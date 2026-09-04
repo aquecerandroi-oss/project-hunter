@@ -1,6 +1,8 @@
 {
   "current": "M0",
-  "status": "not_started",
+  "status": "in_progress",
+  "approved_at": "2026-09-04",
+  "wave": "1 (T01)",
   "plan": "docs/plans/M0.md",
   "updated": "2026-09-04",
   "next_action": "User approves architecture + M0 wave plan; install remaining prerequisites (pnpm, uv, Docker); then execute Wave 1 of docs/plans/M0.md.",
