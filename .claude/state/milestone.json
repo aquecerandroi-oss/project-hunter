@@ -2,7 +2,7 @@
   "current": "M0",
   "status": "in_progress",
   "approved_at": "2026-09-04",
-  "wave": "2 closing — T04, T05, T08, T10 committed; reviews done except T04 cross-review",
+  "wave": "2 closing / 3 partial — T04 cross-review BLOCKED (partition children without RLS/append-only, 5 tables without org_id, seed needs superuser, organizations without RLS, wide grants); T04-fixes in progress (amends 0001 in place, greenfield). T07 dispatched (depends only on T01/T05). T06 waits for T04-fixes + T05-fixes-A.",
   "paused_reason": null,
   "history": "2026-09-04: spend limit hit mid-wave 2 (T05-fixes, T08-fixes, T04 cross-review terminated with 429); limit reset and the three were re-dispatched the same day.",
   "resume_checklist": [
