@@ -21,7 +21,7 @@ from typing import Any
 import pytest
 from svix.webhooks import Webhook
 
-from hunter_api.services.clerk_webhook import (
+from hunter_api.services.webhook_delivery import (
     MAX_BODY_BYTES,
     WebhookNotConfiguredError,
     WebhookSignatureError,

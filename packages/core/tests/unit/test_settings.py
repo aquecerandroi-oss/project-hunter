@@ -39,6 +39,8 @@ def test_rejects_unknown_hunter_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_accepts_staging_as_a_valid_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     """``.env.example`` documents ``development | staging | production``."""
     monkeypatch.setenv("HUNTER_ENV", "staging")
+    _set_required_production_urls(monkeypatch)
+    _set_required_clerk_settings(monkeypatch)
     settings = Settings()
     assert settings.hunter_env == "staging"
 
@@ -67,6 +69,7 @@ def test_production_succeeds_with_urls_present(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("API_URL", "https://api.hunter.example")
     monkeypatch.setenv("NEXT_PUBLIC_API_URL", "https://api.hunter.example")
     monkeypatch.setenv("NEXT_PUBLIC_WS_URL", "wss://api.hunter.example/ws")
+    _set_required_clerk_settings(monkeypatch)
     settings = Settings()
     assert settings.hunter_env == "production"
 
@@ -111,6 +114,7 @@ def test_fails_fast_naming_every_missing_public_url(monkeypatch: pytest.MonkeyPa
 def test_production_succeeds_with_all_urls_set(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HUNTER_ENV", "production")
     _set_required_production_urls(monkeypatch)
+    _set_required_clerk_settings(monkeypatch)
     settings = Settings()
     assert settings.hunter_env == "production"
 
@@ -130,6 +134,7 @@ def test_is_production_and_is_development_properties(monkeypatch: pytest.MonkeyP
     monkeypatch.setenv("HUNTER_ENV", "production")
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@host/db")
     monkeypatch.setenv("REDIS_URL", "redis://host:6379/0")
+    _set_required_clerk_settings(monkeypatch)
     prod = Settings()
     assert prod.is_production is True
     assert prod.is_development is False
@@ -173,3 +178,55 @@ def test_get_settings_is_cached() -> None:
     second = get_settings()
     assert first is second
     get_settings.cache_clear()
+
+
+def _set_required_clerk_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CLERK_ISSUER", "https://clerk.hunter.example")
+    monkeypatch.setenv("CLERK_JWKS_URL", "https://clerk.hunter.example/.well-known/jwks.json")
+    monkeypatch.setenv("CLERK_SECRET_KEY", "sk_FAKE_not_a_real_key")
+    monkeypatch.setenv("CLERK_WEBHOOK_SECRET", "whsec_FAKE_not_a_real_secret")
+
+
+@pytest.mark.parametrize("hunter_env", ["production", "staging"])
+@pytest.mark.parametrize(
+    "missing",
+    ["CLERK_ISSUER", "CLERK_JWKS_URL", "CLERK_SECRET_KEY", "CLERK_WEBHOOK_SECRET"],
+)
+def test_fails_fast_without_the_clerk_credentials(
+    monkeypatch: pytest.MonkeyPatch, hunter_env: str, missing: str
+) -> None:
+    """Each of these has a silent failure mode when empty, which is why the
+    process refuses to start instead: no issuer or JWKS URL and every token is
+    rejected at runtime; no webhook secret and Clerk's user events return 503
+    forever; no secret key and just-in-time provisioning cannot fetch a
+    profile, so a new customer's first request fails.
+    """
+    monkeypatch.setenv("HUNTER_ENV", hunter_env)
+    _set_required_production_urls(monkeypatch)
+    _set_required_clerk_settings(monkeypatch)
+    monkeypatch.setenv(missing, "")
+
+    with pytest.raises(ValidationError, match=missing):
+        Settings()
+
+
+def test_production_succeeds_with_the_clerk_credentials_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HUNTER_ENV", "production")
+    _set_required_production_urls(monkeypatch)
+    _set_required_clerk_settings(monkeypatch)
+
+    settings = Settings()
+
+    assert settings.clerk_issuer == "https://clerk.hunter.example"
+
+
+def test_development_does_not_require_the_clerk_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HUNTER_ENV", "development")
+
+    settings = Settings()
+
+    assert settings.clerk_issuer == ""

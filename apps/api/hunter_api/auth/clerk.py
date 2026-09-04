@@ -3,9 +3,10 @@
 The token flow is: browser holds a Clerk session (httpOnly cookie), Next.js
 reads the session token and calls this API with ``Authorization: Bearer <jwt>``.
 This module is the only place that turns that string into claims. It verifies
-the RS256 signature against Clerk's published JWKS (cached locally, so a
-request costs no network call), plus ``exp``, ``nbf``, ``iss`` and — when the
-token carries one — ``azp``, which must be an origin we serve.
+the RS256 signature against Clerk's published JWKS (cached in
+:mod:`hunter_api.auth.jwks`, so a request costs no network call), plus ``exp``,
+``nbf``, ``iss`` and — when the token carries one — ``azp``, which must be an
+origin we serve.
 
 Nothing here ever logs, echoes or embeds a token: :class:`InvalidTokenError`
 carries a fixed reason, never the input. A bearer token is a live credential,
@@ -18,48 +19,47 @@ the tests). Swapping identity providers is swapping the source, not the API.
 
 from __future__ import annotations
 
-import asyncio
-import time
 from typing import TYPE_CHECKING, Any, Protocol
 
 import httpx
 import jwt
-from fastapi import status
 from pydantic import BaseModel
 
-from hunter_api.errors import HunterError
+from hunter_api.auth.errors import AuthUnavailableError, InvalidTokenError
+from hunter_api.auth.jwks import (
+    DEFAULT_CACHE_TTL_S,
+    DEFAULT_REFRESH_COOLDOWN_S,
+    HttpJwksSource,
+    JwksCache,
+    JwksSource,
+    StaticJwksSource,
+)
 from hunter_core.logging import get_logger
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Sequence
 
     from hunter_api.settings import ApiSettings
 
+__all__ = [
+    "AuthProvider",
+    "AuthUnavailableError",
+    "ClerkAuthProvider",
+    "HttpJwksSource",
+    "InvalidTokenError",
+    "JwksSource",
+    "JwtAuthProvider",
+    "StaticJwksSource",
+    "StaticKeyAuthProvider",
+    "TokenClaims",
+]
+
 logger = get_logger(__name__)
 
-JWKS_TIMEOUT_S = 5.0
-DEFAULT_CACHE_TTL_S = 3600
 LEEWAY_S = 30
 """Clock skew tolerance for ``exp``/``nbf``. Half a minute is enough for two
 machines whose clocks are NTP-disciplined and small enough that an expired
 token is not usefully extended."""
-
-
-class InvalidTokenError(HunterError):
-    """401 for anything wrong with a bearer token — bad signature, expired,
-    wrong issuer, unknown key. The reason is deliberately coarse: telling a
-    caller *which* check failed helps an attacker tune the next attempt more
-    than it helps a legitimate client, which can only do one thing either way
-    (re-authenticate).
-    """
-
-    def __init__(self, detail: str = "The access token is missing or invalid.") -> None:
-        super().__init__(
-            type_slug="invalid-token",
-            title="Unauthorized",
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=detail,
-        )
 
 
 class TokenClaims(BaseModel):
@@ -78,49 +78,8 @@ class AuthProvider(Protocol):
     async def verify(self, token: str) -> TokenClaims: ...
 
 
-class JwksSource(Protocol):
-    """Where a JWKS document comes from."""
-
-    async def fetch(self) -> dict[str, Any]: ...
-
-
-class HttpJwksSource:
-    """Clerk's published JWKS, over HTTPS."""
-
-    def __init__(self, url: str, *, client: httpx.AsyncClient | None = None) -> None:
-        self._url = url
-        self._client = client
-
-    async def fetch(self) -> dict[str, Any]:
-        if self._client is not None:
-            response = await self._client.get(self._url, timeout=JWKS_TIMEOUT_S)
-        else:
-            async with httpx.AsyncClient(timeout=JWKS_TIMEOUT_S) as client:
-                response = await client.get(self._url)
-        response.raise_for_status()
-        document: dict[str, Any] = response.json()
-        return document
-
-
-class StaticJwksSource:
-    """A fixed JWKS document — the tests' signing key, never a real one."""
-
-    def __init__(self, document: dict[str, Any]) -> None:
-        self._document = document
-
-    async def fetch(self) -> dict[str, Any]:
-        return self._document
-
-
 class JwtAuthProvider:
-    """Verifies RS256 tokens against a cached JWKS.
-
-    The cache is keyed by ``kid`` and expires after ``cache_ttl_s``. An unknown
-    ``kid`` triggers **one** refresh (Clerk rotates keys without warning, and a
-    rotation must not sign every user out) and then fails: without that bound,
-    a stream of tokens carrying invented ``kid`` values would turn into a
-    stream of outbound requests, i.e. a free amplification vector.
-    """
+    """Verifies RS256 tokens against a cached JWKS (:class:`JwksCache`)."""
 
     def __init__(
         self,
@@ -129,17 +88,16 @@ class JwtAuthProvider:
         issuer: str,
         allowed_azp: Sequence[str] = (),
         cache_ttl_s: float = DEFAULT_CACHE_TTL_S,
+        jwks_refresh_cooldown_s: float = DEFAULT_REFRESH_COOLDOWN_S,
     ) -> None:
-        self._source = source
         self._issuer = issuer
         self._allowed_azp = frozenset(allowed_azp)
-        self._cache_ttl_s = cache_ttl_s
-        self._keys: dict[str, jwt.PyJWK] = {}
-        self._fetched_at: float | None = None
-        self._lock = asyncio.Lock()
+        self._keys = JwksCache(
+            source, cache_ttl_s=cache_ttl_s, refresh_cooldown_s=jwks_refresh_cooldown_s
+        )
 
     async def verify(self, token: str) -> TokenClaims:
-        key = await self._key_for(_kid_of(token))
+        key = await self._keys.key_for(_kid_of(token))
         try:
             claims: dict[str, Any] = jwt.decode(
                 token,
@@ -167,30 +125,6 @@ class JwtAuthProvider:
             session_id=_optional_str(claims.get("sid")),
         )
 
-    async def _key_for(self, kid: str) -> jwt.PyJWK:
-        async with self._lock:
-            if self._is_stale() or kid not in self._keys:
-                await self._refresh()
-            key = self._keys.get(kid)
-        if key is None:
-            logger.info("token_rejected", reason="unknown_kid")
-            raise InvalidTokenError
-        return key
-
-    def _is_stale(self) -> bool:
-        if self._fetched_at is None:
-            return True
-        return (time.monotonic() - self._fetched_at) >= self._cache_ttl_s
-
-    async def _refresh(self) -> None:
-        try:
-            document = await self._source.fetch()
-        except Exception:
-            logger.warning("jwks_fetch_failed")
-            raise InvalidTokenError("Authentication is temporarily unavailable.") from None
-        self._keys = _parse_jwks(document.get("keys"))
-        self._fetched_at = time.monotonic()
-
 
 class ClerkAuthProvider(JwtAuthProvider):
     """The production provider: Clerk's JWKS URL and issuer, from settings.
@@ -207,6 +141,7 @@ class ClerkAuthProvider(JwtAuthProvider):
             issuer=settings.clerk_issuer,
             allowed_azp=settings.cors_allowed_origins,
             cache_ttl_s=DEFAULT_CACHE_TTL_S,
+            jwks_refresh_cooldown_s=settings.jwks_refresh_cooldown_s,
         )
 
 
@@ -235,25 +170,6 @@ def _kid_of(token: str) -> str:
     if not isinstance(kid, str) or not kid:
         raise InvalidTokenError
     return kid
-
-
-def _parse_jwks(keys: object) -> dict[str, jwt.PyJWK]:
-    if not isinstance(keys, list):
-        return {}
-    parsed: dict[str, jwt.PyJWK] = {}
-    for entry in _dicts(keys):  # pyright: ignore[reportUnknownArgumentType]
-        kid = entry.get("kid")
-        if not isinstance(kid, str):
-            continue
-        try:
-            parsed[kid] = jwt.PyJWK(entry)
-        except jwt.PyJWTError:
-            logger.warning("jwks_entry_unusable", kid=kid)
-    return parsed
-
-
-def _dicts(values: Iterable[object]) -> list[dict[str, Any]]:
-    return [value for value in values if isinstance(value, dict)]
 
 
 def _optional_str(value: object) -> str | None:

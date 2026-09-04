@@ -28,6 +28,7 @@ from hunter_api.services.invitations import (
     revoke_invitation,
 )
 from hunter_core.domain.enums import OrganizationRole
+from hunter_core.domain.types import uuid7
 
 router = APIRouter(prefix="/api/v1/orgs/{org_id}/invitations", tags=["members"])
 accept_router = APIRouter(prefix="/api/v1/invitations", tags=["members"])
@@ -46,6 +47,7 @@ async def create(
     request: Request, context: AdminOrg, session: OrgSession, payload: InvitationCreate
 ) -> InvitationCreated:
     token, token_hash = mint_token()
+    invitation_id = uuid7()
     created = await create_invitation(
         session=session,
         org_id=context.org_id,
@@ -54,7 +56,8 @@ async def create(
         inviter_role=context.role,
         created_by=context.principal.user_id,
         token_hash=token_hash,
-        **audit_kwargs(request, context),
+        invitation_id=invitation_id,
+        **audit_kwargs(request, context, entity_id=invitation_id),
     )
     return InvitationCreated(**created, token=token)
 

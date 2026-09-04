@@ -1,10 +1,12 @@
 """Redis sliding-window rate limiting, per client key.
 
 The key is the authenticated principal id when one is present on
-``request.state`` (set by T06's auth), else the client IP. SECURITY.md §5:
-"token bucket em Redis por usuario e por IP" — implemented here as a sliding
-window over a Redis sorted set (``ZADD``/``ZREMRANGEBYSCORE``/``ZCARD``),
-which is simple, exact, and needs no Lua script.
+``request.state`` (set by T06's auth), else the client IP — plus, on the Clerk
+webhook, a second bucket for the ``svix-id`` (see :func:`_client_keys`).
+SECURITY.md §5: "token bucket em Redis por usuario e por IP" — implemented here
+as a sliding window over a Redis sorted set
+(``ZADD``/``ZREMRANGEBYSCORE``/``ZCARD``), which is simple, exact, and needs no
+Lua script.
 
 Fails open (allows the request, logs a warning at most once per
 ``WARNING_LOG_INTERVAL_S``) if Redis is unreachable: ARCHITECTURE.md's
@@ -36,6 +38,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from hunter_api.errors import CONTENT_TYPE, PROBLEM_BASE
+from hunter_core.domain.types import uuid7
 from hunter_core.logging import get_logger
 
 if TYPE_CHECKING:
@@ -71,15 +74,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         redis_client: RateLimitRedis | None = getattr(request.app.state, "redis", None)
-        client_key = _client_key(request)
+        client_keys = _client_keys(request)
         allowed = True
         if redis_client is not None:
             try:
                 allowed = await _under_limit(
-                    redis_client, client_key, self._settings.rate_limit_per_minute
+                    redis_client, client_keys, self._settings.rate_limit_per_minute
                 )
             except Exception:
-                self._log_fail_open(client_key)
+                self._log_fail_open(client_keys[0])
                 allowed = True
 
         if not allowed:
@@ -99,22 +102,48 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         logger.warning("rate_limit_redis_unavailable", client_key=client_key)
 
 
-def _client_key(request: Request) -> str:
+def _client_keys(request: Request) -> list[str]:
+    """Every bucket this request counts against — all of them must be under
+    the limit for it to pass.
+
+    An authenticated caller is one bucket: the principal. The Clerk webhook is
+    two, and that is the whole point. ``svix-id`` alone is a bucket the sender
+    picks, so a fresh id per request is a fresh empty bucket; the client
+    address alone puts every customer's deliveries in one bucket, because they
+    all arrive from Svix. Counting both bounds a retry storm for one delivery
+    *and* a flood from one source.
+    """
     principal_id = getattr(request.state, "principal_id", None)
     if principal_id:
-        return f"hunter:rl:principal:{principal_id}"
+        return [f"hunter:rl:principal:{principal_id}"]
     client = request.client
     ip = client.host if client is not None else "unknown"
-    return f"hunter:rl:ip:{ip}"
+    keys = [f"hunter:rl:ip:{ip}"]
+    delivery_key = getattr(request.state, "delivery_key", None)
+    if delivery_key:
+        keys.append(f"hunter:rl:delivery:{delivery_key}")
+    return keys
 
 
-async def _under_limit(redis_client: RateLimitRedis, key: str, limit: int) -> bool:
+async def _under_limit(redis_client: RateLimitRedis, keys: list[str], limit: int) -> bool:
+    results = [await _window_count(redis_client, key) <= limit for key in keys]
+    return all(results)
+
+
+async def _window_count(redis_client: RateLimitRedis, key: str) -> int:
+    """Add this request to ``key``'s window and return the window's size.
+
+    The member is ``<timestamp>:<uuid7>``, never the timestamp alone: a sorted
+    set collapses equal members, so two requests landing on the same
+    ``time.time()`` value would be stored once and counted once — and on a
+    coarse clock (Windows ticks at ~15 ms) that is most of a burst.
+    """
     now = time.time()
     await redis_client.zremrangebyscore(key, 0, now - WINDOW_SECONDS)
-    await redis_client.zadd(key, {str(now): now})
+    await redis_client.zadd(key, {f"{now}:{uuid7()}": now})
     count = await redis_client.zcard(key)
     await redis_client.expire(key, WINDOW_SECONDS)
-    return count <= limit
+    return count
 
 
 def _too_many_requests(request: Request) -> JSONResponse:

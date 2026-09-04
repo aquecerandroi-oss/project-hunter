@@ -64,10 +64,19 @@ class UnknownExchangeError(HunterError):
 
 @audited("workspace.created", "workspace")
 async def create_workspace(
-    *, session: AsyncSession, org_id: uuid.UUID, payload: WorkspaceCreate, **_audit: Any
+    *,
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    payload: WorkspaceCreate,
+    workspace_id: uuid.UUID,
+    **_audit: Any,
 ) -> dict[str, Any]:
+    """``workspace_id`` is minted by the caller so the audit row can name the
+    workspace it created — ``@audited`` reads ``entity_id`` from the keyword
+    arguments, which are fixed before this function runs.
+    """
     workspace = await WorkspaceRepository(session, org_id).create(
-        name=payload.name, objective=payload.objective
+        name=payload.name, objective=payload.objective, workspace_id=workspace_id
     )
     return {"id": str(workspace.id), "name": workspace.name, "objective": workspace.objective.value}
 

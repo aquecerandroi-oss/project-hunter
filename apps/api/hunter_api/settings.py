@@ -27,6 +27,21 @@ class ApiSettings(Settings):
     ready_check_timeout_s: float = 3.0
     forwarded_allow_ips: str = "127.0.0.1"
     metrics_token: SecretStr | None = None
+    jwks_refresh_cooldown_s: float = 60.0
+    """Minimum gap between two JWKS refetches triggered by an unknown ``kid``,
+    and how long that ``kid`` is remembered as unknown. ``kid`` arrives from an
+    unauthenticated caller, so this is what keeps a flood of invented ones from
+    becoming a flood of requests to Clerk."""
+
+    max_request_body_bytes: int = 1024 * 1024
+    """Hard cap on ``Content-Length`` for ``/api/*``. Checked before the body is
+    read, so an oversized upload costs a header parse, not a megabyte of RAM."""
+
+    ws_revalidate_interval_s: float = 60.0
+    """How often a live WebSocket re-checks that its principal is still a member
+    of the organizations it is subscribed to. A socket outlives the request that
+    authorized it; without this, removing someone from an organization leaves
+    their open socket receiving that organization's data."""
 
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod

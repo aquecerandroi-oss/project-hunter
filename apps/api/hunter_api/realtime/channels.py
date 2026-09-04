@@ -34,8 +34,16 @@ MAX_CHANNEL_LENGTH = 200
 MAX_CHANNELS_PER_CONNECTION = 50
 
 _PUBLIC_EXACT = frozenset({RADAR_CHANNEL, SYSTEM_CHANNEL})
-_MARKET_RE = re.compile(r"^rt:market:[a-z0-9_-]{1,32}:[A-Za-z0-9._-]{1,32}$")
-_ORG_RE = re.compile(r"^rt:org:([0-9a-fA-F-]{36}):[a-z0-9:_-]{1,64}$")
+_MARKET_RE = re.compile(r"\Art:market:[a-z0-9_-]{1,32}:[A-Za-z0-9._-]{1,32}\Z")
+_ORG_RE = re.compile(r"\Art:org:([0-9a-f-]{36}):[a-z0-9:_-]{1,64}\Z")
+"""``\\A``/``\\Z``, never ``^``/``$``: ``$`` also matches *before* a trailing
+newline, so ``rt:market:binance:BTC\\n`` would pass the grammar and then be
+sent to Redis with the newline still in it — validating one name and
+subscribing to another. Lower-case hex only, for the same class of reason:
+``uuid.UUID`` accepts either case, so an upper-case spelling would authorize
+against the right organization and subscribe to a channel name no publisher
+ever writes."""
+
 _WILDCARD_CHARS = frozenset("*?[]")
 
 PRICE_CLASS = "prices"

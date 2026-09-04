@@ -38,7 +38,6 @@ __all__ = [
     "audit_kwargs",
     "get_redis",
     "get_request_id",
-    "get_session",
     "get_session_factory",
     "get_settings",
     "org_session",
@@ -55,17 +54,6 @@ def get_settings(request: Request) -> ApiSettings:
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
     factory: async_sessionmaker[AsyncSession] = request.app.state.session_factory
     return factory
-
-
-async def get_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
-    """A plain session, with no role downgrade and no RLS settings.
-
-    Reaches only what is visible without a tenant context. Tenant work uses
-    :func:`org_session`; anything user-scoped uses :func:`principal_session`.
-    """
-    session_factory = get_session_factory(request)
-    async with session_factory() as session:
-        yield session
 
 
 async def principal_session(
@@ -94,8 +82,18 @@ async def org_session(request: Request, context: CurrentOrg) -> AsyncGenerator[A
             yield session
 
 
-OrgSession = Annotated["AsyncSession", Depends(org_session)]
-PrincipalSession = Annotated["AsyncSession", Depends(principal_session)]
+OrgSession = Annotated["AsyncSession", Depends(org_session, scope="function")]
+PrincipalSession = Annotated["AsyncSession", Depends(principal_session, scope="function")]
+"""``scope="function"``: the transaction closes — and therefore **commits** —
+while the handler's response is still being assembled, not after it has been
+sent.
+
+FastAPI's default (``scope="request"``) tears dependencies down after
+``await response(...)``. A commit that fails there fails *after* the client
+has already read ``201 Created``, and the only trace is a stack trace in the
+logs: the caller believes a workspace exists that was rolled back. With
+``"function"`` the same failure propagates before a byte is written, so it
+becomes the 500 problem+json it always was."""
 
 
 def get_redis(request: Request) -> redis_asyncio.Redis:

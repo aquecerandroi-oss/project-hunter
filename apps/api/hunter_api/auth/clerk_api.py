@@ -12,7 +12,9 @@ body (SECURITY.md §4).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Protocol, cast
+from urllib.parse import quote
 
 import httpx
 from pydantic import BaseModel
@@ -20,14 +22,14 @@ from pydantic import BaseModel
 from hunter_core.logging import get_logger
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from hunter_api.settings import ApiSettings
 
 logger = get_logger(__name__)
 
 CLERK_API_BASE = "https://api.clerk.com/v1"
 REQUEST_TIMEOUT_S = 5.0
+VERIFIED_STATUS = "verified"
+"""The only ``email_addresses[].verification.status`` we accept."""
 
 
 class UserProfile(BaseModel):
@@ -57,7 +59,10 @@ class ClerkBackendApi:
         if not secret:
             logger.warning("clerk_secret_key_unset")
             return None
-        url = f"{CLERK_API_BASE}/users/{external_auth_id}"
+        # the id comes from a token's ``sub``: percent-encoded so it stays one
+        # path segment and cannot address a different Clerk endpoint with our
+        # secret key attached
+        url = f"{CLERK_API_BASE}/users/{quote(external_auth_id, safe='')}"
         headers = {"Authorization": f"Bearer {secret}"}
         try:
             payload = await self._get(url, headers)
@@ -99,9 +104,11 @@ def profile_from_clerk_user(payload: Mapping[str, Any]) -> UserProfile | None:
     """Map a Clerk ``User`` object onto :class:`UserProfile`.
 
     Shared with the webhook, whose ``user.created``/``user.updated`` payloads
-    carry the same object. The primary address is the one Clerk marks as such;
-    when it names none, the first address is used rather than dropping the user
-    on the floor (``users.email`` is ``NOT NULL``).
+    carry the same object. ``email`` is ``None`` unless Clerk names a primary
+    address *and* reports it verified — callers decide what to do with that
+    (JIT provisioning fails closed with a 503, the webhook acknowledges and
+    records an audit row), because ``users.email`` is ``NOT NULL`` and is what
+    invitations are matched against.
     """
     external_auth_id = payload.get("id")
     if not isinstance(external_auth_id, str) or not external_auth_id:
@@ -115,14 +122,32 @@ def profile_from_clerk_user(payload: Mapping[str, Any]) -> UserProfile | None:
 
 
 def _primary_email(payload: Mapping[str, Any]) -> str | None:
-    addresses = _addresses(payload.get("email_addresses"))
-    if not addresses:
-        return None
+    """The primary address, and only if Clerk has verified it.
+
+    Both halves are load-bearing. ``users.email`` is what
+    ``accept_invitation`` matches an invitation against, so an *unverified*
+    address is an address anyone can type: claim ``owner@customer.test`` on a
+    throwaway Clerk account, never confirm it, and the pending invitation to
+    that organization becomes acceptable. And the *primary* is Clerk's own
+    answer to "which one is this person" — falling back to the first address
+    in the list would let the caller choose it by adding one.
+    """
     primary_id = payload.get("primary_email_address_id")
-    for address in addresses:
-        if primary_id is not None and address.get("id") == primary_id:
-            return _optional_str(address.get("email_address"))
-    return _optional_str(addresses[0].get("email_address"))
+    if not isinstance(primary_id, str) or not primary_id:
+        return None
+    for address in _addresses(payload.get("email_addresses")):
+        if address.get("id") != primary_id:
+            continue
+        return _optional_str(address.get("email_address")) if _is_verified(address) else None
+    return None
+
+
+def _is_verified(address: Mapping[str, Any]) -> bool:
+    verification = address.get("verification")
+    if not isinstance(verification, Mapping):
+        return False
+    status_value = cast("Mapping[str, Any]", verification).get("status")
+    return status_value == VERIFIED_STATUS
 
 
 def _addresses(value: object) -> list[dict[str, Any]]:

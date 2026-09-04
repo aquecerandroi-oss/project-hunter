@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import func, select
 from svix.webhooks import Webhook
 
+from hunter_api.services import clerk_webhook
 from hunter_core.db.models.identity import OrganizationMember, User
 from hunter_core.db.models.system import AuditLog, ProcessedEvent
 from hunter_core.db.session import role_session, tenant_session
@@ -36,10 +37,18 @@ pytestmark = pytest.mark.integration
 WEBHOOK_URL = "/api/webhooks/clerk"
 
 
-def _clerk_user(subject: str, email: str, **extra: Any) -> dict[str, Any]:
+def _clerk_user(
+    subject: str, email: str, *, verification: str = "verified", **extra: Any
+) -> dict[str, Any]:
     return {
         "id": subject,
-        "email_addresses": [{"id": "idn_FAKE_1", "email_address": email}],
+        "email_addresses": [
+            {
+                "id": "idn_FAKE_1",
+                "email_address": email,
+                "verification": {"status": verification},
+            }
+        ],
         "primary_email_address_id": "idn_FAKE_1",
         "first_name": "Web",
         "last_name": "Hook",
@@ -308,3 +317,138 @@ async def test_tenant_session_still_cannot_see_another_orgs_audit(
         orgs = (await session.execute(select(AuditLog.organization_id).distinct())).scalars().all()
 
     assert set(orgs) == {owner.org_id}
+
+
+async def test_an_unverified_primary_email_is_acknowledged_and_recorded(
+    client: httpx.AsyncClient, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """Svix retries anything that is not 2xx, so refusing this payload with an
+    error would be an infinite redelivery loop. It is acknowledged and *not*
+    mirrored: ``users.email`` is what invitations are matched against, so an
+    address Clerk has not verified must never land there. The audit row is what
+    makes the refusal visible afterwards.
+    """
+    subject = f"user_FAKE_unver_{uuid.uuid4().hex[:8]}"
+
+    response = await _post(
+        client,
+        {
+            "type": "user.created",
+            "data": _clerk_user(subject, f"{subject}@example.test", verification="unverified"),
+        },
+        f"msg_FAKE_{uuid.uuid4().hex[:8]}",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ignored", "reason": "no_verified_email"}
+    async with role_session(session_factory, db_role="hunter_worker") as session:
+        mirrored = await session.scalar(
+            select(func.count()).select_from(User).where(User.external_auth_id == subject)
+        )
+        recorded = (
+            (
+                await session.execute(
+                    select(AuditLog).where(
+                        AuditLog.action == "user.email_unverified",
+                        AuditLog.after["external_auth_id"].astext == subject,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert mirrored == 0
+    assert len(recorded) == 1
+    assert recorded[0].organization_id is None
+
+
+async def test_a_delivery_that_fails_midway_is_retried_and_completes(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The ``svix-id`` claim has to be reversible, or a partial failure is
+    permanent.
+
+    ``user.deleted`` revokes one organization per transaction. If the second
+    one fails, the first is already committed and Svix retries — and with an
+    unconditional claim that retry answers "duplicate", leaving organizations B
+    and C with an active membership for an account Clerk has deleted. Releasing
+    the claim on the way out is what makes the retry do the remaining work.
+    """
+    unique = uuid.uuid4().hex[:8]
+    actor = make_actor(f"multi-{unique}")
+    org_ids: list[uuid.UUID] = []
+    for index in range(3):
+        await create_org(client, actor, f"Multi {unique} {index}")
+        assert actor.org_id is not None
+        org_ids.append(actor.org_id)
+
+    calls = {"n": 0}
+    original = clerk_webhook.record_audit
+
+    async def _fail_on_the_second_org(*args: Any, **kwargs: Any) -> None:
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("audit sink exploded")
+        await original(*args, **kwargs)
+
+    monkeypatch.setattr(clerk_webhook, "record_audit", _fail_on_the_second_org)
+
+    delivery_id = f"msg_FAKE_{uuid.uuid4().hex[:8]}"
+    payload = {"type": "user.deleted", "data": {"id": actor.subject, "deleted": True}}
+    failed = await _post(client, payload, delivery_id)
+
+    assert failed.status_code == 500
+    monkeypatch.setattr(clerk_webhook, "record_audit", original)
+
+    retried = await _post(client, payload, delivery_id)
+
+    assert retried.status_code == 200
+    assert retried.json() == {"status": "applied", "type": "user.deleted"}, (
+        "the retry must re-run the work, not report the failed delivery as a duplicate"
+    )
+    async with role_session(session_factory, db_role="hunter_worker") as session:
+        statuses = (
+            (
+                await session.execute(
+                    select(OrganizationMember.status).where(
+                        OrganizationMember.user_id == actor.user_id,
+                        OrganizationMember.organization_id.in_(org_ids),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert list(statuses) == [MemberStatus.SUSPENDED] * 3
+
+
+async def test_a_failed_delivery_leaves_no_claim_behind(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    subject = f"user_FAKE_boom_{uuid.uuid4().hex[:8]}"
+    delivery_id = f"msg_FAKE_{uuid.uuid4().hex[:8]}"
+
+    async def _explode(*_args: Any, **_kwargs: Any) -> dict[str, str]:
+        raise RuntimeError("mirror exploded")
+
+    monkeypatch.setattr(clerk_webhook, "_upsert_user", _explode)
+
+    response = await _post(
+        client,
+        {"type": "user.created", "data": _clerk_user(subject, f"{subject}@example.test")},
+        delivery_id,
+    )
+
+    assert response.status_code == 500
+    async with role_session(session_factory, db_role="hunter_worker") as session:
+        claimed = await session.scalar(
+            select(func.count())
+            .select_from(ProcessedEvent)
+            .where(ProcessedEvent.event_id == delivery_id)
+        )
+    assert claimed == 0, "a delivery that did not take effect must not stay claimed"

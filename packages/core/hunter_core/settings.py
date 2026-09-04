@@ -102,18 +102,33 @@ class Settings(BaseSettings):
     health_port: int = 8001
 
     @model_validator(mode="after")
-    def _require_urls_in_prod(self) -> Settings:
+    def _require_settings_in_prod(self) -> Settings:
+        """Refuse to start a deployed process with an empty required setting.
+
+        Every one of these fails *silently and later* when unset, at the worst
+        possible moment: no ``CLERK_ISSUER`` or ``CLERK_JWKS_URL`` and every
+        token is rejected once real users arrive; no ``CLERK_WEBHOOK_SECRET``
+        and Clerk's deliveries get 503 until they stop retrying, so the local
+        mirror silently drifts; no ``CLERK_SECRET_KEY`` and just-in-time
+        provisioning cannot fetch a profile, so a new customer's very first
+        request fails. Failing at construction turns all of them into a
+        deployment that does not roll out.
+        """
         if self.hunter_env not in ("production", "staging"):
             return self
         secret_checks: list[tuple[str, SecretStr | None]] = [
             ("DATABASE_URL", self.database_url),
             ("REDIS_URL", self.redis_url),
+            ("CLERK_SECRET_KEY", self.clerk_secret_key),
+            ("CLERK_WEBHOOK_SECRET", self.clerk_webhook_secret),
+            ("CLERK_JWKS_URL", self.clerk_jwks_url),
         ]
         plain_checks: list[tuple[str, str]] = [
             ("WEB_ORIGIN", self.web_origin),
             ("API_URL", self.api_url),
             ("NEXT_PUBLIC_API_URL", self.next_public_api_url),
             ("NEXT_PUBLIC_WS_URL", self.next_public_ws_url),
+            ("CLERK_ISSUER", self.clerk_issuer),
         ]
         missing = [
             name for name, value in secret_checks if value is None or not value.get_secret_value()

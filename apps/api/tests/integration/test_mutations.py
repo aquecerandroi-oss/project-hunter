@@ -10,12 +10,14 @@ evidence of how many times something happened.
 from __future__ import annotations
 
 import uuid
+from contextlib import asynccontextmanager
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from sqlalchemy import func, select
 
+from hunter_api import deps
 from hunter_core.db.models.identity import Workspace
 from hunter_core.db.models.system import AuditLog
 from hunter_core.db.session import tenant_session
@@ -24,7 +26,7 @@ from hunter_core.domain.enums import MemberStatus, OrganizationRole
 from .conftest import Actor, create_org
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import AsyncGenerator, Callable
 
     import httpx
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -318,3 +320,131 @@ async def _join(
     joiner.user_id = uuid.UUID(me["user"]["id"])
     joiner.org_id = owner.org_id
     return joiner
+
+
+async def test_a_failure_closing_the_tenant_transaction_is_a_500_not_a_201(
+    client: httpx.AsyncClient,
+    owner: Actor,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The commit has to happen before the response does.
+
+    FastAPI's default is to tear a ``yield`` dependency down *after* the
+    response is sent, which puts the tenant transaction's commit after the
+    client has already read ``201 Created``. A commit that fails there — a
+    lost connection, a deferred constraint, a pooler eviction — leaves the
+    caller believing in a workspace that was rolled back, and the only record
+    of the disagreement is a stack trace nobody is reading. ``scope="function"``
+    is what moves the commit back in front of the response.
+    """
+
+    @asynccontextmanager
+    async def _failing_tenant_session(
+        factory: async_sessionmaker[AsyncSession],
+        org_id: uuid.UUID,
+        user_id: uuid.UUID | None = None,
+    ) -> AsyncGenerator[AsyncSession]:
+        async with tenant_session(factory, org_id, user_id) as session:
+            yield session
+            await session.rollback()
+            raise RuntimeError("commit failed")
+
+    monkeypatch.setattr(deps, "tenant_session", _failing_tenant_session)
+
+    response = await client.post(
+        f"/api/v1/orgs/{owner.org_id}/workspaces",
+        json={"name": "Never Committed"},
+        headers=owner.headers,
+    )
+
+    assert response.status_code == 500, response.text
+    assert response.headers["content-type"].startswith("application/problem+json")
+
+    monkeypatch.undo()
+    listed = await client.get(f"/api/v1/orgs/{owner.org_id}/workspaces", headers=owner.headers)
+    assert all(item["name"] != "Never Committed" for item in listed.json()["items"]), (
+        "the 500 must mean nothing was written"
+    )
+
+
+@pytest.mark.parametrize(
+    ("action", "method", "suffix", "body"),
+    [
+        ("organization.updated", "PATCH", "", {"name": "Entity Renamed"}),
+        ("workspace.created", "POST", "/workspaces", {"name": "Entity Workspace"}),
+        (
+            "invitation.created",
+            "POST",
+            "/invitations",
+            {"email": "entity@example.test", "role": "ANALYST"},
+        ),
+    ],
+)
+async def test_every_mutating_endpoint_records_the_entity_it_changed(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    owner: Actor,
+    action: str,
+    method: str,
+    suffix: str,
+    body: dict[str, Any],
+) -> None:
+    """An audit row without ``entity_id`` says something happened to something.
+
+    ``audit_logs`` is queried by entity when a customer asks "who changed this
+    workspace" or an incident asks "what touched this invitation"; a NULL there
+    makes the row unfindable by the only key that matters.
+    """
+    response = await client.request(
+        method, f"/api/v1/orgs/{owner.org_id}{suffix}", json=body, headers=owner.headers
+    )
+    assert response.status_code in (200, 201), response.text
+
+    row = await _audit_row(session_factory, owner, action)
+
+    assert row.entity_id is not None, f"{action} must name the row it changed"
+
+
+async def test_revoking_an_invitation_records_what_was_revoked(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    owner: Actor,
+) -> None:
+    """``before`` is the only place a revoked invitation survives: the row is
+    deleted, so without it the trail says an invitation was revoked and cannot
+    say to whom or at what role.
+    """
+    created = await client.post(
+        f"/api/v1/orgs/{owner.org_id}/invitations",
+        json={"email": "revoked@example.test", "role": "VIEWER"},
+        headers=owner.headers,
+    )
+    invitation_id = created.json()["id"]
+
+    deleted = await client.delete(
+        f"/api/v1/orgs/{owner.org_id}/invitations/{invitation_id}", headers=owner.headers
+    )
+
+    assert deleted.status_code == 204
+    row = await _audit_row(session_factory, owner, "invitation.revoked")
+    assert row.entity_id == uuid.UUID(invitation_id)
+    assert row.before is not None
+    assert row.before["email"] == "revoked@example.test"
+    assert row.before["role"] == "VIEWER"
+
+
+async def test_reading_one_workspace_is_open_to_a_viewer(
+    client: httpx.AsyncClient, owner: Actor, make_actor: Callable[[str], Actor]
+) -> None:
+    """Listing workspaces is VIEWER; reading one was ADMIN. A dashboard that
+    can see a workspace in a list and 403s on opening it is a broken product,
+    and there is nothing in the row a member of the organization may not see.
+    """
+    viewer = await _join(client, owner, make_actor, OrganizationRole.VIEWER)
+
+    response = await client.get(
+        f"/api/v1/orgs/{owner.org_id}/workspaces/{owner.workspace_id}", headers=viewer.headers
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == str(owner.workspace_id)

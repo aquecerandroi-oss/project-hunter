@@ -55,6 +55,9 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 MIGRATIONS_DIR = REPO_ROOT / "infra" / "migrations"
 SCRIPTS_DIR = REPO_ROOT / "infra" / "scripts"
 API_DB = "hunter_api_it"
+WEB_ORIGIN = "http://web.test"
+"""This suite's single allowed origin: the CORS allowlist, and therefore the
+only ``azp`` the auth provider accepts."""
 
 FAKE_WEBHOOK_SECRET = "whsec_" + base64.b64encode(b"FAKE-webhook-secret-000").decode()
 """A Svix-shaped secret generated for this suite. Not a Clerk credential; the
@@ -144,8 +147,8 @@ def api_settings(api_database_url: str, redis_url: str) -> ApiSettings:
         database_url=SecretStr(api_database_url),
         database_url_migrations=SecretStr(api_database_url),
         redis_url=SecretStr(redis_url),
-        web_origin="http://web.test",
-        cors_allowed_origins=["http://web.test"],
+        web_origin=WEB_ORIGIN,
+        cors_allowed_origins=[WEB_ORIGIN],
         clerk_issuer=FAKE_ISSUER,
         clerk_webhook_secret=SecretStr(FAKE_WEBHOOK_SECRET),
         rate_limit_per_minute=100000,
@@ -164,7 +167,11 @@ def app(
     """
     application = create_app(api_settings)
     application.state.auth_provider = StaticKeyAuthProvider(
-        jwks_for(signing_key), issuer=FAKE_ISSUER
+        jwks_for(signing_key),
+        issuer=FAKE_ISSUER,
+        # the same allowlist production builds the provider with, so the suite
+        # exercises the azp check instead of skipping past it
+        allowed_azp=api_settings.cors_allowed_origins,
     )
     application.state.profiles = profiles
     return application
@@ -194,12 +201,20 @@ async def session_factory(
     return factory
 
 
-def token_for(signing_key: rsa.RSAPrivateKey, subject: str) -> str:
-    return sign(signing_key, subject=subject, azp=None)
+def token_for(signing_key: rsa.RSAPrivateKey, subject: str, *, azp: str | None = WEB_ORIGIN) -> str:
+    """A token shaped like the ones the web app sends.
+
+    ``azp`` is the origin Clerk minted the token for, and it defaults to this
+    suite's own origin so every request here goes through the check a real one
+    does. Pass a different value to prove the check bites.
+    """
+    return sign(signing_key, subject=subject, azp=azp)
 
 
-def auth_header(signing_key: rsa.RSAPrivateKey, subject: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token_for(signing_key, subject)}"}
+def auth_header(
+    signing_key: rsa.RSAPrivateKey, subject: str, *, azp: str | None = WEB_ORIGIN
+) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token_for(signing_key, subject, azp=azp)}"}
 
 
 class Actor:

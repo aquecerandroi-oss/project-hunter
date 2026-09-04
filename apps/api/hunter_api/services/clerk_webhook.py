@@ -1,18 +1,9 @@
-"""The Clerk webhook: signature verification, idempotency, and the mirror.
+"""The Clerk webhook: what each event does to the local mirror.
 
-Clerk delivers through Svix, so every request is signed (``svix-signature``
-over ``svix-id.svix-timestamp.body``) and every delivery is identified
-(``svix-id``). Both matter:
-
-- **Signature.** The endpoint is public by necessity. Without verification,
-  anyone who learns the URL can create a user row with any email — and email
-  is what an invitation is matched against, so a forged ``user.created`` is a
-  path into somebody else's organization. The raw body is verified *before*
-  it is parsed, because the signature covers bytes, not a re-serialization.
-- **Idempotency.** Svix retries with the same ``svix-id`` until it gets a 2xx.
-  Delivery is at-least-once, so the handler must be exactly-once in effect;
-  ``processed_events`` (DATABASE.md §12) is the durable guard, chosen over a
-  Redis SET because losing Redis must not turn into replaying webhooks.
+Authentication and de-duplication of a delivery live one module over
+(:mod:`hunter_api.services.webhook_delivery`): the signature is verified before
+the body is parsed, and the ``svix-id`` is claimed — reversibly — before any
+effect is applied. This module is what happens *after* both of those pass.
 
 **Which role does what.** The handler acts for no organization and no
 signed-in person, so it starts by *reading* across every tenant as
@@ -28,20 +19,20 @@ owns and ``hunter_app`` may only read.
 
 from __future__ import annotations
 
-import json
 import uuid
 from typing import TYPE_CHECKING, Any, cast
 
-from fastapi import status
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
-from svix.webhooks import Webhook, WebhookVerificationError
 
 from hunter_api.auth.clerk_api import profile_from_clerk_user
-from hunter_api.errors import HunterError
 from hunter_api.services.audit import record as record_audit
+from hunter_api.services.webhook_delivery import (
+    CONSUMER,
+    claim_delivery,
+    release_delivery,
+)
 from hunter_core.db.models.identity import OrganizationMember, User
-from hunter_core.db.models.system import ProcessedEvent
 from hunter_core.db.session import bootstrap_session, role_session, tenant_session
 from hunter_core.domain.enums import MemberStatus
 from hunter_core.domain.types import utcnow, uuid7
@@ -54,55 +45,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-CONSUMER = "clerk-webhook"
-SVIX_HEADERS = ("svix-id", "svix-timestamp", "svix-signature")
 HANDLED_TYPES = frozenset({"user.created", "user.updated", "user.deleted"})
-MAX_BODY_BYTES = 256 * 1024
-
-
-class WebhookSignatureError(HunterError):
-    def __init__(self) -> None:
-        super().__init__(
-            type_slug="invalid-webhook-signature",
-            title="Unauthorized",
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="The webhook signature could not be verified.",
-        )
-
-
-class WebhookNotConfiguredError(HunterError):
-    def __init__(self) -> None:
-        super().__init__(
-            type_slug="webhook-not-configured",
-            title="Service Unavailable",
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Webhook delivery is not configured on this deployment.",
-        )
-
-
-def verify_signature(secret: str, body: bytes, headers: Mapping[str, str]) -> dict[str, Any]:
-    """Verify and parse. Raises before any parsing when verification fails.
-
-    An unconfigured secret is a 503, never a bypass: "no secret, so accept
-    everything" is the shape of the classic webhook forgery bug.
-    """
-    if not secret:
-        raise WebhookNotConfiguredError
-    if len(body) > MAX_BODY_BYTES:
-        raise WebhookSignatureError
-    svix_headers = {name: headers.get(name, "") for name in SVIX_HEADERS}
-    if not all(svix_headers.values()):
-        raise WebhookSignatureError
-    try:
-        Webhook(secret).verify(body, svix_headers)
-    except WebhookVerificationError:
-        logger.warning("webhook_signature_rejected", delivery_id=svix_headers["svix-id"])
-        raise WebhookSignatureError from None
-    try:
-        payload: object = json.loads(body)
-    except ValueError:
-        raise WebhookSignatureError from None
-    return cast("dict[str, Any]", payload) if isinstance(payload, dict) else {}
 
 
 async def handle_event(
@@ -117,35 +60,18 @@ async def handle_event(
     data = payload.get("data")
     if not isinstance(event_type, str) or not isinstance(data, dict):
         return {"status": "ignored", "reason": "malformed"}
-    if not await _claim_delivery(session_factory, delivery_id):
+    if not await claim_delivery(session_factory, delivery_id):
         return {"status": "duplicate", "type": event_type}
-    if event_type not in HANDLED_TYPES:
-        return {"status": "ignored", "type": event_type}
-    profile_data = cast("dict[str, Any]", data)
-    if event_type == "user.deleted":
-        return await _revoke_user(session_factory, profile_data, audit)
-    return await _upsert_user(session_factory, event_type, profile_data, audit)
-
-
-async def _claim_delivery(
-    session_factory: async_sessionmaker[AsyncSession], delivery_id: str
-) -> bool:
-    """Insert the delivery id; ``False`` when it was already there.
-
-    Claimed in its own transaction and *before* the effect, so two concurrent
-    retries of the same delivery cannot both proceed — the second one's insert
-    finds the row and it returns early.
-    """
-    async with role_session(session_factory, db_role="hunter_worker") as session:
-        claimed = (
-            await session.execute(
-                insert(ProcessedEvent)
-                .values(consumer=CONSUMER, event_id=delivery_id)
-                .on_conflict_do_nothing(index_elements=["consumer", "event_id"])
-                .returning(ProcessedEvent.event_id)
-            )
-        ).first()
-    return claimed is not None
+    try:
+        if event_type not in HANDLED_TYPES:
+            return {"status": "ignored", "type": event_type}
+        profile_data = cast("dict[str, Any]", data)
+        if event_type == "user.deleted":
+            return await _revoke_user(session_factory, profile_data, audit)
+        return await _upsert_user(session_factory, event_type, profile_data, audit)
+    except Exception:
+        await release_delivery(session_factory, delivery_id)
+        raise
 
 
 async def _find_user(
@@ -179,8 +105,15 @@ async def _upsert_user(
     its grants cover market data and system tables, never ``users``.
     """
     profile = profile_from_clerk_user(data)
-    if profile is None or not profile.email:
-        return {"status": "ignored", "reason": "no_email"}
+    if profile is None:
+        return {"status": "ignored", "reason": "malformed"}
+    if not profile.email:
+        # Clerk names no verified primary address. Acknowledged (a non-2xx is
+        # an infinite Svix retry loop) but never mirrored: ``users.email`` is
+        # what invitations are matched against, so an unverified address here
+        # is a way into somebody else's organization
+        await _record_unverified(session_factory, profile.external_auth_id, audit)
+        return {"status": "ignored", "reason": "no_verified_email"}
     user_id = await _find_user(session_factory, profile.external_auth_id) or uuid7()
     async with bootstrap_session(session_factory, user_id=user_id) as session:
         await session.execute(
@@ -214,6 +147,29 @@ async def _upsert_user(
     return {"status": "applied", "type": event_type}
 
 
+async def _record_unverified(
+    session_factory: async_sessionmaker[AsyncSession],
+    external_auth_id: str,
+    audit: dict[str, Any],
+) -> None:
+    """A system-scope row saying we refused to mirror this account.
+
+    No organization and no ``users`` row exist for it, so this runs as
+    ``hunter_app`` with neither setting: the ``audit_system_scope`` policy
+    (DATABASE.md §15.4) accepts an insert whose ``organization_id`` is NULL,
+    and that is the only row being written.
+    """
+    logger.info("webhook_user_without_verified_email", external_auth_id=external_auth_id)
+    async with role_session(session_factory, db_role="hunter_app") as session:
+        await record_audit(
+            session,
+            "user.email_unverified",
+            "user",
+            audit,
+            after={"external_auth_id": external_auth_id, "reason": "no_verified_email"},
+        )
+
+
 async def _revoke_user(
     session_factory: async_sessionmaker[AsyncSession],
     data: Mapping[str, Any],
@@ -232,8 +188,10 @@ async def _revoke_user(
     filtered by ``app.current_org`` and a transaction has exactly one. Each
     one carries its own audit row, so the organization's admins see the
     revocation in their own trail; a final system-scope row records the event
-    itself. The whole handler is idempotent (the ``svix-id`` is claimed first),
-    so a retry after a partial failure completes the rest.
+    itself. Every step is idempotent (the update is a state assignment, not a
+    transition), and a failure part-way releases the delivery claim — so the
+    Svix retry re-runs the organizations that already succeeded, harmlessly,
+    and finishes the ones that never ran.
     """
     external_auth_id = data.get("id")
     if not isinstance(external_auth_id, str):

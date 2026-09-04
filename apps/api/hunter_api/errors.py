@@ -49,7 +49,10 @@ _STATUS_TITLES: dict[int, str] = {
     404: "Not Found",
     405: "Method Not Allowed",
     409: "Conflict",
+    411: "Length Required",
+    413: "Content Too Large",
     429: "Too Many Requests",
+    503: "Service Unavailable",
 }
 
 
@@ -61,12 +64,22 @@ class HunterError(Exception):
     """
 
     def __init__(
-        self, *, type_slug: str, title: str, status_code: int, detail: str | None = None
+        self,
+        *,
+        type_slug: str,
+        title: str,
+        status_code: int,
+        detail: str | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         self.type = f"{PROBLEM_BASE}/{type_slug}"
         self.title = title
         self.status_code = status_code
         self.detail = detail
+        self.headers = dict(headers or {})
+        """Response headers the problem needs to be actionable — ``Retry-After``
+        on a 503 is the whole difference between "come back in a minute" and a
+        client that retries immediately and makes the outage worse."""
         super().__init__(detail or title)
 
 
@@ -86,6 +99,7 @@ def _problem_response(
     status_code: int,
     detail: str | None = None,
     extra: dict[str, Any] | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     body: dict[str, Any] = {
         "type": type_,
@@ -99,7 +113,12 @@ def _problem_response(
         body["request_id"] = request_id
     if extra:
         body.update(extra)
-    return JSONResponse(body, status_code=status_code, media_type=CONTENT_TYPE)
+    return JSONResponse(
+        body,
+        status_code=status_code,
+        media_type=CONTENT_TYPE,
+        headers=dict(headers) if headers else None,
+    )
 
 
 async def hunter_error_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -111,7 +130,12 @@ async def hunter_error_handler(request: Request, exc: Exception) -> JSONResponse
     """
     assert isinstance(exc, HunterError)
     return _problem_response(
-        request, type_=exc.type, title=exc.title, status_code=exc.status_code, detail=exc.detail
+        request,
+        type_=exc.type,
+        title=exc.title,
+        status_code=exc.status_code,
+        detail=exc.detail,
+        headers=exc.headers,
     )
 
 

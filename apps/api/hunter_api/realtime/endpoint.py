@@ -16,9 +16,15 @@ Protocol (ARCHITECTURE.md §5.2, SECURITY.md §1):
    client that misses one is closed with 4408 — TCP alone will happily hold a
    dead connection open for minutes, which shows up as a browser that has
    silently stopped receiving prices.
+4. membership is re-checked every ``ws_revalidate_interval_s`` for as long as
+   the socket lives (``realtime.session``), because a subscription authorized
+   an hour ago is not evidence of anything now.
 
 Close codes: ``4401`` unauthenticated (bad, missing or late token), ``4400``
-protocol error (unparseable frame, unknown message type), ``4408`` no pong.
+protocol error (unparseable frame, unknown message type), ``4403`` membership
+revoked while connected, ``4408`` no pong, ``4409`` idle, ``4503``
+authentication temporarily unavailable (the JWKS could not be fetched — the
+credential was never judged, so this is not a 4401).
 """
 
 from __future__ import annotations
@@ -30,20 +36,21 @@ from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from hunter_api.auth.clerk import InvalidTokenError
-from hunter_api.auth.principal import ProvisioningError, principal_from_token
+from hunter_api.auth.clerk import AuthUnavailableError, InvalidTokenError
+from hunter_api.auth.principal import ProvisioningError
 from hunter_api.realtime.channels import (
     MAX_CHANNELS_PER_CONNECTION,
     is_authorized,
     throttle_class,
 )
 from hunter_api.realtime.redis_bridge import RedisBridge, RedisClientLike
+from hunter_api.realtime.session import WsSession, close_socket, watch_session
 from hunter_api.realtime.throttle import DEFAULT_INTERVALS_MS, Throttle
 from hunter_api.realtime.ws_manager import ConnectionManager
 from hunter_core.logging import get_logger
 
 if TYPE_CHECKING:
-    from hunter_api.auth.principal import Principal
+    from hunter_api.auth.clerk import AuthProvider
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -55,6 +62,7 @@ MAX_FRAME_BYTES = 16 * 1024
 WS_AUTH_REQUIRED_CODE = 4401
 WS_PROTOCOL_ERROR_CODE = 4400
 WS_PONG_TIMEOUT_CODE = 4408
+WS_AUTH_UNAVAILABLE_CODE = 4503
 
 
 class RealtimeHub:
@@ -111,23 +119,30 @@ class RealtimeHub:
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()
-    principal = await _authenticate(websocket)
-    if principal is None:
+    session = await _authenticate(websocket)
+    if session is None:
         return
     hub: RealtimeHub = websocket.app.state.realtime
     await websocket.send_text(json.dumps({"type": "authenticated"}))
     heartbeat = asyncio.ensure_future(_heartbeat(websocket))
+    watchdog = asyncio.ensure_future(watch_session(websocket, session, hub))
     try:
-        await _serve(websocket, principal, hub)
+        await _serve(websocket, session, hub)
     finally:
-        heartbeat.cancel()
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await heartbeat
+        for task in (heartbeat, watchdog):
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
         await hub.detach(websocket)
 
 
-async def _authenticate(websocket: WebSocket) -> Principal | None:
-    """The first frame, or 4401. Never logs the token."""
+async def _authenticate(websocket: WebSocket) -> WsSession | None:
+    """The first frame, or a close. Never logs the token.
+
+    The verified claims are kept on the session, not the token: revalidation
+    needs to re-resolve the same identity later, and a live credential is not
+    something to hold for the lifetime of a connection.
+    """
     try:
         raw = await asyncio.wait_for(websocket.receive_text(), timeout=AUTH_TIMEOUT_SECONDS)
     except TimeoutError:
@@ -141,28 +156,34 @@ async def _authenticate(websocket: WebSocket) -> Principal | None:
         await _close(websocket, WS_AUTH_REQUIRED_CODE, "authentication required")
         return None
     token = message.get("token")
-    if not isinstance(token, str):
+    if not isinstance(token, str) or not token:
         await _close(websocket, WS_AUTH_REQUIRED_CODE, "authentication required")
         return None
+    provider: AuthProvider = websocket.app.state.auth_provider
     try:
-        return await principal_from_token(
-            token,
-            provider=websocket.app.state.auth_provider,
-            resolver=websocket.app.state.principal_resolver,
-        )
+        claims = await provider.verify(token)
+        principal = await websocket.app.state.principal_resolver.resolve(claims)
+    except AuthUnavailableError:
+        # the token was never judged — telling the client its credential is
+        # bad would send it to re-authenticate through the provider that is
+        # the thing currently unavailable
+        logger.warning("ws_auth_unavailable")
+        await _close(websocket, WS_AUTH_UNAVAILABLE_CODE, "authentication unavailable")
+        return None
     except (InvalidTokenError, ProvisioningError):
         logger.info("ws_auth_rejected")
         await _close(websocket, WS_AUTH_REQUIRED_CODE, "authentication failed")
         return None
+    return WsSession(principal, claims)
 
 
-async def _serve(websocket: WebSocket, principal: Principal, hub: RealtimeHub) -> None:
-    subscribed: set[str] = set()
+async def _serve(websocket: WebSocket, session: WsSession, hub: RealtimeHub) -> None:
     while True:
         try:
             raw = await websocket.receive_text()
         except WebSocketDisconnect:
             return
+        session.mark_frame()
         message = _parse(raw)
         if message is None:
             await _close(websocket, WS_PROTOCOL_ERROR_CODE, "malformed frame")
@@ -173,10 +194,10 @@ async def _serve(websocket: WebSocket, principal: Principal, hub: RealtimeHub) -
         elif kind == "ping":
             await websocket.send_text(json.dumps({"type": "pong"}))
         elif kind == "subscribe":
-            await _subscribe(websocket, principal, hub, message, subscribed)
+            await _subscribe(websocket, session, hub, message)
         elif kind == "unsubscribe":
             for channel in _channels(message):
-                subscribed.discard(channel)
+                session.subscribed.discard(channel)
                 await hub.unsubscribe(websocket, channel)
         else:
             await _close(websocket, WS_PROTOCOL_ERROR_CODE, "unknown message type")
@@ -185,22 +206,21 @@ async def _serve(websocket: WebSocket, principal: Principal, hub: RealtimeHub) -
 
 async def _subscribe(
     websocket: WebSocket,
-    principal: Principal,
+    session: WsSession,
     hub: RealtimeHub,
     message: dict[str, Any],
-    subscribed: set[str],
 ) -> None:
     accepted: list[str] = []
     for channel in _channels(message):
-        if len(subscribed) >= MAX_CHANNELS_PER_CONNECTION:
+        if len(session.subscribed) >= MAX_CHANNELS_PER_CONNECTION:
             await _error(websocket, "too_many_channels", channel)
             break
-        if not is_authorized(channel, principal):
-            logger.info("ws_channel_denied", principal_id=str(principal.user_id))
+        if not is_authorized(channel, session.principal):
+            logger.info("ws_channel_denied", principal_id=str(session.principal.user_id))
             await _error(websocket, "forbidden_channel", channel)
             continue
         await hub.subscribe(websocket, channel)
-        subscribed.add(channel)
+        session.subscribed.add(channel)
         accepted.append(channel)
     await websocket.send_text(json.dumps({"type": "subscribed", "channels": accepted}))
 
@@ -250,5 +270,4 @@ async def _error(websocket: WebSocket, code: str, channel: str) -> None:
 
 
 async def _close(websocket: WebSocket, code: int, reason: str) -> None:
-    with contextlib.suppress(Exception):
-        await websocket.close(code=code, reason=reason)
+    await close_socket(websocket, code, reason)

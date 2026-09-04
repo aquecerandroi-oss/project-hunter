@@ -100,8 +100,15 @@ async def create_invitation(
     inviter_role: OrganizationRole,
     created_by: uuid.UUID,
     token_hash: str,
+    invitation_id: uuid.UUID,
     **_audit: Any,
 ) -> dict[str, Any]:
+    """``invitation_id`` is minted by the caller, next to the token, so the
+    audit row can name the row this call creates: ``@audited`` reads
+    ``entity_id`` off the keyword arguments, which are fixed before the call
+    runs. An audit row with a NULL ``entity_id`` is unfindable by the only key
+    anyone searches the trail with.
+    """
     from hunter_api.auth.rbac import at_least
 
     if not at_least(inviter_role, role):
@@ -112,6 +119,7 @@ async def create_invitation(
         token_hash=token_hash,
         expires_at=utcnow() + timedelta(days=INVITATION_TTL_DAYS),
         created_by=created_by,
+        invitation_id=invitation_id,
     )
     # never the token, and never its hash: this dict becomes the ``after``
     # column of a row admins can read back
@@ -126,7 +134,31 @@ async def create_invitation(
     }
 
 
-@audited("invitation.revoked", "organization_invitation")
+async def _invitation_before(**kwargs: Any) -> dict[str, Any] | None:
+    """The row as it stood, captured before it is deleted.
+
+    Revocation removes the row, so ``before`` is the only place the invitation
+    survives at all: without it the trail records that *an* invitation was
+    revoked and cannot say to whom, at what role, or by when it would have
+    expired. Never the token hash — a deleted invitation's secret has no
+    business outliving it in an append-only table.
+    """
+    session: AsyncSession = kwargs["session"]
+    org_id: uuid.UUID = kwargs["org_id"]
+    invitation_id: uuid.UUID = kwargs["invitation_id"]
+    invitation = await InvitationRepository(session, org_id).get(invitation_id)
+    if invitation is None:
+        return None
+    return {
+        "id": str(invitation.id),
+        "email": invitation.email,
+        "role": invitation.role.value,
+        "expires_at": invitation.expires_at.isoformat(),
+        "accepted_at": invitation.accepted_at.isoformat() if invitation.accepted_at else None,
+    }
+
+
+@audited("invitation.revoked", "organization_invitation", before=_invitation_before)
 async def revoke_invitation(
     *, session: AsyncSession, org_id: uuid.UUID, invitation_id: uuid.UUID, **_audit: Any
 ) -> dict[str, Any]:

@@ -26,6 +26,7 @@ from hunter_api.services.workspaces import (
     update_workspace,
 )
 from hunter_core.domain.enums import OrganizationRole
+from hunter_core.domain.types import uuid7
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,17 +61,23 @@ async def list_workspaces(
 async def create(
     request: Request, context: AdminOrg, session: OrgSession, payload: WorkspaceCreate
 ) -> WorkspaceOut:
-    created = await create_workspace(
+    workspace_id = uuid7()
+    await create_workspace(
         session=session,
         org_id=context.org_id,
         payload=payload,
-        **audit_kwargs(request, context),
+        workspace_id=workspace_id,
+        **audit_kwargs(request, context, entity_id=workspace_id),
     )
-    return await _read(session, context, uuid.UUID(created["id"]))
+    return await _read(session, context, workspace_id)
 
 
 @router.get("/{workspace_id}", response_model=WorkspaceOut, summary="Read a workspace")
-async def read(context: AdminOrg, session: OrgSession, workspace_id: uuid.UUID) -> WorkspaceOut:
+async def read(context: ViewerOrg, session: OrgSession, workspace_id: uuid.UUID) -> WorkspaceOut:
+    """VIEWER, like the listing above it: a member who can see the workspace in
+    a list must be able to open it, and the row carries nothing a member of the
+    organization may not read.
+    """
     return await _read(session, context, workspace_id)
 
 

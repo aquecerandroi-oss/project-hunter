@@ -23,6 +23,7 @@ from hunter_api.auth.clerk_api import create_profile_source
 from hunter_api.auth.principal import PrincipalResolver
 from hunter_api.errors import ProblemDetailsMiddleware, register_error_handlers
 from hunter_api.health import router as health_router
+from hunter_api.middleware.body_size import BodySizeLimitMiddleware
 from hunter_api.middleware.metrics_auth import MetricsAuthMiddleware
 from hunter_api.middleware.rate_limit import RateLimitMiddleware
 from hunter_api.middleware.request_id import RequestIdMiddleware
@@ -146,6 +147,9 @@ def create_app(settings: ApiSettings) -> FastAPI:
     # state that had not been written yet.
     app.add_middleware(RateLimitMiddleware, settings=settings)
     app.add_middleware(TenantContextMiddleware)
+    # outside the limiter: an oversized body is refused on its header alone,
+    # without spending a Redis round trip or reading a byte of it
+    app.add_middleware(BodySizeLimitMiddleware, settings=settings)
     app.add_middleware(MetricsAuthMiddleware, settings=settings)
     app.add_middleware(ProblemDetailsMiddleware)
     app.add_middleware(

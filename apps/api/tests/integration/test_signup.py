@@ -13,21 +13,23 @@ import uuid
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
+from hunter_api.auth.clerk_api import StaticProfileSource, UserProfile
 from hunter_core.db.models.billing import Subscription
-from hunter_core.db.models.identity import Organization, OrganizationMember, Workspace
+from hunter_core.db.models.identity import Organization, OrganizationMember, User, Workspace
 from hunter_core.db.models.portfolios import RiskProfile
 from hunter_core.db.models.system import AuditLog
-from hunter_core.db.session import tenant_session
+from hunter_core.db.session import role_session, tenant_session
 from hunter_core.domain.enums import MemberStatus, OrganizationRole, Plan, RiskPreset
 
-from .conftest import Actor, create_org
+from .conftest import Actor, auth_header, create_org
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     import httpx
+    from cryptography.hazmat.primitives.asymmetric import rsa
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 pytestmark = pytest.mark.integration
@@ -218,3 +220,117 @@ async def test_the_api_role_cannot_write_the_platform_configuration(
     with pytest.raises(ProgrammingError, match="permission denied"):
         async with tenant_session(session_factory, org_id) as session:
             await session.execute(text("UPDATE feature_flags SET enabled = true"))
+
+
+async def test_a_second_clerk_account_claiming_a_taken_email_is_409_not_503(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+    signing_key: rsa.RSAPrivateKey,
+    profiles: StaticProfileSource,
+) -> None:
+    """``users.email`` is unique, so two Clerk accounts cannot both own one.
+
+    The answer has to say which side is at fault. A 503 ("try again") is a lie
+    the client retries forever; 409 with a documented ``type`` is a fact the
+    frontend can act on — sign in with the account that already owns this
+    address, or use a different one.
+    """
+    unique = uuid.uuid4().hex[:8]
+    first = await create_org(client, make_actor(f"claimed-{unique}"), f"Claimed {unique}")
+
+    twin_subject = f"user_FAKE_twin_{unique}"
+    profiles.add(UserProfile(external_auth_id=twin_subject, email=first.email))
+    response = await client.get("/api/v1/me", headers=auth_header(signing_key, twin_subject))
+
+    assert response.status_code == 409, response.text
+    body = response.json()
+    assert body["type"] == "https://hunter.dev/problems/email-already-registered"
+    assert response.headers["content-type"].startswith("application/problem+json")
+    # and the collision is on the record, system-scope, with no second user row
+    async with role_session(session_factory, db_role="hunter_worker") as session:
+        conflicts = (
+            (
+                await session.execute(
+                    select(AuditLog).where(AuditLog.action == "user.provision_conflict")
+                )
+            )
+            .scalars()
+            .all()
+        )
+        twins = await session.scalar(
+            select(func.count()).select_from(User).where(User.external_auth_id == twin_subject)
+        )
+    assert [row for row in conflicts if row.after and row.after["external_auth_id"] == twin_subject]
+    assert twins == 0
+
+
+async def test_a_clerk_account_with_no_verified_email_cannot_be_provisioned(
+    client: httpx.AsyncClient, signing_key: rsa.RSAPrivateKey, profiles: StaticProfileSource
+) -> None:
+    """The profile source answers "no verified address" — the same shape Clerk
+    returns for an account that signed up and never confirmed. Provisioning
+    fails closed: an unverified address in ``users.email`` is an invitation to
+    somebody else's organization waiting to be accepted.
+    """
+    subject = f"user_FAKE_unverified_{uuid.uuid4().hex[:8]}"
+    profiles.add(UserProfile(external_auth_id=subject, email=None))
+
+    response = await client.get("/api/v1/me", headers=auth_header(signing_key, subject))
+
+    assert response.status_code == 503
+    assert response.json()["type"] == "https://hunter.dev/problems/email-not-verified"
+
+
+async def test_provisioning_a_brand_new_account_writes_one_provisioned_audit_row(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """``user.provisioned`` means a row was inserted, so it is written only
+    when the insert actually inserted: two concurrent first requests of the
+    same account must not read as two provisionings.
+    """
+    actor = make_actor(f"provisioned-{uuid.uuid4().hex[:8]}")
+
+    for _ in range(2):
+        assert (await client.get("/api/v1/me", headers=actor.headers)).status_code == 200
+
+    async with role_session(session_factory, db_role="hunter_worker") as session:
+        rows = (
+            (
+                await session.execute(
+                    select(AuditLog).where(
+                        AuditLog.action == "user.provisioned",
+                        AuditLog.after["external_auth_id"].astext == actor.subject,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert len(rows) == 1
+
+
+async def test_a_token_minted_for_another_origin_is_refused_on_a_tenant_route(
+    client: httpx.AsyncClient,
+    make_actor: Callable[[str], Actor],
+    signing_key: rsa.RSAPrivateKey,
+) -> None:
+    """``azp`` is the origin Clerk minted the token for.
+
+    Same Clerk instance, same signature, same issuer, same user — but issued
+    to somebody else's frontend. Without the ``azp`` check that token is a
+    working credential here, which is how one application's session becomes
+    another application's session.
+    """
+    unique = uuid.uuid4().hex[:8]
+    owner = await create_org(client, make_actor(f"azp-{unique}"), f"Azp {unique}")
+
+    response = await client.get(
+        f"/api/v1/orgs/{owner.org_id}",
+        headers=auth_header(signing_key, owner.subject, azp="https://attacker.test"),
+    )
+
+    assert response.status_code == 401
+    assert response.json()["type"] == "https://hunter.dev/problems/invalid-token"

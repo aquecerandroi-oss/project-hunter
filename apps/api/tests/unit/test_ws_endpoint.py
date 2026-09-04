@@ -10,6 +10,7 @@ production verification path rather than a stub that trusts its input.
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from typing import TYPE_CHECKING, Any, cast
 
@@ -19,6 +20,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from hunter_api.auth.clerk import StaticKeyAuthProvider
 from hunter_api.auth.principal import Membership, Principal
+from hunter_api.realtime import session as ws_session
 from hunter_api.realtime.endpoint import RealtimeHub
 from hunter_core.domain.enums import MemberStatus, OrganizationRole
 
@@ -85,13 +87,16 @@ class _FakeRedis:
 class _FakeResolver:
     """Resolves any verified claim to one principal — the DB path is covered
     by the integration suite; here the subject of the test is the protocol.
+
+    ``principal`` is writable so a test can change what the next revalidation
+    round sees, which is how membership is taken away mid-connection.
     """
 
     def __init__(self, principal: Principal) -> None:
-        self._principal = principal
+        self.principal = principal
 
     async def resolve(self, claims: TokenClaims) -> Principal:
-        return self._principal
+        return self.principal
 
 
 @pytest.fixture(scope="module")
@@ -291,3 +296,94 @@ def test_a_client_ping_is_answered(ws_client: TestClient, private_key: rsa.RSAPr
         websocket.send_text(json.dumps({"type": "ping"}))
 
         assert json.loads(websocket.receive_text()) == {"type": "pong"}
+
+
+@pytest.fixture
+def resolver(principal: Principal) -> _FakeResolver:
+    return _FakeResolver(principal)
+
+
+@pytest.fixture
+def watched_client(
+    app: FastAPI,
+    private_key: rsa.RSAPrivateKey,
+    resolver: _FakeResolver,
+    hub: RealtimeHub,
+) -> Iterator[TestClient]:
+    """A client whose sockets revalidate every 50 ms instead of every minute."""
+    app.state.auth_provider = StaticKeyAuthProvider(jwks_for(private_key), issuer=FAKE_ISSUER)
+    app.state.principal_resolver = resolver
+    with TestClient(app) as client:
+        app.state.realtime = hub
+        app.state.settings = app.state.settings.model_copy(
+            update={"ws_revalidate_interval_s": 0.05}
+        )
+        yield client
+
+
+def test_losing_membership_closes_the_socket_and_drops_the_org_subscription(
+    watched_client: TestClient,
+    private_key: rsa.RSAPrivateKey,
+    resolver: _FakeResolver,
+    hub: RealtimeHub,
+) -> None:
+    """A socket outlives the request that authorized it.
+
+    Membership is checked once, at subscribe time, and a WebSocket then stays
+    open for hours. Remove someone from an organization — or suspend them
+    through the Clerk webhook — and without revalidation their open socket
+    keeps receiving that organization's risk events and positions for as long
+    as they leave the tab open.
+    """
+    channel = f"rt:org:{ORG_A}:risk"
+    with watched_client.websocket_connect("/ws") as websocket:
+        websocket.send_text(json.dumps({"type": "auth", "token": sign(private_key)}))
+        websocket.receive_text()
+        websocket.send_text(json.dumps({"type": "subscribe", "channels": [channel]}))
+        assert json.loads(websocket.receive_text())["channels"] == [channel]
+
+        resolver.principal = Principal(
+            user_id=USER, external_auth_id="user_FAKE_clerk_id", memberships=()
+        )
+
+        with pytest.raises(WebSocketDisconnect) as exc_info:
+            websocket.receive_text()
+
+    assert exc_info.value.code == 4403
+    assert hub.manager.subscriber_count(channel) == 0
+
+
+def test_a_socket_that_keeps_its_membership_stays_open(
+    watched_client: TestClient, private_key: rsa.RSAPrivateKey
+) -> None:
+    channel = f"rt:org:{ORG_A}:risk"
+    with watched_client.websocket_connect("/ws") as websocket:
+        websocket.send_text(json.dumps({"type": "auth", "token": sign(private_key)}))
+        websocket.receive_text()
+        websocket.send_text(json.dumps({"type": "subscribe", "channels": [channel]}))
+        websocket.receive_text()
+
+        # several revalidation rounds later the socket is still usable
+        time.sleep(0.2)
+        websocket.send_text(json.dumps({"type": "ping"}))
+
+        assert json.loads(websocket.receive_text()) == {"type": "pong"}
+
+
+def test_an_idle_socket_is_closed(
+    watched_client: TestClient, private_key: rsa.RSAPrivateKey, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A connection nobody is using still holds a slot, a Redis subscription
+    and a task. The pong timeout only catches a client that stopped answering;
+    this catches one that answers and does nothing else, forever.
+    """
+    monkeypatch.setattr(ws_session, "IDLE_TIMEOUT_SECONDS", 0.1)
+
+    with watched_client.websocket_connect("/ws") as websocket:
+        websocket.send_text(json.dumps({"type": "auth", "token": sign(private_key)}))
+        websocket.receive_text()
+
+        with pytest.raises(WebSocketDisconnect) as exc_info:
+            websocket.receive_text()
+
+    assert exc_info.value.code == 4409

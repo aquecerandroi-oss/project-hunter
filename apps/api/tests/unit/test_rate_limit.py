@@ -51,6 +51,9 @@ class _FakeRedis:
     async def expire(self, name: str, seconds: int) -> bool:
         return True
 
+    def keys(self) -> list[str]:
+        return list(self._sets)
+
 
 class _BrokenRedis:
     """Every command raises — simulates Redis being unreachable."""
@@ -162,3 +165,85 @@ async def test_fail_open_warning_is_logged_at_most_once_per_interval(
             assert (await test_client.get("/api/v1/system/info")).status_code == 200
 
     assert warnings.count("rate_limit_redis_unavailable") == 1
+
+
+async def test_requests_in_the_same_clock_tick_are_counted_separately(
+    api_settings: ApiSettings,
+    client_factory: Callable[[FastAPI], AbstractAsyncContextManager[httpx.AsyncClient]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The sliding window is a sorted set, and a set collapses equal members.
+
+    With the timestamp alone as the member, two requests landing on the same
+    ``time.time()`` value are one entry — so on a fast machine (or a coarse
+    clock, which is what Windows has) a burst counts as a single request and
+    the limit stops meaning anything.
+    """
+    frozen = 1_700_000_000.0
+    monkeypatch.setattr(rate_limit_module.time, "time", lambda: frozen)
+    limited = api_settings.model_copy(update={"rate_limit_per_minute": 2})
+    app = create_app(limited)
+
+    async with client_factory(app) as test_client:
+        app.state.redis = _FakeRedis()
+        first = await test_client.get("/api/v1/system/info")
+        second = await test_client.get("/api/v1/system/info")
+        third = await test_client.get("/api/v1/system/info")
+
+    assert (first.status_code, second.status_code) == (200, 200)
+    assert third.status_code == 429
+
+
+async def test_a_webhook_flood_from_one_source_is_limited_despite_rotating_delivery_ids(
+    api_settings: ApiSettings,
+    client_factory: Callable[[FastAPI], AbstractAsyncContextManager[httpx.AsyncClient]],
+) -> None:
+    """``svix-id`` is chosen by the caller, so it cannot be the only bucket.
+
+    Keying on it alone bounds a retry storm for one delivery and nothing else:
+    anyone who can reach the public webhook URL mints a fresh id per request
+    and every one of them lands in an empty bucket. The client address is the
+    part the caller does not choose, so both are counted.
+    """
+    limited = api_settings.model_copy(update={"rate_limit_per_minute": 2})
+    app = create_app(limited)
+
+    async with client_factory(app) as test_client:
+        app.state.redis = _FakeRedis()
+        statuses = [
+            (
+                await test_client.post(
+                    "/api/webhooks/clerk",
+                    content=b"{}",
+                    headers={"svix-id": f"msg_FAKE_{index}"},
+                )
+            ).status_code
+            for index in range(3)
+        ]
+
+    assert statuses[-1] == 429
+    assert 429 not in statuses[:-1]
+
+
+async def test_two_deliveries_of_different_events_share_the_source_bucket_only(
+    api_settings: ApiSettings,
+    client_factory: Callable[[FastAPI], AbstractAsyncContextManager[httpx.AsyncClient]],
+) -> None:
+    """A retry storm for one delivery must not spend another delivery's budget
+    beyond the shared source limit — the per-delivery bucket is what bounds
+    the storm, and it is still keyed on ``svix-id`` alone.
+    """
+    limited = api_settings.model_copy(update={"rate_limit_per_minute": 3})
+    app = create_app(limited)
+    redis = _FakeRedis()
+
+    async with client_factory(app) as test_client:
+        app.state.redis = redis
+        for _ in range(2):
+            await test_client.post(
+                "/api/webhooks/clerk", content=b"{}", headers={"svix-id": "msg_FAKE_repeat"}
+            )
+
+    keys = list(redis.keys())
+    assert any(key.endswith("svix:msg_FAKE_repeat") for key in keys), keys
+    assert any(":ip:" in key for key in keys), keys

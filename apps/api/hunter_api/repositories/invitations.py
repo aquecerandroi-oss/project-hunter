@@ -27,9 +27,10 @@ class InvitationRepository(TenantRepository):
         token_hash: str,
         expires_at: datetime,
         created_by: uuid.UUID,
+        invitation_id: uuid.UUID | None = None,
     ) -> OrganizationInvitation:
         invitation = OrganizationInvitation(
-            id=uuid7(),
+            id=invitation_id or uuid7(),
             organization_id=self.org_id,
             email=email,
             role=role,
