@@ -18,11 +18,22 @@ import tseslint from "typescript-eslint";
 
 import quality from "./eslint-rules/index.cjs";
 
-// Framework presets are enabled in M0 (task T08) only after checking the
-// installed plugin versions, per the toolkit's advice: presets drift between
-// majors, so the exact export name is confirmed against node_modules first.
-//   import reactHooks from "eslint-plugin-react-hooks";
-//   import nextPlugin from "@next/eslint-plugin-next";
+// Framework presets, enabled in M0 (task T08) after checking the installed
+// plugin versions' actual flat-config export names (they drift between
+// majors):
+//   eslint-plugin-react-hooks@7.1.1  -> reactHooks.configs.flat.recommended
+//     (an object shaped `{ plugins, rules }`, ready to spread into a flat
+//     config array entry -- confirmed via
+//     `node -e "console.log(Object.keys(require('eslint-plugin-react-hooks').configs))"`,
+//     which also offers `configs['recommended-latest']`, functionally the
+//     same shape)
+//   @next/eslint-plugin-next@15.5.25 -> nextPlugin.flatConfig.coreWebVitals
+//     (NOT `configs['core-web-vitals']`, which is the legacy eslintrc shape:
+//     `{ plugins: ["@next/next"], extends: [...], rules }` -- invalid in a
+//     flat config array; confirmed via
+//     `node -e "console.log(Object.keys(require('@next/eslint-plugin-next').flatConfig))"`)
+import reactHooks from "eslint-plugin-react-hooks";
+import nextPlugin from "@next/eslint-plugin-next";
 
 const SOURCE = ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}", "hooks/**/*.{ts,tsx}"];
 const TESTS = ["**/*.test.{ts,tsx}", "**/{__tests__,__mocks__,fixtures,mocks}/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"];
@@ -37,8 +48,16 @@ export function hunterWebConfig({ tsconfigRootDir, maxLines = 350 } = {}) {
     },
     js.configs.recommended,
     ...tseslint.configs.strict,
-    //   reactHooks.configs.flat.recommended,
-    //   nextPlugin.configs["core-web-vitals"],   // confirm export name against installed version
+    {
+      // Scoped to SOURCE only (not tests/rule fixtures): these are React/
+      // Next.js authoring rules, meaningless outside app/components/lib/hooks.
+      files: SOURCE,
+      ...reactHooks.configs.flat.recommended,
+    },
+    {
+      files: SOURCE,
+      ...nextPlugin.flatConfig.coreWebVitals,
+    },
 
     {
       // Architecture boundary. `lib/server/**` is server-only (Clerk secret,

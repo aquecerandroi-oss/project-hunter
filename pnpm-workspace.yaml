@@ -3,4 +3,8 @@ packages:
   - "packages/*"
 allowBuilds:
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  - '@clerk/nextjs@7.9.1'
+  - '@clerk/react@6.15.1'
+  - lucide-react@1.41.0
 virtualStoreDir: node_modules/.s

@@ -1,0 +1,51 @@
+{
+  "name": "@hunter/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "lint:types": "eslint --config eslint.typed.config.mjs .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "e2e": "echo e2e lands in T12"
+  },
+  "dependencies": {
+    "next": "^15.5.25",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "@clerk/nextjs": "^7.9.1",
+    "tailwindcss": "^4.3.3",
+    "@tailwindcss/postcss": "^4.3.3",
+    "lucide-react": "^1.41.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.6.0",
+    "@tanstack/react-query": "^5.102.8",
+    "zod": "^4.5.4",
+    "@radix-ui/react-slot": "^1.3.3",
+    "@radix-ui/react-dropdown-menu": "^2.1.24",
+    "@radix-ui/react-tooltip": "^1.2.16",
+    "@radix-ui/react-separator": "^1.1.15",
+    "@radix-ui/react-dialog": "^1.1.23",
+    "@radix-ui/react-avatar": "^1.2.6",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@hunter/config": "workspace:*",
+    "vitest": "^5.0.0",
+    "vite": "^8.2.2",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/jest-dom": "^7.0.1",
+    "jsdom": "^30.0.1",
+    "typescript": "^5.6",
+    "eslint": "^9.0.0",
+    "postcss": "^8.5.28",
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "@types/react-dom": "^19"
+  }
+}
