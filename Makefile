@@ -6,7 +6,7 @@
 
 install:
 	pnpm install
-	uv sync
+	uv sync --all-packages
 
 lint:
 	pnpm lint

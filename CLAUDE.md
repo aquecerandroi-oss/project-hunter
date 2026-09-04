@@ -37,7 +37,7 @@ PostgreSQL 16 (Neon) · Redis 7 (Streams + pub/sub) · Clerk (auth) · Docker ·
 
 Always use exactly these; never guess alternatives.
 
-- **Install:** `pnpm install` and `uv sync`
+- **Install:** `pnpm install` and `uv sync --all-packages` (the root is a virtual uv project; without `--all-packages` the `hunter_*` members are not installed)
 - **Lint:** `pnpm lint` (fast ESLint tier) · `uv run ruff check .` · `uv run ruff format --check .`
 - **Lint (slow tier, CI only):** `pnpm lint:types` · `uv run ruff check --config packages/config/ruff.strict.toml .`
 - **Typecheck:** `pnpm typecheck` · `uv run pyright`
