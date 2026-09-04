@@ -1,9 +1,11 @@
 """Risk events and kill switch history — DATABASE.md §7.
 
 Both are append-only: ``hunter_app`` gets INSERT and SELECT and never UPDATE or
-DELETE (§1.2). ``kill_switch_transitions`` has no ``organization_id`` because
-its scope may be ``system``; it is therefore not an RLS table and is filtered by
-``(scope, scope_id)`` in the repositories.
+DELETE (§1.2). ``kill_switch_transitions`` carries a **nullable**
+``organization_id`` — ``NULL`` exactly when the scope is ``system`` — so it is an
+RLS table like every other row that belongs to a tenant. Leaving it out of RLS
+and filtering on ``(scope, scope_id)`` in the repositories, as the first draft
+did, made every organization's kill-switch history readable by any other.
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ForeignKey, Index, Text, func
+from sqlalchemy import CheckConstraint, ForeignKey, Index, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -55,13 +57,26 @@ class RiskEvent(Base, UUIDPrimaryKeyMixin, TenantMixin):
 
 
 class KillSwitchTransition(Base, UUIDPrimaryKeyMixin):
-    """Every kill switch move, at any scope. Downward moves are always manual."""
+    """Every kill switch move, at any scope. Downward moves are always manual.
+
+    ``organization_id`` is nullable because a ``system`` transition belongs to no
+    tenant, and the CHECK ties the two together so neither can drift: system
+    rows have no organization, organization/portfolio rows always have one.
+    Two policies follow from that — ``tenant_isolation`` for a tenant's own
+    history and ``system_scope_readable`` so every tenant can see that the
+    platform-wide switch moved (they are affected by it).
+    """
 
     __tablename__ = "kill_switch_transitions"
     __table_args__ = (
+        org_fk(),
+        CheckConstraint(
+            "(scope = 'system') = (organization_id IS NULL)", name="system_scope_has_no_org"
+        ),
         Index("ix_kill_switch_transitions_scope_created", "scope", "scope_id", "created_at"),
     )
 
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
     scope: Mapped[KillSwitchScope] = mapped_column(pg_enum("ks_scope"))
     scope_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     from_state: Mapped[KillSwitchState] = mapped_column(pg_enum("kill_switch_state"))

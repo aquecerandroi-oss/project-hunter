@@ -29,27 +29,36 @@ PostgreSQL 16 (Neon em produção). Convenções e schema inicial. As migraçõe
 ALTER TABLE portfolios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE portfolios FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON portfolios
-  USING (organization_id = current_setting('app.current_org', true)::uuid);
+  USING      (organization_id = NULLIF(current_setting('app.current_org', true), '')::uuid)
+  WITH CHECK (organization_id = NULLIF(current_setting('app.current_org', true), '')::uuid);
 ```
 
-- A aplicação abre transação e executa `SET LOCAL app.current_org = '<uuid>'` antes de qualquer query de tenant. Sem o setting, a política retorna zero linhas.
+- A aplicação abre transação e executa `SET LOCAL app.current_org = '<uuid>'` antes de qualquer query de tenant. Sem o setting, a política retorna zero linhas. O `NULLIF` é o que mantém isso verdadeiro na *segunda* transação de uma conexão do pooler, onde o GUC volta como string vazia em vez de ausente (§15.4).
+- A API define também `app.current_user` (o `users.id` do chamador), de que dependem as políticas de `users` (§15.4).
 - Workers de sistema usam um role `hunter_worker` com `BYPASSRLS` apenas nos processos que precisam varrer todas as organizações (strategy, execution, analytics). O `api` usa `hunter_app` sem bypass.
-- `audit_logs` e `risk_events` são append-only: `hunter_app` tem `INSERT` e `SELECT`, nunca `UPDATE`/`DELETE`.
+- `audit_logs`, `risk_events`, `kill_switch_transitions` e `system_events` são append-only: `hunter_app` tem `INSERT` e `SELECT`, nunca `UPDATE`/`DELETE` — e isso vale também para cada partição delas (§15.6).
+- Partições não herdam privilégios nem políticas da tabela-pai: cada filha é criada com `REVOKE ALL` para os dois papéis e, quando a pai é de tenant, com RLS forçada e política própria (§1.3, §15.4).
 
 ### 1.3 Particionamento e retenção
 
 | Tabela | Partição | Retenção padrão | Job |
 |---|---|---|---|
-| `candles` | RANGE por `open_time`, mensal | 1m: 90 d · 5m: 1 a · 1h/1d: sem limite | `analytics-worker` diário |
+| `candles` | LIST por `timeframe`, depois RANGE por `open_time`, mensal | 1m: 90 d · 5m: 1 a · 15m/1h/4h/1d: sem limite | `analytics-worker` diário |
 | `market_snapshots` | mensal | 30 d | idem |
 | `feature_snapshots` | mensal | 14 d (snapshots ligados a anomalias/oportunidades/trades vivem na própria linha dessas tabelas) | idem |
 | `liquidations` | mensal | 30 d | idem |
 | `opportunity_history` | mensal | 90 d | idem |
-| `portfolio_equity_snapshots` | mensal | 1m: 30 d · 1h: sem limite | idem |
+| `portfolio_equity_snapshots` | LIST por `resolution`, depois RANGE por `ts`, mensal | 1m: 30 d · demais: sem limite | idem |
 | `audit_logs` | mensal | sem limite | — |
 | `system_events` | mensal | 30 d | idem |
 
-Partições são criadas com 3 meses de antecedência por `infra/scripts/create_partitions.py`, agendado no analytics-worker. Uma partição faltante gera `system_event` de severidade `critical`.
+**Duas formas de partição.** Seis tabelas são RANGE mensal simples (`audit_logs_2026_09`). `candles` e `portfolio_equity_snapshots` são particionadas primeiro por LIST (`timeframe` / `resolution`) e cada nível desses por RANGE mensal, produzindo folhas como `candles_1m_2026_09`. O motivo é a própria coluna "Retenção": as retenções diferem por timeframe, e com uma única RANGE mensal expirar 1m aos 90 dias exigiria `DELETE` linha a linha dentro de partições que também guardam o 1h que se mantém para sempre — reescrevendo e inchando exatamente os dados que queremos preservar. Com o nível LIST, expirar é `DROP TABLE candles_1m_2026_05`.
+
+O nível LIST é criado para **todos** os rótulos de `candle_timeframe`, não só os que a ingestão escreve hoje: uma linha sem partição é recusada, e uma escrita recusada é indisponibilidade, não aviso.
+
+Partições são criadas com 3 meses de antecedência por `infra/scripts/create_partitions.py`, agendado no analytics-worker. Uma partição faltante gera `system_event` de severidade `critical`. A contrapartida é `infra/scripts/prune_partitions.py`, que faz `DETACH` + `DROP` de cada partição cuja **borda superior** já passou da janela de retenção — nunca de uma que ainda possa conter linha retida — e é idempotente porque lê as partições existentes em `pg_inherits` em vez de gerá-las pelo calendário.
+
+Toda partição, intermediária ou folha, é criada já endurecida: `REVOKE ALL` para `hunter_app`/`hunter_worker` (todo acesso passa pela tabela-pai) e, quando a pai é tabela de tenant, RLS habilitada, forçada e com política **na própria filha**. O Postgres não herda nem privilégios nem políticas de uma pai particionada.
 
 ## 2. Identidade e tenancy
 
@@ -228,8 +237,8 @@ agents                                      (tenant; instância de estratégia n
   created_by, created_at, updated_at, deleted_at
   INDEX (organization_id, portfolio_id, status)
 
-agent_stats                                 (materializado pelo analytics-worker)
-  agent_id, window stats_window (all|7d|30d|90d), computed_at,
+agent_stats                                 (tenant; materializado pelo analytics-worker)
+  agent_id, organization_id, window stats_window (all|7d|30d|90d), computed_at,
   trades INT, wins INT, losses INT, win_rate, profit_factor, expectancy, avg_win, avg_loss,
   sharpe, sortino, max_drawdown_pct, pnl, pnl_pct, by_regime JSONB, by_market JSONB,
   by_hour JSONB, by_volatility JSONB
@@ -255,17 +264,19 @@ portfolios
   is_arena BOOLEAN DEFAULT false, created_by, created_at, updated_at, deleted_at
   INDEX (organization_id, type, status)
 
-portfolio_equity_snapshots                  PARTITION BY RANGE (ts)
-  portfolio_id, ts, resolution (1m|1h|1d), cash, equity, exposure_notional, exposure_pct,
-  unrealized_pnl, realized_pnl_cum, peak_equity, drawdown_pct, open_positions INT
+portfolio_equity_snapshots                  PARTITION BY LIST (resolution) -> RANGE (ts)
+  organization_id, portfolio_id, ts, resolution (1m|1h|1d), cash, equity, exposure_notional,
+  exposure_pct, unrealized_pnl, realized_pnl_cum, peak_equity, drawdown_pct, open_positions INT
   PK (portfolio_id, resolution, ts)
+  FOREIGN KEY (portfolio_id, organization_id) REFERENCES portfolios (id, organization_id)
 
 trade_proposals                             (o "PROPOSAL" do pipeline)
   id, organization_id, portfolio_id, agent_id, signal_id, market_id, direction,
   requested_risk_pct, status proposal_status (pending|approved|rejected|expired|executed|failed),
   risk_decision JSONB,          -- {approved, sized_qty, sized_notional, risk_pct, checks:[{name, passed, value, limit, message}]}
   rejection_reason, kill_switch_snapshot JSONB, regime_id, opportunity_score, confidence,
-  idempotency_key (unique), created_at, decided_at, expires_at
+  idempotency_key, created_at, decided_at, expires_at
+  UNIQUE (organization_id, idempotency_key)   -- por tenant, nunca global
   INDEX (organization_id, portfolio_id, created_at DESC), INDEX (status, expires_at)
 
 orders
@@ -307,8 +318,10 @@ risk_events
   INDEX (organization_id, created_at DESC)
 
 kill_switch_transitions
-  id, scope ks_scope (system|organization|portfolio), scope_id (null para system),
-  from_state, to_state, reason, actor_type (user|system), actor_id, created_at
+  id, organization_id (null ⟺ scope = system), scope ks_scope (system|organization|portfolio),
+  scope_id (null para system), from_state, to_state, reason, actor_type (user|system),
+  actor_id, created_at
+  CHECK ((scope = 'system') = (organization_id IS NULL))
 ```
 
 ## 8. Exchanges conectadas (tenant; pós-MVP, schema no M0)
@@ -337,12 +350,12 @@ backtests
   started_at, finished_at, error, created_at
 
 backtest_results
-  id, backtest_id, segment (full|train|validation|oos|wf_1..n), metrics JSONB,
+  id, backtest_id, organization_id, segment (full|train|validation|oos|wf_1..n), metrics JSONB,
   equity_curve JSONB, warnings JSONB [{code: overfitting|leakage|lookahead, detail}], trades_count INT
   UNIQUE (backtest_id, segment)
 
 backtest_trades
-  id, backtest_id, segment, market_id, direction, entry_ts, exit_ts, entry_price, exit_price,
+  id, backtest_id, organization_id, segment, market_id, direction, entry_ts, exit_ts, entry_price, exit_price,
   qty, pnl, r_multiple, mfe, mae, exit_reason
   INDEX (backtest_id, segment)
 ```
@@ -433,6 +446,18 @@ Decisões tomadas ao escrever `packages/core/hunter_core/db/models/**` e
 `infra/migrations/versions/0001_initial_schema.py` que **acrescentam** ou
 **precisam** o que está acima. Nada aqui contradiz as seções 1–14.
 
+**`0001_initial_schema` é emendada no lugar, não sucedida por uma `0002`.** As
+correções do cross-review de `154ecea` (grants por tabela, RLS nas partições e
+em `organizations`/`users`, `organization_id` em mais cinco tabelas, FKs
+compostas, re-particionamento de `candles` e `portfolio_equity_snapshots`)
+mudam a *forma* do schema inicial, não o evoluem. O schema nunca foi aplicado em
+lugar nenhum além de CI e testcontainers: não há banco no mundo em `0001`, então
+não há nada a migrar. Uma `0002` que reparticionasse `candles` teria de mover
+dados que não existem e deixaria o schema inicial permanentemente errado para
+quem o lesse — a revisão precisa descrever o schema, e o schema correto é este.
+A partir do primeiro deploy real, essa liberdade acaba e toda mudança vira
+revisão nova.
+
 ### 15.1 Enums
 
 - Novo tipo `liquidity_role` (`maker|taker`) para `fills.liquidity`: a seção 7
@@ -455,9 +480,12 @@ Decisões tomadas ao escrever `packages/core/hunter_core/db/models/**` e
 ### 15.2 Chaves primárias de tabelas particionadas
 
 O Postgres exige que a chave de partição faça parte de qualquer PK. Onde a doc
-mostrava só `id`, a PK passa a incluir a coluna de partição:
-`liquidations (id, ts)`, `audit_logs (id, created_at)`,
-`system_events (id, created_at)`.
+mostrava só `id`, a PK passa a incluir a coluna de partição, **e a coluna de
+partição vem primeiro** (é a ordem que os modelos produzem e a que está no banco):
+`liquidations (ts, id)`, `audit_logs (created_at, id)`,
+`system_events (created_at, id)`. A ordem importa: o índice da PK serve
+`WHERE created_at BETWEEN ...` como coluna líder, que é a varredura real dessas
+tabelas; `(id, created_at)` não serviria.
 
 ### 15.3 Índices
 
@@ -470,37 +498,160 @@ mostrava só `id`, a PK passa a incluir a coluna de partição:
 - Novo índice parcial único `uq_risk_profiles_system_preset` em `(preset)`
   `WHERE organization_id IS NULL`: garante um preset de sistema por nome e dá a
   `infra/scripts/seed.py` uma chave natural para o upsert.
+- Novo índice parcial único `uq_opportunity_weights_active` em `(is_active)`
+  `WHERE is_active`: no máximo uma versão de pesos ativa. Sem ele o scorer teria
+  de escolher arbitrariamente entre duas linhas de `WHERE is_active`.
+- FKs "quentes" indexadas explicitamente (`agents.portfolio_id`,
+  `positions.portfolio_id`, `trade_proposals.portfolio_id`,
+  `trades.portfolio_id`, `fills.portfolio_id`, `notifications.user_id`): os
+  índices compostos que começam por `organization_id` não as cobrem, e sem elas
+  um `DELETE` em `portfolios` faz seq scan em cada tabela filha.
+- `UNIQUE (organization_id, idempotency_key)` em `trade_proposals`, no lugar de
+  um único global. A chave é cunhada pelo cliente de um tenant; global, a
+  retentativa do tenant A colidiria com — e seria engolida como duplicata de —
+  a proposta do tenant B.
 
 ### 15.4 RLS
 
-- Além de `tenant_isolation`, `risk_profiles` recebe a política
-  `system_presets_readable` (`FOR SELECT USING (organization_id IS NULL)`).
-  Sem ela `hunter_app` não enxergaria os presets de sistema que o onboarding
-  precisa copiar. É somente leitura: o `WITH CHECK` de `tenant_isolation`
-  continua estritamente por organização, então o app nunca cria nem edita um
-  preset de sistema.
-- `agent_stats`, `backtest_results`, `backtest_trades`,
-  `portfolio_equity_snapshots` e `kill_switch_transitions` **não** têm
-  `organization_id` (conforme §6, §7 e §9) e portanto não têm RLS. O isolamento
-  delas depende do join com a tabela pai (`agents`, `backtests`, `portfolios`)
-  no repositório — os repositórios tenant-scoped precisam garantir isso.
+**Correções do cross-review de `154ecea`.** A revisão provou, com SQL, quatro
+buracos no desenho original; todos estão fechados aqui e cada um tem teste de
+integração que falhava antes da correção.
+
+- `agent_stats`, `backtest_results`, `backtest_trades` e
+  `portfolio_equity_snapshots` **passaram a ter `organization_id NOT NULL`** e
+  `tenant_isolation`. Deixar o isolamento delas para um join com a tabela pai no
+  repositório punha a curva de equity e as estatísticas de agente de um tenant a
+  um `JOIN` esquecido de distância de qualquer outro. `kill_switch_transitions`
+  ganhou `organization_id` **anulável** (`NULL` exatamente quando
+  `scope = 'system'`, garantido por CHECK), `tenant_isolation` e
+  `system_scope_readable` (`FOR SELECT USING (scope = 'system')`): o kill switch
+  da plataforma afeta todo mundo, então todo mundo pode ver que ele se moveu.
+- **Partições de uma pai de tenant** (hoje `audit_logs_*` e
+  `portfolio_equity_snapshots_*`) recebem RLS habilitada, forçada e **política
+  própria**, no momento da criação, tanto na migração quanto em
+  `create_partitions.py`. O Postgres não consulta as políticas da pai para uma
+  consulta que nomeia a filha; sem isso, `SELECT ... FROM audit_logs_2026_09`
+  devolvia as linhas de todos os tenants.
+- `organizations` e `users` também têm RLS, embora não tenham `organization_id`:
+  `organizations` é filtrada pelo próprio `id`; `users` por co-participação
+  (`EXISTS` em `organization_members` na organização corrente) mais uma política
+  que deixa a pessoa ler a própria linha. Antes, qualquer tenant lia e editava a
+  linha de qualquer outro e enumerava seus membros.
+- `audit_logs` ganhou `audit_system_scope`
+  (`FOR INSERT WITH CHECK (organization_id IS NULL)`). O `WITH CHECK` de
+  `tenant_isolation` recusa `organization_id NULL`, então a trilha de auditoria
+  perdia em silêncio exatamente os eventos sem organização em contexto (sign-up,
+  webhook, cron) — que são os que ninguém está olhando.
+
+**Dois settings, não um.** As políticas leem
+`NULLIF(current_setting('app.current_org', true), '')::uuid` e
+`NULLIF(current_setting('app.current_user', true), '')::uuid`. O `NULLIF` é
+obrigatório atrás do pooler: `current_setting(nome, true)` só devolve `NULL`
+enquanto a sessão *nunca* viu o setting; depois de um `SET LOCAL`, o GUC
+sobrevive ao commit como **string vazia**, e `''::uuid` levanta erro em vez de
+devolver zero linhas. `app.current_user` é o `users.id` do chamador (nunca o id
+do Clerk); `hunter_core.db.session.tenant_session` continua definindo só
+`app.current_org` — quem define os dois é a API, no T06.
+
+**Consequência operacional do `FORCE` em `organizations` e `users`.** Criar uma
+organização ou um usuário exige que o setting correspondente já aponte para o id
+que está sendo inserido (a API gera o UUID v7 antes de inserir), ou que a
+operação corra como `hunter_worker`, que tem `BYPASSRLS`. Vale para onboarding e
+para o webhook do Clerk.
+
+- Além de `tenant_isolation`, `risk_profiles` recebe `system_presets_readable`
+  (`FOR SELECT USING (organization_id IS NULL)`): sem ela `hunter_app` não
+  enxergaria os presets de sistema que o onboarding precisa copiar. É somente
+  leitura — o `WITH CHECK` de `tenant_isolation` continua estritamente por
+  organização, então o app nunca cria nem edita um preset de sistema.
+- E `system_presets_manageable`, concedida **apenas ao papel que migra**
+  (`TO CURRENT_USER`, `USING`/`WITH CHECK (organization_id IS NULL)`). Com
+  `FORCE ROW LEVEL SECURITY` o dono da tabela também é filtrado, então sob um
+  dono `NOSUPERUSER` — que é o que um Postgres gerenciado entrega —
+  `infra/scripts/seed.py` não gravava preset nenhum e mesmo assim relatava três
+  linhas semeadas.
 - `hunter_worker` recebe `BYPASSRLS` (§1.2) por um `ALTER ROLE` dentro de um
   bloco `DO` que tolera falta de privilégio: em Postgres gerenciado o papel que
   migra pode não poder concedê-lo, e nesse caso a migração emite um `NOTICE`
   pedindo a concessão manual.
 - Toda tabela de tenant ganhou `FOREIGN KEY (organization_id) REFERENCES
-  organizations(id) ON DELETE CASCADE`, que o `TenantMixin` sozinho não declara.
+  organizations(id) ON DELETE CASCADE`, que o `TenantMixin` sozinho não declara —
+  **com uma exceção deliberada: `audit_logs`.** A trilha de auditoria é
+  append-only e nunca é podada (§1.3); um `CASCADE` apagaria justamente o
+  registro de que a organização existiu e foi removida, e um `RESTRICT` impediria
+  a remoção. A coluna fica sem FK de propósito, e a política de RLS é o que
+  garante que ninguém lê a de outro tenant.
+- **FKs compostas.** `portfolios`, `agents` e `backtests` carregam
+  `UNIQUE (id, organization_id)`, e `orders`, `fills`, `positions`, `trades`,
+  `trade_proposals`, `portfolio_equity_snapshots`, `agent_stats`,
+  `backtest_results` e `backtest_trades` referenciam o **par**
+  `(<pai>_id, organization_id)`. Com FK de uma coluna só, uma linha podia
+  declarar-se da organização A apontando para o portfolio da B: a FK ficava
+  satisfeita e a RLS só olha o `organization_id` da própria linha. Onde a coluna
+  filha é anulável o `ON DELETE` nomeia a coluna
+  (`SET NULL (agent_id)`, Postgres 15+), porque um `SET NULL` simples também
+  anularia `organization_id`, que é `NOT NULL`.
 
 ### 15.5 Partições
 
 `0001_initial_schema` cria 2026-09 a 2026-12 com limites fixos — uma migração
 reaplicada no futuro precisa produzir o mesmo schema, então não pode depender do
 relógio. Tudo depois disso é de `infra/scripts/create_partitions.py`
-(`--months-ahead`, padrão 3). As listas de tabelas particionadas e de tabelas com
-RLS estão **congeladas** em `infra/migrations/ddl/`, e testes de integração
-garantem que continuam iguais às derivadas dos modelos.
+(`--months-ahead`, padrão 3) e `infra/scripts/prune_partitions.py` (`--dry-run`).
+As listas de tabelas particionadas e de tabelas com RLS estão **congeladas** em
+`infra/migrations/ddl/`, e testes de integração garantem que continuam iguais às
+derivadas dos modelos.
 
-### 15.6 Convenção de nomes em Python
+`candles` e `portfolio_equity_snapshots` são LIST-depois-RANGE (§1.3); o nível
+intermediário (`candles_1m`) é ele próprio uma partição e é ocultado do
+autogenerate por `env.py`, junto com as folhas mensais, senão `alembic check`
+acusaria cada um como drift.
+
+### 15.6 Grants
+
+Os `GRANT` são **nomeados tabela a tabela**, nunca
+`GRANT ... ON ALL TABLES IN SCHEMA public`, e os papéis são criados *antes* das
+partições. As duas coisas vêm do cross-review:
+
+- `ON ALL TABLES` é avaliado uma vez, sobre as tabelas que existem naquele
+  instante. As partições já existiam, então cada `audit_logs_YYYY_MM` recebeu
+  `UPDATE`/`DELETE`, e o `REVOKE` na tabela-pai não as alcançava — Postgres
+  confere uma consulta que nomeia a filha contra os privilégios da filha.
+  `DELETE FROM audit_logs_2026_09` era permitido para o papel da API.
+- e ele dava DML completo em tudo: `hunter_app` podia reescrever o catálogo de
+  estratégias, os `plan_entitlements` e os `feature_flags`.
+
+Agora há três classes, congeladas em `infra/migrations/ddl/tables.py` e que
+formam uma partição exata do schema (um teste compara com o `pg_class` real):
+`APP_WRITE_TABLES` (DML completo, todas atrás de RLS), `APP_READ_ONLY_TABLES`
+(só `SELECT`: catálogo global, market data, análise, `plan_entitlements`,
+`feature_flags`, `strategies`, `strategy_versions`, `opportunity_weights` — a
+lista de exceções para escrita da API é deliberadamente **vazia** no M0; quem
+escreve é `hunter_worker`) e `APPEND_ONLY_TABLES` (`SELECT` + `INSERT`).
+`ALTER DEFAULT PRIVILEGES` declara que uma tabela criada depois também não
+herda nada.
+
+### 15.7 Precisão numérica
+
+`market_snapshots.funding_rate` e `funding_rates.rate` são `NUMERIC(28,10)`, não
+`NUMERIC(9,6)` como as demais colunas percentuais. Funding é um número de
+dinheiro, não uma fração de apresentação: `NUMERIC(9,6)` arredondava uma taxa de
+0.0000125 para 0.000013 (erro de 4 % no número de que as estratégias de
+derivativos dependem) e zerava qualquer coisa abaixo de 5e-7, que é a maioria
+delas.
+
+### 15.8 CHECKs de domínio
+
+`qty > 0` (`orders`, `fills`, `trades`, `backtest_trades`), `price > 0` /
+`entry_price > 0` / `exit_price > 0` / `avg_entry_price > 0` onde a coluna é
+obrigatória e `IS NULL OR > 0` onde é opcional, `filled_qty` entre 0 e `qty`,
+`positions.qty >= 0` (uma posição em fechamento chega a zero antes de virar
+`trade`), `initial_capital >= 0` em `portfolios` e `backtests`, e o invariante
+de escopo do kill switch. As tabelas de market data ficaram **de fora** de
+propósito: um feed de exchange emite ocasionalmente um zero, e um CHECK ali
+transformaria um dado estranho em falha de ingestão.
+
+### 15.9 Convenção de nomes em Python
 
 `metadata` é atributo reservado pelo SQLAlchemy declarativo; as colunas JSONB
 chamadas `metadata` são mapeadas para o atributo Python `meta`

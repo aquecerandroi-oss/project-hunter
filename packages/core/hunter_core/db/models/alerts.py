@@ -60,7 +60,9 @@ class Notification(Base, UUIDPrimaryKeyMixin, TenantMixin):
         ),
     )
 
-    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
     rule_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("alert_rules.id", ondelete="SET NULL"), index=True
     )

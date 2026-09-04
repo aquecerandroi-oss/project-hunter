@@ -6,10 +6,11 @@ primary. The URL in ``.env.example`` is written with the plain ``postgresql://``
 scheme (psycopg style); it is upgraded to ``postgresql+asyncpg://`` here so one
 env var serves both worlds.
 
-``include_object`` hides monthly partition children (``candles_2026_09`` and
-friends) from autogenerate: they are data, created by
-``infra/scripts/create_partitions.py``, not schema that belongs in a revision.
-Without this, ``alembic check`` would report every partition as drift.
+``include_object`` hides partition children — both the ``candles_1m`` timeframe
+level and the ``candles_1m_2026_09`` monthly leaves — from autogenerate: they are
+data, created by ``infra/scripts/create_partitions.py``, not schema that belongs
+in a revision. Without this, ``alembic check`` would report every partition as
+drift.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from hunter_core.db.models import Base
+from hunter_core.db.models import Base, list_partition_name, list_partitioned_tables
 from hunter_core.settings import Settings
 
 config = context.config
@@ -36,6 +37,18 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 _PARTITION_CHILD = re.compile(r"_(?:19|20)\d{2}_(?:0[1-9]|1[0-2])$")
+
+_LIST_PARTITIONS = frozenset(
+    list_partition_name(parent, label)
+    for parent, (_column, labels, _sub_key) in list_partitioned_tables().items()
+    for label in labels
+)
+"""The intermediate ``candles_1m`` level: a partition, so also not schema drift.
+
+Unlike the monthly leaves its name has no date to match on, and unlike the
+parents it is not in the metadata — without this every one of them would be
+reported by ``alembic check`` as a table the models do not declare.
+"""
 
 
 def _database_url() -> str:
@@ -49,6 +62,13 @@ def _database_url() -> str:
     return url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 
+def _is_partition_child(name: str | None) -> bool:
+    """True for ``candles_1m`` and for ``candles_1m_2026_09``, false for ``candles``."""
+    if name is None:
+        return False
+    return _PARTITION_CHILD.search(name) is not None or name in _LIST_PARTITIONS
+
+
 def include_object(
     obj: Any,
     name: str | None,
@@ -58,11 +78,11 @@ def include_object(
 ) -> bool:
     """Skip partition children (and anything attached to them)."""
     if type_ == "table":
-        return not (name is not None and _PARTITION_CHILD.search(name) is not None)
+        return not _is_partition_child(name)
     table = getattr(obj, "table", None)
     table_name = getattr(table, "name", None)
     if isinstance(table_name, str):
-        return _PARTITION_CHILD.search(table_name) is None
+        return not _is_partition_child(table_name)
     return True
 
 

@@ -67,6 +67,27 @@ def pg_enum(name: str) -> postgresql.ENUM[Any]:
     )
 
 
+def tenant_scoped_fk(column: str, table: str, ondelete: str = "CASCADE") -> ForeignKeyConstraint:
+    """``(<column>, organization_id)`` -> ``<table>(id, organization_id)``.
+
+    A single-column ``portfolio_id`` foreign key lets a row claim organization A
+    while pointing at organization B's portfolio: the FK is satisfied, and RLS
+    only ever looks at the row's own ``organization_id``, so nothing catches it.
+    Keying the FK on the pair makes the mismatch unrepresentable — which is why
+    ``portfolios`` and ``agents`` carry ``UNIQUE (id, organization_id)``
+    (DATABASE.md §15.4).
+
+    ``ondelete`` for a nullable child column must name it explicitly
+    (``"SET NULL (agent_id)"``, Postgres 15+): a bare ``SET NULL`` would also
+    null ``organization_id``, which is ``NOT NULL``.
+    """
+    return ForeignKeyConstraint(
+        [column, "organization_id"],
+        [f"{table}.id", f"{table}.organization_id"],
+        ondelete=ondelete,
+    )
+
+
 def org_fk(ondelete: str = "CASCADE") -> ForeignKeyConstraint:
     """``organization_id`` -> ``organizations.id`` for tables using ``TenantMixin``.
 

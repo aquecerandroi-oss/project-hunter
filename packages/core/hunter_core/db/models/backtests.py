@@ -12,7 +12,15 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ForeignKey, Index, Integer, Text, UniqueConstraint, func
+from sqlalchemy import (
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Integer,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,6 +32,7 @@ from hunter_core.db.models._common import (
     UUID_ARRAY_EMPTY,
     org_fk,
     pg_enum,
+    tenant_scoped_fk,
 )
 from hunter_core.domain.enums import BacktestStatus, ExitReason, Timeframe, TradeDirection
 
@@ -34,6 +43,9 @@ class Backtest(Base, UUIDPrimaryKeyMixin, TenantMixin):
     __tablename__ = "backtests"
     __table_args__ = (
         org_fk(),
+        # the target of the (backtest_id, organization_id) composite FKs below
+        UniqueConstraint("id", "organization_id", name="uq_backtests_id_org"),
+        CheckConstraint("initial_capital >= 0", name="initial_capital_non_negative"),
         Index("ix_backtests_org_created", "organization_id", "created_at"),
         Index("ix_backtests_status", "status"),
     )
@@ -72,13 +84,21 @@ class Backtest(Base, UUIDPrimaryKeyMixin, TenantMixin):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
-class BacktestResult(Base, UUIDPrimaryKeyMixin):
-    """Metrics for one segment (full, train, validation, oos, wf_1..n)."""
+class BacktestResult(Base, UUIDPrimaryKeyMixin, TenantMixin):
+    """Metrics for one segment (full, train, validation, oos, wf_1..n).
+
+    A tenant table: a backtest's metrics are the organization's, so RLS polices
+    them directly instead of trusting every repository to join ``backtests``.
+    """
 
     __tablename__ = "backtest_results"
-    __table_args__ = (UniqueConstraint("backtest_id", "segment"),)
+    __table_args__ = (
+        org_fk(),
+        tenant_scoped_fk("backtest_id", "backtests"),
+        UniqueConstraint("backtest_id", "segment"),
+    )
 
-    backtest_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("backtests.id", ondelete="CASCADE"))
+    backtest_id: Mapped[uuid.UUID] = mapped_column(index=True)
     segment: Mapped[str] = mapped_column(Text)
     metrics: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=JSONB_EMPTY)
     equity_curve: Mapped[list[Any]] = mapped_column(JSONB, server_default=JSONB_EMPTY_LIST)
@@ -86,13 +106,19 @@ class BacktestResult(Base, UUIDPrimaryKeyMixin):
     trades_count: Mapped[int] = mapped_column(Integer, server_default="0")
 
 
-class BacktestTrade(Base, UUIDPrimaryKeyMixin):
-    """A simulated trade of a backtest run."""
+class BacktestTrade(Base, UUIDPrimaryKeyMixin, TenantMixin):
+    """A simulated trade of a backtest run. Tenant table, as its parent run is."""
 
     __tablename__ = "backtest_trades"
-    __table_args__ = (Index("ix_backtest_trades_backtest_segment", "backtest_id", "segment"),)
+    __table_args__ = (
+        org_fk(),
+        tenant_scoped_fk("backtest_id", "backtests"),
+        CheckConstraint("qty > 0", name="qty_positive"),
+        CheckConstraint("entry_price > 0", name="entry_price_positive"),
+        Index("ix_backtest_trades_backtest_segment", "backtest_id", "segment"),
+    )
 
-    backtest_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("backtests.id", ondelete="CASCADE"))
+    backtest_id: Mapped[uuid.UUID]
     segment: Mapped[str] = mapped_column(Text)
     market_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("markets.id", ondelete="RESTRICT"), index=True

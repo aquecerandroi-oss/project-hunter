@@ -6,10 +6,23 @@ script owns the future. The analytics worker runs it daily, and a missing
 partition is a `critical` `system_event` — so it must never be the reason an
 insert fails.
 
-Idempotent: every statement is ``CREATE TABLE IF NOT EXISTS ... PARTITION OF``,
-so a second run changes nothing. The partitioned tables and their keys are read
-from ``Base.metadata``; names and bounds come from ``hunter_core.db.models``,
-the same helpers the migration uses, so the two can never disagree.
+Two shapes are kept ahead. Six parents are plain monthly ``RANGE``; ``candles``
+and ``portfolio_equity_snapshots`` are ``LIST`` on the timeframe first, so this
+script ensures the ``candles_1m`` level exists too (cheap, and it is what makes a
+newly added ``candle_timeframe`` label writable) before creating that level's
+months.
+
+Every child is hardened the moment it is created, exactly as the migration does
+it: the application roles are revoked (all traffic goes through the parent) and,
+for a child of a tenant parent, RLS is enabled, forced and policed **on the
+child** — Postgres consults neither the parent's grants nor the parent's
+policies for a query that names the child.
+
+Idempotent: creation is ``CREATE TABLE IF NOT EXISTS ... PARTITION OF``, the
+revoke is unconditional, and each policy is dropped before being recreated, so a
+second run changes nothing. Names and bounds come from
+``hunter_core.db.models`` — the same helpers the migration uses, so the two can
+never disagree.
 
 Connects with ``DATABASE_URL_MIGRATIONS`` (direct, never the pooler) over
 asyncpg — the only Postgres driver this workspace installs.
@@ -31,14 +44,22 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from hunter_core.db.models import (
+    create_list_partition_sql,
     create_partition_sql,
+    harden_partition_sql,
+    list_partition_name,
+    list_partitioned_tables,
+    monthly_partition_parents,
     months_from,
     partition_name,
-    partitioned_tables,
+    tenant_tables,
 )
 from hunter_core.settings import Settings
 
 _EXISTING_PARTITIONS = text("SELECT c.relname FROM pg_class c WHERE c.relispartition")
+
+Statement = tuple[str, str]
+"""``(relation the statement concerns, SQL)``."""
 
 
 def migration_url() -> str:
@@ -52,20 +73,39 @@ def migration_url() -> str:
     return url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 
-def planned_statements(months_ahead: int, now: datetime | None = None) -> list[tuple[str, str]]:
-    """``(partition name, SQL)`` for the current month plus ``months_ahead`` more."""
+def _harden(child: str, root: str, tenants: frozenset[str]) -> list[Statement]:
+    return [
+        (child, sql)
+        for sql in harden_partition_sql(
+            child, tenant=root in tenants, audit_scope=root == "audit_logs"
+        )
+    ]
+
+
+def planned_statements(months_ahead: int, now: datetime | None = None) -> list[Statement]:
+    """Everything needed for the current month plus ``months_ahead`` more."""
     start = now or datetime.now(UTC)
-    statements: list[tuple[str, str]] = []
-    for table in partitioned_tables():
-        for year, month in months_from(start, months_ahead + 1):
-            statements.append(
-                (partition_name(table, year, month), create_partition_sql(table, year, month))
-            )
+    tenants = frozenset(tenant_tables())
+    months = months_from(start, months_ahead + 1)
+    statements: list[Statement] = []
+
+    for parent, (_column, labels, sub_key) in list_partitioned_tables().items():
+        for label in labels:
+            intermediate = list_partition_name(parent, label)
+            statements.append((intermediate, create_list_partition_sql(parent, label, sub_key)))
+            statements += _harden(intermediate, parent, tenants)
+
+    for owner, root in monthly_partition_parents().items():
+        for year, month in months:
+            child = partition_name(owner, year, month)
+            statements.append((child, create_partition_sql(owner, year, month)))
+            statements += _harden(child, root, tenants)
+
     return statements
 
 
-async def ensure_partitions(statements: list[tuple[str, str]]) -> list[str]:
-    """Run every statement; return the names that did not exist beforehand."""
+async def ensure_partitions(statements: list[Statement]) -> list[str]:
+    """Run every statement; return the partition names that did not exist before."""
     engine = create_async_engine(migration_url(), connect_args={"statement_cache_size": 0})
     created: list[str] = []
     try:
@@ -74,7 +114,7 @@ async def ensure_partitions(statements: list[tuple[str, str]]) -> list[str]:
             existing = {row[0] for row in result}
             for name, sql in statements:
                 await connection.execute(text(sql))
-                if name not in existing:
+                if name not in existing and name not in created:
                     created.append(name)
     finally:
         await engine.dispose()
@@ -99,16 +139,17 @@ def main() -> int:
         return 2
 
     statements = planned_statements(args.months_ahead)
+    partitions = {name for name, _ in statements}
     if args.dry_run:
         for name, sql in statements:
             print(f"[dry-run] {name}: {sql}")
-        print(f"[dry-run] {len(statements)} partition(s) would be ensured")
+        print(f"[dry-run] {len(partitions)} partition(s) would be ensured")
         return 0
 
     created = asyncio.run(ensure_partitions(statements))
     for name in created:
         print(f"created {name}")
-    print(f"{len(created)} partition(s) created, {len(statements) - len(created)} already present")
+    print(f"{len(created)} partition(s) created, {len(partitions) - len(created)} already present")
     return 0
 
 

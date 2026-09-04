@@ -34,7 +34,17 @@ MarketRegime       regime atual (v0) — usado só para ajuste de tamanho, nunca
 | `min_stop_distance_pct` | 0.003 | 0.002 | 0.001 | Evita stops dentro do ruído |
 | `max_stop_distance_pct` | 0.03 | 0.05 | 0.08 | Evita sizing minúsculo por stop absurdo |
 | `auto_close_on_emergency` | false | false | false | Se `EMERGENCY`, fechar posições automaticamente |
-| `regime_size_multiplier` | {BTC_BEAR long: 0.5, HIGH_VOL: 0.7} | idem | {HIGH_VOL: 0.85} | Multiplicador de tamanho por regime |
+| `regime_size_multiplier` | {BTC_BEAR_LONG: 0.5, HIGH_VOLATILITY: 0.7} | idem | {HIGH_VOLATILITY: 0.85} | Multiplicador de tamanho por regime |
+
+**Gramática das chaves de `regime_size_multiplier`.** Uma chave é `<REGIME>` ou `<REGIME>_<DIRECTION>`, onde `<REGIME>` é um rótulo do enum `market_regime` (`BTC_BULL`, `BTC_BEAR`, `SIDEWAYS`, `HIGH_VOLATILITY`, …, já em maiúsculas) e `<DIRECTION>` é um rótulo de `trade_direction` em maiúsculas (`LONG`, `SHORT`, `NEUTRAL`). O valor é o multiplicador, gravado como **string** JSON para virar `Decimal` sem passar por float.
+
+A busca é feita nesta ordem, e para na primeira que existir:
+
+1. `<REGIME>_<DIRECTION>` — o regime atual com a direção da proposta (`BTC_BEAR_LONG`);
+2. `<REGIME>` — o regime atual, valendo para as duas direções (`HIGH_VOLATILITY`);
+3. `1.0` — sem ajuste.
+
+A ordem é o que resolve a ambiguidade da concatenação: `BTC_BEAR_LONG` é sempre lido como o par (`BTC_BEAR`, `LONG`) antes de ser considerado o nome de um regime. Só um multiplicador é aplicado — eles nunca se compõem —, e um regime que não aparece no mapa não altera o tamanho. Os presets semeados por `infra/scripts/seed.py` seguem exatamente esta gramática.
 
 Limites são validados na edição (`max_position_pct ≤ max_total_exposure_pct`, etc.). Edição gera `audit_logs` com before/after e `risk_events` tipo `limits_changed`.
 

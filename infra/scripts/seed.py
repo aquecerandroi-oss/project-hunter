@@ -110,6 +110,11 @@ RISK_LIMITS: dict[str, tuple[Any, Any, Any]] = {
 }
 
 REGIME_MULTIPLIERS: tuple[dict[str, str], ...] = (
+    # RISK_ENGINE.md §2 grammar: `<REGIME>` or `<REGIME>_<DIRECTION>`, where
+    # <REGIME> is a `market_regime` label and <DIRECTION> is a `trade_direction`
+    # upper-cased. The engine looks up `<REGIME>_<DIRECTION>` first, then
+    # `<REGIME>`, then falls back to 1.0 — so `BTC_BEAR_LONG` narrows longs in a
+    # bear market while `HIGH_VOLATILITY` applies to both directions.
     {"BTC_BEAR_LONG": "0.5", "HIGH_VOLATILITY": "0.7"},
     {"BTC_BEAR_LONG": "0.5", "HIGH_VOLATILITY": "0.7"},
     {"HIGH_VOLATILITY": "0.85"},
@@ -226,7 +231,14 @@ async def seed_feature_flags(conn: AsyncConnection) -> int:
 
 
 async def seed_risk_profiles(conn: AsyncConnection) -> int:
-    """System presets: ``organization_id IS NULL``, copied into an org at onboarding."""
+    """System presets: ``organization_id IS NULL``, copied into an org at onboarding.
+
+    These rows only exist because ``0001`` grants the migrating role the
+    ``system_presets_manageable`` policy. ``risk_profiles`` has ``FORCE ROW LEVEL
+    SECURITY``, which filters the table owner too, so under an ordinary
+    ``NOSUPERUSER`` owner — what a managed Postgres gives you — this upsert
+    matched nothing, wrote nothing, and still reported three rows seeded.
+    """
     for index, (preset, name) in enumerate(RISK_PRESETS):
         limits: dict[str, Any] = {key: values[index] for key, values in RISK_LIMITS.items()}
         limits["regime_size_multiplier"] = REGIME_MULTIPLIERS[index]
@@ -254,7 +266,13 @@ async def seed_opportunity_weights(conn: AsyncConnection) -> int:
     await conn.execute(
         statement.on_conflict_do_update(
             index_elements=[OpportunityWeights.version],
-            set_={"weights": statement.excluded.weights, "is_active": statement.excluded.is_active},
+            # ``is_active`` is deliberately NOT updated. Which version is live is
+            # an operational decision (a rollback after a bad tuning, say), and
+            # re-running the seed — which every deploy does — must not quietly
+            # reactivate v1 underneath it. The partial unique index on
+            # ``is_active`` would refuse the write anyway, turning a routine
+            # deploy into a failed one.
+            set_={"weights": statement.excluded.weights},
         )
     )
     return 1

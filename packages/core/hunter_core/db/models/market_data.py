@@ -1,10 +1,17 @@
-"""Market data — DATABASE.md §4. Global tables; ``candles``, ``market_snapshots``
-and ``liquidations`` are RANGE-partitioned by month (§1.3).
+"""Market data — DATABASE.md §4. Global tables; ``market_snapshots`` and
+``liquidations`` are RANGE-partitioned by month and ``candles`` is
+``LIST (timeframe)`` then ``RANGE (open_time)`` (§1.3).
 
 Raw trades and the order book are deliberately not persisted (SPEC_REVIEW.md B3).
-Partitioned tables carry the partition key inside the primary key, as Postgres
+Partitioned tables carry every partition key inside the primary key, as Postgres
 requires, and ``infra/scripts/create_partitions.py`` keeps 3 months of partitions
 ahead of the current one.
+
+Funding is money-shaped, not a percentage: ``market_snapshots.funding_rate`` and
+``funding_rates.rate`` are ``NUMERIC(28,10)``. ``NUMERIC(9,6)`` would round a
+0.0000125 (0.00125 %) funding rate to 0.000013 — a 4 % error on the number the
+derivatives strategies key off, and exactly zero for the smaller rates that are
+the common case.
 """
 
 from __future__ import annotations
@@ -24,10 +31,17 @@ _MARKET_FK = "markets.id"
 
 
 class Candle(Base):
-    """OHLCV per market and timeframe. ``is_final`` gates anti-look-ahead."""
+    """OHLCV per market and timeframe. ``is_final`` gates anti-look-ahead.
+
+    ``LIST (timeframe)`` first, then ``RANGE (open_time)`` inside each timeframe
+    (``candles_1m_2026_09``). DATABASE.md §1.3 gives 1m 90 days, 5m a year and
+    1h/1d no limit: a single monthly RANGE would force one retention for all of
+    them, and pruning 1m by ``DELETE`` would rewrite partitions that hold the
+    history we keep.
+    """
 
     __tablename__ = "candles"
-    __table_args__ = {"postgresql_partition_by": "RANGE (open_time)"}
+    __table_args__ = {"postgresql_partition_by": "LIST (timeframe)"}
 
     market_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey(_MARKET_FK, ondelete="CASCADE"), primary_key=True
@@ -65,7 +79,7 @@ class MarketSnapshot(Base):
     quote_volume_24h: Mapped[Decimal | None]
     open_interest: Mapped[Decimal | None]
     open_interest_value: Mapped[Decimal | None]
-    funding_rate: Mapped[Decimal | None] = mapped_column(PERCENT)
+    funding_rate: Mapped[Decimal | None]
     next_funding_time: Mapped[datetime | None]
     mark_price: Mapped[Decimal | None]
     index_price: Mapped[Decimal | None]
@@ -82,7 +96,7 @@ class FundingRate(Base):
         ForeignKey(_MARKET_FK, ondelete="CASCADE"), primary_key=True
     )
     funding_time: Mapped[datetime] = mapped_column(primary_key=True)
-    rate: Mapped[Decimal] = mapped_column(PERCENT)
+    rate: Mapped[Decimal]
     mark_price: Mapped[Decimal | None]
 
 

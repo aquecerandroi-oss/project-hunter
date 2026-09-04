@@ -18,7 +18,13 @@ from alembic import command
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from hunter_core.db.models import Base, partition_name, partitioned_tables
+from hunter_core.db.models import (
+    Base,
+    list_partition_name,
+    list_partitioned_tables,
+    partition_name,
+    partitioned_tables,
+)
 from hunter_core.domain.enums import ALL_ENUMS
 
 from .conftest import alembic_config, async_engine, create_database, migration_ddl
@@ -104,21 +110,39 @@ async def test_every_enum_type_exists_with_the_expected_labels(engine: AsyncEngi
 async def test_every_partitioned_parent_has_its_initial_partitions(engine: AsyncEngine) -> None:
     partitions = migration_ddl("partitions")
     initial_months: tuple[tuple[int, int], ...] = partitions.INITIAL_MONTHS
-    frozen: tuple[str, ...] = partitions.PARTITIONED_TABLES
+    frozen_range: tuple[str, ...] = partitions.PARTITIONED_TABLES
+    frozen_list: tuple[tuple[str, tuple[str, ...], str], ...] = partitions.LIST_PARTITIONED_TABLES
 
-    assert set(frozen) == set(partitioned_tables()), (
-        "a model gained or lost postgresql_partition_by without a migration "
-        "updating ddl.partitions.PARTITIONED_TABLES"
+    assert set(frozen_range) == set(partitioned_tables()), (
+        "a model gained or lost a RANGE postgresql_partition_by without a "
+        "migration updating ddl.partitions.PARTITIONED_TABLES"
     )
+    assert {name: (values, key) for name, values, key in frozen_list} == {
+        name: (values, key) for name, (_column, values, key) in list_partitioned_tables().items()
+    }, (
+        "a model gained or lost a LIST postgresql_partition_by without a "
+        "migration updating ddl.partitions.LIST_PARTITIONED_TABLES"
+    )
+
     async with engine.connect() as connection:
         result = await connection.execute(
-            text("SELECT relname FROM pg_class WHERE relispartition AND relkind = 'r'")
+            text("SELECT relname FROM pg_class WHERE relispartition AND relkind IN ('r', 'p')")
         )
         present = {row[0] for row in result}
 
     expected = {
-        partition_name(table, year, month) for table in frozen for year, month in initial_months
+        partition_name(table, year, month)
+        for table in frozen_range
+        for year, month in initial_months
     }
+    for parent, values, _key in frozen_list:
+        for value in values:
+            intermediate = list_partition_name(parent, value)
+            # the timeframe level is itself a partition, and partitioned in turn
+            expected.add(intermediate)
+            expected |= {
+                partition_name(intermediate, year, month) for year, month in initial_months
+            }
     assert expected <= present
 
 

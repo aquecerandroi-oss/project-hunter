@@ -13,7 +13,15 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ForeignKey, Index, Integer, Text, UniqueConstraint, func
+from sqlalchemy import (
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Integer,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -28,6 +36,7 @@ from hunter_core.db.models._common import (
     SQL_TRUE,
     org_fk,
     pg_enum,
+    tenant_scoped_fk,
 )
 from hunter_core.domain.enums import (
     ExecutionMode,
@@ -42,9 +51,10 @@ from hunter_core.domain.enums import (
     TradeDirection,
 )
 
-_PORTFOLIO_FK = "portfolios.id"
 _MARKET_FK = "markets.id"
-_AGENT_FK = "agents.id"
+
+_AGENT_SET_NULL = "SET NULL (agent_id)"
+"""Only ``agent_id`` is nulled when an agent goes: ``organization_id`` is NOT NULL."""
 
 
 class TradeProposal(Base, UUIDPrimaryKeyMixin, TenantMixin):
@@ -55,7 +65,12 @@ class TradeProposal(Base, UUIDPrimaryKeyMixin, TenantMixin):
     __tablename__ = "trade_proposals"
     __table_args__ = (
         org_fk(),
-        UniqueConstraint("idempotency_key"),
+        tenant_scoped_fk("portfolio_id", "portfolios"),
+        tenant_scoped_fk("agent_id", "agents", ondelete=_AGENT_SET_NULL),
+        # scoped per organization: an idempotency key is minted by one tenant's
+        # client, so a global unique lets tenant A's retry collide with — and be
+        # silently swallowed as a duplicate of — tenant B's proposal.
+        UniqueConstraint("organization_id", "idempotency_key", name="uq_trade_proposals_idem"),
         Index(
             "ix_trade_proposals_org_portfolio_created",
             "organization_id",
@@ -65,10 +80,8 @@ class TradeProposal(Base, UUIDPrimaryKeyMixin, TenantMixin):
         Index("ix_trade_proposals_status_expires", "status", "expires_at"),
     )
 
-    portfolio_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(_PORTFOLIO_FK, ondelete="CASCADE"))
-    agent_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey(_AGENT_FK, ondelete="SET NULL"), index=True
-    )
+    portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     signal_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("agent_signals.id", ondelete="SET NULL"), index=True
     )
@@ -100,18 +113,22 @@ class Order(Base, UUIDPrimaryKeyMixin, TenantMixin):
     __tablename__ = "orders"
     __table_args__ = (
         org_fk(),
+        tenant_scoped_fk("portfolio_id", "portfolios"),
+        tenant_scoped_fk("agent_id", "agents", ondelete=_AGENT_SET_NULL),
         UniqueConstraint("portfolio_id", "client_order_id", name="uq_orders_client_order_id"),
+        CheckConstraint("qty > 0", name="qty_positive"),
+        CheckConstraint("price IS NULL OR price > 0", name="price_positive"),
+        CheckConstraint("stop_price IS NULL OR stop_price > 0", name="stop_price_positive"),
+        CheckConstraint("filled_qty >= 0 AND filled_qty <= qty", name="filled_qty_within_qty"),
         Index("ix_orders_org_portfolio_created", "organization_id", "portfolio_id", "created_at"),
         Index("ix_orders_status", "status"),
     )
 
-    portfolio_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(_PORTFOLIO_FK, ondelete="CASCADE"))
+    portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
     proposal_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("trade_proposals.id", ondelete="SET NULL"), index=True
     )
-    agent_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey(_AGENT_FK, ondelete="SET NULL"), index=True
-    )
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     market_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey(_MARKET_FK, ondelete="RESTRICT"), index=True
     )
@@ -150,13 +167,16 @@ class Fill(Base, UUIDPrimaryKeyMixin, TenantMixin):
     __tablename__ = "fills"
     __table_args__ = (
         org_fk(),
+        tenant_scoped_fk("portfolio_id", "portfolios"),
+        CheckConstraint("qty > 0", name="qty_positive"),
+        CheckConstraint("price > 0", name="price_positive"),
         Index("ix_fills_org_portfolio_ts", "organization_id", "portfolio_id", "ts"),
     )
 
     order_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("orders.id", ondelete="CASCADE"), index=True
     )
-    portfolio_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(_PORTFOLIO_FK, ondelete="CASCADE"))
+    portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
     ts: Mapped[datetime] = mapped_column(server_default=func.now())
     qty: Mapped[Decimal]
     price: Mapped[Decimal]
@@ -175,14 +195,17 @@ class Position(Base, UUIDPrimaryKeyMixin, TenantMixin):
     __tablename__ = "positions"
     __table_args__ = (
         org_fk(),
+        tenant_scoped_fk("portfolio_id", "portfolios"),
+        tenant_scoped_fk("agent_id", "agents", ondelete=_AGENT_SET_NULL),
+        # a closing position legitimately reaches 0 before it becomes a trade
+        CheckConstraint("qty >= 0", name="qty_non_negative"),
+        CheckConstraint("avg_entry_price > 0", name="avg_entry_price_positive"),
         Index("ix_positions_org_portfolio_status", "organization_id", "portfolio_id", "status"),
         Index("ix_positions_market_status", "market_id", "status"),
     )
 
-    portfolio_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(_PORTFOLIO_FK, ondelete="CASCADE"))
-    agent_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey(_AGENT_FK, ondelete="SET NULL"), index=True
-    )
+    portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     market_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(_MARKET_FK, ondelete="RESTRICT"))
     direction: Mapped[TradeDirection] = mapped_column(pg_enum("trade_direction"))
     qty: Mapped[Decimal]
@@ -213,14 +236,19 @@ class Trade(Base, UUIDPrimaryKeyMixin, TenantMixin):
     __tablename__ = "trades"
     __table_args__ = (
         org_fk(),
+        tenant_scoped_fk("portfolio_id", "portfolios"),
+        tenant_scoped_fk("agent_id", "agents", ondelete=_AGENT_SET_NULL),
         UniqueConstraint("position_id"),
+        CheckConstraint("qty > 0", name="qty_positive"),
+        CheckConstraint("entry_price > 0", name="entry_price_positive"),
+        CheckConstraint("exit_price > 0", name="exit_price_positive"),
         Index("ix_trades_org_portfolio_closed", "organization_id", "portfolio_id", "closed_at"),
         Index("ix_trades_agent_closed", "agent_id", "closed_at"),
         Index("ix_trades_market_closed", "market_id", "closed_at"),
     )
 
-    portfolio_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(_PORTFOLIO_FK, ondelete="CASCADE"))
-    agent_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey(_AGENT_FK, ondelete="SET NULL"))
+    portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    agent_id: Mapped[uuid.UUID | None]
     strategy_version_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("strategy_versions.id", ondelete="SET NULL"), index=True
     )

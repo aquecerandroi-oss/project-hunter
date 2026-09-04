@@ -27,6 +27,7 @@ from hunter_core.db.models._common import (
     SQL_FALSE,
     org_fk,
     pg_enum,
+    tenant_scoped_fk,
 )
 from hunter_core.domain.enums import (
     AgentStatus,
@@ -142,13 +143,16 @@ class Agent(Base, UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin):
     __tablename__ = "agents"
     __table_args__ = (
         org_fk(),
+        tenant_scoped_fk("portfolio_id", "portfolios"),
+        # the target of every (agent_id, organization_id) composite FK
+        UniqueConstraint("id", "organization_id", name="uq_agents_id_org"),
         Index("ix_agents_org_portfolio_status", "organization_id", "portfolio_id", "status"),
     )
 
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
     )
-    portfolio_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("portfolios.id", ondelete="CASCADE"))
+    portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
     name: Mapped[str] = mapped_column(Text)
     strategy_version_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("strategy_versions.id", ondelete="RESTRICT"), index=True
@@ -173,14 +177,21 @@ class Agent(Base, UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin):
     deleted_at: Mapped[datetime | None]
 
 
-class AgentStats(Base):
-    """Materialized by the analytics worker. PK ``(agent_id, window)``."""
+class AgentStats(Base, TenantMixin):
+    """Materialized by the analytics worker. PK ``(agent_id, window)``.
+
+    A tenant table: these are one organization's realized statistics, so the
+    review is right that leaving RLS to a join with ``agents`` in the repository
+    was a single missing ``JOIN`` away from a cross-tenant read.
+    """
 
     __tablename__ = "agent_stats"
-
-    agent_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("agents.id", ondelete="CASCADE"), primary_key=True
+    __table_args__ = (
+        org_fk(),
+        tenant_scoped_fk("agent_id", "agents"),
     )
+
+    agent_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     window: Mapped[StatsWindow] = mapped_column(pg_enum("stats_window"), primary_key=True)
     computed_at: Mapped[datetime] = mapped_column(server_default=func.now())
     trades: Mapped[int] = mapped_column(Integer, server_default="0")

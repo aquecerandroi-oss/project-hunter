@@ -125,9 +125,22 @@ class MarketRegimeRow(Base, UUIDPrimaryKeyMixin):
 
 
 class OpportunityWeights(Base, UUIDPrimaryKeyMixin):
-    """A versioned weight vector for the opportunity score."""
+    """A versioned weight vector for the opportunity score.
+
+    At most one version is active at a time — the partial unique index makes a
+    second one impossible instead of leaving the scorer to pick arbitrarily from
+    whatever ``WHERE is_active`` returns.
+    """
 
     __tablename__ = "opportunity_weights"
+    __table_args__ = (
+        Index(
+            "uq_opportunity_weights_active",
+            "is_active",
+            unique=True,
+            postgresql_where=text("is_active"),
+        ),
+    )
 
     version: Mapped[str] = mapped_column(Text, unique=True)
     weights: Mapped[dict[str, Any]] = mapped_column(JSONB)

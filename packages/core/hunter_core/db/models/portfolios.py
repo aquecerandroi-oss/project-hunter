@@ -13,12 +13,27 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ForeignKey, Index, Integer, Text, text
+from sqlalchemy import (
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Integer,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from hunter_core.db.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin
-from hunter_core.db.models._common import JSONB_EMPTY, PERCENT, SQL_FALSE, org_fk, pg_enum
+from hunter_core.db.models._common import (
+    JSONB_EMPTY,
+    PERCENT,
+    SQL_FALSE,
+    org_fk,
+    pg_enum,
+    tenant_scoped_fk,
+)
 from hunter_core.domain.enums import (
     KillSwitchState,
     PortfolioStatus,
@@ -63,6 +78,9 @@ class Portfolio(Base, UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin):
     __tablename__ = "portfolios"
     __table_args__ = (
         org_fk(),
+        # the target of every (portfolio_id, organization_id) composite FK
+        UniqueConstraint("id", "organization_id", name="uq_portfolios_id_org"),
+        CheckConstraint("initial_capital >= 0", name="initial_capital_non_negative"),
         Index("ix_portfolios_org_type_status", "organization_id", "type", "status"),
     )
 
@@ -96,15 +114,26 @@ class Portfolio(Base, UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin):
     deleted_at: Mapped[datetime | None]
 
 
-class PortfolioEquitySnapshot(Base):
-    """The equity curve. PK ``(portfolio_id, resolution, ts)``, partitioned on ``ts``."""
+class PortfolioEquitySnapshot(Base, TenantMixin):
+    """The equity curve. PK ``(portfolio_id, resolution, ts)``.
+
+    ``LIST (resolution)`` then ``RANGE (ts)`` per resolution, so the 1m curve can
+    be dropped at 30 days while the 1h curve is kept forever (DATABASE.md §1.3)
+    — a single monthly RANGE could only expire both at once.
+
+    It is a tenant table: it holds one organization's equity, so it carries
+    ``organization_id`` and is policed by RLS like everything else that is money
+    (the review found it readable across tenants through the missing column).
+    """
 
     __tablename__ = "portfolio_equity_snapshots"
-    __table_args__ = {"postgresql_partition_by": "RANGE (ts)"}
-
-    portfolio_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("portfolios.id", ondelete="CASCADE"), primary_key=True
+    __table_args__ = (
+        org_fk(),
+        tenant_scoped_fk("portfolio_id", "portfolios"),
+        {"postgresql_partition_by": "LIST (resolution)"},
     )
+
+    portfolio_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     resolution: Mapped[Timeframe] = mapped_column(pg_enum("candle_timeframe"), primary_key=True)
     ts: Mapped[datetime] = mapped_column(primary_key=True)
     cash: Mapped[Decimal]

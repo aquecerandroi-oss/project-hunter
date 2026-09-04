@@ -5,17 +5,27 @@ Postgres accepts:
 
 1. enum types (``ddl/enums.py``) — the models declare them ``create_type=False``,
    so exactly one place issues ``CREATE TYPE``;
-2. tables and indexes, including the eight RANGE-partitioned parents;
-3. the initial monthly partitions. They are hardcoded (2026-09 .. 2026-12) on
-   purpose: a migration replayed next year must build the same schema, so its
-   bounds cannot come from the clock. Everything after December 2026 belongs to
-   ``infra/scripts/create_partitions.py``, which the analytics worker runs daily
-   and which keeps three months ahead;
-4. the ``hunter_app`` / ``hunter_worker`` roles and their grants, with
-   ``audit_logs``, ``risk_events``, ``kill_switch_transitions`` and
-   ``system_events`` append-only for the app;
-5. Row Level Security — enabled *and forced* — on every table carrying
-   ``organization_id``.
+2. tables and indexes, including the eight partitioned parents;
+3. the ``hunter_app`` / ``hunter_worker`` roles and their grants — named table by
+   table, never ``ON ALL TABLES``, with ``audit_logs``, ``risk_events``,
+   ``kill_switch_transitions`` and ``system_events`` append-only, and every
+   global catalogue, market and analysis table read-only for the app;
+4. Row Level Security — enabled *and forced* — on every relation that belongs to
+   a tenant, plus ``organizations`` and ``users``, which are policed on their own
+   identity rather than on an ``organization_id`` they do not have;
+5. the initial monthly partitions, **last**, each hardened as it is created
+   (grants revoked, RLS enabled/forced/policed on the child itself). They are
+   hardcoded (2026-09 .. 2026-12) on purpose: a migration replayed next year must
+   build the same schema, so its bounds cannot come from the clock. Everything
+   after December 2026 belongs to ``infra/scripts/create_partitions.py``, which
+   the analytics worker runs daily and which keeps three months ahead.
+
+Steps 3-5 are in that order for a reason the T04 cross-review found the hard way:
+under ``GRANT ... ON ALL TABLES`` the partitions created before it silently
+collected full DML, and revoking on the parent never reached them — ``DELETE FROM
+audit_logs_2026_09`` was allowed for the API role. Grants are now per table and
+the children are created after them, so a child has only what step 5 leaves it,
+which is nothing.
 
 ``downgrade()`` reverses all five. The two roles survive it: roles are
 cluster-wide, may still be granted on another database in the same cluster, and
@@ -55,16 +65,16 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     create_enum_types()
     _create_tables()
-    create_initial_partitions()
     create_roles()
     grant_privileges()
     enable_row_level_security()
+    create_initial_partitions()
 
 
 def downgrade() -> None:
+    drop_initial_partitions()
     disable_row_level_security()
     revoke_privileges()
-    drop_initial_partitions()
     _drop_tables()
     drop_enum_types()
 
@@ -226,58 +236,6 @@ def _create_tables() -> None:
         sa.Column("id", sa.UUID(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_intelligence_sources")),
         sa.UniqueConstraint("key", name=op.f("uq_intelligence_sources_key")),
-    )
-    op.create_table(
-        "kill_switch_transitions",
-        sa.Column(
-            "scope",
-            postgresql.ENUM(
-                "system", "organization", "portfolio", name="ks_scope", create_type=False
-            ),
-            nullable=False,
-        ),
-        sa.Column("scope_id", sa.UUID(), nullable=True),
-        sa.Column(
-            "from_state",
-            postgresql.ENUM(
-                "ACTIVE",
-                "WARNING",
-                "TRADING_DISABLED",
-                "EMERGENCY",
-                name="kill_switch_state",
-                create_type=False,
-            ),
-            nullable=False,
-        ),
-        sa.Column(
-            "to_state",
-            postgresql.ENUM(
-                "ACTIVE",
-                "WARNING",
-                "TRADING_DISABLED",
-                "EMERGENCY",
-                name="kill_switch_state",
-                create_type=False,
-            ),
-            nullable=False,
-        ),
-        sa.Column("reason", sa.Text(), nullable=True),
-        sa.Column("actor_type", sa.Text(), nullable=False),
-        sa.Column("actor_id", sa.UUID(), nullable=True),
-        sa.Column(
-            "created_at",
-            sa.TIMESTAMP(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.Column("id", sa.UUID(), nullable=False),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_kill_switch_transitions")),
-    )
-    op.create_index(
-        "ix_kill_switch_transitions_scope_created",
-        "kill_switch_transitions",
-        ["scope", "scope_id", "created_at"],
-        unique=False,
     )
     op.create_table(
         "market_regimes",
@@ -659,6 +617,13 @@ def _create_tables() -> None:
         ["created_by"],
         unique=False,
     )
+    op.create_index(
+        "uq_opportunity_weights_active",
+        "opportunity_weights",
+        ["is_active"],
+        unique=True,
+        postgresql_where=sa.text("is_active"),
+    )
     op.create_table(
         "organizations",
         sa.Column("slug", sa.Text(), nullable=False),
@@ -916,7 +881,7 @@ def _create_tables() -> None:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("market_id", "timeframe", "open_time", name=op.f("pk_candles")),
-        postgresql_partition_by="RANGE (open_time)",
+        postgresql_partition_by="LIST (timeframe)",
     )
     op.create_table(
         "exchange_connections",
@@ -1033,7 +998,7 @@ def _create_tables() -> None:
         "funding_rates",
         sa.Column("market_id", sa.UUID(), nullable=False),
         sa.Column("funding_time", sa.TIMESTAMP(timezone=True), nullable=False),
-        sa.Column("rate", sa.Numeric(precision=9, scale=6), nullable=False),
+        sa.Column("rate", sa.Numeric(precision=28, scale=10), nullable=False),
         sa.Column("mark_price", sa.Numeric(precision=28, scale=10), nullable=True),
         sa.ForeignKeyConstraint(
             ["market_id"],
@@ -1083,6 +1048,75 @@ def _create_tables() -> None:
         unique=False,
     )
     op.create_table(
+        "kill_switch_transitions",
+        sa.Column("organization_id", sa.UUID(), nullable=True),
+        sa.Column(
+            "scope",
+            postgresql.ENUM(
+                "system", "organization", "portfolio", name="ks_scope", create_type=False
+            ),
+            nullable=False,
+        ),
+        sa.Column("scope_id", sa.UUID(), nullable=True),
+        sa.Column(
+            "from_state",
+            postgresql.ENUM(
+                "ACTIVE",
+                "WARNING",
+                "TRADING_DISABLED",
+                "EMERGENCY",
+                name="kill_switch_state",
+                create_type=False,
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "to_state",
+            postgresql.ENUM(
+                "ACTIVE",
+                "WARNING",
+                "TRADING_DISABLED",
+                "EMERGENCY",
+                name="kill_switch_state",
+                create_type=False,
+            ),
+            nullable=False,
+        ),
+        sa.Column("reason", sa.Text(), nullable=True),
+        sa.Column("actor_type", sa.Text(), nullable=False),
+        sa.Column("actor_id", sa.UUID(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("id", sa.UUID(), nullable=False),
+        sa.CheckConstraint(
+            "(scope = 'system') = (organization_id IS NULL)",
+            name=op.f("ck_kill_switch_transitions_system_scope_has_no_org"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["organization_id"],
+            ["organizations.id"],
+            name=op.f("fk_kill_switch_transitions_organization_id_organizations"),
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_kill_switch_transitions")),
+    )
+    op.create_index(
+        op.f("ix_kill_switch_transitions_organization_id"),
+        "kill_switch_transitions",
+        ["organization_id"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_kill_switch_transitions_scope_created",
+        "kill_switch_transitions",
+        ["scope", "scope_id", "created_at"],
+        unique=False,
+    )
+    op.create_table(
         "liquidations",
         sa.Column("ts", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("market_id", sa.UUID(), nullable=False),
@@ -1118,7 +1152,7 @@ def _create_tables() -> None:
         sa.Column("quote_volume_24h", sa.Numeric(precision=28, scale=10), nullable=True),
         sa.Column("open_interest", sa.Numeric(precision=28, scale=10), nullable=True),
         sa.Column("open_interest_value", sa.Numeric(precision=28, scale=10), nullable=True),
-        sa.Column("funding_rate", sa.Numeric(precision=9, scale=6), nullable=True),
+        sa.Column("funding_rate", sa.Numeric(precision=28, scale=10), nullable=True),
         sa.Column("next_funding_time", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column("mark_price", sa.Numeric(precision=28, scale=10), nullable=True),
         sa.Column("index_price", sa.Numeric(precision=28, scale=10), nullable=True),
@@ -1859,6 +1893,9 @@ def _create_tables() -> None:
         ),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("organization_id", sa.UUID(), nullable=False),
+        sa.CheckConstraint(
+            "initial_capital >= 0", name=op.f("ck_backtests_initial_capital_non_negative")
+        ),
         sa.ForeignKeyConstraint(
             ["created_by"],
             ["users.id"],
@@ -1890,6 +1927,7 @@ def _create_tables() -> None:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_backtests")),
+        sa.UniqueConstraint("id", "organization_id", name="uq_backtests_id_org"),
     )
     op.create_index(op.f("ix_backtests_created_by"), "backtests", ["created_by"], unique=False)
     op.create_index(
@@ -1965,6 +2003,9 @@ def _create_tables() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
+        sa.CheckConstraint(
+            "initial_capital >= 0", name=op.f("ck_portfolios_initial_capital_non_negative")
+        ),
         sa.ForeignKeyConstraint(
             ["created_by"],
             ["users.id"],
@@ -1996,6 +2037,7 @@ def _create_tables() -> None:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_portfolios")),
+        sa.UniqueConstraint("id", "organization_id", name="uq_portfolios_id_org"),
     )
     op.create_index(op.f("ix_portfolios_created_by"), "portfolios", ["created_by"], unique=False)
     op.create_index(
@@ -2134,8 +2176,8 @@ def _create_tables() -> None:
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["portfolio_id"],
-            ["portfolios.id"],
+            ["portfolio_id", "organization_id"],
+            ["portfolios.id", "portfolios.organization_id"],
             name=op.f("fk_agents_portfolio_id_portfolios"),
             ondelete="CASCADE",
         ),
@@ -2152,6 +2194,7 @@ def _create_tables() -> None:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_agents")),
+        sa.UniqueConstraint("id", "organization_id", name="uq_agents_id_org"),
     )
     op.create_index(op.f("ix_agents_created_by"), "agents", ["created_by"], unique=False)
     op.create_index(
@@ -2161,6 +2204,7 @@ def _create_tables() -> None:
         unique=False,
     )
     op.create_index(op.f("ix_agents_organization_id"), "agents", ["organization_id"], unique=False)
+    op.create_index(op.f("ix_agents_portfolio_id"), "agents", ["portfolio_id"], unique=False)
     op.create_index(
         op.f("ix_agents_strategy_version_id"), "agents", ["strategy_version_id"], unique=False
     )
@@ -2189,14 +2233,30 @@ def _create_tables() -> None:
         ),
         sa.Column("trades_count", sa.Integer(), server_default="0", nullable=False),
         sa.Column("id", sa.UUID(), nullable=False),
+        sa.Column("organization_id", sa.UUID(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["backtest_id"],
-            ["backtests.id"],
+            ["backtest_id", "organization_id"],
+            ["backtests.id", "backtests.organization_id"],
             name=op.f("fk_backtest_results_backtest_id_backtests"),
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["organization_id"],
+            ["organizations.id"],
+            name=op.f("fk_backtest_results_organization_id_organizations"),
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_backtest_results")),
         sa.UniqueConstraint("backtest_id", "segment", name=op.f("uq_backtest_results_backtest_id")),
+    )
+    op.create_index(
+        op.f("ix_backtest_results_backtest_id"), "backtest_results", ["backtest_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_backtest_results_organization_id"),
+        "backtest_results",
+        ["organization_id"],
+        unique=False,
     )
     op.create_table(
         "backtest_trades",
@@ -2233,9 +2293,12 @@ def _create_tables() -> None:
             nullable=True,
         ),
         sa.Column("id", sa.UUID(), nullable=False),
+        sa.Column("organization_id", sa.UUID(), nullable=False),
+        sa.CheckConstraint("entry_price > 0", name=op.f("ck_backtest_trades_entry_price_positive")),
+        sa.CheckConstraint("qty > 0", name=op.f("ck_backtest_trades_qty_positive")),
         sa.ForeignKeyConstraint(
-            ["backtest_id"],
-            ["backtests.id"],
+            ["backtest_id", "organization_id"],
+            ["backtests.id", "backtests.organization_id"],
             name=op.f("fk_backtest_trades_backtest_id_backtests"),
             ondelete="CASCADE",
         ),
@@ -2244,6 +2307,12 @@ def _create_tables() -> None:
             ["markets.id"],
             name=op.f("fk_backtest_trades_market_id_markets"),
             ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["organization_id"],
+            ["organizations.id"],
+            name=op.f("fk_backtest_trades_organization_id_organizations"),
+            ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_backtest_trades")),
     )
@@ -2255,6 +2324,12 @@ def _create_tables() -> None:
     )
     op.create_index(
         op.f("ix_backtest_trades_market_id"), "backtest_trades", ["market_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_backtest_trades_organization_id"),
+        "backtest_trades",
+        ["organization_id"],
+        unique=False,
     )
     op.create_table(
         "notifications",
@@ -2331,6 +2406,7 @@ def _create_tables() -> None:
         op.f("ix_notifications_organization_id"), "notifications", ["organization_id"], unique=False
     )
     op.create_index(op.f("ix_notifications_rule_id"), "notifications", ["rule_id"], unique=False)
+    op.create_index(op.f("ix_notifications_user_id"), "notifications", ["user_id"], unique=False)
     op.create_table(
         "portfolio_equity_snapshots",
         sa.Column("portfolio_id", sa.UUID(), nullable=False),
@@ -2351,16 +2427,29 @@ def _create_tables() -> None:
         sa.Column("peak_equity", sa.Numeric(precision=28, scale=10), nullable=False),
         sa.Column("drawdown_pct", sa.Numeric(precision=9, scale=6), nullable=True),
         sa.Column("open_positions", sa.Integer(), server_default="0", nullable=False),
+        sa.Column("organization_id", sa.UUID(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["portfolio_id"],
-            ["portfolios.id"],
+            ["organization_id"],
+            ["organizations.id"],
+            name=op.f("fk_portfolio_equity_snapshots_organization_id_organizations"),
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["portfolio_id", "organization_id"],
+            ["portfolios.id", "portfolios.organization_id"],
             name=op.f("fk_portfolio_equity_snapshots_portfolio_id_portfolios"),
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint(
             "portfolio_id", "resolution", "ts", name=op.f("pk_portfolio_equity_snapshots")
         ),
-        postgresql_partition_by="RANGE (ts)",
+        postgresql_partition_by="LIST (resolution)",
+    )
+    op.create_index(
+        op.f("ix_portfolio_equity_snapshots_organization_id"),
+        "portfolio_equity_snapshots",
+        ["organization_id"],
+        unique=False,
     )
     op.create_table(
         "risk_events",
@@ -2499,13 +2588,23 @@ def _create_tables() -> None:
             server_default=sa.text("'{}'::jsonb"),
             nullable=False,
         ),
+        sa.Column("organization_id", sa.UUID(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["agent_id"],
-            ["agents.id"],
+            ["agent_id", "organization_id"],
+            ["agents.id", "agents.organization_id"],
             name=op.f("fk_agent_stats_agent_id_agents"),
             ondelete="CASCADE",
         ),
+        sa.ForeignKeyConstraint(
+            ["organization_id"],
+            ["organizations.id"],
+            name=op.f("fk_agent_stats_organization_id_organizations"),
+            ondelete="CASCADE",
+        ),
         sa.PrimaryKeyConstraint("agent_id", "window", name=op.f("pk_agent_stats")),
+    )
+    op.create_index(
+        op.f("ix_agent_stats_organization_id"), "agent_stats", ["organization_id"], unique=False
     )
     op.create_table(
         "positions",
@@ -2568,11 +2667,15 @@ def _create_tables() -> None:
         ),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("organization_id", sa.UUID(), nullable=False),
+        sa.CheckConstraint(
+            "avg_entry_price > 0", name=op.f("ck_positions_avg_entry_price_positive")
+        ),
+        sa.CheckConstraint("qty >= 0", name=op.f("ck_positions_qty_non_negative")),
         sa.ForeignKeyConstraint(
-            ["agent_id"],
-            ["agents.id"],
+            ["agent_id", "organization_id"],
+            ["agents.id", "agents.organization_id"],
             name=op.f("fk_positions_agent_id_agents"),
-            ondelete="SET NULL",
+            ondelete="SET NULL (agent_id)",
         ),
         sa.ForeignKeyConstraint(
             ["market_id"],
@@ -2587,8 +2690,8 @@ def _create_tables() -> None:
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["portfolio_id"],
-            ["portfolios.id"],
+            ["portfolio_id", "organization_id"],
+            ["portfolios.id", "portfolios.organization_id"],
             name=op.f("fk_positions_portfolio_id_portfolios"),
             ondelete="CASCADE",
         ),
@@ -2607,6 +2710,7 @@ def _create_tables() -> None:
     op.create_index(
         op.f("ix_positions_organization_id"), "positions", ["organization_id"], unique=False
     )
+    op.create_index(op.f("ix_positions_portfolio_id"), "positions", ["portfolio_id"], unique=False)
     op.create_table(
         "trade_proposals",
         sa.Column("portfolio_id", sa.UUID(), nullable=False),
@@ -2662,10 +2766,10 @@ def _create_tables() -> None:
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("organization_id", sa.UUID(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["agent_id"],
-            ["agents.id"],
+            ["agent_id", "organization_id"],
+            ["agents.id", "agents.organization_id"],
             name=op.f("fk_trade_proposals_agent_id_agents"),
-            ondelete="SET NULL",
+            ondelete="SET NULL (agent_id)",
         ),
         sa.ForeignKeyConstraint(
             ["market_id"],
@@ -2680,8 +2784,8 @@ def _create_tables() -> None:
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["portfolio_id"],
-            ["portfolios.id"],
+            ["portfolio_id", "organization_id"],
+            ["portfolios.id", "portfolios.organization_id"],
             name=op.f("fk_trade_proposals_portfolio_id_portfolios"),
             ondelete="CASCADE",
         ),
@@ -2698,7 +2802,7 @@ def _create_tables() -> None:
             ondelete="SET NULL",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_trade_proposals")),
-        sa.UniqueConstraint("idempotency_key", name=op.f("uq_trade_proposals_idempotency_key")),
+        sa.UniqueConstraint("organization_id", "idempotency_key", name="uq_trade_proposals_idem"),
     )
     op.create_index(
         op.f("ix_trade_proposals_agent_id"), "trade_proposals", ["agent_id"], unique=False
@@ -2717,6 +2821,9 @@ def _create_tables() -> None:
         "trade_proposals",
         ["organization_id"],
         unique=False,
+    )
+    op.create_index(
+        op.f("ix_trade_proposals_portfolio_id"), "trade_proposals", ["portfolio_id"], unique=False
     )
     op.create_index(
         op.f("ix_trade_proposals_regime_id"), "trade_proposals", ["regime_id"], unique=False
@@ -2815,8 +2922,19 @@ def _create_tables() -> None:
         ),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("organization_id", sa.UUID(), nullable=False),
+        sa.CheckConstraint(
+            "filled_qty >= 0 AND filled_qty <= qty", name=op.f("ck_orders_filled_qty_within_qty")
+        ),
+        sa.CheckConstraint("price IS NULL OR price > 0", name=op.f("ck_orders_price_positive")),
+        sa.CheckConstraint("qty > 0", name=op.f("ck_orders_qty_positive")),
+        sa.CheckConstraint(
+            "stop_price IS NULL OR stop_price > 0", name=op.f("ck_orders_stop_price_positive")
+        ),
         sa.ForeignKeyConstraint(
-            ["agent_id"], ["agents.id"], name=op.f("fk_orders_agent_id_agents"), ondelete="SET NULL"
+            ["agent_id", "organization_id"],
+            ["agents.id", "agents.organization_id"],
+            name=op.f("fk_orders_agent_id_agents"),
+            ondelete="SET NULL (agent_id)",
         ),
         sa.ForeignKeyConstraint(
             ["market_id"],
@@ -2831,8 +2949,8 @@ def _create_tables() -> None:
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["portfolio_id"],
-            ["portfolios.id"],
+            ["portfolio_id", "organization_id"],
+            ["portfolios.id", "portfolios.organization_id"],
             name=op.f("fk_orders_portfolio_id_portfolios"),
             ondelete="CASCADE",
         ),
@@ -2860,6 +2978,7 @@ def _create_tables() -> None:
         unique=False,
     )
     op.create_index(op.f("ix_orders_organization_id"), "orders", ["organization_id"], unique=False)
+    op.create_index(op.f("ix_orders_portfolio_id"), "orders", ["portfolio_id"], unique=False)
     op.create_index(op.f("ix_orders_position_id"), "orders", ["position_id"], unique=False)
     op.create_index(op.f("ix_orders_proposal_id"), "orders", ["proposal_id"], unique=False)
     op.create_index("ix_orders_status", "orders", ["status"], unique=False)
@@ -2932,8 +3051,14 @@ def _create_tables() -> None:
         sa.Column("closed_at", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("organization_id", sa.UUID(), nullable=False),
+        sa.CheckConstraint("entry_price > 0", name=op.f("ck_trades_entry_price_positive")),
+        sa.CheckConstraint("exit_price > 0", name=op.f("ck_trades_exit_price_positive")),
+        sa.CheckConstraint("qty > 0", name=op.f("ck_trades_qty_positive")),
         sa.ForeignKeyConstraint(
-            ["agent_id"], ["agents.id"], name=op.f("fk_trades_agent_id_agents"), ondelete="SET NULL"
+            ["agent_id", "organization_id"],
+            ["agents.id", "agents.organization_id"],
+            name=op.f("fk_trades_agent_id_agents"),
+            ondelete="SET NULL (agent_id)",
         ),
         sa.ForeignKeyConstraint(
             ["market_id"],
@@ -2954,8 +3079,8 @@ def _create_tables() -> None:
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["portfolio_id"],
-            ["portfolios.id"],
+            ["portfolio_id", "organization_id"],
+            ["portfolios.id", "portfolios.organization_id"],
             name=op.f("fk_trades_portfolio_id_portfolios"),
             ondelete="CASCADE",
         ),
@@ -3002,6 +3127,7 @@ def _create_tables() -> None:
         unique=False,
     )
     op.create_index(op.f("ix_trades_organization_id"), "trades", ["organization_id"], unique=False)
+    op.create_index(op.f("ix_trades_portfolio_id"), "trades", ["portfolio_id"], unique=False)
     op.create_index(op.f("ix_trades_proposal_id"), "trades", ["proposal_id"], unique=False)
     op.create_index(op.f("ix_trades_regime_id"), "trades", ["regime_id"], unique=False)
     op.create_index(op.f("ix_trades_signal_id"), "trades", ["signal_id"], unique=False)
@@ -3035,6 +3161,8 @@ def _create_tables() -> None:
         ),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("organization_id", sa.UUID(), nullable=False),
+        sa.CheckConstraint("price > 0", name=op.f("ck_fills_price_positive")),
+        sa.CheckConstraint("qty > 0", name=op.f("ck_fills_qty_positive")),
         sa.ForeignKeyConstraint(
             ["order_id"], ["orders.id"], name=op.f("fk_fills_order_id_orders"), ondelete="CASCADE"
         ),
@@ -3045,8 +3173,8 @@ def _create_tables() -> None:
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["portfolio_id"],
-            ["portfolios.id"],
+            ["portfolio_id", "organization_id"],
+            ["portfolios.id", "portfolios.organization_id"],
             name=op.f("fk_fills_portfolio_id_portfolios"),
             ondelete="CASCADE",
         ),
@@ -3060,10 +3188,12 @@ def _create_tables() -> None:
         unique=False,
     )
     op.create_index(op.f("ix_fills_organization_id"), "fills", ["organization_id"], unique=False)
+    op.create_index(op.f("ix_fills_portfolio_id"), "fills", ["portfolio_id"], unique=False)
 
 
 def _drop_tables() -> None:
     """The exact reverse of :func:`_create_tables`."""
+    op.drop_index(op.f("ix_fills_portfolio_id"), table_name="fills")
     op.drop_index(op.f("ix_fills_organization_id"), table_name="fills")
     op.drop_index("ix_fills_org_portfolio_ts", table_name="fills")
     op.drop_index(op.f("ix_fills_order_id"), table_name="fills")
@@ -3072,6 +3202,7 @@ def _drop_tables() -> None:
     op.drop_index(op.f("ix_trades_signal_id"), table_name="trades")
     op.drop_index(op.f("ix_trades_regime_id"), table_name="trades")
     op.drop_index(op.f("ix_trades_proposal_id"), table_name="trades")
+    op.drop_index(op.f("ix_trades_portfolio_id"), table_name="trades")
     op.drop_index(op.f("ix_trades_organization_id"), table_name="trades")
     op.drop_index("ix_trades_org_portfolio_closed", table_name="trades")
     op.drop_index(op.f("ix_trades_opportunity_id"), table_name="trades")
@@ -3081,6 +3212,7 @@ def _drop_tables() -> None:
     op.drop_index("ix_orders_status", table_name="orders")
     op.drop_index(op.f("ix_orders_proposal_id"), table_name="orders")
     op.drop_index(op.f("ix_orders_position_id"), table_name="orders")
+    op.drop_index(op.f("ix_orders_portfolio_id"), table_name="orders")
     op.drop_index(op.f("ix_orders_organization_id"), table_name="orders")
     op.drop_index("ix_orders_org_portfolio_created", table_name="orders")
     op.drop_index(op.f("ix_orders_market_id"), table_name="orders")
@@ -3089,33 +3221,45 @@ def _drop_tables() -> None:
     op.drop_index("ix_trade_proposals_status_expires", table_name="trade_proposals")
     op.drop_index(op.f("ix_trade_proposals_signal_id"), table_name="trade_proposals")
     op.drop_index(op.f("ix_trade_proposals_regime_id"), table_name="trade_proposals")
+    op.drop_index(op.f("ix_trade_proposals_portfolio_id"), table_name="trade_proposals")
     op.drop_index(op.f("ix_trade_proposals_organization_id"), table_name="trade_proposals")
     op.drop_index("ix_trade_proposals_org_portfolio_created", table_name="trade_proposals")
     op.drop_index(op.f("ix_trade_proposals_market_id"), table_name="trade_proposals")
     op.drop_index(op.f("ix_trade_proposals_agent_id"), table_name="trade_proposals")
     op.drop_table("trade_proposals")
+    op.drop_index(op.f("ix_positions_portfolio_id"), table_name="positions")
     op.drop_index(op.f("ix_positions_organization_id"), table_name="positions")
     op.drop_index("ix_positions_org_portfolio_status", table_name="positions")
     op.drop_index("ix_positions_market_status", table_name="positions")
     op.drop_index(op.f("ix_positions_agent_id"), table_name="positions")
     op.drop_table("positions")
+    op.drop_index(op.f("ix_agent_stats_organization_id"), table_name="agent_stats")
     op.drop_table("agent_stats")
     op.drop_index(op.f("ix_risk_events_portfolio_id"), table_name="risk_events")
     op.drop_index(op.f("ix_risk_events_organization_id"), table_name="risk_events")
     op.drop_index("ix_risk_events_org_created", table_name="risk_events")
     op.drop_index(op.f("ix_risk_events_acknowledged_by"), table_name="risk_events")
     op.drop_table("risk_events")
+    op.drop_index(
+        op.f("ix_portfolio_equity_snapshots_organization_id"),
+        table_name="portfolio_equity_snapshots",
+    )
     op.drop_table("portfolio_equity_snapshots")
+    op.drop_index(op.f("ix_notifications_user_id"), table_name="notifications")
     op.drop_index(op.f("ix_notifications_rule_id"), table_name="notifications")
     op.drop_index(op.f("ix_notifications_organization_id"), table_name="notifications")
     op.drop_index("ix_notifications_org_user_status_created", table_name="notifications")
     op.drop_table("notifications")
+    op.drop_index(op.f("ix_backtest_trades_organization_id"), table_name="backtest_trades")
     op.drop_index(op.f("ix_backtest_trades_market_id"), table_name="backtest_trades")
     op.drop_index("ix_backtest_trades_backtest_segment", table_name="backtest_trades")
     op.drop_table("backtest_trades")
+    op.drop_index(op.f("ix_backtest_results_organization_id"), table_name="backtest_results")
+    op.drop_index(op.f("ix_backtest_results_backtest_id"), table_name="backtest_results")
     op.drop_table("backtest_results")
     op.drop_index(op.f("ix_agents_workspace_id"), table_name="agents")
     op.drop_index(op.f("ix_agents_strategy_version_id"), table_name="agents")
+    op.drop_index(op.f("ix_agents_portfolio_id"), table_name="agents")
     op.drop_index(op.f("ix_agents_organization_id"), table_name="agents")
     op.drop_index("ix_agents_org_portfolio_status", table_name="agents")
     op.drop_index(op.f("ix_agents_created_by"), table_name="agents")
@@ -3194,6 +3338,11 @@ def _drop_tables() -> None:
     op.drop_table("market_snapshots")
     op.drop_index("ix_liquidations_market_ts", table_name="liquidations")
     op.drop_table("liquidations")
+    op.drop_index("ix_kill_switch_transitions_scope_created", table_name="kill_switch_transitions")
+    op.drop_index(
+        op.f("ix_kill_switch_transitions_organization_id"), table_name="kill_switch_transitions"
+    )
+    op.drop_table("kill_switch_transitions")
     op.drop_index("ix_ingestion_gaps_status_detected", table_name="ingestion_gaps")
     op.drop_index(op.f("ix_ingestion_gaps_market_id"), table_name="ingestion_gaps")
     op.drop_table("ingestion_gaps")
@@ -3217,6 +3366,11 @@ def _drop_tables() -> None:
     op.drop_table("strategy_versions")
     op.drop_index(op.f("ix_organizations_created_by"), table_name="organizations")
     op.drop_table("organizations")
+    op.drop_index(
+        "uq_opportunity_weights_active",
+        table_name="opportunity_weights",
+        postgresql_where=sa.text("is_active"),
+    )
     op.drop_index(op.f("ix_opportunity_weights_created_by"), table_name="opportunity_weights")
     op.drop_table("opportunity_weights")
     op.drop_index(op.f("ix_markets_quote_asset_id"), table_name="markets")
@@ -3248,8 +3402,6 @@ def _drop_tables() -> None:
     )
     op.drop_index("ix_market_regimes_scope_start", table_name="market_regimes")
     op.drop_table("market_regimes")
-    op.drop_index("ix_kill_switch_transitions_scope_created", table_name="kill_switch_transitions")
-    op.drop_table("kill_switch_transitions")
     op.drop_table("intelligence_sources")
     op.drop_table("feature_definitions")
     op.drop_table("exchanges")
