@@ -15,9 +15,10 @@ actual database enums created in T04.
 
 A few DB columns are typed as an enum in DATABASE.md but the doc never spells
 out their members (``market_status``, ``exchange_status``,
-``subscription_status``, ``feature_category``). Those are marked INFERRED
-below with the reasoning; T04 (database-architect) must confirm or correct
-before the migration is written — see the T03 report's CONCERNS section.
+``subscription_status``, ``feature_category``). Those were marked INFERRED by
+T03 with the reasoning; T04 (database-architect) reviewed all four and kept
+them unchanged — they are the values ``0001_initial_schema`` creates, so
+changing one now costs a migration.
 """
 
 from __future__ import annotations
@@ -75,10 +76,10 @@ class WorkspaceObjective(StrEnum):
 class SubscriptionStatus(StrEnum):
     """``subscription_status`` — DATABASE.md §2 (subscriptions.status).
 
-    INFERRED: the doc types the column but never lists members. Modeled after
-    the standard Stripe subscription lifecycle since ``ENABLE_STRIPE`` and
-    ``subscriptions.provider`` (null|stripe) are the only hints. Confirm with
-    database-architect before the migration.
+    INFERRED by T03, confirmed unchanged by T04: the doc types the column but
+    never lists members. Modeled on the Stripe subscription lifecycle since
+    ``ENABLE_STRIPE`` and ``subscriptions.provider`` (null|stripe) are the only
+    hints; billing is Phase 3, so the minimal lifecycle is kept.
     """
 
     TRIALING = "trialing"
@@ -90,8 +91,8 @@ class SubscriptionStatus(StrEnum):
 class ExchangeStatus(StrEnum):
     """``exchange_status`` — DATABASE.md §3 (exchanges.status).
 
-    INFERRED: no members listed in the doc; minimal lifecycle. Confirm with
-    database-architect before the migration.
+    INFERRED by T03, confirmed unchanged by T04: no members listed in the doc.
+    Minimal lifecycle — nothing in the docs distinguishes a third state.
     """
 
     ACTIVE = "active"
@@ -108,8 +109,9 @@ class MarketType(StrEnum):
 class MarketStatus(StrEnum):
     """``market_status`` — DATABASE.md §3 (markets.status).
 
-    INFERRED: no members listed in the doc; ``markets.delisted_at`` implies at
-    least ACTIVE/DELISTED. Confirm with database-architect before the migration.
+    INFERRED by T03, confirmed unchanged by T04: no members listed in the doc;
+    ``markets.delisted_at`` implies at least ACTIVE/DELISTED, and exchanges do
+    halt symbols without delisting them (SUSPENDED).
     """
 
     ACTIVE = "active"
@@ -138,9 +140,9 @@ class OrderSide(StrEnum):
 class FeatureCategory(StrEnum):
     """``feature_category`` — DATABASE.md §5 (feature_definitions.category).
 
-    INFERRED: no members listed in the doc; mapped 1:1 from the feature
-    groups in PIPELINE.md §2 (Preço, Volume, Volatilidade, Microestrutura,
-    Momentum, Derivativos, Cross). Confirm with database-architect.
+    INFERRED by T03, confirmed unchanged by T04: no members listed in the doc;
+    mapped 1:1 from the feature groups in PIPELINE.md §2 (Preço, Volume,
+    Volatilidade, Microestrutura, Momentum, Derivativos, Cross).
     """
 
     PRICE = "price"
@@ -339,6 +341,19 @@ class ExecutionMode(StrEnum):
     LIVE = "live"
 
 
+class LiquidityRole(StrEnum):
+    """``liquidity_role`` — DATABASE.md §7 (fills.liquidity).
+
+    The doc spells the members inline (``liquidity (maker|taker)``) but never
+    names the type; T04 named it ``liquidity_role`` so the closed set is a
+    Postgres enum like every other closed set, per §1 ("Enums: tipos ENUM do
+    Postgres, um por conceito").
+    """
+
+    MAKER = "maker"
+    TAKER = "taker"
+
+
 class OrderStatus(StrEnum):
     """``order_status`` — DATABASE.md §7 (orders.status)."""
 
@@ -513,6 +528,7 @@ ALL_ENUMS: dict[str, type[StrEnum]] = {
     "order_type": OrderType,
     "order_purpose": OrderPurpose,
     "execution_mode": ExecutionMode,
+    "liquidity_role": LiquidityRole,
     "order_status": OrderStatus,
     "position_status": PositionStatus,
     "exit_reason": ExitReason,

@@ -426,3 +426,83 @@ markets ──< candles / market_snapshots / feature_snapshots / anomalies / liq
 agent_signals ── signal_outcomes
 market_regimes ◄── opportunities, trade_proposals, trades
 ```
+
+## 15. Notas de implementação do schema inicial (M0 · T04)
+
+Decisões tomadas ao escrever `packages/core/hunter_core/db/models/**` e
+`infra/migrations/versions/0001_initial_schema.py` que **acrescentam** ou
+**precisam** o que está acima. Nada aqui contradiz as seções 1–14.
+
+### 15.1 Enums
+
+- Novo tipo `liquidity_role` (`maker|taker`) para `fills.liquidity`: a seção 7
+  dá os valores em linha mas não nomeia o tipo, e §1 exige um `ENUM` por
+  conceito fechado.
+- Enums que a doc tipa mas não enumera foram fixados assim:
+  `subscription_status` = `trialing|active|past_due|canceled`;
+  `exchange_status` = `active|inactive`;
+  `market_status` = `active|suspended|delisted`;
+  `feature_category` = `price|volume|volatility|microstructure|momentum|derivatives|cross`
+  (grupos de `PIPELINE.md` §2).
+- `portfolio_equity_snapshots.resolution` reusa `candle_timeframe`;
+  `intelligence_sources.kind` usa `intelligence_source_kind`.
+- `backtest_warning_code` é criado como tipo, mas hoje só é espelhado dentro de
+  `backtest_results.warnings` (JSONB); existe para o espelhamento 1:1 com
+  Pydantic e TS.
+- Todos os tipos são criados **explicitamente** pela migração
+  (`infra/migrations/ddl/enums.py`); os modelos declaram `create_type=False`.
+
+### 15.2 Chaves primárias de tabelas particionadas
+
+O Postgres exige que a chave de partição faça parte de qualquer PK. Onde a doc
+mostrava só `id`, a PK passa a incluir a coluna de partição:
+`liquidations (id, ts)`, `audit_logs (id, created_at)`,
+`system_events (id, created_at)`.
+
+### 15.3 Índices
+
+- Índices compostos são declarados **ascendentes** mesmo onde a doc escreve
+  `DESC`: o Postgres varre um btree para trás com o mesmo custo, e um índice
+  ascendente compara sem ruído no `alembic check`.
+- O índice parcial único de `opportunities` usa os rótulos em maiúsculas
+  (`'WATCHING','HOT','ENTRY_CANDIDATE'`), que são os valores reais de
+  `opportunity_status` (§5 os escreve em minúsculas por descuido).
+- Novo índice parcial único `uq_risk_profiles_system_preset` em `(preset)`
+  `WHERE organization_id IS NULL`: garante um preset de sistema por nome e dá a
+  `infra/scripts/seed.py` uma chave natural para o upsert.
+
+### 15.4 RLS
+
+- Além de `tenant_isolation`, `risk_profiles` recebe a política
+  `system_presets_readable` (`FOR SELECT USING (organization_id IS NULL)`).
+  Sem ela `hunter_app` não enxergaria os presets de sistema que o onboarding
+  precisa copiar. É somente leitura: o `WITH CHECK` de `tenant_isolation`
+  continua estritamente por organização, então o app nunca cria nem edita um
+  preset de sistema.
+- `agent_stats`, `backtest_results`, `backtest_trades`,
+  `portfolio_equity_snapshots` e `kill_switch_transitions` **não** têm
+  `organization_id` (conforme §6, §7 e §9) e portanto não têm RLS. O isolamento
+  delas depende do join com a tabela pai (`agents`, `backtests`, `portfolios`)
+  no repositório — os repositórios tenant-scoped precisam garantir isso.
+- `hunter_worker` recebe `BYPASSRLS` (§1.2) por um `ALTER ROLE` dentro de um
+  bloco `DO` que tolera falta de privilégio: em Postgres gerenciado o papel que
+  migra pode não poder concedê-lo, e nesse caso a migração emite um `NOTICE`
+  pedindo a concessão manual.
+- Toda tabela de tenant ganhou `FOREIGN KEY (organization_id) REFERENCES
+  organizations(id) ON DELETE CASCADE`, que o `TenantMixin` sozinho não declara.
+
+### 15.5 Partições
+
+`0001_initial_schema` cria 2026-09 a 2026-12 com limites fixos — uma migração
+reaplicada no futuro precisa produzir o mesmo schema, então não pode depender do
+relógio. Tudo depois disso é de `infra/scripts/create_partitions.py`
+(`--months-ahead`, padrão 3). As listas de tabelas particionadas e de tabelas com
+RLS estão **congeladas** em `infra/migrations/ddl/`, e testes de integração
+garantem que continuam iguais às derivadas dos modelos.
+
+### 15.6 Convenção de nomes em Python
+
+`metadata` é atributo reservado pelo SQLAlchemy declarativo; as colunas JSONB
+chamadas `metadata` são mapeadas para o atributo Python `meta`
+(`Anomaly.meta`, `Order.meta`, ...). A classe do modelo de `market_regimes` é
+`MarketRegimeRow` para não colidir com o enum `MarketRegime`.

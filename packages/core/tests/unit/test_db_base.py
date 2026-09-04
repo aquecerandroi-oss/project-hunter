@@ -6,16 +6,36 @@ from decimal import Decimal
 from typing import cast
 
 import pytest
-from sqlalchemy import TIMESTAMP, Numeric, String, Table
+from sqlalchemy import TIMESTAMP, MetaData, Numeric, String, Table
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column
 
-from hunter_core.db.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin
+from hunter_core.db.base import (
+    NAMING_CONVENTION,
+    Base,
+    TenantMixin,
+    TimestampMixin,
+    UUIDPrimaryKeyMixin,
+)
 
 pytestmark = pytest.mark.unit
 
 
-class _Widget(Base, UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin):
+class _FixtureBase(Base):
+    """Base's behaviour, but its own ``MetaData``.
+
+    ``test_widgets`` must never enter ``Base.metadata``: that metadata is what
+    Alembic autogenerate and ``alembic check`` compare against the real database,
+    so a fixture table registered there shows up as permanent schema drift the
+    moment any test module is imported (T04 hit exactly that).
+    """
+
+    __abstract__ = True
+
+    metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
+
+class _Widget(_FixtureBase, UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin):
     __tablename__ = "test_widgets"
 
     name: Mapped[str] = mapped_column(String(50))
