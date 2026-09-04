@@ -11,9 +11,7 @@
     "node": "24.20.0 — C:\\Program Files\\nodejs",
     "pnpm": "11.25.0 — %APPDATA%\\npm (npm -g)",
     "uv": "0.12.9 — winget user scope; python 3.12.14 via `uv python install`",
-    "docker": "Docker Desktop 4.89.0 (engine 29.7.2, compose v5.5.0) installed per-user at %LOCALAPPDATA%\\Programs\\DockerDesktop — daemon CANNOT start: WSL is not installed"
+    "docker": "Docker Desktop 4.89.0 (engine 29.7.2, compose v5.5.0) per-user at %LOCALAPPDATA%\\Programs\\DockerDesktop; WSL 2.7.12 with docker-desktop distro; verified 2026-09-04 with `docker run --rm hello-world` (VM: 22 CPUs, 8 GB)"
   },
-  "blockers": [
-    "WSL not installed → Docker Desktop reports 'unable to start'. Fix requires admin: `wsl --install` then reboot, then open Docker Desktop. Needed for T07 and integration tests (testcontainers); Waves 1–2 can proceed without it"
-  ]
+  "blockers": []
 }
