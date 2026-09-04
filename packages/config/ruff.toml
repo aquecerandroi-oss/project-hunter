@@ -25,7 +25,7 @@ ignore = [
 
 [lint.per-file-ignores]
 "**/tests/**" = ["S101", "S105", "S106", "T20"]   # assert, credenciais fake e print em testes
-"infra/scripts/**" = ["T20"]                       # scripts operacionais imprimem
+"**/infra/scripts/**" = ["T20"]                    # scripts operacionais imprimem
 "**/conftest.py" = ["S101"]
 
 [lint.isort]

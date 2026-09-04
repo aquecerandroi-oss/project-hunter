@@ -6,10 +6,13 @@
   "type": "module",
   "exports": {
     "./eslint": "./eslint/eslint.config.mjs",
-    "./eslint/typed": "./eslint/eslint.typed.config.mjs"
+    "./eslint/typed": "./eslint/eslint.typed.config.mjs",
+    "./tsconfig.base.json": "./tsconfig.base.json"
   },
   "scripts": {
-    "verify:eslint-rules": "node eslint/verify.mjs eslint/eslint-rules/index.cjs"
+    "verify:eslint-rules": "node eslint/verify.mjs eslint/eslint-rules/index.cjs",
+    "smoke:eslint": "node eslint/smoke.mjs",
+    "test": "pnpm run verify:eslint-rules && pnpm run smoke:eslint"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
@@ -17,6 +20,7 @@
     "eslint-import-resolver-typescript": "^4.0.0",
     "eslint-plugin-import-x": "^4.0.0",
     "globals": "^16.0.0",
+    "typescript": "^5.6",
     "typescript-eslint": "^8.0.0"
   }
 }

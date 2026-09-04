@@ -61,9 +61,11 @@ export function hunterWebConfig({ tsconfigRootDir, maxLines = 350 } = {}) {
           },
         ],
         // Aliased second registration for boundaries still being migrated toward.
-        // Empty on a greenfield project; a zone lands here (at "warn", with its
+        // The rule's own schema requires at least one zone (minItems: 1), so an
+        // empty list is invalid config, not "no zones yet" -- kept "off" on this
+        // greenfield project and flipped to "warn" with a real zone (and its
         // violation count) only when a boundary is introduced over existing code.
-        "import-x-debt/no-restricted-paths": ["warn", { zones: [] }],
+        "import-x-debt/no-restricted-paths": "off",
       },
     },
     {

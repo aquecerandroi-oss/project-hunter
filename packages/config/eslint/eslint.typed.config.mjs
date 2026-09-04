@@ -12,7 +12,7 @@ import defaultConfig from "./eslint.config.mjs";
 export default [
   ...defaultConfig,
   {
-    files: ["src/**/*.{ts,tsx}"],
+    files: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}", "hooks/**/*.{ts,tsx}"],
     languageOptions: {
       parserOptions: {
         projectService: true,

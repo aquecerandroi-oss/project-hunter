@@ -14,17 +14,19 @@ Três regras:
 | `quality/no-direct-console` | error | Proíbe `console.*` fora de `lib/logger.ts` e `instrumentation*.ts` |
 | `quality/no-direct-data-access` | error | `components/**` e `hooks/**` não importam `@/lib/server/**` (server-only) |
 
-Mais `import-x/no-restricted-paths` para a mesma fronteira e `import-x-debt/...` (vazio, reservado para dívida futura em `warn`).
+Mais `import-x/no-restricted-paths` para a mesma fronteira e `import-x-debt/...` (`off`, reservado para dívida futura — a própria regra exige `zones` não vazio, então liga em `warn` só quando uma zona real for introduzida).
 
-Dois tiers: `eslint.config.mjs` (rápido, pre-commit) e `eslint.typed.config.mjs` (type-aware, só `pnpm lint:types` em CI).
+Dois tiers: `eslint.config.mjs` (rápido, pre-commit) e `eslint.typed.config.mjs` (type-aware, só `pnpm lint:types` em CI). O tier tipado importa o default export de `eslint.config.mjs` e reaplica as mesmas globs de arquivo do layout do `apps/web` (`app/**`, `components/**`, `lib/**`, `hooks/**`) para as regras type-aware.
+
+`tsconfig.base.json` é a base estrita para os apps Next.js 15 / React 19 e pacotes TS (`target` ES2022, `moduleResolution` bundler, `strict`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`, etc.). Sem `paths` — cada app define seu próprio `@/*`. Consumido via `"@hunter/config/tsconfig.base.json"` no `extends` do `tsconfig.json` do app.
 
 **Auto-checagem obrigatória após qualquer alteração de dependência de lint:**
 
 ```bash
-pnpm --filter @hunter/config verify:eslint-rules
+pnpm --filter @hunter/config test
 ```
 
-Saída esperada: três linhas terminando em `: ok`. Executada com sucesso em 2026-09-04 (Node 24.20, eslint 9.39.5). Enquanto o workspace pnpm não existe (M0, T01), o equivalente é `npm install --no-package-lock` dentro de `packages/config` seguido de `node eslint/verify.mjs eslint/eslint-rules/index.cjs`.
+Roda `verify:eslint-rules` (self-teste das regras `quality/*` via `RuleTester`, três linhas `: ok`) e depois `smoke:eslint` (self-teste do config montado — `eslint.config.mjs` — contra arquivos que imitam o layout do `apps/web`; cinco linhas `ok`). Executado com sucesso em 2026-09-04 (Node 24.20, eslint 9.39.5).
 
 ## Python
 
