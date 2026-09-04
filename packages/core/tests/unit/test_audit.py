@@ -74,6 +74,31 @@ async def test_use_audit_sink_restores_previous_sink_on_exit() -> None:
     assert get_audit_sink() is None
 
 
+async def test_audited_does_not_record_when_the_wrapped_function_raises() -> None:
+    """No audit entry for a mutation that never actually happened, and the
+    caller sees the real error, not something swallowed/replaced by the
+    decorator.
+
+    Mutation that breaks this: wrap `result = await func(*args, **kwargs)` in
+    a try/except that still calls `sink.record(...)` (e.g. with `after=None`)
+    before re-raising — `sink.events` would then be non-empty.
+    """
+    sink = InMemoryAuditSink()
+
+    class _Boom(Exception):
+        pass
+
+    @audited("agent.enabled", "agent")
+    async def enable_agent(agent_id: str) -> str:
+        raise _Boom("cannot enable")
+
+    with use_audit_sink(sink):
+        with pytest.raises(_Boom, match="cannot enable"):
+            await enable_agent("agent-1")
+
+    assert sink.events == []
+
+
 async def test_logging_audit_sink_records_without_raising() -> None:
     calls: list[dict[str, object]] = []
 

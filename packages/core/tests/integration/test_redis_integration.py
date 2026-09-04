@@ -14,7 +14,7 @@ import pytest
 
 from hunter_core.events import EventEnvelope, ack, consume, ensure_group, publish
 from hunter_core.events.produce import FIELD_NAME
-from hunter_core.redis import acquire_lock
+from hunter_core.redis import acquire_lock, keys
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
@@ -121,3 +121,47 @@ async def test_acquire_lock_mutual_exclusion(redis_client: redis_asyncio.Redis) 
     await asyncio.gather(contender(), contender())
 
     assert sorted(results) == [False, True]
+
+
+async def test_lock_release_only_deletes_the_key_if_still_held_by_the_same_token(
+    redis_client: redis_asyncio.Redis,
+) -> None:
+    """A holder's release must never delete a lock someone else has since
+    acquired (e.g. because the original holder's TTL expired, or — as
+    simulated here — its key was otherwise removed): the release script
+    checks the stored token before deleting.
+
+    Mutation that breaks this: replace the Lua ``GET``-then-``DEL`` in
+    ``_RELEASE_IF_OWNER_SCRIPT`` (or the ``acquire_lock`` finally block) with
+    an unconditional ``await client.delete(key)`` — B's key would then be
+    deleted out from under it by A's release.
+    """
+    lock_name = f"test-lock-{uuid.uuid4().hex}"
+    key = keys.lock(lock_name)
+
+    lock_a = acquire_lock(redis_client, lock_name, ttl_ms=5_000)
+    acquired_a = await lock_a.__aenter__()
+    assert acquired_a is True
+
+    # Simulate A's lock being stolen (e.g. it expired and someone else took
+    # it) by deleting A's key out from under it.
+    await redis_client.delete(key)
+
+    lock_b = acquire_lock(redis_client, lock_name, ttl_ms=5_000)
+    acquired_b = await lock_b.__aenter__()
+    assert acquired_b is True
+    b_token = await redis_client.get(key)
+    assert b_token is not None
+
+    # A's context manager exits now, while B still believes it holds the
+    # lock. A's stale token no longer matches what's stored, so its release
+    # must be a no-op.
+    await lock_a.__aexit__(None, None, None)
+
+    still_there = await redis_client.get(key)
+    assert still_there == b_token
+
+    # B's release, by contrast, deletes its own still-current token.
+    await lock_b.__aexit__(None, None, None)
+
+    assert await redis_client.get(key) is None
