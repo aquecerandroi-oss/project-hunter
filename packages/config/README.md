@@ -16,7 +16,7 @@ Três regras:
 
 Mais `import-x/no-restricted-paths` para a mesma fronteira e `import-x-debt/...` (`off`, reservado para dívida futura — a própria regra exige `zones` não vazio, então liga em `warn` só quando uma zona real for introduzida).
 
-Dois tiers: `eslint.config.mjs` (rápido, pre-commit) e `eslint.typed.config.mjs` (type-aware, só `pnpm lint:types` em CI). O tier tipado importa o default export de `eslint.config.mjs` e reaplica as mesmas globs de arquivo do layout do `apps/web` (`app/**`, `components/**`, `lib/**`, `hooks/**`) para as regras type-aware.
+Dois tiers: `eslint.config.mjs` (rápido, pre-commit) e `eslint.typed.config.mjs` (type-aware, só `pnpm lint:types` em CI). O tier tipado exporta a factory `hunterWebTypedConfig({ tsconfigRootDir })` — igual à `hunterWebConfig` do tier rápido — porque `import.meta.dirname` dentro deste pacote resolveria para `packages/config/eslint`, não para o app consumidor; `apps/web/eslint.typed.config.mjs` chama a factory com o próprio `import.meta.dirname` e reaplica as mesmas globs de arquivo do layout do `apps/web` (`app/**`, `components/**`, `lib/**`, `hooks/**`) para as regras type-aware.
 
 `tsconfig.base.json` é a base estrita para os apps Next.js 15 / React 19 e pacotes TS (`target` ES2022, `moduleResolution` bundler, `strict`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`, etc.). Sem `paths` — cada app define seu próprio `@/*`. Consumido via `"@hunter/config/tsconfig.base.json"` no `extends` do `tsconfig.json` do app.
 

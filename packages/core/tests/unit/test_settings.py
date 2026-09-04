@@ -63,8 +63,67 @@ def test_production_succeeds_with_urls_present(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("HUNTER_ENV", "production")
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@host/db")
     monkeypatch.setenv("REDIS_URL", "redis://host:6379/0")
+    monkeypatch.setenv("WEB_ORIGIN", "https://app.hunter.example")
+    monkeypatch.setenv("API_URL", "https://api.hunter.example")
+    monkeypatch.setenv("NEXT_PUBLIC_API_URL", "https://api.hunter.example")
+    monkeypatch.setenv("NEXT_PUBLIC_WS_URL", "wss://api.hunter.example/ws")
     settings = Settings()
     assert settings.hunter_env == "production"
+
+
+def _set_required_production_urls(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@host/db")
+    monkeypatch.setenv("REDIS_URL", "redis://host:6379/0")
+    monkeypatch.setenv("WEB_ORIGIN", "https://app.hunter.example")
+    monkeypatch.setenv("API_URL", "https://api.hunter.example")
+    monkeypatch.setenv("NEXT_PUBLIC_API_URL", "https://api.hunter.example")
+    monkeypatch.setenv("NEXT_PUBLIC_WS_URL", "wss://api.hunter.example/ws")
+
+
+@pytest.mark.parametrize("hunter_env", ["production", "staging"])
+def test_fails_fast_without_web_origin_in_prod_and_staging(
+    monkeypatch: pytest.MonkeyPatch, hunter_env: str
+) -> None:
+    monkeypatch.setenv("HUNTER_ENV", hunter_env)
+    _set_required_production_urls(monkeypatch)
+    monkeypatch.setenv("WEB_ORIGIN", "")
+    with pytest.raises(ValidationError, match="WEB_ORIGIN"):
+        Settings()
+
+
+def test_fails_fast_naming_every_missing_public_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HUNTER_ENV", "production")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@host/db")
+    monkeypatch.setenv("REDIS_URL", "redis://host:6379/0")
+    monkeypatch.setenv("WEB_ORIGIN", "")
+    monkeypatch.setenv("API_URL", "")
+    monkeypatch.setenv("NEXT_PUBLIC_API_URL", "")
+    monkeypatch.setenv("NEXT_PUBLIC_WS_URL", "")
+    with pytest.raises(ValidationError) as exc_info:
+        Settings()
+    message = str(exc_info.value)
+    assert "WEB_ORIGIN" in message
+    assert "API_URL" in message
+    assert "NEXT_PUBLIC_API_URL" in message
+    assert "NEXT_PUBLIC_WS_URL" in message
+
+
+def test_production_succeeds_with_all_urls_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HUNTER_ENV", "production")
+    _set_required_production_urls(monkeypatch)
+    settings = Settings()
+    assert settings.hunter_env == "production"
+
+
+def test_development_without_public_urls_uses_localhost_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HUNTER_ENV", "development")
+    settings = Settings()
+    assert settings.web_origin == "http://localhost:3000"
+    assert settings.api_url == "http://localhost:8000"
+    assert settings.next_public_api_url == "http://localhost:8000"
+    assert settings.next_public_ws_url == "ws://localhost:8000/ws"
 
 
 def test_is_production_and_is_development_properties(monkeypatch: pytest.MonkeyPatch) -> None:

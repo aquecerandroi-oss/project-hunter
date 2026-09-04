@@ -17,4 +17,9 @@ app = create_app(get_api_settings())
 def run() -> None:
     """Start uvicorn against :data:`app`, bound to ``ApiSettings.api_port``."""
     settings = get_api_settings()
-    uvicorn.run("hunter_api.main:app", host="0.0.0.0", port=settings.api_port, reload=False)
+    uvicorn.run(
+        "hunter_api.main:app",
+        host="0.0.0.0",  # nosec B104 -- container binds all interfaces behind the platform ingress
+        port=settings.api_port,
+        reload=False,
+    )

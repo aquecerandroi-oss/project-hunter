@@ -103,15 +103,26 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _require_urls_in_prod(self) -> Settings:
-        if self.hunter_env != "production":
+        if self.hunter_env not in ("production", "staging"):
             return self
-        missing = [
-            name
-            for name, value in (("DATABASE_URL", self.database_url), ("REDIS_URL", self.redis_url))
-            if value is None or not value.get_secret_value()
+        secret_checks: list[tuple[str, SecretStr | None]] = [
+            ("DATABASE_URL", self.database_url),
+            ("REDIS_URL", self.redis_url),
         ]
+        plain_checks: list[tuple[str, str]] = [
+            ("WEB_ORIGIN", self.web_origin),
+            ("API_URL", self.api_url),
+            ("NEXT_PUBLIC_API_URL", self.next_public_api_url),
+            ("NEXT_PUBLIC_WS_URL", self.next_public_ws_url),
+        ]
+        missing = [
+            name for name, value in secret_checks if value is None or not value.get_secret_value()
+        ]
+        missing += [name for name, value in plain_checks if not value]
         if missing:
-            raise ValueError(f"missing required settings in production: {', '.join(missing)}")
+            raise ValueError(
+                f"missing required settings in {self.hunter_env}: {', '.join(missing)}"
+            )
         return self
 
     @property

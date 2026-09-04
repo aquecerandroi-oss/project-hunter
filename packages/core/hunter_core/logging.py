@@ -1,4 +1,4 @@
-"""structlog configuration: JSON in prod, pretty console in dev/test.
+"""structlog configuration: JSON in staging/production, pretty console in dev/test.
 
 ARCHITECTURE.md §11: "Logs JSON com request_id, org_id, role, event_id."
 SECURITY.md §4: no secret ever reaches a log. The redaction processor below
@@ -44,11 +44,17 @@ def redact_processor(
     return {key: _redact(key, value) for key, value in event_dict.items()}
 
 
+def is_json_logging(settings: Settings) -> bool:
+    """``True`` when logs should render as JSON (``staging`` and ``production``)."""
+    return settings.hunter_env in ("staging", "production")
+
+
 def configure_logging(settings: Settings, role: str) -> None:
     """Configure structlog + stdlib logging for this process.
 
-    JSON renderer in prod (machine-readable, one line per event); a readable
-    console renderer otherwise. Every event is bound with ``role``.
+    JSON renderer in staging/production (machine-readable, one line per
+    event); a readable console renderer otherwise. Every event is bound with
+    ``role``.
     """
     shared_processors: list[structlog.types.Processor] = [
         structlog.contextvars.merge_contextvars,
@@ -60,7 +66,7 @@ def configure_logging(settings: Settings, role: str) -> None:
     ]
     renderer: structlog.types.Processor = (
         structlog.processors.JSONRenderer()
-        if settings.hunter_env == "prod"
+        if is_json_logging(settings)
         else structlog.dev.ConsoleRenderer()
     )
 
