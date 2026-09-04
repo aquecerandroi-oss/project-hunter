@@ -168,22 +168,25 @@ async def test_dispatcher_starts_on_first_subscribe_and_stops_on_last_unsubscrib
     pubsub = _FakePubSub()
     bridge = RedisBridge(_FakeRedisClient(pubsub), _noop)
 
-    assert bridge._dispatcher is None
+    assert not bridge.is_running
 
     await bridge.ensure_subscribed("rt:radar")
     await _drain()
-    dispatcher = bridge._dispatcher
+    assert bridge.is_running
+    # Task identity (not just is_running) is needed below to prove the same
+    # dispatcher keeps serving both channels rather than being torn down and
+    # recreated in between.
+    dispatcher = bridge._dispatcher  # pyright: ignore[reportPrivateUsage]
     assert dispatcher is not None
-    assert not dispatcher.done()
 
     await bridge.ensure_subscribed("rt:system")
-    assert bridge._dispatcher is dispatcher  # one dispatcher serves both channels
+    assert bridge._dispatcher is dispatcher  # pyright: ignore[reportPrivateUsage]  # one dispatcher serves both channels
 
     await bridge.unsubscribe("rt:radar")
-    assert bridge._dispatcher is dispatcher  # rt:system still active
+    assert bridge._dispatcher is dispatcher  # pyright: ignore[reportPrivateUsage]  # rt:system still active
 
     await bridge.unsubscribe("rt:system")
-    assert bridge._dispatcher is None
+    assert not bridge.is_running
     assert dispatcher.cancelled()
 
 

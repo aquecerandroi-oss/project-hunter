@@ -75,6 +75,11 @@ class RedisBridge:
     def active_channels(self) -> list[str]:
         return sorted(self._channels | self._patterns)
 
+    @property
+    def is_running(self) -> bool:
+        """Whether the dispatcher task is alive (exists and hasn't finished)."""
+        return self._dispatcher is not None and not self._dispatcher.done()
+
     async def ensure_subscribed(self, channel: str) -> None:
         """Subscribe to ``channel`` if not already subscribed; idempotent.
 
