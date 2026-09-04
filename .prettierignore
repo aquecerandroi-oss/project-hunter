@@ -1,0 +1,9 @@
+node_modules
+.next
+dist
+pnpm-lock.yaml
+uv.lock
+packages/config/eslint/eslint-rules/**
+packages/config/eslint/verify.mjs
+.claude/rules/**
+*.md

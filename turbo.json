@@ -1,0 +1,21 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": ["CI"],
+  "tasks": {
+    "lint": {},
+    "lint:types": {},
+    "typecheck": {},
+    "test": {},
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+    },
+    "gen:types": {
+      "cache": false
+    },
+    "e2e": {
+      "cache": false,
+      "dependsOn": ["build"]
+    }
+  }
+}

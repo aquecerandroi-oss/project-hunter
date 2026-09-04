@@ -1,0 +1,84 @@
+[project]
+name = "project-hunter"
+version = "0.0.0"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = [
+  "packages/core",
+  "packages/exchange-adapters",
+  "packages/indicators",
+  "packages/risk-core",
+  "apps/api",
+  "services/market-worker",
+  "services/scanner-worker",
+  "services/strategy-worker",
+  "services/execution-worker",
+  "services/analytics-worker",
+]
+
+[tool.uv.sources]
+hunter-core = { workspace = true }
+hunter-exchanges = { workspace = true }
+hunter-indicators = { workspace = true }
+hunter-risk = { workspace = true }
+hunter-api = { workspace = true }
+hunter-market-worker = { workspace = true }
+hunter-scanner-worker = { workspace = true }
+hunter-strategy-worker = { workspace = true }
+hunter-execution-worker = { workspace = true }
+hunter-analytics-worker = { workspace = true }
+
+[dependency-groups]
+dev = [
+  "ruff>=0.8",
+  "pyright>=1.1.390",
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "pytest-cov>=6",
+  "hypothesis>=6.115",
+  "testcontainers[postgres,redis]>=4.8",
+  "pre-commit>=4",
+  "pip-audit>=2.7",
+  "bandit>=1.8",
+]
+
+[tool.ruff]
+extend = "packages/config/ruff.toml"
+# ruff >= 0.12 also formats fenced ```python blocks inside Markdown; docs/ is
+# documentation-writer's territory (Portuguese, illustrative pseudo-code), not
+# something this task formats.
+extend-exclude = ["docs/**"]
+
+# `extend` resolves the parent file's relative per-file-ignore globs against the
+# parent file's own directory (packages/config), not the repo root, so root-relative
+# patterns like "infra/scripts/**" never match here. Re-anchor with a "**/" prefix so
+# ruff falls back to basename-style matching instead of overriding the working list.
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106", "T20"]
+"**/infra/scripts/**" = ["T20"]
+"**/conftest.py" = ["S101"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+include = ["packages", "apps", "services", "infra/scripts"]
+exclude = ["**/node_modules", "**/.venv", "infra/migrations/versions"]
+reportMissingTypeStubs = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["packages", "apps", "services", "tests"]
+markers = [
+  "unit: fast, no IO",
+  "integration: needs Postgres/Redis via testcontainers",
+  "live: hits a real exchange API; never in CI",
+]
+addopts = "-ra --strict-markers"
+filterwarnings = ["error::DeprecationWarning:hunter_.*"]

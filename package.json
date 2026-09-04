@@ -1,0 +1,25 @@
+{
+  "name": "project-hunter",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "turbo run lint",
+    "lint:types": "turbo run lint:types",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "build": "turbo run build",
+    "gen:types": "turbo run gen:types",
+    "e2e": "turbo run e2e",
+    "verify:eslint-rules": "pnpm --filter @hunter/config verify:eslint-rules",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "turbo": "^2",
+    "prettier": "^3",
+    "typescript": "^5.6"
+  }
+}

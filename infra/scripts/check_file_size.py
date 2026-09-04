@@ -21,8 +21,20 @@ from pathlib import Path
 
 ROOTS = ("apps", "services", "packages", "infra/scripts")
 SKIP_DIRS = {
-    ".venv", "node_modules", "__pycache__", "migrations", "generated", "__generated__",
-    "fixtures", "mocks", "__mocks__", "tests", "__tests__", ".git", "dist", "build",
+    ".venv",
+    "node_modules",
+    "__pycache__",
+    "migrations",
+    "generated",
+    "__generated__",
+    "fixtures",
+    "mocks",
+    "__mocks__",
+    "tests",
+    "__tests__",
+    ".git",
+    "dist",
+    "build",
 }
 SKIP_NAMES = {"__init__.py", "conftest.py", "types.py", "constants.py", "enums.py"}
 
@@ -41,15 +53,23 @@ def count_lines(path: Path) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--max", type=int, default=350, help="line budget per file (default 350)")
-    parser.add_argument("--baseline", type=Path, default=None, help="file with known offenders, one path per line")
+    parser.add_argument(
+        "--baseline", type=Path, default=None, help="file with known offenders, one path per line"
+    )
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="repository root")
     args = parser.parse_args()
 
     baseline: set[str] = set()
     if args.baseline and args.baseline.exists():
-        baseline = {line.strip().replace("\\", "/") for line in args.baseline.read_text().splitlines() if line.strip()}
+        baseline = {
+            line.strip().replace("\\", "/")
+            for line in args.baseline.read_text().splitlines()
+            if line.strip()
+        }
 
     offenders: list[tuple[int, str]] = []
     grandfathered: list[tuple[int, str]] = []
@@ -71,7 +91,9 @@ def main() -> int:
         print(f"warn  {lines:5d} > {args.max}  {rel}  (baseline)")
     for lines, rel in sorted(offenders, reverse=True):
         print(f"error {lines:5d} > {args.max}  {rel}")
-    print(f"scanned {scanned} files; {len(offenders)} over budget, {len(grandfathered)} grandfathered")
+    print(
+        f"scanned {scanned} files; {len(offenders)} over budget, {len(grandfathered)} grandfathered"
+    )
     return 1 if offenders else 0
 
 

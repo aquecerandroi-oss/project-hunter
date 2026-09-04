@@ -1,0 +1,14 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hunter-risk"
+version = "0.0.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "hunter-core",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["hunter_risk"]

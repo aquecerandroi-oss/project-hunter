@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hunter-analytics-worker"
+version = "0.0.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "hunter-core",
+  "numpy>=2.1",
+  "polars>=1.12",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["hunter_analytics_worker"]
