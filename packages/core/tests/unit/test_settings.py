@@ -151,7 +151,7 @@ def test_is_production_and_is_development_properties(monkeypatch: pytest.MonkeyP
 
 
 def test_dump_safe_masks_secrets_and_keeps_public_fields(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:supersecret@host/db")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:FAKEsupersecret@host/db")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-real-secret-value")
     monkeypatch.setenv("WEB_ORIGIN", "http://localhost:3000")
 
