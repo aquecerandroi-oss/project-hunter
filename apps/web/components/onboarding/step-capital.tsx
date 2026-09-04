@@ -18,8 +18,8 @@ export function StepCapital({ data, onChange }: StepCapitalProps) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">Capital virtual</h2>
-        <p className="mt-1 text-sm text-muted">
+        <h2 className="text-lg font-semibold text-fg">Capital virtual</h2>
+        <p className="mt-1 text-sm text-fg-muted">
           Vira o capital inicial padrão dos portfolios paper (a partir do Milestone 3). Mínimo de{" "}
           {formatMoney(MIN_VIRTUAL_CAPITAL, { currency: "USD" })}.
         </p>
@@ -31,10 +31,10 @@ export function StepCapital({ data, onChange }: StepCapitalProps) {
             type="button"
             onClick={() => onChange({ virtualCapital: String(preset) })}
             className={cn(
-              "rounded-md border px-3 py-2 text-sm font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "rounded-md border px-3 py-2 text-sm font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold",
               isPreset && Number(data.virtualCapital) === preset
-                ? "border-accent bg-surface-3 text-foreground"
-                : "border-border bg-surface-2 text-foreground hover:bg-surface-3",
+                ? "border-gold bg-gold-soft text-fg"
+                : "border-border bg-bg-overlay text-fg hover:border-border-strong",
             )}
           >
             {formatMoney(preset, { decimals: 0 })}
@@ -42,18 +42,18 @@ export function StepCapital({ data, onChange }: StepCapitalProps) {
         ))}
       </div>
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-foreground">Ou um valor customizado (USDT)</span>
+        <span className="font-medium text-fg">Ou um valor customizado (USDT)</span>
         <input
           inputMode="decimal"
           value={data.virtualCapital}
           onChange={(e) => onChange({ virtualCapital: e.target.value })}
           placeholder="10000"
           className={cn(
-            "num rounded-md border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            valid ? "border-border" : "border-negative",
+            "num rounded-md border bg-bg-overlay px-3 py-2 text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-gold",
+            valid ? "border-border" : "border-red",
           )}
         />
-        {!valid && <span className="text-xs text-negative">Use um número ≥ {MIN_VIRTUAL_CAPITAL} (ex.: 10000 ou 10000.50)</span>}
+        {!valid && <span className="text-xs text-red">Use um número ≥ {MIN_VIRTUAL_CAPITAL} (ex.: 10000 ou 10000.50)</span>}
       </label>
     </div>
   );

@@ -29,20 +29,20 @@ export default async function MembersSettingsPage({ params }: MembersSettingsPag
   return (
     <div className="flex flex-col gap-6">
       <section>
-        <h2 className="mb-2 text-sm font-medium text-muted">Membros ({members.items.length}{members.next_cursor ? "+" : ""})</h2>
+        <h2 className="mb-2 text-sm font-medium text-fg-muted">Membros ({members.items.length}{members.next_cursor ? "+" : ""})</h2>
         <MembersTable orgId={orgId} members={members.items} currentRole={membership.role} />
       </section>
 
       {canInvite && (
         <section>
-          <h2 className="mb-2 text-sm font-medium text-muted">Convidar</h2>
+          <h2 className="mb-2 text-sm font-medium text-fg-muted">Convidar</h2>
           <InviteForm orgId={orgId} currentRole={membership.role} />
         </section>
       )}
 
       {canInvite && (
         <section>
-          <h2 className="mb-2 text-sm font-medium text-muted">Convites pendentes</h2>
+          <h2 className="mb-2 text-sm font-medium text-fg-muted">Convites pendentes</h2>
           <InvitationsList orgId={orgId} invitations={invitations.items} />
         </section>
       )}

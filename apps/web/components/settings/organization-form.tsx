@@ -38,20 +38,20 @@ export function OrganizationForm({ orgId, initialName, canEdit }: OrganizationFo
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-foreground">Nome da organização</span>
+        <span className="font-medium text-fg">Nome da organização</span>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={!canEdit}
           maxLength={120}
-          className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-md border border-border bg-bg-overlay px-3 py-2 text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-60"
         />
       </label>
       {!canEdit && (
-        <p className="text-xs text-muted">Somente Admin ou Owner podem renomear a organização.</p>
+        <p className="text-xs text-fg-muted">Somente Admin ou Owner podem renomear a organização.</p>
       )}
-      {error && <p className="text-sm text-negative">{error}</p>}
-      {saved && !error && <p className="text-sm text-positive">Salvo.</p>}
+      {error && <p className="text-sm text-red">{error}</p>}
+      {saved && !error && <p className="text-sm text-green">Salvo.</p>}
       {canEdit && (
         <Button type="submit" size="sm" className="self-start" disabled={pending || !valid || name === initialName}>
           {pending ? "Salvando..." : "Salvar"}

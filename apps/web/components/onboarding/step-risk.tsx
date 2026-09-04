@@ -16,8 +16,8 @@ export function StepRisk({ data, onChange }: StepRiskProps) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">Perfil de risco</h2>
-        <p className="mt-1 text-sm text-muted">O preset é copiado para os limites de risco da sua organização.</p>
+        <h2 className="text-lg font-semibold text-fg">Perfil de risco</h2>
+        <p className="mt-1 text-sm text-fg-muted">O preset é copiado para os limites de risco da sua organização.</p>
       </div>
       <div role="radiogroup" aria-label="Perfil de risco" className="grid gap-2 sm:grid-cols-4">
         {RISK_PRESETS.map((preset) => {
@@ -30,8 +30,8 @@ export function StepRisk({ data, onChange }: StepRiskProps) {
               aria-checked={selected}
               onClick={() => onChange({ riskPreset: preset })}
               className={cn(
-                "rounded-md border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                selected ? "border-accent bg-surface-3 text-foreground" : "border-border bg-surface-2 text-foreground hover:bg-surface-3",
+                "rounded-md border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold",
+                selected ? "border-gold bg-gold-soft text-fg" : "border-border bg-bg-overlay text-fg hover:border-border-strong",
               )}
             >
               {RISK_PRESET_LABELS[preset]}
@@ -41,33 +41,33 @@ export function StepRisk({ data, onChange }: StepRiskProps) {
       </div>
 
       {data.riskPreset === "custom" ? (
-        <div className="flex items-center gap-2 rounded-md border border-dashed border-border p-3 text-sm text-muted">
+        <div className="flex items-center gap-2 rounded-md border border-dashed border-border p-3 text-sm text-fg-muted">
           Ajuste fino de limites por checagem individual
           <PlannedBadge milestone="M4" />
           na Risk Center. Por enquanto, o preset Customizado começa com os mesmos limites do Balanceado.
         </div>
       ) : (
         <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-surface-2 text-muted">
+          <table className="w-full text-left">
+            <thead className="bg-bg-overlay text-xs text-fg-muted">
               <tr>
-                <th className="px-3 py-2 font-medium">Limite</th>
-                <th className="px-3 py-2 font-medium">Conservador</th>
-                <th className="px-3 py-2 font-medium">Balanceado</th>
-                <th className="px-3 py-2 font-medium">Agressivo</th>
+                <th className="h-8 px-3 font-medium">Limite</th>
+                <th className="h-8 px-3 font-medium">Conservador</th>
+                <th className="h-8 px-3 font-medium">Balanceado</th>
+                <th className="h-8 px-3 font-medium">Agressivo</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="text-[13px]">
               {RISK_LIMITS_TABLE.map((row) => (
-                <tr key={row.key} className="border-t border-border">
-                  <td className="px-3 py-2 text-foreground">{row.label}</td>
-                  <td className={cn("num px-3 py-2", data.riskPreset === "conservative" ? "font-semibold text-foreground" : "text-muted")}>
+                <tr key={row.key} className="h-8 border-t border-border">
+                  <td className="px-3 text-fg">{row.label}</td>
+                  <td className={cn("num px-3", data.riskPreset === "conservative" ? "font-semibold text-fg" : "text-fg-muted")}>
                     {row.conservative}
                   </td>
-                  <td className={cn("num px-3 py-2", data.riskPreset === "balanced" ? "font-semibold text-foreground" : "text-muted")}>
+                  <td className={cn("num px-3", data.riskPreset === "balanced" ? "font-semibold text-fg" : "text-fg-muted")}>
                     {row.balanced}
                   </td>
-                  <td className={cn("num px-3 py-2", data.riskPreset === "aggressive" ? "font-semibold text-foreground" : "text-muted")}>
+                  <td className={cn("num px-3", data.riskPreset === "aggressive" ? "font-semibold text-fg" : "text-fg-muted")}>
                     {row.aggressive}
                   </td>
                 </tr>

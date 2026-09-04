@@ -32,8 +32,8 @@ export function SettingsNav({ orgSlug }: SettingsNavProps) {
             href={href}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-foreground/80 hover:bg-surface-2 hover:text-foreground",
-              isActive && "bg-surface-2 text-foreground",
+              "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-fg/80 hover:bg-bg-overlay hover:text-fg",
+              isActive && "bg-bg-overlay text-fg",
             )}
           >
             {tab.label}

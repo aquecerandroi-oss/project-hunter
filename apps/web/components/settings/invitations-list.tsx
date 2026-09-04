@@ -24,7 +24,7 @@ export function InvitationsList({ orgId, invitations }: InvitationsListProps) {
 
   const pendingInvitations = invitations.filter((i) => !i.accepted_at);
   if (pendingInvitations.length === 0) {
-    return <p className="text-sm text-muted">Nenhum convite pendente.</p>;
+    return <p className="text-sm text-fg-muted">Nenhum convite pendente.</p>;
   }
 
   function handleRevoke(id: string): void {
@@ -38,16 +38,16 @@ export function InvitationsList({ orgId, invitations }: InvitationsListProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      {error && <p className="text-sm text-negative">{error}</p>}
+      {error && <p className="text-sm text-red">{error}</p>}
       <ul className="flex flex-col gap-2">
         {pendingInvitations.map((invitation) => (
           <li
             key={invitation.id}
-            className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-2 px-3 py-2 text-sm"
+            className="flex items-center justify-between gap-2 rounded-md border border-border bg-bg-overlay px-3 py-2 text-sm"
           >
             <div>
-              <p className="text-foreground">{invitation.email}</p>
-              <p className="text-xs text-muted">
+              <p className="text-fg">{invitation.email}</p>
+              <p className="text-xs text-fg-muted">
                 {invitation.role} · expira em {formatExpiry(invitation.expires_at)}
               </p>
             </div>

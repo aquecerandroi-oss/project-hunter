@@ -15,7 +15,7 @@ export function TooltipContent({ className, sideOffset = 6, ...props }: Componen
       <TooltipPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "z-50 overflow-hidden rounded-md border border-border bg-surface-3 px-3 py-1.5 text-xs text-foreground shadow-md",
+          "z-50 overflow-hidden rounded-md border border-border bg-bg-overlay px-3 py-1.5 text-xs text-fg shadow-md",
           className,
         )}
         {...props}

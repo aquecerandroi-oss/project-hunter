@@ -1,40 +1,50 @@
 @import "tailwindcss";
 
 /*
- * Dark-first design tokens (docs/PRODUCT.md §7): high information density,
- * fixed semantic colors for long/short and PnL, tabular numerals for prices.
- * Tailwind 4 turns every `@theme` entry into both a real CSS custom property
- * (on `:root`) and a matching utility (e.g. `--color-accent` -> `bg-accent`,
- * `text-accent`). The light theme below overrides the *values* of the same
- * custom properties under `[data-theme="light"]` / `.light`, so the utility
- * classes generated here keep working unchanged in both themes.
+ * Visual identity (docs/DESIGN.md): gold (Bitcoin reference), green, black,
+ * white. Dark-first, light theme equally cared for. Tailwind 4 turns every
+ * `@theme` entry into both a real CSS custom property (on `:root`) and a
+ * matching utility (`--color-gold` -> `bg-gold`, `text-gold`, `border-gold`,
+ * `ring-gold`, ...). The light theme below overrides the *values* of the
+ * same custom properties under `[data-theme="light"]` / `.light`, so the
+ * utility classes generated here keep working unchanged in both themes.
+ *
+ * Exact hex values are the contract in docs/DESIGN.md §1 -- do not hand-edit
+ * a value here without updating that table too (and re-running
+ * tests/theme-contrast.test.ts, the source of truth for AA compliance).
  */
 @theme {
   --font-sans: Inter, ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Surface layers, dark by default */
-  --color-background: oklch(16% 0.012 260);
-  --color-surface-1: oklch(20% 0.013 260);
-  --color-surface-2: oklch(24% 0.014 260);
-  --color-surface-3: oklch(29% 0.015 260);
-  --color-foreground: oklch(96% 0.004 260);
-  --color-muted: oklch(64% 0.012 260);
-  --color-border: oklch(32% 0.014 260);
+  /* Three background levels (dark by default) */
+  --color-bg: #0a0a0a;
+  --color-bg-elevated: #111111;
+  --color-bg-overlay: #161616;
 
-  --color-accent: oklch(70% 0.16 250);
-  --color-accent-foreground: oklch(12% 0.01 250);
-  --color-ring: oklch(70% 0.16 250);
+  /* Two border levels */
+  --color-border: #232323;
+  --color-border-strong: #2e2e2e;
 
-  /*
-   * Fixed semantic colors (docs/CLAUDE.md: "fixed semantic colors for
-   * long/short and positive/negative"). These never change between themes --
-   * a red short position must read the same in light and dark mode.
-   */
-  --color-long: oklch(72% 0.19 150);
-  --color-short: oklch(65% 0.22 25);
-  --color-positive: oklch(72% 0.19 150);
-  --color-negative: oklch(65% 0.22 25);
-  --color-warning: oklch(80% 0.17 85);
+  /* Three foreground levels */
+  --color-fg: #f5f5f5;
+  --color-fg-muted: #a3a3a3;
+  --color-fg-subtle: #6b6b6b;
+
+  /* Gold -- brand, primary action, active item, focus. Rare by design. */
+  --color-gold: #f2b705;
+  --color-gold-strong: #d99e00;
+  --color-gold-soft: #3a2e08;
+  --color-gold-fg: #0a0a0a;
+
+  /* Semantic: positive/long/healthy vs. negative/short/error, never decorative */
+  --color-green: #22c55e;
+  --color-green-soft: #0e2a1a;
+  --color-red: #ef4444;
+  --color-red-soft: #2a0e0e;
+
+  --color-warning: #f59e0b;
+  --color-info: #60a5fa;
 }
 
 :root,
@@ -45,14 +55,36 @@
 .light,
 [data-theme="light"] {
   color-scheme: light;
-  --color-background: oklch(99% 0.002 260);
-  --color-surface-1: oklch(97% 0.003 260);
-  --color-surface-2: oklch(94% 0.004 260);
-  --color-surface-3: oklch(90% 0.006 260);
-  --color-foreground: oklch(15% 0.008 260);
-  --color-muted: oklch(45% 0.012 260);
-  --color-border: oklch(85% 0.008 260);
-  --color-accent-foreground: oklch(98% 0.003 250);
+
+  --color-bg: #ffffff;
+  --color-bg-elevated: #fafafa;
+  --color-bg-overlay: #f3f3f3;
+
+  --color-border: #e5e5e5;
+  --color-border-strong: #d4d4d4;
+
+  --color-fg: #0a0a0a;
+  --color-fg-muted: #525252;
+  --color-fg-subtle: #8a8a8a;
+
+  /*
+   * Darker gold than the dark theme's -- needed for AA contrast on white.
+   * #B8860B (docs/DESIGN.md's original pick) only reaches 3.25:1 against
+   * white and against `gold-fg`; #8A6D00 reaches 4.92:1 for both (verified
+   * by tests/theme-contrast.test.ts). See docs/DESIGN.md §1's note.
+   */
+  --color-gold: #8a6d00;
+  --color-gold-strong: #6e5700;
+  --color-gold-soft: #fff4d6;
+  --color-gold-fg: #ffffff;
+
+  --color-green: #15803d;
+  --color-green-soft: #dcfce7;
+  --color-red: #b91c1c;
+  --color-red-soft: #fee2e2;
+
+  --color-warning: #b45309;
+  --color-info: #1d4ed8;
 }
 
 body {
@@ -60,13 +92,14 @@ body {
 }
 
 /*
- * Numbers (prices, PnL, quantities) always use tabular figures so columns
- * align. Tailwind ships `tabular-nums` as a core `font-variant-numeric`
- * utility already -- this class exists only for call sites that prefer a
- * semantic name over the Tailwind primitive.
+ * Numbers (prices, PnL, quantities, ids) always use tabular figures in the
+ * monospace stack so columns align (docs/DESIGN.md §2). Pair with an
+ * explicit sign (+1,23% / -0,45%) and semantic color at the call site --
+ * this utility only fixes the numeral shape and font, never the color.
  */
 @layer utilities {
   .num {
+    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }
 }

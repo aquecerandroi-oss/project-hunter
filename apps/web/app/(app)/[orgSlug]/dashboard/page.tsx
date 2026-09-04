@@ -34,7 +34,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold text-foreground">Dashboard</h1>
+      <h1 className="text-xl font-semibold text-fg">Dashboard</h1>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <OrganizationCard organization={membership.organization} role={membership.role} />
         {workspace ? (

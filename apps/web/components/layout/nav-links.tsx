@@ -47,7 +47,7 @@ export function NavLinks({ items, orgSlug, collapsed = false, onNavigate = () =>
                   aria-describedby={descriptionId}
                   tabIndex={0}
                   onClick={(event) => event.preventDefault()}
-                  className="flex w-full cursor-not-allowed items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-muted opacity-60"
+                  className="flex w-full cursor-not-allowed items-center gap-2 rounded-md border-l-2 border-transparent px-3 py-2 text-left text-sm text-fg-subtle opacity-60"
                 >
                   <Icon className="size-4 shrink-0" aria-hidden="true" />
                   {label}
@@ -75,8 +75,11 @@ export function NavLinks({ items, orgSlug, collapsed = false, onNavigate = () =>
             onClick={onNavigate}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-surface-2 hover:text-foreground",
-              isActive && "bg-surface-2 text-foreground",
+              // 2px transparent border reserves the space the gold active
+              // bar occupies so the label doesn't shift when it appears
+              // (docs/DESIGN.md §3: "item ativo com barra dourada de 2px").
+              "flex items-center gap-2 rounded-md border-l-2 border-transparent px-3 py-2 text-sm font-medium text-fg/80 hover:bg-bg-overlay hover:text-fg",
+              isActive && "border-gold bg-bg-overlay text-fg",
             )}
           >
             <Icon className="size-4 shrink-0" aria-hidden="true" />

@@ -5,15 +5,17 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-accent text-accent-foreground hover:bg-accent/90",
-        secondary: "bg-surface-2 text-foreground hover:bg-surface-3",
-        outline: "border border-border bg-transparent text-foreground hover:bg-surface-2",
-        ghost: "text-foreground hover:bg-surface-2",
-        destructive: "bg-negative text-white hover:bg-negative/90",
+        // Primary action -- gold is rare on purpose (docs/DESIGN.md §2): at
+        // most one `default` button per screen.
+        default: "bg-gold text-gold-fg hover:bg-gold-strong",
+        secondary: "border border-border-strong bg-transparent text-fg hover:bg-bg-overlay",
+        outline: "border border-border bg-transparent text-fg hover:bg-bg-overlay",
+        ghost: "text-fg hover:bg-bg-overlay",
+        destructive: "bg-red text-white hover:bg-red/90",
       },
       size: {
         default: "h-9 px-4 py-2",

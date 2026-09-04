@@ -24,11 +24,11 @@ export function SheetContent({ className, side = "left", children, ...props }: S
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
       <DialogPrimitive.Content
-        className={cn("fixed z-50 flex flex-col border-border bg-surface-1 shadow-lg", SIDE_CLASSES[side], className)}
+        className={cn("fixed z-50 flex flex-col border-border bg-bg-elevated shadow-lg", SIDE_CLASSES[side], className)}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm text-muted hover:text-foreground" aria-label="Fechar">
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm text-fg-muted hover:text-fg" aria-label="Fechar">
           <X className="size-4" />
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
@@ -41,5 +41,5 @@ export function SheetHeader({ className, ...props }: ComponentProps<"div">) {
 }
 
 export function SheetTitle({ className, ...props }: ComponentProps<typeof DialogPrimitive.Title>) {
-  return <DialogPrimitive.Title className={cn("text-sm font-semibold text-foreground", className)} {...props} />;
+  return <DialogPrimitive.Title className={cn("text-sm font-semibold text-fg", className)} {...props} />;
 }

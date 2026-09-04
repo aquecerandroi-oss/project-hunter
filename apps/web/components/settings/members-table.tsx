@@ -27,17 +27,17 @@ export function MembersTable({ orgId, members, currentRole }: MembersTableProps)
 
   return (
     <div className="overflow-x-auto rounded-md border border-border">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-surface-2 text-muted">
+      <table className="w-full text-left">
+        <thead className="bg-bg-overlay text-xs text-fg-muted">
           <tr>
-            <th className="px-3 py-2 font-medium">Nome</th>
-            <th className="px-3 py-2 font-medium">Email</th>
-            <th className="px-3 py-2 font-medium">Papel</th>
-            <th className="px-3 py-2 font-medium">Entrou em</th>
-            {canManage && <th className="px-3 py-2 font-medium">Ações</th>}
+            <th className="h-8 px-3 font-medium">Nome</th>
+            <th className="h-8 px-3 font-medium">Email</th>
+            <th className="h-8 px-3 font-medium">Papel</th>
+            <th className="h-8 px-3 font-medium">Entrou em</th>
+            {canManage && <th className="h-8 px-3 font-medium">Ações</th>}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="text-[13px]">
           {members.map((member) => (
             <MemberRow key={member.user_id} orgId={orgId} member={member} canManage={canManage} />
           ))}
@@ -73,17 +73,17 @@ function MemberRow({ orgId, member, canManage }: { orgId: string; member: Member
   }
 
   return (
-    <tr className="border-t border-border">
-      <td className="px-3 py-2 text-foreground">{member.display_name ?? "--"}</td>
-      <td className="px-3 py-2 text-foreground">{member.email}</td>
-      <td className="px-3 py-2">
+    <tr className="h-8 border-t border-border">
+      <td className="px-3 text-fg">{member.display_name ?? "--"}</td>
+      <td className="px-3 text-fg">{member.email}</td>
+      <td className="px-3">
         {canManage ? (
           <select
             value={member.role}
             disabled={pending}
             onChange={(e) => handleRoleChange(e.target.value)}
             aria-label={`Papel de ${member.email}`}
-            className="rounded-md border border-border bg-surface-2 px-2 py-1 text-sm text-foreground"
+            className="h-7 rounded-md border border-border bg-bg-overlay px-2 text-[13px] text-fg"
           >
             {ORG_ROLES.map((role) => (
               <option key={role} value={role}>
@@ -95,9 +95,9 @@ function MemberRow({ orgId, member, canManage }: { orgId: string; member: Member
           member.role
         )}
       </td>
-      <td className="px-3 py-2 text-foreground">{member.joined_at ? formatDate(member.joined_at) : "--"}</td>
+      <td className="px-3 text-fg">{member.joined_at ? formatDate(member.joined_at) : "--"}</td>
       {canManage && (
-        <td className="px-3 py-2">
+        <td className="px-3">
           <Dialog.Root open={confirmOpen} onOpenChange={setConfirmOpen}>
             <Dialog.Trigger asChild>
               <Button type="button" variant="destructive" size="sm">
@@ -106,9 +106,9 @@ function MemberRow({ orgId, member, canManage }: { orgId: string; member: Member
             </Dialog.Trigger>
             <Dialog.Portal>
               <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
-              <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-surface-1 p-4 shadow-lg">
-                <Dialog.Title className="text-sm font-semibold text-foreground">Remover membro?</Dialog.Title>
-                <Dialog.Description className="mt-2 text-sm text-muted">
+              <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-bg-elevated p-4 shadow-lg">
+                <Dialog.Title className="text-sm font-semibold text-fg">Remover membro?</Dialog.Title>
+                <Dialog.Description className="mt-2 text-sm text-fg-muted">
                   {member.email} perderá acesso a esta organização. Esta ação não pode ser desfeita pela interface.
                 </Dialog.Description>
                 <div className="mt-4 flex justify-end gap-2">
@@ -127,7 +127,7 @@ function MemberRow({ orgId, member, canManage }: { orgId: string; member: Member
         </td>
       )}
       {error && (
-        <td colSpan={5} className="px-3 pb-2 text-xs text-negative">
+        <td colSpan={5} className="px-3 pb-2 text-xs text-red">
           {error}
         </td>
       )}

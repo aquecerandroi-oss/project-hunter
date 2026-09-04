@@ -25,13 +25,13 @@ export function InvitationCreatedBox({ link, email }: InvitationCreatedBoxProps)
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-accent/40 bg-surface-2 p-3 text-sm">
-      <p className="font-medium text-foreground">Convite para {email} criado.</p>
+    <div className="flex flex-col gap-2 rounded-md border border-gold/40 bg-bg-overlay p-3 text-sm">
+      <p className="font-medium text-fg">Convite para {email} criado.</p>
       <p className="text-xs text-warning">
         Copie este link agora -- ele não pode ser recuperado depois de sair desta tela.
       </p>
       <div className="flex items-center gap-2">
-        <code className="num flex-1 truncate rounded bg-surface-3 px-2 py-1 text-xs text-foreground">{link}</code>
+        <code className="num flex-1 truncate rounded bg-bg-overlay px-2 py-1 text-xs text-fg">{link}</code>
         <Button type="button" variant="outline" size="sm" onClick={() => void handleCopy()}>
           {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
           {copied ? "Copiado" : "Copiar"}

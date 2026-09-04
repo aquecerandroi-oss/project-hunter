@@ -28,14 +28,14 @@ export function StepSummary({ org, data }: StepSummaryProps) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">Confirme e finalize</h2>
-        <p className="mt-1 text-sm text-muted">Você pode alterar tudo isso depois em Settings.</p>
+        <h2 className="text-lg font-semibold text-fg">Confirme e finalize</h2>
+        <p className="mt-1 text-sm text-fg-muted">Você pode alterar tudo isso depois em Settings.</p>
       </div>
       <dl className="divide-y divide-border rounded-md border border-border">
         {rows.map((row) => (
           <div key={row.label} className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
-            <dt className="text-muted">{row.label}</dt>
-            <dd className="num text-right font-medium text-foreground">{row.value}</dd>
+            <dt className="text-fg-muted">{row.label}</dt>
+            <dd className="num text-right font-medium text-fg">{row.value}</dd>
           </div>
         ))}
       </dl>

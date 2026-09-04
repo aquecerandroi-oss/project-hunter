@@ -8,7 +8,7 @@ export interface QuickLinksProps {
 
 export function QuickLinks({ orgSlug }: QuickLinksProps) {
   return (
-    <section className="flex flex-wrap gap-2 rounded-lg border border-border bg-surface-1 p-4">
+    <section className="flex flex-wrap gap-2 rounded-lg border border-border bg-bg-elevated p-4">
       <Button asChild variant="secondary" size="sm">
         <Link href={`/${orgSlug}/settings/organization`}>Settings</Link>
       </Button>

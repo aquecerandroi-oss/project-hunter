@@ -43,8 +43,8 @@ O vermelho não estava na direção original, mas é obrigatório num produto fi
 | `--color-fg` | `#0A0A0A` |
 | `--color-fg-muted` | `#525252` |
 | `--color-fg-subtle` | `#8A8A8A` |
-| `--color-gold` | `#B8860B` (dourado mais escuro para contraste AA sobre branco) |
-| `--color-gold-strong` | `#9A7009` |
+| `--color-gold` | `#8A6D00` (dourado mais escuro para contraste AA sobre branco -- ver nota) |
+| `--color-gold-strong` | `#6E5700` |
 | `--color-gold-soft` | `#FFF4D6` |
 | `--color-gold-fg` | `#FFFFFF` |
 | `--color-green` | `#15803D` |
@@ -83,3 +83,4 @@ Contraste mínimo AA (4.5:1) para texto em todos os pares acima; verificar com o
 ## 5. Histórico
 
 - 2026-09-04 — direção inicial (dourado/verde/preto/branco) definida pelo produto; aplicada no M0 após T09.
+- 2026-09-04 — DESIGN-1: `--color-gold` do tema claro ajustado de `#B8860B` para `#8A6D00` (e `--color-gold-strong` de `#9A7009` para `#6E5700`). `#B8860B` sobre branco (e como fundo com texto `gold-fg` branco) mede 3.25:1, abaixo do mínimo AA de 4.5:1; `#8A6D00` mede 4.92:1 nos dois pares. Verificado em `apps/web/tests/theme-contrast.test.ts`.

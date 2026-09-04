@@ -24,14 +24,14 @@ export default async function SystemPage({ params }: SystemPageProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold text-foreground">System</h1>
+      <h1 className="text-xl font-semibold text-fg">System</h1>
       <div className="grid gap-4 md:grid-cols-2">
         <SystemInfoCard info={info} />
         <ReadinessPanel initial={readiness} />
         <FeatureFlagsTable features={info.features} />
-        <section className="rounded-lg border border-dashed border-border bg-surface-1 p-4">
-          <h2 className="text-sm font-medium text-muted">Workers</h2>
-          <p className="mt-2 text-sm text-foreground">Workers: nenhum processo registrado ainda (M1).</p>
+        <section className="rounded-lg border border-dashed border-border bg-bg-elevated p-4">
+          <h2 className="text-xs font-medium uppercase tracking-wide text-fg-muted">Workers</h2>
+          <p className="mt-2 text-sm text-fg">Workers: nenhum processo registrado ainda (M1).</p>
         </section>
       </div>
     </div>

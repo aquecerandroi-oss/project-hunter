@@ -22,14 +22,14 @@ export function OnboardingProgress({ step }: OnboardingProgressProps) {
             <span
               className={cn(
                 "flex size-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-medium",
-                done && "border-accent bg-accent text-accent-foreground",
-                current && !done && "border-accent text-accent",
-                !current && !done && "border-border text-muted",
+                done && "border-gold bg-gold text-gold-fg",
+                current && !done && "border-gold text-gold",
+                !current && !done && "border-border text-fg-muted",
               )}
             >
               {done ? <Check className="size-3.5" /> : s}
             </span>
-            <span className={cn("hidden sm:inline", current ? "font-medium text-foreground" : "text-muted")}>
+            <span className={cn("hidden sm:inline", current ? "font-medium text-fg" : "text-fg-muted")}>
               {STEP_LABELS[s]}
             </span>
             {s !== STEP_COUNT && <span className="mx-1 h-px w-4 bg-border sm:mx-2 sm:w-6" aria-hidden="true" />}

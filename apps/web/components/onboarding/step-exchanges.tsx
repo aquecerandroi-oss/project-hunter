@@ -26,8 +26,8 @@ export function StepExchanges({ data, onChange }: StepExchangesProps) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">Exchanges monitoradas</h2>
-        <p className="mt-1 text-sm text-muted">
+        <h2 className="text-lg font-semibold text-fg">Exchanges monitoradas</h2>
+        <p className="mt-1 text-sm text-fg-muted">
           Filtro de preferência para o radar (a partir do Milestone 1/2). Sem endpoint de exchanges no M0 -- lista fixa das
           duas exchanges semeadas.
         </p>
@@ -40,22 +40,22 @@ export function StepExchanges({ data, onChange }: StepExchangesProps) {
               key={code}
               className={cn(
                 "flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-sm transition-colors",
-                checked ? "border-accent bg-surface-3" : "border-border bg-surface-2 hover:bg-surface-3",
+                checked ? "border-gold bg-gold-soft" : "border-border bg-bg-overlay hover:border-border-strong",
               )}
             >
               <input
                 type="checkbox"
                 checked={checked}
                 onChange={() => toggle(code)}
-                className="size-4 accent-[var(--color-accent)]"
+                className="size-4 accent-[var(--color-gold)]"
               />
-              <span className="font-medium text-foreground">{EXCHANGE_LABELS[code]}</span>
+              <span className="font-medium text-fg">{EXCHANGE_LABELS[code]}</span>
             </label>
           );
         })}
       </div>
       {data.monitoredExchanges.length === 0 && (
-        <p className="text-xs text-muted">Nenhuma selecionada ainda -- você pode ajustar isso depois em Settings.</p>
+        <p className="text-xs text-fg-muted">Nenhuma selecionada ainda -- você pode ajustar isso depois em Settings.</p>
       )}
     </div>
   );

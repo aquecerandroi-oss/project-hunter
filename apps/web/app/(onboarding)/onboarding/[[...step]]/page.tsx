@@ -30,7 +30,7 @@ export default async function OnboardingPage({ params, searchParams }: Onboardin
 
   if (!orgSlug) {
     return (
-      <main className="flex min-h-dvh items-start justify-center bg-background px-4 py-10 sm:items-center">
+      <main className="flex min-h-dvh items-start justify-center bg-bg px-4 py-10 sm:items-center">
         <OnboardingWizard initialOrg={null} initialStep={initialStep} />
       </main>
     );
@@ -48,7 +48,7 @@ export default async function OnboardingPage({ params, searchParams }: Onboardin
     : null;
 
   return (
-    <main className="flex min-h-dvh items-start justify-center bg-background px-4 py-10 sm:items-center">
+    <main className="flex min-h-dvh items-start justify-center bg-bg px-4 py-10 sm:items-center">
       <OnboardingWizard initialOrg={initialOrg} initialStep={initialStep} />
     </main>
   );

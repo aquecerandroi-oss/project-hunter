@@ -55,21 +55,21 @@ export function InviteForm({ orgId, currentRole }: InviteFormProps) {
     <div className="flex flex-col gap-3">
       <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-foreground">Email</span>
+          <span className="font-medium text-fg">Email</span>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="pessoa@exemplo.com"
-            className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="rounded-md border border-border bg-bg-overlay px-3 py-2 text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-gold"
           />
         </label>
         <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-foreground">Papel</span>
+          <span className="font-medium text-fg">Papel</span>
           <select
             value={role}
             onChange={(e) => setRole(e.target.value as OrganizationRole)}
-            className="rounded-md border border-border bg-surface-2 px-2 py-2 text-sm text-foreground"
+            className="rounded-md border border-border bg-bg-overlay px-2 py-2 text-sm text-fg"
           >
             {allowedRoles.map((r) => (
               <option key={r} value={r}>
@@ -82,7 +82,7 @@ export function InviteForm({ orgId, currentRole }: InviteFormProps) {
           {pending ? "Enviando..." : "Convidar"}
         </Button>
       </form>
-      {error && <p className="text-sm text-negative">{error}</p>}
+      {error && <p className="text-sm text-red">{error}</p>}
       {created && <InvitationCreatedBox link={created.link} email={created.email} />}
     </div>
   );

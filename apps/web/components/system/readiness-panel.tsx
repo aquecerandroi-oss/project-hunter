@@ -40,9 +40,9 @@ export function ReadinessPanel({ initial }: ReadinessPanelProps) {
   const allOk = status.database && status.redis;
 
   return (
-    <section className="rounded-lg border border-border bg-surface-1 p-4">
+    <section className="rounded-lg border border-border bg-bg-elevated p-4 transition-colors hover:border-border-strong">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-muted">Dependências</h2>
+        <h2 className="text-xs font-medium uppercase tracking-wide text-fg-muted">Dependências</h2>
         <Button type="button" variant="ghost" size="sm" onClick={handleRefresh} disabled={pending}>
           <RefreshCw className={cn("size-4", pending && "animate-spin")} />
           Atualizar
@@ -53,13 +53,13 @@ export function ReadinessPanel({ initial }: ReadinessPanelProps) {
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
         <div>
-          <dt className="text-muted">Postgres</dt>
+          <dt className="text-fg-muted">Postgres</dt>
           <dd className="mt-1">
             <StatusBadge ok={status.database} detail={status.database_detail} />
           </dd>
         </div>
         <div>
-          <dt className="text-muted">Redis</dt>
+          <dt className="text-fg-muted">Redis</dt>
           <dd className="mt-1">
             <StatusBadge ok={status.redis} detail={status.redis_detail} />
           </dd>

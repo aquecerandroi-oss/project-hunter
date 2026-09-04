@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <head>
           <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         </head>
-        <body className="min-h-dvh bg-background font-sans text-foreground antialiased">{children}</body>
+        <body className="min-h-dvh bg-bg font-sans text-fg antialiased">{children}</body>
       </html>
     </ClerkProvider>
   );

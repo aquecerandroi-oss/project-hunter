@@ -36,24 +36,24 @@ export function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   const { capital, riskPreset, exchanges } = readSettings(workspace.settings);
 
   return (
-    <section className="rounded-lg border border-border bg-surface-1 p-4">
-      <h2 className="text-sm font-medium text-muted">Workspace</h2>
-      <p className="mt-1 text-lg font-semibold text-foreground">{workspace.name}</p>
+    <section className="rounded-lg border border-border bg-bg-elevated p-4 transition-colors hover:border-border-strong">
+      <h2 className="text-xs font-medium uppercase tracking-wide text-fg-muted">Workspace</h2>
+      <p className="mt-1 text-lg font-semibold text-fg">{workspace.name}</p>
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
         <div>
-          <dt className="text-muted">Objetivo</dt>
-          <dd className="text-foreground">{OBJECTIVE_LABELS[workspace.objective]}</dd>
+          <dt className="text-fg-muted">Objetivo</dt>
+          <dd className="text-fg">{OBJECTIVE_LABELS[workspace.objective]}</dd>
         </div>
         <div>
-          <dt className="text-muted">Capital virtual</dt>
-          <dd className="num text-foreground">{capital ? formatMoney(capital) : "--"}</dd>
+          <dt className="text-fg-muted">Capital virtual</dt>
+          <dd className="num text-fg">{capital ? formatMoney(capital) : "--"}</dd>
         </div>
         <div>
-          <dt className="text-muted">Perfil de risco</dt>
-          <dd className="text-foreground">{riskPreset ?? "--"}</dd>
+          <dt className="text-fg-muted">Perfil de risco</dt>
+          <dd className="text-fg">{riskPreset ?? "--"}</dd>
         </div>
         <div>
-          <dt className="text-muted">Exchanges monitoradas</dt>
+          <dt className="text-fg-muted">Exchanges monitoradas</dt>
           <dd className="mt-1 flex flex-wrap gap-1">
             {exchanges.length > 0 ? (
               exchanges.map((code) => (
@@ -62,7 +62,7 @@ export function WorkspaceCard({ workspace }: WorkspaceCardProps) {
                 </Badge>
               ))
             ) : (
-              <span className="text-foreground">Nenhuma</span>
+              <span className="text-fg">Nenhuma</span>
             )}
           </dd>
         </div>

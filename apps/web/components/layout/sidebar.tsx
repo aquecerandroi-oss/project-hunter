@@ -22,7 +22,7 @@ export function Sidebar({ items, orgSlug, className }: SidebarProps) {
     <TooltipProvider delayDuration={200}>
       <aside
         className={cn(
-          "flex shrink-0 flex-col border-r border-border bg-surface-1 transition-[width] duration-150",
+          "flex shrink-0 flex-col border-r border-border bg-bg-elevated transition-[width] duration-150",
           collapsed ? "w-16" : "w-60",
           className,
         )}

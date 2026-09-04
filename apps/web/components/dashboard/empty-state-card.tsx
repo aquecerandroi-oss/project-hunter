@@ -9,9 +9,9 @@ export interface EmptyStateCardProps {
  */
 export function EmptyStateCard({ title, message }: EmptyStateCardProps) {
   return (
-    <section className="rounded-lg border border-dashed border-border bg-surface-1 p-4">
-      <h2 className="text-sm font-medium text-muted">{title}</h2>
-      <p className="mt-2 text-sm text-foreground">{message}</p>
+    <section className="rounded-lg border border-dashed border-border bg-bg-elevated p-4">
+      <h2 className="text-xs font-medium uppercase tracking-wide text-fg-muted">{title}</h2>
+      <p className="mt-2 text-sm text-fg">{message}</p>
     </section>
   );
 }

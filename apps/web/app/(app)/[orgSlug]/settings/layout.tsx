@@ -17,7 +17,7 @@ export default async function SettingsLayout({ children, params }: SettingsLayou
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold text-foreground">Settings</h1>
+      <h1 className="text-xl font-semibold text-fg">Settings</h1>
       <SettingsNav orgSlug={orgSlug} />
       <div className="max-w-2xl">{children}</div>
     </div>

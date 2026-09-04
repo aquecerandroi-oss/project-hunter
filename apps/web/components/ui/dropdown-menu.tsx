@@ -15,7 +15,7 @@ export function DropdownMenuContent({ className, sideOffset = 6, ...props }: Com
       <DropdownMenuPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "z-50 min-w-40 overflow-hidden rounded-md border border-border bg-surface-2 p-1 text-foreground shadow-lg",
+          "z-50 min-w-40 overflow-hidden rounded-md border border-border bg-bg-overlay p-1 text-fg shadow-lg",
           className,
         )}
         {...props}
@@ -28,7 +28,10 @@ export function DropdownMenuItem({ className, ...props }: ComponentProps<typeof 
   return (
     <DropdownMenuPrimitive.Item
       className={cn(
-        "flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-surface-3 focus:bg-surface-3 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        // The menu surface itself is already `bg-overlay` (the top of the 3
+        // background levels), so hover/focus use a translucent tint instead
+        // of another named level -- there isn't a 4th one to elevate to.
+        "flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-fg/10 focus:bg-fg/10 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}
       {...props}
@@ -37,7 +40,7 @@ export function DropdownMenuItem({ className, ...props }: ComponentProps<typeof 
 }
 
 export function DropdownMenuLabel({ className, ...props }: ComponentProps<typeof DropdownMenuPrimitive.Label>) {
-  return <DropdownMenuPrimitive.Label className={cn("px-2 py-1.5 text-xs font-medium text-muted", className)} {...props} />;
+  return <DropdownMenuPrimitive.Label className={cn("px-2 py-1.5 text-xs font-medium text-fg-muted", className)} {...props} />;
 }
 
 export function DropdownMenuSeparator({ className, ...props }: ComponentProps<typeof DropdownMenuPrimitive.Separator>) {

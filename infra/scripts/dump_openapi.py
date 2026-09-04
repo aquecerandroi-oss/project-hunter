@@ -28,8 +28,8 @@ from pydantic import SecretStr
 from hunter_api.app import create_app
 from hunter_api.settings import ApiSettings
 
-DUMMY_DATABASE_URL = "postgresql+asyncpg://hunter:hunter@localhost:59999/hunter_dump_unreachable"
-DUMMY_REDIS_URL = "redis://localhost:59998/0"
+DUMMY_DATABASE_URL = "postgresql+asyncpg://hunter:hunter@db.invalid:59999/hunter_dump_unreachable"
+DUMMY_REDIS_URL = "redis://db.invalid:59998/0"
 
 
 def build_settings() -> ApiSettings:
@@ -37,8 +37,8 @@ def build_settings() -> ApiSettings:
         hunter_env="development",
         database_url=SecretStr(DUMMY_DATABASE_URL),
         redis_url=SecretStr(DUMMY_REDIS_URL),
-        web_origin="http://localhost:3000",
-        cors_allowed_origins=["http://localhost:3000"],
+        web_origin="http://db.invalid:3000",
+        cors_allowed_origins=["http://db.invalid:3000"],
     )
 
 

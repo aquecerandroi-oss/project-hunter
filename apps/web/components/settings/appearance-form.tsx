@@ -55,16 +55,16 @@ export function AppearanceForm() {
       `}</style>
 
       <section>
-        <h2 className="text-sm font-medium text-foreground">Tema</h2>
-        <p className="mt-1 text-sm text-muted">Escuro por padrão; claro disponível desde o M0.</p>
+        <h2 className="text-sm font-medium text-fg">Tema</h2>
+        <p className="mt-1 text-sm text-fg-muted">Escuro por padrão; claro disponível desde o M0.</p>
         <div className="mt-2">
           <ThemeToggle />
         </div>
       </section>
 
       <section>
-        <h2 className="text-sm font-medium text-foreground">Densidade</h2>
-        <p className="mt-1 text-sm text-muted">Afeta o espaçamento do conteúdo principal.</p>
+        <h2 className="text-sm font-medium text-fg">Densidade</h2>
+        <p className="mt-1 text-sm text-fg-muted">Afeta o espaçamento do conteúdo principal.</p>
         <div className="mt-2 flex gap-2" role="radiogroup" aria-label="Densidade">
           {(["comfortable", "compact"] as const).map((option) => (
             <button
@@ -75,7 +75,7 @@ export function AppearanceForm() {
               onClick={() => choose(option)}
               className={cn(
                 "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
-                density === option ? "border-accent bg-surface-3 text-foreground" : "border-border bg-surface-2 text-foreground hover:bg-surface-3",
+                density === option ? "border-gold bg-gold-soft text-fg" : "border-border bg-bg-overlay text-fg hover:border-border-strong",
               )}
             >
               {option === "comfortable" ? "Confortável" : "Compacta"}
