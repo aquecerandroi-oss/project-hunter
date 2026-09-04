@@ -23,10 +23,12 @@ import uuid
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from typing import Any, cast
 
 import pytest
 import pytest_asyncio
 from sqlalchemy import text
+from sqlalchemy.engine import CursorResult, Result
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -35,6 +37,18 @@ from hunter_core.db.session import create_session_factory, get_session, tenant_s
 from hunter_core.domain.types import uuid7
 
 from .conftest import migration_ddl
+
+
+def _rowcount(result: Result[Any]) -> int:
+    """The number of rows a DML statement touched.
+
+    ``AsyncSession.execute`` is typed to return the generic ``Result[Any]``,
+    but a plain textual ``UPDATE``/``DELETE`` always executes through the
+    DBAPI cursor, so the object at runtime is a ``CursorResult`` — the only
+    ``Result`` subtype that actually carries ``rowcount``.
+    """
+    return cast(CursorResult[Any], result).rowcount
+
 
 pytestmark = pytest.mark.integration
 
@@ -378,7 +392,7 @@ async def test_an_organization_cannot_read_or_edit_another(
             text("UPDATE organizations SET name = 'hijacked' WHERE id = :id"),
             {"id": org_b.org_id},
         )
-        assert updated.rowcount == 0
+        assert _rowcount(updated) == 0
 
 
 async def test_an_organization_cannot_list_another_organizations_users(
@@ -530,12 +544,12 @@ async def test_a_co_member_row_is_readable_but_never_writable(
             text("UPDATE users SET external_auth_id = 'clerk-attacker' WHERE id = :id"),
             {"id": org_a.co_user_id},
         )
-        assert hijack.rowcount == 0, "a co-member could rewrite another person's identity"
+        assert _rowcount(hijack) == 0, "a co-member could rewrite another person's identity"
 
         mine = await session.execute(
             text("UPDATE users SET display_name = 'me' WHERE id = :id"), {"id": org_a.user_id}
         )
-        assert mine.rowcount == 1, "app.current_user must still be able to write its own row"
+        assert _rowcount(mine) == 1, "app.current_user must still be able to write its own row"
 
     # deletion never reaches RLS at all: hunter_app holds no DELETE grant on users
     with pytest.raises(ProgrammingError, match=_PERMISSION_DENIED):
@@ -602,7 +616,7 @@ async def test_an_organization_can_be_bootstrapped_and_renamed_but_not_deleted(
                 text("UPDATE organizations SET name = 'renamed' WHERE id = :id"),
                 {"id": org_a.org_id},
             )
-            assert renamed.rowcount == 1
+            assert _rowcount(renamed) == 1
 
             visible = await session.execute(
                 text("SELECT id FROM organizations WHERE id = :id"), {"id": org_b.org_id}

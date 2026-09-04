@@ -8,11 +8,14 @@ reason printed").
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Iterator
 from typing import TYPE_CHECKING
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
@@ -37,6 +40,45 @@ def docker_available() -> bool:
     return _docker_reachable()
 
 
+async def _create_app_roles(url: str, login_role: str) -> None:
+    """Create the two roles ``hunter_core.db.session`` assumes into a transaction.
+
+    A migrated database gets ``hunter_app``/``hunter_worker`` from
+    ``infra/migrations/ddl/security.py``'s ``create_roles()`` (run once, in
+    ``0001_initial_schema``). This session's ``postgres_container`` is shared
+    by tests that exercise ``hunter_core.db.session`` directly against a bare,
+    unmigrated database — no migration ever runs there. ``tenant_session``
+    unconditionally issues ``SET LOCAL ROLE hunter_app`` before anything else
+    (T06), so without this, that statement fails with "role does not exist"
+    before RLS is ever reached, for every test that opens a tenant session
+    here.
+
+    Mirrors the real migration's statements: ``NOLOGIN`` roles (nothing ever
+    connects as them directly), ``hunter_worker`` carrying ``BYPASSRLS``
+    (workers scan every organization), both granted to the container's login
+    role so it may ``SET ROLE`` into either one exactly as a deployed login
+    role would, with baseline privileges on ``public`` for tests that create
+    their own tables under these roles.
+    """
+    engine = create_async_engine(
+        url, isolation_level="AUTOCOMMIT", connect_args={"statement_cache_size": 0}
+    )
+    try:
+        async with engine.connect() as connection:
+            for role, extra_attributes in (("hunter_app", ""), ("hunter_worker", " BYPASSRLS")):
+                exists = await connection.scalar(
+                    text("SELECT 1 FROM pg_roles WHERE rolname = :name"), {"name": role}
+                )
+                if not exists:
+                    await connection.execute(text(f"CREATE ROLE {role} NOLOGIN{extra_attributes}"))
+            await connection.execute(text(f'GRANT hunter_app, hunter_worker TO "{login_role}"'))
+            await connection.execute(
+                text("GRANT ALL ON SCHEMA public TO hunter_app, hunter_worker")
+            )
+    finally:
+        await engine.dispose()
+
+
 @pytest.fixture(scope="session")
 def postgres_container(docker_available: bool) -> Iterator[PostgresContainer]:
     if not docker_available:
@@ -44,6 +86,7 @@ def postgres_container(docker_available: bool) -> Iterator[PostgresContainer]:
     from testcontainers.community.postgres import PostgresContainer
 
     with PostgresContainer("postgres:16-alpine", driver="asyncpg") as container:
+        asyncio.run(_create_app_roles(container.get_connection_url(), container.username))
         yield container
 
 

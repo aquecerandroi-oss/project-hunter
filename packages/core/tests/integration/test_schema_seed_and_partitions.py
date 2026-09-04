@@ -81,7 +81,9 @@ async def _row_counts(url: str) -> dict[str, int]:
         async with engine.connect() as connection:
             counts: dict[str, int] = {}
             for table in SEEDED_TABLES:
-                value = await connection.scalar(text(f"SELECT count(*) FROM {table}"))  # noqa: S608
+                value = await connection.scalar(
+                    text(f"SELECT count(*) FROM {table}")  # noqa: S608  # nosec B608 -- table name from a frozen constant, not user input
+                )
                 counts[table] = int(value or 0)
     finally:
         await engine.dispose()

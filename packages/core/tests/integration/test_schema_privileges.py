@@ -17,6 +17,7 @@ including partition children.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from typing import cast
 
 import pytest
 import pytest_asyncio
@@ -36,6 +37,19 @@ _WRITE_PRIVILEGES = ("UPDATE", "DELETE")
 
 def _security() -> object:
     return migration_ddl("security")
+
+
+def _security_tables(name: str) -> tuple[str, ...]:
+    """A frozen grant-list constant from ``ddl.security``, correctly typed.
+
+    ``ddl.security`` is imported at test time via ``sys.path`` surgery (the
+    same way Alembic itself reaches it) rather than a static import, so
+    pyright sees only ``ModuleType`` and infers ``Unknown`` for any attribute
+    on it. Every constant this reaches for is a documented, frozen
+    ``tuple[str, ...]`` — see ``infra/migrations/ddl/tables.py`` — so a single
+    typed ``cast`` here is enough to make every call site fully typed.
+    """
+    return cast(tuple[str, ...], getattr(_security(), name))
 
 
 @pytest_asyncio.fixture
@@ -74,7 +88,7 @@ async def test_append_only_tables_deny_update_and_delete_to_the_app_role(
     schema_engine: AsyncEngine,
 ) -> None:
     """Every append-only table *and every partition of one* is INSERT/SELECT only."""
-    append_only: tuple[str, ...] = _security().APPEND_ONLY_TABLES  # type: ignore[attr-defined]
+    append_only = _security_tables("APPEND_ONLY_TABLES")
 
     async with schema_engine.connect() as connection:
         targets: list[str] = []
@@ -99,7 +113,7 @@ async def test_append_only_tables_deny_update_and_delete_to_the_app_role(
 async def test_the_app_role_can_still_insert_and_read_append_only_parents(
     schema_engine: AsyncEngine,
 ) -> None:
-    append_only: tuple[str, ...] = _security().APPEND_ONLY_TABLES  # type: ignore[attr-defined]
+    append_only = _security_tables("APPEND_ONLY_TABLES")
     async with schema_engine.connect() as connection:
         for table in append_only:
             for privilege in ("SELECT", "INSERT"):
@@ -129,7 +143,7 @@ async def test_updating_a_global_table_is_denied_to_the_app_role(
 async def test_read_only_tables_grant_the_app_role_nothing_but_select(
     schema_engine: AsyncEngine,
 ) -> None:
-    read_only: tuple[str, ...] = _security().APP_READ_ONLY_TABLES  # type: ignore[attr-defined]
+    read_only = _security_tables("APP_READ_ONLY_TABLES")
     assert read_only, "the read-only grant list is empty"
 
     async with schema_engine.connect() as connection:
@@ -180,11 +194,10 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     schema_engine: AsyncEngine,
 ) -> None:
     """The frozen lists and the database describe the same set of tables."""
-    security = _security()
-    write: tuple[str, ...] = security.APP_WRITE_TABLES  # type: ignore[attr-defined]
-    no_delete: tuple[str, ...] = security.APP_NO_DELETE_TABLES  # type: ignore[attr-defined]
-    read_only: tuple[str, ...] = security.APP_READ_ONLY_TABLES  # type: ignore[attr-defined]
-    append_only: tuple[str, ...] = security.APPEND_ONLY_TABLES  # type: ignore[attr-defined]
+    write = _security_tables("APP_WRITE_TABLES")
+    no_delete = _security_tables("APP_NO_DELETE_TABLES")
+    read_only = _security_tables("APP_READ_ONLY_TABLES")
+    append_only = _security_tables("APPEND_ONLY_TABLES")
 
     classified = list(write) + list(no_delete) + list(read_only) + list(append_only)
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
@@ -212,7 +225,7 @@ async def test_the_app_role_cannot_delete_an_organization_or_a_user(
     tenant owns, so it is not a privilege a request handler — or a bug in one —
     should be able to reach. Removal is an operator/``hunter_worker`` operation.
     """
-    no_delete: tuple[str, ...] = _security().APP_NO_DELETE_TABLES  # type: ignore[attr-defined]
+    no_delete = _security_tables("APP_NO_DELETE_TABLES")
     assert set(no_delete) == {"organizations", "users"}
 
     async with schema_engine.connect() as connection:
@@ -247,7 +260,7 @@ async def test_the_worker_role_owns_the_organization_lifecycle(
     tables — it never creates or edits a person or an organization, which stays
     the API's job.
     """
-    lifecycle: tuple[str, ...] = _security().WORKER_DELETE_TABLES  # type: ignore[attr-defined]
+    lifecycle = _security_tables("WORKER_DELETE_TABLES")
     assert set(lifecycle) == {"organizations", "users"}
 
     async with schema_engine.connect() as connection:
