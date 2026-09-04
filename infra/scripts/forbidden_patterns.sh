@@ -23,6 +23,11 @@ HITS=0
 # ---------------------------------------------------------------------------
 # Path exclusions (apply to the tracked-file scan only; --self-test bypasses
 # git entirely and scans the temp files it creates directly).
+#
+# .github/** is deliberately NOT excluded here: workflow files must still be
+# scanned for "sqlite" and the live-trading kill switch. Only the "localhost"
+# pattern exempts .github/** (see is_localhost_exempt below) — workflows
+# routinely reference service containers by localhost.
 # ---------------------------------------------------------------------------
 is_excluded_path() {
   case "$1" in
@@ -31,7 +36,6 @@ is_excluded_path() {
     .claude/*) return 0 ;;
     *.md) return 0 ;;
     *.lock) return 0 ;;
-    .github/*) return 0 ;;
     "$SCRIPT_PATH") return 0 ;;
   esac
   return 1
@@ -63,18 +67,30 @@ $matches
 EOF
 }
 
-# path_contains_any <path> <word> [<word> ...] — substring match, case-sensitive,
-# against the whole path (used for the localhost dev/test/example/compose/config
-# exemption, which is deliberately substring-based: "packages/config" and
-# "apps/web/lib/dev-utils.ts" both count).
-path_contains_any() {
+# is_localhost_exempt <path> — path-SEGMENT matching for the "localhost"
+# exemption (dev/test/example/compose/config code legitimately hardcodes
+# localhost). Deliberately not a substring word list: "configurator.py" must
+# not be exempted just because it contains "config", and "backtest/" must
+# not be exempted just because it contains "test". Wrapping the path in "/"
+# on both ends turns "does this path have a *segment* equal to X" into a
+# plain substring check for "/X/", without needing to split on "/".
+is_localhost_exempt() {
   path="$1"
-  shift
-  for word in "$@"; do
-    case "$path" in
-      *"$word"*) return 0 ;;
-    esac
-  done
+  base="${path##*/}"
+
+  case "/$path/" in
+    */tests/*|*/test/*|*/dev/*) return 0 ;;
+  esac
+  case "$base" in
+    test_*|conftest*) return 0 ;;
+  esac
+  case "$path" in
+    *packages/config/*|*docker-compose*|*.example*) return 0 ;;
+    # Dev-only defaults; production fails fast without real URLs (the
+    # WEB_ORIGIN/API_URL prod guard is added in a separate fix). A single
+    # named-file exemption, not a directory rule.
+    packages/core/hunter_core/settings.py) return 0 ;;
+  esac
   return 1
 }
 
@@ -85,21 +101,15 @@ path_contains_any() {
 scan_file() {
   f="$1"
 
-  case "$f" in
-    *.py|*.ts|*.tsx|*.toml|*.yml)
-      report "$f" "sqlite" 'sqlite' -i
-      ;;
-  esac
+  # Extension-independent: sqlite/live-trading references are forbidden no
+  # matter what kind of file they show up in (Dockerfile, alembic.ini, a CI
+  # yaml step, ...), not just recognized source-code extensions.
+  report "$f" "sqlite" 'sqlite' -i
 
   case "$f" in
     infra/scripts/*) : ;; # allowlisted — scripts legitimately write files
-    *.py)
+    *.py|*.ts|*.tsx|*.yaml|*.yml|*.ini|*.cfg|*Dockerfile*)
       report "$f" "json.dump(" 'json\.dump\('
-      ;;
-  esac
-  case "$f" in
-    infra/scripts/*) : ;;
-    *.ts|*.tsx)
       report "$f" "writeFileSync(" 'writeFileSync\('
       ;;
   esac
@@ -116,14 +126,16 @@ scan_file() {
     */instrumentation*.ts|instrumentation*.ts) : ;;
     *.config.*) : ;;
     */eslint/*|eslint/*) : ;;
-    *.ts|*.tsx)
+    */smoke.mjs|smoke.mjs) : ;;
+    */verify.mjs|verify.mjs) : ;;
+    *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs)
       report "$f" "console." 'console\.'
       ;;
   esac
 
   case "$f" in
     *.py|*.ts|*.tsx)
-      if ! path_contains_any "$f" test dev example compose config; then
+      if ! is_localhost_exempt "$f"; then
         report "$f" "localhost" 'localhost'
       fi
       ;;
@@ -133,63 +145,123 @@ scan_file() {
 }
 
 # ---------------------------------------------------------------------------
-# --self-test: build one fixture per pattern (plus one clean fixture) in a
-# temp dir, assert each fixture hits exactly its own pattern, and assert the
-# clean fixture hits nothing.
+# --self-test: build one fixture per pattern (plus a clean fixture) and one
+# negative fixture per exemption in a temp dir, cd'd into so fixture paths
+# can use the same repo-relative shape (packages/config/x.py, tests/test_x.py,
+# ...) that path-segment matching actually keys off. Asserts each positive
+# fixture hits exactly its own pattern and each negative fixture hits nothing.
 # ---------------------------------------------------------------------------
 run_self_test() {
+  orig_dir="$PWD"
   tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' EXIT
+  trap 'cd "$orig_dir" 2>/dev/null; rm -rf "$tmp"' EXIT
+  cd "$tmp"
 
   failures=0
 
-  assert_hit() {
-    fixture="$1"
-    label="$2"
-    HITS=0
-    out="$(scan_file "$fixture")"
-    if printf '%s\n' "$out" | grep -qF ": $label"; then
-      echo "ok    - $label detected in $fixture"
+  # check_path <path> — mirrors main()'s real per-file logic: is_excluded_path
+  # first, scan_file only if it wasn't excluded. Fixtures that rely on the
+  # tests/*-style blanket exclusion (rather than a scan_file-level exemption)
+  # need this to actually exercise that path.
+  check_path() {
+    p="$1"
+    if is_excluded_path "$p"; then
+      printf ''
     else
-      echo "FAIL  - $label NOT detected in $fixture"
+      scan_file "$p"
+    fi
+  }
+
+  assert_hit() {
+    path="$1"
+    label="$2"
+    out="$(check_path "$path")"
+    # scan_file runs inside this command substitution's own subshell, so a
+    # reset-and-reread of the global $HITS here would never see its
+    # increments (that was the previous, no-op "HITS=0" — dead code that
+    # asserted nothing). Count hits from $out itself instead: that's what
+    # actually lets us assert "exactly its own pattern, nothing else".
+    hit_count="$(printf '%s\n' "$out" | grep -c . || true)"
+    if printf '%s\n' "$out" | grep -qF ": $label"; then
+      if [ "$hit_count" -eq 1 ]; then
+        echo "ok    - $label detected in $path (exactly one hit)"
+      else
+        echo "ok    - $label detected in $path (note: $hit_count total hits)"
+      fi
+    else
+      echo "FAIL  - $label NOT detected in $path"
       failures=$((failures + 1))
     fi
   }
 
-  printf 'import sqlite3\n' > "$tmp/db_thing.py"
-  assert_hit "$tmp/db_thing.py" "sqlite"
+  assert_no_hit() {
+    path="$1"
+    out="$(check_path "$path")"
+    if [ -z "$out" ]; then
+      echo "ok    - no hit for $path"
+    else
+      echo "FAIL  - unexpected hit(s) for $path:"
+      printf '%s\n' "$out"
+      failures=$((failures + 1))
+    fi
+  }
 
-  printf 'def save(data):\n    json.dump(data, open("state.json", "w"))\n' > "$tmp/exporter.py"
-  assert_hit "$tmp/exporter.py" "json.dump("
+  # --- one positive fixture per pattern ---
+  printf 'import sqlite3\n' > db_thing.py
+  assert_hit "db_thing.py" "sqlite"
 
-  printf 'export function save(data: string) {\n  writeFileSync("state.json", data);\n}\n' > "$tmp/exporter.ts"
-  assert_hit "$tmp/exporter.ts" "writeFileSync("
+  printf 'def save(data):\n    json.dump(data, open("state.json", "w"))\n' > exporter.py
+  assert_hit "exporter.py" "json.dump("
 
-  printf 'def handler():\n    print("debug")\n' > "$tmp/handler.py"
-  assert_hit "$tmp/handler.py" "print("
+  printf 'export function save(data: string) {\n  writeFileSync("state.json", data);\n}\n' > exporter.ts
+  assert_hit "exporter.ts" "writeFileSync("
 
-  printf 'export function onClick() {\n  console.log("clicked");\n}\n' > "$tmp/button.ts"
-  assert_hit "$tmp/button.ts" "console."
+  printf 'def handler():\n    print("debug")\n' > handler.py
+  assert_hit "handler.py" "print("
 
-  printf 'BASE_URL = "http://localhost:8000"\n' > "$tmp/settings_module.py"
-  assert_hit "$tmp/settings_module.py" "localhost"
+  printf 'export function onClick() {\n  console.log("clicked");\n}\n' > button.ts
+  assert_hit "button.ts" "console."
 
-  printf 'ENABLE_LIVE_TRADING=true\n' > "$tmp/flags.py"
-  assert_hit "$tmp/flags.py" "ENABLE_LIVE_TRADING=true"
+  printf 'BASE_URL = "http://localhost:8000"\n' > settings_module.py
+  assert_hit "settings_module.py" "localhost"
 
-  printf 'def add(a, b):\n    return a + b\n' > "$tmp/clean.py"
-  HITS=0
-  out="$(scan_file "$tmp/clean.py")"
-  if [ -z "$out" ]; then
-    echo "ok    - clean fixture has no hits"
-  else
-    echo "FAIL  - clean fixture unexpectedly hit:"
-    printf '%s\n' "$out"
-    failures=$((failures + 1))
-  fi
+  printf 'ENABLE_LIVE_TRADING=true\n' > flags.py
+  assert_hit "flags.py" "ENABLE_LIVE_TRADING=true"
+
+  printf 'def add(a, b):\n    return a + b\n' > clean.py
+  assert_no_hit "clean.py"
+
+  # --- negative fixtures: path-segment exemptions must not be substring traps ---
+  printf 'BASE_URL = "http://localhost:8000"\n' > configurator.py
+  assert_hit "configurator.py" "localhost"      # "config" substring, not the packages/config/ segment
+
+  mkdir -p backtest
+  printf 'BASE_URL = "http://localhost:8000"\n' > backtest/engine.py
+  assert_hit "backtest/engine.py" "localhost"   # "test" substring, not the tests/ segment
+
+  mkdir -p packages/config
+  printf 'BASE_URL = "http://localhost:8000"\n' > packages/config/x.py
+  assert_no_hit "packages/config/x.py"
+
+  mkdir -p tests
+  printf 'def handler():\n    print("debug")\n' > tests/test_x.py
+  assert_no_hit "tests/test_x.py"
+
+  printf '[alembic]\nsqlalchemy.url = sqlite:///local.db\n' > alembic.ini
+  assert_hit "alembic.ini" "sqlite"             # extension-independent
+
+  printf 'console.log("hi");\n' > foo.mjs
+  assert_hit "foo.mjs" "console."               # widened console. extensions
+
+  mkdir -p eslint
+  printf 'console.log("hi");\n' > eslint/smoke.mjs
+  assert_no_hit "eslint/smoke.mjs"
+
+  printf 'console.log("hi");\n' > smoke.mjs
+  assert_no_hit "smoke.mjs"                     # **/smoke.mjs exemption, outside eslint/ too
 
   if [ "$failures" -eq 0 ]; then
-    echo "self-test: all patterns detected, clean file passes"
+    echo "self-test: all patterns detected, clean/exempt fixtures pass"
     return 0
   else
     echo "self-test: $failures failure(s)"
@@ -203,15 +275,13 @@ main() {
     exit $?
   fi
 
-  files="$(git ls-files)"
-  while IFS= read -r f; do
+  # -z / -d '' so filenames with spaces, newlines or non-ASCII bytes round-trip.
+  while IFS= read -r -d '' f; do
     [ -z "$f" ] && continue
     is_excluded_path "$f" && continue
     [ -f "$f" ] || continue
     scan_file "$f"
-  done <<EOF
-$files
-EOF
+  done < <(git ls-files -z)
 
   if [ "$HITS" -gt 0 ]; then
     echo "forbidden-patterns: $HITS hit(s)"

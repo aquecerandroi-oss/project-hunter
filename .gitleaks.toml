@@ -1,18 +1,20 @@
 title = "Project Hunter — gitleaks config"
 
 # Extend the built-in ruleset (docs/SECURITY.md §5: "gitleaks em CI"); we
-# only add allowlist entries, never remove or weaken a default rule.
+# only add allowlist entries and one custom rule, never remove or weaken a
+# default rule.
 [extend]
 useDefault = true
 
-# Narrow, value-based allowlist for three specific, documented, fake
-# credentials that are deliberately committed as CI/example fixtures — never
-# real secrets. They show up in .github/workflows/ci.yml (Clerk's own dummy
-# key format, used so `pnpm build` can run in CI), in .env.example (as
-# illustrative comments) and in docs/**. Because gitleaks combines a single
-# allowlist entry's `paths` and `regexes` with OR (not AND), scoping "this
-# fake value, wherever it legitimately appears" is expressed as a
-# path-independent value match rather than three separate path-scoped ones.
+# Narrow, value-based allowlist for specific, documented, fake credentials
+# deliberately committed as CI/example fixtures — never real secrets.
+# - The two Clerk dummy values (pk_test_.../sk_test_FAKE_CI_BUILD) appear
+#   only in .github/workflows/ci.yml (Clerk's own documented example key
+#   format, used so `pnpm build` can run in CI) — they are NOT in
+#   .env.example, which leaves the Clerk variables empty.
+# - sk-ant-FAKE... is a general prefix allowlist for any Anthropic-key-shaped
+#   fake value following the "make it obviously fake" convention documented
+#   in .claude/hooks/protect-secrets.mjs; it isn't tied to one occurrence.
 [[allowlists]]
 description = "Documented fake example secrets (not real credentials)"
 regexes = [
@@ -21,16 +23,18 @@ regexes = [
   '''sk_test_FAKE_CI_BUILD''',
 ]
 
-# packages/core/tests/** fixtures use synthetic values (containing "FAKE")
-# for hunter_core tests. gitleaks cannot AND a path with a value regex within
-# one allowlist entry (see note above), so the boundary here is the path
-# itself, not the literal value — this directory is test code, reviewed like
-# any other test code, and is already excluded from
-# infra/scripts/forbidden_patterns.sh for the same reason.
+# packages/core/tests/** fixtures use synthetic values. A path-only allowlist
+# would exempt ANY value committed under that directory, including a real
+# secret pasted in by mistake — gitleaks combines a single allowlist entry's
+# `paths` and `regexes` with OR, not AND, so path and value can't be ANDed
+# within one entry either. Require the line itself to say it's fake instead:
+# a value-based boundary, not a path-based one, so a fixture is exempt only
+# because of what it contains, wherever it happens to live.
 [[allowlists]]
-description = "packages/core/tests fixtures (synthetic values only)"
-paths = [
-  '''packages/core/tests/''',
+description = "Fixture values that self-declare as fake (must contain FAKE)"
+regexTarget = "line"
+regexes = [
+  '''(?i)FAKE''',
 ]
 
 # .env.example never holds real values — see docs/SECURITY.md §4 and §8; only
@@ -42,4 +46,25 @@ paths = [
 description = ".env.example placeholders"
 paths = [
   '''\.env\.example$''',
+]
+
+# Database/cache connection URIs with an embedded password (e.g. a Neon or
+# Redis Cloud connection string pasted into a config file) — the default
+# ruleset has no rule shaped for this. `[^:\s/]+` is the username, `{8,}` is
+# a real-looking password length (long enough that dev defaults like
+# "hunter"/"redis" never match, so no allowlist is even needed for those).
+[[rules]]
+id = "hunter-db-uri-embedded-password"
+description = "Database/cache URI with embedded password"
+regex = '''(?i)(postgres(ql)?(\+asyncpg)?|redis|rediss)://[^:\s/]+:[^@\s]{8,}@'''
+tags = ["database", "credentials"]
+
+# Local/CI/dev-default hosts: docker-compose service names and localhost.
+# Scoped to this rule only (not a global [[allowlists]] entry) so it can't
+# weaken unrelated default rules that happen to mention "localhost".
+[[rules.allowlists]]
+description = "Local/dev/CI default hosts (docker-compose services, localhost)"
+regexTarget = "line"
+regexes = [
+  '''@(localhost|127\.0\.0\.1|postgres|redis)(:|/)''',
 ]
