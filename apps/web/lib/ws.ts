@@ -9,9 +9,12 @@ import { logger } from "@/lib/logger";
  * components, and it defaults `enabled` to `false` until M1.
  *
  * Per docs/SECURITY.md §1: the auth token is sent as the FIRST message on
- * the socket (`{ type: "auth", payload: { token } }`), never in the query
- * string; the server closes the connection if it doesn't authenticate
- * within 5s.
+ * the socket, never in the query string; the server closes the connection
+ * if it doesn't authenticate within 5s.
+ *
+ * Wire shape `{ type: "auth", token }` (token at the top level, NOT nested
+ * under `payload`) is the contract T06 implements server-side in the `api`
+ * WS gateway -- keep this in sync with that handler.
  */
 
 export type RealtimeStatus = "idle" | "connecting" | "open" | "closed" | "error";
@@ -30,6 +33,13 @@ export interface RealtimeClientOptions {
   baseBackoffMs?: number | undefined;
   /** Backoff ceiling, ms. Default 15000. */
   maxBackoffMs?: number | undefined;
+  /**
+   * RNG used for reconnect jitter, `() => number` in `[0, 1)`. Injectable so
+   * tests can make delays deterministic; defaults to `Math.random`. Jitter
+   * prevents many clients reconnecting in lockstep (thundering herd) after a
+   * shared outage.
+   */
+  random?: (() => number) | undefined;
   /** Injectable for tests; defaults to the global `WebSocket`. */
   WebSocketImpl?: typeof WebSocket | undefined;
 }
@@ -92,7 +102,11 @@ export class RealtimeClient {
 
   private async authenticate(): Promise<void> {
     const token = await this.options.getAuthToken();
-    this.send({ type: "auth", payload: { token } });
+    // Wire shape is `{ type: "auth", token }` -- token at the top level, not
+    // `RealtimeMessage`'s usual `payload` envelope. See the class doc.
+    if (this.ws && this.ws.readyState === this.ws.OPEN) {
+      this.ws.send(JSON.stringify({ type: "auth", token }));
+    }
     this.setStatus("open");
   }
 
@@ -115,7 +129,12 @@ export class RealtimeClient {
   private scheduleReconnect(): void {
     const base = this.options.baseBackoffMs ?? 500;
     const max = this.options.maxBackoffMs ?? 15000;
-    const delay = Math.min(max, base * 2 ** this.attempt);
+    const random = this.options.random ?? Math.random;
+    const exponential = Math.min(max, base * 2 ** this.attempt);
+    // Full jitter is [0, exponential]; we use "half jitter" ([0.5, 1.0] of
+    // the exponential value) so the delay never collapses to ~0 and clients
+    // still spread out instead of reconnecting in lockstep.
+    const delay = exponential * (0.5 + random() * 0.5);
     this.attempt += 1;
     this.reconnectTimer = setTimeout(() => {
       if (!this.closedByUser) this.open();

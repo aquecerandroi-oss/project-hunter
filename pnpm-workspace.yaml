@@ -3,6 +3,8 @@ packages:
   - "packages/*"
 allowBuilds:
   unrs-resolver: true
+# 24h supply-chain cooldown: a newly-published version isn't installable until it has existed this long.
+minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - '@clerk/nextjs@7.9.1'
   - '@clerk/react@6.15.1'
