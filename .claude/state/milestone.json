@@ -2,7 +2,7 @@
   "current": "M0",
   "status": "in_progress",
   "approved_at": "2026-09-04",
-  "wave": "3 — T04-fixes committed (c28c1bc, re-review in flight), T05 fixes approved, T07 committed + review fixes; compose stack verified end to end (migrate -> api /ready 200 -> web 307 -> worker honest exit); T06 (auth/RBAC/tenancy) in progress",
+  "wave": "4 — T06 committed (5c5e412; security review in flight); schema re-review round 2 fixed (720102f); T09 (onboarding/dashboard/settings/types) in progress; core integration-test cleanup in progress; T11 waits for the T06 review; T12/T13 after",
   "paused_reason": null,
   "history": "2026-09-04: spend limit hit mid-wave 2 (T05-fixes, T08-fixes, T04 cross-review terminated with 429); limit reset and the three were re-dispatched the same day.",
   "resume_checklist": [
