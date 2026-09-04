@@ -102,5 +102,7 @@ def test_configure_logging_selects_renderer_by_env(
     settings = Settings(hunter_env=hunter_env)
     configure_logging(settings, role="api")
     root_handler = stdlib_logging.getLogger().handlers[0]
-    renderer = root_handler.formatter.processors[-1]
+    formatter = root_handler.formatter
+    assert isinstance(formatter, structlog.stdlib.ProcessorFormatter)
+    renderer = formatter.processors[-1]
     assert isinstance(renderer, renderer_type)
