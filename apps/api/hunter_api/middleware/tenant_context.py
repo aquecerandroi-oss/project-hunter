@@ -1,13 +1,23 @@
-"""Placeholder tenant-context middleware.
+"""Clears the per-request tenant slots, and keys the webhook's rate limit.
 
-T06 authenticates the request (Clerk JWT → ``Principal``) and, on tenant
-routes, resolves ``org_id`` from the route plus membership, applying RBAC and
-``SET LOCAL app.current_org`` for RLS (ARCHITECTURE.md §9, SECURITY.md §3).
-None of that exists yet. This middleware only guarantees
-``request.state.org_id`` is always present (as ``None``) so downstream code
-(logging, rate limiting) can read it unconditionally instead of every caller
-needing ``getattr(..., None)``. It does not authenticate, authorize, or touch
-Postgres — completed in T06.
+``request.state.org_id`` and ``request.state.principal_id`` are read by the
+rate limiter and by log context, and are *written* by the RBAC dependencies
+(``hunter_api.auth.rbac``) once the caller is known. This middleware exists so
+they are always present — ``None`` — before anything reads them, instead of
+every reader defending with ``getattr(..., None)``.
+
+The one thing it fills in is the Clerk webhook's rate-limit key. That endpoint
+has no principal and no useful client IP (every delivery for every customer
+arrives from Svix's egress addresses, so an IP key puts them all in one bucket
+and starts dropping real events under load). ``svix-id`` identifies the
+delivery, so keying on it bounds a retry storm for one event without touching
+any other. It is set here because the limiter runs *inside* this middleware —
+see the ordering note in ``app.py`` — and reads the key before the route is
+ever reached.
+
+``svix-id`` is attacker-controllable, so it is length-capped and namespaced
+into its own key space before it becomes a Redis key; it grants nothing on its
+own (the Svix signature is what authenticates the request, in the handler).
 """
 
 from __future__ import annotations
@@ -21,6 +31,9 @@ if TYPE_CHECKING:
     from starlette.middleware.base import RequestResponseEndpoint
     from starlette.types import ASGIApp
 
+WEBHOOK_PATH_PREFIX = "/api/webhooks/"
+MAX_DELIVERY_ID_LENGTH = 128
+
 
 class TenantContextMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp) -> None:
@@ -28,4 +41,14 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Any:
         request.state.org_id = None
+        request.state.principal_id = webhook_rate_limit_key(request)
         return await call_next(request)
+
+
+def webhook_rate_limit_key(request: Request) -> str | None:
+    if not request.url.path.startswith(WEBHOOK_PATH_PREFIX):
+        return None
+    delivery_id = request.headers.get("svix-id")
+    if not delivery_id or len(delivery_id) > MAX_DELIVERY_ID_LENGTH:
+        return None
+    return f"svix:{delivery_id}"

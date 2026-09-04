@@ -56,11 +56,13 @@ async def ready(request: Request) -> JSONResponse:
     """
     settings: ApiSettings = request.app.state.settings
     timeout_s = settings.ready_check_timeout_s
-    db_ok, db_detail = await _check_with_timeout(
-        check_database(request.app.state.engine), timeout_s
-    )
-    redis_ok, redis_detail = await _check_with_timeout(
-        check_redis(request.app.state.redis), timeout_s
+    # concurrently: the checks are independent, and running them in sequence
+    # makes the worst case the *sum* of the timeouts — long enough for an
+    # orchestrator's own probe deadline to fire first, so a half-degraded
+    # process looks dead instead of not-ready
+    (db_ok, db_detail), (redis_ok, redis_detail) = await asyncio.gather(
+        _check_with_timeout(check_database(request.app.state.engine), timeout_s),
+        _check_with_timeout(check_redis(request.app.state.redis), timeout_s),
     )
     body: dict[str, Any] = {"database": db_ok, "redis": redis_ok}
     if db_detail is not None:

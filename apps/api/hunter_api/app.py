@@ -12,12 +12,15 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
 from hunter_api import __version__, analytics
+from hunter_api.auth.clerk import ClerkAuthProvider
+from hunter_api.auth.clerk_api import create_profile_source
+from hunter_api.auth.principal import PrincipalResolver
 from hunter_api.errors import ProblemDetailsMiddleware, register_error_handlers
 from hunter_api.health import router as health_router
 from hunter_api.middleware.metrics_auth import MetricsAuthMiddleware
@@ -25,7 +28,16 @@ from hunter_api.middleware.rate_limit import RateLimitMiddleware
 from hunter_api.middleware.request_id import RequestIdMiddleware
 from hunter_api.middleware.security_headers import SecurityHeadersMiddleware
 from hunter_api.middleware.tenant_context import TenantContextMiddleware
+from hunter_api.realtime.endpoint import RealtimeHub
 from hunter_api.realtime.endpoint import router as realtime_router
+from hunter_api.realtime.redis_bridge import RedisClientLike
+from hunter_api.routers import audit as audit_router
+from hunter_api.routers import invitations as invitations_router
+from hunter_api.routers import me as me_router
+from hunter_api.routers import members as members_router
+from hunter_api.routers import organizations as organizations_router
+from hunter_api.routers import webhooks as webhooks_router
+from hunter_api.routers import workspaces as workspaces_router
 from hunter_core.db.session import create_engine, create_session_factory
 from hunter_core.logging import configure_logging, get_logger
 from hunter_core.observability import init_sentry, metrics_asgi_app
@@ -80,10 +92,29 @@ def create_app(settings: ApiSettings) -> FastAPI:
         app.state.session_factory = session_factory
         app.state.redis = redis_client
 
+        # Built once per process, not per request: the auth provider owns the
+        # JWKS cache (a per-request provider would re-fetch Clerk's keys on
+        # every call) and the realtime hub owns the single Redis pub/sub
+        # connection every WebSocket fans out from. A test overrides either by
+        # assigning to app.state after create_app.
+        if not hasattr(app.state, "auth_provider"):
+            app.state.auth_provider = ClerkAuthProvider(settings)
+        if not hasattr(app.state, "principal_resolver"):
+            app.state.principal_resolver = PrincipalResolver(
+                session_factory, create_profile_source(settings)
+            )
+        # cast: ``RedisClientLike`` names the one method the bridge uses
+        # (``pubsub()``); redis-py's own annotations for it are looser than the
+        # protocol, and the alternative — typing the bridge against the whole
+        # ``Redis`` surface — would make it untestable with a fake.
+        realtime = RealtimeHub(cast("RedisClientLike", redis_client))
+        app.state.realtime = realtime
+
         logger.info("api_startup", environment=settings.hunter_env)
         try:
             yield
         finally:
+            await realtime.close()
             await engine.dispose()
             await redis_client.aclose()
             logger.info("api_shutdown")
@@ -107,8 +138,14 @@ def create_app(settings: ApiSettings) -> FastAPI:
     # response, including ones ProblemDetailsMiddleware builds from an
     # unhandled exception; CORS must wrap ProblemDetails/RateLimit/Tenant so
     # preflight and error responses alike get CORS headers.
-    app.add_middleware(TenantContextMiddleware)
+    #
+    # TenantContext is added *after* RateLimit, i.e. it wraps it. It has to:
+    # the limiter reads its key off request.state before the route runs, and
+    # TenantContext is what puts the Clerk webhook's per-delivery key there
+    # (see its module docstring). In the other order the limiter would read
+    # state that had not been written yet.
     app.add_middleware(RateLimitMiddleware, settings=settings)
+    app.add_middleware(TenantContextMiddleware)
     app.add_middleware(MetricsAuthMiddleware, settings=settings)
     app.add_middleware(ProblemDetailsMiddleware)
     app.add_middleware(
@@ -122,6 +159,14 @@ def create_app(settings: ApiSettings) -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
 
     app.include_router(health_router)
+    app.include_router(me_router.router)
+    app.include_router(organizations_router.router)
+    app.include_router(members_router.router)
+    app.include_router(invitations_router.router)
+    app.include_router(invitations_router.accept_router)
+    app.include_router(workspaces_router.router)
+    app.include_router(audit_router.router)
+    app.include_router(webhooks_router.router)
     app.include_router(realtime_router)
     app.mount("/metrics", metrics_asgi_app())
 

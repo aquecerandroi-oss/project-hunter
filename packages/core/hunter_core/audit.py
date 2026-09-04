@@ -24,15 +24,19 @@ from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from datetime import datetime
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Literal, Protocol
+from ipaddress import ip_address
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+from pydantic_core import to_jsonable_python
 
 from hunter_core.domain.types import utcnow
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 ActorType = Literal["user", "system", "agent"]
 
@@ -86,6 +90,103 @@ class LoggingAuditSink:
 
     async def record(self, event: AuditEvent) -> None:
         self._logger.info("audit_event", **event.model_dump(mode="json"))
+
+
+USER_AGENT_MAX_LENGTH = 512
+"""``audit_logs.user_agent`` is unbounded ``TEXT``, but a request header is
+attacker-controlled and unbounded input on an append-only table that is never
+pruned is a slow-motion disk-fill. 512 characters keeps every real browser UA
+intact."""
+
+
+def _as_uuid(value: str | None) -> UUID | None:
+    """``audit_logs.actor_id`` is a ``uuid`` column, but an actor is not always a
+    person: workers and the webhook name themselves (``"system"``,
+    ``"clerk-webhook"``). Those keep their name in ``actor_type``/``metadata``
+    and leave the uuid column NULL rather than aborting the transaction.
+    """
+    if value is None:
+        return None
+    try:
+        return UUID(value)
+    except ValueError:
+        return None
+
+
+def _as_jsonb(value: Any) -> dict[str, Any] | None:
+    """Coerce a ``before``/``after`` payload into something a JSONB column takes.
+
+    ``fallback=str`` so a ``Decimal`` amount or a ``UUID`` renders instead of
+    raising — an audit row must never be the reason a mutation rolls back.
+    """
+    if value is None:
+        return None
+    data = to_jsonable_python(value, fallback=str)
+    return cast("dict[str, Any]", data) if isinstance(data, dict) else {"value": data}
+
+
+def _as_inet(value: str | None) -> str | None:
+    """Drop anything that is not an IP literal: the column is ``INET`` and a bad
+    value aborts the transaction that carries the mutation being audited.
+    """
+    if value is None:
+        return None
+    try:
+        ip_address(value)
+    except ValueError:
+        return None
+    return value
+
+
+class SqlAuditSink:
+    """Writes each event to ``audit_logs`` **in the caller's own transaction**.
+
+    Constructed with the session the mutation is running in (T06 binds it in
+    ``hunter_api.deps``), so the audit row and the change it describes commit
+    or roll back together: there is no window in which the database says a
+    thing happened and the trail says it did not. ``flush`` — never ``commit``
+    — for the same reason; the surrounding ``tenant_session`` owns the commit.
+
+    ``audit_logs`` is append-only for both roles (DATABASE.md §1.2), and a
+    system-scope row (``organization_id`` NULL) is accepted by the
+    ``audit_system_scope`` policy (§15.4).
+
+    **``created_at`` is set here, never left to the column default.** It is
+    part of the primary key, so a server default makes SQLAlchemy emit
+    ``INSERT ... RETURNING created_at`` — and Postgres applies the table's
+    *SELECT* policies to a RETURNING row. ``tenant_isolation`` cannot see a
+    row whose ``organization_id`` is NULL, so every system-scope audit row
+    (sign-up, webhook, cron: exactly the ones nobody is watching) was refused
+    with "new row violates row-level security policy". Supplying the value
+    drops the RETURNING clause and the problem with it — and the timestamp is
+    then the moment the event happened rather than the moment it flushed.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def record(self, event: AuditEvent) -> None:
+        from hunter_core.db.models.system import AuditLog
+
+        user_agent = event.user_agent
+        self._session.add(
+            AuditLog(
+                created_at=event.ts,
+                organization_id=event.organization_id,
+                actor_type=event.actor_type,
+                actor_id=_as_uuid(event.actor_id),
+                action=event.action,
+                entity_type=event.entity_type,
+                entity_id=_as_uuid(event.entity_id),
+                before=_as_jsonb(event.before),
+                after=_as_jsonb(event.after),
+                ip=_as_inet(event.ip),
+                user_agent=user_agent[:USER_AGENT_MAX_LENGTH] if user_agent else None,
+                request_id=event.metadata.get("request_id"),
+                meta=event.metadata,
+            )
+        )
+        await self._session.flush()
 
 
 _current_sink: ContextVar[AuditSink | None] = ContextVar("hunter_core_audit_sink", default=None)
