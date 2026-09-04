@@ -74,7 +74,7 @@ Turnos importam mais que preço por token: modelo barato que gasta 3× mais turn
 
 ## 6. Quality gates
 
-- **TypeScript:** `pnpm lint` (rápido, pre-commit) com `quality/max-lines` 350 em `error`, `quality/no-direct-console`, `quality/no-direct-data-access` e fronteira `components/** ↛ lib/server/**`; `pnpm lint:types` só em CI. Auto-checagem das regras: `pnpm --filter @hunter/config verify:eslint-rules`.
+- **TypeScript:** `pnpm lint` (rápido, pre-commit) com `quality/max-lines` 350 em `error`, `quality/no-direct-console`, `quality/no-direct-data-access` e fronteira `components/** ↛ lib/server/**`; `pnpm lint:types` só em CI. Auto-checagem das regras e do config montado: `pnpm --filter @hunter/config test` (roda `verify:eslint-rules` e `smoke:eslint`).
 - **Python:** `ruff.toml` bloqueia; `ruff.strict.toml` roda não-bloqueante em CI com contagem anotada; `check_file_size.py` aplica o mesmo teto de 350 linhas.
 - **Promoção:** regra nova nasce em `warn` com a contagem escrita ao lado; vira `error` ao zerar. Nunca aumentar o teto para um arquivo passar; usar `ignore`/baseline com lista explícita.
 - **Arquivo grande:** cortar por responsabilidade (lógica de negócio, UI, acesso a dados), um arquivo por commit, testes entre cada corte. Sem "costura natural", parar e dizer.
