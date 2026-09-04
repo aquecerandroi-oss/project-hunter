@@ -16,7 +16,9 @@ import sys
 import urllib.request
 
 role = os.environ.get("HUNTER_ROLE", "all")
-port = os.environ.get("API_PORT", "8000") if role == "api" else os.environ.get("HEALTH_PORT", "8001")
+port = (
+    os.environ.get("API_PORT", "8000") if role == "api" else os.environ.get("HEALTH_PORT", "8001")
+)
 url = f"http://127.0.0.1:{port}/health"
 
 try:
