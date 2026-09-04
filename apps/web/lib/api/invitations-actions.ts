@@ -1,6 +1,7 @@
 "use server";
 
-import { invitationCreateSchema } from "@/lib/api/schemas";
+import { getOrganization } from "@/lib/api/organizations";
+import { invitationCreateSchema, invitationTokenSchema } from "@/lib/api/schemas";
 import { apiFetch } from "@/lib/server/api";
 
 import { actionError, actionOk, ApiError, problemFromApiError, validationProblem } from "./types";
@@ -42,6 +43,63 @@ export async function revokeInvitation(orgId: string, invitationId: string): Pro
     return actionOk(undefined);
   } catch (error) {
     if (error instanceof ApiError) return actionError(problemFromApiError(error));
+    throw error;
+  }
+}
+
+/** The raw response of `POST /api/v1/invitations/{token}/accept` -- a plain dict, not a schema (routers/invitations.py returns `dict[str, str]`), so it isn't in `@hunter/shared-types`. */
+interface InvitationAcceptResponse {
+  organization_id: string;
+  user_id: string;
+  role: string;
+}
+
+export interface AcceptedInvitation {
+  orgSlug: string;
+}
+
+/**
+ * `POST /api/v1/invitations/{token}/accept` (apps/api/hunter_api/routers/invitations.py)
+ * -- accepted *by* the signed-in caller, not scoped to an org the caller is
+ * already a member of (there is no membership yet). The endpoint's own
+ * response carries only `organization_id` (see `InvitationAcceptResponse`
+ * above), never a slug, so a second read -- `getOrganization`, VIEWER and
+ * above -- resolves the `/<slug>/dashboard` redirect the caller actually
+ * needs; it succeeds because the membership row was written inside the
+ * same accept transaction (services/invitations.py's `accept_invitation`).
+ *
+ * Error mapping is deliberate, not a passthrough: a 404 (bad token, expired,
+ * or already used -- `InvitationNotFoundError` collapses all three on
+ * purpose, see its own docstring) always shows the same generic message, so
+ * this endpoint never becomes an oracle for which tokens once existed. A 403
+ * (`InvitationEmailMismatchError`) shows the API's own detail -- the caller
+ * already knows which email they're signed in as, so naming the mismatch
+ * isn't a leak.
+ */
+export async function acceptInvitation(token: string): Promise<ActionResult<AcceptedInvitation>> {
+  const parsed = invitationTokenSchema.safeParse(token);
+  if (!parsed.success) {
+    return actionError(validationProblem(parsed.error.issues[0]?.message ?? "Convite inválido, expirado ou já usado."));
+  }
+
+  try {
+    const accepted = await apiFetch<InvitationAcceptResponse>(`/api/v1/invitations/${parsed.data}/accept`, {
+      method: "POST",
+    });
+    const organization = await getOrganization(accepted.organization_id);
+    return actionOk({ orgSlug: organization.slug });
+  } catch (error) {
+    if (error instanceof ApiError) {
+      if (error.status === 404) {
+        return actionError({
+          type: error.type,
+          title: error.message,
+          status: error.status,
+          detail: "Convite inválido, expirado ou já usado.",
+        });
+      }
+      return actionError(problemFromApiError(error));
+    }
     throw error;
   }
 }

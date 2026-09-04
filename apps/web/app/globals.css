@@ -92,6 +92,24 @@ body {
 }
 
 /*
+ * Density (Settings > Appearance, components/settings/appearance-form.tsx):
+ * "compact" tightens spacing on the main content region. `app/layout.tsx`'s
+ * pre-hydration script (lib/pre-hydration-script.ts) applies `data-density`
+ * from `localStorage` before paint, the same way it applies `data-theme` --
+ * so this rule being global (not scoped to the Appearance screen's own
+ * markup) is what makes the setting hold on every page, not only while
+ * Settings > Appearance itself is mounted.
+ */
+[data-density="compact"] main {
+  padding: 0.5rem !important;
+}
+
+[data-density="compact"] .density-tight {
+  padding: 0.5rem !important;
+  gap: 0.5rem !important;
+}
+
+/*
  * Numbers (prices, PnL, quantities, ids) always use tabular figures in the
  * monospace stack so columns align (docs/DESIGN.md §2). Pair with an
  * explicit sign (+1,23% / -0,45%) and semantic color at the call site --

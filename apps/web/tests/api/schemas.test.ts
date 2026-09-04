@@ -4,6 +4,7 @@ import {
   MIN_VIRTUAL_CAPITAL,
   invitationCreateSchema,
   invitationEmailSchema,
+  invitationTokenSchema,
   memberRoleSchema,
   monitoredExchangesSchema,
   objectiveSchema,
@@ -124,5 +125,34 @@ describe("memberRoleSchema", () => {
 
   it("rejects a lowercase role (case-sensitive, mirrors the Postgres enum)", () => {
     expect(memberRoleSchema.safeParse("owner").success).toBe(false);
+  });
+});
+
+describe("invitationTokenSchema (mirrors mint_token's 32-byte url-safe token, Path(min_length=8, max_length=128))", () => {
+  it("accepts a 32-char url-safe token", () => {
+    expect(invitationTokenSchema.safeParse("a".repeat(32)).success).toBe(true);
+  });
+
+  it("accepts the 128-char upper bound and a mixed url-safe alphabet", () => {
+    expect(invitationTokenSchema.safeParse("A".repeat(128)).success).toBe(true);
+    expect(invitationTokenSchema.safeParse(`${"a".repeat(28)}A1-_`).success).toBe(true);
+  });
+
+  it("rejects a token shorter than 32 characters", () => {
+    expect(invitationTokenSchema.safeParse("a".repeat(31)).success).toBe(false);
+  });
+
+  it("rejects a token longer than 128 characters", () => {
+    expect(invitationTokenSchema.safeParse("a".repeat(129)).success).toBe(false);
+  });
+
+  it("rejects characters outside the url-safe alphabet", () => {
+    expect(invitationTokenSchema.safeParse(`${"a".repeat(31)}!`).success).toBe(false);
+    expect(invitationTokenSchema.safeParse(`${"a".repeat(31)}/`).success).toBe(false);
+    expect(invitationTokenSchema.safeParse(`${"a".repeat(28)}<script>`).success).toBe(false);
+  });
+
+  it("rejects an empty string", () => {
+    expect(invitationTokenSchema.safeParse("").success).toBe(false);
   });
 });

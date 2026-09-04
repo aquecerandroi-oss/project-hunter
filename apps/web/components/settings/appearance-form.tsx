@@ -18,18 +18,12 @@ function applyDensity(density: Density): void {
 /**
  * Settings > Appearance (docs/PRODUCT.md §4/§7). Reuses the existing
  * `ThemeToggle` (components/layout/theme-toggle.tsx, T08) rather than
- * duplicating its dark/light logic. Density is new here: it sets a real
- * `data-density` attribute on `<html>` and ships the (tiny) CSS that reacts
- * to it inline, since this component's file is the only one in scope to
- * carry it -- a toggle with no visible effect would be exactly the "inert
- * control" CLAUDE.md rules out.
- *
- * Caveat, stated rather than hidden: unlike the theme (which `app/layout.tsx`
- * applies before paint via an inline script), density is only re-applied
- * once this component mounts. A hard refresh on a different page resets to
- * "comfortable" until Settings > Appearance is visited again in that
- * session -- out of this task's file set to fix (it would need the same
- * pre-paint script `app/layout.tsx` already has for theme).
+ * duplicating its dark/light logic. Density sets a real `data-density`
+ * attribute on `<html>`; the CSS that reacts to it lives globally in
+ * `app/globals.css` (not scoped to this component), and `app/layout.tsx`'s
+ * pre-hydration script (lib/pre-hydration-script.ts) applies it from
+ * `localStorage` before paint -- exactly like the theme -- so the setting
+ * holds on every page, not only while this screen is mounted.
  */
 export function AppearanceForm() {
   const [density, setDensity] = useState<Density>(DEFAULT_DENSITY);
@@ -49,11 +43,6 @@ export function AppearanceForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      <style>{`
-        [data-density="compact"] main { padding: 0.5rem !important; }
-        [data-density="compact"] .density-tight { padding: 0.5rem !important; gap: 0.5rem !important; }
-      `}</style>
-
       <section>
         <h2 className="text-sm font-medium text-fg">Tema</h2>
         <p className="mt-1 text-sm text-fg-muted">Escuro por padrão; claro disponível desde o M0.</p>

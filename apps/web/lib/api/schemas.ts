@@ -99,6 +99,19 @@ export const invitationCreateSchema = z.object({
   role: memberRoleSchema,
 });
 
+/**
+ * Shape-only check on the `?token=` from an accept-invite link, before ever
+ * calling `POST /api/v1/invitations/{token}/accept`. Mirrors the token's
+ * real shape (32 random bytes, URL-safe encoded -- services/invitations.py's
+ * `mint_token`) and the API's own `Path(min_length=8, max_length=128)`
+ * (routers/invitations.py); this is defense in depth / fast feedback for an
+ * obviously-mangled link, never a substitute for the API's own lookup.
+ */
+export const invitationTokenSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9_-]{32,128}$/, "Convite inválido, expirado ou já usado.");
+
 export type OnboardingCreateOrgInput = z.infer<typeof onboardingCreateOrgSchema>;
 export type OnboardingUpdateInput = z.infer<typeof onboardingUpdateSchema>;
 export type InvitationCreateInput = z.infer<typeof invitationCreateSchema>;

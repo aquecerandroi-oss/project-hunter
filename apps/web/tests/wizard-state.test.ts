@@ -1,12 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   DEFAULT_DATA,
+  ONBOARDING_MARKER_KEY,
   STEP_COUNT,
   canAdvance,
   createInitialState,
   goBack,
   goNext,
+  hasOnboardingStarted,
+  markOnboardingStarted,
+  resolveEntryStep,
   setOrgCreated,
   updateData,
   validateStep,
@@ -137,5 +141,39 @@ describe("wizard-state: validation per step", () => {
     s = withData(s, { virtualCapital: "not-a-number" });
     expect(canAdvance(s)).toBe(false);
     expect(goNext(s).step).toBe(3);
+  });
+});
+
+describe("resolveEntryStep: direct step-jumping guard (LOW finding on T09, 1bae973)", () => {
+  it("bounces a fresh N > 1 visit with no ?org= and no marker back to step 1", () => {
+    expect(resolveEntryStep(4, false, false)).toBe(1);
+  });
+
+  it("allows N > 1 when ?org= resolved a real, unfinished organization", () => {
+    expect(resolveEntryStep(4, true, false)).toBe(4);
+  });
+
+  it("allows N > 1 when the sessionStorage marker was set (org just created client-side)", () => {
+    expect(resolveEntryStep(4, false, true)).toBe(4);
+  });
+
+  it("step 1 is always allowed regardless of ?org= or the marker", () => {
+    expect(resolveEntryStep(1, false, false)).toBe(1);
+  });
+});
+
+describe("onboarding sessionStorage marker (markOnboardingStarted / hasOnboardingStarted)", () => {
+  afterEach(() => {
+    window.sessionStorage.removeItem(ONBOARDING_MARKER_KEY);
+  });
+
+  it("is absent before markOnboardingStarted runs", () => {
+    expect(hasOnboardingStarted()).toBe(false);
+  });
+
+  it("is present after markOnboardingStarted runs (called once step 1's org creation succeeds)", () => {
+    markOnboardingStarted();
+    expect(hasOnboardingStarted()).toBe(true);
+    expect(window.sessionStorage.getItem(ONBOARDING_MARKER_KEY)).toBe("1");
   });
 });

@@ -125,3 +125,43 @@ export function updateData(state: WizardState, patch: Partial<WizardData>): Wiza
 export function setOrgCreated(state: WizardState, org: OrgIdentity): WizardState {
   return { ...state, org, step: 2, minStep: 2 };
 }
+
+/**
+ * `sessionStorage` key set right after `setOrgCreated` succeeds -- see
+ * `markOnboardingStarted`. A `sessionStorage` marker (not `localStorage`):
+ * it should not survive into a brand new browser session, only a reload or
+ * back-navigation within the one that actually created the org.
+ */
+export const ONBOARDING_MARKER_KEY = "hunter.onboarding";
+
+/** Called once `createOrganization` succeeds (components/onboarding/wizard.tsx). Fails open, same as the theme/density pre-paint scripts (private mode, disabled storage). */
+export function markOnboardingStarted(): void {
+  try {
+    window.sessionStorage.setItem(ONBOARDING_MARKER_KEY, "1");
+  } catch {
+    // ignore -- see docstring
+  }
+}
+
+/** Fails open (returns `false`) rather than throwing when storage is unavailable. */
+export function hasOnboardingStarted(): boolean {
+  try {
+    return window.sessionStorage.getItem(ONBOARDING_MARKER_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A fresh `/onboarding/N` visit with `N > 1`, no `?org=` and no
+ * `ONBOARDING_MARKER_KEY` marker is direct step-jumping: this wizard has
+ * never actually created an organization for this visitor (client state is
+ * gone on a hard navigation), so there is nothing valid to show past step 1.
+ * `hasOrgParam` (server-verified via `resolveOrgContext`, T09) and the
+ * marker (set the moment step 1's mutation actually succeeds) are the only
+ * two honest ways step > 1 is reachable.
+ */
+export function resolveEntryStep(requestedStep: WizardStep, hasOrgParam: boolean, hasMarker: boolean): WizardStep {
+  if (requestedStep > 1 && !hasOrgParam && !hasMarker) return 1;
+  return requestedStep;
+}

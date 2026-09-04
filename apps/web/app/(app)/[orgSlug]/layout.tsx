@@ -8,7 +8,9 @@ import { ready } from "@/lib/api/system";
 import type { ReadyStatus } from "@/lib/api/types";
 import { logger } from "@/lib/logger";
 import { visibleNavItems } from "@/lib/nav-registry";
+import { resolveOnboardingRedirect } from "@/lib/onboarding-redirect";
 import { getServerSession } from "@/lib/server/auth";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 /**
@@ -50,6 +52,14 @@ export default async function OrgLayout({ children, params }: OrgLayoutProps) {
   // never a 500 (docs/DATABASE.md's RLS makes cross-tenant reads 404 too).
   const membership = await resolveOrgContext(orgSlug);
   if (!membership) notFound();
+
+  // An org whose onboarding never finished (docs/PRODUCT.md §3) has no
+  // business rendering the dashboard/settings/system shell -- send the
+  // caller back to resume the wizard at step 2 instead of showing an org
+  // with unset objective/capital/risk profile as if it were ready.
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  const onboardingRedirect = resolveOnboardingRedirect(orgSlug, membership.onboarding.completed, pathname);
+  if (onboardingRedirect) redirect(onboardingRedirect);
 
   const role = membership.role;
   const env = process.env.HUNTER_ENV ?? "development";

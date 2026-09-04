@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { OnboardingProgress } from "@/components/onboarding/progress";
 import { StepCapital } from "@/components/onboarding/step-capital";
@@ -15,6 +15,9 @@ import {
   createInitialState,
   goBack,
   goNext,
+  hasOnboardingStarted,
+  markOnboardingStarted,
+  resolveEntryStep,
   setOrgCreated,
   updateData,
   type OrgIdentity,
@@ -43,6 +46,26 @@ export function OnboardingWizard({ initialOrg, initialStep }: OnboardingWizardPr
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // Guards against direct step-jumping (e.g. typing `/onboarding/4` with no
+  // `?org=`): `sessionStorage` (checked by `hasOnboardingStarted`) is only
+  // readable client-side, so this can't be done in the server page itself --
+  // it runs once, right after mount, and corrects both the in-memory step
+  // and the URL if this visit has no business being past step 1. A resumed
+  // wizard (`initialOrg` set from a server-verified `?org=`) never needs the
+  // correction, since `minStep` is already 2.
+  useEffect(() => {
+    if (initialOrg) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from sessionStorage, an external system, on mount (same pattern as components/settings/appearance-form.tsx)
+    setState((s) => {
+      const safeStep = resolveEntryStep(s.step, false, hasOnboardingStarted());
+      return safeStep === s.step ? s : { ...s, step: safeStep };
+    });
+    if (initialStep !== undefined && initialStep > 1 && !hasOnboardingStarted()) {
+      router.replace("/onboarding");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally runs once, on mount only
+  }, []);
+
   function handleChange(patch: Parameters<typeof updateData>[1]): void {
     setState((s) => updateData(s, patch));
   }
@@ -64,6 +87,7 @@ export function OnboardingWizard({ initialOrg, initialStep }: OnboardingWizardPr
           setError(result.problem.detail ?? result.problem.title);
           return;
         }
+        markOnboardingStarted();
         setState((s) =>
           setOrgCreated(s, {
             orgSlug: result.data.slug,
