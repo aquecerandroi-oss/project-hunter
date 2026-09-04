@@ -20,6 +20,7 @@ from starlette.middleware.cors import CORSMiddleware
 from hunter_api import __version__, analytics
 from hunter_api.errors import ProblemDetailsMiddleware, register_error_handlers
 from hunter_api.health import router as health_router
+from hunter_api.middleware.metrics_auth import MetricsAuthMiddleware
 from hunter_api.middleware.rate_limit import RateLimitMiddleware
 from hunter_api.middleware.request_id import RequestIdMiddleware
 from hunter_api.middleware.security_headers import SecurityHeadersMiddleware
@@ -65,6 +66,11 @@ def create_app(settings: ApiSettings) -> FastAPI:
         init_sentry(settings, "api")
         analytics.configure(settings)
 
+        if settings.hunter_env in ("staging", "production") and (
+            settings.metrics_token is None or not settings.metrics_token.get_secret_value()
+        ):
+            logger.warning("metrics_token_unset", environment=settings.hunter_env)
+
         engine = create_engine(settings)
         session_factory = create_session_factory(engine)
         redis_client = create_redis(settings)
@@ -103,6 +109,7 @@ def create_app(settings: ApiSettings) -> FastAPI:
     # preflight and error responses alike get CORS headers.
     app.add_middleware(TenantContextMiddleware)
     app.add_middleware(RateLimitMiddleware, settings=settings)
+    app.add_middleware(MetricsAuthMiddleware, settings=settings)
     app.add_middleware(ProblemDetailsMiddleware)
     app.add_middleware(
         CORSMiddleware,

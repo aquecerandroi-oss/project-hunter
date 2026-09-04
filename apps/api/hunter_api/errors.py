@@ -20,6 +20,7 @@ headers are still applied.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 from fastapi import status
@@ -126,6 +127,27 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
     )
 
 
+_UNSAFE_ERROR_KEYS = frozenset({"input", "url", "ctx"})
+
+
+def _sanitize_validation_errors(
+    errors: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Strip ``input``/``url``/``ctx`` from each ``exc.errors()`` entry.
+
+    Pydantic v2 echoes the raw submitted value back in ``input`` (and
+    sometimes structured context in ``ctx``) so callers can build a rich
+    error UI — but that means an invalid ``Authorization`` header or a
+    sensitive body field would otherwise round-trip verbatim into a 422
+    response body. ``loc``/``type``/``msg`` are enough to fix a request
+    without ever echoing what was submitted.
+    """
+    return [
+        {key: value for key, value in error.items() if key not in _UNSAFE_ERROR_KEYS}
+        for error in errors
+    ]
+
+
 async def validation_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, RequestValidationError)
     return _problem_response(
@@ -134,7 +156,7 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
         title="Validation Error",
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         detail="One or more fields failed validation.",
-        extra={"errors": exc.errors()},
+        extra={"errors": _sanitize_validation_errors(exc.errors())},
     )
 
 

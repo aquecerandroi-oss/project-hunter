@@ -6,6 +6,7 @@ mounted directly in ``app.py``, not a router endpoint.
 
 from __future__ import annotations
 
+import asyncio
 import os
 from typing import TYPE_CHECKING, Any
 
@@ -17,6 +18,8 @@ from hunter_core.db.session import check_database
 from hunter_core.redis import check_redis
 
 if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
     from hunter_api.settings import ApiSettings
 
 router = APIRouter(tags=["system"])
@@ -28,14 +31,42 @@ async def health() -> dict[str, str]:
     return {"status": "ok", "role": "api", "version": __version__}
 
 
+async def _check_with_timeout(
+    coro: Coroutine[Any, Any, bool], timeout_s: float
+) -> tuple[bool, str | None]:
+    """Run a readiness check, bounding it to ``timeout_s``.
+
+    A dependency that never answers must not hang ``/ready`` forever — a
+    slow/wedged Postgres or Redis should surface as "not ready" quickly
+    enough for an orchestrator's own liveness/readiness probe timeout to
+    still work.
+    """
+    try:
+        ok = await asyncio.wait_for(coro, timeout=timeout_s)
+    except TimeoutError:
+        return False, "timeout"
+    return ok, None
+
+
 @router.get("/ready")
 async def ready(request: Request) -> JSONResponse:
-    """Readiness: 200 only when both Postgres and Redis answer, else 503
-    with per-dependency detail.
+    """Readiness: 200 only when both Postgres and Redis answer within
+    ``ApiSettings.ready_check_timeout_s``, else 503 with per-dependency
+    detail (``"timeout"`` when that dependency didn't answer in time).
     """
-    db_ok = await check_database(request.app.state.engine)
-    redis_ok = await check_redis(request.app.state.redis)
-    body = {"database": db_ok, "redis": redis_ok}
+    settings: ApiSettings = request.app.state.settings
+    timeout_s = settings.ready_check_timeout_s
+    db_ok, db_detail = await _check_with_timeout(
+        check_database(request.app.state.engine), timeout_s
+    )
+    redis_ok, redis_detail = await _check_with_timeout(
+        check_redis(request.app.state.redis), timeout_s
+    )
+    body: dict[str, Any] = {"database": db_ok, "redis": redis_ok}
+    if db_detail is not None:
+        body["database_detail"] = db_detail
+    if redis_detail is not None:
+        body["redis_detail"] = redis_detail
     return JSONResponse(body, status_code=200 if db_ok and redis_ok else 503)
 
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from hunter_core.settings import Settings
@@ -21,9 +21,12 @@ class ApiSettings(Settings):
     model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
 
     api_port: int = 8000
-    cors_allowed_origins: list[str] = ["http://localhost:3000"]
+    cors_allowed_origins: list[str] = []
     rate_limit_per_minute: int = 120
     enable_openapi_docs: bool = False
+    ready_check_timeout_s: float = 3.0
+    forwarded_allow_ips: str = "127.0.0.1"
+    metrics_token: SecretStr | None = None
 
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
@@ -32,6 +35,15 @@ class ApiSettings(Settings):
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @model_validator(mode="after")
+    def _default_cors_from_web_origin(self) -> ApiSettings:
+        """When ``CORS_ALLOWED_ORIGINS`` isn't set, fall back to ``WEB_ORIGIN``
+        instead of a second hardcoded dev URL, so the two can't drift apart.
+        """
+        if not self.cors_allowed_origins:
+            self.cors_allowed_origins = self.cors_origins()
+        return self
 
     @property
     def openapi_enabled(self) -> bool:

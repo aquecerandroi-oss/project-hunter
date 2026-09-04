@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 import pytest
+from fastapi import Header
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
@@ -55,6 +56,53 @@ async def test_422_is_problem_json_with_field_errors(
     body = _assert_problem_json(response, 422)
     assert "errors" in body
     assert body["errors"][0]["loc"] == ["body", "name"]
+
+
+async def test_422_does_not_echo_submitted_field_value(
+    app: FastAPI,
+    client_factory: Callable[[FastAPI], AbstractAsyncContextManager[httpx.AsyncClient]],
+) -> None:
+    class _StrictPayload(BaseModel):
+        count: int
+
+    def _validate(payload: _StrictPayload) -> dict[str, int]:
+        return {"count": payload.count}
+
+    app.post("/__test__/strict-validate")(_validate)
+
+    async with client_factory(app) as test_client:
+        response = await test_client.post(
+            "/__test__/strict-validate", json={"count": "super-secret-value-123"}
+        )
+
+    body = _assert_problem_json(response, 422)
+    error = body["errors"][0]
+    assert "input" not in error
+    assert "url" not in error
+    assert "ctx" not in error
+    assert "super-secret-value-123" not in str(body)
+
+
+async def test_422_header_validation_does_not_leak_header_value(
+    app: FastAPI,
+    client_factory: Callable[[FastAPI], AbstractAsyncContextManager[httpx.AsyncClient]],
+) -> None:
+    def _guarded(
+        authorization: Annotated[str, Header(pattern=r"^Bearer [A-Za-z0-9]+$")],
+    ) -> dict[str, str]:
+        return {"authorization": authorization}
+
+    app.get("/__test__/guarded")(_guarded)
+
+    async with client_factory(app) as test_client:
+        response = await test_client.get(
+            "/__test__/guarded", headers={"Authorization": "sekrit-token-value-xyz"}
+        )
+
+    body = _assert_problem_json(response, 422)
+    error = body["errors"][0]
+    assert "input" not in error
+    assert "sekrit-token-value-xyz" not in str(body)
 
 
 async def test_500_hides_internals_and_includes_request_id(

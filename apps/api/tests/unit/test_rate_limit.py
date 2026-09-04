@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hunter_api.app import create_app
+from hunter_api.middleware import rate_limit as rate_limit_module
 from hunter_api.middleware.rate_limit import EXEMPT_PATHS
 
 if TYPE_CHECKING:
@@ -116,3 +117,48 @@ async def test_fails_open_when_redis_is_unavailable(
         app.state.redis = _BrokenRedis()
         for _ in range(5):
             assert (await test_client.get("/api/v1/system/info")).status_code == 200
+
+
+async def test_spoofed_x_forwarded_for_does_not_change_the_rate_limit_key(
+    api_settings: ApiSettings,
+    client_factory: Callable[[FastAPI], AbstractAsyncContextManager[httpx.AsyncClient]],
+) -> None:
+    """The rate-limit key comes from ``request.client.host`` only. A test
+    client's ``request.client`` is fixed for the life of the transport, so if
+    a spoofed ``X-Forwarded-For`` changed the key, these two requests would
+    land in different buckets and neither would be limited; keying on the
+    real peer means they share one bucket and the second one is limited.
+    """
+    limited = api_settings.model_copy(update={"rate_limit_per_minute": 1})
+    app = create_app(limited)
+
+    async with client_factory(app) as test_client:
+        app.state.redis = _FakeRedis()
+        first = await test_client.get("/api/v1/system/info", headers={"X-Forwarded-For": "1.2.3.4"})
+        second = await test_client.get(
+            "/api/v1/system/info", headers={"X-Forwarded-For": "9.9.9.9"}
+        )
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+
+
+async def test_fail_open_warning_is_logged_at_most_once_per_interval(
+    api_settings: ApiSettings,
+    client_factory: Callable[[FastAPI], AbstractAsyncContextManager[httpx.AsyncClient]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = create_app(api_settings)
+    warnings: list[str] = []
+
+    def _record_warning(event: str, **_kwargs: object) -> None:
+        warnings.append(event)
+
+    monkeypatch.setattr(rate_limit_module.logger, "warning", _record_warning)
+
+    async with client_factory(app) as test_client:
+        app.state.redis = _BrokenRedis()
+        for _ in range(5):
+            assert (await test_client.get("/api/v1/system/info")).status_code == 200
+
+    assert warnings.count("rate_limit_redis_unavailable") == 1

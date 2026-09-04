@@ -33,3 +33,17 @@ async def test_disallowed_origin_gets_no_cors_headers(client: httpx.AsyncClient)
 
     assert response.status_code == 200
     assert "access-control-allow-origin" not in response.headers
+
+
+async def test_preflight_from_a_disallowed_origin_gets_no_cors_headers(
+    client: httpx.AsyncClient,
+) -> None:
+    response = await client.options(
+        "/api/v1/system/info",
+        headers={
+            "Origin": DISALLOWED_ORIGIN,
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert "access-control-allow-origin" not in response.headers

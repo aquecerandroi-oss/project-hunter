@@ -1,9 +1,9 @@
 """Static security response headers — SECURITY.md §5.
 
-HSTS is skipped in development (plain HTTP locally would otherwise get the
-browser to force HTTPS on ``localhost``, which is not served over TLS).
-``Cache-Control: no-store`` applies only to ``/api/*`` so `/health`,
-``/metrics`` and static docs are unaffected.
+HSTS is skipped in development (plain HTTP on a local dev origin would
+otherwise get the browser to force HTTPS on it, which that origin is not
+served over). ``Cache-Control: no-store`` applies only to ``/api/*`` so
+`/health`, ``/metrics`` and static docs are unaffected.
 """
 
 from __future__ import annotations

@@ -33,6 +33,9 @@ from pydantic import SecretStr
 
 from hunter_api.app import create_app
 from hunter_api.settings import ApiSettings
+from hunter_core.logging import get_logger
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -91,7 +94,7 @@ def _docker_reachable() -> bool:
 
         docker.from_env().ping()  # type: ignore[reportUnknownMemberType]
     except Exception as exc:
-        print(f"Docker is not reachable, skipping integration tests: {exc}")
+        logger.warning("docker_not_reachable_skipping_integration_tests", error=str(exc))
         return False
     return True
 
