@@ -1,0 +1,10 @@
+{
+  "current": "M0",
+  "status": "not_started",
+  "plan": "docs/plans/M0.md",
+  "updated": "2026-09-04",
+  "next_action": "User approves architecture + M0 wave plan; install prerequisites (Node 22, pnpm, uv, Docker); then execute Wave 1 of docs/plans/M0.md.",
+  "blockers": [
+    "Dev machine had no node/npm/pnpm/uv/docker on 2026-09-04 — hooks and ESLint self-check could not be executed yet"
+  ]
+}

@@ -21,6 +21,10 @@ Autonomous Crypto Intelligence & Trading SaaS. Plataforma multi-tenant de inteli
 | [docs/PRODUCT.md](docs/PRODUCT.md) | Onboarding, navegação, planos, analytics de produto |
 | [docs/EXTERNAL_SERVICES.md](docs/EXTERNAL_SERVICES.md) | Serviços externos por fase |
 | [docs/DEV_TOOLING.md](docs/DEV_TOOLING.md) | Ferramentas e MCPs para o desenvolvimento |
+| [docs/WORKFLOW.md](docs/WORKFLOW.md) | Fluxo de desenvolvimento com Claude Code (vibe-coding-toolkit): ondas, revisão, commits, gates, memória |
+| [docs/plans/M0.md](docs/plans/M0.md) | Plano de execução do Milestone 0 em ondas paralelas |
+| [docs/decisions/](docs/decisions/README.md) | ADRs (camada dois da memória do projeto) |
+| [CLAUDE.md](CLAUDE.md) | Instruções para o agente: regras, comandos canônicos, roster de especialistas |
 
 ## Estrutura
 

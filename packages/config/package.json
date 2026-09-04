@@ -1,0 +1,22 @@
+{
+  "name": "@hunter/config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared lint/type/format presets for PROJECT HUNTER (ESLint quality gates from vibe-coding-toolkit, ruff, pyright, tsconfig).",
+  "type": "module",
+  "exports": {
+    "./eslint": "./eslint/eslint.config.mjs",
+    "./eslint/typed": "./eslint/eslint.typed.config.mjs"
+  },
+  "scripts": {
+    "verify:eslint-rules": "node eslint/verify.mjs eslint/eslint-rules/index.cjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "eslint-import-resolver-typescript": "^4.0.0",
+    "eslint-plugin-import-x": "^4.0.0",
+    "globals": "^16.0.0",
+    "typescript-eslint": "^8.0.0"
+  }
+}

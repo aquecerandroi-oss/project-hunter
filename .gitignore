@@ -31,6 +31,9 @@ htmlcov/
 # docker / dados locais de dev (nunca estado de produção)
 infra/docker/.data/
 
+# claude code — configurações pessoais ficam fora do repo; settings.json, hooks, agents, memory e state são versionados
+.claude/settings.local.json
+
 # IDE / OS
 .vscode/
 .idea/

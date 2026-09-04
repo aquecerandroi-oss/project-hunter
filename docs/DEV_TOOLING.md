@@ -1,5 +1,9 @@
 # Ferramentas, extensões e MCPs que aceleram o desenvolvimento (item 80.10)
 
+## 0. Método adotado: vibe-coding-toolkit
+
+O fluxo de trabalho com o Claude Code segue o [vibe-coding-toolkit](https://github.com/soumatheusgomes/vibe-coding-toolkit) (ADR 0001, detalhes em `docs/WORKFLOW.md`): orquestrador que não implementa, 12 especialistas em `.claude/agents/`, ondas paralelas com commit serializado, quality gates com regras copiadas byte a byte, memória em duas camadas, hooks fail-open. Plugins recomendados para a sessão do usuário: Superpowers, Ponytail, Caveman (comandos em `docs/WORKFLOW.md` §1).
+
 ## 1. Ferramentas de linha de comando (instalar antes do M0)
 
 | Ferramenta | Para quê |

@@ -1,0 +1,29 @@
+# PROJECT HUNTER — tier estrito, NÃO bloqueante. Roda em CI com continue-on-error
+# e o número de violações é anotado no relatório do milestone. Cada regra migra
+# para ruff.toml quando sua contagem chega a zero (equivalente ao warn → error do ESLint).
+extend = "./ruff.toml"
+
+[lint]
+extend-select = [
+  "C90",   # complexidade ciclomática (teto abaixo)
+  "PLR0912", "PLR0913", "PLR0915",   # branches, argumentos, statements por função
+  "PLR2004",                          # números mágicos
+  "N",     # nomenclatura pep8
+  "SIM",   # simplificações
+  "RET",   # returns consistentes
+  "PT",    # estilo pytest
+  "TRY",   # tratamento de exceções (tryceratops)
+  "ERA",   # código comentado
+  "PERF",  # perflint
+  "FBT",   # boolean traps
+  "ANN",   # anotações de tipo faltando
+]
+extend-ignore = ["ANN401"]   # Any explícito é decisão consciente (pyright cobre)
+
+[lint.mccabe]
+max-complexity = 12
+
+[lint.pylint]
+max-args = 5
+max-branches = 12
+max-statements = 25

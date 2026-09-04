@@ -10,6 +10,8 @@ Formato de fechamento (§77): COMPLETED · FILES CREATED · FILES MODIFIED · DA
 
 **Objetivo:** monorepo funcional, deployável, com auth real, organizações, dashboard shell, migrações, CI.
 
+**Plano de execução em ondas:** `docs/plans/M0.md` (13 tarefas, 6 ondas). **Pré-requisitos de máquina** (Node 22, pnpm, uv, Docker) listados lá; em 2026-09-04 nenhum estava instalado.
+
 **Escopo**
 - Monorepo: pnpm + Turborepo; `uv` workspace; `packages/config` com presets de lint/tsconfig/ruff/pyright.
 - `apps/web`: Next.js, Tailwind, shadcn/ui, tema dark-first com tokens, layout de app (sidebar via `nav-registry`, topbar, seletor de organização), páginas de auth do Clerk, onboarding passos 1–6 (passos 3–5 salvam preferências; portfolio real só no M3, então o passo 3 grava `default_initial_capital` no workspace), `/dashboard` shell com cards de sistema reais (estado dos workers, contagem de mercados = 0 até o M1) e sem números financeiros inventados.
