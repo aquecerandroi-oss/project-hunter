@@ -39,3 +39,6 @@ infra/docker/.data/
 .idea/
 .DS_Store
 Thumbs.db
+
+# intermediate OpenAPI dump (only the generated .d.ts is committed)
+packages/shared-types/openapi.json

@@ -1,0 +1,17 @@
+{
+  "name": "@hunter/shared-types",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./api": "./src/generated/api.d.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@hunter/config": "workspace:*",
+    "typescript": "^5.6"
+  }
+}

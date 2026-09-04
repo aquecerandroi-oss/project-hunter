@@ -11,7 +11,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "build": "turbo run build",
-    "gen:types": "turbo run gen:types",
+    "gen:types": "uv run python infra/scripts/dump_openapi.py > packages/shared-types/openapi.json && openapi-typescript packages/shared-types/openapi.json -o packages/shared-types/src/generated/api.d.ts",
     "e2e": "turbo run e2e",
     "verify:eslint-rules": "pnpm --filter @hunter/config verify:eslint-rules",
     "format": "prettier --write .",
@@ -20,6 +20,7 @@
   "devDependencies": {
     "turbo": "^2",
     "prettier": "^3",
-    "typescript": "^5.6"
+    "typescript": "^5.6",
+    "openapi-typescript": "^7"
   }
 }

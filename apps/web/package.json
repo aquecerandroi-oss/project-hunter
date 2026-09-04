@@ -36,6 +36,7 @@
   },
   "devDependencies": {
     "@hunter/config": "workspace:*",
+    "@hunter/shared-types": "workspace:*",
     "vitest": "^5.0.0",
     "vite": "^8.2.2",
     "@testing-library/react": "^16.3.3",

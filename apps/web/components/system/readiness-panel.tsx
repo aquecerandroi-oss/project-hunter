@@ -1,0 +1,70 @@
+"use client";
+
+import { RefreshCw } from "lucide-react";
+import { useState, useTransition } from "react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { refreshReadiness } from "@/lib/api/system-actions";
+import type { ReadyStatus } from "@/lib/api/types";
+import { cn } from "@/lib/utils";
+
+export interface ReadinessPanelProps {
+  initial: ReadyStatus;
+}
+
+function StatusBadge({ ok, detail }: { ok: boolean; detail?: string | undefined }) {
+  return (
+    <Badge variant={ok ? "positive" : "negative"}>
+      {ok ? "OK" : detail ? `Indisponível (${detail})` : "Indisponível"}
+    </Badge>
+  );
+}
+
+/**
+ * `GET /ready` (apps/api/hunter_api/health.py) -- 200 only when Postgres and
+ * Redis both answer in time, 503 with per-dependency detail otherwise. The
+ * page itself revalidates every 15s (`export const revalidate = 15`); this
+ * button re-runs the real check on demand rather than waiting for that.
+ */
+export function ReadinessPanel({ initial }: ReadinessPanelProps) {
+  const [status, setStatus] = useState(initial);
+  const [pending, startTransition] = useTransition();
+
+  function handleRefresh(): void {
+    startTransition(async () => {
+      setStatus(await refreshReadiness());
+    });
+  }
+
+  const allOk = status.database && status.redis;
+
+  return (
+    <section className="rounded-lg border border-border bg-surface-1 p-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-medium text-muted">Dependências</h2>
+        <Button type="button" variant="ghost" size="sm" onClick={handleRefresh} disabled={pending}>
+          <RefreshCw className={cn("size-4", pending && "animate-spin")} />
+          Atualizar
+        </Button>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Badge variant={allOk ? "positive" : "negative"}>{allOk ? "Ready" : "Not Ready"}</Badge>
+      </div>
+      <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <dt className="text-muted">Postgres</dt>
+          <dd className="mt-1">
+            <StatusBadge ok={status.database} detail={status.database_detail} />
+          </dd>
+        </div>
+        <div>
+          <dt className="text-muted">Redis</dt>
+          <dd className="mt-1">
+            <StatusBadge ok={status.redis} detail={status.redis_detail} />
+          </dd>
+        </div>
+      </dl>
+    </section>
+  );
+}

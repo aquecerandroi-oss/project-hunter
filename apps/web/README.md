@@ -1,6 +1,6 @@
 # @hunter/web
 
-Next.js 15 (App Router) + React 19 + Tailwind 4 + shadcn/ui front end for PROJECT HUNTER. Implemented in Milestone 0 (T08): scaffold, theme, auth pages, app shell. Onboarding and in-app pages land in T09.
+Next.js 15 (App Router) + React 19 + Tailwind 4 + shadcn/ui front end for PROJECT HUNTER. T08 built the scaffold, theme, auth pages and app shell; T09 added onboarding, the dashboard/system/settings pages, the typed API client and `@hunter/shared-types` (generated from `apps/api`'s OpenAPI document).
 
 ## Run
 
@@ -37,9 +37,25 @@ See `.env.example` at the repo root. This app reads:
 - `lib/ws.ts` + `hooks/useRealtime.ts` -- typed realtime client with reconnect/backoff and the `auth`-first-message handshake from `docs/ARCHITECTURE.md` §5.2. **Not connected anywhere in M0**: `useRealtime`'s `enabled` option defaults to `false` because no worker publishes on any `rt:*` channel yet. Turn it on only once the corresponding M1+ backend piece exists.
 - Sentry: intentionally **not wired**. `@sentry/nextjs` was left out rather than half-configured; add it when `NEXT_PUBLIC_SENTRY_DSN`/observability work is scheduled.
 
+## Routes (T09)
+
+| Route | What renders | Role gating |
+|---|---|---|
+| `/` | Redirects: signed out -> `/sign-in`; no memberships -> `/onboarding`; a membership with unfinished onboarding -> `/onboarding?org=<slug>`; else the first membership's `/<slug>/dashboard` | -- |
+| `/onboarding/[[...step]]` | Six-step wizard (docs/PRODUCT.md §3): org+workspace name, objective, virtual capital, risk profile, exchanges, summary. `?org=<slug>` resumes an org that exists but hasn't finished onboarding | Any signed-in user |
+| `/[orgSlug]/dashboard` | Honest M0 shell: org/workspace/members cards + empty states for markets (M1) and portfolio (M3). No PnL, no charts | VIEWER+ |
+| `/[orgSlug]/system` | API env/version/git sha, live Postgres/Redis readiness (with a real refresh button), feature flags, workers empty state (M1) | VIEWER+ |
+| `/[orgSlug]/settings/profile` | Clerk `<UserProfile>` | Any member |
+| `/[orgSlug]/settings/organization` | Rename form -- editable ADMIN+, read-only otherwise | VIEWER+ (edit ADMIN+) |
+| `/[orgSlug]/settings/members` | Roster + invitations. Role change/remove are OWNER-only; invite/revoke are ADMIN+ | VIEWER+ (manage per above) |
+| `/[orgSlug]/settings/security` | Clerk `<UserProfile>` security tab + "API keys: Planejado (Fase 2)" | Any member |
+| `/[orgSlug]/settings/appearance` | Theme (reuses `ThemeToggle`) + a real density toggle, both in `localStorage` | Any member |
+
+Every `[orgSlug]` route resolves the caller's membership via `lib/api/org-context.ts`'s `resolveOrgContext` (built on `/api/v1/me`); an unknown or foreign slug is `notFound()`, never a 500.
+
 ## What T09 needs to know
 
-- `app/(app)/[orgSlug]/layout.tsx` renders `children` as-is inside `<main>`; add pages as `app/(app)/[orgSlug]/<route>/page.tsx` (Server Component by default).
-- Call the API from a Server Component with `import { apiFetch } from "@/lib/server/api"` -- never from `components/**` or `hooks/**` (ESLint fails the build if you try). Client components that need API data should get it via props from a Server Component parent, or through a client-side fetch/TanStack Query call of their own (not `apiFetch`, which is server-only).
-- The layout hardcodes `role = "VIEWER"` until an orgs/membership endpoint exists (see the `TODO(T09/T06)` comment in that file); replace it once `apps/api` exposes current-user role for an org. This doesn't hide any M0 nav item today since every item's `minRole` is `VIEWER`.
-- `lib/nav-registry.ts` is the only place to add/reorder nav items; bump an item from `planned` to `available` there when its milestone lands.
+- `app/(app)/[orgSlug]/layout.tsx` renders `children` as-is inside `<main>`; add pages as `app/(app)/[orgSlug]/<route>/page.tsx` (Server Component by default). It now resolves the real role from `/api/v1/me` (via `resolveOrgContext`) instead of the T08 `role = "VIEWER"` placeholder.
+- Call the API from a Server Component with `import { apiFetch } from "@/lib/server/api"` -- never from `components/**` or `hooks/**` (ESLint fails the build if you try). `lib/api/*.ts` wraps `apiFetch` per resource; mutations live in `lib/api/*-actions.ts` (`"use server"`, zod-validated, return `ActionResult` instead of throwing).
+- `lib/nav-registry.ts` is the only place to add/reorder nav items; bump an item from `planned` to `available` there when its milestone lands. Dashboard/system/settings are already `available` as of T08/T09.
+- `packages/shared-types` is generated from `apps/api`'s OpenAPI document (`pnpm gen:types` at the repo root); never hand-edit `packages/shared-types/src/generated/api.d.ts`.

@@ -3,9 +3,10 @@ import type { ReactNode } from "react";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { resolveOrgContext } from "@/lib/api/org-context";
 import { visibleNavItems } from "@/lib/nav-registry";
 import { getServerSession } from "@/lib/server/auth";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 export interface OrgLayoutProps {
   children: ReactNode;
@@ -22,11 +23,14 @@ export default async function OrgLayout({ children, params }: OrgLayoutProps) {
   const session = await getServerSession();
   if (!session) redirect("/sign-in");
 
-  // TODO(T09/T06): role should come from org membership once the orgs API
-  // exists (docs/SECURITY.md §2) -- Clerk itself carries no role, we don't
-  // use Clerk Organizations. Every M0 nav item has `minRole: "VIEWER"`, so
-  // this placeholder does not hide anything yet.
-  const role = "VIEWER" as const;
+  // The role comes from the caller's own membership row (`/api/v1/me`,
+  // T06) -- Clerk itself carries no role, we don't use Clerk Organizations.
+  // A slug the caller has no membership for reads as "page doesn't exist",
+  // never a 500 (docs/DATABASE.md's RLS makes cross-tenant reads 404 too).
+  const membership = await resolveOrgContext(orgSlug);
+  if (!membership) notFound();
+
+  const role = membership.role;
   const env = process.env.HUNTER_ENV ?? "development";
   const items = visibleNavItems(role, env);
 
