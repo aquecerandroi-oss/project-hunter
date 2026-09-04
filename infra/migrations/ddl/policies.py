@@ -15,6 +15,14 @@ a user belongs to no organization in particular, so it is visible through
 co-membership of the current organization, plus one policy for the caller's own
 row keyed on a second setting, ``app.current_user``.
 
+Neither is written by a single ``FOR ALL`` policy, and the re-review is why.
+A policy that covers every command over every row the caller can *see* turns a
+directory listing into a write surface: co-membership made a colleague's
+``external_auth_id`` editable (an account takeover), and ``organizations``
+allowed a ``DELETE`` that cascades through every table the tenant owns. Both are
+now stated one command at a time — see :func:`_organization_policies` and
+:func:`_user_policies` — and the commands that are absent are absent on purpose.
+
 **Exceptions on top of ``tenant_isolation``** — the seeded system risk presets,
 the system-scope audit row, and the platform-wide kill switch. Each is one named
 policy with the narrowest possible predicate, and each is documented where it is
@@ -49,6 +57,8 @@ KILL_SWITCH_SYSTEM_POLICY = "system_scope_readable"
 USER_MEMBERSHIP_POLICY = "user_visible_to_co_members"
 USER_SELF_POLICY = "user_reads_own_row"
 ORGANIZATION_POLICY = TENANT_POLICY
+ORGANIZATION_UPDATE_POLICY = "organization_updatable"
+ORGANIZATION_BOOTSTRAP_POLICY = "organization_bootstrap"
 
 # S608: the only interpolation is ORG_SETTING, a module constant defined above.
 # No value from outside this file — let alone from a request — reaches this DDL;
@@ -128,15 +138,61 @@ def _append_only_scope_policies() -> None:
     )
 
 
-def _self_scoped_policies() -> None:
-    """``organizations`` and ``users`` — RLS without an ``organization_id``."""
+def _organization_policies() -> None:
+    """``organizations`` — read, rename, bootstrap. Never delete.
+
+    One ``FOR ALL`` policy used to cover all four commands, which handed the API
+    role a ``DELETE`` that cascades: every tenant table references
+    ``organizations(id) ON DELETE CASCADE``, so a single statement would take the
+    portfolios, orders, positions and fills with it. The commands are now
+    separate policies, and the one that is missing is the point:
+
+    - ``tenant_isolation`` (``FOR SELECT``) — a tenant sees its own row;
+    - ``organization_updatable`` (``FOR UPDATE``) — and may rename it, change its
+      plan or move its kill switch, ``WITH CHECK`` binding the new row to the
+      same id so an update cannot re-parent it;
+    - ``organization_bootstrap`` (``FOR INSERT``) — sign-up still has to create
+      the row. The API mints the UUID v7 first and sets ``app.current_org`` to it
+      before inserting, so the check is as tight as the others.
+
+    ``DELETE`` has no policy at all, for anyone: with ``FORCE ROW LEVEL
+    SECURITY`` that closes it to the table owner too, and it is reachable only
+    through ``hunter_worker`` (``BYPASSRLS``, and the only role holding the
+    ``DELETE`` grant) or a superuser — see :data:`ddl.tables.WORKER_DELETE_TABLES`.
+    """
     _force("organizations")
     op.execute(
         f"CREATE POLICY {ORGANIZATION_POLICY} ON organizations "
-        f"USING (id = {ORG_SETTING}) WITH CHECK (id = {ORG_SETTING})"
+        f"FOR SELECT USING (id = {ORG_SETTING})"
     )
+    op.execute(
+        f"CREATE POLICY {ORGANIZATION_UPDATE_POLICY} ON organizations "
+        f"FOR UPDATE USING (id = {ORG_SETTING}) WITH CHECK (id = {ORG_SETTING})"
+    )
+    op.execute(
+        f"CREATE POLICY {ORGANIZATION_BOOTSTRAP_POLICY} ON organizations "
+        f"FOR INSERT WITH CHECK (id = {ORG_SETTING})"
+    )
+
+
+def _user_policies() -> None:
+    """``users`` — a colleague is readable; only you may write your own row.
+
+    ``user_visible_to_co_members`` is ``FOR SELECT``. It was ``FOR ALL``, and a
+    policy that grants every command over every row of the current organization
+    is an account takeover: any member could run
+    ``UPDATE users SET external_auth_id = '<their own Clerk id>' WHERE id = <a
+    colleague>`` and log in as them, or delete the row outright. Nothing needs
+    that — a member list is a read.
+
+    ``user_reads_own_row`` keeps ``USING``/``WITH CHECK`` on ``app.current_user``
+    and is therefore the only write path into this table for the API: a person
+    edits themselves, and nobody else.
+    """
     _force("users")
-    op.execute(f"CREATE POLICY {USER_MEMBERSHIP_POLICY} ON users USING ({_CO_MEMBERSHIP})")
+    op.execute(
+        f"CREATE POLICY {USER_MEMBERSHIP_POLICY} ON users FOR SELECT USING ({_CO_MEMBERSHIP})"
+    )
     op.execute(f"CREATE POLICY {USER_SELF_POLICY} ON users USING ({_SELF}) WITH CHECK ({_SELF})")
 
 
@@ -145,7 +201,8 @@ def enable_row_level_security() -> None:
     _tenant_policies()
     _risk_profile_policies()
     _append_only_scope_policies()
-    _self_scoped_policies()
+    _organization_policies()
+    _user_policies()
 
 
 def disable_row_level_security() -> None:
@@ -158,6 +215,8 @@ def disable_row_level_security() -> None:
         (USER_MEMBERSHIP_POLICY, "users"),
         (USER_SELF_POLICY, "users"),
         (ORGANIZATION_POLICY, "organizations"),
+        (ORGANIZATION_UPDATE_POLICY, "organizations"),
+        (ORGANIZATION_BOOTSTRAP_POLICY, "organizations"),
     ):
         op.execute(f"DROP POLICY IF EXISTS {policy} ON {table}")
     for table in SELF_SCOPED_TABLES:

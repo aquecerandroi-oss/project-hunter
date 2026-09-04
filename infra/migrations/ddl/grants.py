@@ -14,10 +14,20 @@ T04 cross-review proved both:
   request handler writes.
 
 So: every grant is named, table by table, from the frozen lists in
-:mod:`ddl.tables`; partition children get nothing at all (see
-``harden_partition_sql``, applied when each child is created); and
-``ALTER DEFAULT PRIVILEGES`` states that a table added later inherits nothing
-either, instead of relying on the next author to remember.
+:mod:`ddl.tables`, and partition children get nothing at all (see
+``harden_partition_sql``, applied when each child is created).
+
+**What keeps a table added later from inheriting anything is a test, not DDL.**
+The first fix here also wrote ``ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE
+ALL ON TABLES FROM hunter_app, hunter_worker``, which reads like a standing
+guarantee and is in fact a no-op: default privileges for a role other than the
+creating one start out empty, so revoking from them removes nothing, and the
+statement does not survive as a rule that a future ``GRANT`` has to defeat. The
+real guarantee is
+``test_schema_privileges.test_the_grant_lists_cover_every_table_exactly_once``,
+which compares the four frozen grant classes against the live ``pg_class`` and
+fails on any table that is in none of them or in two — so a table added by a
+later revision cannot reach production unclassified.
 """
 
 from __future__ import annotations
@@ -26,26 +36,17 @@ from alembic import op
 
 from ddl.tables import (
     ALL_TABLES,
+    APP_NO_DELETE_TABLES,
     APP_READ_ONLY_TABLES,
     APP_WRITE_TABLES,
     APPEND_ONLY_TABLES,
+    WORKER_DELETE_TABLES,
     WORKER_WRITE_TABLES,
 )
 from hunter_core.db.models import APP_ROLE, WORKER_ROLE
 
 _ROLES = (APP_ROLE, WORKER_ROLE)
 _FULL_DML = "SELECT, INSERT, UPDATE, DELETE"
-
-
-def _default_privileges(action: str) -> None:
-    """``GRANT``/``REVOKE`` nothing by default on anything created from here on."""
-    roles = ", ".join(_ROLES)
-    preposition = "TO" if action == "GRANT" else "FROM"
-    for kind in ("TABLES", "SEQUENCES", "FUNCTIONS"):
-        op.execute(
-            f"ALTER DEFAULT PRIVILEGES IN SCHEMA public "
-            f"{action} ALL ON {kind} {preposition} {roles}"
-        )
 
 
 def grant_privileges() -> None:
@@ -62,6 +63,8 @@ def grant_privileges() -> None:
     # hunter_app — the API. Read the world, write only what a request owns.
     for table in APP_WRITE_TABLES:
         op.execute(f"GRANT {_FULL_DML} ON {table} TO {APP_ROLE}")
+    for table in APP_NO_DELETE_TABLES:
+        op.execute(f"GRANT SELECT, INSERT, UPDATE ON {table} TO {APP_ROLE}")
     for table in APP_READ_ONLY_TABLES:
         op.execute(f"GRANT SELECT ON {table} TO {APP_ROLE}")
     for table in APPEND_ONLY_TABLES:
@@ -74,13 +77,13 @@ def grant_privileges() -> None:
         op.execute(f"GRANT INSERT, UPDATE, DELETE ON {table} TO {WORKER_ROLE}")
     for table in APPEND_ONLY_TABLES:
         op.execute(f"GRANT INSERT ON {table} TO {WORKER_ROLE}")
-
-    _default_privileges("REVOKE")
+    # the one privilege the API is denied: removing a tenant or a person
+    for table in WORKER_DELETE_TABLES:
+        op.execute(f"GRANT DELETE ON {table} TO {WORKER_ROLE}")
 
 
 def revoke_privileges() -> None:
     """Reverse :func:`grant_privileges`. The roles themselves survive a downgrade."""
-    _default_privileges("REVOKE")
     for role in _ROLES:
         op.execute(f"REVOKE ALL ON ALL TABLES IN SCHEMA public FROM {role}")
         op.execute(f"REVOKE USAGE ON SCHEMA public FROM {role}")

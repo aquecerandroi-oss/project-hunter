@@ -7,6 +7,10 @@ Idempotent: every write is an upsert on the row's natural key (``exchanges.code`
 ``feature_flags.key``, the system-preset ``risk_profiles.preset``,
 ``opportunity_weights.version``), so running it twice leaves the same row counts.
 
+Every count it reports comes from the statement's ``RETURNING`` clause, never
+from the length of the input tuple: a row a policy filters away has to make the
+number go down, or the report is worse than no report at all.
+
 Fractions are stored as JSON **strings**, never JSON numbers: a limit like
 ``0.0025`` has no exact binary float, and the Risk Engine reads these straight
 into ``Decimal``. Integers and booleans stay native.
@@ -150,25 +154,44 @@ def migration_url() -> str:
     return url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 
+def _written(result: Any) -> int:
+    """How many rows the statement actually wrote, from its ``RETURNING`` clause.
+
+    Every count in this module comes from here rather than from the length of the
+    input tuple. A constant is what let the ``risk_profiles`` bug hide: under
+    ``FORCE ROW LEVEL SECURITY`` the upsert matched nothing, wrote nothing, and
+    the script still printed "seeded 3 row(s)". An upsert that is filtered away
+    by a policy returns no rows, so the report goes to zero with it.
+    """
+    return len(result.fetchall())
+
+
 async def seed_exchanges(conn: AsyncConnection) -> int:
+    written = 0
     for code, name, capabilities in EXCHANGES:
         statement = insert(Exchange).values(
             id=uuid7(), code=code, name=name, capabilities=capabilities
         )
-        await conn.execute(
+        result = await conn.execute(
             statement.on_conflict_do_update(
                 index_elements=[Exchange.code],
                 set_={
                     "name": statement.excluded.name,
                     "capabilities": statement.excluded.capabilities,
                 },
-            )
+            ).returning(Exchange.id)
         )
-    return len(EXCHANGES)
+        written += _written(result)
+    return written
 
 
-async def seed_strategies(conn: AsyncConnection) -> int:
-    """Catalogue plus one ``draft`` v1 per strategy (PIPELINE.md §6 activates them)."""
+async def seed_strategies(conn: AsyncConnection) -> tuple[int, int]:
+    """Catalogue plus one ``draft`` v1 per strategy (PIPELINE.md §6 activates them).
+
+    Returns ``(strategies, strategy_versions)`` — two tables, two counts, because
+    a report that folded them together could not show one of them failing.
+    """
+    strategies = versions = 0
     for key, name, category, description in STRATEGIES:
         statement = insert(Strategy).values(
             id=uuid7(), key=key, name=name, category=category, description=description
@@ -184,6 +207,7 @@ async def seed_strategies(conn: AsyncConnection) -> int:
             ).returning(Strategy.id)
         )
         strategy_id: uuid.UUID = result.scalar_one()
+        strategies += 1
         version = insert(StrategyVersion).values(
             id=uuid7(),
             strategy_id=strategy_id,
@@ -191,13 +215,14 @@ async def seed_strategies(conn: AsyncConnection) -> int:
             status=StrategyVersionStatus.DRAFT,
             code_ref=f"hunter_indicators.strategies.{key}_v1",
         )
-        await conn.execute(
+        version_result = await conn.execute(
             version.on_conflict_do_update(
                 index_elements=[StrategyVersion.strategy_id, StrategyVersion.version],
                 set_={"code_ref": version.excluded.code_ref},
-            )
+            ).returning(StrategyVersion.id)
         )
-    return len(STRATEGIES)
+        versions += _written(version_result)
+    return strategies, versions
 
 
 async def seed_plan_entitlements(conn: AsyncConnection) -> int:
@@ -208,26 +233,26 @@ async def seed_plan_entitlements(conn: AsyncConnection) -> int:
         for index, plan in enumerate(plans)
     ]
     statement = insert(PlanEntitlement).values(rows)
-    await conn.execute(
+    result = await conn.execute(
         statement.on_conflict_do_update(
             index_elements=[PlanEntitlement.plan, PlanEntitlement.key],
             set_={"value": statement.excluded.value},
-        )
+        ).returning(PlanEntitlement.key)
     )
-    return len(rows)
+    return _written(result)
 
 
 async def seed_feature_flags(conn: AsyncConnection) -> int:
     """Defaults only. The ``ENABLE_*`` env vars are the fallback; this table wins."""
     rows = [{"key": key, "enabled": False, "description": text} for key, text in FEATURE_FLAGS]
     statement = insert(FeatureFlag).values(rows)
-    await conn.execute(
+    result = await conn.execute(
         statement.on_conflict_do_update(
             index_elements=[FeatureFlag.key],
             set_={"description": statement.excluded.description},
-        )
+        ).returning(FeatureFlag.key)
     )
-    return len(rows)
+    return _written(result)
 
 
 async def seed_risk_profiles(conn: AsyncConnection) -> int:
@@ -238,21 +263,29 @@ async def seed_risk_profiles(conn: AsyncConnection) -> int:
     SECURITY``, which filters the table owner too, so under an ordinary
     ``NOSUPERUSER`` owner — what a managed Postgres gives you — this upsert
     matched nothing, wrote nothing, and still reported three rows seeded.
+
+    Note the coupling that survives: the policy is granted ``TO CURRENT_USER``,
+    the role that ran the migration. Run this script as a *different* role and
+    the presets are filtered away again — silently no longer, since the count
+    below comes from ``RETURNING``, but still. DATABASE.md §15.6 records it as an
+    operational constraint: seed and migrate as the same role.
     """
+    written = 0
     for index, (preset, name) in enumerate(RISK_PRESETS):
         limits: dict[str, Any] = {key: values[index] for key, values in RISK_LIMITS.items()}
         limits["regime_size_multiplier"] = REGIME_MULTIPLIERS[index]
         statement = insert(RiskProfile).values(
             id=uuid7(), organization_id=None, name=name, preset=preset, limits=limits
         )
-        await conn.execute(
+        result = await conn.execute(
             statement.on_conflict_do_update(
                 index_elements=[RiskProfile.preset],
                 index_where=RiskProfile.organization_id.is_(None),
                 set_={"name": statement.excluded.name, "limits": statement.excluded.limits},
-            )
+            ).returning(RiskProfile.id)
         )
-    return len(RISK_PRESETS)
+        written += _written(result)
+    return written
 
 
 async def seed_opportunity_weights(conn: AsyncConnection) -> int:
@@ -263,7 +296,7 @@ async def seed_opportunity_weights(conn: AsyncConnection) -> int:
         is_active=True,
         description="Default component weights for the opportunity score (PIPELINE.md §5).",
     )
-    await conn.execute(
+    result = await conn.execute(
         statement.on_conflict_do_update(
             index_elements=[OpportunityWeights.version],
             # ``is_active`` is deliberately NOT updated. Which version is live is
@@ -273,18 +306,22 @@ async def seed_opportunity_weights(conn: AsyncConnection) -> int:
             # ``is_active`` would refuse the write anyway, turning a routine
             # deploy into a failed one.
             set_={"weights": statement.excluded.weights},
-        )
+        ).returning(OpportunityWeights.id)
     )
-    return 1
+    return _written(result)
 
 
 async def seed() -> dict[str, int]:
+    """Every reference table, and how many rows each one actually took."""
     engine = create_async_engine(migration_url(), connect_args={"statement_cache_size": 0})
     try:
         async with engine.begin() as conn:
+            exchanges = await seed_exchanges(conn)
+            strategies, strategy_versions = await seed_strategies(conn)
             return {
-                "exchanges": await seed_exchanges(conn),
-                "strategies": await seed_strategies(conn),
+                "exchanges": exchanges,
+                "strategies": strategies,
+                "strategy_versions": strategy_versions,
                 "plan_entitlements": await seed_plan_entitlements(conn),
                 "feature_flags": await seed_feature_flags(conn),
                 "risk_profiles": await seed_risk_profiles(conn),

@@ -20,7 +20,7 @@ from urllib.parse import urlsplit, urlunsplit
 import pytest
 from alembic import command
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from hunter_core.db.models import create_partition_sql
@@ -103,6 +103,14 @@ async def _partition_names(url: str) -> set[str]:
 
 
 def test_seeding_twice_leaves_the_same_rows(seed_db: str) -> None:
+    """And what the seed *reports* is what the database actually holds.
+
+    The counts used to be the length of the input tuples — constants, printed
+    whether or not a single row landed. That is precisely how the RLS bug in
+    ``risk_profiles`` stayed invisible: the script said "seeded 3 row(s)" while
+    ``FORCE ROW LEVEL SECURITY`` filtered every one of them away. Each seed
+    function now counts what ``RETURNING`` gave back.
+    """
     _use(seed_db)
     seed = _load_script("seed")
 
@@ -113,6 +121,8 @@ def test_seeding_twice_leaves_the_same_rows(seed_db: str) -> None:
 
     assert first == second
     assert counts_after_first == counts_after_second
+    assert set(first) == set(SEEDED_TABLES), "the seed no longer reports every table it writes"
+    assert first == counts_after_first, "the seed reported rows it did not write"
     assert counts_after_first["exchanges"] == 2
     assert counts_after_first["strategies"] == 8
     assert counts_after_first["strategy_versions"] == 8
@@ -156,16 +166,17 @@ def test_create_partitions_is_idempotent(seed_db: str) -> None:
     # so the first run really creates something and the second really has nothing
     # left to do — with a shorter horizon both runs would be no-ops and the
     # assertions would hold vacuously
-    statements: list[tuple[str, str]] = create_partitions.planned_statements(6)
+    groups: list[tuple[str, list[tuple[str, str]]]] = create_partitions.planned_groups(6)
+    statements = [statement for _parent, group in groups for statement in group]
     before = asyncio.run(_partition_names(seed_db))
-    created: list[str] = asyncio.run(create_partitions.ensure_partitions(statements))
+    created: list[str] = asyncio.run(create_partitions.ensure_partitions(groups))
     after = asyncio.run(_partition_names(seed_db))
 
     assert created, "the first run created no partition; the horizon is too short to test"
     assert set(created) == after - before
     assert {name for name, _ in statements} <= after
 
-    created_again: list[str] = asyncio.run(create_partitions.ensure_partitions(statements))
+    created_again: list[str] = asyncio.run(create_partitions.ensure_partitions(groups))
     assert created_again == []
     assert asyncio.run(_partition_names(seed_db)) == after
 
@@ -198,7 +209,7 @@ def test_new_partitions_are_hardened_the_way_the_migration_hardens_them(
     """
     _use(seed_db)
     create_partitions = _load_script("create_partitions")
-    asyncio.run(create_partitions.ensure_partitions(create_partitions.planned_statements(9)))
+    asyncio.run(create_partitions.ensure_partitions(create_partitions.planned_groups(9)))
 
     async def _inspect() -> tuple[list[str], list[str]]:
         engine = async_engine(seed_db)
@@ -437,3 +448,89 @@ def test_prune_partitions_dry_run_touches_nothing(seed_db: str) -> None:
 
     assert {name for name, _ in planned} == {"candles_1m_2025_02"}
     assert asyncio.run(_partition_names(seed_db)) == before
+
+
+def test_a_partition_of_the_same_name_in_another_schema_is_not_mistaken_for_ours(
+    seed_db: str,
+) -> None:
+    """The census of what exists has to be scoped the way the statements are.
+
+    ``CREATE TABLE IF NOT EXISTS audit_logs_2030_01 PARTITION OF audit_logs``
+    resolves through ``search_path`` to ``public``. The "does it already exist?"
+    query did not: it scanned ``pg_class`` for the bare ``relname``, so a
+    same-named partition anywhere in the database — a staging copy, an
+    extension's own table — made the script report a partition it had just
+    created as already present. The daily job's output is the only signal an
+    operator has that it is still keeping ahead of the clock.
+    """
+    _use(seed_db)
+    create_partitions = _load_script("create_partitions")
+    horizon = datetime(2030, 1, 1, tzinfo=UTC)
+
+    async def _shadow(sql: str) -> None:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(text(sql))
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_shadow("CREATE SCHEMA IF NOT EXISTS shadow"))
+    try:
+        asyncio.run(
+            _shadow(
+                "CREATE TABLE shadow.audit_logs (created_at timestamptz NOT NULL) "
+                "PARTITION BY RANGE (created_at)"
+            )
+        )
+        asyncio.run(
+            _shadow(
+                "CREATE TABLE shadow.audit_logs_2030_01 PARTITION OF shadow.audit_logs "
+                "FOR VALUES FROM ('2030-01-01') TO ('2030-02-01')"
+            )
+        )
+        groups = create_partitions.planned_groups(0, horizon)
+        created: list[str] = asyncio.run(create_partitions.ensure_partitions(groups))
+    finally:
+        asyncio.run(_shadow("DROP SCHEMA shadow CASCADE"))
+
+    assert "audit_logs_2030_01" in created
+    assert "audit_logs_2030_01" in asyncio.run(_partition_names(seed_db))
+
+
+def test_one_parent_failing_does_not_discard_the_partitions_of_the_others(
+    seed_db: str,
+) -> None:
+    """One transaction per partitioned parent, not one for the whole run.
+
+    A single transaction over every parent holds an ``ACCESS EXCLUSIVE`` lock on
+    each of them until the last statement commits — so the daily job blocks
+    writes to ``audit_logs`` while it works through ``candles`` — and any failure
+    throws away every partition the run had already created. Here the last
+    parent's group is made to fail: everything before it must still be committed,
+    and its own work must be rolled back whole.
+    """
+    _use(seed_db)
+    create_partitions = _load_script("create_partitions")
+    horizon = datetime(2031, 1, 1, tzinfo=UTC)
+
+    groups: list[tuple[str, list[tuple[str, str]]]] = create_partitions.planned_groups(0, horizon)
+    assert len(groups) > 1, "there is only one partitioned parent; the split cannot be observed"
+    first_names = {name for name, _sql in groups[0][1]}
+    last_names = {name for name, _sql in groups[-1][1]}
+    groups[-1][1].append(
+        (
+            "unreachable",
+            "CREATE TABLE IF NOT EXISTS orphan_child PARTITION OF no_such_parent "
+            "FOR VALUES FROM ('2031-01-01') TO ('2031-02-01')",
+        )
+    )
+
+    before = asyncio.run(_partition_names(seed_db))
+    with pytest.raises(ProgrammingError):
+        asyncio.run(create_partitions.ensure_partitions(groups))
+    after = asyncio.run(_partition_names(seed_db))
+
+    assert first_names <= after, "an earlier parent's partitions were rolled back with the failure"
+    assert first_names - before, "the first group created nothing; the horizon proves nothing"
+    assert last_names & after == last_names & before, "the failing group was left half applied"

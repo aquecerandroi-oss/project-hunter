@@ -182,10 +182,11 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     """The frozen lists and the database describe the same set of tables."""
     security = _security()
     write: tuple[str, ...] = security.APP_WRITE_TABLES  # type: ignore[attr-defined]
+    no_delete: tuple[str, ...] = security.APP_NO_DELETE_TABLES  # type: ignore[attr-defined]
     read_only: tuple[str, ...] = security.APP_READ_ONLY_TABLES  # type: ignore[attr-defined]
     append_only: tuple[str, ...] = security.APPEND_ONLY_TABLES  # type: ignore[attr-defined]
 
-    classified = list(write) + list(read_only) + list(append_only)
+    classified = list(write) + list(no_delete) + list(read_only) + list(append_only)
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 
     async with schema_engine.connect() as connection:
@@ -198,3 +199,66 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         )
         actual = {row[0] for row in result}
     assert set(classified) == actual
+
+
+async def test_the_app_role_cannot_delete_an_organization_or_a_user(
+    schema_engine: AsyncEngine,
+) -> None:
+    """Identity rows are created and edited by the API, never removed by it.
+
+    ``organizations`` and ``users`` are the one grant class between "full DML"
+    and "read only": ``SELECT``/``INSERT``/``UPDATE``. A ``DELETE`` on an
+    organization cascades through every portfolio, order, position and fill the
+    tenant owns, so it is not a privilege a request handler — or a bug in one —
+    should be able to reach. Removal is an operator/``hunter_worker`` operation.
+    """
+    no_delete: tuple[str, ...] = _security().APP_NO_DELETE_TABLES  # type: ignore[attr-defined]
+    assert set(no_delete) == {"organizations", "users"}
+
+    async with schema_engine.connect() as connection:
+        for table in no_delete:
+            for privilege in ("SELECT", "INSERT", "UPDATE"):
+                granted = await connection.scalar(
+                    text("SELECT has_table_privilege('hunter_app', :t, :p)"),
+                    {"t": table, "p": privilege},
+                )
+                assert granted, f"hunter_app lost {privilege} on {table}"
+            deletable = await connection.scalar(
+                text("SELECT has_table_privilege('hunter_app', :t, 'DELETE')"), {"t": table}
+            )
+            assert not deletable, f"hunter_app can still DELETE {table}"
+
+
+async def test_deleting_an_organization_is_denied_to_the_app_role(
+    app_connection: AsyncConnection,
+) -> None:
+    """The reviewer's probe: the grant must refuse before RLS is even consulted."""
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await app_connection.execute(text("DELETE FROM organizations"))
+
+
+async def test_the_worker_role_owns_the_organization_lifecycle(
+    schema_engine: AsyncEngine,
+) -> None:
+    """Someone has to be able to remove a tenant; it is the operator side.
+
+    ``hunter_worker`` has ``BYPASSRLS``, so it is the role a retention or
+    account-closure job runs as. It gets ``DELETE`` and nothing else on these two
+    tables — it never creates or edits a person or an organization, which stays
+    the API's job.
+    """
+    lifecycle: tuple[str, ...] = _security().WORKER_DELETE_TABLES  # type: ignore[attr-defined]
+    assert set(lifecycle) == {"organizations", "users"}
+
+    async with schema_engine.connect() as connection:
+        for table in lifecycle:
+            deletable = await connection.scalar(
+                text("SELECT has_table_privilege('hunter_worker', :t, 'DELETE')"), {"t": table}
+            )
+            assert deletable, f"hunter_worker cannot DELETE {table}"
+            for privilege in ("INSERT", "UPDATE"):
+                granted = await connection.scalar(
+                    text("SELECT has_table_privilege('hunter_worker', :t, :p)"),
+                    {"t": table, "p": privilege},
+                )
+                assert not granted, f"hunter_worker can {privilege} {table}"

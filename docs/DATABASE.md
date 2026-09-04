@@ -456,7 +456,9 @@ não há nada a migrar. Uma `0002` que reparticionasse `candles` teria de mover
 dados que não existem e deixaria o schema inicial permanentemente errado para
 quem o lesse — a revisão precisa descrever o schema, e o schema correto é este.
 A partir do primeiro deploy real, essa liberdade acaba e toda mudança vira
-revisão nova.
+revisão nova. Vale igualmente para a re-revisão de `c28c1bc` (políticas por
+comando em `organizations`/`users`, classe de grant sem `DELETE`, verificação de
+existência dos papéis): mesma revisão, emendada de novo, pelo mesmo motivo.
 
 ### 15.1 Enums
 
@@ -537,6 +539,36 @@ integração que falhava antes da correção.
   (`EXISTS` em `organization_members` na organização corrente) mais uma política
   que deixa a pessoa ler a própria linha. Antes, qualquer tenant lia e editava a
   linha de qualquer outro e enumerava seus membros.
+
+**Correções da re-revisão de `c28c1bc`: uma política por comando.** As duas
+políticas acima nasceram `FOR ALL`, e `FOR ALL` sobre "toda linha que o chamador
+enxerga" transforma uma listagem em superfície de escrita. Ambas foram abertas em
+políticas por comando, e o comando que falta em cada uma é o ponto:
+
+- `user_visible_to_co_members` passou a ser **`FOR SELECT`**. Como `FOR ALL`, ela
+  deixava qualquer membro de uma organização rodar
+  `UPDATE users SET external_auth_id = '<o Clerk id dele>' WHERE id = <colega>` —
+  tomada de conta — ou apagar a linha do colega. Uma lista de membros é leitura;
+  a única porta de escrita em `users` para a API é `user_reads_own_row`, chaveada
+  em `app.current_user`, isto é, a pessoa editando a si mesma.
+- `organizations` deixou de ter `tenant_isolation FOR ALL` e passou a ter três
+  políticas: `tenant_isolation` (`FOR SELECT`), `organization_updatable`
+  (`FOR UPDATE`, `USING`/`WITH CHECK` em `id = app.current_org`, para renomear,
+  trocar plano e mover o kill switch) e `organization_bootstrap`
+  (`FOR INSERT WITH CHECK (id = app.current_org)`, porque o sign-up precisa criar
+  a linha). **Não há política de `DELETE`** — para ninguém: com
+  `FORCE ROW LEVEL SECURITY` isso fecha inclusive para o dono da tabela. Um
+  `DELETE` ali cascateia por `ON DELETE CASCADE` em toda tabela de tenant e
+  apagaria portfolios, ordens, posições e fills num único comando.
+
+**Remover uma organização (ou uma pessoa) é operação de `hunter_worker` /
+operador.** O papel da API perdeu `DELETE` em `organizations` e `users` também na
+camada de grants (§15.6), e `hunter_worker` — que já tem `BYPASSRLS`, portanto
+atravessa a ausência de política — é quem recebeu esse `DELETE`, e nada mais
+nessas duas tabelas. Encerramento de conta é decisão operacional com política de
+retenção junto, não algo que um request handler (ou uma injeção dentro de um)
+deva alcançar. `audit_logs` continua sem FK para `organizations` de propósito, de
+modo que a trilha sobrevive à remoção do tenant.
 - `audit_logs` ganhou `audit_system_scope`
   (`FOR INSERT WITH CHECK (organization_id IS NULL)`). O `WITH CHECK` de
   `tenant_isolation` recusa `organization_id NULL`, então a trilha de auditoria
@@ -573,7 +605,16 @@ para o webhook do Clerk.
 - `hunter_worker` recebe `BYPASSRLS` (§1.2) por um `ALTER ROLE` dentro de um
   bloco `DO` que tolera falta de privilégio: em Postgres gerenciado o papel que
   migra pode não poder concedê-lo, e nesse caso a migração emite um `NOTICE`
-  pedindo a concessão manual.
+  pedindo a concessão manual. **Esse é o único passo que degrada para `NOTICE`.**
+  A criação dos dois papéis também tolera `insufficient_privilege`, mas logo
+  depois `create_roles()` consulta `pg_roles` e, se algum deles de fato não
+  existir, levanta `RAISE EXCEPTION` nomeando o passo manual
+  (`CREATE ROLE hunter_app NOLOGIN; CREATE ROLE hunter_worker NOLOGIN BYPASSRLS;`).
+  Tolerar em silêncio era pior que falhar: todo `GRANT` e toda política daqui
+  para a frente nomeiam esses papéis, então ou a migração morria cem comandos
+  adiante com `role "hunter_app" does not exist`, ou alguém lia o `NOTICE` como
+  aviso e subia o schema sem papel de aplicação nenhum — com a API conectando
+  como dono e passando por cima de todos os grants.
 - Toda tabela de tenant ganhou `FOREIGN KEY (organization_id) REFERENCES
   organizations(id) ON DELETE CASCADE`, que o `TenantMixin` sozinho não declara —
   **com uma exceção deliberada: `audit_logs`.** A trilha de auditoria é
@@ -621,15 +662,48 @@ partições. As duas coisas vêm do cross-review:
 - e ele dava DML completo em tudo: `hunter_app` podia reescrever o catálogo de
   estratégias, os `plan_entitlements` e os `feature_flags`.
 
-Agora há três classes, congeladas em `infra/migrations/ddl/tables.py` e que
-formam uma partição exata do schema (um teste compara com o `pg_class` real):
-`APP_WRITE_TABLES` (DML completo, todas atrás de RLS), `APP_READ_ONLY_TABLES`
-(só `SELECT`: catálogo global, market data, análise, `plan_entitlements`,
-`feature_flags`, `strategies`, `strategy_versions`, `opportunity_weights` — a
-lista de exceções para escrita da API é deliberadamente **vazia** no M0; quem
-escreve é `hunter_worker`) e `APPEND_ONLY_TABLES` (`SELECT` + `INSERT`).
-`ALTER DEFAULT PRIVILEGES` declara que uma tabela criada depois também não
-herda nada.
+Agora há **quatro** classes, congeladas em `infra/migrations/ddl/tables.py` e que
+formam uma partição exata do schema: `APP_WRITE_TABLES` (DML completo, todas
+atrás de RLS), `APP_NO_DELETE_TABLES` (`SELECT`/`INSERT`/`UPDATE` e nunca
+`DELETE` — só `organizations` e `users`; ver §15.4),
+`APP_READ_ONLY_TABLES` (só `SELECT`: catálogo global, market data, análise,
+`plan_entitlements`, `feature_flags`, `strategies`, `strategy_versions`,
+`opportunity_weights` — a lista de exceções para escrita da API é
+deliberadamente **vazia** no M0; quem escreve é `hunter_worker`) e
+`APPEND_ONLY_TABLES` (`SELECT` + `INSERT`). Do lado do worker há ainda
+`WORKER_DELETE_TABLES` (`DELETE` em `organizations` e `users`, e nada além
+disso nessas duas), que é o outro lado de `APP_NO_DELETE_TABLES`.
+
+**O que impede uma tabela futura de nascer sem classificação é um teste, não
+DDL.** A primeira correção escrevia também
+`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM hunter_app,
+hunter_worker`, que *parece* uma garantia permanente e é um no-op: os privilégios
+padrão de um papel que não é o criador já começam vazios, revogar de um conjunto
+vazio não remove nada, e a declaração não sobrevive como regra que um `GRANT`
+futuro tivesse de derrotar. Foi removida. A garantia real é
+`test_schema_privileges.py::test_the_grant_lists_cover_every_table_exactly_once`,
+que compara as quatro classes congeladas com o `pg_class` vivo e falha para
+qualquer tabela que esteja em nenhuma delas ou em duas.
+
+**Restrições operacionais conhecidas.**
+
+- `system_presets_manageable` é concedida `TO CURRENT_USER`, ou seja, ao papel
+  que rodou a migração. **Migre e semeie com o mesmo papel.** Rodar
+  `infra/scripts/seed.py` como um papel diferente faz `FORCE ROW LEVEL SECURITY`
+  filtrar os presets de sistema de novo. O acoplamento não some — o que some é o
+  silêncio: `seed.py` passou a contar as linhas do `RETURNING` de cada `INSERT
+  ... ON CONFLICT`, em vez de devolver o tamanho da tupla de entrada, então uma
+  gravação filtrada por política aparece como `seeded 0 row(s)` em vez de mentir
+  três. Um teste de integração fixa isso (`reported == stored`).
+- Remoção de organização/usuário exige `hunter_worker` ou um superusuário
+  (§15.4): não há política de `DELETE` em `organizations` nem grant de `DELETE`
+  para `hunter_app` em nenhuma das duas.
+- `infra/scripts/create_partitions.py` roda **uma transação por tabela-pai
+  particionada**, não uma para todas. `CREATE TABLE ... PARTITION OF` toma
+  `ACCESS EXCLUSIVE` na pai, e uma transação única segurava as oito travas até o
+  último comando — o job diário bloqueava escrita em `audit_logs` enquanto
+  percorria `candles`. Como todo comando é idempotente, dividir não custa nada: a
+  execução seguinte termina o que a anterior não terminou.
 
 ### 15.7 Precisão numérica
 

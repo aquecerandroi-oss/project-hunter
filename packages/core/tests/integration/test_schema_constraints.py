@@ -365,3 +365,30 @@ async def test_every_hot_foreign_key_column_is_indexed(schema_engine: AsyncEngin
             if not covered:
                 missing.append(f"{table}.{column}")
     assert missing == [], f"foreign key columns with no index leading on them: {missing}"
+
+
+async def test_a_position_quantity_can_never_go_negative(
+    schema_engine: AsyncEngine, market_id: str, portfolios: tuple[str, str, str, str]
+) -> None:
+    """``positions.qty >= 0`` — DATABASE.md §15.8.
+
+    Zero is legal (a position being closed passes through it before it becomes a
+    ``trade``); below zero is an accounting impossibility that would flip the
+    sign of every exposure and drawdown computed from it. A short is expressed by
+    ``direction``, never by a negative quantity.
+    """
+    _org_a, _pf_a, org_b, pf_b = portfolios
+    insert = text(
+        "INSERT INTO positions (id, organization_id, portfolio_id, market_id, direction, "
+        "qty, avg_entry_price) VALUES (:id, :org, :pf, :m, 'short', :qty, 100)"
+    )
+    params = {"org": org_b, "pf": pf_b, "m": market_id}
+
+    with pytest.raises(IntegrityError, match="ck_positions_qty_non_negative"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(text("SET LOCAL ROLE hunter_worker"))
+            await connection.execute(insert, {**params, "id": uuid7(), "qty": -1})
+
+    async with schema_engine.begin() as connection:
+        await connection.execute(text("SET LOCAL ROLE hunter_worker"))
+        await connection.execute(insert, {**params, "id": uuid7(), "qty": 0})

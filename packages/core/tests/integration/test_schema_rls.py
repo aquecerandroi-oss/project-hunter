@@ -40,18 +40,26 @@ pytestmark = pytest.mark.integration
 
 _AS_APP = text("SET LOCAL ROLE hunter_app")
 _RLS_DENIED = "row-level security"
+_PERMISSION_DENIED = "permission denied"
 _SNAPSHOT_TS = datetime(2026, 10, 2, tzinfo=UTC)
 
 _SET_CURRENT_USER = text("SELECT set_config('app.current_user', :user_id, true)")
 
 
 class Tenant:
-    """One organization with a member, a workspace, a portfolio and its curve."""
+    """One organization with two members, a workspace, a portfolio and its curve.
+
+    Two members, not one: the co-membership policy on ``users`` is what makes a
+    colleague's row visible, and the re-review's finding was that the same policy
+    also made it *writable*. Proving that needs a second person in the same
+    organization.
+    """
 
     def __init__(self, slug: str) -> None:
         self.slug = slug
         self.org_id = uuid7()
         self.user_id = uuid7()
+        self.co_user_id = uuid7()
         self.workspace_id = uuid7()
         self.portfolio_id = uuid7()
 
@@ -83,25 +91,27 @@ async def app_session(
 async def _create_tenant(engine: AsyncEngine, tenant: Tenant) -> None:
     """Insert the tenant as the superuser owner, which RLS does not constrain."""
     async with engine.begin() as connection:
-        await connection.execute(
-            text("INSERT INTO users (id, external_auth_id, email) VALUES (:id, :ext, :email)"),
-            {
-                "id": tenant.user_id,
-                "ext": f"clerk-{tenant.slug}",
-                "email": f"{tenant.slug}@example.test",
-            },
-        )
+        for user_id, suffix in ((tenant.user_id, ""), (tenant.co_user_id, "-co")):
+            await connection.execute(
+                text("INSERT INTO users (id, external_auth_id, email) VALUES (:id, :ext, :email)"),
+                {
+                    "id": user_id,
+                    "ext": f"clerk-{tenant.slug}{suffix}",
+                    "email": f"{tenant.slug}{suffix}@example.test",
+                },
+            )
         await connection.execute(
             text("INSERT INTO organizations (id, slug, name) VALUES (:id, :slug, :slug)"),
             {"id": tenant.org_id, "slug": tenant.slug},
         )
-        await connection.execute(
-            text(
-                "INSERT INTO organization_members (organization_id, user_id, role, status) "
-                "VALUES (:org, :user, 'OWNER', 'active')"
-            ),
-            {"org": tenant.org_id, "user": tenant.user_id},
-        )
+        for user_id, role in ((tenant.user_id, "OWNER"), (tenant.co_user_id, "TRADER")):
+            await connection.execute(
+                text(
+                    "INSERT INTO organization_members (organization_id, user_id, role, status) "
+                    "VALUES (:org, :user, :role, 'active')"
+                ),
+                {"org": tenant.org_id, "user": user_id, "role": role},
+            )
         await connection.execute(
             text(
                 "INSERT INTO workspaces (id, organization_id, name, objective) "
@@ -170,7 +180,8 @@ async def tenants(schema_engine: AsyncEngine) -> AsyncIterator[tuple[Tenant, Ten
                     text("DELETE FROM organizations WHERE id = :id"), {"id": tenant.org_id}
                 )
                 await connection.execute(
-                    text("DELETE FROM users WHERE id = :id"), {"id": tenant.user_id}
+                    text("DELETE FROM users WHERE id = ANY(:ids)"),
+                    {"ids": [tenant.user_id, tenant.co_user_id]},
                 )
                 await connection.execute(
                     text("DELETE FROM audit_logs WHERE organization_id = :id"),
@@ -494,4 +505,124 @@ async def test_system_risk_presets_are_readable_but_never_writable(
                     "VALUES (:id, NULL, 'sneaky', 'custom', '{}'::jsonb)"
                 ),
                 {"id": uuid7()},
+            )
+
+
+async def test_a_co_member_row_is_readable_but_never_writable(
+    factory: async_sessionmaker[AsyncSession], tenants: tuple[Tenant, Tenant]
+) -> None:
+    """The re-review's finding: co-membership was ``FOR ALL``, not ``FOR SELECT``.
+
+    ``user_visible_to_co_members`` exists so a colleague appears in a member
+    list. Granted for every command, it also made that colleague's row
+    *writable*: any member of the same organization could point
+    ``external_auth_id`` at their own Clerk identity — an account takeover — or
+    delete the row outright. Writes to a ``users`` row belong to
+    ``user_reads_own_row`` alone, which is keyed on ``app.current_user``.
+    """
+    org_a, _org_b = tenants
+
+    async with app_session(factory, org_a.org_id, org_a.user_id) as session:
+        visible = await session.execute(text("SELECT id FROM users"))
+        assert org_a.co_user_id in {row[0] for row in visible}
+
+        hijack = await session.execute(
+            text("UPDATE users SET external_auth_id = 'clerk-attacker' WHERE id = :id"),
+            {"id": org_a.co_user_id},
+        )
+        assert hijack.rowcount == 0, "a co-member could rewrite another person's identity"
+
+        mine = await session.execute(
+            text("UPDATE users SET display_name = 'me' WHERE id = :id"), {"id": org_a.user_id}
+        )
+        assert mine.rowcount == 1, "app.current_user must still be able to write its own row"
+
+    # deletion never reaches RLS at all: hunter_app holds no DELETE grant on users
+    with pytest.raises(ProgrammingError, match=_PERMISSION_DENIED):
+        async with app_session(factory, org_a.org_id, org_a.user_id) as session:
+            await session.execute(
+                text("DELETE FROM users WHERE id = :id"), {"id": org_a.co_user_id}
+            )
+
+
+async def test_an_empty_current_org_setting_returns_no_rows_instead_of_failing(
+    factory: async_sessionmaker[AsyncSession], tenants: tuple[Tenant, Tenant]
+) -> None:
+    """The ``NULLIF`` guard, stated as a regression test.
+
+    Behind a transaction pooler a GUC that was ``SET LOCAL`` once comes back as
+    an empty string on the next checkout of that connection, never as unset.
+    Without ``NULLIF`` the predicate is ``''::uuid``, which raises
+    ``invalid input syntax for type uuid`` — a hard 500 on every request that
+    legitimately runs with no organization in context.
+    """
+    org_a, _org_b = tenants
+    assert org_a.org_id
+
+    async with get_session(factory) as session, session.begin():
+        await session.execute(text("SELECT set_config('app.current_org', '', true)"))
+        await session.execute(text("SELECT set_config('app.current_user', '', true)"))
+        await session.execute(_AS_APP)
+        assert await session.scalar(text("SELECT count(*) FROM portfolios")) == 0
+        assert await session.scalar(text("SELECT count(*) FROM organizations")) == 0
+        assert await session.scalar(text("SELECT count(*) FROM users")) == 0
+
+
+async def test_an_organization_can_be_bootstrapped_and_renamed_but_not_deleted(
+    schema_engine: AsyncEngine,
+    factory: async_sessionmaker[AsyncSession],
+    tenants: tuple[Tenant, Tenant],
+) -> None:
+    """``organizations`` lifecycle for ``hunter_app``: SELECT, INSERT, UPDATE — no DELETE.
+
+    ``tenant_isolation`` used to be ``FOR ALL`` here, which handed the API role
+    the power to drop an organization row and, through
+    ``ON DELETE CASCADE``, every portfolio, order and position under it. Sign-up
+    still has to create the row, so the INSERT survives as its own policy
+    (``organization_bootstrap``) — the API mints the UUID v7 before inserting and
+    sets ``app.current_org`` to it, so the ``WITH CHECK`` still binds the new row
+    to the caller's own context.
+    """
+    org_a, org_b = tenants
+    fresh = uuid7()
+    slug = f"boot-{uuid.uuid4().hex[:8]}"
+
+    try:
+        async with app_session(factory, fresh) as session:
+            await session.execute(
+                text("INSERT INTO organizations (id, slug, name) VALUES (:id, :slug, 'bootstrap')"),
+                {"id": fresh, "slug": slug},
+            )
+
+        async with app_session(factory, fresh) as session:
+            assert await session.scalar(text("SELECT slug FROM organizations")) == slug
+
+        async with app_session(factory, org_a.org_id) as session:
+            renamed = await session.execute(
+                text("UPDATE organizations SET name = 'renamed' WHERE id = :id"),
+                {"id": org_a.org_id},
+            )
+            assert renamed.rowcount == 1
+
+            visible = await session.execute(
+                text("SELECT id FROM organizations WHERE id = :id"), {"id": org_b.org_id}
+            )
+            assert list(visible) == []
+    finally:
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text("DELETE FROM organizations WHERE id = :id"), {"id": fresh}
+            )
+
+
+async def test_bootstrapping_an_organization_under_another_id_is_refused(
+    factory: async_sessionmaker[AsyncSession], tenants: tuple[Tenant, Tenant]
+) -> None:
+    """``organization_bootstrap`` is bounded to ``id = app.current_org``."""
+    org_a, _org_b = tenants
+    with pytest.raises(ProgrammingError, match=_RLS_DENIED):
+        async with app_session(factory, org_a.org_id) as session:
+            await session.execute(
+                text("INSERT INTO organizations (id, slug, name) VALUES (:id, :slug, 'smuggled')"),
+                {"id": uuid7(), "slug": f"smuggled-{uuid.uuid4().hex[:8]}"},
             )

@@ -24,6 +24,13 @@ second run changes nothing. Names and bounds come from
 ``hunter_core.db.models`` — the same helpers the migration uses, so the two can
 never disagree.
 
+**One transaction per partitioned parent.** Creating a partition takes an
+``ACCESS EXCLUSIVE`` lock on its parent; a single transaction over all eight
+parents held all eight locks until the very last statement committed, so this
+job blocked writes to ``audit_logs`` while it worked through ``candles``.
+Because every statement is idempotent, splitting the work costs nothing: a run
+that fails halfway keeps what it already created and the next run finishes it.
+
 Connects with ``DATABASE_URL_MIGRATIONS`` (direct, never the pooler) over
 asyncpg — the only Postgres driver this workspace installs.
 
@@ -56,10 +63,24 @@ from hunter_core.db.models import (
 )
 from hunter_core.settings import Settings
 
-_EXISTING_PARTITIONS = text("SELECT c.relname FROM pg_class c WHERE c.relispartition")
+_EXISTING_PARTITIONS = text(
+    "SELECT c.relname FROM pg_class c "
+    "WHERE c.relispartition AND c.relnamespace = 'public'::regnamespace"
+)
+"""What already exists, in *this* schema.
+
+Unqualified, the query counts a partition of the same name in any schema of the
+database — a staging copy, an extension's own partitioned table — and the script
+would then report a partition it had just created in ``public`` as "already
+present". The statements themselves are unqualified and so resolve through
+``search_path`` to ``public``; the census has to agree with them.
+"""
 
 Statement = tuple[str, str]
 """``(relation the statement concerns, SQL)``."""
+
+Group = tuple[str, list[Statement]]
+"""``(partitioned parent, its statements)`` — the unit of one transaction."""
 
 
 def migration_url() -> str:
@@ -82,40 +103,72 @@ def _harden(child: str, root: str, tenants: frozenset[str]) -> list[Statement]:
     ]
 
 
-def planned_statements(months_ahead: int, now: datetime | None = None) -> list[Statement]:
-    """Everything needed for the current month plus ``months_ahead`` more."""
+def planned_groups(months_ahead: int, now: datetime | None = None) -> list[Group]:
+    """Everything needed for the current month plus ``months_ahead`` more, per parent.
+
+    Grouped by the *top-level* partitioned table, which is the relation whose
+    lock every statement in the group contends for: the ``candles_1m`` level and
+    every ``candles_1m_YYYY_MM`` under it all belong to ``candles``. Within a
+    group the order still matters — the LIST level is created before the months
+    that hang off it — and the flattened order is unchanged from before.
+    """
     start = now or datetime.now(UTC)
     tenants = frozenset(tenant_tables())
     months = months_from(start, months_ahead + 1)
-    statements: list[Statement] = []
+    groups: dict[str, list[Statement]] = {}
 
     for parent, (_column, labels, sub_key) in list_partitioned_tables().items():
+        statements = groups.setdefault(parent, [])
         for label in labels:
             intermediate = list_partition_name(parent, label)
             statements.append((intermediate, create_list_partition_sql(parent, label, sub_key)))
             statements += _harden(intermediate, parent, tenants)
 
     for owner, root in monthly_partition_parents().items():
+        statements = groups.setdefault(root, [])
         for year, month in months:
             child = partition_name(owner, year, month)
             statements.append((child, create_partition_sql(owner, year, month)))
             statements += _harden(child, root, tenants)
 
-    return statements
+    return list(groups.items())
 
 
-async def ensure_partitions(statements: list[Statement]) -> list[str]:
-    """Run every statement; return the partition names that did not exist before."""
+def planned_statements(months_ahead: int, now: datetime | None = None) -> list[Statement]:
+    """:func:`planned_groups` flattened — what ``--dry-run`` prints."""
+    return [
+        statement
+        for _parent, statements in planned_groups(months_ahead, now)
+        for statement in statements
+    ]
+
+
+async def ensure_partitions(groups: list[Group]) -> list[str]:
+    """Run each group in a transaction of its own; return the names that are new.
+
+    One transaction per partitioned parent, not one spanning all eight.
+    ``CREATE TABLE ... PARTITION OF`` takes an ``ACCESS EXCLUSIVE`` lock on the
+    parent, and a single transaction held every one of those locks until the last
+    statement of the last parent committed — so this daily job blocked writes to
+    ``audit_logs`` for as long as it took to reach the end of ``candles``, which
+    is by far the largest of them. Per parent, each lock is released as soon as
+    that parent is done, and a failure on one parent no longer throws away the
+    partitions already created for the others — the next run picks up where this
+    one stopped, because every statement is idempotent.
+    """
     engine = create_async_engine(migration_url(), connect_args={"statement_cache_size": 0})
     created: list[str] = []
     try:
-        async with engine.begin() as connection:
-            result = await connection.execute(_EXISTING_PARTITIONS)
-            existing = {row[0] for row in result}
-            for name, sql in statements:
-                await connection.execute(text(sql))
-                if name not in existing and name not in created:
-                    created.append(name)
+        async with engine.connect() as connection:
+            async with connection.begin():
+                result = await connection.execute(_EXISTING_PARTITIONS)
+                existing = {row[0] for row in result}
+            for _parent, statements in groups:
+                async with connection.begin():
+                    for name, sql in statements:
+                        await connection.execute(text(sql))
+                        if name not in existing and name not in created:
+                            created.append(name)
     finally:
         await engine.dispose()
     return created
@@ -138,15 +191,16 @@ def main() -> int:
         print("--months-ahead must be >= 0")
         return 2
 
-    statements = planned_statements(args.months_ahead)
-    partitions = {name for name, _ in statements}
+    groups = planned_groups(args.months_ahead)
+    partitions = {name for _parent, statements in groups for name, _sql in statements}
     if args.dry_run:
-        for name, sql in statements:
-            print(f"[dry-run] {name}: {sql}")
+        for parent, statements in groups:
+            for name, sql in statements:
+                print(f"[dry-run] {parent} -> {name}: {sql}")
         print(f"[dry-run] {len(partitions)} partition(s) would be ensured")
         return 0
 
-    created = asyncio.run(ensure_partitions(statements))
+    created = asyncio.run(ensure_partitions(groups))
     for name in created:
         print(f"created {name}")
     print(f"{len(created)} partition(s) created, {len(partitions) - len(created)} already present")
