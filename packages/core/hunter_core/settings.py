@@ -99,7 +99,7 @@ class Settings(BaseSettings):
     retention_feature_snapshots_days: int = 14
 
     # ---- Runtime (nao documentado em .env.example; ver CONCERNS do T03) ----
-    health_port: int = 8000
+    health_port: int = 8001
 
     @model_validator(mode="after")
     def _require_urls_in_prod(self) -> Settings:

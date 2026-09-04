@@ -13,13 +13,13 @@ Nada em produção lê arquivo local. Configuração só por env.
 
 ## 2. Imagens
 
-- `infra/docker/Dockerfile.api-workers`: Python 3.12 slim, `uv sync --frozen`, usuário não-root, `CMD ["python", "-m", "hunter_core.runtime"]` que lê `HUNTER_ROLE`.
+- `infra/docker/Dockerfile.api-workers`: Python 3.12 slim, `uv sync --frozen`, usuário não-root, `ENTRYPOINT infra/docker/entrypoint.sh`: `HUNTER_COMMAND=migrate|seed` executa Alembic ou o seed e sai; caso contrário `HUNTER_ROLE=api` sobe o uvicorn e os papéis de worker (`market|scanner|strategy|execution|analytics|all`) imprimem que ainda não têm entrypoint e saem com 0 até o M1 (sem processo falso).
 - `infra/docker/Dockerfile.web`: Next.js standalone (usado só se o web não for na Vercel).
 - Tag = SHA do commit; `release` do Sentry = mesmo SHA.
 
 ## 3. docker-compose (dev)
 
-Serviços: `postgres:16`, `redis:7`, `api`, `worker` (`HUNTER_ROLE=all`), `web`. Volumes só para os bancos. `docker-compose.test.yml` sobe Postgres e Redis efêmeros para testes de integração.
+Serviços: `postgres:16`, `redis:7`, `migrate` (`HUNTER_COMMAND=migrate`, roda uma vez), `api` (depende do `migrate` concluído), `worker` (`HUNTER_ROLE=all`, sai com 0 até o M1), `web`. Volumes só para os bancos. `docker-compose.test.yml` sobe Postgres e Redis efêmeros para testes de integração.
 
 ## 4. CI (GitHub Actions)
 
