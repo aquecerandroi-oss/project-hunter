@@ -20,7 +20,7 @@ port = os.environ.get("API_PORT", "8000") if role == "api" else os.environ.get("
 url = f"http://127.0.0.1:{port}/health"
 
 try:
-    with urllib.request.urlopen(url, timeout=2) as response:  # noqa: S310 -- fixed loopback health probe
+    with urllib.request.urlopen(url, timeout=2) as response:
         sys.exit(0 if response.status == 200 else 1)
 except Exception:
     sys.exit(1)
