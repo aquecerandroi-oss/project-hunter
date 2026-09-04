@@ -11,6 +11,10 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Protocol
 
+from hunter_core.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class SendsText(Protocol):
     """The one method fan-out needs — matches ``starlette.WebSocket``."""
@@ -47,7 +51,21 @@ class ConnectionManager:
         """Every channel with at least one subscriber."""
         return list(self._channels)
 
-    async def broadcast(self, channel: str, message: str) -> None:
-        """Send ``message`` to every connection subscribed to ``channel``."""
+    async def broadcast(self, channel: str, message: str) -> int:
+        """Send ``message`` to every connection subscribed to ``channel``.
+
+        A connection whose ``send_text`` raises (dropped socket, etc.) is
+        evicted from every channel it was subscribed to — not just this one
+        — and the exception is swallowed so the rest of the fan-out still
+        happens. Returns how many connections were successfully delivered to.
+        """
+        delivered = 0
         for connection in list(self._channels.get(channel, ())):
-            await connection.send_text(message)
+            try:
+                await connection.send_text(message)
+            except Exception:
+                logger.warning("ws_broadcast_send_failed", channel=channel)
+                self.unsubscribe_all(connection)
+            else:
+                delivered += 1
+        return delivered

@@ -24,11 +24,38 @@ async def test_broadcast_reaches_every_subscriber_of_a_channel() -> None:
     manager.subscribe(b, "rt:radar")
     manager.subscribe(other, "rt:system")
 
-    await manager.broadcast("rt:radar", "update")
+    delivered = await manager.broadcast("rt:radar", "update")
 
+    assert delivered == 2
     assert a.sent == ["update"]
     assert b.sent == ["update"]
     assert other.sent == []
+
+
+class _RaisingConnection:
+    async def send_text(self, data: str) -> None:
+        raise RuntimeError("connection dropped")
+
+
+async def test_broadcast_evicts_a_failing_connection_and_keeps_delivering() -> None:
+    """A connection whose ``send_text`` raises must not stop the fan-out to
+    the rest, must not propagate, and must be dropped from every channel it
+    was subscribed to (not just the one being broadcast).
+    """
+    manager = ConnectionManager()
+    first, second, third = _FakeConnection(), _RaisingConnection(), _FakeConnection()
+    manager.subscribe(first, "rt:radar")
+    manager.subscribe(second, "rt:radar")
+    manager.subscribe(second, "rt:system")
+    manager.subscribe(third, "rt:radar")
+
+    delivered = await manager.broadcast("rt:radar", "update")
+
+    assert delivered == 2
+    assert first.sent == ["update"]
+    assert third.sent == ["update"]
+    assert manager.subscriber_count("rt:radar") == 2
+    assert "rt:system" not in manager.channels()  # evicted everywhere, not just rt:radar
 
 
 async def test_unsubscribe_stops_delivery_and_cleans_up_empty_channels() -> None:
