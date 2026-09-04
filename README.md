@@ -37,6 +37,32 @@ tests/       integration · e2e
 docs/
 ```
 
+## Docker
+
+Uma imagem para api + workers (`HUNTER_ROLE` escolhe o processo) e uma para o web, mais um `docker-compose.yml` de desenvolvimento e um `docker-compose.test.yml` só com Postgres/Redis (`docs/DEPLOYMENT.md` §2–§3 tem os detalhes).
+
+```sh
+# build manual das duas imagens
+docker build -f infra/docker/Dockerfile.api-workers -t hunter-api:dev --build-arg GIT_SHA=$(git rev-parse --short HEAD) .
+docker build -f infra/docker/Dockerfile.web -t hunter-web:dev --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_... .
+
+# stack completa de dev (postgres, redis, migrate, api, worker, web)
+docker compose -f infra/docker/docker-compose.yml up -d --build
+```
+
+Funciona sem nenhum arquivo `.env` (usa os defaults de dev do próprio compose); um `.env` na raiz (nunca commitado) sobrepõe esses defaults — por exemplo com chaves reais do Clerk para o login funcionar de verdade.
+
+- API: `http://localhost:8000` (`/health` = vivo, `/ready` = Postgres + Redis alcançáveis, 200 só quando ambos respondem).
+- Web: `http://localhost:3000` (redireciona para o sign-in até haver chaves reais do Clerk em `.env`).
+- `worker` (`HUNTER_ROLE=all`) sobe, imprime que o papel ainda não tem entrypoint e sai com código 0 — `hunter_core.runtime.RoleRegistry` só é populado a partir do Milestone 1; isso é esperado, não uma falha.
+
+Para testes de integração locais sem testcontainers:
+
+```sh
+docker compose -f infra/docker/docker-compose.test.yml up -d   # Postgres em 55432, Redis em 56379
+docker compose -f infra/docker/docker-compose.test.yml down -v
+```
+
 ## Regras inegociáveis
 
 - Nenhum agente executa ordens. Toda entrada passa pelo Risk Engine.

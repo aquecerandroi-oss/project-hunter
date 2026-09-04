@@ -1,0 +1,139 @@
+# PROJECT HUNTER — local dev stack (docs/DEPLOYMENT.md §3).
+#
+#   docker compose -f infra/docker/docker-compose.yml up -d --build
+#
+# Works with zero `.env` file (dev defaults below); an `.env` at the repo
+# root (copy of .env.example, never committed) overrides them — e.g. real
+# Clerk keys so sign-in actually works. Volumes only for the databases —
+# every other service is stateless and rebuilt from source/image each run.
+#
+# `worker` (HUNTER_ROLE=all) intentionally exits 0 immediately as of M0:
+# hunter_core.runtime.RoleRegistry is still empty (see
+# infra/docker/entrypoint.sh) — real workers land in M1.
+
+x-api-env: &api-env
+  DATABASE_URL: postgresql+asyncpg://hunter:hunter@postgres:5432/hunter
+  DATABASE_URL_MIGRATIONS: postgresql+asyncpg://hunter:hunter@postgres:5432/hunter
+  REDIS_URL: redis://redis:6379/0
+  HUNTER_ENV: development
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hunter
+      POSTGRES_PASSWORD: hunter
+      POSTGRES_DB: hunter
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hunter -d hunter"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - hunter_pg:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - hunter_redis:/data
+
+  migrate:
+    # No `build:` here on purpose — the `api` service below builds
+    # hunter-api:${GIT_SHA:-dev} once; migrate/worker just reuse that tag so
+    # `docker compose up --build` doesn't build the same image three times.
+    image: hunter-api:${GIT_SHA:-dev}
+    environment:
+      <<: *api-env
+      # NOT HUNTER_ROLE: "migrate" isn't a valid hunter_core.settings.Role —
+      # see infra/docker/entrypoint.sh's comment. HUNTER_COMMAND is the
+      # image-only switch entrypoint.sh checks first; HUNTER_ROLE stays at
+      # its image default ("api", a real Settings literal) so alembic's
+      # env.py (which constructs the full Settings()) doesn't fail validation.
+      HUNTER_COMMAND: migrate
+    env_file:
+      - path: ../../.env
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api-workers
+      args:
+        GIT_SHA: ${GIT_SHA:-dev}
+    image: hunter-api:${GIT_SHA:-dev}
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: api
+      WEB_ORIGIN: http://localhost:3000
+    env_file:
+      - path: ../../.env
+        required: false
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    image: hunter-api:${GIT_SHA:-dev}
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: all
+    env_file:
+      - path: ../../.env
+        required: false
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_WS_URL: ws://localhost:8000/ws
+        # Dev-only placeholder (documented in .env.example) — real sign-in
+        # needs actual Clerk dev keys in a repo-root `.env`; this only keeps
+        # `next build` (and the container boot) from failing without one.
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-pk_test_Y2xlcmsuZXhhbXBsZS5jb20k}
+    image: hunter-web:${GIT_SHA:-dev}
+    environment:
+      API_URL: http://api:8000
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_WS_URL: ws://localhost:8000/ws
+      HUNTER_ENV: development
+      # Same dev-only placeholder as the build arg above — auth will not
+      # work until real keys arrive via `.env`.
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-pk_test_Y2xlcmsuZXhhbXBsZS5jb20k}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-sk_test_FAKE_FOR_BUILD_ONLY}
+    env_file:
+      - path: ../../.env
+        required: false
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  hunter_pg:
+  hunter_redis:

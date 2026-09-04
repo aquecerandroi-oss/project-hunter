@@ -1,0 +1,85 @@
+# PROJECT HUNTER — web image (used only if apps/web is not deployed on
+# Vercel — docs/DEPLOYMENT.md §2). Next.js 15 standalone build.
+#
+# Build from the repo root:
+#   docker build -f infra/docker/Dockerfile.web -t hunter-web:<sha> \
+#     --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_... .
+#
+# `NEXT_PUBLIC_*` values are baked into the client bundle at build time (they
+# are public by design, see SECURITY.md §4) — pass the real ones as
+# --build-arg for a real deploy; the dev defaults below only make local
+# `docker compose` builds work out of the box.
+
+# ---------------------------------------------------------------------------
+# Stage 1: builder — install the pnpm workspace, run `next build`.
+# ---------------------------------------------------------------------------
+FROM node:22-bookworm-slim AS builder
+
+RUN corepack enable && corepack prepare pnpm@11.25.0 --activate
+
+WORKDIR /app
+
+# --- Layer 1: manifests only (changes rarely) ------------------------------
+# apps/web and packages/config are the only pnpm workspace members web
+# depends on (packages/core etc. are uv/Python, not part of this workspace).
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY packages/config/package.json packages/config/package.json
+COPY apps/web/package.json apps/web/package.json
+
+RUN pnpm install --frozen-lockfile
+
+# --- Layer 2: full source, then build --------------------------------------
+COPY packages/config packages/config
+COPY apps/web apps/web
+
+# `public/` doesn't exist yet (lands with T08/T09); standalone output always
+# expects it, so make sure it's there even if empty.
+RUN mkdir -p apps/web/public
+
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ARG NEXT_PUBLIC_POSTHOG_KEY=
+ARG NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
+    NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL} \
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY} \
+    NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY} \
+    NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST} \
+    NEXT_TELEMETRY_DISABLED=1
+
+RUN pnpm --filter @hunter/web build
+
+# ---------------------------------------------------------------------------
+# Stage 2: runtime — standalone server only, non-root, no pnpm/build tools.
+# ---------------------------------------------------------------------------
+FROM node:22-bookworm-slim AS runtime
+
+RUN groupadd --gid 10001 hunter \
+    && useradd --uid 10001 --gid hunter --no-create-home --shell /usr/sbin/nologin hunter
+
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0 \
+    NEXT_TELEMETRY_DISABLED=1
+
+# `.next/standalone` already contains a pruned node_modules (traced deps) and
+# mirrors the monorepo path (apps/web/server.js), per Next.js's own layout
+# for pnpm workspaces.
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY infra/docker/healthcheck-web.mjs infra/docker/healthcheck-web.mjs
+
+RUN chown -R hunter:hunter /app
+
+USER hunter
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=3 \
+    CMD ["node", "infra/docker/healthcheck-web.mjs"]
+
+CMD ["node", "apps/web/server.js"]

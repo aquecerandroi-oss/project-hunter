@@ -1,0 +1,61 @@
+# PROJECT HUNTER — Docker build context excludes.
+# Keeps `docker build .` fast and image layers small; nothing here should
+# ever be needed inside an image (source is COPYed explicitly per-Dockerfile).
+
+# secrets — never send these to the build context
+.env
+.env.*
+!.env.example
+
+# git
+.git/
+.gitattributes
+.gitignore
+.gitleaks.toml
+
+# node
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+.turbo/
+**/.turbo/
+*.tsbuildinfo
+
+# python
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+**/.pytest_cache/
+.ruff_cache/
+**/.ruff_cache/
+.mypy_cache/
+.pyright/
+
+# build artifacts
+dist/
+**/dist/
+build/
+**/build/
+*.egg-info/
+coverage/
+**/coverage/
+htmlcov/
+playwright-report/
+test-results/
+
+# docker-local state (never production state)
+infra/docker/.data/
+
+# docs (not needed inside images)
+docs/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
