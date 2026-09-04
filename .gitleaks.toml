@@ -21,6 +21,11 @@ regexes = [
   '''sk-ant-FAKE[A-Za-z0-9_-]*''',
   '''pk_test_Y2xlcmsuZXhhbXBsZS5jb20k''',
   '''sk_test_FAKE_CI_BUILD''',
+  # Historical only: a test fixture committed before the FAKE convention
+  # (commits 88c2dd7/4c107f7, packages/core/tests/unit/test_settings.py).
+  # The working tree now uses "FAKEsupersecret"; this exact literal keeps
+  # git-history scans clean without rewriting history.
+  '''postgresql\+asyncpg://u:supersecret@host/db''',
 ]
 
 # packages/core/tests/** fixtures use synthetic values. A path-only allowlist

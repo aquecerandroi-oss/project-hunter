@@ -2,7 +2,15 @@
   "current": "M0",
   "status": "in_progress",
   "approved_at": "2026-09-04",
-  "wave": "2 (T04, T05, T08, T10) — T01/T02/T03 committed and reviewed",
+  "wave": "2 closing — T04, T05, T08, T10 committed; reviews done except T04 cross-review",
+  "paused_reason": null,
+  "history": "2026-09-04: spend limit hit mid-wave 2 (T05-fixes, T08-fixes, T04 cross-review terminated with 429); limit reset and the three were re-dispatched the same day.",
+  "resume_checklist": [
+    "Re-dispatch T05-fixes (apps/api): CRITICAL errors.py strips input/url/ctx from 422 errors; HIGH redis_bridge single dispatcher routed by message channel; HIGH /ready asyncio.wait_for timeout; MEDIUM FORWARDED_ALLOW_IPS trust model, /metrics token gating, ws_manager dead-connection eviction; LOW X-Request-ID bounds, conftest print, CORS preflight test, fail-open log once/60s",
+    "Check whether 'T08-fixes' (apps/web: decimal-safe format, ws jitter, focusable planned nav item, topbar server component, auth message {type,token}, minimumReleaseAge) and the T04 cross-review finished; if not, re-dispatch",
+    "Small follow-ups: packages/core/tests/unit/test_logging.py has 4 pyright strict errors (ProcessorFormatter.processors access, needs a cast); forbidden_patterns.sh still hits apps/api/hunter_api/settings.py:24 (cors dev default) and security_headers.py:4 (docstring) — exempt settings.py like core or move defaults; enums.py exemption in check_file_size.py is by bare filename (consider path-specific)",
+    "Then Wave 3: T06 (Clerk auth, RBAC, tenancy, org routers) and T07 (Docker) per docs/plans/M0.md"
+  ],
   "plan": "docs/plans/M0.md",
   "updated": "2026-09-04",
   "next_action": "User approves architecture + M0 wave plan; install remaining prerequisites (pnpm, uv, Docker); then execute Wave 1 of docs/plans/M0.md.",
