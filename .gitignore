@@ -1,0 +1,38 @@
+# env e segredos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# node
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+dist/
+build/
+*.egg-info/
+htmlcov/
+
+# docker / dados locais de dev (nunca estado de produção)
+infra/docker/.data/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
