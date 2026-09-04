@@ -31,31 +31,64 @@ def test_reads_env_vars_with_correct_types(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_rejects_unknown_hunter_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HUNTER_ENV", "staging")
+    monkeypatch.setenv("HUNTER_ENV", "not-a-real-environment")
     with pytest.raises(ValidationError):
         Settings()
 
 
-def test_dev_defaults_do_not_require_urls(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HUNTER_ENV", "dev")
+def test_accepts_staging_as_a_valid_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``.env.example`` documents ``development | staging | production``."""
+    monkeypatch.setenv("HUNTER_ENV", "staging")
+    settings = Settings()
+    assert settings.hunter_env == "staging"
+
+
+def test_development_defaults_do_not_require_urls(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HUNTER_ENV", "development")
     settings = Settings()
     assert settings.database_url is not None
 
 
-def test_prod_fails_fast_without_database_and_redis_url(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HUNTER_ENV", "prod")
+def test_production_fails_fast_without_database_and_redis_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HUNTER_ENV", "production")
     monkeypatch.setenv("DATABASE_URL", "")
     monkeypatch.setenv("REDIS_URL", "")
     with pytest.raises(ValidationError, match="DATABASE_URL"):
         Settings()
 
 
-def test_prod_succeeds_with_urls_present(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HUNTER_ENV", "prod")
+def test_production_succeeds_with_urls_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HUNTER_ENV", "production")
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@host/db")
     monkeypatch.setenv("REDIS_URL", "redis://host:6379/0")
     settings = Settings()
-    assert settings.hunter_env == "prod"
+    assert settings.hunter_env == "production"
+
+
+def test_is_production_and_is_development_properties(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HUNTER_ENV", "production")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@host/db")
+    monkeypatch.setenv("REDIS_URL", "redis://host:6379/0")
+    prod = Settings()
+    assert prod.is_production is True
+    assert prod.is_development is False
+
+    monkeypatch.setenv("HUNTER_ENV", "development")
+    dev = Settings()
+    assert dev.is_production is False
+    assert dev.is_development is True
+
+    monkeypatch.setenv("HUNTER_ENV", "staging")
+    staging = Settings()
+    assert staging.is_production is False
+    assert staging.is_development is False
+
+    monkeypatch.setenv("HUNTER_ENV", "test")
+    test_env = Settings()
+    assert test_env.is_production is False
+    assert test_env.is_development is False
 
 
 def test_dump_safe_masks_secrets_and_keeps_public_fields(monkeypatch: pytest.MonkeyPatch) -> None:

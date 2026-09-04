@@ -22,7 +22,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from hunter_core.domain.enums import KillSwitchState
 
-Environment = Literal["dev", "test", "prod"]
+Environment = Literal["development", "test", "staging", "production"]
 Role = Literal["api", "market", "scanner", "strategy", "execution", "analytics", "all"]
 
 
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
 
     # ---- Ambiente ----
-    hunter_env: Environment = "dev"
+    hunter_env: Environment = "development"
     hunter_role: Role = "all"
     log_level: str = "INFO"
     web_origin: str = "http://localhost:3000"
@@ -103,7 +103,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _require_urls_in_prod(self) -> Settings:
-        if self.hunter_env != "prod":
+        if self.hunter_env != "production":
             return self
         missing = [
             name
@@ -111,8 +111,18 @@ class Settings(BaseSettings):
             if value is None or not value.get_secret_value()
         ]
         if missing:
-            raise ValueError(f"missing required settings in prod: {', '.join(missing)}")
+            raise ValueError(f"missing required settings in production: {', '.join(missing)}")
         return self
+
+    @property
+    def is_production(self) -> bool:
+        """``True`` only for ``HUNTER_ENV=production`` (never for ``staging``)."""
+        return self.hunter_env == "production"
+
+    @property
+    def is_development(self) -> bool:
+        """``True`` only for ``HUNTER_ENV=development`` (never for ``test``)."""
+        return self.hunter_env == "development"
 
     def cors_origins(self) -> list[str]:
         """``WEB_ORIGIN`` as a list — one or more origins, comma separated."""
