@@ -2,7 +2,7 @@
   "current": "M0",
   "status": "in_progress",
   "approved_at": "2026-09-04",
-  "wave": "1 (T01)",
+  "wave": "2 (T04, T05, T08, T10) — T01/T02/T03 committed and reviewed",
   "plan": "docs/plans/M0.md",
   "updated": "2026-09-04",
   "next_action": "User approves architecture + M0 wave plan; install remaining prerequisites (pnpm, uv, Docker); then execute Wave 1 of docs/plans/M0.md.",
