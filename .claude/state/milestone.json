@@ -3,8 +3,11 @@
   "status": "not_started",
   "plan": "docs/plans/M0.md",
   "updated": "2026-09-04",
-  "next_action": "User approves architecture + M0 wave plan; install prerequisites (Node 22, pnpm, uv, Docker); then execute Wave 1 of docs/plans/M0.md.",
+  "next_action": "User approves architecture + M0 wave plan; install remaining prerequisites (pnpm, uv, Docker); then execute Wave 1 of docs/plans/M0.md.",
+  "verified": [
+    "2026-09-04: Node 24.20 + npm 11.19 installed at C:\\Program Files\\nodejs; hooks pass all 8 manual cases (incl. null stdin); packages/config verify.mjs → 3× ok with eslint 9.39.5"
+  ],
   "blockers": [
-    "Dev machine had no node/npm/pnpm/uv/docker on 2026-09-04 — hooks and ESLint self-check could not be executed yet"
+    "pnpm, uv and Docker still absent on the dev machine (checked 2026-09-04 after Node install)"
   ]
 }

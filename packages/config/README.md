@@ -24,7 +24,7 @@ Dois tiers: `eslint.config.mjs` (rápido, pre-commit) e `eslint.typed.config.mjs
 pnpm --filter @hunter/config verify:eslint-rules
 ```
 
-Saída esperada: três linhas terminando em `: ok`. Ainda não executada nesta máquina (sem Node em 2026-09-04); é a primeira verificação da tarefa T02 do M0.
+Saída esperada: três linhas terminando em `: ok`. Executada com sucesso em 2026-09-04 (Node 24.20, eslint 9.39.5). Enquanto o workspace pnpm não existe (M0, T01), o equivalente é `npm install --no-package-lock` dentro de `packages/config` seguido de `node eslint/verify.mjs eslint/eslint-rules/index.cjs`.
 
 ## Python
 
