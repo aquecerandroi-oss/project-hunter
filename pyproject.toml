@@ -81,4 +81,8 @@ markers = [
   "live: hits a real exchange API; never in CI",
 ]
 addopts = "-ra --strict-markers"
+# Each workspace member has its own `tests` package; resolve them as namespace packages
+# (packages.core.tests..., apps.api.tests...) so one pytest run across members works.
+consider_namespace_packages = true
+pythonpath = ["."]
 filterwarnings = ["error::DeprecationWarning:hunter_.*"]
