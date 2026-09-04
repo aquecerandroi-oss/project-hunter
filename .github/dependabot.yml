@@ -1,0 +1,39 @@
+version: 2
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # Limitation: the "pip" ecosystem reads dependency declarations from the
+  # root pyproject.toml (PEP 621 `[project.dependencies]` and
+  # `[dependency-groups]`), but Dependabot does not resolve or update
+  # uv.lock — only `uv lock --upgrade` does that. Treat these PRs as
+  # "bump the version constraint"; still run `uv lock` (and `uv sync
+  # --all-packages`) locally/in CI to regenerate the lockfile before
+  # merging. Dependabot also does not walk the individual
+  # packages/*/pyproject.toml and services/*/pyproject.toml workspace
+  # members — only the root manifest is watched here. Revisit if/when
+  # Dependabot ships a dedicated "uv" ecosystem.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      pip-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]

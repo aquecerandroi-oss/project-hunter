@@ -1,0 +1,45 @@
+title = "Project Hunter — gitleaks config"
+
+# Extend the built-in ruleset (docs/SECURITY.md §5: "gitleaks em CI"); we
+# only add allowlist entries, never remove or weaken a default rule.
+[extend]
+useDefault = true
+
+# Narrow, value-based allowlist for three specific, documented, fake
+# credentials that are deliberately committed as CI/example fixtures — never
+# real secrets. They show up in .github/workflows/ci.yml (Clerk's own dummy
+# key format, used so `pnpm build` can run in CI), in .env.example (as
+# illustrative comments) and in docs/**. Because gitleaks combines a single
+# allowlist entry's `paths` and `regexes` with OR (not AND), scoping "this
+# fake value, wherever it legitimately appears" is expressed as a
+# path-independent value match rather than three separate path-scoped ones.
+[[allowlists]]
+description = "Documented fake example secrets (not real credentials)"
+regexes = [
+  '''sk-ant-FAKE[A-Za-z0-9_-]*''',
+  '''pk_test_Y2xlcmsuZXhhbXBsZS5jb20k''',
+  '''sk_test_FAKE_CI_BUILD''',
+]
+
+# packages/core/tests/** fixtures use synthetic values (containing "FAKE")
+# for hunter_core tests. gitleaks cannot AND a path with a value regex within
+# one allowlist entry (see note above), so the boundary here is the path
+# itself, not the literal value — this directory is test code, reviewed like
+# any other test code, and is already excluded from
+# infra/scripts/forbidden_patterns.sh for the same reason.
+[[allowlists]]
+description = "packages/core/tests fixtures (synthetic values only)"
+paths = [
+  '''packages/core/tests/''',
+]
+
+# .env.example never holds real values — see docs/SECURITY.md §4 and §8; only
+# variable names and illustrative placeholders are committed. Not anchored
+# with "^": gitleaks path-matches against the path it walked with (which
+# varies with --source / git vs. --no-git mode), so a plain substring is the
+# portable choice — verified against both modes before landing this config.
+[[allowlists]]
+description = ".env.example placeholders"
+paths = [
+  '''\.env\.example$''',
+]

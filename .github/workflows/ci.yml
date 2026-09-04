@@ -1,0 +1,289 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Python version comes from .python-version (uv reads it automatically via
+# `uv python install`); Node version is pinned inline per actions/setup-node
+# step (22, per docs/plans/M0.md prerequisites).
+
+jobs:
+  python-lint:
+    name: python-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install Python (from .python-version)
+        run: uv python install
+      - name: Install dependencies (all workspace members)
+        run: uv sync --all-packages
+      - name: ruff check
+        run: uv run ruff check .
+      - name: ruff format --check
+        run: uv run ruff format --check .
+      - name: pyright
+        run: uv run pyright
+      - name: file-size gate (350 lines)
+        run: uv run python infra/scripts/check_file_size.py
+
+  # Aspirational strict tier (packages/config/ruff.strict.toml). Never blocks
+  # the gate; the violation count is written to the job summary so it's
+  # visible without digging into logs. A rule graduates to ruff.toml (and
+  # this job stops being interesting for it) only once its count hits zero —
+  # see docs/WORKFLOW.md §6.
+  python-lint-strict:
+    name: python-lint-strict (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install
+      - run: uv sync --all-packages
+      - name: ruff check (strict config)
+        run: |
+          set +e
+          output="$(uv run ruff check --config packages/config/ruff.strict.toml . --output-format=concise)"
+          status=$?
+          count=0
+          if [ -n "$output" ]; then
+            count=$(printf '%s\n' "$output" | wc -l)
+          fi
+          printf '%s\n' "$output"
+          {
+            echo "### ruff --config packages/config/ruff.strict.toml"
+            echo "Violations: $count"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+  python-test:
+    name: python-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install
+      - run: uv sync --all-packages
+      # testcontainers spins up Postgres/Redis via the Docker daemon that
+      # ubuntu-latest ships preinstalled; no service containers needed here.
+      # `-m "unit or integration"` excludes the `live` marker by construction
+      # (it hits real exchanges and must never run in CI).
+      - name: pytest (unit + integration)
+        run: uv run pytest -m "unit or integration" --cov --cov-report=xml
+
+  # Runs unconditionally per CLAUDE.md/docs/plans/M0.md T10: this stays red
+  # until T04 (Alembic setup) lands. That failure is expected, not a bug in
+  # this job — do not skip it or make it non-blocking.
+  migrations:
+    name: migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hunter
+          POSTGRES_PASSWORD: hunter
+          POSTGRES_DB: hunter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U hunter -d hunter"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL_MIGRATIONS: postgresql://hunter:hunter@localhost:5432/hunter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install
+      - run: uv sync --all-packages
+      - name: alembic upgrade head
+        run: uv run alembic -c infra/migrations/alembic.ini upgrade head
+      - name: alembic check (no model/migration drift)
+        run: uv run alembic -c infra/migrations/alembic.ini check
+      - name: alembic downgrade -1
+        run: uv run alembic -c infra/migrations/alembic.ini downgrade -1
+      - name: alembic upgrade head (again)
+        run: uv run alembic -c infra/migrations/alembic.ini upgrade head
+      - name: partitions dry run
+        run: uv run python infra/scripts/create_partitions.py --dry-run
+
+  node:
+    name: node
+    runs-on: ubuntu-latest
+    env:
+      # Fake, publicly-documented dummy values (Clerk's own placeholder
+      # format for CI/test builds: https://clerk.com/docs — never real
+      # credentials, so they are plain env, not GitHub secrets. Allowlisted
+      # in .gitleaks.toml.
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k
+      CLERK_SECRET_KEY: sk_test_FAKE_CI_BUILD
+      API_URL: http://localhost:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  # Guarded until T09 (packages/shared-types + the gen:types turbo task) is
+  # in place. Once both exist, this regenerates the client types from the
+  # running OpenAPI schema and fails on any uncommitted diff.
+  types-drift:
+    name: types-drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: gen:types and diff
+        run: |
+          set -e
+          has_task=0
+          if node -e "const p=require('./package.json'); process.exit((p.scripts && p.scripts['gen:types']) ? 0 : 1)"; then
+            has_task=1
+          fi
+          has_pkg=0
+          [ -f packages/shared-types/package.json ] && has_pkg=1
+          if [ "$has_task" = "1" ] && [ "$has_pkg" = "1" ]; then
+            pnpm gen:types
+            git diff --exit-code packages/shared-types
+          else
+            echo "gen:types not available yet (T09)"
+          fi
+
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install
+      - run: uv sync --all-packages
+      # `--strict` (asked for in docs/plans/M0.md T10) fails the whole audit
+      # if ANY dependency can't be collected — and in a uv workspace every
+      # local hunter_* member is "not found on PyPI", so --strict fails
+      # unconditionally here regardless of real vulnerabilities. --skip-editable
+      # keeps the strict *intent* (fail hard on anything pip-audit can
+      # actually check) without that permanent false failure. Verified
+      # locally: `uv run pip-audit --strict` → fails on hunter-analytics-worker
+      # even with zero real CVEs; `uv run pip-audit --skip-editable` → passes
+      # and still audits every third-party dependency.
+      - name: pip-audit
+        run: uv run pip-audit --skip-editable
+      - name: bandit
+        run: uv run bandit -r packages apps services -q -ll
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: pnpm audit
+        run: pnpm audit --audit-level=high
+
+  forbidden-patterns:
+    name: forbidden-patterns
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash infra/scripts/forbidden_patterns.sh
+
+  # Guarded until T07 (infra/docker/**) lands. Job-level `if` can't call
+  # hashFiles() (actionlint: only steps.if/env/... contexts allow it), so the
+  # guard lives on each step instead and the job itself always runs.
+  docker-build:
+    name: docker-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+        if: hashFiles('infra/docker/Dockerfile.api-workers', 'infra/docker/Dockerfile.web') != ''
+      - name: build api-workers image
+        if: hashFiles('infra/docker/Dockerfile.api-workers') != ''
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.api-workers
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: build web image
+        if: hashFiles('infra/docker/Dockerfile.web') != ''
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.web
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: no Dockerfiles yet (T07)
+        if: hashFiles('infra/docker/Dockerfile.api-workers', 'infra/docker/Dockerfile.web') == ''
+        run: echo "infra/docker/Dockerfile.* not present yet (T07); nothing to build."
+
+  # Required status check. Green only once every blocking job above is
+  # green; python-lint-strict is intentionally excluded (non-blocking).
+  # `if: always()` makes this the standard "gate" pattern: it still runs (and
+  # can report failure) even if an upstream job failed or was cancelled,
+  # instead of GitHub skipping it because a `needs` job didn't succeed.
+  gate:
+    name: CI gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - python-lint
+      - python-test
+      - migrations
+      - node
+      - types-drift
+      - security
+      - forbidden-patterns
+      - docker-build
+    steps:
+      - name: Check required jobs
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] || \
+             [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "One or more required jobs failed."
+            exit 1
+          fi
+          echo "All required jobs passed (or were guarded off before their prerequisite task landed)."

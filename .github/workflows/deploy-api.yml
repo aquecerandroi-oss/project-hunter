@@ -1,0 +1,50 @@
+name: Deploy API
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        required: true
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-api-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: Run CI gate
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  deploy:
+    name: Deploy (${{ github.event.inputs.environment }})
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    permissions:
+      contents: read
+    steps:
+      # Railway/Vercel deploy wired in M0 T13 / docs/DEPLOYMENT.md. This is
+      # deliberately not a fake success — it fails loudly instead of
+      # reporting a deploy that never happened. Flip DEPLOY_ENABLED to
+      # "true" as a repository/environment variable once the real
+      # `railway up` (or equivalent) step lands here.
+      - name: Deploy api + workers
+        env:
+          DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
+        run: |
+          if [ "$DEPLOY_ENABLED" != "true" ]; then
+            echo "::error::Deploy for apps/api + workers is not wired up yet (Railway/Vercel deploy wired in M0 T13 / docs/DEPLOYMENT.md). Refusing to report a fake success."
+            exit 1
+          fi
+          echo "::error::DEPLOY_ENABLED=true but no deploy steps are implemented yet. Fix this workflow before flipping the flag."
+          exit 1
