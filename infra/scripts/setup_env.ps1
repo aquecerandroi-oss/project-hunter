@@ -59,16 +59,19 @@ $openaiBstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($openaiSecur
 $openai = [Runtime.InteropServices.Marshal]::PtrToStringAuto($openaiBstr)
 [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($openaiBstr)
 
+# Cada elemento entre parenteses: em PowerShell a virgula (array) tem precedencia maior que "+",
+# e sem parenteses tudo vira UMA linha separada por espacos.
 $lines = @(
-  "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=" + $pk,
-  "CLERK_SECRET_KEY=" + $sk,
-  "CLERK_ISSUER=" + $issuer,
-  "CLERK_JWKS_URL=" + $issuer + "/.well-known/jwks.json"
+  ("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=" + $pk),
+  ("CLERK_SECRET_KEY=" + $sk),
+  ("CLERK_ISSUER=" + $issuer),
+  ("CLERK_JWKS_URL=" + $issuer + "/.well-known/jwks.json")
 )
 if (-not [string]::IsNullOrWhiteSpace($openai)) {
-  $lines += "OPENAI_API_KEY=" + $openai.Trim()
+  $lines += ("OPENAI_API_KEY=" + $openai.Trim())
   $lines += "OPENAI_MODEL=gpt-6-astra"
 }
+if ($lines.Count -lt 4) { throw "bug interno: esperava 4+ linhas, obtive $($lines.Count)" }
 $content = ($lines -join "`n") + "`n"
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [IO.File]::WriteAllText($envPath, $content, $utf8NoBom)
