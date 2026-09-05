@@ -45,6 +45,7 @@ dev = [
   "pre-commit>=4",
   "pip-audit>=2.7",
   "bandit>=1.8",
+  "openai>=1.60",           # infra/scripts/ask_astra.py (second opinion; ADR 0002)
 ]
 
 [tool.ruff]
