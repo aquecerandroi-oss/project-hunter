@@ -60,8 +60,10 @@ if [ -f "$ENV_PATH" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# extract_key <texto> <prefixo> - aceita o valor puro, "NOME=valor" ou varias
-# linhas coladas de uma vez; devolve o primeiro token com o prefixo esperado.
+# extract_key <texto> <prefixo> - aceita o valor puro ou "NOME=valor" (o
+# formato que o Clerk copia), com ou sem aspas, e devolve o primeiro token com
+# o prefixo esperado. Uma linha por vez: o prompt le uma linha (read), entao
+# colar o bloco inteiro do Clerk faz a segunda linha cair no prompt seguinte.
 # ---------------------------------------------------------------------------
 extract_key() {
   local raw="$1" prefix="$2" token candidate
@@ -213,7 +215,10 @@ if [ -L "$ENV_PATH" ]; then
   exit 1
 fi
 umask 077
-ENV_TMP="$ENV_PATH.tmp.$$"
+# mktemp, nao "$ENV_PATH.tmp.$$": nome de PID e previsivel, e quem adivinhar
+# pode plantar um symlink ali e fazer os segredos serem escritos em outro
+# lugar. mktemp cria o arquivo de verdade, 600, no mesmo diretorio.
+ENV_TMP="$(mktemp "$ENV_PATH.XXXXXX")"
 trap 'rm -f "$ENV_TMP"' EXIT
 {
   echo "# PROJECT HUNTER - gerado por infra/scripts/setup_env.sh (perfil: $PROFILE)."

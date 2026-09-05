@@ -28,6 +28,18 @@ if [ "$(stat -c '%a' "$ROOT/.env")" != "600" ]; then
   chmod 600 "$ROOT/.env"
 fi
 
+# Preflight: CORS_ALLOWED_ORIGINS com URL simples derruba a api no boot -
+# ApiSettings declara list[str] e o pydantic-settings tenta json.loads ANTES
+# do validador que aceita "a,b". Quem copiou o .env.example (que ainda traz
+# CORS_ALLOWED_ORIGINS=http://localhost:3000) sobe uma stack que entra em
+# restart loop com SettingsError. Melhor descobrir aqui, em uma linha.
+if grep -q '^CORS_ALLOWED_ORIGINS=[^[]' "$ROOT/.env" 2>/dev/null; then
+  echo "ERRO: o .env define CORS_ALLOWED_ORIGINS com um valor que nao e lista JSON." >&2
+  echo "      A api nao sobe assim (SettingsError). Apague a linha: WEB_ORIGIN ja e o padrao;" >&2
+  echo '      se precisar de varias origens, use o formato ["https://a","https://b"].' >&2
+  exit 1
+fi
+
 COMPOSE=(docker compose --env-file "$ROOT/.env" -p hunter
   -f "$ROOT/infra/docker/docker-compose.yml"
   -f "$ROOT/infra/vps/docker-compose.prod.yml")

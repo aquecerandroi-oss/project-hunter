@@ -27,6 +27,13 @@ compose() { bash "$ROOT/infra/vps/compose.sh" "$@"; }
 umask 077
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR" 2>/dev/null || true
+# Dump do banco inteiro num diretorio legivel por outros e o mesmo que
+# publicar o banco. Se nao der para fechar, nao escreve.
+PERM="$(stat -c '%a' "$BACKUP_DIR" 2>/dev/null || echo '?')"
+if [ "$PERM" != "700" ]; then
+  log "ERRO: $BACKUP_DIR esta com permissao $PERM (esperado 700) - nenhum dump gravado"
+  exit 1
+fi
 
 # "postgres parado" e "compose quebrado" precisam ser coisas diferentes: se
 # qualquer erro (daemon fora, .env sumido, YAML invalido) virasse "parado", o
