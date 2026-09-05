@@ -1,14 +1,35 @@
 ---
 tags: [mercado, exchanges, binance, bybit, m1]
 updated: 2026-09-05
-status: planejado
+status: implementado
 ---
 
 # Exchange Adapters
 
 ## Status
 
-**Planejado para o Milestone 1.** O pacote `packages/exchange-adapters` (`hunter_exchanges`) e as classes `BinanceAdapter`/`BybitAdapter` ainda não existem. O que já existe é só a definição da interface (Protocol) em `docs/ARCHITECTURE.md` §6 e o escopo em `docs/EXCHANGE_INTEGRATION.md`.
+**Binance USDS-M: implementado** (público, commit `97c36ff`, 2026-09-05, T1.2 + T1.2b). **Bybit Linear: planejado** (M1b, mesmo contrato). Conexões privadas continuam Fase 3+.
+
+### Binance USDS-M — o que existe
+
+| Arquivo | Papel |
+|---|---|
+| `packages/exchange-adapters/hunter_exchanges/base.py` | Protocol `ExchangeAdapter`, `ExchangeAdapterExtras` (capacidades T1.2b), `ConnectionState`, `ExchangeError`/`RateLimited` |
+| `.../binance/rest.py` | `exchangeInfo`, `klines`, `ticker/24hr`, `depth`, `premiumIndex`, `fundingRate` (paginado), `openInterest`, `serverTime` |
+| `.../binance/ws.py` + `.../binance/connection.py` | cliente WS combinado, laço de conexão/rotação/backoff, `restart_connection(key)` |
+| `.../binance/subscriptions.py` + `subscription_plan.py` | `update_subscriptions` diff-only, grupos estáveis, JSON-RPC SUBSCRIBE/UNSUBSCRIBE com ACK, catch-up |
+| `.../binance/streams.py` + `normalize.py` | parse de cada canal e de cada rota REST para os `Normalized*` de `hunter_core.domain.market` |
+| `.../binance/event_queue.py` | fila limitada que nunca descarta kline final |
+| `.../rate_limit.py` | token bucket em Redis (`rl:binance:{bucket}`), bucket próprio de histórico de funding, gate de IP com `Retry-After` |
+| `.../testing/` | `FakeExchangeAdapter`, `record.py` e as fixtures gravadas da API pública real |
+
+Decisões que valem como contrato: `fetch_funding()` devolve a **estimativa** do `premiumIndex` com `funding_kind="estimated"` (uma chamada HTTP); o histórico **realizado** sai só de `fetch_realized_funding()` (`/fapi/v1/fundingRate`, `ts` = instante do settlement, paginado). O limite de 1024 streams por conexão é asserido no código (levanta, nunca trunca).
+
+Testes: `uv run pytest packages/exchange-adapters` → **189 passed, 3 skipped**; `HUNTER_LIVE_TESTS=1 uv run pytest packages/exchange-adapters -m live` → **3 passed**, com dado real recebido nas duas rotas (ACK sozinho não conta como prova de vida).
+
+### Limitações conhecidas (aceitas no M1)
+
+Detalhe e cenário de falha de cada uma em `docs/plans/M1.md` → "Limitações conhecidas do M1": cooldown de rate limit não persiste entre processos (M1 assume um processo por IP); reconciliação do header de peso é por instância; rotação de conexão sem sobreposição (buraco do handshake, sub-segundo no caso normal); janela de ~31 s para detectar leitor morto; `last_data_event_*` avança em frame duplicado (o gate de progresso aceito é do worker); fila limitada por número de itens, não por bytes/idade; regenerar fixtures exige rodar o recorder com rede.
 
 ## Escopo do MVP
 

@@ -2,7 +2,7 @@
   "current": "M1",
   "status": "in_progress",
   "approved_at": "2026-09-05",
-  "wave": "1 — T1.1 e contrato do adaptador commitados; T1.6a (Docker) commitado pela Astra; T1.2/T1.3/T1.4/T1.5 em voo (T1.3 com a Astra); decisão conjunta fechada em .claude/state/dialogue-M1.md",
+  "wave": "1 — T1.1 e contrato do adaptador commitados; T1.6a (Docker) commitado pela Astra; T1.2 + T1.2b (adaptador Binance USDS-M público) revisado e commitado em 97c36ff (189 testes offline, 3 live, 16 achados corrigidos); T1.3/T1.4/T1.5 em voo; decisão conjunta fechada em .claude/state/dialogue-M1.md",
   "repo_path": "C:\\dev\\project-hunter",
   "github": "https://github.com/aquecerandroi-oss/project-hunter",
   "paused_reason": null,

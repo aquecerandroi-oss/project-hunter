@@ -1,0 +1,34 @@
+**Not ready to approve T1.2.** Reviewed the tracked diff and untracked files against both requested documents. No files were modified.
+
+**Must-fix**
+
+1. **[P1] Cooldown does not enforce the exchange’s retry deadline.** [rate_limit.py:216](C:/dev/project-hunter/packages/exchange-adapters/hunter_exchanges/rate_limit.py:216) only empties the bucket; refill starts immediately. **Reproduced:** another weight-1 request proceeds after **0.025 seconds**, even if the preceding 429 requested 60 seconds. Concurrent producers can therefore continue sending during cooldown and escalate to an IP ban. Persist a shared blocked-until deadline and enforce it across callers. [Binance’s IP-limit rules](https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/general-info) explicitly require backing off after 429.
+
+2. **[P1] Header reconciliation can restore already-spent shared budget.** [rate_limit.py:180](C:/dev/project-hunter/packages/exchange-adapters/hunter_exchanges/rate_limit.py:180) guards response ordering only within one instance, then overwrites Redis state. **Reproduced:** instance A records 95/100 used; B applies an older reading of 10; A can immediately consume another 90. Concurrent requests also need their outstanding reservations preserved. Reconciliation must be atomic and conservative across processes; “self-correcting on the next response” does not satisfy the shared-IP acceptance criterion.
+
+3. **[P1] Subscription updates can report success without reaching the socket.** [subscriptions.py:184](C:/dev/project-hunter/packages/exchange-adapters/hunter_exchanges/binance/subscriptions.py:184) skips sending when a connection is unavailable, while updating reported subscriptions. **Reproduced:** add ETH during BTC’s handshake; the established URL contains only BTC, but state reports both. BTC traffic keeps connection health green while ETH remains absent until reconnection. Reconcile changes made during opening; also validate error ACKs and expire missing ACKs rather than treating every matching ID as success.
+
+4. **[P1] The internal queue remains unbounded for final candles.** [event_queue.py:54](C:/dev/project-hunter/packages/exchange-adapters/hunter_exchanges/binance/event_queue.py:54) explicitly grows beyond `maxsize` whenever queued and incoming events are finals. The test even asserts this overflow. A blocked consumer eventually accumulates finals without limit, recreating the review kit’s memory-growth failure. Enforce a hard bound with backpressure or observable, recoverable loss.
+
+5. **[P1] Planned rotation lacks jitter and overlap.** [ws.py:246](C:/dev/project-hunter/packages/exchange-adapters/hunter_exchanges/binance/ws.py:246) checks age only before an unbounded `recv()`, then closes the old connection before opening its replacement. Connections started together rotate together, producing a universe-wide gap; trades/liquidations during that gap are lost. A silent socket can also outlive the rotation deadline. Implement timed rotation with jitter and brief overlap, and verify duplicate/late-event handling across that overlap.
+
+6. **[P2] Successful handshakes reset consecutive receive failures.** [ws.py:242](C:/dev/project-hunter/packages/exchange-adapters/hunter_exchanges/binance/ws.py:242) resets `attempt` before any data arrives. **Reproduced:** six immediate receive failures with a configured maximum of three; every backoff remained one second. A flapping endpoint therefore bypasses exponential backoff and the terminal-failure limit. Reset after demonstrated healthy progress.
+
+7. **[P2] `fetch_funding` mixes realized and estimated funding.** [normalize.py:277](C:/dev/project-hunter/packages/exchange-adapters/hunter_exchanges/binance/normalize.py:277) selects the historical settlement rate, attaches the current premium timestamp, and leaves `funding_kind="estimated"`. **Reproduced with fixtures:** historical `0.00001014` becomes a current estimate although premium reports `0.00000649`. Repeated fetches rejuvenate an old settlement. Keep estimated funding sourced from premium; use the separate realized parser for settlements. Its history request also bypasses the dedicated funding-history limiter.
+
+8. **[P2] REST errors escape the adapter exception contract.** [rest.py:173](C:/dev/project-hunter/packages/exchange-adapters/hunter_exchanges/binance/rest.py:173) exposes `httpx.HTTPStatusError`. **Reproduced:** a delisted/invalid symbol returning HTTP 400 escapes as that type, bypassing callers catching `ExchangeError`. Translate exchange failures into the agreed adapter exceptions while retaining useful error details.
+
+**Nice-to-have**
+
+- Add an explicit 1024-stream invariant and deduplicate channel inputs. The present six unique channels yield safe counts, but code currently limits symbols only.
+- Implement `restart_connection(key)` to avoid restarting healthy connections. Its absence remains explicitly nonblocking for M1.
+- Clarify fixture provenance. The recorder describes a hand-built fallback, and the supplied files do not establish which payloads were captured. Real-fixture acceptance remains unproven.
+
+**Agreements**
+
+- Route mapping and unsuffixed `@depth20` match the agreement and [Binance’s routing notice](https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/websocket-market-streams/Important-WebSocket-Change-Notice).
+- Stateless book snapshots preserve `kind="book"` and `is_snapshot=True`; default REST depth resolves to 20.
+- Candle `event_ts=E`, exclusive closing boundaries, exchange-time finality, and separately timestamped realized funding address earlier blockers.
+- Decimal/UTC handling and additive protocols are sound. The documented adapter-liveness versus worker-accepted-progress distinction remains acceptable for M1.
+
+**Validation:** 148 offline tests passed; Pyright, Ruff lint/format, and file-size checks passed. A read-only 20-second live probe received actual payloads for both public channels and market `aggTrade`, `kline_1m`, and `markPrice@1s`. No `forceOrder` arrived; six-channel acceptance remains incomplete, which does not itself prove a liquidation-stream defect.

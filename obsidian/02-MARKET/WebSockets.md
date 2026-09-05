@@ -1,20 +1,26 @@
 ---
 tags: [mercado, websocket, m1]
 updated: 2026-09-05
-status: planejado
+status: implementado
 ---
 
 # WebSockets
 
-Duas camadas distintas de WebSocket no sistema — nenhuma das duas está ligada a dados reais de mercado hoje.
+Duas camadas distintas de WebSocket no sistema.
 
-## 1. WS de mercado (exchange → market-worker) — planejado, M1
+## 1. WS de mercado (exchange → market-worker) — **Binance implementado** (commit `97c36ff`, T1.2 + T1.2b); Bybit planejado
 
-- **Binance:** até 1024 streams por conexão; plano é usar no máximo 200 símbolos × 5 streams = 1000 por conexão (1 conexão por 200 símbolos); reconectar antes das 24 h de vida da conexão.
-- **Bybit:** `subscribe` em lotes de 10 args; heartbeat `ping` a cada 20 s.
-- **Reconexão:** backoff exponencial 1 s → 60 s com jitter; ao reconectar, snapshot REST do book e verificação de gaps de candle.
-- **Book local:** reconstruído a partir de snapshot + diffs (Binance) ou snapshot/delta (Bybit); checagem de sequência; ressincronização ao detectar salto.
-- **Heartbeat:** `hb:market:{exchange}` com `last_event_at`; `/system` mostrará `stale` se > 10 s.
+- **Duas rotas, não uma** (aviso oficial da Binance): `wss://fstream.binance.com/public/stream` para `@depth20` e `@bookTicker`; `wss://fstream.binance.com/market/stream` para `@aggTrade`, `@kline_1m`, `@markPrice@1s` e `@forceOrder`. Com 200 símbolos: 400 streams na rota public e 800 na market. Rotas conferidas contra a doc oficial e, de forma independente, contra `ccxt` e `python-binance`.
+- **Limite de 1024 streams por conexão** (streams, não símbolos): asserido no código em cada ponto que altera grupos — levanta erro em vez de truncar. Grupos de até 200 símbolos por conexão.
+- **`@depth20` sem sufixo**, tratado como substituição integral do snapshot top 20: sem livro local, sem acumulação de deltas, níveis ausentes do snapshot novo somem. Reconciliação de profundidade pelo REST.
+- **Assinaturas incrementais:** `update_subscriptions(added, removed, channels)` recalcula o universo e manda só o diff (JSON-RPC `SUBSCRIBE`/`UNSUBSCRIBE` com `id` e ACK), preservando as assinaturas dos símbolos que ficaram; `UNSUBSCRIBE` vai antes de `SUBSCRIBE` para o transitório nunca passar de 1024. Diff que chega no meio do handshake é reconciliado por catch-up. ACK de erro (ou ACK que não chega) derruba os nomes do estado e reinicia **só** aquela conexão.
+- **Reconexão:** backoff exponencial 1 s → 60 s com jitter; `recv()` com deadline, então a rotação anterior às 24 h dispara mesmo em socket silencioso e um socket ocioso/meio-aberto é detectado dentro do adapter; `restart_connection(key)` reinicia uma conexão sem derrubar as outras.
+- **Prova de vida:** `ConnectionState` só avança `last_data_event_*` com frame de dado bem-formado — ACK de controle e payload malformado (inclusive `bookTicker` vazio) não contam e não zeram o backoff.
+- **Contrapressão:** `BoundedEventQueue` limita a fila interna do adapter e **nunca** descarta um kline final; sob saturação o produtor espera em vez de estourar memória.
+- **Bybit:** `subscribe` em lotes de 10 args; heartbeat `ping` a cada 20 s — ainda planejado (M1b, mesmo contrato).
+- **Heartbeat:** `hb:market:{exchange}` com `last_event_at`; `/system` mostra `stale` se > 10 s.
+
+Limitações conhecidas aceitas no M1 (cenário de falha em `docs/plans/M1.md`): rotação sem sobreposição — a conexão fecha e só então a substituta abre, deixando um buraco do tamanho do handshake a cada ~23,5 h por conexão; janela de ~31 s para detectar leitor morto; fila limitada por itens, não por bytes/idade.
 
 ## 2. WS da aplicação (api → browser) — infraestrutura existe, sem dado real ainda
 

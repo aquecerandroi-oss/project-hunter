@@ -9,6 +9,7 @@ Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado p
 
 ## 2026-09-05
 
+- `97c36ff` feat(exchanges): Binance USDS-M public REST + WS adapter — duas rotas (`/public` e `/market`), assinaturas incrementais (`update_subscriptions` diff-only com ACK e catch-up), funding realizado paginado, fila limitada que nunca descarta kline final, rate limit por tentativa com gate de IP (T1.2 + T1.2b). 189 testes offline + 3 live (dado real nas duas rotas). Revisado por `code-reviewer`, revisão cruzada do `exchange-integration-specialist` e Astra adversarial; 16 achados corrigidos. Ver [[Exchange Adapters]] e [[WebSockets]].
 - `a522bf1` docs(m1): DECISÃO CONJUNTA Claude⇄Astra — acceptance checklist for T1.2/T1.3/T1.4/T1.6
 - `c58d4d1` docs(m1): joint Claude⇄Astra decision folded into the plan (recovery, liquidation identity ON CONFLICT (id, ts), supervision, per-component stalenes
 - `becf1d9` docs(m1): Binance WS routes and @depth20 per official notice; Claude⇄Astra dialogue rounds 1–2 with concrete contracts (recovery, liquidation dedu

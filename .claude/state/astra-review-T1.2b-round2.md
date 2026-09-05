@@ -1,0 +1,21 @@
+**Two items are fully resolved: #4 and #8.** Items #3, #5, and #6 are partially fixed; #1, #2, and #7 remain known limitations. I found one new regression.
+
+| Original item | Status | Re-review finding |
+|---|---|---|
+| **1. Cooldown deadline** | **Open — known limitation** | Still empties the bucket without persisting a blocked-until deadline. |
+| **2. Shared-weight reconciliation** | **Open — known limitation** | Cross-process reconciliation remains non-atomic and can restore spent budget. |
+| **3. Subscription correctness** | **Partially fixed** | Reported state now changes only after sending, but handshake-time updates remain unapplied until reconnect. Error/missing ACK recovery remains absent. |
+| **4. Bounded queue** | **Resolved** | Final-only saturation now blocks producers until space becomes available, preserving the hard bound. |
+| **5. Planned rotation** | **Partially fixed; new regression** | Jitter exists, but extends deadlines beyond 24 hours. No overlap remains a known limitation; blocking `recv()` still prevents timely rotation of silent sockets. |
+| **6. Reconnect counter** | **Partially fixed** | Bare handshakes no longer reset it, but ACKs and malformed frames do—before validating data. |
+| **7. Funding semantics** | **Open — known limitation** | Realized and estimated funding remain mixed; `fetch_funding` also still bypasses the dedicated history limiter. |
+| **8. REST exception contract** | **Resolved** | Other HTTP 4xx responses become non-retryable `ExchangeError`, retaining response details and the original exception as cause. |
+
+**New issue — [P1] Jitter defeats proactive rotation.** At [ws.py:245](C:/dev/project-hunter/packages/exchange-adapters/hunter_exchanges/binance/ws.py:245), `23.5h × (1 + random × 0.1)` yields deadlines up to **25.85 hours**. With `rand=0.5`, the deadline is **24.675 hours**, beyond the intended 24-hour ceiling. Jitter should move rotation earlier or remain capped below that ceiling.
+
+Two remaining gaps prevent closing the partially fixed items:
+
+- **#3 [P1]:** Reproduced adding ETH during BTC’s handshake: the URL contains only BTC, no control frame is sent after opening, and desired membership contains ETH while actual/reported subscriptions omit it. Gating fixes the false report but leaves ETH absent. [subscriptions.py:182](C:/dev/project-hunter/packages/exchange-adapters/hunter_exchanges/binance/subscriptions.py:182) also updates state before ACK confirmation; [ACK handling](C:/dev/project-hunter/packages/exchange-adapters/hunter_exchanges/binance/subscriptions.py:207) only logs nested errors and provides no expiration or recovery.
+- **#6 [P2]:** Reproduced six connections each receiving an ACK then failing, with a failure limit of three: all six backoffs remained **1 second**, with no data progress. The reset at [ws.py:253](C:/dev/project-hunter/packages/exchange-adapters/hunter_exchanges/binance/ws.py:253) must follow validated data progress.
+
+Validation: **152 unit tests passed**, plus in-memory reproduction probes. Reviewed the tracked diff and relevant untracked implementation/tests against the prior review. **No files modified.**
