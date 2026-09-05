@@ -43,3 +43,7 @@ Thumbs.db
 
 # intermediate OpenAPI dump (only the generated .d.ts is committed)
 packages/shared-types/openapi.json
+
+# Obsidian per-user UI state (the vault itself and app.json are versioned)
+vault/.obsidian/workspace*.json
+vault/.obsidian/cache
