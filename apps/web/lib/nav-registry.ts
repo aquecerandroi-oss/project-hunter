@@ -1,30 +1,15 @@
-import {
-  Activity,
-  BarChart3,
-  Bell,
-  Bot,
-  Brain,
-  Building2,
-  FlaskConical,
-  GitBranch,
-  LayoutDashboard,
-  LineChart,
-  type LucideIcon,
-  Radar,
-  Server,
-  Settings,
-  ShieldAlert,
-  Swords,
-  Target,
-  Wallet,
-} from "lucide-react";
-
 /**
  * The single source of the sidebar (docs/ARCHITECTURE.md §8, docs/PRODUCT.md
  * §4). Every route the product will ever have is listed here from M0, with a
  * `status` and the milestone it unlocks at -- an item never renders in
  * production before its milestone (see `visibleNavItems` and CLAUDE.md's "no
  * placeholder / coming soon pages in the nav" rule).
+ *
+ * Items are PLAIN DATA on purpose: the org layout (a Server Component)
+ * computes them and hands them to the client sidebar/mobile nav, and React
+ * only lets serialisable values cross that boundary -- no functions, no
+ * component references. So the href is a `segment` (resolved by `navHref`)
+ * and the icon is a key resolved on the client by `components/layout/nav-icons`.
  */
 
 export type Role = "OWNER" | "ADMIN" | "TRADER" | "ANALYST" | "VIEWER";
@@ -39,40 +24,64 @@ const ROLE_RANK: Record<Role, number> = {
 
 export type NavStatus = "available" | "planned";
 
+export const NAV_ICON_KEYS = [
+  "layout-dashboard",
+  "radar",
+  "line-chart",
+  "target",
+  "wallet",
+  "activity",
+  "bot",
+  "swords",
+  "git-branch",
+  "flask-conical",
+  "bar-chart-3",
+  "brain",
+  "shield-alert",
+  "building-2",
+  "bell",
+  "server",
+  "settings",
+] as const;
+
+export type NavIconKey = (typeof NAV_ICON_KEYS)[number];
+
 export interface NavItem {
   key: string;
   label: string;
-  href: (orgSlug: string) => string;
-  icon: LucideIcon;
+  /** Path segment under `/{orgSlug}/`; build the full href with `navHref`. */
+  segment: string;
+  icon: NavIconKey;
   status: NavStatus;
   /** Milestone or phase this ships in, e.g. "M2" or "Fase 2". Required when planned. */
   plannedMilestone?: string;
   minRole: Role;
 }
 
-function route(segment: string): (orgSlug: string) => string {
-  return (orgSlug: string) => `/${orgSlug}/${segment}`;
+/** Org-scoped href for an item, e.g. `/acme/dashboard`. */
+export function navHref(item: Pick<NavItem, "segment">, orgSlug: string): string {
+  return `/${orgSlug}/${item.segment}`;
 }
 
 // docs/PRODUCT.md §4 -- table order preserved.
 export const NAV_ITEMS: readonly NavItem[] = [
-  { key: "dashboard", label: "Dashboard", href: route("dashboard"), icon: LayoutDashboard, status: "available", minRole: "VIEWER" },
-  { key: "radar", label: "Radar", href: route("radar"), icon: Radar, status: "planned", plannedMilestone: "M2", minRole: "VIEWER" },
-  { key: "markets", label: "Markets", href: route("markets"), icon: LineChart, status: "planned", plannedMilestone: "M1", minRole: "VIEWER" },
-  { key: "opportunities", label: "Opportunities", href: route("opportunities"), icon: Target, status: "planned", plannedMilestone: "M2", minRole: "VIEWER" },
-  { key: "portfolio", label: "Portfolio", href: route("portfolio"), icon: Wallet, status: "planned", plannedMilestone: "M3", minRole: "VIEWER" },
-  { key: "trades", label: "Trades", href: route("trades"), icon: Activity, status: "planned", plannedMilestone: "M3", minRole: "VIEWER" },
-  { key: "agents", label: "Agents", href: route("agents"), icon: Bot, status: "planned", plannedMilestone: "M4", minRole: "VIEWER" },
-  { key: "arena", label: "Agent Arena", href: route("arena"), icon: Swords, status: "planned", plannedMilestone: "M6", minRole: "VIEWER" },
-  { key: "strategies", label: "Strategies", href: route("strategies"), icon: GitBranch, status: "planned", plannedMilestone: "M6", minRole: "VIEWER" },
-  { key: "backtests", label: "Backtests", href: route("backtests"), icon: FlaskConical, status: "planned", plannedMilestone: "M6", minRole: "VIEWER" },
-  { key: "analytics", label: "Analytics", href: route("analytics"), icon: BarChart3, status: "planned", plannedMilestone: "M5", minRole: "VIEWER" },
-  { key: "intelligence", label: "Intelligence", href: route("intelligence"), icon: Brain, status: "planned", plannedMilestone: "Fase 2", minRole: "VIEWER" },
-  { key: "risk", label: "Risk Center", href: route("risk"), icon: ShieldAlert, status: "planned", plannedMilestone: "M4", minRole: "VIEWER" },
-  { key: "exchanges", label: "Exchanges", href: route("exchanges"), icon: Building2, status: "planned", plannedMilestone: "Fase 3", minRole: "VIEWER" },
-  { key: "alerts", label: "Alerts", href: route("alerts"), icon: Bell, status: "planned", plannedMilestone: "Fase 2", minRole: "VIEWER" },
-  { key: "system", label: "System", href: route("system"), icon: Server, status: "available", minRole: "VIEWER" },
-  { key: "settings", label: "Settings", href: route("settings"), icon: Settings, status: "available", minRole: "VIEWER" },
+  { key: "dashboard", label: "Dashboard", segment: "dashboard", icon: "layout-dashboard", status: "available", minRole: "VIEWER" },
+  { key: "radar", label: "Radar", segment: "radar", icon: "radar", status: "planned", plannedMilestone: "M2", minRole: "VIEWER" },
+  { key: "markets", label: "Markets", segment: "markets", icon: "line-chart", status: "planned", plannedMilestone: "M1", minRole: "VIEWER" },
+  { key: "opportunities", label: "Opportunities", segment: "opportunities", icon: "target", status: "planned", plannedMilestone: "M2", minRole: "VIEWER" },
+  { key: "portfolio", label: "Portfolio", segment: "portfolio", icon: "wallet", status: "planned", plannedMilestone: "M3", minRole: "VIEWER" },
+  { key: "trades", label: "Trades", segment: "trades", icon: "activity", status: "planned", plannedMilestone: "M3", minRole: "VIEWER" },
+  { key: "agents", label: "Agents", segment: "agents", icon: "bot", status: "planned", plannedMilestone: "M4", minRole: "VIEWER" },
+  { key: "arena", label: "Agent Arena", segment: "arena", icon: "swords", status: "planned", plannedMilestone: "M6", minRole: "VIEWER" },
+  { key: "strategies", label: "Strategies", segment: "strategies", icon: "git-branch", status: "planned", plannedMilestone: "M6", minRole: "VIEWER" },
+  { key: "backtests", label: "Backtests", segment: "backtests", icon: "flask-conical", status: "planned", plannedMilestone: "M6", minRole: "VIEWER" },
+  { key: "analytics", label: "Analytics", segment: "analytics", icon: "bar-chart-3", status: "planned", plannedMilestone: "M5", minRole: "VIEWER" },
+  { key: "intelligence", label: "Intelligence", segment: "intelligence", icon: "brain", status: "planned", plannedMilestone: "Fase 2", minRole: "VIEWER" },
+  { key: "risk", label: "Risk Center", segment: "risk", icon: "shield-alert", status: "planned", plannedMilestone: "M4", minRole: "VIEWER" },
+  { key: "exchanges", label: "Exchanges", segment: "exchanges", icon: "building-2", status: "planned", plannedMilestone: "Fase 3", minRole: "VIEWER" },
+  { key: "alerts", label: "Alerts", segment: "alerts", icon: "bell", status: "planned", plannedMilestone: "Fase 2", minRole: "VIEWER" },
+  { key: "system", label: "System", segment: "system", icon: "server", status: "available", minRole: "VIEWER" },
+  { key: "settings", label: "Settings", segment: "settings", icon: "settings", status: "available", minRole: "VIEWER" },
 ];
 
 /**

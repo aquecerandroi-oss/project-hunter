@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 
 import { PlannedBadge } from "@/components/layout/planned-badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { NavItem } from "@/lib/nav-registry";
+import { NAV_ICONS } from "@/components/layout/nav-icons";
+import { type NavItem, navHref } from "@/lib/nav-registry";
 import { cn } from "@/lib/utils";
 
 export interface NavLinksProps {
@@ -22,7 +23,7 @@ export function NavLinks({ items, orgSlug, collapsed = false, onNavigate = () =>
   return (
     <nav className="flex flex-col gap-1" aria-label="Navegação principal">
       {items.map((item) => {
-        const Icon = item.icon;
+        const Icon = NAV_ICONS[item.icon];
         const label = <span className={cn("truncate", collapsed && "sr-only")}>{item.label}</span>;
 
         if (item.status === "planned") {
@@ -65,7 +66,7 @@ export function NavLinks({ items, orgSlug, collapsed = false, onNavigate = () =>
           );
         }
 
-        const href = item.href(orgSlug);
+        const href = navHref(item, orgSlug);
         const isActive = pathname === href;
 
         return (

@@ -14,22 +14,23 @@ afterEach(cleanup);
 import { NavLinks } from "@/components/layout/nav-links";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { NavItem } from "@/lib/nav-registry";
-import { LayoutDashboard, Radar } from "lucide-react";
 
+// Plain data, exactly what the Server Component layout passes across the
+// client boundary (no functions, no component references).
 const items: NavItem[] = [
   {
     key: "dashboard",
     label: "Dashboard",
-    href: (orgSlug: string) => `/${orgSlug}/dashboard`,
-    icon: LayoutDashboard,
+    segment: "dashboard",
+    icon: "layout-dashboard",
     status: "available",
     minRole: "VIEWER",
   },
   {
     key: "radar",
     label: "Radar",
-    href: (orgSlug: string) => `/${orgSlug}/radar`,
-    icon: Radar,
+    segment: "radar",
+    icon: "radar",
     status: "planned",
     plannedMilestone: "M2",
     minRole: "VIEWER",
@@ -43,6 +44,15 @@ function renderNav(collapsed = false) {
     </TooltipProvider>,
   );
 }
+
+describe("NavLinks available item", () => {
+  it("links to the org-scoped href and marks the current page", () => {
+    renderNav();
+    const link = screen.getByRole("link", { name: /dashboard/i });
+    expect(link).toHaveAttribute("href", "/acme/dashboard");
+    expect(link).toHaveAttribute("aria-current", "page");
+  });
+});
 
 describe("NavLinks planned item accessibility", () => {
   it("renders the planned item as a focusable element in the tab order", () => {
