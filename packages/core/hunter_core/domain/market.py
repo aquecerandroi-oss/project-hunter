@@ -265,11 +265,19 @@ class NormalizedCandle(_ReceivedAtMixin):
     trade_count: int | None = None
     taker_buy_volume: Decimal | None = None
     is_final: bool
+    event_ts: datetime | None = None
+    """Exchange push time (Binance kline ``E``), UTC-aware when set; used by the
+    market-worker to order same-``open_time`` partials — newest ``event_ts`` wins."""
 
     @field_validator("open_time", "close_time", mode="after")
     @classmethod
     def _times_are_utc(cls, v: datetime) -> datetime:
         return ensure_utc(v)
+
+    @field_validator("event_ts", mode="after")
+    @classmethod
+    def _event_ts_is_utc(cls, v: datetime | None) -> datetime | None:
+        return None if v is None else ensure_utc(v)
 
     @model_validator(mode="after")
     def _check_invariants(self) -> NormalizedCandle:
@@ -292,6 +300,11 @@ class NormalizedFunding(_TsUtcMixin, _ReceivedAtMixin):
     next_funding_time: datetime | None = None
     mark_price: Decimal
     index_price: Decimal | None = None
+    funding_kind: Literal["estimated", "realized"] = "estimated"
+    """``estimated`` = premiumIndex/markPrice stream reading (not yet settled);
+    ``realized`` = settled funding from ``/fapi/v1/fundingRate``."""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    """Labelled raw extras from the exchange payload — ``docs/EXCHANGE_INTEGRATION.md`` §2."""
 
     @field_validator("next_funding_time", mode="after")
     @classmethod

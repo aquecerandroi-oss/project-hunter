@@ -183,6 +183,26 @@ def test_normalized_funding_constructs() -> None:
     assert _funding().funding_rate == Decimal("0.0001")
 
 
+def test_normalized_candle_event_ts_defaults_none() -> None:
+    assert _candle().event_ts is None
+
+
+def test_normalized_candle_event_ts_accepts_aware() -> None:
+    assert _candle(event_ts=T0).event_ts == T0
+
+
+def test_normalized_funding_kind_defaults_estimated() -> None:
+    assert _funding().funding_kind == "estimated"
+
+
+def test_normalized_funding_kind_accepts_realized() -> None:
+    assert _funding(funding_kind="realized").funding_kind == "realized"
+
+
+def test_normalized_funding_metadata_defaults_empty() -> None:
+    assert _funding().metadata == {}
+
+
 def test_normalized_open_interest_constructs() -> None:
     assert _open_interest().open_interest == Decimal("1234.5")
 
@@ -207,6 +227,16 @@ def test_naive_datetime_rejected_on_received_at() -> None:
 def test_naive_datetime_rejected_on_candle_open_time() -> None:
     with pytest.raises(ValidationError):
         _candle(open_time=NAIVE, close_time=NAIVE + timedelta(minutes=1))
+
+
+def test_naive_datetime_rejected_on_candle_event_ts() -> None:
+    with pytest.raises(ValidationError):
+        _candle(event_ts=NAIVE)
+
+
+def test_invalid_funding_kind_rejected() -> None:
+    with pytest.raises(ValidationError):
+        _funding(funding_kind="bogus")
 
 
 def test_negative_qty_rejected_on_book_level() -> None:
@@ -442,6 +472,28 @@ def test_wire_round_trip_preserves_decimal_precision(value: Decimal) -> None:
     restored = from_wire(NormalizedTicker, to_wire(ticker))
     assert restored.last == value
     assert str(restored.last) == str(value)
+
+
+def test_wire_round_trip_candle_with_event_ts() -> None:
+    candle = _candle(event_ts=T0 + timedelta(seconds=1))
+    restored = from_wire(NormalizedCandle, to_wire(candle))
+    assert restored == candle
+    assert restored.event_ts == T0 + timedelta(seconds=1)
+
+
+def test_wire_round_trip_candle_without_event_ts() -> None:
+    candle = _candle()
+    restored = from_wire(NormalizedCandle, to_wire(candle))
+    assert restored == candle
+    assert restored.event_ts is None
+
+
+def test_wire_round_trip_funding_realized_with_metadata() -> None:
+    funding = _funding(funding_kind="realized", metadata={"raw_event": "fundingRate"})
+    restored = from_wire(NormalizedFunding, to_wire(funding))
+    assert restored == funding
+    assert restored.funding_kind == "realized"
+    assert restored.metadata == {"raw_event": "fundingRate"}
 
 
 # --- discriminated union -------------------------------------------------------------------
