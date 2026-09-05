@@ -173,6 +173,35 @@ Máquina de um dono só, login apenas por chave; a própria Astra registra que
 rootless não protege contra o comprometimento da conta que tem `NOPASSWD`.
 Revisar se algum dia mais alguém tiver conta na máquina.
 
+### Segunda rodada, só sobre as correções — `.claude/state/astra-review-vps-fixes.md`
+
+Quatro must-fix, todos aplicados (commit `9690369` + este):
+
+| Achado | O que fiz |
+|---|---|
+| temporário do `.env` com `$$` é nome previsível: dá para plantar symlink e desviar os segredos | `mktemp "$ENV_PATH.XXXXXX"` |
+| `chmod 700` do `/opt/backups` era best-effort e engolia o erro — dump do banco inteiro em diretório legível por outros | recusa gravar se não estiver `700`; e o bootstrap já cria assim |
+| `.env.example:13` ainda traz `CORS_ALLOWED_ORIGINS=http://localhost:3000`, e o compose base importa o `.env` — quem copiar o exemplo derruba a api | preflight no `compose.sh` que aborta com a explicação; correção de verdade é em `apps/api`, fora deste escopo |
+| o comentário prometia colar várias linhas de uma vez, mas o prompt lê uma linha por vez | promessa corrigida no comentário |
+
+Confirmou como corretos: `as_deploy`, `count_ssh_keys`, checagem de versão do
+Compose, `mktemp -d` do uv, `reload-or-restart` do fail2ban, `exit 1` no
+backup, sintaxe do filtro de log do Caddy.
+
+### Verificação independente na máquina (2026-09-05, `ssh hunter-vps`)
+
+```
+Docker 29.8.0 · docker compose 5.5.1 · node v22.23.2 · pnpm 11.25.0 · uv 0.12.9
+ufw active — 22/tcp, 80/tcp, 443/tcp (v4 e v6); default deny incoming
+sshd -T → passwordauthentication no · kbdinteractiveauthentication no
+fail2ban active — jail sshd viva (5 tentativas de bot já barradas)
+swap 4G · usuário hunter no grupo docker · /opt/backups 700 hunter
+ss -ltnp → só 22 público (53 é o resolver local); nada mais escutando fora
+/opt/project-hunter em 9690369, dono hunter
+bash -n limpo nos quatro scripts sob o bash 5.2.21 da própria VPS
+backup_postgres.sh sem stack de pé → ERRO explícito + exit 1 (não finge sucesso)
+```
+
 ## Depois que a VPS estiver de pé
 
 Sessões de desenvolvimento por SSH (o sandbox do Codex funciona em Linux, ao

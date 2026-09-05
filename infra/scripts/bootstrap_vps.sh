@@ -321,6 +321,10 @@ fi
 step "repositorio em $TARGET_DIR"
 $SUDO mkdir -p "$TARGET_DIR" "$BACKUP_DIR"
 $SUDO chown "$DEPLOY_USER:$DEPLOY_USER" "$TARGET_DIR" "$BACKUP_DIR"
+# 700 no diretorio de backup: um dump -Fc do banco inteiro num diretorio que
+# todo mundo le e o mesmo que publicar o banco. backup_postgres.sh recusa
+# gravar se nao estiver assim.
+$SUDO chmod 700 "$BACKUP_DIR"
 if [ -d "$TARGET_DIR/.git" ]; then
   as_deploy git -C "$TARGET_DIR" fetch --quiet origin "$BRANCH"
   as_deploy git -C "$TARGET_DIR" checkout --quiet "$BRANCH"
