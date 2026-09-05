@@ -1,32 +1,44 @@
 # Plantão da Sexta-feira — nota do turno
 
-Atualizado: 2026-09-05, turno da noite (fechamento do M1).
+Atualizado: 2026-09-05, madrugada (fechamento do M1).
 
-## O que mudou desde o último turno
-- **T1.6b commitada** (`b8998cc`): parse leve no adaptador, hot state em lote e sharding do universo
-  com eleição de líder (`MARKET_SHARD=i/N`). Processo solo mantém o comportamento do M1.
-- **T1.7 commitada** (`66b8eb4`): `tests/integration` (pipeline inteiro, invariantes, recovery,
-  supervisão), `tests/e2e/markets.spec.ts` e passo nomeado na CI. 34 passed, 6 skipped (ao vivo).
-- **Decisão conjunta do Shadow Lab** (`fc336d9`): contrato fechado em 3 rodadas, tarefa S0 criada,
-  `EXP-0001`/`EXP-0002` reservados ao Shadow e `EXP-0003` ao M2, `AGENTS.md` dá à Astra o mesmo
-  toolkit dos agentes Claude.
-- **Memória atualizada** (etapa 1 deste turno): changelog com os três commits, `Dialogos/SHADOW.md`
-  nova com a decisão integral e o aceite S0–S4, contrato do Lab em `Architecture Decisions`,
-  `Experiments Index` + `_TEMPLATE-EXP` reescritos (reserva de IDs, protocolo congelado, avaliações
-  acrescentadas, carteira não aplicável), `Momentum Agent`/`Volume Agent` em `planejado-sombra`,
-  `Market Collector` com sharding e `tracking_hold` previsto, `Mente da Sexta-feira` com o toolkit da
-  Astra e duas lições novas, diário do dia com a sessão da noite.
+## O que mudou neste turno
+- **Memória** (`e254145`): changelog dos três commits, `Dialogos/SHADOW.md` com a decisão conjunta
+  integral e o aceite S0–S4, contrato do Lab em `Architecture Decisions`, `Experiments Index` e
+  `_TEMPLATE-EXP` reescritos, agentes em `planejado-sombra`, `Market Collector` e
+  `Mente da Sexta-feira` atualizadas, diário do dia.
+- **CRITICAL corrigido** (`4f9ab28`): `shard_symbols` com `encode("ascii")` cegava os 200 mercados
+  (a Binance lista perpétuos com símbolo em chinês, quatro no top 100). Mais dois HIGH e dois
+  MEDIUM que as revisões dessa correção trouxeram.
+- **Prova da T1.6b** (`3167360`, `fa24346`): três topologias medidas contra a Binance ao vivo.
+  200 mercados são alcançáveis (4 shards × 50 → `markets_ok` 198/200 = 99,0%), mas **não foram
+  entregues**: com N > 1 shards o heartbeat é compartilhado e a página System mente. No ar ficou
+  **um processo × 50 mercados, `markets_ok` 50/50 = 100%**.
+- **Relatório do M1** (`fc3e56f`): formato estendido, todo número com comando colado.
+
+## Estado do M1
+**Aprovação SUSPENSA por um item só**, objetivo:
+`apps/api/tests/integration/test_webhook.py::test_a_crash_where_even_the_release_never_runs_still_recovers_after_the_stale_window`
+falha 3 em 3 com a máquina ociosa — vermelho reprodutível carregado desde a T1.3. Despachado ao
+`backend-specialist` com a instrução de decidir com evidência entre defeito de idempotência e teste
+que promete o que a implementação nunca prometeu, **sem** alargar timeout até passar.
+
+Assim que a suíte `apps/api` fechar verde: escrever a linha de aprovação no topo de
+`docs/reports/M1.md`, mudar `.claude/state/milestone.json` para M2 (`status: planned`, onda 1 =
+T2.1 + T2.2, com T2.1 referenciando `0002_shadow_lab`), acrescentar o item ao changelog e ao
+diário, commitar e dar push.
 
 ## Em voo (não tocar nos arquivos)
 | Tarefa | Dono | Arquivos |
 |---|---|---|
-| S0 — migração `0002_shadow_lab` | `database-architect` | `infra/migrations/**`, `hunter_core/db/models/agents.py`, `domain/enums.py`, `hunter_core/strategies/canonical.py` |
-| S1 — `hunter_core.strategies` | `quant-engineer` | `packages/core/hunter_core/strategies/**` |
+| S2 — strategy-worker sombra | `backend-specialist` | `services/strategy-worker/**`, `packages/core/hunter_core/events/streams.py` |
+| webhook vermelho | `backend-specialist` | `apps/api/hunter_api/services/clerk_webhook.py`, `apps/api/tests/integration/test_webhook.py` |
 
-## Em curso neste turno
-- Etapa 2: prova da T1.6b contra a Binance real com 200 mercados (`.claude/state/t16b-proof.md`).
-- Etapa 3: completar `docs/reports/M1.md` e decidir a aprovação do M1 pela delegação do Everton.
+`ruff check .` no repositório inteiro está vermelho com 5 erros — **todos em
+`services/strategy-worker/`**, código da S2 em voo. Nos caminhos do M1 está limpo.
+
+## Primeira dívida a entrar no M2
+**Heartbeat por shard com agregação na API.** É o que libera os 200 mercados já provados.
 
 ## Precisa do Everton
-- Nada bloqueante. Opcional: `.env` e logins na VPS (`ssh hunter-vps`); colar o hook `Stop` de voz no
-  `.claude/settings.json`.
+- Nada bloqueante. Opcional: `.env` e logins na VPS (`ssh hunter-vps`).
