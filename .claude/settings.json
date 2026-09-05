@@ -9,6 +9,15 @@
             "command": "if command -v node >/dev/null 2>&1; then node .claude/hooks/protect-secrets.mjs; fi"
           }
         ]
+      },
+      {
+        "matcher": "Read|Grep|Glob|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v node >/dev/null 2>&1; then node .claude/hooks/vault-mcp-only.mjs; fi"
+          }
+        ]
       }
     ],
     "SessionStart": [

@@ -34,4 +34,6 @@ Before adding an entry, count `MEMORY.md`'s non-blank lines. Past 130, sanitize 
 3. Rewrite the index with what's left, then add the new entry.
 
 ## Tier two — long-term store
-`docs/decisions/` (Architecture Decision Records, Portuguese, template in `docs/decisions/README.md`). Accessed by direct file edit; one ADR per decision, numbered, never rewritten — superseded ADRs get a "Substituído por" line.
+Two destinations, by kind:
+- **Architecture decisions** → `docs/decisions/` (ADRs, Portuguese, template in `docs/decisions/README.md`). Direct file edit; numbered, never rewritten — superseded ADRs get a "Substituído por" line.
+- **Everything else worth keeping** (business rules, lessons, references, project/area notes, daily logs) → the Obsidian vault `vault/` (structure and templates in `vault/README.md`). Written **only through the vault MCP tools** configured in `.mcp.json`; direct Read/Write/Edit on `vault/` is blocked by `.claude/hooks/vault-mcp-only.mjs` (read-only exception for `vault/daily/` and `vault/templates/`). Migration order from tier one: dedup (search the vault) → match the folder template → create → read back → only then delete the index line.
