@@ -32,11 +32,25 @@ status: parcial
 
 Configuração em `.env.example`: `MARKET_EXCHANGE_CODE`, `MARKET_UNIVERSE_ALLOWLIST`/`BLOCKLIST`, `MARKET_UNIVERSE_REFRESH_S`, `MARKET_OI_POLL_S`, `MARKET_SNAPSHOT_INTERVAL_S`, `MARKET_STALE_AFTER_S`.
 
+## Sharding e capacidade (T1.6b, `b8998cc`)
+
+A T1.6 provou que **um processo satura um core com 200 mercados** e o hot state de alta frequência não se sustenta. A T1.6b atacou isso em três frentes, e a terceira mudou a topologia do worker:
+
+| Frente | O que mudou | Arquivos |
+|---|---|---|
+| A — parse do adaptador | `model_construct` nos parsers quentes com guardas explícitas, cadência do book em `@depth20@500ms` (era 250 ms), varredura de fila mais barata | `hunter_exchanges/binance/{streams,normalize,event_queue,ws}.py` |
+| B — caminho quente do worker | um `EVALSHA` por ticker aceito, pipeline Redis por ciclo (ticker + book + ticks + publish juntos), janela de dedupe de trades em memória, caminhos rápidos de candle (`LSET`/`LPUSH`) em vez de reescrever a lista | `hot_state.py`, `hot_state_candles.py`, `coalesce.py`, `ingest.py`, `streaming.py` |
+| C — sharding | `MARKET_SHARD=i/N` validado na construção, fatia do universo por `crc32` do símbolo, **um líder por exchange** com lock por token e snapshot versionado por CAS, seguidores lendo o snapshot (ou o Postgres na falta dele) | `universe.py`, `universe_leader.py`, `config.py`, `heartbeat.py`, `main.py`, `hunter_core/settings.py` |
+
+**Regra de compatibilidade:** o processo **solo** (sem `MARKET_SHARD`) mantém exatamente o comportamento do M1 — sem lock, sem snapshot. O sharding só entra quando existe mais de um processo, e nesse caso apenas o líder recalcula o universo e faz o upsert de `assets`/`markets`; os seguidores consomem o snapshot versionado. Isso evita duas instâncias disputando `ingestion_gaps` e `monitor_rank`.
+
+**`tracking_hold` (previsto, ainda não implementado).** A [[Dialogos/SHADOW|decisão conjunta do Shadow Lab]] acrescenta um contrato ao Market Collector: um mercado que sai do universo monitorado, mas tem acompanhamento sombra `pending_entry` ou `active`, **continua com suas velas coletadas até o término do acompanhamento**. O hold é derivado do estado durável (`shadow_episodes`), reconciliado após restart, e é por acompanhamento — encerrar a v1 de uma estratégia não libera a coleta que a v2 ainda precisa. Impossibilidade de recuperar o dado gera censura explícita, nunca preço antigo. Entra em S2 (`services/market-worker/**`, só `tracking_hold`), depois de S0 e S1.
+
 ## O que falta
 
-- **Integração real com o adaptador Binance da T1.2** — o worker foi desenvolvido e testado contra um `FakeAdapter` que implementa o Protocol. As duas peças nunca rodaram juntas contra a Binance por mais de um ciclo.
-- **Prova operacional (T1.6)** — subir `docker compose`, rodar `HUNTER_ROLE=market`, e mostrar preço vivo em `mkt:binance:BTCUSDT:ticker`, `ts` avançando, e linhas reais em `candles_1m` / `market_snapshots`. Sem isso, esta página não vira `implementado`.
-- **Agendamento diário de `infra/scripts/create_partitions.py`** — hoje o worker só *detecta* a falta de partição. Dono: T1.6/ops.
+- **Corrida longa (24–48 h)** — a prova da T1.6 durou ~1h50 e a da T1.6b, 15 min. Falta uma corrida contínua longa e um apagão externo atravessando reinícios.
+- **Prazo de convergência do backlog de recovery** — hoje não há prazo definido para o backfill fechar os gaps abertos depois de uma interrupção.
+- **`tracking_hold` do Shadow Lab** — contratado na decisão SHADOW, implementado em S2.
 - **Follow-ups registrados em `docs/plans/M1.md`**: `command_timeout` de 30 s valendo para o engine da API; `market_snapshots.ts` como bucket do minuto e não instante da coleta; sufixo REST parcial no bootstrap; duplicidade de `ingestion_gaps` com duas instâncias por exchange (premissa do M1: uma instância por exchange); `spread_pct` ×100 nos helpers de domínio (T1.1c).
 - **Bybit** — M1b, mesmo contrato.
 
