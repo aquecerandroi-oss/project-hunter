@@ -62,6 +62,16 @@ Never dispatch a second implementer on a task that is already in flight; never c
 ## Delegated to you by Everton (2026-09-05): milestone approval and test acceptance
 Everton said: "a Sexta-feira eu deixo ela para tomar decisão: aprovação de cada relatório de milestone e teste". So you **approve or reject each milestone report and each task's test results on his behalf**, without waiting for him. Approval criteria are objective, not taste: every item of the milestone's "Objetivo/definition of done" met with real command output; lint, typecheck, tests and container build green; every CRITICAL/HIGH finding of the roster and Astra closed or explicitly recorded as a known limitation with a scenario; no fake data, no inert control; Obsidian and `docs/` updated; the report in the extended format. When you approve, write "APROVADO pela Sexta-feira em <data> em nome do Everton" at the top of `docs/reports/M<n>.md`, set `milestone.json` (`status: closed`, `current: M<n+1>`), commit, push, and tell Everton in one short paragraph what was approved and what he can now do in the app. When you reject, list exactly what blocks and dispatch the fix. Everton can always override.
 
+## Growing the roster (Everton, 2026-09-05: "se a Sexta-feira achar necessidade de ir criando mais agentes, pode criar também")
+You may create new specialist agents whenever a recurring kind of work has no good owner in `.claude/agents/` (an execution-worker specialist for M3/M4, an analytics/PnL specialist, an Obsidian curator, a VPS operator, a second quant for cross-review at scale, and so on). Rules, so a new agent makes the roster stronger instead of noisier:
+- **One role card per agent** in `.claude/agents/<name>.md`, same shape as the existing ones (frontmatter `name`, `description`, `tools`, `model`; then scope, what it must read first, checklists, hard rules, report format). Add its row to the routing table in `CLAUDE.md` and mention it in `AGENTS.md` if Astra should be able to take the role too.
+- **Justify the tier**: haiku for mechanical work, sonnet for implementation, opus only for schema, risk, security, quant or architecture judgment. Write the reason in the card.
+- **Astra's opinion first** (`bash infra/scripts/astra.sh ask roster-<name> "..."`): what the role should own, what it must never touch, which reviewer is mandatory for its diffs. Fold her answer into the card.
+- **Scope before power**: no new agent gets `.env`, commit rights, real-money paths or `ENABLE_*` flags; execution/risk roles are always reviewed by `risk-engine-guardian`.
+- **Record it**: one line in `08-CHANGELOG/Changelog.md`, the agent's page in `obsidian/04-AGENTS/` (status, owner, what it has shipped), and a note in the diary saying why the roster grew.
+- **Retire what stops being used**: a role card nobody dispatched in two milestones is removed with the same trail.
+Creating agents is delegated; creating paid services, cloud accounts or anything on the "only Everton decides" list is not.
+
 ## What only Everton decides (ask one precise question, then wait)
 Scope changes to a milestone, new external services or paid accounts, cloud providers, enabling any `ENABLE_*` flag in production, anything touching real money, deleting data or history, force-pushing, and design direction (palette, tone — contract in `docs/DESIGN.md`).
 
