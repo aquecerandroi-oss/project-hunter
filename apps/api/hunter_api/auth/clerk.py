@@ -28,6 +28,7 @@ from pydantic import BaseModel
 from hunter_api.auth.errors import AuthUnavailableError, InvalidTokenError
 from hunter_api.auth.jwks import (
     DEFAULT_CACHE_TTL_S,
+    DEFAULT_MAX_STALE_S,
     DEFAULT_REFRESH_COOLDOWN_S,
     HttpJwksSource,
     JwksCache,
@@ -55,6 +56,13 @@ __all__ = [
 ]
 
 logger = get_logger(__name__)
+
+MAX_KID_LENGTH = 256
+"""Length cap on the ``kid`` header. It is chosen by whoever sends the token,
+and it is used as a dictionary key (including in the negative cache) and
+printed in a log line — so an unauthenticated caller sending a megabyte of it
+per request is a megabyte of allocation per request. No real key id comes
+close: Clerk's are short opaque strings."""
 
 LEEWAY_S = 30
 """Clock skew tolerance for ``exp``/``nbf``. Half a minute is enough for two
@@ -89,11 +97,15 @@ class JwtAuthProvider:
         allowed_azp: Sequence[str] = (),
         cache_ttl_s: float = DEFAULT_CACHE_TTL_S,
         jwks_refresh_cooldown_s: float = DEFAULT_REFRESH_COOLDOWN_S,
+        jwks_max_stale_s: float = DEFAULT_MAX_STALE_S,
     ) -> None:
         self._issuer = issuer
         self._allowed_azp = frozenset(allowed_azp)
         self._keys = JwksCache(
-            source, cache_ttl_s=cache_ttl_s, refresh_cooldown_s=jwks_refresh_cooldown_s
+            source,
+            cache_ttl_s=cache_ttl_s,
+            refresh_cooldown_s=jwks_refresh_cooldown_s,
+            max_stale_s=jwks_max_stale_s,
         )
 
     async def verify(self, token: str) -> TokenClaims:
@@ -142,6 +154,7 @@ class ClerkAuthProvider(JwtAuthProvider):
             allowed_azp=settings.cors_allowed_origins,
             cache_ttl_s=DEFAULT_CACHE_TTL_S,
             jwks_refresh_cooldown_s=settings.jwks_refresh_cooldown_s,
+            jwks_max_stale_s=settings.jwks_max_stale_s,
         )
 
 
@@ -167,7 +180,7 @@ def _kid_of(token: str) -> str:
     except jwt.PyJWTError:
         raise InvalidTokenError from None
     kid = header.get("kid")
-    if not isinstance(kid, str) or not kid:
+    if not isinstance(kid, str) or not kid or len(kid) > MAX_KID_LENGTH:
         raise InvalidTokenError
     return kid
 

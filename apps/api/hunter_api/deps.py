@@ -3,13 +3,28 @@
 Everything here reads from ``app.state``, populated once at startup by
 ``create_app``'s lifespan (``app.py``).
 
-The important one is :func:`org_session`: it opens the request's tenant
-transaction (``SET LOCAL ROLE hunter_app`` + ``app.current_org`` +
-``app.current_user``) **and** binds a :class:`~hunter_core.audit.SqlAuditSink`
-on that same session for the duration. So an ``@audited`` service writes its
-audit row inside the transaction that carries the mutation: either both commit
-or neither does. An audit trail that can disagree with the data it describes is
-worse than none, because it is trusted.
+Two of them open a database transaction, and which one a route asks for is a
+security decision, not a convenience:
+
+- :func:`org_session` is the tenant transaction (``SET LOCAL ROLE hunter_app``
+  + ``app.current_org`` + ``app.current_user``), for everything under
+  ``/api/v1/orgs/{org_id}``. It **also** binds a
+  :class:`~hunter_core.audit.SqlAuditSink` to that same session, so an
+  ``@audited`` service writes its audit row inside the transaction carrying the
+  mutation: either both commit or neither does. An audit trail that can
+  disagree with the data it describes is worse than none, because it is
+  trusted.
+- :func:`principal_session` sets ``app.current_user`` and no organization, for
+  the routes that are about a person rather than a tenant (``/me`` and the
+  per-organization reads it fans out to). It carries no audit sink: nothing
+  reached through it is a tenant mutation. Using it for a tenant route would
+  leave ``app.current_org`` unset, and the RLS policies keyed on it would find
+  nothing rather than the wrong thing — a 404-shaped bug, never a leak, but a
+  bug.
+
+Both are exported as ``Annotated`` aliases (:data:`OrgSession`,
+:data:`PrincipalSession`) whose ``scope="function"`` matters — see the note
+below them.
 """
 
 from __future__ import annotations
@@ -35,6 +50,7 @@ __all__ = [
     "CurrentOrg",
     "CurrentPrincipal",
     "OrgSession",
+    "PrincipalSession",
     "audit_kwargs",
     "get_redis",
     "get_request_id",

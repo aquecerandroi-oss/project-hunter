@@ -17,6 +17,11 @@ Three properties, each answering a specific failure:
 - **A reader whose ``kid`` is cached never waits on the lock.** The fast path
   reads the mapping outside it and only a refetch is serialized; otherwise one
   slow JWKS request stalls every signed-in user behind it.
+- **A cache stops being believed after ``max_stale_s``.** Serving the last
+  known-good document through a JWKS outage keeps the platform up; serving it
+  forever means a key Clerk revoked days ago is still accepted here, because
+  revocation is only ever learned by refetching. Past the ceiling the honest
+  answer is :class:`AuthUnavailableError`.
 """
 
 from __future__ import annotations
@@ -38,6 +43,11 @@ logger = get_logger(__name__)
 
 JWKS_TIMEOUT_S = 5.0
 DEFAULT_CACHE_TTL_S = 3600
+DEFAULT_MAX_STALE_S = 86400.0
+"""How long a cached JWKS may keep answering while every refetch fails. A day
+is long enough to ride out any realistic provider outage and short enough that
+a revoked key does not stay valid for a week."""
+
 DEFAULT_REFRESH_COOLDOWN_S = 60.0
 """How long an unknown ``kid`` is remembered as unknown, and the minimum gap
 between two refetches triggered by one. Both are the same number on purpose:
@@ -91,10 +101,12 @@ class JwksCache:
         *,
         cache_ttl_s: float = DEFAULT_CACHE_TTL_S,
         refresh_cooldown_s: float = DEFAULT_REFRESH_COOLDOWN_S,
+        max_stale_s: float = DEFAULT_MAX_STALE_S,
     ) -> None:
         self._source = source
         self._cache_ttl_s = cache_ttl_s
         self._cooldown_s = refresh_cooldown_s
+        self._max_stale_s = max_stale_s
         self._keys: dict[str, jwt.PyJWK] = {}
         self._fetched_at: float | None = None
         self._failed_at: float | None = None
@@ -135,6 +147,11 @@ class JwksCache:
                 # the source is down and the cache is empty: there is no key to
                 # verify with and no point asking again yet
                 raise AuthUnavailableError
+            if self._beyond_max_stale():
+                # the refetch above failed (or was skipped by the cooldown) and
+                # what is cached is older than we are willing to vouch for
+                logger.warning("jwks_cache_beyond_max_stale")
+                raise AuthUnavailableError
         key = self._keys.get(kid)
         if key is not None:
             return key
@@ -163,6 +180,17 @@ class JwksCache:
         if self._fetched_at is None:
             return True
         return (time.monotonic() - self._fetched_at) >= self._cache_ttl_s
+
+    def _beyond_max_stale(self) -> bool:
+        """Whether the last *successful* fetch is older than the ceiling.
+
+        Checked only on the slow path: inside the TTL there is nothing stale to
+        judge, and a fetch that succeeds resets ``_fetched_at``, so a working
+        provider never reaches this at all.
+        """
+        if self._fetched_at is None:
+            return True
+        return (time.monotonic() - self._fetched_at) >= self._max_stale_s
 
     def _may_refetch_for_unknown(self) -> bool:
         if self._last_unknown_refresh_at is None:

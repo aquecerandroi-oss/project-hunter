@@ -23,6 +23,7 @@ from svix.webhooks import Webhook
 
 from hunter_api.services.webhook_delivery import (
     MAX_BODY_BYTES,
+    DeliveryTooLargeError,
     WebhookNotConfiguredError,
     WebhookSignatureError,
     verify_signature,
@@ -110,12 +111,21 @@ def test_an_unconfigured_secret_is_a_503_never_a_bypass() -> None:
     assert exc_info.value.status_code == 503
 
 
-def test_an_oversized_body_is_rejected_before_verification() -> None:
+def test_an_oversized_body_is_a_413_not_a_401() -> None:
+    """Size and authenticity are different questions, and answering the first
+    with the second's status code is a lie to an honest caller.
+
+    Svix retries a 4xx it reads as transient and gives up on ones it does not;
+    more to the point, an operator looking at a 401 on this endpoint goes
+    hunting for a signing-secret mismatch. The delivery was too big — say so.
+    """
     huge = b"x" * (MAX_BODY_BYTES + 1)
     _, headers = _signed({"type": "user.created", "data": {}})
 
-    with pytest.raises(WebhookSignatureError):
+    with pytest.raises(DeliveryTooLargeError) as exc_info:
         verify_signature(FAKE_SECRET, huge, headers)
+
+    assert exc_info.value.status_code == 413
 
 
 def test_a_signed_but_non_json_body_is_rejected() -> None:

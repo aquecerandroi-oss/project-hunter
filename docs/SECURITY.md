@@ -21,6 +21,8 @@ Decisão: Clerk para **identidade e sessão**. O que fica no nosso banco: `users
 
 WebSocket: token enviado na primeira mensagem (`auth`), nunca na query string. Conexão fechada se não autenticar em 5 s.
 
+**Limitação aceita no M0 — tokens sem `azp`.** A allowlist de origem só morde quando o token traz o claim `azp`: um token sem ele é aceito sem ser comparado com nada (`auth/clerk.py`, `JwtAuthProvider.verify`). O Clerk carimba `azp` nos tokens de sessão do frontend, mas um JWT emitido por template customizado não o inclui por padrão — e exigir o claim rejeitaria esses tokens legítimos. No M0 existe um único cliente (`apps/web`) e todos os tokens vêm dele, então a exposição é: quem já tiver um token válido da mesma instância Clerk, emitido para outra aplicação **sem** `azp`, é aceito aqui. Decisão registrada e aceita para o M0; quando existir um segundo cliente, `azp` passa a ser obrigatório (rastreado para o M1).
+
 ## 2. RBAC
 
 | Ação | OWNER | ADMIN | TRADER | ANALYST | VIEWER |
@@ -68,7 +70,7 @@ Implementação: `require_role(min_role)` como dependência FastAPI; papéis ord
 
 | Item | Implementação |
 |---|---|
-| Rate limiting | Middleware com token bucket em Redis por usuário e por IP; limites distintos para auth, leitura, escrita, WS |
+| Rate limiting | Janela deslizante em Redis (sorted set) em três pontos — ver a tabela abaixo |
 | CSRF | Next.js chama o `api` server-side com Bearer; mutações do browser passam por Server Actions/route handlers com verificação de origem; cookies do Clerk `SameSite=Lax`, `Secure`, `HttpOnly` |
 | CORS | Allowlist de origens exata (`WEB_ORIGIN`); sem `*` |
 | Input validation | Pydantic em todo request; limites de tamanho; `Decimal` para números financeiros |
@@ -79,6 +81,18 @@ Implementação: `require_role(min_role)` como dependência FastAPI; papéis ord
 | Dependências | `pip-audit`, `pnpm audit`, Dependabot |
 | Webhooks | Assinatura verificada (Svix para Clerk); idempotência por `svix-id` |
 | Idempotência | `Idempotency-Key` em POSTs financeiros; `client_order_id` único |
+
+**Rate limiting — onde cada limite vive.** Um único ponto não dá conta: o middleware roda antes do roteamento, quando nenhum token foi verificado, então tudo o que ele enxerga é um endereço; e um limite só por endereço não segura uma conta atrás de rede móvel, VPN ou pool de proxies.
+
+| Limite | Onde | Chave Redis | Variável |
+|---|---|---|---|
+| Por endereço | `RateLimitMiddleware`, antes do roteamento | `hunter:rl:ip:{ip}` (+ `hunter:rl:delivery:{svix-id}` no webhook do Clerk) | `RATE_LIMIT_PER_MINUTE` |
+| Por principal | `auth.rbac.get_principal`, depois de verificar o token | `hunter:rl:principal:{user_id}` | `RATE_LIMIT_PER_MINUTE_PRINCIPAL` |
+| Handshake WS | `realtime.endpoint`, antes do `accept()` | `hunter:rl:ws:{ip}` | `WS_HANDSHAKES_PER_MINUTE` |
+
+Os dois primeiros se aplicam à mesma requisição autenticada e o que estourar primeiro responde `429` problem+json com `Retry-After`. Todos falham em aberto se o Redis estiver indisponível (ARCHITECTURE.md, "degradação segura"); `/health`, `/ready` e `/metrics` são isentos.
+
+Além dos limites por janela, uma conexão WebSocket viva conta contra `WS_MAX_CONNECTIONS_PER_PRINCIPAL` (contagem em processo, no `ConnectionManager`): estourar fecha com o código de aplicação `4429`, o mesmo do handshake recusado.
 
 ## 6. LLM (Fase 2+)
 

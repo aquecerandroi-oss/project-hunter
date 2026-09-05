@@ -26,6 +26,7 @@ from fastapi import Depends, Request, status
 from hunter_api.auth.clerk import InvalidTokenError
 from hunter_api.auth.principal import Principal
 from hunter_api.errors import HunterError
+from hunter_api.middleware.rate_limit import enforce_principal_limit
 from hunter_core.domain.enums import OrganizationRole
 
 if TYPE_CHECKING:
@@ -97,17 +98,24 @@ def bearer_token(request: Request) -> str:
 
 
 async def get_principal(request: Request) -> Principal:
-    """Verify the bearer token and resolve the caller.
+    """Verify the bearer token, resolve the caller, and spend their budget.
 
     Both collaborators come off ``app.state`` (built once in ``create_app``'s
     lifespan) rather than being constructed per request: the JWKS cache lives
     inside the provider, and a per-request provider would re-fetch Clerk's keys
     on every call.
+
+    The per-principal rate limit is applied here rather than declared on each
+    route, because this is the one point every authenticated request passes
+    through: ``require_org`` reaches it through ``get_org_context``, and so
+    does every non-tenant route. A route added next year gets the limit without
+    anyone remembering to ask for it.
     """
     provider: AuthProvider = request.app.state.auth_provider
     resolver: PrincipalResolver = request.app.state.principal_resolver
     principal = await resolver.resolve(await provider.verify(bearer_token(request)))
     request.state.principal_id = str(principal.user_id)
+    await enforce_principal_limit(request, str(principal.user_id))
     return principal
 
 

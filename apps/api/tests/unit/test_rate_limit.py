@@ -8,25 +8,39 @@ real Redis — this suite never needs Docker.
 
 from __future__ import annotations
 
+import uuid
 from collections import defaultdict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+import httpx
 import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+from fastapi import FastAPI
+from starlette.requests import Request
 
 from hunter_api.app import create_app
+from hunter_api.auth.clerk import StaticKeyAuthProvider
+from hunter_api.auth.principal import Principal
+from hunter_api.auth.rbac import CurrentPrincipal
+from hunter_api.errors import register_error_handlers
 from hunter_api.middleware import rate_limit as rate_limit_module
-from hunter_api.middleware.rate_limit import EXEMPT_PATHS
+from hunter_api.middleware.rate_limit import (
+    EXEMPT_PATHS,
+    _client_keys,  # pyright: ignore[reportPrivateUsage]
+)
+from hunter_api.settings import ApiSettings
+
+from .jwt_keys import FAKE_ISSUER, generate_keypair, jwks_for, sign
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from contextlib import AbstractAsyncContextManager
 
-    import httpx
-    from fastapi import FastAPI
-
-    from hunter_api.settings import ApiSettings
+    from hunter_api.auth.clerk import TokenClaims
 
 pytestmark = pytest.mark.unit
+
+PRINCIPAL = uuid.uuid4()
 
 
 class _FakeRedis:
@@ -247,3 +261,117 @@ async def test_two_deliveries_of_different_events_share_the_source_bucket_only(
     keys = list(redis.keys())
     assert any(key.endswith("svix:msg_FAKE_repeat") for key in keys), keys
     assert any(":ip:" in key for key in keys), keys
+
+
+# ---- the second limit: per authenticated principal, applied after auth ----
+#
+# The middleware above cannot do this one. It runs before routing, so there is
+# no principal yet — everything it sees is an address. A single account behind
+# a phone network, a VPN or a botnet is many addresses and one identity, and
+# only a limit keyed on the identity bounds it.
+
+
+class _FixedResolver:
+    """Resolves any verified claim to one principal — the DB path is the
+    integration suite's job; the subject here is the bucket key."""
+
+    def __init__(self, principal: Principal) -> None:
+        self.principal = principal
+
+    async def resolve(self, claims: TokenClaims) -> Principal:
+        return self.principal
+
+
+@pytest.fixture(scope="module")
+def signing_key() -> rsa.RSAPrivateKey:
+    return generate_keypair()
+
+
+def _probe_app(settings: ApiSettings, principal: Principal, key: rsa.RSAPrivateKey) -> FastAPI:
+    """A one-route app whose only guard is ``get_principal``.
+
+    Deliberately not ``create_app``: with the IP middleware also in the stack a
+    429 would not say *which* limit produced it.
+    """
+    app = FastAPI()
+    register_error_handlers(app)
+    app.state.settings = settings
+    app.state.auth_provider = StaticKeyAuthProvider(jwks_for(key), issuer=FAKE_ISSUER)
+    app.state.principal_resolver = _FixedResolver(principal)
+
+    @app.get("/probe")
+    async def probe(  # pyright: ignore[reportUnusedFunction]
+        caller: CurrentPrincipal,
+    ) -> dict[str, str]:
+        return {"user_id": str(caller.user_id)}
+
+    return app
+
+
+async def _get_from(app: FastAPI, host: str, headers: dict[str, str]) -> httpx.Response:
+    """One request from ``host`` — a fresh transport per call, because
+    ``ASGITransport`` fixes ``scope["client"]`` for its whole lifetime."""
+    transport = httpx.ASGITransport(app=app, client=(host, 44444))
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        return await client.get("/probe", headers=headers)
+
+
+async def test_one_principal_from_many_addresses_shares_one_bucket(
+    api_settings: ApiSettings, signing_key: rsa.RSAPrivateKey
+) -> None:
+    """Three addresses, one account, one budget.
+
+    Without this the IP limit is the only limit, and it is exactly the one an
+    attacker with a residential proxy pool pays nothing to defeat.
+    """
+    settings = api_settings.model_copy(update={"rate_limit_per_minute_principal": 2})
+    principal = Principal(user_id=PRINCIPAL, external_auth_id="user_FAKE_clerk_id", memberships=())
+    app = _probe_app(settings, principal, signing_key)
+    redis = _FakeRedis()
+    app.state.redis = redis
+    headers = {"Authorization": f"Bearer {sign(signing_key)}"}
+
+    responses = [await _get_from(app, host, headers) for host in ("1.1.1.1", "2.2.2.2", "3.3.3.3")]
+
+    assert [response.status_code for response in responses] == [200, 200, 429]
+    last = responses[-1]
+    assert last.headers["content-type"].startswith("application/problem+json")
+    assert last.headers["Retry-After"] == "60"
+    assert last.json()["title"] == "Too Many Requests"
+    assert redis.keys() == [f"hunter:rl:principal:{PRINCIPAL}"]
+
+
+async def test_the_principal_limit_fails_open_when_redis_is_unreachable(
+    api_settings: ApiSettings, signing_key: rsa.RSAPrivateKey
+) -> None:
+    """Same call as the middleware makes: availability over enforcement on a
+    read path (ARCHITECTURE.md "degradacao segura")."""
+    settings = api_settings.model_copy(update={"rate_limit_per_minute_principal": 1})
+    principal = Principal(user_id=PRINCIPAL, external_auth_id="user_FAKE_clerk_id", memberships=())
+    app = _probe_app(settings, principal, signing_key)
+    app.state.redis = _BrokenRedis()
+    headers = {"Authorization": f"Bearer {sign(signing_key)}"}
+
+    for _ in range(4):
+        assert (await _get_from(app, "1.1.1.1", headers)).status_code == 200
+
+
+def test_the_middleware_never_keys_on_a_principal() -> None:
+    """The IP limit and the principal limit are two different limits.
+
+    ``_client_keys`` used to prefer ``request.state.principal_id`` — a value
+    nothing had written yet, because the middleware runs before routing. The
+    branch was dead, and it made the IP limit read as if it were narrower than
+    it is. Even with the attribute present, the middleware's bucket is the
+    address.
+    """
+    scope: dict[str, Any] = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/v1/me",
+        "headers": [],
+        "client": ("9.9.9.9", 1234),
+        "state": {"principal_id": str(PRINCIPAL)},
+    }
+
+    assert _client_keys(Request(scope)) == ["hunter:rl:ip:9.9.9.9"]

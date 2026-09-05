@@ -392,3 +392,35 @@ async def test_a_position_quantity_can_never_go_negative(
     async with schema_engine.begin() as connection:
         await connection.execute(text("SET LOCAL ROLE hunter_worker"))
         await connection.execute(insert, {**params, "id": uuid7(), "qty": 0})
+
+
+async def test_a_processed_event_starts_claimed_but_not_completed(
+    schema_engine: AsyncEngine,
+) -> None:
+    """``processed_events`` is a two-phase claim, and the schema is what makes
+    the second phase possible.
+
+    A consumer inserts the row *before* applying the effect and stamps
+    ``completed_at`` after. If the column were ``NOT NULL`` with a default, a
+    process that died in between would leave a row indistinguishable from a
+    finished one — a delivery permanently answered "already handled" that was
+    never handled at all.
+    """
+    delivery_id = f"msg_FAKE_{uuid.uuid4().hex[:8]}"
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text("INSERT INTO processed_events (consumer, event_id) VALUES ('ck', :id)"),
+            {"id": delivery_id},
+        )
+        row = (
+            await connection.execute(
+                text(
+                    "SELECT claimed_at, completed_at FROM processed_events "
+                    "WHERE consumer = 'ck' AND event_id = :id"
+                ),
+                {"id": delivery_id},
+            )
+        ).one()
+
+    assert row.claimed_at is not None, "the claim timestamp is defaulted by the database"
+    assert row.completed_at is None, "a fresh claim is unfinished until the consumer says so"

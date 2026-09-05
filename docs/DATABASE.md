@@ -408,8 +408,14 @@ worker_heartbeats
   PK (worker_role, instance_id)
 
 processed_events                            -- idempotência durável para consumidores críticos
-  consumer, event_id, processed_at
-  PK (consumer, event_id)                   -- limpeza diária > 7 d
+  consumer, event_id, claimed_at, completed_at
+  PK (consumer, event_id)                   -- claim em duas fases: a linha é inserida antes do
+                                            -- efeito (completed_at NULL) e completada depois; só
+                                            -- linha completa conta como duplicata, e um claim
+                                            -- inacabado mais velho que a janela de staleness pode
+                                            -- ser retomado pela redelivery.
+                                            -- limpeza de linhas completas > 7 d
+                                            -- (infra/scripts/prune_processed_events.py)
 ```
 
 ## 13. Relação com a lista da especificação (§42)

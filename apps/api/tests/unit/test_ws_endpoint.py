@@ -9,19 +9,27 @@ production verification path rather than a stub that trusts its input.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import time
 import uuid
+from collections import defaultdict
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from hunter_api.auth.clerk import StaticKeyAuthProvider
+from hunter_api.auth.clerk import AuthUnavailableError, StaticKeyAuthProvider, TokenClaims
 from hunter_api.auth.principal import Membership, Principal
 from hunter_api.realtime import session as ws_session
-from hunter_api.realtime.endpoint import RealtimeHub
+from hunter_api.realtime.endpoint import (
+    RealtimeHub,
+    _serve,  # pyright: ignore[reportPrivateUsage]
+)
+from hunter_api.realtime.session import WsSession, watch_session
 from hunter_core.domain.enums import MemberStatus, OrganizationRole
 
 from .jwt_keys import FAKE_ISSUER, generate_keypair, jwks_for, sign
@@ -31,9 +39,9 @@ if TYPE_CHECKING:
 
     from anyio.from_thread import BlockingPortal
     from cryptography.hazmat.primitives.asymmetric import rsa
-    from fastapi import FastAPI
+    from fastapi import FastAPI, WebSocket
 
-    from hunter_api.auth.clerk import TokenClaims
+    from hunter_api.settings import ApiSettings
 
 pytestmark = pytest.mark.unit
 
@@ -84,6 +92,38 @@ class _FakeRedis:
         return self.pubsub_instance
 
 
+class _WindowRedis:
+    """In-memory sorted sets — the four commands the sliding window uses.
+
+    Every fixture below installs one. The suite's ``app.state.redis`` points at
+    an unreachable address on purpose, and the handshake limit is the first
+    thing ``/ws`` does, so without this each connect pays a TCP timeout before
+    failing open.
+    """
+
+    def __init__(self) -> None:
+        self._sets: dict[str, dict[str, float]] = defaultdict(dict)
+
+    async def zremrangebyscore(self, name: str, min_: float, max_: float) -> None:
+        self._sets[name] = {
+            member: score
+            for member, score in self._sets[name].items()
+            if not (min_ <= score <= max_)
+        }
+
+    async def zadd(self, name: str, mapping: dict[str, float]) -> None:
+        self._sets[name].update(mapping)
+
+    async def zcard(self, name: str) -> int:
+        return len(self._sets[name])
+
+    async def expire(self, name: str, seconds: int) -> bool:
+        return True
+
+    def keys(self) -> list[str]:
+        return list(self._sets)
+
+
 class _FakeResolver:
     """Resolves any verified claim to one principal — the DB path is covered
     by the integration suite; here the subject of the test is the protocol.
@@ -129,8 +169,9 @@ def ws_client(
     app.state.auth_provider = StaticKeyAuthProvider(jwks_for(private_key), issuer=FAKE_ISSUER)
     app.state.principal_resolver = _FakeResolver(principal)
     with TestClient(app) as client:
-        # the app's own hub points at an unreachable Redis; swap in the fake
+        # the app's own hub points at an unreachable Redis; swap in the fakes
         app.state.realtime = hub
+        app.state.redis = _WindowRedis()
         yield client
 
 
@@ -315,6 +356,7 @@ def watched_client(
     app.state.principal_resolver = resolver
     with TestClient(app) as client:
         app.state.realtime = hub
+        app.state.redis = _WindowRedis()
         app.state.settings = app.state.settings.model_copy(
             update={"ws_revalidate_interval_s": 0.05}
         )
@@ -387,3 +429,262 @@ def test_an_idle_socket_is_closed(
             websocket.receive_text()
 
     assert exc_info.value.code == 4409
+
+
+# ---- idle: a pong is not activity ----------------------------------------
+#
+# Driven directly against ``_serve`` and ``watch_session`` with a fake clock,
+# rather than through a socket: the question is whether one specific frame
+# type resets the idle timer, and a wall-clock test of that is a race with the
+# watchdog it is trying to observe.
+
+
+class _Clock:
+    """Stands in for the ``time`` module inside ``realtime.session``."""
+
+    def __init__(self, start: float = 1000.0) -> None:
+        self.now = start
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+
+class _ScriptedSocket:
+    """A live socket, reduced to what the receive loop and watchdog touch:
+    a fixed list of inbound frames, whatever was written back, and the close
+    code the server chose.
+    """
+
+    def __init__(self, app: FastAPI, frames: list[str]) -> None:
+        self.app = app
+        self.state = SimpleNamespace(pong_pending=False)
+        self._frames = list(frames)
+        self.sent: list[str] = []
+        self.closed_with: int | None = None
+
+    async def receive_text(self) -> str:
+        if not self._frames:
+            raise WebSocketDisconnect(1000)
+        return self._frames.pop(0)
+
+    async def send_text(self, data: str) -> None:
+        self.sent.append(data)
+
+    async def close(self, code: int = 1000, reason: str = "") -> None:
+        self.closed_with = code
+
+
+def _session(principal: Principal) -> WsSession:
+    return WsSession(principal, TokenClaims(subject="user_FAKE_clerk_id"))
+
+
+@pytest.fixture
+def idle_app(
+    app: FastAPI,
+    api_settings: ApiSettings,
+    principal: Principal,
+    monkeypatch: pytest.MonkeyPatch,
+) -> FastAPI:
+    """The app the watchdog reads its interval and resolver off.
+
+    Populated by hand rather than by the lifespan: nothing here opens a socket,
+    so there is no ``TestClient`` to run one.
+    """
+    app.state.settings = api_settings.model_copy(update={"ws_revalidate_interval_s": 0.01})
+    app.state.principal_resolver = _FakeResolver(principal)
+    monkeypatch.setattr(ws_session, "IDLE_TIMEOUT_SECONDS", 300)
+    return app
+
+
+async def test_a_pong_only_client_is_closed_as_idle(
+    idle_app: FastAPI, principal: Principal, hub: RealtimeHub, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Answering the heartbeat is not using the connection.
+
+    The pong is the server's own ping coming back, and a browser answers it
+    whether or not anybody is looking at the tab. Count it as activity and the
+    idle timeout can only ever fire for a client that has *also* stopped
+    answering — which is what the 4408 pong timeout already covers — so every
+    abandoned tab holds a slot, a Redis subscription and two tasks for as long
+    as it is left open.
+    """
+    clock = _Clock()
+    monkeypatch.setattr(ws_session, "time", clock)
+    session = _session(principal)
+    socket = _ScriptedSocket(idle_app, [json.dumps({"type": "pong"})] * 5)
+
+    await _serve(cast("WebSocket", socket), session, hub)
+    clock.advance(301)
+    await watch_session(cast("WebSocket", socket), session, hub)
+
+    assert socket.closed_with == 4409
+
+
+async def test_a_client_sending_real_frames_is_not_idle(
+    idle_app: FastAPI, principal: Principal, hub: RealtimeHub, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The other half of the rule: a frame that is not a pong does reset the
+    clock, well past the point a pong-only client would have been closed."""
+    clock = _Clock()
+    monkeypatch.setattr(ws_session, "time", clock)
+    session = _session(principal)
+    socket = _ScriptedSocket(
+        idle_app, [json.dumps({"type": "subscribe", "channels": ["rt:radar"]})]
+    )
+
+    clock.advance(299)
+    await _serve(cast("WebSocket", socket), session, hub)
+    clock.advance(299)
+    watchdog = asyncio.ensure_future(watch_session(cast("WebSocket", socket), session, hub))
+    await asyncio.sleep(0.05)  # several revalidation rounds at 10 ms
+    watchdog.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await watchdog
+
+    assert socket.closed_with is None
+
+
+# ---- the handshake limit and the connection cap ---------------------------
+
+
+def _bounded_client(
+    app: FastAPI,
+    private_key: rsa.RSAPrivateKey,
+    principal: Principal,
+    hub: RealtimeHub,
+    **limits: int,
+) -> Iterator[TestClient]:
+    app.state.auth_provider = StaticKeyAuthProvider(jwks_for(private_key), issuer=FAKE_ISSUER)
+    app.state.principal_resolver = _FakeResolver(principal)
+    with TestClient(app) as client:
+        app.state.realtime = hub
+        app.state.redis = _WindowRedis()
+        app.state.settings = app.state.settings.model_copy(update=limits)
+        yield client
+
+
+@pytest.fixture
+def handshake_limited_client(
+    app: FastAPI, private_key: rsa.RSAPrivateKey, principal: Principal, hub: RealtimeHub
+) -> Iterator[TestClient]:
+    """Two handshakes a minute, no meaningful connection cap."""
+    yield from _bounded_client(
+        app,
+        private_key,
+        principal,
+        hub,
+        ws_handshakes_per_minute=2,
+        ws_max_connections_per_principal=50,
+    )
+
+
+@pytest.fixture
+def connection_capped_client(
+    app: FastAPI, private_key: rsa.RSAPrivateKey, principal: Principal, hub: RealtimeHub
+) -> Iterator[TestClient]:
+    """Two live connections per principal, no meaningful handshake limit."""
+    yield from _bounded_client(
+        app,
+        private_key,
+        principal,
+        hub,
+        ws_handshakes_per_minute=1000,
+        ws_max_connections_per_principal=2,
+    )
+
+
+def test_the_handshake_is_rate_limited_before_it_is_accepted(
+    handshake_limited_client: TestClient, private_key: rsa.RSAPrivateKey
+) -> None:
+    """Opening a socket is cheaper for the client than it is for us.
+
+    Every accepted connection costs a task, a slot in the fan-out and five
+    seconds of patience waiting for the auth frame — and none of that requires
+    a token, so without a limit on the handshake itself an unauthenticated
+    caller opens them as fast as the network allows. The check runs before
+    ``accept()``, so a refused handshake costs a header parse.
+    """
+    for _ in range(2):
+        with handshake_limited_client.websocket_connect("/ws") as websocket:
+            websocket.send_text(json.dumps({"type": "auth", "token": sign(private_key)}))
+            assert json.loads(websocket.receive_text()) == {"type": "authenticated"}
+
+    with (
+        pytest.raises(WebSocketDisconnect) as exc_info,
+        handshake_limited_client.websocket_connect("/ws"),
+    ):
+        pass  # pragma: no cover - the handshake never completes
+
+    assert exc_info.value.code == 4429
+
+
+def test_a_principal_cannot_hold_more_than_the_connection_cap(
+    connection_capped_client: TestClient, private_key: rsa.RSAPrivateKey
+) -> None:
+    """The handshake limit is per address; this one is per account.
+
+    One signed-in user opening a socket per tab, per device and per reconnect
+    loop is a slow leak of tasks and Redis subscriptions that no address limit
+    catches once the connections are spread out in time.
+    """
+    with contextlib.ExitStack() as open_sockets:
+        for _ in range(2):
+            websocket = open_sockets.enter_context(
+                connection_capped_client.websocket_connect("/ws")
+            )
+            websocket.send_text(json.dumps({"type": "auth", "token": sign(private_key)}))
+            assert json.loads(websocket.receive_text()) == {"type": "authenticated"}
+
+        third = open_sockets.enter_context(connection_capped_client.websocket_connect("/ws"))
+        third.send_text(json.dumps({"type": "auth", "token": sign(private_key)}))
+
+        with pytest.raises(WebSocketDisconnect) as exc_info:
+            third.receive_text()
+
+    assert exc_info.value.code == 4429
+
+
+def test_a_closed_connection_gives_its_slot_back(
+    connection_capped_client: TestClient, private_key: rsa.RSAPrivateKey, hub: RealtimeHub
+) -> None:
+    """A cap that only ever counts up is a cap that locks an account out."""
+    for _ in range(4):
+        with connection_capped_client.websocket_connect("/ws") as websocket:
+            websocket.send_text(json.dumps({"type": "auth", "token": sign(private_key)}))
+            assert json.loads(websocket.receive_text()) == {"type": "authenticated"}
+
+    assert hub.manager.connection_count(str(USER)) == 0
+
+
+# ---- 4503: the credential was never judged --------------------------------
+
+
+class _UnavailableAuthProvider:
+    """Clerk's JWKS is unreachable — no verdict on the token, either way."""
+
+    async def verify(self, token: str) -> TokenClaims:
+        raise AuthUnavailableError
+
+
+def test_an_unreachable_jwks_closes_4503_not_4401(
+    app: FastAPI, hub: RealtimeHub, private_key: rsa.RSAPrivateKey, principal: Principal
+) -> None:
+    """4401 tells the browser its session is dead and sends the user back to
+    Clerk to sign in again — through the provider that is the thing currently
+    unavailable. The token was never judged, so no answer about it is honest;
+    4503 says what is true and the client can retry.
+    """
+    app.state.auth_provider = _UnavailableAuthProvider()
+    app.state.principal_resolver = _FakeResolver(principal)
+    with TestClient(app) as client:
+        app.state.realtime = hub
+        app.state.redis = _WindowRedis()
+        with client.websocket_connect("/ws") as websocket:
+            websocket.send_text(json.dumps({"type": "auth", "token": sign(private_key)}))
+            with pytest.raises(WebSocketDisconnect) as exc_info:
+                websocket.receive_text()
+
+    assert exc_info.value.code == 4503

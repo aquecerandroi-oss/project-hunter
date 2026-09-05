@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+from hunter_api.auth import jwks as jwks_module
 from hunter_api.auth.clerk import (
     AuthUnavailableError,
     InvalidTokenError,
@@ -332,3 +333,107 @@ async def test_an_invalid_token_is_still_401_when_the_jwks_is_reachable(
         await provider.verify(sign(private_key, issuer="https://evil.test"))
 
     assert exc_info.value.status_code == 401
+
+
+class _FlakyJwksSource:
+    """Answers once, then goes down — a provider outage after a warm cache."""
+
+    def __init__(self, document: dict[str, Any]) -> None:
+        self.document = document
+        self.fetches = 0
+        self.down = False
+
+    async def fetch(self) -> dict[str, Any]:
+        self.fetches += 1
+        if self.down:
+            raise ConnectionError("jwks unreachable")
+        return self.document
+
+
+class _Clock:
+    """Stands in for the ``time`` module inside ``auth.jwks``.
+
+    Only ``monotonic`` is used there, and only for cache ages — so a fake one
+    makes a day of staleness a single line instead of a sleeping test. Token
+    ``exp`` is unaffected: that is checked against the real wall clock by PyJWT.
+    """
+
+    def __init__(self, start: float = 1000.0) -> None:
+        self.now = start
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+
+async def test_a_cached_key_is_served_while_the_jwks_is_down_but_not_forever(
+    private_key: rsa.RSAPrivateKey, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Serving a cached key through an outage is right; serving it indefinitely
+    is not.
+
+    Revoking a key is done at the identity provider — Clerk stops publishing
+    it. This process only learns that by refetching, so a cache that never
+    expires while the fetch keeps failing is a process that keeps accepting a
+    key that was revoked days ago. Past ``jwks_max_stale_s`` the honest answer
+    is 503: we cannot currently tell whether this token is good.
+    """
+    clock = _Clock()
+    monkeypatch.setattr(jwks_module, "time", clock)
+    source = _FlakyJwksSource(jwks_for(private_key))
+    provider = JwtAuthProvider(
+        source,
+        issuer=FAKE_ISSUER,
+        cache_ttl_s=3600,
+        jwks_refresh_cooldown_s=60,
+        jwks_max_stale_s=86400,
+    )
+    await provider.verify(sign(private_key))
+    source.down = True
+
+    clock.advance(7200)  # past the TTL, well inside the stale ceiling
+    claims = await provider.verify(sign(private_key, subject="user_FAKE_stale"))
+    assert claims.subject == "user_FAKE_stale"
+
+    clock.advance(86400)  # and now past the ceiling
+    with pytest.raises(AuthUnavailableError) as exc_info:
+        await provider.verify(sign(private_key, subject="user_FAKE_too_stale"))
+
+    assert exc_info.value.status_code == 503
+    assert not isinstance(exc_info.value, InvalidTokenError)
+
+
+async def test_a_successful_refetch_resets_the_staleness_clock(
+    private_key: rsa.RSAPrivateKey, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clock = _Clock()
+    monkeypatch.setattr(jwks_module, "time", clock)
+    source = _FlakyJwksSource(jwks_for(private_key))
+    provider = JwtAuthProvider(source, issuer=FAKE_ISSUER, cache_ttl_s=3600, jwks_max_stale_s=86400)
+    await provider.verify(sign(private_key))
+
+    for _ in range(5):
+        clock.advance(80000)
+        assert (await provider.verify(sign(private_key, subject="user_FAKE_ok"))).subject
+
+    assert source.fetches == 6
+
+
+async def test_an_oversized_kid_is_rejected_without_touching_the_cache(
+    private_key: rsa.RSAPrivateKey,
+) -> None:
+    """``kid`` is attacker-chosen and lands in a dictionary key and a log line.
+
+    A megabyte of it per request, from an unauthenticated caller, is a
+    megabyte of allocation per request — so the length is checked before the
+    value is used for anything at all, including as a negative-cache key.
+    """
+    source = _CountingJwksSource(jwks_for(private_key))
+    provider = JwtAuthProvider(source, issuer=FAKE_ISSUER)
+
+    with pytest.raises(InvalidTokenError):
+        await provider.verify(sign(private_key, kid="F" * 300))
+
+    assert source.fetches == 0, "an oversized kid must not reach the JWKS cache at all"

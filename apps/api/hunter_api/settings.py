@@ -23,6 +23,15 @@ class ApiSettings(Settings):
     api_port: int = 8000
     cors_allowed_origins: list[str] = []
     rate_limit_per_minute: int = 120
+    """Requests per minute per client address, enforced in the middleware — the
+    limit that covers the unauthenticated surface."""
+
+    rate_limit_per_minute_principal: int = 600
+    """Requests per minute per authenticated principal, enforced after the
+    token is verified. Higher than the address limit on purpose: a legitimate
+    browser session is chattier than any single address should be, and this
+    exists to bound one account spread over many addresses, not to be the
+    tighter of the two."""
     enable_openapi_docs: bool = False
     ready_check_timeout_s: float = 3.0
     forwarded_allow_ips: str = "127.0.0.1"
@@ -33,9 +42,34 @@ class ApiSettings(Settings):
     unauthenticated caller, so this is what keeps a flood of invented ones from
     becoming a flood of requests to Clerk."""
 
+    jwks_max_stale_s: float = 86400.0
+    """How long a cached JWKS may keep answering while every refetch fails.
+    Past this, authentication answers 503 instead of serving keys nobody has
+    been able to confirm — a key Clerk revoked is only ever learned about by
+    refetching, so an unbounded cache is an unbounded revocation window."""
+
     max_request_body_bytes: int = 1024 * 1024
-    """Hard cap on ``Content-Length`` for ``/api/*``. Checked before the body is
-    read, so an oversized upload costs a header parse, not a megabyte of RAM."""
+    """Hard cap on the body of an ``/api/*`` request, enforced twice: on
+    ``Content-Length`` before the body is read, and on the bytes actually
+    streamed — the header is written by the client, and a chunked upload sends
+    none at all."""
+
+    webhook_claim_stale_s: float = 300.0
+    """How long a ``processed_events`` claim may sit unfinished before a
+    redelivery may take it over. This is what turns a process killed between
+    claiming a Clerk delivery and applying it into one delayed retry instead of
+    a delivery that is answered "duplicate" forever."""
+
+    ws_handshakes_per_minute: int = 30
+    """WebSocket handshakes a single address may complete per minute. Checked
+    before ``accept()``: opening a socket is cheap for the caller and costs us
+    a task, a fan-out slot and five seconds of patience, none of which needs a
+    token."""
+
+    ws_max_connections_per_principal: int = 5
+    """Live WebSocket connections one principal may hold on this process. Bounds
+    the slow leak an address limit cannot see: one account opening a socket per
+    tab, per device and per reconnect loop, spread out over hours."""
 
     ws_revalidate_interval_s: float = 60.0
     """How often a live WebSocket re-checks that its principal is still a member

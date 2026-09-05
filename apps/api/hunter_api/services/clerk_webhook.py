@@ -28,8 +28,10 @@ from sqlalchemy.dialects.postgresql import insert
 from hunter_api.auth.clerk_api import profile_from_clerk_user
 from hunter_api.services.audit import record as record_audit
 from hunter_api.services.webhook_delivery import (
+    CLAIM_STALE_SECONDS,
     CONSUMER,
     claim_delivery,
+    complete_delivery,
     release_delivery,
 )
 from hunter_core.db.models.identity import OrganizationMember, User
@@ -54,24 +56,42 @@ async def handle_event(
     delivery_id: str,
     payload: Mapping[str, Any],
     audit: dict[str, Any],
+    claim_stale_s: float = CLAIM_STALE_SECONDS,
 ) -> dict[str, str]:
-    """Apply one delivery, at most once. Returns what was done, for the response."""
+    """Apply one delivery, at most once. Returns what was done, for the response.
+
+    Claim, effect, complete — in that order, and the order is the whole
+    guarantee. Claiming first stops two concurrent retries; completing last is
+    what makes a process killed in between recoverable, because the claim it
+    left behind is visibly unfinished and expires.
+    """
     event_type = payload.get("type")
     data = payload.get("data")
     if not isinstance(event_type, str) or not isinstance(data, dict):
         return {"status": "ignored", "reason": "malformed"}
-    if not await claim_delivery(session_factory, delivery_id):
+    if not await claim_delivery(session_factory, delivery_id, stale_s=claim_stale_s):
         return {"status": "duplicate", "type": event_type}
     try:
-        if event_type not in HANDLED_TYPES:
-            return {"status": "ignored", "type": event_type}
-        profile_data = cast("dict[str, Any]", data)
-        if event_type == "user.deleted":
-            return await _revoke_user(session_factory, profile_data, audit)
-        return await _upsert_user(session_factory, event_type, profile_data, audit)
+        result = await _apply(session_factory, event_type, cast("dict[str, Any]", data), audit)
     except Exception:
         await release_delivery(session_factory, delivery_id)
         raise
+    await complete_delivery(session_factory, delivery_id)
+    return result
+
+
+async def _apply(
+    session_factory: async_sessionmaker[AsyncSession],
+    event_type: str,
+    data: dict[str, Any],
+    audit: dict[str, Any],
+) -> dict[str, str]:
+    """The effect itself, so :func:`handle_event` reads as claim/effect/complete."""
+    if event_type not in HANDLED_TYPES:
+        return {"status": "ignored", "type": event_type}
+    if event_type == "user.deleted":
+        return await _revoke_user(session_factory, data, audit)
+    return await _upsert_user(session_factory, event_type, data, audit)
 
 
 async def _find_user(

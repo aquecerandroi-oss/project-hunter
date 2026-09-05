@@ -36,7 +36,11 @@ from hunter_api.deps import get_session_factory, get_settings
 from hunter_api.errors import HunterError
 from hunter_api.middleware.body_size import content_length
 from hunter_api.services.clerk_webhook import handle_event, system_audit
-from hunter_api.services.webhook_delivery import MAX_BODY_BYTES, verify_signature
+from hunter_api.services.webhook_delivery import (
+    MAX_BODY_BYTES,
+    DeliveryTooLargeError,
+    verify_signature,
+)
 
 router = APIRouter(prefix="/api/webhooks", tags=["system"])
 
@@ -48,16 +52,6 @@ class LengthRequiredError(HunterError):
             title="Length Required",
             status_code=status.HTTP_411_LENGTH_REQUIRED,
             detail="A Content-Length header is required on this endpoint.",
-        )
-
-
-class DeliveryTooLargeError(HunterError):
-    def __init__(self) -> None:
-        super().__init__(
-            type_slug="payload-too-large",
-            title="Content Too Large",
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"A webhook delivery must not exceed {MAX_BODY_BYTES} bytes.",
         )
 
 
@@ -81,4 +75,5 @@ async def clerk_webhook(
         delivery_id=svix_id,
         payload=payload,
         audit=system_audit(svix_id, getattr(request.state, "request_id", None)),
+        claim_stale_s=settings.webhook_claim_stale_s,
     )

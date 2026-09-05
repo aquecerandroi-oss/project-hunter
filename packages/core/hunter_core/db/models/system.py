@@ -85,13 +85,30 @@ class WorkerHeartbeat(Base):
 
 
 class ProcessedEvent(Base):
-    """Durable idempotency for critical consumers. PK ``(consumer, event_id)``;
-    rows older than 7 days are pruned daily by the analytics worker.
+    """Durable idempotency for critical consumers, in two phases.
+
+    PK ``(consumer, event_id)``. A consumer *claims* a delivery (insert;
+    ``completed_at`` NULL) before applying its effect and *completes* it after,
+    so the row distinguishes "being handled" from "handled". Only a completed
+    row is a duplicate: a claim left unfinished — a pod evicted, an OOM kill, a
+    lost connection between the two steps — is re-claimable once it is older
+    than the consumer's stale window, and the redelivery does the work. A
+    single ``processed_at`` column could not tell those apart, so a crash
+    turned into a delivery permanently answered "already handled" that was
+    never handled at all.
+
+    Completed rows past their retention are removed by
+    ``infra/scripts/prune_processed_events.py``. Unfinished claims are left
+    alone by it: they are the record of a delivery that never landed.
     """
 
     __tablename__ = "processed_events"
-    __table_args__ = (Index("ix_processed_events_processed_at", "processed_at"),)
+    __table_args__ = (
+        Index("ix_processed_events_claimed_at", "claimed_at"),
+        Index("ix_processed_events_completed_at", "completed_at"),
+    )
 
     consumer: Mapped[str] = mapped_column(Text, primary_key=True)
     event_id: Mapped[str] = mapped_column(Text, primary_key=True)
-    processed_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    claimed_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    completed_at: Mapped[datetime | None]

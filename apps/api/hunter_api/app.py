@@ -147,8 +147,9 @@ def create_app(settings: ApiSettings) -> FastAPI:
     # state that had not been written yet.
     app.add_middleware(RateLimitMiddleware, settings=settings)
     app.add_middleware(TenantContextMiddleware)
-    # outside the limiter: an oversized body is refused on its header alone,
-    # without spending a Redis round trip or reading a byte of it
+    # outside the limiter: a body oversized on its header alone is refused
+    # without spending a Redis round trip or reading a byte of it, and the
+    # streaming cap has to wrap `receive` before anything downstream reads it
     app.add_middleware(BodySizeLimitMiddleware, settings=settings)
     app.add_middleware(MetricsAuthMiddleware, settings=settings)
     app.add_middleware(ProblemDetailsMiddleware)

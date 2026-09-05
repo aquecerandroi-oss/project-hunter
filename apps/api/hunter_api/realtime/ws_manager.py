@@ -2,8 +2,10 @@
 
 ARCHITECTURE.md §5.2: the api subscribes to a Redis channel only while at
 least one client wants it, and forwards to every WebSocket subscribed to
-that channel. Auth/authorization (only members of an org may subscribe to
-``rt:org:{id}:*``) is a T06 concern; this class only tracks the fan-out.
+that channel. Authorization (only members of an org may subscribe to
+``rt:org:{id}:*``) lives in ``realtime.channels``; this class tracks the
+fan-out — and, since it is already the process's register of live sockets,
+how many of them one principal is holding (:meth:`try_register`).
 """
 
 from __future__ import annotations
@@ -27,6 +29,45 @@ class ConnectionManager:
 
     def __init__(self) -> None:
         self._channels: dict[str, set[SendsText]] = defaultdict(set)
+        self._by_principal: dict[str, set[SendsText]] = {}
+        self._principal_of: dict[SendsText, str] = {}
+
+    def try_register(self, connection: SendsText, principal_id: str, limit: int) -> bool:
+        """Claim one of ``principal_id``'s connection slots. ``False`` when full.
+
+        Check and claim in one call because they must not be separable: two
+        sockets authenticating at the same moment would both read "4 < 5" and
+        both register. The event loop is single-threaded, and this function
+        never awaits, so the pair is atomic.
+
+        In-process on purpose. The cap bounds what *this* replica will hold —
+        tasks, Redis subscriptions and sockets are per process, and that is
+        what runs out. A cluster-wide cap would need a shared counter that has
+        to be reconciled every time a process dies with sockets open.
+        """
+        holders = self._by_principal.setdefault(principal_id, set())
+        if connection in holders:
+            return True
+        if len(holders) >= limit:
+            return False
+        holders.add(connection)
+        self._principal_of[connection] = principal_id
+        return True
+
+    def release(self, connection: SendsText) -> None:
+        """Give the slot back — called on disconnect, however it happened."""
+        principal_id = self._principal_of.pop(connection, None)
+        if principal_id is None:
+            return
+        holders = self._by_principal.get(principal_id)
+        if holders is None:
+            return
+        holders.discard(connection)
+        if not holders:
+            del self._by_principal[principal_id]
+
+    def connection_count(self, principal_id: str) -> int:
+        return len(self._by_principal.get(principal_id, ()))
 
     def subscribe(self, connection: SendsText, channel: str) -> None:
         self._channels[channel].add(connection)

@@ -73,7 +73,7 @@ def _alembic_config(url: str) -> Config:
     return config
 
 
-def _load_script(name: str) -> ModuleType:
+def load_script(name: str) -> ModuleType:
     """Load an ``infra/scripts`` module by path — they are operational scripts,
     not an installed package.
     """
@@ -113,7 +113,7 @@ def api_database_url(postgres_container: PostgresContainer) -> Iterator[str]:
     url = asyncio.run(_create_database(postgres_container.get_connection_url(), API_DB))
     command.upgrade(_alembic_config(url), "head")
     os.environ["DATABASE_URL_MIGRATIONS"] = url
-    asyncio.run(_load_script("seed").seed())
+    asyncio.run(load_script("seed").seed())
     yield url
 
 

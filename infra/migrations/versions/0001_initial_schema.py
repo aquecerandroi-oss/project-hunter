@@ -303,15 +303,19 @@ def _create_tables() -> None:
         sa.Column("consumer", sa.Text(), nullable=False),
         sa.Column("event_id", sa.Text(), nullable=False),
         sa.Column(
-            "processed_at",
+            "claimed_at",
             sa.TIMESTAMP(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
+        sa.Column("completed_at", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("consumer", "event_id", name=op.f("pk_processed_events")),
     )
     op.create_index(
-        "ix_processed_events_processed_at", "processed_events", ["processed_at"], unique=False
+        "ix_processed_events_claimed_at", "processed_events", ["claimed_at"], unique=False
+    )
+    op.create_index(
+        "ix_processed_events_completed_at", "processed_events", ["completed_at"], unique=False
     )
     op.create_table(
         "strategies",
@@ -3392,7 +3396,8 @@ def _drop_tables() -> None:
     op.drop_index("ix_system_events_component_created", table_name="system_events")
     op.drop_table("system_events")
     op.drop_table("strategies")
-    op.drop_index("ix_processed_events_processed_at", table_name="processed_events")
+    op.drop_index("ix_processed_events_completed_at", table_name="processed_events")
+    op.drop_index("ix_processed_events_claimed_at", table_name="processed_events")
     op.drop_table("processed_events")
     op.drop_table("plan_entitlements")
     op.drop_index(

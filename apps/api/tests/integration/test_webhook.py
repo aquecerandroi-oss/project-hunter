@@ -14,16 +14,16 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from svix.webhooks import Webhook
 
-from hunter_api.services import clerk_webhook
+from hunter_api.services import clerk_webhook, webhook_delivery
 from hunter_core.db.models.identity import OrganizationMember, User
 from hunter_core.db.models.system import AuditLog, ProcessedEvent
 from hunter_core.db.session import role_session, tenant_session
 from hunter_core.domain.enums import MemberStatus
 
-from .conftest import FAKE_WEBHOOK_SECRET, Actor, auth_header, create_org
+from .conftest import FAKE_WEBHOOK_SECRET, Actor, auth_header, create_org, load_script
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -138,9 +138,16 @@ async def test_a_replayed_delivery_changes_nothing(
             .select_from(ProcessedEvent)
             .where(ProcessedEvent.event_id == delivery_id)
         )
+        completed = await session.scalar(
+            select(ProcessedEvent.completed_at).where(ProcessedEvent.event_id == delivery_id)
+        )
     assert users == 1
     assert audits == 1, "a retried delivery must not add a second audit row"
     assert claimed == 1
+    assert completed is not None, (
+        "a delivery whose effect was applied is completed, and only a completed "
+        "row may answer a retry with 'duplicate'"
+    )
 
 
 async def test_user_updated_refreshes_the_mirror(
@@ -452,3 +459,129 @@ async def test_a_failed_delivery_leaves_no_claim_behind(
             .where(ProcessedEvent.event_id == delivery_id)
         )
     assert claimed == 0, "a delivery that did not take effect must not stay claimed"
+
+
+async def _age_claim(
+    session_factory: async_sessionmaker[AsyncSession], delivery_id: str, age_s: float
+) -> None:
+    """Push a claim's timestamp into the past — a crash, without the crash."""
+    async with role_session(session_factory, db_role="hunter_worker") as session:
+        await session.execute(
+            text(
+                "UPDATE processed_events "
+                "SET claimed_at = now() - make_interval(secs => :age_s) "
+                "WHERE event_id = :delivery_id"
+            ),
+            {"age_s": age_s, "delivery_id": delivery_id},
+        )
+
+
+async def test_a_claim_stranded_by_a_crash_is_retried_after_the_stale_window(
+    client: httpx.AsyncClient, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """A claim taken and never finished must not become a permanent "handled".
+
+    ``release_delivery`` covers the failure the process *sees*. It cannot cover
+    the one it does not: a pod evicted, an OOM kill, a lost database connection
+    between the claim and the effect. With a one-phase guard that row says
+    "already applied" forever, so every Svix retry is answered ``duplicate``
+    and the user is never mirrored — silently, with no error anywhere.
+
+    The second phase is what fixes it: an unfinished claim older than
+    ``webhook_claim_stale_s`` is available again.
+    """
+    subject = f"user_FAKE_stranded_{uuid.uuid4().hex[:8]}"
+    delivery_id = f"msg_FAKE_{uuid.uuid4().hex[:8]}"
+    payload = {"type": "user.created", "data": _clerk_user(subject, f"{subject}@example.test")}
+
+    # the claim is taken and the process disappears: no effect, no release
+    assert await webhook_delivery.claim_delivery(session_factory, delivery_id)
+
+    in_flight = await _post(client, payload, delivery_id)
+    assert in_flight.json()["status"] == "duplicate", (
+        "inside the window the claim is treated as in flight, so two live "
+        "retries still cannot both apply it"
+    )
+
+    await _age_claim(session_factory, delivery_id, 3600)
+    retried = await _post(client, payload, delivery_id)
+
+    assert retried.json() == {"status": "applied", "type": "user.created"}
+    async with role_session(session_factory, db_role="hunter_worker") as session:
+        mirrored = await session.scalar(
+            select(func.count()).select_from(User).where(User.external_auth_id == subject)
+        )
+        completed = await session.scalar(
+            select(ProcessedEvent.completed_at).where(ProcessedEvent.event_id == delivery_id)
+        )
+    assert mirrored == 1
+    assert completed is not None
+
+
+async def test_a_completed_claim_is_never_re_run_however_old_it_is(
+    client: httpx.AsyncClient, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """The stale window must not become a re-delivery window: age is only a
+    reason to retry a claim that never finished."""
+    subject = f"user_FAKE_done_{uuid.uuid4().hex[:8]}"
+    delivery_id = f"msg_FAKE_{uuid.uuid4().hex[:8]}"
+    payload = {"type": "user.created", "data": _clerk_user(subject, f"{subject}@example.test")}
+
+    assert (await _post(client, payload, delivery_id)).json()["status"] == "applied"
+    await _age_claim(session_factory, delivery_id, 30 * 86400)
+
+    assert (await _post(client, payload, delivery_id)).json() == {
+        "status": "duplicate",
+        "type": "user.created",
+    }
+
+
+async def test_the_pruner_drops_old_completed_rows_only_and_is_idempotent(
+    session_factory: async_sessionmaker[AsyncSession], api_database_url: str
+) -> None:
+    """Retention for ``processed_events``, and the rule about what it may take.
+
+    A completed row past the window is dead weight. An *unfinished* claim is
+    not: it is the record of a delivery that was never applied, and deleting it
+    would erase the only evidence of it. The second run deletes nothing, which
+    is what makes this safe to schedule.
+    """
+    unique = uuid.uuid4().hex[:8]
+    old_done = f"msg_FAKE_old_{unique}"
+    fresh_done = f"msg_FAKE_fresh_{unique}"
+    old_unfinished = f"msg_FAKE_stuck_{unique}"
+
+    async with role_session(session_factory, db_role="hunter_worker") as session:
+        await session.execute(
+            text(
+                "INSERT INTO processed_events (consumer, event_id, claimed_at, completed_at) "
+                "VALUES "
+                "('prune-test', :old_done, now() - interval '30 days', "
+                "  now() - interval '30 days'), "
+                "('prune-test', :fresh_done, now(), now()), "
+                "('prune-test', :old_unfinished, now() - interval '30 days', NULL)"
+            ),
+            {
+                "old_done": old_done,
+                "fresh_done": fresh_done,
+                "old_unfinished": old_unfinished,
+            },
+        )
+
+    pruner = load_script("prune_processed_events")
+    first = await pruner.prune()
+    second = await pruner.prune()
+
+    assert first >= 1
+    assert second == 0, "a second run must be a no-op, or this cannot be scheduled"
+    async with role_session(session_factory, db_role="hunter_worker") as session:
+        surviving = (
+            (
+                await session.execute(
+                    select(ProcessedEvent.event_id).where(ProcessedEvent.consumer == "prune-test")
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert set(surviving) == {fresh_done, old_unfinished}
