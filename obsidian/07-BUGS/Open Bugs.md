@@ -9,6 +9,22 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
 
 ## Abertos pela prova operacional da T1.6b (2026-09-05, sharding)
 
+- **HIGH (operacional, encontrado no fecho do M1) — o override do Compose não é aplicado quando o
+  `docker compose` é chamado só com o arquivo base, e o worker volta silenciosamente para 200
+  mercados.** `infra/docker/docker-compose.override.yml` é carregado automaticamente apenas na
+  descoberta padrão de arquivos; com `-f infra/docker/docker-compose.yml` (que é como o
+  `CLAUDE.md` documenta o comando) ele **não** entra, e `MARKET_UNIVERSE_SIZE` cai no padrão do
+  código, que é 200. Medido na noite de 2026-09-05, minutos depois da aprovação do M1: o container
+  foi recriado por outro fluxo, `docker inspect` não mostrava nenhuma das duas variáveis, e a sonda
+  devolveu `markets_monitored: 200`, `markets_degraded: 200`, `markets_ok: 0`, hot state completo em
+  **7,0%** — exatamente o colapso que a prova da T1.6b mediu para um processo com 200 mercados.
+  Cenário: qualquer `docker compose -f infra/docker/docker-compose.yml up -d` devolve a máquina à
+  configuração que não se sustenta, sem aviso, e a tela do Everton volta a ficar toda `degraded`.
+  **Correção certa:** mover o padrão honesto (`MARKET_UNIVERSE_SIZE: "50"`) para o próprio
+  `docker-compose.yml`, em vez de depender do override; o override passa a servir só para
+  *aumentar* o universo. Não foi feito agora porque `infra/docker/docker-compose.yml` está sendo
+  editado pela tarefa S2 neste momento. Container restaurado à mão em 23:39 UTC com os dois
+  arquivos explícitos. **Dono: primeiro item do M2, junto do heartbeat por shard.**
 Todos medidos. Prova em `.claude/state/t16b-proof.md`. A HIGH-1 da T1.6 abaixo está
 **resolvida** por esta prova: com 4 shards × 50 mercados, `markets_ok` = 198/200 (99,0%),
 0 stale, 0 unavailable, 200/200 velas finais por minuto e CPU média por shard entre 36,6% e

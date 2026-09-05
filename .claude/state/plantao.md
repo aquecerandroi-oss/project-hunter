@@ -47,5 +47,15 @@ fechada, então não há etapa de diálogo a repetir.
    pydantic é 15% do tempo amostrado pelo py-spy, resolvendo defaults a cada evento.
 3. Gaps de mercados não monitorados que nunca fecham; rebalanceamento na morte de um shard.
 
+## Achado no fecho, corrigido à mão e registrado
+O worker foi recriado por outro fluxo **sem o override** e voltou silenciosamente a 200 mercados:
+`markets_ok` 0, tudo `degraded`, hot state completo em 7,0% — o colapso que a prova mediu. Causa: o
+`docker-compose.override.yml` só entra na descoberta padrão de arquivos, e o comando documentado no
+`CLAUDE.md` usa `-f` explícito. Restaurado à mão às 23:39 UTC (`markets_ok` 49/50, hot state 98%) e
+registrado como HIGH operacional em [[Open Bugs]]. **A correção certa é mover `MARKET_UNIVERSE_SIZE:
+"50"` para o próprio `docker-compose.yml`**, deixando o override só para aumentar — não foi feita
+agora porque `infra/docker/docker-compose.yml` está sendo editado pela S2. É o primeiro item do M2,
+junto do heartbeat por shard.
+
 ## Precisa do Everton
 - Nada bloqueante. Opcional: `.env` e logins na VPS (`ssh hunter-vps`).
