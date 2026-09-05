@@ -15,7 +15,7 @@ pnpm --filter @hunter/web typecheck
 pnpm --filter @hunter/web test     # vitest
 ```
 
-`pnpm --filter @hunter/web e2e` is a placeholder ("e2e lands in T12") until Playwright specs exist.
+`pnpm --filter @hunter/web e2e` runs the Playwright suite in `tests/e2e` (public surfaces, API health, and the Clerk-gated signup → onboarding flow that self-skips without `CLERK_E2E_*` keys).
 
 ## Environment variables
 
