@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "tests/e2e"
 allowBuilds:
   unrs-resolver: true
 # 24h supply-chain cooldown: a newly-published version isn't installable until it has existed this long.

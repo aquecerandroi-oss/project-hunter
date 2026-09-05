@@ -194,6 +194,71 @@ jobs:
             echo "gen:types not available yet (T09)"
           fi
 
+  # docs/plans/M0.md T12. Always runs (never job-level-skipped: `gate` below
+  # treats any `skipped` need as a failure, same reasoning as docker-build's
+  # step-level guards) — public.spec.ts and api-health.spec.ts need no Clerk
+  # keys at all, and signup-onboarding.spec.ts self-skips with its own
+  # reason when CLERK_E2E_PUBLISHABLE_KEY/CLERK_E2E_SECRET_KEY aren't set.
+  # Those two are real Clerk dev-instance keys (test mode on), distinct from
+  # the fake NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY/CLERK_SECRET_KEY used to build
+  # the `web` image when no secrets are configured.
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    needs: [node, python-test]
+    env:
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_E2E_PUBLISHABLE_KEY || 'pk_test_Y2xlcmsuZXhhbXBsZS5jb20k' }}
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_E2E_SECRET_KEY || 'sk_test_FAKE_CI_BUILD' }}
+      CLERK_E2E_PUBLISHABLE_KEY: ${{ secrets.CLERK_E2E_PUBLISHABLE_KEY }}
+      CLERK_E2E_SECRET_KEY: ${{ secrets.CLERK_E2E_SECRET_KEY }}
+      E2E_BASE_URL: http://localhost:3000
+      E2E_API_URL: http://localhost:8000
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Clerk E2E keys status
+        run: |
+          if [ -n "$CLERK_E2E_PUBLISHABLE_KEY" ] && [ -n "$CLERK_E2E_SECRET_KEY" ]; then
+            echo "CLERK_E2E_* secrets present -- signup-onboarding.spec.ts will run against a real Clerk dev instance"
+          else
+            echo "CLERK_E2E_* secrets not configured -- signup-onboarding.spec.ts will self-skip (public + api-health specs still run)"
+          fi
+      - name: docker compose up (postgres, redis, api, worker, web)
+        run: docker compose -f infra/docker/docker-compose.yml up -d --build
+      - name: wait for apps/api /ready
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -sf http://localhost:8000/ready > /dev/null; then
+              echo "apps/api ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "apps/api never became ready" >&2
+          docker compose -f infra/docker/docker-compose.yml logs api migrate
+          exit 1
+      - name: install chromium
+        run: pnpm --filter @hunter/e2e install-browsers
+      - name: run e2e suite
+        run: pnpm --filter @hunter/e2e test
+      - name: upload e2e artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: tests/e2e/artifacts
+          retention-days: 7
+      - name: docker compose down
+        if: always()
+        run: docker compose -f infra/docker/docker-compose.yml down
+
   security:
     name: security
     runs-on: ubuntu-latest

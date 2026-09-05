@@ -1,0 +1,9 @@
+{
+  "extends": "@hunter/config/tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "@playwright/test"],
+    "noEmit": true
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "artifacts"]
+}

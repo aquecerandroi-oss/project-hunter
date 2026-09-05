@@ -11,7 +11,7 @@
     "lint:types": "eslint --config eslint.typed.config.mjs .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "e2e": "echo e2e lands in T12"
+    "e2e": "pnpm --filter @hunter/e2e test"
   },
   "dependencies": {
     "next": "^15.5.25",
