@@ -1,0 +1,18 @@
+{
+  "closeTime": 1788583486766,
+  "count": 3362659,
+  "firstId": 8050911552,
+  "highPrice": "81377.70",
+  "lastId": 8054287259,
+  "lastPrice": "79497.30",
+  "lastQty": "0.059",
+  "lowPrice": "78618.10",
+  "openPrice": "80999.30",
+  "openTime": 1788497040000,
+  "priceChange": "-1502.00",
+  "priceChangePercent": "-1.854",
+  "quoteVolume": "13570225385.90",
+  "symbol": "BTCUSDT",
+  "volume": "169789.646",
+  "weightedAvgPrice": "79923.75"
+}

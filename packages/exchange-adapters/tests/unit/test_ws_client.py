@@ -1,0 +1,198 @@
+"""BinanceWsClient: reconnect + resubscribe, backoff, malformed messages.
+
+``connect_fn`` is a fake async context manager instead of a real socket, so
+every test controls exactly what "the network" does and never waits real
+time (backoff sleep is captured, not awaited). Route-splitting, per-connection
+``connection_states()``, and the connect timeout live in
+``test_ws_client_states.py`` (kept separate to stay under the 350-line budget).
+"""
+
+from __future__ import annotations
+
+import asyncio
+from decimal import Decimal
+
+import pytest
+
+from hunter_exchanges.base import StreamChannel
+from hunter_exchanges.binance.ws import BinanceWsClient
+
+from .ws_test_helpers import (
+    FakeConnection,
+    ScriptedConnector,
+    agg_trade_raw,
+    collect,
+    envelope,
+)
+
+pytestmark = pytest.mark.unit
+
+
+async def test_stream_yields_normalized_events_from_a_connection() -> None:
+    conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw())])
+    connector = ScriptedConnector([conn])
+    client = BinanceWsClient(connect_fn=connector, sleep=lambda _s: asyncio.sleep(0))
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert events[0].kind == "trade"
+    assert events[0].price == Decimal("100")
+    await client.aclose()
+
+
+async def test_reconnects_after_a_connection_failure_and_resubscribes_same_url() -> None:
+    good_conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw())])
+    connector = ScriptedConnector([ConnectionError("boom"), good_conn])
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    client = BinanceWsClient(connect_fn=connector, sleep=fake_sleep, rand=lambda: 0.0)
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert events[0].kind == "trade"
+    assert len(connector.urls) == 2
+    assert connector.urls[0] == connector.urls[1]  # same streams re-requested: "resubscribe"
+    assert sleeps == [1.0]  # first backoff attempt, no jitter (rand=0)
+    await client.aclose()
+
+
+async def test_backoff_grows_exponentially_up_to_the_cap() -> None:
+    good_conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw())])
+    connector = ScriptedConnector(
+        [ConnectionError("1"), ConnectionError("2"), ConnectionError("3"), good_conn]
+    )
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    client = BinanceWsClient(connect_fn=connector, sleep=fake_sleep, rand=lambda: 0.0)
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert events[0].kind == "trade"
+    assert sleeps == [1.0, 2.0, 4.0]
+    await client.aclose()
+
+
+async def test_malformed_envelope_is_counted_and_never_raised() -> None:
+    conn = FakeConnection(["not json at all", envelope("btcusdt@aggTrade", agg_trade_raw())])
+    connector = ScriptedConnector([conn])
+    client = BinanceWsClient(connect_fn=connector, sleep=lambda _s: asyncio.sleep(0))
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert len(events) == 1  # the malformed message never reached the queue
+    assert client.malformed_count == 1
+    await client.aclose()
+
+
+async def test_malformed_message_body_is_counted_and_never_raised() -> None:
+    bad_trade = agg_trade_raw()
+    del bad_trade["p"]  # missing required field -> MalformedMessage from normalize
+    conn = FakeConnection(
+        [envelope("btcusdt@aggTrade", bad_trade), envelope("btcusdt@aggTrade", agg_trade_raw())]
+    )
+    connector = ScriptedConnector([conn])
+    client = BinanceWsClient(connect_fn=connector, sleep=lambda _s: asyncio.sleep(0))
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert len(events) == 1
+    assert client.malformed_count == 1
+    await client.aclose()
+
+
+async def test_connection_state_reflects_no_connection_before_streaming_starts() -> None:
+    client = BinanceWsClient(connect_fn=ScriptedConnector([FakeConnection([])]))
+
+    assert client.connection_state() == "disconnected"
+    await client.aclose()
+
+
+async def test_quiet_socket_rotates_cleanly_at_the_rotation_deadline() -> None:
+    """F7: ``recv()`` must have a deadline — a connection whose symbols go
+    quiet must still rotate at ``max_connection_age_s`` instead of hanging
+    until Binance's own 24h cut (or forever, in a half-open-socket case)."""
+    quiet_conn = FakeConnection([])  # recv() blocks forever: a quiet/half-open socket
+    good_conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw())])
+    connector = ScriptedConnector([quiet_conn, good_conn])
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    client = BinanceWsClient(
+        connect_fn=connector,
+        sleep=fake_sleep,
+        rand=lambda: 0.0,
+        max_connection_age_s=0.02,  # tiny real deadline
+        idle_timeout_s=10.0,  # much larger: the rotation deadline fires first
+    )
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert events[0].kind == "trade"
+    assert len(connector.urls) == 2
+    assert sleeps == []  # a clean rotation never backs off
+    await client.aclose()
+
+
+async def test_idle_socket_reconnects_with_backoff_before_the_rotation_deadline() -> None:
+    """F7: an idle timeout reached *before* the rotation deadline is a
+    connection failure (half-open socket, dead symbols) — backoff and
+    reconnect, never silently wait for the 24h cut."""
+    quiet_conn = FakeConnection([])
+    good_conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw())])
+    connector = ScriptedConnector([quiet_conn, good_conn])
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    client = BinanceWsClient(
+        connect_fn=connector,
+        sleep=fake_sleep,
+        rand=lambda: 0.0,
+        max_connection_age_s=100.0,  # far away
+        idle_timeout_s=0.02,  # tiny real deadline: fires first
+    )
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert events[0].kind == "trade"
+    assert len(connector.urls) == 2
+    assert sleeps == [1.0]  # a genuine connection failure backs off like any other
+    await client.aclose()
+
+
+async def test_proactive_reconnect_before_max_connection_age() -> None:
+    """A connection older than ``max_connection_age_s`` is dropped and re-opened,
+    even with no error — Binance's own 24h limit is never hit."""
+    first_conn = FakeConnection([])  # never yields real data; ages out immediately
+    second_conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw())])
+    connector = ScriptedConnector([first_conn, second_conn])
+    # 1st call: connect_attempt_started_monotonic (0.0). 2nd: connected_at
+    # (0.0, same instant). 3rd: the age check, which already reads 100 — past
+    # max_connection_age_s=1.0 — so it reconnects without ever calling recv()
+    # on the first (aged-out) connection.
+    clock_values = iter([0.0, 0.0, 100.0])
+
+    def fake_clock() -> float:
+        return next(clock_values, 100.0)
+
+    client = BinanceWsClient(
+        connect_fn=connector,
+        clock=fake_clock,
+        sleep=lambda _s: asyncio.sleep(0),
+        max_connection_age_s=1.0,
+    )
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert events[0].kind == "trade"
+    assert len(connector.urls) == 2
+    await client.aclose()

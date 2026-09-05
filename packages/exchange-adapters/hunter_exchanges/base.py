@@ -10,6 +10,7 @@ drive them in tests.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
@@ -35,6 +36,34 @@ class StreamChannel(StrEnum):
     KLINE_1M = "kline_1m"
     MARK_PRICE = "mark_price"  # funding, mark, index
     LIQUIDATIONS = "liquidations"
+
+
+@dataclass
+class ConnectionState:
+    """Point-in-time status of one WebSocket connection an adapter owns.
+
+    Additive (``docs/plans/M1.md`` T1.2): not a required member of
+    :class:`ExchangeAdapter` yet — ``connection_state()`` (the aggregate
+    worst-of-all-connections string) stays the only Protocol requirement so
+    an adapter/fake that predates this field isn't forced to implement
+    per-connection reporting mid-milestone. An adapter that has one may
+    expose it via a plain ``connection_states() -> dict[str, ConnectionState]``
+    method. ``ws_state`` mirrors :meth:`ExchangeAdapter.connection_state`'s
+    values. ``last_data_event_*`` only ever advances on an actual data frame
+    (ACK/ping never count).
+    """
+
+    route: str
+    ws_state: str
+    subscriptions: tuple[str, ...] = ()
+    last_data_event_monotonic: float | None = None
+    last_data_event_ts: datetime | None = None
+    reconnects: int = 0
+    connect_attempt_started_monotonic: float | None = None
+    dropped_events: int = 0
+    """Events discarded by the adapter's bounded internal queue (T1.2b) to
+    keep a slow consumer from growing memory without limit — never counts a
+    dropped final kline, which the queue is never allowed to discard."""
 
 
 class ExchangeError(Exception):
@@ -107,3 +136,54 @@ class ExchangeAdapter(Protocol):
         ...
 
     async def aclose(self) -> None: ...
+
+
+@runtime_checkable
+class ExchangeAdapterExtras(Protocol):
+    """T1.2b capabilities, kept out of :class:`ExchangeAdapter` on purpose.
+
+    Merging these four into ``ExchangeAdapter`` directly would make every
+    ``adapter: ExchangeAdapter``-typed call site require them structurally
+    (pyright, not just ``isinstance``) — breaking on the market-worker's own
+    ``tests/fakes.py::FakeAdapter``, which this package must not modify. Every
+    caller that wants one of these already checks for it defensively
+    (``getattr(adapter, "update_subscriptions", None)`` in
+    ``hunter_market_worker.streaming``/``funding``), so this Protocol exists
+    only for adapters (:class:`~hunter_exchanges.binance.BinanceAdapter`,
+    :class:`~hunter_exchanges.testing.fake_adapter.FakeExchangeAdapter`) that
+    implement the full, honest shape to type-check against.
+    """
+
+    async def fetch_realized_funding(
+        self, symbol: str, start: datetime, end: datetime | None = None, *, limit: int = 1000
+    ) -> list[NormalizedFunding]:
+        """Settled funding history (``funding_kind="realized"``), for backfill."""
+        ...
+
+    async def server_time(self) -> datetime:
+        """The exchange's own clock — never the local one, for recovery cutoffs."""
+        ...
+
+    def connection_states(self) -> dict[str, ConnectionState]:
+        """Per-connection detail; see :class:`ConnectionState`."""
+        ...
+
+    async def update_subscriptions(
+        self, added: Sequence[str], removed: Sequence[str], channels: Sequence[StreamChannel]
+    ) -> None:
+        """Apply an incremental universe diff to an open :meth:`stream` call.
+
+        Symbols that stay subscribed must never be resubscribed — only the
+        diff (``added``/``removed``) travels to the exchange.
+        """
+        ...
+
+    async def restart_connection(self, key: str) -> None:
+        """Cancel and restart exactly one connection's task in place (F8).
+
+        Every other connection is left completely untouched — unlike a
+        blanket ``aclose()`` + reopen-everything fallback, which turns one
+        stalled connection into an avoidable book/ticker hole across the
+        whole monitored universe.
+        """
+        ...
