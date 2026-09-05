@@ -13,7 +13,16 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ForeignKey, Index, Integer, Text, UniqueConstraint, func, text
+from sqlalchemy import (
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Integer,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -32,6 +41,7 @@ from hunter_core.db.models._common import (
 from hunter_core.domain.enums import (
     AgentStatus,
     OutcomeResult,
+    ShadowTrackingState,
     SignalStatus,
     StatsWindow,
     StrategyVersionStatus,
@@ -68,6 +78,14 @@ class StrategyVersion(Base, UUIDPrimaryKeyMixin):
     parameters_schema: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=JSONB_EMPTY)
     default_parameters: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=JSONB_EMPTY)
     code_ref: Mapped[str | None] = mapped_column(Text)
+    params_format: Mapped[int] = mapped_column(Integer, server_default="1")
+    """Which canonical serialisation ``params_hash`` was computed with.
+
+    ``hunter_core.strategies.canonical`` owns format 1. It is part of what the
+    first activation freezes: rehashing an active version under a new format
+    would silently split one experiment in two (SHADOW-LAB.md §1).
+    """
+
     changelog: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     activated_at: Mapped[datetime | None]
@@ -79,6 +97,9 @@ class AgentSignal(Base, UUIDPrimaryKeyMixin):
 
     __tablename__ = "agent_signals"
     __table_args__ = (
+        # the target of shadow_episodes' composite FK: an episode may only hold a
+        # signal of its own strategy version and market (0002_shadow_lab)
+        UniqueConstraint("id", "strategy_version_id", "market_id", name="uq_agent_signals_id_slot"),
         Index("ix_agent_signals_market_emitted", "market_id", "emitted_at"),
         Index("ix_agent_signals_version_emitted", "strategy_version_id", "emitted_at"),
         Index("ix_agent_signals_status_expires", "status", "expires_at"),
@@ -115,6 +136,19 @@ class SignalOutcome(Base):
     """System shadow, 1:1 with a signal — the evidence behind "shadow performance"."""
 
     __tablename__ = "signal_outcomes"
+    __table_args__ = (
+        CheckConstraint(
+            "(tracking_state = 'no_entry') = (no_entry_reason IS NOT NULL) "
+            "AND (tracking_state = 'censored') = (censored_reason IS NOT NULL) "
+            "AND (no_entry_reason IS NULL OR char_length(no_entry_reason) BETWEEN 1 AND 64) "
+            "AND (censored_reason IS NULL OR char_length(censored_reason) BETWEEN 1 AND 64)",
+            name="no_entry_and_censored_reasons",
+        ),
+        CheckConstraint(
+            "(result = 'open') = (tracking_state <> 'terminal')",
+            name="tracking_state_matches_result",
+        ),
+    )
 
     signal_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("agent_signals.id", ondelete="CASCADE"), primary_key=True
@@ -134,6 +168,33 @@ class SignalOutcome(Base):
     exit_ts: Mapped[datetime | None]
     r_multiple: Mapped[Decimal | None]
     tracked_until: Mapped[datetime | None]
+    tracking_state: Mapped[ShadowTrackingState] = mapped_column(
+        pg_enum("shadow_tracking_state"), server_default=ShadowTrackingState.PENDING_ENTRY.value
+    )
+    """Where the *tracking* is, independently of ``result`` (SHADOW-LAB.md §4).
+
+    ``result`` is the financial outcome and ``OutcomeResult`` has no member for
+    "unknown", so a ``no_entry`` or ``censored`` row keeps ``result = 'open'``
+    and this column is what says it is not open. The CHECK above states the
+    invariant the other way round: ``terminal`` if and only if the result
+    resolved.
+    """
+
+    no_entry_reason: Mapped[str | None] = mapped_column(Text)
+    """Why no entry happened (``late``, ``geometry``) — never null when
+    ``tracking_state = 'no_entry'``, always null otherwise."""
+
+    censored_reason: Mapped[str | None] = mapped_column(Text)
+    """Why the outcome cannot be resolved (an unrecoverable bar). Censorship is
+    never turned into ``expired``."""
+
+    meta: Mapped[dict[str, Any]] = mapped_column("meta", JSONB, server_default=JSONB_EMPTY)
+    """Excursion coverage and bounds, cost assumptions, funding availability —
+    ``{unit, method, coverage, mfe_complete_bars, mae_complete_bars, bounds,
+    bar_windows, ambiguous, initial_risk, reference_price}`` (SHADOW-LAB.md §5).
+    The canonical ``mfe``/``mae`` columns stay NULL when the true extreme is
+    undetermined; this is where the honest partial answer lives."""
+
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
 

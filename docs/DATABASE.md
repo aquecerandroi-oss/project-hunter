@@ -752,3 +752,204 @@ transformaria um dado estranho em falha de ingestão.
 chamadas `metadata` são mapeadas para o atributo Python `meta`
 (`Anomaly.meta`, `Order.meta`, ...). A classe do modelo de `market_regimes` é
 `MarketRegimeRow` para não colidir com o enum `MarketRegime`.
+
+## 16. Shadow Lab (`0002_shadow_lab`)
+
+Primeira revisão depois do schema inicial. Entrega a metade **durável** do
+`docs/plans/SHADOW-LAB.md` (tarefa S0): o que precisa ser verdade *antes* de
+qualquer `strategy_version` ser ativada, porque um experimento sombra cujos
+parâmetros, estado de acompanhamento ou entrega de eventos podem mudar depois
+produz números em que ninguém pode acreditar. Nenhuma tabela nova é de tenant:
+como `agent_signals` e `signal_outcomes`, a pesquisa sombra é global (§1.1), sem
+`organization_id` e sem RLS; `hunter_app` só lê, `hunter_worker` escreve.
+
+**Numeração.** Esta é a `0002` que o `docs/plans/M2.md` (T2.1) dizia que ia
+escrever. T2.1 passa a **depender** desta revisão em vez de recriar os seus
+objetos e entra como `0003`.
+
+### 16.1 `strategy_versions`: congelada pela primeira ativação
+
+```
+strategy_versions  (+) params_format INT NOT NULL DEFAULT 1
+```
+
+`params_format` é a versão do formato canônico com que o `params_hash` foi
+calculado (`hunter_core.strategies.canonical`, formato 1: chaves ordenadas,
+número como string decimal normalizada sem zeros à direita nem expoente,
+timestamps ISO-8601 UTC com `Z`, ausentes como `null`, listas na ordem dada).
+
+A trigger `strategy_versions_freeze_update` (`BEFORE UPDATE ... WHEN (OLD.activated_at
+IS NOT NULL)`) rejeita qualquer alteração de `strategy_id`, `version`,
+`code_ref`, `parameters_schema`, `default_parameters`, `params_format` e
+`activated_at` — **inclusive `SET activated_at = NULL`**, que de outro modo
+descongelaria a linha — em qualquer `status` (ativa, deprecated, reativada).
+`status`, `changelog` e `deprecated_at` continuam mutáveis: descrevem o ciclo de
+vida da versão, não o seu conteúdo. A comparação é `IS DISTINCT FROM` sobre o
+valor, então reescrever o mesmo JSONB com outra ordem de chaves não é alteração.
+A **primeira** ativação (`activated_at NULL` para um valor) passa, uma única vez.
+
+**Consequência para `infra/scripts/seed.py`.** O seed faz
+`ON CONFLICT (strategy_id, version) DO UPDATE SET code_ref = excluded.code_ref`.
+Enquanto a v1 estiver `draft` isso é inofensivo; depois da ativação, reexecutar o
+seed com o **mesmo** `code_ref` continua passando (a trigger compara valores e não
+vê alteração), e com um `code_ref` **diferente** o seed falha alto — que é o
+comportamento correto: mudar o código de referência de um experimento em curso é
+uma versão nova, não um `UPDATE`. Quem ativar (script de ops da S2) precisa
+gravar o `code_ref` definitivo **antes** da ativação.
+
+`strategy_versions_freeze_delete` (`BEFORE DELETE`, mesma condição) é o outro
+lado: uma linha ativada que pudesse ser apagada poderia ser reinserida com o
+mesmo `id` e outros parâmetros, e todo sinal que já aponta para ela mudaria de
+significado em silêncio. **Consequência aceita:** apagar uma `strategy` cuja
+versão já foi ativada também falha, porque o `ON DELETE CASCADE` bate na trigger.
+Encerrar uma versão é `status = 'deprecated'`, não `DELETE`.
+
+### 16.2 `signal_outcomes`: o terceiro eixo
+
+```
+signal_outcomes  (+) tracking_state shadow_tracking_state NOT NULL DEFAULT 'pending_entry'
+                 (+) no_entry_reason TEXT, censored_reason TEXT
+                 (+) meta JSONB NOT NULL DEFAULT '{}'
+```
+
+`shadow_tracking_state` = `pending_entry | active | terminal | no_entry | censored`.
+São três eixos distintos: `signal_status` (validade do sinal), `outcome_result`
+(como o trade hipotético terminou) e `tracking_state` (onde o acompanhamento
+está). `terminal`, `no_entry` e `censored` não reabrem. `meta` guarda as
+excursões honestas do item 5 do plano (`{unit, method, coverage,
+mfe_complete_bars, mae_complete_bars, bounds, bar_windows, ambiguous,
+initial_risk, reference_price}`); `mfe`/`mae` canônicos continuam nulos quando o
+extremo é indeterminado.
+
+Dois CHECKs:
+
+- `ck_signal_outcomes_no_entry_and_censored_reasons` — `no_entry` se e somente se
+  `no_entry_reason` não nulo, `censored` se e somente se `censored_reason` não
+  nulo, cada motivo com 1 a 64 caracteres (um `NOT NULL` sozinho aceitaria a
+  string vazia, que não registra nada) e nulo quando não se aplica;
+- `ck_signal_outcomes_tracking_state_matches_result` —
+  `(result = 'open') = (tracking_state <> 'terminal')`.
+
+**Backfill antes do CHECK.** A migração roda um `UPDATE` derivado das colunas que
+já existem (`result <> 'open'` → `terminal`; `result = 'open'` com `entry_ts` →
+`active`; o resto → `pending_entry`) *antes* de instalar a bicondicional. Sem
+ele, um banco que já tivesse um outcome encerrado receberia o default
+`pending_entry`, violaria o CHECK e abortaria o upgrade — a migração funcionaria
+só em banco vazio (achado da revisão da Astra; há teste com `0001` populada).
+
+Uma linha **contraditória** — `result = 'open'` **com** `exit_ts` preenchido — não
+tem `tracking_state` derivável, e chamá-la de `pending_entry` devolveria ao worker
+um acompanhamento já encerrado como se esperasse entrada. A migração **recusa o
+upgrade** com a contagem e a instrução (dar a ela o resultado real e reexecutar),
+em vez de adivinhar; em banco consistente é um no-op.
+
+**Desvio deliberado do brief da S0**, registrado aqui porque muda o contrato: o
+brief propunha `result <> 'open'` implicando `tracking_state IN ('terminal','censored')`.
+`outcome_result` (§6) não tem membro para "desconhecido", e o plano proíbe
+transformar censura em `expired`; forçar uma linha `censored` a carregar um dos
+quatro resultados financeiros seria exatamente essa mentira. Então `censored` e
+`no_entry` mantêm `result = 'open'` e o CHECK vira a bicondicional acima:
+**`terminal` se e somente se o resultado resolveu**. A consequência vale para a
+API e para as métricas (S3): *quem decide se um acompanhamento está aberto é
+`tracking_state`, nunca `result`* — `no_entry` e `censored` não contam como
+abertos, e censura não conta como `expired`.
+
+### 16.3 `shadow_episodes` (sistema)
+
+```
+shadow_episodes
+  id, strategy_version_id -> strategy_versions, market_id -> markets,
+  cohort TEXT, episode_id UUID, last_bar_close TIMESTAMPTZ,
+  armed BOOLEAN NOT NULL DEFAULT true, open_outcome_signal_id -> agent_signals (SET NULL),
+  created_at, updated_at
+  UNIQUE (strategy_version_id, market_id, cohort)            -- uq_shadow_episodes_slot
+  UNIQUE (open_outcome_signal_id) WHERE open_outcome_signal_id IS NOT NULL
+  INDEX  (market_id)             WHERE open_outcome_signal_id IS NOT NULL   -- tracking_hold
+  CHECK  (cohort ~ prospective|replay:<uuid>)                -- ck_shadow_episodes_cohort_format
+  FK (open_outcome_signal_id) -> signal_outcomes (signal_id)
+  FK (open_outcome_signal_id, strategy_version_id, market_id)
+     -> agent_signals (id, strategy_version_id, market_id)   -- exige UNIQUE novo em agent_signals
+```
+
+**Integridade episódio ↔ outcome (achado da revisão da Astra).** Uma FK de uma
+coluna só garantia "o sinal existe" e mais nada: um sinal de BTC podia ocupar o
+slot de ETH — a FK ficava satisfeita, o `tracking_hold` segurava as velas de ETH
+e BTC, o mercado de que o outcome precisa, ficava livre para sair do universo e
+perder o histórico. Duas FKs fecham isso: uma aponta para `signal_outcomes`
+(o outcome tem de existir; um slot não segura uma decisão que ninguém acompanha)
+e a composta amarra o sinal à versão **e** ao mercado do próprio slot, no mesmo
+padrão do §15.4 — por isso `agent_signals` ganhou
+`UNIQUE (id, strategy_version_id, market_id)` (`uq_agent_signals_id_slot`).
+
+O que o DDL ainda **não** garante, e portanto continua sendo invariante da S2
+(transação única + consulta de reconciliação), está declarado aqui de propósito:
+que o outcome apontado esteja aberto (`pending_entry`/`active`) e que a coorte
+dele seja a do slot — a coorte vive no envelope da decisão, não numa coluna. O
+item do aceite S0 "sem acompanhamentos `pending_entry|active` órfãos" está,
+portanto, **parcialmente** coberto por DDL.
+
+Um acompanhamento por (versão, mercado, coorte); replay nunca ocupa o bloqueio
+do prospectivo. `cohort` é texto e não `ENUM` porque um replay carrega o seu
+`run_id` — o conjunto é aberto em valor e fechado em forma, e a mesma regex vive
+em `hunter_core.domain.enums.SHADOW_COHORT_PATTERN` e no CHECK. `armed` nasce
+`true` e é durável: rearme depende de uma barra elegível com a condição falsa
+*após* o término do acompanhamento anterior, e dado ausente não rearma — não é
+algo que um worker possa recalcular de memória depois de um restart. O índice
+parcial por `market_id` é a consulta do `tracking_hold` (§8 do plano): um mercado
+sai do universo monitorado, mas não enquanto um acompanhamento sombra ainda
+precisa das velas dele.
+
+### 16.4 `shadow_outbox` (sistema)
+
+```
+shadow_outbox
+  id BIGSERIAL PK, event_id UUID UNIQUE, stream TEXT, payload JSONB NOT NULL DEFAULT '{}',
+  created_at, dispatched_at (null = pendente), attempts INT NOT NULL DEFAULT 0, last_error TEXT
+  INDEX (id) WHERE dispatched_at IS NULL                     -- fila do despachante
+  CHECK attempts >= 0, CHECK char_length(stream) > 0
+```
+
+Escrita na **mesma transação** do sinal, do outcome e do episódio; o despachante,
+a reconciliação e a entrega idempotente são a S2. `event_id` único é o que faz
+uma reentrega enfileirar uma vez só (`event_id = signal_id` para
+`shadow.signals.emitted`). T2.9 a absorve depois preservando pendências e
+identidades.
+
+**Dois desvios registrados:** (a) a PK é `BIGSERIAL`, não UUID v7 (§1) — dá ao
+despachante uma ordem estável e barata para drenar a fila; nada aqui é dinheiro
+nem dado de tenant. **Não é marca d'água:** a sequence tem lacunas (rollback) e a
+ordem dela não é a ordem de commit — a transação A pode pegar 10, a B pegar 11 e
+commitar primeiro, e um cursor em 11 passaria por cima da A. O predicado de
+pendência é `dispatched_at IS NULL`, que é exatamente o que o índice parcial
+serve (achado da revisão da Astra); (b) por consequência, é a
+**primeira sequence do schema**, e
+`hunter_worker` precisa de `GRANT USAGE ON SEQUENCE shadow_outbox_id_seq` — um
+grant de tabela sozinho passaria em `has_table_privilege` e falharia em todo
+`INSERT` com *permission denied for sequence*. Há teste que insere como o papel,
+em vez de perguntar.
+
+### 16.5 Tipos por revisão (`ddl/enums.py`)
+
+`create_enum_types()` iterava `ALL_ENUMS` em tempo de execução, o que era
+inofensivo com uma revisão só e virou armadilha com duas: acrescentar
+`shadow_tracking_state` a `ALL_ENUMS` fazia a `0001` criá-lo retroativamente e a
+`0002` falhar com *type already exists*. Cada revisão passa a nomear a sua tupla
+congelada (`INITIAL_ENUMS`, 44 tipos; `SHADOW_ENUMS`), como as listas de grant do
+§15.6, e `test_migrations.py::test_every_enum_type_belongs_to_exactly_one_revision`
+prova que as tuplas continuam particionando `ALL_ENUMS`.
+
+**Limitação conhecida (follow-up):** só os *nomes* dos tipos estão congelados por
+revisão; os **rótulos** ainda são lidos de `ALL_ENUMS` em tempo de execução, então
+acrescentar um membro a um enum existente continua alterando retroativamente o
+que a `0001` cria. Congelar os rótulos por revisão é trabalho de quem fizer a
+próxima migração que acrescente um valor de enum (M2 · T2.1).
+
+Pelo mesmo motivo as quatro classes de grant do §15.6 continuam congeladas em
+`0001`: as tabelas desta revisão estão em `ddl/shadow.py`
+(`SHADOW_APP_READ_ONLY_TABLES`, `SHADOW_WORKER_WRITE_TABLES`, `SHADOW_SEQUENCES`)
+e `test_schema_privileges.py` une as listas — toda tabela continua classificada
+exatamente uma vez.
+
+Nada nesta revisão depende de estado de sessão: sem prepared statement de sessão,
+sem `LISTEN/NOTIFY`, sem advisory lock de sessão. O bloqueio de um episódio é a
+própria linha, dentro da transação.

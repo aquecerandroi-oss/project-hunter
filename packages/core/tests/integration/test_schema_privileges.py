@@ -39,6 +39,17 @@ def _security() -> object:
     return migration_ddl("security")
 
 
+def _shadow_tables(name: str) -> tuple[str, ...]:
+    """A grant-list constant added by a revision after ``0001``.
+
+    ``ddl.tables``' four classes are frozen as of ``0001`` — a revision must
+    describe the schema *as of that revision* — so ``0002_shadow_lab`` states
+    its own lists in ``ddl/shadow.py`` and this test unions them. Every table
+    still has to land in exactly one class.
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("shadow"), name))
+
+
 def _security_tables(name: str) -> tuple[str, ...]:
     """A frozen grant-list constant from ``ddl.security``, correctly typed.
 
@@ -143,7 +154,10 @@ async def test_updating_a_global_table_is_denied_to_the_app_role(
 async def test_read_only_tables_grant_the_app_role_nothing_but_select(
     schema_engine: AsyncEngine,
 ) -> None:
-    read_only = _security_tables("APP_READ_ONLY_TABLES")
+    read_only = (
+        *_security_tables("APP_READ_ONLY_TABLES"),
+        *_shadow_tables("SHADOW_APP_READ_ONLY_TABLES"),
+    )
     assert read_only, "the read-only grant list is empty"
 
     async with schema_engine.connect() as connection:
@@ -199,7 +213,11 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     read_only = _security_tables("APP_READ_ONLY_TABLES")
     append_only = _security_tables("APPEND_ONLY_TABLES")
 
-    classified = list(write) + list(no_delete) + list(read_only) + list(append_only)
+    shadow_read_only = _shadow_tables("SHADOW_APP_READ_ONLY_TABLES")
+
+    classified = (
+        list(write) + list(no_delete) + list(read_only) + list(append_only) + list(shadow_read_only)
+    )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 
     async with schema_engine.connect() as connection:

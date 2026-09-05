@@ -23,7 +23,10 @@ changing one now costs a migration.
 
 from __future__ import annotations
 
+import re
+import uuid
 from enum import StrEnum
+from typing import Final
 
 
 class OrganizationRole(StrEnum):
@@ -258,6 +261,84 @@ class OutcomeResult(StrEnum):
     EXPIRED = "expired"
     INVALIDATED = "invalidated"
     OPEN = "open"
+
+
+class ShadowTrackingState(StrEnum):
+    """``shadow_tracking_state`` — ``signal_outcomes.tracking_state``, added by
+    ``0002_shadow_lab`` (docs/plans/SHADOW-LAB.md "Decisão conjunta" §4).
+
+    The third axis of a shadow outcome, and the only one that answers "is this
+    tracking still going?". ``SignalStatus`` says whether the *signal* is still
+    valid, ``OutcomeResult`` says how the hypothetical trade *ended*, and this
+    says where the tracking itself is:
+
+    - ``PENDING_ENTRY`` - decided and persisted, waiting for the entry bar open;
+    - ``ACTIVE`` - hypothetically in the market;
+    - ``TERMINAL`` - resolved, with a financial result;
+    - ``NO_ENTRY`` - never entered (late, geometry); never counted as open;
+    - ``CENSORED`` - a bar the outcome needed is unrecoverable, so the result is
+      unknown. Censorship never becomes ``expired``.
+
+    ``TERMINAL``, ``NO_ENTRY`` and ``CENSORED`` never reopen.
+    """
+
+    PENDING_ENTRY = "pending_entry"
+    ACTIVE = "active"
+    TERMINAL = "terminal"
+    NO_ENTRY = "no_entry"
+    CENSORED = "censored"
+
+
+SHADOW_COHORT_PATTERN = (
+    "^(prospective|replay:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
+)
+"""The exact shape of ``shadow_episodes.cohort`` - also the CHECK in the database.
+
+Not a Postgres ``ENUM``: a replay cohort carries its ``run_id``, so the set is
+open. It is still closed in *shape*, and one regex shared by Python and the
+CHECK constraint is what keeps a typo from quietly creating a third population
+that no report ever mentions.
+"""
+
+_SHADOW_COHORT_RE = re.compile(SHADOW_COHORT_PATTERN)
+
+
+class ShadowCohort:
+    """``prospective`` or ``replay:<run_id>`` - SHADOW-LAB.md §1.
+
+    Replay and prospective are different populations by construction: the data
+    used to develop a version is never that version's reserved forward
+    evaluation, so a replay must never occupy the prospective tracking slot.
+    """
+
+    PROSPECTIVE: Final = "prospective"
+    REPLAY_PREFIX: Final = "replay:"
+
+    @staticmethod
+    def replay(run_id: uuid.UUID) -> str:
+        """The cohort label of one replay run."""
+        return f"{ShadowCohort.REPLAY_PREFIX}{run_id}"
+
+    @staticmethod
+    def is_valid(cohort: str) -> bool:
+        """``fullmatch``, not ``match``: Python's ``$`` also matches *before* a
+        trailing newline, so a cohort ending in one passed here and was then
+        refused by the database (POSIX ``$`` in ``~`` anchors at the true end of
+        the string) and by :meth:`run_id`. Found by Astra's review of S0."""
+        return _SHADOW_COHORT_RE.fullmatch(cohort) is not None
+
+    @staticmethod
+    def run_id(cohort: str) -> uuid.UUID | None:
+        """The ``run_id`` of a replay cohort, or ``None`` for ``prospective``.
+
+        Raises ``ValueError`` for anything the database would refuse, so a
+        malformed cohort fails where it is read, not silently downstream.
+        """
+        if not ShadowCohort.is_valid(cohort):
+            raise ValueError(f"{cohort!r} is not a valid shadow cohort")
+        if cohort == ShadowCohort.PROSPECTIVE:
+            return None
+        return uuid.UUID(cohort.removeprefix(ShadowCohort.REPLAY_PREFIX))
 
 
 class AgentStatus(StrEnum):
@@ -519,6 +600,7 @@ ALL_ENUMS: dict[str, type[StrEnum]] = {
     "strategy_version_status": StrategyVersionStatus,
     "signal_status": SignalStatus,
     "outcome_result": OutcomeResult,
+    "shadow_tracking_state": ShadowTrackingState,
     "agent_status": AgentStatus,
     "stats_window": StatsWindow,
     "risk_preset": RiskPreset,

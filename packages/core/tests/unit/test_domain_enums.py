@@ -5,6 +5,7 @@ values here are copied from docs/DATABASE.md and docs/RISK_ENGINE.md and must
 keep matching them (and, from T04 onward, the real Postgres enums).
 """
 
+import uuid
 from enum import StrEnum
 
 import pytest
@@ -17,6 +18,8 @@ from hunter_core.domain.enums import (
     MarketRegime,
     OrganizationRole,
     PortfolioType,
+    ShadowCohort,
+    ShadowTrackingState,
 )
 
 pytestmark = pytest.mark.unit
@@ -43,6 +46,7 @@ EXPECTED_ENUM_CLASSES = {
     "StrategyVersionStatus",
     "SignalStatus",
     "OutcomeResult",
+    "ShadowTrackingState",
     "AgentStatus",
     "StatsWindow",
     "RiskPreset",
@@ -125,3 +129,33 @@ def test_market_regime_matches_pipeline_md_v0_and_v1() -> None:
         "PANIC",
         "LIQUIDITY_CONTRACTION",
     ]
+
+
+def test_shadow_tracking_state_matches_the_shadow_lab_decision() -> None:
+    assert [member.value for member in ShadowTrackingState] == [
+        "pending_entry",
+        "active",
+        "terminal",
+        "no_entry",
+        "censored",
+    ]
+
+
+def test_a_replay_cohort_round_trips_its_run_id() -> None:
+    run_id = uuid.UUID("0199e4a0-1c3d-7a11-8f0a-2b3c4d5e6f70")
+    cohort = ShadowCohort.replay(run_id)
+    assert cohort == f"replay:{run_id}"
+    assert ShadowCohort.run_id(cohort) == run_id
+    assert ShadowCohort.run_id(ShadowCohort.PROSPECTIVE) is None
+
+
+@pytest.mark.parametrize(
+    "cohort",
+    ["", "replay", "replay:", "replay:nope", "prospective ", "x", "prospective\n"],
+)
+def test_an_unparseable_cohort_is_rejected_in_python_too(cohort: str) -> None:
+    """The same shape the CHECK constraint enforces — a cohort that the database
+    would refuse must not reach it looking valid."""
+    assert not ShadowCohort.is_valid(cohort)
+    with pytest.raises(ValueError, match="not a valid shadow cohort"):
+        ShadowCohort.run_id(cohort)

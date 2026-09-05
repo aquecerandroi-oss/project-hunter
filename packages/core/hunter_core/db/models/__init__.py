@@ -42,6 +42,7 @@ from hunter_core.db.models.agents import (
     Strategy,
     StrategyVersion,
 )
+from hunter_core.db.models.agents_shadow import ShadowEpisode, ShadowOutbox
 from hunter_core.db.models.alerts import AlertRule, Notification
 from hunter_core.db.models.analysis import (
     Anomaly,
@@ -191,6 +192,8 @@ __all__ = [
     "ProcessedEvent",
     "RiskEvent",
     "RiskProfile",
+    "ShadowEpisode",
+    "ShadowOutbox",
     "SignalOutcome",
     "Strategy",
     "StrategyVersion",
