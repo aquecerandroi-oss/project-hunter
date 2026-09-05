@@ -1,18 +1,20 @@
 {
-  "current": "M0",
-  "status": "closing",
-  "approved_at": "2026-09-04",
-  "wave": "6 — T13 (closure docs + §77 report) done 2026-09-05: docs/DEPLOYMENT.md env-var table rewritten from the two settings.py files, README.md quickstart, CLAUDE.md file-size-gate command fixed (bare `python` isn't on PATH here, `uv run python` is), docs/ROADMAP.md marks M0 delivered, docs/reports/M0.md written. Everton approves the close.",
+  "current": "M1",
+  "status": "in_progress",
+  "approved_at": "2026-09-05",
+  "wave": "1 — T1.1 e contrato do adaptador commitados; T1.6a (Docker) commitado pela Astra; T1.2/T1.3/T1.4/T1.5 em voo (T1.3 com a Astra); decisão conjunta fechada em .claude/state/dialogue-M1.md",
   "repo_path": "C:\\dev\\project-hunter",
+  "github": "https://github.com/aquecerandroi-oss/project-hunter",
   "paused_reason": null,
-  "history": "2026-09-04: spend limit hit mid-wave 2 (T05-fixes, T08-fixes, T04 cross-review terminated with 429); limit reset and the three were re-dispatched the same day.",
-  "done_history": "resume_checklist from wave 5 (all resolved by wave 6, kept here for the record): re-dispatch T05-fixes (apps/api) CRITICAL/HIGH/MEDIUM/LOW items — done, see commits 94b26a4/8a454f4; T08-fixes (apps/web) + T04 cross-review — done; packages/core/tests/unit/test_logging.py pyright strict errors, forbidden_patterns.sh exemptions, enums.py bare-filename exemption — still open, now tracked as KNOWN ISSUES in docs/reports/M0.md instead of a resume checklist; Wave 3 (T06 Clerk auth, T07 Docker) — done.",
-  "plan": "docs/plans/M0.md",
+  "history": "2026-09-04: spend limit hit mid-wave 2 (T05-fixes, T08-fixes, T04 cross-review terminated with 429); limit reset and the three were re-dispatched the same day. 2026-09-05: M0 closed and approved; M1 started under the owner's 'IMPLEMENTAÇÃO FUNCIONAL' directive (no per-task approval, report at milestone close).",
+  "done_history": "resume_checklist from wave 5 (all resolved by wave 6, kept here for the record): re-dispatch T05-fixes (apps/api) CRITICAL/HIGH/MEDIUM/LOW items — done, see commits 94b26a4/8a454f4; T08-fixes (apps/web) + T04 cross-review — done; packages/core/tests/unit/test_logging.py pyright strict errors, forbidden_patterns.sh exemptions, enums.py bare-filename exemption — still open, now tracked as KNOWN ISSUES in docs/reports/M0.md instead of a resume checklist; Wave 3 (T06 Clerk auth, T07 Docker) — done. M1 so far: T1.1 normalized market domain types (415cc83), ExchangeAdapter protocol/stream channels/error types (f71059e), T1.6a market-worker compose service + honest role dispatch in the entrypoint (d76a0cf, implemented by Astra), joint Claude⇄Astra acceptance decision (a522bf1, c58d4d1, becf1d9), single Astra channel script infra/scripts/astra.sh (606d5b6), Sexta-feira promoted to wave supervisor (f782985).",
+  "plan": "docs/plans/M1.md",
   "updated": "2026-09-05",
-  "next_action": "Everton reviews docs/reports/M0.md; on approval set current=M1 and plan docs/plans/M1.md",
+  "next_action": "Quando as entregas de T1.2/T1.3/T1.4/T1.5 chegarem ao orquestrador: para cada tarefa rodar o kit .claude/state/review-T1.x.md (verificação → code-reviewer + revisores por caminho em paralelo → segunda opinião da Astra via infra/scripts/astra.sh ask → reconciliar → corrigir CRITICAL/HIGH) e só então commitar por tarefa com a mensagem convencional do plano e dar push. Depois abrir a onda 2 (T1.6b docs/obsidian) e a onda 3 (T1.7). Nenhum implementador novo para tarefas em voo.",
   "verified": [
     "2026-09-04: Node 24.20 + npm 11.19 installed at C:\\Program Files\\nodejs; hooks pass all 8 manual cases (incl. null stdin); packages/config verify.mjs → 3× ok with eslint 9.39.5",
-    "2026-09-05: T13 canonical-command pass — pnpm install, uv sync --all-packages, pnpm lint, uv run ruff check/format --check, pnpm typecheck, uv run pyright, uv run pytest packages/core -q (178 passed), uv run python infra/scripts/check_file_size.py (85 files, 0 over budget), eslint verify (3x ok), pnpm gen:types (regenerates with no functional diff), docker compose stack (postgres/redis/api healthy, /health and /ready 200) all confirmed working as documented"
+    "2026-09-05: T13 canonical-command pass — pnpm install, uv sync --all-packages, pnpm lint, uv run ruff check/format --check, pnpm typecheck, uv run pyright, uv run pytest packages/core -q (178 passed), uv run python infra/scripts/check_file_size.py (85 files, 0 over budget), eslint verify (3x ok), pnpm gen:types (regenerates with no functional diff), docker compose stack (postgres/redis/api healthy, /health and /ready 200) all confirmed working as documented",
+    "2026-09-05: Astra reachable through the Codex CLI (infra/scripts/astra.sh ask/run/dialogue/show); 4 dialogue rounds on M1 closed with a joint acceptance checklist in .claude/state/dialogue-M1.md"
   ],
   "toolchain": {
     "node": "24.20.0 — C:\\Program Files\\nodejs",

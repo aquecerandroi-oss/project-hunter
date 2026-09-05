@@ -65,7 +65,7 @@ Detalhe completo em [[Data Flow]] e `docs/PIPELINE.md`.
 - **06-DECISIONS/** — índice legível das ADRs.
 - **07-BUGS/** — bugs abertos e resolvidos, com hash de commit.
 - **08-CHANGELOG/** — uma entrada por commit, agrupado por dia.
-- **09-OPERATIONS/** — deploy, variáveis de ambiente, monitoramento.
+- **09-OPERATIONS/** — deploy, variáveis de ambiente, monitoramento e o **Diário** (`09-OPERATIONS/Diario/AAAA-MM-DD.md`, uma nota por dia de trabalho: o que foi feito, o que foi decidido, o que ficou em voo) — mais recente: [[2026-09-05]].
 - **10-PERFORMANCE/** — visão de performance (hoje sem trades, descreve o que vai alimentar as métricas).
 
 ## Fontes
