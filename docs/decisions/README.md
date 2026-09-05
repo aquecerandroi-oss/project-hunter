@@ -25,3 +25,4 @@ As decisões tomadas na fase de arquitetura estão consolidadas em `docs/SPEC_RE
 | [0001](0001-adotar-vibe-coding-toolkit.md) | Adotar o fluxo do vibe-coding-toolkit para o desenvolvimento | aceito |
 | [0002](0002-camada-de-provedores-llm.md) | Camada de provedores LLM com Anthropic e OpenAI (GPT-6 Astra) | aceito (Fase 2) |
 | [0003](0003-base-de-conhecimento-obsidian.md) | `obsidian/` como base de conhecimento viva do projeto (separada do `vault/` pessoal) | aceito |
+| [0004](0004-ccxt-como-segunda-implementacao-de-adaptador.md) | CCXT como segunda implementação do `ExchangeAdapter` na Fase 3 (endpoints privados, amplitude certificada); Binance e Bybit próprias | aceito (decisão conjunta Claude ⇄ Astra) |
