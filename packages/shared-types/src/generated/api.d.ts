@@ -21,6 +21,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/markets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List markets */
+        get: operations["list_markets_api_v1_markets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/markets/{exchange}/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one market */
+        get: operations["get_market_api_v1_markets__exchange___symbol__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/markets/{exchange}/{symbol}/candles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read final candles */
+        get: operations["get_candles_api_v1_markets__exchange___symbol__candles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -185,7 +236,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read a workspace */
+        /**
+         * Read a workspace
+         * @description VIEWER, like the listing above it: a member who can see the workspace in
+         *     a list must be able to open it, and the row carries nothing a member of the
+         *     organization may not read.
+         */
         get: operations["read_api_v1_orgs__org_id__workspaces__workspace_id__get"];
         put?: never;
         post?: never;
@@ -225,6 +281,45 @@ export interface paths {
          * @description Public, unauthenticated system metadata. No secret ever appears here.
          */
         get: operations["system_info_api_v1_system_info_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/market-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Per-exchange market connectivity */
+        get: operations["market_status_api_v1_system_market_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/workers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Worker liveness
+         * @description No Postgres involved — ``CurrentPrincipal`` alone is enough
+         *     authentication, so this skips opening a transaction ``PrincipalSession``
+         *     would otherwise pay for on every call.
+         */
+        get: operations["list_workers_api_v1_system_workers_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -341,6 +436,67 @@ export interface components {
             /** User Agent */
             user_agent?: string | null;
         };
+        /** BookLevelOut */
+        BookLevelOut: {
+            /** Price */
+            price: string;
+            /** Qty */
+            qty: string;
+        };
+        /**
+         * CandleOut
+         * @description One ``candles`` row (``is_final = true`` only — DATABASE.md §4's
+         *     anti-look-ahead gate). ``close_time`` is derived (``open_time`` + the
+         *     timeframe's duration), not a stored column.
+         */
+        CandleOut: {
+            /** Close */
+            close: string;
+            /**
+             * Close Time
+             * Format: date-time
+             */
+            close_time: string;
+            /** High */
+            high: string;
+            /** Low */
+            low: string;
+            /** Open */
+            open: string;
+            /**
+             * Open Time
+             * Format: date-time
+             */
+            open_time: string;
+            /** Quote Volume */
+            quote_volume?: string | null;
+            /** Taker Buy Volume */
+            taker_buy_volume?: string | null;
+            /** Trade Count */
+            trade_count?: number | null;
+            /** Volume */
+            volume: string;
+        };
+        /**
+         * ComponentQuality
+         * @description Freshness of a single hot-state component — narrower than the
+         *     market-level :class:`~hunter_core.domain.market.DataQuality`, which also
+         *     knows ``degraded``/``unavailable`` (market-wide concepts, not a single
+         *     component's).
+         * @enum {string}
+         */
+        ComponentQuality: "ok" | "stale" | "absent";
+        /**
+         * ComponentStatusOut
+         * @description A required component's freshness: ``ticker``, ``book``, ``mark``.
+         */
+        ComponentStatusOut: {
+            /** Age Ms */
+            age_ms?: number | null;
+            quality: components["schemas"]["ComponentQuality"];
+            /** Ts */
+            ts?: string | null;
+        };
         /** CursorPage[AuditEntryOut] */
         CursorPage_AuditEntryOut_: {
             /** Items */
@@ -368,6 +524,26 @@ export interface components {
             items: components["schemas"]["WorkspaceOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /**
+         * DataQuality
+         * @description Freshness of a market's hot state — ``docs/plans/M1.md`` staleness rule.
+         * @enum {string}
+         */
+        DataQuality: "ok" | "stale" | "degraded" | "unavailable";
+        /**
+         * FundingComponentStatusOut
+         * @description Funding additionally reports whether the rate is ``estimated`` or
+         *     ``realized`` (``mkt:*:deriv``'s ``funding_kind``) — see ``FundingKind``
+         *     for what happens to a value that is neither.
+         */
+        FundingComponentStatusOut: {
+            /** Age Ms */
+            age_ms?: number | null;
+            /** Kind */
+            kind?: ("estimated" | "realized") | null;
+            /** Ts */
+            ts?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -456,6 +632,230 @@ export interface components {
          * @enum {string}
          */
         KillSwitchState: "ACTIVE" | "WARNING" | "TRADING_DISABLED" | "EMERGENCY";
+        /** MarketComponentsOut */
+        MarketComponentsOut: {
+            book: components["schemas"]["ComponentStatusOut"];
+            funding: components["schemas"]["FundingComponentStatusOut"];
+            mark: components["schemas"]["ComponentStatusOut"];
+            open_interest: components["schemas"]["OptionalComponentStatusOut"];
+            ticker: components["schemas"]["ComponentStatusOut"];
+        };
+        /**
+         * MarketDetailOut
+         * @description ``GET /api/v1/markets/{exchange}/{symbol}`` — the list row plus book and
+         *     recent trades.
+         *
+         *     (G9) ``hot_state_ok`` is the one explicit, machine-readable signal for
+         *     whether this request's Redis hot-state read succeeded — ``ticker``,
+         *     ``deriv``, ``book`` and ``trades`` share a single pipeline read in
+         *     ``services.markets.build_market_detail``, so they either all come back
+         *     real or none do; one flag covers all four. Read ``book``/``recent_trades``
+         *     together with it, never on their own:
+         *
+         *     * ``hot_state_ok is False`` — the read itself failed (Redis down, or a
+         *       ``WRONGTYPE`` on one of the keys). ``book`` is ``null`` and
+         *       ``recent_trades`` is ``null`` because this API *could not ask*, not
+         *       because there is no book/no trades. Render an outage state, never
+         *       "no book"/"no recent trades".
+         *     * ``hot_state_ok is True`` — the read succeeded; ``book``/``recent_trades``
+         *       are the honest state. ``book`` is ``null`` only when ``mkt:*:book`` has
+         *       expired or was never written; ``recent_trades`` is ``[]`` only when
+         *       there is genuinely nothing recent.
+         */
+        MarketDetailOut: {
+            /** Ask */
+            ask?: string | null;
+            /** Base Asset */
+            base_asset?: string | null;
+            /** Bid */
+            bid?: string | null;
+            book?: components["schemas"]["OrderBookOut"] | null;
+            components: components["schemas"]["MarketComponentsOut"];
+            data_quality: components["schemas"]["DataQuality"];
+            /** Exchange */
+            exchange: string;
+            /** Funding Kind */
+            funding_kind?: ("estimated" | "realized") | null;
+            /** Funding Rate */
+            funding_rate?: string | null;
+            /** Has Open Gap */
+            has_open_gap: boolean;
+            /** Hot State Ok */
+            hot_state_ok: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Monitored */
+            is_monitored: boolean;
+            /** Last Price */
+            last_price?: string | null;
+            /** Last Update */
+            last_update?: string | null;
+            /** Mark Price */
+            mark_price?: string | null;
+            market_type: components["schemas"]["MarketType"];
+            /** Monitor Rank */
+            monitor_rank?: number | null;
+            /** Open Interest */
+            open_interest?: string | null;
+            /** Price Change 24H Pct */
+            price_change_24h_pct?: string | null;
+            /** Quote Asset */
+            quote_asset?: string | null;
+            /** Quote Volume 24H */
+            quote_volume_24h?: string | null;
+            /** Recent Trades */
+            recent_trades?: components["schemas"]["TradeOut"][] | null;
+            /** Spread Pct */
+            spread_pct?: string | null;
+            /** Stale After Ms */
+            stale_after_ms: number;
+            status: components["schemas"]["MarketStatus"];
+            /** Symbol */
+            symbol: string;
+            /** Volume 24H */
+            volume_24h?: string | null;
+        };
+        /**
+         * MarketListPage
+         * @description ``GET /api/v1/markets`` — ``schemas.common.CursorPage`` shape plus the
+         *     top-level ``summary`` the brief asks for (a bare ``CursorPage[MarketOut]``
+         *     has no place for it).
+         */
+        MarketListPage: {
+            /** Items */
+            items: components["schemas"]["MarketOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Stale After Ms */
+            stale_after_ms: number;
+            summary: components["schemas"]["MarketsSummary"];
+        };
+        /**
+         * MarketOut
+         * @description One row of ``GET /api/v1/markets`` or the base of the detail response.
+         *
+         *     ``markets``/``exchanges``/``assets`` (Postgres, global/no-RLS tables) give
+         *     the identity and configuration columns; every other field comes from
+         *     Redis hot state and is ``null`` whenever its source component is absent —
+         *     this endpoint never invents a number.
+         */
+        MarketOut: {
+            /** Ask */
+            ask?: string | null;
+            /** Base Asset */
+            base_asset?: string | null;
+            /** Bid */
+            bid?: string | null;
+            components: components["schemas"]["MarketComponentsOut"];
+            data_quality: components["schemas"]["DataQuality"];
+            /** Exchange */
+            exchange: string;
+            /** Funding Kind */
+            funding_kind?: ("estimated" | "realized") | null;
+            /** Funding Rate */
+            funding_rate?: string | null;
+            /** Has Open Gap */
+            has_open_gap: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Monitored */
+            is_monitored: boolean;
+            /** Last Price */
+            last_price?: string | null;
+            /** Last Update */
+            last_update?: string | null;
+            /** Mark Price */
+            mark_price?: string | null;
+            market_type: components["schemas"]["MarketType"];
+            /** Monitor Rank */
+            monitor_rank?: number | null;
+            /** Open Interest */
+            open_interest?: string | null;
+            /** Price Change 24H Pct */
+            price_change_24h_pct?: string | null;
+            /** Quote Asset */
+            quote_asset?: string | null;
+            /** Quote Volume 24H */
+            quote_volume_24h?: string | null;
+            /** Spread Pct */
+            spread_pct?: string | null;
+            status: components["schemas"]["MarketStatus"];
+            /** Symbol */
+            symbol: string;
+            /** Volume 24H */
+            volume_24h?: string | null;
+        };
+        /**
+         * MarketStatus
+         * @description ``market_status`` — DATABASE.md §3 (markets.status).
+         *
+         *     INFERRED by T03, confirmed unchanged by T04: no members listed in the doc;
+         *     ``markets.delisted_at`` implies at least ACTIVE/DELISTED, and exchanges do
+         *     halt symbols without delisting them (SUSPENDED).
+         * @enum {string}
+         */
+        MarketStatus: "active" | "suspended" | "delisted";
+        /** MarketStatusExchangeOut */
+        MarketStatusExchangeOut: {
+            /** Exchange */
+            exchange: string;
+            /** Last Event Age Ms */
+            last_event_age_ms?: number | null;
+            /** Last Event At */
+            last_event_at?: string | null;
+            /** Markets Monitored */
+            markets_monitored: number;
+            /** Open Gaps */
+            open_gaps: number;
+            /** Reconnects */
+            reconnects?: number | null;
+            /** Ws State */
+            ws_state: string;
+        };
+        /** MarketStatusOut */
+        MarketStatusOut: {
+            /** Exchanges */
+            exchanges: components["schemas"]["MarketStatusExchangeOut"][];
+            /** Markets Monitored Total */
+            markets_monitored_total: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * MarketType
+         * @description ``market_type`` — DATABASE.md §3 (markets.market_type).
+         * @enum {string}
+         */
+        MarketType: "spot" | "perpetual";
+        /**
+         * MarketsSummary
+         * @description Counts over every market matching the request's filters (not just the
+         *     page returned) — cheap at M1 scale (``MARKET_UNIVERSE_SIZE`` default 200)
+         *     and what a status header needs ("187 of 200 monitored, 3 stale").
+         */
+        MarketsSummary: {
+            /** Markets Degraded */
+            markets_degraded: number;
+            /** Markets Monitored */
+            markets_monitored: number;
+            /** Markets Ok */
+            markets_ok: number;
+            /** Markets Stale */
+            markets_stale: number;
+            /** Markets Total */
+            markets_total: number;
+            /** Markets Unavailable */
+            markets_unavailable: number;
+        };
         /**
          * MeOut
          * @description ``GET /api/v1/me`` — everything the app shell needs to render itself.
@@ -541,6 +941,54 @@ export interface components {
              */
             virtual_capital: number | string;
         };
+        /**
+         * OptionalComponentStatusOut
+         * @description A non-required component that only exposes its own age: open interest.
+         */
+        OptionalComponentStatusOut: {
+            /** Age Ms */
+            age_ms?: number | null;
+            /** Ts */
+            ts?: string | null;
+        };
+        /**
+         * OrderBookOut
+         * @description The API's fixed projection of ``mkt:*:book`` — see the module
+         *     docstring: ``kind`` and ``depth`` are always these literal values, never
+         *     read off the payload.
+         */
+        OrderBookOut: {
+            /**
+             * Asks
+             * @default []
+             */
+            asks: components["schemas"]["BookLevelOut"][];
+            /**
+             * Bids
+             * @default []
+             */
+            bids: components["schemas"]["BookLevelOut"][];
+            /**
+             * Depth
+             * @default 20
+             * @constant
+             */
+            depth: 20;
+            /**
+             * Kind
+             * @default snapshot
+             * @constant
+             */
+            kind: "snapshot";
+            /** Ts */
+            ts?: string | null;
+        };
+        /**
+         * OrderSide
+         * @description ``order_side`` — DATABASE.md §4 (liquidations.side) and §7 (orders.side).
+         * @enum {string}
+         */
+        OrderSide: "buy" | "sell";
         /**
          * OrganizationCreate
          * @description Sign-up. The slug is derived from the name — a caller cannot choose it
@@ -634,6 +1082,27 @@ export interface components {
          * @enum {string}
          */
         RiskPreset: "conservative" | "balanced" | "aggressive" | "custom";
+        /**
+         * Timeframe
+         * @description ``candle_timeframe`` — DATABASE.md §4 (candles.timeframe).
+         * @enum {string}
+         */
+        Timeframe: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+        /** TradeOut */
+        TradeOut: {
+            /** Price */
+            price: string;
+            /** Qty */
+            qty: string;
+            side: components["schemas"]["OrderSide"];
+            /** Trade Id */
+            trade_id: string;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+        };
         /** UserOut */
         UserOut: {
             /** Avatar Url */
@@ -661,6 +1130,44 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** WorkerHeartbeatOut */
+        WorkerHeartbeatOut: {
+            /** Age S */
+            age_s: number;
+            /** Errors */
+            errors: number;
+            /** Instance */
+            instance: string;
+            /** Last Event At */
+            last_event_at?: string | null;
+            /** Last Success */
+            last_success?: string | null;
+            /** Markets Monitored */
+            markets_monitored?: number | null;
+            /** Open Gaps */
+            open_gaps?: number | null;
+            /** Reconnects */
+            reconnects?: number | null;
+            /** Role */
+            role: string;
+            status: components["schemas"]["WorkerLivenessStatus"];
+            /** Subscriptions */
+            subscriptions?: number | null;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Version */
+            version?: string | null;
+            /** Ws State */
+            ws_state?: string | null;
+        };
+        /**
+         * WorkerLivenessStatus
+         * @enum {string}
+         */
+        WorkerLivenessStatus: "alive" | "late" | "dead";
         /** WorkspaceCreate */
         WorkspaceCreate: {
             /** Name */
@@ -738,6 +1245,109 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_markets_api_v1_markets_get: {
+        parameters: {
+            query?: {
+                exchange?: string | null;
+                q?: string | null;
+                monitored?: boolean | null;
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketListPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_market_api_v1_markets__exchange___symbol__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exchange: string;
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_candles_api_v1_markets__exchange___symbol__candles_get: {
+        parameters: {
+            query?: {
+                timeframe?: components["schemas"]["Timeframe"];
+                limit?: number;
+                before?: string | null;
+            };
+            header?: never;
+            path: {
+                exchange: string;
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandleOut"][];
                 };
             };
             /** @description Validation Error */
@@ -1298,6 +1908,46 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    market_status_api_v1_system_market_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketStatusOut"];
+                };
+            };
+        };
+    };
+    list_workers_api_v1_system_workers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkerHeartbeatOut"][];
                 };
             };
         };
