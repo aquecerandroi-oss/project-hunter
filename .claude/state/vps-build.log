@@ -1,0 +1,55 @@
+### BUILD API
+#48 [runtime 17/19] COPY infra/docker/entrypoint.sh infra/docker/entrypoint.sh
+#48 DONE 0.0s
+
+#49 [runtime 18/19] COPY infra/docker/healthcheck.py infra/docker/healthcheck.py
+#49 DONE 0.0s
+
+#50 [runtime 19/19] RUN chmod +x infra/docker/entrypoint.sh     && chown -R hunter:hunter /app
+#50 DONE 9.2s
+
+#51 exporting to image
+#51 exporting layers
+#51 exporting layers 15.2s done
+#51 exporting manifest sha256:2e0e849f6dc6e1118c1bf5bbd68fc5e61560647ad7cea08c53c4318599abe851 done
+#51 exporting config sha256:1dc47d0bcfe2603178aac9e3b1cd26c9d1633611af3d1e934f3191c3a798270e done
+#51 exporting attestation manifest sha256:b0c1d053daf5567c2a71ba1ccb3e2eb4ff35c23de27c42b4baf72d243f3b99cd 0.0s done
+#51 exporting manifest list sha256:b037b342f8c493f5a16261cfb35353d783a54a0cb1dfa85dd96212ee6ff693b9 done
+#51 naming to docker.io/library/hunter-api:dev done
+#51 unpacking to docker.io/library/hunter-api:dev
+#51 unpacking to docker.io/library/hunter-api:dev 5.3s done
+#51 DONE 20.5s
+
+#52 resolving provenance for metadata file
+#52 DONE 0.0s
+ Image hunter-api:dev Built 
+API_BUILD_SECONDS=47.92
+### BUILD WEB
+#23 [runtime 6/8] COPY --from=builder /app/apps/web/public ./apps/web/public
+#23 DONE 0.0s
+
+#24 [runtime 7/8] COPY infra/docker/healthcheck-web.mjs infra/docker/healthcheck-web.mjs
+#24 DONE 0.0s
+
+#25 [runtime 8/8] RUN chown -R hunter:hunter /app
+#25 DONE 2.5s
+
+#26 exporting to image
+#26 exporting layers
+#26 exporting layers 2.5s done
+#26 exporting manifest sha256:a73a67f3175101752c80d61d1d8c684784be9cccd19f2632645cee57e358df39 done
+#26 exporting config sha256:acb035c9e1f90a138e0b5cff70c44c61007c5774d2e399a13181f4bd2b36792f done
+#26 exporting attestation manifest sha256:68c10285e814a76c0767ef2db31c759c63befe66f67fbf21d40570e4a6c344cf done
+#26 exporting manifest list sha256:f2bcb5e79c762504921919a45ffe1af1071931ad5dcf0f6d9e143a4c21de68be done
+#26 naming to docker.io/library/hunter-web:dev done
+#26 unpacking to docker.io/library/hunter-web:dev
+#26 unpacking to docker.io/library/hunter-web:dev 1.3s done
+#26 DONE 3.8s
+
+#27 resolving provenance for metadata file
+#27 DONE 0.0s
+ Image hunter-web:dev Built 
+WEB_BUILD_SECONDS=77.35
+### IMAGES
+hunter-web:dev 503MB
+hunter-api:dev 1.32GB

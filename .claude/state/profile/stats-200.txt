@@ -1,0 +1,4 @@
+CONTAINER ID   NAME                     CPU %     MEM USAGE / LIMIT     MEM %     NET I/O          BLOCK I/O    PIDS
+8bcf486a08f0   docker-market-worker-1   99.22%    248.3MiB / 7.543GiB   3.21%     307MB / 22.5MB   635kB / 0B   3
+CONTAINER ID   NAME                     CPU %     MEM USAGE / LIMIT     MEM %     NET I/O          BLOCK I/O    PIDS
+8bcf486a08f0   docker-market-worker-1   99.85%    264.9MiB / 7.543GiB   3.43%     399MB / 26.2MB   881kB / 0B   4

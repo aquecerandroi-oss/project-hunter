@@ -1,0 +1,40 @@
+Unable to find image 'nicolaka/netshoot:latest' locally
+latest: Pulling from nicolaka/netshoot
+f4fcdd1672ed: Pulling fs layer
+0f46943e91ef: Pulling fs layer
+e831eb9a722d: Pulling fs layer
+5a31b520f7cd: Pulling fs layer
+dcf0aac248dc: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+6dfe05fc89ee: Pulling fs layer
+0853a899d711: Pulling fs layer
+bea223344dda: Pulling fs layer
+de71a8dba62c: Pulling fs layer
+ebb4e70d3b0a: Pulling fs layer
+ff55a763fbcf: Pulling fs layer
+fe519894e9d4: Pulling fs layer
+72cec7a9d7fd: Pulling fs layer
+4f4fb700ef54: Already exists
+e831eb9a722d: Download complete
+f4fcdd1672ed: Download complete
+0f46943e91ef: Download complete
+5a31b520f7cd: Download complete
+6dfe05fc89ee: Download complete
+dcf0aac248dc: Download complete
+de71a8dba62c: Download complete
+ff55a763fbcf: Download complete
+ebb4e70d3b0a: Download complete
+72cec7a9d7fd: Download complete
+0853a899d711: Download complete
+dad86fcd0eb6: Download complete
+bea223344dda: Download complete
+fe519894e9d4: Download complete
+fe519894e9d4: Pull complete
+0853a899d711: Pull complete
+bea223344dda: Pull complete
+de71a8dba62c: Pull complete
+ebb4e70d3b0a: Pull complete
+72cec7a9d7fd: Pull complete
+4f4fb700ef54: Pull complete
+dcf0aac248dc: Pull complete
+e831eb9a722d: Pull complete

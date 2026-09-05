@@ -1,0 +1,24 @@
+A divisão é coerente **como política operacional**, mas há uma correção necessária e uma perda de disponibilidade que precisa ficar explícita. O lookahead não “só loga”: também deixa `/ready` falso ([partitions.py:143](C:/dev/project-hunter/services/market-worker/hunter_market_worker/partitions.py:143)).
+
+**Must-fix — limitar o tempo total das checagens de startup.** As duas chamadas são aguardadas antes de iniciar qualquer tarefa de coleta, sem prazo próprio ([main.py:50](C:/dev/project-hunter/services/market-worker/hunter_market_worker/main.py:50)). O timeout de 2 segundos existe apenas no endpoint ([runtime.py:124](C:/dev/project-hunter/packages/core/hunter_core/runtime.py:124)).
+
+Cenário concreto: hoje está coberto, amanhã não; a gravação do `system_event` espera um lock. O alerta sobre amanhã passa a bloquear a coleta de hoje, porque `_check()` aguarda o relatório antes de retornar ([partitions.py:143](C:/dev/project-hunter/services/market-worker/hunter_market_worker/partitions.py:143)). O mesmo relatório atrasa a exceção fatal ([partitions.py:173](C:/dev/project-hunter/services/market-worker/hunter_market_worker/partitions.py:173)). Existem limites de 15 segundos por statement e 30 segundos no driver; portanto, não classificaria isso como bloqueio infinito, mas como atraso evitável de dezenas de segundos ([session.py:131](C:/dev/project-hunter/packages/core/hunter_core/db/session.py:131), [session.py:68](C:/dev/project-hunter/packages/core/hunter_core/db/session.py:68)).
+
+Correção proposta: orçamento curto para a consulta, timeout tratado como erro não fatal, e orçamento separado para o relatório. **Depois de confirmar ausência atual, timeout no relatório deve preservar `PartitionsMissing`.**
+
+**Crash loop — possível e intencional, mas pode piorar disponibilidade.** Falta somente `liquidations` do mês, sem liquidações chegando: lotes com candles/snapshots poderiam persistir; o flush separa os tipos antes de gravar ([persist_rows.py:265](C:/dev/project-hunter/services/market-worker/hunter_market_worker/persist_rows.py:265)). Agora qualquer folha ausente impede todas as tarefas, e produção reinicia continuamente ([partitions.py:174](C:/dev/project-hunter/services/market-worker/hunter_market_worker/partitions.py:174), [main.py:55](C:/dev/project-hunter/services/market-worker/hunter_market_worker/main.py:55), [docker-compose.prod.yml:85](C:/dev/project-hunter/infra/vps/docker-compose.prod.yml:85)). Reiniciar não cria a partição.
+
+Não considero isso defeito se “todas as três folhas são obrigatórias” é requisito. Porém, a justificativa “nada pode persistir” é forte demais: quem aborta é o lote que efetivamente tenta escrever na partição ausente.
+
+**Nice-to-have:**
+
+- Testar `run_market()` com `PartitionsMissing` e cancelamento durante startup, verificando fechamento do adapter, remoção dos checks e restauração do contexto. O teste atual verifica limpeza após falha do coalescer ([test_supervision.py:149](C:/dev/project-hunter/services/market-worker/tests/test_supervision.py:149)).
+- Fortalecer futuramente a verificação de vínculo e limites da partição: atualmente ela confirma apenas existência pelo nome via `to_regclass` ([partitions.py:63](C:/dev/project-hunter/services/market-worker/hunter_market_worker/partitions.py:63)).
+
+**Concordo com:**
+
+- Separar ausência confirmada de erro de banco; a exceção fatal fica fora do `except` que libera startup ([partitions.py:164](C:/dev/project-hunter/services/market-worker/hunter_market_worker/partitions.py:164)).
+- Continuar coletando quando falta apenas lookahead ([main.py:51](C:/dev/project-hunter/services/market-worker/hunter_market_worker/main.py:51)).
+- A limpeza: falha ou cancelamento nas checagens atravessa o `finally`, que remove os três callbacks antes de fechar o adapter. Não encontrei vazamento de `readiness_checks` nesse fluxo ([main.py:91](C:/dev/project-hunter/services/market-worker/hunter_market_worker/main.py:91)).
+
+Revisão estática; não executei testes, não li `.env` e não modifiquei arquivos.

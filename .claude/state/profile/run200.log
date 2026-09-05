@@ -1,0 +1,35 @@
++ export 'PATH=/c/Program Files/nodejs:/c/Users/evert/AppData/Local/Programs/DockerDesktop/resources/bin:/c/Program Files/nodejs:/c/Users/evert/AppData/Local/Programs/DockerDesktop/resources/bin:/c/Users/evert/bin:/mingw64/bin:/usr/local/bin:/usr/bin:/bin:/mingw64/bin:/usr/bin:/c/Users/evert/bin:/c/WINDOWS/system32:/c/WINDOWS:/c/WINDOWS/System32/Wbem:/c/WINDOWS/System32/WindowsPowerShell/v1.0:/c/WINDOWS/System32/OpenSSH:/c/Program Files/dotnet:/cmd:/c/Program Files/nodejs:/c/Users/evert/.local/bin:/c/Users/evert/AppData/Local/Microsoft/WindowsApps:/c/Users/evert/AppData/Roaming/npm:/c/Users/evert/AppData/Local/Microsoft/WinGet/Packages/astral-sh.uv_Microsoft.Winget.Source_8wekyb3d8bbwe:/c/Users/evert/AppData/Local/Programs/DockerDesktop/resources/bin:/c/Program Files/nodejs:/mingw64/bin:/usr/bin/vendor_perl:/usr/bin/core_perl:/c/Users/evert/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/e9de050b-2d22-439a-99ef-da0860eadc92/6c08dfce-5e18-4922-a01b-bbd5beeca4f3/bin'
++ PATH='/c/Program Files/nodejs:/c/Users/evert/AppData/Local/Programs/DockerDesktop/resources/bin:/c/Program Files/nodejs:/c/Users/evert/AppData/Local/Programs/DockerDesktop/resources/bin:/c/Users/evert/bin:/mingw64/bin:/usr/local/bin:/usr/bin:/bin:/mingw64/bin:/usr/bin:/c/Users/evert/bin:/c/WINDOWS/system32:/c/WINDOWS:/c/WINDOWS/System32/Wbem:/c/WINDOWS/System32/WindowsPowerShell/v1.0:/c/WINDOWS/System32/OpenSSH:/c/Program Files/dotnet:/cmd:/c/Program Files/nodejs:/c/Users/evert/.local/bin:/c/Users/evert/AppData/Local/Microsoft/WindowsApps:/c/Users/evert/AppData/Roaming/npm:/c/Users/evert/AppData/Local/Microsoft/WinGet/Packages/astral-sh.uv_Microsoft.Winget.Source_8wekyb3d8bbwe:/c/Users/evert/AppData/Local/Programs/DockerDesktop/resources/bin:/c/Program Files/nodejs:/mingw64/bin:/usr/bin/vendor_perl:/usr/bin/core_perl:/c/Users/evert/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/e9de050b-2d22-439a-99ef-da0860eadc92/6c08dfce-5e18-4922-a01b-bbd5beeca4f3/bin'
++ cd /c/dev/project-hunter
++ DC='docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.override.yml -f .claude/state/profile/compose-200.yml'
++ docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.override.yml -f .claude/state/profile/compose-200.yml up -d market-worker
+ Container docker-redis-1 Running 
+ Container docker-postgres-1 Running 
+ Container docker-market-worker-1 Recreate 
+ Container docker-market-worker-1 Recreated 
+ Container docker-postgres-1 Waiting 
+ Container docker-postgres-1 Healthy 
+ Container docker-migrate-1 Starting 
+ Container docker-migrate-1 Started 
+ Container docker-postgres-1 Waiting 
+ Container docker-redis-1 Waiting 
+ Container docker-migrate-1 Waiting 
+ Container docker-postgres-1 Healthy 
+ Container docker-redis-1 Healthy 
+ Container docker-migrate-1 Exited 
+ Container docker-market-worker-1 Starting 
+ Container docker-market-worker-1 Started 
++ sleep 240
++ docker stats --no-stream docker-market-worker-1
++ MSYS_NO_PATHCONV=1
++ docker run --rm --pid=container:docker-market-worker-1 --cap-add SYS_PTRACE --cap-add SYS_ADMIN -v C:/dev/project-hunter/.claude/state/profile:/out python:3.12-slim sh -c 'pip install --quiet py-spy 2>/dev/null; py-spy record --pid 1 --duration 90 --rate 120 --format raw --output /out/raw-200.txt'
+py-spy> Sampling process 120 times a second for 90 seconds. Press Control-C to exit.
+
+py-spy> Wrote raw flamegraph data to '/out/raw-200.txt'. Samples: 11385 Errors: 4
+py-spy> You can use the flamegraph.pl script from https://github.com/brendangregg/flamegraph to generate a SVG
++ docker stats --no-stream docker-market-worker-1
++ MSYS_NO_PATHCONV=1
++ docker run --rm --net=container:docker-market-worker-1 nicolaka/netshoot ss -tin
++ head -40
++ echo DONE200
+DONE200

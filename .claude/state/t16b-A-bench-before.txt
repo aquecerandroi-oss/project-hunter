@@ -1,0 +1,9 @@
+     channel     iters             wall      throughput   latency
+    aggTrade    200000 iters    3.3479s          59,738 events/s    16.740 us/event
+  bookTicker    200000 iters    3.7775s          52,945 events/s    18.888 us/event
+     depth20     20000 iters    5.5045s           3,633 events/s   275.224 us/event
+    kline_1m     50000 iters    1.6016s          31,219 events/s    32.032 us/event
+   markPrice     50000 iters    0.9240s          54,110 events/s    18.481 us/event
+  forceOrder     50000 iters    0.8132s          61,482 events/s    16.265 us/event
+--------------------------------------------------------------------------------
+         mix    500000 iters   20.3670s          24,550 events/s    40.734 us/event  (weights={'aggTrade': 10, 'bookTicker': 10, 'depth20': 2, 'kline_1m': 1, 'markPrice': 1, 'forceOrder': 1})

@@ -1,0 +1,5 @@
+# TEMPORARY, NOT COMMITTED — T1.6b profiling at the plan's real target (200 markets).
+services:
+  market-worker:
+    environment:
+      MARKET_UNIVERSE_SIZE: "200"
