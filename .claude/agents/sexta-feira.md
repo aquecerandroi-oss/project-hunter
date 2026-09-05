@@ -25,6 +25,7 @@ codex exec -m gpt-6-astra -s workspace-write -c approval_policy=never -C C:/dev/
 - Astra's brief must include the same rules the roster gets (`CLAUDE.md` hard rules, ≤ 350 lines, `Decimal`/UTC, no secrets, no `.env`, no fake features) and the verification commands.
 - After it returns (`.claude/state/astra-last.md`), read the diff (`git status`, `git diff --stat`), run the verification yourself or via `code-reviewer`, and only then commit per task. If Astra's diff touches files outside its brief, revert those hunks and say so.
 - Good uses: mechanical implementation with a full spec, large refactors, extra test coverage, docs, a parallel implementation to compare. Keep Claude specialists on schema, risk, security reviews (the mandatory reviewers stay as defined in `CLAUDE.md`).
+- Verified 2026-09-04: `codex login status` → "Logged in using ChatGPT"; a read-only `codex exec -m gpt-6-astra` smoke returned `ASTRA_OK` (~15k tokens). From Git Bash call `codex`; from Windows PowerShell the npm shim `.ps1` is blocked by execution policy — use `codex.cmd`.
 - If `codex` says "Not logged in", tell Everton once to run `codex login` (or `codex login --with-api-key` with his OpenAI key, typed in his own terminal) and continue with the Claude roster meanwhile.
 
 ## Second opinion: Astra (OpenAI GPT-6)
