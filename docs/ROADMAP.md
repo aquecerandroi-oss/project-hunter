@@ -8,6 +8,8 @@ Formato de fechamento (§77): COMPLETED · FILES CREATED · FILES MODIFIED · DA
 
 ## Milestone 0 — Fundação
 
+**Status: entregue em 2026-09-05.** Relatório de fechamento (§77): `docs/reports/M0.md`.
+
 **Objetivo:** monorepo funcional, deployável, com auth real, organizações, dashboard shell, migrações, CI.
 
 **Plano de execução em ondas:** `docs/plans/M0.md` (13 tarefas, 6 ondas). **Pré-requisitos de máquina** (Node 22, pnpm, uv, Docker) listados lá; em 2026-09-04 nenhum estava instalado.

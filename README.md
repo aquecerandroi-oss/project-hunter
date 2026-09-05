@@ -2,7 +2,55 @@
 
 Autonomous Crypto Intelligence & Trading SaaS. Plataforma multi-tenant de inteligência quantitativa para criptomoedas: monitora mercados em tempo real, detecta anomalias, pontua oportunidades, gera sinais por agentes, aplica risco e executa em paper e shadow. Live trading só na Fase 4.
 
-**Estado atual:** fase de arquitetura concluída; Milestone 0 ainda não iniciado.
+**Estado atual:** Milestone 0 entregue em 2026-09-05 (em fechamento — ver `docs/reports/M0.md`); Milestone 1 (market data) é o próximo.
+
+## Quickstart (desenvolvedor novo)
+
+Pré-requisitos (versões verificadas em `.claude/state/milestone.json`):
+
+| Ferramenta | Versão | Instalar (Windows) |
+|---|---|---|
+| Node.js | 22+ (verificado com 24.20) | `winget install OpenJS.NodeJS.LTS` |
+| pnpm | 10+ (verificado com 11.25) | `corepack enable && corepack prepare pnpm@latest --activate` |
+| uv | última (instala Python 3.12 sozinho) | `winget install astral-sh.uv` |
+| Docker Desktop | última (WSL2) | `winget install Docker.DockerDesktop` |
+| Conta Clerk (dev) | — | https://clerk.com — instância de teste, chaves nunca vão para o repo |
+
+```powershell
+# 1. dependências (workspace pnpm + workspace uv)
+pnpm install
+uv sync --all-packages
+
+# 2. .env local — pede as chaves do Clerk na tela, digitação oculta,
+#    nunca aparecem em chat/log/commit
+powershell -ExecutionPolicy Bypass -File infra\scripts\setup_env.ps1
+
+# 3. sobe postgres, redis, roda a migração e sobe api + web
+docker compose -f infra/docker/docker-compose.yml up -d --build
+```
+
+- API: http://localhost:8000 (`/health`, `/ready`, `/docs`)
+- Web: http://localhost:3000 (redireciona para o sign-in do Clerk)
+- `/_design`: página de tokens de design (paleta, tipografia, componentes) — só existe em desenvolvimento, nunca em produção
+
+Para desenvolver o web com hot reload real em vez da imagem `standalone` do
+compose, rode `pnpm dev` dentro de `apps/web` com `apps/api` de pé — comando
+completo e variáveis em `docs/DEPLOYMENT.md` §8.
+
+**Comandos de verificação** (os mesmos do CI e do `CLAUDE.md`):
+
+```bash
+pnpm lint && uv run ruff check . && uv run ruff format --check .
+pnpm typecheck && uv run pyright
+pnpm test && uv run pytest
+pnpm build
+```
+
+Documentação completa: `docs/DEPLOYMENT.md` (ambientes, variáveis de
+ambiente, Docker, CI/CD, operação) e `CLAUDE.md` (regras do agente, comandos
+canônicos, roster de especialistas). `docs/ROADMAP.md` tem o escopo de cada
+milestone; `docs/plans/M0.md` o plano de execução do M0 e `docs/reports/M0.md`
+o relatório de fechamento.
 
 ## Documentação
 

@@ -41,12 +41,12 @@ Always use exactly these; never guess alternatives.
 - **Lint:** `pnpm lint` (fast ESLint tier) · `uv run ruff check .` · `uv run ruff format --check .`
 - **Lint (slow tier, CI only):** `pnpm lint:types` · `uv run ruff check --config packages/config/ruff.strict.toml .`
 - **Typecheck:** `pnpm typecheck` · `uv run pyright`
-- **Test:** `pnpm test` · `uv run pytest`
-- **Build:** `pnpm build` · `docker compose -f infra/docker/docker-compose.yml build`
+- **Test:** `pnpm test` · `uv run pytest` (`pnpm test` also runs `tests/e2e` via turbo — it's a pnpm workspace member with its own `test` script; `public.spec.ts`'s fake-Clerk-key assertion fails locally once a real `.env` is in place, which is expected outside CI. Use `pnpm --filter @hunter/web test` for just the Vitest suite, `pnpm e2e` for Playwright alone)
+- **Build:** `pnpm build` · `docker compose -f infra/docker/docker-compose.yml build` — as of 2026-09-05 the `web` target fails both ways: `docker compose build web` fails for real (`infra/docker/Dockerfile.web` never copies `packages/shared-types` into the image, so `@hunter/web`'s import of `@hunter/shared-types/api` loses its types and `next build`'s type-check trips on `apps/web/app/page.tsx:22`); `pnpm build` on Windows additionally hits `EPERM ... symlink` while Next.js traces deps for the standalone output (enable Developer Mode or run elevated — Linux/CI unaffected by that part). See `docs/reports/M0.md` KNOWN ISSUES #0.
 - **Run/Dev:** `docker compose -f infra/docker/docker-compose.yml up` (postgres, redis, api, worker `all`, web)
 - **Migrations:** `uv run alembic -c infra/migrations/alembic.ini upgrade head` · `... check` · `... revision --autogenerate -m "<msg>"`
 - **Generate TS types from OpenAPI:** `pnpm gen:types`
-- **File-size gate (Python):** `python infra/scripts/check_file_size.py`
+- **File-size gate (Python):** `uv run python infra/scripts/check_file_size.py` (a bare `python` isn't guaranteed on PATH — Windows aliases it to the Store installer; `uv run` is what CI uses too)
 - **ESLint rule self-check:** `node packages/config/eslint/verify.mjs packages/config/eslint/eslint-rules/index.cjs`
 
 ## Read these first (in this order) before any design or implementation work

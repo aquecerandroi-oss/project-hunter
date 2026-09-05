@@ -1,22 +1,18 @@
 {
   "current": "M0",
-  "status": "in_progress",
+  "status": "closing",
   "approved_at": "2026-09-04",
-  "wave": "5 — repo moved to C:\\dev\\project-hunter (2026-09-04); T06 two fix rounds committed (94b26a4, 8a454f4); T09 + T09b + gold theme (DESIGN-1) committed; T12 committed (7e90e81); T11 in progress; T13 (closure + §77 report) next",
+  "wave": "6 — T13 (closure docs + §77 report) done 2026-09-05: docs/DEPLOYMENT.md env-var table rewritten from the two settings.py files, README.md quickstart, CLAUDE.md file-size-gate command fixed (bare `python` isn't on PATH here, `uv run python` is), docs/ROADMAP.md marks M0 delivered, docs/reports/M0.md written. Everton approves the close.",
   "repo_path": "C:\\dev\\project-hunter",
   "paused_reason": null,
   "history": "2026-09-04: spend limit hit mid-wave 2 (T05-fixes, T08-fixes, T04 cross-review terminated with 429); limit reset and the three were re-dispatched the same day.",
-  "resume_checklist": [
-    "Re-dispatch T05-fixes (apps/api): CRITICAL errors.py strips input/url/ctx from 422 errors; HIGH redis_bridge single dispatcher routed by message channel; HIGH /ready asyncio.wait_for timeout; MEDIUM FORWARDED_ALLOW_IPS trust model, /metrics token gating, ws_manager dead-connection eviction; LOW X-Request-ID bounds, conftest print, CORS preflight test, fail-open log once/60s",
-    "Check whether 'T08-fixes' (apps/web: decimal-safe format, ws jitter, focusable planned nav item, topbar server component, auth message {type,token}, minimumReleaseAge) and the T04 cross-review finished; if not, re-dispatch",
-    "Small follow-ups: packages/core/tests/unit/test_logging.py has 4 pyright strict errors (ProcessorFormatter.processors access, needs a cast); forbidden_patterns.sh still hits apps/api/hunter_api/settings.py:24 (cors dev default) and security_headers.py:4 (docstring) — exempt settings.py like core or move defaults; enums.py exemption in check_file_size.py is by bare filename (consider path-specific)",
-    "Then Wave 3: T06 (Clerk auth, RBAC, tenancy, org routers) and T07 (Docker) per docs/plans/M0.md"
-  ],
+  "done_history": "resume_checklist from wave 5 (all resolved by wave 6, kept here for the record): re-dispatch T05-fixes (apps/api) CRITICAL/HIGH/MEDIUM/LOW items — done, see commits 94b26a4/8a454f4; T08-fixes (apps/web) + T04 cross-review — done; packages/core/tests/unit/test_logging.py pyright strict errors, forbidden_patterns.sh exemptions, enums.py bare-filename exemption — still open, now tracked as KNOWN ISSUES in docs/reports/M0.md instead of a resume checklist; Wave 3 (T06 Clerk auth, T07 Docker) — done.",
   "plan": "docs/plans/M0.md",
-  "updated": "2026-09-04",
-  "next_action": "User approves architecture + M0 wave plan; install remaining prerequisites (pnpm, uv, Docker); then execute Wave 1 of docs/plans/M0.md.",
+  "updated": "2026-09-05",
+  "next_action": "Everton reviews docs/reports/M0.md; on approval set current=M1 and plan docs/plans/M1.md",
   "verified": [
-    "2026-09-04: Node 24.20 + npm 11.19 installed at C:\\Program Files\\nodejs; hooks pass all 8 manual cases (incl. null stdin); packages/config verify.mjs → 3× ok with eslint 9.39.5"
+    "2026-09-04: Node 24.20 + npm 11.19 installed at C:\\Program Files\\nodejs; hooks pass all 8 manual cases (incl. null stdin); packages/config verify.mjs → 3× ok with eslint 9.39.5",
+    "2026-09-05: T13 canonical-command pass — pnpm install, uv sync --all-packages, pnpm lint, uv run ruff check/format --check, pnpm typecheck, uv run pyright, uv run pytest packages/core -q (178 passed), uv run python infra/scripts/check_file_size.py (85 files, 0 over budget), eslint verify (3x ok), pnpm gen:types (regenerates with no functional diff), docker compose stack (postgres/redis/api healthy, /health and /ready 200) all confirmed working as documented"
   ],
   "toolchain": {
     "node": "24.20.0 — C:\\Program Files\\nodejs",
