@@ -1,19 +1,18 @@
 {
-  "current": "M1",
-  "status": "awaiting_approval",
+  "current": "M2",
+  "status": "planned",
   "approved_at": null,
-  "wave": "Fechamento. T1.6b (performance + sharding) e T1.7 (integracao/e2e) commitadas e provadas; relatorio completo em docs/reports/M1.md no formato estendido, com saida real de comando em cada numero. A prova da T1.6b (.claude/state/t16b-proof.md) mediu tres topologias contra a Binance ao vivo: 1 processo x 200 mercados COLAPSA (ticker e book ausentes nos 200 em 15 min, 188 velas/min contra 200/min da exchange, CPU media 103,2% de um core); 2 shards x 100 oscilam em ~26% de hot state completo; 4 shards x 50 cumprem a meta (markets_ok 198/200 = 99,0%, 202 mercados distintos por minuto durante 6 minutos, CPU media por shard 36,6%-64,2%). A prova encontrou um CRITICAL da propria T1.6b: shard_symbols fazia s.encode('ascii') e a Binance lista perpetuos com simbolo em chines (4 no top 100 por volume), entao um UnicodeEncodeError dentro do try de run_universe deixava o universo vazio e UM simbolo cegava os 200 mercados. Corrigido com teste de regressao usando os simbolos reais (4f9ab28), junto de dois HIGH (gramatica de canal WS recusando unicode; segmentos de rota sem escape alcancando endpoints internos com o bearer do usuario) e dois MEDIUM. A topologia com shards NAO foi entregue: com N > 1 todos os processos escrevem a mesma chave hb:market:{exchange}, o /system/market-status mostra as assinaturas de um shard como se fossem da exchange e um shard morto fica invisivel — o M1 promete heartbeats reais, entao no ar ficou UM processo x 50 mercados, com markets_ok 50/50 = 100%. A segunda opiniao da Astra bloqueou exatamente nesse ponto e foi acatada mudando a entrega.",
+  "wave": "M1 APROVADO pela Sexta-feira em 2026-09-06 em nome do Everton (docs/reports/M1.md). Onda 1 do M2 a despachar: T2.1 (schema de analise — baselines imutaveis, envelopes, EXTENDED, UNKNOWN, evaluation_state, outbox; a migracao passa a depender de 0002_shadow_lab da S0 e vira 0003) e T2.2 (Feature Engine), em paralelo, arquivos disjuntos. Decisao conjunta Claude/Astra do M2 ja fechada em docs/plans/M2.md (4 rodadas, .claude/state/dialogue-M2.md), entao nao ha etapa de decisao conjunta a repetir antes do despacho.",
   "repo_path": "C:\\dev\\project-hunter",
   "github": "https://github.com/aquecerandroi-oss/project-hunter",
   "paused_reason": null,
   "history": "2026-09-04: spend limit hit mid-wave 2; resolvido no mesmo dia. 2026-09-05: M0 fechado e aprovado; M1 executado sob a diretiva 'IMPLEMENTACAO FUNCIONAL' (sem aprovacao por tarefa, relatorio no fim); trilha paralela do Shadow Lab aberta com decisao conjunta Claude/Astra (S0 e S1 commitadas, S2 em voo).",
-  "plan": "docs/plans/M1.md",
-  "updated": "2026-09-05",
-  "blockers": [
-    "apps/api/tests/integration/test_webhook.py::test_a_crash_where_even_the_release_never_runs_still_recovers_after_the_stale_window falha 3 em 3 execucoes com a maquina ociosa (nao e flake). Vermelho reprodutivel carregado desde a T1.3 com uma nota de 'confirmar verde' que nunca foi cumprida. Despachado ao backend-specialist com a instrucao de decidir com evidencia entre (A) defeito real do caminho de idempotencia do webhook e (B) teste que codifica uma promessa que a implementacao nunca fez — sem alargar timeout ate passar. E o UNICO item que impede a aprovacao do M1."
-  ],
-  "next_action": "Quando a suite apps/api fechar verde: escrever 'APROVADO pela Sexta-feira em <data> em nome do Everton' no topo de docs/reports/M1.md, mudar este arquivo para current M2 / status planned (onda 1 = T2.1 + T2.2, com T2.1 dependendo da migracao 0002_shadow_lab da S0 e virando 0003), acrescentar o item ao changelog e ao diario, commitar e dar push. Primeira divida do M1 a entrar no M2: heartbeat por shard com agregacao na API — e o que libera os 200 mercados ja provados.",
+  "plan": "docs/plans/M2.md",
+  "updated": "2026-09-06",
+  "blockers": [],
+  "next_action": "Despachar a onda 1 do M2: T2.1 (database-architect, opus) e T2.2 (quant-engineer, opus) em paralelo, com os kits de revisao prontos antes das entregas. Primeiro item de divida do M1 a entrar no M2: heartbeat por shard com agregacao na API — e o que libera os 200 mercados ja provados. Segundo: dataclass(slots=True) nos tipos normalizados do caminho quente (model_construct do pydantic e 15% do tempo amostrado pelo py-spy). Terceiro: gaps de mercados nao monitorados que nunca fecham, e rebalanceamento na morte de um shard.",
   "verified": [
+    "2026-09-06: M1 aprovado. O unico bloqueio (test_a_crash_where_even_the_release_never_runs_still_recovers_after_the_stale_window, vermelho 3 em 3 com a maquina ociosa) foi investigado: o TESTE corria um asyncio.sleep(0.3) contra uma janela de 0,2 s enquanto o primeiro POST sozinho leva 0,516-1,265 s. Corrigido com _age_claim (a mesma coluna claimed_at que o takeover le), sem tocar codigo de producao; code-reviewer e Astra responderam PRESERVADO independentemente. apps/api/tests/integration/test_webhook.py -> 17 passed, duas vezes seguidas.",
     "2026-09-05 22:46 UTC: configuracao entregue (1 worker, MARKET_UNIVERSE_SIZE=50) medida pelo mesmo caminho de servico dos handlers autenticados: markets_ok 50/50 = 100%, 0 stale, 0 degraded, 0 unavailable, hot state completo nos tres componentes, CPU media 71,3% de um core (o perfil pre-T1.6b media 95,1% no mesmo tamanho)",
     "2026-09-05 22:11 UTC: 4 shards x 50 mercados = markets_ok 198/200 (99,0%), 202 linhas = 202 mercados distintos = 202 velas finais por minuto durante 6 minutos, gaps abertos 3.230 -> 95 (os 95 sao de mercados nao monitorados), CPU media por shard 36,6/54,6/61,2/64,2%",
     "2026-09-05: suites — exchange-adapters 231 passed 3 skipped; market-worker 174 passed; core 495 passed; apps/api 463 passed 1 failed (o bloqueio acima); web 326 passed 1 failed (flake de carga, passa sozinho); tests/integration 31 passed 1 failed (flake de carga, arquivo inteiro 20 passed na re-execucao); ruff/pyright limpos nos caminhos do M1; check_file_size 171 arquivos 0 acima do orcamento",
@@ -24,5 +23,6 @@
     "pnpm": "11.25.0 — %APPDATA%\\npm (npm -g)",
     "uv": "0.12.9 — winget user scope; python 3.12.14 via `uv python install`",
     "docker": "Docker Desktop 4.89.0 (engine 29.7.2, compose v5.5.0) per-user at %LOCALAPPDATA%\\Programs\\DockerDesktop"
-  }
+  },
+  "m1_result": "M1 fechado com o mercado real da Binance na tela: markets_ok 50/50 = 100%, hot state completo nos tres componentes, 0 degraded, worker no Docker independente do navegador, reconexao e recovery de gaps provados, System com heartbeats reais. Entrega 50 mercados e nao os 200 do plano: os 200 estao PROVADOS (4 shards x 50 -> markets_ok 198/200 = 99,0%, 202 mercados distintos por minuto durante 6 minutos, CPU media por shard 36,6-64,2%) mas nao entregues, porque com N > 1 shards todos escrevem a mesma chave hb:market:{exchange} e a pagina System passaria a mentir (um shard morto fica invisivel). Prova completa em .claude/state/t16b-proof.md."
 }
