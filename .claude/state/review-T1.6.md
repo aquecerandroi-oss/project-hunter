@@ -80,3 +80,8 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 ```
 T1.6a já saiu em `d76a0cf`. O restante (docs + `obsidian/`) pode sair como `docs(m1): deployment, README and obsidian updated for the market pipeline` se ficar separado da infra.
 `git -c commit.gpgsign=false commit` · `git push origin main`.
+
+## Decisão do orquestrador sobre o HIGH-1 (worker satura um core, 2026-09-05)
+- **Aceite do M1** pode ser com universo reduzido (`MARKET_UNIVERSE_SIZE` = 100, ou o maior valor em que `markets_ok` >= 95% por 10 min sem `market_persist_lag` > 10 s), desde que a API/UI mostrem o número real monitorado. Registrar o número medido.
+- **T1.6b (performance do market-worker)**, nova tarefa antes do fechamento do M1: perfilar (py-spy/cProfile no container) e atacar por ordem: parse com `orjson` e sem `pydantic` por evento no caminho quente (validar só na borda), pipelines Redis por lote/coalescência (uma ida por símbolo por ciclo, não por evento), `@depth20@500ms` em vez de 250 ms se o book dominar, `uvloop`/`winloop`, e **sharding** por grupos de símbolos em N processos (`HUNTER_ROLE=market` com `MARKET_SHARD=i/N`) como saída definitiva. Meta: 200 mercados com `markets_ok` >= 95% e CPU < 70% de um core por shard. Métrica nova: `market_ws_backlog_bytes` (Recv-Q) ou idade do último frame lido vs recebido, para o operador ver a saturação.
+- Sem isso, nada de M2 sobre dados degradados: o scanner só liga com `markets_ok` estável.
