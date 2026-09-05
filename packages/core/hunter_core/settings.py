@@ -26,6 +26,29 @@ Environment = Literal["development", "test", "staging", "production"]
 Role = Literal["api", "market", "scanner", "strategy", "execution", "analytics", "all"]
 
 
+def _parse_market_shard(value: str) -> tuple[int, int]:
+    """``"<index>/<total>"`` -> ``(index, total)``, validated (T1.6b-C1).
+
+    Fails loudly and immediately -- a market-worker that silently fell back
+    to "the whole universe" on a typo'd ``MARKET_SHARD`` would duplicate
+    every other shard's REST/WS load instead of refusing to start.
+    """
+    parts = value.split("/")
+    if len(parts) != 2:
+        raise ValueError(f"MARKET_SHARD must be '<index>/<total>', got {value!r}")
+    try:
+        index, total = int(parts[0]), int(parts[1])
+    except ValueError as exc:
+        raise ValueError(
+            f"MARKET_SHARD must be '<index>/<total>' with integers, got {value!r}"
+        ) from exc
+    if total < 1:
+        raise ValueError(f"MARKET_SHARD total must be >= 1, got {value!r}")
+    if not (0 <= index < total):
+        raise ValueError(f"MARKET_SHARD index must satisfy 0 <= index < total, got {value!r}")
+    return index, total
+
+
 class Settings(BaseSettings):
     """Process-wide configuration. Construct via :func:`get_settings`."""
 
@@ -108,6 +131,30 @@ class Settings(BaseSettings):
 
     # ---- Runtime (nao documentado em .env.example; ver CONCERNS do T03) ----
     health_port: int = 8001
+
+    # ---- market-worker sharding (T1.6b-C) ----
+    market_shard: str = "0/1"
+    """``"<index>/<total>"`` — which stable hash slice of the monitored
+    universe this process owns (:func:`hunter_market_worker.universe.shard_symbols`).
+    Default ``"0/1"`` is exactly today's behaviour: one process, the whole
+    universe, no coordination. Parsed eagerly by :func:`_parse_market_shard`
+    so a malformed value fails at construction, never silently at the first
+    symbol-assignment call."""
+
+    @model_validator(mode="after")
+    def _validate_market_shard(self) -> Settings:
+        _parse_market_shard(self.market_shard)
+        return self
+
+    @property
+    def shard_index(self) -> int:
+        """This process's shard index, ``0 <= shard_index < shard_total``."""
+        return _parse_market_shard(self.market_shard)[0]
+
+    @property
+    def shard_total(self) -> int:
+        """Total number of shards (``>= 1``)."""
+        return _parse_market_shard(self.market_shard)[1]
 
     @model_validator(mode="after")
     def _require_settings_in_prod(self) -> Settings:

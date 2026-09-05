@@ -230,3 +230,49 @@ def test_development_does_not_require_the_clerk_credentials(
     settings = Settings()
 
     assert settings.clerk_issuer == ""
+
+
+# ---- MARKET_SHARD (T1.6b-C1) -----------------------------------------------
+
+
+def test_market_shard_defaults_to_single_process_whole_universe() -> None:
+    settings = Settings()
+    assert settings.market_shard == "0/1"
+    assert settings.shard_index == 0
+    assert settings.shard_total == 1
+
+
+def test_market_shard_reads_env_and_exposes_parsed_properties(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MARKET_SHARD", "2/4")
+    settings = Settings()
+    assert settings.shard_index == 2
+    assert settings.shard_total == 4
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "not-a-shard",
+        "1",
+        "1/2/3",
+        "a/4",
+        "1/a",
+        "4/4",  # index must be < total
+        "-1/4",  # index must be >= 0
+        "0/0",  # total must be >= 1
+        "0/-1",
+        "1/-4",
+    ],
+)
+def test_market_shard_rejects_invalid_values(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv("MARKET_SHARD", value)
+    with pytest.raises(ValidationError, match="MARKET_SHARD"):
+        Settings()
+
+
+def test_market_shard_single_index_zero_of_one_is_valid() -> None:
+    settings = Settings(market_shard="0/1")
+    assert settings.shard_index == 0
+    assert settings.shard_total == 1

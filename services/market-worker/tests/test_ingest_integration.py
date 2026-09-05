@@ -16,6 +16,7 @@ from hunter_core.events.envelope import EventEnvelope
 from hunter_core.events.streams import Streams
 from hunter_core.redis import keys
 from hunter_market_worker import wire as msgpack
+from hunter_market_worker.hot_state import TradeMemory
 from hunter_market_worker.ingest import (
     AcceptedEvents,
     TickCoalescer,
@@ -41,6 +42,8 @@ async def _last_stream_payload(redis_client: Any, stream: str) -> EventEnvelope:
 
 
 async def test_handle_event_ticker_writes_hot_state(redis_client: Any) -> None:
+    """B3: the hot-state write is deferred to the coalescer's per-cycle
+    flush, not done inside ``handle_event`` itself."""
     queues = PersistQueues()
     coalescer = TickCoalescer()
     await handle_event(
@@ -50,16 +53,22 @@ async def test_handle_event_ticker_writes_hot_state(redis_client: Any) -> None:
         queues,
         coalescer,
         AcceptedEvents(),
+        TradeMemory(),
     )
+    assert coalescer.dirty_items()  # fed the coalescer
+    assert not await redis_client.exists(keys.ticker(builders.EXCHANGE, "BTCUSDT"))
+
+    await flush_ticks(coalescer, redis_client, PRODUCER)
     raw = await redis_client.hgetall(keys.ticker(builders.EXCHANGE, "BTCUSDT"))
     assert raw[b"last"] == b"50000"
-    assert coalescer.dirty_items()  # also fed the coalescer
 
 
 async def test_handle_event_final_candle_queues_and_publishes(redis_client: Any) -> None:
     queues = PersistQueues()
     candle = builders.candle("BTCUSDT", is_final=True)
-    await handle_event(candle, redis_client, PRODUCER, queues, TickCoalescer(), AcceptedEvents())
+    await handle_event(
+        candle, redis_client, PRODUCER, queues, TickCoalescer(), AcceptedEvents(), TradeMemory()
+    )
 
     queued = queues.events.get_nowait()
     assert isinstance(queued, NormalizedCandle)
@@ -81,6 +90,7 @@ async def test_handle_event_non_final_candle_is_not_queued(redis_client: Any) ->
         queues,
         TickCoalescer(),
         AcceptedEvents(),
+        TradeMemory(),
     )
     assert queues.events.empty()
 
@@ -95,16 +105,21 @@ async def test_handle_event_forwards_event_ts_for_growing_partial_candle(
     queues = PersistQueues()
     coalescer = TickCoalescer()
     accepted = AcceptedEvents()
+    trade_memory = TradeMemory()
     first = builders.candle("BTCUSDT", is_final=False)
     t0 = first.open_time + timedelta(seconds=1)
     first = first.model_copy(update={"event_ts": t0})
 
-    assert await handle_event(first, redis_client, PRODUCER, queues, coalescer, accepted)
+    assert await handle_event(
+        first, redis_client, PRODUCER, queues, coalescer, accepted, trade_memory
+    )
 
     grown = first.model_copy(
         update={"volume": Decimal("20"), "event_ts": t0 + timedelta(seconds=5)}
     )
-    assert await handle_event(grown, redis_client, PRODUCER, queues, coalescer, accepted)
+    assert await handle_event(
+        grown, redis_client, PRODUCER, queues, coalescer, accepted, trade_memory
+    )
 
     key = keys.candles_1m(builders.EXCHANGE, "BTCUSDT")
     rows = await redis_client.lrange(key, 0, -1)
@@ -113,7 +128,9 @@ async def test_handle_event_forwards_event_ts_for_growing_partial_candle(
     assert stored["volume"] == "20"
 
     late = first.model_copy(update={"event_ts": t0})  # older than grown's event_ts
-    assert not await handle_event(late, redis_client, PRODUCER, queues, coalescer, accepted)
+    assert not await handle_event(
+        late, redis_client, PRODUCER, queues, coalescer, accepted, trade_memory
+    )
     rows = await redis_client.lrange(key, 0, -1)
     assert msgpack.unpackb(rows[0])["volume"] == "20"  # unchanged by the late partial
 
@@ -121,7 +138,9 @@ async def test_handle_event_forwards_event_ts_for_growing_partial_candle(
 async def test_handle_event_liquidation_waits_for_commit(redis_client: Any) -> None:
     queues = PersistQueues()
     liq = builders.liquidation("BTCUSDT")
-    await handle_event(liq, redis_client, PRODUCER, queues, TickCoalescer(), AcceptedEvents())
+    await handle_event(
+        liq, redis_client, PRODUCER, queues, TickCoalescer(), AcceptedEvents(), TradeMemory()
+    )
 
     queued = queues.events.get_nowait()
     assert isinstance(queued, NormalizedLiquidation)
@@ -136,6 +155,7 @@ async def test_estimated_funding_rollover_never_becomes_realized(
     queues = PersistQueues()
     coalescer = TickCoalescer()
     memory = AcceptedEvents()
+    trade_memory = TradeMemory()
     t0 = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
     t1 = dt.datetime(2026, 1, 1, 8, tzinfo=dt.UTC)
 
@@ -146,6 +166,7 @@ async def test_estimated_funding_rollover_never_becomes_realized(
         queues,
         coalescer,
         memory,
+        trade_memory,
     )
     assert queues.events.empty()  # first reading: nothing realized yet
 
@@ -156,6 +177,7 @@ async def test_estimated_funding_rollover_never_becomes_realized(
         queues,
         coalescer,
         memory,
+        trade_memory,
     )
     assert queues.events.empty()
 
@@ -211,6 +233,7 @@ async def test_watchdog_and_health_do_not_advance_on_duplicate_events(
             PersistQueues(),
             TickCoalescer(),
             AcceptedEvents(),
+            TradeMemory(),
             universe,
             state,
             health,
@@ -260,6 +283,7 @@ async def test_incremental_subscriptions_keep_existing_symbols(redis_client: Any
             PersistQueues(),
             TickCoalescer(),
             AcceptedEvents(),
+            TradeMemory(),
             universe,
             state,
         )
@@ -275,3 +299,217 @@ async def test_incremental_subscriptions_keep_existing_symbols(redis_client: Any
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
+
+
+async def test_consume_once_returns_on_watchdog_restart_with_no_events_ever_arriving(
+    redis_client: Any,
+) -> None:
+    """B1 regression: an ``async for`` rewrite of the consumer loop must not
+    block forever waiting for the next event once the watchdog asks for a
+    restart -- the housekeeping task must still be able to end the cycle on
+    a completely silent stream."""
+    from hunter_market_worker.heartbeat import HeartbeatState
+    from hunter_market_worker.streaming import consume_once
+    from hunter_market_worker.supervision import Watchdog
+
+    async def warning(_message: str) -> None:
+        return None
+
+    adapter = FakeAdapter()
+    watchdog = Watchdog(adapter, warning)
+    watchdog.restart_stream = True
+    universe = MonitoredUniverse()
+    universe.set(["BTCUSDT"])
+    universe.changed.clear()
+    state = HeartbeatState()
+
+    async with asyncio.timeout(5):
+        await consume_once(
+            adapter,
+            list(universe.symbols),
+            redis_client,
+            PRODUCER,
+            PersistQueues(),
+            TickCoalescer(),
+            AcceptedEvents(),
+            TradeMemory(),
+            universe,
+            state,
+            None,
+            watchdog,
+        )
+
+    assert watchdog.restart_stream is False  # cleared
+    assert adapter.closed is True  # finally still closed the stream
+
+
+async def test_consume_once_raises_when_adapter_lacks_update_subscriptions(
+    redis_client: Any,
+) -> None:
+    from hunter_market_worker.heartbeat import HeartbeatState
+    from hunter_market_worker.streaming import consume_once
+
+    class NoUpdateAdapter:
+        code = "fake"
+
+        async def stream(self, symbols: Any, channels: Any) -> Any:
+            await asyncio.Event().wait()
+            yield  # pragma: no cover - unreachable, keeps this an async generator
+
+        async def aclose(self) -> None:
+            return None
+
+    adapter = NoUpdateAdapter()
+    universe = MonitoredUniverse()
+    universe.set(["BTCUSDT"])
+    universe.changed.clear()
+    state = HeartbeatState()
+
+    task = asyncio.create_task(
+        consume_once(
+            adapter,
+            list(universe.symbols),
+            redis_client,
+            PRODUCER,
+            PersistQueues(),
+            TickCoalescer(),
+            AcceptedEvents(),
+            TradeMemory(),
+            universe,
+            state,
+        )
+    )
+    await asyncio.sleep(0)
+    universe.set(["ETHUSDT"])  # a diff the next 100ms housekeeping tick must see
+
+    with pytest.raises(RuntimeError, match="update_subscriptions"):
+        async with asyncio.timeout(5):
+            await task
+
+
+async def test_consume_once_raises_runtime_error_when_stream_exhausts(
+    redis_client: Any,
+) -> None:
+    """The old code caught ``StopAsyncIteration`` from a manual
+    ``__anext__()`` and turned it into ``RuntimeError``; an ``async for``
+    swallows ``StopAsyncIteration`` as normal loop exit, so this must be
+    detected explicitly."""
+    from hunter_market_worker.heartbeat import HeartbeatState
+    from hunter_market_worker.streaming import consume_once
+
+    class ExhaustingAdapter:
+        code = "fake"
+
+        async def stream(self, symbols: Any, channels: Any) -> Any:
+            return
+            yield  # pragma: no cover - unreachable, keeps this an async generator
+
+        async def aclose(self) -> None:
+            return None
+
+    adapter = ExhaustingAdapter()
+    universe = MonitoredUniverse()
+    universe.set(["BTCUSDT"])
+    universe.changed.clear()
+    state = HeartbeatState()
+
+    with pytest.raises(RuntimeError, match="task stream exited unexpectedly"):
+        async with asyncio.timeout(5):
+            await consume_once(
+                adapter,
+                list(universe.symbols),
+                redis_client,
+                PRODUCER,
+                PersistQueues(),
+                TickCoalescer(),
+                AcceptedEvents(),
+                TradeMemory(),
+                universe,
+                state,
+            )
+
+
+async def test_handle_event_ticker_and_book_never_touch_redis(
+    redis_client: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """B3: ``handle_event`` decides ticker/book acceptance purely from the
+    in-memory ``AcceptedEvents`` gate -- both the accepted and the
+    out-of-order case must cost zero Redis round trips. The actual write is
+    deferred to the coalescer's periodic flush."""
+    calls = {"n": 0}
+    redis_cls: Any = redis_client.__class__
+    original = redis_cls.execute_command
+
+    async def counting(self: Any, *args: Any, **kwargs: Any) -> Any:
+        calls["n"] += 1
+        return await original(self, *args, **kwargs)
+
+    monkeypatch.setattr(redis_cls, "execute_command", counting)
+
+    queues = PersistQueues()
+    coalescer = TickCoalescer()
+    accepted = AcceptedEvents()
+    trade_memory = TradeMemory()
+
+    ticker = builders.ticker("BTCUSDT", "100")
+    assert await handle_event(
+        ticker, redis_client, PRODUCER, queues, coalescer, accepted, trade_memory
+    )
+    book = builders.order_book("BTCUSDT")
+    assert await handle_event(
+        book, redis_client, PRODUCER, queues, coalescer, accepted, trade_memory
+    )
+    assert calls["n"] == 0
+
+    stale_ticker = ticker.model_copy(update={"ts": ticker.ts - timedelta(seconds=5)})
+    assert not await handle_event(
+        stale_ticker, redis_client, PRODUCER, queues, coalescer, accepted, trade_memory
+    )
+    stale_book = book.model_copy(update={"ts": book.ts - timedelta(seconds=5)})
+    assert not await handle_event(
+        stale_book, redis_client, PRODUCER, queues, coalescer, accepted, trade_memory
+    )
+    assert calls["n"] == 0
+
+
+async def test_flush_ticks_writes_ticker_and_book_hot_state_in_the_same_cycle(
+    redis_client: Any,
+) -> None:
+    """B3: the cost of coalescing is up to ``tick_coalesce_ms`` of extra
+    staleness, never more -- a symbol dirty in this cycle must have its hot
+    state written by *this* flush, not a later one."""
+    coalescer = TickCoalescer()
+    coalescer.on_ticker(builders.ticker("BTCUSDT", "50000"))
+    coalescer.on_book(builders.order_book("BTCUSDT", "49999", "50001"))
+
+    await flush_ticks(coalescer, redis_client, PRODUCER)
+
+    raw = await redis_client.hgetall(keys.ticker(builders.EXCHANGE, "BTCUSDT"))
+    assert raw[b"last"] == b"50000"
+    book_raw = await redis_client.get(keys.book(builders.EXCHANGE, "BTCUSDT"))
+    assert book_raw is not None
+    decoded = msgpack.unpackb(book_raw)
+    assert decoded["bids"][0][0] == "49999"
+
+
+async def test_coalesce_loop_flushes_buffered_state_on_cancellation(
+    redis_client: Any,
+) -> None:
+    """B3: a shutdown/cancellation must flush what is buffered -- a ticker
+    sitting in the coalescer at the moment of SIGTERM must not be silently
+    lost just because the next 250ms tick never comes."""
+    from hunter_core.settings import Settings
+    from hunter_market_worker.ingest import coalesce_loop
+
+    coalescer = TickCoalescer()
+    coalescer.on_ticker(builders.ticker("BTCUSDT", "50000"))
+    settings = Settings(tick_coalesce_ms=100_000)  # long enough only shutdown can flush it
+
+    task = asyncio.create_task(coalesce_loop(coalescer, redis_client, settings, PRODUCER))
+    await asyncio.sleep(0)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    raw = await redis_client.hgetall(keys.ticker(builders.EXCHANGE, "BTCUSDT"))
+    assert raw[b"last"] == b"50000"

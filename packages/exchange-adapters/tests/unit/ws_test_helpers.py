@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections import deque
+from collections.abc import Sequence
 from typing import Any
 
 from hunter_exchanges.base import StreamChannel
@@ -32,6 +33,20 @@ def agg_trade_raw(price: str = "100", ts_ms: int = 1, agg_id: int = 1) -> dict[s
     }
 
 
+def depth20_raw() -> dict[str, Any]:
+    return {
+        "e": "depthUpdate",
+        "E": 1,
+        "T": 1,
+        "s": "BTCUSDT",
+        "U": 1,
+        "u": 2,
+        "pu": 1,
+        "b": [["99", "1"]],
+        "a": [["101", "1"]],
+    }
+
+
 def book_ticker_raw() -> dict[str, Any]:
     return {
         "e": "bookTicker",
@@ -47,13 +62,15 @@ def book_ticker_raw() -> dict[str, Any]:
 
 
 class FakeConnection:
-    """Yields queued messages from ``recv()``; blocks once exhausted until cancelled."""
+    """Yields queued messages from ``recv()``; blocks once exhausted until
+    cancelled. ``str | bytes`` (T1.6b-A): a real socket frame can arrive as
+    either, and ``_handle_raw_message`` accepts both."""
 
-    def __init__(self, messages: list[str]) -> None:
+    def __init__(self, messages: Sequence[str | bytes]) -> None:
         self._messages = list(messages)
         self.closed = False
 
-    async def recv(self) -> str:
+    async def recv(self) -> str | bytes:
         if self._messages:
             return self._messages.pop(0)
         await asyncio.Event().wait()

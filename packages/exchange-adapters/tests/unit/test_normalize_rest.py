@@ -261,3 +261,28 @@ def test_to_decimal_rejects_float_and_bool() -> None:
         normalize.to_decimal(1.5, field="x")
     with pytest.raises(MalformedMessage):
         normalize.to_decimal(True, field="x")
+
+
+# ---- T1.6b-A: to_decimal skips the redundant str() for the (always) str
+# case Binance actually sends over the wire (~5.7% self time at 200 markets,
+# t16b-profile.md) — these pin the output as byte-for-byte identical to
+# ``Decimal(str(value))`` for every accepted input shape. ----------------
+
+
+@pytest.mark.parametrize("raw", ["79497.20", "0", "-1.5", "1e10", "0.00000649"])
+def test_to_decimal_accepts_a_string_value_unchanged(raw: str) -> None:
+    assert normalize.to_decimal(raw, field="x") == Decimal(str(raw))
+
+
+def test_to_decimal_accepts_an_int_value() -> None:
+    assert normalize.to_decimal(5, field="x") == Decimal(str(5))
+
+
+def test_to_decimal_accepts_a_decimal_value() -> None:
+    value = Decimal("1.23")
+    assert normalize.to_decimal(value, field="x") == Decimal(str(value))
+
+
+def test_to_decimal_rejects_an_invalid_decimal_string() -> None:
+    with pytest.raises(MalformedMessage):
+        normalize.to_decimal("not-a-number", field="x")

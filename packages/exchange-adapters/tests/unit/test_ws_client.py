@@ -90,6 +90,37 @@ async def test_malformed_envelope_is_counted_and_never_raised() -> None:
     await client.aclose()
 
 
+async def test_malformed_envelope_as_raw_bytes_is_counted_and_never_raised() -> None:
+    """T1.6b-A (orjson): a real socket frame often arrives as ``bytes``, not
+    ``str``. ``orjson.loads`` takes bytes directly (no ``.decode()`` needed);
+    ``orjson.JSONDecodeError`` (a ``ValueError`` subclass, not
+    ``json.JSONDecodeError``) must still be caught here, or a malformed byte
+    frame propagates out of ``_handle_raw_message`` instead of being counted."""
+    conn = FakeConnection([b"not json at all", envelope("btcusdt@aggTrade", agg_trade_raw())])
+    connector = ScriptedConnector([conn])
+    client = BinanceWsClient(connect_fn=connector, sleep=lambda _s: asyncio.sleep(0))
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert len(events) == 1
+    assert client.malformed_count == 1
+    await client.aclose()
+
+
+async def test_well_formed_envelope_as_raw_bytes_parses_normally() -> None:
+    """A good frame delivered as ``bytes`` (the common real-socket case) must
+    parse identically to the same frame delivered as ``str``."""
+    conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw()).encode("utf-8")])
+    connector = ScriptedConnector([conn])
+    client = BinanceWsClient(connect_fn=connector, sleep=lambda _s: asyncio.sleep(0))
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert events[0].kind == "trade"
+    assert events[0].price == Decimal("100")
+    await client.aclose()
+
+
 async def test_malformed_message_body_is_counted_and_never_raised() -> None:
     bad_trade = agg_trade_raw()
     del bad_trade["p"]  # missing required field -> MalformedMessage from normalize

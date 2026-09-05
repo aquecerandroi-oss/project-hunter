@@ -1,12 +1,15 @@
 """The monitored market universe â€” docs/plans/M1.md T1.3, PIPELINE.md Â§1.1.
 
-Every ``market_universe_refresh_s``: list perpetuals from the exchange, fetch
-24h tickers, upsert ``assets``/``markets``, rank by ``volume_24h_usd`` desc
-into ``monitor_rank``, and derive ``is_monitored`` (top
-``MARKET_UNIVERSE_SIZE`` with the allowlist always in and the blocklist never
-in). Publishes ``market.universe.changed`` only when the monitored set
-actually changes, and shares that set with ``ingest.py`` through
-:class:`MonitoredUniverse`.
+Every ``market_universe_refresh_s``: list perpetuals, fetch 24h tickers,
+upsert ``assets``/``markets``, rank by ``volume_24h_usd`` into
+``monitor_rank``, derive ``is_monitored``. Publishes ``market.universe.changed``
+only when the set changes, and shares it via :class:`MonitoredUniverse`.
+
+T1.6b-C2/C4: with ``MARKET_SHARD=i/N``, one shard per exchange holds a
+token-checked lock and is the *leader* refreshing from REST; every other
+shard *follows* its versioned snapshot (or Postgres). Both narrow the result
+via :func:`shard_symbols` before :meth:`MonitoredUniverse.set` -- the one
+place the filter applies, so downstream consumers inherit it for free.
 """
 
 from __future__ import annotations
@@ -14,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import random
+import zlib
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select, update
@@ -27,6 +31,16 @@ from hunter_core.logging import get_logger
 from hunter_exchanges.base import ExchangeError
 from hunter_market_worker.hot_state import write_ticker
 from hunter_market_worker.publication import publish
+from hunter_market_worker.universe_leader import (
+    FOLLOWER_POLL_S,
+    LEADER_RENEW_INTERVAL_S,
+    SNAPSHOT_TTL_MULTIPLIER,
+    extend_leader,
+    follower_symbols,
+    load_snapshot,
+    try_become_leader,
+    write_snapshot,
+)
 from hunter_market_worker.universe_repo import (
     mark_delisted,
     rank_and_monitor,
@@ -49,29 +63,26 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 TICKER_FETCH_CAP = 300
-"""Cap on individual ``fetch_ticker`` calls when the adapter has no bulk
-``fetch_tickers_24h`` â€” keeps a universe refresh from hammering REST for an
-exchange with thousands of symbols."""
+"""Cap on ``fetch_ticker`` calls when the adapter has no bulk endpoint."""
 
 UNIVERSE_RETRY_BASE_S = 5.0
 """HIGH-3: first retry delay after a failed refresh."""
 UNIVERSE_RETRY_MAX_S = 120.0
-"""Hard cap on the retry backoff, well below any realistic
-``market_universe_refresh_s`` (900s default) so a persistent failure keeps
-retrying every couple of minutes instead of sliding back to the full
-success interval."""
+"""Backoff cap, well below ``market_universe_refresh_s`` (900s default)."""
 UNIVERSE_RETRY_JITTER_FRACTION = 0.2
-"""Up to +20% jitter on top of the backoff, so several instances that failed
-at the same moment (e.g. a shared Postgres restart) do not retry in lockstep."""
+"""Up to +20% jitter so instances that failed together do not retry in lockstep."""
+
+
+def shard_symbols(symbols: list[str], shard_index: int, shard_total: int) -> list[str]:
+    """C2: stable slice -- ``crc32(symbol) % total == index``. ``total == 1``
+    yields every symbol unchanged (``x % 1`` is always ``0``)."""
+    return sorted(s for s in symbols if zlib.crc32(s.encode("ascii")) % shard_total == shard_index)
 
 
 @dataclasses.dataclass
 class MonitoredUniverse:
-    """Shared, mutable view of the monitored symbol set.
-
-    ``ingest.py`` watches :attr:`changed` to know when to restart its WS
-    subscription with a new symbol set.
-    """
+    """Shared, mutable view of the monitored symbol set; ``ingest.py`` watches
+    :attr:`changed` to know when to restart its WS subscription."""
 
     symbols: list[str] = dataclasses.field(default_factory=lambda: list[str]())
     initialized: bool = False
@@ -172,17 +183,10 @@ def _retry_delay(
     attempt: int, refresh_s: float, *, rand: Callable[[], float] = random.random
 ) -> float:
     """Backoff for the ``attempt``-th consecutive failed refresh (HIGH-3):
-    exponential from :data:`UNIVERSE_RETRY_BASE_S`, capped well below the
-    normal success interval, plus jitter. A single failed refresh must never
-    cost the worker a full ``market_universe_refresh_s`` (900s default) of
-    blindness — Postgres restarts, brief exchange 5xxs, etc. are routine."""
+    exponential, capped well below the normal success interval, plus jitter."""
     cap = min(UNIVERSE_RETRY_MAX_S, max(UNIVERSE_RETRY_BASE_S, refresh_s / 3))
-    # Clamp the exponent before raising it, not after: ``2 ** (attempt - 1)``
-    # is computed in full before ``min`` sees it, so an outage lasting long
-    # enough for ``attempt`` to reach ~1024 (about 41h at the capped delay)
-    # would raise ``OverflowError: int too large to convert to float`` inside
-    # this helper — killing ``run_universe`` and the whole TaskGroup for a
-    # reason unrelated to the outage. 64 doublings already exceed any cap.
+    # Clamp the exponent before raising it (not after): an outage long enough
+    # for ``attempt`` to reach ~1024 would otherwise overflow ``2 ** attempt``.
     exponent = min(attempt - 1, 64)
     backoff = min(cap, UNIVERSE_RETRY_BASE_S * (2**exponent))
     return backoff + backoff * UNIVERSE_RETRY_JITTER_FRACTION * rand()
@@ -199,22 +203,43 @@ async def run_universe(
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     rand: Callable[[], float] = random.random,
 ) -> None:
-    """Refresh the universe immediately, then every ``market_universe_refresh_s``
-    on success -- or on a short, capped, jittered backoff after a failure
-    (HIGH-3, see :func:`_retry_delay`). ``runtime.mark_error()``/
-    ``mark_success()`` semantics, and "log and keep going" on failure, are
-    unchanged; only the delay before the next attempt differs."""
+    """C4: the lock holder refreshes from REST and publishes a versioned
+    snapshot; every other shard follows it (or Postgres). ``shard_total == 1``
+    makes the lone process its own perpetual leader -- unchanged behaviour."""
     producer = f"market-worker@{runtime.instance}"
     consecutive_failures = 0
+    token = ""
+    # A lone process (``MARKET_SHARD=0/1``, the default) is its own perpetual
+    # leader: no lock, no snapshot, no renewal round trips -- exactly the M1
+    # behaviour, so single-instance deployments gain no new Redis dependency.
+    solo = settings.shard_total == 1
     while True:
+        if solo:
+            is_leader = True
+        else:
+            is_leader, token = await try_become_leader(redis, adapter.code, token)
         try:
-            monitored = await refresh_universe(
-                session_factory, adapter, redis, settings, producer=producer
-            )
-            universe.set(monitored)
+            if is_leader:
+                snapshot = None if solo else await load_snapshot(redis, adapter.code)
+                next_version = int(snapshot["version"]) + 1 if snapshot else 1
+                monitored = await refresh_universe(
+                    session_factory, adapter, redis, settings, producer=producer
+                )
+                if not solo:
+                    await write_snapshot(
+                        redis,
+                        adapter.code,
+                        monitored,
+                        next_version,
+                        SNAPSHOT_TTL_MULTIPLIER * settings.market_universe_refresh_s,
+                    )
+                delay: float = settings.market_universe_refresh_s
+            else:
+                monitored = await follower_symbols(session_factory, redis, adapter.code, settings)
+                delay = FOLLOWER_POLL_S
+            universe.set(shard_symbols(monitored, settings.shard_index, settings.shard_total))
             runtime.mark_success()
             consecutive_failures = 0
-            delay: float = settings.market_universe_refresh_s
         except Exception:
             logger.exception("market_universe_refresh_failed")
             runtime.mark_error()
@@ -222,4 +247,15 @@ async def run_universe(
             delay = _retry_delay(
                 consecutive_failures, settings.market_universe_refresh_s, rand=rand
             )
-        await sleep(delay)
+        if solo or not is_leader:
+            await sleep(delay)
+            continue
+        remaining = delay
+        while remaining > 0:
+            chunk = min(LEADER_RENEW_INTERVAL_S, remaining)
+            await sleep(chunk)
+            remaining -= chunk
+            # Lost the lock mid-sleep: stop waiting out a delay that can be
+            # minutes long and go straight back to the top to reassess.
+            if remaining > 0 and not await extend_leader(redis, adapter.code, token):
+                break

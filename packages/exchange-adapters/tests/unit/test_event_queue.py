@@ -10,6 +10,7 @@ from — this is unit-testable in complete isolation from any socket.
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -142,3 +143,75 @@ async def test_get_blocks_until_an_item_is_put() -> None:
 
     await queue.put("market:0", _trade("1"), states)
     assert await asyncio.wait_for(queue.get(), timeout=0.02) is not None
+
+
+# ---- T1.6b-A: O(1) eviction (ACHADO-1, .claude/state/t16b-profile.md) --------
+#
+# The old `_evict_one` scanned the whole deque from index 0 on every `put`
+# while full (`isinstance` + attribute access per item, then an O(n) `del` on
+# a deque) — 17.8% of one core at 200 markets, self-reinforcing under real
+# saturation. These tests pin the *same observable contract* the scan
+# implementation had (never evict a final, count on the victim's own
+# connection, strict FIFO) while proving the O(1)-common-case shape.
+
+
+async def test_fifo_order_preserved_across_mixed_final_and_non_final_events() -> None:
+    """`get()` must still return strict FIFO order across an interleaving of
+    trades and final klines — not just within one of the two categories."""
+    queue = BoundedEventQueue(maxsize=10)
+    states = _states("market:0")
+    events = [
+        _trade("1"),
+        _candle(is_final=True),
+        _trade("2"),
+        _candle(is_final=True, open_time=datetime(2026, 1, 1, 0, 1, tzinfo=UTC)),
+        _trade("3"),
+    ]
+    for event in events:
+        await queue.put("market:0", event, states)
+
+    drained = [await queue.get() for _ in events]
+
+    assert drained == events
+
+
+async def test_overflow_with_a_final_kline_at_the_head_falls_back_to_the_next_non_final() -> None:
+    """The O(1) common case evicts the head when it is not final; this pins
+    the rare fallback (head *is* a queued final, but a later item is not) —
+    the final at the head must survive, and the non-final behind it is the
+    one dropped, not a linear-scan-avoidance regression that drops nothing
+    or picks the wrong victim."""
+    queue = BoundedEventQueue(maxsize=3)
+    states = _states("market:0")
+    final = _candle(is_final=True)
+    old_trade = _trade("1")
+    await queue.put("market:0", final, states)
+    await queue.put("market:0", old_trade, states)
+    await queue.put("market:0", _trade("2"), states)
+
+    await queue.put("market:0", _trade("3"), states)  # overflow
+
+    assert len(queue) == 3
+    remaining = [await queue.get(), await queue.get(), await queue.get()]
+    assert final in remaining
+    assert old_trade not in remaining
+    assert states["market:0"].dropped_events == 1
+
+
+async def test_fifty_thousand_puts_into_a_saturated_queue_stay_fast() -> None:
+    """Performance regression guard for ACHADO-1: with the queue permanently
+    full of ordinary (non-final) events — the real 200-market shape — every
+    `put` must evict in O(1), not rescan the whole deque. A generous
+    wall-clock budget: the old O(n) scan over a maxsize-1000 deque would take
+    far longer than this at 50k puts."""
+    queue = BoundedEventQueue(maxsize=1000)
+    states = _states("market:0")
+    for _ in range(1000):
+        await queue.put("market:0", _trade("1"), states)
+
+    start = time.perf_counter()
+    for _ in range(50_000):
+        await queue.put("market:0", _trade("1"), states)
+    elapsed = time.perf_counter() - start
+
+    assert elapsed < 2.0

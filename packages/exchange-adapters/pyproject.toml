@@ -11,6 +11,7 @@ dependencies = [
   "httpx>=0.28",
   "websockets>=13",
   "msgpack>=1.1",
+  "orjson>=3.10",
 ]
 
 [tool.hatch.build.targets.wheel]

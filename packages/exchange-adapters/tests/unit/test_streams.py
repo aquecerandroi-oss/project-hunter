@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -29,7 +30,8 @@ def _load(name: str) -> Any:
 
 def test_stream_name_lowercases_symbol_and_maps_channel_suffix() -> None:
     assert streams.stream_name("BTCUSDT", StreamChannel.TRADES) == "btcusdt@aggTrade"
-    assert streams.stream_name("BTCUSDT", StreamChannel.BOOK) == "btcusdt@depth20"  # no suffix
+    # T1.6b-A: default book cadence is now 500ms (was implicit 250ms/no suffix).
+    assert streams.stream_name("BTCUSDT", StreamChannel.BOOK) == "btcusdt@depth20@500ms"
     assert streams.stream_name("BTCUSDT", StreamChannel.MARK_PRICE) == "btcusdt@markPrice@1s"
 
 
@@ -41,6 +43,44 @@ def test_channel_for_stream_name_is_the_inverse_of_stream_name() -> None:
 
 def test_channel_for_unknown_stream_name_is_none() -> None:
     assert streams.channel_for_stream_name("ethusdt@nonsense") is None
+
+
+# ---- T1.6b-A: configurable book cadence (A5) ---------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _restore_default_book_cadence() -> Any:  # pyright: ignore[reportUnusedFunction] - pytest autouse fixture
+    """``set_book_cadence_ms`` is process-wide state — every test that changes
+    it must leave the default (500ms) in place for every other test."""
+    yield
+    streams.set_book_cadence_ms(streams.DEFAULT_BOOK_CADENCE_MS)
+
+
+def test_default_book_cadence_is_500ms() -> None:
+    assert streams.DEFAULT_BOOK_CADENCE_MS == 500
+
+
+def test_set_book_cadence_ms_250_produces_no_suffix() -> None:
+    streams.set_book_cadence_ms(250)
+    assert streams.stream_name("BTCUSDT", StreamChannel.BOOK) == "btcusdt@depth20"
+
+
+def test_set_book_cadence_ms_none_produces_no_suffix() -> None:
+    streams.set_book_cadence_ms(None)
+    assert streams.stream_name("BTCUSDT", StreamChannel.BOOK) == "btcusdt@depth20"
+
+
+def test_set_book_cadence_ms_100_produces_the_100ms_suffix() -> None:
+    streams.set_book_cadence_ms(100)
+    assert streams.stream_name("BTCUSDT", StreamChannel.BOOK) == "btcusdt@depth20@100ms"
+
+
+@pytest.mark.parametrize("suffix", ["depth20", "depth20@100ms", "depth20@250ms", "depth20@500ms"])
+def test_channel_for_stream_name_resolves_every_book_cadence_suffix(suffix: str) -> None:
+    """The reverse map must route every cadence variant to BOOK regardless of
+    which one is currently active — a connection opened before a cadence
+    change can still be receiving frames named after the old one."""
+    assert streams.channel_for_stream_name(f"btcusdt@{suffix}") is StreamChannel.BOOK
 
 
 def test_group_symbols_splits_at_the_connection_limit() -> None:
@@ -250,6 +290,92 @@ def test_parse_force_order() -> None:
     assert liquidation.qty == Decimal("0.345")
     assert liquidation.price == Decimal("79210.50")
     assert liquidation.notional == Decimal("0.345") * Decimal("79210.50")
+
+
+# ---- T1.6b-A: model_construct() correctness guarantees ----------------------
+#
+# A2/A6 (``t16b-profile.md``: pydantic __init__ was 20.36% self time at 200
+# markets) switch every parser here from ``Model(...)`` (validated) to
+# ``Model.model_construct(...)`` (no validators run at all). These tests pin
+# the guarantees that used to come from pydantic's field/model validators and
+# now must hold by construction in the parser itself.
+
+_ALL_CHANNEL_PARSERS: list[tuple[str, Any]] = [
+    ("ws_agg_trade.json", streams.parse_agg_trade),
+    ("ws_depth20.json", streams.parse_depth20),
+    ("ws_kline_1m.json", streams.parse_kline_ws),
+    ("ws_mark_price.json", streams.parse_mark_price),
+    ("ws_force_order.json", streams.parse_force_order),
+]
+
+
+@pytest.mark.parametrize(("fixture", "parser"), _ALL_CHANNEL_PARSERS)
+def test_model_construct_events_have_utc_aware_ts(fixture: str, parser: Any) -> None:
+    raw = _load(fixture)
+
+    event = parser(raw)
+
+    ts = getattr(event, "ts", None) or event.open_time  # NormalizedCandle has no `ts`
+    assert ts.tzinfo is not None
+    assert ts.utcoffset() == UTC.utcoffset(None)
+
+
+@pytest.mark.parametrize(("fixture", "parser"), _ALL_CHANNEL_PARSERS)
+def test_model_construct_events_have_a_populated_utc_aware_received_at(
+    fixture: str, parser: Any
+) -> None:
+    raw = _load(fixture)
+
+    event = parser(raw)
+
+    assert event.received_at is not None
+    assert event.received_at.tzinfo is not None
+    assert event.received_at.utcoffset() == UTC.utcoffset(None)
+
+
+def test_model_construct_book_ticker_has_utc_aware_ts_and_received_at() -> None:
+    raw = _load("ws_book_ticker.json")
+
+    ticker = streams.parse_book_ticker(raw, last=Decimal("79500"))
+
+    assert ticker.ts.tzinfo is not None
+    assert ticker.received_at.tzinfo is not None
+
+
+def test_parse_force_order_still_defaults_notional_to_qty_times_price() -> None:
+    """The model_validator that used to compute this default no longer runs
+    under ``model_construct`` — the parser must set it explicitly."""
+    raw = _load("ws_force_order.json")
+
+    liquidation = streams.parse_force_order(raw)
+
+    assert liquidation.notional == liquidation.qty * liquidation.price
+
+
+def test_parse_depth20_rejects_a_negative_qty() -> None:
+    """``BookLevel.qty``'s ``Field(ge=0)`` doesn't run under
+    ``model_construct`` — the parser must check it explicitly."""
+    raw = json.loads(json.dumps(_load("ws_depth20.json")))
+    raw["b"][0][1] = "-1"
+
+    with pytest.raises(MalformedMessage):
+        streams.parse_depth20(raw)
+
+
+def test_parse_depth20_rejects_bids_not_sorted_descending() -> None:
+    raw = json.loads(json.dumps(_load("ws_depth20.json")))
+    raw["b"][0], raw["b"][1] = raw["b"][1], raw["b"][0]  # swap: no longer descending
+
+    with pytest.raises(MalformedMessage):
+        streams.parse_depth20(raw)
+
+
+def test_parse_depth20_rejects_asks_not_sorted_ascending() -> None:
+    raw = json.loads(json.dumps(_load("ws_depth20.json")))
+    raw["a"][0], raw["a"][1] = raw["a"][1], raw["a"][0]  # swap: no longer ascending
+
+    with pytest.raises(MalformedMessage):
+        streams.parse_depth20(raw)
 
 
 # ---- malformed messages ------------------------------------------------------

@@ -11,7 +11,10 @@ into a :mod:`hunter_core.domain.market` model, dispatched by
 
 Every ``parse_*`` function here is pure and raises
 :class:`~hunter_exchanges.base.MalformedMessage` on a bad payload — ``ws.py``
-decides what happens next (log + count, never propagate).
+decides what happens next (log + count, never propagate). T1.6b-A: every
+parser builds its model with ``.model_construct()``, not ``Model(...)`` (no
+validators run — 20.36% self time at 200 markets, ``t16b-profile.md``), so
+each parser keeps their guarantees explicit instead.
 """
 
 from __future__ import annotations
@@ -41,32 +44,44 @@ from hunter_exchanges.binance.normalize import (
 )
 
 MAX_SYMBOLS_PER_CONNECTION = 200
-#: F12: Binance's documented per-connection cap — 200 x 4 market channels =
-#: 800 is safe only by coincidence; a 5th/6th channel would silently
-#: overshoot this without an explicit assertion (``subscriptions.py``).
-MAX_STREAMS_PER_CONNECTION = 1024
-
-#: Depth of every ``@depth20`` partial-book snapshot (M1 joint decision,
-#: ``.claude/state/dialogue-M1.md`` rodada 1/round 1: top 20, no local book).
-BOOK_DEPTH = 20
-
-#: The two combined-stream routes Binance documents separately (Important
-#: WebSocket Change Notice): book/bid-ask on ``/public/stream``, everything
-#: else on ``/market/stream``. See ``docs/plans/M1.md`` "Decisão conjunta".
-ROUTE_PUBLIC = "public"
-ROUTE_MARKET = "market"
+MAX_STREAMS_PER_CONNECTION = 1024  # F12: Binance's cap; assert_stream_budget guards it
+BOOK_DEPTH = 20  # M1 decision: top 20, no local book
+ROUTE_PUBLIC = "public"  # book/bid-ask (Binance's two-route WS split)
+ROUTE_MARKET = "market"  # everything else
 
 _CHANNEL_SUFFIX: dict[StreamChannel, str] = {
     StreamChannel.TRADES: "aggTrade",
     StreamChannel.BOOK_TICKER: "bookTicker",
-    # No cadence suffix: default (250ms) picked by the joint decision
-    # ("@depth20 sem sufixo"); explicit suffixes are a different, unused contract.
-    StreamChannel.BOOK: "depth20",
     StreamChannel.KLINE_1M: "kline_1m",
     StreamChannel.MARK_PRICE: "markPrice@1s",
     StreamChannel.LIQUIDATIONS: "forceOrder",
 }
-_SUFFIX_TO_CHANNEL = {suffix: channel for channel, suffix in _CHANNEL_SUFFIX.items()}
+
+# T1.6b-A: BOOK's suffix is a module-level cadence (set_book_cadence_ms), not
+# a fixed _CHANNEL_SUFFIX entry — 500ms default halves parse_depth20's 23%
+# self time at 200 markets (t16b-profile.md; was 250ms/no-suffix at M1).
+DEFAULT_BOOK_CADENCE_MS = 500
+_BOOK_CADENCE_SUFFIX: dict[int | None, str] = {
+    None: "depth20",
+    250: "depth20",
+    100: "depth20@100ms",
+}
+_BOOK_SUFFIXES = ("depth20", "depth20@100ms", "depth20@250ms", "depth20@500ms")
+_book_cadence_ms: int | None = DEFAULT_BOOK_CADENCE_MS
+
+
+def set_book_cadence_ms(cadence_ms: int | None) -> None:
+    """Process-wide: ``None``/``250`` -> no suffix, else ``depth20@{ms}ms``."""
+    global _book_cadence_ms
+    _book_cadence_ms = cadence_ms
+
+
+def _book_suffix() -> str:
+    return _BOOK_CADENCE_SUFFIX.get(_book_cadence_ms, f"depth20@{_book_cadence_ms}ms")
+
+
+_SUFFIX_TO_CHANNEL: dict[str, StreamChannel] = {s: c for c, s in _CHANNEL_SUFFIX.items()}
+_SUFFIX_TO_CHANNEL.update(dict.fromkeys(_BOOK_SUFFIXES, StreamChannel.BOOK))
 
 _CHANNEL_ROUTE: dict[StreamChannel, str] = {
     StreamChannel.BOOK: ROUTE_PUBLIC,
@@ -95,7 +110,8 @@ def split_channels_by_route(
 
 def stream_name(symbol: str, channel: StreamChannel) -> str:
     """e.g. ``("BTCUSDT", StreamChannel.TRADES)`` -> ``"btcusdt@aggTrade"``."""
-    return f"{symbol.lower()}@{_CHANNEL_SUFFIX[channel]}"
+    suffix = _book_suffix() if channel is StreamChannel.BOOK else _CHANNEL_SUFFIX[channel]
+    return f"{symbol.lower()}@{suffix}"
 
 
 def channel_for_stream_name(name: str) -> StreamChannel | None:
@@ -107,13 +123,8 @@ def channel_for_stream_name(name: str) -> StreamChannel | None:
 def group_symbols(
     symbols: Sequence[str], max_per_connection: int = MAX_SYMBOLS_PER_CONNECTION
 ) -> list[list[str]]:
-    """Split ``symbols`` into groups of at most ``max_per_connection``.
-
-    ``docs/plans/M1.md`` T1.2: "<= 200 symbols per connection, several
-    connections if more". An empty input yields one empty group so a caller
-    can still open a (stream-less, idle) connection deterministically rather
-    than special-casing "no symbols" itself.
-    """
+    """Split ``symbols`` into groups of at most ``max_per_connection`` (M1.md
+    T1.2). Empty input -> one empty group (a deterministic idle connection)."""
     if not symbols:
         return [[]]
     return [
@@ -128,13 +139,10 @@ def combined_stream_url(base_url: str, streams: Sequence[str]) -> str:
 
 
 def parse_agg_trade(raw: dict[str, Any]) -> NormalizedTrade:
-    """``<symbol>@aggTrade`` -> :class:`NormalizedTrade`.
-
-    ``m`` = "is the buyer the market maker"; when true the taker (aggressor)
-    sold, so the trade's side is SELL, otherwise the taker bought.
-    """
+    """``<symbol>@aggTrade`` -> :class:`NormalizedTrade`. ``m`` = "buyer is
+    maker"; true means the taker (aggressor) sold, else the taker bought."""
     try:
-        return NormalizedTrade(
+        return NormalizedTrade.model_construct(
             exchange=EXCHANGE,
             symbol=require_field(raw, "s"),
             ts=ms_to_datetime(raw["T"], field="T"),
@@ -150,25 +158,19 @@ def parse_agg_trade(raw: dict[str, Any]) -> NormalizedTrade:
 
 
 def event_ts(raw: dict[str, Any]) -> Any:
-    """Event time for channels whose top-level ``T``/``E`` *is* the event
-    time (bookTicker, depth20). Not valid for ``markPrice``/``forceOrder``,
-    which parse their own ``ts``. Exposed so ``ws.py`` can timestamp a
-    deferred bookTicker frame that produced no event.
-    """
+    """Event time for a channel whose top-level ``T``/``E`` *is* it (bookTicker,
+    depth20); exposed so ``ws.py`` can timestamp a deferred bookTicker frame."""
     return (
         ms_to_datetime(raw["T"], field="T") if "T" in raw else ms_to_datetime(raw["E"], field="E")
     )
 
 
 def parse_book_ticker(raw: dict[str, Any], *, last: Decimal) -> NormalizedTicker:
-    """``<symbol>@bookTicker`` -> :class:`NormalizedTicker`.
-
-    The stream never carries a last-traded price, only best bid/ask;
-    ``last`` comes from the caller (``ws.py`` tracks the most recent
-    ``aggTrade`` price), never invented here (CLAUDE.md: "no fake anything").
-    """
+    """``<symbol>@bookTicker`` -> :class:`NormalizedTicker`. ``last`` comes
+    from the caller (``ws.py`` tracks the most recent ``aggTrade`` price) —
+    the stream itself carries no last-traded price, never invented here."""
     try:
-        return NormalizedTicker(
+        return NormalizedTicker.model_construct(
             exchange=EXCHANGE,
             symbol=require_field(raw, "s"),
             ts=event_ts(raw),
@@ -184,29 +186,39 @@ def parse_book_ticker(raw: dict[str, Any], *, last: Decimal) -> NormalizedTicker
         ) from exc
 
 
-def parse_depth20(raw: dict[str, Any]) -> NormalizedOrderBook:
-    """``<symbol>@depth20`` -> :class:`NormalizedOrderBook`.
+def _book_level(price_raw: Any, qty_raw: Any, *, side: str) -> BookLevel:
+    """``[price, qty]`` -> :class:`BookLevel`; ``qty >= 0`` checked explicitly
+    (``BookLevel.Field(ge=0)`` doesn't run under ``model_construct``)."""
+    qty = to_decimal(qty_raw, field=f"{side}.qty")
+    if qty < 0:
+        raise MalformedMessage(f"{side}.qty must be >= 0, got {qty_raw!r}", exchange=EXCHANGE)
+    return BookLevel.model_construct(price=to_decimal(price_raw, field=f"{side}.price"), qty=qty)
 
-    A partial-book snapshot (top 20, no local diff-book), so ``is_snapshot``
-    is always ``True``.
-    """
+
+def _ensure_sorted(levels: list[BookLevel], *, desc: bool, label: str) -> None:
+    """Sort-order check ``model_construct`` skips (was a field_validator)."""
+    bad = any(
+        (a.price < b.price) if desc else (a.price > b.price)
+        for a, b in zip(levels, levels[1:], strict=False)
+    )
+    if bad:
+        raise MalformedMessage(f"{label} price order is broken", exchange=EXCHANGE)
+
+
+def parse_depth20(raw: dict[str, Any]) -> NormalizedOrderBook:
+    """``<symbol>@depth20`` -> :class:`NormalizedOrderBook` (top 20, always
+    ``is_snapshot=True`` — no local diff-book)."""
     try:
-        return NormalizedOrderBook(
+        bids = [_book_level(p, q, side="bid") for p, q in raw["b"]]
+        asks = [_book_level(p, q, side="ask") for p, q in raw["a"]]
+        _ensure_sorted(bids, desc=True, label="bids")
+        _ensure_sorted(asks, desc=False, label="asks")
+        return NormalizedOrderBook.model_construct(
             exchange=EXCHANGE,
             symbol=require_field(raw, "s"),
             ts=event_ts(raw),
-            bids=[
-                BookLevel(
-                    price=to_decimal(p, field="bid.price"), qty=to_decimal(q, field="bid.qty")
-                )
-                for p, q in raw["b"]
-            ],
-            asks=[
-                BookLevel(
-                    price=to_decimal(p, field="ask.price"), qty=to_decimal(q, field="ask.qty")
-                )
-                for p, q in raw["a"]
-            ],
+            bids=bids,
+            asks=asks,
             sequence=int(raw["u"]),
             is_snapshot=True,
         )
@@ -217,19 +229,13 @@ def parse_depth20(raw: dict[str, Any]) -> NormalizedOrderBook:
 
 
 def parse_kline_ws(raw: dict[str, Any]) -> NormalizedCandle:
-    """``<symbol>@kline_1m`` -> :class:`NormalizedCandle`.
-
-    ``is_final`` comes straight from the stream's own ``k.x`` flag, unlike
-    the REST parser. ``close_time`` is the domain model's own *exclusive*
-    boundary (``open_time`` + one minute), not Binance's inclusive ``k.T``.
-    ``event_ts`` carries the frame's top-level ``E`` (push time) so the
-    worker can order same-``open_time`` partials by arrival — REST candles
-    have no such frame and leave it ``None``.
-    """
+    """``<symbol>@kline_1m`` -> :class:`NormalizedCandle`. ``is_final`` is the
+    stream's own ``k.x`` flag; ``event_ts`` is the frame's ``E`` (push time),
+    so the worker can order same-``open_time`` partials by arrival."""
     try:
         k = require_field(raw, "k")
         open_time = ms_to_datetime(k["t"], field="k.t")
-        return NormalizedCandle(
+        return NormalizedCandle.model_construct(
             exchange=EXCHANGE,
             symbol=require_field(raw, "s"),
             timeframe=Timeframe.M1,
@@ -253,18 +259,14 @@ def parse_kline_ws(raw: dict[str, Any]) -> NormalizedCandle:
 
 
 def parse_mark_price(raw: dict[str, Any]) -> NormalizedFunding:
-    """``<symbol>@markPrice@1s`` -> :class:`NormalizedFunding`.
-
-    Always ``funding_kind="estimated"``: a live mark/index reading, never a
-    settled rate. ``metadata`` labels the one raw field with no normalized
-    column of its own (``P``, the estimated settlement price).
-    """
+    """``<symbol>@markPrice@1s`` -> :class:`NormalizedFunding` (always
+    ``funding_kind="estimated"``); ``metadata`` labels the unmapped ``P``."""
     try:
         next_funding_time = ms_to_datetime(raw["T"], field="T") if raw.get("T") else None
         metadata: dict[str, Any] = {}
         if "P" in raw:
             metadata["estimated_settle_price"] = raw["P"]
-        return NormalizedFunding(
+        return NormalizedFunding.model_construct(
             exchange=EXCHANGE,
             symbol=require_field(raw, "s"),
             ts=ms_to_datetime(raw["E"], field="E"),
@@ -282,18 +284,22 @@ def parse_mark_price(raw: dict[str, Any]) -> NormalizedFunding:
 
 
 def parse_force_order(raw: dict[str, Any]) -> NormalizedLiquidation:
-    """``<symbol>@forceOrder`` -> :class:`NormalizedLiquidation`."""
+    """``<symbol>@forceOrder`` -> :class:`NormalizedLiquidation`; ``notional``
+    is set explicitly (its model_validator default skips ``model_construct``)."""
     try:
         order = require_field(raw, "o")
         side_raw = order["S"]
         side = OrderSide.SELL if side_raw == "SELL" else OrderSide.BUY
-        return NormalizedLiquidation(
+        qty = to_decimal(order["q"], field="o.q")
+        price = to_decimal(order["p"], field="o.p")
+        return NormalizedLiquidation.model_construct(
             exchange=EXCHANGE,
             symbol=require_field(order, "s"),
             ts=ms_to_datetime(order["T"], field="o.T"),
             side=side,
-            qty=to_decimal(order["q"], field="o.q"),
-            price=to_decimal(order["p"], field="o.p"),
+            qty=qty,
+            price=price,
+            notional=qty * price,
         )
     except KeyError as exc:
         raise MalformedMessage(
@@ -310,10 +316,7 @@ _PARSERS = {
 }
 
 
-#: F9: required for a bookTicker frame to count as well-formed even when
-#: deferred (no known ``last_price`` yet) — otherwise an empty ``data: {}``
-#: is indistinguishable from a real, healthy frame ("garbage is not proof
-#: of life").
+#: F9: required even for a deferred bookTicker ("garbage isn't proof of life").
 _BOOK_TICKER_REQUIRED_FIELDS = ("s", "b", "a", "B", "A")
 
 
@@ -330,15 +333,9 @@ def _validate_book_ticker_fields(raw: dict[str, Any]) -> None:
 def parse_stream_message(
     stream: str, data: dict[str, Any], *, last_price: Decimal | None
 ) -> Any | None:
-    """Dispatch one combined-stream frame's ``data`` by its ``stream`` name.
-
-    Returns ``None`` for an unrecognized stream suffix, or for
-    ``BOOK_TICKER`` when ``last_price`` is not yet known (no trade seen yet
-    on this connection). Raises :class:`MalformedMessage` for a recognized
-    but malformed payload; the caller catches it, logs, and counts it. A
-    deferred ``BOOK_TICKER`` is still validated first (F9): well-formed
-    still counts as proof of life, malformed never does.
-    """
+    """Dispatch one combined-stream frame's ``data`` by ``stream`` name. ``None``
+    for an unrecognized suffix or a still-deferred ``BOOK_TICKER`` (validated
+    first regardless, F9); raises :class:`MalformedMessage` otherwise."""
     channel = channel_for_stream_name(stream)
     if channel is None:
         raise MalformedMessage(f"unknown stream name {stream!r}", exchange=EXCHANGE)

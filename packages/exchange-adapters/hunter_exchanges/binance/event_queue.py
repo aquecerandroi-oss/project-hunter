@@ -32,11 +32,26 @@ def _is_final_kline(event: NormalizedEvent) -> bool:
 
 
 class BoundedEventQueue:
-    """FIFO of ``(connection_key, event)`` pairs capped at ``maxsize``."""
+    """FIFO of ``(connection_key, event)`` pairs capped at ``maxsize``.
+
+    T1.6b-A (ACHADO-1, ``.claude/state/t16b-profile.md``): the previous
+    ``_evict_one`` linear-scanned the whole deque from index 0 on *every*
+    ``put`` while full (``isinstance`` + attribute access per item via
+    ``enumerate()``, then an indexed ``del``) — 17.8% of one core at 200
+    markets, self-reinforcing because a saturated queue makes ``put``
+    saturated too. ``_final_count`` tracks how many of the currently queued
+    items are final klines, so the common case (the head is not final —
+    finals are rare, everything else is not) evicts in O(1): one tuple
+    unpack, one ``isinstance`` check, ``popleft()``. The full scan only ever
+    runs in the rare case where the head *is* a queued final but a later
+    item is not (never when every item is final — that path already goes
+    through the backpressure branch below instead).
+    """
 
     def __init__(self, maxsize: int = DEFAULT_MAXSIZE) -> None:
         self._maxsize = maxsize
         self._items: deque[tuple[str, NormalizedEvent]] = deque()
+        self._final_count = 0
         self._not_empty = asyncio.Event()
         self._has_room = asyncio.Event()
         self._has_room.set()
@@ -60,22 +75,40 @@ class BoundedEventQueue:
             self._has_room.clear()
             await self._has_room.wait()
         self._items.append((key, event))
+        if _is_final_kline(event):
+            self._final_count += 1
         self._not_empty.set()
 
     def _evict_one(self, states: dict[str, ConnectionState]) -> bool:
+        if not self._items:
+            return False
+        head_key, head_event = self._items[0]
+        if not _is_final_kline(head_event):
+            # Common case, O(1): the head is (almost always) not a final
+            # kline, so evict it directly with no scan at all.
+            self._items.popleft()
+            if head_key in states:
+                states[head_key].dropped_events += 1
+            return True
+        if self._final_count == len(self._items):
+            return False  # every queued item is a final kline: cannot evict
+        # Rare fallback: the head happens to be a queued final but a later
+        # item is not. O(n) here, but never on the hot path above.
         for index, (victim_key, victim_event) in enumerate(self._items):
             if not _is_final_kline(victim_event):
                 del self._items[index]
                 if victim_key in states:
                     states[victim_key].dropped_events += 1
                 return True
-        return False
+        return False  # pragma: no cover — unreachable given the count check above
 
     async def get(self) -> NormalizedEvent:
         while not self._items:
             self._not_empty.clear()
             await self._not_empty.wait()
         _, event = self._items.popleft()
+        if _is_final_kline(event):
+            self._final_count -= 1
         self._has_room.set()
         return event
 

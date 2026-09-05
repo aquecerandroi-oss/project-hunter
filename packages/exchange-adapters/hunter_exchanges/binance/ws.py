@@ -31,13 +31,14 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import random
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, cast
+
+import orjson
 
 from hunter_core.domain.market import NormalizedEvent
 from hunter_core.logging import get_logger
@@ -59,11 +60,13 @@ from hunter_exchanges.binance.streams import (
     BOOK_DEPTH as BOOK_DEPTH,  # re-exported for callers (API/UI book.depth projection)
 )
 from hunter_exchanges.binance.streams import (
+    DEFAULT_BOOK_CADENCE_MS,
     ROUTE_MARKET,
     ROUTE_PUBLIC,
     event_ts,
     group_symbols,
     parse_stream_message,
+    set_book_cadence_ms,
     split_channels_by_route,
 )
 from hunter_exchanges.binance.subscriptions import (
@@ -103,7 +106,13 @@ class BinanceWsClient:
         connect_timeout_s: float = CONNECT_TIMEOUT_S,
         queue_maxsize: int = DEFAULT_MAXSIZE,
         max_reconnect_failures: int = MAX_RECONNECT_FAILURES,
+        book_cadence_ms: int | None = DEFAULT_BOOK_CADENCE_MS,
     ) -> None:
+        # T1.6b-A (A5): module-level in streams.py (stream_name()'s BOOK
+        # suffix), set once here — subscription diffs (subscription_plan.py's
+        # names_for(), outside this package's edit scope) call stream_name()
+        # too, so the cadence has to live where both readers see it.
+        set_book_cadence_ms(book_cadence_ms)
         self._sleep = sleep
         self._queue_maxsize = queue_maxsize
         self._states: dict[str, ConnectionState] = {}
@@ -208,7 +217,9 @@ class BinanceWsClient:
         us" (Astra review, T1.2b resume round 2)."""
         state = self._states[key]
         try:
-            raw_obj: Any = json.loads(raw)
+            # orjson.loads takes `str` or `bytes` directly — never decode()
+            # first (T1.6b-A: json.loads was 6.23% self time at 200 markets).
+            raw_obj: Any = orjson.loads(raw)
             if isinstance(raw_obj, dict):
                 obj = cast("dict[str, Any]", raw_obj)
                 if is_control_ack(obj):
@@ -217,7 +228,7 @@ class BinanceWsClient:
             envelope = cast("dict[str, Any]", raw_obj)
             stream: Any = envelope["stream"]
             data: dict[str, Any] = envelope["data"]
-        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        except (orjson.JSONDecodeError, KeyError, TypeError) as exc:
             self._malformed_count += 1
             logger.warning("binance_ws_malformed_envelope", error=str(exc))
             return False

@@ -51,9 +51,10 @@ async def test_book_snapshot_and_trade_head(redis_client: Any) -> None:
     value = msgpack.unpackb(await redis_client.get(keys.book("fake", "BTCUSDT")))
     assert value["kind"] == "snapshot"
     assert value["depth"] == 20
+    memory = hot_state.TradeMemory()
     for i in range(3):
         await hot_state.push_trade(
-            redis_client, builders.trade("BTCUSDT", "100", "1", trade_id=str(i))
+            redis_client, builders.trade("BTCUSDT", "100", "1", trade_id=str(i)), memory
         )
     rows = await redis_client.lrange(keys.trades("fake", "BTCUSDT"), 0, -1)
     assert [msgpack.unpackb(r)["trade_id"] for r in rows] == ["2", "1", "0"]
@@ -140,17 +141,17 @@ async def test_normal_new_minute_final_does_not_issue_delete(
 async def test_new_trade_during_publication_is_kept_for_next_flush(
     redis_client: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from hunter_market_worker import ingest
+    from hunter_market_worker import coalesce
 
     coalescer = TickCoalescer()
     coalescer.on_trade(builders.trade("BTCUSDT", "100", "1"))
-    original = ingest.publish
+    original = coalesce.publish
 
     async def racing_publish(*args: Any) -> Any:
         coalescer.on_trade(builders.trade("BTCUSDT", "101", "2", trade_id="2"))
         return await original(*args)
 
-    monkeypatch.setattr(ingest, "publish", racing_publish)
+    monkeypatch.setattr(coalesce, "publish", racing_publish)
     await flush_ticks(coalescer, redis_client, "test")
     [(_, accum)] = coalescer.dirty_items()
     assert accum.trades_count == 1 and accum.volume_delta == Decimal("2")

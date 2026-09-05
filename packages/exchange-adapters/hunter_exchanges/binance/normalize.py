@@ -11,11 +11,8 @@ unit-testable against the fixtures in ``testing/fixtures/``.
 WebSocket message parsing lives in :mod:`hunter_exchanges.binance.streams`
 (kept separate so this module stays inside the 350-line budget); both share
 the primitives below (:func:`to_decimal`, :func:`ms_to_datetime`, ...).
-
-All prices/quantities go through ``Decimal(str(...))`` — Binance already
-sends numbers as JSON strings, so a plain ``Decimal(value)`` is enough, but
-every helper is defensive about a stray ``float``/``int``/``bool`` sneaking
-in from a hand-built test payload.
+Every helper is defensive about a stray ``float``/``bool`` sneaking in from
+a hand-built test payload — see :func:`to_decimal`.
 """
 
 from __future__ import annotations
@@ -56,12 +53,13 @@ _STATUS_MAP: dict[str, MarketStatus] = {
 
 
 def to_decimal(value: Any, *, field: str) -> Decimal:
-    """``Decimal(str(value))`` for a ``str``/``int``/``Decimal`` value.
+    """``Decimal(value)`` for a ``str``/``int``/``Decimal`` value.
 
     Rejects ``bool``, ``None`` and, per CLAUDE.md ("money is Decimal, never
     float"), ``float`` too — Binance always sends prices/quantities as JSON
-    strings, so a ``float`` here can only mean a hand-built payload skipped
-    the string and is one binary-rounding surprise away from a wrong value.
+    strings. T1.6b-A (~5.7% self time at 200 markets, ``t16b-profile.md``):
+    skips the redundant ``str(value)`` for the ``str`` case (always true for
+    a real Binance field) — same result either way for ``int``/``Decimal``.
     """
     if isinstance(value, bool) or value is None:
         raise MalformedMessage(
@@ -76,7 +74,7 @@ def to_decimal(value: Any, *, field: str) -> Decimal:
             f"expected a decimal string for {field!r}, got {value!r}", exchange=EXCHANGE
         )
     try:
-        return Decimal(str(value))
+        return Decimal(value) if isinstance(value, str) else Decimal(str(value))
     except InvalidOperation as exc:
         raise MalformedMessage(
             f"invalid decimal for {field!r}: {value!r}", exchange=EXCHANGE

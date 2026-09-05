@@ -9,13 +9,7 @@ publish, and forwards final candles / liquidations to the persist queue.
 
 from __future__ import annotations
 
-import asyncio
-import dataclasses
-from datetime import datetime
-from decimal import Decimal
-from typing import TYPE_CHECKING, Any, cast
-
-import orjson
+from typing import TYPE_CHECKING, Any
 
 from hunter_core.domain.market import (
     NormalizedCandle,
@@ -33,13 +27,27 @@ from hunter_core.events.streams import DEFAULT_MAXLEN, Streams
 from hunter_core.logging import get_logger
 from hunter_exchanges.base import StreamChannel
 from hunter_market_worker import hot_state
+from hunter_market_worker.coalesce import (
+    BOOK_IMBALANCE_DEPTH as BOOK_IMBALANCE_DEPTH,
+)
+from hunter_market_worker.coalesce import (
+    TickCoalescer as TickCoalescer,
+)
+from hunter_market_worker.coalesce import (
+    build_tick_payload as build_tick_payload,
+)
+from hunter_market_worker.coalesce import (
+    coalesce_loop as coalesce_loop,
+)
+from hunter_market_worker.coalesce import (
+    flush_ticks as flush_ticks,
+)
 from hunter_market_worker.publication import liquidation_id, publish
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
 
     from hunter_core.domain.market import NormalizedEvent
-    from hunter_core.settings import Settings
     from hunter_market_worker.persist import PersistQueues
 
 logger = get_logger(__name__)
@@ -52,121 +60,7 @@ CHANNELS = (
     StreamChannel.MARK_PRICE,
     StreamChannel.LIQUIDATIONS,
 )
-BOOK_IMBALANCE_DEPTH = 5
 RECONNECT_BACKOFF_S = 1.0
-
-
-@dataclasses.dataclass
-class _TickAccum:
-    price: Decimal | None = None
-    bid: Decimal | None = None
-    ask: Decimal | None = None
-    volume_delta: Decimal = Decimal(0)
-    trades_count: int = 0
-    book_imbalance_5: Decimal | None = None
-    dirty: bool = False
-    ts: str = ""
-    # H10: price_ts/book_ts track the timestamp of the event kind that owns
-    # each value, so a book-only update cannot republish a frozen price under
-    # a fresh ``ts`` — the UI can tell a stale price from a live one.
-    price_ts: str = ""
-    book_ts: str = ""
-
-
-class TickCoalescer:
-    """Per-(exchange, symbol) tick accumulator, flushed on a fixed interval."""
-
-    def __init__(self) -> None:
-        self._state: dict[tuple[str, str], _TickAccum] = {}
-
-    def _get(self, exchange: str, symbol: str) -> _TickAccum:
-        return self._state.setdefault((exchange, symbol), _TickAccum())
-
-    def on_ticker(self, ticker: NormalizedTicker) -> None:
-        accum = self._get(ticker.exchange, ticker.symbol)
-        event_ts = ticker.ts.isoformat()
-        accum.price = ticker.last
-        accum.bid = ticker.bid
-        accum.ask = ticker.ask
-        accum.dirty = True
-        accum.price_ts = max(filter(None, [accum.price_ts, event_ts]), key=datetime.fromisoformat)
-        accum.ts = max(filter(None, [accum.ts, event_ts]), key=datetime.fromisoformat)
-
-    def on_trade(self, trade: NormalizedTrade) -> None:
-        accum = self._get(trade.exchange, trade.symbol)
-        event_ts = trade.ts.isoformat()
-        accum.price = trade.price
-        accum.volume_delta += trade.qty
-        accum.trades_count += 1
-        accum.dirty = True
-        accum.price_ts = max(filter(None, [accum.price_ts, event_ts]), key=datetime.fromisoformat)
-        accum.ts = max(filter(None, [accum.ts, event_ts]), key=datetime.fromisoformat)
-
-    def on_book(self, book: NormalizedOrderBook) -> None:
-        accum = self._get(book.exchange, book.symbol)
-        event_ts = book.ts.isoformat()
-        accum.book_imbalance_5 = book.imbalance(BOOK_IMBALANCE_DEPTH)
-        accum.dirty = True
-        accum.book_ts = max(filter(None, [accum.book_ts, event_ts]), key=datetime.fromisoformat)
-        accum.ts = max(filter(None, [accum.ts, event_ts]), key=datetime.fromisoformat)
-
-    def dirty_items(self) -> list[tuple[tuple[str, str], _TickAccum]]:
-        return [(key, accum) for key, accum in self._state.items() if accum.dirty]
-
-    def reset(self, key: tuple[str, str]) -> None:
-        accum = self._state[key]
-        accum.volume_delta = Decimal(0)
-        accum.trades_count = 0
-        accum.dirty = False
-
-
-def build_tick_payload(exchange: str, symbol: str, accum: _TickAccum, ts: str) -> dict[str, Any]:
-    """Pure builder for the ``market.ticks`` / ``rt:market:*`` payload â€” no IO,
-    so coalescing can be unit-tested without Redis."""
-    return {
-        "exchange": exchange,
-        "symbol": symbol,
-        "price": str(accum.price) if accum.price is not None else None,
-        "bid": str(accum.bid) if accum.bid is not None else None,
-        "ask": str(accum.ask) if accum.ask is not None else None,
-        "volume_delta": str(accum.volume_delta),
-        "trades_count": accum.trades_count,
-        "book_imbalance_5": (
-            str(accum.book_imbalance_5) if accum.book_imbalance_5 is not None else None
-        ),
-        "ts": ts,
-        "price_ts": accum.price_ts or None,
-        "book_ts": accum.book_ts or None,
-    }
-
-
-async def flush_ticks(
-    coalescer: TickCoalescer, redis: redis_asyncio.Redis, producer: str
-) -> list[str]:
-    """Publish one ``market.ticks`` event (stream + pub/sub) per dirty symbol."""
-    published: list[str] = []
-    for (exchange, symbol), accum in coalescer.dirty_items():
-        payload = build_tick_payload(exchange, symbol, accum, accum.ts)
-        coalescer.reset((exchange, symbol))
-        envelope = EventEnvelope(
-            type=Streams.MARKET_TICKS,
-            producer=producer,
-            key=f"{exchange}:{symbol}",
-            payload=payload,
-        )
-        await publish(redis, Streams.MARKET_TICKS, envelope, DEFAULT_MAXLEN[Streams.MARKET_TICKS])
-        await cast(Any, redis).publish(f"rt:market:{exchange}:{symbol}", orjson.dumps(payload))
-        published.append(symbol)
-    return published
-
-
-async def coalesce_loop(
-    coalescer: TickCoalescer, redis: redis_asyncio.Redis, settings: Settings, producer: str
-) -> None:
-    interval = settings.tick_coalesce_ms / 1000
-    while True:
-        await asyncio.sleep(interval)
-        await flush_ticks(coalescer, redis, producer)
 
 
 class AcceptedEvents:
@@ -270,21 +164,25 @@ async def handle_event(
     queues: PersistQueues,
     coalescer: TickCoalescer,
     accepted: AcceptedEvents,
+    trade_memory: hot_state.TradeMemory,
 ) -> bool:
-    """Dispatch one normalized event to hot state, the coalescer and/or the persist queue."""
+    """Dispatch one normalized event to hot state, the coalescer and/or the persist queue.
+
+    B3: ticker/book acceptance is decided purely by the in-memory
+    ``accepted`` gate above — no Redis round trip either way. The actual
+    hot-state write for both is deferred to the coalescer's periodic flush
+    (:func:`flush_ticks`), which is why ``handle_event`` no longer awaits
+    ``hot_state.write_ticker``/``write_book`` here.
+    """
     if not accepted.accept(event):
         return False
     if isinstance(event, NormalizedTicker):
-        if not await hot_state.write_ticker(redis, event):
-            return False
         coalescer.on_ticker(event)
     elif isinstance(event, NormalizedTrade):
-        if not await hot_state.push_trade(redis, event):
+        if not await hot_state.push_trade(redis, event, trade_memory):
             return False
         coalescer.on_trade(event)
     elif isinstance(event, NormalizedOrderBook):
-        if not await hot_state.write_book(redis, event, depth=20):
-            return False
         coalescer.on_book(event)
     elif isinstance(event, NormalizedCandle):
         if (

@@ -99,11 +99,18 @@ class FakeAdapter:
     ) -> AsyncIterator[NormalizedEvent]:
         self.stream_calls.append((list(symbols), list(channels)))
         self.stream_started.set()
-        while True:
-            item = await self._queue.get()
-            if isinstance(item, BaseException):
-                raise item
-            yield item
+        try:
+            while True:
+                item = await self._queue.get()
+                if isinstance(item, BaseException):
+                    raise item
+                yield item
+        finally:
+            # Mirrors the real Binance adapter (ws.py's StreamConsumer.consume):
+            # the generator's own ``finally`` runs ``on_close`` (here, the
+            # adapter's own ``aclose``) whenever the generator is closed —
+            # cancellation, ``stream.aclose()``, or an exception.
+            await self.aclose()
 
     def connection_state(self) -> str:
         return self._ws_state

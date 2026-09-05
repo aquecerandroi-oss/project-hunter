@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 
 from hunter_exchanges.base import StreamChannel
+from hunter_exchanges.binance import streams
 from hunter_exchanges.binance.ws import (
     BOOK_DEPTH,
     MARKET_WS_BASE_URL,
@@ -31,6 +32,7 @@ from .ws_test_helpers import (
     agg_trade_raw,
     book_ticker_raw,
     collect,
+    depth20_raw,
     envelope,
 )
 
@@ -226,3 +228,38 @@ async def test_more_than_200_symbols_split_into_multiple_connections_per_route()
 
     assert set(client.connection_states().keys()) == {"market:0", "market:1"}
     await agen.aclose()
+
+
+# ---- T1.6b-A: configurable book cadence, wired end-to-end (A5) ---------------
+
+
+@pytest.fixture(autouse=True)
+def _restore_default_book_cadence() -> Any:  # pyright: ignore[reportUnusedFunction] - pytest autouse fixture
+    yield
+    streams.set_book_cadence_ms(streams.DEFAULT_BOOK_CADENCE_MS)
+
+
+async def test_book_channel_subscribes_and_parses_at_the_default_500ms_cadence() -> None:
+    conn = FakeConnection([envelope("btcusdt@depth20@500ms", depth20_raw())])
+    connector = ScriptedConnector([conn])
+    client = BinanceWsClient(connect_fn=connector, sleep=lambda _s: asyncio.sleep(0))
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.BOOK], count=1)
+
+    assert events[0].kind == "book"
+    assert connector.urls[0].endswith("btcusdt@depth20@500ms")
+    await client.aclose()
+
+
+async def test_book_cadence_ms_constructor_param_overrides_the_default() -> None:
+    conn = FakeConnection([envelope("btcusdt@depth20@100ms", depth20_raw())])
+    connector = ScriptedConnector([conn])
+    client = BinanceWsClient(
+        connect_fn=connector, sleep=lambda _s: asyncio.sleep(0), book_cadence_ms=100
+    )
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.BOOK], count=1)
+
+    assert events[0].kind == "book"
+    assert connector.urls[0].endswith("btcusdt@depth20@100ms")
+    await client.aclose()
