@@ -327,7 +327,7 @@ jobs:
         if: hashFiles('infra/docker/Dockerfile.api-workers', 'infra/docker/Dockerfile.web') != ''
       - name: build api-workers image
         if: hashFiles('infra/docker/Dockerfile.api-workers') != ''
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: infra/docker/Dockerfile.api-workers
@@ -336,7 +336,7 @@ jobs:
           cache-to: type=gha,mode=max
       - name: build web image
         if: hashFiles('infra/docker/Dockerfile.web') != ''
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: infra/docker/Dockerfile.web
