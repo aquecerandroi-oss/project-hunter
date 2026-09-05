@@ -158,6 +158,21 @@ ingestion_gaps                              -- lacunas detectadas e seu status d
   id, market_id, timeframe, gap_start, gap_end, detected_at, recovered_at, status, attempts
 ```
 
+Duas convenções que o M1 (T1.3) fixou e que valem para todo consumidor destas tabelas:
+
+- **`market_snapshots`: ausência de linha significa "não observado".** O market-worker pula o
+  mercado quando não há nenhum hot state para ele naquele minuto, em vez de gravar uma linha com
+  todos os campos nulos — como o insert é `ON CONFLICT (market_id, ts) DO NOTHING`, uma linha vazia
+  seria permanente e a observação real que chegasse segundos depois nunca a substituiria. Campos
+  individuais continuam podendo ser `NULL`: cada um é anulado quando o seu próprio timestamp em
+  Redis está mais velho que `MARKET_STALE_AFTER_S` (nunca se republica um valor velho como fresco).
+- **`liquidations.id` é UUID v5, não v7** — a exceção à convenção do §1.3. É um hash determinístico
+  (namespace fixo) de exchange, símbolo, lado, preço, quantidade e do timestamp **truncado ao
+  milissegundo**; é isso que torna a redelivery do WebSocket idempotente sob
+  `ON CONFLICT (id, ts) DO NOTHING`. Por isso o `ts` gravado também é truncado ao milissegundo: a
+  chave persistida tem de ser exatamente a chave de que o `id` foi derivado, senão dois microssegundos
+  de diferença criam duas linhas para a mesma liquidação.
+
 Trades brutos e order book **não** são persistidos no Postgres (ver `SPEC_REVIEW.md` B3).
 
 ## 5. Análise (global)

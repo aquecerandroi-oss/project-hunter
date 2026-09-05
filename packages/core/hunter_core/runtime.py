@@ -66,6 +66,7 @@ class WorkerRuntime:
         )
         self._error_count = 0
         self._last_success: datetime | None = None
+        self.readiness_checks: list[Callable[[], Awaitable[bool]]] = []
         self.app: ASGIApp = self._build_app()
 
     def mark_success(self) -> None:
@@ -117,7 +118,18 @@ class WorkerRuntime:
             db_ok = await check_database(self.engine)
             redis_ok = await check_redis(self.redis)
             details = {"database": db_ok, "redis": redis_ok}
-            return JSONResponse(details, status_code=200 if db_ok and redis_ok else 503)
+            checks_ok = db_ok and redis_ok
+            for index, check in enumerate(self.readiness_checks):
+                try:
+                    ok = bool(await asyncio.wait_for(check(), timeout=2))
+                except Exception:
+                    ok = False
+                name = getattr(check, "__name__", f"check_{index}")
+                if name in details:
+                    name = f"{name}_{index}"
+                details[name] = ok
+                checks_ok = checks_ok and ok
+            return JSONResponse(details, status_code=200 if checks_ok else 503)
 
         return Starlette(
             routes=[

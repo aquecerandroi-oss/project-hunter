@@ -16,6 +16,7 @@ from hunter_core.db.session import (
     check_database,
     create_session_factory,
     get_session,
+    role_session,
     tenant_session,
 )
 
@@ -41,3 +42,26 @@ async def test_tenant_session_sets_current_org_only_inside_its_own_transaction(
     async with get_session(factory) as session:
         result = await session.execute(text("SELECT current_setting('app.current_org', true)"))
         assert result.scalar() in (None, "")
+
+
+async def test_hunter_worker_session_has_a_statement_timeout(db_engine: AsyncEngine) -> None:
+    """D3: a cancelled flush must not hang forever on a dead socket — the
+    worker role gets a server-side deadline so a stuck statement is killed
+    even if the client-side ``asyncio.wait_for`` backstop never gets to."""
+    factory = create_session_factory(db_engine)
+
+    async with role_session(factory, db_role="hunter_worker") as session:
+        result = await session.execute(text("SHOW statement_timeout"))
+        assert result.scalar() == "15s"
+
+
+async def test_hunter_app_session_keeps_the_default_statement_timeout(
+    db_engine: AsyncEngine,
+) -> None:
+    """D3 is scoped to ``hunter_worker`` only — the API's transactions must
+    keep their current (server-default) behaviour."""
+    factory = create_session_factory(db_engine)
+
+    async with role_session(factory, db_role="hunter_app") as session:
+        result = await session.execute(text("SHOW statement_timeout"))
+        assert result.scalar() != "15s"

@@ -98,6 +98,14 @@ class Settings(BaseSettings):
     retention_candles_1m_days: int = 90
     retention_feature_snapshots_days: int = 14
 
+    # ---- market-worker (docs/plans/M1.md T1.3) ----
+    market_universe_allowlist: list[str] = []
+    market_universe_blocklist: list[str] = []
+    market_stale_after_s: int = 10
+    market_universe_refresh_s: int = 900
+    market_oi_poll_s: int = 300
+    market_snapshot_interval_s: int = 60
+
     # ---- Runtime (nao documentado em .env.example; ver CONCERNS do T03) ----
     health_port: int = 8001
 

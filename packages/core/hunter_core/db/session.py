@@ -7,6 +7,25 @@ below disable both asyncpg's statement cache and SQLAlchemy's own prepared
 statement cache — required because Neon/PgBouncer run in transaction pooling
 mode, where a server-prepared statement from one transaction can leak into an
 unrelated one on the next checkout.
+
+D3: the server itself runs with ``statement_timeout = 0`` / ``lock_timeout =
+0`` (no deadline), and asyncpg has no per-command deadline of its own unless
+told to. Without one, a cancelled caller (e.g. ``asyncio.wait_for`` giving up
+on a slow flush) still has to await the driver's own ``ROLLBACK``/close on
+the socket — and if the peer is gone (partition, killed pooler), that await
+never returns, wedging the caller forever even though the *caller's* timeout
+fired. Two independent deadlines close that gap: ``connect_args={"command_
+timeout": 30}`` bounds every asyncpg command at the driver level, and
+``_apply_context`` sets ``SET LOCAL statement_timeout = '15s'`` on the server
+side, only for ``hunter_worker``.
+
+Only the *server-side* ``statement_timeout`` is scoped to ``hunter_worker``.
+``command_timeout`` is a ``connect_args`` value, applied once when the
+connection is opened — before any role is chosen with ``SET LOCAL ROLE`` — so
+it is engine-wide and also bounds ``hunter_app`` (API) connections built by
+this same :func:`create_engine`. 30s is meant as a generous backstop, not a
+per-role policy; splitting it properly would need a role-aware engine
+constructor, which is out of scope for this task.
 """
 
 from __future__ import annotations
@@ -46,6 +65,7 @@ def create_engine(settings: Settings) -> AsyncEngine:
         connect_args={
             "statement_cache_size": 0,
             "prepared_statement_cache_size": 0,
+            "command_timeout": 30,
         },
     )
 
@@ -104,6 +124,11 @@ async def _apply_context(
     ``app.current_org`` is zero rows here exactly as it is in production.
     """
     await session.execute(text(_set_role(db_role)))
+    if db_role == "hunter_worker":
+        # A constant, not caller input — SET LOCAL takes a literal, not a bound
+        # parameter (D3). Only the worker role gets a server-side deadline here;
+        # hunter_app/API transactions are out of scope and keep the default.
+        await session.execute(text("SET LOCAL statement_timeout = '15s'"))
     if org_id is not None:
         await session.execute(
             text(_SET_CONFIG.format(name="app.current_org")), {"value": str(org_id)}

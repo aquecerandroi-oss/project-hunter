@@ -76,6 +76,28 @@ def test_create_engine_raises_when_database_url_missing() -> None:
         create_engine(settings)
 
 
+def test_create_engine_sets_asyncpg_command_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """D3: asyncpg needs its own per-command deadline — ``wait_for`` cancelling
+    the caller is not enough if the driver's own await (ROLLBACK/close on a
+    dead socket) never returns."""
+    from pydantic import SecretStr
+
+    import hunter_core.db.session as session_module
+
+    captured: dict[str, Any] = {}
+
+    def fake_create_async_engine(url: str, **kwargs: Any) -> str:
+        captured.update(kwargs)
+        return "engine"
+
+    monkeypatch.setattr(session_module, "create_async_engine", fake_create_async_engine)
+    settings = Settings(database_url=SecretStr("postgresql+asyncpg://u:p@h/db"))
+
+    create_engine(settings)
+
+    assert captured["connect_args"]["command_timeout"] == 30
+
+
 async def test_tenant_session_downgrades_role_then_sets_current_org() -> None:
     factory = _FakeSessionFactory()
     org_id = uuid.uuid4()
@@ -145,7 +167,21 @@ async def test_role_session_accepts_the_worker_role() -> None:
     async with role_session(factory, db_role="hunter_worker"):  # type: ignore[arg-type]
         pass
 
-    assert _sql(factory) == ["SET LOCAL ROLE hunter_worker"]
+    # D3: the worker role also gets a server-side statement_timeout, set as a
+    # literal (never a bound parameter — SET LOCAL does not accept one).
+    assert _sql(factory) == [
+        "SET LOCAL ROLE hunter_worker",
+        "SET LOCAL statement_timeout = '15s'",
+    ]
+
+
+async def test_role_session_does_not_set_statement_timeout_for_hunter_app() -> None:
+    factory = _FakeSessionFactory()
+
+    async with role_session(factory):  # type: ignore[arg-type]
+        pass
+
+    assert _sql(factory) == ["SET LOCAL ROLE hunter_app"]
 
 
 @pytest.mark.parametrize(

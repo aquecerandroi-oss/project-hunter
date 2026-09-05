@@ -107,6 +107,31 @@ async def test_ready_returns_503_when_redis_unhealthy() -> None:
     assert response.json() == {"database": True, "redis": False}
 
 
+@pytest.mark.parametrize("outcome", [True, False, "exception", "timeout"])
+async def test_readiness_hooks_fail_closed(outcome: bool | str) -> None:
+    runtime = _make_runtime()
+    cancelled = asyncio.Event()
+
+    async def ingestion() -> bool:
+        if outcome == "exception":
+            raise RuntimeError("ingestion failed")
+        if outcome == "timeout":
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+        return outcome is True
+
+    runtime.readiness_checks.append(ingestion)
+    transport = httpx.ASGITransport(app=runtime.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await asyncio.wait_for(client.get("/ready"), 3)
+    assert response.status_code == (200 if outcome is True else 503)
+    assert response.json()["ingestion"] is (outcome is True)
+    if outcome == "timeout":
+        assert cancelled.is_set()
+
+
 async def test_metrics_endpoint_is_mounted() -> None:
     runtime = _make_runtime()
     transport = httpx.ASGITransport(app=runtime.app)

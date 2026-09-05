@@ -43,6 +43,13 @@ def init_sentry(settings: Settings, role: str) -> None:
 
 registry = CollectorRegistry()
 
+market_publish_failures_total = Counter(
+    "market_publish_failures_total",
+    "Market stream publications that failed while the producer was alive.",
+    ["stream"],
+    registry=registry,
+)
+
 events_produced_total = Counter(
     "hunter_events_produced_total",
     "Events published to a Redis Stream.",
@@ -89,6 +96,41 @@ fills_simulated_total = Counter(
     "hunter_fills_simulated_total",
     "Simulated fills produced by paper/shadow execution.",
     ["portfolio_type"],
+    registry=registry,
+)
+
+market_snapshot_stale_fields_total = Counter(
+    "market_snapshot_stale_fields_total",
+    "Snapshot fields written as NULL because their own hot-state timestamp was stale.",
+    ["field"],
+    registry=registry,
+)
+market_snapshot_skipped_no_data_total = Counter(
+    "market_snapshot_skipped_no_data_total",
+    "Minute snapshots skipped because no observable field was fresh (no hot state, "
+    "or every field gated as stale).",
+    registry=registry,
+)
+market_liquidation_duplicates_total = Counter(
+    "market_liquidation_duplicates_total",
+    "Liquidation rows collapsed by ON CONFLICT DO NOTHING (redelivered by the exchange).",
+    registry=registry,
+)
+market_persistence_loss_reports_dropped_total = Counter(
+    "market_persistence_loss_reports_dropped_total",
+    "Loss reports evicted from the bounded loss queue before reaching system_events.",
+    registry=registry,
+)
+market_sampling_bucket_skipped_total = Counter(
+    "market_sampling_bucket_skipped_total",
+    "Sampling boundaries missed because the previous round overran its interval.",
+    ["loop"],
+    registry=registry,
+)
+market_ingestion_gaps = Gauge(
+    "market_ingestion_gaps",
+    "Ingestion gaps by status for the monitored universe.",
+    ["exchange", "status"],
     registry=registry,
 )
 

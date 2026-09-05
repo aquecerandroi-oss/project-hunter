@@ -641,12 +641,14 @@ source = { editable = "services/market-worker" }
 dependencies = [
     { name = "hunter-core" },
     { name = "hunter-exchanges" },
+    { name = "msgpack" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "hunter-core", editable = "packages/core" },
     { name = "hunter-exchanges", editable = "packages/exchange-adapters" },
+    { name = "msgpack", specifier = ">=1.1" },
 ]
 
 [[package]]
