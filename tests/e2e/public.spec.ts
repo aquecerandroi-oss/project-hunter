@@ -34,16 +34,17 @@ test.describe("public surfaces (no auth required)", () => {
   test("/sign-in with the documented fake key never mounts a form (honest failure, not a hang)", async ({ page }) => {
     test.skip(!usingFakeClerkKey(), "real Clerk keys are configured for this run; the fake-key fallback doesn't apply");
 
-    const response = await page.goto("/sign-in");
-    // middleware.ts's clerkMiddleware sets this response header the moment
-    // it can't find a dev-browser JWT for the instance -- the same signal
-    // that, in a real browser, triggers Clerk's client-side handshake
-    // redirect. With a fake Frontend API host that redirect can never
-    // complete, so we assert the honest, observable server-side fact
-    // instead of a client navigation that will never happen.
-    expect(response?.headers()["x-clerk-auth-reason"]).toBe("dev-browser-missing");
-
-    // And the form itself must never silently render as if auth worked.
-    await expect(page.getByLabel(/email address/i)).not.toBeVisible();
+    // middleware.ts's clerkMiddleware answers with a 307 to the instance's
+    // handshake endpoint the moment it can't find a dev-browser JWT. With the
+    // fake key that host (clerk.example.com) does not resolve, so a real
+    // `page.goto` would die on ERR_NAME_NOT_RESOLVED while following it. We
+    // therefore assert the honest, observable server-side fact without
+    // following the redirect: the status, the handshake host and the reason
+    // header. No sign-in form is ever served on this path.
+    const response = await page.request.get("/sign-in", { maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    expect(response.headers()["x-clerk-auth-reason"]).toBe("dev-browser-missing");
+    expect(response.headers()["location"]).toMatch(/^https:\/\/clerk\.example\.com\/v1\/client\/handshake/);
+    expect(await response.text()).not.toMatch(/email address/i);
   });
 });
