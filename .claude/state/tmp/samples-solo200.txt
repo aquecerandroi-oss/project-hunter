@@ -1,0 +1,42 @@
+[21:10:55] docker-market-worker-1 98.37% 236.2MiB / 7.543GiB
+[21:10:55] PROBE {"at": "2026-09-05T21:11:01.140931+00:00", "market_status": {"exchanges": [{"exchange": "binance", "ws_state": "connected", "last_event_at": "2026-09-05T21:10:56.405000Z", "last_event_age_ms": 4978, "markets_monitored": 200, "open_gaps": 3656, "reconnects": 0}], "markets_monitored_total": 200, "updated_at": "2026-09-05T21:11:01.383516Z"}, "summary": {"markets_total": 200, "markets_monitored": 200, "markets_ok": 0, "markets_stale": 0, "markets_degraded": 200, "markets_unavailable": 0}, "components": {"ticker": {"stale": 72, "ok": 127, "absent": 1}, "book": {"stale": 57, "ok": 122, "absent": 21}, "mark": {"stale": 177, "ok": 21, "absent": 2}}, "component_age_ms_p50_p95_max": {"ticker": [7571, 24914, 33022], "book": [7467, 11770, 13844], "mark": [31510, 217513, 276513]}, "hot_state_ok_all_three_components": 8, "hot_state_ok_pct": 4.0, "heartbeats": [{"role": "market", "instance": "b63115094ae3", "ts": "2026-09-05T21:10:57.041087Z", "last_success": "2026-09-05T21:10:56.848537Z", "errors": 1, "version": "0.0.0", "age_s": 4.484122, "status": "alive", "last_event_at": null, "ws_state": null, "subscriptions": null, "reconnects": null, "markets_monitored": null, "open_gaps": null}, {"role": "market", "instance": "binance", "ts": "2026-09-05T21:11:00.590689Z", "last_success": null, "errors": 0, "version": null, "age_s": 0.935857, "status": "alive", "last_event_at": "2026-09-05T21:10:56.405000Z", "ws_state": "connected", "subscriptions": 1200, "reconnects": 0, "markets_monitored": 200, "open_gaps": 3564}]}
+[21:10:55] CANDLES 335207 GAPS_OPEN 3656
+[21:11:31] docker-market-worker-1 99.51% 254.4MiB / 7.543GiB
+[21:12:02] docker-market-worker-1 100.29% 243.3MiB / 7.543GiB
+[21:12:33] docker-market-worker-1 99.89% 247.9MiB / 7.543GiB
+[21:13:03] docker-market-worker-1 99.14% 247.2MiB / 7.543GiB
+[21:13:34] docker-market-worker-1 100.14% 248.4MiB / 7.543GiB
+[21:14:05] docker-market-worker-1 99.59% 247.5MiB / 7.543GiB
+[21:14:35] docker-market-worker-1 98.80% 248.8MiB / 7.543GiB
+[21:15:06] docker-market-worker-1 99.77% 265.3MiB / 7.543GiB
+[21:15:37] docker-market-worker-1 100.02% 259.7MiB / 7.543GiB
+[21:16:08] docker-market-worker-1 99.11% 259.3MiB / 7.543GiB
+[21:16:08] PROBE {"at": "2026-09-05T21:16:14.475534+00:00", "market_status": {"exchanges": [{"exchange": "binance", "ws_state": "connected", "last_event_at": "2026-09-05T21:16:12.042000Z", "last_event_age_ms": 2754, "markets_monitored": 200, "open_gaps": 3525, "reconnects": 0}], "markets_monitored_total": 200, "updated_at": "2026-09-05T21:16:14.796842Z"}, "summary": {"markets_total": 200, "markets_monitored": 200, "markets_ok": 0, "markets_stale": 0, "markets_degraded": 200, "markets_unavailable": 0}, "components": {"ticker": {"ok": 150, "stale": 47, "absent": 3}, "book": {"absent": 82, "ok": 107, "stale": 11}, "mark": {"stale": 177, "ok": 23}}, "component_age_ms_p50_p95_max": {"ticker": [4489, 26367, 33067], "book": [4493, 12525, 12649], "mark": [52000, 338000, 540000]}, "hot_state_ok_all_three_components": 15, "hot_state_ok_pct": 7.5, "heartbeats": [{"role": "market", "instance": "b63115094ae3", "ts": "2026-09-05T21:16:06.633291Z", "last_success": "2026-09-05T21:16:06.592162Z", "errors": 6, "version": "0.0.0", "age_s": 8.376677, "status": "alive", "last_event_at": null, "ws_state": null, "subscriptions": null, "reconnects": null, "markets_monitored": null, "open_gaps": null}, {"role": "market", "instance": "binance", "ts": "2026-09-05T21:16:14.746462Z", "last_success": null, "errors": 0, "version": null, "age_s": 0.264139, "status": "alive", "last_event_at": "2026-09-05T21:16:12.042000Z", "ws_state": "connected", "subscriptions": 1200, "reconnects": 0, "markets_monitored": 200, "open_gaps": 3464}]}
+[21:16:08] CANDLES 336539 GAPS_OPEN 3524
+[21:16:45] docker-market-worker-1 99.43% 273.1MiB / 7.543GiB
+[21:17:16] docker-market-worker-1 101.26% 261.1MiB / 7.543GiB
+[21:17:47] docker-market-worker-1 99.49% 258.9MiB / 7.543GiB
+[21:18:18] docker-market-worker-1 99.97% 258.7MiB / 7.543GiB
+[21:18:49] docker-market-worker-1 99.05% 260.8MiB / 7.543GiB
+[21:19:20] docker-market-worker-1 99.92% 264.8MiB / 7.543GiB
+[21:19:51] docker-market-worker-1 98.85% 262.3MiB / 7.543GiB
+[21:20:22] docker-market-worker-1 99.70% 265MiB / 7.543GiB
+[21:20:53] docker-market-worker-1 99.17% 265MiB / 7.543GiB
+[21:21:24] docker-market-worker-1 99.66% 266MiB / 7.543GiB
+[21:21:24] PROBE {"at": "2026-09-05T21:21:30.631265+00:00", "market_status": {"exchanges": [{"exchange": "binance", "ws_state": "connected", "last_event_at": "2026-09-05T21:19:59.757000Z", "last_event_age_ms": 91259, "markets_monitored": 200, "open_gaps": 3428, "reconnects": 0}], "markets_monitored_total": 200, "updated_at": "2026-09-05T21:21:31.016699Z"}, "summary": {"markets_total": 200, "markets_monitored": 200, "markets_ok": 0, "markets_stale": 0, "markets_degraded": 200, "markets_unavailable": 0}, "components": {"ticker": {"absent": 200}, "book": {"absent": 200}, "mark": {"stale": 200}}, "component_age_ms_p50_p95_max": {"ticker": null, "book": null, "mark": [189338, 403336, 723340]}, "hot_state_ok_all_three_components": 0, "hot_state_ok_pct": 0.0, "heartbeats": [{"role": "market", "instance": "b63115094ae3", "ts": "2026-09-05T21:21:26.523645Z", "last_success": "2026-09-05T21:21:23.846149Z", "errors": 11, "version": "0.0.0", "age_s": 4.866312, "status": "alive", "last_event_at": null, "ws_state": null, "subscriptions": null, "reconnects": null, "markets_monitored": null, "open_gaps": null}, {"role": "market", "instance": "binance", "ts": "2026-09-05T21:21:31.311309Z", "last_success": null, "errors": 0, "version": null, "age_s": 0.080013, "status": "alive", "last_event_at": "2026-09-05T21:19:59.757000Z", "ws_state": "connected", "subscriptions": 1200, "reconnects": 0, "markets_monitored": 200, "open_gaps": 3364}]}
+[21:21:24] CANDLES 337235 GAPS_OPEN 3428
+[21:22:02] docker-market-worker-1 100.09% 278.7MiB / 7.543GiB
+[21:22:32] docker-market-worker-1 100.59% 268.2MiB / 7.543GiB
+[21:23:03] docker-market-worker-1 99.85% 283.6MiB / 7.543GiB
+[21:23:34] docker-market-worker-1 102.65% 284.4MiB / 7.543GiB
+[21:24:05] docker-market-worker-1 149.88% 284.4MiB / 7.543GiB
+[21:24:36] docker-market-worker-1 163.22% 284.7MiB / 7.543GiB
+[21:25:07] docker-market-worker-1 100.91% 285.8MiB / 7.543GiB
+[21:25:39] docker-market-worker-1 98.57% 288.4MiB / 7.543GiB
+[21:26:11] docker-market-worker-1 100.44% 291.7MiB / 7.543GiB
+[21:26:41] docker-market-worker-1 99.69% 291.3MiB / 7.543GiB
+[21:26:41] PROBE {"at": "2026-09-05T21:26:48.801231+00:00", "market_status": {"exchanges": [{"exchange": "binance", "ws_state": "connected", "last_event_at": "2026-09-05T21:24:59.459000Z", "last_event_age_ms": 109762, "markets_monitored": 200, "open_gaps": 3494, "reconnects": 3}], "markets_monitored_total": 200, "updated_at": "2026-09-05T21:26:49.221973Z"}, "summary": {"markets_total": 200, "markets_monitored": 200, "markets_ok": 0, "markets_stale": 0, "markets_degraded": 200, "markets_unavailable": 0}, "components": {"ticker": {"absent": 200}, "book": {"absent": 200}, "mark": {"stale": 200}}, "component_age_ms_p50_p95_max": {"ticker": null, "book": null, "mark": [110413, 110413, 110413]}, "hot_state_ok_all_three_components": 0, "hot_state_ok_pct": 0.0, "heartbeats": [{"role": "market", "instance": "b63115094ae3", "ts": "2026-09-05T21:26:46.294454Z", "last_success": "2026-09-05T21:26:43.435774Z", "errors": 24, "version": "0.0.0", "age_s": 3.135757, "status": "alive", "last_event_at": null, "ws_state": null, "subscriptions": null, "reconnects": null, "markets_monitored": null, "open_gaps": null}, {"role": "market", "instance": "binance", "ts": "2026-09-05T21:26:45.158324Z", "last_success": null, "errors": 0, "version": null, "age_s": 4.272561, "status": "alive", "last_event_at": "2026-09-05T21:24:59.459000Z", "ws_state": "connected", "subscriptions": 1200, "reconnects": 3, "markets_monitored": 200, "open_gaps": 3364}]}
+[21:26:41] CANDLES 338169 GAPS_OPEN 3494
+[21:27:20] docker-market-worker-1 100.17% 276.6MiB / 7.543GiB
+[21:27:51] docker-market-worker-1 98.86% 290.6MiB / 7.543GiB
+DONE 21:28:22
