@@ -21,6 +21,23 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
 
 `.claude/state/milestone.json` (wave 6, T13) afirma que `docs/reports/M0.md` foi escrito e que "Everton approves the close" com base nele — mas **o arquivo `docs/reports/M0.md` não existe no repositório**. O relatório de fechamento do M0 (formato §77) parece não ter sido persistido, apesar de o estado do milestone dizer que foi. Vale confirmar com quem fechou o M0 se o relatório existe em outro lugar ou se precisa ser reescrito.
 
+## Adiados na revisão de T1.5b (2026-09-05) — nenhum bloqueia o commit
+
+Achados reais, com cenário, que ficaram fora do escopo de polimento de UI e foram empurrados para o **M2**. Origem: `.claude/state/review-T1.5b.md` (duas rodadas: `code-reviewer`, `security-reviewer`, Astra/GPT-6 e QA visual).
+
+- **Testes de hidratação de verdade não existem.** `tests/appearance-form.test.tsx` e `tests/motion-showcase.test.tsx` só afirmam o estado **depois** dos efeitos, então **passariam com o bug antigo** (Astra verificou linha a linha). Os mismatches H1/M1/S2 foram corrigidos no código e `tests/use-density.test.tsx` registra o primeiro render — mas cobrir a família toda exige um harness de SSR + hidratação no Vitest. **Dono:** infraestrutura de teste, M2.
+- **jsdom não faz layout, então "visível" nunca é medido.** `use-arrow-key-row-selection` e `use-virtualized-rows` provam a aritmética, não a visibilidade física da linha. Fica para o E2E de Playwright do M2.
+- **Sem tier de rate limit próprio para o servidor web na API.** Toda a renderização SSR compartilha o balde de 120/min por IP; o lado cliente foi contido (mínimo de 2 caracteres, debounce de 250 ms, `q` limitado a 64), o lado servidor não. **Dono:** `apps/api`, M2. Origem: `security-reviewer`.
+- **Tooltip por componente no badge de qualidade** ("qual componente está atrasado") e **explicação do ponto de status acessível por toque no mobile** — as duas precisam de uma superfície de tooltip acessível por toque que a UI ainda não tem. M2.
+- **Frescor vs conexão no Live Status:** a tela pode dizer `CONNECTED` com eventos velhos. Depende de um campo de idade por exchange que a API ainda não expõe. M2.
+- **Reestruturar o modelo de scroll do `thead` fixo / adotar biblioteca de virtualização.** O sintoma concreto (H4) era aritmética e foi corrigido; a reestruturação é mudança de arquitetura. M2.
+- **Layout dos trades a 1024 px com a sidebar aberta** — suspeita da Astra por inferência, sem medição em navegador. Sem cenário provado, sem correção. M2, junto do E2E.
+- **QA interativo do command palette nunca rodou.** Dois dev servers concorrentes sobre o mesmo `apps/web/.next` deixaram a página da 3000 sem carregar JavaScript nenhum (`/_next/static/chunks/main-app.js` → 404); encerrar processos era bloqueado pela política daquela sessão. O comportamento está provado por Vitest e por screenshots estáticos, **não** por interação real. Vale repetir num ambiente limpo.
+
+### Aprendizado de processo registrado
+
+`pnpm lint` + `typecheck` + Vitest **não substituem o build de produção**. A T1.5b passou nos três com o `next build` quebrado (`Only async functions are allowed to be exported in a "use server" file`), porque o Vitest não aplica as restrições do Next App Router. **`docker compose -f infra/docker/docker-compose.yml build web` é obrigatório no aceite de qualquer tarefa de `apps/web`.**
+
 ## Relacionadas
 
 [[Resolved Bugs]] · [[System Overview]]
