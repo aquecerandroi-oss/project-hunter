@@ -1,18 +1,22 @@
-# T1.6b — prova operacional contra a Binance real (2026-09-05, 21:00–22:10 UTC)
+# T1.6b — prova operacional contra a Binance real (2026-09-05, 21:00–22:50 UTC)
 
 **Meta do plano (`.claude/state/review-T1.6.md`, item T1.6b):** 200 mercados com
 `markets_ok ≥ 95%` e **CPU < 70% de um core por shard**.
 
-**Veredito: NÃO CUMPRIDA em nenhuma das três topologias medidas.** A T1.6b melhorou o
-caminho quente de forma mensurável e o sharding funciona como projetado, mas um processo
-Python continua saturando um core e o hot state de alta frequência não se sustenta a 200
-mercados. Além disso a prova encontrou uma **regressão CRITICAL** introduzida pela própria
-T1.6b, que deixava o worker completamente cego contra a Binance real.
+**Veredito em uma linha: a meta é alcançável e foi alcançada — com 4 shards × 50 mercados
+(`markets_ok` 198/200 = 99,0%, CPU média por shard 36,6%–64,2%) — mas essa topologia NÃO é a
+que fica configurada**, porque com mais de um shard todos os processos escrevem a mesma chave
+de heartbeat e a página System passa a mentir (§6.1). O que fica no ar é **um processo sobre os
+50 maiores mercados**, medido em §5: `markets_ok` 50/50 = 100%. O caminho para 200 está provado
+e escrito; falta o heartbeat por shard, que é follow-up do M2.
 
-Imagem usada: `hunter-api:dev` construída de `b8998cc` (e reconstruída após o conserto).
+Como ler a métrica de CPU: a meta é sobre a **média** por processo em regime estável. Picos no
+fecho do minuto (gravação do lote de velas) passam de 100% em todas as topologias, inclusive na
+aprovada — isso está nos números abaixo e não é escondido.
+
+Imagem usada: `hunter-api:dev` construída de `b8998cc` (e reconstruída após o conserto do §0).
 Stack: `infra/docker/docker-compose.yml` + override; Postgres e Redis do Compose; Binance
 USDS-M pública, sem chave.
-
 ---
 
 ## 0. O que a prova encontrou antes de conseguir medir qualquer coisa
@@ -174,20 +178,57 @@ disputa o mesmo event loop da ingestão.
 
 **`markets_ok` = 198/200 = 99,0% ≥ 95%.** Meta cumprida.
 
-Cobertura durável, seis minutos seguidos, 200/200:
+**Quem são os mercados que não ficam `ok`.** Numa medição anterior da mesma corrida (22:05, com
+`markets_ok` em 189/200) rodei uma sonda que devolve o `monitor_rank` de cada ticker não-`ok`:
 
 ```
-$ psql -c "select open_time, count(*) from candles where open_time > now() - interval '7 minutes' group by 1 order by 1 desc"
- 2026-09-05 22:10:00+00 | 200
- 2026-09-05 22:09:00+00 | 200
- 2026-09-05 22:08:00+00 | 200
- 2026-09-05 22:07:00+00 | 200
- 2026-09-05 22:06:00+00 | 200
- 2026-09-05 22:05:00+00 | 200
+$ docker exec docker-api-1 python /tmp/stale_rank.py     # .claude/state/tmp/stale_rank.py
+{"stale_count": 11,
+ "stale_ranks": [71, 141, 144, 158, 165, 166, 168, 170, 175, 179, 197],
+ "stale_examples": [[71, "ZORAUSDT", 11192], [141, "ELSAUSDT", null], [144, "AZTECUSDT", 10025],
+                    [158, "SIGNUSDT", 17834], [165, "ENSUSDT", 10660], [166, "ZESTUSDT", 12266]],
+ "ok_rank_max": 200, "monitor_rank_median_stale": 166}
 ```
 
-Gaps: `recovered` 8.407 · `open` **95** — e os 95 são **todos** de mercados que já não são
-monitorados (ver §6, defeito 2). Para o universo monitorado o backlog zerou.
+Leitura honesta e o seu limite: os não-`ok` estão na cauda do ranking (mediana `monitor_rank`
+166) e o mercado de rank **200 estava `ok`**, o que exclui "o worker abandona o fim da lista".
+A explicação compatível é inatividade da fonte — `bookTicker` só emite quando o melhor bid/ask
+muda, e `stale_after_s` é 10 s. **Isto não é prova**: provar exigiria comparar o instante de
+recepção na fonte com o instante de escrita do worker, e essa medição não foi feita. Fica como
+hipótese com evidência circunstancial, não como fato. Note que o veredito **não depende dela**:
+às 22:11 o número medido foi 198/200 = 99,0%, com `markets_stale` = 0.
+
+**Cobertura durável**, seis minutos seguidos — linhas, mercados distintos e velas finais:
+
+```
+$ psql -c "select open_time, count(*) as linhas, count(distinct market_id) as mercados,
+           count(*) filter (where is_final) as finais from candles
+           where open_time between '2026-09-05 22:05:00+00' and '2026-09-05 22:10:00+00'
+           group by 1 order by 1"
+       open_time        | linhas | mercados | finais
+ 2026-09-05 22:05:00+00 |    202 |      202 |    202
+ 2026-09-05 22:06:00+00 |    202 |      202 |    202
+ 2026-09-05 22:07:00+00 |    202 |      202 |    202
+ 2026-09-05 22:08:00+00 |    202 |      202 |    202
+ 2026-09-05 22:09:00+00 |    202 |      202 |    202
+ 2026-09-05 22:10:00+00 |    202 |      202 |    202
+```
+
+`linhas = mercados` (nenhuma duplicata) e `finais = linhas` (nenhuma vela parcial). São 202 e não
+200 porque duas trocas de universo aconteceram dentro da janela e os mercados que saíram ainda
+tiveram o minuto coletado.
+
+**Gaps**: `recovered` 8.407 · `open` **95**, e os 95 são de mercados que já não são monitorados —
+com a consulta discriminada, não por inferência:
+
+```
+$ psql -c "select m.is_monitored, count(*) from ingestion_gaps g join markets m on m.id=g.market_id
+           where g.status='open' group by 1"
+ is_monitored | count
+ f            |    95
+```
+
+Para o universo monitorado o backlog zerou. Os 95 são o defeito 2 do §6.
 
 ### 4.3 CPU em regime estável (backlog drenado), 12 amostras de 22:06 a 22:11
 
@@ -198,14 +239,43 @@ monitorados (ver §6, defeito 2). Para o universo monitorado o backlog zerou.
 | `market-worker-c` (2/4) | 34,9% | **54,6%** | 100,2% |
 | `market-worker-d` (3/4) | 39,5% | **61,2%** | 95,8% |
 
-**Média por shard entre 36,6% e 64,2% de um core — abaixo dos 70% da meta.** Os picos passam de
-70% no fecho do minuto, quando o lote de velas é gravado; a média é o que a meta mede.
+**Média por shard entre 36,6% e 64,2% de um core — abaixo dos 70% da meta.** Ressalva explícita:
+os **picos** chegam a 100,2%, no fecho do minuto, quando o lote de velas é gravado. Leio a meta
+como média por processo em regime estável; se ela for lida como teto instantâneo, **nenhuma
+topologia a cumpre**, nem esta.
 
 Durante a drenagem do backlog (21:50–22:05) as médias foram 78,4% a 100,2% — o recovery é caro e
 compete com a ingestão. Isso importa para o dimensionamento: **um shard precisa de folga para
+## 5. A configuração que fica no ar: 1 processo × 50 mercados
+
+O §6.1 explica por que a topologia de 4 shards, apesar de cumprir a meta, **não** é a que fica
+configurada. Então a configuração entregue também precisa da sua própria medição — não vale
+"provei outra coisa e deixei esta".
+
+Um worker, `MARKET_UNIVERSE_SIZE=50`, `MARKET_SHARD=0/1`, recriado às 22:39 UTC.
+
+```
+$ docker exec docker-api-1 python /tmp/measure_t16b.py     # 22:46:53 UTC
+"markets_monitored": 50, "ws_state": "connected"
+"markets_ok": 50, "markets_stale": 0, "markets_degraded": 0, "markets_unavailable": 0
+"hot_state_ok_pct": 100.0
+```
+
+**50/50 = 100% `markets_ok`**, zero stale, zero degraded, zero unavailable, hot state completo
+nos três componentes. É o número mais limpo da noite inteira, e é o que o Everton vê na tela.
+
+CPU, 18 amostras de 30 s (22:39 → 22:46, inclui o bootstrap): **mín 1,1% · média 77,7% · máx
+122,3%** de um core. Nas 12 amostras de regime estável: **média 71,3%**. Ou seja: um processo com
+50 mercados fica **na fronteira** dos 70% da meta — cumpre o produto (100% de `markets_ok`) mas
+não sobra folga. É exatamente a razão pela qual o sharding existe, e o motivo de o heartbeat por
+shard virar prioridade do M2 em vez de "um dia".
+
+Comparação com o perfil pré-T1.6b no mesmo tamanho (`.claude/state/t16b-profile.md`): **95,1%**
+de um core a 50 mercados. A T1.6b tirou ~24 pontos percentuais no mesmo trabalho.
+
 recuperar**, não só para ingerir.
 
-## 5. Onde a CPU realmente vai (py-spy, não hipótese)
+## 6. Onde a CPU realmente vai (py-spy, não hipótese)
 
 `py-spy record` anexado ao PID 1 do shard de 100 mercados a partir de um sidecar no mesmo
 namespace de PID, 90 s a 120 Hz, **11.110 amostras**:
@@ -242,15 +312,17 @@ usava **95,1%** de um core, com `pydantic/main.py:__init__` em 10,83% de self. D
 mesmo tamanho de shard roda em **média 36,6%–64,2%**. A T1.6b entregou a redução; o sharding
 entregou a escala.
 
-## 6. Defeitos que esta prova encontrou (além do CRITICAL do §0)
+## 7. Defeitos que esta prova encontrou (além do CRITICAL do §0)
 
 1. **Heartbeat compartilhado entre shards (HIGH, aberto).** Todos os shards escrevem a mesma
    chave `hb:market:binance`. Durante a corrida B o `/system/market-status` mostrou
    `subscriptions: 636` (um shard só) com `markets_monitored: 200`. Cenário concreto: um shard
    morre, o outro continua reescrevendo a chave, e o painel do operador segue verde — a métrica
    que existe para detectar worker morto fica cega justamente na topologia que a T1.6b
-   introduziu. Follow-up do M2: chave por shard (`hb:market:{exchange}:{shard}`) e agregação na
-   API.
+   introduziu. **Foi este defeito que decidiu o que fica no ar:** o M1 promete "página System com
+   heartbeats reais", então a topologia com shards não é entregue (§5, §8). Follow-up do M2: chave
+   por shard (`hb:market:{exchange}:{shard}`), agregação na API e o total de shards esperado vindo
+   da configuração, para que a ausência de um shard seja detectável.
 2. **Gaps de mercados não monitorados nunca fecham (MEDIUM, aberto).** `run_recovery` itera
    `universe.symbols`; um mercado que sai do top-N com gap aberto fica `open` para sempre e
    continua contado em `open_gaps`. Medido: dos 95 gaps abertos no fim, **95 são de mercados não
@@ -262,28 +334,55 @@ entregou a escala.
    sozinho como meta de capacidade; por isso esta prova mede os dois eixos.
 4. **Teste de integração com orçamento de 2 s de relógio (MEDIUM, aberto).**
    `tests/integration/test_market_invariants.py::test_a_fresh_open_interest_write_never_rejuvenates_a_stale_mark`
-   falhou com `assert 2323 < 2000` enquanto a máquina rodava quatro shards a ~100% de CPU. Não é
-   defeito de produto: é um teste que assume folga de CPU. Registrado para o M2.
+   falhou com `assert 2323 < 2000` enquanto a máquina rodava quatro shards a ~100% de CPU. Com a
+   máquina mais folgada o arquivo inteiro passou (`uv run pytest tests/integration/test_market_invariants.py -q`
+   → **20 passed in 49.96s**), o que confirma a leitura: não é defeito de produto, é um teste que
+   assume folga de CPU e vai piscar na CI. Registrado para o M2.
 
-## 7. Conclusão
+## 8. Conclusão
 
-| Meta | Resultado | Veredito |
+| Meta / questão | Resultado medido | Veredito |
 |---|---|---|
-| 200 mercados com `markets_ok ≥ 95%` | **198/200 = 99,0%** (0 stale, 0 unavailable, 2 degraded) | **cumprida** |
-| CPU < 70% de um core por shard | média por shard **36,6% / 54,6% / 61,2% / 64,2%** em regime estável | **cumprida** (picos de fecho de minuto passam de 70%) |
-| Topologia necessária | **4 shards × 50 mercados**. 1 processo colapsa (hot state a 0% em 15 min); 2 shards oscilam em ~26% | — |
-| Cobertura durável | **200/200 velas finais por minuto**, seis minutos seguidos | — |
-| Backlog de recovery | 3.230 → 95 gaps abertos em ~20 min; os 95 restantes são o defeito 2 do §6 | — |
+| 200 mercados com `markets_ok ≥ 95%` | **198/200 = 99,0%** (0 stale, 0 unavailable, 2 degraded), com 4 shards × 50 | **alcançável e alcançada** |
+| CPU < 70% de um core por processo | médias **36,6% / 54,6% / 61,2% / 64,2%** por shard em regime estável; **picos até 100,2%** | cumprida como média, **não** como teto |
+| Um processo × 200 mercados | hot state a **0%** em 15 min, 188 velas/min contra 200/min | impossível, agora medido |
+| Cobertura durável (4 shards) | **202 linhas = 202 mercados distintos = 202 finais** por minuto, seis minutos seguidos | completa |
+| Backlog de recovery | 3.230 → 95 gaps abertos em ~20 min; os 95 são todos de mercados não monitorados | drenado |
+| **Topologia entregue** | **1 processo × 50 mercados: `markets_ok` 50/50 = 100%**, CPU média 71,3% | **é esta que fica no ar** |
 
-**A T1.6b cumpre a meta do plano, com a topologia que ela mesma introduziu.** O que não cumpre é
-o caso de um processo só: 200 mercados num processo continua impossível, e agora está medido com
-o colapso completo do hot state, não por inferência.
+**A T1.6b faz o que prometeu.** O caminho quente ficou ~24 pontos percentuais de CPU mais barato
+no mesmo tamanho de universo (95,1% → 71,3% a 50 mercados) e o sharding entrega a escala: 200
+mercados com 99,0% de `markets_ok` é um resultado real, reproduzível pelo §4.
 
-Override deixado em `infra/docker/docker-compose.override.yml`: **`MARKET_UNIVERSE_SIZE=200` com
-4 shards**, que é a configuração que a prova sustentou. Custa ~2 cores de média na máquina do
-Everton; para voltar a um processo só basta comentar `market-worker-{b,c,d}` e trocar
-`MARKET_SHARD` para `0/1` com `MARKET_UNIVERSE_SIZE=50` (o comentário no arquivo diz isso).
+**E mesmo assim não entrego 200.** Com N > 1 shards, todos escrevem `hb:market:{exchange}` e o
+`/system/market-status` passa a mostrar as assinaturas de **um** shard como se fossem da exchange
+inteira; um shard morto fica invisível atrás dos vivos que continuam reescrevendo a chave. O M1
+promete "página System com heartbeats reais". Entregar uma topologia cuja página System mente
+seria trocar um número bonito por uma mentira operacional, então o override fica em **um processo
+sobre os 50 maiores mercados**, onde tudo o que o M1 promete é verdade (§5). Habilitar 200 é
+mudar quatro linhas do compose, depois que o heartbeat por shard existir (M2).
 
 **O que esta prova NÃO cobre:** corrida de 24–48 h; morte de um shard com os outros vivos
 (rebalanceamento não existe — a fatia do shard morto simplesmente para de ser coletada até ele
-voltar); apagão externo longo atravessando reinícios; e a Bybit.
+voltar); apagão externo longo atravessando reinícios; a afirmação de que os tickers `stale` são
+inatividade da fonte (evidência circunstancial, não prova — §4.2); e a Bybit.
+
+## 9. Segunda opinião (Astra)
+
+Perguntei à Astra se o veredito se sustenta nos números do próprio arquivo, se algum dos defeitos
+abertos deveria **bloquear** a aprovação do M1, e se havia afirmação sem número colado
+(`.claude/state/astra-review-T1.6b-veredito.md`). Ela respondeu **"BLOQUEIA a aprovação do M1
+pelo heartbeat compartilhado"**. Ponto a ponto, e o que fiz:
+
+| Apontamento da Astra | Decisão |
+|---|---|
+| **Heartbeat compartilhado bloqueia**: um shard morre, o outro renova a chave e mascara a perda daquela fatia; o M1 exige heartbeats reais. | **Aceito integralmente.** Não conserto o heartbeat de madrugada (exige decidir a semântica da agregação, e o `services/market-worker` tem outra tarefa em voo): **deixo de entregar a topologia com shards**. O override volta a um processo, onde o defeito não se manifesta, e o heartbeat por shard vira item do M2. Foi este apontamento que mudou o que fica no ar. |
+| A abertura dizia "NÃO CUMPRIDA", contradizendo a conclusão. | **Correto e corrigido.** Eu havia escrito o cabeçalho antes da corrida C e não o revisei. |
+| Os 11 mercados `stale` e seus ranks não estavam no arquivo. | **Correto e corrigido** (§4.2, saída colada). Aceito também a ressalva: rank por volume **não prova** ausência de evento na origem; agora está escrito como hipótese com evidência circunstancial, e o veredito não depende dela. |
+| `COUNT(*) = 200` não prova 200 mercados distintos com velas finais. | **Correto e corrigido**: a consulta agora traz `count(distinct market_id)` e `count(*) filter (where is_final)`. |
+| "95 gaps todos fora do universo" sem a consulta discriminada. | **Correto e corrigido** (§4.2). |
+| CPU: os números não sustentam "sempre abaixo de 70%", há picos de 100,2%. | **Aceito.** O texto agora diz explicitamente que leio a meta como média em regime estável e que, como teto instantâneo, nenhuma topologia a cumpre. |
+| Teste de 2 s: `2323 < 2000` sozinho não comprova flakiness. | **Aceito.** Rodei a suíte inteira depois: `tests/integration/test_market_invariants.py` → **20 passed**. Está no relatório do M1 como execução verde, e o orçamento de 2 s continua registrado como item do M2. |
+| Perfil de uma corrida não isola causalmente recovery vs ingestão. | **Aceito como limitação.** O py-spy mostra distribuição de tempo, não causalidade; o que sustento é o número (`run_recovery` 4,4% do tempo amostrado), não uma prova causal. |
+
+Divergência residual: nenhuma. O bloqueio dela foi acatado mudando a entrega, não o texto.

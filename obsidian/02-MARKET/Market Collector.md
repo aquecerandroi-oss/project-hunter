@@ -8,9 +8,12 @@ status: implementado
 
 ## Status
 
-**Implementado e provado a 200 mercados — com quatro shards (T1.6b, 2026-09-05).** A prova
-completa, com comando e saída, está em `.claude/state/t16b-proof.md`; a prova anterior (T1.6,
-resiliência) em `.claude/state/t16-proof.md`.
+**Implementado.** No ar: **um processo sobre os 50 maiores mercados**, com `markets_ok` 50/50 =
+**100%**. Os 200 do plano estão **provados** (4 shards × 50, `markets_ok` 198/200 = 99,0%) mas
+**não entregues**, porque com mais de um shard o heartbeat é compartilhado e a página System
+passa a mentir — ver "Sharding" abaixo e [[Open Bugs]]. A prova completa, com comando e saída,
+está em `.claude/state/t16b-proof.md`; a prova anterior (T1.6, resiliência) em
+`.claude/state/t16-proof.md`.
 
 **O que ficou provado na T1.6b** (medido, não inferido, contra a Binance ao vivo):
 
@@ -48,9 +51,22 @@ não-ASCII cegava os 200 mercados**. Corrigido com teste de regressão usando os
 (`4f9ab28`). Mesma lição da T1.6 (`EXPIRE` com float no Lua): um dublê de teste que não reproduz
 a fronteira real esconde o defeito — aqui, um universo sintético só de ASCII.
 
-**O que continua aberto** (em [[Open Bugs]]): heartbeat compartilhado entre shards (um shard
-morto fica invisível), gaps de mercados não monitorados que nunca fecham, morte de shard sem
-rebalanceamento, corrida de 24–48 h e a Bybit.
+**A configuração entregue, medida** (22:46 UTC, um processo, 50 mercados): `markets_ok` **50/50 =
+100%**, 0 stale, 0 degraded, 0 unavailable, hot state completo nos três componentes; CPU média
+**71,3%** de um core em regime estável, contra **95,1%** que o perfil pré-T1.6b media no mesmo
+tamanho de universo. Cumpre o produto, sem folga — que é justamente por que o sharding existe.
+
+**Por que 200 não está no ar.** Com N > 1 shards todos escrevem a mesma chave
+`hb:market:{exchange}`: o `/system/market-status` mostrou `subscriptions: 636` (assinaturas de
+**um** shard) com `markets_monitored: 200`, e um shard morto ficaria invisível atrás dos vivos que
+continuam reescrevendo a chave. O M1 promete "página System com heartbeats reais"; uma topologia
+cuja página System mente não é o que se entrega. Heartbeat por shard + agregação na API é item do
+M2 — depois dele, habilitar 200 são quatro linhas de compose. A segunda opinião da Astra foi o que
+fechou essa decisão (`.claude/state/astra-review-T1.6b-veredito.md`).
+
+**O que continua aberto** (em [[Open Bugs]]): heartbeat compartilhado entre shards, gaps de
+mercados não monitorados que nunca fecham, morte de shard sem rebalanceamento, corrida de 24–48 h
+e a Bybit.
 
 ## O que existe (com caminho)
 

@@ -1,72 +1,26 @@
 # Local development override (auto-loaded by docker compose alongside docker-compose.yml).
 #
-# T1.6b proof, 2026-09-05 (.claude/state/t16b-proof.md) — measured against the real
-# Binance, not assumed:
-#   * 1 process / 200 markets: the hot state COLLAPSED — ticker and book absent on all
-#     200 within 15 min, CPU pinned at 103% of a core, durable candles at 188/min against
-#     the 200/min the exchange closes.
-#   * 2 shards x 100: CPU still ~100% each, markets with all three components fresh
-#     oscillating around 26%.
-#   * 4 shards x 50: markets_ok 198/200 = 99.0%, 0 stale, 0 unavailable, 200/200 candles
-#     per minute for six consecutive minutes, and steady-state CPU averaging 36.6% /
-#     54.6% / 61.2% / 64.2% of a core per shard — under the plan's 70% budget.
-# So this is the topology the proof sustained, and the one left configured.
+# T1.6b proof, 2026-09-05 (.claude/state/t16b-proof.md) — measured against the real Binance:
+#   * 1 process / 200 markets: the hot state COLLAPSED — ticker and book absent on all 200
+#     within 15 min, CPU averaging 103.2% of a core, durable candles at 188/min against the
+#     200/min the exchange closes.
+#   * 2 shards x 100: CPU ~100% each, markets with all three components fresh oscillating ~26%.
+#   * 4 shards x 50: markets_ok 198/200 = 99.0%, 200/200 candles per minute, steady-state CPU
+#     averaging 36.6% / 54.6% / 61.2% / 64.2% of a core per shard. The plan's target, met.
 #
-# To go back to a single process (about 2 cores cheaper on this machine), comment out
-# market-worker-{b,c,d} and set market-worker to MARKET_SHARD "0/1" with
-# MARKET_UNIVERSE_SIZE "50" — that is the load one process was measured to hold.
-# Keep every shard identical apart from MARKET_SHARD.
+# So 200 markets IS reachable — but not shipped as the default yet, and the reason is honest:
+# with more than one shard every process writes the same `hb:market:{exchange}` heartbeat key,
+# so /system/market-status reports ONE shard's subscriptions as the exchange total and a dead
+# shard stays invisible behind the live ones that keep rewriting the key. M1 promises "página
+# System com heartbeats reais"; a topology whose System page lies is not what gets shipped.
+# Per-shard heartbeat + aggregation in the API is an M2 follow-up (obsidian/07-BUGS).
+#
+# Until then this machine runs ONE worker over the top 50 markets, which is the configuration
+# where every M1 deliverable is true, measured below in §"1 processo x 50" of the proof.
+# To run the proven 200-market topology anyway, see .claude/state/t16b-proof.md §7 — it is four
+# services with MARKET_SHARD 0/4..3/4 and MARKET_UNIVERSE_SIZE 200.
 services:
   market-worker:
     environment:
-      MARKET_UNIVERSE_SIZE: "200"
-      MARKET_SHARD: "0/4"
-
-  market-worker-b:
-    image: hunter-api:${GIT_SHA:-dev}
-    environment: &shard-env
-      DATABASE_URL: postgresql+asyncpg://hunter:hunter@postgres:5432/hunter
-      DATABASE_URL_MIGRATIONS: postgresql+asyncpg://hunter:hunter@postgres:5432/hunter
-      REDIS_URL: redis://redis:6379/0
-      HUNTER_ENV: development
-      HUNTER_ROLE: market
-      HEALTH_PORT: "8001"
-      MARKET_UNIVERSE_SIZE: "200"
-      MARKET_SHARD: "1/4"
-    env_file: &shard-envfile
-      - path: ../../.env
-        required: false
-    depends_on: &shard-deps
-      migrate:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    healthcheck: &shard-health
-      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://localhost:8001/ready', timeout=25); raise SystemExit(0 if response.status == 200 else 1)"]
-      interval: 15s
-      timeout: 30s
-      start_period: 60s
-      retries: 5
-
-  market-worker-c:
-    image: hunter-api:${GIT_SHA:-dev}
-    environment:
-      <<: *shard-env
-      MARKET_SHARD: "2/4"
-    env_file: *shard-envfile
-    depends_on: *shard-deps
-    restart: unless-stopped
-    healthcheck: *shard-health
-
-  market-worker-d:
-    image: hunter-api:${GIT_SHA:-dev}
-    environment:
-      <<: *shard-env
-      MARKET_SHARD: "3/4"
-    env_file: *shard-envfile
-    depends_on: *shard-deps
-    restart: unless-stopped
-    healthcheck: *shard-health
+      MARKET_UNIVERSE_SIZE: "50"
+      MARKET_SHARD: "0/1"
