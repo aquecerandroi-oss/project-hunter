@@ -86,8 +86,9 @@ class RealtimeHub:
     """Owns the process-wide fan-out: Redis pub/sub in, WebSockets out.
 
     One bridge and one connection manager per process. A channel is subscribed
-    in Redis when its first client asks for it and dropped when its last one
-    leaves, so an idle deployment holds no subscriptions at all.
+    in Redis when its first client asks for it and dropped -- with all of its
+    per-channel state, see :meth:`_forget` -- when its last one leaves, so an
+    idle deployment holds no subscriptions at all.
     """
 
     def __init__(self, redis_client: RedisClientLike) -> None:
@@ -105,18 +106,24 @@ class RealtimeHub:
         self.manager.unsubscribe(connection, channel)
         if self.manager.subscriber_count(channel) == 0:
             await self._bridge.unsubscribe(channel)
+            self._forget(channel)
+
+    def _forget(self, channel: str) -> None:
+        """Per-channel state dies with its last subscriber: names are client-
+        supplied and a live socket has no per-message rate limit, so a
+        subscribe/unsubscribe loop grew these dicts until the process ran out
+        of memory (T1.6b security review, 2026-09-05)."""
+        self._intervals.pop(channel, None)
+        self._throttle.forget(channel)
 
     async def detach(self, connection: WebSocket) -> None:
         self.manager.release(connection)
-        channels = [
-            channel
-            for channel in self.manager.channels()
-            if self.manager.subscriber_count(channel) > 0
-        ]
+        channels = [c for c in self.manager.channels() if self.manager.subscriber_count(c) > 0]
         self.manager.unsubscribe_all(connection)
         for channel in channels:
             if self.manager.subscriber_count(channel) == 0:
                 await self._bridge.unsubscribe(channel)
+                self._forget(channel)
 
     async def close(self) -> None:
         await self._bridge.close()

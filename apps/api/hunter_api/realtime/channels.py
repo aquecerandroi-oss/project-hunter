@@ -34,7 +34,16 @@ MAX_CHANNEL_LENGTH = 200
 MAX_CHANNELS_PER_CONNECTION = 50
 
 _PUBLIC_EXACT = frozenset({RADAR_CHANNEL, SYSTEM_CHANNEL})
-_MARKET_RE = re.compile(r"\Art:market:[a-z0-9_-]{1,32}:[A-Za-z0-9._-]{1,32}\Z")
+_MARKET_RE = re.compile(r"\Art:market:[a-z0-9_-]{1,32}:[\w.-]{1,32}\Z")
+"""The symbol segment is ``[\\w.-]``, not ``[A-Za-z0-9._-]``: Binance USDS-M
+lists perpetuals whose symbol is written in Chinese (``牛来USDT`` was rank 19 by
+24h volume on 2026-09-05, ``龙虾USDT`` rank 42). The worker monitors and
+publishes ``rt:market:binance:牛来USDT``; an ASCII-only grammar rejected the
+subscription, so the detail page of a top-20 market showed a price that never
+moved while every other market updated live. ``\\w`` on a ``str`` pattern is
+Unicode-aware and still excludes ``:`` (the segment separator), whitespace,
+newline and every wildcard character, so the properties documented below are
+unchanged."""
 _ORG_RE = re.compile(r"\Art:org:([0-9a-f-]{36}):[a-z0-9:_-]{1,64}\Z")
 """``\\A``/``\\Z``, never ``^``/``$``: ``$`` also matches *before* a trailing
 newline, so ``rt:market:binance:BTC\\n`` would pass the grammar and then be

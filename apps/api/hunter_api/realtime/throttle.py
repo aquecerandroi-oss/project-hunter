@@ -41,3 +41,13 @@ class Throttle:
             return False
         self._last_emit[channel] = moment
         return True
+
+    def forget(self, channel: str) -> None:
+        """Drop the coalescing state of a channel nobody subscribes to.
+
+        Without this, ``_last_emit`` grows for the lifetime of the process:
+        the channel name is client-supplied, and a socket can subscribe and
+        unsubscribe to a fresh name in a loop with no per-message rate limit.
+        Found by the security review of the T1.6b proof, 2026-09-05
+        (5000 subscribe/unsubscribe cycles left 5000 entries behind)."""
+        self._last_emit.pop(channel, None)

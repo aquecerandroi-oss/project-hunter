@@ -68,3 +68,30 @@ def test_balance_report(shard_total: int, capsys: pytest.CaptureFixture[str]) ->
     counts = [len(shard_symbols(universe, i, shard_total)) for i in range(shard_total)]
     assert sum(counts) == len(universe)
     print(f"N={shard_total} counts={counts} min={min(counts)} max={max(counts)}")
+
+
+# --- CRITICAL-2 (T1.6b proof, 2026-09-05) --------------------------------
+# The synthetic universe above is all-ASCII, which is exactly why the suite
+# stayed green while the worker was blind against the real Binance. On
+# 2026-09-05 four USDS-M perpetuals in the top 100 by 24h volume had Chinese
+# symbols (``牛来USDT`` rank 19, ``龙虾USDT`` rank 42, ``币安人生USDT`` rank 63,
+# ``我踏马来了USDT`` rank 81). ``s.encode("ascii")`` raised UnicodeEncodeError
+# inside ``run_universe``'s try block, so every refresh failed, the universe
+# never loaded and NO market was monitored -- not just the non-ASCII ones.
+_REAL_NON_ASCII = ["牛来USDT", "龙虾USDT", "币安人生USDT", "我踏马来了USDT"]
+
+
+def test_non_ascii_symbols_do_not_raise_and_are_kept() -> None:
+    universe = _universe(50) + _REAL_NON_ASCII
+    assert shard_symbols(universe, 0, 1) == sorted(universe)
+
+
+@pytest.mark.parametrize("shard_total", [1, 2, 3, 4])
+def test_non_ascii_symbols_partition_like_any_other(shard_total: int) -> None:
+    universe = _universe(50) + _REAL_NON_ASCII
+    seen: set[str] = set()
+    for shard_index in range(shard_total):
+        shard = shard_symbols(universe, shard_index, shard_total)
+        assert seen.isdisjoint(shard)
+        seen.update(shard)
+    assert seen == set(universe)

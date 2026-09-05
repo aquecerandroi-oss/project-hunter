@@ -87,3 +87,40 @@ def test_a_suspended_membership_authorizes_nothing() -> None:
 )
 def test_public_channels_are_authorized_for_anyone(member: Principal, channel: str) -> None:
     assert is_authorized(channel, member) is True
+
+
+# --- HIGH (T1.6b proof, 2026-09-05, found by Astra's second opinion) ------
+# Binance USDS-M lists perpetuals with Chinese symbols; four of them were in
+# the top 100 by 24h volume on 2026-09-05 (rank 19, 42, 63, 81). The worker
+# monitors them and publishes rt:market:binance:<symbol>; an ASCII-only
+# grammar refused the subscription, so those detail pages showed a frozen
+# price while every other market updated live.
+@pytest.mark.parametrize("symbol", ["牛来USDT", "龙虾USDT", "币安人生USDT", "我踏马来了USDT"])
+def test_a_unicode_symbol_the_worker_publishes_is_authorized(
+    member: Principal, symbol: str
+) -> None:
+    assert is_authorized(f"rt:market:binance:{symbol}", member) is True
+
+
+# Property check, not a regression: the ASCII rows below were already refused
+# before the widening, and the Unicode ones were refused for the unrelated
+# reason that the old class rejected the ideographs. They exist so that the
+# next change to this grammar cannot quietly let a separator or a wildcard in.
+@pytest.mark.parametrize(
+    "channel",
+    [
+        "rt:market:binance:牛来USDT\n",  # newline still refused (\Z, not $)
+        "rt:market:binance:牛来:USDT",  # ':' is the segment separator
+        "rt:market:binance:牛来*USDT",  # wildcards still refused
+        "rt:market:binance:牛来 USDT",  # whitespace still refused
+        "rt:market:binance:BTC*USDT",  # the same, in plain ASCII
+        "rt:market:binance:BTC?USDT",
+        "rt:market:binance:BTC[US]DT",
+        "rt:market:binance:BTC USDT",
+        "rt:market:binance:BTC:USDT",
+    ],
+)
+def test_the_grammar_still_refuses_separators_and_wildcards(
+    member: Principal, channel: str
+) -> None:
+    assert is_authorized(channel, member) is False

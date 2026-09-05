@@ -75,8 +75,14 @@ UNIVERSE_RETRY_JITTER_FRACTION = 0.2
 
 def shard_symbols(symbols: list[str], shard_index: int, shard_total: int) -> list[str]:
     """C2: stable slice -- ``crc32(symbol) % total == index``. ``total == 1``
-    yields every symbol unchanged (``x % 1`` is always ``0``)."""
-    return sorted(s for s in symbols if zlib.crc32(s.encode("ascii")) % shard_total == shard_index)
+    yields every symbol unchanged (``x % 1`` is always ``0``).
+
+    UTF-8, not ASCII: Binance USDS-M lists perpetuals whose symbol is written in
+    Chinese (``牛来USDT`` was rank 19 by 24h volume on 2026-09-05). Encoding as
+    ASCII raises ``UnicodeEncodeError`` inside ``run_universe``, which catches it,
+    logs ``market_universe_refresh_failed`` and leaves the universe empty --- the
+    worker goes blind for every market, not just the non-ASCII ones."""
+    return sorted(s for s in symbols if zlib.crc32(s.encode("utf-8")) % shard_total == shard_index)
 
 
 @dataclasses.dataclass

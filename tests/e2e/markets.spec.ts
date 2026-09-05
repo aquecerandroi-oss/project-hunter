@@ -93,7 +93,23 @@ test.describe("markets (docs/plans/M1.md T1.7)", () => {
     // just the URL (Astra's second opinion, T1.7: a bare URL match would
     // also pass against an empty or errored detail page) -------------------
     await firstRowLink.click();
-    await page.waitForURL(new RegExp(`/${orgSlug}/markets/[^/]+/${symbol}$`), { timeout: 10_000 });
+    // Compare *decoded* path segments, never the raw URL: the link is built
+    // with encodeURIComponent, and Binance USDS-M lists perpetuals with
+    // Chinese symbols (牛来USDT was rank 19 by 24h volume on 2026-09-05), so
+    // a regex against the literal symbol times out on a page that in fact
+    // navigated correctly. Astra's second opinion, T1.6b proof.
+    await page.waitForURL(
+      (url) => {
+        const parts = url.pathname.split("/").map(decodeURIComponent);
+        return (
+          parts.length === 5 &&
+          parts[1] === orgSlug &&
+          parts[2] === "markets" &&
+          parts[4] === symbol
+        );
+      },
+      { timeout: 10_000 },
+    );
     await expect(page.getByRole("heading", { name: new RegExp(symbol!) })).toBeVisible({
       timeout: 10_000,
     });

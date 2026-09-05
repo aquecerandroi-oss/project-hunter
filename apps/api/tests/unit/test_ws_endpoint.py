@@ -688,3 +688,48 @@ def test_an_unreachable_jwks_closes_4503_not_4401(
                 websocket.receive_text()
 
     assert exc_info.value.code == 4503
+
+
+# --- MEDIUM (security review of the T1.6b proof, 2026-09-05) --------------
+# `RealtimeHub._intervals` and the throttle's `_last_emit` are keyed by the
+# client-supplied channel name. They were never pruned, and a live socket has
+# no per-message rate limit, so a subscribe/unsubscribe loop on fresh names
+# grew both dicts for the lifetime of the process. Measured before the fix:
+# 5000 cycles left `manager.channels()` at 0 and 5000 entries behind.
+@pytest.mark.asyncio
+async def test_per_channel_state_dies_with_the_last_subscriber(hub: RealtimeHub) -> None:
+    socket = cast("WebSocket", object())
+    for index in range(200):
+        channel = f"rt:market:binance:BTC{index}USDT"
+        await hub.subscribe(socket, channel)
+        await hub.unsubscribe(socket, channel)
+
+    assert hub.manager.channels() == []
+    assert hub._intervals == {}
+    assert hub._throttle._last_emit == {}
+
+
+@pytest.mark.asyncio
+async def test_detaching_a_socket_also_drops_its_channel_state(hub: RealtimeHub) -> None:
+    socket = cast("WebSocket", object())
+    for index in range(50):
+        await hub.subscribe(socket, f"rt:market:binance:ETH{index}USDT")
+
+    await hub.detach(socket)
+
+    assert hub._intervals == {}
+    assert hub._throttle._last_emit == {}
+
+
+@pytest.mark.asyncio
+async def test_state_survives_while_another_subscriber_is_still_there(
+    hub: RealtimeHub,
+) -> None:
+    first, second = cast("WebSocket", object()), cast("WebSocket", object())
+    channel = "rt:market:binance:BTCUSDT"
+    await hub.subscribe(first, channel)
+    await hub.subscribe(second, channel)
+
+    await hub.unsubscribe(first, channel)
+
+    assert hub._intervals[channel] > 0, "the surviving subscriber still needs its throttle"
