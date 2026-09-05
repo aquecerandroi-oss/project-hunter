@@ -39,12 +39,22 @@ function Read-Secret([string]$label, [string]$prefix) {
 $pk = Read-Secret "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" "pk_test_"
 $sk = Read-Secret "CLERK_SECRET_KEY" "sk_test_"
 
+# Opcional: chave da OpenAI para a segunda opiniao da Astra (infra/scripts/ask_astra.py).
+$openaiSecure = Read-Host -AsSecureString "OPENAI_API_KEY (opcional, Enter para pular; digitacao oculta)"
+$openaiBstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($openaiSecure)
+$openai = [Runtime.InteropServices.Marshal]::PtrToStringAuto($openaiBstr)
+[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($openaiBstr)
+
 $lines = @(
   "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=" + $pk,
   "CLERK_SECRET_KEY=" + $sk,
   "CLERK_ISSUER=" + $issuer,
   "CLERK_JWKS_URL=" + $issuer + "/.well-known/jwks.json"
 )
+if (-not [string]::IsNullOrWhiteSpace($openai)) {
+  $lines += "OPENAI_API_KEY=" + $openai.Trim()
+  $lines += "OPENAI_MODEL=gpt-6-astra"
+}
 $content = ($lines -join "`n") + "`n"
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [IO.File]::WriteAllText($envPath, $content, $utf8NoBom)
