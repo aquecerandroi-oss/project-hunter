@@ -1,20 +1,56 @@
 ---
 tags: [mercado, market-worker, m1]
 updated: 2026-09-05
-status: parcial
+status: implementado
 ---
 
 # Market Collector
 
 ## Status
 
-**Parcial — código implementado (T1.3, `b8c4766`) e agora com prova operacional real (T1.6).** O `market-worker` rodou ~1h50 em Docker contra a Binance ao vivo, com 200 mercados perpétuos USDT, e a prova completa com comando e saída está em `.claude/state/t16-proof.md`.
+**Implementado e provado a 200 mercados — com quatro shards (T1.6b, 2026-09-05).** A prova
+completa, com comando e saída, está em `.claude/state/t16b-proof.md`; a prova anterior (T1.6,
+resiliência) em `.claude/state/t16-proof.md`.
 
-**O que ficou provado:** 316.794 velas finais de 1 minuto persistidas, com **valores conferidos vela a vela contra o REST da Binance — 800 velas comparadas, zero divergência**; cobertura de 200/200 mercados na maioria dos minutos; reinício do container sem duplicar candle; `restart: unless-stopped` reiniciando de verdade (`RestartCount` 0 → 1 sozinho no caminho fatal do watchdog); `/ready` devolvendo 503 quando devido; gap detectado e recuperado (`open → recovered`) com valor correto; e queda de Postgres e de Redis com recuperação automática em 30 s.
+**O que ficou provado na T1.6b** (medido, não inferido, contra a Binance ao vivo):
 
-**Por que continua `parcial` e não `implementado`:** com 200 mercados o processo satura um core (100 % de CPU) e o hot state de alta frequência não se sustenta — `mkt:*:ticker` e `mkt:*:book` chegam a zero chave viva e o contador novo mostrou **1,15 milhão de eventos descartados**. A série durável fica íntegra (o `BoundedEventQueue` nunca descarta kline final, por contrato), mas o tempo real não. Falta ainda corrida de 24–48 h, prazo definido de convergência do backlog de recovery e apagão externo longo atravessando reinícios.
+| Meta do plano | Resultado (22:11 UTC, 4 shards × 50 mercados) |
+|---|---|
+| 200 mercados com `markets_ok ≥ 95%` | **198/200 = 99,0%** · 0 stale · 0 unavailable · 2 degraded |
+| CPU < 70% de um core por shard | média por shard **36,6% · 54,6% · 61,2% · 64,2%** em regime estável |
+| Cobertura durável | **200/200 velas finais por minuto**, seis minutos seguidos |
+| Backlog de recovery | 3.230 → 95 gaps abertos em ~20 min (os 95 são o defeito de mercados não monitorados) |
 
-**Seis defeitos encontrados só por rodar de verdade**, nenhum deles visível na suíte de testes: `EXPIRE` recebendo float no Lua do rate limiter (o worker **nunca** carregava o universo contra Redis real), `dropped_events` contado e nunca lido, queda de Postgres matando o processo pelo heartbeat, refresh de universo falhado dormindo 900 s e cegando o worker, restart de Redis congelando tudo em zumbi silencioso (cliente sem `socket_timeout`), e o healthcheck do Compose com teto de 3 s dando falso negativo. Todos corrigidos com teste. Ver [[Resolved Bugs]] e [[Monitoring]].
+**Uma topologia funciona, as outras não** — e isso está medido, não suposto:
+
+| Topologia | CPU por processo | Mercados com hot state completo |
+|---|---|---|
+| 1 processo × 200 mercados | média 103,2% de um core | **colapso**: 4,0% → 7,5% → **0%** em 15 min (ticker e book ausentes nos 200) |
+| 2 shards × 100 | ~100% cada | oscilando 5% – 44,5% |
+| **4 shards × 50** | **36,6% – 64,2%** | **99,0%** |
+
+No processo único a série durável também ficou atrás: 188 velas/min contra as 200/min que a
+exchange fecha. Com 4 shards, 200/200 por minuto.
+
+**Onde a CPU vai** (py-spy, 11.110 amostras em 90 s no shard de 100 mercados): caminho quente do
+WS `_handle_raw_message` **34,1%** cumulativo (`parse_book_ticker` 16,4%, `parse_depth20` 13,0%),
+`model_construct` do pydantic **15,0%**, ssl 8,3%, websockets deflate 7,9%, sqlalchemy 6,2% —
+e `run_recovery` só **4,4%**. O recovery consome latência de rede, não CPU; por isso quatro
+processos drenaram 3.135 gaps em vinte minutos. O próximo ganho de performance é trocar os tipos
+normalizados do caminho quente por `dataclass(slots=True)`, porque `model_construct` ainda
+resolve defaults a cada evento (follow-up do M2, ver [[Open Bugs]]).
+
+**A prova também encontrou uma regressão CRITICAL da própria T1.6b:** `shard_symbols` fazia
+`s.encode("ascii")`, e a Binance USDS-M lista perpétuos com símbolo **em chinês** — quatro deles
+no top 100 por volume (`牛来USDT` rank 19, `龙虾USDT` 42, `币安人生USDT` 63, `我踏马来了USDT` 81).
+Um `UnicodeEncodeError` dentro do `try` de `run_universe` deixava o universo vazio: **um símbolo
+não-ASCII cegava os 200 mercados**. Corrigido com teste de regressão usando os símbolos reais
+(`4f9ab28`). Mesma lição da T1.6 (`EXPIRE` com float no Lua): um dublê de teste que não reproduz
+a fronteira real esconde o defeito — aqui, um universo sintético só de ASCII.
+
+**O que continua aberto** (em [[Open Bugs]]): heartbeat compartilhado entre shards (um shard
+morto fica invisível), gaps de mercados não monitorados que nunca fecham, morte de shard sem
+rebalanceamento, corrida de 24–48 h e a Bybit.
 
 ## O que existe (com caminho)
 
@@ -48,8 +84,8 @@ A T1.6 provou que **um processo satura um core com 200 mercados** e o hot state 
 
 ## O que falta
 
-- **Corrida longa (24–48 h)** — a prova da T1.6 durou ~1h50 e a da T1.6b, 15 min. Falta uma corrida contínua longa e um apagão externo atravessando reinícios.
-- **Prazo de convergência do backlog de recovery** — hoje não há prazo definido para o backfill fechar os gaps abertos depois de uma interrupção.
+- **Corrida longa (24–48 h)** — a prova da T1.6 durou ~1h50 e a da T1.6b, 1h10 (três topologias em sequência). Falta uma corrida contínua longa e um apagão externo atravessando reinícios.
+- **Morte de um shard com os outros vivos** — não há rebalanceamento: a fatia do shard morto para de ser coletada até ele voltar. Nunca exercitado.
 - **`tracking_hold` do Shadow Lab** — contratado na decisão SHADOW, implementado em S2.
 - **Follow-ups registrados em `docs/plans/M1.md`**: `command_timeout` de 30 s valendo para o engine da API; `market_snapshots.ts` como bucket do minuto e não instante da coleta; sufixo REST parcial no bootstrap; duplicidade de `ingestion_gaps` com duas instâncias por exchange (premissa do M1: uma instância por exchange); `spread_pct` ×100 nos helpers de domínio (T1.1c).
 - **Bybit** — M1b, mesmo contrato.

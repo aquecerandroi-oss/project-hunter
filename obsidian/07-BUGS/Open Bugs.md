@@ -7,11 +7,49 @@ updated: 2026-09-05
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
+## Abertos pela prova operacional da T1.6b (2026-09-05, sharding)
+
+Todos medidos. Prova em `.claude/state/t16b-proof.md`. A HIGH-1 da T1.6 abaixo está
+**resolvida** por esta prova: com 4 shards × 50 mercados, `markets_ok` = 198/200 (99,0%),
+0 stale, 0 unavailable, 200/200 velas finais por minuto e CPU média por shard entre 36,6% e
+64,2% de um core. Ver [[Resolved Bugs]] e [[Market Collector]].
+
+- **HIGH — os shards compartilham a mesma chave de heartbeat.** Todos escrevem
+  `hb:market:{exchange}`. Medido na corrida de 2 shards: `/system/market-status` devolveu
+  `subscriptions: 636` (assinaturas de **um** shard) com `markets_monitored: 200`. Cenário: um
+  shard morre, o outro continua reescrevendo a chave, e o painel do operador segue verde — a
+  métrica que existe para detectar worker morto fica cega exatamente na topologia que a T1.6b
+  introduziu. **Dono: M2.** Correção: chave por shard (`hb:market:{exchange}:{shard}`) e
+  agregação na API, com o total de shards esperado vindo da configuração.
+- **MEDIUM — gaps de mercados não monitorados nunca fecham.** `run_recovery` itera
+  `universe.symbols`; um mercado que sai do top-N com gap aberto fica `open` para sempre e
+  continua contado em `open_gaps`. Medido: no fim da prova restaram **95 gaps abertos, e os 95
+  são de mercados não monitorados**. Efeito: o número que o operador acompanha nunca chega a
+  zero. **Dono: M2.** (A decisão SHADOW já exige o oposto para o Lab: `tracking_hold` mantém a
+  coleta de um mercado excluído enquanto houver acompanhamento aberto.)
+- **MEDIUM — a morte de um shard não é rebalanceada.** A fatia `crc32(symbol) % N == i` simplesmente
+  deixa de ser coletada até o processo voltar; nada redistribui. `restart: unless-stopped` cobre o
+  caso normal, mas não há prova de um shard morto com os outros vivos. **Dono: M2.**
+- **MEDIUM — `tests/integration/test_market_invariants.py::test_a_fresh_open_interest_write_never_rejuvenates_a_stale_mark`
+  tem orçamento de 2 s de relógio.** Falhou com `assert 2323 < 2000` com a máquina rodando quatro
+  shards a ~100% de CPU. Não é defeito de produto; é um teste que assume folga de CPU e vai piscar
+  na CI. **Dono: M2.**
+- **MEDIUM — `markets_ok` mistura capacidade com backlog de recovery.** Um `ingestion_gap` aberto
+  força `degraded` qualquer que seja o frescor do hot state, então a métrica do plano ficou em 0
+  durante horas enquanto 122 mercados tinham book fresco. É honesta (há buraco na série), mas não
+  serve sozinha como meta de capacidade — por isso a prova mede também "mercados com os três
+  componentes `ok`". **Dono: M2** (separar os dois eixos na API e na tela).
+- **LOW (follow-up de performance, com número) — `model_construct` do pydantic é o maior custo de
+  aplicação restante.** py-spy no shard de 100 mercados (11.110 amostras): `model_construct` 15,0%
+  cumulativo, com `resolve_default_value` 2,49% e `inspect._signature_from_callable` 2,75%
+  pendurados — ele percorre `model_fields` e resolve defaults **a cada evento**. Trocar os tipos
+  normalizados do caminho quente por `dataclass(slots=True)` é o próximo ganho. **Dono: M2.**
+
 ## Abertos pela prova operacional da T1.6 (2026-09-05)
 
 Todos medidos, não suspeitados. Prova em `.claude/state/t16-proof.md`.
 
-- **HIGH-1 — o worker satura um core e o hot state de alta frequência não se sustenta com 200 mercados.** Medido: `docker stats` 100 % de CPU no `market-worker` enquanto o Redis fica em 0,9 % e 103 ops/s e o Postgres em 25 %; `ss -tn` com 769 KB parados no buffer de recepção do socket da Binance; `mkt:*:ticker` e `mkt:*:book` chegando a **zero chave viva** de 200; **1,15 milhão** de eventos descartados. Consequência para o produto: a tela mostra `markets_ok = 0`, tudo `degraded`, sem preço ao vivo. A série durável **não** é afetada (o `BoundedEventQueue` nunca descarta kline final, por contrato — 200/200 mercados por minuto, valores idênticos ao REST). **Dono: M2** (perfilagem primeiro; candidatos são o `LRANGE` de 50 itens com desserialização msgpack a cada trade em `push_trade`, a ausência de pipeline nas escritas de hot state, e a falta de prioridade entre ingestão ao vivo e backfill). **Mitigação disponível hoje, decisão do dono:** reduzir `MARKET_UNIVERSE_SIZE` de 200 para 20–50.
+- **[RESOLVIDA em 2026-09-05 pela prova da T1.6b — ver acima] HIGH-1 — o worker satura um core e o hot state de alta frequência não se sustenta com 200 mercados.** Medido: `docker stats` 100 % de CPU no `market-worker` enquanto o Redis fica em 0,9 % e 103 ops/s e o Postgres em 25 %; `ss -tn` com 769 KB parados no buffer de recepção do socket da Binance; `mkt:*:ticker` e `mkt:*:book` chegando a **zero chave viva** de 200; **1,15 milhão** de eventos descartados. Consequência para o produto: a tela mostra `markets_ok = 0`, tudo `degraded`, sem preço ao vivo. A série durável **não** é afetada (o `BoundedEventQueue` nunca descarta kline final, por contrato — 200/200 mercados por minuto, valores idênticos ao REST). **Dono: M2** (perfilagem primeiro; candidatos são o `LRANGE` de 50 itens com desserialização msgpack a cada trade em `push_trade`, a ausência de pipeline nas escritas de hot state, e a falta de prioridade entre ingestão ao vivo e backfill). **Mitigação disponível hoje, decisão do dono:** reduzir `MARKET_UNIVERSE_SIZE` de 200 para 20–50.
 - **MEDIUM — o backlog de recovery não tem prazo nem freio.** Ao fim da corrida havia 4.729 gaps abertos e 2.324 recuperados, com teto de `MAX_GAPS_PER_CYCLE = 50` por ciclo de 60 s e cada busca REST em série. Quanto maior o backlog, mais REST, mais CPU, menos hot state, mais buracos — laço de realimentação sem amortecimento. Ressalva: esse backlog foi inflado por ~10 apagões que eu mesma provoquei em 1h50, não é o de uma operação normal. Falta definir um prazo de convergência aceito e medir contra ele.
 - **MEDIUM — a prontidão regride de 503 para 200 sem nenhum dado ter chegado.** `ReadinessState.observe_adapter` zera `connect_timed_out` a cada observação e o rededuz do relógio da tentativa de conexão; quando o adaptador desiste de uma tentativa e abre outra, o relógio reinicia e a prontidão volta ao ramo tolerado. Medido no corte de rede: 503 em T+30s, **200 em T+45s**, com a Binance inalcançável. A tolerância de 120 s acumulados é contrato fechado na decisão conjunta, então responder 200 durante ela não é bug — a **regressão** é, e existe um teste (`test_readiness_grace_is_monotonic_and_not_reset_by_flapping`) cuja intenção ela contraria. Recomendação da Astra, absorvida: exigir *progresso recente* nas conexões, não apenas uma tentativa em curso. **Dono: M2** (mexe em contrato acordado).
 - **MEDIUM — apagão de Redis agora vira crash-loop, e o cooldown de rate limit não sobrevive ao restart.** Depois da correção da HIGH-4 o worker morre alto em vez de congelar, o que é o comportamento desejado; mas foram **8 reinícios em 81 s** de apagão. O `IpRateGate` é local ao processo (limitação já registrada do M1), então cada reinício perde o `Retry-After` da Binance, o que pode escalar um `429` para `418` (ban de IP). **Fix já previsto no plano:** persistir `blocked_until` em Redis — com a ironia de que é justamente o Redis que está fora. Alternativa: teto de reinícios ou backoff no supervisor.

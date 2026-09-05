@@ -1,9 +1,72 @@
 # Local development override (auto-loaded by docker compose alongside docker-compose.yml).
-# T1.6 (2026-09-05) measured that one market-worker process saturates a CPU core at 200
-# markets and drops high-frequency data. Until T1.6b (profiling + sharding) lands, the
-# local universe is capped so the hot state is complete and the UI shows live prices.
-# The plan target stays 200 (docs/plans/M1.md); this file only shapes the dev machine.
+#
+# T1.6b proof, 2026-09-05 (.claude/state/t16b-proof.md) — measured against the real
+# Binance, not assumed:
+#   * 1 process / 200 markets: the hot state COLLAPSED — ticker and book absent on all
+#     200 within 15 min, CPU pinned at 103% of a core, durable candles at 188/min against
+#     the 200/min the exchange closes.
+#   * 2 shards x 100: CPU still ~100% each, markets with all three components fresh
+#     oscillating around 26%.
+#   * 4 shards x 50: markets_ok 198/200 = 99.0%, 0 stale, 0 unavailable, 200/200 candles
+#     per minute for six consecutive minutes, and steady-state CPU averaging 36.6% /
+#     54.6% / 61.2% / 64.2% of a core per shard — under the plan's 70% budget.
+# So this is the topology the proof sustained, and the one left configured.
+#
+# To go back to a single process (about 2 cores cheaper on this machine), comment out
+# market-worker-{b,c,d} and set market-worker to MARKET_SHARD "0/1" with
+# MARKET_UNIVERSE_SIZE "50" — that is the load one process was measured to hold.
+# Keep every shard identical apart from MARKET_SHARD.
 services:
   market-worker:
     environment:
-      MARKET_UNIVERSE_SIZE: "50"
+      MARKET_UNIVERSE_SIZE: "200"
+      MARKET_SHARD: "0/4"
+
+  market-worker-b:
+    image: hunter-api:${GIT_SHA:-dev}
+    environment: &shard-env
+      DATABASE_URL: postgresql+asyncpg://hunter:hunter@postgres:5432/hunter
+      DATABASE_URL_MIGRATIONS: postgresql+asyncpg://hunter:hunter@postgres:5432/hunter
+      REDIS_URL: redis://redis:6379/0
+      HUNTER_ENV: development
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+      MARKET_UNIVERSE_SIZE: "200"
+      MARKET_SHARD: "1/4"
+    env_file: &shard-envfile
+      - path: ../../.env
+        required: false
+    depends_on: &shard-deps
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck: &shard-health
+      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://localhost:8001/ready', timeout=25); raise SystemExit(0 if response.status == 200 else 1)"]
+      interval: 15s
+      timeout: 30s
+      start_period: 60s
+      retries: 5
+
+  market-worker-c:
+    image: hunter-api:${GIT_SHA:-dev}
+    environment:
+      <<: *shard-env
+      MARKET_SHARD: "2/4"
+    env_file: *shard-envfile
+    depends_on: *shard-deps
+    restart: unless-stopped
+    healthcheck: *shard-health
+
+  market-worker-d:
+    image: hunter-api:${GIT_SHA:-dev}
+    environment:
+      <<: *shard-env
+      MARKET_SHARD: "3/4"
+    env_file: *shard-envfile
+    depends_on: *shard-deps
+    restart: unless-stopped
+    healthcheck: *shard-health
