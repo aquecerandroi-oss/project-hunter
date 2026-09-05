@@ -23,3 +23,4 @@ As decisões tomadas na fase de arquitetura estão consolidadas em `docs/SPEC_RE
 | ADR | Título | Status |
 |---|---|---|
 | [0001](0001-adotar-vibe-coding-toolkit.md) | Adotar o fluxo do vibe-coding-toolkit para o desenvolvimento | aceito |
+| [0002](0002-camada-de-provedores-llm.md) | Camada de provedores LLM com Anthropic e OpenAI (GPT-6 Astra) | aceito (Fase 2) |
