@@ -117,7 +117,9 @@ services:
       - "${HUNTER_HTTPS_PORT:-443}:443/udp"   # HTTP/3
     environment:
       HUNTER_SITE_ADDRESS: ${HUNTER_SITE_ADDRESS:?defina HUNTER_SITE_ADDRESS no .env (dominio, ou :80 sem dominio)}
-      HUNTER_ACME_EMAIL: ${HUNTER_ACME_EMAIL:-}
+      # Caddy's {$VAR:default} only falls back when the variable is UNSET; an empty
+      # string (no-domain setup) would reach `email` and break the Caddyfile parse.
+      HUNTER_ACME_EMAIL: ${HUNTER_ACME_EMAIL:-hunter@example.invalid}
     volumes:
       - ../vps/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data      # certificados: perder isto e refazer ACME do zero
