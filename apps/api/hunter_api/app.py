@@ -34,9 +34,11 @@ from hunter_api.realtime.endpoint import router as realtime_router
 from hunter_api.realtime.redis_bridge import RedisClientLike
 from hunter_api.routers import audit as audit_router
 from hunter_api.routers import invitations as invitations_router
+from hunter_api.routers import markets as markets_router
 from hunter_api.routers import me as me_router
 from hunter_api.routers import members as members_router
 from hunter_api.routers import organizations as organizations_router
+from hunter_api.routers import system as system_router
 from hunter_api.routers import webhooks as webhooks_router
 from hunter_api.routers import workspaces as workspaces_router
 from hunter_core.db.session import create_engine, create_session_factory
@@ -171,6 +173,8 @@ def create_app(settings: ApiSettings) -> FastAPI:
     app.include_router(invitations_router.accept_router)
     app.include_router(workspaces_router.router)
     app.include_router(audit_router.router)
+    app.include_router(markets_router.router)
+    app.include_router(system_router.router)
     app.include_router(webhooks_router.router)
     app.include_router(realtime_router)
     app.mount("/metrics", metrics_asgi_app())

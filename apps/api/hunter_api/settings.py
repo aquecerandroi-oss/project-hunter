@@ -77,6 +77,11 @@ class ApiSettings(Settings):
     authorized it; without this, removing someone from an organization leaves
     their open socket receiving that organization's data."""
 
+    # market_stale_after_s lives on the core hunter_core.Settings (T1.3 added
+    # it there first — services/markets.py and routers/markets.py read it off
+    # this inherited field, shared verbatim with the market worker's own
+    # staleness handling).
+
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
     def _split_comma_separated(cls, value: object) -> object:
