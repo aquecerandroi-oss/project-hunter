@@ -24,6 +24,19 @@ $issuer = Read-Host "CLERK_ISSUER (Enter para usar $issuerDefault)"
 if ([string]::IsNullOrWhiteSpace($issuer)) { $issuer = $issuerDefault }
 $issuer = $issuer.TrimEnd('/')
 
+# Aceita o valor puro, "NOME=valor", ou varias linhas coladas de uma vez (pega o token certo).
+function Extract-Key([string]$raw, [string]$prefix) {
+  if (-not $raw) { return $null }
+  $tokens = $raw -split '[\s"'']+'
+  foreach ($t in $tokens) {
+    $candidate = $t
+    $eq = $candidate.LastIndexOf('=')
+    if ($eq -ge 0) { $candidate = $candidate.Substring($eq + 1) }
+    if ($candidate.StartsWith($prefix) -and $candidate.Length -gt ($prefix.Length + 10)) { return $candidate }
+  }
+  return $null
+}
+
 function Read-Secret([string]$label, [string]$prefix) {
   while ($true) {
     $prompt = $label + " (comeca com " + $prefix + "; digitacao oculta)"
@@ -31,8 +44,9 @@ function Read-Secret([string]$label, [string]$prefix) {
     $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
     $plain = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
     [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-    if ($plain -and $plain.StartsWith($prefix) -and $plain.Length -gt ($prefix.Length + 10)) { return $plain }
-    Write-Host ("  valor invalido: precisa comecar com " + $prefix + ". Tente de novo.") -ForegroundColor Red
+    $value = Extract-Key $plain $prefix
+    if ($value) { return $value }
+    Write-Host ("  valor invalido: precisa conter uma chave que comeca com " + $prefix + ". Tente de novo.") -ForegroundColor Red
   }
 }
 
@@ -60,5 +74,7 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [IO.File]::WriteAllText($envPath, $content, $utf8NoBom)
 
 Write-Host ""
-Write-Host "OK: .env gravado com 4 variaveis (valores nao exibidos)." -ForegroundColor Green
+Write-Host ("OK: .env gravado com " + $lines.Count + " variaveis (valores nao exibidos).") -ForegroundColor Green
+Write-Host ("  publishable key: " + $pk.Substring(0, 8) + "... (" + $pk.Length + " caracteres)")
+Write-Host ("  secret key:      " + $sk.Substring(0, 8) + "... (" + $sk.Length + " caracteres)")
 Write-Host "Agora diga ao agente 'salvei' para ele reiniciar o servidor com as chaves."
