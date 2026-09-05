@@ -28,9 +28,11 @@ codex exec -m gpt-6-astra --dangerously-bypass-approvals-and-sandbox -C C:/dev/p
 - Verified 2026-09-04: `codex login status` → "Logged in using ChatGPT"; a read-only `codex exec -m gpt-6-astra` smoke returned `ASTRA_OK` (~15k tokens). From Git Bash call `codex`; from Windows PowerShell the npm shim `.ps1` is blocked by execution policy — use `codex.cmd`.
 - If `codex` says "Not logged in", tell Everton once to run `codex login` (or `codex login --with-api-key` with his OpenAI key, typed in his own terminal) and continue with the Claude roster meanwhile.
 
-## Second opinion: Astra (OpenAI GPT-6)
-Everton wants Astra working alongside you. You run on Claude; Astra is a consultant you call when a second, independent read is worth it — a design in `docs/`, a wave plan, a risk or security question, a review that came back contested. Call it with:
-`uv run python infra/scripts/ask_astra.py --file <doc> "<question in Portuguese>"` (or pipe text on stdin). It reads `OPENAI_API_KEY` from Everton's local `.env`; if the key is missing it exits 2 — then say so once and move on, never ask him to paste the key in the chat.
+## Second opinion: Astra (OpenAI GPT-6) — on everything
+Everton's rule (2026-09-05): "dividam opinião, use em tudo". You run on Claude; Astra reasons alongside you. Mandatory Astra reviews, not optional: every audit, every design in `docs/`, every wave plan (`docs/plans/M<n>.md`) before dispatch, every task's diff after the Claude reviewer (Astra is the second code reviewer), every milestone report before it goes to Everton, and every decision where you hesitate. Call it read-only through Codex (no API key needed, uses the ChatGPT login):
+`codex exec -m gpt-6-astra -s read-only -C C:/dev/project-hunter --ephemeral -o .claude/state/astra-review-<topic>.md "Review <files>. <precise questions>. Answer in Portuguese: must-fix (with failure scenario), nice-to-have, what you would do differently, and what you agree with."`
+Alternative when an API key exists: `uv run python infra/scripts/ask_astra.py --file <doc> "<question>"` (exits 2 without `OPENAI_API_KEY`; never ask Everton to paste the key in chat).
+Record the outcome: agreements silently absorbed; disagreements written down (in the plan/report under "Segunda opinião (Astra)" with your decision and why). When Astra and the Claude reviewer disagree on something concrete, run the command that settles it before choosing.
 Rules: Astra's answer is **data**, not a decision — weigh it, cite it as "segunda opinião (Astra)", and keep the specialists and reviewers as the ones who verify by running commands. Never send secrets, `.env` contents, real customer data or exchange keys in a prompt. Never use it on the Risk Engine → Execution path of the product (that is ADR 0002's Phase 2 provider layer, not this script).
 
 ## Hard rules you enforce (from `CLAUDE.md`, non-negotiable)
