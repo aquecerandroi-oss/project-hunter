@@ -2,7 +2,7 @@
   "current": "M1",
   "status": "in_progress",
   "approved_at": "2026-09-05",
-  "wave": "1 — T1.1 e contrato do adaptador commitados; T1.6a (Docker) commitado pela Astra; T1.2 + T1.2b (adaptador Binance USDS-M público) revisado e commitado em 97c36ff (189 testes offline, 3 live, 16 achados corrigidos); T1.4 (API de mercado e system, 109 testes) revisado e commitado em 1df4b87 + tipos regenerados em 00c7996; T1.5 (telas de mercado, Live Status, workers, 223 testes) revisado e commitado em 9b6106f; T1.3 em voo; decisão conjunta fechada em .claude/state/dialogue-M1.md",
+  "wave": "1 — T1.1 e contrato do adaptador commitados; T1.6a (Docker) commitado pela Astra; T1.2 + T1.2b (adaptador Binance USDS-M público) revisado e commitado em 97c36ff (189 testes offline, 3 live, 16 achados corrigidos); T1.4 (API de mercado e system, 109 testes) revisado e commitado em 1df4b87 + tipos regenerados em 00c7996; T1.5 (telas de mercado, Live Status, workers, 223 testes) revisado e commitado em 9b6106f; T1.3 (market-worker: universo, ingest, persist, recovery, supervisão, heartbeat) revisado e commitado em b8c4766 — 139 testes verdes em duas rodadas, packages/core de 178 para 254, CRITICAL/HIGH das três revisões fechados; falta a prova operacional com dado real da Binance (T1.6); decisão conjunta fechada em .claude/state/dialogue-M1.md",
   "repo_path": "C:\\dev\\project-hunter",
   "github": "https://github.com/aquecerandroi-oss/project-hunter",
   "paused_reason": null,

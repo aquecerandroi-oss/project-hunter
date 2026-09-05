@@ -7,6 +7,23 @@ updated: 2026-09-05
 
 Correções reais extraídas do `git log`, todas dentro do Milestone 0. A maioria veio de rodadas de revisão de segurança/qualidade (T04–T10 no plano `docs/plans/M0.md`), não de bugs reportados em produção — não houve produção ainda.
 
+## Market worker (T1.3, commit `b8c4766`)
+
+CRITICAL e HIGH levantados pelo `database-architect` (duas passadas), pelo `code-reviewer` e pela Astra adversarial, todos com cenário de falha medido antes da correção. Uma linha cada.
+
+- **CRITICAL-1** — `market_snapshots` e `open_interest_history` gravavam uma linha por `INSERT`; 400 inserts levavam 19,85 s contra 83 ms em lote, estourando o timeout de flush e descartando a fila inteira por idade. Corrigido: um `INSERT ... ON CONFLICT DO NOTHING` multi-linha por tabela por flush.
+- **CRITICAL D1 (convenção de porcentagem)** — o snapshot gravava fração (correto, `NUMERIC(9,6)`), mas o fix-brief original mandava multiplicar por 100; a instrução errada foi rejeitada e o banco continua em fração. Divergência dos helpers de domínio virou o follow-up T1.1c.
+- **CRITICAL D2** — `PersistQueues.drop()` levantava `RuntimeError` ao encher a fila de perdas; com Postgres fora, o processo morria ~9 min depois. Corrigido: `deque(maxlen=...)` que evicta e conta, nunca levanta.
+- **HIGH-2** — a detecção de gaps fazia 1005 statements e 202 transações por passada (60,6 s com 200 mercados num ciclo de 60 s), segurando `ACCESS SHARE` em `candles` por ~40 s/min. Corrigido: três consultas set-based sobre o universo inteiro.
+- **HIGH-3** — nada garantia que existisse partição para a data corrente; em 2027-01 o primeiro insert derrubaria o flush inteiro em silêncio. Corrigido: `assert_writable_partitions` fatal no startup para *agora*, `/ready` falso e `system_event` critical para o lookahead de +1 dia.
+- **HIGH-4** — o ranking do universo fazia ~500 `UPDATE`s numa transação depois de zerar `is_monitored` de todos, travando linhas de `markets` por segundos. Corrigido: um único `UPDATE ... FROM (VALUES ...)`.
+- **HIGH D3** — sem `command_timeout`/`statement_timeout`, um flush cancelado deixava o `drain_loop` preso para sempre num socket morto, com `/ready` falso e nada reiniciando. Corrigido: `command_timeout=30` no engine e `SET LOCAL statement_timeout = '15s'` nas sessões `hunter_worker`.
+- **HIGH D5** — a detecção terminava em `align(now) - 1 min` e disputava com a fila de persistência, registrando até 200 gaps falsos por ciclo e disparando 200 backfills REST contra o banco já lento. Corrigido: graça de 2 min, maior que a tolerância de atraso da fila.
+- **HIGH H1** — falha em `report_losses` sem `try/except` matava o processo num blip do Postgres; corrigido, e as perdas só saem da fila depois do commit.
+- **HIGH H2..H10** — série de correções de hot state e coalescência: `event_ts` propagado, `HDEL` do campo opcional ausente na mesma transação do `HSET`, staleness por componente (`mark_ts`/`oi_ts`/`funding_ts` independentes), dedupe de trades em janela de 50, candles em janela rápida de 16, final substituindo parcial mesmo com `event_ts` igual, e `price_ts`/`book_ts` separados no payload.
+- **D8 (caminho de produção)** — o bucket de open interest por ciclo só existia no caminho sem fila, morto em produção; um poll de 200 mercados atravessando o limite de 5 min espalhava as leituras por dois buckets, com o corte mudando a cada ciclo. Corrigido: `OpenInterestSample` carrega o `bucket_ts` do ciclo pela fila.
+- **Staleness dos campos de ticker no snapshot** — `price`, `bid`, `ask`, `spread_pct` e volumes eram gravados por mais velho que estivesse o hash, republicando preço congelado como observação nova. Corrigido: gate pelo `ts` do próprio ticker, medido contra o instante real de coleta (não o minuto alinhado, que dava até 59 s de folga), com contador por campo; se tudo é descartado, a linha não é escrita.
+
 ## Infraestrutura de dev
 
 - **`b2e48b5`** — `setup_env.ps1` juntava todas as variáveis numa única linha: em PowerShell 5.1 a vírgula liga mais forte que `+`, então a concatenação de linhas do `.env` colapsava tudo. Corrigido parenteizando cada linha.

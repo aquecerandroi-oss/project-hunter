@@ -88,3 +88,50 @@ feat(market-worker): universe, ingest, persist, recovery, heartbeat
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 ```
 `git -c commit.gpgsign=false commit` · só `services/market-worker/**`, `packages/core/hunter_core/{runtime,settings}.py`, testes de core afetados e `.env.example` · `git push origin main`.
+
+---
+
+# VEREDITO FINAL — T1.3 fechada em 2026-09-05, commit `b8c4766`
+
+## (a) Checklist da decisão conjunta — 11 itens de T1.3
+| # | Item | Veredito |
+|---|---|---|
+| 1 | Só candles finais no Postgres; bootstrap até 1500 fechados; `ON CONFLICT (market_id, timeframe, open_time) DO NOTHING` | ✔ |
+| 2 | Escritor único e serializado da lista Redis de candles; parcial nunca substitui final | ✔ |
+| 3 | Buracos internos a cada minuto na janela de 24 h; `recovered` na mesma transação; `failed` na 5ª tentativa | ✔ (mais reabertura após 1 h, D6) |
+| 4 | Filas limitadas por itens, bytes e idade; snapshot substituível; descarte observável | ✔ |
+| 5 | Snapshots por minuto e OI em buckets UTC de 5 min, em lote idempotente | ✔ (D8 fechado no caminho com fila) |
+| 6 | Liquidação `id = uuid5(...)` com `INSERT ... ON CONFLICT (id, ts) DO NOTHING` | ✔ (`ts` truncado ao ms, D11) |
+| 7 | `market.liquidations` com `event_id` = UUID determinístico; publicação best-effort após commit | ✔ (só republica ids retornados por `RETURNING`, D7) |
+| 8 | `TaskGroup` + `forever`; retorno inesperado é fatal, saída não zero | ✔ |
+| 9 | Watchdog por conexão 30 s / 3 reinícios; universo vazio expõe `idle` | ✔ com ressalva: o token de progresso vem do adaptador, que avança em frame duplicado — limitação já registrada em `docs/plans/M1.md` (T1.2), gate de progresso aceito é a readiness do worker |
+| 10 | `readiness_checks` com timeout de 2 s; tolerância de reconexão de 120 s monotônicos; fila sem flush há 30 s reprova | ✔ |
+| 11 | Coalescer preserva timestamps do último evento aceito; TTL não rejuvenesce sem evento novo; `deriv` com `mark_ts`/`oi_ts`/`funding_ts` independentes | ✔ |
+| 12 | Universo a cada 15 min aplicando só entradas/saídas | ✔ |
+
+## (b) Critérios da linha da tarefa em `docs/plans/M1.md`
+`universe.py` ✔ · `ingest.py` ✔ · `persist.py` ✔ · `recovery.py` ✔ · `heartbeat.py` ✔ · `main.py` ✔ · `settings.py` + `.env.example` ✔ · `runtime.py` com `readiness_checks` sem regredir `packages/core` ✔ (178 → 254 passed).
+
+## (c) Regras do `CLAUDE.md`
+`Decimal` ✔ · UTC nos dados persistidos e monotônico só para watchdog/idade ✔ · nenhum arquivo acima de 350 linhas ✔ (maior: `universe.py`, 333) · `structlog` ✔ · sem estado local ✔ · sem dado falso ✔ (preço velho vira `NULL` + contador, nunca republicado) · role `hunter_worker` em todos os entry points, nenhum dado de tenant tocado ✔ · mutação observável em `system_events` ✔.
+
+## (d) Verificação real (2026-09-05, saída colada)
+```
+uv run pytest services/market-worker -q -p no:cacheprovider   → 139 passed in 169.49s
+uv run pytest services/market-worker -q -p no:cacheprovider   → 139 passed in 170.44s   (2ª rodada, sem flakiness)
+uv run pytest packages/core -q -p no:cacheprovider            → 254 passed in 274.27s
+uv run ruff check services/market-worker packages/core        → All checks passed!
+uv run ruff format --check services/market-worker packages/core → 111 files already formatted
+uv run pyright services/market-worker packages/core           → 0 errors, 0 warnings, 0 informations
+uv run python infra/scripts/check_file_size.py                → scanned 127 files; 0 over budget, 0 grandfathered
+```
+✘ **Prova de dado real ainda não feita.** Subir o worker contra a Binance e mostrar `mkt:binance:BTCUSDT:ticker` vivo com `ts` avançando é da **T1.6**; até lá `obsidian/02-MARKET/Market Collector.md` fica `status: parcial`.
+
+## (e) Revisores
+`code-reviewer` ✔ · `database-architect` ✔ (duas passadas, `db-review-T1.3.md` e `db-review-T1.3-part2.md`) · `exchange-integration-specialist` ✔ (revisão cruzada) · `security-reviewer` dispensado (sem auth, sem entrada de usuário, sem credencial no diff) · `risk-engine-guardian` não se aplica no M1.
+
+## (f) Segunda opinião da Astra (adversarial, sobre o próprio código)
+`.claude/state/astra-review-review-T1.3-final.md`: 20 itens CRITICAL/HIGH conferidos um a um. **17 FECHADO**, 3 ABERTO — todos os três fora do escopo da T1.3 e já registrados como follow-up em `docs/plans/M1.md`: H2 (token de progresso avança em frame duplicado, `packages/exchange-adapters`, T1.2), D1 (helpers de domínio em ×100, `packages/core/hunter_core/domain/market.py`, T1.1c), D4 (`lock_timeout` em `infra/scripts/create_partitions.py`, T1.6/ops). Nenhum CRITICAL/HIGH aberto dentro dos arquivos da T1.3.
+
+## (g) Commit
+`b8c4766` — 58 arquivos, +7857 linhas. Conferido com `git diff --cached --name-only`: zero arquivos de `apps/**`, `packages/exchange-adapters/**` ou `packages/shared-types/**`.
