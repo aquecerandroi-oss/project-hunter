@@ -93,6 +93,14 @@ jobs:
       # (it hits real exchanges and must never run in CI).
       - name: pytest (unit + integration)
         run: uv run pytest -m "unit or integration" --cov --cov-report=xml
+      # docs/plans/M1.md T1.7: already collected by the run above (testpaths
+      # includes "tests" and "apps"; both are marked `integration`) -- this
+      # extra, explicitly-named step exists only so a T1.7 regression shows up
+      # as its own line in the CI log instead of buried in the full run.
+      # `test_market_live.py` self-skips here (HUNTER_LIVE_TESTS unset):
+      # CLAUDE.md's `live` marker is "never in CI" on purpose.
+      - name: pytest (T1.7 market pipeline integration suite)
+        run: uv run pytest tests/integration apps/api/tests/integration/test_t17_market_pipeline_contract.py -q
 
   # Runs unconditionally per CLAUDE.md/docs/plans/M0.md T10: this stays red
   # until T04 (Alembic setup) lands. That failure is expected, not a bug in
@@ -248,6 +256,12 @@ jobs:
         run: pnpm --filter @hunter/e2e install-browsers
       - name: run e2e suite
         run: pnpm --filter @hunter/e2e e2e
+      # docs/plans/M1.md T1.7: already run above (part of the full suite) --
+      # named separately so markets.spec.ts's own result (and, when
+      # CLERK_E2E_* secrets are absent, its self-skip) is visible as its own
+      # CI log line, same reasoning as python-test's T1.7 step above.
+      - name: run T1.7 markets.spec.ts explicitly
+        run: pnpm --filter @hunter/e2e exec playwright test markets.spec.ts
       - name: upload e2e artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
