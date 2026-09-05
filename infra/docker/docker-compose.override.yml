@@ -1,0 +1,9 @@
+# Local development override (auto-loaded by docker compose alongside docker-compose.yml).
+# T1.6 (2026-09-05) measured that one market-worker process saturates a CPU core at 200
+# markets and drops high-frequency data. Until T1.6b (profiling + sharding) lands, the
+# local universe is capped so the hot state is complete and the UI shows live prices.
+# The plan target stays 200 (docs/plans/M1.md); this file only shapes the dev machine.
+services:
+  market-worker:
+    environment:
+      MARKET_UNIVERSE_SIZE: "50"
