@@ -51,3 +51,11 @@ Correções reais extraídas do `git log`, todas dentro do Milestone 0. A maiori
 ## Fontes
 
 `git log` (M0, commits acima), `docs/plans/M0.md` (rodadas T04–T11), `.claude/state/milestone.json`
+
+## Resolvidos em 2026-09-05 (fechamento do M0 / início do M1)
+- `3c31ef0` **Imagem web não construía**: `Dockerfile.web` não copiava `packages/shared-types`, então `@hunter/shared-types` virava `any` e o `next build` falhava dentro da imagem. Encontrado pelo agente de fechamento do M0.
+- `560c94c` **`pnpm test` rodava o Playwright** porque `tests/e2e` expunha `test`; renomeado para `e2e` (CI ajustado).
+- `d76a0cf` **`worker` do compose saía com 0 sem fazer nada**; substituído por `market-worker` com `restart: unless-stopped` e healthcheck; papéis sem pacote falham explicitamente (implementado pela Astra).
+- `b2e48b5` **`setup_env.ps1` gravava o `.env` numa linha só** (precedência da vírgula sobre `+` no PowerShell).
+- `541ef78` **500 em toda rota `/[orgSlug]`**: menu passava função e componente do servidor para o cliente.
+- `744fdf8` **8 testes dependentes de ordem** por balde de rate limit compartilhado entre TestClients.

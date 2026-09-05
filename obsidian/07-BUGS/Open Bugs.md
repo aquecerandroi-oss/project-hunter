@@ -28,3 +28,9 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
 ## Fontes
 
 `.claude/state/milestone.json`, `docs/SECURITY.md` §1
+
+## Abertos em 2026-09-05
+- **Banco local de desenvolvimento com coluna antiga em `processed_events`** (`processed_at` em vez de `claimed_at`/`completed_at`). Código e migração estão certos; o banco foi migrado com uma imagem anterior. Correção: comando `ALTER TABLE` passado ao dono (o modo automático do agente não altera banco). Efeito prático: webhook do Clerk falharia localmente; login e onboarding não dependem dele.
+- **Codex (Astra) no Windows não funciona com sandbox**: `read-only`/`workspace-write` bloqueiam até leitura de arquivos ("blocked by policy"). Decisão do dono: rodar sem sandbox com controles compensatórios (`infra/scripts/astra.sh`).
+- **Limite mensal de gasto da Anthropic** derruba especialistas no meio da tarefa (429). Mitigação: Astra assume tarefas mecânicas; dono avalia aumentar o limite.
+- **Agentes personalizados e MCP do Obsidian só carregam em sessão aberta dentro de `C:\dev\project-hunter`**; sessão nascida fora não os vê.

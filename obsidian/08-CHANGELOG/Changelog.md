@@ -9,6 +9,22 @@ Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado p
 
 ## 2026-09-05
 
+- `a522bf1` docs(m1): DECISÃO CONJUNTA Claude⇄Astra — acceptance checklist for T1.2/T1.3/T1.4/T1.6
+- `c58d4d1` docs(m1): joint Claude⇄Astra decision folded into the plan (recovery, liquidation identity ON CONFLICT (id, ts), supervision, per-component stalenes
+- `becf1d9` docs(m1): Binance WS routes and @depth20 per official notice; Claude⇄Astra dialogue rounds 1–2 with concrete contracts (recovery, liquidation dedu
+- `dd93d99` chore(rules): point the Astra rule at infra/scripts/astra.sh and the dialogue mode
+- `606d5b6` chore(astra): single channel script (ask / run / dialogue / show) and Astra's second opinion recorded in the M1 plan
+- `d76a0cf` feat(ops): market-worker compose service (restart unless-stopped, /ready healthcheck); entrypoint dispatches worker roles honestly (T1.6a, implemented
+- `3399a19` chore(claude-md): fix guideline numbering
+- `8df57ff` chore(agents): Astra second-opinion rule for every agent; Sexta-feira review protocol
+- `3c31ef0` fix(docker): web image copies packages/shared-types (build was failing); sexta-feira: Astra runs unsandboxed by owner authorization
+- `560c94c` fix(test): e2e workspace exposes 'e2e' instead of 'test' so 'pnpm test' no longer runs Playwright
+- `4b24204` docs(m0): closure — DEPLOYMENT env table, README quickstart, CLAUDE.md commands verified, ROADMAP, milestone state, §77 report
+- `f71059e` feat(exchanges): ExchangeAdapter protocol, stream channels and error types (M1 base)
+- `415cc83` feat(core): normalized market domain types (T1.1)
+- `c24a7b6` docs(obsidian): project knowledge base (32 pages, ADR 0003) and M1 wave plan
+- `f153315` docs(audit): CURRENT_STATE.md — full repo audit at end of M0; ADR 0003 obsidian/ knowledge base
+
 - `744fdf8` test(api): T11 integration suite — isolation, RBAC matrix, mutations, webhook, rate limits, websocket, auth edge cases
 - `541ef78` fix(web): nav registry is plain data (segment + icon key) so the server layout can pass it to the client sidebar
 - `b2e48b5` fix(dev): setup_env.ps1 parenthesizes each .env line (comma binds tighter than + in PowerShell, so all vars were joined into one line)
