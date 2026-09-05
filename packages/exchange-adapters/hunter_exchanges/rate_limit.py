@@ -19,6 +19,7 @@ than the exchange does.
 from __future__ import annotations
 
 import asyncio
+import math
 import time
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Protocol
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
 #: Floor for the derived TTL (F2) — short enough that an abandoned bucket's
 #: Redis key still expires in a reasonable time, long enough that even the
 #: shortest real bucket (request_weight, 60s window) survives comfortably.
-_BUCKET_STATE_TTL_FLOOR_S = 120.0
+_TTL_FLOOR_S = 120  # int: Redis EXPIRE rejects a float-serialized argument
 
 # Lua script: refill-then-consume, atomically. Returns the wait time (seconds,
 # as a string — Redis Lua has no float return type) needed before ``weight``
@@ -45,6 +46,7 @@ local capacity = tonumber(ARGV[1])
 local refill_per_s = tonumber(ARGV[2])
 local weight = tonumber(ARGV[3])
 local now = tonumber(ARGV[4])
+local ttl = tonumber(ARGV[5])  -- EXPIRE needs an int; matches _RECORD_USED_WEIGHT_SCRIPT
 
 local tokens = tonumber(redis.call('HGET', key, 'tokens'))
 local ts = tonumber(redis.call('HGET', key, 'ts'))
@@ -64,7 +66,7 @@ else
     tokens = tokens - weight
     redis.call('HSET', key, 'tokens', tokens, 'ts', now)
 end
-redis.call('EXPIRE', key, ARGV[5])
+redis.call('EXPIRE', key, ttl)
 return tostring(wait)
 """
 
@@ -179,7 +181,7 @@ class TokenBucketRateLimiter:
         # never expire mid-window (a 300s funding-history window with the
         # old fixed 120s TTL let the bucket reset to full capacity at 121s,
         # inside the same exchange window).
-        self._bucket_state_ttl_s = max(2.0 * self._refill_period_s, _BUCKET_STATE_TTL_FLOOR_S)
+        self._bucket_state_ttl_s = math.ceil(max(2.0 * self._refill_period_s, _TTL_FLOOR_S))
         self.ip_gate = ip_gate
         self._local_buckets: dict[str, _LocalBucket] = {}
         self._local_lock = asyncio.Lock()

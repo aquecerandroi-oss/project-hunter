@@ -10,7 +10,11 @@ from hunter_core.domain.enums import RiskEventSeverity
 from hunter_core.logging import get_logger
 from hunter_market_worker.config import build_adapter, exchange_code
 from hunter_market_worker.funding import run_funding
-from hunter_market_worker.heartbeat import HeartbeatState, record_system_event, run_heartbeat
+from hunter_market_worker.heartbeat import (
+    HeartbeatState,
+    run_heartbeat,
+    safe_record_system_event,
+)
 from hunter_market_worker.ingest import TickCoalescer, coalesce_loop
 from hunter_market_worker.partitions import PartitionReadiness, assert_writable_partitions
 from hunter_market_worker.persist import PersistQueues, drain_loop, oi_poll_loop, snapshot_loop
@@ -34,13 +38,23 @@ async def run_market(runtime: WorkerRuntime) -> None:
 
     async def warning(message: str) -> None:
         runtime.mark_error()
-        await record_system_event(
+        # HIGH-2: a database error while merely *recording* the watchdog's
+        # warning must not take the whole watchdog task (and therefore the
+        # TaskGroup) down with it.
+        await safe_record_system_event(
             factory, "connection_watchdog", message, RiskEventSeverity.WARNING
         )
 
     watchdog = Watchdog(adapter, warning)
-    partitions = PartitionReadiness(factory)
-    runtime.readiness_checks.extend([health.ingestion, queues.persistence, partitions.ready])
+    partition_readiness = PartitionReadiness(factory)
+
+    async def partitions() -> bool:
+        """Distinct ``__name__`` from ``PartitionReadiness.ready`` (MEDIUM-1):
+        registered under this name in ``/ready``'s ``details``, so the payload
+        never gets a key literally called ``ready`` that isn't the verdict."""
+        return await partition_readiness.ready()
+
+    runtime.readiness_checks.extend([health.ingestion, queues.persistence, partitions])
     token = publication_sessions.set(factory)
     logger.info("market_worker_starting", exchange=adapter.code)
     try:
@@ -48,7 +62,7 @@ async def run_market(runtime: WorkerRuntime) -> None:
         # supervisor restarts us (HIGH-3). A missing +1 day lookahead only makes
         # ``/ready`` false — today's collection keeps running, but say so.
         await assert_writable_partitions(factory)
-        if await partitions.ready():
+        if await partition_readiness.ready():
             logger.info("partition_lookahead_ready")
         else:
             logger.warning("partition_lookahead_missing")
@@ -92,5 +106,5 @@ async def run_market(runtime: WorkerRuntime) -> None:
         publication_sessions.reset(token)
         runtime.readiness_checks.remove(health.ingestion)
         runtime.readiness_checks.remove(queues.persistence)
-        runtime.readiness_checks.remove(partitions.ready)
+        runtime.readiness_checks.remove(partitions)
         await adapter.aclose()

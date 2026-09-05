@@ -95,6 +95,74 @@ banco descartável.
 corrupção lógica, **não** contra perda da máquina; cópia para fora (`rsync`
 para outro host / object storage) ainda não existe.
 
+## Partições diárias
+
+`infra/scripts/create_partitions.py` mantém as partições mensais de `candles`
+e companhia três meses à frente (DATABASE.md §1.3); sem isso o primeiro
+insert do mês sem partição derruba o flush inteiro (`no partition of relation
+"candles_1m" found for row` — docs/plans/M1.md, "Agendamento real das
+partições"). A T1.3 já cobre a **detecção** (readiness check + `system_event`
+critical quando falta partição para `now + 1 dia`); o agendamento abaixo é a
+**prevenção**.
+
+Rodar a mão (mesmo `docker compose run --rm` que `migrate`/`seed` usam —
+`compose.sh` não tem um atalho dedicado para isto, mas encaminha qualquer
+subcomando):
+
+```bash
+bash infra/vps/compose.sh run --rm --no-deps -e HUNTER_COMMAND=partitions api
+```
+
+**`--no-deps` não é opcional aqui.** `api` declara `depends_on: migrate:
+condition: service_completed_successfully` no `docker-compose.yml`, e `docker
+compose run` sobe os `depends_on` a menos que se mande não subir. Sem
+`--no-deps`, este comando dispara `alembic upgrade head` (com
+`DATABASE_URL_MIGRATIONS`, a credencial dona do schema) toda vez que roda —
+inclusive às 04:07 sem ninguém olhando. Um `git pull`/`update` que deixou uma
+revisão nova sem release faria essa migração aplicar sozinha; e se a migração
+falhar, `compose run` aborta na dependência e a partição — o motivo do job
+existir — nunca chega a rodar. `--no-deps` faz este comando fazer só uma
+coisa: criar partição, exatamente como o nome do job promete.
+
+Agendamento (instalar uma vez, à mão — `bootstrap_vps.sh` só instala o cron do
+backup, não este; segue o mesmo padrão de `/etc/cron.d/hunter-backup`):
+
+```bash
+printf '%s\n' \
+  'SHELL=/bin/bash' \
+  'PATH=/usr/local/bin:/usr/bin:/bin' \
+  '7 4 * * * hunter cd /opt/project-hunter && bash infra/vps/compose.sh run --rm --no-deps -e HUNTER_COMMAND=partitions api >> /opt/backups/partitions.log 2>&1' \
+  | sudo tee /etc/cron.d/hunter-partitions >/dev/null
+sudo chmod 644 /etc/cron.d/hunter-partitions
+```
+
+Todo dia às 04:07 (hora da máquina, depois do backup das 03:17 — mesmo
+horário de menor uso, sem disputar o mesmo minuto), saída anexada em
+`/opt/backups/partitions.log` (mesmo diretório do backup, já criado e fechado
+em 700 pelo `backup_postgres.sh`; não é um segundo local de estado, é o mesmo
+diretório operacional).
+
+O script é idempotente e o próprio processo distingue "pulou uma partição por
+`lock_timeout` de 3 s" (não fatal — sai com código **75**, `EX_TEMPFAIL` de
+`sysexits.h`, só para aparecer no log; tenta de novo amanhã) de qualquer outro
+erro de banco (`DBAPIError` não tratado, código **1** — esse sim propaga e
+teria que investigar). Os dois códigos são diferentes de propósito: um
+`grep`/cron-mail que aprendesse "saída != 0 é sempre o skip de rotina"
+pararia de ler `partitions.log`, e uma falha real (privilégio de `CREATE`
+revogado, disco cheio) se repetiria sem ninguém notar até a virada do mês.
+Quando falhar:
+
+```bash
+tail -30 /opt/backups/partitions.log     # o que o cron viu
+bash infra/vps/compose.sh run --rm --no-deps -e HUNTER_COMMAND=partitions api  # rodar a mão para ver o erro na tela
+```
+
+Se falhar dias seguidos perto da virada do mês, o readiness check da T1.3 já
+teria soado `system_event` critical antes disso virar um insert perdido de
+verdade — mas não espere por ele: um `lock_timeout` isolado é normal (gap
+detection ou outra query concorrente segurando o parent), vários dias seguidos
+não é.
+
 ## O que fica exposto
 
 | Porta | Onde escuta | Quem alcança |

@@ -44,20 +44,34 @@ COMPOSE=(docker compose --env-file "$ROOT/.env" -p hunter
   -f "$ROOT/infra/docker/docker-compose.yml"
   -f "$ROOT/infra/vps/docker-compose.prod.yml")
 
+# GIT_SHA resolvido para TODO subcomando, nao so up/update: docker-compose.yml
+# usa `image: hunter-api:${GIT_SHA:-dev}`, e `up`/`update` sao o unico lugar
+# que builda e taggeia a imagem com o SHA do commit deployado. Qualquer outro
+# subcomando (`run`, `logs`, `exec`, `ps`...) que nao exportasse GIT_SHA cairia
+# no default `dev` - uma tag que nao existe na VPS - e o compose reagiria
+# buildando a imagem na hora a partir do working tree (nao do commit
+# deployado), um `docker build` de vários minutos e sem supervisão numa
+# maquina de um core so. `|| true` porque um checkout sem `.git` (nao deveria
+# acontecer aqui, mas nao e motivo pra este script quebrar) so deve deixar
+# GIT_SHA vazio - ai o `${GIT_SHA:-dev}` do compose file assume o default, tal
+# qual antes desta mudanca.
+GIT_SHA="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || true)"
+export GIT_SHA
+
 cmd="${1:-ps}"
 [ "$#" -gt 0 ] && shift
 
 case "$cmd" in
   up)
-    GIT_SHA="$(git -C "$ROOT" rev-parse --short HEAD)" \
-      "${COMPOSE[@]}" up -d --build --remove-orphans "$@"
+    "${COMPOSE[@]}" up -d --build --remove-orphans "$@"
     echo ""
     "${COMPOSE[@]}" ps
     ;;
   update)
     git -C "$ROOT" pull --ff-only
-    GIT_SHA="$(git -C "$ROOT" rev-parse --short HEAD)" \
-      "${COMPOSE[@]}" up -d --build --remove-orphans
+    GIT_SHA="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || true)"
+    export GIT_SHA
+    "${COMPOSE[@]}" up -d --build --remove-orphans
     "${COMPOSE[@]}" ps
     ;;
   logs)

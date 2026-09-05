@@ -10,15 +10,15 @@
 # standard docker-entrypoint convention — so only fall through to
 # role dispatch when no command was given.
 #
-# `migrate` and `seed` are image-only actions, not real
+# `migrate`, `seed` and `partitions` are image-only actions, not real
 # hunter_core.settings.Settings.hunter_role values — that Settings model
 # (packages/core/hunter_core/settings.py) validates HUNTER_ROLE against a
 # strict Literal of actual long-running roles, and *any* Settings()
-# construction downstream (alembic's env.py included) raises immediately if
-# HUNTER_ROLE is "migrate"/"seed". So those two are selected via the
-# separate HUNTER_COMMAND variable instead, leaving HUNTER_ROLE itself untouched
-# (image default "api", itself a valid Settings literal) — only HUNTER_ROLE
-# picks among the real api/worker roles.
+# construction downstream (alembic's env.py and create_partitions.py's own
+# Settings() included) raises immediately if HUNTER_ROLE is one of these. So
+# these are selected via the separate HUNTER_COMMAND variable instead,
+# leaving HUNTER_ROLE itself untouched (image default "api", itself a valid
+# Settings literal) — only HUNTER_ROLE picks among the real api/worker roles.
 set -euo pipefail
 
 if [ "$#" -gt 0 ]; then
@@ -38,6 +38,13 @@ case "$role" in
     ;;
   seed)
     exec python infra/scripts/seed.py
+    ;;
+  partitions)
+    # Daily partition upkeep (docs/plans/M1.md "Agendamento real das
+    # partições", owner T1.6/ops); scheduled via cron on the VPS
+    # (infra/vps/README.md), not a HUNTER_ROLE — same image-only-action
+    # reasoning as migrate/seed above.
+    exec python infra/scripts/create_partitions.py
     ;;
   market)
     exec python -m hunter_market_worker

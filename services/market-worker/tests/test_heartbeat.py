@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 import orjson
 import pytest
@@ -12,6 +12,11 @@ from sqlalchemy import select
 from hunter_core.db.models.system import SystemEvent
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
+from hunter_core.observability import (
+    market_dropped_events_total,
+    market_system_event_record_failures_total,
+)
+from hunter_exchanges.base import ConnectionState
 from hunter_market_worker import heartbeat
 from hunter_market_worker.heartbeat import HeartbeatState
 from hunter_market_worker.universe import MonitoredUniverse
@@ -143,3 +148,144 @@ async def test_run_heartbeat_logs_reconnect_and_marks_success(
             )
         ).all()
     assert events
+
+
+class _BrokenFactory:
+    """A ``session_factory`` that always fails to open a transaction --
+    stands in for a Postgres outage without needing a real broken database."""
+
+    def __call__(self) -> Any:
+        raise ConnectionError("db unreachable")
+
+
+async def test_run_heartbeat_survives_a_broken_system_event_write(
+    redis_client: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """HIGH-2 reproduction: with Postgres down, ``record_system_event`` raises
+    on every attempt. The heartbeat loop must not die -- it keeps writing the
+    Redis heartbeat (the actual liveness signal) and counts the failure
+    instead of letting it escape into the caller's ``TaskGroup``."""
+    monkeypatch.setattr(heartbeat, "HEARTBEAT_INTERVAL_S", 0.01)
+    exchange_code = unique_code()
+    adapter = FakeAdapter(code=exchange_code)
+    adapter.set_connection_state("reconnecting")
+    universe = MonitoredUniverse()
+    universe.set(["BTCUSDT"])
+    state = HeartbeatState()
+    runtime: Any = FakeRuntime(redis=redis_client)
+    metric = cast(Any, market_system_event_record_failures_total.labels(event="ws_reconnected"))
+    before = metric._value.get()  # pyright: ignore[reportPrivateUsage]
+
+    task = asyncio.ensure_future(
+        heartbeat.run_heartbeat(
+            runtime,
+            adapter,
+            universe,
+            state,
+            _BrokenFactory(),  # type: ignore[arg-type]
+        )
+    )
+    try:
+        async with asyncio.timeout(5):
+            await runtime.success.wait()
+            runtime.success.clear()
+            # A ws_state transition triggers a ``record_system_event`` call
+            # that would raise ``ConnectionError`` against the broken factory.
+            adapter.set_connection_state("connected")
+            await runtime.success.wait()
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    # The Redis heartbeat kept being written despite every DB call failing.
+    hb = await redis_client.hgetall(heartbeat.hb_key(exchange_code))
+    assert hb[b"ws_state"] == b"connected"
+    assert runtime.success_count > 0
+    # The failed recording was counted, not silently lost.
+    assert metric._value.get() == before + 1  # pyright: ignore[reportPrivateUsage]
+
+
+async def test_run_heartbeat_writes_dropped_events_to_the_hash_and_the_counter(
+    redis_client: Any, monkeypatch: pytest.MonkeyPatch, db_session_factory: Any
+) -> None:
+    """HIGH-1b: ``ConnectionState.dropped_events`` must reach an operator --
+    the ``hb:market:{exchange}`` hash and the Prometheus counter."""
+    monkeypatch.setattr(heartbeat, "HEARTBEAT_INTERVAL_S", 0.01)
+    exchange_code = unique_code()
+    connection = ConnectionState("public", "connected", ("btcusdt@aggTrade",), dropped_events=9)
+    adapter = FakeAdapter(code=exchange_code)
+    adapter.connection_states = lambda: {"public:0": connection}  # type: ignore[attr-defined]
+    universe = MonitoredUniverse()
+    universe.set(["BTCUSDT"])
+    state = HeartbeatState()
+    runtime: Any = FakeRuntime(redis=redis_client)
+    metric = cast(Any, market_dropped_events_total.labels(exchange=exchange_code))
+    before = metric._value.get()  # pyright: ignore[reportPrivateUsage]
+
+    task = asyncio.ensure_future(
+        heartbeat.run_heartbeat(runtime, adapter, universe, state, db_session_factory)
+    )
+    try:
+        async with asyncio.timeout(5):
+            await runtime.success.wait()
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    hb = await redis_client.hgetall(heartbeat.hb_key(exchange_code))
+    assert hb[b"dropped_events"] == b"9"
+    assert metric._value.get() == before + 9  # pyright: ignore[reportPrivateUsage]
+
+
+class _BrokenRedis:
+    """Stands in for the connection HIGH-4 fixes: with bounded socket
+    timeouts, a Redis restart now raises (``TimeoutError``/``ConnectionError``)
+    instead of the pre-fix behaviour of hanging the awaiting task forever."""
+
+    async def hset(self, *args: Any, **kwargs: Any) -> None:
+        raise TimeoutError("Timeout reading from socket")
+
+    async def expire(self, *args: Any, **kwargs: Any) -> None:
+        raise TimeoutError("Timeout reading from socket")
+
+    async def publish(self, *args: Any, **kwargs: Any) -> None:
+        raise TimeoutError("Timeout reading from socket")
+
+
+async def test_run_heartbeat_surfaces_a_redis_error_instead_of_hanging(
+    db_session_factory: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """HIGH-4 consequence: a Redis error while writing the heartbeat (the
+    liveness signal this loop exists to produce) must reach the caller --
+    eventually ``forever()``/the ``TaskGroup`` in ``main.py`` -- so the
+    process exits non-zero and ``restart: unless-stopped`` brings it back,
+    instead of the pre-fix live zombie (0% CPU, ``/ready`` 503 forever, no
+    log line ever again). Unlike a Postgres failure while recording a
+    ``system_events`` row (HIGH-2, made survivable in
+    :func:`safe_record_system_event` because losing an audit row is
+    acceptable), losing the Redis heartbeat write itself means the loop has
+    nothing left to do -- so it is made fatal, not survivable. The two rules
+    do not contradict: they are deliberately different failure domains
+    (observability record vs. the liveness signal itself), and the DB path
+    is never involved in this scenario.
+
+    A bounded ``asyncio.timeout`` proves this is a fast, real exception, not
+    the pre-fix hang.
+    """
+    monkeypatch.setattr(heartbeat, "HEARTBEAT_INTERVAL_S", 0.01)
+    exchange_code = unique_code()
+    adapter = FakeAdapter(code=exchange_code)
+    universe = MonitoredUniverse()
+    universe.set(["BTCUSDT"])
+    state = HeartbeatState()
+    runtime: Any = FakeRuntime(redis=_BrokenRedis())
+
+    with pytest.raises(TimeoutError):
+        async with asyncio.timeout(5):
+            await heartbeat.run_heartbeat(runtime, adapter, universe, state, db_session_factory)

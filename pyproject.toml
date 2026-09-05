@@ -75,7 +75,11 @@ reportMissingTypeStubs = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["packages", "apps", "services", "tests"]
+# "infra" is here so infra/scripts/tests/ actually runs: the D4 (lock_timeout)
+# and D12 (UTC partition bounds) regression tests were invisible to CI without
+# it, which meant the safety net for the two bugs they exist to catch would
+# never have failed a pipeline (code-reviewer, T1.6).
+testpaths = ["packages", "apps", "services", "tests", "infra"]
 markers = [
   "unit: fast, no IO",
   "integration: needs Postgres/Redis via testcontainers",

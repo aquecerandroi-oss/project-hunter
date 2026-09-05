@@ -13,29 +13,35 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-from typing import TYPE_CHECKING, Any
+import random
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Integer, column, func, select, update
-from sqlalchemy import values as sa_values
-from sqlalchemy.dialects import postgresql
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import select, update
 
-from hunter_core.db.models.markets import Asset, Exchange, Market
+from hunter_core.db.models.markets import Market
 from hunter_core.db.session import role_session
-from hunter_core.domain.enums import MarketStatus, MarketType
-from hunter_core.domain.types import utcnow
+from hunter_core.domain.enums import MarketType
 from hunter_core.events.envelope import EventEnvelope
 from hunter_core.events.streams import DEFAULT_MAXLEN, Streams
 from hunter_core.logging import get_logger
 from hunter_exchanges.base import ExchangeError
 from hunter_market_worker.hot_state import write_ticker
 from hunter_market_worker.publication import publish
+from hunter_market_worker.universe_repo import (
+    mark_delisted,
+    rank_and_monitor,
+    upsert_assets,
+    upsert_exchange,
+    upsert_markets,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     import redis.asyncio as redis_asyncio
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-    from hunter_core.domain.market import NormalizedMarket, NormalizedTicker
+    from hunter_core.domain.market import NormalizedTicker
     from hunter_core.runtime import WorkerRuntime
     from hunter_core.settings import Settings
     from hunter_exchanges.base import ExchangeAdapter
@@ -46,6 +52,17 @@ TICKER_FETCH_CAP = 300
 """Cap on individual ``fetch_ticker`` calls when the adapter has no bulk
 ``fetch_tickers_24h`` â€” keeps a universe refresh from hammering REST for an
 exchange with thousands of symbols."""
+
+UNIVERSE_RETRY_BASE_S = 5.0
+"""HIGH-3: first retry delay after a failed refresh."""
+UNIVERSE_RETRY_MAX_S = 120.0
+"""Hard cap on the retry backoff, well below any realistic
+``market_universe_refresh_s`` (900s default) so a persistent failure keeps
+retrying every couple of minutes instead of sliding back to the full
+success interval."""
+UNIVERSE_RETRY_JITTER_FRACTION = 0.2
+"""Up to +20% jitter on top of the backoff, so several instances that failed
+at the same moment (e.g. a shared Postgres restart) do not retry in lockstep."""
 
 
 @dataclasses.dataclass
@@ -88,163 +105,6 @@ async def _fetch_tickers(
     return result
 
 
-async def _upsert_exchange(session: AsyncSession, code: str) -> Any:
-    exchange_id = await session.scalar(select(Exchange.id).where(Exchange.code == code))
-    if exchange_id is not None:
-        return exchange_id
-    stmt = (
-        pg_insert(Exchange)
-        .values(code=code, name=code.capitalize())
-        .on_conflict_do_update(index_elements=["code"], set_={"code": code})
-        .returning(Exchange.id)
-    )
-    return await session.scalar(stmt)
-
-
-async def _upsert_assets(session: AsyncSession, symbols: set[str]) -> dict[str, Any]:
-    if not symbols:
-        return {}
-    stmt = (
-        pg_insert(Asset)
-        .values([{"symbol": s} for s in sorted(symbols)])
-        .on_conflict_do_update(index_elements=["symbol"], set_={"symbol": Asset.symbol})
-        .returning(Asset.id, Asset.symbol)
-    )
-    rows = (await session.execute(stmt)).all()
-    return {row.symbol: row.id for row in rows}
-
-
-async def _upsert_markets(
-    session: AsyncSession,
-    exchange_id: Any,
-    markets: list[NormalizedMarket],
-    asset_ids: dict[str, Any],
-    tickers: dict[str, NormalizedTicker],
-) -> None:
-    now = utcnow()
-    values = [
-        {
-            "exchange_id": exchange_id,
-            "symbol": m.symbol,
-            "market_type": m.market_type,
-            "base_asset_id": asset_ids.get(m.base),
-            "quote_asset_id": asset_ids.get(m.quote),
-            "status": m.status,
-            "delisted_at": now if m.status == MarketStatus.DELISTED else None,
-            "tick_size": m.tick_size,
-            "step_size": m.step_size,
-            "min_notional": m.min_notional,
-            "contract_size": m.contract_size,
-            "max_leverage": m.max_leverage,
-            "volume_24h_usd": (tickers[m.symbol].quote_volume_24h if m.symbol in tickers else None),
-            "last_seen_at": now,
-        }
-        for m in markets
-    ]
-    if not values:
-        return
-    stmt = pg_insert(Market).values(values)
-    excluded = stmt.excluded
-    stmt = stmt.on_conflict_do_update(
-        index_elements=["exchange_id", "symbol", "market_type"],
-        set_={
-            "status": excluded.status,
-            "tick_size": excluded.tick_size,
-            "step_size": excluded.step_size,
-            "min_notional": excluded.min_notional,
-            "contract_size": excluded.contract_size,
-            "max_leverage": excluded.max_leverage,
-            "base_asset_id": excluded.base_asset_id,
-            "quote_asset_id": excluded.quote_asset_id,
-            "volume_24h_usd": func.coalesce(excluded.volume_24h_usd, Market.volume_24h_usd),
-            "last_seen_at": excluded.last_seen_at,
-            "delisted_at": excluded.delisted_at,
-        },
-    )
-    await session.execute(stmt)
-
-
-async def _mark_delisted(
-    session: AsyncSession, exchange_id: Any, market_type: MarketType, live_symbols: set[str]
-) -> None:
-    stmt = (
-        select(Market.id)
-        .where(Market.exchange_id == exchange_id)
-        .where(Market.market_type == market_type)
-        .where(Market.status != MarketStatus.DELISTED)
-    )
-    if live_symbols:
-        stmt = stmt.where(Market.symbol.notin_(live_symbols))
-    stale_ids = (await session.scalars(stmt)).all()
-    if not stale_ids:
-        return
-    now = utcnow()
-    await session.execute(
-        update(Market)
-        .where(Market.id.in_(stale_ids))
-        .values(
-            status=MarketStatus.DELISTED, delisted_at=now, is_monitored=False, monitor_rank=None
-        )
-    )
-
-
-async def _apply_ranks(session: AsyncSession, rows: list[tuple[Any, int, bool]]) -> None:
-    """HIGH-4: one ``UPDATE ... FROM (VALUES ...)`` for the whole ranking
-    pass instead of one row-locking ``UPDATE`` per market — ~500 individual
-    exclusive locks held for seconds, blocking every concurrent writer."""
-    if not rows:
-        return
-    v = sa_values(
-        column("id", postgresql.UUID(as_uuid=True)),
-        column("rank", Integer()),
-        column("monitored", Boolean()),
-        name="v",
-    ).data(rows)
-    await session.execute(
-        update(Market)
-        .where(Market.id == v.c.id)
-        .values(monitor_rank=v.c.rank, is_monitored=v.c.monitored)
-    )
-
-
-async def _rank_and_monitor(
-    session: AsyncSession,
-    exchange_id: Any,
-    market_type: MarketType,
-    settings: Settings,
-) -> tuple[set[str], set[str]]:
-    """Rank active markets by volume, apply allow/blocklist, write ranks back.
-
-    Returns ``(old_monitored, new_monitored)`` symbol sets.
-    """
-    rows = (
-        await session.execute(
-            select(Market.id, Market.symbol, Market.is_monitored)
-            .where(Market.exchange_id == exchange_id)
-            .where(Market.market_type == market_type)
-            .where(Market.status == MarketStatus.ACTIVE)
-            .order_by(Market.volume_24h_usd.desc().nulls_last())
-        )
-    ).all()
-    old_monitored = {row.symbol for row in rows if row.is_monitored}
-    allowlist = {s.upper() for s in settings.market_universe_allowlist}
-    blocklist = {s.upper() for s in settings.market_universe_blocklist}
-
-    new_monitored: set[str] = set()
-    eligible_rank = 0
-    updates: list[tuple[Any, int, bool]] = []
-    for rank, row in enumerate(rows, start=1):
-        if row.symbol not in blocklist:
-            eligible_rank += 1
-        in_top = eligible_rank <= settings.market_universe_size
-        is_monitored = (row.symbol in allowlist or in_top) and row.symbol not in blocklist
-        if is_monitored:
-            new_monitored.add(row.symbol)
-        updates.append((row.id, rank, is_monitored))
-    await _apply_ranks(session, updates)
-    return old_monitored, new_monitored
-
-
 async def refresh_universe(
     session_factory: async_sessionmaker[AsyncSession],
     adapter: ExchangeAdapter,
@@ -259,7 +119,7 @@ async def refresh_universe(
     asset_symbols = {m.base for m in markets} | {m.quote for m in markets}
 
     async with role_session(session_factory, db_role="hunter_worker") as session:
-        exchange_id = await _upsert_exchange(session, adapter.code)
+        exchange_id = await upsert_exchange(session, adapter.code)
         old_monitored = set(
             await session.scalars(
                 select(Market.symbol).where(
@@ -274,12 +134,10 @@ async def refresh_universe(
             .where(Market.exchange_id == exchange_id, Market.market_type == MarketType.PERPETUAL)
             .values(is_monitored=False, monitor_rank=None)
         )
-        asset_ids = await _upsert_assets(session, asset_symbols)
-        await _upsert_markets(session, exchange_id, markets, asset_ids, tickers)
-        await _mark_delisted(
-            session, exchange_id, MarketType.PERPETUAL, {m.symbol for m in markets}
-        )
-        _, new_monitored = await _rank_and_monitor(
+        asset_ids = await upsert_assets(session, asset_symbols)
+        await upsert_markets(session, exchange_id, markets, asset_ids, tickers)
+        await mark_delisted(session, exchange_id, MarketType.PERPETUAL, {m.symbol for m in markets})
+        _, new_monitored = await rank_and_monitor(
             session, exchange_id, MarketType.PERPETUAL, settings
         )
 
@@ -310,6 +168,26 @@ async def refresh_universe(
     return sorted(new_monitored)
 
 
+def _retry_delay(
+    attempt: int, refresh_s: float, *, rand: Callable[[], float] = random.random
+) -> float:
+    """Backoff for the ``attempt``-th consecutive failed refresh (HIGH-3):
+    exponential from :data:`UNIVERSE_RETRY_BASE_S`, capped well below the
+    normal success interval, plus jitter. A single failed refresh must never
+    cost the worker a full ``market_universe_refresh_s`` (900s default) of
+    blindness — Postgres restarts, brief exchange 5xxs, etc. are routine."""
+    cap = min(UNIVERSE_RETRY_MAX_S, max(UNIVERSE_RETRY_BASE_S, refresh_s / 3))
+    # Clamp the exponent before raising it, not after: ``2 ** (attempt - 1)``
+    # is computed in full before ``min`` sees it, so an outage lasting long
+    # enough for ``attempt`` to reach ~1024 (about 41h at the capped delay)
+    # would raise ``OverflowError: int too large to convert to float`` inside
+    # this helper — killing ``run_universe`` and the whole TaskGroup for a
+    # reason unrelated to the outage. 64 doublings already exceed any cap.
+    exponent = min(attempt - 1, 64)
+    backoff = min(cap, UNIVERSE_RETRY_BASE_S * (2**exponent))
+    return backoff + backoff * UNIVERSE_RETRY_JITTER_FRACTION * rand()
+
+
 async def run_universe(
     session_factory: async_sessionmaker[AsyncSession],
     adapter: ExchangeAdapter,
@@ -317,9 +195,17 @@ async def run_universe(
     settings: Settings,
     universe: MonitoredUniverse,
     runtime: WorkerRuntime,
+    *,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    rand: Callable[[], float] = random.random,
 ) -> None:
-    """Refresh the universe immediately, then every ``market_universe_refresh_s``."""
+    """Refresh the universe immediately, then every ``market_universe_refresh_s``
+    on success -- or on a short, capped, jittered backoff after a failure
+    (HIGH-3, see :func:`_retry_delay`). ``runtime.mark_error()``/
+    ``mark_success()`` semantics, and "log and keep going" on failure, are
+    unchanged; only the delay before the next attempt differs."""
     producer = f"market-worker@{runtime.instance}"
+    consecutive_failures = 0
     while True:
         try:
             monitored = await refresh_universe(
@@ -327,7 +213,13 @@ async def run_universe(
             )
             universe.set(monitored)
             runtime.mark_success()
+            consecutive_failures = 0
+            delay: float = settings.market_universe_refresh_s
         except Exception:
             logger.exception("market_universe_refresh_failed")
             runtime.mark_error()
-        await asyncio.sleep(settings.market_universe_refresh_s)
+            consecutive_failures += 1
+            delay = _retry_delay(
+                consecutive_failures, settings.market_universe_refresh_s, rand=rand
+            )
+        await sleep(delay)

@@ -34,6 +34,40 @@ that fails halfway keeps what it already created and the next run finishes it.
 Connects with ``DATABASE_URL_MIGRATIONS`` (direct, never the pooler) over
 asyncpg — the only Postgres driver this workspace installs.
 
+Two session guards, ``SET LOCAL`` inside the same transaction as the DDL
+(docs/plans/M1.md, "D4 —" and "D12 —"):
+
+- ``lock_timeout = '3s'`` — creating a partition takes ``ACCESS EXCLUSIVE`` on
+  its parent. Without a timeout that request queues behind whatever read
+  currently holds the parent (e.g. gap detection's ``ACCESS SHARE`` on
+  ``candles``) and then queues *every* later request too, including the
+  candle-flush ``INSERT``s — a lock-queue jam, not a slow query, and one that
+  breaches the flush's 10 s timeout long before Postgres would ever cancel the
+  DDL itself. 3 s is comfortably inside that budget. Because every statement
+  here is idempotent, a group that times out is not a failure worth crashing
+  over: it is logged (structlog, parent + reason) and skipped, the run moves
+  on to the next parent, and the next scheduled run retries the skipped one
+  from a clean slate. The process still exits non-zero when anything was
+  skipped — silently exiting 0 would hide a jam that is worth an operator
+  noticing (cron mail, log scrape) even though nothing here demands a page;
+  the T1.3 readiness check is the actual page (`system_event` critical when a
+  partition is missing for ``now + 1 day``). It exits **75** for this case
+  specifically (sysexits.h ``EX_TEMPFAIL``, "temp failure; user is invited to
+  retry" — same file this workspace already draws ``64``/``EX_USAGE`` from in
+  ``infra/docker/entrypoint.sh``), never plain ``1``: a benign, self-healing
+  skip and an unhandled ``DBAPIError`` (which propagates and ends the process
+  with Python's default ``1``) must not share one exit code, or an operator
+  who learns "nightly exit 1 is just the routine skip" stops reading
+  ``partitions.log`` and a real failure — revoked ``CREATE`` privilege, full
+  disk — repeats unnoticed.
+- ``TimeZone = 'UTC'`` — ``_partitions.py`` emits date-only bounds
+  (``'2026-09-01'``) with no offset; Postgres resolves those against the
+  *session* ``TimeZone``, so a non-UTC session leaves an hours-wide gap
+  between two months that the first row landing in it would abort on. Belt
+  and braces: :func:`_explicit_utc_bounds` also rewrites those bounds to carry
+  an explicit ``+00`` from this script's side, without touching the frozen
+  ``_partitions.py``.
+
 Usage:
     uv run python infra/scripts/create_partitions.py
     uv run python infra/scripts/create_partitions.py --months-ahead 6
@@ -44,10 +78,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import re
 import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
 
+import asyncpg
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from hunter_core.db.models import (
@@ -61,7 +99,31 @@ from hunter_core.db.models import (
     partition_name,
     tenant_tables,
 )
+from hunter_core.logging import get_logger
 from hunter_core.settings import Settings
+
+logger = get_logger(__name__)
+
+_LOCK_TIMEOUT_SQL = "SET LOCAL lock_timeout = '3s'"
+_SESSION_UTC_SQL = "SET LOCAL TimeZone = 'UTC'"
+"""D4 / D12 (docs/plans/M1.md) — see the module docstring."""
+
+_DATE_ONLY_BOUND = re.compile(r"'(\d{4}-\d{2}-\d{2})'")
+
+
+def _explicit_utc_bounds(sql: str) -> str:
+    """Rewrite ``_partitions.py``'s bare date bounds to carry an explicit ``+00``.
+
+    ``create_partition_sql`` emits ``FOR VALUES FROM ('2026-09-01') TO
+    ('2026-10-01')`` — a date literal, not a timestamp, so Postgres attaches
+    midnight in the *session* ``TimeZone`` to it (D12). Turning it into
+    ``'2026-09-01 00:00:00+00'`` here makes the statement's own text
+    unambiguous regardless of any session setting, without editing the frozen
+    ``_partitions.py``. A no-op on statements with no date-only literal (the
+    LIST level's ``FOR VALUES IN ('1m')`` never matches this pattern).
+    """
+    return _DATE_ONLY_BOUND.sub(lambda m: f"'{m.group(1)} 00:00:00+00'", sql)
+
 
 _EXISTING_PARTITIONS = text(
     "SELECT c.relname FROM pg_class c "
@@ -128,7 +190,8 @@ def planned_groups(months_ahead: int, now: datetime | None = None) -> list[Group
         statements = groups.setdefault(root, [])
         for year, month in months:
             child = partition_name(owner, year, month)
-            statements.append((child, create_partition_sql(owner, year, month)))
+            sql = _explicit_utc_bounds(create_partition_sql(owner, year, month))
+            statements.append((child, sql))
             statements += _harden(child, root, tenants)
 
     return list(groups.items())
@@ -143,7 +206,9 @@ def planned_statements(months_ahead: int, now: datetime | None = None) -> list[S
     ]
 
 
-async def ensure_partitions(groups: list[Group]) -> list[str]:
+async def ensure_partitions(
+    groups: list[Group], on_skip: Callable[[str], None] | None = None
+) -> list[str]:
     """Run each group in a transaction of its own; return the names that are new.
 
     One transaction per partitioned parent, not one spanning all eight.
@@ -155,6 +220,18 @@ async def ensure_partitions(groups: list[Group]) -> list[str]:
     that parent is done, and a failure on one parent no longer throws away the
     partitions already created for the others — the next run picks up where this
     one stopped, because every statement is idempotent.
+
+    Each group's transaction opens with ``SET LOCAL lock_timeout`` and ``SET
+    LOCAL TimeZone`` (D4/D12, module docstring). A lock-timeout hit rolls that
+    one group back — nothing from it is added to ``created`` — logs a warning
+    naming the parent (structlog) and, if given, calls ``on_skip(parent)`` so a
+    caller (``main`` below) can decide what that means for its own exit code
+    without this function's return type having to carry it. Then it moves on
+    to the next group; the timeout is not raised, because the script is
+    idempotent and the next scheduled run retries the skipped parent from
+    scratch. Any other database error still propagates: only ``lock_timeout``
+    (SQLSTATE ``55P03``) is a condition this job expects and knows how to
+    defer.
     """
     engine = create_async_engine(migration_url(), connect_args={"statement_cache_size": 0})
     created: list[str] = []
@@ -163,12 +240,44 @@ async def ensure_partitions(groups: list[Group]) -> list[str]:
             async with connection.begin():
                 result = await connection.execute(_EXISTING_PARTITIONS)
                 existing = {row[0] for row in result}
-            for _parent, statements in groups:
-                async with connection.begin():
-                    for name, sql in statements:
-                        await connection.execute(text(sql))
-                        if name not in existing and name not in created:
-                            created.append(name)
+            for parent, statements in groups:
+                group_created: list[str] = []
+                try:
+                    async with connection.begin():
+                        await connection.execute(text(_LOCK_TIMEOUT_SQL))
+                        await connection.execute(text(_SESSION_UTC_SQL))
+                        for name, sql in statements:
+                            await connection.execute(text(sql))
+                            # Checked against `created` *and* this group's own
+                            # buffer: several statements in one group name the
+                            # same partition (the CREATE and every harden
+                            # statement all carry the child's name), and
+                            # `created` itself is only extended once the group
+                            # commits — checking it alone would let a name
+                            # in the group but not yet in `created` re-add
+                            # itself once per harden statement.
+                            if (
+                                name not in existing
+                                and name not in created
+                                and name not in group_created
+                            ):
+                                group_created.append(name)
+                except DBAPIError as exc:
+                    if not isinstance(exc.orig, asyncpg.exceptions.LockNotAvailableError):
+                        raise
+                    logger.warning(
+                        "create_partitions.group_skipped",
+                        parent=parent,
+                        reason=(
+                            "lock_timeout: ACCESS EXCLUSIVE not granted within 3s, "
+                            "likely queued behind a concurrent reader/writer on this parent"
+                        ),
+                        retry="next scheduled run (idempotent)",
+                    )
+                    if on_skip is not None:
+                        on_skip(parent)
+                    continue
+                created.extend(group_created)
     finally:
         await engine.dispose()
     return created
@@ -195,15 +304,35 @@ def main() -> int:
     partitions = {name for _parent, statements in groups for name, _sql in statements}
     if args.dry_run:
         for parent, statements in groups:
+            # The two SET LOCAL guards (D4/D12) open every real transaction but
+            # are not part of `statements` (they are not partition-name-bearing
+            # DDL) — printed once per group here so --dry-run shows exactly
+            # what ensure_partitions() executes.
+            print(f"[dry-run] {parent} -> (transaction) {_LOCK_TIMEOUT_SQL}")
+            print(f"[dry-run] {parent} -> (transaction) {_SESSION_UTC_SQL}")
             for name, sql in statements:
                 print(f"[dry-run] {parent} -> {name}: {sql}")
         print(f"[dry-run] {len(partitions)} partition(s) would be ensured")
         return 0
 
-    created = asyncio.run(ensure_partitions(groups))
+    skipped: list[str] = []
+    created = asyncio.run(ensure_partitions(groups, on_skip=skipped.append))
     for name in created:
         print(f"created {name}")
     print(f"{len(created)} partition(s) created, {len(partitions) - len(created)} already present")
+    if skipped:
+        # 75 (EX_TEMPFAIL), not 1: a skip is not a bug (idempotent, retried by
+        # the next scheduled run — module docstring) but it is worth a cron
+        # failure/alert. The T1.3 readiness check is the actual page for a
+        # partition still missing when it matters (now + 1 day); this exit
+        # code is just so an operator scraping cron output notices sooner.
+        # It must be a code distinct from a hard DBAPIError's plain 1 (Python's
+        # default for an uncaught exception) — the whole point of splitting
+        # them is so `partitions.log`'s exit status alone tells "routine,
+        # retries tomorrow" from "propagated, go investigate" apart, which is
+        # exactly what infra/vps/README.md promises the operator.
+        print(f"{len(skipped)} group(s) skipped (lock_timeout): {', '.join(skipped)}")
+        return 75
     return 0
 
 

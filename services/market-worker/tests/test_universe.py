@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import pytest
@@ -15,7 +16,7 @@ from hunter_core.settings import Settings
 from hunter_market_worker import universe as universe_mod
 
 from . import builders
-from .fakes import FakeAdapter
+from .fakes import FakeAdapter, FakeRuntime
 from .universe_test_helpers import unique_code
 
 pytestmark = pytest.mark.integration
@@ -211,3 +212,59 @@ async def test_rank_and_monitor_issues_a_single_update_statement(
     # one UPDATE for the "reset all ranks" step, one for the bulk rank write
     # -- never one per market (~30, if the old per-row loop were still there)
     assert len(statements) <= 2
+
+
+# ---- HIGH-3: a failed refresh retries fast, not on the full success interval -
+
+
+async def test_run_universe_retries_fast_after_failure_and_resets_after_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reproduces the 900s blindness window: two failed refreshes must sleep
+    on a short, capped backoff (never anywhere near
+    ``market_universe_refresh_s``), and the delay must return to the full
+    interval the moment a refresh succeeds again."""
+    calls = 0
+
+    async def fake_refresh(*_args: Any, **_kwargs: Any) -> list[str]:
+        nonlocal calls
+        calls += 1
+        if calls <= 2:
+            raise RuntimeError("simulated postgres outage")
+        return ["BTCUSDT"]
+
+    monkeypatch.setattr(universe_mod, "refresh_universe", fake_refresh)
+
+    sleeps: list[float] = []
+
+    async def fake_sleep(delay: float) -> None:
+        sleeps.append(delay)
+        if len(sleeps) >= 3:
+            raise asyncio.CancelledError
+
+    settings = Settings(market_universe_refresh_s=900)
+    universe = universe_mod.MonitoredUniverse()
+    runtime = FakeRuntime()
+
+    with pytest.raises(asyncio.CancelledError):
+        await universe_mod.run_universe(
+            None,  # type: ignore[arg-type]
+            None,  # type: ignore[arg-type]
+            None,  # type: ignore[arg-type]
+            settings,
+            universe,
+            runtime,  # type: ignore[arg-type]
+            sleep=fake_sleep,
+            rand=lambda: 0.0,
+        )
+
+    assert calls == 3
+    # Two failures: short, capped, non-decreasing backoff -- nowhere near the
+    # 900s success interval.
+    assert sleeps[0] < 30
+    assert sleeps[1] < 60
+    assert sleeps[0] <= sleeps[1]
+    # The third refresh succeeded: back to the full configured interval.
+    assert sleeps[2] == 900
+    assert runtime.error_count == 2
+    assert runtime.success_count == 1

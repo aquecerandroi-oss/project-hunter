@@ -313,6 +313,60 @@ async def test_bucket_state_ttl_has_a_120s_floor_for_short_windows() -> None:
     assert redis.last_ttl == pytest.approx(120.0)
 
 
+class _RawArgsRedisEval:
+    """Captures the raw, un-coerced positional args passed to ``eval``.
+
+    ``_FakeRedisEval`` above re-implements the Lua refill/consume semantics
+    in pure Python, so it never actually round-trips an argument the way
+    redis-py serializes it for a real Redis command — it could not have
+    caught the bug where ``_bucket_state_ttl_s`` was a Python ``float``
+    (``120.0``), which redis-py turns into the string ``"120.0"``, which a
+    real Redis ``EXPIRE`` then rejects ("value is not an integer or out of
+    range"). Asserting on the exact Python type of the captured argument
+    does.
+    """
+
+    def __init__(self) -> None:
+        self.last_args: tuple[Any, ...] | None = None
+
+    async def eval(self, script: str, numkeys: int, *args: Any) -> str:
+        self.last_args = args
+        return "0"
+
+    async def hset(self, name: str, mapping: dict[str, object]) -> None:
+        return None
+
+
+async def test_acquire_sends_the_redis_ttl_as_an_int_not_a_float() -> None:
+    clock = _FakeClock()
+    sleeper = _NoopSleepRecorder(clock)
+    redis = _RawArgsRedisEval()
+    limiter = TokenBucketRateLimiter(
+        "binance", redis=redis, capacity=2400, refill_period_s=60.0, clock=clock, sleep=sleeper
+    )
+
+    await limiter.acquire("request_weight", 1)
+
+    assert redis.last_args is not None
+    ttl_arg = redis.last_args[-1]
+    assert isinstance(ttl_arg, int) and not isinstance(ttl_arg, bool)
+
+
+async def test_record_used_weight_sends_the_redis_ttl_as_an_int_not_a_float() -> None:
+    clock = _FakeClock()
+    sleeper = _NoopSleepRecorder(clock)
+    redis = _RawArgsRedisEval()
+    limiter = TokenBucketRateLimiter(
+        "binance", redis=redis, capacity=2400, refill_period_s=60.0, clock=clock, sleep=sleeper
+    )
+
+    await limiter.record_used_weight("request_weight", used_weight=10)
+
+    assert redis.last_args is not None
+    ttl_arg = redis.last_args[-1]
+    assert isinstance(ttl_arg, int) and not isinstance(ttl_arg, bool)
+
+
 # --- F3: record_used_weight must never release in-flight reservations ---
 
 

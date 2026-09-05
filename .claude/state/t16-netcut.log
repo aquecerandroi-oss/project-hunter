@@ -1,0 +1,79 @@
+### T=0 (antes do corte) 16:46:38
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=0 Status=running StartedAt=2026-09-05T16:43:30.490104864Z
+last_event_at=2026-09-05T16:46:36.231000+00:00 ws_state=connected subscriptions=1200 reconnects=0 markets_monitored=200 open_gaps=517 ts=2026-09-05T16:46:38.914233+00:00 
+candles=301617
+ERROR:  aggregate functions are not allowed in GROUP BY
+LINE 1: select status||'='||count(*) from ingestion_gaps group by 1
+                            ^
+### APLICANDO BLOQUEIO de tcp/443 no netns do worker 16:46:42
+2
+--- T+15s 16:46:59
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=0 Status=running ExitCode=0 StartedAt=2026-09-05T16:43:30.490104864Z
+--- T+30s 16:47:16
+ready: 503 {"database":true,"redis":true,"ingestion":false,"persistence":true,"ready":true}
+RestartCount=0 Status=running ExitCode=0 StartedAt=2026-09-05T16:43:30.490104864Z
+--- T+45s 16:47:32
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=0 Status=running ExitCode=0 StartedAt=2026-09-05T16:43:30.490104864Z
+--- T+60s 16:47:48
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=0 Status=running ExitCode=0 StartedAt=2026-09-05T16:43:30.490104864Z
+--- T+75s 16:48:05
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=0 Status=running ExitCode=0 StartedAt=2026-09-05T16:43:30.490104864Z
+--- T+90s 16:48:21
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+105s 16:48:38
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+120s 16:48:55
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+135s 16:49:12
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+150s 16:49:29
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+165s 16:49:48
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+180s 16:50:04
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+195s 16:50:21
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+210s 16:50:39
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+225s 16:50:55
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+240s 16:51:12
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+255s 16:51:28
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+270s 16:51:50
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+285s 16:52:07
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+300s 16:52:24
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+315s 16:52:40
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+--- T+330s 16:52:57
+ready: 200 {"database":true,"redis":true,"ingestion":true,"persistence":true,"ready":true}
+RestartCount=1 Status=running ExitCode=0 StartedAt=2026-09-05T16:48:16.593619427Z
+### REMOVENDO BLOQUEIO 16:52:59
+0
+### fim 16:53:00

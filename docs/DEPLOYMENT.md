@@ -266,6 +266,42 @@ o alcançam). Para isso, ou use `docker-compose.test.yml` (expõe
 `localhost:55432`, ver `infra/docker/docker-compose.test.yml`), ou rode via
 `docker compose run --rm migrate` acima.
 
+### Partições diárias (`HUNTER_COMMAND=partitions`)
+
+`infra/scripts/create_partitions.py` mantém as partições mensais três meses à
+frente (DATABASE.md §1.3); sem um agendamento real, em 2027-01 o primeiro
+insert falharia com `no partition of relation "candles_1m" found for row`
+(docs/plans/M1.md, pendência "Agendamento real das partições"). Igual a
+`migrate`/`seed`, `partitions` não é um `HUNTER_ROLE` — é acionado por
+`HUNTER_COMMAND` (ver `infra/docker/entrypoint.sh`). Não existe um serviço
+`partitions` dedicado no compose (como `seed` também não tem); reaproveita a
+imagem do serviço `api` com o comando trocado:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml run --rm --no-deps \
+  -e HUNTER_COMMAND=partitions api
+```
+
+`--no-deps` é obrigatório: `api` declara `depends_on: migrate: condition:
+service_completed_successfully`, e `docker compose run` sobe os `depends_on`
+por padrão — sem `--no-deps`, este comando roda `alembic upgrade head` (com
+`DATABASE_URL_MIGRATIONS`, a credencial dona do schema) toda vez, inclusive no
+cron diário sem release nem supervisão. `--no-deps` restringe o comando a
+exatamente o que ele promete: criar partição.
+
+Idempotente (`CREATE TABLE IF NOT EXISTS ... PARTITION OF`): rodar de novo sem
+nada de novo para criar não faz nada. Cada `CREATE`/`ALTER` roda dentro de uma
+transação com `SET LOCAL lock_timeout = '3s'` e `SET LOCAL TimeZone = 'UTC'`
+(docs/plans/M1.md, "D4 —" e "D12 —"): um grupo que não consegue o lock
+`ACCESS EXCLUSIVE` em 3 s é logado (structlog) e pulado, não derruba o run
+inteiro, e o processo sai com código **75** (`EX_TEMPFAIL` de `sysexits.h`) se
+algo foi pulado — a rodada seguinte, agendada, tenta de novo. Um `DBAPIError`
+não tratado (qualquer outro erro de banco) propaga e termina o processo com o
+código **1** padrão do Python; os dois nunca compartilham código, exatamente
+para que o status de saída sozinho, sem ler o log, já diga "skip de rotina"
+de "erro real". O agendamento real (cron diário na VPS) está documentado em
+`infra/vps/README.md`, seção "Partições diárias".
+
 ### Testes de integração locais sem testcontainers
 
 ```bash

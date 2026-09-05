@@ -8,7 +8,13 @@ status: parcial
 
 ## Status
 
-**Parcial — implementado no M1 (T1.3, commit `b8c4766`), ainda sem prova operacional.** O serviço `market-worker` existe e roda contra o Protocol do adaptador (`services/market-worker/hunter_market_worker/`, 20 módulos, 20 arquivos de teste, 139 testes verdes). O que **ainda não** existe é a prova de que ele coleta dado real de ponta a ponta: a integração com o adaptador Binance da T1.2 nunca foi executada ao vivo por mais de um ciclo, e a validação operacional (subir o worker, ver `mkt:*` vivo no Redis e linhas entrando no Postgres por 60 s) é da **T1.6**. Enquanto isso não acontecer, o dashboard continua honesto: "mercados monitorados = 0" até haver linha em `markets`.
+**Parcial — código implementado (T1.3, `b8c4766`) e agora com prova operacional real (T1.6).** O `market-worker` rodou ~1h50 em Docker contra a Binance ao vivo, com 200 mercados perpétuos USDT, e a prova completa com comando e saída está em `.claude/state/t16-proof.md`.
+
+**O que ficou provado:** 316.794 velas finais de 1 minuto persistidas, com **valores conferidos vela a vela contra o REST da Binance — 800 velas comparadas, zero divergência**; cobertura de 200/200 mercados na maioria dos minutos; reinício do container sem duplicar candle; `restart: unless-stopped` reiniciando de verdade (`RestartCount` 0 → 1 sozinho no caminho fatal do watchdog); `/ready` devolvendo 503 quando devido; gap detectado e recuperado (`open → recovered`) com valor correto; e queda de Postgres e de Redis com recuperação automática em 30 s.
+
+**Por que continua `parcial` e não `implementado`:** com 200 mercados o processo satura um core (100 % de CPU) e o hot state de alta frequência não se sustenta — `mkt:*:ticker` e `mkt:*:book` chegam a zero chave viva e o contador novo mostrou **1,15 milhão de eventos descartados**. A série durável fica íntegra (o `BoundedEventQueue` nunca descarta kline final, por contrato), mas o tempo real não. Falta ainda corrida de 24–48 h, prazo definido de convergência do backlog de recovery e apagão externo longo atravessando reinícios.
+
+**Seis defeitos encontrados só por rodar de verdade**, nenhum deles visível na suíte de testes: `EXPIRE` recebendo float no Lua do rate limiter (o worker **nunca** carregava o universo contra Redis real), `dropped_events` contado e nunca lido, queda de Postgres matando o processo pelo heartbeat, refresh de universo falhado dormindo 900 s e cegando o worker, restart de Redis congelando tudo em zumbi silencioso (cliente sem `socket_timeout`), e o healthcheck do Compose com teto de 3 s dando falso negativo. Todos corrigidos com teste. Ver [[Resolved Bugs]] e [[Monitoring]].
 
 ## O que existe (com caminho)
 

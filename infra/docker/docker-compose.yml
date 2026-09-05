@@ -104,12 +104,22 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    # Budgets measured in the T1.6 operational proof (.claude/state/t16-proof.md
+    # §10), not guessed. The health server shares the worker's single event
+    # loop with ingestion, so under a full 200-market load plus a gap-recovery
+    # backlog its own /ready latency was measured swinging between 0.01s and
+    # 24.79s. The previous 2s client timeout / 3s healthcheck timeout produced
+    # runs of four consecutive false failures on a worker that was in fact
+    # ready — a false "unhealthy" is worse than none, because anything acting
+    # on it (autoheal, an orchestrator probe, a load balancer) would restart or
+    # evict a healthy worker. These values absorb the measured tail; the real
+    # fix is the ingestion capacity work (HIGH-1, M2), not a bigger timeout.
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://localhost:8001/ready', timeout=2); raise SystemExit(0 if response.status == 200 else 1)"]
-      interval: 10s
-      timeout: 3s
-      start_period: 10s
-      retries: 3
+      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://localhost:8001/ready', timeout=25); raise SystemExit(0 if response.status == 200 else 1)"]
+      interval: 15s
+      timeout: 30s
+      start_period: 60s
+      retries: 5
 
   web:
     build:

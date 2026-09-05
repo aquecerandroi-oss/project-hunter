@@ -85,3 +85,70 @@ T1.6a já saiu em `d76a0cf`. O restante (docs + `obsidian/`) pode sair como `doc
 - **Aceite do M1** pode ser com universo reduzido (`MARKET_UNIVERSE_SIZE` = 100, ou o maior valor em que `markets_ok` >= 95% por 10 min sem `market_persist_lag` > 10 s), desde que a API/UI mostrem o número real monitorado. Registrar o número medido.
 - **T1.6b (performance do market-worker)**, nova tarefa antes do fechamento do M1: perfilar (py-spy/cProfile no container) e atacar por ordem: parse com `orjson` e sem `pydantic` por evento no caminho quente (validar só na borda), pipelines Redis por lote/coalescência (uma ida por símbolo por ciclo, não por evento), `@depth20@500ms` em vez de 250 ms se o book dominar, `uvloop`/`winloop`, e **sharding** por grupos de símbolos em N processos (`HUNTER_ROLE=market` com `MARKET_SHARD=i/N`) como saída definitiva. Meta: 200 mercados com `markets_ok` >= 95% e CPU < 70% de um core por shard. Métrica nova: `market_ws_backlog_bytes` (Recv-Q) ou idade do último frame lido vs recebido, para o operador ver a saturação.
 - Sem isso, nada de M2 sobre dados degradados: o scanner só liga com `markets_ok` estável.
+
+---
+
+# VEREDITO — 2026-09-05, depois da prova operacional
+
+**T1.6: `parcial`.** Prova completa em `.claude/state/t16-proof.md` (1000 linhas, cada item com
+comando e saída real). Segunda opinião da Astra em `.claude/state/astra-review-t16-proof.md` —
+chegou ao mesmo veredito, de forma independente.
+
+## (a) Checklist da decisão conjunta — situação item a item
+
+- [x] **T1.6 — cenários operacionais no Compose.** Executados: reinício do container, corte
+  seletivo de rede só para a Binance (sidecar `NET_ADMIN` no namespace do worker), apagão de
+  Postgres, apagão de Redis, e o caminho fatal do watchdog. `503` quando devido: provado.
+  Reconexão limitada: provada. Saída não-zero em falha fatal: provada (traceback no topo do
+  interpretador; entrypoint devolve 1/0/64). **Restart real do container por `restart:
+  unless-stopped`: provado** (`RestartCount` 0 → 1 sozinho). Sem falso fatal no shutdown:
+  provado (`Exit=0` no `docker compose restart`). *A declaração no arquivo deixou de ser a
+  evidência.*
+- [x] **T1.3 — supervisão de tarefas permanentes.** Exceção em tarefa dentro do `TaskGroup` é
+  fatal e sai não-zero: provado com traceback real. Cancelamento coordenado é normal: provado.
+- [x] **T1.3 — watchdog por conexão.** 30 s sem dado reinicia a conexão; 3 sem progresso é fatal:
+  provado no corte de rede, com as duas rotas (`key=public:0`, `key=market:0`) no log.
+  *Ressalva:* "só a public silenciosa" **não** foi isolável no nível de rede — as duas rotas
+  usam o mesmo host e o mesmo IP (`13.159.59.76:443`). Continua coberto pelo unitário
+  `test_watchdog_restarts_only_silent_connection`.
+- [x] **T1.3 — `readiness_checks` e 503.** Provado nos três caminhos (`ingestion`, `persistence`,
+  `database`). *Achado:* a prontidão **regride** de 503 para 200 sem dado ter chegado
+  (MEDIUM, registrado em [[Open Bugs]] e no §MEDIUM-2 da prova).
+
+## (b) Critérios da linha da tarefa em `docs/plans/M1.md`
+
+- [x] `entrypoint.sh` despacha papéis de verdade — e ganhou a ação `partitions`.
+- [x] `docker-compose.yml`: `market-worker` com `restart: unless-stopped`, `HUNTER_ROLE=market`,
+  healthcheck em `:8001/ready` — agora com orçamentos **medidos** (`timeout: 30s`, `retries: 5`),
+  porque os 3 s anteriores davam quatro falsos negativos seguidos.
+- [x] `Dockerfile.api-workers` instala os pacotes de worker — a imagem sobe e coleta de verdade.
+- [x] `docs/DEPLOYMENT.md` — comando manual de partições documentado.
+- [x] `infra/vps/README.md` — cron diário de partições documentado.
+- [x] `obsidian/` — [[Market Collector]], [[Monitoring]], [[Changelog]], [[Open Bugs]],
+  [[Resolved Bugs]] atualizados com o que passou a ser verdade **e** com o que continua aberto.
+- [x] Verificação da linha: `docker compose logs market-worker` mostra eventos reais;
+  `/api/v1/system/workers` lista `market` (provado pelo serviço, ver §3 da prova).
+
+## (c) Regras do `CLAUDE.md`
+
+- [x] Nenhum segredo no repositório, na imagem, no compose ou no log. `.env` nunca lido.
+- [x] Nenhum dado falso na documentação — o que não foi provado está escrito como não provado.
+- [x] `structlog` no container, log JSON, sem `print`.
+- [x] Nenhum volume novo de estado de aplicação.
+- [x] `forbidden_patterns.sh` → `forbidden-patterns: clean`.
+- [x] Todo "feito" acompanha comando e saída real.
+
+## (d) O que **falta** para virar `implementado`
+
+1. Capacidade: o processo satura um core com 200 mercados; hot state de alta frequência não se
+   sustenta (HIGH-1, M2).
+2. Convergência do backlog de recovery dentro de um prazo definido **antes** do teste.
+3. Corrida de 24–48 h atravessando a virada UTC e a rotação de conexão de ~23,5 h da Binance.
+4. Apagão externo longo atravessando vários reinícios (proxy fora do worker).
+5. Morte abrupta sem chance de limpeza (OOM controlado).
+6. HTTP autenticado ponta a ponta com token Clerk.
+
+## (e) Revisores despachados
+
+`code-reviewer` (escopo completo do diff) e `security-reviewer` (obrigatório: imagem, compose,
+cron da VPS, segredos, cardinalidade de labels, DoS do retry). Astra respondida e registrada.

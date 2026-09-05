@@ -133,6 +133,20 @@ market_ingestion_gaps = Gauge(
     ["exchange", "status"],
     registry=registry,
 )
+market_system_event_record_failures_total = Counter(
+    "market_system_event_record_failures_total",
+    "system_events that could not be recorded because persistence was unavailable "
+    "(HIGH-2): the worker keeps running, but the record itself was lost.",
+    ["event"],
+    registry=registry,
+)
+market_dropped_events_total = Counter(
+    "market_dropped_events_total",
+    "Non-final WS events an exchange adapter's bounded internal queue discarded "
+    "under load (HIGH-1b). Final klines are never dropped.",
+    ["exchange"],
+    registry=registry,
+)
 
 
 def metrics_asgi_app() -> ASGIApp:

@@ -22,6 +22,10 @@ from hunter_core.db.session import role_session
 from hunter_core.domain.enums import RiskEventSeverity
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
+from hunter_core.observability import (
+    market_dropped_events_total,
+    market_system_event_record_failures_total,
+)
 from hunter_market_worker.supervision import connection_field
 
 if TYPE_CHECKING:
@@ -48,6 +52,11 @@ class HeartbeatState:
     reconnects: int = 0
     open_gaps: int = 0
     last_error: str | None = None
+    dropped_events: int = 0
+    """Cumulative events discarded by the adapter's bounded queue (HIGH-1b),
+    mirrors :attr:`reconnects`: a running total surfaced in the heartbeat
+    hash, while :data:`hunter_core.observability.market_dropped_events_total`
+    only ever receives the per-tick delta."""
 
 
 def hb_key(exchange: str) -> str:
@@ -71,6 +80,7 @@ async def _write_hash(
         "reconnects": str(state.reconnects),
         "markets_monitored": str(len(universe.symbols)),
         "open_gaps": str(state.open_gaps),
+        "dropped_events": str(state.dropped_events),
         "ts": now.isoformat(),
     }
     await cast(Any, redis).hset(key, mapping=mapping)
@@ -107,6 +117,27 @@ async def record_system_event(
         session.add(SystemEvent(level=severity, component=COMPONENT, event=event, message=message))
 
 
+async def safe_record_system_event(
+    session_factory: async_sessionmaker[AsyncSession],
+    event: str,
+    message: str,
+    severity: RiskEventSeverity,
+) -> None:
+    """``record_system_event``, but a persistence failure is an observability
+    loss, never a reason to stop ingesting (HIGH-2): a real Postgres outage
+    must not take the caller's permanent loop down with it. Logs a warning,
+    increments :data:`market_system_event_record_failures_total`, and
+    returns. ``asyncio.CancelledError`` is never swallowed -- coordinated
+    shutdown must still cancel."""
+    try:
+        await record_system_event(session_factory, event, message, severity)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.warning("market_system_event_record_failed", system_event=event, exc_info=True)
+        market_system_event_record_failures_total.labels(event=event).inc()
+
+
 def _transition_event(ws_state: str) -> tuple[str, RiskEventSeverity]:
     if ws_state == "connected":
         return "ws_reconnected", RiskEventSeverity.WARNING
@@ -115,18 +146,29 @@ def _transition_event(ws_state: str) -> tuple[str, RiskEventSeverity]:
     return "ws_state_changed", RiskEventSeverity.WARNING
 
 
-def connection_summary(adapter: Any, previous: dict[str, int]) -> tuple[int | None, int]:
+def connection_summary(
+    adapter: Any,
+    previous_reconnects: dict[str, int],
+    previous_dropped: dict[str, int],
+) -> tuple[int | None, int, int]:
+    """Subscriptions (a snapshot count) plus reconnects and dropped events
+    (per-tick deltas of each connection's monotonic counter) since the last
+    call -- HIGH-1b: ``ConnectionState.dropped_events`` is otherwise
+    incremented by the adapter and never read by anything."""
     method = getattr(adapter, "connection_states", None)
     if method is None:
-        return None, 0
-    subscriptions = reconnects = 0
+        return None, 0, 0
+    subscriptions = reconnects = dropped = 0
     for name, connection in method().items():
         active = connection_field(connection, "subscriptions") or ()
         subscriptions += active if isinstance(active, int) else len(active)
         count = int(connection_field(connection, "reconnects") or 0)
-        reconnects += max(0, count - previous.get(name, 0))
-        previous[name] = count
-    return subscriptions, reconnects
+        reconnects += max(0, count - previous_reconnects.get(name, 0))
+        previous_reconnects[name] = count
+        dropped_count = int(connection_field(connection, "dropped_events") or 0)
+        dropped += max(0, dropped_count - previous_dropped.get(name, 0))
+        previous_dropped[name] = dropped_count
+    return subscriptions, reconnects, dropped
 
 
 async def run_heartbeat(
@@ -137,27 +179,37 @@ async def run_heartbeat(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """Write the hash, publish ``rt:system``, and log state transitions —
-    every :data:`HEARTBEAT_INTERVAL_S` seconds."""
+    every :data:`HEARTBEAT_INTERVAL_S` seconds.
+
+    HIGH-2: the Redis writes (:func:`_write_hash`, :func:`_publish_status`)
+    are the liveness signal this loop exists to produce, and they must
+    complete every tick even when Postgres is down. So they run *before* any
+    ``system_events`` recording is even attempted, and every such recording
+    goes through :func:`safe_record_system_event`, which never raises. A
+    database outage must degrade this loop to "no system_events written",
+    never to "the whole TaskGroup dies".
+    """
     previous_ws_state: str | None = None
     last_sent = float("-inf")
-    previous_counts: dict[str, int] = {}
+    previous_reconnects: dict[str, int] = {}
+    previous_dropped: dict[str, int] = {}
     while True:
-        subscriptions, reconnects = connection_summary(adapter, previous_counts)
+        subscriptions, reconnects, dropped = connection_summary(
+            adapter, previous_reconnects, previous_dropped
+        )
         if reconnects:
             state.reconnects += reconnects
             runtime.mark_error()
-            await record_system_event(
-                session_factory,
-                "adapter_reconnect",
-                f"{adapter.code}: {reconnects} connection retries",
-                RiskEventSeverity.WARNING,
-            )
+        if dropped:
+            state.dropped_events += dropped
+            market_dropped_events_total.labels(exchange=adapter.code).inc(dropped)
         ws_state = (
             "idle" if universe.initialized and not universe.symbols else adapter.connection_state()
         )
         if (
             ws_state == previous_ws_state
             and not reconnects
+            and not dropped
             and state.last_error is None
             and time.monotonic() - last_sent < HEARTBEAT_INTERVAL_S
         ):
@@ -168,13 +220,20 @@ async def run_heartbeat(
             runtime.redis, adapter.code, universe, state, ws_state, now, subscriptions
         )
         await _publish_status(runtime.redis, adapter.code, universe, state, ws_state, now)
+        if reconnects:
+            await safe_record_system_event(
+                session_factory,
+                "adapter_reconnect",
+                f"{adapter.code}: {reconnects} connection retries",
+                RiskEventSeverity.WARNING,
+            )
         if previous_ws_state is not None and ws_state != previous_ws_state:
             event, severity = _transition_event(ws_state)
-            await record_system_event(
+            await safe_record_system_event(
                 session_factory, event, f"{previous_ws_state} -> {ws_state}", severity
             )
         if state.last_error is not None:
-            await record_system_event(
+            await safe_record_system_event(
                 session_factory, "adapter_error", state.last_error, RiskEventSeverity.WARNING
             )
             state.last_error = None

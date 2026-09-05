@@ -227,8 +227,31 @@ def test_heartbeat_counts_adapter_reconnects_and_actual_subscriptions() -> None:
             return {"public:0": state}
 
     previous: dict[str, int] = {}
+    previous_dropped: dict[str, int] = {}
     adapter = Adapter()
-    assert connection_summary(adapter, previous) == (2, 2)
-    assert connection_summary(adapter, previous) == (2, 0)
+    assert connection_summary(adapter, previous, previous_dropped) == (2, 2, 0)
+    assert connection_summary(adapter, previous, previous_dropped) == (2, 0, 0)
     state.reconnects = 3
-    assert connection_summary(adapter, previous) == (2, 1)
+    assert connection_summary(adapter, previous, previous_dropped) == (2, 1, 0)
+
+
+def test_heartbeat_derives_dropped_events_delta_from_adapter_state() -> None:
+    """HIGH-1b: ``ConnectionState.dropped_events`` is a cumulative counter the
+    adapter increments; ``connection_summary`` must turn it into a per-tick
+    delta the same way it already does for ``reconnects``."""
+    from hunter_exchanges.base import ConnectionState
+    from hunter_market_worker.heartbeat import connection_summary
+
+    state = ConnectionState("public", "connected", ("depth",), dropped_events=7)
+
+    class Adapter:
+        def connection_states(self) -> dict[str, ConnectionState]:
+            return {"public:0": state}
+
+    previous_reconnects: dict[str, int] = {}
+    previous_dropped: dict[str, int] = {}
+    adapter = Adapter()
+    assert connection_summary(adapter, previous_reconnects, previous_dropped) == (1, 0, 7)
+    assert connection_summary(adapter, previous_reconnects, previous_dropped) == (1, 0, 0)
+    state.dropped_events = 12
+    assert connection_summary(adapter, previous_reconnects, previous_dropped) == (1, 0, 5)
