@@ -57,6 +57,8 @@ Detalhe completo em [[Data Flow]] e `docs/PIPELINE.md`.
 
 ## Como navegar
 
+- [[Mente da Sexta-feira]] — como a assistente pensa (Claude + Astra) e onde cada tipo de memória fica; [[Dialogos/Index|diálogos]] e [[Revisoes-Astra/Index|revisões da Astra]].
+
 - **01-ARCHITECTURE/** — visão de sistema, fluxo de dados, infraestrutura, workers.
 - **02-MARKET/** — coleta de mercado, adapters de exchange, WebSockets, features, anomalias (tudo planejado M1–M2).
 - **03-TRADING/** — paper trading, risk engine, execução, portfolio, estratégias (tudo planejado M3–M4).
