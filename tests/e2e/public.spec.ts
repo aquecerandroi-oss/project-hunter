@@ -41,7 +41,18 @@ test.describe("public surfaces (no auth required)", () => {
     // therefore assert the honest, observable server-side fact without
     // following the redirect: the status, the handshake host and the reason
     // header. No sign-in form is ever served on this path.
-    const response = await page.request.get("/sign-in", { maxRedirects: 0 });
+    // clerkMiddleware only handshakes requests that look like a document
+    // navigation from a browser (Accept text/html + sec-fetch-dest document);
+    // the plain APIRequestContext is served the page directly, so mimic one.
+    const response = await page.request.get("/sign-in", {
+      maxRedirects: 0,
+      headers: {
+        accept: "text/html,application/xhtml+xml",
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128 Playwright",
+      },
+    });
     expect(response.status()).toBe(307);
     expect(response.headers()["x-clerk-auth-reason"]).toBe("dev-browser-missing");
     expect(response.headers()["location"]).toMatch(/^https:\/\/clerk\.example\.com\/v1\/client\/handshake/);
