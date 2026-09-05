@@ -161,6 +161,36 @@ describe("theme tokens parsed from app/globals.css", () => {
       expect(contrastRatio(token(tokens, "fg-muted"), token(tokens, "bg"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
     });
 
+    // T1.5b joint decision #9: "contraste >= 4.5:1 também para fg-subtle
+    // onde carrega informação" -- it labels ages, exchange codes and
+    // snapshot timestamps (DESIGN-2, docs/DESIGN.md §5), not just decorative
+    // placeholders, so it must clear AA like every other informational token.
+    it("fg-subtle on bg", () => {
+      expect(contrastRatio(token(tokens, "fg-subtle"), token(tokens, "bg"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    });
+
+    it("fg-subtle on bg-elevated", () => {
+      expect(contrastRatio(token(tokens, "fg-subtle"), token(tokens, "bg-elevated"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    });
+
+    // M6 (T1.5b fix pass): the contrast net only checked `fg-subtle` over
+    // `bg`/`bg-elevated` -- extended to the backgrounds these tokens are
+    // actually used on in this diff: `bg-overlay` (the sticky table header,
+    // hover rows, the command palette's own surface) and `gold-soft` (the
+    // command palette's SELECTED result row, `components/layout/
+    // command-palette.tsx`, which renders `fg-muted` for the exchange code).
+    it("fg-subtle on bg-overlay", () => {
+      expect(contrastRatio(token(tokens, "fg-subtle"), token(tokens, "bg-overlay"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    });
+
+    it("fg-muted on bg-overlay", () => {
+      expect(contrastRatio(token(tokens, "fg-muted"), token(tokens, "bg-overlay"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    });
+
+    it("fg-muted on gold-soft (command palette's selected result row)", () => {
+      expect(contrastRatio(token(tokens, "fg-muted"), token(tokens, "gold-soft"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    });
+
     it("gold-fg on gold", () => {
       expect(contrastRatio(token(tokens, "gold-fg"), token(tokens, "gold"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
     });

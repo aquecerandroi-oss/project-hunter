@@ -6,10 +6,13 @@ import { BadgesShowcase } from "@/components/design/badges-showcase";
 import { ButtonsShowcase } from "@/components/design/buttons-showcase";
 import { InputsShowcase } from "@/components/design/inputs-showcase";
 import { KpiCardShowcase } from "@/components/design/kpi-card-showcase";
+import { MotionShowcase } from "@/components/design/motion-showcase";
 import { SidebarStatesShowcase } from "@/components/design/sidebar-states-showcase";
+import { StalenessShowcase } from "@/components/design/staleness-showcase";
 import { TableShowcase } from "@/components/design/table-showcase";
 import { TokenSwatches } from "@/components/design/token-swatches";
 import { TypographyScale } from "@/components/design/typography-scale";
+import { CommandPalette } from "@/components/layout/command-palette";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -67,6 +70,18 @@ export function DesignPreview() {
 
       <Section title="Estados de item de navegação">
         <SidebarStatesShowcase />
+      </Section>
+
+      <Section title="Snapshot, conexão e verificação (T1.5b)">
+        <StalenessShowcase />
+      </Section>
+
+      <Section title="Motion calmo -- flash de preço (T1.5b)">
+        <MotionShowcase />
+      </Section>
+
+      <Section title="Command palette (T1.5b)">
+        <CommandPalette orgSlug="preview" />
       </Section>
     </main>
   );

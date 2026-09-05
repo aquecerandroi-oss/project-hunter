@@ -1,14 +1,18 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { MarketRow } from "@/components/markets/market-row";
 import { MarketsEmpty } from "@/components/markets/markets-empty";
+import { MarketsTableHead, MARKETS_TABLE_HEADERS, type SortDirection, type SortKey } from "@/components/markets/markets-table-head";
 import { SummaryChips } from "@/components/markets/summary-chips";
+import { useArrowKeyRowSelection } from "@/hooks/useArrowKeyRowSelection";
 import { useMarketChannels } from "@/hooks/useMarketChannels";
+import { useRowHeight } from "@/hooks/useDensity";
+import { useVirtualizedRows } from "@/hooks/useVirtualizedRows";
 import type { MarketRow as MarketRowData, MarketsSummary, RtMarketMessage } from "@/lib/api/types";
-import { cn } from "@/lib/utils";
 
 export interface MarketsTableProps {
   orgSlug: string;
@@ -20,28 +24,20 @@ export interface MarketsTableProps {
   truncated?: boolean;
 }
 
-type SortKey = "symbol" | "last_price" | "price_change_24h_pct" | "quote_volume_24h" | "spread_pct";
-type SortDirection = "asc" | "desc";
-
-// Row height matches docs/DESIGN.md §2's table density (32px). Manual
+// Row height is `hooks/useDensity.ts`'s `useRowHeight()` (40px comfortable,
+// 32px compact -- docs/DESIGN.md §2, joint decision #6), read once per
+// render so the windowing math below and every row's own inline height stay
+// the same number, never two constants that can drift apart. Manual
 // windowing (no extra dependency was authorized for this task) is enough to
 // satisfy CLAUDE.md's "tables virtualize at >= 200 rows" for the ~200-row
 // monitored universe, and doubles as the "visible rows" set for realtime
 // channel subscriptions (docs/plans/M1.md T1.5).
-const ROW_HEIGHT = 32;
 const OVERSCAN = 8;
 const VIEWPORT_HEIGHT = 480;
-
-const HEADERS: { key: SortKey | null; label: string; align?: "right" }[] = [
-  { key: "symbol", label: "Mercado" },
-  { key: null, label: "Status" },
-  { key: "last_price", label: "Último", align: "right" },
-  { key: null, label: "Bid", align: "right" },
-  { key: null, label: "Ask", align: "right" },
-  { key: "spread_pct", label: "Spread", align: "right" },
-  { key: "price_change_24h_pct", label: "24h %", align: "right" },
-  { key: "quote_volume_24h", label: "24h Vol", align: "right" },
-];
+// `MarketsTableHead`'s `<th>` cells are a fixed `h-8` (32px) regardless of
+// density -- the sticky header occludes that much of the scroll container's
+// top (T1.5b Astra must-fix #4).
+const HEADER_HEIGHT = 32;
 
 function toNumber(value: string | null | undefined): number {
   if (value === null || value === undefined) return Number.NaN;
@@ -122,13 +118,20 @@ function applyLiveTick(row: MarketRowData, tick: RtMarketMessage | undefined): M
   return next;
 }
 
-/** `/[orgSlug]/markets`'s table: search, sortable columns, virtualized rows, live prices for the visible window. */
+function rowId(row: MarketRowData): string {
+  return `market-row-${row.exchange}-${row.symbol}`;
+}
+
+/** `/[orgSlug]/markets`'s table: search, sortable columns, virtualized rows, live prices for the visible window, keyboard-navigable rows. */
 export function MarketsTable({ orgSlug, items, summary, staleAfterMs, truncated = false }: MarketsTableProps) {
   const { getToken } = useAuth();
+  const router = useRouter();
+  const rowHeight = useRowHeight();
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({ key: "quote_volume_24h", direction: "desc" });
   const [scrollTop, setScrollTop] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -144,24 +147,55 @@ export function MarketsTable({ orgSlug, items, summary, staleAfterMs, truncated 
 
   const sorted = useMemo(() => sortRows(filtered, sort.key, sort.direction), [filtered, sort]);
 
-  // Clamped to `sorted.length`: filtering to a shorter list must not leave
-  // `startIndex` pointing past its end from a scroll position set against
-  // the *previous*, longer list -- that would slice out an empty window
-  // and hide real matches (Astra's T1.5 review).
-  const maxStartIndex = Math.max(0, sorted.length - 1);
-  const startIndex = Math.min(maxStartIndex, Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN));
-  const visibleCount = Math.ceil(VIEWPORT_HEIGHT / ROW_HEIGHT) + OVERSCAN * 2;
-  const endIndex = Math.min(sorted.length, startIndex + visibleCount);
-  const visibleRows = sorted.slice(startIndex, endIndex);
-  const topPad = startIndex * ROW_HEIGHT;
-  const bottomPad = (sorted.length - endIndex) * ROW_HEIGHT;
+  // Windowing math (M9: extracted out of this component -- also H1's home
+  // for a density-driven, SSR-safe row height) lives in
+  // `hooks/useVirtualizedRows.ts`.
+  const { startIndex, endIndex, visibleRows, topPad, bottomPad } = useVirtualizedRows({
+    rows: sorted,
+    rowHeight,
+    scrollTop,
+    viewportHeight: VIEWPORT_HEIGHT,
+    overscan: OVERSCAN,
+  });
 
   const channels = useMemo(() => visibleRows.map((row) => `rt:market:${row.exchange}:${row.symbol}`), [visibleRows]);
   const { messages } = useMarketChannels({ channels, getAuthToken: () => getToken() });
 
+  const { selectedIndex, handleKeyDown, reset: resetSelection } = useArrowKeyRowSelection({
+    rowCount: sorted.length,
+    rowHeight,
+    viewportHeight: VIEWPORT_HEIGHT,
+    stickyHeaderHeight: HEADER_HEIGHT,
+    getScrollContainer: () => containerRef.current,
+    onOpen: (index) => {
+      // M3 (T1.5b fix pass 2, closing the PARTIAL from pass 1): membership in
+      // the *rendered* window (`startIndex`/`endIndex`) is not the same
+      // thing as being *visible* -- `useVirtualizedRows` renders `OVERSCAN`
+      // (8) extra rows above and below the viewport so a fast scroll doesn't
+      // flash empty rows, but those overscan rows sit off-screen. A manual
+      // (mouse-wheel/scrollbar) scroll of as little as one row height can
+      // leave `selectedIndex` pointing at a row that is still rendered (so
+      // the old guard passed it) yet fully outside the viewport. The real
+      // geometry is the same the sticky header forces `useArrowKeyRowSelection`
+      // to use: a row's top edge in the scrollable content is
+      // `HEADER_HEIGHT + index * rowHeight`, and it's only visible if that
+      // span overlaps `[scrollTop, scrollTop + VIEWPORT_HEIGHT]` at all.
+      const rowTop = HEADER_HEIGHT + index * rowHeight;
+      const rowBottom = rowTop + rowHeight;
+      const isVisible = rowBottom > scrollTop && rowTop < scrollTop + VIEWPORT_HEIGHT;
+      if (!isVisible) {
+        resetSelection();
+        return;
+      }
+      const row = sorted[index];
+      if (row) router.push(`/${orgSlug}/markets/${encodeURIComponent(row.exchange)}/${encodeURIComponent(row.symbol)}`);
+    },
+  });
+
   function handleSearchChange(value: string): void {
     setQ(value);
     setScrollTop(0);
+    resetSelection();
     if (containerRef.current) containerRef.current.scrollTop = 0;
   }
 
@@ -169,17 +203,38 @@ export function MarketsTable({ orgSlug, items, summary, staleAfterMs, truncated 
     setSort((prev) => (prev.key === key ? { key, direction: prev.direction === "asc" ? "desc" : "asc" } : { key, direction: "desc" }));
   }
 
-  if (items.length === 0) return <MarketsEmpty />;
+  useEffect(() => {
+    // "/" focuses the search box from anywhere on the page (joint decision
+    // #7) -- ignored while the user is already typing in an input/textarea.
+    function handleGlobalSlash(event: KeyboardEvent): void {
+      if (event.key !== "/") return;
+      const target = event.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
+      event.preventDefault();
+      searchRef.current?.focus();
+    }
+    window.addEventListener("keydown", handleGlobalSlash);
+    return () => window.removeEventListener("keydown", handleGlobalSlash);
+  }, []);
+
+  if (items.length === 0) return <MarketsEmpty orgSlug={orgSlug} />;
+
+  // `aria-activedescendant` must never reference an id that isn't actually
+  // in the DOM right now -- manually scrolling (not via the arrow keys)
+  // can carry the selected index outside the virtualized window's rendered
+  // rows without moving `selectedIndex` itself (T1.5b Astra must-fix #4).
+  const selectedRow = selectedIndex >= startIndex && selectedIndex < endIndex ? sorted[selectedIndex] : undefined;
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SummaryChips summary={summary} />
         <input
+          ref={searchRef}
           type="search"
           value={q}
           onChange={(e) => handleSearchChange(e.target.value)}
-          placeholder="Buscar símbolo..."
+          placeholder="Buscar símbolo... (/)"
           aria-label="Buscar mercado"
           className="h-8 w-56 rounded-md border border-border bg-bg-overlay px-3 text-[13px] text-fg placeholder:text-fg-subtle"
         />
@@ -190,60 +245,82 @@ export function MarketsTable({ orgSlug, items, summary, staleAfterMs, truncated 
         </p>
       )}
       <div className="overflow-x-auto rounded-md border border-border">
-        <div ref={containerRef} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)} style={{ height: VIEWPORT_HEIGHT, overflowY: "auto" }}>
-          <table className="w-full text-left text-[13px]">
-            <thead className="sticky top-0 bg-bg-overlay text-xs text-fg-muted">
-              <tr>
-                {HEADERS.map((header) => {
-                  const isSorted = header.key !== null && sort.key === header.key;
-                  const ariaSort: "ascending" | "descending" | "none" = isSorted
-                    ? sort.direction === "asc"
-                      ? "ascending"
-                      : "descending"
-                    : "none";
-                  return (
-                    <th
-                      key={header.label}
-                      className={cn("h-8 px-3 font-medium", header.align === "right" && "text-right")}
-                      aria-sort={header.key ? ariaSort : undefined}
-                    >
-                      {header.key ? (
-                        <button type="button" onClick={() => toggleSort(header.key as SortKey)} className="hover:text-fg">
-                          {header.label}
-                          {isSorted ? (sort.direction === "asc" ? " ↑" : " ↓") : ""}
-                        </button>
-                      ) : (
-                        header.label
-                      )}
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
+        <div
+          ref={containerRef}
+          onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+          onKeyDown={handleKeyDown}
+          tabIndex={0}
+          role="grid"
+          aria-label="Mercados monitorados"
+          aria-activedescendant={selectedRow ? rowId(selectedRow) : undefined}
+          // M2 (T1.5b fix pass 2): the table is virtualized -- only a window
+          // of `sorted.length` is ever rendered -- so without an explicit
+          // `aria-rowcount` a screen reader has no way to know the grid has
+          // more rows than the DOM currently holds; it would report the
+          // window size as the total. `+ 1` accounts for the header row
+          // (`aria-rowindex` 1 below), which also counts per the ARIA spec.
+          aria-rowcount={sorted.length + 1}
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+          style={{ height: VIEWPORT_HEIGHT, overflowY: "auto" }}
+        >
+          {/*
+           * `role="presentation"` on the `<table>` alone used to strip the
+           * implicit `row`/`columnheader`/`cell` roles off every descendant
+           * that had no role of its own (the WAI-ARIA conditionally-
+           * presentational cascade) -- zero explicit roles were set anywhere
+           * under `components/markets`, so the grid exposed no rows and no
+           * cells at all: NVDA/JAWS announced "grid" with nothing inside it,
+           * and `aria-activedescendant` pointed at a `<tr>` whose row
+           * semantics had been stripped (M2, both reviewers, T1.5b fix pass
+           * 2). The fix is a COMPLETE explicit role tree: `role="row"` on
+           * every `<tr>` (`MarketsTableHead`'s header row included),
+           * `role="columnheader"` on its `<th>`s, `role="gridcell"` on every
+           * `MarketRow` `<td>` (see those two files). An element with its own
+           * explicit role is excluded from the presentational cascade, so
+           * `role="presentation"` here still only ever removes the table's
+           * OWN redundant implicit `table`/`rowgroup` roles -- the div's
+           * `grid` stays the only competing table-role-tree difference NVDA/
+           * JAWS used to see, while the row/columnheader/gridcell tree
+           * underneath it is now real and complete.
+           */}
+          <table role="presentation" className="w-full text-left text-[13px]">
+            <MarketsTableHead sort={sort} onToggleSort={toggleSort} />
             <tbody>
               {topPad > 0 && (
                 <tr aria-hidden="true" style={{ height: topPad }}>
-                  <td colSpan={HEADERS.length} />
+                  <td colSpan={MARKETS_TABLE_HEADERS.length} />
                 </tr>
               )}
-              {visibleRows.map((row) => (
-                <MarketRow
-                  key={`${row.exchange}:${row.symbol}`}
-                  orgSlug={orgSlug}
-                  row={applyLiveTick(row, messages[`rt:market:${row.exchange}:${row.symbol}`] as RtMarketMessage | undefined)}
-                  staleAfterMs={staleAfterMs}
-                />
-              ))}
+              {visibleRows.map((row, visibleOffset) => {
+                const absoluteIndex = startIndex + visibleOffset;
+                return (
+                  <MarketRow
+                    key={`${row.exchange}:${row.symbol}`}
+                    id={rowId(row)}
+                    orgSlug={orgSlug}
+                    row={applyLiveTick(row, messages[`rt:market:${row.exchange}:${row.symbol}`] as RtMarketMessage | undefined)}
+                    staleAfterMs={staleAfterMs}
+                    rowHeight={rowHeight}
+                    selected={absoluteIndex === selectedIndex}
+                    // Header row is `aria-rowindex` 1 (`MarketsTableHead`), so
+                    // data row `absoluteIndex` (0-based) is `+ 2` (M2).
+                    ariaRowIndex={absoluteIndex + 2}
+                    onOpen={() => router.push(`/${orgSlug}/markets/${encodeURIComponent(row.exchange)}/${encodeURIComponent(row.symbol)}`)}
+                  />
+                );
+              })}
               {bottomPad > 0 && (
                 <tr aria-hidden="true" style={{ height: bottomPad }}>
-                  <td colSpan={HEADERS.length} />
+                  <td colSpan={MARKETS_TABLE_HEADERS.length} />
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
-      {sorted.length === 0 && q && <p className="text-center text-sm text-fg-muted">Nenhum mercado encontrado para &quot;{q}&quot;.</p>}
+      {sorted.length === 0 && q && (
+        <p className="text-center text-sm text-fg-muted">Nenhum resultado para &quot;{q}&quot; nesta lista.</p>
+      )}
     </div>
   );
 }

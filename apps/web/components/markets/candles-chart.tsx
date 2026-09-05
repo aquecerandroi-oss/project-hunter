@@ -65,12 +65,16 @@ function layoutOptions() {
 }
 
 function seriesOptions() {
-  const gold = cssVar("--color-gold");
+  // Green up / red down (joint decision #3): gold is reserved for brand,
+  // primary action, active item and focus -- candles are the single biggest
+  // surface in the app, so painting them gold would make gold dominate the
+  // screen instead of staying rare. Astra's T1.5b design review agreed.
+  const green = cssVar("--color-green");
   const red = cssVar("--color-red");
   return {
-    upColor: gold,
-    borderUpColor: gold,
-    wickUpColor: gold,
+    upColor: green,
+    borderUpColor: green,
+    wickUpColor: green,
     downColor: red,
     borderDownColor: red,
     wickDownColor: red,
@@ -79,7 +83,7 @@ function seriesOptions() {
 
 /**
  * 1m candles, last 500 (docs/plans/M1.md T1.5), TradingView-style density
- * (docs/DESIGN.md): gold up, red down. The only place in the app that
+ * (docs/DESIGN.md): green up, red down. The only place in the app that
  * converts a `Decimal` string to `number` -- the charting library only
  * accepts floats, and nothing downstream reads these values back as money
  * (CLAUDE.md's Decimal rule applies to stored/transmitted values, not a

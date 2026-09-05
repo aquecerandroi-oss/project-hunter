@@ -148,6 +148,31 @@ describe("MarketDetailView: honest states for a failed hot-state read (H3)", () 
   });
 });
 
+describe("MarketDetailView: book/trades are labelled as a snapshot, not a live feed (T1.5b joint decision #1)", () => {
+  it("labels both panels 'Snapshot · há Ns', never implying the realtime channel updates them", () => {
+    useMarketChannelsMock.mockReturnValue({ status: "closed", messages: {} });
+    const withBook: MarketDetail = {
+      ...detail,
+      book: { kind: "snapshot", depth: 20, bids: [], asks: [], ts: lastUpdate },
+      recent_trades: [],
+    };
+
+    render(<MarketDetailView detail={withBook} candles={[]} />);
+
+    const snapshotLabels = screen.getAllByText(/^Snapshot ·/);
+    expect(snapshotLabels).toHaveLength(2);
+  });
+
+  it("says 'sem dado' instead of a fake age when there is no timestamp to age off of", () => {
+    useMarketChannelsMock.mockReturnValue({ status: "closed", messages: {} });
+    const noTrades: MarketDetail = { ...detail, book: null, recent_trades: [] };
+
+    render(<MarketDetailView detail={noTrades} candles={[]} />);
+
+    expect(screen.getAllByText(/Snapshot · sem dado/)).toHaveLength(2);
+  });
+});
+
 describe("MarketDetailView: candles isolated from the rest of the page (H5)", () => {
   it("shows an honest candles-unavailable message without hiding price/book/trades", () => {
     useMarketChannelsMock.mockReturnValue({ status: "closed", messages: {} });

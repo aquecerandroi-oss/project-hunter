@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 afterEach(cleanup);
@@ -33,6 +33,22 @@ describe("RecentTrades: buy/sell is never colour-only (F8)", () => {
   it("still shows the honest empty state with no trades", () => {
     render(<RecentTrades trades={[]} hotStateOk />);
     expect(screen.getByText("Nenhum trade recente.")).toBeInTheDocument();
+  });
+});
+
+describe("RecentTrades: timestamp renders UTC immediately, local offset only as a client-only enhancement (H2, T1.5b fix pass)", () => {
+  it("shows the UTC clock on the very first render, matching the ISO timestamp's own UTC components", () => {
+    render(<RecentTrades trades={[makeTrade({ ts: "2026-09-05T14:32:10.000Z" })]} hotStateOk />);
+    // A naive split (UTC in one span, local time computed synchronously in
+    // the same render) is exactly the bug: the server and the browser can
+    // disagree on "local", but never on this UTC part -- it must be present
+    // immediately, not only after some client-only effect runs.
+    expect(screen.getByText(/14:32:10 UTC/)).toBeInTheDocument();
+  });
+
+  it("adds the local offset in parentheses once mounted, without ever losing the UTC part", async () => {
+    render(<RecentTrades trades={[makeTrade({ ts: "2026-09-05T14:32:10.000Z" })]} hotStateOk />);
+    await waitFor(() => expect(screen.getByText(/14:32:10 UTC \(\d{2}:\d{2}:\d{2} [+-]\d{2}:\d{2}\)/)).toBeInTheDocument());
   });
 });
 

@@ -81,6 +81,24 @@ function AsOf({ ts }: { ts: string | null | undefined }) {
   return <span className="ml-2 text-[11px] normal-case text-fg-subtle">atualizado há {formatAge(ageMs)}</span>;
 }
 
+/**
+ * Book and recent trades are a snapshot fetched once with the page (T1.5b
+ * joint decision #1): the realtime channel only carries price/bid/ask, so
+ * animating this section on every price tick would fake activity that isn't
+ * there. Every panel names its own nature and age instead of borrowing the
+ * header's live quality badge -- "Snapshot · há 2 min", never implying a
+ * live feed for data that isn't one.
+ */
+function SnapshotLabel({ ts }: { ts: string | null | undefined }) {
+  const now = useAgeTicker();
+  const ageMs = computeAgeMs(ts, now);
+  return (
+    <span className="ml-2 text-[11px] normal-case text-fg-subtle">
+      Snapshot · {ageMs !== null ? `há ${formatAge(ageMs)}` : "sem dado"}
+    </span>
+  );
+}
+
 /** `/[orgSlug]/markets/[exchange]/[symbol]` (docs/plans/M1.md T1.5): header + candles + book + trades + derivatives, live price via `rt:market:{exchange}:{symbol}`. */
 export function MarketDetailView({ detail, candles, candlesError = null }: MarketDetailViewProps) {
   const { getToken } = useAuth();
@@ -108,10 +126,12 @@ export function MarketDetailView({ detail, candles, candlesError = null }: Marke
           staleAfterMs={detail.stale_after_ms}
           hasOpenGap={detail.has_open_gap}
         />
-        <span className="font-mono text-lg tabular-nums text-fg">{formatPrice(lastPrice)}</span>
+        {/* 28px -- the type scale's top tier for "the big number" (docs/DESIGN.md §2), same as the KPI card anchor. */}
+        <span className="font-mono text-[28px] tabular-nums text-fg">{formatPrice(lastPrice)}</span>
         <span className="text-xs text-fg-muted">
           bid {formatPrice(bid)} · ask {formatPrice(ask)}
         </span>
+        <AsOf ts={components.ticker.ts} />
       </header>
 
       <section className="rounded-lg border border-border bg-bg-elevated p-4">
@@ -128,14 +148,14 @@ export function MarketDetailView({ detail, candles, candlesError = null }: Marke
         <section className="rounded-lg border border-border bg-bg-elevated p-4">
           <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-muted">
             Book
-            <AsOf ts={detail.book?.ts} />
+            <SnapshotLabel ts={detail.book?.ts} />
           </h2>
           <OrderBook book={detail.book ?? null} hotStateOk={detail.hot_state_ok} />
         </section>
         <section className="rounded-lg border border-border bg-bg-elevated p-4">
           <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-muted">
             Trades recentes
-            <AsOf ts={recentTrades?.[0]?.ts} />
+            <SnapshotLabel ts={recentTrades?.[0]?.ts} />
           </h2>
           <RecentTrades trades={recentTrades} hotStateOk={detail.hot_state_ok} />
         </section>

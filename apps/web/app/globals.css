@@ -26,10 +26,16 @@
   --color-border: #232323;
   --color-border-strong: #2e2e2e;
 
-  /* Three foreground levels */
+  /*
+   * Three foreground levels. `fg-subtle` carries real information in
+   * several places (ages, exchange codes, snapshot labels) -- see DESIGN-2
+   * in docs/DESIGN.md §5: #6b6b6b measured 3.72:1 on `bg` and 3.54:1 on
+   * `bg-elevated`, both below WCAG AA. #828282 clears 4.5:1 against both
+   * (tests/theme-contrast.test.ts).
+   */
   --color-fg: #f5f5f5;
   --color-fg-muted: #a3a3a3;
-  --color-fg-subtle: #6b6b6b;
+  --color-fg-subtle: #828282;
 
   /* Gold -- brand, primary action, active item, focus. Rare by design. */
   --color-gold: #f2b705;
@@ -63,9 +69,15 @@
   --color-border: #e5e5e5;
   --color-border-strong: #d4d4d4;
 
+  /*
+   * DESIGN-2/DESIGN-3 (docs/DESIGN.md §5): #8a8a8a measured 3.45:1 on white,
+   * below AA; #737373 fixed that but still only reached 4.27:1 against
+   * `bg-overlay` (#F3F3F3 -- Astra's T1.5b design review caught this one,
+   * the earlier fix only checked `bg`). #666666 clears 4.5:1 against both.
+   */
   --color-fg: #0a0a0a;
   --color-fg-muted: #525252;
-  --color-fg-subtle: #8a8a8a;
+  --color-fg-subtle: #666666;
 
   /*
    * Darker gold than the dark theme's -- needed for AA contrast on white.
@@ -119,5 +131,67 @@ body {
   .num {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * Calm price flash (docs/DESIGN.md §2, joint decision #4): background only,
+   * never the text colour -- a price cell tints briefly on an actual change,
+   * gated in JS by `hooks/usePriceFlash.ts` (reduced-motion, the persisted
+   * on/off switch, and a per-row rate limit). This `@media` query is a
+   * second, CSS-only guarantee for anyone who somehow gets the class without
+   * going through the hook.
+   */
+  .flash-up {
+    animation: price-flash-up 300ms ease-out;
+  }
+
+  .flash-down {
+    animation: price-flash-down 300ms ease-out;
+  }
+}
+
+@keyframes price-flash-up {
+  from {
+    background-color: var(--color-green-soft);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+@keyframes price-flash-down {
+  from {
+    background-color: var(--color-red-soft);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /*
+   * App-wide reduced-motion (M5, T1.5b fix pass): the price-flash rule below
+   * already neutralised `.flash-up`/`.flash-down`, but that left every OTHER
+   * transition/animation in the app (e.g. `components/layout/sidebar.tsx`'s
+   * `transition-[width] duration-150` on collapse/expand) untouched for a
+   * user who asked the OS for reduced motion. The standard near-zero-duration
+   * override covers the whole shell; it does not disable price flash by
+   * itself -- `hooks/usePriceFlash.ts`'s own `usePrefersReducedMotion` gate
+   * already stops the flash class from ever being applied in the first
+   * place, so this is a second, CSS-only guarantee, same as the specific
+   * `.flash-up`/`.flash-down` rule it sits next to.
+   */
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .flash-up,
+  .flash-down {
+    animation: none;
   }
 }

@@ -3,17 +3,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { resolveOrgContextMock, listWorkspacesMock, listMembersMock, getMarketStatusMock } = vi.hoisted(() => ({
+const { resolveOrgContextMock, listWorkspacesMock, listMembersMock, getMarketStatusMock, readyMock } = vi.hoisted(() => ({
   resolveOrgContextMock: vi.fn(),
   listWorkspacesMock: vi.fn(),
   listMembersMock: vi.fn(),
   getMarketStatusMock: vi.fn(),
+  readyMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api/org-context", () => ({ resolveOrgContext: resolveOrgContextMock }));
 vi.mock("@/lib/api/workspaces", () => ({ listWorkspaces: listWorkspacesMock }));
 vi.mock("@/lib/api/members", () => ({ listMembers: listMembersMock }));
-vi.mock("@/lib/api/system", () => ({ getMarketStatus: getMarketStatusMock }));
+// `wasReadyCheckAttempted` is real, pure logic (not a network call) --
+// `vi.importActual` keeps it wired to whatever `readyMock` resolves to,
+// instead of re-implementing (and risking drifting from) its rule for
+// telling a genuine `ReadyStatus` apart from `ready()`'s "not configured"
+// sentinel.
+vi.mock("@/lib/api/system", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api/system")>("@/lib/api/system");
+  return { ...actual, getMarketStatus: getMarketStatusMock, ready: readyMock };
+});
 vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("notFound() should not be called in these tests");
@@ -91,6 +100,7 @@ beforeEach(() => {
   listWorkspacesMock.mockReset();
   listMembersMock.mockReset();
   getMarketStatusMock.mockReset().mockResolvedValue(marketStatus);
+  readyMock.mockReset().mockResolvedValue({ database: true, redis: true });
 });
 
 afterEach(cleanup);
@@ -128,6 +138,45 @@ describe("DashboardPage: one failing section must not take down the others (F3)"
 
     expect(screen.queryByText(/indisponível/i)).not.toBeInTheDocument();
     expect(screen.getByText("1")).toBeInTheDocument();
+  });
+});
+
+describe("DashboardPage: hierarchy (T1.5b joint decision #2) -- markets first, no financial placeholders", () => {
+  it("shows a one-line health summary linking to /system, and a 'Ver mercados' link, and never a Portfolio 'chega no M3' placeholder", async () => {
+    listWorkspacesMock.mockResolvedValue({ items: [workspace], next_cursor: null });
+    listMembersMock.mockResolvedValue({ items: [makeMember("m1")], next_cursor: null });
+
+    const jsx = await DashboardPage({ params: Promise.resolve({ orgSlug: "acme" }) });
+    render(jsx);
+
+    expect(screen.getByRole("link", { name: /Sistema operacional/ })).toHaveAttribute("href", "/acme/system");
+    expect(screen.getByRole("link", { name: "Ver mercados" })).toHaveAttribute("href", "/acme/markets");
+    expect(screen.queryByText(/chega no M3/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nenhum portfolio ainda/)).not.toBeInTheDocument();
+  });
+
+  it("shows 'sem verificação' (not a fabricated outage) when ready() itself rejects", async () => {
+    listWorkspacesMock.mockResolvedValue({ items: [workspace], next_cursor: null });
+    listMembersMock.mockResolvedValue({ items: [makeMember("m1")], next_cursor: null });
+    readyMock.mockRejectedValue(new Error("API_URL is not configured"));
+
+    const jsx = await DashboardPage({ params: Promise.resolve({ orgSlug: "acme" }) });
+    render(jsx);
+
+    expect(screen.getByRole("link", { name: /sem verificação/ })).toBeInTheDocument();
+    expect(screen.queryByText("Sistema indisponível")).not.toBeInTheDocument();
+  });
+
+  it("shows 'sem verificação' when ready() resolves its own not-configured sentinel (the real path, T1.5b Astra must-fix #1)", async () => {
+    listWorkspacesMock.mockResolvedValue({ items: [workspace], next_cursor: null });
+    listMembersMock.mockResolvedValue({ items: [makeMember("m1")], next_cursor: null });
+    readyMock.mockResolvedValue({ database: false, redis: false, database_detail: "not_configured", redis_detail: "not_configured" });
+
+    const jsx = await DashboardPage({ params: Promise.resolve({ orgSlug: "acme" }) });
+    render(jsx);
+
+    expect(screen.getByRole("link", { name: /sem verificação/ })).toBeInTheDocument();
+    expect(screen.queryByText("Sistema indisponível")).not.toBeInTheDocument();
   });
 });
 

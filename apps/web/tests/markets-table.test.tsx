@@ -5,61 +5,19 @@ vi.mock("@clerk/nextjs", () => ({
   useAuth: () => ({ getToken: async () => null }),
 }));
 
+const routerPush = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ refresh: vi.fn(), push: routerPush }),
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  routerPush.mockClear();
+});
 
 import { MarketsError } from "@/components/markets/markets-error";
 import { MarketsTable } from "@/components/markets/markets-table";
-import type { MarketRow, MarketsSummary } from "@/lib/api/types";
-
-const summary: MarketsSummary = {
-  markets_total: 2,
-  markets_monitored: 2,
-  markets_ok: 1,
-  markets_stale: 1,
-  markets_degraded: 0,
-  markets_unavailable: 0,
-};
-
-function makeRow(overrides: Partial<MarketRow> = {}): MarketRow {
-  const now = new Date().toISOString();
-  return {
-    id: "11111111-1111-1111-1111-111111111111",
-    exchange: "binance",
-    symbol: "BTCUSDT",
-    base_asset: "BTC",
-    quote_asset: "USDT",
-    market_type: "perpetual",
-    status: "active",
-    is_monitored: true,
-    monitor_rank: 1,
-    last_price: "65000.12",
-    bid: "65000.00",
-    ask: "65000.24",
-    spread_pct: "0.01",
-    volume_24h: "1000",
-    quote_volume_24h: "65000000",
-    price_change_24h_pct: "1.23",
-    mark_price: "65000.12",
-    open_interest: "500",
-    funding_rate: "0.0001",
-    funding_kind: "realized",
-    last_update: now,
-    data_quality: "ok",
-    has_open_gap: false,
-    components: {
-      ticker: { ts: now, age_ms: 0, quality: "ok" },
-      book: { ts: now, age_ms: 0, quality: "ok" },
-      mark: { ts: now, age_ms: 0, quality: "ok" },
-      open_interest: { ts: now, age_ms: 0 },
-      funding: { ts: now, age_ms: 0, kind: "realized" },
-    },
-    ...overrides,
-  };
-}
+import { makeRow, summary } from "@/tests/fixtures/markets-row";
 
 describe("MarketsTable: renders real rows, no invented data", () => {
   it("shows symbol, last price and the quality badge for each row", () => {
@@ -152,6 +110,114 @@ describe("MarketsTable: a null base_asset must not crash the search filter (H1)"
 
     expect(screen.queryByText("BTCUSDT")).not.toBeInTheDocument();
     expect(screen.getByText("ETHUSDT")).toBeInTheDocument();
+  });
+});
+
+describe("MarketsTable: separate empty states (joint decision #8)", () => {
+  it("says 'Nenhum resultado' for a search with no matches, distinct from the empty-universe message", () => {
+    render(<MarketsTable orgSlug="acme" items={[makeRow()]} summary={summary} staleAfterMs={10_000} />);
+    fireEvent.change(screen.getByLabelText("Buscar mercado"), { target: { value: "zzz-no-match" } });
+    expect(screen.getByText(/Nenhum resultado para/)).toBeInTheDocument();
+    expect(screen.queryByText(/Nenhum mercado monitorado ainda/)).not.toBeInTheDocument();
+  });
+});
+
+describe("MarketsTable: exchange/symbol segments are URL-encoded before building a route (LOW, one-liner)", () => {
+  it("encodes a symbol containing a slash in the row's own Link href", () => {
+    const row = makeRow({ exchange: "binance", symbol: "WEIRD/SYM" });
+    render(<MarketsTable orgSlug="acme" items={[row]} summary={summary} staleAfterMs={10_000} />);
+
+    const link = screen.getByRole("link", { name: "WEIRD/SYM" });
+    expect(link).toHaveAttribute("href", "/acme/markets/binance/WEIRD%2FSYM");
+  });
+
+  it("encodes a symbol containing a slash before router.push on Enter", () => {
+    const row = makeRow({ exchange: "binance", symbol: "WEIRD/SYM" });
+    render(<MarketsTable orgSlug="acme" items={[row]} summary={summary} staleAfterMs={10_000} />);
+    const grid = screen.getByRole("grid", { name: "Mercados monitorados" });
+
+    fireEvent.keyDown(grid, { key: "ArrowDown" });
+    fireEvent.keyDown(grid, { key: "Enter" });
+
+    expect(routerPush).toHaveBeenCalledWith("/acme/markets/binance/WEIRD%2FSYM");
+  });
+});
+
+describe("MarketsTable: a missing 24h change is neutral, never colored as if it were positive (M4)", () => {
+  it("shows the '--' placeholder in the muted color, not green, when price_change_24h_pct is null", () => {
+    const row = makeRow({ price_change_24h_pct: null });
+    render(<MarketsTable orgSlug="acme" items={[row]} summary={summary} staleAfterMs={10_000} />);
+
+    const cell = screen.getByText("--").closest("td");
+    expect(cell).toHaveClass("text-fg-muted");
+    expect(cell).not.toHaveClass("text-green");
+    expect(cell).not.toHaveClass("text-red");
+  });
+
+  it("still colors a real negative change red, and a real positive change green", () => {
+    const rows = [
+      makeRow({ symbol: "AUSDT", price_change_24h_pct: "-1.50" }),
+      makeRow({ symbol: "BUSDT", price_change_24h_pct: "1.50" }),
+    ];
+    render(<MarketsTable orgSlug="acme" items={rows} summary={summary} staleAfterMs={10_000} />);
+
+    expect(screen.getByText("-1.50%").closest("td")).toHaveClass("text-red");
+    expect(screen.getByText("+1.50%").closest("td")).toHaveClass("text-green");
+  });
+});
+
+// M3's off-screen-Enter guard lives in `markets-table-visibility.test.tsx`
+// and M2's ARIA role tree lives in `markets-table-grid-roles.test.tsx` --
+// split out to keep this file under the lint config's 350-line budget.
+
+describe("MarketsTable: keyboard navigation (arrow keys move, Enter opens)", () => {
+  it("moves the selection down/up with arrow keys and marks the active row with aria-selected", () => {
+    const rows = [makeRow({ symbol: "AAAUSDT" }), makeRow({ symbol: "BBBUSDT" })];
+    render(<MarketsTable orgSlug="acme" items={rows} summary={summary} staleAfterMs={10_000} />);
+    const grid = screen.getByRole("grid", { name: "Mercados monitorados" });
+
+    fireEvent.keyDown(grid, { key: "ArrowDown" });
+    const firstRow = screen.getByText("AAAUSDT").closest("tr");
+    expect(firstRow).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(grid, { key: "ArrowDown" });
+    const secondRow = screen.getByText("BBBUSDT").closest("tr");
+    expect(secondRow).toHaveAttribute("aria-selected", "true");
+    expect(firstRow).toHaveAttribute("aria-selected", "false");
+
+    fireEvent.keyDown(grid, { key: "ArrowUp" });
+    expect(firstRow).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("navigates to the selected row's detail page on Enter", () => {
+    const rows = [makeRow({ exchange: "binance", symbol: "AAAUSDT" })];
+    render(<MarketsTable orgSlug="acme" items={rows} summary={summary} staleAfterMs={10_000} />);
+    const grid = screen.getByRole("grid", { name: "Mercados monitorados" });
+
+    fireEvent.keyDown(grid, { key: "ArrowDown" });
+    fireEvent.keyDown(grid, { key: "Enter" });
+
+    expect(routerPush).toHaveBeenCalledWith("/acme/markets/binance/AAAUSDT");
+  });
+});
+
+describe("MarketsTable: a blocked Web Storage must never white-screen the whole table (NEW, Astra, T1.5b fix pass 2)", () => {
+  it("still renders every row when localStorage.getItem throws SecurityError (every row calls usePriceFlash)", () => {
+    const original = window.localStorage.getItem;
+    window.localStorage.getItem = vi.fn(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+
+    try {
+      const rows = [makeRow(), makeRow({ symbol: "ETHUSDT", base_asset: "ETH" })];
+      expect(() =>
+        render(<MarketsTable orgSlug="acme" items={rows} summary={summary} staleAfterMs={10_000} />),
+      ).not.toThrow();
+      expect(screen.getByText("BTCUSDT")).toBeInTheDocument();
+      expect(screen.getByText("ETHUSDT")).toBeInTheDocument();
+    } finally {
+      window.localStorage.getItem = original;
+    }
   });
 });
 

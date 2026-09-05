@@ -1,16 +1,19 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { EmptyStateCard } from "@/components/dashboard/empty-state-card";
 import { MembersCard } from "@/components/dashboard/members-card";
 import { OrganizationCard } from "@/components/dashboard/organization-card";
 import { QuickLinks } from "@/components/dashboard/quick-links";
+import { SystemHealthLine } from "@/components/dashboard/system-health-line";
 import { WorkspaceCard } from "@/components/dashboard/workspace-card";
 import { LiveStatus } from "@/components/system/live-status";
+import { Button } from "@/components/ui/button";
 import { isApiError } from "@/lib/api-error";
 import { listMembers } from "@/lib/api/members";
 import { resolveOrgContext } from "@/lib/api/org-context";
-import { getMarketStatus } from "@/lib/api/system";
-import type { MarketStatusResponse, WorkspaceOut } from "@/lib/api/types";
+import { getMarketStatus, ready, wasReadyCheckAttempted } from "@/lib/api/system";
+import type { MarketStatusResponse, ReadyStatus, WorkspaceOut } from "@/lib/api/types";
 import { listWorkspaces } from "@/lib/api/workspaces";
 import { logger } from "@/lib/logger";
 
@@ -53,9 +56,14 @@ async function loadMembers(orgId: string): Promise<MembersLoad> {
 }
 
 /**
- * The M0 dashboard shell (docs/plans/M0.md T09, docs/PRODUCT.md §4: shell at
- * M0, complete at M5). Only cards this milestone can back with real data --
- * no PnL, no charts, no invented numbers (CLAUDE.md's "no fake anything").
+ * The M1 dashboard shell (docs/plans/M0.md T09, docs/PRODUCT.md §4: shell at
+ * M0, complete at M5). Hierarchy per T1.5b's joint decision #2: Markets and
+ * coverage first (what the product actually does today), a one-line health
+ * summary next (diagnosis detail lives in `/system`), org/workspace/members
+ * below. No PnL/equity placeholder cards -- the nav already communicates
+ * what M3 brings; an outlined "chega no M3" card was still occupying space
+ * with an absence, which is not what docs/PRODUCT.md §7's "estados vazios
+ * honestos" asks for on a screen that has real data to show instead.
  */
 export default async function DashboardPage({ params }: DashboardPageProps) {
   const { orgSlug } = await params;
@@ -63,15 +71,36 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
   if (!membership) notFound();
 
   const orgId = membership.organization.id;
-  const [workspaceLoad, membersLoad, marketStatus] = await Promise.all([
+  const [workspaceLoad, membersLoad, marketStatus, readiness] = await Promise.all([
     loadWorkspace(orgId),
     loadMembers(orgId),
     marketStatusOrNull(),
+    readyOrNull(),
   ]);
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold text-fg">Dashboard</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold text-fg">Dashboard</h1>
+        <SystemHealthLine orgSlug={orgSlug} status={readiness} />
+      </div>
+
+      <section className="rounded-lg border border-border bg-bg-elevated p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-medium uppercase tracking-wide text-fg-muted">Mercados</h2>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/${orgSlug}/markets`}>Ver mercados</Link>
+          </Button>
+        </div>
+        <div className="mt-3">
+          {marketStatus ? (
+            <LiveStatus variant="full" initial={marketStatus} />
+          ) : (
+            <EmptyStateCard title="Cobertura" message="Mercados: status indisponível no momento." />
+          )}
+        </div>
+      </section>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <OrganizationCard organization={membership.organization} role={membership.role} />
         {renderWorkspace(workspaceLoad)}
@@ -80,12 +109,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
         ) : (
           <EmptyStateCard title="Membros" message={`Membros indisponível: ${membersLoad.reason}`} />
         )}
-        {marketStatus ? (
-          <LiveStatus variant="full" initial={marketStatus} />
-        ) : (
-          <EmptyStateCard title="Mercados" message="Mercados: status indisponível no momento." />
-        )}
-        <EmptyStateCard title="Portfolio" message="Nenhum portfolio ainda · Milestone 3" />
       </div>
       <QuickLinks orgSlug={orgSlug} />
     </div>
@@ -112,6 +135,25 @@ async function marketStatusOrNull(): Promise<MarketStatusResponse | null> {
     return await getMarketStatus();
   } catch (error) {
     logger.error("dashboard_market_status_load_failed", { error: error instanceof Error ? error.message : String(error) });
+    return null;
+  }
+}
+
+/**
+ * `null` only when `/ready` itself could not be attempted (`ready()`'s
+ * `READY_CHECK_NOT_CONFIGURED` sentinel, T1.5b Astra must-fix #1) -- never
+ * for a real, attempted "down"/"degraded" reading, so `SystemHealthLine`'s
+ * `dotState` can tell "sem verificação" apart from a genuine outage
+ * (joint decision #5). The `try`/`catch` is defense in depth mirroring
+ * `[orgSlug]/layout.tsx`'s `readyOrDown` for the case `ready()` itself
+ * rejects, which it no longer does on its own.
+ */
+async function readyOrNull(): Promise<ReadyStatus | null> {
+  try {
+    const status = await ready();
+    return wasReadyCheckAttempted(status) ? status : null;
+  } catch (error) {
+    logger.error("dashboard_ready_check_failed", { error: error instanceof Error ? error.message : String(error) });
     return null;
   }
 }

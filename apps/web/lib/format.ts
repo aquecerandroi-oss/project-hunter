@@ -132,6 +132,78 @@ export function formatPct(value: string | number, opts: { signed?: boolean; digi
   }).format(toNumber(value));
 }
 
+/**
+ * Time is always UTC (CLAUDE.md) -- deterministic everywhere, server or
+ * browser, any timezone. This is the ONLY half of a timestamp that is safe
+ * to render during SSR (H2, T1.5b fix pass): `formatUtcWithOffset` below
+ * used to call `date.getTimezoneOffset()` (the *runtime's* zone) directly in
+ * render, so a UTC-container server and a non-UTC browser produced different
+ * text for the exact same trade -- a hydration mismatch on every trade row
+ * for every non-UTC user. Callers that render during SSR (e.g.
+ * `components/markets/recent-trades.tsx`) must use this function for the
+ * first paint and add the local offset only as a client-only enhancement
+ * after mount (see that component's `useLocalOffsetSuffix`).
+ */
+export function formatUtc(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "--";
+
+  const utc = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "UTC",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+
+  return `${utc} UTC`;
+}
+
+/**
+ * The local wall-clock time with its signed UTC offset, e.g. `"11:32:10
+ * -03:00"` -- deliberately NOT part of `formatUtc` above, since it depends
+ * on the runtime's own timezone (`Intl.DateTimeFormat`'s implicit zone /
+ * `Date#getTimezoneOffset`) and must only ever be computed client-side,
+ * after mount (H2). Returns `null` for an invalid timestamp so a caller can
+ * fall back to just the UTC part without a "--" leaking into the offset.
+ */
+export function formatLocalOffset(iso: string): string | null {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const local = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+
+  // `getTimezoneOffset()` is minutes to ADD to local time to reach UTC (so
+  // it's the negative of the conventional "+02:00" style offset) -- flip the
+  // sign here rather than at every call site.
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const abs = Math.abs(offsetMinutes);
+  const offsetHours = String(Math.floor(abs / 60)).padStart(2, "0");
+  const offsetRemainder = String(abs % 60).padStart(2, "0");
+
+  return `${local} ${sign}${offsetHours}:${offsetRemainder}`;
+}
+
+/**
+ * UTC clock + local offset in one string, e.g. `"14:32:10 UTC (11:32:10
+ * -03:00)"` (joint decision #9: "horários acessíveis sem hover... em UTC com
+ * offset local"). Safe to call anywhere that does NOT render during SSR --
+ * see `formatUtc`'s docstring for the one place (SSR'd trade rows) that
+ * needs the two halves split apart instead.
+ */
+export function formatUtcWithOffset(iso: string): string {
+  const utc = formatUtc(iso);
+  if (utc === "--") return "--";
+  const local = formatLocalOffset(iso);
+  return local ? `${utc} (${local})` : utc;
+}
+
 export function formatCompact(value: string | number, locale = "en-US"): string {
   const raw = normalizeToDecimalString(value);
   const approx = Number(raw);

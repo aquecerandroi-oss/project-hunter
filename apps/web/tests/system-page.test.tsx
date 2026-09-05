@@ -36,7 +36,7 @@ vi.mock("next/navigation", () => ({
 // (`useRouter`) mocked, same as `auto-refresh.test.tsx`.
 
 import SystemPage from "@/app/(app)/[orgSlug]/system/page";
-import { DEFAULT_AUTO_REFRESH_INTERVAL_MS } from "@/components/auto-refresh";
+import { DEFAULT_AUTO_REFRESH_INTERVAL_MS } from "@/lib/auto-refresh-interval";
 import { ApiError } from "@/lib/api-error";
 import type { MembershipOut, SystemInfo, WorkerHeartbeat } from "@/lib/api/types";
 

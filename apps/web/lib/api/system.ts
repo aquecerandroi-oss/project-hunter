@@ -3,7 +3,15 @@ import "server-only";
 import { logger } from "@/lib/logger";
 import { apiFetch } from "@/lib/server/api";
 
+import { READY_CHECK_NOT_CONFIGURED, wasReadyCheckAttempted } from "./ready-status";
 import type { MarketStatusResponse, ReadyStatus, SystemInfo, WorkerHeartbeat } from "./types";
+
+// Re-exported so every existing server-side caller (this file's own
+// `ready()` below, `app/(app)/[orgSlug]/layout.tsx`, `dashboard/page.tsx`,
+// `tests/api/system.test.ts`) keeps importing from `@/lib/api/system`
+// unchanged -- see `./ready-status`'s docstring for why the definitions
+// themselves had to move (H3, client-safe import for `readiness-panel.tsx`).
+export { READY_CHECK_NOT_CONFIGURED, wasReadyCheckAttempted };
 
 /** `GET /api/v1/system/info` (apps/api/hunter_api/health.py) -- public, unauthenticated. */
 export async function systemInfo(): Promise<SystemInfo> {
@@ -32,16 +40,24 @@ export async function getMarketStatus(): Promise<MarketStatusResponse> {
  * infra probe does against this same endpoint.
  */
 export async function ready(): Promise<ReadyStatus> {
-  // H7: the `API_URL` check used to sit BEFORE this `try`, so a missing
-  // config threw straight out of `ready()` -- past the System page's own
-  // `Promise.all` isolation (loadWorkers()/loadSystemInfo() render their own
-  // honest per-section message; nothing does if the whole page's render
-  // rejects first). Every exit from this function must be a normal return, so
-  // the config check moves inside the same `try` as the fetch itself.
-  try {
-    const baseUrl = process.env.API_URL;
-    if (!baseUrl) throw new Error("API_URL is not configured");
+  // H7: a missing config used to throw straight out of `ready()` -- past the
+  // System page's own `Promise.all` isolation. Every exit from this function
+  // is a normal return; a missing `API_URL` returns its own sentinel detail
+  // (`READY_CHECK_NOT_CONFIGURED`) instead of reaching the `try` at all --
+  // there is nothing to attempt, so it is not the same case as the `catch`
+  // below (a real, attempted check that failed).
+  const baseUrl = process.env.API_URL;
+  if (!baseUrl) {
+    logger.error("ready_check_not_configured", {});
+    return {
+      database: false,
+      redis: false,
+      database_detail: READY_CHECK_NOT_CONFIGURED,
+      redis_detail: READY_CHECK_NOT_CONFIGURED,
+    };
+  }
 
+  try {
     const response = await fetch(`${baseUrl}/ready`, {
       headers: { Accept: "application/json" },
       cache: "no-store",

@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { wasReadyCheckAttempted } from "@/lib/api/ready-status";
 import { refreshReadiness } from "@/lib/api/system-actions";
 import type { ReadyStatus } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
@@ -13,7 +14,20 @@ export interface ReadinessPanelProps {
   initial: ReadyStatus;
 }
 
-function StatusBadge({ ok, detail }: { ok: boolean; detail?: string | undefined }) {
+/**
+ * H3 (T1.5b fix pass): the API's `not_configured` sentinel (`API_URL` unset)
+ * used to fall through to `detail ? "Indisponível (${detail})" : ...`, so
+ * this page showed a red "Indisponível (not_configured)" -- a raw internal
+ * token in Portuguese UI copy, AND the exact false alarm joint decision #5
+ * forbids ("ausência de verificação não é queda") -- while the topbar and
+ * the dashboard one click away correctly said "sem verificação". `attempted`
+ * (from `wasReadyCheckAttempted`, imported from the client-safe
+ * `lib/api/ready-status.ts`, never the `"server-only"` `lib/api/system.ts`)
+ * makes "sem verificação" its own neutral state here too, never folded into
+ * "Indisponível".
+ */
+function StatusBadge({ ok, detail, attempted }: { ok: boolean; detail?: string | undefined; attempted: boolean }) {
+  if (!attempted) return <Badge variant="default">Sem verificação</Badge>;
   return (
     <Badge variant={ok ? "positive" : "negative"}>
       {ok ? "OK" : detail ? `Indisponível (${detail})` : "Indisponível"}
@@ -56,6 +70,7 @@ export function ReadinessPanel({ initial }: ReadinessPanelProps) {
   }
 
   const allOk = status.database && status.redis;
+  const attempted = wasReadyCheckAttempted(status);
 
   return (
     <section className="rounded-lg border border-border bg-bg-elevated p-4 transition-colors hover:border-border-strong">
@@ -67,19 +82,21 @@ export function ReadinessPanel({ initial }: ReadinessPanelProps) {
         </Button>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Badge variant={allOk ? "positive" : "negative"}>{allOk ? "Ready" : "Not Ready"}</Badge>
+        <Badge variant={!attempted ? "default" : allOk ? "positive" : "negative"}>
+          {!attempted ? "Sem verificação" : allOk ? "Ready" : "Not Ready"}
+        </Badge>
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
         <div>
           <dt className="text-fg-muted">Postgres</dt>
           <dd className="mt-1">
-            <StatusBadge ok={status.database} detail={status.database_detail} />
+            <StatusBadge ok={status.database} detail={status.database_detail} attempted={attempted} />
           </dd>
         </div>
         <div>
           <dt className="text-fg-muted">Redis</dt>
           <dd className="mt-1">
-            <StatusBadge ok={status.redis} detail={status.redis_detail} />
+            <StatusBadge ok={status.redis} detail={status.redis_detail} attempted={attempted} />
           </dd>
         </div>
       </dl>

@@ -11,6 +11,12 @@ import type { ReadyStatus } from "@/lib/api/types";
 
 const ready: ReadyStatus = { database: true, redis: true };
 const redisDown: ReadyStatus = { database: true, redis: false, redis_detail: "unreachable" };
+const notConfigured: ReadyStatus = {
+  database: false,
+  redis: false,
+  database_detail: "not_configured",
+  redis_detail: "not_configured",
+};
 
 beforeEach(() => {
   refreshReadinessMock.mockReset();
@@ -38,5 +44,24 @@ describe("ReadinessPanel: reconciles a fresh server snapshot, not just the value
     fireEvent.click(screen.getByRole("button", { name: /Atualizar/ }));
 
     await screen.findByText("Not Ready");
+  });
+});
+
+describe("ReadinessPanel: 'sem verificação' is a distinct, neutral state, never folded into 'Indisponível' (H3)", () => {
+  it("shows 'Sem verificação' for both dependencies and the header pill when the check was never attempted", () => {
+    render(<ReadinessPanel initial={notConfigured} />);
+
+    expect(screen.getAllByText("Sem verificação")).toHaveLength(3); // header pill + Postgres + Redis
+    // The bug: the raw API sentinel leaking straight into Portuguese UI copy.
+    expect(screen.queryByText(/not_configured/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Not Ready")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Indisponível/)).not.toBeInTheDocument();
+  });
+
+  it("still shows the real 'Indisponível (detail)' reading once the check has actually run and failed", () => {
+    render(<ReadinessPanel initial={redisDown} />);
+
+    expect(screen.getByText(/Indisponível \(unreachable\)/)).toBeInTheDocument();
+    expect(screen.queryByText("Sem verificação")).not.toBeInTheDocument();
   });
 });

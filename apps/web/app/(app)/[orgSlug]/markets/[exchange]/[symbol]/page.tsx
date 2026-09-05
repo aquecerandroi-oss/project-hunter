@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
-import { AutoRefresh, autoRefreshIntervalMs } from "@/components/auto-refresh";
+import { AutoRefresh } from "@/components/auto-refresh";
+import { autoRefreshIntervalMs } from "@/lib/auto-refresh-interval";
 import { MarketDetailView } from "@/components/markets/market-detail-view";
 import { MarketsError } from "@/components/markets/markets-error";
 import { isApiError } from "@/lib/api-error";

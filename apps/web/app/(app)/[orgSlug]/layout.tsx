@@ -4,7 +4,7 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { resolveOrgContext } from "@/lib/api/org-context";
-import { ready } from "@/lib/api/system";
+import { ready, wasReadyCheckAttempted } from "@/lib/api/system";
 import type { ReadyStatus } from "@/lib/api/types";
 import { logger } from "@/lib/logger";
 import { visibleNavItems } from "@/lib/nav-registry";
@@ -14,17 +14,18 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 /**
- * `ready()` (lib/api/system.ts) already turns a failed fetch into a
- * `{database: false, redis: false}` reading -- the one thing it can't
- * survive is `API_URL` being unset, which it deliberately throws on. That's
- * exactly right for the System page (a real misconfiguration should be
- * loud there), but the topbar's status dot renders on every page under this
- * layout, so a missing `API_URL` must not 500 the whole app shell -- fall
- * back to a "down" reading instead.
+ * `ready()` (lib/api/system.ts) never throws -- a missing `API_URL` and a
+ * real fetch failure both resolve to a `ReadyStatus`, but only the latter is
+ * an actual "checked and failed" reading. `null` here means the check was
+ * never attempted (T1.5b Astra must-fix #1) so `topbar.tsx`'s `dotState` can
+ * render "sem verificação" instead of a fabricated "Sistema indisponível" --
+ * this `try`/`catch` is defense in depth for the (currently unreachable,
+ * since `ready()` itself no longer throws) case of `ready()` rejecting.
  */
 async function readyOrDown(): Promise<ReadyStatus | null> {
   try {
-    return await ready();
+    const status = await ready();
+    return wasReadyCheckAttempted(status) ? status : null;
   } catch (error) {
     logger.error("topbar_ready_check_failed", { error: error instanceof Error ? error.message : String(error) });
     return null;

@@ -42,6 +42,20 @@ export function formatVolume(value: string | null | undefined): string {
   return value === null || value === undefined ? "--" : formatCompact(value);
 }
 
+/**
+ * `quote_volume_24h` with its unit spelled out (joint decision #3: "unidade
+ * explícita"). A single table column header can't carry this honestly --
+ * the ~200-row monitored universe mixes USDT-, USDC- and BUSD-quoted
+ * markets, so a static header like "24h Vol (USDT)" would misdescribe every
+ * non-USDT row. Each cell states its own quote asset instead of a column
+ * that would sometimes lie.
+ */
+export function formatVolumeWithUnit(value: string | null | undefined, quoteAsset: string | null | undefined): string {
+  const amount = formatVolume(value);
+  if (amount === "--" || !quoteAsset) return amount;
+  return `${amount} ${quoteAsset}`;
+}
+
 /** `funding_rate` is a fraction (e.g. `0.0001` = 0.01%), unlike `price_change_24h_pct`. */
 export function formatFundingRate(value: string | null | undefined): string {
   return value === null || value === undefined ? "--" : formatPct(value, { digits: 4 });

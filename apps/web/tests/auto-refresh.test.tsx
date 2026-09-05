@@ -7,7 +7,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: refreshMock }),
 }));
 
-import { AutoRefresh, MIN_AUTO_REFRESH_INTERVAL_MS, autoRefreshIntervalMs } from "@/components/auto-refresh";
+import { AutoRefresh } from "@/components/auto-refresh";
+import { MIN_AUTO_REFRESH_INTERVAL_MS, autoRefreshIntervalMs } from "@/lib/auto-refresh-interval";
 
 function setVisibility(state: DocumentVisibilityState): void {
   Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });

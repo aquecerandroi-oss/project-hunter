@@ -95,7 +95,7 @@ describe("CandlesChart: an init failure is an honest, distinct state (F4)", () =
 
 describe("CandlesChart: colors track the live theme, not just the one at mount (F5)", () => {
   it("re-applies chart and series colors when data-theme changes, without hardcoded hex", async () => {
-    document.documentElement.style.setProperty("--color-gold", "#111111");
+    document.documentElement.style.setProperty("--color-green", "#111111");
     document.documentElement.style.setProperty("--color-red", "#222222");
     document.documentElement.style.setProperty("--color-fg-muted", "#333333");
     document.documentElement.style.setProperty("--color-border", "#444444");
@@ -116,7 +116,7 @@ describe("CandlesChart: colors track the live theme, not just the one at mount (
     // theme-recoloring effect were deleted entirely).
     const callsBeforeThemeChange = chartApplyOptionsMock.mock.calls.length;
 
-    document.documentElement.style.setProperty("--color-gold", "#999999");
+    document.documentElement.style.setProperty("--color-green", "#999999");
     document.documentElement.style.setProperty("--color-red", "#888888");
     document.documentElement.style.setProperty("--color-fg-muted", "#777777");
     document.documentElement.style.setProperty("--color-border", "#666666");
