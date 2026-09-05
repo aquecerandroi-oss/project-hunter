@@ -21,7 +21,8 @@ import importlib.util
 import os
 import sys
 import uuid
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncGenerator, AsyncIterator, Iterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Any
@@ -262,3 +263,67 @@ async def create_org(client: httpx.AsyncClient, actor: Actor, name: str) -> Acto
     me = await client.get("/api/v1/me", headers=actor.headers)
     actor.user_id = uuid.UUID(me.json()["user"]["id"])
     return actor
+
+
+def build_custom_app(
+    *,
+    database_url: str,
+    redis_url: str,
+    signing_key: rsa.RSAPrivateKey,
+    profiles: StaticProfileSource,
+    **setting_overrides: Any,
+) -> FastAPI:
+    """A second, independently-configured application.
+
+    For tests that need settings the shared ``api_settings``/``app``/``client``
+    fixtures deliberately keep generous — a tight ``rate_limit_per_minute``, a
+    short ``ws_revalidate_interval_s`` — without perturbing every other test
+    that shares those fixtures. Same database, same Redis, same signing key;
+    just its own ``ApiSettings`` and its own app object.
+    """
+    fields: dict[str, Any] = {
+        "hunter_env": "test",
+        "database_url": SecretStr(database_url),
+        "database_url_migrations": SecretStr(database_url),
+        "redis_url": SecretStr(redis_url),
+        "web_origin": WEB_ORIGIN,
+        "cors_allowed_origins": [WEB_ORIGIN],
+        "clerk_issuer": FAKE_ISSUER,
+        "clerk_webhook_secret": SecretStr(FAKE_WEBHOOK_SECRET),
+        "rate_limit_per_minute": 100000,
+        "rate_limit_per_minute_principal": 100000,
+    }
+    fields.update(setting_overrides)
+    settings = ApiSettings(**fields)
+    application = create_app(settings)
+    application.state.auth_provider = StaticKeyAuthProvider(
+        jwks_for(signing_key),
+        issuer=FAKE_ISSUER,
+        allowed_azp=settings.cors_allowed_origins,
+    )
+    application.state.profiles = profiles
+    return application
+
+
+@asynccontextmanager
+async def running(
+    application: FastAPI, *, client_addr: tuple[str, int] | None = None
+) -> AsyncGenerator[httpx.AsyncClient]:
+    """Run ``application``'s lifespan and hand back a client bound to it.
+
+    ``client_addr`` fixes ``request.client`` for the life of the transport
+    (``httpx.ASGITransport`` cannot change it per request), which is what lets
+    a test simulate two different callers sharing one process — two IPs, one
+    Redis, one principal budget.
+    """
+    async with application.router.lifespan_context(application):
+        application.state.principal_resolver = PrincipalResolver(
+            application.state.session_factory, application.state.profiles
+        )
+        transport = (
+            httpx.ASGITransport(app=application, client=client_addr)
+            if client_addr is not None
+            else httpx.ASGITransport(app=application)
+        )
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            yield client

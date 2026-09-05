@@ -433,6 +433,66 @@ async def test_revoking_an_invitation_records_what_was_revoked(
     assert row.before["role"] == "VIEWER"
 
 
+async def test_a_403_rejected_mutation_writes_no_audit_row(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    owner: Actor,
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """RBAC and audit are two different concerns, and the order matters: a
+    request refused for lacking a role never reached the handler that would
+    have written the row, so the trail must show nothing happened — not a
+    mutation attempt, successful or otherwise.
+    """
+    viewer = await _join(client, owner, make_actor, OrganizationRole.VIEWER)
+
+    response = await client.patch(
+        f"/api/v1/orgs/{owner.org_id}",
+        json={"name": "Should Never Land"},
+        headers=viewer.headers,
+    )
+
+    assert response.status_code == 403
+    assert await _audit_count(session_factory, owner, "organization.updated") == 0
+
+
+async def test_a_404_rejected_mutation_writes_no_audit_row(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    owner: Actor,
+) -> None:
+    """The org-id-doesn't-resolve-to-a-membership path is the tenant-isolation
+    guard, ahead of the handler; it must leave the audit trail exactly as
+    empty as the 403 case above.
+    """
+    response = await client.patch(
+        f"/api/v1/orgs/{uuid.uuid4()}",
+        json={"name": "Should Never Land"},
+        headers=owner.headers,
+    )
+
+    assert response.status_code == 404
+    assert await _audit_count(session_factory, owner, "organization.updated") == 0
+
+
+async def test_a_422_rejected_mutation_writes_no_audit_row(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    owner: Actor,
+) -> None:
+    """A payload that fails validation never reaches the service function that
+    calls ``record_audit`` — Pydantic rejects it before the handler runs.
+    """
+    response = await client.post(
+        f"/api/v1/orgs/{owner.org_id}/invitations",
+        json={"email": "not-an-email", "role": "VIEWER"},
+        headers=owner.headers,
+    )
+
+    assert response.status_code == 422
+    assert await _audit_count(session_factory, owner, "invitation.created") == 0
+
+
 async def test_reading_one_workspace_is_open_to_a_viewer(
     client: httpx.AsyncClient, owner: Actor, make_actor: Callable[[str], Actor]
 ) -> None:

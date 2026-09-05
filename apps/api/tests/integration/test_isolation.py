@@ -16,6 +16,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
+from hunter_core.db.models.identity import OrganizationMember
+from hunter_core.db.session import tenant_session
+from hunter_core.domain.enums import MemberStatus, OrganizationRole
+
 from .conftest import Actor, create_org
 
 if TYPE_CHECKING:
@@ -23,6 +27,7 @@ if TYPE_CHECKING:
 
     import httpx
     from fastapi import FastAPI
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 pytestmark = pytest.mark.integration
 
@@ -152,3 +157,67 @@ async def test_me_lists_only_the_callers_own_organizations(
     org_ids = {m["organization"]["id"] for m in body["memberships"]}
     assert org_ids == {str(a.org_id)}
     assert str(b.org_id) not in org_ids
+
+
+async def test_a_suspended_membership_is_404_not_403(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """``Principal.membership()`` treats a suspended row as no membership at
+    all (SECURITY.md §2/§3): the caller is not told the organization exists,
+    exactly as if they had never joined it.
+    """
+    unique = uuid.uuid4().hex[:8]
+    owner = await create_org(client, make_actor(f"susp-{unique}"), f"Suspended {unique}")
+    assert owner.org_id is not None and owner.user_id is not None
+
+    async with tenant_session(session_factory, owner.org_id, owner.user_id) as session:
+        member = await session.get(OrganizationMember, (owner.org_id, owner.user_id))
+        assert member is not None
+        member.status = MemberStatus.SUSPENDED
+
+    response = await client.get(f"/api/v1/orgs/{owner.org_id}", headers=owner.headers)
+
+    assert response.status_code == 404
+    assert response.headers["content-type"].startswith("application/problem+json")
+    assert "Organization not found" in response.json()["detail"]
+
+
+async def test_an_invited_but_not_yet_active_membership_is_404_not_403(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """A row that exists only as ``invited`` grants nothing yet — the M0 accept
+    flow moves straight to ``active`` (``services/invitations.py``), so this
+    row shape is reachable only by a state a client could observe mid-way
+    through some future multi-step flow. It must read the same as no row.
+    """
+    unique = uuid.uuid4().hex[:8]
+    owner = await create_org(client, make_actor(f"invowner-{unique}"), f"Invited {unique}")
+    assert owner.org_id is not None and owner.user_id is not None
+    not_yet_member = make_actor(f"invitee-{unique}")
+    # JIT-provision the user row without ever joining the organization
+    provisioned = await client.get("/api/v1/me", headers=not_yet_member.headers)
+    assert provisioned.status_code == 200
+    not_yet_member.user_id = uuid.UUID(provisioned.json()["user"]["id"])
+
+    async with tenant_session(session_factory, owner.org_id, owner.user_id) as session:
+        session.add(
+            OrganizationMember(
+                organization_id=owner.org_id,
+                user_id=not_yet_member.user_id,
+                role=OrganizationRole.VIEWER,
+                status=MemberStatus.INVITED,
+                invited_by=owner.user_id,
+                joined_at=None,
+            )
+        )
+
+    response = await client.get(f"/api/v1/orgs/{owner.org_id}", headers=not_yet_member.headers)
+
+    assert response.status_code == 404
+    assert response.headers["content-type"].startswith("application/problem+json")
+    me = (await client.get("/api/v1/me", headers=not_yet_member.headers)).json()
+    assert me["memberships"] == [], "an invited row must not appear as a membership either"

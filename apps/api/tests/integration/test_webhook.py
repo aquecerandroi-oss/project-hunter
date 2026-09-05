@@ -8,6 +8,7 @@ handler has to be exactly-once *in effect* — the ``svix-id`` is claimed in
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from datetime import UTC, datetime
@@ -23,7 +24,15 @@ from hunter_core.db.models.system import AuditLog, ProcessedEvent
 from hunter_core.db.session import role_session, tenant_session
 from hunter_core.domain.enums import MemberStatus
 
-from .conftest import FAKE_WEBHOOK_SECRET, Actor, auth_header, create_org, load_script
+from .conftest import (
+    FAKE_WEBHOOK_SECRET,
+    Actor,
+    auth_header,
+    build_custom_app,
+    create_org,
+    load_script,
+    running,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -31,6 +40,8 @@ if TYPE_CHECKING:
     import httpx
     from cryptography.hazmat.primitives.asymmetric import rsa
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    from hunter_api.auth.clerk_api import StaticProfileSource
 
 pytestmark = pytest.mark.integration
 
@@ -585,3 +596,63 @@ async def test_the_pruner_drops_old_completed_rows_only_and_is_idempotent(
             .all()
         )
     assert set(surviving) == {fresh_done, old_unfinished}
+
+
+async def test_a_crash_where_even_the_release_never_runs_still_recovers_after_the_stale_window(
+    api_database_url: str,
+    redis_url: str,
+    signing_key: rsa.RSAPrivateKey,
+    profiles: StaticProfileSource,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``test_a_delivery_that_fails_midway_is_retried_and_completes`` proves the
+    happy path of crash recovery: the ``except`` block runs, calls
+    ``release_delivery``, and the very next retry succeeds. This is the
+    harder case the stale window (``webhook_claim_stale_s``) exists for: a
+    crash severe enough that *even the cleanup* never took effect — a
+    connection already lost, a pod killed mid-``except``. ``release_delivery``
+    is monkeypatched to a no-op to stand in for that, so the claim is left
+    exactly as a real crash would leave it: taken, unfinished, and — until the
+    stale window passes — indistinguishable from a delivery still in flight.
+    """
+    app = build_custom_app(
+        database_url=api_database_url,
+        redis_url=redis_url,
+        signing_key=signing_key,
+        profiles=profiles,
+        webhook_claim_stale_s=0.2,
+    )
+
+    original_upsert_user = clerk_webhook._upsert_user  # pyright: ignore[reportPrivateUsage]
+
+    async def _noop_release(*_args: Any, **_kwargs: Any) -> None:
+        return None
+
+    async def _explode(*_args: Any, **_kwargs: Any) -> dict[str, str]:
+        raise RuntimeError("mirror exploded and the crash took the cleanup with it")
+
+    monkeypatch.setattr(clerk_webhook, "release_delivery", _noop_release)
+    monkeypatch.setattr(clerk_webhook, "_upsert_user", _explode)
+
+    subject = f"user_FAKE_unreleased_{uuid.uuid4().hex[:8]}"
+    delivery_id = f"msg_FAKE_{uuid.uuid4().hex[:8]}"
+    payload = {"type": "user.created", "data": _clerk_user(subject, f"{subject}@example.test")}
+
+    async with running(app) as client:
+        failed = await _post(client, payload, delivery_id)
+        assert failed.status_code == 500
+
+        immediate_retry = await _post(client, payload, delivery_id)
+        assert immediate_retry.json()["status"] == "duplicate", (
+            "with the release a no-op, the claim is left exactly as a real "
+            "crash would leave it: taken and unfinished"
+        )
+
+        monkeypatch.setattr(clerk_webhook, "_upsert_user", original_upsert_user)
+        await asyncio.sleep(0.3)
+        recovered = await _post(client, payload, delivery_id)
+
+    assert recovered.json() == {"status": "applied", "type": "user.created"}, (
+        "past webhook_claim_stale_s an unfinished claim must become available "
+        "again, however it was left unfinished"
+    )
