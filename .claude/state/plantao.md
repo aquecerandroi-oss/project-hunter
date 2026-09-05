@@ -1,6 +1,6 @@
 # Plantão da Sexta-feira — nota do turno
 
-Atualizado: 2026-09-05, madrugada (fechamento do M1).
+Atualizado: 2026-09-06, madrugada. M1 fechado e aprovado.
 
 ## O que mudou neste turno
 - **Memória** (`e254145`): changelog dos três commits, `Dialogos/SHADOW.md` com a decisão conjunta
@@ -17,16 +17,14 @@ Atualizado: 2026-09-05, madrugada (fechamento do M1).
 - **Relatório do M1** (`fc3e56f`): formato estendido, todo número com comando colado.
 
 ## Estado do M1
-**Aprovação SUSPENSA por um item só**, objetivo:
-`apps/api/tests/integration/test_webhook.py::test_a_crash_where_even_the_release_never_runs_still_recovers_after_the_stale_window`
-falha 3 em 3 com a máquina ociosa — vermelho reprodutível carregado desde a T1.3. Despachado ao
-`backend-specialist` com a instrução de decidir com evidência entre defeito de idempotência e teste
-que promete o que a implementação nunca prometeu, **sem** alargar timeout até passar.
+**APROVADO** pela Sexta-feira em 2026-09-06 em nome do Everton (`3d47a9e`). O bloqueio — o teste de
+webhook vermelho 3 em 3 — foi investigado com medição, corrigido em `27a0598` sem tocar código de
+produção, e revisado adversarialmente por `code-reviewer` e Astra, que responderam PRESERVADO
+independentemente. `milestone.json` está em **M2, onda 1 a despachar: T2.1 + T2.2**.
 
-Assim que a suíte `apps/api` fechar verde: escrever a linha de aprovação no topo de
-`docs/reports/M1.md`, mudar `.claude/state/milestone.json` para M2 (`status: planned`, onda 1 =
-T2.1 + T2.2, com T2.1 referenciando `0002_shadow_lab`), acrescentar o item ao changelog e ao
-diário, commitar e dar push.
+Ressalva registrada com a aprovação: o M1 entrega **50 mercados**, não os 200 do plano. Os 200 estão
+provados (4 shards × 50 → `markets_ok` 198/200) e não entregues, porque essa topologia compartilha a
+chave de heartbeat e faria a página System mentir.
 
 ## Em voo (não tocar nos arquivos)
 | Tarefa | Dono | Arquivos |
@@ -37,8 +35,17 @@ diário, commitar e dar push.
 `ruff check .` no repositório inteiro está vermelho com 5 erros — **todos em
 `services/strategy-worker/`**, código da S2 em voo. Nos caminhos do M1 está limpo.
 
-## Primeira dívida a entrar no M2
-**Heartbeat por shard com agregação na API.** É o que libera os 200 mercados já provados.
+## Próximo passo
+Despachar a onda 1 do M2: **T2.1** (`database-architect`, opus — schema de análise; a migração passa
+a depender de `0002_shadow_lab` e vira `0003`) e **T2.2** (`quant-engineer`, opus — Feature Engine),
+em paralelo, com os kits de revisão prontos antes das entregas. A decisão conjunta do M2 já está
+fechada, então não há etapa de diálogo a repetir.
+
+## Dívidas do M1 que entram no M2, por prioridade
+1. **Heartbeat por shard com agregação na API** — é o que libera os 200 mercados já provados.
+2. **`dataclass(slots=True)` nos tipos normalizados do caminho quente** — `model_construct` do
+   pydantic é 15% do tempo amostrado pelo py-spy, resolvendo defaults a cada evento.
+3. Gaps de mercados não monitorados que nunca fecham; rebalanceamento na morte de um shard.
 
 ## Precisa do Everton
 - Nada bloqueante. Opcional: `.env` e logins na VPS (`ssh hunter-vps`).
