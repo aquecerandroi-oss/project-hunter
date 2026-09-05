@@ -247,7 +247,7 @@ jobs:
       - name: install chromium
         run: pnpm --filter @hunter/e2e install-browsers
       - name: run e2e suite
-        run: pnpm --filter @hunter/e2e test
+        run: pnpm --filter @hunter/e2e e2e
       - name: upload e2e artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
