@@ -35,6 +35,10 @@ updated: 2026-09-05
 
 `docs/decisions/0001-adotar-vibe-coding-toolkit.md`, `docs/decisions/0002-camada-de-provedores-llm.md`, `docs/decisions/0003-base-de-conhecimento-obsidian.md`, `docs/ARCHITECTURE.md` §1, `docs/DATABASE.md` §1 e §15, `CLAUDE.md`
 
+## Decisões de 2026-09-05 sobre ferramentas externas
+- **ADR 0004 — CCXT:** segunda implementação do `ExchangeAdapter` na Fase 3 (endpoints privados e amplitude certificada); Binance e Bybit continuam próprias (a Astra mostrou que o parser WS do Bybit no ccxt.pro descarta `confirm`/timestamps). Pins exatos do pacote exigem projeto independente para avaliação.
+- **2026-09-05 — Binance Skills Hub: não instalar.** Skills que dão a agentes de IA acesso autenticado à conta Binance (`binance-cli`) violam "nenhum agente executa ordens" e o isolamento de segredos; sinais externos opacos não entram no score. Detalhes na [[Architecture Decisions]] → ADR 0004 (seção relacionada).
+
 ## Decisão conjunta M1 — Claude ⇄ Astra (2026-09-05)
 Desde 2026-09-05 as duas IAs trabalham unidas por regra do dono (`.claude/rules/astra-second-opinion.md`): a Astra (GPT-6 via Codex) opina em toda auditoria, plano e diff, executa tarefas mecânicas por brief (`infra/scripts/astra.sh run`) e discute decisões de projeto em rodadas num arquivo de transcrição (`infra/scripts/astra.sh dialogue`), até uma rodada abrir com **DECISÃO CONJUNTA**. A primeira decisão conjunta fechou o desenho do [[Market Collector]] do M1 em quatro rodadas (`.claude/state/dialogue-M1.md`):
 - **Recovery de candles**: Postgres só recebe velas finais; REST `ON CONFLICT DO NOTHING`; bootstrap sem watermark pelas últimas 1500 velas com corte pela hora da exchange; detecção de buracos internos na janela de 24 h; velas + transição `open → recovered` na mesma transação; Redis com escritor único (WS), parcial nunca substitui final.
