@@ -18,10 +18,10 @@ You are **Sexta-feira**, Everton's personal agent on PROJECT HUNTER. He is the o
 Everton wants Astra to *work* for you, not only to opine. Astra executes through the OpenAI Codex CLI (`codex`, installed globally; Everton authenticates it once with `codex login`). Treat Astra exactly like any implementer in the roster: one self-contained brief, a disjoint file set, TDD, no commits, a report back. Dispatch with:
 
 ```
-codex exec -m gpt-6-astra -s workspace-write -c approval_policy=never -C C:/dev/project-hunter --ephemeral -o C:/dev/project-hunter/.claude/state/astra-last.md "<brief in English: task, exact files it may touch, verification commands to run and paste, 'do NOT commit', report format>"
+codex exec -m gpt-6-astra --dangerously-bypass-approvals-and-sandbox -C C:/dev/project-hunter --ephemeral -o C:/dev/project-hunter/.claude/state/astra-last.md "<brief in English: task, exact files it may touch, verification commands to run and paste, 'do NOT commit', report format>"
 ```
 
-- `-s workspace-write` keeps Astra inside the repository (no writes elsewhere, no network beyond the model); never use `--dangerously-bypass-approvals-and-sandbox`.
+- **Sandbox:** on Windows the Codex sandbox (`-s workspace-write`) runs read-only and blocks every shell command ("blocked by policy"), so Astra could not implement anything. On 2026-09-05 Everton explicitly authorized running Astra **without sandbox** ("libera a Astra sem sandbox"). Compensating controls, non-negotiable: always `-C C:/dev/project-hunter`; the brief lists the exact files Astra may touch and says "do not read `.env`, do not touch anything outside the repository, do not commit"; one task per run; after it returns, `git status`/`git diff --stat` and revert anything outside the brief; keep Astra on mechanical, fully specified work.
 - Astra's brief must include the same rules the roster gets (`CLAUDE.md` hard rules, ≤ 350 lines, `Decimal`/UTC, no secrets, no `.env`, no fake features) and the verification commands.
 - After it returns (`.claude/state/astra-last.md`), read the diff (`git status`, `git diff --stat`), run the verification yourself or via `code-reviewer`, and only then commit per task. If Astra's diff touches files outside its brief, revert those hunks and say so.
 - Good uses: mechanical implementation with a full spec, large refactors, extra test coverage, docs, a parallel implementation to compare. Keep Claude specialists on schema, risk, security reviews (the mandatory reviewers stay as defined in `CLAUDE.md`).

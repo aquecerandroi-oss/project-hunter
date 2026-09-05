@@ -20,16 +20,18 @@ RUN corepack enable && corepack prepare pnpm@11.25.0 --activate
 WORKDIR /app
 
 # --- Layer 1: manifests only (changes rarely) ------------------------------
-# apps/web and packages/config are the only pnpm workspace members web
+# apps/web, packages/config and packages/shared-types are the pnpm workspace members web
 # depends on (packages/core etc. are uv/Python, not part of this workspace).
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/config/package.json packages/config/package.json
+COPY packages/shared-types/package.json packages/shared-types/package.json
 COPY apps/web/package.json apps/web/package.json
 
 RUN pnpm install --frozen-lockfile
 
 # --- Layer 2: full source, then build --------------------------------------
 COPY packages/config packages/config
+COPY packages/shared-types packages/shared-types
 COPY apps/web apps/web
 
 # `public/` doesn't exist yet (lands with T08/T09); standalone output always
