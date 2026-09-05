@@ -1,3 +1,5 @@
+# pyright: reportPrivateUsage=false
+# (this suite inspects the endpoint's throttle internals on purpose)
 """``/ws`` protocol: authenticate first, subscribe only to your own channels.
 
 Uses ``starlette.testclient.TestClient`` specifically for its

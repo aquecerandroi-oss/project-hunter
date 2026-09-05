@@ -3,7 +3,7 @@
 # (não-bloqueante) até a contagem zerar; aí a regra migra para cá.
 target-version = "py312"
 line-length = 100
-extend-exclude = ["infra/migrations/versions", "**/generated/**", ".venv"]
+extend-exclude = ["infra/migrations/versions", "**/generated/**", ".venv", ".claude"]  # .claude/state holds ad-hoc profiling scripts, not product code
 
 [lint]
 select = [

@@ -39,7 +39,7 @@ check_unchanged() {
 
 run_codex() {
   local out="$1" prompt="$2"
-  codex exec -m "$MODEL" --dangerously-bypass-approvals-and-sandbox -C "$REPO" --ephemeral -o "$out" "$prompt" >/dev/null 2>"$STATE/astra-stderr.log" || {
+  codex exec -m "$MODEL" --dangerously-bypass-approvals-and-sandbox -C "$REPO" --ephemeral -o "$out" "$prompt" </dev/null >/dev/null 2>"$STATE/astra-stderr.log" || {
     echo "codex falhou (veja $STATE/astra-stderr.log)" >&2; return 1; }
 }
 
