@@ -65,6 +65,7 @@ Dispatch the specialist whose row matches; never a generic agent for delegable w
 
 | Agent | When to use | Default model |
 |---|---|---|
+| `product-owner` | Everton's agent: takes product requests in Portuguese, writes specs/briefs, dispatches the whole roster (including the opus specialists), enforces the workflow, reports in §77 format. Entry point for a human steering the product. | opus |
 | `backend-specialist` | FastAPI routers/services, SQLAlchemy repositories, workers (`services/*`), Redis Streams consumers/producers, Pydantic schemas. | sonnet |
 | `frontend-specialist` | Next.js App Router pages, shadcn/ui components, Tailwind theme, TanStack Table/Query, realtime hooks, nav-registry. | sonnet |
 | `database-architect` | Schema changes, Alembic migrations, RLS policies, partitions/retention, indexes, query plans. Reviews any migration. | opus |
