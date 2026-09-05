@@ -16,10 +16,16 @@
 
 set -euo pipefail
 
-REPO="C:/dev/project-hunter"
+# Repo root = two levels above this script, wherever the clone lives (Windows dev box or the VPS).
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 STATE="$REPO/.claude/state"
 MODEL="${ASTRA_MODEL:-gpt-6-astra}"
-export PATH="/c/Program Files/nodejs:/c/Users/evert/AppData/Roaming/npm:/c/Users/evert/AppData/Local/Microsoft/WinGet/Packages/astral-sh.uv_Microsoft.Winget.Source_8wekyb3d8bbwe:/c/Users/evert/.local/bin:$PATH"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)  # Everton's Windows box: toolchain is not on the Git Bash PATH by default
+    export PATH="/c/Program Files/nodejs:/c/Users/evert/AppData/Roaming/npm:/c/Users/evert/AppData/Local/Microsoft/WinGet/Packages/astral-sh.uv_Microsoft.Winget.Source_8wekyb3d8bbwe:/c/Users/evert/.local/bin:$PATH" ;;
+  *)                     # Linux (VPS): user-level npm prefix from the bootstrap
+    export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH" ;;
+esac
 
 GUARD="Regras fixas: AGENTS.md na raiz do repositório é o seu toolkit (mesmo do Claude: CLAUDE.md, roster em .claude/agents, regras em .claude/rules) e vale integralmente. Você é a Astra, um dos dois motores de raciocínio da Sexta-feira (o outro é o Claude) no PROJECT HUNTER; juntos vocês são uma só assistente. Antes de responder leia obsidian/00-HOME.md e as páginas do Obsidian dos módulos envolvidos (obsidian/ é a memória compartilhada; os diálogos anteriores estão em obsidian/06-DECISIONS/Dialogos e as suas revisões em obsidian/06-DECISIONS/Revisoes-Astra). Nunca leia .env. Nunca toque em nada fora de C:/dev/project-hunter. Nunca faça commit. Responda em português, de forma concreta, citando arquivo e linha quando afirmar algo sobre o código, e termine com uma seção OBSIDIAN listando quais páginas da base deveriam ser atualizadas por causa desta resposta (título da página + 1 linha)."
 
