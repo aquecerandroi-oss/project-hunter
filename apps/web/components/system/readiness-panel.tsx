@@ -29,6 +29,24 @@ function StatusBadge({ ok, detail }: { ok: boolean; detail?: string | undefined 
  */
 export function ReadinessPanel({ initial }: ReadinessPanelProps) {
   const [status, setStatus] = useState(initial);
+  // Tracks the last `initial` this component actually reconciled against --
+  // React's own documented "adjust state when a prop changes" pattern
+  // (https://react.dev/learn/you-might-not-need-an-effect), setting state
+  // during render rather than in a `useEffect` (which would fire one render
+  // late and trigger a cascading-render lint error). `useState(initial)`
+  // alone only ever reads `initial` at mount; `AutoRefresh` re-renders the
+  // System page with a fresh `/ready` result every cycle, but this component
+  // instance survives that re-render (its position in the tree hasn't
+  // changed), so without this the panel kept showing whatever it read once
+  // at mount forever -- Redis going down after the page first loaded never
+  // reached the screen (H6). The manual "Atualizar" click's `setStatus`
+  // below still wins whenever it resolves after the next render, since
+  // whichever update was dispatched more recently is what ends up rendered.
+  const [syncedInitial, setSyncedInitial] = useState(initial);
+  if (initial !== syncedInitial) {
+    setSyncedInitial(initial);
+    setStatus(initial);
+  }
   const [pending, startTransition] = useTransition();
 
   function handleRefresh(): void {

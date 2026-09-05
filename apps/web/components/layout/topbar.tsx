@@ -2,8 +2,11 @@ import { UserButton } from "@clerk/nextjs";
 import type { ReactNode } from "react";
 
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { LiveStatus } from "@/components/system/live-status";
 import { Separator } from "@/components/ui/separator";
-import type { ReadyStatus } from "@/lib/api/types";
+import { getMarketStatus } from "@/lib/api/system";
+import type { MarketStatusResponse, ReadyStatus } from "@/lib/api/types";
+import { logger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 
 export interface TopbarProps {
@@ -45,7 +48,18 @@ function SystemStatusDot({ status }: { status: ReadyStatus | null }) {
   );
 }
 
-export function Topbar({ orgSlug, systemStatus, children }: TopbarProps) {
+/** `/system/market-status` (T1.4) can 404/500 before that piece deploys -- the topbar must never 500 the whole shell over a missing widget. */
+async function marketStatusOrNull(): Promise<MarketStatusResponse | null> {
+  try {
+    return await getMarketStatus();
+  } catch (error) {
+    logger.error("topbar_market_status_load_failed", { error: error instanceof Error ? error.message : String(error) });
+    return null;
+  }
+}
+
+export async function Topbar({ orgSlug, systemStatus, children }: TopbarProps) {
+  const marketStatus = await marketStatusOrNull();
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-bg-elevated px-4">
       {children}
@@ -70,6 +84,14 @@ export function Topbar({ orgSlug, systemStatus, children }: TopbarProps) {
        */}
       <span className="truncate text-sm font-medium text-fg-muted">{orgSlug}</span>
       <SystemStatusDot status={systemStatus} />
+      <Separator orientation="vertical" className="h-5" />
+      {marketStatus ? (
+        <LiveStatus variant="compact" initial={marketStatus} />
+      ) : (
+        <span className="text-xs text-fg-subtle" title="Mercados: status indisponível no momento">
+          mercados indisponível
+        </span>
+      )}
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
         <Separator orientation="vertical" className="h-6" />

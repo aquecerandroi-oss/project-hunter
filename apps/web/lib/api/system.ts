@@ -3,11 +3,21 @@ import "server-only";
 import { logger } from "@/lib/logger";
 import { apiFetch } from "@/lib/server/api";
 
-import type { ReadyStatus, SystemInfo } from "./types";
+import type { MarketStatusResponse, ReadyStatus, SystemInfo, WorkerHeartbeat } from "./types";
 
 /** `GET /api/v1/system/info` (apps/api/hunter_api/health.py) -- public, unauthenticated. */
 export async function systemInfo(): Promise<SystemInfo> {
   return apiFetch<SystemInfo>("/api/v1/system/info");
+}
+
+/** `GET /api/v1/system/workers` -- a bare array (`schemas/system.py`'s `list[WorkerHeartbeatOut]`); `market` role rows also carry `ws_state`/`markets_monitored`/etc. */
+export async function getWorkers(): Promise<WorkerHeartbeat[]> {
+  return apiFetch<WorkerHeartbeat[]>("/api/v1/system/workers");
+}
+
+/** `GET /api/v1/system/market-status` (T1.4) -- monitored count, WS state, last-tick age and open gaps per exchange. */
+export async function getMarketStatus(): Promise<MarketStatusResponse> {
+  return apiFetch<MarketStatusResponse>("/api/v1/system/market-status");
 }
 
 /**
@@ -22,10 +32,16 @@ export async function systemInfo(): Promise<SystemInfo> {
  * infra probe does against this same endpoint.
  */
 export async function ready(): Promise<ReadyStatus> {
-  const baseUrl = process.env.API_URL;
-  if (!baseUrl) throw new Error("API_URL is not configured");
-
+  // H7: the `API_URL` check used to sit BEFORE this `try`, so a missing
+  // config threw straight out of `ready()` -- past the System page's own
+  // `Promise.all` isolation (loadWorkers()/loadSystemInfo() render their own
+  // honest per-section message; nothing does if the whole page's render
+  // rejects first). Every exit from this function must be a normal return, so
+  // the config check moves inside the same `try` as the fetch itself.
   try {
+    const baseUrl = process.env.API_URL;
+    if (!baseUrl) throw new Error("API_URL is not configured");
+
     const response = await fetch(`${baseUrl}/ready`, {
       headers: { Accept: "application/json" },
       cache: "no-store",

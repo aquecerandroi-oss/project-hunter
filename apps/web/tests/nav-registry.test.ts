@@ -10,9 +10,9 @@ describe("nav-registry", () => {
     expect(new Set(keys).size).toBe(17);
   });
 
-  it("marks only dashboard, system and settings available in M0", () => {
+  it("marks dashboard, markets, system and settings available (M1: markets goes live)", () => {
     const available = NAV_ITEMS.filter((item) => item.status === "available").map((item) => item.key);
-    expect(available.sort()).toEqual(["dashboard", "settings", "system"]);
+    expect(available.sort()).toEqual(["dashboard", "markets", "settings", "system"]);
   });
 
   it("gives every planned item a milestone", () => {
@@ -31,7 +31,7 @@ describe("nav-registry", () => {
   it("hides planned items in production", () => {
     const items = visibleNavItems("OWNER", "production");
     expect(items.every((item) => item.status === "available")).toBe(true);
-    expect(items.map((item) => item.key).sort()).toEqual(["dashboard", "settings", "system"]);
+    expect(items.map((item) => item.key).sort()).toEqual(["dashboard", "markets", "settings", "system"]);
   });
 
   it("shows planned items outside production", () => {
@@ -44,7 +44,7 @@ describe("nav-registry", () => {
   it("never hides an available item regardless of role", () => {
     for (const role of ["OWNER", "ADMIN", "TRADER", "ANALYST", "VIEWER"] as const) {
       const items = visibleNavItems(role, "production");
-      expect(items.map((item) => item.key).sort()).toEqual(["dashboard", "settings", "system"]);
+      expect(items.map((item) => item.key).sort()).toEqual(["dashboard", "markets", "settings", "system"]);
     }
   });
 });

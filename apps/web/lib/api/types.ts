@@ -95,3 +95,101 @@ export function validationProblem(detail: string): Problem {
 }
 
 export { ApiError };
+
+/**
+ * Aliases onto the OpenAPI-generated `components["schemas"]` for the real
+ * T1.4 market/system contract (`apps/api/hunter_api/schemas/{markets,system}.py`,
+ * `pnpm gen:types`) -- same pattern as the org/workspace aliases above. T1.5's
+ * H1 fix retired the hand-written mirror of this contract that used to live
+ * here: it had already drifted (`base_asset`/`quote_asset` are
+ * `string | null`, not the non-nullable `string` this file used to declare),
+ * which crashed `markets-table.tsx`'s search filter on the first
+ * not-yet-backfilled row. Every numeric field is still a `Decimal` string or
+ * `null`, never a `number` -- CLAUDE.md's "money is Decimal, never float"
+ * extends to the wire format here too.
+ */
+export type MarketDataQuality = components["schemas"]["DataQuality"];
+/** A single component's own freshness -- narrower than `MarketDataQuality`, which also knows `degraded`/`unavailable` (market-wide, not one component's). */
+export type ComponentQuality = components["schemas"]["ComponentQuality"];
+
+/** `ticker`/`book`/`mark` -- the three required components. */
+export type ComponentStatus = components["schemas"]["ComponentStatusOut"];
+/** `open_interest` -- not required, so it carries no `quality`. */
+export type OptionalComponentStatus = components["schemas"]["OptionalComponentStatusOut"];
+export type FundingComponentStatus = components["schemas"]["FundingComponentStatusOut"];
+export type MarketComponents = components["schemas"]["MarketComponentsOut"];
+
+/** One row of `GET /api/v1/markets` (`MarketOut`) -- named `MarketRow` here because every call site reads it as a table row. */
+export type MarketRow = components["schemas"]["MarketOut"];
+export type MarketsSummary = components["schemas"]["MarketsSummary"];
+/** `GET /api/v1/markets`'s full page shape (`MarketListPage`), including `stale_after_ms` (H2) and `summary`. */
+export type MarketsListResponse = components["schemas"]["MarketListPage"];
+
+/** `{price, qty}`, both `Decimal` strings. */
+export type OrderBookLevel = components["schemas"]["BookLevelOut"];
+export type MarketBook = components["schemas"]["OrderBookOut"];
+export type RecentTrade = components["schemas"]["TradeOut"];
+
+/**
+ * `GET /api/v1/markets/{exchange}/{symbol}` (`MarketDetailOut`). Carries
+ * `hot_state_ok` (H3): `false` means the Redis hot-state read itself failed
+ * and `book`/`recent_trades` are `null` because the API *could not ask*, not
+ * because there is no book/no trades -- render an outage, never "no book"/"no
+ * recent trades", whenever this is `false`. See the generated type's own
+ * docstring in `packages/shared-types/src/generated/api.d.ts` for the full
+ * contract.
+ */
+export type MarketDetail = components["schemas"]["MarketDetailOut"];
+
+/** `GET .../candles` -- final candles only (`is_final = true`), never a partial one. */
+export type Candle = components["schemas"]["CandleOut"];
+
+export type WorkerStatus = components["schemas"]["WorkerLivenessStatus"];
+/**
+ * `GET /api/v1/system/workers` -- one row per `hb:{role}:{instance}` key.
+ * The `market` role's rows (`instance` = exchange code) additionally carry
+ * the exchange fields below; every other role has them `null`, never fabricated.
+ */
+export type WorkerHeartbeat = components["schemas"]["WorkerHeartbeatOut"];
+
+export type ExchangeStatus = components["schemas"]["MarketStatusExchangeOut"];
+/** `GET /api/v1/system/market-status`. */
+export type MarketStatusResponse = components["schemas"]["MarketStatusOut"];
+
+/**
+ * `rt:market:{exchange}:{symbol}` payload (docs/ARCHITECTURE.md §5.2,
+ * `services/market-worker/hunter_market_worker/ingest.py::build_tick_payload`).
+ * Not part of the OpenAPI document (it's a Redis pub/sub message, not an HTTP
+ * response), so it stays hand-typed. `price_ts`/`book_ts` (H4) track the
+ * timestamp of the event kind that actually owns each value -- `ts` is only
+ * the coalesced aggregate (bumped on ANY event, price or book), so using it
+ * to age the price lets a book-only update republish a frozen price under a
+ * fresh-looking age. Compare/display the price's age against `price_ts` and
+ * the book's against `book_ts`; never fall back to `ts` when one of these is
+ * missing (a worker that hasn't shipped them yet must read as "no signal",
+ * not as fresh).
+ */
+export interface RtMarketMessage {
+  exchange: string;
+  symbol: string;
+  price: string | null;
+  bid: string | null;
+  ask: string | null;
+  volume_delta: string | null;
+  trades_count: number | null;
+  book_imbalance_5: string | null;
+  ts: string;
+  price_ts: string | null;
+  book_ts: string | null;
+}
+
+/** `rt:system` payload -- one exchange's status per message. */
+export interface RtSystemMessage {
+  type: "market_status";
+  exchange: string;
+  ws_state: string;
+  last_event_at: string | null;
+  markets_monitored: number;
+  open_gaps: number;
+  ts: string;
+}
