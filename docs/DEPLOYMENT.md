@@ -278,3 +278,142 @@ docker compose -f infra/docker/docker-compose.test.yml down -v
 
 CI usa testcontainers direto (`tests/integration/README.md`,
 `apps/api/tests/integration/conftest.py`); isto é só a conveniência local.
+
+## 9. VPS (Contabo) — operação 24/7
+
+Ambiente que existe de fato hoje, ao lado do dev local: **uma** VPS Ubuntu
+22.04/24.04 rodando a mesma stack do `infra/docker/docker-compose.yml` mais um
+override de produção. Serve para o `market-worker` ficar coletando mercado sem
+o PC ligado e para sessões de desenvolvimento por SSH (Claude Code e Codex
+rodam em Linux; o sandbox do Codex funciona lá, ao contrário do Windows).
+
+Não substitui o §1 (Railway/Vercel/Neon continuam o alvo de produção da Fase
+4); é a máquina de trabalho contínuo do MVP.
+
+### 9.1 Arquivos
+
+| Arquivo | O que faz |
+|---|---|
+| `infra/scripts/bootstrap_vps.sh` | prepara a máquina do zero (Docker, Node 22, pnpm, uv, ufw, fail2ban, unattended-upgrades, swap, usuário de deploy, clone do repo, cron do backup). Idempotente. |
+| `infra/scripts/setup_env.sh` | cria o `.env` com digitação oculta (`--vps` para o perfil da VPS). Versão bash do `setup_env.ps1`. |
+| `infra/vps/docker-compose.prod.yml` | override: `restart: always`, portas fechadas, `HUNTER_ENV=staging`, Caddy, logs com rotação. |
+| `infra/vps/Caddyfile` | borda HTTP: `/api/*` e `/ws` → api; resto → web; TLS automático com domínio. |
+| `infra/vps/compose.sh` | atalho que monta o `docker compose` certo (dois `-f`, `--env-file`, nome de projeto). |
+| `infra/vps/backup_postgres.sh` | `pg_dump -Fc` diário em `/opt/backups`, retenção 7 dias. |
+
+`infra/vps/README.md` tem os comandos de operação do dia a dia.
+
+### 9.2 Ordem de instalação
+
+```bash
+# 1. do PC (SSH já configurado — ver .claude/state/vps.md)
+scp infra/scripts/bootstrap_vps.sh hunter-vps:/tmp/
+ssh hunter-vps 'bash /tmp/bootstrap_vps.sh'
+
+# 2. na VPS, como o usuário de deploy — só o dono da máquina faz isto
+ssh hunter@<ip>
+cd /opt/project-hunter
+bash infra/scripts/setup_env.sh --vps
+
+# 3. subir
+bash infra/vps/compose.sh up
+bash infra/vps/compose.sh ps
+```
+
+O bootstrap **nunca** cria o `.env` e **nunca** sobe a stack: as chaves são
+digitadas pelo dono na própria máquina, e nenhum agente as vê.
+
+### 9.3 Decisões e por quê
+
+**`HUNTER_ENV=staging`, não `production`.** `Settings._require_settings_in_prod`
+trata os dois igual (`staging|production` exigem `CLERK_SECRET_KEY`,
+`CLERK_WEBHOOK_SECRET`, `CLERK_JWKS_URL`, `CLERK_ISSUER`, `WEB_ORIGIN`,
+`API_URL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`), então staging já
+obriga a configuração completa e liga logs JSON e headers de segurança. O que
+`production` muda a mais é semântico — `is_production` fecha o OpenAPI e é a
+palavra que a Fase 4 usa para "dinheiro real". Enquanto o Clerk está em
+instância de desenvolvimento e `ENABLE_LIVE_TRADING=false`, chamar isto de
+produção seria mentira. O `setup_env.sh --vps` pede o `CLERK_WEBHOOK_SECRET`
+justamente porque staging não sobe sem ele.
+
+**Caddy, não nginx.** TLS automático (ACME) sem escrever configuração de
+certificado, sem cron de renovação e sem um segundo container de ACME client;
+o `Caddyfile` inteiro tem 40 linhas contra o par nginx.conf + certbot. Com um
+domínio só e uma máquina só, é menos coisa para dar errado. Se algum dia
+existir load balancing sério ou cache, nginx volta à mesa.
+
+**Uma origem só.** O navegador fala com `https://<domínio>` e ponto: o Caddy
+manda `/api/*` e `/ws` para a api e todo o resto para o Next.js. Isso mata
+CORS e cookie cross-site, e mantém `/health`, `/ready` e `/metrics` fora do
+alcance externo — eles só existem na porta 8000 da rede interna do compose.
+
+**`FORWARDED_ALLOW_IPS` com IP fixo do Caddy.** O peer TCP da api passa a ser
+o container do Caddy, não `127.0.0.1`. Sem esse IP na lista, o uvicorn ignora
+o `X-Forwarded-For` e todo request vira "o mesmo cliente" para o rate limit
+por endereço — um visitante abusivo derrubaria o limite de todos. Por isso a
+rede do compose tem sub-rede fixa (`172.28.0.0/24`) e o Caddy tem
+`ipv4_address: 172.28.0.10`; os dois valores andam juntos.
+
+**Portas.** Só 22, 80 e 443 em `0.0.0.0`. api (8000) e web (3000) publicam em
+`127.0.0.1` (túnel SSH para depurar); Postgres e Redis não publicam porta
+nenhuma. Isso importa porque **portas publicadas pelo Docker furam o `ufw`**:
+o daemon escreve as regras dele antes das do firewall. A defesa não é a regra
+de firewall, é não publicar. Verificação: `sudo ss -ltnp | grep -v 127.0.0.1`.
+
+**Grupo `docker`, não rootless.** Quem está no grupo `docker` é root na
+prática — é o custo aceito para uma máquina de um dono só, com login apenas
+por chave SSH. Docker rootless complicaria bind de 80/443 e o acesso aos
+volumes sem ganho real neste cenário. Revisar se um dia mais alguém tiver
+conta na máquina.
+
+**Redis com AOF.** O hot state é reconstruível (§6), mas um restart limpo
+custa um ciclo inteiro de reconexão de streams; `appendfsync everysec` encurta
+isso de minutos para segundos.
+
+### 9.4 Backup
+
+`pg_dump -Fc` diário às 03:17 (hora da máquina) para `/opt/backups`, retenção
+de 7 dias, via `/etc/cron.d/hunter-backup`. Antes de aplicar a retenção o
+script confere se o `pg_restore --list` consegue ler o índice do arquivo novo
+— checagem barata, que pega dump vazio, truncado no começo ou que não é dump
+nenhum, e impede que a retenção apague os dumps bons em cima de lixo. Ela
+**não** prova integridade dos blocos de dados (`--list` lê o índice, não o
+dado); para isso só existe restaurar num banco descartável de tempos em
+tempos. `compose ps` falhando é tratado como erro (exit 1), não como "banco
+parado" — senão uma configuração quebrada viraria semanas sem backup com o
+cron reportando sucesso.
+
+Os arquivos ficam no **mesmo disco**: é proteção contra erro humano e
+corrupção lógica, não contra perda da máquina. Cópia para fora do host ainda
+não existe.
+
+### 9.5 Bug encontrado ao configurar (fora desta seção)
+
+`CORS_ALLOWED_ORIGINS` **não pode** ser definida como no `.env.example`
+(`CORS_ALLOWED_ORIGINS=http://localhost:3000`): `ApiSettings` declara o campo
+como `list[str]`, e o `pydantic-settings` tenta `json.loads` no valor antes de
+chegar ao `field_validator(mode="before")` que aceita `"a,b"`. Reproduzido:
+
+```
+$ CORS_ALLOWED_ORIGINS=https://hunter.exemplo.com uv run python -c "from hunter_api.settings import ApiSettings; ApiSettings()"
+SettingsError: error parsing value for field "cors_allowed_origins" from source "EnvSettingsSource"
+```
+
+Efeito se alguém seguir o `.env.example` num deploy: a api não sobe, entra em
+restart loop e o Caddy fica sem upstream saudável. A configuração da VPS
+contorna simplesmente **não definindo** a variável — `_default_cors_from_web_origin`
+usa `WEB_ORIGIN`, que é o valor desejado. A correção de verdade
+(`NoDecode`/`json` no `.env.example`, ou aceitar string) é de `apps/api` e
+`.env.example`, fora do escopo desta seção.
+
+### 9.6 Limitações conhecidas
+
+- Uma máquina só: sem alta disponibilidade, sem réplica, sem backup off-site.
+- Clerk em instância de desenvolvimento (`pk_test_`/`sk_test_`).
+- Sem domínio, o Caddy serve HTTP puro pelo IP e o sign-in do Clerk
+  provavelmente não funciona — serve para ver a stack de pé, não para usar.
+- `ENABLE_LIVE_TRADING=false` e `SYSTEM_KILL_SWITCH=ACTIVE`: nada nesta
+  máquina executa ordem real (regra dura do `CLAUDE.md`; live trading só na
+  Fase 4).
+- Sem monitoramento externo: `restart: always` cobre queda de processo, nada
+  avisa se a VPS inteira cair.

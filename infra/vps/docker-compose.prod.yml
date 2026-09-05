@@ -1,0 +1,146 @@
+# PROJECT HUNTER - override de producao 24/7 numa VPS (docs/DEPLOYMENT.md,
+# secao "VPS (Contabo) - operacao 24/7"). Nao se usa sozinho:
+#
+#   docker compose --env-file .env -p hunter \
+#     -f infra/docker/docker-compose.yml -f infra/vps/docker-compose.prod.yml up -d --build
+#
+# (ou, mais simples, `bash infra/vps/compose.sh up`)
+#
+# O que este arquivo muda em relacao ao compose de dev:
+#   - restart: always em tudo que precisa sobreviver a reboot;
+#   - nenhuma porta em 0.0.0.0 alem das do Caddy: api e web so em 127.0.0.1
+#     (tunel SSH para depurar), postgres e redis em porta nenhuma;
+#   - Caddy na frente, TLS automatico quando ha dominio;
+#   - HUNTER_ENV=staging (nao production): staging ja liga logs JSON, headers
+#     de seguranca e a exigencia de todos os segredos do Clerk, sem prometer
+#     as garantias de production, que ainda nao existem (Fase 4);
+#   - senha real no Postgres, vinda do .env;
+#   - logs com rotacao, para um worker 24/7 nao encher o disco.
+#
+# `--env-file .env` nao e opcional: o diretorio de projeto do compose e o do
+# PRIMEIRO arquivo -f (infra/docker/), entao o .env da raiz nao seria lido
+# para interpolar ${POSTGRES_PASSWORD} e companhia.
+
+x-prod-logging: &prod-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-prod-db-env: &prod-db-env
+  DATABASE_URL: postgresql+asyncpg://hunter:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env (infra/scripts/setup_env.sh --vps)}@postgres:5432/hunter
+  DATABASE_URL_MIGRATIONS: postgresql+asyncpg://hunter:${POSTGRES_PASSWORD}@postgres:5432/hunter
+  REDIS_URL: redis://redis:6379/0
+  HUNTER_ENV: staging
+
+services:
+  postgres:
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    logging: *prod-logging
+
+  redis:
+    restart: always
+    # Persistencia: AOF everysec. O hot state e reconstruivel (docs/DEPLOYMENT.md
+    # secao 6), mas um restart limpo custa um ciclo inteiro de reconexao de
+    # streams; o AOF encurta isso de minutos para segundos.
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    logging: *prod-logging
+
+  migrate:
+    environment:
+      <<: *prod-db-env
+      HUNTER_COMMAND: migrate
+    logging: *prod-logging
+
+  api:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: api
+      # O peer TCP da api e o Caddy, nao o loopback: sem este IP o uvicorn
+      # ignora X-Forwarded-For e todo request vira "o mesmo cliente" para o
+      # rate limit por endereco (um visitante abusivo derruba o limite de
+      # todos). IP fixo definido na rede `default` abaixo.
+      FORWARDED_ALLOW_IPS: 172.28.0.10
+      WEB_ORIGIN: ${HUNTER_PUBLIC_URL:?defina HUNTER_PUBLIC_URL no .env}
+      # CORS_ALLOWED_ORIGINS fica de fora de proposito: ApiSettings declara
+      # list[str] e o pydantic-settings tenta json.loads no valor antes do
+      # validador que aceita "a,b", entao uma URL simples derruba a api no
+      # boot (SettingsError, container em restart loop, Caddy sem upstream
+      # saudavel). Sem a variavel, _default_cors_from_web_origin usa
+      # WEB_ORIGIN - o mesmo valor que queriamos.
+      API_URL: ${HUNTER_PUBLIC_URL}
+      NEXT_PUBLIC_API_URL: ${HUNTER_PUBLIC_URL}
+      NEXT_PUBLIC_WS_URL: ${HUNTER_WS_URL:?defina HUNTER_WS_URL no .env}
+    # !override: sem isso o compose CONCATENA as listas de ports e a 8000
+    # publica de dev continuaria valendo em 0.0.0.0 (e portas publicadas pelo
+    # Docker furam o ufw).
+    ports: !override
+      - "127.0.0.1:8000:8000"
+    logging: *prod-logging
+
+  market-worker:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+    logging: *prod-logging
+
+  web:
+    restart: always
+    build:
+      args:
+        # NEXT_PUBLIC_* entram no bundle em build time: mudar o dominio exige
+        # `up -d --build`, nao so restart.
+        NEXT_PUBLIC_API_URL: ${HUNTER_PUBLIC_URL}
+        NEXT_PUBLIC_WS_URL: ${HUNTER_WS_URL}
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:?defina no .env}
+    environment:
+      HUNTER_ENV: staging
+      API_URL: http://api:8000          # SSR fala com a api pela rede interna
+      NEXT_PUBLIC_API_URL: ${HUNTER_PUBLIC_URL}
+      NEXT_PUBLIC_WS_URL: ${HUNTER_WS_URL}
+      WEB_ORIGIN: ${HUNTER_PUBLIC_URL}
+    ports: !override
+      - "127.0.0.1:3000:3000"
+    logging: *prod-logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "${HUNTER_HTTP_PORT:-80}:80"
+      - "${HUNTER_HTTPS_PORT:-443}:443"
+      - "${HUNTER_HTTPS_PORT:-443}:443/udp"   # HTTP/3
+    environment:
+      HUNTER_SITE_ADDRESS: ${HUNTER_SITE_ADDRESS:?defina HUNTER_SITE_ADDRESS no .env (dominio, ou :80 sem dominio)}
+      HUNTER_ACME_EMAIL: ${HUNTER_ACME_EMAIL:-}
+    volumes:
+      - ../vps/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # certificados: perder isto e refazer ACME do zero
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    networks:
+      default:
+        ipv4_address: 172.28.0.10
+    logging: *prod-logging
+
+networks:
+  default:
+    # Sub-rede fixa so para o Caddy ter IP estavel (FORWARDED_ALLOW_IPS acima).
+    # Se 172.28.0.0/24 colidir com algo na VPS, troque aqui e no
+    # FORWARDED_ALLOW_IPS da api - os dois tem que andar juntos.
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+
+volumes:
+  caddy_data:
+  caddy_config:

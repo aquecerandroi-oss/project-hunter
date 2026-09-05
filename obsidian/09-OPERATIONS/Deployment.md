@@ -1,5 +1,5 @@
 ---
-tags: [operacoes, deploy]
+tags: [operacoes, deploy, vps]
 updated: 2026-09-05
 status: parcial
 ---
@@ -35,10 +35,29 @@ Nenhum desses ambientes remotos está provisionado ainda — o M0 entrega "deplo
 | Perda súbita anormal | OWNER aciona kill switch da org; operador pode acionar o de sistema |
 | Suspeita de vazamento de tenant | Revogar sessão no Clerk; auditar `audit_logs`; RLS é a barreira final |
 
+## VPS (Contabo) — operação 24/7
+
+**Estado (2026-09-05):** scripts e configuração **prontos e validados localmente**; ainda **não aplicados** na máquina — o acesso SSH (`Host hunter-vps`) não estava configurado no PC quando isto foi escrito. O que falta está em `.claude/state/vps.md`.
+
+Uma VPS Ubuntu 22.04/24.04 roda a mesma stack do compose de dev mais um override de produção, para o `market-worker` coletar mercado sem o PC ligado e para sessões de desenvolvimento por SSH (Claude Code e Codex funcionam melhor em Linux — o sandbox do Codex só funciona lá).
+
+| Arquivo | O que faz |
+|---|---|
+| `infra/scripts/bootstrap_vps.sh` | prepara a máquina (Docker, Node 22, pnpm, uv, ufw, fail2ban, unattended-upgrades, swap 4 GB, usuário de deploy, clone, cron do backup). Idempotente. |
+| `infra/scripts/setup_env.sh` | cria o `.env` com digitação oculta (`--vps`). Versão bash do `setup_env.ps1`. |
+| `infra/vps/docker-compose.prod.yml` | `restart: always`, portas fechadas, `HUNTER_ENV=staging`, Caddy, logs com rotação. |
+| `infra/vps/Caddyfile` | `/api/*` e `/ws` → api; resto → web; TLS automático com domínio. |
+| `infra/vps/compose.sh` | atalho do `docker compose` (dois `-f`, `--env-file`, nome de projeto). |
+| `infra/vps/backup_postgres.sh` | `pg_dump -Fc` diário em `/opt/backups`, retenção 7 dias, dump validado antes da retenção. |
+
+Decisões: `HUNTER_ENV=staging` (não `production` — Clerk ainda é instância de dev e `ENABLE_LIVE_TRADING=false`); Caddy em vez de nginx (TLS automático, 40 linhas de config); origem única para o navegador (sem CORS; `/health`, `/ready` e `/metrics` inalcançáveis de fora); só 22/80/443 públicas, api e web em `127.0.0.1`, Postgres e Redis sem porta publicada — **portas publicadas pelo Docker furam o ufw**, então a defesa é não publicar. Detalhe completo em `docs/DEPLOYMENT.md` §9 e `infra/vps/README.md`.
+
+Limitações: uma máquina só (sem HA, sem réplica, sem backup fora do host), Clerk em instância de desenvolvimento, sem monitoramento externo (nada avisa se a VPS inteira cair).
+
 ## Relacionadas
 
 [[Infrastructure]] · [[Environment Variables]] · [[Monitoring]]
 
 ## Fontes
 
-`docs/DEPLOYMENT.md`, `.claude/state/milestone.json`
+`docs/DEPLOYMENT.md`, `infra/vps/README.md`, `.claude/state/vps.md`, `.claude/state/milestone.json`

@@ -1,0 +1,55 @@
+# PROJECT HUNTER - borda HTTP da VPS (infra/vps/docker-compose.prod.yml).
+#
+# Uma origem so para o navegador: o web (Next.js) responde tudo, menos
+# /api/* e /ws, que vao para a api (FastAPI). Origem unica evita CORS e
+# cookie cross-site, e mantem /health, /ready e /metrics inalcancaveis de
+# fora - eles existem so na porta 8000 da rede interna do compose.
+#
+# HUNTER_SITE_ADDRESS vem do .env:
+#   hunter.exemplo.com  -> Caddy pede certificado ao Let's Encrypt sozinho
+#   :80                 -> HTTP puro pelo IP, sem TLS (Clerk costuma recusar
+#                          sign-in fora de um dominio real; use so para testar)
+{
+	# Sem dominio o ACME nunca roda, entao este endereco nao e usado; com
+	# dominio, o setup_env.sh --vps exige um e-mail valido.
+	email {$HUNTER_ACME_EMAIL:hunter@example.invalid}
+	# API de administracao do Caddy desligada: ela nao precisa existir aqui e
+	# quem a alcanca reconfigura a borda inteira.
+	admin off
+}
+
+{$HUNTER_SITE_ADDRESS} {
+	encode zstd gzip
+
+	# X-Forwarded-For / -Proto / -Host sao adicionados pelo reverse_proxy do
+	# Caddy automaticamente; a api so confia neles vindos deste container
+	# (FORWARDED_ALLOW_IPS no compose de producao).
+	@api path /api/* /ws
+	handle @api {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	# Navegador ignora HSTS servido por HTTP puro, entao esta linha e inerte
+	# no modo sem dominio e vale de verdade assim que houver TLS.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header -Server
+
+	# O convite de organizacao chega como /accept-invite?token=... - sem este
+	# filtro o token de convite ficaria em texto puro no log de acesso, que e
+	# lido por qualquer um com acesso ao `docker logs`.
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					replace token REDACTED
+				}
+			}
+		}
+	}
+}

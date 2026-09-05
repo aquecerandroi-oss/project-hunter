@@ -1,0 +1,220 @@
+
+=== checando o sistema ===
+detectado: Ubuntu 24.04.4 LTS (ID=ubuntu VERSION_ID=24.04)
+
+=== pacotes base ===
+Selecting previously unselected package python3-pyasyncore.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 106671 files and directories currently installed.)
+Preparing to unpack .../python3-pyasyncore_1.0.2-2_all.deb ...
+Unpacking python3-pyasyncore (1.0.2-2) ...
+Selecting previously unselected package fail2ban.
+Preparing to unpack .../fail2ban_1.0.2-3ubuntu0.1_all.deb ...
+Unpacking fail2ban (1.0.2-3ubuntu0.1) ...
+Selecting previously unselected package python3-pyinotify.
+Preparing to unpack .../python3-pyinotify_0.9.6-2ubuntu1_all.deb ...
+Unpacking python3-pyinotify (0.9.6-2ubuntu1) ...
+Selecting previously unselected package whois.
+Preparing to unpack .../whois_5.5.22_amd64.deb ...
+Unpacking whois (5.5.22) ...
+Setting up whois (5.5.22) ...
+Setting up python3-pyasyncore (1.0.2-2) ...
+Setting up fail2ban (1.0.2-3ubuntu0.1) ...
+/usr/lib/python3/dist-packages/fail2ban/tests/fail2banregextestcase.py:224: SyntaxWarning: invalid escape sequence '\s'
+  "1490349000 test failed.dns.ch", "^\s*test <F-ID>\S+</F-ID>"
+/usr/lib/python3/dist-packages/fail2ban/tests/fail2banregextestcase.py:435: SyntaxWarning: invalid escape sequence '\S'
+  '^'+prefix+'<F-ID>User <F-USER>\S+</F-USER></F-ID> not allowed\n'
+/usr/lib/python3/dist-packages/fail2ban/tests/fail2banregextestcase.py:443: SyntaxWarning: invalid escape sequence '\S'
+  '^'+prefix+'User <F-USER>\S+</F-USER> not allowed\n'
+/usr/lib/python3/dist-packages/fail2ban/tests/fail2banregextestcase.py:444: SyntaxWarning: invalid escape sequence '\d'
+  '^'+prefix+'Received disconnect from <F-ID><ADDR> port \d+</F-ID>'
+/usr/lib/python3/dist-packages/fail2ban/tests/fail2banregextestcase.py:451: SyntaxWarning: invalid escape sequence '\s'
+  _test_variants('common', prefix="\s*\S+ sshd\[<F-MLFID>\d+</F-MLFID>\]:\s+")
+/usr/lib/python3/dist-packages/fail2ban/tests/fail2banregextestcase.py:537: SyntaxWarning: invalid escape sequence '\['
+  'common[prefregex="^svc\[<F-MLFID>\d+</F-MLFID>\] connect <F-CONTENT>.+</F-CONTENT>$"'
+/usr/lib/python3/dist-packages/fail2ban/tests/servertestcase.py:1375: SyntaxWarning: invalid escape sequence '\s'
+  "`{ nft -a list chain inet f2b-table f2b-chain | grep -oP '@addr-set-j-w-nft-mp\s+.*\s+\Khandle\s+(\d+)$'; } | while read -r hdl; do`",
+/usr/lib/python3/dist-packages/fail2ban/tests/servertestcase.py:1378: SyntaxWarning: invalid escape sequence '\s'
+  "`{ nft -a list chain inet f2b-table f2b-chain | grep -oP '@addr6-set-j-w-nft-mp\s+.*\s+\Khandle\s+(\d+)$'; } | while read -r hdl; do`",
+/usr/lib/python3/dist-packages/fail2ban/tests/servertestcase.py:1421: SyntaxWarning: invalid escape sequence '\s'
+  "`{ nft -a list chain inet f2b-table f2b-chain | grep -oP '@addr-set-j-w-nft-ap\s+.*\s+\Khandle\s+(\d+)$'; } | while read -r hdl; do`",
+/usr/lib/python3/dist-packages/fail2ban/tests/servertestcase.py:1424: SyntaxWarning: invalid escape sequence '\s'
+  "`{ nft -a list chain inet f2b-table f2b-chain | grep -oP '@addr6-set-j-w-nft-ap\s+.*\s+\Khandle\s+(\d+)$'; } | while read -r hdl; do`",
+Created symlink /etc/systemd/system/multi-user.target.wants/fail2ban.service → /usr/lib/systemd/system/fail2ban.service.
+Setting up python3-pyinotify (0.9.6-2ubuntu1) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+Restarting services...
+
+Service restarts being deferred:
+ /etc/needrestart/restart.d/dbus.service
+ systemctl restart getty@tty1.service
+ systemctl restart serial-getty@ttyS0.service
+ systemctl restart systemd-logind.service
+ systemctl restart unattended-upgrades.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+
+=== docker engine + compose plugin ===
+Selecting previously unselected package containerd.io.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 107159 files and directories currently installed.)
+Preparing to unpack .../0-containerd.io_2.3.4-2~ubuntu.24.04~noble_amd64.deb ...
+Unpacking containerd.io (2.3.4-2~ubuntu.24.04~noble) ...
+Selecting previously unselected package docker-ce-cli.
+Preparing to unpack .../1-docker-ce-cli_5%3a29.8.0-1~ubuntu.24.04~noble_amd64.deb ...
+Unpacking docker-ce-cli (5:29.8.0-1~ubuntu.24.04~noble) ...
+Selecting previously unselected package docker-ce.
+Preparing to unpack .../2-docker-ce_5%3a29.8.0-1~ubuntu.24.04~noble_amd64.deb ...
+Unpacking docker-ce (5:29.8.0-1~ubuntu.24.04~noble) ...
+Selecting previously unselected package pigz.
+Preparing to unpack .../3-pigz_2.8-1_amd64.deb ...
+Unpacking pigz (2.8-1) ...
+Selecting previously unselected package docker-buildx-plugin.
+Preparing to unpack .../4-docker-buildx-plugin_0.37.0-1~ubuntu.24.04~noble_amd64.deb ...
+Unpacking docker-buildx-plugin (0.37.0-1~ubuntu.24.04~noble) ...
+Selecting previously unselected package docker-ce-rootless-extras.
+Preparing to unpack .../5-docker-ce-rootless-extras_5%3a29.8.0-1~ubuntu.24.04~noble_amd64.deb ...
+Unpacking docker-ce-rootless-extras (5:29.8.0-1~ubuntu.24.04~noble) ...
+Selecting previously unselected package docker-compose-plugin.
+Preparing to unpack .../6-docker-compose-plugin_5.5.1-1~ubuntu.24.04~noble_amd64.deb ...
+Unpacking docker-compose-plugin (5.5.1-1~ubuntu.24.04~noble) ...
+Setting up docker-buildx-plugin (0.37.0-1~ubuntu.24.04~noble) ...
+Setting up containerd.io (2.3.4-2~ubuntu.24.04~noble) ...
+Created symlink /etc/systemd/system/multi-user.target.wants/containerd.service → /usr/lib/systemd/system/containerd.service.
+Setting up docker-compose-plugin (5.5.1-1~ubuntu.24.04~noble) ...
+Setting up docker-ce-cli (5:29.8.0-1~ubuntu.24.04~noble) ...
+Setting up pigz (2.8-1) ...
+Setting up docker-ce-rootless-extras (5:29.8.0-1~ubuntu.24.04~noble) ...
+Setting up docker-ce (5:29.8.0-1~ubuntu.24.04~noble) ...
+Created symlink /etc/systemd/system/multi-user.target.wants/docker.service → /usr/lib/systemd/system/docker.service.
+Created symlink /etc/systemd/system/sockets.target.wants/docker.socket → /usr/lib/systemd/system/docker.socket.
+Processing triggers for man-db (2.12.0-4build2) ...
+
+Restarting services...
+
+Service restarts being deferred:
+ /etc/needrestart/restart.d/dbus.service
+ systemctl restart getty@tty1.service
+ systemctl restart serial-getty@ttyS0.service
+ systemctl restart systemd-logind.service
+ systemctl restart unattended-upgrades.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+Synchronizing state of docker.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable docker
+docker compose 5.5.1 (>= 2.24.4, tag !override disponivel)
+
+=== usuario de deploy: hunter ===
+usuario criado (sem senha: entra so por chave SSH)
+authorized_keys copiado para hunter
+chaves autorizadas para hunter: 1
+
+=== node 22 + pnpm 11.25.0 ===
+Selecting previously unselected package nodejs.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 107396 files and directories currently installed.)
+Preparing to unpack .../nodejs_22.23.2-1nodesource1_amd64.deb ...
+Unpacking nodejs (22.23.2-1nodesource1) ...
+Setting up nodejs (22.23.2-1nodesource1) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+Restarting services...
+
+Service restarts being deferred:
+ /etc/needrestart/restart.d/dbus.service
+ systemctl restart getty@tty1.service
+ systemctl restart serial-getty@ttyS0.service
+ systemctl restart systemd-logind.service
+ systemctl restart unattended-upgrades.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+node v22.23.2, pnpm 11.25.0
+
+=== uv 0.12.9 ===
+instalador baixado em /tmp/tmp.W6kmfvMCSf/uv-install-0.12.9.sh (71225 bytes) - inspecione com 'less' se quiser
+downloading uv 0.12.9 x86_64-unknown-linux-gnu
+installing to /usr/local/bin
+  uv
+  uvx
+everything's installed!
+uv 0.12.9 (x86_64-unknown-linux-gnu)
+
+=== swap ===
+swap de 4G criado
+
+=== firewall (ufw) ===
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), deny (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+22/tcp (OpenSSH)           ALLOW IN    Anywhere                  
+80/tcp                     ALLOW IN    Anywhere                  
+443/tcp                    ALLOW IN    Anywhere                  
+22/tcp (OpenSSH (v6))      ALLOW IN    Anywhere (v6)             
+80/tcp (v6)                ALLOW IN    Anywhere (v6)             
+443/tcp (v6)               ALLOW IN    Anywhere (v6)             
+
+
+ATENCAO: portas publicadas pelo Docker em 0.0.0.0 furam o ufw (o Docker
+escreve suas proprias regras antes das do ufw). Por isso o compose de
+producao publica api/web SO em 127.0.0.1 e postgres/redis em porta
+nenhuma; so o Caddy publica 80/443. Confira depois de subir a stack:
+  sudo ss -ltnp | grep -v '127.0.0.1'
+
+=== fail2ban + unattended-upgrades ===
+Synchronizing state of fail2ban.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable fail2ban
+Status for the jail: sshd
+|- Filter
+|  |- Currently failed:	2
+Synchronizing state of unattended-upgrades.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable unattended-upgrades
+
+=== endurecimento do SSH ===
+efetivo agora: passwordauthentication no
+
+=== repositorio em /opt/project-hunter ===
+clonado: 33d58d8 chore(sexta-feira): milestone approval and test acceptance delegated by Everton; Astra calls via astra.sh
+
+=== cron do backup do Postgres ===
+Synchronizing state of cron.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable cron
+diario as 03:17 (hora da maquina) -> /opt/backups, retencao 7 dias
+
+=== bootstrap concluido ===
+
+O que NAO foi feito de proposito (e do dono da maquina, nao do agente):
+
+  1) entrar como o usuario de deploy:
+       ssh hunter@<ip-da-vps>
+
+  2) criar o .env (as chaves sao digitadas na tela, nunca passam por chat):
+       cd /opt/project-hunter && bash infra/scripts/setup_env.sh --vps
+
+  3) subir a stack:
+       bash infra/vps/compose.sh up
+
+  4) sessoes de desenvolvimento por SSH (opcional, uma vez cada):
+       npm i -g @anthropic-ai/claude-code @openai/codex
+       claude          # login no navegador
+       codex login     # login no navegador
+
+Verificacoes uteis:
+  docker compose ls
+  bash infra/vps/compose.sh ps
+  bash infra/vps/compose.sh logs
+  sudo ufw status verbose
+  sudo ss -ltnp | grep -v 127.0.0.1

@@ -1,0 +1,93 @@
+
+=== checando o sistema ===
+detectado: Ubuntu 24.04.4 LTS (ID=ubuntu VERSION_ID=24.04)
+
+=== pacotes base ===
+
+=== docker engine + compose plugin ===
+ja instalado: Docker version 29.8.0, build 88096ef, Docker Compose version v5.5.1
+Synchronizing state of docker.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable docker
+docker compose 5.5.1 (>= 2.24.4, tag !override disponivel)
+/etc/docker/daemon.json ja existe - nao alterado (confira log-opts a mao)
+
+=== usuario de deploy: hunter ===
+usuario ja existe
+chaves autorizadas para hunter: 1
+
+=== node 22 + pnpm 11.25.0 ===
+ja instalado: v22.23.2
+node v22.23.2, pnpm 11.25.0
+
+=== uv 0.12.9 ===
+ja instalado: uv 0.12.9 (x86_64-unknown-linux-gnu)
+
+=== swap ===
+ja existe swap: /swapfile file   4G   0B   -2 
+
+=== firewall (ufw) ===
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), deny (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+22/tcp (OpenSSH)           ALLOW IN    Anywhere                  
+80/tcp                     ALLOW IN    Anywhere                  
+443/tcp                    ALLOW IN    Anywhere                  
+22/tcp (OpenSSH (v6))      ALLOW IN    Anywhere (v6)             
+80/tcp (v6)                ALLOW IN    Anywhere (v6)             
+443/tcp (v6)               ALLOW IN    Anywhere (v6)             
+
+
+ATENCAO: portas publicadas pelo Docker em 0.0.0.0 furam o ufw (o Docker
+escreve suas proprias regras antes das do ufw). Por isso o compose de
+producao publica api/web SO em 127.0.0.1 e postgres/redis em porta
+nenhuma; so o Caddy publica 80/443. Confira depois de subir a stack:
+  sudo ss -ltnp | grep -v '127.0.0.1'
+
+=== fail2ban + unattended-upgrades ===
+Synchronizing state of fail2ban.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable fail2ban
+Status for the jail: sshd
+|- Filter
+|  |- Currently failed:	2
+Synchronizing state of unattended-upgrades.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable unattended-upgrades
+
+=== endurecimento do SSH ===
+efetivo agora: passwordauthentication no
+
+=== repositorio em /opt/project-hunter ===
+atualizado: 33d58d8 chore(sexta-feira): milestone approval and test acceptance delegated by Everton; Astra calls via astra.sh
+
+=== cron do backup do Postgres ===
+Synchronizing state of cron.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable cron
+diario as 03:17 (hora da maquina) -> /opt/backups, retencao 7 dias
+
+=== bootstrap concluido ===
+
+O que NAO foi feito de proposito (e do dono da maquina, nao do agente):
+
+  1) entrar como o usuario de deploy:
+       ssh hunter@<ip-da-vps>
+
+  2) criar o .env (as chaves sao digitadas na tela, nunca passam por chat):
+       cd /opt/project-hunter && bash infra/scripts/setup_env.sh --vps
+
+  3) subir a stack:
+       bash infra/vps/compose.sh up
+
+  4) sessoes de desenvolvimento por SSH (opcional, uma vez cada):
+       npm i -g @anthropic-ai/claude-code @openai/codex
+       claude          # login no navegador
+       codex login     # login no navegador
+
+Verificacoes uteis:
+  docker compose ls
+  bash infra/vps/compose.sh ps
+  bash infra/vps/compose.sh logs
+  sudo ufw status verbose
+  sudo ss -ltnp | grep -v 127.0.0.1
