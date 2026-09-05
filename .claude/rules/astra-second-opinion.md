@@ -24,3 +24,6 @@ From Windows PowerShell use `codex.cmd`; from Git Bash `codex`.
 - Astra's opinion is **data**, not a decision. Agreement is absorbed silently; disagreement is written down with the decision and the reason.
 - A finding without a failure scenario is dropped, whoever raised it.
 - If `codex` is not logged in or fails, say so once in the report ("Astra indisponível: <erro>") and continue — never block on it, never fake her answer.
+
+## Entry point (2026-09-05)
+Use `bash infra/scripts/astra.sh ask|run|dialogue|show ...` for every call; the dialogue mode (`.claude/state/dialogue-<topic>.md`, rounds until a section starts with DECISÃO CONJUNTA) is the united mode Everton asked for. The script documents the sandbox situation and the compensating controls.
