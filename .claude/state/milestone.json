@@ -2,7 +2,8 @@
   "current": "M0",
   "status": "in_progress",
   "approved_at": "2026-09-04",
-  "wave": "4 — T06 committed (5c5e412; security review in flight); schema re-review round 2 fixed (720102f); T09 (onboarding/dashboard/settings/types) in progress; core integration-test cleanup in progress; T11 waits for the T06 review; T12/T13 after",
+  "wave": "5 — repo moved to C:\\dev\\project-hunter (2026-09-04); T06 two fix rounds committed (94b26a4, 8a454f4); T09 + T09b + gold theme (DESIGN-1) committed; T12 committed (7e90e81); T11 in progress; T13 (closure + §77 report) next",
+  "repo_path": "C:\\dev\\project-hunter",
   "paused_reason": null,
   "history": "2026-09-04: spend limit hit mid-wave 2 (T05-fixes, T08-fixes, T04 cross-review terminated with 429); limit reset and the three were re-dispatched the same day.",
   "resume_checklist": [
