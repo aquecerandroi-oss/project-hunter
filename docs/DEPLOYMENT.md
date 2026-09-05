@@ -20,13 +20,14 @@ de variáveis está no §7.
 
 ## 3. docker-compose (dev)
 
-Serviços: `postgres:16`, `redis:7`, `migrate` (`HUNTER_COMMAND=migrate`, roda uma vez), `api` (depende do `migrate` concluído), `worker` (`HUNTER_ROLE=all`, sai com 0 até o M1), `web`. Volumes só para os bancos. `docker-compose.test.yml` sobe Postgres (porta 55432) e Redis (porta 56379) efêmeros para testes de integração locais.
+Serviços: `postgres:16`, `redis:7`, `migrate` (`HUNTER_COMMAND=migrate`, roda uma vez), `api` (depende do `migrate` concluído), `market-worker` (`HUNTER_ROLE=market`, processo contínuo com `restart: unless-stopped`), `web`. Volumes só para os bancos. `docker-compose.test.yml` sobe Postgres (porta 55432) e Redis (porta 56379) efêmeros para testes de integração locais.
 
 Funciona sem nenhum `.env` (usa defaults de dev embutidos no compose para as chaves do Clerk — build/boot não falham, mas o sign-in real não funciona); um `.env` na raiz (gerado por `infra/scripts/setup_env.ps1`, nunca commitado) sobrepõe esses defaults.
 
 - API: `http://localhost:8000` (`/health` = vivo, `/ready` = Postgres + Redis alcançáveis, 200 só quando ambos respondem, `/metrics` atrás de `METRICS_TOKEN`).
 - Web: `http://localhost:3000` (redireciona para o sign-in do Clerk).
-- `worker` (`HUNTER_ROLE=all`) sobe, imprime que o papel ainda não tem entrypoint e sai com código 0 — `hunter_core.runtime.RoleRegistry` só é populado a partir do Milestone 1; isso é esperado, não uma falha.
+- `market-worker` reutiliza a imagem construída pelo serviço `api` e executa `python -m hunter_market_worker`, após Postgres e Redis saudáveis e `migrate` concluído com sucesso. O healthcheck consulta `http://localhost:8001/ready` dentro do container, sem publicar porta no host.
+- Um `HUNTER_ROLE` por container no M1: `market`, `scanner`, `strategy`, `execution` e `analytics` executam seus respectivos módulos `hunter_<role>_worker`. Os quatro últimos falham enquanto não tiverem `__main__.py`; `all` não é suportado e sai com código 64.
 
 Comandos reais (instalação, `.env`, subir a stack, migrar/seedar manualmente,
 rodar o web fora do compose) estão no §8.

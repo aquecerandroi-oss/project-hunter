@@ -7,9 +7,8 @@
 # Clerk keys so sign-in actually works. Volumes only for the databases —
 # every other service is stateless and rebuilt from source/image each run.
 #
-# `worker` (HUNTER_ROLE=all) intentionally exits 0 immediately as of M0:
-# hunter_core.runtime.RoleRegistry is still empty (see
-# infra/docker/entrypoint.sh) — real workers land in M1.
+# `market-worker` runs continuously with HUNTER_ROLE=market.
+# Run one HUNTER_ROLE per container (M1).
 
 x-api-env: &api-env
   DATABASE_URL: postgresql+asyncpg://hunter:hunter@postgres:5432/hunter
@@ -88,11 +87,12 @@ services:
       redis:
         condition: service_healthy
 
-  worker:
+  market-worker:
     image: hunter-api:${GIT_SHA:-dev}
     environment:
       <<: *api-env
-      HUNTER_ROLE: all
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
     env_file:
       - path: ../../.env
         required: false
@@ -103,7 +103,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    restart: "no"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://localhost:8001/ready', timeout=2); raise SystemExit(0 if response.status == 200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
 
   web:
     build:

@@ -2,11 +2,8 @@
 # PROJECT HUNTER — single entrypoint for the api+workers image.
 #
 # One image, many roles (ARCHITECTURE.md §1.7): HUNTER_ROLE picks the process
-# that runs. `api` is the only role with a real implementation as of M0 —
-# `hunter_core.runtime.RoleRegistry` (packages/core/hunter_core/runtime.py)
-# is intentionally empty until the per-service workers land in M1. A worker
-# role must never *pretend* to run: it prints why and exits 0 so `docker
-# compose up` stays green without a fake "healthy" long-running process.
+# that runs. Run one role per container; worker roles execute their package
+# entrypoints and fail explicitly if that package has no entrypoint yet.
 #
 # An explicit command (e.g. `docker run hunter-api:dev python -c "..."` or
 # `... id -u` for verification/debugging) always wins over role dispatch —
@@ -42,9 +39,15 @@ case "$role" in
   seed)
     exec python infra/scripts/seed.py
     ;;
-  market | scanner | strategy | execution | analytics | all)
-    echo "role ${role} has no entrypoint yet (lands in M1)"
-    exit 0
+  market)
+    exec python -m hunter_market_worker
+    ;;
+  scanner | strategy | execution | analytics)
+    exec python -m "hunter_${role}_worker"
+    ;;
+  all)
+    echo "role all is not supported yet: run one HUNTER_ROLE per container (M1)"
+    exit 64
     ;;
   *)
     echo "unknown HUNTER_ROLE: ${role}" >&2
