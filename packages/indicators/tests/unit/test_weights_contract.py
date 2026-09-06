@@ -18,11 +18,12 @@ from __future__ import annotations
 import importlib.util
 import sys
 import uuid
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -44,7 +45,16 @@ from hunter_indicators.baselines import (
     compute_revision,
 )
 from hunter_indicators.features import DEFAULT_REGISTRY, FeatureValue, FeatureVector
+from hunter_indicators.opportunity import (
+    COMPONENT_QUANTUM,
+    COMPONENTS,
+    CONFIDENCE_QUANTUM,
+    SCORE_QUANTUM,
+    StatusThresholds,
+    WeightProfile,
+)
 from hunter_indicators.stage import StageThresholds
+from packages.indicators.tests.scoring import TEST_WEIGHTS
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SCRIPTS_DIR = REPO_ROOT / "infra" / "scripts"
@@ -203,3 +213,123 @@ class TestReplayWithRecordedBaselineIds:
         assert second.severity == first.severity
         assert second.baseline == first.baseline
         assert second.baseline_ids == first.baseline_ids
+
+
+class TestT24RatifiedTheV2Vector:
+    """The T2.4 ratification, pinned: the numbers themselves.
+
+    ``docs/DATABASE.md`` §17.8 leaves the individual component weights to be
+    frozen (or superseded) by T2.4. T2.4 **ratified them unchanged**, and this
+    class is what makes the promise mechanical: any edit to the shipped vector
+    fails here, which is the effect ``components_frozen`` describes.
+
+    The flag itself is still ``false`` **by design of this task's file scope**.
+    Flipping it is a coordinated two-file change: the seed refuses to rewrite a
+    published vector, and ``packages/core/tests/integration/
+    test_schema_seed_and_partitions.py::test_the_seed_refuses_to_rewrite_a_
+    published_weight_vector`` uses exactly that flip as its *divergence fixture*
+    — shipping ``true`` makes its UPDATE a no-op, turns it red, and its
+    ``_reset_shipped_weights`` drags the next test down with it (both reproduced
+    against a real Postgres). Whoever owns both files does the flip; this test
+    asserts today's truth rather than pretending.
+    """
+
+    def test_the_active_profile_is_the_m2_one(self) -> None:
+        version, weights = active_weights()
+        assert version == "v2"
+        assert weights["profile"] == "M2"
+
+    def test_the_freeze_flag_is_still_the_published_one(self) -> None:
+        _version, weights = active_weights()
+        assert weights["components_frozen"] is False, (
+            "the flag moved: check that packages/core's seed integration tests "
+            "moved with it, since one of them uses this flip as a fixture"
+        )
+
+    def test_the_component_weights_are_the_ratified_ones(self) -> None:
+        _version, weights = active_weights()
+        assert weights["components"] == {
+            "momentum": "0.20",
+            "volume": "0.20",
+            "order_flow": "0.15",
+            "liquidity": "0.10",
+            "derivatives": "0.10",
+            "market_regime": "0.10",
+            "anomalies": "0.05",
+            "agent_consensus": "0.00",
+            "external_intelligence": "0.00",
+        }
+
+    def test_the_budget_of_the_joint_decision_holds(self) -> None:
+        _version, weights = active_weights()
+        components = weights["components"]
+        total = sum((Decimal(value) for value in components.values()), Decimal(0))
+        assert total == Decimal("0.90")
+        assert Decimal(components["agent_consensus"]) == Decimal(0)
+        assert Decimal(weights["early_movement"]["magnitude"]) == Decimal(10)
+        assert weights["early_movement"]["values"] == [-1, 0, 1]
+        assert total + Decimal(weights["early_movement"]["magnitude"]) / Decimal(100) == Decimal(1)
+
+    def test_the_scorer_reads_the_shipped_vector(self) -> None:
+        version, weights = active_weights()
+        profile = WeightProfile.from_weights(weights, version=version)
+        assert profile.total_weight == Decimal("0.90")
+        assert profile.early_movement_magnitude == Decimal("10")
+        assert {definition.name for definition in COMPONENTS} == set(profile.components)
+        for definition in COMPONENTS:
+            profile.weight_of(definition.name)  # every component has a published weight
+
+    def test_the_status_machine_reads_the_shipped_vector(self) -> None:
+        version, weights = active_weights()
+        thresholds = StatusThresholds.from_weights(weights, version=version)
+        assert thresholds.watching_min == Decimal("40")
+        assert thresholds.hot_min == Decimal("75")
+        assert thresholds.entry_candidate_min == Decimal("80")
+        assert thresholds.anomaly_severity_min == Decimal("60")
+        assert thresholds.score_floor == Decimal("40")
+        assert thresholds.below_floor_minutes == 15
+
+    def test_the_fixture_the_scorer_tests_use_is_the_shipped_vector(self) -> None:
+        """The arithmetic tests pin numbers, not the profile — but the two must be
+        the same profile, or those tests would be describing a build nobody ships."""
+        _version, weights = active_weights()
+        for block in ("components", "early_movement", "status", "expiry", "precision"):
+            assert TEST_WEIGHTS[block] == weights[block], block
+
+
+class TestTheProfilePrecisionIsTheOneThisBuildQuantises:
+    """``weights["precision"]`` was read and then ignored (cross review, must-fix
+    2): the quanta are module constants (2/4/4), so a profile publishing 3/6/6
+    produced numbers at 2/4/4 while ``weights_version`` claimed otherwise. Same
+    doctrine as ``rounding``: refuse, never approximate."""
+
+    def _weights(self, **precision: Any) -> dict[str, Any]:
+        published = dict(cast("Mapping[str, Any]", TEST_WEIGHTS["precision"]))
+        return {**TEST_WEIGHTS, "precision": {**published, **precision}}
+
+    def test_a_rounding_mode_this_build_does_not_use_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="ROUND_HALF_EVEN"):
+            WeightProfile.from_weights(self._weights(rounding="ROUND_HALF_UP"), version="v9")
+
+    @pytest.mark.parametrize(
+        ("key", "value"),
+        [("score_decimals", 3), ("confidence_decimals", 6), ("component_decimals", 2)],
+    )
+    def test_a_precision_the_quanta_do_not_implement_is_refused(self, key: str, value: int) -> None:
+        with pytest.raises(ValueError, match=key):
+            WeightProfile.from_weights(self._weights(**{key: value}), version="v9")
+
+    @pytest.mark.parametrize("value", [2.5, 2.9, "dois", True])
+    def test_a_precision_that_is_not_a_whole_number_is_refused(self, value: Any) -> None:
+        """``int(2.5)`` truncates to 2 and would have accepted a profile whose
+        published precision this build does not implement, while reporting
+        agreement with it (Astra, cross review of these fixes)."""
+        with pytest.raises(ValueError, match="score_decimals"):
+            WeightProfile.from_weights(self._weights(score_decimals=value), version="v9")
+
+    def test_the_shipped_vector_publishes_the_precision_the_quanta_implement(self) -> None:
+        version, weights = active_weights()
+        profile = WeightProfile.from_weights(weights, version=version)
+        assert profile.score_decimals == -int(SCORE_QUANTUM.as_tuple().exponent) == 2
+        assert profile.confidence_decimals == -int(CONFIDENCE_QUANTUM.as_tuple().exponent) == 4
+        assert profile.component_decimals == -int(COMPONENT_QUANTUM.as_tuple().exponent) == 4

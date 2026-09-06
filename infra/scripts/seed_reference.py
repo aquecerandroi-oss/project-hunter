@@ -170,13 +170,27 @@ OPPORTUNITY_WEIGHTS_V2: dict[str, Any] = {
         # Early-Movement term below. ``agent_consensus`` is 0.00 by the joint
         # decision (no agent emits before M4) and returns as v3 in M4.
         #
-        # PROVISIONAL. The decision fixes the sum, the zero and the signed
-        # term; it leaves the individual weights to be frozen before T2.4 is
-        # implemented. This vector is v1's, with agent_consensus zeroed and the
-        # remaining 0.05 taken from ``anomalies`` — the component whose signal
-        # is already counted twice elsewhere in M2 (it drives the ANOMALY status
-        # and the EARLY confirmations). ``components_frozen`` is false until
-        # T2.4 ratifies this vector or publishes v3.
+        # **T2.4 ratified these numbers unchanged** (2026-09-06): the scorer that
+        # reads them is the one that was just built, and it found no reason to
+        # move a weight that no historical study supports either way. The vector
+        # is v1's, with agent_consensus zeroed and the remaining 0.05 taken from
+        # ``anomalies`` — the component whose signal is already counted twice in
+        # M2 (it drives the ANOMALY status and the EARLY confirmations). It stays
+        # **policy, not calibration**: the first weeks of real scores (EXP-0003)
+        # are what a v3 would be built on, and the M4 profile is where
+        # ``agent_consensus`` stops being zero.
+        #
+        # ``components_frozen`` **stays false here on purpose.** Flipping it is a
+        # coordinated two-file change and T2.4 owns only this one: the seed
+        # refuses to rewrite a published vector (``seed_weights.py``), and
+        # ``packages/core/tests/integration/test_schema_seed_and_partitions.py``
+        # ::test_the_seed_refuses_to_rewrite_a_published_weight_vector uses
+        # exactly this flip as its *divergence fixture* — shipping ``true`` makes
+        # that test's UPDATE a no-op and turns it red, and its ``_reset_shipped_
+        # weights`` then drags the next test down with it. What T2.4 does freeze
+        # is mechanical anyway: ``packages/indicators/tests/unit/
+        # test_weights_contract.py::TestT24RatifiedTheV2Vector`` pins every number
+        # of this block, so a silent edit fails a test either way.
         "momentum": "0.20",
         "volume": "0.20",
         "order_flow": "0.15",
@@ -253,7 +267,8 @@ OPPORTUNITY_WEIGHTS: tuple[tuple[str, dict[str, Any], str], ...] = (
         OPPORTUNITY_WEIGHTS_V2,
         "M2 profile: components sum 0.90, Agent Consensus 0, "
         "signed Early-Movement +/-10, stage/status/normalization thresholds versioned. "
-        "Component weights are provisional until T2.4 freezes or supersedes them.",
+        "Component weights ratified unchanged by T2.4 (2026-09-06); the frozen flag "
+        "waits for the coordinated change described in the vector above.",
     ),
 )
 

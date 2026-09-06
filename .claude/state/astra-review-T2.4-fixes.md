@@ -1,0 +1,12 @@
+**RESUMO:** MF-1 corrigido; MF-2 ainda tem uma brecha. Não encontrei outro bloqueio nos oito ajustes.
+**ARQUIVOS:** nenhum criado ou modificado; revisão como `quant-engineer`.
+**TESTES:** `uv run pytest` nos três arquivos revisados, com filtros e cache desativado: `15 passed, 77 deselected`; precisão/arredondamento: `5 passed, 12 deselected`. Não reexecutei os 671.
+**MUST-FIX:** um perfil com `score_decimals=2.5` ou `2.9` passa porque `int()` trunca antes de validar; reproduzi ambos como `accepted=2`. Recuse valores não inteiros antes da conversão ([weights.py:73](/C:/dev/project-hunter/packages/indicators/hunter_indicators/opportunity/weights.py:73)).
+**NICE-TO-HAVE:** “derruba 10 pontos” descreve o orçamento nominal; a tabela implementada alcança 80, portanto a contribuição máxima retirada é **8 pontos**, com peso 0,10 ([overlays.py:54](/C:/dev/project-hunter/packages/indicators/hunter_indicators/opportunity/overlays.py:54)).
+**O QUE EU FARIA DIFERENTE:** acrescentaria teste integrado de entrada e saída da histerese; hoje o teste do scorer injeta `confidence=None` via `replace` ([test_opportunity_scorer.py:500](/C:/dev/project-hunter/packages/indicators/tests/unit/test_opportunity_scorer.py:500)).
+**CONCORDO COM:** manter regime indisponível durante a pendência é uma política conservadora coerente; não manteria contribuição sem confiança conhecida ([overlays.py:185](/C:/dev/project-hunter/packages/indicators/hunter_indicators/opportunity/overlays.py:185)).
+Concordo com ausência versus anulação, maturidade das anomalias e consenso sem `reason` disponível ([scorer.py:214](/C:/dev/project-hunter/packages/indicators/hunter_indicators/opportunity/scorer.py:214), [overlays.py:132](/C:/dev/project-hunter/packages/indicators/hunter_indicators/opportunity/overlays.py:132), [overlays.py:262](/C:/dev/project-hunter/packages/indicators/hunter_indicators/opportunity/overlays.py:262)).
+Aceito o desempate assimétrico declarado, evento pelo par com `label_changed` e fronteira HALF_EVEN ([classifier.py:134](/C:/dev/project-hunter/packages/indicators/hunter_indicators/regime/classifier.py:134), [decision.py:143](/C:/dev/project-hunter/packages/indicators/hunter_indicators/regime/decision.py:143), [test_opportunity_scorer.py:508](/C:/dev/project-hunter/packages/indicators/tests/unit/test_opportunity_scorer.py:508)).
+**OBSIDIAN**
+“Revisões da Astra — T2.4”: registrar a brecha residual de precisão e os testes desta rodada.
+“Data Flow”: registrar regime pendente sem contribuição e publicação por mudança do par.
