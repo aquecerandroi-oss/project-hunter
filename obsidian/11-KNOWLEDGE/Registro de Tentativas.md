@@ -53,6 +53,49 @@ delas pode ser confirmada nessa mesma população — a confirmação exige jane
 por isso que a coluna `Início/fim UTC` está vazia e tem de ser preenchida **antes** de qualquer
 coleta.
 
+## Acréscimo de 2026-09-06 (segunda rodada de conhecimento — volume e fluxo de ordens)
+
+Linhas **acrescentadas**, nunca editadas. **Tentativas avaliadas continuam em 0**: nenhuma das
+candidatas abaixo foi rodada, e nenhum dos diagnósticos foi executado.
+
+| ID | Candidata | Nota de origem | Parâmetros | `δ` | Início/fim UTC | Status |
+|---|---|---|---|---|---|---|
+| T-009 | desequilíbrio agressor na barra do sinal | [[KB-0014-taker-buy-volume-o-que-temos-medido]] | `taker_imbalance_min` — valor **a definir pela distribuição condicionada a pico**, não o 0,10 da minha primeira redação | a definir | — | proposta, **bloqueada** pela observação sem decisão |
+| T-010 | teto de volume | [[KB-0015-volume-relativo-e-o-pico-como-exaustao]] | `volume_mult_max` — valor **exploratório**, sem sustentação; o 12 que escrevi não tem justificativa | a definir | — | proposta, dependente do diagnóstico D-004 |
+| T-011 | filtro de book `orderbook_imbalance_20 ≥ 0` | [[KB-0012-ofi-nao-e-o-nosso-orderbook-imbalance]] | — | — | — | **proposta e retirada em 2026-09-06**, antes de qualquer coleta: a feature é razão invariante a escala e não mede profundidade, que era a propriedade invocada |
+
+**T-011 fica registrada mesmo tendo morrido no mesmo dia.** A regra desta página diz que candidata
+abandonada depois de olhar dado entra na conta; esta foi abandonada por argumento sobre a
+**definição** da feature, não por resultado, e é por isso que está aqui com o motivo escrito — para
+que ninguém a reproponha achando que é ideia nova.
+
+**Diagnósticos registrados** (não são variantes de estratégia; **contam como inspeção da amostra**, e
+a KB-0015 corrigiu a minha ideia de que diagnóstico "não gasta tentativa" — um diagnóstico usado para
+escolher a próxima hipótese entra no histórico de pesquisa):
+
+| ID | Diagnóstico | Nota | Status |
+|---|---|---|---|
+| D-001 | retorno de preço a horizonte fixo por quartil de `volume_ratio_5m`, **com** o grupo `not_triggered` | [[KB-0011-volume-magnitude-e-a-ponte-para-direcao]] | proposto; exige registrar as barras `volume_below_threshold` |
+| D-002 | cobertura e idade de `orderbook_imbalance_20` até o instante da decisão | [[KB-0012-ofi-nao-e-o-nosso-orderbook-imbalance]] | proposto |
+| D-003 | composição e escala do denominador de 288 barras (zeros, volumes pequenos, mediana absoluta, razão — **separados**) | [[KB-0013-vpin-e-a-disputa-sobre-toxicidade]] | proposto |
+| D-004 | associação de `volume_ratio_5m` com o resultado, **todos** os modos de saída | [[KB-0015-volume-relativo-e-o-pico-como-exaustao]] | proposto |
+| D-005 | cobertura e distribuição de `spread_pct` **anterior** à decisão (caudas e proporção acima de 2 bps) | [[KB-0016-quando-o-fluxo-importa-dependencia-de-estado]] | proposto |
+| D-006 | observabilidade da série de `liquidations` já coletada, após corrigir a semântica `q`/`z` e `p`/`ap` | [[KB-0017-liquidacoes-o-fluxo-forcado-que-observamos-por-amostragem]] | proposto |
+| D-007 | gaps **abertos** × janela do denominador, separados dos **recuperados** | [[KB-0018-volume-relatado-e-o-denominador-que-usamos]] | proposto |
+
+**Medições e requisitos que não são tentativa nem diagnóstico** (não alteram decisão, não consomem
+multiplicidade): persistir `taker_imbalance_5m` no envelope, e gravar no envelope o ranking do
+mercado, o tamanho e a regra do universo e o timestamp do refresh.
+
+**Análise retirada por inexecutabilidade:** estratificação retrospectiva de expectancy por faixa de
+liquidez. O ranking do instante **não está** no envelope de nenhum sinal, e reconstruí-lo pelo estado
+atual de `markets` atribuiria resultados à faixa errada
+([[KB-0016-quando-o-fluxo-importa-dependencia-de-estado]]).
+
+**Consequência de multiplicidade, repetida porque vale para estas também:** T-009 a T-011 e D-001 a
+D-007 nasceram da inspeção da coorte de 2026-09-06. Nenhuma pode ser confirmada nessa mesma
+população; a confirmação exige janela futura reservada, declarada **antes** da coleta.
+
 ## Relacionados
 
 [[Strategy Backlog]] · [[Index]] ·
