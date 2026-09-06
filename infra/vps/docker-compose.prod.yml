@@ -138,6 +138,8 @@ services:
       HUNTER_ACME_EMAIL: ${HUNTER_ACME_EMAIL:-hunter@example.invalid}
       # `internal` (IP sem dominio) ou o e-mail do ACME (dominio) - ver Caddyfile.
       HUNTER_TLS_ARG: ${HUNTER_TLS_ARG:-internal}
+      # Nome usado quando o cliente nao manda SNI (IP puro). compose.sh exporta.
+      HUNTER_DEFAULT_SNI: ${HUNTER_DEFAULT_SNI:-localhost}
     volumes:
       - ../vps/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data      # certificados: perder isto e refazer ACME do zero

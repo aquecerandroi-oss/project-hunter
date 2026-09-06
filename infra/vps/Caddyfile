@@ -16,6 +16,10 @@
 	# API de administracao do Caddy desligada: ela nao precisa existir aqui e
 	# quem a alcanca reconfigura a borda inteira.
 	admin off
+	# Navegadores nao mandam SNI quando o endereco e um IP; sem isto o Caddy nao
+	# acha o certificado e responde "internal error" no handshake (visto em
+	# 2026-09-06). compose.sh deriva o valor de HUNTER_SITE_ADDRESS.
+	default_sni {$HUNTER_DEFAULT_SNI}
 }
 
 {$HUNTER_SITE_ADDRESS} {

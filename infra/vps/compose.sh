@@ -58,6 +58,12 @@ COMPOSE=(docker compose --env-file "$ROOT/.env" -p hunter
 GIT_SHA="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || true)"
 export GIT_SHA
 
+# HUNTER_DEFAULT_SNI: o host de HUNTER_SITE_ADDRESS sem esquema/porta (IP ou
+# dominio). O Caddy precisa dele para servir o certificado a clientes que nao
+# mandam SNI - todo navegador, quando o endereco e um IP.
+HUNTER_DEFAULT_SNI="$(sed -n "s#^HUNTER_SITE_ADDRESS=##p" "$ROOT/.env" | head -1 | sed "s#^https\{0,1\}://##; s#[:/].*##")"
+export HUNTER_DEFAULT_SNI="${HUNTER_DEFAULT_SNI:-localhost}"
+
 cmd="${1:-ps}"
 [ "$#" -gt 0 ] && shift
 
