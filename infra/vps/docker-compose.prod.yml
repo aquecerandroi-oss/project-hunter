@@ -89,6 +89,22 @@ services:
       HEALTH_PORT: "8001"
     logging: *prod-logging
 
+  # Shadow Lab (docs/plans/SHADOW-LAB.md, S2). Sem este bloco o servico existe
+  # no compose base mas herda o `x-api-env` de desenvolvimento, entao na VPS ele
+  # sobe com a senha de dev e morre em loop com
+  # `asyncpg.exceptions.InvalidPasswordError: password authentication failed for
+  # user "hunter"` — medido em 2026-09-06, na primeira subida do Lab na VPS.
+  # Cada servico que fala com o Postgres precisa do `*prod-db-env` aqui; nao ha
+  # heranca automatica entre os dois arquivos para chaves que o override nao
+  # menciona.
+  strategy-worker:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: strategy
+      HEALTH_PORT: "8001"
+    logging: *prod-logging
+
   web:
     restart: always
     build:
