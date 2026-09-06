@@ -8,6 +8,7 @@ version = "0.0.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "hunter-core",
+  "msgpack>=1.1",
   "numpy>=2.1",
   "polars>=1.12",
 ]
