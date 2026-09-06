@@ -349,6 +349,126 @@ código e do dado de 2026-09-06, e da leitura de fontes externas. Nenhuma pode s
 mesma população; a confirmação exige janela futura reservada, declarada **antes** da coleta, e o piso
 de 100 outcomes e 30 dias **não substitui cálculo de potência**.
 
+## Sétima rodada (2026-09-06) — meme coins
+
+Linhas **acrescentadas**, nunca editadas. **Tentativas avaliadas continuam em 0.** Diferença desta
+rodada: é a que teve **mais medição própria** — VPS, 45 h de dados, 200 mercados monitorados, 581 mil
+velas de 1 min, mais 50 livros de 20 níveis do hot state e o stream de universo do Redis. Nenhuma
+candidata foi rodada e nenhum diagnóstico foi executado.
+
+**Restrição estrutural que decidiu o formato da fila, e vale registrar aqui porque ela invalida
+famílias inteiras de candidatas antes de elas serem propostas:** o `StrategyContext`
+(`packages/core/hunter_core/strategies/base.py:109`) carrega apenas `candles_1m`, `funding`,
+`open_interest`, `eligible` e `eligibility_reason`, e recusa velas de outro símbolo. Portanto
+**nenhum filtro por spread, livro, volume de 24 h ou por outro mercado é implementável hoje** sem
+mudança de contrato.
+
+### Variantes novas
+
+| ID | Candidata | Nota de origem | Parâmetros | `δ` | Início/fim UTC | Status |
+|---|---|---|---|---|---|---|
+| T-028 | **teto de ATR% mais apertado** (M-A) | [[KB-0057-a-volatilidade-das-memes-e-o-piso-que-bane-o-btc]] | `atr_pct_max ∈ {0,03; 0,02}` contra a base de 0,05; θ de quantil congelado **antes** da janela | a definir | — | proposta, **bloqueada** pelos diagnósticos `D-042` e `D-043` (exigência da Astra) |
+| T-029 | **teto de funding absoluto como custo** (M-E) | [[KB-0059-funding-em-memes-a-cadencia-antes-do-sentimento]] | `abs_funding_max = θ`, simétrico, **não direcional** | a definir | — | proposta. **Não duplica a T-016**: aquela era filtro direcional retirado por prior desfavorável; esta é simétrica e não promete previsão |
+| T-030 | **teto de amplitude da barra de referência** (M-G) | [[KB-0064-a-cauda-de-queda-e-o-que-o-risk-engine-vai-precisar]] | `bar_range_atr_max = K`, quantil congelado antes | a definir | — | proposta |
+| T-031 | **piso de liquidez** (`quote_volume_24h` mínimo) (M-B) | [[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]] | — | — | — | **proposta e bloqueada no mesmo dia:** o `StrategyContext` não carrega o campo (`base.py:109`), e o `ts` do hash `ticker` é compartilhado entre REST e WS (`hot_state.py:61`, `sampling.py:55`), então volume velho pode aparecer preenchido e "fresco". Achado da Astra |
+| T-032 | **braço por coorte de meme** ("só memes" ou "sem memes") | [[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]] | — | — | — | **proposta e retirada no mesmo dia, antes de qualquer coleta:** dentro de cada estratégia as coortes não se distinguem na amostra atual **e**, decisivo, nenhuma regra consegue saber em que coorte está — o contexto é de um símbolo só e recusa velas de outro |
+| T-033 | **estratégia de listagem** (primeiros N dias de um perpétuo novo) | [[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]] | — | — | — | **proposta e bloqueada no mesmo dia:** aquecimento de 24 h 15 min (`momentum_v1`) e 24 h (`volume_anomaly_v1`); o backfill de 1499 min não inventa história anterior à listagem; e não gravamos `onboardDate`. A refutação é **inconstruível**, que é o que a [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] proíbe |
+| T-034 | **detecção de pump em tempo real** | [[KB-0061-pump-and-dump-o-detector-que-precisa-de-25-segundos]] | — | — | — | **proposta e bloqueada no mesmo dia:** a literatura opera em blocos de 25 s sobre o tape; nós decidimos sobre barras fechadas de 5 e 15 min. Não é reparametrização, é outra arquitetura |
+
+**T-031 a T-034 ficam registradas mesmo tendo morrido no mesmo dia**, pela mesma regra que preservou
+T-011, T-016, T-021, T-026 e T-027 — para que ninguém as reproponha como ideia nova.
+
+### Diagnósticos registrados
+
+| ID | Diagnóstico | Nota | Status |
+|---|---|---|---|
+| D-042 | `D-MEME-ATR` — ciclo de trabalho de `atr_pct_min`/`atr_pct_max` no ATR **que a estratégia consome**, por coorte e hora UTC, com gate isolado · exclusões posteriores · emissões efetivas separados | [[KB-0057-a-volatilidade-das-memes-e-o-piso-que-bane-o-btc]] | proposto — **roda hoje**; bloqueia a T-028 |
+| D-043 | `D-MEME-LIQ` — ATR contra **spread** condicionado a sinal, com snapshots comprovadamente anteriores; sem BTC, por coorte, removendo um mercado por vez | [[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]] | proposto; bloqueia a T-028 |
+| D-044 | `D-MEME-CUSTO` — `EXEC-C` por coorte, mais `R_net` recomputado com o spread medido de cada coorte | [[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]] | proposto — **roda hoje** |
+| D-045 | `D-MEME-FUND` — funding em **bps por hora de exposição** (intervalo medido, não cadência modal), cadência publicada junto, e custo por acompanhamento | [[KB-0059-funding-em-memes-a-cadencia-antes-do-sentimento]] | proposto; `next_funding_time` continua com zero linhas |
+| D-046 | `D-MEME-BETA` — distribuição de β e R² por coorte, com sensibilidade à retirada de **mercados** e de **blocos de tempo** | [[KB-0060-correlacao-com-o-btc-e-a-meme-season]] | proposto |
+| D-047 | `D-MEME-PICO` — lado do máximo em **janela fixa** (barra de referência → entrada + 2 h), independente da saída, com empates, cobertura, maturação e dependência declarados antes | [[KB-0061-pump-and-dump-o-detector-que-precisa-de-25-segundos]] | proposto — **não identifica exaustão**; sem grupo de comparação é descrição |
+| D-048 | `D-MEME-SAIDA` — os 27 sinais em 14 mercados que saíram do universo, contra os 982 que ficaram | [[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]] | proposto — **roda hoje** |
+| D-049 | `D-MEME-GAP` — saída contra barreira nos stops, decomposta em `exit_at_open` · `exit_base` · barreira · custos; o resultado se chama **gap na resolução do modelo** | [[KB-0064-a-cauda-de-queda-e-o-que-o-risk-engine-vai-precisar]] | proposto — **roda hoje** |
+| D-050 | `D-MEME-POP` — retrato por **estratégia/versão × coorte**, mercados desmonitorados incluídos, `count(r_multiple)` ao lado das médias, corte temporal declarado por consulta | [[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]] | proposto — **roda hoje** |
+| D-051 | `D-MEME-ATRPAR` — taxa de alvo pareada por decil de `atr_pct` dentro de cada estratégia | [[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]] | proposto; **ausência de diferença não demonstra redundância** |
+
+**Não é tentativa nem diagnóstico — é proveniência**, e por isso não consome multiplicidade:
+`H-KB0056` (carimbar `monitor_rank`, tamanho e regra do universo e a versão da lista de marcação),
+`H-KB0062a` (persistir `onboardDate`, em **duas** camadas: `normalize.py:137` e
+`universe_repo.py:64`) e `H-KB0062b` (persistir o diff de universo em tabela própria).
+
+**Não é tentativa nem diagnóstico — é estado do instrumento:** `enable_social_intelligence` e
+`enable_onchain` são flags **sem consumidor funcional**, e `intelligence_events` é tabela sem
+escritor nem leitor ([[KB-0063-social-e-on-chain-a-linha-que-nao-atravessamos]]). Vai para a página
+do módulo, não para esta contagem.
+
+**Inferências retiradas nesta rodada, registradas para não voltarem.** A Astra recusou a primeira
+versão das dez notas, em três passagens (`.claude/state/astra-review-KB-0056-0058-memecoins.md`,
+`astra-review-KB-0059-0061-memecoins.md`, `astra-review-KB-0062-0065-memecoins.md`):
+
+1. **"Zero sinais de Momentum em BTCUSDT confirma que o piso o exclui"** — é **compatibilidade
+   observacional**: o gate de ATR vem depois de rompimento, retorno e `rvol`
+   (`momentum_v1.py:180,204`), e o BTC pode estar sendo recusado antes.
+2. **"Média simples de TR aproxima Wilder com viés conhecido"** — o viés **não tem direção
+   universal**; contraexemplo: TR usual de 0,1%, um choque de 10% e 14 barras normais dá SMA 0,1% e
+   Wilder ≈0,3506%.
+3. **"As frações abaixo do piso são taxas de recusa operacional"** — a minha consulta atravessa
+   lacunas que a `aggregate.py:128` recusa.
+4. **"A volatilidade migrou para as listagens novas"** — 42 h sem data de listagem mostram
+   heterogeneidade contemporânea, não migração.
+5. **"O nosso dado discorda do ME2F porque TRUMP está no meio do pelotão"** — o ME2F mede
+   fragilidade combinando volatilidade, concentração e sentimento; ATR de dois dias não refuta isso.
+6. **"Meme coin é ativo sem utilidade declarada"** — falso para DOGE e FLOKI, pelas páginas oficiais
+   deles. A definição passou a separar origem cultural, utilidade declarada e direito a fluxo de
+   caixa.
+7. **"Sem carimbo, nenhuma estratificação por meme é possível"** — a **classificação** é
+   reconstruível pela identidade do mercado (`record.py:188`); o que se perde é o **denominador**
+   (composição e ranking históricos).
+8. **"A M-B é testável agora"** — não é: o `StrategyContext` não carrega volume de 24 h, e o `ts`
+   compartilhado entre REST e WS deixa volume velho parecer fresco.
+9. **"−0,651 entre ATR e profundidade demonstra o mecanismo da M-A"** — associação transversal com
+   medidas desalinhadas no tempo não demonstra custo condicionado ao sinal.
+10. **"As memes têm funding menos extremo"** — vale só **por liquidação nesta janela**; a comparação
+    exige normalizar por hora de exposição, e comparar mínimos de 21 contra 150 mercados favorece o
+    grupo maior.
+11. **"A coorte B amplifica quando acompanha e não acompanha o resto do tempo"** — β = ρ·σa/σb e
+    R² = ρ²; inclinação e ajuste são coisas diferentes, e não há estado alternando.
+12. **"0,39 em 15 min e 0,77 diário são comparáveis via efeito Epps"** — Epps explica um mecanismo
+    possível sem atribuir a diferença a ele; e a fonte dos 0,77-0,78 **não abriu** (HTTP 403), então
+    os números saíram.
+13. **"O detector da literatura leva 25 segundos, logo o evento é curto"** — os 25 s são **tamanho de
+    bloco**; o artigo descreve movimentos de horas. A Astra abriu o HTML que a minha ferramenta não
+    abriu.
+14. **"A `volume_anomaly_v1` é literalmente a regra de Kamps & Kleinberg com outro relógio"** —
+    fechamento acima do meio da barra não é anomalia de preço contra histórico, e o teto de
+    `2 × ATR` faz a estratégia **rejeitar** movimentos explosivos.
+15. **"O diff do universo não existe em lugar nenhum depois de 30 minutos"** — está no stream do
+    Redis; fui conferir e medi **52 entradas e 52 saídas em 20 h**. E os "30 minutos" eram observação
+    da tabela, não política: `prune_dispatched` não fixa prazo e o documentado são sete dias.
+16. **"Persistir a data de listagem custa uma linha"** — são duas camadas
+    (`normalize.py:137` e `universe_repo.py:64`, que não transfere `metadata`).
+17. **"A cauda ruim não está nas memes"** — 19 contra 133 mercados não decide cauda; só sobrevive
+    "a maior queda **observada** pertence ao `E_resto`".
+18. **"As memes concentram os dois extremos"** — amplitude mediana 11,51% na coorte A contra 12,10%
+    no resto.
+19. **"Uma barra de −10% atravessa qualquer stop de 1,5 ATR"** — pode ser queda contínua, e a
+    distância do stop depende do ATR do instante.
+20. **"`stop − exit_price` mede o gap"** — mistura gap e custo assumido (`walker.py:71,155`,
+    `pricing.py:53`), inclusive quando não houve gap.
+21. **"`R > 1` no alvo é gap favorável"** — o simulador credita só `target1` (`walker.py:73,157`).
+22. **"O confundidor de ATR é de primeira ordem"** — se movimentos e barreiras escalam juntos, o
+    processo em unidades de ATR preserva tempos e probabilidades de toque; o efeito que sobra anda na
+    direção contrária (custo fixo em bps pesa **menos** em R quando o risco percentual é maior).
+23. **"A população do Lab já é meme"** — são **92 de 978** sinais. A nota foi renomeada.
+24. **"Guardar `occurred_at` evita look-ahead em dado social"** — falta o instante em que o evento
+    **e a classificação** ficaram disponíveis.
+
+**Consequência de multiplicidade, repetida:** T-028 a T-034 e D-042 a D-051 nasceram da inspeção do
+código e do dado de 2026-09-06. Nenhuma pode ser confirmada nessa mesma população; a confirmação
+exige janela futura reservada, declarada **antes** da coleta, e o piso de 100 outcomes e 30 dias
+**não substitui cálculo de potência**.
+
 ## Relacionados
 
 [[Strategy Backlog]] · [[Index]] ·

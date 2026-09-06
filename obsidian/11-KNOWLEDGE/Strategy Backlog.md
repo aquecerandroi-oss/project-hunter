@@ -416,3 +416,128 @@ futura reservada, maturação e cobertura**, sem converter funding desconhecido 
   atual.
 - **Nenhum classificador de meta-rotulagem.** O formato entra como convenção; o modelo exigiria
   amostra rotulada que não temos.
+
+---
+
+## Sétima rodada (2026-09-06) — meme coins
+
+Dez notas ([[KB-0056-meme-coin-como-ativo-e-o-rotulo-que-nao-e-medida]] a
+[[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]]). É a rodada com **mais medição própria** de
+todas: ATR%, spread, profundidade de 20 níveis, funding, beta contra o BTC, quedas, sinais e
+outcomes — tudo na **VPS**, com 45 h de dados reais, 200 mercados monitorados e 581 mil velas de
+1 min.
+
+### A restrição estrutural que organiza toda esta fila
+
+**O `StrategyContext` carrega `candles_1m`, `funding`, `open_interest`, `eligible` e
+`eligibility_reason` — e nada mais** (`packages/core/hunter_core/strategies/base.py:109` em diante),
+e ele é validado para **recusar velas de outro símbolo**. Consequências que decidem o que pode
+entrar na fila:
+
+> 1. Toda candidata testável hoje tem de ser calculável a partir de **velas, funding e open
+>    interest** do próprio mercado. Spread, livro e volume de 24 h **não estão lá** — filtros que os
+>    usem exigem mudança de contrato, do mesmo peso dos itens 19 e 20.
+> 2. **Filtro entre mercados é estruturalmente impossível hoje.** Nenhuma regra pode olhar o BTC,
+>    ou a coorte, ou o mercado vizinho, porque o contexto é de um símbolo só e rejeita o resto.
+
+### O que a medição derrubou do folclore de meme
+
+| Afirmação corrente | O que medi (VPS, 42 h, 2026-09-05 00:00 a 2026-09-06 18:00 UTC) |
+|---|---|
+| "Meme é o ativo mais volátil" | Medianas de ATR%(14) por barra de 15 min **próximas** entre memes (0,84%) e resto (0,83%). O contraste grande é BTC (0,127%) e majors (0,50%) contra tudo mais ([[KB-0057-a-volatilidade-das-memes-e-o-piso-que-bane-o-btc]]) |
+| "As memes azuis são as mais voláteis" | DOGE 0,56%, PEPE 0,53%, SHIB 0,45% — na faixa das majors. As listagens recentes de símbolo não-ASCII vão de 1,57% a 5,87% |
+| "Meme tem funding extremo" | Por liquidação, **menos** extremo que o resto (\|média\| 1,07 contra 2,32 bps); e metade da diferença entre coortes é **cadência**, não sentimento ([[KB-0059-funding-em-memes-a-cadencia-antes-do-sentimento]]) |
+| "Memes descolam do mercado" | São **mais** acopladas ao BTC que a altcoin média: inclinação mediana 2,80 e R² 0,152, contra 1,44 e 0,021 ([[KB-0060-correlacao-com-o-btc-e-a-meme-season]]) |
+| "Meme é onde estão as quedas de 80%" | A maior queda **observada** ficou fora das memes (−58,67% contra −29,75%) — mas 19 contra 133 mercados **não decide cauda** ([[KB-0064-a-cauda-de-queda-e-o-que-o-risk-engine-vai-precisar]]) |
+| "Meme dá mais sinal" | 4,00 sinais por mercado contra 5,43 do resto; e dentro de cada estratégia as taxas de alvo não se distinguem ([[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]]) |
+
+**O achado que mais importa não é sobre meme, é sobre nós:** o estimador de ATR ficou **abaixo do
+piso `atr_pct_min = 0,003` em 100% das 154 observações do BTCUSDT**, e a `momentum_v1` emitiu **zero
+sinais** para o BTC. Se confirmado pelo `D-MEME-ATR`, quer dizer que **ninguém decidiu** que o Lab
+seria um laboratório de altcoin: o piso de custo decidiu, e nunca foi lido assim.
+
+### Duas medições que mudam contratos existentes
+
+| Componente | Assumido pelo Lab | Medido nas memes (coorte A) | Medido nas majors |
+|---|---|---|---|
+| Spread total | 2 bps | **3,12 bps** (p99 12,10) | 1,23 bps |
+| Travessia de 5.000 USDT contra o mid | não existe no contrato | **7,07 bps** | 1,34 bps |
+| Cabe 20.000 USDT em 20 níveis? | não perguntado | **18 de 21** | 23 de 23 |
+
+Para 5.000 USDT, o custo estático da perna de entrada numa meme mediana **já supera os 6 bps** que o
+Lab assume para spread mais slippage somados, antes de qualquer taxa
+([[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]]). Isso reforça o item 19
+(`assumed_notional_usd`) da quinta rodada; **não** autoriza recalibrar custo na amostra que revelou
+o problema.
+
+### Marcação de universo — `meme_universe_v1`, congelada antes de qualquer consulta
+
+Toda candidata desta rodada declara a que universo se aplica usando esta lista, que é **julgamento
+meu** e está datada por isso ([[KB-0056-meme-coin-como-ativo-e-o-rotulo-que-nao-e-medida]]):
+
+- **Coorte A (21):** `DOGEUSDT, 1000SHIBUSDT, 1000PEPEUSDT, 1000BONKUSDT, 1000FLOKIUSDT, WIFUSDT,
+  BOMEUSDT, FARTCOINUSDT, PENGUUSDT, TRUMPUSDT, MOODENGUSDT, CHILLGUYUSDT, PNUTUSDT, NEIROUSDT,
+  1000CATUSDT, 1000000BOBUSDT, SPXUSDT, USELESSUSDT, MUBARAKUSDT, BROCCOLI714USDT, TSTUSDT`
+- **Coorte B (regra sintática):** símbolo que não casa `^[A-Za-z0-9]+$` — hoje 牛来USDT, 哈基米USDT,
+  龙虾USDT, 币安人生USDT, 我踏马来了USDT. **Confunde meme com listagem recente**, e a regra identifica
+  caracteres, não natureza econômica.
+- **Zona cinzenta, fora das duas:** PEOPLE, CATI, GIGGLE, 4, DOOD, PUMP, MARSCOIN, BULLA, RAYSOL,
+  GRAM, TRADOOR, SKYAI.
+
+A lista é `default_parameters` de **relatório**, nunca de decisão: **nenhuma candidata abaixo muda de
+comportamento por coorte** — porque, pela restrição estrutural acima, nenhuma regra consegue saber em
+que coorte está.
+
+### Fila para a sombra — meme coins
+
+**Todas atrás da #1 do backlog** (valor incremental da invalidação, T-005) e do bloco de saídas da
+sexta rodada. Nenhuma é ativada por mim.
+
+| # | Candidata | Regra em uma frase | Parâmetros | Dado (temos?) | Marcação de universo | O que a refutaria |
+|---|---|---|---|---|---|---|
+| **M-A** | **Teto de ATR% mais apertado** ([[KB-0057-a-volatilidade-das-memes-e-o-piso-que-bane-o-btc]] · [[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]]) | Manter tudo da `momentum_v1` e baixar só o teto de volatilidade admitida | `atr_pct_max ∈ {0,05 (base), 0,03, 0,02}`; θ de quantil **congelado antes** da janela | **sim** — Wilder(14) sobre 15m com `atr_bars=97`, já calculado no contexto | universo inteiro; **relatório estratificado** por `meme_universe_v1` | diferença **pareada** de média de `R_net` contra a base sem exceder o efeito mínimo declarado, com Holm e blocos de tempo, e os quatro números da `C-META`. **Bloqueada até `D-MEME-ATR` e `D-MEME-LIQ` rodarem** (exigência da Astra) |
+| **M-E** | **Teto de funding absoluto como custo** ([[KB-0059-funding-em-memes-a-cadencia-antes-do-sentimento]]) | Recusar o sinal quando \|`funding_rate`\| na decisão passar de θ — **filtro de custo, simétrico, não direcional** | `abs_funding_max = θ`, de quantil congelado antes; um braço | **sim** — `funding` está no `StrategyContext` | universo inteiro; relatório por coorte | os dois denominadores da `C-META` não positivos. **Não é a T-016**: aquela era direcional e foi retirada por prior desfavorável ([[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]]); esta é simétrica e não promete previsão. **Ressalva:** `funding_rate` é a estimativa em formação, e sem `next_funding_time` não sabemos a fase do ciclo ([[KB-0019-o-que-a-nossa-funding-rate-mede-de-fato]]) |
+| **M-G** | **Teto de amplitude da barra de referência** ([[KB-0064-a-cauda-de-queda-e-o-que-o-risk-engine-vai-precisar]]) | Recusar quando a amplitude da própria barra de 15 min do sinal passar de K × ATR₀ | `bar_range_atr_max = K`, de quantil congelado antes; um braço | **sim** — só velas | universo inteiro; relatório por coorte | os dois denominadores da `C-META`. **É distinta do `atr_pct_max`**: aquele mede o nível ambiente de volatilidade, este mede **aquela barra**. E é distinta do `return_max_atr = 2` da `volume_anomaly_v1`, que limita o **retorno** e não a amplitude, e não existe na `momentum_v1` |
+| ~~**M-B**~~ | ~~**Piso de liquidez** (`quote_volume_24h` mínimo)~~ | — | — | **não** | — | **BLOQUEADA em 2026-09-06.** Dois motivos: o `StrategyContext` **não carrega** volume de 24 h (`base.py:109`), então é mudança de contrato; e o `ts` do hash `ticker` é compartilhado entre REST e WS (`hot_state.py:61`, `sampling.py:55`), então volume velho pode aparecer preenchido e "fresco". Achado da Astra. Classificação: *especificada; diagnóstico de cobertura liberado; avaliação bloqueada até validar disponibilidade e frescor* |
+
+### Diagnósticos abertos pela sétima rodada
+
+| Item | Nota | O que responde | Pré-requisito |
+|---|---|---|---|
+| `D-MEME-ATR` | [[KB-0057-a-volatilidade-das-memes-e-o-piso-que-bane-o-btc]] | ciclo de trabalho de `atr_pct_min`/`atr_pct_max` **no ATR que a estratégia consome**, por coorte e hora UTC, com três números: gate de ATR isolado nas janelas válidas, exclusões após os demais critérios, emissões efetivas | **nenhum — roda hoje**; **bloqueia a M-A** |
+| `D-MEME-LIQ` | [[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]] | ATR contra **spread** (não profundidade), com spread de snapshots comprovadamente anteriores, condicionado aos sinais; associação refeita sem BTC, por coorte, removendo um mercado por vez | **nenhum**; **bloqueia a M-A** |
+| `D-MEME-CUSTO` | [[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]] | `EXEC-C` estratificado por coorte, mais recomputar `R_net` com o spread **medido** de cada coorte | **nenhum — roda hoje** |
+| `D-MEME-FUND` | [[KB-0059-funding-em-memes-a-cadencia-antes-do-sentimento]] | funding em **bps por hora de exposição** (intervalo real medido, não cadência modal), com cadência publicada junto; e custo de funding realizado por acompanhamento | intervalo medido; `next_funding_time` continua com **zero linhas** |
+| `D-MEME-BETA` | [[KB-0060-correlacao-com-o-btc-e-a-meme-season]] | `D-023` estratificado, publicando **distribuição** de β e R² por coorte, com sensibilidade à retirada de mercados **e** de blocos de tempo | nenhum |
+| `D-MEME-PICO` | [[KB-0061-pump-and-dump-o-detector-que-precisa-de-25-segundos]] | de que lado do máximo entramos, em **janela fixa** (barra de referência → entrada + 2 h), independente da saída | desenho declarado antes: empates, cobertura, maturação, dependência |
+| `D-MEME-SAIDA` | [[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]] | tamanho do viés de sobrevivência: os **27 sinais em 14 mercados** que saíram do universo, contra os 982 que ficaram | **nenhum — roda hoje** |
+| `D-MEME-GAP` | [[KB-0064-a-cauda-de-queda-e-o-que-o-risk-engine-vai-precisar]] | saída contra barreira nos stops, **decomposta** em `exit_at_open`, `exit_base`, barreira e custos — é **gap na resolução do modelo**, não custo de execução real | **nenhum — roda hoje** |
+| `D-MEME-POP` | [[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]] | retrato por **estratégia/versão × coorte** com todos os denominadores, mercados desmonitorados incluídos, `count(r_multiple)` ao lado de cada média e corte temporal declarado | **nenhum — roda hoje** |
+| `D-MEME-ATRPAR` | [[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]] | taxa de alvo pareada por decil de `atr_pct`, dentro de cada estratégia. **Ausência de diferença não demonstra redundância** | `D-MEME-POP` |
+
+### Proveniência — três itens que não são estratégia e destravam o resto
+
+| Item | Nota | Por quê |
+|---|---|---|
+| `H-KB0056` — carimbar `monitor_rank` do instante, tamanho e regra do universo, e a versão da lista de marcação, no envelope | [[KB-0056-meme-coin-como-ativo-e-o-rotulo-que-nao-e-medida]] | a **classificação** é reconstruível pela identidade do mercado; o **ranking e a composição históricos** não são |
+| `H-KB0062a` — persistir a data de listagem (`onboardDate`) | [[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]] | são **duas** mudanças, não uma: `binance/normalize.py:137` guarda só `contractType`, e `universe_repo.py:64` **não transfere `metadata`** no upsert |
+| `H-KB0062b` — persistir o diff de universo em tabela própria | [[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]] | hoje ele existe no stream do Redis (46 eventos, 20 h) mas a retenção é por **número de entradas**; com 52 trocas em 20 h, isso é da ordem de semanas |
+
+### O que esta rodada explicitamente NÃO propõe
+
+- **Nenhuma estratégia de listagem nova.** É a ideia mais citada do mercado de meme e a sua refutação
+  é **impossível de construir** hoje: a `momentum_v1` precisa de 24 h 15 min de histórico contínuo e
+  a `volume_anomaly_v1` de 24 h, o backfill não inventa história que a Binance não tem, e não
+  gravamos a data de listagem ([[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]]).
+- **Nenhum braço "só memes" nem "sem memes".** Duas razões: dentro de cada estratégia as coortes não
+  se distinguem na amostra atual, e — decisivo — **nenhuma regra consegue saber em que coorte está**,
+  porque o contexto é de um símbolo só.
+- **Nenhum braço de detecção de pump.** A literatura opera em blocos de 25 s; nós decidimos sobre
+  barras de 5 e 15 min. Não é parâmetro, é outra arquitetura.
+- **Nada de social nem on-chain.** `enable_social_intelligence` é flag sem consumidor funcional e
+  `intelligence_events` é tabela sem escritor ([[KB-0063-social-e-on-chain-a-linha-que-nao-atravessamos]]).
+- **Nenhuma recalibração de `spread_bps`, `slippage_bps` ou `fee_bps` por coorte.** Seria calibrar na
+  amostra que revelou o problema ([[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]]).
+- **Nenhuma mudança de limite de risco.** Os cinco requisitos da
+  [[KB-0064-a-cauda-de-queda-e-o-que-o-risk-engine-vai-precisar]] são **propostas** para o Risk
+  Engine do M3/M4, nascidas de 42 h sem nenhum evento de stress.

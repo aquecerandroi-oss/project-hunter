@@ -21,7 +21,8 @@ Cada nota é uma síntese própria (nunca cópia), com fonte, data, qualidade da
 | Gestão de risco e sizing | KB-0005, KB-0035, KB-0040 | iniciado |
 | Estatística de backtest (overfitting, look-ahead, custos) | KB-0010 | iniciado |
 | Execução e microestrutura do preenchimento | KB-0036, KB-0037, KB-0038, KB-0039, KB-0040, KB-0041, KB-0042, KB-0043, KB-0044 | quinta rodada feita (2026-09-06) |
-| Livros de estratégia | KB-0045, KB-0046, KB-0047, KB-0048, KB-0049, KB-0050, KB-0051, KB-0052, KB-0053, KB-0054, KB-0055 | **sexta rodada feita (2026-09-06)** |
+| Livros de estratégia | KB-0045, KB-0046, KB-0047, KB-0048, KB-0049, KB-0050, KB-0051, KB-0052, KB-0053, KB-0054, KB-0055 | sexta rodada feita (2026-09-06) |
+| Meme coins | KB-0056, KB-0057, KB-0058, KB-0059, KB-0060, KB-0061, KB-0062, KB-0063, KB-0064, KB-0065 | **sétima rodada feita (2026-09-06)** |
 
 ## Notas
 _(uma linha por nota: link para a nota — fonte curta — qualidade da evidência — hipótese sim/não)_
@@ -83,6 +84,16 @@ _(uma linha por nota: link para a nota — fonte curta — qualidade da evidênc
 | [[KB-0053-contracao-de-volatilidade-o-unico-pedaco-formalizavel]] | base antes do rompimento | descrições públicas de Weinstein, O'Neil (IBD) e Minervini | anedótico (apresentação retrospectiva de vencedoras) | sim — `D-CONTR` e **L4**, contração 8/32 terminando em `t−1` |
 | [[KB-0054-a-cauda-direita-e-o-alvo-fixo-que-a-corta]] | trend following / saída | páginas públicas de Andreas Clenow | backtest do autor (**nenhum número dele citado**) | sim — é a **L1**; `target2`/`target3` persistidos e nunca usados como barreira |
 | [[KB-0055-douglas-o-livro-que-nao-vira-hipotese]] | processo | descrições públicas de *Trading in the Zone* | anedótico | **não** — nota de leitura, sem linha no backlog nem no registro |
+| [[KB-0056-meme-coin-como-ativo-e-o-rotulo-que-nao-e-medida]] | meme / definição e método | arXiv 2512.11850; arXiv 2512.00377 | preprints (resumo) + universo medido | sim — `H-KB0056`, proveniência da marcação |
+| [[KB-0057-a-volatilidade-das-memes-e-o-piso-que-bane-o-btc]] | meme / volatilidade | **medição própria na VPS** (SQL colado) | replicado + preprint em resumo | sim — `D-MEME-ATR` e a candidata **M-A** |
+| [[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]] | meme / execução e custo | `market_snapshots` + 50 livros do hot state | **replicado** (duas medições) | sim — `D-MEME-LIQ`, `D-MEME-CUSTO`; **M-B bloqueada** |
+| [[KB-0059-funding-em-memes-a-cadencia-antes-do-sentimento]] | meme / funding | 2.136 liquidações da VPS + docs da Binance | replicado + documentação | sim — `D-MEME-FUND` e a candidata **M-E** |
+| [[KB-0060-correlacao-com-o-btc-e-a-meme-season]] | meme / fator e regime | medição própria (β e R² contra o BTC) | replicado; **a fonte externa não abriu (403)** | sim — `D-MEME-BETA`; **nenhum filtro de regime** |
+| [[KB-0061-pump-and-dump-o-detector-que-precisa-de-25-segundos]] | meme / manipulação | La Morgia et al. (arXiv 2105.00733) | preprint — **o HTML só abriu para a Astra** | sim — `D-MEME-PICO`, redesenhado por ela |
+| [[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]] | meme / listagem e proveniência | código + **stream de universo do Redis** | leitura de código + SQL + 46 eventos | sim — `H-KB0062a/b`, `D-MEME-SAIDA` |
+| [[KB-0063-social-e-on-chain-a-linha-que-nao-atravessamos]] | meme / social e on-chain | arXiv 2512.11850 e 2512.00377 + nosso código | preprints (resumo) + inventário | **não** — depende de flag; nota de leitura |
+| [[KB-0064-a-cauda-de-queda-e-o-que-o-risk-engine-vai-precisar]] | meme / risco | medição própria (quedas por coorte) | replicado, com a conclusão de cauda **retirada** | sim — `D-MEME-GAP` e a candidata **M-G**; requisitos para o M3/M4 |
+| [[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]] | meme / momentum vs reversão | `agent_signals` e `signal_outcomes` da VPS | replicado, **abaixo do limiar editorial** | sim, só diagnóstico — `D-MEME-POP`, `D-MEME-ATRPAR` |
 
 ## O que a primeira rodada mudou de fato
 
@@ -369,6 +380,69 @@ Os diagnósticos que "rodam hoje" ainda não rodaram.
 | `vantharp.com/.../A_Short_Lesson_on_R_and_R-multiple.pdf` | PDF voltou binário ilegível; **a Astra abriu** | ela confirmou que o material sustenta risco inicial, R-múltiplos, expectancy e a importância do sizing — e que é material do instituto sobre o simulador deles, **não** prova de leitura do livro |
 | Capítulo de resultados de Aronson (conclusão estatística) | o resumo público não expõe o número | a página da editora sustenta "mais de 6.400 regras sobre o S&P 500"; **"quase nada sobrevive" ficou marcado como de memória, a confirmar** |
 | Números de meta-rotulagem reportados por fontes secundárias | não verificados por mim nem pela Astra | **saíram inteiramente** da KB-0052 — nem como evidência, nem como contraexemplo |
+
+## O que a sétima rodada mudou de fato
+
+Tema: **meme coins**, com um pedido direto do Everton — estudar para usar no virtual. É a rodada com
+**mais medição própria de todas**: 45 h de dados reais na VPS, 200 mercados monitorados, 581 mil
+velas de 1 min, 50 livros de 20 níveis do hot state, 2.136 liquidações de funding e o stream de
+universo do Redis. E o saldo é quase todo **contra o folclore**.
+
+1. **O rótulo "meme" não separa volatilidade dentro do nosso universo.** Medianas de ATR%(14)
+   próximas entre memes (0,84%) e resto (0,83%). Quem se separa é BTC (0,127%) e as majors (0,50%).
+   DOGE, PEPE e SHIB ficam na faixa das majors.
+2. **`atr_pct_min = 0,003` deixou o BTC fora em 100% das barras medidas, e a `momentum_v1` emitiu
+   zero sinais para BTCUSDT.** Se o `D-MEME-ATR` confirmar, ninguém decidiu que o Lab seria um
+   laboratório de altcoin — o piso de custo decidiu, e nunca foi lido assim.
+3. **O custo por coorte é o que o contrato erra.** Spread mediano de 3,12 bps nas memes contra 2
+   assumidos; atravessar 5.000 USDT custa 7,07 bps, mais que os 6 bps de spread + slippage somados;
+   3 de 21 livros de meme não comportam 20.000 USDT. Correlação de postos de −0,651 entre ATR% e
+   profundidade — **que não demonstra o mecanismo**, como a Astra fez questão de registrar.
+4. **"Meme tem funding extremo" é falso na nossa amostra**, e metade da diferença entre coortes é
+   **cadência de liquidação** (4 h contra 8 h), não sentimento.
+5. **Memes são mais acopladas ao BTC que a altcoin média**, não menos: inclinação mediana 2,80 e R²
+   0,152 contra 1,44 e 0,021.
+6. **A restrição que organiza tudo:** o `StrategyContext` só carrega velas, funding e open interest
+   do próprio símbolo. Nenhum filtro por spread, livro, volume de 24 h **ou por outro mercado** é
+   implementável hoje. Isso matou três candidatas antes de elas nascerem.
+7. **O primeiro dia de um perpétuo novo é estruturalmente invisível** (aquecimento de 24 h), e não
+   gravamos a data de listagem — `markets.metadata` está vazia, e persistir o `onboardDate` exige
+   **duas** camadas, não uma.
+8. **O universo gira 26% em 20 horas** — 52 entradas e 52 saídas, com 16 símbolos oscilando na
+   fronteira do rank 200. Descoberto porque a Astra derrubou a minha afirmação de que o diff estava
+   perdido: ele estava no stream do Redis, com 46 eventos.
+9. **Vinte e sete sinais em quatorze mercados que já saíram do universo** — viés de sobrevivência
+   acontecendo em quinze horas, e que as minhas próprias consultas descartavam em silêncio.
+
+**Saldo de método, e é o mais duro da série.** A Astra recusou a primeira versão das **dez** notas,
+em três passagens, e a lista completa das **24 inferências retiradas** está no
+[[Registro de Tentativas]]. Além disso ela: **abriu o artigo de pump-and-dump que a minha ferramenta
+não abriu** e mostrou que os 25 segundos são tamanho de bloco, não duração do evento; **recuperou um
+dado que eu tinha declarado perdido** (o diff de universo no Redis); **derrubou o título de uma nota
+inteira** com o meu próprio número (92 de 978 sinais são meme, então "a população do Lab já é meme"
+é falso, e o arquivo foi renomeado); **achou um defeito de emparelhamento no meu SQL de beta** (que
+refiz, com números idênticos — a correção virou verificação); e **derrubou as duas explicações que
+eu tinha dado para o `R > 1` no alvo e para o confundidor de ATR**, mostrando que o efeito real anda
+na direção contrária.
+
+**Três candidatas testáveis hoje saíram da rodada** (M-A, M-E, M-G), duas bloqueadas por contrato
+(M-B, e a de listagem), duas retiradas por argumento (braço por coorte, detecção de pump) e dez
+diagnósticos, cinco dos quais rodam sem pré-requisito nenhum. **Nada foi ativado.**
+
+## Fontes que não abriram nesta rodada (sétima)
+
+| Fonte | O que aconteceu | Como contornei |
+|---|---|---|
+| `papers.ssrn.com/.../6292920` (desempenho de meme coins 2025-2026) | HTTP 403 para mim **e para a Astra** | os números de correlação diária (0,77-0,78) **saíram inteiramente** da KB-0060 |
+| `arxiv.org/pdf/2005.06610` (La Morgia et al., versão ICCCN 2020) | PDF ilegível, duas tentativas | li o resumo; **nenhum número de desempenho dele** entrou |
+| `arxiv.org/pdf/2105.00733` ("The Doge of Wall Street") | o PDF não abriu para mim; **a Astra abriu o HTML** | os 317 eventos da Binance, os blocos de 25 s e a validação cruzada vêm da leitura dela |
+| Kamps & Kleinberg (2018); Xu & Livshits (2019) | **não abri os textos primários** | citei só o **formato** do argumento; nenhuma fórmula nem número deles |
+| Busca por efeito de listagem em perpétuos | devolveu só material de divulgação de corretora | **nada citado**; registrado como resultado da busca |
+| Busca por menções sociais como preditor em perpétuos de meme | idem, com números sem fonte | **nada citado** ([[KB-0063-social-e-on-chain-a-linha-que-nao-atravessamos]]) |
+
+E a diferença operacional desta rodada em relação a todas as anteriores: **a VPS respondeu**. Todos
+os números acima são de produção, não da instância local. As limitações são de **janela** (42-45 h,
+um regime, sem stress) e de **maturidade** (o Lab tem 15 h de sinais), não de acesso.
 
 ## Relacionados
 
