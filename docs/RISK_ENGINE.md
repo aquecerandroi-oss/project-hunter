@@ -1,9 +1,12 @@
-# Risk Engine — contrato v2
+# Risk Engine — contrato v2.1
 
-**Versão 2, 2026-09-06.** Reescrito a partir da diretiva do Everton de 2026-09-06
-(`.claude/state/directive-risk-engine-2026-09-06.md`, verbatim) e das medições da oitava rodada de
-conhecimento (`obsidian/11-KNOWLEDGE/Strategy Backlog.md` → "Regras propostas para o Risk Engine").
-O v1 continua legível em `git show 8f42b4d:docs/RISK_ENGINE.md`; a §9 lista o que mudou e por quê.
+**Versão 2.1, 2026-09-06.** A v2 (mesma data) foi reescrita a partir da diretiva do Everton de
+2026-09-06 (`.claude/state/directive-risk-engine-2026-09-06.md`, verbatim) e das medições da oitava
+rodada de conhecimento (`obsidian/11-KNOWLEDGE/Strategy Backlog.md` → "Regras propostas para o Risk
+Engine"). Esta revisão fecha, no contrato, as três invariantes que a revisão adversarial da T3.2
+(`.claude/state/review-T3.2-risk-core.md`, commits `bf4924b` e `5f86028`) provou faltarem no núcleo
+que a v2 já descrevia — nenhum limite do Everton foi alterado; §9.2 lista o que mudou e por quê. O v1
+continua legível em `git show 8f42b4d:docs/RISK_ENGINE.md`; a §9 lista o que mudou entre v1 e v2.
 
 Função pura e determinística:
 
@@ -55,11 +58,13 @@ carteira virtual do M3. Os presets `conservative`/`balanced`/`aggressive` do v1 
 | `max_concurrent_positions` | `5` | Abertas + pendentes |
 | `max_beta_btc_exposure` | `0.5` | `Σ \|notional_i × β_i\| / equity` (módulo, R-CORR-1) |
 | `min_liquidity_usd_24h` | `50_000_000` | Volume 24 h do par, **na exchange de execução** |
+| `max_volume_age_s` | `120` | **Novo em v2.1.** Idade máxima do volume do minuto e do volume de 24 h (mesmo carimbo, R-OPS-2); acima disso, sem carimbo, ou carimbo no futuro, `liquidity_24h` e `participation` viram `unavailable` (§3.1 checks 9 e 19). Origem: a própria v2 já prometia "os insumos com idade máxima declarada... volume de 24 h, volume do minuto" em §7 (R-OPS-2); a revisão adversarial de 2026-09-06 (bloqueante 3) achou que o valor existia no perfil e nunca era lido |
 | `max_leverage` | `1` | SPOT, sem empréstimo, sem alavancagem, sem short |
 | `kill_switch_warning` | `{daily_loss_pct: 0.01, drawdown_pct: 0.04}` | Modo AVISO (§5) |
 | `kill_switch_blocked` | `{daily_loss_pct: 0.02, drawdown_pct: 0.08}` | Modo BLOQUEADO (§5) |
 | `warning_size_multiplier` | `0.5` | Aplicado ao **tamanho final aprovado** (§4) |
 | `regime_size_multiplier` | gramática do v1 (§2.1) | Aplicado ao **tamanho final aprovado** |
+| `max_entry_deviation_pct` | `0.005` | **Novo em v2.1.** Meia largura da zona de entrada em torno do **preço observado** (§3.1 check 7, "entrada fora da zona"). Origem: a v2 já nomeava a zona no texto do check sem publicar o número no perfil; R-OPS-2 e a revisão adversarial de 2026-09-06 (bloqueante 2) exigiram a chave, porque sem ela `entry_ref` nunca era confrontado com o mercado |
 | `max_spread_pct`, `max_slippage_pct`, `[min,max]_stop_distance_pct` | herdados do preset conservador, revisáveis | Guardas técnicas, não limites de capital |
 
 **O que a diretiva não define e este contrato não inventa:** nenhum limite acima foi criado por nós.
@@ -97,9 +102,9 @@ estado é novo no v2 (R-OPS-1) e **reprova por padrão**.
 | 4 | `data_quality` | mercado `degraded`, ou último preço mais velho que o limite declarado | carimbo do preço |
 | 5 | `market_gap` | o mercado tem lacuna de coleta **não recuperada** na janela (R-OPS-3) | continuidade |
 | 6 | `market_in_universe` | o mercado saiu do universo entre o sinal e a proposta (R-OPS-4) | universo |
-| 7 | `signal_validity` | sinal expirado/invalidado; stop do lado errado; entrada fora da zona | proposta |
-| 8 | `stop_distance` | fora de `[min_stop_distance_pct, max_stop_distance_pct]` | proposta |
-| 9 | `liquidity_24h` | `quote_volume_24h` < `min_liquidity_usd_24h` (50 M) | velas 24 h |
+| 7 | `signal_validity` | sinal inativo; **ou** stop fora de `(0, entry_ref)`; **ou** stop não abaixo do preço observado; **ou** `\|entry_ref − observado\| / observado > max_entry_deviation_pct` | proposta + preço observado |
+| 8 | `stop_distance` | fora de `[min_stop_distance_pct, max_stop_distance_pct]`, medida no preço do sizing (§4, `sizing_price`) | proposta |
+| 9 | `liquidity_24h` | `quote_volume_24h` < `min_liquidity_usd_24h` (50 M); **ou** o volume (minuto ou 24 h) tem idade > `max_volume_age_s`, sem carimbo, ou carimbo no futuro → `unavailable` | velas 24 h |
 | 10 | `spread` | `spread_pct` > `max_spread_pct` | book |
 | 11 | `book_depth` | book ausente, vencido, ou raso demais para qualquer tamanho admissível | book (10 s) |
 | 12 | `beta_validity` | sem β válido para o mercado (§6) — o ativo fica só em shadow | `market_betas` |
@@ -112,6 +117,33 @@ estado é novo no v2 (R-OPS-1) e **reprova por padrão**.
 Reprovar em 16 ou 17 também **aciona** a transição de kill switch (§5) — o check não é só um veto,
 é o detector.
 
+**`signal_validity` (check 7), por extenso — novo em v2.1.** O preço observado é o `mid` do livro
+quando existe, senão `last_price` (`last_price` é obrigatório, então o preço observado nunca é
+indisponível; a frescura dele é o check 4, `data_quality`). Reprova a menos que **todas** as
+condições valham juntas:
+
+1. o sinal está ativo (`signal_valid`);
+2. o stop está abaixo de `entry_ref` (geometria do lado comprado);
+3. o stop está abaixo do **preço observado** — um stop já rompido no mercado atual não abre posição;
+4. `|entry_ref − observado| / observado ≤ max_entry_deviation_pct` (0,5 % no `paper_v1`) — a zona de
+   entrada, medida contra o observado, não contra `entry_ref`.
+
+**A banda é assimétrica, e isso é intencional, não um bug a esconder.** Como o denominador é o preço
+**observado**, para `entry_ref = 100` a banda admite observado entre ≈ 99,5025 e ≈ 100,5025 — ela é
+levemente mais tolerante à alta. Nenhum caminho de tamanho fica mais generoso por causa disso: o
+sizing (§4) usa o **pior** dos dois preços, então a assimetria nunca aumenta o tamanho aprovado; ela
+só decide se a proposta é **admissível**. Cenário que motivou o check: `entry_ref = 100`, stop 97,5,
+mercado a 110 — antes da v2.1 era aprovado, com notional registrado 1.851,80 contra gasto real
+2.036,98 e perda real no stop de 235,55 (1,18 % do patrimônio contra o teto de 0,25 %); e um LONG com
+stop 97,5 e mercado a 90 (stop já rompido) também era aprovado.
+
+**Idade do volume (checks 9 e 19) — novo em v2.1.** O insumo de liquidez carrega **um** carimbo
+(`volume_ts`) para o volume de 24 h e para a referência do minuto; um carimbo vencido, ausente ou no
+futuro invalida os dois de uma vez — `liquidity_24h` (check 9) vira `unavailable`, o sizing não roda
+(§4), e `participation`, `sizing`, `slippage_estimate`, `cash` e `exposure_after` saem `unavailable`
+em cascata, pelo motivo declarado. Cenário: um volume do minuto observado 45 minutos antes do `as_of`
+não pode sustentar o teto de participação como se fosse agora.
+
 ### 3.2 Sizing (§4) e checks posteriores
 
 | # | Check | Reprova quando |
@@ -119,29 +151,48 @@ Reprovar em 16 ou 17 também **aciona** a transição de kill switch (§5) — o
 | 18 | `sizing` | o tamanho final é menor que o `min_notional`/`step_size` do mercado — **rejeita, nunca arredonda para cima** |
 | 19 | `participation` | registrado sempre; reprova só se a referência de volume estiver indisponível |
 | 20 | `slippage_estimate` | travessia do book para o tamanho final > `max_slippage_pct`; sem book → `unavailable` → rejeita |
-| 21 | `cash` | notional > caixa disponível (SPOT: caixa é o limite duro, não há margem) |
+| 21 | `cash` | notional > `available_cash` = `cash − Σ reserved_cash` das pendências (SPOT: caixa é o limite duro, não há margem) |
 | 22 | `exposure_after` | exposição, exposição por moeda ou exposição em β **após** esta entrada acima do teto — passa por construção, registrado para prova |
 
 ## 4. Sizing — mínimo entre os tetos, com o limitante vencedor publicado
+
+**O preço do sizing é o pior entre `entry_ref` e o preço observado — novo em v2.1.** Para um LONG o
+pior é o maior. Toda linha abaixo, a perda planejada, o arredondamento por `step_size`, os dois
+contrafactuais e a distância de stop (check 8) são medidos em `sizing_price =
+max(entry_ref, preço observado)`, que a decisão publica em `sizing.sizing_price` — o `entry_ref`
+pedido continua gravado ao lado, sem ser sobrescrito. A garantia é que **o teto nunca fica mais
+generoso por causa de um preço velho**: com o mercado acima da referência o motor compra menos
+unidades e reconhece a perda maior; com o mercado abaixo, a referência continua valendo. Se essa
+diferença é grande o bastante para recusar a proposta é assunto do check 7 (`signal_validity`, §3.1),
+não deste módulo.
+
+**Essa garantia vale para o tamanho, não para a geometria do stop — declarado, não escondido.** "Nunca
+mais permissivo" é uma frase sobre `qty_final`, e a banda de distância do stop (check 8) é medida no
+mesmo `sizing_price`, então ela pode ficar **mais permissiva** quando o mercado se afasta na direção
+certa. Exemplo: referência 100, stop 99,8, mercado 100,2 — a distância medida contra `entry_ref` é
+0,20 % (abaixo do mínimo de 0,3 % do `paper_v1`, reprovaria), mas medida contra o preço observado
+(100,2) é 0,3992 %, dentro da banda. É a mesma medida que o sizing usa para o resto da fórmula; o
+contrato registra o comportamento em vez de prometer uma monotonicidade que o `sizing_price` não tem.
 
 O risco planejado inclui custos: a perda no stop é a distância até o stop **mais** os custos estimados
 de ida e volta (taxas + slippage estimado), como a diretiva exige.
 
 ```
 custo_estimado   = fee_entrada + fee_saída + slippage_estimado          (fração do notional)
-stop_distance    = |entry_ref − stop| / entry_ref
+stop_distance    = |sizing_price − stop| / sizing_price
 d_efetiva        = stop_distance + custo_estimado
 
 orcamento_risco  = equity × risk_per_trade_pct                                   (0,25 %)
 orcamento_agreg  = equity × max_aggregate_planned_risk_pct − risco_planejado_em_uso   (1 %)
+available_cash   = max(0, cash − Σ reserved_cash)                     (§4, "caixa disponível")
 
-qty_by_risk         = min(orcamento_risco, orcamento_agreg) / (entry_ref × d_efetiva)
-qty_by_participation= participacao_disponivel / entry_ref            (fórmula única, abaixo)
+qty_by_risk         = min(orcamento_risco, orcamento_agreg) / (sizing_price × d_efetiva)
+qty_by_participation= participacao_disponivel / sizing_price         (fórmula única, abaixo)
 qty_by_book         = maior qty cuja travessia do book fica em max_slippage_pct
-qty_by_exposure     = (max_total_exposure_pct × equity − exposicao_incl_pendentes) / entry_ref
-qty_by_asset        = (max_asset_exposure_pct × equity − exposicao_da_moeda) / entry_ref
-qty_by_beta         = (max_beta_btc_exposure × equity − Σ|notional_i × β_i|) / (entry_ref × |β|)
-qty_by_cash         = (cash_disponivel − taxas_estimadas) / entry_ref
+qty_by_exposure     = (max_total_exposure_pct × equity − exposicao_incl_pendentes) / sizing_price
+qty_by_asset        = (max_asset_exposure_pct × equity − exposicao_da_moeda) / sizing_price
+qty_by_beta         = (max_beta_btc_exposure × equity − Σ|notional_i × β_i|) / (sizing_price × |β|)
+qty_by_cash         = (available_cash − taxas_estimadas) / sizing_price
 
 qty_bruta   = min(todos os acima)
 limitante   = argmin(...)                          → sizing.binding_constraint   (R-PROV-1)
@@ -152,6 +203,26 @@ qty_final   = floor_to_step(qty_bruta × regime_multiplier × ks_multiplier, ste
 não morde, e os outros continuam valendo.
 
 `qty_by_cash` desconta as taxas estimadas: consumir todo o caixa deixaria a taxa sem cobertura.
+
+**Caixa disponível é líquido das reservas — novo em v2.1.** `available_cash = max(0, cash − Σ
+reserved_cash)`, e cada reserva pendente carrega o seu **próprio** `reserved_cash` — o espelho de
+`trade_proposals.reserved_cash` (T3.1), recebido pelo motor como dado imutável da reserva, nunca
+recalculado por este módulo. O `PendingEntry` recusa `reserved_cash < reserved_notional` na
+construção: no SPOT o caixa que uma compra segura é o notional mais as taxas, nunca menos. O teto de
+caixa (check 21, §3.2) passa a publicar `limit = available_cash` (na v2 publicava `max_leverage = 1`,
+que não é um número de dinheiro e não dizia nada à Explanation Panel). Antes da v2.1 o teto de caixa
+era o único que ignorava as reservas pendentes (caixa 500, 400 já reservados, aprovava outros 499,5 —
+900 comprometidos contra 500) e, na primeira correção, reestimava a reserva alheia com o multiplicador
+de custo da proposta **candidata** — um candidato que declarasse custo zero encolhia o compromisso de
+quem já havia reservado. As duas falhas estão fechadas: o caixa que uma reserva segura nunca encolhe
+por causa da próxima candidata.
+
+**`tied_limits` — desempate estável, novo em v2.1.** Quando dois ou mais tetos empatam no mesmo valor,
+o vencedor é o primeiro na ordem declarada de `CAP_ORDER` (`requested`, `risk_per_trade`,
+`aggregate_risk`, `market_participation`, `book_depth`, `asset_exposure`, `total_exposure`,
+`beta_exposure`, `cash`) — nunca a ordem de iteração do dicionário nem uma escolha implícita do
+runtime. `sizing.tied_limits` publica os nomes dos outros tetos empatados, para a Explanation Panel
+não esconder que a decisão poderia ter citado outro limitante.
 
 **Janela da referência de volume.** Com `t = floor_minute(as_of)`: o último minuto completo é
 `[t−1m, t)` e a mediana é das 30 barras completas `[t−30m, t)`.
@@ -178,7 +249,9 @@ do minuto não perdoa consumo ainda dentro da janela de 60 s. Se a referência c
 entrada pendente é revalidada contra o teto novo — e execuções passadas nunca são desfeitas para a
 soma caber. Saídas de proteção **não** consomem este orçamento.
 
-`entry_ref` = meio da `entry_zone`, ou o último preço se ele estiver dentro da zona.
+`entry_ref` = meio da `entry_zone`, ou o último preço se ele estiver dentro da zona — calculado por
+quem monta a proposta, antes do Risk Engine. O motor recebe esse número, nunca o recalcula, e usa
+`sizing_price` (acima) em toda a aritmética; os dois ficam publicados lado a lado na decisão.
 
 **Os multiplicadores agem sobre o tamanho final (R-KS-1).** No v1 eles multiplicavam o orçamento de
 risco, e a redução prometida pelo §5 não era garantida: com stop estreito, outro teto vencia e a
@@ -224,6 +297,19 @@ Ambas sobre o **patrimônio total**, incluindo posições abertas marcadas a mer
 histórico** (`peak_equity`) é monotônico, só sobe, **nunca é resetado**, e é um pico **amostrado**, com
 a cadência declarada — não é o máximo intratick, e o contrato diz isso em vez de fingir precisão.
 
+**A perda do dia vem do patrimônio, sempre — declarado na v2, provado na v2.1.** A fórmula acima não é
+opcional nem tem fallback: `daily_realized_pnl`, `daily_unrealized_pnl` e `daily_costs` são **apenas de
+relato**, e nada no motor decide com eles. A revisão adversarial de 2026-09-06 (bloqueante 1)
+reproduziu o buraco que isso fecha: patrimônio de abertura 20.000, agora 19.500 (−2,5 %), campos de
+PnL do dia vazios → o check `daily_loss` reportava `PASSED value=0` e aprovava entrada em tamanho
+cheio, com o teto de bloqueio de 2 % já rompido. Quando os três campos chegam preenchidos, a
+divergência entre eles e o movimento do próprio patrimônio é publicada em
+`PortfolioState.daily_decomposition_gap` — **e nunca bloqueia**: exigir que a decomposição bata para
+construir o estado tornaria um descasamento contábil de poucas casas decimais capaz de impedir a
+construção do `PortfolioState` e, com ela, a saída de proteção que depende dele — exatamente o que a
+regra 3 da diretiva proíbe. O `daily_decomposition_gap` existe para a reconciliação da T3.3 medir, não
+para este motor punir.
+
 | Estado | Entradas | Saídas | Gestão de posições | Aciona |
 |---|---|---|---|---|
 | `ACTIVE` | permitidas | normais | normal | — |
@@ -235,6 +321,35 @@ Em `TRADING_DISABLED` **não há liquidação automática**: as posições conti
 e alvos continuam valendo. A retomada é **sempre** manual e autorizada pelo Everton, auditada em
 `kill_switch_transitions` — o v1 permitia `WARNING → ACTIVE` automático no novo dia UTC; o v2 não
 permite nenhuma volta automática a partir de `TRADING_DISABLED`.
+
+**`resume` recusa retomar enquanto a avaliação automática ainda bloqueia — novo em v2.1.** O núcleo
+puro (`hunter_risk.kill_switch.resume`) exige a avaliação automática do instante do ato: se
+`daily_loss` ou `drawdown` ainda estão sobre o limiar de bloqueio, a retomada é **recusada** em vez de
+gravada como uma transição que a próxima avaliação desfaria no minuto seguinte — o registro de uma
+transição que não muda nada é pior no log do que transição nenhuma (revisão de 2026-09-06, item 5). A
+trava durável (a coluna que guarda o estado entre avaliações), a transição auditada e a autenticação
+de que é de fato o Everton continuam sendo donas da **T3.6** — o núcleo puro só nega o destravamento
+quando ele nasceria já invalidado; ele não persiste nada e não autentica ninguém.
+
+**`evaluate_exit` funciona sem `PortfolioState` — novo em v2.1, achado pela Astra na 2ª rodada da
+revisão.** `evaluate_exit(proposal, position, limits, kill_switch, *, portfolio=None)` recebe a
+**posição** como argumento obrigatório e o estado da carteira como opcional. O cenário que exige isso:
+um restart depois da meia-noite de São Paulo, em que o worker reconstrói a posição a partir do
+Postgres muito antes de reconstruir a âncora do dia — e `PortfolioState` não se constrói sem
+`day_start_equity` e sem `day_start_utc` validado contra `as_of` (§1). Com a assinatura antiga, o stop
+de uma posição já existente esperaria por um número que só limita **entradas**, ou o chamador
+inventaria um. Quando o estado da carteira está disponível, ele é usado e a avaliação automática do
+kill switch entra na decisão como de costume; **sem ele, o kill switch registrado na saída é o mais
+restritivo das travas persistidas** (sistema, organização, portfolio) — as escadas automáticas de
+perda e drawdown só *sobem* o estado e não são mensuráveis sem patrimônio, então usar só as travas
+persistidas nunca é mais permissivo que a avaliação completa. A mensagem do check diz "sem estado da
+carteira", para a proveniência não fingir uma avaliação que não rodou.
+
+**Quantidade vendável é o mínimo entre a posição e a visão da carteira.** Quando `portfolio` chega,
+`evaluate_exit` toma `min(qty da posição entregue, qty da posição na carteira)`: depois de uma saída
+parcial de 6 unidades, a carteira pode já mostrar 4 enquanto o objeto de posição entregue ainda diz
+10, e vender 10 no SPOT venderia unidades que não existem. A divergência **nunca recusa a saída**; ela
+só reduz a quantidade aprovada, com o clamp registrado no `ExitPlan`.
 
 Transições para cima são imediatas. Cada transição publica `kill_switch.changed`; os workers reagem
 em < 1 s e releem o estado do Redis a cada 10 s.
@@ -309,6 +424,17 @@ ao Sentry.
   de casos e reutilizável no backtest.
 - LLM não tem acesso ao Risk Engine nem aos limites.
 - `ENABLE_LIVE_TRADING=false`. O adaptador live levanta `LiveTradingDisabled`.
+- **`float` é recusado na construção de todo insumo do motor** (`hunter_risk.base.RiskModel`, todo
+  valor money/limite): `Decimal("0.1") != Decimal(0.1)`, e o pydantic converte um `float` para
+  `Decimal` sem reclamar, então o erro (um limite que é `0,10000000000000000555…` da equity) nunca
+  falha um teste nem aparece num log — a proibição é imposta na construção, não na revisão.
+  **Exceção pendente, fora do escopo desta tarefa:** `AssumedCosts`
+  (`packages/core/hunter_core/strategies/envelope.py:45`) herda de `_Frozen`, não de `RiskModel`, e
+  aceita `float` em `spread_bps`/`slippage_bps`/`fee_bps` — o cenário que expõe o problema é
+  `0.1 + 0.2 = 0.30000000000000004` sobrevivendo à conversão para `Decimal` sem erro. `AssumedCosts` é
+  dono do `packages/core` (envelope do Shadow Lab, não deste pacote); o `risk-engine-guardian`
+  registrou a pendência em `.claude/state/notes-T3.2-risk-core.md` §"Pendência fora do meu escopo" e
+  ela segue aberta para quem tocar `packages/core` a seguir.
 
 ## 9. O que mudou em relação ao v1, e por quê
 
@@ -345,6 +471,25 @@ declarado, e nada de margem, futuros ou preset mais permissivo entra de carona.
 | `max_exchange_exposure_pct` | **inaplicável** enquanto houver uma exchange de execução; volta a valer no M1b |
 | `auto_close_on_emergency` | **mantido em `false`**; a diretiva proíbe liquidação automática |
 | Presets `conservative`/`balanced`/`aggressive` | **continuam existindo e não são o perfil da carteira**; nada neles pode elevar os limites do `paper_v1` |
+
+### 9.2 O que mudou da v2.0 para a v2.1, e por quê
+
+A v2 já **descrevia** a zona de entrada, a idade máxima do volume e a exclusão das reservas do caixa.
+A revisão adversarial da T3.2 (`.claude/state/review-T3.2-risk-core.md`, `bf4924b` → `5f86028`) achou
+que o núcleo implementado não cumpria três dessas promessas; a v2.1 fecha o contrato no que o código
+passou a fazer, sem mudar nenhum limite do Everton.
+
+| # | v2.0 (texto) | v2.1 (código provado) | Achado bloqueante |
+|---|---|---|---|
+| 1 | `entry_ref` da proposta nunca era confrontado com o mercado; a "zona de entrada" do check 7 não tinha número no perfil | `max_entry_deviation_pct = 0,005` publicado em §2; `signal_validity` reprova fora da banda, com o stop também confrontado contra o preço observado (não só contra `entry_ref`); o sizing usa `sizing_price = pior(entry_ref, observado)` | Achado 2: `entry_ref = 100`, stop 97,5, mercado a 110 — aprovado, com notional registrado 1.851,80 contra gasto real 2.036,98 e perda real no stop de 1,18 % da equity contra o teto de 0,25 %; e um LONG com stop acima do mercado (90) também aprovado |
+| 2 | `max_volume_age_s` existia como campo do perfil (§7, R-OPS-2) mas nunca era lido | `liquidity_24h` e `participation` viram `unavailable` quando o volume (minuto ou 24 h) tem idade > 120 s, sem carimbo, ou carimbo no futuro | Achado 3: volume do minuto observado 45 minutos antes do `as_of` sustentando o teto de participação como se fosse agora |
+| 3 | o teto de caixa (§3.2 check 21) não descontava as reservas pendentes | `available_cash = max(0, cash − Σ reserved_cash)`, com cada reserva carregando o seu próprio `reserved_cash`; o teto publica `limit = available_cash`, não mais `max_leverage` | Achado 4: caixa 500 com 400 já reservados aprovava outros 499,5 — 900 comprometidos contra 500 |
+
+Junto com os três achados bloqueantes, a v2.1 registra três decisões que **DEVE CORRIGIR**/sugestões da
+mesma revisão: `resume` recusa retomar enquanto a avaliação automática ainda bloqueia (§5); `tied_limits`
+tem desempate estável por `CAP_ORDER` (§4); e `evaluate_exit` funciona sem `PortfolioState`, com a
+quantidade vendável como o mínimo entre a posição entregue e a da carteira (§5) — este último não veio
+da revisão original, mas de uma segunda e uma terceira rodada da Astra sobre o mesmo diff.
 
 ## 10. Saídas: tentativa e intenção não são a mesma coisa
 

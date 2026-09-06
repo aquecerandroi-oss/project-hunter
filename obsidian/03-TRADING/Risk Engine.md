@@ -16,6 +16,16 @@ status: planejado
 > atuar. Plano: `docs/plans/M3.md`. Ver [[Portfolio]], [[Paper Trading]], [[Execution Engine]],
 > [[Strategy Backlog]].
 
+**Atualização de 2026-09-06 (T3.2b).** O núcleo puro (`packages/risk-core`) implementa hoje as
+invariantes que a v2 já prometia e uma revisão adversarial (`bf4924b` → `5f86028`, 204 testes) provou
+faltarem: `entry_ref` confrontado com o preço observado (banda `max_entry_deviation_pct = 0,5 %`),
+sizing pelo pior entre `entry_ref` e o preço observado (`sizing_price`), idade máxima do volume
+aplicada (`max_volume_age_s = 120 s`), caixa líquido das reservas pendentes (`available_cash`), e
+`evaluate_exit` provado funcionando sem `PortfolioState` (restart após a meia-noite de São Paulo). O
+contrato normativo passa a ser **`docs/RISK_ENGINE.md` v2.1**; nenhum limite do Everton mudou. Decisão
+registrada em `docs/decisions/0005-carteira-virtual-e-risk-engine-paper-v1.md`. A seção "Status" abaixo
+ainda descreve o estado anterior à implementação e será atualizada na consolidação de T3.10.
+
 ## Status
 
 **Planejado para o Milestone 3** (era M4 até 2026-09-06). `hunter_risk` (`packages/risk-core`) ainda não tem implementação — hoje só existe a interface (`RiskEngine.evaluate` como Protocol em `docs/ARCHITECTURE.md` §6) e o schema (`risk_profiles`, `trade_proposals.risk_decision`, `risk_events`, `kill_switch_transitions`). É a peça mais sensível do sistema — regra de ouro do produto (`CLAUDE.md`): **nenhum agente executa ordens**; todo caminho de entrada é AGENT → PROPOSAL → RISK ENGINE → EXECUTION, e o `risk-engine-guardian` (opus) é revisor obrigatório de qualquer mudança aqui quando ela for implementada.
