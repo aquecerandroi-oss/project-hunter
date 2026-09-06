@@ -7,6 +7,44 @@ updated: 2026-09-06
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
+## Abertos pela subida do Shadow Lab na VPS (S4, 2026-09-06)
+
+Prova completa em `.claude/state/vps-lab-proof.md`.
+
+- **HIGH — o `code_ref` não é portável entre a máquina do Everton e a VPS.** Os digests do mesmo
+  commit divergem: `momentum_v1` é `...@sha256:c012f75cdd8492d3...` no dev box e
+  `...@sha256:6ccbe8b6c8ac18f3...` na VPS. Investigado até a causa, com os dois lados em `75fc59c` e
+  `git status` limpo em `packages/core/hunter_core/strategies/`: `git hash-object` devolve o **mesmo**
+  blob nos dois (`core.autocrlf=true` + `.gitattributes` normalizam na entrada), mas os **bytes em
+  disco** diferem — `base.py` tem 14.095 bytes no Windows e 13.757 na VPS, e a diferença é
+  exatamente 338, o número de linhas do arquivo: quatro módulos do fecho de imports (`base.py`,
+  `aggregate.py`, `indicators.py`, `envelope.py`) estão em **CRLF** na árvore de trabalho do Windows
+  e em LF na VPS (`tr -cd '\r' < base.py | wc -c` → 338). O `code_ref` é o digest desses bytes.
+  **Cenário:** ativar uma versão a partir do dev box contra o banco de produção — ou restaurar um
+  dump com versões congeladas no Windows e rodá-las na VPS — faz `load_active_versions` recusar
+  **todas** com `shadow_version_code_ref_mismatch`. Graças à correção da S2 o `/ready` fica vermelho
+  em vez de mentir, mas o Lab não roda, e campo congelado não se corrige no lugar: só `--supersede`,
+  encerrando a coorte anterior. Não morde hoje porque cada ambiente ativou as suas próprias linhas.
+  **Correção certa:** normalizar as quebras de linha antes do digest (ou digerir o AST/bytecode em
+  vez do arquivo bruto), com teste que compare o digest do mesmo módulo em CRLF e em LF. Dono:
+  quem tocar `hunter_strategy_worker/code_ref.py` a seguir.
+- **MEDIUM (deploy) — o `seed` de dados de referência não faz parte do fluxo de deploy da VPS.**
+  `compose.sh update` roda `migrate` e nunca `seed`. Medido antes de ativar o Lab: 526 mercados e
+  **367.256 velas** coletados, e **zero** linhas em `strategies`, `strategy_versions` e
+  `feature_definitions` — a VPS coletava mercado havia horas sem ter uma única estratégia cadastrada.
+  Só apareceu porque o script de ativação recusou com a mensagem certa
+  (`REFUSED: no strategy_version for momentum v1 (run infra/scripts/seed.py first)`). Rodado à mão
+  com `HUNTER_COMMAND=seed`, que é idempotente; **a próxima VPS nasce com o mesmo buraco**. Dono:
+  `devops-engineer` — o `seed` precisa entrar no `compose.sh update`, depois do `migrate`.
+- **MEDIUM (observado, não é defeito) — 19 de 70 acompanhamentos encerrados na VPS têm
+  `R_net = NULL` por funding.** 18 com `funding_missing:2026-09-06T04:00:00+00:00` e 1 com
+  `funding_ambiguous_exit`, todos preservando `meta.r_ex_funding`. É o contrato do item 3 da decisão
+  conjunta funcionando (nunca zero inventado), mas é uma população grande — 27% dos encerrados — que
+  a janela local não produziu, e **toda avaliação datada sobre a VPS tem de contá-la fora dos
+  "encerrados avaliáveis"**. Fica aqui como lembrete de cobertura, não como bug do worker; o que
+  seria bug é o `market-worker` não apurar o funding das 04:00 para os mercados do universo, e isso
+  ainda não foi investigado.
+
 ## Abertos pela primeira avaliação do Shadow Lab (S4, 2026-09-06)
 
 - **HIGH (operacional, local) — o `market-worker` do stack local está `unhealthy` e o Lab parou de

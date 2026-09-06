@@ -1,6 +1,6 @@
 ---
 tags: [operacoes, deploy, vps]
-updated: 2026-09-05
+updated: 2026-09-06
 status: parcial
 ---
 
@@ -37,7 +37,23 @@ Nenhum desses ambientes remotos está provisionado ainda — o M0 entrega "deplo
 
 ## VPS (Contabo) — operação 24/7
 
-**Estado (2026-09-05):** scripts e configuração **prontos e validados localmente**; ainda **não aplicados** na máquina — o acesso SSH (`Host hunter-vps`) não estava configurado no PC quando isto foi escrito. O que falta está em `.claude/state/vps.md`.
+**Estado (2026-09-06):** VPS **no ar**, `vmi3483069`, rodando `hunter-api:75fc59c` e
+`hunter-web:75fc59c`. Sete containers `healthy`: `api`, `web`, `caddy`, `postgres`, `redis`,
+`market-worker` e — desde 2026-09-06 03:36 UTC — o **`strategy-worker` do Shadow Lab**, com
+`momentum v1` e `volume_anomaly v1` ativadas pelo script auditado. Migração em `0003_analysis`.
+Prova operacional em `.claude/state/vps-lab-proof.md`; resultado em [[Experiments Index]].
+
+**Duas armadilhas de deploy descobertas ao subir o Lab** (as duas em [[Open Bugs]]):
+
+1. **Todo serviço novo que fala com o Postgres precisa do seu bloco em
+   `infra/vps/docker-compose.prod.yml`.** O override **não** herda o que não menciona: o
+   `strategy-worker` existia só no compose base, herdou o `x-api-env` de desenvolvimento e morreu em
+   loop com `InvalidPasswordError`. Corrigido em `75fc59c`.
+2. **O `seed` não está no fluxo de deploy.** `compose.sh update` roda `migrate` e nunca `seed`; a
+   VPS coletava mercado havia horas (526 mercados, 367 mil velas) com **zero** linhas em
+   `strategies`, `strategy_versions` e `feature_definitions`. Rodado à mão com
+   `bash infra/vps/compose.sh run --rm -e HUNTER_COMMAND=seed --entrypoint /app/infra/docker/entrypoint.sh migrate`
+   (idempotente, só dado de referência). Enquanto não entrar no `update`, a próxima VPS nasce igual.
 
 Uma VPS Ubuntu 22.04/24.04 roda a mesma stack do compose de dev mais um override de produção, para o `market-worker` coletar mercado sem o PC ligado e para sessões de desenvolvimento por SSH (Claude Code e Codex funcionam melhor em Linux — o sandbox do Codex só funciona lá).
 
@@ -56,7 +72,7 @@ Limitações: uma máquina só (sem HA, sem réplica, sem backup fora do host), 
 
 ## Relacionadas
 
-[[Infrastructure]] · [[Environment Variables]] · [[Monitoring]]
+[[Infrastructure]] · [[Environment Variables]] · [[Monitoring]] · [[Workers]] · [[Experiments Index]] · [[Open Bugs]]
 
 ## Fontes
 

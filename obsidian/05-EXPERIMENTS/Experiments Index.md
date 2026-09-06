@@ -102,6 +102,21 @@ Código, `default_parameters`, `parameters_schema` e `params_hash` são idêntic
 separa as populações é o `strategy_version_id` dentro do `uuid5` de cada sinal. Comparar `v1` com
 `v2` como se fossem hipóteses concorrentes seria erro de leitura — está escrito em cada página.
 
+### A VPS é uma população separada, ainda sem avaliação datada
+
+Desde 2026-09-06 03:36 UTC o Shadow Lab também roda na VPS
+(`.claude/state/vps-lab-proof.md`): `momentum v1` e `volume_anomaly v1` ativadas pelo script
+auditado, 109 sinais em 1 h 18 min, todos `research_only` e `prospective`, `/ready` 200, outbox
+109/109, zero exceção — e **zero `unavailable`**, ao contrário da máquina local.
+
+Mas essas linhas **não** entram nas avaliações acima. São `strategy_version` próprias, com
+`activated_at` e `code_ref` diferentes (o digest não é o mesmo entre Windows e Linux — [[Open Bugs]]),
+logo são **coortes distintas**, com população própria. Vão virar avaliação datada no próximo
+plantão, com o mesmo SQL, e com uma exclusão que a janela local não teve: **19 dos 70
+acompanhamentos encerrados na VPS têm `R_net = NULL`** por funding não apurado
+(`funding_missing:2026-09-06T04:00:00+00:00`, `funding_ambiguous_exit`), com `meta.r_ex_funding`
+preservado — 27% dos encerrados ficam fora dos "encerrados avaliáveis".
+
 ### Rotina de plantão
 
 A cada turno da [[Mente da Sexta-feira|Sexta-feira]] os experimentos ativos recebem **uma avaliação

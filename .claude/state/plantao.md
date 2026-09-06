@@ -20,6 +20,18 @@ Atualizado: 2026-09-06, madrugada (turno S4). M1 aprovado; M2 na onda 2; **Shado
   proibição explícita de ativar a variante vencedora. Um turno em que o Lab não produziu nada
   também vira avaliação, com a cobertura que explica o silêncio.
 
+- **O Lab foi ao ar na VPS** (`.claude/state/vps-lab-proof.md`): `compose.sh update` aplicou a
+  `0003_analysis`, subiu o `strategy-worker`, e as duas versões foram ativadas pelo script auditado
+  às 03:36 UTC (sem `--supersede`; não havia linha ativada lá). Em 1 h 18 min: 109 sinais, 100%
+  `research_only` e `prospective`, 70 encerrados, outbox 109/109 com uma tentativa e zero erro,
+  `/ready` 200 com as seis checagens, zero exceção, **zero `unavailable`**. O Lab custa 0,66% de um
+  core e 81 MB. Dois bloqueios no caminho: o serviço subia com a senha de dev (corrigido em
+  `75fc59c`) e a VPS nunca tinha rodado o `seed`.
+- **Achado HIGH: o `code_ref` não é portável entre esta máquina e a VPS.** Mesmo commit,
+  `git hash-object` idêntico, digests diferentes — quatro módulos do fecho de imports estão em CRLF
+  na árvore do Windows e o digest é dos bytes em disco. Ativar daqui contra o banco de produção faria
+  o worker de lá recusar **todas** as versões congeladas.
+
 ## Rotina fixa do Lab, a partir de agora
 
 1. Rodar o SQL da página de cada `EXP-*` ativo (snapshot `REPEATABLE READ READ ONLY`), colar a saída.
@@ -55,7 +67,12 @@ Atualizado: 2026-09-06, madrugada (turno S4). M1 aprovado; M2 na onda 2; **Shado
 
 Integrar as tarefas em voo quando entregarem (kit de revisão → revisores em paralelo → Astra →
 correções → commit por tarefa → push) e acrescentar a próxima avaliação datada aos dois `EXP` no
-turno seguinte, destacando a linha de **horizonte maturado**.
+turno seguinte, destacando a linha de **horizonte maturado** e abrindo a coorte da VPS (com as 19
+exclusões de funding contadas fora dos encerrados avaliáveis).
+
+Dois itens de infraestrutura para o `devops-engineer`, ambos achados nesta subida: pôr o `seed` no
+`compose.sh update` (senão a próxima VPS nasce sem estratégias) e normalizar as quebras de linha
+antes do digest do `code_ref` (senão uma versão congelada aqui nunca roda lá).
 
 ## Precisa do Everton
 
