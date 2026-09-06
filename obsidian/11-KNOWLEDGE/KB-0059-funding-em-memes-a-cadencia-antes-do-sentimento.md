@@ -1,7 +1,7 @@
 ---
 tags: [knowledge, nota, memecoins, funding, perpetuos]
 tema: meme coins / funding e posicionamento
-fonte: medição própria — funding_rates da VPS (2.136 liquidações, 229 mercados) + documentação de funding da Binance
+fonte: medição própria — funding_rates da VPS (2.136 liquidações em 229 mercados na tabela; a análise por coorte cobre os 200 monitorados) + documentação de funding da Binance
 fonte_url: https://www.binance.com/en/support/faq/detail/360033525031
 lido_em: 2026-09-06
 evidencia: replicado (SQL colado) + documentação
@@ -14,13 +14,19 @@ astra: pendente
 ## O que afirma
 
 "Meme coin tem funding extremo" é uma das frases mais repetidas do mercado. Medi as **2.136 taxas de
-funding efetivamente liquidadas** na VPS, e a coorte de memes tem funding **menos** extremo que o
-resto do universo: média do valor absoluto de **1,07 bps** contra **2,32 bps** do resto, e a cauda
-negativa profunda (−64,8 bps) está fora das memes, não dentro.
+funding efetivamente liquidadas** na VPS, e **por liquidação, nesta janela**, a coorte de memes é
+**menos** extrema que o resto do universo: média do valor absoluto de **1,07 bps** contra **2,32
+bps**, e a cauda negativa profunda (−64,8 bps) apareceu fora das memes.
 
-E antes de qualquer leitura de sentimento vem um fato mecânico que engole metade da diferença entre
-grupos: **a mediana de funding de um mercado depende de qual cadência de liquidação ele usa**, não
-de quão eufórico ele está.
+E antes de qualquer leitura de sentimento vem um fato mecânico: **"funding por liquidação" não é uma
+grandeza comparável entre mercados com cadências diferentes.** A taxa base da Binance é 0,01% por
+ciclo de 8 h e 0,005% por ciclo de 4 h; um mercado que cobra 0,8 bps a cada hora tem taxa **horária
+6,4 vezes maior** que outro cobrando 1 bps a cada 8 h — e ainda aparece oito vezes mais na amostra
+de eventos. Comparar medianas por liquidação entre coortes de cadência diferente é comparar
+contratos diferentes, e a correção de normalização é da Astra.
+
+**Consequência, escrita antes dos números:** a frase "as memes têm funding menos extremo" vale como
+**descrição por liquidação nesta janela**, e **não** como conclusão normalizada sobre memes.
 
 ## Onde foi mostrado
 
@@ -50,9 +56,12 @@ FROM funding_rates f JOIN cls ON cls.id = f.market_id GROUP BY 1 ORDER BY 1;
 
 Três leituras, em ordem de importância:
 
-1. **A mediana das memes (0,50 bps) é metade da mediana das majors (1,00 bps) — e isso é cadência,
-   não sentimento.** A taxa base da Binance é 0,01% por ciclo de 8 h (1 bps) e 0,005% por ciclo de
-   4 h (0,5 bps). A segunda consulta confirma:
+1. **A mediana das memes (0,50 bps) é metade da mediana das majors (1,00 bps), e as duas coincidem
+   exatamente com as taxas base das duas cadências.** Isso é **compatível** com a explicação de
+   cadência; medi as contagens, não os intervalos, então a cadência de cada mercado é **inferida** a
+   partir do número de liquidações em 45 h, e a parcela da diferença que ela explica **não foi
+   medida** (eu tinha escrito "engole metade da diferença" — a razão entre medianas foi medida, a
+   atribuição causal não).
 
 ```
       grupo       | mercados | min_liq | media_liq | max_liq | cadencia_4h_ou_menor | cadencia_8h
@@ -70,9 +79,12 @@ Três leituras, em ordem de importância:
    1 h, que é o piso comprimido da Binance quando a taxa bate no teto
    ([[KB-0026-funding-num-horizonte-de-4h-e-o-vies-de-exclusao]]).
 
-2. **O extremo mora fora das memes.** O funding mais negativo do universo foi de **−64,8 bps** num
-   mercado do `E_resto`; a meme mais negativa da coorte A ficou em **−0,98 bps**. E 9,8% das
-   liquidações do resto passaram de 5 bps em módulo, contra 4,4% das memes.
+2. **O extremo observado ficou fora das memes.** O funding mais negativo do universo foi de
+   **−64,8 bps** num mercado do `E_resto`; a meme mais negativa da coorte A ficou em **−0,98 bps**.
+   E 9,8% das liquidações do resto passaram de 5 bps em módulo, contra 4,4% das memes.
+   **Ressalva de tamanho de grupo (Astra):** comparar o **mínimo** de 21 mercados com o de 150
+   favorece o grupo maior por construção. A fração acima de 5 bps não tem esse problema; o mínimo
+   tem.
 
 3. **A coorte B é a que mais parece com o folclore**: mediana 1,12 bps, máximo 19,1 bps, 8,5% acima
    de 5 bps, e **nenhuma taxa negativa** — todo mundo comprado, pagando para ficar. Cinco mercados
@@ -97,10 +109,15 @@ sequer são o grupo de funding mais extremo.
 
 **`D-MEME-FUND` (diagnóstico, testável agora, perpétuo da Binance).** Duas perguntas, nesta ordem:
 
-1. **Cadência antes de tudo.** Para cada mercado com sinal, o número de liquidações por dia e a
-   cadência inferida, publicados **junto** de qualquer estatística de funding. Nenhuma comparação
-   entre coortes é publicada sem essa coluna. Isto é convenção, não teste.
-2. **Custo de funding realizado por coorte**, sobre os outcomes já colhidos: para cada
+1. **Normalizar antes de comparar.** Para cada mercado, a taxa em **bps por hora de exposição**
+   (taxa liquidada dividida pelo intervalo real entre liquidações consecutivas, medido — não pela
+   cadência modal), com a distribuição entre mercados publicada com pesos iguais e cobertura
+   temporal comparável. Quantis de taxa horária declaram a ponderação por duração. Desenho da Astra.
+   **Ressalva dela que precisa entrar no relatório:** taxa horária é **normalização, não cobrança
+   proporcional** — quem atravessa um pagamento paga a taxa inteira, não a fração da hora.
+2. **Cadência publicada junto.** Para cada mercado com sinal, o número de liquidações por dia e a
+   cadência inferida. Nenhuma comparação entre coortes sai sem essa coluna. Convenção, não teste.
+3. **Custo de funding realizado por coorte**, sobre os outcomes já colhidos: para cada
    acompanhamento, quantas liquidações ele atravessou (separando **confirmado**, **inferido** e
    **indeterminado**, como a [[KB-0026-funding-num-horizonte-de-4h-e-o-vies-de-exclusao]] exige) e
    quanto isso somou em bps sobre o notional. É o `D-016` da terceira rodada com a estratificação
@@ -133,7 +150,20 @@ do que a [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] pede.
 
 ## Segunda opinião (Astra)
 
-_(pendente)_
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-0059-0061-memecoins.md`).
+
+1. **Impôs a normalização por hora de exposição** e a distinção entre normalização e cobrança: quem
+   atravessa um pagamento paga a taxa inteira. Cenário de falha dela: 0,8 bps por hora "parece menos
+   extremo por cobrança" que 1 bps a cada 8 h, quando é 6,4 vezes a taxa horária.
+2. **Estreitou a conclusão** para "menos extremo **por liquidação nesta janela**", e derrubou o meu
+   "engole metade da diferença": a razão entre medianas é medida, a atribuição causal não é.
+3. **Apontou o viés de tamanho de grupo** na comparação de mínimos entre 21 e 150 mercados.
+4. **Conferiu a aritmética de R** e confirmou: 0,5/51 = 0,98% de 1 R; 7/51 = 13,73%. Lembrou que
+   os 51 bps continuam sendo denominador **sintético** da [[KB-0038-a-taxa-de-4-bps-nao-e-nem-maker-nem-taker]].
+5. **Marcou como inferência, não medição**, a cadência de cada mercado — eu contei liquidações, não
+   medi intervalos.
+6. **Concordou** em separar taxa liquidada de estimativa em formação, em investigar cadência antes
+   de interpretar funding, e em não abrir braço de estratégia nenhum a partir desta nota.
 
 ## Relacionados
 
