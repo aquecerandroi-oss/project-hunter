@@ -297,3 +297,122 @@ Nenhum dos três seria ajustado com dado independente — todos seriam calibrado
 revelou o problema, que é o erro da [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]].
 E o valor prático de todos os itens acima é **zero em expectancy**: eles só tornam falsificável uma
 hipótese que hoje não é.
+
+---
+
+## Sexta rodada (2026-09-06) — livros de estratégia
+
+Onze notas ([[KB-0045-turtles-a-entrada-que-ja-temos-e-a-saida-que-nao]] a
+[[KB-0055-douglas-o-livro-que-nao-vira-hipotese]]). **É a primeira rodada desde a primeira que produz
+candidatas de estratégia**, e não só diagnósticos — porque livros dão regras objetivas, que é
+justamente o que o Everton pediu: coisa para sair validando no virtual.
+
+### Duas correções que atingem candidatas que já estavam na fila
+
+> **1. A #6 (`return_4h > 0`, T-001) é redundante com a própria condição de entrada.** Se
+> `close_t > max(C_{t−1} … C_{t−20})` nos fechamentos de 15m, então em particular
+> `close_t > C_{t−16}`, e 16 barras de 15 min são 240 minutos — logo `return_4h > 0` já é verdade no
+> instante do disparo. O gate não filtraria nada, **exceto** quando a feature do M2 estivesse
+> indisponível ou defasada, e alguém publicaria essa redução de amostra como "benefício da
+> confirmação de tendência". Achado da Astra, conferido linha a linha
+> ([[KB-0048-o-teste-antes-da-regra-e-o-filtro-que-ja-estava-dentro]]). **A #6 sai da fila.**
+
+> **2. A #2 (piso de custo) ganha uma tradução, e perde uma que eu tinha inventado.** O piso passa a
+> ser publicado também como `custo_R_nominal_referencia = b / (10.000 · k · atr_pct)`, medido **na
+> referência** — o mesmo corte, dito em unidades que sobrevivem à revisão da hipótese de taxa. O que
+> **não** vale é o que eu tinha proposto primeiro: um teto sobre o custo em R **efetivo** não
+> equivale a um piso de ATR (depende do deslocamento `g = P_entry/C − 1`) e, pior, `P_entry` **não é
+> conhecido no instante da decisão**
+> ([[KB-0050-previsao-continua-e-o-limite-de-velocidade-de-custo]]).
+
+### Fila para a sombra — livros
+
+**Todas atrás da #1 do backlog** (valor incremental da invalidação, T-005), que continua sendo a
+primeira — decisão conjunta minha e da Astra, nas duas revisões desta rodada.
+
+| # | Candidata | Regra em uma frase | Parâmetros | Dado (temos?) | Esforço | O que a refutaria |
+|---|---|---|---|---|---|---|
+| **L1** | **Alvo assimétrico** ([[KB-0054-a-cauda-direita-e-o-alvo-fixo-que-a-corta]] · [[KB-0046-r-multiplos-e-o-r-que-a-simetria-esconde]]) | Manter entrada, stop, invalidação e horizonte, e replicar cada acompanhamento com o alvo a 1,5 / 3,0 / 4,5 ATR₀ da referência | `target_atr ∈ {1.5, 3.0, 4.5}` — 3 e 4,5 são o `target2_atr`/`target3_atr` que a estratégia já calcula e persiste | **sim** — velas de 1 min, entradas registradas, ATR₀ congelado; exige motor de replay | médio (3 braços) | diferença **pareada** de média de `R_net` contra a base sem exceder o efeito mínimo declarado, com Holm e blocos de tempo. Ausência de evidência **não** é refutação |
+| **L2** | **Saída sem alvo e por canal oposto** ([[KB-0045-turtles-a-entrada-que-ja-temos-e-a-saida-que-nao]]) | Mesma entrada e stop; um braço sem alvo; outro sem alvo e saindo quando o fechamento de 15m fica abaixo do mínimo dos 10 fechamentos anteriores | `exit_lookback = 10`; `target = null`; stop, invalidação e horizonte inalterados | **sim** — mesmas velas | médio (2 braços + saída móvel) | `CHAN − NOTGT` ≤ 0 no efeito declarado. **Poucas saídas por canal não refutam**: poucas saídas podem ter efeito grande |
+| **L3** | **Razão de eficiência de Kaufman** ([[KB-0047-razao-de-eficiencia-de-kaufman]]) | Só aceitar o sinal quando a `ER(20)` sobre os 21 fechamentos de 15m — deslocamento líquido dividido pela soma dos deslocamentos barra a barra — ficar ≥ θ | `efficiency_window = 20`; `efficiency_min = θ`, de um quantil da distribuição condicionada, **congelado antes** | **sim** para o cálculo; o grupo de comparação retrospectivo é **replay reconstruído** (as barras `not_triggered` não são gravadas individualmente) | baixo (diagnóstico `D-ER`) / médio (braço) | nem `delta_por_aceito` nem `delta_por_oportunidade` positivos (convenção `C-META`) |
+| **L4** | **Contração de volatilidade antes do rompimento** ([[KB-0053-contracao-de-volatilidade-o-unico-pedaco-formalizavel]]) | Só aceitar quando `ATR(8 barras de 15m) / ATR(32 barras)` — **as duas janelas terminando em `t−1`** — ficar ≤ θ | estimador declarado (Wilder exige `period + 2` barras), janelas 8/32, `θ` de quantil congelado antes | **sim** para o cálculo; mesma ressalva de replay reconstruído | médio | os dois denominadores do `C-META` não positivos; ou correlação alta com `ER`/`atr_pct`, que a tira por parcimônia |
+| **L5** | **Benchmark aleatório condicionado** ([[KB-0049-walk-forward-que-nao-temos-e-o-nulo-que-nunca-calculamos]]) | Para cada sinal, sortear entradas alternativas **na mesma elegibilidade, mercado, hora UTC e bloco de calendário**, e rodar o mesmo acompanhamento | `K` declarado **depois** da especificação de estatística, ponderação e blocos | velas: sim. Controles são **replay reconstruído**, com cobertura publicada | alto | não é braço e não tem refutação — é referência. O quantil de leitura é declarado antes |
+
+Sobre a L5, duas coisas que a revisão obrigou a escrever: **não é teste de permutação validado** —
+sortear não demonstra a intercambialidade que um p-valor exigiria —, e **o zero continua sendo** a
+referência de "isto é lucrativo?". Ganhar de um controle de −0,30 R com −0,08 R não demonstra
+rentabilidade nenhuma.
+
+### O bloco de políticas de saída — T-005, L1 e L2 são a mesma busca
+
+Compartilhar entradas não determina, sozinho, a família estatística. Mas aqui a finalidade é
+**procurar uma política de saída melhor dentro do mesmo conjunto de alternativas**, e para essa
+finalidade os três são um bloco só (desenho da Astra):
+
+| Pergunta | Contrastes primários |
+|---|---|
+| T-005 (invalidação) | `INV-B − base` · `INV-C − base` · `INV-E − base` |
+| L1 (alvo) | `alvo 3 − base` · `alvo 4,5 − base` |
+| L2 (saída móvel) | `NOTGT − base` · `CHAN − NOTGT` |
+
+**Oito políticas únicas** (incluindo a base compartilhada) e **sete contrastes**, sem cruzar todas as
+combinações. **Holm a 5% sobre os sete**, com p-valores válidos para a dependência temporal — Holm
+aceita dependência entre testes, mas **não conserta** p-valores calculados tratando entradas
+correlacionadas como independentes.
+
+`INV-B` **não** duplica `EXIT-NOTGT`: o primeiro remove a invalidação e conserva o alvo; o segundo
+remove o alvo e conserva a invalidação. E o bloco **não autoriza** combinar o vencedor de T-005 com o
+vencedor de L1 — isso seria uma comparação adicional, e uma tentativa a mais.
+
+**Ressalva de pareamento que quase passou:** aumentar o alvo mexe na validação
+`stop < entrada < alvo` (`walker.py:45`), então um alvo maior pode admitir entradas que a base
+recusaria. As entradas só continuam pareadas se essa checagem ficar congelada na base. E rodar
+qualquer braço como estratégia **independente**, em vez de replay, muda ocupação e rearme de slots
+(`episodes.py:57`) — nesse regime não há pareamento nenhum.
+
+### O menor conjunto para o Everton começar a validar mais rápido
+
+1. **Reproduzir a base** a partir dos registros persistidos, conferindo saída, preço e R. Sem isso
+   nenhum contraste tem chão.
+2. **Piloto técnico `INV-A` contra `INV-B`** sobre as entradas efetivas da base — o menor contraste
+   que responde se a invalidação acrescenta valor.
+3. **Completar a T-005** (`INV-C` e `INV-E`): são quatro braços, não dois. Reduzir o escopo para A/B
+   é legítimo, mas tem de ser declarado **antes** da janela — não se eliminam C e E depois de olhar
+   resultado.
+4. **L1 em seguida**; `D-ER` e `D-CONTR` rodando como **observação**, sem filtro ativo.
+
+O primeiro replay produz aprendizado operacional rápido. **Confirmação continua exigindo janela
+futura reservada, maturação e cobertura**, sem converter funding desconhecido em zero — e o piso de
+100 outcomes e 30 dias **não substitui cálculo de potência**.
+
+### Diagnósticos e convenções abertos pela sexta rodada
+
+| Item | Nota | O que responde | Pré-requisito |
+|---|---|---|---|
+| `D-VT` — distribuição do payoff nominal `(target1 − P_entry)/(P_entry − stop)` e do desvio referência→`P_entry` | [[KB-0046-r-multiplos-e-o-r-que-a-simetria-esconde]] | quanto o relógio desloca a razão ganho/risco que todo mundo lê como 1:1 | **nenhum — roda hoje** (usar `P_entry`, não o `open` bruto) |
+| `D-ER` — distribuição de `ER(20)` condicionada a sinal | [[KB-0047-razao-de-eficiencia-de-kaufman]] | de onde sai o θ, sem calibrar em cima de outcomes | grupo de comparação é replay reconstruído |
+| `D-CHAN-a` — correlação de postos entre `ER(20)`, `VR(2)` e `VR(4)` | [[KB-0048-o-teste-antes-da-regra-e-o-filtro-que-ja-estava-dentro]] | se vale gastar duas tentativas em duas medidas de caminho | estimador de `VR` declarado antes |
+| `D-CHAN-b` — mercados com sinal que não estão mais monitorados, separando outcomes encerrados, censurados e abertos | [[KB-0048-o-teste-antes-da-regra-e-o-filtro-que-ja-estava-dentro]] | viés de sobrevivência, no escopo estreito | **nenhum** |
+| `D-CHAN-c` — fração de sinais com `return_4h > 0`, **por reconstrução com velas** | [[KB-0048-o-teste-antes-da-regra-e-o-filtro-que-ja-estava-dentro]] | confirma ou derruba a redundância da T-001 | `return_4h` **não está** no envelope da `momentum_v1` |
+| `D-CONC` — concentração temporal: acompanhamentos abertos por minuto, mercados por minuto e por hora, blocos e outcomes por bloco | [[KB-0051-tres-barreiras-mais-uma-e-a-amostra-que-nao-e-independente]] | quão concentrada está a população, antes de o limiar editorial ser atingido | **nenhum — roda hoje** |
+| `D-CONTR` — distribuição da razão de contração e correlação com `atr_pct` e `ER` | [[KB-0053-contracao-de-volatilidade-o-unico-pedaco-formalizavel]] | se a contração é medida distinta na nossa população | estimador e janelas congelados |
+| `C-META` — convenção de relatório de filtros: estratégia-base, população avaliável, cobertura, e `q`, `μ_A − μ_B`, `q·μ_A − μ_B`, precisão positiva | [[KB-0052-meta-rotulagem-o-formato-de-todo-filtro-que-propusemos]] | impede o filtro que "melhora a média" cortando 90% da amostra | **nenhum — é convenção** |
+| `C-COST` — publicar `custo_R_nominal_referencia` ao lado de `atr_pct_min` | [[KB-0050-previsao-continua-e-o-limite-de-velocidade-de-custo]] | o piso em unidades que sobrevivem à revisão da taxa | **nenhum — é tradução, não muda população** |
+| `C-FCAST` — score contínuo não vinculante, com faixas e alvo declarados **antes** | [[KB-0050-previsao-continua-e-o-limite-de-velocidade-de-custo]] | se um score ordena `R_net` — pergunta prospectiva, **não** adiada para o M4 | nome de método próprio; nunca reusar `confidence_method` |
+
+### O que esta rodada explicitamente NÃO propõe
+
+- **Nenhum braço em nome de Mark Douglas.** Não há humano no laço; atribuir resultado de algoritmo a
+  psicologia sem observar decisão humana é o erro que a nota registra
+  ([[KB-0055-douglas-o-livro-que-nao-vira-hipotese]]).
+- **Nenhum braço de dimensionamento, volatilidade-alvo ou carteira** (Carver, Van Tharp, Turtles,
+  Clenow): o Lab de sombra não dimensiona posição, e `PnL de carteira` é *não aplicável*.
+- **Nenhuma troca do relógio de amostragem** (barras de volume ou de dólar): não é reparametrização,
+  é outra estratégia — muda a janela do rompimento, a do ATR, a do volume relativo, a cadência das
+  decisões e o rearme. Registrada como ideia **bloqueada**
+  ([[KB-0052-meta-rotulagem-o-formato-de-todo-filtro-que-propusemos]]).
+- **Nenhum alongamento do horizonte** neste primeiro lote. Que as 4 h sejam a trava é hipótese que
+  exige outro contraste; variar só o alvo já mede o efeito do alvo **condicionado** ao horizonte
+  atual.
+- **Nenhum classificador de meta-rotulagem.** O formato entra como convenção; o modelo exigiria
+  amostra rotulada que não temos.

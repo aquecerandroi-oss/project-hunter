@@ -258,6 +258,97 @@ cada uma, e os pareceres inteiros ficaram em `.claude/state/astra-review-KB-0036
 2026-09-06 e **contam como inspeção da amostra**. Nenhum pode ser confirmado nessa mesma população;
 a confirmação exige janela futura reservada, declarada **antes** da coleta.
 
+## Sexta rodada (2026-09-06) — livros de estratégia
+
+Linhas **acrescentadas**, nunca editadas. **Tentativas avaliadas continuam em 0.** Esta é a primeira
+rodada desde a primeira a propor variantes de estratégia, e por isso é também a que mais precisa
+desta página.
+
+**Correção da T-001, com a mesma ID e o motivo, como a regra da página manda.**
+
+| ID | Candidata | Nota de origem | Parâmetros | `δ` | Início/fim UTC | Status |
+|---|---|---|---|---|---|---|
+| T-001 | gate de tendência (`return_4h > 0`) | [[KB-0048-o-teste-antes-da-regra-e-o-filtro-que-ja-estava-dentro]] | — | — | — | **retirada em 2026-09-06, antes de qualquer coleta:** é **redundante com a condição de entrada**. `close_t > max(C_{t−1} … C_{t−20})` nos fechamentos de 15m implica `close_t > C_{t−16}`, e 16 barras de 15 min são 240 minutos. O gate só recusaria sinais quando a feature estivesse indisponível ou defasada — e isso seria publicado como benefício da confirmação de tendência. Achado da Astra, conferido por mim (`indicators.py:141,147`, `price.py:38`) |
+
+**T-001 fica registrada** pela mesma regra que preservou T-011, T-016 e T-021: foi abandonada por
+argumento sobre a **definição** da regra, não por resultado, e está aqui com o motivo para que
+ninguém a reproponha como ideia nova. Ressalva: a implicação é exata na **série de 15m da
+estratégia**; a feature do M2 é calculada sobre velas de 1 min com âncora própria, e a versão `_live`
+não satisfaz automaticamente a equivalência. Por isso o `D-CHAN-c` existe.
+
+### Variantes novas
+
+| ID | Candidata | Nota de origem | Parâmetros | `δ` | Início/fim UTC | Status |
+|---|---|---|---|---|---|---|
+| T-022a/b | **alvo assimétrico** (L1) | [[KB-0054-a-cauda-direita-e-o-alvo-fixo-que-a-corta]] · [[KB-0046-r-multiplos-e-o-r-que-a-simetria-esconde]] | `target_atr ∈ {3.0, 4.5}` contra a base de 1,5; stop, invalidação e horizonte inalterados | a definir (efeito mínimo relevante, **antes** da janela) | — | proposta (2 contrastes), **dentro do bloco de saídas** |
+| T-023a/b | **sem alvo** e **saída por canal oposto** (L2) | [[KB-0045-turtles-a-entrada-que-ja-temos-e-a-saida-que-nao]] | `EXIT-NOTGT` (sem alvo) e `EXIT-CHAN` (sem alvo + mínimo dos 10 fechamentos de 15m) | a definir | — | proposta (2 contrastes: `NOTGT − base` e `CHAN − NOTGT`), **dentro do bloco de saídas** |
+| T-024 | **filtro de eficiência de Kaufman** (L3) | [[KB-0047-razao-de-eficiencia-de-kaufman]] | `efficiency_window = 20`; `efficiency_min = θ` — **θ a definir pela distribuição condicionada**, nunca por outcomes | a definir | — | proposta, **bloqueada** pelo `D-ER` |
+| T-025 | **contração de volatilidade** (L4) | [[KB-0053-contracao-de-volatilidade-o-unico-pedaco-formalizavel]] | `ATR(8)/ATR(32)`, **as duas janelas terminando em `t−1`**, estimador declarado; `contraction_max = θ` a definir | a definir | — | proposta, **bloqueada** pelo `D-CONTR` e pelo congelamento do estimador |
+| T-026 | **relógio de amostragem** (barras de volume ou de dólar) | [[KB-0052-meta-rotulagem-o-formato-de-todo-filtro-que-propusemos]] | — | — | — | **proposta e bloqueada no mesmo dia:** não é reparametrização, é outra estratégia (muda rompimento, ATR, volume relativo, cadência e rearme); e `quote_volume` é *nullable* em parte do universo |
+| T-027 | **alongar o horizonte** além de 14.400 s | [[KB-0054-a-cauda-direita-e-o-alvo-fixo-que-a-corta]] | — | — | — | **proposta e adiada no mesmo dia:** exige contraste próprio e muda exposição, atravessamento de funding e ocupação de slots; **não** entra no primeiro lote |
+
+**Família declarada, e é a novidade de método desta rodada.** T-005, T-022 e T-023 procuram a mesma
+coisa — uma política de saída melhor sobre as **mesmas entradas congeladas** —, então formam **um
+bloco**: 8 políticas únicas (com a base compartilhada) e **7 contrastes**, com **Holm a 5% sobre os
+sete**. Holm aceita dependência entre testes, mas **não conserta** p-valores calculados tratando
+entradas correlacionadas como independentes; a incerteza sai de reamostragem em blocos de tempo. O
+bloco **não autoriza** combinar o vencedor de T-005 com o de T-022 — isso seria comparação adicional,
+e tentativa a mais.
+
+### Diagnósticos e convenções registrados
+
+| ID | Diagnóstico | Nota | Status |
+|---|---|---|---|
+| D-034 | distribuição do payoff nominal `(target1 − P_entry)/(P_entry − stop)` e do desvio referência→`P_entry` | [[KB-0046-r-multiplos-e-o-r-que-a-simetria-esconde]] | proposto — **roda hoje**, usando `P_entry` e não o `open` bruto |
+| D-035 | distribuição de `ER(20)` condicionada a sinal disparado | [[KB-0047-razao-de-eficiencia-de-kaufman]] | proposto; grupo de comparação é **replay reconstruído** |
+| D-036 | correlação de postos entre `ER(20)`, `VR(2)` e `VR(4)`, com o estimador de `VR` declarado antes | [[KB-0048-o-teste-antes-da-regra-e-o-filtro-que-ja-estava-dentro]] | proposto — regra de priorização, **não** prova de redundância |
+| D-037 | mercados com sinal que não estão mais monitorados, separando outcomes encerrados, censurados e abertos | [[KB-0048-o-teste-antes-da-regra-e-o-filtro-que-ja-estava-dentro]] | proposto; não identifica quem saiu e voltou |
+| D-038 | fração de sinais com `return_4h > 0`, **por reconstrução com velas** | [[KB-0048-o-teste-antes-da-regra-e-o-filtro-que-ja-estava-dentro]] | proposto — confirma ou derruba a retirada da T-001 |
+| D-039 | benchmark aleatório condicionado (L5) | [[KB-0049-walk-forward-que-nao-temos-e-o-nulo-que-nunca-calculamos]] | proposto — **não é** teste de permutação validado; especificar população, estatística, calendário, invalidação e censura **antes** de escolher `K` |
+| D-040 | concentração temporal: acompanhamentos abertos por minuto, mercados por minuto e hora, blocos e outcomes por bloco | [[KB-0051-tres-barreiras-mais-uma-e-a-amostra-que-nao-e-independente]] | proposto — **roda hoje**; mede concentração, **não** tamanho efetivo de amostra |
+| D-041 | distribuição da razão de contração e correlação com `atr_pct` e `ER` | [[KB-0053-contracao-de-volatilidade-o-unico-pedaco-formalizavel]] | proposto; exige estimador, aquecimento e janelas congelados |
+
+**Convenções que não são tentativa nem diagnóstico** (não consomem multiplicidade): `C-META`
+(relatório de filtros com estratégia-base, população avaliável, cobertura e os quatro números),
+`C-COST` (publicar `custo_R_nominal_referencia` ao lado de `atr_pct_min`, sem mudar população) e
+`C-FCAST` (score contínuo não vinculante, com faixas e alvo declarados antes).
+
+**Inferências retiradas nesta rodada, registradas para não voltarem:**
+
+1. **"O canal oposto raramente decidiria a saída em 4 h"** — o raciocínio estava errado; o que
+   restringe o canal é a **concorrência com a invalidação nos 9 primeiros fechamentos**, e a partir
+   do décimo ele pode disparar sozinho dentro do horizonte (contraexemplo numérico da Astra).
+2. **"Os dois lados do payoff se deslocam na mesma direção"** — é efeito duplo: risco `a + δ`, ganho
+   `a − δ`.
+3. **"Teto de custo em R equivale a piso de `atr_pct`"** — só nominalmente; depende de `g`, e
+   `P_entry` não é conhecido na decisão.
+4. **"Zero é o nulo errado"** — zero continua sendo a referência de rentabilidade; o benchmark
+   responde outra pergunta.
+5. **"`VR` e `ER` medem quase a mesma coisa"** — dois arranjos dos mesmos 20 retornos dão a mesma
+   `ER` com `VR(2)` de 0 e de 1,894737.
+6. **"Todas as candidatas de filtro são meta-rótulos sobre a `momentum_v1`"** — filtro não é
+   meta-rótulo (o meta-rótulo é o alvo do modelo secundário), e a #11 e a #12 são sobre a
+   `volume_anomaly_v1`.
+7. **"`nº outcomes / nº blocos` é o tamanho efetivo da amostra"** — mede outcomes por bloco, e
+   concentrar a população faz a razão **subir**.
+8. **"O `rvol_min = 1,5` é o critério de volume do CANSLIM"** — o do IBD é volume diário 40–50% acima
+   da **média**; o nosso é 1,5× a **mediana** de 96 barras de 15 min, e numa distribuição assimétrica
+   pode ficar abaixo da média.
+9. **"MFE é sempre nulo e não ajuda"** — um extremo pode ser conhecido com o outro nulo, e um gap
+   favorável pode registrar excursão acima do alvo creditado.
+10. **"Qualquer cauda é truncada em 4 horas"** — o horizonte limita **duração**, não magnitude; e
+    variar só o alvo mede o efeito do alvo **condicionado** ao horizonte.
+11. **"A contribuição do decil superior sobre o `R_net` total" como métrica de cauda** — degenera
+    quando a soma total é perto de zero ou negativa.
+12. **"Clenow pirâmide"** — as regras publicadas dele rejeitam piramidação explicitamente.
+13. **"Avaliação antes do fim da janela é sempre tentativa inválida"** — monitoramento **descritivo**
+    continua permitido; o proibido é a inferência antecipada e a parada oportunista.
+
+**Consequência de multiplicidade, repetida:** T-022 a T-027 e D-034 a D-041 nasceram da inspeção do
+código e do dado de 2026-09-06, e da leitura de fontes externas. Nenhuma pode ser confirmada nessa
+mesma população; a confirmação exige janela futura reservada, declarada **antes** da coleta, e o piso
+de 100 outcomes e 30 dias **não substitui cálculo de potência**.
+
 ## Relacionados
 
 [[Strategy Backlog]] · [[Index]] ·

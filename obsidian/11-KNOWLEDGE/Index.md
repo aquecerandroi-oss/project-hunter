@@ -20,7 +20,8 @@ Cada nota é uma síntese própria (nunca cópia), com fonte, data, qualidade da
 | Regime de mercado e volatilidade | KB-0007, KB-0016, KB-0027, KB-0028, KB-0029, KB-0030, KB-0031, KB-0032, KB-0033, KB-0034, KB-0035 | **quarta rodada feita (2026-09-06)** |
 | Gestão de risco e sizing | KB-0005, KB-0035, KB-0040 | iniciado |
 | Estatística de backtest (overfitting, look-ahead, custos) | KB-0010 | iniciado |
-| Execução e microestrutura do preenchimento | KB-0036, KB-0037, KB-0038, KB-0039, KB-0040, KB-0041, KB-0042, KB-0043, KB-0044 | **quinta rodada feita (2026-09-06)** |
+| Execução e microestrutura do preenchimento | KB-0036, KB-0037, KB-0038, KB-0039, KB-0040, KB-0041, KB-0042, KB-0043, KB-0044 | quinta rodada feita (2026-09-06) |
+| Livros de estratégia | KB-0045, KB-0046, KB-0047, KB-0048, KB-0049, KB-0050, KB-0051, KB-0052, KB-0053, KB-0054, KB-0055 | **sexta rodada feita (2026-09-06)** |
 
 ## Notas
 _(uma linha por nota: link para a nota — fonte curta — qualidade da evidência — hipótese sim/não)_
@@ -71,6 +72,17 @@ _(uma linha por nota: link para a nota — fonte curta — qualidade da evidênc
 | [[KB-0042-o-open-nao-e-preco-executavel]] | execução / referência de preço | definição do dado + `pricing.py` + medição própria | leitura de código + medição, sem experimento | sim — `EXEC-G`, erro de referência assinado |
 | [[KB-0043-selecao-adversa-o-custo-que-so-aparece-depois-do-fill]] | execução / seleção adversa | arXiv 2608.04373v3 — **Hyperliquid**, não Binance | preprint com método declarado, **de outra venue** | sim — `EXEC-H`, retorno entre aberturas (**não** é markout) |
 | [[KB-0044-o-que-morre-em-dez-segundos]] | proveniência / qualidade do dado | `market_snapshots` + `hot_state.py`/`universe.py`/`coalesce.py` | **replicado** (contagens exatas) + código conferido | sim — `EXEC-I`, carimbo de execução em registro separado |
+| [[KB-0045-turtles-a-entrada-que-ja-temos-e-a-saida-que-nao]] | rompimento / saída | página pública de regras dos Turtles (Covel); **o documento original não abriu** | anedótico (grupo selecionado por sobrevivência) | sim — **L2**, três políticas `EXIT-BASE/NOTGT/CHAN` |
+| [[KB-0046-r-multiplos-e-o-r-que-a-simetria-esconde]] | risco / métricas | material aberto do Van Tharp Institute (**o PDF só abriu para a Astra**) | anedótico + aritmética conferida | sim — `D-VT` (roda hoje) e **L1**, alvo assimétrico |
+| [[KB-0047-razao-de-eficiencia-de-kaufman]] | tendência / filtro | artigo aberto do próprio Kaufman; docs públicas da KAMA | anedótico (a fórmula é definição, não resultado) | sim — `D-ER` e **L3**, com θ da distribuição condicionada |
+| [[KB-0048-o-teste-antes-da-regra-e-o-filtro-que-ja-estava-dentro]] | momentum vs reversão / método | prévia aberta de Chan; Lo & MacKinlay para `VR` | backtest do autor + **implicação lógica conferida** | sim — `D-CHAN-a/b/c`; **derrubou a T-001 por redundância** |
+| [[KB-0049-walk-forward-que-nao-temos-e-o-nulo-que-nunca-calculamos]] | validação / estatística | Pardo e Aronson em página de editora e resumo de capítulo | misto — ferramental revisado, livros lidos em resumo | sim — **L5**, benchmark aleatório condicionado (**não** é teste de permutação) |
+| [[KB-0050-previsao-continua-e-o-limite-de-velocidade-de-custo]] | sistemático / custos | blog público de Robert Carver | backtest do autor + aritmética **corrigida pela Astra** | sim — `C-COST` (tradução) e `C-FCAST` (score com pergunta prospectiva) |
+| [[KB-0051-tres-barreiras-mais-uma-e-a-amostra-que-nao-e-independente]] | rotulagem / dependência | descrições abertas do método de López de Prado | descrição de método (o livro não foi lido) | sim — `D-CONC`, concentração temporal (roda hoje) |
+| [[KB-0052-meta-rotulagem-o-formato-de-todo-filtro-que-propusemos]] | filtros / convenção | descrições abertas de meta-rotulagem e barras alternativas | anedótico | sim — `C-META`, convenção de relatório; relógio de amostragem **bloqueado** |
+| [[KB-0053-contracao-de-volatilidade-o-unico-pedaco-formalizavel]] | base antes do rompimento | descrições públicas de Weinstein, O'Neil (IBD) e Minervini | anedótico (apresentação retrospectiva de vencedoras) | sim — `D-CONTR` e **L4**, contração 8/32 terminando em `t−1` |
+| [[KB-0054-a-cauda-direita-e-o-alvo-fixo-que-a-corta]] | trend following / saída | páginas públicas de Andreas Clenow | backtest do autor (**nenhum número dele citado**) | sim — é a **L1**; `target2`/`target3` persistidos e nunca usados como barreira |
+| [[KB-0055-douglas-o-livro-que-nao-vira-hipotese]] | processo | descrições públicas de *Trading in the Zone* | anedótico | **não** — nota de leitura, sem linha no backlog nem no registro |
 
 ## O que a primeira rodada mudou de fato
 
@@ -299,6 +311,64 @@ Limitação operacional da rodada: todos os números são da **instância local*
 mercados monitorados, worker reiniciado na véspera). A VPS não foi consultada. E os livros do book
 são de **dois instantes** de uma quarta-feira à tarde — não descrevem stress, que é justamente quando
 a `momentum_v1` dispara.
+
+## O que a sexta rodada mudou de fato
+
+Tema: **livros de estratégia**, com um pedido explícito do Everton — não resenha, candidatas que o
+Lab consiga testar em sombra. É a primeira rodada desde a primeira que **produz variantes de
+estratégia**, e a razão é simples: livros dão regras objetivas.
+
+1. **A `momentum_v1` já é um rompimento de canal — de fechamentos, não de extremos — com filtros
+   próprios.** O que ela **não** tem é a saída da família: os Turtles e o trend following sistemático
+   não usam alvo fixo. `target_atr = 1,5` fecha o vencedor onde a literatura diz para deixá-lo
+   correr. Isso vira as candidatas **L1** e **L2**.
+2. **`target2_atr = 3` e `target3_atr = 4,5` são calculados, montados e gravados** (`record.py:137`,
+   `persist.py:59`) e o acompanhamento **não os usa como barreiras** (`walker.py:73,157`;
+   `tracking_repo.py:102` reconstrói só `virtual_targets[0]`). Nunca soubemos com que frequência o
+   preço seguiria até lá.
+3. **O payoff nominal no alvo não é 1 R.** Stop e alvo são simétricos **em torno da referência**, e a
+   entrada é uma abertura posterior: risco `a + δ`, ganho `a − δ`. Não é descoberta nossa — o mesmo
+   exemplo já estava em `SHADOW-LAB.md:13` —, mas a **distribuição** disso nunca foi publicada.
+4. **A T-001 morreu por lógica, não por dado.** `close_t > max` dos 20 fechamentos anteriores implica
+   `close_t > C_{t−16}`, e 16 barras de 15 min são 4 horas: o gate `return_4h > 0` **já está dentro**
+   da condição de entrada. Achado da Astra.
+5. **O Lab não tem grupo de comparação.** A única referência é o zero — que continua sendo a
+   referência certa para rentabilidade, mas não diz se a seleção do **instante** carrega informação.
+   Daí a **L5**, e o cuidado de chamá-la benchmark condicionado e não teste de permutação.
+6. **A dependência da amostra não é temporal, é transversal.** `episodes.py` já impede dois
+   acompanhamentos no mesmo slot; o que estreita a incerteza artificialmente é tratar cem altcoins
+   reagindo ao mesmo movimento do BTC como cem observações. O contrato já pedia blocos de tempo; o
+   que faltava era **medir a concentração** (`D-CONC`).
+7. **Metade do backlog é a mesma forma:** decisão binária sobre sinais de uma estratégia-base. Isso
+   virou a convenção `C-META`, com quatro números obrigatórios — e a descoberta, pela Astra, de que
+   duas dessas candidatas (#11 e #12) são sobre a **`volume_anomaly_v1`**, não sobre a `momentum_v1`.
+8. **`confidence` é constante e o sistema já diz isso** (`constant_uncalibrated_v1`). O que faltava
+   era a consequência: um score contínuo não vinculante **pode** ser avaliado hoje, prospectivamente,
+   sem precisar de dimensionamento.
+
+**Saldo de método.** A Astra revisou as onze notas em quatro passagens e recusou a primeira versão de
+todas. Além dos itens acima, ela: **derrubou o argumento com que eu tinha rebaixado a minha própria
+candidata L2** (a raridade da saída por canal, com contraexemplo numérico dentro das 4 h);
+**desmontou a equivalência entre teto de custo em R e piso de ATR** com um contraexemplo aritmético;
+**provou que `VR` e `ER` não são a mesma medida** com dois arranjos dos mesmos vinte retornos;
+**mostrou que `nº outcomes / nº blocos` mede o inverso do que eu disse**; **corrigiu a álgebra do
+payoff** (efeito duplo, não paralelo); e desenhou o **bloco de sete contrastes com Holm** que
+organiza T-005, L1 e L2 como uma busca só. A lista completa das treze inferências retiradas está no
+[[Registro de Tentativas]].
+
+**E uma limitação que vale para a rodada inteira: nenhum SQL foi executado.** Todos os fatos sobre o
+nosso sistema são **leitura de código**, conferida linha a linha pelas duas partes; nenhum é medição.
+Os diagnósticos que "rodam hoje" ainda não rodaram.
+
+## Fontes que não abriram nesta rodada (sexta)
+
+| Fonte | O que aconteceu | Como contornei |
+|---|---|---|
+| `tradingblox.com/originals/turtlerules.pdf` (regras originais dos Turtles) | HTTP 403 | usei a página pública de regras de Covel, que sustenta 20/55 e o `N`; **stop de 2N, canal de saída, piramidação e "sem alvo" ficaram "de memória, a confirmar"** |
+| `kaufmansignals.com/matching-the-markets-to-the-strategy/` | HTTP 403 para mim; **a Astra abriu** | a fórmula da `ER` veio de documentação pública concordante (StockCharts, MetaTrader, TradingView) e a atribuição ao artigo do autor foi conferida por ela |
+| `vantharp.com/.../A_Short_Lesson_on_R_and_R-multiple.pdf` | PDF voltou binário ilegível; **a Astra abriu** | ela confirmou que o material sustenta risco inicial, R-múltiplos, expectancy e a importância do sizing — e que é material do instituto sobre o simulador deles, **não** prova de leitura do livro |
+| Capítulo de resultados de Aronson (conclusão estatística) | o resumo público não expõe o número | a página da editora sustenta "mais de 6.400 regras sobre o S&P 500"; **"quase nada sobrevive" ficou marcado como de memória, a confirmar** |
+| Números de meta-rotulagem reportados por fontes secundárias | não verificados por mim nem pela Astra | **saíram inteiramente** da KB-0052 — nem como evidência, nem como contraexemplo |
 
 ## Relacionados
 
