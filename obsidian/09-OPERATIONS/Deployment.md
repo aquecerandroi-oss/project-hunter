@@ -37,11 +37,52 @@ Nenhum desses ambientes remotos está provisionado ainda — o M0 entrega "deplo
 
 ## VPS (Contabo) — operação 24/7
 
-**Estado (2026-09-06):** VPS **no ar**, `vmi3483069`, rodando `hunter-api:75fc59c` e
-`hunter-web:75fc59c`. Sete containers `healthy`: `api`, `web`, `caddy`, `postgres`, `redis`,
-`market-worker` e — desde 2026-09-06 03:36 UTC — o **`strategy-worker` do Shadow Lab**, com
-`momentum v1` e `volume_anomaly v1` ativadas pelo script auditado. Migração em `0003_analysis`.
-Prova operacional em `.claude/state/vps-lab-proof.md`; resultado em [[Experiments Index]].
+**Estado (2026-09-06 13:29 UTC):** VPS **no ar** na imagem `88bac0b`, `vmi3483069`. Sete containers,
+os seis com healthcheck em `healthy`: `api`, `web`, `caddy`, `postgres`, `redis`, `market-worker` e
+— desde 2026-09-06 03:36 UTC — o **`strategy-worker` do Shadow Lab**, com `momentum v1` e
+`volume_anomaly v1` ativadas pelo script auditado. Migração em `0003_analysis`. `/ready` responde
+**200**. Zero exceção nos logs das últimas 24 h nos dois workers. Disco 32 GB de 348 (10%), memória
+2,1 GB de 47. Prova operacional em `.claude/state/vps-lab-proof.md`; resultado em
+[[Experiments Index]] e nas avaliações datadas de [[EXP-0001-momentum-v1]] e
+[[EXP-0002-volume-anomaly-v1]].
+
+### HTTPS no IP puro, com certificado interno (`7e00f3b`, `88bac0b`)
+
+Ainda não há domínio, então a VPS é acessada pelo endereço IP — e isso exigiu duas correções que
+não são óbvias:
+
+1. **HTTP puro não serve.** Os cookies de sessão do Clerk são `Secure`, então o navegador
+   simplesmente não os guardava e o sign-in entrava em **laço infinito** de redirecionamento. O
+   Caddy passou a emitir um certificado com a **CA interna** dele (`tls internal`). O navegador
+   mostra um aviso de certificado não confiável — **isso é esperado** enquanto não houver domínio;
+   quem for entrar tem de aceitar o aviso uma vez.
+2. **Navegador não manda SNI quando o destino é um IP.** Sem SNI o Caddy não sabia qual site servir
+   e respondia o handshake TLS com `internal error`; o Chrome mostrava `ERR_SSL_PROTOCOL_ERROR` e
+   nada carregava. Corrigido com `default_sni`, que o `compose.sh` deriva de `HUNTER_SITE_ADDRESS`
+   (a variável do compose de produção; `HUNTER_TLS_ARG` seleciona `internal` ou o e-mail do ACME
+   quando houver domínio). Depois disso o Everton **abriu e viu** o `/ever/lab` em
+   `https://169.58.116.99`.
+
+### Incidente resolvido — uma chave do Clerk colada no prompt errado
+
+O `setup_env.sh` perguntava por `CLERK_ISSUER` aceitando qualquer texto. Um `sk_test_` digitado ali
+virou "issuer", quebrou o JWKS em silêncio e derrubou **toda** a autenticação da VPS — o sintoma
+apareceu longe da causa. Resolvido em duas frentes, nesta ordem: **o Everton trocou a chave** (a
+antiga está revogada; o valor nunca foi registrado no repositório, nesta base ou em log), e
+`bf1c382` fez o script **recusar** um `CLERK_ISSUER` que não seja URL. A regra que fica é
+operacional, não de disciplina: **nenhuma chave é digitada em prompt que não seja o da própria
+chave** — e agora o script impede. Ver [[Resolved Bugs]].
+
+### O backup nunca rodou — HIGH aberto em 2026-09-06
+
+A tabela abaixo diz que `backup_postgres.sh` faz um dump diário. **Ele nunca fez nenhum.**
+`/opt/backups` contém só `backup.log`, com uma linha: `Permission denied`. O arquivo é rastreado no
+git como `100644` (sem bit de execução) e a linha do cron instalada por
+`infra/scripts/bootstrap_vps.sh:346` invoca o caminho **diretamente**, em vez de `bash <caminho>` —
+que é como o cabeçalho do próprio script manda rodá-lo e como `compose.sh` e `astra.sh` são sempre
+invocados. Não existe um único dump desta VPS. Detalhe, cenário e as duas opções de correção em
+[[Open Bugs]]. **Enquanto isso não for corrigido, a pesquisa do Shadow Lab está sem rede** — e ela
+é a única coisa aqui que não se refaz coletando de novo, porque `signal_outcomes` avança no lugar.
 
 **Duas armadilhas de deploy descobertas ao subir o Lab** (as duas em [[Open Bugs]]):
 
@@ -57,7 +98,7 @@ Prova operacional em `.claude/state/vps-lab-proof.md`; resultado em [[Experiment
    **Não o coloque no `update` como está:** depois da primeira ativação de uma `strategy_version`, o
    seed tenta sobrescrever o `code_ref` congelado, a trigger recusa e **a transação inteira reverte**
    — as oito tabelas. Reproduzido nesta VPS em 2026-09-06. Antes de automatizar, o seed precisa
-   preservar versões ativadas, com teste `seed → ativação → seed`. Ver [[Open Bugs]].
+   preservar versões ativadas, com teste `seed → ativação → seed`. **Corrigido em `2587b9f`** (o seed nunca mais toca uma `strategy_version` ativada, com o teste `seed → ativação → seed`); ver [[Resolved Bugs]].
 
 Uma VPS Ubuntu 22.04/24.04 roda a mesma stack do compose de dev mais um override de produção, para o `market-worker` coletar mercado sem o PC ligado e para sessões de desenvolvimento por SSH (Claude Code e Codex funcionam melhor em Linux — o sandbox do Codex só funciona lá).
 
@@ -68,7 +109,7 @@ Uma VPS Ubuntu 22.04/24.04 roda a mesma stack do compose de dev mais um override
 | `infra/vps/docker-compose.prod.yml` | `restart: always`, portas fechadas, `HUNTER_ENV=staging`, Caddy, logs com rotação. |
 | `infra/vps/Caddyfile` | `/api/*` e `/ws` → api; resto → web; TLS automático com domínio. |
 | `infra/vps/compose.sh` | atalho do `docker compose` (dois `-f`, `--env-file`, nome de projeto). |
-| `infra/vps/backup_postgres.sh` | `pg_dump -Fc` diário em `/opt/backups`, retenção 7 dias, dump validado antes da retenção. |
+| `infra/vps/backup_postgres.sh` | `pg_dump -Fc` diário em `/opt/backups`, retenção 7 dias, dump validado antes da retenção. **Nunca executou** — ver o HIGH acima. |
 
 Decisões: `HUNTER_ENV=staging` (não `production` — Clerk ainda é instância de dev e `ENABLE_LIVE_TRADING=false`); Caddy em vez de nginx (TLS automático, 40 linhas de config); origem única para o navegador (sem CORS; `/health`, `/ready` e `/metrics` inalcançáveis de fora); só 22/80/443 públicas, api e web em `127.0.0.1`, Postgres e Redis sem porta publicada — **portas publicadas pelo Docker furam o ufw**, então a defesa é não publicar. Detalhe completo em `docs/DEPLOYMENT.md` §9 e `infra/vps/README.md`.
 

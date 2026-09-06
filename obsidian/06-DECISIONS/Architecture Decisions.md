@@ -85,3 +85,54 @@ serialização), tem de existir um teste de integração contra a dependência r
 improvável. Complementa a regra vizinha do `code_ref`: um digest de escopo largo demais também é um
 duplo que mente — ele muda quando o sistema não mudou, e faz o processo pular trabalho válido com
 `/ready` verde.
+
+## Decisão — o rate limit é fail-closed quando a coordenação em Redis cai (T2.9, 2026-09-06)
+
+> **Estado: em voo.** A T2.9 ainda não foi commitada quando esta nota foi escrita; o que está
+> registrado aqui é a decisão e o cenário que a justifica, lido no código de
+> `packages/exchange-adapters/hunter_exchanges/rate_limit_gate.py`,
+> `rate_limit_local.py` e `rate_limit_suspension.py`. Confirmar ao integrar.
+
+O `429`/`418` da Binance é **por IP**, não por bucket e não por processo. Um `Retry-After` recebido
+por um bucket obriga todos os outros buckets — **e todos os outros processos que compartilham o mesmo
+IP de saída** — a recuar; a próxima requisição transforma o `429` em `418`, que é banimento de IP.
+
+Até a T2.9 o prazo de bloqueio era um float monotônico **local ao processo**. Isso era correto com um
+processo por IP e ficou silenciosamente errado no instante em que o `market-worker` passou a rodar em
+shards: **o shard A tomava o `429`, o shard B nunca ficava sabendo e continuava chamando.** O
+`blocked_until` passou a viver em `rl:{exchange}:ip:blocked_until`, escrito por um script Lua que só
+estende o prazo e que lê o **relógio do próprio Redis** (`TIME`) — um prazo absoluto comparado por
+vários processos não pode usar o relógio de parede de cada um, senão um shard adiantado em um segundo
+levanta um bloqueio que outro ainda está cumprindo.
+
+A decisão que importa é o que acontece **quando o Redis some**:
+
+- Um bloqueio que este processo **já conhece** nunca é esquecido: ele é espelhado num prazo
+  monotônico local, então um `429` continua parando este processo mesmo se a escrita coordenada
+  falhar. A alternativa seria retentar imediatamente e comprar o banimento.
+- Essa metade do portão é **fail-closed por construção**: ela só sabe *acrescentar* bloqueio, nunca
+  admitir nada.
+- A admissão — o outro lado, o do limitador — **se suspende inteira** enquanto a coordenação está
+  fora (`rate_limit_suspension.py`). É essa a decisão nova: antes, um portão degradado podia conviver
+  com vários shards gastando **cada um** um orçamento local completo contra uma cota única e
+  compartilhada. Recusar chamada é um custo conhecido; um `418` é um apagão de coleta de duração
+  desconhecida.
+
+Regra geral que fica, e que vale para o próximo recurso compartilhado: **quando a coordenação de uma
+cota compartilhada cai, o padrão é recusar, não seguir com a cota local.** Um orçamento local
+multiplicado pelo número de processos não é um orçamento — é a ausência dele. Ver [[Workers]] e
+[[Exchange Adapters]].
+
+## Decisão — HTTPS com CA interna no IP puro, enquanto não houver domínio (2026-09-06)
+
+Servir a VPS em HTTP puro não é uma escolha de conveniência: os cookies de sessão do Clerk são
+`Secure`, então o navegador não os guarda e o sign-in **nunca completa** — entra em laço de
+redirecionamento. Com um IP no lugar de um domínio não existe ACME, então a saída é o certificado da
+**CA interna do Caddy** (`tls internal`) mais `default_sni` (navegador não envia SNI para um IP, e sem
+SNI o Caddy responde `internal error` no handshake). O preço é um aviso de certificado no navegador,
+que **é esperado e está documentado** em [[Deployment]] — não é um defeito a esconder.
+
+O que isso **não** autoriza: tratar o aviso como normal quando houver domínio. No dia em que existir
+um, `HUNTER_TLS_ARG` troca `internal` pelo e-mail do ACME e o aviso tem de desaparecer; um aviso de
+TLS que a equipe aprendeu a ignorar é exatamente como um certificado trocado passa despercebido.
+Commits `7e00f3b` e `88bac0b`.

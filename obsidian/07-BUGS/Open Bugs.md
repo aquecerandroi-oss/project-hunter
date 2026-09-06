@@ -11,7 +11,7 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
 
 Prova completa em `.claude/state/vps-lab-proof.md`.
 
-- **HIGH — o `code_ref` não é portável entre a máquina do Everton e a VPS.** Os digests do mesmo
+- **[RESOLVIDA em 2026-09-06 por `98c15bc` — ver [[Resolved Bugs]]] HIGH — o `code_ref` não é portável entre a máquina do Everton e a VPS.** Os digests do mesmo
   commit divergem: `momentum_v1` é `...@sha256:c012f75cdd8492d3...` no dev box e
   `...@sha256:6ccbe8b6c8ac18f3...` na VPS. Investigado até a causa, com os dois lados em `75fc59c` e
   `git status` limpo em `packages/core/hunter_core/strategies/`: `git hash-object` devolve o **mesmo**
@@ -38,7 +38,7 @@ Prova completa em `.claude/state/vps-lab-proof.md`.
   Windows, e as coortes locais de [[EXP-0001-momentum-v1]] e [[EXP-0002-volume-anomaly-v1]] deixam de
   rodar sem `--supersede` auditado; os da VPS, já em LF, não mudam. Dono: quem tocar
   `hunter_strategy_worker/code_ref.py` a seguir.
-- **HIGH (deploy) — o `seed` não é idempotente depois da primeira ativação, e não pode entrar no
+- **[RESOLVIDA em 2026-09-06 por `2587b9f` — ver [[Resolved Bugs]]] HIGH (deploy) — o `seed` não é idempotente depois da primeira ativação, e não pode entrar no
   fluxo de deploy como está.** Dois problemas encadeados. (a) `compose.sh update` roda `migrate` e
   nunca `seed`: medido antes de ativar o Lab, a VPS tinha 526 mercados e **367.256 velas** coletados
   e **zero** linhas em `strategies`, `strategy_versions` e `feature_definitions` — coletava mercado
@@ -73,6 +73,75 @@ Prova completa em `.claude/state/vps-lab-proof.md`.
   liquidação que preserve o timestamp original em vez de exigir igualdade com uma grade calculada.
   Toda avaliação datada sobre a VPS conta os 19 fora dos "encerrados avaliáveis" de qualquer forma.
 
+  **Investigação fechada em 2026-09-06 (turno da tarde) — censo completo em
+  [[EXP-0001-momentum-v1]], seção "Hipóteses de falha".** Sobre os 73 outcomes com
+  `funding_missing:*` da coorte da VPS (`as_of = 13:00Z`), com evidência graduada: **69** têm linha
+  em `funding_rates` do **mesmo mercado** a menos de 2 s do instante pedido mas não no instante
+  exato; **3** têm casamento exato na leitura de hoje e causa histórica por demonstrar; **1** não tem
+  candidato em ±60 s (o vizinho está a 2 h). Deltas observados: +5 ms (22), −5 ms (18), +1 ms (25),
+  +995 ms (1), +1001 ms (3), 0 ms (3). `funding_rates` tem 1883 linhas em 221 mercados e **851 delas
+  têm parte de segundos diferente de zero** — a grade real da corretora não é redonda. Por
+  liquidação em vez de por outcome: **66 liquidações distintas, 57 mercados, 7 instantes.** A
+  hipótese está confirmada como mecanismo dominante; ela deixa de ser "sob investigação" e vira o
+  item MEDIUM abaixo, com a proibição explícita da correção ingênua.
+
+## Abertos no plantão da tarde de 2026-09-06 (coorte da VPS)
+
+- **HIGH (operacional, VPS) — o backup do Postgres da VPS nunca rodou; não existe um único dump.**
+  `/opt/backups` contém apenas `backup.log`, com uma linha: `/bin/bash: line 1:
+  /opt/project-hunter/infra/vps/backup_postgres.sh: Permission denied`. Causa: o arquivo é rastreado
+  no git como `100644` (`git ls-files -s infra/vps/backup_postgres.sh`) e a linha instalada pelo
+  bootstrap em `/etc/cron.d/hunter-backup` invoca o caminho **diretamente**
+  (`infra/scripts/bootstrap_vps.sh:346`), em vez de `bash <caminho>` — que é como o próprio
+  cabeçalho do script manda rodá-lo e como todo o resto do repositório invoca esses scripts
+  (`compose.sh`, `astra.sh`). Sem bit de execução, o cron falha todo dia às 03:17 e escreve a mesma
+  linha no log. **Cenário:** perder o volume do Postgres da VPS apaga a pesquisa inteira do Shadow
+  Lab, e ela é **irrecuperável por construção** — `signal_outcomes` avança no lugar, não há
+  histórico de estados, e nenhuma avaliação datada passada pode ser reconstruída a partir dos
+  sinais. É o único dado do projeto que não se refaz coletando de novo. **Fix (uma linha, duas
+  opções):** trocar a linha do cron para `bash <script>` no bootstrap, **ou** marcar o arquivo
+  executável no índice (`git update-index --chmod=+x`) e refazer o deploy. **Bloqueado neste turno:**
+  tentei as duas coisas na VPS e o gate de permissão da sessão recusou (escrita em `/etc/cron.d` via
+  `sudo` e execução do script). Precisa do Everton ou de uma tarefa `devops-engineer` com permissão.
+  Dono: `devops-engineer`.
+- **MEDIUM (pesquisa/instrumento) — o funding é casado por igualdade exata de timestamp contra uma
+  grade calculada, e a corretora não usa grade redonda.** Detalhe e censo acima. **O efeito medido é
+  pequeno e isso importa para a prioridade:** entre os outcomes que têm `R_net`, **nenhum** dos 173
+  de momentum atravessou uma liquidação e só **9** dos 394 de volume atravessaram, com efeito médio
+  de −0,000195 R e extremos −0,027742 / +0,000036. Não é a causa de uma expectancy de −0,2 R; é
+  cobertura de pesquisa perdida em silêncio (50 outcomes fora do `R_net` na coorte avaliável).
+  **A correção ingênua é proibida** (revisão da Astra em [[S4-hipoteses]], must-fix 5): dar
+  tolerância de ±2 s ao `known.get()` permite **cobrar a mesma liquidação duas vezes**, porque
+  `strategy-worker/funding.py:126` faz a união da grade calculada com o observado (a grade tem
+  `08:00:00` e o observado tem `08:00:00.005`); e uma janela larga passa a cobrar funding
+  **posterior** à saída, enquanto o recorte atual termina em `exit_ts` (`settle.py:60`). O protocolo
+  correto precisa validar a cadência vigente, exigir associação **única** sem reutilizar liquidação,
+  preservar o timestamp original separando identidade de incidência, recusar ambiguidades nas
+  fronteiras e usar tolerância muito menor que metade do espaçamento mínimo validado. Dono:
+  `quant-engineer` + `exchange-integration-specialist`.
+- **LOW (observabilidade) — a hipótese de chegada tardia do funding não é demonstrável com o schema
+  de hoje.** Três outcomes têm casamento exato de timestamp e ainda assim foram rotulados
+  `funding_missing`, o que só se explica se a linha ficou visível depois da avaliação. Mas
+  `FundingRate` não registra horário de ingestão e `SignalOutcome.updated_at` não registra o
+  snapshot da consulta de funding, então não há como datar a visibilidade. Enquanto isso não
+  existir, "corrida de leitura" fica como hipótese plausível e **não** como diagnóstico.
+- **MEDIUM (teste intermitente) — `packages/exchange-adapters/tests/unit/test_ws_client.py::test_quiet_socket_rotates_cleanly_at_the_rotation_deadline`.**
+  Apontado pela T2.9 (`.claude/state/notes-T2.9.md`): em execução isolada passou, passou, falhou
+  (`assert 3 == 2` no número de conexões). O teste crava a **contagem exata** de reconexões com
+  `max_connection_age_s=0.02` — um prazo real de 20 ms numa máquina carregada rende uma rotação a
+  mais. `ws_client.py` e `test_ws_client.py` **não** são tocados pelo diff da T2.9, então não é
+  regressão dela. **Cenário:** um teste que falha por carga da máquina treina a equipe a reexecutar
+  a suíte até passar, e é assim que uma falha real vira ruído aceito. **Fix:** asserção `>= 2`, ou
+  prazo vindo de um relógio injetado em vez do relógio real. Dono:
+  `exchange-integration-specialist`.
+- **Observação (capacidade, não bug) — `dropped_events = 7.073.659` no `hb:market:binance` da VPS**
+  em ~14 h, com o `market-worker` a 98,97% de um core (de 12 na máquina, carga 1,32). Por contrato o
+  `BoundedEventQueue` **nunca** descarta kline final (`binance/event_queue.py`), e a evidência bate:
+  `ingestion_gaps` com 1590 `recovered`, 2 `open`, 2 `failed`, e a última vela de 1 min às 13:27Z. O
+  que se perde é evento parcial (hot state), não série durável. Fica registrado em
+  [[Market Collector]] como consumo de margem: a folga que hoje absorve 200 mercados é a mesma que o
+  scanner do M2 vai querer.
+
 ## Abertos pela primeira avaliação do Shadow Lab (S4, 2026-09-06)
 
 - **HIGH (operacional, local) — o `market-worker` do stack local está `unhealthy` e o Lab parou de
@@ -87,6 +156,11 @@ Prova completa em `.claude/state/vps-lab-proof.md`.
   provável: contenção da máquina com a T2.9 em prova mais o Postgres. **Registrado e não
   consertado por instrução** — os arquivos do `market-worker` estão em voo na T2.9. Dono: quem
   fechar a T2.9. Ver [[EXP-0001-momentum-v1]], [[EXP-0002-volume-anomaly-v1]] e [[Market Collector]].
+  **Estado em 2026-09-06 13:23Z:** não observável — o Docker Desktop desta máquina está fora
+  (`open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`), então não há
+  stack local nenhum de pé. O bug continua **aberto** e não verificado; a coleta e o Lab que
+  importam agora estão na VPS, onde `open_gaps = 0` e a última vela é das 13:27Z. Reabrir a
+  verificação quando o Everton subir o Docker de novo.
 - **HIGH (latente, todo o projeto) — o default de `hunter_core.events.consume()` mata qualquer
   consumidor num stream ocioso.** `consume()` bloqueia o `XREADGROUP` por 5000 ms e
   `hunter_core/redis.py` define `socket_timeout = 5.0`: os dois vencem no mesmo instante e o

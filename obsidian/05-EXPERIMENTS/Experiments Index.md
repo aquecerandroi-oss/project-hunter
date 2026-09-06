@@ -22,14 +22,37 @@ Na primeira avaliação datada (`as_of = 2026-09-06T02:55:00Z`) os dois experime
 `EXP-0001` teve o horizonte de 4 h maturado — a população avaliável é inteiramente composta de
 acompanhamentos que resolveram cedo.
 
+**Segunda avaliação datada, 2026-09-06 à tarde — agora sobre a coorte da VPS**
+(`as_of = 13:00:00Z`, `read_at = 13:26:35Z`). É **outra população, em outro banco**: a VPS tem uma só
+versão ativada por estratégia (ativadas lá às 03:36 UTC, com `code_ref` de digest diferente do local
+pelo motivo já registrado em [[Open Bugs]]), então esta leitura **não continua** a série local.
+
+| Experimento | Coorte | Emitidos | Avaliáveis c/ `R_net` | Taxa de alvo | Expectancy (R) | PF | Dias | Result |
+|---|---|---|---|---|---|---|---|---|
+| `EXP-0001` momentum | v1 (VPS, active) | 208 | 91 | 0,5333 | **−0,2102** | 0,6084 | 1 | **inconclusivo** |
+| `EXP-0002` volume | v1 (VPS, active) | 459 | 316 | 0,5000 | **−0,2304** | 0,6539 | 1 | **inconclusivo** |
+
+Duas coisas mudaram de verdade nesta leitura. **Primeira: o horizonte maturou.** Na avaliação da
+madrugada nenhum dos 57 acompanhamentos do momentum tinha as 4 h completas, e a expectancy aparecia
+em +0,3053 R; com o gate cumprido ela é **−0,2102 R**. O alerta escrito naquela página estava certo —
+os números de então descreviam "os que resolveram cedo". **Segunda: o `EXP-0002` passou dos 100
+outcomes** (316) e continua `inconclusivo` assim mesmo, porque o limiar é 100 **E** 30 dias, e há
+**1**. Trezentos e dezesseis outcomes de um único dia são 316 leituras do mesmo dia de mercado.
+
+Abertas nas duas páginas as seções **"Hipóteses de falha"** — pesquisa datada e acrescentada, que não
+toca Hipótese nem Protocolo e não ativa nada. A primeira rodada cobre a invalidação (35% dos
+acompanhamentos resolvidos, nenhum lucrativo, e um contrafactual que o dado **não** decide) e o
+funding não apurável (69 de 73 casos são falha de identificação temporal, com efeito medido de no
+máximo 0,028 R). Revisão em [[S4-hipoteses]].
+
 Cada experimento significativo (uma hipótese testada sobre uma estratégia, um conjunto de parâmetros, um mercado ou período) ganha seu próprio arquivo `EXP-NNNN-<slug>.md` nesta mesma pasta, numerado sequencialmente a partir de `EXP-0001`.
 
 ## Registro de IDs (decisão conjunta SHADOW, 2026-09-05)
 
 | ID | Experimento | Origem | Estado |
 |---|---|---|---|
-| `EXP-0001` | [[EXP-0001-momentum-v1\|momentum em modo sombra]] (15 min, stop e alvo a 1,5 ATR da referência, horizonte 4 h) | Shadow Lab v0 — tarefa S4 | **aberto em 2026-09-06**, coortes `v1` (deprecated) e `v2` (active) |
-| `EXP-0002` | [[EXP-0002-volume-anomaly-v1\|volume_anomaly em modo sombra]] (5 min, ATR de 15 min, stop na mínima da barra do sinal, horizonte 2 h) | Shadow Lab v0 — tarefa S4 | **aberto em 2026-09-06**, coortes `v1` (deprecated) e `v2` (active) |
+| `EXP-0001` | [[EXP-0001-momentum-v1\|momentum em modo sombra]] (15 min, stop e alvo a 1,5 ATR da referência, horizonte 4 h) | Shadow Lab v0 — tarefa S4 | **aberto em 2026-09-06**; coortes locais `v1` (deprecated) e `v2` (active), e a coorte da **VPS** `v1` (active, `code_ref` `…6ccbe8b6…`) |
+| `EXP-0002` | [[EXP-0002-volume-anomaly-v1\|volume_anomaly em modo sombra]] (5 min, ATR de 15 min, stop na mínima da barra do sinal, horizonte 2 h) | Shadow Lab v0 — tarefa S4 | **aberto em 2026-09-06**; coortes locais `v1` (deprecated) e `v2` (active), e a coorte da **VPS** `v1` (active, `code_ref` `…a03d18fe…`) |
 | `EXP-0003` | Baselines por ativo/hora do M2 (T2.8) | `docs/plans/M2.md` | **reservado** — o M2 cedeu `EXP-0001` ao Shadow e passou para cá |
 
 A reserva está consolidada nos três lugares que a decisão exige: aqui, em `docs/plans/SHADOW-LAB.md` (item 11) e em `docs/plans/M2.md` (T2.8).

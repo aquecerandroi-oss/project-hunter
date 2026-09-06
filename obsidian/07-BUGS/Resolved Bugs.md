@@ -7,6 +7,38 @@ updated: 2026-09-06
 
 Correções reais extraídas do `git log`. A maioria veio de rodadas de revisão de segurança/qualidade, não de bugs reportados em produção — não houve produção ainda.
 
+## Shadow Lab e VPS — S4 (2026-09-06)
+
+Os dois HIGH que a subida do Lab na VPS abriu (ver [[Open Bugs]] e `.claude/state/vps-lab-proof.md`)
+foram fechados no mesmo dia.
+
+- **HIGH — o `code_ref` não era portável entre a máquina do Everton e a VPS** (`98c15bc`). Mesmo
+  commit, `git hash-object` idêntico, digests diferentes: quatro módulos do fecho de imports estavam
+  em CRLF na árvore de trabalho do Windows e em LF na VPS, e o digest é dos **bytes em disco**.
+  Cenário que deixou de existir: ativar uma versão a partir do dev box contra o banco de produção
+  faria `load_active_versions` recusar **todas** as versões congeladas com
+  `shadow_version_code_ref_mismatch`, e campo congelado não se corrige no lugar. Corrigido com
+  normalização **mínima** de quebras de linha e BOM antes do digest — não AST, não bytecode, porque
+  os dois ampliariam o contrato em vez de consertar o incidente. Diagnóstico confirmado
+  independentemente pela Astra reproduzindo a composição do digest em memória
+  ([[S4-vps-lab]]): converter só CRLF → LF nos arquivos locais devolve exatamente os hashes da VPS,
+  que são os dos blobs do commit.
+- **HIGH (deploy) — o `seed` revertia as versões ativadas e não podia entrar no fluxo de deploy**
+  (`2587b9f`). `seed.py` fazia `on_conflict_do_update(set_={"code_ref": ...})` com um placeholder; a
+  trigger de congelamento recusa em qualquer linha já ativada; e o seed roda numa transação só, então
+  **as oito tabelas revertiam juntas**. Reproduzido na própria VPS depois da ativação. A recomendação
+  original — pôr o `seed` no `compose.sh update` — teria quebrado o deploy seguinte, e foi a revisão
+  da Astra que a inverteu: **primeiro** o seed preserva versões ativadas, com teste
+  `seed → ativação → seed`, **depois** se automatiza. Corrigido nessa ordem.
+- **Incidente de segurança, resolvido — um `sk_test_` do Clerk foi colado no prompt errado do
+  `setup_env.sh`.** O prompt de `CLERK_ISSUER` aceitava qualquer texto, então uma chave digitada ali
+  virava "issuer", quebrava o JWKS em silêncio e derrubava toda a autenticação da VPS. Duas
+  correções, nesta ordem: **o Everton trocou a chave** (a antiga está revogada; o valor nunca foi
+  registrado aqui, no repositório nem em log), e `bf1c382` fez o script **recusar** um
+  `CLERK_ISSUER` que não seja URL. A regra que fica: nenhuma chave é digitada em prompt que não seja
+  o da própria chave — hoje isso está bloqueado no script, não só na disciplina. Ver
+  [[Deployment]].
+
 ## Shadow Lab — S2 (`5d0153b`, 2026-09-05/06)
 
 Três defeitos que **os testes verdes não pegavam**, todos encontrados rodando de verdade ou por

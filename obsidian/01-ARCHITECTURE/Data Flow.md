@@ -97,6 +97,37 @@ O caminho sombra é deliberadamente **inalcançável** a partir da execução, e
 
 Consenso do Opportunity Engine do M2 recebe peso **zero** para sinais sombra.
 
+## Em voo, ainda não commitada: outbox transacional genérico (T2.9)
+
+Sem hash de commit — código não commitado, fonte `.claude/state/notes-T2.9.md`.
+`hunter_core.events.outbox` generaliza para o `market-worker` (e, quando a T2.5
+existir, para o `scanner-worker`) o mesmo padrão que o outbox do Shadow Lab já
+roda em produção para `shadow.signals.emitted`: a transação que grava a linha
+de negócio só **enfileira** o evento (`outbox_store.enqueue`); um despachante
+separado é quem publica no stream. Isso fecha a janela entre "o Postgres
+confirmou" e "o Redis recebeu" — sem ela, um crash nesse intervalo perde o
+evento sem deixar rastro, porque nenhum outro processo sabe que ele deveria
+existir. Ver detalhe completo em [[Workers]]. **Não migrado ainda:**
+`market.universe.changed` continua publicado *best-effort*, fora do outbox,
+porque os arquivos que o produzem estão travados até a S2 do Shadow Lab
+fechar.
+
+## Em voo, ainda não commitada: rate limit fail-closed sem Redis (T2.9)
+
+Decisão do orquestrador em 2026-09-06 (`.claude/state/notes-T2.9.md`
+§"DECIDIDO"), ainda sem commit: quando o Redis que coordena o rate limit REST
+da Binance cai, o `market-worker` **recusa** novas admissões em vez de cair
+para um orçamento local por processo. Cenário concreto: com sharding
+(`MARKET_SHARD`, T1.6b) N processos batem no mesmo IP de saída; a Binance
+soma `429`/`418` por IP, não por processo, então N orçamentos locais
+somariam N cotas contra uma única cota real — e o preço de estourá-la é um
+banimento de IP (`418`), não um simples atraso. Fail-closed aqui é
+deliberadamente o oposto do fail-open que seria "deixa passar e tenta de
+novo depois": um gap de mercado pode esperar o Redis voltar (o WS segue
+ingerindo, a recuperação retoma depois), um IP banido não. Detalhe de
+código e a divergência com o brief original (que pedia fallback em memória)
+em [[Workers]].
+
 ## Comunicação (definida, parcialmente em uso)
 
 - **Redis Streams** (worker → worker): envelope fixo `{event_id, type, ts, producer, key, payload}`; `MAXLEN ~ N` por tipo; consumer groups por serviço; idempotência via `hunter:processed:{consumer}` + `processed_events` no Postgres.
@@ -111,8 +142,8 @@ Bar-features usam só candles `is_final`; o candle em formação entra apenas na
 
 ## Relacionadas
 
-[[System Overview]] · [[Market Collector]] · [[Features]] · [[Anomalies]] · [[Risk Engine]] · [[Execution Engine]]
+[[System Overview]] · [[Market Collector]] · [[Features]] · [[Anomalies]] · [[Risk Engine]] · [[Execution Engine]] · [[Workers]]
 
 ## Fontes
 
-`docs/PIPELINE.md`, `docs/ARCHITECTURE.md` §5
+`docs/PIPELINE.md`, `docs/ARCHITECTURE.md` §5, `.claude/state/notes-T2.9.md` (T2.9, em voo)

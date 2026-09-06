@@ -7,6 +7,7 @@ updated: 2026-09-06
 
 Cada revisão é uma opinião do motor Astra da [[Mente da Sexta-feira]] sobre um plano, um diff ou uma decisão; o resultado (aceito/rejeitado e por quê) fica no kit da tarefa em `.claude/state/review-*.md` e nas páginas de [[Open Bugs]] / [[Resolved Bugs]].
 
+- [[S4-hipoteses]] — as hipóteses de falha do Shadow Lab sobre a coorte da VPS (5 must-fix; "intervalo do contrafactual" e "72 bugs de identidade" caíram)
 - [[S4-vps-lab]] — a prova operacional do Lab na VPS (hashes reproduzidos; 4 achados, incluindo a recomendação que teria quebrado o deploy)
 - [[S4-avaliacoes-shadow]] — as primeiras avaliações datadas do Shadow Lab (5 must-fix, todos aceitos antes de publicar)
 - [[M1-plan]]

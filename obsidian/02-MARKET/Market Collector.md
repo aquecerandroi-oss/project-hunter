@@ -1,6 +1,6 @@
 ---
 tags: [mercado, market-worker, m1]
-updated: 2026-09-05
+updated: 2026-09-06
 status: implementado
 ---
 
@@ -98,6 +98,90 @@ A T1.6 provou que **um processo satura um core com 200 mercados** e o hot state 
 
 **`tracking_hold` (previsto, ainda não implementado).** A [[Dialogos/SHADOW|decisão conjunta do Shadow Lab]] acrescenta um contrato ao Market Collector: um mercado que sai do universo monitorado, mas tem acompanhamento sombra `pending_entry` ou `active`, **continua com suas velas coletadas até o término do acompanhamento**. O hold é derivado do estado durável (`shadow_episodes`), reconciliado após restart, e é por acompanhamento — encerrar a v1 de uma estratégia não libera a coleta que a v2 ainda precisa. Impossibilidade de recuperar o dado gera censura explícita, nunca preço antigo. Entra em S2 (`services/market-worker/**`, só `tracking_hold`), depois de S0 e S1.
 
+## Capacidade medida na VPS (2026-09-06 13:29 UTC)
+
+Leitura real contra a VPS, não simulada, complementando a prova da T1.6b acima:
+
+| Fonte | Métrica | Valor |
+|---|---|---|
+| `hb:market:binance` | `ws_state` | `connected` |
+| `hb:market:binance` | `subscriptions` | 1200 |
+| `hb:market:binance` | `markets_monitored` | 200 |
+| `hb:market:binance` | `reconnects` | 0 |
+| `hb:market:binance` | `open_gaps` | 0 |
+| `hb:market:binance` | `dropped_events` | 7.073.659 |
+| `hb:market:binance` | último evento | 13:29:39Z |
+| `docker stats` | `market-worker` | 98,97% CPU / 259,8 MiB |
+| `docker stats` | `strategy-worker` | 0,60% CPU / 80,92 MiB |
+| VPS | núcleos / load average | 12 núcleos / 1,32 |
+| `ingestion_gaps` | `recovered` / `open` / `failed` | 1590 / 2 / 2 |
+| `candles` (1m) | última vela fechada | 2026-09-06 13:27:00Z |
+| `candles` (1m) | linhas totais | 506.900 |
+
+**A leitura honesta dos 7.073.659 `dropped_events`.** Por contrato,
+`BoundedEventQueue` (`packages/exchange-adapters/hunter_exchanges/binance/event_queue.py`)
+**nunca descarta uma vela final**: no overflow, o item mais antigo que **não**
+é uma vela final é a vítima; quando tudo na fila (mais o item entrando) é vela
+final, `put` aplica contrapressão de verdade — espera `get` liberar espaço —
+em vez de descartar (docstring do módulo, comportamento coberto por teste na
+T1.6b). O contador incrementado é o de eventos descartados por conexão
+(`ConnectionState.dropped_events`), não o de velas perdidas. A evidência de
+`ingestion_gaps` concorda com essa leitura: 2 `open` e 2 `failed` em 1594
+buracos processados, não milhões — se os drops fossem série durável, os gaps
+abertos estariam na mesma ordem de grandeza dos drops, e não estão. Os 7
+milhões são eventos parciais/estado quente (ticker, book, trades brutos) que a
+fila descarta sob pressão porque **não são persistidos no Postgres de qualquer
+forma** (ver "Hot state" e "O que existe" acima) — perda de estado efêmero, não
+de série.
+
+**A leitura honesta do outro lado: um core está saturado.** 98,97% de CPU para
+um único container `market-worker` (`docker stats`), com `hb:market:binance`
+mostrando `markets_monitored=200` e `subscriptions=1200` (200 × 6 canais —
+`aggTrade`, `bookTicker`, `depth`, `kline_1m`, `markPrice`, `forceOrder` —,
+a contagem de um processo cobrindo o universo inteiro, não a de um shard),
+numa VPS de 12 núcleos com load average 1,32. **Isto diverge do estado
+descrito no topo desta página** ("no ar: um processo sobre os 50 maiores
+mercados"; 200 "provados mas não entregues" por causa do heartbeat
+compartilhado entre shards): a leitura de 2026-09-06 13:29Z é de 200
+mercados com CPU e composição de assinaturas batendo com a topologia
+"1 processo × 200" que a própria T1.6b mediu como propensa a colapso do hot
+state.
+
+**Divergência medida, não deixada em aberto (Sexta-feira, 2026-09-06 13:5xZ).**
+Confirmei a topologia: **um** container `market-worker`, **sem** `MARKET_SHARD`
+e sem `MARKET_UNIVERSE_SIZE` no ambiente (`docker exec … printenv` devolve
+vazio para os três), ou seja, o **default de 200 mercados num processo único** —
+exatamente a topologia da linha "colapso" da tabela acima. **Mas o colapso não
+está acontecendo aqui:**
+
+```
+$ docker exec hunter-redis-1 redis-cli --scan --pattern "mkt:*:ticker" | wc -l
+200
+$ docker exec hunter-redis-1 redis-cli --scan --pattern "mkt:*:book"   | wc -l
+200
+```
+
+**200 de 200 no ticker e 200 de 200 no book** — hot state completo, contra os
+"0% em 15 min" que a T1.6 mediu. O que muda entre os dois ambientes é o host: a
+prova da T1.6 rodou na máquina de desenvolvimento, com Postgres, Redis, web e o
+resto disputando os mesmos núcleos; a VPS tem **12 núcleos** e load average
+1,32, então o mesmo processo satura o seu core sem competir por ele. O texto do
+topo desta página descreve o que foi **entregue e provado no M1** (50 mercados,
+por causa do heartbeat compartilhado entre shards); a VPS roda o default, que é
+outra coisa.
+
+Duas ressalvas para não transformar isto em conclusão maior do que é: (a) uma
+leitura pontual de hot state completo não é a corrida de 15 min que produziu a
+linha de colapso — a série de 24–48 h continua faltando ([[Open Bugs]]); e (b)
+o motivo pelo qual 200 não foi *entregue* nunca foi CPU, foi a página System
+mentir com N > 1 shards, e isso não muda com host maior. Em qualquer dos casos,
+o número é consumo de capacidade, não
+um defeito: a margem que sobra é o que o `scanner-worker` do M2 (T2.5,
+[[Features]], [[Anomalies]]) vai precisar disputar quando entrar no mesmo
+host. O `strategy-worker` ao lado, em modo sombra, usa 0,60% de CPU e
+80,92 MiB — a folga do host hoje está quase toda no
+`market-worker`.
+
 ## O que falta
 
 - **Corrida longa (24–48 h)** — a prova da T1.6 durou ~1h50 e a da T1.6b, 1h10 (três topologias em sequência). Falta uma corrida contínua longa e um apagão externo atravessando reinícios.
@@ -126,8 +210,8 @@ WS caiu → reconnect com backoff (1 s → 60 s) + REST recovery. Redis caiu →
 
 ## Relacionadas
 
-[[Exchange Adapters]] · [[WebSockets]] · [[Data Flow]] · [[Workers]]
+[[Exchange Adapters]] · [[WebSockets]] · [[Data Flow]] · [[Workers]] · [[Features]] · [[Anomalies]]
 
 ## Fontes
 
-`docs/PIPELINE.md` §1, `docs/ARCHITECTURE.md` §4, `docs/ROADMAP.md` (Milestone 1)
+`docs/PIPELINE.md` §1, `docs/ARCHITECTURE.md` §4, `docs/ROADMAP.md` (Milestone 1); capacidade medida na VPS em 2026-09-06 13:29Z (`hb:market:binance`, `docker stats`, `ingestion_gaps`, `candles`), confirmada contra `packages/exchange-adapters/hunter_exchanges/binance/event_queue.py`
