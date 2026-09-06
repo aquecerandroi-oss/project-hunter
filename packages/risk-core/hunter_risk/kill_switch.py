@@ -174,11 +174,15 @@ def resume(
 ) -> KillSwitchState:
     """Clear (or lower) the portfolio latch. Returns the new latch, nothing else.
 
-    It does **not** override the automatic assessment: if the day's loss or the
-    drawdown still breach the blocking thresholds, the next :func:`assess` puts
-    the portfolio straight back into ``TRADING_DISABLED``. That is deliberate -
-    an unlock that also suspended the thresholds would be a silent exception to
-    a limit Everton wrote, granted by whoever pressed the button.
+    It does **not** override the automatic assessment: an unlock that also
+    suspended the thresholds would be a silent exception to a limit Everton
+    wrote, granted by whoever pressed the button. So while the automatic
+    triggers still bite, the resume is **refused** rather than granted as a
+    no-op that the next :func:`assess` would undo - the audit record of a
+    transition that changed nothing is worse than no transition (review of
+    2026-09-06, finding 5). ``assessment`` must be the assessment of *this*
+    portfolio at the instant of the act; persisting the latch and the transition
+    is T3.6's job, not this function's.
     """
     if authorization.portfolio_id != portfolio_id:
         raise ValueError(
@@ -191,4 +195,11 @@ def resume(
         )
     if RESTRICTION_ORDER[authorization.to_state] >= RESTRICTION_ORDER[latched]:
         raise ValueError("resume may only de-escalate; raising the switch is not an authorisation")
+    if blocks_entries(assessment.automatic) and not blocks_entries(authorization.to_state):
+        raise ValueError(
+            f"the automatic assessment is still {assessment.automatic} "
+            f"(daily loss {assessment.daily_loss_pct}, drawdown {assessment.drawdown_pct}): "
+            "resume would be undone by the next assessment, so it is refused instead of "
+            "recorded as a transition that changed nothing"
+        )
     return authorization.to_state

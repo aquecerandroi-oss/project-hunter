@@ -72,6 +72,12 @@ class RiskLimits(RiskModel):
     max_spread_pct: Decimal = Field(gt=0, le=_ONE)
     min_stop_distance_pct: Decimal = Field(gt=0, le=_ONE)
     max_stop_distance_pct: Decimal = Field(gt=0, le=_ONE)
+    max_entry_deviation_pct: Decimal = Field(gt=0, le=_ONE)
+    """Half-width of the entry zone around the **observed** price (v2 §3.1 check
+    7, "entrada fora da zona"). Outside it the proposal describes a market that
+    no longer exists: the review of 2026-09-06 reproduced ``entry_ref = 100``
+    against a market at 110, approved, with a real loss at the stop of 1,18 % of
+    the equity against a ceiling of 0,25 %."""
     """Technical guards inherited from the v1 ``conservative`` preset and kept by
     v2 §2. They are not capital limits and none was proved redundant; changing a
     value is a question for Everton, not a refactor."""
@@ -144,6 +150,7 @@ PAPER_V1: Final = RiskLimits(
     max_spread_pct=Decimal("0.0005"),
     min_stop_distance_pct=Decimal("0.003"),
     max_stop_distance_pct=Decimal("0.03"),
+    max_entry_deviation_pct=Decimal("0.005"),
     max_price_age_s=10,
     max_book_age_s=10,
     max_volume_age_s=120,

@@ -10,8 +10,8 @@ from hunter_core.domain.enums import KillSwitchState
 from hunter_risk.inputs import BookLevel
 from hunter_risk.kill_switch import entry_size_multiplier
 from hunter_risk.limits import PAPER_V1, RiskLimits
+from hunter_risk.observations import book_capacity_qty
 from hunter_risk.sizing import (
-    book_capacity_qty,
     entry_cash_multiplier,
     floor_to_step,
     round_trip_cost_fraction,

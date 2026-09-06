@@ -1,21 +1,22 @@
 """The size: nine ceilings, the smallest one wins, and it is a ceiling.
 
-    planned loss per unit of notional = |entry_ref - stop| / entry_ref + round-trip costs
+    price (every line below)          = max(entry_ref, preco observado) - the worse one
+    planned loss per unit of notional = |price - stop| / price + round-trip costs
     risk ceiling                      = equity x risk_per_trade_pct / that
     aggregate ceiling                 = remaining aggregate risk budget / that
     participation ceiling             = 1 % x min(last complete minute, median of 30) - used
     book ceiling                      = deepest walk of the ask side inside max_slippage_pct,
-                                        in units, then priced at entry_ref
+                                        in units, then priced at that price
     per-coin ceiling                  = 10 % x equity - exposure on that coin
     total ceiling                     = 40 % x equity - total exposure
     beta ceiling                      = (50 % x equity - sum|notional x beta|) / |beta|
-    cash ceiling                      = cash / ((1 + deslocamento) x (1 + fee))
+    cash ceiling                      = (cash - reservas) / ((1 + deslocamento) x (1 + fee))
     requested ceiling                 = what the caller asked for, if it asked
 
     notional = min(ceilings) x kill_switch_multiplier
-    qty      = floor_to_step(notional / entry_ref)
+    qty      = floor_to_step(notional / max(entry_ref, preco observado))
 
-Three properties that are the point of this module:
+Four properties that are the point of this module:
 
 - **the multiplier comes last** (``R-KS-1``). The old contract multiplied the
   *risk budget*, so a proposal whose binding ceiling was participation or the
@@ -26,7 +27,13 @@ Three properties that are the point of this module:
   proposal and never moved. A stop widened to fit a size would be a protection
   the engine invented and then reported;
 - **rounding is always down**. Rounding a quantity up to the step is how a
-  computed 9.9997 % becomes 10.0004 % of a limit that was just checked.
+  computed 9.9997 % becomes 10.0004 % of a limit that was just checked;
+- **the price is the worse of the two** (review of 2026-09-06, finding 2). Every
+  ceiling, the planned loss and the counterfactuals are measured at
+  ``max(entry_ref, preco observado)``, so a reference that the market has left
+  behind can never make a ceiling more generous than the market itself. Whether
+  the proposal is admissible at all, with that gap, is the ``signal_validity``
+  check's answer, not this module's.
 
 Costs use the same hypothesis as the shadow lab
 (``services/strategy-worker/hunter_strategy_worker/pricing.py``): half the
@@ -44,8 +51,9 @@ from hunter_core.strategies.envelope import AssumedCosts
 from hunter_core.strategies.numeric import CONTEXT
 from hunter_risk.decision import Counterfactual, LimitCap, Sizing
 from hunter_risk.exposure import PortfolioState
-from hunter_risk.inputs import BetaEstimate, BookLevel, EntryProposal, MarketLiquidity, MarketSpec
+from hunter_risk.inputs import BetaEstimate, EntryProposal, MarketLiquidity, MarketSpec
 from hunter_risk.limits import RiskLimits
+from hunter_risk.observations import book_capacity_qty, worst_entry_price
 
 _ZERO = Decimal(0)
 _ONE = Decimal(1)
@@ -106,42 +114,6 @@ def floor_to_step(qty: Decimal, step: Decimal) -> Decimal:
     return quantize(qty, step)
 
 
-def book_capacity_qty(
-    asks: tuple[BookLevel, ...], mid: Decimal, max_slippage_pct: Decimal
-) -> Decimal | None:
-    """Largest **quantity** whose VWAP against ``mid`` stays inside ``max_slippage_pct``.
-
-    A quantity, not a spend, and that is the whole point: the spend of a walk
-    that ends at a VWAP above ``entry_ref`` buys *fewer* units than
-    ``spend / entry_ref`` suggests. Returning 202 for a walk of 2 units at
-    ``entry_ref = 100`` would authorise 2.02 units, whose real crossing costs
-    101.0099 against a budget of 101 (Astra, diff review of T3.1).
-
-    ``None`` when the book was not observed: in stress the feed is exactly what
-    disappears, and "no book" must reject rather than skip the only per-size
-    cost measurement there is (``R-OPS-1``).
-    """
-    if not asks:
-        return None
-    with localcontext(CONTEXT):
-        budget_price = mid * (_ONE + max_slippage_pct)
-        filled_qty = _ZERO
-        spent = _ZERO
-        for level in asks:
-            if level.price <= budget_price:
-                filled_qty += level.qty
-                spent += level.qty * level.price
-                continue
-            # Partial: take q such that (spent + q*p) / (filled + q) == budget_price.
-            room = budget_price * filled_qty - spent
-            if room <= _ZERO:
-                break
-            take = min(level.qty, room / (level.price - budget_price))
-            filled_qty += take
-            break
-        return filled_qty
-
-
 def _cap(name: str, notional: Decimal | None, limit: Decimal | None, detail: str) -> LimitCap:
     floored = None if notional is None else max(_ZERO, notional)
     return LimitCap(name=name, notional=floored, limit=limit, detail=detail)
@@ -155,8 +127,10 @@ def _ceilings(
     liquidity: MarketLiquidity,
     beta: BetaEstimate,
     loss_per_unit: Decimal,
+    cash_multiplier: Decimal,
 ) -> tuple[LimitCap, ...]:
     equity = portfolio.equity
+    price = worst_entry_price(proposal, liquidity)
     reference = liquidity.participation_reference
     mid = liquidity.reference_mid
     beta_used = portfolio.beta_exposure()
@@ -165,6 +139,8 @@ def _ceilings(
             "size_entry needs a participation reference, a mid price and a known beta "
             "aggregate; evaluate() must reject before sizing when any of them is missing"
         )
+
+    available_cash = portfolio.available_cash
 
     with localcontext(CONTEXT):
         risk_budget = equity * limits.risk_per_trade_pct
@@ -202,7 +178,7 @@ def _ceilings(
             ),
             _cap(
                 "book_depth",
-                None if book_qty is None else book_qty * proposal.entry_ref,
+                None if book_qty is None else book_qty * price,
                 limits.max_slippage_pct,
                 f"walk do book ate o slippage maximo: {book_qty} unidades",
             ),
@@ -227,9 +203,10 @@ def _ceilings(
             ),
             _cap(
                 "cash",
-                portfolio.cash / entry_cash_multiplier(proposal.assumed_costs),
-                limits.max_leverage,
-                "caixa disponivel dividido pelo custo de entrada, taxa inclusa",
+                available_cash / cash_multiplier,
+                available_cash,
+                f"caixa {portfolio.cash} menos {portfolio.cash - available_cash} ja reservado, "
+                "dividido pelo custo de entrada com taxa",
             ),
         ]
     return tuple(caps)
@@ -246,8 +223,9 @@ def size_entry(
     size_multiplier: Decimal,
 ) -> Sizing:
     """The size of one entry, with every ceiling and the winner recorded."""
+    price = worst_entry_price(proposal, liquidity)
     cost_pct = round_trip_cost_fraction(proposal.assumed_costs)
-    stop_distance = stop_distance_fraction(proposal.entry_ref, proposal.stop)
+    stop_distance = stop_distance_fraction(price, proposal.stop)
     loss_per_unit = stop_distance + cost_pct
 
     caps = _ceilings(
@@ -257,6 +235,7 @@ def size_entry(
         liquidity=liquidity,
         beta=beta,
         loss_per_unit=loss_per_unit,
+        cash_multiplier=entry_cash_multiplier(proposal.assumed_costs),
     )
     binding = _winner(caps)
     tied = tuple(
@@ -271,13 +250,14 @@ def size_entry(
 
     with localcontext(CONTEXT):
         after = before * size_multiplier
-        qty = floor_to_step(after / proposal.entry_ref, spec.step_size)
-        notional = qty * proposal.entry_ref
+        qty = floor_to_step(after / price, spec.step_size)
+        notional = qty * price
         planned_risk = notional * loss_per_unit
         planned_risk_pct = planned_risk / portfolio.equity
 
     return Sizing(
         entry_ref=proposal.entry_ref,
+        sizing_price=price,
         stop=proposal.stop,
         stop_distance_pct=stop_distance,
         cost_pct=cost_pct,
@@ -293,12 +273,12 @@ def size_entry(
         planned_risk_quote=planned_risk,
         planned_risk_pct=planned_risk_pct,
         size_without_multipliers=_counterfactual(
-            "size_without_multipliers", before, proposal.entry_ref, spec.step_size
+            "size_without_multipliers", before, price, spec.step_size
         ),
         size_without_participation=_counterfactual(
             "size_without_participation",
             _cheapest_excluding(caps, "market_participation"),
-            proposal.entry_ref,
+            price,
             spec.step_size,
             multiplier=size_multiplier,
         ),

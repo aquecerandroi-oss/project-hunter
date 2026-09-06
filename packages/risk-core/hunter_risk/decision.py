@@ -113,6 +113,13 @@ class Sizing(RiskModel):
     """How the size was reached, in the order it was reached."""
 
     entry_ref: Decimal
+    """The reference the proposal carried, kept as evidence of what was asked."""
+    sizing_price: Decimal
+    """The price every ceiling was actually measured at: the **worse** of
+    ``entry_ref`` and the observed price (review of 2026-09-06, finding 2). Equal
+    to ``entry_ref`` when the market has not moved away from it; above it when
+    the market has, so a stale reference never buys more units than the market
+    would sell."""
     stop: Decimal
     """The stop the strategy declared. The engine never moves it."""
     stop_distance_pct: Decimal

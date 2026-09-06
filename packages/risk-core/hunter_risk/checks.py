@@ -29,7 +29,16 @@ from hunter_risk.exposure import PortfolioState
 from hunter_risk.inputs import BetaEstimate, EntryProposal, MarketLiquidity, MarketSpec
 from hunter_risk.kill_switch import KillSwitchAssessment
 from hunter_risk.limits import RiskLimits
-from hunter_risk.sizing import book_capacity_qty, stop_distance_fraction
+from hunter_risk.observations import (
+    book_capacity_qty,
+    entry_deviation,
+    entry_zone_ok,
+    observed_price,
+    stale_volume_reason,
+    stop_below_market,
+    worst_entry_price,
+)
+from hunter_risk.sizing import stop_distance_fraction
 
 _ZERO = Decimal(0)
 _ONE = Decimal(1)
@@ -94,27 +103,9 @@ def gate_checks(
                 message="mercado ainda monitorado entre o sinal e a proposta",
             )
         ),
-        check(
-            "signal_validity",
-            proposal.signal_valid and _ZERO < proposal.stop < proposal.entry_ref,
-            value=proposal.stop,
-            limit=proposal.entry_ref,
-            message="sinal ativo e stop de long abaixo da referencia de entrada",
-        ),
-        _stop_distance(proposal, limits),
-        (
-            unavailable(
-                "liquidity_24h", "volume de 24 h nao observado", limit=limits.min_liquidity_usd_24h
-            )
-            if liquidity.quote_volume_24h is None
-            else check(
-                "liquidity_24h",
-                liquidity.quote_volume_24h >= limits.min_liquidity_usd_24h,
-                value=liquidity.quote_volume_24h,
-                limit=limits.min_liquidity_usd_24h,
-                message="piso de liquidez no venue de execucao",
-            )
-        ),
+        _signal_validity(proposal, limits, liquidity),
+        _stop_distance(proposal, limits, liquidity),
+        _liquidity_24h(portfolio, limits, liquidity),
         (
             unavailable("spread", "bid/ask nao observados", limit=limits.max_spread_pct)
             if spread is None
@@ -190,10 +181,72 @@ def _data_quality(limits: RiskLimits, liquidity: MarketLiquidity, price_age: Dec
     )
 
 
-def _stop_distance(proposal: EntryProposal, limits: RiskLimits) -> RiskCheck:
+def _signal_validity(
+    proposal: EntryProposal, limits: RiskLimits, liquidity: MarketLiquidity
+) -> RiskCheck:
+    """v2 §3.1 check 7 - the three things that make a signal still tradable.
+
+    The signal is active, the stop is on the right side (of the reference **and**
+    of the market the order will meet), and the reference is still inside the
+    declared entry zone around the observed price. The three travel together
+    because they answer one question: is this proposal about the market that
+    exists now? The review of 2026-09-06 found the last two missing:
+    ``entry_ref = 100`` with the market at 110 was approved with a real planned
+    loss of 1,18 % of the equity, and a long whose stop sat above the market was
+    approved as well.
+    """
+    deviation = entry_deviation(proposal, liquidity)
+    geometry_ok = _ZERO < proposal.stop < proposal.entry_ref
+    return check(
+        "signal_validity",
+        proposal.signal_valid
+        and geometry_ok
+        and stop_below_market(proposal, liquidity)
+        and entry_zone_ok(proposal, liquidity, limits),
+        value=deviation,
+        limit=limits.max_entry_deviation_pct,
+        message=(
+            f"sinal ativo={proposal.signal_valid}; stop {proposal.stop} abaixo da referencia "
+            f"{proposal.entry_ref} e do preco observado {observed_price(liquidity)}; desvio da "
+            f"zona de entrada {deviation}"
+        ),
+    )
+
+
+def _liquidity_24h(
+    portfolio: PortfolioState, limits: RiskLimits, liquidity: MarketLiquidity
+) -> RiskCheck:
+    """v2 §3.1 check 9, with the age the profile declares (``R-OPS-2``).
+
+    ``max_volume_age_s`` (120 s in ``paper_v1``) existed and was never read: a
+    volume photographed 45 minutes earlier passed the floor and sized the
+    participation ceiling as if it were now (review of 2026-09-06, finding 3).
+    """
+    stale = stale_volume_reason(portfolio, limits, liquidity)
+    if stale is not None:
+        return unavailable("liquidity_24h", stale, limit=limits.min_liquidity_usd_24h)
+    if liquidity.quote_volume_24h is None:
+        return unavailable(
+            "liquidity_24h", "volume de 24 h nao observado", limit=limits.min_liquidity_usd_24h
+        )
+    return check(
+        "liquidity_24h",
+        liquidity.quote_volume_24h >= limits.min_liquidity_usd_24h,
+        value=liquidity.quote_volume_24h,
+        limit=limits.min_liquidity_usd_24h,
+        message="piso de liquidez no venue de execucao",
+    )
+
+
+def _stop_distance(
+    proposal: EntryProposal, limits: RiskLimits, liquidity: MarketLiquidity
+) -> RiskCheck:
+    """The band, measured at the same price the sizing uses - the worse of the two."""
     if not _ZERO < proposal.stop < proposal.entry_ref:
         return unavailable("stop_distance", "geometria do stop invalida: distancia nao calculavel")
-    distance = stop_distance_fraction(proposal.entry_ref, proposal.stop)
+    # max(entry_ref, observed) is never below entry_ref, which the guard above
+    # already put strictly over the stop, so the division is always defined.
+    distance = stop_distance_fraction(worst_entry_price(proposal, liquidity), proposal.stop)
     return check(
         "stop_distance",
         limits.min_stop_distance_pct <= distance <= limits.max_stop_distance_pct,

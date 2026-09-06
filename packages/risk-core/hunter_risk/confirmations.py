@@ -21,7 +21,8 @@ from hunter_risk.decision import RiskCheck, Sizing, check, unavailable
 from hunter_risk.exposure import PortfolioState
 from hunter_risk.inputs import BetaEstimate, EntryProposal, MarketLiquidity, MarketSpec
 from hunter_risk.limits import RiskLimits
-from hunter_risk.sizing import book_capacity_qty, entry_cash_multiplier
+from hunter_risk.observations import book_capacity_qty, stale_volume_reason
+from hunter_risk.sizing import entry_cash_multiplier
 
 _ZERO = Decimal(0)
 _ONE = Decimal(1)
@@ -44,7 +45,8 @@ def post_sizing_checks(
     """
     notional = sizing.notional
     equity = portfolio.equity
-    reference = liquidity.participation_reference
+    stale_volume = stale_volume_reason(portfolio, limits, liquidity)
+    reference = None if stale_volume else liquidity.participation_reference
     beta_used = portfolio.beta_exposure()
     capacity_qty = book_capacity_qty(
         liquidity.asks, liquidity.reference_mid or _ZERO, limits.max_slippage_pct
@@ -54,6 +56,7 @@ def post_sizing_checks(
         total_after = portfolio.total_exposure + notional
         beta_after = None if beta_used is None else beta_used + abs(notional * beta.value)
         cash_needed = notional * entry_cash_multiplier(proposal.assumed_costs)
+        available_cash = portfolio.available_cash
 
     return (
         check(
@@ -67,7 +70,10 @@ def post_sizing_checks(
             ),
         ),
         (
-            unavailable("participation", "referencia de volume do minuto indisponivel")
+            unavailable(
+                "participation",
+                stale_volume or "referencia de volume do minuto indisponivel",
+            )
             if reference is None
             else check(
                 "participation",
@@ -94,10 +100,13 @@ def post_sizing_checks(
         ),
         check(
             "cash",
-            cash_needed <= portfolio.cash,
+            cash_needed <= available_cash,
             value=cash_needed,
-            limit=portfolio.cash,
-            message="caixa necessario incluindo taxas estimadas (SPOT: caixa e o limite duro)",
+            limit=available_cash,
+            message=(
+                f"caixa necessario incluindo taxas estimadas contra o caixa {portfolio.cash} "
+                "liquido das reservas pendentes (SPOT: caixa e o limite duro)"
+            ),
         ),
         _exposure_after(limits, equity, asset_after, total_after, beta_after),
     )

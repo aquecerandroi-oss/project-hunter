@@ -35,7 +35,8 @@ from hunter_risk.kill_switch import (
     resume,
 )
 from hunter_risk.limits import PAPER_V1, RiskLimits
-from hunter_risk.sizing import book_capacity_qty, round_trip_cost_fraction, size_entry
+from hunter_risk.observations import book_capacity_qty, observed_price, worst_entry_price
+from hunter_risk.sizing import round_trip_cost_fraction, size_entry
 
 __version__ = "0.0.0"
 
@@ -70,9 +71,11 @@ __all__ = [
     "evaluate_exit",
     "gate_checks",
     "most_restrictive",
+    "observed_price",
     "post_sizing_checks",
     "resume",
     "round_trip_cost_fraction",
     "sao_paulo_day_start_utc",
     "size_entry",
+    "worst_entry_price",
 ]

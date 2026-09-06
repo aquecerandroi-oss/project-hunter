@@ -100,23 +100,75 @@ class TestAggregates:
 
 
 class TestDailyResult:
-    def test_daily_pnl_is_realised_plus_unrealised_minus_costs(self) -> None:
+    def test_daily_pnl_is_the_movement_of_the_equity_since_the_day_start(self) -> None:
+        # v2 SS5: the day's result is a fact about the patrimony, not a field a
+        # caller may forget to fill (review of 2026-09-06, finding 1).
+        state = portfolio(equity=Decimal("19830"), day_start_equity=Decimal("20000"))
+        assert state.daily_pnl == Decimal("-170")
+
+    def test_daily_loss_pct_is_measured_against_the_equity_at_the_day_start(self) -> None:
         state = portfolio(
+            equity=Decimal("19830"),
+            peak_equity=Decimal("20000"),
+            day_start_equity=Decimal("20000"),
+        )
+        assert state.daily_loss_pct == Decimal("0.0085")
+
+    def test_the_reported_decomposition_is_measured_never_enforced(self) -> None:
+        state = portfolio(
+            equity=Decimal("19830"),
+            peak_equity=Decimal("20000"),
+            day_start_equity=Decimal("20000"),
             daily_realized_pnl=Decimal("-100"),
             daily_unrealized_pnl=Decimal("-50"),
             daily_costs=Decimal("20"),
         )
         assert state.daily_pnl == Decimal("-170")
+        assert state.daily_decomposition_gap == Decimal("0")
 
-    def test_daily_loss_pct_is_measured_against_the_equity_at_the_day_start(self) -> None:
-        state = portfolio(equity=Decimal("19830"), daily_realized_pnl=Decimal("-170"))
-        # day_start_equity defaults to the same 19830 in the factory; set it explicitly.
-        state = state.model_copy(update={"day_start_equity": Decimal("20000")})
-        assert state.daily_loss_pct == Decimal("0.0085")
+        # A ledger that disagrees still builds, on purpose: the state is what a
+        # protective exit is evaluated against (Astra, review of this diff).
+        off = portfolio(
+            equity=Decimal("19830"),
+            peak_equity=Decimal("20000"),
+            day_start_equity=Decimal("20000"),
+            daily_realized_pnl=Decimal("-100"),
+            daily_unrealized_pnl=Decimal("0"),
+            daily_costs=Decimal("0"),
+        )
+        assert off.daily_decomposition_gap == Decimal("70")
+        assert off.daily_loss_pct == Decimal("0.0085")
+
+    def test_a_partial_decomposition_reports_no_gap_at_all(self) -> None:
+        assert portfolio(daily_realized_pnl=Decimal("0")).daily_decomposition_gap is None
 
     def test_a_profitable_day_is_a_loss_of_zero_never_a_negative_loss(self) -> None:
-        state = portfolio(daily_realized_pnl=Decimal("500"))
+        state = portfolio(equity=Decimal("20500"), day_start_equity=Decimal("20000"))
         assert state.daily_loss_pct == Decimal("0")
+
+    def test_available_cash_is_net_of_the_pending_reservations(self) -> None:
+        # Finding 4: cash was the one ceiling that ignored the reservations.
+        reserved = pending(reserved_notional=Decimal("400"))
+        assert reserved.reserved_cash == Decimal("400.400096")
+        state = portfolio(cash=Decimal("500"), pending_entries=(reserved,))
+        assert state.available_cash == Decimal("99.599904")
+        assert portfolio(cash=Decimal("500")).available_cash == Decimal("500")
+
+    def test_available_cash_uses_the_reservation_own_hold(self) -> None:
+        # Astra, review of this diff: re-estimating the hold with the candidate's
+        # cost hypothesis would let a zero-cost candidate shrink somebody else's
+        # commitment - 400 held would come back as 400 and free 0,40 of cash.
+        expensive = pending(reserved_notional=Decimal("400"), reserved_cash=Decimal("420"))
+        state = portfolio(cash=Decimal("500"), pending_entries=(expensive,))
+        assert state.available_cash == Decimal("80")
+
+    def test_a_reservation_holding_less_cash_than_its_notional_is_refused(self) -> None:
+        with pytest.raises(ValidationError, match="reserved_cash"):
+            pending(reserved_notional=Decimal("400"), reserved_cash=Decimal("399"))
+
+    def test_available_cash_never_goes_negative(self) -> None:
+        state = portfolio(cash=Decimal("300"), pending_entries=(pending(),))
+        assert state.available_cash == Decimal("0")
 
     def test_drawdown_is_measured_from_the_historical_peak(self) -> None:
         state = portfolio(equity=Decimal("18400"), peak_equity=Decimal("20000"))

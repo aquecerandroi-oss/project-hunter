@@ -27,12 +27,18 @@ PORTFOLIO_ID = uuid.UUID("00000000-0000-7000-8000-0000000000aa")
 
 
 def _loss(pct: str) -> PortfolioState:
+    """A wallet that opened the day at 20.000 and is now ``pct`` below it.
+
+    The loss is the movement of the equity itself (v2 SS5), which is what the
+    engine measures - not an optional PnL field a caller may leave at zero
+    (review of 2026-09-06, finding 1).
+    """
     equity = Decimal("20000")
     return portfolio(
         equity=equity * (Decimal(1) - Decimal(pct)),
         peak_equity=equity,
         cash=equity,
-        daily_realized_pnl=-equity * Decimal(pct),
+        day_start_equity=equity,
     )
 
 
@@ -101,6 +107,24 @@ class TestAutomaticEscalation:
         assert got.automatic is KillSwitchState.ACTIVE
         assert got.effective is KillSwitchState.TRADING_DISABLED
 
+    def test_without_a_latch_a_recovered_wallet_goes_straight_back_to_active(self) -> None:
+        # `assess` has no memory: it reads the state it is given. The day the
+        # loss is recovered, the automatic assessment is ACTIVE again - which is
+        # exactly why BLOQUEADO cannot live in this function. The durable latch
+        # is T3.6's column, and this test is the reason it is mandatory.
+        assert assess(_loss("0.02"), PAPER_V1, KillSwitchInputs()).automatic is (
+            KillSwitchState.TRADING_DISABLED
+        )
+        recovered = portfolio(
+            equity=Decimal("20000"), peak_equity=Decimal("20000"), day_start_equity=Decimal("20000")
+        )
+        assert assess(recovered, PAPER_V1, KillSwitchInputs()).automatic is KillSwitchState.ACTIVE
+        # With the latch handed in, the block survives the recovery.
+        latched = assess(
+            recovered, PAPER_V1, KillSwitchInputs(portfolio=KillSwitchState.TRADING_DISABLED)
+        )
+        assert latched.effective is KillSwitchState.TRADING_DISABLED
+
     def test_time_alone_never_clears_a_block(self) -> None:
         blocked = _loss("0.02")
         later = blocked.model_copy(update={"as_of": NOW + timedelta(hours=4)})
@@ -159,10 +183,17 @@ class TestResume:
                 PORTFOLIO_ID,
             )
 
-    def test_clearing_the_latch_does_not_override_a_breach_that_is_still_open(self) -> None:
-        still_losing = _loss("0.02")
-        assessment = assess(still_losing, PAPER_V1, KillSwitchInputs())
-        cleared = resume(KillSwitchState.TRADING_DISABLED, self._auth(), assessment, PORTFOLIO_ID)
+    def test_clearing_the_latch_is_refused_while_the_breach_is_still_open(self) -> None:
+        # The old signature took the assessment and never read it, so this call
+        # returned ACTIVE and the next assess() blocked again: a transition in
+        # the audit trail that changed nothing (review of 2026-09-06, finding 5).
+        assessment = assess(_loss("0.02"), PAPER_V1, KillSwitchInputs())
+        with pytest.raises(ValueError, match="still"):
+            resume(KillSwitchState.TRADING_DISABLED, self._auth(), assessment, PORTFOLIO_ID)
+
+    def test_a_granted_resume_never_suspends_the_thresholds(self) -> None:
+        quiet = assess(portfolio(), PAPER_V1, KillSwitchInputs())
+        cleared = resume(KillSwitchState.TRADING_DISABLED, self._auth(), quiet, PORTFOLIO_ID)
         assert cleared is KillSwitchState.ACTIVE
-        after = assess(still_losing, PAPER_V1, KillSwitchInputs(portfolio=cleared))
+        after = assess(_loss("0.02"), PAPER_V1, KillSwitchInputs(portfolio=cleared))
         assert after.effective is KillSwitchState.TRADING_DISABLED

@@ -383,9 +383,10 @@ class TestBlockedNeverDisarms:
         state = portfolio(open_positions=(position(),))
         got = evaluate_exit(
             exit_proposal(),
-            state,
+            position(),
             PAPER_V1,
             KillSwitchInputs(system=KillSwitchState.TRADING_DISABLED),
+            portfolio=state,
         )
         assert got.approved is True
         assert got.exit_plan is not None
@@ -394,7 +395,11 @@ class TestBlockedNeverDisarms:
     def test_a_protective_exit_is_approved_under_emergency_too(self) -> None:
         state = portfolio(open_positions=(position(),))
         got = evaluate_exit(
-            exit_proposal(), state, PAPER_V1, KillSwitchInputs(portfolio=KillSwitchState.EMERGENCY)
+            exit_proposal(),
+            position(),
+            PAPER_V1,
+            KillSwitchInputs(portfolio=KillSwitchState.EMERGENCY),
+            portfolio=state,
         )
         assert got.approved is True
         assert got.effective_kill_switch is KillSwitchState.EMERGENCY
@@ -405,11 +410,17 @@ class TestBlockedNeverDisarms:
         ).model_copy(
             update={"day_start_equity": Decimal("20000"), "daily_realized_pnl": Decimal("-1000")}
         )
-        assert evaluate_exit(exit_proposal(), state, PAPER_V1, KillSwitchInputs()).approved is True
+        got = evaluate_exit(
+            exit_proposal(), position(), PAPER_V1, KillSwitchInputs(), portfolio=state
+        )
+        assert got.approved is True
 
     def test_an_exit_never_sells_more_than_the_position_holds(self) -> None:
-        state = portfolio(open_positions=(position(qty=Decimal("4")),))
-        got = evaluate_exit(exit_proposal(qty=Decimal("10")), state, PAPER_V1, KillSwitchInputs())
+        held = position(qty=Decimal("4"))
+        state = portfolio(open_positions=(held,))
+        got = evaluate_exit(
+            exit_proposal(qty=Decimal("10")), held, PAPER_V1, KillSwitchInputs(), portfolio=state
+        )
         assert got.approved is True
         assert got.exit_plan is not None
         assert got.exit_plan.approved_qty == Decimal("4")
@@ -417,12 +428,75 @@ class TestBlockedNeverDisarms:
 
     def test_an_exit_for_a_position_the_wallet_does_not_hold_is_a_caller_bug(self) -> None:
         with pytest.raises(ValueError, match="position"):
-            evaluate_exit(exit_proposal(), portfolio(), PAPER_V1, KillSwitchInputs())
+            evaluate_exit(
+                exit_proposal(), position(), PAPER_V1, KillSwitchInputs(), portfolio=portfolio()
+            )
+
+    def test_an_exit_handed_the_wrong_position_is_a_caller_bug(self) -> None:
+        other = position(position_id=uuid.UUID(int=7))
+        with pytest.raises(ValueError, match="position"):
+            evaluate_exit(exit_proposal(), other, PAPER_V1, KillSwitchInputs())
+
+    def test_an_exit_handed_a_position_in_another_market_is_a_caller_bug(self) -> None:
+        elsewhere = position(market=market("ETHUSDT", "ETH"))
+        with pytest.raises(ValueError, match="ETHUSDT"):
+            evaluate_exit(exit_proposal(), elsewhere, PAPER_V1, KillSwitchInputs())
+
+    def test_a_stop_runs_before_the_daily_anchor_is_rebuilt(self) -> None:
+        # Astra, second review of this diff: after a restart past Sao Paulo
+        # midnight the worker has the position from Postgres long before it has
+        # the day's reference - and PortfolioState cannot be built without that
+        # reference. v2 SS5 is explicit: "entradas novas bloqueadas, protecoes
+        # preservadas". So the exit takes the position, not the wallet.
+        got = evaluate_exit(
+            exit_proposal(),
+            position(),
+            PAPER_V1,
+            KillSwitchInputs(organization=KillSwitchState.TRADING_DISABLED),
+        )
+        assert got.approved is True
+        assert got.exit_plan is not None
+        assert got.exit_plan.approved_qty == Decimal("10")
+        assert got.effective_kill_switch is KillSwitchState.TRADING_DISABLED
+        assert "sem estado da carteira" in got.checks[0].message
+
+    def test_a_stale_position_never_sells_more_than_the_wallet_holds(self) -> None:
+        # Astra, third review of this diff: after a partial exit of 6 the wallet
+        # holds 4 while the position object handed in still says 10. Two sources
+        # for one holding: the smaller wins, and the exit is not refused.
+        stale = position(qty=Decimal("10"))
+        state = portfolio(open_positions=(position(qty=Decimal("4")),))
+        got = evaluate_exit(
+            exit_proposal(qty=Decimal("10")),
+            stale,
+            PAPER_V1,
+            KillSwitchInputs(),
+            portfolio=state,
+        )
+        assert got.approved is True
+        assert got.exit_plan is not None
+        assert got.exit_plan.approved_qty == Decimal("4")
+        assert got.exit_plan.clamped is True
+
+    def test_without_the_wallet_the_exit_is_still_clamped_to_the_position(self) -> None:
+        got = evaluate_exit(
+            exit_proposal(qty=Decimal("10")),
+            position(qty=Decimal("4")),
+            PAPER_V1,
+            KillSwitchInputs(),
+        )
+        assert got.exit_plan is not None
+        assert got.exit_plan.approved_qty == Decimal("4")
+        assert got.exit_plan.clamped is True
 
     def test_an_exit_carries_its_reason(self) -> None:
         state = portfolio(open_positions=(position(),))
         got = evaluate_exit(
-            exit_proposal(reason=ExitReason.KILL_SWITCH), state, PAPER_V1, KillSwitchInputs()
+            exit_proposal(reason=ExitReason.KILL_SWITCH),
+            position(),
+            PAPER_V1,
+            KillSwitchInputs(),
+            portfolio=state,
         )
         assert got.exit_plan is not None
         assert got.exit_plan.reason is ExitReason.KILL_SWITCH
@@ -529,4 +603,6 @@ class TestTheStateBelongsToTheProposal:
             update={"portfolio_id": uuid.UUID(int=99)}
         )
         with pytest.raises(ValueError, match="portfolio"):
-            evaluate_exit(exit_proposal(), state, PAPER_V1, KillSwitchInputs())
+            evaluate_exit(
+                exit_proposal(), position(), PAPER_V1, KillSwitchInputs(), portfolio=state
+            )

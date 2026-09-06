@@ -19,6 +19,7 @@ from hunter_risk.inputs import (
     MarketLiquidity,
     MarketSpec,
 )
+from hunter_risk.sizing import entry_cash_multiplier
 
 NOW = datetime(2026, 9, 6, 18, 30, tzinfo=UTC)
 """One fixed instant for every table case: the engine never reads a clock."""
@@ -27,6 +28,9 @@ COSTS = AssumedCosts(
     spread_bps=Decimal("2"), slippage_bps=Decimal("5"), fee_bps=Decimal("4"), max_entry_delay_s=120
 )
 """The frozen hypothesis of both v0 strategies (momentum_v1, volume_anomaly_v1)."""
+
+CASH_MULTIPLIER = entry_cash_multiplier(COSTS)
+"""What one unit of reference notional holds in cash under COSTS: 1,00100024."""
 
 SOL = MarketIdentity(
     exchange="binance",
@@ -87,7 +91,7 @@ def liquidity(**over: Any) -> MarketLiquidity:
     )
 
 
-def beta(value: str = "1.0", **over: Any) -> BetaEstimate:
+def beta(value: str | Decimal = "1.0", **over: Any) -> BetaEstimate:
     return BetaEstimate.model_validate(
         {"value": Decimal(value), "as_of": NOW, "validated": True, "bars": 720, **over}
     )
@@ -108,10 +112,13 @@ def position(**over: Any) -> OpenPosition:
 
 
 def pending(**over: Any) -> PendingEntry:
+    """A reservation that holds its own cash, fees included, like the real one."""
+    notional: Decimal = over.pop("reserved_notional", Decimal("1000"))
     return PendingEntry.model_validate(
         {
             "market": SOL,
-            "reserved_notional": Decimal("1000"),
+            "reserved_notional": notional,
+            "reserved_cash": notional * CASH_MULTIPLIER,
             "planned_risk_quote": Decimal("25"),
             "beta_btc": Decimal("1.0"),
             **over,
@@ -132,9 +139,6 @@ def portfolio(**over: Any) -> PortfolioState:
             "day_start_utc": sao_paulo_day_start_utc(NOW),
             "open_positions": (),
             "pending_entries": (),
-            "daily_realized_pnl": Decimal("0"),
-            "daily_unrealized_pnl": Decimal("0"),
-            "daily_costs": Decimal("0"),
             "marks_complete": True,
             **over,
         }

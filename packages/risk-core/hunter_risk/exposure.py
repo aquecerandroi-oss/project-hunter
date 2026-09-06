@@ -77,12 +77,29 @@ class OpenPosition(RiskModel):
 
 
 class PendingEntry(RiskModel):
-    """An approved entry that has not filled yet: it reserves slot, risk and exposure."""
+    """An approved entry that has not filled yet: it reserves slot, risk, exposure and cash."""
 
     market: MarketIdentity
     reserved_notional: Decimal = Field(gt=0)
+    """What it commits to exposure and to the participation budget."""
+    reserved_cash: Decimal = Field(gt=0)
+    """What it commits to **cash**, fees included - the reservation's own number,
+    not a re-estimate made with the next candidate's cost hypothesis. A candidate
+    that declares zero costs must not be able to make a standing reservation
+    cheaper than it is (Astra, review of this diff). Mirrors
+    ``trade_proposals.reserved_cash``."""
     planned_risk_quote: Decimal = Field(ge=0)
     beta_btc: Decimal | None = None
+
+    @model_validator(mode="after")
+    def _cash_covers_the_notional(self) -> PendingEntry:
+        if self.reserved_cash < self.reserved_notional:
+            raise ValueError(
+                f"reserved_cash {self.reserved_cash} is below reserved_notional "
+                f"{self.reserved_notional}: on spot the cash a purchase holds is the notional "
+                "plus its fees, never less"
+            )
+        return self
 
 
 class PortfolioState(RiskModel):
@@ -101,12 +118,15 @@ class PortfolioState(RiskModel):
     day_start_utc: datetime
     open_positions: tuple[OpenPosition, ...] = ()
     pending_entries: tuple[PendingEntry, ...] = ()
-    daily_realized_pnl: Decimal = _ZERO
-    """**Gross of costs.** ``daily_costs`` is subtracted once, here; a caller that
-    already netted fees out must pass ``daily_costs = 0`` or the day is charged
-    twice."""
-    daily_unrealized_pnl: Decimal = _ZERO
-    daily_costs: Decimal = Field(default=_ZERO, ge=0)
+    daily_realized_pnl: Decimal | None = None
+    """Reporting only, and **never** the source of the day's loss (v2 §5). The
+    loss is ``1 - equity / day_start_equity``; these three fields decompose it
+    for the panel. ``None`` means "not reported", never zero - a decomposition
+    that defaults to zero is how a wallet 2,5 % down reported ``daily_loss
+    PASSED value=0`` (review of 2026-09-06, finding 1). **Gross of costs**:
+    ``daily_costs`` is subtracted once, here."""
+    daily_unrealized_pnl: Decimal | None = None
+    daily_costs: Decimal | None = Field(default=None, ge=0)
     marks_complete: bool = True
     """False when any open position could not be marked with a fresh price, or when
     the daily anchor could not be rebuilt after a restart: the equity is then a
@@ -135,18 +155,43 @@ class PortfolioState(RiskModel):
         return self
 
     @property
+    def daily_decomposition_gap(self) -> Decimal | None:
+        """How far the reported decomposition sits from the equity's own movement.
+
+        ``None`` when the three fields were not all reported. **It never refuses
+        the state**, and that is a deliberate reversal: an exception here would
+        make a wallet whose ledger is a rounding unit off impossible to build,
+        and :func:`hunter_risk.evaluate.evaluate_exit` needs a built state - an
+        accounting discrepancy would then block a protective exit, which the
+        directive §3 forbids outright (Astra, review of this diff). The number is
+        published so the reconciliation of T3.3 can act on it; nothing in this
+        engine decides anything with it, because the loss that blocks the wallet
+        is :attr:`daily_loss_pct`, derived from the equity.
+        """
+        parts = (self.daily_realized_pnl, self.daily_unrealized_pnl, self.daily_costs)
+        if any(part is None for part in parts):
+            return None
+        realized, unrealized, costs = parts
+        assert realized is not None and unrealized is not None and costs is not None
+        return (realized + unrealized - costs) - (self.equity - self.day_start_equity)
+
+    @property
     def daily_pnl(self) -> Decimal:
-        """Realised plus unrealised minus costs - directive §5."""
-        return self.daily_realized_pnl + self.daily_unrealized_pnl - self.daily_costs
+        """The day's result: the equity's own movement since the day start (v2 §5).
+
+        Derived, not supplied: the loss that blocks the wallet is a fact about
+        the patrimony, and a caller that forgot to fill the PnL fields must not
+        be able to produce a day with no loss in it.
+        """
+        return self.equity - self.day_start_equity
 
     @property
     def daily_loss_pct(self) -> Decimal:
-        """Loss of the day over the equity the day started with. Never negative."""
-        pnl = self.daily_pnl
-        if pnl >= _ZERO:
+        """``max(0, 1 - equity / day_start_equity)`` - v2 §5. Never negative."""
+        if self.equity >= self.day_start_equity:
             return _ZERO
         with localcontext(CONTEXT):
-            return -pnl / self.day_start_equity
+            return (self.day_start_equity - self.equity) / self.day_start_equity
 
     @property
     def drawdown_pct(self) -> Decimal:
@@ -198,6 +243,21 @@ class PortfolioState(RiskModel):
             ),
             held,
         )
+
+    @property
+    def available_cash(self) -> Decimal:
+        """Cash minus what the standing reservations already hold, fees included.
+
+        Cash was the one ceiling that ignored the reservations, and the hole was
+        arithmetical: 500 of cash with 400 already reserved authorised another
+        499,5, so 900 was committed against 500 (review of 2026-09-06, finding
+        4). Each reservation brings its **own** ``reserved_cash``: re-estimating
+        it with the candidate's cost hypothesis would let a candidate that
+        declares no costs shrink a commitment somebody else already made.
+        """
+        with localcontext(CONTEXT):
+            reserved = sum((e.reserved_cash for e in self.pending_entries), _ZERO)
+            return max(_ZERO, self.cash - reserved)
 
     def beta_exposure(self) -> Decimal | None:
         """``Sum |notional_i * beta_i|`` - directive §4, absolute value, not signed.
