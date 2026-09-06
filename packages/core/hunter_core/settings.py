@@ -73,6 +73,18 @@ class Settings(BaseSettings):
     redis_url: SecretStr | None = SecretStr("redis://localhost:6379/0")
     db_pool_size: int = 5
     db_max_overflow: int = 5
+    db_statement_timeout_app_s: int = 10
+    """Server-side ``SET LOCAL statement_timeout`` (seconds) applied to every
+    ``hunter_app`` transaction (``hunter_core.db.session.role_session``). The
+    API previously ran with the server default (``0`` — no deadline; D3's
+    ``command_timeout=30`` bounds only the driver, not the server), so an
+    authenticated caller hitting an unindexed/expensive query repeatedly could
+    saturate Postgres with nothing ever cutting a single query short. Lower
+    than ``db_statement_timeout_worker_s`` on purpose: request/response work is
+    expected to be short; a worker job legitimately needs more room."""
+    db_statement_timeout_worker_s: int = 15
+    """Server-side ``SET LOCAL statement_timeout`` (seconds) for ``hunter_worker``
+    transactions — unchanged from the value this module already enforced."""
 
     # ---- Auth (Clerk) ----
     next_public_clerk_publishable_key: str = ""

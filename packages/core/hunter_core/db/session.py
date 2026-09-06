@@ -16,16 +16,30 @@ the socket — and if the peer is gone (partition, killed pooler), that await
 never returns, wedging the caller forever even though the *caller's* timeout
 fired. Two independent deadlines close that gap: ``connect_args={"command_
 timeout": 30}`` bounds every asyncpg command at the driver level, and
-``_apply_context`` sets ``SET LOCAL statement_timeout = '15s'`` on the server
-side, only for ``hunter_worker``.
+``_apply_context`` sets a server-side ``SET LOCAL statement_timeout`` on
+every role.
 
-Only the *server-side* ``statement_timeout`` is scoped to ``hunter_worker``.
 ``command_timeout`` is a ``connect_args`` value, applied once when the
 connection is opened — before any role is chosen with ``SET LOCAL ROLE`` — so
-it is engine-wide and also bounds ``hunter_app`` (API) connections built by
-this same :func:`create_engine`. 30s is meant as a generous backstop, not a
-per-role policy; splitting it properly would need a role-aware engine
-constructor, which is out of scope for this task.
+it is engine-wide and bounds every role's connection at 30s regardless of the
+server-side value below. It is a generous backstop, not a per-role policy;
+splitting it properly would need a role-aware engine constructor, which is
+out of scope for this task.
+
+S3a-MEDIUM (security-reviewer, 2026-09): earlier revisions of this module set
+the server-side ``statement_timeout`` only for ``hunter_worker`` — every
+``hunter_app`` (API) transaction ran with the server's ``statement_timeout =
+0``, i.e. no deadline at all, so an authenticated caller repeating an
+expensive/unindexed query could saturate Postgres with nothing to cut a
+single query short. Every role now gets a ``SET LOCAL statement_timeout``:
+``hunter_app`` defaults to ``Settings.db_statement_timeout_app_s`` (10s,
+shorter — request/response work is expected to be quick), ``hunter_worker``
+keeps ``Settings.db_statement_timeout_worker_s`` (15s, unchanged). Both are
+configurable per deployment; ``role_session`` accepts an optional ``settings``
+override (tests use it to prove cancellation), and falls back to the
+process-wide :func:`hunter_core.settings.get_settings` otherwise — the same
+cached singleton the worker entry points already use, so no call site outside
+this module needs to change to pick up an env override.
 """
 
 from __future__ import annotations
@@ -42,6 +56,8 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+
+from hunter_core.settings import get_settings
 
 if TYPE_CHECKING:
     from hunter_core.settings import Settings
@@ -107,13 +123,31 @@ def _set_role(db_role: str) -> str:
     return f"SET LOCAL ROLE {db_role}"
 
 
+def _statement_timeout_s(db_role: str, settings: Settings | None) -> int:
+    """The configured ``SET LOCAL statement_timeout`` (seconds) for ``db_role``.
+
+    ``db_role`` is assumed already validated by :func:`_set_role` (called
+    right before this in :func:`_apply_context`), so it is one of
+    ``DB_ROLES``. Falls back to the process-wide cached settings when no
+    explicit ``settings`` is given (S3a-MEDIUM) — the same singleton
+    ``hunter_market_worker``/``hunter_strategy_worker`` entry points already
+    use, so a ``DB_STATEMENT_TIMEOUT_*_S`` env override reaches every caller
+    of this module without threading ``Settings`` through each one.
+    """
+    resolved = settings if settings is not None else get_settings()
+    if db_role == "hunter_worker":
+        return resolved.db_statement_timeout_worker_s
+    return resolved.db_statement_timeout_app_s
+
+
 async def _apply_context(
     session: AsyncSession,
     db_role: str,
     org_id: uuid.UUID | None,
     user_id: uuid.UUID | None,
+    settings: Settings | None,
 ) -> None:
-    """``SET LOCAL ROLE`` first, then the two RLS settings, in that order.
+    """``SET LOCAL ROLE`` first, then the deadline, then the two RLS settings.
 
     The role comes first so every later statement in the transaction — the
     ``set_config`` calls included — already runs as the unprivileged role.
@@ -124,11 +158,11 @@ async def _apply_context(
     ``app.current_org`` is zero rows here exactly as it is in production.
     """
     await session.execute(text(_set_role(db_role)))
-    if db_role == "hunter_worker":
-        # A constant, not caller input — SET LOCAL takes a literal, not a bound
-        # parameter (D3). Only the worker role gets a server-side deadline here;
-        # hunter_app/API transactions are out of scope and keep the default.
-        await session.execute(text("SET LOCAL statement_timeout = '15s'"))
+    # A value resolved from trusted process config, never caller input — SET
+    # LOCAL takes a literal, not a bound parameter (D3, S3a-MEDIUM). Every
+    # role gets a server-side deadline here, hunter_app included.
+    timeout_s = _statement_timeout_s(db_role, settings)
+    await session.execute(text(f"SET LOCAL statement_timeout = '{timeout_s}s'"))
     if org_id is not None:
         await session.execute(
             text(_SET_CONFIG.format(name="app.current_org")), {"value": str(org_id)}
@@ -146,15 +180,22 @@ async def role_session(
     db_role: str = "hunter_app",
     org_id: uuid.UUID | None = None,
     user_id: uuid.UUID | None = None,
+    settings: Settings | None = None,
 ) -> AsyncGenerator[AsyncSession, None]:
     """One transaction, opened as ``db_role``, with whichever RLS settings are given.
 
     The three named helpers below are this function with the combination each
     call site is allowed to use; prefer them, so a reader can tell from the
     name which rows the transaction can reach.
+
+    ``settings`` overrides where the ``SET LOCAL statement_timeout`` for
+    ``db_role`` comes from (S3a-MEDIUM); omit it in production call sites —
+    it falls back to :func:`hunter_core.settings.get_settings`. Tests use the
+    override to prove cancellation with a short timeout without touching
+    process-wide env vars.
     """
     async with session_factory() as session, session.begin():
-        await _apply_context(session, db_role, org_id, user_id)
+        await _apply_context(session, db_role, org_id, user_id, settings)
         yield session
 
 
@@ -165,6 +206,7 @@ async def tenant_session(
     user_id: uuid.UUID | None = None,
     *,
     db_role: str = "hunter_app",
+    settings: Settings | None = None,
 ) -> AsyncGenerator[AsyncSession, None]:
     """A session whose transaction has ``app.current_org`` set for RLS.
 
@@ -176,7 +218,7 @@ async def tenant_session(
     behind the request.
     """
     async with role_session(
-        session_factory, db_role=db_role, org_id=org_id, user_id=user_id
+        session_factory, db_role=db_role, org_id=org_id, user_id=user_id, settings=settings
     ) as session:
         yield session
 
@@ -187,6 +229,7 @@ async def user_session(
     user_id: uuid.UUID,
     *,
     db_role: str = "hunter_app",
+    settings: Settings | None = None,
 ) -> AsyncGenerator[AsyncSession, None]:
     """User-scoped but organization-less: only ``app.current_user`` is set.
 
@@ -195,7 +238,9 @@ async def user_session(
     ``tenant_isolation`` compares against an unset ``app.current_org`` — that is
     the intended behaviour, not a limitation to work around.
     """
-    async with role_session(session_factory, db_role=db_role, user_id=user_id) as session:
+    async with role_session(
+        session_factory, db_role=db_role, user_id=user_id, settings=settings
+    ) as session:
         yield session
 
 
@@ -206,6 +251,7 @@ async def bootstrap_session(
     org_id: uuid.UUID | None = None,
     user_id: uuid.UUID | None = None,
     db_role: str = "hunter_app",
+    settings: Settings | None = None,
 ) -> AsyncGenerator[AsyncSession, None]:
     """For the two writes that create the very rows the settings point at.
 
@@ -217,7 +263,7 @@ async def bootstrap_session(
     a diff.
     """
     async with role_session(
-        session_factory, db_role=db_role, org_id=org_id, user_id=user_id
+        session_factory, db_role=db_role, org_id=org_id, user_id=user_id, settings=settings
     ) as session:
         yield session
 

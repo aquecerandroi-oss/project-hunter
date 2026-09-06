@@ -105,14 +105,18 @@ async def test_tenant_session_downgrades_role_then_sets_current_org() -> None:
     async with tenant_session(factory, org_id):  # type: ignore[arg-type]
         pass
 
-    assert len(factory.calls) == 2
+    assert len(factory.calls) == 3
     role_statement, role_params = factory.calls[0]
     # the role downgrade comes first, so every later statement in the
     # transaction — including set_config — runs as hunter_app
     assert str(role_statement) == "SET LOCAL ROLE hunter_app"
     assert role_params is None
 
-    org_statement, org_params = factory.calls[1]
+    timeout_statement, timeout_params = factory.calls[1]
+    assert str(timeout_statement) == "SET LOCAL statement_timeout = '10s'"
+    assert timeout_params is None
+
+    org_statement, org_params = factory.calls[2]
     assert "set_config('app.current_org'" in str(org_statement)
     assert org_params == {"value": str(org_id)}
     # the org id must be a bound parameter, never interpolated into the SQL text
@@ -128,10 +132,10 @@ async def test_tenant_session_sets_current_user_when_given() -> None:
         pass
 
     statements = _sql(factory)
-    assert len(statements) == 3
-    assert "app.current_org" in statements[1]
-    assert "app.current_user" in statements[2]
-    assert factory.calls[2][1] == {"value": str(user_id)}
+    assert len(statements) == 4
+    assert "app.current_org" in statements[2]
+    assert "app.current_user" in statements[3]
+    assert factory.calls[3][1] == {"value": str(user_id)}
 
 
 async def test_user_session_sets_only_current_user() -> None:
@@ -144,6 +148,7 @@ async def test_user_session_sets_only_current_user() -> None:
     statements = _sql(factory)
     assert statements == [
         "SET LOCAL ROLE hunter_app",
+        "SET LOCAL statement_timeout = '10s'",
         "SELECT set_config('app.current_user', :value, true)",
     ]
 
@@ -157,8 +162,8 @@ async def test_bootstrap_session_sets_both_ids_before_they_exist() -> None:
         pass
 
     statements = _sql(factory)
-    assert "app.current_org" in statements[1]
-    assert "app.current_user" in statements[2]
+    assert "app.current_org" in statements[2]
+    assert "app.current_user" in statements[3]
 
 
 async def test_role_session_accepts_the_worker_role() -> None:
@@ -167,21 +172,44 @@ async def test_role_session_accepts_the_worker_role() -> None:
     async with role_session(factory, db_role="hunter_worker"):  # type: ignore[arg-type]
         pass
 
-    # D3: the worker role also gets a server-side statement_timeout, set as a
-    # literal (never a bound parameter — SET LOCAL does not accept one).
+    # D3/S3a-MEDIUM: the worker role gets a server-side statement_timeout, set
+    # as a literal (never a bound parameter — SET LOCAL does not accept one).
     assert _sql(factory) == [
         "SET LOCAL ROLE hunter_worker",
         "SET LOCAL statement_timeout = '15s'",
     ]
 
 
-async def test_role_session_does_not_set_statement_timeout_for_hunter_app() -> None:
+async def test_role_session_sets_its_own_shorter_statement_timeout_for_hunter_app() -> None:
+    """S3a-MEDIUM: the API previously ran with no server-side deadline at all
+    (server ``statement_timeout = 0``); every ``hunter_app`` transaction now
+    gets one too, distinct from (and shorter than) the worker's."""
     factory = _FakeSessionFactory()
 
     async with role_session(factory):  # type: ignore[arg-type]
         pass
 
-    assert _sql(factory) == ["SET LOCAL ROLE hunter_app"]
+    assert _sql(factory) == [
+        "SET LOCAL ROLE hunter_app",
+        "SET LOCAL statement_timeout = '10s'",
+    ]
+
+
+async def test_role_session_statement_timeout_is_configurable_via_settings() -> None:
+    factory = _FakeSessionFactory()
+    settings = Settings(db_statement_timeout_app_s=3, db_statement_timeout_worker_s=42)
+
+    async with role_session(factory, settings=settings):  # type: ignore[arg-type]
+        pass
+    async with role_session(factory, db_role="hunter_worker", settings=settings):  # type: ignore[arg-type]
+        pass
+
+    assert _sql(factory) == [
+        "SET LOCAL ROLE hunter_app",
+        "SET LOCAL statement_timeout = '3s'",
+        "SET LOCAL ROLE hunter_worker",
+        "SET LOCAL statement_timeout = '42s'",
+    ]
 
 
 @pytest.mark.parametrize(

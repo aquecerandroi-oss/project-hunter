@@ -275,4 +275,20 @@ def test_market_shard_rejects_invalid_values(monkeypatch: pytest.MonkeyPatch, va
 def test_market_shard_single_index_zero_of_one_is_valid() -> None:
     settings = Settings(market_shard="0/1")
     assert settings.shard_index == 0
+
+
+def test_statement_timeout_defaults_are_ten_and_fifteen_seconds() -> None:
+    settings = Settings()
+    assert settings.db_statement_timeout_app_s == 10
+    assert settings.db_statement_timeout_worker_s == 15
+
+
+def test_statement_timeouts_read_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DB_STATEMENT_TIMEOUT_APP_S", "7")
+    monkeypatch.setenv("DB_STATEMENT_TIMEOUT_WORKER_S", "20")
+
+    settings = Settings()
+
+    assert settings.db_statement_timeout_app_s == 7
+    assert settings.db_statement_timeout_worker_s == 20
     assert settings.shard_total == 1
