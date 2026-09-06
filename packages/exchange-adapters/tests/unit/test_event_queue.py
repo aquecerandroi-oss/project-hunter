@@ -13,13 +13,14 @@ import asyncio
 import time
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 import pytest
 
 from hunter_core.domain.enums import OrderSide, Timeframe
 from hunter_core.domain.market import NormalizedCandle, NormalizedTrade, close_time_for
 from hunter_exchanges.base import ConnectionState
-from hunter_exchanges.binance.event_queue import BoundedEventQueue
+from hunter_exchanges.binance.event_queue import BoundedEventQueue, StreamConsumer
 
 pytestmark = pytest.mark.unit
 
@@ -196,6 +197,73 @@ async def test_overflow_with_a_final_kline_at_the_head_falls_back_to_the_next_no
     assert final in remaining
     assert old_trade not in remaining
     assert states["market:0"].dropped_events == 1
+
+
+# ---- T2.5-adapter: enqueued/delivered/evicted (Astra diff review finding 1) -
+
+
+async def test_enqueued_counts_every_successful_append_only() -> None:
+    queue = BoundedEventQueue(maxsize=10)
+    states = _states("market:0")
+
+    await queue.put("market:0", _trade("1"), states)
+    await queue.put("market:0", _trade("2"), states)
+
+    assert queue.enqueued == 2
+    assert queue.evicted == 0
+    assert queue.progress() == (2, 0)
+
+
+async def test_an_incoming_dropped_event_is_never_counted_as_enqueued() -> None:
+    """Queue full of only final klines, incoming non-final: the *incoming*
+    event is the one dropped (never entered the queue), so it must not
+    appear on either side of the ``enqueued``/``delivered``+``evicted``
+    ledger — its loss is already ``dropped_events``' job."""
+    queue = BoundedEventQueue(maxsize=1)
+    states = _states("market:0")
+    await queue.put("market:0", _candle(is_final=True), states)
+
+    await queue.put("market:0", _trade("1"), states)  # dropped before entry
+
+    assert queue.enqueued == 1
+    assert queue.evicted == 0
+
+
+async def test_eviction_increments_evicted_not_enqueued() -> None:
+    queue = BoundedEventQueue(maxsize=2)
+    states = _states("market:0")
+    await queue.put("market:0", _trade("1"), states)
+    await queue.put("market:0", _trade("2"), states)
+
+    await queue.put("market:0", _trade("3"), states)  # overflow: evicts trade 1
+
+    assert queue.enqueued == 3  # every item that ever entered, evicted or not
+    assert queue.evicted == 1
+    assert queue.progress() == (3, 1)
+
+
+async def test_stream_consumer_delivered_counts_only_what_was_actually_yielded() -> None:
+    consumer = StreamConsumer(maxsize=10)
+    states = _states("market:0")
+    await consumer.put("market:0", _trade("1"), states)
+    await consumer.put("market:0", _trade("2"), states)
+
+    # Nothing has been drained through ``consume()`` yet: two items sit
+    # enqueued, none delivered -- exactly the backlog a plain queue-length
+    # read after a `get()` would miss, since `enqueued` already reflects
+    # both items regardless of whether anything popped them.
+    assert consumer.queue.enqueued == 2
+    assert consumer.delivered == 0
+
+    async def close() -> None:
+        return None
+
+    agen: Any = consumer.consume(close)
+    await agen.__anext__()
+    assert consumer.delivered == 1
+    await agen.__anext__()
+    assert consumer.delivered == 2
+    await agen.aclose()
 
 
 async def test_fifty_thousand_puts_into_a_saturated_queue_stay_fast() -> None:

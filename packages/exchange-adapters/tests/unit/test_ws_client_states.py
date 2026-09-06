@@ -170,6 +170,126 @@ async def test_connection_states_counts_reconnects() -> None:
     await agen.aclose()
 
 
+async def test_connection_generation_ignores_a_keys_very_first_connect() -> None:
+    conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw())])
+    connector = ScriptedConnector([conn])
+    client = BinanceWsClient(connect_fn=connector, sleep=lambda _s: asyncio.sleep(0))
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert events[0].kind == "trade"
+    assert client.connection_generation() == 0
+    await client.aclose()
+
+
+async def test_connection_generation_counts_an_internal_reconnect() -> None:
+    """T2.5-adapter: a connection this client repairs on its own, without
+    ever ending :meth:`~hunter_exchanges.binance.ws.BinanceWsClient.stream`'s
+    generator, still bumps the generation counter — the fact
+    ``hunter_market_worker.coverage.CoverageTracker`` logs next to a break it
+    detects through ``connection_state()`` instead (see that module's
+    docstring for why generation itself is not the break signal)."""
+    good_conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw())])
+    connector = ScriptedConnector([ConnectionError("boom"), good_conn])
+    client = BinanceWsClient(
+        connect_fn=connector, sleep=lambda _s: asyncio.sleep(0), rand=lambda: 0.0
+    )
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert events[0].kind == "trade"
+    assert client.connection_generation() == 1
+    await client.aclose()
+
+
+async def test_connection_generation_counts_a_forced_single_key_restart() -> None:
+    """F8's ``restart_connection`` starts a brand new ``ConnectionRunner.run``
+    task whose own first connect never passes through the internal
+    ``on_reconnect`` callback — counted instead where a key gets reused."""
+    conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw())])
+    connector = ScriptedConnector([conn])
+    client = BinanceWsClient(connect_fn=connector, sleep=lambda _s: asyncio.sleep(0))
+    agen: Any = client.stream(["BTCUSDT"], [StreamChannel.TRADES]).__aiter__()
+    await agen.__anext__()
+    assert client.connection_generation() == 0
+
+    await client.restart_connection("market:0")
+
+    assert client.connection_generation() == 1
+    await agen.aclose()
+
+
+async def test_queue_progress_reports_zero_before_any_stream_call() -> None:
+    client = BinanceWsClient(connect_fn=ScriptedConnector([FakeConnection([])]))
+    assert client.queue_progress() == (0, 0, 0)
+    await client.aclose()
+
+
+async def test_queue_progress_tracks_delivery_through_the_real_pipeline() -> None:
+    conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw())])
+    connector = ScriptedConnector([conn])
+    client = BinanceWsClient(connect_fn=connector, sleep=lambda _s: asyncio.sleep(0))
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert events[0].kind == "trade"
+    enqueued, delivered, evicted = client.queue_progress()
+    assert enqueued == delivered == 1
+    assert evicted == 0
+    await client.aclose()
+
+
+async def test_ws_state_flips_to_reconnecting_before_the_slow_close_completes() -> None:
+    """T2.5-adapter (Astra review, second round, finding 1): a reader
+    polling ``connection_state()`` during a slow ``__aexit__`` must already
+    see ``"reconnecting"`` — marking the break *after* the close await would
+    let that reader believe the connection was healthy for however long the
+    close takes."""
+
+    class DyingConnection:
+        async def recv(self) -> str:
+            raise ConnectionError("boom")
+
+        async def send(self, message: str) -> None:
+            return None
+
+        async def close(self) -> None:
+            return None
+
+    class SlowCloseConnectCM:
+        def __init__(self, connection: object, gate: asyncio.Event) -> None:
+            self._connection = connection
+            self._gate = gate
+
+        async def __aenter__(self) -> Any:
+            return self._connection
+
+        async def __aexit__(self, *exc_info: object) -> None:
+            await self._gate.wait()
+
+    gate = asyncio.Event()
+    good_conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw())])
+    calls = {"count": 0}
+
+    def connect_fn(url: str) -> Any:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return SlowCloseConnectCM(DyingConnection(), gate)
+        return FakeConnectCM(good_conn)
+
+    client = BinanceWsClient(connect_fn=connect_fn, sleep=lambda _s: asyncio.sleep(0))
+    agen: Any = client.stream(["BTCUSDT"], [StreamChannel.TRADES]).__aiter__()
+    await asyncio.sleep(0.02)  # let the first connection fail and enter its slow close
+
+    assert client.connection_states()["market:0"].ws_state == "reconnecting"
+
+    gate.set()  # unblock the close; the reconnect can now proceed
+    event = await agen.__anext__()
+
+    assert event.kind == "trade"
+    await agen.aclose()
+
+
 async def test_malformed_only_connection_never_records_a_data_event() -> None:
     conn = FakeConnection(["not json at all"])
     connector = ScriptedConnector([conn])

@@ -39,6 +39,8 @@ class FakeAdapter:
         self.open_interests: dict[str, NormalizedOpenInterest] = {}
         self.candles_response: dict[str, list[NormalizedCandle]] = {}
         self._ws_state = "connected"
+        self._queue_progress: tuple[int, int, int] = (0, 0, 0)
+        self._generation = 0
         self._queue: asyncio.Queue[NormalizedEvent | BaseException] = asyncio.Queue()
         self.closed = False
         self.stream_started = asyncio.Event()
@@ -117,6 +119,24 @@ class FakeAdapter:
 
     def set_connection_state(self, state: str) -> None:
         self._ws_state = state
+
+    def queue_progress(self) -> tuple[int, int, int]:
+        """T2.5-adapter: scriptable ``(enqueued, delivered, evicted)`` for
+        tests exercising ``CoverageTracker``'s backlog gate — defaults to
+        "caught up" (``0, 0, 0``), like a real adapter with nothing queued."""
+        return self._queue_progress
+
+    def set_queue_progress(self, enqueued: int, delivered: int, evicted: int = 0) -> None:
+        self._queue_progress = (enqueued, delivered, evicted)
+
+    def connection_generation(self) -> int:
+        """T2.5-adapter: scriptable, for tests exercising the case
+        ``ws_state`` alone cannot catch — a full reconnect cycle completing
+        between two stamps."""
+        return self._generation
+
+    def bump_generation(self) -> None:
+        self._generation += 1
 
     async def aclose(self) -> None:
         self.closed = True

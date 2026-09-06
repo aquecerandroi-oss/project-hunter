@@ -429,6 +429,124 @@ async def test_consume_once_raises_runtime_error_when_stream_exhausts(
             )
 
 
+async def test_internal_reconnect_holds_covered_until_back_without_ending_the_generator(
+    redis_client: Any,
+) -> None:
+    """T2.5-adapter (Astra diff review finding 1): a socket the adapter
+    repairs *inside* its own reconnect loop, without ever ending
+    :meth:`~hunter_market_worker.streaming.consume_once`'s ``stream()``
+    generator, must still break the published coverage interval.
+    ``consume_once`` never sees an exception or a fresh ``stream()`` call in
+    this scenario (that is exactly the gap Astra's review found), so the fix
+    reads the adapter's own ``connection_state()`` every housekeeping tick
+    instead of waiting for the generator to end or for an event to arrive."""
+    from hunter_market_worker.coverage import CoverageTracker
+    from hunter_market_worker.heartbeat import HeartbeatState
+    from hunter_market_worker.streaming import consume_once
+
+    adapter = FakeAdapter()
+    universe = MonitoredUniverse()
+    universe.set(["BTCUSDT"])
+    universe.changed.clear()
+    state = HeartbeatState()
+    coverage = CoverageTracker(adapter.code)
+    coverage_key = keys.tape_coverage(adapter.code)
+
+    task = asyncio.create_task(
+        consume_once(
+            adapter,
+            list(universe.symbols),
+            redis_client,
+            PRODUCER,
+            PersistQueues(),
+            TickCoalescer(),
+            AcceptedEvents(),
+            TradeMemory(),
+            universe,
+            state,
+            None,
+            None,
+            coverage,
+        )
+    )
+    try:
+        await adapter.stream_started.wait()
+        # > COVERAGE_SAFETY_S (0.5s) must elapse before ``covered_until`` can
+        # clear ``session_since`` at all — see ``coverage.py``'s margin.
+        await asyncio.sleep(0.9)
+        healthy = await redis_client.hgetall(coverage_key)
+        assert healthy[b"covered_until"] != healthy[b"session_since"]  # genuinely advancing
+
+        adapter.set_connection_state("reconnecting")  # internal reconnect: generator never ends
+        await asyncio.sleep(0.4)
+        frozen = await redis_client.hgetall(coverage_key)
+        assert frozen[b"covered_until"] == healthy[b"covered_until"]  # held, never advanced
+
+        adapter.set_connection_state("connected")
+        await asyncio.sleep(0.4)
+        resumed = await redis_client.hgetall(coverage_key)
+        assert resumed[b"covered_until"] > frozen[b"covered_until"]  # resumes once healthy again
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+
+async def test_backlogged_adapter_queue_holds_covered_until_back(redis_client: Any) -> None:
+    """T2.5-adapter (Astra diff review finding 1, second gap): an item the
+    adapter's reader task has already popped off its own internal queue but
+    has not yet yielded is invisible to ``_in_flight`` — the tracker must
+    also refuse to advance past what the adapter reports as delivered."""
+    from hunter_market_worker.coverage import CoverageTracker
+    from hunter_market_worker.heartbeat import HeartbeatState
+    from hunter_market_worker.streaming import consume_once
+
+    adapter = FakeAdapter()
+    universe = MonitoredUniverse()
+    universe.set(["BTCUSDT"])
+    universe.changed.clear()
+    state = HeartbeatState()
+    coverage = CoverageTracker(adapter.code)
+    coverage_key = keys.tape_coverage(adapter.code)
+
+    task = asyncio.create_task(
+        consume_once(
+            adapter,
+            list(universe.symbols),
+            redis_client,
+            PRODUCER,
+            PersistQueues(),
+            TickCoalescer(),
+            AcceptedEvents(),
+            TradeMemory(),
+            universe,
+            state,
+            None,
+            None,
+            coverage,
+        )
+    )
+    try:
+        await adapter.stream_started.wait()
+        await asyncio.sleep(0.9)
+        healthy = await redis_client.hgetall(coverage_key)
+        assert healthy[b"covered_until"] != healthy[b"session_since"]
+
+        adapter.set_queue_progress(enqueued=5, delivered=3)  # 2 items still in transit
+        await asyncio.sleep(0.4)
+        frozen = await redis_client.hgetall(coverage_key)
+        assert frozen[b"covered_until"] == healthy[b"covered_until"]
+
+        adapter.set_queue_progress(enqueued=5, delivered=5)  # caught up again
+        await asyncio.sleep(0.4)
+        resumed = await redis_client.hgetall(coverage_key)
+        assert resumed[b"covered_until"] > frozen[b"covered_until"]
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+
 async def test_handle_event_ticker_and_book_never_touch_redis(
     redis_client: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:

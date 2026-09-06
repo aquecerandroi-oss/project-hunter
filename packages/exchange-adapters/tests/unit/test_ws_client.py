@@ -147,7 +147,19 @@ async def test_connection_state_reflects_no_connection_before_streaming_starts()
 async def test_quiet_socket_rotates_cleanly_at_the_rotation_deadline() -> None:
     """F7: ``recv()`` must have a deadline — a connection whose symbols go
     quiet must still rotate at ``max_connection_age_s`` instead of hanging
-    until Binance's own 24h cut (or forever, in a half-open-socket case)."""
+    until Binance's own 24h cut (or forever, in a half-open-socket case).
+
+    T2.5-adapter: this test used the real event-loop clock (no ``clock=``
+    injected) to compute ``remaining = max_age - (clock() - connected_at)``
+    against a 20ms budget. Real scheduling jitter between reading
+    ``connected_at`` and the loop's first read of ``remaining`` silently ate
+    into that budget, so the *actual* timeout handed to
+    ``asyncio.wait_for(connection.recv(), ...)`` varied with how busy the
+    machine was instead of always being ``max_age`` — flaky under load.
+    Pinning ``clock()`` to a fixed instant for every read makes the computed
+    timeout deterministic; ``asyncio.wait_for`` still waits a real (but now
+    fixed and known) 20ms for the quiet connection's deadline to fire, which
+    is what actually exercises the rotation."""
     quiet_conn = FakeConnection([])  # recv() blocks forever: a quiet/half-open socket
     good_conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw())])
     connector = ScriptedConnector([quiet_conn, good_conn])
@@ -156,11 +168,15 @@ async def test_quiet_socket_rotates_cleanly_at_the_rotation_deadline() -> None:
     async def fake_sleep(seconds: float) -> None:
         sleeps.append(seconds)
 
+    def fake_clock() -> float:
+        return 0.0  # every read is the same instant: no real-time budget erosion
+
     client = BinanceWsClient(
         connect_fn=connector,
+        clock=fake_clock,
         sleep=fake_sleep,
         rand=lambda: 0.0,
-        max_connection_age_s=0.02,  # tiny real deadline
+        max_connection_age_s=0.05,  # tiny, but now a fixed real wait_for timeout
         idle_timeout_s=10.0,  # much larger: the rotation deadline fires first
     )
 

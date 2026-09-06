@@ -22,6 +22,12 @@
   leaving every other connection untouched.
 - :meth:`connection_states` reports one :class:`ConnectionState` per
   connection, updated by **data events only** (ACK/ping frames never count).
+- :meth:`connection_generation` and :meth:`queue_progress`, both read by
+  ``hunter_market_worker.coverage.CoverageTracker`` to bound a claimed
+  coverage interval to a reconnect this client repaired internally (a
+  full cycle can complete between two stamps) and to what has actually
+  left this adapter's own internal queue — T2.5-adapter, Astra diff
+  review finding 1.
 
 ``connect_fn``/``clock``/``sleep``/``rand`` are injectable so tests never
 touch a real socket or wait real seconds.
@@ -126,6 +132,16 @@ class BinanceWsClient:
         self._key_tasks: dict[str, asyncio.Task[None]] = {}
         self._last_trade: dict[str, tuple[Decimal, datetime, int]] = {}
         self._consumer: StreamConsumer | None = None
+        # T2.5-adapter: monotonic count of every (re)connection beyond a
+        # connection key's very first. Read by ``CoverageTracker.stamp`` at
+        # stamp time (not per delivered event -- an earlier design tying the
+        # break to a generation observed on *delivered* events was reviewed
+        # and rejected: a stale queued event or a healthy sibling key could
+        # mask the break). It complements ``connection_state()`` for the one
+        # case that alone cannot catch: a full reconnect cycle completing
+        # entirely between two stamps. See ``hunter_market_worker/coverage.py``.
+        self._generation = 0
+        self._started_keys: set[str] = set()
         self._runner = ConnectionRunner(
             base_urls={ROUTE_PUBLIC: public_base_url, ROUTE_MARKET: market_base_url},
             subs=self._subs,
@@ -139,7 +155,37 @@ class BinanceWsClient:
             idle_timeout_s=idle_timeout_s,
             connect_timeout_s=connect_timeout_s,
             max_reconnect_failures=max_reconnect_failures,
+            on_reconnect=self._bump_generation,
         )
+
+    def _bump_generation(self) -> None:
+        self._generation += 1
+
+    def connection_generation(self) -> int:
+        """How many (re)connections this client has been through, across
+        every connection key, since it was created — a key's very first
+        connect never counts, every one after it does (real failure,
+        proactive 24h rotation, or a forced single-key restart via
+        :meth:`restart_connection`, F8). Not part of
+        :class:`~hunter_exchanges.base.ExchangeAdapterExtras`: callers that
+        want it use ``getattr`` (the pattern ``rest_gate_status`` already
+        established), same as every other additive capability here."""
+        return self._generation
+
+    def queue_progress(self) -> tuple[int, int, int]:
+        """``(enqueued, delivered, evicted)`` for the current :meth:`stream`
+        call, or ``(0, 0, 0)`` before one exists. A consumer is caught up
+        with this adapter's own internal pipeline exactly when
+        ``enqueued == delivered + evicted`` — plain queue length cannot tell
+        that (an item already popped is not counted as delivered until it is
+        actually yielded), and ``dropped_events`` alone cannot either (an
+        evicted item is gone for good and must not keep looking like backlog
+        forever after the one break its eviction already causes). See
+        :mod:`hunter_exchanges.binance.event_queue`."""
+        if self._consumer is None:
+            return 0, 0, 0
+        enqueued, evicted = self._consumer.queue.progress()
+        return enqueued, self._consumer.delivered, evicted
 
     def connection_state(self) -> WsState:
         """The worst ``ws_state`` across every connection (``base.py`` contract)."""
@@ -204,6 +250,14 @@ class BinanceWsClient:
         self._start_group(group)
 
     def _start_group(self, group: SymbolGroup) -> None:
+        if group.key in self._started_keys:
+            # A brand new `ConnectionRunner.run()` task for a key that was
+            # already live — F8's `restart_connection`, whose own first
+            # connect never passes through `ConnectionRunner`'s internal
+            # `on_reconnect` (it *is* that runner's first iteration). Count
+            # it here instead, the one other place a key gets (re)started.
+            self._bump_generation()
+        self._started_keys.add(group.key)
         self._states[group.key] = ConnectionState(route=group.route, ws_state="connecting")
         task = asyncio.ensure_future(self._runner.run(group.key, group.route))
         assert self._consumer is not None
@@ -280,4 +334,5 @@ class BinanceWsClient:
                 logger.warning("binance_ws_task_error_during_close", error=str(exc))
         self._key_tasks.clear()
         self._states.clear()
+        self._started_keys.clear()
         self._subs.reset()

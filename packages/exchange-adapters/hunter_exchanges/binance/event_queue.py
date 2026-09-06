@@ -12,6 +12,21 @@ applies real backpressure instead: it awaits until :meth:`get` frees a slot,
 so the queue's size never exceeds ``maxsize`` either way (Astra review,
 T1.2b resume finding 4: an unconditional "let it grow" here reproduces the
 exact unbounded-memory failure the bound exists to prevent).
+
+``enqueued``/``evicted`` (T2.5-adapter, Astra diff review finding 1): three
+monotonic counters — ``enqueued`` here, ``evicted`` here, ``delivered`` on
+:class:`StreamConsumer` — let a consumer outside this package (the
+market-worker's ``CoverageTracker``) tell "queue empty" from "caught up".
+Plain queue length cannot: an item :meth:`get` has already popped is no
+longer in the deque, but is not delivered until it is actually yielded, so
+length alone reads "0" during exactly the window a naive check would miss.
+``enqueued == delivered + evicted`` is the honest form (Astra review,
+finding 3): an evicted item is gone for good and must not count against
+"caught up" forever after the one legitimate break its eviction already
+causes via ``dropped_events``. An event dropped *before* it ever entered the
+queue (the incoming-item-dropped branch of :meth:`put`) increments neither
+counter — it never reached ``enqueued`` on either side of the ledger, and
+its loss is already reported through ``dropped_events``.
 """
 
 from __future__ import annotations
@@ -55,6 +70,15 @@ class BoundedEventQueue:
         self._not_empty = asyncio.Event()
         self._has_room = asyncio.Event()
         self._has_room.set()
+        self.enqueued = 0
+        """Count of items that actually entered the queue (``append``
+        succeeded) since this queue was created. Never counts an incoming
+        event dropped before entry (that loss is ``dropped_events``, not a
+        queue-progress fact)."""
+        self.evicted = 0
+        """Count of previously-enqueued items removed by :meth:`_evict_one`
+        to make room — gone for good, and excluded from ``enqueued`` on the
+        "caught up" side of the ledger together with :attr:`StreamConsumer.delivered`."""
 
     async def put(
         self, key: str, event: NormalizedEvent, states: dict[str, ConnectionState]
@@ -75,6 +99,7 @@ class BoundedEventQueue:
             self._has_room.clear()
             await self._has_room.wait()
         self._items.append((key, event))
+        self.enqueued += 1
         if _is_final_kline(event):
             self._final_count += 1
         self._not_empty.set()
@@ -87,6 +112,7 @@ class BoundedEventQueue:
             # Common case, O(1): the head is (almost always) not a final
             # kline, so evict it directly with no scan at all.
             self._items.popleft()
+            self.evicted += 1
             if head_key in states:
                 states[head_key].dropped_events += 1
             return True
@@ -97,6 +123,7 @@ class BoundedEventQueue:
         for index, (victim_key, victim_event) in enumerate(self._items):
             if not _is_final_kline(victim_event):
                 del self._items[index]
+                self.evicted += 1
                 if victim_key in states:
                     states[victim_key].dropped_events += 1
                 return True
@@ -115,6 +142,13 @@ class BoundedEventQueue:
     def __len__(self) -> int:
         return len(self._items)
 
+    def progress(self) -> tuple[int, int]:
+        """``(enqueued, evicted)`` since this queue was created — the two
+        counters :class:`StreamConsumer` combines with its own ``delivered``
+        to answer "caught up?" without trusting queue length (see module
+        docstring)."""
+        return self.enqueued, self.evicted
+
 
 class StreamConsumer:
     """Bridges N reader tasks (one per connection) into one ``AsyncIterator``.
@@ -130,6 +164,12 @@ class StreamConsumer:
         self.queue = BoundedEventQueue(maxsize)
         self._failure: BaseException | None = None
         self._failure_event = asyncio.Event()
+        self.delivered = 0
+        """Count of items actually yielded from :meth:`consume` — incremented
+        with no ``await`` between the increment and the ``yield`` (Astra
+        review, T2.5-adapter finding 3), so it never lags an item that
+        :meth:`BoundedEventQueue.get` has already popped but this generator
+        has not yet handed to its caller."""
 
     async def put(
         self, key: str, event: NormalizedEvent, states: dict[str, ConnectionState]
@@ -163,8 +203,10 @@ class StreamConsumer:
                     assert self._failure is not None
                     raise self._failure
                 if get_task in done:
-                    yield get_task.result()
+                    result = get_task.result()
+                    self.delivered += 1
                     get_task = None
+                    yield result
         finally:
             for pending in (get_task, fail_task):
                 if pending is not None:

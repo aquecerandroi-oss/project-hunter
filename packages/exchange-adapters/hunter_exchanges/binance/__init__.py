@@ -92,6 +92,14 @@ class BinanceAdapter:
     def connection_states(self) -> dict[str, ConnectionState]:
         return self._ws.connection_states()
 
+    def connection_generation(self) -> int:
+        """Additive, like ``connection_states()`` — see ``BinanceWsClient.connection_generation``."""
+        return self._ws.connection_generation()
+
+    def queue_progress(self) -> tuple[int, int, int]:
+        """Additive, like ``connection_states()`` — see ``BinanceWsClient.queue_progress``."""
+        return self._ws.queue_progress()
+
     def rest_gate_status(self) -> str:
         """``"ok"``/``"suspended"`` REST admissions (T2.9).
 

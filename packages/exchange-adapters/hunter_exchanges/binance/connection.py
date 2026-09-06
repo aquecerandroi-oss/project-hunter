@@ -71,6 +71,7 @@ class ConnectionRunner:
         idle_timeout_s: float = IDLE_TIMEOUT_S,
         connect_timeout_s: float = CONNECT_TIMEOUT_S,
         max_reconnect_failures: int = MAX_RECONNECT_FAILURES,
+        on_reconnect: Callable[[], None] | None = None,
     ) -> None:
         self._base_urls = base_urls
         self._subs = subs
@@ -83,6 +84,11 @@ class ConnectionRunner:
         self._max_connection_age_s = max_connection_age_s
         self._idle_timeout_s = idle_timeout_s
         self._connect_timeout_s = connect_timeout_s
+        #: T2.5-adapter: observability only (``BinanceWsClient.connection_generation``)
+        #: — never consulted by this class itself. Fired at the exact instant
+        #: ``state.reconnects`` already advances (every pass through the loop
+        #: beyond the first: real failure or proactive 24h rotation alike).
+        self._on_reconnect = on_reconnect
         self._max_reconnect_failures = max_reconnect_failures
 
     def clock(self) -> float:
@@ -138,6 +144,8 @@ class ConnectionRunner:
                 state.ws_state = "connecting" if first_iteration else "reconnecting"
                 if not first_iteration:
                     state.reconnects += 1
+                    if self._on_reconnect is not None:
+                        self._on_reconnect()
                 first_iteration = False
                 state.connect_attempt_started_monotonic = self._clock()
                 try:
@@ -195,14 +203,24 @@ class ConnectionRunner:
                     logger.warning(
                         "binance_ws_connection_error", key=key, route=route, error=str(exc)
                     )
+                    # T2.5-adapter (Astra review, second round, finding 1):
+                    # mark the break *before* the close await, not after —
+                    # ``__aexit__`` can take real time, and a reader polling
+                    # ``ws_state`` during that close must not still see
+                    # "connected".
+                    state.ws_state = "reconnecting"
                     self._subs.live_ws.pop(key, None)
                     await self._close_quietly(cm, connection)
                     cm, connection = None, None
-                    state.ws_state = "reconnecting"
                     attempt = await self._backoff_or_raise(key, attempt, exc, "failed")
                     continue
                 # Aged out with no error: a clean lifetime is healthy too
                 # (even an empty group) — reconnect now, no backoff/count.
+                # Still marked "reconnecting" before the close await (same
+                # reasoning as above): no data can flow while the old socket
+                # is closing and the new one is not yet open, clean rotation
+                # or not.
+                state.ws_state = "reconnecting"
                 attempt = 0
                 self._subs.live_ws.pop(key, None)
                 await self._close_quietly(cm, connection)
