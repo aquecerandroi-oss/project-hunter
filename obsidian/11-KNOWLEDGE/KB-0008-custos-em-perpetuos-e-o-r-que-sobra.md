@@ -146,4 +146,4 @@ Divergência: nenhuma. Frase dela que fica: o diagnóstico justifica investigaç
 
 [[Strategy Backlog]] · [[KB-0007-atr-e-escala-por-volatilidade]] ·
 [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]] · [[KB-0009-o-efeito-do-quarto-de-hora]] ·
-[[EXP-0001-momentum-v1]] · [[Funding]] · [[Risk Engine]]
+[[EXP-0001-momentum-v1]] · [[Market Collector]] · [[Risk Engine]]
