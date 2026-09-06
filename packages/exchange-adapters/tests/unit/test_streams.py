@@ -281,15 +281,87 @@ def test_parse_mark_price_labels_the_estimated_settle_price_in_metadata() -> Non
 
 
 def test_parse_force_order() -> None:
+    """Fully filled order (KB-0017): ``o.X == "FILLED"`` so the executed
+    quantity (``o.z``) equals the original (``o.q``), but ``price`` must
+    still prefer the average fill price (``o.ap``) over the order price
+    (``o.p``) — they can differ even on a full fill."""
     raw = _load("ws_force_order.json")
 
     liquidation = streams.parse_force_order(raw)
 
     assert liquidation.symbol == "BTCUSDT"
     assert liquidation.side is OrderSide.SELL
-    assert liquidation.qty == Decimal("0.345")
-    assert liquidation.price == Decimal("79210.50")
-    assert liquidation.notional == Decimal("0.345") * Decimal("79210.50")
+    assert liquidation.qty == Decimal("0.345")  # o.z, same as o.q here (FILLED)
+    assert liquidation.price == Decimal("79215.00")  # o.ap, not o.p
+    assert liquidation.notional == Decimal("0.345") * Decimal("79215.00")
+
+
+def test_parse_force_order_uses_executed_qty_not_original_qty_on_partial_fill() -> None:
+    """KB-0017 bug: a liquidation order for 10 BTC that only fills 1 BTC
+    (``o.X == "PARTIALLY_FILLED"``) must report ``qty == o.z`` (1.000), never
+    ``o.q`` (10.000) — the original parser overstated forced flow here."""
+    raw = _load("ws_force_order_partial.json")
+
+    liquidation = streams.parse_force_order(raw)
+
+    assert liquidation.qty == Decimal("1.000")  # o.z, not o.q ("10.000")
+    assert liquidation.price == Decimal("79050.00")  # o.ap
+    assert liquidation.notional == Decimal("1.000") * Decimal("79050.00")
+
+
+def test_parse_force_order_reports_zero_qty_when_nothing_executed_yet() -> None:
+    """``o.X == "NEW"`` with ``o.z == "0"``: nothing has executed. ``qty``
+    must be an explicit zero, never fall back to the original ``o.q`` — a
+    liquidation order that hasn't traded yet isn't forced flow. ``o.ap`` is
+    also ``"0"`` in this state (no fills to average), so ``price`` falls
+    back to the order price ``o.p``."""
+    raw = _load("ws_force_order_unfilled.json")
+
+    liquidation = streams.parse_force_order(raw)
+
+    assert liquidation.qty == Decimal("0")
+    assert liquidation.price == Decimal("78500.00")  # o.p, ap is "0" (no fills)
+    assert liquidation.notional == Decimal("0")
+
+
+def test_parse_force_order_falls_back_to_order_price_when_ap_key_is_absent() -> None:
+    """Defensive: even if ``o.ap`` were missing outright (not just ``"0"``),
+    the parser must not raise — it falls back to ``o.p``."""
+    raw = json.loads(json.dumps(_load("ws_force_order.json")))
+    del raw["o"]["ap"]
+
+    liquidation = streams.parse_force_order(raw)
+
+    assert liquidation.price == Decimal("79210.50")  # o.p, no o.ap to prefer
+
+
+def test_parse_force_order_missing_z_raises_malformed_message() -> None:
+    raw = json.loads(json.dumps(_load("ws_force_order.json")))
+    del raw["o"]["z"]
+
+    with pytest.raises(MalformedMessage):
+        streams.parse_force_order(raw)
+
+
+def test_parse_force_order_identity_fields_are_unaffected_by_the_qty_price_fix() -> None:
+    """``exchange``/``symbol``/``side``/``ts`` come from ``o.s``/``o.S``/``o.T``
+    only — untouched by the o.q/o.z, o.p/o.ap change — so
+    ``hunter_market_worker.publication.liquidation_id`` still derives those
+    four components of its hash exactly as before. (It also folds ``price``
+    and ``qty`` into that hash, so ids for non-``FILLED`` orders — and any
+    order where ``ap != p`` — do change after this fix; see
+    ``.claude/state/notes-liquidations.md``.)"""
+    filled = streams.parse_force_order(_load("ws_force_order.json"))
+    partial = streams.parse_force_order(_load("ws_force_order_partial.json"))
+
+    for liquidation in (filled, partial):
+        assert liquidation.exchange == "binance"
+        assert liquidation.symbol == "BTCUSDT"
+
+    assert filled.side is OrderSide.SELL
+    assert partial.side is OrderSide.SELL
+    assert filled.ts.tzinfo is not None
+    assert partial.ts.tzinfo is not None
 
 
 # ---- T1.6b-A: model_construct() correctness guarantees ----------------------
