@@ -14,6 +14,15 @@ beforeEach(() => {
   apiFetchMock.mockResolvedValue({});
 });
 
+// Narrow instead of `!` (no-non-null-assertion): `mock.calls[0]` is
+// `undefined` when `apiFetch` was never invoked -- fail with a clear message
+// rather than assert past that possibility.
+function firstCallPath(): string {
+  const call = apiFetchMock.mock.calls[0];
+  if (!call) throw new Error("apiFetch was not called");
+  return call[0] as string;
+}
+
 // HIGH (security review of the T1.6b proof, 2026-09-05): `exchange` and
 // `symbol` are Next.js dynamic route segments -- URL-decoded by the router,
 // so fully caller-controlled. Unescaped, WHATWG URL parsing resolves `..`
@@ -24,7 +33,7 @@ describe("market path segments are escaped before they reach the internal API", 
   it("cannot climb out of /api/v1/markets with ../ in the symbol", async () => {
     await getMarket("binance", "BTCUSDT/../../../metrics");
 
-    const path = apiFetchMock.mock.calls[0]![0] as string;
+    const path = firstCallPath();
     expect(path).toBe("/api/v1/markets/binance/BTCUSDT%2F..%2F..%2F..%2Fmetrics");
     expect(new URL(path, "http://api.internal:8000").pathname).toContain("/api/v1/markets/");
   });
@@ -32,7 +41,7 @@ describe("market path segments are escaped before they reach the internal API", 
   it("cannot inject a query string or a fragment through the exchange", async () => {
     await getMarket("binance?x=1#frag", "BTCUSDT");
 
-    expect(apiFetchMock.mock.calls[0]![0]).toBe(
+    expect(firstCallPath()).toBe(
       "/api/v1/markets/binance%3Fx%3D1%23frag/BTCUSDT",
     );
   });
@@ -44,7 +53,7 @@ describe("market path segments are escaped before they reach the internal API", 
     // separator; what matters is that the caller-controlled part is one opaque
     // segment (`BTCUSDT%2F..%2F..`), which URL normalization does not treat as
     // `..` and therefore cannot climb out of `/api/v1/markets/`.
-    const path = apiFetchMock.mock.calls[0]![0] as string;
+    const path = firstCallPath();
     expect(path).toBe("/api/v1/markets/binance/BTCUSDT%2F..%2F../candles?limit=10");
     expect(new URL(path, "http://api.internal:8000").pathname).toBe(
       "/api/v1/markets/binance/BTCUSDT%2F..%2F../candles",
@@ -54,8 +63,10 @@ describe("market path segments are escaped before they reach the internal API", 
   it("round-trips the real Chinese symbols Binance lists (rank 19 and 42 by 24h volume on 2026-09-05)", async () => {
     await getMarket("binance", "牛来USDT");
 
-    const path = apiFetchMock.mock.calls[0]![0] as string;
+    const path = firstCallPath();
     expect(path).toBe("/api/v1/markets/binance/%E7%89%9B%E6%9D%A5USDT");
-    expect(decodeURIComponent(new URL(path, "http://x").pathname.split("/")[5]!)).toBe("牛来USDT");
+    const segment = new URL(path, "http://x").pathname.split("/")[5];
+    if (!segment) throw new Error("expected a 6th path segment");
+    expect(decodeURIComponent(segment)).toBe("牛来USDT");
   });
 });

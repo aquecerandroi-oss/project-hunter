@@ -4,15 +4,15 @@ import { NAV_ICONS } from "@/components/layout/nav-icons";
 import { NAV_ICON_KEYS, NAV_ITEMS, navHref, visibleNavItems } from "@/lib/nav-registry";
 
 describe("nav-registry", () => {
-  it("lists all 17 routes from docs/PRODUCT.md §4", () => {
-    expect(NAV_ITEMS).toHaveLength(17);
+  it("lists all 18 routes (docs/PRODUCT.md §4's 17 plus `lab`, added for the Shadow Lab research track, S3)", () => {
+    expect(NAV_ITEMS).toHaveLength(18);
     const keys = NAV_ITEMS.map((item) => item.key);
-    expect(new Set(keys).size).toBe(17);
+    expect(new Set(keys).size).toBe(18);
   });
 
-  it("marks dashboard, markets, system and settings available (M1: markets goes live)", () => {
+  it("marks dashboard, markets, lab, system and settings available (M1: markets goes live; S3: lab goes live)", () => {
     const available = NAV_ITEMS.filter((item) => item.status === "available").map((item) => item.key);
-    expect(available.sort()).toEqual(["dashboard", "markets", "settings", "system"]);
+    expect(available.sort()).toEqual(["dashboard", "lab", "markets", "settings", "system"]);
   });
 
   it("gives every planned item a milestone", () => {
@@ -31,12 +31,12 @@ describe("nav-registry", () => {
   it("hides planned items in production", () => {
     const items = visibleNavItems("OWNER", "production");
     expect(items.every((item) => item.status === "available")).toBe(true);
-    expect(items.map((item) => item.key).sort()).toEqual(["dashboard", "markets", "settings", "system"]);
+    expect(items.map((item) => item.key).sort()).toEqual(["dashboard", "lab", "markets", "settings", "system"]);
   });
 
   it("shows planned items outside production", () => {
     const items = visibleNavItems("OWNER", "development");
-    expect(items).toHaveLength(17);
+    expect(items).toHaveLength(18);
     const radar = items.find((item) => item.key === "radar");
     expect(radar?.status).toBe("planned");
   });
@@ -44,7 +44,7 @@ describe("nav-registry", () => {
   it("never hides an available item regardless of role", () => {
     for (const role of ["OWNER", "ADMIN", "TRADER", "ANALYST", "VIEWER"] as const) {
       const items = visibleNavItems(role, "production");
-      expect(items.map((item) => item.key).sort()).toEqual(["dashboard", "markets", "settings", "system"]);
+      expect(items.map((item) => item.key).sort()).toEqual(["dashboard", "lab", "markets", "settings", "system"]);
     }
   });
 });

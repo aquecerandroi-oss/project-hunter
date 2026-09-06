@@ -71,6 +71,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: "opportunities", label: "Opportunities", segment: "opportunities", icon: "target", status: "planned", plannedMilestone: "M2", minRole: "VIEWER" },
   { key: "portfolio", label: "Portfolio", segment: "portfolio", icon: "wallet", status: "planned", plannedMilestone: "M3", minRole: "VIEWER" },
   { key: "trades", label: "Trades", segment: "trades", icon: "activity", status: "planned", plannedMilestone: "M3", minRole: "VIEWER" },
+  // Shadow Lab (docs/plans/SHADOW-LAB.md, S3): a research track parallel to
+  // the milestone sequence -- not in docs/PRODUCT.md §4's original 17-route
+  // table, added the moment its API exists (S3a, `GET /api/v1/lab/shadow/*`).
+  // "flask-conical" (otherwise reserved for the still-planned `backtests`
+  // route, which stays hidden in production) fits the "lab" concept and is
+  // already a registered icon key -- no new icon needed.
+  { key: "lab", label: "Lab", segment: "lab", icon: "flask-conical", status: "available", minRole: "VIEWER" },
   { key: "agents", label: "Agents", segment: "agents", icon: "bot", status: "planned", plannedMilestone: "M4", minRole: "VIEWER" },
   { key: "arena", label: "Agent Arena", segment: "arena", icon: "swords", status: "planned", plannedMilestone: "M6", minRole: "VIEWER" },
   { key: "strategies", label: "Strategies", segment: "strategies", icon: "git-branch", status: "planned", plannedMilestone: "M6", minRole: "VIEWER" },

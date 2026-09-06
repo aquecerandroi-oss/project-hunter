@@ -8,8 +8,22 @@
     {
       "name": "web-dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@hunter/web", "dev", "--port", "3000"],
-      "port": 3000
+      "runtimeArgs": ["dev", "--port", "3000"],
+      "cwd": "apps/web",
+      "port": 3000,
+      "env": {
+        "API_URL": "http://127.0.0.1:8010",
+        "NEXT_PUBLIC_API_URL": "http://127.0.0.1:8010",
+        "NEXT_PUBLIC_WS_URL": "ws://127.0.0.1:8000/ws",
+        "WEB_ORIGIN": "http://localhost:3000"
+      }
+    },
+    {
+      "name": "api-host",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "uvicorn", "hunter_api.app:app", "--port", "8010"],
+      "cwd": "apps/api",
+      "port": 8010
     }
   ]
 }
