@@ -33,13 +33,15 @@ from hunter_scanner_worker.config import build_config
 from hunter_scanner_worker.consumers import (
     ConsumerHealth,
     candle_of,
+    coalesce,
+    observe_delay,
     pending_ack,
+    run_batch_consumer,
     run_stream_consumer,
-    symbol_of,
-    ts_of,
 )
 from hunter_scanner_worker.deriv import deriv_loop
 from hunter_scanner_worker.health import CycleHealth, readiness_checks, write_heartbeat
+from hunter_scanner_worker.metrics import scanner_ticks_coalesced_total
 from hunter_scanner_worker.persist import DB_ROLE
 from hunter_scanner_worker.policy import load_policy
 from hunter_scanner_worker.pressure import LivePressure
@@ -140,13 +142,14 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
                 Streams.MARKET_DERIVATIVES,
                 Streams.MARKET_LIQUIDATIONS,
             ):
-                tasks[f"consume:{stream}"] = run_stream_consumer(
+                tasks[f"consume:{stream}"] = run_batch_consumer(
                     runtime.redis,
                     runtime,
                     stream,
                     consumers,
-                    _touch_handler(scanner, stream),
+                    touch_batch_handler(scanner, stream),
                     block_ms=config.consume_block_ms,
+                    batch=config.consume_batch,
                 )
             tasks["consume:candles"] = run_stream_consumer(
                 runtime.redis,
@@ -173,20 +176,24 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
                 runtime.readiness_checks.remove(check)
 
 
-def _touch_handler(scanner: Scanner, stream: str) -> Any:
+def touch_batch_handler(scanner: Scanner, stream: str) -> Any:
     """Ticks, derivatives and liquidations: notifications with no durable effect.
 
     The evidence is the hot state, not the message, so the ACK is immediate --
     losing one of these costs nothing, because the next evaluation reads the
-    same Redis keys either way.
+    same Redis keys either way. And for the same reason the batch is coalesced
+    per market before it is applied: 500 ticks over 40 markets are 40 touches,
+    not 500 (T2.5d). Every message of the batch is still acked -- coalescence
+    absorbs work, never messages.
     """
 
-    async def handle(message_id: str, envelope: EventEnvelope) -> PendingAck | None:
-        del message_id
-        symbol = symbol_of(envelope)
-        if symbol is not None:
-            scanner.state.touch(symbol, stream, input_ts=ts_of(envelope))
-        return None
+    async def handle(deliveries: list[tuple[str, EventEnvelope]]) -> None:
+        result = coalesce(deliveries)
+        observe_delay(stream, result.oldest)
+        for symbol, stamp in result.newest.items():
+            scanner.state.touch(symbol, stream, input_ts=stamp)
+        if result.absorbed:
+            scanner_ticks_coalesced_total.labels(stream=stream).inc(result.absorbed)
 
     return handle
 

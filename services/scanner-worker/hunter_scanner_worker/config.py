@@ -65,6 +65,16 @@ class ScannerConfig:
     """Under ``hunter_core.redis``'s 5 s socket timeout: a block that runs its
     whole budget on a quiet stream would expire the read deadline itself."""
 
+    consume_batch: int = 500
+    """Messages one ``XREADGROUP`` of a notification stream may bring back.
+
+    A ceiling, not a wait: the read returns what is there. The number is what
+    the T2.5c measurement asks for -- 151 ticks/s produced against 71 consumed,
+    a backlog of ~95 000 -- and at one round trip per batch it drains that
+    backlog in seconds instead of never. Handling stays a dict touch per market
+    after coalescence, so a full batch is microseconds of work, far inside the
+    30 s idle time that would let another consumer reclaim it."""
+
     max_markets: int = 400
     """Guard rail on the evaluated universe. 200 is the configured size; twice
     that is a bug somewhere upstream, and evaluating it silently would blow the

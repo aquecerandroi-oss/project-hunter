@@ -16,11 +16,9 @@ from hunter_core.db.session import role_session
 from hunter_core.domain.types import ensure_utc, utcnow
 from hunter_core.logging import get_logger
 from hunter_scanner_worker import writers
-from hunter_scanner_worker.backfill import request_gaps
 from hunter_scanner_worker.bootstrap import (
     MINUTE,
     REASON_INCOMPLETE,
-    REASON_NO_CANDLES,
     BootstrapOutcome,
     BootstrapSettings,
     BootstrapWindow,
@@ -36,11 +34,9 @@ from hunter_scanner_worker.repo import load_candles
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    import redis.asyncio as redis_asyncio
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from hunter_indicators.baselines import BaselineGate, BaselineRevision
-    from hunter_scanner_worker.backfill import BackfillRequester
     from hunter_scanner_worker.baselines import BaselineCache
     from hunter_scanner_worker.registry import MarketRef
 
@@ -49,7 +45,6 @@ logger = get_logger(__name__)
 __all__ = [
     "finish_job",
     "prepare_job",
-    "run_bootstrap",
     "store_revisions",
 ]
 
@@ -101,36 +96,6 @@ async def store_revisions(
         len(revisions)
     )
     return len(revisions)
-
-
-async def run_bootstrap(
-    factory: async_sessionmaker[AsyncSession],
-    redis: redis_asyncio.Redis,
-    requester: BackfillRequester,
-    ref: MarketRef,
-    *,
-    window: BootstrapWindow,
-    settings: BootstrapSettings,
-    now: datetime | None = None,
-) -> BootstrapOutcome:
-    """One market, end to end: read, ask for repairs, replay, write."""
-    moment = now or utcnow()
-    async with role_session(factory, db_role=DB_ROLE) as session:
-        job = await prepare_job(session, ref, window=window, settings=settings, now=moment)
-    requested = await request_gaps(
-        redis, requester, ref, job.gaps, reason="baseline_bootstrap", now=moment
-    )
-    if not job.candles:
-        logger.warning("scanner_bootstrap_no_candles", symbol=ref.symbol)
-        return BootstrapOutcome(
-            ref=ref,
-            window=window,
-            gaps=job.gaps,
-            reason=REASON_NO_CANDLES,
-            requested=requested,
-        )
-    await job.run_slice()
-    return await finish_job(factory, job, now=moment, requested=requested)
 
 
 async def finish_job(

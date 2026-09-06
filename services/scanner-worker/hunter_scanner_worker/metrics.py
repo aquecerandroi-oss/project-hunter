@@ -150,6 +150,29 @@ scanner_consumer_events_total = Counter(
     registry=registry,
 )
 
+scanner_ticks_coalesced_total = Counter(
+    "hunter_scanner_ticks_coalesced_total",
+    "Notifications absorbed by another one of the same market inside the same "
+    "read batch: work that was never worth doing twice, because the evidence is "
+    "the hot state at the current cut and not the message. Messages with no "
+    "market attached are NOT counted here.",
+    ["stream"],
+    registry=registry,
+)
+
+scanner_stream_delay_seconds = Histogram(
+    "hunter_scanner_stream_delay_seconds",
+    "Age of the OLDEST message of a read batch when it was read, from the stamp "
+    "the market-worker put on it: the queue itself, sampled before coalescence "
+    "replaces it with the newest one. Read it per stream and per BATCH, not per "
+    "message: for market.ticks it is queue plus publication delay, but for "
+    "market.derivatives the stamp is the sample instant of a 5-minute cadence, "
+    "so minutes there mean 'the last sample is old', not 'the consumer is late'.",
+    buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 300.0),
+    labelnames=["stream"],
+    registry=registry,
+)
+
 __all__ = [
     "scanner_anomalies_open",
     "scanner_backfill_requests_total",
@@ -167,6 +190,8 @@ __all__ = [
     "scanner_opportunities",
     "scanner_persist_batch_seconds",
     "scanner_stage_seconds",
+    "scanner_stream_delay_seconds",
     "scanner_tick_to_opportunity_seconds",
+    "scanner_ticks_coalesced_total",
     "scanner_universe_size",
 ]

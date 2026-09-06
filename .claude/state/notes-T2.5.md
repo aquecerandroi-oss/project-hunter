@@ -549,6 +549,19 @@ Efeito colateral que precisou de conserto no mesmo arquivo: `check_gaps` expandi
 em minutos para subtrair da janela de detecção. Com lacunas de 7 dias abertas isso construiria
 milhões de `datetime` por ciclo; agora os gaps são recortados à janela antes da expansão.
 
+**Correção (T2.9c, 2026-09-06, achado da Astra):** a frase "tudo mais antigo é, por construção,
+histórico **pedido por alguém**" (linha 530 acima) está errada — só a parte "por construção,
+histórico" é verdadeira. `check_gaps` só *cria* lacunas dentro da própria janela, mas nada impede uma
+lacuna **viva** de *envelhecer* para o estrato `history` sem nunca ter passado por
+`market.backfill.requested`: REST fora do ar (ou o processo parado) por mais que
+`BOOTSTRAP_WINDOW_MINUTES` (~25 h) move `live_from` para a frente do `gap_end` de uma lacuna que a
+própria detecção (ou `persist.report_losses`) criou recente — `reopen_stale_failed`
+(`recovery_queries.py`) reabre um `failed` antigo sem tocar `gap_start`/`gap_end`, então a idade da
+janela **não** prova a origem. Consequência prática, registrada em `notes-T2.9.md`
+(T2.9c): o consumidor que agrega anúncios do estrato `history` não pode rotular
+`reason="backfill_request"` — usa um motivo genérico (`historical_recovery`) que descreve o que se
+sabe (REST, estrato antigo) sem afirmar o que não se sabe (se alguém pediu).
+
 ## 26. A corrida que a tabela não impede (must-fix 2)
 
 `ingestion_gaps` não tem unicidade por intervalo, e agora existem **dois** escritores com o mesmo
@@ -1007,3 +1020,328 @@ pedido volta toda hora":
 Também aceitei a ressalva dela sobre o `try-lock`: "fica na fila para a próxima iteração" não é
 retenção ilimitada — o deque de perdas é limitado (`maxlen`) e uma contenção longa pode evictar uma
 perda antes de ela ser reportada. Isso degrada o *relato*, não reintroduz a duplicidade do MF3.
+
+---
+
+# T2.5e — "em dia" não podia exigir fila vazia
+
+Quarta parte, `exchange-integration-specialist`
+(`.claude/state/brief-T2.5e-coverage-caught-up.md`). Sintoma medido no stack local (rodando havia
+30 min) **e** confirmado de novo, ao vivo, no começo desta tarefa: `mkt:binance:coverage` com
+`session_since == covered_until`, congelado desde `21:24:10.268519Z`, e o log mostrando **uma única**
+transição para `reason=queue_backlog` às `21:24:10.900874Z` que nunca mais se resolveu — o aviso só
+sai ao *entrar* no estado quebrado (`coverage.py`, antes desta tarefa), então o congelamento ficou
+silencioso depois do primeiro segundo. Consequência confirmada: 100% das avaliações de janela do
+scanner voltavam `uncovered` com um tape que, de fato, estava fresco.
+
+## 33. A hipótese era exatamente a do brief, com uma causa mais funda embaixo
+
+`CoverageTracker.stamp` (`hunter_market_worker/coverage.py`, herdado da T2.5-adapter) exigia
+`enqueued == delivered + evicted` no instante do carimbo. Sob fluxo contínuo (~150 msg/s em 200
+mercados), essa igualdade só é verdadeira no instante exato em que a fila compartilhada está
+totalmente vazia — e há uma folga estrutural que a torna ainda mais rara do que "produtor mais rápido
+que o consumidor": entre `BoundedEventQueue.get()` retirar um item da própria deque e
+`StreamConsumer.consume()` retomar depois do seu `await asyncio.wait(...)` para incrementar
+`delivered`, existe uma folga de agendamento do asyncio — o item já saiu do lado "enfileirado" do
+livro-razão e ainda não entrou no lado "entregue". Sob carga contínua isso acontece a cada mensagem,
+não ocasionalmente. Confirmado com um teste de reprodução **antes** de mudar a regra
+(`test_a_continuous_producer_and_a_keeping_up_consumer_do_not_break_coverage`,
+`services/market-worker/tests/test_tape_coverage_backlog.py`): um produtor a ~200 msg/s e um
+consumidor que drena sem atraso artificial ainda assim não bateram a igualdade exata na maioria dos
+carimbos.
+
+## 34. A consulta de desenho que a Astra derrubou duas vezes antes de aceitar a terceira forma
+
+`.claude/state/astra-review-T2.5e-coverage.md`. Levei um desenho de "idade local de enfileiramento":
+`BoundedEventQueue` guardaria o instante monotônico de cada `put()` e `CoverageTracker` toleraria um
+backlog se `enqueued − delivered − evicted ≤ N` **e** a idade do item mais antigo na fila ≤
+`COVERAGE_SAFETY_S`. A Astra rejeitou com dois contraexemplos concretos, e os dois procedem:
+
+1. **o item já retirado da deque, ainda não entregue, é tão pendente quanto qualquer coisa na fila**
+   (achado 1). Minha primeira versão só olhava a cabeça de `_items`; no instante exato da folga
+   descrita no §33, a deque pode estar vazia enquanto o item que acabou de sair dela ainda não foi
+   contado como entregue — `oldest_pending_ts()` reportaria `None` (nada pendente) exatamente quando
+   *há* algo pendente. Testado e fechado
+   (`test_stream_consumer_oldest_pending_ts_counts_an_item_already_popped_but_not_yet_delivered`,
+   `packages/exchange-adapters/tests/unit/test_event_queue.py`): `StreamConsumer` mantém a própria
+   task `get()` em voo visível (`self._pending_get`, não uma variável local de `consume()`), e um
+   leitor externo — outra task, o housekeeping do market-worker — enxerga `.done()` e o resultado (e
+   com ele o timestamp) antes mesmo de `consume()` ter retomado para incrementar `delivered`;
+2. **idade local não é idade do evento** (achado 2, e o mais importante). Um evento pode ficar
+   represado *antes* de chegar a esta fila (transporte do adapter) por mais tempo que a margem, e só
+   então ser posto na fila — a idade local (desde o `put()`) lê "fresca" enquanto o `ts` do próprio
+   evento já está dentro da janela que um carimbo está prestes a reivindicar como coberta. O cenário
+   dela: evento com `ts=09:59.200`, chega à fila às `09:59.900` (700 ms de trânsito), agora é `10:00.000`
+   — idade local 100 ms (pareceria seguro), mas o corte candidato (`10:00.000 − 0,5s = 09:59.500`) já
+   ultrapassa o `ts` do evento pendente. Comparar uma duração monotônica com um `now` de parede
+   também misturava domínios de relógio sem necessidade (achado 3, dela).
+
+**A forma que ficou:** comparar o **timestamp do próprio evento** pendente (não uma idade local
+derivada) contra o corte candidato (`moment − COVERAGE_SAFETY_S`), tudo no mesmo domínio de relógio
+(UTC de parede, o mesmo que todo o resto do módulo já usa). Sem idade, sem relógio monotônico, sem
+teto de contagem: a Astra recusou também `MAX_QUEUE_BACKLOG` (nice-to-have, aceito) — "600 itens
+depois do corte podem ser seguros; um único item antes do corte pode invalidar", ou seja, magnitude
+nunca foi o sinal honesto, o conteúdo (o timestamp) sempre foi. E a ordem de chegada na fila (várias
+reader tasks, uma por conexão, alimentando a mesma fila) não é ordem de timestamp — `oldest_pending_ts`
+é o **mínimo** sobre tudo que ainda está na fila, nunca só a cabeça
+(`test_oldest_pending_ts_is_the_minimum_across_the_queue_not_the_head`).
+
+## 35. `NormalizedCandle` não tem `ts`, e o fallback é deliberadamente tardio, não uma adivinhação
+
+A fila carrega todo tipo de evento (trades, candles, book, funding, liquidações), mas só
+`NormalizedCandle` não tem campo `ts` direto (tem `open_time`/`close_time`/`event_ts` opcional).
+`_effective_ts` (`event_queue.py`) prefere `event_ts` (o tempo de evento do wire da kline) e cai para
+`close_time` na ausência dele — nunca antes do próprio fechamento da vela, o que faz do fallback um
+piso conservador, não um palpite. Dois testes cobrem as duas pontas
+(`test_oldest_pending_ts_falls_back_to_a_candles_close_time`,
+`test_oldest_pending_ts_prefers_a_candles_own_event_ts_over_close_time`).
+
+## 36. O que mudou, arquivo por arquivo
+
+- **`packages/exchange-adapters/hunter_exchanges/binance/event_queue.py`**: `_effective_ts`;
+  `BoundedEventQueue.oldest_pending_ts()` (mínimo sobre a deque); `StreamConsumer._pending_get`
+  (a task de `get()` promovida de variável local do `consume()` a atributo, visível de fora) e
+  `StreamConsumer.oldest_pending_ts()` (o item em voo, se houver, combinado com o resto da fila).
+- **`packages/exchange-adapters/hunter_exchanges/binance/ws.py`** /
+  **`packages/exchange-adapters/hunter_exchanges/binance/__init__.py`**: `queue_oldest_pending_ts()`,
+  aditivo, no mesmo padrão de `connection_generation`/`queue_progress` (leitura defensiva por
+  `getattr`, `None` para quem não implementa). Não fazia parte da lista de arquivos do brief (só
+  citava `event_queue.py`), mas sem esses dois o sinal nunca chegaria de fato ao market-worker em
+  produção — só funcionaria nos testes que o passam direto.
+- **`services/market-worker/hunter_market_worker/coverage.py`**: `stamp()` ganha o parâmetro aditivo
+  `oldest_pending_ts`; a checagem de backlog deixou de ser `enqueued != delivered + evicted ⇒ quebra`
+  e passou a ser `backlog != 0 e (oldest_pending_ts é None ou já alcançou o corte candidato) ⇒ quebra`.
+  Nice-to-have da Astra também aceito: um log `tape_coverage_interval_resumed` na retomada de um
+  `queue_backlog`, com `frozen_for_s` (o aviso de entrada já existia; o de saída, não).
+- **`services/market-worker/hunter_market_worker/streaming.py`**: lê `queue_oldest_pending_ts` do
+  adapter do mesmo jeito que `queue_progress`/`connection_generation` (`getattr` defensivo) e repassa
+  ao `stamp()`.
+- **Testes**: `packages/exchange-adapters/tests/unit/test_event_queue.py` (+7),
+  `packages/exchange-adapters/tests/unit/test_ws_client_states.py` (+2),
+  `services/market-worker/tests/test_tape_coverage_backlog.py` (novo arquivo, 4 testes: reprodução,
+  duas honestidades — fila crescendo quebra, item parado além da margem congela mesmo com backlog de
+  um — e o log de retomada). As 13 asserções pré-existentes de `test_tape_coverage.py` (reconexão,
+  geração, drop de eventos) **não foram tocadas** e continuam verdes sem nenhuma mudança — nenhuma
+  delas passa `oldest_pending_ts`, então o comportamento padrão (backlog > 0 sem prova ⇒ quebra) é
+  idêntico ao de antes desta tarefa.
+
+## 37. O que a prova mostrou
+
+Registro completo: `.claude/state/t25e-proof.md`. `mkt:binance:coverage` saiu do congelamento
+observado no início da tarefa (frozen desde `21:24:10Z`) e passou a avançar a cada carimbo (~250 ms)
+depois do deploy local; nenhuma nova quebra por `queue_backlog` sobreviveu além de um carimbo isolado
+sob carga real. VPS: mesmo sintoma reproduzido de forma independente na máquina de produção antes do
+deploy (commit `3dcb218`, sem o fix), e verificado depois de copiar os arquivos alterados (sem commit
+git, conforme instruído) e reconstruir o `market-worker` lá.
+
+## 38. O que ficou como requisito para outras tarefas
+
+- **`packages/core/**` — tolerância de mensagem ilegível em `hunter_core.events.consume`** (já
+  registrado em T2.5-backfill §27): continua fora do escopo desta tarefa.
+- **Nada novo abre aqui além do já registrado no §30 do T2.5c** (consumo em lote de `market.ticks`,
+  `redis[hiredis]`, caminho de construção de `MarketContext` para fontes já conferidas) — o item 5
+  daquela lista ("`mkt:coverage:binance` congelado") é o que esta tarefa fecha.
+
+---
+
+# T2.5d — as duas causas restantes do p99, e a pendência MEDIUM da revisão
+
+## 39. O consumidor não era lento: ele ia ao Redis três vezes por mensagem
+
+A T2.5c mediu 151 mensagens/s produzidas em `market.ticks` contra **~71/s consumidas**, com o lag
+parado em ~95 000. O erro seria procurar o custo no *tratamento* — que é um `touch` num dicionário.
+Ele estava no caminho até o tratamento, em `hunter_core.events.consume`:
+
+1. `is_processed` faz **dois `SISMEMBER` sequenciais** (hoje e ontem), cada um uma ida ao servidor;
+2. `ack` faz **um pipeline** (`SADD` + `EXPIRE` + `XACK`), mais uma ida.
+
+Três idas por mensagem, e cada ida é um round trip inteiro no *event loop* — a 71/s isso é
+exatamente o que um round trip de ~4,5 ms explica. `consume_batches()` paga as mesmas duas perguntas
+**por lote**: um `SMISMEMBER` por dia dentro de um pipeline (uma ida, dois comandos, N membros) e um
+`ack_many` com um `SADD` multi-membro e um `XACK` com todos os ids (outra ida). Um lote de 500
+mensagens custa **duas** idas em vez de 1 500.
+
+Medido dentro do contêiner, num stream sintético (`t25d.bench.*`, apagado no fim), com os dois
+grupos lendo as mesmas 4 000 mensagens: **399,8 msg/s com `consume()` contra 22 694 msg/s com
+`consume_batches(batch=500)` — 56,8×**. O número absoluto do `consume()` aqui é maior que os 71/s da
+T2.5c porque o processo desta janela está muito menos carregado e já tem `hiredis`; o que importa é
+a razão entre os dois, medida no mesmo processo, no mesmo Redis, no mesmo instante.
+
+**`consume()` não mudou de comportamento.** A refatoração extraiu o laço de leitura
+(`_read_loop`, `XAUTOCLAIM` + `XREADGROUP` + orçamento de deadlines) para que as duas formas não
+divirjam, mas o guard continua sendo avaliado **imediatamente antes de entregar cada mensagem** —
+não no início do lote. Essa foi a escolha 1 da Astra no desenho, e a razão é concreta: antecipar o
+guard alarga a janela em que outro consumidor do mesmo grupo termina o mesmo `event_id` primeiro, e
+isso não se paga para acelerar três streams. Quem não pede lote lê 10 por vez e paga por mensagem,
+como sempre pagou (`test_consume_still_guards_one_message_at_a_time`).
+
+## 40. O lote entrega duplicatas de propósito
+
+A minha primeira versão colapsava `event_id` repetido dentro do lote (entregava o primeiro, dava
+`XACK` nos demais) argumentando que o resultado era idêntico ao de hoje. A Astra derrubou com um
+cenário que eu não tinha: **o handler pode falhar**. Hoje, se a primeira entrega falha, o evento não
+fica marcado e a *segunda* entrega é o que conclui o trabalho. Colapsando, a segunda já teria sido
+confirmada e sobraria só a primeira, pendente, esperando recuperação.
+
+Então `consume_batches()` entrega **toda** entrada não processada, repetições incluídas, e a decisão
+de coalescer é de quem chama — que continua obrigado a passar **todas** as entradas absorvidas para
+`ack_many` (must-fix 3 dela): 500 ticks que viraram 40 `touch` são 500 mensagens concluídas, e
+confirmar só os 40 "representantes" deixaria 460 pendentes para o `XAUTOCLAIM` trazer de volta para
+sempre.
+
+Terceira regra do contrato: **envelope ilegível não derruba o lote**. Uma entrada podre entre 499
+boas é pulada, registrada (`consume_message_unreadable`) e deixada **pendente** — não confirmada,
+porque confirmar é esconder. `consume()` continua levantando, mensagem a mensagem, como sempre fez.
+
+## 41. Coalescência: o que ela poupa, e quando ela não poupa nada
+
+`coalesce()` agrupa o lote por mercado e guarda **o maior** carimbo. É o certo porque o vetor é
+calculado do hot state no corte atual: a notificação mais nova é a que descreve a evidência que o
+scanner vai ler, e é também o que `MarketState.touch` já fazia entre chamadas — o lote não podia
+significar outra coisa que a sequência que ele substitui.
+
+Mas o máximo **esconde a fila**, e a Astra exigiu que isso ficasse medido em vez de assumido: por
+isso `hunter_scanner_stream_delay_seconds{stream}` amostra a idade da mensagem **mais velha** do
+lote, antes da coalescência. Foi essa métrica que revelou o achado da prova (§46): mesmo com lag 0,
+o tick já chega velho.
+
+E a honestidade sobre o ganho: na janela desta prova a coalescência absorveu **405 de 28 072**
+notificações (1,4 %), porque com lag 0 os lotes são pequenos (28 072 mensagens em 1 324 lotes ≈ 21
+por lote, espalhadas por 200 mercados). Os 266 primeiros vieram do backlog de partida, num único
+lote. **A coalescência é um absorvedor de backlog, não uma economia de regime permanente** — é
+quando o consumidor está atrás que vinte ticks do mesmo mercado caem no mesmo lote, e é exatamente
+aí que ela impede que o atraso vire trabalho.
+
+## 42. `hiredis`: a hipótese da T2.5c, medida — 7×
+
+A T2.5c registrou `HIREDIS_AVAILABLE = False` na imagem e 16–21 ms por leitura de hot state por
+mercado, com a ressalva (aceita) de que atribuir tudo ao parser era hipótese, não medida: nem
+`pip` nem `uv` existiam no venv da imagem para instalar e comparar.
+
+Agora está medido, no mesmo contêiner, no mesmo Redis, com dois clientes lado a lado — um com o
+parser padrão (hiredis) e outro forçado a `_AsyncRESP2Parser` — sobre 5 mercados líquidos com 1 122
+velas e 2 000 trades cada:
+
+| parser | ms por mercado |
+|---|---|
+| Python puro (RESP2) | **23,8 – 32,9** |
+| `hiredis` | **3,3 – 4,3** |
+
+**~7×**, ~20 ms por mercado por tick. `redis[hiredis]>=5.2` como extra (escolha 3 da Astra: a
+compatibilidade fica declarada pelo próprio `redis-py`), `hiredis 3.4.1` no `uv.lock` com wheels
+cp312 manylinux, e `redis` continua em 8.1.0 — o extra não arrastou upgrade de nada.
+
+## 43. O atalho "sem candles" no caminho de produção, e a morte do `run_bootstrap`
+
+Pendência MEDIUM da revisão da T2.5b: `REASON_NO_CANDLES` existia em `replay_io.run_bootstrap`, que
+**nenhum caminho de produção chamava** — `main.py` sobe `baseline_loop`, que montava o job com
+`prepare_job` e ia direto para `run_slice`. Um mercado sem vela persistida (listagem nova, scanner de
+pé antes do coletor) ocupava o único slot por ~13 s de parede calculando 10 080 cortes vazios e
+terminava com `history_incomplete` — uma frase que afirma que houve replay.
+
+A Astra escolheu a opção mais dura (a 4): **remover o `run_bootstrap`** em vez de deduplicar o
+atalho, porque manter um segundo caminho não-fatiado dentro do serviço foi exatamente o que
+permitiu que o atalho ficasse testado e inalcançável ao mesmo tempo. Ele virou uma composição de
+teste em `tests/test_bootstrap.py` (os quatro testes de arquivo continuam valendo o que valiam), e o
+ramo vazio passou a ser fechado no laço, com o que ela exigiu que não faltasse: `REASON_NO_CANDLES`
+preservando `gaps` e `requested`, tentativa gravada no ledger (com o backoff que uma tentativa
+incompleta ganha), `baseline_note` do mercado, `progress.running` liberado, e o slot devolvido
+**sem** replay.
+
+`tests/test_baseline_loop.py` é o teste costurado que faltava: refresh antes do bootstrap e uma vez
+por hora fechada; mercado vazio que não entra no replay e o **seguinte** que entra; motivo e backoff
+no ledger real (contra um Redis falso, para provar o que o próximo processo vai ler); e um mercado
+que levanta sendo estacionado sem levar os outros junto.
+
+`baseline_runner.py` passou de 350 linhas com isso, e o corte foi por responsabilidade, não por
+tamanho: o *runner* escolhe o mercado, dá prioridade ao refresh e distribui orçamento;
+`baseline_jobs.py` é a vida de **uma** tentativa (começar, fechar, estacionar), e as três terminam
+com uma entrada no ledger — porque tentativa que ninguém grava é mercado que a próxima passada
+escolhe de novo.
+
+## 44. Números escolhidos, e de onde cada um vem
+
+- **`consume_batch = 500`** (`ScannerConfig`): teto de `COUNT`, não espera — o `XREADGROUP` volta com
+  o que houver. Dimensionado para o backlog que a T2.5c mediu (~95 000): a 500 por ida, drena em
+  segundos. Tratar 500 é microssegundos (um `touch` por mercado depois da coalescência), muito
+  dentro dos 30 s de `claim_idle_ms` que fariam outro consumidor reivindicar o lote.
+- **`block_ms` continua 2 000** (`consume_block_ms`), abaixo do `socket_timeout` de 5 s do cliente —
+  a regressão da T2.9 não muda de lugar por causa do lote.
+- **Buckets de `hunter_scanner_stream_delay_seconds`**: 0,05 s a 300 s. O piso mede "o consumidor
+  encostou no produtor" e o teto mede minutos de fila; a escala do histograma de latência (0,1–21 s)
+  seria curta demais para o caso que ela existe para expor.
+- **`PROCESSED_DAYS` e `PROCESSED_TTL_S` não mudaram.** O lote lê a mesma janela de dois dias; o que
+  mudou é que ele a lê com dois comandos em vez de 2N.
+
+## 45. As duas rodadas da Astra
+
+**Desenho** (`.claude/state/astra-review-T2.5d-throughput.md`), quatro escolhas e seis must-fix,
+todos incorporados antes da primeira linha de código: guard por mensagem preservado em `consume()`;
+lote entregando duplicatas; `ack_many` confirmando tudo o que o lote absorveu; carimbo **máximo** na
+coalescência **com** a idade da mais velha medida à parte; `redis[hiredis]` como extra; e o
+`run_bootstrap` removido com o ramo vazio fechado pelo caminho operacional completo. Os
+nice-to-have aceitos: `SMISMEMBER` (um por dia) em vez de 2N `SISMEMBER`, um `XACK` com todos os
+ids, e a `stream` como label do contador de coalescência.
+
+**Diff** (`.claude/state/astra-review-T2.5d-diff.md`): **APPROVE_WITH_NITS**, sem must-fix. Ela
+confirmou linha a linha que o `_read_loop` não antecipa reclaim (o gerador fica suspenso no `yield`
+até a última mensagem da página) e que o orçamento de deadlines continua contando só timeouts do
+`XREADGROUP`. Três correções aceitas e feitas aqui:
+
+1. **A frase estava errada, não o código.** "nada foi aplicado, então nada pode ser marcado" —
+   quando o handler falha no vigésimo mercado, dezenove `touch` já aconteceram. O contrato honesto é
+   "nem tudo concluiu"; refazer um `touch` é livre e exato (conjunto de motivos + carimbo máximo), e
+   é isso que torna o lote a unidade certa de reentrega. Docstring e teste corrigidos.
+2. **Reclaim de várias páginas não tinha teste** — o meu cobria uma página terminada em `0-0`. Agora
+   há um com cursor `5-0` seguido de `0-0`, e ele exige que a segunda página tenha vindo do reclaim
+   e **não** de uma leitura nova (`client.read_counts == []`).
+3. **A virada de UTC no caminho do lote não tinha teste**: ler às 23:59:59 e confirmar às 00:00:01
+   marca a chave de *hoje* (a de D+1) e a reentrega seguinte é filtrada, porque o guard lê hoje e
+   ontem. É a mesma costura do `ack`, agora provada para `ack_many`.
+
+Ressalvas dela que ficam registradas e **não** foram corrigidas: (a) o guard antecipado do lote é um
+filtro, não uma reserva — outro consumidor pode concluir o evento entre a consulta e o handler, o
+que é aceitável para `touch` idempotente e não é garantia de execução única; (b) o histograma novo
+mede **máximos por lote**, não a distribuição por mensagem; (c) faltam testes de "marca gravada com
+`XACK` não concluído" e de seleção pelo `pending_markets` real no harness do `baseline_loop`.
+
+## 46. O que a prova mostrou — e o dono do p99 mudou de novo
+
+Registro completo em `t25-proof.md` (T2.5d). O resumo:
+
+| | T2.5c | T2.5d |
+|---|---|---|
+| Lag de `market.ticks` | ~95 000 (10 min) | **0** |
+| CPU do `scanner-worker` | 97–145 % | **55 %** |
+| Leitura do hot state | 16–21 ms/mercado | **3,3–4,3 ms/mercado** |
+| Cortes de bootstrap na janela | **0** (suspenso a janela inteira) | **170 683**, 16 mercados concluídos |
+| Baselines declaradas | 91/200 | **107/200** |
+| Exceções no log | 0 | **0** |
+
+E o achado que só apareceu porque a fila sumiu: **o tick já chega velho**. Medindo a diferença entre
+o `XADD` (o carimbo de parede que o próprio id da mensagem carrega) e o `ts` que o coletor pôs no
+payload, nas 200 entradas mais novas: **mediana 3,70 s, máximo 34 s**. O orçamento de 3 s da decisão
+conjunta é medido a partir desse `ts` — de propósito, "uma fila tem de aparecer no número" — então
+ele já está estourado **antes** de a mensagem existir no stream. Some-se a isso que, no fim da
+janela, a entrada mais nova de `market.ticks` tinha **130–147 s** de idade de `XADD` (o
+`market-worker`, a 99,7 % de CPU e com outra tarefa em voo nos arquivos dele, parou de publicar por
+mais de dois minutos) e o histograma tick→oportunidade desta janela mede, em boa parte, a saúde do
+produtor.
+
+Por isso o `xfail` de `tests/test_load.py` **fica** — e o texto dele agora diz o que esta tarefa
+mudou e o que ela não podia mudar (o teste roda contra um Redis falso; nem o lote nem o `hiredis`
+aparecem lá).
+
+## 47. O que fica como requisito para outras tarefas
+
+1. **`market-worker` — a publicação de `market.ticks` atrasa 3,7 s na mediana e para por minutos.**
+   Sintoma, hora e método de medição em `t25-proof.md` (T2.5d §5). Enquanto isso não cair, nenhum
+   trabalho no scanner pode fechar o p99 de 3 s, porque o relógio do orçamento começa no carimbo do
+   coletor. Arquivo de outra tarefa em voo; não toquei.
+2. **`packages/indicators` — o caminho de construção de `MarketContext` para fontes já conferidas**
+   (herdado do §30 da T2.5c): continua sendo o que falta para o teste de carga sintético passar.
+3. **`mkt:coverage:binance`**: 14 259 avaliações `uncovered` contra 150 `covered` nesta janela. O
+   `market-worker` da T2.5-coverage (§34–§38 acima) mexeu nisso; o contêiner desta janela ainda
+   rodava a imagem anterior, então o número aqui **não** mede a correção dele.
+4. **`consume_batches` para o `market-worker` e o `strategy-worker`**, se algum dia um deles ficar
+   para trás: a API está pronta e o default deles não mudou. Hoje nenhum dos dois tem fila.

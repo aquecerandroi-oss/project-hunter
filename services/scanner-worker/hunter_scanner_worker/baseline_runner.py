@@ -7,7 +7,8 @@ that must never delay the refresh by more than one budget slice).
 
 Which markets still need a bootstrap is :mod:`hunter_scanner_worker.ledger`'s
 question; how a market is replayed is :mod:`hunter_scanner_worker.replay`'s. This
-module owns only the order and the budget.
+module owns only the order and the budget; one job's own lifetime (start,
+close, park) is :mod:`hunter_scanner_worker.baseline_jobs`.
 """
 
 from __future__ import annotations
@@ -17,17 +18,20 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
-from hunter_scanner_worker.backfill import request_gaps
-from hunter_scanner_worker.bootstrap import BootstrapOutcome, BootstrapSettings, window_for
+from hunter_scanner_worker.baseline_jobs import (
+    REASON_FAILED,
+    close_empty,
+    close_job,
+    record_failure,
+    start_job,
+)
+from hunter_scanner_worker.bootstrap import BootstrapSettings, window_for
 from hunter_scanner_worker.ledger import BootstrapLedger, pending_markets
 from hunter_scanner_worker.metrics import scanner_bootstrap_markets
-from hunter_scanner_worker.persist import DB_ROLE
-from hunter_scanner_worker.refresh import closed_hour_before, refresh_hour, reload_market
+from hunter_scanner_worker.refresh import closed_hour_before, refresh_hour
 from hunter_scanner_worker.regime import BTC_SYMBOL
-from hunter_scanner_worker.replay_io import finish_job, prepare_job
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -37,7 +41,6 @@ if TYPE_CHECKING:
 
     from hunter_core.runtime import WorkerRuntime
     from hunter_scanner_worker.backfill import BackfillRequester
-    from hunter_scanner_worker.bootstrap import BootstrapWindow
     from hunter_scanner_worker.config import ScannerConfig
     from hunter_scanner_worker.ledger import LedgerEntry
     from hunter_scanner_worker.registry import MarketRef
@@ -45,9 +48,6 @@ if TYPE_CHECKING:
     from hunter_scanner_worker.scanner import Scanner
 
 logger = get_logger(__name__)
-
-REASON_FAILED = "bootstrap_failed"
-BOOTSTRAP_REASON = "baseline_bootstrap"
 
 __all__ = [
     "REASON_FAILED",
@@ -92,61 +92,6 @@ class BootstrapProgress:
 
     def touch(self) -> None:
         self.last_advance_at = utcnow()
-
-
-async def _start_job(
-    factory: async_sessionmaker[AsyncSession],
-    redis: redis_asyncio.Redis,
-    requester: BackfillRequester,
-    ref: MarketRef,
-    *,
-    window: BootstrapWindow,
-    settings: BootstrapSettings,
-    progress: BootstrapProgress,
-) -> tuple[BootstrapJob, int]:
-    """Read one market's candles, ask for the repairs it needs, and start it."""
-    now = utcnow()
-    async with role_session(factory, db_role=DB_ROLE) as session:
-        job: BootstrapJob = await prepare_job(
-            session, ref, window=window, settings=settings, now=now
-        )
-    requested = await request_gaps(
-        redis, requester, ref, job.gaps, reason=BOOTSTRAP_REASON, now=now
-    )
-    progress.running = ref.symbol
-    progress.touch()
-    return job, requested
-
-
-async def _close_job(
-    scanner: Scanner,
-    factory: async_sessionmaker[AsyncSession],
-    engine: AsyncEngine,
-    redis: redis_asyncio.Redis,
-    job: BootstrapJob,
-    *,
-    settings: BootstrapSettings,
-    ledger: BootstrapLedger,
-    entry: LedgerEntry | None,
-    progress: BootstrapProgress,
-    requested: int,
-) -> BootstrapOutcome:
-    """Write what the replay produced and record the attempt."""
-    outcome = await finish_job(
-        factory, job, requested=requested, cache=scanner.cache, gate=scanner.policy.gate
-    )
-    await ledger.record(redis, outcome, settings=settings, previous=entry, now=utcnow())
-    if scanner.cache is not None and outcome.revisions:
-        await reload_market(engine, scanner.cache, job.ref, now=utcnow())
-    state = scanner.state.get(job.ref.symbol)
-    if state is not None:
-        # "Under construction, and here is why" — carried per market so the
-        # heartbeat can say it and the Radar is never shown a market whose
-        # silence has no reason attached.
-        state.baseline_note = outcome.reason
-    progress.running = None
-    progress.touch()
-    return outcome
 
 
 def due_hour(refreshed: datetime | None, now: datetime) -> datetime:
@@ -244,7 +189,7 @@ async def baseline_loop(
                     continue
                 ref = _first(pending, BTC_SYMBOL)
                 entry = entries.get(ref.market_id)
-                job, requested = await _start_job(
+                job, requested = await start_job(
                     factory,
                     redis,
                     requester,
@@ -253,6 +198,20 @@ async def baseline_loop(
                     settings=settings,
                     progress=progress,
                 )
+                if not job.candles:
+                    await close_empty(
+                        scanner,
+                        redis,
+                        job,
+                        settings=settings,
+                        ledger=ledger,
+                        entry=entry,
+                        progress=progress,
+                        requested=requested,
+                    )
+                    job, entry, requested = None, None, 0
+                    runtime.mark_success()
+                    continue
             # Evaluation first: while a tick is waiting, the replay sleeps
             # instead of taking its duty share (T2.5c, ``pressure``). The
             # refresh above is *not* gated -- it is bounded and it is the only
@@ -261,7 +220,7 @@ async def baseline_loop(
             progress.cuts = job.cuts_done
             progress.touch()
             if finished:
-                await _close_job(
+                await close_job(
                     scanner,
                     factory,
                     engine,
@@ -287,31 +246,11 @@ async def baseline_loop(
                 # The failure is this market's, and it earns the same backoff an
                 # incomplete run earns — otherwise the next pass picks it again
                 # and the rest of the universe never starts.
-                await _record_failure(redis, ledger, job, settings=settings, entry=entry)
+                await record_failure(redis, ledger, job, settings=settings, entry=entry)
                 job = None
                 entry = None
             progress.running = None
             await asyncio.sleep(config.baseline_check_s)
-
-
-async def _record_failure(
-    redis: redis_asyncio.Redis,
-    ledger: BootstrapLedger,
-    job: BootstrapJob,
-    *,
-    settings: BootstrapSettings,
-    entry: LedgerEntry | None,
-) -> None:
-    """Park a market that raised, with a reason and a growing retry delay."""
-    try:
-        await ledger.record(
-            redis,
-            BootstrapOutcome(ref=job.ref, window=job.window, complete=False, reason=REASON_FAILED),
-            settings=settings,
-            previous=entry,
-        )
-    except Exception:
-        logger.warning("scanner_bootstrap_failure_unrecorded", symbol=job.ref.symbol)
 
 
 def _first(pending: Sequence[MarketRef], preferred: str) -> MarketRef:

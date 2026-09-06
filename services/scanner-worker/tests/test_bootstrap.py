@@ -27,10 +27,10 @@ from hunter_core.db.models.market_data import Candle
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import BaselineSource, Timeframe
 from hunter_indicators.baselines import SqlBaselineStore
-from hunter_scanner_worker.backfill import BackfillRequester
+from hunter_scanner_worker.backfill import BackfillRequester, request_gaps
 from hunter_scanner_worker.bootstrap import BootstrapSettings, missing_runs, window_for
 from hunter_scanner_worker.registry import MarketRef
-from hunter_scanner_worker.replay_io import run_bootstrap
+from hunter_scanner_worker.replay_io import finish_job, prepare_job
 
 from .builders import EXCHANGE, FakeHotState
 from .db_helpers import seed_market
@@ -117,6 +117,35 @@ async def _count(factory: Any, market_id: UUID) -> int:
             )
             or 0
         )
+
+
+async def run_bootstrap(
+    factory: Any,
+    redis: Any,
+    requester: BackfillRequester,
+    ref: MarketRef,
+    *,
+    window: Any,
+    settings: BootstrapSettings,
+    now: datetime,
+) -> Any:
+    """One market end to end, unsliced -- a **test** composition (T2.5d).
+
+    It used to live in ``replay_io`` and nothing in production called it: the
+    worker runs ``baseline_runner.baseline_loop``, which slices the replay under
+    a budget, stands aside under live pressure and short-circuits a market with
+    no persisted candles (``tests/test_baseline_loop.py``). Keeping a second,
+    unsliced path in the service was how the "no candles" shortcut ended up
+    tested and unreachable at the same time (code review of T2.5b, MEDIUM 1), so
+    the composition these archive tests need lives here now, next to them.
+    """
+    async with role_session(factory, db_role="hunter_worker") as session:
+        job = await prepare_job(session, ref, window=window, settings=settings, now=now)
+    requested = await request_gaps(
+        redis, requester, ref, job.gaps, reason="baseline_bootstrap", now=now
+    )
+    await job.run_slice()
+    return await finish_job(factory, job, now=now, requested=requested)
 
 
 def test_the_window_is_the_seven_days_before_the_hour_that_just_closed() -> None:

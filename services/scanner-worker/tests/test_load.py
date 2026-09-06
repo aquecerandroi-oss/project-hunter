@@ -108,7 +108,15 @@ class MultiMarketHotState(FakeHotState):
         "``.claude/state/t25-proof.md`` (T2.5c): against the real stack, where "
         "candle buffers are ~790 rows and the loop also serves the consumers, "
         "the p99 of the histogram is what decides acceptance. Kept as a strict "
-        "xfail so the day that construction path lands, this fails by passing."
+        "xfail so the day that construction path lands, this fails by passing. "
+        "T2.5d did NOT change this number and could not: the fixture is a fake "
+        "Redis, so neither the batched consumption nor hiredis touches it (both "
+        "pay off in transport, and this test has none). What T2.5d changed is "
+        "the operational side -- market.ticks lag 0, scanner CPU 97-145% -> 55%, "
+        "hot-state read 23.8-32.9 ms -> 3.3-4.3 ms per market -- and the "
+        "operational p99 is still out of budget for a reason that is now "
+        "upstream: a tick is already ~3.7 s old (median) when the collector "
+        "XADDs it (``.claude/state/t25-proof.md``, T2.5d section 5)."
     ),
 )
 async def test_two_hundred_markets_at_one_tick_a_second_stay_inside_the_budget() -> None:

@@ -700,3 +700,293 @@ e não é desta tarefa.
 `source='rest'` com mais de 2 dias em **218 mercados** (eram 123 857 às 20:39 — o dreno continua a
 ~6 lacunas por ciclo); `ingestion_gaps` `recovered` 17 660 · `open` 1 834 · `failed` 2; **213**
 mercados com ≥ 3 dias distintos de velas de 1 min. `docker ps`: `market-worker` *healthy*.
+
+---
+
+# Prova operacional — T2.5d (consumo em lote + `hiredis`) — 2026-09-06
+
+Quarta janela, mesmo stack local. Imagem `hunter-api:dev` reconstruída da árvore de trabalho da
+T2.5d (`docker compose -f infra/docker/docker-compose.yml build api`) e **só o `scanner-worker`
+recriado** (`up -d --no-deps --force-recreate scanner-worker`): o `market-worker`, o
+`strategy-worker` e a `api` seguiram com os contêineres que já estavam de pé, porque há outra tarefa
+em voo nos arquivos do coletor. Tudo abaixo foi lido do `/metrics`, do `/ready`, do Redis, do log e
+do `docker stats`.
+
+## 1. Janela
+
+| | |
+|---|---|
+| Processo recriado | **2026-09-06T22:45:07Z** |
+| Janela medida | **22:45:07Z → 23:16:30Z** (31 min 23 s) |
+| Universo | 200 mercados |
+| Serviços | `postgres`, `redis`, `market-worker`, `scanner-worker`, `strategy-worker`, `api` |
+| Exceções no log do scanner | **0** (`grep -ciE "traceback|exception|\"error\"|scanner_batch_failed|consume_message_unreadable"` → 0 em 333 linhas) |
+| `/ready` | **200** a janela inteira; no fim: `{"database":true,"redis":true,"scanner_consumers":true,"scanner_evaluation":true,"scanner_outbox":true,"scanner_baselines":true,"baselines":"bootstrapping MITOUSDT (107/200)"}` |
+
+Ressalva declarada: depois desta janela eu ainda mexi em **duas docstrings e três testes** (correções
+1–3 da revisão de diff da Astra). Nenhuma linha de código executável mudou; a imagem medida aqui é a
+que está na árvore.
+
+## 2. `hiredis` na imagem, e o custo de leitura antes/depois
+
+```
+$ docker run --rm hunter-api:dev python -c "import redis, redis.utils as u, hiredis; ..."
+redis 8.1.0
+HIREDIS_AVAILABLE True
+hiredis 3.4.1
+```
+
+Medição no **mesmo contêiner**, com dois clientes lado a lado — o padrão (hiredis) e um forçado a
+`_AsyncRESP2Parser` — lendo o hot state de 5 mercados líquidos (1 122 velas + 2 000 trades cada) com
+o `read_hot_state` de produção:
+
+```
+HIREDIS_AVAILABLE=True symbols=5 rounds=6
+python-parser  round 0..5: 25.38  28.01  27.96  30.34  25.48  27.86  ms/mercado
+hiredis-parser round 0..5:  4.03   4.23   4.05   3.75   3.74   3.61  ms/mercado
+python-parser  round 0..5: 32.94  26.58  26.76  23.80  24.95  23.90  ms/mercado
+hiredis-parser round 0..5:  3.71   3.51   3.32   4.06   4.09   4.25  ms/mercado
+```
+
+**23,8–32,9 ms → 3,3–4,3 ms por mercado (~7×).** No contêiner **anterior** (imagem da T2.5c,
+`HIREDIS_AVAILABLE=False`), o mesmo probe dava 19,9–34,3 ms nos dois rótulos — porque sem `hiredis`
+os dois clientes usavam o mesmo parser Python, que é justamente o que a hipótese da T2.5c dizia.
+
+## 3. Taxa de dreno: `consume()` contra `consume_batches()`
+
+O stack local desta noite **não** reproduz as 151 msg/s da T2.5c (o coletor está publicando ~22–28
+msg/s, §5), então a capacidade não pode ser afirmada a partir do tráfego vivo. Medida num stream
+sintético dentro do contêiner (`t25d.bench.<hex>`, apagado no fim junto com as chaves
+`hunter:processed:` que ele criou), 4 000 mensagens, dois grupos independentes lendo as mesmas
+mensagens:
+
+```
+HIREDIS_AVAILABLE=True stream=t25d.bench.7e3bb4a7 messages=4000
+consume()        :    399.8 msg/s
+consume_batches():  22694.0 msg/s  (batch=500)
+speedup          :   56.8x
+cleaned: stream + 2 processed keys
+```
+
+Os 399,8 msg/s do `consume()` são maiores que os 71/s da T2.5c porque este processo está muito menos
+carregado e já tem `hiredis`; o que a medição prova é a **razão** entre as duas APIs no mesmo
+processo, no mesmo Redis, no mesmo instante.
+
+## 4. O lag de `market.ticks`
+
+| | |
+|---|---|
+| `XINFO GROUPS` no fim da janela | `entries-read 7 410 657`, **`lag 0`**, `pending 0` |
+| Mensagens tratadas na janela | `market.ticks` **28 072**, `market.candles.closed` 8 654, `market.derivatives` 3 423, `market.liquidations` 6 |
+| Lotes de ticks | 1 324 (≈ 21 mensagens por lote) |
+| Coalescidas | **405** (1,4 %) — 266 delas no lote único que drenou o backlog de partida |
+
+Antes da troca, na mesma noite e no mesmo stack, uma janela de 62 s com o consumidor por mensagem:
+`lag 1 714 → 560`, com produção de ~28 msg/s. Não era o estado patológico da T2.5c, e por isso a
+prova de capacidade é a do §3 e não esta.
+
+**A coalescência é um absorvedor de backlog**, não uma economia permanente: com lag 0 os lotes são
+pequenos e espalhados por 200 mercados, e quase nada se repete dentro do mesmo lote.
+
+## 5. Latência tick → oportunidade — **ainda fora do orçamento**, e o dono mudou de novo
+
+Histograma completo da janela (o processo nasceu nela):
+
+| | |
+|---|---|
+| Amostras | 13 671 |
+| ≤ 1 s | 9 |
+| ≤ 2 s | 47 |
+| ≤ 3 s | **499 (3,7 %)** — T2.5c: 0,87 % |
+| ≤ 5 s | 5 304 (38,8 %) |
+| ≤ 8 s | 8 691 (63,6 %) |
+| ≤ 13 s | 10 089 (73,8 %) |
+| ≤ 21 s | 10 775 (78,8 %) |
+| p50 (interpolado no balde 5–8 s) | **~6,4 s** |
+| p95 / p99 | **> 21 s** (último balde: 2 896 amostras) |
+
+**Alvo p99 ≤ 3 s: não cumprido.** E a causa mudou de dono outra vez — não é mais a fila do
+consumidor, que está em zero. Duas medições novas:
+
+1. **`hunter_scanner_stream_delay_seconds{stream="market.ticks"}`** (idade da mensagem *mais velha*
+   do lote, amostrada **antes** da coalescência): 1 324 amostras, **910 ≤ 5 s**, nenhuma ≤ 1 s, média
+   6,0 s. Com o lag em zero, o consumidor não pode ser a explicação disso.
+2. **O tick já nasce velho.** Comparando o `XADD` (o carimbo de parede que o id da mensagem carrega)
+   com o `ts` que o coletor pôs no payload, nas 200 entradas mais novas de `market.ticks`:
+
+   ```
+   sampled 200 newest entries of market.ticks at 2026-09-06T23:18:12Z
+   publication delay (XADD - payload ts): min=2.66s median=3.70s max=34.00s
+   age of the newest entries in the stream (now - XADD): min=129.97s median=141.30s max=147.46s
+   ```
+
+   **Mediana de 3,70 s entre o instante que o coletor carimba e o instante em que ele publica** — o
+   orçamento de 3 s já está estourado antes de a mensagem existir. E a segunda linha diz que, no fim
+   da janela, o `market-worker` (a **99,7 % de CPU**, com outra tarefa em voo nos arquivos dele e
+   ainda na imagem anterior) **não publicava um tick havia mais de dois minutos**.
+
+Atribuição honesta, então: esta janela mede um produtor doente. O que ela prova do lado do
+consumidor é que ele não é mais o gargalo (lag 0, CPU pela metade); o que ela **não** pode provar é
+o p99 de ponta a ponta, porque o relógio do orçamento começa num carimbo que chega com 3,7 s de
+atraso mediano.
+
+## 6. O que a CPU liberada comprou: o bootstrap voltou a andar
+
+Na T2.5c o bootstrap ficou **suspenso a janela inteira** (`bootstrap_suspended = 1` do primeiro ao
+último minuto, `bootstrap_cuts_total = 0`), porque o mercado sujo mais velho estava sempre acima de
+1 s. Nesta janela a contrapressão alterna (`scanner_bootstrap_suspended` / `..._resumed` no log) e o
+replay tomou fatias de verdade:
+
+| | T2.5c | T2.5d |
+|---|---|---|
+| `hunter_scanner_bootstrap_cuts_total` | **0** | **170 683** |
+| `scanner_bootstrap_market_done` no log | 0 | **16** |
+| `scanner_bootstrap_markets{state="declared"}` | 91 | **107** (pending 93) |
+| `hunter_scanner_baselines{state="usable"}` | — | 4 394 (45 583 sob construção) |
+
+## 7. Recursos
+
+| | T2.5c | T2.5d |
+|---|---|---|
+| CPU do `scanner-worker` (`docker stats`) | 97–145 % | **54,7 %** |
+| RSS do `scanner-worker` | 883,5 MiB | **945,2 MiB** |
+| CPU do `market-worker` (contexto, não é desta tarefa) | 99 % | **99,7 %** |
+
+O RSS subiu ~7 % e a explicação é o bootstrap ter voltado a rodar (buffers de replay vivos entre
+fatias), não o lote: um lote de 500 envelopes é efêmero e some no fim do `ack_many`.
+
+## 8. Veredito
+
+| Item de aceite | Situação |
+|---|---|
+| `consume()` com lote e ACK em pipeline | **cumprido** — `consume_batches` + `ack_many`, 2 idas por lote em vez de 3 por mensagem, 56,8× no dreno medido |
+| Idempotência por `event_id` preservada | **cumprido** — mesma janela de dois dias, agora com `SMISMEMBER`; reentrega após crash sem perda nem duplicação, com teste de reclaim de duas páginas e da virada de UTC |
+| `block_ms` < timeout do socket | **cumprido** — 2 000 ms contra 5 s, inalterado |
+| Nada muda para quem não pede lote | **cumprido** — assinatura, defaults e guard por mensagem de `consume()` intactos; suítes do market-worker e do strategy-worker verdes |
+| Coalescência por mercado + `hunter_scanner_ticks_coalesced_total` | **cumprido** — 405 absorvidas na janela, e a métrica de fila (`stream_delay`) impede que o máximo esconda o atraso |
+| `hiredis` na imagem, medido no contêiner | **cumprido** — `HIREDIS_AVAILABLE True`, 23,8–32,9 ms → 3,3–4,3 ms por mercado |
+| Lag de `market.ticks` perto de zero | **cumprido** — **0** |
+| 0 exceções, `/ready` verde | **cumprido** |
+| p99 ≤ 3 s com 200 mercados | **não cumprido** — p50 ~6,4 s, p99 > 21 s, com a causa medida **fora** do consumidor: 3,70 s de mediana entre carimbo e publicação, e um coletor que parou de publicar por 2 min |
+| `xfail` de `tests/test_load.py` | **mantido** — o teste roda contra um Redis falso, onde nem o lote nem o `hiredis` aparecem; o texto do `xfail` agora diz isso e aponta para o §5 acima |
+| Atalho "sem candles" no laço de produção | **cumprido** — `run_bootstrap` removido, ramo vazio fechado no `baseline_loop` com ledger e backoff, `tests/test_baseline_loop.py` costurado |
+
+# Prova operacional — T2.9c (anúncio agregado do estrato histórico) — 2026-09-06
+
+`market-worker` reconstruído (imagem `hunter-api:dev`, serviço `api` do compose — é o que
+`market-worker`/`scanner-worker`/`strategy-worker` compartilham) e recriado
+(`docker compose up -d --no-deps market-worker`, sem tocar nos outros serviços) às **23:11:11Z**,
+observado até **23:24:04Z** (13 min). `/ready` verde logo após o boot:
+`{"database":true,"redis":true,"ingestion":true,"persistence":true,"partitions":true,"outbox":true,"rest_gate":"ok"}`.
+
+## 1. O estrato vivo estava saturado nesta janela — e isso é o desenho funcionando, não um defeito
+
+Achado antes de qualquer conclusão: nos 13 minutos observados, `ingestion_gaps` do estrato **vivo**
+(`gap_end` dentro dos 1 499 min da detecção) ficou parado em ~715 lacunas abertas (716 → 714),
+muito acima do orçamento de `MAX_GAPS_PER_CYCLE = 50`/ciclo — provavelmente o próprio reconnect de
+WS que o meu `docker compose up --no-deps market-worker` causou para ~200 mercados. Consequência
+prevista pelo item 7 do PIPELINE §1b ("a coleta ao vivo nunca espera o bootstrap"): com
+`leftover = min(history_limit, live_limit - len(live)) = min(6, 50-50) = 0`, o estrato **histórico**
+não recebeu orçamento nenhum do laço natural (`recovery.check_gaps`) durante toda a janela —
+`gaps_open` do estrato histórico **cresceu** de 1 992 para (medido a seguir) ~2 400, porque o
+scanner-worker (T2.5d, em voo, reiniciado ~22 min antes de mim) estava pedindo bootstrap de mercados
+novos a ~1/min (`market_backfill_requests_total{outcome="accepted"}` 1→7 na janela,
+`market_backfill_minutes_total` 8 247→59 628) mais rápido do que o estrato vivo liberava orçamento
+para o histórico. **Isto não é uma falha desta tarefa**: é a garantia "vivo nunca espera" segurando
+sob carga real, exatamente como desenhada — e é também a razão de esta prova ter uma segunda parte
+(§2) além da caracterização de 13 min.
+
+## 2. Verificação direta: o mesmo código, contra Postgres/Redis/Binance reais, uma vez
+
+Como o laço natural não ia exercitar o caminho `tier="history"` dentro da janela (§1), rodei o
+próprio `recover_registered(..., tier="history")` — a mesma função que `recovery.check_gaps` chama,
+nenhuma cópia — dentro do contêiner `market-worker`, contra uma lacuna histórica real
+(`ingestion_gaps.id=01a078e7-20a4-7ee1-9dcd-b013fa021d41`, `IOUSDT` em `binance`,
+`[2026-09-05T18:00, 2026-09-05T22:00)`, criada pelo próprio `market_backfill_planned` do log desta
+janela). Script descartável, sem alterar nada do worker em execução — só um segundo processo Python
+reusando `hunter_market_worker.config.build_adapter` e `hunter_core.db.session` com as mesmas
+variáveis de ambiente do contêiner:
+
+```
+market_gap_recovered  candles_inserted=240 symbol=IOUSDT
+AFTER recovered 1 2026-09-05 18:00:00+00:00 2026-09-05 21:59:00+00:00
+BACKFILLED_ROW 2026-09-06 23:21:03+00 {'end': '2026-09-05T22:00:00+00:00', 'count': 240,
+  'start': '2026-09-05T18:00:00+00:00', 'reason': 'historical_recovery', 'source': 'rest',
+  'symbol': 'IOUSDT', 'exchange': 'binance', 'timeframe': '1m'}
+```
+
+Confirmado em Postgres e Redis, não só no `stdout` do script:
+
+| | |
+|---|---|
+| Candles `source='rest'` inseridas para `IOUSDT` em `[18:00, 22:00)` | **240** |
+| Linhas de `market.candles.closed` para esse mesmo mercado/janela | **0** |
+| Linhas de `market.candles.backfilled` para esse mesmo mercado/janela | **1**, `count=240` |
+| `outbox_events` (`market.candles.backfilled`) | `pending=0`, `dispatched=1` |
+| `XLEN market.candles.backfilled` (Redis) | 1, entrada com o `event_id` e o payload completos |
+| Gap | `open` → `recovered`, `attempts` 0 → 1 |
+
+240 minutos, **um** evento — contra os 240 `market.candles.closed` que o mesmo lote teria gerado
+antes desta tarefa (medido de verdade em `test_backfill_consumer.py` antes da mudança, §0 desta
+prova não existia porque o teste **falhou** com `assert 0 == 120` na primeira execução pós-diff,
+exatamente o comportamento antigo que esta tarefa remove).
+
+## 3. Caracterização de 13 min: `outbox_pending`, erros, sem regressão
+
+Nove capturas a cada ~65-90 s (mais lento que 60 s porque o `/ready` do próprio worker ficou lento
+sob a carga do estrato vivo saturado — ver abaixo), via `/metrics` e consultas diretas a
+Postgres/Redis:
+
+| Captura (hora) | `hunter_outbox_pending` | `oldest_pending_s` | `market.candles.backfilled` (stream) | `errors` (na janela desde a captura anterior) |
+|---|---|---|---|---|
+| 23:13:17 | 0 | 0 | 0 | 28 |
+| 23:14:35 | 9 | 3,0 | 0 | 21 |
+| 23:15:49 | 0 | 0 | 0 | 12 |
+| 23:16:56 | 0 | 0 | 0 | 33 |
+| 23:18:17 | 0 | 0 | 0 | 28 |
+| 23:19:23 | 0 | 0 | 0 | **0** |
+| 23:20:34 | 0 | 0 | 0 | 10 |
+| 23:21:56 | 1 | 0,6 | **1** (a verificação direta do §2) | 11 |
+| 23:23:18 | 0 | 0 | 1 | 23 |
+
+`hunter_outbox_pending` **nunca** passou de 9 (teto de prontidão é 500) e `oldest_pending_seconds`
+nunca passou de 3 s (teto é 30 s) — a fila ficou "estacionada perto de zero" o tempo todo, inclusive
+sob a carga real de ~200 mercados reconectando e o scanner pedindo bootstrap simultaneamente.
+
+**"errors" não é zero, e é preciso dizer exatamente o que são.** Toda ocorrência inspecionada
+(`docker logs` com a janela de cada captura) é de duas classes **pré-existentes**, nenhuma delas
+tocada por este diff:
+
+1. `market_persist_flush_failed` (`asyncio.exceptions.CancelledError` → `TimeoutError`, dentro de
+   `flush_batch`, `services/market-worker/hunter_market_worker/persist.py`) — a mesma causa
+   "indeterminada" já registrada na prova da T2.5-backfill (acima, §7 daquela seção): rajada de
+   recuperação de lacunas vivas competindo por conexão/tempo de laço com o flush de velas.
+2. `market_gap_backfill_failed` para um símbolo (`龙虾USDT`) cujo `fetch_candles` real
+   (`hunter_exchanges/binance/rest.py`) falhou na rede — tratado exatamente como desenhado (o
+   `except` de `recover_registered` conta a tentativa e loga, não derruba o worker).
+
+**Busca dirigida por qualquer traceback originado do código novo** (`grep` por
+`backfill_announce`, `enqueue_candles_backfilled`, e pelas linhas de `recovery_drain.py` que este
+diff mudou) não encontrou nenhuma exceção nova: as duas ocorrências de `recovery_drain.py` nos logs
+são dentro de `market_gap_backfill_failed` (item 2 acima, na chamada de REST, código inalterado por
+esta tarefa). `/ready` alternou `200`/`503`/timeout de leitura em 4 das 9 capturas — sintoma do
+mesmo estrato vivo saturado (o health server compartilha o loop do worker, PIPELINE.md §1 item 7) e
+não do `outbox` (que nunca deixou de aparecer `true` quando o `/ready` respondeu).
+
+## 4. Veredito
+
+| Item pedido no brief | Situação |
+|---|---|
+| `outbox_pending` estacionado perto de 0 | **cumprido** — máximo 9, na maior parte do tempo 0, teto é 500 |
+| Minutos backfilled por minuto de relógio, antes/depois | **medido pontualmente, não em regime**: o estrato vivo saturado impediu o laço natural de rodar `history` nesta janela (§1); a verificação direta (§2) prova 240 min → 1 evento em produção real. A vazão em regime (42 eventos para 7 dias) está provada pela suíte de integração (`test_backfill_lane.py::test_seven_days_of_history_costs_at_most_forty_two_announcements`, Postgres real, sem mock do meu código), não por esta janela ao vivo |
+| 0 exceções | **0 exceções novas** atribuíveis a este diff; exceções pré-existentes (flush timeout, símbolo com falha de rede) continuaram na mesma classe e taxa da prova anterior, nenhuma delas em código tocado por esta tarefa |
+| Scanner pedindo bootstrap | **confirmado real, não simulado**: `market_backfill_requests_total{outcome="accepted"}` 1→7 e `market_backfill_minutes_total` 8 247→59 628 na janela, todos do scanner-worker de verdade (T2.5d) |
+
+**Ressalva de honestidade:** esta prova não conseguiu mostrar o laço natural (`recovery.check_gaps`)
+processando o estrato histórico em regime dentro dos 13 minutos, porque outra causa real (reconnect
+de WS após o meu próprio restart, concorrendo com o bootstrap ativo do scanner) manteve o estrato
+vivo acima do seu próprio orçamento o tempo todo — a garantia de prioridade fez exatamente o que
+deveria. Isso não invalida a prova: o mesmo código foi exercitado uma vez contra dados de produção
+reais (§2) e a vazão em regime está provada pela suíte de integração. Registrado como observação
+para quem for medir de novo: repetir esta prova depois que o estrato vivo drenar (ou numa janela sem
+um bootstrap concorrente ativo) mostraria o laço natural produzindo os agregados sozinho.
