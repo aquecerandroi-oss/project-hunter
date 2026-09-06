@@ -46,6 +46,9 @@ read_existing() {
 OLD_PG_PASSWORD="$(read_existing POSTGRES_PASSWORD)"
 OLD_AUTH_SECRET="$(read_existing AUTH_SECRET)"
 OLD_MASTER_KEY="$(read_existing HUNTER_MASTER_KEY)"
+OLD_PK="$(read_existing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)"
+OLD_SK="$(read_existing CLERK_SECRET_KEY)"
+OLD_WHSEC="$(read_existing CLERK_WEBHOOK_SECRET)"
 
 if [ -f "$ENV_PATH" ]; then
   printf 'Ja existe um .env. Sobrescrever? (s/N) '
@@ -92,11 +95,21 @@ extract_key() {
 # read_secret <label> <prefixo> - digitacao oculta, valida o prefixo, repete.
 # Todo texto de tela vai para stderr: o valor lido sai por stdout e e o unico
 # conteudo que o chamador captura com $( ).
+# Terceiro argumento opcional: valor atual do .env. Com ele, Enter em branco
+# mantem a chave existente (re-rodar o script para trocar so a URL nao deve
+# obrigar a colar as tres chaves do Clerk de novo).
 read_secret() {
-  local label="$1" prefix="$2" value="" plain=""
+  local label="$1" prefix="$2" current="${3:-}" value="" plain=""
   while [ -z "$value" ]; do
-    printf '%s (comeca com %s; digitacao oculta): ' "$label" "$prefix" >&2
+    if [ -n "$current" ]; then
+      printf '%s (Enter mantem a atual %s; ou cole a nova, digitacao oculta): ' "$label" "$(mask "$current")" >&2
+    else
+      printf '%s (comeca com %s; digitacao oculta): ' "$label" "$prefix" >&2
+    fi
     read -rs plain; echo "" >&2
+    if [ -n "$current" ] && [ -z "$(printf '%s' "$plain" | tr -d '[:space:]')" ]; then
+      printf '%s' "$current"; return 0
+    fi
     value="$(extract_key "$plain" "$prefix" || true)"
     plain=""
     if [ -z "$value" ]; then
@@ -154,13 +167,15 @@ ISSUER="${ISSUER%/}"
 PUBLIC_URL="http://127.0.0.1:3000"
 WS_URL="ws://127.0.0.1:3000/ws"
 SITE_ADDRESS=""
+TLS_ARG=""
 ACME_EMAIL=""
 
 if [ "$PROFILE" = "vps" ]; then
   echo ""
   echo "Dominio publico do HUNTER nesta VPS (ex.: hunter.seudominio.com)."
-  echo "Sem dominio, deixe vazio: o Caddy serve em HTTP na porta 80 pelo IP"
-  echo "(sem TLS; o Clerk costuma recusar sign-in fora de um dominio real)."
+  echo "Sem dominio, deixe vazio: o Caddy serve HTTPS pelo IP com um certificado"
+  echo "interno (o navegador pede para aceitar uma vez). HTTP puro nao serve: os"
+  echo "cookies de sessao do Clerk sao Secure e o sign-in entra em loop."
   printf 'DOMINIO (Enter para nenhum): '
   read -r DOMAIN
   DOMAIN="$(printf '%s' "$DOMAIN" | tr -d '[:space:]' | sed 's#^https\{0,1\}://##; s#/.*$##')"
@@ -168,6 +183,7 @@ if [ "$PROFILE" = "vps" ]; then
     PUBLIC_URL="https://$DOMAIN"
     WS_URL="wss://$DOMAIN/ws"
     SITE_ADDRESS="$DOMAIN"
+    TLS_ARG=""   # preenchido com o e-mail do ACME logo abaixo
     # Obrigatorio quando ha dominio: e o endereco que recebe o aviso de
     # certificado prestes a expirar se a renovacao automatica parar.
     while [ -z "$ACME_EMAIL" ]; do
@@ -178,20 +194,22 @@ if [ "$PROFILE" = "vps" ]; then
         *) echo "  e-mail invalido, tente de novo."; ACME_EMAIL="" ;;
       esac
     done
+    TLS_ARG="$ACME_EMAIL"
   else
     printf 'IP publico da VPS (para as URLs do frontend): '
     read -r VPS_IP
     VPS_IP="$(printf '%s' "$VPS_IP" | tr -d '[:space:]')"
     [ -n "$VPS_IP" ] || { echo "sem dominio e sem IP nao da para montar as URLs publicas." >&2; exit 64; }
-    PUBLIC_URL="http://$VPS_IP"
-    WS_URL="ws://$VPS_IP/ws"
-    SITE_ADDRESS=":80"
+    PUBLIC_URL="https://$VPS_IP"
+    WS_URL="wss://$VPS_IP/ws"
+    SITE_ADDRESS="https://$VPS_IP"
+    TLS_ARG="internal"
   fi
 fi
 
 echo ""
-PK="$(read_secret NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY pk_test_)"
-SK="$(read_secret CLERK_SECRET_KEY sk_test_)"
+PK="$(read_secret NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY pk_test_ "$OLD_PK")"
+SK="$(read_secret CLERK_SECRET_KEY sk_test_ "$OLD_SK")"
 
 WHSEC=""
 if [ "$PROFILE" = "vps" ]; then
@@ -199,7 +217,7 @@ if [ "$PROFILE" = "vps" ]; then
   echo "CLERK_WEBHOOK_SECRET e obrigatorio em HUNTER_ENV=staging (o processo se"
   echo "recusa a subir sem ele). Clerk -> Configure -> Webhooks -> seu endpoint"
   echo "($PUBLIC_URL/api/webhooks/clerk) -> Signing Secret."
-  WHSEC="$(read_secret CLERK_WEBHOOK_SECRET whsec_)"
+  WHSEC="$(read_secret CLERK_WEBHOOK_SECRET whsec_ "$OLD_WHSEC")"
 fi
 
 OPENAI="$(read_optional_secret OPENAI_API_KEY)"
@@ -244,6 +262,7 @@ trap 'rm -f "$ENV_TMP"' EXIT
     echo "HUNTER_WS_URL=$WS_URL"
     echo "HUNTER_SITE_ADDRESS=$SITE_ADDRESS"
     echo "HUNTER_ACME_EMAIL=$ACME_EMAIL"
+    echo "HUNTER_TLS_ARG=${TLS_ARG:-internal}"
     echo "WEB_ORIGIN=$PUBLIC_URL"
     # CORS_ALLOWED_ORIGINS de proposito ausente: ApiSettings declara list[str]
     # e o pydantic-settings tenta json.loads no valor ANTES do validador que

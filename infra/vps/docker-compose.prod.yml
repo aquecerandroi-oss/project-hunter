@@ -136,6 +136,8 @@ services:
       # Caddy's {$VAR:default} only falls back when the variable is UNSET; an empty
       # string (no-domain setup) would reach `email` and break the Caddyfile parse.
       HUNTER_ACME_EMAIL: ${HUNTER_ACME_EMAIL:-hunter@example.invalid}
+      # `internal` (IP sem dominio) ou o e-mail do ACME (dominio) - ver Caddyfile.
+      HUNTER_TLS_ARG: ${HUNTER_TLS_ARG:-internal}
     volumes:
       - ../vps/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data      # certificados: perder isto e refazer ACME do zero

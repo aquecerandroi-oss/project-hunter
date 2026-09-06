@@ -9,7 +9,7 @@ Referência completa em `docs/DEPLOYMENT.md`, seção "VPS (Contabo) — operaç
 | Arquivo | O que é |
 |---|---|
 | `docker-compose.prod.yml` | override do compose de dev (portas, restart, staging, Caddy, logs) |
-| `Caddyfile` | borda HTTP: `/api/*` e `/ws` → api, resto → web; TLS automático se houver domínio |
+| `Caddyfile` | borda HTTPS: `/api/*` e `/ws` → api, resto → web; Let's Encrypt com domínio, certificado interno do Caddy sem domínio (`HUNTER_TLS_ARG`) |
 | `compose.sh` | atalho que monta o comando `docker compose` certo (os dois `-f`, o `--env-file`, o nome de projeto) |
 | `backup_postgres.sh` | `pg_dump -Fc` diário em `/opt/backups`, retenção 7 dias, instalado em `/etc/cron.d/hunter-backup` |
 
@@ -197,7 +197,7 @@ ssh -L 8000:127.0.0.1:8000 -L 3000:127.0.0.1:3000 hunter@<ip>
   segurança e a exigência de todos os segredos do Clerk, sem prometer as
   garantias de produção (Fase 4, `ENABLE_LIVE_TRADING` continua `false`).
 - Clerk continua no plano/instância de desenvolvimento (`pk_test_`/`sk_test_`).
-- Sem domínio o Caddy serve HTTP puro pelo IP e o sign-in do Clerk
+- Sem domínio o Caddy serve HTTPS pelo IP com certificado interno (o navegador pede para aceitar uma vez; HTTP puro faz o sign-in do Clerk entrar em loop porque os cookies são `Secure`), e o sign-in do Clerk
   provavelmente não funciona — serve para ver a stack de pé, não para usar.
 - Uma máquina só: sem alta disponibilidade, sem réplica de banco, sem backup
   fora do host.

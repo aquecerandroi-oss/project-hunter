@@ -7,8 +7,8 @@
 #
 # HUNTER_SITE_ADDRESS vem do .env:
 #   hunter.exemplo.com  -> Caddy pede certificado ao Let's Encrypt sozinho
-#   :80                 -> HTTP puro pelo IP, sem TLS (Clerk costuma recusar
-#                          sign-in fora de um dominio real; use so para testar)
+#   https://<ip>        -> HTTPS pelo IP com certificado interno (HUNTER_TLS_ARG=internal);
+#                          o navegador pede para aceitar o certificado uma vez
 {
 	# Sem dominio o ACME nunca roda, entao este endereco nao e usado; com
 	# dominio, o setup_env.sh --vps exige um e-mail valido.
@@ -19,6 +19,13 @@
 }
 
 {$HUNTER_SITE_ADDRESS} {
+	# HUNTER_TLS_ARG (do .env): `internal` = certificado da CA interna do Caddy
+	# (unico jeito de ter HTTPS num IP sem dominio - o navegador avisa uma vez);
+	# um e-mail = ACME/Let's Encrypt para o dominio. HTTPS nao e luxo aqui: o
+	# Clerk grava os cookies de sessao como `Secure; SameSite=None`, e em HTTP
+	# puro o navegador os descarta - a sessao nunca cola e o sign-in entra em
+	# loop de handshake (visto na VPS em 2026-09-06).
+	tls {$HUNTER_TLS_ARG}
 	encode zstd gzip
 
 	# X-Forwarded-For / -Proto / -Host sao adicionados pelo reverse_proxy do
