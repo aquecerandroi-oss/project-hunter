@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Drop the partitions retention no longer covers — DATABASE.md §1.3.
 
-The counterpart of ``create_partitions.py``: that one keeps the future three
-months ahead, this one lets the past go. Both are scheduled on the analytics
-worker.
+The counterpart of ``create_partitions.py``: that one keeps the months around
+the clock — three ahead and, since T2.5f, two behind — this one lets the rest of
+the past go. Both are scheduled on the analytics worker and both read the same
+retention table, ``partition_retention.py``, which is what keeps the creator from
+provisioning a month this job would drop the same night.
 
 Retention is per *partition*, never per row. ``DELETE FROM candles WHERE
 open_time < ...`` would rewrite and bloat the partitions holding the history we
@@ -32,24 +34,22 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import re
 import sys
 from datetime import UTC, datetime
 
+from partition_retention import KEEP_FOREVER, is_expired, retention_days
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from hunter_core.db.models import (
-    detach_partition_sql,
-    list_partition_name,
-    month_bounds,
-)
+from hunter_core.db.models import detach_partition_sql
 from hunter_core.settings import Settings
 
-KEEP_FOREVER: int | None = None
-"""Retention for a relation DATABASE.md §1.3 gives no limit for."""
-
-_MONTH_SUFFIX = re.compile(r"^(?P<owner>.+)_(?P<year>(?:19|20)\d{2})_(?P<month>0[1-9]|1[0-2])$")
+__all__ = ["KEEP_FOREVER", "expired_partitions", "is_expired", "main", "prune", "retention_days"]
+"""``retention_days``/``is_expired`` moved to the sibling ``partition_retention``
+when ``create_partitions.py`` gained a backward horizon (T2.5f) and needed the
+same policy: the creator must not create a month this job would drop the same
+night. Re-exported so this module's surface — and the tests that load it by path
+— are unchanged by the split."""
 
 _CANDIDATES = text(
     "SELECT parent.relname, child.relname "
@@ -64,47 +64,6 @@ Statement = tuple[str, str]
 """``(partition being dropped, SQL)``."""
 
 
-def retention_days(settings: Settings | None = None) -> dict[str, int | None]:
-    """Days of history to keep, per relation that directly owns monthly children.
-
-    The two figures the platform tunes at runtime come from ``Settings``; the
-    rest are the fixed table in DATABASE.md §1.3. Timeframes the document does
-    not give a limit for (``15m``, ``4h``) are kept forever on purpose —
-    inventing a retention for them here would silently delete data no decision
-    covers.
-    """
-    config = settings or Settings()
-    candles = {
-        "1m": config.retention_candles_1m_days,
-        "5m": 365,
-        "15m": KEEP_FOREVER,
-        "1h": KEEP_FOREVER,
-        "4h": KEEP_FOREVER,
-        "1d": KEEP_FOREVER,
-    }
-    equity = {
-        "1m": 30,
-        "5m": KEEP_FOREVER,
-        "15m": KEEP_FOREVER,
-        "1h": KEEP_FOREVER,
-        "4h": KEEP_FOREVER,
-        "1d": KEEP_FOREVER,
-    }
-    policy: dict[str, int | None] = {
-        "audit_logs": KEEP_FOREVER,
-        "system_events": 30,
-        "market_snapshots": 30,
-        "liquidations": 30,
-        "opportunity_history": 90,
-        "feature_snapshots": config.retention_feature_snapshots_days,
-    }
-    for label, days in candles.items():
-        policy[list_partition_name("candles", label)] = days
-    for label, days in equity.items():
-        policy[list_partition_name("portfolio_equity_snapshots", label)] = days
-    return policy
-
-
 def migration_url() -> str:
     """``DATABASE_URL_MIGRATIONS`` on the asyncpg driver."""
     secret = Settings().database_url_migrations
@@ -114,23 +73,6 @@ def migration_url() -> str:
     if url.startswith("postgresql+"):
         return url
     return url.replace("postgresql://", "postgresql+asyncpg://", 1)
-
-
-def is_expired(child: str, keep_days: int | None, now: datetime) -> bool:
-    """True when every row ``child`` can hold is older than the retention window.
-
-    A monthly partition covers ``[start, end)``; it is expired only once ``end``
-    itself is past the cutoff, so the month a retained row could still fall in is
-    never a candidate.
-    """
-    if keep_days is None:
-        return False
-    match = _MONTH_SUFFIX.match(child)
-    if match is None:
-        return False
-    _lower, upper = month_bounds(int(match["year"]), int(match["month"]))
-    cutoff = now.timestamp() - keep_days * 86400
-    return datetime.strptime(upper, "%Y-%m-%d").replace(tzinfo=UTC).timestamp() <= cutoff
 
 
 def planned_statements(

@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
-"""Keep monthly partitions ahead of the clock — DATABASE.md §1.3.
+"""Keep monthly partitions around the clock — DATABASE.md §1.3.
 
 ``0001_initial_schema`` creates 2026-09 through 2026-12; from there on this
-script owns the future. The analytics worker runs it daily, and a missing
-partition is a `critical` `system_event` — so it must never be the reason an
-insert fails.
+script owns the future **and, since T2.5f, the recent past**. The analytics
+worker runs it daily, and a missing partition is a `critical` `system_event` —
+so it must never be the reason an insert fails.
+
+``--months-behind`` (default 2) is the half that did not exist. The job only
+ever looked forward, so a backfill request for seven days made on the 6th named
+minutes in the previous month that no partition accepted: the market-worker's
+consumer refused 3 300 of 8 547 minutes with ``market_backfill_refused
+reason=no_partition``, and the baseline bootstrap (7 days) and replay/β
+(30 days) would keep hitting it. A past month is created only while retention
+would still keep it (``partition_plan``, ``partition_retention``) — creating one
+the pruner drops the same night would just be the two daily jobs fighting over
+the same partition.
 
 Two shapes are kept ahead. Six parents are plain monthly ``RANGE``; ``candles``
 and ``portfolio_equity_snapshots`` are ``LIST`` on the timeframe first, so this
@@ -71,6 +81,7 @@ Two session guards, ``SET LOCAL`` inside the same transaction as the DDL
 Usage:
     uv run python infra/scripts/create_partitions.py
     uv run python infra/scripts/create_partitions.py --months-ahead 6
+    uv run python infra/scripts/create_partitions.py --months-behind 2
     uv run python infra/scripts/create_partitions.py --dry-run
 """
 
@@ -78,27 +89,22 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import re
 import sys
 from collections.abc import Callable
-from datetime import UTC, datetime
 
 import asyncpg
+from partition_plan import (
+    DEFAULT_MONTHS_AHEAD,
+    DEFAULT_MONTHS_BEHIND,
+    Group,
+    Statement,
+    planned_groups,
+    planned_statements,
+)
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from hunter_core.db.models import (
-    create_list_partition_sql,
-    create_partition_sql,
-    harden_partition_sql,
-    list_partition_name,
-    list_partitioned_tables,
-    monthly_partition_parents,
-    months_from,
-    partition_name,
-    tenant_tables,
-)
 from hunter_core.logging import get_logger
 from hunter_core.settings import Settings
 
@@ -107,23 +113,6 @@ logger = get_logger(__name__)
 _LOCK_TIMEOUT_SQL = "SET LOCAL lock_timeout = '3s'"
 _SESSION_UTC_SQL = "SET LOCAL TimeZone = 'UTC'"
 """D4 / D12 (docs/plans/M1.md) — see the module docstring."""
-
-_DATE_ONLY_BOUND = re.compile(r"'(\d{4}-\d{2}-\d{2})'")
-
-
-def _explicit_utc_bounds(sql: str) -> str:
-    """Rewrite ``_partitions.py``'s bare date bounds to carry an explicit ``+00``.
-
-    ``create_partition_sql`` emits ``FOR VALUES FROM ('2026-09-01') TO
-    ('2026-10-01')`` — a date literal, not a timestamp, so Postgres attaches
-    midnight in the *session* ``TimeZone`` to it (D12). Turning it into
-    ``'2026-09-01 00:00:00+00'`` here makes the statement's own text
-    unambiguous regardless of any session setting, without editing the frozen
-    ``_partitions.py``. A no-op on statements with no date-only literal (the
-    LIST level's ``FOR VALUES IN ('1m')`` never matches this pattern).
-    """
-    return _DATE_ONLY_BOUND.sub(lambda m: f"'{m.group(1)} 00:00:00+00'", sql)
-
 
 _EXISTING_PARTITIONS = text(
     "SELECT c.relname FROM pg_class c "
@@ -138,11 +127,23 @@ present". The statements themselves are unqualified and so resolve through
 ``search_path`` to ``public``; the census has to agree with them.
 """
 
-Statement = tuple[str, str]
-"""``(relation the statement concerns, SQL)``."""
-
-Group = tuple[str, list[Statement]]
-"""``(partitioned parent, its statements)`` — the unit of one transaction."""
+__all__ = [
+    "DEFAULT_MONTHS_AHEAD",
+    "DEFAULT_MONTHS_BEHIND",
+    "Group",
+    "Statement",
+    "ensure_partitions",
+    "main",
+    "migration_url",
+    "planned_groups",
+    "planned_statements",
+]
+"""The plan moved to ``partition_plan`` (T2.5f, 350-line budget) but the two
+test suites that drive this job load *this* file by path and call
+``planned_groups``/``planned_statements`` on it
+(``packages/core/tests/integration/test_schema_seed_and_partitions.py``,
+``infra/scripts/tests/test_create_partitions.py``). Re-exported here so the
+script's public surface is unchanged by an internal split."""
 
 
 def migration_url() -> str:
@@ -154,56 +155,6 @@ def migration_url() -> str:
     if url.startswith("postgresql+"):
         return url
     return url.replace("postgresql://", "postgresql+asyncpg://", 1)
-
-
-def _harden(child: str, root: str, tenants: frozenset[str]) -> list[Statement]:
-    return [
-        (child, sql)
-        for sql in harden_partition_sql(
-            child, tenant=root in tenants, audit_scope=root == "audit_logs"
-        )
-    ]
-
-
-def planned_groups(months_ahead: int, now: datetime | None = None) -> list[Group]:
-    """Everything needed for the current month plus ``months_ahead`` more, per parent.
-
-    Grouped by the *top-level* partitioned table, which is the relation whose
-    lock every statement in the group contends for: the ``candles_1m`` level and
-    every ``candles_1m_YYYY_MM`` under it all belong to ``candles``. Within a
-    group the order still matters — the LIST level is created before the months
-    that hang off it — and the flattened order is unchanged from before.
-    """
-    start = now or datetime.now(UTC)
-    tenants = frozenset(tenant_tables())
-    months = months_from(start, months_ahead + 1)
-    groups: dict[str, list[Statement]] = {}
-
-    for parent, (_column, labels, sub_key) in list_partitioned_tables().items():
-        statements = groups.setdefault(parent, [])
-        for label in labels:
-            intermediate = list_partition_name(parent, label)
-            statements.append((intermediate, create_list_partition_sql(parent, label, sub_key)))
-            statements += _harden(intermediate, parent, tenants)
-
-    for owner, root in monthly_partition_parents().items():
-        statements = groups.setdefault(root, [])
-        for year, month in months:
-            child = partition_name(owner, year, month)
-            sql = _explicit_utc_bounds(create_partition_sql(owner, year, month))
-            statements.append((child, sql))
-            statements += _harden(child, root, tenants)
-
-    return list(groups.items())
-
-
-def planned_statements(months_ahead: int, now: datetime | None = None) -> list[Statement]:
-    """:func:`planned_groups` flattened — what ``--dry-run`` prints."""
-    return [
-        statement
-        for _parent, statements in planned_groups(months_ahead, now)
-        for statement in statements
-    ]
 
 
 async def ensure_partitions(
@@ -288,8 +239,18 @@ def main() -> int:
     parser.add_argument(
         "--months-ahead",
         type=int,
-        default=3,
-        help="months to create beyond the current one (default 3)",
+        default=DEFAULT_MONTHS_AHEAD,
+        help=f"months to create beyond the current one (default {DEFAULT_MONTHS_AHEAD})",
+    )
+    parser.add_argument(
+        "--months-behind",
+        type=int,
+        default=DEFAULT_MONTHS_BEHIND,
+        help=(
+            "months of history to keep writable before the current one "
+            f"(default {DEFAULT_MONTHS_BEHIND}); a past month retention would "
+            "already drop is skipped"
+        ),
     )
     parser.add_argument(
         "--dry-run", action="store_true", help="print the statements without running them"
@@ -299,8 +260,11 @@ def main() -> int:
     if args.months_ahead < 0:
         print("--months-ahead must be >= 0")
         return 2
+    if args.months_behind < 0:
+        print("--months-behind must be >= 0")
+        return 2
 
-    groups = planned_groups(args.months_ahead)
+    groups = planned_groups(args.months_ahead, months_behind=args.months_behind)
     partitions = {name for _parent, statements in groups for name, _sql in statements}
     if args.dry_run:
         for parent, statements in groups:

@@ -4,8 +4,13 @@ The scanner publishes windows it cannot fill itself (the joint M2 decision gives
 REST to the market-worker alone) and, until this task, nobody read them: 29
 messages on the stream and ``XINFO GROUPS`` empty (``.claude/state/t25-proof.md``
 §T2.5b/4). These tests cover the whole path — request, gap rows, REST through the
-existing recovery, candles in Postgres and one ``market.candles.closed`` per
-backfilled minute in the outbox — plus every way a request is *not* served.
+existing recovery, candles in Postgres and the outbox announcement of what got
+recovered — plus every way a request is *not* served.
+
+T2.9c: a window old enough to land in the *history* tier (PIPELINE.md §1b item
+7) is announced as one aggregate ``market.candles.backfilled`` per recovered
+chunk instead of one ``market.candles.closed`` per minute -- see
+``test_backfill_lane.py`` for the tier-threading and throughput tests.
 """
 
 from __future__ import annotations
@@ -107,7 +112,7 @@ async def gaps_of(session_factory: Any, market_id: Any) -> list[IngestionGap]:
         return list(rows)
 
 
-async def test_a_request_becomes_gaps_the_recovery_fills_and_the_outbox_announces(
+async def test_a_request_becomes_gaps_the_recovery_fills_and_the_outbox_announces_the_chunk(
     db_session_factory: Any, redis_client: Any
 ) -> None:
     exchange_code = unique_code()
@@ -156,15 +161,29 @@ async def test_a_request_becomes_gaps_the_recovery_fills_and_the_outbox_announce
                 Candle.source == "rest",
             )
         )
-        announced = await session.scalar(
+        per_minute = await session.scalar(
             select(func.count())
             .select_from(OutboxEvent)
             .where(OutboxEvent.stream == Streams.MARKET_CANDLES_CLOSED)
         )
+        aggregate_rows = (
+            await session.execute(
+                select(OutboxEvent.payload).where(
+                    OutboxEvent.stream == Streams.MARKET_CANDLES_BACKFILLED
+                )
+            )
+        ).all()
     assert candles == 120
-    # Every backfilled minute is announced exactly like a live one — the same
-    # ``upsert_candles`` path enqueues it in the same transaction (durable.py).
-    assert announced == 120
+    # T2.9c: a window three days old lands in the *history* tier
+    # (PIPELINE.md §1b item 7), so the recovery announces the whole chunk as
+    # one aggregate event instead of one ``market.candles.closed`` per
+    # minute — see test_backfill_lane.py for that behaviour end to end.
+    assert per_minute == 0
+    assert len(aggregate_rows) == 1
+    payload = aggregate_rows[0][0]["payload"]
+    assert payload["count"] == 120
+    assert payload["source"] == "rest"
+    assert payload["reason"] == "historical_recovery"
     assert (await gaps_of(db_session_factory, market_id))[0].status == "recovered"
 
 
@@ -487,11 +506,17 @@ async def test_minutes_with_no_partition_are_not_planned(
 ) -> None:
     """Astra's nice-to-have, promoted after the first test run failed on it.
 
-    ``create_partitions.py`` provisions the current month and the ones ahead, so
-    a seven-day request early in a month names minutes no partition accepts. The
-    insert would abort the whole transaction — candles, outbox rows and the
-    gap's status together — and the gap would spend its five attempts on a
-    condition no retry can fix.
+    The insert of a minute no partition accepts would abort the whole
+    transaction — candles, outbox rows and the gap's status together — and the
+    gap would spend its five attempts on a condition no retry can fix.
+
+    **Still true after T2.5f, and that is the point of the window this uses.**
+    ``create_partitions.py`` now also keeps two months *behind* writable, which
+    is what fixed the seven-day request early in a month that motivated this
+    test. It does not — and must not — provision an unbounded past: two years
+    back is outside the horizon *and* outside every retention window in
+    DATABASE.md §1.3, so the refusal is the only correct answer and this test
+    fences it.
     """
     exchange_code = unique_code()
     market_id = await seed_market(db_session_factory, exchange_code, "LINKUSDT")

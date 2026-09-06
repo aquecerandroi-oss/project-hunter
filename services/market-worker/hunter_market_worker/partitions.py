@@ -193,17 +193,28 @@ async def storable_months(
 ) -> set[tuple[int, int]]:
     """Which ``(year, month)`` pairs already have a ``candles_1m`` partition.
 
-    T2.5-backfill. The daily partition job creates the current month and the
-    months **ahead** (``infra/scripts/create_partitions.py``: ``months_from(now,
-    months_ahead + 1)``), so a request for seven days of history on the 3rd of a
-    month names minutes that no partition would accept. Inserting them aborts
-    the whole transaction — candles, outbox rows and the gap's own status
-    transition together — and the gap would burn its five attempts on a
-    condition no retry can fix.
+    T2.5-backfill. Inserting a minute no partition accepts aborts the whole
+    transaction — candles, outbox rows and the gap's own status transition
+    together — and the gap would burn its five attempts on a condition no retry
+    can fix. So the consumer asks first and plans only what can be stored,
+    saying in the log which month is missing. Only ``candles`` is checked: a
+    REST backfill writes candles and nothing else.
 
-    So the consumer asks first and plans only what can be stored, saying in the
-    log which month is missing. Only ``candles`` is checked: a REST backfill
-    writes candles and nothing else.
+    **The policy this reflects changed in T2.5f.** The daily job used to create
+    the current month and the months *ahead* only, so a request for seven days
+    made early in a month was refused for the whole previous month (3 300 of
+    8 547 minutes, 2026-09-06). ``infra/scripts/create_partitions.py`` now also
+    keeps ``--months-behind`` (default 2) of the past writable, bounded by
+    retention: a month the pruner would drop is not created, because creating it
+    would only start a nightly fight between the two jobs.
+
+    This function is unchanged by that, and deliberately so: it asks the
+    database what exists (``to_regclass``) instead of recomputing the policy.
+    The policy is what *should* be there; ``to_regclass`` is what *is*. A month
+    older than the horizon, a month past retention, a job that has not run yet
+    or was skipped on a ``lock_timeout`` (it exits 75 and retries tomorrow) —
+    all of them still produce a month the consumer must refuse rather than
+    abort a transaction on.
     """
     storable: set[tuple[int, int]] = set()
     for year, month in months:

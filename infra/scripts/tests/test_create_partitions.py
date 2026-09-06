@@ -1,4 +1,5 @@
-"""Unit tests for the D4/D12 fixes in ``infra/scripts/create_partitions.py``.
+"""Unit tests for ``infra/scripts/create_partitions.py``: the D4/D12 fixes and
+the T2.5f backward horizon (``--months-behind``).
 
 Location note: the repo's existing coverage for this script is integration-only,
 against a real Postgres, in
@@ -13,18 +14,20 @@ two ``SET LOCAL`` statements later, that file is where it belongs; this one
 does not depend on it and does not modify it.
 
 Run:
-    uv run pytest infra/scripts/tests/test_create_partitions.py -v
+    uv run pytest infra/scripts/tests -q
 
-Not wired into ``[tool.pytest.ini_options] testpaths`` (``pyproject.toml`` only
-lists ``packages``, ``apps``, ``services``, ``tests`` — outside this change's
-file scope), so a bare ``uv run pytest`` will not pick this file up on its own;
-it must be named explicitly, as above, or ``testpaths`` extended separately.
+``testpaths`` in ``pyproject.toml`` has since been extended with ``infra``, so a
+bare ``uv run pytest`` collects this file too (the note here used to say the
+opposite). The real-Postgres half of T2.5f lives next door in
+``test_create_partitions_integration.py``.
 """
 
 from __future__ import annotations
 
 import asyncio
 import importlib.util
+import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -35,7 +38,8 @@ from sqlalchemy.exc import DBAPIError
 
 pytestmark = pytest.mark.unit
 
-SCRIPT_PATH = Path(__file__).resolve().parents[1] / "create_partitions.py"
+SCRIPTS_DIR = Path(__file__).resolve().parents[1]
+SCRIPT_PATH = SCRIPTS_DIR / "create_partitions.py"
 
 
 def _load_module() -> ModuleType:
@@ -44,7 +48,15 @@ def _load_module() -> ModuleType:
     A fresh module object per test (no shared ``sys.modules`` entry reused
     across tests) so ``monkeypatch.setattr`` on one test's module never leaks
     into another's.
+
+    ``infra/scripts`` goes on ``sys.path`` first, the same surgery
+    ``packages/core/tests/integration/conftest.py::_load_script`` does: since
+    T2.5f the script imports its plan from the sibling ``partition_plan``
+    module, which running it as ``python infra/scripts/create_partitions.py``
+    resolves for free and loading it by path does not.
     """
+    if str(SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS_DIR))
     spec = importlib.util.spec_from_file_location("hunter_infra_create_partitions_ut", SCRIPT_PATH)
     assert spec is not None
     assert spec.loader is not None
@@ -251,3 +263,176 @@ def test_a_non_lock_timeout_error_still_propagates(monkeypatch: pytest.MonkeyPat
 
     with pytest.raises(DBAPIError):
         asyncio.run(module.ensure_partitions(groups))
+
+
+# --- T2.5f: months behind ----------------------------------------------------
+#
+# The job only ever looked forward, so a seven-day backfill request made early
+# in a month named minutes no partition accepted and the market-worker's
+# consumer refused them with ``no_partition`` (notes-T2.5 §31). These tests fix
+# the new half of the policy: how far back the job provisions, and the one
+# condition under which it declines to.
+
+
+def _months_of(groups: list[Any], owner: str) -> list[tuple[int, int]]:
+    """The ``(year, month)`` pairs planned for one monthly owner, in plan order."""
+    prefix = f"{owner}_"
+    months: list[tuple[int, int]] = []
+    for _parent, statements in groups:
+        for name, sql in statements:
+            if not sql.startswith("CREATE TABLE IF NOT EXISTS") or "FOR VALUES FROM" not in sql:
+                continue
+            if not name.startswith(prefix):
+                continue
+            year, month = name[len(prefix) :].split("_")
+            months.append((int(year), int(month)))
+    return months
+
+
+def test_the_default_horizon_reaches_two_months_back() -> None:
+    """The fix itself: without asking, the job now provisions the recent past.
+
+    Two, because the widest window anyone asks for is 30 days (replay/β) and
+    one month back is its strict minimum, with no room for a request whose
+    window ends a few days in the past.
+    """
+    module = _load_module()
+    now = datetime(2026, 9, 6, tzinfo=UTC)
+
+    months = _months_of(module.planned_groups(3, now), "candles_1m")
+
+    assert module.DEFAULT_MONTHS_BEHIND == 2
+    assert months[:3] == [(2026, 7), (2026, 8), (2026, 9)]
+    assert months[-1] == (2026, 12), "the forward horizon must be untouched"
+
+
+def test_months_behind_zero_plans_exactly_what_the_job_planned_before() -> None:
+    """Regression fence: the new parameter is additive, not a rewrite.
+
+    With ``--months-behind 0`` the plan is the current month and the ones
+    ahead — statement for statement, the behaviour every existing test of this
+    script was written against.
+    """
+    module = _load_module()
+    now = datetime(2026, 9, 6, tzinfo=UTC)
+
+    groups = module.planned_groups(3, now, 0)
+
+    assert _months_of(groups, "candles_1m") == [(2026, 9), (2026, 10), (2026, 11), (2026, 12)]
+    assert _months_of(groups, "audit_logs") == [(2026, 9), (2026, 10), (2026, 11), (2026, 12)]
+
+
+def test_a_backward_month_retention_already_expired_is_not_planned() -> None:
+    """The guard, per owner: never create what the pruner drops the same night.
+
+    On 2026-09-06 the 30-day retention of ``market_snapshots`` still covers
+    August (its upper bound, 2026-09-01, is after the 2026-08-07 cutoff) but no
+    longer July, while ``candles_1m``'s 90 days covers both. One global "keep
+    two months back" would either starve candles or make the short-retention
+    parents churn: created at 04:07, dropped by ``prune_partitions.py`` at
+    04:12, every night, each taking ``ACCESS EXCLUSIVE`` on the parent for
+    nothing.
+    """
+    module = _load_module()
+    now = datetime(2026, 9, 6, tzinfo=UTC)
+
+    groups = module.planned_groups(0, now)
+
+    assert _months_of(groups, "candles_1m")[:2] == [(2026, 7), (2026, 8)]
+    assert _months_of(groups, "market_snapshots") == [(2026, 8), (2026, 9)]
+    assert _months_of(groups, "liquidations") == [(2026, 8), (2026, 9)]
+    # audit_logs is kept forever, so nothing is ever filtered out of its past
+    assert _months_of(groups, "audit_logs") == [(2026, 7), (2026, 8), (2026, 9)]
+
+
+def test_a_parent_whose_whole_window_has_passed_gets_no_past_at_all() -> None:
+    """14-day retention (``feature_snapshots``) late in a month: no backward month.
+
+    On 2026-09-20 the cutoff is 2026-09-06, past August's upper bound — every
+    row August could still hold is already expired. Planning it would create a
+    partition with nothing legal to put in it.
+    """
+    module = _load_module()
+    now = datetime(2026, 9, 20, tzinfo=UTC)
+
+    assert _months_of(module.planned_groups(0, now), "feature_snapshots") == [(2026, 9)]
+
+
+def test_the_plan_never_contains_a_month_the_pruner_would_drop() -> None:
+    """The invariant, read from the *other* job's own function, all year round.
+
+    ``partition_retention.is_expired`` is what ``prune_partitions.py`` plans
+    with; asserting against it is what makes "the two daily jobs cannot fight"
+    a property rather than a comment. Checked on every 5th day of a year so a
+    month boundary, a February and a year rollover are all included.
+    """
+    module = _load_module()
+    if str(SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS_DIR))
+    import partition_retention
+
+    policy = partition_retention.retention_days()
+    day = datetime(2026, 9, 1, tzinfo=UTC)
+    for _ in range(73):
+        day += timedelta(days=5)
+        for owner, keep_days in policy.items():
+            for year, month in _months_of(module.planned_groups(3, day), owner):
+                child = f"{owner}_{year:04d}_{month:02d}"
+                assert not partition_retention.is_expired(child, keep_days, day), (
+                    f"{child} would be planned on {day.date()} and dropped by prune the same day"
+                )
+
+
+def test_ninety_day_retention_covers_the_two_months_behind_every_day_of_a_year() -> None:
+    """``candles_1m`` is the parent the backfill actually writes to.
+
+    DATABASE.md §1.3 requires the retention window to be at least
+    ``months-behind + 1`` months for a parent that receives history: 90 days is
+    ≥ 3 calendar months in the worst case, so the guard above never trims
+    ``candles_1m``'s past — proven for every 5th day of a year rather than for
+    the one date this was written on.
+    """
+    module = _load_module()
+    day = datetime(2026, 9, 1, tzinfo=UTC)
+    for _ in range(73):
+        day += timedelta(days=5)
+        months = _months_of(module.planned_groups(0, day), "candles_1m")
+        assert len(months) == 3, f"candles_1m lost a backward month on {day.date()}: {months}"
+
+
+def test_thirty_days_back_from_the_first_of_march_needs_the_second_month() -> None:
+    """Why the default is 2 and not 1 — the case Astra's review of this diff produced.
+
+    2027-03-01 minus 30 days is 2027-01-30: a 30-day replay window opened on the
+    first of March reaches **January**, not February, because February is short.
+    With one month behind, that request would be refused for its oldest two
+    days, which is the same ``no_partition`` this task exists to remove.
+    """
+    module = _load_module()
+    now = datetime(2027, 3, 1, tzinfo=UTC)
+
+    assert (now - timedelta(days=30)).month == 1
+    assert _months_of(module.planned_groups(0, now), "candles_1m")[:2] == [(2027, 1), (2027, 2)]
+
+
+def test_expiry_flips_at_a_utc_midnight_and_the_plan_moves_with_it() -> None:
+    """The boundary the invariant is stated at: same instant, same answer.
+
+    ``feature_snapshots`` keeps 14 days, so August's upper bound (2026-09-01)
+    falls out of the window between 2026-09-14 23:59 and 2026-09-15 00:00 UTC.
+    A run planned just before that midnight and pruned just after can therefore
+    create a month the next prune drops — once, self-healing (the next plan no
+    longer contains it), and never at the cost of a retained row. Written down
+    as a test so the "the two jobs cannot fight" claim keeps its "at the same
+    instant" qualifier.
+    """
+    module = _load_module()
+
+    before = datetime(2026, 9, 14, 23, 59, tzinfo=UTC)
+    after = datetime(2026, 9, 15, 0, 1, tzinfo=UTC)
+
+    assert _months_of(module.planned_groups(0, before), "feature_snapshots") == [
+        (2026, 8),
+        (2026, 9),
+    ]
+    assert _months_of(module.planned_groups(0, after), "feature_snapshots") == [(2026, 9)]

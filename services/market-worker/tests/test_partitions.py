@@ -4,7 +4,7 @@ CRITICAL ``system_event`` — not be discovered by a failed insert months later.
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -12,12 +12,15 @@ from sqlalchemy import select
 
 from hunter_core.db.models.system import SystemEvent
 from hunter_core.db.session import role_session
+from hunter_core.domain.types import utcnow
 from hunter_market_worker import partitions
 from hunter_market_worker.partitions import (
     PartitionReadiness,
     PartitionsMissing,
     assert_writable_partitions,
 )
+
+from .db_helpers import ensure_candle_partition
 
 pytestmark = pytest.mark.integration
 
@@ -209,3 +212,42 @@ async def test_a_hanging_system_event_still_leaves_a_missing_partition_fatal(
             await assert_writable_partitions(
                 db_session_factory, now=lambda: datetime(2027, 4, 1, tzinfo=UTC)
             )
+
+
+# --- T2.5f: the months behind the partition job now provisions ----------------
+
+
+async def test_a_month_inside_the_backward_policy_is_storable(db_session_factory: Any) -> None:
+    """``storable_months`` says yes once the month exists — which is what changed.
+
+    T2.5f gave ``infra/scripts/create_partitions.py`` a ``--months-behind``
+    horizon (default 2, bounded by retention), so the months a 7-day or 30-day
+    backfill names are provisioned instead of refused. This asserts the
+    consumer's side of that contract: with the partition in place, the planner
+    stops excluding those minutes. The partition is created here the way the job
+    creates it (same ``_partitions.py`` helpers, same hardening) because the
+    test database is migrated, not job-managed.
+    """
+    target = utcnow() - timedelta(days=45)
+    await ensure_candle_partition(db_session_factory, target)
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        storable = await partitions.storable_months(session, {(target.year, target.month)})
+
+    assert storable == {(target.year, target.month)}
+
+
+async def test_a_month_outside_every_horizon_is_still_refused(db_session_factory: Any) -> None:
+    """The refusal did not become dead code: two years back has no partition.
+
+    The backward horizon is bounded (two months, and never past retention), so
+    ``storable_months`` remains the guard that keeps an unstorable minute from
+    aborting the whole transaction — see
+    ``test_backfill_consumer.py::test_minutes_with_no_partition_are_not_planned``.
+    """
+    ancient = utcnow() - timedelta(days=730)
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        storable = await partitions.storable_months(session, {(ancient.year, ancient.month)})
+
+    assert storable == set()

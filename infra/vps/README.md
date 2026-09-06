@@ -98,12 +98,19 @@ para outro host / object storage) ainda não existe.
 ## Partições diárias
 
 `infra/scripts/create_partitions.py` mantém as partições mensais de `candles`
-e companhia três meses à frente (DATABASE.md §1.3); sem isso o primeiro
-insert do mês sem partição derruba o flush inteiro (`no partition of relation
-"candles_1m" found for row` — docs/plans/M1.md, "Agendamento real das
-partições"). A T1.3 já cobre a **detecção** (readiness check + `system_event`
-critical quando falta partição para `now + 1 dia`); o agendamento abaixo é a
-**prevenção**.
+e companhia três meses à frente **e dois meses para trás** (DATABASE.md §1.3);
+sem isso o primeiro insert do mês sem partição derruba o flush inteiro (`no
+partition of relation "candles_1m" found for row` — docs/plans/M1.md,
+"Agendamento real das partições"). A T1.3 já cobre a **detecção** (readiness
+check + `system_event` critical quando falta partição para `now + 1 dia`); o
+agendamento abaixo é a **prevenção**.
+
+Os dois meses para trás (`--months-behind`, padrão 2) são o que faz backfill de
+histórico ter onde cair: sem eles um pedido de 7 dias feito no começo do mês era
+recusado com `market_backfill_refused reason=no_partition` (T2.5f). Um mês para
+trás que a retenção já não cubra **não** é criado — seria criado às 04:07 e
+derrubado por `prune_partitions.py` logo depois. O cron abaixo não muda: o
+padrão já é 2.
 
 Rodar a mão (mesmo `docker compose run --rm` que `migrate`/`seed` usam —
 `compose.sh` não tem um atalho dedicado para isto, mas encaminha qualquer
