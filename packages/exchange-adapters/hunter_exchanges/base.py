@@ -76,11 +76,22 @@ class ExchangeError(Exception):
 
 
 class RateLimited(ExchangeError):
-    """The exchange (or our own token bucket) refused the call; wait ``retry_after_s``."""
+    """The exchange (or our own token bucket) refused the call; wait ``retry_after_s``.
 
-    def __init__(self, message: str, *, exchange: str, retry_after_s: float) -> None:
+    ``reason`` names *why* our own side refused when the refusal was not about
+    spent budget — today only ``"redis_unavailable"``, i.e. REST admissions are
+    suspended because the shared rate-limit coordination cannot be reached
+    (T2.9, fail-closed). Callers that want to wait for coordination to come
+    back instead of burning a retry attempt branch on it; ``None`` means the
+    ordinary "no budget right now".
+    """
+
+    def __init__(
+        self, message: str, *, exchange: str, retry_after_s: float, reason: str | None = None
+    ) -> None:
         super().__init__(message, exchange=exchange, retryable=True)
         self.retry_after_s = retry_after_s
+        self.reason = reason
 
 
 class ExchangeUnavailable(ExchangeError):

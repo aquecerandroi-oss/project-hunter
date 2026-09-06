@@ -63,7 +63,12 @@ async def test_handle_event_ticker_writes_hot_state(redis_client: Any) -> None:
     assert raw[b"last"] == b"50000"
 
 
-async def test_handle_event_final_candle_queues_and_publishes(redis_client: Any) -> None:
+async def test_handle_event_final_candle_queues_without_publishing(redis_client: Any) -> None:
+    """T2.9: a closed candle is durable, so ingest only queues it. The
+    ``market.candles.closed`` event is written to ``outbox_events`` inside the
+    transaction that persists the candle and published from there — see
+    ``test_outbox_producers.py``. Publishing here used to announce candles a
+    failed flush never stored."""
     queues = PersistQueues()
     candle = builders.candle("BTCUSDT", is_final=True)
     await handle_event(
@@ -73,12 +78,7 @@ async def test_handle_event_final_candle_queues_and_publishes(redis_client: Any)
     queued = queues.events.get_nowait()
     assert isinstance(queued, NormalizedCandle)
     assert queued is candle
-
-    envelope = await _last_stream_payload(redis_client, Streams.MARKET_CANDLES_CLOSED)
-    assert envelope.type == Streams.MARKET_CANDLES_CLOSED
-    assert envelope.producer == PRODUCER
-    assert envelope.key == f"{builders.EXCHANGE}:BTCUSDT"
-    assert envelope.payload["is_final"] is True
+    assert await redis_client.xrange(Streams.MARKET_CANDLES_CLOSED) == []
 
 
 async def test_handle_event_non_final_candle_is_not_queued(redis_client: Any) -> None:

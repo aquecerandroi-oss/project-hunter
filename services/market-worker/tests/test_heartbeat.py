@@ -47,6 +47,7 @@ async def test_write_hash_has_every_documented_field_and_ttl(redis_client: Any) 
         "reconnects",
         "markets_monitored",
         "open_gaps",
+        "rest_gate",
         "ts",
     ):
         assert name in fields

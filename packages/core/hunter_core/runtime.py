@@ -67,6 +67,16 @@ class WorkerRuntime:
         self._error_count = 0
         self._last_success: datetime | None = None
         self.readiness_checks: list[Callable[[], Awaitable[bool]]] = []
+        self.status_details: dict[str, Callable[[], str]] = {}
+        """Non-verdict state reported next to the ``/ready`` checks (T2.9).
+
+        A readiness *check* answers "should traffic reach me"; a status detail
+        answers "what is degraded right now". The market-worker's ``rest_gate``
+        is the first one: ``"suspended"`` while the shared rate-limit
+        coordination is unreachable, which an operator has to see, but which
+        must not turn readiness red — the WebSocket keeps ingesting. Each
+        callable is a cheap, synchronous state read (no IO).
+        """
         self.app: ASGIApp = self._build_app()
 
     def mark_success(self) -> None:
@@ -117,7 +127,7 @@ class WorkerRuntime:
         async def ready(_request: Request) -> JSONResponse:
             db_ok = await check_database(self.engine)
             redis_ok = await check_redis(self.redis)
-            details = {"database": db_ok, "redis": redis_ok}
+            details: dict[str, bool | str] = {"database": db_ok, "redis": redis_ok}
             checks_ok = db_ok and redis_ok
             for index, check in enumerate(self.readiness_checks):
                 try:
@@ -129,6 +139,19 @@ class WorkerRuntime:
                     name = f"{name}_{index}"
                 details[name] = ok
                 checks_ok = checks_ok and ok
+            for name, describe in self.status_details.items():
+                # A diagnostic never replaces a verdict it does not
+                # participate in: the body is what a human reads during an
+                # incident, and `redis: "suspended"` hiding `redis: false`
+                # would hide the reason for the 503 itself.
+                key = name
+                while key in details:  # never lands on a second verdict either
+                    key = f"{key}_detail"
+                try:
+                    details[key] = describe()
+                except Exception:
+                    # And it may not take the endpoint down with it either.
+                    details[key] = "unknown"
             return JSONResponse(details, status_code=200 if checks_ok else 503)
 
         return Starlette(

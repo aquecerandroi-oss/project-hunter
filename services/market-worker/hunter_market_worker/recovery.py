@@ -16,8 +16,10 @@ from hunter_core.domain.market import align_open_time
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_core.observability import candle_gaps_total, market_ingestion_gaps
+from hunter_exchanges.rate_limit_suspension import is_coordination_outage
 from hunter_market_worker import recovery_queries as queries
 from hunter_market_worker.persist import load_market_ids, upsert_candles
+from hunter_market_worker.supervision import rest_gate_suspended
 
 logger = get_logger(__name__)
 CHECK_INTERVAL_S = 60
@@ -151,6 +153,9 @@ async def recover_registered(
                 )
                 gap.gap_start = earliest
         async with session.begin_nested():
+            # ``upsert_candles`` also queues the ``market.candles.closed``
+            # event for every backfilled minute, in this same transaction —
+            # a recovered candle is announced exactly like a live one (T2.9).
             inserted = await upsert_candles(session, closed, {symbol: gap.market_id}, source="rest")
             present = await queries.persisted(session, gap.market_id, gap.gap_start, gap.gap_end)
             if expected_times(gap.gap_start, gap.gap_end) <= present:
@@ -158,7 +163,20 @@ async def recover_registered(
                 gap.recovered_at = now
                 candle_gaps_total.labels(exchange=adapter.code).inc()
                 logger.info("market_gap_recovered", symbol=symbol, candles_inserted=inserted)
-    except Exception:
+    except Exception as exc:
+        if is_coordination_outage(exc) or rest_gate_suspended(adapter):
+            # T2.9: the outage started mid-cycle, after the gate was checked.
+            # It must not spend an attempt towards MAX_ATTEMPTS, which would
+            # park the gap as ``failed`` for FAILED_RETRY_AFTER_S.
+            #
+            # The *state* of the gate decides, not only the exception type
+            # (Astra, round 4): FETCH_TIMEOUT_S is 20s and the limiter's
+            # max_wait_s is 30s, so the usual way this shows up is the fetch
+            # being cancelled by the timeout long before ``acquire`` gets to
+            # raise ``RateLimited(reason="redis_unavailable")``.
+            gap.attempts -= 1  # an infrastructure outage is not this gap's fault
+            logger.warning("market_gap_deferred_rest_gate", symbol=symbol)
+            return
         logger.exception("market_gap_backfill_failed", symbol=symbol, attempt=gap.attempts)
     if gap.status != "recovered" and gap.attempts >= MAX_ATTEMPTS:
         gap.status = "failed"
@@ -297,6 +315,7 @@ async def run_recovery(
 ) -> None:
     last_check = float("-inf")
     last_reconnects = heartbeat_state.reconnects
+    waiting_for_gate = False
     while True:
         await asyncio.sleep(POLL_S)
         now = time.monotonic()
@@ -304,6 +323,18 @@ async def run_recovery(
             now, last_check, heartbeat_state.reconnects, last_reconnects, universe.symbols
         ):
             continue
+        if rest_gate_suspended(adapter):
+            # Deliberately *before* ``last_check`` is consumed, so the next
+            # poll retries in POLL_S instead of a whole CHECK_INTERVAL_S: the
+            # gate can re-open at any moment and the backlog should not wait
+            # a minute more than the outage lasted. Not a worker error.
+            if not waiting_for_gate:
+                logger.warning("market_recovery_waiting_for_rest_gate", exchange=adapter.code)
+                waiting_for_gate = True
+            continue
+        if waiting_for_gate:
+            logger.info("market_recovery_rest_gate_reopened", exchange=adapter.code)
+            waiting_for_gate = False
         last_check, last_reconnects = now, heartbeat_state.reconnects
         try:
             await check_gaps(session_factory, adapter, universe.symbols, heartbeat_state)

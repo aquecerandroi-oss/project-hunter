@@ -5,6 +5,14 @@ docs/plans/M1.md T1.3 item 2 / PIPELINE.md Â§1.2-Â§1.4. Subscribes
 state (``hot_state.py``) immediately, coalesces ticks per symbol every
 ``tick_coalesce_ms`` into one ``market.ticks`` event + ``rt:market:{ex}:{sym}``
 publish, and forwards final candles / liquidations to the persist queue.
+
+T2.9: this module only publishes what is *ephemeral*. Closed candles, open
+interest, liquidations and realized funding are durable — they are queued in
+the transaction that persists them (``durable.py``) and reach Redis from the
+outbox dispatcher, so no consumer can ever see an event whose row is not
+there. What stays here is the funding **estimate** from the WS mark-price
+stream: nobody persists it, the next message supersedes it within seconds, and
+paying an outbox round trip for it would only add lag.
 """
 
 from __future__ import annotations
@@ -19,7 +27,6 @@ from hunter_core.domain.market import (
     NormalizedOrderBook,
     NormalizedTicker,
     NormalizedTrade,
-    to_wire,
 )
 from hunter_core.domain.types import utcnow
 from hunter_core.events.envelope import EventEnvelope
@@ -42,7 +49,7 @@ from hunter_market_worker.coalesce import (
 from hunter_market_worker.coalesce import (
     flush_ticks as flush_ticks,
 )
-from hunter_market_worker.publication import liquidation_id, publish
+from hunter_market_worker.publication import publish
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
@@ -89,7 +96,14 @@ async def publish_derivatives(
     *,
     funding: NormalizedFunding | None,
     oi: NormalizedOpenInterest | None,
+    funding_kind: str | None = "estimated",
 ) -> None:
+    """The **ephemeral** derivatives publication (the WS funding estimate).
+
+    ``funding_kind`` is on every derivatives event, durable or not, so a
+    consumer can tell an estimate from a settlement without inferring it from
+    which fields are populated (Astra, T2.9 round 1).
+    """
     source_ts = funding.ts if funding is not None else oi.ts if oi is not None else utcnow()
     payload = {
         "exchange": exchange,
@@ -106,6 +120,8 @@ async def publish_derivatives(
         "index_price": str(funding.index_price)
         if funding and funding.index_price is not None
         else None,
+        "funding_kind": funding_kind,
+        "bucket_ts": None,
         "ts": source_ts.isoformat(),
     }
     envelope = EventEnvelope(
@@ -116,38 +132,6 @@ async def publish_derivatives(
     )
     await publish(
         redis, Streams.MARKET_DERIVATIVES, envelope, DEFAULT_MAXLEN[Streams.MARKET_DERIVATIVES]
-    )
-
-
-async def _publish_candle_closed(
-    redis: redis_asyncio.Redis, producer: str, candle: NormalizedCandle
-) -> None:
-    envelope = EventEnvelope(
-        type=Streams.MARKET_CANDLES_CLOSED,
-        producer=producer,
-        key=f"{candle.exchange}:{candle.symbol}",
-        payload=to_wire(candle),
-    )
-    await publish(
-        redis,
-        Streams.MARKET_CANDLES_CLOSED,
-        envelope,
-        DEFAULT_MAXLEN[Streams.MARKET_CANDLES_CLOSED],
-    )
-
-
-async def publish_liquidation(
-    redis: redis_asyncio.Redis, producer: str, liq: NormalizedLiquidation
-) -> None:
-    envelope = EventEnvelope(
-        event_id=liquidation_id(liq),
-        type=Streams.MARKET_LIQUIDATIONS,
-        producer=producer,
-        key=f"{liq.exchange}:{liq.symbol}",
-        payload=to_wire(liq),
-    )
-    await publish(
-        redis, Streams.MARKET_LIQUIDATIONS, envelope, DEFAULT_MAXLEN[Streams.MARKET_LIQUIDATIONS]
     )
 
 
@@ -195,8 +179,11 @@ async def handle_event(
         if not await hot_state.push_candle(redis, event, event_ts=event.event_ts):
             return False
         if event.is_final:
+            # Durable (T2.9): queued here, published by the outbox once the
+            # candle row itself has committed. The eager publish that used to
+            # sit on this line put candles on the stream that a failed flush
+            # then never persisted.
             _enqueue(queues, event)
-            await _publish_candle_closed(redis, producer, event)
     elif isinstance(event, NormalizedFunding):
         if not await hot_state.write_funding(redis, event):
             return False
@@ -206,10 +193,9 @@ async def handle_event(
     elif isinstance(event, NormalizedOpenInterest):
         if not await hot_state.write_open_interest(redis, event):
             return False
+        # Durable (T2.9): open_interest_history is written from the queue, and
+        # the event goes out with that row.
         _enqueue(queues, event)
-        await publish_derivatives(
-            redis, producer, event.exchange, event.symbol, funding=None, oi=event
-        )
     else:
         _enqueue(queues, event)
         # Liquidations publish only after the persistence transaction commits.
@@ -217,4 +203,4 @@ async def handle_event(
     return True
 
 
-__all__ = ["coalesce_loop", "publish_liquidation", "publish_derivatives"]
+__all__ = ["coalesce_loop", "publish_derivatives"]

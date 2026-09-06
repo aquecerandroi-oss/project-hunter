@@ -92,6 +92,16 @@ class BinanceAdapter:
     def connection_states(self) -> dict[str, ConnectionState]:
         return self._ws.connection_states()
 
+    def rest_gate_status(self) -> str:
+        """``"ok"``/``"suspended"`` REST admissions (T2.9).
+
+        Additive, like ``connection_states()``: not part of the
+        :class:`~hunter_exchanges.base.ExchangeAdapter` Protocol, so an adapter
+        or fake that predates it is not forced to implement it — readers use
+        ``getattr`` and default to ``"ok"``.
+        """
+        return self._rest.rest_gate_status()
+
     async def aclose(self) -> None:
         await self._ws.aclose()
         await self._rest.aclose()

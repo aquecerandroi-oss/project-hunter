@@ -5,7 +5,7 @@ from datetime import timedelta
 from typing import Any, cast
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from hunter_core.db.models.market_data import (
     IngestionGap,
@@ -13,11 +13,12 @@ from hunter_core.db.models.market_data import (
     MarketSnapshot,
     OpenInterestHistory,
 )
-from hunter_core.db.models.system import SystemEvent
+from hunter_core.db.models.system import OutboxEvent, SystemEvent
 from hunter_core.db.session import role_session
 from hunter_core.events.envelope import EventEnvelope
+from hunter_core.events.outbox import dispatch_pending
 from hunter_core.observability import market_publish_failures_total
-from hunter_market_worker import ingest, persist, publication
+from hunter_market_worker import persist, publication
 from hunter_market_worker.queues import Loss, PersistQueues, Snapshot
 
 from . import builders
@@ -28,42 +29,49 @@ from .universe_test_helpers import unique_code
 pytestmark = pytest.mark.integration
 
 
-async def test_liquidation_commits_before_publication_with_same_uuid(
+async def test_a_liquidation_reaches_the_stream_only_after_its_row_committed(
     db_session_factory: Any, redis_client: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """T2.9 makes this a transactional guarantee instead of an ordering
+    convention: the event is written to ``outbox_events`` *inside* the
+    transaction that inserts the liquidation, so it cannot be on the stream
+    while the row is not in Postgres. The identity is the same uuid5 end to
+    end — row primary key, outbox ``event_id`` and envelope ``event_id``."""
     code = unique_code()
     await seed_market(db_session_factory, code, "BTCUSDT")
     liq = builders.liquidation("BTCUSDT", exchange=code)
     same = liq.model_copy(update={"price": liq.price.quantize(builders.Decimal("0.00"))})
     assert publication.liquidation_id(liq) == publication.liquidation_id(same)
-    observed = asyncio.Event()
-    original = ingest.publish_liquidation
-
-    async def check_commit(redis: Any, producer: str, item: Any) -> None:
-        # D11: the stored ts is truncated to the millisecond to match the
-        # precision liquidation_id() hashes — not the raw microsecond value.
-        expected_ts = item.ts.replace(microsecond=(item.ts.microsecond // 1000) * 1000)
-        async with role_session(db_session_factory, db_role="hunter_worker") as session:
-            row = await session.scalar(
-                select(Liquidation).where(Liquidation.id == publication.liquidation_id(item))
-            )
-            assert row is not None and row.ts == expected_ts
-        await original(redis, producer, item)
-        observed.set()
-
-    monkeypatch.setattr(ingest, "publish_liquidation", check_commit)
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        await session.execute(delete(OutboxEvent))  # count only this test's event
     monkeypatch.setattr(persist, "FLUSH_INTERVAL_S", 0.01)
     queues = PersistQueues()
     queues.events.put_nowait(liq)
-    task = asyncio.create_task(
-        persist.drain_loop(db_session_factory, code, queues, FakeRuntime(redis_client))
-    )
+    runtime = FakeRuntime(redis_client)
+
+    task = asyncio.create_task(persist.drain_loop(db_session_factory, code, queues, runtime))
     try:
-        await asyncio.wait_for(observed.wait(), 5)
+        await asyncio.wait_for(runtime.success.wait(), 5)
     finally:
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
+
+    # D11: the stored ts is truncated to the millisecond to match the
+    # precision liquidation_id() hashes — not the raw microsecond value.
+    expected_ts = liq.ts.replace(microsecond=(liq.ts.microsecond // 1000) * 1000)
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        row = await session.scalar(
+            select(Liquidation).where(Liquidation.id == publication.liquidation_id(liq))
+        )
+        assert row is not None and row.ts == expected_ts
+        queued = await session.scalar(
+            select(OutboxEvent).where(OutboxEvent.event_id == publication.liquidation_id(liq))
+        )
+        assert queued is not None and queued.stream == "market.liquidations"
+
+    assert await redis_client.xrange("market.liquidations") == [], "not published yet"
+    assert await dispatch_pending(redis_client, db_session_factory) == 1
     rows = await redis_client.xrange("market.liquidations")
     envelope = EventEnvelope.from_bytes(rows[0][1][b"data"])
     assert envelope.event_id == publication.liquidation_id(liq)
@@ -87,12 +95,13 @@ async def test_duplicate_liquidation_in_one_batch_is_published_exactly_once(
     task = asyncio.create_task(persist.drain_loop(db_session_factory, code, queues, runtime))
     try:
         await asyncio.wait_for(runtime.success.wait(), 5)
-        await asyncio.sleep(0.05)  # give a (buggy) second publish time to land
+        await asyncio.sleep(0.05)  # give a (buggy) second enqueue time to land
     finally:
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
 
+    await dispatch_pending(redis_client, db_session_factory)
     rows = await redis_client.xrange("market.liquidations")
     matching = [
         r
@@ -179,10 +188,10 @@ async def test_transient_failure_retries_original_batch(
     completed = asyncio.Event()
     original = persist.flush_batch
 
-    async def flaky(*args: Any) -> None:
+    async def flaky(*args: Any, **kwargs: Any) -> None:
         nonlocal calls
         calls += 1
-        await original(*args)
+        await original(*args, **kwargs)
         if calls == 1:
             raise ConnectionError("commit response lost")
         completed.set()

@@ -144,12 +144,14 @@ async def test_main_supervises_coalescer_and_closes_adapter(
         engine = redis = object()
         instance = "test"
         readiness_checks: list[Any] = []
+        status_details: dict[str, Any] = {}
 
     runtime: Any = Runtime()
     with pytest.raises(ExceptionGroup) as exc:
         await main.run_market(runtime)
     assert any(isinstance(child, ValueError) for child in exc.value.exceptions)
     assert adapter.closed and runtime.readiness_checks == []
+    assert runtime.status_details == {}
 
 
 async def test_readiness_false_with_zero_data_then_true_after_first_event() -> None:

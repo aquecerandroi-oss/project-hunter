@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from hunter_core.db.session import create_session_factory
 from hunter_core.domain.enums import RiskEventSeverity
+from hunter_core.events.outbox import OutboxHealth
 from hunter_core.logging import get_logger
 from hunter_market_worker.config import build_adapter, exchange_code
 from hunter_market_worker.funding import run_funding
@@ -16,12 +17,19 @@ from hunter_market_worker.heartbeat import (
     safe_record_system_event,
 )
 from hunter_market_worker.ingest import TickCoalescer, coalesce_loop
+from hunter_market_worker.outbox import readiness as outbox_readiness
+from hunter_market_worker.outbox import run_outbox
 from hunter_market_worker.partitions import PartitionReadiness, assert_writable_partitions
 from hunter_market_worker.persist import PersistQueues, drain_loop, oi_poll_loop, snapshot_loop
 from hunter_market_worker.publication import publication_sessions
 from hunter_market_worker.recovery import run_recovery
 from hunter_market_worker.streaming import run_ingest, run_watchdog
-from hunter_market_worker.supervision import IngestionHealth, Watchdog, forever
+from hunter_market_worker.supervision import (
+    IngestionHealth,
+    Watchdog,
+    forever,
+    rest_gate_status,
+)
 from hunter_market_worker.universe import MonitoredUniverse, run_universe
 
 if TYPE_CHECKING:
@@ -35,6 +43,8 @@ async def run_market(runtime: WorkerRuntime) -> None:
     adapter = build_adapter(exchange_code(), settings, runtime.redis)
     universe, queues, state = MonitoredUniverse(), PersistQueues(), HeartbeatState()
     coalescer, health = TickCoalescer(), IngestionHealth()
+    outbox_health, outbox_wake = OutboxHealth(), asyncio.Event()
+    producer = f"market-worker@{runtime.instance}"
 
     async def warning(message: str) -> None:
         runtime.mark_error()
@@ -54,7 +64,13 @@ async def run_market(runtime: WorkerRuntime) -> None:
         never gets a key literally called ``ready`` that isn't the verdict."""
         return await partition_readiness.ready()
 
-    runtime.readiness_checks.extend([health.ingestion, queues.persistence, partitions])
+    outbox = outbox_readiness(outbox_health)
+    runtime.readiness_checks.extend([health.ingestion, queues.persistence, partitions, outbox])
+    # T2.9: a *detail*, not a check. "suspended" means the shared rate-limit
+    # coordination is unreachable and this process admits no REST call; the
+    # WebSocket keeps ingesting, so readiness stays green and an operator
+    # still sees the degradation on /ready (and in the heartbeat hash).
+    runtime.status_details["rest_gate"] = lambda: rest_gate_status(adapter)
     token = publication_sessions.set(factory)
     logger.info("market_worker_starting", exchange=adapter.code)
     try:
@@ -89,7 +105,10 @@ async def run_market(runtime: WorkerRuntime) -> None:
                 "coalescer": coalesce_loop(
                     coalescer, runtime.redis, settings, f"market-worker@{runtime.instance}"
                 ),
-                "persist": drain_loop(factory, adapter.code, queues, runtime),
+                "persist": drain_loop(
+                    factory, adapter.code, queues, runtime, outbox_wake, producer
+                ),
+                "outbox": run_outbox(factory, runtime.redis, outbox_health, outbox_wake),
                 "snapshots": snapshot_loop(
                     factory, runtime.redis, adapter.code, universe, settings, runtime, queues
                 ),
@@ -107,4 +126,6 @@ async def run_market(runtime: WorkerRuntime) -> None:
         runtime.readiness_checks.remove(health.ingestion)
         runtime.readiness_checks.remove(queues.persistence)
         runtime.readiness_checks.remove(partitions)
+        runtime.readiness_checks.remove(outbox)
+        runtime.status_details.pop("rest_gate", None)
         await adapter.aclose()

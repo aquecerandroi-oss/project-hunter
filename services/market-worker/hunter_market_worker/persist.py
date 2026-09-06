@@ -1,4 +1,12 @@
-"""Bounded batch persistence, retrying failures without silently clearing the batch."""
+"""Bounded batch persistence, retrying failures without silently clearing the batch.
+
+T2.9: the flush no longer publishes anything itself. Every durable event is
+queued inside the flush transaction (``persist_rows``/``durable``); when that
+transaction commits, the loop only *wakes* the outbox dispatcher. The
+publication therefore never runs on the drain's hot path, so a stalled Redis
+can no longer delay the next flush and age the queue out — it just leaves the
+backlog visible in ``outbox_events`` (Astra, T2.9 round 1).
+"""
 
 from __future__ import annotations
 
@@ -13,7 +21,7 @@ from hunter_core.db.models.market_data import Candle, IngestionGap
 from hunter_core.db.models.system import SystemEvent
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import RiskEventSeverity
-from hunter_core.domain.market import NormalizedCandle, NormalizedLiquidation
+from hunter_core.domain.market import NormalizedCandle
 from hunter_core.logging import get_logger
 from hunter_market_worker.persist_rows import (
     flush_batch,
@@ -22,7 +30,6 @@ from hunter_market_worker.persist_rows import (
     upsert_funding,
     upsert_liquidations,
 )
-from hunter_market_worker.publication import liquidation_id
 from hunter_market_worker.queues import PersistItem, PersistQueues, item_bytes
 from hunter_market_worker.sampling import oi_poll_loop, snapshot_loop, write_snapshots
 
@@ -136,7 +143,15 @@ async def report_losses(factory: Any, exchange: str, queues: PersistQueues) -> N
     )
 
 
-async def drain_loop(factory: Any, exchange_code: str, queues: PersistQueues, runtime: Any) -> None:
+async def drain_loop(
+    factory: Any,
+    exchange_code: str,
+    queues: PersistQueues,
+    runtime: Any,
+    outbox_wake: asyncio.Event | None = None,
+    producer: str | None = None,
+) -> None:
+    producer = producer or f"market-worker@{getattr(runtime, 'instance', 'unknown')}"
     batch: list[PersistItem] = []
     batch_bytes = 0
     oldest = time.monotonic()
@@ -185,8 +200,8 @@ async def drain_loop(factory: Any, exchange_code: str, queues: PersistQueues, ru
                 logger.exception("market_persist_lag_report_failed")
             warned = True
         try:
-            inserted_liquidation_ids = await asyncio.wait_for(
-                flush_batch(factory, exchange_code, batch), timeout=10
+            await asyncio.wait_for(
+                flush_batch(factory, exchange_code, batch, producer=producer), timeout=10
             )
         except Exception:
             runtime.mark_error()
@@ -201,18 +216,9 @@ async def drain_loop(factory: Any, exchange_code: str, queues: PersistQueues, ru
         queues.last_flush = queues.clock()
         queues.in_flight = False
         runtime.mark_success()
-        from hunter_market_worker.ingest import publish_liquidation
-
-        # Only republish liquidations that were actually inserted this flush
-        # (M1/D7), and exactly once per id even if the same liquidation was
-        # redelivered twice within the batch (Astra's second opinion) — two
-        # occurrences collapse to one persisted row and must collapse to one
-        # publication too, keyed on the same last-write-wins occurrence.
-        to_publish: dict[Any, NormalizedLiquidation] = {}
-        for item in batch:
-            if isinstance(item, NormalizedLiquidation):
-                to_publish[liquidation_id(item)] = item
-        for liq_id, item in to_publish.items():
-            if liq_id in inserted_liquidation_ids:
-                await publish_liquidation(runtime.redis, f"market-worker@{runtime.instance}", item)
+        # The events for everything this flush inserted are already committed
+        # alongside their rows; all that is left is to let the dispatcher know
+        # there is work, so a closed candle does not wait out its poll interval.
+        if outbox_wake is not None:
+            outbox_wake.set()
         batch, batch_bytes, warned = [], 0, False

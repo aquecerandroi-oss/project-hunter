@@ -53,7 +53,8 @@ class _FakeRedisEval:
         self.last_ttl: float | None = None
 
     async def eval(self, script: str, numkeys: int, *args: Any) -> str:
-        key, capacity, refill_per_s, arg3, now, ttl = args
+        key, capacity, refill_per_s, arg3, now = args[:5]
+        ttl = args[-1]
         capacity = float(capacity)
         refill_per_s = float(refill_per_s)
         now = float(now)
@@ -66,28 +67,41 @@ class _FakeRedisEval:
         elapsed = max(0.0, now - ts)
         tokens = min(capacity, tokens + elapsed * refill_per_s)
         if script is _RECORD_USED_WEIGHT_SCRIPT:
-            # F3 emulation: min(tokens after refill, capacity - used_weight)
-            # — mirrors _RECORD_USED_WEIGHT_SCRIPT exactly, since this fake
-            # stands in for a real Lua interpreter that would run the actual
-            # script text.
+            # F3 + T2.9 emulation: the staleness guard now lives in the script
+            # (``uw``/``uw_at`` in the same hash, so it is atomic across
+            # processes), then min(tokens after refill, capacity -
+            # used_weight). Mirrors the real Lua exactly, since this fake
+            # stands in for the interpreter that would run the script text.
             used_weight = float(arg3)
+            window = float(args[5])
+            if state is not None and "uw" in state:
+                if used_weight < state["uw"] and (now - state["uw_at"]) < window:
+                    return "stale"
             proposed = max(0.0, capacity - used_weight)
             new_tokens = min(tokens, proposed)
-            self._hashes[key] = {"tokens": new_tokens, "ts": now}
+            self._hashes[key] = {
+                "tokens": new_tokens,
+                "ts": now,
+                "uw": used_weight,
+                "uw_at": now,
+            }
             return str(new_tokens)
         weight = float(arg3)
         if tokens < weight:
-            self._hashes[key] = {"tokens": tokens, "ts": now}
+            self._write(key, tokens, now)
             return str((weight - tokens) / refill_per_s)
         tokens -= weight
-        self._hashes[key] = {"tokens": tokens, "ts": now}
+        self._write(key, tokens, now)
         return "0"
 
+    def _write(self, key: str, tokens: float, now: float) -> None:
+        state = self._hashes.setdefault(key, {})
+        state["tokens"], state["ts"] = tokens, now
+
     async def hset(self, name: str, mapping: dict[str, object]) -> None:
-        self._hashes[name] = {
-            "tokens": float(mapping["tokens"]),  # type: ignore[arg-type]
-            "ts": float(mapping["ts"]),  # type: ignore[arg-type]
-        }
+        state = self._hashes.setdefault(name, {})
+        state["tokens"] = float(mapping["tokens"])  # type: ignore[arg-type]
+        state["ts"] = float(mapping["ts"])  # type: ignore[arg-type]
 
 
 async def test_local_acquire_consumes_tokens_immediately_when_budget_available() -> None:

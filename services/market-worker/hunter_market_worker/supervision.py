@@ -7,11 +7,45 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, cast
 
+from hunter_exchanges.rate_limit import REST_GATE_OK, REST_GATE_SUSPENDED
+
 
 def connection_field(state: Any, name: str) -> Any:
     if isinstance(state, dict):
         return cast(dict[str, Any], state).get(name)
     return getattr(state, name, None)
+
+
+def rest_gate_status(adapter: Any) -> str:
+    """``"ok"``/``"suspended"``: is this adapter admitting REST calls? (T2.9)
+
+    ``suspended`` means the shared rate-limit coordination (Redis) is
+    unreachable, so the adapter refuses REST admissions rather than letting N
+    shards each spend a full local budget against one shared Binance quota.
+    It is a **degradation, not a failure**: the WebSocket keeps ingesting, so
+    this is *reported* (heartbeat hash, ``rt:system``, and the ``rest_gate``
+    status detail on ``/ready``) and never turns the readiness verdict red by
+    itself. A total Redis outage still fails ``/ready`` through the ``redis``
+    check — this field says *which* degradation is in progress, not that
+    everything is fine.
+
+    Read through ``getattr`` like ``connection_states()``: an adapter (or the
+    suite's ``FakeAdapter``) that predates the method is simply admitting.
+    """
+    status = getattr(adapter, "rest_gate_status", None)
+    return REST_GATE_OK if status is None else str(status())
+
+
+def rest_gate_suspended(adapter: Any) -> bool:
+    """T2.9: are this adapter's REST admissions suspended (Redis unreachable)?
+
+    A backfill attempted anyway would fail on the way out, still increment
+    ``ingestion_gaps.attempts`` and, after ``MAX_ATTEMPTS``, park the gap as
+    ``failed`` for an hour — an infrastructure outage turned into lost market
+    data. Waiting costs nothing: the gap stays open, the WebSocket keeps
+    ingesting, and the recovery cycle resumes on its own.
+    """
+    return rest_gate_status(adapter) == REST_GATE_SUSPENDED
 
 
 async def forever(name: str, coro: Awaitable[None]) -> None:

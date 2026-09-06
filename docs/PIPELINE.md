@@ -46,12 +46,13 @@ Definição exata do fluxo (item 80.6). Cada etapa: gatilho, entrada, saída, on
 2. **Streams WS** por mercado monitorado: `aggTrade`, `bookTicker`, `depth` (top 25, 250 ms), `kline_1m`, `markPrice` (funding, mark, index), `forceOrder` (liquidações). Bybit: `publicTrade`, `orderbook.25`, `kline.1`, `tickers`, `liquidation`.
 3. **Normalização** para `NormalizedTicker | NormalizedTrade | NormalizedOrderBook | NormalizedCandle | NormalizedFunding | NormalizedOpenInterest | NormalizedLiquidation`. Timestamps da exchange em `ts`; hora local em `received_at`.
 4. **Hot state** em Redis a cada 250 ms por símbolo (coalescido). Ring buffer de trades e candles.
-5. **Persistência.** Candle 1m fechado → `candles` (`is_final=true`) e `market.candles.closed`. Snapshot por minuto → `market_snapshots`. Open interest via REST a cada 5 min → `open_interest_history`. Funding realizado → `funding_rates`. Liquidações → `liquidations`.
+5. **Persistência.** Candle 1m fechado → `candles` (`is_final=true`); o evento `market.candles.closed` é enfileirado na mesma transação e publicado pela outbox (§10b). Snapshot por minuto → `market_snapshots`. Open interest via REST a cada 5 min → `open_interest_history`. Funding realizado → `funding_rates`. Liquidações → `liquidations`.
 6. **Recovery.** Ao reconectar ou detectar gap (`open_time` esperado ausente), busca candles via REST, grava com `source=rest`, registra `ingestion_gaps`. Enquanto há gap aberto para um mercado, seu `data_quality` no hot state é `degraded`.
+7. **Rate limit do REST (fail-closed).** Todo request REST passa por um token bucket compartilhado em Redis (`rl:{exchange}:{bucket}`) e pelo bloqueio por IP (`rl:{exchange}:ip:blocked_until`, deadline no relógio do Redis): todo processo que sai pelo mesmo IP divide **uma** cota da exchange. **Com o Redis indisponível o portão fecha:** nenhuma admissão REST nova, motivo `redis_unavailable`, re-tentativa com backoff curto e jitter — nunca um orçamento em memória por processo, porque N shards com bucket próprio somam N cotas contra uma cota única e o preço do erro é um ban de IP da Binance, irreversível no curto prazo (aceite conjunto da M2, T2.9). Uma exceção do Redis nunca sobe para o worker: o limitador devolve `RateLimited` com `reason=redis_unavailable`, que os laços já sabem sobreviver. O WS continua ingerindo e o **recovery de gaps espera** em vez de gastar tentativas (`ingestion_gaps.attempts` não avança), retomando sozinho quando o Redis volta — sem burst de compensação, porque o bucket compartilhado vale uma janela e não uma janela por minuto de queda. Observabilidade: contador `exchange_rest_admissions_suspended_total{exchange,bucket,reason}` e campo `rest_gate` (`ok`/`suspended`) em três lugares — no heartbeat `hb:market:{exchange}`, no `rt:system` e no corpo do `/ready` do market-worker. No `/ready` ele entra como *status detail* (`WorkerRuntime.status_details`), não como readiness check: é uma string ao lado do veredito e **não** altera o status code — o gate suspenso, por si só, nunca deixa a prontidão vermelha. Ressalva honesta: numa queda **total** do Redis o `/ready` fica vermelho de qualquer jeito, pelo check `redis` (o worker também depende do Redis para coalescer, streams e heartbeat); o que o `rest_gate` faz é dizer *qual* degradação está em curso. A ingestão pelo WS e a persistência em Postgres continuam, o heartbeat degrada para "não publicado" em vez de derrubar o TaskGroup, e um gap cuja recuperação esbarre na indisponibilidade **não** gasta `ingestion_gaps.attempts`.
 
 **Eventos publicados:** `market.ticks` (coalescido 250 ms; payload: preço, bid, ask, volume incremental, trades_count, book_imbalance top 5), `market.candles.closed`, `market.derivatives` (OI, funding, mark), `market.liquidations`, `market.universe.changed`.
 
-**Falha:** WS caiu → reconnect com backoff (1 s → 60 s), REST recovery; Redis caiu → buffer em memória por 60 s, depois descarta ticks (candles são recuperáveis); Postgres lento → escrita em lote com fila em memória limitada, alerta se > 10 s de atraso.
+**Falha:** WS caiu → reconnect com backoff (1 s → 60 s), REST recovery; Redis caiu → buffer em memória por 60 s, depois descarta ticks (efêmeros); os eventos duráveis ficam pendentes em `outbox_events` e saem quando o Redis volta (§10b) e as admissões REST ficam suspensas até lá (item 7, sem orçamento independente por processo); Postgres lento → escrita em lote com fila em memória limitada, alerta se > 10 s de atraso.
 
 ## 2. Feature Engine
 
@@ -204,6 +205,43 @@ Lista completa de checks em `RISK_ENGINE.md`.
 | `risk.events` | strategy, execution, api | api (rt), analytics (alerts) | 10k |
 | `kill_switch.changed` | api | strategy, execution | 1k |
 | `audit` | api, workers | (persistido pelo produtor; stream só para rt) | 10k |
+
+## 10b. Outbox transacional (T2.9)
+
+**Durável vs efêmero.** Um evento é **durável** quando alguém persiste um efeito a partir dele — se ele se perder, some trabalho que ninguém reconstrói do Redis. É **efêmero** quando descreve o presente e a próxima mensagem o substitui em segundos.
+
+| Evento | Classe | Por quê |
+|---|---|---|
+| `market.candles.closed` | durável | vira linha em `candles`; o strategy-worker decide a partir dela |
+| `market.derivatives` (OI) | durável | vira linha em `open_interest_history` |
+| `market.derivatives` (funding **realizado**) | durável | vira linha em `funding_rates` |
+| `market.liquidations` | durável | vira linha em `liquidations` |
+| `market.derivatives` (funding **estimado**, WS mark price) | efêmero | ninguém persiste; o próximo markPrice o substitui |
+| `market.ticks`, `rt:*` | efêmero | visão coalescida do agora |
+
+Todo evento de `market.derivatives` carrega `funding_kind` (`realized` / `estimated` / `null` quando é só OI) e `bucket_ts` (o slot de 5 min persistido, `null` no caminho efêmero), para que o consumidor saiba o que tem em mãos sem inferir pelos campos preenchidos.
+
+**Como funciona.** `hunter_core.events.outbox`:
+
+1. **Enfileirar** (`enqueue`) na **mesma transação** da linha de negócio. Acontece dentro dos `upsert_*` de `persist_rows.py` — o caminho único por onde passam tanto o ingest WS quanto o backfill REST do `recovery.py`, para que nenhum produtor novo esqueça. O `event_id` é determinístico (uuid5 da chave natural da linha), com `ON CONFLICT (event_id) DO NOTHING`: transação repetida enfileira uma vez, redelivery é no-op.
+2. **Despachar** (`dispatch_pending`): `SELECT ... FOR UPDATE SKIP LOCKED` em ordem de `created_at`, `XADD`, marca `dispatched_at`/`attempts`/`last_error`. O `SKIP LOCKED` é o que torna N shards seguros sem eleição de líder. Cada micro-lote é uma transação curta com orçamento de tempo: o `XADD` nunca fica pendurado segurando locks.
+3. **Reconciliar** (`reconcile`) na partida: publica tudo com `dispatched_at IS NULL`, na ordem de criação, antes de qualquer evento novo. Com `since=`, republica também o que já foi despachado — a recuperação para um stream **perdido** (`XTRIM`/flush), que o predicado de pendência jamais alcançaria.
+
+A linha guarda o **envelope inteiro** em `payload`, então o evento fica determinado no enfileiramento (identidade, `ts`, produtor, chave) e uma republicação é byte a byte a mesma mensagem. O payload de negócio fica um nível abaixo: `payload -> 'payload' ->> 'symbol'`.
+
+**Garantia.** Entrega **pelo menos uma vez** — o Redis 7 não tem `XADD` idempotente, então duplicata física existe e não é escondida. O **efeito** é uma vez só: `event_id` determinístico + a guarda de `hunter_core.events.consume` (`hunter:processed:{group}`) + a chave única do próprio efeito em Postgres. O ACK só vem depois do efeito idempotente.
+
+| Falha injetada | Resultado |
+|---|---|
+| morre antes do commit | nada persistido, nada publicado; a mensagem de origem é reentregue |
+| morre entre o commit e o `XADD` | linha pendente; a próxima varredura (ou a reconciliação da partida) publica **uma vez** |
+| morre depois do `XADD`, antes da marca | publicado duas vezes, mesmos bytes; o consumidor entrega uma |
+| consumidor cai depois do efeito, antes do ACK | redelivery é no-op (efeito com chave única) |
+| stream perdido (`XTRIM`/flush) | `reconcile(since=...)` reenche a partir do Postgres |
+
+**Prontidão.** `/ready` fica vermelho quando a fila passa de `MAX_PENDING` (500) **ou** o evento mais antigo passa de `MAX_LAG_S` (30 s) — profundidade e idade são falhas diferentes. Métricas: `hunter_outbox_pending`, `hunter_outbox_oldest_pending_seconds`, `hunter_outbox_dispatched_total`, `hunter_outbox_dispatch_failures_total`, `hunter_outbox_replayed_total`.
+
+**Latência.** O `drain_loop` não publica: ao committar, ele só acorda o despachante (`asyncio.Event`). Assim um Redis lento não atrasa o flush seguinte, e a vela fechada não espera o intervalo de polling.
 
 ## 11. Latências alvo (MVP)
 

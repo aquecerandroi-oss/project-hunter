@@ -8,6 +8,12 @@ rest (D10). That is the wrong row when a batch carries more than one reading
 for the same natural key: the later one is the newer one. So every batch is
 deduplicated in Python first, keeping the **last** occurrence per conflict
 key, before it ever reaches Postgres.
+
+T2.9: each upsert also queues the durable event for the rows it actually
+inserted, **in this same transaction** (``durable.py``). It lives here rather
+than in the callers on purpose — this is the one path every producer goes
+through, WS ingest and REST backfill alike, so "persisted but never announced"
+is not a state a new caller can create by forgetting a line.
 """
 
 from __future__ import annotations
@@ -34,6 +40,7 @@ from hunter_core.domain.market import (
     NormalizedOpenInterest,
 )
 from hunter_core.observability import market_liquidation_duplicates_total
+from hunter_market_worker import durable
 from hunter_market_worker.publication import liquidation_id
 from hunter_market_worker.queues import (
     OpenInterestSample,
@@ -88,9 +95,16 @@ async def upsert_candles(
     market_ids: dict[str, Any],
     *,
     source: str,
+    producer: str = durable.PRODUCER,
 ) -> int:
-    """``INSERT ... ON CONFLICT (market_id, timeframe, open_time) DO NOTHING``."""
+    """``INSERT ... ON CONFLICT (market_id, timeframe, open_time) DO NOTHING``.
+
+    Returns how many candles were newly inserted, and queues one
+    ``market.candles.closed`` event for each of them (T2.9). A candle the
+    conflict clause dropped was already announced by whoever inserted it.
+    """
     rows: dict[tuple[Any, Any, datetime], dict[str, Any]] = {}
+    by_key: dict[tuple[Any, Any, datetime], NormalizedCandle] = {}
     for c in candles:
         if not c.is_final:
             continue
@@ -98,6 +112,7 @@ async def upsert_candles(
         if market_id is None:
             losses_total.labels(kind=c.kind, reason="unknown_market").inc()
             continue
+        by_key[(market_id, c.timeframe, c.open_time)] = c
         rows[(market_id, c.timeframe, c.open_time)] = {
             "market_id": market_id,
             "timeframe": c.timeframe,
@@ -120,14 +135,29 @@ async def upsert_candles(
         .values(_dedupe_last(rows))
         .on_conflict_do_nothing(index_elements=["market_id", "timeframe", "open_time"])
     )
-    result = await session.execute(stmt.returning(Candle.open_time))
-    return len(result.all())
+    # The whole conflict key, not just ``open_time``: one flush carries many
+    # markets, and the event has to be built from the exact occurrence that
+    # survived deduplication (Astra, T2.9 round 1).
+    result = await session.execute(
+        stmt.returning(Candle.market_id, Candle.timeframe, Candle.open_time)
+    )
+    inserted = [by_key[(row.market_id, row.timeframe, row.open_time)] for row in result.all()]
+    await durable.enqueue_candles(session, inserted, producer=producer)
+    return len(inserted)
 
 
 async def upsert_funding(
-    session: AsyncSession, items: list[NormalizedFunding], market_ids: dict[str, Any]
+    session: AsyncSession,
+    items: list[NormalizedFunding],
+    market_ids: dict[str, Any],
+    *,
+    producer: str = durable.PRODUCER,
 ) -> None:
+    """Only a *realized* settlement is stored — and therefore only a realized
+    settlement is durable. The WS estimate is a view of the present that nobody
+    persists, so it stays on the ephemeral path (``durable.py``)."""
     rows: dict[tuple[Any, datetime], dict[str, Any]] = {}
+    by_key: dict[tuple[Any, datetime], NormalizedFunding] = {}
     for f in items:
         if not isinstance(f, RealizedFunding):
             continue
@@ -135,6 +165,7 @@ async def upsert_funding(
         if market_id is None:
             losses_total.labels(kind=f.kind, reason="unknown_market").inc()
             continue
+        by_key[(market_id, f.ts)] = f
         rows[(market_id, f.ts)] = {
             "market_id": market_id,
             "funding_time": f.ts,
@@ -147,12 +178,19 @@ async def upsert_funding(
         pg_insert(FundingRate)
         .values(_dedupe_last(rows))
         .on_conflict_do_nothing(index_elements=["market_id", "funding_time"])
+        .returning(FundingRate.market_id, FundingRate.funding_time)
     )
-    await session.execute(stmt)
+    result = await session.execute(stmt)
+    inserted = [by_key[(row.market_id, row.funding_time)] for row in result.all()]
+    await durable.enqueue_realized_funding(session, inserted, producer=producer)
 
 
 async def upsert_liquidations(
-    session: AsyncSession, items: list[NormalizedLiquidation], market_ids: dict[str, Any]
+    session: AsyncSession,
+    items: list[NormalizedLiquidation],
+    market_ids: dict[str, Any],
+    *,
+    producer: str = durable.PRODUCER,
 ) -> set[Any]:
     """``INSERT ... ON CONFLICT (id, ts) DO NOTHING``, returning the ids actually
     inserted (M1/D7) so callers only republish what is newly durable.
@@ -165,6 +203,7 @@ async def upsert_liquidations(
     on ``id`` without matching on ``ts`` and be inserted twice.
     """
     rows: dict[tuple[Any, datetime], dict[str, Any]] = {}
+    by_id: dict[Any, NormalizedLiquidation] = {}
     attempted = 0
     for liq in items:
         market_id = market_ids.get(liq.symbol)
@@ -173,6 +212,7 @@ async def upsert_liquidations(
             continue
         attempted += 1
         liq_id = liquidation_id(liq)
+        by_id[liq_id] = liq
         ts = liq.ts.replace(microsecond=(liq.ts.microsecond // 1000) * 1000)
         rows[(liq_id, ts)] = {
             "id": liq_id,
@@ -197,6 +237,9 @@ async def upsert_liquidations(
     duplicates = attempted - len(inserted_ids)
     if duplicates > 0:
         market_liquidation_duplicates_total.inc(duplicates)
+    await durable.enqueue_liquidations(
+        session, [by_id[liq_id] for liq_id in inserted_ids], producer=producer
+    )
     return inserted_ids
 
 
@@ -225,6 +268,8 @@ async def upsert_open_interest(
     session: AsyncSession,
     interests: list[NormalizedOpenInterest | OpenInterestSample],
     market_ids: dict[str, Any],
+    *,
+    producer: str = durable.PRODUCER,
 ) -> None:
     """Both shapes of an open-interest reading land here (D8).
 
@@ -234,6 +279,7 @@ async def upsert_open_interest(
     round, and keeps deriving its bucket from its own ``ts``.
     """
     rows: dict[tuple[Any, datetime], dict[str, Any]] = {}
+    by_key: dict[tuple[Any, datetime], tuple[NormalizedOpenInterest, datetime]] = {}
     for item in interests:
         oi = item.reading if isinstance(item, OpenInterestSample) else item
         market_id = market_ids.get(oi.symbol)
@@ -241,6 +287,7 @@ async def upsert_open_interest(
             losses_total.labels(kind=oi.kind, reason="unknown_market").inc()
             continue
         bucket = item.bucket_ts if isinstance(item, OpenInterestSample) else oi_bucket(oi.ts)
+        by_key[(market_id, bucket)] = (oi, bucket)
         rows[(market_id, bucket)] = {
             "market_id": market_id,
             "ts": bucket,
@@ -253,15 +300,27 @@ async def upsert_open_interest(
         pg_insert(OpenInterestHistory)
         .values(_dedupe_last(rows))
         .on_conflict_do_nothing(index_elements=["market_id", "ts"])
+        .returning(OpenInterestHistory.market_id, OpenInterestHistory.ts)
     )
-    await session.execute(stmt)
+    result = await session.execute(stmt)
+    inserted = [by_key[(row.market_id, row.ts)] for row in result.all()]
+    await durable.enqueue_open_interest(session, inserted, producer=producer)
 
 
 async def flush_batch(
-    session_factory: async_sessionmaker[AsyncSession], exchange_code: str, batch: list[PersistItem]
+    session_factory: async_sessionmaker[AsyncSession],
+    exchange_code: str,
+    batch: list[PersistItem],
+    *,
+    producer: str = durable.PRODUCER,
 ) -> set[Any]:
-    """Persist one drained batch. Returns the ids of liquidations actually
-    inserted (M1/D7) — callers must only republish those."""
+    """Persist one drained batch, queueing every durable event with it (T2.9).
+
+    Returns the ids of liquidations actually inserted (M1/D7). Nothing is
+    published from here: the rows and their events commit together, and the
+    outbox dispatcher is what reaches Redis — so a publication can neither
+    outlive a transaction that rolled back nor be lost because one did not.
+    """
     candles = [i for i in batch if isinstance(i, NormalizedCandle)]
     fundings = [i for i in batch if isinstance(i, NormalizedFunding)]
     liquidations = [i for i in batch if isinstance(i, NormalizedLiquidation)]
@@ -270,9 +329,11 @@ async def flush_batch(
     symbols = {i.symbol for i in batch}
     async with role_session(session_factory, db_role="hunter_worker") as session:
         market_ids = await load_market_ids(session, exchange_code, symbols)
-        await upsert_candles(session, candles, market_ids, source="ws")
-        await upsert_funding(session, fundings, market_ids)
-        inserted_liquidation_ids = await upsert_liquidations(session, liquidations, market_ids)
+        await upsert_candles(session, candles, market_ids, source="ws", producer=producer)
+        await upsert_funding(session, fundings, market_ids, producer=producer)
+        inserted_liquidation_ids = await upsert_liquidations(
+            session, liquidations, market_ids, producer=producer
+        )
         await upsert_snapshots(session, snapshots, market_ids)
-        await upsert_open_interest(session, interests, market_ids)
+        await upsert_open_interest(session, interests, market_ids, producer=producer)
     return inserted_liquidation_ids

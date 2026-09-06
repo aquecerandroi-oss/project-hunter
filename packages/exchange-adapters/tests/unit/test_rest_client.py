@@ -81,7 +81,7 @@ async def test_used_weight_header_is_recorded_on_the_limiter() -> None:
     await client.fetch_ticker("BTCUSDT")
 
     # capacity - used_weight should now be the bucket's remaining budget.
-    remaining = limiter._local_buckets["request_weight"].tokens  # type: ignore[reportPrivateUsage]
+    remaining = limiter._local.tokens("request_weight")  # type: ignore[union-attr] # pyright: ignore[reportPrivateUsage,reportOptionalMemberAccess]
     assert remaining == pytest.approx(2400 - 37)
     await client.aclose()
 
@@ -356,7 +356,7 @@ async def test_fetch_realized_funding_uses_its_own_bucket_not_request_weight() -
 
     await client.fetch_realized_funding("BTCUSDT", datetime(2026, 1, 1, tzinfo=UTC))
 
-    request_weight_tokens = limiter._local_buckets.get("request_weight")  # type: ignore[reportPrivateUsage]
+    request_weight_tokens = limiter._local.tokens("request_weight")  # type: ignore[union-attr] # pyright: ignore[reportPrivateUsage,reportOptionalMemberAccess]
     assert request_weight_tokens is None  # request_weight was never touched
     await client.aclose()
 

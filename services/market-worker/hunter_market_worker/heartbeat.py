@@ -26,7 +26,8 @@ from hunter_core.observability import (
     market_dropped_events_total,
     market_system_event_record_failures_total,
 )
-from hunter_market_worker.supervision import connection_field
+from hunter_exchanges.rate_limit import REST_GATE_OK
+from hunter_market_worker.supervision import connection_field, rest_gate_status
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
@@ -71,6 +72,7 @@ async def _write_hash(
     ws_state: str,
     now: datetime,
     subscriptions: int | None = None,
+    rest_gate: str = REST_GATE_OK,
 ) -> None:
     key = hb_key(exchange)
     mapping = {
@@ -81,6 +83,11 @@ async def _write_hash(
         "markets_monitored": str(len(universe.symbols)),
         "open_gaps": str(state.open_gaps),
         "dropped_events": str(state.dropped_events),
+        # T2.9: "suspended" while the shared rate-limit coordination is
+        # unreachable and this process therefore admits no REST call. A
+        # degradation reported next to a healthy ``ws_state`` — never a
+        # readiness failure, since ingestion continues over the WebSocket.
+        "rest_gate": rest_gate,
         "ts": now.isoformat(),
     }
     await cast(Any, redis).hset(key, mapping=mapping)
@@ -94,6 +101,7 @@ async def _publish_status(
     state: HeartbeatState,
     ws_state: str,
     now: datetime,
+    rest_gate: str = REST_GATE_OK,
 ) -> None:
     payload = {
         "type": "market_status",
@@ -102,6 +110,7 @@ async def _publish_status(
         "last_event_at": state.last_event_at.isoformat() if state.last_event_at else None,
         "markets_monitored": len(universe.symbols),
         "open_gaps": state.open_gaps,
+        "rest_gate": rest_gate,
         "ts": now.isoformat(),
     }
     await cast(Any, redis).publish("rt:system", orjson.dumps(payload))
@@ -171,6 +180,42 @@ def connection_summary(
     return subscriptions, reconnects, dropped
 
 
+async def _safe_publish(
+    redis: redis_asyncio.Redis,
+    exchange: str,
+    universe: MonitoredUniverse,
+    state: HeartbeatState,
+    ws_state: str,
+    now: datetime,
+    subscriptions: int | None,
+    rest_gate: str,
+) -> bool:
+    """Publish the heartbeat, degrading instead of raising. True if it landed.
+
+    T2.9/Astra: ``run_heartbeat`` is a ``forever()`` task in the market
+    ``TaskGroup``, so an exception out of these two writes cancels every
+    sibling — including the WebSocket ingestion that suspending REST
+    admissions exists to keep alive. A Redis outage must degrade this loop to
+    "no heartbeat published" (the hash then expires on its own TTL, so the API
+    correctly shows the worker as stale) exactly like a Postgres outage
+    already degrades it to "no system_events written" via
+    :func:`safe_record_system_event`. The next tick republishes the *current*
+    state, so the snapshot converges within ``HEARTBEAT_INTERVAL_S`` of the
+    outage ending. What a skipped tick does lose is a transition that both
+    happened and reverted during the outage: ``rt:system`` is a live feed with
+    no replay. The durable record of a connection transition is the
+    ``system_events`` row, which is written on the Postgres path and does not
+    depend on this succeeding.
+    """
+    try:
+        await _write_hash(redis, exchange, universe, state, ws_state, now, subscriptions, rest_gate)
+        await _publish_status(redis, exchange, universe, state, ws_state, now, rest_gate)
+    except Exception:
+        logger.warning("market_heartbeat_publish_failed", exchange=exchange, exc_info=True)
+        return False
+    return True
+
+
 async def run_heartbeat(
     runtime: WorkerRuntime,
     adapter: ExchangeAdapter,
@@ -190,6 +235,7 @@ async def run_heartbeat(
     never to "the whole TaskGroup dies".
     """
     previous_ws_state: str | None = None
+    previous_rest_gate: str | None = None
     last_sent = float("-inf")
     previous_reconnects: dict[str, int] = {}
     previous_dropped: dict[str, int] = {}
@@ -206,8 +252,10 @@ async def run_heartbeat(
         ws_state = (
             "idle" if universe.initialized and not universe.symbols else adapter.connection_state()
         )
+        rest_gate = rest_gate_status(adapter)
         if (
             ws_state == previous_ws_state
+            and rest_gate == previous_rest_gate
             and not reconnects
             and not dropped
             and state.last_error is None
@@ -216,10 +264,9 @@ async def run_heartbeat(
             await asyncio.sleep(min(0.1, HEARTBEAT_INTERVAL_S))
             continue
         now = utcnow()
-        await _write_hash(
-            runtime.redis, adapter.code, universe, state, ws_state, now, subscriptions
+        published = await _safe_publish(
+            runtime.redis, adapter.code, universe, state, ws_state, now, subscriptions, rest_gate
         )
-        await _publish_status(runtime.redis, adapter.code, universe, state, ws_state, now)
         if reconnects:
             await safe_record_system_event(
                 session_factory,
@@ -238,6 +285,8 @@ async def run_heartbeat(
             )
             state.last_error = None
         previous_ws_state = ws_state
+        previous_rest_gate = rest_gate
         last_sent = time.monotonic()
-        runtime.mark_success()
+        if published:
+            runtime.mark_success()
         await asyncio.sleep(min(0.1, HEARTBEAT_INTERVAL_S))

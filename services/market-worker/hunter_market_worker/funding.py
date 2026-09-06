@@ -12,13 +12,10 @@ from hunter_core.db.models.market_data import FundingRate
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import RiskEventSeverity
 from hunter_core.domain.market import to_wire
-from hunter_core.events.envelope import EventEnvelope
-from hunter_core.events.streams import DEFAULT_MAXLEN, Streams
 from hunter_core.logging import get_logger
 from hunter_market_worker.heartbeat import record_system_event
 from hunter_market_worker.hot_state import write_funding
 from hunter_market_worker.persist_rows import load_market_ids
-from hunter_market_worker.publication import publish
 from hunter_market_worker.queues import RealizedFunding
 from hunter_market_worker.recovery import server_now
 
@@ -32,6 +29,11 @@ async def poll_realized(
 
     Each returned NormalizedFunding.ts is the settlement time, sourced from
     realized REST history. This explicit capability is absent from T1.2 today.
+
+    T2.9: a settlement is durable, so this only writes hot state and queues the
+    row. The ``market.derivatives`` event is enqueued by ``upsert_funding`` in
+    the transaction that persists the settlement — publishing it here would
+    announce a settlement a failed flush never stored.
     """
     now = await server_now(adapter)
     async with role_session(factory, db_role="hunter_worker") as session:
@@ -62,15 +64,6 @@ async def poll_realized(
             realized = RealizedFunding.model_validate(to_wire(record))
             queues.events.put_nowait(realized)
             await write_funding(redis, realized, realized=True)
-            payload = to_wire(realized)
-            payload["funding_kind"] = "realized"
-            envelope = EventEnvelope(
-                type=Streams.MARKET_DERIVATIVES,
-                producer=producer,
-                key=f"{adapter.code}:{symbol}",
-                payload=payload,
-            )
-            await publish(redis, envelope.type, envelope, DEFAULT_MAXLEN[envelope.type])
 
 
 async def run_funding(

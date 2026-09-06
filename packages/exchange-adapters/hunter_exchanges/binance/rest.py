@@ -34,7 +34,12 @@ from hunter_core.domain.market import (
 )
 from hunter_exchanges.base import ExchangeError, ExchangeUnavailable, RateLimited
 from hunter_exchanges.binance import normalize
-from hunter_exchanges.rate_limit import IpRateGate, TokenBucketRateLimiter
+from hunter_exchanges.rate_limit import (
+    REST_GATE_OK,
+    REST_GATE_SUSPENDED,
+    IpRateGate,
+    TokenBucketRateLimiter,
+)
 
 BASE_URL = "https://fapi.binance.com"
 REQUEST_WEIGHT_BUCKET = "request_weight"
@@ -118,6 +123,18 @@ class BinanceRestClient:
         self._backoff_max_s = backoff_max_s
         self._sleep = sleep
 
+    def rest_gate_status(self) -> str:
+        """``"ok"`` or ``"suspended"`` — whether this client is admitting REST calls.
+
+        Suspended means the shared rate-limit coordination is unreachable and
+        every bucket on this IP is fail-closed (T2.9). Reported by the
+        market-worker's heartbeat as ``rest_gate``: a *degradation* (the
+        WebSocket keeps ingesting, gap recovery waits), not a readiness
+        failure.
+        """
+        suspended = self._rate_limiter.suspended or self._funding_rate_limiter.suspended
+        return REST_GATE_SUSPENDED if suspended else REST_GATE_OK
+
     async def aclose(self) -> None:
         if self._owns_client:
             await self._client.aclose()
@@ -153,13 +170,6 @@ class BinanceRestClient:
                 if not is_last_attempt:
                     await self._backoff(attempt)
                 continue
-            used_weight = response.headers.get(_USED_WEIGHT_HEADER)
-            # The used-weight header always reflects request_weight, never a
-            # dedicated per-endpoint limit (e.g. funding history) — applying
-            # it there would let a shared-IP request_weight burst resurrect
-            # budget this bucket never actually spent.
-            if used_weight is not None and bucket == REQUEST_WEIGHT_BUCKET:
-                await limiter.record_used_weight(bucket, int(used_weight))
             if response.status_code in (429, 418):
                 # This process's own budget stops believing it has room the
                 # instant the exchange says otherwise (Astra review, T1.2
@@ -174,6 +184,16 @@ class BinanceRestClient:
                     exchange="binance",
                     retry_after_s=retry_after,
                 )
+            # Recorded only after the 429/418 branch: the cooldown that opens the
+            # IP gate must never depend on the weight bookkeeping succeeding
+            # (T2.9 review — a future exception here would otherwise skip it).
+            used_weight = response.headers.get(_USED_WEIGHT_HEADER)
+            # The used-weight header always reflects request_weight, never a
+            # dedicated per-endpoint limit (e.g. funding history) — applying
+            # it there would let a shared-IP request_weight burst resurrect
+            # budget this bucket never actually spent.
+            if used_weight is not None and bucket == REQUEST_WEIGHT_BUCKET:
+                await limiter.record_used_weight(bucket, int(used_weight))
             if response.status_code >= 500:
                 last_exc = ExchangeUnavailable(
                     f"binance {response.status_code} for {path}", exchange="binance"

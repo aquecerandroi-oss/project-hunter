@@ -299,3 +299,51 @@ async def test_run_awaits_heartbeat_and_stops_health_server_when_main_raises(
 
     assert heartbeat["cancelled"] is True
     assert server_instances[0].should_exit is True
+
+
+async def test_status_details_annotate_ready_without_changing_the_verdict() -> None:
+    """T2.9: a worker publishes non-boolean state next to the verdict.
+
+    The market-worker's ``rest_gate`` is ``"suspended"`` while the shared
+    rate-limit coordination is unreachable — a degradation an operator must
+    see, but not a readiness failure (the WebSocket keeps ingesting). So a
+    status detail annotates the body and never flips the status code.
+    """
+    runtime = _make_runtime(db_ok=True, redis_ok=True)
+    runtime.status_details["rest_gate"] = lambda: "suspended"
+    transport = httpx.ASGITransport(app=runtime.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/ready")
+    assert response.status_code == 200
+    assert response.json() == {"database": True, "redis": True, "rest_gate": "suspended"}
+
+
+async def test_a_broken_status_detail_does_not_break_ready() -> None:
+    """A diagnostic field must not be able to take the endpoint down: the
+    verdict it does not participate in still has to be answerable."""
+
+    def boom() -> str:
+        raise RuntimeError("no adapter yet")
+
+    runtime = _make_runtime(db_ok=True, redis_ok=True)
+    runtime.status_details["rest_gate"] = boom
+    transport = httpx.ASGITransport(app=runtime.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/ready")
+    assert response.status_code == 200
+    assert response.json()["rest_gate"] == "unknown"
+
+
+async def test_a_status_detail_never_overwrites_a_verdict_key() -> None:
+    """Astra, T2.9: the body is read by a human during an incident. A
+    diagnostic named after a check would replace ``redis: false`` with a
+    string and hide the very reason for the 503."""
+    runtime = _make_runtime(db_ok=True, redis_ok=False)
+    runtime.status_details["redis"] = lambda: "suspended"
+    transport = httpx.ASGITransport(app=runtime.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/ready")
+    assert response.status_code == 503
+    body = response.json()
+    assert body["redis"] is False
+    assert body["redis_detail"] == "suspended"

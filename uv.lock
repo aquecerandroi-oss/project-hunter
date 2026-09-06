@@ -628,6 +628,7 @@ dependencies = [
     { name = "msgpack" },
     { name = "numpy" },
     { name = "polars" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 
 [package.metadata]
@@ -636,6 +637,7 @@ requires-dist = [
     { name = "msgpack", specifier = ">=1.1" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "polars", specifier = ">=1.12" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.36" },
 ]
 
 [[package]]

@@ -291,17 +291,10 @@ async def _run_oi_cycle(
             logger.warning("market_oi_poll_failed", symbol=symbol, error=str(exc))
             continue
         readings.append(oi)
-        if await hot_state.write_open_interest(redis, oi):
-            from hunter_market_worker.ingest import publish_derivatives
-
-            await publish_derivatives(
-                redis,
-                f"market-worker@{runtime.instance}",
-                adapter.code,
-                symbol,
-                funding=None,
-                oi=oi,
-            )
+        # Hot state is the live view; the *event* is durable and leaves with
+        # the ``open_interest_history`` row (T2.9, ``durable.py``), so there is
+        # no eager publish here any more.
+        await hot_state.write_open_interest(redis, oi)
         if queues is not None:
             # D8: the bucket travels with the reading, so a round straddling a
             # 5-minute boundary still lands on one slot (main.py always passes
