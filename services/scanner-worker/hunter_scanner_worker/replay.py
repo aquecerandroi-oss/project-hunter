@@ -32,12 +32,11 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from hunter_core.db.session import role_session
 from hunter_core.domain.enums import BaselineSource
-from hunter_core.domain.types import ensure_utc, utcnow
+from hunter_core.domain.types import ensure_utc
 from hunter_core.logging import get_logger
 from hunter_indicators.baselines import BaselineRevision, ObservationCollector
 from hunter_indicators.baselines.bootstrap import (
@@ -46,47 +45,28 @@ from hunter_indicators.baselines.bootstrap import (
     replay_vectors,
 )
 from hunter_indicators.features import DEFAULT_REGISTRY
-from hunter_scanner_worker import writers
-from hunter_scanner_worker.backfill import request_gaps
 from hunter_scanner_worker.bootstrap import (
-    MINUTE,
-    REASON_INCOMPLETE,
-    REASON_NO_CANDLES,
-    BootstrapOutcome,
     BootstrapSettings,
     BootstrapWindow,
-    merge_runs,
-    missing_runs,
 )
 from hunter_scanner_worker.metrics import (
-    scanner_baseline_revisions_total,
     scanner_bootstrap_cuts_total,
 )
-from hunter_scanner_worker.persist import DB_ROLE
-from hunter_scanner_worker.refresh import admissible
-from hunter_scanner_worker.repo import load_candles
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    import redis.asyncio as redis_asyncio
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+    from collections.abc import Callable, Sequence
 
     from hunter_core.domain.market import NormalizedCandle
-    from hunter_indicators.baselines import BaselineGate
-    from hunter_scanner_worker.backfill import BackfillRequester
-    from hunter_scanner_worker.baselines import BaselineCache
     from hunter_scanner_worker.registry import MarketRef
 
 logger = get_logger(__name__)
 
-__all__ = [
-    "BootstrapJob",
-    "finish_job",
-    "prepare_job",
-    "run_bootstrap",
-    "store_revisions",
-]
+__all__ = ["BootstrapJob"]
+
+
+_IDLE_S = 0.05
+"""How long a suspended replay sleeps between two looks at the backlog when the
+duty cycle leaves no pause of its own (``duty = 1``)."""
 
 
 class BootstrapJob:
@@ -145,10 +125,21 @@ class BootstrapJob:
     def progress(self) -> float:
         return 0.0 if not self.total_cuts else self._cuts / self.total_cuts
 
-    async def run_slice(self, budget_s: float | None = None) -> bool:
-        """Replay for at most ``budget_s`` of wall time. ``True`` when finished."""
+    async def run_slice(
+        self, budget_s: float | None = None, *, pressure: Callable[[], bool] | None = None
+    ) -> bool:
+        """Replay for at most ``budget_s`` of wall time. ``True`` when finished.
+
+        ``pressure`` is asked at every cooperative boundary -- including before
+        the first cut -- whether the evaluation loop is behind; while it says so
+        the replay sleeps instead of taking its duty share. Checking only on
+        entry would let a visit hold its 120 s budget through a backlog that
+        started one cut later (Astra, T2.5c design review).
+        """
         started = time.perf_counter()
-        slice_started = started
+        if await self._stand_aside(pressure, started, budget_s):
+            return False
+        slice_started = time.perf_counter()
         for vector, _state in self._vectors:
             self._collector.add(vector)
             self._cuts += 1
@@ -159,10 +150,29 @@ class BootstrapJob:
                 self._report_cuts()
                 return False
             await asyncio.sleep(self.settings.pause_s)
+            if await self._stand_aside(pressure, started, budget_s):
+                return False
             slice_started = time.perf_counter()
         self._finished = True
         self._report_cuts()
         return True
+
+    async def _stand_aside(
+        self, pressure: Callable[[], bool] | None, started: float, budget_s: float | None
+    ) -> bool:
+        """Sleep while the live loop is late. ``True`` when this visit is over.
+
+        The job itself is untouched: the generator and the collector survive, so
+        coming back costs nothing and re-anchors nothing.
+        """
+        if pressure is None:
+            return False
+        while pressure():
+            self._report_cuts()
+            if budget_s is None or time.perf_counter() - started >= budget_s:
+                return True
+            await asyncio.sleep(self.settings.pause_s or _IDLE_S)
+        return False
 
     def _report_cuts(self) -> None:
         """Only the cuts this slice added. A counter is monotonic, not cumulative:
@@ -196,148 +206,3 @@ class BootstrapJob:
 
     def rejections(self) -> dict[str, dict[str, int]]:
         return {feature: dict(reasons) for feature, reasons in self._collector.rejections().items()}
-
-
-async def prepare_job(
-    session: AsyncSession,
-    ref: MarketRef,
-    *,
-    window: BootstrapWindow,
-    settings: BootstrapSettings,
-    now: datetime,
-) -> BootstrapJob:
-    """Read the candles this market's replay needs, and find what is missing."""
-    first = window.start - timedelta(minutes=settings.buffer_minutes)
-    candles = await load_candles(
-        session,
-        ref.market_id,
-        exchange=ref.exchange,
-        symbol=ref.symbol,
-        since=first,
-        until=window.end - MINUTE,
-    )
-    tail = ensure_utc(now) - timedelta(minutes=settings.tail_lag_minutes)
-    runs = [
-        (run_start, min(run_end, tail))
-        for run_start, run_end in missing_runs(
-            [candle.open_time for candle in candles], start=first, end=window.end
-        )
-        if run_start < tail
-    ]
-    return BootstrapJob(
-        ref,
-        window=window,
-        settings=settings,
-        candles=candles,
-        gaps=merge_runs(runs, settings=settings),
-    )
-
-
-async def store_revisions(
-    factory: async_sessionmaker[AsyncSession], revisions: Sequence[BaselineRevision]
-) -> int:
-    """Append-only, in one transaction. A retry collides and writes nothing."""
-    if not revisions:
-        return 0
-    async with role_session(factory, db_role=DB_ROLE) as session:
-        await writers.write_revisions(session, list(revisions))
-    scanner_baseline_revisions_total.labels(source="bootstrap", outcome="written").inc(
-        len(revisions)
-    )
-    return len(revisions)
-
-
-async def run_bootstrap(
-    factory: async_sessionmaker[AsyncSession],
-    redis: redis_asyncio.Redis,
-    requester: BackfillRequester,
-    ref: MarketRef,
-    *,
-    window: BootstrapWindow,
-    settings: BootstrapSettings,
-    now: datetime | None = None,
-) -> BootstrapOutcome:
-    """One market, end to end: read, ask for repairs, replay, write."""
-    moment = now or utcnow()
-    async with role_session(factory, db_role=DB_ROLE) as session:
-        job = await prepare_job(session, ref, window=window, settings=settings, now=moment)
-    requested = await request_gaps(
-        redis, requester, ref, job.gaps, reason="baseline_bootstrap", now=moment
-    )
-    if not job.candles:
-        logger.warning("scanner_bootstrap_no_candles", symbol=ref.symbol)
-        return BootstrapOutcome(
-            ref=ref,
-            window=window,
-            gaps=job.gaps,
-            reason=REASON_NO_CANDLES,
-            requested=requested,
-        )
-    await job.run_slice()
-    return await finish_job(factory, job, now=moment, requested=requested)
-
-
-async def finish_job(
-    factory: async_sessionmaker[AsyncSession],
-    job: BootstrapJob,
-    *,
-    now: datetime | None = None,
-    requested: int = 0,
-    cache: BaselineCache | None = None,
-    gate: BaselineGate | None = None,
-) -> BootstrapOutcome:
-    """Compute the revisions of a finished replay, write them, and report.
-
-    ``available_at`` is stamped **here**, after the replay, never at the instant
-    the job was created: a revision published with an earlier stamp than the
-    moment its population was closed would pass ``available_at <= as_of`` for a
-    cut that could not have known it (Astra, T2.5b diff review, must-fix 1).
-
-    And a bootstrap is subject to the same maturity policy as the hourly refresh:
-    a re-run over a window with holes can produce a non-empty bucket below the
-    gate, and publishing it would *demote* a usable baseline, because the
-    projection prefers the newest ``available_at`` and knows nothing about
-    maturity (must-fix 2).
-    """
-    # Never earlier than the real clock, and never earlier than the caller's
-    # reference: publication is *after* the population was closed, whichever of
-    # the two is later. A test that reasons at a fixed instant keeps its instant;
-    # production always lands on the wall clock, which is the point of MF-1.
-    moment = utcnow() if now is None else max(now, utcnow())
-    produced = job.revisions(available_at=moment)
-    revisions, withheld = (
-        admissible(produced, cache, gate)
-        if cache is not None and gate is not None
-        else (list(produced), [])
-    )
-    if withheld:
-        scanner_baseline_revisions_total.labels(source="bootstrap", outcome="withheld").inc(
-            len(withheld)
-        )
-        logger.info(
-            "scanner_bootstrap_revision_withheld",
-            symbol=job.ref.symbol,
-            withheld=len(withheld),
-        )
-    await store_revisions(factory, revisions)
-    complete = not job.gaps
-    logger.info(
-        "scanner_bootstrap_market_done",
-        symbol=job.ref.symbol,
-        cuts=job.cuts_done,
-        buckets=len(revisions),
-        gaps=len(job.gaps),
-        complete=complete,
-    )
-    return BootstrapOutcome(
-        ref=job.ref,
-        window=job.window,
-        cuts=job.cuts_done,
-        revisions=tuple(revisions),
-        complete=complete,
-        reason=None if complete else REASON_INCOMPLETE,
-        gaps=job.gaps,
-        rejections=job.rejections(),
-        requested=requested,
-        withheld=len(withheld),
-    )

@@ -42,6 +42,7 @@ from hunter_scanner_worker.deriv import deriv_loop
 from hunter_scanner_worker.health import CycleHealth, readiness_checks, write_heartbeat
 from hunter_scanner_worker.persist import DB_ROLE
 from hunter_scanner_worker.policy import load_policy
+from hunter_scanner_worker.pressure import LivePressure
 from hunter_scanner_worker.regime import BTC_SYMBOL, RegimeEngine
 from hunter_scanner_worker.registry import MarketRegistry
 from hunter_scanner_worker.runners import (
@@ -117,7 +118,18 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
                 "watchdog": watchdog_loop(scanner, factory, runtime.redis, runtime),
                 "registry": registry_loop(scanner, factory, runtime.redis, runtime, universe_wake),
                 "baselines": baseline_loop(
-                    scanner, factory, runtime.engine, runtime.redis, runtime, progress, requester
+                    scanner,
+                    factory,
+                    runtime.engine,
+                    runtime.redis,
+                    runtime,
+                    progress,
+                    requester,
+                    LivePressure(
+                        scanner.state,
+                        suspend_s=config.feature_throttle_s,
+                        resume_s=config.feature_throttle_s / 2,
+                    ),
                 ),
                 "deriv": deriv_loop(scanner, factory, runtime),
                 "outbox": run_dispatcher(runtime.redis, factory, outbox_health, db_role=DB_ROLE),

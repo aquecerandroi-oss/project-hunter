@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
 
     from hunter_scanner_worker.coverage import TapeCoverage
+    from hunter_scanner_worker.hotcache import HotCache
 
 logger = get_logger(__name__)
 
@@ -111,13 +112,29 @@ async def build_market_context(
     deriv_history: Sequence[DerivObservation] = (),
     now: datetime | None = None,
     btc: MarketContext | None = None,
+    cache: HotCache | None = None,
 ) -> ContextBuild:
-    """Read the four hot-state keys of one market and cut them coherently."""
+    """Read the four hot-state keys of one market and cut them coherently.
+
+    ``cache`` is the market's :class:`~hunter_scanner_worker.hotcache.HotCache`
+    when there is one: the rows are still read whole, and it only spares the
+    decode of the candle and trade rows that did not change since the last tick.
+    Without one -- a caller with no market state, and every cold path -- the
+    loaders decode all of them, which is the same answer for more CPU.
+    """
     moment = now or utcnow()
     as_of, covers_from, covered_until = evaluation_cut(coverage, symbol, now=moment)
     raw = await read_hot_state(redis, exchange, symbol)
-    candles = decode_candles(raw.candles, raw.candles_limit)
-    trades = decode_trades(raw.trades, as_of, raw.trades_limit)
+    candles = (
+        decode_candles(raw.candles, raw.candles_limit)
+        if cache is None
+        else cache.candles.decode(raw.candles, raw.candles_limit)
+    )
+    trades = (
+        decode_trades(raw.trades, as_of, raw.trades_limit)
+        if cache is None
+        else cache.trades.decode(raw.trades, as_of, raw.trades_limit)
+    )
     if covered_until is not None and covers_from is not None:
         # What the *session* proves and what the *tape* can show are two
         # different floors, and which one binds depends on truncation:
@@ -147,6 +164,10 @@ async def build_market_context(
         deriv_history=history_entry(deriv_history, as_of),
         btc=btc,
     )
+    if cache is not None:
+        # The windows the last tick derived from the same minutes, carried into
+        # this context instead of folded again (``hotcache.CARRIED_WINDOWS``).
+        cache.adopt(context)
     return ContextBuild(
         context=context,
         covered=covered_until is not None,

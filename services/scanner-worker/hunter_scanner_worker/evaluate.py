@@ -119,6 +119,12 @@ class Evaluation:
     history: HistoryVerdict | None = None
     history_mark: HistoryMark | None = None
     anomaly_states: tuple[AnomalyState, ...] = ()
+    scored: bool = False
+    """Whether the score throttle let this observation reach the scorer.
+
+    Read by the evaluation loop to decide whether the tick->opportunity
+    histogram gets a sample: the budget is about the age of the input when the
+    *opportunity* is published, and a vector-only pass published none."""
 
     @property
     def observation_ts(self) -> datetime:
@@ -195,6 +201,7 @@ def evaluate_market(inputs: EvaluationInputs) -> Evaluation:
             transitions=transitions,
             stage=stage,
             anomaly_states=anomaly_states,
+            scored=False,
         )
 
     ctx = ScoreContext(
@@ -247,6 +254,7 @@ def evaluate_market(inputs: EvaluationInputs) -> Evaluation:
         history=history,
         history_mark=mark,
         anomaly_states=anomaly_states,
+        scored=True,
     )
 
 

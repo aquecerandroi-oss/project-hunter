@@ -86,15 +86,23 @@ async def publish_features(
         logger.warning("scanner_feature_publish_failed", symbol=ref.symbol)
 
 
-async def publish_radar(redis: redis_asyncio.Redis, ref: MarketRef, evaluation: Evaluation) -> None:
-    """``radar:scores`` (ZSET), ``opp:*`` and the ``rt:radar`` broadcast."""
+async def publish_radar(redis: redis_asyncio.Redis, ref: MarketRef, evaluation: Evaluation) -> str:
+    """``radar:scores`` (ZSET), ``opp:*`` and the ``rt:radar`` broadcast.
+
+    Three outcomes, kept apart because the caller measures a latency with them
+    (Astra, T2.5c diff review, must-fix 2): :data:`RADAR_WRITTEN` when the row
+    is on the Radar, :data:`RADAR_NOTHING` when there was nothing usable to show
+    -- a finished cycle that published nothing on purpose -- and
+    :data:`RADAR_FAILED` when Redis refused the write, which is the one case
+    that must never be reported as a delivered opportunity.
+    """
     score = evaluation.score
     state = evaluation.status.state_out if evaluation.status is not None else None
     if score is None or state is None or score.score is None:
         # Nothing to project: a market with no eligible evidence keeps whatever
         # the Radar last showed, stamped by its own ``last_updated_at``. Writing
         # a zero here is the one thing that must not happen.
-        return
+        return RADAR_NOTHING
     member = f"{ref.exchange}:{ref.symbol}"
     payload: dict[str, Any] = {
         "market_id": str(ref.market_id),
@@ -116,6 +124,13 @@ async def publish_radar(redis: redis_asyncio.Redis, ref: MarketRef, evaluation: 
         await cast(Any, redis).publish(RADAR_CHANNEL, orjson.dumps(payload))
     except Exception:
         logger.warning("scanner_radar_publish_failed", symbol=ref.symbol)
+        return RADAR_FAILED
+    return RADAR_WRITTEN
+
+
+RADAR_WRITTEN = "written"
+RADAR_NOTHING = "nothing"
+RADAR_FAILED = "failed"
 
 
 async def drop_from_radar(redis: redis_asyncio.Redis, ref: MarketRef) -> None:

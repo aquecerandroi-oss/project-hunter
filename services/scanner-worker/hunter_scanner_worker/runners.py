@@ -33,6 +33,7 @@ from hunter_scanner_worker import publish as projections
 from hunter_scanner_worker import rows
 from hunter_scanner_worker.checkpoint import load_checkpoint, save_checkpoint
 from hunter_scanner_worker.coverage import read_coverage
+from hunter_scanner_worker.metrics import scanner_tick_to_opportunity_seconds
 from hunter_scanner_worker.persist import DB_ROLE, WriteBatch, flush_batch
 from hunter_scanner_worker.regime import BTC_SYMBOL, breadth_observation
 from hunter_scanner_worker.watchdog import sweep_silent_markets
@@ -73,13 +74,34 @@ async def evaluation_loop(
             due = scanner.state.due(now, config.feature_throttle_s)
             evaluated = 0
             for market in due[: config.max_markets]:
+                # Captured before the advance clears the dirt: the measurement
+                # starts at the market's own timestamp, not at ours.
+                waiting_since = market.last_input_ts
                 evaluation = await scanner.advance(redis, market, batch, now=now)
                 if evaluation is None:
                     continue
                 evaluated += 1
                 await projections.publish_features(redis, scanner.producer, market.ref, evaluation)
+                radar = projections.RADAR_NOTHING
                 if evaluation.score is not None:
-                    await projections.publish_radar(redis, market.ref, evaluation)
+                    radar = await projections.publish_radar(redis, market.ref, evaluation)
+                delivered = radar != projections.RADAR_FAILED
+                if evaluation.scored and delivered and waiting_since is not None:
+                    # After the publish, never before it: the budget is "tick to
+                    # opportunity", and an observation taken inside ``advance``
+                    # would leave the two projections outside the number that is
+                    # supposed to bound them (Astra, T2.5c design review).
+                    #
+                    # ``delivered`` is the second half of that: an observation whose
+                    # Radar row was refused by Redis was *not* delivered, and
+                    # counting it would report a latency for something nobody
+                    # can see (Astra, diff review, must-fix 2). An observation
+                    # with no usable score published nothing on purpose and is
+                    # still a finished cycle, which is what the histogram's help
+                    # text now says it measures.
+                    scanner_tick_to_opportunity_seconds.observe(
+                        max(0.0, (utcnow() - waiting_since).total_seconds())
+                    )
             cycle.touch(evaluated)
             if (now - last_flush).total_seconds() >= config.persist_s or batch.acks:
                 batch.acks.extend(scanner.state.pending_acks)

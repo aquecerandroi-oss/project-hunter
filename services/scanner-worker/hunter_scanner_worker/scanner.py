@@ -34,10 +34,7 @@ from hunter_scanner_worker.context import build_market_context
 from hunter_scanner_worker.coverage import TapeCoverage
 from hunter_scanner_worker.deriv import DerivHistory, detector_roster, disarmed_reasons
 from hunter_scanner_worker.evaluate import Evaluation, EvaluationInputs, evaluate_market
-from hunter_scanner_worker.metrics import (
-    scanner_markets_evaluated_total,
-    scanner_tick_to_opportunity_seconds,
-)
+from hunter_scanner_worker.metrics import scanner_markets_evaluated_total
 from hunter_scanner_worker.persist import WriteBatch
 from hunter_scanner_worker.regime import RegimeEngine
 from hunter_scanner_worker.registry import MarketRegistry
@@ -135,6 +132,7 @@ class Scanner:
             coverage=self.coverage,
             deriv_history=observations,
             now=moment,
+            cache=market.hot,
         )
         context = build.context
         # Rebuilt every cycle, from current state: that is what makes a detector
@@ -179,10 +177,6 @@ class Scanner:
         market.evaluations += 1
         if score_due:
             market.last_score_at = moment
-            if market.last_input_ts is not None:
-                scanner_tick_to_opportunity_seconds.observe(
-                    max(0.0, (utcnow() - market.last_input_ts).total_seconds())
-                )
         scanner_markets_evaluated_total.labels(
             outcome="covered" if build.covered else "uncovered"
         ).inc()

@@ -45,6 +45,8 @@ from hunter_scanner_worker.metrics import (
     scanner_baselines,
     scanner_detectors_disarmed,
     scanner_dirty_markets,
+    scanner_hot_rows_decoded_total,
+    scanner_hot_rows_resident,
     scanner_universe_size,
 )
 
@@ -69,6 +71,10 @@ OUTBOX_MAX_PENDING = 5_000
 OUTBOX_MAX_LAG_S = 60.0
 
 _DISARMED_SEEN: set[tuple[str, str]] = set()
+
+_DECODED_SEEN: dict[str, int] = {}
+"""Rows each market had decoded at the previous heartbeat: the metric is a
+counter, so what is published is the delta, never the running total."""
 """Label pairs this process has published, so a rearmed detector can be
 set back to zero instead of keeping its last value forever."""
 
@@ -183,6 +189,29 @@ async def write_heartbeat(
     )
     scanner_universe_size.set(len(markets))
     scanner_dirty_markets.set(scanner.state.dirty)
+    # The incremental context, in numbers an operator can see: how many decoded
+    # rows are resident and how many rows this process had to decode. In a
+    # steady state the second grows by one per market per minute; if it grows by
+    # 1500, the reuse stopped happening and the latency is about to say so.
+    resident = sum(market.hot.rows for market in markets)
+    scanner_hot_rows_resident.labels(kind="candles").set(
+        sum(len(market.hot.candles) for market in markets)
+    )
+    scanner_hot_rows_resident.labels(kind="trades").set(
+        sum(len(market.hot.trades) for market in markets)
+    )
+    # Per market, never a global sum: a market that leaves the universe takes
+    # its counter with it, and a delta over the sum would swallow everybody
+    # else's increments in that heartbeat (Astra, T2.5c diff review).
+    live = {market.ref.symbol for market in markets}
+    for symbol in [key for key in _DECODED_SEEN if key not in live]:
+        del _DECODED_SEEN[symbol]
+    for market in markets:
+        decoded = market.hot.decoded
+        scanner_hot_rows_decoded_total.inc(
+            max(0, decoded - _DECODED_SEEN.get(market.ref.symbol, 0))
+        )
+        _DECODED_SEEN[market.ref.symbol] = decoded
     scanner_anomalies_open.labels(state="active").set(open_anomalies)
     if maturity is not None:
         scanner_baselines.labels(state="usable").set(maturity.usable)
@@ -212,6 +241,7 @@ async def write_heartbeat(
         "detectors_disarmed": ",".join(
             f"{kind}:{reason}={count}" for (kind, reason), count in sorted(disarmed.items())
         ),
+        "hot_rows_resident": str(resident),
         "coverage": "live" if scanner.coverage.fresh() else "unproven",
         "consumer_errors": str(consumers.errors),
         "errors": str(runtime.error_count),

@@ -51,10 +51,11 @@ def candle(
     trades: int = 50,
     is_final: bool = True,
     event_ts: datetime | None = None,
+    symbol: str = SYMBOL,
 ) -> NormalizedCandle:
     return NormalizedCandle(
         exchange=EXCHANGE,
-        symbol=SYMBOL,
+        symbol=symbol,
         timeframe=Timeframe.M1,
         open_time=open_time,
         close_time=open_time + timedelta(minutes=1),
@@ -77,10 +78,11 @@ def series(
     start: datetime = ORIGIN,
     close: Decimal = Decimal("100"),
     volume: Decimal = Decimal("10"),
+    symbol: str = SYMBOL,
 ) -> list[NormalizedCandle]:
     """``minutes`` contiguous closed candles, oldest first."""
     return [
-        candle(start + timedelta(minutes=index), close=close, volume=volume)
+        candle(start + timedelta(minutes=index), close=close, volume=volume, symbol=symbol)
         for index in range(minutes)
     ]
 
@@ -109,6 +111,23 @@ def book_payload(
             "bids": [[str(bid - Decimal(index) / 100), "1"] for index in range(depth)],
             "asks": [[str(ask + Decimal(index) / 100), "1"] for index in range(depth)],
         }
+    )
+
+
+def corrupt_trade_row() -> bytes:
+    """A trade row whose timestamp does not parse — the loader skips it."""
+    return _packb({"ts": "not-a-time", "price": "1", "qty": "1", "side": "buy", "trade_id": "x"})
+
+
+def bad_side_trade_row(ts: datetime) -> bytes:
+    """A trade row whose ``side`` is not an ``OrderSide``.
+
+    The loader only reads ``side`` for a row that survived the cut, so this row
+    is *silently skipped* while ``ts`` is in the future and *raises* once the
+    cut reaches it.
+    """
+    return _packb(
+        {"ts": ts.isoformat(), "price": "1", "qty": "1", "side": "sideways", "trade_id": "z"}
     )
 
 

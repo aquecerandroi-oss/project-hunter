@@ -30,7 +30,7 @@ from hunter_indicators.baselines import SqlBaselineStore
 from hunter_scanner_worker.backfill import BackfillRequester
 from hunter_scanner_worker.bootstrap import BootstrapSettings, missing_runs, window_for
 from hunter_scanner_worker.registry import MarketRef
-from hunter_scanner_worker.replay import run_bootstrap
+from hunter_scanner_worker.replay_io import run_bootstrap
 
 from .builders import EXCHANGE, FakeHotState
 from .db_helpers import seed_market
@@ -305,7 +305,7 @@ async def test_slicing_the_replay_does_not_change_a_single_number(
     identical byte for byte (Astra, T2.5b design review, must-fix 5 — a recreated
     generator would restart Wilder's recursion from a different anchor).
     """
-    from hunter_scanner_worker.replay import prepare_job
+    from hunter_scanner_worker.replay_io import prepare_job
 
     settings = BootstrapSettings(window_days=1, buffer_minutes=60, duty=1.0, slice_s=0.001)
     window = window_for(NOW, days=settings.window_days)
@@ -336,7 +336,7 @@ async def test_the_cut_counter_counts_each_minute_once_however_many_slices(
     market replayed in forty slices must not read as forty markets: incrementing
     a monotonic counter by the *running total* once per slice multiplies it."""
     from hunter_scanner_worker.metrics import scanner_bootstrap_cuts_total
-    from hunter_scanner_worker.replay import prepare_job
+    from hunter_scanner_worker.replay_io import prepare_job
 
     settings = BootstrapSettings(window_days=1, buffer_minutes=60, duty=1.0, slice_s=0.001)
     window = window_for(NOW, days=settings.window_days)

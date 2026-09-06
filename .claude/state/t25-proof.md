@@ -384,3 +384,313 @@ corrigido roda:
 | Recarga imediata | `scanner_baseline_market_reloaded symbol=DEXEUSDT revisions=381` logo após cada mercado — a correção que impede um bootstrap de ficar invisível até a hora virar |
 | Refresh horário | o bucket da hora 18 entrou (`live` foi de 3 045 para 6 263 revisões, 201 mercados) |
 | `complete=False gaps=1` por mercado | correto: o histórico local começa em `2026-09-01`, então todo mercado tem um buraco declarado no início da janela de 7 dias e um pedido de backfill |
+
+---
+
+# Prova operacional — T2.5-backfill (consumidor de `market.backfill.requested`)
+
+**2026-09-06**, stack local (`infra/docker/docker-compose.yml`), imagem `hunter-api:dev` reconstruída
+da árvore de trabalho desta tarefa, `market-worker` recriado às **20:23:52Z** e observado até
+**20:39:43Z** (15 min 51 s). `scanner-worker`, `api`, `strategy-worker`, `postgres` e `redis` no ar o
+tempo todo, contra a Binance real. Todo número abaixo foi lido do Redis, do `/metrics`, do `/ready`,
+do Postgres ou do log do contêiner.
+
+**Ressalva honesta de ambiente:** a árvore de trabalho também contém as alterações **não commitadas de
+outra tarefa em voo** (`services/scanner-worker/**`), que entraram na mesma imagem. O que está sendo
+provado aqui é o consumidor do market-worker; o scanner é o produtor real, no estado em que está.
+
+## 1. O grupo existe, e o backlog acabou
+
+`XINFO GROUPS market.backfill.requested` — era **vazio** na T2.5b (§4 daquela prova), com 29 mensagens
+paradas:
+
+| Campo | Valor |
+|---|---|
+| `name` | `market-worker.backfill.binance.0of1` |
+| `consumers` | 2 (o `instance` anterior e o atual; nomes por processo) |
+| `pending` | **0** |
+| `entries-read` | **97** |
+| `lag` | **0** |
+| `XLEN` | 97 |
+
+As 97 mensagens são pedidos reais do scanner acumulados no stream (as 29 da prova da T2.5b mais as
+publicadas depois). O grupo é criado em `id=0`, então a primeira partida **drenou o backlog inteiro**.
+
+## 2. O que o consumidor decidiu (log real, dois exemplos)
+
+```
+market_backfill_planned  outcome=accepted symbol=ACEUSDT shard=0/1 reason=baseline_bootstrap
+  requested_by=scanner-worker@6c6e55dea590:1 requested_minutes=8547 minutes=5247 chunks=22
+  gap_start=2026-08-29T17:00:00+00:00 gap_end=2026-09-04T15:26:00+00:00 unstorable_minutes=3300
+market_backfill_refused  reason=no_partition symbol=ADAUSDT exchange=binance
+```
+
+O segundo é o achado da prova (notes §29): `create_partitions.py` provisiona o mês corrente e os
+seguintes, então **agosto não existe** e 3 300 dos 8 547 minutos pedidos não têm onde ser gravados. Em
+vez de abortar a transação inteira e queimar as cinco tentativas do gap, o consumidor não planeja
+aqueles minutos, diz `unstorable_minutes` no log e — quando a janela inteira é insalvável — recusa com
+`no_partition` **sem marcar o `event_id`**, para ser reavaliado quando as partições existirem. Foi
+por causa deste log que `accepted` passou a ser `partial` sempre que algo fica de fora.
+
+## 3. Idempotência, medida em produção
+
+Pedido injetado às 20:34:11Z **com o produtor real** (`hunter_scanner_worker.backfill.BackfillRequester`,
+executado dentro do contêiner do scanner) para `ETHUSDT`, janela `[2026-09-03T20:34, 2026-09-04T20:34)`:
+
+```
+scanner_backfill_requested  symbol=ETHUSDT gap_start=2026-09-03T20:34:00+00:00 gap_end=2026-09-04T20:34:00+00:00
+market_backfill_planned     outcome=empty symbol=ETHUSDT requested_minutes=1440 minutes=0 chunks=0
+                            gap_start=2026-09-03T20:34:00+00:00 gap_end=2026-09-04T20:33:00+00:00
+```
+
+`gap_end` no log é `20:33` porque o intervalo do pedido é semiaberto e a linha de gap é inclusiva —
+a tradução do §22 das notas, visível. E `minutes=0` porque a janela **já estava completa**:
+
+```
+select count(*) from candles c join markets m on m.id=c.market_id
+where m.symbol='ETHUSDT' and c.open_time >= '2026-09-03 20:34' and c.open_time < '2026-09-04 20:34';
+-> 1440
+```
+
+1 440 de 1 440 minutos persistidos, **nenhuma chamada REST** feita pelo pedido repetido. Um segundo
+pedido do scanner (`JTOUSDT`, 8 427 minutos) na mesma janela também saiu `empty`.
+`market_backfill_requests_total{outcome="empty"} 2.0`.
+
+## 4. História que antes não existia
+
+| Medida (Postgres, 20:39:43Z) | Valor |
+|---|---|
+| Velas `source='rest'` com mais de 25 h (fora da janela de detecção) | **411 803**, em **236 mercados** |
+| Velas `source='rest'` com mais de 2 dias (inalcançáveis pela detecção, logo do backfill) | **123 857**, em **218 mercados** |
+| Minuto mais antigo já preenchido | **2026-09-01T00:00Z** (a fronteira da partição; agosto continua sem partição) |
+| `ingestion_gaps` | `recovered` 16 732 · `open` 2 136 · `failed` 2 |
+| Velas antigas preenchidas na janela de 6,5 min medida (20:33 → 20:39) | +9 774 minutos |
+| Gaps recuperados no mesmo intervalo | +43 (≈ 6,6/min, o teto é 6 por ciclo de 60 s) |
+
+**O que isso destrava, que é o ponto da tarefa:**
+
+| | T2.5b (`t25-proof` §8) | agora |
+|---|---|---|
+| Mercados com ≥ 3 dias distintos de velas de 1 min | ~0 (192 de 200 tinham 2,1 dias) | **213** |
+| Mercados com menos de 3 dias | quase todos | 25 |
+| Baselines utilizáveis (buckets) | 1 065 | **3 220** (`hunter_scanner_baselines{state="usable"}`) |
+
+"≥ 3 dias distintos" é exatamente o portão de maturidade da decisão conjunta do M2 (≥ 3 dias distintos
+**e** ≥ 120 observações). Ele deixou de ser inalcançável por falta de dado local.
+
+## 5. Saúde do coletor durante o bootstrap
+
+| | |
+|---|---|
+| `/ready` ao fim | `{"database":true,"redis":true,"ingestion":true,"persistence":true,"partitions":true,"outbox":true,"rest_gate":"ok"}` |
+| `outbox_events` pendentes | **0** |
+| `market_backfill_cycle_failed` | **0** |
+| Tracebacks em 17 min | **1** (`market_persist_flush_failed`, 20:25:20Z, 90 s após o restart) |
+| Rate limit | nenhum `429`/`418`; nenhum `exchange_rest_admissions_suspended_total` |
+
+O único traceback é um `TimeoutError` de 10 s no COMMIT de um lote de persistência (`persist.py:203`)
+durante a rajada de partida — o lote é **retentado**, não descartado (só é largado se passar de
+`queues.max_age`), e a prontidão de `persistence` nunca ficou vermelha. Está registrado como
+preocupação: o backfill acrescenta contenção no Postgres (leituras de cobertura de 7 dias e escrita de
+lotes de velas antigas) e uma vez em 17 minutos isso empurrou um COMMIT além dos 10 s.
+
+## 6. O que esta prova **não** mostra
+
+- **Nenhum pedido novo do scanner na janela.** O `scanner-worker` deste contêiner não publicou nada
+  entre 20:23 e 20:39 (a deduplicação por janela é de 1 h), então os dois pedidos servidos na janela
+  foram um injetado com o produtor real e um antigo reentregue. O que a janela mostra de verdade é o
+  **dreno** (as 97 mensagens já consumidas, os gaps sendo recuperados a 6/ciclo).
+- **Backfill de sete dias completo:** impossível hoje, porque agosto não tem partição (§2). Os 5–6
+  dias de setembro são o que existe, e é o que foi preenchido.
+- **Concorrência entre shards reais:** o stack local roda `MARKET_SHARD=0/1`. O fan-out por shard está
+  provado em teste (`test_a_market_of_another_shard_is_ignored_without_effect`), não em operação.
+- **p99 tick→oportunidade** continua fora do orçamento e não é assunto desta tarefa (t25-proof §7).
+
+---
+
+# Prova operacional — T2.5c (contexto incremental) — 2026-09-06
+
+Terceira janela, mesmo stack local, imagem `hunter-api:dev` reconstruída da árvore de trabalho da
+T2.5c (`docker compose build api`) e **só o `scanner-worker` recriado** — o `market-worker` seguiu
+com o contêiner que já estava de pé, porque há outra tarefa em voo nos arquivos dele. Tudo abaixo
+foi lido do `/metrics`, do `/ready`, do Redis, do Postgres e do `docker stats`.
+
+## 1. Janela
+
+| | |
+|---|---|
+| Processo recriado | **2026-09-06T20:33:24Z** |
+| Janela medida | **20:33:24Z → 21:05:29Z** (32 min 5 s) |
+| Universo | 200 mercados monitorados |
+| Serviços | `postgres`, `redis`, `market-worker`, `scanner-worker`, `strategy-worker`, `api` |
+| Exceções no log do scanner | **0** (`grep -ciE "traceback|exception|error"` → 0 em 169 linhas) |
+| `/ready` | **200** a janela inteira: `{"database":true,"redis":true,"scanner_consumers":true,"scanner_evaluation":true,"scanner_outbox":true,"scanner_baselines":true,"baselines":"bootstrapping JTOUSDT (91/200)"}` |
+
+## 2. O que o cache fez, medido dentro do contêiner
+
+`docker exec … probe2.py` (só leitura, 5 mercados líquidos, caches quentes):
+
+```
+hiredis: False
+round 0: read=22.5ms candles=37.3ms trades=25.5ms book+deriv=0.2ms | rows candles=1009 trades=2000
+round 1: read=19.2ms candles=0.8ms  trades=0.9ms  book+deriv=0.3ms | rows candles=1009 trades=2000
+round 2: read=18.6ms candles=0.8ms  trades=0.7ms  book+deriv=0.3ms | rows candles=1009 trades=2000
+round 3: read=19.3ms candles=0.9ms  trades=1.2ms  book+deriv=0.2ms | rows candles=1009 trades=2000
+```
+
+**Decodificar 3 000 linhas por tick passou de 62,8 ms para 1,7 ms.** E o contador confirma no
+processo real: entre 21:00:32 e 21:03:36 (184 s, ~4 400 avaliações),
+`hunter_scanner_hot_rows_decoded_total` subiu **1 262** — sem reaproveitamento seriam ~13 milhões.
+
+| Métrica | Valor no fim da janela |
+|---|---|
+| `hunter_scanner_hot_rows_resident{kind="candles"}` | 162 050 |
+| `hunter_scanner_hot_rows_resident{kind="trades"}` | 385 163 |
+| `hunter_scanner_hot_rows_decoded_total` | 714 863 (dos quais ~540 000 na partida fria) |
+| RSS do `scanner-worker` (`docker stats`) | **883,5 MiB** com buffers de ~800 velas; CPU 97–145 % |
+
+## 3. Latência tick → oportunidade — **ainda fora do orçamento**, com a causa medida noutro lugar
+
+Histograma completo da janela (o processo nasceu nela, então o acumulado **é** a janela):
+
+| | |
+|---|---|
+| Amostras | **47 994** (T2.5b: 13 645 — **3,5×** mais avaliações no mesmo tempo) |
+| ≤ 2 s | 11 |
+| ≤ 3 s | **417 (0,87 %)** — T2.5b: 0 |
+| ≤ 5 s | 4 961 (10,3 %) |
+| ≤ 8 s | 14 580 (30,4 %) |
+| ≤ 13 s | 25 190 (52,5 %) |
+| ≤ 21 s | 28 099 (**58,5 %**) — T2.5b: 15 % |
+| p50 (interpolado no balde 8–13 s) | **~12,4 s** |
+| p95 / p99 | **> 21 s** (último balde) |
+
+**Alvo p99 ≤ 3 s: não cumprido.** E a causa **mudou de dono** — não é mais o custo do contexto:
+
+1. **O consumidor de `market.ticks` está permanentemente ~10 min atrás.** Medido com
+   `XINFO STREAM` / `XINFO GROUPS` em 62 s: **151 mensagens/s produzidas, ~71/s consumidas**, lag
+   estacionado em **~95 000** (o `MAXLEN` de 100 000 apara o resto). O histograma mede a partir do
+   `ts` que o *mercado* carimbou — de propósito, "uma fila tem de aparecer no número". O consumidor
+   de `market.candles.closed`, que tem 1/30 do volume, está com **lag 0**.
+   **Atribuição limitada, de propósito** (correção da Astra): `last_input_ts` guarda o **maior**
+   carimbo entre os gatilhos que sujaram o mercado (`MarketState.touch`), então um fechamento
+   recente substitui o de um tick atrasado — nem toda amostra é a idade de um tick. O que está
+   medido é o sintoma (a fila) e a correlação; separar "espera no stream", "espera no dirty set",
+   "leitura", "cálculo" e "publicação" exige instrumentar as etapas, e isso não foi feito nesta
+   janela;
+2. **O laço de avaliação está saturado de CPU**: ~25–30 mercados/s contra os ~200/s que o throttle
+   de 1 s pede. Por mercado: **~19 ms de leitura do Redis** (parser RESP em Python puro,
+   `HIREDIS_AVAILABLE = False`) + ~10 ms de CPU. 97 % de um núcleo no `docker stats`, com o
+   `market-worker` levando outros 99 % na mesma máquina.
+
+Nenhuma das duas está em `services/scanner-worker/**`: a primeira é a taxa de consumo de
+`hunter_core.events.consume` (uma verificação de `event_id` por mensagem), a segunda é o parser do
+`redis-py` e a revalidação por tick em `hunter_indicators.features.context`. O que **estava** neste
+serviço — decodificar o hot state inteiro a cada tick — caiu 37×.
+
+## 4. O que o scanner escreveu na janela (o caminho durável acompanhou)
+
+Contado por par **(mercado, minuto)**, não por linhas — a contagem bruta não distingue "um minuto
+faltando aqui compensado por outro ali" (achado da Astra na revisão de diff). Nos 31 minutos
+fechados de 20:34 a 21:05:
+
+| | |
+|---|---|
+| Pares (mercado, minuto) distintos | **6 200** |
+| Mercados com **os 31 minutos** | **199** |
+| Mercados com menos | **2**, e os dois são a troca de universo das 20:38:58 (`scanner_universe_changed added=['VETUSDT'] removed=['ROBOUSDT']`): `VETUSDT` 26 minutos, `ROBOUSDT` 5 |
+| Mercados distintos com snapshot | 201 (200 ao mesmo tempo; o 201º é a troca acima) |
+| Anomalias ativas | 4 |
+| **Oportunidades abertas** | **4** — `ETHUSDT` ANOMALY score 15,00 conf 0,1191; `DOGEUSDT` 0,67; `BTCUSDT` 0,16; `ADAUSDT` 0,00 |
+| `radar:scores` (ZSET) | **5 entradas** |
+| Revisões de baseline no arquivo | 45 199 |
+
+**O Radar tem linhas reais pela primeira vez** (T2.5 e T2.5b: 0 linhas, 0 entradas). Não é mérito
+desta tarefa — é o bootstrap da T2.5b tendo terminado em mercados suficientes —, mas é a primeira
+janela em que o pipeline inteiro produz o artefato que ele existe para produzir.
+
+## 5. Bootstrap: suspenso a janela inteira, e isso é a resposta certa
+
+`hunter_scanner_bootstrap_suspended = 1` do primeiro minuto ao último, `bootstrap_cuts_total = 0`,
+`/ready` verde com `"bootstrapping JTOUSDT (91/200)"` ao lado. A contrapressão da §27 das notas fez
+exatamente o que foi desenhada para fazer: com o mercado sujo mais velho sempre acima de 1 s, o
+replay não tomou uma fatia sequer. **A consequência honesta é que o bootstrap não avança neste
+stack enquanto o custo por avaliação não cair** — e é melhor que ele diga isso (métrica + `/ready`)
+do que roubar 40 % de um laço que já está atrasado.
+
+## 6. Defeito encontrado pela prova, e que não é desta tarefa
+
+`mkt:coverage:binance` está **congelado**: `covered_until == session_since ==
+2026-09-06T20:23:56.93Z`, 41 minutos parado, enquanto o tape e as velas estão frescos (trade mais
+novo 8 s atrás, vela do minuto fechada no segundo certo). Consequência: **todas** as 48 057
+avaliações da janela saíram `outcome="uncovered"`, e toda feature de tape saiu
+`insufficient_coverage`. O `CoverageTracker` é do `market-worker`
+(`hunter_market_worker/coverage.py`, carimbo a cada 0,25 s), o contêiner dele não foi recriado nesta
+janela e há **outra tarefa em voo nesses arquivos** — então fica registrado como observação, não
+como diagnóstico: quem estiver no `market-worker` tem aqui o sintoma e a hora.
+
+## 7. Veredito
+
+| Item de aceite | Situação |
+|---|---|
+| Contexto incremental por mercado | **cumprido** — 62,8 ms → 1,7 ms de decode por tick, com identidade de bytes provada |
+| Reprodutibilidade byte-idêntica | **cumprido** — `tests/test_context_identity.py`, 60 minutos com buraco, backfill e vela em formação |
+| Memória medida e limitada | **cumprido** — 2 357 B/vela, 674 MiB projetados para 200×1500, 883 MiB de RSS reais |
+| Fixture do `test_load.py` corrigida | **cumprido** — cada símbolo sob a própria chave, tape cheio |
+| `xfail` removido | **não** — 3,23 s contra 3,0 s no pior caso sintético; `xfail(strict=True)` mantido com o número e a causa |
+| Bootstrap não empurra a avaliação | **cumprido** — suspenso enquanto há atraso, com métrica |
+| p99 ≤ 3 s com 200 mercados | **não cumprido** — p50 ~12,4 s, p99 > 21 s, com as duas causas medidas e ambas fora deste serviço |
+| 0 exceções, `/ready` verde | **cumprido** |
+
+**Ressalva de honestidade sobre esta janela:** ela rodou com a árvore **anterior** à revisão de
+diff da Astra (`.claude/state/astra-review-T2.5c-diff.md`). Os quatro ajustes que vieram depois
+dela — a linha de trade com verdicto dependente do corte, a amostra do histograma que passou a
+exigir que a projeção não tenha falhado, o contador de decode por mercado e os limiares da
+contrapressão lidos do `ScannerConfig` — não mudam nenhum dos custos medidos aqui (nenhum toca o
+caminho quente), mas a prova **não** foi refeita depois deles e isto está dito em vez de omitido.
+
+## 7. Confirmação depois das correções da revisão de diff da Astra
+
+Imagem reconstruída e `market-worker` recriado às **21:24:03Z**, observado até **21:32:16Z**. O que a
+segunda rodada acrescenta à prova:
+
+**A cauda não liquidada é contada (must-fix 1), com dado real.** Pedido injetado às 21:13:16Z com o
+produtor real para `BTCUSDT`, `[2026-09-06T15:13, 2026-09-06T21:43)` — deliberadamente 30 minutos no
+futuro:
+
+```
+market_backfill_planned  outcome=empty->partial symbol=BTCUSDT requested_minutes=390 minutes=0
+  chunks=0 gap_start=2026-09-06T15:13:00+00:00 gap_end=2026-09-06T21:11:00+00:00
+  not_settled_minutes=31 unstorable_minutes=0
+```
+
+`gap_end` recortado para 21:11 (o último minuto liquidado: `align_open_time(21:13) − 2 min`) e
+**31 minutos contados como não liquidados**, o que segura a marca do `event_id`. Este log é também o
+que motivou o último ajuste: ele saiu `outcome=empty` enquanto a marca era retida — a palavra dizia
+"pronto" e o ACK dizia "não". Agora `partial` é exatamente a condição de reter a marca
+(`test_a_pass_that_wrote_nothing_and_still_owes_minutes_says_partial`).
+
+**O `report_losses` não pode esperar pelo lock (correção do meu próprio remédio).** Ao pôr o terceiro
+escritor sob o mesmo `pg_advisory_xact_lock` (must-fix 3), ele passou a **bloquear** dentro do
+`drain_loop`, que roda uma vez por segundo, atrás de um ciclo de detecção que lê a cobertura de 200
+mercados. Medido: `market_persist_lag lag_s=14,4` e 4 `market_persist_flush_failed` em 7 min. Trocado
+por `pg_try_advisory_xact_lock`: quem não pega o lock **não escreve nada e não drena nada**, e a
+iteração seguinte tenta de novo (o relatório de perdas é best-effort; o flush não é). Teste:
+`test_the_loss_report_gives_up_the_lock_instead_of_delaying_the_flush`.
+
+**Janela de confirmação (8 min):**
+
+| | |
+|---|---|
+| `/ready` | verde, `rest_gate: ok` |
+| Grupo | `pending 0`, `entries-read 98`, `lag 0` |
+| `market_persist_flush_failed` | **2** (eram 4 em 7 min com o lock bloqueante) |
+| `market_persist_lag` | 3 ocorrências |
+| Outros erros | nenhum |
+
+**Causa do timeout de flush: continua indeterminada, e é assim que fica registrada.** O `wait_for` de
+10 s cobre `flush_batch` inteiro e o log não separa fases nem espera de lock (a Astra recusou minha
+atribuição a contenção e ela está certa). O que se sabe: acontece durante a rajada de recuperação de
+lacunas vivas de um minuto (dezenas de chamadas REST e transações curtas no mesmo event loop), o lote
+é **retentado** e a prontidão de `persistence` nunca ficou vermelha. Medir por fase é o próximo passo,
+e não é desta tarefa.

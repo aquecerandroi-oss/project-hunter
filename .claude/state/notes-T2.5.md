@@ -467,3 +467,543 @@ com job em voo, duas viradas seguidas) — as funções que decidem cada um dess
 em separado, o laço que as costura não; (c) dois arquivos de **teste** acima de 350 linhas
 (`test_bootstrap.py` 434, `test_persistence.py` 475), que o gate exclui por desenho
 (`infra/scripts/check_file_size.py`, `SKIP_DIRS`).
+
+---
+
+# T2.5-backfill — o consumidor que faltava (`market-worker`)
+
+Fecha o item 1 do §19: "não existe consumidor de `market.backfill.requested`… este é o bloqueio mais
+alto do M2 hoje". Segunda opinião de desenho **antes** de codar:
+`.claude/state/astra-review-T2.5-backfill.md` (5 must-fix; os cinco endereçados abaixo).
+
+## 22. O pedido vira lacuna, e só. Quem busca continua sendo o recovery
+
+O consumidor **não chama REST**. Ele traduz um pedido em linhas de `ingestion_gaps` e para. Isso não é
+economia de código: é o que mantém uma única porta para a exchange (a decisão conjunta do M2), um
+único orçamento de taxa, uma única política de tentativa e um único caminho de anúncio — as velas
+preenchidas viram `market.candles.closed` pela outbox porque `upsert_candles` as enfileira na mesma
+transação, exatamente como um minuto ao vivo (`durable.py`). **Confirmado na prova**, não assumido.
+
+Duas convenções de intervalo se encontram e a tradução mora num lugar só
+(`backfill_plan.normalize_window`): o pedido é **semiaberto** `[gap_start, gap_end)` (o produtor
+corrigiu isso na T2.5b, §15) e `ingestion_gaps` é **inclusivo nas duas pontas**
+(`expected_times(start, end)` conta `end`, e o fetch pede `gap_end + 1min`). O último minuto aceito é
+`min(gap_end, detection_last + 1min) − 1min`, com `detection_last = align_open_time(server_now) −
+DETECTION_GRACE` — a fórmula é da Astra e é um minuto mais larga que o meu clamp original, que
+descartava um minuto que o próprio recovery aceitaria.
+
+## 23. Um grupo por shard (e por que o grupo único está errado aqui)
+
+`market-worker.backfill.{exchange}.{i}of{N}`. Toda mensagem chega a **todos** os shards; só o dono do
+mercado (`crc32(symbol) % N == i`, a mesma fatia de `universe.shard_symbols`) planeja, os outros dão
+`XACK` sem efeito. Com um grupo compartilhado, cada pedido é entregue a **um** shard, que na maioria
+das vezes não é o dono e só poderia descartá-lo — o pedido se perderia em silêncio. A Astra concorda
+com a topologia e acrescentou o `{exchange}` no nome (hoje só existe Binance, mas dois workers de
+exchanges diferentes competiriam no mesmo grupo e descartariam trabalho alheio).
+
+Custos declarados, não escondidos: mudar `N` cria grupos novos que releem o histórico retido e deixa
+os antigos com pendências (remoção é procedimento manual); cada grupo tem seu próprio
+`hunter:processed:{group}`; e o stream tem `MAXLEN 5 000`, então um shard parado por muito tempo perde
+pedidos por trimming — a republicação horária do scanner é parte necessária da recuperação, não um
+luxo.
+
+## 24. `XACK` nem sempre é marca — o achado mais importante da revisão
+
+Must-fix 1 da Astra, e ela está certa: `ack()` grava o `event_id` em `hunter:processed:{group}` e
+`consume()` consulta esse conjunto **antes** de entregar. Uma recusa por "mercado fora do universo"
+marcada como processada faria a republicação de uma hora depois ser descartada pela guarda **antes**
+de alguém reconsultar o universo — o mercado voltaria e nunca seria backfillado. Regra implementada:
+
+| Situação | `XACK` | Marca `event_id` |
+|---|---|---|
+| planejado por inteiro | sim | **sim** |
+| planejamento parcial (teto de linhas, mês sem partição, minutos de outro gap) | sim | **não** |
+| recusa dependente do estado de agora (fora do universo, janela futura, sem partição) | sim | **não** |
+| pedido de outro shard/exchange | sim | **não** (a topologia pode mudar) |
+| erro transitório (Postgres/Redis) | **não** | não — volta pelo `XAUTOCLAIM`; após 3 tentativas é largado com `outcome=failed` e log de erro |
+| envelope ilegível | sim | não (quarentena) |
+
+## 25. Prioridade sem coluna: a idade da janela, não a origem
+
+`ingestion_gaps` não tem `source` nem `priority` e esta tarefa não pode migrar o schema. A separação
+é pela **idade da janela**, que é propriedade do dado: `check_gaps` só cria lacunas dentro dos seus
+1 499 minutos, então tudo mais antigo é, por construção, histórico pedido por alguém; e um pedido
+*dentro* das últimas 24 h descreve exatamente os minutos que a detecção acharia sozinha, então
+tratá-lo como vivo não é erro. O que a Astra corrigiu (must-fix 3) e foi implementado:
+
+1. **Desempate dentro do estrato vivo.** `ORDER BY detected_at` deixava 50 lacunas de quase um dia
+   passarem à frente de um buraco de um minuto recém-detectado. Agora os dois estratos ordenam por
+   `gap_end DESC` — o minuto ausente mais novo primeiro, que é o que toda janela rolante espera.
+2. **Teto de linhas não é teto de tempo.** Seis páginas lentas a `FETCH_TIMEOUT_S = 20 s` seriam
+   120 s e empurrariam a próxima detecção dois minutos. O estrato histórico roda sob prazo monotônico
+   (`HISTORY_BUDGET_S = 30 s`), não inicia outra lacuna sem orçamento e limita o timeout do fetch ao
+   que resta.
+3. **Descartada** a ideia de gravar `detected_at` no futuro para ordenar por último: quebraria
+   `reopen_stale_failed` (que reabre `failed` por `detected_at <= now − 1 h`) e o backfill nunca mais
+   seria retentado.
+
+Garantia declarada: **o estrato histórico só gasta o que o vivo não gastou** (`leftover =
+min(history_limit, live_limit − len(live))`), com teto próprio de 6 linhas por ciclo.
+
+Efeito colateral que precisou de conserto no mesmo arquivo: `check_gaps` expandia **todo** gap aberto
+em minutos para subtrair da janela de detecção. Com lacunas de 7 dias abertas isso construiria
+milhões de `datetime` por ciclo; agora os gaps são recortados à janela antes da expansão.
+
+## 26. A corrida que a tabela não impede (must-fix 2)
+
+`ingestion_gaps` não tem unicidade por intervalo, e agora existem **dois** escritores com o mesmo
+protocolo (ler cobertura → inserir o que falta). Os dois leem "faltando, sem gap", os dois inserem: duas
+linhas, dois fetches REST das mesmas velas. Corrigido com `pg_advisory_xact_lock` por exchange
+(`recovery_queries.lock_gap_planning`), tomado **antes** da leitura nos dois caminhos, transacional
+(solto no commit ou no rollback, nunca vazado) e sem nenhuma chamada REST na mão. Teste:
+`test_two_planners_racing_write_one_set_of_gaps`.
+
+Segundo achado da mesma revisão: a fusão de buracos próximos (≤ 60 min) pode atravessar velas
+**persistidas** — refazer minuto presente é inofensivo — mas **nunca** minutos de um gap `open`/`failed`.
+Fundir por cima de um `failed` recriaria aqueles minutos como `open` e contornaria o cooldown de uma
+hora. Teste: `test_the_merge_never_reaches_across_a_gap_that_already_exists`.
+
+## 27. Mensagem ilegível não pode derrubar o coletor (must-fix 5)
+
+`hunter_core.events.consume` desserializa o envelope **antes** do `yield`; um envelope inválido
+levanta dentro do gerador, mata a task, e com o `TaskGroup` do `main.py` mata o worker inteiro — que
+reencontra a mesma mensagem depois do restart, porque o `XAUTOCLAIM` a repesca da PEL. Como esta
+tarefa só pode tocar `hunter_core/events/**` para nome/maxlen, a tolerância mora em
+`backfill_reader.read_batch`, que entrega `(id, None)` para o que não parseia. **Divergência
+declarada:** o certo é isso viver no core, para todos os consumidores; fica como pendência escrita no
+módulo e aqui.
+
+## 28. Números escolhidos, e de onde cada um vem
+
+| Constante | Valor | Por quê |
+|---|---|---|
+| `MAX_REQUEST_MINUTES` | 10 080 (7 dias) | a janela de bootstrap da decisão conjunta; acima disso trunca pelo lado **antigo** e é final (teto de política, não de orçamento) |
+| `CHUNK_MINUTES` | 240 | limitado por cima pela página de klines (1 500, peso 10, uma chamada dentro de `FETCH_TIMEOUT_S`) e **por baixo pela outbox**: cada minuto preenchido é uma linha, `MAX_PENDING` da prontidão é 500 e a virada de minuto de 200 mercados já contribui ~200. 240 + 200 cabe; 1 440 deixaria `/ready` vermelho ~15 s por ciclo (despachante ~100 linhas/varredura) e ainda atrasaria a vela ao vivo atrás de um dia de histórico |
+| `MERGE_MINUTES` | 60 | mesmo número que o produtor usa (notes §15) |
+| `MAX_ROWS_PER_REQUEST` | 48 | 7 dias em pedaços de 240 são 42; a folga é para janela fragmentada. O excedente é **adiado** (não marcado), não descartado |
+| `MAX_HISTORY_GAPS_PER_CYCLE` | 6 | 6 páginas × peso 10 = 60 de 2 400/min, e ≤ 1 440 linhas de outbox por ciclo |
+| `HISTORY_BUDGET_S` / `MIN_FETCH_BUDGET_S` | 30 s / 3 s | metade da cadência de detecção (60 s), e um piso abaixo do qual não vale começar outra página |
+| `MAX_MESSAGE_ATTEMPTS` | 3 | uma mensagem que falha sempre é largada com log de erro em vez de girar para sempre |
+
+**Vazão que isso implica, dita por extenso:** 1 440 minutos de histórico por ciclo por shard ≈ 1 dia
+de velas por minuto de relógio; 7 dias de um mercado ≈ 7 min; 200 mercados ≈ 23 h. O gargalo **não é
+REST** (13 440 de peso para 2 M de velas, ~6 min de cota) — é a outbox, que publica uma mensagem por
+minuto preenchido a ~100/s. Registrado como requisito para outra tarefa (§31).
+
+## 29. O buraco que a prova encontrou antes da prova: partições
+
+O primeiro teste de integração com velas de 6 dias atrás falhou com `no partition of relation
+"candles_1m" found for row`, e o mesmo aconteceu **no stack local** no primeiro minuto do consumidor
+ligado: `create_partitions.py` provisiona o mês corrente e os **seguintes**, então um pedido de 7 dias
+no dia 6 do mês nomeia minutos de agosto que nenhuma partição aceita. Inserir aborta a transação
+inteira (velas + outbox + transição de status do gap) e o gap gastaria suas cinco tentativas numa
+condição que nenhuma retentativa conserta.
+
+`partitions.storable_months` pergunta antes: os meses sem partição não são planejados, o log diz
+`unstorable_minutes` e, se a janela inteira for insalvável, o pedido é recusado com `no_partition` —
+sem marca, para ser reavaliado quando as partições existirem. Foi por isso que `accepted` deixou de
+ser o nome do desfecho quando algo ficou de fora: um pedido real da prova entregou 5 247 minutos e
+deixou 3 300 sem partição, e chamar aquilo de `accepted` teria escondido o problema.
+
+## 30. Testes (39 novos, em três arquivos)
+
+`tests/test_backfill_plan.py` (17, sem docker): semiaberto → inclusivo, clamp na detecção, futuro,
+vazio, timestamp ingênuo, segundos truncados, teto de 7 dias, subtração de velas, fusão sobre velas
+presentes, **não** fusão sobre gap existente, janela completa, teto de linhas com adiamento medido.
+`tests/test_backfill_priority.py` (6, Postgres): ordem por minuto mais novo, histórico não toma o
+orçamento do vivo, histórico usa a sobra sob teto próprio, fronteira exata do estrato, lacuna de 6
+dias **é** drenada (o que não acontecia antes), prazo estourado não gasta tentativa.
+`tests/test_backfill_consumer.py` (16, Postgres + Redis): pedido → lacunas → REST falso → 120 velas
+`source=rest` → **120 linhas de outbox** `market.candles.closed`; repetição não refaz REST; fora do
+shard ignora sem marca; fora do universo recusa **e é atendido quando volta com o mesmo `event_id`**;
+janela futura; teto de 7 dias; mensagem malformada em quarentena com a próxima servida; payload
+inválido; timeframe não suportado; mercado desconhecido; outra exchange; mês sem partição; reentrega
+não duplica; dois planejadores concorrentes escrevem um conjunto só; `XINFO GROUPS` com lag 0; e um
+teste de contrato que publica com o **produtor real** (`hunter_scanner_worker.backfill`,
+`importorskip`).
+
+## 31. O que fica como requisito para outras tarefas
+
+- **Job de partições (`infra/scripts/create_partitions.py`, infra/ops):** provisionar meses **para
+  trás** (pelo menos 1) ou aceitar que todo backfill no começo do mês perde a parte do mês anterior.
+  Medido: 3 300 de 8 547 minutos de um pedido real (§29).
+- **T2.9 / dono da outbox:** anunciar *cada* minuto backfillado pelo mesmo caminho da vela ao vivo é
+  o gargalo de vazão do bootstrap (§28) e ainda coloca anúncios de histórico à frente de velas vivas
+  na ordem `created_at`. Ou o backfill ganha um caminho de anúncio próprio (ou nenhum, já que o
+  scanner lê candles do Postgres para o bootstrap), ou a vazão do bootstrap fica presa em ~1 dia de
+  histórico por minuto de relógio. **Não decidi sozinho:** é contrato da T2.9.
+- **`hunter_core.events.consume`:** a tolerância a mensagem ilegível (§27) devia ser do core.
+- **Operação:** trocar `MARKET_SHARD=i/N` exige remover os grupos antigos
+  (`XGROUP DESTROY market.backfill.requested market-worker.backfill.binance.{i}of{N_antigo}`) depois
+  de confirmar que não há pendências.
+
+**A revisão de diff desta tarefa está no §32**, mais abaixo: a seção T2.5c foi intercalada aqui
+por outra tarefa em voo enquanto esta ainda escrevia.
+
+---
+
+# T2.5c — o contexto que sobrevive ao tick
+
+Terceira parte. A T2.5b fechou com **p99 > 21 s** contra o alvo de 3 s da decisão conjunta e
+entregou a causa medida à T2.2b: 77–89 % do custo por mercado era `decode_candles`. Esta tarefa
+ataca esse item e mede o que sobra. Segunda opinião de desenho:
+`.claude/state/astra-review-T2.5c-context.md` (6 perguntas), e ela **derrubou o meu desenho** — o
+que está na árvore é o dela.
+
+## 22. O desenho que eu levei, os três contraexemplos que o mataram, e o que ficou
+
+Levei uma **janela persistente com fusão**: guardar as velas decodificadas por mercado, ler só as
+16 linhas mais novas por tick (`hot_state_candles.CANDLE_FAST_WINDOW`), fundir por `open_time`, e
+invalidar por evento (`market.candles.closed` com `open_time` no passado), por regressão de
+cobertura e por ressincronização periódica. A Astra recusou com três cenários **concretos**, e cada
+um é um jeito diferente de a lista do Redis mudar sem ninguém anunciar:
+
+1. **vela WS mais velha que as 16 mais novas** entra por `_push_candle_full_rewrite` e reescreve o
+   miolo da lista; o evento durável só sai depois (`ingest.py:179` escreve no Redis **antes** de
+   enfileirar), então há uma janela em que a leitura curta não vê a mudança e a leitura inteira vê;
+2. **REST antes, WS depois:** o backfill já inseriu a linha no Postgres e o `INSERT … DO NOTHING`
+   não produz um segundo evento (`persist_rows.py:133`), então a vela WS que preenche aquele minuto
+   no Redis **não é anunciada** para ninguém;
+3. **a chave que o Redis perdeu** (eviction, `FLUSHDB`, um `LTRIM` externo) e que volta com uma
+   linha só: uma fusão preserva 1 499 velas que o Redis não tem mais. Uma união nunca *remove*.
+
+A conclusão dela — "'só o WS escreve' não implica 'toda escrita relevante é anunciada'" — está
+certa, e a alternativa que ela propôs é melhor que a minha em todos os eixos menos um:
+
+> **continue lendo a lista inteira; reaproveite o objeto decodificado quando a linha for
+> byte-idêntica.**
+
+É o que está implementado (`hunter_scanner_worker/hotcache.py`). A sequência é **reconstruída das
+linhas recebidas** a cada tick, então remoção, reordenação, reescrita histórica e truncamento saem
+corretos por construção: não existe regra de invalidação para errar, e o que a lista perdeu o cache
+perde na mesma passada. O eixo que se perde é o tráfego — as 3 500 linhas continuam viajando do
+Redis a cada tick, e a §25 mostra que **é isso que sobrou como gargalo**.
+
+A chave é a **linha crua**, não o minuto: é a única coisa que prova que a linha não mudou, e achar
+o `open_time` exigiria desempacotar (parte do custo) e reimplementar a precedência do escritor
+(`_candle_may_replace`). Linha nova → decodificada **pela função de produção**, uma linha por vez
+(`decode_candles((row,), …)`), para que este módulo não possa discordar do loader.
+
+## 23. O que o cache prova, e como
+
+Cadeia de dois elos, os dois testados:
+
+- `tests/test_hotcache.py` — um cache **novo** responde **exatamente** o que `decode_candles` /
+  `decode_trades` respondem, para toda forma que os loaders têm opinião sobre (vazio, truncado,
+  vela em formação, linha corrompida, linha depois do corte). Igualdade de `SourceEntry`, não de
+  amostra;
+- `tests/test_context_identity.py` — um cache **mantido** responde o que um novo responde, ao longo
+  de 60 minutos sintéticos com buraco, backfill reescrevendo o miolo, vela em formação atualizada
+  dentro do minuto e o anel deslizando em 1 500. Compara `FeatureVector.canonical_bytes()` **e**
+  `canonical_json(FeatureState.as_wire())` em cada corte, e um segundo teste compara o
+  `MarketContext` **inteiro** (janela, `truncated`, fontes), porque uma divergência em dado que
+  nenhuma feature lê hoje não apareceria nos bytes do vetor e apareceria no dia em que alguém ler
+  (exigência da Astra).
+
+## 24. Memória: medida, não estimada — e por que 1 500 velas ficam
+
+`tracemalloc`, medido, com o teste que o afirma (`test_the_resident_cost_of_one_market_is_measured_not_estimated`):
+
+| | |
+|---|---|
+| Por vela residente | **2 357 B** (dos quais 311 B são a linha crua guardada como chave) |
+| Por mercado (buffer cheio de 1 500) | **3,4 MiB** |
+| 200 mercados | **674 MiB** |
+| No teto de guarda `max_markets = 400` | ~1,3 GiB |
+| Tape (2 000 linhas por mercado) | +~0,6 MiB por mercado, ~128 MiB nos 200 |
+
+A T2.2b estimou 1 625 B/vela e ~487 MB; o número real é 38 % maior.
+
+**Fica em 1 500.** Encurtar a janela era a alternativa óbvia e ela **muda os números**, não só a
+memória: `relative_volume_1h` pede 60 × 24 = **1 440 velas finais**, e 1 440 linhas *incluindo* a
+vela em formação deixam 1 439 — a feature ficaria indisponível durante a formação de todo minuto
+(achado da Astra; a folga das 1 500 é deliberada, `volume.py:14`). E `windows._bars_15m` usa
+`run // 15` barras de todo o rabo contíguo: 1 500 minutos são 100 barras de 15 min, 1 440 são 96 —
+muda a ancoragem fria do ATR. Economia: **4 %** (~19,5 MiB nos 200 mercados). Não se troca
+identidade de resultado por 4 % de memória.
+
+O alvo é a VPS Contabo (12 vCPU, 47 GB — `.claude/state/vps.md`), então 674 MiB residentes são
+0,6 % da máquina. Um teto por LRU de mercados foi considerado e recusado: com 200 mercados
+continuamente ativos, qualquer capacidade abaixo de 200 transforma cada passada em uma sequência de
+reconstruções (concordância com a Astra).
+
+## 25. O que a medição achou depois que o decode saiu do caminho
+
+A ordem dos gargalos mudou três vezes nesta tarefa, e cada mudança veio de uma medição, não de um
+palpite. Custo de **um mercado, um tick**, medido **dentro do contêiner** contra o Redis real
+(`docker exec … probe2.py`, 5 mercados líquidos, listas cheias):
+
+| | frio (1ª passada) | quente |
+|---|---|---|
+| `read_hot_state` (Redis → Python) | 20,7 ms | **16–21 ms** |
+| decodificar 1 009 velas | 36,7 ms | **0,6–0,9 ms** |
+| decodificar 2 000 trades | 25,0 ms | **0,7–1,0 ms** |
+| book + derivativos | 0,2 ms | 0,2 ms |
+
+Os dois caches entregam ~40×. **O que sobrou é a leitura**, e ela é grande por um motivo verificado:
+`redis.connection.HIREDIS_AVAILABLE` é **False** na imagem — o parser RESP em Python puro percorre
+~3 000 linhas por mercado por tick. *(Tentei medir o ganho do `hiredis` no contêiner e não consegui
+instalá-lo lá: a imagem tem um venv sem `pip` e sem `uv`. Então isto é hipótese com uma causa
+medida, não um número — e a mudança é `packages/core/pyproject.toml`, fora deste brief.)*
+
+No banco de testes (Windows, `tests/test_load.py`, 200 mercados com **hot state cheio**, 1 500 velas
+e 2 000 trades cada):
+
+| | T2.5b | T2.5c |
+|---|---|---|
+| custo por mercado (p50) | 66,6 ms | **13,4 ms** |
+| passada completa (p99 de 5) | 15,1 s | **3,23 s** |
+| passada fria (200 mercados sem cache) | — | 19,4 s |
+
+**A fixture estava medindo o vazio** e isso foi corrigido primeiro (item 3 do brief): ela semeava as
+velas de BTCUSDT sob a chave de todos os símbolos, `build_context` descartava as 1 500 como de outro
+mercado e o motor rodava sobre um contexto **vazio** — 31,5 ms/mercado na T2.5, 66,6 ms depois de
+semear cada símbolo sob a própria chave. O número piorou porque passou a existir. A fixture também
+passou a semear um tape **cheio** (2 000), que é o que 75 % do universo real tem (medido:
+`LLEN` de 238 chaves `mkt:binance:*:trades` → p25 = p50 = p75 = max = 2 000).
+
+O `xfail(strict=True)` **fica**, com o número novo: 3,23 s contra 3,0 s, 8 % fora. As duas maiores
+parcelas do que sobrou estão **fora deste serviço**: `build_context` varre, ordena e deduplica as
+1 500 velas e `MarketContext.__post_init__` revalida as 1 500 velas e os 2 000 trades — a cada tick,
+para um corte que andou um segundo (~3,1 ms perfilados por mercado, somados). O remédio é um caminho
+de construção para um contexto cujas fontes **já foram conferidas**, e isso é `packages/**`.
+
+## 26. As janelas derivadas atravessam o tick (e o cinto de segurança disso)
+
+O memo por contexto da T2.2b (`minute_index`, `bars_15m`) morria com o contexto, e o contexto morre a
+cada tick — então dobrar cem barras de 15 min acontecia 60 vezes por minuto para um histórico de
+minutos que muda **uma** vez por minuto. `HotCache.adopt` transporta essas duas entradas para o
+contexto seguinte quando `final_candles` é igual (comparação por valor que o `tuple.__eq__` resolve
+por identidade, porque as velas vêm do cache). Medido: 16,7 → 10,9 ms por mercado no banco de
+testes; 13,4 ms com o tape cheio.
+
+Três coisas fazem disso uma otimização e não uma aposta:
+
+1. **Lista branca, nunca o memo inteiro** (`CARRIED_WINDOWS`). As duas entradas de hoje são funções
+   de `final_candles` **só** — verificado em `windows._build_index` e `_bars_15m`. Uma derivação
+   futura que dependa de `as_of`, da vela em formação ou do livro simplesmente não viaja: ela é
+   recalculada, o que é apenas mais lento;
+2. **um teste afirma a pureza contra o próprio `windows`**
+   (`test_the_carried_windows_depend_on_the_minutes_and_on_nothing_else`): dois contextos com os
+   mesmos minutos e `as_of`/forming diferentes têm de derivar as mesmas barras. No dia em que isso
+   deixar de valer, quebra aqui — não num vetor;
+3. **o teste de identidade de 60 minutos roda com o transporte ligado.** Ele é o aceite.
+
+Ressalva registrada: `MarketContext.memo` é documentado como "nasce com o contexto, morre com ele", e
+este módulo escreve nele de fora. É uma dependência do scanner num detalhe de outro pacote, aceita
+com os três guardas acima e **declarada** aqui para quem mexer no memo.
+
+## 27. Bootstrap: prioridade dinâmica em vez de fatia fixa
+
+A T2.5b deu ao bootstrap 40 % do relógio por *duty cycle*. Uma repartição fixa gasta a sua parte
+qualquer que seja o atraso, e o orçamento defendido é a **idade de um tick**. Agora
+(`hunter_scanner_worker/pressure.py` + `BootstrapJob.run_slice(pressure=…)`):
+
+- **suspende** quando o mercado sujo mais velho passa de **1 s** (uma cadência de features: esse
+  mercado já perdeu o próprio ritmo) e **volta** abaixo de **0,5 s**. A histerese existe para não
+  oscilar entre duas fatias;
+- a pergunta é feita **em toda fronteira cooperativa** que o replay já tinha, não só na entrada:
+  uma visita tem orçamento de 120 s, e perceber o atraso só na entrada deixaria o bootstrap segurar
+  o loop por dois minutos depois de o scanner ficar para trás (correção da Astra);
+- suspender é **pausar**, nunca cancelar: o gerador e o coletor sobrevivem, porque recriá-los
+  reancoraria a recursão de Wilder e pagaria os cortes de novo (T2.5b §12);
+- o **refresh horário não é regulado** — é limitado e é a única coisa que mantém o arquivo atual;
+- `hunter_scanner_bootstrap_suspended` publica o estado. Na prova de 30 min ele ficou **1 o tempo
+  todo**, que é a resposta certa para um loop que está permanentemente atrasado — e é também a
+  confissão de que, neste stack, o bootstrap não avança enquanto o custo por mercado não cair
+  (registrado na prova, não escondido).
+
+Divergência com a Astra: ela sugeria `1 s / 0,5 s` como "hipóteses de tuning"; adotei exatamente
+esses valores e amarrei o de suspensão ao `feature_throttle_s`, para que a explicação seja um
+número do produto e não um gosto.
+
+## 28. A fronteira da medição mudou de lugar
+
+`scanner_tick_to_opportunity_seconds` era observado **dentro** de `Scanner.advance`, antes de
+`features.updated` e da linha do Radar saírem — as duas projeções ficavam fora do número que existe
+para limitá-las (achado da Astra). Agora a amostra é tirada no `evaluation_loop`, **depois** do
+publish, com o `last_input_ts` capturado antes do `advance` (que limpa a sujeira). `Evaluation.scored`
+diz se o throttle do score deixou a observação chegar ao scorer, porque é isso que define se houve
+oportunidade para medir. Teste: `test_the_latency_sample_is_taken_after_the_projections_are_published`
+prova a ordem espionando o publish e lendo o `_count` do histograma no meio dele.
+
+## 29. Suposições numéricas novas
+
+1. `SUSPEND_S = 1,0` (= `feature_throttle_s`) e `RESUME_S = 0,5` (§27).
+2. `_IDLE_S = 0,05` — quanto um replay suspenso dorme entre duas olhadas no backlog quando o duty
+   cycle não lhe dá pausa própria (`duty = 1`).
+3. `WARMUP_CEILING_S = 20` no teste de carga: teto da passada fria, reportado à parte do orçamento.
+4. Janela de velas mantida em **1 500** (§24), tape em `TRADES_MAXLEN = 2 000` — nenhum dos dois é
+   escolha nova, os dois passaram a ser escolha **medida**.
+
+## 32. [T2.5-backfill] Revisão de diff da Astra — três must-fix, três corrigidos
+
+> Continuação da seção **T2.5-backfill** (§22–§31, acima). Este arquivo é um log compartilhado e
+> outra tarefa em voo (T2.5c) intercalou a sua própria seção entre as duas metades desta.
+
+`.claude/state/astra-review-T2.5-backfill-diff.md`. Veredito: **REQUEST_CHANGES**, e os três achados
+são reais. O que mudou depois dela:
+
+1. **HIGH — a cauda não liquidada recebia marca definitiva.** `normalize_window` recortava o fim da
+   janela contra `detection_last` e **esquecia** o recorte; `final` era `plan.complete`. Cenário
+   dela: pedido `[10:00, 10:30)` com `detection_last = 10:05` planejava seis minutos e marcava o
+   evento inteiro como processado — a republicação depois das 10:30 seria descartada pela guarda e
+   **ninguém jamais planejaria os 24 minutos restantes**. (A detecção periódica os pegaria por
+   estarem recentes, mas isso conserta o dado, não o contrato do consumidor.) Corrigido:
+   `Window.clamped_minutes` conta o recorte, ele entra no `left_out` e `final = left_out == 0`. Note
+   a assimetria deliberada: o teto de 7 dias corta o **passado** e é definitivo (política); o clamp
+   corta o **futuro próximo** e é temporário. Testes:
+   `test_the_unsettled_tail_is_counted_and_not_forgotten` e
+   `test_a_window_whose_end_has_not_closed_yet_is_not_marked_processed` (o `event_id` não é marcado).
+2. **HIGH — 30 s não limitavam a operação inteira nem respeitavam a próxima detecção.** O prazo
+   nascia *depois* do estrato vivo e só limitava o fetch. Cenário reproduzido por ela: vivo gasta
+   45 s, histórico gasta 8 s de banco + 20 s de REST + 8 s de banco = ciclo de 81 s. Corrigido em
+   duas partes: (a) `history_deadline(cycle_start, now)` devolve o **menor** entre "30 s a partir de
+   agora" e "o fim do ciclo de 60 s menos 5 s de margem" — no cenário dela, 10 s; (b) o prazo embrulha
+   a **unidade inteira** (`asyncio.timeout(remaining)` em volta de `recover_one`), não só o fetch. E
+   o `timeout_s` do fetch voltou a ser o do adaptador: se quem cortou foi o **ciclo**, o cancelamento
+   vem do prazo de fora, a transação faz rollback e o gap **não gasta tentativa** — cobrar do gap a
+   lentidão do nosso ciclo era exatamente o que ela pediu para não fazer. Testes:
+   `test_the_history_deadline_is_the_cycle_end_when_live_collection_was_slow` (com os números dela) e
+   `test_a_unit_that_outlives_the_budget_does_not_spend_an_attempt`.
+3. **MEDIUM — havia um terceiro escritor de lacunas fora do protocolo.** `persist.report_losses`
+   também lê cobertura e insere gaps (a vela final que a fila descartou), e não participava da
+   serialização: uma vela descartada e um pedido de backfill leem "faltando, sem gap" ao mesmo tempo
+   e os dois inserem. Corrigido com o mesmo `lock_gap_planning` antes da leitura — o que exigiu
+   ampliar o escopo para `persist.py` (dentro de `services/market-worker/**`). Teste:
+   `test_a_dropped_candle_and_a_request_do_not_open_two_gaps_for_one_minute`.
+
+**Nice-to-have aceitos e feitos:**
+
+- O teste de timeout do fetch **não testava nada** desde a extração: ele fazia `monkeypatch` de
+  `recovery.FETCH_TIMEOUT_S`, mas `recover_registered` liga o padrão em `recovery_drain`, então o
+  `sleep(10)` do adaptador simplesmente retornava antes dos 20 s e as asserções passavam sem
+  timeout nenhum. Agora o teste passa `timeout_s=0.05` explicitamente. **Achado meu no mesmo
+  arquivo:** o `sed` da extração renomeou `test__recover_one_...` para `testrecover_one_...`;
+  corrigido (o nome voltou a começar por `test_`).
+- `outcome_name` e a marca não podem discordar: o nome agora sai de `left_out` (adiados + bloqueados
+  + sem partição + não liquidados), que é a mesma condição de `final`. Teste:
+  `test_the_word_and_the_mark_never_disagree`.
+- Prova de progresso entre republicações depois do teto de linhas:
+  `test_a_second_pass_plans_the_holes_the_row_budget_deferred` — as linhas da primeira passada viram
+  cobertura e a segunda planeja as mais antigas, **sem** o produtor inventar outra identidade.
+
+**Registrado, não implementado:**
+
+- Ela recusa atribuir o `TimeoutError` de 10 s no flush à minha contenção **e tem razão**: o
+  `wait_for` cobre `flush_batch` inteiro e o relato não separa fases nem espera de lock. Fica como
+  "causa indeterminada" na prova, não como diagnóstico.
+- "240 é tamanho de lote, não garantia de prontidão": dois chunks rápidos somam 480 anúncios antes da
+  drenagem. O que o número **garante** é o teto por ciclo (6 × 240 = 1 440) e o que a prova mediu é
+  `outbox_pending = 0` ao fim com `/ready` verde — evidência, não promessa. O remédio de verdade é o
+  item da T2.9 no §31.
+- A referência de **30 dias** do regime não cabe em um pedido: o teto de 7 dias é política e alguém
+  precisa pedir o resto em outras janelas. Está dito no `PIPELINE.md` §1b e é decisão de produto, não
+  de worker.
+
+## 30. O que ficou como requisito para outras tarefas (T2.5c)
+
+Todos com número medido na prova (`t25-proof.md`, T2.5c), e nenhum dentro de
+`services/scanner-worker/**`:
+
+1. **`hunter_core.events.consume` — o consumidor de `market.ticks` é hoje o dono do p99.**
+   151 mensagens/s produzidas contra **~71/s consumidas**, lag estacionado em ~95 000 (o `MAXLEN`
+   de 100 000 apara o resto), ou seja **~10 minutos** de atraso permanente numa fila cujo consumo
+   custa um `touch` num dicionário. O suspeito medido é o custo por mensagem do envelope + guarda de
+   `event_id`. Duas saídas possíveis, e a escolha é de desenho, não de worker: (a) tornar o consumo
+   em lote (uma verificação por lote em vez de uma por mensagem); (b) para um stream de
+   **notificação** — e `consumers.py` já declara que ticks não têm efeito durável e que perder um
+   não custa nada — pular o acumulado em vez de drená-lo mensagem a mensagem (`XGROUP SETID … $`
+   acima de um limiar de lag). Não implementei: muda a semântica de consumo e merece brief próprio.
+2. **`packages/core/pyproject.toml` — `redis[hiredis]`.** `HIREDIS_AVAILABLE = False` na imagem, e
+   a leitura do hot state custa **16–21 ms por mercado por tick** para ~3 000 linhas com o parser
+   RESP em Python puro. Hipótese com causa medida (não consegui instalar `hiredis` no contêiner
+   para medir o ganho: o venv da imagem não tem `pip` nem `uv`).
+3. **`packages/indicators/hunter_indicators/features/context.py` — um caminho de construção para
+   fontes já conferidas.** `build_context` varre/ordena/deduplica 1 500 velas e
+   `MarketContext.__post_init__` revalida 1 500 velas + 2 000 trades **a cada tick**, para um corte
+   que andou um segundo: ~3,1 ms perfilados por mercado. É o que falta para o teste de carga passar
+   (3,23 s contra 3,0 s).
+4. **Leitura incremental do tape (desenhada, não entregue).** `hot_state_trades.push_trade` é
+   estritamente `LPUSH` + `LTRIM` — append-only —, então ler as K linhas mais novas e checar
+   sobreposição pela linha que já era a cabeça **é** decidível, e o descarte da cauda é exatamente
+   `n` linhas por `n` chegadas. Isso corta ~2 000 das ~3 000 linhas por tick. Não vale para as
+   velas (reescrita no miolo, §22), e por isso não entrou junto: é um segundo desenho, com os
+   contraexemplos da Astra para responder de novo.
+5. **`market-worker`: `mkt:coverage:binance` congelado** (prova §6) — 41 min sem carimbo com o tape
+   fresco, e por isso 100 % das avaliações da janela saíram `uncovered`. Sintoma e hora registrados;
+   o arquivo é de outra tarefa em voo.
+
+## 31. Revisão de diff da Astra — três must-fix, três corrigidos
+
+`.claude/state/astra-review-T2.5c-diff.md`. Veredito dela: **REQUEST_CHANGES**, com "aceito o cache
+por bytes e o transporte restrito do memo". Os três:
+
+1. **O cache do tape mudava quais linhas o loader aceita** (o único defeito real de equivalência do
+   diff, e eu não tinha visto). `decode_trades` lê `side` **depois** de descartar a linha pelo
+   corte, então uma linha carimbada no futuro com `side` inválido é silenciosamente pulada por ele —
+   e o meu decode adiantado (corte `_NEVER`) levantava `ValueError`, o que derruba o ciclo inteiro
+   (`runners.py`, o `except` abandona o resto da passada). Corrigido com um terceiro veredito,
+   `DEFERRED`: a linha que não decodifica sem corte não é cacheada como recusa, é entregue ao loader
+   **no corte real** a cada tick — pulada enquanto está no futuro, levantando no instante em que o
+   corte a alcança, exatamente como o loader. Teste novo, com os dois cortes.
+2. **`scored` não provava publicação.** `publish_radar` volta sem escrever quando não há score
+   utilizável **e engole exceção do Redis** — então o histograma dizia "oportunidade publicada em
+   N s" para uma linha que ninguém viu. `publish_radar` passou a devolver três veredictos
+   (`RADAR_WRITTEN` / `RADAR_NOTHING` / `RADAR_FAILED`); a amostra só sai quando não foi
+   `RADAR_FAILED`, e o texto da métrica passou a dizer o que ela mede. Teste novo com um Redis que
+   recusa o `zadd`. **Divergência parcial registrada:** ela mediria só publicações de verdade, o que
+   deixaria o histograma quase vazio nesta fase (4 oportunidades em 200 mercados); mantive a amostra
+   para o ciclo que terminou sem ter o que projetar, porque é um ciclo concluído e é o que torna o
+   número comparável com as provas T2.5/T2.5b — e escrevi isso no `help` da métrica.
+3. **A prova afirmava mais do que mostrava.** Os dois pontos aceitos e corrigidos no
+   `t25-proof.md`: (a) "6 400 = nenhum minuto perdido" virou a contagem por **par (mercado,
+   minuto)** — 6 200 pares, **199 mercados com os 31 minutos**, e os dois que faltam são a troca de
+   universo das 20:38:58 (`VETUSDT` entrou, `ROBOUSDT` saiu), o que também explica os "201 mercados
+   distintos"; (b) a atribuição do p99 ao consumidor virou sintoma + correlação, porque
+   `last_input_ts` guarda o **maior** carimbo entre os gatilhos e um fechamento recente substitui o
+   de um tick atrasado.
+
+Nice-to-have aceitos: o contador de decode passou a ser delta **por mercado** (a soma global perdia
+incrementos quando um mercado saía do universo); `LivePressure` recebe os limiares do
+`ScannerConfig` em vez de constantes próprias; um teste em que a pressão sobe **dentro** da mesma
+chamada de `run_slice` (o anterior mudava a pressão entre chamadas e ficaria verde sem a checagem
+interna); e o teste de pureza do memo passou a atravessar fronteiras de 15 minutos, não só dois
+instantes do mesmo minuto.
+
+**Divergência registrada (consumo):** ela defende consumo em lote em `hunter_core.events.consume`
+(uma ida ao Redis por lote, mantendo uma decisão por `event_id`) e **recusa** `XGROUP SETID $` como
+primeira correção, com um cenário que eu aceito: perder dezenove notificações quando a vigésima
+marca o mercado não é o mesmo que perder **todas** — um mercado pouco ativo pode ter a única
+notificação dele no trecho pulado. Registro a preferência dela no item 1 do §30 e não implementei
+nenhuma das duas: é `packages/core/**`.
+
+Ela também recusa atribuir os 16–21 ms de leitura inteiramente ao parser, porque `read_hot_state`
+mede o pipeline inteiro (transporte + espera no loop). Concordo, e o §25 já dizia que o ganho do
+`hiredis` **não foi medido**; o §30 mantém a hipótese com a causa medida ao lado.
+
+**[T2.5-backfill] Correção do meu próprio remédio (registrada porque a prova a encontrou):** pôr `report_losses` sob
+o lock **bloqueante** o fez esperar dentro do `drain_loop`, que roda uma vez por segundo, atrás de um
+ciclo de detecção que lê 200 mercados — `market_persist_lag lag_s=14,4` e 4 flushes estourando o
+timeout em 7 min. Trocado por `pg_try_advisory_xact_lock`
+(`recovery_queries.try_lock_gap_planning`): quem não pega o lock não escreve nada, não drena nada e
+tenta na iteração seguinte. O relatório de perdas é best-effort por contrato (H1); o flush não é.
+
+**[T2.5-backfill] Rodada 2 da Astra: APPROVE, com três caminhos de `partial` sem conclusão que ela
+pediu para registrar** (`.claude/state/astra-review-T2.5-backfill-diff2.md`). Não são defeitos deste
+consumidor; são limites de progresso do sistema, e estão aqui para quem for depurar "por que este
+pedido volta toda hora":
+
+1. **Mês antigo sem partição:** os minutos continuam bloqueados mesmo depois de a parte armazenável
+   ser recuperada. Some quando o job de partições provisionar meses para trás (§31).
+2. **Fonte permanentemente vazia:** o gap alterna tentativa → `failed` → reabertura de hora em hora,
+   e enquanto existir ele bloqueia o pedido. O `market_gap_history_starts_later` cobre o caso em que
+   a exchange devolve dado começando depois; o caso "nunca devolve nada" não tem cura local.
+3. **Orçamento sempre curto:** com o vivo consumindo as vagas ou o relógio, uma unidade histórica que
+   precise de mais tempo do que sobra pode ser cancelada repetidamente — sem gastar tentativa (por
+   desenho), mas também sem progredir. É visível em `market_backfill_budget_spent` e
+   `market_backfill_unit_timeout`; o remédio é reduzir a fila viva, não afrouxar o prazo.
+
+Também aceitei a ressalva dela sobre o `try-lock`: "fica na fila para a próxima iteração" não é
+retenção ilimitada — o deque de perdas é limitado (`maxlen`) e uma contenção longa pode evictar uma
+perda antes de ela ser reportada. Isso degrada o *relato*, não reintroduz a duplicidade do MF3.

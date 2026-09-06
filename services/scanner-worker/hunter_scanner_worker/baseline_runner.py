@@ -27,10 +27,10 @@ from hunter_scanner_worker.metrics import scanner_bootstrap_markets
 from hunter_scanner_worker.persist import DB_ROLE
 from hunter_scanner_worker.refresh import closed_hour_before, refresh_hour, reload_market
 from hunter_scanner_worker.regime import BTC_SYMBOL
-from hunter_scanner_worker.replay import finish_job, prepare_job
+from hunter_scanner_worker.replay_io import finish_job, prepare_job
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     import redis.asyncio as redis_asyncio
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -179,6 +179,7 @@ async def baseline_loop(
     runtime: WorkerRuntime,
     progress: BootstrapProgress,
     requester: BackfillRequester,
+    pressure: Callable[[], bool] | None = None,
 ) -> None:
     """Refresh the hour that closed; spend what is left on one bootstrap slice.
 
@@ -252,7 +253,11 @@ async def baseline_loop(
                     settings=settings,
                     progress=progress,
                 )
-            finished = await job.run_slice(config.bootstrap_budget_s)
+            # Evaluation first: while a tick is waiting, the replay sleeps
+            # instead of taking its duty share (T2.5c, ``pressure``). The
+            # refresh above is *not* gated -- it is bounded and it is the only
+            # thing keeping the archive current.
+            finished = await job.run_slice(config.bootstrap_budget_s, pressure=pressure)
             progress.cuts = job.cuts_done
             progress.touch()
             if finished:

@@ -28,7 +28,10 @@ scanner_markets_evaluated_total = Counter(
 
 scanner_tick_to_opportunity_seconds = Histogram(
     "hunter_scanner_tick_to_opportunity_seconds",
-    "Age of the newest input when the opportunity it produced was scored.",
+    "Age of the newest input when the observation it triggered finished: the "
+    "scorer ran and the projections went out -- or there was nothing usable to "
+    "project, which is a finished cycle too. A Radar row Redis refused is NOT "
+    "sampled: that observation was not delivered.",
     buckets=(0.1, 0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 8.0, 13.0, 21.0),
     registry=registry,
 )
@@ -100,6 +103,28 @@ scanner_bootstrap_cuts_total = Counter(
     registry=registry,
 )
 
+scanner_bootstrap_suspended = Gauge(
+    "hunter_scanner_bootstrap_suspended",
+    "1 while the baseline bootstrap is standing aside for a late evaluation loop.",
+    registry=registry,
+)
+
+scanner_hot_rows_resident = Gauge(
+    "hunter_scanner_hot_rows_resident",
+    "Decoded hot-state rows kept in memory across ticks, over the whole "
+    "universe. The price of the incremental context: ~2.4 KB per candle row.",
+    ["kind"],
+    registry=registry,
+)
+
+scanner_hot_rows_decoded_total = Counter(
+    "hunter_scanner_hot_rows_decoded_total",
+    "Hot-state rows this process had to decode. A steady state costs one candle "
+    "per market per minute plus the trades that arrived; a number that tracks "
+    "the universe times 3500 means the reuse is not happening.",
+    registry=registry,
+)
+
 scanner_baseline_revisions_total = Counter(
     "hunter_scanner_baseline_revisions_total",
     "Baseline revisions offered to the archive, by source and outcome. "
@@ -132,6 +157,9 @@ __all__ = [
     "scanner_baselines",
     "scanner_bootstrap_cuts_total",
     "scanner_bootstrap_markets",
+    "scanner_bootstrap_suspended",
+    "scanner_hot_rows_decoded_total",
+    "scanner_hot_rows_resident",
     "scanner_consumer_events_total",
     "scanner_detectors_disarmed",
     "scanner_dirty_markets",

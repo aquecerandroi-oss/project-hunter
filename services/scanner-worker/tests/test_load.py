@@ -39,12 +39,19 @@ pytestmark = pytest.mark.unit
 cost, which is exactly the part a latency budget is about."""
 
 MARKETS = 200
-SECONDS = 5
-"""Five passes over 200 markets is 1000 evaluations -- enough for a stable p99 of
+SECONDS = 6
+"""Six passes over 200 markets is 1200 evaluations -- enough for a stable p99 of
 the per-market cost, which is the quantity that scales. Sixty seconds produced
 the same verdict and took seven minutes."""
 CUT = ORIGIN + timedelta(minutes=1500)
 BUDGET_P99_S = 3.0
+WARMUP_CEILING_S = 20.0
+"""The **first** pass decodes 1500 rows for all 200 markets, because no market
+has a cache yet: 13.3 s measured here. It is reported apart from the budget on
+purpose -- the p99 the joint decision asks for is of *healthy operation*, and a
+process that has not yet read a market has no tick to be late for. What a
+restart costs is the operational proof's business (``.claude/state/t25-proof.md``),
+and this ceiling only keeps the warm-up from silently doubling."""
 
 
 def _percentile(samples: list[float], fraction: float) -> float:
@@ -54,15 +61,23 @@ def _percentile(samples: list[float], fraction: float) -> float:
 
 
 class MultiMarketHotState(FakeHotState):
-    """The same synthetic candles for every symbol, keyed per market."""
+    """The same synthetic *shape* for every symbol, seeded under its own key.
+
+    Each market's rows carry that market's own symbol: ``build_context`` drops
+    candles belonging to another market, so seeding BTCUSDT's rows under every
+    key -- what this fixture did until T2.5c -- made the engine measure an empty
+    context and the number meant nothing (notes-T2.2 section 18).
+    """
 
     def seed(self, refs: list[MarketRef], *, as_of: datetime) -> None:
         from hunter_core.redis import keys
 
-        candles = series(1500)
-        rows = candle_rows(candles)
-        trades = trade_rows(120, until=as_of)
+        # A **full** tape, not a token one: ``TRADES_MAXLEN`` is 2000 and the
+        # busy markets do fill it, so a 120-trade fixture measured a tenth of
+        # the decode the container pays (notes-T2.5 section 25).
+        trades = trade_rows(2000, until=as_of)
         for ref in refs:
+            rows = candle_rows(series(1500, symbol=ref.symbol))
             self.lists[keys.candles_1m(ref.exchange, ref.symbol)] = rows
             self.lists[keys.trades(ref.exchange, ref.symbol)] = trades
         self.hashes[keys.tape_coverage(EXCHANGE)] = {
@@ -75,24 +90,25 @@ class MultiMarketHotState(FakeHotState):
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        "MEASURED CEILING, not an aspiration -- and T2.2b re-measured what the "
-        "ceiling is made of, because the reason written here before was wrong. "
-        "The per-market cost is ~54 ms and 76-89% of it is "
-        "hunter_indicators.features.hotstate.decode_candles: every tick re-reads "
-        "and re-validates 1500 msgpack rows into pydantic candles (~50 ms), "
-        "because scanner.advance builds a brand-new MarketContext from the hot "
-        "state each time. The feature engine is no longer the bottleneck: the "
-        "T2.2b per-context memo took a vector from ~38 ms to ~11 ms of profiled "
-        "CPU (.claude/state/notes-T2.2.md section 18), which moves this number by "
-        "about 1 ms because -- second finding -- MultiMarketHotState.seed above "
-        "stores BTCUSDT candles under every symbol's key, so build_context drops "
-        "all 1500 as foreign and the engine measured here runs on an EMPTY "
-        "context. Both are T2.5b's to fix, in this order: (1) seed each market's "
-        "own symbol so the number means what the docstring says; (2) keep the "
-        "MarketContext per market and append the closed minute instead of "
-        "decoding 1500 rows per tick. 200 x 15 ms is the 3 s budget, and decode "
-        "alone is over it. Kept as a strict xfail so it fails loudly the day that "
-        "lands, instead of quietly asserting a number nobody re-measured."
+        "MEASURED, and 8% out: cycle p99 3.23 s against the 3.0 s budget, with "
+        "every one of the 200 markets holding a FULL hot state (1500 candle rows "
+        "and a maxed-out 2000-trade tape). That worst case is what a mature "
+        "deployment looks like -- the tape ring buffer was full for 75% of the "
+        "real universe when this was measured (notes-T2.5 section 25) -- so the "
+        "fixture is not pessimistic on purpose. T2.5c took the per-market cost "
+        "from 66.6 ms to 13.4 ms (decode reuse by row + the derived windows "
+        "carried between ticks); what is left is 200 x 13.4 ms, and its two "
+        "biggest parts are OUTSIDE this service: "
+        "hunter_indicators.features.context.build_context re-scans and re-sorts "
+        "the 1500 candles and MarketContext.__post_init__ re-validates them and "
+        "the 2000 trades on every tick (~3.1 ms profiled per market between "
+        "them), for a cut that moved by one second. The remedy is a construction "
+        "path for a context whose sources were already checked -- packages/**, "
+        "and this brief may not touch it. The operational number is in "
+        "``.claude/state/t25-proof.md`` (T2.5c): against the real stack, where "
+        "candle buffers are ~790 rows and the loop also serves the consumers, "
+        "the p99 of the histogram is what decides acceptance. Kept as a strict "
+        "xfail so the day that construction path lands, this fails by passing."
     ),
 )
 async def test_two_hundred_markets_at_one_tick_a_second_stay_inside_the_budget() -> None:
@@ -130,19 +146,27 @@ async def test_two_hundred_markets_at_one_tick_a_second_stay_inside_the_budget()
         per_cycle.append(time.perf_counter() - cycle_started)
 
     assert len(per_market) >= MARKETS, "every market must be evaluated at least once"
-    p95 = _percentile(per_cycle, 0.95)
-    p99 = _percentile(per_cycle, 0.99)
+    warmup, steady = per_cycle[0], per_cycle[1:]
+    warm_markets = per_market[MARKETS:]
+    p95 = _percentile(steady, 0.95)
+    p99 = _percentile(steady, 0.99)
+    decoded = sum(state.hot.candles.decoded for state in scanner.state.markets.values())
     print(
         f"\nscanner load: markets={MARKETS} seconds={SECONDS} "
         f"evaluations={len(per_market)} "
-        f"per-market p50={_percentile(per_market, 0.5) * 1000:.1f}ms "
-        f"p99={_percentile(per_market, 0.99) * 1000:.1f}ms | "
-        f"per-cycle p95={p95:.3f}s p99={p99:.3f}s"
+        f"per-market p50={_percentile(warm_markets, 0.5) * 1000:.1f}ms "
+        f"p99={_percentile(warm_markets, 0.99) * 1000:.1f}ms | "
+        f"per-cycle p95={p95:.3f}s p99={p99:.3f}s | "
+        f"warm-up pass {warmup:.3f}s | rows decoded {decoded}"
     )
     # The cycle is what a tick actually waits for: one pass over every dirty
     # market. If a full pass fits inside the budget, no tick can be older than
     # the budget when its opportunity is written.
     assert p99 <= BUDGET_P99_S, f"cycle p99 {p99:.3f}s exceeds the {BUDGET_P99_S}s budget"
+    assert warmup <= WARMUP_CEILING_S, f"the cold pass took {warmup:.3f}s"
+    # 1500 rows once per market and nothing after: the fixture never rewrites a
+    # row, and re-decoding unchanged rows is exactly the cost T2.5c removed.
+    assert decoded == MARKETS * 1500, decoded
 
 
 async def test_coalescence_turns_twenty_touches_into_one_evaluation() -> None:
@@ -199,3 +223,132 @@ async def test_the_measurement_starts_at_the_market_not_at_the_worker() -> None:
     assert market.last_input_ts is not None
     assert (datetime.now(UTC) - market.last_input_ts) > timedelta(seconds=40)
     assert Decimal(str(market.evaluations)) == Decimal(0)
+
+
+def _samples(histogram: Any) -> float:
+    for metric in histogram.collect():
+        for sample in metric.samples:
+            if sample.name.endswith("_count"):
+                return float(sample.value)
+    raise AssertionError("the histogram must expose a _count sample")
+
+
+async def test_the_latency_sample_is_taken_after_the_projections_are_published() -> None:
+    """The budget is "tick to **opportunity**", so the publish is inside it.
+
+    Until T2.5c the histogram was observed inside ``Scanner.advance``, which left
+    ``features.updated`` and the Radar projection outside the number that is
+    supposed to bound them (Astra, T2.5c design review). Two facts are asserted
+    here: ``advance`` alone samples nothing, and by the time the loop publishes
+    the Radar row the sample has *not* been taken yet.
+    """
+    import asyncio
+
+    from pydantic import SecretStr
+
+    from hunter_core.runtime import WorkerRuntime
+    from hunter_core.settings import Settings
+    from hunter_scanner_worker import publish as projections
+    from hunter_scanner_worker.health import CycleHealth
+    from hunter_scanner_worker.metrics import scanner_tick_to_opportunity_seconds
+    from hunter_scanner_worker.runners import evaluation_loop
+
+    ref = MarketRef(market_id=UUID(int=1), exchange=EXCHANGE, symbol="SYM000USDT")
+    policy = build_policy()
+    scanner = Scanner(
+        config=ScannerConfig(exchange=EXCHANGE),
+        policy=policy,
+        registry=MarketRegistry(exchange=EXCHANGE),
+        state=ScannerState(),
+    )
+    scanner.registry.apply([ref])
+    scanner.cache = BaselineCache(gate=policy.gate)
+    market = scanner.state.ensure(ref)
+    redis = MultiMarketHotState()
+    redis.seed([ref], as_of=CUT)
+    market.touch("tick", input_ts=CUT)
+
+    at_publish: list[float] = []
+    original = projections.publish_features
+
+    async def spy(*args: Any, **kwargs: Any) -> None:
+        at_publish.append(_samples(scanner_tick_to_opportunity_seconds))
+        await original(*args, **kwargs)
+
+    # ``publish_features`` rather than ``publish_radar``: it goes out on every
+    # evaluation, while the Radar row needs a score, and with an empty baseline
+    # archive there is none (T2.4: degraded is not evidence).
+    projections.publish_features = spy  # type: ignore[assignment]
+    settings = Settings(
+        database_url=SecretStr("postgresql+asyncpg://u:p@localhost/x"),
+        redis_url=SecretStr("redis://localhost:6379/0"),
+    )
+    runtime = WorkerRuntime(
+        "scanner", settings, engine=cast("Any", None), redis_client=cast("Any", redis)
+    )
+    before = _samples(scanner_tick_to_opportunity_seconds)
+    try:
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(
+                evaluation_loop(
+                    scanner, cast("Any", None), cast("Any", redis), runtime, CycleHealth()
+                ),
+                0.6,
+            )
+    finally:
+        projections.publish_features = original  # type: ignore[assignment]
+
+    assert market.evaluations >= 1, "the loop has to have evaluated the market"
+    after = _samples(scanner_tick_to_opportunity_seconds)
+    assert after > before, "the loop has to have sampled the latency"
+    assert at_publish, "the loop has to have published the vector"
+    assert at_publish[0] == before, "no sample had been taken when the vector went out"
+
+
+async def test_a_radar_row_redis_refused_is_not_counted_as_delivered() -> None:
+    """A latency sample claims a delivery, so a failed write must not produce one.
+
+    ``publish_radar`` swallows the Redis error on purpose (the projection is
+    ephemeral and the durable row is already committed), which is exactly why
+    the histogram may not treat "we tried" as "it is on the Radar" (Astra,
+    T2.5c diff review, must-fix 2).
+    """
+    from hunter_scanner_worker import publish as projections
+    from hunter_scanner_worker.metrics import scanner_tick_to_opportunity_seconds
+
+    ref = MarketRef(market_id=UUID(int=1), exchange=EXCHANGE, symbol="SYM000USDT")
+
+    class Refusing(MultiMarketHotState):
+        async def zadd(self, key: str, mapping: dict[str, float]) -> int:
+            raise ConnectionError("redis said no")
+
+    redis = Refusing()
+    redis.seed([ref], as_of=CUT)
+    evaluation = _scored_evaluation(ref)
+    before = _samples(scanner_tick_to_opportunity_seconds)
+
+    assert (
+        await projections.publish_radar(cast("Any", redis), ref, evaluation)
+        == projections.RADAR_FAILED
+    )
+    assert _samples(scanner_tick_to_opportunity_seconds) == before
+
+
+def _scored_evaluation(ref: MarketRef) -> Any:
+    """The smallest evaluation ``publish_radar`` accepts as publishable."""
+    from types import SimpleNamespace
+
+    from hunter_core.domain.enums import OpportunityStage, OpportunityStatus, TradeDirection
+
+    state = SimpleNamespace(
+        score=Decimal("42.00"),
+        status=OpportunityStatus.HOT,
+        stage=OpportunityStage.NONE,
+        direction=TradeDirection.LONG,
+    )
+    return SimpleNamespace(
+        score=SimpleNamespace(score=Decimal("42.00"), confidence=Decimal("0.5"), eligible=True),
+        status=SimpleNamespace(state_out=state),
+        observation_ts=CUT,
+        scored=True,
+    )
