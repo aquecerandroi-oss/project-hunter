@@ -37,13 +37,14 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0004_outbox_pending_index"
+HEAD_REVISION = "0005_baseline_lock_grant"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
 INITIAL_REVISION = "0001_initial_schema"
 SHADOW_REVISION = "0002_shadow_lab"
 ANALYSIS_REVISION = "0003_analysis"
+OUTBOX_INDEX_REVISION = "0004_outbox_pending_index"
 
 _PENDING_PREDICATE = "dispatched_at IS NULL"
 """What makes an index a *pending* index, spelled out here rather than imported:
@@ -953,3 +954,86 @@ def test_history_rows_in_two_partitions_survive_the_downgrade_and_upgrade(
     finally:
         asyncio.run(_delete_legacy_analysis(upgraded, market))
         command.upgrade(config, "head")
+
+
+async def _table_privileges(url: str, role: str, table: str) -> set[str]:
+    """Which of the four DML privileges ``role`` holds on ``table``, right now."""
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            held: set[str] = set()
+            for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE"):
+                granted = await connection.scalar(
+                    text("SELECT has_table_privilege(:role, :table, :privilege)"),
+                    {"role": role, "table": table, "privilege": privilege},
+                )
+                if granted:
+                    held.add(privilege)
+            return held
+    finally:
+        await engine.dispose()
+
+
+def _frozen_lock_tables() -> tuple[str, ...]:
+    return cast("tuple[str, ...]", migration_ddl("baseline_lock").BASELINE_LOCK_TABLES_0005)
+
+
+def test_0005_grants_the_row_lock_on_exactly_the_tables_it_froze(upgraded: str) -> None:
+    """At head the worker may lock a baseline row; nothing else moved.
+
+    ``UPDATE`` is granted for what PostgreSQL demands it for — a row mark is
+    ``ACL_SELECT_FOR_UPDATE``, which *is* ``ACL_UPDATE`` — not because a
+    revision became editable. Immutability is the ``feature_baselines_immutable``
+    trigger, which refuses every ``UPDATE`` for every role including the owner,
+    and is asserted in ``test_schema_analysis.py`` as the worker role itself.
+    """
+    frozen = _frozen_lock_tables()
+    assert frozen, "0005 froze no table to grant"
+    for table in frozen:
+        held = asyncio.run(_table_privileges(upgraded, "hunter_worker", table))
+        assert held == {"SELECT", "INSERT", "UPDATE", "DELETE"}, (table, held)
+
+
+def test_0005_touches_no_table_0003_had_not_already_classified(upgraded: str) -> None:
+    """A grant revision must not smuggle in an unclassified table.
+
+    ``test_schema_privileges.test_the_grant_lists_cover_every_table_exactly_once``
+    partitions the schema over the *app*-side classes, so a worker-side grant on
+    a table nobody classified would slip past it. The frozen tuple therefore has
+    to be a subset of what ``0003`` already owns.
+    """
+    analysis = migration_ddl("analysis")
+    owned = set(cast("tuple[str, ...]", analysis.ANALYSIS_WORKER_APPEND_TABLES))
+    assert set(_frozen_lock_tables()) <= owned, (
+        "0005 grants on a table 0003 never classified; give it its own grant class"
+    )
+
+
+def test_0005_reverses_to_the_baseline_privileges_0003_shipped(upgraded: str) -> None:
+    """Rolling back this deploy restores create-and-expire, not nothing.
+
+    The downgrade revokes the single privilege rather than ``REVOKE ALL``: a
+    database rolled back to ``0004`` must still be able to write and expire
+    baselines, which is what ``0003`` granted. The scanner degrades again
+    (BUG-1) — it probes at startup and says so — but it keeps running.
+    """
+    config = alembic_config(upgraded)
+    try:
+        command.downgrade(config, OUTBOX_INDEX_REVISION)
+        for table in _frozen_lock_tables():
+            held = asyncio.run(_table_privileges(upgraded, "hunter_worker", table))
+            assert held == {"SELECT", "INSERT", "DELETE"}, (table, held)
+        assert asyncio.run(_revision(upgraded)) == OUTBOX_INDEX_REVISION
+    finally:
+        command.upgrade(config, "head")
+    for table in _frozen_lock_tables():
+        assert "UPDATE" in asyncio.run(_table_privileges(upgraded, "hunter_worker", table))
+    command.check(config)
+
+
+def test_0005_leaves_the_api_role_read_only_on_baselines(upgraded: str) -> None:
+    """The grant is the worker's alone. ``hunter_app`` reads a baseline to
+    explain a score and has never had a reason to write one."""
+    for table in _frozen_lock_tables():
+        held = asyncio.run(_table_privileges(upgraded, "hunter_app", table))
+        assert held == {"SELECT"}, (table, held)

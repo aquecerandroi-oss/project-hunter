@@ -783,9 +783,12 @@ qualquer tabela que esteja em nenhuma delas ou em duas.
   transação sem prazo de espera por trava (o `statement_timeout` do §1.2a é da
   aplicação, não do migrador), então uma revisão que precise de `ACCESS
   EXCLUSIVE` numa tabela quente pode enfileirar todo escritor atrás de um
-  leitor longo. Nenhuma revisão até a `0004` depende disso: a `0001` cria o
-  schema, a `0002`/`0003` mexem em tabelas ainda frias e a `0004` reconstrói os
-  índices com `CONCURRENTLY`, sem tomar trava sobre uma construção (§17.5). A
+  leitor longo. Nenhuma revisão até a `0005` depende disso: a `0001` cria o
+  schema, a `0002`/`0003` mexem em tabelas ainda frias, a `0004` reconstrói os
+  índices com `CONCURRENTLY`, sem tomar trava sobre uma construção (§17.5), e a
+  `0005` é um `GRANT`, que **não trava a relação** (medido: dentro da transação
+  do `GRANT`, `pg_locks` não tem nenhuma linha para `feature_baselines`; o que é
+  travado é o catálogo). A
   primeira revisão que precisar de uma trava longa numa tabela quente é que
   traz o `SET LOCAL lock_timeout` — e traz junto a decisão de que uma janela de
   manutenção é aceitável ali.
@@ -1172,7 +1175,11 @@ construção" é estado que o Radar mostra, não linha ausente.
 
 **Imutabilidade.** Trigger `feature_baselines_immutable`
 (`BEFORE UPDATE OR DELETE ... FOR EACH ROW`) recusa **todo** `UPDATE`, para todos
-os papéis, inclusive o dono. `DELETE` **não** é proibido — retenção precisa
+os papéis, inclusive o dono — e desde a `0005` (adiante) a imutabilidade é
+**dele sozinho**, não mais do trigger *mais* a ausência de grant. Não é perda:
+nenhum `REVOKE` alcança o dono da tabela, então o trigger sempre foi a fechadura
+mais forte das duas, e é a única que continua valendo para todo papel.
+`DELETE` **não** é proibido — retenção precisa
 expirar revisões —, mas é recusado a menos que o chamador se declare com
 `SET LOCAL app.baseline_retention = 'on'`. O marcador é de transação, o que o
 torna seguro atrás do pooler (mesmo mecanismo de `app.current_org`, §15.4), e
@@ -1205,6 +1212,43 @@ tem de implementar, é **exclusão mútua por linha**, não uma regra de idade:
    verifica que ninguém referencia B, um scorer com B em cache grava o envelope,
    o job apaga B" deixa de ser possível porque um dos dois espera pelo outro.
    Locks de linha, nunca advisory lock de sessão (§1.2 / pooler).
+
+**O lock exige o privilégio de `UPDATE`, e é a `0005_baseline_lock_grant` que o
+concede (BUG-1 da T2.5).** O protocolo acima esteve **inexecutável** entre a
+`0003` e a `0005`: o PostgreSQL exige `UPDATE` para tomar qualquer lock de linha
+(`ACL_SELECT_FOR_UPDATE` *é* `ACL_UPDATE`, e um grant por coluna não serve —
+um row mark não tem coluna atualizada, então a verificação cai no
+`pg_class_aclcheck` de tabela), e a `0003` negava `UPDATE` a `hunter_worker` de
+propósito. Contra um banco corretamente migrado, o passo 2 falhava com
+*permission denied for table feature_baselines* — e uma falha de privilégio
+**aborta a transação inteira**, então o scanner sonda uma vez na partida
+(`hunter_scanner_worker.writers.probe_baseline_lock`), loga em `error` e degrada
+para uma leitura de existência: a amostra cuja baseline sumiu continua não sendo
+gravada, mas a serialização contra o `DELETE` da retenção se perde.
+
+A correção é o grant, e **conceder `UPDATE` não torna uma revisão editável**: o
+trigger `feature_baselines_immutable` recusa todo `UPDATE` para todo papel,
+dono incluído. O que faltava era exatamente a parte do protocolo que o trigger
+não sabe expressar — o lock. A lista fica congelada por revisão como todas as
+outras (`ddl/baseline_lock.py`, `BASELINE_LOCK_TABLES_0005`); a `0003` continua
+descrevendo o schema que ela construiu. O `downgrade` da `0005` revoga só esse
+privilégio (nunca `REVOKE ALL`), então um banco revertido para a `0004` volta a
+poder criar e expirar baselines — e volta a degradar, dizendo isso no log.
+Provado como o papel, não perguntado ao catálogo:
+`test_schema_privileges.py::test_the_worker_can_actually_take_for_share_on_a_baseline_row`
+e `test_schema_analysis.py::test_the_worker_can_lock_a_baseline_row_and_still_cannot_rewrite_it`
+(o `FOR SHARE` passa, o `UPDATE` ainda levanta pelo trigger).
+
+**Pendência do lado do scanner (T2.5), declarada e não corrigida aqui.** A sonda
+continua no código e agora devolve `True`, então
+`services/scanner-worker/tests/test_persistence.py::test_the_row_lock_is_probed_once_and_its_absence_is_reported`
+— que afirma `allowed is False` e cujo comentário pede "atualize a nota em
+`probe_baseline_lock`" quando o grant chegar — **falha por passar** contra o
+head. É o sinal desejado (mesmo padrão do `xfail(strict=True)` da T2.5 §7) e o
+conserto é do dono de `services/**`: inverter a asserção e reescrever o
+docstring de `writers.probe_baseline_lock`. A sonda em si vale a pena manter —
+ela é o que distingue um banco na `0004` de um banco no head sem custar uma
+transação de escrita.
 
 Se a consulta de referências vier a pesar, o caminho é um índice GIN sobre a
 expressão JSONB dos ids, **não** uma segunda coluna `UUID[]` a sincronizar à mão:
@@ -1448,11 +1492,44 @@ desta revisão estão em `ddl/analysis.py` (`ANALYSIS_APP_READ_ONLY_TABLES`,
 continua classificada exatamente uma vez.
 
 A novidade é `ANALYSIS_WORKER_APPEND_TABLES` = (`feature_baselines`):
-`SELECT`/`INSERT`/`DELETE` para `hunter_worker` e **`UPDATE` para ninguém**. Não é
-a classe append-only do §15.6 (que também proíbe `DELETE`, porque trilha de
-auditoria não é podada) — baselines *são* podadas, no mesmo prazo das amostras que
-dependem delas. `UPDATE` é negado no grant, antes de o trigger ser consultado:
-duas fechaduras independentes na mesma porta.
+`SELECT`/`INSERT`/`DELETE` para `hunter_worker` e, **na `0003`**, `UPDATE` para
+ninguém. Não é a classe append-only do §15.6 (que também proíbe `DELETE`, porque
+trilha de auditoria não é podada) — baselines *são* podadas, no mesmo prazo das
+amostras que dependem delas.
+
+**Correção da `0005_baseline_lock_grant` (BUG-1 da T2.5).** Esta seção dizia que
+negar `UPDATE` no grant eram "duas fechaduras independentes na mesma porta", ao
+lado do trigger. Eram uma fechadura na porta e outra no batente: o trigger já
+recusava todo `UPDATE` para todo papel — inclusive o dono, que nenhum `REVOKE`
+alcança —, enquanto a ausência do grant não protegia a escrita e **impedia o
+lock de linha** que o próprio §17.2 manda o escritor tomar (o PostgreSQL exige
+`UPDATE` para `FOR SHARE`/`FOR UPDATE`). A `0005` concede `UPDATE` em
+`feature_baselines` a `hunter_worker` **para travar linha, não para escrever**;
+a imutabilidade fica inteira no trigger. Nada muda para `hunter_app`, que segue
+só com `SELECT`.
+
+| Classe | Revisão | Papel | Privilégios |
+|---|---|---|---|
+| `APP_WRITE_TABLES` | `0001` | `hunter_app` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` |
+| `APP_NO_DELETE_TABLES` | `0001` | `hunter_app` | `SELECT`/`INSERT`/`UPDATE` |
+| `APP_READ_ONLY_TABLES` (+ `SHADOW_*`, `ANALYSIS_APP_READ_ONLY_TABLES`) | `0001`–`0003` | `hunter_app` | `SELECT` |
+| `APPEND_ONLY_TABLES` | `0001` | ambos | `SELECT`/`INSERT` |
+| `WORKER_DELETE_TABLES` | `0001` | `hunter_worker` | `DELETE` (só `organizations`/`users`) |
+| `WORKER_WRITE_TABLES`, `SHADOW_WORKER_WRITE_TABLES`, `ANALYSIS_WORKER_WRITE_TABLES` | `0001`–`0003` | `hunter_worker` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` |
+| `ANALYSIS_WORKER_APPEND_TABLES` | `0003` | `hunter_worker` | `SELECT`/`INSERT`/`DELETE` |
+| `BASELINE_LOCK_TABLES_0005` | `0005` | `hunter_worker` | `+ UPDATE` **só como lock** (`ddl/baseline_lock.py`) |
+
+A última linha não é uma classe nova de tabela: é um privilégio acrescentado a
+uma tabela que a `0003` já classificou, e
+`test_migrations.py::test_0005_touches_no_table_0003_had_not_already_classified`
+é o que impede que ela vire a porta de entrada de uma tabela sem classificação —
+o teste de partição de §15.6 é sobre as classes do `hunter_app` e não veria um
+grant só do worker. A partição continua exata.
+
+**Orçamento de nome de revisão: 32 caracteres.** `alembic_version.version_num` é
+`VARCHAR(32)`; o id `0005_feature_baselines_lock_grant` (33) rodou a revisão
+inteira e só então falhou no `UPDATE alembic_version` com *value too long*. Daí
+o nome curto `0005_baseline_lock_grant`.
 
 ### 17.7 Guardas em banco populado
 

@@ -19,8 +19,10 @@ evidence its own scores point at — deletion has to be an act, not an accident.
 ``0001`` and ``ddl.shadow``'s as of ``0002``; these are this revision's addition,
 and ``test_schema_privileges.py`` unions all three so every table stays
 classified exactly once. ``feature_baselines`` gets its own class:
-``SELECT``/``INSERT``/``DELETE`` for the worker and **no ``UPDATE`` for anyone**,
-so the trigger is the second lock on a door the grants already closed.
+``SELECT``/``INSERT``/``DELETE`` for the worker and **no ``UPDATE`` for anyone**
+— which ``0005_baseline_lock_grant`` later corrects, because that withheld
+privilege was what PostgreSQL demands for the ``FOR SHARE`` of DATABASE.md
+§17.2 and not what protects the archive (the trigger is).
 
 **Guards for a populated database.** Three new invariants (the expiry
 biconditional, one open episode per market, one active anomaly per market and
@@ -70,7 +72,8 @@ The outbox is genuinely mutable: the dispatcher stamps ``dispatched_at``, counts
 """
 
 ANALYSIS_WORKER_APPEND_TABLES: tuple[str, ...] = ("feature_baselines",)
-"""``SELECT``/``INSERT``/``DELETE`` for ``hunter_worker`` — and never ``UPDATE``.
+"""``SELECT``/``INSERT``/``DELETE`` for ``hunter_worker`` — and, *as of ``0003``*,
+never ``UPDATE``.
 
 A fifth grant class, and the reason it exists is the whole point of the table: a
 baseline revision may be created and, once nothing depends on it, expired, but
@@ -78,6 +81,14 @@ it may never be *changed*. This is not the append-only class of
 :data:`ddl.tables.APPEND_ONLY_TABLES` (which also forbids ``DELETE``, because an
 audit trail is never pruned) — baselines are pruned, on the same schedule as the
 samples that depend on them.
+
+**Not the state at head, and this list must not be edited to say so.** It is
+frozen as of ``0003`` like every other grant list. ``0005_baseline_lock_grant``
+adds ``UPDATE`` on this table, for the row lock ``FOR SHARE`` needs and for
+nothing else — see ``ddl/baseline_lock.py``, which owns that decision and its
+own frozen tuple. What keeps a baseline revision unwritable is the
+``feature_baselines_immutable`` trigger below, which refuses every ``UPDATE``
+for every role, the owner included.
 """
 
 ANALYSIS_SEQUENCES: tuple[str, ...] = ("outbox_events_id_seq",)

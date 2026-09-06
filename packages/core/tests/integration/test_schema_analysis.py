@@ -174,6 +174,75 @@ async def test_a_baseline_revision_cannot_be_updated(connection: AsyncConnection
         )
 
 
+async def test_the_worker_can_lock_a_baseline_row_and_still_cannot_rewrite_it(
+    schema_engine: AsyncEngine,
+) -> None:
+    """BUG-1 of T2.5, closed by ``0005`` — and the archive is untouched.
+
+    §17.2 makes the writer take ``SELECT ... FOR SHARE`` on every
+    ``baseline_id`` it is about to reference, so that the retention job's
+    ``FOR UPDATE`` on the same row cannot delete a revision between "the job
+    proved nobody references it" and "the scorer wrote the envelope". PostgreSQL
+    requires the ``UPDATE`` privilege for that lock, which ``0003`` deliberately
+    withheld, so the statement failed with *permission denied* and the scanner
+    degraded to an existence check.
+
+    Both halves are asserted here, as ``hunter_worker`` itself, because the pair
+    is the point: the lock now works, and the ``UPDATE`` the grant nominally
+    authorises is still refused row by row by ``feature_baselines_immutable``.
+    Immutability was never the grant's to keep — the trigger refuses the owner
+    too, and no ``REVOKE`` reaches an owner.
+    """
+    async with schema_engine.begin() as setup:
+        await setup.execute(text("GRANT hunter_worker TO CURRENT_USER"))
+
+    async with schema_engine.connect() as conn:
+        transaction = await conn.begin()
+        try:
+            await conn.execute(text("SET LOCAL ROLE hunter_worker"))
+            market = await _market(conn)
+            baseline_id = await _baseline(conn, market)
+
+            locked = await conn.scalar(
+                text("SELECT id FROM feature_baselines WHERE id = ANY(:ids) FOR SHARE"),
+                {"ids": [str(baseline_id)]},
+            )
+            assert locked == baseline_id, "hunter_worker still cannot take the row lock"
+
+            with pytest.raises(DBAPIError, match=_IMMUTABLE):
+                await conn.execute(
+                    text("UPDATE feature_baselines SET median = 2 WHERE id = :id"),
+                    {"id": baseline_id},
+                )
+        finally:
+            await transaction.rollback()
+
+
+async def test_the_lock_grant_did_not_open_the_retention_door_for_the_worker(
+    schema_engine: AsyncEngine,
+) -> None:
+    """``0005`` widened one privilege and no behaviour: a ``DELETE`` by the role
+    that owns the scanner is still refused unless it declares itself the
+    retention job. A bug in the scanner must not be able to delete the evidence
+    its own scores point at."""
+    async with schema_engine.begin() as setup:
+        await setup.execute(text("GRANT hunter_worker TO CURRENT_USER"))
+
+    async with schema_engine.connect() as conn:
+        transaction = await conn.begin()
+        try:
+            await conn.execute(text("SET LOCAL ROLE hunter_worker"))
+            market = await _market(conn)
+            baseline_id = await _baseline(conn, market)
+
+            with pytest.raises(DBAPIError, match=_RETENTION_ONLY):
+                await conn.execute(
+                    text("DELETE FROM feature_baselines WHERE id = :id"), {"id": baseline_id}
+                )
+        finally:
+            await transaction.rollback()
+
+
 async def test_a_baseline_cannot_be_deleted_without_declaring_the_retention_job(
     connection: AsyncConnection,
 ) -> None:

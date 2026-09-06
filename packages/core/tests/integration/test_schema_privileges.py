@@ -16,7 +16,10 @@ including partition children.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import cast
 
 import pytest
@@ -24,6 +27,8 @@ import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
+
+from hunter_core.domain.types import uuid7
 
 from .conftest import migration_ddl
 
@@ -60,6 +65,16 @@ def _analysis_tables(name: str) -> tuple[str, ...]:
     return cast(tuple[str, ...], getattr(migration_ddl("analysis"), name))
 
 
+def _lock_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0005_feature_baselines_lock_grant``'s ``ddl/baseline_lock.py``.
+
+    It grants no table class of its own: it hands ``hunter_worker`` the single
+    ``UPDATE`` privilege PostgreSQL demands for a row lock, on a table ``0003``
+    already classified. See that module for why the archive is not weakened.
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("baseline_lock"), name))
+
+
 def _security_tables(name: str) -> tuple[str, ...]:
     """A frozen grant-list constant from ``ddl.security``, correctly typed.
 
@@ -87,6 +102,67 @@ async def app_connection(schema_engine: AsyncEngine) -> AsyncIterator[AsyncConne
         await connection.execute(_AS_APP)
         yield connection
         await connection.rollback()
+
+
+@pytest_asyncio.fixture
+async def worker_connection(schema_engine: AsyncEngine) -> AsyncIterator[AsyncConnection]:
+    """A connection whose transaction runs as ``hunter_worker``, rolled back after.
+
+    The pipeline's own role: everything it writes it writes as this, so a
+    statement the scanner issues has to be proven here rather than inferred from
+    ``has_table_privilege``.
+    """
+    async with schema_engine.begin() as connection:
+        await connection.execute(text("GRANT hunter_worker TO CURRENT_USER"))
+    async with schema_engine.connect() as connection:
+        await connection.begin()
+        await connection.execute(text("SET LOCAL ROLE hunter_worker"))
+        yield connection
+        await connection.rollback()
+
+
+async def _market(connection: AsyncConnection) -> uuid.UUID:
+    """A throwaway market to hang a baseline on, written as the caller's role."""
+    exchange, market = uuid7(), uuid7()
+    await connection.execute(
+        text("INSERT INTO exchanges (id, code, name) VALUES (:id, :code, 'Probe')"),
+        {"id": exchange, "code": f"probe-{uuid.uuid4().hex[:8]}"},
+    )
+    await connection.execute(
+        text(
+            "INSERT INTO markets (id, exchange_id, symbol, market_type) "
+            "VALUES (:id, :exchange, :symbol, 'perpetual')"
+        ),
+        {"id": market, "exchange": exchange, "symbol": f"BTC{uuid.uuid4().hex[:6].upper()}"},
+    )
+    return market
+
+
+async def _baseline(connection: AsyncConnection, market: uuid.UUID) -> uuid.UUID:
+    window_end = datetime(2026, 9, 5, 11, 59, tzinfo=UTC)
+    result = await connection.execute(
+        text(
+            "INSERT INTO feature_baselines "
+            "(id, market_id, feature, feature_version, algo_version, hour_of_day, "
+            " window_start, window_end, available_at, median, mad, sample_size, "
+            " expected_size, distinct_days, coverage, source, sampling, input_fingerprint) "
+            "VALUES (:id, :market, 'volume_relative', 1, 'mad_v1', 11, :window_start, "
+            " :window_end, :available_at, :median, :mad, 400, 420, 7, :coverage, 'live', "
+            " 'per_minute', :fingerprint) RETURNING id"
+        ),
+        {
+            "id": uuid7(),
+            "market": market,
+            "window_start": window_end - timedelta(days=7),
+            "window_end": window_end,
+            "available_at": window_end + timedelta(minutes=2),
+            "median": Decimal("1.0000000000"),
+            "mad": Decimal("0.2500000000"),
+            "coverage": Decimal("0.952381"),
+            "fingerprint": uuid.uuid4().hex,
+        },
+    )
+    return result.scalar_one()
 
 
 async def _partitions_of(connection: AsyncConnection, parent: str) -> list[str]:
@@ -312,32 +388,67 @@ async def test_the_worker_role_owns_the_organization_lifecycle(
                 assert not granted, f"hunter_worker can {privilege} {table}"
 
 
-async def test_the_worker_can_write_a_baseline_but_never_rewrite_one(
+async def test_the_worker_holds_update_on_a_baseline_only_to_lock_the_row(
     schema_engine: AsyncEngine,
 ) -> None:
-    """``feature_baselines`` is the one table with a create-and-expire class.
+    """``feature_baselines`` is the one table whose ``UPDATE`` grant is a lock.
 
-    ``UPDATE`` is denied at the grant, before the immutability trigger is even
-    consulted — two independent locks on the same door, because the value of the
-    archive is exactly that a revision cannot be edited after a score named it.
-    ``DELETE`` is granted because retention has to expire revisions eventually;
-    the trigger is what makes the deletion a declared act.
+    ``0003`` withheld ``UPDATE`` and called it the second of "two independent
+    locks on the same door". It was not: PostgreSQL demands the ``UPDATE``
+    privilege for *any* row lock (``ACL_SELECT_FOR_UPDATE`` is ``ACL_UPDATE``),
+    so withholding it did not protect the archive — the
+    ``feature_baselines_immutable`` trigger already refuses every ``UPDATE`` for
+    every role, the owner included, which no ``REVOKE`` can do — it only made
+    the ``FOR SHARE`` of DATABASE.md §17.2 impossible, which is BUG-1 of T2.5.
+    ``0005`` grants it. What the archive is worth is asserted where it now
+    lives: ``test_schema_analysis.py``, as the worker role, against the trigger.
     """
     append_tables = _analysis_tables("ANALYSIS_WORKER_APPEND_TABLES")
     assert set(append_tables) == {"feature_baselines"}
+    locked = _lock_tables("BASELINE_LOCK_TABLES_0005")
+    assert set(locked) <= set(append_tables), "0005 grants outside 0003's class"
 
     async with schema_engine.connect() as connection:
         for table in append_tables:
-            for privilege in ("SELECT", "INSERT", "DELETE"):
+            expected: set[str] = {"SELECT", "INSERT", "DELETE"}
+            if table in locked:
+                expected.add("UPDATE")
+            held: set[str] = set()
+            for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE"):
                 granted = await connection.scalar(
                     text("SELECT has_table_privilege('hunter_worker', :t, :p)"),
                     {"t": table, "p": privilege},
                 )
-                assert granted, f"hunter_worker cannot {privilege} {table}"
-            updatable = await connection.scalar(
-                text("SELECT has_table_privilege('hunter_worker', :t, 'UPDATE')"), {"t": table}
-            )
-            assert not updatable, f"hunter_worker can UPDATE {table}"
+                if granted:
+                    held.add(privilege)
+            assert held == expected, (table, held)
+
+
+async def test_the_worker_can_actually_take_for_share_on_a_baseline_row(
+    worker_connection: AsyncConnection,
+) -> None:
+    """Run as the role, not asked of ``has_table_privilege`` — this is BUG-1.
+
+    The scanner's probe (``hunter_scanner_worker.writers.probe_baseline_lock``)
+    is this statement, and against ``0003`` it failed with *permission denied*,
+    aborting the transaction it ran in. Asking the catalogue whether ``UPDATE``
+    is granted would not have caught it before the grant existed and would not
+    prove it now: what §17.2 needs is that this exact statement runs, on a real
+    row, as ``hunter_worker``.
+    """
+    market = await _market(worker_connection)
+    baseline_id = await _baseline(worker_connection, market)
+
+    locked = await worker_connection.scalar(
+        text("SELECT id FROM feature_baselines WHERE id = ANY(:ids) FOR SHARE"),
+        {"ids": [str(baseline_id)]},
+    )
+    assert locked == baseline_id
+
+    empty = await worker_connection.execute(
+        text("SELECT id FROM feature_baselines WHERE id = ANY(:ids) FOR SHARE"), {"ids": []}
+    )
+    assert empty.fetchall() == [], "the startup probe must run without raising"
 
 
 async def test_the_app_role_cannot_write_a_baseline_or_the_outbox(
