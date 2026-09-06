@@ -156,7 +156,10 @@ async def flush_ticks(
             payload = build_tick_payload(exchange, symbol, accum, ts)
             coalescer.reset((exchange, symbol))
             if accum.hot_ticker is not None:
-                hot_state.queue_ticker_hash(pipe, sha, accum.hot_ticker)
+                # KB-0044: this ticker always comes from the WS bookTicker
+                # stream (on_ticker) -- must own only its own fields, never
+                # the REST 24h-ticker refresh's.
+                hot_state.queue_ticker_hash(pipe, sha, accum.hot_ticker, source="ws")
                 accum.hot_ticker = None
             if accum.hot_book is not None:
                 hot_state.queue_book_set(pipe, accum.hot_book)

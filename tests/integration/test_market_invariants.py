@@ -27,7 +27,6 @@ from hunter_core.domain.market import NormalizedCandle, align_open_time
 from hunter_core.domain.types import utcnow
 from hunter_core.redis import keys
 from hunter_market_worker import hot_state
-from hunter_market_worker.ingest import publish_liquidation
 from hunter_market_worker.persist_rows import flush_batch
 from hunter_market_worker.publication import liquidation_id
 from hunter_market_worker.universe import refresh_universe
@@ -259,8 +258,8 @@ async def test_late_or_duplicate_ticker_never_rejuvenates_the_hash(worker_redis:
     fresh = b.ticker(SYMBOL, "100")
     stale = b.ticker(SYMBOL, "1", ts=fresh.ts - timedelta(seconds=1))
 
-    assert await hot_state.write_ticker(worker_redis, fresh)
-    assert not await hot_state.write_ticker(worker_redis, stale)
+    assert await hot_state.write_ticker(worker_redis, fresh, source="rest")
+    assert not await hot_state.write_ticker(worker_redis, stale, source="rest")
 
     raw = await worker_redis.hgetall(keys.ticker(EXCHANGE, SYMBOL))
     assert raw[b"last"] == b"100"  # the older duplicate never overwrote it
@@ -310,18 +309,37 @@ async def test_a_second_book_snapshot_wholesale_replaces_the_first(worker_redis:
 # ---------------------------------------------------------------------------
 
 
-async def test_liquidation_event_id_matches_the_deterministic_row_id(worker_redis: Any) -> None:
+async def test_liquidation_event_id_matches_the_deterministic_row_id(
+    worker_session_factory: async_sessionmaker[AsyncSession],
+    worker_redis: Any,
+    worker_settings: Settings,
+) -> None:
+    """Since T2.9 a liquidation is not published directly: ``flush_batch``
+    inserts the row and queues the ``market.liquidations`` event in the same
+    transaction (transactional outbox). The identity contract is unchanged —
+    the queued ``event_id`` is the row's uuid5 primary key — so a consumer can
+    dedupe a redelivery against the row it already has."""
+    from sqlalchemy import select
+
+    from hunter_core.db.models.system import OutboxEvent
     from hunter_core.events.streams import Streams
 
+    await _seed_market(worker_session_factory, worker_redis, worker_settings)
     liq = b.liquidation(SYMBOL, price="1234.5", qty="0.02")
-    await publish_liquidation(worker_redis, PRODUCER, liq)
 
-    entries = await worker_redis.xrange(Streams.MARKET_LIQUIDATIONS, "-", "+")
-    assert entries
-    from hunter_core.events.envelope import EventEnvelope
+    inserted = await flush_batch(worker_session_factory, EXCHANGE, [liq])
+    assert inserted == {liquidation_id(liq)}
 
-    envelope = EventEnvelope.from_bytes(entries[-1][1][b"data"])
-    assert envelope.event_id == liquidation_id(liq)
+    async with worker_session_factory() as session:
+        rows = (
+            await session.execute(
+                select(OutboxEvent.event_id, OutboxEvent.stream).where(
+                    OutboxEvent.stream == Streams.MARKET_LIQUIDATIONS,
+                    OutboxEvent.event_id == liquidation_id(liq),
+                )
+            )
+        ).all()
+    assert len(rows) == 1, "one identity end to end: the queued event is the row's id"
 
 
 # ---------------------------------------------------------------------------
@@ -374,7 +392,7 @@ async def test_book_stopped_with_ticker_and_mark_active_is_degraded(
     authed_actor: dict[str, str],
 ) -> None:
     symbol = quality_market
-    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"))
+    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"), source="rest")
     await hot_state.write_funding(worker_redis, b.funding(symbol, mark_price=Decimal("10")))
     # book never written for this market -> absent, a required component.
     row = await _row(pipeline_client, authed_actor, symbol)
@@ -389,7 +407,7 @@ async def test_mark_stopped_with_ticker_and_book_active_is_degraded(
     authed_actor: dict[str, str],
 ) -> None:
     symbol = quality_market
-    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"))
+    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"), source="rest")
     await hot_state.write_book(worker_redis, b.order_book(symbol))
     row = await _row(pipeline_client, authed_actor, symbol)
     assert row["components"]["mark"]["quality"] == "absent"
@@ -406,7 +424,7 @@ async def test_open_interest_updates_while_mark_is_stopped_stay_independent(
     component's freshness or vice-versa -- an OI update alone must not make a
     stopped ``mark`` (and therefore the aggregate) look any less degraded."""
     symbol = quality_market
-    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"))
+    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"), source="rest")
     await hot_state.write_book(worker_redis, b.order_book(symbol))
     await hot_state.write_open_interest(worker_redis, b.open_interest(symbol))
     row = await _row(pipeline_client, authed_actor, symbol)
@@ -431,7 +449,7 @@ async def test_a_fresh_open_interest_write_never_rejuvenates_a_stale_mark(
     """
     symbol = quality_market
     old_ts = utcnow() - timedelta(seconds=11)  # market_stale_after_s=10 in this suite's settings
-    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"))
+    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"), source="rest")
     await hot_state.write_book(worker_redis, b.order_book(symbol))
     await hot_state.write_funding(
         worker_redis, b.funding(symbol, mark_price=Decimal("10"), ts=old_ts)
@@ -455,7 +473,7 @@ async def test_a_required_component_older_than_stale_after_s_is_stale_not_ok(
 ) -> None:
     symbol = quality_market
     old_ts = utcnow() - timedelta(seconds=11)  # market_stale_after_s=10 in this suite's settings
-    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10", ts=old_ts))
+    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10", ts=old_ts), source="rest")
     await hot_state.write_book(worker_redis, b.order_book(symbol, ts=old_ts))
     await hot_state.write_funding(
         worker_redis, b.funding(symbol, mark_price=Decimal("10"), ts=old_ts)
@@ -472,7 +490,7 @@ async def test_all_required_components_fresh_and_no_gap_is_ok(
     authed_actor: dict[str, str],
 ) -> None:
     symbol = quality_market
-    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"))
+    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"), source="rest")
     await hot_state.write_book(worker_redis, b.order_book(symbol))
     await hot_state.write_funding(worker_redis, b.funding(symbol, mark_price=Decimal("10")))
     row = await _row(pipeline_client, authed_actor, symbol)
@@ -490,7 +508,7 @@ async def test_component_age_ms_is_the_exchange_event_ts_never_the_flush_time(
     confirm the API reports roughly that age, not ~0."""
     symbol = quality_market
     event_ts = utcnow() - timedelta(seconds=5)
-    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10", ts=event_ts))
+    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10", ts=event_ts), source="rest")
     row = await _row(pipeline_client, authed_actor, symbol)
     age_ms = row["components"]["ticker"]["age_ms"]
     assert 4500 <= age_ms <= 8000  # generous band for test wall-clock overhead, never ~0
@@ -506,7 +524,7 @@ async def test_open_or_failed_gap_degrades_even_with_fresh_ticks(
     """T1.4 decision conjunta: 'gap failed com ticks atuais' -- an ingestion
     gap degrades the market even though every required component is fresh."""
     symbol = quality_market
-    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"))
+    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"), source="rest")
     await hot_state.write_book(worker_redis, b.order_book(symbol))
     await hot_state.write_funding(worker_redis, b.funding(symbol, mark_price=Decimal("10")))
 
@@ -549,7 +567,7 @@ async def test_time_advancing_with_no_new_publication_eventually_reads_stale(
     """The literal 'passagem do tempo sem publicações' scenario -- exercised
     via a backdated ``ts`` (clock injetável), not a real sleep."""
     symbol = quality_market
-    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"))
+    await hot_state.write_ticker(worker_redis, b.ticker(symbol, "10"), source="rest")
     await hot_state.write_book(worker_redis, b.order_book(symbol))
     await hot_state.write_funding(worker_redis, b.funding(symbol, mark_price=Decimal("10")))
     row = await _row(pipeline_client, authed_actor, symbol)

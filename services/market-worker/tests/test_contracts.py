@@ -35,12 +35,12 @@ async def test_components_keep_independent_source_times(redis_client: Any) -> No
 
 async def test_duplicate_and_late_ticker_do_not_refresh(redis_client: Any) -> None:
     event = builders.ticker("BTCUSDT", "100")
-    await hot_state.write_ticker(redis_client, event)
+    await hot_state.write_ticker(redis_client, event, source="rest")
     key = keys.ticker("fake", "BTCUSDT")
     await redis_client.expire(key, 7)
-    assert await hot_state.write_ticker(redis_client, event) is False
+    assert await hot_state.write_ticker(redis_client, event, source="rest") is False
     late = event.model_copy(update={"ts": event.ts - timedelta(seconds=1), "last": Decimal("90")})
-    assert await hot_state.write_ticker(redis_client, late) is False
+    assert await hot_state.write_ticker(redis_client, late, source="rest") is False
     assert await redis_client.hget(key, "last") == b"100"
     assert await redis_client.ttl(key) <= 7
 

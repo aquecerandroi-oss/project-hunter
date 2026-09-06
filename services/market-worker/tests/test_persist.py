@@ -119,7 +119,7 @@ async def testsnapshot_loop_reads_hot_state_when_present(
     exchange_code = unique_code()
     market_id = await seed_market(db_session_factory, exchange_code, "ETHUSDT")
     ticker = builders.ticker("ETHUSDT", "3000", exchange=exchange_code)
-    await hot_state.write_ticker(redis_client, ticker)
+    await hot_state.write_ticker(redis_client, ticker, source="rest")
 
     await persist.write_snapshots(
         db_session_factory, redis_client, exchange_code, ["ETHUSDT"], Settings()
@@ -131,6 +131,44 @@ async def testsnapshot_loop_reads_hot_state_when_present(
         )
     assert row is not None
     assert row.price == 3000
+
+
+async def test_snapshot_carries_both_rest_volume_and_ws_spread_together(
+    db_session_factory: Any, redis_client: Any
+) -> None:
+    """KB-0044, durable side: ``market_snapshots`` reads the ticker hash with
+    one ``HGETALL`` (``sampling.py::write_snapshots``), so it inherited the
+    field-clobbering bug wholesale -- a REST refresh and a WS bookTicker
+    landing close together used to leave the hash (and therefore the
+    snapshot) with only one side's fields. With per-producer ownership, a
+    REST write followed by a WS write leaves both in the hash at once, and
+    the persisted row carries volume_24h *and* bid/ask/spread_pct from the
+    same snapshot cycle -- no change needed in ``sampling.py`` itself."""
+    from datetime import timedelta
+
+    exchange_code = unique_code()
+    market_id = await seed_market(db_session_factory, exchange_code, "BTCUSDT")
+
+    rest = builders.ticker_rest("BTCUSDT", "100", exchange=exchange_code)
+    await hot_state.write_ticker(redis_client, rest, source="rest")
+    ws = builders.ticker_ws(
+        "BTCUSDT", "100.5", exchange=exchange_code, ts=rest.ts + timedelta(milliseconds=250)
+    )
+    await hot_state.write_ticker(redis_client, ws, source="ws")
+
+    await persist.write_snapshots(
+        db_session_factory, redis_client, exchange_code, ["BTCUSDT"], Settings()
+    )
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        row = await session.scalar(
+            select(MarketSnapshot).where(MarketSnapshot.market_id == market_id)
+        )
+    assert row is not None
+    assert row.volume_24h == 1000
+    assert row.bid == ws.bid
+    assert row.ask == ws.ask
+    assert row.spread_pct is not None
 
 
 async def testoi_poll_loop_writes_history_and_hot_state(

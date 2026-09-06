@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from hunter_core.redis import keys
-from hunter_market_worker import hot_state
+from hunter_market_worker import hot_state, hot_state_trades
 from hunter_market_worker import wire as msgpack
 
 from . import builders
@@ -18,7 +18,7 @@ pytestmark = pytest.mark.integration
 
 async def test_write_ticker_fields_and_ttl(redis_client: Any) -> None:
     ticker = builders.ticker("BTCUSDT", "50000")
-    await hot_state.write_ticker(redis_client, ticker)
+    await hot_state.write_ticker(redis_client, ticker, source="rest")
 
     key = keys.ticker(builders.EXCHANGE, "BTCUSDT")
     raw = await redis_client.hgetall(key)
@@ -75,7 +75,7 @@ async def test_write_ticker_is_a_single_redis_round_trip(
 
     monkeypatch.setattr(pipeline_cls, "immediate_execute_command", counting_immediate)
 
-    await hot_state.write_ticker(redis_client, builders.ticker("BTCUSDT", "50000"))
+    await hot_state.write_ticker(redis_client, builders.ticker("BTCUSDT", "50000"), source="rest")
 
     assert calls["direct"] + calls["pipeline"] == 1
 
@@ -84,11 +84,11 @@ async def test_hash_falls_back_to_eval_after_script_flush(redis_client: Any) -> 
     """B2: a Redis restart flushes the script cache (T1.6 already proved
     restarts happen) — a ``NOSCRIPT`` on the cached SHA must fall back to
     ``EVAL``, never propagate and kill the worker."""
-    await hot_state.write_ticker(redis_client, builders.ticker("BTCUSDT", "50000"))
+    await hot_state.write_ticker(redis_client, builders.ticker("BTCUSDT", "50000"), source="rest")
     await redis_client.script_flush()
 
     accepted = await hot_state.write_ticker(
-        redis_client, builders.ticker("BTCUSDT", "50001", ts=builders.utcnow())
+        redis_client, builders.ticker("BTCUSDT", "50001", ts=builders.utcnow()), source="rest"
     )
     assert accepted
     assert await redis_client.hget(keys.ticker(builders.EXCHANGE, "BTCUSDT"), "last") == b"50001"
@@ -103,20 +103,39 @@ async def test_hash_orders_by_instant_not_string_bytes(redis_client: Any) -> Non
 
     key = keys.ticker(builders.EXCHANGE, "ETHUSDT")
     t0 = builders.utcnow().replace(microsecond=500_000)
-    await hot_state.write_ticker(redis_client, builders.ticker("ETHUSDT", "100", ts=t0))
+    await hot_state.write_ticker(
+        redis_client, builders.ticker("ETHUSDT", "100", ts=t0), source="rest"
+    )
     t1 = t0 + timedelta(microseconds=1)  # chronologically later
-    accepted = await hot_state.write_ticker(redis_client, builders.ticker("ETHUSDT", "101", ts=t1))
+    accepted = await hot_state.write_ticker(
+        redis_client, builders.ticker("ETHUSDT", "101", ts=t1), source="rest"
+    )
     assert accepted
     assert await redis_client.hget(key, "last") == b"101"
 
 
-async def test_write_ticker_omits_unknown_optional_fields(redis_client: Any) -> None:
-    ticker = builders.ticker("ETHUSDT", "3000", bid=None, ask=None, high_24h=None, low_24h=None)
-    await hot_state.write_ticker(redis_client, ticker)
+async def test_write_ticker_rest_omits_bid_ask(redis_client: Any) -> None:
+    """The REST 24h-ticker never carries bid/ask (KB-0044,
+    ``binance/normalize.py::parse_ticker_24h``) -- they must never appear."""
+    ticker = builders.ticker_rest("ETHUSDT", "3000")
+    await hot_state.write_ticker(redis_client, ticker, source="rest")
     raw = await redis_client.hgetall(keys.ticker(builders.EXCHANGE, "ETHUSDT"))
     fields = {k.decode() for k in raw}
     assert "bid" not in fields
     assert "ask" not in fields
+    assert "volume_24h" in fields
+
+
+async def test_write_ticker_ws_omits_volume_fields(redis_client: Any) -> None:
+    """The WS ``bookTicker`` never carries 24h volume (KB-0044,
+    ``binance/normalize.py::parse_book_ticker``) -- it must never appear."""
+    ticker = builders.ticker_ws("ETHUSDT", "3000")
+    await hot_state.write_ticker(redis_client, ticker, source="ws")
+    raw = await redis_client.hgetall(keys.ticker(builders.EXCHANGE, "ETHUSDT"))
+    fields = {k.decode() for k in raw}
+    assert "volume_24h" not in fields
+    assert "quote_volume_24h" not in fields
+    assert "bid" in fields
 
 
 async def test_write_book_msgpack_shape_and_ttl(redis_client: Any) -> None:
@@ -235,7 +254,7 @@ async def test_trade_memory_cold_start_reseeds_from_redis_no_duplicate(
 async def test_push_trade_trims_to_maxlen(
     redis_client: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(hot_state, "TRADES_MAXLEN", 5)
+    monkeypatch.setattr(hot_state_trades, "TRADES_MAXLEN", 5)
     key = keys.trades(builders.EXCHANGE, "ETHUSDT")
     memory = hot_state.TradeMemory()
     for i in range(10):
@@ -257,28 +276,141 @@ async def test_push_candle_wire_format(redis_client: Any) -> None:
     assert decoded["is_final"] is True
 
 
-async def test_write_ticker_drops_stale_optional_field_under_fresh_ts(
+async def test_write_ticker_rest_drops_stale_optional_field_under_fresh_ts(
     redis_client: Any,
 ) -> None:
-    """H4: a field the exchange stops sending must disappear, not sit stale
-    next to a fresh ``ts`` (fake-by-omission)."""
+    """H4: a REST-owned field the exchange stops sending must disappear, not
+    sit stale next to a fresh ``ts`` (fake-by-omission) -- scoped to the
+    fields the REST producer actually owns (KB-0044)."""
     from datetime import timedelta
 
     key = keys.ticker(builders.EXCHANGE, "BTCUSDT")
-    with_volume = builders.ticker("BTCUSDT", "100")
-    await hot_state.write_ticker(redis_client, with_volume)
+    with_volume = builders.ticker_rest("BTCUSDT", "100")
+    await hot_state.write_ticker(redis_client, with_volume, source="rest")
     assert await redis_client.hget(key, "volume_24h") == b"1000"
 
-    without_volume = builders.ticker(
+    without_volume = builders.ticker_rest(
         "BTCUSDT",
         "101",
         ts=with_volume.ts + timedelta(seconds=1),
         volume_24h=None,
     )
-    await hot_state.write_ticker(redis_client, without_volume)
+    await hot_state.write_ticker(redis_client, without_volume, source="rest")
     fields = {k.decode() for k in await redis_client.hgetall(key)}
     assert "volume_24h" not in fields
     assert await redis_client.hget(key, "last") == b"101"
+
+
+async def test_write_ticker_ws_drops_stale_optional_field_under_fresh_ts(
+    redis_client: Any,
+) -> None:
+    """H4, WS side: a WS-owned field (``bid_qty``) the stream stops sending
+    must disappear too, scoped to the fields the WS producer owns."""
+    from datetime import timedelta
+
+    key = keys.ticker(builders.EXCHANGE, "ETHUSDT")
+    with_qty = builders.ticker_ws("ETHUSDT", "3000")
+    await hot_state.write_ticker(redis_client, with_qty, source="ws")
+    assert await redis_client.hget(key, "bid_qty") == b"5"
+
+    without_qty = builders.ticker_ws(
+        "ETHUSDT",
+        "3001",
+        ts=with_qty.ts + timedelta(seconds=1),
+        bid_qty=None,
+    )
+    await hot_state.write_ticker(redis_client, without_qty, source="ws")
+    fields = {k.decode() for k in await redis_client.hgetall(key)}
+    assert "bid_qty" not in fields
+    assert await redis_client.hget(key, "last") == b"3001"
+
+
+async def test_shared_ownership_reproduces_the_kb_0044_bug(redis_client: Any) -> None:
+    """Documents the exact failure mode KB-0044 measured in production
+    (``market_snapshots.volume_24h``: 6 populated rows out of 55,709): if the
+    REST-ticker writer and the WS-ticker writer ever go back to sharing one
+    "owns every ticker field" set, an accepted write from either one wipes
+    the other's fields via the owned-field ``HDEL`` in ``hot_state._hash``.
+    This pins that failure down at the primitive level so nobody can
+    reintroduce a single shared ``owned`` tuple for the ticker hash without
+    this test failing."""
+    key = keys.ticker(builders.EXCHANGE, "BTCUSDT")
+    shared_owned = hot_state.TICKER_REST_FIELDS + hot_state.TICKER_WS_FIELDS
+
+    rest_only_fields = {"last": "100", "volume_24h": "1000", "ts": builders.utcnow().isoformat()}
+    await hot_state._hash(  # pyright: ignore[reportPrivateUsage]
+        redis_client, key, rest_only_fields, "ts", builders.utcnow(), 30, owned=shared_owned
+    )
+    assert await redis_client.hget(key, "volume_24h") == b"1000"
+
+    from datetime import timedelta
+
+    ws_only_fields = {
+        "last": "100.5",
+        "bid": "100.4",
+        "ask": "100.6",
+        "ts": (builders.utcnow() + timedelta(milliseconds=250)).isoformat(),
+    }
+    await hot_state._hash(  # pyright: ignore[reportPrivateUsage]
+        redis_client,
+        key,
+        ws_only_fields,
+        "ts",
+        builders.utcnow() + timedelta(milliseconds=250),
+        30,
+        owned=shared_owned,
+    )
+    # This is the bug: a shared owned-set treats "volume_24h" as missing from
+    # the WS write and HDELs it, even though the WS producer never carries it.
+    assert await redis_client.hget(key, "volume_24h") is None
+    assert await redis_client.hget(key, "bid") == b"100.4"
+
+
+async def test_rest_ticker_and_ws_ticker_coexist_in_same_hash(redis_client: Any) -> None:
+    """KB-0044: the REST 24h-ticker refresh (``universe.py``, no bid/ask) and
+    the WS ``bookTicker`` (``coalesce.py``, no volume) write the *same* ticker
+    hash. Before the fix, both declared ``owned=TICKER_FIELDS`` (every ticker
+    field), so each accepted write ``HDEL``'d the other producer's fields in
+    the same MULTI -- volume_24h and bid/ask could (almost) never coexist,
+    which is why ``market_snapshots.volume_24h`` had 6 populated rows out of
+    55,709 (KB-0044). Field ownership must be scoped per producer."""
+    from datetime import timedelta
+
+    key = keys.ticker(builders.EXCHANGE, "BTCUSDT")
+    rest = builders.ticker_rest("BTCUSDT", "100")
+    await hot_state.write_ticker(redis_client, rest, source="rest")
+
+    ws = builders.ticker_ws("BTCUSDT", "100.5", ts=rest.ts + timedelta(milliseconds=250))
+    await hot_state.write_ticker(redis_client, ws, source="ws")
+
+    fields = {k.decode(): v.decode() for k, v in (await redis_client.hgetall(key)).items()}
+    # The WS write must not have deleted the REST-owned fields ...
+    assert fields["volume_24h"] == "1000"
+    assert fields["quote_volume_24h"] == "1000000"
+    assert fields["high_24h"] == str(rest.high_24h)
+    assert fields["low_24h"] == str(rest.low_24h)
+    # ... and both must be present at once, not one clobbering the other.
+    assert fields["bid"] == str(ws.bid)
+    assert fields["ask"] == str(ws.ask)
+    assert fields["last"] == "100.5"
+
+
+async def test_rest_ticker_after_ws_ticker_does_not_delete_bid_ask(redis_client: Any) -> None:
+    """Same bug, opposite order: a REST refresh landing after a WS
+    ``bookTicker`` must not erase bid/ask."""
+    from datetime import timedelta
+
+    key = keys.ticker(builders.EXCHANGE, "ETHUSDT")
+    ws = builders.ticker_ws("ETHUSDT", "3000")
+    await hot_state.write_ticker(redis_client, ws, source="ws")
+
+    rest = builders.ticker_rest("ETHUSDT", "3001", ts=ws.ts + timedelta(milliseconds=250))
+    await hot_state.write_ticker(redis_client, rest, source="rest")
+
+    fields = {k.decode(): v.decode() for k, v in (await redis_client.hgetall(key)).items()}
+    assert fields["bid"] == str(ws.bid)
+    assert fields["ask"] == str(ws.ask)
+    assert fields["volume_24h"] == "1000"
 
 
 async def test_open_interest_write_does_not_delete_mark_price(redis_client: Any) -> None:

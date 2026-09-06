@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from collections import deque
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from redis.exceptions import NoScriptError, WatchError
 
@@ -13,7 +12,6 @@ from hunter_core.domain.market import (
     NormalizedOpenInterest,
     NormalizedOrderBook,
     NormalizedTicker,
-    NormalizedTrade,
     to_wire,
 )
 from hunter_core.redis import keys
@@ -30,27 +28,38 @@ from hunter_market_worker.hot_state_candles import (
 from hunter_market_worker.hot_state_candles import (
     push_candle as push_candle,
 )
+from hunter_market_worker.hot_state_trades import (
+    TRADE_DEDUPE_WINDOW as TRADE_DEDUPE_WINDOW,
+)
+from hunter_market_worker.hot_state_trades import (
+    TRADES_MAXLEN as TRADES_MAXLEN,
+)
+from hunter_market_worker.hot_state_trades import (
+    TradeMemory as TradeMemory,
+)
+from hunter_market_worker.hot_state_trades import (
+    push_trade as push_trade,
+)
 
 TICKER_TTL_S = 30
 BOOK_TTL_S = 10
 DERIV_TTL_S = 600
-TRADES_MAXLEN = 2000
-# A WS reconnect only ever replays a handful of recent trades, so a 50-item
-# window (newest-first) covers dedupe/ordering without reading the whole
-# 2000-item ring buffer on every single trade (H7).
-TRADE_DEDUPE_WINDOW = 50
 
 # Fields each writer owns in a shared hash. On an accepted write, owned
 # fields whose value is None are HDEL'd in the same MULTI as the HSET, so an
 # exchange that stops sending an optional field does not leave it stale next
 # to a fresh timestamp (H4). A writer must never touch a field it does not
 # own — the ticker and deriv hashes are shared by several writers.
-TICKER_FIELDS = (
+#
+# KB-0044: the ticker hash has two disjoint writers — the REST 24h-ticker
+# refresh (``universe.py``, no bid/ask) and the WS ``bookTicker`` stream
+# (``coalesce.py``, no 24h volume). Both used to share ``owned=TICKER_FIELDS``
+# (every field), so each accepted write HDEL'd the *other* producer's fields
+# as "missing, must be stale": a REST write erased bid/ask, the next
+# bookTicker erased volume_24h right back — 6/55,709 populated rows in prod.
+# Ownership must be scoped to what each producer actually sends.
+TICKER_REST_FIELDS = (
     "last",
-    "bid",
-    "ask",
-    "bid_qty",
-    "ask_qty",
     "volume_24h",
     "quote_volume_24h",
     "high_24h",
@@ -58,6 +67,18 @@ TICKER_FIELDS = (
     "change_24h_pct",
     "ts",
 )
+TICKER_WS_FIELDS = (
+    "last",
+    "bid",
+    "ask",
+    "bid_qty",
+    "ask_qty",
+    "ts",
+)
+_TICKER_OWNED_FIELDS: dict[str, tuple[str, ...]] = {
+    "rest": TICKER_REST_FIELDS,
+    "ws": TICKER_WS_FIELDS,
+}
 FUNDING_FIELDS = ("funding_rate", "funding_kind", "next_funding_time", "funding_ts")
 MARK_FIELDS = ("mark_price", "index_price", "mark_ts")
 OI_FIELDS = ("open_interest", "open_interest_value", "oi_ts")
@@ -163,12 +184,17 @@ async def _hash(
     return bool(result)
 
 
-def queue_ticker_hash(pipe: Any, sha: str, ticker: NormalizedTicker) -> None:
+def queue_ticker_hash(
+    pipe: Any, sha: str, ticker: NormalizedTicker, *, source: Literal["rest", "ws"]
+) -> None:
     """Queue the same atomic ticker HSET-if-newer onto ``pipe`` (B3's
     per-cycle batch) without awaiting a result â€” the caller has already
-    resolved ``sha`` via :func:`ensure_script_sha`."""
+    resolved ``sha`` via :func:`ensure_script_sha`. ``source`` picks the
+    producer-scoped owned-field set (KB-0044); the coalescer only ever
+    queues WS ``bookTicker`` tickers, so it always passes ``"ws"``."""
     fields = _ticker_fields(ticker)
-    argv = _hash_argv(fields, "ts", ticker.ts, TICKER_TTL_S, TICKER_FIELDS)
+    owned = _TICKER_OWNED_FIELDS[source]
+    argv = _hash_argv(fields, "ts", ticker.ts, TICKER_TTL_S, owned)
     pipe.evalsha(sha, 1, keys.ticker(ticker.exchange, ticker.symbol), *argv)
 
 
@@ -210,7 +236,14 @@ def _book_payload(book: NormalizedOrderBook, depth: int = 20) -> dict[str, Any]:
     }
 
 
-async def write_ticker(redis: Any, ticker: NormalizedTicker) -> bool:
+async def write_ticker(
+    redis: Any, ticker: NormalizedTicker, *, source: Literal["rest", "ws"]
+) -> bool:
+    """``source`` picks the producer-scoped owned-field set (KB-0044): the
+    universe refresh always passes ``"rest"`` (no bid/ask on that endpoint);
+    the coalescer batches WS tickers through :func:`queue_ticker_hash`
+    instead, but the parameter is still required so no caller can default
+    back into sharing one owned set across producers."""
     return await _hash(
         redis,
         keys.ticker(ticker.exchange, ticker.symbol),
@@ -218,7 +251,7 @@ async def write_ticker(redis: Any, ticker: NormalizedTicker) -> bool:
         "ts",
         ticker.ts,
         TICKER_TTL_S,
-        owned=TICKER_FIELDS,
+        owned=_TICKER_OWNED_FIELDS[source],
     )
 
 
@@ -238,71 +271,6 @@ async def write_book(redis: Any, book: NormalizedOrderBook, depth: int = 20) -> 
                 return True
             except WatchError:
                 continue
-
-
-class TradeMemory:
-    """Bounded per-(exchange, symbol) recent-trade-id window + newest ``ts``
-    (B4/H7): replaces a per-trade ``LRANGE`` + msgpack-unpack of up to
-    :data:`TRADE_DEDUPE_WINDOW` rows (2.48% of the worker's own CPU at 50
-    markets, t16b-profile.md) with an in-memory check. Seeded from Redis
-    once per symbol on first touch so a worker restart (blank memory) never
-    duplicates a trade already in the ring buffer. Bounded and dropped via
-    :meth:`forget` when a symbol leaves the universe (same bug class as F11
-    in ``ws.py`` — an unbounded per-symbol map growing forever)."""
-
-    def __init__(self, window: int = TRADE_DEDUPE_WINDOW) -> None:
-        self._window = window
-        self._ids: dict[tuple[str, str], deque[str]] = {}
-        self._newest_ts: dict[tuple[str, str], datetime] = {}
-        self._seeded: set[tuple[str, str]] = set()
-
-    def forget(self, exchange: str, symbol: str) -> None:
-        key = (exchange, symbol)
-        self._ids.pop(key, None)
-        self._newest_ts.pop(key, None)
-        self._seeded.discard(key)
-
-    async def _seed(self, redis: Any, exchange: str, symbol: str) -> None:
-        key = (exchange, symbol)
-        rows = await redis.lrange(keys.trades(exchange, symbol), 0, self._window - 1)
-        decoded: list[dict[str, Any]] = [msgpack.unpackb(row) for row in rows]
-        self._ids[key] = deque((row["trade_id"] for row in decoded), maxlen=self._window)
-        if decoded:
-            self._newest_ts[key] = datetime.fromisoformat(decoded[0]["ts"])
-        self._seeded.add(key)
-
-    async def accepts(self, redis: Any, trade: NormalizedTrade) -> bool:
-        key = (trade.exchange, trade.symbol)
-        if key not in self._seeded:
-            await self._seed(redis, trade.exchange, trade.symbol)
-        ids = self._ids.setdefault(key, deque(maxlen=self._window))
-        if trade.trade_id in ids:
-            return False
-        newest = self._newest_ts.get(key)
-        if newest is not None and trade.ts < newest:
-            return False
-        ids.appendleft(trade.trade_id)
-        if newest is None or trade.ts > newest:
-            self._newest_ts[key] = trade.ts
-        return True
-
-
-async def push_trade(redis: Any, trade: NormalizedTrade, memory: TradeMemory) -> bool:
-    if not await memory.accepts(redis, trade):
-        return False
-    key = keys.trades(trade.exchange, trade.symbol)
-    payload = {
-        "ts": trade.ts.isoformat(),
-        "price": str(trade.price),
-        "qty": str(trade.qty),
-        "side": trade.side.value,
-        "trade_id": trade.trade_id,
-    }
-    async with redis.pipeline(transaction=True) as pipe:
-        pipe.lpush(key, msgpack.packb(payload, use_bin_type=True))
-        pipe.ltrim(key, 0, TRADES_MAXLEN - 1)
-        await pipe.execute()
-    return True
 
 
 async def write_funding(redis: Any, funding: NormalizedFunding, *, realized: bool = False) -> bool:

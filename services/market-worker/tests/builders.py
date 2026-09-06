@@ -58,6 +58,42 @@ def ticker(symbol: str, last: str, **overrides: object) -> NormalizedTicker:
     return NormalizedTicker.model_validate(fields)
 
 
+def ticker_rest(symbol: str, last: str, **overrides: object) -> NormalizedTicker:
+    """A ticker shaped like Binance's ``GET /fapi/v1/ticker/24hr`` -- no
+    bid/ask, only that endpoint never carries them
+    (``binance/normalize.py::parse_ticker_24h``)."""
+    fields = {
+        "exchange": EXCHANGE,
+        "symbol": symbol,
+        "ts": utcnow(),
+        "last": Decimal(last),
+        "volume_24h": Decimal("1000"),
+        "quote_volume_24h": Decimal("1000000"),
+        "high_24h": Decimal(last) + Decimal("10"),
+        "low_24h": Decimal(last) - Decimal("10"),
+        "change_24h_pct": Decimal("1.5"),
+        **overrides,
+    }
+    return NormalizedTicker.model_validate(fields)
+
+
+def ticker_ws(symbol: str, last: str, **overrides: object) -> NormalizedTicker:
+    """A ticker shaped like Binance's ``bookTicker`` stream -- no 24h volume,
+    only bid/ask/quantities (``binance/normalize.py::parse_book_ticker``)."""
+    fields = {
+        "exchange": EXCHANGE,
+        "symbol": symbol,
+        "ts": utcnow(),
+        "last": Decimal(last),
+        "bid": Decimal(last) - Decimal("0.01"),
+        "ask": Decimal(last) + Decimal("0.01"),
+        "bid_qty": Decimal("5"),
+        "ask_qty": Decimal("3"),
+        **overrides,
+    }
+    return NormalizedTicker.model_validate(fields)
+
+
 def trade(
     symbol: str, price: str, qty: str, *, side: OrderSide = OrderSide.BUY, **overrides: object
 ) -> NormalizedTrade:

@@ -180,7 +180,9 @@ async def refresh_universe(
 
     for symbol in new_monitored:
         if symbol in tickers:
-            await write_ticker(redis, tickers[symbol])
+            # KB-0044: this is the REST 24h-ticker refresh (no bid/ask) --
+            # must own only its own fields, never the WS bookTicker's.
+            await write_ticker(redis, tickers[symbol], source="rest")
 
     if payload is not None:
         # After the commit on purpose: the line means "this is now true in
