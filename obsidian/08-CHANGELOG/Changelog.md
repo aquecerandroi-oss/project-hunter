@@ -9,6 +9,111 @@ Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado p
 
 ## 2026-09-06
 
+- **`766f8b6` — T2.9c: a recuperação histórica anuncia **um** evento por lote inserido, não um por
+  minuto.** Para o Everton: o histórico de 7 dias que o scanner pede deixa de sufocar a fila de
+  anúncios e de passar na frente das velas ao vivo. O consumidor de backfill (`3dcb218`) gerava um
+  `market.candles.closed` por minuto backfillado (~1 440 por ciclo), o que limitava o dreno a ~1 dia
+  de histórico por minuto de relógio. Agora o estrato `history` insere com `announce=False` e
+  enfileira **um** `market.candles.backfilled` (stream novo, `MAXLEN 5 000`) por lote, na mesma
+  transação das velas e da transição do gap; a identidade é `uuid5` sobre o intervalo **realmente
+  inserido** — dois lotes commitados nunca compartilham o mínimo, porque o `ON CONFLICT DO NOTHING`
+  nunca insere o mesmo minuto duas vezes. `reason = "historical_recovery"` (a janela envelheceu),
+  nunca `"backfill_request"`: must-fix da Astra, porque uma lacuna criada pela coleta ao vivo pode
+  envelhecer para o estrato histórico sem que ninguém tenha pedido nada. Prova no contêiner: um gap
+  de 240 min → 240 velas, **0** `market.candles.closed`, **1** anúncio agregado. Nenhum consumidor do
+  novo stream existe ainda — está registrado com os quatro requisitos que quem o escrever terá de
+  cumprir.
+- **`fe8872c` — T2.5e: a cobertura do tape volta a andar.** Para o Everton: as features de fluxo
+  (velocidade de negócios, pressão compradora/vendedora) tinham parado de existir porque o coletor
+  não conseguia mais **provar** o que havia observado. Desde `4bb2865` o carimbo exigia
+  `enfileirados == entregues + descartados` no instante exato — igualdade que, sob fluxo contínuo
+  (~150 msg/s), quase nunca é verdadeira, por uma folga de agendamento do asyncio que acontece a
+  cada mensagem. Resultado medido: `mkt:binance:coverage` congelado por > 2 h no local e **19
+  quebras em 45 min** na VPS, com **100 %** das avaliações do scanner lidas como `uncovered`. A
+  Astra derrubou dois desenhos com contraexemplos (o item já retirado da fila e ainda não entregue;
+  idade local que não prova nada sobre o timestamp do evento); a regra entregue compara o
+  **timestamp do próprio evento pendente** com o corte candidato, tudo em UTC, sem teto de
+  contagem — "magnitude nunca foi o sinal honesto". Os 13 testes de cobertura anteriores passam sem
+  uma linha alterada. Ver [[Open Bugs]]: na VPS o carimbo **voltou a congelar** depois do deploy e
+  isso está aberto.
+- **`48c6f0d` — T2.5d: consumo em lote, `hiredis` na imagem, e o fim da fila de 10 minutos.** Para o
+  Everton: o scanner deixou de estar dez minutos atrás do mercado. `hunter_core.events` ganhou
+  `consume_batches()` + `ack_many()`: a guarda por `event_id` vira **um** `SMISMEMBER` pipelined por
+  lote e a conclusão um `SADD` + `EXPIRE` + `XACK` — três idas ao Redis **por mensagem** viraram
+  duas **por lote**. Medido no contêiner: 400 → **22 694 msg/s**. `consume()` não mudou de
+  comportamento (a Astra recusou colapsar `event_id` repetido dentro do lote: se o handler falha, é a
+  segunda entrega que conclui o trabalho). `redis[hiredis]` declarado no core: leitura de hot state
+  de 23,8–32,9 ms → **3,3–4,3 ms** por mercado. Prova de 31 min com 200 mercados: lag de
+  `market.ticks` ~95 000 → **0**, CPU do scanner 97–145 % → **54,7 %**, **170 683** cortes de
+  bootstrap, 0 exceções. E o achado que só apareceu com a fila zerada: **o tick já nasce velho** —
+  mediana de 3,70 s entre o carimbo do coletor e o `XADD` (ver [[Open Bugs]], T2.5g em voo).
+- **`faabe3d` — contrato do Risk Engine na versão 2.1.** Para o Everton: o documento que rege o
+  motor de risco passou a dizer exatamente o que o código faz, sem mudar **nenhum** limite seu.
+  Entraram as invariantes provadas pela revisão adversarial da T3.2: `entry_ref` confrontado com o
+  preço observado (`max_entry_deviation_pct = 0,5 %`), idade máxima do volume aplicada
+  (`max_volume_age_s = 120 s`), caixa líquido das reservas pendentes, `resume()` recusado enquanto a
+  avaliação automática ainda bloqueia, `sizing_price` = pior entre referência e preço observado, e a
+  pendência de `AssumedCosts` aceitando `float` (fora de escopo, em [[Open Bugs]]).
+- **`5f86028` — T3.2b: os cinco buracos que a revisão adversarial provou, fechados com os números
+  dela virando teste.** Para o Everton: sem isto, o motor aprovaria entradas que a sua própria
+  diretiva proíbe. (1) Carteira em 19 500 contra abertura de 20 000 era aprovada em tamanho cheio,
+  porque a perda do dia vinha de campos opcionais com default 0 em vez do patrimônio; agora vem de
+  `1 − equity/equity_início_do_dia`, **sempre**, e a divergência contábil é publicada
+  (`daily_decomposition_gap`), **nunca** recusa — um descasamento de 6e-11 não pode impedir a
+  construção do estado que protege uma posição. (2) `entry_ref = 100` com o mercado a 110 era
+  aprovado, com perda real no stop de **1,18 %** do patrimônio contra teto de 0,25 %; agora
+  `signal_validity` exige a banda de ±0,5 % e stop abaixo do preço observado, e o sizing usa o
+  **pior** dos dois preços. (3) Volume de 45 minutos atrás sustentava a participação; agora vence e
+  recusa. (4) Caixa 500 com 400 reservados aprovava mais 499,5; agora `available_cash` é líquido das
+  reservas, cada uma carregando o **seu** `reserved_cash` (um candidato que declara custo zero não
+  encolhe a reserva alheia). (5) `resume()` recusa a retomada enquanto os gatilhos automáticos ainda
+  mordem. **204 testes** no núcleo.
+- **`bbb4d57` — T2.5f: partições mensais provisionadas dois meses para trás, com guarda de
+  retenção.** Para o Everton: o backfill de histórico deixa de bater em "não existe partição para
+  esta data" — era o que impedia velas antigas de serem gravadas. `--months-behind` (default 2,
+  porque um mês só não basta em março) e a tabela de retenção passou a ser lida **também** pelo
+  criador: sem essa guarda, `market_snapshots` (retenção de 30 dias) ganharia uma partição às 04:07 e
+  a perderia às 04:12 todo dia, sob `ACCESS EXCLUSIVE` no pai. Uma transação por pai, `lock_timeout`,
+  saída 75 quando pula. Local: 31 partições criadas, segunda execução 0/115. **Na VPS: as mesmas 31**
+  (medido hoje — 13 em `2026_07` e 18 em `2026_08`, 103 partições no total).
+- **`bf4924b` — T3.2: o núcleo puro do Risk Engine existe.** Para o Everton: a peça que decide se uma
+  proposta pode virar ordem saiu do papel — pura, sem IO, sem relógio, com `Decimal` em toda linha
+  (o modelo **recusa** `float` na construção). Onze módulos: `RiskLimits` com o preset `PAPER_V1`
+  congelado; `PortfolioState` com posições, reservas, exposição por ativo e por β-BTC, início do dia
+  em São Paulo validado contra o `as_of` e pico monotônico; kill switch com os três escopos,
+  ordenação por dicionário e `resume` casado; e o sizing como **mínimo de nove tetos** (risco por
+  operação com custos de ida e volta, 1 % de participação líquida do que já está reservado, caminhada
+  no livro até o slippage máximo, caixa, por ativo, total, β-BTC com `|β|`, risco agregado planejado,
+  slots contando pendentes), publicando o teto que amarrou e dois contrafactuais. Arredondamento
+  sempre **para baixo**. Nada disto executa nada: é o núcleo, e a T3.3–T3.14 é que o liga.
+- **`da2fb49` — T3.7: β contra o BTC, versionado e com validade.** Para o Everton: o teto de
+  correlação da sua diretiva (Σ|notional × β| ≤ 0,5 × patrimônio) precisa de um β que se possa
+  auditar; agora existe. MQO com intercepto sobre 480 fechamentos horários ininterruptos de 30 dias,
+  retornos simples (o consumidor é uma afirmação sobre dinheiro), R² **relatado e nunca portão**,
+  `valid_until` ancorado no fim da janela — não no `as_of`, senão um job atrasado manteria um β vivo
+  uma hora além da recomputação que deveria substituí-lo. Motivos de invalidade explícitos
+  (`insufficient_history`, `gaps`, `btc_missing`, `degenerate_variance`, este último depois de a
+  Astra reproduzir duas séries planas marcando β = 1, R² = 1, válido). BTC = 1 por definição. Sem
+  `numpy`, sem `float`. **Ainda não medimos quantos mercados passam na validade** — está declarado.
+- **`3dcb218` — o consumidor de `market.backfill.requested`: os pedidos de histórico do scanner
+  finalmente são atendidos.** Para o Everton: era o **bloqueio mais alto do M2** — o scanner pedia 7
+  dias de histórico para construir as baselines e ninguém escutava (97 mensagens no stream, nenhum
+  grupo de consumo). Agora cada shard lê, só o dono planeja, e o dreno acontece num segundo estrato
+  de prioridade **atrás** das lacunas ao vivo, com o orçamento que sobrar do ciclo. Idempotente por
+  `event_id` e por lacuna; teto de 7 dias em pedaços de 240 min; recusas com motivo; envelope
+  ilegível é posto de quarentena e **nunca** derruba o worker. Prova: 210 970 velas REST de mais de
+  dois dias em 218 mercados; mercados com ≥ 3 dias distintos de velas de ~0 → **213**; buckets de
+  baseline utilizáveis 1 065 → **3 220**.
+- **`9626bf4` — T2.5c: o scanner decodifica cada linha do hot state uma vez, e as primeiras linhas do
+  Radar apareceram.** Para o Everton: **as quatro primeiras oportunidades e as cinco primeiras linhas
+  de `radar:scores` do projeto** existiram nesta janela. O scanner reconstruía cada `MarketContext` a
+  partir de 1 500 linhas msgpack por tick (62,8 ms por mercado no contêiner). A janela persistente com
+  invalidação por evento foi **recusada na revisão** com três contraexemplos concretos (uma vela de WS
+  reescrevendo o miolo sem evento, o `INSERT DO NOTHING` do backfill que não produz segundo evento,
+  uma chave perdida e recriada); o que entrou é a alternativa da Astra — a lista inteira continua
+  sendo lida a cada tick e o objeto decodificado é cacheado **pela linha crua**, então remoção,
+  reescrita, evicção e truncamento ficam corretos por construção. Medido: decode 62,8 → **1,7 ms**,
+  custo por mercado 66,6 → **13,4 ms**, p99 da passada completa 15,1 → **3,23 s**.
 - **`2c6bb2d` — R1: replay de oito políticas de saída sobre as entradas congeladas do Lab
   ([[EXP-0004-politicas-de-saida]]).** Pesquisa (`purpose = research_only`), **sem escrever nada**: a
   transação é `REPEATABLE READ, READ ONLY` e quem impede a escrita é o Postgres, não a revisão de
@@ -56,6 +161,78 @@ Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado p
   substituída pela decisão do Everton, inaplicável ou pendente com a pergunta. **Nada foi
   implementado nesta entrega, e o M3 não declara modo autônomo:** as entradas são manuais, porque a
   ponte sinal → proposta não existe e sinal `research_only` continua recusado.
+- **`7cf9e18` — S2-context: o contexto da estratégia passou a receber funding e open interest, e o
+  sinal carimba o regime.** Para o Everton: as estratégias decidiam olhando **menos** do que o
+  sistema já sabia — `funding` e `open_interest` chegavam `None` em **toda** avaliação, o que
+  bloqueava a candidata de "funding extremo" do backlog, e `agent_signals.regime_id` nunca era
+  gravado, então não dava para perguntar "como esta estratégia se sai em tendência?". Módulo novo
+  `derivatives.py`: funding vem do durável (`funding_time <= corte`) e cai para o hot state só quando
+  o durável não tem a linha ou o preço de marcação. **Open interest só é aceito do hot state** — a
+  Astra construiu o contraexemplo que matou qualquer folga finita: `open_interest_history.ts` é o
+  bucket arredondado do **início** de uma rodada de poll sequencial, então uma leitura feita às
+  12:05:02 é gravada como 12:00 e nenhuma folga prova "lido antes do corte". Proveniência (fonte,
+  `ts`, motivo) gravada nos dois casos. Ver [[Open Bugs]].
+- **`d878fd6` — S2-funding: a liquidação é identificada por proximidade temporal, nunca por
+  igualdade exata de timestamp.** Para o Everton: 69 dos 73 acompanhamentos que diziam "funding não
+  apurável" tinham a linha real a menos de **2 segundos** do instante pedido — a maioria a **5
+  milissegundos**. A grade real da Binance não é redonda (851 de 1 883 linhas com segundos ≠ 0) e o
+  código casava por igualdade exata. A correção ingênua de dar tolerância era **proibida** (cobraria a
+  mesma liquidação duas vezes) — e o código antigo já dobrava a cobrança quando havia duas linhas
+  reais próximas. Agora todo o histórico lido é clusterizado por proximidade pura (2 s): um cluster
+  cujos membros **discordam** sobre estar dentro da janela vira incerteza declarada, nunca escolha do
+  lado conveniente; um cluster unânime precisa concordar em taxa e preço de marcação e conta como
+  **uma** cobrança. Três desenhos foram derrubados pela Astra antes deste, e o motivo de cada
+  rejeição está no docstring. Script `recompute_funding.py` (auditado, `--apply`, preserva o valor
+  anterior em `meta.funding.previous`) — rodado **na VPS**: 97 outcomes recomputados.
+- **`bd1d4d8` — T2.5b: bootstrap de baselines a partir das velas persistidas, refresh horário e
+  prontidão que diz "bootstrapando".** Para o Everton: sem baseline, nenhum detector de anomalia
+  pontua nada — o scanner ficava com 200 de 200 mercados sem score. O bootstrap faz **uma** passada
+  de features por minuto (custo proporcional a minutos, não a features), em fatias cooperativas de
+  50 ms a 40 % do relógio, retomável depois de restart e só quando **duas** fontes concordam (o
+  arquivo e o registro no Redis) — a Astra recusou usar só `max(window_end)`, porque ele não
+  distingue "escreveu tudo o que existe" de "escreveu e morreu". Uma correção dela evitou que a
+  tarefa nascesse inútil: o refresh horário **apagaria** o bootstrap, porque ordena por recência e
+  não sabe o que é maturidade. Prova: 28 mercados bootstrapados em 30 min, 9 909 revisões, 1 065
+  buckets utilizáveis, e o scorer produzindo score elegível pela primeira vez.
+- **`4bb2865` — T2.5-adapter: geração de conexão e marca de progresso fecham os dois buracos da
+  prova de cobertura.** Para o Everton: sem isto o sistema poderia chamar de "contínuo" um intervalo
+  que tinha um buraco dentro. A revisão da Astra mostrou que (a) o runner reconecta um socket caído
+  sem terminar o gerador, então uma lacuna real cabia dentro de um intervalo declarado contínuo, e
+  (b) um evento já retirado da fila e ainda não entregue é invisível para quem lê o tamanho da fila.
+  O adaptador passou a expor `connection_generation()` e `queue_progress()`; a sessão de cobertura
+  **quebra** com reconexão e recomeça em vez de esticar. É o commit que introduziu a exigência de
+  fila exatamente vazia — corrigida em `fe8872c`.
+- **`99685ff` — o `scanner-worker` recebe as credenciais de produção no override da VPS.** Para o
+  Everton: o scanner subiu em laço de crash na VPS depois do deploy de `fa9f957`, tentando o banco
+  com a senha de desenvolvimento. Mesmo erro de família do `strategy-worker` em `75fc59c`: override
+  não herda o que não menciona.
+- **`fa9f957` — o hash do ticker passa a ter dono por produtor; o volume REST não é mais apagado pelo
+  `bookTicker` (KB-0044).** Para o Everton: `volume_24h`, `quote_volume_24h` e a variação de 24 h
+  sumiam da tela e da base — sobreviviam em **6** de 55 709 linhas. Dois produtores complementares
+  (o refresh REST, que traz volume e não traz cotação; o stream `bookTicker`, que traz cotação e não
+  traz volume) escreviam o mesmo hash declarando propriedade sobre o conjunto **inteiro** de campos,
+  e a regra do Lua apaga todo campo de propriedade ausente na escrita atual — cada um apagava o do
+  outro. Agora a escrita declara a origem (`rest` ou `ws`) e cada origem é dona só dos seus campos.
+  Corrigido também na VPS. Ver [[Resolved Bugs]].
+- **`2544e82` — T2.2b: índice de minutos e barras de 15 min memoizados por contexto, byte a byte
+  idênticos.** Para o Everton: é o que divide por ~6 o custo do bootstrap **e** da latência do
+  scanner; a prova exigida foi que o resultado não muda em um único bit.
+- **`d12464b` — migração `0005`: `hunter_worker` ganha o lock de linha em `feature_baselines`.** Para
+  o Everton: o protocolo de retenção do banco era inexecutável entre a `0003` e esta — o `FOR SHARE`
+  do scanner falhava com "permission denied" e o worker degradava para uma checagem de existência,
+  sem se serializar contra um `DELETE` de retenção concorrente. A imutabilidade continua **inteira**
+  na trigger (que recusa todo `UPDATE`, para todo papel, inclusive o dono); o `GRANT` entrega apenas
+  o cadeado que a trigger não sabe expressar. O `downgrade` revoga **um** privilégio, nunca
+  `REVOKE ALL`.
+- **Rodadas 5 a 8 de aquisição de conhecimento — KB-0036 a KB-0075** (`562a0fa`, `b9605a8`,
+  `7cc3956`, `2d4a296`, `65989bb`, `8616b83`, `47cc42a`, `30c1225`, `412e401`, `ac9c220`, `f6f9e05`,
+  `5325d1b`, `548fddc`, `8f42b4d` e as correções da Astra em `ed105d5`, `31d7a23`, `1a29c93`,
+  `6a915f3`, `a466e6a`): execução (tipos de ordem, lei da raiz quadrada, spread medido, custo por
+  coorte), livros de estratégia (Turtles, três barreiras, contração de volatilidade, eficiência de
+  Kaufman), meme coins (o rótulo como grau de liberdade, o piso de ATR que bane o BTC, a cauda de
+  queda) e as **vinte e uma regras propostas para o Risk Engine** que alimentaram a diretiva do M3.
+  Cada nota revisada pela Astra; em duas rodadas ela derrubou afirmações minhas que estavam erradas.
+  **Nada ativa sozinho** — as candidatas ficam no [[Strategy Backlog]].
 - **`72cebc5` · `0fa8bee` · `995ddb8` — rotina de aquisição de conhecimento** (`obsidian/11-KNOWLEDGE`): índice, modelo de nota e `Strategy Backlog`; notas escritas com as próprias palavras, com fonte, qualidade da evidência e uma hipótese testável no Lab; cada uma revisada pela Astra; **nada ativa sozinho**. Primeiras notas: KB-0001..0003 sobre momentum e rompimento de canal.
 - **`88bac0b` — `default_sni` para clientes que chegam pelo IP puro.** Navegador não manda SNI para um endereço IP, então o Caddy respondia o handshake TLS com `internal error` e o Chrome mostrava `ERR_SSL_PROTOCOL_ERROR`. `compose.sh` passou a derivar o `default_sni` de `HUNTER_SITE_ADDRESS`. Com isso o Everton **abriu e viu** o `/ever/lab` em `https://169.58.116.99`.
 - **`7e00f3b` — HTTPS no IP puro, com a CA interna do Caddy.** Os cookies de sessão do Clerk são `Secure`; em HTTP puro o navegador não os guardava e o sign-in entrava em laço infinito. A VPS passou a servir HTTPS com certificado interno — o aviso do navegador é esperado e está documentado em [[Deployment]].

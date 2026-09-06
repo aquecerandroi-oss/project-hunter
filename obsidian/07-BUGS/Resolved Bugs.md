@@ -7,6 +7,39 @@ updated: 2026-09-06
 
 Correções reais extraídas do `git log`. A maioria veio de rodadas de revisão de segurança/qualidade, não de bugs reportados em produção — não houve produção ainda.
 
+## Coleta de mercado — ondas T2.5 (2026-09-06, noite)
+
+- **HIGH (qualidade de dado) — o volume de 24 h era apagado do hot state pelo `bookTicker`**
+  (`fa9f957`, KB-0044). Dois produtores complementares escreviam o mesmo hash `mkt:*:ticker`
+  declarando propriedade sobre o conjunto **inteiro** de campos do ticker: o refresh REST traz
+  `volume_24h`/`quote_volume_24h` e nunca `bid`/`ask`; o stream `bookTicker` traz `bid`/`ask` e nunca
+  volume. Como a regra do Lua apaga (`HDEL`, no mesmo `MULTI` do `HSET`) todo campo de propriedade
+  ausente na escrita atual — o que existe para não deixar valor velho ao lado de carimbo fresco —,
+  cada escrita apagava os campos do outro produtor. Evidência em produção: `volume_24h` preenchido em
+  **6 de 55 709** linhas de `market_snapshots`, que herdam o hash pelo `HGETALL`. Corrigido exigindo
+  `source="rest"|"ws"` na escrita, o que seleciona `TICKER_REST_FIELDS` ou `TICKER_WS_FIELDS` como
+  conjunto próprio; o TTL continua sendo renovado por qualquer escrita aceita. `TradeMemory` mudou de
+  módulo (`hot_state_trades.py`) só para o arquivo caber no orçamento de 350 linhas. No ar na VPS
+  desde o deploy da noite de 2026-09-06 (o deploy anterior derrubou o `scanner-worker` por outro
+  motivo — ver `99685ff`).
+- **HIGH (instrumento de pesquisa) — a cobertura do tape congelava porque exigia a fila exatamente
+  vazia** (aberto por `4bb2865`, fechado por `fe8872c`, T2.5e). `CoverageTracker.stamp` exigia
+  `enfileirados == entregues + descartados` **no instante do carimbo**. Sob fluxo contínuo (~150
+  msg/s em 200 mercados) essa igualdade quase nunca é verdadeira, e não por lentidão do consumidor:
+  entre `BoundedEventQueue.get()` retirar o item da deque e `StreamConsumer.consume()` retomar depois
+  do `await` para contá-lo como entregue existe uma folga de agendamento do asyncio que acontece
+  **a cada mensagem**. Medido: `mkt:binance:coverage` congelado por mais de 2 h no local (desde
+  21:24:10Z) e **19 quebras em 45 min** na VPS, com **100 %** das avaliações do scanner lidas como
+  `uncovered` — ou seja, as três features de tape se recusavam e nenhum EARLY era publicado.
+  Reproduzido por teste **antes** de mudar a regra. A Astra recusou dois desenhos com contraexemplos
+  (o item já retirado da deque e ainda não entregue é tão pendente quanto os outros; idade local de
+  enfileiramento não prova nada sobre o `ts` do próprio evento) e também o teto de contagem
+  (`MAX_QUEUE_BACKLOG`): "600 itens depois do corte podem ser seguros; um único item antes do corte
+  pode invalidar". A regra entregue compara o **timestamp do evento pendente mais antigo** (mínimo
+  sobre a fila **mais** o item em voo) com o corte candidato, tudo em UTC. Os 13 testes de cobertura
+  anteriores passam intocados. **Ressalva honesta:** verificado no stack local; **na VPS o carimbo
+  voltou a congelar depois do deploy** e isso está aberto em [[Open Bugs]] como HIGH.
+
 ## Shadow Lab e VPS — S4 (2026-09-06)
 
 Os dois HIGH que a subida do Lab na VPS abriu (ver [[Open Bugs]] e `.claude/state/vps-lab-proof.md`)

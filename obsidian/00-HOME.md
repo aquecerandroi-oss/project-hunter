@@ -11,7 +11,16 @@ Esta pasta (`obsidian/`) é a base de conhecimento **do projeto**, viva e versio
 
 ## Onde estamos agora
 
-**Fim do Milestone 0** (fundação): monorepo, auth real (Clerk), organizações/workspaces/membros/convites, dashboard shell, página de sistema, settings, schema completo do banco (54 tabelas), migrações com RLS, Docker, CI. **Nada de mercado, agentes, risco ou execução está implementado ainda** — essas peças existem só como schema e interface, aguardando M1–M5. Ver `docs/audit/CURRENT_STATE.md` (em elaboração) para o levantamento linha a linha do que existe hoje.
+**Atualizado em 2026-09-06 (noite).** M0 (fundação: monorepo, auth Clerk, organizações/workspaces,
+dashboard, schema de 54 tabelas com RLS, Docker, CI) e **M1 fechados**. Hoje, **rodando 24 h por dia
+na VPS**: o `market-worker` coletando 200 mercados da Binance, o `scanner-worker` (M2) construindo
+baselines e avaliando features/anomalias/regime, e o `strategy-worker` com o **Shadow Lab** —
+estratégias que registram "eu entraria aqui" e medem o que teria acontecido, **sem carteira, sem
+ordem, sem um centavo**. Em andamento: **M2** (radar e oportunidades; a coleta ainda satura um core
+com 200 mercados — [[Open Bugs]]) e **M3** (carteira virtual e Risk Engine: o núcleo puro do motor de
+risco já existe e está testado, mas **nada o chama ainda**). Nada de execução real existe, e nenhum
+`ENABLE_*` de autonomia está ligado. Ver `docs/audit/CURRENT_STATE.md` para o levantamento linha a
+linha e o [[Changelog]] para o dia a dia.
 
 ## O pipeline (visão completa; hoje só a fundação existe)
 
@@ -51,7 +60,8 @@ Detalhe completo em [[Data Flow]] e `docs/PIPELINE.md`.
 | Anomaly Engine | planejado | [[Anomalies]] | M2 |
 | Paper Trading / Execution Engine | planejado | [[Paper Trading]], [[Execution Engine]] | M3 |
 | Portfolio (carteira permanente em USDT com âncora em BRL) | planejado | [[Portfolio]] | M3 |
-| Risk Engine (contrato v2, perfil `paper_v1`) | planejado | [[Risk Engine]] | **M3** (era M4; ADR 0005) |
+| Risk Engine (contrato v2.1, perfil `paper_v1`) | **núcleo puro implementado** (`packages/risk-core`, 204 testes, `bf4924b` → `5f86028`); nada integrado | [[Risk Engine]] | **M3** (era M4; ADR 0005) |
+| β contra o BTC (`beta_v1`, com validade) | implementado como pacote puro (`da2fb49`), sem tabela | [[Risk Engine]] | M3 |
 | Estratégias / Agentes + ponte sinal → proposta | planejado | [[Strategies]], [[Agents Overview]] | M4 |
 | Analytics / Performance | planejado | [[Performance Overview]] | M5 |
 
@@ -63,7 +73,7 @@ Detalhe completo em [[Data Flow]] e `docs/PIPELINE.md`.
 - **02-MARKET/** — coleta de mercado, adapters de exchange, WebSockets, features, anomalias (tudo planejado M1–M2).
 - **03-TRADING/** — paper trading, risk engine, execução, portfolio, estratégias (tudo planejado M3–M4).
 - **04-AGENTS/** — visão geral de agentes e as quatro estratégias do MVP (planejado M4).
-- **05-EXPERIMENTS/** — índice de experimentos (`EXP-NNNN`), template e os experimentos do Shadow Lab em andamento desde 2026-09-06: [[EXP-0001-momentum-v1]] e [[EXP-0002-volume-anomaly-v1]], com avaliações datadas e o SQL que produziu cada número.
+- **05-EXPERIMENTS/** — índice de experimentos ([[Experiments Index]], `EXP-NNNN`), template e os experimentos do Shadow Lab em andamento desde 2026-09-06: [[EXP-0001-momentum-v1]], [[EXP-0002-volume-anomaly-v1]] e [[EXP-0004-politicas-de-saida]] (replay de oito políticas de saída sobre as entradas já congeladas, `2c6bb2d` — pesquisa que não escreve nada), todos com avaliações **datadas e acrescentadas** e o SQL que produziu cada número.
 - **06-DECISIONS/** — índice legível das ADRs.
 - **07-BUGS/** — bugs abertos e resolvidos, com hash de commit.
 - **08-CHANGELOG/** — uma entrada por commit, agrupado por dia.

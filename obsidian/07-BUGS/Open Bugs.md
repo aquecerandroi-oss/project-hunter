@@ -7,9 +7,71 @@ updated: 2026-09-06
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
+## Abertos no plantão da noite de 2026-09-06 (integração das ondas T2.5 / T2.9c / T3.2 / T3.7)
+
+- **HIGH (operacional, VPS — medido agora) — `mkt:binance:coverage` voltou a congelar depois do
+  deploy de `fe8872c`, e o Lab está perdendo barras.** O commit `fe8872c` (T2.5e) foi entregue
+  exatamente para descongelar a cobertura do tape e foi verificado no stack local (`t25e-proof.md`:
+  o carimbo passou a avançar a cada ~250 ms). **Na VPS o sintoma reapareceu:** imagem confirmada em
+  `fe8872c` (build `2026-09-06T23:34:58Z`, `oldest_pending_ts` presente no código do contêiner em
+  execução), duas quebras `tape_coverage_interval_broken reason=reconnect backlog=0` às 23:35:17Z e
+  23:35:19Z e **nenhum log de retomada depois disso**; `covered_until` lido quatro vezes entre
+  23:40:55Z e 23:44:46Z devolveu sempre `2026-09-06T23:35:18.496199+00:00` — o mesmo valor de
+  `session_since` e dos 200 campos `sym:*`, ou seja **um único carimbo, no início da sessão, e nada
+  mais em 9 minutos**. No mesmo intervalo o heartbeat do scanner declara `coverage=unproven` e o do
+  Lab foi de `{"unavailable":844}` (23:40:47Z) a `{"unavailable":2367}` (23:44:46Z) com
+  `not_triggered` parado em 319. **Consequência:** enquanto o carimbo não anda, as features de tape
+  (`trade_velocity_1m`, `buy_pressure_5m`, `sell_pressure_5m`) se recusam sozinhas e nenhum EARLY é
+  publicado — é o mesmo prejuízo que a T2.5e fechou no local. **Não diagnosticado:** não sei ainda se
+  é a mesma causa (a igualdade exata morreu no código), uma sessão que não se reabre depois da
+  reconexão dupla do boot, ou o produtor saturado (ver o item seguinte). **Próximo passo:** medir
+  `queue_oldest_pending_ts` e o motivo de quebra no contêiner da VPS antes de mudar qualquer linha.
+- **HIGH (capacidade, T2.5g em voo) — o coletor de um processo satura com 200 mercados: o tick nasce
+  com 3,7 s.** Medido na prova da T2.5d, com a fila de `market.ticks` já em zero: entre o carimbo que
+  o coletor põe no payload e o `XADD` da mensagem há **mediana de 3,70 s e máximo de 34 s** nas 200
+  entradas mais novas; no fim daquela janela a entrada mais nova tinha **130–147 s** de idade porque
+  o `market-worker`, a 99,7 % de **um** core, parou de publicar por mais de dois minutos. O orçamento
+  de 3 s da decisão conjunta é contado **a partir desse carimbo**, então ele já está estourado antes
+  de a mensagem existir no stream: **nenhum trabalho dentro do scanner pode fechar o p99 enquanto
+  isto não cair.** Medições de hoje na VPS na mesma direção: `dropped_events` 969 619 → 1 101 345 em
+  ~1 min e `open_gaps` 4 105 → 4 195 em ~4 min. Dono: **T2.5g** (latência de publicação e 200
+  mercados em 4 shards com heartbeat agregado), brief já escrito em `7830c89`.
+- **MEDIUM (contrato de tipos, `packages/core`) — `AssumedCosts` aceita `float`.**
+  `packages/core/hunter_core/strategies/envelope.py:45` converte via `str`, então um `float` entra
+  sem erro. Cenário: o envelope de custos é parte do **`code_ref`** de uma versão de estratégia — um
+  custo que entra como `0.0004` binário em vez de `Decimal("0.0004")` pode mudar o digest congelado e,
+  com ele, a identidade da versão, além de contaminar dinheiro com aritmética binária (a regra dura do
+  projeto é `Decimal` em todo valor monetário). Achado pela revisão adversarial da T3.2 (item 10) e
+  registrado pelo `risk-engine-guardian` como fora do escopo dele. **Dono: `packages/core`.**
+- **MEDIUM (pesquisa/instrumento) — `funding_rates` não guarda instante de ingestão
+  (`received_at`).** Sem ele, "esta linha chegou depois daquela avaliação" é **indemonstrável**. Foi
+  exatamente o que aconteceu no R1 (`2c6bb2d`): 14 das 339 linhas comparáveis divergiram **só na
+  liquidação**, e a explicação — chegada tardia da linha de funding das 20:00 — ficou registrada como
+  **compatível, não comprovada**. Enquanto a coluna não existir, toda auditoria de reprodutibilidade
+  que envolva funding termina em "não sei dizer". Dono: `database-architect` (migração aditiva) +
+  quem escreve `funding_rates`.
+- **MEDIUM (proveniência) — `open_interest_history.ts` é o bucket da rodada de poll, não o instante
+  real da leitura.** `persist_rows.py` calcula **um** bucket de 5 min para a rodada inteira e depois
+  faz REST sequencial por símbolo, então um mercado lido tarde na rodada é gravado com um `ts`
+  anterior à leitura. A Astra construiu o contraexemplo que mata qualquer folga finita: rodada
+  começa 12:04:59 (bucket 12:00), leitura às 12:05:02, gravada com `ts=12:00` — uma avaliação no
+  corte 12:05:00, **três segundos antes da leitura real**, passaria por uma folga de 5 minutos.
+  Consequência aceita na S2-context (`7cf9e18`): o OI durável **nunca** é usado como prova de
+  `<= corte`, só o hot state (cujo `oi_ts` é o instante real), e uma linha durável sozinha vira
+  sempre `timestamp_unprovable`. Ou seja: hoje o Lab decide **sem** open interest sempre que o hot
+  state não tiver o valor. Correção de verdade = uma coluna com o instante da leitura em
+  `open_interest_history`. Dono: `market-worker` + `database-architect`.
+- **[NÃO REPRODUZIDO — preciso da evidência original] — "`test_universe` com eleição de líder
+  instável".** Registrado aqui porque me foi relatado, mas **não consegui reproduzir**:
+  `uv run pytest services/market-worker/tests/test_universe.py -q` rodou **4 vezes** nesta máquina
+  (uma com `-p no:randomly`, três com a ordenação aleatória padrão) e deu **9 passed** em todas
+  (31–36 s por execução). Sem cenário de falha, esta entrada não é um bug — é um pedido de
+  evidência: quem viu a falha precisa colar a saída (semente do `pytest-randomly` inclusive) para
+  que ela vire um bug com dono. Mantida na lista só para não se perder.
+
 ## Abertos pela quinta rodada de conhecimento (2026-09-06) — achado da Sexta-feira, confirmado pela Astra
 
-- **[CORRIGIDO NA ÁRVORE, AGUARDANDO COMMIT] HIGH (qualidade de dado) — conflito de propriedade de campos entre o ticker REST e o `bookTicker`: `volume_24h` e `bid`/`ask` quase nunca coexistiam no mesmo hash quente.** Achado em [[KB-0044-o-que-morre-em-dez-segundos]] (rodada 5 de conhecimento), com o mecanismo confirmado por leitura de código depois do apontamento da Astra. O refresh de universo busca o ticker de 24h da Binance (`universe.py:107` → `GET /fapi/v1/ticker/24hr`, `binance/rest.py:270`), cujo parser nunca preenche `bid`/`ask` (`binance/normalize.py:212`, docstring explícito), e escreve no hash `mkt:{exchange}:{symbol}:ticker` (`universe.py:181`). O stream `bookTicker` produz `bid`/`ask`/quantidades e nunca volume (`binance/streams.py:168`) e o coalescer escreve **no mesmo hash** (`coalesce.py:158`). Antes da correção os dois escritores declaravam `owned=TICKER_FIELDS` — o conjunto **inteiro** de campos do ticker — e a regra do Lua de `hot_state.py` apaga com `HDEL`, no mesmo `MULTI` do `HSET`, todo campo de propriedade que vier ausente (H4, para não deixar valor velho ao lado de timestamp fresco). Com dois produtores complementares isso faz cada escrita apagar os campos do outro: um refresh REST aceito grava `volume_24h` e apaga `bid`/`ask`; o próximo `bookTicker` aceito grava `bid`/`ask` e apaga `volume_24h` de volta. **Evidência em produção:** de 55.709 linhas em `market_snapshots`, só **6** têm `volume_24h`/`quote_volume_24h` preenchidos — o `HGETALL` que alimenta o snapshot (`sampling.py::write_snapshots`) herda o hash como estiver no instante da leitura, então herdou a perda sem precisar de mudança própria. Refina a entrada LOW mais antiga desta mesma lista ("`volume_24h`... vêm `null` na API") — a causa **não é só o TTL de 30 s**, é a disputa de escritores; aumentar o TTL não resolveria nada.
+- **[RESOLVIDA em 2026-09-06 por `fa9f957`, no ar na VPS desde o deploy da noite — ver [[Resolved Bugs]]] HIGH (qualidade de dado) — conflito de propriedade de campos entre o ticker REST e o `bookTicker`: `volume_24h` e `bid`/`ask` quase nunca coexistiam no mesmo hash quente.** Achado em [[KB-0044-o-que-morre-em-dez-segundos]] (rodada 5 de conhecimento), com o mecanismo confirmado por leitura de código depois do apontamento da Astra. O refresh de universo busca o ticker de 24h da Binance (`universe.py:107` → `GET /fapi/v1/ticker/24hr`, `binance/rest.py:270`), cujo parser nunca preenche `bid`/`ask` (`binance/normalize.py:212`, docstring explícito), e escreve no hash `mkt:{exchange}:{symbol}:ticker` (`universe.py:181`). O stream `bookTicker` produz `bid`/`ask`/quantidades e nunca volume (`binance/streams.py:168`) e o coalescer escreve **no mesmo hash** (`coalesce.py:158`). Antes da correção os dois escritores declaravam `owned=TICKER_FIELDS` — o conjunto **inteiro** de campos do ticker — e a regra do Lua de `hot_state.py` apaga com `HDEL`, no mesmo `MULTI` do `HSET`, todo campo de propriedade que vier ausente (H4, para não deixar valor velho ao lado de timestamp fresco). Com dois produtores complementares isso faz cada escrita apagar os campos do outro: um refresh REST aceito grava `volume_24h` e apaga `bid`/`ask`; o próximo `bookTicker` aceito grava `bid`/`ask` e apaga `volume_24h` de volta. **Evidência em produção:** de 55.709 linhas em `market_snapshots`, só **6** têm `volume_24h`/`quote_volume_24h` preenchidos — o `HGETALL` que alimenta o snapshot (`sampling.py::write_snapshots`) herda o hash como estiver no instante da leitura, então herdou a perda sem precisar de mudança própria. Refina a entrada LOW mais antiga desta mesma lista ("`volume_24h`... vêm `null` na API") — a causa **não é só o TTL de 30 s**, é a disputa de escritores; aumentar o TTL não resolveria nada.
 
   **Correção aplicada:** propriedade de campo por produtor em vez de um conjunto único. `hot_state.py` agora tem `TICKER_REST_FIELDS` (o que o ticker de 24h realmente manda: `last`, `volume_24h`, `quote_volume_24h`, `high_24h`, `low_24h`, `change_24h_pct`, `ts`) e `TICKER_WS_FIELDS` (o que o `bookTicker` realmente manda: `last`, `bid`, `ask`, `bid_qty`, `ask_qty`, `ts`), e `write_ticker`/`queue_ticker_hash` exigem um `source: Literal["rest", "ws"]` explícito que escolhe qual conjunto é usado para decidir o que fica "ausente, deve ser apagado" — nunca mais o outro produtor. `universe.py` chama com `source="rest"`; o coalescer (`coalesce.py`), com `source="ws"`. Nenhuma mudança em `sampling.py`: como os dois conjuntos de campos agora convivem no mesmo hash, o snapshot volta a ver `volume_24h` **e** `bid`/`ask`/`spread_pct` juntos sem precisar de alteração própria — confirmado por teste (`test_snapshot_carries_both_rest_volume_and_ws_spread_together`, `services/market-worker/tests/test_persist.py`). Testes de reprodução e regressão em `services/market-worker/tests/test_hot_state.py`: `test_shared_ownership_reproduces_the_kb_0044_bug` fixa o mecanismo exato (um `owned` compartilhado ainda apaga `volume_24h` na próxima escrita `bookTicker`) para que ninguém reintroduza um conjunto único por engano; `test_rest_ticker_and_ws_ticker_coexist_in_same_hash` e `test_rest_ticker_after_ws_ticker_does_not_delete_bid_ask` provam a convivência nos dois sentidos de chegada; os testes H4 (`test_write_ticker_rest_drops_stale_optional_field_under_fresh_ts`, `test_write_ticker_ws_drops_stale_optional_field_under_fresh_ts`) confirmam que a propriedade por produtor não perdeu a proteção original contra campo obsoleto — cada um só apaga o que é seu. `TradeMemory`/`push_trade` foram extraídos para `hot_state_trades.py` (mesmo padrão de `hot_state_candles.py`) para o `hot_state.py` caber no orçamento de 350 linhas depois da correção.
 
@@ -259,7 +321,7 @@ Todos medidos, não suspeitados. Prova em `.claude/state/t16-proof.md`.
 - **MEDIUM — nada age quando o worker fica vivo-e-parado.** `restart: unless-stopped` só cobre morte de processo, e o Docker Compose puro **não** reinicia por healthcheck. O healthcheck detectou o zumbi corretamente durante 19 minutos e ninguém escutou. **Dono: T1.7/ops** — `autoheal` no Compose, ou um watchdog interno que mate o processo depois de N minutos de `/ready` reprovado.
 - **LOW — `/api/v1/system/workers` mostra dois "workers" para um processo só.** O heartbeat genérico do runtime (chaveado por hostname) e o heartbeat de mercado (chaveado por exchange) aparecem como duas linhas de `role=market`. Não é dado falso, mas induz o operador a contar errado.
 - **LOW — `dropped_events` está no Redis mas não na API.** O campo entrou no hash `hb:market:{exchange}` e em métrica; `scan_heartbeats` continua com uma allowlist de campos, então não quebra, mas o número não chega a `WorkerHeartbeatOut` nem à tela. Falta uma mudança aditiva em `apps/api/hunter_api/services/system_status.py` e no schema.
-- **LOW — `volume_24h`, `quote_volume_24h` e `price_change_24h_pct` vêm `null` na API.** O refresh de universo grava `quote_volume_24h` no hash do ticker, mas o hash tem TTL de 30 s e é reescrito pela ingestão sem esses campos, então some entre refreshes (15 min). **Causa raiz mais precisa achada em 2026-09-06:** não é (só) o TTL — é a disputa de propriedade de campos entre o refresh REST e o `bookTicker` no mesmo hash, corrigida na árvore. Ver a entrada HIGH no topo desta lista e [[KB-0044-o-que-morre-em-dez-segundos]].
+- **LOW — `volume_24h`, `quote_volume_24h` e `price_change_24h_pct` vêm `null` na API.** O refresh de universo grava `quote_volume_24h` no hash do ticker, mas o hash tem TTL de 30 s e é reescrito pela ingestão sem esses campos, então some entre refreshes (15 min). **Causa raiz mais precisa achada em 2026-09-06:** não é (só) o TTL — é a disputa de propriedade de campos entre o refresh REST e o `bookTicker` no mesmo hash. **RESOLVIDA em `fa9f957`** (propriedade por produtor), no ar na VPS desde o deploy da noite de 2026-09-06. Ver a entrada no topo desta lista, [[Resolved Bugs]] e [[KB-0044-o-que-morre-em-dez-segundos]].
 
 ## Rastreados desde o fechamento do M0
 
