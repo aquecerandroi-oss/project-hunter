@@ -25,7 +25,7 @@ from hunter_core.domain.types import ensure_utc, utcnow
 from hunter_core.logging import get_logger
 from hunter_strategy_worker import slots
 from hunter_strategy_worker.gaps import censor_reason, covering_gap
-from hunter_strategy_worker.metrics import shadow_outcomes_total
+from hunter_strategy_worker.metrics import shadow_funding_unresolved_total, shadow_outcomes_total
 from hunter_strategy_worker.plan import LateReason
 from hunter_strategy_worker.repo import MarketRow, load_candles
 from hunter_strategy_worker.settle import settle
@@ -108,6 +108,16 @@ async def _finish(
         )
         exit_price, r_multiple = settlement.exit_price, settlement.r_multiple
         meta = merged_meta(meta, **settlement.meta)
+        reason = settlement.meta.get("r_net_reason")
+        if reason is not None:
+            family = reason.split(":", 1)[0]
+            shadow_funding_unresolved_total.labels(reason=family).inc()
+            logger.info(
+                "shadow_funding_unresolved",
+                signal_id=str(tracking.signal_id),
+                market_id=str(tracking.market_id),
+                reason=reason,
+            )
     ended_at = progress.exit_ts or utcnow()
     excursions = progress.excursions(plan)
     meta = merged_meta(meta, progress=progress.to_jsonable(), excursions=excursions)

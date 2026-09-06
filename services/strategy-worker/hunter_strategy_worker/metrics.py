@@ -15,6 +15,7 @@ from hunter_core.observability import registry
 
 __all__ = [
     "shadow_evaluations_total",
+    "shadow_funding_unresolved_total",
     "shadow_outbox_dispatched_total",
     "shadow_outbox_pending",
     "shadow_outcomes_total",
@@ -42,6 +43,14 @@ shadow_outcomes_total = Counter(
     "hunter_shadow_outcomes_total",
     "Shadow trackings that reached a final tracking state, by state and result.",
     ["tracking_state", "result"],
+    registry=registry,
+)
+shadow_funding_unresolved_total = Counter(
+    "hunter_shadow_funding_unresolved_total",
+    "Terminal outcomes whose R_net stayed null because funding could not be "
+    "established, by reason family (the part before ':', so a per-instant "
+    "funding_missing reason does not explode cardinality).",
+    ["reason"],
     registry=registry,
 )
 shadow_trackings_open = Gauge(

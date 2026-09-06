@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from sqlalchemy import select, text
@@ -23,7 +23,7 @@ from hunter_strategy_worker.catalogue import load_active_versions
 from hunter_strategy_worker.config import ShadowConfig
 from hunter_strategy_worker.consumer import sweep_outcomes
 from hunter_strategy_worker.decide import evaluate_slot
-from hunter_strategy_worker.metrics import shadow_trackings_unswept
+from hunter_strategy_worker.metrics import shadow_funding_unresolved_total, shadow_trackings_unswept
 from hunter_strategy_worker.repo import load_market
 from hunter_strategy_worker.tracking_repo import count_open_trackings, load_open_trackings
 
@@ -130,6 +130,12 @@ async def _episode(tracked: dict[str, Any]) -> Any:
         return (await session.execute(select(ShadowEpisode))).scalar_one()
 
 
+def _unresolved_total(reason: str) -> float:
+    metric = shadow_funding_unresolved_total.labels(reason=reason)
+    value = cast("float", metric._value.get())  # pyright: ignore[reportPrivateUsage]
+    return value
+
+
 class TestEntryAndStop:
     async def test_the_entry_is_taken_at_the_open_of_the_chosen_bar(
         self, tracked: dict[str, Any]
@@ -161,6 +167,7 @@ class TestEntryAndStop:
     ) -> None:
         """No funding history at all: the cadence is unknown, so the net R is
         null with a reason and the funding-free R is kept separately."""
+        before = _unresolved_total("funding_schedule_unknown")
         await _add(tracked, AFTER_CUT)
         await sweep_outcomes(tracked["factory"], CONFIG, now=CUT + timedelta(minutes=5, seconds=5))
         outcome = await _outcome(tracked)
@@ -168,6 +175,8 @@ class TestEntryAndStop:
         assert outcome.meta["r_net_reason"] == "funding_schedule_unknown"
         assert Decimal(outcome.meta["r_ex_funding"]) < Decimal("-1")
         assert outcome.meta["funding"]["per_unit"] is None
+        after = _unresolved_total("funding_schedule_unknown")
+        assert after == before + 1
 
     async def test_funding_with_a_known_cadence_and_no_crossing_is_zero_and_priced(
         self, tracked: dict[str, Any]

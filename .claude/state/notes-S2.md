@@ -414,3 +414,94 @@ quais linhas fica com o orquestrador; esta tarefa só corrigiu o cálculo, não 
 `services/strategy-worker/tests/test_code_ref.py`, `.gitattributes` (raiz — `*.py text eol=lf`,
 `*.sh text eol=lf`, `*.ps1 text eol=crlf`, para que clones futuros já venham em LF; a árvore
 existente **não** foi renormalizada agora, isso é commit separado do orquestrador), esta nota.
+
+## 23. Funding: identidade por proximidade temporal, não por igualdade exata de timestamp (S2-funding)
+
+Achado da Sexta-feira/Astra (H2, `EXP-0001-momentum-v1.md`): dos 73 outcomes com `R_net = null`
+por funding "não apurável", **69** tinham uma linha real em `funding_rates` a menos de 2 s do
+instante que o código pedia — a maioria a 5 ms —, porque `resolve_funding` casava por **igualdade
+exata de timestamp** contra uma grade nominal calculada, e a grade real da Binance não é redonda
+(851 de 1883 linhas de `funding_rates` têm segundos ≠ 0). A correção ingênua de dar tolerância
+`±2s` ao casamento é **proibida**: o código antigo fazia a **união** da grade calculada com o
+observado, então uma tolerância aplicada a essa união cobraria a mesma liquidação duas vezes.
+
+**Desenho, com três rodadas de revisão da Astra matando dois desenhos antes deste** (a razão de
+cada rejeição está no docstring de `funding.py`, não repetida aqui):
+
+1. *Rejeitado:* grade de slots ancorada no epoch Unix (`floor(epoch_s / interval_s)`). Morreu com
+   dois contraexemplos concretos: `_cadence()` truncava o gap pro segundo (`int()` em vez de
+   `round()`), então um par jitterizado lia 28799 s em vez de 28800 e a âncora do epoch caía longe
+   da grade real; e um mercado que passa a liquidar de hora em hora por um tempo depois do seu 8h
+   normal (mecanismo real da Binance) põe **dois pagamentos reais e devidos** no mesmo bucket de
+   8h, e "o mais antigo vence" descartava o segundo silenciosamente.
+2. *Rejeitado:* casamento por proximidade só contra a grade nominal, com sobras tratadas como
+   eventos soltos. Morreu com três achados: a guarda de ambiguidade comparava o instante **nominal**
+   contra a abertura da barra, não o instante **real** da linha (uma liquidação 5 ms depois da
+   abertura passava como não-ambígua); duas linhas próximas do mesmo nominal com taxas
+   **conflitantes** eram resolvidas escolhendo a mais próxima, quando discordância é evidência de
+   que não é o mesmo evento; e duas linhas duplicadas fora da grade (sem nominal por perto) nunca
+   eram deduplicadas, porque o casamento só olhava pro nominal.
+3. *Rejeitado:* clusterização restrita às linhas já dentro de `(entry_ts, exit_ts]`, usando o
+   primeiro membro do cluster como instante de referência para toda fronteira. Morreu com dois
+   cenários de "cluster a cavalo de uma fronteira": duas representações do mesmo evento, uma no
+   instante exato de `ambiguous_from` (não-ambígua sozinha) e outra 5 ms depois (ambígua sozinha) —
+   escolher a primeira escondia a incerteza da segunda; e duas representações, uma exatamente na
+   entrada (corretamente nunca cobrada) e outra 5 ms depois (dentro da janela) — filtrar pra janela
+   *antes* de clusterizar escondia a irmã que provava serem o mesmo evento nunca-cobrado.
+
+**O desenho final** (`services/strategy-worker/hunter_strategy_worker/funding.py`):
+clusteriza **todo** o histórico lido (não só o que já está na janela) por proximidade temporal pura
+(`MATCH_TOLERANCE = 2s`, exportada — bem menor que a metade do menor espaçamento real entre
+liquidações distintas, que é medido em horas). Por cluster: se os membros **discordam** sobre estar
+dentro de `(entry_ts, exit_ts]`, ou sobre estar antes/depois de `ambiguous_from`, o resultado é
+`funding_boundary_uncertain`/`funding_ambiguous_exit` — incidência incerta, nunca resolvida
+escolhendo o lado conveniente. Só um cluster **unânime** dentro da janela segue adiante: precisa
+concordar em `rate` e `mark_price` (senão `funding_conflicting_rows`); um cluster de mais de uma
+linha que concorda é **uma** cobrança (`duplicate_settlement_row` em `meta.funding.notes`), nunca
+duas. Só depois disso o cluster é casado (contabilidade, nunca reutilizável) com o nominal mais
+próximo, unicamente para dizer quais nominais ficam genuinamente `funding_missing` — a grade
+identifica lacunas, nunca fabrica ou funde uma cobrança. **Achado colateral:** o código antigo
+também *dobrava* a cobrança quando duas linhas reais e muito próximas existiam para o mesmo
+settlement (reproduzido: `per_unit` saía 0.04 em vez de 0.02) — um bug latente distinto do H2, que
+este desenho também fecha por construção.
+
+**A janela de leitura em si precisou alargar.** `settle.py`/`recompute_funding.py` liam
+`funding_rates` até `exit_ts` inclusive; uma linha real 5 ms **depois** de `exit_ts` (a outra
+metade de um cluster cuja irmã está dentro da janela) nunca chegava a `resolve_funding`, que
+então via só a metade "dentro" do cluster e a cobrava como se fosse um evento resolvido e solto —
+exatamente o bug que o item 3 do desenho corrige, mas só se o dado chegar. As duas leituras agora
+pedem até `exit_ts + MATCH_TOLERANCE`; `resolve_funding` continua sendo o único lugar que decide o
+que está de fato "dentro" — o alargamento é só para não cegar o clusterizador.
+
+**Métrica/log:** `hunter_shadow_funding_unresolved_total{reason}` (Counter, família do motivo sem
+o sufixo do timestamp — `funding_missing:<instante>` vira `funding_missing`, senão a cardinalidade
+explode) e log estruturado `shadow_funding_unresolved` (`signal_id`, `market_id`, `reason`
+completo), em `outcomes.py::_finish`.
+
+**Recompute (`infra/scripts/recompute_funding.py`, novo).** Lista outcomes **terminais** com
+`r_multiple IS NULL` e `meta.funding.reason` não nulo, recomputa com o código atual contra os
+valores **armazenados** (nunca re-anda as barras), e só com `--apply` grava — preservando
+`meta.r_ex_funding` intocado e `meta.funding.reason = null` (nunca sobrescrito pela auditoria,
+para não poluir uma futura contagem de "funding indisponível" com um outcome já corrigido);
+`meta.funding.previous` guarda o objeto `funding` anterior por inteiro, `recomputed_at` e
+`recompute_reason` registram quando e por quê. Idempotente por construção (a mesma `WHERE
+r_multiple IS NULL` do `SELECT` está no `UPDATE`); `--apply` só conta uma linha como escrita se
+`rowcount > 0` (uma segunda execução concorrente não infla a contagem).
+
+**Prova.** 25 testes novos (`test_funding.py` un­it, `test_settle.py` e `test_recompute_funding.py`
+de integração contra Postgres real via testcontainers — este último carrega o script por caminho,
+como `infra/scripts/tests/test_create_partitions.py` já faz, porque o script não é pacote
+instalado). Cada um dos cenários de bug foi confirmado falhando contra o código anterior antes da
+correção (evidência no relatório da tarefa, não repetida aqui). `uv run pytest
+services/strategy-worker` (unit + integração, por arquivo), `ruff check .`, `ruff format --check
+services`, `pyright services/strategy-worker` e `check_file_size.py` verdes. Dry-run real contra o
+Postgres do stack local (`docker compose ... exec strategy-worker`, com o código copiado pro
+container e restaurado ao original depois — a imagem publicada não mudou): **0 de 237** outcomes
+terminais locais estão afetados hoje, porque nenhum atravessa uma liquidação neste snapshot
+(`meta.funding.reason` já é `null` nos 237); o censo de 73 casos do H2 é da coorte da **VPS**,
+população diferente. A sintaxe do `UPDATE` foi validada contra o schema real numa transação
+`BEGIN; ...; ROLLBACK;` antes disso.
+
+**Arquivos tocados:** `services/strategy-worker/hunter_strategy_worker/{funding,settle,outcomes,metrics}.py`,
+`services/strategy-worker/tests/{test_funding,test_settle,test_recompute_funding,test_shadow_outcomes}.py`
+(novo: `test_settle.py`, `test_recompute_funding.py`), `infra/scripts/recompute_funding.py` (novo), esta nota.

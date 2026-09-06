@@ -20,7 +20,7 @@ from datetime import timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from hunter_strategy_worker.funding import resolve_funding
+from hunter_strategy_worker.funding import MATCH_TOLERANCE, resolve_funding
 from hunter_strategy_worker.pricing import exit_price, r_net
 from hunter_strategy_worker.repo import load_funding
 
@@ -61,7 +61,13 @@ async def settle(
         session,
         market_id=market_id,
         since=progress.entry_ts - _CADENCE_LOOKBACK,
-        until=exit_ts,
+        # A real row a few ms *after* exit_ts can be the other half of a
+        # cluster whose sibling is inside the window — resolve_funding needs
+        # to see it to tell "boundary uncertain" from "resolved" (Astra,
+        # S2-funding review, round 4 must-fix 1). It is never charged on its
+        # own: resolve_funding's own (entry_ts, exit_ts] filter still excludes
+        # a cluster with no member inside the window.
+        until=exit_ts + MATCH_TOLERANCE,
     )
     # An intrabar exit is only known to be somewhere inside its bar; the close
     # is a conservative *barrier*, not the financial instant. A settlement in
