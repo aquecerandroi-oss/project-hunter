@@ -143,6 +143,56 @@ que atravessamento inferido é atravessamento real.
 coorte e do código de 2026-09-06. Nenhuma pode ser confirmada nessa mesma população; a confirmação
 exige janela futura reservada, declarada **antes** da coleta.
 
+## Acréscimo de 2026-09-06 (quarta rodada de conhecimento — regime de mercado e volatilidade)
+
+Linhas **acrescentadas**, nunca editadas. **Tentativas avaliadas continuam em 0.** Diferença desta
+rodada em relação à terceira: **houve SQL**, na instância local (o Docker local subiu; a VPS
+continua recusada pelo portão de permissão). Nenhuma candidata foi rodada.
+
+| ID | Candidata | Nota de origem | Parâmetros | `δ` | Início/fim UTC | Status |
+|---|---|---|---|---|---|---|
+| T-017 | carimbo de regime no envelope do sinal (`regime_id`, par `{trend, volatility}`, `confidence`, `classifier_version`, idade em segundos, `volatility_ratio`, `breadth.fraction`) | [[KB-0030-o-regime-nao-chega-ao-sinal]] | nenhum parâmetro de decisão; **observação sem decisão** | — | — | proposta — pré-requisito de toda estratificação por regime |
+| T-018 | referência de volatilidade **por hora UTC** em vez da mediana agrupada | [[KB-0032-o-relogio-dentro-do-limiar-de-volatilidade]] | 24 medianas; exigiria 480 amostras **por hora** (20× a história atual) | seria `regime_v1` | — | proposta, **bloqueada por amostra**; a alternativa barata é gravar a hora UTC e corrigir na análise |
+| T-019 | publicar a fração de avanços **incondicional** ao lado da conjunta na amplitude | [[KB-0033-amplitude-de-mercado-a-nossa-e-condicionada-a-volume]] | nenhum; só medição adicional em `supporting_features` | — | — | proposta |
+| T-020 | tendência **por mercado** gravada junto do sinal (chamar `classify_market_trend`, que já existe e não tem chamada) | [[KB-0034-btc-como-fator-e-o-regime-global-que-e-so-o-btc]] | os mesmos limiares do `regime_v0` | — | — | proposta |
+| T-021 | escalar exposição pelo inverso da volatilidade (Barroso & Santa-Clara) | [[KB-0035-momentum-crashes-e-o-piso-que-virou-filtro-de-regime]] | alvo de volatilidade a definir | — | — | **proposta e adiada para o M4 no mesmo dia**: o Lab de sombra não dimensiona posição, e `PnL de carteira` é *não aplicável* — abrir braço de sombra para isso gastaria dia de coleta numa pergunta que o instrumento não responde |
+
+**T-021 fica registrada mesmo tendo sido adiada no mesmo dia**, pela regra que preservou a T-011 e a
+T-016: foi barrada por **limite do instrumento**, não por resultado, e está aqui com o motivo.
+
+**Diagnósticos registrados** (não são variantes; **contam como inspeção da amostra**):
+
+| ID | Diagnóstico | Nota | Status |
+|---|---|---|---|
+| D-017 | persistência do estimador horário: autocorrelação de |retorno| nos atrasos 1–48 h, com **poder declarado**, e a mesma conta no retorno com sinal | [[KB-0027-aglomeracao-de-volatilidade-o-que-ela-licencia]] | proposto, bloqueado por amostra (47 horas) |
+| D-018 | discordância de rótulo `LOW`/`NORMAL`/`HIGH` entre o nosso estimador, Parkinson e Garman-Klass sobre as mesmas horas | [[KB-0028-o-nosso-estimador-de-volatilidade-e-o-mais-ineficiente]] | proposto — mede **sensibilidade**, não precisão |
+| D-019 | duração e número de transições do par `{trend, volatility}`, e idas-e-voltas em 15 min | [[KB-0029-hamilton-e-o-que-um-limiar-com-histerese-nao-e]] | proposto, bloqueado pelo warm-up |
+| D-020 | curva do warm-up: `samples` e `distinct_days` por dia, e horas **rejeitadas** por motivo (< 60 min · sem âncora · não contígua · preço zero) | [[KB-0031-o-classificador-de-regime-esta-mudo-por-warm-up]] | proposto — é o mais barato e o mais urgente |
+| D-021 | mediana do estimador **por hora UTC** e taxa de troca de faixa contra a mediana agrupada | [[KB-0032-o-relogio-dentro-do-limiar-de-volatilidade]] | proposto, exige ≥ 20 dias para separar hora de dia |
+| D-022 | distribuição conjunta das três frações de amplitude (incondicional · com volume · conjunta) e o seu ciclo diário | [[KB-0033-amplitude-de-mercado-a-nossa-e-condicionada-a-volume]] | proposto |
+| D-023 | R² e beta de cada mercado contra o BTCUSDT em 5 min e em 1 h, distribuição transversal | [[KB-0034-btc-como-fator-e-o-regime-global-que-e-so-o-btc]] | proposto |
+| D-024 | ciclo de trabalho do piso: fração admitida por `[atr_pct_min, atr_pct_max]` por hora UTC, **medida no ATR que a `momentum_v1` de fato consome** (`rolling_window_v1`), nunca no `atr_14_pct` do M2 | [[KB-0035-momentum-crashes-e-o-piso-que-virou-filtro-de-regime]] | proposto — pré-requisito de qualquer mudança no piso |
+
+**Não é tentativa nem diagnóstico — é estado do instrumento**, e por isso não consome
+multiplicidade: o classificador em warm-up (47/480 amostras, 3/20 dias), o `regime_id` nunca escrito
+nos sinais, e a amplitude nunca utilizável na instância observável. Vão para [[Open Bugs]] ou para a
+página do módulo, conforme o caso.
+
+**Inferências retiradas nesta rodada, registradas para não voltarem:**
+
+1. **"A razão de volatilidade percorreu 0,505 a 2,245"** como se fosse leitura do sistema — não é: o
+   classificador não calculou razão nenhuma no período, e o número é meu, contra a mediana de 47
+   horas ([[KB-0032-o-relogio-dentro-do-limiar-de-volatilidade]]).
+2. **"O motivo `gap` prova que falta a vela de 240 minutos atrás"** — falso: qualquer minuto ausente
+   na janela produz o mesmo motivo ([[KB-0033-amplitude-de-mercado-a-nossa-e-condicionada-a-volume]]).
+3. **A primeira versão da H-KB0035a**, que mediria o piso da `momentum_v1` com o ATR do M2 — dois
+   instrumentos diferentes com o mesmo apelido.
+4. **A razão de variâncias da KB-0027 escrita na escala da soma** em vez da média.
+
+**Consequência de multiplicidade, repetida:** T-017 a T-021 e D-017 a D-024 nasceram da inspeção do
+código e do dado de 2026-09-06. Nenhuma pode ser confirmada nessa mesma população; a confirmação
+exige janela futura reservada, declarada **antes** da coleta.
+
 ## Relacionados
 
 [[Strategy Backlog]] · [[Index]] ·

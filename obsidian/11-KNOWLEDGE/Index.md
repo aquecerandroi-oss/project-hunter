@@ -17,8 +17,8 @@ Cada nota é uma síntese própria (nunca cópia), com fonte, data, qualidade da
 | Volume e fluxo de ordens | KB-0009, KB-0011, KB-0012, KB-0013, KB-0014, KB-0015, KB-0016, KB-0018 | segunda rodada feita (2026-09-06) |
 | Perpétuos: funding, OI, posicionamento | KB-0008, KB-0017, KB-0019, KB-0020, KB-0021, KB-0022, KB-0023, KB-0024, KB-0025, KB-0026 | **terceira rodada feita (2026-09-06)** |
 | Análise técnica clássica (o que tem evidência e o que não tem) | KB-0003 | iniciado |
-| Regime de mercado e volatilidade | KB-0007, KB-0016 | iniciado |
-| Gestão de risco e sizing | KB-0005 | iniciado |
+| Regime de mercado e volatilidade | KB-0007, KB-0016, KB-0027, KB-0028, KB-0029, KB-0030, KB-0031, KB-0032, KB-0033, KB-0034, KB-0035 | **quarta rodada feita (2026-09-06)** |
+| Gestão de risco e sizing | KB-0005, KB-0035 | iniciado |
 | Estatística de backtest (overfitting, look-ahead, custos) | KB-0010 | iniciado |
 
 ## Notas
@@ -52,6 +52,15 @@ _(uma linha por nota: link para a nota — fonte curta — qualidade da evidênc
 | [[KB-0024-open-interest-como-posicionamento-evidencia-e-folclore]] | open interest | Hong & Yogo (JFE 2012); Bessembinder & Seguin (JFQA 1993) | estudo revisado **lido em resumo** / **anedótico** para os quadrantes | sim — quadrantes contra controle por volume agressor; OI em nível como profundidade |
 | [[KB-0025-o-nosso-detector-de-open-interest-so-olha-para-cima]] | open interest / cascatas | arXiv 2608.03616; arXiv 2607.27070; nosso `detectors.py` | preprints com método declarado | sim — **sem promessa preditiva**; observabilidade do desmonte |
 | [[KB-0026-funding-num-horizonte-de-4h-e-o-vies-de-exclusao]] | funding / método | nosso `funding.py` + contagens da H2 do EXP-0001 | leitura de código + inventário (não é taxa) | sim — separar atravessamento confirmado, inferido e indeterminado |
+| [[KB-0027-aglomeracao-de-volatilidade-o-que-ela-licencia]] | volatilidade / persistência | Engle (1982) e Bollerslev (1986) via V-Lab; Cont (2001); Andersen & Bollerslev (1998) | estudo revisado **lido em resumo/documentação** | sim — persistência do nosso estimador horário, com **poder declarado** |
+| [[KB-0028-o-nosso-estimador-de-volatilidade-e-o-mais-ineficiente]] | volatilidade / estimador | Parkinson (1980), Garman & Klass (1980), Rogers & Satchell (1991) — em resumo técnico | estudo revisado (fórmulas em resumo) + código próprio | sim — discordância de rótulo entre estimadores (**sensibilidade**, não precisão) |
+| [[KB-0029-hamilton-e-o-que-um-limiar-com-histerese-nao-e]] | regime / método | Hamilton (1989) — conceito; o texto primário **não abriu** | conceito em fonte secundária + código próprio | sim — duração e transições do par `{trend, volatility}` |
+| [[KB-0030-o-regime-nao-chega-ao-sinal]] | regime / proveniência | nosso código + **SQL rodado** | replicado (197 sinais, 0 com `regime_id`) | sim — carimbo de regime no envelope, sem mudar decisão |
+| [[KB-0031-o-classificador-de-regime-esta-mudo-por-warm-up]] | regime / operação | nosso `model.py`/`series.py` + **SQL rodado** | replicado (47/480 amostras, 3/20 dias) | sim — curva do warm-up e horas rejeitadas por motivo |
+| [[KB-0032-o-relogio-dentro-do-limiar-de-volatilidade]] | volatilidade / sazonalidade | literatura intradiária de BTC (só resumo) + **SQL rodado** | dado próprio **inconclusivo** (2 dias, hora confundida com dia) | sim — mediana por hora UTC e taxa de troca de faixa |
+| [[KB-0033-amplitude-de-mercado-a-nossa-e-condicionada-a-volume]] | amplitude / regime | literatura **disputada** + `breadth.py` + **SQL rodado** | disputada / replicado (0 de 48 instantes com cobertura) | sim — publicar a fração incondicional ao lado da conjunta |
+| [[KB-0034-btc-como-fator-e-o-regime-global-que-e-so-o-btc]] | fator de mercado | Liu, Tsyvinski & Wu (JF 2022) — **só o resumo** | estudo revisado lido em resumo + código próprio | sim — R² e beta contra o BTC; discordância como informação |
+| [[KB-0035-momentum-crashes-e-o-piso-que-virou-filtro-de-regime]] | momentum / risco / custo | Daniel & Moskowitz (2016) em resumo; Barroso & Santa-Clara (2015) **em fonte secundária** | estudo revisado, números de segunda mão | sim — ciclo de trabalho do piso, **no ATR que a estratégia consome** |
 
 ## O que a primeira rodada mudou de fato
 
@@ -122,7 +131,64 @@ de caso, não dos sete eventos; "a literatura rejeitou a previsão" era falso) e
 inferências minhas inteiras (a taxa de atravessamento de ~13% e a duração média de 1 h derivada
 dela).
 
-## Fontes que não abriram nesta rodada
+## O que a quarta rodada mudou de fato
+
+Tema: regime de mercado e volatilidade — o que decide se as candidatas das três rodadas anteriores
+valem em todo lugar ou só num regime. **A resposta é que hoje a pergunta não pode ser feita**, e
+esta é a primeira rodada em que houve SQL executado (instância local; a VPS continua recusada pelo
+portão de permissão).
+
+1. **O regime não chega ao sinal.** `agent_signals.regime_id` existe, está indexada, e o
+   `strategy-worker` nunca a escreve — a palavra `regime` não aparece no worker. Medido: **197
+   sinais, 0 com `regime_id`**. Toda estratificação por regime é retrospectivamente inexecutável, do
+   mesmo jeito que o ranking de liquidez da segunda rodada.
+2. **E não haveria o que carimbar.** O `regime_v0` está mudo **por construção**: exige 480 amostras
+   horárias em 20 dias distintos, e o banco tem **47 horas em 3 dias**. `market_regimes` tem uma
+   única linha, `global`/`UNKNOWN`. Faltam ~18 dias de coleta ininterrupta, e cada gap de um minuto
+   na fronteira mata a hora inteira.
+3. **O rótulo `global` é, literalmente, o BTCUSDT.** `RegimeScope.BTC` existe no enum e **nunca é
+   usado**; `classify_market_trend` está exportada e **não tem chamada em produção**; e
+   `btc_correlation_1h`, `market_beta_1h`, `relative_strength_vs_btc_1h` estão em `docs/PIPELINE.md`
+   e **não existem** no código.
+4. **A nossa amplitude não é uma linha de avanços** — é a conjunção `return_4h > 0` **E**
+   `relative_volume_1h > 1,5`. Isso cria uma assimetria real em `_confidence`: num mercado calmo a
+   fração tende a zero, então `BULL` é rebaixado a 0,6 e `BEAR` promovido a 1. A amplitude não está
+   discordando do touro; está medindo que não há volume. Medido: **0 de 48 instantes** com cobertura
+   de 80%; 100% das leituras de `return_4h` indisponíveis.
+5. **Há um relógio dentro do limiar de volatilidade.** A referência é a mediana de 30 dias que
+   **mistura todas as horas UTC**, enquanto a janela corrente é de uma hora específica. Medido no
+   BTCUSDT: 1,08 bps na hora mais calma contra 3,17 bps na mais agitada. **Inconclusivo por
+   construção** — dois dias, e hora confundida com dia —, mas o formato bate com a literatura.
+6. **O piso de custo pode ser um filtro de regime.** `atr_pct_min = 0,003` é um piso **absoluto**
+   sobre uma quantidade cuja distribuição respira; e a resposta da literatura à alta volatilidade é
+   **escalar** exposição, não **filtrar** entrada — distinção que o nosso desenho apaga.
+7. **`confidence` pode ser nula**, durante transição pendente, e **"três leituras" não são "três
+   minutos"**: o contador é de leituras, não de tempo.
+
+Saldo de método: **a Astra derrubou quatro afirmações minhas** — a razão de variâncias escrita na
+escala da soma, o diagnóstico de que `gap` prova a ausência da vela de 240 minutos, a hipótese que
+mediria o piso da `momentum_v1` com o ATR do M2, e a apresentação da razão 0,505–2,245 como se fosse
+leitura do sistema (com 47 amostras o classificador não calcula razão nenhuma). Também exigiu que as
+consultas morassem nas páginas, o que faltava em três notas.
+
+## Fontes que não abriram nesta rodada (quarta)
+
+| Fonte | O que aconteceu | Como contornei |
+|---|---|---|
+| `www-stat.wharton.upenn.edu/.../BollerslevReview.pdf` (survey ARCH) | conexão recusada | usei a documentação do V-Lab (NYU Stern) para GARCH(1,1) |
+| `econweb.ucsd.edu/~jhamilto/palgrav1.pdf` (Hamilton, resenha do autor) | **certificado expirado** | conceito lido em fontes secundárias; a nota declara |
+| `kentdaniel.net/.../jfe_16.pdf` (Daniel & Moskowitz) | PDF voltou binário ilegível | resumo do NBER w20439; **nenhum número do artigo entrou** |
+| `faculty.washington.edu/.../AndersenBollerslevIER1998.pdf` | PDF ilegível (streams comprimidos) | argumento lido em resumo; **nenhum R² citado** |
+| `ledgerjournal.org/.../213` (intraday behavior of Bitcoin) | PDF ilegível | resumos de busca; a nota se apoia na **nossa** medição |
+| `rama.cont.perso.math.cnrs.fr/pdf/clustering.pdf` (Cont) | certificado não confere com o host | fatos estilizados em resumo; declarado |
+| `sciencedirect.com/.../S0264999319312982` (breadth) | HTTP 403 | **nenhum número de tamanho de efeito** entrou na KB-0033 |
+| Busca por evidência acadêmica de stops por ATR | só retornou material de fornecedor (LuxAlgo, VolatilityBox, TradersPost) com números sem fonte ("34% menos stops", "28% melhor") | **nada disso foi citado**; registrado aqui como o que a busca produziu |
+
+E a limitação operacional da rodada: **o `psql` na VPS foi recusado de novo** pelo portão de
+permissão da sessão, então todos os números são da **instância local**, que tem 3 dias de história e
+um scanner reiniciado há menos de uma hora. Nenhum deles descreve produção.
+
+## Fontes que não abriram na terceira rodada
 
 Registradas porque uma nota que cita o que não leu é pior que uma nota a menos:
 

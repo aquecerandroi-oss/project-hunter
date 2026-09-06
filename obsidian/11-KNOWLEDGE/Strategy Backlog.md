@@ -166,6 +166,67 @@ direta no nosso mercado aponta para poder preditivo à frente ~zero por ativo, e
 contra uma prior desfavorável é o oposto do que a
 [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] pede.
 
+## Acréscimo da quarta rodada (2026-09-06) — regime de mercado e volatilidade
+
+**Antes de qualquer coisa desta rodada, três fatos que mudam o que a página acima promete:**
+
+> 1. **Nenhuma candidata da fila pode ser avaliada por regime.** `agent_signals.regime_id` existe e
+>    nunca é escrito pelo `strategy-worker`; medido no banco local, **197 sinais, 0 com regime_id**
+>    ([[KB-0030-o-regime-nao-chega-ao-sinal]]).
+> 2. **E não haveria o que carimbar.** O classificador está em warm-up por construção — 480 amostras
+>    horárias e 20 dias distintos contra **47 horas em 3 dias**; `market_regimes` tem **uma linha**,
+>    `global`/`UNKNOWN` ([[KB-0031-o-classificador-de-regime-esta-mudo-por-warm-up]]).
+> 3. **E o `global` não é global:** é o BTCUSDT. `RegimeScope.BTC` existe no enum e nunca é usado
+>    ([[KB-0034-btc-como-fator-e-o-regime-global-que-e-so-o-btc]]).
+
+**Correção que atinge uma candidata já na fila.** A #3 (diagnóstico por decil de ATR) e a #2 (piso
+de custo) precisam usar o ATR que a `momentum_v1` **de fato consome** — `rolling_window_v1` sobre
+15m com `atr_bars=97`, recalculado a cada avaliação — e **não** o `atr_14_pct` do
+`feature_snapshots`, que é o checkpoint ancorado do M2. São dois instrumentos com o mesmo apelido
+([[KB-0035-momentum-crashes-e-o-piso-que-virou-filtro-de-regime]], achado da Astra).
+
+### Novas na fila
+
+| # | Candidata | Notas-fonte | Dado necessário (temos?) | Esforço | Edge esperado e evidência | Status |
+|---|---|---|---|---|---|---|
+| 15 | **Carimbo de regime no envelope** (par, `confidence`, versão, idade, `volatility_ratio`, `breadth.fraction`) — observação sem decisão | [[KB-0030-o-regime-nao-chega-ao-sinal]] | `regime:current` no Redis (sim) · coluna `regime_id` (existe) | baixo | **nenhum edge prometido.** É proveniência: sem ele, nenhuma pergunta desta rodada é respondível | especificada |
+| 16 | **Fração de avanços incondicional** publicada ao lado da conjunta | [[KB-0033-amplitude-de-mercado-a-nossa-e-condicionada-a-volume]] | `return_4h`, `relative_volume_1h` (existem; **cobertura zero na instância local**) | baixo | corrige uma incoerência interna (amplitude que confunde "sem volume" com "discordando"), não promete retorno | especificada |
+| 17 | **Tendência por mercado** gravada no envelope (`classify_market_trend`, que já existe e não é chamada) | [[KB-0034-btc-como-fator-e-o-regime-global-que-e-so-o-btc]] | `return_4h`, `return_1d`, `atr_pct` por mercado | baixo | permite perguntar se discordar do BTC é informativo; **nada demonstrado** | ideia |
+| 18 | **Referência de volatilidade por hora UTC** | [[KB-0032-o-relogio-dentro-do-limiar-de-volatilidade]] | 20× mais história do que temos | alto | seria `regime_v1`; a alternativa barata é gravar a hora e corrigir na análise | **bloqueada por amostra** |
+| — | ~~**Escalar exposição pelo inverso da volatilidade**~~ (Barroso & Santa-Clara) | [[KB-0035-momentum-crashes-e-o-piso-que-virou-filtro-de-regime]] | — | — | evidência revisada em ações mensais (Sharpe 0,53 → 0,97, número de segunda mão); **mas o Lab de sombra não dimensiona posição** e `PnL de carteira` é *não aplicável* | **adiada para o M4 em 2026-09-06**, sem gastar dia de sombra |
+
+### Diagnósticos e auditorias abertos pela quarta rodada
+
+| Item | Nota | O que responde | Pré-requisito |
+|---|---|---|---|
+| Curva do warm-up (`samples`/`distinct_days` por dia; horas rejeitadas por motivo) | [[KB-0031-o-classificador-de-regime-esta-mudo-por-warm-up]] | quando o regime acorda, e quantas horas perdemos por gap | nenhum — **o mais barato e o mais urgente** |
+| Ciclo de trabalho do piso `[atr_pct_min, atr_pct_max]` por hora UTC | [[KB-0035-momentum-crashes-e-o-piso-que-virou-filtro-de-regime]] | se o piso de custo é, na prática, um filtro de horário/regime | usar o ATR da estratégia, não o do M2 |
+| Mediana do estimador por hora UTC e taxa de troca de faixa | [[KB-0032-o-relogio-dentro-do-limiar-de-volatilidade]] | quanto do rótulo `HIGH`/`LOW` é relógio | ≥ 20 dias, para separar hora de dia |
+| Discordância de rótulo entre o nosso estimador, Parkinson e Garman-Klass | [[KB-0028-o-nosso-estimador-de-volatilidade-e-o-mais-ineficiente]] | quanto o veredito depende de uma escolha nossa (**sensibilidade**, não precisão) | OHLC de 1 min (temos) |
+| Persistência do estimador horário, com poder declarado | [[KB-0027-aglomeracao-de-volatilidade-o-que-ela-licencia]] | se o `volatility_ratio` descreve estado ou ruído | ≥ 20 dias |
+| Duração e transições do par `{trend, volatility}` | [[KB-0029-hamilton-e-o-que-um-limiar-com-histerese-nao-e]] | se o rótulo dura o suficiente para condicionar decisão | classificador fora do warm-up |
+| Distribuição conjunta das três frações de amplitude | [[KB-0033-amplitude-de-mercado-a-nossa-e-condicionada-a-volume]] | se a assimetria touro/urso é grande na prática | cobertura de 80%, hoje inexistente |
+| R² e beta de cada mercado contra o BTCUSDT (5 min e 1 h) | [[KB-0034-btc-como-fator-e-o-regime-global-que-e-so-o-btc]] | se chamar de `global` uma leitura do BTC é defensável | velas de 1 min (temos) |
+
+### Onde a quarta rodada entra na ordem (2026-09-06)
+
+1. **A curva do warm-up, primeiro.** Custa uma consulta, e responde a pergunta que decide todo o
+   resto: o regime acorda em 18 dias ou nunca, porque perdemos horas demais por gap? Enquanto isso
+   não for sabido, planejar análise por regime é planejar sobre um instrumento cego.
+2. **O carimbo de regime (#15) em paralelo**, porque não depende do item 1: mesmo gravando `UNKNOWN`
+   ele distingue "não sabíamos" de "não gravamos", e essa distinção é irrecuperável depois.
+3. **O ciclo de trabalho do piso**, porque ele **bloqueia** a #2 da fila original. Subir
+   `atr_pct_min` de 0,003 para 0,0089 sem saber quanto do universo isso desliga, e em que horas, é
+   mudar a população sem saber para qual.
+4. **R² contra o BTC**, porque é barato, usa dado que já temos, e pode transformar a #16 e a #17 de
+   ideias em perguntas — ou matá-las, se a amplitude for só o BTC medido de novo.
+5. **Os demais**, todos bloqueados por amostra, entram quando a história existir.
+
+**O que esta rodada explicitamente NÃO propõe:** nenhum filtro de entrada por regime. Não porque a
+ideia seja ruim, mas porque não temos como avaliá-la — nem o regime chega ao sinal, nem o
+classificador classifica. Propor um filtro agora seria propor algo cuja refutação é impossível, que
+é exatamente o que a [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] proíbe.
+
 ## Já em sombra
 - `momentum_v1` → [[EXP-0001-momentum-v1]] (coortes `v1` e `v2`; `v2` difere só pelo `code_ref`)
 - `volume_anomaly_v1` → [[EXP-0002-volume-anomaly-v1]]
