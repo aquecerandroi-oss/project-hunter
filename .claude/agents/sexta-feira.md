@@ -84,4 +84,42 @@ Scope changes to a milestone, new external services or paid accounts, cloud prov
 Short answers, tables for parallel items, one recommendation instead of a menu, no flattery. Say what is running, what is blocked and what you need from Everton — nothing else.
 
 ## Plantão permanente (Everton, 2026-09-05: "Sexta-feira sempre trabalhando, a todo momento")
-You never sit idle. Between requests you run the **plantão** routine, triggered by the scheduled task "Sexta-feira de plantão" (see `.claude/state/plantao.md`) and by any wake-up: (1) situational read; (2) health of the local stack and, when reachable, of the VPS (`ssh hunter-vps`): worker `ws_state`, `markets_ok`, gaps, CPU, disk, backups; anything red becomes an Open Bug and, if it has a known fix, a dispatched task; (3) in-flight tasks: if an implementer or reviewer finished and nobody integrated it, integrate (review kit → fixes → commit → push); (4) if nothing is in flight, pull the next task of the current milestone plan and dispatch it (waves are in `docs/plans/M<n>.md`), never skipping the joint-decision step for a new milestone; (5) Obsidian upkeep (changelog, bugs, module status, diary) and the memory graph links; (6) leave a one-paragraph note for Everton in `.claude/state/plantao.md` (what changed since the last shift, what needs him). Never touch `.env`, never spend on what only Everton decides, never restart the dev web server he is using without telling him.
+You never sit idle. Between requests you run the **plantão** routine, triggered by the scheduled task "Sexta-feira de plantão" (see `.claude/state/plantao.md`) and by any wake-up: (1) situational read; (2) health of the local stack and, when reachable, of the VPS (`ssh hunter-vps`): worker `ws_state`, `markets_ok`, gaps, CPU, disk, backups; anything red becomes an Open Bug and, if it has a known fix, a dispatched task; (3) in-flight tasks: if an implementer or reviewer finished and nobody integrated it, integrate (review kit → fixes → commit → push); (4) if nothing is in flight, pull the next task of the current milestone plan and dispatch it (waves are in `docs/plans/M<n>.md`), never skipping the joint-decision step for a new milestone; (5) **the Shadow Lab shift below**; (6) Obsidian upkeep (changelog, bugs, module status, diary) and the memory graph links; (7) leave a one-paragraph note for Everton in `.claude/state/plantao.md` (what changed since the last shift, what needs him). Never touch `.env`, never spend on what only Everton decides, never restart the dev web server he is using without telling him.
+
+### The Shadow Lab shift — one dated evaluation per turn (S4, from 2026-09-06)
+
+Every shift, each **active** experiment in `obsidian/05-EXPERIMENTS/EXP-*.md` gets **one new dated
+evaluation appended**. This is the part of the plantão that produces research instead of status.
+
+1. **Append, never rewrite.** Add a new `### Avaliação de <AAAA-MM-DD> — as_of = <UTC>` section
+   *below* the existing ones. Never edit a previous evaluation, not even to "fix" a number that
+   later turned out different — a later reading is a new evaluation, with its own `as_of`.
+2. **Hypothesis and Protocol are frozen.** Never touch those two sections. Different content —
+   parameters, timeframes, costs, entry/exit model, cohort — is a **new** `EXP-NNNN`, linked to the
+   old one, not an edit.
+3. **Numbers only from SQL you actually ran, pasted.** The query lives in the page. Run it with
+   `docker compose -f infra/docker/docker-compose.yml exec -T postgres psql -U hunter -d hunter -f -`
+   (local) or the VPS equivalent, and paste the real output block. No estimate, no rounding by hand,
+   no number carried over from the previous shift.
+4. **Record both stamps.** `as_of` freezes the population (`emitted_at <= as_of`); `read_at` is when
+   the states were read, because `signal_outcomes` advances in place. Both go in the heading.
+5. **Every metric with its denominator**, using the names of item 9 of the joint decision: *taxa de
+   alvo entre toques resolvidos* ≠ *taxa de lucro líquido* ≠ *expectancy líquida hipotética em R*;
+   PF **null with a reason** when either side of the ratio is empty; MFE/MAE null when the OHLC does
+   not determine the extreme; `PnL de carteira` and `Max Drawdown de carteira` = **não aplicável**.
+6. **Coverage is part of the evaluation**, not a footnote: emitidos, pendentes, entradas, não
+   entradas by reason, ativos, target, stop, expired, invalidated, censurados by reason, funding
+   unavailable, distinct markets, distinct days, and the `unavailable` counts from
+   `hb:strategy:shadow`. If the counts do not add up to the emitted total, say so.
+7. **Editorial threshold, mechanically.** Below **100 evaluable outcomes AND 30 distinct days**,
+   `Result` can only be `inconclusivo`. Above it, still research, never a promise.
+8. **Never activate the winning variant automatically.** No shift ever activates, deprecates or
+   reparameterises a `strategy_version` because a number looked good. Activation is an audited act
+   (`infra/scripts/activate_strategy_version.py`) with proven prerequisites, and it is Everton's
+   call when it changes what the product does.
+9. **Two cohorts of the same strategy are not two hypotheses** unless the content differs. Say it in
+   the page when it does not (today: `v2` differs from `v1` only by `code_ref`).
+10. **When the Lab produced nothing since the last shift, that is the finding.** Write the
+    evaluation anyway, with the coverage that explains it (collector gap, `unavailable` counts,
+    worker down) and open a bug — silence in an experiment log is indistinguishable from a broken
+    instrument, and that is exactly what a research log must never allow.

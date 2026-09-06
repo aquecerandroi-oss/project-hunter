@@ -1,61 +1,63 @@
 # Plantão da Sexta-feira — nota do turno
 
-Atualizado: 2026-09-06, madrugada. M1 fechado e aprovado.
+Atualizado: 2026-09-06, madrugada (turno S4). M1 aprovado; M2 na onda 2; **Shadow Lab coletando**.
 
 ## O que mudou neste turno
-- **Memória** (`e254145`): changelog dos três commits, `Dialogos/SHADOW.md` com a decisão conjunta
-  integral e o aceite S0–S4, contrato do Lab em `Architecture Decisions`, `Experiments Index` e
-  `_TEMPLATE-EXP` reescritos, agentes em `planejado-sombra`, `Market Collector` e
-  `Mente da Sexta-feira` atualizadas, diário do dia.
-- **CRITICAL corrigido** (`4f9ab28`): `shard_symbols` com `encode("ascii")` cegava os 200 mercados
-  (a Binance lista perpétuos com símbolo em chinês, quatro no top 100). Mais dois HIGH e dois
-  MEDIUM que as revisões dessa correção trouxeram.
-- **Prova da T1.6b** (`3167360`, `fa24346`): três topologias medidas contra a Binance ao vivo.
-  200 mercados são alcançáveis (4 shards × 50 → `markets_ok` 198/200 = 99,0%), mas **não foram
-  entregues**: com N > 1 shards o heartbeat é compartilhado e a página System mente. No ar ficou
-  **um processo × 50 mercados, `markets_ok` 50/50 = 100%**.
-- **Relatório do M1** (`fc3e56f`): formato estendido, todo número com comando colado.
 
-## Estado do M1
-**APROVADO** pela Sexta-feira em 2026-09-06 em nome do Everton (`3d47a9e`). O bloqueio — o teste de
-webhook vermelho 3 em 3 — foi investigado com medição, corrigido em `27a0598` sem tocar código de
-produção, e revisado adversarialmente por `code-reviewer` e Astra, que responderam PRESERVADO
-independentemente. `milestone.json` está em **M2, onda 1 a despachar: T2.1 + T2.2**.
+- **`EXP-0001` e `EXP-0002` abertos** (`9347c80`) com a primeira avaliação datada sobre dado real da
+  Binance: protocolo congelado, SQL reproduzível na própria página, saída colada,
+  `as_of = 2026-09-06T02:55:00Z`. Os dois estão **inconclusivos** — 1 dia distinto contra os 30 do
+  limiar, e **0 dos 57** acompanhamentos avaliáveis do momentum com o horizonte de 4 h maturado.
+- **`status: sombra`** passou a valer em `Momentum Agent` e `Volume Agent`, porque a prova
+  operacional existe (`.claude/state/s2-proof.md` + worker no ar) — não porque o desenho ficou pronto.
+- **Revisão da Astra acatada antes de publicar** (`obsidian/06-DECISIONS/Revisoes-Astra/S4-avaliacoes-shadow.md`):
+  cinco must-fix, cinco aceitos. O mais consequente foi a contagem de **horizonte maturado**, que
+  revelou que 100% da população medida do momentum é composta dos acompanhamentos que resolveram
+  cedo. O segundo foi o PF de uma população sem ganhos: é **zero**, não nulo.
+- **Rotina do plantão ampliada** (`.claude/agents/sexta-feira.md`, seção "Plantão permanente"): a
+  cada turno, uma avaliação datada **acrescentada** aos experimentos ativos, com SQL rodado e
+  colado, `as_of` + `read_at`, cobertura completa, limiar editorial aplicado mecanicamente, e a
+  proibição explícita de ativar a variante vencedora. Um turno em que o Lab não produziu nada
+  também vira avaliação, com a cobertura que explica o silêncio.
 
-Ressalva registrada com a aprovação: o M1 entrega **50 mercados**, não os 200 do plano. Os 200 estão
-provados (4 shards × 50 → `markets_ok` 198/200) e não entregues, porque essa topologia compartilha a
-chave de heartbeat e faria a página System mentir.
+## Rotina fixa do Lab, a partir de agora
+
+1. Rodar o SQL da página de cada `EXP-*` ativo (snapshot `REPEATABLE READ READ ONLY`), colar a saída.
+2. Acrescentar `### Avaliação de <data> — as_of / read_at` **abaixo** da anterior. Nunca reescrever.
+3. Hipótese e Protocolo não se tocam. Conteúdo diferente = `EXP` novo, linkado.
+4. `Result` só sai de `inconclusivo` com 100 outcomes avaliáveis **E** 30 dias distintos.
+5. Nenhuma ativação/desativação/mudança de parâmetro decorre de número de avaliação.
+6. Atualizar `Experiments Index`, o diário e, quando mudar estado, as páginas dos agentes.
 
 ## Em voo (não tocar nos arquivos)
-| Tarefa | Dono | Arquivos |
-|---|---|---|
-| S2 — strategy-worker sombra | `backend-specialist` | `services/strategy-worker/**`, `packages/core/hunter_core/events/streams.py` |
-| webhook vermelho | `backend-specialist` | `apps/api/hunter_api/services/clerk_webhook.py`, `apps/api/tests/integration/test_webhook.py` |
 
-`ruff check .` no repositório inteiro está vermelho com 5 erros — **todos em
-`services/strategy-worker/`**, código da S2 em voo. Nos caminhos do M1 está limpo.
+| Tarefa | Arquivos |
+|---|---|
+| T2.3 | `packages/indicators/{anomalies,baselines}`, `stage.py` |
+| T2.6 | `apps/api` radar/opportunities/anomalies/regime |
+| T2.9 | `packages/core/hunter_core/events/{outbox,consume}*`, `services/market-worker/**` (exceto `universe*`) |
+| S3a | `apps/api/**/lab*` |
+
+## Vermelho conhecido, registrado e não consertado
+
+- **`market-worker` local `unhealthy`** desde ~02:04 UTC: `hb:market:binance` vazio, última vela
+  `02:50`, **773 `ingestion_gaps` abertos**. Consequência no Lab: heartbeat `hb:strategy:shadow`
+  com `{"unavailable":400,"ineligible":1}` em 401 barras — o Lab parou de avaliar. Não consertei
+  porque os arquivos do `market-worker` estão em voo na T2.9. É a recusa correta de agregar sobre
+  buraco, não defeito do Lab.
+- **Default de `consume()` perigoso** para todo consumidor futuro (bloqueio de 5000 ms contra
+  `socket_timeout = 5,0`). O `strategy-worker` está blindado; o resto não. A T2.9 está editando
+  exatamente esse arquivo — é a hora de arrumar.
+- **Cobertura de `unavailable` por motivo não é persistida.** Só o agregado por estado, em memória,
+  no heartbeat. Requisito da S3.
 
 ## Próximo passo
-Despachar a onda 1 do M2: **T2.1** (`database-architect`, opus — schema de análise; a migração passa
-a depender de `0002_shadow_lab` e vira `0003`) e **T2.2** (`quant-engineer`, opus — Feature Engine),
-em paralelo, com os kits de revisão prontos antes das entregas. A decisão conjunta do M2 já está
-fechada, então não há etapa de diálogo a repetir.
 
-## Dívidas do M1 que entram no M2, por prioridade
-1. **Heartbeat por shard com agregação na API** — é o que libera os 200 mercados já provados.
-2. **`dataclass(slots=True)` nos tipos normalizados do caminho quente** — `model_construct` do
-   pydantic é 15% do tempo amostrado pelo py-spy, resolvendo defaults a cada evento.
-3. Gaps de mercados não monitorados que nunca fecham; rebalanceamento na morte de um shard.
-
-## Achado no fecho, corrigido à mão e registrado
-O worker foi recriado por outro fluxo **sem o override** e voltou silenciosamente a 200 mercados:
-`markets_ok` 0, tudo `degraded`, hot state completo em 7,0% — o colapso que a prova mediu. Causa: o
-`docker-compose.override.yml` só entra na descoberta padrão de arquivos, e o comando documentado no
-`CLAUDE.md` usa `-f` explícito. Restaurado à mão às 23:39 UTC (`markets_ok` 49/50, hot state 98%) e
-registrado como HIGH operacional em [[Open Bugs]]. **A correção certa é mover `MARKET_UNIVERSE_SIZE:
-"50"` para o próprio `docker-compose.yml`**, deixando o override só para aumentar — não foi feita
-agora porque `infra/docker/docker-compose.yml` está sendo editado pela S2. É o primeiro item do M2,
-junto do heartbeat por shard.
+Integrar as tarefas em voo quando entregarem (kit de revisão → revisores em paralelo → Astra →
+correções → commit por tarefa → push) e acrescentar a próxima avaliação datada aos dois `EXP` no
+turno seguinte, destacando a linha de **horizonte maturado**.
 
 ## Precisa do Everton
-- Nada bloqueante. Opcional: `.env` e logins na VPS (`ssh hunter-vps`).
+
+Nada bloqueante. O Lab está rodando e anotando sozinho; o que falta para os números valerem alguma
+coisa é tempo — dias distintos, não mais mercados.
