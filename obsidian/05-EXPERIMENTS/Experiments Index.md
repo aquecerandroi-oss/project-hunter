@@ -45,6 +45,18 @@ acompanhamentos resolvidos, nenhum lucrativo, e um contrafactual que o dado **n�
 funding não apurável (69 de 73 casos são falha de identificação temporal, com efeito medido de no
 máximo 0,028 R). Revisão em [[S4-hipoteses]].
 
+**Terceiro experimento aberto em 2026-09-06 à noite: [[EXP-0004-politicas-de-saida]]**, e ele é de
+outro tipo. Não é uma coorte nova coletando: é um **replay** das oito políticas de saída sobre as
+**mesmas entradas** que o Lab já registrou (`as_of = 2026-09-06T20:55Z`, commit `2c6bb2d`), unindo
+num bloco só o T-005 (invalidação), o L1 (alvo assimétrico) e o L2 (sem alvo / canal oposto) do
+[[Registro de Tentativas]] — 7 contrastes com Holm a 5% e efeito mínimo declarado de 0,05 R. O
+replay **não escreve nada** (transação `REPEATABLE READ, READ ONLY`) e **não cria coorte
+`replay:<run_id>`**; a população é a mesma dos experimentos acima, lida no banco **local**. O portão
+de reprodução passou (**trajetória 1,0000 em 339 linhas comparáveis**, com 14 divergências isoladas
+na liquidação), e o resultado é **inconclusivo por `B = 1`**: todas as entradas caem num único dia
+UTC, então IC é indisponível (`single_block`) e `p = 1` sai **por construção** — ausência de
+replicação, não evidência de equivalência. Os sete contrastes daquela página são **exploratórios**.
+
 Cada experimento significativo (uma hipótese testada sobre uma estratégia, um conjunto de parâmetros, um mercado ou período) ganha seu próprio arquivo `EXP-NNNN-<slug>.md` nesta mesma pasta, numerado sequencialmente a partir de `EXP-0001`.
 
 ## Registro de IDs (decisão conjunta SHADOW, 2026-09-05)
@@ -54,6 +66,7 @@ Cada experimento significativo (uma hipótese testada sobre uma estratégia, um 
 | `EXP-0001` | [[EXP-0001-momentum-v1\|momentum em modo sombra]] (15 min, stop e alvo a 1,5 ATR da referência, horizonte 4 h) | Shadow Lab v0 — tarefa S4 | **aberto em 2026-09-06**; coortes locais `v1` (deprecated) e `v2` (active), e a coorte da **VPS** `v1` (active, `code_ref` `…6ccbe8b6…`) |
 | `EXP-0002` | [[EXP-0002-volume-anomaly-v1\|volume_anomaly em modo sombra]] (5 min, ATR de 15 min, stop na mínima da barra do sinal, horizonte 2 h) | Shadow Lab v0 — tarefa S4 | **aberto em 2026-09-06**; coortes locais `v1` (deprecated) e `v2` (active), e a coorte da **VPS** `v1` (active, `code_ref` `…a03d18fe…`) |
 | `EXP-0003` | Baselines por ativo/hora do M2 (T2.8) | `docs/plans/M2.md` | **reservado** — o M2 cedeu `EXP-0001` ao Shadow e passou para cá |
+| `EXP-0004` | [[EXP-0004-politicas-de-saida\|replay de oito políticas de saída sobre as entradas congeladas]] (bloco T-005 + L1 + L2, 7 contrastes, efeito mínimo 0,05 R) | Rodada 6 de conhecimento → brief R1; commit `2c6bb2d` | **aberto em 2026-09-06**; primeira execução `as_of = 2026-09-06T20:55Z`, **inconclusivo por `B = 1`** |
 
 A reserva está consolidada nos três lugares que a decisão exige: aqui, em `docs/plans/SHADOW-LAB.md` (item 11) e em `docs/plans/M2.md` (T2.8).
 
@@ -95,6 +108,7 @@ Todos os números vêm de `agent_signals` / `signal_outcomes` reais, com o SQL c
 |---|---|---|---|---|
 | [[EXP-0001-momentum-v1]] | `momentum` v1 (deprecated) + v2 (active) | 2026-09-06 | `2026-09-06T02:55:00Z` | **inconclusivo** — 57 avaliáveis (48 + 9), 1 dia, **0 com horizonte maturado** |
 | [[EXP-0002-volume-anomaly-v1]] | `volume_anomaly` v1 (deprecated) + v2 (active) | 2026-09-06 | `2026-09-06T02:55:00Z` | **inconclusivo** — 72 avaliáveis (66 + 6), 1 dia, 35 com horizonte maturado |
+| [[EXP-0004-politicas-de-saida]] | replay: `momentum` v1+v2 e `volume_anomaly` v1+v2 (4 versões congeladas), 8 políticas de saída | 2026-09-06 | `2026-09-06T20:55:00Z` | **inconclusivo** — 275 maturados, **1** dia (`B = 1`); reprodução de trajetória 1,0000 em 339 comparáveis |
 
 ### O que a próxima extração tem de fazer (achados da revisão da Astra, 2026-09-06)
 

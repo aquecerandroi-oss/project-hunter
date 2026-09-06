@@ -29,6 +29,12 @@ inexistência de testes privados omitidos.
 (`momentum v1/v2` e `volume_anomaly_v1`) são o experimento base, não variantes de busca — e `v2`
 difere de `v1` apenas pelo `code_ref` ([[EXP-0001-momentum-v1]]).
 
+> **Acréscimo da mesma data (noite), sem apagar o parágrafo acima:** essa contagem **deixou de valer
+> às 20:55Z de 2026-09-06**. O bloco de saídas (T-005 + T-022a/b + T-023a/b) foi rodado como replay
+> retrospectivo — **1 execução, 7 contrastes, inconclusiva por `B = 1`**. O estado atualizado está na
+> seção "Acréscimo de 2026-09-06 (noite)", no fim desta página, e o detalhe em
+> [[EXP-0004-politicas-de-saida]].
+
 ## Candidatas propostas (ainda não rodadas)
 
 | ID | Candidata | Nota de origem | Parâmetros | `δ` | Início/fim UTC | Status |
@@ -578,6 +584,34 @@ anteriores:
 **Consequência de multiplicidade:** D-052 a D-056 nasceram da inspeção do contrato e do dado de
 2026-09-06. Nenhum é variante de estratégia, mas todos são inspeção da mesma população — e nenhuma
 candidata das rodadas anteriores pode ser confirmada nela.
+
+## Acréscimo de 2026-09-06 (noite) — o bloco de saídas **saiu do papel**: piloto executado (EXP-0004)
+
+Linhas **novas, com as mesmas IDs** e o motivo, como manda esta página — as linhas de T-005, T-022a/b
+e T-023a/b acima **não** foram editadas. O que mudou é o estado: o bloco de saídas foi **rodado**
+como replay sobre as entradas já congeladas (`as_of = 2026-09-06T20:55Z`, commit `2c6bb2d`,
+[[EXP-0004-politicas-de-saida]]).
+
+| ID | Candidata | Nota de origem | Parâmetros | `δ` | Início/fim UTC | Status |
+|---|---|---|---|---|---|---|
+| T-005 | valor incremental da invalidação | [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]] | braços `INV-A/B/C/E`; `INV-E` com `L − 0,25·ATR₀` | **0,05 R** (declarado antes) | replay retrospectivo até `2026-09-06T20:55Z` — **sem janela futura reservada** | **piloto executado, inconclusivo por `B = 1`** — Δ: `INV-B − base` −0,010928; `INV-C − base` −0,006098; `INV-E − base` −0,003127; nenhum atinge o efeito mínimo; IC indisponível (`single_block`), `p = 1` por construção |
+| T-022a/b | **alvo assimétrico** (L1) | [[KB-0054-a-cauda-direita-e-o-alvo-fixo-que-a-corta]] · [[KB-0046-r-multiplos-e-o-r-que-a-simetria-esconde]] | `target_atr ∈ {3.0, 4.5}` contra a base de 1,5; stop, invalidação e horizonte inalterados | **0,05 R** | idem | **piloto executado, inconclusivo por `B = 1`** — Δ: `TGT-3 − base` **+0,056216** (87 pares); `TGT-4.5 − base` **+0,111738** (86 pares); ambos ≥ efeito mínimo em **magnitude**, nenhum rejeitado por Holm. **Subpopulação diferente: só `momentum`** — `volume_anomaly` persiste um alvo só (`target2/3_missing` em 204 linhas) |
+| T-023a/b | **sem alvo** e **saída por canal oposto** (L2) | [[KB-0045-turtles-a-entrada-que-ja-temos-e-a-saida-que-nao]] | `EXIT-NOTGT` (sem alvo) e `EXIT-CHAN` (sem alvo + mínimo dos 10 fechamentos de 15 m, **invalidação nativa mantida**) | **0,05 R** | idem | **piloto executado, inconclusivo por `B = 1`** — Δ: `EXIT-NOTGT − base` **+0,094064** (238 pares); `EXIT-CHAN − EXIT-NOTGT` +0,005228 (237 pares) |
+
+**Contagem de multiplicidade, atualizada.** As tentativas avaliadas deixam de ser **0**: este bloco é
+**1 execução com 7 contrastes** (T-005: 3; T-022a/b: 2; T-023a/b: 2), lida e registrada. Toda
+candidata proposta daqui para a frente carrega este histórico.
+
+**Por que continua sendo exploratório, e não confirmação.** Três razões, todas registradas na página
+do experimento: (1) a coluna `Início/fim UTC` **não** foi preenchida antes da janela — é replay
+retrospectivo sobre a população que já existia, então esta rodada não pode confirmar nada, só
+descrever; (2) **`B = 1`** — as entradas caem todas em 2026-09-06, o IC sai indisponível
+(`single_block`) e o `p = 1` é por construção, ausência de replicação e não evidência de
+equivalência; (3) mesmo com seis blocos o menor p atingível (`2/64 = 0,031`) já seria maior que o
+limiar de Holm (`0,05/7`). A confirmação exige repetir a **mesma** execução com janela em ≥ 30 dias
+UTC distintos. **Nada foi ativado**, e o bloco continua sem autorizar combinar o vencedor de T-005
+com o de T-022.
+
 ## Relacionados
 
 [[Strategy Backlog]] · [[Index]] ·

@@ -9,6 +9,29 @@ Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado p
 
 ## 2026-09-06
 
+- **`2c6bb2d` — R1: replay de oito políticas de saída sobre as entradas congeladas do Lab
+  ([[EXP-0004-politicas-de-saida]]).** Pesquisa (`purpose = research_only`), **sem escrever nada**: a
+  transação é `REPEATABLE READ, READ ONLY` e quem impede a escrita é o Postgres, não a revisão de
+  código. Une num bloco só o T-005 (invalidação), o L1 (alvo assimétrico) e o L2 (sem alvo / canal
+  oposto) do [[Registro de Tentativas]] — **8 políticas, 7 contrastes, Holm a 5%, efeito mínimo
+  declarado 0,05 R**, sobre as **mesmas entradas** que o Lab já registrou. O replay **não
+  reimplementa o acompanhamento**: um braço é um `TrackingPlan` diferente dobrado pelo mesmo
+  `walker.walk` e fechado pelo mesmo `settle.settle`, com o plano reconstruído das colunas gravadas.
+  **Portão passou:** reprodução de **trajetória 1,0000 em 339 linhas comparáveis** (limiar 0,9900),
+  com **14 divergências só de liquidação** — atribuídas a ingestão tardia de funding como
+  **compatível, não comprovada**, porque `funding_rates` não guarda instante de ingestão.
+  **Resultado: inconclusivo por `B = 1`** — todas as entradas caem num único dia UTC, então o IC é
+  indisponível (`single_block`) e o `p = 1` sai por construção; os sete contrastes daquela leitura
+  são **exploratórios**, e os três com magnitude ≥ 0,05 R (`TGT-3` +0,056, `TGT-4.5` +0,112,
+  `EXIT-NOTGT` +0,094) são aprendizado operacional, não confirmação. Três rodadas de revisão da Astra
+  entraram no código **antes** da publicação (`EXIT-CHAN` mantendo a invalidação nativa; `as_of` como
+  corte de **velas**, não só de população; corte comum de maturidade **antes** do pareamento —
+  sozinho ele move `TGT-3 − base` de +0,118 para +0,056 R; portão antes dos contrastes;
+  `input_digest` **e** `series_digest`). Três pendências ficaram abertas e estão escritas:
+  `settle` sem corte temporal, `funding_rates` sem `received_at`, e `volume_anomaly` sem alvos
+  informativos (L1 é, hoje, experimento de `momentum`). **Nada foi ativado.** No mesmo dia,
+  `recompute_funding.py --apply` rodou **na VPS** (97 de 110 resolvidos, 13 seguem sem funding) e
+  **ainda não** no local.
 - **`docs(m3)` — o M3 planejado a partir da diretiva do Everton: carteira virtual e Risk Engine.** Ele
   respondeu às sete decisões que a oitava rodada devolveu (capital, `f`, `p`, `θ`, limiares de perda,
   modalidade, piso de liquidez) e foi além, com uma diretiva de sete partes mais uma lista de
