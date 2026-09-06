@@ -2,33 +2,24 @@
 """Seed the reference data every environment needs — DATABASE.md, PRODUCT.md §5,
 RISK_ENGINE.md §2, PIPELINE.md §2 and §5.
 
-Idempotent: most writes are an upsert on the row's natural key
-(``exchanges.code``, ``strategies.key``, ``(strategy_id, version)``,
-``(plan, key)``, ``feature_flags.key``, the system-preset
-``risk_profiles.preset``), so running it twice leaves the same row counts.
+Idempotent: most writes are an upsert on the row's natural key (``exchanges.code``,
+``strategies.key``, ``(strategy_id, version)``, ``(plan, key)``, ``feature_flags.key``,
+the system-preset ``risk_profiles.preset``), so running it twice leaves the same counts.
 
-Two tables are **not** upserted, because their content is frozen once published
-and something stored elsewhere names it: ``opportunity_weights.version``, which
-every score cites, and ``(feature_definitions.name, version)``, whose identity is
-hashed into every ``feature_snapshots.feature_set_version``. For those the seed
-inserts what is missing, *verifies* what exists, and stops on a divergence
-(DATABASE.md §17.8).
+Three things are **never** rewritten, because their content is frozen once
+published and something stored elsewhere names it: ``opportunity_weights.version``,
+which every score cites, ``(feature_definitions.name, version)``, hashed into
+every ``feature_snapshots.feature_set_version``, and a ``strategy_version`` past
+its first activation, which every shadow signal points at. The first two are
+inserted when missing, *verified* when present, and a divergence stops the seed.
+The third does not even stop it: the frozen row is the truth, a registry that has
+moved on is answered by a successor version rather than by this script, so the
+row is left untouched and reported (DATABASE.md §16.1 and §17.8).
 
-The content lives in the sibling ``seed_reference`` module — literals, plus the
-feature catalogue derived from the ``hunter_indicators`` registry; this file is
-the writes. ``is_active`` on ``opportunity_weights`` is the one thing here that
-is an *operational* state rather than content, and §17 of DATABASE.md records
-how it is handled: the seed promotes the release's profile exactly once, on the
-run that first creates it, and never touches the flag on a row that already
-exists.
-
-Every count it reports comes from the statement's ``RETURNING`` clause, never
-from the length of the input tuple: a row a policy filters away has to make the
-number go down, or the report is worse than no report at all.
-
-Fractions are stored as JSON **strings**, never JSON numbers: a limit like
-``0.0025`` has no exact binary float, and the Risk Engine reads these straight
-into ``Decimal``. Integers and booleans stay native.
+The content is the sibling ``seed_reference`` module (fractions as JSON strings
+included); this file is the writes. ``is_active`` on ``opportunity_weights`` is
+the one *operational* state here, handled as §17.8 says: promoted exactly once,
+on the run that first creates the profile, never touched on a row that exists.
 
 Connects with ``DATABASE_URL_MIGRATIONS`` (direct, never the pooler) over
 asyncpg, the only Postgres driver this workspace installs.
@@ -87,11 +78,10 @@ def migration_url() -> str:
 def _written(result: Any) -> int:
     """How many rows the statement actually wrote, from its ``RETURNING`` clause.
 
-    Every count in this module comes from here rather than from the length of the
-    input tuple. A constant is what let the ``risk_profiles`` bug hide: under
-    ``FORCE ROW LEVEL SECURITY`` the upsert matched nothing, wrote nothing, and
-    the script still printed "seeded 3 row(s)". An upsert that is filtered away
-    by a policy returns no rows, so the report goes to zero with it.
+    Every count in this module comes from here, never from the length of the
+    input tuple: a constant is what let the ``risk_profiles`` bug hide, printing
+    "seeded 3 row(s)" while ``FORCE ROW LEVEL SECURITY`` filtered every one of
+    them away. A row a policy refuses has to make the number go down.
     """
     return len(result.fetchall())
 
@@ -115,8 +105,38 @@ async def seed_exchanges(conn: AsyncConnection) -> int:
     return written
 
 
+async def _report_frozen_version(conn: AsyncConnection, key: str, shipped: str) -> int:
+    """The activated v1 the upsert skipped: report it, count it as present (§16.1).
+
+    Not an error, and not this script's to resolve: the activated row is the truth
+    every shadow signal points at, while ``shipped`` is only the registry's
+    placeholder. Moving a frozen version onto real code publishes a successor
+    (``activate_strategy_version.py --supersede``), which is why rewriting the old
+    one is what ``0002``'s trigger refuses.
+    """
+    stored = await conn.scalar(
+        select(StrategyVersion.code_ref)
+        .join(Strategy, Strategy.id == StrategyVersion.strategy_id)
+        .where(Strategy.key == key, StrategyVersion.version == "v1")
+    )
+    if stored != shipped:
+        print(
+            f"note: {key} v1 is activated and frozen at {stored}; this build's registry "
+            f"ships {shipped}. Left untouched: supersede it to move the code."
+        )
+    return 1
+
+
 async def seed_strategies(conn: AsyncConnection) -> tuple[int, int]:
     """Catalogue plus one ``draft`` v1 per strategy (PIPELINE.md §6 activates them).
+
+    The version upsert **never touches an activated row**: ``WHERE activated_at
+    IS NULL`` on the ``DO UPDATE`` turns a frozen row into a no-op, so no
+    ``UPDATE`` runs and ``0002``'s freeze trigger never fires. Without it, one
+    activated version failed the statement and — the seed being a single
+    transaction — took all eight reference tables down with it, on every deploy
+    from then on. A ``draft`` row is still refreshed: nothing points at it yet,
+    and until something is activated the registry is the only truth there is.
 
     Returns ``(strategies, strategy_versions)`` — two tables, two counts, because
     a report that folded them together could not show one of them failing.
@@ -138,20 +158,24 @@ async def seed_strategies(conn: AsyncConnection) -> tuple[int, int]:
         )
         strategy_id: uuid.UUID = result.scalar_one()
         strategies += 1
+        code_ref = f"hunter_indicators.strategies.{key}_v1"
         version = insert(StrategyVersion).values(
             id=uuid7(),
             strategy_id=strategy_id,
             version="v1",
             status=StrategyVersionStatus.DRAFT,
-            code_ref=f"hunter_indicators.strategies.{key}_v1",
+            code_ref=code_ref,
         )
         version_result = await conn.execute(
             version.on_conflict_do_update(
                 index_elements=[StrategyVersion.strategy_id, StrategyVersion.version],
                 set_={"code_ref": version.excluded.code_ref},
+                where=StrategyVersion.activated_at.is_(None),
             ).returning(StrategyVersion.id)
         )
-        versions += _written(version_result)
+        # A frozen row the statement skipped is still a row that is there.
+        written = _written(version_result)
+        versions += written or await _report_frozen_version(conn, key, code_ref)
     return strategies, versions
 
 
@@ -189,16 +213,13 @@ async def seed_risk_profiles(conn: AsyncConnection) -> int:
     """System presets: ``organization_id IS NULL``, copied into an org at onboarding.
 
     These rows only exist because ``0001`` grants the migrating role the
-    ``system_presets_manageable`` policy. ``risk_profiles`` has ``FORCE ROW LEVEL
+    ``system_presets_manageable`` policy: ``risk_profiles`` has ``FORCE ROW LEVEL
     SECURITY``, which filters the table owner too, so under an ordinary
-    ``NOSUPERUSER`` owner — what a managed Postgres gives you — this upsert
-    matched nothing, wrote nothing, and still reported three rows seeded.
-
-    Note the coupling that survives: the policy is granted ``TO CURRENT_USER``,
-    the role that ran the migration. Run this script as a *different* role and
-    the presets are filtered away again — silently no longer, since the count
-    below comes from ``RETURNING``, but still. DATABASE.md §15.6 records it as an
-    operational constraint: seed and migrate as the same role.
+    ``NOSUPERUSER`` owner this upsert matched nothing, wrote nothing and still
+    reported three rows seeded. The coupling that survives is ``TO CURRENT_USER``
+    — run this as a *different* role and the presets are filtered away again,
+    visibly now that the count comes from ``RETURNING``. DATABASE.md §15.6 records
+    it: seed and migrate as the same role.
     """
     written = 0
     for index, (preset, name) in enumerate(RISK_PRESETS):
@@ -221,14 +242,13 @@ async def seed_risk_profiles(conn: AsyncConnection) -> int:
 async def _refuse_diverging_definition(conn: AsyncConnection, row: dict[str, Any]) -> None:
     """A published ``(name, version)`` is frozen, like a weight vector (§17.8).
 
-    ``feature_snapshots.feature_set_version`` is a hash of exactly what
-    ``FeatureDefinition.identity()`` covers — key, version, category, inputs and
-    parameters — so rewriting any of them under a name that already exists makes
-    this table describe an engine that did not produce the stored snapshots. A
-    real formula change is a **new** ``version`` in the registry, which inserts a
-    row next to the old one; there is no case where overwriting is right, so the
-    seed stops instead. ``description`` is deliberately outside the check: it is
-    prose, excluded from the hash, and is refreshed in place.
+    ``feature_snapshots.feature_set_version`` hashes exactly what
+    ``FeatureDefinition.identity()`` covers — key, version, category, inputs,
+    parameters — so rewriting any of them under an existing name makes this table
+    describe an engine that did not produce the stored snapshots. A real formula
+    change is a **new** ``version`` in the registry, inserted next to the old row;
+    overwriting is never right, so the seed stops. ``description`` is outside the
+    check: prose, excluded from the hash, refreshed in place.
     """
     stored = (
         await conn.execute(
@@ -268,13 +288,12 @@ async def _refuse_diverging_definition(conn: AsyncConnection, row: dict[str, Any
 async def seed_feature_definitions(conn: AsyncConnection) -> int:
     """The catalogue of ``hunter_indicators``' registry — derived, never retyped.
 
-    ``seed_reference.feature_definition_rows()`` is the engine's own
-    ``as_row()``, so the table says which features exist, what category they are
-    in, which sources each may read and with which parameters, in the build's
-    vocabulary. Missing rows are inserted; existing ones are *verified* and a
-    divergence stops the seed — the ``opportunity_weights`` rule of §17.8, for
-    the same reason: a stored snapshot names an identity, and that identity has
-    to keep meaning what it meant.
+    ``seed_reference.feature_definition_rows()`` is the engine's own ``as_row()``,
+    so the table says which features exist, in which category, reading which
+    sources with which parameters, in the build's vocabulary. Missing rows are
+    inserted, existing ones *verified*, and a divergence stops the seed — the
+    ``opportunity_weights`` rule of §17.8, for the same reason: a stored snapshot
+    names an identity, which has to keep meaning what it meant.
     """
     rows = feature_definition_rows()
     for row in rows:

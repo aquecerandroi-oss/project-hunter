@@ -39,6 +39,22 @@ CREATE POLICY tenant_isolation ON portfolios
 - `audit_logs`, `risk_events`, `kill_switch_transitions` e `system_events` são append-only: `hunter_app` tem `INSERT` e `SELECT`, nunca `UPDATE`/`DELETE` — e isso vale também para cada partição delas (§15.6).
 - Partições não herdam privilégios nem políticas da tabela-pai: cada filha é criada com `REVOKE ALL` para os dois papéis e, quando a pai é de tenant, com RLS forçada e política própria (§1.3, §15.4).
 
+### 1.2a Timeouts de sessão (`SET LOCAL statement_timeout`)
+
+O servidor roda com `statement_timeout = 0` / `lock_timeout = 0` (sem prazo) — Neon/RDS não fixam um limite por padrão, e depender só disso deixaria qualquer transação livre para rodar indefinidamente. `hunter_core.db.session._apply_context` fecha essa lacuna: toda transação aberta por `role_session` (e portanto por `tenant_session`, `user_session`, `bootstrap_session`) recebe um `SET LOCAL statement_timeout` logo após o `SET LOCAL ROLE`, **antes** de qualquer query da aplicação.
+
+| Role | Timeout padrão | Setting |
+|---|---|---|
+| `hunter_app` (API) | 10 s | `Settings.db_statement_timeout_app_s` / env `DB_STATEMENT_TIMEOUT_APP_S` |
+| `hunter_worker` | 15 s | `Settings.db_statement_timeout_worker_s` / env `DB_STATEMENT_TIMEOUT_WORKER_S` |
+
+- **Achado que motivou isto (security-reviewer, S3a, MEDIUM):** antes desta seção, só `hunter_worker` recebia um `statement_timeout`; toda transação da API (`hunter_app`) rodava sem prazo nenhum. Um chamador autenticado batendo repetidamente numa rota cara — o exemplo usado foi `GET /api/v1/lab/shadow/summary?window=all`, uma varredura sem índice por versão — não tinha nada que cortasse uma única query, podendo saturar o Postgres mesmo estando corretamente autenticado e dentro do rate limit por requisição.
+- `hunter_app` tem um valor menor que `hunter_worker` de propósito: trabalho de request/response é esperado ser curto; um job de worker (ex.: consumo de stream, agregações) legitimamente precisa de mais espaço. Nenhuma chamada de `hunter_app` no `apps/api` de hoje é uma operação de longa duração — as únicas que fariam sentido levar mais tempo (webhooks do Clerk que reconciliam várias linhas, buscas de membership) já rodam como `hunter_worker`.
+- **Não vaza entre transações da mesma conexão.** `SET LOCAL` é escopado à transação corrente; o Postgres o reseta em todo `COMMIT`/`ROLLBACK`, mesmo quando o pooler (Neon/PgBouncer em modo transação) entrega a mesma conexão física para a próxima transação, de outro chamador. Coberto por teste de integração com um engine de `pool_size=1` (`packages/core/tests/integration/test_db_integration.py`), forçando a segunda transação a reusar a conexão da primeira.
+- `role_session` aceita um `settings: Settings | None` opcional para sobrescrever os dois valores; sem ele, cai no `hunter_core.settings.get_settings()` cacheado (o mesmo singleton que os `__main__` dos workers já usam), então nenhum call site precisou mudar para herdar um override por env var.
+- `command_timeout=30` (D3, `connect_args` do `create_engine`) continua sendo um teto do driver asyncpg, à parte — vale para as duas roles e não substitui o `statement_timeout` do servidor: é o que impede um `await` do driver de travar para sempre num socket morto, não o que corta uma query lenta ainda viva.
+- `lock_timeout` não tem um valor padrão hoje (nem tinha antes desta seção); só o `statement_timeout` foi endurecido aqui. Ver `hunter_core/db/session.py` se/quando isso mudar.
+
 ### 1.3 Particionamento e retenção
 
 | Tabela | Partição | Retenção padrão | Job |
@@ -788,14 +804,38 @@ vida da versão, não o seu conteúdo. A comparação é `IS DISTINCT FROM` sobr
 valor, então reescrever o mesmo JSONB com outra ordem de chaves não é alteração.
 A **primeira** ativação (`activated_at NULL` para um valor) passa, uma única vez.
 
-**Consequência para `infra/scripts/seed.py`.** O seed faz
-`ON CONFLICT (strategy_id, version) DO UPDATE SET code_ref = excluded.code_ref`.
-Enquanto a v1 estiver `draft` isso é inofensivo; depois da ativação, reexecutar o
-seed com o **mesmo** `code_ref` continua passando (a trigger compara valores e não
-vê alteração), e com um `code_ref` **diferente** o seed falha alto — que é o
-comportamento correto: mudar o código de referência de um experimento em curso é
-uma versão nova, não um `UPDATE`. Quem ativar (script de ops da S2) precisa
-gravar o `code_ref` definitivo **antes** da ativação.
+**Consequência para `infra/scripts/seed.py`.** O seed **insere a v1 ausente e
+nunca toca linha ativada**: o `ON CONFLICT (strategy_id, version) DO UPDATE SET
+code_ref = excluded.code_ref` leva um `WHERE strategy_versions.activated_at IS
+NULL`, então na linha congelada nenhum `UPDATE` chega a rodar e a trigger nem
+dispara. Enquanto a versão está `draft` o upsert continua atualizando o `code_ref`
+que o registry publica — e o mesmo valeria para `parameters_schema` e
+`default_parameters` se o seed passasse a semeá-los: nada aponta para a linha
+ainda, e até a primeira ativação o registry é a única verdade que existe.
+
+**Correção de 2026-09-06 (HIGH reproduzido na VPS).** Esta seção dizia o
+contrário — que um `code_ref` divergente devia fazer o seed *falhar alto*, "o
+comportamento correto". Não é: como o seed roda numa transação só, a exceção da
+trigger revertia as **oito** tabelas de referência, e o ambiente ficava sem
+`exchanges`, `plan_entitlements`, `feature_flags`, `risk_profiles`,
+`feature_definitions` e `opportunity_weights` — não "sem `strategy_versions`", sem
+nada — em todo deploy posterior à primeira ativação. E o divergente é o caso
+**normal**, não o excepcional: o seed grava o placeholder do registry
+(`hunter_indicators.strategies.<key>_v1`) e a ativação grava o digest por versão
+(`hunter_core.strategies.<módulo>@sha256:…`, de
+`hunter_strategy_worker.code_ref.version_code_ref`), de modo que **toda** linha
+ativada diverge do registry por construção.
+
+Divergência em linha ativada **não é erro do seed**: a versão congelada é a
+verdade — é ela que todo sinal sombra nomeia — e o registry evolui publicando
+sucessora (`infra/scripts/activate_strategy_version.py --supersede`), nunca por um
+`UPDATE` vindo daqui. O seed apenas **relata** na saída
+(`note: <key> v1 is activated and frozen at <code_ref>; …`) e segue semeando o
+resto. A contagem de `strategy_versions` continua vindo do banco e não do tamanho
+da tupla de entrada (§15.6): a linha que o seed deliberadamente não escreveu
+continua sendo uma linha que está lá. Quem ativa continua devendo gravar o
+`code_ref` definitivo **antes** da ativação — só que agora não é um seed
+reexecutado, e o ambiente inteiro sem dado de referência, que descobre isso.
 
 `strategy_versions_freeze_delete` (`BEFORE DELETE`, mesma condição) é o outro
 lado: uma linha ativada que pudesse ser apagada poderia ser reinserida com o
@@ -1360,6 +1400,19 @@ vezes no M2 (dirige o status `ANOMALY` e as confirmações de EARLY) — e a lin
 carrega `components_frozen: false`. **T2.4 ratifica esse vetor ou publica uma v3**;
 enquanto isso não acontece, nenhum score foi produzido por ele (o scorer é a
 própria T2.4).
+
+**`strategy_versions` é a terceira coisa congelada do seed**, ao lado de
+`feature_definitions` e `opportunity_weights` — e a única das três em que uma
+divergência **não** para o seed. A regra e o motivo estão em §16.1; o que fica
+aqui é a consequência para o seed como um todo: ele é idempotente também em banco
+que já ativou versão. O teste que fixa isso é
+`packages/core/tests/integration/test_schema_seed_and_partitions.py::test_the_seed_never_touches_an_activated_strategy_version`,
+que ativa uma versão do jeito que o script de ops ativa (`status`, `activated_at` e
+um `code_ref` novo), roda o seed **duas vezes** e compara `xmin` — contagem de
+linha não enxerga reescrita — da linha congelada, de `feature_definitions` e de
+`opportunity_weights`, enquanto verifica que as oito tabelas continuam com as
+mesmas linhas de antes da ativação e que o seed relatou o que o banco de fato
+guarda.
 
 ### 17.9 Pooler
 

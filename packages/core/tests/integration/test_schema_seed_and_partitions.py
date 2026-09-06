@@ -38,6 +38,17 @@ OWNER_DB = "hunter_owned"
 FROZEN_FEATURE = "spread_pct"
 """The definition the freeze test tampers with, then puts back."""
 
+ACTIVATED_KEY = "momentum"
+"""The strategy whose v1 the freeze test activates, then puts back."""
+
+FROZEN_CODE_REF = f"hunter_core.strategies.{ACTIVATED_KEY}_v1@sha256:{'ab' * 32}"
+"""What activation writes over the seed's registry placeholder.
+
+Shaped the way ``hunter_strategy_worker.code_ref.version_code_ref`` writes it —
+the per-version digest, not the ``hunter_indicators.strategies.*`` placeholder
+the seed ships — because the difference between the two is the whole bug.
+"""
+
 SEEDED_TABLES = (
     "exchanges",
     "strategies",
@@ -316,6 +327,141 @@ async def _restore_shipped_catalogue(url: str) -> None:
             )
     finally:
         await engine.dispose()
+
+
+async def _activate_v1(url: str, key: str, code_ref: str) -> None:
+    """Do to the row exactly what ``infra/scripts/activate_strategy_version.py`` does.
+
+    Same three columns, same order, same ``WHERE activated_at IS NULL`` guard:
+    the point is a row frozen the way ops freezes one, not a row hand-built to
+    make the seed fail.
+    """
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "UPDATE strategy_versions SET status = 'active', activated_at = now(), "
+                    "code_ref = :code_ref WHERE version = 'v1' AND activated_at IS NULL "
+                    "AND strategy_id = (SELECT id FROM strategies WHERE key = :key)"
+                ),
+                {"code_ref": code_ref, "key": key},
+            )
+    finally:
+        await engine.dispose()
+
+
+async def _deactivate_v1(url: str, key: str) -> None:
+    """Give the module's shared database back — through a door ops does not have.
+
+    ``SET activated_at = NULL`` is one of the changes ``0002``'s trigger refuses
+    on purpose (§16.1), so the restore switches the trigger off for its own
+    length. Written out loud, and only here: nothing in ``seed.py`` may do this,
+    and leaving an activated row behind would quietly change what every test
+    after this one is running against.
+    """
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "ALTER TABLE strategy_versions DISABLE TRIGGER strategy_versions_freeze_update"
+                )
+            )
+            await connection.execute(
+                text(
+                    "UPDATE strategy_versions SET status = 'draft', activated_at = NULL, "
+                    "code_ref = :code_ref WHERE version = 'v1' AND strategy_id = "
+                    "(SELECT id FROM strategies WHERE key = :key)"
+                ),
+                {"code_ref": f"hunter_indicators.strategies.{key}_v1", "key": key},
+            )
+            await connection.execute(
+                text("ALTER TABLE strategy_versions ENABLE TRIGGER strategy_versions_freeze_update")
+            )
+    finally:
+        await engine.dispose()
+
+
+async def _frozen_version(url: str, key: str) -> tuple[Any, ...]:
+    """The activated row, ``xmin`` included, so a rewrite cannot hide as a re-count."""
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            result = await connection.execute(
+                text(
+                    "SELECT xmin::text, code_ref, status::text, activated_at "
+                    "FROM strategy_versions WHERE version = 'v1' AND strategy_id = "
+                    "(SELECT id FROM strategies WHERE key = :key)"
+                ),
+                {"key": key},
+            )
+            return tuple(result.one())
+    finally:
+        await engine.dispose()
+
+
+async def _xmins(url: str, table: str, label: str) -> dict[str, str]:
+    """``{natural key: xmin}`` for a whole table — the M2 seeds' no-rewrite witness."""
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            result = await connection.execute(
+                text(f"SELECT {label}::text, xmin::text FROM {table}")  # noqa: S608  # nosec B608 -- both names are frozen constants in this module, not user input
+            )
+            return {row[0]: row[1] for row in result}
+    finally:
+        await engine.dispose()
+
+
+def test_the_seed_never_touches_an_activated_strategy_version(
+    seed_db: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The seed stays idempotent against a database that has activated a version.
+
+    The HIGH reproduced on the VPS: after the first activation the seed still
+    upserted ``code_ref`` back to the registry placeholder, ``0002``'s freeze
+    trigger refused the change — correctly, that is what it is for — and because
+    the whole seed is one transaction, all eight reference tables rolled back
+    with it. Not "strategy_versions was skipped": *nothing was seeded at all*,
+    on every deploy from then on.
+
+    The activated row is the truth (§16.1). A registry that has moved on is not
+    a seed error and is not the seed's to resolve — that is
+    ``activate_strategy_version.py --supersede``, an ops decision — so the seed
+    leaves the row exactly as it is, says on stdout that it did, and finishes
+    seeding everything else. ``xmin`` is the witness: an upsert writing the same
+    values back still makes a new row version, and a row count cannot see it.
+    """
+    _use(seed_db)
+    seed = _load_script("seed")
+    asyncio.run(seed.seed())
+    counts_before = asyncio.run(_row_counts(seed_db))
+    asyncio.run(_activate_v1(seed_db, ACTIVATED_KEY, FROZEN_CODE_REF))
+    try:
+        frozen_before = asyncio.run(_frozen_version(seed_db, ACTIVATED_KEY))
+        catalogue_before = asyncio.run(_xmins(seed_db, "feature_definitions", "name"))
+        weights_before = asyncio.run(_xmins(seed_db, "opportunity_weights", "version"))
+        assert frozen_before[1] == FROZEN_CODE_REF, "the activation did not take"
+
+        first: dict[str, int] = asyncio.run(seed.seed())
+        capsys.readouterr()
+        second: dict[str, int] = asyncio.run(seed.seed())
+        note = capsys.readouterr().out
+
+        counts_after = asyncio.run(_row_counts(seed_db))
+        assert first == second == counts_after == counts_before, (
+            "a frozen version stopped the seed from seeding the other seven tables"
+        )
+        assert asyncio.run(_frozen_version(seed_db, ACTIVATED_KEY)) == frozen_before, (
+            "the seed rewrote an activated strategy_version"
+        )
+        assert asyncio.run(_xmins(seed_db, "feature_definitions", "name")) == catalogue_before
+        assert asyncio.run(_xmins(seed_db, "opportunity_weights", "version")) == weights_before
+        assert FROZEN_CODE_REF in note, "the seed did not report the frozen row it left alone"
+        assert "supersede" in note, "the note does not say how the registry is meant to move on"
+    finally:
+        asyncio.run(_deactivate_v1(seed_db, ACTIVATED_KEY))
 
 
 def test_create_partitions_is_idempotent(seed_db: str) -> None:
