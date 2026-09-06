@@ -25,25 +25,53 @@ Prova completa em `.claude/state/vps-lab-proof.md`.
   **todas** com `shadow_version_code_ref_mismatch`. Graças à correção da S2 o `/ready` fica vermelho
   em vez de mentir, mas o Lab não roda, e campo congelado não se corrige no lugar: só `--supersede`,
   encerrando a coorte anterior. Não morde hoje porque cada ambiente ativou as suas próprias linhas.
-  **Correção certa:** normalizar as quebras de linha antes do digest (ou digerir o AST/bytecode em
-  vez do arquivo bruto), com teste que compare o digest do mesmo módulo em CRLF e em LF. Dono:
-  quem tocar `hunter_strategy_worker/code_ref.py` a seguir.
-- **MEDIUM (deploy) — o `seed` de dados de referência não faz parte do fluxo de deploy da VPS.**
-  `compose.sh update` roda `migrate` e nunca `seed`. Medido antes de ativar o Lab: 526 mercados e
-  **367.256 velas** coletados, e **zero** linhas em `strategies`, `strategy_versions` e
-  `feature_definitions` — a VPS coletava mercado havia horas sem ter uma única estratégia cadastrada.
-  Só apareceu porque o script de ativação recusou com a mensagem certa
-  (`REFUSED: no strategy_version for momentum v1 (run infra/scripts/seed.py first)`). Rodado à mão
-  com `HUNTER_COMMAND=seed`, que é idempotente; **a próxima VPS nasce com o mesmo buraco**. Dono:
-  `devops-engineer` — o `seed` precisa entrar no `compose.sh update`, depois do `migrate`.
-- **MEDIUM (observado, não é defeito) — 19 de 70 acompanhamentos encerrados na VPS têm
-  `R_net = NULL` por funding.** 18 com `funding_missing:2026-09-06T04:00:00+00:00` e 1 com
-  `funding_ambiguous_exit`, todos preservando `meta.r_ex_funding`. É o contrato do item 3 da decisão
-  conjunta funcionando (nunca zero inventado), mas é uma população grande — 27% dos encerrados — que
-  a janela local não produziu, e **toda avaliação datada sobre a VPS tem de contá-la fora dos
-  "encerrados avaliáveis"**. Fica aqui como lembrete de cobertura, não como bug do worker; o que
-  seria bug é o `market-worker` não apurar o funding das 04:00 para os mercados do universo, e isso
-  ainda não foi investigado.
+  Confirmado independentemente pela Astra, que reproduziu a composição do digest em memória:
+  converter só CRLF → LF nos arquivos locais devolve **exatamente** os hashes da VPS, que são iguais
+  aos dos blobs do commit (`raw c012f75c… → lf 6ccbe8b6… = git_blob 6ccbe8b6…`). `git ls-files --eol`
+  mostra os quatro arquivos como `i/lf, w/crlf` **apesar** de `eol=lf` no `.gitattributes` — a
+  normalização vale para o que entra no repositório, não para o que já está na árvore de trabalho.
+  **Correção certa:** normalização **mínima** de quebras de linha antes do digest, mantendo nomes,
+  ordem e separadores; **não** AST nem bytecode (AST exige inventar uma canonicalização nova,
+  bytecode não é estável entre versões do Python — os dois ampliariam o contrato em vez de consertar
+  o incidente). Com teste que compare o digest do mesmo módulo em CRLF e em LF. **E a correção
+  precisa vir com um plano para as versões já congeladas:** publicá-la muda os digests do lado
+  Windows, e as coortes locais de [[EXP-0001-momentum-v1]] e [[EXP-0002-volume-anomaly-v1]] deixam de
+  rodar sem `--supersede` auditado; os da VPS, já em LF, não mudam. Dono: quem tocar
+  `hunter_strategy_worker/code_ref.py` a seguir.
+- **HIGH (deploy) — o `seed` não é idempotente depois da primeira ativação, e não pode entrar no
+  fluxo de deploy como está.** Dois problemas encadeados. (a) `compose.sh update` roda `migrate` e
+  nunca `seed`: medido antes de ativar o Lab, a VPS tinha 526 mercados e **367.256 velas** coletados
+  e **zero** linhas em `strategies`, `strategy_versions` e `feature_definitions` — coletava mercado
+  havia horas sem uma única estratégia cadastrada. Só apareceu porque o script de ativação recusou
+  com a mensagem certa. (b) A correção óbvia — pôr o `seed` no `update` — **quebraria o próximo
+  deploy**, achado da revisão da Astra e reproduzido por mim na própria VPS depois da ativação:
+
+  ```
+  $ bash infra/vps/compose.sh run --rm -e HUNTER_COMMAND=seed --entrypoint /app/infra/docker/entrypoint.sh migrate
+  sqlalchemy.exc.DBAPIError: asyncpg.exceptions.RaiseError:
+    strategy_versions 01a074c5-8f1d-7a75-a88b-2badb6a5dd67 is frozen after activation: code_ref cannot change
+  [SQL: INSERT INTO strategy_versions (...) ON CONFLICT (strategy_id, version)
+        DO UPDATE SET code_ref = excluded.code_ref ...]
+  [parameters: (..., 'v1', 'draft', 'hunter_indicators.strategies.momentum_v1', ...)]
+  ```
+
+  `seed.py` sobrescreve `code_ref` com um placeholder; a trigger de congelamento recusa em qualquer
+  linha já ativada; e o seed roda numa transação só, então **as oito tabelas revertem juntas**. O
+  rollback funcionou (8 estratégias, 8 versões, 28 features, versões ativas intactas), mas um deploy
+  que falha inteiro por causa disso é pior que o buraco original. **Correção:** o seed tem de
+  **preservar** o `code_ref` de versões já ativadas, com teste `seed → ativação → seed`, **antes** de
+  entrar em qualquer fluxo automático. Dono: `devops-engineer` + `database-architect`.
+- **MEDIUM (sob investigação) — 18 outcomes na VPS podem ter `funding_missing` falso.** 19 de 70
+  acompanhamentos encerrados têm `R_net = NULL` (18 `funding_missing:2026-09-06T04:00:00+00:00`, 1
+  `funding_ambiguous_exit`), todos preservando `meta.r_ex_funding` — o comportamento conservador
+  está certo. Mas a Astra apontou que `hunter_strategy_worker/funding.py` trunca o intervalo para
+  segundos, projeta uma grade de liquidações e exige **correspondência exata de timestamp**, e o
+  histórico desta VPS tem `max(funding_time) = 2026-09-06 04:00:00.005+00`. **Cenário:** a liquidação
+  real existe cinco milissegundos depois da grade, a busca exata falha, e o outcome é rotulado como
+  funding ausente quando o dado está lá. Não cruzei outcome a outcome, então não está provado — mas
+  **não dá para classificar esses 18 como ausência legítima de dado**. Correção: identidade de
+  liquidação que preserve o timestamp original em vez de exigir igualdade com uma grade calculada.
+  Toda avaliação datada sobre a VPS conta os 19 fora dos "encerrados avaliáveis" de qualquer forma.
 
 ## Abertos pela primeira avaliação do Shadow Lab (S4, 2026-09-06)
 

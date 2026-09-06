@@ -49,11 +49,15 @@ Prova operacional em `.claude/state/vps-lab-proof.md`; resultado em [[Experiment
    `infra/vps/docker-compose.prod.yml`.** O override **não** herda o que não menciona: o
    `strategy-worker` existia só no compose base, herdou o `x-api-env` de desenvolvimento e morreu em
    loop com `InvalidPasswordError`. Corrigido em `75fc59c`.
-2. **O `seed` não está no fluxo de deploy.** `compose.sh update` roda `migrate` e nunca `seed`; a
-   VPS coletava mercado havia horas (526 mercados, 367 mil velas) com **zero** linhas em
-   `strategies`, `strategy_versions` e `feature_definitions`. Rodado à mão com
-   `bash infra/vps/compose.sh run --rm -e HUNTER_COMMAND=seed --entrypoint /app/infra/docker/entrypoint.sh migrate`
-   (idempotente, só dado de referência). Enquanto não entrar no `update`, a próxima VPS nasce igual.
+2. **O `seed` é de bootstrap, não de deploy — e hoje não pode ser repetido.** `compose.sh update`
+   roda `migrate` e nunca `seed`; a VPS coletava mercado havia horas (526 mercados, 367 mil velas)
+   com **zero** linhas em `strategies`, `strategy_versions` e `feature_definitions`. Rodado à mão
+   uma vez, com
+   `bash infra/vps/compose.sh run --rm -e HUNTER_COMMAND=seed --entrypoint /app/infra/docker/entrypoint.sh migrate`.
+   **Não o coloque no `update` como está:** depois da primeira ativação de uma `strategy_version`, o
+   seed tenta sobrescrever o `code_ref` congelado, a trigger recusa e **a transação inteira reverte**
+   — as oito tabelas. Reproduzido nesta VPS em 2026-09-06. Antes de automatizar, o seed precisa
+   preservar versões ativadas, com teste `seed → ativação → seed`. Ver [[Open Bugs]].
 
 Uma VPS Ubuntu 22.04/24.04 roda a mesma stack do compose de dev mais um override de produção, para o `market-worker` coletar mercado sem o PC ligado e para sessões de desenvolvimento por SSH (Claude Code e Codex funcionam melhor em Linux — o sandbox do Codex só funciona lá).
 

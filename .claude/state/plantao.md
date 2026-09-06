@@ -70,9 +70,17 @@ correções → commit por tarefa → push) e acrescentar a próxima avaliação
 turno seguinte, destacando a linha de **horizonte maturado** e abrindo a coorte da VPS (com as 19
 exclusões de funding contadas fora dos encerrados avaliáveis).
 
-Dois itens de infraestrutura para o `devops-engineer`, ambos achados nesta subida: pôr o `seed` no
-`compose.sh update` (senão a próxima VPS nasce sem estratégias) e normalizar as quebras de linha
-antes do digest do `code_ref` (senão uma versão congelada aqui nunca roda lá).
+Três itens de infraestrutura achados nesta subida, na ordem certa:
+
+1. **`seed` que preserva versões ativadas** (`devops-engineer` + `database-architect`), com teste
+   `seed → ativação → seed`. **Só depois** ele pode entrar no `compose.sh update` — hoje ele
+   sobrescreve o `code_ref` congelado, a trigger recusa e a transação inteira reverte (reproduzido
+   na VPS).
+2. **Normalização mínima de quebras de linha antes do digest do `code_ref`**, com um plano de
+   `--supersede` para as coortes locais que vão mudar de digest. Não AST, não bytecode.
+3. **Identidade de liquidação de funding que preserve o timestamp original** em vez de exigir
+   igualdade com uma grade calculada — 18 outcomes da VPS podem estar rotulados como
+   `funding_missing` com o dado presente.
 
 ## Precisa do Everton
 

@@ -61,8 +61,45 @@ seeded  28 row(s) into feature_definitions
 seeded   2 row(s) into opportunity_weights
 ```
 
-**Fica aberto:** o `seed` não está no fluxo de deploy (`compose.sh update`), então a próxima VPS
-nasce com o mesmo buraco. É trabalho de `devops-engineer`, registrado em `obsidian/07-BUGS`.
+**E aqui a revisão da Astra derrubou a minha recomendação óbvia.** Eu ia pedir para pôr o `seed` no
+`compose.sh update`. Ela apontou que `seed.py` faz `on_conflict_do_update(set_={"code_ref": ...})`
+em `strategy_versions`, substituindo o `code_ref` pelo placeholder — e a trigger de congelamento
+recusa isso em qualquer linha já ativada, com o seed inteiro numa transação só. Testei o cenário na
+própria VPS, depois da ativação:
+
+```
+$ bash infra/vps/compose.sh run --rm -e HUNTER_COMMAND=seed --entrypoint /app/infra/docker/entrypoint.sh migrate
+sqlalchemy.exc.DBAPIError: asyncpg.exceptions.RaiseError:
+  strategy_versions 01a074c5-8f1d-7a75-a88b-2badb6a5dd67 is frozen after activation: code_ref cannot change
+HINT:  create a new strategy_version; status, changelog and deprecated_at stay mutable
+[SQL: INSERT INTO strategy_versions (strategy_id, version, status, code_ref, id) VALUES (...)
+      ON CONFLICT (strategy_id, version) DO UPDATE SET code_ref = excluded.code_ref RETURNING strategy_versions.id]
+[parameters: (..., 'v1', 'draft', 'hunter_indicators.strategies.momentum_v1', ...)]
+```
+
+**O `seed` não é idempotente depois da primeira ativação: ele falha e reverte a transação inteira**
+— todas as oito tabelas. Colocá-lo no `compose.sh update` quebraria o próximo deploy desta VPS.
+O rollback funcionou (nada corrompido):
+
+```
+      key       | version | status |         activated_at          | code_ref
+----------------+---------+--------+-------------------------------+-----------------------------------
+ momentum       | v1      | active | 2026-09-06 03:36:36.988581+00 | hunter_core.strategies.momentum_v1@sha256:6ccbe8b6c8ac1
+ volume_anomaly | v1      | active | 2026-09-06 03:36:47.845595+00 | hunter_core.strategies.volume_anomaly_v1@sha256:a03d18f
+
+ strategies | versions | features | weights | weights_ativos
+------------+----------+----------+---------+----------------
+          8 |        8 |       28 |       2 |              1
+```
+
+**Fica aberto, com a correção certa agora conhecida:** o `seed` precisa **preservar** o `code_ref` de
+versões já ativadas (não sobrescrever), com teste `seed → ativação → seed`, **antes** de entrar em
+qualquer fluxo de deploy. Registrado como HIGH em `obsidian/07-BUGS/Open Bugs.md`.
+
+**Uma ressalva de honestidade sobre este seed:** não medi `opportunity_weights` antes de rodar. O
+código insere o que falta, verifica o que existe e recusa divergência, mas promove `is_active` na
+corrida que **cria** o perfil da release — como não há contagem anterior, não posso afirmar que
+nenhuma linha preexistente mudou de estado. A leitura de depois é `weights = 2`, `is_active = 1`.
 
 ## 1. `compose.sh update` — migração 0003 aplicada e o Lab no ar
 
@@ -143,9 +180,14 @@ $ docker exec hunter-strategy-worker-1 python -c "import urllib.request,sys; r=u
 ```
 
 Quatro delas são as do Lab (`shadow_migration`, `shadow_versions`, `shadow_consumer`,
-`shadow_outbox`); `database` e `redis` são do runtime base. `shadow_versions` só fica verde porque
-há versão `active` **e executável** — foi a checagem acrescentada quando o `code_ref` da árvore
-inteira deixava o Lab morto com `/ready` verde.
+`shadow_outbox`); `database` e `redis` são do runtime base.
+
+**Cuidado com o que `shadow_versions` verde significa** (correção da revisão da Astra): a checagem
+fica falsa quando existem linhas `active` e **nenhuma** executável — ela pega o caso do `code_ref`
+quebrado, que era o objetivo. Mas verde **não** prova catálogo executável não vazio (zero versões
+ativas também passa) nem que *todas* as versões ativas rodam: uma válida esconde outra recusada.
+Cenário: um deploy perde uma estratégia e o `/ready` continua verde. A evidência boa de que as duas
+estão rodando são os **sinais por estratégia** da seção 5, não esta checagem.
 
 ## 4. Heartbeat e primeiras avaliações
 
@@ -229,7 +271,7 @@ Chaves de heartbeat presentes: `hb:strategy:shadow`, `hb:strategy:42244c7e039c:1
 Os slots avançam: 203 por estratégia (mercados avaliados), 15 e 23 segurando um acompanhamento
 aberto — exatamente os `open_trackings` do heartbeat. Nenhuma censura por gap nesta janela.
 
-## 6. Outbox e stream — nada perdido
+## 6. Outbox e stream
 
 ```
 $ psql -c "select count(*) total, count(dispatched_at) dispatched, count(*) filter (where dispatched_at is null) pending, max(attempts), count(last_error) from shadow_outbox;"
@@ -243,7 +285,14 @@ $ docker exec hunter-redis-1 redis-cli XLEN shadow.signals.emitted
 
 Uma tentativa por evento, nenhum erro, nenhuma pendência.
 
-## 7. `R_net` nulo com motivo — o comportamento que a máquina local não produziu
+**O que isto prova e o que não prova** (correção da revisão da Astra): prova que o despachante
+esvaziou a fila sem reter nada e sem erro. **Não** prova "nada perdido" — o `XLEN` foi lido às 03:45,
+com 41 sinais, e os 109 despachos são do snapshot de 04:46; contagens iguais em instantes diferentes
+também poderiam esconder um evento duplicado e outro ausente. Para afirmar entrega exata seria
+preciso reconciliar as **identidades** (sinal, linha de outbox, evento) de uma população delimitada
+— e a entrega é idempotente por desenho justamente porque pode repetir depois de um crash.
+
+## 7. `R_net` nulo com motivo — e um motivo que pode estar errado
 
 ```
 $ psql -c "select (meta->>'r_net_reason') as r_net_reason, (meta->'funding'->>'reason') as funding_reason,
@@ -261,13 +310,26 @@ $ psql -c "select count(*) linhas, count(distinct market_id) mercados, min(fundi
    1472 |      208 | 2026-09-04 23:00:00.007+00 | 2026-09-06 04:00:00.005+00
 ```
 
-**19 dos 70 acompanhamentos encerrados têm `R_net = NULL`, cada um com o motivo escrito** — 18
-atravessaram a liquidação de funding das 04:00 UTC sem que o funding daquele mercado estivesse
-apurado, e 1 tem saída ambígua em relação à liquidação. Em todos os 19, `meta.r_ex_funding` está
-preservado como métrica separada, com cobertura própria. É exatamente o contrato do item 3 da
-decisão conjunta — **nunca zero inventado** — e é uma população que a janela local (com funding
-completo e horizontes curtos) não produziu. Qualquer avaliação datada sobre a VPS tem de contar
-essas 19 fora dos "encerrados avaliáveis".
+**19 dos 70 acompanhamentos encerrados têm `R_net = NULL`, cada um com o motivo escrito**, e em todos
+os 19 `meta.r_ex_funding` está preservado como métrica separada. O comportamento conservador está
+certo — **nunca zero inventado**, item 3 da decisão conjunta — e é uma população que a janela local
+(com funding completo e horizontes curtos) não produziu. Qualquer avaliação datada sobre a VPS tem
+de contar essas 19 fora dos "encerrados avaliáveis".
+
+**Mas o motivo pode estar errado, e isso é um achado, não uma nota de rodapé.** A revisão da Astra
+apontou que `hunter_strategy_worker/funding.py` trunca o intervalo para segundos inteiros, projeta
+uma grade de liquidações e exige **correspondência exata de timestamp**. O histórico desta VPS tem
+`max(funding_time) = 2026-09-06 04:00:00.005+00` — cinco milissegundos depois da grade. Cenário
+concreto: histórico às 02:00:00, 03:00:00 e 04:00:00.005; entrada às 03:30, saída às 04:30; a
+cadência calculada é 3600 s, a grade exige `04:00:00`, a liquidação real **existe** em
+`04:00:00.005`, a busca exata falha e o outcome recebe `funding_missing:04:00:00`.
+
+Isso **não prova** que explica os 18 casos — não cruzei outcome a outcome com o histórico por
+mercado. Mas impede classificá-los como ausência legítima de dado. Enquanto não houver esse
+cruzamento, a leitura correta é: **19 outcomes com `R_net` desconhecido, dos quais 18 podem ser
+falso `funding_missing` por identidade de liquidação frágil**. Registrado em
+`obsidian/07-BUGS/Open Bugs.md`; a correção passa por definir a identidade da liquidação preservando
+o timestamp original, em vez de exigir igualdade com uma grade calculada.
 
 ## 8. Saúde da máquina
 
@@ -349,11 +411,33 @@ O `code_ref` é o digest desses bytes.
 
 **Cenário de falha:** ativar uma versão a partir do dev box contra o banco de produção (ou restaurar
 um dump com versões congeladas no Windows e rodá-las na VPS) faz `load_active_versions` recusar
-**todas** com `shadow_version_code_ref_mismatch`. Com a correção da S2, `/ready` fica vermelho e o
-container em restart em vez de mentir — então não é silencioso, mas o Lab **não roda**, e um campo
-congelado não se corrige no lugar: só `--supersede`, com a coorte anterior encerrada.
+**todas** com `shadow_version_code_ref_mismatch`. Com a correção da S2 o `/ready` fica vermelho em
+vez de mentir — mas **readiness falsa não reinicia container nenhum**: `restart: always` reage à
+*saída* do processo, e neste caminho o worker continua de pé, consumindo e recusando avaliar (a
+afirmação anterior, de que o container entraria em restart, era minha e estava errada; correção da
+revisão da Astra). Ou seja: não é silencioso para quem olha o `/ready`, mas é silencioso para quem
+espera autocura. E campo congelado não se corrige no lugar: só `--supersede`, encerrando a coorte.
 
 Hoje não morde porque cada ambiente ativou as suas próprias linhas. Registrado como HIGH em
-`obsidian/07-BUGS/Open Bugs.md`. Correção certa: normalizar as quebras de linha antes do digest (ou
-digerir o AST/bytecode em vez do arquivo bruto), com teste que compara o digest de um mesmo módulo
-em CRLF e em LF.
+`obsidian/07-BUGS/Open Bugs.md`.
+
+**Confirmação independente (Astra, `.claude/state/astra-review-S4-vps-lab.md`).** Ela reproduziu a
+composição do digest em memória e fechou o diagnóstico: converter só CRLF → LF nos arquivos locais
+devolve **exatamente** os hashes da VPS, que por sua vez são iguais aos dos blobs do commit.
+
+```
+momentum_v1        raw: c012f75cdd8492d3...   lf: 6ccbe8b6c8ac18f3...   git_blob: 6ccbe8b6c8ac18f3...
+volume_anomaly_v1  raw: d8275427c958743b...   lf: a03d18fece9e0052...   git_blob: a03d18fece9e0052...
+```
+
+`git ls-files --eol` mostra os quatro arquivos como `i/lf, w/crlf` **apesar** de `eol=lf` no
+`.gitattributes` — a normalização vale para o que entra no repositório, não para o que já está na
+árvore de trabalho.
+
+**Correção certa, com o preço declarado.** Normalização mínima de quebras de linha antes do digest,
+mantendo nomes, ordem e separadores atuais. **Não** AST nem bytecode: AST exige inventar uma
+representação canônica nova, e bytecode não tem estabilidade garantida entre versões do Python —
+os dois ampliariam o contrato em vez de consertar o incidente. E a correção **precisa de um plano
+para as versões já congeladas**: publicá-la muda os digests do lado Windows de `c012…/d827…` para
+`6ccb…/a03d…`, e as coortes locais de `EXP-0001`/`EXP-0002` deixam de rodar sem `--supersede`
+auditado. Os digests da VPS, por já serem LF, **não** mudam.

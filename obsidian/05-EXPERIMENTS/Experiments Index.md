@@ -113,9 +113,15 @@ Mas essas linhas **não** entram nas avaliações acima. São `strategy_version`
 `activated_at` e `code_ref` diferentes (o digest não é o mesmo entre Windows e Linux — [[Open Bugs]]),
 logo são **coortes distintas**, com população própria. Vão virar avaliação datada no próximo
 plantão, com o mesmo SQL, e com uma exclusão que a janela local não teve: **19 dos 70
-acompanhamentos encerrados na VPS têm `R_net = NULL`** por funding não apurado
-(`funding_missing:2026-09-06T04:00:00+00:00`, `funding_ambiguous_exit`), com `meta.r_ex_funding`
-preservado — 27% dos encerrados ficam fora dos "encerrados avaliáveis".
+acompanhamentos encerrados na VPS têm `R_net = NULL`** (`funding_missing:2026-09-06T04:00:00+00:00`
+em 18, `funding_ambiguous_exit` em 1), com `meta.r_ex_funding` preservado — 27% dos encerrados ficam
+fora dos "encerrados avaliáveis". **O motivo desses 18 está sob investigação**, não confirmado: o
+cálculo exige timestamp exato numa grade de liquidações e o histórico da VPS tem a liquidação em
+`04:00:00.005` (achado da Astra, [[S4-vps-lab]]) — o dado pode estar lá. Fora da conta eles ficam de
+qualquer jeito; o que muda é se o rótulo é honesto.
+
+Vale a mesma advertência do [[Workers|worker]]: a prova da VPS mostra que o **fluxo de sombra
+funcionou naquela janela**, e nada além. Não é avaliação de experimento.
 
 ### Rotina de plantão
 
