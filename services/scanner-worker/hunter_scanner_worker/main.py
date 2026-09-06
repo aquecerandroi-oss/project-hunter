@@ -27,8 +27,9 @@ from hunter_core.events.outbox import OutboxHealth, reconcile, run_dispatcher
 from hunter_core.events.streams import Streams
 from hunter_core.logging import get_logger
 from hunter_scanner_worker.backfill import BackfillRequester
+from hunter_scanner_worker.baseline_runner import BootstrapProgress, baseline_loop
 from hunter_scanner_worker.baselines import BaselineCache
-from hunter_scanner_worker.config import ScannerConfig, exchange_code
+from hunter_scanner_worker.config import build_config
 from hunter_scanner_worker.consumers import (
     ConsumerHealth,
     candle_of,
@@ -37,6 +38,7 @@ from hunter_scanner_worker.consumers import (
     symbol_of,
     ts_of,
 )
+from hunter_scanner_worker.deriv import deriv_loop
 from hunter_scanner_worker.health import CycleHealth, readiness_checks, write_heartbeat
 from hunter_scanner_worker.persist import DB_ROLE
 from hunter_scanner_worker.policy import load_policy
@@ -56,6 +58,7 @@ from hunter_scanner_worker.writers import probe_baseline_lock
 if TYPE_CHECKING:
     from hunter_core.events.envelope import EventEnvelope
     from hunter_core.runtime import WorkerRuntime
+    from hunter_scanner_worker.config import ScannerConfig
     from hunter_scanner_worker.state import PendingAck
 
 logger = get_logger(__name__)
@@ -67,7 +70,7 @@ __all__ = ["run_scanner"]
 
 async def run_scanner(runtime: WorkerRuntime) -> None:
     """Entry point registered for ``HUNTER_ROLE=scanner``."""
-    config = ScannerConfig(exchange=exchange_code())
+    config = build_config()
     factory = create_session_factory(runtime.engine)
     from hunter_core.db.session import role_session
 
@@ -88,9 +91,15 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
 
     consumers, cycle, outbox_health = ConsumerHealth(), CycleHealth(), OutboxHealth()
     requester = BackfillRequester(scanner.producer)
+    progress = BootstrapProgress()
     universe_wake = asyncio.Event()
-    checks = readiness_checks(scanner, consumers, cycle, outbox_health, config, runtime.redis)
+    checks = readiness_checks(
+        scanner, consumers, cycle, outbox_health, config, runtime.redis, progress
+    )
     runtime.readiness_checks.extend(checks)
+    # A diagnostic, never a verdict: an operator reading a green ``/ready``
+    # still has to see "bootstrapping BTCUSDT (37/200)" next to it.
+    runtime.status_details["baselines"] = progress.describe
 
     try:
         await refresh_universe(scanner, factory, runtime.redis)
@@ -107,8 +116,12 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
                 "regime": regime_loop(scanner, factory, runtime.redis, runtime),
                 "watchdog": watchdog_loop(scanner, factory, runtime.redis, runtime),
                 "registry": registry_loop(scanner, factory, runtime.redis, runtime, universe_wake),
+                "baselines": baseline_loop(
+                    scanner, factory, runtime.engine, runtime.redis, runtime, progress, requester
+                ),
+                "deriv": deriv_loop(scanner, factory, runtime),
                 "outbox": run_dispatcher(runtime.redis, factory, outbox_health, db_role=DB_ROLE),
-                "heartbeat": _heartbeat_loop(runtime, scanner, cycle, consumers, config),
+                "heartbeat": _heartbeat_loop(runtime, scanner, cycle, consumers, config, progress),
             }
             for stream in (
                 Streams.MARKET_TICKS,
@@ -139,10 +152,10 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
                 _universe_handler(universe_wake),
                 block_ms=config.consume_block_ms,
             )
-            del requester  # wired by the bootstrap below; kept for the next wave
             for name, coro in tasks.items():
                 group.create_task(forever(name, coro), name=f"scanner-{name}")
     finally:
+        runtime.status_details.pop("baselines", None)
         for check in checks:
             if check in runtime.readiness_checks:
                 runtime.readiness_checks.remove(check)
@@ -207,7 +220,7 @@ def _universe_handler(wake: asyncio.Event) -> Any:
 
 
 async def _warm(scanner: Scanner, factory: Any, runtime: WorkerRuntime, cycle: CycleHealth) -> None:
-    """Load the baseline cache and the regime's reference series, once."""
+    """Load the baseline cache, the derivative history and the regime's series."""
     from hunter_scanner_worker.repo import load_candles, load_open_regime
 
     now = utcnow()
@@ -215,7 +228,16 @@ async def _warm(scanner: Scanner, factory: Any, runtime: WorkerRuntime, cycle: C
     async with runtime.engine.begin() as connection:
         loaded = await scanner.cache.refresh(connection, refs, now=now) if scanner.cache else 0
     cycle.baselines_loaded = True
-    logger.info("scanner_baselines_loaded", revisions=loaded, markets=len(refs))
+    # Before the first evaluation, not after: a market evaluated without its
+    # open-interest history disarms ``OPEN_INTEREST_SPIKE`` for that cycle, and
+    # doing that on every restart would be a self-inflicted blind spot.
+    observations = await scanner.deriv.refresh(factory, refs, now=now)
+    logger.info(
+        "scanner_baselines_loaded",
+        revisions=loaded,
+        markets=len(refs),
+        deriv_observations=observations,
+    )
 
     btc = scanner.registry.ref(BTC_SYMBOL)
     if btc is not None and scanner.regime is not None:
@@ -242,7 +264,8 @@ async def _heartbeat_loop(
     cycle: CycleHealth,
     consumers: ConsumerHealth,
     config: ScannerConfig,
+    progress: BootstrapProgress,
 ) -> None:
     while True:
-        await write_heartbeat(runtime.redis, runtime, scanner, cycle, consumers)
+        await write_heartbeat(runtime.redis, runtime, scanner, cycle, consumers, progress)
         await asyncio.sleep(config.heartbeat_s)

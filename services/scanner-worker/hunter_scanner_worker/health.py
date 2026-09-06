@@ -16,10 +16,16 @@ anonymous ``false``:
   a perfectly healthy worker producing nothing;
 - **``scanner_outbox``** -- nothing queued and unpublished for too long. An
   event stuck in Postgres means the streams no longer reflect the database;
-- **``scanner_baselines``** -- the archive was *loaded*. Deliberately not "the
-  archive is mature": a fresh install has no seven-day history and saying so is
-  the honest state, not a failure. What would be a failure is not knowing --
-  a cache that was never read cannot tell "under construction" from "empty".
+- **``scanner_baselines``** -- the archive was loaded **and** every market's
+  baseline state is either usable or declared under construction, for at least
+  ``baseline_ready_ratio`` of the universe. Deliberately not "the archive is
+  mature": a fresh install has no seven-day history and saying so is the honest
+  state, not a failure. While the bootstrap is still walking the universe the
+  check stays green *as long as it is advancing* -- a bootstrap that stopped
+  advancing below the ratio is a worker that will never have baselines, and that
+  is a failure. ``/ready`` carries the sentence itself as a status detail
+  (``baselines: "bootstrapping BTCUSDT (37/200)"``), which is a diagnostic and
+  never a verdict.
 
 The heartbeat (``hb:scanner:<instance>``) carries the numbers an operator reads
 during an incident: universe size, dirty markets, baseline maturity, open
@@ -37,6 +43,7 @@ from hunter_core.redis import keys
 from hunter_scanner_worker.metrics import (
     scanner_anomalies_open,
     scanner_baselines,
+    scanner_detectors_disarmed,
     scanner_dirty_markets,
     scanner_universe_size,
 )
@@ -48,6 +55,7 @@ if TYPE_CHECKING:
 
     from hunter_core.events.outbox import OutboxHealth
     from hunter_core.runtime import WorkerRuntime
+    from hunter_scanner_worker.baseline_runner import BootstrapProgress
     from hunter_scanner_worker.config import ScannerConfig
     from hunter_scanner_worker.consumers import ConsumerHealth
     from hunter_scanner_worker.scanner import Scanner
@@ -59,6 +67,10 @@ MAX_CONSUMER_IDLE_S = 60.0
 MAX_CYCLE_IDLE_S = 30.0
 OUTBOX_MAX_PENDING = 5_000
 OUTBOX_MAX_LAG_S = 60.0
+
+_DISARMED_SEEN: set[tuple[str, str]] = set()
+"""Label pairs this process has published, so a rearmed detector can be
+set back to zero instead of keeping its last value forever."""
 
 __all__ = ["CycleHealth", "newest_stream_entry_at", "readiness_checks", "write_heartbeat"]
 
@@ -108,8 +120,8 @@ def readiness_checks(
     outbox: OutboxHealth,
     config: ScannerConfig,
     redis: redis_asyncio.Redis | None = None,
+    progress: BootstrapProgress | None = None,
 ) -> list[Callable[[], Awaitable[bool]]]:
-    del config  # cadences are the loops' business; readiness reads state
 
     async def scanner_consumers() -> bool:
         if not consumers.last_iteration_at:
@@ -137,7 +149,16 @@ def readiness_checks(
         return outbox.ready(max_pending=OUTBOX_MAX_PENDING, max_lag_s=OUTBOX_MAX_LAG_S)
 
     async def scanner_baselines() -> bool:
-        return cycle.baselines_loaded and scanner.cache is not None
+        if not cycle.baselines_loaded or scanner.cache is None:
+            return False
+        if progress is None:
+            return True
+        if progress.ratio >= config.baseline_ready_ratio:
+            return True
+        # Still building. Green while it advances, red once it stops: a
+        # bootstrap that is not moving will never produce a baseline, and a
+        # scanner that will never have baselines cannot score anything.
+        return progress.active()
 
     return [scanner_consumers, scanner_evaluation, scanner_outbox, scanner_baselines]
 
@@ -148,6 +169,7 @@ async def write_heartbeat(
     scanner: Scanner,
     cycle: CycleHealth,
     consumers: ConsumerHealth,
+    progress: BootstrapProgress | None = None,
 ) -> None:
     """``hb:scanner:<instance>`` plus the gauges the dashboards read."""
     markets = list(scanner.state.markets.values())
@@ -165,6 +187,18 @@ async def write_heartbeat(
     if maturity is not None:
         scanner_baselines.labels(state="usable").set(maturity.usable)
         scanner_baselines.labels(state="under_construction").set(maturity.under_construction)
+    under_construction = sum(1 for market in markets if market.baseline_note is not None)
+    disarmed: dict[tuple[str, str], int] = {}
+    for market in markets:
+        for kind, reason in market.disarmed:
+            disarmed[(kind, reason)] = disarmed.get((kind, reason), 0) + 1
+    for label in _DISARMED_SEEN - set(disarmed):
+        # The last market rearmed: the series has to go to zero, or the gauge
+        # keeps reporting detectors that are armed again.
+        scanner_detectors_disarmed.labels(type=label[0], reason=label[1]).set(0)
+    for (kind, reason), count in disarmed.items():
+        scanner_detectors_disarmed.labels(type=kind, reason=reason).set(count)
+    _DISARMED_SEEN.update(disarmed)
     mapping = {
         "ts": utcnow().isoformat(),
         "markets": str(len(markets)),
@@ -173,6 +207,11 @@ async def write_heartbeat(
         "anomalies_open": str(open_anomalies),
         "baselines_usable": str(maturity.usable if maturity else 0),
         "baselines_under_construction": str(maturity.under_construction if maturity else 0),
+        "baselines_state": progress.describe() if progress is not None else "unknown",
+        "markets_under_construction": str(under_construction),
+        "detectors_disarmed": ",".join(
+            f"{kind}:{reason}={count}" for (kind, reason), count in sorted(disarmed.items())
+        ),
         "coverage": "live" if scanner.coverage.fresh() else "unproven",
         "consumer_errors": str(consumers.errors),
         "errors": str(runtime.error_count),

@@ -338,21 +338,29 @@ async def test_a_closed_anomaly_is_reloaded_so_an_old_evaluation_cannot_reopen_i
     assert stored_state.observation_ts == NOW
 
 
-async def test_the_row_lock_is_probed_once_and_its_absence_is_reported(
+async def test_the_row_lock_is_taken_now_that_the_grant_exists(
     db_session_factory: Any,
 ) -> None:
-    """``0003`` grants no ``UPDATE`` on ``feature_baselines``, and PostgreSQL
-    needs it for ``SELECT ... FOR SHARE``. The scanner has to *find that out* and
-    say so, not discover it inside a batch and lose the batch."""
-    from hunter_scanner_worker.writers import probe_baseline_lock
+    """PostgreSQL requires ``UPDATE`` to take any row lock, and ``0003`` granted
+    none -- reported by T2.5 as BUG-1, which degraded the writer to a plain
+    existence check and gave up the serialisation against a concurrent retention
+    ``DELETE``. Migration ``0005_baseline_lock_grant`` added exactly that grant
+    (immutability stays in the ``feature_baselines_immutable`` trigger, which
+    refuses every ``UPDATE`` for every role), so against a database at head the
+    protocol of ``docs/DATABASE.md`` section 17.2 is honoured in full.
+
+    This asserts against a **migrated** database on purpose: the probe is the
+    scanner's way of finding out what this deployment allows, and the answer here
+    is the answer production gets."""
+    from hunter_scanner_worker import writers
 
     async with role_session(db_session_factory, db_role="hunter_worker") as session:
-        allowed = await probe_baseline_lock(session)
+        allowed = await writers.probe_baseline_lock(session)
+        assert allowed is True
+        # And the statement the batch will actually run is the locking one.
+        surviving = await writers.surviving_baselines(session, {uuid7()})
 
-    # If this ever starts returning True, the grant was added and the retention
-    # protocol of DATABASE.md 17.2 is honoured in full -- update the note in
-    # writers.probe_baseline_lock rather than this assertion.
-    assert allowed is False
+    assert surviving == set()
 
 
 async def test_a_vanished_baseline_drops_every_effect_of_that_evaluation(

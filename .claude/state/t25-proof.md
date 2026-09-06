@@ -191,3 +191,196 @@ O worker roda 30 minutos contra dado real sem uma exceção, escreve o que tem e
 escrever, e diz com motivo estruturado tudo o que não tem. O que falta para o aceite integral do M2
 são duas coisas, e ambas são a **mesma** dependência: o custo por vetor da T2.2 precisa cair antes do
 bootstrap das baselines ser viável, e sem baselines não há score, nem anomalia, nem linha no Radar.
+
+---
+
+# Prova operacional — T2.5b (bootstrap, refresh horário, backfill, derivativos)
+
+Segunda janela, sobre o mesmo stack local, com a imagem `hunter-api:dev` reconstruída do
+commit de trabalho da T2.5b (`docker compose build api`) e o `scanner-worker` recriado. Tudo
+abaixo foi lido do banco, do Redis, do `/metrics`, do `/ready` e do `docker stats`.
+
+## 1. Janela e preparação declarada
+
+| | |
+|---|---|
+| Janela contínua | **2026-09-06T18:20:23Z → 18:51:01Z** (30 min 38 s) |
+| Serviços | `postgres`, `redis`, `market-worker`, `scanner-worker`, `strategy-worker`, `api` |
+| Migrações | `0005_baseline_lock_grant` (head) — chegou de outra tarefa em voo e **fecha o BUG-1** da §6.5 |
+| Universo | 200 mercados monitorados |
+
+**Preparação feita à mão, e por quê (isto não é dado inventado).** O banco local só tinha
+candles de `2026-09-04T15:27Z` em diante — 2,1 dias. Com 2 dias não existe bucket utilizável
+(o portão pede ≥ 3 dias distintos), então nenhuma baseline do bootstrap passaria e a prova
+mediria o vazio de novo. O caminho previsto para isso é o `market.backfill.requested`, e ele
+**não tem consumidor** (§4). Então fiz à mão exatamente o que o consumidor faria: inseri 32
+linhas em `ingestion_gaps` (8 mercados × 4 janelas de 1 dia, `2026-09-01T00:00Z` →
+`2026-09-04T15:26Z`) e deixei o **market-worker** buscá-las por REST, que é o dono do REST.
+Resultado: 8 mercados com **5,76 dias de candles reais da Binance** (`8 299` minutos cada);
+os outros 192 continuam com 2,1 dias. Nenhuma linha foi escrita por mim em `candles`.
+
+## 2. O bootstrap rodou, e o que ele produziu
+
+| Métrica | Valor |
+|---|---|
+| Mercados com bootstrap concluído na janela | **28** (`feature_baselines.source='bootstrap'`, 28 `market_id` distintos) |
+| Revisões de bootstrap gravadas | **9 909** no banco (`hunter_scanner_baseline_revisions_total{source="bootstrap"}` = 9 549 no instante da leitura) |
+| Buckets **utilizáveis** (≥ 3 dias distintos e ≥ 120 observações) | **1 065** |
+| Minutos reprocessados | **278 917** cortes (`hunter_scanner_bootstrap_cuts_total`) |
+| Custo por mercado | 10 080 cortes; ~65 s de parede neste banco (a maior parte dos cortes cai antes do primeiro candle e é barata) |
+| Progresso em `/ready` | `"baselines":"bootstrapping 4USDT (9/200)"` às 18:31, `"bootstrapping BEATUSDT (26/200)"` às 18:51 |
+| `scanner_baselines` (readiness) | **verde a janela inteira**, com o progresso ao lado como *status detail* |
+
+Ordem: `BTCUSDT` primeiro por desenho (o regime e o breadth dependem dele), depois a ordem do
+universo.
+
+## 3. O refresh horário
+
+Na partida, o bucket da hora fechada (17:00Z) foi recomputado para os 200 mercados a partir das
+`feature_snapshots` de 7 dias:
+
+```
+scanner_baseline_hour_refreshed hour=2026-09-06T17:00:00+00:00 markets=200 written=3045 withheld=0 cached=3045
+```
+
+**Só o bucket daquela hora** (`hour=17`), 3 045 revisões `live`, nenhuma retida — não havia ainda
+bootstrap utilizável para nenhuma delas, então não havia maturidade a proteger. A política de
+retenção de revisão imatura (`outcome="withheld"`) aparece no `/metrics` em 0, que é o número
+correto para esta janela; quem a exercita é o teste
+`test_an_immature_live_revision_does_not_supersede_a_usable_bootstrap`.
+
+## 4. Backfill: pedido, e **sem consumidor** — o bloqueio herdado
+
+| | |
+|---|---|
+| Pedidos publicados | **28** (`hunter_scanner_backfill_requests_total`), 29 mensagens no stream |
+| Exemplo real | `scanner_backfill_requested symbol=BTCUSDT gap_start=2026-08-29T17:00:00Z gap_end=2026-09-01T00:00:00Z reason=baseline_bootstrap` |
+| Consumidores do stream | **nenhum** — `XINFO GROUPS market.backfill.requested` devolve vazio |
+| REST chamado pelo scanner | **zero** (o teste mata `httpx.AsyncClient` e o bootstrap passa) |
+
+O pedido é publicado corretamente e **ninguém o atende**: `services/market-worker` não tem
+consumidor de `market.backfill.requested` (a `recovery.py` acha lacunas pela própria janela de
+detecção, de 1 439 minutos). É a MF-3 da Astra, confirmada, e está **fora dos arquivos desta
+tarefa**. Enquanto não existir, "faltou histórico" é declarado (`markets_under_construction`) e
+reparado à mão, como na §1.
+
+## 5. Derivativos
+
+| | |
+|---|---|
+| Observações de OI carregadas na partida | **7 164** sobre 200 mercados (`scanner_baselines_loaded deriv_observations=7164`) |
+| Janela | 9 h (cobre `open_interest_change_4h` e `funding_change_8h` com as tolerâncias) |
+| `OPEN_INTEREST_SPIKE` desarmado | **1 mercado** (`deriv_history_unavailable`); nos outros 199 está armado |
+| `FUNDING_ANOMALY` desarmado | **81 mercados** (`funding_unavailable`: o hash `deriv` não traz funding para eles) |
+| `LIQUIDATION_CLUSTER` / `CROSS_EXCHANGE_DIVERGENCE` | 200 cada, pelos motivos herdados (`feature_not_implemented`, `single_exchange_until_m1b`) |
+
+Antes da T2.5b o `load_deriv_history` nunca era chamado e `OPEN_INTEREST_SPIKE` ficava **armado e
+mudo** nos 200. Agora o motivo é uma métrica e um campo do heartbeat
+(`detectors_disarmed=...OPEN_INTEREST_SPIKE:deriv_history_unavailable=1`).
+
+## 6. O que o scanner fez na janela
+
+| Métrica | Valor |
+|---|---|
+| Avaliações (vetores) | **13 725** (`markets_evaluated_total{outcome="covered"}`) |
+| `feature_snapshots` gravadas na janela | **6 599** |
+| Eventos consumidos | ticks 52 248 · candles 53 746 · derivativos 49 678 · liquidações 105 · universo 1 |
+| Transações de persistência | 96 lotes, 17,75 s somados → **185 ms por lote** |
+| `outbox` pendente | **0** |
+| Anomalias abertas / oportunidades | **0 / 0** |
+| Regimes | 1 linha (`UNKNOWN`, warm-up: `regime_seeded samples=137 usable=False`) |
+| Exceções em 30 min | **0** (`grep -icE "traceback\|exception\|_failed"` sobre os logs da janela) |
+| CPU / memória | scanner **99,8 %** de um núcleo, 166 MiB · market-worker 99,9 %, 275 MiB |
+| `/ready` | **200** nos quatro checks, com `baselines: "bootstrapping ... (26/200)"` |
+
+## 7. Latência tick → oportunidade — continua fora do orçamento, com uma causa a mais
+
+| | Janela T2.5 (30 min) | Janela T2.5b (30 min) |
+|---|---|---|
+| Amostras | 27 259 | **13 645** |
+| Média | 201 s | **145 s** |
+| ≤ 3 s | 150 (0,55 %) | **0** |
+| ≤ 21 s | ~2 000 | **2 066 (15 %)** |
+| p95 / p99 | > 21 s | **> 21 s** |
+
+**Alvo p99 ≤ 3 s: não cumprido.** Duas causas somadas, ambas declaradas:
+
+1. a herdada e não resolvida: ~50 ms por vetor (`windows._epoch_minutes`, notes-T2.2 §16). A
+   T2.2b, que derruba isso para ≤ 5 ms, **não estava na árvore** durante esta prova
+   (`packages/indicators/hunter_indicators/features/windows.py:38` continua sem memo);
+2. a nova e intencional: o bootstrap divide o mesmo event loop, com `bootstrap_duty = 0,4`
+   (padrão). Perto de metade do relógio do scanner esteve reproduzindo 279 mil minutos de
+   histórico. Essa metade desaparece sozinha quando o arquivo estiver construído; a outra é o
+   item 1.
+
+O número honesto: com o bootstrap ativo há **menos avaliações** (13 725 contra 27 336) e uma
+média **melhor** (145 s contra 201 s), porque o backlog de mercados sujos ficou parecido
+(`dirty` 124–162 contra 117–149) sobre menos amostras — a latência não piorou, e também não
+chegou perto do alvo.
+
+## 8. Radar da API — **ainda não demonstrado**, com um motivo novo e mais estreito
+
+`GET /api/v1/radar` seleciona `FROM opportunities`: **0 linhas**. `radar:scores` (ZSET): **0
+entradas**. Mas o motivo mudou de lugar, e a diferença importa.
+
+Sonda somente-leitura dentro do contêiner, pelo caminho de produção (`build_market_context` →
+`evaluate_market`), sobre os 26 mercados já bootstrapados:
+
+```
+       ADAUSDT score=0.00 eligible=True  conf=0.0952 status=NORMAL stage=NONE available=['agent_consensus','anomalies','volume']
+       BTCUSDT score=0.09 eligible=True  conf=0.0952 status=NORMAL stage=NONE available=['agent_consensus','anomalies','volume']
+        (24 outros) score=None eligible=False        available=['agent_consensus','anomalies']
+scored: 2/26
+```
+
+Isto é **progresso real e verificável** sobre a T2.5, onde `score` era `None` em 200 de 200:
+
+- **o scorer agora produz score elegível** (`eligible=True`) para os mercados com ≥ 3 dias
+  distintos de histórico — exatamente os dois da amostra que passaram pelo backfill da §1;
+- os outros 24 seguem `no_eligible_evidence` porque só têm 2,1 dias de candles: os buckets
+  existem e não passam o portão. É a §4 de novo — o backfill não tem quem o atenda;
+- mesmo nos dois que pontuam, **só o componente `volume` está disponível**. `momentum`,
+  `liquidity`, `order_flow` e `derivatives` dizem `no_usable_input` e `market_regime` diz
+  `regime_unknown` (o regime está em warm-up: `regime_seeded samples=137 usable=False`).
+  `liquidity`/`order_flow` são estruturais e estão declarados desde a T2.3: o bootstrap **não
+  pode** produzir baseline de livro nem de tape (`historical_source_unavailable`), então elas só
+  amadurecem com 7 dias de `feature_snapshots` ao vivo;
+- com um componente de oito e peso ~0,10, o score fica ~0, `advance_status` devolve `NORMAL`,
+  `NORMAL` não abre episódio, e sem episódio não há linha em `opportunities` nem em
+  `radar:scores`. **Comportamento correto**, não falha.
+
+Nenhuma linha foi inventada para preencher o Radar. O que falta para demonstrá-lo, na ordem:
+(a) um consumidor de `market.backfill.requested` (fora desta tarefa) para que os 192 mercados
+restantes tenham 7 dias; (b) 7 dias de snapshots ao vivo para o livro e o tape, ou uma decisão
+explícita sobre pontuar com menos componentes; (c) o memo da T2.2b, para que o bootstrap dos 200
+mercados caiba em horas em vez de dias.
+
+## 9. Veredito
+
+| Item da T2.5b | Situação |
+|---|---|
+| Runner de bootstrap (7 dias, uma passada por minuto, lotes, progresso reidratável) | **OK** — 28 mercados, 9 909 revisões, 1 065 buckets utilizáveis |
+| Refresh horário só do bucket da hora fechada | **OK** — `hour=17`, 3 045 revisões, nenhum outro bucket tocado |
+| Backfill publicado, nunca REST, "em construção" com motivo | **OK no scanner**; **BLOQUEADO** do lado de quem atende (nenhum consumidor) |
+| `load_deriv_history` chamado de verdade, detectores desarmados com motivo | **OK** — 7 164 observações; `OPEN_INTEREST_SPIKE` armado em 199/200 |
+| Readiness declara o bootstrap sem ficar vermelho | **OK** — `"bootstrapping BEATUSDT (26/200)"`, quatro checks verdes |
+| 0 exceções, outbox 0, snapshots por minuto | **OK** |
+| p99 tick→oportunidade ≤ 3 s | **NÃO CUMPRIDO** (> 21 s) — §7 |
+| Radar da API com linhas reais | **NÃO DEMONSTRADO** — §8, com o motivo agora medido componente a componente |
+
+## 10. Confirmação após as correções da revisão de diff da Astra
+
+A janela de 30 min da §1 mediu a imagem **anterior** às cinco correções (notes-T2.5 §21). Depois
+delas a imagem foi reconstruída (`docker compose build api`) e o `scanner-worker` recriado, com uma
+janela curta de confirmação — não é uma segunda prova de 30 min, é a evidência de que o binário
+corrigido roda:
+
+| | |
+|---|---|
+| Janela | **2026-09-06T19:12:48Z → 19:22:25Z** (9 min 37 s) |
+| Exceções | **0** |
+| `/ready` | `{"database":true,"redis":true,"scanner_consumers":true,"scanner_evaluation":true,"scanner_outbox":true,"scanner_baselines":true,"baselines":"bootstrapping DOGEUSDT (51/200)"}` |
+| Bootstrap | **51 mercados** no arquivo (18 077 revisões), ~70 s por mercado, 10 080 cortes cada |
+| Recarga imediata | `scanner_baseline_market_reloaded symbol=DEXEUSDT revisions=381` logo após cada mercado — a correção que impede um bootstrap de ficar invisível até a hora virar |
+| Refresh horário | o bucket da hora 18 entrou (`live` foi de 3 045 para 6 263 revisões, 201 mercados) |
+| `complete=False gaps=1` por mercado | correto: o histórico local começa em `2026-09-01`, então todo mercado tem um buraco declarado no início da janela de 7 dias e um pedido de backfill |

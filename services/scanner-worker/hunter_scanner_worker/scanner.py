@@ -32,6 +32,7 @@ from hunter_scanner_worker.baselines import BaselineCache
 from hunter_scanner_worker.checkpoint import Checkpoint
 from hunter_scanner_worker.context import build_market_context
 from hunter_scanner_worker.coverage import TapeCoverage
+from hunter_scanner_worker.deriv import DerivHistory, detector_roster, disarmed_reasons
 from hunter_scanner_worker.evaluate import Evaluation, EvaluationInputs, evaluate_market
 from hunter_scanner_worker.metrics import (
     scanner_markets_evaluated_total,
@@ -47,7 +48,6 @@ if TYPE_CHECKING:
 
     import redis.asyncio as redis_asyncio
 
-    from hunter_indicators.features import DerivObservation
     from hunter_scanner_worker.config import ScannerConfig
     from hunter_scanner_worker.policy import Policy
 
@@ -71,9 +71,11 @@ class Scanner:
     cache: BaselineCache | None = None
     regime: RegimeEngine | None = None
     coverage: TapeCoverage = field(default_factory=TapeCoverage)
-    deriv_history: dict[UUID, list[DerivObservation]] = field(
-        default_factory=dict[UUID, list["DerivObservation"]]
-    )
+    deriv: DerivHistory = field(default_factory=DerivHistory)
+    """Open-interest readings from the durable tables. Without them the
+    ``open_interest_change_*`` features are ``missing_input`` forever and
+    ``OPEN_INTEREST_SPIKE`` is armed and permanently silent."""
+
     regime_id: UUID | None = None
     producer: str = "scanner-worker"
 
@@ -125,15 +127,25 @@ class Scanner:
         moment = now or utcnow()
         if self.cache is None:
             return None
+        observations = self.deriv.for_market(market.ref.market_id)
         build = await build_market_context(
             redis,
             exchange=market.ref.exchange,
             symbol=market.ref.symbol,
             coverage=self.coverage,
-            deriv_history=self.deriv_history.get(market.ref.market_id, []),
+            deriv_history=observations,
             now=moment,
         )
         context = build.context
+        # Rebuilt every cycle, from current state: that is what makes a detector
+        # rearm by itself the moment its evidence exists, and what keeps
+        # "cannot be evaluated" a *declared* state instead of silence.
+        snapshot = context.deriv.value
+        detectors = detector_roster(
+            has_oi_history=bool(observations),
+            has_funding=snapshot is not None and snapshot.funding_rate is not None,
+        )
+        market.disarmed = disarmed_reasons(detectors)
         cut = BaselineCut(as_of=context.as_of, observation_ts=context.as_of)
         score_due = market.due_for_score(moment, self.config.score_throttle_s)
         evaluation = evaluate_market(
@@ -146,6 +158,7 @@ class Scanner:
                 stage_thresholds=self.policy.stage,
                 status_thresholds=self.policy.status,
                 stage_inputs=self.stage_inputs(market, as_of=context.as_of),
+                detectors=detectors,
                 stage_state=market.checkpoint.stage,
                 feature_state=market.checkpoint.features,
                 anomaly_states=tuple(market.anomalies.values()),

@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from hunter_core.events.outbox import OutboxHealth
+from hunter_scanner_worker.baseline_runner import BootstrapProgress
 from hunter_scanner_worker.baselines import BaselineCache
 from hunter_scanner_worker.config import ScannerConfig
 from hunter_scanner_worker.consumers import ConsumerHealth
@@ -41,7 +42,11 @@ class FakeStreams:
 
 
 def _checks(
-    consumers: ConsumerHealth, redis: Any, *, cycle: CycleHealth | None = None
+    consumers: ConsumerHealth,
+    redis: Any,
+    *,
+    cycle: CycleHealth | None = None,
+    progress: BootstrapProgress | None = None,
 ) -> dict[str, Any]:
     policy = build_policy()
     scanner = Scanner(
@@ -53,7 +58,7 @@ def _checks(
     scanner.cache = BaselineCache(gate=policy.gate)
     outbox = OutboxHealth(last_sweep_at=NOW)
     built = readiness_checks(
-        scanner, consumers, cycle or CycleHealth(), outbox, ScannerConfig(), redis
+        scanner, consumers, cycle or CycleHealth(), outbox, ScannerConfig(), redis, progress
     )
     return {check.__name__: check for check in built}
 
@@ -114,4 +119,47 @@ async def test_an_empty_baseline_archive_is_not_a_readiness_failure() -> None:
     # A fresh install has no seven-day history. "Under construction" is a state
     # the Radar shows, not a reason to refuse traffic; what would be a failure
     # is not knowing, which is what ``baselines_loaded`` records.
+    assert await checks["scanner_baselines"]() is True
+
+
+def _loaded_cycle() -> CycleHealth:
+    cycle = CycleHealth()
+    cycle.baselines_loaded = True
+    return cycle
+
+
+async def test_a_bootstrap_still_walking_the_universe_declares_itself_instead_of_going_red() -> (
+    None
+):
+    consumers = ConsumerHealth(started_at=NOW)
+    consumers.last_iteration_at["market.ticks"] = NOW
+    progress = BootstrapProgress(total=200, declared=10, running="BTCUSDT")
+    progress.touch()
+
+    checks = _checks(consumers, FakeStreams({}), cycle=_loaded_cycle(), progress=progress)
+
+    assert await checks["scanner_baselines"]() is True
+    assert progress.describe() == "bootstrapping BTCUSDT (10/200)"
+
+
+async def test_a_bootstrap_that_stopped_advancing_below_the_ratio_is_red() -> None:
+    consumers = ConsumerHealth(started_at=NOW)
+    consumers.last_iteration_at["market.ticks"] = NOW
+    progress = BootstrapProgress(total=200, declared=10)
+    progress.last_advance_at = NOW - timedelta(hours=1)
+
+    checks = _checks(consumers, FakeStreams({}), cycle=_loaded_cycle(), progress=progress)
+
+    # Nothing is advancing and 190 markets have no declared baseline state: this
+    # worker will never score anything, which is a failure and not a phase.
+    assert await checks["scanner_baselines"]() is False
+
+
+async def test_eighty_percent_declared_is_green_with_nothing_running() -> None:
+    consumers = ConsumerHealth(started_at=NOW)
+    consumers.last_iteration_at["market.ticks"] = NOW
+    progress = BootstrapProgress(total=200, declared=160)
+
+    checks = _checks(consumers, FakeStreams({}), cycle=_loaded_cycle(), progress=progress)
+
     assert await checks["scanner_baselines"]() is True

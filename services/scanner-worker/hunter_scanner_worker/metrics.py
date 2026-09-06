@@ -87,6 +87,37 @@ scanner_backfill_requests_total = Counter(
     registry=registry,
 )
 
+scanner_bootstrap_markets = Gauge(
+    "hunter_scanner_bootstrap_markets",
+    "Markets by baseline bootstrap state (done / pending / running).",
+    ["state"],
+    registry=registry,
+)
+
+scanner_bootstrap_cuts_total = Counter(
+    "hunter_scanner_bootstrap_cuts_total",
+    "Minutes replayed by the baseline bootstrap. The unit of its cost.",
+    registry=registry,
+)
+
+scanner_baseline_revisions_total = Counter(
+    "hunter_scanner_baseline_revisions_total",
+    "Baseline revisions offered to the archive, by source and outcome. "
+    '"written" counts what was sent to the append-only INSERT, including the '
+    'idempotent collisions a retry produces; "withheld" counts what was not sent '
+    "because it would have replaced a usable baseline with a less mature one.",
+    ["source", "outcome"],
+    registry=registry,
+)
+
+scanner_detectors_disarmed = Gauge(
+    "hunter_scanner_detectors_disarmed",
+    "Markets whose detector is disarmed, by type and reason -- never armed and mute.",
+    ["type", "reason"],
+    registry=registry,
+)
+
+
 scanner_consumer_events_total = Counter(
     "hunter_scanner_consumer_events_total",
     "Stream messages handled, by stream.",
@@ -97,8 +128,12 @@ scanner_consumer_events_total = Counter(
 __all__ = [
     "scanner_anomalies_open",
     "scanner_backfill_requests_total",
+    "scanner_baseline_revisions_total",
     "scanner_baselines",
+    "scanner_bootstrap_cuts_total",
+    "scanner_bootstrap_markets",
     "scanner_consumer_events_total",
+    "scanner_detectors_disarmed",
     "scanner_dirty_markets",
     "scanner_markets_evaluated_total",
     "scanner_opportunities",

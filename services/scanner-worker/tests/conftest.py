@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+    from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
     from testcontainers.community.postgres import PostgresContainer
     from testcontainers.community.redis import RedisContainer
 
@@ -125,20 +125,28 @@ def migrated_db_url(postgres_container: PostgresContainer) -> Iterator[str]:
 
 
 @pytest_asyncio.fixture
-async def db_session_factory(
-    migrated_db_url: str,
-) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+async def db_engine(migrated_db_url: str) -> AsyncIterator[AsyncEngine]:
+    """The engine itself — the baseline cache and the hourly refresh take an
+    ``AsyncConnection``, not a session, because ``SqlBaselineStore`` does."""
     from pydantic import SecretStr
 
-    from hunter_core.db.session import create_engine, create_session_factory
+    from hunter_core.db.session import create_engine
     from hunter_core.settings import Settings
 
-    settings = Settings(database_url=SecretStr(migrated_db_url))
-    engine = create_engine(settings)
+    engine = create_engine(Settings(database_url=SecretStr(migrated_db_url)))
     try:
-        yield create_session_factory(engine)
+        yield engine
     finally:
         await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def db_session_factory(
+    db_engine: AsyncEngine,
+) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    from hunter_core.db.session import create_session_factory
+
+    yield create_session_factory(db_engine)
 
 
 @pytest_asyncio.fixture

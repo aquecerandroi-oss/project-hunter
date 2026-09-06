@@ -104,6 +104,16 @@ class MarketState:
     joined_at: datetime | None = None
     evaluations: int = 0
 
+    baseline_note: str | None = None
+    """Why this market's baselines are still "under construction", if they are.
+    Set by the bootstrap when it finds holes it had to ask somebody else to
+    repair; ``None`` once a run completed over an unbroken history."""
+
+    disarmed: tuple[tuple[str, str], ...] = ()
+    """``(detector, reason)`` for every detector this market cannot evaluate at
+    all. An armed detector that can never fire is indistinguishable from a calm
+    market, so the reason is carried here and reported."""
+
     def touch(self, reason: str, *, input_ts: datetime | None = None) -> None:
         """Mark dirty. Twenty touches in a second still cost one evaluation."""
         now = utcnow()

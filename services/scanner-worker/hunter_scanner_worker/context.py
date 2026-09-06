@@ -62,7 +62,13 @@ window says ``insufficient_coverage`` -- late and honest beats current and
 made up.
 """
 
-__all__ = ["ContextBuild", "MAX_CUT_LAG_S", "build_market_context", "evaluation_cut"]
+__all__ = [
+    "ContextBuild",
+    "MAX_CUT_LAG_S",
+    "build_market_context",
+    "evaluation_cut",
+    "history_entry",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,7 +144,7 @@ async def build_market_context(
         book=decode_book(raw.book, as_of),
         trades=trades,
         deriv=decode_deriv(raw.deriv, as_of),
-        deriv_history=_history_entry(deriv_history, as_of),
+        deriv_history=history_entry(deriv_history, as_of),
         btc=btc,
     )
     return ContextBuild(
@@ -148,7 +154,7 @@ async def build_market_context(
     )
 
 
-def _history_entry(
+def history_entry(
     observations: Sequence[DerivObservation], as_of: datetime
 ) -> SourceEntry[tuple[DerivObservation, ...]]:
     """The ``deriv_history`` source entry, cut at ``as_of``."""

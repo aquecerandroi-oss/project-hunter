@@ -61,20 +61,20 @@ cost a whole cycle of writes to learn a fact that never changes."""
 async def probe_baseline_lock(session: AsyncSession) -> bool:
     """Find out whether ``SELECT ... FOR SHARE`` is permitted here.
 
-    ``0003`` grants ``hunter_worker`` ``SELECT, INSERT, DELETE`` on
-    ``feature_baselines`` and deliberately no ``UPDATE``
-    (``infra/migrations/ddl/analysis.py``: ``ANALYSIS_WORKER_APPEND_TABLES``),
-    while PostgreSQL requires ``UPDATE`` for a row lock. So against a correctly
-    migrated database the locked statement fails with *permission denied*, and
-    the retention protocol of ``docs/DATABASE.md`` section 17.2 -- which has the
-    writer take ``FOR SHARE`` before referencing a revision -- cannot be
-    honoured as written.
+    ``0003`` granted ``hunter_worker`` ``SELECT, INSERT, DELETE`` on
+    ``feature_baselines`` and deliberately no ``UPDATE``, while PostgreSQL
+    requires ``UPDATE`` for a row lock: the locked statement failed with
+    *permission denied* and the retention protocol of ``docs/DATABASE.md``
+    section 17.2 -- which has the writer take ``FOR SHARE`` before referencing a
+    revision -- could not be honoured as written. That was T2.5's BUG-1, and
+    **``0005_baseline_lock_grant`` fixed it**: the grant is in, immutability
+    stays where it always was (the ``feature_baselines_immutable`` trigger
+    refuses every ``UPDATE`` for every role, owner included).
 
-    This is a deployment defect, not a scanner defect, so it is probed in its
-    own transaction, logged at error level and reported; the fix is one grant,
-    and granting ``UPDATE`` changes nothing about immutability (the
-    ``feature_baselines_immutable`` trigger refuses every ``UPDATE`` for every
-    role, owner included).
+    The probe stays, because it answers a question about *this* deployment and
+    not about the migration history: a database still at ``0004`` degrades to a
+    plain existence check with an ``error`` in the log instead of losing a batch
+    to a privilege failure inside a transaction.
     """
     global _lock_denied
     try:

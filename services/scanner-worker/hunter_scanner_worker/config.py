@@ -73,5 +73,65 @@ class ScannerConfig:
     backfill_days: int = 7
     """History the baseline bootstrap wants before it declares a bucket."""
 
+    baseline_window_days: int = 7
+    """Days of history a baseline bucket is computed from. 420 observations per
+    ``(market, feature, UTC hour)`` — the joint M2 decision's expected size."""
 
-__all__ = ["CONSUMER_GROUP", "DEFAULT_EXCHANGE_CODE", "ScannerConfig", "exchange_code", "group_for"]
+    bootstrap_budget_s: float = 120.0
+    """Wall time one visit spends on one market's replay before the loop looks at
+    the clock again. It bounds how late the hourly refresh can be, which is the
+    only reason the bootstrap is sliced at all."""
+
+    bootstrap_duty: float = 0.4
+    """Share of wall time the replay may hold. A market is ~10 000 cuts at tens of
+    milliseconds each; taking the whole loop would stall live evaluation for
+    minutes, and taking too little would never finish. Overridable per deployment
+    (``SCANNER_BOOTSTRAP_DUTY``) because the right split depends on how far behind
+    the live loop already is."""
+
+    baseline_ready_ratio: float = 0.80
+    """Share of the universe that must have a *declared* baseline state — usable
+    or under construction with a reason — for readiness to go green."""
+
+    deriv_refresh_s: float = 300.0
+    """How often the durable open-interest history is re-read. The collector
+    samples every 5 minutes, so anything faster only re-reads the same rows."""
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _clamped_duty(raw: float) -> float:
+    """``duty`` outside ``(0, 1]`` is a typo, not a policy: 0 divides by zero."""
+    return min(1.0, max(0.05, raw))
+
+
+def build_config() -> ScannerConfig:
+    """The run's cadences, with the two bootstrap knobs an operator may tune.
+
+    Only cadences are read from the environment. Thresholds never are: they are
+    versioned in ``opportunity_weights`` so a decision can be replayed against the
+    numbers that produced it.
+    """
+    return ScannerConfig(
+        exchange=exchange_code(),
+        bootstrap_budget_s=max(1.0, _env_float("SCANNER_BOOTSTRAP_BUDGET_S", 120.0)),
+        bootstrap_duty=_clamped_duty(_env_float("SCANNER_BOOTSTRAP_DUTY", 0.4)),
+    )
+
+
+__all__ = [
+    "CONSUMER_GROUP",
+    "DEFAULT_EXCHANGE_CODE",
+    "ScannerConfig",
+    "build_config",
+    "exchange_code",
+    "group_for",
+]

@@ -267,6 +267,7 @@ async def refresh_universe(
         # being a Radar row. Leaving the ZSET entry would show a score nobody
         # is refreshing.
         scanner.state.drop(ref.symbol)
+        scanner.deriv.drop(ref.market_id)
         await projections.drop_from_radar(redis, ref)
     if diff.changed:
         await _rehydrate(scanner, factory, [ref for ref in diff.added])
