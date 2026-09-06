@@ -6,7 +6,7 @@ fonte_url: —
 lido_em: 2026-09-06
 evidencia: replicado (saída colada)
 hipotese_testavel: sim
-astra: pendente
+astra: discorda em parte (correções aplicadas)
 ---
 
 # A tabela de capacidade — quantos mercados suportam 500, 2.000 e 10.000 USDT
@@ -29,6 +29,9 @@ O resumo, medido em 200 livros de 20 níveis lidos do hot state da VPS num inter
 E a distribuição do teto por mercado, a 5 bps contra o mid: **mediana 2.174 USDT**, decil inferior
 **295 USDT**, decil superior **41.879 USDT**. Dois mercados têm capacidade **zero** a 5 bps, porque o
 meio spread sozinho já custa mais que isso.
+
+**Isto é uma fotografia de 11 segundos, e só do lado do ask.** Não é capacidade operacional
+comprovada; é o que o livro mostrava naquele instante.
 
 ## Onde foi mostrado
 
@@ -88,13 +91,17 @@ mercados com capacidade ZERO a 5 bps (meio spread ja > 5 bps): 2/200
 
 **Três leituras do teto que só aparecem lendo a saída inteira:**
 
-1. **Cinco dos dez maiores estão censurados pela profundidade de 20 níveis, não pelos 5 bps.**
+1. **Três dos dez maiores estão censurados pela profundidade de 20 níveis, não pelos 5 bps.**
    BTCUSDT, ETHUSDT e BNBUSDT têm `max5 = prof_ask20` exatamente — o livro acabou antes de o custo
    chegar a 5 bps. **O teto real deles é maior do que o medido**, e a nossa medição não sabe quanto.
+   *(Eu tinha escrito "cinco"; são três — correção da revisão da Astra, conferida na saída.)*
 2. **Spread e profundidade são defeitos independentes.** SUSHIUSDT tem 105 mil USD de profundidade e
-   capacidade de **3 USDT** a 5 bps, porque o spread de 3,86 bps consome quase todo o orçamento antes
-   de o primeiro nível ser tocado. 1000FLOKIUSDT tem 124 mil de profundidade e teto de 99 USDT. O
+   capacidade de **3 USDT** a 5 bps; 1000FLOKIUSDT tem 124 mil de profundidade e teto de 99 USDT. O
    contrário também: CLOUSDT tem spread de 0,88 bps e só 1.760 USD de profundidade.
+   **Correção da revisão:** eu explicava o caso do SUSHI dizendo que o spread "consome quase todo o
+   orçamento". Não consome: contra o mid, um spread de 3,86 bps custa **1,93 bps**, e sobram 3,07 dos
+   5. O mecanismo que zera a capacidade dele é outro, e **esta medição não o identifica** — só
+   registra que os primeiros níveis esgotam o orçamento restante.
 3. **Contra o melhor ask** (só profundidade, sem o meio spread) a mediana sobe de 2.174 para 3.536
    USDT. A diferença é o custo que o spread cobra antes de qualquer impacto — e é ela que separa "o
    livro é fino" de "o mercado é caro".
@@ -111,8 +118,12 @@ mercados com capacidade ZERO a 5 bps (meio spread ja > 5 bps): 2/200
 | 200.000 USDT | 10.000 | **50/200** | 90/200 |
 
 Lida assim, ela diz uma coisa simples e útil: **com 10 mil USDT de capital, a capacidade do livro
-praticamente não é um problema** — 197 dos 200 mercados absorvem a posição a 10 bps ou menos. A
-capacidade só começa a morder a partir de dezenas de milhares.
+não aparece como o gargalo nesta fotografia** — 197 dos 200 mercados absorvem a posição a 10 bps ou
+menos, **do lado do ask**. A capacidade só começa a morder a partir de dezenas de milhares.
+
+**Ressalva que a revisão exigiu e que limita essa frase:** só o **ask** foi medido. Uma entrada
+barata nesta fotografia pode ser seguida de uma saída num **bid raso durante um rompimento**, e a
+tabela nada diz sobre isso. "A capacidade não é problema" é leitura **de uma perna, num instante**.
 
 **E ela desmente uma leitura fácil do piso de liquidez do contrato.** O `min_liquidity_usd_24h` de
 50 M USD (perfil Conservative) desligaria 182 dos 232 mercados
@@ -149,7 +160,15 @@ censurada pela profundidade de 20 níveis, e sem a hora do dia. As duas coisas e
 
 ## Segunda opinião (Astra)
 
-Pendente nesta versão.
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-sizing-risk-2.md`). **Três correções, todas
+aplicadas:** são **três** e não cinco os mercados censurados pela profundidade de 20 níveis entre os
+dez maiores; o spread de 3,86 bps do SUSHIUSDT custa **1,93 bps** contra o mid e **não** "quase todo
+o orçamento" — a minha explicação do caso estava errada; e "com 10 mil a capacidade não é problema"
+extrapola uma leitura **só do ask**, com o cenário de falha concreto de entrar barato e sair num bid
+raso durante rompimento.
+
+**Concordou com:** que a fotografia é diagnóstico condicional e que livro e volume medem aspectos
+diferentes.
 
 ## Relacionados
 

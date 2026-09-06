@@ -6,7 +6,7 @@ fonte_url: —
 lido_em: 2026-09-06
 evidencia: replicado (SQL colado) + leitura de código
 hipotese_testavel: sim
-astra: pendente
+astra: concorda
 ---
 
 # Risco operacional — as regras de "não operar quando…", e o princípio de falhar fechado
@@ -149,7 +149,14 @@ dos estados de check, que é o mesmo `R-PROV-1`.
 
 ## Segunda opinião (Astra)
 
-Pendente nesta versão.
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-sizing-risk-2.md`), na rodada que cobriu as
+seis notas de medição. Ela não pediu correção de conteúdo nesta nota, e reforçou o princípio geral
+que a atravessa: **manter as medições como diagnósticos condicionais, sem eliminar controles antes
+de provar redundância** — o que é exatamente o argumento de `R-OPS-1`.
+
+A ressalva dela que mais atinge esta página, e que vale registrar: **correlações baixas numa janela
+não demonstram baixa concentração de carteira**, do mesmo modo que **34 mercados com lacuna numa
+janela sem incidente não descrevem uma queda de exchange**.
 
 ## Relacionados
 

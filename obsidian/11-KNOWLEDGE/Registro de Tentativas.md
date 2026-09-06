@@ -500,6 +500,84 @@ código e do dado de 2026-09-06. Nenhuma pode ser confirmada nessa mesma popula�
 exige janela futura reservada, declarada **antes** da coleta, e o piso de 100 outcomes e 30 dias
 **não substitui cálculo de potência**.
 
+
+## Acréscimo de 2026-09-06 (oitava rodada — dimensionamento de posição e Risk Engine)
+
+**Tentativas avaliadas continuam em 0.** Esta rodada **não propõe nenhuma variante de estratégia**:
+o Shadow Lab não dimensiona posição, e tudo o que saiu dela são regras para o Risk Engine do M3/M4
+(seção "Regras propostas para o Risk Engine (M3/M4)" no [[Strategy Backlog]]). Nada aqui entra na
+conta de multiplicidade de estratégia — mas as **medições** feitas entram como inspeção da amostra,
+e por isso ficam registradas.
+
+### Diagnósticos e convenções abertos (não são variantes)
+
+| ID | Item | Nota de origem | Pré-requisito |
+|---|---|---|---|
+| D-052 | `R-PROV-1` — distribuição do limitante vencedor do sizing, com `stop_distance`, orçamento de risco e estado de cada check | [[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]] | existir proposta (M3) |
+| D-053 | `R-VOL-1` — notional por unidade de risco, **nas duas referências** (`1/(k·atr_pct)` e `1/d_E`) | [[KB-0068-sizing-por-volatilidade-a-posicao-sai-do-atr]] | idem |
+| D-054 | `R-CAP-M` — série da tabela de capacidade por mercado e por hora, **dos dois lados do livro** | [[KB-0070-a-tabela-de-capacidade-quantos-mercados-suportam-cada-tamanho]] | nenhum além de gravar |
+| D-055 | `R-KS-2` — tamanho com e sem multiplicadores, **na mesma proposta e no mesmo estado** | [[KB-0072-drawdown-e-kill-switch-a-evidencia-e-a-convencao]] | existir proposta |
+| D-056 | `D-PAPER-1` — desfecho recomputado no **mark price** contra o desfecho por OHLC de negócios, com matriz de concordância | [[KB-0075-paper-trading-honesto-o-que-a-sombra-ainda-nao-simula]] | medir antes a cobertura de `mark_price` por minuto |
+| C-PAPER | convenção: todo relatório do Lab traz a população do Lab e a população que o Risk Engine teria admitido | [[KB-0075-paper-trading-honesto-o-que-a-sombra-ainda-nao-simula]] | `M` exige **simulação sequencial**, ainda não feita |
+
+### Inferências minhas retiradas nesta rodada (revisões da Astra, 2026-09-06)
+
+`.claude/state/astra-review-KB-sizing-risk-1.md` e `-2.md`. Linhas novas, nunca edição das
+anteriores:
+
+1. **"`max_position_pct` sempre vence o sizing"** — não decorre da comparação feita: caixa,
+   exposição total, por ativo e por exchange podem dar quantidade menor. Contraexemplo: equity
+   10.000, preço 100, Balanced, stop 1,5%, caixa livre 100, `max_leverage = 2` → `qty_by_cash = 2`
+   contra `qty_by_position = 5`.
+2. **"Risco efetivo por operação"** — o nome correto é *risco bruto no stop, supondo posição limitada
+   exclusivamente pelo teto por posição e sem arredondamento*. Custos e gaps ficam fora.
+3. **"O Risk Engine recusaria 98,9% das entradas do Lab"** — a consulta mede **demanda**: conta
+   acompanhamentos que uma carteira com teto nem teria aberto. Taxa de rejeição exige simulação
+   sequencial com desempate declarado.
+4. **"182 mercados abaixo do piso de liquidez"** — são **182 somas observadas** abaixo do piso, com
+   completude não verificada; 34 mercados têm lacunas em 24 h.
+5. **"A fórmula de sizing tem sete limitantes"** — tem **seis**; `floor_to_step` é operação
+   posterior.
+6. **"Kelly é função da expectancy"** — é da distribuição inteira. Contraexemplo: duas apostas com
+   expectancy de 0,1 R pedem `f*` de 10% e de 5%.
+7. **"69% terminaram sem tocar o alvo, logo sequências de 20 perdas são esperadas"** — invalidação
+   não determina o sinal do resultado líquido, e a inferência exige ordenação e dependência.
+8. **"A expectancy do Lab não é distinguível de zero em nenhuma coorte"** — a formulação correta é
+   **"evidência insuficiente para concluir"**; nenhuma referência da nota fornece esse teste.
+9. **"`ks_multiplier` e `regime_size_multiplier` são inertes"** — não universalmente. O limiar é
+   `d > r·m/p`, e há combinações admissíveis (Balanced + `BTC_BEAR_LONG` + `WARNING`, stop acima de
+   2,5%) em que reduzem. O que sobrevive é que a redução **não é garantida**.
+10. **"Uma hora ruim atinge o limite diário de 2%"** — é cenário condicionado, não vazão demonstrada:
+    mediana de duração não determina vazão.
+11. **"Os dois tetos de capacidade discordam por um fator de ~4"** — estoque e fluxo não podem
+    discordar; e as medianas vêm de universos diferentes (200 contra 232 mercados).
+12. **"`p = 0,10` deixa 500 USDT passar no mercado mediano"** — autoriza **460,51 USDT**.
+13. **"Acima de 10% de participação o custo cresce mais rápido que o tamanho (`√γ`)"** — `√γ` é
+    **sublinear**, e a fonte não estabelece transição universal em 10%.
+14. **"Cinco dos dez maiores estão censurados pela profundidade de 20 níveis"** — são **três**.
+15. **"O spread de 3,86 bps do SUSHIUSDT consome quase todo o orçamento de 5 bps"** — contra o mid
+    custa **1,93 bps**; o mecanismo que zera a capacidade dele **não foi identificado**.
+16. **"β mede escala de volatilidade, não co-movimento"** — `β = ρ·σa/σb` mistura as duas; com
+    `ρ = 0`, β é zero. E **147/232 não demonstra "não separa nada"**: demonstra que o critério é
+    quase sempre verdadeiro, o que o torna ruim como **agrupamento**, não inútil como sensibilidade
+    ao fator. O título da [[KB-0071-beta-maior-que-0-8-nao-separa-nada-no-nosso-universo]] é mais
+    forte que o achado, e fica registrado assim.
+17. **"`Σ(notional × β)/equity` substitui o check de correlação"** — com soma **assinada**, long A e
+    short B de mesmo notional e β = 1 zeram a medida e ainda perdem nas duas pernas. Corrigido para o
+    **módulo**, e rebaixado a controle **complementar**.
+18. **"`d_liq ≈ 1/L − mmr`"** — falta o denominador: `(1/L − mmr)/(1 − mmr)` para long,
+    `/(1 + mmr)` para short. Com isso, o stop mediano de 1,52% só é ultrapassado por volta de
+    **49,7×**, e um stop de 5% já fica além da liquidação a **25×**.
+19. **"`max_leverage` nunca morde no Balanced"** — exige hipótese sobre caixa livre que não temos; e
+    seis posições de 5% somam **30%**, não 60%.
+20. **"Com 10 mil de capital a capacidade não é problema"** — leitura **só do ask**; a saída num bid
+    raso durante rompimento não foi medida.
+21. **"Duração mediana curta torna o funding economicamente irrelevante"** — mostra que a maioria não
+    atravessa ciclo; a cauda e o custo realizado continuam por medir.
+
+**Consequência de multiplicidade:** D-052 a D-056 nasceram da inspeção do contrato e do dado de
+2026-09-06. Nenhum é variante de estratégia, mas todos são inspeção da mesma população — e nenhuma
+candidata das rodadas anteriores pode ser confirmada nela.
 ## Relacionados
 
 [[Strategy Backlog]] · [[Index]] ·

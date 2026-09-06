@@ -6,7 +6,7 @@ fonte_url: —
 lido_em: 2026-09-06
 evidencia: leitura de código + leitura de contrato + medição própria citada
 hipotese_testavel: sim
-astra: pendente
+astra: concorda
 ---
 
 # Paper trading honesto — o que a sombra ainda não simula, e por que os números dela não passam para o M4
@@ -32,10 +32,13 @@ Sete diferenças, todas com consequência mensurável:
 | 4 | sem rejeição de ordem | rejeições, `min_notional`, `step_size` | posições pequenas podem ser **inexecutáveis** e hoje contam como executadas |
 | 5 | sem fila, sem tipo de ordem | ordem agressiva explícita ([[KB-0039-tipos-de-ordem-e-o-que-a-sombra-assume-sem-dizer]]) | o Lab tem política de execução implícita que ninguém escreveu |
 | 6 | funding tratado como transferência assinada na apuração | funding realizado por ciclo, com cadência real | a mediana de exposição é de 12 a 21 min: a maioria não atravessa ciclo |
-| 7 | sem carteira: cada sinal vira acompanhamento | 6 slots, caixa finito, exposição agregada | **981 de 992 entradas do Lab não teriam existido** ([[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]]) |
+| 7 | sem carteira: cada sinal vira acompanhamento | 6 slots, caixa finito, exposição agregada | **981 de 992 entradas chegaram com ≥ 6 acompanhamentos anteriores abertos** ([[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]]) |
 
 A linha 7 é a que fecha a nota: **a diferença entre o Lab e o M4 não é de precisão de custo; é de
-população.** Nove em cada dez oportunidades que o Lab avalia o produto não teria pegado.
+população.** **Ressalva obrigatória (correção da Astra):** esse número mede **demanda**, não taxa de
+rejeição — a consulta conta acompanhamentos que uma carteira com teto nem teria aberto. Quantas
+oportunidades o produto teria pegado só se sabe com **simulação sequencial**, com regra de desempate
+declarada para as entradas do mesmo minuto. O que está estabelecido é a direção, não a razão.
 
 ## Onde foi mostrado
 
@@ -90,7 +93,9 @@ indesejado** — é só a informação que falta.
 
 E uma **convenção**, `C-PAPER`: todo relatório do Lab passa a trazer, ao lado do resultado, a linha
 *"população do Lab: N acompanhamentos; população que o Risk Engine teria admitido: M"*. Enquanto
-`M ≪ N`, nenhum número do Lab é previsão sobre o produto — e hoje `M/N ≈ 1/90`.
+`M ≪ N`, nenhum número do Lab é previsão sobre o produto. **`M` exige a simulação sequencial descrita
+acima e ainda não foi calculado** — o que temos hoje é a demanda (981 de 992 entradas com ≥ 6
+acompanhamentos abertos), que é um limite superior grosseiro da lotação, não `M`.
 
 ## Por que pode falhar
 
@@ -99,15 +104,24 @@ E uma **convenção**, `C-PAPER`: todo relatório do Lab passa a trazer, ao lado
 - **A comparação de instrumentos de stop depende da cobertura de `market_snapshots` por minuto**, que
   é justamente o que a quinta rodada mediu como ruim (8 de 200 sinais com snapshot no próprio
   minuto). O diagnóstico pode ficar sem denominador.
-- **`M/N ≈ 1/90` usa os limites do perfil Balanced sobre uma janela de 16 h.** Com outro perfil, ou
-  outra vazão de sinal, a razão muda muito.
+- **A razão `M/N` não foi calculada.** O número de concorrência mede demanda, e convertê-lo em taxa
+  de admissão exige simulação sequencial que não foi feita. Qualquer razão publicada antes disso é
+  invenção.
 - **Nada disto significa que o Lab esteja errado.** Ele mede o que se propôs a medir — se a regra de
   entrada e saída seleciona instantes com informação. O erro seria ler esse número como previsão de
   retorno de uma carteira, e é exatamente esse erro que esta nota tenta tornar impossível.
 
 ## Segunda opinião (Astra)
 
-Pendente nesta versão.
+Revisões de 2026-09-06 (`.claude/state/astra-review-KB-sizing-risk-1.md` e `-2.md`).
+
+**A correção que atinge esta nota** veio da primeira: o número de concorrência mede **demanda**, não
+taxa de rejeição, e a razão `M/N` que eu tinha publicado (≈ 1/90) **não foi calculada** — exige
+simulação sequencial com regra de desempate declarada. Corrigido acima e no `C-PAPER`.
+
+**Concordou com o achado central da nota:** a diferença de preços que importa é **mark contra
+negócios** — o contrato prevê stop no mark (`PIPELINE.md:189`) e o walker observa velas
+(`walker.py:71`). É o que sustenta o `D-PAPER-1`.
 
 ## Relacionados
 

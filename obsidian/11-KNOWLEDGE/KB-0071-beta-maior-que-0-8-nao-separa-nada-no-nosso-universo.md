@@ -6,7 +6,7 @@ fonte_url: —
 lido_em: 2026-09-06
 evidencia: replicado (SQL colado)
 hipotese_testavel: sim
-astra: pendente
+astra: discorda em parte (correções aplicadas)
 ---
 
 # `beta > 0.8` não separa nada no nosso universo — e a exposição agregada precisa de outra medida
@@ -20,13 +20,22 @@ onde o Lab realmente emite sinal é **0,062**, e **nenhum** dos 780 pares passa 
 
 A causa é elementar e já tinha sido registrada no [[Registro de Tentativas]] (item 11 da sétima
 rodada): `β = ρ · σ_a / σ_b`. Como `σ_altcoin ≫ σ_BTC`, o β fica grande **mesmo com correlação
-minúscula**. O β mede quanto o ativo se move *por unidade* de movimento do BTC; a correlação mede
-quanto do movimento é *explicado* por ele. **O check de correlação está medindo escala de
-volatilidade.**
+pequena**. O β mede quanto o ativo se move *por unidade* de movimento do BTC; a correlação mede
+quanto do movimento é *explicado* por ele.
+
+> **Correção de 2026-09-06, na revisão da Astra, e ela atinge o título desta nota.** Eu escrevi que
+> "o check está medindo escala de volatilidade". **Está errado como afirmação absoluta:** `β` combina
+> escala **e** co-movimento — com `ρ = 0`, `β` é zero por maior que seja a volatilidade. O defeito
+> real é de **confusão**, não de substituição: `ρ = 0,1` com razão de volatilidades 10 dá `β = 1`, e
+> `ρ = 0,9` com razão 0,5 dá `β = 0,45` — o critério trata o primeiro como correlacionado e o segundo
+> como não. E **147 de 232 não demonstra "não separa nada"**: demonstra que o critério é quase sempre
+> verdadeiro no nosso universo, o que o torna ruim como regra de **agrupamento**, sem torná-lo inútil
+> como medida de **sensibilidade ao fator**. **O título desta nota é mais forte que o achado**, e
+> fica registrado assim em vez de ser reescrito.
 
 Isso **não** significa que o limite de posições correlacionadas seja desnecessário. Significa que,
-como escrito, ele erra nos dois sentidos: marca como correlacionado quase tudo, e não teria como
-detectar o caso que interessa — a correlação subir em stress, que é quando o limite existe.
+como escrito, ele erra nos dois sentidos: marca quase tudo, e não teria como detectar o caso que
+interessa — a correlação subir em stress, que é quando o limite existe.
 
 ## Onde foi mostrado
 
@@ -113,11 +122,13 @@ FROM pairs;
 Autorizam:
 
 - **`β > 0,8` classifica 63% do universo como correlacionado**, incluindo mercados cuja correlação
-  com o BTC é praticamente zero. Como critério de agrupamento, ele é quase constante — e um critério
-  quase constante não é critério.
-- **Correlação e β discordam por construção nesta amostra.** Só **1** mercado de 232 tem correlação
-  acima de 0,8 com o BTC, contra 147 com β acima de 0,8.
-- **A concentração real, nesta janela, é baixa.** 29 de 780 pares acima de 0,3.
+  com o BTC é pequena. Como critério de **agrupamento**, ele é quase constante nesta amostra — e um
+  critério quase constante agrupa mal.
+- **Correlação e β discordam nesta amostra.** Só **1** mercado de 232 tem `|ρ| > 0,8` com o BTC
+  (a coluna é `sqrt(R²)`, que é o **módulo** de ρ e **perde o sinal**), contra 147 com β acima de
+  0,8. Note também que `R² = ρ²`, não `ρ`: a fração de variância explicada mediana de 0,0259
+  corresponde a `|ρ| ≈ 0,16`.
+- **A concentração medida nesta janela é baixa.** 29 de 780 pares acima de 0,3.
 
 **Não** autorizam:
 
@@ -135,13 +146,18 @@ Autorizam:
 importa é a **exposição agregada em unidades de fator**:
 
 ```
-exposição_β = Σ_i (notional_i × β_i)   [na direção da posição]
+exposição_β = Σ_i |notional_i × β_i|   [módulo, não soma assinada]
 ```
 
-Isso é uma única linha, usa o β que já dá para calcular, e é robusto ao problema acima: se os β são
-grandes porque as altcoins são voláteis, então `exposição_β` **é literalmente a exposição em
-equivalente-BTC**, que é a quantidade que se quer limitar. O defeito de usar β como *rótulo binário*
-desaparece quando ele é usado como *peso*.
+Usa o β que já dá para calcular, e desfaz o defeito de agrupamento: o β vira **peso**, não rótulo
+binário, e a soma é a exposição em equivalente-BTC.
+
+> **Correção da revisão da Astra, em dois pontos.** (a) Eu tinha escrito a soma **assinada**; assim,
+> `long A` e `short B` de mesmo notional e `β = 1` **zeram a medida**, e no entanto A caindo e B
+> subindo perde nas duas pernas. Por isso o módulo. (b) Mesmo com módulo, **isto não substitui
+> integralmente o controle de concentração**: não elimina compensações nem risco residual/setorial. É
+> um limite **adicional** de fator, que convive com um teto de exposição bruta e com tetos por
+> cluster — e exige validar os próprios β.
 
 ## Hipótese testável no Lab
 
@@ -149,7 +165,8 @@ desaparece quando ele é usado como *peso*.
 
 Duas regras propostas ao Risk Engine, no [[Strategy Backlog]]:
 
-- **`R-CORR-1` — substituir a contagem por `max_beta_exposure_pct`**: `Σ(notional × β) / equity ≤ θ`.
+- **`R-CORR-1` — acrescentar `max_beta_exposure_pct`**: `Σ|notional × β| / equity ≤ θ`, **ao lado**
+  de um teto de exposição bruta e dos tetos por cluster, não no lugar deles.
   Dado necessário: β por mercado contra o BTC, numa janela declarada, recalculado periodicamente.
   **Temos o dado** (velas de 1 min, 232 mercados); **não temos o cálculo** — `market_beta_1h` está
   em `docs/PIPELINE.md` e **não existe no código**
@@ -184,7 +201,20 @@ uma aposta única no BTC".
 
 ## Segunda opinião (Astra)
 
-Pendente nesta versão.
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-sizing-risk-2.md`). **Duas correções que
+mudam o conteúdo, aplicadas acima:**
+
+1. **"β mede só escala de volatilidade" é falso.** `β = ρ·σa/σb` combina escala **e** co-movimento;
+   com `ρ = 0`, β é zero. O defeito é de **confusão** entre os dois, e **147/232 não demonstra "não
+   separa nada"** — o título da nota é mais forte que o achado, e isso ficou registrado.
+2. **A exposição em β com notional assinado deixa passar exposições negativas grandes.** Cenário:
+   long A e short B, mesmo notional, β = 1 → a medida zera, e A caindo com B subindo perde nas duas
+   pernas. Corrigido para o módulo, e rebaixado de "substituto" para **controle complementar**.
+
+Mais: `R² = ρ²` (não ρ) e `sqrt(R²)` perde o sinal — a coluna do SQL é `|ρ|`.
+
+**Concordou com:** que β alto **não** equivale a correlação alta, e que exposição ponderada informa
+mais que contagem isolada.
 
 ## Relacionados
 

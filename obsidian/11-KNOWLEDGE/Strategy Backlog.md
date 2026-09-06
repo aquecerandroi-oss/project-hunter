@@ -589,3 +589,162 @@ do backlog e do bloco de saídas da sexta rodada.
 - **Nenhuma mudança de limite de risco.** Os cinco requisitos da
   [[KB-0064-a-cauda-de-queda-e-o-que-o-risk-engine-vai-precisar]] são **propostas** para o Risk
   Engine do M3/M4, nascidas de 42 h sem nenhum evento de stress.
+
+---
+
+## Oitava rodada (2026-09-06) — dimensionamento de posição e Risk Engine
+
+Dez notas ([[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]] a
+[[KB-0075-paper-trading-honesto-o-que-a-sombra-ainda-nao-simula]]). **Esta rodada não produz nenhuma
+candidata de estratégia, e não deveria produzir.** O Shadow Lab não dimensiona posição; a saída aqui
+é a seção **"Regras propostas para o Risk Engine (M3/M4)"** — vinte itens, nenhum implementado,
+nenhum ativado, nenhum virando código nesta rodada.
+
+**O ponto de partida que ninguém tinha notado:** o Risk Engine **já está especificado**
+(`docs/RISK_ENGINE.md`, 116 linhas, 20 checks, sizing com seis limitantes, três perfis) e **não tem
+uma linha de código** (`packages/risk-core/hunter_risk/__init__.py` tem 3 linhas). O contrato é
+anterior a tudo que este projeto mediu, e confrontá-lo com o dado foi o trabalho da rodada.
+
+### O que a medição fez com o contrato existente
+
+| Item do contrato | O que a medição mostrou | Nota |
+|---|---|---|
+| `risk_per_trade_pct` | **não pode vencer `max_position_pct` nos presets** — e o argumento não depende da amostra: os limiares (12,5 / 10 / 10%) estão **acima** do `max_stop_distance_pct` de cada perfil (3 / 5 / 8%), então o check 5 reprova antes. O risco bruto no stop fica **6 a 8× abaixo** do rótulo | [[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]] |
+| `ks_multiplier` e `regime_size_multiplier` | **a fórmula do §4 não garante a promessa do §5.** Eles só multiplicam `risk_usdt`; a redução em `WARNING` acontece em algumas combinações de perfil/regime e **não** em outras, e quem decide é a distância do stop | [[KB-0072-drawdown-e-kill-switch-a-evidencia-e-a-convencao]] |
+| `max_concurrent_positions` (3/6/12) | **981 de 992** entradas chegaram quando havia ≥ 6 acompanhamentos anteriores abertos na sombra (906 com ≥ 12). **Isto é demanda, não taxa de rejeição** | idem |
+| `min_liquidity_usd_24h` (50M/20M/5M) | **182 / 142 / 45** das 232 **somas observadas** ficam abaixo do piso — com **completude não verificada** (34 mercados têm lacunas em 24 h) | idem |
+| `[min_stop_distance_pct, max_stop_distance_pct]` | o Conservative recusaria ~14% dos sinais de cada estratégia, pelos dois lados; os 44 stops abaixo de 0,3% são todos da `volume_anomaly_v1`, cujo stop é a mínima da barra (`volume_anomaly_v1.py:183`) | idem |
+| `correlation` (`beta > 0.8`) | marca **147 de 232** mercados; `|ρ|` mediana entre pares é **0,062** e nenhum par passa de 0,8. O critério **confunde** escala de volatilidade com co-movimento (β = ρ·σa/σb) — não é que meça só escala | [[KB-0071-beta-maior-que-0-8-nao-separa-nada-no-nosso-universo]] |
+| `max_leverage` (1/2/3) | o controle efetivo vem de `max_position_pct × max_concurrent_positions` (6 × 5% = **30%** do equity no Balanced) e do caixa disponível — **não** do `max_leverage`. Declarar que ele "nunca morde" exige hipótese sobre caixa livre que não temos | [[KB-0073-alavancagem-em-perpetuos-a-liquidacao-contra-o-nosso-stop]] |
+| `slippage_estimate` (check 18) | precisa do livro, que vive 10 s e nunca é gravado. O contrato **não diz** o que fazer quando o insumo falta | [[KB-0074-risco-operacional-as-regras-de-nao-operar-quando]] |
+
+### A tabela de capacidade que o M3 vai precisar
+
+Medida em 200 livros de 20 níveis do hot state da VPS, num intervalo de **11 segundos**, **só do lado
+do ask** ([[KB-0070-a-tabela-de-capacidade-quantos-mercados-suportam-cada-tamanho]]):
+
+| Notional por sinal | cabe no livro | custo ≤ 5 bps (mid) | custo ≤ 10 bps | custo mediano | % do minuto mediano (4.605 USDT) |
+|---|---|---|---|---|---|
+| 500 USDT | 199/200 | **164/200** | 197/200 | 2,48 bps | 10,86% |
+| 2.000 USDT | 194/200 | **106/200** | 172/200 | 4,48 bps | 43,4% |
+| 10.000 USDT | 165/200 | **50/200** | 90/200 | 9,36 bps | 217% |
+
+Teto por mercado a 5 bps contra o mid: mediana **2.174 USDT**, decil inferior **295**, decil superior
+**41.879**. Dois mercados com capacidade **zero** (meio spread já acima de 5 bps). **Três dos dez
+maiores estão censurados pela profundidade de 20 níveis**, então para eles a tabela subestima.
+
+**Ressalva estrutural, exigida pela revisão:** o teto de livro (estoque) e a participação (fluxo)
+**não são comparáveis termo a termo** e não podem "discordar"; e as duas medianas vêm de universos
+diferentes (200 livros contra 232 mercados), então a razão entre elas não representa mercado nenhum.
+A comparação certa é pareada, mercado a mercado.
+
+## Regras propostas para o Risk Engine (M3/M4)
+
+**Nada aqui está implementado, decidido nem ativado.** Cada linha tem nome, fórmula ou parâmetro,
+dado necessário (e se temos), o que a refutaria ou quando ela erra, e quem decide.
+
+### A. Coerência do contrato — as três que não custam parâmetro novo
+
+| Regra | Fórmula / parâmetro | Dado necessário (temos?) | Quando ela erra | Quem decide |
+|---|---|---|---|---|
+| **`R-KS-1`** — decidir o que o multiplicador multiplica, e cumprir | escolher entre reduzir o **orçamento de risco** (comportamento do §4) e reduzir a **quantidade final** (o que o §5 promete). Se for quantidade: aplicar antes do arredondamento, sem duplicar multiplicadores, e revalidar o mínimo negociável | nenhum — é a fórmula do §4 | **Não é "uma linha"** (correção da Astra). Erra se alguém quiser que o multiplicador afete só o orçamento. Cenário de falha se nada for feito: kill switch vai a `WARNING` com stops estreitos, o painel diz "tamanho × 0,5", e as posições abrem do mesmo tamanho | Sexta-feira (coerência) |
+| **`R-PROV-1`** — publicar o limitante vencedor | gravar `sizing.binding_constraint` (§4 já pede) **e** publicar a distribuição dele, com `stop_distance`, orçamento de risco, risco bruto no stop e o estado de cada check | nenhum | Não erra — é proveniência. Sem ela, "risco de 0,5% por operação" é frase que nenhum dado pode contrariar | Sexta-feira |
+| **`R-KS-2`** — o degrau verificável | registrar, **para a mesma proposta e o mesmo estado**, o tamanho que sairia com e sem os multiplicadores | nenhum | Comparar médias antes/depois de `WARNING` **não isola o efeito** — a população muda junto (correção da Astra) | Sexta-feira |
+
+### B. Dimensionamento
+
+| Regra | Fórmula / parâmetro | Dado necessário (temos?) | Quando ela erra | Quem decide |
+|---|---|---|---|---|
+| **`R-SIZE-1`** — fração de risco por operação | `risk_usdt = equity × f`; recomendação **`f = 0,0025`** para começar, **teto de `0,01`** enquanto não houver expectancy com janela futura reservada e ≥ 100 outcomes em ≥ 30 dias | nenhum | Erra se a distribuição verdadeira dos resultados for muito melhor do que supomos (perde crescimento). O erro oposto é o caro, e Kelly **não** é função só da expectancy — depende da distribuição inteira | **decisão do Everton** (é tolerância, não otimização) |
+| **`R-SIZE-2`** — o estimador do sizing é o da estratégia | `stop_distance` vem do `stop` que o **sinal declarou**; se o motor recalcular ATR, usa `rolling_window_v1` sobre 15 min com `atr_bars = 97`, nunca o `atr_14_pct` do `feature_snapshots` | temos os dois; o risco é usar o errado | Erra se a estratégia declarar stop absurdo — daí a banda `[min, max]_stop_distance_pct` continuar existindo. Cenário de falha: tamanho calculado sobre um ATR que não é o que pôs o stop | Sexta-feira |
+| **`R-VOL-1`** — diagnóstico de notional por unidade de risco | publicar **as duas** razões: `1/(k × atr_pct)` na referência e `1/d_E` na entrada, com `d_E = (E − C + k·a·C)/E` | os campos existem quando houver propostas | Publicar só a primeira é o erro que a KB-0068 cometeu na primeira versão: na entrada a razão pode ser dez vezes maior. E não vale para a `volume_anomaly_v1` | Sexta-feira |
+
+### C. Capacidade e impacto
+
+| Regra | Fórmula / parâmetro | Dado necessário (temos?) | Quando ela erra | Quem decide |
+|---|---|---|---|---|
+| **`R-CAP-1`** — teto de notional por livro | `notional ≤ N*(m, c)`, o maior notional cujo custo de travessia contra o mid fica em `c` bps; recomendação `c = 5` | **não temos** — exige o **carimbo de execução** (item 20 da quinta rodada). O livro vive 10 s e não é gravado | Erra num livro raso momentâneo (rejeita oportunidade boa) e erra por otimismo em stress. E a nossa medição é **só do ask**: entrada barata pode ser seguida de saída num bid raso | Sexta-feira; `c` é técnico |
+| **`R-CAP-2`** — teto de participação | `notional ≤ p × quote_volume` da janela declarada; recomendação **`p` entre 0,05 e 0,10 sobre a vela de 1 min**, declarado antes, **sem alegação de ótimo** | **temos** — `quote_volume` das velas de 1 min, 232/232 mercados com ao menos uma barra preenchida nas últimas 24 h | Erra em mercado intermitente. E é preciso declarar o denominador: volume **histórico** ou volume realizado **incluindo a nossa execução** — são grandezas diferentes. `p = 0,10` autoriza **460,51 USDT** no mercado mediano, não 500 | **decisão do Everton** |
+| **`R-CAP-M`** — medir a tabela e guardar a série | varredura periódica das chaves `book`, fora do caminho da decisão, gravando `N*` por mercado, por hora, **dos dois lados** | temos o acesso; **não temos** a série | Não erra — é medição. Uma leitura de 11 s é fotografia, não capacidade operacional | Sexta-feira |
+
+### D. Correlação e exposição agregada
+
+| Regra | Fórmula / parâmetro | Dado necessário (temos?) | Quando ela erra | Quem decide |
+|---|---|---|---|---|
+| **`R-CORR-1`** — exposição em β como limite **adicional** | `Σ|notional_i × β_i| / equity ≤ θ` (**módulo**, não soma assinada), **ao lado** de um teto de exposição bruta e dos tetos por cluster — não no lugar deles | **temos o insumo** (velas de 1 min, 232 mercados) e **não temos o cálculo**: `market_beta_1h` está em `docs/PIPELINE.md` e não existe no código | Com soma assinada, long A e short B de mesmo notional e β = 1 **zeram a medida** e ainda assim perdem nas duas pernas — daí o módulo. Mesmo com módulo, **não elimina compensações nem risco residual/setorial**. E β estimado em 40 h é ruidoso (R² mediano 0,026): o ruído vira exposição | **decisão do Everton** — `θ` responde "quanto do capital aceito que se comporte como uma aposta única no BTC" |
+| **`R-CORR-2`** — teto por cluster declarado | lista versionada de clusters (padrão `meme_universe_v1`), não agrupamento estimado na mesma janela | a lista é julgamento; o dado para revisá-la existe | Erra quando o cluster declarado ficar velho. Estimar cluster e limitar exposição com a mesma amostra seria calibrar no dado que revelou o problema | Sexta-feira propõe a lista; **Everton decide o teto** |
+
+### E. Drawdown e kill switch
+
+| Regra | Fórmula / parâmetro | Dado necessário (temos?) | Quando ela erra | Quem decide |
+|---|---|---|---|---|
+| **`R-DD-1`** — limite de drawdown do pico de equity | `max_drawdown_pct` (recomendação 0,10 no Balanced) **e** `max_daily_loss_pct` (0,02) — os dois, porque **não são redundantes**: o diário reinicia à meia-noite UTC, o drawdown não | equity e pico de equity — **só existem no M3** | Cenário **condicionado** (não é vazão medida): *se* houver 6 slots ocupados continuamente, giro de ~14 min, sinal sempre disponível e perdas de 1 R cheio, 2% ao dia sai em ~1 h. Vários desses "se" podem falhar. Erra por ser tarde demais se o limite for lido como tolerância e não como detector de falha | **decisão do Everton** |
+| **`R-DD-2`** — reformular o limite diário como detector | o gatilho continua sendo perda; a **leitura** muda: parada por perda diária abre investigação de instrumento (lacuna, funding, regime), não é "disciplina" | nenhum — é convenção de operação | **Não encontrei formalização aberta na busca realizada**: ela devolveu só material de *prop firm*, e o mecanismo que essas páginas invocam (impedir *revenge trading*) não se aplica — não há humano no laço. E **expectancy sozinha não calibra um detector**: seriam necessárias a distribuição das perdas e a dependência temporal | Sexta-feira |
+
+### F. Alavancagem
+
+| Regra | Fórmula / parâmetro | Dado necessário (temos?) | Quando ela erra | Quem decide |
+|---|---|---|---|---|
+| **`R-LEV-1`** — margem isolada por posição | modo isolado no paper e no M4 | é configuração de conta na exchange | Com margem cruzada, uma posição perdedora consome a margem das outras e move o preço de liquidação de todas. Isolada custa capital ocioso. **Ressalva:** `max_position_pct` limita **notional**, não promete perda máxima igual à margem alocada | **decisão do Everton** (modo de conta; `ENABLE_LIVE_TRADING` continua sendo dele) |
+| **`R-LEV-2`** — distância até a liquidação como check próprio | rejeitar quando `d_liq < k × stop_distance`, com `d_liq = (1/L − mmr)/(1 − mmr)` para long e `/(1 + mmr)` para short; recomendação `k = 3` | **não temos** — a escada de margem de manutenção exige `/fapi/v1/leverageBracket`, chamada autenticada. **Bloqueada por dado** | Erra ao usar a **mediana** do stop para declarar folga: com stop de 1,52% a liquidação só chega antes por volta de **49,7×**, mas com stop de 5% ela chega antes já a **25×** — e stop largo é o de mercado agitado. Sem alavancagem o check nunca morde, e isso deve ser **dito** | Sexta-feira; a alavancagem é do Everton |
+
+### G. Risco operacional — falhar fechado
+
+| Regra | Fórmula / parâmetro | Dado necessário (temos?) | Quando ela erra | Quem decide |
+|---|---|---|---|---|
+| **`R-OPS-1`** — falhar fechado, por check | cada check declara o insumo e o que fazer se faltar; padrão **rejeitar**; `risk_decision.checks` ganha o estado `unavailable`, distinto de `passed`/`failed` | nenhum | Erra por custo assimétrico **não medido**: rejeitar por dado ausente pode desligar o sistema nos momentos mais lucrativos. Cenário de falha se não for feito: o livro some em stress e a proposta é aprovada sem estimativa de slippage exatamente quando o slippage explode | Sexta-feira |
+| **`R-OPS-2`** — idade máxima por insumo | preço 10 s (já no contrato); livro, volume de 24 h e β precisam do seu, declarado | temos carimbo para preço e livro; **não temos** para o resto | Erra se a idade tolerada for calibrada na latência de um dia calmo | Sexta-feira |
+| **`R-OPS-3`** — não abrir com lacuna aberta | rejeitar quando a janela do próprio mercado tiver lacuna **não recuperada** | **temos** — continuidade em `coverage.py:153`, consumida em `context.py:96`; falta ligar ao Risk Engine. Medido: **34 de 232** mercados com lacuna em 24 h, **32** com mais de 40 min, decil inferior com 331 min faltando | Erra ao confundir lacuna recuperada com lacuna aberta. E 24 h sem incidente conhecido **não descrevem uma queda de exchange** | Sexta-feira |
+| **`R-OPS-4`** — não abrir em mercado fora do universo | rejeitar se o mercado saiu do universo entre a emissão do sinal e a proposta | existe no stream do Redis, com retenção por **número de entradas** — daí o `H-KB0062b`. Medido: 27 sinais em 14 mercados desmonitorados em 15 h | Erra ao tratar saída temporária do rank 200 como saída de mercado | Sexta-feira |
+
+### H. Honestidade do simulador
+
+| Regra | Fórmula / parâmetro | Dado necessário (temos?) | Quando ela erra | Quem decide |
+|---|---|---|---|---|
+| **`C-PAPER`** — a linha de população em todo relatório | *"população do Lab: N acompanhamentos; população que o Risk Engine teria admitido: M"* | **`M` ainda não foi calculado** — exige simulação sequencial com regra de desempate declarada; o que temos é demanda (981 de 992 com ≥ 6 abertos) | Não erra; impede a leitura errada. Publicar uma razão `M/N` antes da simulação seria invenção | Sexta-feira |
+| **`D-PAPER-1`** — diferença entre instrumentos de stop | recomputar os 292 `stop` e 290 `target` usando `mark_price` em vez do `high`/`low` da vela de negócios; publicar a matriz de concordância | **parcialmente** — `market_snapshots` guarda `mark_price` com chave no minuto alinhado (risco de look-ahead); a cobertura por minuto **não foi medida** e é o primeiro passo | Pode ficar sem denominador: só 8 de 200 sinais tinham snapshot no próprio minuto na quinta rodada | Sexta-feira |
+
+### O que precisa do Everton, em uma lista só
+
+1. **Capital inicial do paper do M3/M4** — sem ele nenhuma tabela de capacidade vira decisão.
+2. **`f`, a fração de risco por operação** (recomendação: 0,25%, teto de 1%).
+3. **`p`, a taxa de participação máxima** (recomendação: entre 5% e 10% da vela de 1 min; com 10%
+   o tamanho autorizado no mercado mediano é 460 USDT).
+4. **`θ`, o teto de exposição em β-BTC** (em módulo).
+5. **`max_daily_loss_pct` e `max_drawdown_pct`** — os valores atuais do Balanced (2% e 10%) são o
+   ponto de partida recomendado, com a ressalva condicionada sobre a escala de tempo.
+6. **Modo de margem (isolada) e alavancagem** — recomendação: isolada e **sem alavancagem** no
+   começo.
+7. **O universo ou o piso de liquidez** — um dos dois tem de ceder, depois de reconciliar a
+   completude das somas de volume.
+
+### Ordem recomendada para o M3
+
+1. **`R-KS-1` e `R-PROV-1`.** Sem eles tudo o mais é inverificável, e o kill switch promete uma
+   redução que não é garantida.
+2. **`R-OPS-1` (falhar fechado).** É o único item cuja ausência transforma degradação em aprovação
+   silenciosa.
+3. **`R-SIZE-1` e `R-SIZE-2`.** Precisam da decisão do Everton sobre `f`, mas o desenho não espera.
+4. **`R-CAP-2` (participação).** É a única regra de capacidade implementável **hoje**, sem mudar
+   contrato.
+5. **`R-CAP-M` (série de capacidade)** em paralelo, porque a série só existe se começar a ser
+   gravada — e desta vez dos **dois lados** do livro.
+6. **`R-CORR-1`** depois, porque exige calcular β, que hoje não existe em nenhum lugar do código.
+7. **`R-CAP-1`, `R-LEV-2`** por último: dependem, respectivamente, do carimbo de execução e de uma
+   chamada autenticada que não fazemos.
+
+### O que esta rodada explicitamente NÃO propõe
+
+- **Nenhuma candidata de estratégia.** O Lab não dimensiona; toda regra aqui é de Risk Engine.
+- **Nenhuma mudança em `spread_bps`, `slippage_bps` ou `fee_bps`** — a proibição das rodadas 5 e 7
+  continua: seria calibrar na amostra que revelou o problema.
+- **Nenhuma alteração de `atr_pct_min`/`atr_pct_max`**, mesmo tendo descoberto que eles funcionam
+  como controle de tamanho ([[KB-0068-sizing-por-volatilidade-a-posicao-sai-do-atr]]): mexer neles
+  muda a população da `momentum_v1`, e isso é a T-007, que exige janela futura reservada.
+- **Nenhuma remoção de controle existente.** Nem o check de correlação, nem o piso de liquidez, nem
+  o `max_leverage` — nenhum foi provado redundante, e a revisão da Astra foi explícita: não eliminar
+  controles antes de provar redundância.
+- **Nenhuma ativação, nenhum código.**
+- **Nenhum número de Kelly, de *optimal f* ou de limite diário de *prop firm*.** As três buscas
+  devolveram, respectivamente, tabelas ilegíveis, material de fornecedor e material comercial; o que
+  entrou nas notas foi a **forma** do argumento, sempre declarada como tal.

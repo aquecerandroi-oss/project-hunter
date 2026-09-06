@@ -19,6 +19,7 @@ Cada nota é uma síntese própria (nunca cópia), com fonte, data, qualidade da
 | Análise técnica clássica (o que tem evidência e o que não tem) | KB-0003 | iniciado |
 | Regime de mercado e volatilidade | KB-0007, KB-0016, KB-0027, KB-0028, KB-0029, KB-0030, KB-0031, KB-0032, KB-0033, KB-0034, KB-0035 | **quarta rodada feita (2026-09-06)** |
 | Gestão de risco e sizing | KB-0005, KB-0035, KB-0040 | iniciado |
+| **Dimensionamento e risco (Risk Engine M3/M4)** | KB-0066, KB-0067, KB-0068, KB-0069, KB-0070, KB-0071, KB-0072, KB-0073, KB-0074, KB-0075 | **oitava rodada feita (2026-09-06)** |
 | Estatística de backtest (overfitting, look-ahead, custos) | KB-0010 | iniciado |
 | Execução e microestrutura do preenchimento | KB-0036, KB-0037, KB-0038, KB-0039, KB-0040, KB-0041, KB-0042, KB-0043, KB-0044 | quinta rodada feita (2026-09-06) |
 | Livros de estratégia | KB-0045, KB-0046, KB-0047, KB-0048, KB-0049, KB-0050, KB-0051, KB-0052, KB-0053, KB-0054, KB-0055 | sexta rodada feita (2026-09-06) |
@@ -94,6 +95,16 @@ _(uma linha por nota: link para a nota — fonte curta — qualidade da evidênc
 | [[KB-0063-social-e-on-chain-a-linha-que-nao-atravessamos]] | meme / social e on-chain | arXiv 2512.11850 e 2512.00377 + nosso código | preprints (resumo) + inventário | **não** — depende de flag; nota de leitura |
 | [[KB-0064-a-cauda-de-queda-e-o-que-o-risk-engine-vai-precisar]] | meme / risco | medição própria (quedas por coorte) | replicado, com a conclusão de cauda **retirada** | sim — `D-MEME-GAP` e a candidata **M-G**; requisitos para o M3/M4 |
 | [[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]] | meme / momentum vs reversão | `agent_signals` e `signal_outcomes` da VPS | replicado, **abaixo do limiar editorial** | sim, só diagnóstico — `D-MEME-POP`, `D-MEME-ATRPAR` |
+| [[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]] | risco / contrato do Risk Engine | `docs/RISK_ENGINE.md` + medição própria na VPS | **replicado** (SQL colado) | sim — `R-PROV-1`, publicar o limitante vencedor |
+| [[KB-0067-a-fracao-de-risco-por-operacao-e-o-preco-de-errar-a-expectancy]] | risco / fração por operação | MacLean-Thorp-Ziemba e Grossman & Zhou **em resumo**; Vince e Tharp **anedóticos** | estudo revisado em resumo + aritmética | **não** para o Lab — vira `R-SIZE-1`, decisão do Everton |
+| [[KB-0068-sizing-por-volatilidade-a-posicao-sai-do-atr]] | risco / sizing por volatilidade | Harvey et al. (JPM 2018) **em resumo, o PDF deu 403** + o nosso código | estudo revisado em resumo + aritmética conferida pela Astra | **não** para o Lab — `R-SIZE-2` e `R-VOL-1` |
+| [[KB-0069-capacidade-e-impacto-o-teto-que-o-livro-impoe]] | risco / capacidade e impacto | Durin, Rosenbaum & Szymanski (arXiv 2311.18283) **em resumo** + medição própria | preprint em resumo + medição | **não** — `R-CAP-1` e `R-CAP-2` |
+| [[KB-0070-a-tabela-de-capacidade-quantos-mercados-suportam-cada-tamanho]] | risco / capacidade medida | **medição própria** — 200 livros de 20 níveis na VPS | replicado (saída colada) | **não** — `R-CAP-M` |
+| [[KB-0071-beta-maior-que-0-8-nao-separa-nada-no-nosso-universo]] | risco / correlação e exposição | medição própria (β, R² e correlação entre pares) | replicado (SQL colado) | **não** — `R-CORR-1` e `R-CORR-2`; **o título é mais forte que o achado** |
+| [[KB-0072-drawdown-e-kill-switch-a-evidencia-e-a-convencao]] | risco / drawdown e kill switch | Grossman & Zhou **em resumo**; limite diário só em material de *prop firm* | revisado em resumo + **anedótico/vendedor** | **não** — `R-KS-1`, `R-KS-2`, `R-DD-1`, `R-DD-2` |
+| [[KB-0073-alavancagem-em-perpetuos-a-liquidacao-contra-o-nosso-stop]] | risco / alavancagem e liquidação | documentação da Binance (FAQ 360033525271) | documentação lida + aritmética **corrigida pela Astra** | **não** — `R-LEV-1` e `R-LEV-2` |
+| [[KB-0074-risco-operacional-as-regras-de-nao-operar-quando]] | risco operacional / qualidade do dado | medição própria + inventário das rodadas 2 a 7 | replicado + leitura de código | **não** — `R-OPS-1` a `R-OPS-4` |
+| [[KB-0075-paper-trading-honesto-o-que-a-sombra-ainda-nao-simula]] | risco / paper trading | nosso `walker.py`, contrato do M4 | leitura de código + contrato | sim — `D-PAPER-1` (cobertura a medir) e a convenção `C-PAPER` |
 
 ## O que a primeira rodada mudou de fato
 
@@ -444,6 +455,80 @@ E a diferença operacional desta rodada em relação a todas as anteriores: **a 
 os números acima são de produção, não da instância local. As limitações são de **janela** (42-45 h,
 um regime, sem stress) e de **maturidade** (o Lab tem 15 h de sinais), não de acesso.
 
+
+## O que a oitava rodada mudou de fato
+
+Tema: **dimensionamento de posição e Risk Engine**. Foi a primeira rodada que não olhou para a
+estratégia e sim para o que aconteceria com ela **depois** de aprovada — e a descoberta que organiza
+tudo é que o Risk Engine **já está escrito** (`docs/RISK_ENGINE.md`, 20 checks, três perfis com
+valores) e **não tem uma linha de código**. O contrato é anterior a tudo que este projeto mediu.
+
+1. **`risk_per_trade_pct` não pode vencer `max_position_pct` nos presets — e o argumento não depende
+   da amostra.** O termo de risco só seria o mínimo com distâncias de stop de 10% a 12,5%, e o
+   `max_stop_distance_pct` de cada perfil é 3% / 5% / 8%: o check 5 reprova antes. O risco bruto no
+   stop fica **6 a 8× abaixo do rótulo** (0,030% / 0,076% / 0,152% contra 0,25% / 0,5% / 1%).
+   *(A versão mais forte deste argumento é da Astra; a minha original dependia da amostra.)*
+2. **A fórmula do §4 não garante a promessa do §5.** `ks_multiplier` e `regime_size_multiplier` só
+   multiplicam `risk_usdt`. Em `WARNING`, com stop estreito, o tamanho pode ficar **intacto** —
+   enquanto o painel diz "tamanho × 0,5". Eu tinha escrito que eles eram **inertes**; a Astra mostrou
+   que há combinações admissíveis (Balanced + `BTC_BEAR_LONG` + `WARNING`, stop acima de 2,5%) em que
+   reduzem. O defeito real é que a redução **não é garantida**.
+3. **A tabela de capacidade que o M3 precisava não existia, e agora existe.** 200 livros de 20
+   níveis: o mercado mediano comporta **2.174 USDT a 5 bps** contra o mid; 164/200 mercados suportam
+   500 USDT a esse custo, 106/200 suportam 2.000 e 50/200 suportam 10.000. Só do lado do **ask**, num
+   intervalo de 11 segundos.
+4. **Há um segundo teto que ninguém tinha olhado: participação.** O volume de cotação mediano de um
+   minuto é **4.605 USDT** — 500 USDT são **10,86%** do minuto mediano e **49%** no decil inferior.
+   Estoque e fluxo não se comparam termo a termo, e a primeira versão da nota dizia que eles
+   "discordavam"; não discordam, são complementares.
+5. **O check de correlação confunde escala com co-movimento.** `β > 0,8` marca **147 de 232**
+   mercados, e a `|ρ|` mediana entre pares dos 40 mercados com mais sinal é **0,062**, com **nenhum**
+   par acima de 0,8. Como `β = ρ·σa/σb`, `ρ = 0,1` com razão de volatilidades 10 dá `β = 1`. **Não
+   é** que β meça só volatilidade — é que ele mistura as duas coisas e o critério não as distingue.
+6. **A fronteira de liquidação depende do stop, não só da alavancagem.** Com a fórmula correta
+   (`d_liq = (1/L − mmr)/(1 − mmr)`), o stop **mediano** de 1,52% só é ultrapassado pela liquidação
+   por volta de **49,7×** — mas um stop de 5%, dentro da banda do Balanced, já fica além dela a
+   **25×**. Usar a mediana para declarar folga deixa desprotegida exatamente a posição de mercado
+   agitado.
+7. **34 de 232 mercados perderam velas nas últimas 24 h**, 32 deles mais de 40 minutos, com o decil
+   inferior perdendo 331 minutos. A mediana é perfeita — o problema é concentrado, e uma média o
+   esconderia.
+8. **O Lab e o paper do M4 são simuladores diferentes.** O Lab resolve por OHLC de velas de
+   negócios; o contrato do M4 dispara stop no **mark** e prevê preenchimento parcial, taxas de taker
+   e rejeição. Nenhum número do Lab descreve o produto, e a convenção `C-PAPER` passa a dizer isso em
+   todo relatório.
+
+**Saldo de método.** A Astra revisou as dez notas em duas passagens e **derrubou onze afirmações
+minhas**: "`max_position_pct` sempre vence" (caixa pode limitar antes); o nome "risco efetivo" (é
+risco bruto no stop); "recusaria 98,9% das entradas" (é demanda, não taxa de rejeição); "182 mercados
+abaixo do piso" (são somas observadas, completude não verificada); "sete limitantes" (são seis);
+Kelly como função da expectancy (é da distribuição inteira, com contraexemplo numérico); a inferência
+de sequências de perdas a partir de "69% sem tocar o alvo"; "os multiplicadores são inertes"; "os dois
+tetos de capacidade discordam"; `p = 0,10` autorizando 500 USDT (autoriza 460,51); e a fórmula de
+liquidação sem denominador. Também corrigiu **cinco para três** os mercados censurados pela
+profundidade de 20 níveis, mostrou que a soma **assinada** de exposição em β deixa passar posições
+compensadas que perdem nas duas pernas, e derrubou a minha justificativa pelo `√γ` — que é
+**sublinear**, o contrário do que eu tinha escrito.
+
+**Nenhuma candidata de estratégia saiu desta rodada, e isso é o resultado.** Saíram **vinte regras
+propostas** para o Risk Engine do M3/M4, sete decisões que são do Everton, e uma ordem de execução.
+**Nada foi ativado, nada virou código.**
+
+## Fontes que não abriram nesta rodada (oitava)
+
+| Fonte | O que aconteceu | Como contornei |
+|---|---|---|
+| `papers.ssrn.com/.../SSRN_ID3202923` (Harvey et al., *The Impact of Volatility Targeting*) | HTTP 403 | li o resumo do JPM; **só "60 ativos", "1926-2017" e "alvo de 10%"** entraram — nenhum Sharpe, nenhum tamanho de efeito |
+| `webhomes.maths.ed.ac.uk/.../Chap1_KellyZiemba.pdf` | o PDF abriu, mas **a tabela 1.1 e a figura 1.1 saíram ilegíveis** | **nenhum número de Kelly** entrou; só a forma do trade-off |
+| `onlinelibrary.wiley.com/.../Grossman & Zhou 1993` | paywall | li resumo e ficha; a atribuição dos "25% de drawdown" ficou marcada como **fonte secundária não conferida** |
+| Busca por avaliação crítica do *optimal f* de Ralph Vince | devolveu **só material de praticante e fornecedor**, incluindo uma alegação de "900% de drawdown" que é aritmeticamente impossível | **nenhum número citado**; sobrevive só a objeção estrutural (regra que depende da maior perda histórica) |
+| Busca por evidência de limite de perda diária | nove links, **todos comerciais** (*prop firms*) | **nada citado**; registrado como resultado da busca, e o mecanismo comportamental invocado por elas **não se aplica** — não há humano no laço |
+| Tabela de margem de manutenção por faixa da Binance | exige login | a conta de liquidação foi feita com `mmr` como incógnita e um valor **ilustrativo declarado** de 0,5% |
+| `arxiv.org/pdf/2311.18283` (Durin, Rosenbaum & Szymanski) | li **só o resumo**, não abri o PDF | nenhum coeficiente nem constante de calibração entrou |
+
+E a diferença operacional: **a VPS respondeu em todas as consultas**, e todos os números vêm de
+produção. As limitações são de **janela** (16 h de sinais; 40 h de velas; um regime; sem stress) e de
+**instante** (os livros são de 11 segundos), não de acesso.
 ## Relacionados
 
 [[Strategy Backlog]] · [[Registro de Tentativas]] · [[Experiments Index]] ·

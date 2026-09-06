@@ -6,7 +6,7 @@ fonte_url: —
 lido_em: 2026-09-06
 evidencia: replicado (SQL e leitura de livro colados) + leitura de contrato
 hipotese_testavel: sim
-astra: pendente
+astra: discorda em parte (correções aplicadas)
 ---
 
 # O Risk Engine já está escrito — e a medição contraria cinco dos seus limites
@@ -15,20 +15,26 @@ astra: pendente
 
 Antes de propor regra nova é preciso dizer o que já existe: **o Risk Engine do M3/M4 não é uma
 página em branco**. `docs/RISK_ENGINE.md` tem 116 linhas com vinte checks numerados, uma fórmula de
-sizing com sete limitantes, três perfis de risco com valores, e a máquina de estados do kill switch.
+sizing com **seis** limitantes (mais o arredondamento `floor_to_step`, que é operação posterior e não
+limitante — correção da Astra), três perfis de risco com valores, e a máquina de estados do kill
+switch.
 O que **não** existe é código: `packages/risk-core/hunter_risk/` tem um `__init__.py` de 3 linhas e
 nada mais. O contrato é anterior a tudo que este projeto mediu.
 
 Confrontado com 16 h de sinais reais, 200 livros de ordens e 232 mercados da VPS, ele produz cinco
 resultados que ninguém previu ao escrevê-lo:
 
-1. **`risk_per_trade_pct` nunca é o limitante.** Em nenhum dos 992 acompanhamentos medidos. Quem
-   decide o tamanho é sempre `max_position_pct`, e a diferença entre o rótulo e o efeito é de **6 a 8
-   vezes**.
-2. **`max_concurrent_positions` recusaria 98,9% das entradas** que o Lab produziu (981 de 992
-   chegaram com 6 ou mais acompanhamentos já abertos).
-3. **`min_liquidity_usd_24h` do perfil Conservative desliga 78% do universo** (182 de 232 mercados
-   abaixo de 50 M USD de volume de cotação em 24 h).
+1. **`risk_per_trade_pct` nunca vence `max_position_pct`** — e, **corrigida pela Astra**, a
+   conclusão é mais forte e não depende da amostra: nos presets atuais, com os multiplicadores em 1,
+   o termo de risco só venceria com distâncias de stop de 10% a 12,5%, **acima do
+   `max_stop_distance_pct` de cada perfil (3% / 5% / 8%)** — o check 5 reprovaria a proposta antes.
+   Isso **não** significa que `max_position_pct` decida o tamanho: exposição total, por ativo, por
+   exchange e caixa podem dar um número menor.
+2. **981 das 992 entradas do Lab chegaram quando havia ao menos 6 acompanhamentos anteriores abertos
+   na sombra** (906 com ao menos 12). **Isto não é uma taxa de rejeição** — correção da Astra: a
+   consulta conta acompanhamentos que uma carteira limitada nem teria aberto.
+3. **182 das 232 somas observadas de volume de cotação de 24 h ficam abaixo do piso de 50 M USD** do
+   perfil Conservative — **com completude não verificada** (a soma é sobre as barras presentes).
 4. **A banda `[min_stop_distance_pct, max_stop_distance_pct]` do Conservative recusa ~14% dos sinais
    de cada estratégia**, pelos dois lados.
 5. **O check de correlação (`beta > 0.8`) marca 147 de 232 mercados como correlacionados** — mas a
@@ -47,7 +53,7 @@ Tudo na **VPS**, em 2026-09-06 entre 19:45 e 20:00 UTC. Janela do Lab: `agent_si
 
 ### O sizing: qual limitante vence, na aritmética do próprio contrato
 
-A fórmula de `docs/RISK_ENGINE.md` §4 toma o **mínimo** de sete quantidades. Duas delas competem
+A fórmula de `docs/RISK_ENGINE.md` §4 toma o **mínimo** de seis quantidades. Duas delas competem
 sempre:
 
 ```
@@ -96,21 +102,46 @@ FROM s GROUP BY 1 ORDER BY 1;
 ```
 
 **A maior distância de stop observada em 992 entradas é 9,32%** — abaixo dos 10% de que o
-`qty_by_risk` precisaria para vencer, em qualquer perfil. Logo, na população inteira, o tamanho é
-fixado por `max_position_pct` e o **risco efetivo por operação** é
-`max_position_pct × stop_distance`:
+`qty_by_risk` precisaria para vencer.
 
-| Perfil | risco nominal por operação | risco efetivo na mediana (stop 1,52%, momentum) | razão |
+**E há um argumento mais forte, que a Astra apontou e que não depende de amostra nenhuma:** os
+limiares de 12,5% / 10% / 10% estão **acima do `max_stop_distance_pct` de cada perfil**, que é 3% /
+5% / 8% (`docs/RISK_ENGINE.md` §2). Uma proposta com distância de stop grande o bastante para o
+termo de risco vencer seria **reprovada pelo check 5 antes de chegar ao sizing**. Nos presets
+atuais, com os multiplicadores em 1, `qty_by_risk` **não pode** ser o mínimo — isso é propriedade da
+tabela de limites, não da nossa população.
+
+Daí sai a quantidade que o rótulo esconde. **Nome correto, exigido pela revisão: risco bruto no
+stop, supondo a posição limitada exclusivamente pelo teto por posição e sem arredondamento.** Não é
+risco observado — custos e gaps ficam de fora, e os outros quatro limitantes podem dar um número
+menor ainda:
+
+| Perfil | `risk_per_trade_pct` (rótulo) | `max_position_pct × 1,5174%` | razão |
 |---|---|---|---|
-| Conservative | 0,25% do equity | 0,02 × 1,5174% = **0,030%** | 8,2× menor |
-| Balanced | 0,50% | 0,05 × 1,5174% = **0,076%** | 6,6× menor |
-| Aggressive | 1,00% | 0,10 × 1,5174% = **0,152%** | 6,6× menor |
+| Conservative | 0,25% do equity | **0,030348%** | 8,2× menor |
+| Balanced | 0,50% | **0,075870%** | 6,6× menor |
+| Aggressive | 1,00% | **0,151740%** | 6,6× menor |
 
 Isso não é bug de implementação — não há implementação. É uma propriedade da tabela de limites que
-só aparece quando se conhece a distribuição de `stop_distance`, e ela não existia quando a tabela
-foi escrita.
+só aparece quando se põe `risk_per_trade_pct`, `max_position_pct` e `max_stop_distance_pct` lado a
+lado, e ninguém tinha posto.
 
-### Concorrência: quantas entradas chegariam com o teto já cheio
+**Ressalva de instrumento, também da revisão:** `virtual_entry` é o preenchimento sintético do Lab
+(`next_1m_open`, `persist.py:54`). O `entry_ref` do contrato é o meio da `entry_zone` ou o último
+preço dentro dela. **São referências diferentes**, e a igualdade entre elas é suposição minha, não
+fato. O que a medição acima sustenta é a distribuição de `(entrada − stop)/entrada` como a
+estratégia a produz; se o Risk Engine usar outra referência, a distribuição muda.
+
+### Concorrência: quantas entradas chegaram com N acompanhamentos anteriores abertos
+
+**Título corrigido na revisão.** A consulta abaixo **não** simula uma carteira: ela conta quantos
+acompanhamentos anteriores da sombra ainda estavam abertos quando cada entrada aconteceu — inclusive
+acompanhamentos que uma carteira com teto **nem teria aberto**. Ela mede **demanda**, não taxa de
+rejeição. Cenário que a Astra usou para derrubar a minha leitura original: seis operações aceitas
+terminam, mas acompanhamentos que a carteira teria recusado continuam abertos na sombra; a consulta
+acusa lotação onde a carteira teria slot livre. A taxa de rejeição exige simulação sequencial com
+regra de desempate declarada — e entradas no mesmo minuto (houve um com 31) precisariam competir
+entre si.
 
 ```sql
 WITH iv AS (
@@ -171,9 +202,13 @@ no [[Registro de Tentativas]] (T-031): o volume de cotação de 24 h **é recons
 A ressalva do *nullable* continua valendo para barras individuais — aqui nenhum mercado ficou com
 zero barras preenchidas, mas a fração de barras nulas por mercado não foi medida.
 
-O que o contrato faz com isso: `min_liquidity_usd_24h` = 50 M / 20 M / 5 M desliga, respectivamente,
-**182, 142 e 45** dos 232 mercados. O perfil Conservative deixaria de operar **78% do universo que
-nós mesmos escolhemos monitorar**.
+O que o contrato faz com isso: `min_liquidity_usd_24h` = 50 M / 20 M / 5 M deixa abaixo do piso,
+respectivamente, **182, 142 e 45** das 232 **somas observadas**. **Correção da revisão:** isto é
+soma sobre as barras **presentes**, e 34 mercados têm lacunas nas últimas 24 h
+([[KB-0074-risco-operacional-as-regras-de-nao-operar-quando]]) — um mercado com 40 M observados e
+barras faltando que valeriam 20 M seria classificado abaixo de 50 M sem estar. A leitura correta é
+**"182 somas observadas abaixo do piso, com completude não verificada"**, e reconciliar barras
+esperadas, presentes, ausentes e nulas é pré-requisito de qualquer decisão sobre o piso.
 
 ## Como mediríamos aqui
 
@@ -182,8 +217,8 @@ importa:
 
 | Achado | Natureza | O que fazer |
 |---|---|---|
-| `risk_per_trade_pct` nunca vence | **incoerência interna** da tabela: dois limites que dizem a mesma coisa e um deles é decorativo | escolher qual é o instrumento de sizing e dizer isso na página; é decisão do Everton |
-| Teto de posições concorrentes | **diferença de população**: o Lab não tem carteira, então nunca competiu por slot de capital | não muda o limite; muda o que a sombra pode alegar sobre o produto |
+| `risk_per_trade_pct` nunca vence `max_position_pct` nos presets | **incoerência interna** da tabela: a banda de stop admissível exclui, por construção, o regime em que o termo de risco morderia | escolher qual é o instrumento de sizing e dizer isso na página; é decisão do Everton |
+| Concorrência na sombra | **diferença de população**: o Lab não tem carteira, então nunca competiu por slot de capital | não muda o limite; muda o que a sombra pode alegar sobre o produto |
 | Piso de liquidez de 24 h | **desalinhamento entre o universo e o perfil** | ou o universo encolhe, ou o piso desce; ver a medição de capacidade em [[KB-0070-a-tabela-de-capacidade-quantos-mercados-suportam-cada-tamanho]] |
 | Banda de distância de stop | **interação com a estratégia**, não com o mercado | a `volume_anomaly_v1` usa a mínima da barra como stop (`volume_anomaly_v1.py:183`), e é ela quem produz os 44 stops abaixo de 0,3% |
 | `beta > 0.8` como correlação | **erro de medida** | ver [[KB-0071-beta-maior-que-0-8-nao-separa-nada-no-nosso-universo]] |
@@ -224,7 +259,32 @@ O que a refutaria: nada. É proveniência, não previsão.
 
 ## Segunda opinião (Astra)
 
-Pendente nesta versão.
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-sizing-risk-1.md`). Ela conferiu as duas
+tabelas principais recomputando-as com `Decimal` e confirmou os números; **derrubou quatro
+conclusões minhas**, todas já corrigidas acima:
+
+1. **"`max_position_pct` sempre vence" não decorre da comparação feita.** Exposição total, por
+   ativo, por exchange e caixa podem dar quantidade menor. Cenário: equity 10.000, preço 100,
+   Balanced, stop 1,5%, caixa disponível 100, `max_leverage = 2` → `qty_by_risk = 33,33`,
+   `qty_by_position = 5`, **`qty_by_cash = 2`**. Quem decide é o caixa.
+   **E ela ofereceu uma conclusão melhor que a minha:** os limiares (12,5 / 10 / 10%) estão acima do
+   `max_stop_distance_pct` de cada perfil (3 / 5 / 8%), então o termo de risco não pode vencer
+   **independentemente da amostra** — o check 5 reprova antes.
+2. **A tabela de "risco efetivo" está com o nome errado.** É *risco bruto no stop, supondo posição
+   limitada exclusivamente pelo teto por posição e sem arredondamento*. Custos e gaps ficam fora.
+3. **"Recusaria 98,9% das entradas" confunde demanda irrestrita com carteira simulada.** Corrigido
+   para "981 entradas chegaram quando havia ao menos 6 acompanhamentos anteriores abertos na
+   sombra".
+4. **A soma de `quote_volume` das barras presentes não prova volume completo de 24 h.** Corrigido
+   para "182 somas observadas abaixo do piso, com completude não verificada".
+
+Também corrigiu **"sete limitantes" → seis** (`floor_to_step` é operação, não limitante) e apontou
+que **`virtual_entry` não é comprovadamente o `entry_ref`** do futuro Risk Engine (o contrato usa a
+zona/preço atual; a sombra persiste `next_1m_open`, `persist.py:54`).
+
+**Concordou com:** as contas das duas tabelas sob as condições explicitadas; que a sombra não
+demonstra PnL nem drawdown de carteira; e que o dado apresentado **não** justifica alterar limite
+nenhum automaticamente.
 
 ## Relacionados
 

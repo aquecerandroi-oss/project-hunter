@@ -6,19 +6,26 @@ fonte_url: https://webhomes.maths.ed.ac.uk/mckinnon/blackouts/StochOptFinanceAnd
 lido_em: 2026-09-06
 evidencia: estudo revisado lido em resumo (Kelly, Grossman & Zhou) + anedótico (Vince, Tharp) + aritmética própria conferida
 hipotese_testavel: sim
-astra: pendente
+astra: discorda em parte (correções aplicadas)
 ---
 
 # A fração de risco por operação — e o preço de errar a expectancy
 
 ## O que afirma
 
-A pergunta "quanto arriscar por operação" tem uma resposta matemática exata (Kelly) e uma razão
-igualmente exata para **não** usá-la: a resposta ótima é uma função da expectancy, e a expectancy
-que temos é uma estimativa ruidosa de uma amostra de 16 horas. Errar a expectancy para cima faz o
-tamanho ótimo crescer sem limite; e a curva de crescimento em torno do ótimo é **assimétrica** —
-apostar o dobro do ótimo destrói o crescimento de longo prazo, enquanto apostar metade preserva a
-maior parte dele.
+A pergunta "quanto arriscar por operação" tem uma resposta matemática exata **dentro de um modelo
+declarado** (Kelly) e uma razão igualmente exata para **não** usá-la aqui: a resposta ótima é função
+da **distribuição inteira** dos resultados, não só da média, e a distribuição que temos vem de uma
+amostra de 16 horas.
+
+**Correção da revisão da Astra, e ela desfaz a primeira versão desta frase:** Kelly **não** é
+determinado pela expectancy. Numa aposta binária com ganho `b` e perda 1, `f* = (b·p − q)/b`. Duas
+apostas com a mesma expectancy de 0,1 R pedem tamanhos diferentes: com `b = 1` e `p = 0,55`, `f*` é
+10%; com `b = 2` e `p = 1,1/3`, é 5%. Usar só a média recomendaria o mesmo tamanho para as duas.
+A afirmação que eu tinha escrito — "apostar o dobro do ótimo destrói o crescimento, metade preserva
+a maior parte" — é verdadeira **sob hipóteses que eu não declarei**, e por isso sai como fato e fica
+como o que é: a forma qualitativa do trade-off crescimento × segurança que o capítulo de MacLean,
+Thorp e Ziemba descreve.
 
 A consequência prática, e é a única coisa que este projeto pode afirmar hoje: **a fração de risco
 por operação não é derivável do nosso dado.** Ela é um parâmetro de tolerância, escolhido pelo dono
@@ -76,11 +83,15 @@ Três observações que a nossa própria medição impõe sobre essa cadeia:
    fração de risco definida sobre a referência **subestima** o risco realizado sempre que `δ > 0`.
 3. **Custos entram dentro do R, não fora.** Com stop mediano de 1,52% e 10 bps de custo por perna
    ([[KB-0038-a-taxa-de-4-bps-nao-e-nem-maker-nem-taker]] mais spread medido), a ida e volta consome
-   `20/152 = 13,2%` de 1 R. A fração de risco escolhida é uma fração do R **bruto**; o R líquido é
-   menor por construção.
+   `20/152 = 13,2%` de 1 R. **Precisão que a revisão exigiu:** custos **reduzem o resultado líquido e
+   aumentam a perda no stop** — dizer "o R líquido é menor" dá a impressão errada de que o risco
+   diminuiu. Uma operação stopada perde `1 R + custos`, não `1 R − custos`.
 
 **O argumento de ruína, na forma em que ele é usável aqui.** Com fração fixa `f` de capital por
-operação e `n` perdas seguidas, o capital cai para `(1−f)^n`. Isso é definição, não resultado:
+operação e `n` perdas **exatamente iguais a `f`**, o capital cai para `(1−f)^n`. Isso é definição,
+não resultado — e, **corrigido pela revisão, não é um piso geral**: perdas menores que `f` produzem
+drawdown menor, e gaps que atravessam o stop produzem maior
+([[KB-0064-a-cauda-de-queda-e-o-que-o-risk-engine-vai-precisar]]).
 
 | `f` por operação | após 10 perdas seguidas | após 20 | após 30 |
 |---|---|---|---|
@@ -89,11 +100,14 @@ operação e `n` perdas seguidas, o capital cai para `(1−f)^n`. Isso é defini
 | 1,00% | −9,56% | −18,21% | −26,03% |
 | 2,00% | −18,29% | −33,24% | −45,45% |
 
-E o dado que dá escala a essa tabela: dos 986 acompanhamentos terminais medidos hoje na VPS, **292
-terminaram em stop e 387 em invalidação** — ou seja, **69% terminaram sem tocar o alvo**. Uma
-sequência de 20 resultados negativos não é excepcional numa taxa dessas; é o que se espera de vez em
-quando. **Isso não é expectancy** (invalidação não é perda de 1 R) e não deve ser lido como tal — é
-só a ordem de grandeza da frequência com que a conta acima é exercitada.
+**O que eu tinha escrito aqui e a revisão derrubou.** Eu somava os 292 desfechos `stop` e os 387
+`invalidated` dos 986 terminais medidos hoje na VPS, chamava de "69% terminaram sem tocar o alvo" e
+concluía que uma sequência de 20 resultados negativos "é o que se espera de vez em quando". **Isso
+não se sustenta**, por três motivos que a Astra listou: invalidação **não determina o sinal do
+resultado líquido** (uma invalidação pode encerrar acima da entrada e ser lucrativa); a inferência
+sobre sequências exige **ordenação e dependência**, que a contagem não tem; e o horizonte não entra.
+Fica só o fato bruto — **290 `target`, 292 `stop`, 387 `invalidated`, 17 `expired`** — sem nenhuma
+leitura de frequência de perdas.
 
 ## Hipótese testável no Lab
 
@@ -108,10 +122,12 @@ recomendação.
 
 **A recomendação, e o motivo dela em uma frase:** começar em **0,25% por operação** e nunca passar de
 **1%** enquanto a expectancy não tiver janela futura reservada e ≥ 100 outcomes em ≥ 30 dias. O
-motivo não é o Kelly — é que a fração ótima é proporcional à expectancy estimada, a nossa expectancy
-hoje **não é distinguível de zero em nenhuma coorte** ([[Strategy Performance]] e a
-[[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]]), e a assimetria da curva de crescimento pune
-o erro para cima muito mais que o erro para baixo.
+motivo não é o Kelly — é que qualquer fração derivada de dado exige uma estimativa da distribuição de
+resultados, e **a evidência que temos é insuficiente para concluir coisa alguma sobre a nossa**
+(correção da revisão: eu tinha escrito "não é distinguível de zero em nenhuma coorte", e nenhuma das
+referências desta nota fornece esse teste; o que existe é uma amostra abaixo do piso editorial —
+[[Strategy Performance]], [[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]]). Diante disso, o
+erro para cima é o caro.
 
 ## Por que pode falhar
 
@@ -129,7 +145,18 @@ o erro para cima muito mais que o erro para baixo.
 
 ## Segunda opinião (Astra)
 
-Pendente nesta versão.
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-sizing-risk-1.md`). **Três correções minhas,
+todas aplicadas no corpo:**
+
+1. **Kelly não é determinado pela expectancy** e não cresce necessariamente sem limite. Contraexemplo
+   dela, com a fórmula do próprio capítulo citado (`f* = (b·p − q)/b`): duas apostas com expectancy
+   de 0,1 R dão `f*` de 10% e de 5% conforme a distribuição.
+2. **A tabela `(1−f)^n` não é um piso geral** — é o cenário de `n` perdas exatamente iguais a `f`.
+3. **A leitura de "69% terminaram sem tocar o alvo" não autoriza inferir sequências de perdas**, e
+   "expectancy não distinguível de zero" tinha de virar "evidência insuficiente para concluir".
+
+E uma precisão de linguagem: custos **aumentam a perda no stop**; "R líquido menor" sugeria o
+contrário.
 
 ## Relacionados
 

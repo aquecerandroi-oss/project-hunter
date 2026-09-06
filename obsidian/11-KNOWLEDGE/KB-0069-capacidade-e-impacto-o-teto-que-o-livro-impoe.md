@@ -6,7 +6,7 @@ fonte_url: https://arxiv.org/abs/2311.18283
 lido_em: 2026-09-06
 evidencia: preprint lido em resumo + medição própria (livros e velas, saídas coladas em KB-0070)
 hipotese_testavel: sim
-astra: pendente
+astra: discorda em parte (correções aplicadas)
 ---
 
 # Capacidade e impacto — o teto de notional que o livro impõe, e o que ele não é
@@ -29,6 +29,15 @@ minuto mediano**. De 2.000 USDT, **43%**. No decil inferior (1.024 USDT por minu
 
 Isso é grande. E é grande de um jeito que o teto de livro **não mostra**, porque o livro se recompõe
 entre uma leitura e outra.
+
+> **Correção de 2026-09-06, na revisão da Astra, e ela desfaz a tese que esta nota tinha na primeira
+> versão.** Eu escrevia que os dois tetos "discordam por um fator de ~4", como se fosse um achado
+> empírico. **Não é.** Eles medem coisas diferentes — estoque e fluxo — e por isso **não podem
+> discordar**; são limites complementares. Pior: as duas medianas vêm de universos diferentes (200
+> livros contra 232 mercados) e de resumos duplos, então a razão entre elas **não representa
+> necessariamente mercado nenhum**. Com `p = 10%`, a razão entre os dois resumos seria **4,72** — e
+> isso é uma propriedade da escolha de `p`, não uma medição. A comparação certa é pareada: `N_book`
+> contra `p × V_T` **no mesmo mercado**, com participação, horizonte e mercado declarados.
 
 ## Onde foi mostrado
 
@@ -61,19 +70,23 @@ volume de cotação de 24 h, mediana entre mercados:          13.853.954 USDT
 
 | Notional por sinal | % do minuto mediano (4.605 USDT) | % do minuto no decil inferior (1.024 USDT) | % do volume de 24 h mediano |
 |---|---|---|---|
-| 500 USDT | 10,9% | 48,8% | 0,0036% |
-| 2.000 USDT | 43,4% | 195% (não cabe no minuto) | 0,014% |
-| 10.000 USDT | 217% (não cabe no minuto) | 977% | 0,072% |
+| 500 USDT | 10,86% | 48,8% | 0,0036% |
+| 2.000 USDT | 43,4% | 195% | 0,014% |
+| 10.000 USDT | 217% | 977% | 0,072% |
 
-E o contraste com o teto de livro medido no mesmo instante
-([[KB-0070-a-tabela-de-capacidade-quantos-mercados-suportam-cada-tamanho]]): o mercado mediano
-comporta **2.174 USDT a 5 bps** de custo contra o mid. Ou seja:
+**Uma percentagem acima de 100% não significa "não cabe"** (correção da revisão; a primeira versão
+escrevia isso): significa superar o volume **histórico de referência** daquele minuto. O que ela diz
+é que a nossa ordem seria, sozinha, maior que o fluxo típico — não que a exchange a recusaria.
 
-> **Os dois tetos discordam por um fator de ~4 no mercado mediano.** O livro diz que 2.174 USDT
-> passam a 5 bps; a participação diz que 2.174 USDT são 47% do fluxo de um minuto inteiro. Os dois
-> podem estar certos ao mesmo tempo — o livro é um estoque instantâneo e o volume é um fluxo — e é
-> exatamente por isso que **usar um só dos dois como limite de capacidade é escolher não ver metade
-> do problema**.
+**E é preciso declarar o denominador:** a tabela usa volume **histórico**, medido antes de nós. Uma
+participação medida sobre o volume **realizado incluindo a nossa própria execução** é outra
+quantidade, sempre menor, e as duas não se comparam.
+
+O teto de livro medido no mesmo instante
+([[KB-0070-a-tabela-de-capacidade-quantos-mercados-suportam-cada-tamanho]]) é de **2.174 USDT a 5
+bps** no mercado mediano. **Pela ressalva acima, os dois números não são comparáveis assim** — vêm de
+universos diferentes e de resumos duplos. O que a coexistência deles sustenta é só isto: **usar um só
+dos dois como limite de capacidade é escolher não ver metade do problema.**
 
 **Qual dos dois é o certo para nós?** Nenhum sozinho, e a resposta honesta é que **não sabemos**,
 porque nunca executamos nada. O que dá para afirmar:
@@ -106,14 +119,28 @@ vinculante em todas (aí é um limite de capital disfarçado). Os dois casos sã
 a distribuição do limitante vencedor (`R-PROV-1`).
 
 **`p` é decisão do Everton**, porque escolhe entre operar pouco em muitos mercados e operar mais em
-poucos. A recomendação, e o motivo: **`p = 0,10` sobre a vela de 1 min**, porque é o valor em que a
-tabela acima ainda deixa 500 USDT passar no mercado mediano — e porque acima disso a literatura de
-impacto entra no regime `√γ`, onde o custo cresce mais rápido que o tamanho.
+poucos.
+
+**Duas correções da revisão que atingem a recomendação que eu tinha escrito:**
+
+1. **`p = 0,10` não deixa 500 USDT passar no mercado mediano.** 500/4.605,10 = **10,8575%**, e
+   `p = 10%` autoriza **460,51 USDT**. Recomendar `p = 0,10` prometendo que a ordem de 500 passa é
+   rejeitar exatamente a ordem que a recomendação promete aceitar. Ou o `p` sobe para 0,11, ou o
+   tamanho de referência desce para 460 — e a escolha tem de ser explícita.
+2. **A justificativa pelo `√γ` era falsa.** `√γ` é **sublinear**: o custo cresce mais devagar que a
+   taxa de participação, não mais rápido. E a fonte **não estabelece** transição universal em 10%,
+   nem crescimento superlinear do impacto unitário. Retiro a justificativa; o que sobra é uma escolha
+   de prudência sem apoio de tamanho de efeito.
+
+Com isso, a recomendação honesta é: **`p` entre 0,05 e 0,10 sobre a vela de 1 min, declarado antes,
+sem alegação de que algum valor seja o ótimo** — e a tabela acima serve para o Everton ver o que cada
+valor implica.
 
 ## Por que pode falhar
 
-- **`quote_volume` da vela é volume dos dois lados**, e a nossa ordem é de um lado só. A
-  participação real contra o fluxo contrário é maior que a tabela sugere.
+- **`quote_volume` da vela é o volume negociado**, e cada negócio tem comprador e vendedor. Isso
+  **não** autoriza dividir por dois automaticamente para achar "o fluxo do outro lado" (ressalva da
+  revisão); o que a participação compara com o quê precisa ser declarado por quem escolhe o `p`.
 - **Uma leitura de livro de um instante não descreve o livro no instante seguinte.** Os 200 livros
   medidos são de um intervalo de **11 segundos** de uma tarde de domingo, e o livro é justamente o
   que evapora em stress ([[KB-0044-o-que-morre-em-dez-segundos]]).
@@ -126,7 +153,23 @@ impacto entra no regime `√γ`, onde o custo cresce mais rápido que o tamanho.
 
 ## Segunda opinião (Astra)
 
-Pendente nesta versão.
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-sizing-risk-2.md`). Conferiu a aritmética com
+`Decimal` (`cap10 = 460,51`; `book/cap10 = 4,7209`) e **derrubou três coisas**, todas corrigidas
+acima:
+
+1. **"Os dois tetos discordam" é conclusão inválida.** Estoque e fluxo informam limites
+   complementares; não discordam. E as medianas vêm de universos diferentes (200 contra 232), então
+   a razão não representa mercado nenhum. Cenário de falha: impor um corte universal de capacidade a
+   partir de uma comparação sem pareamento.
+2. **`p = 0,10` contradiz a própria tabela** — autoriza 460,51 USDT, não 500. Cenário de falha:
+   rejeitar exatamente a ordem que a recomendação promete aceitar.
+3. **A justificativa pelo `√γ` estava invertida.** `√γ` é sublinear, e a fonte não estabelece
+   transição em 10%. Retirada.
+
+Mais: `Q/V > 100%` não significa impossibilidade de execução; e é preciso declarar se a participação
+usa volume histórico ou volume realizado incluindo a nossa execução.
+
+**Concordou com:** livro e volume medem aspectos diferentes, e impacto exige calibração local.
 
 ## Relacionados
 

@@ -6,7 +6,7 @@ fonte_url: https://jpm.pm-research.com/content/45/1/14.abstract
 lido_em: 2026-09-06
 evidencia: estudo revisado lido em resumo (o PDF do SSRN devolveu 403) + aritmética própria sobre parâmetros do nosso código
 hipotese_testavel: sim
-astra: pendente
+astra: discorda em parte (correções aplicadas)
 ---
 
 # Sizing por volatilidade — a posição já sai do ATR, e o nosso piso decide o tamanho sem dizer
@@ -29,6 +29,16 @@ notional = R / stop_distance = R / (1,5 × atr_pct)
 E como o Lab admite só `atr_pct ∈ [0,003; 0,05]` (`momentum_v1.py:83-84`), o **notional por 1 R está
 confinado numa faixa de 16,7 vezes** — decidida por dois parâmetros que foram escolhidos como filtro
 de custo e nunca foram lidos como controle de tamanho.
+
+**Duas ressalvas que a revisão da Astra impôs e que delimitam tudo o que vem abaixo:**
+
+- A identidade `notional = R/(1,5 × atr_pct)` vale **na referência do sinal da `momentum_v1`**, onde
+  o stop é `close − 1,5 × ATR`. **Na entrada ela não vale**: se `C` é a referência, `E` a entrada e
+  `a = ATR/C`, a distância na entrada é `d_E = (E − C + 1,5·a·C)/E`, e `notional/R = 1/d_E`.
+  Contraexemplo dela: referência 100, ATR 0,3, stop 99,55, entrada 99,60 → `notional/R = 1.992`,
+  quase dez vezes os 222 da tabela.
+- **Não vale para a `volume_anomaly_v1`**, cujo stop é a mínima da barra do sinal
+  (`volume_anomaly_v1.py:183`) e não é derivado do ATR.
 
 ## Onde foi mostrado
 
@@ -57,7 +67,8 @@ previsão contínua dividida por volatilidade, o que separa **quanto acreditar**
 ## Como mediríamos aqui
 
 **A aritmética da faixa, com os parâmetros que estão no código.** Para uma unidade de risco `R` em
-USDT e stop a `k = 1,5` ATR:
+USDT e stop a `k = 1,5` ATR, **medida na referência do sinal da `momentum_v1`** — não na entrada, e
+não para a `volume_anomaly_v1`:
 
 | `atr_pct` | distância do stop | notional por 1 R | custo de ida e volta (20 bps) em fração de 1 R |
 |---|---|---|---|
@@ -69,12 +80,13 @@ USDT e stop a `k = 1,5` ATR:
 
 Duas leituras que só existem quando as colunas ficam lado a lado:
 
-1. **O piso de ATR é o teto de alavancagem implícito.** No piso, uma operação de 1 R abre uma posição
-   de 222 R. Com fração de risco de 0,5% do equity, isso é **111% do equity numa única posição** —
-   antes de qualquer teto do Risk Engine. É por isso que `max_position_pct` domina a fórmula de
-   sizing em toda a nossa população
-   ([[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]]): não é coincidência de
-   parâmetros, é consequência direta de stops estreitos.
+1. **O piso de ATR é o teto de alavancagem implícito.** No piso, um **orçamento** de risco de 1 R
+   pediria uma posição de 222 R. Com fração de risco de 0,5% do equity, isso é **111% do equity numa
+   única posição** — antes de qualquer teto do Risk Engine. É por isso que `qty_by_risk` nunca é o
+   mínimo nos presets ([[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]]): não é
+   coincidência de parâmetros, é consequência direta de stops estreitos. **A distinção que a revisão
+   exigiu:** `R` aqui é **orçamento de risco**, não risco realizado; e o tamanho final pode ser menor
+   ainda por exposição total, por ativo, por exchange ou por caixa.
 2. **A última coluna é a [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] escrita de outro jeito**, e
    confirma o motivo do piso — mas mostra que o piso está fazendo **dois** trabalhos ao mesmo tempo:
    limitar o custo em R **e** limitar o tamanho da posição. Um único parâmetro controlando duas
@@ -99,9 +111,10 @@ estratégia usou para pôr o stop** — `rolling_window_v1` sobre 15 min com `at
 `atr_14_pct` do `feature_snapshots`. São dois instrumentos com o mesmo apelido, e a quarta rodada já
 tropeçou nisso ([[KB-0035-momentum-crashes-e-o-piso-que-virou-filtro-de-regime]], achado da Astra).
 
-E um **diagnóstico que roda quando o M4 existir**, `R-VOL-1`: publicar, por proposta, a razão
-`notional / (R)` — isto é, `1/(k × atr_pct)` — ao lado do limitante vencedor. É a curva acima medida
-na população real, e é o que mostra se o piso de ATR está funcionando como controle de tamanho.
+E um **diagnóstico que roda quando o M4 existir**, `R-VOL-1`: publicar, por proposta, **as duas**
+razões — `1/(k × atr_pct)` (na referência) e `1/d_E` (na entrada efetiva) — ao lado do limitante
+vencedor e do orçamento de risco. Publicar só a primeira é o erro que esta nota cometeu na primeira
+versão.
 
 ## Por que pode falhar
 
@@ -121,7 +134,15 @@ na população real, e é o que mostra se o piso de ATR está funcionando como c
 
 ## Segunda opinião (Astra)
 
-Pendente nesta versão.
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-sizing-risk-1.md`). Ela recomputou a tabela
+com `Decimal` e confirmou os cinco valores e a razão de 16,6667× entre os extremos. **E restringiu o
+alcance da tabela em três frentes**, todas aplicadas acima: ela vale **na referência** do sinal, não
+na entrada (`d_E = (E − C + 1,5·a·C)/E`, com contraexemplo numérico onde `notional/R` chega a 1.992);
+**não vale para a `volume_anomaly_v1`**, cujo stop é a mínima da barra; e `R` tem de ser dito como
+**orçamento de risco**, distinto do risco bruto no stop e do tamanho final.
+
+**Concordou com:** que stop por ATR **não** equivale a controle de volatilidade de carteira — que é
+a distinção central da nota.
 
 ## Relacionados
 

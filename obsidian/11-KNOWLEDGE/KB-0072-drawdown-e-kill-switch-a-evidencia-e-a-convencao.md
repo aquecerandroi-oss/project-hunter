@@ -6,7 +6,7 @@ fonte_url: https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1467-9965.1993.tb00
 lido_em: 2026-09-06
 evidencia: estudo revisado lido em resumo (Grossman & Zhou) + **anedótico/vendedor** (limites diários) + aritmética própria
 hipotese_testavel: sim
-astra: pendente
+astra: discorda em parte (correções aplicadas)
 ---
 
 # Drawdown e kill switch — o que é evidência, o que é convenção, e o multiplicador que não multiplica nada
@@ -18,18 +18,22 @@ Três coisas, e a terceira é a que importa mais:
 1. **O limite de drawdown tem formalização revisada.** Grossman & Zhou (1993) resolvem exatamente o
    problema de investir sob a restrição `W_t ≥ α·M_t`, onde `M_t` é o máximo de riqueza já atingido.
    É um problema de otimização com restrição, não uma regra de bolso.
-2. **O limite de perda diária não tem.** A busca por evidência devolveu **exclusivamente material de
+2. **Para o limite de perda diária eu não encontrei formalização na busca realizada.** Ela devolveu
+   **exclusivamente material de
    *prop firm* e de fornecedor** — Topstep, Apex, CrossTrade, MyFundedCapital e afins — com números
    ("2 a 4% do saldo inicial", "3% é o máximo que alguém deveria perder num dia") **sem fonte nem
    método**. Nenhum deles é citado aqui como evidência. E o mecanismo que essas páginas invocam —
    impedir *revenge trading*, "externalizar a decisão de parar" — **não se aplica a nós**: não há
    humano no laço. É o mesmo argumento que tirou Mark Douglas do backlog
    ([[KB-0055-douglas-o-livro-que-nao-vira-hipotese]]).
-3. **O `ks_multiplier` e o `regime_size_multiplier` do nosso contrato são inertes na população que
-   medimos.** Ambos multiplicam apenas `risk_usdt`, que entra só no `qty_by_risk` — e o `qty_by_risk`
-   **nunca é o mínimo** em nenhuma das 992 entradas medidas
-   ([[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]]). Passar o kill switch para
-   `WARNING` **não reduziria tamanho nenhum**.
+3. **A fórmula do §4 não garante a promessa do §5.** O `ks_multiplier` e o `regime_size_multiplier`
+   multiplicam apenas `risk_usdt`, que entra só no `qty_by_risk`. O §5 promete que em `WARNING` as
+   entradas são "permitidas com tamanho × 0.5"; **com stop estreito, `WARNING` pode deixar o tamanho
+   intacto**.
+   **Correção da revisão da Astra, e ela desfaz a primeira versão desta afirmação:** eu tinha escrito
+   "são inertes". Não são universalmente. Com `m = regime_multiplier × ks_multiplier`, o limiar vira
+   `d > r·m/p` — e há combinações admissíveis em que ele morde (tabela abaixo). O que sobrevive, e é
+   o defeito real, é que a redução **não é garantida** e depende do stop.
 
 ## Onde foi mostrado
 
@@ -57,11 +61,26 @@ qty             = floor_to_step(min(todos), step_size)
 ```
 
 `ks_multiplier` (0,5 em `WARNING`) e `regime_multiplier` (0,5 em `BTC_BEAR_LONG`, 0,7 em
-`HIGH_VOLATILITY`) aparecem **só** dentro de `qty_by_risk`. Medido: `qty_by_risk < qty_by_position`
-exigiria `stop_distance > 10%`, e a maior distância observada em 992 entradas foi **9,32%**. Com os
-dois multiplicadores em 0,5 simultaneamente o limiar cai para 2,5% — aí sim `qty_by_risk` passaria a
-morder em parte da população (a mediana da `momentum_v1` é 1,52%, mas o p90 é 3,52%). **Com um só
-multiplicador em 0,5, o limiar é 5% e praticamente nada muda.**
+`HIGH_VOLATILITY`) aparecem **só** dentro de `qty_by_risk`. Com `m = regime_multiplier ×
+ks_multiplier`, o termo de risco vence quando `stop_distance > risk_per_trade_pct × m /
+max_position_pct`. Confrontando esse limiar com o `max_stop_distance_pct` de cada perfil:
+
+| Perfil e estado | `m` | limiar | `max_stop_distance_pct` | o multiplicador reduz tamanho? |
+|---|---|---|---|---|
+| qualquer, `ACTIVE` e regime neutro | 1,00 | 10 a 12,5% | 3 / 5 / 8% | **nunca** — o check 5 reprova antes |
+| Conservative, `WARNING` + `BTC_BEAR_LONG` | 0,25 | 3,125% | 3% | **não** — o limiar continua acima do stop máximo |
+| Balanced, só `WARNING` | 0,50 | 5% | 5% | **só empata** no extremo |
+| Balanced, `WARNING` + `BTC_BEAR_LONG` | 0,25 | 2,5% | 5% | **sim**, para stops acima de 2,5% |
+| Aggressive, só `WARNING` | 0,50 | 5% | 8% | **sim**, para stops acima de 5% |
+
+Cenário admissível construído pela Astra: Balanced, `BTC_BEAR_LONG`, `WARNING`, stop 3%, equity
+10.000, preço 100 → `qty_by_risk = 4,166667` contra `qty_by_position = 5`. **Há redução**, supondo
+folga nos demais limites.
+
+**O que isso deixa de pé, e é o que importa:** a redução prometida pelo §5 **acontece em algumas
+combinações e não em outras**, e quem decide é a distância do stop — que ninguém escolheu com isso em
+mente. Eu **não** provei inércia nas 992 entradas: os estados de carteira, regime e kill switch
+daquelas propostas não foram reconstruídos, e nem existiam.
 
 Cenário de falha concreto: o kill switch de organização vai para `WARNING` porque a perda do dia
 passou de 70% do limite; o painel mostra "entradas permitidas com tamanho × 0.5"; e as próximas
@@ -81,9 +100,13 @@ A duração mediana dos acompanhamentos encerrados, medida hoje na VPS:
  invalidated | 387 |        14.0 |    44.0
 ```
 
-Com `max_concurrent_positions = 6` e giro mediano de ~14 min, a vazão é de ~26 posições por hora.
-**O limite diário de 2% pode ser alcançado em cerca de uma hora ruim.** Ele não é folga; é uma
-restrição que morde no primeiro dia adverso — e essa é uma informação que não existia.
+**Cenário hipotético, explicitamente condicionado (a revisão exigiu esta rotulagem):** *se* houver 6
+slots ocupados continuamente, *se* o giro for o mediano de ~14 min, *se* houver sempre sinal elegível
+ao liberar slot, e *se* todas as operações perderem 1 R cheio ao tamanho mediano, então 26 perdas
+levam cerca de uma hora. Cada um desses "se" pode falhar — várias posições duram muito mais que 14
+min (p90 de 48 a 73 min), e mediana de duração **não determina vazão**. O que a conta mostra é ordem
+de grandeza: **2% ao dia não é uma folga confortável nessa escala de tempo**. Não é vazão medida da
+carteira, porque não há carteira.
 
 ## Como mediríamos aqui
 
@@ -114,17 +137,22 @@ protege o capital.
 
 Três regras propostas ao Risk Engine, no [[Strategy Backlog]]:
 
-- **`R-KS-1` — o multiplicador tem de multiplicar.** Aplicar `ks_multiplier` e `regime_multiplier` ao
-  **tamanho final**, depois do mínimo, e não só a `qty_by_risk`. **Cenário de falha se não for
-  feito:** o de cima. Custo: uma linha. É a mudança de maior alavancagem desta rodada inteira.
-- **`R-KS-2` — o degrau publicado.** Toda transição de kill switch grava o tamanho médio pedido antes
-  e depois, para que "reduzimos exposição" seja verificável. Sem isso `R-KS-1` volta a ser
-  inverificável do mesmo jeito.
+- **`R-KS-1` — decidir o que o multiplicador multiplica, e cumprir.** A escolha é entre reduzir o
+  **orçamento de risco** (comportamento atual do §4) e reduzir a **quantidade final** (o que o §5
+  promete). **Não é "uma linha"** — a Astra tem razão nisso: se for a quantidade, a aplicação vai
+  antes do arredondamento final, sem duplicar multiplicadores, e o mínimo negociável tem de ser
+  revalidado depois. **Cenário de falha se nada for feito:** kill switch vai a `WARNING` com stops
+  estreitos, o painel diz "tamanho × 0,5", e as posições abrem do mesmo tamanho.
+- **`R-KS-2` — o degrau verificável.** Comparar médias antes e depois de `WARNING` **não isola o
+  efeito** (correção da revisão): a população muda junto. O certo é registrar, **para a mesma
+  proposta e o mesmo estado**, o tamanho que sairia com e sem os multiplicadores — dois números na
+  mesma decisão.
 - **`R-DD-1` — limite de drawdown do pico de equity, com escopo de portfolio**, já no contrato, e
   **não** automaticamente reduzido a limite diário. Valores: **decisão do Everton**. A recomendação é
   `max_daily_loss_pct = 0,02` e `max_drawdown_pct = 0,10` como ponto de partida do Balanced — os
-  valores que já estão na página —, **com a ressalva medida acima**: 2% ao dia é cerca de uma hora
-  ruim na vazão atual, não uma folga confortável.
+  valores que já estão na página —, com a ressalva **condicionada** acima sobre a escala de tempo.
+  E uma limitação que a revisão fez questão de registrar: **expectancy sozinha não calibra um
+  detector de falha** — seriam necessárias a distribuição das perdas e a dependência temporal.
 
 **O que refutaria `R-KS-1`:** nada; é correção de coerência. O que a tornaria desnecessária é
 descobrir que `qty_by_risk` passa a ser o limitante dominante numa população futura — verificável com
@@ -147,7 +175,22 @@ o `R-PROV-1`.
 
 ## Segunda opinião (Astra)
 
-Pendente nesta versão.
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-sizing-risk-1.md`). **Duas correções de peso,
+já aplicadas:**
+
+1. **Os multiplicadores não são universalmente inertes.** O limiar correto é `d > r·m/p`, e há
+   combinações admissíveis dos presets em que eles reduzem tamanho — a tabela de cinco linhas acima é
+   dela. O que sobrevive, e ela **concorda**, é que a fórmula do §4 **não garante** a promessa de
+   "tamanho × 0,5" do §5.
+2. **"Uma hora ruim" é cenário hipotético, não vazão demonstrada.** Mediana de duração não determina
+   vazão; faltam seleção, reposição, composição e dimensionamento.
+
+E duas de método: `R-KS-1` **não é uma linha** (é uma decisão entre orçamento e quantidade, com
+revalidação do mínimo negociável); e `R-KS-2` como eu tinha escrito **não isola o efeito**, porque
+comparar médias antes/depois mistura mudança de população com mudança de multiplicador.
+
+**Concordou com:** que `WARNING` não garante metade do tamanho na fórmula atual; e que limite diário
+e drawdown do pico **não são redundantes**.
 
 ## Relacionados
 
