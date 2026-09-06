@@ -50,6 +50,16 @@ def _shadow_tables(name: str) -> tuple[str, ...]:
     return cast(tuple[str, ...], getattr(migration_ddl("shadow"), name))
 
 
+def _analysis_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0003_analysis``'s lists in ``ddl/analysis.py``.
+
+    It adds a fifth ``hunter_worker`` class — ``SELECT``/``INSERT``/``DELETE``
+    and never ``UPDATE`` — because a ``feature_baselines`` revision may be
+    created and expired but never changed.
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("analysis"), name))
+
+
 def _security_tables(name: str) -> tuple[str, ...]:
     """A frozen grant-list constant from ``ddl.security``, correctly typed.
 
@@ -157,6 +167,7 @@ async def test_read_only_tables_grant_the_app_role_nothing_but_select(
     read_only = (
         *_security_tables("APP_READ_ONLY_TABLES"),
         *_shadow_tables("SHADOW_APP_READ_ONLY_TABLES"),
+        *_analysis_tables("ANALYSIS_APP_READ_ONLY_TABLES"),
     )
     assert read_only, "the read-only grant list is empty"
 
@@ -214,9 +225,15 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     append_only = _security_tables("APPEND_ONLY_TABLES")
 
     shadow_read_only = _shadow_tables("SHADOW_APP_READ_ONLY_TABLES")
+    analysis_read_only = _analysis_tables("ANALYSIS_APP_READ_ONLY_TABLES")
 
     classified = (
-        list(write) + list(no_delete) + list(read_only) + list(append_only) + list(shadow_read_only)
+        list(write)
+        + list(no_delete)
+        + list(read_only)
+        + list(append_only)
+        + list(shadow_read_only)
+        + list(analysis_read_only)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 
@@ -293,3 +310,80 @@ async def test_the_worker_role_owns_the_organization_lifecycle(
                     {"t": table, "p": privilege},
                 )
                 assert not granted, f"hunter_worker can {privilege} {table}"
+
+
+async def test_the_worker_can_write_a_baseline_but_never_rewrite_one(
+    schema_engine: AsyncEngine,
+) -> None:
+    """``feature_baselines`` is the one table with a create-and-expire class.
+
+    ``UPDATE`` is denied at the grant, before the immutability trigger is even
+    consulted — two independent locks on the same door, because the value of the
+    archive is exactly that a revision cannot be edited after a score named it.
+    ``DELETE`` is granted because retention has to expire revisions eventually;
+    the trigger is what makes the deletion a declared act.
+    """
+    append_tables = _analysis_tables("ANALYSIS_WORKER_APPEND_TABLES")
+    assert set(append_tables) == {"feature_baselines"}
+
+    async with schema_engine.connect() as connection:
+        for table in append_tables:
+            for privilege in ("SELECT", "INSERT", "DELETE"):
+                granted = await connection.scalar(
+                    text("SELECT has_table_privilege('hunter_worker', :t, :p)"),
+                    {"t": table, "p": privilege},
+                )
+                assert granted, f"hunter_worker cannot {privilege} {table}"
+            updatable = await connection.scalar(
+                text("SELECT has_table_privilege('hunter_worker', :t, 'UPDATE')"), {"t": table}
+            )
+            assert not updatable, f"hunter_worker can UPDATE {table}"
+
+
+async def test_the_app_role_cannot_write_a_baseline_or_the_outbox(
+    schema_engine: AsyncEngine,
+) -> None:
+    """Everything the M2 pipeline writes is written by a worker. The API reads a
+    baseline to explain a score and reads the outbox to report queue depth; a
+    request handler that could write either could rewrite the past or publish an
+    event nobody produced."""
+    read_only = _analysis_tables("ANALYSIS_APP_READ_ONLY_TABLES")
+    async with schema_engine.connect() as connection:
+        for table in read_only:
+            selectable = await connection.scalar(
+                text("SELECT has_table_privilege('hunter_app', :t, 'SELECT')"), {"t": table}
+            )
+            assert selectable, f"hunter_app cannot read {table}"
+            for privilege in ("INSERT", "UPDATE", "DELETE"):
+                granted = await connection.scalar(
+                    text("SELECT has_table_privilege('hunter_app', :t, :p)"),
+                    {"t": table, "p": privilege},
+                )
+                assert not granted, f"hunter_app can {privilege} {table}"
+
+
+async def test_the_worker_can_actually_insert_into_the_outbox_sequence_and_all(
+    schema_engine: AsyncEngine,
+) -> None:
+    """Inserted as the role, not asked of ``has_table_privilege``.
+
+    ``outbox_events.id`` is ``BIGSERIAL``, and a table grant alone passes every
+    privilege check and then fails the ``INSERT`` with "permission denied for
+    sequence" — the trap ``shadow_outbox`` paid for in ``0002``. Only a real
+    write proves the sequence grant went out with the table grant.
+    """
+    async with schema_engine.begin() as connection:
+        await connection.execute(text("GRANT hunter_worker TO CURRENT_USER"))
+    async with schema_engine.connect() as connection:
+        transaction = await connection.begin()
+        try:
+            await connection.execute(text("SET LOCAL ROLE hunter_worker"))
+            written = await connection.scalar(
+                text(
+                    "INSERT INTO outbox_events (event_id, stream) "
+                    "VALUES (gen_random_uuid(), 'opportunities.updated') RETURNING id"
+                )
+            )
+            assert written is not None
+        finally:
+            await transaction.rollback()

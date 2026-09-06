@@ -158,8 +158,15 @@ class FeatureCategory(StrEnum):
 
 
 class AnomalyType(StrEnum):
-    """``anomaly_type`` — DATABASE.md §5, PIPELINE.md §3. MVP (v1) plus the two
-    Phase 2/3 types the pipeline doc already names.
+    """``anomaly_type`` — DATABASE.md §5, §17 and PIPELINE.md §3.
+
+    The ten MVP (v1) detectors of the joint M2 decision plus the two Phase 2/3
+    types the pipeline doc already names. ``TRADE_VELOCITY_SPIKE`` and
+    ``MOMENTUM_SHIFT`` were added by ``0003_analysis`` with
+    ``ADD VALUE ... BEFORE 'SOCIAL_SPIKE'``, which is why they sit with the v1
+    group here: this class's order is the database's label order.
+    ``CROSS_EXCHANGE_DIVERGENCE`` stays registered but no detector arms it until
+    a second exchange exists (M1b).
     """
 
     VOLUME_SPIKE = "VOLUME_SPIKE"
@@ -170,6 +177,8 @@ class AnomalyType(StrEnum):
     FUNDING_ANOMALY = "FUNDING_ANOMALY"
     LIQUIDATION_CLUSTER = "LIQUIDATION_CLUSTER"
     CROSS_EXCHANGE_DIVERGENCE = "CROSS_EXCHANGE_DIVERGENCE"
+    TRADE_VELOCITY_SPIKE = "TRADE_VELOCITY_SPIKE"
+    MOMENTUM_SHIFT = "MOMENTUM_SHIFT"
     SOCIAL_SPIKE = "SOCIAL_SPIKE"
     WHALE_ACTIVITY = "WHALE_ACTIVITY"
 
@@ -182,6 +191,29 @@ class AnomalyStatus(StrEnum):
     EXPIRED = "expired"
 
 
+class AnomalyEvaluationState(StrEnum):
+    """``anomaly_evaluation_state`` — ``anomalies.evaluation_state``, added by
+    ``0003_analysis`` (joint M2 decision, "Anomalias").
+
+    A second axis, deliberately separate from ``AnomalyStatus``: that one says
+    where the anomaly is in its ``active -> resolved/expired`` lifecycle, this
+    one says whether the data behind it can still be believed.
+
+    - ``OK`` — evaluated against fresh, eligible data;
+    - ``STALE`` — the source is late or degraded, so the anomaly may not feed a
+      score;
+    - ``UNKNOWN`` — no data arrived at all for this evaluation.
+
+    The pair that matters is ``active + unknown``: an anomaly whose feed went
+    away stays *active* and becomes ineligible. It is never resolved by absence
+    — "we stopped looking" is not "it stopped happening".
+    """
+
+    OK = "ok"
+    STALE = "stale"
+    UNKNOWN = "unknown"
+
+
 class RegimeScope(StrEnum):
     """``regime_scope`` — DATABASE.md §5 (market_regimes.scope)."""
 
@@ -190,8 +222,14 @@ class RegimeScope(StrEnum):
 
 
 class MarketRegime(StrEnum):
-    """``market_regime`` — DATABASE.md §5, PIPELINE.md §4. v0 (M2) plus the v1
-    (Phase 2) values the pipeline doc already names.
+    """``market_regime`` — DATABASE.md §5, §17, PIPELINE.md §4. v0 (M2) plus
+    the v1 (Phase 2) values the pipeline doc already names.
+
+    ``UNKNOWN`` (``0003_analysis``) is the classifier's warm-up state, and it is a
+    *classification*, not a missing value: while the 30 days of 1-minute candles
+    the volatility percentile needs are not yet durable, the regime is honestly
+    unknown and the reason goes in ``supporting_features``. A NULL would have let
+    every consumer invent its own default; ``UNKNOWN`` makes them handle it.
     """
 
     BTC_BULL = "BTC_BULL"
@@ -204,6 +242,7 @@ class MarketRegime(StrEnum):
     ALT_EXPANSION = "ALT_EXPANSION"
     PANIC = "PANIC"
     LIQUIDITY_CONTRACTION = "LIQUIDITY_CONTRACTION"
+    UNKNOWN = "UNKNOWN"
 
 
 class TradeDirection(StrEnum):
@@ -224,9 +263,21 @@ intentionally NOT a second entry in ``ALL_ENUMS`` — there is only one DB type.
 
 
 class OpportunityStatus(StrEnum):
-    """``opportunity_status`` — DATABASE.md §5. ``IN_POSITION`` and
-    ``BLOCKED_BY_RISK`` are deliberately excluded: the doc states they are
-    derived per-organization at read time and are never stored in this column.
+    """``opportunity_status`` — DATABASE.md §5 and §17.
+
+    ``IN_POSITION`` and ``BLOCKED_BY_RISK`` are deliberately excluded: the doc
+    states they are derived per organization at read time and are never stored in
+    this column — the same opportunity can be in position for one tenant and
+    blocked by risk for another, and a global column cannot say both.
+
+    ``EXTENDED`` (``0003_analysis``) is the one global status the joint M2
+    decision adds. Precedence, highest first: ``EXPIRED`` (terminal) >
+    ``EXTENDED`` > ``ENTRY_CANDIDATE`` > ``HOT`` > ``ANOMALY`` > ``WATCHING`` >
+    ``NORMAL``. Declaration order below is the *database's* label order
+    (``0003`` adds ``EXTENDED`` with ``BEFORE 'EXPIRED'``), not the precedence.
+
+    ``NORMAL`` never *opens* an episode, but it is a valid temporary state of one
+    already open: the row keeps its id and starts ``below_40_since``.
     """
 
     NORMAL = "NORMAL"
@@ -234,6 +285,7 @@ class OpportunityStatus(StrEnum):
     ANOMALY = "ANOMALY"
     HOT = "HOT"
     ENTRY_CANDIDATE = "ENTRY_CANDIDATE"
+    EXTENDED = "EXTENDED"
     EXPIRED = "EXPIRED"
 
 
@@ -339,6 +391,62 @@ class ShadowCohort:
         if cohort == ShadowCohort.PROSPECTIVE:
             return None
         return uuid.UUID(cohort.removeprefix(ShadowCohort.REPLAY_PREFIX))
+
+
+class OpportunityStage(StrEnum):
+    """``opportunity_stage`` — ``opportunities.stage``, added by ``0003_analysis``
+    (joint M2 decision, "Estágio EARLY/DEVELOPING/EXTENDED").
+
+    Where a move is in its life, from ``r = |return_1h| / atr_pct`` with the ATR
+    of Wilder(14) over complete 15-minute UTC bars:
+
+    - ``EARLY`` — ``r < 1.5`` **and** the symmetric confirmations fired;
+    - ``DEVELOPING`` — ``1.5 <= r <= 4``;
+    - ``EXTENDED`` — ``r > 4``, or the exhaustion alternative;
+    - ``NONE`` — no stage could be computed (ATR warm-up, missing data).
+
+    ``NONE`` is a member and not a NULL on purpose: "we cannot tell yet" is an
+    answer the Radar has to show, and a nullable column would have let a consumer
+    read the absence as EARLY.
+
+    UPPER_SNAKE_CASE like ``OpportunityStatus``, its sibling column on the same
+    table, rather than the lower-case draft in the superseded "Decisões deste
+    plano" of ``docs/plans/M2.md`` — recorded in DATABASE.md §17.
+    """
+
+    EARLY = "EARLY"
+    DEVELOPING = "DEVELOPING"
+    EXTENDED = "EXTENDED"
+    NONE = "NONE"
+
+
+class BaselineSource(StrEnum):
+    """``baseline_source`` — ``feature_baselines.source`` (``0003_analysis``).
+
+    ``LIVE`` is computed from the feature snapshots the scanner wrote as they
+    happened; ``BOOTSTRAP`` is computed by the same calculators over persisted
+    candles, so a market does not have to wait a week for its first baseline. The
+    column exists because the two are *not* interchangeable evidence: a bootstrap
+    baseline may only be used for decisions after its ``available_at``, never
+    back-dated to simulate knowledge nobody had.
+    """
+
+    LIVE = "live"
+    BOOTSTRAP = "bootstrap"
+
+
+class BaselineSampling(StrEnum):
+    """``baseline_sampling`` — ``feature_baselines.sampling`` (``0003_analysis``).
+
+    How the observations inside a bucket were drawn. One member today: the joint
+    M2 decision fixes per-minute observations, 420 expected per (market, feature,
+    UTC hour) bucket over seven days. A single-member enum is not a defect — it
+    is the point: a second sampling policy has to arrive as a migration, and
+    every baseline row already says which policy produced it, so two populations
+    can never be silently averaged together.
+    """
+
+    PER_MINUTE = "per_minute"
 
 
 class AgentStatus(StrEnum):
@@ -593,10 +701,14 @@ ALL_ENUMS: dict[str, type[StrEnum]] = {
     "feature_category": FeatureCategory,
     "anomaly_type": AnomalyType,
     "anomaly_status": AnomalyStatus,
+    "anomaly_evaluation_state": AnomalyEvaluationState,
     "regime_scope": RegimeScope,
     "market_regime": MarketRegime,
     "trade_direction": TradeDirection,
     "opportunity_status": OpportunityStatus,
+    "opportunity_stage": OpportunityStage,
+    "baseline_source": BaselineSource,
+    "baseline_sampling": BaselineSampling,
     "strategy_version_status": StrategyVersionStatus,
     "signal_status": SignalStatus,
     "outcome_result": OutcomeResult,

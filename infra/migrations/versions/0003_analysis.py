@@ -1,0 +1,382 @@
+"""analysis: immutable baselines, envelopes, episode identity and the outbox
+
+The schema half of Milestone 2 (task T2.1), against the joint Claude/Astra
+decision in ``docs/plans/M2.md`` — which prevails over that plan's own earlier
+"Decisões deste plano". Described in DATABASE.md §17.
+
+Seven things, in the order Postgres accepts them:
+
+1. the four new enum types (``ddl/enums.py`` owns every ``CREATE TYPE``; this
+   revision's mapping is ``ANALYSIS_ENUMS``);
+2. the four new *values* on types ``0001`` already created —
+   ``opportunity_status.EXTENDED``, ``market_regime.UNKNOWN`` and the two MVP
+   detectors ``anomaly_type`` was missing. Postgres 12+ allows ``ALTER TYPE ...
+   ADD VALUE`` inside a transaction block but forbids *using* the new value in
+   the same transaction, so this revision adds them and uses none of them;
+3. the guards: three new invariants that no honest backfill can produce for a
+   row that already violates them, so the upgrade counts the offenders and
+   stops with instructions instead of guessing (``0002``'s precedent);
+4. ``feature_baselines`` (immutable revisions with a causal cut) and
+   ``outbox_events`` (T2.9, shape-identical to ``shadow_outbox`` so the
+   absorption cannot lose a pending event);
+5. the columns the M2 pipeline needs — ``opportunities.stage``/``explanation``/
+   ``below_40_since``, ``opportunity_history.stage``/``envelope``,
+   ``anomalies.evaluation_state`` — plus the backfill that gives every
+   pre-existing anomaly ``unknown`` rather than an ``ok`` nobody verified;
+6. episode identity: the partial unique index on ``opportunities`` moves from a
+   list of statuses to ``WHERE expired_at IS NULL``, with a CHECK keeping
+   ``status = 'EXPIRED'`` and ``expired_at`` in lockstep — so NORMAL is a valid
+   state of an *open* episode and cannot silently start a second one. Alembic's
+   autogenerate does not compare index predicates, so the swap is written by
+   hand here and asserted against ``pg_indexes`` in ``test_schema_analysis.py``;
+7. grants, and the immutability trigger on ``feature_baselines``.
+
+``downgrade()`` reverses all seven and is tested. Reversing an ``ADD VALUE``
+means rebuilding the type from the labels ``0001`` froze, because Postgres
+cannot drop an enum label; it refuses first if any row still carries one of the
+new labels — including a history sample under an already-expired episode.
+
+Nothing here depends on session state: no session-level prepared statement, no
+``LISTEN``/``NOTIFY``, no session advisory lock. The one GUC involved,
+``app.baseline_retention``, is read with ``SET LOCAL`` semantics exactly like
+``app.current_org``.
+
+Revision ID: 0003_analysis
+Revises: 0002_shadow_lab
+Create Date: 2026-09-05
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+from alembic import op
+from ddl.analysis import (
+    create_feature_baseline_immutability,
+    drop_feature_baseline_immutability,
+    grant_analysis_privileges,
+    refuse_a_downgrade_that_would_discard_durable_state,
+    refuse_rows_the_new_invariants_cannot_describe,
+    refuse_rows_using_values_0003_added,
+    restore_frozen_enum_labels,
+    revoke_analysis_privileges,
+)
+from ddl.enums import ANALYSIS_ENUMS, add_enum_values, create_enum_types, drop_enum_types
+from sqlalchemy.dialects import postgresql
+
+revision: str = "0003_analysis"
+down_revision: str | None = "0002_shadow_lab"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+_OPEN_EPISODE_INDEX = "uq_opportunities_open_per_market"
+_STATUS_PREDICATE = (
+    "status = ANY (ARRAY['WATCHING'::opportunity_status, "
+    "'HOT'::opportunity_status, 'ENTRY_CANDIDATE'::opportunity_status])"
+)
+"""What ``0001`` keyed episode identity on, and what the downgrade restores."""
+
+_OPEN_PREDICATE = "expired_at IS NULL"
+"""What it is keyed on from here: an episode is open until it expires.
+
+The joint decision's decisive scenario is why. HOT(id=A, 80) that falls to 35
+for a minute and recovers to 45 has to come back as WATCHING(id=A) — the same
+episode — and under the old predicate the row left the index at 35 and a second
+row could take the slot. NORMAL is a legal, temporary state of an open episode.
+"""
+
+
+def upgrade() -> None:
+    create_enum_types(ANALYSIS_ENUMS)
+    add_enum_values()
+    refuse_rows_the_new_invariants_cannot_describe()
+    _create_tables()
+    _alter_analysis_tables()
+    _move_episode_identity_to_expired_at()
+    grant_analysis_privileges()
+    create_feature_baseline_immutability()
+
+
+def downgrade() -> None:
+    refuse_a_downgrade_that_would_discard_durable_state()
+    refuse_rows_using_values_0003_added()
+    drop_feature_baseline_immutability()
+    revoke_analysis_privileges()
+    _drop_episode_identity_objects()
+    _revert_analysis_tables()
+    _drop_tables()
+    restore_frozen_enum_labels()
+    _restore_open_episode_index_on_status()
+    drop_enum_types(ANALYSIS_ENUMS)
+
+
+def _create_tables() -> None:
+    """Autogenerated from ``hunter_core.db.models``, unedited except for order."""
+    op.create_table(
+        "outbox_events",
+        sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
+        sa.Column("event_id", sa.UUID(), nullable=False),
+        sa.Column("stream", sa.Text(), nullable=False),
+        sa.Column(
+            "payload",
+            postgresql.JSONB(astext_type=sa.Text()),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
+        sa.Column(
+            "created_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("dispatched_at", sa.TIMESTAMP(timezone=True), nullable=True),
+        sa.Column("attempts", sa.Integer(), server_default="0", nullable=False),
+        sa.Column("last_error", sa.Text(), nullable=True),
+        sa.CheckConstraint("attempts >= 0", name=op.f("ck_outbox_events_attempts_not_negative")),
+        sa.CheckConstraint(
+            "char_length(stream) > 0", name=op.f("ck_outbox_events_stream_not_empty")
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_outbox_events")),
+        sa.UniqueConstraint("event_id", name=op.f("uq_outbox_events_event_id")),
+    )
+    op.create_index(
+        "ix_outbox_events_pending",
+        "outbox_events",
+        ["id"],
+        unique=False,
+        postgresql_where=sa.text("dispatched_at IS NULL"),
+    )
+    op.create_table(
+        "feature_baselines",
+        sa.Column("market_id", sa.UUID(), nullable=False),
+        sa.Column("feature", sa.Text(), nullable=False),
+        sa.Column("feature_version", sa.Integer(), server_default="1", nullable=False),
+        sa.Column("algo_version", sa.Text(), nullable=False),
+        sa.Column("hour_of_day", sa.SmallInteger(), nullable=False),
+        sa.Column("window_start", sa.TIMESTAMP(timezone=True), nullable=False),
+        sa.Column("window_end", sa.TIMESTAMP(timezone=True), nullable=False),
+        sa.Column("available_at", sa.TIMESTAMP(timezone=True), nullable=False),
+        sa.Column("median", sa.Numeric(precision=28, scale=10), nullable=False),
+        sa.Column("mad", sa.Numeric(precision=28, scale=10), nullable=False),
+        sa.Column("sample_size", sa.Integer(), nullable=False),
+        sa.Column("expected_size", sa.Integer(), nullable=False),
+        sa.Column("distinct_days", sa.Integer(), nullable=False),
+        sa.Column("coverage", sa.Numeric(precision=9, scale=6), nullable=False),
+        sa.Column(
+            "source",
+            postgresql.ENUM("live", "bootstrap", name="baseline_source", create_type=False),
+            nullable=False,
+        ),
+        sa.Column(
+            "sampling",
+            postgresql.ENUM("per_minute", name="baseline_sampling", create_type=False),
+            nullable=False,
+        ),
+        sa.Column("input_fingerprint", sa.Text(), nullable=False),
+        sa.Column(
+            "computed_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("id", sa.UUID(), nullable=False),
+        sa.CheckConstraint(
+            "coverage BETWEEN 0 AND 1", name=op.f("ck_feature_baselines_coverage_is_a_fraction")
+        ),
+        sa.CheckConstraint(
+            "hour_of_day BETWEEN 0 AND 23", name=op.f("ck_feature_baselines_hour_of_day_in_range")
+        ),
+        sa.CheckConstraint("mad >= 0", name=op.f("ck_feature_baselines_mad_not_negative")),
+        sa.CheckConstraint(
+            "sample_size >= 0 AND expected_size > 0 AND sample_size <= expected_size "
+            "AND distinct_days >= 0",
+            name=op.f("ck_feature_baselines_counts_are_coherent"),
+        ),
+        sa.CheckConstraint(
+            "window_start < window_end AND window_end <= available_at",
+            name=op.f("ck_feature_baselines_window_is_ordered_and_causal"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["market_id"],
+            ["markets.id"],
+            name=op.f("fk_feature_baselines_market_id_markets"),
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_feature_baselines")),
+        sa.UniqueConstraint(
+            "market_id",
+            "feature",
+            "hour_of_day",
+            "feature_version",
+            "algo_version",
+            "window_end",
+            "source",
+            "input_fingerprint",
+            name="uq_feature_baselines_revision",
+        ),
+    )
+    op.create_index(
+        "ix_feature_baselines_lookup",
+        "feature_baselines",
+        ["market_id", "feature", "hour_of_day", "available_at"],
+        unique=False,
+    )
+
+
+def _alter_analysis_tables() -> None:
+    op.add_column(
+        "anomalies",
+        sa.Column(
+            "evaluation_state",
+            postgresql.ENUM(
+                "ok", "stale", "unknown", name="anomaly_evaluation_state", create_type=False
+            ),
+            server_default="ok",
+            nullable=False,
+        ),
+    )
+    # The column default is ``ok`` because that is what a detector writes on a
+    # healthy evaluation, but ``ADD COLUMN`` applies that default to every row
+    # that already exists — and nobody checked the data quality behind those.
+    # They all predate the M2 detectors, so they all get ``unknown``: an
+    # anomaly whose evaluation state was never established is exactly the
+    # ``active + unknown`` case the joint decision names, ineligible rather
+    # than trusted. On an empty table this is a no-op.
+    op.execute("UPDATE anomalies SET evaluation_state = 'unknown'::anomaly_evaluation_state")
+    op.create_index(
+        "uq_anomalies_active_per_market_type",
+        "anomalies",
+        ["market_id", "type"],
+        unique=True,
+        postgresql_where=sa.text("status = 'active'::anomaly_status"),
+    )
+    op.add_column(
+        "opportunities",
+        sa.Column(
+            "stage",
+            postgresql.ENUM(
+                "EARLY",
+                "DEVELOPING",
+                "EXTENDED",
+                "NONE",
+                name="opportunity_stage",
+                create_type=False,
+            ),
+            server_default="NONE",
+            nullable=False,
+        ),
+    )
+    op.add_column(
+        "opportunities",
+        sa.Column(
+            "explanation",
+            postgresql.JSONB(astext_type=sa.Text()),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
+    )
+    op.add_column(
+        "opportunities", sa.Column("below_40_since", sa.TIMESTAMP(timezone=True), nullable=True)
+    )
+    op.add_column(
+        "opportunity_history",
+        sa.Column(
+            "stage",
+            postgresql.ENUM(
+                "EARLY",
+                "DEVELOPING",
+                "EXTENDED",
+                "NONE",
+                name="opportunity_stage",
+                create_type=False,
+            ),
+            server_default="NONE",
+            nullable=False,
+        ),
+    )
+    op.add_column(
+        "opportunity_history",
+        sa.Column(
+            "envelope",
+            postgresql.JSONB(astext_type=sa.Text()),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
+    )
+
+
+def _revert_analysis_tables() -> None:
+    op.drop_column("opportunity_history", "envelope")
+    op.drop_column("opportunity_history", "stage")
+    op.drop_column("opportunities", "below_40_since")
+    op.drop_column("opportunities", "explanation")
+    op.drop_column("opportunities", "stage")
+    op.drop_index(
+        "uq_anomalies_active_per_market_type",
+        table_name="anomalies",
+        postgresql_where=sa.text("status = 'active'::anomaly_status"),
+    )
+    op.drop_column("anomalies", "evaluation_state")
+
+
+def _move_episode_identity_to_expired_at() -> None:
+    """Swap the partial unique index, then bind ``status`` to ``expired_at``.
+
+    Written by hand because ``alembic check`` cannot see it: Alembic compares
+    index *columns* and not the ``WHERE`` clause, so an index left with the old
+    predicate would report no drift while enforcing the wrong invariant. The
+    assertion lives in ``test_schema_analysis.py``, against ``pg_indexes``.
+    """
+    op.drop_index(
+        _OPEN_EPISODE_INDEX, table_name="opportunities", postgresql_where=sa.text(_STATUS_PREDICATE)
+    )
+    op.create_index(
+        _OPEN_EPISODE_INDEX,
+        "opportunities",
+        ["market_id"],
+        unique=True,
+        postgresql_where=sa.text(_OPEN_PREDICATE),
+    )
+    op.create_check_constraint(
+        op.f("ck_opportunities_expired_at_matches_status"),
+        "opportunities",
+        "(status = 'EXPIRED'::opportunity_status) = (expired_at IS NOT NULL)",
+    )
+
+
+def _drop_episode_identity_objects() -> None:
+    """Take this revision's episode-identity objects out, and only that.
+
+    The ``0001`` index is *not* recreated here: its predicate casts to
+    ``opportunity_status``, and a stored expression bound to that type would
+    block ``restore_frozen_enum_labels`` from replacing it. It goes back in
+    :func:`_restore_open_episode_index_on_status`, after the rebuild.
+    """
+    op.drop_constraint(
+        op.f("ck_opportunities_expired_at_matches_status"), "opportunities", type_="check"
+    )
+    op.drop_index(
+        _OPEN_EPISODE_INDEX, table_name="opportunities", postgresql_where=sa.text(_OPEN_PREDICATE)
+    )
+
+
+def _restore_open_episode_index_on_status() -> None:
+    op.create_index(
+        _OPEN_EPISODE_INDEX,
+        "opportunities",
+        ["market_id"],
+        unique=True,
+        postgresql_where=sa.text(_STATUS_PREDICATE),
+    )
+
+
+def _drop_tables() -> None:
+    op.drop_index("ix_feature_baselines_lookup", table_name="feature_baselines")
+    op.drop_table("feature_baselines")
+    op.drop_index(
+        "ix_outbox_events_pending",
+        table_name="outbox_events",
+        postgresql_where=sa.text("dispatched_at IS NULL"),
+    )
+    op.drop_table("outbox_events")

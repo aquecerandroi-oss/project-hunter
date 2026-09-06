@@ -13,9 +13,15 @@ import pytest
 from hunter_core.domain import enums
 from hunter_core.domain.enums import (
     ALL_ENUMS,
+    AnomalyEvaluationState,
+    AnomalyType,
+    BaselineSampling,
+    BaselineSource,
     ExecutionMode,
     KillSwitchState,
     MarketRegime,
+    OpportunityStage,
+    OpportunityStatus,
     OrganizationRole,
     PortfolioType,
     ShadowCohort,
@@ -47,6 +53,10 @@ EXPECTED_ENUM_CLASSES = {
     "SignalStatus",
     "OutcomeResult",
     "ShadowTrackingState",
+    "OpportunityStage",
+    "AnomalyEvaluationState",
+    "BaselineSource",
+    "BaselineSampling",
     "AgentStatus",
     "StatsWindow",
     "RiskPreset",
@@ -128,7 +138,77 @@ def test_market_regime_matches_pipeline_md_v0_and_v1() -> None:
         "ALT_EXPANSION",
         "PANIC",
         "LIQUIDITY_CONTRACTION",
+        "UNKNOWN",
     ]
+
+
+def test_market_regime_unknown_is_last_because_0003_appended_it() -> None:
+    """``ALTER TYPE ... ADD VALUE`` appends, and ``pg_enum.enumsortorder`` is what
+    ``test_migrations`` compares against. Declaration order here *is* the label
+    order in the database, so a member inserted in the middle of this class
+    without a matching ``BEFORE``/``AFTER`` in the migration is drift.
+    """
+    assert list(MarketRegime)[-1] is MarketRegime.UNKNOWN
+
+
+def test_opportunity_status_gains_only_extended_and_keeps_it_before_expired() -> None:
+    """The joint M2 decision adds exactly one global status: ``EXTENDED``.
+
+    ``IN_POSITION`` and ``BLOCKED_BY_RISK`` stay derived per organization at read
+    time (DATABASE.md §5), so they are still absent. ``EXTENDED`` sits before
+    ``EXPIRED`` because ``0003`` adds it with ``BEFORE 'EXPIRED'`` — this class
+    and ``enumsortorder`` have to agree.
+    """
+    assert [member.value for member in OpportunityStatus] == [
+        "NORMAL",
+        "WATCHING",
+        "ANOMALY",
+        "HOT",
+        "ENTRY_CANDIDATE",
+        "EXTENDED",
+        "EXPIRED",
+    ]
+
+
+def test_anomaly_type_gains_the_two_missing_mvp_detectors_before_phase_two() -> None:
+    assert [member.value for member in AnomalyType] == [
+        "VOLUME_SPIKE",
+        "PRICE_ACCELERATION",
+        "VOLATILITY_EXPANSION",
+        "ORDERBOOK_IMBALANCE",
+        "OPEN_INTEREST_SPIKE",
+        "FUNDING_ANOMALY",
+        "LIQUIDATION_CLUSTER",
+        "CROSS_EXCHANGE_DIVERGENCE",
+        "TRADE_VELOCITY_SPIKE",
+        "MOMENTUM_SHIFT",
+        "SOCIAL_SPIKE",
+        "WHALE_ACTIVITY",
+    ]
+
+
+def test_opportunity_stage_matches_the_joint_decision() -> None:
+    """``NONE`` is a real stage, not a NULL: during ATR warm-up there is no stage
+    yet, and the Radar has to say so instead of implying EARLY.
+    """
+    assert [member.value for member in OpportunityStage] == [
+        "EARLY",
+        "DEVELOPING",
+        "EXTENDED",
+        "NONE",
+    ]
+
+
+def test_anomaly_evaluation_state_separates_quality_from_lifecycle() -> None:
+    """``active + unknown`` is what an anomaly holds when its data stopped
+    arriving: still active, not eligible, and never resolved by absence.
+    """
+    assert [member.value for member in AnomalyEvaluationState] == ["ok", "stale", "unknown"]
+
+
+def test_baseline_source_and_sampling_match_the_joint_decision() -> None:
+    assert [member.value for member in BaselineSource] == ["live", "bootstrap"]
+    assert [member.value for member in BaselineSampling] == ["per_minute"]
 
 
 def test_shadow_tracking_state_matches_the_shadow_lab_decision() -> None:

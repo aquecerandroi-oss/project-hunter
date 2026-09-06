@@ -53,6 +53,7 @@ from hunter_core.db.models.analysis import (
     OpportunityHistory,
     OpportunityWeights,
 )
+from hunter_core.db.models.analysis_baselines import FeatureBaseline
 from hunter_core.db.models.backtests import Backtest, BacktestResult, BacktestTrade
 from hunter_core.db.models.billing import (
     FeatureFlag,
@@ -82,7 +83,13 @@ from hunter_core.db.models.market_data import (
 from hunter_core.db.models.markets import Asset, Exchange, Market
 from hunter_core.db.models.portfolios import Portfolio, PortfolioEquitySnapshot, RiskProfile
 from hunter_core.db.models.risk import KillSwitchTransition, RiskEvent
-from hunter_core.db.models.system import AuditLog, ProcessedEvent, SystemEvent, WorkerHeartbeat
+from hunter_core.db.models.system import (
+    AuditLog,
+    OutboxEvent,
+    ProcessedEvent,
+    SystemEvent,
+    WorkerHeartbeat,
+)
 
 TENANT_COLUMN = "organization_id"
 
@@ -162,6 +169,7 @@ __all__ = [
     "Candle",
     "Exchange",
     "ExchangeConnection",
+    "FeatureBaseline",
     "FeatureDefinition",
     "FeatureFlag",
     "FeatureSnapshot",
@@ -185,6 +193,7 @@ __all__ = [
     "OrganizationFeatureOverride",
     "OrganizationInvitation",
     "OrganizationMember",
+    "OutboxEvent",
     "PlanEntitlement",
     "Portfolio",
     "PortfolioEquitySnapshot",

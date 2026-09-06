@@ -10,8 +10,11 @@ Anything that drives Alembic is a **sync** test: ``env.py`` calls
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Mapping
+from datetime import UTC, datetime
+from typing import cast
 
 import pytest
 import pytest_asyncio
@@ -34,9 +37,43 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0002_shadow_lab"
+HEAD_REVISION = "0003_analysis"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
+
+INITIAL_REVISION = "0001_initial_schema"
+SHADOW_REVISION = "0002_shadow_lab"
+
+
+def _frozen_enums() -> tuple[Mapping[str, tuple[str, ...]], ...]:
+    """The per-revision frozen ``type -> labels`` mappings, oldest first."""
+    enums = migration_ddl("enums")
+    return (
+        cast("Mapping[str, tuple[str, ...]]", enums.INITIAL_ENUMS),
+        cast("Mapping[str, tuple[str, ...]]", enums.SHADOW_ENUMS),
+        cast("Mapping[str, tuple[str, ...]]", enums.ANALYSIS_ENUMS),
+    )
+
+
+async def _enum_labels(url: str) -> dict[str, list[str]]:
+    """Every enum type in ``public`` and its labels, in ``enumsortorder``."""
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            result = await connection.execute(
+                text(
+                    "SELECT t.typname, e.enumlabel FROM pg_type t "
+                    "JOIN pg_enum e ON e.enumtypid = t.oid "
+                    "JOIN pg_namespace n ON n.oid = t.typnamespace "
+                    "WHERE n.nspname = 'public' ORDER BY t.typname, e.enumsortorder"
+                )
+            )
+            labels: dict[str, list[str]] = {}
+            for type_name, label in result:
+                labels.setdefault(type_name, []).append(label)
+    finally:
+        await engine.dispose()
+    return labels
 
 
 @pytest.fixture(scope="module")
@@ -161,6 +198,206 @@ async def _delete_outcome(url: str, signal_id: uuid.UUID) -> None:
         await engine.dispose()
 
 
+async def _market(connection: AsyncConnection) -> uuid.UUID:
+    """A fresh exchange and market, so each test owns its own rows."""
+    exchange, market = uuid7(), uuid7()
+    await connection.execute(
+        text("INSERT INTO exchanges (id, code, name) VALUES (:id, :code, 'Legacy')"),
+        {"id": exchange, "code": f"legacy-{uuid.uuid4().hex[:8]}"},
+    )
+    await connection.execute(
+        text(
+            "INSERT INTO markets (id, exchange_id, symbol, market_type) "
+            "VALUES (:id, :exchange, :symbol, 'perpetual')"
+        ),
+        {"id": market, "exchange": exchange, "symbol": f"BTC{uuid.uuid4().hex[:6].upper()}"},
+    )
+    return market
+
+
+async def _seed_legacy_analysis(url: str) -> uuid.UUID:
+    """One anomaly and one opportunity of the shape a ``0002`` database holds.
+
+    Neither carries ``evaluation_state`` or ``stage`` — those columns do not
+    exist yet at this point — which is exactly what makes them the rows ``0003``
+    has to decide about.
+    """
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            market = await _market(connection)
+            await connection.execute(
+                text(
+                    "INSERT INTO anomalies (id, market_id, type, severity, confidence, status) "
+                    "VALUES (:id, :market, 'VOLUME_SPIKE', 80.00, 0.9000, 'active')"
+                ),
+                {"id": uuid7(), "market": market},
+            )
+            await connection.execute(
+                text(
+                    "INSERT INTO opportunities "
+                    "(id, market_id, direction, score, confidence, status) "
+                    "VALUES (:id, :market, 'long', 55.00, 0.8000, 'WATCHING')"
+                ),
+                {"id": uuid7(), "market": market},
+            )
+    finally:
+        await engine.dispose()
+    return market
+
+
+async def _seed_extended_opportunity(url: str) -> uuid.UUID:
+    """An opportunity using a label only ``0003`` defines."""
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            market = await _market(connection)
+            await connection.execute(
+                text(
+                    "INSERT INTO opportunities "
+                    "(id, market_id, direction, score, confidence, status, stage) "
+                    "VALUES (:id, :market, 'long', 88.00, 0.9000, 'EXTENDED', 'EXTENDED')"
+                ),
+                {"id": uuid7(), "market": market},
+            )
+    finally:
+        await engine.dispose()
+    return market
+
+
+async def _delete_legacy_analysis(url: str, market_id: uuid.UUID) -> None:
+    """Drop the market; ``ON DELETE CASCADE`` takes its analysis rows with it.
+
+    The retention marker is set because the cascade reaches ``feature_baselines``,
+    whose trigger refuses an undeclared ``DELETE`` however it arrives — a cascade
+    is still a deletion. That is deliberate (a market is retired with
+    ``delisted_at``, never hard-deleted by the application) and is recorded in
+    DATABASE.md §17.2.
+    """
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(text("SET LOCAL app.baseline_retention = 'on'"))
+            await connection.execute(text("DELETE FROM markets WHERE id = :id"), {"id": market_id})
+    finally:
+        await engine.dispose()
+
+
+async def _seed_pending_outbox_event(url: str) -> uuid.UUID:
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            event_id = uuid7()
+            await connection.execute(
+                text(
+                    "INSERT INTO outbox_events (event_id, stream) "
+                    "VALUES (:id, 'opportunities.updated')"
+                ),
+                {"id": event_id},
+            )
+    finally:
+        await engine.dispose()
+    return event_id
+
+
+async def _delete_outbox_event(url: str, event_id: uuid.UUID) -> None:
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text("DELETE FROM outbox_events WHERE event_id = :id"), {"id": event_id}
+            )
+    finally:
+        await engine.dispose()
+
+
+async def _seed_opportunity_referencing_a_baseline(url: str) -> uuid.UUID:
+    """A live baseline revision plus a score whose envelope names it."""
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            market = await _market(connection)
+            baseline_id = uuid7()
+            await connection.execute(
+                text(
+                    "INSERT INTO feature_baselines "
+                    "(id, market_id, feature, algo_version, hour_of_day, window_start, "
+                    " window_end, available_at, median, mad, sample_size, expected_size, "
+                    " distinct_days, coverage, source, sampling, input_fingerprint) "
+                    "VALUES (:id, :market, 'volume_relative', 'mad_v1', 11, "
+                    " :start, :end, :available, 1.0, 0.25, 400, 420, 7, 0.95, "
+                    " 'live', 'per_minute', 'probe')"
+                ),
+                {
+                    "id": baseline_id,
+                    "market": market,
+                    "start": datetime(2026, 8, 29, 11, tzinfo=UTC),
+                    "end": datetime(2026, 9, 5, 11, 59, tzinfo=UTC),
+                    "available": datetime(2026, 9, 5, 12, 1, tzinfo=UTC),
+                },
+            )
+            await connection.execute(
+                text(
+                    "INSERT INTO opportunities "
+                    "(id, market_id, direction, score, confidence, status, feature_snapshot) "
+                    "VALUES (:id, :market, 'long', 76.00, 0.9000, 'HOT', "
+                    " CAST(:snapshot AS jsonb))"
+                ),
+                {
+                    "id": uuid7(),
+                    "market": market,
+                    "snapshot": json.dumps({"baseline_ids": [str(baseline_id)]}),
+                },
+            )
+    finally:
+        await engine.dispose()
+    return market
+
+
+async def _seed_history_across_two_partitions(url: str) -> uuid.UUID:
+    """One open episode with a sample in 2026-09 and another in 2026-10.
+
+    ``opportunity_history`` is RANGE-partitioned by month, and the downgrade
+    retypes ``status`` on the parent without ``ONLY`` — the assertion worth
+    making is that the rows in *every* child survive that, with their values.
+    """
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            market = await _market(connection)
+            episode = uuid7()
+            await connection.execute(
+                text(
+                    "INSERT INTO opportunities "
+                    "(id, market_id, direction, score, confidence, status) "
+                    "VALUES (:id, :market, 'long', 76.00, 0.9000, 'HOT')"
+                ),
+                {"id": episode, "market": market},
+            )
+            for month in (9, 10):
+                await connection.execute(
+                    text(
+                        "INSERT INTO opportunity_history "
+                        "(opportunity_id, ts, score, confidence, status) "
+                        "VALUES (:id, :ts, 76.00, 0.9000, 'HOT')"
+                    ),
+                    {"id": episode, "ts": datetime(2026, month, 15, 12, tzinfo=UTC)},
+                )
+    finally:
+        await engine.dispose()
+    return market
+
+
+async def _scalars(url: str, sql: str, params: dict[str, object]) -> list[str]:
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            result = await connection.execute(text(sql), params)
+            return [row[0] for row in result]
+    finally:
+        await engine.dispose()
+
+
 async def _tracking_states(url: str, ids: dict[str, uuid.UUID]) -> dict[str, str]:
     engine = async_engine(url)
     try:
@@ -277,11 +514,7 @@ def test_every_enum_type_belongs_to_exactly_one_revision(upgraded: str) -> None:
     with "type already exists". The tuples are frozen now; this is what keeps
     them honest, exactly like the grant-class test does for tables.
     """
-    enums = migration_ddl("enums")
-    initial: tuple[str, ...] = enums.INITIAL_ENUMS
-    shadow: tuple[str, ...] = enums.SHADOW_ENUMS
-
-    classified = [*initial, *shadow]
+    classified = [name for mapping in _frozen_enums() for name in mapping]
     assert len(classified) == len(set(classified)), "an enum type is owned by two revisions"
     assert set(classified) == set(ALL_ENUMS), (
         "an enum was added to ALL_ENUMS without a revision claiming it in ddl/enums.py"
@@ -306,7 +539,7 @@ def test_the_new_revision_reverses_and_re_applies(upgraded: str) -> None:
     command.check(config)
 
 
-def test_the_new_revision_upgrades_a_database_that_already_has_rows(upgraded: str) -> None:
+def test_0002_upgrades_a_database_that_already_has_rows(upgraded: str) -> None:
     """``0002`` on a populated ``0001``, not only on an empty schema.
 
     Raised by Astra's review of S0: ``signal_outcomes.tracking_state`` arrives
@@ -317,7 +550,7 @@ def test_the_new_revision_upgrades_a_database_that_already_has_rows(upgraded: st
     The revision backfills from columns that already exist; this proves it.
     """
     config = alembic_config(upgraded)
-    command.downgrade(config, "-1")
+    command.downgrade(config, INITIAL_REVISION)
     legacy = asyncio.run(_seed_legacy_outcomes(upgraded))
 
     command.upgrade(config, "head")
@@ -327,7 +560,7 @@ def test_the_new_revision_upgrades_a_database_that_already_has_rows(upgraded: st
     command.check(config)
 
 
-def test_the_new_revision_refuses_a_contradictory_legacy_row(upgraded: str) -> None:
+def test_0002_refuses_a_contradictory_legacy_row(upgraded: str) -> None:
     """An outcome that is ``open`` *and* has an ``exit_ts`` stops the upgrade.
 
     Astra's second round: the backfill can derive a tracking state from a
@@ -337,7 +570,7 @@ def test_the_new_revision_refuses_a_contradictory_legacy_row(upgraded: str) -> N
     rows instead of guessing.
     """
     config = alembic_config(upgraded)
-    command.downgrade(config, "-1")
+    command.downgrade(config, INITIAL_REVISION)
     signal_id = asyncio.run(_seed_contradictory_outcome(upgraded))
     try:
         with pytest.raises(DBAPIError, match="cannot infer a tracking_state"):
@@ -364,3 +597,177 @@ def test_downgrade_base_then_upgrade_head(upgraded: str) -> None:
 
     command.upgrade(config, "head")
     command.check(config)
+
+
+def test_each_revision_creates_exactly_the_labels_it_froze(upgraded: str) -> None:
+    """Stopping at ``0001`` or ``0002`` must reproduce *that* revision's enums.
+
+    The follow-up DATABASE.md §16.5 left open. ``0002`` froze the type *names*
+    per revision but still read the labels from ``ALL_ENUMS`` at migration time,
+    so this revision — the first to add a member to an existing enum — would
+    have changed what ``0001`` builds: a fresh ``upgrade 0001`` would have
+    created an ``opportunity_status`` that already contained ``EXTENDED``, and
+    ``0003``'s ``ADD VALUE`` would then have been adding a label that was
+    already there.
+
+    Order is asserted with the labels, from ``enumsortorder``: ``EXTENDED``
+    lands before ``EXPIRED`` and the two detectors before ``SOCIAL_SPIKE``
+    because the migration says ``BEFORE``, and the Python classes declare them
+    in the same places. A member moved in one and not the other is drift this
+    catches.
+    """
+    initial, shadow, analysis = _frozen_enums()
+    config = alembic_config(upgraded)
+    try:
+        command.downgrade(config, "base")
+
+        command.upgrade(config, INITIAL_REVISION)
+        after_initial = asyncio.run(_enum_labels(upgraded))
+        assert after_initial == {name: list(v) for name, v in initial.items()}
+        assert "EXTENDED" not in after_initial["opportunity_status"]
+        assert "UNKNOWN" not in after_initial["market_regime"]
+
+        command.upgrade(config, SHADOW_REVISION)
+        after_shadow = asyncio.run(_enum_labels(upgraded))
+        assert after_shadow == {
+            name: list(v) for mapping in (initial, shadow) for name, v in mapping.items()
+        }
+
+        command.upgrade(config, "head")
+        after_head = asyncio.run(_enum_labels(upgraded))
+        assert after_head == {name: [m.value for m in cls] for name, cls in ALL_ENUMS.items()}
+        assert set(analysis) <= set(after_head)
+    finally:
+        command.upgrade(config, "head")
+
+
+def test_0003_upgrades_a_database_that_already_holds_analysis_rows(upgraded: str) -> None:
+    """``0003`` on a populated ``0002``: the anomaly backfill and the new invariants.
+
+    The interesting row is the pre-existing anomaly. ``ADD COLUMN ... DEFAULT
+    'ok'`` writes ``ok`` into every row that already exists, and nobody ever
+    checked the data quality behind those — they predate the detectors that set
+    the column. The migration backfills them to ``unknown`` instead, which is
+    the ``active + unknown`` state the joint decision defines as ineligible.
+    """
+    config = alembic_config(upgraded)
+    command.downgrade(config, "-1")
+    market_id = asyncio.run(_seed_legacy_analysis(upgraded))
+    try:
+        command.upgrade(config, "head")
+
+        states = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT evaluation_state::text FROM anomalies WHERE market_id = :market",
+                {"market": market_id},
+            )
+        )
+        assert states == ["unknown"], (
+            "an anomaly that predates the M2 detectors was assumed to have been "
+            "evaluated against good data"
+        )
+        stages = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT stage::text FROM opportunities WHERE market_id = :market",
+                {"market": market_id},
+            )
+        )
+        assert stages == ["NONE"], "a legacy opportunity was given a stage nobody computed"
+        command.check(config)
+    finally:
+        asyncio.run(_delete_legacy_analysis(upgraded, market_id))
+        command.upgrade(config, "head")
+
+
+def test_0003_refuses_to_downgrade_while_a_new_enum_label_is_in_use(upgraded: str) -> None:
+    """Postgres cannot drop an enum label, so the downgrade rebuilds the type —
+    and a row that still says ``EXTENDED`` would lose its meaning in the cast.
+    The guard names the rows instead of destroying them.
+    """
+    market_id = asyncio.run(_seed_extended_opportunity(upgraded))
+    try:
+        with pytest.raises(DBAPIError, match="opportunity_status label"):
+            command.downgrade(alembic_config(upgraded), "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(_delete_legacy_analysis(upgraded, market_id))
+
+
+def test_0003_refuses_to_downgrade_while_the_outbox_still_owes_a_publication(
+    upgraded: str,
+) -> None:
+    """Reversing a schema is allowed; losing an obligation is not.
+
+    A row with ``dispatched_at IS NULL`` is an event the system still owes. The
+    downgrade drops ``outbox_events``; without this guard it would finish
+    successfully, the deploy would look clean, and the event would simply never
+    be published — the exact loss the outbox exists to make impossible.
+    """
+    event_id = asyncio.run(_seed_pending_outbox_event(upgraded))
+    try:
+        with pytest.raises(DBAPIError, match="outbox_events rows are still pending"):
+            command.downgrade(alembic_config(upgraded), "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(_delete_outbox_event(upgraded, event_id))
+
+
+def test_0003_refuses_to_downgrade_while_a_sample_still_names_a_baseline(
+    upgraded: str,
+) -> None:
+    """An opportunity that survives its own evidence is worse than no downgrade.
+
+    ``feature_baselines`` has no foreign key pointing at it — the ids live in the
+    envelope — so nothing in the DDL stops the drop. The score would remain,
+    still saying "this is why", pointing at a revision that no longer exists.
+    """
+    market = asyncio.run(_seed_opportunity_referencing_a_baseline(upgraded))
+    try:
+        with pytest.raises(DBAPIError, match="name a feature_baselines revision"):
+            command.downgrade(alembic_config(upgraded), "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(_delete_legacy_analysis(upgraded, market))
+
+
+def test_history_rows_in_two_partitions_survive_the_downgrade_and_upgrade(
+    upgraded: str,
+) -> None:
+    """The enum rebuild retypes a partitioned column; the data has to come back.
+
+    ``ALTER TABLE ... ALTER COLUMN TYPE`` without ``ONLY`` recurses into every
+    child, and this is the round trip with rows in two of them — the cheap
+    version of "we reversed the deploy and the score history is still there".
+    """
+    market = asyncio.run(_seed_history_across_two_partitions(upgraded))
+    config = alembic_config(upgraded)
+    try:
+        command.downgrade(config, "-1")
+        command.upgrade(config, "head")
+
+        rows = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT h.status::text FROM opportunity_history h "
+                "JOIN opportunities o ON o.id = h.opportunity_id "
+                "WHERE o.market_id = :market ORDER BY h.ts",
+                {"market": market},
+            )
+        )
+        assert rows == ["HOT", "HOT"], "a partitioned history row did not survive the round trip"
+        stages = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT h.stage::text FROM opportunity_history h "
+                "JOIN opportunities o ON o.id = h.opportunity_id "
+                "WHERE o.market_id = :market ORDER BY h.ts",
+                {"market": market},
+            )
+        )
+        assert stages == ["NONE", "NONE"], "the re-added column did not take its default"
+        command.check(config)
+    finally:
+        asyncio.run(_delete_legacy_analysis(upgraded, market))
+        command.upgrade(config, "head")

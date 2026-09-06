@@ -938,11 +938,14 @@ congelada (`INITIAL_ENUMS`, 44 tipos; `SHADOW_ENUMS`), como as listas de grant d
 §15.6, e `test_migrations.py::test_every_enum_type_belongs_to_exactly_one_revision`
 prova que as tuplas continuam particionando `ALL_ENUMS`.
 
-**Limitação conhecida (follow-up):** só os *nomes* dos tipos estão congelados por
-revisão; os **rótulos** ainda são lidos de `ALL_ENUMS` em tempo de execução, então
-acrescentar um membro a um enum existente continua alterando retroativamente o
-que a `0001` cria. Congelar os rótulos por revisão é trabalho de quem fizer a
-próxima migração que acrescente um valor de enum (M2 · T2.1).
+**Limitação conhecida — resolvida na `0003` (§17.1).** Nesta revisão só os *nomes*
+dos tipos estavam congelados por revisão; os **rótulos** ainda eram lidos de
+`ALL_ENUMS` em tempo de execução, então acrescentar um membro a um enum existente
+alteraria retroativamente o que a `0001` cria. A `0003_analysis` (M2 · T2.1) — a
+primeira migração a acrescentar valores a enums existentes — congelou os rótulos
+por revisão (`INITIAL_ENUMS`, `SHADOW_ENUMS`, `ANALYSIS_ENUMS` passam a ser mapas
+`tipo -> rótulos` e nada em `ddl/enums.py` lê `ALL_ENUMS`), com teste que para em
+`0001` e em `0002` e compara rótulos e ordem.
 
 Pelo mesmo motivo as quatro classes de grant do §15.6 continuam congeladas em
 `0001`: as tabelas desta revisão estão em `ddl/shadow.py`
@@ -953,3 +956,414 @@ exatamente uma vez.
 Nada nesta revisão depende de estado de sessão: sem prepared statement de sessão,
 sem `LISTEN/NOTIFY`, sem advisory lock de sessão. O bloqueio de um episódio é a
 própria linha, dentro da transação.
+
+## 17. Análise — M2 (`0003_analysis`)
+
+Segunda revisão depois do schema inicial e a primeira que **acrescenta valor a um
+enum existente**. Entrega o estado durável do Milestone 2 (tarefa T2.1) conforme
+a **"Decisão conjunta Claude ⇄ Astra (2026-09-05)"** de `docs/plans/M2.md`, que
+prevalece sobre as "Decisões deste plano" do mesmo documento. Nenhuma tabela nova
+é de tenant: análise é global (§1.1), sem `organization_id` e sem RLS;
+`hunter_app` só lê, `hunter_worker` escreve.
+
+### 17.1 Rótulos de enum congelados por revisão (`ddl/enums.py`)
+
+O follow-up que a §16.5 deixou aberto está fechado aqui. A `0002` congelou os
+**nomes** dos tipos por revisão, mas os **rótulos** continuavam vindo de
+`ALL_ENUMS` em tempo de execução — então esta revisão, a primeira a acrescentar
+um membro a um enum que já existia, teria alterado retroativamente o que a `0001`
+cria: um `upgrade 0001` em banco limpo passaria a criar um `opportunity_status`
+que já contém `EXTENDED`, e o `ALTER TYPE ... ADD VALUE` da `0003` encontraria o
+rótulo já lá.
+
+Cada revisão passa a nomear o seu próprio mapa congelado `tipo -> rótulos`
+(`INITIAL_ENUMS`, 44 tipos; `SHADOW_ENUMS`; `ANALYSIS_ENUMS`) e nada em
+`ddl/enums.py` lê `ALL_ENUMS`.
+`test_migrations.py::test_each_revision_creates_exactly_the_labels_it_froze` para
+em `0001` e em `0002` e compara os rótulos **e a ordem** (`enumsortorder`) com o
+que aquela revisão congelou;
+`test_every_enum_type_belongs_to_exactly_one_revision` continua provando a
+partição por nome.
+
+**A ordem faz parte do contrato.** `ANALYSIS_ADDED_VALUES` diz onde cada rótulo
+entra e as classes de `hunter_core.domain.enums` os declaram nas mesmas posições:
+
+| Tipo | Rótulo novo | Posição |
+|---|---|---|
+| `opportunity_status` | `EXTENDED` | `BEFORE 'EXPIRED'` (EXPIRED é terminal) |
+| `anomaly_type` | `TRADE_VELOCITY_SPIKE`, `MOMENTUM_SHIFT` | `BEFORE 'SOCIAL_SPIKE'` (são MVP v1) |
+| `market_regime` | `UNKNOWN` | no fim |
+
+Tipos novos: `opportunity_stage`, `anomaly_evaluation_state`, `baseline_source`,
+`baseline_sampling`.
+
+**Caixa de `opportunity_stage`: `EARLY | DEVELOPING | EXTENDED | NONE`, em
+maiúsculas.** É um desvio consciente do rascunho `(early | developing | extended
+| none)` das "Decisões deste plano" (superadas) e da regra de caixa do §15.1: a
+coluna irmã na mesma tabela é `opportunity_status`, que é MAIÚSCULA, os dois
+aparecem juntos na mesma lista de precedência e no mesmo chip do Radar, e a
+decisão conjunta escreve os três estágios em maiúsculas em toda a prosa. `NONE` é
+membro e não `NULL` de propósito: durante o warm-up do ATR não há estágio, e uma
+coluna anulável deixaria cada consumidor ler a ausência como `EARLY`.
+
+`baseline_sampling` tem **um** membro (`per_minute`). Não é defeito: uma segunda
+política de amostragem passa a exigir migração, e toda linha já grava qual
+política a produziu, então duas populações não podem ser somadas em silêncio.
+
+**Postgres 12+ permite `ALTER TYPE ... ADD VALUE` dentro de transação, mas proíbe
+*usar* o valor novo na mesma transação** — inclusive em `DEFAULT` e em predicado
+de índice. A `0003` acrescenta os quatro e não usa nenhum; o único rótulo que ela
+escreve em DDL (`'EXPIRED'`, no CHECK de expiração) já existia na `0001`.
+
+**Downgrade.** Postgres não tem `ALTER TYPE ... DROP VALUE`, então o downgrade
+renomeia o tipo, recria-o com os rótulos congelados da `0001`, converte cada
+coluna (`opportunities.status`, `opportunity_history.status`, `anomalies.type`,
+`market_regimes.regime`) com `USING x::text::tipo` e derruba o tipo antigo.
+`opportunity_history` é particionada: `ALTER TABLE ... ALTER COLUMN TYPE` sem
+`ONLY` recursa para as partições, e por isso o índice parcial e o CHECK novos são
+removidos **antes** — nenhuma expressão armazenada pode continuar ligada ao tipo
+que vai ser substituído. Antes de tudo isso há uma guarda que conta as linhas que
+ainda usam um rótulo prestes a desaparecer (inclusive uma amostra `EXTENDED` sob
+um episódio já `EXPIRED`) e **recusa** o downgrade nomeando-as.
+
+### 17.2 `feature_baselines` — revisões imutáveis
+
+```
+feature_baselines
+  id (uuid7), market_id -> markets (CASCADE), feature, feature_version, algo_version,
+  hour_of_day SMALLINT 0-23, window_start, window_end, available_at,
+  median NUMERIC(28,10), mad NUMERIC(28,10),
+  sample_size, expected_size, distinct_days, coverage NUMERIC(9,6),
+  source baseline_source (live|bootstrap), sampling baseline_sampling (per_minute),
+  input_fingerprint, computed_at
+  UNIQUE (market_id, feature, hour_of_day, feature_version, algo_version,
+          window_end, source, input_fingerprint)      -- uq_feature_baselines_revision
+  INDEX  (market_id, feature, hour_of_day, available_at)  -- ix_feature_baselines_lookup
+  CHECKs: hour_of_day 0-23; window_start < window_end <= available_at;
+          0 <= sample_size <= expected_size, expected_size > 0, distinct_days >= 0;
+          0 <= coverage <= 1; mad >= 0
+```
+
+**Arquivo de revisões, não projeção atual.** Uma linha por (mercado, feature,
+hora UTC) bastaria para pontuar *agora* e seria inútil para explicar *então*. O
+critério de aceite da decisão conjunta é "recalcular baselines amanhã reproduz o
+score de hoje", o que só é verdade se uma revisão é escrita uma vez e nunca
+editada: recomputar cria linha nova com `available_at` posterior, e o envelope do
+score guarda o `id` que usou. O bucket é a **hora UTC** com observações **por
+minuto** — 420 esperadas em sete dias.
+
+**Corte causal — duas condições, não uma:** `available_at <= as_of` **E**
+`window_end < observation_ts`. O cenário que exige as duas: uma feature de 10:00
+processada às 10:02 passaria por um teste só de `available_at <= 10:02` contra
+uma baseline publicada às 10:01 que já inclui a observação de 10:00. O leitor
+também escolhe versões compatíveis de feature e algoritmo — uma mediana calculada
+por outro algoritmo é outra população, não um valor mais novo da mesma.
+
+**`input_fingerprint` separa retentativa de recomputação.** Digest canônico do
+conjunto de entrada e do corte. Sem ele, um backfill que chegue depois de a
+janela ter sido calculada produziria (mercado, feature, hora, versões,
+`window_end`, `source`) idênticos com amostra/mediana/MAD diferentes: a revisão
+corrigida não poderia ser gravada — `DO NOTHING` manteria a incompleta e `UPDATE`
+é proibido. Com ele, reexecutar o mesmo job colide (idempotente) e uma
+recomputação real entra como revisão nova.
+
+**Maturidade não é armazenada.** `sample_size`, `expected_size`, `distinct_days`
+e `coverage` ficam crus e o gate (>= 3 dias distintos **E** >= 120 observações
+válidas) é aplicado pelo leitor com os seus limiares versionados
+(`opportunity_weights.weights["baseline_gate"]`). Um booleano gravado congelaria
+um limiar feito para ser versionado. Baseline abaixo do gate existe — "em
+construção" é estado que o Radar mostra, não linha ausente.
+
+**Imutabilidade.** Trigger `feature_baselines_immutable`
+(`BEFORE UPDATE OR DELETE ... FOR EACH ROW`) recusa **todo** `UPDATE`, para todos
+os papéis, inclusive o dono. `DELETE` **não** é proibido — retenção precisa
+expirar revisões —, mas é recusado a menos que o chamador se declare com
+`SET LOCAL app.baseline_retention = 'on'`. O marcador é de transação, o que o
+torna seguro atrás do pooler (mesmo mecanismo de `app.current_org`, §15.4), e
+significa que um bug no scanner não apaga a evidência que os próprios scores dele
+apontam: apagar é um ato, não um acidente.
+
+**Protocolo de retenção (contrato para T2.8, não implementado aqui).** Não há FK
+entre `opportunities`/`opportunity_history` e `feature_baselines` — os
+`baseline_ids` vivem dentro do envelope JSONB —, então **nada no DDL impede**
+apagar uma baseline ainda referenciada. O contrato que fecha isso, e que a T2.8
+tem de implementar, é **exclusão mútua por linha**, não uma regra de idade:
+
+1. **Idade não prova ausência de dependência.** Uma amostra gravada hoje pode
+   referenciar uma revisão de duas semanas atrás (uma baseline permanece
+   utilizável até ser recomputada). Qualquer critério do tipo "apague o que for
+   mais velho que X" apaga evidência viva. A única condição válida é *nenhuma
+   amostra preservada referencia esta revisão*, avaliada sobre
+   **`opportunities.feature_snapshot` e `opportunity_history.envelope`** — a
+   projeção atual conta tanto quanto o histórico.
+2. **O escritor toma o lock antes de referenciar.** Antes de gravar um envelope,
+   o scorer faz `SELECT ... FROM feature_baselines WHERE id = ANY(...) FOR SHARE`
+   na mesma transação e **revalida que as linhas ainda existem** — uma baseline
+   em cache pode ter sido apagada desde que ele a leu. Se sumiu, o componente
+   fica indisponível com motivo; nunca se grava um `baseline_id` que não está
+   mais lá.
+3. **A retenção toma o mesmo lock antes de apagar.** `SELECT ... FOR UPDATE` na
+   revisão candidata, e só então a consulta de referências e o `DELETE`, tudo na
+   mesma transação e com `SET LOCAL app.baseline_retention = 'on'`. Os dois locks
+   sobre a mesma linha são o que serializa as duas operações: a corrida "o job
+   verifica que ninguém referencia B, um scorer com B em cache grava o envelope,
+   o job apaga B" deixa de ser possível porque um dos dois espera pelo outro.
+   Locks de linha, nunca advisory lock de sessão (§1.2 / pooler).
+
+Se a consulta de referências vier a pesar, o caminho é um índice GIN sobre a
+expressão JSONB dos ids, **não** uma segunda coluna `UUID[]` a sincronizar à mão:
+ela não daria FK de qualquer forma, e duas representações divergem.
+
+O **downgrade** da `0003` (§17.7) recusa enquanto houver amostra preservada
+referenciando uma baseline, pelo mesmo motivo.
+
+**Consequência aceita:** o `ON DELETE CASCADE` de `market_id` também passa pelo
+trigger — apagar um `market` que tenha baselines exige o mesmo marcador. Um
+mercado é aposentado com `delisted_at` e nunca apagado de verdade pela aplicação
+(§3), então na prática isso só aparece em limpeza operacional, e é o
+comportamento certo: uma cascata continua sendo uma exclusão.
+
+**Volume e cadência (a fechar em T2.3).** Um recomputo completo de 200 mercados ×
+20 features × 24 buckets são **96 mil linhas**. Recomputar *todos* os buckets a
+cada hora seriam 2,3 milhões de linhas/dia; recomputar apenas o bucket da hora que
+fechou são 4 mil linhas/hora, ~96 mil/dia. A tabela **não** é particionada, e essa
+decisão assume a segunda cadência. T2.3 fixa a cadência; se escolher a primeira, o
+particionamento mensal por `available_at` volta à mesa antes do ensaio de 24 h.
+
+### 17.3 Identidade do episódio de oportunidade
+
+```
+opportunities  (+) stage opportunity_stage NOT NULL DEFAULT 'NONE'
+               (+) explanation JSONB NOT NULL DEFAULT '{}'
+               (+) below_40_since TIMESTAMPTZ
+  uq_opportunities_open_per_market: UNIQUE (market_id) WHERE expired_at IS NULL
+  CHECK ((status = 'EXPIRED') = (expired_at IS NOT NULL))
+
+opportunity_history  (+) stage opportunity_stage NOT NULL DEFAULT 'NONE'
+                     (+) envelope JSONB NOT NULL DEFAULT '{}'
+```
+
+O índice parcial único **deixa de ser por lista de status** (`'WATCHING'`,
+`'HOT'`, `'ENTRY_CANDIDATE'`, §15.3) e passa a ser `WHERE expired_at IS NULL`. O
+cenário decisivo da decisão conjunta é o motivo: `HOT(id=A, 80)` que cai para
+`NORMAL(35)` por um minuto e volta a `WATCHING(45)` tem de continuar sendo o
+**mesmo** episódio; sob o predicado antigo a linha saía do índice ao virar NORMAL
+e um segundo episódio podia ocupar a vaga — o Radar mostraria uma oportunidade
+"nova" que é o mesmo movimento. `NORMAL` não *abre* episódio, mas é estado
+temporário válido de um já aberto.
+
+O CHECK bicondicional é o que impede os dois lados de discordarem: o índice
+chaveia identidade em `expired_at` e todo consumidor lê `status`. Sem ele um
+episódio ficaria aberto para o índice e encerrado para o Radar, ou o contrário.
+
+`below_40_since` é durável porque a expiração de 15 minutos tem de sobreviver a um
+restart e não é recomputável de mais nada: perda de qualidade interrompe a
+continuidade (o intervalo desconhecido nunca conta como "abaixo de 40"), e só o
+processo que viu as observações sabe disso.
+
+`opportunities.feature_snapshot` e `opportunity_history.envelope` carregam o
+envelope completo por amostra: vetor exato, `ts`/qualidade/disponibilidade por
+entrada, `as_of`, `baseline_ids`, `regime_id`, versões e `state_in`/`state_out` da
+histerese e dos confirmadores. Duas garantias, declaradas: recomputar um score
+gravado a partir do envelope, **sim**; refazer a trajetória intraminuto, **não**
+(perfil de backtest "bar-only" identificado). `stage` entra no history porque uma
+mudança de estágio é um dos gatilhos que gravam uma amostra — sem a coluna, a
+amostra apareceria na série sem motivo visível.
+
+**`alembic check` não vê troca de predicado de índice.** O Alembic compara as
+*colunas* de um índice, não o `WHERE`. Um índice deixado com o predicado antigo
+não acusaria drift e estaria fazendo cumprir o invariante errado, então a troca é
+escrita à mão na revisão e
+`test_schema_analysis.py::test_episode_identity_is_keyed_on_expired_at_and_not_on_a_status_list`
+lê `pg_indexes.indexdef` para provar.
+
+### 17.4 `anomalies.evaluation_state`
+
+```
+anomalies  (+) evaluation_state anomaly_evaluation_state NOT NULL DEFAULT 'ok'
+  uq_anomalies_active_per_market_type: UNIQUE (market_id, type) WHERE status = 'active'
+```
+
+Eixo separado do ciclo de vida: `status` diz onde a anomalia está
+(`active → resolved/expired`), `evaluation_state` diz se o dado por trás dela
+ainda pode ser acreditado (`ok | stale | unknown`). O par que importa é
+`active + unknown` — a anomalia cujo feed sumiu continua **ativa** e fica
+inelegível, e nunca é resolvida por ausência: "paramos de olhar" não é "parou de
+acontecer".
+
+**Backfill deliberado.** `ADD COLUMN ... DEFAULT 'ok'` escreveria `ok` em toda
+linha preexistente, atribuindo uma qualidade que ninguém verificou. A migração
+grava `unknown` em todas elas logo depois: são anteriores aos detectores do M2 e
+`active + unknown` é exatamente o estado previsto para elas. Em tabela vazia é
+no-op.
+
+### 17.5 `outbox_events` (T2.9)
+
+```
+outbox_events
+  id BIGSERIAL PK, event_id UUID UNIQUE, stream TEXT, payload JSONB NOT NULL DEFAULT '{}',
+  created_at, dispatched_at (null = pendente), attempts INT NOT NULL DEFAULT 0, last_error TEXT
+  INDEX (id) WHERE dispatched_at IS NULL       -- ix_outbox_events_pending
+  CHECK attempts >= 0, CHECK char_length(stream) > 0
+```
+
+**Forma idêntica à de `shadow_outbox` (§16.4), de propósito.** O Shadow Lab
+entregou a sua fila na `0002` antes desta existir e o item 6 de `SHADOW-LAB.md`
+exige que a absorção não perca pendências, então as colunas batem uma a uma e a
+absorção é um `INSERT ... SELECT` com **lista explícita de colunas** que preserva
+`event_id`, `stream`, `payload`, `created_at`, `dispatched_at`, `attempts` e
+`last_error` e deixa `id` ser reemitido pela sequence local. Copiar `id` entre
+duas filas populadas colidiria — e não significaria nada se não colidisse: `id` é
+ordem de drenagem, nunca identidade. O predicado de pendência é
+`dispatched_at IS NULL`, nunca uma marca d'água sobre `id` (§16.4). Há teste que
+executa exatamente esse `INSERT ... SELECT`, para que as duas formas não possam
+divergir sem alguém ficar vermelho. A troca dos escritores (a fila antiga
+continua recebendo enquanto a cópia roda) é coordenação da T2.9, não DDL.
+
+Mesmos dois desvios registrados na §16.4: PK `BIGSERIAL` em vez de UUID v7 (§1) e
+a sequence `outbox_events_id_seq`, que exige
+`GRANT USAGE ON SEQUENCE ... TO hunter_worker` — um grant de tabela sozinho passa
+em `has_table_privilege` e falha no `INSERT` com *permission denied for sequence*,
+então o teste insere como o papel em vez de perguntar.
+
+### 17.6 Grants — a quinta classe
+
+`ddl/tables.py` está congelada na `0001` e `ddl/shadow.py` na `0002`; as listas
+desta revisão estão em `ddl/analysis.py` (`ANALYSIS_APP_READ_ONLY_TABLES`,
+`ANALYSIS_WORKER_WRITE_TABLES`, `ANALYSIS_WORKER_APPEND_TABLES`,
+`ANALYSIS_SEQUENCES`) e `test_schema_privileges.py` une as três — toda tabela
+continua classificada exatamente uma vez.
+
+A novidade é `ANALYSIS_WORKER_APPEND_TABLES` = (`feature_baselines`):
+`SELECT`/`INSERT`/`DELETE` para `hunter_worker` e **`UPDATE` para ninguém**. Não é
+a classe append-only do §15.6 (que também proíbe `DELETE`, porque trilha de
+auditoria não é podada) — baselines *são* podadas, no mesmo prazo das amostras que
+dependem delas. `UPDATE` é negado no grant, antes de o trigger ser consultado:
+duas fechaduras independentes na mesma porta.
+
+### 17.7 Guardas em banco populado
+
+Três invariantes novos não podem ser derivados para linhas que já os violam. A
+migração conta os infratores e **recusa** com instruções, seguindo o precedente da
+`0002` (fazer backfill do que as colunas existentes *implicam*, recusar o que elas
+apenas sugerem). Em todo banco onde o scanner do M2 nunca rodou — que é todo banco
+hoje — cada uma conta zero.
+
+| Guarda | Por que não há backfill honesto |
+|---|---|
+| `(status = 'EXPIRED') <> (expired_at IS NOT NULL)` | inventar `expired_at` fabricaria justamente o carimbo em que o modelo de episódio é chaveado |
+| mais de uma oportunidade aberta por mercado | a migração não pode escolher qual das duas é o episódio |
+| mais de uma anomalia `active` por (mercado, tipo) | idem: qual delas o detector está mantendo é conhecimento do detector |
+
+**E guardas no downgrade.** Reverter um schema é permitido; perder dado não é — e
+"a migração reverteu sem erro" é exatamente como essa perda seria reportada. Além
+da guarda de rótulos (§17.1), o downgrade recusa quando:
+
+| Guarda | Cenário concreto |
+|---|---|
+| `outbox_events` com `dispatched_at IS NULL` | é uma publicação que o sistema deve; derrubar a tabela conclui com sucesso e o evento simplesmente nunca sai — a perda exata que a outbox existe para tornar impossível |
+| amostra preservada com `baseline_ids` não vazio no envelope | a oportunidade sobrevive e a evidência não: a linha continua dizendo "é por isso" apontando para nada |
+
+Baselines que **nenhuma** amostra preservada referencia não são protegidas: são
+recomputáveis a partir dos `feature_snapshots`, e recusar por causa delas tornaria
+o downgrade impossível em qualquer banco que o scanner já tenha tocado. É perda
+aceita e recuperável, registrada aqui em vez de descoberta depois.
+
+### 17.8 Seeds
+
+**`feature_definitions` é derivado do registry da T2.2, nunca redigitado.** O seed
+chama `hunter_indicators.features.default_definitions_rows()`, cujo `as_row()`
+devolve exatamente as colunas da tabela (`name`, `version`, `category`,
+`parameters`, `description`, `inputs`); `seed_reference.feature_definition_rows()`
+só repassa e `seed.py` acrescenta o `id` (UUID v7 da aplicação). **v1: 28
+features.**
+
+O motivo de não haver segunda cópia: `feature_snapshots.feature_set_version` é o
+hash das próprias identidades que essas linhas guardam (chave, `version`,
+`category`, `inputs`, `parameters`). Uma lista escrita à mão ao lado do registry
+não é documentação, é uma segunda verdade — e as duas já tinham divergido: **20
+das 28 chaves ficaram órfãs de um lado ou do outro** (o seed dizia `volatility` e
+`volume_relative`, o registry publica `atr_14_pct` e `relative_volume_5m`; o seed
+falava o vocabulário `candles_1m`/`book_20`, o registry fala `candles:1m`/`book:20`).
+Uma tabela assim descreve um motor que ninguém rodou.
+
+`parameters` **deixa de ficar no default `{}`**: as janelas, períodos e limiares
+vêm canonicalizados do registry (números como *string* JSON, como em todo o resto
+do seed), que é onde foram de fato calculados — a razão para deixá-los vazios era
+não inventar número, e derivar não inventa nada. `inputs` continua nomeando as
+fontes que cada calculadora pode ler (o que permite revisar look-ahead), agora no
+vocabulário real do build (`candles:1m`, `candles:1m:forming`, `book:20`,
+`trades`, `deriv:funding`, `deriv:oi`, `deriv:history`, `state:atr_15m`).
+
+**Uma `(name, version)` publicada é congelada, como um vetor de pesos.** O seed
+insere o que falta, **verifica** o que existe e **para** quando a identidade
+armazenada difere da que este build publica — mudança de fórmula é `version` nova
+no registry, que entra como linha nova ao lado da antiga, e sobrescrever faria a
+tabela mentir sobre todo snapshot que citou aquela identidade. Fora da comparação
+fica só `description`: é prosa, o próprio hash do conjunto a exclui de propósito
+(reescrever texto não pode invalidar snapshot), então ela é atualizada no lugar.
+Rodar o seed duas vezes não reescreve nenhuma linha — o teste de integração
+compara `xmin`, não contagem de linhas.
+
+Este documento **não lista as 28 chaves**: listá-las aqui recriaria a divergência
+que a derivação acabou de fechar. A lista viva é
+`hunter_indicators.features.DEFAULT_REGISTRY`. As features `Cross` de
+`PIPELINE.md` §2 (`btc_correlation_1h`, `market_beta_1h`,
+`relative_strength_vs_btc_1h`) **continuam fora**: não estão na entrega da T2.2 e
+portanto não estão no registry.
+
+O seed passa a depender de `hunter-indicators`, e depende onde roda: é membro do
+workspace `uv` (`pyproject.toml` raiz), `uv sync --all-packages` o instala no venv
+da imagem e `Dockerfile.api-workers` copia `packages/indicators` — a mesma imagem
+serve `HUNTER_COMMAND=migrate` e `HUNTER_COMMAND=seed` (`infra/docker/entrypoint.sh`).
+
+**`opportunity_weights` v2 ativo, v1 inativo.** A v1 continua com a sua forma
+plana; a v2 é aninhada (`components`, `early_movement`, `normalization`, `stage`,
+`status`, `expiry`, `baseline_gate`, `precision`) porque a decisão conjunta manda
+os limiares de estágio morarem em `weights["stage"]`, "versionados, nunca
+hardcoded", e um mapa plano não distinguiria um peso de componente de um limiar. A
+forma é lida por versão, nunca adivinhada.
+
+**Conteúdo de uma versão publicada é congelado, como em `strategy_versions`
+(§16.1).** Toda `opportunities.weights_version` nomeia um vetor; se o seed
+reescrevesse os números sob o mesmo nome, todo score já explicado por ele mudaria
+de significado em silêncio. Então `infra/scripts/seed_weights.py` **insere** uma
+versão ausente e **verifica** uma existente, e uma divergência para o seed com a
+instrução de publicar versão nova. Regressão concreta que isso fecha: a T2.4
+ratifica a v2 e grava `components_frozen: true`, e o deploy seguinte devolveria
+`false` sem que ninguém visse.
+
+A troca de versão ativa fica no **seed**, não na migração, e acontece **uma vez**:
+a decisão vem do `INSERT ... ON CONFLICT DO NOTHING ... RETURNING`, isto é, só
+promove quem de fato *criou* a linha. Basear isso num `SELECT` anterior seria
+sujeito a corrida — entre a leitura e a escrita, um operador pode ter criado a
+versão inativa de propósito, e o seed a promoveria por cima da escolha dele. Com
+`DO NOTHING`, quem criou primeiro ganha e esta execução não promove nada. A
+aposentadoria da anterior e a ativação da nova são duas instruções nessa ordem na
+mesma transação (o índice parcial único obriga). Uma versão ativa fora de
+`seed_reference.PROMOTED_FROM` nunca é rebaixada: tirar o perfil vivo de um scorer
+em operação não é decisão de script de deploy.
+
+`infra/scripts/seed.py` passou a ter dois módulos irmãos por causa do orçamento de
+350 linhas: `seed_reference.py` (conteúdo, sem IO — literais mais o catálogo de
+features derivado do registry) e `seed_weights.py` (a parte do seed que não é
+upsert simples; `feature_definitions` segue a mesma regra dentro de `seed.py`).
+
+**Desvio registrado, a ratificar pela T2.4.** A decisão conjunta fixa a aritmética
+(`Σ pesos_i = 0,90`, Agent Consensus 0, Early-Movement assinado ±10 fora da soma,
+`score = clip(Σ w_i·c_i + 10·e, 0, 100)`) mas deixa explicitamente os **pesos
+individuais** para congelar antes de implementar a T2.4. O brief da T2.1 exige v2
+ativa. A v2 semeada resolve o conflito assim: tudo que a decisão fixa vai como
+está; o vetor de componentes é o da v1 com `agent_consensus` zerado e os 0,05
+restantes retirados de `anomalies` — o componente cujo sinal já é contado duas
+vezes no M2 (dirige o status `ANOMALY` e as confirmações de EARLY) — e a linha
+carrega `components_frozen: false`. **T2.4 ratifica esse vetor ou publica uma v3**;
+enquanto isso não acontece, nenhum score foi produzido por ele (o scorer é a
+própria T2.4).
+
+### 17.9 Pooler
+
+Nada nesta revisão depende de estado de sessão: sem prepared statement de sessão,
+sem `LISTEN/NOTIFY`, sem advisory lock de sessão. O único GUC envolvido,
+`app.baseline_retention`, é lido com `NULLIF(current_setting(..., true), '')` e
+escrito com `SET LOCAL`, exatamente como `app.current_org` (§15.4).

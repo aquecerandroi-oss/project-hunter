@@ -1,4 +1,5 @@
-"""Audit, system events, heartbeats and idempotency — DATABASE.md §12.
+"""Audit, system events, heartbeats, idempotency and the outbox — DATABASE.md
+§12 and §17.
 
 ``audit_logs`` and ``system_events`` are RANGE-partitioned by month on
 ``created_at`` and are append-only for ``hunter_app``. ``audit_logs`` keeps a
@@ -12,7 +13,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Index, Integer, Text, func
+from sqlalchemy import BigInteger, CheckConstraint, Index, Integer, Text, func, text
 from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -112,3 +113,59 @@ class ProcessedEvent(Base):
     event_id: Mapped[str] = mapped_column(Text, primary_key=True)
     claimed_at: Mapped[datetime] = mapped_column(server_default=func.now())
     completed_at: Mapped[datetime | None]
+
+
+class OutboxEvent(Base):
+    """Events a durable producer owes a Redis stream, written in *its* transaction.
+
+    The generic half of T2.9. A worker that writes a business row and then does
+    ``XADD`` has two failure windows — crash after the commit (event lost) and
+    crash after the ``XADD`` before the ACK (event duplicated) — and no amount of
+    retrying closes the first one. Writing the intent to this table inside the
+    same transaction as the business row turns "did it happen?" into a question
+    the database answers: the row and the obligation commit together or neither
+    does, and a dispatcher drains ``dispatched_at IS NULL`` afterwards.
+
+    **Shape-identical to** ``shadow_outbox`` on purpose (SHADOW-LAB.md §6). The
+    Shadow Lab shipped its own queue in ``0002`` before this one existed, and the
+    absorption has to preserve pending work, so the columns match one for one and
+    the migration is an ``INSERT ... SELECT`` with an explicit column list that
+    keeps ``event_id``, ``stream``, ``payload``, ``created_at``,
+    ``dispatched_at``, ``attempts`` and ``last_error`` and lets ``id`` be
+    re-issued from this table's own sequence. Copying ``id`` across two populated
+    queues would collide, and it would mean nothing if it did not: ``id`` is a
+    drain order, never an identity.
+
+    ``BIGSERIAL`` rather than the UUID v7 of §1, for the same reason
+    ``shadow_outbox`` is: a cheap, stable order to drain in. It is **not** a
+    watermark — the sequence has gaps and its order is not commit order, so
+    "everything below N is published" is false. The pending predicate is
+    ``dispatched_at IS NULL``, which is what the partial index serves.
+    """
+
+    __tablename__ = "outbox_events"
+    __table_args__ = (
+        Index(
+            "ix_outbox_events_pending",
+            "id",
+            postgresql_where=text("dispatched_at IS NULL"),
+        ),
+        CheckConstraint("attempts >= 0", name="attempts_not_negative"),
+        CheckConstraint("char_length(stream) > 0", name="stream_not_empty"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    event_id: Mapped[uuid.UUID] = mapped_column(unique=True)
+    """The event's identity, computed deterministically by the producer from the
+    business row. Unique, so a retried transaction queues the event once and a
+    redelivery is a no-op instead of a second publication. This — not ``id`` — is
+    what survives the absorption of ``shadow_outbox``."""
+
+    stream: Mapped[str] = mapped_column(Text)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=JSONB_EMPTY)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    dispatched_at: Mapped[datetime | None]
+    """``NULL`` until the event is on the stream — the reconciliation predicate."""
+
+    attempts: Mapped[int] = mapped_column(Integer, server_default="0")
+    last_error: Mapped[str | None] = mapped_column(Text)

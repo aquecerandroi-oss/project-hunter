@@ -1,11 +1,26 @@
 #!/usr/bin/env python3
 """Seed the reference data every environment needs — DATABASE.md, PRODUCT.md §5,
-RISK_ENGINE.md §2, PIPELINE.md §5.
+RISK_ENGINE.md §2, PIPELINE.md §2 and §5.
 
-Idempotent: every write is an upsert on the row's natural key (``exchanges.code``,
-``strategies.key``, ``(strategy_id, version)``, ``(plan, key)``,
-``feature_flags.key``, the system-preset ``risk_profiles.preset``,
-``opportunity_weights.version``), so running it twice leaves the same row counts.
+Idempotent: most writes are an upsert on the row's natural key
+(``exchanges.code``, ``strategies.key``, ``(strategy_id, version)``,
+``(plan, key)``, ``feature_flags.key``, the system-preset
+``risk_profiles.preset``), so running it twice leaves the same row counts.
+
+Two tables are **not** upserted, because their content is frozen once published
+and something stored elsewhere names it: ``opportunity_weights.version``, which
+every score cites, and ``(feature_definitions.name, version)``, whose identity is
+hashed into every ``feature_snapshots.feature_set_version``. For those the seed
+inserts what is missing, *verifies* what exists, and stops on a divergence
+(DATABASE.md §17.8).
+
+The content lives in the sibling ``seed_reference`` module — literals, plus the
+feature catalogue derived from the ``hunter_indicators`` registry; this file is
+the writes. ``is_active`` on ``opportunity_weights`` is the one thing here that
+is an *operational* state rather than content, and §17 of DATABASE.md records
+how it is handled: the seed promotes the release's profile exactly once, on the
+run that first creates it, and never touches the flag on a row that already
+exists.
 
 Every count it reports comes from the statement's ``RETURNING`` clause, never
 from the length of the input tuple: a row a policy filters away has to make the
@@ -29,118 +44,33 @@ import sys
 import uuid
 from typing import Any
 
+from seed_reference import (
+    ENTITLEMENTS,
+    EXCHANGES,
+    FEATURE_FLAGS,
+    REGIME_MULTIPLIERS,
+    RISK_LIMITS,
+    RISK_PRESETS,
+    STRATEGIES,
+    feature_definition_rows,
+)
+from seed_weights import seed_opportunity_weights
+from sqlalchemy import select, text, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 
 from hunter_core.db.models import (
     Exchange,
+    FeatureDefinition,
     FeatureFlag,
-    OpportunityWeights,
     PlanEntitlement,
     RiskProfile,
     Strategy,
     StrategyVersion,
 )
-from hunter_core.domain.enums import Plan, RiskPreset, StrategyVersionStatus
+from hunter_core.domain.enums import Plan, StrategyVersionStatus
 from hunter_core.domain.types import uuid7
 from hunter_core.settings import Settings
-
-_CAPABILITIES = {
-    "spot": True,
-    "perpetual": True,
-    "funding": True,
-    "open_interest": True,
-    "liquidations": True,
-    "ws_depth": True,
-}
-
-EXCHANGES: tuple[tuple[str, str, dict[str, Any]], ...] = (
-    ("binance", "Binance", _CAPABILITIES),
-    ("bybit", "Bybit", _CAPABILITIES),
-)
-
-STRATEGIES: tuple[tuple[str, str, str, str], ...] = (
-    ("momentum", "Momentum", "trend", "Continuation with relative volume and breakout strength."),
-    ("breakout", "Breakout", "trend", "Range break confirmed by volume and order flow."),
-    ("volume_anomaly", "Volume Anomaly", "anomaly", "Entry after a VOLUME_SPIKE with pressure."),
-    ("order_flow", "Order Flow", "microstructure", "Book imbalance and taker pressure."),
-    ("mean_reversion", "Mean Reversion", "reversion", "Fade of stretched moves in low volatility."),
-    ("derivatives", "Derivatives", "derivatives", "Funding, open interest and liquidation setups."),
-    ("narrative", "Narrative", "intelligence", "Narrative and news driven flow (Phase 2)."),
-    ("ensemble", "Ensemble", "meta", "Weighted combination of the other strategies."),
-)
-
-ENTITLEMENTS: dict[str, tuple[Any, Any, Any, Any]] = {
-    # key: (FREE, PRO, QUANT, ENTERPRISE) — ``None`` means unlimited
-    "max_agents": (2, 8, 30, None),
-    "max_exchanges": (2, 4, 8, None),
-    "max_portfolios": (1, 5, 20, None),
-    "market_history_days": (30, 180, 730, None),
-    "backtesting": (False, True, True, True),
-    "advanced_intelligence": (False, False, True, True),
-    "custom_agent_params": (False, True, True, True),
-    "live_trading": (False, False, True, True),
-    "api_access": (False, True, True, True),
-}
-
-FEATURE_FLAGS: tuple[tuple[str, str], ...] = (
-    ("ENABLE_LIVE_TRADING", "Live execution. Stays off until Phase 4."),
-    ("ENABLE_SOCIAL_INTELLIGENCE", "Social sources for the intelligence pipeline."),
-    ("ENABLE_ONCHAIN", "On-chain sources for the intelligence pipeline."),
-    ("ENABLE_STRIPE", "Billing through Stripe."),
-    ("ENABLE_LLM_ANALYSIS", "LLM classification of external content."),
-    ("ENABLE_ARENA", "Agent Arena."),
-    ("ENABLE_BACKTESTS", "Backtest engine and UI."),
-)
-
-RISK_LIMITS: dict[str, tuple[Any, Any, Any]] = {
-    # key: (conservative, balanced, aggressive) — RISK_ENGINE.md §2
-    "max_position_pct": ("0.02", "0.05", "0.10"),
-    "risk_per_trade_pct": ("0.0025", "0.005", "0.01"),
-    "max_total_exposure_pct": ("0.30", "0.60", "1.00"),
-    "max_daily_loss_pct": ("0.01", "0.02", "0.04"),
-    "max_drawdown_pct": ("0.05", "0.10", "0.20"),
-    "max_concurrent_positions": (3, 6, 12),
-    "max_asset_exposure_pct": ("0.05", "0.10", "0.20"),
-    "max_exchange_exposure_pct": ("0.50", "0.70", "1.00"),
-    "min_liquidity_usd_24h": ("50000000", "20000000", "5000000"),
-    "max_spread_pct": ("0.0005", "0.001", "0.002"),
-    "max_slippage_pct": ("0.001", "0.002", "0.005"),
-    "max_leverage": (1, 2, 3),
-    "max_correlated_positions": (2, 4, 8),
-    "min_stop_distance_pct": ("0.003", "0.002", "0.001"),
-    "max_stop_distance_pct": ("0.03", "0.05", "0.08"),
-    "auto_close_on_emergency": (False, False, False),
-}
-
-REGIME_MULTIPLIERS: tuple[dict[str, str], ...] = (
-    # RISK_ENGINE.md §2 grammar: `<REGIME>` or `<REGIME>_<DIRECTION>`, where
-    # <REGIME> is a `market_regime` label and <DIRECTION> is a `trade_direction`
-    # upper-cased. The engine looks up `<REGIME>_<DIRECTION>` first, then
-    # `<REGIME>`, then falls back to 1.0 — so `BTC_BEAR_LONG` narrows longs in a
-    # bear market while `HIGH_VOLATILITY` applies to both directions.
-    {"BTC_BEAR_LONG": "0.5", "HIGH_VOLATILITY": "0.7"},
-    {"BTC_BEAR_LONG": "0.5", "HIGH_VOLATILITY": "0.7"},
-    {"HIGH_VOLATILITY": "0.85"},
-)
-
-RISK_PRESETS: tuple[tuple[RiskPreset, str], ...] = (
-    (RiskPreset.CONSERVATIVE, "Conservative"),
-    (RiskPreset.BALANCED, "Balanced"),
-    (RiskPreset.AGGRESSIVE, "Aggressive"),
-)
-
-OPPORTUNITY_WEIGHTS_V1: dict[str, str] = {
-    "momentum": "0.20",
-    "volume": "0.20",
-    "liquidity": "0.10",
-    "order_flow": "0.15",
-    "derivatives": "0.10",
-    "market_regime": "0.10",
-    "anomalies": "0.10",
-    "agent_consensus": "0.05",
-    "external_intelligence": "0.00",
-}
 
 
 def migration_url() -> str:
@@ -288,27 +218,85 @@ async def seed_risk_profiles(conn: AsyncConnection) -> int:
     return written
 
 
-async def seed_opportunity_weights(conn: AsyncConnection) -> int:
-    statement = insert(OpportunityWeights).values(
-        id=uuid7(),
-        version="v1",
-        weights=OPPORTUNITY_WEIGHTS_V1,
-        is_active=True,
-        description="Default component weights for the opportunity score (PIPELINE.md §5).",
+async def _refuse_diverging_definition(conn: AsyncConnection, row: dict[str, Any]) -> None:
+    """A published ``(name, version)`` is frozen, like a weight vector (§17.8).
+
+    ``feature_snapshots.feature_set_version`` is a hash of exactly what
+    ``FeatureDefinition.identity()`` covers — key, version, category, inputs and
+    parameters — so rewriting any of them under a name that already exists makes
+    this table describe an engine that did not produce the stored snapshots. A
+    real formula change is a **new** ``version`` in the registry, which inserts a
+    row next to the old one; there is no case where overwriting is right, so the
+    seed stops instead. ``description`` is deliberately outside the check: it is
+    prose, excluded from the hash, and is refreshed in place.
+    """
+    stored = (
+        await conn.execute(
+            select(
+                FeatureDefinition.category,
+                FeatureDefinition.inputs,
+                FeatureDefinition.parameters,
+                FeatureDefinition.description,
+            ).where(
+                FeatureDefinition.name == row["name"],
+                FeatureDefinition.version == row["version"],
+            )
+        )
+    ).first()
+    if stored is None:
+        return  # deleted between the insert and this read; the next run inserts it
+    identity = (stored.category, sorted(stored.inputs), stored.parameters)
+    shipped = (row["category"], sorted(row["inputs"]), row["parameters"])
+    if identity != shipped:
+        raise SystemExit(
+            f"feature_definitions {row['name']} v{row['version']} in the database differs "
+            f"from the definition this build's registry publishes, and a published feature "
+            f"identity is never rewritten: every feature_snapshots.feature_set_version "
+            f"naming it was hashed from the stored one. Bump the version in "
+            f"hunter_indicators instead of editing the definition in place."
+        )
+    if stored.description != row["description"]:
+        await conn.execute(
+            text(
+                "UPDATE feature_definitions SET description = :description "
+                "WHERE name = :name AND version = :version"
+            ),
+            {"description": row["description"], "name": row["name"], "version": row["version"]},
+        )
+
+
+async def seed_feature_definitions(conn: AsyncConnection) -> int:
+    """The catalogue of ``hunter_indicators``' registry — derived, never retyped.
+
+    ``seed_reference.feature_definition_rows()`` is the engine's own
+    ``as_row()``, so the table says which features exist, what category they are
+    in, which sources each may read and with which parameters, in the build's
+    vocabulary. Missing rows are inserted; existing ones are *verified* and a
+    divergence stops the seed — the ``opportunity_weights`` rule of §17.8, for
+    the same reason: a stored snapshot names an identity, and that identity has
+    to keep meaning what it meant.
+    """
+    rows = feature_definition_rows()
+    for row in rows:
+        statement = insert(FeatureDefinition).values(id=uuid7(), **row)
+        result = await conn.execute(
+            statement.on_conflict_do_nothing(constraint="uq_feature_definitions_name").returning(
+                FeatureDefinition.id
+            )
+        )
+        if not result.fetchall():
+            await _refuse_diverging_definition(conn, row)
+
+    present = await conn.execute(
+        select(FeatureDefinition.id).where(
+            tuple_(FeatureDefinition.name, FeatureDefinition.version).in_(
+                [(row["name"], row["version"]) for row in rows]
+            )
+        )
     )
-    result = await conn.execute(
-        statement.on_conflict_do_update(
-            index_elements=[OpportunityWeights.version],
-            # ``is_active`` is deliberately NOT updated. Which version is live is
-            # an operational decision (a rollback after a bad tuning, say), and
-            # re-running the seed — which every deploy does — must not quietly
-            # reactivate v1 underneath it. The partial unique index on
-            # ``is_active`` would refuse the write anyway, turning a routine
-            # deploy into a failed one.
-            set_={"weights": statement.excluded.weights},
-        ).returning(OpportunityWeights.id)
-    )
-    return _written(result)
+    # Counted from what the database actually holds, never from len(rows) — the
+    # doctrine ``_written`` states, and the reason the risk_profiles bug showed.
+    return len(present.fetchall())
 
 
 async def seed() -> dict[str, int]:
@@ -325,6 +313,7 @@ async def seed() -> dict[str, int]:
                 "plan_entitlements": await seed_plan_entitlements(conn),
                 "feature_flags": await seed_feature_flags(conn),
                 "risk_profiles": await seed_risk_profiles(conn),
+                "feature_definitions": await seed_feature_definitions(conn),
                 "opportunity_weights": await seed_opportunity_weights(conn),
             }
     finally:

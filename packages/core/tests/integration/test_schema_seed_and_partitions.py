@@ -13,6 +13,7 @@ import os
 import sys
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from decimal import Decimal
 from types import ModuleType
 from typing import Any, cast
 from urllib.parse import urlsplit, urlunsplit
@@ -24,6 +25,7 @@ from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from hunter_core.db.models import create_partition_sql
+from hunter_indicators.features import default_definitions_rows
 
 from .conftest import SCRIPTS_DIR, alembic_config, async_engine, create_database
 
@@ -33,6 +35,9 @@ OWNER_ROLE = "hunter_owner_probe"
 OWNER_PASSWORD = "FAKEownerpw"
 OWNER_DB = "hunter_owned"
 
+FROZEN_FEATURE = "spread_pct"
+"""The definition the freeze test tampers with, then puts back."""
+
 SEEDED_TABLES = (
     "exchanges",
     "strategies",
@@ -40,6 +45,7 @@ SEEDED_TABLES = (
     "plan_entitlements",
     "feature_flags",
     "risk_profiles",
+    "feature_definitions",
     "opportunity_weights",
 )
 
@@ -55,6 +61,16 @@ def _use(url: str) -> None:
 
 
 def _load_script(name: str) -> ModuleType:
+    """Load ``infra/scripts/<name>.py`` the way running it as a script would.
+
+    ``seed.py`` imports its data from the sibling ``seed_reference`` module (the
+    two split when the M2 catalogue pushed the script past the 350-line budget).
+    Running ``python infra/scripts/seed.py`` puts that directory on ``sys.path``
+    automatically; loading the file by path does not, so it is added here — the
+    same surgery ``conftest.alembic_config`` does for ``infra/migrations``.
+    """
+    if str(SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS_DIR))
     spec = importlib.util.spec_from_file_location(
         f"hunter_infra_{name}", SCRIPTS_DIR / f"{name}.py"
     )
@@ -131,7 +147,8 @@ def test_seeding_twice_leaves_the_same_rows(seed_db: str) -> None:
     assert counts_after_first["plan_entitlements"] == 36
     assert counts_after_first["feature_flags"] == 7
     assert counts_after_first["risk_profiles"] == 3
-    assert counts_after_first["opportunity_weights"] == 1
+    assert counts_after_first["feature_definitions"] == len(default_definitions_rows()) == 28
+    assert counts_after_first["opportunity_weights"] == 2
 
 
 def test_seeded_risk_presets_carry_the_documented_limits(seed_db: str) -> None:
@@ -158,6 +175,147 @@ def test_seeded_risk_presets_carry_the_documented_limits(seed_db: str) -> None:
     assert limits["max_drawdown_pct"] == "0.10"
     assert limits["max_concurrent_positions"] == 6
     assert limits["auto_close_on_emergency"] is False
+
+
+def test_the_seeded_catalogue_is_exactly_the_feature_registry(seed_db: str) -> None:
+    """``feature_definitions`` is derived from ``hunter_indicators``, not retyped.
+
+    The catalogue and the engine drifted the moment they were written twice: the
+    hand-written seed shipped ``volatility``/``volume_relative`` and an
+    ``inputs`` vocabulary of ``book_20``/``candles_1m``, while the registry that
+    actually computes the numbers publishes ``atr_14_pct``/``relative_volume_5m``
+    reading ``book:20``/``candles:1m`` — 20 of 28 keys orphaned on one side or
+    the other. Every ``feature_snapshots`` row names a ``feature_set_version``
+    hashed from these identities, so a catalogue that is not the registry's is a
+    table describing an engine nobody ran. This asserts the whole row, not just
+    the names: category, version, inputs and parameters all decide the hash.
+    """
+    _use(seed_db)
+    seed = _load_script("seed")
+    asyncio.run(seed.seed())
+
+    expected = {
+        row["name"]: (
+            row["version"],
+            row["category"].value,
+            sorted(row["inputs"]),
+            row["parameters"],
+            row["description"],
+        )
+        for row in default_definitions_rows()
+    }
+
+    async def _catalogue() -> dict[str, tuple[Any, ...]]:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.connect() as connection:
+                result = await connection.execute(
+                    text(
+                        "SELECT name, version, category::text, inputs, parameters, description "
+                        "FROM feature_definitions"
+                    )
+                )
+                return {row[0]: (row[1], row[2], sorted(row[3]), row[4], row[5]) for row in result}
+        finally:
+            await engine.dispose()
+
+    stored = asyncio.run(_catalogue())
+    assert sorted(stored) == sorted(expected), "the seeded keys are not the registry's keys"
+    assert len(stored) == 28
+    assert stored == expected
+
+
+def test_reseeding_the_catalogue_rewrites_no_row(seed_db: str) -> None:
+    """Running the seed twice is a no-op — no row rewritten, not merely recounted.
+
+    ``xmin`` is the witness. An upsert that writes the same values back still
+    gives every row a new version, and a row count cannot see it; a definition
+    rewritten under the same ``(name, version)`` is exactly what must never
+    happen, because the snapshots that named that identity were produced by the
+    stored one.
+    """
+    _use(seed_db)
+    seed = _load_script("seed")
+    asyncio.run(seed.seed())
+
+    async def _row_versions() -> dict[str, str]:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.connect() as connection:
+                result = await connection.execute(
+                    text("SELECT name, id::text || ':' || xmin::text FROM feature_definitions")
+                )
+                return {row[0]: row[1] for row in result}
+        finally:
+            await engine.dispose()
+
+    before = asyncio.run(_row_versions())
+    asyncio.run(seed.seed())
+    after = asyncio.run(_row_versions())
+
+    assert len(before) == 28
+    assert before == after, "reseeding rewrote feature_definitions rows"
+
+
+def test_the_seed_refuses_to_rewrite_a_published_feature_definition(seed_db: str) -> None:
+    """A published ``(name, version)`` is frozen, like a weight vector (§17.8).
+
+    ``feature_snapshots.feature_set_version`` is a hash of key, version,
+    category, inputs and parameters, so changing any of them under a name that
+    already exists makes the catalogue lie about every snapshot computed with
+    it. The registry answers a real formula change by bumping ``version``; the
+    seed's job when the stored identity differs is to stop, not to overwrite.
+    """
+    _use(seed_db)
+    seed = _load_script("seed")
+    asyncio.run(seed.seed())
+
+    async def _tamper() -> None:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    text("UPDATE feature_definitions SET inputs = :inputs WHERE name = :name"),
+                    {"inputs": ["book:20", "ghost:99"], "name": FROZEN_FEATURE},
+                )
+        finally:
+            await engine.dispose()
+
+    async def _stored_inputs() -> list[str]:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.connect() as connection:
+                value = await connection.scalar(
+                    text("SELECT inputs FROM feature_definitions WHERE name = :name"),
+                    {"name": FROZEN_FEATURE},
+                )
+        finally:
+            await engine.dispose()
+        return list(value or [])
+
+    asyncio.run(_tamper())
+    try:
+        with pytest.raises(SystemExit, match="never rewritten"):
+            asyncio.run(seed.seed())
+        assert asyncio.run(_stored_inputs()) == ["book:20", "ghost:99"], (
+            "the refused seed still overwrote the definition"
+        )
+    finally:
+        asyncio.run(_restore_shipped_catalogue(seed_db))
+
+
+async def _restore_shipped_catalogue(url: str) -> None:
+    """Undo the local edit so later tests seed against the shipped catalogue."""
+    shipped = next(row for row in default_definitions_rows() if row["name"] == FROZEN_FEATURE)
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text("UPDATE feature_definitions SET inputs = :inputs WHERE name = :name"),
+                {"inputs": list(shipped["inputs"]), "name": FROZEN_FEATURE},
+            )
+    finally:
+        await engine.dispose()
 
 
 def test_create_partitions_is_idempotent(seed_db: str) -> None:
@@ -252,9 +410,15 @@ def test_reseeding_never_reactivates_a_retired_weight_version(seed_db: str) -> N
     """Which opportunity weights are live is an operational decision, not a seed one.
 
     The seed used to write ``is_active`` on conflict, so every deploy silently
-    reactivated v1 underneath whatever an operator had switched to. With the
-    partial unique index on ``is_active`` it would not even fail loudly — it
-    would fail the deploy.
+    reactivated the shipped version underneath whatever an operator had switched
+    to. With the partial unique index on ``is_active`` it would not even fail
+    loudly — it would fail the deploy.
+
+    Retargeted at v2 by T2.1: from ``0003`` on, v2 is the active profile, so v2
+    is the version an operator could retire. The seed writes ``is_active``
+    exactly once, on the run that *creates* the active version's row; by the time
+    this test runs that row exists, which is why the promotion cannot come back
+    and walk over the rollback below.
     """
     _use(seed_db)
     seed = _load_script("seed")
@@ -265,7 +429,7 @@ def test_reseeding_never_reactivates_a_retired_weight_version(seed_db: str) -> N
         try:
             async with engine.begin() as connection:
                 await connection.execute(
-                    text("UPDATE opportunity_weights SET is_active = false WHERE version = 'v1'")
+                    text("UPDATE opportunity_weights SET is_active = false WHERE version = 'v2'")
                 )
         finally:
             await engine.dispose()
@@ -274,18 +438,27 @@ def test_reseeding_never_reactivates_a_retired_weight_version(seed_db: str) -> N
         try:
             async with engine.connect() as connection:
                 active = await connection.scalar(
-                    text("SELECT is_active FROM opportunity_weights WHERE version = 'v1'")
+                    text("SELECT is_active FROM opportunity_weights WHERE version = 'v2'")
                 )
                 weights = await connection.scalar(
-                    text("SELECT weights ? 'momentum' FROM opportunity_weights WHERE version='v1'")
+                    text(
+                        "SELECT weights -> 'components' ? 'momentum' "
+                        "FROM opportunity_weights WHERE version = 'v2'"
+                    )
                 )
         finally:
             await engine.dispose()
         return bool(active), bool(weights)
 
-    still_active, weights_refreshed = asyncio.run(_retire_then_reseed())
-    assert still_active is False, "re-seeding reactivated a version an operator had retired"
-    assert weights_refreshed is True, "the seed must still refresh the weight vector itself"
+    try:
+        still_active, weights_refreshed = asyncio.run(_retire_then_reseed())
+        assert still_active is False, "re-seeding reactivated a version an operator had retired"
+        assert weights_refreshed is True, "the seed lost the published weight vector"
+    finally:
+        # This module shares one seeded database across its tests, and the point
+        # of this one is to leave a profile retired — which is exactly the state
+        # the next test must not inherit.
+        asyncio.run(_restore_shipped_profile(seed_db))
 
 
 def test_only_one_weight_version_can_be_active(seed_db: str) -> None:
@@ -536,3 +709,256 @@ def test_one_parent_failing_does_not_discard_the_partitions_of_the_others(
     assert first_names <= after, "an earlier parent's partitions were rolled back with the failure"
     assert first_names - before, "the first group created nothing; the horizon proves nothing"
     assert last_names & after == last_names & before, "the failing group was left half applied"
+
+
+def test_the_seed_ships_v2_active_and_retires_v1(seed_db: str) -> None:
+    """The M2 profile is the live one, and v1 survives as history.
+
+    ``opportunity_weights`` is versioned precisely so a score can name the vector
+    that produced it, so retiring v1 by deleting or rewriting it would erase what
+    every M1-era row meant. It stays, inactive, in its original flat shape — v2
+    is nested because the joint decision puts the stage thresholds under
+    ``weights["stage"]``, and the shape is read per version, never guessed.
+    """
+    _use(seed_db)
+    seed = _load_script("seed")
+    asyncio.run(seed.seed())
+
+    async def _profiles() -> list[tuple[str, bool, bool]]:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.connect() as connection:
+                result = await connection.execute(
+                    text(
+                        "SELECT version, is_active, weights ? 'components' "
+                        "FROM opportunity_weights ORDER BY version"
+                    )
+                )
+                return [(row[0], bool(row[1]), bool(row[2])) for row in result]
+        finally:
+            await engine.dispose()
+
+    assert asyncio.run(_profiles()) == [("v1", False, False), ("v2", True, True)]
+
+
+def test_the_v2_component_weights_sum_to_the_agreed_budget(seed_db: str) -> None:
+    """``sum(w_i) = 0.90``, Agent Consensus at zero.
+
+    The joint decision fixes the arithmetic even where it leaves the individual
+    weights to T2.4: the remaining 0.10 of the 1.00 budget is the *signed*
+    Early-Movement term, ``score = clip(sum(w_i * c_i) + 10 * e, 0, 100)`` with
+    ``e in {-1, 0, +1}``. A vector summing to 0.95 would quietly hand every
+    component a bonus and put the pre-clip ceiling above 100.
+
+    Summed as ``Decimal`` on purpose: the values are stored as JSON strings
+    because 0.05 has no exact binary float, and adding them as floats here would
+    be the very bug that storage choice exists to avoid.
+    """
+    _use(seed_db)
+    seed = _load_script("seed")
+    asyncio.run(seed.seed())
+
+    async def _components() -> dict[str, str]:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.connect() as connection:
+                weights = await connection.scalar(
+                    text(
+                        "SELECT weights -> 'components' FROM opportunity_weights "
+                        "WHERE version = 'v2'"
+                    )
+                )
+                return cast(dict[str, str], weights)
+        finally:
+            await engine.dispose()
+
+    components = asyncio.run(_components())
+    assert sum(Decimal(value) for value in components.values()) == Decimal("0.90")
+    assert Decimal(components["agent_consensus"]) == Decimal("0")
+
+
+def test_a_live_profile_the_seed_does_not_ship_is_left_alone(seed_db: str) -> None:
+    """The promotion is one-shot, and it never demotes a stranger.
+
+    If some future v3 is live and the v2 row has been removed, the seed recreates
+    v2 **inactive**: taking the live profile away from a running scorer is not a
+    decision a deploy script gets to make. The only version it may retire is the
+    one it replaced (``seed_reference.PROMOTED_FROM``).
+    """
+    _use(seed_db)
+    seed = _load_script("seed")
+    asyncio.run(seed.seed())
+
+    async def _install_v3_then_reseed() -> tuple[str | None, bool]:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    text("DELETE FROM opportunity_weights WHERE version = 'v2'")
+                )
+                await connection.execute(
+                    text(
+                        "INSERT INTO opportunity_weights (id, version, weights, is_active) "
+                        "VALUES (gen_random_uuid(), 'v3', '{}'::jsonb, true)"
+                    )
+                )
+        finally:
+            await engine.dispose()
+        await seed.seed()
+        engine = async_engine(seed_db)
+        try:
+            async with engine.connect() as connection:
+                live = await connection.scalar(
+                    text("SELECT version FROM opportunity_weights WHERE is_active")
+                )
+                present = await connection.scalar(
+                    text("SELECT true FROM opportunity_weights WHERE version = 'v2'")
+                )
+        finally:
+            await engine.dispose()
+        return live, bool(present)
+
+    try:
+        live, v2_present = asyncio.run(_install_v3_then_reseed())
+        assert live == "v3", "the seed demoted a profile it does not ship"
+        assert v2_present, "the seed must still ensure its own version exists"
+    finally:
+        asyncio.run(_restore_shipped_profile(seed_db))
+
+
+async def _restore_shipped_profile(url: str) -> None:
+    """Put the shared seed database back the way the other tests expect it.
+
+    Deactivate first, then activate: the partial unique index allows exactly one
+    live version, so activating v2 while another test's probe is still active
+    fails — the same ordering the seed's own promotion has to obey.
+    """
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(text("DELETE FROM opportunity_weights WHERE version = 'v3'"))
+            await connection.execute(
+                text("UPDATE opportunity_weights SET is_active = false WHERE is_active")
+            )
+            await connection.execute(
+                text("UPDATE opportunity_weights SET is_active = true WHERE version = 'v2'")
+            )
+    finally:
+        await engine.dispose()
+
+
+def test_the_seed_refuses_to_rewrite_a_published_weight_vector(seed_db: str) -> None:
+    """A weight version is frozen once published, exactly like a strategy version.
+
+    Every opportunity records ``weights_version``, so rewriting the numbers under
+    an existing name changes the meaning of scores already explained by it. The
+    concrete regression: T2.4 ratifies v2 and stores ``components_frozen: true``,
+    and the next deploy — every deploy runs this script — quietly puts ``false``
+    back. The seed has to stop instead, and say to publish a new version.
+    """
+    _use(seed_db)
+    seed = _load_script("seed")
+    asyncio.run(seed.seed())
+
+    async def _ratify_v2() -> None:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    text(
+                        "UPDATE opportunity_weights "
+                        "SET weights = jsonb_set(weights, '{components_frozen}', 'true') "
+                        "WHERE version = 'v2'"
+                    )
+                )
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_ratify_v2())
+    try:
+        with pytest.raises(SystemExit, match="never rewritten"):
+            asyncio.run(seed.seed())
+
+        async def _still_ratified() -> bool:
+            engine = async_engine(seed_db)
+            try:
+                async with engine.connect() as connection:
+                    return bool(
+                        await connection.scalar(
+                            text(
+                                "SELECT weights -> 'components_frozen' = 'true'::jsonb "
+                                "FROM opportunity_weights WHERE version = 'v2'"
+                            )
+                        )
+                    )
+            finally:
+                await engine.dispose()
+
+        assert asyncio.run(_still_ratified()), "the refused seed still overwrote the vector"
+    finally:
+        asyncio.run(_reset_shipped_weights(seed_db))
+
+
+def test_the_seed_does_not_promote_a_version_it_did_not_create(seed_db: str) -> None:
+    """Only the run whose ``INSERT`` created the row may promote it.
+
+    Astra's interleaving: the seed decides "v2 is missing", an operator stages v2
+    inactive on purpose while keeping v1 live, and the seed then finds a conflict
+    and promotes anyway — overriding a deliberate operational choice. Deciding
+    from ``ON CONFLICT DO NOTHING ... RETURNING`` instead of an earlier ``SELECT``
+    is what makes that impossible, and this is the deterministic form of that
+    race: the row already exists when the seed runs, so the seed must not touch
+    ``is_active`` at all.
+    """
+    _use(seed_db)
+    seed = _load_script("seed")
+    asyncio.run(seed.seed())
+
+    async def _stage_v2_inactive_with_v1_live() -> None:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    text("UPDATE opportunity_weights SET is_active = false WHERE version = 'v2'")
+                )
+                await connection.execute(
+                    text("UPDATE opportunity_weights SET is_active = true WHERE version = 'v1'")
+                )
+        finally:
+            await engine.dispose()
+
+    async def _live_version() -> str | None:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.connect() as connection:
+                return await connection.scalar(
+                    text("SELECT version FROM opportunity_weights WHERE is_active")
+                )
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_stage_v2_inactive_with_v1_live())
+    try:
+        asyncio.run(seed.seed())
+        assert asyncio.run(_live_version()) == "v1", (
+            "the seed promoted a version it did not create, overriding an operator"
+        )
+    finally:
+        asyncio.run(_restore_shipped_profile(seed_db))
+
+
+async def _reset_shipped_weights(url: str) -> None:
+    """Undo a local edit to a weight vector so later tests see the shipped one."""
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "UPDATE opportunity_weights "
+                    "SET weights = weights - 'components_frozen' "
+                    "  || jsonb_build_object('components_frozen', false) "
+                    "WHERE version = 'v2'"
+                )
+            )
+    finally:
+        await engine.dispose()
