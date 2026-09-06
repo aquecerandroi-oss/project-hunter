@@ -1,137 +1,97 @@
-"""The outbox row: identity, the envelope it stores, and the SQL around it.
+"""The SQL around the outbox queue: write, claim, mark, prune.
 
 The row shape is fixed by ``outbox_events`` (T2.1, ``db/models/system.py``):
 ``(event_id, stream, payload, created_at, dispatched_at, attempts, last_error)``.
-Two decisions are worth stating here because everything else follows from
-them.
+What a row *means* — its identity and the envelope it carries — lives next
+door in :mod:`hunter_core.events.outbox_event`; this module never decides what
+an event is, only what happens to it in Postgres.
 
-**The ``payload`` column holds the whole :class:`EventEnvelope`, not just the
-business payload.** The event is therefore fully determined at *enqueue*
-time — identity, ``ts``, producer and routing key included — so every
-publication of a row is the same message rather than a new event that merely
-looks alike: publish it twice and the two stream entries are identical bytes,
-because both are rendered from the one stored row. The dispatcher becomes a
-dumb pipe with no heuristics (the S2 dispatcher had to guess the routing key
-from ``payload["symbol"]``). The business payload is one level in:
-``payload -> 'payload' ->> 'symbol'``.
-
-Rebuilding always goes through :class:`EventEnvelope` so the envelope's own
-fields come back in the model's fixed order (Astra, T2.9 round 1). Note the
-narrow limit of that: JSONB does not preserve key order, and the *business*
-payload is an opaque dict, so the bytes are not necessarily identical to what
-the producer originally serialized — only to every other publication of the
-same row. Identity never depends on bytes; it is ``event_id``.
-
-**``event_id`` is deterministic, computed by the producer from the business
-row** (:func:`event_id_for`), and the column is ``UNIQUE`` with ``ON CONFLICT
-DO NOTHING``: a retried transaction queues the event once, and a redelivery of
-the source message is a no-op instead of a second publication.
+Two predicates carry the whole design, and neither is a watermark over ``id``
+(the sequence has gaps and its order is not commit order): **pending** is
+``dispatched_at IS NULL``, and **prunable** is ``dispatched_at < older_than``,
+the retention job's input (DATABASE.md §1.3). Counting the pending rows — and
+splitting off the ones declared permanently broken, :data:`UNPUBLISHABLE_MARK` —
+is :mod:`hunter_core.events.outbox_health`, because those numbers exist to be
+interpreted as a verdict and that interpretation belongs with them.
 """
 
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
-from uuid import UUID, uuid5
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, cast
+from uuid import UUID
 
-from sqlalchemy import func, literal, select, tuple_, update
+from sqlalchemy import delete, literal, select, tuple_, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from hunter_core.db.models.system import OutboxEvent
-from hunter_core.domain.types import utcnow
-from hunter_core.events.envelope import EventEnvelope
+from hunter_core.events.outbox_event import build_envelope, outbox_row
 
 if TYPE_CHECKING:
+    from sqlalchemy import CursorResult, Select
     from sqlalchemy.ext.asyncio import AsyncSession
 
-OUTBOX_NAMESPACE = UUID("0d0d5f8e-6f1c-4f2f-9a3b-2b1f5a7c9e40")
-"""uuid5 namespace for :func:`event_id_for`. Frozen: changing it renames every
-future event and would let an already-published event be published again under
-a new identity."""
+    from hunter_core.events.envelope import EventEnvelope
 
 _ERROR_MAX_CHARS = 500
 
+UNPUBLISHABLE_MARK = "unpublishable: "
+"""Prefix :func:`record_failure` writes when the failure is a property of the
+**row**, not of the transport — today only "this payload is not an envelope".
+
+Inferring it from ``attempts`` instead would misread a Redis outage, which
+fails the same row on every sweep, as N individual defects, and take the whole
+backlog out of the readiness verdict exactly when it matters (PIPELINE.md
+§10b). A permanent defect is *declared*, and only a declaration counts."""
+
+UNPUBLISHABLE_ATTEMPTS = 5
+"""Failed attempts before a row marked permanently broken stops voting on
+readiness. Not zero on purpose: the first failures are still reported as a
+backlog, so a bug that suddenly makes every payload unreadable is visible as an
+outage before it is reclassified as N individual defects."""
+
+PRUNE_BATCH = 5_000
+"""Rows one :func:`prune_dispatched` statement may delete. A ceiling on the
+lock footprint and the WAL of a single transaction, not on the retention job:
+the job calls this in a loop until it returns less than it asked for."""
+
 __all__ = [
-    "OUTBOX_NAMESPACE",
+    "PRUNE_BATCH",
+    "UNPUBLISHABLE_ATTEMPTS",
+    "UNPUBLISHABLE_MARK",
     "PendingRow",
-    "build_envelope",
     "claim_pending",
     "enqueue",
     "enqueue_many",
-    "envelope_from_row",
-    "event_id_for",
     "mark_dispatched",
-    "outbox_row",
-    "pending_stats",
+    "permanent_failure",
+    "prunable_ids",
+    "prune_dispatched",
     "record_failure",
+    "transient_failure",
     "replay_rows",
 ]
 
 
-def _part(value: object) -> str:
-    """One component of the canonical string an ``event_id`` hashes.
+def permanent_failure(reason: str) -> str:
+    """Tag ``reason`` as a defect of the row itself (see :data:`UNPUBLISHABLE_MARK`)."""
+    return f"{UNPUBLISHABLE_MARK}{transient_failure(reason)}"
 
-    Datetimes are normalized to UTC first so the same instant written in
-    another offset is the same event; a naive one is rejected outright,
-    because "which instant" would then depend on the writer's box.
+
+def transient_failure(reason: str) -> str:
+    """Strip the mark from a reason nobody declared permanent.
+
+    The mark is a *classification*, so it has to be reserved: ``last_error``
+    otherwise holds whatever a driver said, and an exception whose text happened
+    to start with it would take its own row out of the readiness verdict
+    (Astra, T2.9b review). Stripping is a loop because one removal would leave
+    ``"unpublishable: unpublishable: x"`` still imitating it.
     """
-    if isinstance(value, datetime):
-        if value.tzinfo is None:
-            raise ValueError(f"event_id parts must be timezone-aware datetimes, got {value!r}")
-        return value.astimezone(UTC).isoformat()
-    return str(value)
-
-
-def event_id_for(stream: str, *parts: object) -> UUID:
-    """The deterministic identity of the event ``parts`` describe on ``stream``.
-
-    Same business row, same id — forever, on every process. That is what makes
-    ``ON CONFLICT (event_id) DO NOTHING`` an idempotent enqueue and what lets a
-    consumer recognize a redelivery.
-    """
-    canonical = "|".join([stream, *(_part(part) for part in parts)])
-    return uuid5(OUTBOX_NAMESPACE, canonical)
-
-
-def build_envelope(
-    stream: str,
-    event_id: UUID,
-    payload: dict[str, Any],
-    *,
-    producer: str,
-    key: str,
-    ts: datetime | None = None,
-) -> EventEnvelope:
-    """The envelope the row stores. ``ts`` is the enqueue instant (UTC)."""
-    if ts is not None and ts.tzinfo is None:
-        raise ValueError(f"the envelope ts must be timezone-aware, got {ts!r}")
-    return EventEnvelope(
-        event_id=event_id,
-        type=stream,
-        ts=(ts.astimezone(UTC) if ts is not None else utcnow()),
-        producer=producer,
-        key=key,
-        payload=payload,
-    )
-
-
-def outbox_row(envelope: EventEnvelope) -> dict[str, Any]:
-    """The ``outbox_events`` column values for ``envelope``."""
-    return {
-        "event_id": envelope.event_id,
-        "stream": envelope.type,
-        "payload": envelope.model_dump(mode="json"),
-    }
-
-
-def envelope_from_row(payload: dict[str, Any]) -> EventEnvelope:
-    """Rebuild the envelope a row stores, in the model's own field order."""
-    try:
-        return EventEnvelope.model_validate(payload)
-    except Exception as exc:
-        raise ValueError(f"outbox payload is not an envelope: {exc}") from exc
+    while reason.startswith(UNPUBLISHABLE_MARK):
+        reason = reason.removeprefix(UNPUBLISHABLE_MARK)
+    return reason
 
 
 async def enqueue(
@@ -230,7 +190,11 @@ async def claim_pending(
 
     The predicate is ``dispatched_at IS NULL``, never ``id > watermark``: the
     sequence has gaps and its order is not commit order, so a cursor would
-    step over a transaction that took a lower id and committed later.
+    step over a transaction that took a lower id and committed later. Rows
+    already declared unpublishable are **not** excluded here: a payload that
+    someone repairs has to go out on the next sweep without an operator
+    remembering a second step. They are excluded from the *verdict*, not from
+    the work.
 
     ``exclude_ids`` is how one sweep steps *over* rows it already examined and
     could not publish (an unreadable payload stays pending on purpose). Without
@@ -301,25 +265,80 @@ async def mark_dispatched(session: AsyncSession, ids: list[int], *, at: datetime
     )
 
 
-async def record_failure(session: AsyncSession, row_id: int, error: str) -> None:
-    """Count one failed publication attempt and keep its reason visible."""
+async def record_failure(
+    session: AsyncSession, row_id: int, error: str, *, permanent: bool = False
+) -> None:
+    """Count one failed publication attempt and keep its reason visible.
+
+    ``permanent=True`` says the row can never be published as it stands (its
+    payload is not an envelope), as opposed to a transport failure that the
+    next sweep may well survive. Only the former is ever classified
+    unpublishable — see :data:`UNPUBLISHABLE_MARK` for why the difference has
+    to be recorded rather than inferred from ``attempts``.
+    """
+    reason = permanent_failure(error) if permanent else transient_failure(error)
     await session.execute(
         update(OutboxEvent)
         .where(OutboxEvent.id == row_id)
-        .values(attempts=OutboxEvent.attempts + 1, last_error=error[:_ERROR_MAX_CHARS])
+        .values(attempts=OutboxEvent.attempts + 1, last_error=reason[:_ERROR_MAX_CHARS])
     )
 
 
-async def pending_stats(session: AsyncSession) -> tuple[int, datetime | None]:
-    """``(pending count, oldest created_at)`` — the readiness inputs."""
-    row = (
+async def prune_dispatched(
+    session: AsyncSession, older_than: datetime, batch: int = PRUNE_BATCH
+) -> int:
+    """Delete up to ``batch`` rows dispatched before ``older_than``. Returns how many.
+
+    Retention for ``outbox_events`` (DATABASE.md §1.3, which owns the policy).
+    Two invariants live in the ``WHERE`` rather than in the caller: a row with
+    ``dispatched_at IS NULL`` is an obligation and is never prunable at any
+    age, and ``older_than`` is the *ceiling* of the replay window, because
+    ``reconcile(since=)`` can only reach rows still in the table.
+
+    Bounded so the job can loop: one long ``DELETE`` over a day of rows would
+    hold locks and produce WAL for as long as it ran, on a table the dispatcher
+    is writing to at the same time. Which rows a batch takes is
+    :func:`prunable_ids`.
+    """
+    if older_than.tzinfo is None:
+        raise ValueError(f"prune older_than must be timezone-aware, got {older_than!r}")
+    # ``session.execute`` is typed ``Result``; only the cursor result carries a
+    # row count, and a DML statement always produces one.
+    result = cast(
+        "CursorResult[Any]",
         await session.execute(
-            select(func.count(), func.min(OutboxEvent.created_at)).where(
-                OutboxEvent.dispatched_at.is_(None)
+            delete(OutboxEvent).where(
+                OutboxEvent.id.in_(prunable_ids(older_than, batch).scalar_subquery())
             )
-        )
-    ).one()
-    oldest: datetime | None = row[1]
-    if oldest is not None and oldest.tzinfo is None:
-        oldest = oldest.replace(tzinfo=UTC)
-    return int(row[0]), oldest
+        ),
+    )
+    return result.rowcount
+
+
+def prunable_ids(older_than: datetime, batch: int) -> Select[tuple[int]]:
+    """The ids one :func:`prune_dispatched` batch deletes, **in ``id`` order**.
+
+    Not ``dispatched_at`` order, which is what this said and what DATABASE.md
+    §1.3 used to promise (Astra, T2.9b review). ``dispatched_at`` carries no
+    index, so ordering by it made every batch a Seq Scan of the whole table
+    plus a sort — once per loop of the retention job, on the table the
+    dispatcher is writing to. And it gets no index: that one would be
+    maintained on every ``mark_dispatched``, i.e. on the dispatcher's hot path,
+    and would hold an entry for every dispatched row the seven-day retention
+    still keeps (order of 5M at 700k rows/day), all to serve a job that runs
+    once a day.
+
+    ``id`` is a ``BIGSERIAL``, so it is insertion order, and a batch is a
+    *bounded slice* of the prunable set rather than a ranking: every row it
+    returns already satisfies the retention predicate, so which goes first
+    changes nothing. It uses the primary key index that already exists and
+    stops after ``batch`` rows. The one cost, stated: pending rows at the head
+    of the key are re-scanned by every batch, never qualifying — a set bounded
+    by the readiness alarm (500 pending).
+    """
+    return (
+        select(OutboxEvent.id)
+        .where(OutboxEvent.dispatched_at.is_not(None), OutboxEvent.dispatched_at < older_than)
+        .order_by(OutboxEvent.id)
+        .limit(batch)
+    )

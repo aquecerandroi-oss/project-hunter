@@ -651,6 +651,13 @@ async def test_the_dispatcher_finds_pending_rows_through_a_partial_index(
         .all()
     )
     assert any("dispatched_at IS NULL" in definition for definition in definitions), definitions
+    # ``0004``: the same widening ``outbox_events`` got. The two queues are
+    # shape-identical on purpose (16.4/17.5) and are drained in the same
+    # ``(created_at, id)`` order, so their pending index must not diverge.
+    assert any(
+        "(dispatched_at IS NULL)" in definition and "(created_at, id)" in definition
+        for definition in definitions
+    ), definitions
 
 
 async def test_an_outbox_row_starts_pending_with_no_attempts(

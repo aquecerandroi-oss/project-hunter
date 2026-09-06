@@ -17,6 +17,8 @@ from redis.backoff import ExponentialWithJitterBackoff
 from redis.retry import Retry
 
 if TYPE_CHECKING:
+    from datetime import date
+
     from hunter_core.settings import Settings
 
 _RELEASE_IF_OWNER_SCRIPT = """
@@ -163,6 +165,35 @@ class keys:
         return f"opp:{exchange}:{symbol}"
 
     @staticmethod
+    def tape_coverage(exchange: str) -> str:
+        """``mkt:{exchange}:coverage`` — the collector's own proof of continuity.
+
+        Written by the market-worker (the only process that knows whether it
+        stayed subscribed and dropped nothing) and read by the scanner to fill
+        ``SourceEntry.covered_until``. Deliberately *not* derived from
+        ``hb:{role}:{instance}``: that hash reports a live socket next to a
+        cumulative drop counter, and a connected socket that lost a trade would
+        read as "covered" (T2.5 design review).
+        """
+        return f"mkt:{exchange}:coverage"
+
+    @staticmethod
+    def scanner_state(exchange: str, symbol: str) -> str:
+        """``scan:state:{exchange}:{symbol}`` — the scanner's warm checkpoint.
+
+        The ATR anchor and the stage hysteresis of one market. Losable by
+        contract (ARCHITECTURE.md §5.3): losing it re-anchors the ATR and costs
+        the stage two observations, and the scanner says so in the sample it
+        writes rather than pretending the state survived.
+        """
+        return f"scan:state:{exchange}:{symbol}"
+
+    @staticmethod
+    def baseline_projection(exchange: str, symbol: str) -> str:
+        """``scan:baseline:{exchange}:{symbol}`` — the cached current projection."""
+        return f"scan:baseline:{exchange}:{symbol}"
+
+    @staticmethod
     def radar_scores() -> str:
         return "radar:scores"
 
@@ -195,9 +226,18 @@ class keys:
         return f"lock:{name}"
 
     @staticmethod
-    def processed(consumer: str) -> str:
-        """``hunter:processed:{consumer}`` — idempotency SET (events.py)."""
-        return f"hunter:processed:{consumer}"
+    def processed(consumer: str, day: date) -> str:
+        """``hunter:processed:{consumer}:{YYYYMMDD}`` — idempotency SET (consume.py).
+
+        One set per **UTC day**, not one per consumer group. A single key was
+        given a fresh TTL on every ``ack``, so it never expired: it grew for the
+        lifetime of the deployment, and the only way it could ever have expired
+        would have been to drop every event id at once, on an idle stream, which
+        is precisely when a redelivery is most likely. A daily key stops being
+        written at midnight and then expires on its own, and the guard reads the
+        last two of them so the window never has a seam (:mod:`.events.consume`).
+        """
+        return f"hunter:processed:{consumer}:{day:%Y%m%d}"
 
 
 @asynccontextmanager

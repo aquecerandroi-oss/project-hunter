@@ -6,11 +6,13 @@ import asyncio
 from typing import Any
 
 import pytest
-from sqlalchemy import event, select
+from sqlalchemy import delete, event, select
 
 from hunter_core.db.models.markets import Market
+from hunter_core.db.models.system import OutboxEvent
 from hunter_core.db.session import role_session
 from hunter_core.events.envelope import EventEnvelope
+from hunter_core.events.outbox import dispatch_pending
 from hunter_core.events.streams import Streams
 from hunter_core.settings import Settings
 from hunter_market_worker import universe as universe_mod
@@ -126,19 +128,29 @@ async def test_refresh_universe_marks_delisted_when_symbol_disappears(
 async def test_refresh_universe_publishes_universe_changed_only_when_it_changes(
     db_session_factory: Any, redis_client: Any
 ) -> None:
+    """T2.9b: the refresh *queues*; the dispatcher publishes. The observable
+    contract is unchanged — one message per real change, none for a cycle that
+    found the same set — so the assertion is still about the stream, with the
+    sweep the worker already runs standing in for ``run_outbox``."""
     exchange_code = unique_code()
     adapter = _adapter_with(exchange_code, {"AUSDT": "300", "BUSDT": "100"})
     settings = Settings(market_universe_size=10)
+    # The Postgres container is shared: another test's still-pending rows would
+    # otherwise be drained by the sweeps below and counted on this stream.
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        await session.execute(delete(OutboxEvent))
 
     await universe_mod.refresh_universe(
         db_session_factory, adapter, redis_client, settings, producer=PRODUCER
     )
+    await dispatch_pending(redis_client, db_session_factory)
     length_after_first = await redis_client.xlen(Streams.MARKET_UNIVERSE_CHANGED)
     assert length_after_first == 1
 
     await universe_mod.refresh_universe(
         db_session_factory, adapter, redis_client, settings, producer=PRODUCER
     )
+    await dispatch_pending(redis_client, db_session_factory)
     length_after_second = await redis_client.xlen(Streams.MARKET_UNIVERSE_CHANGED)
     assert length_after_second == 1  # unchanged monitored set -> no second publish
 
@@ -179,6 +191,7 @@ async def test_inactive_market_exits_even_when_allowlisted(
         db_session_factory, adapter, redis_client, settings, producer=PRODUCER
     )
     assert monitored == ["BUSDT"]
+    await dispatch_pending(redis_client, db_session_factory)
     rows = await redis_client.xrange(Streams.MARKET_UNIVERSE_CHANGED)
     changed = EventEnvelope.from_bytes(rows[-1][1][b"data"])
     assert changed.payload["removed"] == ["AUSDT"]

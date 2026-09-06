@@ -46,7 +46,7 @@ Definição exata do fluxo (item 80.6). Cada etapa: gatilho, entrada, saída, on
 2. **Streams WS** por mercado monitorado: `aggTrade`, `bookTicker`, `depth` (top 25, 250 ms), `kline_1m`, `markPrice` (funding, mark, index), `forceOrder` (liquidações). Bybit: `publicTrade`, `orderbook.25`, `kline.1`, `tickers`, `liquidation`.
 3. **Normalização** para `NormalizedTicker | NormalizedTrade | NormalizedOrderBook | NormalizedCandle | NormalizedFunding | NormalizedOpenInterest | NormalizedLiquidation`. Timestamps da exchange em `ts`; hora local em `received_at`.
 4. **Hot state** em Redis a cada 250 ms por símbolo (coalescido). Ring buffer de trades e candles.
-5. **Persistência.** Candle 1m fechado → `candles` (`is_final=true`); o evento `market.candles.closed` é enfileirado na mesma transação e publicado pela outbox (§10b). Snapshot por minuto → `market_snapshots`. Open interest via REST a cada 5 min → `open_interest_history`. Funding realizado → `funding_rates`. Liquidações → `liquidations`.
+5. **Persistência.** Candle 1m fechado → `candles` (`is_final=true`); o evento `market.candles.closed` é enfileirado na mesma transação e publicado pela outbox (§10b). Snapshot por minuto → `market_snapshots`. Open interest via REST a cada 5 min → `open_interest_history`. Funding realizado → `funding_rates`. Liquidações → `liquidations` (`qty`/`price` = quantidade **executada acumulada** `o.z` e **preço médio** `o.ap` do `forceOrder`, nunca a quantidade/preço originais `o.q`/`o.p` — KB-0017, `.claude/state/notes-liquidations.md`; linhas persistidas antes de 2026-09-06 usam a semântica antiga e não foram reescritas).
 6. **Recovery.** Ao reconectar ou detectar gap (`open_time` esperado ausente), busca candles via REST, grava com `source=rest`, registra `ingestion_gaps`. Enquanto há gap aberto para um mercado, seu `data_quality` no hot state é `degraded`.
 7. **Rate limit do REST (fail-closed).** Todo request REST passa por um token bucket compartilhado em Redis (`rl:{exchange}:{bucket}`) e pelo bloqueio por IP (`rl:{exchange}:ip:blocked_until`, deadline no relógio do Redis): todo processo que sai pelo mesmo IP divide **uma** cota da exchange. **Com o Redis indisponível o portão fecha:** nenhuma admissão REST nova, motivo `redis_unavailable`, re-tentativa com backoff curto e jitter — nunca um orçamento em memória por processo, porque N shards com bucket próprio somam N cotas contra uma cota única e o preço do erro é um ban de IP da Binance, irreversível no curto prazo (aceite conjunto da M2, T2.9). Uma exceção do Redis nunca sobe para o worker: o limitador devolve `RateLimited` com `reason=redis_unavailable`, que os laços já sabem sobreviver. O WS continua ingerindo e o **recovery de gaps espera** em vez de gastar tentativas (`ingestion_gaps.attempts` não avança), retomando sozinho quando o Redis volta — sem burst de compensação, porque o bucket compartilhado vale uma janela e não uma janela por minuto de queda. Observabilidade: contador `exchange_rest_admissions_suspended_total{exchange,bucket,reason}` e campo `rest_gate` (`ok`/`suspended`) em três lugares — no heartbeat `hb:market:{exchange}`, no `rt:system` e no corpo do `/ready` do market-worker. No `/ready` ele entra como *status detail* (`WorkerRuntime.status_details`), não como readiness check: é uma string ao lado do veredito e **não** altera o status code — o gate suspenso, por si só, nunca deixa a prontidão vermelha. Ressalva honesta: numa queda **total** do Redis o `/ready` fica vermelho de qualquer jeito, pelo check `redis` (o worker também depende do Redis para coalescer, streams e heartbeat); o que o `rest_gate` faz é dizer *qual* degradação está em curso. A ingestão pelo WS e a persistência em Postgres continuam, o heartbeat degrada para "não publicado" em vez de derrubar o TaskGroup, e um gap cuja recuperação esbarre na indisponibilidade **não** gasta `ingestion_gaps.attempts`.
 
@@ -76,6 +76,25 @@ Definição exata do fluxo (item 80.6). Cada etapa: gatilho, entrada, saída, on
 - **Anti-look-ahead:** bar-features usam só candles `is_final`; o candle em formação entra apenas nas tick-features, marcadas com sufixo `_live`.
 
 **Falha:** dados `degraded` → features marcadas `quality=degraded` e não alimentam anomalias nem oportunidades até o gap fechar.
+
+**Como o `scanner-worker` executa isto na prática (T2.5).** As etapas 2 a 5 são um pipeline de
+*streams* neste documento e um **único passo síncrono por corte** dentro do processo: um dono avança
+cada mercado (`hunter_scanner_worker/evaluate.py`) porque `ScoreContext` recusa um score cujo
+estágio, regime ou anomalias venham de outro instante, e cinco consumidores independentes leriam
+estados que outro já moveu. `features.updated` continua sendo publicado — para consumidores de fora
+—, mas não é o transporte deste pipeline. Consequências que valem registrar:
+
+- **cadência real:** o laço acorda a cada 0,25 s e avalia os mercados "sujos" cujo throttle de 1 s
+  venceu; o scorer tem o seu próprio de 2 s. Uma passada completa sobre 200 mercados custa hoje ~7 s
+  (medida em `services/scanner-worker/tests/test_load.py`), acima do alvo p99 ≤ 3 s da decisão
+  conjunta — o gargalo é o custo por vetor herdado da T2.2 e está registrado em
+  `.claude/state/notes-T2.5.md` §7;
+- **o corte é a prova de cobertura, não o relógio:** o `market-worker` publica em
+  `mkt:{exchange}:coverage` o intervalo em que ele consegue provar que estava conectado e assinado, e
+  o scanner avalia em `as_of = covered_until`. Sem essa prova, `trade_velocity_1m`,
+  `buy_pressure_5m` e `sell_pressure_5m` saem `insufficient_coverage` e nenhum EARLY é confirmado;
+- **o scanner nunca chama REST:** falta de histórico vira `market.backfill.requested`, que o
+  `market-worker` — dono do rate limit e da tabela de gaps — atende.
 
 ## 3. Anomaly Engine
 
@@ -192,7 +211,7 @@ Lista completa de checks em `RISK_ENGINE.md`.
 | `market.candles.closed` | market | scanner, strategy | 50k |
 | `market.derivatives` | market | scanner | 20k |
 | `market.liquidations` | market | scanner | 20k |
-| `market.universe.changed` | market | scanner, strategy, api | 1k |
+| `market.universe.changed` | market (durável, via outbox) | scanner, strategy, api | 1k |
 | `features.updated` | scanner | scanner (anomaly, opportunity) | 100k |
 | `anomalies.detected` | scanner | scanner (opportunity), api (rt), analytics | 20k |
 | `regime.changed` | scanner | strategy, execution, api | 1k |
@@ -216,6 +235,7 @@ Lista completa de checks em `RISK_ENGINE.md`.
 | `market.derivatives` (OI) | durável | vira linha em `open_interest_history` |
 | `market.derivatives` (funding **realizado**) | durável | vira linha em `funding_rates` |
 | `market.liquidations` | durável | vira linha em `liquidations` |
+| `market.universe.changed` | durável | o scanner faz warm-up dos mercados novos e encerra os que saíram; perder o evento deixa a coleta e o universo elegível em desacordo até o próximo *ciclo em que algo mudar* — que pode não vir. Enfileirado na mesma transação que grava `is_monitored`/`monitor_rank` (T2.9b) |
 | `market.derivatives` (funding **estimado**, WS mark price) | efêmero | ninguém persiste; o próximo markPrice o substitui |
 | `market.ticks`, `rt:*` | efêmero | visão coalescida do agora |
 
@@ -224,7 +244,7 @@ Todo evento de `market.derivatives` carrega `funding_kind` (`realized` / `estima
 **Como funciona.** `hunter_core.events.outbox`:
 
 1. **Enfileirar** (`enqueue`) na **mesma transação** da linha de negócio. Acontece dentro dos `upsert_*` de `persist_rows.py` — o caminho único por onde passam tanto o ingest WS quanto o backfill REST do `recovery.py`, para que nenhum produtor novo esqueça. O `event_id` é determinístico (uuid5 da chave natural da linha), com `ON CONFLICT (event_id) DO NOTHING`: transação repetida enfileira uma vez, redelivery é no-op.
-2. **Despachar** (`dispatch_pending`): `SELECT ... FOR UPDATE SKIP LOCKED` em ordem de `created_at`, `XADD`, marca `dispatched_at`/`attempts`/`last_error`. O `SKIP LOCKED` é o que torna N shards seguros sem eleição de líder. Cada micro-lote é uma transação curta com orçamento de tempo: o `XADD` nunca fica pendurado segurando locks.
+2. **Despachar** (`dispatch_pending`): `SELECT ... FOR UPDATE SKIP LOCKED` em ordem de `(created_at, id)` — servida pelo índice parcial homônimo desde a `0004` —, `XADD`, marca `dispatched_at`/`attempts`/`last_error`. O `SKIP LOCKED` é o que torna N shards seguros sem eleição de líder. Cada micro-lote é uma transação curta com orçamento de tempo: o `XADD` nunca fica pendurado segurando locks.
 3. **Reconciliar** (`reconcile`) na partida: publica tudo com `dispatched_at IS NULL`, na ordem de criação, antes de qualquer evento novo. Com `since=`, republica também o que já foi despachado — a recuperação para um stream **perdido** (`XTRIM`/flush), que o predicado de pendência jamais alcançaria.
 
 A linha guarda o **envelope inteiro** em `payload`, então o evento fica determinado no enfileiramento (identidade, `ts`, produtor, chave) e uma republicação é byte a byte a mesma mensagem. O payload de negócio fica um nível abaixo: `payload -> 'payload' ->> 'symbol'`.
@@ -239,7 +259,11 @@ A linha guarda o **envelope inteiro** em `payload`, então o evento fica determi
 | consumidor cai depois do efeito, antes do ACK | redelivery é no-op (efeito com chave única) |
 | stream perdido (`XTRIM`/flush) | `reconcile(since=...)` reenche a partir do Postgres |
 
-**Prontidão.** `/ready` fica vermelho quando a fila passa de `MAX_PENDING` (500) **ou** o evento mais antigo passa de `MAX_LAG_S` (30 s) — profundidade e idade são falhas diferentes. Métricas: `hunter_outbox_pending`, `hunter_outbox_oldest_pending_seconds`, `hunter_outbox_dispatched_total`, `hunter_outbox_dispatch_failures_total`, `hunter_outbox_replayed_total`.
+**Ordem de `created_at` é ordem de enfileiramento, *best-effort*, e nenhum consumidor pode depender dela.** Não é ordem de commit: `created_at` cai no `now()` do Postgres, que é o início da **transação**, então uma transação longa pode carimbar mais cedo um evento que só ficou visível depois de outro; as linhas só aparecem no commit, então uma varredura pode publicar B e só na passada seguinte publicar o A que ficou atrás dele; N shards varrem em paralelo sob `SKIP LOCKED` e a intercalação dos `XADD` é a que a rede der; e uma linha que falhou é pulada pelo resto da varredura e sai depois de linhas criadas mais tarde. A ordenação existe para **limitar a idade** do acúmulo — que é o que a prontidão mede —, não para dar sequência a ninguém. Quem precisa de ordem usa os carimbos de negócio dentro do payload (`open_time` da vela, `ts` do funding) e deduplica por `event_id`.
+
+**Prontidão.** `/ready` fica vermelho quando a fila passa de `MAX_PENDING` (500) **ou** o evento mais antigo passa de `MAX_LAG_S` (30 s) — profundidade e idade são falhas diferentes. **Linhas inpublicáveis ficam fora do veredito**: uma linha cujo `payload` não é envelope nunca vai sair por mais saudável que o processo esteja, e contá-la como acúmulo prenderia o `/ready` em vermelho até alguém editar um JSONB à mão — vermelho que, no segundo dia, ninguém mais lê como incidente. Ela continua na tabela, continua logada (`outbox_row_unreadable`, `warning`, uma linha por varredura — não mais um traceback por segundo) e é contada em `hunter_outbox_unpublishable`. A classificação exige que o **despachante** tenha declarado o defeito como permanente, não só `attempts >= N`: uma queda de Redis falha a mesma linha em toda varredura, e a regra ingênua daria o acúmulo inteiro como defeituoso exatamente quando ele mais importa — o **check `outbox`** ficaria verde *porque* o Redis caiu. (Numa queda **total** o `/ready` fica vermelho de qualquer jeito, pelo check `redis`; o que se perderia é justamente a informação de quanto o despachante ficou para trás, que é o que se olha na volta.) Métricas: `hunter_outbox_pending`, `hunter_outbox_oldest_pending_seconds`, `hunter_outbox_unpublishable`, `hunter_outbox_dispatched_total`, `hunter_outbox_dispatch_failures_total`, `hunter_outbox_replayed_total`.
+
+**Retenção.** Linhas despachadas há mais de 7 dias são apagadas por um DELETE diário em lotes (`prune_dispatched`); pendentes nunca. O prazo é o **teto** da janela de `reconcile(since=...)` — ver DATABASE.md §1.3. O job é do analytics-worker (M5).
 
 **Latência.** O `drain_loop` não publica: ao committar, ele só acorda o despachante (`asyncio.Event`). Assim um Redis lento não atrasa o flush seguinte, e a vela fechada não espera o intervalo de polling.
 

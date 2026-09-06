@@ -28,6 +28,12 @@ outbox_dispatch_failures_total = Counter(
     ["stream"],
     registry=registry,
 )
+outbox_unpublishable = Gauge(
+    "hunter_outbox_unpublishable",
+    "Pending rows declared permanently broken: kept for diagnosis, counted "
+    "here, and deliberately excluded from the readiness verdict.",
+    registry=registry,
+)
 outbox_replayed_total = Counter(
     "hunter_outbox_replayed_total",
     "Already-dispatched rows republished to recover a lost/trimmed stream.",
@@ -41,4 +47,5 @@ __all__ = [
     "outbox_oldest_pending_seconds",
     "outbox_pending",
     "outbox_replayed_total",
+    "outbox_unpublishable",
 ]

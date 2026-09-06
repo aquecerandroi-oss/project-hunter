@@ -22,35 +22,45 @@ A lost **stream** (``XTRIM``, flush) is a different failure and needs a
 different tool: those rows are marked dispatched, so the pending predicate can
 never bring them back. :func:`reconcile` with ``since=`` republishes a window
 of retained rows for exactly that case.
+
+Two neighbours carry the rest: :mod:`hunter_core.events.outbox_health` owns the
+backlog snapshot and the readiness verdict, and
+:mod:`hunter_core.events.outbox_recovery` owns the time-window replay. Both are
+re-exported here, so ``from hunter_core.events.outbox import ...`` stays the one
+import a worker needs.
 """
 
 from __future__ import annotations
 
 import asyncio
 import time
-from dataclasses import dataclass, field
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
+from hunter_core.events.outbox_event import (
+    build_envelope,
+    envelope_from_row,
+    event_id_for,
+)
+from hunter_core.events.outbox_health import (
+    STALE_SWEEP_FACTOR,
+    OutboxHealth,
+    refresh_health,
+)
 from hunter_core.events.outbox_metrics import (
     outbox_dispatch_failures_total,
     outbox_dispatched_total,
-    outbox_oldest_pending_seconds,
-    outbox_pending,
 )
 from hunter_core.events.outbox_recovery import REPLAY_LIMIT, replay_since
 from hunter_core.events.outbox_store import (
+    UNPUBLISHABLE_ATTEMPTS,
     PendingRow,
-    build_envelope,
     claim_pending,
     enqueue,
     enqueue_many,
-    envelope_from_row,
-    event_id_for,
     mark_dispatched,
-    pending_stats,
+    prune_dispatched,
     record_failure,
 )
 from hunter_core.events.produce import publish
@@ -58,6 +68,8 @@ from hunter_core.events.streams import DEFAULT_MAXLEN
 from hunter_core.logging import get_logger
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     import redis.asyncio as redis_asyncio
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -85,11 +97,6 @@ MIN_PUBLISH_S = 0.5
 """Budget below which a publication is not even started — beginning one that
 is certain to be cut off would only burn an ``attempts`` increment."""
 
-STALE_SWEEP_FACTOR = 3.0
-"""Multiple of ``max_lag_s`` after which a health snapshot is too old to vote
-green: a readiness verdict must not coast on the last successful observation
-while the query that produces it keeps failing."""
-
 FALLBACK_MAXLEN = 20_000
 
 __all__ = [
@@ -97,6 +104,7 @@ __all__ = [
     "BUDGET_S",
     "MICRO_BATCH",
     "STALE_SWEEP_FACTOR",
+    "UNPUBLISHABLE_ATTEMPTS",
     "OutboxHealth",
     "build_envelope",
     "dispatch_pending",
@@ -104,72 +112,26 @@ __all__ = [
     "enqueue_many",
     "event_id_for",
     "REPLAY_LIMIT",
+    "prune_dispatched",
     "reconcile",
     "refresh_health",
     "run_dispatcher",
 ]
 
 
-@dataclass
-class OutboxHealth:
-    """How far behind the dispatcher is — shared with ``/ready``."""
-
-    pending: int = 0
-    oldest_pending: datetime | None = None
-    last_sweep_at: datetime | None = None
-    dispatched: int = 0
-    failures: int = 0
-    started_at: datetime = field(default_factory=utcnow)
-    """When this snapshot began waiting for its first observation. Bounds the
-    startup grace below, so "not observed yet" cannot mean "green forever"."""
-
-    def lag_s(self, *, now: datetime | None = None) -> float:
-        """Age of the oldest undispatched row, in seconds (0 when empty)."""
-        if self.oldest_pending is None:
-            return 0.0
-        return ((now or utcnow()) - self.oldest_pending).total_seconds()
-
-    def ready(self, *, max_pending: int, max_lag_s: float, now: datetime | None = None) -> bool:
-        """Red once the backlog is too deep, too old, or no longer observed.
-
-        The first two because they are different failures: a burst the sweep is
-        still working through is deep and young, while a Redis that stopped
-        accepting writes is shallow and old. The third because a snapshot that
-        stopped being refreshed — or was never taken at all — would otherwise
-        keep answering green from numbers nobody stands behind.
-        """
-        if self.pending > max_pending or self.lag_s(now=now) > max_lag_s:
-            return False
-        # A *bounded* startup grace, not an open one: until the first sweep
-        # lands there is no verdict to give, but a process whose backlog query
-        # never once succeeded is not healthy — it is blind, and answering
-        # green would hide exactly the failure this check exists to surface.
-        reference = self.last_sweep_at or self.started_at
-        age = ((now or utcnow()) - reference).total_seconds()
-        return age <= max_lag_s * STALE_SWEEP_FACTOR
-
-
 def _maxlen(stream: str) -> int:
     return DEFAULT_MAXLEN.get(stream, FALLBACK_MAXLEN)
 
 
-async def refresh_health(
-    session_factory: async_sessionmaker[AsyncSession],
+async def _fail(
+    session: AsyncSession,
+    row: PendingRow,
+    reason: str,
     health: OutboxHealth,
     *,
-    db_role: str = "hunter_worker",
-) -> OutboxHealth:
-    """Re-read the pending backlog into ``health`` and the metrics."""
-    async with role_session(session_factory, db_role=db_role) as session:
-        health.pending, health.oldest_pending = await pending_stats(session)
-    health.last_sweep_at = utcnow()
-    outbox_pending.set(health.pending)
-    outbox_oldest_pending_seconds.set(health.lag_s())
-    return health
-
-
-async def _fail(session: AsyncSession, row: PendingRow, reason: str, health: OutboxHealth) -> None:
-    await record_failure(session, row.id, reason)
+    permanent: bool = False,
+) -> None:
+    await record_failure(session, row.id, reason, permanent=permanent)
     outbox_dispatch_failures_total.labels(stream=row.stream).inc()
     health.failures += 1
 
@@ -200,13 +162,25 @@ async def _publish_micro_batch(
             break
         try:
             envelope = envelope_from_row(row.payload)
-        except ValueError:
+        except ValueError as exc:
             # Unpublishable as it stands: count the attempt, keep the reason,
             # and step over it — one poisoned row must not block the stream.
             # The row is deliberately *not* marked dispatched; it stays for
             # diagnosis and for a later attempt after the payload is fixed.
-            logger.exception("outbox_row_unreadable", event_id=str(row.event_id))
-            await _fail(session, row, "payload is not an envelope", health)
+            #
+            # ``warning``, not ``exception``: the traceback is always the same
+            # three frames of pydantic and says nothing the message does not,
+            # while a row that stays pending is re-examined once per sweep —
+            # every second, forever, until someone fixes it. One line per row
+            # per sweep is the budget; a stack trace per row per second is how
+            # a single bad payload buries every other log a service emits.
+            logger.warning(
+                "outbox_row_unreadable",
+                event_id=str(row.event_id),
+                stream=row.stream,
+                error=str(exc),
+            )
+            await _fail(session, row, "payload is not an envelope", health, permanent=True)
             skipped.add(row.id)
             continue
         try:
@@ -244,7 +218,28 @@ async def dispatch_pending(
     health: OutboxHealth | None = None,
     db_role: str = "hunter_worker",
 ) -> int:
-    """Publish pending rows in ``created_at`` order. Returns how many were sent."""
+    """Publish pending rows in ``created_at`` order. Returns how many were sent.
+
+    **``created_at`` order is best-effort enqueue order, and nothing more.** It
+    is not commit order and no consumer may depend on it:
+
+    - ``created_at`` defaults to ``now()``, which in Postgres is the start of
+      the *transaction*. A long transaction that queues an event last can
+      therefore stamp it earlier than an event a short transaction queued and
+      committed while the first was still open;
+    - the rows only become visible at commit, so a sweep can publish B and then
+      publish A behind it on the next pass, with ``A.created_at < B.created_at``;
+    - N shards sweep concurrently under ``SKIP LOCKED``, each taking a disjoint
+      slice; the interleaving of their ``XADD``s is whatever the network gives;
+    - a row that failed to publish is stepped over for the rest of the sweep and
+      goes out after rows created later than it.
+
+    Ordering is chosen because draining oldest-first bounds the *age* of the
+    backlog, which is what readiness measures — not to give anyone a sequence.
+    Consumers order by the business timestamps inside the payload (a candle's
+    ``open_time``, a funding ``ts``) and de-duplicate on ``event_id``; per-key
+    sequencing, if it is ever needed, has to be built on those, not on this.
+    """
     health = health or OutboxHealth()
     deadline = time.monotonic() + budget_s
     published = 0

@@ -13,13 +13,14 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections.abc import AsyncIterator, Iterator
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import pytest
 import pytest_asyncio
 from alembic import command
 from sqlalchemy import text
+from sqlalchemy.dialects import postgresql
 from structlog.testing import capture_logs
 
 from hunter_core.db.models.system import SystemEvent
@@ -29,12 +30,15 @@ from hunter_core.domain.types import utcnow
 from hunter_core.events.consume import ack, consume
 from hunter_core.events.outbox import (
     MICRO_BATCH,
+    UNPUBLISHABLE_ATTEMPTS,
     OutboxHealth,
     dispatch_pending,
+    prune_dispatched,
     reconcile,
     refresh_health,
 )
-from hunter_core.events.outbox_store import enqueue, event_id_for
+from hunter_core.events.outbox_event import event_id_for
+from hunter_core.events.outbox_store import PRUNE_BATCH, enqueue, prunable_ids
 from hunter_core.events.produce import ensure_group
 from hunter_core.redis import keys
 
@@ -97,7 +101,9 @@ async def channel(redis_client: redis_asyncio.Redis) -> AsyncIterator[tuple[str,
     name, group = f"{STREAM}.{suffix}", f"t29.{suffix}"
     await ensure_group(redis_client, name, group)
     yield name, group
-    await redis_client.delete(name, keys.processed(group))
+    await redis_client.delete(
+        name, *(keys.processed(group, (utcnow() - timedelta(days=d)).date()) for d in (0, 1))
+    )
 
 
 def _candle_event(symbol: str, minute: int) -> tuple[uuid.UUID, dict[str, Any]]:
@@ -471,3 +477,236 @@ async def test_a_publication_cannot_outlive_the_sweep_budget(
         ).one()
     assert row.dispatched_at is None, "a publication that may not have landed is not marked"
     assert "budget" in row.last_error
+
+
+# --- T2.9b: an unpublishable row is counted apart, never a red verdict ------
+
+_POISON = text("UPDATE outbox_events SET payload = '{\"nope\": 1}'::jsonb WHERE event_id = :id")
+
+
+async def _poison(factory: async_sessionmaker[AsyncSession], event_id: uuid.UUID) -> None:
+    """Make a queued row's payload something no envelope can be built from."""
+    async with role_session(factory, db_role="hunter_worker") as session:
+        await session.execute(_POISON, {"id": event_id})
+
+
+async def test_a_poisoned_row_is_counted_apart_and_leaves_readiness_green(
+    factory: async_sessionmaker[AsyncSession],
+    redis_client: redis_asyncio.Redis,
+    channel: tuple[str, str],
+) -> None:
+    """One row nobody can publish must not make a whole worker look broken.
+
+    Before this, a payload that is not an envelope stayed pending forever, so
+    ``/ready`` was red until a human edited a JSONB column — and a red that
+    stays red for days stops being read as an outage. The row is still there,
+    still counted, still logged; it just does not vote.
+    """
+    stream, _group = channel
+    poisoned = await _queue(factory, stream, "BTCUSDT", 0)
+    await _poison(factory, poisoned)
+    good = await _queue(factory, stream, "ETHUSDT", 1)
+
+    health = OutboxHealth()
+    for _ in range(UNPUBLISHABLE_ATTEMPTS):
+        await dispatch_pending(redis_client, factory, health=health)
+
+    assert health.unpublishable == 1
+    assert health.pending == 0, "the abandoned row must not be counted as owed work"
+    assert health.ready(max_pending=0, max_lag_s=30.0) is True
+
+    entries = await _entries(redis_client, stream)
+    assert len(entries) == 1
+    assert str(good) in str(entries[0][1])
+
+    async with role_session(factory, db_role="hunter_worker") as session:
+        attempts, last_error = (
+            await session.execute(
+                text("SELECT attempts, last_error FROM outbox_events WHERE event_id = :id"),
+                {"id": poisoned},
+            )
+        ).one()
+    assert attempts >= UNPUBLISHABLE_ATTEMPTS
+    assert last_error is not None
+    assert "payload is not an envelope" in last_error
+
+
+async def test_a_poisoned_row_logs_one_warning_per_sweep_and_no_traceback(
+    factory: async_sessionmaker[AsyncSession],
+    redis_client: redis_asyncio.Redis,
+    channel: tuple[str, str],
+) -> None:
+    """``logger.exception`` here printed the same pydantic traceback once per
+    second, forever, for a message the event name already carries. One warning
+    per row per sweep is the budget."""
+    stream, _group = channel
+    await _poison(factory, await _queue(factory, stream, "BTCUSDT", 0))
+
+    with capture_logs() as logs:
+        await dispatch_pending(redis_client, factory, micro_batch=1)
+
+    unreadable = [entry for entry in logs if entry["event"] == "outbox_row_unreadable"]
+    assert len(unreadable) == 1, logs
+    assert unreadable[0]["log_level"] == "warning"
+    assert "exc_info" not in unreadable[0]
+
+
+async def test_a_transport_failure_is_never_mistaken_for_an_unpublishable_row(
+    factory: async_sessionmaker[AsyncSession],
+    channel: tuple[str, str],
+) -> None:
+    """The regression this guards is readiness going green *because* Redis died.
+
+    An outage fails the same row on every sweep, so a plain "``attempts >= N``
+    and it has an error" rule would write the whole backlog off as N individual
+    defects exactly when the backlog matters most.
+    """
+    stream, _group = channel
+    await _queue(factory, stream, "BTCUSDT", 0)
+
+    class DeadRedis:
+        async def xadd(self, *_args: Any, **_kwargs: Any) -> None:
+            raise ConnectionError("connection reset by peer")
+
+    health = OutboxHealth()
+    for _ in range(UNPUBLISHABLE_ATTEMPTS + 2):
+        await dispatch_pending(DeadRedis(), factory, health=health)  # type: ignore[arg-type]
+
+    assert health.unpublishable == 0, "a dead transport is an outage, not a broken row"
+    assert health.pending == 1
+    assert health.ready(max_pending=0, max_lag_s=30.0) is False
+
+
+# --- T2.9b: retention (DATABASE.md 1.3) ------------------------------------
+
+
+async def _mark(
+    factory: async_sessionmaker[AsyncSession], event_id: uuid.UUID, at: datetime
+) -> None:
+    async with role_session(factory, db_role="hunter_worker") as session:
+        await session.execute(
+            text("UPDATE outbox_events SET dispatched_at = :at WHERE event_id = :id"),
+            {"at": at, "id": event_id},
+        )
+
+
+async def _survivors(factory: async_sessionmaker[AsyncSession]) -> set[uuid.UUID]:
+    async with role_session(factory, db_role="hunter_worker") as session:
+        rows = await session.execute(text("SELECT event_id FROM outbox_events"))
+        return {row[0] for row in rows}
+
+
+async def test_prune_deletes_dispatched_rows_past_the_cutoff_and_nothing_else(
+    factory: async_sessionmaker[AsyncSession], channel: tuple[str, str]
+) -> None:
+    """Retention is what keeps the queue from becoming an archive — the
+    market-worker alone queues on the order of 700k rows a day. The cutoff is
+    also the ceiling of the replay window: ``reconcile(since=)`` can only reach
+    rows that are still in the table.
+    """
+    stream, _group = channel
+    now = utcnow()
+    old = await _queue(factory, stream, "BTCUSDT", 0)
+    recent = await _queue(factory, stream, "ETHUSDT", 1)
+    pending = await _queue(factory, stream, "SOLUSDT", 2)
+    await _mark(factory, old, now - timedelta(days=8))
+    await _mark(factory, recent, now - timedelta(days=6))
+
+    async with role_session(factory, db_role="hunter_worker") as session:
+        deleted = await prune_dispatched(session, now - timedelta(days=7))
+
+    assert deleted == 1
+    assert await _survivors(factory) == {recent, pending}
+
+
+async def test_prune_never_deletes_a_pending_row_however_old(
+    factory: async_sessionmaker[AsyncSession], channel: tuple[str, str]
+) -> None:
+    """A row with ``dispatched_at IS NULL`` is a publication the system owes.
+    Age does not settle a debt, and a retention job that deleted one would
+    produce exactly the silent loss the outbox exists to make impossible."""
+    stream, _group = channel
+    owed = await _queue(factory, stream, "BTCUSDT", 0)
+    async with role_session(factory, db_role="hunter_worker") as session:
+        await session.execute(
+            text("UPDATE outbox_events SET created_at = :at WHERE event_id = :id"),
+            {"at": utcnow() - timedelta(days=400), "id": owed},
+        )
+
+    async with role_session(factory, db_role="hunter_worker") as session:
+        deleted = await prune_dispatched(session, utcnow())
+
+    assert deleted == 0
+    assert await _survivors(factory) == {owed}
+
+
+async def test_prune_is_bounded_by_its_batch_so_the_job_can_loop(
+    factory: async_sessionmaker[AsyncSession], channel: tuple[str, str]
+) -> None:
+    """One ``DELETE`` over a whole day of rows would hold locks and produce WAL
+    for as long as it ran, on a table the dispatcher is writing to. The job
+    calls this in a loop until it returns less than it asked for."""
+    stream, _group = channel
+    cutoff = utcnow() - timedelta(days=7)
+    for minute in range(5):
+        queued = await _queue(factory, stream, "BTCUSDT", minute)
+        # ``minute + 1``: the cutoff is exclusive, so a row dispatched *at* it stays.
+        await _mark(factory, queued, cutoff - timedelta(minutes=minute + 1))
+
+    pruned: list[int] = []
+    for _ in range(3):
+        async with role_session(factory, db_role="hunter_worker") as session:
+            pruned.append(await prune_dispatched(session, cutoff, 2))
+
+    assert pruned == [2, 2, 1]
+    assert await _survivors(factory) == set()
+
+
+_BULK_DISPATCHED = """
+INSERT INTO outbox_events (event_id, stream, payload, created_at, dispatched_at)
+SELECT gen_random_uuid(), 'market.candles.closed', '{}'::jsonb,
+       now() - (n || ' seconds')::interval,
+       now() - (n || ' seconds')::interval
+FROM generate_series(1, 60000) AS n
+"""
+"""A backlog of dispatched rows retention has not reached yet. Sixty thousand is
+under a day of the market-worker's own volume (~700k/day, DATABASE.md §1.3) and
+well under the seven days it keeps — the point is only that it is large enough
+for the planner to have a real choice."""
+
+
+async def test_prune_takes_its_batch_from_an_index_and_never_a_seq_scan(
+    outbox_engine: AsyncEngine,
+) -> None:
+    """The batch is ordered by ``id``, and ``EXPLAIN`` is the proof.
+
+    Ordering by ``dispatched_at`` — which is what this did — reads as "oldest
+    first" and costs a **Seq Scan of the whole table plus a sort**, every batch,
+    every loop of the retention job, because ``dispatched_at`` has no index and
+    deliberately gets none: it would be maintained on every ``mark_dispatched``,
+    i.e. on the dispatcher's hot path, and would cover every dispatched row the
+    seven-day retention still holds, to serve a job that runs once a day. The
+    primary key is already there, is insertion order, and lets the scan stop at
+    ``batch`` rows.
+    """
+    async with outbox_engine.begin() as connection:
+        await connection.execute(text(_BULK_DISPATCHED))
+        await connection.execute(text("ANALYZE outbox_events"))
+
+    compiled = prunable_ids(utcnow(), PRUNE_BATCH).compile(
+        dialect=postgresql.dialect(paramstyle="named")
+    )
+    async with outbox_engine.connect() as connection:
+        rows = await connection.scalars(text(f"EXPLAIN {compiled}"), dict(compiled.params))
+        plan = "\n".join(rows)
+
+    assert "Seq Scan" not in plan, plan
+    assert "Index Scan using pk_outbox_events" in plan, plan
+
+
+async def test_prune_refuses_a_naive_cutoff(factory: async_sessionmaker[AsyncSession]) -> None:
+    """Seven days ago on whose clock? A naive cutoff would silently mean the
+    box's local time and delete a different set of rows in every region."""
+    async with role_session(factory, db_role="hunter_worker") as session:
+        with pytest.raises(ValueError, match="timezone-aware"):
+            await prune_dispatched(session, datetime(2026, 9, 6, 12, 0))  # noqa: DTZ001

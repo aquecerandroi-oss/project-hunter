@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from hunter_core.domain.types import utcnow
 from hunter_core.events import EventEnvelope, ack, consume, ensure_group, publish
 from hunter_core.events.produce import FIELD_NAME
 from hunter_core.redis import acquire_lock, keys
@@ -41,8 +42,11 @@ async def test_ack_marks_processed_and_clears_pending(redis_client: redis_asynci
 
     await ack(redis_client, stream, group, message_id, received)
 
+    # The per-day key of T2.9b, not the single ``hunter:processed:{group}`` it
+    # replaced: that one had its TTL pushed forward by every ack, so it never
+    # expired. This assertion still named it, and had been silently red since.
     is_processed = await redis_client.sismember(  # type: ignore[reportUnknownMemberType]
-        f"hunter:processed:{group}", str(envelope.event_id)
+        keys.processed(group, utcnow().date()), str(envelope.event_id)
     )
     assert is_processed
     pending = await redis_client.xpending(stream, group)  # type: ignore[reportUnknownMemberType]

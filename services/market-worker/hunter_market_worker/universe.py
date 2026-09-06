@@ -2,8 +2,10 @@
 
 Every ``market_universe_refresh_s``: list perpetuals, fetch 24h tickers,
 upsert ``assets``/``markets``, rank by ``volume_24h_usd`` into
-``monitor_rank``, derive ``is_monitored``. Publishes ``market.universe.changed``
-only when the set changes, and shares it via :class:`MonitoredUniverse`.
+``monitor_rank``, derive ``is_monitored``. Queues ``market.universe.changed``
+only when the set changes — in the same transaction as the flags it announces,
+published by the outbox dispatcher (T2.9b) — and shares it via
+:class:`MonitoredUniverse`.
 
 T1.6b-C2/C4: with ``MARKET_SHARD=i/N``, one shard per exchange holds a
 token-checked lock and is the *leader* refreshing from REST; every other
@@ -18,19 +20,18 @@ import asyncio
 import dataclasses
 import random
 import zlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select, update
 
 from hunter_core.db.models.markets import Exchange, Market
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import MarketType
-from hunter_core.events.envelope import EventEnvelope
-from hunter_core.events.streams import DEFAULT_MAXLEN, Streams
+from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_exchanges.base import ExchangeError
+from hunter_market_worker.durable import enqueue_universe_changed
 from hunter_market_worker.hot_state import write_ticker
-from hunter_market_worker.publication import publish
 from hunter_market_worker.universe_leader import (
     FOLLOWER_POLL_S,
     LEADER_RENEW_INTERVAL_S,
@@ -135,7 +136,11 @@ async def refresh_universe(
     markets = await adapter.list_markets(MarketType.PERPETUAL)
     tickers = await _fetch_tickers(adapter, [m.symbol for m in markets])
     asset_symbols = {m.base for m in markets} | {m.quote for m in markets}
+    # One instant for the whole cycle: it is both the event's identity part and
+    # its envelope ``ts``, so the two can never describe different moments.
+    refreshed_at = utcnow()
 
+    payload: dict[str, Any] | None = None
     async with role_session(session_factory, db_role="hunter_worker") as session:
         exchange_id = await upsert_exchange(session, adapter.code)
         old_monitored = set(
@@ -158,29 +163,28 @@ async def refresh_universe(
         _, new_monitored = await rank_and_monitor(
             session, exchange_id, MarketType.PERPETUAL, settings
         )
+        # Durable by §10b of PIPELINE.md: the scanner warms up the markets this
+        # announces and shuts down the ones it retires, so a lost change is
+        # work nobody reconstructs. Queued *here*, inside the transaction that
+        # just wrote ``is_monitored``/``monitor_rank`` — never published from
+        # this path, so a stalled Redis cannot hold the refresh open.
+        if old_monitored != new_monitored:
+            payload = await enqueue_universe_changed(
+                session,
+                exchange=adapter.code,
+                old_monitored=old_monitored,
+                new_monitored=new_monitored,
+                at=refreshed_at,
+                producer=producer,
+            )
 
     for symbol in new_monitored:
         if symbol in tickers:
             await write_ticker(redis, tickers[symbol])
 
-    if old_monitored != new_monitored:
-        payload = {
-            "added": sorted(new_monitored - old_monitored),
-            "removed": sorted(old_monitored - new_monitored),
-            "total": len(new_monitored),
-        }
-        envelope = EventEnvelope(
-            type=Streams.MARKET_UNIVERSE_CHANGED,
-            producer=producer,
-            key=adapter.code,
-            payload=payload,
-        )
-        await publish(
-            redis,
-            Streams.MARKET_UNIVERSE_CHANGED,
-            envelope,
-            DEFAULT_MAXLEN[Streams.MARKET_UNIVERSE_CHANGED],
-        )
+    if payload is not None:
+        # After the commit on purpose: the line means "this is now true in
+        # Postgres and owed to the stream", not "this is what I was about to do".
         logger.info("market_universe_changed", **payload)
 
     return sorted(new_monitored)

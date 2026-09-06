@@ -1,5 +1,6 @@
 """Unit tests for hunter_core.redis: key builders and lock logic against a fake client."""
 
+from datetime import date
 from typing import Any
 
 import pytest
@@ -30,7 +31,10 @@ def test_key_builders_match_architecture_md_5_3() -> None:
     assert keys.heartbeat("market", "host-1") == "hb:market:host-1"
     assert keys.rate_limit("binance", "rest") == "rl:binance:rest"
     assert keys.lock("universe-refresh") == "lock:universe-refresh"
-    assert keys.processed("scanner-worker") == "hunter:processed:scanner-worker"
+    assert (
+        keys.processed("scanner-worker", date(2026, 9, 6))
+        == "hunter:processed:scanner-worker:20260906"
+    )
 
 
 def test_create_redis_raises_when_redis_url_missing() -> None:

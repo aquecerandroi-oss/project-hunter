@@ -10,5 +10,6 @@ of what a partition is called, where its bounds are and how it is secured.
 - :mod:`ddl.grants` — the per-table ``GRANT``s and default privileges;
 - :mod:`ddl.policies` — the RLS policies;
 - :mod:`ddl.security` — roles, and one import that re-exports the three above;
-- :mod:`ddl.partitions` — the initial partitions, each hardened at creation.
+- :mod:`ddl.partitions` — the initial partitions, each hardened at creation;
+- :mod:`ddl.outbox_index` — the pending index shared by the two outbox queues.
 """

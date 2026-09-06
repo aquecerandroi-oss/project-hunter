@@ -37,12 +37,21 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0003_analysis"
+HEAD_REVISION = "0004_outbox_pending_index"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
 INITIAL_REVISION = "0001_initial_schema"
 SHADOW_REVISION = "0002_shadow_lab"
+ANALYSIS_REVISION = "0003_analysis"
+
+_PENDING_PREDICATE = "dispatched_at IS NULL"
+"""What makes an index a *pending* index, spelled out here rather than imported:
+these tests exist to check ``ddl/outbox_index.py``, so they must not agree with
+it by construction."""
+
+_STAGING_SUFFIX = "_rebuilding"
+"""The name ``0004`` builds under before renaming; nothing may survive with it."""
 
 
 def _frozen_enums() -> tuple[Mapping[str, tuple[str, ...]], ...]:
@@ -651,7 +660,9 @@ def test_0003_upgrades_a_database_that_already_holds_analysis_rows(upgraded: str
     the ``active + unknown`` state the joint decision defines as ineligible.
     """
     config = alembic_config(upgraded)
-    command.downgrade(config, "-1")
+    # Named, not ``-1``: the head moved to ``0004`` and reversing one revision
+    # would leave ``0003`` applied, making the seed below meaningless.
+    command.downgrade(config, SHADOW_REVISION)
     market_id = asyncio.run(_seed_legacy_analysis(upgraded))
     try:
         command.upgrade(config, "head")
@@ -688,10 +699,15 @@ def test_0003_refuses_to_downgrade_while_a_new_enum_label_is_in_use(upgraded: st
     """
     market_id = asyncio.run(_seed_extended_opportunity(upgraded))
     try:
+        config = alembic_config(upgraded)
+        command.downgrade(config, ANALYSIS_REVISION)
         with pytest.raises(DBAPIError, match="opportunity_status label"):
-            command.downgrade(alembic_config(upgraded), "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == ANALYSIS_REVISION, (
+            "the downgrade must not commit"
+        )
     finally:
+        command.upgrade(alembic_config(upgraded), "head")
         asyncio.run(_delete_legacy_analysis(upgraded, market_id))
 
 
@@ -707,10 +723,15 @@ def test_0003_refuses_to_downgrade_while_the_outbox_still_owes_a_publication(
     """
     event_id = asyncio.run(_seed_pending_outbox_event(upgraded))
     try:
+        config = alembic_config(upgraded)
+        command.downgrade(config, ANALYSIS_REVISION)
         with pytest.raises(DBAPIError, match="outbox_events rows are still pending"):
-            command.downgrade(alembic_config(upgraded), "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == ANALYSIS_REVISION, (
+            "the downgrade must not commit"
+        )
     finally:
+        command.upgrade(alembic_config(upgraded), "head")
         asyncio.run(_delete_outbox_event(upgraded, event_id))
 
 
@@ -725,11 +746,172 @@ def test_0003_refuses_to_downgrade_while_a_sample_still_names_a_baseline(
     """
     market = asyncio.run(_seed_opportunity_referencing_a_baseline(upgraded))
     try:
+        config = alembic_config(upgraded)
+        command.downgrade(config, ANALYSIS_REVISION)
         with pytest.raises(DBAPIError, match="name a feature_baselines revision"):
-            command.downgrade(alembic_config(upgraded), "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == ANALYSIS_REVISION, (
+            "the downgrade must not commit"
+        )
     finally:
+        command.upgrade(alembic_config(upgraded), "head")
         asyncio.run(_delete_legacy_analysis(upgraded, market))
+
+
+async def _pending_index_defs(url: str) -> dict[str, str]:
+    """``index name -> indexdef`` for every pending index the database holds.
+
+    Discovered by the *predicate*, not by a hard-coded pair of names: a third
+    queue added by a later revision has to show up here, because that is the
+    whole point of the freeze tests below.
+    """
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            rows = await connection.execute(
+                text(
+                    "SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'public' "
+                    "AND indexdef LIKE :predicate"
+                ),
+                {"predicate": f"%WHERE ({_PENDING_PREDICATE})%"},
+            )
+            return {name: definition for name, definition in rows}
+    finally:
+        await engine.dispose()
+
+
+async def _pending_index_slots(url: str) -> set[tuple[str, str]]:
+    """``(table, index)`` for every pending index — the live set the frozen
+    per-revision tuples of ``ddl/outbox_index.py`` have to partition."""
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            rows = await connection.execute(
+                text(
+                    "SELECT tablename, indexname FROM pg_indexes WHERE schemaname = 'public' "
+                    "AND indexdef LIKE :predicate"
+                ),
+                {"predicate": f"%WHERE ({_PENDING_PREDICATE})%"},
+            )
+            return {(table, index) for table, index in rows}
+    finally:
+        await engine.dispose()
+
+
+async def _invalid_and_staging_indexes(url: str) -> tuple[list[str], list[str]]:
+    """Indexes Postgres marked invalid, and staging names nobody renamed."""
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            invalid = list(
+                await connection.scalars(
+                    text(
+                        "SELECT c.relname FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid "
+                        "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                        "WHERE n.nspname = 'public' AND NOT i.indisvalid"
+                    )
+                )
+            )
+            staging = list(
+                await connection.scalars(
+                    text(
+                        "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' "
+                        "AND indexname LIKE :suffix"
+                    ),
+                    {"suffix": f"%{_STAGING_SUFFIX}"},
+                )
+            )
+            return invalid, staging
+    finally:
+        await engine.dispose()
+
+
+def _frozen_pending_indexes() -> tuple[tuple[tuple[str, str], ...], ...]:
+    """The per-revision frozen ``(table, index)`` tuples, oldest first."""
+    outbox_index = migration_ddl("outbox_index")
+    return (cast("tuple[tuple[str, str], ...]", outbox_index.PENDING_INDEXES_0004),)
+
+
+def test_every_pending_outbox_index_belongs_to_exactly_one_revision(upgraded: str) -> None:
+    """The frozen per-revision tuples still partition the live pending indexes.
+
+    Same trap as the enum one above (DATABASE.md §16.5), one shape down: while
+    ``ddl/outbox_index.py`` exported a single *live* ``PENDING_INDEXES`` read at
+    migration time, a ``0005`` that added a third queue and appended it to that
+    list would make ``0004`` — which rebuilt two indexes when it ran — try to
+    rebuild an index that does not exist yet, and fail on every clean database.
+    Each revision names its own tuple; this is what keeps them honest.
+    """
+    claimed = [slot for frozen in _frozen_pending_indexes() for slot in frozen]
+    assert len(claimed) == len(set(claimed)), "a pending index is owned by two revisions"
+    assert set(claimed) == asyncio.run(_pending_index_slots(upgraded)), (
+        "an outbox queue was added without a revision claiming its pending index"
+    )
+
+
+def test_0004_rebuilds_exactly_the_indexes_that_existed_when_it_was_written(
+    upgraded: str,
+) -> None:
+    """At ``0003`` the database holds precisely what ``0004`` froze.
+
+    This is the half of the freeze that catches the trap in the direction it
+    actually happens: appending a future queue to ``PENDING_INDEXES_0004``
+    instead of giving it its own tuple passes the partition test above and
+    fails here, because at the revision ``0004`` runs against, that index has
+    never been created.
+    """
+    config = alembic_config(upgraded)
+    try:
+        command.downgrade(config, ANALYSIS_REVISION)
+        frozen = cast(
+            "tuple[tuple[str, str], ...]", migration_ddl("outbox_index").PENDING_INDEXES_0004
+        )
+        assert asyncio.run(_pending_index_slots(upgraded)) == set(frozen)
+    finally:
+        command.upgrade(config, "head")
+
+
+def test_0004_leaves_no_invalid_or_staging_index_behind(upgraded: str) -> None:
+    """``CREATE INDEX CONCURRENTLY`` is the one build that can succeed halfway.
+
+    A failed concurrent build leaves an ``indisvalid = false`` index that the
+    planner ignores and ``pg_indexes`` still lists, so "the index is there"
+    proves nothing on its own. The revision also builds under a staging name
+    before renaming, so a leftover staging index means a rename never happened.
+    """
+    invalid, staging = asyncio.run(_invalid_and_staging_indexes(upgraded))
+    assert invalid == [], invalid
+    assert staging == [], staging
+
+
+def test_0004_keys_both_pending_indexes_on_the_drain_order(upgraded: str) -> None:
+    """The dispatcher claims ``ORDER BY created_at, id``; the index must say so.
+
+    Both queues together: they are shape-identical by design (DATABASE.md
+    §16.4/§17.5) and the absorption copies rows between them, so an index that
+    diverged would make one of the two silently slower.
+    """
+    definitions = asyncio.run(_pending_index_defs(upgraded))
+    assert set(definitions) == {"ix_outbox_events_pending", "ix_shadow_outbox_pending"}
+    for name, definition in definitions.items():
+        assert "(created_at, id)" in definition, (name, definition)
+        assert "(dispatched_at IS NULL)" in definition, (name, definition)
+
+
+def test_0004_reverses_to_the_index_0002_and_0003_shipped(upgraded: str) -> None:
+    """A rollback of this deploy must leave the queues findable, not indexless."""
+    config = alembic_config(upgraded)
+    try:
+        command.downgrade(config, ANALYSIS_REVISION)
+        definitions = asyncio.run(_pending_index_defs(upgraded))
+        assert set(definitions) == {"ix_outbox_events_pending", "ix_shadow_outbox_pending"}
+        for name, definition in definitions.items():
+            assert definition.endswith("btree (id) WHERE (dispatched_at IS NULL)"), (
+                name,
+                definition,
+            )
+    finally:
+        command.upgrade(config, "head")
 
 
 def test_history_rows_in_two_partitions_survive_the_downgrade_and_upgrade(
@@ -744,7 +926,7 @@ def test_history_rows_in_two_partitions_survive_the_downgrade_and_upgrade(
     market = asyncio.run(_seed_history_across_two_partitions(upgraded))
     config = alembic_config(upgraded)
     try:
-        command.downgrade(config, "-1")
+        command.downgrade(config, SHADOW_REVISION)
         command.upgrade(config, "head")
 
         rows = asyncio.run(

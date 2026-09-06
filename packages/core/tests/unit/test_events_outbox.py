@@ -16,11 +16,16 @@ import pytest
 
 from hunter_core.events.envelope import EventEnvelope
 from hunter_core.events.outbox import STALE_SWEEP_FACTOR, OutboxHealth
-from hunter_core.events.outbox_store import (
+from hunter_core.events.outbox_event import (
     build_envelope,
     envelope_from_row,
     event_id_for,
     outbox_row,
+)
+from hunter_core.events.outbox_store import (
+    UNPUBLISHABLE_MARK,
+    permanent_failure,
+    transient_failure,
 )
 
 pytestmark = pytest.mark.unit
@@ -170,3 +175,49 @@ def test_a_batch_of_envelopes_collapses_duplicates_before_the_insert() -> None:
     other = build_envelope("s", event_id_for("s", "y"), {"n": 2}, producer="p", key="k")
     rows = {e.event_id: outbox_row(e) for e in [envelope, other, envelope]}
     assert len(rows) == 2
+
+
+# --- unpublishable rows are counted, never a verdict (T2.9b) ---------------
+
+
+def test_a_permanent_failure_is_tagged_so_it_can_never_be_confused_with_an_outage() -> None:
+    """The tag is the whole point: "``attempts >= N``" alone cannot tell a row
+    nobody can publish from a row Redis was down for, and a Redis outage that
+    reclassified its own backlog as N individual defects would turn the outbox
+    readiness check green *because* the transport died."""
+    assert permanent_failure("payload is not an envelope").startswith(UNPUBLISHABLE_MARK)
+    assert not "connection reset by peer".startswith(UNPUBLISHABLE_MARK)
+
+
+def test_abandoned_rows_do_not_change_the_readiness_verdict() -> None:
+    """A payload no retry can fix is a defect to fix, not an outage to page on.
+
+    ``max_pending=0`` is the strictest verdict there is, and three unpublishable
+    rows still leave it green — while one ordinary pending row does not.
+    """
+    now = datetime(2026, 9, 6, 12, 0, tzinfo=UTC)
+    poisoned = OutboxHealth(pending=0, unpublishable=3, last_sweep_at=now)
+    assert poisoned.ready(max_pending=0, max_lag_s=30, now=now) is True
+
+    behind = OutboxHealth(pending=1, unpublishable=3, last_sweep_at=now)
+    assert behind.ready(max_pending=0, max_lag_s=30, now=now) is False
+
+
+def test_the_abandonment_threshold_is_per_health_snapshot() -> None:
+    """``N`` is configurable, and it is the worker holding the snapshot that
+    configures it — a service with a stricter backlog target may want to keep
+    reporting a broken row for longer before writing it off."""
+    assert OutboxHealth().unpublishable_after > 0
+    assert OutboxHealth(unpublishable_after=1).unpublishable_after == 1
+
+
+def test_a_transport_error_cannot_imitate_the_permanent_mark() -> None:
+    """``last_error`` holds whatever a driver said. If a transport failure whose
+    text happened to start with the mark were stored verbatim, it would take its
+    own row out of the readiness verdict — the mark is a classification, so it
+    has to be reserved (Astra, T2.9b review). Stripping loops because removing
+    it once would leave the doubled prefix still imitating it."""
+    assert transient_failure(f"{UNPUBLISHABLE_MARK}connection reset") == "connection reset"
+    assert transient_failure(f"{UNPUBLISHABLE_MARK * 3}boom") == "boom"
+    assert transient_failure("connection reset") == "connection reset"
+    assert permanent_failure(f"{UNPUBLISHABLE_MARK}x") == f"{UNPUBLISHABLE_MARK}x"

@@ -67,6 +67,50 @@ O servidor roda com `statement_timeout = 0` / `lock_timeout = 0` (sem prazo) —
 | `portfolio_equity_snapshots` | LIST por `resolution`, depois RANGE por `ts`, mensal | 1m: 30 d · demais: sem limite | idem |
 | `audit_logs` | mensal | sem limite | — |
 | `system_events` | mensal | 30 d | idem |
+| `outbox_events` | — | despachadas há mais de **7 d** (`dispatched_at IS NOT NULL AND dispatched_at < now() - interval '7 days'`); pendentes **nunca** são apagadas | `analytics-worker` diário, DELETE em lotes (M5) |
+| `shadow_outbox` | — | idem, enquanto a fila existir (§17.5 a absorve) | idem |
+
+**As duas filas de outbox não são particionadas — são podadas.** Elas são fila,
+não histórico: o volume é alto (o market-worker sozinho enfileira da ordem de
+**700 mil linhas/dia**, medido no stack local com 200 mercados) mas a vida útil
+de cada linha é curta, e o predicado de poda (`dispatched_at`) não é o mesmo por
+onde se lê (`dispatched_at IS NULL`), então um `DROP` de partição não expressa a
+retenção. O job diário chama
+`hunter_core.events.outbox_store.prune_dispatched(session, older_than, batch)`
+em laço até ele devolver menos do que pediu — `DELETE` em lotes de 5 mil, **em
+ordem de `id`**, para não segurar lock nem gerar WAL de um dia inteiro numa
+transação só, numa tabela em que o despachante está escrevendo ao mesmo tempo.
+
+**Ordem de `id`, não de `dispatched_at`** (revisão T2.9b da Astra; esta seção
+dizia "ordenados pelos mais antigos"). `dispatched_at` não tem índice e não vai
+ter: ele seria mantido em todo `mark_dispatched`, isto é, no caminho quente do
+despachante, e cobriria toda linha despachada que a retenção de 7 dias ainda
+guarda (~5 milhões a 700 mil/dia) para servir um job que roda uma vez por dia.
+Ordenar por ele fazia de cada lote um **Seq Scan da tabela inteira mais um
+sort**. `id` é `BIGSERIAL`, portanto ordem de inserção, e o lote é uma *fatia
+limitada* do conjunto podável, nunca um ranking: toda linha que ele devolve já
+satisfaz o predicado de retenção, então qual sai primeiro não muda nada. O
+índice da PK já existe e a varredura para em `batch` linhas — provado por
+`EXPLAIN` em
+`test_outbox_integration.py::test_prune_takes_its_batch_from_an_index_and_never_a_seq_scan`.
+O custo declarado: linhas pendentes na cabeça da PK são revarridas por todo
+lote, sem nunca qualificar — conjunto limitado pelo alarme de prontidão (500).
+
+Duas regras que o `WHERE` carrega e não são negociáveis:
+
+- **linha pendente nunca é podada, com qualquer idade.** `dispatched_at IS NULL`
+  é uma publicação que o sistema deve; apagá-la é exatamente a perda silenciosa
+  que a outbox existe para tornar impossível (é a mesma razão pela qual o
+  downgrade da `0003` recusa, §17.7);
+- **os 7 dias são o teto da janela de replay.** `reconcile(since=...)` só
+  alcança linha que ainda esteja na tabela, então essa retenção é o que faz
+  "sabemos reencher um stream perdido de até uma semana atrás" ser verdade e
+  "de um mês atrás" ser mentira. Aumentar a janela de replay é aumentar este
+  prazo, nunca o contrário.
+
+O job em si é do analytics-worker e chega no **M5**; até lá a função pura existe,
+tem teste e não é chamada por ninguém em produção — registrado aqui para que a
+lacuna seja um item de plano e não uma descoberta.
 
 **Duas formas de partição.** Seis tabelas são RANGE mensal simples (`audit_logs_2026_09`). `candles` e `portfolio_equity_snapshots` são particionadas primeiro por LIST (`timeframe` / `resolution`) e cada nível desses por RANGE mensal, produzindo folhas como `candles_1m_2026_09`. O motivo é a própria coluna "Retenção": as retenções diferem por timeframe, e com uma única RANGE mensal expirar 1m aos 90 dias exigiria `DELETE` linha a linha dentro de partições que também guardam o 1h que se mantém para sempre — reescrevendo e inchando exatamente os dados que queremos preservar. Com o nível LIST, expirar é `DROP TABLE candles_1m_2026_05`.
 
@@ -735,6 +779,16 @@ qualquer tabela que esteja em nenhuma delas ou em duas.
 - Remoção de organização/usuário exige `hunter_worker` ou um superusuário
   (§15.4): não há política de `DELETE` em `organizations` nem grant de `DELETE`
   para `hunter_app` em nenhuma das duas.
+- **Migração não tem `lock_timeout`.** `env.py` roda cada revisão numa
+  transação sem prazo de espera por trava (o `statement_timeout` do §1.2a é da
+  aplicação, não do migrador), então uma revisão que precise de `ACCESS
+  EXCLUSIVE` numa tabela quente pode enfileirar todo escritor atrás de um
+  leitor longo. Nenhuma revisão até a `0004` depende disso: a `0001` cria o
+  schema, a `0002`/`0003` mexem em tabelas ainda frias e a `0004` reconstrói os
+  índices com `CONCURRENTLY`, sem tomar trava sobre uma construção (§17.5). A
+  primeira revisão que precisar de uma trava longa numa tabela quente é que
+  traz o `SET LOCAL lock_timeout` — e traz junto a decisão de que uma janela de
+  manutenção é aceitável ali.
 - `infra/scripts/create_partitions.py` roda **uma transação por tabela-pai
   particionada**, não uma para todas. `CREATE TABLE ... PARTITION OF` toma
   `ACCESS EXCLUSIVE` na pai, e uma transação única segurava as oito travas até o
@@ -945,7 +999,7 @@ precisa das velas dele.
 shadow_outbox
   id BIGSERIAL PK, event_id UUID UNIQUE, stream TEXT, payload JSONB NOT NULL DEFAULT '{}',
   created_at, dispatched_at (null = pendente), attempts INT NOT NULL DEFAULT 0, last_error TEXT
-  INDEX (id) WHERE dispatched_at IS NULL                     -- fila do despachante
+  INDEX (created_at, id) WHERE dispatched_at IS NULL         -- fila do despachante (0004)
   CHECK attempts >= 0, CHECK char_length(stream) > 0
 ```
 
@@ -961,7 +1015,9 @@ nem dado de tenant. **Não é marca d'água:** a sequence tem lacunas (rollback)
 ordem dela não é a ordem de commit — a transação A pode pegar 10, a B pegar 11 e
 commitar primeiro, e um cursor em 11 passaria por cima da A. O predicado de
 pendência é `dispatched_at IS NULL`, que é exatamente o que o índice parcial
-serve (achado da revisão da Astra); (b) por consequência, é a
+serve (achado da revisão da Astra) — desde a `0004` com a chave
+`(created_at, id)`, a ordem em que o despachante drena, e não mais só `(id)`
+(§17.5); (b) por consequência, é a
 **primeira sequence do schema**, e
 `hunter_worker` precisa de `GRANT USAGE ON SEQUENCE shadow_outbox_id_seq` — um
 grant de tabela sozinho passaria em `has_table_privilege` e falharia em todo
@@ -1243,22 +1299,139 @@ no-op.
 outbox_events
   id BIGSERIAL PK, event_id UUID UNIQUE, stream TEXT, payload JSONB NOT NULL DEFAULT '{}',
   created_at, dispatched_at (null = pendente), attempts INT NOT NULL DEFAULT 0, last_error TEXT
-  INDEX (id) WHERE dispatched_at IS NULL       -- ix_outbox_events_pending
+  INDEX (created_at, id) WHERE dispatched_at IS NULL   -- ix_outbox_events_pending (0004)
   CHECK attempts >= 0, CHECK char_length(stream) > 0
 ```
+
+**O índice parcial é `(created_at, id)`, não `(id)` (`0004_outbox_pending_index`).**
+O predicado nunca esteve errado; a chave estava. `claim_pending` ordena por
+`(created_at, id)` — a sequence tem lacunas e a ordem dela não é a de commit,
+então `id` sozinho não é ordem de nada — e um índice chaveado só em `id` até
+*encontra* as pendentes, mas não as entrega ordenadas; com a ordenação
+inevitável, o planner deixa de usar o índice. Medido com `EXPLAIN ANALYZE` do
+claim real (Postgres 16, 30 mil pendentes): com `(id)` é **Seq Scan nas 30 mil
+linhas + quicksort de 3,5 MB, 15,255 ms**; com `(created_at, id)` é **Index
+Scan que para nas 20 linhas pedidas, 0,237 ms**. No teto de
+prontidão (500 pendentes) a diferença é ruído; ela importa exatamente quando
+dói, no acúmulo que uma queda de Redis deixa para trás, que é também quando a
+varredura precisa drenar mais rápido. A `shadow_outbox` muda junto pelo mesmo
+motivo pelo qual as duas formas são idênticas (§16.4): deixar os índices
+divergirem tornaria uma das filas silenciosamente mais lenta sem que ninguém
+depois conseguisse reconstruir por quê. `ddl/outbox_index.py` é dono das duas.
+
+**A `0004` não roda em transação: o índice é reconstruído com
+`CONCURRENTLY`.** `outbox_events` é caminho de escrita quente — toda transação
+de negócio do market-worker insere nela (ordem de 700 mil linhas/dia, §1.3) e o
+despachante escreve a cada varredura. Um `DROP INDEX` + `CREATE INDEX` comum
+toma `ACCESS EXCLUSIVE` na tabela e constrói o substituto segurando essa trava,
+bloqueando **todo** produtor pelo tempo da construção; e o teto de prontidão de
+500 pendentes não limita esse trabalho, porque é alarme e não limite físico e
+conta só as pendentes, enquanto a construção varre a tabela inteira, histórico
+despachado incluído (revisão T2.9b da Astra). A sequência, nos dois sentidos, é:
+
+1. `CREATE INDEX CONCURRENTLY <índice>_rebuilding` — leitores e escritores
+   seguem, e o índice antigo continua servindo o claim;
+2. `DROP INDEX CONCURRENTLY <índice>` — a fila nunca fica sem índice utilizável;
+3. `ALTER INDEX <índice>_rebuilding RENAME TO <índice>` — trava só de catálogo.
+
+**Preço declarado: a revisão perde a atomicidade.** Nenhum dos três comandos
+pode rodar dentro de bloco de transação, então `rebuild_pending_indexes` abre um
+`op.get_context().autocommit_block()`, que commita o que veio antes dele. Uma
+queda no meio deixa um índice `_rebuilding` para trás, possivelmente
+`indisvalid = false` — por isso cada passo começa derrubando o nome de staging
+com `IF EXISTS`: **reexecutar a revisão é a recuperação**, e é idempotente
+inclusive por cima de uma execução que deu certo.
+`test_migrations.py::test_0004_leaves_no_invalid_or_staging_index_behind` lê
+`pg_index.indisvalid`, porque "o índice está lá" não prova nada sozinho depois
+de uma construção concorrente. Isto substitui a nota anterior de aplicar a
+revisão "numa janela de manutenção com `lock_timeout`": não há mais janela a
+respeitar, e por isso nada de `lock_timeout` entrou em `env.py` (ver
+"Restrições operacionais conhecidas", §15.6).
+
+**Listas congeladas por revisão, como em §16.5.** `ddl/outbox_index.py` exporta
+`PENDING_INDEXES_0004`, `DRAIN_ORDER_0004` e `LEGACY_ORDER_0004` — tuplas
+congeladas que só a `0004` lê, no mesmo padrão de `ddl/tables.py`,
+`ddl/shadow.py` e `ddl/analysis.py`. Enquanto eram uma lista *viva* lida em
+tempo de migração, uma `0005` que acrescentasse uma fila `execution_outbox` e a
+anexasse ali faria a `0004` — que tinha dois índices para reconstruir no dia em
+que foi escrita — tentar reconstruir um terceiro que ainda não existe no ponto
+dela na história, e falhar em **todo banco limpo** (reproduzido: `relation
+"execution_outbox" does not exist`). Uma fila nova traz a sua própria tupla; a
+da `0004` nunca cresce. Dois testes seguram isso:
+`test_every_pending_outbox_index_belongs_to_exactly_one_revision` (as tuplas
+congeladas particionam os índices parciais vivos, descobertos pelo predicado) e
+`test_0004_rebuilds_exactly_the_indexes_that_existed_when_it_was_written` (em
+`0003`, o banco contém exatamente o que a `0004` congelou). `PENDING_PREDICATE`
+continua compartilhado e não congelado: não é lista que cresce, é a definição da
+dívida (§1.3, §16.4).
 
 **Forma idêntica à de `shadow_outbox` (§16.4), de propósito.** O Shadow Lab
 entregou a sua fila na `0002` antes desta existir e o item 6 de `SHADOW-LAB.md`
 exige que a absorção não perca pendências, então as colunas batem uma a uma e a
 absorção é um `INSERT ... SELECT` com **lista explícita de colunas** que preserva
-`event_id`, `stream`, `payload`, `created_at`, `dispatched_at`, `attempts` e
-`last_error` e deixa `id` ser reemitido pela sequence local. Copiar `id` entre
-duas filas populadas colidiria — e não significaria nada se não colidisse: `id` é
-ordem de drenagem, nunca identidade. O predicado de pendência é
-`dispatched_at IS NULL`, nunca uma marca d'água sobre `id` (§16.4). Há teste que
-executa exatamente esse `INSERT ... SELECT`, para que as duas formas não possam
-divergir sem alguém ficar vermelho. A troca dos escritores (a fila antiga
+`event_id`, `stream`, `created_at`, `dispatched_at`, `attempts` e `last_error` e
+deixa `id` ser reemitido pela sequence local. Copiar `id` entre duas filas
+populadas colidiria — e não significaria nada se não colidisse: `id` é ordem de
+drenagem, nunca identidade. O predicado de pendência é `dispatched_at IS NULL`,
+nunca uma marca d'água sobre `id` (§16.4). A troca dos escritores (a fila antiga
 continua recebendo enquanto a cópia roda) é coordenação da T2.9, não DDL.
+
+**`payload` é a exceção: ele é embrulhado, não copiado.** As duas colunas se
+chamam igual e guardam coisas diferentes. A `shadow_outbox` guarda só o payload
+de negócio e a S2 monta o envelope na hora do dispatch; a `outbox_events` guarda
+o **envelope inteiro**, que é o que torna a linha uma mensagem pronta e uma
+republicação byte a byte a mesma coisa. Uma cópia crua produziria linhas que o
+despachante genérico recusa com *payload is not an envelope* — pendentes para
+sempre, contadas como inpublicáveis, nunca entregues. O statement, portanto:
+
+```sql
+INSERT INTO outbox_events
+    (event_id, stream, payload, created_at, dispatched_at, attempts, last_error)
+SELECT
+    event_id,
+    stream,
+    jsonb_build_object(
+        'event_id', event_id,
+        'type',     stream,
+        'ts',       to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US') || 'Z',
+        'producer', 'strategy-worker.shadow',
+        'key',      coalesce(nullif(payload ->> 'symbol', ''), event_id::text),
+        'payload',  payload
+    ),
+    created_at, dispatched_at, attempts, last_error
+FROM shadow_outbox;
+```
+
+| Campo do envelope | De onde vem | Por quê |
+|---|---|---|
+| `event_id` | a própria coluna | a identidade **se preserva**; é o ponto inteiro de não perder pendência |
+| `type` | `stream` da linha | é o mesmo conceito com outro nome |
+| `ts` | `created_at` | o `ts` histórico **não existe**: a S2 o gerava no dispatch, então para uma linha que nunca despachou não há o que recuperar. `created_at` é o substituto honesto e estável — mas é o `now()` do Postgres, ou seja o **início da transação**, não o instante do commit (Astra, revisão T2.9b). Fica registrado como substituto em vez de passado por original |
+| `producer` | `PRODUCER` da S2 (`strategy-worker.shadow`) | foi quem produziu |
+| `key` | `payload->>'symbol'`, senão o `event_id` | repete a heurística de roteamento da S2 (`payload.get("symbol") or event_id`), para que o roteamento depois da absorção seja idêntico ao de antes. A equivalência vale para símbolo textual, string vazia e ausência; **não** para um `symbol` que seja `false`/`0` em JSON, que o Python trataria como falso e o `->>` devolve como texto — nenhum produtor da S2 escreve isso, e está registrado aqui em vez de suposto |
+| `payload` | o payload legado, um nível abaixo | `payload -> 'payload' ->> 'symbol'`, como em qualquer linha nativa |
+
+`test_schema_analysis.py` executa **este** statement e depois passa a linha
+resultante por `hunter_core.events.outbox_event.envelope_from_row` — a mesma
+função que `dispatch_pending` chama antes do `XADD` —, conferindo campo a campo.
+Provar só que as colunas batem não provaria nada: o que a absorção precisa
+garantir é que a linha absorvida é *despachável*.
+
+**Duas condições operacionais que o statement sozinho não dá** (Astra, revisão
+T2.9b), e sem as quais a absorção perde pendência:
+
+1. **Parar os escritores, não só o despachante.** Drenar a fila com o
+   `dispatch_once` da S2 e depois copiar deixa uma janela: uma transação da S2
+   que commita *depois* do snapshot da cópia insere uma linha que a cópia não
+   viu e que o `DROP TABLE` seguinte apaga. O corte é: trocar o `enqueue` da S2
+   pelo genérico (ou parar o worker), **esperar as transações em voo**, só então
+   rodar a cópia final, e só então derrubar a tabela.
+2. **O statement não é reexecutável depois de um sucesso parcial.**
+   `outbox_events.event_id` é `UNIQUE`, então uma segunda passada aborta em
+   colisão. Isso é a proteção funcionando, e a saída **não** é acrescentar um
+   `ON CONFLICT DO NOTHING` genérico, que esconderia tanto a linha já copiada
+   quanto uma colisão real de identidade: rode a cópia uma vez, dentro de uma
+   transação, e reconcilie por contagem antes de derrubar a fila antiga.
 
 Mesmos dois desvios registrados na §16.4: PK `BIGSERIAL` em vez de UUID v7 (§1) e
 a sequence `outbox_events_id_seq`, que exige

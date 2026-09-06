@@ -1,0 +1,14 @@
+- **(1) Migração:** aceito `drop + create` transacional e as duas filas na mesma revisão. Não exigiria `CONCURRENTLY`, mas corrigiria a justificativa: **500 é alarme, não limite físico**; o build varre a tabela, incluindo histórico despachado, e o `DROP` normal bloqueia acessos. Usaria `lock_timeout` e verificaria tamanho total/janela operacional antes de aplicar ([outbox_index.py:54](C:/dev/project-hunter/infra/migrations/ddl/outbox_index.py:54); [PostgreSQL](https://www.postgresql.org/docs/16/sql-dropindex.html)). Não acrescentaria `dispatched_at` nem `INCLUDE`: o predicado basta e o claim precisa acessar as linhas para `FOR UPDATE` ([outbox_store.py:191](C:/dev/project-hunter/packages/core/hunter_core/events/outbox_store.py:191)).
+
+- **(2) Envelope:** concordo com `ts = created_at` como substituto estável. Corrigir apenas “instante do commit”: `created_at` não garante isso ([DATABASE.md:1339](C:/dev/project-hunter/docs/DATABASE.md:1339)). A `key` corresponde ao legado para símbolo textual, vazio ou ausente; não é equivalência geral para JSON inválido como `false`/`0` ([outbox.py:100](C:/dev/project-hunter/services/strategy-worker/hunter_strategy_worker/outbox.py:100)).
+
+- **MUST-FIX antes da absorção:** interromper também os **escritores antigos**, aguardar transações em voo e fazer a cópia final antes de retirar a tabela. Parar só o dispatcher permite inserir depois do snapshot da cópia e perder essa pendência no descarte. O roteiro atual não fecha essa janela ([notes-T2.9.md:75](C:/dev/project-hunter/.claude/state/notes-T2.9.md:75)). O SQL também não é reexecutável após sucesso: colisões de `event_id` abortam; não usar `DO NOTHING` indiscriminadamente para escondê-las ([DATABASE.md:1318](C:/dev/project-hunter/docs/DATABASE.md:1318)).
+
+- **(3) Divergência:** concordo. Tentativas não distinguem defeito permanente de indisponibilidade. O prefixo centralizado é aceitável agora; **não exigiria coluna nova** ([outbox_health.py:66](C:/dev/project-hunter/packages/core/hunter_core/events/outbox_health.py:66)). Reservaria o prefixo para classificação, impedindo que mensagens transitórias gravadas literalmente o imitem ([outbox_store.py:262](C:/dev/project-hunter/packages/core/hunter_core/events/outbox_store.py:262)). Precisão: o predicado antigo poderia deixar **o check da outbox** verde; isso não prova que o `/ready` inteiro ficaria verde.
+
+- **Validação:** leitura apenas; nenhum arquivo alterado, teste ou benchmark reexecutado.
+
+**OBSIDIAN**
+
+- **Workers:** registrar corte seguro dos escritores e classificação explícita de inpublicáveis.
+- **Architecture Decisions:** documentar índice composto, limites do bloqueio transacional e `created_at` como timestamp substituto.

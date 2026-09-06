@@ -30,6 +30,8 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from hunter_core.domain.types import uuid7
+from hunter_core.events.envelope import EventEnvelope
+from hunter_core.events.outbox_event import envelope_from_row
 
 pytestmark = pytest.mark.integration
 
@@ -503,13 +505,64 @@ async def test_pending_events_are_found_by_the_partial_index(
     schema_engine: AsyncEngine,
 ) -> None:
     """``dispatched_at IS NULL`` is the pending predicate, not a watermark on
-    ``id``: the sequence has gaps and its order is not commit order."""
+    ``id``: the sequence has gaps and its order is not commit order.
+
+    ``0004`` widened the key from ``(id)`` to ``(created_at, id)`` -- the order
+    the dispatcher actually claims in. With ``(id)`` alone Postgres abandoned the
+    index and seq-scanned plus sorted the whole pending set on every sweep
+    (measured 15.3 ms against 0.2 ms per claim with 30k pending rows).
+    """
     async with schema_engine.connect() as connection:
         definition = await connection.scalar(
             text("SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_outbox_events_pending'")
         )
     assert definition is not None
     assert "(dispatched_at IS NULL)" in definition
+    assert "(created_at, id)" in definition, definition
+
+
+ABSORB_SHADOW_OUTBOX = """
+INSERT INTO outbox_events
+    (event_id, stream, payload, created_at, dispatched_at, attempts, last_error)
+SELECT
+    event_id,
+    stream,
+    jsonb_build_object(
+        'event_id', event_id,
+        'type',     stream,
+        'ts',       to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US') || 'Z',
+        'producer', 'strategy-worker.shadow',
+        'key',      coalesce(nullif(payload ->> 'symbol', ''), event_id::text),
+        'payload',  payload
+    ),
+    created_at,
+    dispatched_at,
+    attempts,
+    last_error
+FROM shadow_outbox
+"""
+"""The absorption of ``shadow_outbox``, exactly as DATABASE.md §17.5 documents it.
+
+Not a plain column copy: the two queues store *different things* in ``payload``.
+``shadow_outbox`` keeps only the business payload and the S2 dispatcher builds
+the envelope at publication time; ``outbox_events`` keeps the whole envelope, so
+that a row is a finished message and republishing it is the same bytes. Copying
+the legacy column across would produce rows the generic dispatcher rejects as
+"payload is not an envelope" — pending forever, counted as unpublishable, never
+delivered. So the statement **wraps**:
+
+- ``event_id`` is the same value in both places — identity is preserved, which
+  is the whole point of not losing pendencies;
+- ``type`` is the row's own ``stream``;
+- ``ts`` is ``created_at``. The historical ``ts`` does not exist: S2 generated it
+  at dispatch, so for a row that never dispatched there is nothing to recover.
+  ``created_at`` is the honest substitute — the instant the decision committed —
+  and it is documented as a substitute rather than passed off as the original;
+- ``producer`` is S2's own ``PRODUCER`` (``strategy-worker.shadow``), because
+  that is who produced it;
+- ``key`` repeats S2's heuristic (``payload["symbol"] or event_id``), so routing
+  after the absorption is identical to routing before it.
+"""
 
 
 async def test_the_generic_outbox_can_absorb_shadow_outbox_without_losing_a_pending_row(
@@ -517,7 +570,7 @@ async def test_the_generic_outbox_can_absorb_shadow_outbox_without_losing_a_pend
 ) -> None:
     """SHADOW-LAB.md §6: T2.9 absorbs ``shadow_outbox`` preserving pendencies.
 
-    The copy is an explicit column list that keeps ``event_id`` — the durable
+    The copy has an explicit column list that keeps ``event_id`` — the durable
     identity — and lets ``id`` be re-issued locally, because ``id`` is a drain
     order and copying it across two populated queues would collide for no
     benefit. This is the statement T2.9 will run; proving it here means the two
@@ -529,7 +582,7 @@ async def test_the_generic_outbox_can_absorb_shadow_outbox_without_losing_a_pend
             "INSERT INTO shadow_outbox (event_id, stream, payload, attempts, last_error) "
             "VALUES (:id, 'shadow.signals.emitted', CAST(:payload AS jsonb), 2, 'timeout')"
         ),
-        {"id": pending, "payload": '{"signal_id": "x"}'},
+        {"id": pending, "payload": '{"signal_id": "x", "symbol": "BTCUSDT"}'},
     )
     await connection.execute(
         text(
@@ -539,19 +592,12 @@ async def test_the_generic_outbox_can_absorb_shadow_outbox_without_losing_a_pend
         {"id": dispatched},
     )
 
-    await connection.execute(
-        text(
-            "INSERT INTO outbox_events "
-            "(event_id, stream, payload, created_at, dispatched_at, attempts, last_error) "
-            "SELECT event_id, stream, payload, created_at, dispatched_at, attempts, last_error "
-            "FROM shadow_outbox"
-        )
-    )
+    await connection.execute(text(ABSORB_SHADOW_OUTBOX))
 
     row = await connection.execute(
         text(
-            "SELECT stream, payload ->> 'signal_id', attempts, last_error, dispatched_at "
-            "FROM outbox_events WHERE event_id = :id"
+            "SELECT stream, payload -> 'payload' ->> 'signal_id', attempts, last_error, "
+            "dispatched_at FROM outbox_events WHERE event_id = :id"
         ),
         {"id": pending},
     )
@@ -568,3 +614,70 @@ async def test_the_generic_outbox_can_absorb_shadow_outbox_without_losing_a_pend
         text("SELECT count(*) FROM outbox_events WHERE dispatched_at IS NULL")
     )
     assert still_pending == 1
+
+
+async def test_an_absorbed_row_is_an_envelope_the_generic_dispatcher_can_publish(
+    connection: AsyncConnection,
+) -> None:
+    """The absorbed row has to survive ``envelope_from_row`` — that is the only
+    thing standing between it and the stream.
+
+    ``dispatch_pending`` does exactly two things with a claimed row: rebuild the
+    envelope from ``payload`` and ``XADD`` it. A row whose ``payload`` is the
+    bare legacy business dict fails the first step with ``ValueError`` and is
+    counted unpublishable instead of delivered, which is precisely the silent
+    loss the absorption exists to avoid. So the assertion is not "the columns
+    match" but "the model parses it, and every envelope field says what it
+    should".
+    """
+    event_id = uuid7()
+    await connection.execute(
+        text(
+            "INSERT INTO shadow_outbox (event_id, stream, payload) "
+            "VALUES (:id, 'shadow.signals.emitted', CAST(:payload AS jsonb))"
+        ),
+        {"id": event_id, "payload": '{"signal_id": "s-1", "symbol": "ETHUSDT"}'},
+    )
+    await connection.execute(text(ABSORB_SHADOW_OUTBOX))
+
+    stored_payload, created_at = (
+        await connection.execute(
+            text("SELECT payload, created_at FROM outbox_events WHERE event_id = :id"),
+            {"id": event_id},
+        )
+    ).one()
+
+    envelope = envelope_from_row(stored_payload)
+
+    assert envelope.event_id == event_id, "the identity must survive the absorption unchanged"
+    assert envelope.type == "shadow.signals.emitted"
+    assert envelope.ts == created_at, "created_at is the documented substitute for the lost ts"
+    assert envelope.ts.tzinfo is not None
+    assert envelope.producer == "strategy-worker.shadow"
+    assert envelope.key == "ETHUSDT", "routing must keep S2's payload['symbol'] heuristic"
+    assert envelope.payload == {"signal_id": "s-1", "symbol": "ETHUSDT"}
+    assert EventEnvelope.from_bytes(envelope.to_bytes()) == envelope
+
+
+async def test_an_absorbed_row_without_a_symbol_falls_back_to_its_event_id(
+    connection: AsyncConnection,
+) -> None:
+    """S2's key heuristic is ``payload["symbol"] or event_id``; both halves.
+
+    A shadow event that carries no symbol still needs a routing key, and an
+    empty string is not one — ``key`` is part of the envelope contract.
+    """
+    event_id = uuid7()
+    await connection.execute(
+        text(
+            "INSERT INTO shadow_outbox (event_id, stream, payload) "
+            "VALUES (:id, 'shadow.signals.emitted', '{\"symbol\": \"\"}'::jsonb)"
+        ),
+        {"id": event_id},
+    )
+    await connection.execute(text(ABSORB_SHADOW_OUTBOX))
+
+    stored_payload = await connection.scalar(
+        text("SELECT payload FROM outbox_events WHERE event_id = :id"), {"id": event_id}
+    )
+    assert envelope_from_row(stored_payload).key == str(event_id)

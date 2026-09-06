@@ -18,8 +18,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from hunter_core.db.session import role_session
+from hunter_core.events.outbox_event import envelope_from_row
 from hunter_core.events.outbox_metrics import outbox_replayed_total
-from hunter_core.events.outbox_store import envelope_from_row, replay_rows
+from hunter_core.events.outbox_store import replay_rows
 from hunter_core.events.produce import publish
 from hunter_core.events.streams import DEFAULT_MAXLEN
 from hunter_core.logging import get_logger

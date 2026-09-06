@@ -137,14 +137,17 @@ class ShadowOutbox(Base):
     order, so "everything below id N is published" is false: transaction A can
     take 10, B take 11 and commit first, and a cursor at 11 would step over A.
     The pending predicate is ``dispatched_at IS NULL``, which is exactly what
-    the partial index serves. Nothing here is a tenant's data, and nothing here
-    is money.
+    the partial index serves -- keyed on ``(created_at, id)`` since ``0004``,
+    the order a dispatcher actually drains in, so the index answers the
+    ``ORDER BY`` as well as the filter. Nothing here is a tenant's data, and
+    nothing here is money.
     """
 
     __tablename__ = "shadow_outbox"
     __table_args__ = (
         Index(
             "ix_shadow_outbox_pending",
+            "created_at",
             "id",
             postgresql_where=text("dispatched_at IS NULL"),
         ),
