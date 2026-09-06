@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AnomaliesTile, loadAnomaliesTile } from "@/components/dashboard/anomalies-tile";
 import { EmptyStateCard } from "@/components/dashboard/empty-state-card";
+import { HotOpportunitiesTile, loadHotOpportunitiesTile } from "@/components/dashboard/hot-opportunities-tile";
 import { MembersCard } from "@/components/dashboard/members-card";
 import { OrganizationCard } from "@/components/dashboard/organization-card";
 import { QuickLinks } from "@/components/dashboard/quick-links";
+import { RegimeTile, loadRegimeTile } from "@/components/dashboard/regime-tile";
 import { SystemHealthLine } from "@/components/dashboard/system-health-line";
 import { WorkspaceCard } from "@/components/dashboard/workspace-card";
 import { LiveStatus } from "@/components/system/live-status";
@@ -71,11 +74,14 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
   if (!membership) notFound();
 
   const orgId = membership.organization.id;
-  const [workspaceLoad, membersLoad, marketStatus, readiness] = await Promise.all([
+  const [workspaceLoad, membersLoad, marketStatus, readiness, anomaliesLoad, hotOpportunitiesLoad, regimeLoad] = await Promise.all([
     loadWorkspace(orgId),
     loadMembers(orgId),
     marketStatusOrNull(),
     readyOrNull(),
+    loadAnomaliesTile(),
+    loadHotOpportunitiesTile(),
+    loadRegimeTile(),
   ]);
 
   return (
@@ -100,6 +106,20 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           )}
         </div>
       </section>
+
+      {/*
+       * Radar tiles (T2.7, brief line 12): anomalies/HOT/regime, right after
+       * Mercados per the same hierarchy rule (T1.5b joint decision #2) --
+       * what the product actually does today, before org/workspace/members
+       * chrome. Each tile fetches and fails on its own (same isolation as
+       * `loadWorkspace`/`loadMembers` above), so one down component never
+       * takes the section with it.
+       */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <AnomaliesTile result={anomaliesLoad} />
+        <HotOpportunitiesTile orgSlug={orgSlug} result={hotOpportunitiesLoad} />
+        <RegimeTile result={regimeLoad} />
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <OrganizationCard organization={membership.organization} role={membership.role} />

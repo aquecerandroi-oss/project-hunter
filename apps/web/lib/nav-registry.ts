@@ -66,9 +66,9 @@ export function navHref(item: Pick<NavItem, "segment">, orgSlug: string): string
 // docs/PRODUCT.md §4 -- table order preserved.
 export const NAV_ITEMS: readonly NavItem[] = [
   { key: "dashboard", label: "Dashboard", segment: "dashboard", icon: "layout-dashboard", status: "available", minRole: "VIEWER" },
-  { key: "radar", label: "Radar", segment: "radar", icon: "radar", status: "planned", plannedMilestone: "M2", minRole: "VIEWER" },
+  { key: "radar", label: "Radar", segment: "radar", icon: "radar", status: "available", minRole: "VIEWER" },
   { key: "markets", label: "Markets", segment: "markets", icon: "line-chart", status: "available", minRole: "VIEWER" },
-  { key: "opportunities", label: "Opportunities", segment: "opportunities", icon: "target", status: "planned", plannedMilestone: "M2", minRole: "VIEWER" },
+  { key: "opportunities", label: "Opportunities", segment: "opportunities", icon: "target", status: "available", minRole: "VIEWER" },
   { key: "portfolio", label: "Portfolio", segment: "portfolio", icon: "wallet", status: "planned", plannedMilestone: "M3", minRole: "VIEWER" },
   { key: "trades", label: "Trades", segment: "trades", icon: "activity", status: "planned", plannedMilestone: "M3", minRole: "VIEWER" },
   // Shadow Lab (docs/plans/SHADOW-LAB.md, S3): a research track parallel to

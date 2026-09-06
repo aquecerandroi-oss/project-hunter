@@ -14,6 +14,12 @@ vi.mock("@/hooks/useMarketChannels", () => ({ useMarketChannels: useMarketChanne
 // `MarketDetailView`'s own tick-freshness guard.
 vi.mock("@/components/markets/candles-chart", () => ({ CandlesChart: () => null }));
 
+// The T2.7 anomaly timeline fetches via its own Server Action on mount
+// (`components/anomalies/anomaly-timeline.tsx`) -- out of scope for this
+// file's tick-freshness assertions, mocked out the same way `CandlesChart`
+// is above.
+vi.mock("@/components/anomalies/anomaly-timeline", () => ({ AnomalyTimeline: () => null }));
+
 afterEach(cleanup);
 
 import { MarketDetailView } from "@/components/markets/market-detail-view";

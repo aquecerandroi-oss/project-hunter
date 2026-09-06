@@ -2,6 +2,7 @@
 
 import { useAuth } from "@clerk/nextjs";
 
+import { AnomalyTimeline } from "@/components/anomalies/anomaly-timeline";
 import { CandlesChart } from "@/components/markets/candles-chart";
 import { DerivativesCard } from "@/components/markets/derivatives-card";
 import { formatPrice } from "@/components/markets/format";
@@ -170,6 +171,11 @@ export function MarketDetailView({ detail, candles, candlesError = null }: Marke
           fundingKind={detail.funding_kind}
           components={detail.components}
         />
+      </section>
+
+      <section className="rounded-lg border border-border bg-bg-elevated p-4">
+        <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-muted">Anomalias (24h)</h2>
+        <AnomalyTimeline marketId={detail.id} />
       </section>
     </div>
   );

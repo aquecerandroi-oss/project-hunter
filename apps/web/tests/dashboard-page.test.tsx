@@ -3,17 +3,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { resolveOrgContextMock, listWorkspacesMock, listMembersMock, getMarketStatusMock, readyMock } = vi.hoisted(() => ({
-  resolveOrgContextMock: vi.fn(),
-  listWorkspacesMock: vi.fn(),
-  listMembersMock: vi.fn(),
-  getMarketStatusMock: vi.fn(),
-  readyMock: vi.fn(),
-}));
+const { resolveOrgContextMock, listWorkspacesMock, listMembersMock, getMarketStatusMock, readyMock, listAnomaliesMock, listRadarMock, getCurrentRegimeMock } =
+  vi.hoisted(() => ({
+    resolveOrgContextMock: vi.fn(),
+    listWorkspacesMock: vi.fn(),
+    listMembersMock: vi.fn(),
+    getMarketStatusMock: vi.fn(),
+    readyMock: vi.fn(),
+    // T2.7's three dashboard tiles -- mocked to a deterministic "empty,
+    // verified" result so this file's pre-existing assertions (about
+    // workspace/members/market-status/readiness) are never coupled to them.
+    listAnomaliesMock: vi.fn(),
+    listRadarMock: vi.fn(),
+    getCurrentRegimeMock: vi.fn(),
+  }));
 
 vi.mock("@/lib/api/org-context", () => ({ resolveOrgContext: resolveOrgContextMock }));
 vi.mock("@/lib/api/workspaces", () => ({ listWorkspaces: listWorkspacesMock }));
 vi.mock("@/lib/api/members", () => ({ listMembers: listMembersMock }));
+vi.mock("@/lib/api/anomalies", () => ({ listAnomalies: listAnomaliesMock }));
+vi.mock("@/lib/api/radar", () => ({ listRadar: listRadarMock }));
+vi.mock("@/lib/api/regime", () => ({ getCurrentRegime: getCurrentRegimeMock }));
 // `wasReadyCheckAttempted` is real, pure logic (not a network call) --
 // `vi.importActual` keeps it wired to whatever `readyMock` resolves to,
 // instead of re-implementing (and risking drifting from) its rule for
@@ -101,6 +111,9 @@ beforeEach(() => {
   listMembersMock.mockReset();
   getMarketStatusMock.mockReset().mockResolvedValue(marketStatus);
   readyMock.mockReset().mockResolvedValue({ database: true, redis: true });
+  listAnomaliesMock.mockReset().mockResolvedValue({ items: [], next_cursor: null, as_of: "2026-01-01T00:00:00Z", window_start: "2025-12-02T00:00:00Z" });
+  listRadarMock.mockReset().mockResolvedValue({ items: [], next_cursor: null, as_of: "2026-01-01T00:00:00Z", org_scoped: true });
+  getCurrentRegimeMock.mockReset().mockResolvedValue({ items: [], as_of: "2026-01-01T00:00:00Z" });
 });
 
 afterEach(cleanup);
