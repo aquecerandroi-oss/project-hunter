@@ -3,16 +3,25 @@
 Split out of ``recovery.py`` for the 350-line budget, along a real seam:
 ``recovery.py`` decides **what** to repair (detection, tiers, budgets) and this
 module executes **one** repair — the fetch, the filters that decide which
-candles belong to the gap, and the transaction where the candles, the
-``market.candles.closed`` outbox rows and the gap's status transition commit or
-roll back together.
+candles belong to the gap, and the transaction where the candles, the outbox
+row(s) and the gap's status transition commit or roll back together.
+
+T2.9c: which outbox row(s) depends on ``tier``, the classification
+``recovery.check_gaps`` already computed before calling in. The *live* tier
+(the default) announces every inserted minute as its own
+``market.candles.closed``, unchanged since T2.9. The *history* tier announces
+the whole batch this call actually inserts as one aggregate
+``market.candles.backfilled`` instead — publishing history one minute at a
+time was measured queuing up to 1,440 events/cycle ahead of live candles in
+the dispatcher's ``(created_at, id)`` order (notes-T2.5.md §28, §31;
+notes-T2.9.md T2.9c).
 """
 
 from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import select
 
@@ -23,8 +32,18 @@ from hunter_core.logging import get_logger
 from hunter_core.observability import candle_gaps_total
 from hunter_exchanges.rate_limit_suspension import is_coordination_outage
 from hunter_market_worker import recovery_queries as queries
+from hunter_market_worker.backfill_announce import enqueue_candles_backfilled
 from hunter_market_worker.persist import upsert_candles
 from hunter_market_worker.supervision import rest_gate_suspended
+
+Tier = Literal["live", "history"]
+HISTORICAL_RECOVERY_REASON = "historical_recovery"
+"""Fixed ``reason`` for every ``market.candles.backfilled`` event: describes
+*why this is history* (the window aged past the live threshold), never a
+claim about who asked for it -- ``ingestion_gaps`` carries no origin, and a
+gap the live tier itself created can age into history without any
+``market.backfill.requested`` ever existing
+(``recovery_queries.pending_gaps`` docstring; notes-T2.9.md T2.9c)."""
 
 logger = get_logger(__name__)
 MINUTE = timedelta(minutes=1)
@@ -46,6 +65,7 @@ async def recover_registered(
     candles: list[Any] | None = None,
     fetch_error: BaseException | None = None,
     timeout_s: float = FETCH_TIMEOUT_S,
+    tier: Tier = "live",
 ) -> None:
     """Atomically backfill one gap: candles and the status transition commit
     (or roll back) together via ``begin_nested``.
@@ -54,6 +74,15 @@ async def recover_registered(
     this transaction (M3) — pass neither to fetch here as before (used
     directly by tests and by any caller that already holds a short-lived
     connection budget).
+
+    ``tier`` is the caller's own classification (``recovery.check_gaps``
+    already tells live collection apart from history by the age of the gap's
+    window before it ever reaches here, PIPELINE.md §1b item 7) — this
+    function does not infer it. ``"history"`` (T2.9c) announces the whole
+    batch this call actually inserts as one aggregate
+    ``market.candles.backfilled`` event instead of one ``market.candles.closed``
+    per minute, in the same transaction as the candles and the status
+    transition.
     """
     gap.attempts += 1
     try:
@@ -90,10 +119,25 @@ async def recover_registered(
                 )
                 gap.gap_start = earliest
         async with session.begin_nested():
-            # ``upsert_candles`` also queues the ``market.candles.closed``
-            # event for every backfilled minute, in this same transaction —
-            # a recovered candle is announced exactly like a live one (T2.9).
-            inserted = await upsert_candles(session, closed, {symbol: gap.market_id}, source="rest")
+            # ``upsert_candles`` queues one ``market.candles.closed`` per
+            # inserted minute for the live tier -- a recovered candle
+            # announced exactly like a live one (T2.9). The history tier
+            # (T2.9c) opts out of that and gets the actually-inserted batch
+            # back instead, to announce as one aggregate event below, in this
+            # same transaction.
+            newly_inserted: list[Any] = []
+            inserted = await upsert_candles(
+                session,
+                closed,
+                {symbol: gap.market_id},
+                source="rest",
+                announce=tier != "history",
+                collected=newly_inserted if tier == "history" else None,
+            )
+            if tier == "history" and newly_inserted:
+                await enqueue_candles_backfilled(
+                    session, newly_inserted, reason=HISTORICAL_RECOVERY_REASON
+                )
             present = await queries.persisted(session, gap.market_id, gap.gap_start, gap.gap_end)
             if expected_times(gap.gap_start, gap.gap_end) <= present:
                 gap.status = "recovered"
@@ -133,9 +177,11 @@ async def recover_one(
     now: datetime,
     *,
     timeout_s: float = FETCH_TIMEOUT_S,
+    tier: Tier = "live",
 ) -> None:
     """M3: fetch over REST with no transaction open, then re-check the gap
-    ``FOR UPDATE`` and write in one short transaction."""
+    ``FOR UPDATE`` and write in one short transaction. ``tier`` passes
+    through to :func:`recover_registered` unchanged."""
     async with role_session(session_factory, db_role="hunter_worker") as session:
         gap = await session.scalar(
             select(IngestionGap).where(IngestionGap.id == gap_id, IngestionGap.status == "open")
@@ -171,4 +217,5 @@ async def recover_one(
             candles=candles,
             fetch_error=fetch_error,
             timeout_s=timeout_s,
+            tier=tier,
         )

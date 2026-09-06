@@ -48,21 +48,26 @@ Above: ``BinanceRestClient.fetch_candles`` pages at ``_KLINES_PAGE_LIMIT``
 (1500) with weight 10 per page, so anything up to 1500 minutes is one page —
 one HTTP call inside ``recovery.FETCH_TIMEOUT_S``.
 
-Below: every backfilled minute is announced as ``market.candles.closed``
-through the outbox (``durable.enqueue_candles``, the same path as a live
-candle), so one recovered chunk enqueues ``CHUNK_MINUTES`` rows in one
-transaction. The market-worker's readiness turns red above ``MAX_PENDING``
-(500) unpublished rows, and the live minute boundary of 200 markets already
-contributes ~200.
+Below: the retry unit, not the outbox anymore. A chunk is one
+``recover_registered`` attempt, so a chunk that fails (timeout, a transient
+Postgres error) retries 240 minutes instead of a whole multi-day request.
+Before T2.9c this floor was doing double duty: every backfilled minute was
+announced as its own ``market.candles.closed`` through the outbox
+(``durable.enqueue_candles``, the same path as a live candle), so one
+recovered chunk enqueued ``CHUNK_MINUTES`` rows in one transaction and 240 was
+also sized to keep that from being most of the readiness ceiling
+(``MAX_PENDING``, 500) by itself. T2.9c replaced that with one aggregate
+``market.candles.backfilled`` per chunk
+(``backfill_announce.enqueue_candles_backfilled``), so the outbox no longer
+bounds this number from below.
 
-**What 240 bounds, precisely:** one chunk's announcements. It is *not* a promise
-that the queue stays under 500 — two chunks recovered back to back before the
-dispatcher (100 rows/sweep) drains can add up, and the real per-cycle ceiling is
-``MAX_HISTORY_GAPS_PER_CYCLE x CHUNK_MINUTES`` = 1 440 (Astra, T2.5-backfill diff
-review). 1 440 in a *single* transaction would park ``/ready`` red for the ~15s
-one drain takes; 240 at a time, spaced by a REST call each, is what the local
-proof measured with ``outbox_pending = 0`` at the end. The cost is more rows and
-more REST calls for the same history."""
+**What 240 bounds, precisely (T2.9c):** the retry unit and the per-cycle
+history *throughput*, not the outbox. ``MAX_HISTORY_GAPS_PER_CYCLE x
+CHUNK_MINUTES`` = 1 440 minutes of history recovered per cycle is still the
+real per-cycle ceiling (Astra, T2.5-backfill diff review) — it now bounds how
+much history a bootstrap catches up per minute of wall clock, not how many
+outbox rows a cycle produces. That number is ``MAX_HISTORY_GAPS_PER_CYCLE``
+(one aggregate event per chunk), independent of ``CHUNK_MINUTES``."""
 
 MERGE_MINUTES = 60
 """Two holes closer than this become one row.

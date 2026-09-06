@@ -186,7 +186,7 @@ async def check_gaps(
         symbol = symbol_by_market_id.get(market_id)
         if symbol is None:
             continue
-        await recover_one(session_factory, adapter, gap_id, symbol, now)
+        await recover_one(session_factory, adapter, gap_id, symbol, now, tier="live")
 
     # History last, and under a wall-clock budget: what is left of the cycle
     # decides how much of a bootstrap gets served, never the other way round.
@@ -211,7 +211,7 @@ async def check_gaps(
                 # come from the deadline above — which rolls back — and not from
                 # the gap's own timeout, which would spend an attempt on a slow
                 # cycle rather than on a slow exchange.
-                await recover_one(session_factory, adapter, gap_id, symbol, now)
+                await recover_one(session_factory, adapter, gap_id, symbol, now, tier="history")
         except TimeoutError:
             logger.warning("market_backfill_unit_timeout", symbol=symbol, budget_s=remaining)
             break

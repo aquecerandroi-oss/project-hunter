@@ -407,3 +407,159 @@ e religar o Redis no meio de um ciclo), não de unidade, e é o mesmo cenário d
 prova operacional. Ficam os testes de unidade nas duas pontas (limiter e
 recovery) e o furo permanece: nenhum teste automatizado exercita a composição
 real limiter+timeout+recovery com um Redis de verdade morrendo. Para T1.6b.
+
+---
+
+## T2.9c — anúncios de backfill sem sufocar o outbox
+
+Achado do consumidor de backfill (T2.5-backfill, `3dcb218`; notes-T2.5.md §28,
+§31, concern 2): cada minuto backfillado virava um `market.candles.closed` na
+outbox, um por linha. Consequência dupla, medida na T2.5-backfill: (a) o
+dreno ficava limitado a ~1 dia de histórico por minuto de relógio — a outbox,
+não o REST, era o gargalo de vazão do bootstrap; (b) anúncios de minutos
+antigos entravam na frente de velas ao vivo na ordem `(created_at, id)` do
+despachante, porque nada distingue origem numa fila que só ordena por
+enfileiramento (PIPELINE.md §10b).
+
+### Desenho, com a Astra antes de codar
+
+`.claude/state/astra-review-T2.9c-backfill-lane.md`. Levei três opções: (A) um
+evento agregado `market.candles.backfilled` por pedaço em vez de um por
+minuto; (B) prioridade/quota no despachante genérico
+(`hunter_core.events.outbox`) para velas vivas não esperarem atrás de
+histórico; (C) as duas. **Ela aceitou A sozinha, sem B**, com a ressalva de
+que "a espera deixou de ser problema prático" tem de ser conclusão de medição
+(item "vazão" abaixo), não afirmação a priori — o motivo para não fazer B: o
+estrato histórico já é limitado a `MAX_HISTORY_GAPS_PER_CYCLE = 6` linhas de
+outbox por ciclo por shard depois de A (era até 1 440), o que não justifica o
+risco de tocar o despachante genérico que também serve `market.universe.changed`,
+`market.derivatives` e `market.liquidations`. Registrado como não descartado
+para sempre: se a fila crescer por outro motivo, o candidato é uma quota por
+`stream` em `dispatch_pending`, não uma prioridade por linha.
+
+**Must-fix dela, corrigido antes de codar (não depois):** a premissa que eu
+levei — "todo gap do estrato `history` nasceu de um `market.backfill.requested`,
+por construção" — é **falsa**. `recovery_queries.pending_gaps` classifica só
+pela idade da janela (`gap_end < live_from`), nunca pela origem, e uma lacuna
+que a própria coleta ao vivo criou (`check_gaps` ou `persist.report_losses`)
+pode **envelhecer** para o estrato histórico se o REST (ou o worker) ficar
+fora por mais que `BOOTSTRAP_WINDOW_MINUTES` (~25 h) — `reopen_stale_failed`
+reabre um `failed` antigo sem tocar `gap_start`/`gap_end`, então o cooldown não
+reseta o relógio. Corrigido: o `reason` do evento agregado é
+`"historical_recovery"` (a janela envelheceu), nunca `"backfill_request"`
+(alguém pediu) — a segunda frase é uma afirmação que o schema atual não pode
+sustentar. Correção espelhada em `notes-T2.5.md` (novo parágrafo depois do
+§25) e no docstring de `recovery_queries.pending_gaps`.
+
+### O que foi implementado
+
+1. **Stream novo** `Streams.MARKET_CANDLES_BACKFILLED = "market.candles.backfilled"`
+   (`packages/core/hunter_core/events/streams.py`, `MAXLEN = 5_000`) — sem
+   migração, sem coluna nova em `ingestion_gaps`.
+2. **Módulo novo** `services/market-worker/hunter_market_worker/backfill_announce.py`
+   (`candles_backfilled_event_id`, `enqueue_candles_backfilled`) — extraído de
+   `durable.py` por orçamento de linhas real (durable.py bateria 388 linhas
+   com as duas funções dentro; a costura também é de responsabilidade: um
+   arquivo anuncia *minutos*, um por evento, o outro anuncia *lotes*).
+3. **`persist_rows.upsert_candles`** ganhou `announce: bool = True` e
+   `collected: list[NormalizedCandle] | None = None`. `announce=False` pula o
+   `enqueue_candles` por minuto; `collected`, se passado, recebe exatamente os
+   candles que a chamada **realmente inseriu** (o mesmo `inserted` que já
+   existia, só também exposto ao chamador). Comportamento padrão inalterado —
+   todo chamador existente (`persist_rows.flush_batch`, o caminho WS) continua
+   idêntico.
+4. **`recovery_drain.recover_registered`/`recover_one`** ganharam
+   `tier: Literal["live", "history"] = "live"`. `tier="history"` chama
+   `upsert_candles(..., announce=False, collected=...)` e, na **mesma**
+   transação (`session.begin_nested()`, junto com as velas e a transição de
+   status do gap), enfileira um `market.candles.backfilled` com o lote
+   coletado. `tier="live"` (o padrão) preserva o comportamento de sempre —
+   nenhum teste existente precisou mudar por causa do parâmetro em si.
+5. **`recovery.check_gaps`** passa `tier="live"` no laço do estrato vivo e
+   `tier="history"` no laço do estrato histórico — a classificação que já
+   existia (`queries.pending_gaps`) agora chega à decisão de anúncio.
+
+### (1) Idempotência do evento agregado
+
+`event_id = uuid5(stream, exchange, symbol, timeframe, "rest", start, end)`,
+sobre o **intervalo realmente inserido nesta transação**
+(`min`/`max(open_time)` do lote coletado), não sobre os limites nominais do
+gap (`gap.gap_start`/`gap.gap_end`). A Astra confirmou a escolha e apontou a
+justificativa mais precisa: dois lotes **commitados** para a mesma chave
+`(market_id, timeframe)` nunca podem compartilhar um mínimo, porque o
+`ON CONFLICT DO NOTHING` de `upsert_candles` nunca deixa o mesmo minuto ser
+inserido duas vezes — os lotes são disjuntos por construção. Hashear os
+limites nominais do gap faria uma segunda passada sobre o mesmo gap ainda
+aberto colidir com a primeira e as velas novas recuperadas na segunda
+passada nunca seriam anunciadas (o `ON CONFLICT` do outbox as descartaria em
+silêncio). Testes:
+`services/market-worker/tests/test_outbox_producers.py::test_two_disjoint_backfill_batches_get_different_identities`,
+`::test_an_empty_backfill_batch_announces_nothing` (lote vazio não é evento —
+nada foi inserido, nada para anunciar).
+
+### (2) Transacionalidade
+
+`enqueue_candles_backfilled` é chamado dentro do mesmo `session.begin_nested()`
+de `recover_registered` que grava as velas e decide `gap.status = "recovered"`
+— rollback da unidade (prazo estourado, erro de escrita) desfaz os três
+juntos; commit publica os três juntos. Nenhum caminho novo de transação;
+reaproveita exatamente o que a T2.9 original já garantia para
+`market.candles.closed`. Teste:
+`test_backfill_lane.py::test_a_history_tier_gap_is_announced_as_one_aggregate_event`.
+
+### (3) Teste de vazão
+
+`test_backfill_lane.py::test_seven_days_of_history_costs_at_most_forty_two_announcements`:
+7 dias × 1 mercado em pedaços de 240 min (`10 080 / 240 = 42`) →
+**42 anúncios agregados**, `market.candles.closed` = 0 para esses candles —
+contra os 10 080 de antes desta tarefa. `::test_live_candles_are_not_queued_behind_a_cycles_worth_of_history`
+mede o outro lado com relógio injetado (`now` é parâmetro explícito em todo o
+caminho, nunca lido do relógio real dentro da função sob teste): um ciclo
+inteiro do estrato histórico (`MAX_HISTORY_GAPS_PER_CYCLE = 6` pedaços) mais
+uma vela ao vivo saem **na mesma varredura** do despachante
+(`dispatch_pending` publica os 7). Antes desta tarefa o mesmo ciclo teria
+produzido até 1 440 linhas de `market.candles.closed` — muito acima do
+`BATCH = 100` de uma varredura — e uma vela ao vivo enfileirada depois delas
+esperaria a próxima. **Ressalva da Astra, registrada e não contestada:** 240×
+menos eventos não é 240× mais histórico recuperado (o teto de
+`MAX_HISTORY_GAPS_PER_CYCLE × CHUNK_MINUTES = 1 440 min/ciclo` continua o
+mesmo, só que agora é o teto de *vazão*, não de *outbox*); o teto é por
+execução de recovery/shard, não global; e esta mudança não compacta linhas
+antigas que já estivessem pendentes antes do deploy — só muda o que passa a
+ser enfileirado dali para a frente.
+
+### (4) Prova de 15 min no stack local
+
+Ver `.claude/state/t25-proof.md`, seção acrescentada por esta tarefa.
+
+### O que fica registrado, não implementado
+
+- **Nenhum consumidor de `market.candles.backfilled` existe ainda.** O
+  scanner-worker (T2.5d, em voo) é o candidato óbvio — ele já faz bootstrap
+  lendo candles persistidas do Postgres (não deste stream), então o evento
+  serviria só para **invalidar/reagendar** um bootstrap em andamento sem
+  esperar a releitura periódica de cobertura, nunca como fonte da verdade.
+  Requisitos que a Astra listou para quem for implementar (T2.5d/T2.5e, **não
+  implementados aqui** por estarem fora da lista de arquivos desta tarefa):
+  1. reler a cobertura em Postgres antes de agir — o evento é um sinal para
+     *quando* olhar de novo, não uma promessa do que vai encontrar;
+  2. tratar duplicatas (o evento é entrega pelo menos uma vez, como todo
+     evento da outbox);
+  3. o agregado **não** marca um gap/pedido como completo — `[start, end)`
+     cobre só os minutos que aquela transação inseriu, sem prometer
+     continuidade nem conclusão (a Astra insistiu nisso: um consumidor que
+     tratasse um `market.candles.backfilled` como "pronto" estaria errado
+     sempre que uma unidade parar por prazo/erro e continuar depois);
+  4. manter a recuperação por releitura periódica/restart independente do
+     evento — já existe hoje via `retry_at` no bootstrap do scanner
+     (`hunter_scanner_worker/ledger.py`, citado pela Astra), então o evento
+     só antecipa a reação, nunca é a única garantia.
+- **`market.candles.backfilled` não substitui nada em `market.candles.closed`
+  para o estrato vivo.** Nenhuma edição em `services/scanner-worker/**` ou
+  `services/strategy-worker/**` — as suítes dos dois que tocam candles
+  (`test_consumers.py`, `test_consumer_supervision.py`) rodaram sem edição e
+  continuam verdes.
+- **`CHUNK_MINUTES = 240` não mudou.** O piso que a outbox impunha
+  desapareceu (docstring de `backfill_plan.py` corrigida), mas 240 continua
+  sendo a unidade de retentativa de uma página de klines — não havia motivo
+  para mexer nesse número por conta desta tarefa.

@@ -23,7 +23,7 @@ from hunter_core.domain.enums import Timeframe
 from hunter_core.domain.market import to_wire
 from hunter_core.events.outbox import dispatch_pending
 from hunter_core.events.streams import Streams
-from hunter_market_worker import durable, persist, persist_rows
+from hunter_market_worker import backfill_announce, durable, persist, persist_rows
 from hunter_market_worker.publication import liquidation_id
 from hunter_market_worker.queues import OpenInterestSample, PersistItem, RealizedFunding
 
@@ -153,6 +153,114 @@ async def test_a_rest_backfilled_candle_is_published_too(db_session_factory: Any
     # which shard emitted an event, and identity (``event_id``) does not
     # depend on it. Plumbing it through is a follow-up in notes-T2.9.md.
     assert rows[0].payload["producer"] == durable.PRODUCER
+
+
+async def test_upsert_candles_can_skip_the_per_minute_announcement_and_collect_instead(
+    db_session_factory: Any,
+) -> None:
+    """T2.9c: the history-tier recovery path opts out of ``enqueue_candles``
+    and gets the inserted rows back instead, so its caller can build one
+    aggregate announcement rather than one per minute."""
+    code = unique_code()
+    market_id = await seed_market(db_session_factory, code, "BTCUSDT")
+    await _clear_outbox(db_session_factory)
+    candle = builders.candle("BTCUSDT", exchange=code)
+    collected: list[Any] = []
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        inserted = await persist.upsert_candles(
+            session,
+            [candle],
+            {"BTCUSDT": market_id},
+            source="rest",
+            announce=False,
+            collected=collected,
+        )
+
+    assert inserted == 1
+    assert collected == [candle]
+    assert await _outbox(db_session_factory) == []
+
+
+# --- aggregated history announcement (T2.9c) --------------------------------
+
+
+async def test_a_history_backfill_batch_is_announced_as_one_aggregate_event(
+    db_session_factory: Any,
+) -> None:
+    code = unique_code()
+    market_id = await seed_market(db_session_factory, code, "BTCUSDT")
+    await _clear_outbox(db_session_factory)
+    base = builders.candle("BTCUSDT", exchange=code).open_time
+    candles = [
+        builders.candle("BTCUSDT", open_time=base + timedelta(minutes=n), exchange=code)
+        for n in range(3)
+    ]
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        await backfill_announce.enqueue_candles_backfilled(
+            session, candles, reason="historical_recovery"
+        )
+
+    rows = await _outbox(db_session_factory)
+    assert len(rows) == 1
+    assert rows[0].stream == Streams.MARKET_CANDLES_BACKFILLED
+    payload = rows[0].payload["payload"]
+    assert payload["exchange"] == code
+    assert payload["symbol"] == "BTCUSDT"
+    assert payload["timeframe"] == Timeframe.M1.value
+    assert payload["start"] == base.isoformat()
+    assert payload["end"] == (base + timedelta(minutes=3)).isoformat()
+    assert payload["count"] == 3
+    assert payload["source"] == "rest"
+    assert payload["reason"] == "historical_recovery"
+    assert market_id  # the market exists; the event does not carry its id
+
+
+async def test_an_empty_backfill_batch_announces_nothing(db_session_factory: Any) -> None:
+    code = unique_code()
+    await seed_market(db_session_factory, code, "BTCUSDT")
+    await _clear_outbox(db_session_factory)
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        await backfill_announce.enqueue_candles_backfilled(
+            session, [], reason="historical_recovery"
+        )
+
+    assert await _outbox(db_session_factory) == []
+
+
+async def test_two_disjoint_backfill_batches_get_different_identities(
+    db_session_factory: Any,
+) -> None:
+    """Two committed batches for the same market/timeframe can never share a
+    minimum -- ``ON CONFLICT DO NOTHING`` never lets the same minute be
+    inserted twice -- so their spans are disjoint and the identity derived
+    from ``min``/``max`` open_time never collides."""
+    code = unique_code()
+    await seed_market(db_session_factory, code, "BTCUSDT")
+    await _clear_outbox(db_session_factory)
+    base = builders.candle("BTCUSDT", exchange=code).open_time
+    first_batch = [
+        builders.candle("BTCUSDT", open_time=base + timedelta(minutes=n), exchange=code)
+        for n in range(2)
+    ]
+    second_batch = [
+        builders.candle("BTCUSDT", open_time=base + timedelta(minutes=n), exchange=code)
+        for n in range(2, 4)
+    ]
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        await backfill_announce.enqueue_candles_backfilled(
+            session, first_batch, reason="historical_recovery"
+        )
+        await backfill_announce.enqueue_candles_backfilled(
+            session, second_batch, reason="historical_recovery"
+        )
+
+    rows = await _outbox(db_session_factory)
+    assert len(rows) == 2
+    assert rows[0].event_id != rows[1].event_id
 
 
 # --- liquidations, realized funding, open interest --------------------------

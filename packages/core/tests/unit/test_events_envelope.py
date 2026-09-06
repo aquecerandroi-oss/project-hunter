@@ -36,6 +36,7 @@ def test_every_pipeline_stream_has_a_default_maxlen() -> None:
         Streams.MARKET_DERIVATIVES,
         Streams.MARKET_LIQUIDATIONS,
         Streams.MARKET_UNIVERSE_CHANGED,
+        Streams.MARKET_CANDLES_BACKFILLED,
         Streams.FEATURES_UPDATED,
         Streams.ANOMALIES_DETECTED,
         Streams.REGIME_CHANGED,
@@ -56,5 +57,6 @@ def test_every_pipeline_stream_has_a_default_maxlen() -> None:
 def test_stream_names_match_pipeline_md() -> None:
     assert Streams.MARKET_TICKS == "market.ticks"
     assert Streams.MARKET_CANDLES_CLOSED == "market.candles.closed"
+    assert Streams.MARKET_CANDLES_BACKFILLED == "market.candles.backfilled"
     assert Streams.KILL_SWITCH_CHANGED == "kill_switch.changed"
     assert Streams.RISK_EVENTS == "risk.events"

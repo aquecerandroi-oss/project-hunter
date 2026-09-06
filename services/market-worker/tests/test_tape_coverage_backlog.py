@@ -1,3 +1,4 @@
+# pyright: reportPrivateUsage=false
 """T2.5e: "caught up" is a bounded delay, not an empty queue.
 
 ``.claude/state/brief-T2.5e-coverage-caught-up.md``: after T2.5-adapter,

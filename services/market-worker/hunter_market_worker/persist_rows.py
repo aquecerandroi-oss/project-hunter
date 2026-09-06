@@ -96,12 +96,20 @@ async def upsert_candles(
     *,
     source: str,
     producer: str = durable.PRODUCER,
+    announce: bool = True,
+    collected: list[NormalizedCandle] | None = None,
 ) -> int:
     """``INSERT ... ON CONFLICT (market_id, timeframe, open_time) DO NOTHING``.
 
-    Returns how many candles were newly inserted, and queues one
-    ``market.candles.closed`` event for each of them (T2.9). A candle the
+    Returns how many candles were newly inserted. By default also queues one
+    ``market.candles.closed`` event per inserted candle (T2.9) — a candle the
     conflict clause dropped was already announced by whoever inserted it.
+
+    ``announce=False`` skips that per-minute enqueue: the history-tier
+    recovery path (T2.9c) announces the whole batch as one aggregate
+    ``market.candles.backfilled`` event instead (PIPELINE.md §1b item 7).
+    ``collected``, when given, is extended with the candles actually
+    inserted, so that event reflects the real outcome.
     """
     rows: dict[tuple[Any, Any, datetime], dict[str, Any]] = {}
     by_key: dict[tuple[Any, Any, datetime], NormalizedCandle] = {}
@@ -142,7 +150,10 @@ async def upsert_candles(
         stmt.returning(Candle.market_id, Candle.timeframe, Candle.open_time)
     )
     inserted = [by_key[(row.market_id, row.timeframe, row.open_time)] for row in result.all()]
-    await durable.enqueue_candles(session, inserted, producer=producer)
+    if collected is not None:
+        collected.extend(inserted)
+    if announce:
+        await durable.enqueue_candles(session, inserted, producer=producer)
     return len(inserted)
 
 

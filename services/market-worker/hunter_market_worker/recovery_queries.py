@@ -184,7 +184,20 @@ async def pending_gaps(
     A gap whose ``gap_end`` reaches into the detection window is *live*: either
     the collector found it itself or a backfill request named minutes the
     collector would have found anyway. Everything older is *history* — by
-    construction, since ``check_gaps`` never creates a gap that old.
+    construction, since ``check_gaps`` never *creates* a gap that old.
+
+    That construction is about **creation**, not **origin**: it does not mean a
+    gap in this tier was necessarily born from ``market.backfill.requested``.
+    A gap ``check_gaps`` or ``persist.report_losses`` created inside the live
+    window can still *age* into ``history`` here without anyone ever asking
+    for it — REST staying down, or the worker itself being stopped, for longer
+    than ``BOOTSTRAP_WINDOW_MINUTES``\\ shifts ``live_from`` past a
+    ``gap_end`` that was never touched. ``reopen_stale_failed`` reopens a
+    stale ``failed`` gap without moving its bounds either, so a cooldown does
+    not reset the clock (Astra, T2.9c review — notes-T2.5.md §25 correction,
+    notes-T2.9.md). A caller that needs to say *why* a history-tier chunk was
+    recovered has to say "the window aged past the live threshold", not
+    "someone requested it".
 
     Both tiers are ordered by ``gap_end DESC``: the newest missing minute is the
     one whose absence hurts most (it is the one every rolling window is waiting
