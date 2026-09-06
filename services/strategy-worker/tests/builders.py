@@ -303,6 +303,9 @@ __all__ = [
     "ensure_partitions",
     "NamedStrategy",
     "insert_candles",
+    "insert_funding_rate",
+    "insert_open_interest",
+    "insert_regime",
     "isolate_catalogue",
     "only_version",
     "register_gap",
@@ -351,6 +354,81 @@ async def register_gap(
             "detected_at": detected_at or utcnow(),
         },
     )
+
+
+async def insert_funding_rate(
+    session: AsyncSession,
+    market_id: uuid.UUID,
+    *,
+    funding_time: datetime,
+    rate: Decimal,
+    mark_price: Decimal | None,
+) -> None:
+    """One durable ``funding_rates`` settlement row."""
+    await session.execute(
+        text(
+            "INSERT INTO funding_rates (market_id, funding_time, rate, mark_price) "
+            "VALUES (:market_id, :funding_time, :rate, :mark_price)"
+        ),
+        {
+            "market_id": market_id,
+            "funding_time": funding_time,
+            "rate": rate,
+            "mark_price": mark_price,
+        },
+    )
+    await session.flush()
+
+
+async def insert_open_interest(
+    session: AsyncSession,
+    market_id: uuid.UUID,
+    *,
+    ts: datetime,
+    open_interest: Decimal | None,
+    open_interest_value: Decimal | None = None,
+) -> None:
+    """One durable ``open_interest_history`` sample row."""
+    await session.execute(
+        text(
+            "INSERT INTO open_interest_history (market_id, ts, open_interest, open_interest_value) "
+            "VALUES (:market_id, :ts, :open_interest, :open_interest_value)"
+        ),
+        {
+            "market_id": market_id,
+            "ts": ts,
+            "open_interest": open_interest,
+            "open_interest_value": open_interest_value,
+        },
+    )
+    await session.flush()
+
+
+async def insert_regime(
+    session: AsyncSession,
+    *,
+    start_time: datetime,
+    end_time: datetime | None = None,
+    regime: str = "SIDEWAYS",
+    scope: str = "global",
+) -> uuid.UUID:
+    """One ``market_regimes`` row, like ``hunter_scanner_worker.writers.write_regime``."""
+    regime_id = uuid7()
+    await session.execute(
+        text(
+            "INSERT INTO market_regimes (id, scope, regime, start_time, end_time) "
+            "VALUES (:id, :scope, :regime, :start_time, :end_time)"
+        ),
+        {
+            "id": regime_id,
+            "scope": scope,
+            "regime": regime,
+            "start_time": start_time,
+            "end_time": end_time,
+        },
+    )
+    await session.flush()
+    return regime_id
 
 
 async def isolate_catalogue(session: AsyncSession, *, keep: str = "volume_anomaly") -> None:

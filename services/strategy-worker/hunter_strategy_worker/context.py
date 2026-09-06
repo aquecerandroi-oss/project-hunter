@@ -7,6 +7,13 @@ which drops anything non-final or closing after ``source_bar_close``. That cut
 is the anti-look-ahead guarantee: a candle that arrives later, or the minute
 still forming, cannot move a decision (S1, ``strategies/base.py``).
 
+Funding and open interest go through the same cut (:mod:`.derivatives`): until
+this module started passing them, ``StrategyContext.funding`` and
+``.open_interest`` were always ``None`` even though ``build_context`` already
+accepted and filtered both (notes-S2.md, "o que o contexto nunca recebe").
+Neither v1 strategy reads them yet, so this does not change what they decide;
+it unblocks a funding-gated candidate strategy from the backlog.
+
 Eligibility is read from ``markets.is_monitored`` at that moment and the reading
 instant is recorded in the envelope: the universe is overwritten in place by
 every refresh, so the current flag is only evidence about *now*. The caller
@@ -24,6 +31,7 @@ from hunter_core.domain.types import utcnow
 from hunter_core.strategies.base import StrategyContext, build_context
 from hunter_strategy_worker import hot_state
 from hunter_strategy_worker.config import PRODUCER
+from hunter_strategy_worker.derivatives import load_derivatives
 from hunter_strategy_worker.record import Provenance
 from hunter_strategy_worker.repo import load_candles, newest_received_at
 
@@ -72,11 +80,14 @@ async def build_market_context(
     candles = [merged[key] for key in sorted(merged)]
     eligible, reason = _eligibility(market)
     observed_at = utcnow()
+    deriv = await load_derivatives(session, redis, market=market, cut=source_bar_close)
     context = build_context(
         candles,
         exchange=market.exchange,
         symbol=market.symbol,
         source_bar_close=source_bar_close,
+        funding=deriv.funding,
+        open_interest=deriv.open_interest,
         eligible=eligible,
         eligibility_reason=reason,
     )
@@ -87,5 +98,11 @@ async def build_market_context(
         eligibility_observed_at=observed_at,
         producer=PRODUCER,
         code_ref=code_ref,
+        funding_ts=deriv.funding_ts,
+        funding_source=deriv.funding_source,
+        funding_reason=deriv.funding_reason,
+        open_interest_ts=deriv.open_interest_ts,
+        open_interest_source=deriv.open_interest_source,
+        open_interest_reason=deriv.open_interest_reason,
     )
     return context, provenance

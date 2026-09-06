@@ -65,6 +65,20 @@ class Provenance:
     overwritten in place, so the reading is only evidence near its own instant."""
     producer: str
     code_ref: str | None
+    funding_ts: datetime | None
+    """``ts`` of the funding observation the context received, if any."""
+    funding_source: str | None
+    """``"durable"`` or ``"hot_state"``; ``None`` when ``funding_ts`` is ``None``."""
+    funding_reason: str | None
+    """Why there is no funding observation; ``None`` when ``funding_ts`` is set
+    (:mod:`hunter_strategy_worker.derivatives`)."""
+    open_interest_ts: datetime | None
+    open_interest_source: str | None
+    open_interest_reason: str | None
+    """``regime_id``/``regime_reason`` are deliberately *not* here: the regime
+    lookup happens later, under the slot lock in ``decide.py`` (closer to the
+    actual write), and reaches the envelope as :func:`build_record`'s own
+    keyword arguments instead."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +106,7 @@ class ShadowRecord:
     tracking_state: ShadowTrackingState
     no_entry_reason: str | None
     plan: EntryPlan
+    regime_id: uuid.UUID | None
 
     @property
     def entered_slot(self) -> bool:
@@ -131,8 +146,16 @@ def build_record(
     cohort: str,
     plan: EntryPlan,
     provenance: Provenance,
+    regime_id: uuid.UUID | None = None,
+    regime_reason: str | None = None,
 ) -> ShadowRecord:
-    """Assemble the immutable artefacts of one shadow decision."""
+    """Assemble the immutable artefacts of one shadow decision.
+
+    ``regime_id``/``regime_reason`` are separate from ``provenance`` because the
+    regime lookup happens later, under the slot lock in ``decide.py``, not while
+    the context was built — but both land in the same envelope
+    ``provenance`` block (SHADOW-LAB.md §2: written once, at the decision).
+    """
     tracking = _tracking_plan(decision, costs, plan)
     targets = to_db_scale_all((decision.target1, *decision.targets_informational))
     envelope = decision.supporting_features.to_jsonable()
@@ -148,6 +171,14 @@ def build_record(
             "code_ref": provenance.code_ref,
             "strategy_version_id": version.id,
             "params_hash": version.params_hash,
+            "funding_ts": provenance.funding_ts,
+            "funding_source": provenance.funding_source,
+            "funding_reason": provenance.funding_reason,
+            "open_interest_ts": provenance.open_interest_ts,
+            "open_interest_source": provenance.open_interest_source,
+            "open_interest_reason": provenance.open_interest_reason,
+            "regime_id": regime_id,
+            "regime_reason": regime_reason,
         }
     )
     late = plan.late_reason
@@ -231,4 +262,5 @@ def build_record(
         tracking_state=state,
         no_entry_reason=late.value if late else None,
         plan=plan,
+        regime_id=regime_id,
     )

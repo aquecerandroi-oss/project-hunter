@@ -183,6 +183,67 @@ class TestRecomputeFunding:
             second_pass = await module._candidates(conn)
         assert signal_id not in {c.signal_id for c in second_pass}
 
+    async def test_apply_through_the_real_run_path_never_writes_an_unresolved_row(
+        self,
+        tracked: dict[str, Any],  # noqa: F811 (the fixture imported above)
+    ) -> None:
+        """The guard lives in ``_process`` (what ``_run`` calls), not in the
+        caller: with ``--apply`` a row that still does not resolve must come
+        out byte-identical — no ``recomputed_at``, no ``previous`` — and the
+        counters must say so (code review of d878fd6, finding 2)."""
+        module = _load_module()
+        signal_id = await _signal_id(tracked)
+        meta: dict[str, Any] = {
+            "assumed_costs": _ASSUMED_COSTS,
+            "progress": {"exit_at_open": True, "exit_bar_open": None},
+            "funding": {
+                "per_unit": None,
+                "reason": "funding_schedule_unknown",
+                "settlements": 0,
+                "interval_s": None,
+                "notes": [],
+                "charged_at": [],
+            },
+            "r_net_reason": "funding_schedule_unknown",
+            "r_ex_funding": "0.5",
+        }
+        async with role_session(tracked["factory"], db_role="hunter_worker") as session:
+            await session.execute(
+                text(
+                    "UPDATE signal_outcomes SET tracking_state = 'terminal', result = 'target', "
+                    "virtual_entry = :ve, virtual_stop = :vs, entry_ts = :entry_ts, "
+                    "exit_price = :ep, exit_ts = :exit_ts, r_multiple = NULL, "
+                    "meta = CAST(:meta AS jsonb) "
+                    "WHERE signal_id = :signal_id"
+                ),
+                {
+                    "ve": Decimal("100"),
+                    "vs": Decimal("99"),
+                    "entry_ts": T0,
+                    "ep": Decimal("101"),
+                    "exit_ts": T0 + timedelta(minutes=5),
+                    "meta": _dump(meta),
+                    "signal_id": signal_id,
+                },
+            )
+
+        def open_tx() -> Any:
+            return role_session(tracked["factory"], db_role="hunter_worker")
+
+        total, resolved, applied = await module._process(open_tx, apply=True, reason="test: apply")
+        assert (total, resolved, applied) == (1, 0, 0)
+
+        async with role_session(tracked["factory"], db_role="hunter_worker") as session:
+            row = (
+                await session.execute(
+                    text("SELECT r_multiple, meta FROM signal_outcomes WHERE signal_id = :id"),
+                    {"id": signal_id},
+                )
+            ).one()
+        assert row.r_multiple is None
+        assert row.meta["funding"] == meta["funding"]  # untouched: no audit keys added
+        assert row.meta["r_net_reason"] == "funding_schedule_unknown"
+
     async def test_a_still_unresolvable_outcome_is_reported_but_never_written(
         self,
         tracked: dict[str, Any],  # noqa: F811 (the fixture imported above)

@@ -9,6 +9,11 @@ instead be spent while the tracking still looked open.
 
 Everything that mutates state happens in one transaction that holds the slot's
 row lock, so two consumers handling the same bar produce one tracking.
+
+The global regime in force at ``bar_close`` (:func:`hunter_strategy_worker.repo.load_regime_asof`)
+is looked up under that same lock, right before the record is built, and is
+stamped onto ``agent_signals.regime_id`` — never blocking the decision when
+there is none yet (notes-S2.md, "o regime não chega ao sinal").
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ from hunter_strategy_worker.outcomes import advance_tracking
 from hunter_strategy_worker.persist import persist_decision
 from hunter_strategy_worker.plan import plan_entry
 from hunter_strategy_worker.record import build_record
+from hunter_strategy_worker.repo import load_regime_asof
 from hunter_strategy_worker.tracking_repo import load_tracking
 
 if TYPE_CHECKING:
@@ -166,6 +172,7 @@ async def evaluate_slot(
             costs=costs,
             now=decision_at,
         )
+        regime_id, regime_reason = await load_regime_asof(session, cut=bar_close)
         record = build_record(
             signal_id=signal_id(
                 strategy_version_id=version.id,
@@ -182,6 +189,8 @@ async def evaluate_slot(
             cohort=config.cohort,
             plan=plan,
             provenance=provenance,
+            regime_id=regime_id,
+            regime_reason=regime_reason,
         )
         written = await persist_decision(session, record)
         # A decision born ``no_entry`` (late) never occupies the slot — it would

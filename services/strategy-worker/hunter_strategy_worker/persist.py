@@ -61,6 +61,7 @@ async def persist_decision(session: AsyncSession, record: ShadowRecord) -> bool:
             expected_holding_s=record.horizon_s,
             reason=record.reason,
             supporting_features=record.supporting_features,
+            regime_id=record.regime_id,
             emitted_at=record.decision_at,
             expires_at=record.plan.entry_bar_open + timedelta(seconds=record.horizon_s),
             status=SignalStatus.ACTIVE,

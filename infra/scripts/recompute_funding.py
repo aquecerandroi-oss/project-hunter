@@ -40,6 +40,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -249,6 +251,39 @@ async def _apply(conn: AsyncConnection, result: Recomputed, *, reason: str) -> b
     return outcome.rowcount > 0
 
 
+async def _process(
+    open_tx: Callable[[], AbstractAsyncContextManager[Any]], *, apply: bool, reason: str
+) -> tuple[int, int, int]:
+    """Recompute every candidate, **one transaction per row**.
+
+    ``open_tx`` opens a fresh transaction (``engine.begin()`` in production, a
+    role session in tests). The UPDATE is idempotent per row (``WHERE
+    r_multiple IS NULL``), so committing row by row is safe to re-run and
+    means a failure at row N — a legacy ``assumed_costs`` shape, an operator's
+    Ctrl-C — leaves rows 1..N-1 committed and visible, matching what the
+    console already reported for them (code review of d878fd6, finding 1: a
+    single run-wide transaction rolled every printed line back and held row
+    locks on ``signal_outcomes`` for the whole run). Returns
+    ``(candidates, resolved, applied)``.
+    """
+    async with open_tx() as conn:
+        candidates = await _candidates(conn)
+    print(f"{len(candidates)} terminal outcome(s) with r_multiple null due to funding")
+    resolved = 0
+    applied = 0
+    for candidate in candidates:
+        async with open_tx() as conn:
+            history = await _funding_history(conn, candidate)
+            result = _recompute(candidate, history)
+            print(_report_line(result))
+            if result.r_multiple is None:
+                continue  # reported, never written — no audit trail on an unresolved row
+            resolved += 1
+            if apply and await _apply(conn, result, reason=reason):
+                applied += 1
+    return len(candidates), resolved, applied
+
+
 async def _run(args: argparse.Namespace) -> int:
     secret = Settings().database_url_migrations
     if secret is None or not secret.get_secret_value():
@@ -259,24 +294,12 @@ async def _run(args: argparse.Namespace) -> int:
     engine = create_async_engine(url, connect_args={"statement_cache_size": 0})
     apply = args.apply and not args.dry_run
     try:
-        async with engine.connect() as conn, conn.begin():
-            candidates = await _candidates(conn)
-            print(f"{len(candidates)} terminal outcome(s) with r_multiple null due to funding")
-            resolved = 0
-            applied = 0
-            for candidate in candidates:
-                history = await _funding_history(conn, candidate)
-                result = _recompute(candidate, history)
-                print(_report_line(result))
-                if result.r_multiple is not None:
-                    resolved += 1
-                    if apply and await _apply(conn, result, reason=args.reason):
-                        applied += 1
-            mode = "applied" if apply else "dry-run"
-            summary = f"{mode}: {resolved}/{len(candidates)} outcome(s) now resolve"
-            if apply:
-                summary += f"; {applied} row(s) written"
-            print(summary)
+        total, resolved, applied = await _process(engine.begin, apply=apply, reason=args.reason)
+        mode = "applied" if apply else "dry-run"
+        summary = f"{mode}: {resolved}/{total} outcome(s) now resolve"
+        if apply:
+            summary += f"; {applied} row(s) written"
+        print(summary)
     finally:
         await engine.dispose()
     return 0

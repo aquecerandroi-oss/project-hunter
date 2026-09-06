@@ -505,3 +505,130 @@ população diferente. A sintaxe do `UPDATE` foi validada contra o schema real n
 **Arquivos tocados:** `services/strategy-worker/hunter_strategy_worker/{funding,settle,outcomes,metrics}.py`,
 `services/strategy-worker/tests/{test_funding,test_settle,test_recompute_funding,test_shadow_outcomes}.py`
 (novo: `test_settle.py`, `test_recompute_funding.py`), `infra/scripts/recompute_funding.py` (novo), esta nota.
+
+## 24. `build_market_context` nunca recebia funding/OI; `regime_id` nunca era carimbado (S2-context)
+
+Dois buracos medidos pela Sexta-feira (notas-S2, KB-0030, KB-0059): (1)
+`context.py::build_market_context` chamava `build_context(...)` sem `funding` nem
+`open_interest`, embora `base.py` (S1) já aceitasse e filtrasse os dois por `ts <= cut` —
+`StrategyContext.funding`/`.open_interest` eram `None` em **toda** avaliação, bloqueando a
+candidata M-E do backlog (teto de funding extremo); (2) `agent_signals.regime_id` nunca era
+gravado, apesar de `market_regimes` existir desde a T2.1/T2.4 e o scanner escrever regimes.
+
+**(a) Módulo novo `derivatives.py`.** Durável primeiro (`funding_rates`, `open_interest_history`,
+lidos por `market_id` + PK, mais recente com `ts <= cut`), hot state (`mkt:{ex}:{sym}:deriv`) só
+quando o durável não tem linha ou a linha é incompleta para o tipo de domínio
+(`NormalizedFunding.mark_price` é obrigatório). Fonte (`"durable"`/`"hot_state"`) e motivo de
+ausência (`no_data`, `no_mark_price`, `no_open_interest_value`, `timestamp_unprovable`) voltam
+junto do valor e são gravados em `supporting_features.provenance` (JSONB já existente — sem
+migração). `context.py` passa `funding=`/`open_interest=` para `build_context`, que já fazia o
+corte; nada em `packages/**` mudou.
+
+**Três rodadas de revisão da Astra, a segunda derrubando a correção da primeira:**
+
+- **MUST-FIX 1 (rodada 1) — o `ts` durável do OI é o início do bucket da rodada de poll, não o
+  instante da leitura.** `hunter_market_worker/persist_rows.py` calcula **um** bucket (`oi_bucket`,
+  5 min) para a rodada inteira e depois faz REST sequencial por símbolo
+  (`sampling.py::_run_oi_cycle`); um mercado tarde na rodada pode ter sido lido estritamente depois
+  do bucket em que foi gravado. `row.ts <= cut` sozinho **não prova** "lido antes do corte".
+  *Correção tentada:* aceitar a linha durável só quando `cut >= row.ts + 5 min` (uma folga do
+  tamanho de `OI_BUCKET_MINUTES`).
+- **MUST-FIX 1 (rodada 2) — a folga fixa não fecha o buraco, e a Astra construiu o contraexemplo:**
+  rodada começa `12:04:59` (bucket `12:00`, porque `oi_bucket` arredonda o **início** da rodada para
+  baixo), lê o mercado às `12:05:02` e grava `ts=12:00`; uma avaliação no corte `12:05:00` — três
+  segundos **antes** da leitura real — passaria pela folga de 5 min (`12:05:00 >= 12:00 + 5min`).
+  Qualquer folga finita tem essa falha: ela reduz a exposição, nunca estabelece garantia, porque
+  nada no código limita quanto tempo uma rodada pode levar. **Correção final: o `ts` durável do OI
+  nunca é tratado como prova de `<= cut`, ponto.** `_resolve_open_interest` só aceita o hot state
+  (cujo `oi_ts` é o instante real da leitura, `hunter_market_worker.hot_state.write_open_interest`);
+  uma linha durável sozinha vira sempre `timestamp_unprovable`, **não importa a idade** — nada no
+  esquema atual distingue "seguramente antiga" de "a rodada que a escreveu ainda pode estar
+  rodando" sem uma suposição que este módulo se recusa a fazer. **Risco residual declarado, fora do
+  escopo desta tarefa** (não pode tocar `services/market-worker/**`): o OI durável nunca vira
+  utilizável enquanto o market-worker descartar o timestamp real de cada leitura em favor do bucket
+  da rodada — o conserto de verdade é lá, não aqui. `OI_BUCKET_SLACK` e o teste que fixava aceitação
+  exatamente na fronteira de 5 min foram removidos (cristalizavam a premissa errada).
+- **MUST-FIX 2 — um settlement realizado no hot state nunca atualiza o preço de mark.**
+  `hunter_market_worker/hot_state.py::write_funding(realized=True)` só toca o grupo de campos do
+  funding, deixando o `mark_price`/`mark_ts` do último snapshot **estimado** (possivelmente muito
+  mais antigo ou mais novo, e não relacionado) parado no hash. Combiná-los fabricaria uma
+  observação que nunca existiu como tal. `DerivRaw` passou a expor `mark_ts` separado de
+  `funding_ts`, e `_resolve_funding` só aceita a combinação do hot state quando
+  `funding_ts == mark_ts` (prova de que vieram da mesma escrita); senão, `no_mark_price`.
+- **MUST-FIX 3 — aceito, já estava certo por construção, só o nome do motivo mudou.**
+  `load_regime_asof` não filtra por valor de `regime`, então um regime `UNKNOWN` gravado durante o
+  warm-up do classificador (T2.4) já era retornado como um regime de verdade (é uma classificação,
+  não um valor ausente — docstring de `MarketRegime`). Só a **ausência de qualquer linha** retorna
+  `None`; o motivo passou de `"no_regime_before_cut"` para `"no_regime_asof"` para não presumir "é
+  warm-up" de um `SELECT` vazio — a função não sabe distinguir os dois casos e não tenta.
+- **Nice-to-have aceito:** a query de regime ganhou `end_time IS NULL OR cut < end_time`
+  (`[start_time, end_time)` explícito), em vez de confiar apenas em "o mais recente com
+  `start_time <= cut`" — mais barato do que continuar assumindo contiguidade perfeita entre linhas.
+
+**Não aceito, com motivo:** a sugestão de privilegiar sempre a observação "inteira" mais adequada
+semanticamente por cima de "durável primeiro" (ex.: nunca usar o durável de funding quando ele é
+`realized` e uma leitura mais nova `estimated` existiria) foi descartada — o brief pede
+durável-primeiro explicitamente, e o `funding_kind="realized"` já é gravado corretamente para
+diferenciar as duas leituras a jusante (o Lab decide o que fazer com cada tipo).
+
+**(b) `regime_id`.** `decide.py::evaluate_slot` chama `repo.load_regime_asof(session, cut=bar_close)`
+dentro da mesma transação que já segura o lock do slot, antes de `build_record`; `RegimeScope.GLOBAL`
+sempre (é o único escopo que o scanner popula hoje — `scanner.py:229` — não existe regime por
+mercado). `regime_id`/`regime_reason` **não** entraram em `Provenance` (que é montado em
+`context.py`, antes da procura de regime): são parâmetros próprios de `build_record`, escritos no
+mesmo bloco `supporting_features.provenance` do item (a). Nunca bloqueia o sinal
+(`ShadowConfig`/`Evaluation` inalterados).
+
+**(c) `code_ref` não muda.** Only `services/strategy-worker/**` foi tocado; o digest
+(`code_ref.py`) é sobre `packages/core/hunter_core/strategies/**`, intocado. `test_code_ref.py`
+(23 testes) continua verde sem qualquer alteração — confirmado rodando a suíte isolada.
+
+**(d) Nada de novo é emitido.** `momentum_v1`/`volume_anomaly_v1` não leem `ctx.funding`/
+`ctx.open_interest` (grep confirma). `test_no_new_signals.py` prova isso construindo o mesmo
+contexto com e sem funding/OI preenchidos (incluindo um funding deliberadamente extremo,
+`0.0009`) e comparando a `Decision` (modelo Pydantic congelado, `==`) — idêntica com e sem. Achado
+da Astra, não fechado: para `volume_anomaly_v1` o lote realmente dispara (`decision is not None`
+verificado); para `momentum_v1` nenhum dos dois lotes dispara (a receita de `series()` é a de
+`volume_anomaly_v1`, 1m/5m; a de `momentum_v1` é 15m e não foi reproduzida aqui por custo/tempo) —
+a prova de invariância para `momentum_v1` cobre hoje só a população "sem sinal", não "com sinal
+suprimido por engano". **Pendência declarada para quem pegar isso depois:** um lote que dispare
+`momentum_v1` de verdade (recibo em `packages/core/tests/unit/strategies/test_momentum_v1.py`) e a
+mesma comparação `==`.
+
+**Testes novos:** `test_derivatives.py` (unit, resolução pura — inclui os cenários das três
+must-fixes da Astra, reproduzidos falhando contra o código anterior a cada correção),
+`test_context_derivatives.py` (integração: durável, hot state, fonte na proveniência, o cenário
+pedido explicitamente pelo brief — uma observação 1 s depois do corte nunca entra, para funding
+**e** para OI —, e o caso "taxa elegível com mark só no futuro" que a Astra pediu),
+`test_regime_stamp.py` (integração: regime vigente carimbado, `UNKNOWN` carimbado como qualquer
+outro, ausência com motivo, nunca bloqueia, fronteiras exatas `start_time == cut` aceita e
+`end_time == cut` recusada), `test_no_new_signals.py` (unit, item d, com a pendência acima).
+
+**Comandos e saída real (após as três rodadas de revisão da Astra):**
+`uv run pytest services/strategy-worker --ignore=.../test_replay_arms.py
+--ignore=.../test_replay_reproduce.py -q` → **205 passed** (os dois arquivos de `replay/**`
+excluídos são de outra tarefa em voo — ver "Achado não meu" abaixo); `uv run ruff check
+services/strategy-worker` e `uv run ruff format --check services/strategy-worker` verdes (o único
+achado é em `replay/**`, de outra tarefa em voo, fora do escopo desta); `uv run pyright
+services/strategy-worker` → 0 erros; `uv run python infra/scripts/check_file_size.py` → só
+`replay/engine.py` (351 linhas, outra tarefa, oscilando enquanto ela edita) acima do orçamento —
+nenhum arquivo tocado aqui passa de 291 linhas.
+
+**Achado não meu, registrado para quem estiver de plantão em `replay/`:**
+`test_replay_arms.py::test_no_arm_enters_where_the_base_refused_the_entry` falha com
+`AttributeError: 'NoneType' object has no attribute 'execute'` (o teste passa `session=None` de
+propósito e o caminho de código chega a `repo.py::load_funding`, função que esta tarefa não tocou).
+Reproduzido isolado, confirmado não relacionado a nada aqui — `repo.load_funding` está byte a byte
+igual ao que era antes desta tarefa (só funções novas foram acrescentadas ao módulo).
+
+**Fechamento da Astra (3ª rodada, pós-correção):** "sim, fecha o must-fix 1" — hot state consultado
+incondicionalmente, corte aplicado antes do resolver, durável sozinho sempre `timestamp_unprovable`
+independente da idade. Nice-to-have aceito e aplicado: a abertura do docstring do módulo dizia
+"durável primeiro, hot state como fallback" para os dois igualmente, quando o OI tem uma exceção
+obrigatória — reescrita para nomear a assimetria explicitamente.
+
+**Arquivos tocados:** `services/strategy-worker/hunter_strategy_worker/derivatives.py` (novo),
+`services/strategy-worker/hunter_strategy_worker/{hot_state,repo,context,record,persist,decide}.py`,
+`services/strategy-worker/tests/{test_derivatives,test_context_derivatives,test_regime_stamp,test_no_new_signals}.py`
+(novos), `services/strategy-worker/tests/builders.py` (helpers `insert_funding_rate`,
+`insert_open_interest`, `insert_regime`), esta nota.
