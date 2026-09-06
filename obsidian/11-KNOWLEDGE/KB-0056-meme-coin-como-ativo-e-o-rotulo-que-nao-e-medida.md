@@ -13,10 +13,24 @@ astra: pendente
 
 ## O que afirma
 
-Uma meme coin não tem fluxo de caixa, protocolo com receita nem utilidade declarada: o preço é
-inteiramente atenção precificada. A literatura aberta que eu consegui ler trata disso **na cadeia**
-(criação de token, concentração de carteiras, difusão social) e **não** no perpétuo de corretora
-centralizada, que é o único lugar onde o nosso Lab enxerga.
+Uma meme coin é um ativo cuja **origem e tração são culturais**, e cujo preço é atenção precificada.
+A literatura aberta que eu consegui ler trata disso **na cadeia** (criação de token, concentração de
+carteiras, difusão social) e **não** no perpétuo de corretora centralizada, que é o único lugar onde
+o nosso Lab enxerga.
+
+**Correção da minha primeira definição, exigida pela revisão da Astra.** Eu tinha escrito "sem
+fluxo de caixa, protocolo com receita nem utilidade declarada". Isso é **falso como critério
+universal** e ela apontou os contraexemplos dentro da minha própria lista: a página oficial do
+[Dogecoin](https://dogecoin.com/) declara finalidade de moeda e pagamentos; a do
+[FLOKI](https://floki.com/) declara utilidade em jogos e DeFi. São memes pela origem cultural, não
+pela ausência de utilidade declarada. Então o critério vira **três eixos separados**, e só o
+primeiro define a lista:
+
+1. **Origem cultural** — o ativo existe por causa de uma referência (cão, sapo, político, piada).
+   É este eixo, e só ele, que define `meme_universe_v1`.
+2. **Utilidade declarada** — o que o projeto diz fazer. Varia dentro da lista, e não é critério.
+3. **Direito a fluxo de caixa** — nenhum dos 21 tem. Mas isso também vale para a maioria das
+   altcoins do universo, então **não separa** meme de não-meme.
 
 E há um problema anterior a qualquer hipótese: **"meme" não é um dado, é um rótulo que eu escolho.**
 Escolher a lista depois de olhar o resultado é o grau de liberdade mais barato que existe para
@@ -80,21 +94,41 @@ Conferi que a lista cobre o universo: dos 200 monitorados na VPS em 2026-09-06,
 
 **Não é uma estratégia — é um requisito de proveniência, e é o item 0 desta rodada.**
 
-`H-KB0056`: gravar no envelope imutável de cada sinal a **marcação de universo** (`universe_tag`),
-com o nome e a versão da lista (`meme_universe_v1`), a coorte (`A`, `B`, `cinza`, `btc`, `major`,
-`resto`) e o `monitor_rank` do instante. Sem decidir nada com isso.
+`H-KB0056`: gravar no envelope imutável de cada sinal o **`monitor_rank` do instante** e o **tamanho
+e a regra do universo vigente**, e junto o nome e a versão da lista de marcação
+(`meme_universe_v1`). Sem decidir nada com isso.
 
-Motivo, e é o mesmo da [[KB-0030-o-regime-nao-chega-ao-sinal]] e do requisito de ranking da
-[[KB-0016-quando-o-fluxo-importa-dependencia-de-estado]]: reconstruir a marcação depois, pelo estado
-**atual** de `markets`, atribui resultado à coorte errada quando a lista mudar — e ela vai mudar,
-porque memes entram e saem do top 200. Uma estratificação por meme feita amanhã sobre a lista de
-amanhã é irrecuperavelmente errada.
+**Correção importante que a Astra impôs, e que muda o motivo da hipótese.** Eu tinha escrito que sem
+o carimbo "nenhuma estratificação por meme é possível". Isso mistura duas coisas:
 
-**O que a refutaria:** nada. Não é hipótese sobre o mercado, é sobre o nosso registro. O que a
-tornaria desnecessária é alguém mostrar que a coorte de cada sinal é reconstruível sem ambiguidade a
-partir do que já gravamos — e não é: o universo é reescrito a cada 900 s
-(`packages/core/hunter_core/settings.py:140`) e o diff só vive em `outbox_events`, que na VPS
-guarda **30 minutos** (medido: a tabela inteira ia de 18:15 a 18:46 às 18:46 UTC).
+- **A classificação cultural É reconstruível.** Uma lista estática versionada, aplicada à identidade
+  do mercado que o registro já guarda (`services/strategy-worker/hunter_strategy_worker/record.py:188`
+  grava exchange e símbolo), pode ser aplicada retrospectivamente a qualquer sinal antigo. Nada se
+  perde aqui.
+- **O que É irrecuperável é a composição e o ranking históricos do top 200.** O universo é reescrito
+  a cada 900 s (`packages/core/hunter_core/settings.py:140`), o diff só existe no evento
+  `market.universe.changed`, e a `outbox_events` na VPS guarda **cerca de 30 minutos** (medido: às
+  18:46 UTC a tabela inteira ia de 18:15 a 18:46, e **zero** eventos de universo sobreviviam). Sem
+  isso não há **denominador** — não dá para dizer quantas memes estavam elegíveis num dia passado,
+  nem qual era o rank de cada uma.
+
+E o efeito disso já é mensurável. Medido na VPS em 2026-09-06:
+
+```
+ total_sinais | em_mercado_monitorado | em_mercado_nao_monitorado | mercados_que_sairam
+--------------+-----------------------+---------------------------+---------------------
+         1009 |                   982 |                        27 |                  14
+```
+
+Vinte e sete sinais, em quatorze mercados, foram emitidos por mercados que **já saíram** do universo
+em menos de um dia — com **GOATUSDT** (uma meme, hoje no rank 249) liderando com 5 sinais. Toda
+consulta que agrupa por `is_monitored` — inclusive as minhas desta rodada — descarta esses 27 em
+silêncio. Isso é viés de sobrevivência acontecendo em quinze horas.
+
+**O que a refutaria:** nada; não é hipótese sobre o mercado. O que a tornaria parcialmente
+desnecessária é passar a persistir o diff de universo em tabela própria, em vez de só na outbox
+efêmera — aí o rank histórico deixaria de ser perdido e o carimbo no sinal viraria conveniência, não
+necessidade.
 
 ## Por que pode falhar
 
@@ -113,7 +147,24 @@ guarda **30 minutos** (medido: a tabela inteira ia de 18:15 a 18:46 às 18:46 UT
 
 ## Segunda opinião (Astra)
 
-_(pendente — esta rodada revisa em bloco de três notas)_
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-0056-0058-memecoins.md`). Quatro correções
+entraram no texto acima:
+
+1. **A definição estava errada.** "Sem utilidade declarada" é falso para DOGE e FLOKI, que declaram
+   utilidade nas suas páginas oficiais. Ela pediu para **corrigir a definição preservando a lista
+   v1**, exatamente para não reclassificar depois de ver resultado — e é o que fiz: três eixos
+   separados, só o primeiro define a lista.
+2. **Eu confundi reconstruir a classificação com reconstruir o universo.** A lista estática é
+   aplicável retrospectivamente pela identidade do mercado; o que se perde é composição e ranking
+   históricos. Cenário de falha dela: declarar tudo irrecuperável bloqueia uma análise válida,
+   enquanto carimbar só o sinal é vendido como solução para um denominador que continua ausente.
+3. **A regra sintática não identifica idade nem natureza econômica.** Ela identifica caracteres fora
+   do ASCII alfanumérico, e nada mais. Cenário de falha: cinco contratos recentes e pouco líquidos
+   concentram ATR alto, e o efeito é atribuído a "meme" quando idade, seleção por volume ou desenho
+   do tick explicam. Isso **invalida a interpretação causal**, não as estatísticas dos cinco
+   símbolos. Está escrito na seção "Por que pode falhar".
+4. **Concordou** em congelar a lista antes das consultas, em declarar a zona cinzenta, e em tratar a
+   dupla seleção (ter perpétuo + estar no top 200) como limite de generalização.
 
 ## Relacionados
 

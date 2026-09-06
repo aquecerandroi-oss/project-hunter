@@ -13,13 +13,16 @@ astra: pendente
 
 ## O que afirma
 
-O folclore diz "meme coin é volátil". Medi, e o rótulo **não separa volatilidade** dentro do nosso
-universo: as memes da coorte A ficam em **0,84%** de ATR por barra de 15 min, contra **0,83%** do
-resto do universo monitorado. O que separa é outra coisa — **BTC e majors contra todo o resto** —, e
-a consequência é grande: `atr_pct_min = 0,003` exclui o **BTCUSDT em 100% das barras** medidas.
+O folclore diz "meme coin é volátil". Medi, e **as medianas agregadas da coorte de memes e do resto
+do universo ficaram próximas nesta janela**: 0,84% contra 0,83% de ATR por barra de 15 min. (Isso
+não é "as distribuições são iguais" — medianas próximas não estabelecem equivalência; a ressalva é
+da Astra.) O contraste grande é outro: **BTC e majors contra todo o resto**.
 
-O Lab de sombra já é, por construção, um laboratório de altcoin e meme. Ninguém decidiu isso; o
-piso de custo decidiu.
+E dele sai a consequência que dá nome à nota: o estimador que usei ficou **abaixo de
+`atr_pct_min = 0,003` em 100% das 154 observações do BTCUSDT**. Isso *sugere* que o gate de ATR da
+`momentum_v1` exclui o BTC de forma sistemática — não prova, pelas duas razões que a revisão desta
+nota deixou escritas abaixo. Se sobreviver ao teste, quer dizer que ninguém decidiu que o Lab de
+sombra seria um laboratório de altcoin e meme: o piso de custo decidiu.
 
 ## Onde foi mostrado
 
@@ -92,11 +95,18 @@ E o detalhe por mercado, que é onde o rótulo morre (média simples de TR% sobr
  B_meme_nao_ascii | 币安人生USDT 1.5656
 ```
 
-**DOGE (0,56%), PEPE (0,53%) e SHIB (0,45%) são menos voláteis que a mediana das majors seria de
-esperar e ficam abaixo da mediana do resto do universo (0,83%).** As memes "azuis" viraram ativos
-grandes; a volatilidade migrou para as listagens novas. Isso **concorda com o ordenamento** do ME2F
-(memes estabelecidas em faixa intermediária, ETH/SOL resilientes) e **discorda em um ponto**: lá os
-tokens políticos concentram o risco máximo; aqui TRUMPUSDT (0,72%) está no meio do pelotão.
+**DOGE (0,56%), PEPE (0,53%) e SHIB (0,45%) ficam abaixo da mediana do resto do universo (0,83%) e
+na mesma faixa das majors** (mediana 0,50%) — DOGE e PEPE ligeiramente acima dela, SHIB abaixo. O
+que a nossa janela mostra é **heterogeneidade contemporânea grande dentro da coorte**: o mercado
+mais volátil da coorte A (USELESS, 3,66%) tem oito vezes o ATR% do menos volátil (SHIB, 0,45%).
+
+Isso **é compatível com o ordenamento** do ME2F, que põe as memes estabelecidas (DOGE, SHIB, PEPE)
+em faixa intermediária e ETH/SOL como resilientes. **Duas coisas que eu tinha escrito e retirei:**
+que "a volatilidade migrou para as listagens novas" — uma fotografia de 42 h sem data de listagem
+não demonstra migração nenhuma, demonstra heterogeneidade num instante —, e que o nosso dado
+discordaria do ME2F por TRUMPUSDT (0,72%) estar no meio do pelotão: o ME2F mede fragilidade
+combinando volatilidade, concentração de carteiras e sentimento, e ATR de dois dias não refuta esse
+objeto. As duas retiradas são da Astra.
 
 ## Como mediríamos aqui
 
@@ -128,10 +138,17 @@ BTCUSDT na VPS. O único sinal de BTC que existe é da `volume_anomaly_v1`, que 
  Volume Anomaly | E_resto          |    574
 ```
 
-A previsão "o piso bane o BTC da `momentum_v1`" tinha uma refutação simples — um sinal de Momentum
-em BTCUSDT — e ela não apareceu em 1.004 sinais. Isso **não prova** o mecanismo (o BTC podia estar
-falhando no rompimento ou no `rvol_min`), mas o piso é o candidato com previsão quantitativa e
-100% de concordância.
+**E aqui a revisão da Astra derrubou a minha palavra "confirmação".** A ordem dos testes na
+`momentum_v1` é: rompimento (`momentum_v1.py:180`), retorno positivo (`:186`), `rvol_min` (`:192`)
+e **só então** o gate de ATR (`:204`). Um mercado que nunca rompe o canal **nunca chega** ao gate.
+Então "0 sinais de Momentum em BTCUSDT" é **compatibilidade observacional**, não confirmação
+independente: o BTC pode estar sendo recusado antes, por rompimento ou por volume relativo, e
+remover o piso continuaria dando zero. Os 1.009 sinais dos outros mercados **não são 1.009 testes**
+da hipótese sobre o BTC.
+
+A redação que sobrevive é a dela: *o estimador de média simples ficou abaixo de 0,3% em todas as 154
+observações do BTC; isso sugere exclusão pelo gate da Momentum, a confirmar com o Wilder e com a
+população efetivamente avaliável.* É exatamente o que o `D-MEME-ATR` abaixo mede.
 
 ## Hipótese testável no Lab
 
@@ -145,10 +162,13 @@ acrescentada, e responde: **quem o piso e o teto estão selecionando, por nome.*
 **`M-A` — teto de ATR% mais apertado (candidata de estratégia, testável agora).**
 Regra: manter tudo da `momentum_v1` e baixar só `atr_pct_max`.
 Parâmetros: `atr_pct_max ∈ {0,05 (base), 0,03, 0,02}`.
-Mecanismo declarado, e ele **não** é "volatilidade alta é ruim": é que ATR% alto e livro fino andam
-juntos na nossa amostra (correlação de postos **−0,651** entre ATR%(14) e profundidade top-20 em
-USD, nos 27 mercados de meme + BTC — [[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]]),
-e o custo de execução assumido não acompanha.
+Mecanismo **conjecturado** — e a palavra é essa depois da revisão —, e ele **não** é "volatilidade
+alta é ruim": é que ATR% alto e livro fino parecem andar juntos na nossa amostra (correlação de
+postos de **−0,651** entre ATR%(14) e profundidade top-20 em USD, nos 27 mercados de meme mais o
+BTC), enquanto o custo de execução assumido não acompanha. **Essa correlação não demonstra o
+mecanismo**: mistura dois instantes, é transversal entre mercados, e não diz nada sobre o custo
+*condicionado ao sinal*. Quem decide se o mecanismo existe é o `D-MEME-LIQ` da
+[[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]], e ele roda **antes** da `M-A`.
 O que a refutaria: diferença **pareada** de média de `R_net` contra a base sem exceder o efeito
 mínimo declarado antes da janela, com os quatro números da convenção `C-META` (cobertura, `q`,
 `μ_A − μ_B`, `q·μ_A − μ_B`).
@@ -158,9 +178,24 @@ cortando um terço dos sinais não é melhoria — é a armadilha que a `C-META`
 
 ## Por que pode falhar
 
-- **Estimador errado.** Média simples de TR não é Wilder; e o meu ATR é de barra corrente, enquanto
-  a estratégia usa 97 barras de aquecimento. A ordem de grandeza sobrevive (o BTC tem 0,127% contra
-  um piso de 0,300%: menos da metade), mas a fração exata de recusa não.
+- **Estimador diferente, e o viés não tem direção fixa.** Eu tinha escrito que a diferença era
+  "barra corrente contra aquecimento"; está errado. O código recebe 97 barras, calcula 96 TRs,
+  inicializa com 14 e aplica **82 passos de suavização de Wilder**, dividindo pelo último fechamento
+  (`packages/core/hunter_core/strategies/indicators.py:88`). As duas medidas incluem a última barra
+  completa. O que muda é a **memória**: Wilder guarda choques que já saíram das últimas 14 barras.
+  Contraexemplo aritmético da Astra (sintético, não é o BTC): fechamento constante, TR usual de
+  0,1%, um choque de 10% e depois 14 barras normais → **SMA = 0,1%**, **Wilder ≈ 0,3506%**. O meu
+  estimador reprovaria pelo piso; o da estratégia admitiria. Logo, **mediana distante do piso não
+  prova ausência de inversões**, e as frações "abaixo do piso" e "acima do teto" valem para o
+  estimador descrito, não como taxa de recusa operacional. Para o BTC especificamente, os 154 pontos
+  ficaram todos abaixo de 0,3% com p95 em 0,198% — o que torna a inversão improvável ali, sem
+  torná-la impossível.
+- **A minha consulta atravessa lacunas; a estratégia não.** Eu descarto barras de 15 min incompletas
+  e depois uso `lag` e `ROWS`, ou seja, costuro barras não adjacentes. A agregação real recusa a
+  janela inteira quando falta qualquer minuto
+  (`packages/core/hunter_core/strategies/aggregate.py:128`). Consequência concreta: uma listagem com
+  pouco histórico recebe ATR na minha consulta mas ficaria `UNAVAILABLE` na estratégia — e a minha
+  fração vira "recusa pelo teto" onde nenhuma avaliação seria possível. Achado da Astra.
 - **42 horas.** Um único regime, dois dias, sem stress. A [[KB-0032-o-relogio-dentro-do-limiar-de-volatilidade]]
   já mostrou que hora do dia e dia se confundem nesta janela.
 - **A coorte B tem 5 mercados**, um deles com 41 barras. Nada ali é estimativa estável.
@@ -173,7 +208,26 @@ cortando um terço dos sinais não é melhoria — é a armadilha que a `C-META`
 
 ## Segunda opinião (Astra)
 
-_(pendente)_
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-0056-0058-memecoins.md`). Ela recusou a
+primeira versão desta nota em quatro pontos, todos já incorporados acima:
+
+1. **"Confirmação independente" virou "compatibilidade observacional"** — o gate de ATR vem depois
+   de rompimento, retorno e `rvol` (`momentum_v1.py:180,204`).
+2. **O viés SMA↔Wilder não tem direção universal**, com o contraexemplo numérico (choque de 10% e
+   14 barras normais: SMA 0,1%, Wilder ≈0,3506%).
+3. **A minha consulta atravessa lacunas** que a `aggregate.py:128` recusa, então as frações não são
+   taxas de recusa operacional.
+4. **"A volatilidade migrou para as listagens novas" saiu inteira**, e a alegada discordância com o
+   ME2F por causa do TRUMP também.
+
+Ela também exigiu, para a `M-A`, que o `D-MEME-ATR` rode **antes** de promover a candidata, com três
+números separados: gate de ATR isolado nas janelas válidas, exclusões adicionais depois dos demais
+critérios, e emissões efetivas. E lembrou que rodar um braço como estratégia **independente** muda
+ocupação e rearme de slots (`services/strategy-worker/hunter_strategy_worker/decide.py:144`) — o
+resultado não pode ser apresentado como efeito pareado do filtro.
+
+**Concordou** em não concluir que excluir o BTC torna o piso errado, e em manter tudo como pesquisa:
+os dados não demonstram vantagem econômica nenhuma.
 
 ## Relacionados
 

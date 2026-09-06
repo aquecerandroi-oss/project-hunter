@@ -69,7 +69,8 @@ D_majors          23/23           343807           3313     1.24   0.63    0.65 
 
 Extremos da coorte A que valem por si: CHILLGUYUSDT com **3.186 USD** nos 20 níveis (não comporta
 5.000), USELESSUSDT com 9.006, 1000000BOBUSDT com spread de **10,66 bps**. E BROCCOLI714USDT
-custando **42,82 bps** para 20.000 — sete vezes o custo total assumido por perna. No outro extremo,
+custando **42,82 bps** para 20.000 — cerca de sete vezes os **6 bps de spread mais slippage**
+assumidos (não o custo total por perna, que inclui ainda a taxa; correção da Astra). No outro extremo,
 DOGEUSDT custa **0,56 bps** para qualquer um dos quatro tamanhos, e TRUMPUSDT 2,54 bps para 20.000.
 **A dispersão dentro da coorte A é maior que a distância entre coortes.**
 
@@ -96,19 +97,35 @@ bps** que o Lab assume para spread mais slippage somados, antes de qualquer taxa
 
 ## Hipótese testável no Lab
 
-**`M-B` — piso de liquidez no instante da decisão (candidata de estratégia, testável agora, com uma
-ressalva de disponibilidade).**
-Regra: recusar o sinal quando o **volume de cotação de 24 h** do mercado no instante da decisão for
-menor que θ.
-Parâmetros: `min_quote_volume_24h_usd = θ`, com θ saindo de um quantil da distribuição **condicionada
-a sinal**, congelado antes da janela; um único braço.
-Dado: `quote_volume_24h` em `market_snapshots` e no hash `ticker` do hot state.
-**Ressalva medida hoje, e ela é a novidade:** até 2026-09-06 17:59 UTC a cobertura era praticamente
-zero (o defeito de escritores da [[KB-0044-o-que-morre-em-dez-segundos]]); depois do deploy do
-commit `fa9f957` na VPS ela pulou para **6.264 de 9.901 leituras (63%) na hora das 18:00**. Ou seja:
-a candidata **passou a ser testável hoje**, e não era ontem.
-O que a refutaria: os dois denominadores da `C-META` não positivos — nem `delta_por_aceito`, nem
-`delta_por_oportunidade`.
+**`M-B` — piso de liquidez no instante da decisão. BLOQUEADA, e a revisão da Astra é que a
+bloqueou.**
+Regra pretendida: recusar o sinal quando o **volume de cotação de 24 h** do mercado no instante da
+decisão for menor que θ (`min_quote_volume_24h_usd`, de um quantil da distribuição condicionada a
+sinal, congelado antes da janela).
+
+Eu tinha escrito "testável agora". **Não é**, por dois motivos concretos:
+
+1. **A estratégia não recebe o campo.** O `StrategyContext` (`packages/core/hunter_core/strategies/base.py:109`
+   em diante) carrega exatamente `exchange`, `symbol`, `source_bar_close`, `candles_1m`, `funding`,
+   `open_interest`, `eligible` e `eligibility_reason`. Não há volume de 24 h, nem spread, nem livro.
+   Implementar a `M-B` exige **mudança de contrato**, não parametrização — e mudança de contrato tem
+   o mesmo peso do item 19 e do item 20 do backlog.
+2. **A cobertura de hoje não sustenta "disponível no instante da decisão".** Até 2026-09-06 17:59 UTC
+   ela era praticamente zero (o defeito de escritores da [[KB-0044-o-que-morre-em-dez-segundos]]);
+   depois do deploy do commit `fa9f957` na VPS pulou para **6.264 de 9.901 leituras (63%) na hora das
+   18:00**. Mas 63% num agregado horário que inclui a hora do deploy não distingue recuperação
+   progressiva de ausência concentrada em certos mercados. Pior: a Astra achou um mecanismo que eu
+   não tinha visto — **REST e WebSocket compartilham o campo `ts`** do hash `ticker`
+   (`services/market-worker/hunter_market_worker/hot_state.py:61`), o volume pertence ao REST, e o
+   `sampling.py:55` julga o frescor de `quote_volume_24h` por esse timestamp compartilhado. Cenário
+   de falha: o refresh REST para, o `bookTicker` continua chegando, e um volume velho aparece
+   **preenchido e "fresco"** — exatamente enquanto a `M-B` afirmasse estar usando liquidez do
+   instante.
+
+Classificação correta, palavras dela: **especificada; diagnóstico de cobertura liberado; avaliação
+da candidata bloqueada até validar disponibilidade e frescor.** O desbloqueio não é esperar um
+número de dias: é cobertura **por oportunidade, coorte e hora**, idade da fonte, regra declarada
+para ausentes, e θ congelado numa janela anterior.
 
 **`D-MEME-CUSTO` (diagnóstico, roda hoje, sem pré-requisito):** repetir o `EXEC-C` da quinta rodada
 (sensibilidade a `fee_bps ∈ {4; 4,5; 5}`) **estratificado por coorte**, e acrescentar uma linha nova:
@@ -116,10 +133,19 @@ recomputar o `R_net` de cada outcome trocando `spread_bps` de 2 pelo spread **me
 (3,12 nas memes, 1,23 nas majors). Não é calibração — é sensibilidade sobre população fixa, e serve
 para saber se o vermelho publicado cabe dentro do erro da hipótese de custo **naquela coorte**.
 
-**Bloqueada, e fica registrado por quê:** a versão boa disto exige o **carimbo de execução** do item
-20 do backlog ([[KB-0044-o-que-morre-em-dez-segundos]]). Sem ele, não existe livro gravado no
-instante do sinal, e tudo que eu medir de profundidade é de um instante arbitrário — como estes
-números são.
+**`D-MEME-LIQ` (diagnóstico, desenho da Astra, é o que sustentaria ou derrubaria o mecanismo da
+`M-A`):** em vez de correlacionar ATR com profundidade em instantes desalinhados, medir **ATR contra
+spread**, com o ATR de Wilder exato por mercado e o spread vindo só de snapshots
+**comprovadamente anteriores** ao fechamento da barra de referência, e condicionado aos sinais
+efetivamente emitidos. Refazer a associação transversal **sem o BTC**, separando as coortes A e B, e
+removendo um mercado por vez para ver se algum ponto sozinho carrega o resultado. Isto sustenta, no
+máximo, o **componente de spread** da hipótese; o componente de profundidade exige livros
+repetidos, contemporâneos ao sinal, e com tamanho declarado — e uma leitura só nunca recupera isso.
+
+**Bloqueada, e fica registrado por quê:** a versão boa da parte de profundidade exige o **carimbo de
+execução** do item 20 do backlog ([[KB-0044-o-que-morre-em-dez-segundos]]). Sem ele, não existe
+livro gravado no instante do sinal, e tudo que eu medir de profundidade é de um instante
+arbitrário — como estes números são.
 
 ## Por que pode falhar
 
@@ -140,7 +166,25 @@ números são.
 
 ## Segunda opinião (Astra)
 
-_(pendente)_
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-0056-0058-memecoins.md`).
+
+1. **Bloqueou a `M-B`** pelos dois motivos escritos acima (o contexto da estratégia não tem o campo;
+   o `ts` compartilhado entre REST e WS deixa volume velho parecer fresco). Foi a correção de maior
+   alcance da rodada, e eu tinha classificado a candidata como testável hoje.
+2. **Rebaixou o −0,651 como prova de mecanismo.** Cenário de falha dela: moedas menores combinam ATR
+   médio alto e livro top-20 pequeno, mas os rompimentos atraem liquidez suficiente; baixar o teto
+   eliminaria oportunidades **sem** reduzir o custo condicionado ao sinal, e o resultado poderia
+   melhorar por outro motivo e ser atribuído à liquidez. Também lembrou que profundidade em 20
+   níveis depende da distância entre níveis e do tick relativo, e que somar os dois lados não mede
+   execução de compra — muito menos a venda de saída.
+3. **Disse o que sustentaria o mecanismo com o dado que temos**, e virou o `D-MEME-LIQ` acima:
+   Wilder exato por mercado, associado só a snapshots comprovadamente anteriores, medindo ATR contra
+   **spread** condicionado aos sinais; e recalcular a associação sem o BTC, separando A e B, tirando
+   um mercado de cada vez.
+4. **Corrigiu a comparação dos 42,82 bps**, que eu tinha chamado de "sete vezes o custo total por
+   perna".
+5. **Concordou** em separar travessia contra o mid de `slippage_bps` sem meio spread, e em publicar
+   retenção e contribuição por oportunidade além da média por aceito.
 
 ## Relacionados
 
