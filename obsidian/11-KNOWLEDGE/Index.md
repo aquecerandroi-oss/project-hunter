@@ -18,8 +18,9 @@ Cada nota é uma síntese própria (nunca cópia), com fonte, data, qualidade da
 | Perpétuos: funding, OI, posicionamento | KB-0008, KB-0017, KB-0019, KB-0020, KB-0021, KB-0022, KB-0023, KB-0024, KB-0025, KB-0026 | **terceira rodada feita (2026-09-06)** |
 | Análise técnica clássica (o que tem evidência e o que não tem) | KB-0003 | iniciado |
 | Regime de mercado e volatilidade | KB-0007, KB-0016, KB-0027, KB-0028, KB-0029, KB-0030, KB-0031, KB-0032, KB-0033, KB-0034, KB-0035 | **quarta rodada feita (2026-09-06)** |
-| Gestão de risco e sizing | KB-0005, KB-0035 | iniciado |
+| Gestão de risco e sizing | KB-0005, KB-0035, KB-0040 | iniciado |
 | Estatística de backtest (overfitting, look-ahead, custos) | KB-0010 | iniciado |
+| Execução e microestrutura do preenchimento | KB-0036, KB-0037, KB-0038, KB-0039, KB-0040, KB-0041, KB-0042, KB-0043, KB-0044 | **quinta rodada feita (2026-09-06)** |
 
 ## Notas
 _(uma linha por nota: link para a nota — fonte curta — qualidade da evidência — hipótese sim/não)_
@@ -61,6 +62,15 @@ _(uma linha por nota: link para a nota — fonte curta — qualidade da evidênc
 | [[KB-0033-amplitude-de-mercado-a-nossa-e-condicionada-a-volume]] | amplitude / regime | literatura **disputada** + `breadth.py` + **SQL rodado** | disputada / replicado (0 de 48 instantes com cobertura) | sim — publicar a fração incondicional ao lado da conjunta |
 | [[KB-0034-btc-como-fator-e-o-regime-global-que-e-so-o-btc]] | fator de mercado | Liu, Tsyvinski & Wu (JF 2022) — **só o resumo** | estudo revisado lido em resumo + código próprio | sim — R² e beta contra o BTC; discordância como informação |
 | [[KB-0035-momentum-crashes-e-o-piso-que-virou-filtro-de-regime]] | momentum / risco / custo | Daniel & Moskowitz (2016) em resumo; Barroso & Santa-Clara (2015) **em fonte secundária** | estudo revisado, números de segunda mão | sim — ciclo de trabalho do piso, **no ATR que a estratégia consome** |
+| [[KB-0036-o-tamanho-que-a-sombra-nunca-declara]] | execução / custo por tamanho | medição própria: 200 livros `depth20` do hot state | **medição própria** (duas leituras, saídas coladas) | sim — declarar `assumed_notional_usd` e diagnóstico `EXEC-A` |
+| [[KB-0037-o-spread-assumido-contra-o-spread-medido]] | execução / spread | `market_snapshots` (53 mil observações) + arXiv 2602.00776 | **replicado** (SQL colado); preprint **sem** número de spread | sim — `EXEC-B`, carimbo de spread na decisão |
+| [[KB-0038-a-taxa-de-4-bps-nao-e-nem-maker-nem-taker]] | execução / taxas | FAQ de taxas da Binance (tabela **não abriu** sem login) | documentação (número de **exemplo**) + aritmética conferida | sim — `EXEC-C`, sensibilidade a 4 / 4,5 / 5 bps |
+| [[KB-0039-tipos-de-ordem-e-o-que-a-sombra-assume-sem-dizer]] | execução / tipos de ordem | documentação USDⓈ-M da Binance + nosso `plan.py`/`walker.py` | documentação lida + leitura de código | sim — `EXEC-D`, **descrição de contexto**, não teste de simetria |
+| [[KB-0040-a-lei-da-raiz-quadrada-e-o-regime-que-nao-e-o-nosso]] | impacto de mercado | Donier & Bonart (arXiv 1412.4503); Emilio Said (arXiv 2205.07385) | estudo revisado — **o PDF não abriu para mim; a Astra o leu** | sim — `EXEC-E`, capacidade condicionada à cobertura |
+| [[KB-0041-almgren-chriss-ao-contrario-o-custo-dominante-e-o-relogio]] | execução / risco de tempo | Almgren-Chriss em **fonte secundária** + **SQL rodado** | dado próprio (192 entradas, amostra **selecionada**) | sim — `EXEC-F`, decomposição por entrada |
+| [[KB-0042-o-open-nao-e-preco-executavel]] | execução / referência de preço | definição do dado + `pricing.py` + medição própria | leitura de código + medição, sem experimento | sim — `EXEC-G`, erro de referência assinado |
+| [[KB-0043-selecao-adversa-o-custo-que-so-aparece-depois-do-fill]] | execução / seleção adversa | arXiv 2608.04373v3 — **Hyperliquid**, não Binance | preprint com método declarado, **de outra venue** | sim — `EXEC-H`, retorno entre aberturas (**não** é markout) |
+| [[KB-0044-o-que-morre-em-dez-segundos]] | proveniência / qualidade do dado | `market_snapshots` + `hot_state.py`/`universe.py`/`coalesce.py` | **replicado** (contagens exatas) + código conferido | sim — `EXEC-I`, carimbo de execução em registro separado |
 
 ## O que a primeira rodada mudou de fato
 
@@ -204,6 +214,91 @@ Registradas porque uma nota que cita o que não leu é pior que uma nota a menos
 E uma limitação operacional que atravessa quatro notas: **nenhuma consulta SQL foi executada nesta
 rodada.** O portão de permissão desta sessão recusou `psql` na VPS e o Docker local está fora, então
 as previsões sobre `missing_input`, disparos e populações são **leitura de código**, não medição.
+
+## O que a quinta rodada mudou de fato
+
+Tema: **execução e microestrutura do preenchimento** — a última peça antes do M4. A pergunta era
+"quanto custa executar?", e a resposta honesta é **não sabemos, e não dá para saber com o que está
+gravado**. Foi a rodada com mais medição própria e, de longe, com mais erros meus corrigidos pela
+Astra.
+
+1. **O contrato de custo não tem tamanho.** `AssumedCosts` congela `spread_bps`, `slippage_bps`,
+   `fee_bps` e `max_entry_delay_s` — e nenhum notional. Sem isso, "6 bps por lado" não tem medição
+   capaz de contrariá-lo. Medido nos 200 livros de 20 níveis do hot state: atravessar o ask custa
+   **2,53 bps** para 500 USDT, **3,47** para 1.000, **6,85** para 5.000, **10,65** para 20 mil — e
+   **68 dos 200 livros não comportam** 20 mil. O notional mediano no melhor ask é **352 USDT**.
+2. **O spread não é o elo fraco.** Mediana medida de **2,30 bps** contra 2 assumidos: erro de
+   **0,30 bps na ida e volta**, 1,5% do custo total. A dispersão entre decis é grande (0,97 no decil
+   10, 4,93 no decil 1), mas entra pela metade no modelo. Quem carrega o peso é `slippage_bps`, e
+   ele é justamente o que ninguém mediu.
+3. **O maior número da rodada não é custo: é relógio.** Entre o fechamento da barra de referência e
+   a abertura da barra de entrada, o preço se desloca **14,4 bps** (momentum) e **15,0** (volume) em
+   mediana absoluta, com p90 de 44,1 e 49,6 — contra 6 bps de custo assumido por perna. Mediana
+   assinada ~zero. E 19 dos 216 sinais nem entraram, recusados por `late:delay`.
+4. **A taxa de 4 bps não é nem o maker nem o taker do exemplo da Binance** (2 e 5 bps; 4,5 com BNB).
+   Diferença de 1 a 2 bps na ida e volta, na direção que favorece a estratégia — e que, sendo
+   aritmética, **não pode** explicar uma expectancy negativa.
+5. **A sombra tem uma política de execução implícita e ninguém a escreveu.** O modelo é
+   preenchimento sintético por barras com deslocamento adverso: uma **aproximação de execução
+   agressiva**, com preenchimento integral **suposto**, não verificado. Não existe recusa por não
+   preenchimento.
+6. **`volume_24h` tem 6 linhas em 55.709, e há um defeito de desenho que é mecanismo consistente com
+   essa cobertura baixa.** Dois escritores — o refresh REST (`/fapi/v1/ticker/24hr`, que traz volume
+   e **não** traz bid/ask) e o `bookTicker` (que traz bid/ask e **não** traz volume) — dividem o
+   mesmo hash com o mesmo `TICKER_FIELDS`, e a regra do Lua apaga com `HDEL` todo campo de
+   propriedade que vem `None`. Cada escrita apaga a outra. Isso explica a primeira consulta que
+   escrevi nesta rodada ter voltado **zero linhas**. **As seis linhas não foram atribuídas
+   individualmente ao mecanismo nem à versão do código que rodava** — a explicação é consistente, não
+   verificada linha a linha. **Achado da Astra; conferi o caminho inteiro no código antes de
+   publicar.**
+7. **Do inventário de seis perguntas da [[KB-0044-o-que-morre-em-dez-segundos]], quatro são
+   retrospectivamente inexecutáveis, uma é respondível e uma é parcial.** Book vive 10 s e nunca é
+   gravado; `bid_qty`/`ask_qty` vivem 30 s e nunca são gravados; só **8 de 200** sinais têm snapshot
+   no seu próprio minuto. Respondível: o deslocamento referência→entrada. Parcial: o decil de
+   liquidez, que existe atual mas não histórico. **Isso vale para aquele inventário** — fora dele,
+   `EXEC-C`, `EXEC-F` e `EXEC-H` também são retrospectivos e rodam hoje.
+
+**Saldo de método — e é o pior da série, no sentido bom.** A Astra recusou a primeira versão de
+**todas as nove notas**. Além disso:
+
+- **Abriu o PDF de Donier & Bonart que a minha ferramenta não leu** e derrubou a tese central da
+  KB-0040: **61% das metaordens têm uma única ordem-filha**, então "somos ordem única" não isenta
+  ninguém; a equação normaliza por volume e volatilidade **diários**; e a medida é impacto de
+  **pico**, não permanente.
+- **Corrigiu quatro erros aritméticos meus:** 0,15 em vez de 0,30 bps de ida e volta; "p90 < 6
+  garante erro máximo de 2 bps" (duas pernas a 5,9 custam 3,9); "15% de 51 bps dá 3,8 bps por lado
+  para o book" (7,65 bps totais já consumidos pelas taxas); e a decomposição que somava termos
+  sobrepostos para "fechar" em 6 bps.
+- **Derrubou três conclusões estatísticas:** "variância, não viés" (quantis não determinam média:
+  −1, 0, +100 tem mediana 0 e média +33); "mediana zero encerra a seleção adversa"; e "o efeito de
+  14 bps dá poder à H2" (a H2 mede uma diferença **pareada**, cuja variância é outra).
+- **Inverteu duas perspectivas minhas:** markout positivo na direção do agressor é adverso para a
+  **contraparte passiva**, não para nós; e, numa compra, alta antes da entrada **afasta** do stop e
+  piora o preço — eu tinha escrito o contrário.
+- **E salvou uma medição:** eu tinha declarado como risco a suposição de que a barra de referência
+  fosse de 1 minuto. Ela conferiu que momentum agrega 15 min, volume agrega 5 min, e
+  `aggregate.py:86` define `close = minutes[-1].close` — então o `JOIN` em −1 minuto está **certo**,
+  e "consertá-lo" introduziria o erro.
+
+**Nenhuma candidata de estratégia saiu desta rodada, e isso é o resultado.** Saíram duas mudanças de
+contrato (declarar o tamanho; carimbar a execução em registro separado) e nove diagnósticos, três
+dos quais rodam hoje sem pré-requisito nenhum.
+
+## Fontes que não abriram nesta rodada (quinta)
+
+| Fonte | O que aconteceu | Como contornei |
+|---|---|---|
+| `binance.com/en/fee/futureFee` (tabela de tarifas) | "No records found" sem login | usei o **exemplo** do FAQ 360033544231 (maker 0,02% / taker 0,05%), declarando que é exemplo |
+| `arxiv.org/pdf/1412.4503` (Donier & Bonart) | PDF voltou binário ilegível, duas tentativas | **a Astra o abriu** e conferiu equação 1, seção 4.1, tabela I e seção 6; a nota declara que os fatos são leitura dela |
+| `smallake.kr/.../optliq.pdf` (Almgren & Chriss, original) | PDF ilegível | conceito em verbete secundário; **nenhuma fórmula do artigo citada** |
+| `tandfonline.com/.../14697688.2025.2515933` (latência e seleção adversa em Bybit/Binance) | HTTP 403 | **não citada em nota nenhuma** |
+| `arxiv.org/html/2602.00776v1` (microestrutura de cripto) | abriu, mas **não publica número de spread por capitalização** | registrado na KB-0037; nenhum número dele entrou |
+| Busca por spread/profundidade em perpétuos por capitalização | devolveu alegações de terceiros ("spread médio < 0,05 bps", "impacto de 0,5 M USD < 0,3 bps") sem que eu conseguisse chegar à fonte primária | **nada disso foi citado** |
+
+Limitação operacional da rodada: todos os números são da **instância local** (24 h de história, 200
+mercados monitorados, worker reiniciado na véspera). A VPS não foi consultada. E os livros do book
+são de **dois instantes** de uma quarta-feira à tarde — não descrevem stress, que é justamente quando
+a `momentum_v1` dispara.
 
 ## Relacionados
 

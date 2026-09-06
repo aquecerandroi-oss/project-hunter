@@ -193,6 +193,71 @@ página do módulo, conforme o caso.
 código e do dado de 2026-09-06. Nenhuma pode ser confirmada nessa mesma população; a confirmação
 exige janela futura reservada, declarada **antes** da coleta.
 
+## Quinta rodada (2026-09-06) — execução e microestrutura do preenchimento
+
+**Nenhuma variante nova de estratégia.** A rodada não gastou multiplicidade em parâmetros: gastou em
+diagnósticos e em duas mudanças de contrato. O que entra aqui, portanto, são **diagnósticos** e
+**inferências retiradas**.
+
+| ID | Diagnóstico | Nota | Status |
+|---|---|---|---|
+| D-025 | custo de atravessar o book por tamanho, por sinal, com a fração sem cobertura publicada junto | [[KB-0036-o-tamanho-que-a-sombra-nunca-declara]] | proposto, bloqueado pelo carimbo de execução |
+| D-026 | spread cotado no instante da decisão, por estratégia e por decil | [[KB-0037-o-spread-assumido-contra-o-spread-medido]] | proposto, bloqueado pelo carimbo — e o **corte por decil** exige, além dele, um **ranking congelado no instante**, que o carimbo sozinho não dá |
+| D-027 | sensibilidade a taxa de 4 / 4,5 / 5 bps por lado, sobre a mesma população e as mesmas censuras | [[KB-0038-a-taxa-de-4-bps-nao-e-nem-maker-nem-taker]] | proposto — **roda hoje**, sem pré-requisito |
+| D-028 | contexto da barra de saída (amplitude e gap) por resultado, mais sensibilidade a deslocamento assimétrico | [[KB-0039-tipos-de-ordem-e-o-que-a-sombra-assume-sem-dizer]] | proposto — descreve contexto, **não** valida simetria de execução |
+| D-029 | teto de capacidade por tamanho, condicionado à cobertura, com o orçamento declarado pelo Everton | [[KB-0040-a-lei-da-raiz-quadrada-e-o-regime-que-nao-e-o-nosso]] | proposto, bloqueado pelo carimbo |
+| D-030 | decomposição por entrada: deslocamento referência→entrada, os 6 bps assumidos, a taxa e o funding, tudo no mesmo denominador | [[KB-0041-almgren-chriss-ao-contrario-o-custo-dominante-e-o-relogio]] | proposto — **roda hoje** |
+| D-031 | erro de referência entre a abertura e o meio do book, assinado, com **média** e não só quantis | [[KB-0042-o-open-nao-e-preco-executavel]] | proposto, bloqueado pelo carimbo |
+| D-032 | retorno entre aberturas no minuto seguinte à entrada, medido contra a abertura bruta | [[KB-0043-selecao-adversa-o-custo-que-so-aparece-depois-do-fill]] | proposto — **roda hoje** |
+| D-033 | cobertura do carimbo de execução | [[KB-0044-o-que-morre-em-dez-segundos]] | proposto |
+
+**Não é tentativa nem diagnóstico — é estado do instrumento:** o book de 20 níveis e os tamanhos no
+topo nunca são gravados; `volume_24h` tem 6 linhas em 55.709, e há um **mecanismo consistente com
+essa cobertura**: o refresh REST e o `bookTicker` usam o mesmo `TICKER_FIELDS` e cada escrita apaga
+com `HDEL` os campos do outro (**as seis linhas não foram atribuídas individualmente**);
+`next_funding_time` tem zero linhas por omissão no dicionário do snapshot. Vão para [[Open Bugs]].
+
+**Inferências retiradas nesta rodada, registradas para não voltarem:**
+
+1. **"A lei da raiz quadrada é sobre metaordens, nós somos ordem única, logo ela não se aplica"** —
+   falso: **61% das metaordens** da amostra de Donier & Bonart têm uma única ordem-filha. O que
+   separa os regimes é a normalização (volume e volatilidade **diários**) e o objeto medido (impacto
+   de **pico**, não permanente, e nenhum dos dois é o preço pago).
+2. **A decomposição que "fechava" em 6 bps** (1,15 + 2,3 + 2,3): dois termos se sobrepunham,
+   diferença de medianas não é mediana da diferença, e o erro de referência vale ~±**meio** spread.
+3. **"O Lab cobra o erro de referência sempre no lado adverso"** — não cobra: aplica acréscimo fixo
+   à abertura, e o custo contra o meio do mercado oscila para os dois lados.
+4. **"O deslocamento referência→entrada é variância, não viés"** — quantis não determinam média
+   (−1, 0, +100 tem mediana 0 e média +33).
+5. **"Somos o lado informado, a contraparte é formador de mercado, o spread efetivo é maior"** —
+   nada disso demonstrado.
+6. **"Falta produtor para `volume_24h`"** — o produtor existe; o defeito é disputa de escritores.
+7. **"15% de 1 R dá orçamento de 3,8 bps por lado para o book"** — 15% de 51 bps são 7,65 bps
+   **totais**, já consumidos pelos 8 bps de taxa.
+8. **"68 dos 200 livros" e "28+41 = 69"** apresentados como a mesma amostra — são **duas leituras**
+   do Redis, segundos de diferença.
+
+**Correções por nota, para quem consultar este registro como memória dos erros.** Os oito itens
+acima são os de maior alcance; a lista completa por nota está na seção "Segunda opinião (Astra)" de
+cada uma, e os pareceres inteiros ficaram em `.claude/state/astra-review-KB-0036-0038-execucao.md`,
+`astra-review-KB-0039-0041-execucao.md` e `astra-review-KB-0042-0044-execucao.md`. Resumo:
+
+| Nota | O que foi retirado ou estreitado |
+|---|---|
+| [[KB-0036-o-tamanho-que-a-sombra-nunca-declara]] | critério de adequação dos 6 bps limitado a **custo estático da perna de entrada no instante da decisão**, com cobertura obrigatória; "acima de 5.000 mais da metade não cabe" (são 34% em 20 mil); "tamanho é o único parâmetro que decide"; "ordem pequena executa no toque"; e as duas leituras do Redis apresentadas como uma amostra só |
+| [[KB-0037-o-spread-assumido-contra-o-spread-medido]] | 0,15 → **0,30 bps** de ida e volta; a falsa garantia de "p90 abaixo de 6 implica erro máximo de 2 bps"; "monotônico"; "a dispersão é quase toda entre mercados"; e a causalidade atribuída ao filtro de volume |
+| [[KB-0038-a-taxa-de-4-bps-nao-e-nem-maker-nem-taker]] | tarifa de **exemplo** distinguida de tarifa efetiva; "inequivocamente taker nos dois lados"; 51 bps declarado como denominador **de exemplo**; e a comparação com os 14 bps de deslocamento absoluto |
+| [[KB-0039-tipos-de-ordem-e-o-que-a-sombra-assume-sem-dizer]] | "é o modelo de uma ordem a mercado" e "sempre preenche"; amplitude de vela validando simetria de execução; e "stop-primeiro mais deslocamento é dupla penalização" |
+| [[KB-0040-a-lei-da-raiz-quadrada-e-o-regime-que-nao-e-o-nosso]] | autoria do arXiv 2205.07385 (é **Emilio Said**); a omissão da dependência de velocidade; a tabela que comparava raiz quadrada com custo de book; e o teto de capacidade mal calculado |
+| [[KB-0041-almgren-chriss-ao-contrario-o-custo-dominante-e-o-relogio]] | "variância, não viés"; a não linearidade da geometria como prova de deterioração; a perspectiva invertida do stop numa compra; a amostra selecionada não declarada; o "poder plausível" da H2; a comparação causal dos grupos de 60 e 120 s; "500 a 5.000 cabem em um a três níveis"; e a ressalva **errada** sobre o JOIN de 1 minuto |
+| [[KB-0042-o-open-nao-e-preco-executavel]] | a decomposição com termos sobrepostos; "o Lab cobra o erro sempre no lado adverso"; mediana e IQR como prova de ausência de viés; abertura fora do intervalo bid-ask como prova de atraso; e a conversão linear de segundos em bps |
+| [[KB-0043-selecao-adversa-o-custo-que-so-aparece-depois-do-fill]] | a perspectiva do markout; o transporte de magnitudes de outra venue; o retorno contra `P_entry` como evidência (contaminado pelos 6 bps); os dois critérios sobre stops e sobre mediana zero; e o poder presumido sem cálculo |
+| [[KB-0044-o-que-morre-em-dez-segundos]] | "falta produtor para `volume_24h`"; "TTL é janela histórica"; `market_snapshots` como permanente; e a promessa de que o carimbo torna **todas** as perguntas respondíveis — não dá ranking histórico nem mid posterior, e o `EXEC-H` nem depende dele |
+
+**Consequência de multiplicidade:** D-025 a D-033 nasceram da inspeção do código e do dado de
+2026-09-06 e **contam como inspeção da amostra**. Nenhum pode ser confirmado nessa mesma população;
+a confirmação exige janela futura reservada, declarada **antes** da coleta.
+
 ## Relacionados
 
 [[Strategy Backlog]] · [[Index]] ·

@@ -235,3 +235,65 @@ classificador classifica. Propor um filtro agora seria propor algo cuja refutaç
 
 [[Index]] · [[Registro de Tentativas]] · [[Experiments Index]] · [[Strategy Performance]] ·
 [[Features]] · [[Momentum Agent]]
+
+---
+
+## Quinta rodada (2026-09-06) — execução e microestrutura do preenchimento
+
+**A rodada não produziu nenhuma candidata de estratégia, e isso é o resultado.** Produziu nove
+diagnósticos e **duas** correções de contrato, porque a pergunta "quanto custa executar" não pode ser
+respondida com o que está gravado hoje ([[KB-0044-o-que-morre-em-dez-segundos]]).
+
+**O que a medição mostrou sobre os custos assumidos** (`spread_bps=2`, `slippage_bps=5`,
+`fee_bps=4`, ou 6 bps por perna dentro do preço mais 4 bps de taxa fora dele):
+
+| Componente | Assumido | Medido | Veredito |
+|---|---|---|---|
+| Spread | 2 bps totais | mediana 2,30 bps; p95 7,97; decil 10 = 0,97, decil 1 = 4,93 | **acerta a mediana**; erro de ida e volta de 0,30 bps ([[KB-0037-o-spread-assumido-contra-o-spread-medido]]) |
+| Slippage | 5 bps por lado, **sem** o meio spread | o que medi é **outra grandeza**: custo de atravessar o ask contra o **mid**, que **já inclui** o meio spread — 500 USDT → 2,53 bps; 5.000 → 6,85 | **não comparável termo a termo**, e não é falsificável hoje porque o tamanho não existe no contrato ([[KB-0036-o-tamanho-que-a-sombra-nunca-declara]]) |
+| Taxa | 4 bps por lado | maker 2 / taker 5 no exemplo do FAQ da Binance; 4,5 com BNB | 1 a 2 bps de ida e volta a menos ([[KB-0038-a-taxa-de-4-bps-nao-e-nem-maker-nem-taker]]) |
+| Referência (`open`) | tratado como preço | é o primeiro **negócio** do minuto; erro de sinal desconhecido | o custo contra o mid oscila ±meio spread ([[KB-0042-o-open-nao-e-preco-executavel]]) |
+| Espera até a entrada | imposta pela arquitetura; o deslocamento **já entra** em `P_entry` e no R | \|deslocamento\| mediano **14,4 bps**, p90 44,1 | não é custo a somar — é **dispersão** nunca quantificada ([[KB-0041-almgren-chriss-ao-contrario-o-custo-dominante-e-o-relogio]]) |
+
+### Nova na fila — e é de contrato, não de estratégia
+
+| # | Item | Notas-fonte | Dado necessário (temos?) | Esforço | Edge esperado | Status |
+|---|---|---|---|---|---|---|
+| 19 | **`assumed_notional_usd` em `AssumedCosts`**, congelado na versão | [[KB-0036-o-tamanho-que-a-sombra-nunca-declara]] | nenhum — é campo de contrato | baixo | **nenhum edge.** Sem ele, "6 bps por lado" não tem medição que possa contrariá-lo | especificada |
+| 20 | **Carimbo de execução associado ao sinal** (bid/ask/mid, `bid_qty`/`ask_qty`, idade do book, custo de atravessar numa grade de tamanhos, cobertura, `quote_volume_24h` do instante) — em **registro separado** do envelope da decisão | [[KB-0044-o-que-morre-em-dez-segundos]] | book do hot state (existe, vive 10 s) | médio | **nenhum edge.** Proveniência: destrava `EXEC-A`, `EXEC-B` e `EXEC-G` | especificada |
+| — | ~~**Entrada por post-only (GTX)** para pagar maker~~ | [[KB-0039-tipos-de-ordem-e-o-que-a-sombra-assume-sem-dizer]] | fila e fluxo agressor no nível (**não temos**) | — | trocaria 3 bps de taxa por risco de não executar | **impossível de avaliar em sombra**; volta no M4 |
+
+### Diagnósticos abertos pela quinta rodada
+
+| Item | Nota | O que responde | Pré-requisito |
+|---|---|---|---|
+| `EXEC-A` — custo de book por tamanho, por sinal, com cobertura | [[KB-0036-o-tamanho-que-a-sombra-nunca-declara]] | se os 6 bps descrevem a perna de entrada no instante da decisão | itens 19 e 20 |
+| `EXEC-B` — spread cotado no instante da decisão | [[KB-0037-o-spread-assumido-contra-o-spread-medido]] | quanto o spread real difere dos 2 bps na população dos sinais | item 20 (**o corte por decil exige, além dele, um ranking congelado no instante**) |
+| `EXEC-C` — sensibilidade a `fee_bps ∈ {4; 4,5; 5}` sobre população fixa | [[KB-0038-a-taxa-de-4-bps-nao-e-nem-maker-nem-taker]] | se o resultado publicado cabe dentro do erro da hipótese de custo | **nenhum — roda hoje** |
+| `EXEC-D` — contexto da barra de saída (amplitude, gap) por `result`, mais sensibilidade a deslocamento assimétrico | [[KB-0039-tipos-de-ordem-e-o-que-a-sombra-assume-sem-dizer]] | descrição; **não** valida simetria de execução | nenhum |
+| `EXEC-E` — custo por tamanho com **fração sem cobertura** publicada junto | [[KB-0040-a-lei-da-raiz-quadrada-e-o-regime-que-nao-e-o-nosso]] | capacidade, se o Everton declarar o orçamento | item 20 |
+| `EXEC-F` — decomposição por entrada: deslocamento, 6 bps, taxa, funding | [[KB-0041-almgren-chriss-ao-contrario-o-custo-dominante-e-o-relogio]] | quanto do R efetivo vem de cada termo | **nenhum — roda hoje** |
+| `EXEC-G` — erro de referência `(open − mid)/mid`, assinado, com média | [[KB-0042-o-open-nao-e-preco-executavel]] | se o `open` é referência enviesada | item 20 |
+| `EXEC-H` — retorno entre aberturas após a entrada (não é markout) | [[KB-0043-selecao-adversa-o-custo-que-so-aparece-depois-do-fill]] | para onde o preço vai no minuto seguinte à entrada | **nenhum — roda hoje** |
+| `EXEC-I` — cobertura do carimbo | [[KB-0044-o-que-morre-em-dez-segundos]] | se as perguntas acima ficam respondíveis | item 20 |
+
+### Ordem recomendada (2026-09-06)
+
+1. **`EXEC-C` e `EXEC-F`, hoje.** Não exigem coleta nova para a versão descritiva básica: recomputam
+   sobre resultado já colhido. O
+   `EXEC-C` responde se o vermelho cabe dentro do erro da hipótese de taxa; o `EXEC-F` separa o que
+   hoje chamamos de "custo" em quatro termos com nomes distintos.
+2. **`EXEC-H` junto**, pelo mesmo motivo — usa `candles` e as entradas já identificadas, e mais nada.
+   Ressalva: o **corte por decil** dele tem a mesma dependência de ranking congelado do `EXEC-B`.
+3. **Item 19 (`assumed_notional_usd`).** Uma linha de contrato que transforma uma hipótese
+   inverificável em hipótese verificável. É a mudança de maior alavancagem da rodada.
+4. **Item 20 (carimbo de execução).** Destrava `EXEC-A`, `EXEC-B`, `EXEC-G` e `EXEC-E`. Custa
+   latência no caminho da decisão e precisa de desenho — é o item que merece uma decisão conjunta.
+5. **`EXEC-D`** também não exige coleta nova; fica por último não por dependência, e sim porque com
+   OHLC ele descreve contexto e não mede custo — é o menos informativo sobre execução.
+
+**O que esta rodada explicitamente NÃO propõe:** mexer em `spread_bps`, `slippage_bps` ou `fee_bps`.
+Nenhum dos três seria ajustado com dado independente — todos seriam calibrados na amostra que
+revelou o problema, que é o erro da [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]].
+E o valor prático de todos os itens acima é **zero em expectancy**: eles só tornam falsificável uma
+hipótese que hoje não é.
