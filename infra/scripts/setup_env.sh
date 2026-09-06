@@ -143,6 +143,12 @@ ISSUER_DEFAULT="https://measured-stingray-3890.clerk.accounts.dev"
 printf 'CLERK_ISSUER (Enter para usar %s): ' "$ISSUER_DEFAULT"
 read -r ISSUER
 [ -n "$ISSUER" ] || ISSUER="$ISSUER_DEFAULT"
+# Uma chave colada aqui por engano viraria CLERK_ISSUER/CLERK_JWKS_URL invalidos e
+# derrubaria toda a autenticacao (aconteceu na VPS em 2026-09-06): so aceita URL.
+case "$ISSUER" in
+  https://*) ;;
+  *) echo "CLERK_ISSUER precisa ser uma URL https:// (ex.: $ISSUER_DEFAULT); recebido algo que nao e URL. Nada foi gravado." >&2; exit 64 ;;
+esac
 ISSUER="${ISSUER%/}"
 
 PUBLIC_URL="http://127.0.0.1:3000"
