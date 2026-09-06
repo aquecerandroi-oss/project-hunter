@@ -1,12 +1,13 @@
 ---
 tags: [astra, revisao, indice]
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # Revisões da Astra — índice
 
 Cada revisão é uma opinião do motor Astra da [[Mente da Sexta-feira]] sobre um plano, um diff ou uma decisão; o resultado (aceito/rejeitado e por quê) fica no kit da tarefa em `.claude/state/review-*.md` e nas páginas de [[Open Bugs]] / [[Resolved Bugs]].
 
+- [[S4-avaliacoes-shadow]] — as primeiras avaliações datadas do Shadow Lab (5 must-fix, todos aceitos antes de publicar)
 - [[M1-plan]]
 - [[T1.2]]
 - [[T1.2b-round2]]

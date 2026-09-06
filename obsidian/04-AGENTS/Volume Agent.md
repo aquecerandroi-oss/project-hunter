@@ -1,20 +1,29 @@
 ---
 tags: [agentes, volume, m4, shadow-lab]
-updated: 2026-09-05
-status: planejado-sombra
+updated: 2026-09-06
+status: sombra
 ---
 
 # Volume Agent
 
 ## Status
 
-**`planejado-sombra`** — desenho fechado pela [[Dialogos/SHADOW|decisão conjunta do Shadow Lab]] (2026-09-05, commit `fc336d9`), **sem implementação e sem ativação**. Vira `sombra` só depois da prova operacional de S0–S2; nenhum item da checklist de aceite foi verificado. O agente completo do MVP, ao lado de [[Momentum Agent]], continua sendo Milestone 4.
+**`sombra`** desde 2026-09-06, com prova operacional em `.claude/state/s2-proof.md`.
+`volume_anomaly v1` foi ativada pelo script auditado em 2026-09-05 23:20:09 UTC e sucedida por `v2`
+em 2026-09-06 02:08:19 UTC (correção do `code_ref`, não mudança de estratégia). Contagens da
+primeira avaliação datada, `as_of = 2026-09-06T02:55:00Z`: **107 sinais emitidos** (92 na coorte v1,
+15 na v2), **72 acompanhamentos encerrados avaliáveis**, e as três populações de exclusão que a
+decisão conjunta manda separar apareceram todas — `late:delay` (11), `geometry` (5) e censura por
+gap (1). Números, SQL e leitura em [[EXP-0002-volume-anomaly-v1]].
 
-Hoje: `strategies.key = volume_anomaly` e `strategy_versions` v1 existem só como seed `status = draft`.
+O agente completo do MVP, ao lado de [[Momentum Agent]], continua sendo Milestone 4: não há
+carteira, ordem, posição nem PnL.
 
 ## `volume_anomaly_v1` — parâmetros congelados pela decisão SHADOW
 
-Protocolo do experimento `EXP-0002` (reservado em [[Experiments Index]]); imutável a partir da primeira ativação.
+Protocolo do experimento [[EXP-0002-volume-anomaly-v1]]; imutável desde a primeira ativação.
+`params_hash = fa5dce78173b2b9688578f7c96a5f37544eb504aa7b2227262ad296c32f63bb9`
+(`params_format = 1`), idêntico em v1 e v2.
 
 | Item | Valor |
 |---|---|
@@ -39,13 +48,22 @@ Idêntico ao perfil "por barras" v0 descrito em [[Momentum Agent]]: entrada no o
 
 Componentes correspondentes no Opportunity Engine: "Volume" (peso padrão 0.20, de `relative_volume_*` e `volume_acceleration`) e "Anomalies" (peso padrão 0.10). Depende do Anomaly Engine do M2 — a versão sombra acima existe justamente para não precisar esperar por ele.
 
-## O que ainda não existe
+## O que já existe e o que ainda não existe
 
-Nenhum sinal gerado, nenhum outcome, nenhuma versão `v2` para comparar. Sinais do Lab carregam `purpose = research_only` e não são elegíveis a execução: `active` numa versão não implica elegibilidade (o M4 terá `execution_eligible` explícito).
+**Existe:** decisões sombra de 5 min sobre o mercado real, entradas hipotéticas por barras,
+outcomes com `R_net`, e a recusa explícita de entrar quando a geometria não fecha
+(`no_entry: geometry`, 5 casos na primeira avaliação) — com stop na mínima da barra do sinal, uma
+barra de pico com corpo grande coloca a entrada acima do alvo, e a versão prefere não entrar a
+inventar geometria.
+
+**Não existe:** a versão do M4 baseada na anomalia `VOLUME_SPIKE` do Anomaly Engine e no order
+flow — é **outra versão**, comparável em paralelo, nunca esta renomeada. Também não existe
+execução: sinais do Lab carregam `purpose = research_only` e não são elegíveis; `active` numa
+versão não implica elegibilidade (o M4 terá `execution_eligible` explícito).
 
 ## Relacionadas
 
-[[Agents Overview]] · [[Strategies]] · [[Momentum Agent]] · [[Anomalies]] · [[Experiments Index]] · [[Dialogos/SHADOW]] · [[Agent Performance]] · [[Risk Engine]]
+[[Agents Overview]] · [[Strategies]] · [[Momentum Agent]] · [[Anomalies]] · [[Experiments Index]] · [[EXP-0002-volume-anomaly-v1]] · [[Dialogos/SHADOW]] · [[Agent Performance]] · [[Strategy Performance]] · [[Workers]] · [[Risk Engine]]
 
 ## Fontes
 

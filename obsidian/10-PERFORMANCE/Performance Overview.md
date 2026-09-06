@@ -1,21 +1,30 @@
 ---
-tags: [performance, analytics, m5]
-updated: 2026-09-05
-status: planejado
+tags: [performance, analytics, shadow-lab, m5]
+updated: 2026-09-06
+status: parcial
 ---
 
 # Performance Overview
 
 ## Status honesto
 
-**Não existe nenhum dado de performance ainda.** Não há mercado sendo coletado, não há sinal gerado, não há trade paper executado. As tabelas que vão alimentar esta área (`agent_stats`, `signal_outcomes`, `portfolio_equity_snapshots`, `trades`) existem como schema vazio desde o M0. O `analytics-worker` que as populariam é planejado para o M5.
+**Não existe dado de performance de carteira, e não vai existir antes do M3/M4.** Não há trade
+paper, não há posição, não há capital. `agent_stats`, `portfolio_equity_snapshots` e `trades`
+continuam vazias, e o `analytics-worker` que as popularia é do M5.
+
+**O que passou a existir em 2026-09-06:** mercado real coletado (M1 aprovado) e `agent_signals` +
+`signal_outcomes` reais, escritos pelo `strategy-worker` em modo sombra. São **medidas de
+experimento**, hipotéticas e com custos assumidos declarados, e estão em
+[[EXP-0001-momentum-v1]] e [[EXP-0002-volume-anomaly-v1]] — não nesta página, e não como
+performance. As duas avaliações abertas estão `inconclusivo` pelo limiar editorial (100 outcomes
+avaliáveis **E** 30 dias distintos). Definições das métricas em [[Strategy Performance]].
 
 ## O que vai alimentar cada visão (quando existir)
 
 | Página | Fonte de dado planejada | Depende de |
 |---|---|---|
 | [[Agent Performance]] | `agent_stats` (materializado por janela 7d/30d/90d/all, por regime, mercado, hora, volatilidade) | M4 (agentes gerando sinal) + M5 (analytics-worker) |
-| [[Strategy Performance]] | `agent_stats` agregado por `strategy_version_id`; `backtest_results` quando houver backtest | M4/M5, M6 (backtest) |
+| [[Strategy Performance]] | hoje: `agent_signals` + `signal_outcomes` por `strategy_version_id` (Shadow Lab, só como ponteiro para os `EXP-NNNN`); depois: `agent_stats` agregado e `backtest_results` | Shadow Lab (existe), M4/M5, M6 (backtest) |
 | Dashboard (`/analytics`) | `trades`, `portfolio_equity_snapshots`, `risk_events` | M3 (execução) + M5 (agregação) |
 
 ## Métricas previstas (definição, não dado real)

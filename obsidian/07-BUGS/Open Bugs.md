@@ -1,11 +1,50 @@
 ---
 tags: [bugs, abertos]
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # Open Bugs
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
+
+## Abertos pela primeira avaliação do Shadow Lab (S4, 2026-09-06)
+
+- **HIGH (operacional, local) — o `market-worker` do stack local está `unhealthy` e o Lab parou de
+  avaliar.** `docker compose ps` às 02:57 UTC: `market-worker  Up 9 minutes (unhealthy)`; o hash de
+  heartbeat `hb:market:binance` estava **vazio** (expirado); a última vela persistida era
+  `2026-09-06 02:50:00+00` com `now() = 02:57:32`; `ingestion_gaps` acumulou **773 linhas `open`**
+  com `gap_start` a partir de 02:04. Consequência medida no Lab: o heartbeat
+  `hb:strategy:shadow` às 02:56:38 devolveu `evaluations_by_state = {"unavailable":400,
+  "ineligible":1}` sobre `evaluated_bars = 401` — **100% das avaliações recusadas**, porque a
+  agregação exige a janela contígua inteira e um minuto perdido custa até ~24 h de avaliações
+  naquele mercado. **Não é defeito do Lab**: é a recusa correta de agregar sobre buraco. Causa
+  provável: contenção da máquina com a T2.9 em prova mais o Postgres. **Registrado e não
+  consertado por instrução** — os arquivos do `market-worker` estão em voo na T2.9. Dono: quem
+  fechar a T2.9. Ver [[EXP-0001-momentum-v1]], [[EXP-0002-volume-anomaly-v1]] e [[Market Collector]].
+- **HIGH (latente, todo o projeto) — o default de `hunter_core.events.consume()` mata qualquer
+  consumidor num stream ocioso.** `consume()` bloqueia o `XREADGROUP` por 5000 ms e
+  `hunter_core/redis.py` define `socket_timeout = 5.0`: os dois vencem no mesmo instante e o
+  processo morre com `redis.exceptions.TimeoutError` **sempre que o mercado fica quieto**. Medido
+  na primeira tentativa da prova da S2 (23:18–23:21 UTC de 2026-09-05,
+  `hunter_core/events/consume.py:85`). O `strategy-worker` foi blindado no seu próprio consumidor
+  (`CONSUME_BLOCK_MS = 2000` + backoff, com regressão em `tests/test_consumer_supervision.py`),
+  **mas o default continua perigoso para todo consumidor futuro** — e a T2.9 está editando
+  exatamente `packages/core/hunter_core/events/consume.py` agora. Cenário: o próximo worker que
+  usar o default morre em silêncio no primeiro fim de semana quieto. Dono: T2.9 / M2.
+- **MEDIUM (observabilidade de pesquisa) — a quebra de `unavailable` por motivo não é persistida em
+  lugar nenhum.** O heartbeat `hb:strategy:shadow` agrega só por *estado*
+  (`{"unavailable":400,"ineligible":1}`); o motivo (`gap`, `warmup`, `stale`, universo mudado) só
+  aparece numa sonda ad-hoc dentro do container. Cenário: uma avaliação datada não consegue dizer
+  **por que** perdeu 400 barras sem alguém entrar no container na hora — e depois que a janela
+  passa, a informação não existe mais. É requisito de cobertura da S3
+  (`.claude/state/notes-S2.md` §14 já pede separar `late:delay`, `late:missed_open`,
+  `late:unconfirmed`, `geometry`, `gap:*` e `blocked:*`); esta linha acrescenta que o mesmo vale
+  para o lado das avaliações recusadas. Dono: S3.
+- **LOW (retenção × pesquisa) — a retenção não conhece o `tracking_hold`.** `tracking_hold` mantém
+  a *coleta* de um mercado segurado, mas a poda de 90 dias de `candles_1m`
+  (`infra/scripts/prune_partitions.py`) apaga por partição sem olhar `shadow_episodes`. Com
+  horizontes de 2–4 h isso não morde hoje; um replay antigo ou uma versão de horizonte longo
+  morderia, e o efeito seria censura silenciosa de acompanhamentos. Dono: schema/retention.
 
 ## Abertos pela prova operacional da T1.6b (2026-09-05, sharding)
 

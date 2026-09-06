@@ -1,23 +1,35 @@
 ---
 tags: [experimentos, indice]
-updated: 2026-09-05
-status: planejado
+updated: 2026-09-06
+status: em-andamento
 ---
 
 # Experiments Index
 
 ## Status honesto
 
-**Não existe nenhum experimento rodando ainda.** Não há paper trading, não há agente ativo, não há `signal_outcomes` real. O que mudou em 2026-09-05 é que os **IDs estão reservados** e o protocolo está congelado pela [[Dialogos/SHADOW|decisão conjunta do Shadow Lab]]: quando S0–S2 forem entregues e provadas, `EXP-0001` e `EXP-0002` nascem com hipótese e protocolo já escritos, e as avaliações passam a ser **acrescentadas** e datadas — nunca reescritas.
+**Dois experimentos abertos e coletando desde 2026-09-06.** S0 (migração `0002_shadow_lab`), S1
+(estratégias) e S2 (`strategy-worker` em modo sombra) foram entregues e provados
+(`.claude/state/s2-proof.md`), as duas versões foram ativadas pelo script auditado e o worker está
+no ar emitindo sinais sobre o mercado real da Binance. Continua valendo o que o Shadow Lab **não**
+é: não há carteira, ordem, posição nem PnL de portfolio — todo número é hipotético, com custos
+assumidos declarados, e todo sinal carrega `purpose = research_only`.
+
+Na primeira avaliação datada (`as_of = 2026-09-06T02:55:00Z`) os dois experimentos estão
+**inconclusivos** pelo limiar editorial: **57** outcomes avaliáveis no `EXP-0001` (48 na coorte v1 +
+9 na v2) e **72** no `EXP-0002` (66 + 6), todos em **1** dia distinto, contra os 100 outcomes **E**
+30 dias exigidos. E há um segundo motivo, achado nessa mesma leitura: **nenhum** dos 57 do
+`EXP-0001` teve o horizonte de 4 h maturado — a população avaliável é inteiramente composta de
+acompanhamentos que resolveram cedo.
 
 Cada experimento significativo (uma hipótese testada sobre uma estratégia, um conjunto de parâmetros, um mercado ou período) ganha seu próprio arquivo `EXP-NNNN-<slug>.md` nesta mesma pasta, numerado sequencialmente a partir de `EXP-0001`.
 
-## Reserva de IDs (decisão conjunta SHADOW, 2026-09-05)
+## Registro de IDs (decisão conjunta SHADOW, 2026-09-05)
 
 | ID | Experimento | Origem | Estado |
 |---|---|---|---|
-| `EXP-0001` | `momentum_v1` em modo sombra (15 min, stop e alvo a 1,5 ATR da referência, horizonte 4 h) | Shadow Lab v0 — tarefa S4 | **reservado**, arquivo só nasce após a prova de S0–S2 |
-| `EXP-0002` | `volume_anomaly_v1` em modo sombra (5 min, ATR de 15 min, stop na mínima da barra do sinal, horizonte 2 h) | Shadow Lab v0 — tarefa S4 | **reservado**, idem |
+| `EXP-0001` | [[EXP-0001-momentum-v1\|momentum em modo sombra]] (15 min, stop e alvo a 1,5 ATR da referência, horizonte 4 h) | Shadow Lab v0 — tarefa S4 | **aberto em 2026-09-06**, coortes `v1` (deprecated) e `v2` (active) |
+| `EXP-0002` | [[EXP-0002-volume-anomaly-v1\|volume_anomaly em modo sombra]] (5 min, ATR de 15 min, stop na mínima da barra do sinal, horizonte 2 h) | Shadow Lab v0 — tarefa S4 | **aberto em 2026-09-06**, coortes `v1` (deprecated) e `v2` (active) |
 | `EXP-0003` | Baselines por ativo/hora do M2 (T2.8) | `docs/plans/M2.md` | **reservado** — o M2 cedeu `EXP-0001` ao Shadow e passou para cá |
 
 A reserva está consolidada nos três lugares que a decisão exige: aqui, em `docs/plans/SHADOW-LAB.md` (item 11) e em `docs/plans/M2.md` (T2.8).
@@ -56,7 +68,46 @@ Todos os números vêm de `agent_signals` / `signal_outcomes` reais, com o SQL c
 
 ## Experimentos registrados
 
-_Nenhum arquivo ainda._ `EXP-0001` e `EXP-0002` nascem quando S0 (migração), S1 (estratégias) e S2 (worker sombra) estiverem entregues e provados — ver [[Dialogos/SHADOW]].
+| Arquivo | Estratégia | Aberto em | Última avaliação (`as_of`) | Result |
+|---|---|---|---|---|
+| [[EXP-0001-momentum-v1]] | `momentum` v1 (deprecated) + v2 (active) | 2026-09-06 | `2026-09-06T02:55:00Z` | **inconclusivo** — 57 avaliáveis (48 + 9), 1 dia, **0 com horizonte maturado** |
+| [[EXP-0002-volume-anomaly-v1]] | `volume_anomaly` v1 (deprecated) + v2 (active) | 2026-09-06 | `2026-09-06T02:55:00Z` | **inconclusivo** — 72 avaliáveis (66 + 6), 1 dia, 35 com horizonte maturado |
+
+### O que a próxima extração tem de fazer (achados da revisão da Astra, 2026-09-06)
+
+O SQL das páginas já incorpora estes cinco pontos; ficam escritos aqui porque valem para **todo**
+`EXP-NNNN` futuro, não só para estes dois:
+
+1. **Coorte e propósito impostos na consulta**, não apenas declarados no protocolo
+   (`supporting_features->>'cohort'` e `->>'purpose'`). No dia em que existir `replay:<run_id>`, um
+   SQL sem esse filtro mistura prospectivo com retrospectivo em silêncio.
+2. **Maturação do horizonte contada à parte** (`expires_at <= read_at`). Sem ela, uma leitura feita
+   cedo mede só os acompanhamentos que resolveram rápido e a composição muda sozinha com o tempo.
+3. **Motivos exatos**, agrupados pelo valor, nunca por `LIKE 'late%'` — `late:delay`,
+   `late:missed_open` e `late:unconfirmed` são populações diferentes.
+4. **PF nulo só com motivo verdadeiro:** ausência de **perdas** (denominador vazio) ou ausência de
+   população. Ausência de **ganhos** dá PF **zero**, que é um resultado conhecido — chamá-lo de nulo
+   esconderia o pior caso.
+5. **Snapshot único** (`REPEATABLE READ READ ONLY`) para todas as consultas da mesma avaliação, e a
+   ressalva escrita de forma dura: a leitura **não é reconstruível** depois, porque `signal_outcomes`
+   avança no lugar e não há histórico de estados preservado.
+
+### Por que existem duas coortes de versão em cada experimento
+
+`v2` não é variante de pesquisa: nas duas estratégias ela nasceu da correção do `code_ref` (o
+digest da árvore inteira invalidava toda versão congelada a cada módulo novo — MUST-FIX 1 do
+`risk-engine-guardian`). Campo congelado não se corrige no lugar, então a correção obrigou uma
+versão nova, e a `v1` foi `--supersede`d para `deprecated` **mantendo a população que já tinha**.
+Código, `default_parameters`, `parameters_schema` e `params_hash` são idênticos entre as duas; o que
+separa as populações é o `strategy_version_id` dentro do `uuid5` de cada sinal. Comparar `v1` com
+`v2` como se fossem hipóteses concorrentes seria erro de leitura — está escrito em cada página.
+
+### Rotina de plantão
+
+A cada turno da [[Mente da Sexta-feira|Sexta-feira]] os experimentos ativos recebem **uma avaliação
+nova, datada**, com o SQL colado, o `as_of` do turno e os números de saída real. Avaliação anterior
+nunca é reescrita; hipótese e protocolo nunca mudam; a variante "vencedora" nunca é ativada
+automaticamente. A rotina está em `.claude/agents/sexta-feira.md`, seção "Plantão permanente".
 
 ## Relacionadas
 

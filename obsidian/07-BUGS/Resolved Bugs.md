@@ -1,11 +1,52 @@
 ---
 tags: [bugs, resolvidos]
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # Resolved Bugs
 
-Correções reais extraídas do `git log`, todas dentro do Milestone 0. A maioria veio de rodadas de revisão de segurança/qualidade (T04–T10 no plano `docs/plans/M0.md`), não de bugs reportados em produção — não houve produção ainda.
+Correções reais extraídas do `git log`. A maioria veio de rodadas de revisão de segurança/qualidade, não de bugs reportados em produção — não houve produção ainda.
+
+## Shadow Lab — S2 (`5d0153b`, 2026-09-05/06)
+
+Três defeitos que **os testes verdes não pegavam**, todos encontrados rodando de verdade ou por
+revisão adversarial. A lição comum está registrada em [[Architecture Decisions]]: um duplo de teste
+que reimplementa a semântica do sistema real (o Lua do rate limiter, o timeout do Redis, o digest do
+código) esconde exatamente a classe de falha que só aparece em produção.
+
+- **HIGH — `consume()` matava o worker sempre que o mercado ficava quieto.** Na primeira tentativa
+  da prova operacional (23:18–23:21 UTC) o `strategy-worker` morreu com
+  `redis.exceptions.TimeoutError: Timeout reading from redis:6379` em
+  `hunter_core/events/consume.py:85`. Causa: `consume()` bloqueia o `XREADGROUP` por 5000 ms e o
+  cliente Redis tem `socket_timeout = 5.0` — num stream ocioso os dois vencem no mesmo instante. O
+  container reiniciava (`restart: unless-stopped`) e nada se perdia, mas um worker que morre no
+  silêncio do mercado não está supervisionado. Corrigido no consumidor do `strategy-worker`
+  (`CONSUME_BLOCK_MS = 2000` + backoff no laço), com regressão em `test_consumer_supervision.py`.
+  **O default de `consume()` continua perigoso para os outros consumidores** — segue em
+  [[Open Bugs]].
+- **HIGH — `code_ref` era o digest da árvore inteira, e um módulo novo matava o Lab em silêncio.**
+  `strategies_code_ref()` fazia o digest de *todos* os `.py` de `hunter_core/strategies/` e a
+  comparação exigia igualdade exata. Cenário reproduzido pelo `risk-engine-guardian`: acrescentar
+  `momentum_v2.py` — ou **um comentário** em `indicators.py` — mudava o digest,
+  `load_active_versions` passava a pular **todas** as versões congeladas com
+  `shadow_version_code_ref_mismatch`, e o Lab parava de avaliar com `/ready` ainda **verde**.
+  Corrigido em duas frentes: (a) o `code_ref` passou a ser o digest do módulo da própria estratégia
+  mais o fecho transitivo dos módulos irmãos que ela realmente importa, derivado por análise `ast`
+  (formato `hunter_core.strategies.<módulo>@sha256:<64 hex>`); (b) a checagem `shadow_versions` de
+  `/ready` fica **falsa** quando há linhas `active` e nenhuma executável, com as recusas contadas
+  por motivo. Como campo congelado não se corrige no lugar (a trigger recusa o `UPDATE`), a correção
+  obrigou `momentum v2` e `volume_anomaly v2`, com as v1 `--supersede`d para `deprecated`
+  **mantendo a população que já tinham** — é a razão de cada experimento ter duas coortes
+  ([[EXP-0001-momentum-v1]], [[EXP-0002-volume-anomaly-v1]]).
+- **MEDIUM — a censura por gap era cega e o viés era o pior possível.** `_handle_gap` censurava por
+  relógio (`censor_after_s = 1800 s`) sem olhar o que o coletor estava fazendo. Na prova da S2 o
+  recovery levou ~10 min para 786 gaps; uma janela pior censuraria acompanhamentos que o dado ainda
+  ia cobrir — e a perda seria **correlacionada com a instabilidade do market-worker**, ou seja,
+  sumiria justamente o que foi decidido nas condições que mais interessam. Corrigido: a censura
+  consulta `ingestion_gaps` e o veredito vira o sufixo do motivo — `gap:<minuto>:failed` (censura
+  na hora), `gap:<minuto>:unregistered` (censura ao esgotar 7200 s), `gap:<minuto>:stalled` (gap
+  `open` parado além de `gap_recovery_max_s = 86 400 s`), e `open` recente **espera o quanto for
+  preciso**. As três populações são contadas separadamente pela S3.
 
 ## Prova operacional do market-worker (T1.6, 2026-09-05)
 

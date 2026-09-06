@@ -1,6 +1,6 @@
 ---
 tags: [performance, agentes, m5]
-updated: 2026-09-05
+updated: 2026-09-06
 status: planejado
 ---
 
@@ -9,6 +9,12 @@ status: planejado
 ## Status honesto
 
 **Sem dado.** Nenhum agente existe (ver [[Agents Overview]]), então não há uma única linha em `agent_stats` para reportar. Esta página fica pronta para quando houver.
+
+**Cuidado com a confusão que 2026-09-06 tornou possível.** O Shadow Lab está gerando `agent_signals`
+e `signal_outcomes` reais desde 2026-09-06 ([[EXP-0001-momentum-v1]], [[EXP-0002-volume-anomaly-v1]]),
+mas isso **não** é performance de agente: não há `agents`, não há portfolio, não há trade e
+`agent_stats` continua vazia. Sinal sombra é pesquisa sobre uma `strategy_version`; agente é uma
+configuração de um dono apostando num portfolio, e isso é Milestone 4.
 
 ## O que será medido, por agente, quando existir
 

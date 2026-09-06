@@ -63,11 +63,11 @@ Detalhe completo em [[Data Flow]] e `docs/PIPELINE.md`.
 - **02-MARKET/** — coleta de mercado, adapters de exchange, WebSockets, features, anomalias (tudo planejado M1–M2).
 - **03-TRADING/** — paper trading, risk engine, execução, portfolio, estratégias (tudo planejado M3–M4).
 - **04-AGENTS/** — visão geral de agentes e as quatro estratégias do MVP (planejado M4).
-- **05-EXPERIMENTS/** — índice de experimentos (`EXP-NNNN`) e template; hoje vazio.
+- **05-EXPERIMENTS/** — índice de experimentos (`EXP-NNNN`), template e os experimentos do Shadow Lab em andamento desde 2026-09-06: [[EXP-0001-momentum-v1]] e [[EXP-0002-volume-anomaly-v1]], com avaliações datadas e o SQL que produziu cada número.
 - **06-DECISIONS/** — índice legível das ADRs.
 - **07-BUGS/** — bugs abertos e resolvidos, com hash de commit.
 - **08-CHANGELOG/** — uma entrada por commit, agrupado por dia.
-- **09-OPERATIONS/** — deploy, variáveis de ambiente, monitoramento e o **Diário** (`09-OPERATIONS/Diario/AAAA-MM-DD.md`, uma nota por dia de trabalho: o que foi feito, o que foi decidido, o que ficou em voo) — mais recente: [[2026-09-05]].
+- **09-OPERATIONS/** — deploy, variáveis de ambiente, monitoramento e o **Diário** (`09-OPERATIONS/Diario/AAAA-MM-DD.md`, uma nota por dia de trabalho: o que foi feito, o que foi decidido, o que ficou em voo) — mais recente: [[2026-09-06]].
 - **10-PERFORMANCE/** — visão de performance (hoje sem trades, descreve o que vai alimentar as métricas).
 
 ## Fontes

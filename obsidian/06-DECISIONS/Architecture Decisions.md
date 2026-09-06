@@ -1,6 +1,6 @@
 ---
 tags: [decisoes, adr, indice]
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # Architecture Decisions
@@ -63,3 +63,25 @@ O que essa decisão fixa como regra permanente do produto, e não só do Lab:
 - **Durabilidade antes de publicação.** Sinal + outcome inicial + episódio/checkpoint + linha de outbox na mesma transação, ACK só após o commit; `shadow_outbox` antecipa o contrato T2.9, que a absorve sem perder pendências nem identidades. `INSERT ... ON CONFLICT (id) DO NOTHING` com `id = uuid5(NAMESPACE_SHADOW, canonical(strategy_version_id, market_id, params_hash, source_bar_close, cohort))`, `decision_at` fora do hash.
 
 **Consequência para os milestones:** S0 e S1 correm em paralelo com o fim do M1 (arquivos disjuntos); T2.1 do M2 passa a **referenciar** a migração `0002_shadow_lab` em vez de recriar seus objetos; T2.8 cede `EXP-0001`/`EXP-0002` ao Shadow e fica com `EXP-0003`. Ver [[Strategies]], [[Momentum Agent]], [[Volume Agent]], [[Experiments Index]], [[Market Collector]] (`tracking_hold`).
+
+## Lição recorrente — o duplo de teste que reimplementa o sistema real esconde a falha (2026-09-06)
+
+Três vezes, em três subsistemas diferentes, uma suíte inteiramente verde escondeu um defeito que
+matava o processo contra a dependência de verdade. Está aqui como **classe de bug**, para entrar nos
+briefs seguintes e não ser redescoberta uma quarta vez:
+
+1. **T1.6** — `_FakeRedisEval` reimplementava a semântica do Lua em Python, então nunca exercitava a
+   tipagem enviada ao Redis: `EXPIRE` com `120.0` era recusado pelo Redis real e **todo**
+   `list_markets` falhava em produção com a suíte verde ([[Resolved Bugs]]).
+2. **T1.6** — o cliente Redis dos testes nunca ficava sem rede, então `socket_timeout = None`
+   passava despercebido; contra um Redis reiniciado o worker virava zumbi silencioso por 19 minutos.
+3. **S2** — o inverso do mesmo erro: os testes usavam streams *com* mensagens, então nunca
+   encontraram o instante em que o bloqueio de 5000 ms do `XREADGROUP` empata com o
+   `socket_timeout` de 5,0 s. O worker morria **exatamente quando o mercado ficava quieto**.
+
+Regra que fica: **onde o duplo reimplementa comportamento da dependência (script, timeout, digest,
+serialização), tem de existir um teste de integração contra a dependência real** — e a condição
+"ociosa" (stream vazio, mercado parado, fim de semana) é um caso de teste, não um estado
+improvável. Complementa a regra vizinha do `code_ref`: um digest de escopo largo demais também é um
+duplo que mente — ele muda quando o sistema não mudou, e faz o processo pular trabalho válido com
+`/ready` verde.
