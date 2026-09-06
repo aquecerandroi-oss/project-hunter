@@ -431,14 +431,32 @@ outcomes — tudo na **VPS**, com 45 h de dados reais, 200 mercados monitorados 
 
 **O `StrategyContext` carrega `candles_1m`, `funding`, `open_interest`, `eligible` e
 `eligibility_reason` — e nada mais** (`packages/core/hunter_core/strategies/base.py:109` em diante),
-e ele é validado para **recusar velas de outro símbolo**. Consequências que decidem o que pode
-entrar na fila:
+e ele é validado para **recusar velas de outro símbolo**.
 
-> 1. Toda candidata testável hoje tem de ser calculável a partir de **velas, funding e open
->    interest** do próprio mercado. Spread, livro e volume de 24 h **não estão lá** — filtros que os
->    usem exigem mudança de contrato, do mesmo peso dos itens 19 e 20.
-> 2. **Filtro entre mercados é estruturalmente impossível hoje.** Nenhuma regra pode olhar o BTC,
->    ou a coorte, ou o mercado vizinho, porque o contexto é de um símbolo só e rejeita o resto.
+> **Correção de 2026-09-06, e ela desfaz duas afirmações de impossibilidade que eu tinha escrito
+> aqui.** A revisão da Astra mostrou que o limite é mais estreito do que eu disse:
+>
+> 1. **Volume de 24 h NÃO é impossível.** `NormalizedCandle.quote_volume` existe
+>    (`packages/core/hunter_core/domain/market.py:264`) e o contexto carrega
+>    `context_minutes = 1560` (26 h) de velas — então um volume de cotação de 24 h é **reconstruível
+>    somando as velas**, sem nenhuma mudança de contrato. A ressalva real é outra: `quote_volume` é
+>    *nullable* em parte do universo ([[KB-0013-vpin-e-a-disputa-sobre-toxicidade]]).
+> 2. **Filtro por coorte NÃO é impossível.** A estratégia conhece o próprio `symbol`, então uma lista
+>    estática versionada cabe em `default_parameters`. Eu tinha retirado a T-032 com esse argumento
+>    errado; a retirada continua, mas **pelo motivo certo** (ausência de evidência), e a correção
+>    está no [[Registro de Tentativas]].
+>
+> **O que de fato limita a fila, e sobrevive:**
+>
+> 1. **`funding` e `open_interest` nunca chegam ao contexto em produção.**
+>    `build_market_context` chama `build_context` **sem passá-los**
+>    (`services/strategy-worker/hunter_strategy_worker/context.py:75`), então são `None` em toda
+>    avaliação. O `load_funding` existente serve à **apuração do outcome**
+>    (`settle.py:60`), não à decisão. Isso não é limite de contrato — é alimentação.
+> 2. **Spread e livro não estão em lugar nenhum do contexto**, e continuam exigindo mudança de
+>    contrato, do mesmo peso dos itens 19 e 20.
+> 3. **Filtro entre mercados é estruturalmente impossível.** Nenhuma regra pode olhar o BTC ou o
+>    mercado vizinho: o contexto é de um símbolo só e rejeita velas de outro.
 
 ### O que a medição derrubou do folclore de meme
 
@@ -446,7 +464,7 @@ entrar na fila:
 |---|---|
 | "Meme é o ativo mais volátil" | Medianas de ATR%(14) por barra de 15 min **próximas** entre memes (0,84%) e resto (0,83%). O contraste grande é BTC (0,127%) e majors (0,50%) contra tudo mais ([[KB-0057-a-volatilidade-das-memes-e-o-piso-que-bane-o-btc]]) |
 | "As memes azuis são as mais voláteis" | DOGE 0,56%, PEPE 0,53%, SHIB 0,45% — na faixa das majors. As listagens recentes de símbolo não-ASCII vão de 1,57% a 5,87% |
-| "Meme tem funding extremo" | Por liquidação, **menos** extremo que o resto (\|média\| 1,07 contra 2,32 bps); e metade da diferença entre coortes é **cadência**, não sentimento ([[KB-0059-funding-em-memes-a-cadencia-antes-do-sentimento]]) |
+| "Meme tem funding extremo" | Por liquidação **nesta janela**, menos extremo que o resto (\|média\| 1,07 contra 2,32 bps). E a comparação entre coortes **não é válida sem normalizar por cadência** (4 h contra 8 h): a razão entre medianas foi medida, **a parcela que a cadência explica não foi** ([[KB-0059-funding-em-memes-a-cadencia-antes-do-sentimento]]) |
 | "Memes descolam do mercado" | São **mais** acopladas ao BTC que a altcoin média: inclinação mediana 2,80 e R² 0,152, contra 1,44 e 0,021 ([[KB-0060-correlacao-com-o-btc-e-a-meme-season]]) |
 | "Meme é onde estão as quedas de 80%" | A maior queda **observada** ficou fora das memes (−58,67% contra −29,75%) — mas 19 contra 133 mercados **não decide cauda** ([[KB-0064-a-cauda-de-queda-e-o-que-o-risk-engine-vai-precisar]]) |
 | "Meme dá mais sinal" | 4,00 sinais por mercado contra 5,43 do resto; e dentro de cada estratégia as taxas de alvo não se distinguem ([[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]]) |
@@ -495,10 +513,10 @@ sexta rodada. Nenhuma é ativada por mim.
 
 | # | Candidata | Regra em uma frase | Parâmetros | Dado (temos?) | Marcação de universo | O que a refutaria |
 |---|---|---|---|---|---|---|
-| **M-A** | **Teto de ATR% mais apertado** ([[KB-0057-a-volatilidade-das-memes-e-o-piso-que-bane-o-btc]] · [[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]]) | Manter tudo da `momentum_v1` e baixar só o teto de volatilidade admitida | `atr_pct_max ∈ {0,05 (base), 0,03, 0,02}`; θ de quantil **congelado antes** da janela | **sim** — Wilder(14) sobre 15m com `atr_bars=97`, já calculado no contexto | universo inteiro; **relatório estratificado** por `meme_universe_v1` | diferença **pareada** de média de `R_net` contra a base sem exceder o efeito mínimo declarado, com Holm e blocos de tempo, e os quatro números da `C-META`. **Bloqueada até `D-MEME-ATR` e `D-MEME-LIQ` rodarem** (exigência da Astra) |
-| **M-E** | **Teto de funding absoluto como custo** ([[KB-0059-funding-em-memes-a-cadencia-antes-do-sentimento]]) | Recusar o sinal quando \|`funding_rate`\| na decisão passar de θ — **filtro de custo, simétrico, não direcional** | `abs_funding_max = θ`, de quantil congelado antes; um braço | **sim** — `funding` está no `StrategyContext` | universo inteiro; relatório por coorte | os dois denominadores da `C-META` não positivos. **Não é a T-016**: aquela era direcional e foi retirada por prior desfavorável ([[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]]); esta é simétrica e não promete previsão. **Ressalva:** `funding_rate` é a estimativa em formação, e sem `next_funding_time` não sabemos a fase do ciclo ([[KB-0019-o-que-a-nossa-funding-rate-mede-de-fato]]) |
-| **M-G** | **Teto de amplitude da barra de referência** ([[KB-0064-a-cauda-de-queda-e-o-que-o-risk-engine-vai-precisar]]) | Recusar quando a amplitude da própria barra de 15 min do sinal passar de K × ATR₀ | `bar_range_atr_max = K`, de quantil congelado antes; um braço | **sim** — só velas | universo inteiro; relatório por coorte | os dois denominadores da `C-META`. **É distinta do `atr_pct_max`**: aquele mede o nível ambiente de volatilidade, este mede **aquela barra**. E é distinta do `return_max_atr = 2` da `volume_anomaly_v1`, que limita o **retorno** e não a amplitude, e não existe na `momentum_v1` |
-| ~~**M-B**~~ | ~~**Piso de liquidez** (`quote_volume_24h` mínimo)~~ | — | — | **não** | — | **BLOQUEADA em 2026-09-06.** Dois motivos: o `StrategyContext` **não carrega** volume de 24 h (`base.py:109`), então é mudança de contrato; e o `ts` do hash `ticker` é compartilhado entre REST e WS (`hot_state.py:61`, `sampling.py:55`), então volume velho pode aparecer preenchido e "fresco". Achado da Astra. Classificação: *especificada; diagnóstico de cobertura liberado; avaliação bloqueada até validar disponibilidade e frescor* |
+| **M-A** | **Teto de ATR% mais apertado** ([[KB-0057-a-volatilidade-das-memes-e-o-piso-que-bane-o-btc]] · [[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]]) | Manter tudo da `momentum_v1` e baixar só o teto de volatilidade admitida | `atr_pct_max ∈ {0,05 (base), 0,03, 0,02}`; θ de quantil **congelado antes** da janela | **sim** — Wilder(14) sobre 15m com `atr_bars=97`, já calculado no contexto | universo inteiro; **relatório estratificado** por `meme_universe_v1` | diferença de média de `R_net` contra a base sem exceder o efeito mínimo declarado, com Holm e blocos de tempo, e os quatro números da `C-META`. **Bloqueada até `D-MEME-ATR` e `D-MEME-LIQ` rodarem.** E a `C-META` avalia aceitação/recusa sobre **as oportunidades fixadas pela base** — rodar como versão autônoma muda slots e rearme (`decide.py:129,152`), e aí o efeito **não é pareado** e a mudança de população tem de ser reportada junto |
+| **M-E** | **Teto de funding extremo em módulo** ([[KB-0059-funding-em-memes-a-cadencia-antes-do-sentimento]]) | Recusar o sinal quando \|`funding_rate`\| na decisão passar de θ | `abs_funding_max = θ`, de quantil congelado antes; um braço | **calculável pelo contrato, BLOQUEADA pela alimentação**: `build_market_context` não passa `funding` (`context.py:75`), então ele é `None` em toda avaliação | universo inteiro; relatório por coorte | os dois denominadores da `C-META` não positivos. **A justificativa de "custo simétrico" foi retirada** — o Lab só admite LONG e o funding é transferência **assinada** (`base.py:214`, `pricing.py:13,79`): +10 bps custa, −10 bps paga, e um filtro em módulo elimina os dois. A hipótese econômica de substituição ainda precisa ser escrita. **Não é a T-016** ([[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]]), que era direcional |
+| **M-G** | **Teto de amplitude da barra de referência** ([[KB-0064-a-cauda-de-queda-e-o-que-o-risk-engine-vai-precisar]]) | Recusar quando a amplitude da própria barra de 15 min do sinal passar de K × ATR | `bar_range_atr_max = K`, de quantil congelado antes; um braço | **sim** — só velas (`aggregate.py:40` já traz máxima e mínima) | universo inteiro; relatório por coorte | os dois denominadores da `C-META`. **A Astra conferiu que é distinta**: M-A mede `ATRₜ/closeₜ`, M-G mede `(highₜ−lowₜ)/ATRₜ`, e o `return_max_atr` da `volume_anomaly_v1` mede retorno entre fechamentos de 5m contra ATR% de 15m — uma barra pode ter pavios grandes e retorno pequeno. **Ressalva dela que muda o parâmetro:** o ATR implementado **inclui a barra corrente** (`ATRₜ = (13·ATR₍ₜ₋₁₎ + TRₜ)/14`, `indicators.py:62,88`), e como `high−low ≤ TR` a razão **nunca passa de 14** — `K ≥ 14` seria inoperante. Usar o ATR anterior mede outra coisa e tem de ser declarado como outra definição |
+| ~~**M-B**~~ | ~~**Piso de liquidez** (volume de cotação de 24 h mínimo)~~ | — | — | parcialmente | — | **BLOQUEADA na forma proposta em 2026-09-06** — mas por um motivo mais estreito do que eu escrevi. O caminho pelo hash `ticker` está fechado (`ts` compartilhado entre REST e WS: `hot_state.py:61`, `sampling.py:55`, então volume velho parece fresco). O caminho **aberto** que eu tinha declarado impossível é reconstruir o volume de cotação de 24 h **somando `quote_volume` das velas** do próprio contexto (`market.py:264`), com a ressalva de que o campo é *nullable*. Reclassificada: *especificada por via alternativa; exige diagnóstico de cobertura de `quote_volume` por coorte antes de virar braço* |
 
 ### Diagnósticos abertos pela sétima rodada
 
@@ -515,6 +533,31 @@ sexta rodada. Nenhuma é ativada por mim.
 | `D-MEME-POP` | [[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]] | retrato por **estratégia/versão × coorte** com todos os denominadores, mercados desmonitorados incluídos, `count(r_multiple)` ao lado de cada média e corte temporal declarado | **nenhum — roda hoje** |
 | `D-MEME-ATRPAR` | [[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]] | taxa de alvo pareada por decil de `atr_pct`, dentro de cada estratégia. **Ausência de diferença não demonstra redundância** | `D-MEME-POP` |
 
+### Ordem recomendada — desenho da Astra, que corrigiu a minha
+
+1. **`D-MEME-POP` e `D-MEME-SAIDA` primeiro.** Reconciliar população, versões, estados e mercados
+   desmonitorados, com `as_of` e `read_at` declarados. Sem isso nenhum número por coorte tem chão —
+   e foi exatamente o erro que a minha própria [[KB-0065-a-coorte-de-memes-nao-se-distingue-do-resto]]
+   cometeu na primeira versão.
+2. **`D-MEME-ATR`, `D-MEME-CUSTO` e `D-MEME-GAP`** como diagnósticos descritivos. No `D-MEME-ATR`,
+   separar **reconstrução com dado de hoje** de **recusa operacional comprovada naquela decisão** —
+   são coisas diferentes. O `D-MEME-CUSTO` roda hoje **como sensibilidade a custos assumidos**, com
+   os spreads medidos entrando como cenário; isso **não** equivale a reconstruir spread executável em
+   cada entrada e saída.
+3. **`D-005` antes ou dentro do `D-MEME-LIQ`** (cobertura e idade do spread anterior à decisão,
+   da segunda rodada): ausência de snapshot **não pode** eliminar em silêncio justamente as
+   oportunidades mais problemáticas.
+4. **`D-040` (concentração temporal) antes de qualquer inferência entre coortes** — ela é quem define
+   os blocos da análise.
+5. **Antes da M-E: alimentar e observar o funding sem decidir** (`D-010` da terceira rodada), e usar
+   `D-016`/`D-MEME-FUND` para exposição e cadência. Enquanto `context.py:75` não passar o funding,
+   a candidata não tem dado.
+6. **Antes da M-G:** distribuição da razão de amplitude e retenção incremental sobre os sinais da
+   base.
+
+**A M-A continua atrás do `D-MEME-ATR` e do `D-MEME-LIQ`**, e todo este bloco continua atrás da #1
+do backlog e do bloco de saídas da sexta rodada.
+
 ### Proveniência — três itens que não são estratégia e destravam o resto
 
 | Item | Nota | Por quê |
@@ -526,12 +569,17 @@ sexta rodada. Nenhuma é ativada por mim.
 ### O que esta rodada explicitamente NÃO propõe
 
 - **Nenhuma estratégia de listagem nova.** É a ideia mais citada do mercado de meme e a sua refutação
-  é **impossível de construir** hoje: a `momentum_v1` precisa de 24 h 15 min de histórico contínuo e
-  a `volume_anomaly_v1` de 24 h, o backfill não inventa história que a Binance não tem, e não
-  gravamos a data de listagem ([[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]]).
-- **Nenhum braço "só memes" nem "sem memes".** Duas razões: dentro de cada estratégia as coortes não
-  se distinguem na amostra atual, e — decisivo — **nenhuma regra consegue saber em que coorte está**,
-  porque o contexto é de um símbolo só.
+  é **impossível de construir** hoje: a `momentum_v1` precisa de 24 h 15 min de histórico contínuo,
+  e a `volume_anomaly_v1` **também** — 289 barras de 5 min **e** 97 barras completas de 15 min para o
+  ATR (`volume_anomaly_v1.py:122`; correção da Astra, eu tinha escrito só 24 h). O backfill não
+  inventa história que a Binance não tem, e não gravamos a data de listagem
+  ([[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]]).
+- **Nenhum braço "só memes" nem "sem memes" — por ausência de evidência, não por impossibilidade
+  técnica.** Eu tinha escrito que "nenhuma regra consegue saber em que coorte está"; **está errado**,
+  e a Astra corrigiu: a estratégia conhece o próprio `symbol`, e uma lista estática versionada cabe
+  em `default_parameters`. O motivo que sobra é o outro: dentro de cada estratégia as coortes não se
+  distinguem na amostra atual (10 e 34 toques resolvidos), e gastar uma tentativa contra isso hoje
+  seria gastar mal. A correção está registrada com a mesma ID no [[Registro de Tentativas]].
 - **Nenhum braço de detecção de pump.** A literatura opera em blocos de 25 s; nós decidimos sobre
   barras de 5 e 15 min. Não é parâmetro, é outra arquitetura.
 - **Nada de social nem on-chain.** `enable_social_intelligence` é flag sem consumidor funcional e

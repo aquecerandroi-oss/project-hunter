@@ -105,11 +105,17 @@ sinal, congelado antes da janela).
 
 Eu tinha escrito "testável agora". **Não é**, por dois motivos concretos:
 
-1. **A estratégia não recebe o campo.** O `StrategyContext` (`packages/core/hunter_core/strategies/base.py:109`
-   em diante) carrega exatamente `exchange`, `symbol`, `source_bar_close`, `candles_1m`, `funding`,
-   `open_interest`, `eligible` e `eligibility_reason`. Não há volume de 24 h, nem spread, nem livro.
-   Implementar a `M-B` exige **mudança de contrato**, não parametrização — e mudança de contrato tem
-   o mesmo peso do item 19 e do item 20 do backlog.
+1. **A estratégia não recebe o campo pronto.** O `StrategyContext`
+   (`packages/core/hunter_core/strategies/base.py:109` em diante) carrega exatamente `exchange`,
+   `symbol`, `source_bar_close`, `candles_1m`, `funding`, `open_interest`, `eligible` e
+   `eligibility_reason`. Não há volume de 24 h, nem spread, nem livro.
+   **Correção de 2026-09-06, na revisão da fila:** eu concluí daí que a `M-B` exigiria mudança de
+   contrato. **Errado.** `NormalizedCandle.quote_volume` existe
+   (`packages/core/hunter_core/domain/market.py:264`) e o contexto carrega 1.560 minutos de velas —
+   então o volume de cotação de 24 h é **reconstruível somando as velas**, sem tocar no contrato. O
+   que fica de pé é a ressalva de qualidade: `quote_volume` é *nullable* em parte do universo
+   ([[KB-0013-vpin-e-a-disputa-sobre-toxicidade]]), e a cobertura dele por coorte tem de ser medida
+   antes de a candidata virar braço.
 2. **A cobertura de hoje não sustenta "disponível no instante da decisão".** Até 2026-09-06 17:59 UTC
    ela era praticamente zero (o defeito de escritores da [[KB-0044-o-que-morre-em-dez-segundos]]);
    depois do deploy do commit `fa9f957` na VPS pulou para **6.264 de 9.901 leituras (63%) na hora das
@@ -122,10 +128,10 @@ Eu tinha escrito "testável agora". **Não é**, por dois motivos concretos:
    **preenchido e "fresco"** — exatamente enquanto a `M-B` afirmasse estar usando liquidez do
    instante.
 
-Classificação correta, palavras dela: **especificada; diagnóstico de cobertura liberado; avaliação
-da candidata bloqueada até validar disponibilidade e frescor.** O desbloqueio não é esperar um
-número de dias: é cobertura **por oportunidade, coorte e hora**, idade da fonte, regra declarada
-para ausentes, e θ congelado numa janela anterior.
+Classificação correta depois das duas revisões: **especificada por via alternativa (soma de
+`quote_volume` das velas); o caminho pelo hash `ticker` fica bloqueado por frescor; e a avaliação
+exige antes um diagnóstico de cobertura de `quote_volume` por oportunidade, coorte e hora**, com
+regra declarada para ausentes e θ congelado numa janela anterior.
 
 **`D-MEME-CUSTO` (diagnóstico, roda hoje, sem pré-requisito):** repetir o `EXEC-C` da quinta rodada
 (sensibilidade a `fee_bps ∈ {4; 4,5; 5}`) **estratificado por coorte**, e acrescentar uma linha nova:

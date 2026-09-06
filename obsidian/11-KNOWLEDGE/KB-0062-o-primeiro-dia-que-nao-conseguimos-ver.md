@@ -18,9 +18,11 @@ história de meme coin em que o nosso Lab **não pode participar**, e o motivo n
 é aritmética de aquecimento.
 
 A `momentum_v1` precisa de **97 barras de 15 min** para o seu ATR (`momentum_v1.py:82`), o que são
-**24 h 15 min** de histórico contínuo. A `volume_anomaly_v1` precisa de **288 barras de 5 min**
-(`volume_anomaly_v1.py:69`), que são **24 h**. E a agregação recusa a janela inteira se **faltar
-qualquer minuto** (`aggregate.py:128`). Para um perpétuo que a Binance acabou de listar, não existe
+**24 h 15 min** de histórico contínuo. E a `volume_anomaly_v1` precisa do mesmo, ou mais: eu tinha
+escrito "288 barras de 5 min, que são 24 h", e a Astra corrigiu — ela exige **289 barras de 5 min
+E 97 barras completas de 15 min** para o ATR (`volume_anomaly_v1.py:122`), ou seja **também ≥ 24 h
+15 min**, com espera adicional possível pelo alinhamento dos buckets. A agregação recusa a janela
+inteira se **faltar qualquer minuto** (`aggregate.py:128`). Para um perpétuo que a Binance acabou de listar, não existe
 histórico para buscar: o primeiro dia de vida do contrato é, para nós, estruturalmente cego.
 
 E há uma segunda camada, que é conserto de registro e não limite físico: **não gravamos a data de

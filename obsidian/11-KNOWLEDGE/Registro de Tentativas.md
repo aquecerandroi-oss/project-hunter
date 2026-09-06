@@ -464,6 +464,37 @@ versão das dez notas, em três passagens (`.claude/state/astra-review-KB-0056-0
 24. **"Guardar `occurred_at` evita look-ahead em dado social"** — falta o instante em que o evento
     **e a classificação** ficaram disponíveis.
 
+### Correções da mesma data, com as mesmas IDs e o motivo (a regra desta página)
+
+A revisão da fila pela Astra (`.claude/state/astra-review-fila-memecoins.md`) mostrou que **duas
+retiradas minhas usavam argumento falso** e que **um status estava errado**. Linhas novas, nunca
+edição das anteriores:
+
+| ID | Correção | Motivo |
+|---|---|---|
+| T-029 | de "teto de funding **absoluto como custo simétrico**" para **"teto de funding extremo em módulo, com hipótese econômica a escrever"**; e de "proposta" para **"proposta, bloqueada pela alimentação do contexto"** | Dois erros. (a) O Lab só admite LONG e o funding é transferência **assinada** (`base.py:214`, `pricing.py:13,79`): +10 bps custa e −10 bps paga, então um filtro em módulo elimina os dois e atribui a exclusão a "custo" indevidamente. (b) `build_market_context` **não passa `funding`** (`context.py:75`), que é `None` em toda avaliação — o `load_funding` serve à apuração do outcome (`settle.py:60`), não à decisão. Cenário de falha: implementar supondo dado presente, e o filtro nunca atuar (ou tudo virar indisponível) |
+| T-031 | de "bloqueada, o contexto não carrega volume de 24 h" para **"especificada por via alternativa"** | O caminho pelo hash `ticker` continua fechado (`ts` compartilhado entre REST e WS). Mas `NormalizedCandle.quote_volume` existe (`domain/market.py:264`) e o contexto tem 1560 minutos de velas, então o volume de cotação de 24 h é **reconstruível somando velas**, sem mudar contrato. Ressalva: o campo é *nullable* em parte do universo. **A minha declaração de impossibilidade estava errada** |
+| T-032 | mantida retirada, **com outro motivo** | Eu retirei dizendo que "nenhuma regra sabe em que coorte está". **Falso:** a estratégia conhece o próprio `symbol` e uma lista estática versionada cabe em `default_parameters`. O motivo que sobrevive é **ausência de evidência** — dentro de cada estratégia as coortes não se distinguem, com 10 e 34 toques resolvidos |
+| T-033 | mantida bloqueada, com o **aquecimento corrigido** | Eu atribuí 24 h à `volume_anomaly_v1`. Ela exige **289 barras de 5 min e 97 barras completas de 15 min** para o ATR (`volume_anomaly_v1.py:122`), ou seja **também ≥ 24 h 15 min**, com possível espera adicional por alinhamento. Cenário de falha: esperar avaliação em T+24 h e diagnosticar indisponibilidade normal como defeito |
+
+**Correções de método na mesma revisão, que não mudam ID nenhuma:**
+
+25. **"A M-A produz diferença pareada"** — só se a `C-META` avaliar aceitação e recusa sobre as
+    **oportunidades fixadas pela base**. Rodada como versão autônoma, ela tem slots e rearme
+    próprios (`decide.py:129,152`): recusar uma entrada pode liberar uma oportunidade posterior que
+    a base não poderia aproveitar, e parear só sinais coincidentes omite parte do efeito.
+26. **"Metade da diferença de funding entre coortes é cadência"** — a frase tinha voltado como fato
+    na consolidação do backlog, contrariando a própria KB-0059. A razão entre medianas foi medida; a
+    parcela explicada pela cadência **não**.
+27. **`K ≥ 14` na M-G seria inoperante** — o ATR implementado inclui a barra corrente
+    (`ATRₜ = (13·ATR₍ₜ₋₁₎ + TRₜ)/14`, `indicators.py:62,88`) e `high − low ≤ TR`, então a razão da
+    M-G nunca passa de 14. Usar o ATR anterior é **outra definição**, e tem de ser declarada.
+
+**Duplicação verificada pela Astra contra T-001 a T-027:** nenhuma duplicata exata. M-A é parente da
+T-007 mas mexe no **teto** e não no piso; M-E difere da T-016 (direcional) e da T-012 (observação de
+fase); M-G é parente da T-002 mas amplitude não é impulso, e não equivale à T-025, que compara ATRs
+**anteriores**. Serem contrastes distintos **não** os torna buscas estatisticamente independentes.
+
 **Consequência de multiplicidade, repetida:** T-028 a T-034 e D-042 a D-051 nasceram da inspeção do
 código e do dado de 2026-09-06. Nenhuma pode ser confirmada nessa mesma população; a confirmação
 exige janela futura reservada, declarada **antes** da coleta, e o piso de 100 outcomes e 30 dias

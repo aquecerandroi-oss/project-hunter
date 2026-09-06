@@ -128,7 +128,17 @@ sequer são o grupo de funding mais extremo.
 "atravessou uma liquidação" continua sendo inferência a partir da cadência modal, com todo o
 problema que a KB-0026 registrou.
 
-**O que não proponho, e é deliberado:** nenhum braço de sombra sobre funding de meme. Duas rodadas
+**A candidata que saiu daqui — `M-E`, teto de funding extremo em módulo — está bloqueada, e por dois
+motivos que a revisão da fila achou.** (a) `build_market_context` **não passa `funding`** ao contexto
+(`services/strategy-worker/hunter_strategy_worker/context.py:75`), então ele é `None` em toda
+avaliação; o `load_funding` existente serve à apuração do outcome (`settle.py:60`), não à decisão.
+(b) Eu tinha justificado a regra como "filtro de custo simétrico"; **isso está errado** — o Lab só
+admite LONG e o funding é transferência **assinada** (`base.py:214`, `pricing.py:13,79`): +10 bps
+custa e −10 bps **paga**. Um filtro em módulo elimina os dois casos e chama os dois de custo. A regra
+pode sobreviver como "exclusão de funding extremo em módulo", mas com **outra** hipótese econômica,
+ainda por escrever.
+
+**O que não proponho, e é deliberado:** nenhum braço direcional de funding. Duas rodadas
 já registraram que a evidência aponta para poder preditivo nulo, e esta acrescenta que a premissa
 descritiva do folclore também é falsa. Gastar tentativa contra duas priors desfavoráveis é o oposto
 do que a [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] pede.

@@ -129,11 +129,15 @@ condicionar por volatilidade, isso **não demonstra** que "meme" é redundante �
 detectada numa amostra pequena não é demonstração de redundância (correção da Astra). No máximo,
 diminui a prioridade.
 
-**O que esta nota explicitamente NÃO propõe: nenhum braço de estratégia por coorte de meme.** Nem
-"só memes", nem "sem memes", nem parâmetro diferente por coorte. Dez toques resolvidos na
-`momentum_v1`; a marcação é julgamento meu
+**O que esta nota explicitamente NÃO propõe: nenhum braço de estratégia por coorte de meme — por
+ausência de evidência, não por impossibilidade técnica.** Eu tinha escrito na fila que "nenhuma regra
+consegue saber em que coorte está"; **está errado**, e a revisão corrigiu: a estratégia conhece o
+próprio `symbol`, então uma lista estática versionada cabe em `default_parameters`. Os motivos que
+sobrevivem são: dez toques resolvidos na `momentum_v1`; a marcação é julgamento meu
 ([[KB-0056-meme-coin-como-ativo-e-o-rotulo-que-nao-e-medida]]); e os confundidores abaixo tornam
-qualquer resultado atribuível a várias causas ao mesmo tempo.
+qualquer resultado atribuível a várias causas ao mesmo tempo. **Baixa prioridade não é
+impossibilidade, e ausência de diferença detectada não é equivalência** — as duas distinções são
+exigência da Astra.
 
 ## Por que pode falhar
 
