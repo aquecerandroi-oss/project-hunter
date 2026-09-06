@@ -31,6 +31,7 @@ from hunter_market_worker.persist_rows import (
     upsert_liquidations,
 )
 from hunter_market_worker.queues import PersistItem, PersistQueues, item_bytes
+from hunter_market_worker.recovery_queries import try_lock_gap_planning
 from hunter_market_worker.sampling import oi_poll_loop, snapshot_loop, write_snapshots
 
 __all__ = [
@@ -107,6 +108,18 @@ async def report_losses(factory: Any, exchange: str, queues: PersistQueues) -> N
     if not losses:
         return
     async with role_session(factory, db_role="hunter_worker") as session:
+        # The third writer of ``ingestion_gaps``, and it runs the same
+        # read-then-insert protocol as the periodic detection and the backfill
+        # consumer: it must take the same transaction-scoped advisory lock
+        # before reading coverage, or a dropped candle and a backfill request
+        # both read "missing, no gap" and both insert (Astra, T2.5-backfill
+        # diff review, must-fix 3).
+        if not await try_lock_gap_planning(session, exchange):
+            # Never wait here: this runs once per drain iteration and a
+            # detection cycle holds the lock for as long as it reads 200
+            # markets. The losses stay queued for the next iteration.
+            logger.debug("market_loss_report_deferred", exchange=exchange)
+            return
         ids = await load_market_ids(session, exchange, {loss.item.symbol for loss in losses})
         final_candle_keys: set[GapKey] = set()
         for loss in losses:

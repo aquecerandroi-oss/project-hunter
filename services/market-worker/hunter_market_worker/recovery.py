@@ -7,24 +7,21 @@ import time
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
-
 from hunter_core.db.models.market_data import IngestionGap
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import Timeframe
 from hunter_core.domain.market import align_open_time
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
-from hunter_core.observability import candle_gaps_total, market_ingestion_gaps
-from hunter_exchanges.rate_limit_suspension import is_coordination_outage
+from hunter_core.observability import market_ingestion_gaps
 from hunter_market_worker import recovery_queries as queries
-from hunter_market_worker.persist import load_market_ids, upsert_candles
+from hunter_market_worker.persist import load_market_ids
+from hunter_market_worker.recovery_drain import expected_times, recover_one
 from hunter_market_worker.supervision import rest_gate_suspended
 
 logger = get_logger(__name__)
 CHECK_INTERVAL_S = 60
 POLL_S = 5
-MAX_ATTEMPTS = 5
 MINUTE = timedelta(minutes=1)
 
 # D5: the persistence queue (queues.py PersistQueues.max_age) tolerates up to
@@ -38,7 +35,27 @@ DETECTION_GRACE = 2 * MINUTE
 # detection past its one-minute cadence, and give every backfill call a hard
 # ceiling instead of letting one stuck connection block the rest.
 MAX_GAPS_PER_CYCLE = 50
-FETCH_TIMEOUT_S = 20.0
+
+# T2.5-backfill: the history tier (gaps older than the detection window, i.e.
+# whatever `market.backfill.requested` asked for) spends only what live
+# collection left of MAX_GAPS_PER_CYCLE, never more than this many rows, and
+# never more than HISTORY_BUDGET_S of wall time. The row ceiling bounds the
+# REST weight (one 240-minute chunk is one klines page, weight 10 -> 60 of the
+# 2400/min quota); the time ceiling is what actually protects the cadence,
+# because six slow pages at FETCH_TIMEOUT_S each would be 120s and push the
+# next detection two minutes late (Astra, must-fix 3).
+MAX_HISTORY_GAPS_PER_CYCLE = 6
+HISTORY_BUDGET_S = 30.0
+MIN_FETCH_BUDGET_S = 3.0
+CYCLE_TAIL_MARGIN_S = 5.0
+"""How much of the detection interval is left to the bookkeeping after history.
+
+The budget is a *deadline*, not a stopwatch started when history begins (Astra,
+T2.5-backfill diff review, must-fix 2): with live collection spending 45s of the
+60s cycle, a fresh 30s of history would make the cycle 81s and push the next
+detection more than a minute late. :func:`history_deadline` therefore takes the
+earlier of "30s from now" and "the cycle's own end", and the deadline bounds the
+**whole** recovery unit — the reads and the write, not only the fetch."""
 
 # D6 + MEDIUM-5: a `failed` gap is retried instead of permanently suppressing
 # those minutes from `missing`; reopening is bounded per cycle so a bad patch
@@ -60,10 +77,6 @@ async def server_now(adapter: Any) -> datetime:
     return await method()
 
 
-def expected_times(start: datetime, end: datetime) -> set[datetime]:
-    return {start + MINUTE * n for n in range(int((end - start) / MINUTE) + 1)}
-
-
 def _missing_ranges(
     start: datetime, end: datetime, persisted: set[datetime], covered: set[datetime]
 ) -> list[tuple[datetime, datetime]]:
@@ -77,161 +90,42 @@ def _missing_ranges(
     return ranges
 
 
-def _reopen_stale_failed(
-    gaps_by_market: dict[Any, list[IngestionGap]], cutoff: datetime, max_reopen: int
-) -> int:
-    """D6: a `failed` gap older than ``cutoff`` gets one more try instead of
-    permanently subtracting its minutes from ``missing``. Bounded per cycle."""
-    reopened = 0
-    for gaps in gaps_by_market.values():
-        for gap in gaps:
-            if reopened >= max_reopen:
-                return reopened
-            if gap.status == "failed" and gap.detected_at <= cutoff:
-                gap.status = "open"
-                gap.attempts = 0
-                reopened += 1
-                logger.info(
-                    "market_gap_reopened",
-                    market_id=gap.market_id,
-                    gap_start=gap.gap_start,
-                    gap_end=gap.gap_end,
-                )
-    return reopened
-
-
-async def recover_registered(
-    session: Any,
-    adapter: Any,
-    gap: IngestionGap,
-    symbol: str,
-    now: datetime,
+def history_deadline(
+    cycle_start: float,
+    now: float,
     *,
-    candles: list[Any] | None = None,
-    fetch_error: BaseException | None = None,
-) -> None:
-    """Atomically backfill one gap: candles and the status transition commit
-    (or roll back) together via ``begin_nested``.
+    budget_s: float | None = None,
+    interval_s: float | None = None,
+    margin_s: float | None = None,
+) -> float:
+    """Monotonic instant at which the history tier of this cycle must stop.
 
-    ``candles``/``fetch_error`` let a caller fetch over REST *before* opening
-    this transaction (M3) — pass neither to fetch here as before (used
-    directly by tests and by any caller that already holds a short-lived
-    connection budget).
+    The earlier of the tier's own budget and the cycle's end. Pure, so the
+    arithmetic that protects the detection cadence is pinned by a test instead
+    of being read off a running worker. The module constants are read **here**,
+    not bound as defaults, so an operator (or a test) that changes one changes
+    the behaviour.
     """
-    gap.attempts += 1
-    try:
-        if fetch_error is not None:
-            raise fetch_error
-        if candles is None:
-            candles = await asyncio.wait_for(
-                adapter.fetch_candles(symbol, Timeframe.M1, gap.gap_start, gap.gap_end + MINUTE),
-                timeout=FETCH_TIMEOUT_S,
-            )
-        candles = candles or []
-        closed = [
-            c
-            for c in candles
-            if c.symbol == symbol
-            and c.timeframe == Timeframe.M1
-            and c.is_final
-            and c.close_time <= now
-            and gap.gap_start <= c.open_time <= gap.gap_end
-        ]
-        if closed:
-            # M2: a market listed after gap_start never has candles for the
-            # minutes before it existed. An adapter that actually returned
-            # candles, starting later than requested, means history simply
-            # does not go back further — narrow the gap instead of demanding
-            # the impossible range forever.
-            earliest = min(c.open_time for c in closed)
-            if earliest > gap.gap_start:
-                logger.info(
-                    "market_gap_history_starts_later",
-                    symbol=symbol,
-                    old_start=gap.gap_start,
-                    new_start=earliest,
-                )
-                gap.gap_start = earliest
-        async with session.begin_nested():
-            # ``upsert_candles`` also queues the ``market.candles.closed``
-            # event for every backfilled minute, in this same transaction —
-            # a recovered candle is announced exactly like a live one (T2.9).
-            inserted = await upsert_candles(session, closed, {symbol: gap.market_id}, source="rest")
-            present = await queries.persisted(session, gap.market_id, gap.gap_start, gap.gap_end)
-            if expected_times(gap.gap_start, gap.gap_end) <= present:
-                gap.status = "recovered"
-                gap.recovered_at = now
-                candle_gaps_total.labels(exchange=adapter.code).inc()
-                logger.info("market_gap_recovered", symbol=symbol, candles_inserted=inserted)
-    except Exception as exc:
-        if is_coordination_outage(exc) or rest_gate_suspended(adapter):
-            # T2.9: the outage started mid-cycle, after the gate was checked.
-            # It must not spend an attempt towards MAX_ATTEMPTS, which would
-            # park the gap as ``failed`` for FAILED_RETRY_AFTER_S.
-            #
-            # The *state* of the gate decides, not only the exception type
-            # (Astra, round 4): FETCH_TIMEOUT_S is 20s and the limiter's
-            # max_wait_s is 30s, so the usual way this shows up is the fetch
-            # being cancelled by the timeout long before ``acquire`` gets to
-            # raise ``RateLimited(reason="redis_unavailable")``.
-            gap.attempts -= 1  # an infrastructure outage is not this gap's fault
-            logger.warning("market_gap_deferred_rest_gate", symbol=symbol)
-            return
-        logger.exception("market_gap_backfill_failed", symbol=symbol, attempt=gap.attempts)
-    if gap.status != "recovered" and gap.attempts >= MAX_ATTEMPTS:
-        gap.status = "failed"
-        # D6/Astra: detected_at is the only durable clock the cooldown has.
-        # Refresh it on every re-failure, not just the original detection --
-        # otherwise a gap reopened once and then failing again would already
-        # be past FAILED_RETRY_AFTER_S and get reopened on the very next
-        # cycle, turning the cooldown into a tight retry loop.
-        gap.detected_at = now
-
-
-async def _recover_one(
-    session_factory: Any, adapter: Any, gap_id: Any, symbol: str, now: datetime
-) -> None:
-    """M3: fetch over REST with no transaction open, then re-check the gap
-    ``FOR UPDATE`` and write in one short transaction."""
-    async with role_session(session_factory, db_role="hunter_worker") as session:
-        gap = await session.scalar(
-            select(IngestionGap).where(IngestionGap.id == gap_id, IngestionGap.status == "open")
-        )
-        if gap is None:
-            return
-        gap_start, gap_end = gap.gap_start, gap.gap_end
-
-    fetch_error: BaseException | None = None
-    candles: list[Any] = []
-    try:
-        candles = await asyncio.wait_for(
-            adapter.fetch_candles(symbol, Timeframe.M1, gap_start, gap_end + MINUTE),
-            timeout=FETCH_TIMEOUT_S,
-        )
-    except Exception as exc:
-        fetch_error = exc
-
-    async with role_session(session_factory, db_role="hunter_worker") as session:
-        gap = await session.scalar(
-            select(IngestionGap)
-            .where(IngestionGap.id == gap_id, IngestionGap.status == "open")
-            .with_for_update()
-        )
-        if gap is None:
-            return
-        await recover_registered(
-            session, adapter, gap, symbol, now, candles=candles, fetch_error=fetch_error
-        )
+    budget = HISTORY_BUDGET_S if budget_s is None else budget_s
+    interval = CHECK_INTERVAL_S if interval_s is None else interval_s
+    margin = CYCLE_TAIL_MARGIN_S if margin_s is None else margin_s
+    return min(cycle_start + interval - margin, now + budget)
 
 
 async def check_gaps(
     session_factory: Any, adapter: Any, symbols: list[str], heartbeat_state: Any
 ) -> None:
+    cycle_start = time.monotonic()
     now = await server_now(adapter)
     end = align_open_time(now, Timeframe.M1) - DETECTION_GRACE
     reopen_cutoff = now - timedelta(seconds=FAILED_RETRY_AFTER_S)
 
     async with role_session(session_factory, db_role="hunter_worker") as session:
+        # Taken before the coverage is read: the backfill consumer creates rows
+        # for the same markets through the same read-then-insert protocol, and
+        # only a lock held across both halves keeps the two from inserting the
+        # same minutes twice (recovery_queries.GAP_PLANNING_LOCK_NAMESPACE).
+        await queries.lock_gap_planning(session, adapter.code)
         ids = await load_market_ids(session, adapter.code, set(symbols))
         market_ids = list(ids.values())
         market_watermarks = await queries.watermarks(session, market_ids)
@@ -249,7 +143,7 @@ async def check_gaps(
         by_market = await queries.persisted_by_market(session, market_ids, global_start, end)
         market_gaps = await queries.gaps_by_market(session, market_ids, ("open", "failed"))
 
-        _reopen_stale_failed(market_gaps, reopen_cutoff, MAX_REOPEN_PER_CYCLE)
+        queries.reopen_stale_failed(market_gaps, reopen_cutoff, MAX_REOPEN_PER_CYCLE)
 
         for mid in market_ids:
             start = starts[mid]
@@ -257,7 +151,13 @@ async def check_gaps(
             gaps = market_gaps.get(mid, [])
             covered: set[datetime] = set()
             for gap in gaps:
-                covered |= expected_times(gap.gap_start, gap.gap_end)
+                # Clipped to the detection window (T2.5-backfill): a backfill
+                # request can leave seven-day gaps open, and expanding each one
+                # to its minutes would build millions of datetimes per cycle to
+                # subtract from a window that never contained them.
+                if gap.gap_end < start:
+                    continue
+                covered |= expected_times(max(gap.gap_start, start), gap.gap_end)
             for first, last in _missing_ranges(start, end, persisted, covered):
                 session.add(
                     IngestionGap(
@@ -274,20 +174,47 @@ async def check_gaps(
     # M3: bound the per-cycle backfill work and fetch outside any open
     # transaction/lock (moved off the detection session above).
     async with role_session(session_factory, db_role="hunter_worker") as session:
-        pending = (
-            await session.execute(
-                select(IngestionGap.id, IngestionGap.market_id)
-                .where(IngestionGap.market_id.in_(market_ids), IngestionGap.status == "open")
-                .order_by(IngestionGap.detected_at, IngestionGap.id)
-                .limit(MAX_GAPS_PER_CYCLE)
-            )
-        ).all()
+        live, history = await queries.pending_gaps(
+            session,
+            market_ids,
+            live_from=end - MINUTE * BOOTSTRAP_WINDOW_MINUTES,
+            live_limit=MAX_GAPS_PER_CYCLE,
+            history_limit=MAX_HISTORY_GAPS_PER_CYCLE,
+        )
     symbol_by_market_id = {v: k for k, v in ids.items()}
-    for gap_id, market_id in pending:
+    for gap_id, market_id in live:
         symbol = symbol_by_market_id.get(market_id)
         if symbol is None:
             continue
-        await _recover_one(session_factory, adapter, gap_id, symbol, now)
+        await recover_one(session_factory, adapter, gap_id, symbol, now)
+
+    # History last, and under a wall-clock budget: what is left of the cycle
+    # decides how much of a bootstrap gets served, never the other way round.
+    deadline = history_deadline(cycle_start, time.monotonic())
+    for gap_id, market_id in history:
+        remaining = deadline - time.monotonic()
+        symbol = symbol_by_market_id.get(market_id)
+        if remaining < MIN_FETCH_BUDGET_S:
+            logger.info("market_backfill_budget_spent", exchange=adapter.code, left=len(history))
+            break
+        if symbol is None:
+            continue
+        try:
+            # The deadline wraps the **unit**, not only the fetch: the reads,
+            # the row lock and the write are on the cycle's clock too. A unit
+            # cancelled here rolls its transaction back, so the budget running
+            # out never spends one of the gap's MAX_ATTEMPTS — that is the
+            # difference between "we ran out of time" and "this gap failed".
+            async with asyncio.timeout(remaining):
+                # ``timeout_s`` stays the adapter's own budget on purpose. If
+                # the *cycle* is what cut the call short, the cancellation must
+                # come from the deadline above — which rolls back — and not from
+                # the gap's own timeout, which would spend an attempt on a slow
+                # cycle rather than on a slow exchange.
+                await recover_one(session_factory, adapter, gap_id, symbol, now)
+        except TimeoutError:
+            logger.warning("market_backfill_unit_timeout", symbol=symbol, budget_s=remaining)
+            break
 
     async with role_session(session_factory, db_role="hunter_worker") as session:
         open_count = await queries.count_by_status(session, market_ids, "open")

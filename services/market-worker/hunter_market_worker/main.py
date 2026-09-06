@@ -9,6 +9,7 @@ from hunter_core.db.session import create_session_factory
 from hunter_core.domain.enums import RiskEventSeverity
 from hunter_core.events.outbox import OutboxHealth
 from hunter_core.logging import get_logger
+from hunter_market_worker.backfill import run_backfill
 from hunter_market_worker.config import build_adapter, exchange_code
 from hunter_market_worker.funding import run_funding
 from hunter_market_worker.heartbeat import (
@@ -116,6 +117,11 @@ async def run_market(runtime: WorkerRuntime) -> None:
                     factory, runtime.redis, adapter, universe, settings, runtime, queues
                 ),
                 "recovery": run_recovery(factory, adapter, universe, state, runtime),
+                # T2.5-backfill: turns `market.backfill.requested` into gap rows
+                # the recovery above drains. It never calls REST itself.
+                "backfill": run_backfill(
+                    factory, adapter, runtime.redis, universe, settings, runtime
+                ),
                 "heartbeat": run_heartbeat(runtime, adapter, universe, state, factory),
                 "watchdog": run_watchdog(watchdog, universe),
             }

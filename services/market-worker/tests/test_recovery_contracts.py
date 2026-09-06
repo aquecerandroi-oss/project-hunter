@@ -12,7 +12,7 @@ from hunter_core.domain.enums import Timeframe
 from hunter_core.domain.market import align_open_time
 from hunter_core.domain.types import utcnow
 from hunter_core.observability import market_ingestion_gaps
-from hunter_market_worker import recovery
+from hunter_market_worker import recovery, recovery_drain
 from hunter_market_worker.heartbeat import HeartbeatState
 from hunter_market_worker.persist import upsert_candles
 
@@ -98,7 +98,7 @@ async def test_recovery_transition_and_inserts_roll_back_together(db_session_fac
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
             saved = await session.get(IngestionGap, gap_id)
             assert saved is not None
-            await recovery.recover_registered(session, adapter, saved, "BTCUSDT", now)
+            await recovery_drain.recover_registered(session, adapter, saved, "BTCUSDT", now)
             assert saved.status == "recovered"
             raise RuntimeError("abort transaction")
     async with role_session(db_session_factory, db_role="hunter_worker") as session:
@@ -131,7 +131,7 @@ async def test_partial_finality_and_incomplete_backfill_after_five(db_session_fa
         adapter = FakeAdapter(code)
         adapter.candles_response["BTCUSDT"] = [partial]
         for _ in range(5):
-            await recovery.recover_registered(session, adapter, gap, "BTCUSDT", now)
+            await recovery_drain.recover_registered(session, adapter, gap, "BTCUSDT", now)
         assert gap.status == "failed" and gap.attempts == 5
 
 
@@ -166,7 +166,7 @@ async def test_history_starts_later_narrows_gap_and_recovers(db_session_factory:
     async with role_session(db_session_factory, db_role="hunter_worker") as session:
         saved = await session.get(IngestionGap, gap_id)
         assert saved is not None
-        await recovery.recover_registered(session, adapter, saved, "BTCUSDT", now)
+        await recovery_drain.recover_registered(session, adapter, saved, "BTCUSDT", now)
         assert saved.status == "recovered"
         assert saved.gap_start == listed_at
         assert saved.attempts == 1
@@ -192,10 +192,10 @@ async def test_empty_fetch_still_increments_attempts_and_eventually_fails(
         )
         session.add(gap)
         await session.flush()
-        for _ in range(recovery.MAX_ATTEMPTS):
-            await recovery.recover_registered(session, adapter, gap, "BTCUSDT", now)
+        for _ in range(recovery_drain.MAX_ATTEMPTS):
+            await recovery_drain.recover_registered(session, adapter, gap, "BTCUSDT", now)
         assert gap.status == "failed"
-        assert gap.attempts == recovery.MAX_ATTEMPTS
+        assert gap.attempts == recovery_drain.MAX_ATTEMPTS
         assert gap.gap_start == gap_start  # never narrowed: an empty response
         # is a failed/absent REST call, not proof that history starts later
 
@@ -275,8 +275,8 @@ async def test_refailed_gap_refreshes_detected_at_so_cooldown_restarts(
         )
         session.add(gap)
         await session.flush()
-        for _ in range(recovery.MAX_ATTEMPTS):
-            await recovery.recover_registered(session, adapter, gap, "BTCUSDT", now)
+        for _ in range(recovery_drain.MAX_ATTEMPTS):
+            await recovery_drain.recover_registered(session, adapter, gap, "BTCUSDT", now)
         assert gap.status == "failed"
         assert gap.detected_at == now
         assert gap.detected_at > old_detected_at

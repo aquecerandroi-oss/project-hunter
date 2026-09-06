@@ -14,7 +14,7 @@ from hunter_core.db.session import role_session
 from hunter_core.domain.enums import Timeframe
 from hunter_core.domain.market import align_open_time
 from hunter_core.domain.types import utcnow
-from hunter_market_worker import persist, recovery
+from hunter_market_worker import persist, recovery, recovery_drain
 from hunter_market_worker.heartbeat import HeartbeatState
 
 from . import builders
@@ -86,14 +86,14 @@ async def test_check_gaps_widens_an_existing_open_gap_and_marks_failed_on_repeat
 
     adapter.fetch_candles = _always_fails  # type: ignore[method-assign]
 
-    for _ in range(recovery.MAX_ATTEMPTS):
+    for _ in range(recovery_drain.MAX_ATTEMPTS):
         await recovery.check_gaps(db_session_factory, adapter, ["ETHUSDT"], heartbeat_state)
 
     async with role_session(db_session_factory, db_role="hunter_worker") as session:
         gap = await session.scalar(select(IngestionGap).where(IngestionGap.market_id == market_id))
     assert gap is not None
     assert gap.status == "failed"
-    assert gap.attempts == recovery.MAX_ATTEMPTS
+    assert gap.attempts == recovery_drain.MAX_ATTEMPTS
 
 
 async def test_check_gaps_is_a_noop_once_up_to_date(db_session_factory: Any) -> None:
@@ -196,7 +196,7 @@ async def test_check_gaps_detection_statement_count_does_not_grow_with_market_co
                         gap_start=start,
                         gap_end=end,
                         status="failed",
-                        attempts=recovery.MAX_ATTEMPTS,
+                        attempts=recovery_drain.MAX_ATTEMPTS,
                         detected_at=utcnow(),
                     )
                 )
@@ -287,7 +287,7 @@ async def test_check_gaps_bounds_recovery_work_per_cycle(
 async def test_recover_registered_times_out_a_hanging_fetch_and_increments_attempts(
     db_session_factory: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(recovery, "FETCH_TIMEOUT_S", 0.05)
+    del monkeypatch  # the budget is an argument now, not a module constant to patch
     exchange_code = unique_code()
     market_id = await seed_market(db_session_factory, exchange_code, "BTCUSDT")
     now = align_open_time(utcnow(), Timeframe.M1)
@@ -310,7 +310,14 @@ async def test_recover_registered_times_out_a_hanging_fetch_and_increments_attem
         session.add(gap)
         await session.flush()
 
-        await recovery.recover_registered(session, adapter, gap, "BTCUSDT", now)
+        # Explicit: after the split, ``recover_registered`` binds its default
+        # from ``recovery_drain``, so patching ``recovery.FETCH_TIMEOUT_S`` proved
+        # nothing — the 10s sleep simply returned before the 20s default and the
+        # assertions passed without a timeout ever happening (Astra, T2.5-backfill
+        # diff review, nice-to-have 1).
+        await recovery_drain.recover_registered(
+            session, adapter, gap, "BTCUSDT", now, timeout_s=0.05
+        )
 
         assert gap.attempts == 1
         assert gap.status == "open"  # below MAX_ATTEMPTS, the loop keeps going
@@ -348,7 +355,7 @@ async def test_recover_one_fetches_over_rest_with_no_connection_checked_out(
         await session.flush()
         gap_id = gap.id
 
-    await recovery._recover_one(  # pyright: ignore[reportPrivateUsage]
+    await recovery_drain.recover_one(  # pyright: ignore[reportPrivateUsage]
         db_session_factory, adapter, gap_id, "BTCUSDT", now
     )
 

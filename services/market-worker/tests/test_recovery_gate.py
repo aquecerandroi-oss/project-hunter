@@ -17,7 +17,7 @@ import pytest
 from hunter_core.domain.types import utcnow
 from hunter_exchanges.base import RateLimited
 from hunter_exchanges.rate_limit_suspension import REDIS_UNAVAILABLE
-from hunter_market_worker import recovery
+from hunter_market_worker import recovery, recovery_drain
 from hunter_market_worker.supervision import rest_gate_suspended
 
 
@@ -139,7 +139,7 @@ async def test_a_coordination_outage_does_not_burn_a_gap_attempt() -> None:
     fail-closed gate is supposed to prevent."""
     gap = _open_gap()
 
-    await recovery.recover_registered(
+    await recovery_drain.recover_registered(
         None, _GateAdapter(), gap, "BTCUSDT", utcnow(), fetch_error=_suspended()
     )
 
@@ -153,7 +153,7 @@ async def test_an_ordinary_fetch_failure_still_burns_an_attempt() -> None:
     permanently broken gap is retried forever."""
     gap = _open_gap()
 
-    await recovery.recover_registered(
+    await recovery_drain.recover_registered(
         None, _GateAdapter(), gap, "BTCUSDT", utcnow(), fetch_error=ValueError("bad symbol")
     )
 
@@ -166,7 +166,7 @@ async def test_an_ordinary_rate_limit_still_burns_an_attempt() -> None:
     gap = _open_gap()
     spent = RateLimited("no budget", exchange="binance", retry_after_s=1.0)
 
-    await recovery.recover_registered(
+    await recovery_drain.recover_registered(
         None, _GateAdapter(), gap, "BTCUSDT", utcnow(), fetch_error=spent
     )
 
@@ -183,7 +183,7 @@ async def test_a_timeout_while_the_gate_is_suspended_does_not_burn_an_attempt() 
     the same outage."""
     gap = _open_gap()
 
-    await recovery.recover_registered(
+    await recovery_drain.recover_registered(
         None,
         _GateAdapter("suspended"),
         gap,
@@ -199,7 +199,7 @@ async def test_a_timeout_while_the_gate_is_suspended_does_not_burn_an_attempt() 
 async def test_a_timeout_with_a_healthy_gate_still_burns_an_attempt() -> None:
     gap = _open_gap()
 
-    await recovery.recover_registered(
+    await recovery_drain.recover_registered(
         None, _GateAdapter("ok"), gap, "BTCUSDT", utcnow(), fetch_error=TimeoutError()
     )
 

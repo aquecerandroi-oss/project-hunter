@@ -694,3 +694,9 @@ atribuição a contenção e ela está certa). O que se sabe: acontece durante a
 lacunas vivas de um minuto (dezenas de chamadas REST e transações curtas no mesmo event loop), o lote
 é **retentado** e a prontidão de `persistence` nunca ficou vermelha. Medir por fase é o próximo passo,
 e não é desta tarefa.
+
+**Instantâneo final, 21:49:23Z** (25 min de contêiner no ar, sem reinícios): grupo
+`market-worker.backfill.binance.0of1` com `pending 0`, `entries-read 99`, `lag 0`; **210 970** velas
+`source='rest'` com mais de 2 dias em **218 mercados** (eram 123 857 às 20:39 — o dreno continua a
+~6 lacunas por ciclo); `ingestion_gaps` `recovered` 17 660 · `open` 1 834 · `failed` 2; **213**
+mercados com ≥ 3 dias distintos de velas de 1 min. `docker ps`: `market-worker` *healthy*.

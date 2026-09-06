@@ -60,3 +60,32 @@ async def seed_market(
         session.add(market)
         await session.flush()
         return market.id
+
+
+async def ensure_candle_partition(session_factory: Any, target: Any) -> None:
+    """Create the ``candles_1m`` partition of ``target``'s month, if absent.
+
+    The migrated test database only carries the months
+    ``infra/scripts/create_partitions.py`` plans for *now and ahead*, so any
+    test that writes history a few days back crosses into a month with no
+    partition and the insert aborts the whole transaction. Production has the
+    same hole, and the backfill consumer answers it by refusing to plan minutes
+    it cannot store (``partitions.storable_months``); a test that wants to
+    exercise the recovery itself creates the partition instead.
+    """
+    from sqlalchemy import text
+
+    from hunter_core.db.models._partitions import (
+        create_partition_sql,
+        harden_partition_sql,
+        list_partition_name,
+    )
+
+    child = list_partition_name("candles", "1m")
+    async with session_factory() as session:
+        await session.execute(text(create_partition_sql(child, target.year, target.month)))
+        for statement in harden_partition_sql(
+            f"{child}_{target.year:04d}_{target.month:02d}", tenant=False
+        ):
+            await session.execute(text(statement))
+        await session.commit()

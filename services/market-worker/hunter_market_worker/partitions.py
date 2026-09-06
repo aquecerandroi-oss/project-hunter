@@ -186,3 +186,28 @@ async def assert_writable_partitions(
     raise PartitionsMissing(
         f"no partition accepts rows timestamped {target.isoformat()}: {', '.join(missing)}"
     )
+
+
+async def storable_months(
+    session: AsyncSession, months: set[tuple[int, int]]
+) -> set[tuple[int, int]]:
+    """Which ``(year, month)`` pairs already have a ``candles_1m`` partition.
+
+    T2.5-backfill. The daily partition job creates the current month and the
+    months **ahead** (``infra/scripts/create_partitions.py``: ``months_from(now,
+    months_ahead + 1)``), so a request for seven days of history on the 3rd of a
+    month names minutes that no partition would accept. Inserting them aborts
+    the whole transaction — candles, outbox rows and the gap's own status
+    transition together — and the gap would burn its five attempts on a
+    condition no retry can fix.
+
+    So the consumer asks first and plans only what can be stored, saying in the
+    log which month is missing. Only ``candles`` is checked: a REST backfill
+    writes candles and nothing else.
+    """
+    storable: set[tuple[int, int]] = set()
+    for year, month in months:
+        name = partition_name(list_partition_name("candles", "1m"), year, month)
+        if await session.scalar(text("SELECT to_regclass(:name)"), {"name": name}) is not None:
+            storable.add((year, month))
+    return storable
