@@ -152,6 +152,7 @@ SELECT count(*) AS mercados, count(*) FILTER (WHERE barras_com_qv = 0) AS sem_qu
   round(percentile_cont(0.50) WITHIN GROUP (ORDER BY qv_24h)::numeric) AS mediana_qv24h,
   round(percentile_cont(0.90) WITHIN GROUP (ORDER BY qv_24h)::numeric) AS p90_qv24h,
   round(percentile_cont(0.50) WITHIN GROUP (ORDER BY qv_1m_mediana)::numeric,2) AS mediana_qv_1min,
+  round(percentile_cont(0.10) WITHIN GROUP (ORDER BY qv_1m_mediana)::numeric,2) AS p10_qv_1min,
   count(*) FILTER (WHERE qv_24h < 5000000) AS abaixo_5M,
   count(*) FILTER (WHERE qv_24h < 20000000) AS abaixo_20M,
   count(*) FILTER (WHERE qv_24h < 50000000) AS abaixo_50M
@@ -159,9 +160,9 @@ FROM v;
 ```
 
 ```
- mercados | sem_quote_volume | p10_qv24h | mediana_qv24h | p90_qv24h | mediana_qv_1min | abaixo_5m | abaixo_20m | abaixo_50m
-----------+------------------+-----------+---------------+-----------+-----------------+-----------+------------+------------
-      232 |                0 |   2746595 |      13853954 | 156762105 |         4605.10 |        45 |        142 |        182
+ mercados | sem_quote_volume | p10_qv24h | mediana_qv24h | p90_qv24h | mediana_qv_1min | p10_qv_1min | abaixo_5m | abaixo_20m | abaixo_50m
+----------+------------------+-----------+---------------+-----------+-----------------+-------------+-----------+------------+------------
+      232 |                0 |   2746595 |      13853954 | 156762105 |         4605.10 |     1024.13 |        45 |        142 |        182
 ```
 
 **Cobertura de `quote_volume`: 232 de 232 mercados têm o campo somável nas velas de 1 min.** Isso
