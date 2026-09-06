@@ -4,7 +4,7 @@ tema: Perpétuos: funding, OI, posicionamento
 fonte: Material de praticante e de corretora (Kraken Learn, Bitsgap, Nexo, quantjourney) — nenhum com amostra, teste ou custo declarados; documentação da Binance sobre teto/piso e mudança de cadência; nosso detector `FUNDING_ANOMALY`
 fonte_url: https://www.kraken.com/learn/futures-trading-funding-rate-strategy · https://www.binance.com/en/support/faq/detail/360033525031
 lido_em: 2026-09-06
-evidencia: **anedótico** — não achei nenhum teste publicado, revisado ou não, da regra contrária ao funding extremo em perpétuos
+evidencia: **anedótico** — nenhum teste publicado da regra contrária ao funding extremo em perpétuos foi localizado nas fontes consultadas
 hipotese_testavel: sim (como diagnóstico, com grupo de controle)
 astra: concorda com ressalvas
 ---
