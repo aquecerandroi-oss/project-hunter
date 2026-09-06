@@ -147,5 +147,5 @@ registrado aqui para o plantão.
 [[Strategy Backlog]] · [[Registro de Tentativas]] · [[Index]] ·
 [[KB-0016-quando-o-fluxo-importa-dependencia-de-estado]] ·
 [[KB-0013-vpin-e-a-disputa-sobre-toxicidade]] ·
-[[KB-0017-liquidacoes-o-fluxo-forcado-que-nao-observamos]] · [[EXP-0002-volume-anomaly-v1]] · [[Features]] ·
+[[KB-0017-liquidacoes-o-fluxo-forcado-que-observamos-por-amostragem]] · [[EXP-0002-volume-anomaly-v1]] · [[Features]] ·
 [[Anomalies]]

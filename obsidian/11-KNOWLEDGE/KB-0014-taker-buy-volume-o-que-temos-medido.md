@@ -172,7 +172,7 @@ poder estatístico.
 - **Barras finas.** Com poucos negócios, o desequilíbrio de 5 min ainda é ruidoso; o corte pode
   selecionar liquidez, não intenção.
 - **Agressor não é informado.** Comprador agressor pode ser um short se cobrindo, uma liquidação
-  forçada ([[KB-0017-liquidacoes-o-fluxo-forcado-que-nao-observamos]]) ou execução de carteira. O
+  forçada ([[KB-0017-liquidacoes-o-fluxo-forcado-que-observamos-por-amostragem]]) ou execução de carteira. O
   campo diz **quem cruzou o spread**, não quem sabia de algo.
 - **Mudança de código no caminho congelado.** Somar um campo em `Bar` toca a agregação usada também
   pela `momentum_v1`. Exige revisão do `quant-engineer`, `code-reviewer`, e um `strategy_version`
