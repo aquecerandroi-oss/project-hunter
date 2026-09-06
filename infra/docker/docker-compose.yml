@@ -121,6 +121,49 @@ services:
       start_period: 60s
       retries: 5
 
+  # Shadow Lab (docs/plans/SHADOW-LAB.md, task S2). Evaluates the activated
+  # strategy_versions on their own timeframe closes, persists each decision with
+  # its immutable envelope and follows the hypothetical outcome bar by bar.
+  # It places no orders and touches no portfolio: every signal it writes carries
+  # purpose = research_only and travels on its own `shadow.signals.emitted`
+  # stream. Same image as api/market-worker; HUNTER_ROLE=strategy is what
+  # entrypoint.sh dispatches on.
+  strategy-worker:
+    image: hunter-api:${GIT_SHA:-dev}
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: strategy
+      HEALTH_PORT: "8001"
+    env_file:
+      - path: ../../.env
+        required: false
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # not `service_healthy`: the shadow worker reads the same durable candles
+      # and the same hot state the market-worker writes, but it must survive the
+      # collector being down (it backs off and censors, it does not die), and a
+      # hard dependency would make one restart cascade into two.
+      market-worker:
+        condition: service_started
+    restart: unless-stopped
+    # The four readiness checks are `shadow_migration`, `shadow_versions` (red when
+    # active versions exist but none is runnable), `shadow_consumer` and `shadow_outbox`
+    # (hunter_strategy_worker/health.py). The timeouts mirror the
+    # market-worker's, for the same measured reason: the health server shares the
+    # worker's event loop, so its /ready latency follows the loop's load. A false
+    # "unhealthy" would restart a worker that is mid-decision.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://localhost:8001/ready', timeout=25); raise SystemExit(0 if response.status == 200 else 1)"]
+      interval: 15s
+      timeout: 30s
+      start_period: 60s
+      retries: 5
+
   web:
     build:
       context: ../..

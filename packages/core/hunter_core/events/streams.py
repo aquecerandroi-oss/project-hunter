@@ -16,6 +16,11 @@ class Streams:
     REGIME_CHANGED = "regime.changed"
     OPPORTUNITIES_UPDATED = "opportunities.updated"
     SIGNALS_EMITTED = "signals.emitted"
+    SHADOW_SIGNALS_EMITTED = "shadow.signals.emitted"
+    """Shadow Lab decisions (SHADOW-LAB.md §10). Deliberately **not**
+    ``signals.emitted``: a shadow signal carries ``purpose = research_only`` and
+    must never reach the proposal builder, and the cheapest way to guarantee
+    that is for it to travel on a stream that pipeline nobody subscribes to."""
     PROPOSALS_DECIDED = "proposals.decided"
     EXECUTIONS_COMPLETED = "executions.completed"
     POSITIONS_UPDATED = "positions.updated"
@@ -35,6 +40,7 @@ DEFAULT_MAXLEN: dict[str, int] = {
     Streams.REGIME_CHANGED: 1_000,
     Streams.OPPORTUNITIES_UPDATED: 50_000,
     Streams.SIGNALS_EMITTED: 20_000,
+    Streams.SHADOW_SIGNALS_EMITTED: 20_000,
     Streams.PROPOSALS_DECIDED: 20_000,
     Streams.EXECUTIONS_COMPLETED: 20_000,
     Streams.POSITIONS_UPDATED: 50_000,

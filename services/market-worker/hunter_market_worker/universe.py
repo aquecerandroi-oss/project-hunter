@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select, update
 
-from hunter_core.db.models.markets import Market
+from hunter_core.db.models.markets import Exchange, Market
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import MarketType
 from hunter_core.events.envelope import EventEnvelope
@@ -44,6 +44,7 @@ from hunter_market_worker.universe_leader import (
 from hunter_market_worker.universe_repo import (
     mark_delisted,
     rank_and_monitor,
+    tracking_hold_symbols,
     upsert_assets,
     upsert_exchange,
     upsert_markets,
@@ -185,6 +186,43 @@ async def refresh_universe(
     return sorted(new_monitored)
 
 
+async def with_tracking_holds(
+    session_factory: async_sessionmaker[AsyncSession],
+    adapter: ExchangeAdapter,
+    monitored: list[str],
+    settings: Settings,
+) -> list[str]:
+    """``monitored`` plus every market a Shadow Lab tracking still needs.
+
+    Applied on the **common** path of :func:`run_universe`, after the leader's
+    REST refresh *and* after a follower's snapshot/Postgres fallback: a held
+    market must not vanish just because this shard is following rather than
+    leading, or because the Redis snapshot was lost (Astra, S2 design review,
+    must-fix 3).
+
+    A hold widens *collection*, never *eligibility*: ``markets.is_monitored``
+    (what the strategy-worker reads to decide whether a market is in the
+    eligible universe) is untouched, and ``market.universe.changed`` keeps
+    reporting the eligible set. The operator blocklist still wins — an explicit
+    exclusion stops collection, and the affected trackings are censored with
+    that reason rather than quietly kept alive.
+    """
+    blocklist = {s.upper() for s in settings.market_universe_blocklist}
+    async with role_session(session_factory, db_role="hunter_worker") as session:
+        exchange_id = await session.scalar(select(Exchange.id).where(Exchange.code == adapter.code))
+        if exchange_id is None:
+            return monitored
+        held = await tracking_hold_symbols(session, exchange_id)
+    extra = sorted(held - set(monitored) - blocklist)
+    if extra:
+        logger.info("market_universe_tracking_hold", symbols=extra, total=len(extra))
+    # The blocklist is applied to the **whole** result, not only to what the
+    # hold added: a follower that restarts with a new blocklist may be handed a
+    # stale snapshot that still names a blocked symbol, and filtering only the
+    # extras would leave it collecting (Astra, S2 diff review, must-fix 8).
+    return sorted((set(monitored) | set(extra)) - blocklist)
+
+
 def _retry_delay(
     attempt: int, refresh_s: float, *, rand: Callable[[], float] = random.random
 ) -> float:
@@ -243,6 +281,7 @@ async def run_universe(
             else:
                 monitored = await follower_symbols(session_factory, redis, adapter.code, settings)
                 delay = FOLLOWER_POLL_S
+            monitored = await with_tracking_holds(session_factory, adapter, monitored, settings)
             universe.set(shard_symbols(monitored, settings.shard_index, settings.shard_total))
             runtime.mark_success()
             consecutive_failures = 0

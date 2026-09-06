@@ -625,6 +625,7 @@ version = "0.0.0"
 source = { editable = "packages/indicators" }
 dependencies = [
     { name = "hunter-core" },
+    { name = "msgpack" },
     { name = "numpy" },
     { name = "polars" },
 ]
@@ -632,6 +633,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "hunter-core", editable = "packages/core" },
+    { name = "msgpack", specifier = ">=1.1" },
     { name = "numpy", specifier = ">=2.1" },
     { name = "polars", specifier = ">=1.12" },
 ]
@@ -687,6 +689,7 @@ dependencies = [
     { name = "hunter-core" },
     { name = "hunter-indicators" },
     { name = "hunter-risk" },
+    { name = "msgpack" },
 ]
 
 [package.metadata]
@@ -694,6 +697,7 @@ requires-dist = [
     { name = "hunter-core", editable = "packages/core" },
     { name = "hunter-indicators", editable = "packages/indicators" },
     { name = "hunter-risk", editable = "packages/risk-core" },
+    { name = "msgpack", specifier = ">=1.1" },
 ]
 
 [[package]]

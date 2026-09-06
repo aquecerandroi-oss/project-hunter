@@ -10,6 +10,7 @@ dependencies = [
   "hunter-core",
   "hunter-indicators",
   "hunter-risk",
+  "msgpack>=1.1",
 ]
 
 [tool.hatch.build.targets.wheel]

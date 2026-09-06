@@ -235,6 +235,15 @@ async def test_run_universe_retries_fast_after_failure_and_resets_after_success(
 
     monkeypatch.setattr(universe_mod, "refresh_universe", fake_refresh)
 
+    async def no_holds(_factory: Any, _adapter: Any, monitored: list[str], _s: Any) -> list[str]:
+        return monitored
+
+    # S2: the success path now also asks Postgres which markets a Shadow Lab
+    # tracking still needs (``tracking_hold``). This test drives run_universe
+    # with ``None`` for the session factory and the adapter, so that query is
+    # stubbed out — the backoff is what is under test here.
+    monkeypatch.setattr(universe_mod, "with_tracking_holds", no_holds)
+
     sleeps: list[float] = []
 
     async def fake_sleep(delay: float) -> None:

@@ -15,6 +15,7 @@ from sqlalchemy import values as sa_values
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from hunter_core.db.models.agents_shadow import ShadowEpisode
 from hunter_core.db.models.markets import Asset, Exchange, Market
 from hunter_core.domain.enums import MarketStatus, MarketType
 from hunter_core.domain.types import utcnow
@@ -124,6 +125,32 @@ async def mark_delisted(
             status=MarketStatus.DELISTED, delisted_at=now, is_monitored=False, monitor_rank=None
         )
     )
+
+
+async def tracking_hold_symbols(session: AsyncSession, exchange_id: Any) -> set[str]:
+    """Symbols this exchange must keep collecting for the Shadow Lab.
+
+    docs/plans/SHADOW-LAB.md §8: a market may leave the monitored universe, but
+    not while a shadow tracking still needs its 1m candles — losing them would
+    turn an outcome that was merely out of the top N into a *censored* one.
+
+    The predicate is ``shadow_episodes.open_outcome_signal_id IS NOT NULL``
+    (served by the partial index ``ix_shadow_episodes_hold``), so the hold is
+    durable and survives a restart: it is derived from the database, never from
+    a worker's memory. Several versions may hold the same market — ending one
+    experiment does not release the collection another still depends on, which
+    is why this is a set of symbols and not a per-version flag.
+    """
+    rows = await session.scalars(
+        select(Market.symbol)
+        .join(ShadowEpisode, ShadowEpisode.market_id == Market.id)
+        .where(
+            Market.exchange_id == exchange_id,
+            ShadowEpisode.open_outcome_signal_id.is_not(None),
+        )
+        .distinct()
+    )
+    return set(rows)
 
 
 async def _apply_ranks(session: AsyncSession, rows: list[tuple[Any, int, bool]]) -> None:
