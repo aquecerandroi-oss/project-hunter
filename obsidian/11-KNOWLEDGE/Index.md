@@ -22,7 +22,7 @@ Cada nota é uma síntese própria (nunca cópia), com fonte, data, qualidade da
 | Estatística de backtest (overfitting, look-ahead, custos) | KB-0010 | iniciado |
 
 ## Notas
-_(uma linha por nota: `[[Título]] — fonte curta — qualidade da evidência — hipótese sim/não)_
+_(uma linha por nota: link para a nota — fonte curta — qualidade da evidência — hipótese sim/não)_
 
 | Nota | Tema | Fonte curta | Evidência | Hipótese |
 |---|---|---|---|---|
