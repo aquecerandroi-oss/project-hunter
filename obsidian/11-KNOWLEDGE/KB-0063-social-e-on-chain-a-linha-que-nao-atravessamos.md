@@ -13,15 +13,17 @@ astra: pendente
 
 ## O que afirma
 
-A parte da literatura de meme coin que tem os resultados mais fortes é **exatamente a parte que
-usa dado que não temos**: criação de token, concentração de carteiras, difusão social, wash trading
+A parte da literatura de meme coin que eu consegui ler é **em boa medida a parte que usa dado que
+não temos**: criação de token, concentração de carteiras, difusão social, wash trading
 em pool de liquidez. E a nossa arquitetura tem o lugar preparado para isso — e **nada dentro dele**.
 
 `enable_social_intelligence` é uma flag declarada em `packages/core/hunter_core/settings.py:119` com
-valor padrão `False`, publicada no `/health` (`apps/api/hunter_api/health.py:85`) e exibida na
-tela de sistema do frontend — e **sem um único `if` no código inteiro**. A tabela
-`intelligence_events` existe com colunas, índices e chaves estrangeiras
-(`packages/core/hunter_core/db/models/intelligence.py:34-58`) e **não tem nem escritor nem leitor**.
+valor padrão `False`, publicada no `/health` (`apps/api/hunter_api/health.py:85`) e exibida na tela
+de sistema do frontend (`apps/web/components/system/feature-flags-table.tsx:27`) — e **sem um único
+`if` que mude comportamento**. A precisão é da Astra: ela tem consumidores de **exibição**, e zero
+consumidores **funcionais**. A tabela `intelligence_events` existe com colunas, índices e chaves
+estrangeiras (`packages/core/hunter_core/db/models/intelligence.py:34-58`) e **não tem nem escritor
+nem leitor**.
 
 Isto é uma nota de leitura com inventário, **não** uma hipótese. Não há candidata de estratégia aqui,
 e é deliberado.
@@ -44,7 +46,7 @@ e é deliberado.
 
 | Peça | Onde | Estado |
 |---|---|---|
-| Flag `enable_social_intelligence` | `settings.py:119` | declarada, padrão `False`, **zero consumidores** |
+| Flag `enable_social_intelligence` | `settings.py:119` | declarada, padrão `False`, **zero consumidores funcionais** (só exibição em `/health` e na tela de sistema) |
 | Flag `enable_onchain` | `settings.py:120` | idem — **nunca testada em condicional** |
 | Tabela `intelligence_events` | `db/models/intelligence.py:34-58` | esquema completo (fonte, `dedupe_hash`, `occurred_at`, `asset_ids` com índice GIN, `classification` em JSONB), **sem escritor e sem leitor** |
 | Tipos de fonte previstos | `domain/enums.py:645-655` | NEWS, REDDIT, X, GOOGLE_TRENDS, ONCHAIN, WHALES, LISTINGS, UNLOCKS, ANNOUNCEMENTS |
@@ -57,9 +59,13 @@ e é deliberado.
 Não medimos. O que dá para escrever é o que **precisaria existir** para que a primeira pergunta
 social virasse testável, e a lista é útil porque impede que "ligar a flag" pareça uma tarefa:
 
-1. **Um coletor por fonte**, com `dedupe_hash` de verdade e carimbo de `occurred_at` **do evento**,
-   não da nossa ingestão — sem isso, qualquer estudo retrospectivo tem look-ahead embutido, que é o
-   erro mais fácil de cometer com dado social.
+1. **Um coletor por fonte, com TRÊS carimbos de tempo, não um.** Eu tinha escrito que bastava
+   guardar `occurred_at` do evento em vez do instante da nossa ingestão. **Não basta** — a Astra
+   apontou o cenário exato: notícia publicada às 10h00, ingerida às 10h07, classificada às 10h08,
+   entrando retrospectivamente numa decisão das 10h01. Precisa de **quando o evento ocorreu**,
+   **quando ele chegou** e **quando a classificação ficou disponível**. O esquema já separa
+   `occurred_at` de `ingested_at` (`db/models/intelligence.py:48-49`); o terceiro carimbo não existe,
+   e informação enriquecida **nunca retroage**.
 2. **Ligação evento → ativo** (`asset_ids`), que para meme coin é o passo mais difícil e mais sujeito
    a erro: o mesmo apelido aparece em dezenas de tokens, e o nosso universo já tem símbolos que só
    existem em chinês.
@@ -109,7 +115,17 @@ uma sessão futura minha — leia "desligada" como "pronta e desligada".
 
 ## Segunda opinião (Astra)
 
-_(pendente)_
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-0062-0065-memecoins.md`). Foi a nota menos
+corrigida do bloco — ela conferiu o inventário e disse que está correto —, com três ajustes:
+
+1. **O requisito temporal que eu propus ainda permitia look-ahead.** `occurred_at` é necessário e
+   insuficiente; falta o instante em que o evento **e a classificação** ficaram disponíveis à
+   estratégia, com o cenário das 10h00/10h07/10h08 escrito acima.
+2. **"Zero consumidores" virou "zero consumidores funcionais"** — `/health` e o frontend leem as
+   flags.
+3. **Retirou "os resultados mais fortes da literatura"**: conferir que os números dos resumos batem
+   com Mancino e Xiang et al. não valida transporte para perpétuos, nem me autoriza a hierarquizar a
+   literatura que eu não li inteira.
 
 ## Relacionados
 

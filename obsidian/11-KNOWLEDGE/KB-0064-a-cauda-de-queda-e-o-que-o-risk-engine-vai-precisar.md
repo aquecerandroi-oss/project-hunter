@@ -13,14 +13,24 @@ astra: pendente
 
 ## O que afirma
 
-Em 42 horas, a queda máxima mediana das memes foi de **−5,66%**, com a pior em **−29,75%**. Isso
-soa como confirmação do folclore, mas o mesmo cálculo no resto do universo dá **−6,65%** de mediana
-e **−58,67%** de pior caso: **a cauda ruim desta janela não está nas memes, está fora delas.**
+Em 42 horas, a queda máxima mediana das memes foi de **−5,66%**, com a pior em **−29,75%**. O mesmo
+cálculo no resto do universo dá **−6,65%** de mediana e **−58,67%** de pior caso.
 
-O que muda com meme não é a magnitude típica da queda; é que **as memes concentram os dois extremos
-ao mesmo tempo** (a queda de 30% e a subida que a produziu) e, pela
-[[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]], são justamente as que têm o livro
-mais fino para sair. O risco relevante não é volatilidade — é **volatilidade com saída estreita**.
+**O que sobrevive à revisão é bem menos do que eu tinha escrito.** Eu tinha concluído "a cauda ruim
+não está nas memes, está fora delas" e "as memes concentram os dois extremos ao mesmo tempo". A
+Astra derrubou as duas:
+
+- Só sobrevive: **"a maior queda observada entre os mercados incluídos pertence ao `E_resto`"**.
+  Comparar extremos de **19** contra **133** mercados dá muito mais oportunidade ao grupo maior de
+  produzir um extremo, e medianas não resolvem comparação de caudas.
+- "Concentram os dois extremos" **não tem apoio nenhum**: a amplitude mediana da coorte A é
+  **11,51%** contra **12,10%** do resto — e amplitude não determina a ordem subida→queda.
+- **Cenário de falha dela, e é o que importa:** transformar essa abertura em justificativa para
+  limites **menos** conservadores para memes.
+
+O que fica de pé, porque vem de outra medição e não desta: pela
+[[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]], as memes têm o livro mais fino para
+sair. O risco a registrar não é volatilidade — é **volatilidade com saída estreita**.
 
 Esta nota **não propõe nada para o Lab**: o Lab de sombra não dimensiona posição, `PnL de carteira`
 é *não aplicável*, e por isso tudo aqui é registro para o Risk Engine do M3/M4.
@@ -56,9 +66,12 @@ Três leituras:
    dois dias, e pior barra de 15 min mediana de −5,96%. Quatro mercados. Com a ressalva de sempre —
    ser meme e ser listagem recente estão confundidos ali
    ([[KB-0056-meme-coin-como-ativo-e-o-rotulo-que-nao-e-medida]]).
-2. **A pior barra isolada do universo (−31,11% em 15 minutos) está no `E_resto`**, não nas memes. E
-   comparar mínimos entre 19 e 133 mercados favorece o grupo maior por construção — a mesma ressalva
-   que a Astra impôs na [[KB-0059-funding-em-memes-a-cadencia-antes-do-sentimento]].
+2. **A pior barra isolada observada (−31,11% em 15 minutos) está no `E_resto`**, e isso é uma
+   **observação individual**, não uma afirmação sobre caudas: comparar mínimos entre 19 e 133
+   mercados favorece o grupo maior por construção — a mesma ressalva que a Astra impôs na
+   [[KB-0059-funding-em-memes-a-cadencia-antes-do-sentimento]]. A comparação que valeria é
+   **frequência de perdas acima de limiares comuns**, com cobertura comparável, e ela não está
+   feita.
 3. **O BTC nesta janela caiu 0,73% no pior momento.** Um stop de 1,5 ATR nele seria de ~0,19% do
    preço, o que só reforça o que a [[KB-0057-a-volatilidade-das-memes-e-o-piso-que-bane-o-btc]] achou
    sobre o piso.
@@ -89,9 +102,12 @@ Cinco regras que este dado sugere, todas como **requisito a debater**, nenhuma c
    desmonitora), e a [[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]] mostra que 14 mercados
    saíram do universo em 15 h. Para o Risk Engine, uma posição aberta num mercado que saiu do
    universo é um caso que precisa de regra escrita.
-4. **Gap entre barras é o modo de falha do stop.** Uma barra de 15 min de −10,03% (o pior caso da
-   coorte A) atravessa qualquer stop de 1,5 ATR sem tocar no preço do stop. A
-   [[KB-0005-stops-quando-eles-param-perdas]] já dizia que stop não é seguro; aqui está a magnitude.
+4. **Barra grande é o cenário de teste do stop — e não é prova de gap.** Eu tinha escrito que uma
+   barra de −10,03% "atravessa qualquer stop de 1,5 ATR sem tocar no preço do stop". Errado nos dois
+   pedaços: uma queda de 10% pode acontecer **negociando continuamente através do stop** (não é
+   salto), e a distância do stop depende do ATR **naquele instante**, então "qualquer" é falso. O
+   que fica é a magnitude, como cenário a dimensionar. A [[KB-0005-stops-quando-eles-param-perdas]]
+   já dizia que stop não é seguro.
 5. **Correlação em stress.** A [[KB-0060-correlacao-com-o-btc-e-a-meme-season]] mediu beta mediano de
    2,80 das memes contra o BTC numa janela **sem** stress. Limite de exposição agregada que assuma
    independência entre posições de meme está assumindo o contrário do que a literatura de crise
@@ -99,12 +115,21 @@ Cinco regras que este dado sugere, todas como **requisito a debater**, nenhuma c
 
 ## Hipótese testável no Lab
 
-**`D-MEME-GAP` (diagnóstico, roda hoje, sem pré-requisito):** para os outcomes já colhidos, a
-distribuição do **preço de saída contra o preço de stop** nos casos de `result = 'stop'`, por coorte
-de `meme_universe_v1`. Quanto o preço de saída ficou **abaixo** do stop mede diretamente o custo do
-gap, e é o número que o Risk Engine vai precisar para dimensionar. É o `EXEC-D` da quinta rodada
-([[KB-0039-tipos-de-ordem-e-o-que-a-sombra-assume-sem-dizer]]) estratificado por coorte, e vale a
-mesma ressalva dela: **descreve contexto, não valida simetria de execução**.
+**`D-MEME-GAP` (diagnóstico, roda hoje, sem pré-requisito) — com o desenho corrigido pela Astra,
+porque a minha primeira versão mediria a coisa errada.** Para os outcomes com `result = 'stop'`, a
+distribuição do preço de saída contra o preço de stop, por coorte — **decomposta em quatro termos
+separados**: `exit_at_open`, `exit_base`, a barreira, e os custos assumidos.
+
+Motivo: no simulador, um stop tocado dentro da barra sai **na barreira**, e uma abertura abaixo dela
+sai **na abertura** (`walker.py:71,155`); depois disso o preço recebe o acréscimo adverso de custo
+(`pricing.py:53`). Ou seja, `stop − exit_price` **mistura gap com custo assumido, inclusive quando
+não houve gap nenhum**. Cenário de falha dela: medir o déficit em stops sem gap e usar isso como
+estimativa empírica de gap para dimensionar posição real.
+
+E o nome do resultado tem de dizer o que ele é: **gap observado na resolução do modelo**, não custo
+de execução real. É o `EXEC-D` da quinta rodada
+([[KB-0039-tipos-de-ordem-e-o-que-a-sombra-assume-sem-dizer]]) estratificado por coorte, com a mesma
+ressalva: **descreve contexto, não valida simetria de execução**.
 
 **Registro para o M3/M4, não candidata:** os cinco requisitos acima vão para a página do Risk Engine
 com a marcação de que nasceram de 42 h de observação e nenhum evento de stress.
@@ -114,10 +139,13 @@ com a marcação de que nasceram de 42 h de observação e nenhum evento de stre
 - **Quarenta e duas horas, um regime, sem crise.** Falar de cauda de risco com dois dias de dado é o
   limite do que se pode fazer com um instrumento novo. O pior caso observado é o pior caso **desta
   janela**, e nada mais.
-- **Queda máxima em janela curta é uma estatística viciada para baixo**: quanto maior a janela, pior
-  a queda máxima observada, sempre. Comparar coortes na mesma janela é legítimo; comparar com
-  qualquer número publicado sobre "queda de 80-95% em meme coin" **não é**, e por isso nenhum número
-  desses entrou aqui.
+- **Queda máxima depende da janela, e a formulação precisa ser exata** (correção da Astra): ao
+  **estender** uma trajetória preservando as observações anteriores, a queda máxima só pode piorar
+  ou ficar igual — com a convenção negativa que usei, fica **mais negativa**. Isso não é "viciada
+  para baixo em magnitude", e janelas móveis diferentes não obedecem à monotonicidade. Além disso,
+  mesma janela nominal **não** garante mesma cobertura, especialmente com o filtro de 150 barras.
+  Comparar coortes na mesma janela é legítimo; comparar com qualquer número publicado sobre "queda
+  de 80-95% em meme coin" **não é**, e por isso nenhum número desses entrou aqui.
 - **Dezenove mercados na coorte A e quatro na B.** Os quantis extremos são ruído.
 - **`min(cl/pico − 1)` usa fechamentos de 15 min**, então subestima a queda intrabarra — a queda
   real dentro da barra é pelo menos tão ruim quanto a medida.
@@ -126,7 +154,25 @@ com a marcação de que nasceram de 42 h de observação e nenhum evento de stre
 
 ## Segunda opinião (Astra)
 
-_(pendente)_
+Revisão de 2026-09-06 (`.claude/state/astra-review-KB-0062-0065-memecoins.md`).
+
+1. **Derrubou a afirmação sobre a cauda.** Só sobrevive "a maior queda observada entre os mercados
+   incluídos pertence ao `E_resto`"; 19 contra 133 mercados não decide caudas. Cenário de falha:
+   usar isso para justificar limites **menos** conservadores em memes.
+2. **Derrubou "as memes concentram os dois extremos"** com o número que eu mesmo tinha publicado:
+   amplitude mediana 11,51% na coorte A contra 12,10% no resto.
+3. **Corrigiu a ressalva de janela** — extensão preserva o passado, então a queda máxima piora ou
+   fica igual; janelas móveis não são monótonas; e mesma janela nominal não é mesma cobertura.
+4. **Derrubou "atravessa qualquer stop de 1,5 ATR"** — queda de 10% pode ser contínua, e a distância
+   do stop depende do ATR do instante.
+5. **Reprojetou o `D-MEME-GAP`**: `stop − exit_price` mistura gap e custo assumido
+   (`walker.py:71,155`, `pricing.py:53`), e o resultado tem de se chamar **gap observado na
+   resolução do modelo**.
+6. **Sugeriu o que eu deveria ter feito primeiro:** frequência de perdas acima de limiares comuns,
+   com cobertura comparável, deixando mínimos como observações individuais.
+7. **Concordou** que não há base aqui para alterar risco nem declarar vantagem, e que os cinco
+   requisitos ficam como **propostas** para o Risk Engine, com evidência de preço distinguida de
+   evidência de execução.
 
 ## Relacionados
 
