@@ -1,14 +1,24 @@
 ---
-tags: [trading, risco, m4]
-updated: 2026-09-05
+tags: [trading, risco, m3]
+updated: 2026-09-06
 status: planejado
 ---
 
 # Risk Engine
 
+> **Atualizado em 2026-09-06 — leia isto antes do resto da página.** A diretiva do Everton (ADR 0005,
+> [[Dialogos/M3]]) trouxe o Risk Engine para o **Milestone 3** e substituiu o contrato: vale
+> `docs/RISK_ENGINE.md` **v2**, com o perfil `paper_v1` (0,25 % por operação com custos dentro, 1 %
+> agregado, 1 % de participação do minuto, 40 % total, 10 % por moeda, 5 posições, β-BTC 0,5×, kill
+> switch 1 %/4 % e 2 %/8 % com o dia em `America/Sao_Paulo`, SPOT sem alavancagem, piso de 50 M). Os
+> presets Conservative/Balanced/Aggressive descritos abaixo **continuam existindo e não são o perfil
+> da carteira** — e a medição da rodada 8 mostrou que neles o `risk_per_trade_pct` nunca chegava a
+> atuar. Plano: `docs/plans/M3.md`. Ver [[Portfolio]], [[Paper Trading]], [[Execution Engine]],
+> [[Strategy Backlog]].
+
 ## Status
 
-**Planejado para o Milestone 4.** `hunter_risk` (`packages/risk-core`) ainda não tem implementação — hoje só existe a interface (`RiskEngine.evaluate` como Protocol em `docs/ARCHITECTURE.md` §6) e o schema (`risk_profiles`, `trade_proposals.risk_decision`, `risk_events`, `kill_switch_transitions`). É a peça mais sensível do sistema — regra de ouro do produto (`CLAUDE.md`): **nenhum agente executa ordens**; todo caminho de entrada é AGENT → PROPOSAL → RISK ENGINE → EXECUTION, e o `risk-engine-guardian` (opus) é revisor obrigatório de qualquer mudança aqui quando ela for implementada.
+**Planejado para o Milestone 3** (era M4 até 2026-09-06). `hunter_risk` (`packages/risk-core`) ainda não tem implementação — hoje só existe a interface (`RiskEngine.evaluate` como Protocol em `docs/ARCHITECTURE.md` §6) e o schema (`risk_profiles`, `trade_proposals.risk_decision`, `risk_events`, `kill_switch_transitions`). É a peça mais sensível do sistema — regra de ouro do produto (`CLAUDE.md`): **nenhum agente executa ordens**; todo caminho de entrada é AGENT → PROPOSAL → RISK ENGINE → EXECUTION, e o `risk-engine-guardian` (opus) é revisor obrigatório de qualquer mudança aqui quando ela for implementada.
 
 ## Contrato (definido, sem código)
 

@@ -9,6 +9,30 @@ Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado p
 
 ## 2026-09-06
 
+- **`docs(m3)` — o M3 planejado a partir da diretiva do Everton: carteira virtual e Risk Engine.** Ele
+  respondeu às sete decisões que a oitava rodada devolveu (capital, `f`, `p`, `θ`, limiares de perda,
+  modalidade, piso de liquidez) e foi além, com uma diretiva de sete partes mais uma lista de
+  validação. Saíram: `docs/plans/M3.md` (14 tarefas, 6 ondas, checklist de aceite por tarefa),
+  `docs/RISK_ENGINE.md` reescrito como **contrato v2**, ADR 0005, e a correção de `docs/ROADMAP.md` e
+  `docs/PRODUCT.md`, que ainda punham o Risk Engine no M4 e a carteira no fluxo de onboarding.
+  **Nenhum limite dele foi alterado**, e nove conflitos entre a diretiva e o sistema que existe hoje
+  voltaram para ele em "Perguntas ao Everton antes de alterar qualquer limite" — a começar pelo maior:
+  ele mandou operar **SPOT** e todo o sistema construído até aqui é **perpétuo**, sem adaptador spot
+  (`binance/rest.py:223` recusa o que não for PERPETUAL, e a chave do livro no hot state colidiria).
+  Decisão conjunta em três rodadas ([[Dialogos/M3]]), na qual a Astra derrubou seis afirmações minhas:
+  o termo cambial calculado sobre o **caixa** em vez do equity (ela conferiu com `Decimal` e mostrou
+  um erro de R$8.200 no exemplo); "reset = carteira nova" como saída legítima, que preservaria as
+  linhas antigas e ainda assim reiniciaria patrimônio e pico e **destravaria um kill switch
+  BLOQUEADO**; a saída de proteção executando com "o pior candidato disponível" quando falta livro,
+  que é **fabricar proteção**; "o stop executa pior por construção", quando o preço pode sair melhor,
+  igual ou pior; generalizar para as saídas o cancelamento terminal do restante, que deixaria unidades
+  desprotegidas depois de um fill parcial; e as duas afirmações sem consulta, "só o BTC teria β
+  válido" e "a participação será **sempre** o limitante" — os 46 USDT medidos vêm de **perpétuos**,
+  numa janela histórica, e não descrevem a população SPOT futura. Todas corrigidas antes de o plano
+  existir. As vinte e uma regras da rodada 8 ficaram marcadas no [[Strategy Backlog]] como adotada,
+  substituída pela decisão do Everton, inaplicável ou pendente com a pergunta. **Nada foi
+  implementado nesta entrega, e o M3 não declara modo autônomo:** as entradas são manuais, porque a
+  ponte sinal → proposta não existe e sinal `research_only` continua recusado.
 - **`72cebc5` · `0fa8bee` · `995ddb8` — rotina de aquisição de conhecimento** (`obsidian/11-KNOWLEDGE`): índice, modelo de nota e `Strategy Backlog`; notas escritas com as próprias palavras, com fonte, qualidade da evidência e uma hipótese testável no Lab; cada uma revisada pela Astra; **nada ativa sozinho**. Primeiras notas: KB-0001..0003 sobre momentum e rompimento de canal.
 - **`88bac0b` — `default_sni` para clientes que chegam pelo IP puro.** Navegador não manda SNI para um endereço IP, então o Caddy respondia o handshake TLS com `internal error` e o Chrome mostrava `ERR_SSL_PROTOCOL_ERROR`. `compose.sh` passou a derivar o `default_sni` de `HUNTER_SITE_ADDRESS`. Com isso o Everton **abriu e viu** o `/ever/lab` em `https://169.58.116.99`.
 - **`7e00f3b` — HTTPS no IP puro, com a CA interna do Caddy.** Os cookies de sessão do Clerk são `Secure`; em HTTP puro o navegador não os guardava e o sign-in entrava em laço infinito. A VPS passou a servir HTTPS com certificado interno — o aviso do navegador é esperado e está documentado em [[Deployment]].

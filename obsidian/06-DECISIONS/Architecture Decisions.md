@@ -136,3 +136,41 @@ O que isso **não** autoriza: tratar o aviso como normal quando houver domínio.
 um, `HUNTER_TLS_ARG` troca `internal` pelo e-mail do ACME e o aviso tem de desaparecer; um aviso de
 TLS que a equipe aprendeu a ignorar é exatamente como um certificado trocado passa despercebido.
 Commits `7e00f3b` e `88bac0b`.
+
+## Decisão — a carteira virtual e o Risk Engine `paper_v1` (2026-09-06, ADR 0005)
+
+O Everton respondeu às sete decisões que a oitava rodada de conhecimento devolveu a ele, e foi além:
+uma diretiva de sete partes (`.claude/state/directive-risk-engine-2026-09-06.md`, verbatim) que fixa
+capital, risco por operação, risco agregado, participação, exposição, kill switch, modalidade e
+universo. O contrato virou `docs/RISK_ENGINE.md` **v2**; o plano, `docs/plans/M3.md`; a conversa que
+fechou a arquitetura, [[Dialogos/M3|o diálogo M3]].
+
+O que merece ficar registrado aqui não são os números dele — esses estão no ADR e no contrato — mas
+**os dois defeitos que a medição encontrou no contrato antigo**, porque eles são a forma de um erro
+que vai se repetir:
+
+1. **`risk_per_trade_pct` nunca atuava.** O contrato dizia "risco de 0,25 % por operação" e a
+   aritmética dos presets impedia que esse teto fosse o limitante: os limiares implícitos (12,5 /
+   10 / 10 %) ficam **acima** do `max_stop_distance_pct` de cada perfil (3 / 5 / 8 %), então o check
+   de distância reprovava antes e o risco bruto no stop saía 6 a 8× abaixo do rótulo. O rótulo não
+   descrevia o comportamento, e **nenhum dado podia contrariá-lo** porque o motor não publicava qual
+   teto tinha vencido.
+2. **O multiplicador do kill switch não garantia redução.** O §5 prometia "tamanho × 0,5" em AVISO e
+   o §4 multiplicava o **orçamento de risco**; com stop estreito outro teto vencia e a posição saía
+   do mesmo tamanho, com o painel dizendo que tinha caído pela metade.
+
+A lição, que vale para qualquer limite futuro: **um controle que não publica o que o fez agir é uma
+frase, não um controle.** No v2 o motor grava o limitante vencedor e dois contrafactuais distintos —
+o tamanho sem os multiplicadores e o tamanho sem o teto de participação —, e os multiplicadores agem
+sobre o tamanho final, antes do arredondamento, com revalidação do mínimo negociável.
+
+A segunda lição veio do diálogo, e é da mesma família: **"a saída é sempre permitida" não pode virar
+"a saída sempre executa".** A primeira redação mandava sair "com o pior candidato disponível" quando
+faltasse livro — isso é fabricar proteção, exatamente o que a diretiva proíbe. No v2 a saída de
+proteção é uma **intenção durável**: a tentativa termina, a intenção permanece para a quantidade
+remanescente, e sem livro utilizável ela fica pendente, degradada e visível. O contrário —
+cancelamento terminal do restante — vale só para a **entrada**.
+
+Ver [[Risk Engine]], [[Portfolio]], [[Paper Trading]], [[Execution Engine]] e a seção "Regras
+propostas para o Risk Engine (M3/M4)" do [[Strategy Backlog]], onde cada uma das vinte e uma regras
+ficou marcada como adotada, substituída pela decisão do Everton, ou pendente com a pergunta.

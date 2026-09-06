@@ -60,7 +60,9 @@ Formato de fechamento (§77): COMPLETED · FILES CREATED · FILES MODIFIED · DA
 
 ---
 
-## Milestone 3 — Paper trading
+## Milestone 3 — Carteira virtual e Risk Engine
+
+> **Revisado em 2026-09-06** pela diretiva do Everton (ADR 0005). O escopo abaixo era "paper trading", com o Risk Engine no M4; a diretiva manda **implementar o Risk Engine e integrá-lo à carteira**, então ele desce para cá e o M4 fica com agentes e a ponte sinal → proposta. Acrescentam-se: carteira permanente de R$100.000 convertidos em USDT com âncora de câmbio, caminho de dados **SPOT**, β versionado, e o perfil `paper_v1`. As entradas do M3 são **manuais**; o modo autônomo não é declarado aqui. Plano vigente: `docs/plans/M3.md`; contrato: `docs/RISK_ENGINE.md` v2.
 
 **Escopo**
 - `hunter_core.execution`: `ExecutionAdapter`, `PaperExecutionAdapter` (walk do book, partial fills, slippage, fees, latência), `ShadowExecutionAdapter`, `LiveExecutionAdapter` (stub que levanta `LiveTradingDisabled`).
@@ -76,11 +78,13 @@ Formato de fechamento (§77): COMPLETED · FILES CREATED · FILES MODIFIED · DA
 
 ---
 
-## Milestone 4 — Agentes e Risk Engine
+## Milestone 4 — Agentes e a ponte sinal → proposta
+
+> **Revisado em 2026-09-06** (ADR 0005): o Risk Engine e o kill switch saíram daqui para o M3. O que fica é o que faz a carteira operar **sozinha** — e é aqui que o modo autônomo passa a poder ser declarado, com a ponte entre sinal e proposta provada ponta a ponta (mapeamento explícito de ativo, unidades e geometria de entrada/stop/alvo entre o mercado do sinal e o de execução; sinal `research_only` continua recusado).
 
 **Escopo**
 - Framework `Strategy`; `momentum_v1` e `volume_anomaly_v1` ativados; `strategy-worker` gerando sinais globais.
-- `hunter_risk`: `RiskEngine` completo (todos os checks de `RISK_ENGINE.md`), sizing, kill switch em 3 escopos com transições auditadas.
+- ~~`hunter_risk`: `RiskEngine` completo, sizing, kill switch~~ → **movido para o M3**.
 - Proposal builder, `trade_proposals`, fluxo AGENT → PROPOSAL → RISK → PAPER EXECUTION de ponta a ponta.
 - API: agents CRUD (enable/pause/disable, alocação, filtros), signals, proposals (com decisão e checks), risk (limites, estado, eventos, kill switch).
 - Web: `/agents`, `/agents/[id]` (métricas básicas; estatísticas completas no M5), `/risk` (Risk Center com limites editáveis, exposição, kill switch), propostas rejeitadas visíveis com motivo, status `IN_POSITION` e `BLOCKED_BY_RISK` no Radar.

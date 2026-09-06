@@ -643,6 +643,35 @@ A comparação certa é pareada, mercado a mercado.
 **Nada aqui está implementado, decidido nem ativado.** Cada linha tem nome, fórmula ou parâmetro,
 dado necessário (e se temos), o que a refutaria ou quando ela erra, e quem decide.
 
+> **Situação em 2026-09-06, depois da diretiva do Everton.** As tabelas abaixo ficam como estavam —
+> elas registram o que a rodada 8 propôs e por quê. O destino de cada regra está na tabela seguinte.
+> Nada continua "proposto" sem dizer o que aconteceu com ele. Fontes: `docs/RISK_ENGINE.md` v2,
+> `docs/plans/M3.md`, ADR 0005, [[Dialogos/M3]].
+
+| Regra | Destino | O que mudou |
+|---|---|---|
+| `R-KS-1` | **adotada** | O multiplicador passa a agir sobre o **tamanho final aprovado**, antes do arredondamento, com revalidação do mínimo negociável; tamanho reduzido abaixo do mínimo **rejeita**, nunca arredonda para cima (contrato v2 §4) |
+| `R-PROV-1` | **adotada** | `sizing.binding_constraint` gravado e publicado, com cada teto calculado e a distribuição do limitante (§4) |
+| `R-KS-2` | **adotada e desdobrada** | Vira **dois contrafactuais distintos** — sem multiplicadores e sem participação — que nunca podem ser reportados como um só (§4) |
+| `R-SIZE-1` | **substituída pela decisão do Everton** | `f = 0,0025`, **incluindo custos estimados**, e mais um teto agregado de 1 % que a regra não previa. Ele manteve a recomendação e proibiu liberar 1 % por operação sem aprovação dele |
+| `R-SIZE-2` | **adotada** | O `stop_distance` vem do stop que o sinal declarou; a banda `[min,max]_stop_distance_pct` continua como guarda técnica |
+| `R-VOL-1` | **adotada como diagnóstico** | Publicar as duas razões continua valendo; não é limite, é proveniência |
+| `R-CAP-1` | **pendente — bloqueada por dado** | Continua exigindo o carimbo de execução; o que entra no M3 é o check `book_depth` (livro ausente, vencido ou raso reprova) e a série do `R-CAP-M` |
+| `R-CAP-2` | **substituída pela decisão do Everton** | Ele escolheu **`p = 0,01`** (não 0,05–0,10) e definiu a referência: `min(último minuto completo, mediana dos 30 minutos completos)`. Virou o orçamento móvel de 60 s por `(mercado, escopo de capital)` do contrato v2 §4 |
+| `R-CAP-M` | **adotada** | Tarefa T3.M, diagnóstico separado, dos dois lados do livro, fora do caminho da decisão |
+| `R-CORR-1` | **substituída pela decisão do Everton** | Ele fixou **θ = 0,5×** do patrimônio, em módulo, e acrescentou a regra dura: **sem β validado o ativo fica só em shadow**. O β versionado é a T3.7 |
+| `R-CORR-2` | **pendente** | A diretiva não menciona cluster declarado; o teto por moeda (10 %) cobre parte do risco. Fica para depois do M3, sem lista estimada na mesma amostra |
+| `R-DD-1` | **substituída pela decisão do Everton** | Quatro limiares em vez de dois: AVISO em 1 % diário **ou** 4 % de drawdown, BLOQUEADO em 2 % **ou** 8 %; dia em `America/Sao_Paulo`; pico sem reset |
+| `R-DD-2` | **adotada como leitura** | Parada por perda diária abre investigação de instrumento; continua sem formalização externa |
+| `R-LEV-1` | **inaplicável nesta etapa** | Ele escolheu SPOT sem empréstimo, alavancagem, short ou futuros — margem isolada não se aplica |
+| `R-LEV-2` | **inaplicável nesta etapa** | Sem alavancagem o check nunca morde, e isso está **dito** no contrato (§9.1). A chamada autenticada continua não sendo feita |
+| `R-OPS-1` | **adotada** | Estado `unavailable`, distinto de `failed`, reprovando por padrão (§3, §7) |
+| `R-OPS-2` | **adotada** | Idade máxima declarada por insumo: preço, livro, volume 24 h, volume do minuto, β, universo, continuidade |
+| `R-OPS-3` | **adotada** | Check `market_gap` na admissibilidade (§3.1) |
+| `R-OPS-4` | **adotada, com a correção do diálogo** | Check `market_in_universe` impede **entrada**; sair da elegibilidade **não** encerra gestão, e por isso o M3 acrescenta o **hold durável para posições paper** (T3.0) |
+| `C-PAPER` | **adotada** | A linha de população continua obrigatória; `M` só existe depois da simulação sequencial, agora com a regra de desempate declarada (`fifo_v1`) |
+| `D-PAPER-1` | **pendente** | Continua valendo para o Lab. No M3 o gatilho é o **último negócio SPOT válido** — `mark_price` é conceito de perpétuo e não se transplanta |
+
 ### A. Coerência do contrato — as três que não custam parâmetro novo
 
 | Regra | Fórmula / parâmetro | Dado necessário (temos?) | Quando ela erra | Quem decide |
@@ -717,6 +746,16 @@ dado necessário (e se temos), o que a refutaria ou quando ela erra, e quem deci
    começo.
 7. **O universo ou o piso de liquidez** — um dos dois tem de ceder, depois de reconciliar a
    completude das somas de volume.
+
+> **Respondida em 2026-09-06.** As sete foram decididas na diretiva: (1) R$100.000 fictícios, com
+> conversão registrada; (2) `f = 0,0025`, com custos dentro e teto agregado de 1 %; (3) `p = 0,01`
+> com a referência do minuto que ele definiu; (4) `θ = 0,5×`, e sem β validado o ativo fica só em
+> shadow; (5) quatro limiares (1 %/4 % e 2 %/8 %) em vez de dois, com o dia em `America/Sao_Paulo` e
+> o pico sem reset; (6) **SPOT, sem alavancagem** — margem isolada não se aplica; (7) o piso de 50 M
+> **fica**, e ele prefere menos mercados negociáveis a baixar o piso. Nove conflitos novos entre a
+> diretiva e o sistema que existe hoje foram devolvidos a ele em `docs/plans/M3.md` → "Perguntas ao
+> Everton antes de alterar qualquer limite", e **nenhum limite dele foi alterado** enquanto ele não
+> responde.
 
 ### Ordem recomendada para o M3
 

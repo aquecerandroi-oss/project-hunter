@@ -50,14 +50,14 @@ Detalhe completo em [[Data Flow]] e `docs/PIPELINE.md`.
 | Feature Engine | planejado | [[Features]] | M2 |
 | Anomaly Engine | planejado | [[Anomalies]] | M2 |
 | Paper Trading / Execution Engine | planejado | [[Paper Trading]], [[Execution Engine]] | M3 |
-| Portfolio | planejado | [[Portfolio]] | M3 |
-| Risk Engine | planejado | [[Risk Engine]] | M4 |
-| Estratégias / Agentes | planejado | [[Strategies]], [[Agents Overview]] | M4 |
+| Portfolio (carteira permanente em USDT com âncora em BRL) | planejado | [[Portfolio]] | M3 |
+| Risk Engine (contrato v2, perfil `paper_v1`) | planejado | [[Risk Engine]] | **M3** (era M4; ADR 0005) |
+| Estratégias / Agentes + ponte sinal → proposta | planejado | [[Strategies]], [[Agents Overview]] | M4 |
 | Analytics / Performance | planejado | [[Performance Overview]] | M5 |
 
 ## Como navegar
 
-- [[Mente da Sexta-feira]] — como a assistente pensa (Claude + Astra) e onde cada tipo de memória fica; [[Dialogos/Index|diálogos]] e [[Revisoes-Astra/Index|revisões da Astra]].
+- [[Mente da Sexta-feira]] — como a assistente pensa (Claude + Astra) e onde cada tipo de memória fica; [[Dialogos/Index|diálogos]] e [[Revisoes-Astra/Index|revisões da Astra]]. Mais recente: [[Dialogos/M3]] — carteira virtual e Risk Engine, a partir da diretiva do Everton de 2026-09-06 (ADR 0005; plano `docs/plans/M3.md`; contrato `docs/RISK_ENGINE.md` v2). O M3 **não** declara modo autônomo: as entradas são manuais e a ponte sinal → proposta é do M4.
 
 - **01-ARCHITECTURE/** — visão de sistema, fluxo de dados, infraestrutura, workers.
 - **02-MARKET/** — coleta de mercado, adapters de exchange, WebSockets, features, anomalias (tudo planejado M1–M2).

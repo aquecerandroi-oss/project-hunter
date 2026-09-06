@@ -14,6 +14,8 @@ Encontrar situações com **assimetria + anomalia + contexto + liquidez + contro
 5. Exchanges monitoradas (preferência de filtro).
 6. Entrar no dashboard. No M3, o passo 3 passa a criar o primeiro portfolio paper.
 
+> **Corrigido em 2026-09-06 (ADR 0005).** A carteira do dono no M3 não segue os passos 3 e 4: ela é **uma só, permanente, aberta com R$100.000 convertidos em USDT** ao câmbio registrado na abertura, com o perfil `paper_v1` (não `conservative`/`balanced`/`aggressive`), sem aporte e sem reset. O fluxo de onboarding acima continua descrevendo o produto para outros usuários; a carteira principal de um workspace é única por escopo e não pode ser recriada para recomeçar.
+
 ## 4. Navegação (registro único, com milestone de disponibilidade)
 
 | Item | Rota | Disponível a partir de |
