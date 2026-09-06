@@ -25,10 +25,14 @@ from hunter_api.repositories.opportunities import (
     encode_opportunity_cursor,
 )
 from hunter_api.repositories.radar_common import (
+    FEATURE_ENVELOPE_PATH,
+    FEATURE_KEY_VOLATILITY,
+    FEATURE_KEY_VOLUME,
     AnalysisDataUnavailableError,
     InvalidRadarCursorError,
     decode_sort_cursor,
     encode_sort_cursor,
+    feature_value_expr,
     like_contains,
     postgres_failures_as_503,
     sentinel_for,
@@ -46,6 +50,13 @@ from hunter_api.schemas.radar import RadarStatusFilter
 from hunter_api.services.opportunities import extract_baseline_ids
 from hunter_api.services.radar import StatusRequiresOrgError, resolve_status_tokens
 from hunter_core.domain.types import utcnow
+from hunter_indicators.opportunity import (
+    ScoreContext,
+    WeightProfile,
+    opportunity_envelope,
+    score_opportunity,
+)
+from packages.indicators.tests.scoring import CONFIG, MARKET, baselines_for, ok, vector
 
 pytestmark = pytest.mark.unit
 
@@ -295,3 +306,85 @@ def test_resolve_history_limit_explicit_over_the_envelope_cap_is_422() -> None:
     assert raised.value.status_code == 422
     assert raised.value.detail is not None
     assert "50" in raised.value.detail
+
+
+# --- contract test: the envelope path the radar actually reads (HIGH bug, ----
+# --- Astra/T2.7 cross-package review, 2026-09-06) ----------------------------
+#
+# T2.6 (this package) and T2.4 (`hunter_indicators.opportunity.envelope`) each
+# froze a shape for `opportunities.feature_snapshot` without a shared test
+# forcing them to agree: this module read `feature_snapshot["features"]
+# ["values"][key]["value"]`, but `opportunity_envelope()` actually nests the
+# vector under `feature_snapshot["vector"]["values"][key]["value"]`
+# (`packages/indicators/hunter_indicators/opportunity/envelope.py::
+# opportunity_envelope`, `.../features/vector.py::FeatureVector.as_wire`).
+# The consequence was silent: `volatility_min`/`volatility_max` excluded every
+# row and `sort=volume` fell back to the NULL sentinel for every row, with no
+# error anywhere in the response.
+#
+# The fixture below builds the envelope by *calling* `opportunity_envelope()`
+# with a minimal real `ScoreResult`/`ScoreContext` (the same fixtures
+# `packages/indicators/tests/scoring.py` gives its own scorer tests), so this
+# test is a statement about the producer's actual output, not about a second
+# hand-typed dict that could drift from it exactly the way the first one did.
+
+_CONTRACT_WEIGHTS: dict[str, object] = {
+    "components": {
+        name: ("1" if name == "momentum" else "0")
+        for name in (
+            "momentum",
+            "volume",
+            "order_flow",
+            "liquidity",
+            "derivatives",
+            "market_regime",
+            "anomalies",
+            "agent_consensus",
+            "external_intelligence",
+        )
+    },
+    "early_movement": {"magnitude": "0", "values": [-1, 0, 1]},
+    "precision": {
+        "score_decimals": 2,
+        "confidence_decimals": 4,
+        "component_decimals": 4,
+        "rounding": "ROUND_HALF_EVEN",
+    },
+}
+"""A minimal but valid weight profile — every component the scorer iterates
+needs a weight, or ``WeightProfile.weight_of`` raises. Only ``momentum``
+carries any weight; this test cares about the envelope's shape, not the score."""
+
+
+def _real_envelope(values: dict[str, str]) -> dict[str, object]:
+    """A ``feature_snapshot`` produced by the real ``opportunity_envelope()``."""
+    ctx = ScoreContext(
+        market_id=MARKET,
+        vector=vector({key: ok(key, value) for key, value in values.items()}),
+        projection=baselines_for(list(values)),
+        config=CONFIG,
+        profile=WeightProfile.from_weights(_CONTRACT_WEIGHTS, version="contract-test"),
+    )
+    result = score_opportunity(ctx)
+    return opportunity_envelope(result, ctx)
+
+
+def test_feature_value_expr_path_matches_the_real_envelope_shape() -> None:
+    envelope = _real_envelope({FEATURE_KEY_VOLATILITY: "0.05", FEATURE_KEY_VOLUME: "9"})
+    outer, inner = FEATURE_ENVELOPE_PATH
+    assert envelope[outer][inner][FEATURE_KEY_VOLATILITY]["value"] == Decimal("0.05")  # type: ignore[index]
+    assert envelope[outer][inner][FEATURE_KEY_VOLUME]["value"] == Decimal("9")  # type: ignore[index]
+
+
+def test_feature_value_expr_compiles_to_the_confirmed_json_path() -> None:
+    """A cheap, complementary guard: the compiled SQL literally names the two
+    path segments, so an edit to the literal keys inside ``feature_value_expr``
+    cannot silently drift from :data:`FEATURE_ENVELOPE_PATH`."""
+    compiled = str(
+        feature_value_expr(FEATURE_KEY_VOLUME).compile(
+            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+        )
+    )
+    assert "'vector'" in compiled
+    assert "'values'" in compiled
+    assert f"'{FEATURE_KEY_VOLUME}'" in compiled

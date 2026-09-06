@@ -102,6 +102,64 @@ importa quando T2.4/T2.5 realmente escreverem esse valor; `repositories
 `EXPIRED` acumulados — outra decisão para T2.8/retenção); cobertura de teste
 de cursor do Radar não inclui empate exato de `sort_value` nem `ASC`.
 
+## Bug HIGH corrigido: caminho JSON do envelope divergia do produtor real (T2.7/Astra, 2026-09-06)
+
+**Causa.** Esta seção do arquivo (ver "Assunção registrada" logo abaixo, texto
+histórico mantido para o registro) já havia deixado explícito que
+`feature_value_expr` **assumia** um caminho (`feature_snapshot["features"]
+["values"][key]["value"]`) porque T2.4/T2.5 ainda não tinham aterrissado.
+Quando T2.4 aterrissou (`packages/indicators/hunter_indicators/opportunity/
+envelope.py::opportunity_envelope()`, commit `665ed3f`), ninguém voltou para
+conferir a suposição contra o produtor real — e o `quant-engineer` (T2.4), por
+sua vez, não tinha como saber que a API já fixara um caminho concorrente, pois
+não existia nenhum teste de contrato ligando os dois lados. Cada time fixou
+sua própria forma do envelope de forma independente e consistente internamente
+(`opportunity_envelope()` aninha o vetor sob `"vector"`, não `"features"`), e
+nada no CI comparava as duas. O resultado: `GET /api/v1/radar?volatility_min=`/
+`volatility_max=` excluía silenciosamente toda linha (a extração JSONB
+retornava `NULL`, que nunca satisfaz uma desigualdade) e `sort=volume`
+degradava toda linha para a sentinela de "sem valor" — nenhum erro, nenhum
+log, só um resultado errado.
+
+**Correção.** `feature_value_expr` agora lê
+`feature_snapshot["vector"]["values"][key]["value"]`, o caminho que
+`opportunity_envelope()` + `FeatureVector.as_wire()` realmente produzem. O
+literal `("vector", "values")` foi extraído para a constante
+`FEATURE_ENVELOPE_PATH`, referenciada tanto pela função quanto pelo teste de
+contrato, para que os dois nunca mais possam divergir sem o teste falhar.
+
+**Teste de contrato que agora existe** (a peça que faltava): em vez de um
+segundo dict escrito à mão que poderia divergir do produtor exatamente como o
+primeiro divergiu, os testes chamam a função real `opportunity_envelope()`
+(importada de `hunter_indicators.opportunity`) com um `ScoreContext`/
+`ScoreResult` mínimo montado a partir de `packages/indicators/tests/scoring.py`
+(as mesmas fixtures que os testes do próprio scorer usam) e verificam que
+`FEATURE_ENVELOPE_PATH` alcança o valor no envelope de verdade:
+
+- `apps/api/tests/unit/test_analysis_read_models.py::
+  test_feature_value_expr_path_matches_the_real_envelope_shape` — constrói o
+  envelope real e confere `envelope["vector"]["values"][key]["value"]`.
+- `apps/api/tests/unit/test_analysis_read_models.py::
+  test_feature_value_expr_compiles_to_the_confirmed_json_path` — compila a
+  expressão SQL (`literal_binds=True`) e confere que o texto gerado nomeia
+  `'vector'`/`'values'`/a chave, capturando qualquer futura edição dos
+  literais dentro de `feature_value_expr` que se afaste da constante.
+- `apps/api/tests/integration/test_radar_api.py::
+  test_list_radar_volatility_filter_and_volume_sort_read_the_real_envelope_shape`
+  — ponta a ponta: semeia uma oportunidade com `feature_snapshot` construído
+  por `analysis_fixtures.py::real_feature_snapshot` (que também chama
+  `opportunity_envelope()` de verdade, nunca um dict inventado) e confere que
+  `?volatility_min=` inclui a linha e `?sort=volume` a ordena na frente de uma
+  linha sem `feature_snapshot`. Confirmado que falha pelo motivo certo
+  revertendo temporariamente o caminho para `"features"` antes de aplicar a
+  correção (a linha válida desaparecia da resposta filtrada).
+
+**Lição para o processo:** uma suposição documentada não é um contrato —
+precisa de um teste que rode contra o código do outro time, não só contra a
+própria leitura da documentação. `analysis_fixtures.py::real_feature_snapshot`
+fica como o único ponto de construção de `feature_snapshot` de teste daqui
+para frente; nenhum teste novo deveria voltar a escrever esse dict à mão.
+
 ## Assunção registrada: caminho JSON do envelope de features
 
 `opportunities.feature_snapshot`/`opportunity_history.envelope` são o "envelope"
@@ -207,15 +265,12 @@ etc.), e não toquei `main.py` (nada a fazer lá).
   item 4, para o mecanismo e o gap conhecido (falha na abertura da própria
   `PrincipalSession`, antes do corpo da rota, ainda cai no 500 genérico, igual
   a todo outro endpoint do M1 que lê Postgres).
-- **Filtros de volatilidade/volume não têm teste de integração** cobrindo o
-  caminho JSON real (`feature_value_expr`) — só a query é exercitada
-  indiretamente pelos testes que NÃO usam esses filtros. Não escrevi fixture
-  com `feature_snapshot` no formato assumido para T2.6 propriamente dito por
-  ter ficado sem tempo depois de fechar RLS/paginação/anomalias/regime, que
-  são os itens obrigatórios do brief. Recomendo ao code-reviewer/test-engineer
-  fechar isso quando T2.4/T2.5 confirmarem o formato real do envelope (o teste
-  ficaria testando a própria suposição, não o formato real, então não é puro
-  ganho fazer agora).
+- ~~**Filtros de volatilidade/volume não têm teste de integração** cobrindo o
+  caminho JSON real (`feature_value_expr`)~~ — **fechado** em 2026-09-06 (ver
+  "Bug HIGH corrigido: caminho JSON do envelope divergia do produtor real"
+  acima): T2.4 aterrissou com um caminho diferente do assumido aqui
+  (`"vector"`, não `"features"`), o que este pendência já havia previsto como
+  risco. Teste de contrato + integração agora cobrem o caminho real.
 - **`GET /api/v1/opportunities` (lista)** não replica todos os filtros ricos do
   Radar (regime, anomaly_type, volatilidade, status derivado por org) — só
   `score_min`, `status` (nativo), `stage`, `exchange`, `q`. O brief pede a

@@ -2,11 +2,18 @@
 anomalies, regime). Every row here follows the T2.1 models exactly
 (``hunter_core.db.models.analysis``/``analysis_baselines``) — no field is
 invented outside a model's own contract, per the brief's "sem dado fabricado
-fora de teste".
+fora de teste". :func:`real_feature_snapshot` extends that rule to
+``feature_snapshot`` itself: it is built by *calling*
+``hunter_indicators.opportunity.envelope.opportunity_envelope()`` (T2.4), not
+by hand-writing a dict shaped like it — see
+``apps/api/hunter_api/repositories/radar_common.py``'s module docstring and
+``.claude/state/notes-T2.6.md`` for the HIGH bug this guards against (T2.6 and
+T2.4 once froze two different envelope shapes with nothing forcing agreement).
 """
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -33,11 +40,66 @@ from hunter_core.domain.enums import (
     RegimeScope,
     TradeDirection,
 )
+from hunter_core.strategies.canonical import canonical_json
+from hunter_indicators.opportunity import (
+    ScoreContext,
+    WeightProfile,
+    opportunity_envelope,
+    score_opportunity,
+)
+from packages.indicators.tests.scoring import CONFIG, MARKET, baselines_for, ok, vector
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 _JSON_EMPTY: dict[str, Any] = {}
+
+_REAL_ENVELOPE_WEIGHTS: dict[str, object] = {
+    "components": {
+        name: ("1" if name == "momentum" else "0")
+        for name in (
+            "momentum",
+            "volume",
+            "order_flow",
+            "liquidity",
+            "derivatives",
+            "market_regime",
+            "anomalies",
+            "agent_consensus",
+            "external_intelligence",
+        )
+    },
+    "early_movement": {"magnitude": "0", "values": [-1, 0, 1]},
+    "precision": {
+        "score_decimals": 2,
+        "confidence_decimals": 4,
+        "component_decimals": 4,
+        "rounding": "ROUND_HALF_EVEN",
+    },
+}
+"""A minimal but valid weight profile: ``score_opportunity`` looks up a weight
+for every component in the roster, so all nine need an entry even though only
+``momentum`` carries one — the tests using this only care about the envelope's
+JSON shape, never its score."""
+
+
+def real_feature_snapshot(values: dict[str, str]) -> dict[str, Any]:
+    """``opportunities.feature_snapshot`` as the scanner actually writes it:
+    the output of a real ``opportunity_envelope()`` call, canonicalised to the
+    same string-encoded-number wire form ``FeatureVector.as_wire()`` promises
+    (``packages/indicators/hunter_indicators/features/vector.py``), so a JSONB
+    column round-trips it exactly like the real writer would.
+    """
+    ctx = ScoreContext(
+        market_id=MARKET,
+        vector=vector({key: ok(key, value) for key, value in values.items()}),
+        projection=baselines_for(list(values)),
+        config=CONFIG,
+        profile=WeightProfile.from_weights(_REAL_ENVELOPE_WEIGHTS, version="fixture-test"),
+    )
+    result = score_opportunity(ctx)
+    envelope = opportunity_envelope(result, ctx)
+    return json.loads(canonical_json(envelope))
 
 
 async def seed_exchange(session_factory: async_sessionmaker[AsyncSession]) -> tuple[str, uuid.UUID]:

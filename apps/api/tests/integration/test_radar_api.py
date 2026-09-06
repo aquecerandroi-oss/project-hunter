@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from hunter_api.repositories.radar_common import FEATURE_KEY_VOLATILITY, FEATURE_KEY_VOLUME
 from hunter_core.domain.enums import (
     AnomalyType,
     KillSwitchState,
@@ -482,6 +483,47 @@ async def test_list_radar_non_finite_decimal_query_is_422(
 
     assert response.status_code == 422, response.text
     assert response.headers["content-type"].startswith("application/problem+json")
+
+
+async def test_list_radar_volatility_filter_and_volume_sort_read_the_real_envelope_shape(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """Regression for the HIGH bug found in Astra/T2.7's cross-package review:
+    ``feature_value_expr`` used to read
+    ``feature_snapshot["features"]["values"][key]["value"]``, but the real
+    envelope (``hunter_indicators.opportunity.envelope.opportunity_envelope``,
+    T2.4) nests the vector under ``"vector"``, not ``"features"``. The bug was
+    silent — no error, just an excluded row and a NULL sort key — so this test
+    seeds a ``feature_snapshot`` built by *calling* ``opportunity_envelope()``
+    (``analysis_fixtures.py::real_feature_snapshot``) and proves both the
+    ``volatility`` filter and the ``volume`` sort actually read it.
+    """
+    _e1, _s1, high_id = await fx.seed_market(session_factory)
+    await fx.seed_opportunity(
+        session_factory,
+        high_id,
+        feature_snapshot=fx.real_feature_snapshot(
+            {FEATURE_KEY_VOLATILITY: "0.05", FEATURE_KEY_VOLUME: "9"}
+        ),
+    )
+    # No feature_snapshot at all: the default (`{}`) reads NULL at the same
+    # path, so this row must be excluded by the filter and sort last.
+    _e2, _s2, low_id = await fx.seed_market(session_factory)
+    await fx.seed_opportunity(session_factory, low_id)
+    actor: Actor = make_actor("radar-envelope-shape")
+
+    filtered = await client.get("/api/v1/radar?volatility_min=0.01", headers=actor.headers)
+    assert filtered.status_code == 200, filtered.text
+    market_ids = {item["market_id"] for item in filtered.json()["items"]}
+    assert str(high_id) in market_ids
+    assert str(low_id) not in market_ids
+
+    sorted_response = await client.get("/api/v1/radar?sort=volume&order=desc", headers=actor.headers)
+    assert sorted_response.status_code == 200, sorted_response.text
+    ids_in_order = [item["market_id"] for item in sorted_response.json()["items"]]
+    assert ids_in_order.index(str(high_id)) < ids_in_order.index(str(low_id))
 
 
 async def test_list_radar_cursor_with_a_non_finite_score_is_422_not_500(

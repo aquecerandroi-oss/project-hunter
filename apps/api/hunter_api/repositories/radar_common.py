@@ -1,23 +1,33 @@
 """Shared plumbing for the T2.6 read models: the radar/opportunities keyset
 cursor and the one JSONB path this module assumes about the feature envelope.
 
-**Envelope path assumption (``.claude/state/notes-T2.6.md``).** T2.4/T2.5 (the
-opportunity engine and scanner-worker that actually write
-``opportunities.feature_snapshot``) are still in flight, so the exact shape of
-the envelope is not frozen anywhere yet. What *is* frozen is
-``hunter_indicators.features.vector.FeatureVector.as_wire()`` (T2.2, already
-merged): ``{"values": {"<key>": {"value": "<decimal string>", ...}, ...},
-...}``, with every number serialized as a canonical decimal string, never a
-JSON number. This module assumes the envelope nests that vector under a
-``"features"`` key — ``feature_snapshot["features"]["values"][key]["value"]``
-— rather than flattening it (which would collide with the envelope's own
-``as_of``/``baseline_ids``/``regime_id`` keys). ``atr_14_pct``
-(``hunter_indicators.features.trend``, the Wilder-14 ATR fraction that also
-feeds the EARLY/DEVELOPING/EXTENDED stage classifier) and
-``relative_volume_1h`` (``hunter_indicators.features.volume``) are the two
-concrete keys this API reads, for the radar's ``volatility`` filter and
-``volume`` sort key respectively. If T2.5 lands a different envelope shape,
-:func:`feature_value_expr`'s path is the one place to fix.
+**Envelope path — confirmed against the real producer
+(``.claude/state/notes-T2.6.md``).** ``opportunities.feature_snapshot`` is
+written by ``hunter_indicators.opportunity.envelope.opportunity_envelope()``
+(T2.4, commit ``665ed3f``): ``{"vector": ctx.vector.as_wire(), "as_of": ...,
+"baseline_ids": ..., "regime_id": ..., ...}``. ``ctx.vector.as_wire()``
+(``hunter_indicators.features.vector.FeatureVector.as_wire()``, T2.2) is
+``{"values": {"<key>": {"value": "<decimal string>", "quality": ...,
+"reason": ..., "inputs": [...]}, ...}, "provenance": {...}, ...}``, with every
+number serialized as a canonical decimal string, never a JSON number. So the
+full path a feature reads is
+``feature_snapshot["vector"]["values"][<key>]["value"]`` —
+:data:`FEATURE_ENVELOPE_PATH` names the ``("vector", "values")`` prefix, used
+both by :func:`feature_value_expr` and by the T2.6 contract test
+(``apps/api/tests/unit/test_analysis_read_models.py``) that proves this path
+matches a real envelope built by calling ``opportunity_envelope()``, not a
+hand-written dict. ``atr_14_pct`` (``hunter_indicators.features.trend``, the
+Wilder-14 ATR fraction that also feeds the EARLY/DEVELOPING/EXTENDED stage
+classifier) and ``relative_volume_1h`` (``hunter_indicators.features.volume``)
+are the two concrete keys this API reads, for the radar's ``volatility``
+filter and ``volume`` sort key respectively.
+
+An earlier revision of this module nested the vector under a ``"features"``
+key instead of ``"vector"`` — a guess made before T2.4 landed, never checked
+against the real envelope. It silently excluded every row from
+``volatility_min``/``volatility_max`` and made ``sort=volume`` degrade to the
+``NULL`` sentinel for every row (HIGH, found by Astra/T2.7's cross-package
+review). See the module docstring history in ``notes-T2.6.md`` for the postmortem.
 """
 
 from __future__ import annotations
@@ -51,6 +61,11 @@ see :func:`like_contains`."""
 
 FEATURE_KEY_VOLATILITY = "atr_14_pct"
 FEATURE_KEY_VOLUME = "relative_volume_1h"
+
+FEATURE_ENVELOPE_PATH: tuple[str, str] = ("vector", "values")
+"""The two JSONB keys ``opportunity_envelope()`` nests every feature under —
+see the module docstring. Shared with the contract test so the path can never
+drift between this module and its test without the test failing."""
 
 # NULLS LAST regardless of sort direction: a market missing a feature reads
 # behind every market that has one, whichever way the list is ordered — never
@@ -112,9 +127,10 @@ def decode_sort_cursor(cursor: str | None) -> tuple[Decimal, uuid.UUID] | None:
 def feature_value_expr(key: str) -> ColumnElement[Decimal | None]:
     """``opportunities.feature_snapshot``'s reading of feature ``key``, as a
     nullable ``Numeric`` SQL expression — see the module docstring for the
-    assumed path and its two concrete keys.
+    confirmed path and its two concrete keys.
     """
-    raw = Opportunity.feature_snapshot["features"]["values"][key]["value"].astext
+    outer, inner = FEATURE_ENVELOPE_PATH
+    raw = Opportunity.feature_snapshot[outer][inner][key]["value"].astext
     return cast(raw, Numeric)
 
 
