@@ -25,11 +25,11 @@ from hunter_exchanges.binance.event_queue import BoundedEventQueue, StreamConsum
 pytestmark = pytest.mark.unit
 
 
-def _trade(price: str = "1") -> NormalizedTrade:
+def _trade(price: str = "1", ts: datetime = datetime(2026, 1, 1, tzinfo=UTC)) -> NormalizedTrade:
     return NormalizedTrade(
         exchange="binance",
         symbol="BTCUSDT",
-        ts=datetime(2026, 1, 1, tzinfo=UTC),
+        ts=ts,
         trade_id="1",
         price=Decimal(price),
         qty=Decimal("1"),
@@ -38,7 +38,9 @@ def _trade(price: str = "1") -> NormalizedTrade:
 
 
 def _candle(
-    is_final: bool, open_time: datetime = datetime(2026, 1, 1, tzinfo=UTC)
+    is_final: bool,
+    open_time: datetime = datetime(2026, 1, 1, tzinfo=UTC),
+    event_ts: datetime | None = None,
 ) -> NormalizedCandle:
     return NormalizedCandle(
         exchange="binance",
@@ -52,6 +54,7 @@ def _candle(
         close=Decimal("1"),
         volume=Decimal("1"),
         is_final=is_final,
+        event_ts=event_ts,
     )
 
 
@@ -283,3 +286,113 @@ async def test_fifty_thousand_puts_into_a_saturated_queue_stay_fast() -> None:
     elapsed = time.perf_counter() - start
 
     assert elapsed < 2.0
+
+
+# ---- T2.5e: oldest_pending_ts (Astra diff review, T2.5e must-fix 1 and 2) ----
+
+
+async def test_oldest_pending_ts_is_none_when_nothing_is_queued() -> None:
+    queue = BoundedEventQueue(maxsize=10)
+    assert queue.oldest_pending_ts() is None
+
+
+async def test_oldest_pending_ts_is_the_minimum_across_the_queue_not_the_head() -> None:
+    """Several reader tasks (one per connection) feed one shared queue by
+    arrival order, not by the event's own timestamp -- a later-arriving item
+    can carry an earlier ``ts`` (Astra diff review, must-fix 2). The head of
+    the deque alone would have reported the *later* timestamp here."""
+    queue = BoundedEventQueue(maxsize=10)
+    states = _states("market:0", "market:1")
+    earlier_arrival_later_ts = _trade("1", ts=datetime(2026, 1, 1, 12, 0, tzinfo=UTC))
+    later_arrival_earlier_ts = _trade("2", ts=datetime(2026, 1, 1, 11, 59, tzinfo=UTC))
+    await queue.put("market:1", earlier_arrival_later_ts, states)
+    await queue.put("market:0", later_arrival_earlier_ts, states)
+
+    assert queue.oldest_pending_ts() == later_arrival_earlier_ts.ts
+
+
+async def test_oldest_pending_ts_falls_back_to_a_candles_close_time() -> None:
+    """``NormalizedCandle`` has no ``ts`` field; without a wire ``event_ts``
+    the close time is the conservative (never-too-early) stand-in."""
+    queue = BoundedEventQueue(maxsize=10)
+    states = _states("market:0")
+    candle = _candle(is_final=True)
+    await queue.put("market:0", candle, states)
+
+    assert queue.oldest_pending_ts() == candle.close_time
+
+
+async def test_oldest_pending_ts_prefers_a_candles_own_event_ts_over_close_time() -> None:
+    queue = BoundedEventQueue(maxsize=10)
+    states = _states("market:0")
+    event_ts = datetime(2025, 12, 31, 23, 59, tzinfo=UTC)
+    candle = _candle(is_final=True, event_ts=event_ts)
+    await queue.put("market:0", candle, states)
+
+    assert queue.oldest_pending_ts() == event_ts
+
+
+async def test_stream_consumer_oldest_pending_ts_is_none_before_anything_is_put() -> None:
+    consumer = StreamConsumer(maxsize=10)
+    assert consumer.oldest_pending_ts() is None
+
+
+async def test_stream_consumer_oldest_pending_ts_counts_an_item_already_popped_but_not_yet_delivered() -> (
+    None
+):
+    """Astra diff review, T2.5e must-fix 1: the item ``BoundedEventQueue.get``
+    has already popped from its own deque is exactly as pending as anything
+    still queued behind it. An external reader (``CoverageTracker``, via a
+    different task) must not see it as "gone" just because :meth:`consume`
+    has not resumed past its own ``await asyncio.wait(...)`` yet -- plain
+    queue length, or a naive "check the deque" implementation, would have
+    read ``None`` here despite nothing having been delivered."""
+    consumer = StreamConsumer(maxsize=10)
+    states = _states("market:0")
+    trade = _trade("1", ts=datetime(2026, 1, 1, 12, 0, tzinfo=UTC))
+    await consumer.put("market:0", trade, states)
+
+    # Reach into exactly the state ``consume()`` would be in mid-race: the
+    # queue's own ``get()`` coroutine has already run to completion (the
+    # item left the deque) inside a Task nobody has consumed the result of
+    # yet.
+    consumer._pending_get = asyncio.ensure_future(consumer.queue.get())
+    await asyncio.sleep(0)  # let it run once; the item is already there, so it never blocks
+    assert consumer._pending_get.done()
+    assert len(consumer.queue) == 0  # gone from the deque...
+    assert consumer.delivered == 0  # ...but not yet counted as delivered
+
+    assert consumer.oldest_pending_ts() == trade.ts
+
+    async def close() -> None:
+        return None
+
+    agen: Any = consumer.consume(close)
+    await agen.__anext__()  # resumes past the same task, delivers it
+    assert consumer.delivered == 1
+    assert consumer.oldest_pending_ts() is None
+    await agen.aclose()
+
+
+async def test_stream_consumer_oldest_pending_ts_is_the_in_flight_item_not_a_fresher_one_behind_it() -> (
+    None
+):
+    """Astra diff review nice-to-have: the in-flight ``get()`` result and the
+    rest of the deque are combined by minimum, not by "whichever is checked
+    first" -- an old item already popped must still win over a fresher one
+    that arrived right behind it."""
+    consumer = StreamConsumer(maxsize=10)
+    states = _states("market:0")
+    old_trade = _trade("1", ts=datetime(2026, 1, 1, 11, 0, tzinfo=UTC))
+    await consumer.put("market:0", old_trade, states)
+
+    consumer._pending_get = asyncio.ensure_future(consumer.queue.get())
+    await asyncio.sleep(0)
+    assert consumer._pending_get.done()
+    assert len(consumer.queue) == 0
+
+    fresher_trade = _trade("2", ts=datetime(2026, 1, 1, 12, 0, tzinfo=UTC))
+    await consumer.put("market:0", fresher_trade, states)
+    assert len(consumer.queue) == 1
+
+    assert consumer.oldest_pending_ts() == old_trade.ts

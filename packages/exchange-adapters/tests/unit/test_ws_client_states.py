@@ -239,6 +239,30 @@ async def test_queue_progress_tracks_delivery_through_the_real_pipeline() -> Non
     await client.aclose()
 
 
+# ---- T2.5e: queue_oldest_pending_ts (CoverageTracker's bounded-delay check) --
+
+
+async def test_queue_oldest_pending_ts_is_none_before_any_stream_call() -> None:
+    client = BinanceWsClient(connect_fn=ScriptedConnector([FakeConnection([])]))
+    assert client.queue_oldest_pending_ts() is None
+    await client.aclose()
+
+
+async def test_queue_oldest_pending_ts_is_none_once_the_real_pipeline_catches_up() -> None:
+    """Additive pass-through to ``StreamConsumer.oldest_pending_ts`` (see
+    ``event_queue.py`` for the mechanics, unit-tested there in isolation):
+    with nothing backlogged, there is nothing pending to report."""
+    conn = FakeConnection([envelope("btcusdt@aggTrade", agg_trade_raw())])
+    connector = ScriptedConnector([conn])
+    client = BinanceWsClient(connect_fn=connector, sleep=lambda _s: asyncio.sleep(0))
+
+    events = await collect(client, ["BTCUSDT"], [StreamChannel.TRADES], count=1)
+
+    assert events[0].kind == "trade"
+    assert client.queue_oldest_pending_ts() is None
+    await client.aclose()
+
+
 async def test_ws_state_flips_to_reconnecting_before_the_slow_close_completes() -> None:
     """T2.5-adapter (Astra review, second round, finding 1): a reader
     polling ``connection_state()`` during a slow ``__aexit__`` must already

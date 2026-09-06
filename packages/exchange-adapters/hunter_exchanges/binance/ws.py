@@ -187,6 +187,16 @@ class BinanceWsClient:
         enqueued, evicted = self._consumer.queue.progress()
         return enqueued, self._consumer.delivered, evicted
 
+    def queue_oldest_pending_ts(self) -> datetime | None:
+        """The own timestamp of the oldest event accepted but not yet
+        delivered (or evicted) — ``None`` while nothing is pending. T2.5e:
+        lets ``CoverageTracker`` bound a backlog instead of requiring
+        ``queue_progress`` to read exact equality (see
+        :mod:`hunter_exchanges.binance.event_queue`)."""
+        if self._consumer is None:
+            return None
+        return self._consumer.oldest_pending_ts()
+
     def connection_state(self) -> WsState:
         """The worst ``ws_state`` across every connection (``base.py`` contract)."""
         if not self._states:

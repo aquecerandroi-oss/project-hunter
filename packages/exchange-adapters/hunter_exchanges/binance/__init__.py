@@ -100,6 +100,11 @@ class BinanceAdapter:
         """Additive, like ``connection_states()`` — see ``BinanceWsClient.queue_progress``."""
         return self._ws.queue_progress()
 
+    def queue_oldest_pending_ts(self) -> datetime | None:
+        """Additive, like ``connection_states()`` — see
+        ``BinanceWsClient.queue_oldest_pending_ts`` (T2.5e)."""
+        return self._ws.queue_oldest_pending_ts()
+
     def rest_gate_status(self) -> str:
         """``"ok"``/``"suspended"`` REST admissions (T2.9).
 

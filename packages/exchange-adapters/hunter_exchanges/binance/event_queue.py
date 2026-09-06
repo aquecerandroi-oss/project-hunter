@@ -27,6 +27,44 @@ causes via ``dropped_events``. An event dropped *before* it ever entered the
 queue (the incoming-item-dropped branch of :meth:`put`) increments neither
 counter — it never reached ``enqueued`` on either side of the ledger, and
 its loss is already reported through ``dropped_events``.
+
+``oldest_pending_ts`` (T2.5e, ``.claude/state/brief-T2.5e-coverage-caught-up.md``):
+under continuous flow the exact equality above is caught true only in the
+instant the queue is fully empty, which at ~150 msg/s across 200 markets is
+almost never — there is nearly always one item between an ``append`` and the
+matching ``get`` (measured on the local stack: one transition to
+``reason=queue_backlog`` that then never resolved, `docs/PIPELINE.md` §1).
+``CoverageTracker`` needed a bounded-delay reading of the same backlog
+instead of an empty-queue one, and Astra's diff review (must-fix 1 and 2,
+``.claude/state/astra-review-T2.5e-coverage.md``) rejected the first two
+shapes that reading took:
+
+- **local enqueue age is not the event's own age.** An event can sit
+  upstream of this queue (adapter transport, not this process's business)
+  for longer than the margin before it is ever ``put``; measuring "how long
+  since *this* queue saw it" would then read as fresh while the event's own
+  ``ts`` already falls inside the window a stamp is about to claim covered —
+  exactly the fabricated coverage this module exists to avoid. The fix
+  compares each pending event's own timestamp (:func:`_effective_ts`, wall
+  clock, the same UTC domain as everything ``CoverageTracker`` publishes)
+  against the candidate cut, never a locally measured age against a
+  monotonic clock (which would also silently mix clock domains — Astra
+  review, must-fix 3);
+- **the queue's FIFO (enqueue) order is not timestamp order.** Several
+  reader tasks (one per connection) feed this queue by arrival, not by the
+  event's own ``ts`` — a later-arriving event from a different connection
+  key can carry an earlier ``ts``. :meth:`oldest_pending_ts` takes the
+  minimum over every item still queued, never just the head.
+
+The item :meth:`~BoundedEventQueue.get` has already popped but
+:class:`StreamConsumer` has not yet counted as ``delivered`` is exactly as
+pending as anything still in the deque (Astra review, must-fix 1): it has
+left this queue's own ledger, but nothing downstream has it yet either.
+:class:`StreamConsumer` keeps that one in-flight ``get()`` task visible
+(:attr:`StreamConsumer._pending_get`) for precisely this reason — an
+external reader can see it is ``done()`` (its result, and thus its
+timestamp, already exists) before :meth:`StreamConsumer.consume` itself has
+had a chance to resume past the ``await`` that is racing it.
 """
 
 from __future__ import annotations
@@ -35,6 +73,8 @@ import asyncio
 import contextlib
 from collections import deque
 from collections.abc import AsyncIterator, Awaitable, Callable
+from datetime import datetime
+from typing import cast
 
 from hunter_core.domain.market import NormalizedCandle, NormalizedEvent
 from hunter_exchanges.base import ConnectionState
@@ -44,6 +84,22 @@ DEFAULT_MAXSIZE = 10_000
 
 def _is_final_kline(event: NormalizedEvent) -> bool:
     return isinstance(event, NormalizedCandle) and event.is_final
+
+
+def _effective_ts(event: NormalizedEvent) -> datetime | None:
+    """The wall-clock instant a pending event is "about", for the coverage
+    bounded-delay check (module docstring). Most :class:`NormalizedEvent`
+    variants carry ``ts`` directly; :class:`NormalizedCandle` does not — it
+    falls back to the kline's own wire event time (``event_ts``) or, failing
+    that, to ``close_time``. Neither is provably correct for a still-forming
+    candle (its content can describe an instant earlier than either): a
+    best-effort stand-in from what the wire actually gives this queue, not a
+    proof — the same kind of limit the module docstring already declares for
+    the 0.5s margin itself."""
+    ts = getattr(event, "ts", None)
+    if ts is not None:
+        return cast(datetime, ts)
+    return getattr(event, "event_ts", None) or getattr(event, "close_time", None)
 
 
 class BoundedEventQueue:
@@ -149,6 +205,14 @@ class BoundedEventQueue:
         docstring)."""
         return self.enqueued, self.evicted
 
+    def oldest_pending_ts(self) -> datetime | None:
+        """The smallest :func:`_effective_ts` among everything still sitting
+        in the deque, or ``None`` if it is empty. Never just the head's own
+        timestamp — arrival order (several reader tasks feeding one queue)
+        is not timestamp order (module docstring)."""
+        timestamps = [ts for _, event in self._items if (ts := _effective_ts(event)) is not None]
+        return min(timestamps) if timestamps else None
+
 
 class StreamConsumer:
     """Bridges N reader tasks (one per connection) into one ``AsyncIterator``.
@@ -170,6 +234,13 @@ class StreamConsumer:
         review, T2.5-adapter finding 3), so it never lags an item that
         :meth:`BoundedEventQueue.get` has already popped but this generator
         has not yet handed to its caller."""
+        self._pending_get: asyncio.Task[NormalizedEvent] | None = None
+        """The in-flight ``queue.get()`` task, kept on ``self`` (not a local
+        in :meth:`consume`) so :meth:`oldest_pending_ts` can see an item that
+        has already left :attr:`queue`'s own deque but has not yet been
+        counted into :attr:`delivered` — the gap between ``get()`` returning
+        and this generator resuming past its ``await`` (T2.5e, Astra diff
+        review must-fix 1)."""
 
     async def put(
         self, key: str, event: NormalizedEvent, states: dict[str, ConnectionState]
@@ -184,35 +255,54 @@ class StreamConsumer:
             self._failure = exc
             self._failure_event.set()
 
+    def oldest_pending_ts(self) -> datetime | None:
+        """The own timestamp (module docstring's :func:`_effective_ts`) of
+        the oldest event not yet :attr:`delivered` or evicted — the in-flight
+        ``get()`` result, if one exists and has not yet been handed to
+        :meth:`consume`'s caller, together with everything still queued
+        behind it. ``None`` means genuinely nothing is pending."""
+        candidates: list[datetime] = []
+        pending = self._pending_get
+        if pending is not None and pending.done() and not pending.cancelled():
+            if pending.exception() is None:
+                ts = _effective_ts(pending.result())
+                if ts is not None:
+                    candidates.append(ts)
+        queue_oldest = self.queue.oldest_pending_ts()
+        if queue_oldest is not None:
+            candidates.append(queue_oldest)
+        return min(candidates) if candidates else None
+
     async def consume(
         self, on_close: Callable[[], Awaitable[None]]
     ) -> AsyncIterator[NormalizedEvent]:
-        get_task: asyncio.Task[NormalizedEvent] | None = None
         fail_task: asyncio.Task[bool] | None = None
         try:
             while True:
-                if get_task is None:
-                    get_task = asyncio.ensure_future(self.queue.get())
+                if self._pending_get is None:
+                    self._pending_get = asyncio.ensure_future(self.queue.get())
                 if fail_task is None:
                     fail_task = asyncio.ensure_future(self._failure_event.wait())
                 done, _ = await asyncio.wait(
-                    {get_task, fail_task}, return_when=asyncio.FIRST_COMPLETED
+                    {self._pending_get, fail_task}, return_when=asyncio.FIRST_COMPLETED
                 )
                 if fail_task in done:
-                    get_task.cancel()
+                    self._pending_get.cancel()
                     assert self._failure is not None
                     raise self._failure
-                if get_task in done:
-                    result = get_task.result()
+                if self._pending_get in done:
+                    result = self._pending_get.result()
                     self.delivered += 1
-                    get_task = None
+                    self._pending_get = None
                     yield result
         finally:
-            for pending in (get_task, fail_task):
+            pending_get = self._pending_get
+            for pending in (pending_get, fail_task):
                 if pending is not None:
                     pending.cancel()
-            for pending in (get_task, fail_task):
+            for pending in (pending_get, fail_task):
                 if pending is not None:
                     with contextlib.suppress(asyncio.CancelledError):
                         await pending
+            self._pending_get = None
             await on_close()

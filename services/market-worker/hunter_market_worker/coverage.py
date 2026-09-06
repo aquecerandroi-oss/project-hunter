@@ -27,71 +27,70 @@ at its own clock: "as it was observable at ``as_of``" is what ``MarketContext``
 means, and moving the cut is the only honest way to satisfy a proof that is,
 by construction, always slightly behind.
 
-**T2.5-adapter: the two gaps the T2.5 diff review found.** Astra's review
-said the 0.5s margin only *complements* a proof, never *is* one, for two
-reasons — both required participation from ``packages/exchange-adapters/**``,
-which this module could not see into before. Closing them took two rounds:
-a first design (per-event ``observe_generation``) was reviewed and rejected
-— a queued event from before a break can be delivered after it with a stale
-timestamp, and a healthy sibling connection key can paper over a broken one,
-because the internal queue is shared. The design below is the second round,
-reviewed and accepted (``.claude/state/astra-review-T2.5-adapter-diff.md``):
+**T2.5-adapter** (full account: ``.claude/state/astra-review-T2.5-adapter-diff.md``)
+closed two gaps the 0.5s margin alone cannot see through, both read at
+**stamp time** (every housekeeping tick, ~250ms), never per event:
 
 - **an internal reconnect.** ``ConnectionRunner.run`` (``binance/connection.py``)
   retries a dropped socket without ever ending :meth:`stream`'s generator, so
-  a design that only broke a session when that generator itself ended could
-  keep publishing a "continuous" interval straight through a real gap. Fixed
-  with two signals, read at **stamp time** (every housekeeping tick, ~250ms),
-  never per event:
-
-  - ``ws_state`` — the adapter's own ``connection_state()``, already
-    mandatory on every :class:`~hunter_exchanges.base.ExchangeAdapter`. It is
-    set to ``"reconnecting"`` *before* the socket close awaits inside
-    ``ConnectionRunner.run`` (not after), and it aggregates the **worst**
-    state across every connection key an adapter owns — a healthy sibling
-    key can never read as "connected" while another one is down;
-  - ``connection_generation`` — a monotonic counter, bumped on every
-    reconnect (real failure, proactive 24h rotation, or a forced single-key
-    restart). ``ws_state`` alone can miss a full connect→disconnect→reconnect
-    cycle that completes *between* two stamps (a fast rotation, or an F8
-    restart) — it would read "connected" both before and after, having never
-    been observed as anything else. The generation counter does not reset
-    back, so comparing it against the value last seen at stamp time catches
-    that cycle regardless of how briefly it was visible.
-
-  Either signal changing forces a break with ``reason="reconnect"``; once
-  both agree the adapter is healthy again, the *old* ``session_since`` is not
-  stretched across the gap — a fresh, conservative session starts at the
-  instant resumption is confirmed instead (a real rupture invalidates
-  continuity; there is no "the tape between disconnect and reconnect" to
-  reach back for);
+  a session that only broke when that generator ended could keep publishing
+  "continuous" straight through a real gap. Two signals catch it: ``ws_state``
+  (the adapter's own ``connection_state()``, mandatory, set to
+  ``"reconnecting"`` *before* the close awaits, worst state across every
+  connection key) and ``connection_generation`` (a monotonic counter, bumped
+  on every reconnect — catches a full connect→disconnect→reconnect cycle that
+  completes *between* two stamps, which ``ws_state`` alone would read as
+  "connected" throughout). Either changing forces ``reason="reconnect"``;
+  once both agree healthy again, a *fresh* session starts at the resumption
+  instant rather than stretching the old one across a gap this process could
+  not see through;
 - **a backlogged queue without drops.** ``_in_flight == 0`` means no write
-  *this process* started is unfinished; it never meant the adapter's own
-  inbound queue was empty — an item already popped by its reader task
-  (``BoundedEventQueue.get``) is not counted as delivered until it is
-  actually yielded, so a plain queue-length read would have missed exactly
-  that item. Fixed with ``queue_progress`` (``enqueued``, ``delivered``,
-  ``evicted``): ``enqueued == delivered + evicted`` is "caught up", counting
-  an eviction on its own side of the ledger so the one legitimate break it
-  already causes (via ``dropped_events``) does not read as permanent backlog
-  afterwards. Unlike a real reconnect, a backlog that clears **without** ever
-  losing ``ws_state`` never invalidates the session — nothing was lost, only
-  delayed, so resuming simply un-freezes the same interval.
+  *this process* started is unfinished, never that the adapter's own inbound
+  queue was empty — an item its reader task already popped is not delivered
+  until actually yielded. ``queue_progress`` (``enqueued``, ``delivered``,
+  ``evicted``) fixes that: an eviction counts on its own side of the ledger
+  so the one break it already causes (``dropped_events``) does not read as
+  permanent backlog afterwards. Unlike a reconnect, this kind of backlog
+  clearing without ever losing ``ws_state`` never invalidates the session —
+  nothing was lost, only delayed.
 
-All three signals are read in the same task that already calls
-:meth:`writing`/:meth:`written` (``hunter_market_worker.streaming``'s
-housekeeping loop) — no new task, no per-message allocation.
-``connection_generation``/``queue_progress`` are read defensively
-(``getattr``, additive capability, same pattern as ``rest_gate_status``);
-``ws_state`` is not, since ``connection_state()`` is mandatory. An adapter or
-fake that implements neither additive method behaves exactly as before this
-module's docstring: ``ws_state`` defaults to ``"connected"``,
-``queue_progress``/``connection_generation`` default to ``None``.
+**T2.5e** (``.claude/state/brief-T2.5e-coverage-caught-up.md``, full account
+in ``.claude/state/notes-T2.5.md`` T2.5e section) found the ledger above
+right but the bar wrong: at ~150 msg/s across 200 markets there is almost
+always one item between an ``append`` and the matching ``get``, so
+``enqueued == delivered + evicted`` was true only in the instant the queue
+was fully empty — nearly never, and once broken the interval stayed
+``reason="queue_backlog"`` forever (the warning only fires on *entering* the
+break, measured on the local stack and the VPS). "Caught up" is now a
+**bounded delay**: a nonzero backlog only breaks the interval if the oldest
+pending event's own timestamp (:func:`hunter_exchanges.binance.event_queue._effective_ts`,
+wall clock — ``queue_oldest_pending_ts()``) has itself reached the window
+this stamp is about to claim covered (``moment - COVERAGE_SAFETY_S``); ahead
+of that cut, the event's absence from ``delivered`` costs nothing the claim
+depends on, and the 0.5s margin is doing exactly the job declared for it
+above. A plain count threshold was rejected in design review (magnitude
+decides nothing a timestamp does not already decide correctly), and so was a
+*locally measured* age: an event can sit longer than the margin upstream of
+this queue, invisibly, before ever being ``put``, so its own ``ts`` — not
+how long *this* queue has known about it — is what must be checked, taken as
+the *minimum* over every still-pending event (arrival order across several
+reader tasks is not timestamp order) including one already popped from the
+queue but not yet delivered (``queue_oldest_pending_ts()`` covers both; see
+that module's docstring for how).
+
+All four signals are read in the same housekeeping task that already calls
+:meth:`writing`/:meth:`written`. ``connection_generation``/``queue_progress``/
+``queue_oldest_pending_ts`` are read defensively (``getattr``, additive
+capability, same pattern as ``rest_gate_status``); ``ws_state`` is not, since
+``connection_state()`` is mandatory. An adapter implementing none of the
+additive methods behaves exactly as before this module existed: ``ws_state``
+defaults to ``"connected"``, the other three to ``None``.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from time import monotonic
 from typing import TYPE_CHECKING, Any, cast
 
 from hunter_core.domain.types import utcnow
@@ -153,6 +152,9 @@ class CoverageTracker:
         #: ``"queue_backlog"`` decide whether resuming starts a fresh session
         #: or simply un-freezes the current one (see module docstring).
         self._break_reason: str | None = None
+        #: Monotonic reading when the current break started (T2.5e resumption
+        #: log; monotonic so a wall-clock adjustment cannot go negative).
+        self._broken_since_monotonic: float | None = None
         #: Last ``connection_generation`` observed, baselined fresh each
         #: session so a number that does not reset across sessions never
         #: reads as a break at the next ``session_started``.
@@ -169,6 +171,7 @@ class CoverageTracker:
         self._in_flight = 0
         self._last_safe_covered_until = None
         self._break_reason = None
+        self._broken_since_monotonic = None
         self._generation = None
 
     def session_broken(self) -> None:
@@ -177,6 +180,7 @@ class CoverageTracker:
         self._symbols = {}
         self._last_safe_covered_until = None
         self._break_reason = None
+        self._broken_since_monotonic = None
         self._generation = None
 
     def subscribed(self, symbols: Iterable[str], *, at: datetime | None = None) -> None:
@@ -215,28 +219,20 @@ class CoverageTracker:
         ws_state: str = "connected",
         queue_progress: tuple[int, int, int] | None = None,
         connection_generation: int | None = None,
+        oldest_pending_ts: datetime | None = None,
     ) -> bool:
         """Publish the interval this collector can stand behind. ``False`` = nothing claimed.
 
-        T2.5-adapter, three more reasons ``covered_until`` may hold back, on
-        top of the ``dropped_events`` break below — see the module docstring
-        for why each exists:
-
-        - ``ws_state`` (the adapter's own ``connection_state()``, required by
-          every adapter) — not ``"connected"`` is a ``reason="reconnect"`` break;
-        - ``connection_generation`` (additive; ``None`` if unsupported) —
-          changed since the last stamp is also a ``"reconnect"`` break, even
-          if ``ws_state`` already reads ``"connected"`` again;
-        - ``queue_progress`` (additive; ``None`` if unsupported) —
-          ``enqueued != delivered + evicted`` is a ``reason="queue_backlog"``
-          break.
-
-        A ``"reconnect"`` break, once resumed, starts a fresh, conservative
-        session at the resumption instant (the old ``session_since`` cannot
-        be stretched across a gap this process could not see through). A
-        ``"queue_backlog"`` break simply un-freezes the existing session once
-        resumed — nothing was lost, only delayed. Neither ever moves the
-        claim *forward* faster than the existing rules allow.
+        Three more reasons ``covered_until`` may hold back, on top of the
+        ``dropped_events`` break below (module docstring): ``ws_state`` not
+        ``"connected"``, or ``connection_generation`` changed, are each a
+        ``reason="reconnect"`` break; a nonzero backlog in ``queue_progress``
+        is ``reason="queue_backlog"`` *unless* ``oldest_pending_ts`` proves it
+        bounded (still ahead of the window this stamp is about to claim) —
+        unknown counts as unbounded. A ``"reconnect"`` break, once resumed,
+        starts a fresh session at the resumption instant; a
+        ``"queue_backlog"`` break simply un-freezes the existing one. Neither
+        ever moves the claim forward faster than the existing rules allow.
         """
         moment = now or utcnow()
         key = keys.tape_coverage(self.exchange)
@@ -265,46 +261,58 @@ class CoverageTracker:
             if self._generation is None:
                 self._generation = connection_generation
             elif connection_generation != self._generation:
-                # A full reconnect cycle (rotation, or an F8 restart) can
-                # complete between two stamps and read back "connected"
-                # before this process ever observes "reconnecting" — the
-                # generation counter is the persistent marker that survives
-                # that gap (Astra review, second round, finding 3).
+                # Survives a full reconnect cycle completed between stamps.
                 self._generation = connection_generation
                 caught_up = False
                 reason = "reconnect"
+        backlog = 0
         if caught_up and queue_progress is not None:
             enqueued, delivered, evicted = queue_progress
-            if enqueued != delivered + evicted:
-                caught_up = False
-                reason = "queue_backlog"
+            backlog = enqueued - delivered - evicted
+            if backlog != 0:
+                # Bounded delay, not empty queue (T2.5e, module docstring):
+                # still a break unless the oldest pending event's own
+                # timestamp proves it has not reached the claimed window.
+                candidate_cut = moment - timedelta(seconds=COVERAGE_SAFETY_S)
+                if oldest_pending_ts is None or oldest_pending_ts <= candidate_cut:
+                    caught_up = False
+                    reason = "queue_backlog"
 
         was_broken = self._break_reason is not None
+        if caught_up and was_broken and self._break_reason == "queue_backlog":
+            assert self._broken_since_monotonic is not None
+            logger.info(
+                "tape_coverage_interval_resumed",
+                exchange=self.exchange,
+                reason="queue_backlog",
+                frozen_for_s=monotonic() - self._broken_since_monotonic,
+            )
         if caught_up and was_broken and self._break_reason == "reconnect":
-            # Confirmed resumption from a real rupture: do not stretch the
-            # old session across a gap this process could not see through
-            # (Astra review, second round, finding 2) — start a new,
-            # conservative one at the instant resumption is confirmed.
+            # Confirmed resumption from a real rupture: a fresh, conservative
+            # session starts now rather than stretching the old one across a
+            # gap this process could not see through.
             self._session_since = moment
             self._symbols = {symbol: moment for symbol in self._symbols}
             self._last_safe_covered_until = None
         if not caught_up:
             if reason != "reconnect" and self._break_reason == "reconnect":
-                # "reconnect" is the stronger reason and must survive for the
-                # whole still-unresumed window: a queue backlog observed
-                # *after* a rupture, before resumption is confirmed, must not
-                # downgrade it to "queue_backlog" — that would let the next
-                # caught-up tick take the "just un-freeze" branch instead of
-                # starting the fresh session the rupture still requires
-                # (Astra review, third round).
+                # "reconnect" outranks and survives a backlog observed before
+                # resumption is confirmed (else the next caught-up tick would
+                # merely un-freeze instead of starting the fresh session the
+                # rupture still requires).
                 reason = "reconnect"
             if reason is not None and not was_broken:
                 logger.warning(
-                    "tape_coverage_interval_broken", exchange=self.exchange, reason=reason
+                    "tape_coverage_interval_broken",
+                    exchange=self.exchange,
+                    reason=reason,
+                    backlog=backlog,
                 )
+                self._broken_since_monotonic = monotonic()
             self._break_reason = reason
         else:
             self._break_reason = None
+            self._broken_since_monotonic = None
 
         if caught_up:
             self._last_safe_covered_until = moment - timedelta(seconds=COVERAGE_SAFETY_S)

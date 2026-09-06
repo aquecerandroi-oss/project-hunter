@@ -60,18 +60,22 @@ async def consume_once(
                 # while a hot-state write is in flight, never past
                 # ``now - COVERAGE_SAFETY_S``, and never past what this
                 # adapter's own connection/queue state can actually stand
-                # behind either (T2.5-adapter, hunter_market_worker/coverage.py).
+                # behind either (T2.5-adapter/T2.5e, hunter_market_worker/coverage.py).
                 # ``connection_state()`` is mandatory; ``queue_progress``/
-                # ``connection_generation`` are read defensively (additive,
-                # like ``rest_gate_status``).
+                # ``connection_generation``/``queue_oldest_pending_ts`` are
+                # read defensively (additive, like ``rest_gate_status``).
                 queue_progress = getattr(adapter, "queue_progress", None)
                 generation = getattr(adapter, "connection_generation", None)
+                oldest_pending_ts = getattr(adapter, "queue_oldest_pending_ts", None)
                 await coverage.stamp(
                     redis,
                     dropped_events=int(connection_field(adapter, "dropped_events") or 0),
                     ws_state=adapter.connection_state(),
                     queue_progress=queue_progress() if queue_progress is not None else None,
                     connection_generation=generation() if generation is not None else None,
+                    oldest_pending_ts=(
+                        oldest_pending_ts() if oldest_pending_ts is not None else None
+                    ),
                 )
             if watchdog is not None and watchdog.restart_stream:
                 watchdog.restart_stream = False
