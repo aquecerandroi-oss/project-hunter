@@ -198,9 +198,11 @@ por **0,30 bps de ida e volta**. Não vale o preço de uma variante
 - **Um dia não é uma amostra de regimes.** Todo o material é de uma janela de 24 h.
 - **O decil usa `volume_24h_usd` da tabela `markets`**, atualizado pelo refresh do universo, não o
   volume do instante. Estratificação com denominador defasado.
-- **Spread cotado não é spread pago.** Quem atravessa paga a meio spread *mais* o que o tamanho
-  arrasta ([[KB-0036-o-tamanho-que-a-sombra-nunca-declara]]) *mais* o que o preço faz depois
-  ([[KB-0043-selecao-adversa-o-custo-que-so-aparece-depois-do-fill]]).
+- **Spread cotado não é spread pago.** Quem atravessa paga o meio spread *mais* o que o tamanho
+  arrasta ([[KB-0036-o-tamanho-que-a-sombra-nunca-declara]]), *menos ou mais* o erro de referência
+  do `open` ([[KB-0042-o-open-nao-e-preco-executavel]]). O que o preço faz **depois** do fill não é
+  spread pago e não entra nessa soma — está em
+  [[KB-0043-selecao-adversa-o-custo-que-so-aparece-depois-do-fill]] e já vive dentro do `R_net`.
 
 ## Segunda opinião (Astra)
 
