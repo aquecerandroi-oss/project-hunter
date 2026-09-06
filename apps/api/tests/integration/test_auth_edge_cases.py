@@ -11,11 +11,15 @@ keep working while that flood is in progress.
 
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from sqlalchemy.exc import OperationalError
 
 from hunter_api.auth.clerk import JwtAuthProvider
+from hunter_api.auth.clerk_api import StaticProfileSource, UserProfile
+from hunter_api.auth.principal import PrincipalResolver
 
 from ..unit.jwt_keys import FAKE_ISSUER, jwks_for, sign
 from .conftest import WEB_ORIGIN, auth_header
@@ -141,3 +145,117 @@ async def test_the_jwks_source_being_unreachable_is_503_with_retry_after(
     assert response.headers["content-type"].startswith("application/problem+json")
     assert "Retry-After" in response.headers
     assert response.json()["type"] == "https://hunter.dev/problems/auth-unavailable"
+
+
+async def test_principal_resolution_postgres_outage_is_503_not_a_generic_500(
+    client: httpx.AsyncClient,
+    signing_key: rsa.RSAPrivateKey,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A Postgres outage that hits *before* a router's own dependency chain
+    even starts — inside ``CurrentPrincipal`` resolution itself
+    (``PrincipalResolver._load``, which every authenticated request runs
+    through) — used to escape every route's error handling and fall through
+    to ``ProblemDetailsMiddleware``'s generic 500, because nothing upstream of
+    ``get_principal`` ever turned an ``OperationalError`` into a problem+json
+    response. It must come back as the same ``503`` shape every other
+    Postgres-outage path in this API already uses, on any authenticated
+    route — ``/api/v1/lab/shadow/versions`` (whose own ``lab_session``
+    dependency has an unrelated ``try`` that only runs *after* the principal
+    already resolved) stands in for "any".
+    """
+
+    async def _boom(self: object, external_auth_id: str) -> None:
+        raise OperationalError("SELECT 1", {}, Exception("connection refused"))
+
+    monkeypatch.setattr(PrincipalResolver, "_load", _boom)
+
+    response = await client.get(
+        "/api/v1/lab/shadow/versions",
+        headers=auth_header(signing_key, f"user_FAKE_pg_outage_{uuid.uuid4().hex[:8]}"),
+    )
+
+    assert response.status_code == 503, response.text
+    assert response.headers["content-type"].startswith("application/problem+json")
+    body = response.json()
+    assert body["type"] == "https://hunter.dev/problems/service-unavailable"
+    assert "connection refused" not in body["detail"]
+    assert "OperationalError" not in body["detail"]
+
+
+async def test_principal_resolution_os_error_from_role_session_is_also_503(
+    client: httpx.AsyncClient,
+    signing_key: rsa.RSAPrivateKey,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The task calls out ``OperationalError``/``OSError``/
+    ``ConnectionRefusedError`` explicitly; the first is exercised above, and
+    ``ConnectionRefusedError`` is an ``OSError`` subclass, so raising it here
+    covers all three with one guard clause
+    (``PrincipalResolver.resolve``'s ``except (OperationalError, OSError)``).
+    """
+
+    async def _boom(self: object, external_auth_id: str) -> None:
+        raise ConnectionRefusedError("connection refused")
+
+    monkeypatch.setattr(PrincipalResolver, "_load", _boom)
+
+    response = await client.get(
+        "/api/v1/lab/shadow/versions",
+        headers=auth_header(signing_key, f"user_FAKE_conn_refused_{uuid.uuid4().hex[:8]}"),
+    )
+
+    assert response.status_code == 503, response.text
+    assert response.json()["type"] == "https://hunter.dev/problems/service-unavailable"
+
+
+async def test_principal_resolution_authorization_errors_keep_their_own_type(
+    client: httpx.AsyncClient,
+    signing_key: rsa.RSAPrivateKey,
+    profiles: StaticProfileSource,
+) -> None:
+    """A guard against an overly broad ``except`` in
+    ``PrincipalResolver.resolve``: an unverified Clerk account is a real,
+    distinct failure (``UnverifiedEmailError``, 503 ``email-not-verified``)
+    that must keep its own ``type`` and detail, not be reclassified as the
+    generic "Postgres is down" ``service-unavailable`` the new
+    ``(OperationalError, OSError)`` guard produces. Neither is a 401/403, but
+    the principle is the same one the task states for authorization/validation
+    errors: this ``except`` must never widen to swallow a different failure.
+    """
+    subject = f"user_FAKE_unverified_lab_{uuid.uuid4().hex[:8]}"
+    profiles.add(UserProfile(external_auth_id=subject, email=None))
+
+    response = await client.get(
+        "/api/v1/lab/shadow/versions", headers=auth_header(signing_key, subject)
+    )
+
+    assert response.status_code == 503, response.text
+    assert response.json()["type"] == "https://hunter.dev/problems/email-not-verified"
+
+
+async def test_principal_resolution_postgres_outage_during_jit_provisioning_is_also_503(
+    client: httpx.AsyncClient,
+    signing_key: rsa.RSAPrivateKey,
+    profiles: StaticProfileSource,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Astra's second-opinion review of this fix (nice-to-have): the same
+    guard must also hold for the *insert* path — a brand-new account (no
+    local ``users`` row yet) whose provisioning insert hits a dead Postgres,
+    not just the read path exercised above.
+    """
+    subject = f"user_FAKE_pg_outage_during_provisioning_{uuid.uuid4().hex[:8]}"
+    profiles.add(UserProfile(external_auth_id=subject, email=f"{subject}@example.test"))
+
+    async def _boom(self: object, user_id: object, subject_arg: object, profile: object) -> bool:
+        raise OperationalError("INSERT", {}, Exception("connection refused"))
+
+    monkeypatch.setattr(PrincipalResolver, "_insert_user", _boom)
+
+    response = await client.get(
+        "/api/v1/lab/shadow/versions", headers=auth_header(signing_key, subject)
+    )
+
+    assert response.status_code == 503, response.text
+    assert response.json()["type"] == "https://hunter.dev/problems/service-unavailable"

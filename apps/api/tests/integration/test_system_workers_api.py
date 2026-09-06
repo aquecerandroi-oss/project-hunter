@@ -327,15 +327,24 @@ async def test_market_status_isolates_a_single_exchange_wrongtype_heartbeat(
     exercises real per-exchange isolation, not the wholesale-failure path.)
     """
     code = await _seed_exchange(session_factory, monitored_markets=1, open_gaps=0)
-    await redis_client.set(keys.heartbeat("market", code), "not-a-hash")
-    actor: Actor = make_actor("market-status-wrongtype")
+    bogus_key = keys.heartbeat("market", code)
+    await redis_client.set(bogus_key, "not-a-hash")
+    try:
+        actor: Actor = make_actor("market-status-wrongtype")
 
-    response = await client.get("/api/v1/system/market-status", headers=actor.headers)
+        response = await client.get("/api/v1/system/market-status", headers=actor.headers)
 
-    assert response.status_code == 200, response.text
-    assert "not-a-hash" not in response.text
-    entry = next(row for row in response.json()["exchanges"] if row["exchange"] == code)
-    assert entry["ws_state"] == "unavailable"
+        assert response.status_code == 200, response.text
+        assert "not-a-hash" not in response.text
+        entry = next(row for row in response.json()["exchanges"] if row["exchange"] == code)
+        assert entry["ws_state"] == "unavailable"
+    finally:
+        # (T2.6) left uncleaned, this WRONGTYPE key persists in the
+        # session-scoped Redis container and 503s every later test that does
+        # a full ``hb:*`` scan (``GET /api/v1/system/workers``), even though
+        # this test's own target (``/market-status``) only ever reads it
+        # per-exchange and is isolated from the failure by construction.
+        await redis_client.delete(bogus_key)
 
 
 async def test_market_status_reports_ws_state_and_open_gaps(
@@ -368,3 +377,53 @@ async def test_market_status_reports_ws_state_and_open_gaps(
     assert entry["last_event_at"] is not None
     assert entry["last_event_age_ms"] is not None
     assert entry["reconnects"] == 4
+
+
+async def test_workers_reports_the_scanner_role_through_the_generic_hb_scan(
+    client: httpx.AsyncClient,
+    redis_client: redis_asyncio.Redis,
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """T2.6: ``/system/workers`` "passes to show `scanner`" without any
+    scanner-specific code (``services/system_status.py``'s ``scan_heartbeats``
+    already parses role generically off the ``hb:{role}:{instance}`` key) --
+    this is the contract test the brief asks for, proving it end to end
+    rather than only at the unit level (``test_system_workers_status.py``).
+    """
+    instance = f"scanner-{uuid.uuid4().hex[:8]}"
+    scanner_key = keys.heartbeat("scanner", instance)
+    await redis_client.hset(
+        scanner_key,
+        mapping={"ts": datetime.now(UTC).isoformat(), "errors": "0", "version": "0.0.0"},
+    )
+    try:
+        actor: Actor = make_actor("workers-reader-scanner")
+
+        response = await client.get("/api/v1/system/workers", headers=actor.headers)
+
+        assert response.status_code == 200, response.text
+        rows = [row for row in response.json() if row["role"] == "scanner"]
+        assert len(rows) == 1
+        assert rows[0]["instance"] == instance
+        assert rows[0]["status"] == "alive"
+    finally:
+        # No TTL on a hand-written hash (unlike the real 30s TTL
+        # ``WorkerRuntime`` writes) — left behind, it would make the very
+        # next test ("scanner absent") see a "present" scanner forever.
+        await redis_client.delete(scanner_key)
+
+
+async def test_workers_absent_scanner_is_simply_missing_not_reported_unavailable(
+    client: httpx.AsyncClient, make_actor: Callable[[str], Actor]
+) -> None:
+    """ "Ausente = sem verificação, distinto de indisponível" (brief): no
+    ``hb:scanner:*`` key at all is a healthy ``200`` with no ``scanner`` row —
+    never a fabricated "unavailable" entry, and never the ``503`` a genuine
+    Redis outage gets (``test_workers_returns_503_...`` above).
+    """
+    actor: Actor = make_actor("workers-reader-scanner-absent")
+
+    response = await client.get("/api/v1/system/workers", headers=actor.headers)
+
+    assert response.status_code == 200, response.text
+    assert all(row["role"] != "scanner" for row in response.json())

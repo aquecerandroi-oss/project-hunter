@@ -29,7 +29,8 @@ from typing import TYPE_CHECKING
 from fastapi import status
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 
 from hunter_api.errors import HunterError
 from hunter_core.audit import AuditEvent, SqlAuditSink
@@ -89,6 +90,31 @@ class UnverifiedEmailError(ProvisioningError):
         super().__init__(
             "Confirm your email address with your identity provider, then try again.",
             type_slug="email-not-verified",
+        )
+
+
+class PrincipalUnavailableError(HunterError):
+    """503 for "the database is unreachable while resolving who is calling".
+
+    Distinct from :class:`ProvisioningError` (Clerk's Backend API could not be
+    reached) and from ``routers.lab.LabUnavailableError`` (Postgres died
+    *after* authentication already succeeded): this one is the systemic case
+    underneath every authenticated route, because
+    :meth:`PrincipalResolver.resolve` is what every request runs through
+    before a router's own dependencies get a chance to run. Without this, a
+    Postgres outage here surfaced as a generic 500
+    (``ProblemDetailsMiddleware``'s catch-all) instead of the same
+    "come back later" shape every other Postgres-outage path in this API
+    already uses. ``detail`` stays generic on purpose — never the driver's
+    own message, which can carry a hostname or connection string fragment.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            type_slug="service-unavailable",
+            title="Service Unavailable",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The service is temporarily unavailable. Try again shortly.",
         )
 
 
@@ -164,16 +190,32 @@ class PrincipalResolver:
         self._profile_source = profile_source
 
     async def resolve(self, claims: TokenClaims) -> Principal:
-        found = await self._load(claims.subject)
-        if found is None:
-            await self._provision(claims)
+        try:
             found = await self._load(claims.subject)
             if found is None:
-                # the insert reported no conflict on ``external_auth_id`` yet
-                # the row is not there: the only way that happens is a
-                # concurrent delete, and the caller can retry
-                logger.warning("jit_provisioning_vanished", subject=claims.subject)
-                raise ProvisioningError
+                await self._provision(claims)
+                found = await self._load(claims.subject)
+                if found is None:
+                    # the insert reported no conflict on ``external_auth_id``
+                    # yet the row is not there: the only way that happens is a
+                    # concurrent delete, and the caller can retry
+                    logger.warning("jit_provisioning_vanished", subject=claims.subject)
+                    raise ProvisioningError
+        except (
+            OperationalError,
+            PoolTimeoutError,
+            OSError,
+        ) as exc:  # pool exhaustion is infrastructure too
+            # ``ConnectionRefusedError`` is an ``OSError`` subclass, already
+            # covered. Both come out of ``role_session``/``bootstrap_session``
+            # (``hunter_core.db.session``) inside ``_load``/``_provision``
+            # below, opening a connection or running a statement. Deliberately
+            # narrow: ``ProvisioningError``/``UnverifiedEmailError``/
+            # ``EmailAlreadyRegisteredError`` are ``HunterError`` subclasses,
+            # not instances of these two types, so they are never caught here
+            # and keep reaching the client as themselves.
+            logger.error("principal_resolution_postgres_unavailable", exc_info=exc)
+            raise PrincipalUnavailableError from exc
         user_id, email, memberships = found
         return Principal(
             user_id=user_id,

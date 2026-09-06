@@ -32,12 +32,17 @@ from hunter_api.middleware.tenant_context import TenantContextMiddleware
 from hunter_api.realtime.endpoint import RealtimeHub
 from hunter_api.realtime.endpoint import router as realtime_router
 from hunter_api.realtime.redis_bridge import RedisClientLike
+from hunter_api.routers import anomalies as anomalies_router
 from hunter_api.routers import audit as audit_router
 from hunter_api.routers import invitations as invitations_router
+from hunter_api.routers import lab as lab_router
 from hunter_api.routers import markets as markets_router
 from hunter_api.routers import me as me_router
 from hunter_api.routers import members as members_router
+from hunter_api.routers import opportunities as opportunities_router
 from hunter_api.routers import organizations as organizations_router
+from hunter_api.routers import radar as radar_router
+from hunter_api.routers import regime as regime_router
 from hunter_api.routers import system as system_router
 from hunter_api.routers import webhooks as webhooks_router
 from hunter_api.routers import workspaces as workspaces_router
@@ -64,6 +69,7 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     {"name": "agents", "description": "Trading agents (strategies) and their signals."},
     {"name": "risk", "description": "Risk profiles, risk events and the kill switch."},
     {"name": "analytics", "description": "Performance statistics and signal outcomes."},
+    {"name": "lab", "description": "Shadow Lab: hypothetical, no-capital strategy research."},
     {"name": "system", "description": "Health, readiness, metrics and system info."},
     {"name": "audit", "description": "The append-only audit log."},
 ]
@@ -174,6 +180,11 @@ def create_app(settings: ApiSettings) -> FastAPI:
     app.include_router(workspaces_router.router)
     app.include_router(audit_router.router)
     app.include_router(markets_router.router)
+    app.include_router(radar_router.router)
+    app.include_router(opportunities_router.router)
+    app.include_router(anomalies_router.router)
+    app.include_router(regime_router.router)
+    app.include_router(lab_router.router)
     app.include_router(system_router.router)
     app.include_router(webhooks_router.router)
     app.include_router(realtime_router)

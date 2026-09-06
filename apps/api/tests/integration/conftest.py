@@ -77,7 +77,15 @@ def _alembic_config(url: str) -> Config:
 def load_script(name: str) -> ModuleType:
     """Load an ``infra/scripts`` module by path — they are operational scripts,
     not an installed package.
+
+    ``SCRIPTS_DIR`` is added to ``sys.path`` first: ``seed.py`` imports its
+    sibling ``seed_reference`` with a bare ``from seed_reference import ...``
+    (T2.1), which only resolves when the directory containing it is
+    importable — exactly like ``_alembic_config`` already does for
+    ``MIGRATIONS_DIR`` above, for the same reason.
     """
+    if str(SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS_DIR))
     spec = importlib.util.spec_from_file_location(
         f"hunter_api_it_{name}", SCRIPTS_DIR / f"{name}.py"
     )

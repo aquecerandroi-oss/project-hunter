@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/anomalies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List anomalies */
+        get: operations["list_anomalies_api_v1_anomalies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/invitations/{token}/accept": {
         parameters: {
             query?: never;
@@ -15,6 +32,57 @@ export interface paths {
         put?: never;
         /** Accept an invitation */
         post: operations["accept_api_v1_invitations__token__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/shadow/signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shadow Lab decisions and tracked outcomes */
+        get: operations["list_signals_api_v1_lab_shadow_signals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/shadow/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shadow Lab performance summary */
+        get: operations["get_summary_api_v1_lab_shadow_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/shadow/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shadow strategy version catalogue */
+        get: operations["list_versions_api_v1_lab_shadow_versions_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -81,6 +149,40 @@ export interface paths {
         };
         /** The signed-in user and their organizations */
         get: operations["read_me_api_v1_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List opportunities */
+        get: operations["list_opportunities_api_v1_opportunities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one opportunity */
+        get: operations["get_opportunity_api_v1_opportunities__opportunity_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -269,6 +371,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/radar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the opportunity radar */
+        get: operations["list_radar_api_v1_radar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/regime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Current market regime per scope */
+        get: operations["get_current_regime_api_v1_regime_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/regime/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Regime history */
+        get: operations["get_regime_history_api_v1_regime_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/info": {
         parameters: {
             query?: never;
@@ -392,6 +545,119 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AnomalyEvaluationState
+         * @description ``anomaly_evaluation_state`` — ``anomalies.evaluation_state``, added by
+         *     ``0003_analysis`` (joint M2 decision, "Anomalias").
+         *
+         *     A second axis, deliberately separate from ``AnomalyStatus``: that one says
+         *     where the anomaly is in its ``active -> resolved/expired`` lifecycle, this
+         *     one says whether the data behind it can still be believed.
+         *
+         *     - ``OK`` — evaluated against fresh, eligible data;
+         *     - ``STALE`` — the source is late or degraded, so the anomaly may not feed a
+         *       score;
+         *     - ``UNKNOWN`` — no data arrived at all for this evaluation.
+         *
+         *     The pair that matters is ``active + unknown``: an anomaly whose feed went
+         *     away stays *active* and becomes ineligible. It is never resolved by absence
+         *     — "we stopped looking" is not "it stopped happening".
+         * @enum {string}
+         */
+        AnomalyEvaluationState: "ok" | "stale" | "unknown";
+        /** AnomalyOut */
+        AnomalyOut: {
+            /** Baseline */
+            baseline?: string | null;
+            /** Confidence */
+            confidence: string;
+            /** Current Value */
+            current_value?: string | null;
+            /**
+             * Detected At
+             * Format: date-time
+             */
+            detected_at: string;
+            /** Detector Version */
+            detector_version?: string | null;
+            /** Deviation */
+            deviation?: string | null;
+            evaluation_state: components["schemas"]["AnomalyEvaluationState"];
+            /** Exchange */
+            exchange: string;
+            /** Feature Snapshot */
+            feature_snapshot: {
+                [key: string]: unknown;
+            };
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Market Id
+             * Format: uuid
+             */
+            market_id: string;
+            /** Resolved At */
+            resolved_at?: string | null;
+            /** Severity */
+            severity: string;
+            status: components["schemas"]["AnomalyStatus"];
+            /** Symbol */
+            symbol: string;
+            type: components["schemas"]["AnomalyType"];
+            /** Unit */
+            unit?: string | null;
+        };
+        /** AnomalyPage */
+        AnomalyPage: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Items */
+            items: components["schemas"]["AnomalyOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /**
+             * Window Start
+             * Format: date-time
+             */
+            window_start: string;
+        };
+        /**
+         * AnomalyStatus
+         * @description ``anomaly_status`` — DATABASE.md §5 (anomalies.status).
+         * @enum {string}
+         */
+        AnomalyStatus: "active" | "resolved" | "expired";
+        /**
+         * AnomalyType
+         * @description ``anomaly_type`` — DATABASE.md §5, §17 and PIPELINE.md §3.
+         *
+         *     The ten MVP (v1) detectors of the joint M2 decision plus the two Phase 2/3
+         *     types the pipeline doc already names. ``TRADE_VELOCITY_SPIKE`` and
+         *     ``MOMENTUM_SHIFT`` were added by ``0003_analysis`` with
+         *     ``ADD VALUE ... BEFORE 'SOCIAL_SPIKE'``, which is why they sit with the v1
+         *     group here: this class's order is the database's label order.
+         *     ``CROSS_EXCHANGE_DIVERGENCE`` stays registered but no detector arms it until
+         *     a second exchange exists (M1b).
+         * @enum {string}
+         */
+        AnomalyType: "VOLUME_SPIKE" | "PRICE_ACCELERATION" | "VOLATILITY_EXPANSION" | "ORDERBOOK_IMBALANCE" | "OPEN_INTEREST_SPIKE" | "FUNDING_ANOMALY" | "LIQUIDATION_CLUSTER" | "CROSS_EXCHANGE_DIVERGENCE" | "TRADE_VELOCITY_SPIKE" | "MOMENTUM_SHIFT" | "SOCIAL_SPIKE" | "WHALE_ACTIVITY";
+        /** AssumedCostsOut */
+        AssumedCostsOut: {
+            /** Assumed Spread Bps */
+            assumed_spread_bps: string | null;
+            /** Fee Bps */
+            fee_bps: string | null;
+            /** Max Entry Delay S */
+            max_entry_delay_s: number | null;
+            /** Slippage Bps */
+            slippage_bps: string | null;
+        };
+        /**
          * AuditEntryOut
          * @description One ``audit_logs`` row as an organization's admins see it.
          *
@@ -477,6 +743,15 @@ export interface components {
             /** Volume */
             volume: string;
         };
+        /** CensoredCounts */
+        CensoredCounts: {
+            /** By Reason */
+            by_reason: {
+                [key: string]: number;
+            };
+            /** Total */
+            total: number;
+        };
         /**
          * ComponentQuality
          * @description Freshness of a single hot-state component — narrower than the
@@ -497,6 +772,19 @@ export interface components {
             /** Ts */
             ts?: string | null;
         };
+        /** CoverageOut */
+        CoverageOut: {
+            assumed_costs: components["schemas"]["AssumedCostsOut"];
+            /** Distinct Days */
+            distinct_days: number;
+            /** Markets With Signals */
+            markets_with_signals: number;
+            /**
+             * Note
+             * @default counts markets/days that produced at least one signal — evaluations that never triggered are not observable (Evaluation.state is not persisted; see counts.decisions_reason)
+             */
+            note: string;
+        };
         /** CursorPage[AuditEntryOut] */
         CursorPage_AuditEntryOut_: {
             /** Items */
@@ -515,6 +803,20 @@ export interface components {
         CursorPage_MemberOut_: {
             /** Items */
             items: components["schemas"]["MemberOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[OpportunitySummaryOut] */
+        CursorPage_OpportunitySummaryOut_: {
+            /** Items */
+            items: components["schemas"]["OpportunitySummaryOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[SignalListItemOut] */
+        CursorPage_SignalListItemOut_: {
+            /** Items */
+            items: components["schemas"]["SignalListItemOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -792,6 +1094,19 @@ export interface components {
             volume_24h?: string | null;
         };
         /**
+         * MarketRegime
+         * @description ``market_regime`` — DATABASE.md §5, §17, PIPELINE.md §4. v0 (M2) plus
+         *     the v1 (Phase 2) values the pipeline doc already names.
+         *
+         *     ``UNKNOWN`` (``0003_analysis``) is the classifier's warm-up state, and it is a
+         *     *classification*, not a missing value: while the 30 days of 1-minute candles
+         *     the volatility percentile needs are not yet durable, the regime is honestly
+         *     unknown and the reason goes in ``supporting_features``. A NULL would have let
+         *     every consumer invent its own default; ``UNKNOWN`` makes them handle it.
+         * @enum {string}
+         */
+        MarketRegime: "BTC_BULL" | "BTC_BEAR" | "SIDEWAYS" | "HIGH_VOLATILITY" | "LOW_VOLATILITY" | "RISK_ON" | "RISK_OFF" | "ALT_EXPANSION" | "PANIC" | "LIQUIDITY_CONTRACTION" | "UNKNOWN";
+        /**
          * MarketStatus
          * @description ``market_status`` — DATABASE.md §3 (markets.status).
          *
@@ -856,6 +1171,15 @@ export interface components {
             /** Markets Unavailable */
             markets_unavailable: number;
         };
+        /** MaturityOut */
+        MaturityOut: {
+            /** Distinct Days */
+            distinct_days: number;
+            /** Evaluable Outcomes */
+            evaluable_outcomes: number;
+            /** Inconclusive */
+            inconclusive: boolean;
+        };
         /**
          * MeOut
          * @description ``GET /api/v1/me`` — everything the app shell needs to render itself.
@@ -905,6 +1229,28 @@ export interface components {
             role: components["schemas"]["OrganizationRole"];
             status: components["schemas"]["MemberStatus"];
         };
+        /** NoEntryCounts */
+        NoEntryCounts: {
+            /** By Reason */
+            by_reason: {
+                [key: string]: number;
+            };
+            /** Total */
+            total: number;
+        };
+        /**
+         * NullableMetric
+         * @description A rate/expectancy that is ``null`` with a reason instead of a lie.
+         *
+         *     Never a bare ``None``: a denominator of zero always says *why* — "no
+         *     sample" is a different fact from "no losses" (SHADOW-LAB.md §9).
+         */
+        NullableMetric: {
+            /** Reason */
+            reason?: string | null;
+            /** Value */
+            value: string | null;
+        };
         /**
          * OnboardingState
          * @description Whether this organization has finished the onboarding flow (PRODUCT.md §3).
@@ -940,6 +1286,222 @@ export interface components {
              * @default 10000
              */
             virtual_capital: number | string;
+        };
+        /**
+         * OpportunityAnomalyOut
+         * @description One anomaly linked to the opportunity's market — active ones by
+         *     default (``services/opportunities.py``), so an anomaly that resolved
+         *     weeks ago does not clutter "why are we looking at this?".
+         */
+        OpportunityAnomalyOut: {
+            /** Confidence */
+            confidence: string;
+            /**
+             * Detected At
+             * Format: date-time
+             */
+            detected_at: string;
+            evaluation_state: components["schemas"]["AnomalyEvaluationState"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Severity */
+            severity: string;
+            status: components["schemas"]["AnomalyStatus"];
+            type: components["schemas"]["AnomalyType"];
+        };
+        /**
+         * OpportunityDetailOut
+         * @description ``GET /api/v1/opportunities/{id}`` — the full explainability contract:
+         *     decomposition, deterministic pt-BR ``explanation``, the feature envelope
+         *     the score was computed from, the anomalies backing it and its trajectory.
+         */
+        OpportunityDetailOut: {
+            /** Anomalies */
+            anomalies: components["schemas"]["OpportunityAnomalyOut"][];
+            /** Baseline Ids */
+            baseline_ids: string[];
+            /** Below 40 Since */
+            below_40_since?: string | null;
+            /** Confidence */
+            confidence: string;
+            /** Decomposition */
+            decomposition: {
+                [key: string]: unknown;
+            };
+            direction: components["schemas"]["TradeDirection"];
+            /** Exchange */
+            exchange: string;
+            /** Expired At */
+            expired_at?: string | null;
+            /** Explanation */
+            explanation: {
+                [key: string]: unknown;
+            };
+            /** Feature Snapshot */
+            feature_snapshot: {
+                [key: string]: unknown;
+            };
+            /**
+             * First Seen At
+             * Format: date-time
+             */
+            first_seen_at: string;
+            /** History */
+            history: components["schemas"]["OpportunityHistoryPointOut"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** In Position */
+            in_position?: boolean | null;
+            /**
+             * Last Updated At
+             * Format: date-time
+             */
+            last_updated_at: string;
+            /**
+             * Market Id
+             * Format: uuid
+             */
+            market_id: string;
+            market_type: components["schemas"]["MarketType"];
+            /** Peak Score */
+            peak_score?: string | null;
+            regime?: components["schemas"]["MarketRegime"] | null;
+            /** Regime Id */
+            regime_id?: string | null;
+            /** Risk Blocked */
+            risk_blocked?: boolean | null;
+            /** Risk Blocked Reason */
+            risk_blocked_reason?: string | null;
+            /** Score */
+            score: string;
+            stage: components["schemas"]["OpportunityStage"];
+            status: components["schemas"]["OpportunityStatus"];
+            /** Symbol */
+            symbol: string;
+            /** Weights Version */
+            weights_version?: string | null;
+        };
+        /** OpportunityHistoryPointOut */
+        OpportunityHistoryPointOut: {
+            /** Confidence */
+            confidence?: string | null;
+            /** Decomposition */
+            decomposition: {
+                [key: string]: unknown;
+            };
+            /** Envelope */
+            envelope?: {
+                [key: string]: unknown;
+            } | null;
+            /** Score */
+            score: string;
+            stage: components["schemas"]["OpportunityStage"];
+            status: components["schemas"]["OpportunityStatus"];
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+        };
+        /**
+         * OpportunityStage
+         * @description ``opportunity_stage`` — ``opportunities.stage``, added by ``0003_analysis``
+         *     (joint M2 decision, "Estágio EARLY/DEVELOPING/EXTENDED").
+         *
+         *     Where a move is in its life, from ``r = |return_1h| / atr_pct`` with the ATR
+         *     of Wilder(14) over complete 15-minute UTC bars:
+         *
+         *     - ``EARLY`` — ``r < 1.5`` **and** the symmetric confirmations fired;
+         *     - ``DEVELOPING`` — ``1.5 <= r <= 4``;
+         *     - ``EXTENDED`` — ``r > 4``, or the exhaustion alternative;
+         *     - ``NONE`` — no stage could be computed (ATR warm-up, missing data).
+         *
+         *     ``NONE`` is a member and not a NULL on purpose: "we cannot tell yet" is an
+         *     answer the Radar has to show, and a nullable column would have let a consumer
+         *     read the absence as EARLY.
+         *
+         *     UPPER_SNAKE_CASE like ``OpportunityStatus``, its sibling column on the same
+         *     table, rather than the lower-case draft in the superseded "Decisões deste
+         *     plano" of ``docs/plans/M2.md`` — recorded in DATABASE.md §17.
+         * @enum {string}
+         */
+        OpportunityStage: "EARLY" | "DEVELOPING" | "EXTENDED" | "NONE";
+        /**
+         * OpportunityStatus
+         * @description ``opportunity_status`` — DATABASE.md §5 and §17.
+         *
+         *     ``IN_POSITION`` and ``BLOCKED_BY_RISK`` are deliberately excluded: the doc
+         *     states they are derived per organization at read time and are never stored in
+         *     this column — the same opportunity can be in position for one tenant and
+         *     blocked by risk for another, and a global column cannot say both.
+         *
+         *     ``EXTENDED`` (``0003_analysis``) is the one global status the joint M2
+         *     decision adds. Precedence, highest first: ``EXPIRED`` (terminal) >
+         *     ``EXTENDED`` > ``ENTRY_CANDIDATE`` > ``HOT`` > ``ANOMALY`` > ``WATCHING`` >
+         *     ``NORMAL``. Declaration order below is the *database's* label order
+         *     (``0003`` adds ``EXTENDED`` with ``BEFORE 'EXPIRED'``), not the precedence.
+         *
+         *     ``NORMAL`` never *opens* an episode, but it is a valid temporary state of one
+         *     already open: the row keeps its id and starts ``below_40_since``.
+         * @enum {string}
+         */
+        OpportunityStatus: "NORMAL" | "WATCHING" | "ANOMALY" | "HOT" | "ENTRY_CANDIDATE" | "EXTENDED" | "EXPIRED";
+        /**
+         * OpportunitySummaryOut
+         * @description One row of ``GET /api/v1/opportunities`` — the same shape as a radar row.
+         *
+         *     Carries **no** ``decomposition`` (MF-2): the per-row JSONB breakdown is a
+         *     detail-view field, and selecting it for every row of every page made the
+         *     list statement read and decode the largest column in the table for data no
+         *     list view renders. ``GET /opportunities/{id}`` is the one request that
+         *     returns it.
+         */
+        OpportunitySummaryOut: {
+            /** Confidence */
+            confidence: string;
+            direction: components["schemas"]["TradeDirection"];
+            /** Exchange */
+            exchange: string;
+            /**
+             * First Seen At
+             * Format: date-time
+             */
+            first_seen_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** In Position */
+            in_position?: boolean | null;
+            /**
+             * Last Updated At
+             * Format: date-time
+             */
+            last_updated_at: string;
+            /**
+             * Market Id
+             * Format: uuid
+             */
+            market_id: string;
+            market_type: components["schemas"]["MarketType"];
+            regime?: components["schemas"]["MarketRegime"] | null;
+            /** Risk Blocked */
+            risk_blocked?: boolean | null;
+            /** Score */
+            score: string;
+            stage: components["schemas"]["OpportunityStage"];
+            status: components["schemas"]["OpportunityStatus"];
+            /** Symbol */
+            symbol: string;
+            /** Weights Version */
+            weights_version?: string | null;
         };
         /**
          * OptionalComponentStatusOut
@@ -1071,11 +1633,178 @@ export interface components {
             name: string;
         };
         /**
+         * OutcomeResult
+         * @description ``outcome_result`` — DATABASE.md §6 (signal_outcomes.result).
+         * @enum {string}
+         */
+        OutcomeResult: "target" | "stop" | "expired" | "invalidated" | "open";
+        /**
          * Plan
          * @description ``plan_tier`` — DATABASE.md §2.
          * @enum {string}
          */
         Plan: "FREE" | "PRO" | "QUANT" | "ENTERPRISE";
+        /**
+         * ProfitFactorOut
+         * @description PF with its denominator spelled out (Astra, contract review, must-fix 3).
+         *
+         *     ``sum_positive``/``sum_negative_abs``/``sample_size`` are always present,
+         *     even when ``value`` is null, so a caller can tell "PF is null because there
+         *     is no sample" from "PF is null because nobody has lost yet" without
+         *     re-deriving the sums itself.
+         */
+        ProfitFactorOut: {
+            /** Reason */
+            reason?: string | null;
+            /** Sample Size */
+            sample_size: number;
+            /** Sum Negative Abs */
+            sum_negative_abs: string;
+            /** Sum Positive */
+            sum_positive: string;
+            /** Value */
+            value: string | null;
+        };
+        /** RExFundingBlock */
+        RExFundingBlock: {
+            coverage: components["schemas"]["RExFundingCoverage"];
+            hypothetical_net_expectancy_r: components["schemas"]["NullableMetric"];
+            net_profit_rate: components["schemas"]["NullableMetric"];
+            profit_factor: components["schemas"]["ProfitFactorOut"];
+            sum_of_hypothetical_r: components["schemas"]["SumOfROut"];
+        };
+        /** RExFundingCoverage */
+        RExFundingCoverage: {
+            /** Evaluable Outcomes */
+            evaluable_outcomes: number;
+            /** R Net Evaluable Outcomes */
+            r_net_evaluable_outcomes: number;
+        };
+        /**
+         * RadarItemOut
+         * @description One row of the radar table.
+         */
+        RadarItemOut: {
+            /** Below 40 Since */
+            below_40_since?: string | null;
+            /** Change */
+            change?: string | null;
+            /** Confidence */
+            confidence: string;
+            direction: components["schemas"]["TradeDirection"];
+            /** Exchange */
+            exchange: string;
+            /**
+             * First Seen At
+             * Format: date-time
+             */
+            first_seen_at: string;
+            /** In Position */
+            in_position?: boolean | null;
+            /**
+             * Last Updated At
+             * Format: date-time
+             */
+            last_updated_at: string;
+            /**
+             * Market Id
+             * Format: uuid
+             */
+            market_id: string;
+            market_type: components["schemas"]["MarketType"];
+            /**
+             * Opportunity Id
+             * Format: uuid
+             */
+            opportunity_id: string;
+            /** Peak Score */
+            peak_score?: string | null;
+            regime?: components["schemas"]["MarketRegime"] | null;
+            /** Risk Blocked */
+            risk_blocked?: boolean | null;
+            /** Risk Blocked Reason */
+            risk_blocked_reason?: string | null;
+            /** Score */
+            score: string;
+            stage: components["schemas"]["OpportunityStage"];
+            status: components["schemas"]["OpportunityStatus"];
+            /** Symbol */
+            symbol: string;
+        };
+        /** RadarPage */
+        RadarPage: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Items */
+            items: components["schemas"]["RadarItemOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Org Scoped */
+            org_scoped: boolean;
+        };
+        /**
+         * RadarStatusFilter
+         * @description ``?status=`` — every ``OpportunityStatus`` member plus the two
+         *     per-organization pseudo-statuses. A plain ``list[OpportunityStatus]``
+         *     would 422 on ``IN_POSITION``/``RISK_BLOCKED`` before the router ever saw
+         *     them; this is the accept-list that lets FastAPI validate the whole set in
+         *     one declaration.
+         * @enum {string}
+         */
+        RadarStatusFilter: "NORMAL" | "WATCHING" | "ANOMALY" | "HOT" | "ENTRY_CANDIDATE" | "EXTENDED" | "EXPIRED" | "IN_POSITION" | "RISK_BLOCKED";
+        /** RegimeCurrentOut */
+        RegimeCurrentOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Items */
+            items: components["schemas"]["RegimeOut"][];
+        };
+        /** RegimeHistoryPage */
+        RegimeHistoryPage: {
+            /** Items */
+            items: components["schemas"]["RegimeOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** RegimeOut */
+        RegimeOut: {
+            /** Classifier Version */
+            classifier_version?: string | null;
+            /** Confidence */
+            confidence?: string | null;
+            /** End Time */
+            end_time?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Stale */
+            is_stale: boolean;
+            regime: components["schemas"]["MarketRegime"];
+            scope: components["schemas"]["RegimeScope"];
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /** Supporting Features */
+            supporting_features: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * RegimeScope
+         * @description ``regime_scope`` — DATABASE.md §5 (market_regimes.scope).
+         * @enum {string}
+         */
+        RegimeScope: "global" | "btc";
         /**
          * RiskPreset
          * @description ``risk_preset`` — DATABASE.md §7 (risk_profiles.preset).
@@ -1083,11 +1812,157 @@ export interface components {
          */
         RiskPreset: "conservative" | "balanced" | "aggressive" | "custom";
         /**
+         * ShadowTrackingState
+         * @description ``shadow_tracking_state`` — ``signal_outcomes.tracking_state``, added by
+         *     ``0002_shadow_lab`` (docs/plans/SHADOW-LAB.md "Decisão conjunta" §4).
+         *
+         *     The third axis of a shadow outcome, and the only one that answers "is this
+         *     tracking still going?". ``SignalStatus`` says whether the *signal* is still
+         *     valid, ``OutcomeResult`` says how the hypothetical trade *ended*, and this
+         *     says where the tracking itself is:
+         *
+         *     - ``PENDING_ENTRY`` - decided and persisted, waiting for the entry bar open;
+         *     - ``ACTIVE`` - hypothetically in the market;
+         *     - ``TERMINAL`` - resolved, with a financial result;
+         *     - ``NO_ENTRY`` - never entered (late, geometry); never counted as open;
+         *     - ``CENSORED`` - a bar the outcome needed is unrecoverable, so the result is
+         *       unknown. Censorship never becomes ``expired``.
+         *
+         *     ``TERMINAL``, ``NO_ENTRY`` and ``CENSORED`` never reopen.
+         * @enum {string}
+         */
+        ShadowTrackingState: "pending_entry" | "active" | "terminal" | "no_entry" | "censored";
+        /** SignalListItemOut */
+        SignalListItemOut: {
+            /** Censored Reason */
+            censored_reason: string | null;
+            /** Cohort */
+            cohort: string;
+            /**
+             * Decision At
+             * Format: date-time
+             */
+            decision_at: string;
+            /** Entry Plan */
+            entry_plan: {
+                [key: string]: unknown;
+            };
+            /** Entry Ts */
+            entry_ts: string | null;
+            /** Excursions */
+            excursions: {
+                [key: string]: unknown;
+            };
+            /** Exit Price */
+            exit_price: string | null;
+            /** Exit Ts */
+            exit_ts: string | null;
+            /** Market */
+            market: string;
+            /** No Entry Reason */
+            no_entry_reason: string | null;
+            /** Purpose */
+            purpose: string;
+            /** R Ex Funding */
+            r_ex_funding: string | null;
+            /** R Multiple */
+            r_multiple: string | null;
+            /** R Multiple Reason */
+            r_multiple_reason: string | null;
+            /** Reference Price */
+            reference_price: string | null;
+            result: components["schemas"]["OutcomeResult"];
+            /**
+             * Signal Id
+             * Format: uuid
+             */
+            signal_id: string;
+            /**
+             * Source Bar Close
+             * Format: date-time
+             */
+            source_bar_close: string;
+            /** Stop */
+            stop: string | null;
+            /**
+             * Strategy Version Id
+             * Format: uuid
+             */
+            strategy_version_id: string;
+            /** Supporting Features */
+            supporting_features: {
+                [key: string]: unknown;
+            } | null;
+            /** Target1 */
+            target1: string | null;
+            tracking_state: components["schemas"]["ShadowTrackingState"];
+            /** Virtual Entry */
+            virtual_entry: string | null;
+        };
+        /**
+         * StrategyVersionStatus
+         * @description ``strategy_version_status`` — DATABASE.md §6 (strategy_versions.status).
+         * @enum {string}
+         */
+        StrategyVersionStatus: "draft" | "active" | "deprecated";
+        /**
+         * SumOfROut
+         * @description ``sum_of_hypothetical_r`` — named and ordered explicitly (SHADOW-LAB.md §9).
+         */
+        SumOfROut: {
+            /** Count */
+            count: number;
+            /**
+             * Ordered By
+             * @default exit_ts
+             */
+            ordered_by: string;
+            /** Reason */
+            reason?: string | null;
+            /** Value */
+            value: string | null;
+        };
+        /** SummaryOut */
+        SummaryOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Cohort */
+            cohort: string;
+            /**
+             * Label
+             * @default SOMBRA — hipotético, sem capital, custos assumidos
+             */
+            label: string;
+            /** Versions */
+            versions: components["schemas"]["VersionSummaryOut"][];
+            /** Window */
+            window: string;
+        };
+        /** TerminalCounts */
+        TerminalCounts: {
+            /** By Result */
+            by_result: {
+                [key: string]: number;
+            };
+            /** Total */
+            total: number;
+        };
+        /**
          * Timeframe
          * @description ``candle_timeframe`` — DATABASE.md §4 (candles.timeframe).
          * @enum {string}
          */
         Timeframe: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+        /**
+         * TradeDirection
+         * @description ``trade_direction`` — DATABASE.md §5 (opportunities.direction) and §6
+         *     (agent_signals.direction, agents.allowed_directions).
+         * @enum {string}
+         */
+        TradeDirection: "long" | "short" | "neutral";
         /** TradeOut */
         TradeOut: {
             /** Price */
@@ -1129,6 +2004,107 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VersionCounts */
+        VersionCounts: {
+            /** Active */
+            active: number;
+            censored: components["schemas"]["CensoredCounts"];
+            /** Decisions */
+            decisions?: null;
+            /**
+             * Decisions Reason
+             * @default evaluation_state_not_persisted
+             */
+            decisions_reason: string;
+            /** Entered */
+            entered: number;
+            /** Funding Not Settleable */
+            funding_not_settleable: number;
+            no_entry: components["schemas"]["NoEntryCounts"];
+            /** Pending Entry */
+            pending_entry: number;
+            /** Signals Emitted */
+            signals_emitted: number;
+            terminal: components["schemas"]["TerminalCounts"];
+        };
+        /** VersionMetrics */
+        VersionMetrics: {
+            hypothetical_net_expectancy_r: components["schemas"]["NullableMetric"];
+            net_profit_rate: components["schemas"]["NullableMetric"];
+            profit_factor: components["schemas"]["ProfitFactorOut"];
+            sum_of_hypothetical_r: components["schemas"]["SumOfROut"];
+            target_rate_among_resolved_touches: components["schemas"]["NullableMetric"];
+        };
+        /** VersionOut */
+        VersionOut: {
+            /** Activated At */
+            activated_at: string | null;
+            /** Code Ref */
+            code_ref: string | null;
+            /** Default Parameters */
+            default_parameters: {
+                [key: string]: unknown;
+            };
+            /** Deprecated At */
+            deprecated_at: string | null;
+            /** Params Hash */
+            params_hash: string;
+            status: components["schemas"]["StrategyVersionStatus"];
+            /** Strategy Key */
+            strategy_key: string;
+            /**
+             * Strategy Version Id
+             * Format: uuid
+             */
+            strategy_version_id: string;
+            /** Superseded By */
+            superseded_by: string | null;
+            /** Version */
+            version: string;
+        };
+        /** VersionSummaryOut */
+        VersionSummaryOut: {
+            /** Activated At */
+            activated_at: string | null;
+            /** Code Ref */
+            code_ref: string | null;
+            counts: components["schemas"]["VersionCounts"];
+            coverage: components["schemas"]["CoverageOut"];
+            /** Deprecated At */
+            deprecated_at: string | null;
+            maturity: components["schemas"]["MaturityOut"];
+            metrics: components["schemas"]["VersionMetrics"];
+            /** Portfolio Max Drawdown */
+            portfolio_max_drawdown?: null;
+            /**
+             * Portfolio Max Drawdown Reason
+             * @default not_applicable
+             */
+            portfolio_max_drawdown_reason: string;
+            /** Portfolio Pnl */
+            portfolio_pnl?: null;
+            /**
+             * Portfolio Pnl Reason
+             * @default not_applicable
+             */
+            portfolio_pnl_reason: string;
+            r_ex_funding: components["schemas"]["RExFundingBlock"];
+            status: components["schemas"]["StrategyVersionStatus"];
+            /** Strategy Key */
+            strategy_key: string;
+            /**
+             * Strategy Version Id
+             * Format: uuid
+             */
+            strategy_version_id: string;
+            /** Version */
+            version: string;
+        };
+        /** VersionsOut */
+        VersionsOut: {
+            /** Items */
+            items: components["schemas"]["VersionOut"][];
         };
         /** WorkerHeartbeatOut */
         WorkerHeartbeatOut: {
@@ -1225,6 +2201,43 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_anomalies_api_v1_anomalies_get: {
+        parameters: {
+            query?: {
+                window_hours?: number;
+                type?: components["schemas"]["AnomalyType"] | null;
+                status?: components["schemas"]["AnomalyStatus"] | null;
+                market_id?: string | null;
+                min_severity?: number | string | null;
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnomalyPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     accept_api_v1_invitations__token__accept_post: {
         parameters: {
             query?: never;
@@ -1254,6 +2267,97 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_signals_api_v1_lab_shadow_signals_get: {
+        parameters: {
+            query?: {
+                strategy_version_id?: string | null;
+                market?: string | null;
+                tracking_state?: components["schemas"]["ShadowTrackingState"] | null;
+                result?: components["schemas"]["OutcomeResult"] | null;
+                cohort?: string;
+                cursor?: string | null;
+                limit?: number | null;
+                include?: string[] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_SignalListItemOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_summary_api_v1_lab_shadow_summary_get: {
+        parameters: {
+            query?: {
+                window?: "7d" | "30d" | "all";
+                as_of?: string | null;
+                cohort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_versions_api_v1_lab_shadow_versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionsOut"];
                 };
             };
         };
@@ -1377,6 +2481,81 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeOut"];
+                };
+            };
+        };
+    };
+    list_opportunities_api_v1_opportunities_get: {
+        parameters: {
+            query?: {
+                org_id?: string | null;
+                score_min?: number | string | null;
+                status?: components["schemas"]["OpportunityStatus"][] | null;
+                stage?: components["schemas"]["OpportunityStage"][] | null;
+                exchange?: string | null;
+                q?: string | null;
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_OpportunitySummaryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_opportunity_api_v1_opportunities__opportunity_id__get: {
+        parameters: {
+            query?: {
+                org_id?: string | null;
+                /** @description Include each history point's full feature envelope. Caps history_limit at 50 (422 above that). */
+                include_envelope?: boolean;
+                /** @description How many of the newest history points to return. Maximum 500, or 50 when include_envelope=true (422 above that). Omitted: 100, or 50 with the envelope. */
+                history_limit?: number | null;
+            };
+            header?: never;
+            path: {
+                opportunity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1877,6 +3056,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_radar_api_v1_radar_get: {
+        parameters: {
+            query?: {
+                org_id?: string | null;
+                score_min?: number | string | null;
+                status?: components["schemas"]["RadarStatusFilter"][] | null;
+                stage?: components["schemas"]["OpportunityStage"][] | null;
+                exchange?: string | null;
+                anomaly_type?: components["schemas"]["AnomalyType"] | null;
+                regime?: components["schemas"]["MarketRegime"] | null;
+                volatility_min?: number | string | null;
+                volatility_max?: number | string | null;
+                q?: string | null;
+                sort?: "score" | "change" | "volume" | "age";
+                order?: "asc" | "desc";
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RadarPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_current_regime_api_v1_regime_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegimeCurrentOut"];
+                };
+            };
+        };
+    };
+    get_regime_history_api_v1_regime_history_get: {
+        parameters: {
+            query?: {
+                scope?: components["schemas"]["RegimeScope"] | null;
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegimeHistoryPage"];
                 };
             };
             /** @description Validation Error */
