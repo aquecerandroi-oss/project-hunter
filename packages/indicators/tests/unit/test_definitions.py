@@ -208,3 +208,23 @@ class TestTheRegisteredV1Set:
         assert first == second
         first[0]["description"] = "mutated"
         assert default_definitions_rows()[0]["description"] != "mutated"
+
+
+class TestTheRegistryCachesItsIdentity:
+    """T2.2b: the version is hashed once, and ``register`` is what invalidates it."""
+
+    def test_registering_a_calculator_changes_the_version(self) -> None:
+        registry = FeatureRegistry()
+        empty = registry.feature_set_version
+        registry.register(_Calc(DEF_A))
+        first = registry.feature_set_version
+        assert first != empty
+        registry.register(_Calc(DEF_B))
+        assert registry.feature_set_version != first
+        assert registry.feature_set_version == feature_set_version([DEF_A, DEF_B])
+
+    def test_the_version_is_computed_once_between_registrations(self) -> None:
+        registry = FeatureRegistry([_Calc(DEF_A), _Calc(DEF_B)])
+        seen = [registry.feature_set_version for _ in range(5)]
+        assert len(set(seen)) == 1
+        assert seen[0] == feature_set_version([DEF_A, DEF_B])

@@ -75,17 +75,24 @@ class MultiMarketHotState(FakeHotState):
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        "MEASURED CEILING, not an aspiration. 200 markets cost ~42 ms each, so one "
-        "pass is ~8.4 s against the 3 s p99 the joint M2 decision sets. This is "
-        "exactly what the T2.2 cross review predicted and handed to T2.5 "
-        "(.claude/state/notes-T2.2.md section 16: ~50 ms/vector, 53% of it in "
-        "windows._epoch_minutes, called 17x per vector, bars_15m recomputed 3x). "
-        "The fix is a per-(market, as_of) memo inside "
-        "packages/indicators/hunter_indicators/features/windows.py -- engine code "
-        "this brief may not change (it allows packages/indicators only for thin IO "
-        "adapters). Kept as a strict xfail so it fails loudly the day the memo "
-        "lands and this stops being true, instead of quietly asserting a number "
-        "nobody re-measured."
+        "MEASURED CEILING, not an aspiration -- and T2.2b re-measured what the "
+        "ceiling is made of, because the reason written here before was wrong. "
+        "The per-market cost is ~54 ms and 76-89% of it is "
+        "hunter_indicators.features.hotstate.decode_candles: every tick re-reads "
+        "and re-validates 1500 msgpack rows into pydantic candles (~50 ms), "
+        "because scanner.advance builds a brand-new MarketContext from the hot "
+        "state each time. The feature engine is no longer the bottleneck: the "
+        "T2.2b per-context memo took a vector from ~38 ms to ~11 ms of profiled "
+        "CPU (.claude/state/notes-T2.2.md section 18), which moves this number by "
+        "about 1 ms because -- second finding -- MultiMarketHotState.seed above "
+        "stores BTCUSDT candles under every symbol's key, so build_context drops "
+        "all 1500 as foreign and the engine measured here runs on an EMPTY "
+        "context. Both are T2.5b's to fix, in this order: (1) seed each market's "
+        "own symbol so the number means what the docstring says; (2) keep the "
+        "MarketContext per market and append the closed minute instead of "
+        "decoding 1500 rows per tick. 200 x 15 ms is the 3 s budget, and decode "
+        "alone is over it. Kept as a strict xfail so it fails loudly the day that "
+        "lands, instead of quietly asserting a number nobody re-measured."
     ),
 )
 async def test_two_hundred_markets_at_one_tick_a_second_stay_inside_the_budget() -> None:

@@ -130,6 +130,7 @@ class FeatureRegistry:
 
     def __init__(self, calculators: Sequence[FeatureCalculator] = ()) -> None:
         self._by_key: dict[str, FeatureCalculator] = {}
+        self._version: str | None = None
         for calculator in calculators:
             self.register(calculator)
 
@@ -138,6 +139,7 @@ class FeatureRegistry:
         if key in self._by_key:
             raise ValueError(f"{key} is already registered (one calculator per key)")
         self._by_key[key] = calculator
+        self._version = None  # the set changed, so its identity has to be re-derived
 
     def get(self, key: str) -> FeatureCalculator:
         try:
@@ -156,7 +158,16 @@ class FeatureRegistry:
 
     @property
     def feature_set_version(self) -> str:
-        return feature_set_version(self.definitions())
+        """The identity of this set, hashed once per registry (T2.2b).
+
+        Every vector publishes it, so the engine was rebuilding twenty-eight
+        ``FeatureDefinition`` objects and hashing their canonical JSON on every
+        tick, for a string that only changes when :meth:`register` is called --
+        the sole mutator, and the sole place that clears the cache.
+        """
+        if self._version is None:
+            self._version = feature_set_version(self.definitions())
+        return self._version
 
 
 __all__ = [

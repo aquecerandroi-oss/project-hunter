@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -57,7 +57,6 @@ change over 1 h needs a reference the caller supplies (Postgres
 ``unavailable``, never "change since the first reading after the restart"."""
 
 MISSING_INPUT = "missing_input"
-_MINUTE = timedelta(minutes=1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,10 +206,22 @@ class MarketContext:
     1440. Travels to the provenance of ``candles:1m`` (nice-to-have b)."""
     btc: MarketContext | None = None
     """The reference market, cut at the same instant. Never nested twice."""
+    memo: dict[str, Any] = field(compare=False, repr=False, init=False)
+    """Derivations of *this* context, computed at most once (``windows.memoize``).
+
+    Never a process-wide cache: born with the context, dead with it, holding
+    only functions of ``final_candles``/``as_of`` — which a frozen context over
+    a tuple cannot change. Nothing to evict, nothing kept between ticks or
+    markets, no key CPython can recycle. ``init=False`` keeps it out of
+    ``dataclasses.replace``, which therefore starts empty (T2.2b)."""
 
     def __post_init__(self) -> None:
         as_of = ensure_utc(self.as_of)
         object.__setattr__(self, "as_of", as_of)
+        object.__setattr__(self, "memo", {})
+        # frozen protects the binding, not the list: a caller keeping its list
+        # could append after a window was derived (Astra, T2.2b review).
+        object.__setattr__(self, "final_candles", tuple(self.final_candles))
         _check_candles(self.final_candles, self.exchange, self.symbol, as_of)
         if self.forming is not None:
             _check_forming(self.forming, self.exchange, self.symbol, as_of)

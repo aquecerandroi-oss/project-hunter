@@ -1,40 +1,17 @@
-"""Window selection over the context — the only place that decides "enough data".
+"""FROZEN reference: ``features/windows.py`` as of commit ``551d542`` (pre-T2.2b).
 
-Three rules, borrowed from ``hunter_core.strategies.aggregate`` because they are
-the same rules the shadow lab already fought for:
-
-- a window is **exactly** the requested length or it does not exist; never a
-  shorter one silently;
-- a missing minute inside the window is a ``gap``, not something to interpolate;
-  history that does not reach back is ``warmup``. They are different facts;
-- a trade window only exists when the tape can *prove* it covers it — a ring
-  buffer that starts inside the window cannot, and "no trades" would then be
-  indistinguishable from "trades I never saw".
-
-NumPy does the O(n) work here (minute contiguity over 1500 candles, slicing the
-tape by timestamp) on ``int64`` epoch arrays. Prices, volumes and quantities
-never become floats: every arithmetic result the product persists or compares
-against a threshold stays ``Decimal``.
-
-**Derived once per context** (T2.2b). The epoch-minute array and the complete
-15-minute bars do not depend on *which* window is being asked for, only on
-``final_candles`` and ``as_of``; a vector asked seventeen times for the first and
-three times for the second, and rebuilding them was 53% and 45% of the measured
-cost of a vector (``.claude/state/notes-T2.2.md`` section 16). They are now
-memoised on the context that owns them (:func:`memoize`), which is the narrowest
-scope that works: the memo is created with the context, dies with it, and every
-field it reads is immutable on a frozen dataclass over a tuple - so it cannot go
-stale, cannot be evicted at the wrong moment and cannot outlive a tick. The
-answers are unchanged, byte for byte, and ``tests/reference/windows_v0.py`` keeps
-the pre-memo code so a test can prove it.
+Test-only. See ``tests/reference/__init__.py``: this file exists so
+``test_engine_identity.py`` can run the feature engine on the old, un-memoised
+window code and compare canonical bytes with the memoised one. It must never be
+"improved" — a fix here would make the equivalence test compare the new code
+with itself.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import cast
 
 import numpy as np
 
@@ -48,64 +25,22 @@ _MINUTE = timedelta(minutes=1)
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
-def memoize[T](ctx: MarketContext, key: str, factory: Callable[[], T]) -> T:
-    """``factory()``, computed once for ``ctx`` and kept on it under ``key``.
-
-    ``try``/``except KeyError`` rather than ``get``: a derivation whose answer is
-    ``None`` (or an empty window) must still count as computed, or the expensive
-    branch would run again for every caller asking the same question.
-    """
-    try:
-        return cast("T", ctx.memo[key])
-    except KeyError:
-        value = ctx.memo[key] = factory()
-        return value
-
-
-def _minutes_of(candles: Sequence[NormalizedCandle]) -> np.ndarray:
-    """Epoch minute of every ``open_time``, oldest first, read-only ``int64``.
-
-    Integer division of the ``timedelta`` instead of ``int(total_seconds()) //
-    60``: the same answer for every candle the type admits (``open_time`` is
-    validated aligned to the minute, so there is no fractional second to round)
-    without a float ever holding a timestamp. The array is frozen because it is
-    shared with every window that asks the context for it.
-    """
-    minutes = np.fromiter(
-        ((candle.open_time - _EPOCH) // _MINUTE for candle in candles),
-        dtype=np.int64,
-        count=len(candles),
+def _epoch_minutes(candles: Sequence[NormalizedCandle]) -> np.ndarray:
+    return np.array(
+        [int((c.open_time - _EPOCH).total_seconds()) // 60 for c in candles], dtype=np.int64
     )
-    minutes.flags.writeable = False
-    return minutes
 
 
-def _tail_length(minutes: np.ndarray) -> int:
-    """How many minutes at the end of ``minutes`` form an unbroken run."""
-    if minutes.size == 0:
+def _contiguous_tail_length(candles: Sequence[NormalizedCandle]) -> int:
+    """How many candles at the end of ``candles`` form an unbroken minute run."""
+    if not candles:
         return 0
+    minutes = _epoch_minutes(candles)
     steps = np.diff(minutes)
     broken = np.nonzero(steps != 1)[0]
     if broken.size == 0:
         return int(minutes.size)
     return int(minutes.size - (broken[-1] + 1))
-
-
-@dataclass(frozen=True, slots=True)
-class _MinuteIndex:
-    """The epoch minutes of ``ctx.final_candles`` and their contiguous tail."""
-
-    minutes: np.ndarray
-    tail: int
-
-
-def _index(ctx: MarketContext) -> _MinuteIndex:
-    return memoize(ctx, "minute_index", lambda: _build_index(ctx.final_candles))
-
-
-def _build_index(candles: Sequence[NormalizedCandle]) -> _MinuteIndex:
-    minutes = _minutes_of(candles)
-    return _MinuteIndex(minutes=minutes, tail=_tail_length(minutes))
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,7 +77,7 @@ def tail_minutes(ctx: MarketContext, count: int, *, include_forming: bool = Fals
     forming = ctx.forming
     if include_forming and forming is None:
         return MinuteWindow(reason=Reason.MISSING_INPUT)
-    run = _index(ctx).tail
+    run = _contiguous_tail_length(candles)
     if run < count:
         # history that never reached back is warm-up; a hole inside a history
         # that *does* reach back is a gap (aggregate.py's distinction).
@@ -172,46 +107,13 @@ def bars_15m(ctx: MarketContext) -> BarWindow:
     The last bar ends at the newest 15-minute boundary that had already closed
     at the newest final minute: a partial bucket is never emitted, so a bar the
     market had not finished printing cannot reach the ATR.
-
-    Memoised on ``ctx``: the ATR advance, the ATR provenance and
-    ``breakout_strength_20`` each ask for this window, and folding a hundred bars
-    three times per vector was 45% of the vector's cost.
     """
-    return memoize(ctx, "bars_15m", lambda: _bars_15m(ctx))
-
-
-def _usable_for_bars(
-    ctx: MarketContext, anchor: datetime
-) -> tuple[list[NormalizedCandle], np.ndarray]:
-    """The candles a complete-bar window may use, with their epoch minutes.
-
-    The contiguous tail of ``final_candles`` is **not** the contiguous tail of
-    these: a hole inside the bucket still open shortens the first and leaves the
-    complete bars untouched (Astra, T2.2b design review), so the two lengths stay
-    separate numbers. What is reused is the arithmetic - the usable candles are
-    normally a prefix of ``final_candles`` (``close_time`` grows with
-    ``open_time``), and then their minutes are a slice of the memoised array. A
-    ``close_time`` out of order is possible in the type, so the general case
-    still builds its own array, exactly as the pre-memo code always did.
-    """
-    candles = ctx.final_candles
-    usable = [item for item in candles if item.close_time <= anchor]
-    if not usable or usable[-1] is candles[len(usable) - 1]:
-        # A subsequence of length m whose last element sits at index m-1 must
-        # occupy indices 0..m-1: the m-1 elements before it are all at smaller
-        # indices, in order, and there are exactly that many slots. So this one
-        # identity check proves the prefix, and the slice is the right minutes.
-        return usable, _index(ctx).minutes[: len(usable)]
-    return usable, _minutes_of(usable)
-
-
-def _bars_15m(ctx: MarketContext) -> BarWindow:
     last = ctx.last_final
     if last is None:
         return BarWindow(reason=Reason.MISSING_INPUT)
     anchor = align_open_time(last.close_time, Timeframe.M15)
-    usable, minutes = _usable_for_bars(ctx, anchor)
-    run = _tail_length(minutes)
+    usable = [c for c in ctx.final_candles if c.close_time <= anchor]
+    run = _contiguous_tail_length(usable)
     bars_needed = run // 15
     if bars_needed < 1:
         return BarWindow(reason=Reason.WARMUP)
@@ -282,7 +184,6 @@ __all__ = [
     "MinuteWindow",
     "TradeWindow",
     "bars_15m",
-    "memoize",
     "tail_minutes",
     "trades_between",
 ]

@@ -291,3 +291,141 @@ trades: quem sabe é quem coleta.
 observações até o corte** ao montar cada `MarketContext` — carregar o histórico inteiro e avaliar um
 corte anterior levanta, e capturar/ignorar essas exceções enviesaria a amostra (as avaliações que
 levantam não são aleatórias).
+
+## 18. T2.2b — desempenho sem mudar um byte (memo por contexto)
+
+Fecha o requisito que a §16 deixou em aberto. Nada de fórmula mudou: o aceite foi **igualdade de
+bytes** com a implementação anterior, e o benchmark veio depois.
+
+### 18.1 Onde o memo mora: no próprio `MarketContext`
+
+`MarketContext` ganhou `memo: dict[str, Any]` com `field(compare=False, repr=False, init=False)`,
+preenchido no `__post_init__`. É o escopo mais estreito que resolve o problema, e a escolha responde
+às três perguntas que a §16 fez a quem otimizasse:
+
+- **vazamento:** não existe dicionário de processo. O memo nasce com o contexto e morre com ele; o
+  scanner constrói um contexto novo por tick, então nada atravessa ticks nem mercados. Não há
+  política de expulsão para errar;
+- **invalidação:** tudo o que o memo guarda é função de `final_candles` e `as_of`, que num
+  `frozen=True` sobre uma **tupla** não mudam. `init=False` mantém o campo fora do construtor e fora
+  de `dataclasses.replace`, que portanto começa com o memo **vazio** — um contexto recortado nunca lê
+  janelas de outro corte;
+- **identidade:** `compare=False` tira o campo de `__eq__`/`__hash__`. Ressalva registrada da Astra:
+  isso **não** o tira de `asdict()` nem do pickle, então não prometemos identidade dessas
+  serializações do contexto — quem serializa é `FeatureVector.canonical_bytes()` e
+  `FeatureState.as_wire()`, e esses são exatamente os que o teste compara.
+
+Descartado: cache global com chave `(id(ctx), as_of)`. O CPython recicla `id()` assim que o contexto
+anterior é coletado, e um contexto novo poderia colidir com a entrada de um morto — janelas de outro
+mercado, sem nenhum sintoma.
+
+**`final_candles` agora é normalizado para tupla no `__post_init__`** (must-fix da Astra na revisão
+de desenho): `frozen` protege a ligação, não a lista ligada; um chamador que guardasse a própria
+lista poderia dar `append` depois da primeira janela e deixar o memo descrevendo velas que o contexto
+não tem mais.
+
+### 18.2 O que é derivado uma vez
+
+`windows.memoize(ctx, chave, fábrica)` guarda:
+
+- `minute_index`: o array `int64` de minutos de epoch de `final_candles` (**read-only**) e o
+  comprimento da cauda contígua. Era reconstruído 17× por vetor;
+- `bars_15m`: o `BarWindow` das barras de 15 min completas. Era agregado 3× por vetor
+  (`atr.advance_from_context`, `quality._atr_state`, `BreakoutStrength.compute`).
+
+`_epoch_minutes` virou `_minutes_of`, com `np.fromiter` sobre divisão inteira de `timedelta` em vez
+de `int(total_seconds()) // 60` — mesma resposta para toda vela que o tipo admite (`open_time` é
+validado alinhado ao minuto, não há fração de segundo para arredondar) e sem nenhum float segurando
+um timestamp.
+
+**As duas caudas são números diferentes** (must-fix da Astra): a cauda contígua de `final_candles`
+não é a cauda das velas *usáveis* para barras completas — um buraco dentro do balde ainda aberto
+encurta a primeira e não toca nas barras fechadas. `_usable_for_bars` calcula as duas separadamente e
+só reaproveita a **aritmética**: as velas usáveis normalmente são um prefixo, e o prefixo é provado
+com uma comparação de identidade — `usable[-1] is candles[len(usable) - 1]`. Uma subsequência de
+tamanho *m* cujo último elemento está no índice *m-1* só pode ocupar `0..m-1`, porque os *m-1*
+elementos anteriores estão em índices estritamente menores e há exatamente essa quantidade de vagas
+(a Astra conferiu o argumento). Quando o `close_time` está fora de ordem — possível no tipo — o array
+é reconstruído para a subsequência, exatamente como o código antigo sempre fez.
+
+**Fora das janelas, um desperdício por vetor:** `FeatureRegistry.feature_set_version` reconstruía as
+28 `FeatureDefinition` e hasheava o JSON canônico delas **a cada vetor**, para uma string que só muda
+quando alguém chama `register`. Passou a ser calculada uma vez e invalidada em `register` — que é o
+único mutador do registro, e por isso a invalidação é provável em uma linha.
+
+### 18.3 Aceite: os mesmos bytes, provados contra o código antigo
+
+`packages/indicators/tests/reference/windows_v0.py` é a cópia **congelada** do `windows.py`
+pré-T2.2b, só de teste, nunca importada pela produção.
+`tests/unit/test_engine_identity.py` roda o motor inteiro duas vezes por corte — uma pela produção,
+outra com todos os sítios de import (`atr`, `quality`, `trend`, `price`, `volume`, `micro`)
+apontados para a referência — e compara `FeatureVector.canonical_bytes()` **e**
+`canonical_json(FeatureState.as_wire())`. Detalhes que fazem disso prova e não ritual:
+
+- os dois percursos carregam **estados independentes**, corte a corte, e os cortes andam **para a
+  frente** (must-fix 1 da Astra na revisão do diff): a recursão ancorada do ATR só é exercitada quando
+  uma barra nova é dobrada num estado que já existia;
+- o teste do buffer circular **desliza de fato**: 101 cortes, 1500 minutos por corte, a vela mais
+  antiga caindo fora enquanto o mesmo checkpoint continua (must-fix 2). Quatro cópias da mesma fatia
+  com estado zerado não exercitavam nada;
+- o *patch* é verificado: um espião conta as entradas na referência, e um percurso que nunca entrasse
+  no código velho falharia em vez de comparar o novo consigo mesmo;
+- há uma varredura de 100 posições de buraco sobre um corte fixo. Ela existe porque a primeira versão
+  do teste (20 cortes espalhados) **não pegou** um off-by-one em `_tail_length`: a cauda contígua só
+  *decide* algo nas fronteiras (61 minutos, 31, 16, cada múltiplo de 15 na contagem de barras).
+  Verificado por mutação: `_tail_length` com -1 quebra 5 casos; um minuto errado em `_minutes_of`
+  quebra 107 de 116;
+- `test_windows_memo.py` prova as propriedades do memo pela **contagem de derivações** (não por
+  tempo, que numa máquina compartilhada é cara ou coroa): uma vez por contexto, zero na segunda
+  chamada, duas em dois contextos iguais (não há cache global), memo vazio depois de `replace`,
+  tupla preservada quando o chamador esvazia a lista dele.
+
+### 18.4 Medições (máquina do Everton, série sintética de 1500 velas)
+
+| | antes | depois |
+|---|---|---|
+| custo por vetor, relógio (p50 de 60 contextos novos) | 24,4 ms | **4,5–4,8 ms** (mín. 3,9) |
+| custo por vetor, CPU perfilada (cProfile, 10 vetores) | 45,8 ms | 10,5 ms |
+| `compute_features` no caminho do scanner (40 mercados, CPU perfilada) | 1,507 s = 37,7 ms/mercado | 0,457 s = **11,4 ms/mercado** |
+
+A linha de base "antes" do scanner é **conservadora**: ela roda com as janelas antigas mas já com o
+`feature_set_version` em cache, então o ganho real é um pouco maior que o 3,3× medido. Os 37,7 ms
+batem com os "~50 ms por vetor" da §16 medidos noutra máquina.
+
+O que sobrou dentro de `compute_features` é, em ordem: `hunter_core.strategies.aggregate` (~50% —
+dobrar até 100 barras de 15 min, fora do escopo desta tarefa e necessário para a identidade de
+bytes), as somas de `Decimal` de `relative_volume_1h` sobre 1440 minutos e os extremos de 24 h.
+
+### 18.5 O que **não** foi feito, e por quê
+
+**O caminho incremental "só a cauda" (item 3 do brief) não foi implementado.** Não há por onde
+ligá-lo sem o dono do scanner: `scanner.advance` constrói um `MarketContext` novo do zero a cada
+tick, o único carregador por mercado que a T2.2 expõe é o `FeatureState`, e ele é **serializado**
+(`as_wire`) — pendurar uma janela de barras nele mudaria os bytes que este mesmo aceite proíbe mudar.
+Pior: uma chave barata de invalidação sobre 1500 minutos (âncora + contagem + cauda) **não** detecta
+um minuto reescrito por backfill do REST, que é exatamente o caso em que o motor mais precisa estar
+certo. A versão correta é "o scanner guarda o `MarketContext` e acrescenta o minuto fechado", e é da
+T2.5b. O memo desta tarefa já está pendurado no contexto: no dia em que o contexto sobreviver ao
+tick, ele passa a pagar mais sem nenhuma mudança aqui.
+
+**`test_load.py` continua `xfail(strict=True)`** — com o motivo reescrito, porque o antigo estava
+errado. Duas medições, ambas reproduzíveis por `.claude/state/tmp/bench_scanner.py`:
+
+1. **o gargalo do scanner não é o motor de features, é o decode.**
+   `hunter_indicators.features.hotstate.decode_candles` responde por **77–89%** do custo por mercado:
+   1500 linhas msgpack revalidadas em `NormalizedCandle` do pydantic a cada tick (2,9 s de CPU
+   perfilada em 40 mercados contra 0,457 s de `compute_features`). O orçamento de 3 s por ciclo com
+   200 mercados são 15 ms por mercado; o decode sozinho passa disso;
+2. **a fixture do teste mede o vazio.** `MultiMarketHotState.seed` grava as velas de `BTCUSDT` sob a
+   chave de **todos** os símbolos, e `build_context` descarta as 1500 como estrangeiras: o contexto
+   avaliado tem `final_candles = 0` e o motor nunca rodou ali. Por isso a otimização desta tarefa
+   move o número do teste em ~1 ms.
+
+Consertar (2) é uma linha na fixture; consertar (1) é o contexto incremental. Ambos são da T2.5b, e o
+`xfail` estrito fica de pé para falhar alto no dia em que chegarem.
+
+**Cache de decode foi considerado e recusado nesta tarefa.** Um memo por `(exchange, symbol)` de 1500
+velas decodificadas custa ~487 MB para 200 mercados (medido com `tracemalloc`: 1625 B por
+`NormalizedCandle`). É a mesma memória que um `MarketContext` incremental custaria — ou seja, é a
+**mesma decisão**, e ela é do dono do scanner, não de um cache escondido dentro de um decodificador
+que hoje é puro. A Astra concordou em não assumir essa retenção aqui.
