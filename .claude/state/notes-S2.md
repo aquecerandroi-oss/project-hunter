@@ -374,3 +374,43 @@ recupera aquelas avaliações. As gauges dão visibilidade, não preservação. 
 recuperação de verdade seria uma coorte de replay (`replay:<run_id>`), que é escopo da S3/S4 e não
 desta tarefa. A S3 precisa contar as barras perdidas nessa janela como cobertura ausente com
 motivo, não como mercado quieto.
+
+## 22. `code_ref` hasheava bytes crus — CRLF (Windows) vs LF (VPS) davam versões diferentes
+Bug HIGH achado pela Sexta-feira na VPS (2026-09-06): `version_code_ref`
+(`services/strategy-worker/hunter_strategy_worker/code_ref.py`) hasheava os bytes exatos de cada
+módulo do fecho. `packages/core/hunter_core/strategies/**` está com CRLF numa checkout Windows e
+com LF na VPS (Linux); mesmo commit, dois digests diferentes. Uma versão ativada de um lado batia
+`code_ref_mismatch` do outro — `load_active_versions` a pulava e `/ready` (via `shadow_versions`)
+ficava vermelho sem nenhuma mudança de código real.
+
+**Correção:** o digest agora é calculado sobre o conteúdo *normalizado* de cada módulo —
+decodificado como UTF-8 (BOM inicial, se houver, descartado via `utf-8-sig`), com `\r\n` e `\r`
+reescritos para `\n` antes de entrar no `sha256` (`_normalized_source`, mesmo arquivo). A leitura
+usada para descobrir o fecho de imports (`ast.parse`) também passou a decodificar com `utf-8-sig`,
+pelo mesmo motivo — um módulo com BOM antes só quebrava o parse antes de chegar ao hash. Nada além
+disso muda: espaços finais, indentação e o resto do texto continuam byte-a-byte significativos
+(`TestLineEndingNormalization::test_a_real_code_change_still_changes_the_digest_under_crlf` e
+`test_trailing_whitespace_still_changes_the_digest` provam isso — trocar um byte real ainda muda o
+digest, com CRLF ou sem). Testes em `services/strategy-worker/tests/test_code_ref.py`.
+
+**O digest de toda versão já ativada muda com esta correção** — inclusive as da tabela do §20
+(`momentum`/v2 `code_ref=hunter_core.strategies.momentum_v1@sha256:c012f75c…`,
+`volume_anomaly`/v2 `code_ref=…@sha256:d8275427…`). Reproduzido e confirmado nesta tarefa:
+
+| variante | digest de `momentum_v1` (fecho: aggregate, base, canonical, envelope, indicators, numeric, schema) |
+|---|---|
+| **antes** da correção, árvore LF (a que está no repo) | `hunter_core.strategies.momentum_v1@sha256:c012f75cdd8492d3eb46aa9abd536320220c3bf71788e47e6b6b73218b0ba823` |
+| **antes** da correção, mesma árvore forçada para CRLF | `hunter_core.strategies.momentum_v1@sha256:4942036753bf73091374d86ae74c4e8e885d776a2ec8fb5afd5f5e34afd3f52b` (**diferente** — o bug, reproduzido) |
+| **depois** da correção, árvore LF | `hunter_core.strategies.momentum_v1@sha256:6ccbe8b6c8ac18f32e93a6d44e71e0045155646479907b2b1944f39c3cdf4c95` |
+| **depois** da correção, mesma árvore forçada para CRLF | `hunter_core.strategies.momentum_v1@sha256:6ccbe8b6c8ac18f32e93a6d44e71e0045155646479907b2b1944f39c3cdf4c95` (**igual** — corrigido) |
+
+Ou seja: qualquer linha de `strategy_versions` já congelada com o digest antigo (tree-wide *ou*
+por módulo, calculado antes desta correção, em qualquer SO) vai divergir do digest que esta
+imagem calcula agora. A regularização é via `infra/scripts/activate_strategy_version.py
+--supersede` (o mesmo mecanismo do §20/§21-b) — decidir **onde** rodar (dev, VPS, ambos) e para
+quais linhas fica com o orquestrador; esta tarefa só corrigiu o cálculo, não tocou no catálogo.
+
+**Arquivos tocados:** `services/strategy-worker/hunter_strategy_worker/code_ref.py`,
+`services/strategy-worker/tests/test_code_ref.py`, `.gitattributes` (raiz — `*.py text eol=lf`,
+`*.sh text eol=lf`, `*.ps1 text eol=crlf`, para que clones futuros já venham em LF; a árvore
+existente **não** foi renormalizada agora, isso é commit separado do orquestrador), esta nota.

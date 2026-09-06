@@ -34,6 +34,16 @@ changes", never the other way round:
 The same function and the same directory serve the ops script and the worker —
 one resolution, ``Path(hunter_core.strategies.__file__).parent``, so dev box and
 image cannot disagree.
+
+**The digest hashes normalized text, not raw bytes.** A Windows checkout
+writes ``\\r\\n``; the VPS (Linux) checks the same commit out as ``\\n``. Hashing
+raw bytes made those two checkouts disagree on the digest of the very same
+code, so a version activated on one host was refused on the other as
+``shadow_version_code_ref_mismatch`` (Sexta-feira, VPS bug report). Before
+hashing, each module's bytes are decoded as UTF-8 (a leading BOM, if any, is
+dropped), and ``\\r\\n``/``\\r`` are rewritten to ``\\n``. Nothing else is
+touched: trailing whitespace, indentation and every other byte of the text
+stay exactly as significant as before, so a real edit still moves the digest.
 """
 
 from __future__ import annotations
@@ -194,9 +204,22 @@ def module_closure(module: str, strategies_dir: Path = STRATEGIES_DIR) -> tuple[
         seen.add(name)
         path = strategies_dir / f"{name}.py"
         queue.extend(
-            _sibling_imports(path.read_text(encoding="utf-8"), path, strategies_dir) - seen
+            _sibling_imports(path.read_text(encoding="utf-8-sig"), path, strategies_dir) - seen
         )
     return tuple(sorted(seen))
+
+
+def _normalized_source(raw: bytes) -> bytes:
+    """``raw`` decoded as UTF-8, BOM stripped, newlines rewritten to ``\\n``.
+
+    This is the only transformation applied before hashing: a CRLF checkout
+    (Windows) and an LF checkout (Linux/VPS) of the same commit must freeze
+    the same ``code_ref`` (see the module docstring). Trailing whitespace and
+    every other byte of the text are left alone on purpose — they are still
+    part of the code the digest swears to.
+    """
+    text = raw.decode("utf-8-sig")
+    return text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
 
 
 def version_code_ref(module: str, strategies_dir: Path = STRATEGIES_DIR) -> str:
@@ -205,12 +228,13 @@ def version_code_ref(module: str, strategies_dir: Path = STRATEGIES_DIR) -> str:
     Both the module *names* and their *bytes* go into the hash: moving a
     calculator to another module changes the experiment's code even when the
     bytes are identical, and a version already collecting evidence must not
-    silently accept that.
+    silently accept that. The bytes are normalized first — see
+    :func:`_normalized_source`.
     """
     digest = hashlib.sha256()
     for name in module_closure(module, strategies_dir):
         digest.update(name.encode("utf-8"))
         digest.update(b"\0")
-        digest.update((strategies_dir / f"{name}.py").read_bytes())
+        digest.update(_normalized_source((strategies_dir / f"{name}.py").read_bytes()))
         digest.update(b"\0")
     return f"{PACKAGE}.{module}@sha256:{digest.hexdigest()}"

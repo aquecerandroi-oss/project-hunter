@@ -122,6 +122,89 @@ class TestDigest:
         assert version_code_ref("alpha_v1", tmp_path) != before
 
 
+def _force_lf(path: Path) -> None:
+    """Rewrite ``path`` with literal ``\\n`` bytes on disk.
+
+    ``Path.write_text`` translates ``\\n`` to the platform's newline on write
+    (that is how ``_tree`` above already wrote CRLF on a Windows test box) —
+    so a test that reads back the raw bytes needs a known, platform-independent
+    baseline before it rewrites them to CRLF/CR itself.
+    """
+    path.write_bytes(path.read_text(encoding="utf-8").encode("utf-8"))
+
+
+class TestLineEndingNormalization:
+    """A Windows checkout writes ``\\r\\n``; the VPS (Linux) writes ``\\n``. The
+    tree-wide digest hashed raw bytes, so the same commit froze two different
+    ``code_ref`` values depending on which OS activated it, and the side that
+    did not activate refused the version as ``shadow_version_code_ref_mismatch``
+    (Sexta-feira, VPS bug report). The digest now normalizes line endings
+    before hashing so both checkouts agree; it still changes for any real
+    difference in the code, trailing whitespace included.
+    """
+
+    def test_crlf_and_lf_produce_the_same_digest(self, tmp_path: Path) -> None:
+        _tree(tmp_path)
+        for name in ("numeric.py", "base.py", "alpha_v1.py"):
+            _force_lf(tmp_path / name)
+        lf_digest = version_code_ref("alpha_v1", tmp_path)
+        for name in ("numeric.py", "base.py", "alpha_v1.py"):
+            path = tmp_path / name
+            path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+        assert version_code_ref("alpha_v1", tmp_path) == lf_digest
+
+    def test_lone_cr_is_also_normalized(self, tmp_path: Path) -> None:
+        """Old Mac-style line endings are rarer but the rule is "any newline
+        spelling", not "CRLF specifically"."""
+        _tree(tmp_path)
+        for name in ("numeric.py", "base.py", "alpha_v1.py"):
+            _force_lf(tmp_path / name)
+        lf_digest = version_code_ref("alpha_v1", tmp_path)
+        for name in ("numeric.py", "base.py", "alpha_v1.py"):
+            path = tmp_path / name
+            path.write_bytes(path.read_bytes().replace(b"\n", b"\r"))
+        assert version_code_ref("alpha_v1", tmp_path) == lf_digest
+
+    def test_a_utf8_bom_is_stripped_before_hashing(self, tmp_path: Path) -> None:
+        _tree(tmp_path)
+        _force_lf(tmp_path / "numeric.py")
+        lf_digest = version_code_ref("alpha_v1", tmp_path)
+        path = tmp_path / "numeric.py"
+        path.write_bytes(b"\xef\xbb\xbf" + path.read_bytes())
+        assert version_code_ref("alpha_v1", tmp_path) == lf_digest
+
+    def test_a_real_code_change_still_changes_the_digest_under_crlf(self, tmp_path: Path) -> None:
+        """Normalization must not become a loophole: a genuine edit still
+        moves the digest, whichever line ending the file was saved with."""
+        _tree(tmp_path)
+        for name in ("numeric.py", "base.py", "alpha_v1.py"):
+            path = tmp_path / name
+            _force_lf(path)
+            path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+        before = version_code_ref("alpha_v1", tmp_path)
+        (tmp_path / "numeric.py").write_bytes(b"X = 2\r\n")
+        assert version_code_ref("alpha_v1", tmp_path) != before
+
+    def test_trailing_whitespace_still_changes_the_digest(self, tmp_path: Path) -> None:
+        """Normalization touches newline spelling and the BOM only: trailing
+        spaces and the rest of the text stay significant."""
+        _tree(tmp_path)
+        before = version_code_ref("alpha_v1", tmp_path)
+        (tmp_path / "numeric.py").write_text("X = 1   \n", encoding="utf-8")
+        assert version_code_ref("alpha_v1", tmp_path) != before
+
+    def test_momentum_v1_digest_agrees_between_crlf_and_lf_checkouts(self, tmp_path: Path) -> None:
+        """The reported bug, reproduced on the real closure: a CRLF copy of
+        every module momentum_v1 pulls in must freeze the same code_ref as
+        the LF checkout it was cloned from."""
+        lf_digest = version_code_ref("momentum_v1")
+        for name in module_closure("momentum_v1"):
+            src = STRATEGIES_DIR / f"{name}.py"
+            dst = tmp_path / f"{name}.py"
+            dst.write_bytes(src.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+        assert version_code_ref("momentum_v1", tmp_path) == lf_digest
+
+
 class TestImportsItCannotResolve:
     """Astra, S2 fixes diff review (HIGH a): silently dropping an import the
     closure cannot follow is the one direction that must never happen — the
