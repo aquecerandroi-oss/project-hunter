@@ -11,6 +11,16 @@ class Streams:
     MARKET_DERIVATIVES = "market.derivatives"
     MARKET_LIQUIDATIONS = "market.liquidations"
     MARKET_UNIVERSE_CHANGED = "market.universe.changed"
+    MARKET_BACKFILL_REQUESTED = "market.backfill.requested"
+    """A consumer asking the collector for history it does not have.
+
+    The joint M2 decision gives REST to the market-worker alone, so a worker that
+    needs older candles states the need on this stream and the collector -- which
+    owns the rate limit, the gap table and the recovery loop -- decides how and
+    when to fetch them. Deliberately a *request*, never a command: the payload
+    describes a window, and the identity is the window, so asking twice is one
+    gap."""
+
     FEATURES_UPDATED = "features.updated"
     ANOMALIES_DETECTED = "anomalies.detected"
     REGIME_CHANGED = "regime.changed"
@@ -35,6 +45,7 @@ DEFAULT_MAXLEN: dict[str, int] = {
     Streams.MARKET_DERIVATIVES: 20_000,
     Streams.MARKET_LIQUIDATIONS: 20_000,
     Streams.MARKET_UNIVERSE_CHANGED: 1_000,
+    Streams.MARKET_BACKFILL_REQUESTED: 5_000,
     Streams.FEATURES_UPDATED: 100_000,
     Streams.ANOMALIES_DETECTED: 20_000,
     Streams.REGIME_CHANGED: 1_000,

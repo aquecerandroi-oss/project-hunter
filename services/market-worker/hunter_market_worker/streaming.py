@@ -9,6 +9,8 @@ from typing import Any
 
 from hunter_core.logging import get_logger
 from hunter_exchanges.base import ExchangeError
+from hunter_market_worker.coverage import CoverageTracker
+from hunter_market_worker.heartbeat import connection_field
 from hunter_market_worker.hot_state import TradeMemory
 from hunter_market_worker.ingest import CHANNELS, AcceptedEvents, TickCoalescer, handle_event
 from hunter_market_worker.supervision import IngestionHealth, Watchdog
@@ -31,6 +33,7 @@ async def consume_once(
     heartbeat_state: Any,
     health: IngestionHealth | None = None,
     watchdog: Watchdog | None = None,
+    coverage: CoverageTracker | None = None,
 ) -> None:
     """Drain ``adapter.stream(...)`` with a plain ``async for`` (B1 —
     t16b-profile.md ACHADO-2: the old loop created one ``Task`` and one timer
@@ -41,12 +44,24 @@ async def consume_once(
     """
     stream = adapter.stream(list(symbols), CHANNELS)
     symbols = list(symbols)
+    if coverage is not None:
+        # A fresh stream is a fresh coverage interval: nothing before this
+        # instant was collected *by this session*, and the scanner may not
+        # treat the tape as continuous across a reconnect (T2.5).
+        coverage.session_started(symbols)
 
     async def housekeeping() -> None:
         while True:
             await asyncio.sleep(_HOUSEKEEPING_INTERVAL_S)
             if health is not None:
                 health.observe_adapter(adapter, active=bool(symbols))
+            if coverage is not None and coverage.due(time.monotonic()):
+                # Publishes only what this process can stand behind: nothing
+                # while a hot-state write is in flight, and never past
+                # ``now - COVERAGE_SAFETY_S`` (hunter_market_worker/coverage.py).
+                await coverage.stamp(
+                    redis, dropped_events=int(connection_field(adapter, "dropped_events") or 0)
+                )
             if watchdog is not None and watchdog.restart_stream:
                 watchdog.restart_stream = False
                 return
@@ -64,14 +79,23 @@ async def consume_once(
                     for symbol in removed:
                         trade_memory.forget(adapter.code, symbol)
                     symbols[:] = list(universe.symbols)
+                    if coverage is not None:
+                        coverage.subscribed(sorted(added))
+                        coverage.unsubscribed(sorted(removed))
 
     async def consume() -> None:
         async for event in stream:
             if event.symbol not in symbols:
                 continue
-            accepted = await handle_event(
-                event, redis, producer, queues, coalescer, funding_memory, trade_memory
-            )
+            if coverage is not None:
+                coverage.writing()
+            try:
+                accepted = await handle_event(
+                    event, redis, producer, queues, coalescer, funding_memory, trade_memory
+                )
+            finally:
+                if coverage is not None:
+                    coverage.written()
             if accepted:
                 if health is not None:
                     health.data_event()
@@ -104,6 +128,13 @@ async def consume_once(
         # Otherwise housekeeping ended on its own (watchdog.restart_stream) —
         # same contract as before: consume_once simply returns.
     finally:
+        if coverage is not None:
+            # The interval ended. Saying so is not the same as saying nothing:
+            # a reader must be able to tell "the collector is gone" from "the
+            # collector is here and cannot prove continuity right now".
+            coverage.session_broken()
+            with contextlib.suppress(Exception):
+                await coverage.stamp(redis, dropped_events=0)
         for task in (consume_task, housekeeping_task):
             task.cancel()
         for task in (consume_task, housekeeping_task):
@@ -129,6 +160,7 @@ async def run_ingest(
     producer = f"market-worker@{runtime.instance}"
     memory = AcceptedEvents()
     trade_memory = TradeMemory()
+    coverage = CoverageTracker(adapter.code)
     while True:
         if not universe.symbols:
             if universe.initialized:
@@ -155,6 +187,7 @@ async def run_ingest(
                 heartbeat_state,
                 health,
                 watchdog,
+                coverage,
             )
         except ExchangeError as exc:
             heartbeat_state.last_error = str(exc)

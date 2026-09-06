@@ -50,3 +50,4 @@ vault/.obsidian/cache
 
 # Obsidian app workspace state (per machine)
 .obsidian/
+.coverage

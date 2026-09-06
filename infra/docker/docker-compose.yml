@@ -121,6 +121,54 @@ services:
       start_period: 60s
       retries: 5
 
+  # Market intelligence (docs/plans/M2.md, task T2.5). Consumes the market.*
+  # streams, evaluates every monitored market against the engines of
+  # hunter_indicators and persists what it concluded: feature_snapshots,
+  # anomalies, market_regimes, opportunities (+ history) and feature_baselines.
+  # It places no orders and never calls an exchange: missing history is asked of
+  # the market-worker over `market.backfill.requested`, which owns REST.
+  scanner-worker:
+    image: hunter-api:${GIT_SHA:-dev}
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: scanner
+      HEALTH_PORT: "8001"
+    env_file:
+      - path: ../../.env
+        required: false
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # `service_started`, not `service_healthy`: the scanner reads the hot state
+      # and the durable candles the collector writes, but it has to survive the
+      # collector being down (it evaluates what it has and says the tape is
+      # uncovered, rather than dying), and a hard dependency would turn one
+      # restart into two.
+      market-worker:
+        condition: service_started
+    restart: unless-stopped
+    # Four readiness checks (hunter_scanner_worker/health.py): `scanner_consumers`
+    # (every stream loop iterated recently -- a quiet stream is not a stuck
+    # consumer), `scanner_evaluation` (the cycle is running: consumers that mark
+    # work nobody performs would otherwise look perfectly healthy),
+    # `scanner_outbox` (nothing queued and unpublished for too long) and
+    # `scanner_baselines` (the archive was *loaded* -- deliberately not "is
+    # mature", because a fresh install has no seven-day history and saying so is
+    # the honest state). Timeouts mirror the market-worker's, for the same
+    # measured reason: the health server shares the worker's event loop, so its
+    # /ready latency follows the loop's load, and a false "unhealthy" would
+    # restart a worker mid-cycle.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://localhost:8001/ready', timeout=25); raise SystemExit(0 if response.status == 200 else 1)"]
+      interval: 15s
+      timeout: 30s
+      start_period: 90s
+      retries: 5
+
   # Shadow Lab (docs/plans/SHADOW-LAB.md, task S2). Evaluates the activated
   # strategy_versions on their own timeframe closes, persists each decision with
   # its immutable envelope and follows the hypothetical outcome bar by bar.
