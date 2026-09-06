@@ -105,6 +105,16 @@ services:
       HEALTH_PORT: "8001"
     logging: *prod-logging
 
+  # M2 scanner (T2.5). Mesma regra acima: sem `*prod-db-env` ele sobe com a
+  # senha de dev e reinicia em loop (medido em 2026-09-06 no deploy fa9f957).
+  scanner-worker:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: scanner
+      HEALTH_PORT: "8001"
+    logging: *prod-logging
+
   web:
     restart: always
     build:
