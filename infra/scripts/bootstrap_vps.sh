@@ -343,7 +343,7 @@ step "cron do backup do Postgres"
 printf '%s\n' \
   'SHELL=/bin/bash' \
   'PATH=/usr/local/bin:/usr/bin:/bin' \
-  "17 3 * * * $DEPLOY_USER $TARGET_DIR/infra/vps/backup_postgres.sh >> $BACKUP_DIR/backup.log 2>&1" \
+  "17 3 * * * $DEPLOY_USER bash $TARGET_DIR/infra/vps/backup_postgres.sh >> $BACKUP_DIR/backup.log 2>&1" \
   | $SUDO tee /etc/cron.d/hunter-backup >/dev/null
 $SUDO chmod 644 /etc/cron.d/hunter-backup
 $SUDO systemctl enable --now cron

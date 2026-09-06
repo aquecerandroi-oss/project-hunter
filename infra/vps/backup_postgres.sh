@@ -62,7 +62,10 @@ fi
 # todos os blocos de dados estejam integros: --list le o indice, nao o dado.
 # O unico teste de verdade e restaurar num banco descartavel de tempos em
 # tempos (README, secao Backup).
-if ! compose exec -T postgres pg_restore --list /dev/stdin < "$TARGET" >/dev/null 2>&1; then
+# Sem nome de arquivo: dentro do container "/dev/stdin" nao aponta para o pipe do
+# docker exec e o pg_restore respondia "did not find magic string" para dumps
+# perfeitamente validos (o backup nunca gravou nada ate 2026-09-06 por isso).
+if ! compose exec -T postgres pg_restore --list < "$TARGET" >/dev/null 2>&1; then
   log "ERRO: dump ilegivel pelo pg_restore; removendo e mantendo os antigos"
   rm -f "$TARGET"
   exit 1
