@@ -23,6 +23,14 @@ início e fim.** Todas as candidatas abaixo nasceram da inspeção da coorte de 
 `buy/sell_pressure_*` · `trade_velocity_*`. Nas velas: `volume` e `taker_buy_volume`.
 **`return_24h` não existe.**
 
+> **Correção de 2026-09-06 (terceira rodada), e ela invalida parte da lista acima:**
+> `funding_change_8h`, `open_interest_change_1h` e `open_interest_change_4h` **estão registradas mas
+> não computam em produção** — `load_deriv_history` não tem chamada, então `Scanner.deriv_history`
+> fica sempre vazio e as três retornam `missing_input` em toda barra
+> ([[KB-0020-funding-change-8h-nunca-calcula]]). `funding_rate`, `mark_price` e `index_price`
+> **computam** (dependem só do snapshot do hash `deriv`). O detector `OPEN_INTEREST_SPIKE` está
+> **armado e mudo**; o `FUNDING_ANOMALY` mede **distância da mediana**, não extremo absoluto.
+
 **Acréscimos verificados em 2026-09-06 (segunda rodada de conhecimento):**
 `taker_buy_volume` tem **cobertura de 100%** no banco (519.422 velas de 1 min, 222 mercados) mas é
 **descartado na agregação 1m→5m** (`aggregate.py:40,77`) — usá-lo exige carregar o campo no `Bar`.
@@ -48,7 +56,10 @@ do mercado no instante da decisão não está no envelope** de nenhum sinal.
 | 10 | **Alvo assimétrico** (alvo > stop) | [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] | — | médio | separada de propósito: muda acertos, exposição, invalidações e funding ao mesmo tempo | ideia |
 | 11 | **Desequilíbrio agressor na barra do sinal** (`taker_imbalance_5m ≥ θ`) — precedido de **observar sem decidir** | [[KB-0014-taker-buy-volume-o-que-temos-medido]] | `taker_buy_volume` nas velas de 1 min (**sim**, cobertura de 100% medida); exige carregar o campo no `Bar` de `aggregate.py` | baixo (observação) / médio (braço) | evidência **direcional observada**, não inferida — é o que os dois filtros de preço da `volume_anomaly_v1` não conseguem ver. Utilidade **não demonstrada** | ideia — o θ sai da distribuição **condicionada a pico**, ainda não medida |
 | 12 | **Teto de volume** (`volume_mult_max`, além do piso de 4) | [[KB-0015-volume-relativo-e-o-pico-como-exaustao]] | `volume_ratio_5m` no envelope (sim) | médio | **nenhum edge prometido.** Exaustão é explicação compatível, não identificada; o valor 12 é exploratório e sem sustentação | ideia, dependente do diagnóstico H-KB0015a |
+| 13 | **Prêmio contra o índice** — `last_index_basis_fraction` e `mark−index` como medidas **distintas**, primeiro só observadas | [[KB-0021-funding-como-preco-de-posicionamento-nao-como-previsao]] | `price`, `mark_price`, `index_price` (sim, no `deriv` e em `market_snapshots`; `index_price` é *nullable*) | baixo (observação) | **nenhum edge prometido.** O carry tem evidência revisada em horizonte de dias a meses; a 4 h, nada | ideia — bloqueada pelo recorte estritamente anterior (chave por minuto) |
+| 14 | **OI em nível como profundidade** (não a variação) | [[KB-0024-open-interest-como-posicionamento-evidencia-e-folclore]] | `open_interest` / `open_interest_value` (sim) | médio (exige normalização entre mercados) | Bessembinder & Seguin: OI grande **associado** a menos volatilidade por unidade de volume, em futuros tradicionais dos anos 1980 | ideia |
 | — | ~~**Filtro de book** `orderbook_imbalance_20 ≥ 0`~~ | [[KB-0012-ofi-nao-e-o-nosso-orderbook-imbalance]] | — | — | **retirada na própria nota**: a feature é uma razão invariante a escala e **não mede profundidade**, que era a propriedade invocada | **descartada em 2026-09-06** |
+| — | ~~**Funding como filtro direcional de entrada**~~ | [[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]] | — | — | **não proposta como braço de sombra**: a melhor evidência direta (Binance USDⓈ-M, 2021–2024) mostra poder preditivo à frente ~zero por ativo; a versão transversal exige carteira e giro que o Lab não tem | **não entra na fila em 2026-09-06** — só diagnóstico |
 
 ## Diagnósticos e auditorias abertos pela segunda rodada
 
@@ -64,6 +75,28 @@ Nenhum destes é variante de estratégia, mas **todos contam como inspeção da 
 | Cobertura e distribuição de `spread_pct` anterior à decisão | [[KB-0016-quando-o-fluxo-importa-dependencia-de-estado]] | caudas e proporção acima de 2 bps, não só mediana | bucket **inteiramente anterior** — o sampler arredonda ao minuto |
 | Observabilidade da série de liquidações | [[KB-0017-liquidacoes-o-fluxo-forcado-que-observamos-por-amostragem]] | qualidade do coletor e intensidade da amostra recebida | corrigir a semântica `q`/`z`, `p`/`ap` antes de somar |
 | Gaps abertos × janela do denominador | [[KB-0018-volume-relatado-e-o-denominador-que-usamos]] | se algum sinal foi emitido com gap **aberto** na janela | separar gaps abertos de recuperados |
+
+## Diagnósticos e auditorias abertos pela terceira rodada (funding, OI, posicionamento)
+
+**Antes de qualquer um deles, um bloqueio de instrumento que torna três features e um detector
+inúteis** — e que não é diagnóstico, é conserto ou desarme honesto
+([[KB-0020-funding-change-8h-nunca-calcula]]):
+
+> `load_deriv_history` não tem chamada em produção → `Scanner.deriv_history` sempre vazio →
+> `funding_change_8h`, `open_interest_change_1h` e `open_interest_change_4h` são `missing_input` em
+> toda barra → `OPEN_INTEREST_SPIKE` está **armado e mudo**. Vai para [[Open Bugs]].
+
+| Item | Nota | O que responde | Pré-requisito |
+|---|---|---|---|
+| Motivos de indisponibilidade das três features de derivativos, com denominador (chave ausente · valor presente · `missing_input` · `warmup` · sem vetor) | [[KB-0020-funding-change-8h-nunca-calcula]] | confirma ou refuta o bloqueio, e distingue os dois mecanismos | nenhum além do acesso ao banco |
+| Contagem de disparos de `OPEN_INTEREST_SPIKE` desde o armamento | [[KB-0020-funding-change-8h-nunca-calcula]] | teste mais barato do bloqueio (previsão: zero) | nenhum |
+| Mistura de `funding_kind` no instante das decisões, idade da leitura e fase do ciclo | [[KB-0019-o-que-a-nossa-funding-rate-mede-de-fato]] | se as nossas leituras de funding são estimativa em formação ou taxa liquidada | persistir os três campos no envelope |
+| Cobertura de `index_price` e distribuição do prêmio contra o índice | [[KB-0021-funding-como-preco-de-posicionamento-nao-como-previsao]] | se há dispersão real ou só ruído de arredondamento | recorte **estritamente anterior** — a chave de `market_snapshots` é o minuto alinhado |
+| Associação de `funding_rate` (nível, condicionado ao sinal) com o resultado | [[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]] | se o nosso recorte contraria a evidência externa | funding persistido no envelope |
+| Taxa base do `FUNDING_ANOMALY` e retorno subsequente, **com grupo não disparado** | [[KB-0023-funding-extremo-como-contrarian-a-afirmacao-mais-repetida]] | se o desvio de funding tem associação, separando nível, desvio, sinal, limite e cadência | nenhum |
+| Quadrantes OI × preço nos outcomes existentes, contra controle por volume agressor | [[KB-0024-open-interest-como-posicionamento-evidencia-e-folclore]] | se a leitura direcional do folclore sobrevive a quem cruzou o spread | `open_interest_history` com folga efetiva registrada |
+| Disparos de um detector de OI **bilateral** e coincidência de queda de OI com `liquidations` | [[KB-0025-o-nosso-detector-de-open-interest-so-olha-para-cima]] | se a nossa amostragem de 5 min enxerga o desmonte | destravar o histórico; corrigir a semântica do `notional` |
+| Duração dos acompanhamentos (`exit_ts − entry_ts`) e taxa de atravessamento explícita | [[KB-0026-funding-num-horizonte-de-4h-e-o-vies-de-exclusao]] | quanto tempo ficamos expostos e quantos outcomes cruzam liquidação de verdade | separar atravessamento confirmado, inferido e indeterminado |
 
 **Requisito de proveniência (bloqueia análise por liquidez):** gravar no envelope de cada sinal o
 **ranking do mercado**, o **tamanho e a regra do universo** e o **timestamp do refresh** — hoje nada
@@ -106,6 +139,32 @@ distribuição **condicionada a pico de volume**, que é a população que decid
 **Lembrete de multiplicidade:** os diagnósticos do item 1 são inspeção da mesma população que gerou
 as suspeitas, e portanto **exploração**. Nenhuma candidata desta rodada pode ser confirmada nessa
 população ([[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]]).
+
+### Onde a terceira rodada entra nessa ordem (2026-09-06)
+
+**Antes de tudo, e antes até dos diagnósticos da segunda rodada:** o bloqueio de
+[[KB-0020-funding-change-8h-nunca-calcula]]. Enquanto `deriv_history` não for alimentado, três
+features do M2 e um detector armado são decoração — e qualquer página que os liste como disponíveis
+está errada. Consertar ou desarmar é decisão de contrato, não faxina, e não é diagnóstico: é bug.
+
+Depois disso, na ordem, e **nenhum deles é braço de estratégia**:
+
+1. **Os dois diagnósticos que confirmam o bloqueio** (motivos com denominador; disparos do
+   `OPEN_INTEREST_SPIKE`). Custam uma consulta cada e decidem entre o caminho A e o B.
+2. **Duração e atravessamento** ([[KB-0026-funding-num-horizonte-de-4h-e-o-vies-de-exclusao]]).
+   É a medição que impede que "0 de 173" continue sendo lido como frequência de mercado, e
+   `exit_ts − entry_ts` é a consulta mais barata desta lista inteira.
+3. **Observar sem decidir o funding** (`funding_kind`, idade, fase do ciclo) — mesmo padrão do
+   `taker_imbalance_5m` da segunda rodada, e pré-requisito dos itens 4 e 5.
+4. **Taxa base do `FUNDING_ANOMALY` com grupo de controle.** O detector já existe e nunca foi lido.
+5. **Quadrantes de OI contra o controle por volume agressor.** Depende do item 1 estar resolvido.
+6. **Prêmio contra o índice** (#13) e **OI em nível como profundidade** (#14) por último: são as
+   duas ideias novas da rodada e as duas mais distantes de evidência aplicável ao nosso horizonte.
+
+**O que a rodada explicitamente NÃO propõe:** funding como filtro direcional de entrada. A evidência
+direta no nosso mercado aponta para poder preditivo à frente ~zero por ativo, e gastar uma tentativa
+contra uma prior desfavorável é o oposto do que a
+[[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] pede.
 
 ## Já em sombra
 - `momentum_v1` → [[EXP-0001-momentum-v1]] (coortes `v1` e `v2`; `v2` difere só pelo `code_ref`)

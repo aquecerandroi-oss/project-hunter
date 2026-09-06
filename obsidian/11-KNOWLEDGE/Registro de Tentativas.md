@@ -96,6 +96,53 @@ atual de `markets` atribuiria resultados à faixa errada
 D-007 nasceram da inspeção da coorte de 2026-09-06. Nenhuma pode ser confirmada nessa mesma
 população; a confirmação exige janela futura reservada, declarada **antes** da coleta.
 
+## Acréscimo de 2026-09-06 (terceira rodada de conhecimento — funding, open interest e posicionamento)
+
+Linhas **acrescentadas**, nunca editadas. **Tentativas avaliadas continuam em 0**: nenhuma candidata
+foi rodada e nenhum diagnóstico foi executado — nesta rodada nem SQL houve, porque o portão de
+permissão da sessão recusou `psql` na VPS e o Docker local estava fora.
+
+| ID | Candidata | Nota de origem | Parâmetros | `δ` | Início/fim UTC | Status |
+|---|---|---|---|---|---|---|
+| T-012 | `time_to_funding_s` como feature, para condicionar a linha de base do `FUNDING_ANOMALY` à fase do ciclo | [[KB-0019-o-que-a-nossa-funding-rate-mede-de-fato]] | `next_funding_time − as_of`, em segundos | a definir | — | proposta, **bloqueada** pela observação sem decisão |
+| T-013 | prêmio contra o índice — `last_index_basis_fraction` e `mark−index` como medidas **distintas** | [[KB-0021-funding-como-preco-de-posicionamento-nao-como-previsao]] | nenhum parâmetro de decisão; só medição | — | — | proposta, **bloqueada** pelo recorte estritamente anterior |
+| T-014 | OI **em nível** como proxy de profundidade | [[KB-0024-open-interest-como-posicionamento-evidencia-e-folclore]] | normalização entre mercados **a definir** (por OI próprio recente ou `open_interest_value`) | a definir | — | proposta |
+| T-015 | detector de OI **bilateral** (lado de baixo além do de cima) | [[KB-0025-o-nosso-detector-de-open-interest-so-olha-para-cima]] | `DetectorSide.BOTH` em `open_interest_change_1h`; seria `detector_version` nova | a definir | — | proposta, **bloqueada** pelo bloqueio de `deriv_history` |
+| T-016 | funding como filtro direcional de entrada | [[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]] | — | — | — | **proposta e retirada em 2026-09-06**, antes de qualquer coleta: a melhor evidência direta no nosso mercado e corretora (Binance USDⓈ-M, 2021–2024) mostra poder preditivo à frente ~zero por ativo; a versão transversal exige carteira, neutralização e giro que o Lab não tem |
+
+**T-016 fica registrada mesmo tendo morrido no mesmo dia**, pela mesma regra que preservou a T-011:
+foi abandonada por argumento sobre evidência externa, **não** por resultado nosso, e está aqui com o
+motivo para que ninguém a reproponha como ideia nova. Ressalva obrigatória: a evidência que a matou é
+sobre **outra variável** (variação, não nível), **outro universo** e **outro horizonte** — ela é
+prior desfavorável, não refutação.
+
+**Diagnósticos registrados** (não são variantes; **contam como inspeção da amostra**):
+
+| ID | Diagnóstico | Nota | Status |
+|---|---|---|---|
+| D-008 | motivos de indisponibilidade de `funding_change_8h`, `open_interest_change_1h/4h`, com denominador (chave ausente · valor presente · `missing_input` · `warmup` · sem vetor) | [[KB-0020-funding-change-8h-nunca-calcula]] | proposto |
+| D-009 | contagem de disparos de `OPEN_INTEREST_SPIKE` desde o armamento (previsão: zero) | [[KB-0020-funding-change-8h-nunca-calcula]] | proposto |
+| D-010 | mistura de `funding_kind`, idade da leitura e fase do ciclo no instante das decisões | [[KB-0019-o-que-a-nossa-funding-rate-mede-de-fato]] | proposto |
+| D-011 | cobertura de `index_price` e distribuição do prêmio contra o índice, com recorte **estritamente anterior** | [[KB-0021-funding-como-preco-de-posicionamento-nao-como-previsao]] | proposto |
+| D-012 | associação de `funding_rate` (nível, condicionada ao **sinal**) com o resultado | [[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]] | proposto |
+| D-013 | taxa base do `FUNDING_ANOMALY` e retorno a horizonte fixo, **com grupo não disparado**, separando nível · desvio · sinal · limite vigente · cadência | [[KB-0023-funding-extremo-como-contrarian-a-afirmacao-mais-repetida]] | proposto |
+| D-014 | quadrantes OI × preço nos outcomes existentes, com controle por `taker_imbalance_5m` | [[KB-0024-open-interest-como-posicionamento-evidencia-e-folclore]] | proposto |
+| D-015 | coincidência entre queda acentuada de OI e eventos de `liquidations` (validação de instrumento) | [[KB-0025-o-nosso-detector-de-open-interest-so-olha-para-cima]] | proposto, depende de corrigir a semântica do `notional` |
+| D-016 | duração dos acompanhamentos (`exit_ts − entry_ts`) e taxa de atravessamento explícita, separando atravessamento **confirmado**, **inferido** e **indeterminado** | [[KB-0026-funding-num-horizonte-de-4h-e-o-vies-de-exclusao]] | proposto |
+
+**Não é tentativa nem diagnóstico — é bug de instrumento**, e por isso não consome multiplicidade:
+`load_deriv_history` sem chamada em produção, deixando três features `missing_input` e o detector
+`OPEN_INTEREST_SPIKE` armado e mudo. Vai para [[Open Bugs]], não para esta contagem.
+
+**Inferências retiradas nesta rodada, registradas para não voltarem:** a taxa de atravessamento de
+funding de ~13% e a duração média de acompanhamento de ~1 h derivada dela
+([[KB-0026-funding-num-horizonte-de-4h-e-o-vies-de-exclusao]]) — misturavam populações e assumiam
+que atravessamento inferido é atravessamento real.
+
+**Consequência de multiplicidade, repetida:** T-012 a T-016 e D-008 a D-016 nasceram da inspeção da
+coorte e do código de 2026-09-06. Nenhuma pode ser confirmada nessa mesma população; a confirmação
+exige janela futura reservada, declarada **antes** da coleta.
+
 ## Relacionados
 
 [[Strategy Backlog]] · [[Index]] ·
