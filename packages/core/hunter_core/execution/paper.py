@@ -34,26 +34,24 @@ from hunter_core.execution.adapter import (
     Residual,
     SpotFilters,
 )
-from hunter_core.execution.book_walk import (
-    BOOK_POLICY_VERSION,
-    BookVerdict,
-    BookWalk,
-    eligible_book,
-    walk_book,
-)
+from hunter_core.execution.book_walk import BookVerdict, BookWalk, walk_book
 from hunter_core.execution.entries import MarketEntryOrder
+from hunter_core.execution.idempotency import decision_fingerprint, guard_replay
 from hunter_core.execution.intents import ExitAttempt
 from hunter_core.execution.pricing import (
     ExecutionPolicy,
     apply_model_slippage,
+    eligible_for,
     mark_price,
+    policy_versions,
+    price_band_breach,
+    reference_fields,
     residual_for,
     slippage_vs_plan,
     taker_fee,
     untradable_reason,
 )
 from hunter_core.execution.triggers import (
-    MARKING_POLICY_VERSION,
     ProtectedPosition,
     TriggerEvaluation,
     check_triggers,
@@ -93,18 +91,28 @@ class PaperExecutionAdapter:
         """One attempt to buy; whatever does not fill is cancelled for good."""
         recorded = self._replay(order.execution_key)
         if recorded is not None:
-            return recorded
+            return guard_replay(
+                recorded,
+                submitted_qty=order.qty,
+                decision=decision_fingerprint(order.decision),
+            )
         common = order.report_identity(last_trade)
         market = (order.decision.market.exchange, order.decision.market.symbol)
         usable, _ = usable_trade(last_trade, now=now, policy=self.policy.marking_policy)
-        common |= self._reference(usable, avg_price, now)
+        common |= reference_fields(usable, avg_price, now=now, policy=self.policy)
         verdict = filters.check_market_order(
             order.qty, avg_price=avg_price, last_price=None if usable is None else usable.price
         )
         if not verdict.ok:
             return self._no_fill(common, verdict.qty, verdict.reason or "filter", now)
-        book_verdict = self._eligible(
-            book, order.decision_at, now, OrderSide.BUY, previous_book_sequence, market
+        book_verdict = eligible_for(
+            self.policy,
+            book,
+            decision_at=order.decision_at,
+            now=now,
+            side=OrderSide.BUY,
+            previous_sequence=previous_book_sequence,
+            market=market,
         )
         if not book_verdict.eligible or book is None:
             return self._no_fill(common, verdict.qty, book_verdict.reason, now)
@@ -112,6 +120,12 @@ class PaperExecutionAdapter:
         if walk.filled_qty <= 0:
             return self._no_fill(common, verdict.qty, "no_depth", now)
         gross, vwap = apply_model_slippage(walk, side=OrderSide.BUY, policy=self.policy)
+        if price_band_breach(filters, side=OrderSide.BUY, fill_price=vwap, avg_price=avg_price):
+            # Our own band (T3.0a S5), and an entry can always be refused: a book
+            # whose vwap sits outside PERCENT_PRICE_BY_SIDE around the exchange
+            # average is a corrupted snapshot, and paper equity is the lab's only
+            # output (review of 2026-09-07, item 15).
+            return self._no_fill(common, verdict.qty, "price_band", now)
         fee = taker_fee(
             fees, asset="base", base_qty=walk.filled_qty, gross=gross, vwap=vwap, policy=self.policy
         )
@@ -147,14 +161,14 @@ class PaperExecutionAdapter:
         """One attempt at a durable intention, which survives whatever it fails to sell."""
         recorded = self._replay(attempt.execution_key)
         if recorded is not None:
-            return recorded
+            return guard_replay(recorded, submitted_qty=attempt.qty)
         intent = attempt.intent
         common = attempt.report_identity(last_trade)
         if not intent.live:
             return self._no_fill(common, Decimal(0), "intent_terminal", now)
         usable, _ = usable_trade(last_trade, now=now, policy=self.policy.marking_policy)
         mark = mark_price(usable, avg_price, now=now, policy=self.policy)
-        common |= self._reference(usable, avg_price, now)
+        common |= reference_fields(usable, avg_price, now=now, policy=self.policy)
         wanted = min(attempt.qty, max(position_qty, Decimal(0)), intent.remaining_qty)
         if wanted <= 0:
             return self._no_fill(common, Decimal(0), "no_position_qty", now)
@@ -171,13 +185,15 @@ class PaperExecutionAdapter:
                 return self._no_fill(common, wanted, reason, now, degraded=True)
             leftover = residual_for(wanted, reason, mark, policy=self.policy)
             return self._no_fill(common, verdict.qty, reason, now, residual=leftover)
-        book_verdict = self._eligible(
+        market = None if intent.market is None else (intent.market.exchange, intent.market.symbol)
+        book_verdict = eligible_for(
+            self.policy,
             book,
-            attempt.decision_at,
-            now,
-            OrderSide.SELL,
-            previous_book_sequence,
-            None if intent.market is None else (intent.market.exchange, intent.market.symbol),
+            decision_at=attempt.decision_at,
+            now=now,
+            side=OrderSide.SELL,
+            previous_sequence=previous_book_sequence,
+            market=market,
         )
         if not book_verdict.eligible or book is None:
             return self._no_fill(common, verdict.qty, book_verdict.reason, now, degraded=True)
@@ -198,6 +214,13 @@ class PaperExecutionAdapter:
         blocked = untradable_reason(left, filters, vwap or mark[0]) if left > 0 else None
         if blocked is not None:
             leftover = residual_for(left, blocked, vwap or mark, policy=self.policy)
+        # The band never refuses a protection: a real 20 % crash puts the fill
+        # under ask_multiplier_down exactly when the stop matters most, and
+        # "travas nao podem impedir saidas de protecao" (directive, rule 3). It is
+        # published with an alert instead (review of 2026-09-07, item 15).
+        breached = price_band_breach(
+            filters, side=OrderSide.SELL, fill_price=vwap, avg_price=avg_price
+        )
         return self._filled(
             common,
             walk,
@@ -212,6 +235,8 @@ class PaperExecutionAdapter:
             planned=attempt.planned_price,
             side=OrderSide.SELL,
             residual=leftover,
+            alert=breached,
+            reason="price_band_breached" if breached else "",
         )
 
     def check_triggers(
@@ -236,48 +261,16 @@ class PaperExecutionAdapter:
     # ---------------------------------------------------------------- helpers
 
     def _replay(self, execution_key: str) -> ExecutionReport | None:
+        """The recorded execution of this key, if there is one.
+
+        Whether it is really a *replay* of the same order is
+        :func:`~hunter_core.execution.idempotency.guard_replay`'s question."""
         return None if self.journal is None else self.journal.get(execution_key)
 
     def _record(self, report: ExecutionReport) -> ExecutionReport:
         if self.journal is not None:
             self.journal.record(report)
         return report
-
-    def _eligible(
-        self,
-        book: NormalizedOrderBook | None,
-        decision_at: datetime,
-        now: datetime,
-        side: OrderSide,
-        previous_sequence: int | None,
-        market: tuple[str, str] | None = None,
-    ) -> BookVerdict:
-        return eligible_book(
-            book,
-            decision_at=decision_at,
-            latency=self.policy.latency,
-            now=now,
-            max_age=self.policy.max_book_age,
-            previous_sequence=previous_sequence,
-            side=side,
-            market=market,
-        )
-
-    def _reference(
-        self, usable: NormalizedTrade | None, avg_price: Decimal | None, now: datetime
-    ) -> dict[str, Any]:
-        """Which price the filters were judged against — published, not implied."""
-        price, source = mark_price(usable, avg_price, now=now, policy=self.policy)
-        return {"filter_reference_price": price, "filter_reference_source": source}
-
-    def _versions(self, now: datetime) -> dict[str, Any]:
-        return {
-            "executed_at": now,
-            "latency_ms": self.policy.latency_ms,
-            "marking_policy_version": MARKING_POLICY_VERSION,
-            "book_policy_version": BOOK_POLICY_VERSION,
-            "execution_policy_version": self.policy.version,
-        }
 
     def _filled(
         self,
@@ -309,7 +302,7 @@ class PaperExecutionAdapter:
                 book_sequence=book_verdict.sequence,
                 book_received_at=book_verdict.received_at,
                 eligible_at=common["decision_at"] + self.policy.latency,
-                **self._versions(now),
+                **policy_versions(self.policy, now),
                 **slippage_vs_plan(planned, walk.filled_qty, gross, side=side, policy=self.policy),
                 **common,
                 **fields,
@@ -344,7 +337,7 @@ class PaperExecutionAdapter:
                 degraded=degraded,
                 alert=degraded,
                 reason=reason,
-                **self._versions(now),
+                **policy_versions(self.policy, now),
                 **common,
             )
         )

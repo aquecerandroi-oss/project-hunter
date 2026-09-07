@@ -27,6 +27,7 @@ from pydantic import Field, model_validator
 from hunter_core.domain.enums import OrderSide
 from hunter_core.domain.market import NormalizedTrade
 from hunter_core.execution.adapter import EntryWithoutApproval, ExecutionModel
+from hunter_core.execution.idempotency import decision_fingerprint
 from hunter_risk.decision import RiskDecision
 
 __all__ = ["MarketEntryOrder", "client_order_id_for_entry", "execution_key_for_entry"]
@@ -127,6 +128,8 @@ class MarketEntryOrder(ExecutionModel):
             "execution_key": self.execution_key,
             "client_order_id": self.client_order_id,
             "proposal_id": self.proposal_id,
+            "submitted_qty": self.qty,
+            "decision_fingerprint": decision_fingerprint(self.decision),
             "side": OrderSide.BUY,
             "planned_price": self.entry_ref,
             "decision_at": self.decision_at,

@@ -45,6 +45,7 @@ from hunter_core.domain.market import BookLevel, NormalizedOrderBook, Normalized
 from hunter_core.domain.types import uuid7
 from hunter_core.execution.adapter import ExecutionReport
 from hunter_core.execution.entries import MarketEntryOrder
+from hunter_core.execution.idempotency import applied_attempts_from_execution_keys
 from hunter_core.execution.intents import ExitAttempt, ExitIntent, apply_attempt
 from hunter_core.execution.paper import PaperExecutionAdapter
 from hunter_risk.decision import Counterfactual, LimitCap, RiskDecision, Sizing, check
@@ -79,6 +80,12 @@ class _Filters:
             self.effective_step_size
         )
 
+    def price_band(self, side: OrderSide, *, avg_price: Decimal) -> tuple[Decimal, Decimal]:
+        """The real BTCUSDT ``PERCENT_PRICE_BY_SIDE`` multipliers (T3.0a §5)."""
+        if side is OrderSide.BUY:
+            return avg_price * Decimal("0.5"), avg_price * Decimal("1.2")
+        return avg_price * Decimal("0.8"), avg_price * Decimal(2)
+
     def check_market_order(
         self,
         qty: Decimal,
@@ -89,6 +96,12 @@ class _Filters:
         rounded = self.round_qty_down(qty)
         ok = rounded >= self.effective_min_qty
         return _Verdict(ok=ok, qty=rounded, reason=None if ok else "min_qty")
+
+
+class _FineFilters(_Filters):
+    """The same rules with a 0,1 minimum — the 0,8 intention of the redelivery test."""
+
+    effective_min_qty = Decimal("0.1")
 
 
 class _Verdict:
@@ -658,3 +671,62 @@ async def _only_intent(connection: AsyncConnection, wallet: Wallet) -> uuid.UUID
         {"pf": wallet.portfolio_id},
     )
     return uuid.UUID(str(found))
+
+
+async def test_a_redelivered_exit_report_never_fills_the_intention_twice(
+    engine: AsyncEngine, wallet: Wallet
+) -> None:
+    """Review of 2026-09-07, blocker 2, against the real schema and a restart.
+
+    An intention of 0,8 whose attempt sold 0,4: the stream redelivers the same
+    report. In memory ``applied_attempts`` stops it, but Postgres has **no
+    column** for that yet (debt registered for T3.1b/T3.10), so the intention
+    rebuilt after a restart comes back without it. What *is* persisted is the
+    fill, and its ``execution_key`` is ``exit:{attempt_id}`` — so the set is
+    derived from the journal, and the second application changes nothing.
+    """
+    intent = _new_intent(wallet, intended="0.8")
+    async with engine.begin() as connection:
+        await _insert_intent(connection, wallet, intent)
+        report = _ADAPTER.submit_protection_exit(
+            ExitAttempt.for_intent(intent, qty=Decimal("0.8"), decision_at=DECIDED_AT),
+            Decimal("0.8"),
+            _book([("95.00", "0.4")]),
+            _trade("95"),
+            _FineFilters(),
+            _Fees(),
+            NOW,
+        )
+        assert report.filled_qty == Decimal("0.4")
+        await _persist_attempt(connection, wallet, report, purpose="stop")
+        await _save_intent(
+            connection, apply_attempt(intent, report, now=NOW, min_qty=Decimal("0.1"))
+        )
+
+    async with engine.connect() as connection:
+        rebuilt = await _load_intent(connection, await _only_intent(connection, wallet))
+        # Both sources, and that is the contract: an attempt that found no book
+        # is applied to the intention and writes **no fill**, only an order
+        # (Astra, T3.4b review, MUST-FIX 2). Same ``exit:{attempt_id}`` string.
+        keys = list(
+            (
+                await connection.execute(
+                    text(
+                        "SELECT execution_key FROM fills WHERE portfolio_id = :pf "
+                        "UNION SELECT client_order_id FROM orders WHERE portfolio_id = :pf"
+                    ),
+                    {"pf": wallet.portfolio_id},
+                )
+            ).scalars()
+        )
+        recovered = ExitIntent.model_validate(
+            rebuilt.model_dump() | {"applied_attempts": applied_attempts_from_execution_keys(keys)}
+        )
+    assert rebuilt.applied_attempts == ()  # the column debt, visible
+    assert recovered.applied_attempts == (report.attempt_id,)
+
+    again = apply_attempt(recovered, report, now=NOW, min_qty=Decimal("0.1"))
+    assert again == recovered
+    assert again.filled_qty == Decimal("0.4")
+    assert again.state is ExitIntentState.OPEN
+    assert again.closed_at is None

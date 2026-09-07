@@ -138,3 +138,19 @@ def test_the_live_module_imports_nothing_that_could_reach_a_venue() -> None:
     assert not any(
         name.startswith(("http", "requests", "aiohttp", "websocket")) for name in imported
     )
+
+
+def test_the_boundary_docstring_names_the_task_that_really_applies_a_report() -> None:
+    """Review of 2026-09-07, item 4: provenance prose is part of the contract.
+
+    ``adapter.py`` said T3.3 turns an ``ExecutionReport`` into cash. Nothing
+    applies a report yet — T3.5 will — and a docstring that names an applier
+    which does not exist sends the next reader looking for money-moving code
+    that was never written, or worse, assuming it already runs.
+    """
+    import hunter_core.execution.adapter as adapter_module
+
+    doc = inspect.getdoc(adapter_module) or ""
+    assert "**T3.5** turns an :class:`ExecutionReport` into cash" in doc
+    assert "T3.3 turns an" not in doc
+    assert "nothing applies a report yet" in doc.lower()

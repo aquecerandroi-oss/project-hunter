@@ -22,7 +22,6 @@ from hunter_core.execution.adapter import (
     ExecutionReport,
     FeeCharge,
     FeeSchedule,
-    InMemoryExecutionJournal,
     LevelFill,
     LiveTradingDisabled,
     Residual,
@@ -39,6 +38,12 @@ from hunter_core.execution.entries import (
     MarketEntryOrder,
     client_order_id_for_entry,
     execution_key_for_entry,
+)
+from hunter_core.execution.idempotency import (
+    InMemoryExecutionJournal,
+    ReplayMismatch,
+    applied_attempts_from_execution_keys,
+    decision_fingerprint,
 )
 from hunter_core.execution.intents import (
     ExitAttempt,
@@ -85,13 +90,16 @@ __all__ = [
     "MarkingPolicy",
     "PaperExecutionAdapter",
     "ProtectedPosition",
+    "ReplayMismatch",
     "Residual",
     "ShadowExecutionAdapter",
     "SpotFilters",
     "TriggerEvaluation",
     "allocate_sellable",
+    "applied_attempts_from_execution_keys",
     "apply_attempt",
     "check_triggers",
+    "decision_fingerprint",
     "client_order_id_for_entry",
     "client_order_id_for_exit",
     "eligible_book",

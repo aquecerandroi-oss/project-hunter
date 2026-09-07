@@ -188,7 +188,9 @@ class NormalizedTrade(_TsUtcMixin, _ReceivedAtMixin):
 
 
 class BookLevel(NormalizedModel):
-    price: Decimal
+    # Price 0 or below is corrupt data, not a level; ``eligible_book`` refuses it
+    # too, since the stream parsers build levels with ``model_construct``.
+    price: Decimal = Field(gt=0)
     qty: Decimal = Field(ge=0)
 
 

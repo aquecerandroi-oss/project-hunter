@@ -39,6 +39,7 @@ from hunter_core.execution.entries import (
     client_order_id_for_entry,
     execution_key_for_entry,
 )
+from hunter_core.execution.idempotency import applied_attempts_from_execution_keys
 from hunter_core.execution.intents import (
     ExitAttempt,
     ExitIntent,
@@ -399,3 +400,114 @@ def test_a_fulfilled_or_superseded_intention_is_closed_and_stays_closed() -> Non
             _intent("10").model_dump()
             | {"filled_qty": Decimal("10"), "state": ExitIntentState.FULFILLED, "closed_at": None}
         )
+
+
+# ------------------------------------------------- one attempt, applied once
+
+
+def test_replaying_one_attempt_report_never_counts_its_fill_twice() -> None:
+    """Review of 2026-09-07, blocker 2: a redelivery closed the intention early.
+
+    Intention of 0,8 with an attempt that filled 0,4. Folding the same
+    ``ExecutionReport`` in twice summed 0,4 + 0,4, marked the intention
+    ``fulfilled`` and left 0,4 units of the position with no protection at all —
+    from a redelivered stream event, which is the normal case, not the exotic one.
+    """
+    intent = _intent("0.8")
+    attempt = ExitAttempt.for_intent(intent, qty=Decimal("0.8"), decision_at=NOW)
+    report = _exit_report(attempt, filled="0.4")
+
+    once = apply_attempt(intent, report, now=NOW, min_qty=Decimal("0.1"))
+    assert (once.filled_qty, once.state) == (Decimal("0.4"), ExitIntentState.OPEN)
+    assert once.applied_attempts == (attempt.attempt_id,)
+
+    twice = apply_attempt(once, report, now=NOW, min_qty=Decimal("0.1"))
+    assert twice.filled_qty == Decimal("0.4")
+    assert twice.state is ExitIntentState.OPEN
+    assert twice.closed_at is None
+    assert twice == once
+
+
+def test_a_redelivery_after_the_intention_closed_is_a_no_op_not_an_exception() -> None:
+    """The redelivery of the *last* attempt arrives at a terminal intention.
+
+    Raising there would crash the worker on a legitimate at-least-once
+    redelivery; recomputing would try to reopen a closed row. The attempt is
+    already applied, so the answer is the intention exactly as it stands.
+    """
+    intent = _intent("0.4")
+    attempt = ExitAttempt.for_intent(intent, qty=Decimal("0.4"), decision_at=NOW)
+    report = _exit_report(attempt, filled="0.4", status="filled")
+    closed = apply_attempt(intent, report, now=NOW, min_qty=Decimal("0.1"))
+    assert closed.state is ExitIntentState.FULFILLED
+    assert apply_attempt(closed, report, now=NOW, min_qty=Decimal("0.1")) == closed
+
+
+def test_the_applied_attempts_are_rebuilt_from_the_execution_keys_of_the_fills() -> None:
+    """``portfolio_exit_intents`` has no column for this yet — so it is derived.
+
+    The durable authority for "this attempt was already applied" is
+    ``fills.execution_key`` (``exit:{attempt_id}``, DATABASE.md §18.3). Until the
+    column exists (debt registered for T3.1b/T3.10), the restart path rebuilds
+    the set from the journal instead of trusting an empty in-memory tuple.
+    """
+    first, second = uuid.UUID(int=31), uuid.UUID(int=32)
+    keys = [
+        execution_key_for_exit(first),
+        "entry:00000000-0000-0000-0000-000000000009",
+        execution_key_for_exit(second),
+    ]
+    assert applied_attempts_from_execution_keys(keys) == (first, second)
+    with pytest.raises(ValueError, match="exit:"):
+        applied_attempts_from_execution_keys(["exit:not-a-uuid"])
+
+
+def test_an_intention_rebuilt_from_postgres_is_made_idempotent_by_the_journal() -> None:
+    """The restart the column debt would otherwise reopen.
+
+    After a restart the intention comes back from Postgres without its applied
+    attempts, so the same report would be folded in a second time. Rebuilding
+    the set from the fills the journal wrote closes it with the data that *is*
+    persisted.
+    """
+    intent = _intent("0.8")
+    attempt = ExitAttempt.for_intent(intent, qty=Decimal("0.8"), decision_at=NOW)
+    report = _exit_report(attempt, filled="0.4")
+    applied = apply_attempt(intent, report, now=NOW, min_qty=Decimal("0.1"))
+
+    rebuilt = ExitIntent.model_validate(applied.model_dump() | {"applied_attempts": ()})
+    recovered = ExitIntent.model_validate(
+        rebuilt.model_dump()
+        | {"applied_attempts": applied_attempts_from_execution_keys([report.execution_key])}
+    )
+    assert apply_attempt(recovered, report, now=NOW, min_qty=Decimal("0.1")) == recovered
+
+
+def test_an_attempt_that_filled_nothing_is_recovered_from_its_order_not_its_fill() -> None:
+    """Astra, T3.4b review, MUST-FIX 2: no fill row means no key to derive from.
+
+    A stop that found no usable book is applied to the intention (it marks the
+    degradation) and writes **no fill** — only an ``orders`` row, whose
+    ``client_order_id`` is the same ``exit:{attempt_id}``. Deriving the applied
+    set from ``fills`` alone lost that attempt: after a restart the redelivery
+    of the degraded report hit an intention meanwhile superseded and raised,
+    turning a harmless redelivery into a crashed consumer.
+
+    So the durable authority is both keys, and the parser takes either.
+    """
+    intent = _intent("10")
+    attempt = ExitAttempt.for_intent(intent, qty=Decimal("10"), decision_at=NOW)
+    degraded = _exit_report(attempt, filled="0", status="pending_degraded", degraded=True)
+    applied = apply_attempt(intent, degraded, now=NOW, min_qty=Decimal("1"))
+    assert applied.applied_attempts == (attempt.attempt_id,)
+
+    retired = supersede(applied, successor_id=uuid.UUID(int=13), now=NOW)
+    rebuilt = ExitIntent.model_validate(retired.model_dump() | {"applied_attempts": ()})
+    with pytest.raises(ValueError, match="terminal"):
+        apply_attempt(rebuilt, degraded, now=NOW, min_qty=Decimal("1"))
+
+    recovered = ExitIntent.model_validate(
+        rebuilt.model_dump()
+        | {"applied_attempts": applied_attempts_from_execution_keys([attempt.client_order_id])}
+    )
+    assert apply_attempt(recovered, degraded, now=NOW, min_qty=Decimal("1")) == recovered

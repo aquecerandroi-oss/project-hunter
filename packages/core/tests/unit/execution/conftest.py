@@ -117,6 +117,11 @@ class StubFilters:
     apply_min_to_market: bool = True
     max_qty: Decimal = Decimal("1000")
     avg_price_mins: int | None = 5
+    bid_multiplier_down: Decimal | None = Decimal("0.5")
+    bid_multiplier_up: Decimal | None = Decimal("1.2")
+    ask_multiplier_down: Decimal | None = Decimal("0.8")
+    ask_multiplier_up: Decimal | None = Decimal("2")
+    """The real BTCUSDT ``PERCENT_PRICE_BY_SIDE`` multipliers (T3.0a §5)."""
 
     @property
     def effective_step_size(self) -> Decimal:
@@ -129,6 +134,17 @@ class StubFilters:
     @property
     def effective_max_qty(self) -> Decimal:
         return self.max_qty
+
+    def price_band(self, side: OrderSide, *, avg_price: Decimal) -> tuple[Decimal, Decimal]:
+        """Same shape as ``SpotMarketFilters.price_band``: no multiplier on a side
+        collapses that edge onto the average, which is not a band."""
+        if side is OrderSide.BUY:
+            down, up = self.bid_multiplier_down, self.bid_multiplier_up
+        else:
+            down, up = self.ask_multiplier_down, self.ask_multiplier_up
+        low = avg_price * down if down is not None else avg_price
+        high = avg_price * up if up is not None else avg_price
+        return low, high
 
     def round_qty_down(self, qty: Decimal) -> Decimal:
         if self.step_size <= 0:

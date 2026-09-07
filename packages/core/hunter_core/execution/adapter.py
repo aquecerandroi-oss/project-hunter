@@ -7,10 +7,13 @@ decision (``docs/plans/M3.md``, items 3 and 4) puts the *balance* somewhere else
 - the **adapter computes** — a pure function of an order, a book, a trade, the
   market's filters, the fee schedule and an instant handed in: no clock, no
   Redis, no Postgres, no balance;
-- the **ledger applies** — T3.3 turns an :class:`ExecutionReport` into cash,
+- the **ledger applies** — **T3.5** turns an :class:`ExecutionReport` into cash,
   quantity and fees, in the transaction that also moves the intention and the
   participation ledger, under the wallet's lock. Two writers of one balance is
-  the failure that split exists to prevent.
+  the failure that split exists to prevent. T3.3 built the wallet state this
+  report will feed; **nothing applies a report yet**, and saying otherwise (as
+  this docstring did until the review of 2026-09-07, item 4) sends the next
+  reader looking for an applier that does not exist.
 
 Three invariants are enforced **in the constructor** of :class:`ExecutionReport`,
 so a violation cannot be written down at all:
@@ -50,7 +53,6 @@ __all__ = [
     "ExecutionJournal",
     "ExecutionModel",
     "ExecutionReport",
-    "InMemoryExecutionJournal",
     "FeeCharge",
     "FeeSchedule",
     "LevelFill",
@@ -134,6 +136,15 @@ class ExecutionReport(ExecutionModel):
     side: OrderSide
 
     requested_qty: Decimal = Field(ge=0)
+    submitted_qty: Decimal | None = None
+    """What the caller asked for, **before** the market's filters rounded it —
+    the quantity a replay of this key has to match (see
+    :func:`hunter_core.execution.idempotency.guard_replay`). ``requested_qty``
+    is post-filter and cannot serve: a step-size round-down would read as a
+    different order."""
+    decision_fingerprint: str = ""
+    """The identity of the ``RiskDecision`` that authorised an entry. Same key,
+    different decision means the proposal was re-decided, not redelivered."""
     filled_qty: Decimal = Field(default=Decimal(0), ge=0)
     unfilled_qty: Decimal = Field(default=Decimal(0), ge=0)
     levels: tuple[LevelFill, ...] = ()
@@ -250,6 +261,11 @@ class SpotFilters(Protocol):
     @property
     def effective_step_size(self) -> Decimal: ...
     def round_qty_down(self, qty: Decimal) -> Decimal: ...
+    # ``PERCENT_PRICE_BY_SIDE``: on Binance it bounds a **limit** price and never
+    # rejects a MARKET order, so here it is our own sanity band for a simulated
+    # fill that walked the book (T3.0a §5), applied in ``execution.pricing``.
+    def price_band(self, side: OrderSide, *, avg_price: Decimal) -> tuple[Decimal, Decimal]: ...
+
     def check_market_order(
         self,
         qty: Decimal,
@@ -280,21 +296,6 @@ class ExecutionJournal(Protocol):
 
     def get(self, execution_key: str) -> ExecutionReport | None: ...
     def record(self, report: ExecutionReport) -> None: ...
-
-
-class InMemoryExecutionJournal:
-    """The journal a worker keeps in memory for one cycle; Postgres keeps the real
-    one in ``fills.execution_key`` (``docs/DATABASE.md`` §18.3)."""
-
-    def __init__(self) -> None:
-        self.reports: dict[str, ExecutionReport] = {}
-
-    def get(self, execution_key: str) -> ExecutionReport | None:
-        return self.reports.get(execution_key)
-
-    def record(self, report: ExecutionReport) -> None:
-        """First writer wins: a replay never overwrites the recorded execution."""
-        self.reports.setdefault(report.execution_key, report)
 
 
 class ExecutionAdapter(Protocol):

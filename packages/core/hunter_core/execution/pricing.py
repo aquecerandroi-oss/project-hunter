@@ -14,19 +14,25 @@ its rounding written down:
   back to the planned stop;
 - :func:`mark_price` and :func:`residual_for` — a price to *value* a leftover
   with, never a price to fill at, and a value that is ``None`` **with a reason**
-  when no valid price exists.
+  when no valid price exists;
+- :func:`price_band_breach` — ``PERCENT_PRICE_BY_SIDE`` as **our** sanity band on
+  a simulated fill (T3.0a §5: Binance applies that filter to a limit price and
+  never rejects a MARKET order for it);
+- :func:`eligible_for`, :func:`reference_fields` and :func:`policy_versions` —
+  the declared parameters applied to one snapshot, kept next to the parameters
+  themselves instead of inside the adapter's flow.
 """
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import ROUND_CEILING, Decimal, localcontext
 from typing import Any
 
 from pydantic import Field
 
 from hunter_core.domain.enums import OrderSide
-from hunter_core.domain.market import NormalizedTrade
+from hunter_core.domain.market import NormalizedOrderBook, NormalizedTrade
 from hunter_core.execution.adapter import (
     ExecutionModel,
     FeeCharge,
@@ -34,16 +40,25 @@ from hunter_core.execution.adapter import (
     Residual,
     SpotFilters,
 )
-from hunter_core.execution.book_walk import BookWalk
-from hunter_core.execution.triggers import MarkingPolicy
+from hunter_core.execution.book_walk import (
+    BOOK_POLICY_VERSION,
+    BookVerdict,
+    BookWalk,
+    eligible_book,
+)
+from hunter_core.execution.triggers import MARKING_POLICY_VERSION, MarkingPolicy, usable_trade
 from hunter_core.strategies.numeric import CONTEXT
 
 __all__ = [
     "EXECUTION_POLICY_VERSION",
     "ExecutionPolicy",
     "apply_model_slippage",
+    "eligible_for",
     "untradable_reason",
     "mark_price",
+    "policy_versions",
+    "price_band_breach",
+    "reference_fields",
     "residual_for",
     "slippage_vs_plan",
     "taker_fee",
@@ -151,17 +166,92 @@ def mark_price(
     last_trade: NormalizedTrade | None,
     avg_price: Decimal | None,
     *,
-    now: Any,
+    now: datetime,
     policy: ExecutionPolicy,
 ) -> tuple[Decimal | None, str]:
-    """A price to value a residual with, with its provenance — or none, with why."""
-    if last_trade is not None:
-        age = Decimal((now - last_trade.ts).total_seconds())
-        if 0 <= age <= policy.marking_policy.max_trade_age_s:
-            return last_trade.price, f"last_spot_trade:{last_trade.trade_id}"
+    """A price to value a residual with, with its provenance — or none, with why.
+
+    Validity is :func:`~hunter_core.execution.triggers.usable_trade` and nothing
+    else. This function used to re-implement the age rule and, missing the
+    ``received_at <= now`` half of it, valued a residual with a print our socket
+    had not seen (review of 2026-09-07, item 10). One definition, one place.
+    """
+    usable, _ = usable_trade(last_trade, now=now, policy=policy.marking_policy)
+    if usable is not None:
+        return usable.price, f"last_spot_trade:{usable.trade_id}"
     if avg_price is not None:
         return avg_price, "exchange_avg_price"
     return None, "unavailable: no valid spot trade and no average price"
+
+
+def price_band_breach(
+    filters: SpotFilters,
+    *,
+    side: OrderSide,
+    fill_price: Decimal | None,
+    avg_price: Decimal | None,
+) -> bool:
+    """Did the simulated fill land outside ``PERCENT_PRICE_BY_SIDE``?
+
+    Measured against the **exchange average price**, the reference Binance names
+    for that filter — never against the last trade, which moves with the very
+    book we are suspicious of. Without an average there is no band, and a symbol
+    that publishes no multipliers gets ``(avg, avg)`` back, which is not a band
+    either: treating it as one would refuse every fill that is not exactly the
+    average, which is every fill.
+    """
+    if fill_price is None or avg_price is None or avg_price <= 0:
+        return False
+    low, high = filters.price_band(side, avg_price=avg_price)
+    if not low < avg_price < high:
+        return False
+    return fill_price < low or fill_price > high
+
+
+def eligible_for(
+    policy: ExecutionPolicy,
+    book: NormalizedOrderBook | None,
+    *,
+    decision_at: datetime,
+    now: datetime,
+    side: OrderSide,
+    previous_sequence: int | None = None,
+    market: tuple[str, str] | None = None,
+) -> BookVerdict:
+    """:func:`~hunter_core.execution.book_walk.eligible_book` under this policy."""
+    return eligible_book(
+        book,
+        decision_at=decision_at,
+        latency=policy.latency,
+        now=now,
+        max_age=policy.max_book_age,
+        previous_sequence=previous_sequence,
+        side=side,
+        market=market,
+    )
+
+
+def reference_fields(
+    usable: NormalizedTrade | None,
+    avg_price: Decimal | None,
+    *,
+    now: datetime,
+    policy: ExecutionPolicy,
+) -> dict[str, Any]:
+    """Which price the filters were judged against — published, not implied."""
+    price, source = mark_price(usable, avg_price, now=now, policy=policy)
+    return {"filter_reference_price": price, "filter_reference_source": source}
+
+
+def policy_versions(policy: ExecutionPolicy, now: datetime) -> dict[str, Any]:
+    """The three versioned rule sets every report carries, plus the instant."""
+    return {
+        "executed_at": now,
+        "latency_ms": policy.latency_ms,
+        "marking_policy_version": MARKING_POLICY_VERSION,
+        "book_policy_version": BOOK_POLICY_VERSION,
+        "execution_policy_version": policy.version,
+    }
 
 
 def residual_for(

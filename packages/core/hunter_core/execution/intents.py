@@ -85,6 +85,13 @@ class ExitIntent(ExecutionModel):
     superseded_by_id: uuid.UUID | None = None
     closed_reason: str | None = None
     closed_at: datetime | None = None
+    applied_attempts: tuple[uuid.UUID, ...] = ()
+    """The attempts already folded into ``filled_qty`` — what makes
+    :func:`apply_attempt` idempotent. ``portfolio_exit_intents`` has **no column
+    for it yet** (debt registered for T3.1b/T3.10), so across a restart it is
+    rebuilt from the fills that were really written
+    (:func:`~hunter_core.execution.idempotency.applied_attempts_from_execution_keys`
+    over ``fills.execution_key``)."""
 
     @model_validator(mode="after")
     def _same_checks_the_database_makes(self) -> ExitIntent:
@@ -209,6 +216,7 @@ class ExitAttempt(ExecutionModel):
             "attempt_id": self.attempt_id,
             "intent_id": self.intent.intent_id,
             "position_id": self.intent.position_id,
+            "submitted_qty": self.qty,
             "side": OrderSide.SELL,
             "planned_price": self.planned_price,
             "decision_at": self.decision_at,
@@ -252,9 +260,22 @@ def apply_attempt(
     min_notional: Decimal | None = None,
     valuation_price: Decimal | None = None,
 ) -> ExitIntent:
-    """Fold one attempt's report into the intention, and only what it proves."""
+    """Fold one attempt's report into the intention, and only what it proves.
+
+    **Once per attempt.** Applying the same report twice summed the fill (0,4 →
+    0,8) and, against an intention of 0,8, marked it ``fulfilled`` while 0,4
+    units were still in the position with no protection left (review of
+    2026-09-07, blocker 2). A redelivery is the normal case of an at-least-once
+    stream, so the second application is a **no-op**, not an exception — even
+    when the first one closed the intention.
+    """
     if report.intent_id not in (None, intent.intent_id):
         raise ValueError("this report belongs to another intention")
+    attempt_id = report.attempt_id
+    if attempt_id is None:
+        raise ValueError("an exit report without an attempt_id cannot be applied idempotently")
+    if attempt_id in intent.applied_attempts:
+        return intent
     if not intent.live:
         raise ValueError(
             f"intention {intent.intent_id} is terminal ({intent.state}); applying an attempt "
@@ -264,7 +285,10 @@ def apply_attempt(
     if filled > intent.intended_qty:
         raise ValueError("an attempt filled more than the intention ever intended")
     remaining = intent.intended_qty - filled
-    changes: dict[str, object] = {"filled_qty": filled}
+    changes: dict[str, object] = {
+        "filled_qty": filled,
+        "applied_attempts": (*intent.applied_attempts, attempt_id),
+    }
     if report.degraded:
         changes["degraded_since"] = intent.degraded_since or now
         changes["degraded_reason"] = report.reason or "degraded"

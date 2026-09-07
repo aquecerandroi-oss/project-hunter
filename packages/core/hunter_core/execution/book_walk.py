@@ -7,10 +7,13 @@ fill is "sempre determinado pelo livro elegível **após a latência declarada**
 On spot there is no exchange clock in the ``depth`` payload at all — the T3.0a
 notes record that ``ts == received_at`` exactly — so "after the latency" is a
 statement about *our* receipt, and this module measures it there and says so.
-Four ways a book is refused, each with its own reason: it was observed before
-the latency elapsed, it is older than the declared budget, it comes from the
-future (a clock disagreement is never "very fresh"), or its sequence went
-backwards.
+Seven ways a book is refused, each with its own reason: it is another market's,
+its side is empty, it carries a level priced at zero or below (corrupt data the
+stream parsers cannot catch, because they build levels with ``model_construct``),
+it was observed before the latency elapsed, it is older than the declared budget,
+it comes from the future (a clock disagreement is never "very fresh"), or its
+sequence went backwards. Every one of them is a **verdict**, never an exception
+raised from inside an attempt.
 
 **What does it fill** (:func:`walk_book`). A single pass, best price first,
 stopping when the levels run out — ``depth_exhausted`` instead of an extrapolated
@@ -95,8 +98,21 @@ def eligible_book(
         # sized on liquidity that does not exist for the order being sent.
         return BookVerdict(eligible=False, reason="market_mismatch", received_at=book.received_at)
     received_at = book.received_at
-    if not _side_levels(book, side):
+    levels = _side_levels(book, side)
+    if not levels:
         return BookVerdict(eligible=False, reason="empty_side", received_at=received_at)
+    if any(level.price <= 0 or level.qty < 0 for level in levels):
+        # ``BookLevel`` bounds both, but the stream parsers build levels with
+        # ``model_construct`` and no validator runs there. Without this the walk
+        # raised ``ValidationError`` from inside ``LevelFill`` - an exception
+        # escaping the adapter instead of a verdict the caller can record,
+        # degrade and alert on (review of 2026-09-07, item 11).
+        return BookVerdict(
+            eligible=False,
+            reason="non_positive_level",
+            received_at=received_at,
+            sequence=book.sequence,
+        )
     if received_at > now:
         return BookVerdict(
             eligible=False,

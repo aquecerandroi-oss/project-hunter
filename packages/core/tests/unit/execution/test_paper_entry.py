@@ -10,12 +10,15 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 
+import pytest
+
 from hunter_core.domain.enums import ExecutionMode, OrderSide
 from hunter_core.execution import (
     EXECUTION_POLICY_VERSION,
     ExecutionPolicy,
     InMemoryExecutionJournal,
     PaperExecutionAdapter,
+    ReplayMismatch,
 )
 from hunter_core.execution.entries import MarketEntryOrder
 
@@ -265,3 +268,121 @@ def test_a_trade_we_have_not_received_cannot_serve_as_the_filter_reference(fees:
     )
     assert (report.status, report.reason) == ("rejected", "avg_price_unavailable")
     assert report.observed_trade_id == "100"
+
+
+def test_a_replay_of_the_same_key_with_another_quantity_fails_loudly(
+    filters: StubFilters, fees: StubFees
+) -> None:
+    """Review of 2026-09-07, item 9: the old fill answered a *different* order.
+
+    ``entry:{proposal_id}`` is the identity of one decision, and the recorded
+    report was handed back for any order carrying that key. A worker that
+    re-decided the proposal for 2 units received the report of the 3 units that
+    executed — a position 50 % larger than the caller believes it holds, with
+    nothing in the log saying so.
+    """
+    journal = InMemoryExecutionJournal()
+    adapter = PaperExecutionAdapter(journal=journal)
+    first = adapter.submit_market_entry(
+        _order("3"), DEEP_BOOK, trade("100"), filters, fees, NOW, avg_price=AVG
+    )
+    assert first.filled_qty == Decimal("3")
+
+    with pytest.raises(ReplayMismatch) as raised:
+        adapter.submit_market_entry(
+            _order("2"), DEEP_BOOK, trade("100"), filters, fees, NOW, avg_price=AVG
+        )
+    assert raised.value.recorded_qty == Decimal("3")
+    assert raised.value.requested_qty == Decimal("2")
+    assert raised.value.execution_key == f"entry:{uuid.UUID(int=5)}"
+    assert len(journal.reports) == 1
+
+
+def test_a_replay_of_the_same_key_behind_another_decision_fails_loudly(
+    filters: StubFilters, fees: StubFees
+) -> None:
+    """Same proposal, same size, a decision that sized against another price.
+
+    The proposal id is in the key, so it can never diverge; the decision behind
+    it can — a re-evaluation with a different ``sizing_price`` and stop is not
+    the order that executed, and answering "already done" hides the difference.
+    """
+    journal = InMemoryExecutionJournal()
+    adapter = PaperExecutionAdapter(journal=journal)
+    recorded = adapter.submit_market_entry(
+        _order("3"), DEEP_BOOK, trade("100"), filters, fees, NOW, avg_price=AVG
+    )
+    assert recorded.decision_fingerprint
+
+    with pytest.raises(ReplayMismatch) as raised:
+        adapter.submit_market_entry(
+            _order("3", entry_ref="101"), DEEP_BOOK, trade("100"), filters, fees, NOW, avg_price=AVG
+        )
+    assert raised.value.recorded_decision == recorded.decision_fingerprint
+    assert raised.value.requested_decision != recorded.decision_fingerprint
+    assert raised.value.recorded_qty == raised.value.requested_qty == Decimal("3")
+
+
+def test_a_fill_outside_the_percent_price_band_never_opens_a_position(
+    filters: StubFilters, fees: StubFees
+) -> None:
+    """Review of 2026-09-07, item 15: ``PERCENT_PRICE_BY_SIDE``, finally used.
+
+    The band is **ours**, not the exchange's — Binance applies that filter to a
+    limit price and never rejects a MARKET order for it (T3.0a §5). It is here
+    as a sanity guard on a *simulated* fill: this book says the best ask is 500
+    while the reference price is 100, which is a corrupted snapshot, not a
+    market. Filling it would credit the paper wallet with a position bought at
+    five times the price, and paper equity is the whole output of the lab.
+    """
+    corrupted = book(asks=[("500.00", "10")])
+    report = _adapter().submit_market_entry(
+        _order("3"), corrupted, trade("100"), filters, fees, NOW, avg_price=AVG
+    )
+    assert (report.status, report.reason) == ("rejected", "price_band")
+    assert report.filled_qty == 0
+    assert report.remaining_cancelled is True
+
+
+def test_a_symbol_without_published_multipliers_has_no_band_to_breach(fees: StubFees) -> None:
+    """``price_band`` answers ``(avg, avg)`` when the symbol publishes none.
+
+    Treating that as a band would refuse every fill whose vwap is not exactly
+    the reference — which is every fill.
+    """
+    bandless = coarse_filters(
+        bid_multiplier_down=None,
+        bid_multiplier_up=None,
+        ask_multiplier_down=None,
+        ask_multiplier_up=None,
+    )
+    report = _adapter().submit_market_entry(
+        _order("3"), DEEP_BOOK, trade("100"), bandless, fees, NOW, avg_price=AVG
+    )
+    assert report.status == "filled"
+
+
+def test_a_recorded_report_without_its_identity_is_never_taken_for_the_same_order(
+    filters: StubFilters, fees: StubFees
+) -> None:
+    """Astra, T3.4b review, MUST-FIX 3: absent identity is not "identical".
+
+    A report rebuilt from Postgres carries whatever columns exist. If
+    ``submitted_qty`` is not among them, treating the missing value as a match
+    hands the recorded fill of 3 to an order for 2 — the very case the guard was
+    added for, defeated by the round trip. Unknown identity fails closed.
+    """
+    journal = InMemoryExecutionJournal()
+    adapter = PaperExecutionAdapter(journal=journal)
+    first = adapter.submit_market_entry(
+        _order("3"), DEEP_BOOK, trade("100"), filters, fees, NOW, avg_price=AVG
+    )
+    journal.reports[first.execution_key] = first.model_copy(
+        update={"submitted_qty": None, "decision_fingerprint": ""}
+    )
+    with pytest.raises(ReplayMismatch) as raised:
+        adapter.submit_market_entry(
+            _order("2"), DEEP_BOOK, trade("100"), filters, fees, NOW, avg_price=AVG
+        )
+    assert raised.value.recorded_qty is None
+    assert raised.value.requested_qty == Decimal("2")

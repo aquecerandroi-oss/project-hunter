@@ -16,8 +16,10 @@ from datetime import timedelta
 from decimal import Decimal
 
 import pytest
+from pydantic import ValidationError
 
 from hunter_core.domain.enums import OrderSide
+from hunter_core.domain.market import BookLevel
 from hunter_core.execution.book_walk import (
     BOOK_POLICY_VERSION,
     eligible_book,
@@ -188,3 +190,34 @@ def test_eligibility_uses_the_receive_stamp_because_spot_has_no_exchange_clock()
     assert not eligible_book(
         too_early, decision_at=decided_at, latency=LATENCY, now=NOW, max_age=seconds(10)
     ).eligible
+
+
+def test_a_price_of_zero_is_not_a_book_level_at_all() -> None:
+    """Review of 2026-09-07, item 11, half one: the model refuses it.
+
+    ``BookLevel.qty`` was bounded and ``price`` was not, so a level priced at 0
+    (or below) was a legal object all the way into the walk.
+    """
+    with pytest.raises(ValidationError):
+        BookLevel(price=Decimal("0"), qty=Decimal("1"))
+
+
+def test_a_non_positive_level_is_refused_as_a_verdict_not_as_an_exception() -> None:
+    """Half two, which is the one that matters in production.
+
+    The Binance stream parser builds levels with ``model_construct``
+    (``binance/streams.py``: "``BookLevel.Field(ge=0)`` doesn't run under
+    ``model_construct``"), so validation never ran on that path. A zero-priced
+    level then reached ``walk_book``, where ``LevelFill(price=0)`` raised a
+    ``ValidationError`` out of the middle of an attempt — an exception escaping
+    the adapter instead of a report, which is the one thing the caller cannot
+    write down, degrade or alert on.
+    """
+    corrupt = book(asks=[("100", "1")]).model_copy(
+        update={"asks": [BookLevel.model_construct(price=Decimal("0"), qty=Decimal("1"))]}
+    )
+    verdict = eligible_book(
+        corrupt, decision_at=NOW - seconds(1), latency=LATENCY, now=NOW, max_age=seconds(10)
+    )
+    assert not verdict.eligible
+    assert verdict.reason == "non_positive_level"

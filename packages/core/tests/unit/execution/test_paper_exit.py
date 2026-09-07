@@ -22,6 +22,7 @@ from hunter_core.execution import (
     ExecutionPolicy,
     InMemoryExecutionJournal,
     PaperExecutionAdapter,
+    ReplayMismatch,
 )
 from hunter_core.execution.intents import ExitAttempt, ExitIntent, apply_attempt, void_intent
 from hunter_core.execution.triggers import ProtectedPosition, check_triggers
@@ -459,3 +460,50 @@ def test_a_book_from_another_market_never_fills_this_protection(
     )
     assert (report.status, report.reason) == ("pending_degraded", "market_mismatch")
     assert report.filled_qty == 0
+
+
+def test_a_replayed_attempt_with_another_quantity_fails_loudly(
+    filters: StubFilters, fees: StubFees
+) -> None:
+    """Item 9, exit side: ``exit:{attempt_id}`` is one attempt, of one size.
+
+    An attempt id rebuilt deterministically after a restart, handed a different
+    clamped quantity, would otherwise receive the report of the first attempt —
+    ten units "sold" for a protection that asked for four.
+    """
+    journal = InMemoryExecutionJournal()
+    adapter = PaperExecutionAdapter(journal=journal)
+    intent = _intent("10")
+    attempt = _attempt(intent, "10")
+    adapter.submit_protection_exit(
+        attempt, Decimal("10"), DEEP_BOOK, trade("95"), filters, fees, NOW, avg_price=AVG
+    )
+    smaller = attempt.model_copy(update={"qty": Decimal("4")})
+    with pytest.raises(ReplayMismatch) as raised:
+        adapter.submit_protection_exit(
+            smaller, Decimal("4"), DEEP_BOOK, trade("95"), filters, fees, NOW, avg_price=AVG
+        )
+    assert (raised.value.recorded_qty, raised.value.requested_qty) == (Decimal("10"), Decimal("4"))
+
+
+def test_a_protection_fills_outside_the_band_and_says_so_instead_of_refusing(
+    filters: StubFilters, fees: StubFees
+) -> None:
+    """The asymmetry is the point (review of 2026-09-07, item 15).
+
+    On an entry the band refuses: an entry can always be refused, and failing
+    closed is the contract's default. On a **protection** it never refuses — a
+    genuine 20 % flash crash puts the fill under ``ask_multiplier_down`` exactly
+    when the stop matters most, and "travas não podem impedir saídas de
+    proteção" (directive, rule 3). So the exit fills and the breach is published
+    with an alert.
+    """
+    intent = _intent("5")
+    crashed = book(bids=[("10.00", "5")])
+    report = _adapter().submit_protection_exit(
+        _attempt(intent, "5"), Decimal("5"), crashed, trade("10"), filters, fees, NOW, avg_price=AVG
+    )
+    assert report.status == "filled"
+    assert report.filled_qty == Decimal("5")
+    assert report.alert is True
+    assert report.reason == "price_band_breached"
