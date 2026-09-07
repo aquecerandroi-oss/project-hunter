@@ -1,0 +1,17 @@
+# Brief T3.0d — fechar a identidade spot antes de ligar `MARKET_SPOT_ENABLED` em qualquer ambiente compartilhado
+
+**Owner:** exchange-integration-specialist. **Revisor depois:** code-reviewer. **Não commitar.** **Regra operacional: nunca Bash em background; comandos em primeiro plano com timeout ≤ 5 min; suítes com testcontainers por arquivo; Astra indisponível até 2026-09-12.** Outros agentes estão editando `services/execution-worker/**`, `packages/core/hunter_core/{admission,db}/**` e `tests/integration/paper/**` — **não toque** nesses caminhos.
+
+## Leia antes
+`.claude/state/review-T3.0b.md` (itens 1–5), `.claude/state/notes-T3.0c.md` (ressalvas 2, 6 e 9), `.claude/state/t30-proof.md` §1, `.claude/state/map-T3.0-market-identity.md`, `services/market-worker/hunter_market_worker/{durable,spot,spot_universe,market_ids}.py`, `packages/exchange-adapters/hunter_exchanges/binance_spot/identity.py`, `docs/PIPELINE.md` (chaves do hot state), `docs/DEPLOYMENT.md` (nota de rollback `DEL mkt:*:candles:1m`).
+
+## Entregar
+1. **Bloqueante — `candle_event_id` e a `key` do envelope com `market_type`** (`durable.py`, `enqueue_candles`). Reproduzido em 2026-09-07: perp e spot do mesmo símbolo/minuto geram o **mesmo** `event_id` (`10fec7fa-c293-5400-966d-d921d8defed5`) e o segundo `market.candles.closed` morre no `ON CONFLICT (event_id)` do outbox. Regra: o perpétuo continua **byte-idêntico** (mesmo id de hoje — não invalide o dedupe do stream em produção); só o spot ganha o componente `market_type` no namespace. Teste: as duas fitas fechando a mesma vela no mesmo lote → dois eventos, dois ids distintos, id do perp igual ao de antes (fixe o valor no teste). Confira o mesmo problema em `market.backfill.*`, `market.ticks` e nos eventos de universo (`market.universe.*`) — qualquer id derivado só de `(exchange, symbol, ts)` tem a mesma colisão.
+2. **`load_market_ids` filtrado por `market_type`** (`market_ids.py:47`): teste dedicado com `binance` perp + spot do mesmo símbolo → cada coletor recebe só o seu `market_id`.
+3. **Docstring de `binance_spot/identity.py:23-33`**: descreve um gap que a T3.0b já fechou; reescreva com o estado real (modelos `Normalized*` carregam `market_type`; exceção deliberada do hash `mkt:*:ticker`, KB-0044 — cite).
+4. **Scanner não mistura spot em `scanner_stream_delay_seconds`** (`notes-T3.0c.md` §6): a única linha em `services/scanner-worker/**` que filtra o tipo ou rotula a série; teste unitário com um tick spot no stream → não entra na série perp.
+5. **Asserção do hash `mkt:*:ticker`** (`review-T3.0b.md` item 4): teste que fixa que o ticker é escrito **só** pelo coletor perp (dono dos campos, KB-0044) e que o coletor spot nunca escreve nele.
+6. **`docs/PIPELINE.md`** seção spot: chaves `mkt:{ex}:spot:{sym}:*`, `hb:market:spot:{ex}`, canal `rt:market-spot:{ex}:{sym}` (sem assinante hoje), ids de evento com `market_type`, e a condição para ligar (`MARKET_SPOT_ENABLED=true` só com folga de event loop no shard 0 medida — os números do A/B da `t30-proof.md` §1). **Não decida** histerese do piso (`PROMUSDT` flapa) — deixe como pergunta ao Everton na nota.
+
+## Provar
+`services/market-worker` por arquivo (`test_spot_*`, `test_persistence_contracts`, `test_outbox_producers`, `test_market_type_identity`, novos), `packages/exchange-adapters`, `services/scanner-worker/tests` (unidade), `ruff check`/`format --check`/`pyright` nos pacotes tocados, `check_file_size.py`. Nada em `.env*`, `infra/migrations/**`. Relatório em português no formato estendido com saída real; `.claude/state/notes-T3.0d.md`.
