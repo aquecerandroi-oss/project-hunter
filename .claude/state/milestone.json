@@ -1,34 +1,62 @@
 {
-  "current": "M2",
-  "status": "planned",
+  "current": "M3",
+  "status": "in_progress",
   "approved_at": null,
-  "wave": "M1 APROVADO pela Sexta-feira em 2026-09-06 em nome do Everton (docs/reports/M1.md). Onda 1 do M2 a despachar: T2.1 (schema de analise — baselines imutaveis, envelopes, EXTENDED, UNKNOWN, evaluation_state, outbox; a migracao passa a depender de 0002_shadow_lab da S0 e vira 0003) e T2.2 (Feature Engine), em paralelo, arquivos disjuntos. Decisao conjunta Claude/Astra do M2 ja fechada em docs/plans/M2.md (4 rodadas, .claude/state/dialogue-M2.md), entao nao ha etapa de decisao conjunta a repetir antes do despacho.",
+  "wave": "M3 ondas 1 e 2 em voo (T3.1 migracao 0006 commitada, T3.0a adaptador SPOT, T3.2 risk-core, T3.3 ledger, T3.4 execucao paper, T3.6 kill switch, T3.7 beta, T3.8a API de leitura, T3.12 admissao). O M2 esta entregue em codigo e NAO foi aprovado (docs/reports/M2.md, parecer da Sexta-feira em 2026-09-07): quatro condicoes objetivas de aprovacao, nenhuma delas bloqueia o M3.",
   "repo_path": "C:\\dev\\project-hunter",
   "github": "https://github.com/aquecerandroi-oss/project-hunter",
   "paused_reason": null,
-  "history": "2026-09-04: spend limit hit mid-wave 2; resolvido no mesmo dia. 2026-09-05: M0 fechado e aprovado; M1 executado sob a diretiva 'IMPLEMENTACAO FUNCIONAL' (sem aprovacao por tarefa, relatorio no fim); trilha paralela do Shadow Lab aberta com decisao conjunta Claude/Astra (S0 e S1 commitadas, S2 em voo).",
+  "history": "2026-09-04: spend limit hit mid-wave 2; resolvido no mesmo dia. 2026-09-05: M0 fechado e aprovado; M1 executado sob a diretiva 'IMPLEMENTACAO FUNCIONAL'; trilha paralela do Shadow Lab aberta com decisao conjunta Claude/Astra. 2026-09-06: M1 APROVADO pela Sexta-feira em nome do Everton (docs/reports/M1.md), com a ressalva dos 50 mercados; M2 executado inteiro (T2.1 a T2.9c). 2026-09-07: M2 fechado em codigo e NAO APROVADO pela Sexta-feira em nome do Everton (docs/reports/M2.md, tarefa T2.8) — dois dos cinco artefatos do objetivo nunca foram observados com dado real (estagio 0 em 299 amostras; regime UNKNOWN em 100% das leituras), p99 tick->oportunidade em 0,3% de cumprimento, 1 de 10 detectores disparando, e um HIGH aberto em producao (cobertura de tape congelada na VPS) como causa direta do primeiro item. EXP-0003 aberto em obsidian/05-EXPERIMENTS com a primeira avaliacao datada. A divida nº 1 do M1 (heartbeat compartilhado entre shards) foi fechada em 9ceb389.",
   "plan": "docs/plans/M3.md",
+  "m2": {
+    "status": "delivered_not_approved",
+    "verdict": "NAO APROVADO pela Sexta-feira em nome do Everton em 2026-09-07",
+    "report": "docs/reports/M2.md",
+    "plan": "docs/plans/M2.md",
+    "experiment": "obsidian/05-EXPERIMENTS/EXP-0003-baselines-v1.md",
+    "proof": ".claude/state/t25-proof.md (sete provas operacionais: T2.5, T2.5b, T2.5-backfill, T2.5c, T2.5d, T2.9c, T2.5g)",
+    "commits": "88a3b0d 487bc4a 2544e82 72cfe72 665ed3f 5bd17db 98bcfea 05ef6f8 eb0b0fd 81d4161 766f8b6 551d542 4bb2865 bd1d4d8 9626bf4 3dcb218 48c6f0d fe8872c bbb4d57 9ceb389 d12464b fa9f957 (617 arquivos tocados, +81.025/-2.514)",
+    "migrations": "0003_analysis, 0004_outbox_pending_index, 0005_baseline_lock_grant (head aplicado na VPS)",
+    "approval_conditions": [
+      "1. A cobertura da VPS volta a andar (covered_until avancando por >= 30 min continuos) e o T2.5g e implantado la, com a chave compartilhada hb:market:binance removida.",
+      "2. Uma leitura datada mostra stage != NONE e regime != UNKNOWN com dado real — exige 3 dias distintos de feature_snapshots ao vivo sobre tape/livro/derivativos; janela 2026-09-09 / 2026-09-10; vai para a segunda avaliacao do EXP-0003.",
+      "3. p99 tick->oportunidade dentro de 3 s, OU renegociacao explicita do alvo com o numero medido ao lado (a decisao conjunta fixou 3 s).",
+      "4. Os tres entregaveis de teste da T2.8 (integracao ponta a ponta + e2e radar.spec.ts e opportunity.spec.ts) mais uma execucao unica e datada de todas as suites do M2."
+    ]
+  },
   "m3": {
-    "status": "planned",
+    "status": "in_progress",
     "planned_at": "2026-09-06",
     "source": ".claude/state/directive-risk-engine-2026-09-06.md",
     "joint_decision": ".claude/state/dialogue-M3.md (3 rodadas, DECISAO CONJUNTA na rodada 3)",
-    "contract": "docs/RISK_ENGINE.md v2",
+    "contract": "docs/RISK_ENGINE.md v2.1",
     "adr": "docs/decisions/0005-carteira-virtual-e-risk-engine-paper-v1.md",
     "scope": "Carteira SPOT permanente (R$100.000 convertidos em USDT com ancora de cambio), Risk Engine paper_v1 completo, gestao automatica de protecoes. Entradas SOMENTE MANUAIS: a ponte sinal->proposta e M4 e sinal research_only continua recusado. O M3 NAO declara modo autonomo.",
-    "blocked_on_owner": "Pergunta 1 (SPOT vs perpetuo) bloqueia a T3.0 e, por dependencia, T3.4 e T3.5. As nove perguntas estao em docs/plans/M3.md.",
     "waves": "0 consolidacao+perguntas | 1 T3.1,T3.0(adapter),T3.2 | 2 T3.0(integracao),T3.3,T3.4 | 3 T3.11,T3.7,T3.6 | 4 T3.12,T3.5,T3.8(API),T3.13 | 5 T3.8(Web),T3.9,T3.10,T3.M"
   },
-  "updated": "2026-09-06",
-  "blockers": [],
-  "next_action": "M3 onda 1: T3.2 (risk-core, guardian) e T3.7 (beta, quant) em voo; T3.1 (migracao 0006, database-architect) e T3.0 (caminho SPOT, exchange-integration) a despachar assim que T2.5f e T2.5e liberarem os especialistas. Respostas as nove perguntas decididas pela Sexta-feira em nome do Everton (docs/plans/M3.md). Pendentes do M2: T2.5d (throughput), T2.5e (cobertura), T2.5f (particoes), T2.8 (prova/relatorio M2, EXP-0003), aprovacao do M2.",
-  "next_action_m2": "Despachar a onda 1 do M2: T2.1 (database-architect, opus) e T2.2 (quant-engineer, opus) em paralelo, com os kits de revisao prontos antes das entregas. Primeiro item de divida do M1 a entrar no M2: heartbeat por shard com agregacao na API — e o que libera os 200 mercados ja provados. Segundo: dataclass(slots=True) nos tipos normalizados do caminho quente (model_construct do pydantic e 15% do tempo amostrado pelo py-spy). Terceiro: gaps de mercados nao monitorados que nunca fecham, e rebalanceamento na morte de um shard.",
+  "updated": "2026-09-07",
+  "blockers": [
+    "HIGH (VPS, aberto e nao diagnosticado) — mkt:binance:coverage congelado: covered_until 2026-09-07T02:34:57Z contra relogio de 03:19:20Z (44 min). hb:scanner declara coverage=unproven; hb:strategy:shadow conta 63.793 avaliacoes unavailable. Consequencia: nenhuma baseline de tape amadurece e nenhum EARLY pode ser publicado. Proximo passo: medir queue_oldest_pending_ts e o motivo de quebra DENTRO do conteiner da VPS antes de mudar qualquer linha.",
+    "HIGH (implantacao) — o T2.5g esta commitado e provado no local (4 shards, hb:market:binance:0of4..3of4, covered_until a 1 s do relogio) e NAO esta na VPS: a chave compartilhada hb:market:binance ainda existe la e a VPS roda 1 shard com 200 mercados.",
+    "MEDIO/produto — teto aritmetico de score 25,00 de 100 (3 de 9 componentes disponiveis, pesos 0,25) contra watching_min=40: nenhum mercado pode ser HOT hoje. Nao e defeito de codigo; e falta de evidencia, e some quando as baselines de tape/livro/derivativos amadurecerem.",
+    "MEDIUM — ninguem consome market.candles.backfilled (so produtores no repositorio).",
+    "MEDIUM — os tres entregaveis de teste da T2.8 nao existem (integracao ponta a ponta, e2e radar.spec.ts e opportunity.spec.ts).",
+    "MEDIUM — AssumedCosts aceita float (packages/core/hunter_core/strategies/envelope.py:45), com impacto em code_ref de versao congelada.",
+    "MEDIUM — funding_rates sem received_at; open_interest_history.ts e o bucket da rodada de poll, nao o instante da leitura.",
+    "Herdados do M1, ainda abertos: gaps de mercados nao monitorados que nunca fecham (4.726 open_gaps medidos na prova da T2.5g); morte de shard sem rebalanceamento; markets_ok misturando capacidade e backlog."
+  ],
+  "next_action": "1) Fechar o HIGH da cobertura congelada na VPS (medir dentro do conteiner antes de mudar linha). 2) Implantar o T2.5g na VPS (--profile shards, conferir shards_expected/reporting=4/4 e 200 campos sym:). 3) Segunda avaliacao datada do EXP-0003 em 2026-09-09/10 — e ela que decide se estagio e regime saem do papel. 4) Despachar os tres entregaveis de teste da T2.8 (test-engineer) e uma corrida unica de todas as suites do M2 quando os agentes do M3 liberarem os testcontainers. 5) M3 segue: ondas 1 e 2 em voo.",
   "verified": [
-    "2026-09-06: M1 aprovado. O unico bloqueio (test_a_crash_where_even_the_release_never_runs_still_recovers_after_the_stale_window, vermelho 3 em 3 com a maquina ociosa) foi investigado: o TESTE corria um asyncio.sleep(0.3) contra uma janela de 0,2 s enquanto o primeiro POST sozinho leva 0,516-1,265 s. Corrigido com _age_claim (a mesma coluna claimed_at que o takeover le), sem tocar codigo de producao; code-reviewer e Astra responderam PRESERVADO independentemente. apps/api/tests/integration/test_webhook.py -> 17 passed, duas vezes seguidas.",
-    "2026-09-05 22:46 UTC: configuracao entregue (1 worker, MARKET_UNIVERSE_SIZE=50) medida pelo mesmo caminho de servico dos handlers autenticados: markets_ok 50/50 = 100%, 0 stale, 0 degraded, 0 unavailable, hot state completo nos tres componentes, CPU media 71,3% de um core (o perfil pre-T1.6b media 95,1% no mesmo tamanho)",
-    "2026-09-05 22:11 UTC: 4 shards x 50 mercados = markets_ok 198/200 (99,0%), 202 linhas = 202 mercados distintos = 202 velas finais por minuto durante 6 minutos, gaps abertos 3.230 -> 95 (os 95 sao de mercados nao monitorados), CPU media por shard 36,6/54,6/61,2/64,2%",
-    "2026-09-05: suites — exchange-adapters 231 passed 3 skipped; market-worker 174 passed; core 495 passed; apps/api 463 passed 1 failed (o bloqueio acima); web 326 passed 1 failed (flake de carga, passa sozinho); tests/integration 31 passed 1 failed (flake de carga, arquivo inteiro 20 passed na re-execucao); ruff/pyright limpos nos caminhos do M1; check_file_size 171 arquivos 0 acima do orcamento",
-    "2026-09-05: py-spy no shard de 100 mercados (11.110 amostras/90 s) — _handle_raw_message 34,1% cumulativo, model_construct do pydantic 15,0%, run_recovery apenas 4,4%: o gargalo e o caminho quente do WS, nao o recovery"
+    "2026-09-07 03:24:49Z (VPS, somente leitura): 88.746 revisoes de baseline vigentes no corte available_at <= 03:30:00Z, 4.944 utilizaveis (5,57%) pelo portao >= 3 dias distintos E >= 120 observacoes, 211 mercados, 27 features, 1.521 com MAD zero, cobertura media 0,2032. Apenas 12 das 27 features tem algum bucket utilizavel; as 15 mudas sao exatamente tape (trade_velocity_1m, buy/sell_pressure_5m), livro (spread_pct, orderbook_imbalance_20), derivativos (funding_rate, open_interest_change_1h/4h) e todas as _live. No melhor caso, 29 de 200 mercados.",
+    "2026-09-07 03:24:49Z (VPS): 108.688 feature_snapshots sobre 212 mercados desde 2026-09-06T18:17Z (9 h 07 min); 15 anomalias, TODAS VOLUME_SPIKE (12 resolved, 3 active, severidade 0,0 a 100,0); 12 oportunidades (8 EXPIRED, 3 NORMAL, 1 ANOMALY), score 0,00 a 11,92; 299 amostras de opportunity_history, TODAS com stage=NONE; 1 linha em market_regimes, regime UNKNOWN com trend_input_unavailable, breadth coverage 0 (200 mercados excluidos por missing_return_4h) e volatility_warmup (146 de 480 amostras, 7 de 20 dias); radar:scores com 10 entradas.",
+    "2026-09-07 (VPS): disponibilidade por componente identica nas 12 oportunidades — volume (peso 0,20), anomalies (0,05) e agent_consensus (0,00) disponiveis; momentum (0,20), order_flow (0,15), liquidity (0,10), derivatives (0,10) com no_usable_input, market_regime (0,10) com regime_unknown, external_intelligence com feature_not_implemented. Pesos disponiveis somam 0,25 -> teto aritmetico de score 25,00 de 100 contra watching_min=40, hot_min=75, entry_candidate_min=80 (lidos de opportunity_weights ativa).",
+    "2026-09-07 03:24Z (local, 4 shards): 73.051 revisoes vigentes, 8.028 utilizaveis (10,99%), 212 mercados, 27 features, cobertura media 0,2129; 128.786 snapshots sobre 216 mercados desde 2026-09-06T15:35Z; 18 anomalias todas VOLUME_SPIKE; 14 oportunidades todas EXPIRED/NONE (score 0,00 a 2,32); radar:scores 8; mkt:binance:coverage com 202 campos e covered_until 03:19:26.829Z contra relogio de 03:19:27Z (vivo); heartbeats por shard hb:market:binance:0of4..3of4 presentes.",
+    "2026-09-07 (T2.5g, .claude/state/t25-proof.md): latencia de publicacao de market.ticks p50 25,82 s com 1 processo/200 mercados -> 4,31 s (p95 5,54, p99 5,65) com 4 shards -> 0,41 s (p95 11,28) com 8 shards. Tick->oportunidade: 4 shards media 7,74 s com 0,3% dentro de 3 s; 8 shards media 2,55 s com 70,5% dentro de 3 s mas p95 ~11 s. Causa do residuo medida: crc32(symbol) % N equilibra CONTAGEM e nao TRAFEGO (descartes por shard com 8: 73, 10.232, 21.799, 3.231, 50.867, 0, 162.386, 175.839); py-spy num shard de 25 mercados poe queue_oldest_pending_ts em 11,25% cumulativo (varredura da fila inteira a cada 250 ms).",
+    "2026-09-07 (gates rodados em primeiro plano): uv run pytest packages/indicators -q -> 874 passed in 55.15s; ruff check nos caminhos do M2 -> All checks passed!; ruff format --check -> 252 files already formatted; pyright packages/indicators services/scanner-worker services/market-worker -> 0 errors, 0 warnings; check_file_size -> scanned 410 files, 0 over budget. NAO rodadas: as suites com testcontainers (scanner-worker, apps/api, packages/core, tests/integration) e apps/web, porque quatro agentes do M3 usavam o mesmo daemon — e a ausencia de uma execucao unica e datada e a condicao 4 de aprovacao do M2.",
+    "2026-09-07: AssumedCosts(spread_bps=1.1, ...) devolve Decimal('1.1') sem erro — o float e aceito (packages/core/hunter_core/strategies/envelope.py:45).",
+    "2026-09-07: nenhum consumidor de market.candles.backfilled no repositorio (grep so encontra produtores em services/market-worker); tests/e2e nao tem radar.spec.ts nem opportunity.spec.ts; tests/integration nao tem o teste ponta a ponta candle->features->anomalia->score->radar.",
+    "2026-09-06: M1 aprovado. Todos os criterios objetivos cumpridos com saida real de comando; o unico bloqueio (teste vermelho reprodutivel na suite da API) foi investigado, corrigido e revisado adversarialmente por dois revisores independentes.",
+    "2026-09-05 22:11 UTC: 4 shards x 50 mercados = markets_ok 198/200 (99,0%), 202 mercados distintos por minuto durante 6 minutos, gaps abertos 3.230 -> 95, CPU media por shard 36,6/54,6/61,2/64,2%"
   ],
   "toolchain": {
     "node": "24.20.0 — C:\\Program Files\\nodejs",
@@ -36,5 +64,6 @@
     "uv": "0.12.9 — winget user scope; python 3.12.14 via `uv python install`",
     "docker": "Docker Desktop 4.89.0 (engine 29.7.2, compose v5.5.0) per-user at %LOCALAPPDATA%\\Programs\\DockerDesktop"
   },
-  "m1_result": "M1 fechado com o mercado real da Binance na tela: markets_ok 50/50 = 100%, hot state completo nos tres componentes, 0 degraded, worker no Docker independente do navegador, reconexao e recovery de gaps provados, System com heartbeats reais. Entrega 50 mercados e nao os 200 do plano: os 200 estao PROVADOS (4 shards x 50 -> markets_ok 198/200 = 99,0%, 202 mercados distintos por minuto durante 6 minutos, CPU media por shard 36,6-64,2%) mas nao entregues, porque com N > 1 shards todos escrevem a mesma chave hb:market:{exchange} e a pagina System passaria a mentir (um shard morto fica invisivel). Prova completa em .claude/state/t16b-proof.md."
+  "m1_result": "M1 fechado e aprovado com o mercado real da Binance na tela: markets_ok 50/50 = 100%, hot state completo nos tres componentes, 0 degraded, worker no Docker independente do navegador, reconexao e recovery de gaps provados, System com heartbeats reais. Entregou 50 mercados e nao os 200 do plano porque com N > 1 shards todos escreviam a mesma chave hb:market:{exchange}. Essa divida foi FECHADA no M2 pela T2.5g (9ceb389): heartbeat por shard agregado pela API, com shards_expected/shards_reporting; falta implantar na VPS.",
+  "m2_result": "M2 entregue em codigo e NAO APROVADO em 2026-09-07. O que funciona e e visivel: o Radar tem linhas reais pela primeira vez (10 entradas em radar:scores na VPS, 12 oportunidades com decomposicao completa e versoes carimbadas), e o painel 'por que estamos olhando isso?' responde em portugues determinístico, sem LLM, com motivo legivel por maquina para cada componente ausente — este item esta integralmente cumprido. O que nao foi cumprido, com numero: estagio EARLY/DEVELOPING/EXTENDED nunca publicado (0 em 299); regime UNKNOWN em 100% das leituras; p99 tick->oportunidade 0,3% dentro do orcamento com 4 shards; 1 de 10 detectores de anomalia disparando; 6 de 9 componentes indisponiveis (teto de score 25,00 de 100 contra a linha 40 do WATCHING); os tres entregaveis de teste da propria T2.8 inexistentes. Motor correto, evidencia insuficiente — e um HIGH aberto em producao (cobertura congelada na VPS) como causa direta do primeiro item."
 }

@@ -1,11 +1,38 @@
 ---
 tags: [changelog, historico]
-updated: 2026-09-06
+updated: 2026-09-07
 ---
 
 # Changelog
 
 Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado por dia, mais novo primeiro. Todo o histórico até agora é do Milestone 0 (fundação) — ver `docs/plans/M0.md` para as ondas T01–T13 e [[Resolved Bugs]] para o detalhe das correções de segurança/qualidade citadas aqui.
+
+## 2026-09-07
+
+- **`9ceb389` — T2.5g: 200 mercados em N shards, com heartbeat por shard agregado pela API.** Para o
+  Everton: a página System volta a poder dizer a verdade com mais de um coletor no ar, e o mercado
+  chega ao Radar seis vezes mais rápido. A dívida nº 1 do M1 — todos os shards escrevendo a mesma
+  chave `hb:market:{exchange}`, de modo que um shard morto ficava invisível — está fechada: cada
+  shard tem a própria chave, a API agrega com `shards_expected`/`shards_reporting`, um heartbeat
+  vencido vira `unavailable` em vez de repassar `connected`, e um shard sem evento não herda o
+  frescor do irmão. A cobertura do tape passou a ser escrita **inteira dentro de um script Lua**
+  (reconciliação total dos campos `sym:`), o que revelou e matou um órfão real em produção
+  (`KOMAUSDT` sem dono, 201 campos para 200 mercados). Medido: latência de publicação de
+  `market.ticks` p50 **25,82 s → 4,31 s** com 4 shards, e 0,41 s com 8. Os descartes finalmente são
+  contados. Ver [[Open Bugs]]: **não implantado na VPS**.
+- **Fecho do M2 (T2.8): relatório, parecer e `EXP-0003`.** Para o Everton: o Radar tem linhas reais
+  pela primeira vez, e eu **não aprovei** o milestone. `docs/reports/M2.md` traz o formato estendido
+  inteiro, com o que foi entregue por tarefa e o que não foi cumprido **com número**: estágio
+  EARLY/DEVELOPING/EXTENDED **nunca publicado** (0 em 299 amostras), regime **`UNKNOWN` em 100 %**
+  das leituras, p99 tick→oportunidade em **0,3 %** de cumprimento com 4 shards (70,5 % com 8, mas o
+  p95 fica em ~11 s porque `crc32 % N` equilibra contagem e não tráfego), **1 de 10** detectores de
+  anomalia disparando, **6 de 9** componentes de score indisponíveis com motivo — e o teto
+  aritmético de score que isso implica, **25,00 de 100** contra a linha de 40 do WATCHING.
+  [[EXP-0003-baselines-v1]] abre o M2 como experimento de **instrumento**, com o SQL colado e a
+  saída real: 4.944 buckets utilizáveis de 88.746 (5,57 %), 12 de 27 features com algum bucket
+  utilizável, e as 15 mudas sendo exatamente as de tape, livro, derivativos e `_live`. O motor está
+  certo — ele escreve o que tem evidência e diz o motivo de tudo o que não tem. O que falta é, na
+  maior parte, **tempo de coleta**; as quatro condições objetivas de aprovação estão no VEREDITO.
 
 ## 2026-09-06
 

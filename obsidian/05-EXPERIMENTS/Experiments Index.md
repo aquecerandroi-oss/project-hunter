@@ -1,6 +1,6 @@
 ---
 tags: [experimentos, indice]
-updated: 2026-09-06
+updated: 2026-09-07
 status: em-andamento
 ---
 
@@ -8,7 +8,9 @@ status: em-andamento
 
 ## Status honesto
 
-**Dois experimentos abertos e coletando desde 2026-09-06.** S0 (migração `0002_shadow_lab`), S1
+**Quatro experimentos abertos: `EXP-0001` e `EXP-0002` (coortes prospectivas do Shadow Lab, desde
+2026-09-06), `EXP-0004` (replay de políticas de saída, 2026-09-06) e `EXP-0003` (o instrumento de
+baselines do M2, 2026-09-07).** Os dois primeiros: S0 (migração `0002_shadow_lab`), S1
 (estratégias) e S2 (`strategy-worker` em modo sombra) foram entregues e provados
 (`.claude/state/s2-proof.md`), as duas versões foram ativadas pelo script auditado e o worker está
 no ar emitindo sinais sobre o mercado real da Binance. Continua valendo o que o Shadow Lab **não**
@@ -57,6 +59,20 @@ na liquidação), e o resultado é **inconclusivo por `B = 1`**: todas as entrad
 UTC, então IC é indisponível (`single_block`) e `p = 1` sai **por construção** — ausência de
 replicação, não evidência de equivalência. Os sete contrastes daquela página são **exploratórios**.
 
+**Quarto experimento aberto em 2026-09-07: [[EXP-0003-baselines-v1]]**, e ele é de um terceiro
+tipo. Não é coorte prospectiva nem replay: mede um **instrumento** — o arquivo de baselines por
+(mercado, feature, hora UTC) do M2 — e o que ele destrava rio abaixo. Por isso as métricas em R e
+de carteira do [[_TEMPLATE-EXP|template]] estão marcadas **não aplicáveis** ali, em vez de
+preenchidas com número sem significado. Primeira avaliação (`as_of = 2026-09-07T03:30Z`,
+`read_at = 03:24:49Z`, população da VPS): **4.944 buckets utilizáveis de 88.746 revisões vigentes
+(5,57 %)**, **12 de 27** features com ao menos um bucket utilizável, **29 de 200** mercados no
+melhor caso. `Result` **inconclusivo** — 1 dia distinto de série viva contra os 3 do portão. Duas
+coisas já decididas por aritmética e não por opinião: as 15 features mudas são exatamente as de
+tape, livro, derivativos e `_live` (o `historical_source_unavailable` da T2.3, confirmado em
+produção), e com 3 componentes disponíveis somando peso 0,25 **o score não passa de 25,00 contra a
+linha de 40 do WATCHING** — nenhum mercado pode ser HOT hoje. Detalhe e parecer do milestone em
+`docs/reports/M2.md`.
+
 Cada experimento significativo (uma hipótese testada sobre uma estratégia, um conjunto de parâmetros, um mercado ou período) ganha seu próprio arquivo `EXP-NNNN-<slug>.md` nesta mesma pasta, numerado sequencialmente a partir de `EXP-0001`.
 
 ## Registro de IDs (decisão conjunta SHADOW, 2026-09-05)
@@ -65,7 +81,7 @@ Cada experimento significativo (uma hipótese testada sobre uma estratégia, um 
 |---|---|---|---|
 | `EXP-0001` | [[EXP-0001-momentum-v1\|momentum em modo sombra]] (15 min, stop e alvo a 1,5 ATR da referência, horizonte 4 h) | Shadow Lab v0 — tarefa S4 | **aberto em 2026-09-06**; coortes locais `v1` (deprecated) e `v2` (active), e a coorte da **VPS** `v1` (active, `code_ref` `…6ccbe8b6…`) |
 | `EXP-0002` | [[EXP-0002-volume-anomaly-v1\|volume_anomaly em modo sombra]] (5 min, ATR de 15 min, stop na mínima da barra do sinal, horizonte 2 h) | Shadow Lab v0 — tarefa S4 | **aberto em 2026-09-06**; coortes locais `v1` (deprecated) e `v2` (active), e a coorte da **VPS** `v1` (active, `code_ref` `…a03d18fe…`) |
-| `EXP-0003` | Baselines por ativo/hora do M2 (T2.8) | `docs/plans/M2.md` | **reservado** — o M2 cedeu `EXP-0001` ao Shadow e passou para cá |
+| `EXP-0003` | [[EXP-0003-baselines-v1\|baselines por ativo e hora do M2, e o que elas destravam]] (instrumento, não estratégia: maturidade das baselines → anomalias, estágio, regime, score) | `docs/plans/M2.md` (T2.8) | **aberto em 2026-09-07**; primeira avaliação `as_of = 2026-09-07T03:30Z`, **inconclusivo** (1 dia distinto de série viva) |
 | `EXP-0004` | [[EXP-0004-politicas-de-saida\|replay de oito políticas de saída sobre as entradas congeladas]] (bloco T-005 + L1 + L2, 7 contrastes, efeito mínimo 0,05 R) | Rodada 6 de conhecimento → brief R1; commit `2c6bb2d` | **aberto em 2026-09-06**; primeira execução `as_of = 2026-09-06T20:55Z`, **inconclusivo por `B = 1`** |
 
 A reserva está consolidada nos três lugares que a decisão exige: aqui, em `docs/plans/SHADOW-LAB.md` (item 11) e em `docs/plans/M2.md` (T2.8).
@@ -109,6 +125,7 @@ Todos os números vêm de `agent_signals` / `signal_outcomes` reais, com o SQL c
 | [[EXP-0001-momentum-v1]] | `momentum` v1 (deprecated) + v2 (active) | 2026-09-06 | `2026-09-06T02:55:00Z` | **inconclusivo** — 57 avaliáveis (48 + 9), 1 dia, **0 com horizonte maturado** |
 | [[EXP-0002-volume-anomaly-v1]] | `volume_anomaly` v1 (deprecated) + v2 (active) | 2026-09-06 | `2026-09-06T02:55:00Z` | **inconclusivo** — 72 avaliáveis (66 + 6), 1 dia, 35 com horizonte maturado |
 | [[EXP-0004-politicas-de-saida]] | replay: `momentum` v1+v2 e `volume_anomaly` v1+v2 (4 versões congeladas), 8 políticas de saída | 2026-09-06 | `2026-09-06T20:55:00Z` | **inconclusivo** — 275 maturados, **1** dia (`B = 1`); reprodução de trajetória 1,0000 em 339 comparáveis |
+| [[EXP-0003-baselines-v1]] | baselines por (mercado, feature, hora UTC) do M2 — instrumento, não estratégia | 2026-09-07 | `2026-09-07T03:30:00Z` | **inconclusivo** — 1 dia distinto de série viva; **4.944 buckets utilizáveis de 88.746 (5,57 %)**, 12 de 27 features com algum bucket utilizável, **teto de score 25,00 de 100** |
 
 ### O que a próxima extração tem de fazer (achados da revisão da Astra, 2026-09-06)
 

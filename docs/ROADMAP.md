@@ -33,6 +33,12 @@ Formato de fechamento (§77): COMPLETED · FILES CREATED · FILES MODIFIED · DA
 
 ## Milestone 1 — Market data
 
+**Status: entregue e APROVADO em 2026-09-06** pela Sexta-feira em nome do Everton. Relatório de
+fechamento (§77): `docs/reports/M1.md`. Ressalva registrada junto da aprovação: entrega 50 mercados,
+não os 200 do plano — os 200 estavam provados (`markets_ok` 198/200) e a topologia que os sustenta
+tinha heartbeat compartilhado. **Essa dívida foi fechada no M2** (`9ceb389`, heartbeat por shard
+agregado pela API); a implantação na VPS continua pendente.
+
 **Escopo**
 - `hunter_exchanges`: `ExchangeAdapter`, `BinanceAdapter` (USDS-M) e `BybitAdapter` (Linear): REST público (markets, candles, ticker, book, funding, OI) e WS (trades, bookTicker, depth, kline, markPrice, liquidations). Rate limiter por exchange em Redis. Fixtures gravadas para testes.
 - Normalização: modelos `Normalized*` em `hunter_core.domain`.
@@ -47,6 +53,25 @@ Formato de fechamento (§77): COMPLETED · FILES CREATED · FILES MODIFIED · DA
 ---
 
 ## Milestone 2 — Inteligência de mercado
+
+> **Status: entregue em código, NÃO APROVADO em 2026-09-07** pela Sexta-feira em nome do Everton.
+> Relatório e parecer: `docs/reports/M2.md`. Plano e decisão conjunta: `docs/plans/M2.md`.
+> Experimento do milestone: `obsidian/05-EXPERIMENTS/EXP-0003-baselines-v1.md`.
+>
+> Todas as tarefas (T2.1 a T2.9c) estão commitadas, revisadas pelo roster e pela Astra, e o
+> `scanner-worker` roda 24 h na VPS. O Radar tem linhas reais. **Dois dos cinco artefatos que o
+> objetivo promete na tela nunca foram observados com dado real:** estágio EARLY/DEVELOPING/EXTENDED
+> (0 em 299 amostras de `opportunity_history`) e regime de mercado (`UNKNOWN` em 100 % das leituras,
+> com motivo estruturado). Somam-se: p99 tick→oportunidade em **0,3 %** de cumprimento com 4 shards
+> (alvo ≤ 3 s), **1 de 10** detectores de anomalia disparando, e **6 de 9** componentes de score
+> indisponíveis — o que dá um teto aritmético de **25,00 de 100** contra `watching_min = 40`.
+> Um HIGH aberto em produção (cobertura de tape congelada na VPS) é causa direta do primeiro item.
+>
+> **Quatro condições objetivas de aprovação** (íntegra no VEREDITO do relatório): (1) cobertura da
+> VPS voltando a andar e T2.5g implantado lá; (2) leitura datada com estágio ≠ NONE e regime ≠
+> UNKNOWN — janela 2026-09-09/10; (3) p99 dentro de 3 s ou renegociação explícita do alvo com o
+> número medido; (4) os três entregáveis de teste da T2.8 mais uma execução única e datada das
+> suítes do M2. **Nada disto bloqueia o M3**, que corre em caminhos disjuntos.
 
 **Escopo**
 - `hunter_indicators`: registro de features, conjunto v1, detectores de anomalia v1, regime v0, Opportunity Engine com pesos em `opportunity_weights`.

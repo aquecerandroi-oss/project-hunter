@@ -1,11 +1,48 @@
 ---
 tags: [bugs, abertos]
-updated: 2026-09-06
+updated: 2026-09-07
 ---
 
 # Open Bugs
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
+
+## Abertos no fecho do M2 (2026-09-07, tarefa T2.8 — ver `docs/reports/M2.md`)
+
+- **HIGH (operacional, VPS — remedido hoje) — a cobertura continua congelada, e agora sabemos o
+  custo dela.** Leitura de **2026-09-07T03:19:20Z**: `mkt:binance:coverage.covered_until =
+  2026-09-07T02:34:57Z` — **44 minutos parado**. `hb:scanner:*` declara `coverage = unproven`;
+  `hb:strategy:shadow` conta `{"unavailable": 63.793}` avaliações contra 11.479 `not_triggered` e
+  460 `triggered`. **O custo, agora quantificado:** enquanto o carimbo não anda, `trade_velocity_1m`,
+  `buy_pressure_5m` e `sell_pressure_5m` se recusam sozinhas, **nenhuma baseline de tape amadurece**
+  (0 buckets utilizáveis em 393–398, ver [[EXP-0003-baselines-v1]]) e **nenhum EARLY pode ser
+  publicado** — 0 estágios ≠ `NONE` em 299 amostras. É o bloqueio nº 1 do M2 e a razão nº 1 do
+  parecer de não aprovação. **Próximo passo inalterado:** medir `queue_oldest_pending_ts` e o motivo
+  de quebra **dentro do contêiner da VPS** antes de mudar qualquer linha.
+- **HIGH (implantação) — o T2.5g está commitado e provado, e não está na VPS.** A chave
+  compartilhada `hb:market:binance` (desenho antigo, o HIGH que decidiu a topologia entregue no M1)
+  **ainda existe** no Redis da VPS, ao lado de um único `hb:market:<instance>`: a VPS roda **1 shard
+  com 200 mercados**, exatamente a topologia em que o tick nasce com 3,7 s de atraso mediano. No
+  local, os quatro shards com heartbeat por shard (`hb:market:binance:0of4` … `:3of4`) estão no ar
+  e a cobertura anda (`covered_until` a 1 s do relógio). Dono: ops.
+- **HIGH (produto, medido) — o score não pode passar de 25,00 de 100.** Com 3 componentes de 9
+  disponíveis (pesos 0,20 `volume` + 0,05 `anomalies` + 0,00 `agent_consensus`) contra
+  `watching_min = 40`, `hot_min = 75`, `entry_candidate_min = 80`, **nenhum mercado pode alcançar
+  WATCHING por pontuação** — os que aparecem como `ANOMALY` chegaram pela rota da severidade
+  (`anomaly_severity_min = 60`). Não é defeito de código (o motor recusa redistribuir peso, e
+  derruba a `confidence` para 0,0714 em vez de fingir certeza): é falta de evidência, e some quando
+  as baselines de tape/livro/derivativos amadurecerem. Registrado porque **é o que o Everton vê na
+  tela**.
+- **MEDIUM (integridade de pesquisa) — ninguém consome `market.candles.backfilled`.** `grep` no
+  repositório encontra só produtores (`backfill_announce.py`, `recovery_drain.py`). Decisão
+  consciente da T2.9c (`766f8b6` deixa escritos os quatro requisitos de quem o escrever), mas a
+  consequência é real: o scanner **não sabe** quando um pedaço da história que ele pediu chegou —
+  descobre no refresh horário seguinte. Dono: `services/scanner-worker`.
+- **MEDIUM (cobertura de teste) — os três entregáveis de teste da T2.8 não existem.** O plano do M2
+  pede integração ponta a ponta (candle → features → anomalia → score → radar) e os e2e
+  `radar.spec.ts` e `opportunity.spec.ts`. `tests/e2e/` tem `markets`, `api-health`, `public` e
+  `signup-onboarding`; `tests/integration/` só o pipeline de mercado do M1. Dono: `test-engineer`.
+  É a condição nº 4 de aprovação do M2.
 
 ## Abertos no plantão da noite de 2026-09-06 (integração das ondas T2.5 / T2.9c / T3.2 / T3.7)
 

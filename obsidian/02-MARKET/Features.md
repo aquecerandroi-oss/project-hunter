@@ -1,18 +1,27 @@
 ---
 tags: [mercado, features, m2]
-updated: 2026-09-06
-status: implementado, sem scanner
+updated: 2026-09-07
+status: implementado
 ---
 
 # Features (Feature Engine)
 
 ## Status
 
-**`implementado, sem scanner`.** T2.2 (commit `487bc4a`, 2026-09-05) entregou `hunter_indicators.features` completo e testado: `MarketContext` carregado do hot state do `market-worker` (msgpack, mais-novo-primeiro, campos de timestamp sombra), as calculadoras — a mensagem do commit fala em 28 —, `FeatureVector` com qualidade e proveniência por feature, e um checkpoint de ATR de Wilder ancorado. `feature_set_version` está fixado em teste como `a2b12fcd…cac51` (`.claude/state/notes-T2.2.md` §"DEFAULT_REGISTRY.feature_set_version"). Prova real: 232 testes passando, `ruff`/`format`/`pyright` limpos, revisão de código aprovada, cross-review de outro quant reproduzindo ATR e features de forma independente (3 must-fix corrigidos com teste) e 4 rodadas de revisão da Astra absorvidas.
+**`implementado`.** T2.2 (commit `487bc4a`, 2026-09-05) entregou `hunter_indicators.features` completo e testado: `MarketContext` carregado do hot state do `market-worker` (msgpack, mais-novo-primeiro, campos de timestamp sombra), as calculadoras — a mensagem do commit fala em 28 —, `FeatureVector` com qualidade e proveniência por feature, e um checkpoint de ATR de Wilder ancorado. `feature_set_version` está fixado em teste como `a2b12fcd…cac51` (`.claude/state/notes-T2.2.md` §"DEFAULT_REGISTRY.feature_set_version"). Prova real: 232 testes passando, `ruff`/`format`/`pyright` limpos, revisão de código aprovada, cross-review de outro quant reproduzindo ATR e features de forma independente (3 must-fix corrigidos com teste) e 4 rodadas de revisão da Astra absorvidas.
 
-**O que falta para valer em produção: nada calcula isto sobre o universo ao vivo.** Não existe `scanner-worker` — é a T2.5 do plano do M2 (`docs/plans/M2.md`), que consome `market.ticks`/`market.candles.closed` e roda as calculadoras nas cadências do pipeline. Até a T2.5 (e a T2.4, que depende destas features para o Regime/Opportunity Engine) fecharem, `feature_definitions`/`feature_snapshots` continuam sem uma linha escrita fora dos testes. **Não há nenhum número de produção para citar aqui** — nenhuma cobertura, nenhuma taxa de qualidade, nada medido contra mercado real; só a suíte sintética do pacote.
+**Atualização de 2026-09-07: agora existe quem calcule isto sobre o universo ao vivo.** O `scanner-worker` (T2.5, `551d542`, e as sucessoras até `9ceb389`) roda as calculadoras nas cadências do pipeline contra os 200 mercados monitorados da Binance. Os números de produção que faltavam nesta página, lidos hoje em modo somente-leitura:
 
-Três features ficam **honestamente indisponíveis** até a T2.5 trazer cobertura do coletor e histórico de derivativos (`.claude/state/notes-T2.2.md` §11) — o commit não lista quais no stat, então não afirmo os nomes aqui sem conferir o `quality.py`.
+| Medida | VPS (2026-09-07T03:24Z) | Local (mesma hora) |
+|---|---|---|
+| `feature_snapshots` gravadas | **108.688** sobre 212 mercados | 128.786 sobre 216 mercados |
+| Início da série viva | 2026-09-06T18:17Z (9 h 07 min) | 2026-09-06T15:35Z (11 h 49 min) |
+| `feature_definitions` seedadas | 28 | 28 |
+| Revisões de baseline vigentes | 88.746 | 73.051 |
+
+**E a limitação medida, que é o achado desta página.** Das 27 features com baseline, **12 têm ao menos um bucket utilizável e 15 têm zero** — e as 15 são exatamente as de **tape** (`trade_velocity_1m`, `buy_pressure_5m`, `sell_pressure_5m`), **livro** (`spread_pct`, `orderbook_imbalance_20`), **derivativos** (`funding_rate`, `open_interest_change_1h/4h`) e todas as `_live`. O motivo é estrutural e estava declarado desde a T2.3: o bootstrap sobre candles persistidas **não pode** produzir baseline de tape nem de livro (`historical_source_unavailable`), então elas só amadurecem com 7 dias de `feature_snapshots` ao vivo. A contagem completa, com o SQL e a saída real, está em [[EXP-0003-baselines-v1]]; a consequência rio abaixo (teto de score 25,00 de 100) está em `docs/reports/M2.md`.
+
+Na melhor feature, **29 dos 200 mercados** têm bucket utilizável. Na prova operacional de 2026-09-06 (`.claude/state/t25-proof.md` §3), num minuto fechado sobre 202 mercados, `trade_velocity_1m` saiu com `quality = ok` em **179** mercados e `orderbook_imbalance_20`/`spread_pct` em **86** — qualidade de dado é uma coisa, maturidade de baseline é outra, e a página separa as duas de propósito.
 
 ## Especificação (a implementar em `hunter_indicators`)
 

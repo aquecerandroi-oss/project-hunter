@@ -1,16 +1,27 @@
 ---
 tags: [mercado, anomalias, m2]
-updated: 2026-09-06
-status: implementado, sem scanner
+updated: 2026-09-07
+status: implementado
 ---
 
 # Anomalies (Anomaly Engine)
 
 ## Status
 
-**`implementado, sem scanner`.** T2.3 (commit `72cfe72`, 2026-09-06) entregou `hunter_indicators.baselines`, `hunter_indicators.anomalies` e `hunter_indicators.stage` completos e testados, sobre as calculadoras de [[Features]] (T2.2). Prova real: 462 testes passando, `ruff`/`format`/`pyright`/`check_file_size` limpos, revisão de código aprovada, cross-review de quant (2 must-fix corrigidos) e rodadas de design/diff/fixes da Astra absorvendo 7 bugs reais.
+**`implementado`.** T2.3 (commit `72cfe72`, 2026-09-06) entregou `hunter_indicators.baselines`, `hunter_indicators.anomalies` e `hunter_indicators.stage` completos e testados, sobre as calculadoras de [[Features]] (T2.2). Prova real: 462 testes passando, `ruff`/`format`/`pyright`/`check_file_size` limpos, revisão de código aprovada, cross-review de quant (2 must-fix corrigidos) e rodadas de design/diff/fixes da Astra absorvendo 7 bugs reais.
 
-**O que falta para valer em produção: mesma lacuna de [[Features]] — não existe `scanner-worker`.** É a T2.5 do plano do M2 (`docs/plans/M2.md`) que vai ler `feature_snapshots`, alimentar as baselines em produção e escrever em `anomalies`. Até lá a tabela `anomalies` continua vazia fora dos testes, e **não há nenhum número de produção para citar** — nenhuma contagem de anomalias reais, nenhuma taxa de disparo, nada medido contra mercado. `EXP-0003-baselines-v1` (as primeiras 24 h reais) é entregável da T2.8, não deste commit.
+**Atualização de 2026-09-07: o `scanner-worker` existe, alimenta as baselines em produção e escreve em `anomalies`.** E o número de produção que faltava aqui é desconfortável, então fica escrito com todas as letras: **um dos dez detectores disparou.**
+
+| Medida (2026-09-07T03:24Z) | VPS | Local |
+|---|---|---|
+| Anomalias gravadas | **15** (12 `resolved`, 3 `active`) | **18** (14 `resolved`, 4 `expired`) |
+| Tipos distintos que dispararam | **1** — `VOLUME_SPIKE` | **1** — `VOLUME_SPIKE` |
+| Severidade observada | 0,0 a **100,0** | 0,0 a 39,1 |
+| Janela | 02:24Z → 03:15Z | mesma noite |
+
+**Por que só um.** Dois detectores estão desarmados **com motivo**, e isso é o desenho funcionando: `LIQUIDATION_CLUSTER: feature_not_implemented` e `CROSS_EXCHANGE_DIVERGENCE: single_exchange_until_m1b`, ambos em 200/200 mercados no heartbeat do scanner. Os outros **sete estão armados e mudos** — e a causa é a mesma de [[Features]]: sem baseline utilizável não há `d = (x − mediana)/MAD`, e as features de tape, livro e derivativos que esses detectores leem têm **zero** buckets utilizáveis. Contagem completa, SQL e saída real em [[EXP-0003-baselines-v1]].
+
+Isto é uma **limitação medida, não um defeito**: um detector que dispararia sobre baseline imatura estaria inventando desvio. Mas o objetivo do M2 pede "anomalias reais das últimas 24 h", e o que existe hoje é um tipo só — está registrado como tal no parecer de `docs/reports/M2.md`, que **não aprovou** o milestone.
 
 ## O que T2.3 entregou de fato (conferido no diff, `72cfe72`)
 
