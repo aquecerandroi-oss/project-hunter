@@ -83,7 +83,7 @@ async def push_candle(
     event_ts = event_ts or getattr(candle, "event_ts", None)
     if event_ts is None and not candle.is_final:
         return False
-    key = keys.candles_1m(candle.exchange, candle.symbol)
+    key = keys.candles_1m(candle.exchange, candle.symbol, candle.market_type)
     value = to_wire(candle)
     if event_ts is not None:
         value["ts"] = event_ts.isoformat()

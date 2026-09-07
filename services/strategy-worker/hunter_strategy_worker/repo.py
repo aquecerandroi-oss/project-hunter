@@ -22,7 +22,7 @@ from sqlalchemy import or_, select
 from hunter_core.db.models.analysis import MarketRegimeRow
 from hunter_core.db.models.market_data import Candle, FundingRate, OpenInterestHistory
 from hunter_core.db.models.markets import Exchange, Market
-from hunter_core.domain.enums import MarketStatus, RegimeScope, Timeframe
+from hunter_core.domain.enums import MarketStatus, MarketType, RegimeScope, Timeframe
 from hunter_core.domain.market import NormalizedCandle
 from hunter_strategy_worker.funding import Settlement
 
@@ -54,15 +54,40 @@ class MarketRow:
     exchange: str
     is_monitored: bool
     status: MarketStatus
+    market_type: MarketType = MarketType.PERPETUAL
 
 
-async def load_market(session: AsyncSession, exchange: str, symbol: str) -> MarketRow | None:
-    """The market row for ``exchange:symbol``, or ``None`` if it is unknown."""
+async def load_market(
+    session: AsyncSession,
+    exchange: str,
+    symbol: str,
+    market_type: MarketType = MarketType.PERPETUAL,
+) -> MarketRow | None:
+    """The market row for ``exchange:symbol`` of ``market_type``, or ``None``.
+
+    T3.0b: ``markets`` is unique on ``(exchange_id, symbol, market_type)``, so
+    the type is part of the question. Without it this ``LIMIT 1`` picked an
+    arbitrary listing the moment the spot pair existed — and everything
+    downstream (candles, funding, the signal's ``market_id``) would belong to a
+    market nobody asked about. ``PERPETUAL`` by default: that is what the
+    shadow lab trades today, and it is what every caller meant.
+    """
     row = (
         await session.execute(
-            select(Market.id, Market.symbol, Market.is_monitored, Market.status, Exchange.code)
+            select(
+                Market.id,
+                Market.symbol,
+                Market.is_monitored,
+                Market.status,
+                Market.market_type,
+                Exchange.code,
+            )
             .join(Exchange, Exchange.id == Market.exchange_id)
-            .where(Exchange.code == exchange, Market.symbol == symbol)
+            .where(
+                Exchange.code == exchange,
+                Market.symbol == symbol,
+                Market.market_type == market_type,
+            )
             .limit(1)
         )
     ).first()
@@ -74,6 +99,7 @@ async def load_market(session: AsyncSession, exchange: str, symbol: str) -> Mark
         exchange=row.code,
         is_monitored=bool(row.is_monitored),
         status=row.status,
+        market_type=row.market_type,
     )
 
 

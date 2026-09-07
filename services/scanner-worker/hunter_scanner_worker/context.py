@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
+from hunter_core.domain.enums import MarketType
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_indicators.features import (
@@ -109,6 +110,7 @@ async def build_market_context(
     exchange: str,
     symbol: str,
     coverage: TapeCoverage,
+    market_type: MarketType = MarketType.PERPETUAL,
     deriv_history: Sequence[DerivObservation] = (),
     now: datetime | None = None,
     btc: MarketContext | None = None,
@@ -124,7 +126,7 @@ async def build_market_context(
     """
     moment = now or utcnow()
     as_of, covers_from, covered_until = evaluation_cut(coverage, symbol, now=moment)
-    raw = await read_hot_state(redis, exchange, symbol)
+    raw = await read_hot_state(redis, exchange, symbol, market_type=market_type)
     candles = (
         decode_candles(raw.candles, raw.candles_limit)
         if cache is None

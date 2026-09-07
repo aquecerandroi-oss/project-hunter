@@ -72,6 +72,7 @@ async def build_market_context(
         symbol=market.symbol,
         count=config.hot_state_tail,
         cut=source_bar_close,
+        market_type=market.market_type,
     )
     merged: dict[datetime, NormalizedCandle] = {
         c.open_time: c for c in tail if c.open_time >= start

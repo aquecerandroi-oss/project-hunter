@@ -16,12 +16,17 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from decimal import Decimal
-from enum import StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 from hunter_core.domain.enums import MarketStatus, MarketType, OrderSide, Timeframe
+from hunter_core.domain.quality import (
+    DataQuality as DataQuality,  # re-exported: this module is the historical home
+)
+from hunter_core.domain.quality import (
+    data_quality as data_quality,
+)
 from hunter_core.domain.types import ensure_utc, utcnow
 
 _TIMEFRAME_SECONDS: dict[Timeframe, int] = {
@@ -32,15 +37,6 @@ _TIMEFRAME_SECONDS: dict[Timeframe, int] = {
     Timeframe.H4: 4 * 60 * 60,
     Timeframe.D1: 24 * 60 * 60,
 }
-
-
-class DataQuality(StrEnum):
-    """Freshness of a market's hot state — ``docs/plans/M1.md`` staleness rule."""
-
-    OK = "ok"
-    STALE = "stale"
-    DEGRADED = "degraded"
-    UNAVAILABLE = "unavailable"
 
 
 def timeframe_seconds(tf: Timeframe) -> int:
@@ -69,24 +65,6 @@ def close_time_for(open_time: datetime, tf: Timeframe) -> datetime:
 def is_aligned(ts: datetime, tf: Timeframe) -> bool:
     """Whether ``ts`` already sits on a ``tf`` bucket boundary."""
     return align_open_time(ts, tf) == ensure_utc(ts)
-
-
-def data_quality(
-    last_event_at: datetime | None,
-    *,
-    now: datetime,
-    stale_after_s: int,
-    has_open_gap: bool,
-) -> DataQuality:
-    """Classify a market's data freshness for the API/UI staleness badge."""
-    if last_event_at is None:
-        return DataQuality.UNAVAILABLE
-    if has_open_gap:
-        return DataQuality.DEGRADED
-    age_s = (ensure_utc(now) - ensure_utc(last_event_at)).total_seconds()
-    if age_s > stale_after_s:
-        return DataQuality.STALE
-    return DataQuality.OK
 
 
 def to_wire(model: BaseModel) -> dict[str, Any]:
@@ -150,10 +128,26 @@ class NormalizedMarket(NormalizedModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+# --- ``market_type`` on the event models (T3.0b) ------------------------------
+# ``BTCUSDT`` is two markets on Binance -- the spot pair and the USDS-M
+# perpetual -- with different prices, fees and filters. Without this field the
+# two are indistinguishable the moment an event leaves the adapter that
+# produced it, and they collapse onto one hot-state key.
+#
+# The default is ``PERPETUAL`` on purpose: every USDS-M parser omits the field,
+# and every payload already sitting in Redis or on a stream was written without
+# it -- all of them must keep meaning exactly what they meant before. The spot
+# parsers pass ``SPOT`` explicitly; nothing is ever inferred, because a wrong
+# guess here silently labels a spot market as a perpetual one. ``to_wire``
+# always writes the field out, so a payload produced from now on states which
+# market it is instead of leaning on the default.
+
+
 class NormalizedTicker(_TsUtcMixin, _ReceivedAtMixin):
     kind: Literal["ticker"] = "ticker"
     exchange: str
     symbol: str
+    market_type: MarketType = MarketType.PERPETUAL
     last: Decimal
     bid: Decimal | None = None
     ask: Decimal | None = None
@@ -180,6 +174,7 @@ class NormalizedTrade(_TsUtcMixin, _ReceivedAtMixin):
     kind: Literal["trade"] = "trade"
     exchange: str
     symbol: str
+    market_type: MarketType = MarketType.PERPETUAL
     trade_id: str
     price: Decimal
     qty: Decimal
@@ -198,6 +193,7 @@ class NormalizedOrderBook(_TsUtcMixin, _ReceivedAtMixin):
     kind: Literal["book"] = "book"
     exchange: str
     symbol: str
+    market_type: MarketType = MarketType.PERPETUAL
     bids: list[BookLevel]
     asks: list[BookLevel]
     sequence: int | None = None
@@ -255,6 +251,7 @@ class NormalizedCandle(_ReceivedAtMixin):
     kind: Literal["candle"] = "candle"
     exchange: str
     symbol: str
+    market_type: MarketType = MarketType.PERPETUAL
     timeframe: Timeframe
     open_time: datetime
     close_time: datetime

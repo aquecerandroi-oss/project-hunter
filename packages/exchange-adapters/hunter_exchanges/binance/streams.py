@@ -30,11 +30,10 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
 
-from hunter_core.domain.enums import OrderSide, Timeframe
+from hunter_core.domain.enums import MarketType, OrderSide, Timeframe
 from hunter_core.domain.market import (
     BookLevel,
     NormalizedCandle,
-    NormalizedFunding,
     NormalizedOrderBook,
     NormalizedTicker,
     NormalizedTrade,
@@ -47,7 +46,9 @@ from hunter_exchanges.binance.normalize import (
     ms_to_datetime,
     require_field,
     to_decimal,
-    to_decimal_or_none,
+)
+from hunter_exchanges.binance.streams_derivatives import (
+    parse_mark_price as parse_mark_price,
 )
 from hunter_exchanges.binance.streams_liquidation import parse_force_order as parse_force_order
 
@@ -153,6 +154,7 @@ def parse_agg_trade(raw: dict[str, Any]) -> NormalizedTrade:
         return NormalizedTrade.model_construct(
             exchange=EXCHANGE,
             symbol=require_field(raw, "s"),
+            market_type=MarketType.PERPETUAL,
             ts=ms_to_datetime(raw["T"], field="T"),
             trade_id=str(raw["a"]),
             price=to_decimal(raw["p"], field="p"),
@@ -184,6 +186,7 @@ def parse_book_ticker(raw: dict[str, Any], *, last: Decimal) -> NormalizedTicker
         return NormalizedTicker.model_construct(
             exchange=EXCHANGE,
             symbol=require_field(raw, "s"),
+            market_type=MarketType.PERPETUAL,
             ts=event_ts(raw),
             last=last,
             bid=to_decimal(raw["b"], field="b"),
@@ -237,6 +240,7 @@ def parse_depth20(raw: dict[str, Any]) -> NormalizedOrderBook:
         return NormalizedOrderBook.model_construct(
             exchange=EXCHANGE,
             symbol=require_field(raw, "s"),
+            market_type=MarketType.PERPETUAL,
             ts=event_ts(raw),
             bids=bids,
             asks=asks,
@@ -251,7 +255,9 @@ def parse_depth20(raw: dict[str, Any]) -> NormalizedOrderBook:
         ) from exc
 
 
-def parse_kline_ws(raw: dict[str, Any]) -> NormalizedCandle:
+def parse_kline_ws(
+    raw: dict[str, Any], *, market_type: MarketType = MarketType.PERPETUAL
+) -> NormalizedCandle:
     """``<symbol>@kline_1m`` -> :class:`NormalizedCandle`. ``is_final`` is the
     stream's own ``k.x`` flag; ``event_ts`` is the frame's ``E`` (push time),
     so the worker can order same-``open_time`` partials by arrival."""
@@ -261,6 +267,7 @@ def parse_kline_ws(raw: dict[str, Any]) -> NormalizedCandle:
         return NormalizedCandle.model_construct(
             exchange=EXCHANGE,
             symbol=require_field(raw, "s"),
+            market_type=market_type,
             timeframe=Timeframe.M1,
             open_time=open_time,
             close_time=close_time_for(open_time, Timeframe.M1),
@@ -280,33 +287,6 @@ def parse_kline_ws(raw: dict[str, Any]) -> NormalizedCandle:
     except (KeyError, TypeError, ValueError) as exc:
         raise MalformedMessage(
             f"malformed kline_1m payload {raw!r}: {exc}", exchange=EXCHANGE
-        ) from exc
-
-
-def parse_mark_price(raw: dict[str, Any]) -> NormalizedFunding:
-    """``<symbol>@markPrice@1s`` -> :class:`NormalizedFunding` (always
-    ``funding_kind="estimated"``); ``metadata`` labels the unmapped ``P``."""
-    try:
-        next_funding_time = ms_to_datetime(raw["T"], field="T") if raw.get("T") else None
-        metadata: dict[str, Any] = {}
-        if "P" in raw:
-            metadata["estimated_settle_price"] = raw["P"]
-        return NormalizedFunding.model_construct(
-            exchange=EXCHANGE,
-            symbol=require_field(raw, "s"),
-            ts=ms_to_datetime(raw["E"], field="E"),
-            funding_rate=to_decimal(raw["r"], field="r"),
-            next_funding_time=next_funding_time,
-            mark_price=to_decimal(raw["p"], field="p"),
-            index_price=to_decimal_or_none(raw.get("i"), field="i"),
-            funding_kind="estimated",
-            metadata=metadata,
-            kind="funding",
-            received_at=utcnow(),
-        )
-    except KeyError as exc:
-        raise MalformedMessage(
-            f"missing field {exc} in markPrice {raw!r}", exchange=EXCHANGE
         ) from exc
 
 

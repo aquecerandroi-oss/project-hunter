@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
 
+from hunter_core.domain.enums import MarketType
 from hunter_core.domain.types import ensure_utc, utcnow
 from hunter_core.logging import get_logger
 from hunter_core.redis import keys
@@ -100,10 +101,19 @@ class TapeCoverage:
 
 
 async def read_coverage(
-    redis: redis_asyncio.Redis, exchange: str, *, now: datetime | None = None
+    redis: redis_asyncio.Redis,
+    exchange: str,
+    *,
+    now: datetime | None = None,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> TapeCoverage:
-    """Read ``mkt:{exchange}:coverage``. A missing key is no coverage, not an error."""
-    fields: dict[Any, Any] = await cast(Any, redis).hgetall(keys.tape_coverage(exchange))
+    """Read ``mkt:{exchange}:coverage``. A missing key is no coverage, not an error.
+
+    One hash per venue *and* market type (T3.0b), so the ``sym:*`` fields stay
+    plain symbols and no collector's proof is ever read as another's.
+    """
+    key = keys.tape_coverage(exchange, market_type)
+    fields: dict[Any, Any] = await cast(Any, redis).hgetall(key)
     if not fields:
         return TapeCoverage(fetched_at=now or utcnow())
     decoded = {_text(key): value for key, value in fields.items()}

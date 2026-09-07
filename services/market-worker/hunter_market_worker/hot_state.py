@@ -195,7 +195,7 @@ def queue_ticker_hash(
     fields = _ticker_fields(ticker)
     owned = _TICKER_OWNED_FIELDS[source]
     argv = _hash_argv(fields, "ts", ticker.ts, TICKER_TTL_S, owned)
-    pipe.evalsha(sha, 1, keys.ticker(ticker.exchange, ticker.symbol), *argv)
+    pipe.evalsha(sha, 1, keys.ticker(ticker.exchange, ticker.symbol, ticker.market_type), *argv)
 
 
 def queue_book_set(pipe: Any, book: NormalizedOrderBook, depth: int = 20) -> None:
@@ -209,7 +209,7 @@ def queue_book_set(pipe: Any, book: NormalizedOrderBook, depth: int = 20) -> Non
     upstream guarantee and therefore still needs to check for itself."""
     payload = _book_payload(book, depth)
     pipe.set(
-        keys.book(book.exchange, book.symbol),
+        keys.book(book.exchange, book.symbol, book.market_type),
         msgpack.packb(payload, use_bin_type=True),
         ex=BOOK_TTL_S,
     )
@@ -217,7 +217,11 @@ def queue_book_set(pipe: Any, book: NormalizedOrderBook, depth: int = 20) -> Non
 
 def _ticker_fields(ticker: NormalizedTicker) -> dict[str, str]:
     fields = to_wire(ticker)
-    for field in ("kind", "exchange", "symbol", "received_at"):
+    # ``market_type`` joins the identity fields that are already *in the key*
+    # and therefore never repeated inside the hash (T3.0b). Writing it as a
+    # field would also put an unowned name into a hash two producers share
+    # (KB-0044), and would change the perpetual's hash for no gain.
+    for field in ("kind", "exchange", "symbol", "market_type", "received_at"):
         fields.pop(field, None)
     fields["ts"] = ticker.ts.isoformat()
     return _mapping(**fields)
@@ -246,7 +250,7 @@ async def write_ticker(
     back into sharing one owned set across producers."""
     return await _hash(
         redis,
-        keys.ticker(ticker.exchange, ticker.symbol),
+        keys.ticker(ticker.exchange, ticker.symbol, ticker.market_type),
         _ticker_fields(ticker),
         "ts",
         ticker.ts,
@@ -256,7 +260,7 @@ async def write_ticker(
 
 
 async def write_book(redis: Any, book: NormalizedOrderBook, depth: int = 20) -> bool:
-    key = keys.book(book.exchange, book.symbol)
+    key = keys.book(book.exchange, book.symbol, book.market_type)
     payload = _book_payload(book, depth)
     while True:
         async with redis.pipeline(transaction=True) as pipe:

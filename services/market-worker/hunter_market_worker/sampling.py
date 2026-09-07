@@ -14,7 +14,7 @@ from hunter_core.db.models.market_data import (
     OpenInterestHistory,
 )
 from hunter_core.db.session import role_session
-from hunter_core.domain.enums import Timeframe
+from hunter_core.domain.enums import MarketType, Timeframe
 from hunter_core.domain.market import (
     align_open_time,
 )
@@ -180,17 +180,21 @@ async def write_snapshots(
     symbols: list[str],
     settings: Settings,
     queues: PersistQueues | None = None,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> None:
+    """``market_type`` (T3.0b) travels with the symbols: it picks both the hot
+    state read here and the ``market_id`` the row is written under, and the two
+    must be the same market."""
     pipe = redis.pipeline(transaction=False)
     for symbol in symbols:
-        pipe.hgetall(keys.ticker(exchange_code, symbol))
-        pipe.hgetall(keys.derivatives(exchange_code, symbol))
+        pipe.hgetall(keys.ticker(exchange_code, symbol, market_type))
+        pipe.hgetall(keys.derivatives(exchange_code, symbol, market_type))
     raw = await pipe.execute()
     observed_at = utcnow()
     snapshot_ts = align_open_time(observed_at, Timeframe.M1)
     stale_after = settings.market_stale_after_s
     async with role_session(session_factory, db_role="hunter_worker") as session:
-        market_ids = await load_market_ids(session, exchange_code, set(symbols))
+        market_ids = await load_market_ids(session, exchange_code, set(symbols), market_type)
         values: list[dict[str, Any]] = []
         for index, symbol in enumerate(symbols):
             market_id = market_ids.get(symbol)

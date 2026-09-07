@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from hunter_core.domain.enums import MarketType
 from hunter_core.redis import keys
 from hunter_market_worker import hot_state, hot_state_trades
 from hunter_market_worker import wire as msgpack
@@ -221,7 +222,7 @@ async def test_trade_memory_is_bounded_and_forgotten_on_symbol_removal(
         await hot_state.push_trade(
             redis_client, builders.trade("BTCUSDT", "100", "1", trade_id=str(i)), memory
         )
-    key = (builders.EXCHANGE, "BTCUSDT")
+    key = (builders.EXCHANGE, "BTCUSDT", MarketType.PERPETUAL)
     assert len(memory._ids[key]) <= hot_state.TRADE_DEDUPE_WINDOW  # pyright: ignore[reportPrivateUsage]
 
     memory.forget(builders.EXCHANGE, "BTCUSDT")

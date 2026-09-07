@@ -130,6 +130,7 @@ class Scanner:
             exchange=market.ref.exchange,
             symbol=market.ref.symbol,
             coverage=self.coverage,
+            market_type=market.ref.market_type,
             deriv_history=observations,
             now=moment,
             cache=market.hot,

@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import msgpack
 
+from hunter_core.domain.enums import MarketType
 from hunter_core.domain.market import NormalizedCandle, from_wire
 from hunter_core.domain.types import ensure_utc
 from hunter_core.logging import get_logger
@@ -51,12 +52,18 @@ def _decode(raw: bytes) -> NormalizedCandle | None:
 
 
 async def read_tail(
-    redis: redis_asyncio.Redis, *, exchange: str, symbol: str, count: int, cut: datetime
+    redis: redis_asyncio.Redis,
+    *,
+    exchange: str,
+    symbol: str,
+    count: int,
+    cut: datetime,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> list[NormalizedCandle]:
-    """The newest ``count`` final 1m candles that had closed by ``cut``."""
+    """The newest ``count`` final 1m candles of one market that closed by ``cut``."""
     if count <= 0:
         return []
-    key = keys.candles_1m(exchange, symbol)
+    key = keys.candles_1m(exchange, symbol, market_type)
     rows: list[bytes] = cast("list[bytes]", await redis.lrange(key, 0, count - 1))
     candles: list[NormalizedCandle] = []
     for raw in rows:
@@ -64,6 +71,11 @@ async def read_tail(
         if candle is None or not candle.is_final or candle.close_time > cut:
             continue
         if candle.exchange != exchange or candle.symbol != symbol:
+            continue
+        # A row that names another listing is dropped, never repriced as this
+        # one (T3.0b). Rows written before ``market_type`` existed decode as
+        # ``PERPETUAL``, which is exactly what they were.
+        if candle.market_type is not market_type:
             continue
         candles.append(candle)
     candles.sort(key=lambda candle: candle.open_time)
@@ -131,7 +143,12 @@ _EMPTY_DERIV = DerivRaw(
 
 
 async def read_derivatives(
-    redis: redis_asyncio.Redis, *, exchange: str, symbol: str, cut: datetime
+    redis: redis_asyncio.Redis,
+    *,
+    exchange: str,
+    symbol: str,
+    cut: datetime,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> DerivRaw:
     """Funding/open-interest fields observed at or before ``cut``.
 
@@ -139,7 +156,8 @@ async def read_derivatives(
     single newest reading of each field, never a history: this can only ever
     answer "what is the last known value", not "what was it N minutes ago".
     """
-    raw: dict[Any, Any] = await redis.hgetall(keys.derivatives(exchange, symbol))  # type: ignore[misc]
+    key = keys.derivatives(exchange, symbol, market_type)
+    raw: dict[Any, Any] = await redis.hgetall(key)  # type: ignore[misc]
     if not raw:
         return _EMPTY_DERIV
     plain = {_text(k): _text(v) for k, v in raw.items() if not _text(k).startswith("_")}

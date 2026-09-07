@@ -135,7 +135,13 @@ async def _save_checkpoints(
         if market.last_vector_at is None:
             continue
         try:
-            await save_checkpoint(redis, market.ref.exchange, market.ref.symbol, market.checkpoint)
+            await save_checkpoint(
+                redis,
+                market.ref.exchange,
+                market.ref.symbol,
+                market.checkpoint,
+                market.ref.market_type,
+            )
         except Exception:
             logger.warning("scanner_checkpoint_save_failed", symbol=market.ref.symbol)
 
@@ -282,7 +288,7 @@ async def refresh_universe(
     now = utcnow()
     for ref in diff.added:
         state = scanner.state.ensure(ref, now=now)
-        state.checkpoint = await load_checkpoint(redis, ref.exchange, ref.symbol)
+        state.checkpoint = await load_checkpoint(redis, ref.exchange, ref.symbol, ref.market_type)
         state.touch("universe_added")
     for ref in diff.removed:
         # An honest close-out: the market stops being evaluated *and* stops

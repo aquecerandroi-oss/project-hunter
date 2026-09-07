@@ -54,7 +54,7 @@ from hunter_core.domain.market import (
 from hunter_exchanges.base import MalformedMessage, StreamChannel
 from hunter_exchanges.binance.normalize import ms_to_datetime, to_decimal
 from hunter_exchanges.binance.streams import parse_kline_ws as _parse_kline_ws
-from hunter_exchanges.binance_spot.identity import EXCHANGE
+from hunter_exchanges.binance_spot.identity import EXCHANGE, MARKET_TYPE
 
 __all__ = [
     "BOOK_CADENCE_MS",
@@ -151,6 +151,7 @@ def parse_agg_trade(raw: dict[str, Any], *, symbol: str) -> NormalizedTrade:
         return NormalizedTrade.model_construct(
             exchange=EXCHANGE,
             symbol=symbol,
+            market_type=MARKET_TYPE,
             ts=ms_to_datetime(raw["T"], field="T"),
             trade_id=str(raw["a"]),
             price=to_decimal(raw["p"], field="p"),
@@ -189,6 +190,7 @@ def parse_book_ticker(
     return NormalizedTicker.model_construct(
         exchange=EXCHANGE,
         symbol=symbol,
+        market_type=MARKET_TYPE,
         ts=received_at,
         received_at=received_at,
         last=last,
@@ -241,6 +243,7 @@ def parse_depth20(
         return NormalizedOrderBook.model_construct(
             exchange=EXCHANGE,
             symbol=symbol,
+            market_type=MARKET_TYPE,
             ts=received_at,
             received_at=received_at,
             bids=bids,
@@ -257,8 +260,9 @@ def parse_depth20(
 def parse_kline(raw: dict[str, Any]) -> NormalizedCandle:
     """``<symbol>@kline_1m`` - byte-identical to the USDS-M frame, so the
     USDS-M parser is reused rather than copied (both stamp
-    ``exchange="binance"``, which is correct for spot too: same venue)."""
-    return _parse_kline_ws(raw)
+    ``exchange="binance"``, which is correct for spot too: same venue). The
+    *market* is not shared, hence ``market_type`` (T3.0b)."""
+    return _parse_kline_ws(raw, market_type=MARKET_TYPE)
 
 
 def parse_stream_message(

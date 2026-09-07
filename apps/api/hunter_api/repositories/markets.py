@@ -152,16 +152,26 @@ class MarketRepository:
         rows = (await self.session.execute(statement)).all()
         return [_row_to_market(row) for row in rows]
 
-    async def get_market(self, exchange: str, symbol: str) -> MarketRow | None:
-        """The market for ``(exchange, symbol)``, or ``None``.
+    async def get_market(
+        self, exchange: str, symbol: str, market_type: MarketType = MarketType.PERPETUAL
+    ) -> MarketRow | None:
+        """The market for ``(exchange, symbol, market_type)``, or ``None``.
 
-        M1 only ever seeds Binance USDS-M perpetuals, so ``(exchange, symbol)``
-        is unambiguous today; a future exchange with both spot and perpetual
-        listings under the same symbol would need ``market_type`` in the path
-        too — out of scope until that market type actually exists.
+        T3.0b: ``markets`` is unique on the three of them, so this ``LIMIT 1``
+        needed the third or it would return an arbitrary listing as soon as the
+        spot pair of a symbol exists. ``PERPETUAL`` is the default because that
+        is what ``/markets/{exchange}/{symbol}`` has always answered; giving
+        the route a way to ask for the spot listing is UI work that belongs
+        with the spot data path (T3.0c), not a silent change of meaning here.
         """
         statement = (
-            _base_select().where(Exchange.code == exchange, Market.symbol == symbol).limit(1)
+            _base_select()
+            .where(
+                Exchange.code == exchange,
+                Market.symbol == symbol,
+                Market.market_type == market_type,
+            )
+            .limit(1)
         )
         row = (await self.session.execute(statement)).first()
         return _row_to_market(row) if row is not None else None

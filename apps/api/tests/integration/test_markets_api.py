@@ -881,3 +881,52 @@ async def test_gapped_market_ids_handles_more_ids_than_the_postgres_bind_paramet
         gapped = await MarketRepository(session).gapped_market_ids(market_ids)
 
     assert gapped == set()
+
+
+async def test_spot_and_perpetual_of_one_symbol_are_two_rows_with_their_own_hot_state(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    redis_client: redis_asyncio.Redis,
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """T3.0b: ``markets`` allows both listings of one symbol, and the hot state
+    now has a key per listing. The page must show each market its own price —
+    before this, both rows read ``mkt:{exchange}:{symbol}:ticker`` and the two
+    were shown the same number, one of which was a lie."""
+    exchange, symbol, perpetual_id = await _seed_market(session_factory)
+    async with session_factory() as session:
+        row = (await session.execute(select(Market).where(Market.id == perpetual_id))).scalar_one()
+        session.add(
+            Market(
+                exchange_id=row.exchange_id,
+                symbol=symbol,
+                market_type=MarketType.SPOT,
+                base_asset_id=row.base_asset_id,
+                quote_asset_id=row.quote_asset_id,
+                is_monitored=True,
+                monitor_rank=2,
+            )
+        )
+        await session.commit()
+    await _write_ticker(redis_client, exchange, symbol)  # perpetual: 50000.5
+    await redis_client.hset(
+        keys.ticker(exchange, symbol, MarketType.SPOT),
+        mapping={"last": "49000.25", "ts": datetime.now(UTC).isoformat()},
+    )
+    actor: Actor = make_actor("markets-reader-spot")
+
+    response = await client.get(f"/api/v1/markets?exchange={exchange}", headers=actor.headers)
+
+    assert response.status_code == 200, response.text
+    rows = {item["market_type"]: item for item in response.json()["items"]}
+    assert set(rows) == {"perpetual", "spot"}
+    assert rows["perpetual"]["last_price"] == "50000.5"
+    assert rows["spot"]["last_price"] == "49000.25"
+
+    detail = await client.get(f"/api/v1/markets/{exchange}/{symbol}", headers=actor.headers)
+
+    # The route still names a market by exchange + symbol, so it answers for
+    # the perpetual — deterministically, instead of an arbitrary LIMIT 1 row.
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["market_type"] == "perpetual"
+    assert detail.json()["id"] == str(perpetual_id)

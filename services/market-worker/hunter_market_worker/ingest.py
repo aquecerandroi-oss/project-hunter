@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from hunter_core.domain.enums import MarketType
 from hunter_core.domain.market import (
     NormalizedCandle,
     NormalizedFunding,
@@ -74,13 +75,17 @@ class AcceptedEvents:
     """Keep component watermarks across hot-key expiry for this ingest lifetime."""
 
     def __init__(self) -> None:
-        self.latest: dict[tuple[str, str, str], Any] = {}
+        self.latest: dict[tuple[str, str, Any, str], Any] = {}
         self.missing_candle_ts_reported = False
 
     def accept(self, event: NormalizedEvent) -> bool:
         if isinstance(event, (NormalizedCandle, NormalizedLiquidation, NormalizedTrade)):
             return True
-        key = (event.exchange, event.symbol, event.kind)
+        # ``market_type`` is part of the watermark's identity (T3.0b): funding
+        # and open interest have none (perpetual-only concepts), so they fall
+        # back to the perpetual, which is what they are.
+        market_type = getattr(event, "market_type", MarketType.PERPETUAL)
+        key = (event.exchange, event.symbol, market_type, event.kind)
         previous = self.latest.get(key)
         if previous is not None and event.ts <= previous:
             return False

@@ -24,7 +24,7 @@ from typing import Any, cast
 
 import msgpack
 
-from hunter_core.domain.enums import OrderSide
+from hunter_core.domain.enums import MarketType, OrderSide
 from hunter_core.domain.market import NormalizedCandle, from_wire
 from hunter_core.domain.types import ensure_utc
 from hunter_core.redis import keys
@@ -78,15 +78,18 @@ async def read_hot_state(
     exchange: str,
     symbol: str,
     *,
+    market_type: MarketType = MarketType.PERPETUAL,
     candles: int = CANDLES_MAXLEN,
     trades: int = TRADES_MAXLEN,
 ) -> HotStateRaw:
-    """Read the four hot-state keys of one market in a single pipeline."""
+    """Read the four hot-state keys of one market in a single pipeline
+    (``market_type`` is part of that identity since T3.0b: the spot pair's
+    candles read under the perpetual's name score a market that never traded)."""
     async with redis.pipeline(transaction=False) as pipe:
-        pipe.lrange(keys.candles_1m(exchange, symbol), 0, candles - 1)
-        pipe.get(keys.book(exchange, symbol))
-        pipe.lrange(keys.trades(exchange, symbol), 0, trades - 1)
-        pipe.hgetall(keys.derivatives(exchange, symbol))
+        pipe.lrange(keys.candles_1m(exchange, symbol, market_type), 0, candles - 1)
+        pipe.get(keys.book(exchange, symbol, market_type))
+        pipe.lrange(keys.trades(exchange, symbol, market_type), 0, trades - 1)
+        pipe.hgetall(keys.derivatives(exchange, symbol, market_type))
         candle_rows, book, trade_rows, deriv = await pipe.execute()
     return HotStateRaw(
         candles=list(candle_rows or ()),

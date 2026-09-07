@@ -19,13 +19,13 @@ import redis.exceptions
 from hunter_api.schemas.markets import ComponentQuality, MarketOut
 from hunter_api.services.markets import (
     HotState,
-    _pipeline_hot_state,  # pyright: ignore[reportPrivateUsage]
     aggregate_data_quality,
     build_market_out,
     parse_book,
     parse_trades,
     spread_pct,
 )
+from hunter_api.services.markets_hot_state import pipeline_hot_state
 from hunter_core.domain.enums import MarketStatus, MarketType, Timeframe
 from hunter_core.domain.market import DataQuality
 
@@ -655,8 +655,8 @@ async def test_pipeline_hot_state_degrades_to_absent_when_redis_is_unavailable(
     ``capture_logs()``'s later reconfiguration no longer reaches it.
     """
     fake_redis = _RaisingRedis(redis.exceptions.ConnectionError("connection refused"))
-    with caplog.at_level(logging.WARNING, logger="hunter_api.services.markets"):
-        result = await _pipeline_hot_state(fake_redis, [_row()])  # pyright: ignore[reportArgumentType]
+    with caplog.at_level(logging.WARNING, logger="hunter_api.services.markets_hot_state"):
+        result = await pipeline_hot_state(fake_redis, [_row()])  # pyright: ignore[reportArgumentType]
     assert result == {}
     assert "ConnectionError" in caplog.text
     assert "mkt:" not in caplog.text
@@ -673,8 +673,8 @@ async def test_pipeline_hot_state_wrongtype_error_never_logs_the_offending_key(
         "mkt:binance:BTCUSDT:ticker"
     )
     fake_redis = _RaisingRedis(exc)
-    with caplog.at_level(logging.WARNING, logger="hunter_api.services.markets"):
-        result = await _pipeline_hot_state(fake_redis, [_row()])  # pyright: ignore[reportArgumentType]
+    with caplog.at_level(logging.WARNING, logger="hunter_api.services.markets_hot_state"):
+        result = await pipeline_hot_state(fake_redis, [_row()])  # pyright: ignore[reportArgumentType]
     assert result == {}
     assert "mkt:binance:BTCUSDT:ticker" not in caplog.text
     assert "ticker" not in caplog.text
@@ -706,10 +706,10 @@ async def test_pipeline_hot_state_isolates_a_single_market_command_failure(
     ]
     fake_redis = _PartialFailureRedis(results)
     rows = [_row(symbol="AAA"), _row(symbol="BBB")]
-    with caplog.at_level(logging.WARNING, logger="hunter_api.services.markets"):
-        out = await _pipeline_hot_state(fake_redis, rows)  # pyright: ignore[reportArgumentType]
-    assert out["binance:AAA"].ticker == {}
-    assert out["binance:BBB"].ticker["last"] == "1"
+    with caplog.at_level(logging.WARNING, logger="hunter_api.services.markets_hot_state"):
+        out = await pipeline_hot_state(fake_redis, rows)  # pyright: ignore[reportArgumentType]
+    assert out[rows[0].id].ticker == {}
+    assert out[rows[1].id].ticker["last"] == "1"
     assert "ResponseError" in caplog.text
     assert "AAA" not in caplog.text
     assert "BBB" not in caplog.text

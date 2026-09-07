@@ -12,7 +12,7 @@ already import them from ``services.markets``.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -43,6 +43,13 @@ from hunter_api.services.markets_codec import (
     to_decimal,
     to_funding_kind,
     to_timestamp,
+)
+from hunter_api.services.markets_hot_state import (
+    EMPTY_HOT_STATE,
+    pipeline_hot_state,
+)
+from hunter_api.services.markets_hot_state import (
+    HotState as HotState,  # re-exported: callers and tests import it from here
 )
 from hunter_api.services.markets_quality import (
     CLOCK_SKEW_TOLERANCE_S,
@@ -79,91 +86,6 @@ __all__ = [
 logger = get_logger(__name__)
 
 RECENT_TRADES_LIMIT = 50
-
-
-@dataclass(frozen=True, slots=True)
-class HotState:
-    """One market's Redis snapshot, decoded but not yet interpreted."""
-
-    ticker: dict[str, str]
-    deriv: dict[str, str]
-    book_ts: datetime | None
-
-
-_EMPTY_HOT_STATE = HotState(ticker={}, deriv={}, book_ts=None)
-
-
-async def _pipeline_hot_state(
-    redis: redis_asyncio.Redis, rows: list[MarketRow]
-) -> dict[str, HotState]:
-    """One round trip: ``ticker``/``deriv`` HGETALL and a ``book`` GET (for
-    its ``ts`` only) per row, keyed by ``"{exchange}:{symbol}"``.
-
-    (G3) ``execute(raise_on_error=False)``: a per-command failure (a
-    ``WRONGTYPE`` on one market's ticker key) then comes back *in place* in
-    ``results`` as the exception object, isolated to the one command -- and
-    therefore market -- it belongs to, rather than aborting the whole
-    pipeline. A failure at ``execute()`` itself (Redis actually down) still
-    raises past this ``try`` and degrades every market, correctly: there is
-    no per-market data to isolate when the connection itself is gone.
-    """
-    if not rows:
-        return {}
-    pipe = redis.pipeline(transaction=False)
-    for row in rows:
-        pipe.hgetall(keys.ticker(row.exchange, row.symbol))
-        pipe.hgetall(keys.derivatives(row.exchange, row.symbol))
-        pipe.get(keys.book(row.exchange, row.symbol))
-    try:
-        results = await pipe.execute(raise_on_error=False)
-    except redis_exceptions.RedisError as exc:
-        # (F2) Redis itself unreachable -- every market in this page degrades
-        # to "no hot state" rather than 500ing the request. Only the error's
-        # *type* and how many markets were affected are logged: redis-py
-        # appends the failing command and its key to a WRONGTYPE message, and
-        # that key name must never reach a log line.
-        logger.warning(
-            "market_hot_state_redis_error",
-            error_type=type(exc).__name__,
-            market_count=len(rows),
-        )
-        return {}
-    out: dict[str, HotState] = {}
-    command_error_types: set[str] = set()
-    for index, row in enumerate(rows):
-        raw_ticker, raw_deriv, raw_book = results[index * 3 : index * 3 + 3]
-        # Explicit concrete types below (rather than reassigning the
-        # `Any`-typed unpacked result in place) keep pyright's strict mode
-        # from unioning `Any` with the failure-branch literal.
-        ticker_raw: dict[bytes, bytes] = {}
-        deriv_raw: dict[bytes, bytes] = {}
-        book_raw: bytes | None = None
-        if isinstance(raw_ticker, BaseException):
-            command_error_types.add(type(raw_ticker).__name__)
-        else:
-            ticker_raw = raw_ticker
-        if isinstance(raw_deriv, BaseException):
-            command_error_types.add(type(raw_deriv).__name__)
-        else:
-            deriv_raw = raw_deriv
-        if isinstance(raw_book, BaseException):
-            command_error_types.add(type(raw_book).__name__)
-        else:
-            book_raw = raw_book
-        out[f"{row.exchange}:{row.symbol}"] = HotState(
-            ticker=decode_hash(ticker_raw),
-            deriv=decode_hash(deriv_raw),
-            book_ts=parse_book_ts(book_raw),
-        )
-    if command_error_types:
-        # (G3) one or more individual commands failed but the pipeline as a
-        # whole still executed -- only error types/count logged, never a key.
-        logger.warning(
-            "market_hot_state_command_error",
-            error_types=sorted(command_error_types),
-            market_count=len(rows),
-        )
-    return out
 
 
 def build_market_out(
@@ -251,7 +173,7 @@ async def build_market_list_page(
     one consistent snapshot of hot state instead of two ``HGETALL`` rounds
     that could straddle a worker write.
     """
-    hot_state = await _pipeline_hot_state(redis, rows)
+    hot_states = await pipeline_hot_state(redis, rows)
     gapped_ids = await MarketRepository(session).gapped_market_ids([r.id for r in rows])
     # (F3) captured after the Redis and Postgres reads above, not before: ages
     # are `now - <component ts>`, so `now` must reflect the instant those
@@ -262,7 +184,7 @@ async def build_market_list_page(
     items = [
         build_market_out(
             row,
-            hot_state.get(f"{row.exchange}:{row.symbol}", _EMPTY_HOT_STATE),
+            hot_states.get(row.id, EMPTY_HOT_STATE),
             has_gap=row.id in gapped_ids,
             now=now,
             stale_after_s=stale_after_s,
@@ -296,10 +218,10 @@ async def build_market_detail(
     session: AsyncSession, row: MarketRow, redis: redis_asyncio.Redis, *, stale_after_s: float
 ) -> MarketDetailOut:
     pipe = redis.pipeline(transaction=False)
-    pipe.hgetall(keys.ticker(row.exchange, row.symbol))
-    pipe.hgetall(keys.derivatives(row.exchange, row.symbol))
-    pipe.get(keys.book(row.exchange, row.symbol))
-    pipe.lrange(keys.trades(row.exchange, row.symbol), 0, RECENT_TRADES_LIMIT - 1)
+    pipe.hgetall(keys.ticker(row.exchange, row.symbol, row.market_type))
+    pipe.hgetall(keys.derivatives(row.exchange, row.symbol, row.market_type))
+    pipe.get(keys.book(row.exchange, row.symbol, row.market_type))
+    pipe.lrange(keys.trades(row.exchange, row.symbol, row.market_type), 0, RECENT_TRADES_LIMIT - 1)
     # Declared up front so both the happy path (redis-py's `execute()` return
     # type is untyped `Any`) and the except-branch fallback below share one
     # concrete, fully-known type -- otherwise pyright infers a partially

@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import orjson
 
-from hunter_core.domain.enums import OpportunityStage, OpportunityStatus, TradeDirection
+from hunter_core.domain.enums import MarketType, OpportunityStage, OpportunityStatus, TradeDirection
 from hunter_core.domain.types import ensure_utc
 from hunter_core.logging import get_logger
 from hunter_core.redis import keys
@@ -140,16 +140,25 @@ def _default(value: Any) -> Any:
 
 
 async def save_checkpoint(
-    redis: redis_asyncio.Redis, exchange: str, symbol: str, checkpoint: Checkpoint
+    redis: redis_asyncio.Redis,
+    exchange: str,
+    symbol: str,
+    checkpoint: Checkpoint,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> None:
-    key = keys.scanner_state(exchange, symbol)
+    key = keys.scanner_state(exchange, symbol, market_type)
     payload = orjson.dumps(checkpoint.as_wire(), default=_default)
     await cast(Any, redis).set(key, payload, ex=CHECKPOINT_TTL_S)
 
 
-async def load_checkpoint(redis: redis_asyncio.Redis, exchange: str, symbol: str) -> Checkpoint:
+async def load_checkpoint(
+    redis: redis_asyncio.Redis,
+    exchange: str,
+    symbol: str,
+    market_type: MarketType = MarketType.PERPETUAL,
+) -> Checkpoint:
     """Rehydrate one market. A corrupt or foreign-version payload starts cold."""
-    raw: Any = await cast(Any, redis).get(keys.scanner_state(exchange, symbol))
+    raw: Any = await cast(Any, redis).get(keys.scanner_state(exchange, symbol, market_type))
     if not raw:
         return Checkpoint()
     try:

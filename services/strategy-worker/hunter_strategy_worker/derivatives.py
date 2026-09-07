@@ -176,7 +176,11 @@ async def load_derivatives(
     # OI's durable ``ts`` never proves ``<= cut`` on its own (module docstring,
     # must-fix 1), so the hot state is unconditionally consulted for it.
     raw = await hot_state.read_derivatives(
-        redis, exchange=market.exchange, symbol=market.symbol, cut=cut
+        redis,
+        exchange=market.exchange,
+        symbol=market.symbol,
+        cut=cut,
+        market_type=market.market_type,
     )
     funding, funding_source, funding_reason = _resolve_funding(market, funding_row, raw)
     oi, oi_source, oi_reason = _resolve_open_interest(market, oi_row, raw)

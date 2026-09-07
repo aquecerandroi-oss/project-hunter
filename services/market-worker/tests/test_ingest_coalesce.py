@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from hunter_core.domain.enums import MarketType
 from hunter_market_worker.ingest import AcceptedEvents, TickCoalescer, build_tick_payload
 
 from . import builders
@@ -25,8 +26,9 @@ def test_ten_trades_coalesce_into_one_dirty_entry() -> None:
 
     dirty = coalescer.dirty_items()
     assert len(dirty) == 1
-    (exchange, symbol), accum = dirty[0]
+    (exchange, symbol, market_type), accum = dirty[0]
     assert (exchange, symbol) == (builders.EXCHANGE, "BTCUSDT")
+    assert market_type is MarketType.PERPETUAL
     assert accum.trades_count == 10
     assert accum.volume_delta == Decimal("5")
 
@@ -34,7 +36,7 @@ def test_ten_trades_coalesce_into_one_dirty_entry() -> None:
 def test_reset_clears_counters_but_keeps_last_price() -> None:
     coalescer = TickCoalescer()
     coalescer.on_trade(builders.trade("BTCUSDT", "100", "1"))
-    key = (builders.EXCHANGE, "BTCUSDT")
+    key = (builders.EXCHANGE, "BTCUSDT", MarketType.PERPETUAL)
     coalescer.reset(key)
 
     assert coalescer.dirty_items() == []

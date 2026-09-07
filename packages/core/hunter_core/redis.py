@@ -16,6 +16,8 @@ import redis.asyncio as redis_asyncio
 from redis.backoff import ExponentialWithJitterBackoff
 from redis.retry import Retry
 
+from hunter_core.domain.enums import MarketType
+
 if TYPE_CHECKING:
     from datetime import date
 
@@ -133,39 +135,82 @@ async def check_redis(client: redis_asyncio.Redis) -> bool:
     return bool(pong)
 
 
+# --- market identity in a key (T3.0b) ----------------------------------------
+# ``BTCUSDT`` is two markets on Binance: the spot pair and the USDS-M
+# perpetual. One venue, two instruments — so the *venue segment* of every
+# market key carries the type, and the perpetual's segment stays what it was:
+# ``mkt:binance:BTCUSDT:ticker`` (perpetual, in Redis right now) next to
+# ``mkt:binance:spot:BTCUSDT:ticker``. Nothing migrates — four collector
+# shards, the scanner, the strategy worker and the API are all reading the
+# first form as this ships — so ``PERPETUAL`` is both the default and the
+# byte-identical key. Spot is the variant that has to say its name.
+
+
+_PERP = MarketType.PERPETUAL
+"""The default of every builder below — spelled once so the signatures fit."""
+
+
+def _venue(exchange: str, market_type: MarketType) -> str:
+    """``binance`` for perpetuals, ``binance:spot`` for spot."""
+    if market_type is _PERP:
+        return exchange
+    return f"{exchange}:{market_type.value}"
+
+
+def _venue_prefix(market_type: MarketType) -> str:
+    """``""`` for perpetuals, ``"spot:"`` for spot — the type *before* the
+    exchange, which only ``hb:market:*`` needs (see :meth:`keys.market_heartbeat`)."""
+    return "" if market_type is _PERP else f"{market_type.value}:"
+
+
 class keys:
     """Hot-state key builders — one per row of ARCHITECTURE.md §5.3."""
 
     @staticmethod
-    def ticker(exchange: str, symbol: str) -> str:
-        return f"mkt:{exchange}:{symbol}:ticker"
+    def ticker(exchange: str, symbol: str, market_type: MarketType = _PERP) -> str:
+        return f"mkt:{_venue(exchange, market_type)}:{symbol}:ticker"
 
     @staticmethod
-    def book(exchange: str, symbol: str) -> str:
-        return f"mkt:{exchange}:{symbol}:book"
+    def book(exchange: str, symbol: str, market_type: MarketType = _PERP) -> str:
+        return f"mkt:{_venue(exchange, market_type)}:{symbol}:book"
 
     @staticmethod
-    def trades(exchange: str, symbol: str) -> str:
-        return f"mkt:{exchange}:{symbol}:trades"
+    def trades(exchange: str, symbol: str, market_type: MarketType = _PERP) -> str:
+        return f"mkt:{_venue(exchange, market_type)}:{symbol}:trades"
 
     @staticmethod
-    def candles_1m(exchange: str, symbol: str) -> str:
-        return f"mkt:{exchange}:{symbol}:candles:1m"
+    def candles_1m(exchange: str, symbol: str, market_type: MarketType = _PERP) -> str:
+        return f"mkt:{_venue(exchange, market_type)}:{symbol}:candles:1m"
 
     @staticmethod
-    def derivatives(exchange: str, symbol: str) -> str:
-        return f"mkt:{exchange}:{symbol}:deriv"
+    def derivatives(exchange: str, symbol: str, market_type: MarketType = _PERP) -> str:
+        """``mkt:{venue}:{symbol}:deriv``. Built for spot too, and deliberately:
+        the reader that asks for a spot market's funding must find an empty
+        hash, never the perpetual's."""
+        return f"mkt:{_venue(exchange, market_type)}:{symbol}:deriv"
 
     @staticmethod
-    def features(exchange: str, symbol: str) -> str:
-        return f"feat:{exchange}:{symbol}"
+    def features(exchange: str, symbol: str, market_type: MarketType = _PERP) -> str:
+        return f"feat:{_venue(exchange, market_type)}:{symbol}"
 
     @staticmethod
-    def opportunity(exchange: str, symbol: str) -> str:
-        return f"opp:{exchange}:{symbol}"
+    def opportunity(exchange: str, symbol: str, market_type: MarketType = _PERP) -> str:
+        return f"opp:{_venue(exchange, market_type)}:{symbol}"
 
     @staticmethod
-    def tape_coverage(exchange: str) -> str:
+    def market_slug(exchange: str, symbol: str, market_type: MarketType = _PERP) -> str:
+        """One market's identity as a single string: ``binance:BTCUSDT`` for the
+        perpetual, ``binance:spot:BTCUSDT`` for the spot pair.
+
+        Not a Redis key, but the same identity problem wherever a market is a
+        *name*: the ``radar:scores`` ZSET member (two rows for one symbol would
+        be one member, and the last writer would set the score of a market it
+        knows nothing about) and any per-market map built from a page of rows.
+        """
+        return f"{_venue(exchange, market_type)}:{symbol}"
+
+    @staticmethod
+    def tape_coverage(exchange: str, market_type: MarketType = _PERP) -> str:
         """``mkt:{exchange}:coverage`` — the collector's own proof of continuity.
 
         Written by the market-worker (the only process that knows whether it
@@ -174,11 +219,14 @@ class keys:
         ``hb:{role}:{instance}``: that hash reports a live socket next to a
         cumulative drop counter, and a connected socket that lost a trade would
         read as "covered" (T2.5 design review).
+
+        One hash per venue **and market type** (T3.0b), so the ``sym:*`` fields
+        inside it stay unambiguous with a plain symbol as their name.
         """
-        return f"mkt:{exchange}:coverage"
+        return f"mkt:{_venue(exchange, market_type)}:coverage"
 
     @staticmethod
-    def scanner_state(exchange: str, symbol: str) -> str:
+    def scanner_state(exchange: str, symbol: str, market_type: MarketType = _PERP) -> str:
         """``scan:state:{exchange}:{symbol}`` — the scanner's warm checkpoint.
 
         The ATR anchor and the stage hysteresis of one market. Losable by
@@ -186,12 +234,12 @@ class keys:
         the stage two observations, and the scanner says so in the sample it
         writes rather than pretending the state survived.
         """
-        return f"scan:state:{exchange}:{symbol}"
+        return f"scan:state:{_venue(exchange, market_type)}:{symbol}"
 
     @staticmethod
-    def baseline_projection(exchange: str, symbol: str) -> str:
+    def baseline_projection(exchange: str, symbol: str, market_type: MarketType = _PERP) -> str:
         """``scan:baseline:{exchange}:{symbol}`` — the cached current projection."""
-        return f"scan:baseline:{exchange}:{symbol}"
+        return f"scan:baseline:{_venue(exchange, market_type)}:{symbol}"
 
     @staticmethod
     def radar_scores() -> str:
@@ -218,7 +266,13 @@ class keys:
         return f"hb:{role}:{instance}"
 
     @staticmethod
-    def market_heartbeat(exchange: str, shard_index: int = 0, shard_total: int = 1) -> str:
+    def market_heartbeat(
+        exchange: str,
+        shard_index: int = 0,
+        shard_total: int = 1,
+        *,
+        market_type: MarketType = _PERP,
+    ) -> str:
         """The collector's per-exchange heartbeat — one key **per shard**.
 
         T2.5g: with ``MARKET_SHARD=i/N`` and ``N > 1`` each shard owns
@@ -227,20 +281,28 @@ class keys:
         ``hb:market:{exchange}`` is what kept the 200 already-proven markets
         undelivered in M1: four shards writing one hash makes a dead shard
         invisible. ``N == 1`` keeps the classic key byte for byte.
+
+        T3.0b — **this is the one place where the type goes before the
+        exchange** (``hb:market:spot:binance:0of4``), against the layout of
+        every ``mkt:`` key. The reason is the ``SCAN`` pattern below: Redis
+        globs match ``:`` with ``*``, so ``hb:market:binance:spot:0of4`` would
+        be swept up by the perpetual's ``hb:market:binance:*of*``, pass the
+        ``{i}of{N}`` suffix check and be counted as a USDS-M shard.
         """
+        prefix = f"hb:market:{_venue_prefix(market_type)}{exchange}"
         if shard_total <= 1:
-            return f"hb:market:{exchange}"
-        return f"hb:market:{exchange}:{shard_index}of{shard_total}"
+            return prefix
+        return f"{prefix}:{shard_index}of{shard_total}"
 
     @staticmethod
-    def market_heartbeat_shard_pattern(exchange: str) -> str:
+    def market_heartbeat_shard_pattern(exchange: str, market_type: MarketType = _PERP) -> str:
         """``SCAN MATCH`` pattern for every shard key of one exchange. Never
         matches the classic solo key (which has no trailing segment) nor
         ``WorkerRuntime``'s generic ``hb:market:{hostname}:{pid}`` — that one
         lives under ``hb:market:`` too, so a consumer must still validate the
         ``{i}of{N}`` suffix and the hash's own ``shard_index``/``shard_total``
         fields instead of trusting the pattern alone."""
-        return f"hb:market:{exchange}:*of*"
+        return f"hb:market:{_venue_prefix(market_type)}{exchange}:*of*"
 
     @staticmethod
     def rate_limit(exchange: str, bucket: str) -> str:

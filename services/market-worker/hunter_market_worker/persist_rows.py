@@ -21,7 +21,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from hunter_core.db.models.market_data import (
@@ -31,7 +30,6 @@ from hunter_core.db.models.market_data import (
     MarketSnapshot,
     OpenInterestHistory,
 )
-from hunter_core.db.models.markets import Exchange, Market
 from hunter_core.db.session import role_session
 from hunter_core.domain.market import (
     NormalizedCandle,
@@ -41,6 +39,9 @@ from hunter_core.domain.market import (
 )
 from hunter_core.observability import market_liquidation_duplicates_total
 from hunter_market_worker import durable
+from hunter_market_worker.market_ids import (
+    load_market_ids as load_market_ids,  # re-exported: every caller imports it from here
+)
 from hunter_market_worker.publication import liquidation_id
 from hunter_market_worker.queues import (
     OpenInterestSample,
@@ -71,22 +72,6 @@ def _dedupe_last(rows: dict[Any, dict[str, Any]]) -> list[dict[str, Any]]:
     """The values already collapsed by conflict key, keeping insertion order
     of last-write-wins (D10) — see the module docstring."""
     return list(rows.values())
-
-
-async def load_market_ids(
-    session: AsyncSession, exchange_code: str, symbols: set[str]
-) -> dict[str, Any]:
-    if not symbols:
-        return {}
-    rows = (
-        await session.execute(
-            select(Market.id, Market.symbol)
-            .join(Exchange, Exchange.id == Market.exchange_id)
-            .where(Exchange.code == exchange_code)
-            .where(Market.symbol.in_(symbols))
-        )
-    ).all()
-    return {row.symbol: row.id for row in rows}
 
 
 async def upsert_candles(

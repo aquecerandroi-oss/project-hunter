@@ -44,6 +44,10 @@ class MarketRef:
     market_id: UUID
     exchange: str
     symbol: str
+    market_type: MarketType = MarketType.PERPETUAL
+    """Completes the identity of every key this ref addresses (T3.0b).
+    Perpetual by default because :func:`load_universe` selects perpetuals and
+    nothing else — the day it selects spot too, the ref has to say so."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,4 +129,12 @@ async def load_universe(session: AsyncSession, exchange: str, *, limit: int) -> 
         .limit(limit)
     )
     rows = (await session.execute(statement)).all()
-    return [MarketRef(market_id=row[0], exchange=exchange, symbol=row[1]) for row in rows]
+    return [
+        MarketRef(
+            market_id=row[0],
+            exchange=exchange,
+            symbol=row[1],
+            market_type=MarketType.PERPETUAL,
+        )
+        for row in rows
+    ]

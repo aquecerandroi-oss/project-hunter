@@ -67,7 +67,7 @@ async def publish_features(
     }
     body = vector.as_json()
     try:
-        key = keys.features(ref.exchange, ref.symbol)
+        key = keys.features(ref.exchange, ref.symbol, ref.market_type)
         await cast(Any, redis).set(key, orjson.dumps(body), ex=FEATURE_TTL_S)
         await xadd(
             redis,
@@ -103,7 +103,7 @@ async def publish_radar(redis: redis_asyncio.Redis, ref: MarketRef, evaluation: 
         # the Radar last showed, stamped by its own ``last_updated_at``. Writing
         # a zero here is the one thing that must not happen.
         return RADAR_NOTHING
-    member = f"{ref.exchange}:{ref.symbol}"
+    member = keys.market_slug(ref.exchange, ref.symbol, ref.market_type)
     payload: dict[str, Any] = {
         "market_id": str(ref.market_id),
         "exchange": ref.exchange,
@@ -119,7 +119,9 @@ async def publish_radar(redis: redis_asyncio.Redis, ref: MarketRef, evaluation: 
     try:
         await cast(Any, redis).zadd(keys.radar_scores(), {member: float(state.score)})
         await cast(Any, redis).set(
-            keys.opportunity(ref.exchange, ref.symbol), orjson.dumps(payload), ex=FEATURE_TTL_S
+            keys.opportunity(ref.exchange, ref.symbol, ref.market_type),
+            orjson.dumps(payload),
+            ex=FEATURE_TTL_S,
         )
         await cast(Any, redis).publish(RADAR_CHANNEL, orjson.dumps(payload))
     except Exception:
@@ -140,8 +142,9 @@ async def drop_from_radar(redis: redis_asyncio.Redis, ref: MarketRef) -> None:
     the "fake anything" this product forbids, arrived by omission.
     """
     try:
-        await cast(Any, redis).zrem(keys.radar_scores(), f"{ref.exchange}:{ref.symbol}")
-        await cast(Any, redis).delete(keys.opportunity(ref.exchange, ref.symbol))
+        member = keys.market_slug(ref.exchange, ref.symbol, ref.market_type)
+        await cast(Any, redis).zrem(keys.radar_scores(), member)
+        await cast(Any, redis).delete(keys.opportunity(ref.exchange, ref.symbol, ref.market_type))
     except Exception:
         logger.warning("scanner_radar_drop_failed", symbol=ref.symbol)
 

@@ -17,24 +17,43 @@ a hand-built test payload — see :func:`to_decimal`.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from decimal import Decimal, InvalidOperation
+from datetime import datetime
 from typing import Any, cast
 
 from hunter_core.domain.enums import MarketStatus, MarketType, Timeframe
 from hunter_core.domain.market import (
     BookLevel,
     NormalizedCandle,
-    NormalizedFunding,
     NormalizedMarket,
-    NormalizedOpenInterest,
     NormalizedOrderBook,
     NormalizedTicker,
     close_time_for,
 )
 from hunter_exchanges.base import MalformedMessage
-
-EXCHANGE = "binance"
+from hunter_exchanges.binance.normalize_derivatives import (
+    parse_funding as parse_funding,
+)
+from hunter_exchanges.binance.normalize_derivatives import (
+    parse_open_interest as parse_open_interest,
+)
+from hunter_exchanges.binance.normalize_derivatives import (
+    parse_realized_funding as parse_realized_funding,
+)
+from hunter_exchanges.binance.parse import (
+    EXCHANGE as EXCHANGE,
+)
+from hunter_exchanges.binance.parse import (
+    ms_to_datetime as ms_to_datetime,
+)
+from hunter_exchanges.binance.parse import (
+    require_field as require_field,
+)
+from hunter_exchanges.binance.parse import (
+    to_decimal as to_decimal,
+)
+from hunter_exchanges.binance.parse import (
+    to_decimal_or_none as to_decimal_or_none,
+)
 
 # exchangeInfo `status` -> our MarketStatus. Binance's futures lifecycle has
 # more states than we track; only TRADING is ever monitored (M1.md Decisões),
@@ -50,54 +69,6 @@ _STATUS_MAP: dict[str, MarketStatus] = {
     "DELIVERED": MarketStatus.DELISTED,
     "CLOSE": MarketStatus.DELISTED,
 }
-
-
-def to_decimal(value: Any, *, field: str) -> Decimal:
-    """``Decimal(value)`` for a ``str``/``int``/``Decimal`` value.
-
-    Rejects ``bool``, ``None`` and, per CLAUDE.md ("money is Decimal, never
-    float"), ``float`` too — Binance always sends prices/quantities as JSON
-    strings. T1.6b-A (~5.7% self time at 200 markets, ``t16b-profile.md``):
-    skips the redundant ``str(value)`` for the ``str`` case (always true for
-    a real Binance field) — same result either way for ``int``/``Decimal``.
-    """
-    if isinstance(value, bool) or value is None:
-        raise MalformedMessage(
-            f"expected a decimal string for {field!r}, got {value!r}", exchange=EXCHANGE
-        )
-    if isinstance(value, float):
-        raise MalformedMessage(
-            f"refusing a float for {field!r}: {value!r} (use a string)", exchange=EXCHANGE
-        )
-    if not isinstance(value, (str, int, Decimal)):
-        raise MalformedMessage(
-            f"expected a decimal string for {field!r}, got {value!r}", exchange=EXCHANGE
-        )
-    try:
-        return Decimal(value) if isinstance(value, str) else Decimal(str(value))
-    except InvalidOperation as exc:
-        raise MalformedMessage(
-            f"invalid decimal for {field!r}: {value!r}", exchange=EXCHANGE
-        ) from exc
-
-
-def to_decimal_or_none(value: Any, *, field: str) -> Decimal | None:
-    return None if value is None else to_decimal(value, field=field)
-
-
-def ms_to_datetime(value: Any, *, field: str) -> datetime:
-    """Epoch milliseconds (Binance's native timestamp unit) -> UTC ``datetime``."""
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise MalformedMessage(
-            f"expected an epoch-ms int for {field!r}, got {value!r}", exchange=EXCHANGE
-        )
-    return datetime.fromtimestamp(value / 1000, tz=UTC)
-
-
-def require_field(raw: dict[str, Any], field: str) -> Any:
-    if field not in raw:
-        raise MalformedMessage(f"missing field {field!r} in {raw!r}", exchange=EXCHANGE)
-    return raw[field]
 
 
 def _filter_entry(raw: dict[str, Any], filter_type: str) -> dict[str, Any] | None:
@@ -161,7 +132,13 @@ def parse_exchange_info(raw: dict[str, Any]) -> list[NormalizedMarket]:
     return markets
 
 
-def parse_kline(raw: list[Any], *, symbol: str, now: datetime) -> NormalizedCandle:
+def parse_kline(
+    raw: list[Any],
+    *,
+    symbol: str,
+    now: datetime,
+    market_type: MarketType = MarketType.PERPETUAL,
+) -> NormalizedCandle:
     """One ``klines`` row (REST array-of-12 format) -> :class:`NormalizedCandle`.
 
     ``is_final`` is derived from ``close_time <= now`` (T1.2 brief): REST
@@ -188,6 +165,7 @@ def parse_kline(raw: list[Any], *, symbol: str, now: datetime) -> NormalizedCand
         return NormalizedCandle(
             exchange=EXCHANGE,
             symbol=symbol,
+            market_type=market_type,
             timeframe=Timeframe.M1,
             open_time=open_time,
             close_time=close_time,
@@ -205,8 +183,17 @@ def parse_kline(raw: list[Any], *, symbol: str, now: datetime) -> NormalizedCand
         raise MalformedMessage(f"malformed kline row {raw!r}: {exc}", exchange=EXCHANGE) from exc
 
 
-def parse_klines(raw: list[list[Any]], *, symbol: str, now: datetime) -> list[NormalizedCandle]:
-    return [parse_kline(row, symbol=symbol, now=now) for row in raw]
+def parse_klines(
+    raw: list[list[Any]],
+    *,
+    symbol: str,
+    now: datetime,
+    market_type: MarketType = MarketType.PERPETUAL,
+) -> list[NormalizedCandle]:
+    """``market_type`` because the row format is identical on ``/api/v3`` and
+    this parser is shared with the spot adapter (T3.0b): the only thing that
+    tells a spot candle from a perpetual one is the caller."""
+    return [parse_kline(row, symbol=symbol, now=now, market_type=market_type) for row in raw]
 
 
 def parse_ticker_24h(raw: dict[str, Any]) -> NormalizedTicker:
@@ -261,82 +248,6 @@ def parse_order_book(raw: dict[str, Any], *, symbol: str) -> NormalizedOrderBook
     except (KeyError, ValueError, TypeError) as exc:
         raise MalformedMessage(
             f"malformed depth payload {raw!r}: {exc}", exchange=EXCHANGE
-        ) from exc
-
-
-def parse_funding(premium: dict[str, Any], *, symbol: str) -> NormalizedFunding:
-    """``GET /fapi/v1/premiumIndex`` -> the *estimated*, not-yet-settled
-    :class:`NormalizedFunding` (``funding_kind="estimated"``, explicit — F1).
-    Realized/settled funding comes only from :func:`parse_realized_funding`
-    — mixing the two mislabels a stale, settled rate as a fresh estimate.
-    """
-    try:
-        funding_rate = to_decimal(premium["lastFundingRate"], field="lastFundingRate")
-        next_funding_time = (
-            ms_to_datetime(premium["nextFundingTime"], field="nextFundingTime")
-            if premium.get("nextFundingTime")
-            else None
-        )
-        metadata: dict[str, Any] = {}
-        for extra in ("estimatedSettlePrice", "interestRate"):
-            if extra in premium:
-                metadata[extra] = premium[extra]
-        return NormalizedFunding(
-            exchange=EXCHANGE,
-            symbol=symbol,
-            ts=ms_to_datetime(premium["time"], field="time"),
-            funding_rate=funding_rate,
-            next_funding_time=next_funding_time,
-            mark_price=to_decimal(premium["markPrice"], field="markPrice"),
-            index_price=to_decimal_or_none(premium.get("indexPrice"), field="indexPrice"),
-            funding_kind="estimated",
-            metadata=metadata,
-        )
-    except (KeyError, IndexError) as exc:
-        raise MalformedMessage(
-            f"malformed funding payload {premium!r}: {exc}", exchange=EXCHANGE
-        ) from exc
-
-
-def parse_realized_funding(raw: dict[str, Any]) -> NormalizedFunding:
-    """One ``GET /fapi/v1/fundingRate`` row -> settled :class:`NormalizedFunding`.
-
-    ``ts`` is the settlement's own ``fundingTime`` (never ``time.time()`` /
-    the request's own clock — Astra review, T1.2 resume finding 4: reusing
-    ``premiumIndex``'s ``time`` here would make the same settlement look
-    newly timestamped on every repeated fetch). ``mark_price`` is required
-    by the domain model; current Binance responses always include it, and a
-    row without one is treated as malformed rather than inventing a value
-    (CLAUDE.md: "no fake anything").
-    """
-    try:
-        return NormalizedFunding(
-            exchange=EXCHANGE,
-            symbol=require_field(raw, "symbol"),
-            ts=ms_to_datetime(raw["fundingTime"], field="fundingTime"),
-            funding_rate=to_decimal(raw["fundingRate"], field="fundingRate"),
-            mark_price=to_decimal(require_field(raw, "markPrice"), field="markPrice"),
-            funding_kind="realized",
-        )
-    except KeyError as exc:
-        raise MalformedMessage(
-            f"missing field {exc} in funding rate history row {raw!r}", exchange=EXCHANGE
-        ) from exc
-
-
-def parse_open_interest(raw: dict[str, Any], *, symbol: str) -> NormalizedOpenInterest:
-    """``GET /fapi/v1/openInterest`` -> :class:`NormalizedOpenInterest`."""
-    try:
-        return NormalizedOpenInterest(
-            exchange=EXCHANGE,
-            symbol=symbol,
-            ts=ms_to_datetime(raw["time"], field="time"),
-            open_interest=to_decimal(raw["openInterest"], field="openInterest"),
-            open_interest_value=None,
-        )
-    except KeyError as exc:
-        raise MalformedMessage(
-            f"missing field {exc} in open interest {raw!r}", exchange=EXCHANGE
         ) from exc
 
 

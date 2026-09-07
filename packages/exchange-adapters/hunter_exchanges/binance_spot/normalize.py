@@ -32,6 +32,7 @@ from typing import Any
 from hunter_core.domain.enums import MarketStatus, OrderSide
 from hunter_core.domain.market import (
     BookLevel,
+    NormalizedCandle,
     NormalizedMarket,
     NormalizedOrderBook,
     NormalizedTicker,
@@ -44,7 +45,7 @@ from hunter_exchanges.binance.normalize import (
     to_decimal,
 )
 from hunter_exchanges.binance.normalize import (
-    parse_klines as parse_klines,  # identical 12-field row format on /api/v3
+    parse_klines as _parse_klines,  # identical 12-field row format on /api/v3
 )
 from hunter_exchanges.binance.normalize import (
     parse_server_time as parse_server_time,
@@ -89,6 +90,17 @@ class AvgPrice:
     price: Decimal
     mins: int
     close_time: datetime | None = None
+
+
+def parse_klines(raw: list[list[Any]], *, symbol: str, now: datetime) -> list[NormalizedCandle]:
+    """``GET /api/v3/klines`` -> candles **stamped SPOT**.
+
+    The row format is byte-identical to the USDS-M one, so the parser is the
+    USDS-M parser; what is not identical is the market. Re-exporting it bare
+    (as T3.0a did) would have labelled every spot candle ``perpetual`` and
+    written it onto the perpetual's hot-state key.
+    """
+    return _parse_klines(raw, symbol=symbol, now=now, market_type=MARKET_TYPE)
 
 
 def parse_market(raw: dict[str, Any]) -> NormalizedMarket:
@@ -170,6 +182,7 @@ def parse_ticker_24h(raw: dict[str, Any]) -> NormalizedTicker:
         return NormalizedTicker(
             exchange=EXCHANGE,
             symbol=require_field(raw, "symbol"),
+            market_type=MARKET_TYPE,
             ts=ms_to_datetime(raw["closeTime"], field="closeTime"),
             last=to_decimal(raw["lastPrice"], field="lastPrice"),
             bid=to_decimal(raw["bidPrice"], field="bidPrice"),
@@ -200,6 +213,7 @@ def parse_depth(raw: dict[str, Any], *, symbol: str, received_at: datetime) -> N
         return NormalizedOrderBook(
             exchange=EXCHANGE,
             symbol=symbol,
+            market_type=MARKET_TYPE,
             ts=received_at,
             received_at=received_at,
             bids=[
@@ -233,6 +247,7 @@ def _trade(
     return NormalizedTrade(
         exchange=EXCHANGE,
         symbol=symbol,
+        market_type=MARKET_TYPE,
         ts=ms_to_datetime(ts_ms, field="time"),
         trade_id=str(trade_id),
         price=to_decimal(price, field="price"),

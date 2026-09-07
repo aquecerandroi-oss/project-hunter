@@ -116,7 +116,7 @@ async def handle_candle(
     if not due:
         return
     async with role_session(factory, db_role="hunter_worker") as session:
-        market = await load_market(session, candle.exchange, candle.symbol)
+        market = await load_market(session, candle.exchange, candle.symbol, candle.market_type)
     if market is None:
         logger.warning("shadow_market_unknown", exchange=candle.exchange, symbol=candle.symbol)
         return

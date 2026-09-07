@@ -59,6 +59,7 @@ from typing import TYPE_CHECKING, Any
 
 from redis.exceptions import NoScriptError
 
+from hunter_core.domain.enums import MarketType
 from hunter_core.redis import keys
 
 if TYPE_CHECKING:
@@ -172,8 +173,8 @@ return 1
 _SCRIPT_SHA_ATTR = "_hunter_coverage_publish_sha"
 
 
-def shards_key(exchange: str) -> str:
-    return f"{keys.tape_coverage(exchange)}:shards"
+def shards_key(exchange: str, market_type: MarketType = MarketType.PERPETUAL) -> str:
+    return f"{keys.tape_coverage(exchange, market_type)}:shards"
 
 
 def shard_id(shard_index: int, shard_total: int) -> str:
@@ -207,6 +208,7 @@ async def publish(
     symbols: Mapping[str, datetime],
     now: datetime,
     key_ttl_s: int,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> None:
     """One atomic stamp: this shard's record, its symbols, and the aggregate.
 
@@ -229,12 +231,16 @@ async def publish(
     ]
     client: Any = redis
     sha = await ensure_script_sha(client)
+    # One aggregate per venue *and* market type (T3.0b): the ``sym:*`` fields
+    # inside the hash are plain symbols, so a shared hash would make one
+    # collector's coverage stand as proof for a market it never subscribed to.
+    cov, shards = keys.tape_coverage(exchange, market_type), shards_key(exchange, market_type)
     try:
-        await client.evalsha(sha, 2, keys.tape_coverage(exchange), shards_key(exchange), *argv)
+        await client.evalsha(sha, 2, cov, shards, *argv)
     except NoScriptError:
         # A Redis restart flushes the script cache (same fallback as
         # ``hot_state``): run it once by body and re-cache the SHA.
-        await client.eval(_SCRIPT, 2, keys.tape_coverage(exchange), shards_key(exchange), *argv)
+        await client.eval(_SCRIPT, 2, cov, shards, *argv)
         setattr(client, _SCRIPT_SHA_ATTR, await client.script_load(_SCRIPT))
 
 

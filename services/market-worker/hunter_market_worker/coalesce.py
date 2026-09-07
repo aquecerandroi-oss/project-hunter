@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import orjson
 
+from hunter_core.domain.enums import MarketType
 from hunter_core.domain.market import NormalizedOrderBook, NormalizedTicker, NormalizedTrade
 from hunter_core.domain.types import utcnow
 from hunter_core.events.envelope import EventEnvelope
@@ -33,6 +34,16 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 BOOK_IMBALANCE_DEPTH = 5
+
+_MarketKey = tuple[str, str, MarketType]
+"""``(exchange, symbol, market_type)`` — one accumulator per *market*."""
+
+# T3.0c owns the last un-discriminated identity on this path: the
+# ``market.ticks`` payload and the ``rt:market:{exchange}:{symbol}`` channel
+# still name a market by exchange and symbol alone. Changing them means
+# changing the API's channel grammar (``hunter_api.realtime.channels``, which
+# refuses an extra ``:`` segment on purpose) and the web client with it, so it
+# is deliberately not done here — spot is not ingested by this worker yet.
 
 
 def _max_ts(current: datetime | None, candidate: datetime) -> datetime:
@@ -66,16 +77,23 @@ class _TickAccum:
 
 
 class TickCoalescer:
-    """Per-(exchange, symbol) tick accumulator, flushed on a fixed interval."""
+    """Per-(exchange, symbol, market_type) tick accumulator, flushed on a fixed
+    interval.
+
+    T3.0b: the spot pair and the perpetual of one symbol are two markets with
+    two prices. Sharing an accumulator would publish one of them under the
+    other's price and drop one of the two pending hot-state snapshots at every
+    flush.
+    """
 
     def __init__(self) -> None:
-        self._state: dict[tuple[str, str], _TickAccum] = {}
+        self._state: dict[_MarketKey, _TickAccum] = {}
 
-    def _get(self, exchange: str, symbol: str) -> _TickAccum:
-        return self._state.setdefault((exchange, symbol), _TickAccum())
+    def _get(self, exchange: str, symbol: str, market_type: MarketType) -> _TickAccum:
+        return self._state.setdefault((exchange, symbol, market_type), _TickAccum())
 
     def on_ticker(self, ticker: NormalizedTicker) -> None:
-        accum = self._get(ticker.exchange, ticker.symbol)
+        accum = self._get(ticker.exchange, ticker.symbol, ticker.market_type)
         accum.price = ticker.last
         accum.bid = ticker.bid
         accum.ask = ticker.ask
@@ -85,7 +103,7 @@ class TickCoalescer:
         accum.hot_ticker = ticker
 
     def on_trade(self, trade: NormalizedTrade) -> None:
-        accum = self._get(trade.exchange, trade.symbol)
+        accum = self._get(trade.exchange, trade.symbol, trade.market_type)
         accum.price = trade.price
         accum.volume_delta += trade.qty
         accum.trades_count += 1
@@ -94,17 +112,17 @@ class TickCoalescer:
         accum.ts = _max_ts(accum.ts, trade.ts)
 
     def on_book(self, book: NormalizedOrderBook) -> None:
-        accum = self._get(book.exchange, book.symbol)
+        accum = self._get(book.exchange, book.symbol, book.market_type)
         accum.book_imbalance_5 = book.imbalance(BOOK_IMBALANCE_DEPTH)
         accum.dirty = True
         accum.book_ts = _max_ts(accum.book_ts, book.ts)
         accum.ts = _max_ts(accum.ts, book.ts)
         accum.hot_book = book
 
-    def dirty_items(self) -> list[tuple[tuple[str, str], _TickAccum]]:
+    def dirty_items(self) -> list[tuple[_MarketKey, _TickAccum]]:
         return [(key, accum) for key, accum in self._state.items() if accum.dirty]
 
-    def reset(self, key: tuple[str, str]) -> None:
+    def reset(self, key: _MarketKey) -> None:
         accum = self._state[key]
         accum.volume_delta = Decimal(0)
         accum.trades_count = 0
@@ -151,10 +169,11 @@ async def flush_ticks(
     sha = await hot_state.ensure_script_sha(redis)
     published: list[str] = []
     async with redis.pipeline(transaction=False) as pipe:
-        for (exchange, symbol), accum in items:
+        for key, accum in items:
+            exchange, symbol, _market_type = key
             ts = accum.ts.isoformat() if accum.ts else utcnow().isoformat()
             payload = build_tick_payload(exchange, symbol, accum, ts)
-            coalescer.reset((exchange, symbol))
+            coalescer.reset(key)
             if accum.hot_ticker is not None:
                 # KB-0044: this ticker always comes from the WS bookTicker
                 # stream (on_ticker) -- must own only its own fields, never

@@ -9,9 +9,16 @@ from collections import deque
 from datetime import datetime
 from typing import Any
 
+from hunter_core.domain.enums import MarketType
 from hunter_core.domain.market import NormalizedTrade
 from hunter_core.redis import keys
 from hunter_market_worker import wire as msgpack
+
+_MarketKey = tuple[str, str, MarketType]
+"""``(exchange, symbol, market_type)``: the spot pair and the perpetual of one
+symbol have their own trade ids, and neither dedupes the other (T3.0b)."""
+
+_PERP = MarketType.PERPETUAL
 
 TRADES_MAXLEN = 2000
 # A WS reconnect only ever replays a handful of recent trades, so a 50-item
@@ -21,7 +28,7 @@ TRADE_DEDUPE_WINDOW = 50
 
 
 class TradeMemory:
-    """Bounded per-(exchange, symbol) recent-trade-id window + newest ``ts``
+    """Bounded per-(exchange, symbol, market_type) recent-trade-id window + newest ``ts``
     (B4/H7): replaces a per-trade ``LRANGE`` + msgpack-unpack of up to
     :data:`TRADE_DEDUPE_WINDOW` rows (2.48% of the worker's own CPU at 50
     markets, t16b-profile.md) with an in-memory check. Seeded from Redis
@@ -32,19 +39,19 @@ class TradeMemory:
 
     def __init__(self, window: int = TRADE_DEDUPE_WINDOW) -> None:
         self._window = window
-        self._ids: dict[tuple[str, str], deque[str]] = {}
-        self._newest_ts: dict[tuple[str, str], datetime] = {}
-        self._seeded: set[tuple[str, str]] = set()
+        self._ids: dict[_MarketKey, deque[str]] = {}
+        self._newest_ts: dict[_MarketKey, datetime] = {}
+        self._seeded: set[_MarketKey] = set()
 
-    def forget(self, exchange: str, symbol: str) -> None:
-        key = (exchange, symbol)
+    def forget(self, exchange: str, symbol: str, market_type: MarketType = _PERP) -> None:
+        key = (exchange, symbol, market_type)
         self._ids.pop(key, None)
         self._newest_ts.pop(key, None)
         self._seeded.discard(key)
 
-    async def _seed(self, redis: Any, exchange: str, symbol: str) -> None:
-        key = (exchange, symbol)
-        rows = await redis.lrange(keys.trades(exchange, symbol), 0, self._window - 1)
+    async def _seed(self, redis: Any, key: _MarketKey) -> None:
+        exchange, symbol, market_type = key
+        rows = await redis.lrange(keys.trades(exchange, symbol, market_type), 0, self._window - 1)
         decoded: list[dict[str, Any]] = [msgpack.unpackb(row) for row in rows]
         self._ids[key] = deque((row["trade_id"] for row in decoded), maxlen=self._window)
         if decoded:
@@ -52,9 +59,9 @@ class TradeMemory:
         self._seeded.add(key)
 
     async def accepts(self, redis: Any, trade: NormalizedTrade) -> bool:
-        key = (trade.exchange, trade.symbol)
+        key = (trade.exchange, trade.symbol, trade.market_type)
         if key not in self._seeded:
-            await self._seed(redis, trade.exchange, trade.symbol)
+            await self._seed(redis, key)
         ids = self._ids.setdefault(key, deque(maxlen=self._window))
         if trade.trade_id in ids:
             return False
@@ -70,7 +77,7 @@ class TradeMemory:
 async def push_trade(redis: Any, trade: NormalizedTrade, memory: TradeMemory) -> bool:
     if not await memory.accepts(redis, trade):
         return False
-    key = keys.trades(trade.exchange, trade.symbol)
+    key = keys.trades(trade.exchange, trade.symbol, trade.market_type)
     payload = {
         "ts": trade.ts.isoformat(),
         "price": str(trade.price),
