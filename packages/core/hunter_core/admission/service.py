@@ -30,7 +30,14 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict
 
-from hunter_core.admission.dedupe import AdmittedProposal, ensure_same_request, find_admitted
+from hunter_core.admission.decide import decide_pending
+from hunter_core.admission.dedupe import (
+    AdmittedProposal,
+    ensure_pending_is_the_same_request,
+    ensure_same_request,
+    find_admitted,
+    find_pending,
+)
 from hunter_core.admission.inputs import unmeasured_decision, verify_market
 from hunter_core.admission.participation import ParticipationRepository
 from hunter_core.admission.record import (
@@ -43,7 +50,7 @@ from hunter_core.admission.record import (
 from hunter_core.admission.reservation import expire_reservations
 from hunter_core.admission.sources import ProposalRequest, admission_key, resolve_source
 from hunter_core.domain.enums import ProposalSource, ProposalStatus, ReservationState
-from hunter_core.domain.types import ensure_utc, utcnow, uuid7
+from hunter_core.domain.types import ensure_utc, uuid7
 from hunter_core.logging import get_logger
 from hunter_core.portfolio.state import build_portfolio_state
 from hunter_core.risk.scopes import effective_state
@@ -112,7 +119,7 @@ def _replay(existing: AdmittedProposal, organization_id: uuid.UUID) -> Admission
         reserved_cash=existing.reserved_cash,
         reserved_risk=existing.reserved_risk,
         reserved_until=existing.reserved_until,
-        decided_at=existing.decided_at or utcnow(),
+        decided_at=existing.decided_at,
         replayed=True,
     )
 
@@ -217,7 +224,12 @@ async def admit(
         market_id=request.market_id,
         cut=as_of - timedelta(seconds=limits.participation_window_s),
     )
-    proposal_id = uuid7()
+    # The API files the request and the engine decides **that row** (§19.4), so
+    # the proposal's identity is the filed row's whenever there is one.
+    pending = await find_pending(session, organization_id=org, idempotency_key=key)
+    if pending is not None:
+        ensure_pending_is_the_same_request(pending, request, origin)
+    proposal_id = pending.proposal_id if pending is not None else uuid7()
     if build.state is None:
         decision = unmeasured_decision(
             request,
@@ -254,15 +266,27 @@ async def admit(
             spec=spec,
         )
 
-    written = await insert_proposal(
-        session,
-        request,
-        proposal_id=proposal_id,
-        source=origin,
-        key=key,
-        decision=decision,
-        scopes=scopes,
-        as_of=as_of,
+    written = (
+        await decide_pending(
+            session,
+            request,
+            proposal_id=proposal_id,
+            source=origin,
+            decision=decision,
+            scopes=scopes,
+            as_of=as_of,
+        )
+        if pending is not None
+        else await insert_proposal(
+            session,
+            request,
+            proposal_id=proposal_id,
+            source=origin,
+            key=key,
+            decision=decision,
+            scopes=scopes,
+            as_of=as_of,
+        )
     )
     if not written:
         # Another transaction committed this key while this one was deciding: it

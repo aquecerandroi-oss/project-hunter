@@ -23,6 +23,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hunter_core.domain.enums import ProposalSource, TradeDirection
+from hunter_core.strategies.canonical import params_hash
 from hunter_core.strategies.envelope import PURPOSE_RESEARCH_ONLY, AssumedCosts
 from hunter_risk.inputs import MarketIdentity
 
@@ -31,6 +32,7 @@ __all__ = [
     "OriginRefused",
     "ProposalRequest",
     "admission_key",
+    "request_digest",
     "resolve_source",
 ]
 
@@ -69,6 +71,41 @@ def admission_key(source: ProposalSource, client_key: str) -> str:
             "client_key is empty; without it a retry cannot be told from a second order"
         )
     return f"{source.value}:{stripped}"
+
+
+def request_digest(request: ProposalRequest, source: ProposalSource) -> str:
+    """The canonical identity of *what was asked* — ``trade_proposals.request_digest``.
+
+    The idempotency key says "this is the same request"; the digest is what
+    **proves** it (DATABASE.md §19.3). Without it, a replay of a *rejected*
+    proposal could only be compared against the four columns that happen to be
+    stored, so a second, different request that reused the key came back as the
+    first one's refusal (T3.12, pendência 1).
+
+    Only the fields that decide capital are in it — the wallet, the market, the
+    direction, the geometry, the ceiling and the cost hypothesis. The actor is
+    not: the same order filed twice by two operators is the same order, and the
+    audit trail is where "who" belongs.
+    """
+    return params_hash(
+        {
+            "source": source.value,
+            "portfolio_id": str(request.portfolio_id),
+            "market_id": str(request.market_id),
+            "market": request.market.model_dump(mode="json"),
+            "direction": request.direction.value,
+            "entry_ref": str(request.entry_ref),
+            "stop": str(request.stop),
+            "requested_notional": (
+                None if request.requested_notional is None else str(request.requested_notional)
+            ),
+            "requested_risk_pct": (
+                None if request.requested_risk_pct is None else str(request.requested_risk_pct)
+            ),
+            "assumed_costs": request.assumed_costs.model_dump(mode="json"),
+            "agent_id": None if request.agent_id is None else str(request.agent_id),
+        }
+    )
 
 
 class ProposalRequest(BaseModel):

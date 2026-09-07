@@ -1,30 +1,36 @@
-"""The API's thin adapter over the shared admission service — T3.12.
+"""The API's side of an admission: it **files a request**, it does not decide.
 
-The manual paper order (T3.8) has **no path of its own**: it builds a
-:class:`~hunter_core.admission.sources.ProposalRequest` here and hands it to
-``hunter_core.admission.admit``, which is what decides, reserves, audits and
-publishes. This module adds exactly three things a request needs and the domain
-service must not know about:
+``0007_paper_roles`` §19.2 settles who does what: *the worker decides and writes
+risk state; the API asks, reads and authorises people*. So the manual paper order
+(T3.8) is filed here as a **pending request** — ``source = manual``,
+``status = pending``, no decision, no FIFO place, no reservation — and the
+execution-worker's admission cycle decides that same row, in place, one second
+later (``hunter_core.admission.decide_pending``).
 
-- the ``Idempotency-Key`` header becomes the request's ``client_key``, and the
-  origin is always ``manual`` — the operator's order is not an agent's;
-- the authenticated principal becomes the audit actor, and the organization of
-  the transaction is the organization of the request;
-- domain refusals become RFC 9457 problems, with the status that is *true* of
-  each: a request that may never become a proposal is a 422, a reused key is a
-  409, and a wallet that has not been opened is a 409 as well — none of them is
-  a 500, and a *rejected* proposal is not an error at all (it is a decision,
-  returned with its checks).
+Three reasons this is not the API running ``admit()`` itself, and none of them is
+style:
 
-There is no route here: ``POST /api/v1/orgs/{org_id}/portfolios/{id}/orders`` is
-T3.8's, and this is the function it calls.
+- ``fifo_v1`` is a counter on ``portfolio_risk_state`` and that row is the
+  engine's: since ``0006`` the API's ``UPDATE`` is refused by privilege, not by a
+  trigger;
+- since ``0007`` the API has no ``UPDATE``/``DELETE`` on ``trade_proposals`` at
+  all, so it could not attach a reservation or move a status even if it wanted to;
+- ``outbox_events`` is worker-writable only, so an admission run by the API could
+  decide and never announce.
 
-**Known coupling, not yet resolved (notes-T3.12.md §2):** admission advances
-``portfolio_risk_state.last_admission_seq`` and inserts into ``outbox_events``,
-and the ``hunter_app`` role holds neither privilege today. Until T3.1b decides,
-the route's unit of work has to be one that does — this adapter does not choose
-a database role on its own, because widening one silently is exactly how tenant
-isolation gets lost.
+The database enforces the shape rather than trusting this module:
+``trade_proposals_the_app_only_files_requests`` (§19.4) refuses an ``INSERT`` by
+the application role that carries a decision, a sequence or a reservation.
+
+**Blocking gap, declared and not worked around.** ``trade_proposals`` has no
+column for the *geometry* of a request — ``entry_ref``, ``stop``,
+``requested_notional`` and ``assumed_costs`` are inputs of the Risk Engine and
+none of them is persisted. A filed request can therefore be identified (key +
+``request_digest``) but **not re-decided from the row alone**, so the manual
+route is not end-to-end until a migration adds somewhere to keep it. Writing the
+geometry into ``risk_decision`` is not an option (the guard refuses it, and it
+would be a decision nobody took) and inventing values is worse. Registered in
+``.claude/state/notes-T3.5.md`` §3 for T3.1d/T3.8.
 """
 
 from __future__ import annotations
@@ -34,40 +40,44 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from fastapi import status
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from hunter_api.errors import HunterError
-from hunter_core.admission.dedupe import IdempotencyConflict
-from hunter_core.admission.inputs import MarketMismatch
-from hunter_core.admission.service import admit
-from hunter_core.admission.sources import OriginRefused, ProposalRequest
-from hunter_core.domain.enums import ProposalSource
-from hunter_core.portfolio.state import WalletNotOpen
-from hunter_core.risk.scopes import RiskStateMissing
+from hunter_core.admission.dedupe import IdempotencyConflict, find_admitted, find_pending
+from hunter_core.admission.sources import (
+    OriginRefused,
+    ProposalRequest,
+    admission_key,
+    request_digest,
+)
+from hunter_core.domain.enums import ProposalSource, ProposalStatus
+from hunter_core.domain.types import uuid7
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
     from datetime import datetime
     from decimal import Decimal
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from hunter_api.auth.rbac import OrgContext
-    from hunter_core.admission.service import AdmissionResult
     from hunter_core.domain.enums import TradeDirection
     from hunter_core.strategies.envelope import AssumedCosts
-    from hunter_risk.inputs import BetaEstimate, MarketIdentity, MarketLiquidity, MarketSpec
+    from hunter_risk.inputs import MarketIdentity
 
 __all__ = [
-    "AdmissionInputs",
+    "FiledRequest",
     "OrderRefusedError",
     "OrderReplayConflictError",
     "WalletNotOpenError",
-    "admit_manual_order",
+    "file_manual_order",
 ]
+
+IDEMPOTENCY_CONSTRAINT = "uq_trade_proposals_idem"
 
 
 class OrderRefusedError(HunterError):
-    """422 — the request may never become a proposal (origin, purpose, market)."""
+    """422 — the request may never become a proposal (origin, purpose, geometry)."""
 
     def __init__(self, detail: str) -> None:
         super().__init__(
@@ -79,7 +89,7 @@ class OrderRefusedError(HunterError):
 
 
 class OrderReplayConflictError(HunterError):
-    """409 — the idempotency key already answered a **different** order."""
+    """409 — the idempotency key already names a **different** order."""
 
     def __init__(self, detail: str) -> None:
         super().__init__(
@@ -91,13 +101,7 @@ class OrderReplayConflictError(HunterError):
 
 
 class WalletNotOpenError(HunterError):
-    """409 — the wallet named by the order has never been opened.
-
-    Both halves of "not open" map here: no anchor (``WalletNotOpen``) and no
-    lock row (``RiskStateMissing``, raised earlier, while the lock order is
-    being acquired). Leaving the second one untranslated would answer a wallet
-    that was never opened with a 500 (Astra, diff review, finding 7).
-    """
+    """409 — the wallet named by the order has never been opened."""
 
     def __init__(self, detail: str) -> None:
         super().__init__(
@@ -109,24 +113,26 @@ class WalletNotOpenError(HunterError):
 
 
 @dataclass(frozen=True, slots=True)
-class AdmissionInputs:
-    """The market picture the Risk Engine is handed, assembled by the caller.
+class FiledRequest:
+    """What the API can honestly tell the caller after filing an order.
 
-    Grouped rather than spread over the signature because they travel together
-    and are decided together: the price source, the beta revision and the exit
-    cost hypothesis are the caller's declared choices (T3.3), and a route that
-    picked them implicitly would be choosing them for the whole system.
+    Deliberately **not** a decision: at this point the Risk Engine has not seen
+    the request, and returning an approval-shaped object with empty checks is how
+    an operator learns to read "filed" as "approved".
     """
 
-    liquidity: MarketLiquidity
-    spec: MarketSpec
-    beta: BetaEstimate
-    prices: Mapping[uuid.UUID, Decimal]
-    betas: Mapping[uuid.UUID, Decimal]
-    exit_cost_rate: Decimal
+    proposal_id: uuid.UUID
+    portfolio_id: uuid.UUID
+    market_id: uuid.UUID
+    idempotency_key: str
+    request_digest: str
+    status: ProposalStatus
+    decided: bool
+    """``True`` when this key had already been decided — the caller should read
+    the decision back, not file again."""
 
 
-async def admit_manual_order(
+async def file_manual_order(
     session: AsyncSession,
     *,
     context: OrgContext,
@@ -138,15 +144,14 @@ async def admit_manual_order(
     entry_ref: Decimal,
     stop: Decimal,
     assumed_costs: AssumedCosts,
-    inputs: AdmissionInputs,
     now: datetime,
     requested_notional: Decimal | None = None,
-) -> AdmissionResult:
-    """Submit one operator order through the shared admission service.
+) -> FiledRequest:
+    """Record one operator order as a pending request. The engine decides it.
 
-    Returns the decision — approved *or* rejected. A rejection is a 200 with the
-    checks that produced it (the Explanation Panel needs the whole picture); only
-    a request that could never be a proposal raises.
+    Idempotent by ``(organization_id, idempotency_key)``: filing the same order
+    twice returns the row that already exists — decided or not — and filing a
+    *different* order under the same key is a 409, never a silent overwrite.
     """
     try:
         request = ProposalRequest(
@@ -166,22 +171,89 @@ async def admit_manual_order(
     except ValueError as exc:
         raise OrderRefusedError(str(exc)) from exc
 
+    source = ProposalSource.MANUAL
     try:
-        return await admit(
-            session,
-            request,
-            source=ProposalSource.MANUAL,
-            liquidity=inputs.liquidity,
-            spec=inputs.spec,
-            beta=inputs.beta,
-            prices=inputs.prices,
-            betas=inputs.betas,
-            exit_cost_rate=inputs.exit_cost_rate,
-            now=now,
-        )
-    except IdempotencyConflict as exc:
-        raise OrderReplayConflictError(str(exc)) from exc
-    except (OriginRefused, MarketMismatch) as exc:
+        key = admission_key(source, idempotency_key)
+    except ValueError as exc:
         raise OrderRefusedError(str(exc)) from exc
-    except (WalletNotOpen, RiskStateMissing) as exc:
-        raise WalletNotOpenError(str(exc)) from exc
+    digest = request_digest(request, source)
+
+    decided = await find_admitted(session, organization_id=context.org_id, idempotency_key=key)
+    if decided is not None:
+        _refuse_a_different_order(decided.request_digest, digest, decided.proposal_id)
+        return FiledRequest(
+            proposal_id=decided.proposal_id,
+            portfolio_id=decided.portfolio_id,
+            market_id=decided.market_id,
+            idempotency_key=key,
+            request_digest=digest,
+            status=decided.status,
+            decided=True,
+        )
+    pending = await find_pending(session, organization_id=context.org_id, idempotency_key=key)
+    if pending is not None:
+        _refuse_a_different_order(pending.request_digest, digest, pending.proposal_id)
+        return FiledRequest(
+            proposal_id=pending.proposal_id,
+            portfolio_id=pending.portfolio_id,
+            market_id=pending.market_id,
+            idempotency_key=key,
+            request_digest=digest,
+            status=ProposalStatus.PENDING,
+            decided=False,
+        )
+
+    proposal_id = uuid7()
+    try:
+        await session.execute(
+            text(
+                "INSERT INTO trade_proposals (id, organization_id, portfolio_id, market_id, "
+                "direction, status, idempotency_key, request_digest, source, created_at) "
+                "VALUES (:id, :org, :pf, :market, :direction, 'pending', :key, :digest, "
+                "'manual', :now)"
+            ),
+            {
+                "id": proposal_id,
+                "org": context.org_id,
+                "pf": portfolio_id,
+                "market": market_id,
+                "direction": direction.value,
+                "key": key,
+                "digest": digest,
+                "now": now,
+            },
+        )
+    except IntegrityError as exc:
+        if IDEMPOTENCY_CONSTRAINT in str(exc.orig):
+            raise OrderReplayConflictError(
+                f"idempotency key {idempotency_key!r} was filed concurrently; read the proposal "
+                "back instead of filing it again"
+            ) from exc
+        raise OrderRefusedError(str(exc.orig)) from exc
+    return FiledRequest(
+        proposal_id=proposal_id,
+        portfolio_id=portfolio_id,
+        market_id=market_id,
+        idempotency_key=key,
+        request_digest=digest,
+        status=ProposalStatus.PENDING,
+        decided=False,
+    )
+
+
+def _refuse_a_different_order(stored: str | None, asked: str, proposal_id: uuid.UUID) -> None:
+    """A reused key that names another order is a conflict, never a replay."""
+    if stored is not None and stored != asked:
+        raise OrderReplayConflictError(
+            f"idempotency key already names proposal {proposal_id}, which is a different order "
+            f"(request_digest {stored} != {asked})"
+        )
+
+
+def refused(exc: Exception) -> HunterError:
+    """Translate a domain refusal into the problem+json it really is."""
+    if isinstance(exc, IdempotencyConflict):
+        return OrderReplayConflictError(str(exc))
+    if isinstance(exc, OriginRefused):
+        return OrderRefusedError(str(exc))
+    return OrderRefusedError(str(exc))

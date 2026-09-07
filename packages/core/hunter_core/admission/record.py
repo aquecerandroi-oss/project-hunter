@@ -29,7 +29,7 @@ from hunter_core.admission.reservation import (
     ReservationRepository,
     reserved_cash_for,
 )
-from hunter_core.admission.sources import admission_key
+from hunter_core.admission.sources import admission_key, request_digest
 from hunter_core.audit import AuditEvent, SqlAuditSink
 from hunter_core.domain.enums import (
     ParticipationEntryKind,
@@ -127,14 +127,15 @@ async def insert_proposal(
         "source": source.value,
         "created": as_of,
         "expires": as_of + RESERVATION_TTL if approved else None,
+        "digest": request_digest(request, source),
     }
     statement = text(
         "INSERT INTO trade_proposals (id, organization_id, portfolio_id, agent_id, signal_id, "
         "market_id, direction, requested_risk_pct, status, risk_decision, rejection_reason, "
-        "kill_switch_snapshot, idempotency_key, source, created_at, decided_at, expires_at) "
-        "VALUES (:id, :org, :pf, :agent, :signal, :market, :direction, :risk_pct, :status, "
-        "CAST(:decision AS jsonb), :reason, CAST(:snapshot AS jsonb), :key, :source, :created, "
-        ":created, :expires)"
+        "kill_switch_snapshot, idempotency_key, request_digest, source, created_at, decided_at, "
+        "expires_at) VALUES (:id, :org, :pf, :agent, :signal, :market, :direction, :risk_pct, "
+        ":status, CAST(:decision AS jsonb), :reason, CAST(:snapshot AS jsonb), :key, :digest, "
+        ":source, :created, :created, :expires)"
     )
     try:
         async with session.begin_nested():

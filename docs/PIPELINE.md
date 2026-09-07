@@ -217,17 +217,80 @@ Lista completa de checks em `RISK_ENGINE.md`.
 
 ## 8. Execution Engine
 
-**Onde:** `execution-worker`. **Gatilho:** `proposals.decided` (approved), `market.ticks` (gestão de posições, throttle 1 s), `kill_switch.changed`.
+**Onde:** `execution-worker` (`HUNTER_ROLE=execution`, T3.5). **Papel de banco:** `hunter_worker` em
+todos os ciclos — desde a `0007_paper_roles` (§19.1) a trava da carteira, o `fifo_v1`,
+`portfolios.kill_switch_state`, a curva de equity e a outbox são do motor. **Gatilhos:** relógio,
+não evento: seis laços com cadência própria, cada passada uma transação, sob a trava da carteira
+(`portfolio_risk_state`, ordem sistema → organização → carteira).
 
-1. **Entrada.** `ExecutionAdapter(mode=portfolio.type).submit(OrderIntent)`. Paper v1: ordem a mercado contra o book top 25 do Redis; fill com walk do book (partial fills se o book não cobre), slippage real do book + `slippage_model` (bps adicionais configuráveis), fee taker (Binance 0,05 %, Bybit 0,055 %, configurável), latência simulada 50–300 ms (o preço usado é o book **após** a latência, o que penaliza mercados rápidos). Se `spread_pct > max_spread_pct` no momento, a ordem é rejeitada com `reason=spread_guard`.
-2. Cria `orders` (`client_order_id = proposal_id`), `fills`, `positions`; ordens filhas `stop` e `target` viram registros `pending` gerenciados pelo worker (não existe exchange para segurá-las em paper).
-3. **Gestão.** A cada 1 s: marca a mercado com mark price; atualiza `unrealized_pnl`, MFE, MAE; verifica stop (toque no mark), alvos parciais, invalidações do sinal e `expected_holding` × 3 como expiração; verifica limites de portfolio (perda diária, drawdown) → `risk_events` e, se o risk profile permitir `auto_close_on_emergency`, fecha.
-4. **Saída.** Fecha posição → `trades` com `exit_reason`, snapshots de features de entrada e saída, `r_multiple`. Publica `executions.completed`, `positions.updated`.
-5. **Equity.** A cada 1 min por portfolio com posição ou movimento: `portfolio_equity_snapshots` (1m). analytics-worker agrega em 1h/1d.
-6. **Shadow.** `mode=shadow` grava ordens e fills com `simulated=true` e `execution_mode=shadow`, sem alterar cash. Idêntico ao paper em tudo o mais.
-7. **Live.** `LiveExecutionAdapter` existe como interface e levanta `LiveTradingDisabled` enquanto `ENABLE_LIVE_TRADING=false` ou entitlement ausente. Sem implementação até a Fase 4.
+| Laço | Cadência | O que faz |
+|---|---|---|
+| `admission` | 1 s | lê os pedidos que a API arquivou (`status='pending'`) e decide **a própria linha** (`hunter_core.admission.decide_pending`); nunca insere uma segunda proposta para o mesmo pedido |
+| `entries` | 1 s | proposta `approved` com reserva `held` → uma tentativa → aplica o `ExecutionReport` |
+| `protection` | 1 s | `check_triggers` pelo último negócio SPOT válido; disparo → tentativa de saída |
+| `expiry` | 5 s | `expire_reservations` sob a trava (30 s sem ordem) |
+| `kill_switch` | 10 s | relê o estado efetivo; BLOQUEADO cancela pendentes e **não** toca proteções |
+| `mtm` | 60 s | ponto da curva `1m` → `evaluate_and_persist` → publica `kill_switch.changed` |
 
-**Falha:** worker reinicia → relê posições `open` do Postgres, reconstrói estado, retoma; propostas `approved` sem ordem após 30 s **perdem a reserva** (`reservation_state=expired`, `reserved_slot=false`), nunca são executadas tarde — o `status` continua `approved`, porque ele registra o que o Risk Engine decidiu e isso não deixa de ser verdade; o que expira é o compromisso, que é o outro eixo (DATABASE.md §18.3, T3.12); market data `degraded` para o mercado → não abre, mas continua gerenciando saídas com o último preço válido e gera `risk_event` se ficar sem preço por > 60 s.
+1. **Entrada — uma tentativa, e só contra livro elegível.** A ordem carrega a `RiskDecision`
+   aprovada (`MarketEntryOrder`), o `client_order_id` e o `execution_key` são `entry:{proposal_id}`
+   (derivados, nunca aleatórios) e o fill sai de uma caminhada única no **livro spot** recebido
+   depois da latência declarada. Enquanto o livro não é elegível — ausente, velho, anterior à
+   latência, de outro mercado — a proposta é **adiada**, não recusada: nada é escrito e a tentativa
+   não é gasta; se o livro nunca chegar, a reserva expira em 30 s e é liberada com o motivo. Já
+   *dentro* da tentativa, filtro, banda de preço ou profundidade recusam em definitivo.
+2. **O fill vira ledger na mesma transação:** `orders`, `fills` (com `execution_key`,
+   `submitted_qty` e `decision_fingerprint`), `positions` com a **quantidade líquida da taxa em
+   ativo-base**, `participation_consumptions` (`kind='executed'`, único por `fill_id`), a reserva
+   → `consumed`, a **intenção de proteção durável** (`portfolio_exit_intents`, nunca uma posição
+   sem stop), a auditoria e a outbox. Reentrega do mesmo relatório não escreve nada:
+   `uq_orders_client_order_id` e `uq_fills_execution_key` são a idempotência, não uma flag.
+3. **Proteção — a tentativa acaba, a intenção não.** Cada tentativa tem identidade própria
+   (`exit:{attempt_id}`); sem livro utilizável a saída fica `pending_degraded`, com alerta, e a
+   intenção guarda a quantidade — vela **nunca** dá fill retroativo. Uma tentativa degradada é
+   repetida no ciclo seguinte sem esperar novo cruzamento. Stop, alvo e fechamento manual dividem a
+   mesma quantidade vendável (`allocate_sellable`) sob a trava da posição.
+4. **Resíduo.** Uma compra spot paga a taxa em moeda, então a quantidade líquida quase nunca é
+   múltiplo do `step_size`: o que sobra abaixo do mínimo é **pó**, fica na posição (status
+   `closing`), continua valendo no patrimônio e a intenção termina em `blocked_residual` — nunca
+   `fulfilled`. O `trades` é escrito nesse instante, com a quantidade realmente liquidada e o preço
+   de saída **efetivo** (o que faz `qty × (saída − entrada)` bater com o realizado acumulado).
+5. **MTM e curva.** `build_portfolio_state` com marcas do último negócio válido → ponto em
+   `portfolio_equity_snapshots` na resolução `1m`, com `fx_observation_id` **ou**
+   `brl_unavailable_reason`, e `marks_stale` quando alguma marca é estimada. O ponto é escrito
+   **antes** da avaliação do kill switch: o pico e a referência do dia são limitados pelo maior
+   patrimônio que a curva mostrou (DATABASE.md §18.7), então um pico gravado antes do ponto que o
+   sustenta é recusado pelo banco. Na virada do dia o ponto que ancorou a referência é espelhado na
+   faixa `1h`, que não é podada.
+6. **Kill switch.** Relido a cada 10 s **e** na transação de cada efeito. `TRADING_DISABLED`
+   bloqueia entradas novas e libera as pendentes (`held → released`, auditado, devolvendo só o não
+   executado) e **não** toca em nenhuma proteção — "travas de entrada não podem impedir saídas de
+   proteção". O worker é o único papel que move a trava e publica `kill_switch.changed` na mesma
+   transação.
+7. **Live.** `LiveExecutionAdapter` levanta `LiveTradingDisabled` sempre, e o processo **recusa
+   subir** com `ENABLE_LIVE_TRADING=true`: um worker de papel que subisse assim seria um que o
+   operador acredita estar operando de verdade.
+
+**Falha e reinício:** não há estado em memória para perder. Cada passada relê posições, intenções e
+reservas do Postgres, então o worker depois de um `kill -9` é o worker de antes, menos o que a
+última transação não comitou. A única coisa em memória é a marca-d'água do gatilho, e perdê-la causa
+uma reavaliação, nunca uma segunda venda. Propostas `approved` sem ordem após 30 s **perdem a
+reserva** (`reservation_state=expired`, `reserved_slot=false`), nunca são executadas tarde — o
+`status` continua `approved`, porque ele registra o que o Risk Engine decidiu e isso não deixa de ser
+verdade; o que expira é o compromisso, que é o outro eixo (DATABASE.md §18.3, T3.12).
+
+**Prontidão** (`/ready`, cinco checks próprios): schema paper aplicado, kill switch legível, atraso
+do MTM ≤ 120 s, nenhuma proteção disparada esperando > 5 s, outbox sem atraso. **Métricas:**
+`hunter_execution_orders_total{kind,outcome}`, `hunter_execution_protection_delay_seconds`,
+`hunter_execution_mtm_age_seconds`, `hunter_execution_pending_degraded_total{reason}`.
+**Heartbeat:** `hb:execution:paper` (patrimônio, kill switch, posições, atraso de proteção, erros).
+
+**Acoplamento aberto (T3.0b/T3.1d):** o `avgPrice` que o filtro `NOTIONAL` de uma ordem MARKET exige
+não é coletado por ninguém ainda; num mercado que o exige (`avgPriceMins > 0`) a entrada é **adiada
+com motivo**, nunca julgada pelo último negócio. E `trade_proposals` não tem coluna para a geometria
+do pedido (`entry_ref`, `stop`, `assumed_costs`), então um pedido arquivado pela API ainda não pode
+ser decidido a partir da linha — o worker registra `pending_request_without_geometry` e não inventa
+número nenhum.
 
 ## 9. Analytics e Learning
 

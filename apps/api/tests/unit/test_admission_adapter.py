@@ -1,15 +1,19 @@
-"""The API adapter of the admission service — T3.12, no database.
+"""The API adapter files a **request** — T3.5, addendum condition 2. No database.
 
-What is proved: the adapter is a *translation*, not a second decision path. It
-mints the manual origin, stamps the authenticated principal as the audit actor,
-carries the ``Idempotency-Key`` through as the request's client key, and turns
-each domain refusal into the RFC 9457 problem that is true of it — a request
-that may never be a proposal is a 422, a reused key is a 409.
+What is proved: the API never decides. It mints the manual origin, carries the
+``Idempotency-Key`` through as the request's client key, computes the canonical
+``request_digest`` that identifies *what was asked*, and writes one pending row —
+``status = pending``, no decision, no sequence, no reservation, which is exactly
+the shape ``trade_proposals_the_app_only_files_requests`` enforces in the
+database (DATABASE.md §19.4). Filing the same order twice returns the row that
+exists; filing a **different** order under the same key is a 409.
 """
 
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -18,15 +22,19 @@ import pytest
 from hunter_api.auth.principal import Principal
 from hunter_api.auth.rbac import OrgContext
 from hunter_api.services import admission as adapter
-from hunter_core.admission.dedupe import IdempotencyConflict
-from hunter_core.admission.inputs import MarketMismatch
-from hunter_core.admission.sources import OriginRefused
-from hunter_core.domain.enums import MarketType, OrganizationRole, TradeDirection
+from hunter_core.domain.enums import (
+    MarketType,
+    OrganizationRole,
+    ProposalSource,
+    ProposalStatus,
+    TradeDirection,
+)
 from hunter_core.strategies.envelope import AssumedCosts
 from hunter_risk.inputs import MarketIdentity
 
 pytestmark = pytest.mark.unit
 
+NOW = datetime(2026, 9, 7, 12, 0, tzinfo=UTC)
 MARKET = MarketIdentity(
     exchange="binance",
     symbol="SOLUSDT",
@@ -46,97 +54,152 @@ def context() -> OrgContext:
     return OrgContext(org_id=uuid.uuid4(), role=OrganizationRole.OWNER, principal=principal)
 
 
-async def call(monkeypatch: pytest.MonkeyPatch, spy: Any, **overrides: Any) -> Any:
-    monkeypatch.setattr(adapter, "admit", spy)
-    ctx = overrides.pop("context", None) or context()
-    inputs = adapter.AdmissionInputs(
-        liquidity=None,  # type: ignore[arg-type]
-        spec=None,  # type: ignore[arg-type]
-        beta=None,  # type: ignore[arg-type]
-        prices={},
-        betas={},
-        exit_cost_rate=Decimal(0),
-    )
-    from datetime import UTC, datetime
+class RecordingSession:
+    """A session that only remembers the statement it was handed."""
 
-    return await adapter.admit_manual_order(
-        None,  # type: ignore[arg-type]
-        context=ctx,
-        idempotency_key=overrides.pop("idempotency_key", "operator-1"),
-        portfolio_id=uuid.uuid4(),
-        market_id=uuid.uuid4(),
-        market=MARKET,
-        direction=TradeDirection.LONG,
-        entry_ref=overrides.pop("entry_ref", Decimal(100)),
-        stop=overrides.pop("stop", Decimal("97.5")),
-        assumed_costs=COSTS,
-        inputs=inputs,
-        now=datetime(2026, 9, 6, 18, 30, tzinfo=UTC),
-        **overrides,
-    )
+    def __init__(self) -> None:
+        self.statements: list[tuple[str, dict[str, Any]]] = []
+
+    async def execute(self, statement: Any, params: dict[str, Any] | None = None) -> Any:
+        self.statements.append((str(statement), params or {}))
+        return None
 
 
-class TestTheAdapterOnlyTranslates:
-    async def test_the_request_carries_the_manual_origin_and_the_principal(
+@dataclass(frozen=True)
+class _Stored:
+    proposal_id: uuid.UUID
+    portfolio_id: uuid.UUID
+    market_id: uuid.UUID
+    request_digest: str | None
+    status: ProposalStatus = ProposalStatus.PENDING
+
+
+async def file_order(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    decided: Any = None,
+    pending: Any = None,
+    session: Any = None,
+    **overrides: Any,
+) -> Any:
+    async def _decided(*_: Any, **__: Any) -> Any:
+        return decided
+
+    async def _pending(*_: Any, **__: Any) -> Any:
+        return pending
+
+    monkeypatch.setattr(adapter, "find_admitted", _decided)
+    monkeypatch.setattr(adapter, "find_pending", _pending)
+    fields: dict[str, Any] = {
+        "context": context(),
+        "idempotency_key": "operator-key-1",
+        "portfolio_id": uuid.uuid4(),
+        "market_id": uuid.uuid4(),
+        "market": MARKET,
+        "direction": TradeDirection.LONG,
+        "entry_ref": Decimal(100),
+        "stop": Decimal("97.5"),
+        "assumed_costs": COSTS,
+        "now": NOW,
+    }
+    fields.update(overrides)
+    return await adapter.file_manual_order(session or RecordingSession(), **fields)
+
+
+class TestTheApiFilesARequestAndNothingElse:
+    async def test_one_pending_row_with_no_decision_no_sequence_and_no_reservation(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        seen: dict[str, Any] = {}
+        session = RecordingSession()
 
-        async def spy(session: Any, request: Any, **kwargs: Any) -> str:
-            seen["request"] = request
-            seen["kwargs"] = kwargs
-            return "decided"
+        filed = await file_order(monkeypatch, session=session)
 
-        ctx = context()
-        result = await call(monkeypatch, spy, context=ctx)
+        assert filed.status is ProposalStatus.PENDING
+        assert filed.decided is False
+        assert filed.idempotency_key == "manual:operator-key-1"
+        assert filed.request_digest
+        sql, params = session.statements[0]
+        assert "INSERT INTO trade_proposals" in sql
+        assert "'pending'" in sql
+        for forbidden in ("risk_decision", "admission_seq", "reserved_", "decided_at"):
+            assert forbidden not in sql
+        assert params["digest"] == filed.request_digest
 
-        assert result == "decided"
-        assert seen["kwargs"]["source"].value == "manual"
-        assert seen["request"].client_key == "operator-1"
-        assert seen["request"].organization_id == ctx.org_id
-        assert seen["request"].actor_id == str(ctx.principal.user_id)
-        assert seen["request"].actor_type == "user"
-        assert seen["request"].agent_id is None
-
-    async def test_a_malformed_geometry_is_a_422_not_a_500(
+    async def test_the_digest_is_the_identity_of_what_was_asked_not_of_who_asked(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        async def spy(session: Any, request: Any, **kwargs: Any) -> str:  # pragma: no cover
-            raise AssertionError("the service must not be reached")
+        portfolio_id, market_id = uuid.uuid4(), uuid.uuid4()
+        fixed = {"portfolio_id": portfolio_id, "market_id": market_id}
 
-        with pytest.raises(adapter.OrderRefusedError) as caught:
-            await call(monkeypatch, spy, stop=Decimal(120))
-        assert caught.value.status_code == 422
-        assert caught.value.type.endswith("/order-refused")
+        first = await file_order(monkeypatch, **fixed)
+        # A different operator, byte for byte the same order.
+        other_operator = await file_order(monkeypatch, context=context(), **fixed)
+        other_stop = await file_order(monkeypatch, stop=Decimal("96"), **fixed)
 
-    async def test_a_reused_key_is_a_409(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        async def spy(session: Any, request: Any, **kwargs: Any) -> str:
-            raise IdempotencyConflict("already answered proposal 1")
+        assert other_operator.request_digest == first.request_digest
+        assert other_stop.request_digest != first.request_digest
 
-        with pytest.raises(adapter.OrderReplayConflictError) as caught:
-            await call(monkeypatch, spy)
-        assert caught.value.status_code == 409
-        assert caught.value.type.endswith("/idempotency-key-conflict")
-
-    @pytest.mark.parametrize(
-        "error", [OriginRefused("research_only"), MarketMismatch("another market")]
-    )
-    async def test_a_request_that_may_never_be_a_proposal_is_a_422(
-        self, monkeypatch: pytest.MonkeyPatch, error: Exception
+    async def test_a_key_that_already_named_another_order_is_a_conflict(
+        self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        async def spy(session: Any, request: Any, **kwargs: Any) -> str:
-            raise error
+        stored = _Stored(
+            proposal_id=uuid.uuid4(),
+            portfolio_id=uuid.uuid4(),
+            market_id=uuid.uuid4(),
+            request_digest="a-digest-of-another-order",
+        )
 
-        with pytest.raises(adapter.OrderRefusedError) as caught:
-            await call(monkeypatch, spy)
-        assert caught.value.status_code == 422
+        with pytest.raises(adapter.OrderReplayConflictError) as refusal:
+            await file_order(monkeypatch, pending=stored)
 
-    async def test_an_unopened_wallet_is_a_409(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from hunter_core.portfolio.state import WalletNotOpen
+        assert refusal.value.status_code == 409
 
-        async def spy(session: Any, request: Any, **kwargs: Any) -> str:
-            raise WalletNotOpen("never opened")
+    async def test_refiling_the_same_order_returns_the_row_that_exists(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        session = RecordingSession()
+        first = await file_order(monkeypatch, session=session)
+        stored = _Stored(
+            proposal_id=first.proposal_id,
+            portfolio_id=first.portfolio_id,
+            market_id=first.market_id,
+            request_digest=first.request_digest,
+        )
 
-        with pytest.raises(adapter.WalletNotOpenError) as caught:
-            await call(monkeypatch, spy)
-        assert caught.value.status_code == 409
+        again = await file_order(
+            monkeypatch,
+            pending=stored,
+            session=session,
+            portfolio_id=first.portfolio_id,
+            market_id=first.market_id,
+        )
+
+        assert again.proposal_id == first.proposal_id
+        assert again.decided is False
+        assert len(session.statements) == 1  # nothing was written the second time
+
+    async def test_a_stop_at_or_above_the_entry_is_a_422_not_a_pending_row(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        session = RecordingSession()
+
+        with pytest.raises(adapter.OrderRefusedError) as refusal:
+            await file_order(monkeypatch, session=session, stop=Decimal(101))
+
+        assert refusal.value.status_code == 422
+        assert session.statements == []
+
+    async def test_a_float_price_never_reaches_the_database(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        with pytest.raises(adapter.OrderRefusedError):
+            await file_order(monkeypatch, entry_ref=100.4)  # type: ignore[arg-type]
+
+
+class TestTheOriginIsAlwaysManual:
+    async def test_the_idempotency_key_carries_the_origin(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        filed = await file_order(monkeypatch, idempotency_key="k")
+
+        assert filed.idempotency_key.startswith(f"{ProposalSource.MANUAL.value}:")

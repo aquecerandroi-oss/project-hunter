@@ -36,6 +36,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 
+from hunter_core.admission.sources import request_digest
 from hunter_core.db.repositories.base import TenantRepository
 from hunter_core.domain.enums import (
     ProposalSource,
@@ -50,7 +51,13 @@ if TYPE_CHECKING:
 
     from hunter_core.admission.sources import ProposalRequest
 
-__all__ = ["AdmittedProposal", "IdempotencyConflict", "find_admitted"]
+__all__ = [
+    "AdmittedProposal",
+    "IdempotencyConflict",
+    "PendingRequest",
+    "find_admitted",
+    "find_pending",
+]
 
 
 class IdempotencyConflict(ValueError):
@@ -74,7 +81,13 @@ class AdmittedProposal(BaseModel):
     reserved_cash: Decimal | None
     reserved_risk: Decimal | None
     reserved_until: datetime | None
-    decided_at: datetime | None
+    decided_at: datetime
+    """Never null: :func:`find_admitted` only matches rows that were **decided**.
+    A row still waiting for the engine has no decision to replay, and
+    ``RiskDecision.model_validate({})`` on its empty ``risk_decision`` raised ten
+    validation errors instead (adversarial review of 2026-09-07, must-fix 1)."""
+
+    request_digest: str | None
     risk_decision: dict[str, Any]
 
     @property
@@ -96,8 +109,9 @@ class ProposalLookup(TenantRepository):
             "SELECT id AS proposal_id, portfolio_id, market_id, direction::text AS direction, "
             "source::text AS source, status::text AS status, admission_seq, "
             "reservation_state::text AS reservation_state, reserved_notional, reserved_cash, "
-            "reserved_risk, reserved_until, decided_at, risk_decision FROM trade_proposals "
-            "WHERE organization_id = :org AND idempotency_key = :key"
+            "reserved_risk, reserved_until, decided_at, request_digest, risk_decision "
+            "FROM trade_proposals WHERE organization_id = :org AND idempotency_key = :key "
+            "AND decided_at IS NOT NULL AND status <> 'pending'"
         )
         row = (
             await self.session.execute(statement, {"org": self.organization_id, "key": key})
@@ -105,13 +119,58 @@ class ProposalLookup(TenantRepository):
         return None if row is None else AdmittedProposal.model_validate(row, from_attributes=True)
 
 
+class PendingRequest(BaseModel):
+    """A request the API filed and the engine has not decided yet (§19.4)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    proposal_id: uuid.UUID
+    portfolio_id: uuid.UUID
+    market_id: uuid.UUID
+    direction: TradeDirection
+    source: ProposalSource
+    request_digest: str | None
+
+
 async def find_admitted(
     session: AsyncSession, *, organization_id: uuid.UUID, idempotency_key: str
 ) -> AdmittedProposal | None:
-    """The proposal this key already produced, if any."""
+    """The **decided** proposal this key already produced, if any.
+
+    Decided, and only decided. A pending request written by the API carries no
+    decision, so answering a replay with it would mean parsing ``{}`` as a
+    ``RiskDecision`` — ten validation errors — and, in the role model of
+    ``0007_paper_roles`` (the API files, the engine admits), a manual order that
+    matched here would never be decided at all: it would replay as itself for
+    ever (adversarial review of 2026-09-07, must-fix 1).
+    """
     lookup = ProposalLookup(session, organization_id)
     await lookup.require_tenant_context()
     return await lookup.by_idempotency_key(idempotency_key)
+
+
+async def find_pending(
+    session: AsyncSession, *, organization_id: uuid.UUID, idempotency_key: str
+) -> PendingRequest | None:
+    """The undecided request this key filed, if there is one.
+
+    Locked ``FOR UPDATE``: it is about to be decided **in its own row**, and two
+    admissions racing for the same request must not both decide it.
+    """
+    lookup = ProposalLookup(session, organization_id)
+    await lookup.require_tenant_context()
+    row = (
+        await session.execute(
+            text(
+                "SELECT id AS proposal_id, portfolio_id, market_id, "
+                "direction::text AS direction, source::text AS source, request_digest "
+                "FROM trade_proposals WHERE organization_id = :org AND idempotency_key = :key "
+                "AND status = 'pending' AND decided_at IS NULL FOR UPDATE"
+            ),
+            {"org": organization_id, "key": idempotency_key},
+        )
+    ).one_or_none()
+    return None if row is None else PendingRequest.model_validate(row, from_attributes=True)
 
 
 def _differs(stored: Any, asked: Any) -> bool:
@@ -144,6 +203,42 @@ def _geometry(existing: AdmittedProposal, request: ProposalRequest) -> list[tupl
     ]
 
 
+def _digest_pair(
+    stored: str | None, request: ProposalRequest, source: ProposalSource
+) -> list[tuple[str, Any, Any]]:
+    """The canonical identity of the request, when the stored row carries one.
+
+    A row written before ``0007_paper_roles`` genuinely has no digest, and
+    comparing against a null would refuse every legitimate retry of it. When it
+    **is** there it closes the hole the four columns left open: a replayed
+    *refusal* whose second request had a different price, stop or ceiling
+    (T3.12, pendência 1).
+    """
+    return [] if stored is None else [("request_digest", stored, request_digest(request, source))]
+
+
+def ensure_pending_is_the_same_request(
+    pending: PendingRequest, request: ProposalRequest, source: ProposalSource
+) -> None:
+    """Refuse to decide a filed request as if it were a different one."""
+    mismatches = [
+        f"{name}: stored {stored}, requested {asked}"
+        for name, stored, asked in [
+            ("portfolio_id", pending.portfolio_id, request.portfolio_id),
+            ("market_id", pending.market_id, request.market_id),
+            ("direction", pending.direction.value, request.direction.value),
+            ("source", pending.source.value, source.value),
+            *_digest_pair(pending.request_digest, request, source),
+        ]
+        if _differs(stored, asked)
+    ]
+    if mismatches:
+        raise IdempotencyConflict(
+            f"idempotency key already filed request {pending.proposal_id}, which is a different "
+            "order: " + "; ".join(mismatches)
+        )
+
+
 def ensure_same_request(
     existing: AdmittedProposal, request: ProposalRequest, source: ProposalSource
 ) -> None:
@@ -155,6 +250,7 @@ def ensure_same_request(
             ("market_id", existing.market_id, request.market_id),
             ("direction", existing.direction.value, request.direction.value),
             ("source", existing.source.value, source.value),
+            *_digest_pair(existing.request_digest, request, source),
             *_geometry(existing, request),
         ]
         if _differs(stored, asked)

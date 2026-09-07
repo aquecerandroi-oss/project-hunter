@@ -1,0 +1,94 @@
+"""``HUNTER_ROLE=execution`` — the paper wallet's engine.
+
+One TaskGroup owns six long-lived loops (admission, entries, protection, expiry,
+kill switch, mark-to-market) plus the heartbeat; :func:`forever` makes any of
+them *returning* fatal, because a loop that quietly stopped is worse than a
+process that restarts — a stopped protection loop is a position without a stop.
+
+Two refusals happen before any loop starts:
+
+- **``ENABLE_LIVE_TRADING=true``** (``config.load_config``). This process is the
+  paper worker and there is no live adapter; coming up anyway would be coming up
+  as something an operator believes is trading real money;
+- **the paper schema is missing.** Without ``0006``/``0007`` there is no wallet
+  lock to take and no column to write the curve's quality into, and a worker that
+  "runs" while every cycle raises reports itself healthy while doing nothing.
+
+**Recovery is not a step here, and that is the design.** There is no state to
+rebuild: every loop re-reads the positions, the intentions and the reservations
+from Postgres on every pass, so the worker that comes back after ``kill -9`` is
+the worker that went down, minus whatever the last transaction did not commit.
+The only in-memory thing is the trigger watermark, and losing it can cause a
+re-evaluation, never a second sale (``protection.TriggerWatermarks``).
+"""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Awaitable
+from typing import TYPE_CHECKING
+
+from hunter_core.db.session import create_session_factory
+from hunter_core.logging import get_logger
+from hunter_execution_worker.config import load_config
+from hunter_execution_worker.cycles import Cycles, every
+from hunter_execution_worker.health import migration_present, readiness_checks
+from hunter_execution_worker.heartbeat import run_heartbeat
+from hunter_execution_worker.market_data import RedisSpotMarketData
+from hunter_execution_worker.state import CycleHealth
+
+if TYPE_CHECKING:
+    from hunter_core.runtime import WorkerRuntime
+
+logger = get_logger(__name__)
+
+__all__ = ["forever", "run_execution"]
+
+
+async def forever(name: str, coro: Awaitable[None]) -> None:
+    """A long-lived loop must never return; if it does, that is fatal."""
+    await coro
+    raise RuntimeError(f"task {name} exited unexpectedly")
+
+
+async def run_execution(runtime: WorkerRuntime) -> None:
+    """Entry point registered for ``HUNTER_ROLE=execution``."""
+    config = load_config()
+    factory = create_session_factory(runtime.engine)
+    health = CycleHealth()
+    checks = readiness_checks(factory, config, health)
+    runtime.readiness_checks.extend(checks)
+    logger.info(
+        "execution_worker_starting",
+        paper_autonomy=config.enable_paper_autonomy,
+        mtm_poll_s=config.mtm_poll_s,
+    )
+    try:
+        if not await migration_present(factory):
+            raise RuntimeError(
+                "0006_paper_wallet/0007_paper_roles are not applied; refusing to run. There is no "
+                "wallet lock to take and nowhere to record why a curve point has no BRL"
+            )
+        cycles = Cycles(factory, RedisSpotMarketData(runtime.redis), config, health)
+        async with asyncio.TaskGroup() as group:
+            loops = {
+                "admission": (config.admission_poll_s, cycles.admission),
+                "entries": (config.admission_poll_s, cycles.entries),
+                "protection": (config.protection_poll_s, cycles.protection),
+                "expiry": (config.expiry_poll_s, cycles.expiry),
+                "kill_switch": (config.kill_switch_poll_s, cycles.kill_switch),
+                "mtm": (config.mtm_poll_s, cycles.mark_to_market),
+            }
+            for name, (cadence, run) in loops.items():
+                group.create_task(
+                    forever(name, every(cadence, run, name=name, health=health)),
+                    name=f"execution-{name}",
+                )
+            group.create_task(
+                forever("heartbeat", run_heartbeat(runtime, health, config)),
+                name="execution-heartbeat",
+            )
+    finally:
+        for check in checks:
+            if check in runtime.readiness_checks:
+                runtime.readiness_checks.remove(check)

@@ -162,6 +162,21 @@ services:
       HEALTH_PORT: "8001"
     logging: *prod-logging
 
+  # M3 execution (T3.5). Sem `*prod-db-env` ele sobe com a senha de dev e
+  # reinicia em loop (mesma medicao de 2026-09-06). `ENABLE_LIVE_TRADING: "false"`
+  # e explicito: o processo recusa subir se for true, e um paper worker que
+  # subisse mesmo assim seria um que o operador acredita estar operando de
+  # verdade. Nenhuma ativacao de producao nesta tarefa (T3.13).
+  execution-worker:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: execution
+      HEALTH_PORT: "8001"
+      ENABLE_LIVE_TRADING: "false"
+      ENABLE_PAPER_AUTONOMY: ${ENABLE_PAPER_AUTONOMY:-false}
+    logging: *prod-logging
+
   web:
     restart: always
     build:

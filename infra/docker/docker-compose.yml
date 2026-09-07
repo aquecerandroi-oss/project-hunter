@@ -309,6 +309,50 @@ services:
       start_period: 60s
       retries: 5
 
+  # M3 execution (T3.5). Runs as the engine (`hunter_worker`): the wallet lock,
+  # `fifo_v1`, `portfolios.kill_switch_state`, the equity curve and the outbox are
+  # worker-only since `0007_paper_roles` (§19.1). `ENABLE_LIVE_TRADING` is passed
+  # explicitly and pinned to false: the process refuses to start if it is true.
+  execution-worker:
+    image: hunter-api:${GIT_SHA:-dev}
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: execution
+      HEALTH_PORT: "8001"
+      ENABLE_LIVE_TRADING: "false"
+      ENABLE_PAPER_AUTONOMY: ${ENABLE_PAPER_AUTONOMY:-false}
+    env_file:
+      - path: ../../.env
+        required: false
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # `service_started`, not `service_healthy`: the wallet reads the spot hot
+      # state the collector writes, and it has to survive the collector being
+      # down — with no usable book a protection stays pending **with an alert**
+      # instead of fabricating a fill, which is the behaviour the contract asks
+      # for and which a hard dependency would replace with a restart loop.
+      market-worker:
+        condition: service_started
+    restart: unless-stopped
+    # Five readiness checks (hunter_execution_worker/health.py): `paper_schema`
+    # (0006/0007 applied), `kill_switch_legible` (this process can still read the
+    # latch it obeys), `mtm_fresh` (the curve that anchors the day is not frozen,
+    # <= 120 s), `protection_prompt` (no fired protection waiting more than 5 s)
+    # and `outbox_not_lagging`. The timeouts mirror the other workers': the health
+    # server shares the loop, and a false "unhealthy" would restart a worker
+    # mid-fill.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://localhost:8001/ready', timeout=25); raise SystemExit(0 if response.status == 200 else 1)"]
+      interval: 15s
+      timeout: 30s
+      start_period: 60s
+      retries: 5
+
   web:
     build:
       context: ../..
