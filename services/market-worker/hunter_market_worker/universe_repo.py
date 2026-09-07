@@ -205,17 +205,38 @@ async def monitor_by_floor(
     invented: the caller computed the set from the same listing that was just
     upserted, so the only way to be here is a row that went inactive between
     the two, and monitoring a suspended pair is never right.
+
+    ``old_monitored`` is read **before** any row is touched and across every
+    status, not only ``ACTIVE`` (T3.0e/D12): a row that left ``ACTIVE`` since
+    the last refresh (suspended, delisted) must still be reported as removed
+    and must not keep a stale ``is_monitored=True`` just because it fell out
+    of the ranked query below -- a blanket reset, mirroring
+    :func:`rank_and_monitor`'s, runs before ranking picks the survivors back
+    up.
     """
+    old_monitored = set(
+        await session.scalars(
+            select(Market.symbol).where(
+                Market.exchange_id == exchange_id,
+                Market.market_type == market_type,
+                Market.is_monitored.is_(True),
+            )
+        )
+    )
+    await session.execute(
+        update(Market)
+        .where(Market.exchange_id == exchange_id, Market.market_type == market_type)
+        .values(is_monitored=False, monitor_rank=None)
+    )
     rows = (
         await session.execute(
-            select(Market.id, Market.symbol, Market.is_monitored)
+            select(Market.id, Market.symbol)
             .where(Market.exchange_id == exchange_id)
             .where(Market.market_type == market_type)
             .where(Market.status == MarketStatus.ACTIVE)
             .order_by(Market.volume_24h_usd.desc().nulls_last())
         )
     ).all()
-    old_monitored = {row.symbol for row in rows if row.is_monitored}
     new_monitored = {row.symbol for row in rows if row.symbol in eligible}
     await _apply_ranks(
         session,

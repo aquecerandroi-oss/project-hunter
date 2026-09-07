@@ -29,7 +29,10 @@ import orjson
 from hunter_core.domain.enums import MarketType, RiskEventSeverity
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
-from hunter_core.observability import market_dropped_events_total
+from hunter_core.observability import (
+    market_dropped_events_total,
+    market_spot_dropped_events_total,
+)
 from hunter_core.redis import keys
 from hunter_exchanges.rate_limit import REST_GATE_OK
 from hunter_market_worker.heartbeat_events import (
@@ -279,7 +282,17 @@ async def run_heartbeat(
             runtime.mark_error()
         if dropped:
             state.dropped_events += dropped
-            market_dropped_events_total.labels(exchange=adapter.code).inc(dropped)
+            # T3.0e: separate series per venue -- both adapters answer
+            # ``adapter.code == "binance"`` by design (one row in
+            # ``exchanges``), so a shared counter cannot tell "spot is
+            # reconnecting, routine" from "the perpetual, which the whole
+            # Radar depends on, is losing tape" (review-T3.0c-T3.0d.md).
+            metric = (
+                market_spot_dropped_events_total
+                if market_type is MarketType.SPOT
+                else market_dropped_events_total
+            )
+            metric.labels(exchange=adapter.code).inc(dropped)
         ws_state = (
             "idle" if universe.initialized and not universe.symbols else adapter.connection_state()
         )

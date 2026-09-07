@@ -123,7 +123,9 @@ async def report_losses(
             # Never wait here: this runs once per drain iteration and a
             # detection cycle holds the lock for as long as it reads 200
             # markets. The losses stay queued for the next iteration.
-            logger.debug("market_loss_report_deferred", exchange=exchange)
+            logger.debug(
+                "market_loss_report_deferred", exchange=exchange, market_type=market_type.value
+            )
             return
         ids = await load_market_ids(
             session, exchange, {loss.item.symbol for loss in losses}, market_type
@@ -184,7 +186,7 @@ async def drain_loop(
             await report_losses(factory, exchange_code, queues, market_type)
         except Exception:
             runtime.mark_error()
-            logger.exception("market_persist_report_losses_failed")
+            logger.exception("market_persist_report_losses_failed", market_type=market_type.value)
         if not batch:
             try:
                 item = await asyncio.wait_for(queues.events.get(), FLUSH_INTERVAL_S)
@@ -213,14 +215,14 @@ async def drain_loop(
         if age > LAG_WARNING_S and not warned:
             from hunter_market_worker.heartbeat import record_system_event
 
-            logger.warning("market_persist_lag", lag_s=age)
+            logger.warning("market_persist_lag", lag_s=age, market_type=market_type.value)
             try:
                 await record_system_event(
                     factory, "persistence_lag", f"lag={age:.1f}s", RiskEventSeverity.WARNING
                 )
             except Exception:
                 runtime.mark_error()
-                logger.exception("market_persist_lag_report_failed")
+                logger.exception("market_persist_lag_report_failed", market_type=market_type.value)
             warned = True
         try:
             await asyncio.wait_for(
@@ -231,7 +233,9 @@ async def drain_loop(
             )
         except Exception:
             runtime.mark_error()
-            logger.exception("market_persist_flush_failed", batch_size=len(batch))
+            logger.exception(
+                "market_persist_flush_failed", batch_size=len(batch), market_type=market_type.value
+            )
             if time.monotonic() - oldest >= queues.max_age:
                 for item in batch:
                     queues.drop(item, "age")

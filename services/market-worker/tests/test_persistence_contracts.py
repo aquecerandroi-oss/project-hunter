@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import pytest
 from sqlalchemy import delete, func, select
+from structlog.testing import capture_logs
 
 from hunter_core.db.models.market_data import (
     IngestionGap,
@@ -15,6 +16,7 @@ from hunter_core.db.models.market_data import (
 )
 from hunter_core.db.models.system import OutboxEvent, SystemEvent
 from hunter_core.db.session import role_session
+from hunter_core.domain.enums import MarketType
 from hunter_core.events.envelope import EventEnvelope
 from hunter_core.events.outbox import dispatch_pending
 from hunter_core.observability import market_publish_failures_total
@@ -256,6 +258,51 @@ async def test_report_losses_failure_leaves_drain_loop_alive_and_losses_intact(
 
     assert list(queues.losses) == [Loss(pending, "capacity")]
     assert runtime.error_count >= 2
+
+
+class _ErroredOnceRuntime(FakeRuntime):
+    """``FakeRuntime`` plus an event set the first time ``mark_error`` runs."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.errored = asyncio.Event()
+
+    def mark_error(self) -> None:
+        super().mark_error()
+        self.errored.set()
+
+
+async def test_flush_failure_log_carries_the_market_type(
+    db_session_factory: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T3.0e/ressalva 3 (notes-T3.0c.md): with two queues -- perpetual and
+    spot -- sharing one Postgres, an operator reading
+    ``market_persist_flush_failed`` has to know which one failed."""
+
+    async def failing_flush_batch(*args: Any, **kwargs: Any) -> None:
+        raise ConnectionError("commit response lost")
+
+    monkeypatch.setattr(persist, "flush_batch", failing_flush_batch)
+    monkeypatch.setattr(persist, "FLUSH_INTERVAL_S", 0.01)
+    queues = PersistQueues()
+    queues.events.put_nowait(builders.liquidation("BTCUSDT"))
+    runtime = _ErroredOnceRuntime()
+
+    with capture_logs() as logs:
+        task = asyncio.create_task(
+            persist.drain_loop(
+                db_session_factory, "fake", queues, runtime, market_type=MarketType.SPOT
+            )
+        )
+        try:
+            await asyncio.wait_for(runtime.errored.wait(), 5)
+        finally:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+    flush_failed = [line for line in logs if line["event"] == "market_persist_flush_failed"]
+    assert flush_failed and flush_failed[0]["market_type"] == "spot"
 
 
 async def test_report_losses_drain_is_robust_to_concurrent_eviction(

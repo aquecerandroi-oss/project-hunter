@@ -172,6 +172,20 @@ market_spot_ingestion_gaps = Gauge(
     ["exchange", "status"],
     registry=registry,
 )
+# T3.0e (review-T3.0c-T3.0d.md, "Antes do deploy" item 1): ``run_heartbeat`` is
+# shared by both loops and both adapters answer ``adapter.code == "binance"``
+# by design, so a label on ``market_dropped_events_total`` cannot tell the two
+# venues apart -- same reasoning as the three series above, same fix: a series
+# of its own rather than a ``market_type`` label on a live counter.
+market_spot_dropped_events_total = Counter(
+    "market_spot_dropped_events_total",
+    "Non-final WS events the SPOT adapter's bounded internal queue discarded "
+    "under load. Separate from ``market_dropped_events_total`` so a spot "
+    "reconnect (routine) cannot be misread as the perpetual (the Radar's "
+    "primary health signal) losing tape.",
+    ["exchange"],
+    registry=registry,
+)
 
 
 def metrics_asgi_app() -> ASGIApp:

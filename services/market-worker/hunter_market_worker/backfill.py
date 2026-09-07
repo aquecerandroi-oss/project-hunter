@@ -47,7 +47,7 @@ from prometheus_client import Counter
 
 from hunter_core.db.models.market_data import IngestionGap
 from hunter_core.db.session import role_session
-from hunter_core.domain.enums import Timeframe
+from hunter_core.domain.enums import MarketType, Timeframe
 from hunter_core.domain.market import align_open_time
 from hunter_core.events.consume import ack, is_processed
 from hunter_core.events.streams import Streams
@@ -266,6 +266,10 @@ class BackfillConsumer:
             outcome=name,
             exchange=request.exchange,
             symbol=request.symbol,
+            # T3.0e: literal -- this consumer only plans PERPETUAL history
+            # today (spot has no backfill requester yet). Named so an
+            # operator never has to guess which product a log line is about.
+            market_type=MarketType.PERPETUAL.value,
             shard=f"{self.settings.shard_index}/{self.settings.shard_total}",
             event_id=event_id,
             reason=request.reason,

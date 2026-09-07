@@ -11,9 +11,11 @@ from sqlalchemy import select
 
 from hunter_core.db.models.system import SystemEvent
 from hunter_core.db.session import role_session
+from hunter_core.domain.enums import MarketType
 from hunter_core.domain.types import utcnow
 from hunter_core.observability import (
     market_dropped_events_total,
+    market_spot_dropped_events_total,
     market_system_event_record_failures_total,
 )
 from hunter_exchanges.base import ConnectionState
@@ -242,6 +244,53 @@ async def test_run_heartbeat_writes_dropped_events_to_the_hash_and_the_counter(
     hb = await redis_client.hgetall(heartbeat.hb_key(exchange_code))
     assert hb[b"dropped_events"] == b"9"
     assert metric._value.get() == before + 9  # pyright: ignore[reportPrivateUsage]
+
+
+async def test_run_heartbeat_writes_spot_drops_to_the_spot_series_never_the_shared_one(
+    redis_client: Any, monkeypatch: pytest.MonkeyPatch, db_session_factory: Any
+) -> None:
+    """T3.0e/review-T3.0c-T3.0d.md ("Antes do deploy" item 1): both adapters
+    answer ``adapter.code == "binance"`` (one row in ``exchanges``), so a
+    label alone cannot tell a spot reconnect from the perpetual losing tape
+    -- the spot loop must increment its own series and leave the shared one
+    (the Radar's primary health signal) untouched."""
+    monkeypatch.setattr(heartbeat, "HEARTBEAT_INTERVAL_S", 0.01)
+    exchange_code = unique_code()
+    connection = ConnectionState("public", "connected", ("btcusdt@aggTrade",), dropped_events=5)
+    adapter = FakeAdapter(code=exchange_code)
+    adapter.connection_states = lambda: {"public:0": connection}  # type: ignore[attr-defined]
+    universe = MonitoredUniverse()
+    universe.set(["BTCUSDT"])
+    state = HeartbeatState()
+    runtime: Any = FakeRuntime(redis=redis_client)
+    perp_metric = cast(Any, market_dropped_events_total.labels(exchange=exchange_code))
+    spot_metric = cast(Any, market_spot_dropped_events_total.labels(exchange=exchange_code))
+    perp_before = perp_metric._value.get()  # pyright: ignore[reportPrivateUsage]
+    spot_before = spot_metric._value.get()  # pyright: ignore[reportPrivateUsage]
+
+    task = asyncio.ensure_future(
+        heartbeat.run_heartbeat(
+            runtime,
+            adapter,
+            universe,
+            state,
+            db_session_factory,
+            market_type=MarketType.SPOT,
+            shard=(0, 1),
+        )
+    )
+    try:
+        async with asyncio.timeout(5):
+            await runtime.success.wait()
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    assert spot_metric._value.get() == spot_before + 5  # pyright: ignore[reportPrivateUsage]
+    assert perp_metric._value.get() == perp_before  # pyright: ignore[reportPrivateUsage]
 
 
 class _BrokenRedis:

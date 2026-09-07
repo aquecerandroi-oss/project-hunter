@@ -41,6 +41,7 @@ from hunter_core.logging import get_logger
 from hunter_core.observability import market_spot_universe_size
 from hunter_market_worker.durable import enqueue_universe_changed
 from hunter_market_worker.hot_state import write_ticker
+from hunter_market_worker.spot_band import apply_permanence_band
 from hunter_market_worker.universe import MonitoredUniverse, retry_delay
 from hunter_market_worker.universe_repo import (
     mark_delisted,
@@ -68,7 +69,12 @@ SPOT_QUOTE = "USDT"
 
 SPOT_VOLUME_FLOOR_USDT = Decimal("50000000")
 """D1: 50M USDT of 24h quote volume, **on spot**. Everton's number; changing it
-is his call, so it is a constant with a name and not an environment knob."""
+is his call, so it is a constant with a name and not an environment knob.
+
+D12 added a hysteresis band on the way *out* of the universe -- see
+``spot_band.py`` for ``SPOT_EXIT_FLOOR_USDT``/``SPOT_EXIT_STREAK`` and the
+reasons a monitored pair can leave. This constant, and the function below,
+are the admission rule only, and D12 does not change a word of it."""
 
 
 def tradable_symbols(
@@ -140,8 +146,32 @@ async def refresh_spot_universe(
         # under this release.
         await upsert_markets(session, exchange_id, markets, asset_ids, tickers, write_metadata=True)
         await mark_delisted(session, exchange_id, MarketType.SPOT, {m.symbol for m in markets})
+        # D12: the band applies only to a pair that is *already* monitored --
+        # so its old set has to be known before ``monitor_by_floor`` decides
+        # the new one, not just returned by it as a side effect.
+        currently_monitored = set(
+            await session.scalars(
+                select(Market.symbol).where(
+                    Market.exchange_id == exchange_id,
+                    Market.market_type == MarketType.SPOT,
+                    Market.is_monitored.is_(True),
+                )
+            )
+        )
+        survivors, removed_reasons = await apply_permanence_band(
+            redis,
+            adapter.code,
+            currently_monitored,
+            markets,
+            tickers,
+            settings.market_universe_blocklist,
+        )
+        # Admission is untouched (D12): a symbol not already monitored enters
+        # only through ``tradable_symbols``'s full 50M floor, never through
+        # surviving a band it was never subject to.
+        final_monitored = survivors | (eligible - currently_monitored)
         old_monitored, new_monitored = await monitor_by_floor(
-            session, exchange_id, MarketType.SPOT, eligible
+            session, exchange_id, MarketType.SPOT, final_monitored
         )
         if old_monitored != new_monitored:
             payload = await enqueue_universe_changed(
@@ -152,6 +182,7 @@ async def refresh_spot_universe(
                 at=refreshed_at,
                 producer=producer,
                 market_type=MarketType.SPOT,
+                removed_reasons=removed_reasons or None,
             )
 
     for symbol in sorted(new_monitored):

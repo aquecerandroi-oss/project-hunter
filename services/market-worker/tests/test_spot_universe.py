@@ -148,6 +148,24 @@ def _spot_adapter(code: str, volumes: dict[str, str]) -> FakeAdapter:
     return adapter
 
 
+def _one_pair_adapter(
+    code: str,
+    symbol: str,
+    volume: str | None,
+    *,
+    status: MarketStatus = MarketStatus.ACTIVE,
+    quote: str = "USDT",
+) -> FakeAdapter:
+    """One refresh's worth of reading for a single already-listed pair -- a
+    fresh adapter every call, exactly like a market-worker process that
+    restarted would build one from scratch."""
+    adapter = FakeAdapter(code=code)
+    adapter.markets.append(_spot_market(symbol, exchange=code, status=status, quote=quote))
+    if volume is not None:
+        adapter.tickers[symbol] = _spot_ticker(symbol, volume, exchange=code)
+    return adapter
+
+
 async def _markets(session_factory: Any, code: str) -> dict[tuple[str, MarketType], Market]:
     async with role_session(session_factory, db_role="hunter_worker") as session:
         rows = (
@@ -295,3 +313,223 @@ async def test_hot_state_ticker_from_the_spot_refresh_lands_on_the_spot_key(
 
     assert await redis_client.hget(f"mkt:{code}:spot:BIGUSDT:ticker", "last") == b"100"
     assert await redis_client.exists(f"mkt:{code}:BIGUSDT:ticker") == 0
+
+
+# --------------------------------------------------------------------------
+# D12 — the exit-only hysteresis band, against Postgres + Redis
+# --------------------------------------------------------------------------
+
+
+async def _is_monitored(session_factory: Any, code: str, symbol: str) -> bool:
+    rows = await _markets(session_factory, code)
+    return rows[(symbol, MarketType.SPOT)].is_monitored
+
+
+@pytest.mark.integration
+async def test_a_pair_oscillating_around_the_admission_floor_never_leaves(
+    db_session_factory: Any, redis_client: Any
+) -> None:
+    """``PROMUSDT`` (notes-T3.0c.md §8, t30-proof.md §2): 49M/51M straddles
+    the 50M admission floor but never touches the 40M exit floor, so it must
+    never generate a removal."""
+    code, symbol = unique_code(), "PROMUSDT"
+    settings = Settings()
+    for volume in ("51000000", "49000000", "51000000", "49000000"):
+        adapter = _one_pair_adapter(code, symbol, volume)
+        await spot_universe.refresh_spot_universe(
+            db_session_factory, adapter, redis_client, settings, producer=PRODUCER
+        )
+        assert await _is_monitored(db_session_factory, code, symbol)
+
+
+@pytest.mark.integration
+async def test_a_pair_between_the_exit_floor_and_the_admission_floor_never_enters(
+    db_session_factory: Any, redis_client: Any
+) -> None:
+    """D12: the band is exit-only. 45M clears the 40M exit floor by a wide
+    margin but never clears the 50M admission floor, and admission does not
+    relax for a pair that has never been monitored."""
+    code, symbol = unique_code(), "MIDUSDT"
+    settings = Settings()
+    for _ in range(3):
+        adapter = _one_pair_adapter(code, symbol, "45000000")
+        monitored = await spot_universe.refresh_spot_universe(
+            db_session_factory, adapter, redis_client, settings, producer=PRODUCER
+        )
+        assert monitored == []
+
+
+@pytest.mark.integration
+async def test_three_consecutive_readings_below_the_exit_floor_remove_the_pair(
+    db_session_factory: Any, redis_client: Any
+) -> None:
+    code, symbol = unique_code(), "THINUSDT"
+    settings = Settings()
+    admit = _one_pair_adapter(code, symbol, str(spot_universe.SPOT_VOLUME_FLOOR_USDT * 2))
+    await spot_universe.refresh_spot_universe(
+        db_session_factory, admit, redis_client, settings, producer=PRODUCER
+    )
+    assert await _is_monitored(db_session_factory, code, symbol)
+
+    below = _one_pair_adapter(code, symbol, "30000000")
+    for _ in range(2):
+        await spot_universe.refresh_spot_universe(
+            db_session_factory, below, redis_client, settings, producer=PRODUCER
+        )
+        assert await _is_monitored(db_session_factory, code, symbol)
+
+    monitored = await spot_universe.refresh_spot_universe(
+        db_session_factory, below, redis_client, settings, producer=PRODUCER
+    )
+    assert symbol not in monitored
+    assert not await _is_monitored(db_session_factory, code, symbol)
+
+
+@pytest.mark.integration
+async def test_two_below_readings_then_one_above_resets_the_streak(
+    db_session_factory: Any, redis_client: Any
+) -> None:
+    code, symbol = unique_code(), "RESETUSDT"
+    settings = Settings()
+    admit = _one_pair_adapter(code, symbol, str(spot_universe.SPOT_VOLUME_FLOOR_USDT * 2))
+    await spot_universe.refresh_spot_universe(
+        db_session_factory, admit, redis_client, settings, producer=PRODUCER
+    )
+
+    below = _one_pair_adapter(code, symbol, "30000000")
+    for _ in range(2):
+        await spot_universe.refresh_spot_universe(
+            db_session_factory, below, redis_client, settings, producer=PRODUCER
+        )
+
+    above = _one_pair_adapter(code, symbol, str(spot_universe.SPOT_VOLUME_FLOOR_USDT * 2))
+    await spot_universe.refresh_spot_universe(
+        db_session_factory, above, redis_client, settings, producer=PRODUCER
+    )
+    assert await _is_monitored(db_session_factory, code, symbol)
+
+    # Two more "below" readings: if the streak had not truly reset to zero,
+    # this second one would be the third *consecutive* one and remove the
+    # pair. It must not -- the reset actually happened.
+    for _ in range(2):
+        await spot_universe.refresh_spot_universe(
+            db_session_factory, below, redis_client, settings, producer=PRODUCER
+        )
+        assert await _is_monitored(db_session_factory, code, symbol)
+
+
+@pytest.mark.integration
+async def test_a_restart_between_the_second_and_third_reading_keeps_the_streak(
+    db_session_factory: Any, redis_client: Any
+) -> None:
+    """The durable counter lives in Redis, never in a Python object shared
+    across calls -- every adapter and every call below is independent,
+    exactly as if the shard 0 process had been restarted between refreshes."""
+    code, symbol = unique_code(), "SURVIVEUSDT"
+    settings = Settings()
+    await spot_universe.refresh_spot_universe(
+        db_session_factory,
+        _one_pair_adapter(code, symbol, str(spot_universe.SPOT_VOLUME_FLOOR_USDT * 2)),
+        redis_client,
+        settings,
+        producer=PRODUCER,
+    )
+
+    await spot_universe.refresh_spot_universe(
+        db_session_factory,
+        _one_pair_adapter(code, symbol, "30000000"),
+        redis_client,
+        settings,
+        producer=PRODUCER,
+    )
+    assert await redis_client.hget(f"mkt:{code}:spot:band_state", symbol) == b"1"
+
+    # "Restart": nothing Python-side survives from the calls above except the
+    # Redis client, which in production is a separate, already-running
+    # process the market-worker container never restarts alongside itself.
+    await spot_universe.refresh_spot_universe(
+        db_session_factory,
+        _one_pair_adapter(code, symbol, "30000000"),
+        redis_client,
+        settings,
+        producer=PRODUCER,
+    )
+    assert await redis_client.hget(f"mkt:{code}:spot:band_state", symbol) == b"2"
+    assert await _is_monitored(db_session_factory, code, symbol)
+
+    monitored = await spot_universe.refresh_spot_universe(
+        db_session_factory,
+        _one_pair_adapter(code, symbol, "30000000"),
+        redis_client,
+        settings,
+        producer=PRODUCER,
+    )
+    assert symbol not in monitored
+    assert await redis_client.hget(f"mkt:{code}:spot:band_state", symbol) is None
+
+
+@pytest.mark.integration
+async def test_losing_trading_status_removes_immediately_with_no_band(
+    db_session_factory: Any, redis_client: Any
+) -> None:
+    """D12: the three hard-exit conditions skip the band entirely -- one
+    reading is enough, never three."""
+    code, symbol = unique_code(), "HALTUSDT"
+    settings = Settings()
+    await spot_universe.refresh_spot_universe(
+        db_session_factory,
+        _one_pair_adapter(code, symbol, str(spot_universe.SPOT_VOLUME_FLOOR_USDT * 2)),
+        redis_client,
+        settings,
+        producer=PRODUCER,
+    )
+    assert await _is_monitored(db_session_factory, code, symbol)
+
+    suspended = _one_pair_adapter(
+        code,
+        symbol,
+        str(spot_universe.SPOT_VOLUME_FLOOR_USDT * 2),
+        status=MarketStatus.SUSPENDED,
+    )
+    monitored = await spot_universe.refresh_spot_universe(
+        db_session_factory, suspended, redis_client, settings, producer=PRODUCER
+    )
+    assert symbol not in monitored
+    assert not await _is_monitored(db_session_factory, code, symbol)
+
+
+@pytest.mark.integration
+async def test_the_universe_event_carries_the_removal_reason(
+    db_session_factory: Any, redis_client: Any
+) -> None:
+    """D12: ``market.universe.changed`` names *why* a pair left."""
+    code, symbol = unique_code(), "REASONUSDT"
+    settings = Settings()
+    await spot_universe.refresh_spot_universe(
+        db_session_factory,
+        _one_pair_adapter(code, symbol, str(spot_universe.SPOT_VOLUME_FLOOR_USDT * 2)),
+        redis_client,
+        settings,
+        producer=PRODUCER,
+    )
+
+    below = _one_pair_adapter(code, symbol, "30000000")
+    for _ in range(3):
+        await spot_universe.refresh_spot_universe(
+            db_session_factory, below, redis_client, settings, producer=PRODUCER
+        )
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        rows = (
+            await session.scalars(
+                select(OutboxEvent).where(OutboxEvent.stream == Streams.MARKET_UNIVERSE_CHANGED)
+            )
+        ).all()
+    payloads = [
+        EventEnvelope.model_validate(row.payload).payload
+        for row in rows
+        if EventEnvelope.model_validate(row.payload).key.startswith(code)
+    ]
+    removal_payloads = [p for p in payloads if symbol in p.get("removed", [])]
+    assert len(removal_payloads) == 1
+    assert removal_payloads[0]["removed_reasons"] == {symbol: "below_band_3x"}

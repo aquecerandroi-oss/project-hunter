@@ -187,6 +187,40 @@ async def test_a_request_becomes_gaps_the_recovery_fills_and_the_outbox_announce
     assert (await gaps_of(db_session_factory, market_id))[0].status == "recovered"
 
 
+async def test_the_planned_log_line_names_the_product(
+    db_session_factory: Any, redis_client: Any
+) -> None:
+    """T3.0e/ressalva 3 (notes-T3.0c.md §3): named literally, not read off the
+    request -- this consumer only ever plans PERPETUAL history today."""
+    from structlog.testing import capture_logs
+
+    exchange_code = unique_code()
+    market_id = await seed_market(db_session_factory, exchange_code, "BTCUSDT")
+    now = align_open_time(utcnow(), Timeframe.M1)
+    window_end = now - MINUTE
+    window_start = window_end - 5 * MINUTE
+    await ensure_candle_partition(db_session_factory, window_start)
+    await publish_request(
+        redis_client,
+        request_payload(
+            market_id=market_id,
+            exchange=exchange_code,
+            symbol="BTCUSDT",
+            gap_start=window_start,
+            gap_end=window_end,
+        ),
+    )
+    consumer = build_consumer(
+        db_session_factory, redis_client, FakeAdapter(code=exchange_code), ["BTCUSDT"]
+    )
+
+    with capture_logs() as logs:
+        await consumer.run_once()
+
+    planned = [line for line in logs if line["event"] == "market_backfill_planned"]
+    assert planned and planned[0]["market_type"] == "perpetual"
+
+
 async def test_asking_again_for_a_filled_window_costs_no_rest_call(
     db_session_factory: Any, redis_client: Any
 ) -> None:

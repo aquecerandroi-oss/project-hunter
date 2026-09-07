@@ -307,6 +307,7 @@ async def enqueue_universe_changed(
     at: datetime,
     producer: str = PRODUCER,
     market_type: MarketType = MarketType.PERPETUAL,
+    removed_reasons: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Queue ``market.universe.changed`` and return the payload it carries.
 
@@ -318,6 +319,9 @@ async def enqueue_universe_changed(
     The payload reports the **eligible** set. The Shadow Lab's tracking hold
     widens what the worker *collects* without widening what is eligible
     (SHADOW-LAB.md §8), and it is applied later, outside this transaction.
+
+    ``removed_reasons`` (T3.0e/D12): why each removed symbol left (e.g.
+    ``below_band_3x``), additive/optional -- only spot sets it.
     """
     payload: dict[str, Any] = {
         "added": sorted(new_monitored - old_monitored),
@@ -328,6 +332,8 @@ async def enqueue_universe_changed(
         # behaviour it already had for a payload that never named a product.
         "market_type": market_type.value,
     }
+    if removed_reasons:
+        payload["removed_reasons"] = dict(sorted(removed_reasons.items()))  # T3.0e/D12
     await enqueue_many(
         session,
         [
