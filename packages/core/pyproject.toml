@@ -7,6 +7,16 @@ name = "hunter-core"
 version = "0.0.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  # The ledger (hunter_core.portfolio) *builds* the risk engine's own
+  # ``PortfolioState``/``OpenPosition``/``PendingEntry`` instead of redefining
+  # them (T3.3), so the distribution dependency points both ways: the pure
+  # engine depends on the domain types here, and the ledger depends on the value
+  # objects there. A distribution cycle is not a module-initialisation cycle -
+  # ``hunter_risk`` only imports ``hunter_core.domain``/``strategies``, which
+  # import nothing from ``hunter_core.portfolio``. Declared rather than hidden:
+  # an undeclared import is a dependency no image build can catch (Astra, T3.3
+  # policy review, answer 4).
+  "hunter-risk",
   "pydantic>=2.9",
   "pydantic-settings>=2.6",
   "sqlalchemy[asyncio]>=2.0.36",

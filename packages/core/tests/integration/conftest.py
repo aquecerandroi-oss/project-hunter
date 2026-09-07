@@ -11,9 +11,13 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import itertools
 import os
 import sys
-from collections.abc import AsyncIterator, Iterator
+import uuid
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from datetime import datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING
@@ -106,3 +110,155 @@ async def schema_engine(migrated_schema_db: str) -> AsyncIterator[AsyncEngine]:
         yield engine
     finally:
         await engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def paper_ledger_db(container_url: str) -> Iterator[str]:
+    """A database of its own with every migration applied, for the T3.3 ledger.
+
+    Separate from ``migrated_schema_db`` because the ledger tests *write* the
+    paper wallet's tables, and a wallet is unique per ``(organization,
+    workspace)`` for ever: sharing a database with the schema tests would let
+    one module's opening decide another module's ``WalletAlreadyOpen``.
+    """
+    url = asyncio.run(create_database(container_url, "hunter_paper_ledger"))
+    command.upgrade(alembic_config(url), "head")
+    yield url
+
+
+@pytest_asyncio.fixture
+async def ledger_engine(paper_ledger_db: str) -> AsyncIterator[AsyncEngine]:
+    """An engine on the ledger database, connected as the container owner."""
+    engine = async_engine(paper_ledger_db)
+    try:
+        yield engine
+    finally:
+        await engine.dispose()
+
+
+class LedgerTenant:
+    """One organization, workspace, exchange and SPOT market, freshly created.
+
+    Built as the container owner (which RLS does not constrain) so that the code
+    under test is the only thing that ever runs as ``hunter_app`` — every tenant
+    read and write in the ledger tests then goes through the real policies.
+    """
+
+    def __init__(self, slug: str) -> None:
+        from hunter_core.domain.types import uuid7
+
+        self.slug = slug
+        self.org_id = uuid7()
+        self.workspace_id = uuid7()
+        self.exchange_id = uuid7()
+        self.market_id = uuid7()
+        self.base_asset_id = uuid7()
+        self.quote_asset_id = uuid7()
+        self.symbol = f"HTR{slug[:6].upper()}USDT"
+        self.base_symbol = f"HTR{slug[:6].upper()}"
+
+
+@pytest_asyncio.fixture
+async def ledger_tenant(ledger_engine: AsyncEngine) -> LedgerTenant:
+    """A tenant with a market to trade, unique per test.
+
+    ``USDT`` is created once and shared: ``assets.symbol`` is globally unique,
+    and the operating currency of every wallet is the same asset.
+    """
+    import uuid as _uuid
+
+    tenant = LedgerTenant(_uuid.uuid4().hex[:8])
+    params = {
+        "org": tenant.org_id,
+        "ws": tenant.workspace_id,
+        "ex": tenant.exchange_id,
+        "market": tenant.market_id,
+        "base": tenant.base_asset_id,
+        "quote": tenant.quote_asset_id,
+        "slug": tenant.slug,
+        "symbol": tenant.symbol,
+        "base_symbol": tenant.base_symbol,
+    }
+    async with ledger_engine.begin() as connection:
+        await connection.execute(
+            text("INSERT INTO organizations (id, slug, name) VALUES (:org, :slug, :slug)"), params
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO workspaces (id, organization_id, name, objective) "
+                "VALUES (:ws, :org, :slug, 'paper_trading')"
+            ),
+            params,
+        )
+        await connection.execute(
+            text("INSERT INTO exchanges (id, code, name) VALUES (:ex, :slug, 'Ledger probe')"),
+            params,
+        )
+        await connection.execute(
+            text("INSERT INTO assets (id, symbol) VALUES (:base, :base_symbol)"), params
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO assets (id, symbol) VALUES (:quote, 'USDT') "
+                "ON CONFLICT (symbol) DO NOTHING"
+            ),
+            params,
+        )
+        quote_id = await connection.scalar(text("SELECT id FROM assets WHERE symbol = 'USDT'"))
+        tenant.quote_asset_id = quote_id
+        params["quote"] = quote_id
+        await connection.execute(
+            text(
+                "INSERT INTO markets (id, exchange_id, symbol, market_type, base_asset_id, "
+                "quote_asset_id) VALUES (:market, :ex, :symbol, 'spot', :base, :quote)"
+            ),
+            params,
+        )
+    return tenant
+
+
+_FX_JITTER = itertools.count(1)
+"""``uq_fx_observations_observation`` is ``(pair, source, observed_at)`` and the
+table is immutable by trigger, so two ledger tests asking for "a rate at noon"
+would collide — and they do collide when the two modules run in one process.
+One counter for the whole session, a few microseconds *backwards* each time, so
+no observation ever lands ahead of the instant that consumes it and no age
+crosses a policy limit."""
+
+
+@pytest.fixture
+def observe_fx(
+    ledger_engine: AsyncEngine,
+) -> Callable[..., Awaitable[uuid.UUID]]:
+    """Persist one ``fx_observations`` row, as the collector of T3.11 would."""
+    from hunter_core.domain.types import uuid7
+    from hunter_core.portfolio.opening import PAPER_FX_POLICY
+
+    async def _observe(
+        *,
+        rate: Decimal = Decimal("5.4321"),
+        pair: str = PAPER_FX_POLICY.pair,
+        source: str = PAPER_FX_POLICY.source,
+        observed_at: datetime,
+        available_at: datetime | None = None,
+    ) -> uuid.UUID:
+        observation_id = uuid7()
+        offset = timedelta(microseconds=next(_FX_JITTER))
+        async with ledger_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO fx_observations (id, pair, rate, source, observed_at, "
+                    "available_at) VALUES (:id, :pair, :rate, :source, :observed, :available)"
+                ),
+                {
+                    "id": observation_id,
+                    "pair": pair,
+                    "rate": rate,
+                    "source": source,
+                    "observed": observed_at - offset,
+                    "available": (available_at or observed_at) - offset,
+                },
+            )
+        return observation_id
+
+    return _observe
