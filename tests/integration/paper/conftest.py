@@ -25,6 +25,25 @@ Four rules this module holds itself to, from §12 of that spec:
   makes ``portfolio_equity_snapshots`` read-only to ``hunter_app`` and takes
   ``UPDATE`` on ``trade_proposals`` away from it. Every fixture here writes
   risk state, curve and admission as :data:`ENGINE_ROLE`.
+
+**T3.9b extension (§0 unchanged, nothing above this note redeclared).** V4-V9
+and §10 need the real ``execution-worker`` cycles (``execute_approved_entries``,
+``run_protection_cycle``, ``cancel_pending_entries``, ``expire_stale_reservations``)
+against this same wallet, not the hand-written ``buy_filled``. Two additions make
+that possible without touching a number above:
+
+- ``_reference_data`` now also writes ``tick_size``/``step_size``/``min_notional``
+  and ``metadata.spot_market_filters`` on each ``markets`` row (previously only
+  the identity), because ``hunter_execution_worker.reference.load_market`` reads
+  filters from the row, not from ``Market.spec`` (the Risk Engine's own view,
+  built straight from the fixture). Every recorded symbol carries
+  ``avgPriceMins = 5`` (measured, ``.claude/state/notes-T3.0a.md`` §5), so every
+  entry attempt below supplies ``avg_price`` explicitly — the collector that
+  would supply it for real (T3.0b) does not exist yet (``notes-T3.5.md`` §5.2);
+- the book/trade builders, the ``WalletRef`` bridge and the cycle runners at the
+  end of this module. Nothing here is a double that fills: ``StaticSpotMarketData``
+  is the same labelled test double the execution-worker's own suites use, and
+  the real ``PaperExecutionAdapter`` inside each cycle decides what it fills.
 """
 
 from __future__ import annotations
@@ -57,8 +76,17 @@ from hunter_core.admission.service import AdmissionResult, admit
 from hunter_core.admission.sources import ProposalRequest
 from hunter_core.db.repositories.fx import FxObservationRepository
 from hunter_core.db.session import create_session_factory, tenant_session
-from hunter_core.domain.enums import KillSwitchState, MarketType, TradeDirection
+from hunter_core.domain.enums import (
+    ExitReason,
+    KillSwitchState,
+    MarketType,
+    OrderSide,
+    TradeDirection,
+)
+from hunter_core.domain.market import BookLevel as DomBookLevel
+from hunter_core.domain.market import NormalizedOrderBook, NormalizedTrade
 from hunter_core.domain.types import uuid7
+from hunter_core.execution.intents import ExitIntent
 from hunter_core.portfolio.fx_policy import FxPolicy
 from hunter_core.portfolio.ledger import record_equity_point
 from hunter_core.portfolio.opening import open_paper_wallet
@@ -66,6 +94,18 @@ from hunter_core.portfolio.state import PortfolioStateBuild, build_portfolio_sta
 from hunter_core.risk.kill_switch import KillSwitchEvaluation, evaluate_and_persist
 from hunter_core.strategies.envelope import AssumedCosts
 from hunter_exchanges.binance_spot.filters import parse_filters
+from hunter_execution_worker.entry import execute_approved_entries
+from hunter_execution_worker.guard import cancel_pending_entries, expire_stale_reservations
+from hunter_execution_worker.intents_repo import insert_intent
+from hunter_execution_worker.market_data import SpotSnapshot, StaticSpotMarketData
+from hunter_execution_worker.positions import open_position
+from hunter_execution_worker.protection import (
+    DegradedRetries,
+    TriggerWatermarks,
+    run_protection_cycle,
+)
+from hunter_execution_worker.reference import MarketReference
+from hunter_execution_worker.wallet import WalletRef
 from hunter_risk.inputs import BetaEstimate, BookLevel, MarketIdentity, MarketLiquidity, MarketSpec
 
 if TYPE_CHECKING:
@@ -212,6 +252,11 @@ class Market:
         self.symbol = symbol
         self.base = base
         self.id = market_id
+        self.filters = filters
+        """The parsed real filters — what T3.9b's execution-level tests judge a
+        simulated fill by, read from the same ``markets`` row the worker reads
+        (``_reference_data`` now writes ``tick_size``/``step_size``/``min_notional``
+        and ``metadata.spot_market_filters`` for it, not only the identity)."""
         self.identity = MarketIdentity(
             exchange="binance",
             symbol=symbol,
@@ -279,10 +324,13 @@ async def _reference_data(engine: AsyncEngine) -> dict[str, uuid.UUID]:
             base_id = await connection.scalar(
                 text("SELECT id FROM assets WHERE symbol = :symbol"), {"symbol": base}
             )
+            filters = recorded_filters(symbol)
             await connection.execute(
                 text(
                     "INSERT INTO markets (id, exchange_id, symbol, market_type, base_asset_id, "
-                    "quote_asset_id) VALUES (:id, :ex, :symbol, 'spot', :base, :quote) "
+                    "quote_asset_id, tick_size, step_size, min_notional, is_monitored, metadata) "
+                    "VALUES (:id, :ex, :symbol, 'spot', :base, :quote, :tick, :step, "
+                    ":min_notional, true, CAST(:meta AS jsonb)) "
                     "ON CONFLICT (exchange_id, symbol, market_type) DO NOTHING"
                 ),
                 {
@@ -291,6 +339,10 @@ async def _reference_data(engine: AsyncEngine) -> dict[str, uuid.UUID]:
                     "symbol": symbol,
                     "base": base_id,
                     "quote": quote_id,
+                    "tick": filters.tick_size,
+                    "step": filters.step_size,
+                    "min_notional": filters.min_notional,
+                    "meta": json.dumps({"spot_market_filters": filters.to_metadata()}),
                 },
             )
             market_id = await connection.scalar(
@@ -340,6 +392,20 @@ async def observe_fx(
 @pytest_asyncio.fixture
 async def wallet(engine: AsyncEngine, factory: async_sessionmaker[AsyncSession]) -> Wallet:
     """§0, opened for real: R$100.000 at 5,00 credit 20.000 USDT, as the engine."""
+    return await open_fresh_wallet(engine, factory)
+
+
+async def open_fresh_wallet(
+    engine: AsyncEngine, factory: async_sessionmaker[AsyncSession]
+) -> Wallet:
+    """The ``wallet`` fixture's own body, callable directly.
+
+    T3.9b's Hypothesis property test (V5 step 4) needs a **fresh** wallet per
+    generated example, and a pytest fixture is resolved once per test item —
+    including once for a whole ``@given`` run, since Hypothesis re-invokes the
+    same function body rather than asking pytest for a new one. This is the
+    one place that body lives; the fixture above is now a one-line caller.
+    """
     market_ids = await _reference_data(engine)
     built = Wallet(uuid7(), uuid7(), uuid7())
     async with engine.begin() as connection:
@@ -747,3 +813,315 @@ def check_of(decision: Mapping[str, Any], name: str) -> Mapping[str, Any]:
         if entry["name"] == name:
             return entry
     raise LookupError(f"no check named {name}")
+
+
+# --------------------------------------------------------------------------
+# T3.9b — the execution-worker cycles against this same §0 wallet
+# --------------------------------------------------------------------------
+
+
+def wallet_ref(wallet: Wallet) -> WalletRef:
+    """The worker's own identity for this wallet — both halves, never one."""
+    return WalletRef(wallet.org_id, wallet.portfolio_id)
+
+
+def market_reference(market: Market) -> MarketReference:
+    """The worker's view of a §0 market: real filters, ``SPOT_VIP0`` fees.
+
+    Built from the same :class:`Market` the Risk Engine's ``MarketSpec`` comes
+    from, so a test that opens a position "directly" (bypassing the entry
+    cycle, to fix a round quantity like V4's ten units) still books it against
+    the identical filters ``load_market`` would read back from the row.
+    """
+    return MarketReference(market_id=market.id, identity=market.identity, filters=market.filters)
+
+
+def spot_book(
+    market: Market,
+    *,
+    received_at: datetime,
+    bid: Decimal = Decimal(100),
+    ask: Decimal = Decimal(100),
+    qty: Decimal = BOOK_DEPTH,
+    sequence: int | None = None,
+) -> NormalizedOrderBook:
+    """One flat, deep SPOT snapshot for ``market`` — a single level keeps the
+    walk's VWAP exact, matching every closed number of the spec."""
+    return NormalizedOrderBook(
+        exchange=market.identity.exchange,
+        symbol=market.symbol,
+        market_type=MarketType.SPOT,
+        ts=received_at,
+        received_at=received_at,
+        bids=[DomBookLevel(price=bid, qty=qty)],
+        asks=[DomBookLevel(price=ask, qty=qty)],
+        sequence=sequence,
+        is_snapshot=True,
+    )
+
+
+def spot_trade(
+    market: Market,
+    *,
+    price: Decimal,
+    ts: datetime,
+    trade_id: int,
+    received_at: datetime | None = None,
+    qty: Decimal = Decimal(1),
+    side: OrderSide = OrderSide.BUY,
+) -> NormalizedTrade:
+    return NormalizedTrade(
+        exchange=market.identity.exchange,
+        symbol=market.symbol,
+        market_type=MarketType.SPOT,
+        ts=ts,
+        received_at=received_at or ts,
+        trade_id=str(trade_id),
+        price=price,
+        qty=qty,
+        side=side,
+    )
+
+
+def static_data(market: Market, snapshot: SpotSnapshot) -> StaticSpotMarketData:
+    """The labelled double (CLAUDE.md): the snapshot handed to it, nothing else.
+
+    The real ``PaperExecutionAdapter`` inside every cycle below decides what it
+    fills — this only stands in for the SPOT collector that does not exist yet
+    (``notes-T3.5.md`` §5.3).
+    """
+    return StaticSpotMarketData({(market.identity.exchange, market.symbol): snapshot})
+
+
+async def run_entries(
+    factory: async_sessionmaker[AsyncSession],
+    wallet: Wallet,
+    data: StaticSpotMarketData,
+    *,
+    now: datetime,
+) -> tuple[Any, ...]:
+    """One ``execute_approved_entries`` cycle, as the engine, in its own transaction."""
+    async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
+        return await execute_approved_entries(
+            session, wallet=wallet_ref(wallet), data=data, now=now
+        )
+
+
+async def run_protection(
+    factory: async_sessionmaker[AsyncSession],
+    wallet: Wallet,
+    data: StaticSpotMarketData,
+    *,
+    now: datetime,
+    watermarks: TriggerWatermarks | None = None,
+    retries: DegradedRetries | None = None,
+    clock: Any = None,
+) -> tuple[Any, ...]:
+    """One ``run_protection_cycle``, as the engine, in its own transaction.
+
+    A fresh ``watermarks``/``retries`` on every call **is** the restart of V6
+    step 5 and §10: both are declared in-memory-only by ``triggering.py``, so a
+    test that never passes the previous call's objects back is exercising
+    exactly the recovery path a real process restart would take.
+    """
+    async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
+        return await run_protection_cycle(
+            session,
+            wallet=wallet_ref(wallet),
+            data=data,
+            now=now,
+            watermarks=watermarks,
+            retries=retries,
+            clock=clock,
+        )
+
+
+async def run_cancel_pending(
+    factory: async_sessionmaker[AsyncSession], wallet: Wallet, *, now: datetime
+) -> tuple[uuid.UUID, ...]:
+    async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
+        return await cancel_pending_entries(session, wallet=wallet_ref(wallet), now=now)
+
+
+async def run_expire_reservations(
+    factory: async_sessionmaker[AsyncSession], wallet: Wallet, *, now: datetime
+) -> tuple[uuid.UUID, ...]:
+    async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
+        return await expire_stale_reservations(session, wallet=wallet_ref(wallet), now=now)
+
+
+async def open_position_directly(
+    factory: async_sessionmaker[AsyncSession],
+    wallet: Wallet,
+    market: Market,
+    *,
+    qty: Decimal,
+    entry_price: Decimal,
+    stop_price: Decimal | None,
+    now: datetime,
+) -> uuid.UUID:
+    """Open a position with the real writer, at a round quantity a fee would never leave.
+
+    Used only where the scenario is about **protection** (V4's stop-vs-target
+    dispute, V8's gap, V9's missing book) and a fill's own arithmetic
+    (18,518 @ 100,01 → 18,499482 net) would just be noise around the number the
+    test actually cares about. The writer is ``hunter_execution_worker.positions
+    .open_position`` itself, not a stub — nothing here fabricates a fill or a
+    balance the ledger does not also see (``build_portfolio_state`` reads this
+    row exactly as it would read one a real entry cycle produced).
+    """
+    async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
+        return await open_position(
+            session,
+            wallet=wallet_ref(wallet),
+            market=market_reference(market),
+            qty=qty,
+            entry_price=entry_price,
+            stop_price=stop_price,
+            fees_quote=Decimal(0),
+            now=now,
+            proposal_id=None,
+        )
+
+
+async def insert_intent_directly(
+    factory: async_sessionmaker[AsyncSession],
+    wallet: Wallet,
+    market: Market,
+    *,
+    position_id: uuid.UUID,
+    protection_key: str,
+    intended_qty: Decimal,
+    trigger_price: Decimal | None,
+    now: datetime,
+    reason: ExitReason = ExitReason.STOP,
+) -> ExitIntent:
+    async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
+        return await insert_intent(
+            session,
+            wallet=wallet_ref(wallet),
+            market=market_reference(market),
+            position_id=position_id,
+            protection_key=protection_key,
+            reason=reason,
+            intended_qty=intended_qty,
+            trigger_price=trigger_price,
+            now=now,
+        )
+
+
+async def read_positions(engine: AsyncEngine, wallet: Wallet) -> list[Any]:
+    async with engine.begin() as connection:
+        return list(
+            (
+                await connection.execute(
+                    text(
+                        "SELECT id, market_id, qty, avg_entry_price, mark_price, realized_pnl, "
+                        "fees_paid, status::text AS status, stop_price FROM positions "
+                        "WHERE portfolio_id = :pf ORDER BY opened_at"
+                    ),
+                    {"pf": wallet.portfolio_id},
+                )
+            ).all()
+        )
+
+
+async def read_orders(engine: AsyncEngine, wallet: Wallet) -> list[Any]:
+    async with engine.begin() as connection:
+        return list(
+            (
+                await connection.execute(
+                    text(
+                        "SELECT client_order_id, side::text AS side, purpose::text AS purpose, "
+                        "status::text AS status, qty, filled_qty, avg_fill_price, reason "
+                        "FROM orders WHERE portfolio_id = :pf ORDER BY created_at"
+                    ),
+                    {"pf": wallet.portfolio_id},
+                )
+            ).all()
+        )
+
+
+async def read_fills(engine: AsyncEngine, wallet: Wallet) -> list[Any]:
+    async with engine.begin() as connection:
+        return list(
+            (
+                await connection.execute(
+                    text(
+                        "SELECT f.execution_key, f.qty, f.price, f.fee, f.fee_asset, "
+                        "f.slippage_bps, o.side::text AS side FROM fills f "
+                        "JOIN orders o ON o.id = f.order_id WHERE f.portfolio_id = :pf "
+                        "ORDER BY f.ts"
+                    ),
+                    {"pf": wallet.portfolio_id},
+                )
+            ).all()
+        )
+
+
+async def read_exit_intents(engine: AsyncEngine, wallet: Wallet) -> list[Any]:
+    async with engine.begin() as connection:
+        return list(
+            (
+                await connection.execute(
+                    text(
+                        "SELECT id, protection_key, state::text AS state, intended_qty, "
+                        "filled_qty, degraded_since, degraded_reason, closed_reason "
+                        "FROM portfolio_exit_intents WHERE portfolio_id = :pf "
+                        "ORDER BY created_at"
+                    ),
+                    {"pf": wallet.portfolio_id},
+                )
+            ).all()
+        )
+
+
+async def read_trades(engine: AsyncEngine, wallet: Wallet) -> list[Any]:
+    async with engine.begin() as connection:
+        return list(
+            (
+                await connection.execute(
+                    text(
+                        "SELECT entry_price, exit_price, qty, fees, pnl, pnl_pct, "
+                        "exit_reason::text AS exit_reason FROM trades "
+                        "WHERE portfolio_id = :pf ORDER BY closed_at"
+                    ),
+                    {"pf": wallet.portfolio_id},
+                )
+            ).all()
+        )
+
+
+async def sum_sold(engine: AsyncEngine, wallet: Wallet) -> Decimal:
+    """Every unit ever sold by this wallet, across every sell fill."""
+    async with engine.begin() as connection:
+        total = await connection.scalar(
+            text(
+                "SELECT coalesce(sum(f.qty), 0) FROM fills f JOIN orders o ON o.id = f.order_id "
+                "WHERE f.portfolio_id = :pf AND o.side = 'sell'"
+            ),
+            {"pf": wallet.portfolio_id},
+        )
+    return Decimal(total)
+
+
+async def count_rows(engine: AsyncEngine, wallet: Wallet, table: str) -> int:
+    """How many rows of ``table`` this wallet has. ``table`` is never input."""
+    allowed = (
+        "orders",
+        "fills",
+        "positions",
+        "trades",
+        "portfolio_exit_intents",
+        "participation_consumptions",
+    )
+    if table not in allowed:
+        raise ValueError(f"{table} is not one of {allowed}")
+    async with engine.begin() as connection:
+        return int(
+            await connection.scalar(
+                text(f"SELECT count(*) FROM {table} WHERE portfolio_id = :pf"),  # noqa: S608
+                {"pf": wallet.portfolio_id},
+            )
+            or 0
+        )

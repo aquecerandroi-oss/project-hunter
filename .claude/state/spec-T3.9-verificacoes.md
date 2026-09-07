@@ -722,3 +722,43 @@ para revisar o teste, não o código, se aparecer:
    autenticação (não apenas RBAC de papel) não foi localizado nesta leitura; V3/§11 não podem testar
    "retomada recusada para um ADMIN qualquer" enquanto essa identidade não estiver definida em
    T3.6/T3.8.
+
+---
+
+## §13b. T3.9b (2026-09-06/07) — V4 a V9 e §10 pelo caminho persistido, atualização
+
+Item 2 acima está **fechado**: `hunter_risk.limits.PAPER_V1` hoje carrega `max_price_age_s=10`,
+`max_book_age_s=10`, `max_volume_age_s=120` como campos reais e lidos (`checks.py`,
+`observations.py`), e `risk_profiles.limits` é gravado a partir do mesmo `RiskLimits.model_dump()`
+(nota do §9.3 v2.2 do `docs/RISK_ENGINE.md`) — uma fonte única. V6 pôde ser escrito.
+
+Divergências e limites novos, com o teste que os prova ou o motivo de não existir teste:
+
+1. **V7 item 5 — o rótulo do resíduo é `below_min_notional`, não `below_min_qty`.** A spec supôs que
+   um resíduo de 0,00001 BTC (o próprio piso de `LOT_SIZE`) seria barrado pela quantidade. O código
+   mede `effective_min_qty` primeiro e 0,00001 **não é menor** que 0,00001 (são iguais) — quem barra
+   é o piso de `NOTIONAL` (0,80 USDT < 5 USDT). A quantidade, o preço e "nunca quitado" da spec
+   continuam corretos; só o rótulo diverge. Provado por
+   `test_v7_exchange_minimums.py::TestAResidualBelowTheFloorIsAccountedAndVisibleNeverQuietlySettled`:
+   o comportamento real passa, a alegação literal da spec é `xfail(strict=True)`.
+2. **V6 itens 3 e 4 (queda de WS com gap, perda de Redis durante uma decisão) não são
+   entregáveis nesta tarefa.** Os dois dependem do coletor SPOT ligado ao hot state do
+   `market-worker` (T3.0b) e do `RedisSpotMarketData` real lendo-o; `notes-T3.5.md` §5.3 registra
+   essa ligação como inexistente em 2026-09-07, e todo teste desta suíte usa `StaticSpotMarketData`
+   (o duplo rotulado), que nunca toca Redis. Não há gap nem queda para simular honestamente sem
+   inventar um caminho que não existe — nenhum teste foi escrito para eles (nem `xfail`: não há
+   código a chamar). Registrado no docstring de `test_v6_stale_data_reconnect_restart.py`.
+3. **V4's "um stop de 10 unidades encontra 4 vendáveis" (RISK_ENGINE.md §10) não é o cenário
+   stop-vs-target da própria V4** — reler a citação no contrato mostra que ela descreve **book raso**
+   limitando um único stop (exatamente o que `test_restart_recovery.py` do T3.5 já prova, com
+   4/10 reais), não uma disputa entre duas proteções. A disputa que V4 pede (stop vs. target) é
+   provada à parte, e o achado é: com o stop cobrindo o `intended_qty` inteiro da posição,
+   `allocate_sellable` dá zero ao alvo **mesmo que o alvo nunca tenha dado o seu próprio gatilho** —
+   não é preciso as duas dispararem na mesma janela para o alvo acabar `voided`; qualquer fechamento
+   do stop já o faz. `test_v4_concurrent_orders_and_duplicate_fills.py` prova essa versão, mais forte
+   que a literal.
+4. **Os números de V8 usados aqui são os de `.claude/state/t35-proof.md` (entrada a 100,01), não os
+   da spec (entrada a 100,00).** A tarefa que dispachou esta nota pediu explicitamente os números
+   reais da prova de 30 minutos; o método (`slippage_vs_plan_bps` publicado, positivo, nunca
+   corrigido) é o mesmo da spec, só a fixture de preço de entrada muda. `SLIPPAGE_BPS =
+   256,41025641` bate nos dois casos porque a razão `(stop − preço)/stop` não depende da quantidade.
