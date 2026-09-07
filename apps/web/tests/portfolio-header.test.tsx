@@ -10,7 +10,7 @@ describe("PortfolioHeader: equity side-by-side in USDT and BRL, never a fabricat
   it("renders both the USDT and the BRL equity", () => {
     render(<PortfolioHeader summary={makeSummary()} />);
     expect(screen.getByText("18,650.50 USDT")).toBeInTheDocument();
-    expect(screen.getByText("R$100,725.19")).toBeInTheDocument();
+    expect(screen.getByText("R$ 100.725,19")).toBeInTheDocument();
   });
 
   it("shows 'não disponível' for BRL, not a $0 or an invented conversion, when brl is null", () => {

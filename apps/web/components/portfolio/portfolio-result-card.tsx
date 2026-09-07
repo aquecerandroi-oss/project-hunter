@@ -1,6 +1,7 @@
 import { PortfolioAsOf } from "@/components/portfolio/portfolio-as-of";
-import { brlUnavailableLabel, formatBrl, formatBrlSigned, signColorClass } from "@/components/portfolio/portfolio-format";
+import { brlUnavailableLabel, signColorClass } from "@/components/portfolio/portfolio-format";
 import type { PortfolioAnchor, PortfolioSummary } from "@/lib/api/portfolio-types";
+import { formatBrl, formatBrlSigned } from "@/lib/format";
 
 export interface PortfolioResultCardProps {
   summary: PortfolioSummary;

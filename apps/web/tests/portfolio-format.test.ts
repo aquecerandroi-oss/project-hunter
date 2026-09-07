@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   brlUnavailableLabel,
-  formatBrl,
-  formatBrlSigned,
   formatPctOrUnavailable,
   killSwitchBadgeVariant,
   killSwitchLabel,
@@ -33,20 +31,6 @@ describe("formatUsdtSigned", () => {
 
   it("does not sign an exact zero", () => {
     expect(formatUsdtSigned("0")).toBe("0.00 USDT");
-  });
-});
-
-describe("formatBrl / formatBrlSigned", () => {
-  it("renders the BRL currency symbol", () => {
-    expect(formatBrl("100000")).toBe("R$100,000.00");
-  });
-
-  it("signs a positive BRL result explicitly", () => {
-    expect(formatBrlSigned("725.185185")).toBe("+R$725.19");
-  });
-
-  it("does not double the sign for a negative BRL result", () => {
-    expect(formatBrlSigned("-725.185185")).toBe("-R$725.19");
   });
 });
 

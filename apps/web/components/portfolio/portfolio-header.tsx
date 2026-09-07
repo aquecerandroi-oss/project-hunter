@@ -1,8 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { PortfolioAsOf } from "@/components/portfolio/portfolio-as-of";
-import { formatBrl, unavailableLabel } from "@/components/portfolio/portfolio-format";
+import { unavailableLabel } from "@/components/portfolio/portfolio-format";
 import type { PortfolioSummary } from "@/lib/api/portfolio-types";
-import { formatUsdt } from "@/lib/format";
+import { formatBrl, formatUsdt } from "@/lib/format";
 
 export interface PortfolioHeaderProps {
   summary: PortfolioSummary;

@@ -116,6 +116,62 @@ export function formatMoney(value: string | number, opts: FormatMoneyOptions = {
 }
 
 /**
+ * Brazilian Real, styled per the "pt-BR" convention (T3.8b polish pass, first
+ * BRL-denominated screen in the product): the integer part is grouped every
+ * 3 digits with "." and the fraction is separated with "," -- the opposite
+ * of `formatMoney`'s "en-US" grouping. Reusing `formatMoney(value, {currency:
+ * "BRL", locale: "en-US"})` (the wallet's original approach) sidesteps a
+ * literal collision -- `Intl.NumberFormat("pt-BR")` groups thousands with
+ * "." too, so joining the grouped integer and the fraction with a literal
+ * "." (as `formatMoney` always does) would print an ambiguous
+ * "R$100.000.00" -- but it also means the number never actually reads as
+ * Brazilian. This is a sibling implementation instead, built the same
+ * decimal-safe way as `formatMoney` (parse into sign/integer/fraction parts,
+ * round with `BigInt` arithmetic via `roundDecimal`, group with
+ * `Intl.NumberFormat`'s `bigint` support via `groupInteger`) but joining the
+ * pieces with "," for the fraction, so it is `formatMoney` itself -- and
+ * every other USD/en-US caller in the product -- that stays untouched.
+ *
+ * Rounding is half-up on the third fraction digit, the same convention
+ * `roundDecimal` already applies for every other currency in the product
+ * (verified: `"99999.99999999983784"` rounds to `"100000.00"`, i.e. the
+ * carry propagates through every "9"). A second rounding rule for one
+ * currency would be its own kind of surprise, so this deliberately does not
+ * introduce half-even.
+ *
+ * Never routes the value through `Number()`: like `formatMoney`, a
+ * `Decimal` string beyond `2**53` keeps every digit, because the sign/int/
+ * frac split and the rounding both work on strings/`BigInt`, not floats.
+ *
+ * Negative amounts use the Unicode minus sign "−" (U+2212) *before* "R$"
+ * (e.g. "−R$ 1.234,56"), not the ASCII hyphen-minus -- the typographic sign
+ * `Intl`'s own pt-BR currency data reaches for, and the placement a
+ * Brazilian-first reading expects at a glance.
+ */
+export function formatBrl(value: string | number): string {
+  const rounded = roundDecimal(parseDecimal(normalizeToDecimalString(value)), 2);
+  const groupedInt = groupInteger(rounded.intDigits, "pt-BR");
+  const { prefix } = currencyParts("pt-BR", "BRL");
+  // Node/ICU renders the pt-BR currency prefix with U+00A0 (non-breaking
+  // space) between "R$" and the number -- normalized here to a plain
+  // U+0020 space so the rendered text matches what the rest of the UI (and
+  // every test asserting on it) can select and compare as an ordinary
+  // string.
+  const normalizedPrefix = prefix.replace(new RegExp(String.fromCharCode(160), "g"), " ");
+  const sign = rounded.negative ? "−" : "";
+  return `${sign}${normalizedPrefix}${groupedInt},${rounded.fracDigits}`;
+}
+
+/** `formatBrl` with an explicit leading "+" on a non-zero, non-negative amount (docs/DESIGN.md §2: signed numbers) -- mirrors `formatUsdtSigned` below; `formatBrl` already prints "−" for negatives but never "+" for positives. */
+export function formatBrlSigned(value: string | number): string {
+  const raw = typeof value === "number" ? value.toString() : value;
+  const isZero = /^[+-]?0+(\.0+)?$/.test(raw.trim());
+  const negative = raw.trim().startsWith("-");
+  const sign = isZero || negative ? "" : "+";
+  return `${sign}${formatBrl(value)}`;
+}
+
+/**
  * USDT has no ISO 4217 code, so `formatMoney`'s Intl currency style cannot
  * render it (`Intl.NumberFormat` throws `RangeError` for an unknown currency).
  * Reuses `formatMoney`'s decimal-safe grouping/rounding under "USD" (same

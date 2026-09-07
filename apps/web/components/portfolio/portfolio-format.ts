@@ -5,29 +5,7 @@
  * never vira 0" -- so every helper below renders that reason as readable
  * Portuguese text instead of a dash or a silent zero.
  */
-import { formatMoney, formatPct } from "@/lib/format";
-
-/**
- * BRL amounts always use `locale: "en-US"` (never `"pt-BR"`) -- `formatMoney`
- * always joins the grouped integer and fraction with a literal ".", but
- * `Intl.NumberFormat("pt-BR")` groups thousands with "." too, which would
- * collide into an ambiguous "R$100.000.00". `Intl`'s BRL currency symbol
- * ("R$") renders correctly under "en-US" regardless of that locale's own
- * grouping convention, so this sidesteps the collision instead of touching
- * `formatMoney`'s shared grouping logic for every other caller.
- */
-export function formatBrl(value: string | number): string {
-  return formatMoney(value, { currency: "BRL" });
-}
-
-/** `formatBrl` with an explicit leading "+" on a non-zero, non-negative amount (docs/DESIGN.md §2: signed numbers) -- `formatMoney` already prints "-" for negatives but never "+" for positives. */
-export function formatBrlSigned(value: string | number): string {
-  const raw = typeof value === "number" ? value.toString() : value;
-  const isZero = /^[+-]?0+(\.0+)?$/.test(raw.trim());
-  const negative = raw.trim().startsWith("-");
-  const sign = isZero || negative ? "" : "+";
-  return `${sign}${formatBrl(value)}`;
-}
+import { formatPct } from "@/lib/format";
 
 /** `PortfolioSummaryOut.unavailable[]` codes -- `hunter_core.portfolio.state.build_portfolio_state` (Python docstring quoted in `schemas/portfolio.py`). */
 const UNAVAILABLE_LABELS: Record<string, string> = {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { formatCompact, formatLocalOffset, formatMoney, formatPct, formatUtc, formatUtcWithOffset } from "@/lib/format";
+import { formatBrl, formatBrlSigned, formatCompact, formatLocalOffset, formatMoney, formatPct, formatUtc, formatUtcWithOffset } from "@/lib/format";
 
 describe("formatMoney", () => {
   it("formats a numeric-string USD amount", () => {
@@ -34,6 +34,43 @@ describe("formatMoney", () => {
   it("throws a TypeError for a non-finite number", () => {
     expect(() => formatMoney(Number.NaN)).toThrow(TypeError);
     expect(() => formatMoney(Number.POSITIVE_INFINITY)).toThrow(TypeError);
+  });
+});
+
+describe("formatBrl: pt-BR grouping (\".\" thousands, \",\" fraction) -- the wallet's first BRL screen (T3.8b polish pass)", () => {
+  it("groups thousands with '.' and separates the fraction with ','", () => {
+    expect(formatBrl("100725.19")).toBe("R$ 100.725,19");
+  });
+
+  it("puts a Unicode minus sign (U+2212) before the 'R$' symbol for a negative amount", () => {
+    expect(formatBrl("-1234.5")).toBe("−R$ 1.234,50");
+  });
+
+  it("renders an exact zero without any sign", () => {
+    expect(formatBrl("0")).toBe("R$ 0,00");
+  });
+
+  it("rounds half-up through a carry that propagates across every digit", () => {
+    expect(formatBrl("99999.99999999983784")).toBe("R$ 100.000,00");
+  });
+
+  it("does not lose precision on a Decimal string above 2^53 (never routes the full value through Number())", () => {
+    // 2^53 = 9_007_199_254_740_992; the integer part below is several orders above it.
+    expect(formatBrl("12345678901234567.89")).toBe("R$ 12.345.678.901.234.567,89");
+  });
+});
+
+describe("formatBrlSigned", () => {
+  it("adds an explicit '+' for a positive amount", () => {
+    expect(formatBrlSigned("725.185185")).toBe("+R$ 725,19");
+  });
+
+  it("does not double the sign for a negative amount (formatBrl already carries the '−')", () => {
+    expect(formatBrlSigned("-725.185185")).toBe("−R$ 725,19");
+  });
+
+  it("does not sign an exact zero", () => {
+    expect(formatBrlSigned("0")).toBe("R$ 0,00");
   });
 });
 
