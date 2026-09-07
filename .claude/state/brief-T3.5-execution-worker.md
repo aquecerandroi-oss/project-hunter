@@ -17,3 +17,11 @@
 9. **Testes** (testcontainers): V2–V8 da spec com os números fechados; ordens simultâneas na mesma carteira; fills duplicados; reconciliação por fill (caixa, qty líquida, taxas, PnL); dados atrasados/reconexão (livro velho → sem fill, alerta); restart; duas sessões concorrentes; mínimos e incrementos; gap adverso; sem fill fabricado (sem livro, a saída fica pendente com alerta).
 10. **Prova** de 30 min no stack local com o adaptador spot em modo teste (fixture gravada ou stream real se T3.0b já estiver na árvore) e a carteira `ever` aberta: uma proposta manual aprovada → fill → posição com proteções → stop disparado por negócio sintético → saída → PnL reconciliado; `/ready` verde; 0 exceções. Registre em `.claude/state/t35-proof.md`.
 Comandos e PATH como nas outras tarefas. Não toque em `.env*`, `infra/migrations/**`, `packages/**` (exceto `settings.py` role), `apps/**`. Relatório em português no formato estendido com saída real e a prova.
+
+## Adendo 2026-09-07 — cinco condições da revisão adversarial (`.claude/state/review-T3.1b-T3.6-T3.12.md`)
+1. **Dedupe**: `find_admitted` só casa linhas decididas; o pedido manual `status='pending'` é **decidido na própria linha** (nunca inserido de novo); sem `decided_at` fabricado.
+2. **A API só registra o pedido** (`apps/api/hunter_api/services/admission.py` vira "registrar pedido manual pendente"); o worker admite no ciclo de 1 s. Ajuste o adaptador da API nesta tarefa (é a única edição em `apps/api`).
+3. **`ReservationCycleClosed` no caminho do fill = "a reserva morreu, não liquide"**, nunca retentável (corrida `expired × consumed`).
+4. **Publicar `kill_switch.changed`** após `evaluate_and_persist` e ao processar uma retomada (o worker tem INSERT no outbox pela 0007); a API não publica.
+5. **Fixtures**: escreva `portfolio_equity_snapshots` como `hunter_worker` (a 0007 revoga o DML do app).
+Também: o `GET .../risk/kill-switch` deve dizer de que processo veio o escopo `system` (sugestão 14) — registre para a T3.8c.
