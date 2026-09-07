@@ -34,8 +34,8 @@ from hunter_api.schemas.portfolio_lists import (
     AsOfPage,
     EquityCurvePointOut,
     OrderOut,
+    PortfolioTradeOut,
     PositionOut,
-    TradeOut,
 )
 from hunter_api.services.portfolio_lists import (
     DEFAULT_CURVE_RESOLUTION,
@@ -224,7 +224,7 @@ async def get_orders(
 
 @router.get(
     "/{portfolio_id}/trades",
-    response_model=AsOfPage[TradeOut],
+    response_model=AsOfPage[PortfolioTradeOut],
     summary="List trades — empty until T3.4/T3.5 land a writer",
 )
 async def get_trades(
@@ -233,7 +233,7 @@ async def get_trades(
     portfolio_id: uuid.UUID,
     limit: _Limit = None,
     cursor: str | None = None,
-) -> AsOfPage[TradeOut]:
+) -> AsOfPage[PortfolioTradeOut]:
     await _owned(session, context, portfolio_id)
     as_of = utcnow()
     items, next_cursor = await list_trades(

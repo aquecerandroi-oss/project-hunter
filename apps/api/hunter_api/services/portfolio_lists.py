@@ -27,8 +27,8 @@ from hunter_api.repositories.base import encode_cursor as encode_id_cursor
 from hunter_api.schemas.portfolio_lists import (
     EquityCurvePointOut,
     OrderOut,
+    PortfolioTradeOut,
     PositionOut,
-    TradeOut,
 )
 from hunter_core.db.models.execution_fills import Position
 from hunter_core.db.models.execution_orders import Order
@@ -239,7 +239,7 @@ async def list_trades(
     *,
     limit: int | None,
     cursor: str | None,
-) -> tuple[list[TradeOut], str | None]:
+) -> tuple[list[PortfolioTradeOut], str | None]:
     size = clamp_page_size(limit)
     statement = (
         select(Trade)
@@ -253,7 +253,7 @@ async def list_trades(
     page = rows[:size]
     next_cursor = encode_id_cursor(page[-1].closed_at, page[-1].id) if len(rows) > size else None
     items = [
-        TradeOut(
+        PortfolioTradeOut(
             id=row.id,
             market_id=row.market_id,
             direction=row.direction,

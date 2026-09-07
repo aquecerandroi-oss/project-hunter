@@ -107,7 +107,7 @@ class OrderOut(BaseModel):
     completed_at: datetime | None
 
 
-class TradeOut(BaseModel):
+class PortfolioTradeOut(BaseModel):
     """One ``trades`` row. Empty today — no writer exists yet (T3.4/T3.5)."""
 
     id: uuid.UUID

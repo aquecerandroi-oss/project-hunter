@@ -854,6 +854,18 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** AsOfPage[PortfolioTradeOut] */
+        AsOfPage_PortfolioTradeOut_: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Items */
+            items: components["schemas"]["PortfolioTradeOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** AsOfPage[PositionOut] */
         AsOfPage_PositionOut_: {
             /**
@@ -863,18 +875,6 @@ export interface components {
             as_of: string;
             /** Items */
             items: components["schemas"]["PositionOut"][];
-            /** Next Cursor */
-            next_cursor?: string | null;
-        };
-        /** AsOfPage[TradeOut] */
-        AsOfPage_TradeOut_: {
-            /**
-             * As Of
-             * Format: date-time
-             */
-            as_of: string;
-            /** Items */
-            items: components["schemas"]["hunter_api__schemas__portfolio_lists__TradeOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -1413,7 +1413,7 @@ export interface components {
             /** Quote Volume 24H */
             quote_volume_24h?: string | null;
             /** Recent Trades */
-            recent_trades?: components["schemas"]["hunter_api__schemas__markets__TradeOut"][] | null;
+            recent_trades?: components["schemas"]["TradeOut"][] | null;
             /** Spread Pct */
             spread_pct?: string | null;
             /** Stale After Ms */
@@ -2266,6 +2266,46 @@ export interface components {
             workspace_id: string;
         };
         /**
+         * PortfolioTradeOut
+         * @description One ``trades`` row. Empty today — no writer exists yet (T3.4/T3.5).
+         */
+        PortfolioTradeOut: {
+            /**
+             * Closed At
+             * Format: date-time
+             */
+            closed_at: string;
+            direction: components["schemas"]["TradeDirection"];
+            /** Entry Price */
+            entry_price: string;
+            /** Exit Price */
+            exit_price: string;
+            exit_reason: components["schemas"]["ExitReason"] | null;
+            /** Fees */
+            fees: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Market Id
+             * Format: uuid
+             */
+            market_id: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Pnl */
+            pnl: string;
+            /** Pnl Pct */
+            pnl_pct: string | null;
+            /** Qty */
+            qty: string;
+        };
+        /**
          * PortfolioType
          * @description ``portfolio_type`` — DATABASE.md §7 (portfolios.type).
          * @enum {string}
@@ -2681,6 +2721,21 @@ export interface components {
          * @enum {string}
          */
         TradeDirection: "long" | "short" | "neutral";
+        /** TradeOut */
+        TradeOut: {
+            /** Price */
+            price: string;
+            /** Qty */
+            qty: string;
+            side: components["schemas"]["OrderSide"];
+            /** Trade Id */
+            trade_id: string;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+        };
         /**
          * TransitionOut
          * @description One audited move. ``evidence`` is the numbers; ``reason`` is the prose.
@@ -2917,61 +2972,6 @@ export interface components {
             /** Name */
             name?: string | null;
             objective?: components["schemas"]["WorkspaceObjective"] | null;
-        };
-        /** TradeOut */
-        hunter_api__schemas__markets__TradeOut: {
-            /** Price */
-            price: string;
-            /** Qty */
-            qty: string;
-            side: components["schemas"]["OrderSide"];
-            /** Trade Id */
-            trade_id: string;
-            /**
-             * Ts
-             * Format: date-time
-             */
-            ts: string;
-        };
-        /**
-         * TradeOut
-         * @description One ``trades`` row. Empty today — no writer exists yet (T3.4/T3.5).
-         */
-        hunter_api__schemas__portfolio_lists__TradeOut: {
-            /**
-             * Closed At
-             * Format: date-time
-             */
-            closed_at: string;
-            direction: components["schemas"]["TradeDirection"];
-            /** Entry Price */
-            entry_price: string;
-            /** Exit Price */
-            exit_price: string;
-            exit_reason: components["schemas"]["ExitReason"] | null;
-            /** Fees */
-            fees: string;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Market Id
-             * Format: uuid
-             */
-            market_id: string;
-            /**
-             * Opened At
-             * Format: date-time
-             */
-            opened_at: string;
-            /** Pnl */
-            pnl: string;
-            /** Pnl Pct */
-            pnl_pct: string | null;
-            /** Qty */
-            qty: string;
         };
     };
     responses: never;
@@ -3972,7 +3972,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AsOfPage_TradeOut_"];
+                    "application/json": components["schemas"]["AsOfPage_PortfolioTradeOut_"];
                 };
             };
             /** @description Validation Error */
