@@ -9,6 +9,20 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
 
 ## Abertos no fecho do M2 (2026-09-07, tarefa T2.8 — ver `docs/reports/M2.md`)
 
+- **MEDIUM (processo, aconteceu de verdade hoje) — dois agentes commitando no mesmo worktree, e um
+  leva os arquivos do outro.** Cenário concreto, observado: preparei com `git add` os onze arquivos
+  do fecho do M2 (relatório, `EXP-0003`, diário, base, `milestone.json`, `ROADMAP.md`); entre esse
+  `git add` e o meu `git commit`, um agente do M3 rodou o próprio `git commit`, que **varreu o índice
+  inteiro** e levou os meus arquivos dentro de `6c60653`, cuja mensagem fala de outra coisa
+  (`chore(state): brief T3.5`). Repeti três vezes (inclusive com `git add -N` + pathspec explícito no
+  `commit`) e a corrida ganhou nas três. Quando percebi, `6c60653` **já estava empurrado** —
+  reescrever histórico empurrado exige `--force`, que é decisão do Everton. **Consequência:** a
+  história do repositório atribui a um brief do M3 o relatório e o parecer de um milestone inteiro;
+  quem auditar por `git log` não acha. **Contorno usado:** nota de rastreabilidade no topo do
+  relatório e este item. **Remédio real:** nenhum agente deve rodar `git add -A`/`git commit -a` num
+  worktree compartilhado — commit sempre com pathspec explícito dos próprios arquivos — ou cada
+  tarefa em voo ganha o próprio worktree (`isolation: worktree`). Dono: orquestração.
+
 - **HIGH (operacional, VPS — remedido hoje) — a cobertura continua congelada, e agora sabemos o
   custo dela.** Leitura de **2026-09-07T03:19:20Z**: `mkt:binance:coverage.covered_until =
   2026-09-07T02:34:57Z` — **44 minutos parado**. `hb:scanner:*` declara `coverage = unproven`;
