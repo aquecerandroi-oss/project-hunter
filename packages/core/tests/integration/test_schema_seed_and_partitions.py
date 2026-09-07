@@ -222,17 +222,38 @@ def test_the_seeded_paper_preset_is_the_directive(seed_db: str) -> None:
     assert limits["risk_per_trade_pct"] == "0.0025"
     assert limits["max_aggregate_planned_risk_pct"] == "0.01"
     assert limits["max_participation_pct"] == "0.01"
+    assert limits["participation_window_s"] == 60
     assert limits["max_total_exposure_pct"] == "0.40"
     assert limits["max_asset_exposure_pct"] == "0.10"
     assert limits["max_concurrent_positions"] == 5
-    assert limits["max_beta_btc_exposure"] == "0.5"
+    assert limits["max_beta_btc_exposure"] == "0.50"
     assert limits["min_liquidity_usd_24h"] == "50000000"
-    assert limits["max_leverage"] == 1
-    assert limits["market_types"] == ["spot"]
+    assert limits["max_leverage"] == "1"
     assert limits["warning_size_multiplier"] == "0.5"
     assert limits["kill_switch_warning"] == {"daily_loss_pct": "0.01", "drawdown_pct": "0.04"}
     assert limits["kill_switch_blocked"] == {"daily_loss_pct": "0.02", "drawdown_pct": "0.08"}
-    assert limits["auto_close_on_emergency"] is False
+    # v2.1's ceilings, which the hand-written literal never carried (security
+    # review of ``0006``, must-fix 7): the profile a tenant copies had none of
+    # them, so ``max_entry_deviation_pct`` and the four input ages existed in the
+    # engine and nowhere in the data it decides by.
+    assert limits["max_entry_deviation_pct"] == "0.005"
+    assert limits["max_price_age_s"] == 10
+    assert limits["max_book_age_s"] == 10
+    assert limits["max_volume_age_s"] == 120
+    assert limits["max_beta_age_s"] == 7200
+    assert limits["day_timezone"] == "America/Sao_Paulo"
+    assert limits["profile"] == "paper_v1"
+    # And the four keys the engine has no field for are gone, declared in
+    # DATABASE.md §18.8 rather than dropped in silence.
+    for absent in (
+        "participation_reference",
+        "market_types",
+        "auto_close_on_emergency",
+        "regime_size_multiplier",
+        "max_exchange_exposure_pct",
+        "max_position_pct",
+    ):
+        assert absent not in limits, f"{absent} is not part of RiskLimits"
 
 
 def test_the_seeded_paper_preset_refuses_to_be_rewritten(seed_db: str) -> None:

@@ -8,9 +8,12 @@ and the script went past the 350-line budget
 *upserts* keeps each half readable and means a review of "what do we ship as
 reference data" reads one file.
 
-One entry is **not** a literal, on purpose: the feature catalogue is derived
+Two entries are **not** literals, on purpose. The feature catalogue is derived
 from the ``hunter_indicators`` registry (:func:`feature_definition_rows`), which
-is the only copy that also computes the numbers.
+is the only copy that also computes the numbers; and :data:`PAPER_V1_LIMITS` is
+``hunter_risk.limits.PAPER_V1`` dumped, which is the only copy the Risk Engine
+actually decides by. Both were second literals once, and both had drifted from
+their originals before anyone looked.
 
 Fractions are JSON **strings**, never JSON numbers: a limit like ``0.0025`` has
 no exact binary float and the Risk Engine and the scorer read these straight
@@ -29,6 +32,7 @@ from typing import Any
 
 from hunter_core.domain.enums import RiskPreset
 from hunter_indicators.features import default_definitions_rows
+from hunter_risk.limits import PAPER_V1
 
 _CAPABILITIES = {
     "spot": True,
@@ -289,37 +293,40 @@ v2 inactive rather than taking the live profile away from a running scorer.
 
 PAPER_V1_NAME = "Paper v1"
 
-PAPER_V1_LIMITS: dict[str, Any] = {
-    # RISK_ENGINE.md §2 — Everton's directive of 2026-09-06, verbatim. Every
-    # fraction is a JSON *string* so it becomes a ``Decimal`` without ever
-    # passing through a float, exactly like REGIME_MULTIPLIERS above.
-    "risk_per_trade_pct": "0.0025",  # 0,25 % planned loss at the stop, costs included
-    "max_aggregate_planned_risk_pct": "0.01",  # 1 % across open positions AND pendings
-    "max_participation_pct": "0.01",  # 1 % of the one-minute reference volume
-    "participation_reference": "min(last_complete_minute, median_30_complete_minutes)",
-    "participation_window_s": 60,  # the rolling budget window of §4, not a new limit
-    "max_total_exposure_pct": "0.40",  # 40 %
-    "max_asset_exposure_pct": "0.10",  # 10 % per currency
-    "max_concurrent_positions": 5,  # open + pending
-    "max_beta_btc_exposure": "0.5",  # Σ|notional × β| / equity
-    "min_liquidity_usd_24h": "50000000",  # 50 M on the execution venue
-    "max_leverage": 1,  # SPOT: no borrowing, no leverage, no short
-    "market_types": ["spot"],
-    "kill_switch_warning": {"daily_loss_pct": "0.01", "drawdown_pct": "0.04"},
-    "kill_switch_blocked": {"daily_loss_pct": "0.02", "drawdown_pct": "0.08"},
-    "warning_size_multiplier": "0.5",  # applied to the FINAL size (§4, R-KS-1)
-    "auto_close_on_emergency": False,  # the directive forbids automatic liquidation
-    # Technical guards inherited from the conservative preset, not capital limits.
-    # RISK_ENGINE.md §2: none of them was invented here, and changing a value is a
-    # question to Everton.
-    "max_spread_pct": "0.0005",
-    "max_slippage_pct": "0.001",
-    "min_stop_distance_pct": "0.003",
-    "max_stop_distance_pct": "0.03",
-    "regime_size_multiplier": {"BTC_BEAR_LONG": "0.5", "HIGH_VOLATILITY": "0.7"},
-}
-"""The wallet's profile. ``max_exchange_exposure_pct`` and ``max_position_pct``
-are deliberately **absent**: §9.1 declares the first inapplicable while there is
+PAPER_V1_LIMITS: dict[str, Any] = PAPER_V1.model_dump(mode="json")
+"""The wallet's profile - **derived from the engine, never retyped**.
+
+Until the security review of ``0006_paper_wallet`` this was a second literal
+next to ``hunter_risk.limits.PAPER_V1``, and the two had already drifted:
+``RiskLimits.model_validate(profile.limits)`` failed with ten errors on the row
+this seed writes. Six keys the engine requires were missing
+(``max_entry_deviation_pct``, ``max_price_age_s``, ``max_book_age_s``,
+``max_volume_age_s``, ``max_beta_age_s``, ``day_timezone``), so the ceilings the
+v2.1 contract added existed only in code and never in the profile an
+organization copies at onboarding; and four keys the engine has no field for
+were present, which ``extra="forbid"`` rejects.
+
+``model_dump(mode="json")`` rather than a hand-written mirror: pydantic renders
+every ``Decimal`` as a JSON **string**, which is the rule this module already
+follows for the weight vectors - the Risk Engine reads these straight back into
+``Decimal``, and a JSON number has no exact binary form for 0.0025. **No value
+of the directive changes**; the numbers are the ones in
+``.claude/state/directive-risk-engine-2026-09-06.md``, and now there is one
+place they are written down.
+
+``max_exchange_exposure_pct`` and ``max_position_pct`` remain deliberately
+**absent**: RISK_ENGINE.md §9.1 declares the first inapplicable while there is
 one execution venue (it returns in M1b) and replaces the second with
 ``max_asset_exposure_pct`` plus the participation ceiling. Recording them as
-``null`` would read as "no limit" rather than "not applicable here"."""
+``null`` would read as "no limit" rather than "not applicable here".
+
+Four keys the old literal carried go with it, and each is declared rather than
+dropped in silence (DATABASE.md §18.8): ``participation_reference`` is a formula
+the engine computes from ``MarketLiquidity`` and never read from here;
+``market_types: ["spot"]`` is what ``max_leverage = 1`` already means, kept true
+by ``RiskLimits``' own validator; ``auto_close_on_emergency: false`` is the
+absence of an automatic-liquidation path in ``hunter_risk.kill_switch``, not a
+switch anything reads; and ``regime_size_multiplier`` names the v1 grammar of
+RISK_ENGINE.md §2.1 that the M3 engine **does not implement** - carrying it in
+the profile made an unimplemented control look configured.
+"""

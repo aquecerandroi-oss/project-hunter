@@ -480,10 +480,13 @@ async def test_the_platform_kill_switch_is_readable_by_every_tenant(
         await connection.execute(
             text(
                 "INSERT INTO kill_switch_transitions "
-                "(id, organization_id, scope, from_state, to_state, actor_type) "
-                "VALUES (:id, NULL, 'system', 'ACTIVE', 'WARNING', 'system')"
+                "(id, organization_id, scope, from_state, to_state, actor_type, evidence) "
+                "VALUES (:id, NULL, 'system', 'ACTIVE', 'WARNING', 'system', :evidence)"
             ),
-            {"id": uuid7()},
+            # An automatic move carries the numbers that justified it (T3.1b,
+            # suggestion 9): ``actor_id`` is null by definition on a ``system``
+            # row, so ``evidence`` is the only thing on it that says why.
+            {"id": uuid7(), "evidence": '{"drawdown_pct": "0.05"}'},
         )
         await connection.execute(
             text(

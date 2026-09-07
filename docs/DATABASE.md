@@ -1226,10 +1226,26 @@ tem de implementar, é **exclusão mútua por linha**, não uma regra de idade:
 **O lock exige o privilégio de `UPDATE`, e é a `0005_baseline_lock_grant` que o
 concede (BUG-1 da T2.5).** O protocolo acima esteve **inexecutável** entre a
 `0003` e a `0005`: o PostgreSQL exige `UPDATE` para tomar qualquer lock de linha
-(`ACL_SELECT_FOR_UPDATE` *é* `ACL_UPDATE`, e um grant por coluna não serve —
-um row mark não tem coluna atualizada, então a verificação cai no
-`pg_class_aclcheck` de tabela), e a `0003` negava `UPDATE` a `hunter_worker` de
-propósito. Contra um banco corretamente migrado, o passo 2 falhava com
+(`ACL_SELECT_FOR_UPDATE` *é* `ACL_UPDATE`), e a `0003` negava `UPDATE` a
+`hunter_worker` de propósito.
+
+**Correção de fato (T3.1b, medida):** esta seção afirmava também que "um grant
+por coluna não serve — um row mark não tem coluna atualizada, então a verificação
+cai no `pg_class_aclcheck` de tabela". **É falso.** Em Postgres 16.15,
+`GRANT SELECT, UPDATE (uma_coluna)` é suficiente para `SELECT ... FOR UPDATE` e
+continua recusando qualquer `UPDATE` que escreva valor:
+
+```sql
+GRANT SELECT, UPDATE (updated_at) ON t TO r;
+SET ROLE r; SELECT v FROM t WHERE id = 1 FOR UPDATE;   -- 1 linha
+SET ROLE r; UPDATE t SET v = 99 WHERE id = 1;          -- permission denied
+```
+
+A `0005` **não muda**: o grant de tabela em `feature_baselines` é inofensivo
+porque a imutabilidade ali mora inteira num trigger que vale até para o dono, e
+mexer numa revisão aplicada é outra conversa. O que muda é a justificativa — e a
+§18.7 usa a forma estreita (`UPDATE (updated_at)`) onde ela de fato importa, numa
+tabela cujo conteúdo o papel da aplicação não pode escrever. Contra um banco corretamente migrado, o passo 2 falhava com
 *permission denied for table feature_baselines* — e uma falha de privilégio
 **aborta a transação inteira**, então o scanner sonda uma vez na partida
 (`hunter_scanner_worker.writers.probe_baseline_lock`), loga em `error` e degrada
@@ -1696,6 +1712,41 @@ e reset**, e uma proibição que só existe em prosa é uma proibição que o pr
 ou trigger — e, quando não deu para virar, diz isso também em vez de deixar o
 leitor supor.
 
+**A `0006` foi corrigida no lugar, antes de qualquer aplicação persistente
+(T3.1b).** A revisão de segurança de `11faba8`
+(`.claude/state/review-T3.1-security.md`) achou dois bloqueantes, cinco "deve
+corrigir" e cinco sugestões, cada um reproduzido como `hunter_app`/`hunter_worker`
+reais. Como a `0006` **nunca** tinha sido aplicada a banco persistente nenhum — a
+VPS e o stack local estavam os dois em `0005_baseline_lock_grant`, verificado
+antes da edição —, a correção foi na própria revisão e não numa `0007`, pelo
+mesmo motivo e com o mesmo limite que a §15 registra para a
+`0001_initial_schema`: uma revisão que nunca rodou em lugar nenhum **descreve** um
+schema, e o schema tem de ser o certo para quem o ler a seguir. A partir do
+primeiro deploy real dela essa liberdade acaba. O que mudou está espalhado pelas
+seções abaixo, cada uma marcada com o achado que a moveu:
+
+| Achado | Onde | O que passou a ser verdade |
+|---|---|---|
+| bloqueante 1 | §18.7 | a transição que autoriza um movimento do kill switch tem de ser a **mais recente** do escopo **e** ter sido escrita **nesta transação** |
+| bloqueante 2 | §18.5, §18.8 | a carteira principal é única por **organização**, não por `(organização, workspace)` |
+| deve 3 | §18.7 | a mesma constraint trigger em `organizations`, com `scope = 'organization'` |
+| deve 4 | §18.3 | `orders.position_id`, `trades.position_id` e `trades.proposal_id` compostos, e `orders.exit_intent_id` amarrado ao `position_id` da intenção |
+| deve 5 | §18.7, §18.9 | `portfolio_risk_state` recusa todo `UPDATE` do `hunter_app`; dia crescente, referência do dia uma vez por dia, pico ≤ equity observado |
+| deve 6 | §18.2 | a âncora confere o **par** da observação de FX |
+| deve 7 | §18.8 | `paper_v1` tem **uma** fonte: `hunter_risk.limits.PAPER_V1` |
+| sugestão 8 | §18.5 | `released ≤ reserved_notional` da própria proposta |
+| sugestão 9 | §18.7 | transição automática sem `evidence` é irrepresentável |
+| sugestão 10 | §18.7 | `kill_switch_transitions` sem FK em cascata: a trilha sobrevive ao tenant |
+| sugestões 11 e 12 | §18.3, §18.9 | declarações, registradas onde já moram |
+
+E três escapes que a **revisão da Astra sobre esta própria correção** reproduziu,
+fechados antes de ela ficar de pé: uma CTE que escrevia o filho antes do pai
+pulava o teto do pico; `equity_day_start` participava do teto que ele mesmo
+deveria respeitar; e `current_user = 'hunter_app'` é nome, não privilégio — um
+papel que apenas herda a role atravessava o trigger. As três estão na §18.7, com
+o experimento que mede cada uma. A terceira corrige de quebra uma afirmação
+errada da §17.2 sobre grant por coluna.
+
 ### 18.1 Enums (`ddl/enums.py`)
 
 Tipos novos, congelados em `PAPER_ENUMS`: `proposal_source` (`manual|agent`),
@@ -1778,6 +1829,20 @@ fontes persistidas discordavam sobre o capital de abertura, e uma reconstrução
 que lesse `initial_capital` enquanto a atribuição lê `credited_amount` parte de
 um número que ninguém creditou.
 
+**E tem de ser uma cotação *deste par* (T3.1b, deve corrigir 6).** A trigger
+confere `fx_observations.pair = operating_currency || origin_currency` —
+`'USDT' || 'BRL' = 'USDTBRL'`, quantas unidades da moeda de origem custa uma
+unidade da moeda operacional — e que a observação tem `available_at`. O que
+faltava era exatamente isto: `conversion_is_exact` prova que a aritmética fecha
+*consigo mesma*, não que a taxa precifica as duas moedas certas. Uma âncora
+nomeando uma observação `BTCUSDT` a 60000 e copiando essa taxa passa em todos os
+CHECKs e abre a carteira com "R$1,2 bilhão" — e, como a âncora é imutável, o erro
+seria **permanente**. `available_at` é `NOT NULL` hoje; a condição está na trigger
+mesmo assim, porque a garantia que interessa é "a abertura foi explicada por uma
+cotação que dava para alcançar", e ela não pode depender de a coluna continuar
+`NOT NULL` para sempre. A convenção do par é declarada aqui: **`operating ||
+origin`**, e é a mesma que `hunter_core.portfolio.attribution.FX_PAIR` publica.
+
 **O que isso *não* prova**, e a frase honesta é esta: que carteira, crédito,
 âncora e auditoria nasceram no mesmo commit. A trigger exige que a linha de trava
 exista, não que ela tenha sido criada na mesma transação. A atomicidade da
@@ -1808,9 +1873,16 @@ trade_proposals  (+) source proposal_source NOT NULL DEFAULT 'manual'
 
 orders  (+) exit_intent_id UUID
   UNIQUE (id, organization_id, portfolio_id)                 -- uq_orders_id_scope
-  FK (proposal_id, organization_id, portfolio_id) -> trade_proposals, ON DELETE SET NULL (proposal_id)
+  UNIQUE (id, organization_id, portfolio_id, market_id)      -- uq_orders_id_market_scope
+  FK (proposal_id, organization_id, portfolio_id, market_id) -> trade_proposals, ON DELETE SET NULL (proposal_id)
+  FK (position_id, organization_id, portfolio_id, market_id) -> positions, ON DELETE SET NULL (position_id)
   FK (exit_intent_id, organization_id, portfolio_id, market_id) -> portfolio_exit_intents
+  FK (exit_intent_id, position_id) -> portfolio_exit_intents (id, position_id)  -- fk_orders_exit_intent_matches_position
   CHECK purpose <> 'entry' OR exit_intent_id IS NULL
+  CHECK exit_intent_id IS NULL OR position_id IS NOT NULL
+
+trades  FK (position_id, organization_id, portfolio_id, market_id) -> positions, ON DELETE SET NULL (position_id)
+        FK (proposal_id, organization_id, portfolio_id, market_id) -> trade_proposals, ON DELETE SET NULL (proposal_id)
 
 fills  (+) execution_key TEXT NOT NULL
   UNIQUE (organization_id, execution_key)                    -- uq_fills_execution_key
@@ -1844,7 +1916,11 @@ Um eixo só **não** impede um escritor de reabrir um ciclo por `UPDATE`
 (`consumed` de volta para `held`); o que o schema garante é que existe **um** eixo
 por proposta, e é isso que torna `proposal_id` identidade suficiente da reserva
 no ledger de participação (§18.5). Manter o ciclo único é regra do serviço de
-admissão (T3.12), com teste.
+admissão (T3.12), com teste — **e é a sugestão 11 da revisão de segurança da
+T3.1b, registrada aqui como invariante da T3.12 em vez de virar DDL**: um CHECK
+sobre `reservation_state` não enxerga a transição, só o valor final, e uma trigger
+que proibisse `consumed -> held` proibiria junto a correção legítima de um ciclo
+escrito errado dentro da mesma transação.
 
 Os CHECKs são duas implicações e não uma bicondicional, de propósito: quantificada
 se e somente se `reservation_state <> 'none'`, o que deixa `consumed`, `released`
@@ -1872,6 +1948,30 @@ entrada sem preço vestindo uma aprovação — e ordem → fill pelo **trio**
 As ações de `ON DELETE` que a `0001` tinha são preservadas —
 `SET NULL (proposal_id)` nomeando a coluna, porque um `SET NULL` simples também
 anularia `organization_id` e `portfolio_id`, ambos `NOT NULL`.
+
+**E descendo também pela posição (T3.1b, deve corrigir 4).** A primeira redação
+parou na proposta: `orders.position_id`, `trades.position_id` e
+`trades.proposal_id` continuavam FKs de uma coluna só, e o mesmo argumento vale
+inteiro para elas — uma ordem da organização A apontando para a posição da B
+satisfazia a FK, e a RLS só olha o `organization_id` da própria linha. Em
+`trades` isso é pior que em `orders`: é a tabela que o analytics trata como a
+verdade, então uma linha que atribui a posição de outro tenant a esta carteira é
+um número que ninguém desfaz depois. As três passam ao **quádruplo**
+`(id, organization_id, portfolio_id, market_id)`.
+
+**A quarta amarração é entre duas colunas da mesma linha.** `exit_intent_id`
+carregava o quádruplo e `position_id` não carregava nada, então as duas podiam
+nomear posições **diferentes** da mesma carteira e do mesmo mercado: o fill
+reduziria uma posição enquanto o `filled_qty` da intenção creditaria a proteção
+da outra — as unidades desprotegidas em silêncio que a §10 do contrato existe
+para impedir. Fecham duas coisas juntas: a FK
+`(exit_intent_id, position_id) -> portfolio_exit_intents (id, position_id)`
+(o alvo `uq_portfolio_exit_intents_id_position` já existia, §18.4) e o
+`CHECK exit_intent_id IS NULL OR position_id IS NOT NULL`. **O CHECK não é
+enfeite:** uma FK composta é `MATCH SIMPLE`, isto é, não é verificada quando
+qualquer coluna dela é nula, então sem ele bastaria deixar `position_id` nulo
+para a amarração não valer. A implicação "toda tentativa contra uma proteção
+durável sabe qual posição está protegendo" é o que o CHECK declara.
 
 **O que continua não sendo DDL, e por quê.** "Nenhuma ordem de entrada sem
 proposta aprovada" (§8 do contrato) **não** virou CHECK. Um
@@ -2015,15 +2115,28 @@ orders` avulso é recusado, porque apagar um consumo executado devolve em silên
 o orçamento daquele mercado; já uma cascata de organização passa, porque as
 linhas do log vão junto no mesmo comando.
 
+**Uma liberação devolve o que foi reservado, nunca mais (T3.1b, sugestão 8).**
+`notional > 0` era o único limite de um lançamento `released`, então uma
+liberação de 900 contra uma reserva de 80 era aceita e a fórmula acima devolvia
+820 USDT de um minuto que aquele mercado nunca teve. Um CHECK não alcança
+`trade_proposals`, então é a trigger
+`participation_consumptions_release_within_reservation`, `BEFORE INSERT`:
+`notional ≤ trade_proposals.reserved_notional` da **própria** proposta, e uma
+liberação contra proposta que nunca quantificou reserva é recusada de saída —
+não há o que devolver. Só `released` é checado: `reserved` *é* a quantificação, e
+`executed` é amarrado ao fill pelas três FKs acima.
+
 O que **não** é DDL: que a soma por reserva nunca fique negativa e que o saldo
 negativo de uma reserva não compense o positivo de outra. São invariantes da
 T3.12, com teste.
 
 **Escopo de capital.** A chave do orçamento é `(market_id, escopo)` e o escopo é
-a carteira principal (§11 do contrato). Com uma principal por
-`(organization_id, workspace_id)`, a trava dessa carteira serializa o orçamento;
-**mais de uma carteira no mesmo escopo exige trava própria antes de ser
-habilitada** — condição escrita, não suposição.
+a carteira principal (§11 do contrato). Com uma principal por **organização**
+(§18.8), a trava dessa carteira serializa o orçamento; **mais de uma carteira no
+mesmo escopo exige trava própria antes de ser habilitada** — condição escrita,
+não suposição. Esta frase dizia `(organization_id, workspace_id)` até a T3.1b, e
+o bloqueante 2 é exatamente o motivo de não dizer mais: com o workspace na chave,
+"o escopo de capital" era algo que um botão de criar workspace redefinia.
 
 ### 18.6 `market_betas` — revisões imutáveis e qual delas vale
 
@@ -2116,6 +2229,8 @@ kill_switch_transitions  (+) evidence JSONB NOT NULL DEFAULT '{}'
   CHECK actor_type IN ('user','system')
   CHECK NOT (from_state IN ('TRADING_DISABLED','EMERGENCY') AND to_state IN ('ACTIVE','WARNING'))
         OR (actor_type = 'user' AND actor_id IS NOT NULL)
+  CHECK actor_type <> 'system' OR evidence <> '{}'::jsonb
+  -- e **nenhuma** FK para organizations (§15.4, o precedente de audit_logs)
 ```
 
 **Uma linha que é quatro coisas, de propósito.** `portfolio_risk_state` é ao
@@ -2132,6 +2247,102 @@ então "uma linha por carteira" é chave e não convenção.
 nenhum `UPDATE` aconteça para uma trigger de `UPDATE` ver (Astra). O pico é
 **amostrado**, com `peak_sampling_interval_s` declarando a cadência: não é o
 máximo intratick, e o schema diz isso em vez de fingir precisão.
+
+**A linha de trava é do motor, e o `hunter_app` não escreve nela (T3.1b, deve
+corrigir 5).** "Só sobe" e "só avança" eram os dois únicos limites, e o papel da
+aplicação tinha `UPDATE`: de dentro de um request handler dava para reescrever
+`trading_day` e `equity_day_start` — que é zerar a perda do dia, um reset
+contábil sem `DELETE` nenhum — ou gravar `peak_equity = 999999` e travar a
+carteira num drawdown de 98 % que **nada desfaz**, porque o pico nunca volta a
+descer. Quatro regras novas:
+
+1. **só o motor faz `UPDATE`.** O teste é de **pertencimento de papel**
+   (`pg_has_role(current_user, 'hunter_worker', 'USAGE')`), não
+   `current_user = 'hunter_app'` — ver "nome não é privilégio" abaixo.
+2. **`trading_day` é estritamente crescente** e nunca volta a ser desconhecido:
+   rebobiná-lo reabre um dia cuja perda já foi contada.
+3. **`equity_day_start` (com `day_reference_observed_at`) é definível uma vez por
+   `trading_day`.** Desconhecido → conhecido continua permitido — é a referência
+   ficando disponível, e a §18.7 exige que "desconhecida" seja representável;
+   conhecido → qualquer outra coisa é rebasear a perda de hoje num número
+   escolhido *depois* da perda.
+4. **nem `peak_equity` nem `equity_day_start` passam do equity observado.**
+   "Observado" é definido e não implícito: o **maior `equity` já registrado em
+   `portfolio_equity_snapshots`** para a carteira, ou o
+   `portfolios.initial_capital` que a âncora prova ter sido creditado, mais — no
+   `UPDATE` — o pico que a linha já carrega. Só é avaliado quando um dos dois
+   **sobe**; a queda do pico já é recusada e a igualdade é todo heartbeat comum.
+
+**`equity_day_start` é *limitado* pelo teto, não *parte* dele** (revisão de diff
+da Astra sobre este mesmo diff). A primeira redação punha `NEW.equity_day_start`
+dentro do `greatest`, e então um único statement declarava o próprio teto: um
+`INSERT` com `peak_equity = 999999` **e** `equity_day_start = 999999` passava como
+`hunter_app`, sem snapshot nenhum, e a carteira nascia num drawdown fictício de
+98 % que a monotonicidade torna permanente. Os dois são equity da mesma carteira:
+os dois são limitados pelo que ela mostrou, e nenhum atesta o outro.
+
+**A metade do `INSERT` é um segundo trigger, adiado, e isso não é estilo.** Com a
+verificação em `BEFORE INSERT`, a Astra escapou com uma CTE que escrevia o
+**filho antes do pai** num único statement: a carteira ainda não existia, o
+trigger não tinha com o que comparar, e a FK — verificada no *fim* do statement,
+quando o pai já existia — ficava satisfeita. Resultado: capital 20.000, pico
+999.999, como `hunter_app`. `portfolio_risk_state_opens_honestly` é
+`AFTER INSERT ... DEFERRABLE INITIALLY DEFERRED`, então roda quando o quadro
+inteiro existe — e por isso pode **recusar** uma carteira invisível em vez de
+pular: no COMMIT a RLS já opinou sobre o próprio `INSERT`, então uma linha que
+chegou até ali pertence a uma carteira que a sessão enxerga.
+
+**Nome não é privilégio: por que a trava é um grant por coluna.** A decisão é
+"`UPDATE` só para `hunter_worker`". A primeira implementação manteve o grant de
+tabela e recusou no trigger comparando `current_user = 'hunter_app'` — e a Astra
+atravessou isso com um papel que apenas **herda** `hunter_app`: ele mantém todos
+os privilégios da role e reporta o próprio nome, então o trigger não o
+reconhecia e o pico foi a 999999. A correção tem duas metades, e a primeira é a
+que importa:
+
+- **privilégio:** `hunter_app` recebe `SELECT`, `INSERT` e
+  `UPDATE (updated_at)` — e nada mais. Privilégio **é** herdado, então a
+  restrição viaja com a herança;
+- **trigger:** `pg_has_role(current_user, 'hunter_worker', 'USAGE')`, que é a
+  pergunta que o guarda de fato quer fazer, como defesa em profundidade.
+
+Por que uma coluna e não `REVOKE UPDATE`: o PostgreSQL cobra `ACL_UPDATE` por
+`SELECT ... FOR UPDATE`, e essa trava é a serialização da carteira que a T3.6
+toma na entrada da retomada (`hunter_core.risk.scopes.load_locked_state`);
+revogar tudo reintroduziria o BUG-1 da T2.5 com outro nome. **Um grant por coluna
+satisfaz o row mark e recusa toda escrita de valor — medido, não suposto**
+(Postgres 16.15):
+
+```sql
+GRANT SELECT, UPDATE (updated_at) ON t TO r;
+SET ROLE r; SELECT v FROM t WHERE id = 1 FOR UPDATE;   -- 1 linha
+SET ROLE r; UPDATE t SET v = 99 WHERE id = 1;          -- permission denied
+```
+
+Isso **contradiz** a frase da §17.2 ("um grant por coluna não serve — um row mark
+não tem coluna atualizada"), que fica corrigida lá. A `0005` continua com o grant
+de tabela em `feature_baselines` porque ali a imutabilidade mora inteira num
+trigger que vale até para o dono; o que muda é a justificativa, não o DDL.
+Provado como o papel, não perguntado ao catálogo, em
+`test_the_app_role_can_lock_the_wallet_row_and_never_write_it` (o `FOR UPDATE`
+passa, três `UPDATE` batem no privilégio e o de `updated_at` bate no trigger) e
+em `test_a_role_that_merely_inherits_the_app_cannot_write_the_lock_row_either`.
+
+**Custo declarado.** O teto lê `max(equity)` da curva por `portfolio_id`, uma
+tabela LIST→RANGE. O índice `ix_portfolio_equity_snapshots_peak_lookup`
+(`(portfolio_id, equity)`, criado na pai e propagado a toda partição, presente e
+futura) transforma isso num index scan; sem ele seria uma agregação sobre todos os
+pontos da carteira, a cada subida do pico — uma por intervalo de amostragem por
+carteira, o que hoje é ruído e amanhã não precisa ser.
+
+**Divisão de trabalho, e é contrato para a T3.6.** A retomada pela API
+(`hunter_app`) escreve `kill_switch_transitions` **e**
+`portfolios.kill_switch_state`, nas duas na mesma transação; a **referência
+diária e o pico são do worker** (`hunter_worker`), e nenhum caminho da API os
+toca. É a leitura literal de "a retomada não redefine pico nem perdas"
+(RISK_ENGINE.md §5) transformada em privilégio, e `hunter_core/risk/resume.py` já
+a documenta do lado do código ("this module writes to `portfolio_risk_state`
+never at all").
 
 **A referência diária pode ser desconhecida.** `equity_day_start` e
 `day_reference_observed_at` são anuláveis, juntos (CHECK): não conseguir
@@ -2165,6 +2376,94 @@ transação. Adiada porque isso não dita ordem de statement — a T3.6 escreve 
 dois na ordem que quiser. Com ela o CHECK passa a valer transitivamente: sair de
 um bloqueio exige uma pessoa nomeada também na coluna efetiva.
 
+**"Correspondente" era fraco demais, e a T3.1b (bloqueante 1) mostrou como.** A
+primeira redação da trigger perguntava `EXISTS` sobre
+`(scope, scope_id, organization_id, from_state, to_state)` — qualquer linha,
+de qualquer época. Consequência: a **primeira** retomada legítima cunhava o par
+`(TRADING_DISABLED, ACTIVE)` e, a partir dali, `UPDATE portfolios SET
+kill_switch_state = 'ACTIVE'` passava para sempre — desbloqueio completo, sem
+linha, sem ator, sem evidência (reproduzido: **3 transições para 4 movimentos**).
+A variante é pior porque não precisa nem de um ciclo: `actor_id` não tem FK de
+propósito, então gravar **uma** linha `EMERGENCY → ACTIVE` atribuída a um UUID
+que nunca foi usuário autorizava todo destravamento futuro.
+
+Duas condições substituem o `EXISTS`, e **são necessárias as duas**:
+
+1. **coerência com a última transição do escopo** — a mais recente de
+   `(scope, scope_id)` por `ORDER BY created_at DESC, id DESC` tem de ser
+   exatamente `from = OLD.kill_switch_state`, `to = NEW.kill_switch_state`;
+2. **prova de mesma transação** — `t.xmin = pg_current_xact_id()::xid`.
+
+Sozinha, (1) é derrotada por uma linha *plantada antes*: escrever a transição
+numa transação e mover a coluna na seguinte a torna "a mais recente" e passa —
+que é literalmente a variante do ator inexistente. Sozinha, (2) é derrotada por
+uma transação que escreve uma linha casando com um movimento que ela não está
+fazendo. Juntas, "um movimento, uma linha, uma transação".
+
+**Por que `xmin` e não `portfolios.current_transition_id` com FK.** As duas
+opções estavam na mesa. `xmin` não custa coluna nova em tabela quente, não custa
+FK de uma tabela de tenant para uma append-only, e não obriga nenhum escritor a
+mudar: o caminho único (`hunter_core.risk.transitions.record_transition`) já
+escreve os dois na mesma transação. E `current_transition_id` **não prova mesma
+transação sozinho** — nada impede apontá-lo para uma linha escrita antes —, então
+ele exigiria a mesma condição (2) por cima, com o custo a mais. Barata e provável,
+como o brief pedia; registrada aqui a escolha.
+
+**O preço declarado, e é uma recusa falsa, nunca uma aprovação falsa.** Uma linha
+inserida **dentro de um `SAVEPOINT`** carrega o xid da subtransação, não o do topo
+(`pg_current_xact_id()` devolve sempre o do topo — medido). A regra para
+T3.4/T3.6/T3.12 é, portanto: **escreva a transição e o `UPDATE` na mesma
+transação, sem `SAVEPOINT`/`begin_nested` entre eles.** Nenhum caminho de escrita
+de hoje usa um.
+
+**Segunda consequência declarada: um movimento por transação e por escopo.** Se
+uma transação mover o kill switch da mesma carteira duas vezes (`ACTIVE →
+WARNING → TRADING_DISABLED` em dois `UPDATE`), a trigger adiada dispara duas
+vezes no COMMIT e as duas leem a *mesma* "última transição" — a segunda casa, a
+primeira não, e a transação é recusada. É o comportamento certo (a coluna se moveu
+de `ACTIVE` para `TRADING_DISABLED` e não há transição que diga isso) e o motor
+avalia um degrau por vez de qualquer forma, mas fica escrito em vez de descoberto.
+
+**A mesma trigger em `organizations` (T3.1b, deve corrigir 3).**
+`organizations.kill_switch_state` é lida como bloqueante pela API
+(`apps/api/.../radar_org_derivation.py`) e não tinha guarda nenhuma: um bloqueio
+de organização inteira era levantado com um `UPDATE` e zero histórico.
+`organizations_kill_switch_is_audited` é a mesma função, instanciada com
+`scope = 'organization'` e `organization_id = NEW.id`. O escopo `system` não tem
+linha (é configuração de processo, `hunter_core.risk.scopes`), então não tem
+trigger — e a §18.9 registra isso em vez de deixar a ausência parecer descuido.
+
+**Uma transição automática publica os números (T3.1b, sugestão 9).**
+`CHECK (actor_type <> 'system' OR evidence <> '{}'::jsonb)`. Numa linha `system`,
+`actor_id` é nulo por definição e `reason` é prosa: `evidence` é a única coisa
+que diz *por quê*. Vazia, a linha registra que algo aconteceu e nada sobre o quê.
+Uma pessoa continua podendo mover sem números — ela é a evidência. A guarda de
+upgrade correspondente conta linhas `actor_type = 'system'` preexistentes e
+**recusa**, porque a evidência de um movimento passado não é derivável.
+
+**A trilha sobrevive ao tenant (T3.1b, sugestão 10).**
+`kill_switch_transitions.organization_id` perdeu a FK
+`ON DELETE CASCADE` para `organizations` — pelo mesmo motivo, e com o mesmo
+precedente, de `audit_logs` (§15.4). O teardown é declarado com
+`app.portfolio_teardown`, um `SET LOCAL` que qualquer papel escreve, e com a
+cascata `DELETE FROM organizations` levava junto exatamente o registro de que o
+kill switch daquela organização foi travado: travar a carteira e depois remover o
+tenant era um jeito de o travamento nunca ter acontecido. **A órfã é
+intencional** — a linha continua com `organization_id` apontando para nada.
+
+**E a frase honesta sobre quem a lê** (correção da Astra na revisão deste diff,
+que reproduziu o contrário do que esta seção dizia antes): `tenant_isolation`
+filtra pela **coluna**, não pela linha referenciada, então a órfã é ilegível por
+**todo outro tenant** — mas continua legível por uma sessão que apresente
+`app.current_org` igual ao id da organização removida, que é exatamente o dono da
+trilha. Não é buraco: é a mesma propriedade que `audit_logs` tem desde a `0001`
+(§15.4) e é o ponto de a trilha sobreviver. O `CHECK
+(scope = 'system') = (organization_id IS NULL)` não é afetado — apagar a
+organização não mexe em `scope` nem em `organization_id`.
+
+Há guarda de downgrade para a órfã: restaurar a FK não a representa, então o
+downgrade recusa nomeando-as em vez de apagá-las.
+
 **O que continua não sendo prova, e o schema não finge que é:** *qual* pessoa.
 `actor_id` não tem FK para `users` de propósito — um usuário removido depois não
 pode invalidar a trilha —, então um UUID preenchido prova que alguém foi nomeado,
@@ -2179,7 +2478,7 @@ registrada.
 O índice único parcial da §11 do contrato está em `portfolios`:
 
 ```sql
-CREATE UNIQUE INDEX uq_portfolios_principal_paper ON portfolios (organization_id, workspace_id)
+CREATE UNIQUE INDEX uq_portfolios_principal_paper ON portfolios (organization_id)
   WHERE type = 'paper' AND NOT is_arena;
 ```
 
@@ -2187,8 +2486,29 @@ Sem `status` e sem excluir `deleted_at` preenchido, exatamente como a decisão
 conjunta manda — arquivar ou apagar logicamente a carteira e abrir outra
 preservaria as linhas antigas e ainda assim reiniciaria patrimônio e pico, e
 destravaria um kill switch bloqueado que ninguém autorizou. Como o Alembic não
-compara predicado de índice (§17.3), o predicado é lido de `pg_indexes` por
-`test_schema_paper.py`.
+compara predicado de índice (§17.3), **a chave e o predicado** são lidos de
+`pg_indexes` por `test_schema_paper.py`.
+
+**A chave é a organização, e não `(organização, workspace)` (T3.1b, bloqueante
+2).** Por par, o índice não impedia nada que um usuário não desfizesse: workspace
+é agrupamento de produto e `hunter_app` tem `INSERT` nele, então a sequência
+reproduzida foi *criar workspace novo → inserir portfolio + `portfolio_risk_state`
++ âncora com R$100.000 novos*, **sem `DELETE`, sem auditoria, sem tocar em nada
+que uma trigger visse**. Permanência chaveada em algo que um botão da UI cria não
+é permanência. A D7 do Everton é "uma carteira principal" e é isso que o índice
+passa a dizer; se um dia houver várias, é ato auditado de OWNER e revisão nova,
+nunca efeito colateral.
+
+**O que a T3.3 tem de ajustar** (declarado, não corrigido aqui — `hunter_core/
+portfolio/**` é dela): `open_paper_wallet` pré-checa
+`PortfolioRepository.principal_paper_id(workspace_id)` e a mensagem de
+`WalletAlreadyOpen` fala em workspace. O comportamento continua **seguro** —
+abrir a segunda carteira em outro workspace da mesma organização agora perde no
+índice, a `IntegrityError` nomeia `uq_portfolios_principal_paper` e o
+`except` existente a converte em `WalletAlreadyOpen` —, mas a pré-checagem passa a
+ser inútil e a mensagem, errada: ela diz "concurrent opening" para o que é uma
+carteira já aberta noutro workspace. O ajuste é escopar a pré-checagem pela
+organização e reescrever as duas frases.
 
 **O índice impede uma segunda carteira e não impede nada sobre a primeira.** E
 `portfolios` está em `APP_WRITE_TABLES` (§15.6), então `hunter_app` tem `DELETE`:
@@ -2231,10 +2551,49 @@ mudar grants; a `0005` já acrescenta um), mas porque sozinha ela bloquearia
 também a exclusão legítima de carteiras de experimento e não fecharia nem a
 cascata nem a alteração de identidade.
 
-**Seed.** `paper_v1` é semeado por `infra/scripts/seed_paper.py` com os valores da
-diretiva gravados como **strings JSON** (viram `Decimal` sem passar por float),
-e é a quarta coisa congelada do seed: inserido quando falta, **verificado** quando
-presente, com divergência parando o seed. Os três presets genéricos continuam
+**Seed: uma fonte para o `paper_v1` (T3.1b, deve corrigir 7).**
+`seed_reference.PAPER_V1_LIMITS` era um **segundo literal** ao lado de
+`hunter_risk.limits.PAPER_V1`, e os dois já tinham divergido:
+`RiskLimits.model_validate(profile.limits)` falhava com **dez** erros sobre a
+linha que o seed grava. Seis chaves que o motor exige faltavam —
+`max_entry_deviation_pct`, `max_price_age_s`, `max_book_age_s`,
+`max_volume_age_s`, `max_beta_age_s` e `day_timezone` —, ou seja, os tetos que a
+v2.1 do contrato acrescentou existiam no código e **em nenhum perfil que uma
+organização copia no onboarding**; e quatro chaves para as quais o motor não tem
+campo estavam presentes, o que `extra="forbid"` rejeita.
+
+A correção é a doutrina do §17.8 aplicada de novo: o seed passa a gravar
+exatamente `hunter_risk.limits.PAPER_V1.model_dump(mode="json")`.
+`hunter-core` já declara `hunter-risk` como dependência de distribuição
+(`packages/core/pyproject.toml`) e a imagem já copia `packages/risk-core`, então
+não foi preciso gerar JSON por script. `model_dump(mode="json")` é o que mantém a
+regra do §17.8 sobre fração: pydantic renderiza todo `Decimal` como **string**
+JSON, que é como o motor os lê de volta. **Nenhum valor da diretiva muda** — a
+prova é `test_the_seeded_paper_profile_has_exactly_one_source`, que carrega os
+dois e compara `json.dumps(..., sort_keys=True)` byte a byte, mais as asserções
+por número em `test_schema_seed_and_partitions.py`.
+
+**Quatro chaves saem do JSON, e cada uma tem destino declarado** — o mesmo padrão
+de `max_exchange_exposure_pct`/`max_position_pct` logo abaixo, e não um
+desaparecimento silencioso:
+
+| Chave removida | Onde a informação passa a viver |
+|---|---|
+| `participation_reference` | é **fórmula**, não limite: `hunter_risk` a calcula de `MarketLiquidity` (`inputs.participation_reference`) e nunca a leu daqui |
+| `market_types: ["spot"]` | é o que `max_leverage = 1` já significa, e o validador de `RiskLimits` recusa qualquer outro valor ("directive §6 is spot only") |
+| `auto_close_on_emergency: false` | é a **ausência** de caminho de liquidação automática em `hunter_risk.kill_switch`, não um interruptor que alguém lê |
+| `regime_size_multiplier` | nomeia a gramática do v1 (RISK_ENGINE.md §2.1) que o motor do M3 **não implementa** — `RiskLimits` não tem o campo. Carregá-la no perfil fazia um controle não implementado parecer configurado |
+
+As duas últimas linhas são **desvio em relação à tabela de RISK_ENGINE.md §2**,
+que ainda lista `participation_reference` e `regime_size_multiplier` como chaves
+do perfil. Fica registrado aqui como a diferença entre *o que o contrato descreve*
+e *o que o motor da T3.2 lê*; fechá-la é decisão do dono de
+`docs/RISK_ENGINE.md` e de `packages/risk-core` (acrescentar os campos ao
+`RiskLimits` ou remover as linhas da tabela), não deste diff, que não pode tocar
+em `packages/risk-core/**`.
+
+`paper_v1` continua sendo a quarta coisa congelada do seed: inserido quando falta,
+**verificado** quando presente, com divergência parando o seed. Os três presets genéricos continuam
 sendo reescritos no lugar porque são padrões em que ninguém apostou dinheiro;
 `paper_v1` é o perfil da carteira, todo número nele é do Everton, e o contrato
 (§2) faz de qualquer mudança de valor uma pergunta a ele, não um deploy. O custo
@@ -2255,9 +2614,21 @@ leria como "sem limite" em vez de "não se aplica aqui".
 |---|---|---|---|
 | `PAPER_APP_READ_ONLY_TABLES` | `hunter_app` | `SELECT` | `fx_observations`, `market_betas` |
 | `PAPER_APPEND_TABLES` | ambos | `SELECT`/`INSERT` | `portfolio_currency_anchor`, `participation_consumptions` |
-| `PAPER_NO_DELETE_TABLES` | ambos | `SELECT`/`INSERT`/`UPDATE` | `portfolio_exit_intents`, `portfolio_risk_state` |
+| `PAPER_NO_DELETE_TABLES` | ambos | `SELECT`/`INSERT`/`UPDATE` | `portfolio_exit_intents` |
+| `PAPER_LOCK_ONLY_TABLES` | `hunter_app` | `SELECT`/`INSERT` + `UPDATE (updated_at)` | `portfolio_risk_state` |
+| `PAPER_LOCK_ONLY_TABLES` | `hunter_worker` | `SELECT`/`INSERT`/`UPDATE` | `portfolio_risk_state` |
 | `PAPER_WORKER_APPEND_TABLES` | `hunter_worker` | `SELECT`/`INSERT` | `fx_observations` |
 | `PAPER_WORKER_SUPERSEDE_TABLES` | `hunter_worker` | `SELECT`/`INSERT`/`UPDATE` | `market_betas` |
+
+**`PAPER_LOCK_ONLY_TABLES` é a sexta classe, e a primeira com grant por coluna.**
+`portfolio_risk_state` saiu de `PAPER_NO_DELETE_TABLES` na T3.1b: o `UPDATE` do
+`hunter_app` ali é **trava, não escrita**, e a forma estreita
+(`UPDATE (updated_at)`) é a que sobrevive a herança de papel, porque privilégio é
+herdado e nome não é. Mesmo formato de argumento que `BASELINE_LOCK_TABLES_0005`
+(§17.6) — o privilégio nomeia a capacidade, não a permissão —, só que aqui a
+permissão é de fato negada pelo próprio grant e não só pelo trigger. O motivo
+completo, com o bug que um `REVOKE` inteiro reintroduziria e o experimento que
+mede o grant por coluna, está na §18.7 (e a correção da §17.2, lá).
 
 `test_schema_privileges.py` une estas listas às das revisões anteriores — toda
 tabela continua classificada exatamente uma vez.
@@ -2266,13 +2637,36 @@ tabela continua classificada exatamente uma vez.
 `tenant_isolation` própria. `fx_observations` e `market_betas` ficam fora por
 serem globais (§1.1).
 
+**Triggers desta revisão, por tabela** (todas em `ddl/paper.py`):
+
+| Tabela | Trigger | Momento |
+|---|---|---|
+| `fx_observations` | `fx_observations_immutable` | `BEFORE UPDATE OR DELETE` |
+| `market_betas` | `market_betas_immutable` | `BEFORE UPDATE OR DELETE` |
+| `portfolio_currency_anchor` | `portfolio_currency_anchor_matches_observation` | `BEFORE INSERT` |
+| `portfolio_currency_anchor` | `portfolio_currency_anchor_immutable` | `BEFORE UPDATE OR DELETE` |
+| `portfolio_risk_state` | `portfolio_risk_state_guard` | `BEFORE INSERT OR UPDATE OR DELETE` |
+| `portfolio_risk_state` | `portfolio_risk_state_opens_honestly` | constraint trigger `AFTER INSERT`, `DEFERRABLE INITIALLY DEFERRED` |
+| `portfolios` | `portfolios_permanence` | `BEFORE UPDATE OR DELETE` |
+| `workspaces` | `workspaces_permanence` | `BEFORE DELETE` |
+| `portfolios` | `portfolios_kill_switch_is_audited` | constraint trigger `AFTER UPDATE`, `DEFERRABLE INITIALLY DEFERRED` |
+| `organizations` | `organizations_kill_switch_is_audited` | idem |
+| `participation_consumptions` | `participation_consumptions_release_within_reservation` | `BEFORE INSERT` |
+
+**Não há trigger para o escopo `system` do kill switch, e a ausência é
+deliberada:** ele não tem linha — é configuração de processo lida por
+`hunter_core.risk.scopes` —, então não há coluna efetiva a amarrar a uma
+transição. Uma transição de escopo `system` continua sendo escrita e lida
+normalmente (§15.4, `system_scope_readable`).
+
 **Guardas de upgrade** (a migração conta os infratores e recusa com instruções —
 o precedente da `0002`; em todo banco de hoje cada uma conta zero):
 
 | Guarda | Por que não há backfill honesto |
 |---|---|
-| mais de uma carteira principal paper por `(organização, workspace)` | escolher qual delas é a permanente é decisão de operador sobre qual história é a real |
+| mais de uma carteira principal paper por **organização** | escolher qual delas é a permanente é decisão de operador sobre qual história é a real |
 | `kill_switch_transitions.actor_type` fora de (`user`,`system`) | o ator verdadeiro é conhecimento de quem moveu o switch |
+| transição `actor_type = 'system'` preexistente (T3.1b) | ela receberia o default `evidence = '{}'` e violaria o CHECK novo; os números que justificaram um movimento passado não são deriváveis de coluna nenhuma |
 | `from_state = to_state` | uma transição que não moveu não é transição |
 | saída de bloqueio sem `actor_type='user'` e `actor_id` | a migração não inventa a identidade que autorizou |
 | ordem cujo `(organization_id, portfolio_id)` diverge do da proposta | nenhuma inferência diz qual dos dois escopos era o verdadeiro |
@@ -2293,11 +2687,25 @@ contrato que esta revisão fixa para a T3.2); fill com `execution_key <> id::tex
 (chave real, não a identidade legada do backfill); proposta com `admission_seq`;
 ordem com `exit_intent_id`.
 
+e, desde a T3.1b, **transição de kill switch órfã** (com `organization_id` que
+não nomeia organização nenhuma): ela só existe porque a FK em cascata foi
+removida, e restaurar a FK no downgrade não a representa — recusar nomeando-as é
+o oposto de apagá-las em silêncio.
+
 O que **não** é guardado, declarado em vez de descoberto: revisões de β que
 nenhuma decisão preservada nomeia e observações de FX que nenhuma âncora ou
 snapshot nomeia — ambas recomputáveis ou recoletáveis, e recusar por causa delas
 tornaria o downgrade impossível em qualquer banco que os coletores já tenham
-tocado. É a mesma fronteira da §17.7.
+tocado. É a mesma fronteira da §17.7. **E, completando a sugestão 12 da revisão
+de segurança:** também não são guardadas as **intenções de saída em estado
+terminal** (`fulfilled`, `superseded`, `voided`) nem os **consumos de participação
+com mais de 60 s**. Os dois são deliberados e pela mesma razão: a guarda existe
+para não perder *obrigação viva* nem *evidência de um número que sobrevive*, e
+nenhum dos dois é. Uma intenção terminal já não deve nada — o que sobrevive dela é
+a ordem, o fill e o `trade`; um consumo fora da janela móvel já não conta contra
+nenhum teto, porque a fórmula da §18.5 só soma `executed` dentro dos 60 s. O que
+se perde é **histórico de auditoria**, não obrigação, e as instruções da guarda
+mandam exportar antes (abaixo) exatamente por isso.
 
 **As instruções das guardas dizem "exporte antes", e exportar não muda
 predicado nenhum.** É deliberado, e a frase completa é esta: o downgrade de um
@@ -2323,15 +2731,17 @@ sem `LISTEN`/`NOTIFY`, sem advisory lock de sessão — a serialização é a li
 `0006_paper_wallet` tem 17 caracteres; o teto de `alembic_version.version_num`
 continua sendo 32 (§17.6).
 
-**`execution.py` foi dividido em três, e o caminho público continua o mesmo.**
+**`execution.py` foi dividido em quatro, e o caminho público continua o mesmo.**
 `Fill`, `Position` e `Trade` moraram nele até esta revisão; a reserva, a sequência
 FIFO e as identidades compostas empurraram o módulo para além das 350 linhas
 (`infra/scripts/check_file_size.py`), então eles passaram para
-`execution_fills.py` e `execution_trades.py`. `execution.py` **reexporta os três**:
-`from hunter_core.db.models.execution import Position` é caminho público com
-chamador fora deste pacote (`apps/api`), e uma divisão de módulo que quebra um
+`execution_fills.py` e `execution_trades.py` — e as duas FKs compostas mais o
+CHECK que a T3.1b acrescentou a `orders` o empurraram de novo (359 linhas,
+medido), levando `Order` para `execution_orders.py`. `execution.py` **reexporta os
+quatro**: `from hunter_core.db.models.execution import Position` é caminho público
+com chamador fora deste pacote (`apps/api`), e uma divisão de módulo que quebra um
 import é uma refatoração que quebrou alguma coisa (Astra reproduziu o
-`ImportError` na revisão de diff).
+`ImportError` na revisão de diff). Sobra em `execution.py` só `TradeProposal`.
 
 Dois nomes de constraint tiveram de encolher porque a convenção de nomes gerava
 mais de 63 caracteres e o Postgres trunca identificadores: a bicondicional da
@@ -2340,3 +2750,10 @@ do sucessor de uma intenção é nomeada à mão
 (`fk_portfolio_exit_intents_superseded_by_id`). O sintoma, se alguém repetir o
 erro: `alembic check` acusa drift permanente, comparando o nome truncado que o
 banco tem com o nome inteiro que o modelo declara.
+
+Um terceiro nome é à mão por **colisão**, não por tamanho:
+`fk_orders_exit_intent_matches_position` (§18.3). A convenção
+`fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s` produziria
+`fk_orders_exit_intent_id_portfolio_exit_intents` para as **duas** FKs que
+`orders` tem para `portfolio_exit_intents` — a do quádruplo e a do par
+`(exit_intent_id, position_id)` — e a segunda derrubaria a primeira.

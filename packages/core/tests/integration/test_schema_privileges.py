@@ -318,6 +318,10 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     paper_read_only = _paper_tables("PAPER_APP_READ_ONLY_TABLES")
     paper_append = _paper_tables("PAPER_APPEND_TABLES")
     paper_no_delete = _paper_tables("PAPER_NO_DELETE_TABLES")
+    # T3.1b: ``portfolio_risk_state`` left ``PAPER_NO_DELETE_TABLES`` for a class
+    # of its own — the API gets SELECT/INSERT and ``UPDATE (updated_at)``, which
+    # is exactly enough to take the wallet lock and not enough to write a value.
+    paper_lock_only = _paper_tables("PAPER_LOCK_ONLY_TABLES")
 
     classified = (
         list(write)
@@ -329,6 +333,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(paper_read_only)
         + list(paper_append)
         + list(paper_no_delete)
+        + list(paper_lock_only)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 

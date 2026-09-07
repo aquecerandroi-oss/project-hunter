@@ -15,7 +15,7 @@ Nine things, in the order Postgres accepts them:
    but forbids *using* the value in that same transaction, so this revision adds
    them and writes none of them; ``paper_v1`` reaches the database through
    ``infra/scripts/seed.py``, after this has committed;
-3. the guards: six invariants no honest backfill can produce for a row that
+3. the guards: seven invariants no honest backfill can produce for a row that
    already violates them, so the upgrade counts the offenders and stops with
    instructions instead of guessing (``0002``'s precedent);
 4. the six new tables - ``fx_observations`` and ``market_betas`` (global,
@@ -27,13 +27,14 @@ Nine things, in the order Postgres accepts them:
    ``orders``, ``execution_key`` on ``fills``, ``fx_observation_id`` on the
    equity curve, and the kill-switch transition's ``evidence`` plus the CHECK
    that makes leaving a latched block an authenticated act;
-6. composite identity down proposal -> order -> fill, replacing the
-   single-column foreign keys and preserving their ``ON DELETE`` actions;
-7. the **principal wallet index**: unique on ``(organization_id, workspace_id)``
+6. composite identity down proposal -> order -> fill and across
+   position -> order/trade and intention -> attempt, replacing the single-column
+   foreign keys and preserving their ``ON DELETE`` actions;
+7. the **principal wallet index**: unique on ``(organization_id)``
    ``WHERE type = 'paper' AND NOT is_arena``, with no mention of ``status`` and
    no exclusion of ``deleted_at``. Alembic's autogenerate does not compare index
-   predicates, so this one is asserted against ``pg_indexes`` in
-   ``test_schema_paper.py``;
+   predicates, so both the key and the predicate are asserted against
+   ``pg_indexes`` in ``test_schema_paper.py``;
 8. RLS and grants for the new tables;
 9. the triggers: immutability where the plan says immutable, a monotonic peak
    and sequence, the permanence of an anchored wallet against deletion, against
@@ -47,6 +48,26 @@ that survives it - a live exit intention, a held reservation, participation
 spent inside the rolling window, the rate a wallet opened at. Reversing the two
 ``ADD VALUE``s means rebuilding those types from the labels ``0001`` froze,
 because Postgres cannot drop an enum label.
+
+**Amended in place after the security review of ``11faba8``, before any
+persistent application (T3.1b).** The review found two blocking holes and five
+must-fix ones; this revision was corrected rather than succeeded by a ``0007``
+because it had never been applied to a durable database - the VPS and the local
+stack were both on ``0005_baseline_lock_grant``, verified before the edit. It is
+the same freedom, and the same limit, that section 15 records for
+``0001_initial_schema``: a revision that never ran anywhere describes a schema,
+and the schema has to be the right one for whoever reads it next. What changed:
+the audited-kill-switch trigger now requires the newest transition of the scope,
+written in the same transaction (it accepted any matching row, ever); the same
+trigger guards ``organizations``; the principal wallet is unique per
+**organization**, not per ``(organization, workspace)``; ``orders`` and
+``trades`` name a position by its full scope and ``trades`` names its proposal
+the same way; the lock row refuses the application role's ``UPDATE`` and holds
+its trading day, its day reference and its peak to what was observed; the anchor
+checks the observation's currency pair; a participation release may not exceed
+its own reservation; an automatic transition must carry evidence; and
+``kill_switch_transitions`` loses its cascading foreign key so the kill-switch
+trail outlives the tenant, exactly like ``audit_logs``.
 
 Nothing here depends on session state: no session-level prepared statement, no
 ``LISTEN``/``NOTIFY``, no session advisory lock. The one GUC involved,
@@ -79,11 +100,13 @@ from ddl.paper import (
     create_cascade_guard,
     create_immutability,
     create_kill_switch_audit_guard,
+    create_participation_guards,
     create_permanence_guards,
     create_risk_state_guards,
     disable_paper_row_level_security,
     drop_anchor_guards,
     drop_immutability,
+    drop_participation_guards,
     drop_permanence_guards,
     drop_risk_state_guards,
     enable_paper_row_level_security,
@@ -116,10 +139,12 @@ def upgrade() -> None:
     create_permanence_guards()
     create_cascade_guard()
     create_kill_switch_audit_guard()
+    create_participation_guards()
 
 
 def downgrade() -> None:
     refuse_a_downgrade_that_would_discard_durable_state()
+    drop_participation_guards()
     drop_permanence_guards()
     drop_risk_state_guards()
     drop_anchor_guards()
@@ -845,6 +870,27 @@ def _alter_existing_tables() -> None:
         "kill_switch_transitions",
         "NOT (from_state IN ('TRADING_DISABLED', 'EMERGENCY') AND to_state IN ('ACTIVE', 'WARNING')) OR (actor_type = 'user' AND actor_id IS NOT NULL)",
     )
+    # An automatic move publishes the numbers it was based on - security review,
+    # suggestion 9. ``evidence = '{}'`` on a ``system`` transition is a latch
+    # nobody can audit afterwards: ``reason`` is prose and ``actor_id`` is null
+    # by definition, so the JSONB is the only thing that says *why*.
+    op.create_check_constraint(
+        op.f("ck_kill_switch_transitions_an_automatic_move_shows_its_numbers"),
+        "kill_switch_transitions",
+        "actor_type <> 'system' OR evidence <> '{}'::jsonb",
+    )
+    # The kill-switch trail outlives the tenant, exactly like ``audit_logs``
+    # (section 15.4) - security review, suggestion 10. With the cascade, a
+    # teardown (``app.portfolio_teardown``, a GUC any role can set) erased the
+    # record that the switch had ever been latched, for the organization whose
+    # latch it was. The orphan row is deliberate; ``tenant_isolation`` is what
+    # keeps it unreadable by anyone else, and the CHECK on ``(scope = 'system')
+    # = (organization_id IS NULL)`` is unaffected.
+    op.drop_constraint(
+        op.f("fk_kill_switch_transitions_organization_id_organizations"),
+        "kill_switch_transitions",
+        type_="foreignkey",
+    )
     op.add_column("orders", sa.Column("exit_intent_id", sa.UUID(), nullable=True))
     op.create_index(op.f("ix_orders_exit_intent_id"), "orders", ["exit_intent_id"], unique=False)
     op.drop_constraint(op.f("fk_orders_proposal_id_trade_proposals"), "orders", type_="foreignkey")
@@ -864,10 +910,57 @@ def _alter_existing_tables() -> None:
         ["id", "organization_id", "portfolio_id", "market_id"],
         ondelete="SET NULL (exit_intent_id)",
     )
+    # Security review, must-fix 4. ``position_id`` was a single-column foreign
+    # key, so organization A's order named organization B's position and every
+    # constraint passed; and ``exit_intent_id`` (quadruple) and ``position_id``
+    # could name two different positions, which is a protection attempt pointed
+    # at something it is not protecting. The second FK ties them together
+    # whenever both are present, and the CHECK is what makes "both present"
+    # follow from an attempt existing at all.
+    op.drop_constraint(op.f("fk_orders_position_id_positions"), "orders", type_="foreignkey")
+    op.create_foreign_key(
+        op.f("fk_orders_position_id_positions"),
+        "orders",
+        "positions",
+        ["position_id", "organization_id", "portfolio_id", "market_id"],
+        ["id", "organization_id", "portfolio_id", "market_id"],
+        ondelete="SET NULL (position_id)",
+    )
+    op.create_foreign_key(
+        "fk_orders_exit_intent_matches_position",
+        "orders",
+        "portfolio_exit_intents",
+        ["exit_intent_id", "position_id"],
+        ["id", "position_id"],
+        ondelete="SET NULL (exit_intent_id)",
+    )
     op.create_check_constraint(
         op.f("ck_orders_an_entry_serves_no_exit_intent"),
         "orders",
         "purpose <> 'entry' OR exit_intent_id IS NULL",
+    )
+    op.create_check_constraint(
+        op.f("ck_orders_an_exit_attempt_names_its_position"),
+        "orders",
+        "exit_intent_id IS NULL OR position_id IS NOT NULL",
+    )
+    op.drop_constraint(op.f("fk_trades_position_id_positions"), "trades", type_="foreignkey")
+    op.create_foreign_key(
+        op.f("fk_trades_position_id_positions"),
+        "trades",
+        "positions",
+        ["position_id", "organization_id", "portfolio_id", "market_id"],
+        ["id", "organization_id", "portfolio_id", "market_id"],
+        ondelete="SET NULL (position_id)",
+    )
+    op.drop_constraint(op.f("fk_trades_proposal_id_trade_proposals"), "trades", type_="foreignkey")
+    op.create_foreign_key(
+        op.f("fk_trades_proposal_id_trade_proposals"),
+        "trades",
+        "trade_proposals",
+        ["proposal_id", "organization_id", "portfolio_id", "market_id"],
+        ["id", "organization_id", "portfolio_id", "market_id"],
+        ondelete="SET NULL (proposal_id)",
     )
     op.add_column(
         "portfolio_equity_snapshots", sa.Column("fx_observation_id", sa.UUID(), nullable=True)
@@ -886,10 +979,26 @@ def _alter_existing_tables() -> None:
         ["id"],
         ondelete="RESTRICT",
     )
+    # The ceiling ``portfolio_risk_state_guard`` measures a rising peak against
+    # is ``max(equity)`` for the wallet; the PK cannot answer that without
+    # reading every point. Created on the partitioned parent, so it propagates
+    # to existing partitions and to the ones create_partitions.py adds later.
+    op.create_index(
+        "ix_portfolio_equity_snapshots_peak_lookup",
+        "portfolio_equity_snapshots",
+        ["portfolio_id", "equity"],
+        unique=False,
+    )
+    # One principal paper wallet per **organization** - security review, blocking
+    # 2. Keyed on ``(organization_id, workspace_id)`` it stopped nothing: a
+    # request handler created a second workspace and opened a second wallet with
+    # a fresh R$100.000, no DELETE, no audit trail (reproduced). D7 is "uma
+    # carteira principal"; if several are ever wanted, that is an audited OWNER
+    # act, not a side effect of creating a workspace.
     op.create_index(
         "uq_portfolios_principal_paper",
         "portfolios",
-        ["organization_id", "workspace_id"],
+        ["organization_id"],
         unique=True,
         postgresql_where=sa.text("type = 'paper' AND NOT is_arena"),
     )
@@ -1010,10 +1119,31 @@ def _revert_existing_tables() -> None:
     op.drop_column("trade_proposals", "reservation_state")
     op.drop_column("trade_proposals", "admission_seq")
     op.drop_column("trade_proposals", "source")
+    op.drop_constraint(op.f("fk_trades_proposal_id_trade_proposals"), "trades", type_="foreignkey")
+    op.create_foreign_key(
+        op.f("fk_trades_proposal_id_trade_proposals"),
+        "trades",
+        "trade_proposals",
+        ["proposal_id"],
+        ["id"],
+        ondelete="SET NULL",
+    )
+    op.drop_constraint(op.f("fk_trades_position_id_positions"), "trades", type_="foreignkey")
+    op.create_foreign_key(
+        op.f("fk_trades_position_id_positions"),
+        "trades",
+        "positions",
+        ["position_id"],
+        ["id"],
+        ondelete="SET NULL",
+    )
     op.drop_index(
         "uq_portfolios_principal_paper",
         table_name="portfolios",
         postgresql_where=sa.text("type = 'paper' AND NOT is_arena"),
+    )
+    op.drop_index(
+        "ix_portfolio_equity_snapshots_peak_lookup", table_name="portfolio_equity_snapshots"
     )
     op.drop_constraint(
         op.f("fk_portfolio_equity_snapshots_fx_observation_id_fx_observations"),
@@ -1025,7 +1155,20 @@ def _revert_existing_tables() -> None:
         table_name="portfolio_equity_snapshots",
     )
     op.drop_column("portfolio_equity_snapshots", "fx_observation_id")
+    op.drop_constraint(
+        op.f("ck_orders_an_exit_attempt_names_its_position"), "orders", type_="check"
+    )
     op.drop_constraint(op.f("ck_orders_an_entry_serves_no_exit_intent"), "orders", type_="check")
+    op.drop_constraint("fk_orders_exit_intent_matches_position", "orders", type_="foreignkey")
+    op.drop_constraint(op.f("fk_orders_position_id_positions"), "orders", type_="foreignkey")
+    op.create_foreign_key(
+        op.f("fk_orders_position_id_positions"),
+        "orders",
+        "positions",
+        ["position_id"],
+        ["id"],
+        ondelete="SET NULL",
+    )
     op.drop_constraint(
         op.f("fk_orders_exit_intent_id_portfolio_exit_intents"), "orders", type_="foreignkey"
     )
@@ -1040,6 +1183,19 @@ def _revert_existing_tables() -> None:
     )
     op.drop_index(op.f("ix_orders_exit_intent_id"), table_name="orders")
     op.drop_column("orders", "exit_intent_id")
+    op.create_foreign_key(
+        op.f("fk_kill_switch_transitions_organization_id_organizations"),
+        "kill_switch_transitions",
+        "organizations",
+        ["organization_id"],
+        ["id"],
+        ondelete="CASCADE",
+    )
+    op.drop_constraint(
+        op.f("ck_kill_switch_transitions_an_automatic_move_shows_its_numbers"),
+        "kill_switch_transitions",
+        type_="check",
+    )
     op.drop_constraint(
         op.f("ck_kill_switch_transitions_resuming_a_block_is_authenticated"),
         "kill_switch_transitions",

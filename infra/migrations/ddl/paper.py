@@ -26,7 +26,7 @@ that would move a wallet out of the protected scope are frozen once it is
 anchored, and deleting it is refused outright for the application role and
 requires a declared teardown for anyone else.
 
-**Guards for a populated database, and for the downgrade.** Three invariants
+**Guards for a populated database, and for the downgrade.** Seven invariants
 cannot be derived for rows that already violate them, so the upgrade counts the
 offenders and refuses with instructions (``0002``'s precedent). The downgrade
 refuses whenever reversing would silently destroy an obligation or the evidence
@@ -71,15 +71,44 @@ budget's memory — editing one would move money that was already spent, deletin
 one would give a market's minute back.
 """
 
-PAPER_NO_DELETE_TABLES: tuple[str, ...] = ("portfolio_exit_intents", "portfolio_risk_state")
+PAPER_NO_DELETE_TABLES: tuple[str, ...] = ("portfolio_exit_intents",)
 """``SELECT``/``INSERT``/``UPDATE`` for both roles — and never ``DELETE``.
 
-Both are genuinely mutable: an intention accumulates ``filled_qty`` and changes
-state, the risk state moves its peak, its day reference and its FIFO counter.
-Neither may be *removed*. An exit intention is the proof a position was
-protected, and the peak is monotonic precisely so that nothing can restart it —
-a ``DELETE`` plus an ``INSERT`` would be the reset a trigger comparing ``OLD``
-and ``NEW`` on ``UPDATE`` never sees (Astra's counter-example).
+An intention is genuinely mutable: it accumulates ``filled_qty`` and changes
+state. It may not be *removed* — it is the proof a position was protected.
+"""
+
+PAPER_LOCK_ONLY_TABLES: tuple[str, ...] = ("portfolio_risk_state",)
+"""``hunter_app``: ``SELECT``/``INSERT`` and ``UPDATE`` of **one column**.
+
+The engine owns this row (security review, finding 5): the peak, the trading day
+and its equity reference are ``hunter_worker``'s, and the API's business is the
+kill-switch column and its transition (T3.6). But the API also has to *take the
+wallet lock* on the way in (``hunter_core.risk.scopes.load_locked_state``), and
+PostgreSQL charges ``ACL_UPDATE`` for ``SELECT ... FOR UPDATE``, so a plain
+``REVOKE`` would reintroduce ``0005``'s bug with a new name — *permission denied
+for table portfolio_risk_state*, aborting the whole resume transaction.
+
+**A column-level grant is the exact shape needed, and this is measured, not
+assumed.** ``GRANT UPDATE (updated_at)`` lets the role take the row lock and
+refuses every ``UPDATE`` that writes a value:
+
+    GRANT SELECT, UPDATE (updated_at) ON t TO r;
+    SET ROLE r; SELECT v FROM t WHERE id = 1 FOR UPDATE;   -- 1 row
+    SET ROLE r; UPDATE t SET v = 99 WHERE id = 1;          -- permission denied
+
+(Postgres 16.15, probe of the T3.1b review. This contradicts the sentence in
+§17.2 that says a column grant "não serve" for a row mark; ``0005``'s table-wide
+grant on ``feature_baselines`` is left as it is, because there the immutability
+lives entirely in a trigger that binds the owner too — but the claim behind it is
+wrong and §17.2 now says so.)
+
+Why the privilege and not only the trigger: ``current_user = 'hunter_app'`` is a
+**name** test, and a login that merely *inherits* ``hunter_app`` keeps the
+privileges while reporting its own name — Astra reproduced exactly that, updating
+the peak to 999999 through an inheriting role. A privilege is inherited too, so
+narrowing it to one column travels with the inheritance; the trigger stays as
+defence in depth and is now a role-*membership* test rather than a name.
 """
 
 PAPER_WORKER_APPEND_TABLES: tuple[str, ...] = ("fx_observations",)
@@ -144,9 +173,18 @@ BETA_IMMUTABLE = "market_betas_immutable"
 ANCHOR_IMMUTABLE = "portfolio_currency_anchor_immutable"
 ANCHOR_MATCHES_FX = "portfolio_currency_anchor_matches_observation"
 RISK_STATE_GUARD = "portfolio_risk_state_guard"
+RISK_STATE_OPENS_HONESTLY = "portfolio_risk_state_opens_honestly"
+LOCK_COLUMN = "updated_at"
+"""The one column ``hunter_app`` may ``UPDATE`` — see :data:`PAPER_LOCK_ONLY_TABLES`.
+
+It carries no risk figure, and the grant on it exists for exactly one reason:
+PostgreSQL charges ``ACL_UPDATE`` for a row mark, and a *column* grant satisfies
+that while refusing every ``UPDATE`` that writes a value (measured, Postgres 16)."""
 PORTFOLIO_PERMANENCE = "portfolios_permanence"
 WORKSPACE_PERMANENCE = "workspaces_permanence"
 KILL_SWITCH_AUDITED = "portfolios_kill_switch_is_audited"
+ORG_KILL_SWITCH_AUDITED = "organizations_kill_switch_is_audited"
+PARTICIPATION_RELEASE = "participation_consumptions_release_within_reservation"
 
 _IS_ANCHORED = (
     "SELECT EXISTS (SELECT 1 FROM portfolio_currency_anchor "
@@ -158,7 +196,25 @@ construction: every value in it is a literal of this module."""
 _MARKER_IS_SET = (
     f"NULLIF(current_setting('{TEARDOWN_SETTING}', true), '') IS NOT DISTINCT FROM 'on'"
 )
-_CALLER_IS_THE_APP = f"current_user = '{APP_ROLE}'"
+
+_HAS_APP = f"pg_has_role(current_user, '{APP_ROLE}', 'USAGE')"
+_HAS_WORKER = f"pg_has_role(current_user, '{WORKER_ROLE}', 'USAGE')"
+
+_CALLER_IS_THE_APP = f"({_HAS_APP} AND NOT {_HAS_WORKER})"
+"""The session has the API's privileges **and nothing beyond them**.
+
+``current_user = 'hunter_app'`` was a *name* test and Astra walked through it in
+the T3.1b review: a login that merely inherits ``hunter_app`` keeps every
+privilege of the role while reporting its own name, so the guard did not
+recognise it. ``pg_has_role(..., 'USAGE')`` asks the question the guard actually
+means — *are the application's privileges available to this session?* — and the
+second half is what keeps the operator out of it: a superuser (or the owner, who
+is a member of both) has the worker's privileges too, so it is not "the app" and
+may still tear a tenant down with the declared marker. ``hunter_app`` itself, and
+anything that inherits only it, is."""
+
+_CALLER_IS_THE_ENGINE = _HAS_WORKER
+"""The session has ``hunter_worker``'s privileges — the lock row's only writer."""
 
 
 def _function(name: str, body: str) -> None:
@@ -239,15 +295,48 @@ def drop_immutability() -> None:
 
 
 def create_anchor_guards() -> None:
-    """The anchor is written once, agrees with its observation, and stays put."""
+    """The anchor is written once, agrees with its observation, and stays put.
+
+    "Agrees" is four things, and the first two are the security review's finding
+    6: the observation has to be **on this wallet's pair**
+    (``operating_currency || origin_currency``, i.e. ``USDTBRL``) and to carry an
+    ``available_at``. Without the pair check, an anchor naming a ``BTCUSDT``
+    observation at 60000 opened a wallet with "R$1,2 bilhão" — every CHECK
+    passed, because ``conversion_is_exact`` only proves the arithmetic is
+    internally consistent, not that the rate prices the right two currencies.
+    And the anchor is immutable, so the wrong opening would be permanent.
+    """
     _function(
         ANCHOR_MATCHES_FX,
         """
     DECLARE observed numeric;
+    DECLARE observed_pair text;
+    DECLARE observed_available timestamptz;
     DECLARE declared numeric;
     DECLARE wallet_currency text;
     BEGIN
-        SELECT rate INTO observed FROM fx_observations WHERE id = NEW.fx_observation_id;
+        SELECT rate, pair, available_at INTO observed, observed_pair, observed_available
+        FROM fx_observations WHERE id = NEW.fx_observation_id;
+        IF observed_pair IS DISTINCT FROM (NEW.operating_currency || NEW.origin_currency) THEN
+            RAISE EXCEPTION USING
+                MESSAGE = 'portfolio_currency_anchor names fx_observation '
+                    || NEW.fx_observation_id || ' on pair '
+                    || coalesce(observed_pair, 'missing') || ', and this wallet converts '
+                    || NEW.origin_currency || ' into ' || NEW.operating_currency
+                    || ', whose pair is ' || (NEW.operating_currency || NEW.origin_currency),
+                HINT = 'the convention is operating_currency || origin_currency (USDTBRL): '
+                    || 'how many units of the origin currency one unit of the operating '
+                    || 'currency costs. A BTCUSDT quote copied here opens the wallet with a '
+                    || 'number nobody credited, and the anchor is immutable, so the error '
+                    || 'would be permanent';
+        END IF;
+        IF observed_available IS NULL THEN
+            RAISE EXCEPTION USING
+                MESSAGE = 'fx_observation ' || NEW.fx_observation_id
+                    || ' has no available_at and may not anchor a wallet',
+                HINT = 'available_at is when we could have acted on the rate; an opening '
+                    || 'explained by a quote that was never reachable is not explained';
+        END IF;
         IF observed IS DISTINCT FROM NEW.rate THEN
             RAISE EXCEPTION USING
                 MESSAGE = 'portfolio_currency_anchor rate ' || NEW.rate
@@ -319,11 +408,74 @@ def drop_anchor_guards() -> None:
     _drop(ANCHOR_MATCHES_FX, "portfolio_currency_anchor")
 
 
+_OBSERVED_EQUITY = (
+    "greatest("
+    "coalesce((SELECT max(s.equity) FROM portfolio_equity_snapshots s "
+    "WHERE s.portfolio_id = NEW.portfolio_id), 0), "
+    "coalesce((SELECT p.initial_capital FROM portfolios p "
+    "WHERE p.id = NEW.portfolio_id), 0))"
+)
+"""The largest equity this wallet has ever **shown** — the ceiling of everything.
+
+"Observed" is defined, not implied (security review, finding 5): the greatest
+``portfolio_equity_snapshots.equity`` written for the wallet, or the capital its
+anchor credited. Anything above that is a number the curve never showed, and
+writing 999999 into ``peak_equity`` latches the wallet into a permanent
+drawdown — a kill switch nobody triggered, from a peak nobody measured, and the
+peak can never come back down to undo it.
+
+**``equity_day_start`` is bounded by it, not part of it** (Astra, T3.1b diff
+review). The first version put ``NEW.equity_day_start`` inside the ``greatest``,
+and one statement then declared its own ceiling: an ``INSERT`` with
+``peak_equity = 999999`` *and* ``equity_day_start = 999999`` passed as
+``hunter_app`` with no snapshot at all. Both columns are equities of the same
+wallet, so both are capped by what the wallet showed; neither may vouch for the
+other.
+
+The ``portfolios`` half is what makes the *opening* legal — the wallet's first
+lock row is written before its first curve point, and the anchor already proves
+``initial_capital`` is what was credited (§18.2).
+"""
+
+
 def create_risk_state_guards() -> None:
-    """The peak only rises, the sequence only advances, and neither restarts."""
+    """The peak only rises, the sequence only advances, and neither restarts.
+
+    ``0006`` shipped three of those. The security review's finding 5 added the
+    rest, and they are all about the same hole: ``hunter_app`` could rewrite the
+    engine's own bookkeeping from inside a request handler.
+
+    - **only the engine may ``UPDATE`` this row.** The lock row belongs to
+      ``hunter_worker``; the API's business here is the kill-switch *column* and
+      the transition, never the daily reference and never the peak (T3.6). The
+      test is role **membership** (:data:`_CALLER_IS_THE_ENGINE`) and not
+      ``current_user = 'hunter_app'``: a login that merely inherits ``hunter_app``
+      keeps its privileges while reporting its own name, and Astra walked an
+      inherited role straight through the name test in the T3.1b review. The
+      privilege side of the same fix is :data:`PAPER_LOCK_ONLY_TABLES`;
+    - **``trading_day`` is strictly increasing**, and is never unset. Rewinding
+      it (or clearing it) re-opens a day whose loss was already counted;
+    - **``equity_day_start`` is settable once per ``trading_day``.** Unknown to
+      known is the reference becoming available; known to anything else is an
+      accounting reset — the day's loss measured from a baseline chosen after
+      the loss;
+    - **neither the peak nor the day reference may exceed the equity that was
+      observed** (:data:`_OBSERVED_EQUITY`).
+
+    **The ``INSERT`` half is a separate, deferred trigger, and that is not a
+    style choice.** Checked ``BEFORE INSERT``, the ceiling was escapable with a
+    data-modifying CTE that wrote the child *before* the parent (Astra
+    reproduced it): the wallet did not exist yet, the guard had nothing to
+    compare against, and the foreign key — verified at the end of the statement,
+    when the parent did exist — was satisfied. Deferring the check to COMMIT
+    fixes the ordering, and it also lets the guard *refuse* an invisible wallet
+    instead of skipping: by COMMIT, RLS has already had its say on the insert
+    itself, so a row that got this far belongs to a wallet the session can see.
+    """
     _function(
         RISK_STATE_GUARD,
         f"""
+    DECLARE ceiling numeric;
     BEGIN
         IF TG_OP = 'DELETE' THEN
             IF {_CALLER_IS_THE_APP} OR NOT ({_MARKER_IS_SET}) THEN
@@ -336,12 +488,42 @@ def create_risk_state_guards() -> None:
             END IF;
             RETURN OLD;
         END IF;
+        IF TG_OP = 'INSERT' THEN
+            RETURN NEW;   -- the ceiling is checked at COMMIT; see the note below
+        END IF;
+        IF NOT ({_CALLER_IS_THE_ENGINE}) THEN
+            RAISE EXCEPTION USING
+                MESSAGE = 'portfolio_risk_state for ' || OLD.portfolio_id
+                    || ' may not be updated by ' || current_user,
+                HINT = 'the lock row is the engine''s: the daily reference and the peak are '
+                    || 'written by hunter_worker. The API moves the kill switch column and '
+                    || 'writes its transition, and resuming redefines neither peak nor '
+                    || 'losses. The only UPDATE this schema grants the API is of '
+                    || 'updated_at, which exists so it can take SELECT ... FOR UPDATE on '
+                    || 'the wallet lock (the 0005 lesson)';
+        END IF;
         IF NEW.peak_equity < OLD.peak_equity THEN
             RAISE EXCEPTION USING
                 MESSAGE = 'peak_equity for portfolio ' || OLD.portfolio_id
                     || ' would fall from ' || OLD.peak_equity || ' to ' || NEW.peak_equity,
                 HINT = 'the historical peak is monotonic and is never reset — drawdown is '
                     || 'measured from it, and lowering it would erase a limit that fired';
+        END IF;
+        IF NEW.peak_equity > OLD.peak_equity
+            OR (NEW.equity_day_start IS NOT NULL
+                AND NEW.equity_day_start IS DISTINCT FROM OLD.equity_day_start) THEN
+            ceiling := greatest({_OBSERVED_EQUITY}, OLD.peak_equity);
+            IF greatest(NEW.peak_equity, coalesce(NEW.equity_day_start, 0)) > ceiling THEN
+                RAISE EXCEPTION USING
+                    MESSAGE = 'portfolio ' || OLD.portfolio_id || ' would carry a peak of '
+                        || NEW.peak_equity || ' and a day reference of '
+                        || coalesce(NEW.equity_day_start::text, 'unknown')
+                        || ', above every equity observed for it (' || ceiling || ')',
+                    HINT = 'both are measurements, not settings: a peak above the curve '
+                        || 'latches the wallet in a drawdown that never happened and can '
+                        || 'never come back down, and a day reference above it invents the '
+                        || 'loss of the day. Write the equity point first';
+            END IF;
         END IF;
         IF NEW.last_admission_seq < OLD.last_admission_seq THEN
             RAISE EXCEPTION USING
@@ -350,6 +532,31 @@ def create_risk_state_guards() -> None:
                     || ' to ' || NEW.last_admission_seq,
                 HINT = 'fifo_v1 is a durable order; rewinding it would hand an admitted '
                     || 'place in the queue to a second proposal';
+        END IF;
+        IF NEW.trading_day IS DISTINCT FROM OLD.trading_day
+            AND OLD.trading_day IS NOT NULL
+            AND (NEW.trading_day IS NULL OR NEW.trading_day <= OLD.trading_day) THEN
+            RAISE EXCEPTION USING
+                MESSAGE = 'trading_day for portfolio ' || OLD.portfolio_id
+                    || ' would move from ' || OLD.trading_day || ' to '
+                    || coalesce(NEW.trading_day::text, 'unknown'),
+                HINT = 'the trading day only advances: re-opening a day whose loss was '
+                    || 'already counted is how the daily-loss limit is cleared without '
+                    || 'anything being earned back';
+        END IF;
+        IF NEW.trading_day IS NOT DISTINCT FROM OLD.trading_day
+            AND OLD.equity_day_start IS NOT NULL
+            AND (NEW.equity_day_start IS DISTINCT FROM OLD.equity_day_start
+                 OR NEW.day_reference_observed_at IS DISTINCT FROM
+                    OLD.day_reference_observed_at) THEN
+            RAISE EXCEPTION USING
+                MESSAGE = 'the day reference of portfolio ' || OLD.portfolio_id
+                    || ' for ' || coalesce(OLD.trading_day::text, 'an unknown day')
+                    || ' is already ' || OLD.equity_day_start
+                    || ' and is set once per trading day',
+                HINT = 'rewriting it re-bases today''s loss on a number chosen after the '
+                    || 'loss — an accounting reset with no DELETE and no new day. Unknown '
+                    || 'to known is allowed; known to anything else is not';
         END IF;
         IF NEW.portfolio_id IS DISTINCT FROM OLD.portfolio_id
             OR NEW.organization_id IS DISTINCT FROM OLD.organization_id THEN
@@ -360,15 +567,49 @@ def create_risk_state_guards() -> None:
         END IF;
         RETURN NEW;
     END;
-""",
+""",  # noqa: S608
     )
     op.execute(
-        f"CREATE TRIGGER {RISK_STATE_GUARD} BEFORE UPDATE OR DELETE ON portfolio_risk_state "
+        f"CREATE TRIGGER {RISK_STATE_GUARD} "
+        f"BEFORE INSERT OR UPDATE OR DELETE ON portfolio_risk_state "
         f"FOR EACH ROW EXECUTE FUNCTION {RISK_STATE_GUARD}()"
+    )
+    _function(
+        RISK_STATE_OPENS_HONESTLY,
+        f"""
+    DECLARE ceiling numeric;
+    BEGIN
+        ceiling := {_OBSERVED_EQUITY};
+        IF NOT EXISTS (SELECT 1 FROM portfolios p WHERE p.id = NEW.portfolio_id) THEN
+            RAISE EXCEPTION USING
+                MESSAGE = 'portfolio ' || NEW.portfolio_id || ' does not exist, or is not '
+                    || 'visible to ' || current_user || ', so its lock row cannot be opened',
+                HINT = 'write the wallet first; a lock row whose wallet the writer cannot see '
+                    || 'has no capital to be measured against';
+        END IF;
+        IF greatest(NEW.peak_equity, coalesce(NEW.equity_day_start, 0)) > ceiling THEN
+            RAISE EXCEPTION USING
+                MESSAGE = 'portfolio ' || NEW.portfolio_id || ' opens with a peak of '
+                    || NEW.peak_equity || ' and a day reference of '
+                    || coalesce(NEW.equity_day_start::text, 'unknown')
+                    || ', above every equity this wallet has shown (' || ceiling || ')',
+                HINT = 'a wallet opens at the capital its anchor credits; a peak above that '
+                    || 'latches a drawdown nobody measured, and the peak never falls again';
+        END IF;
+        RETURN NEW;
+    END;
+""",  # noqa: S608
+    )
+    op.execute(
+        f"CREATE CONSTRAINT TRIGGER {RISK_STATE_OPENS_HONESTLY} "
+        f"AFTER INSERT ON portfolio_risk_state "
+        f"DEFERRABLE INITIALLY DEFERRED FOR EACH ROW "
+        f"EXECUTE FUNCTION {RISK_STATE_OPENS_HONESTLY}()"
     )
 
 
 def drop_risk_state_guards() -> None:
+    _drop(RISK_STATE_OPENS_HONESTLY, "portfolio_risk_state")
     _drop(RISK_STATE_GUARD, "portfolio_risk_state")
 
 
@@ -464,11 +705,52 @@ def create_cascade_guard() -> None:
     )
 
 
+def _audited_move_body(*, subject: str, scope: str, organization: str) -> str:
+    """The body of an audited-kill-switch guard, for one scope.
+
+    Written once and instantiated twice because the hole is the same on both
+    tables and a second, hand-copied trigger is how the two drift apart.
+    """
+    return f"""
+    DECLARE latest record;
+    BEGIN
+        SELECT t.from_state, t.to_state, t.xmin INTO latest
+        FROM kill_switch_transitions t
+        WHERE t.scope = '{scope}' AND t.scope_id = NEW.id
+          AND t.organization_id = {organization}
+        ORDER BY t.created_at DESC, t.id DESC
+        LIMIT 1;
+        IF NOT FOUND
+            OR latest.from_state IS DISTINCT FROM OLD.kill_switch_state
+            OR latest.to_state IS DISTINCT FROM NEW.kill_switch_state THEN
+            RAISE EXCEPTION USING
+                MESSAGE = '{subject} ' || NEW.id || ' moved its kill switch from '
+                    || OLD.kill_switch_state || ' to ' || NEW.kill_switch_state
+                    || ' without an audited transition',
+                HINT = 'write the kill_switch_transitions row in the same transaction, and '
+                    || 'let it be the newest one for this scope: the state the workers read '
+                    || 'and the history a human reads may not disagree, and leaving a '
+                    || 'latched block needs a named person';
+        END IF;
+        IF latest.xmin IS DISTINCT FROM pg_current_xact_id()::xid THEN
+            RAISE EXCEPTION USING
+                MESSAGE = '{subject} ' || NEW.id || ' moved its kill switch from '
+                    || OLD.kill_switch_state || ' to ' || NEW.kill_switch_state
+                    || ' citing a transition written by an earlier transaction',
+                HINT = 'one move, one row, one transaction: a transition banked earlier '
+                    || 'would unblock this wallet again every time it is latched. Write '
+                    || 'the row and the column together';
+        END IF;
+        RETURN NEW;
+    END;
+"""  # noqa: S608
+
+
 def create_kill_switch_audit_guard() -> None:
-    """Moving the effective kill switch requires the transition that explains it.
+    """Moving an effective kill switch requires the transition that explains it.
 
     The CHECK on ``kill_switch_transitions`` makes an *unaudited* resumption
-    unrepresentable in the history; on its own it says nothing about the column
+    unrepresentable in the history; on its own it says nothing about the columns
     the workers actually read. ``UPDATE portfolios SET kill_switch_state =
     'ACTIVE'`` was a complete, silent unblock — no row, no actor, no evidence
     (Astra, diff review).
@@ -479,34 +761,45 @@ def create_kill_switch_audit_guard() -> None:
     transitively, so leaving TRADING_DISABLED or EMERGENCY needs a named person
     there too.
 
+    **Three things the first version got wrong, all from the security review.**
+
+    1. *(blocking 1)* It asked ``EXISTS`` on ``(scope, scope_id, organization_id,
+       from_state, to_state)`` — any row, ever. So after one legitimate
+       latch-and-resume cycle the pair ``(TRADING_DISABLED, ACTIVE)`` existed for
+       good, and every later ``UPDATE portfolios SET kill_switch_state =
+       'ACTIVE'`` passed with no row, no actor and no evidence (reproduced: three
+       transitions for four movements). The variant is worse, because it needs no
+       cycle at all: ``actor_id`` has no foreign key, so writing **one** row
+       ``EMERGENCY -> ACTIVE`` naming a user id that never existed unlatched the
+       wallet for ever after. Two conditions replace it: the transition has to be
+       the **newest** one of that scope *and* to have been written **in this
+       transaction** (``xmin = pg_current_xact_id()``). Being newest alone is not
+       enough — the row can be banked in an earlier transaction, which is exactly
+       the nonexistent-actor variant; being same-transaction alone is not enough
+       either, because a transaction may write a matching row for a move it is
+       not making.
+    2. *(must-fix 3)* Only ``portfolios`` had it, while
+       ``organizations.kill_switch_state`` is read as blocking by the API
+       (``radar_org_derivation.py``) and moved without any transition at all. The
+       same trigger now guards it with ``scope = 'organization'``.
+    3. The failure mode of the ``xmin`` test is a **false refusal**, never a
+       false pass, and it has one shape: a transition inserted inside a
+       ``SAVEPOINT`` carries the sub-transaction's xid, not the top level's. The
+       single write path (``hunter_core.risk.transitions.record_transition``)
+       does not use one; the rule for T3.4/T3.6/T3.12 is written down in
+       DATABASE.md §18.7 rather than left to be discovered.
+
     What this still does not prove is *which* person, and it does not try to:
     ``actor_id`` carries no foreign key on purpose (a user removed later must not
     be able to invalidate the trail), so authenticating the identity stays the
     API's job in T3.6. What the schema guarantees is that the move is recorded,
-    attributed to a kind of actor, and explained.
+    once, attributed to a kind of actor, and explained.
     """
     _function(
         KILL_SWITCH_AUDITED,
-        """
-    BEGIN
-        IF NOT EXISTS (
-            SELECT 1 FROM kill_switch_transitions t
-            WHERE t.scope = 'portfolio' AND t.scope_id = NEW.id
-              AND t.organization_id = NEW.organization_id
-              AND t.from_state = OLD.kill_switch_state
-              AND t.to_state = NEW.kill_switch_state
-        ) THEN
-            RAISE EXCEPTION USING
-                MESSAGE = 'portfolio ' || NEW.id || ' moved its kill switch from '
-                    || OLD.kill_switch_state || ' to ' || NEW.kill_switch_state
-                    || ' without an audited transition',
-                HINT = 'write the kill_switch_transitions row in the same transaction: '
-                    || 'the state the workers read and the history a human reads may '
-                    || 'not disagree, and leaving a latched block needs a named person';
-        END IF;
-        RETURN NEW;
-    END;
-""",
+        _audited_move_body(
+            subject="portfolio", scope="portfolio", organization="NEW.organization_id"
+        ),
     )
     op.execute(
         f"CREATE CONSTRAINT TRIGGER {KILL_SWITCH_AUDITED} AFTER UPDATE ON portfolios "
@@ -514,9 +807,70 @@ def create_kill_switch_audit_guard() -> None:
         f"WHEN (OLD.kill_switch_state IS DISTINCT FROM NEW.kill_switch_state) "
         f"EXECUTE FUNCTION {KILL_SWITCH_AUDITED}()"
     )
+    _function(
+        ORG_KILL_SWITCH_AUDITED,
+        _audited_move_body(subject="organization", scope="organization", organization="NEW.id"),
+    )
+    op.execute(
+        f"CREATE CONSTRAINT TRIGGER {ORG_KILL_SWITCH_AUDITED} AFTER UPDATE ON organizations "
+        f"DEFERRABLE INITIALLY DEFERRED FOR EACH ROW "
+        f"WHEN (OLD.kill_switch_state IS DISTINCT FROM NEW.kill_switch_state) "
+        f"EXECUTE FUNCTION {ORG_KILL_SWITCH_AUDITED}()"
+    )
+
+
+def create_participation_guards() -> None:
+    """A release gives back what was reserved, never more (security review, 8).
+
+    ``notional > 0`` was the only bound on a ``released`` entry, so a release of
+    900 against a reservation of 80 was accepted and the budget formula of §18.5
+    — ``Σ(reserved − executed − released)`` — handed a market 820 USDT of the
+    minute it never had. A CHECK cannot reach ``trade_proposals``, so this is a
+    trigger; and a release against a proposal that never quantified a reservation
+    is refused outright, because there is nothing for it to give back.
+    """
+    _function(
+        PARTICIPATION_RELEASE,
+        """
+    DECLARE reserved numeric;
+    BEGIN
+        IF NEW.kind <> 'released' THEN
+            RETURN NEW;
+        END IF;
+        SELECT reserved_notional INTO reserved
+        FROM trade_proposals WHERE id = NEW.proposal_id;
+        IF reserved IS NULL THEN
+            RAISE EXCEPTION USING
+                MESSAGE = 'participation release of ' || NEW.notional || ' names proposal '
+                    || NEW.proposal_id || ', which never quantified a reservation',
+                HINT = 'a release returns a commitment that was made; without a '
+                    || 'reserved_notional there is nothing to give back to the market''s '
+                    || 'minute';
+        END IF;
+        IF NEW.notional > reserved THEN
+            RAISE EXCEPTION USING
+                MESSAGE = 'participation release of ' || NEW.notional || ' for proposal '
+                    || NEW.proposal_id || ' is larger than the ' || reserved
+                    || ' that proposal reserved',
+                HINT = 'the budget is Σ(reserved − executed − released); releasing more '
+                    || 'than was reserved hands the market a minute it never had';
+        END IF;
+        RETURN NEW;
+    END;
+""",
+    )
+    op.execute(
+        f"CREATE TRIGGER {PARTICIPATION_RELEASE} BEFORE INSERT ON participation_consumptions "
+        f"FOR EACH ROW EXECUTE FUNCTION {PARTICIPATION_RELEASE}()"
+    )
+
+
+def drop_participation_guards() -> None:
+    _drop(PARTICIPATION_RELEASE, "participation_consumptions")
 
 
 def drop_permanence_guards() -> None:
+    _drop(ORG_KILL_SWITCH_AUDITED, "organizations")
     _drop(KILL_SWITCH_AUDITED, "portfolios")
     _drop(WORKSPACE_PERMANENCE, "workspaces")
     _drop(PORTFOLIO_PERMANENCE, "portfolios")
@@ -548,12 +902,22 @@ def _refuse(count_sql: str, message: str, hint: str) -> None:
 _UPGRADE_GUARDS: tuple[tuple[str, str, str], ...] = (
     (
         "SELECT organization_id FROM portfolios WHERE type = 'paper' AND NOT is_arena "
-        "GROUP BY organization_id, workspace_id HAVING count(*) > 1",
-        "(organization, workspace) pairs already hold more than one principal paper "
-        "wallet; 0006_paper_wallet makes that pair unique and cannot choose which of "
+        "GROUP BY organization_id HAVING count(*) > 1",
+        "organizations already hold more than one principal paper wallet; "
+        "0006_paper_wallet makes that unique per organization and cannot choose which of "
         "them is the permanent one",
         "keep the wallet whose history is the real one, mark the others is_arena = true "
         "(an explicitly labelled experiment), and re-run the migration",
+    ),
+    (
+        "SELECT 1 FROM kill_switch_transitions WHERE actor_type = 'system'",
+        "kill_switch_transitions rows were written by an automatic actor before "
+        "0006_paper_wallet added the evidence column, so they carry the '{}' default; "
+        "the revision requires an automatic move to publish the numbers that justified "
+        "it and cannot invent them",
+        "attach the evidence each automatic move was based on (daily loss, drawdown, "
+        "equity, peak, trading day and the thresholds in force), or remove the rows, "
+        "and re-run the migration",
     ),
     (
         "SELECT 1 FROM kill_switch_transitions WHERE actor_type NOT IN ('user', 'system')",
@@ -697,6 +1061,15 @@ _DOWNGRADE_GUARDS: tuple[tuple[str, str, str], ...] = (
         "export the referenced revisions before downgrading",
     ),
     (
+        "SELECT 1 FROM kill_switch_transitions t WHERE t.organization_id IS NOT NULL "
+        "AND NOT EXISTS (SELECT 1 FROM organizations o WHERE o.id = t.organization_id)",
+        "kill switch transitions outlived the organization they belong to, which is what "
+        "0006_paper_wallet dropping the cascading foreign key is for; restoring that key "
+        "cannot represent them and reverting would have to delete the trail",
+        "export those transitions before downgrading, and be explicit that the record of "
+        "a removed tenant's latch goes with them",
+    ),
+    (
         "SELECT 1 FROM kill_switch_transitions WHERE evidence <> '{}'::jsonb",
         "kill switch transitions carry the numbers that justified them; dropping "
         "the column keeps the move and loses the reason - and a system-scope "
@@ -748,6 +1121,10 @@ def grant_paper_privileges() -> None:
         op.execute(f"GRANT SELECT, INSERT ON {table} TO {APP_ROLE}, {WORKER_ROLE}")
     for table in PAPER_NO_DELETE_TABLES:
         op.execute(f"GRANT SELECT, INSERT, UPDATE ON {table} TO {APP_ROLE}, {WORKER_ROLE}")
+    for table in PAPER_LOCK_ONLY_TABLES:
+        op.execute(f"GRANT SELECT, INSERT ON {table} TO {APP_ROLE}, {WORKER_ROLE}")
+        op.execute(f"GRANT UPDATE ({LOCK_COLUMN}) ON {table} TO {APP_ROLE}")
+        op.execute(f"GRANT UPDATE ON {table} TO {WORKER_ROLE}")
     for table in PAPER_WORKER_APPEND_TABLES:
         op.execute(f"GRANT SELECT, INSERT ON {table} TO {WORKER_ROLE}")
     for table in PAPER_WORKER_SUPERSEDE_TABLES:
@@ -759,6 +1136,7 @@ def revoke_paper_privileges() -> None:
         *PAPER_APP_READ_ONLY_TABLES,
         *PAPER_APPEND_TABLES,
         *PAPER_NO_DELETE_TABLES,
+        *PAPER_LOCK_ONLY_TABLES,
         *PAPER_WORKER_APPEND_TABLES,
         *PAPER_WORKER_SUPERSEDE_TABLES,
     ):

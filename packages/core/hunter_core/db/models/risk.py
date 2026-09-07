@@ -69,7 +69,15 @@ class KillSwitchTransition(Base, UUIDPrimaryKeyMixin):
 
     __tablename__ = "kill_switch_transitions"
     __table_args__ = (
-        org_fk(),
+        # **No foreign key to ``organizations``, exactly like ``audit_logs``**
+        # (§15.4) — security review of ``0006``, suggestion 10. The cascade made
+        # the kill-switch trail the one piece of evidence a tenant teardown
+        # erased, and the teardown is declared with ``app.portfolio_teardown``, a
+        # ``SET LOCAL`` any role can write. Latching a wallet and then removing
+        # the organization must not be a way to make the latch never have
+        # happened. The orphan row is deliberate and ``tenant_isolation`` keeps
+        # it unreadable by every other tenant; ``system_scope_has_no_org`` is
+        # unaffected, because it constrains the *shape* and not the reference.
         CheckConstraint(
             "(scope = 'system') = (organization_id IS NULL)", name="system_scope_has_no_org"
         ),
@@ -87,6 +95,15 @@ class KillSwitchTransition(Base, UUIDPrimaryKeyMixin):
             "AND to_state IN ('ACTIVE', 'WARNING')) "
             "OR (actor_type = 'user' AND actor_id IS NOT NULL)",
             name="resuming_a_block_is_authenticated",
+        ),
+        # **An automatic move publishes the numbers it was based on.** With
+        # ``actor_id`` null by definition and ``reason`` being prose, ``evidence``
+        # is the only thing on a ``system`` row that says *why* — an empty one is
+        # a latch (or an unlatch, at WARNING level) nobody can audit afterwards
+        # (security review, suggestion 9).
+        CheckConstraint(
+            "actor_type <> 'system' OR evidence <> '{}'::jsonb",
+            name="an_automatic_move_shows_its_numbers",
         ),
         Index("ix_kill_switch_transitions_scope_created", "scope", "scope_id", "created_at"),
     )

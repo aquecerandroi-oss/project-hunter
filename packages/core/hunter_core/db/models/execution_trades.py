@@ -17,6 +17,7 @@ from typing import Any
 from sqlalchemy import (
     CheckConstraint,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Text,
@@ -51,6 +52,31 @@ class Trade(Base, UUIDPrimaryKeyMixin, TenantMixin):
         org_fk(),
         tenant_scoped_fk("portfolio_id", "portfolios"),
         tenant_scoped_fk("agent_id", "agents", ondelete=_AGENT_SET_NULL),
+        # Same correction as ``orders`` (security review, must-fix 4): the closed
+        # position and the decision behind it are named by their full scope, not
+        # by a bare id that any organization's row satisfies. ``trades`` is the
+        # table analytics treats as the truth, so a row attributing another
+        # tenant's position to this wallet is a number nobody can un-publish.
+        ForeignKeyConstraint(
+            ["position_id", "organization_id", "portfolio_id", "market_id"],
+            [
+                "positions.id",
+                "positions.organization_id",
+                "positions.portfolio_id",
+                "positions.market_id",
+            ],
+            ondelete="SET NULL (position_id)",
+        ),
+        ForeignKeyConstraint(
+            ["proposal_id", "organization_id", "portfolio_id", "market_id"],
+            [
+                "trade_proposals.id",
+                "trade_proposals.organization_id",
+                "trade_proposals.portfolio_id",
+                "trade_proposals.market_id",
+            ],
+            ondelete="SET NULL (proposal_id)",
+        ),
         UniqueConstraint("position_id"),
         CheckConstraint("qty > 0", name="qty_positive"),
         CheckConstraint("entry_price > 0", name="entry_price_positive"),
@@ -66,15 +92,11 @@ class Trade(Base, UUIDPrimaryKeyMixin, TenantMixin):
         ForeignKey("strategy_versions.id", ondelete="SET NULL"), index=True
     )
     market_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(_MARKET_FK, ondelete="RESTRICT"))
-    position_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("positions.id", ondelete="SET NULL")
-    )
+    position_id: Mapped[uuid.UUID | None]
     signal_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("agent_signals.id", ondelete="SET NULL"), index=True
     )
-    proposal_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("trade_proposals.id", ondelete="SET NULL"), index=True
-    )
+    proposal_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     opportunity_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("opportunities.id", ondelete="SET NULL"), index=True
     )

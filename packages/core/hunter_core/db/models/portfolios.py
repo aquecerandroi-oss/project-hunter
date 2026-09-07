@@ -82,18 +82,27 @@ class Portfolio(Base, UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin):
         UniqueConstraint("id", "organization_id", name="uq_portfolios_id_org"),
         CheckConstraint("initial_capital >= 0", name="initial_capital_non_negative"),
         Index("ix_portfolios_org_type_status", "organization_id", "type", "status"),
-        # **One principal paper wallet per (organization, workspace), for ever.**
-        # RISK_ENGINE.md §11 and the M3 joint decision, item 2. The predicate is
-        # exactly ``type = 'paper' AND NOT is_arena`` and deliberately does *not*
-        # mention ``status`` and does *not* exclude ``deleted_at IS NOT NULL``:
-        # archiving or soft-deleting the wallet and opening another one would
-        # preserve the old rows and still restart the equity and the peak, and
-        # would release a TRADING_DISABLED kill switch nobody authorised — the
-        # same substitution the directive forbids when it forbids a reset.
+        # **One principal paper wallet per organization, for ever.**
+        # RISK_ENGINE.md §11 and the M3 joint decision, item 2 (D7: "uma carteira
+        # principal"). The predicate is exactly ``type = 'paper' AND NOT
+        # is_arena`` and deliberately does *not* mention ``status`` and does
+        # *not* exclude ``deleted_at IS NOT NULL``: archiving or soft-deleting
+        # the wallet and opening another one would preserve the old rows and
+        # still restart the equity and the peak, and would release a
+        # TRADING_DISABLED kill switch nobody authorised — the same substitution
+        # the directive forbids when it forbids a reset.
+        #
+        # **The key is the organization, not (organization, workspace)** —
+        # security review of ``0006``, blocking 2. Per pair, the index stopped
+        # nothing that mattered: ``hunter_app`` creates a workspace and opens a
+        # second principal wallet inside it with a fresh R$100.000, no ``DELETE``
+        # and no audit entry (reproduced). Workspaces are a user-facing grouping,
+        # so anything keyed on them is a permanence guarantee a UI button can
+        # dissolve. Several principal wallets, if they are ever wanted, are an
+        # audited OWNER act and a migration, not a side effect.
         Index(
             "uq_portfolios_principal_paper",
             "organization_id",
-            "workspace_id",
             unique=True,
             postgresql_where=text("type = 'paper' AND NOT is_arena"),
         ),
@@ -145,6 +154,15 @@ class PortfolioEquitySnapshot(Base, TenantMixin):
     __table_args__ = (
         org_fk(),
         tenant_scoped_fk("portfolio_id", "portfolios"),
+        # "The largest equity this wallet ever showed" — the ceiling
+        # ``portfolio_risk_state_guard`` measures a rising peak and a new day
+        # reference against (§18.7). The PK is ``(portfolio_id, resolution,
+        # ts)``, which finds the wallet's rows but cannot answer ``max(equity)``
+        # without reading them all; this makes it an index scan instead, on a
+        # check that runs once per sampling interval per wallet. Declared on the
+        # partitioned parent, so Postgres propagates it to every partition,
+        # including the ones ``create_partitions.py`` adds later.
+        Index("ix_portfolio_equity_snapshots_peak_lookup", "portfolio_id", "equity"),
         {"postgresql_partition_by": "LIST (resolution)"},
     )
 

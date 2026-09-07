@@ -22,9 +22,13 @@ Four groups, matching the four promises T3.1 is accepted on:
 
 from __future__ import annotations
 
+import importlib.util
+import json
+import sys
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -34,6 +38,9 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from sqlalchemy.sql.elements import TextClause
 
 from hunter_core.domain.types import uuid7
+from hunter_risk.limits import PAPER_V1, RiskLimits
+
+from .conftest import SCRIPTS_DIR
 
 pytestmark = pytest.mark.integration
 
@@ -190,10 +197,10 @@ async def _as(
 # --------------------------------------------------------------------------
 
 
-async def test_the_principal_wallet_index_ignores_status_and_soft_delete(
+async def test_the_principal_wallet_index_is_keyed_on_the_organization_alone(
     schema_engine: AsyncEngine,
 ) -> None:
-    """The predicate is read back from Postgres, not from the model.
+    """The key *and* the predicate, read back from Postgres, not from the model.
 
     Alembic compares the *columns* of an index and not its ``WHERE`` (§17.3), so
     an index left with the wrong predicate reports no drift while enforcing the
@@ -201,6 +208,12 @@ async def test_the_principal_wallet_index_ignores_status_and_soft_delete(
     predicate must not mention ``status`` and must not exclude a filled
     ``deleted_at`` — archiving or soft-deleting the wallet and opening another
     one is the substitution the directive forbids.
+
+    The **key** is the security review's blocking finding 2. With
+    ``(organization_id, workspace_id)`` the index was permanence against nothing
+    a user cannot undo: creating a workspace is an ordinary product action, and
+    the wallet inside it is a fresh R$100.000. D7 is one principal wallet, so the
+    key is the organization.
     """
     async with schema_engine.connect() as connection:
         definition: str | None = await connection.scalar(
@@ -209,7 +222,10 @@ async def test_the_principal_wallet_index_ignores_status_and_soft_delete(
         )
     assert definition is not None, "the principal-wallet index is missing"
     assert "UNIQUE INDEX" in definition
-    assert "(organization_id, workspace_id)" in definition
+    assert "(organization_id)" in definition
+    assert "workspace_id" not in definition, (
+        "keyed on the workspace, a second principal wallet is one CREATE WORKSPACE away"
+    )
     assert "type = 'paper'" in definition
     assert "NOT is_arena" in definition
     assert "status" not in definition, "the index must not depend on status"
@@ -446,6 +462,17 @@ async def test_the_peak_only_rises_and_the_admission_sequence_only_advances(
     """Drawdown is measured from the peak; lowering it erases a limit that fired."""
     wallet, _other = wallets
     async with schema_engine.begin() as connection:
+        # The peak may only rise as far as the curve went (T3.1b, must-fix 5), so
+        # the rise this test needs has to be an observation first.
+        await connection.execute(
+            text(
+                "INSERT INTO portfolio_equity_snapshots (organization_id, portfolio_id, "
+                "resolution, ts, cash, equity, exposure_notional, unrealized_pnl, "
+                "realized_pnl_cum, peak_equity) VALUES "
+                "(:org, :pf, '1m', :ts, 0, 25000, 0, 0, 0, 25000)"
+            ),
+            {"org": wallet.org_id, "pf": wallet.portfolio_id, "ts": _NOW},
+        )
         await connection.execute(
             text("UPDATE portfolio_risk_state SET peak_equity = 25000 WHERE portfolio_id = :id"),
             {"id": wallet.portfolio_id},
@@ -944,10 +971,19 @@ async def test_leaving_a_blocked_kill_switch_needs_a_named_person(
             await connection.execute(
                 text(
                     "INSERT INTO kill_switch_transitions (id, organization_id, scope, scope_id, "
-                    "from_state, to_state, actor_type) VALUES "
-                    "(:id, :org, 'portfolio', :pf, 'TRADING_DISABLED', 'ACTIVE', 'system')"
+                    "from_state, to_state, actor_type, evidence) VALUES "
+                    "(:id, :org, 'portfolio', :pf, 'TRADING_DISABLED', 'ACTIVE', 'system', "
+                    ":evidence)"
                 ),
-                {"id": uuid7(), "org": wallet.org_id, "pf": wallet.portfolio_id},
+                # Carrying evidence on purpose, so the CHECK under test is the
+                # only one that can fire: an automatic move with an empty
+                # ``evidence`` is refused by a *different* constraint since T3.1b.
+                {
+                    "id": uuid7(),
+                    "org": wallet.org_id,
+                    "pf": wallet.portfolio_id,
+                    "evidence": '{"daily_loss_pct": "0.005"}',
+                },
             )
     async with schema_engine.begin() as connection:
         await connection.execute(
@@ -1225,8 +1261,8 @@ async def test_the_kill_switch_state_cannot_move_without_an_audited_transition(
                 await connection.execute(
                     text(
                         "INSERT INTO kill_switch_transitions (id, organization_id, scope, "
-                        "scope_id, from_state, to_state, actor_type, actor_id) VALUES "
-                        "(:id, :org, 'portfolio', :pf, :frm, :to, :actor, :actor_id)"
+                        "scope_id, from_state, to_state, actor_type, actor_id, evidence) VALUES "
+                        "(:id, :org, 'portfolio', :pf, :frm, :to, :actor, :actor_id, :evidence)"
                     ),
                     {
                         "id": uuid7(),
@@ -1236,6 +1272,7 @@ async def test_the_kill_switch_state_cannot_move_without_an_audited_transition(
                         "to": to_state,
                         "actor": actor,
                         "actor_id": uuid7() if actor == "user" else None,
+                        "evidence": '{"daily_loss_pct": "0.021"}',
                     },
                 )
 
@@ -1321,3 +1358,950 @@ async def test_a_protection_can_be_substituted_under_the_same_key(
             {"pos": position},
         )
     assert live == second, "the successor is the live protection"
+
+
+# --------------------------------------------------------------------------
+# T3.1b — the security review of `11faba8`, one test per finding
+#
+# Every one of these ran green against the revision as written: what they assert
+# is a refusal the database did not make. They are here as regressions, and the
+# docstring of each names the finding and the scenario it reproduced.
+# --------------------------------------------------------------------------
+
+
+async def _latch(engine: AsyncEngine, wallet: Wallet, to_state: str, *, actor: str) -> None:
+    """Move the wallet's kill switch the audited way: one row, one column, one
+    transaction — which is exactly what the guard now requires."""
+    async with engine.begin() as connection:
+        current = await connection.scalar(
+            text("SELECT kill_switch_state FROM portfolios WHERE id = :id"),
+            {"id": wallet.portfolio_id},
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO kill_switch_transitions (id, organization_id, scope, scope_id, "
+                "from_state, to_state, actor_type, actor_id, evidence) VALUES "
+                "(:id, :org, 'portfolio', :pf, :frm, :to, :actor, :actor_id, :evidence)"
+            ),
+            {
+                "id": uuid7(),
+                "org": wallet.org_id,
+                "pf": wallet.portfolio_id,
+                "frm": current,
+                "to": to_state,
+                "actor": actor,
+                "actor_id": uuid7() if actor == "user" else None,
+                "evidence": '{"equity": "18000", "peak_equity": "20000"}',
+            },
+        )
+        await connection.execute(
+            text("UPDATE portfolios SET kill_switch_state = :to WHERE id = :id"),
+            {"to": to_state, "id": wallet.portfolio_id},
+        )
+
+
+async def test_a_banked_transition_cannot_unlock_the_wallet_a_second_time(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review, **blocking 1** — two full cycles, then the bare UPDATE.
+
+    The guard asked ``EXISTS`` on ``(scope, scope_id, organization_id,
+    from_state, to_state)`` with no notion of *when*. So the first honest
+    resumption minted the pair ``(TRADING_DISABLED, ACTIVE)`` and from then on
+    ``UPDATE portfolios SET kill_switch_state = 'ACTIVE'`` was a complete, silent
+    unblock — reproduced as three transitions covering four movements.
+
+    Two cycles is the smallest test that sees it: the first is honest, and the
+    second is where the banked row would be spent.
+    """
+    wallet, _other = wallets
+    await _latch(schema_engine, wallet, "TRADING_DISABLED", actor="system")
+    await _latch(schema_engine, wallet, "ACTIVE", actor="user")
+    await _latch(schema_engine, wallet, "TRADING_DISABLED", actor="system")
+
+    with pytest.raises(DBAPIError, match="without an audited transition"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text("UPDATE portfolios SET kill_switch_state = 'ACTIVE' WHERE id = :id"),
+                {"id": wallet.portfolio_id},
+            )
+
+    async with schema_engine.connect() as connection:
+        state = await connection.scalar(
+            text("SELECT kill_switch_state FROM portfolios WHERE id = :id"),
+            {"id": wallet.portfolio_id},
+        )
+        moves = await connection.scalar(
+            text("SELECT count(*) FROM kill_switch_transitions WHERE scope_id = :pf"),
+            {"pf": wallet.portfolio_id},
+        )
+    assert state == "TRADING_DISABLED", "the wallet stayed latched"
+    assert moves == 3, "three transitions, three movements — never four movements for three"
+
+    await _latch(schema_engine, wallet, "ACTIVE", actor="user")
+
+
+async def test_a_transition_banked_in_an_earlier_transaction_is_refused(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review, **blocking 1, the nonexistent-actor variant**.
+
+    ``actor_id`` has no foreign key on purpose (a user removed later must not
+    invalidate the trail), so nothing stops a row ``EMERGENCY -> ACTIVE``
+    attributed to a UUID that was never a user. Written **once**, it satisfied
+    the old ``EXISTS`` for ever. Being the newest transition of the scope is not
+    enough on its own either — this test banks the row *after* the latch, so it
+    is the newest one, and it is still refused because it belongs to another
+    transaction.
+    """
+    wallet, _other = wallets
+    await _latch(schema_engine, wallet, "EMERGENCY", actor="system")
+    ghost = uuid7()
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO kill_switch_transitions (id, organization_id, scope, scope_id, "
+                "from_state, to_state, actor_type, actor_id) VALUES "
+                "(:id, :org, 'portfolio', :pf, 'EMERGENCY', 'ACTIVE', 'user', :ghost)"
+            ),
+            {"id": uuid7(), "org": wallet.org_id, "pf": wallet.portfolio_id, "ghost": ghost},
+        )
+    async with schema_engine.connect() as connection:
+        exists = await connection.scalar(
+            text("SELECT count(*) FROM users WHERE id = :id"), {"id": ghost}
+        )
+    assert exists == 0, "the actor this row names never existed, and the schema allows that"
+
+    with pytest.raises(DBAPIError, match="written by an earlier transaction"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text("UPDATE portfolios SET kill_switch_state = 'ACTIVE' WHERE id = :id"),
+                {"id": wallet.portfolio_id},
+            )
+
+
+async def test_an_organization_cannot_move_its_kill_switch_unaudited(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review, **must-fix 3** — the org scope had no guard at all.
+
+    ``organizations.kill_switch_state`` is read as blocking by the API
+    (``radar_org_derivation.py``), and only ``portfolios`` carried the constraint
+    trigger, so an organization-wide block could be lifted with one ``UPDATE``
+    and no history whatsoever.
+    """
+    wallet, _other = wallets
+    with pytest.raises(DBAPIError, match="without an audited transition"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text("UPDATE organizations SET kill_switch_state = 'EMERGENCY' WHERE id = :id"),
+                {"id": wallet.org_id},
+            )
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO kill_switch_transitions (id, organization_id, scope, scope_id, "
+                "from_state, to_state, actor_type, evidence) VALUES "
+                "(:id, :org, 'organization', :org, 'ACTIVE', 'EMERGENCY', 'system', :evidence)"
+            ),
+            {"id": uuid7(), "org": wallet.org_id, "evidence": '{"drawdown_pct": "0.09"}'},
+        )
+        await connection.execute(
+            text("UPDATE organizations SET kill_switch_state = 'EMERGENCY' WHERE id = :id"),
+            {"id": wallet.org_id},
+        )
+    with pytest.raises(DBAPIError, match="without an audited transition"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text("UPDATE organizations SET kill_switch_state = 'ACTIVE' WHERE id = :id"),
+                {"id": wallet.org_id},
+            )
+
+
+async def test_a_new_workspace_does_not_free_a_second_principal_wallet(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review, **blocking 2** — reproduced end to end as ``hunter_app``.
+
+    The application role holds ``INSERT`` on ``workspaces`` and on
+    ``portfolios``: it created a workspace, a wallet, a lock row and an anchor
+    with R$100.000 of new money, and no ``DELETE`` and no audit entry ever
+    happened, because the unique index was keyed on the pair the second insert
+    changed.
+    """
+    wallet, _other = wallets
+    second_workspace = uuid7()
+    connection = await _as(schema_engine, _AS_APP, wallet.org_id)
+    try:
+        await connection.execute(
+            text(
+                "INSERT INTO workspaces (id, organization_id, name, objective) "
+                "VALUES (:id, :org, 'a second workspace', 'paper_trading')"
+            ),
+            {"id": second_workspace, "org": wallet.org_id},
+        )
+        with pytest.raises(IntegrityError, match="uq_portfolios_principal_paper"):
+            await connection.execute(
+                text(
+                    "INSERT INTO portfolios (id, organization_id, workspace_id, name, type, "
+                    "initial_capital) VALUES (:id, :org, :ws, 'second', 'paper', 100000)"
+                ),
+                {"id": uuid7(), "org": wallet.org_id, "ws": second_workspace},
+            )
+    finally:
+        await connection.rollback()
+        await connection.close()
+
+
+@pytest.mark.parametrize(
+    ("table", "columns", "constraint"),
+    [
+        (
+            "orders",
+            "(id, organization_id, portfolio_id, market_id, position_id, client_order_id, "
+            "side, type, purpose, qty) VALUES (:id, :org, :pf, :m, :pos, :key, 'sell', "
+            "'market', 'exit', 1)",
+            "fk_orders_position_id_positions",
+        ),
+        (
+            "trades",
+            "(id, organization_id, portfolio_id, market_id, position_id, execution_mode, "
+            "direction, entry_price, exit_price, qty, pnl, opened_at, closed_at) VALUES "
+            "(:id, :org, :pf, :m, :pos, 'paper', 'long', 100, 110, 1, 10, now(), now())",
+            "fk_trades_position_id_positions",
+        ),
+    ],
+)
+async def test_a_row_cannot_claim_another_organizations_position(
+    schema_engine: AsyncEngine,
+    wallets: tuple[Wallet, Wallet],
+    table: str,
+    columns: str,
+    constraint: str,
+) -> None:
+    """Security review, **must-fix 4** — ``position_id`` was a bare foreign key.
+
+    ``orders`` and ``trades`` both pointed at ``positions(id)`` alone, so an
+    order (or the closed-trade row analytics treats as the truth) could name
+    another organization's position: the foreign key was satisfied and RLS only
+    ever reads the row's own ``organization_id``.
+    """
+    first, second = wallets
+    foreign_position = uuid7()
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO positions (id, organization_id, portfolio_id, market_id, direction, "
+                "qty, avg_entry_price) VALUES (:id, :org, :pf, :m, 'long', 10, 100)"
+            ),
+            {
+                "id": foreign_position,
+                "org": second.org_id,
+                "pf": second.portfolio_id,
+                "m": second.market_id,
+            },
+        )
+    with pytest.raises(IntegrityError, match=constraint):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text(f"INSERT INTO {table} {columns}"),
+                {
+                    "id": uuid7(),
+                    "org": first.org_id,
+                    "pf": first.portfolio_id,
+                    "m": first.market_id,
+                    "pos": foreign_position,
+                    "key": uuid.uuid4().hex,
+                },
+            )
+
+
+async def test_a_trade_cannot_claim_another_organizations_proposal(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review, **must-fix 4**, the ``trades.proposal_id`` half.
+
+    ``orders`` got the composite key in ``0006``; ``trades`` kept the
+    single-column one, so the row that explains a realised PnL could cite a
+    decision belonging to another tenant, another wallet or another market.
+    """
+    first, second = wallets
+    async with schema_engine.begin() as connection:
+        foreign = await _proposal(connection, second)
+    with pytest.raises(IntegrityError, match="fk_trades_proposal_id_trade_proposals"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO trades (id, organization_id, portfolio_id, market_id, "
+                    "proposal_id, execution_mode, direction, entry_price, exit_price, qty, "
+                    "pnl, opened_at, closed_at) VALUES (:id, :org, :pf, :m, :proposal, 'paper', "
+                    "'long', 100, 110, 1, 10, now(), now())"
+                ),
+                {
+                    "id": uuid7(),
+                    "org": first.org_id,
+                    "pf": first.portfolio_id,
+                    "m": first.market_id,
+                    "proposal": foreign,
+                },
+            )
+
+
+async def test_an_exit_attempt_and_its_intention_must_name_the_same_position(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review, **must-fix 4**, the last half: the two could disagree.
+
+    ``exit_intent_id`` carried the quadruple and ``position_id`` carried
+    nothing, so both were satisfiable by *different* positions of the same wallet
+    and market: the fill would reduce one position while the intention's
+    ``filled_qty`` credited the protection of another — six units silently
+    unprotected, which is the whole point of §10.
+    """
+    wallet, _other = wallets
+    protected, other_position, intent = uuid7(), uuid7(), uuid7()
+    async with schema_engine.begin() as connection:
+        for position in (protected, other_position):
+            await connection.execute(
+                text(
+                    "INSERT INTO positions (id, organization_id, portfolio_id, market_id, "
+                    "direction, qty, avg_entry_price) VALUES (:id, :org, :pf, :m, 'long', 10, 100)"
+                ),
+                {
+                    "id": position,
+                    "org": wallet.org_id,
+                    "pf": wallet.portfolio_id,
+                    "m": wallet.market_id,
+                },
+            )
+        await connection.execute(
+            text(
+                "INSERT INTO portfolio_exit_intents (id, organization_id, portfolio_id, "
+                "position_id, market_id, reason, protection_key, intended_qty) VALUES "
+                "(:id, :org, :pf, :pos, :m, 'stop', 'stop', 10)"
+            ),
+            {
+                "id": intent,
+                "org": wallet.org_id,
+                "pf": wallet.portfolio_id,
+                "pos": protected,
+                "m": wallet.market_id,
+            },
+        )
+
+    def _order(position: uuid.UUID | None) -> dict[str, object]:
+        return {
+            "id": uuid7(),
+            "org": wallet.org_id,
+            "pf": wallet.portfolio_id,
+            "m": wallet.market_id,
+            "intent": intent,
+            "pos": position,
+            "key": uuid.uuid4().hex,
+        }
+
+    statement = text(
+        "INSERT INTO orders (id, organization_id, portfolio_id, market_id, exit_intent_id, "
+        "position_id, client_order_id, side, type, purpose, qty) VALUES "
+        "(:id, :org, :pf, :m, :intent, :pos, :key, 'sell', 'market', 'exit', 4)"
+    )
+    with pytest.raises(IntegrityError, match="fk_orders_exit_intent_matches_position"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(statement, _order(other_position))
+    with pytest.raises(IntegrityError, match="an_exit_attempt_names_its_position"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(statement, _order(None))
+    async with schema_engine.begin() as connection:
+        await connection.execute(statement, _order(protected))
+
+
+async def test_the_app_role_can_lock_the_wallet_row_and_never_write_it(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review, **must-fix 5** — and the ``0005`` lesson, kept.
+
+    ``hunter_app`` held ``SELECT``/``INSERT``/``UPDATE`` on the lock row, so a
+    request handler could rewrite ``trading_day`` and ``equity_day_start`` (an
+    accounting reset that zeroes the day's loss) or write ``peak_equity =
+    999999`` and latch the wallet in a permanent drawdown. It cannot simply lose
+    ``UPDATE``: PostgreSQL charges ``ACL_UPDATE`` for ``SELECT ... FOR UPDATE``
+    and that lock is what T3.6's resume takes on the way in (§17.2).
+
+    What it has instead is ``UPDATE (updated_at)`` — measured to be exactly
+    enough for the row mark and not enough to write a value (Astra's proposal in
+    the T3.1b diff review, which is also what makes the guard survive role
+    inheritance, since a privilege is inherited and a name is not). All three
+    layers are asserted here, as the role: the lock works, the privilege refuses
+    a risk column, and the trigger refuses even the column the grant allows.
+    """
+    wallet, _other = wallets
+    connection = await _as(schema_engine, _AS_APP, wallet.org_id)
+    try:
+        locked = await connection.scalar(
+            text(
+                "SELECT peak_equity FROM portfolio_risk_state WHERE portfolio_id = :id FOR UPDATE"
+            ),
+            {"id": wallet.portfolio_id},
+        )
+        assert locked is not None, "the wallet lock is what serialises every evaluation"
+    finally:
+        await connection.rollback()
+        await connection.close()
+
+    for statement, message in (
+        (
+            "UPDATE portfolio_risk_state SET peak_equity = 999999 WHERE portfolio_id = :id",
+            _DENIED,
+        ),
+        (
+            "UPDATE portfolio_risk_state SET equity_day_start = 1, "
+            "day_reference_observed_at = now() WHERE portfolio_id = :id",
+            _DENIED,
+        ),
+        (
+            "UPDATE portfolio_risk_state SET last_admission_seq = 9 WHERE portfolio_id = :id",
+            _DENIED,
+        ),
+        # The one column the grant does allow, so this is the trigger speaking.
+        (
+            "UPDATE portfolio_risk_state SET updated_at = now() WHERE portfolio_id = :id",
+            "may not be updated by",
+        ),
+    ):
+        connection = await _as(schema_engine, _AS_APP, wallet.org_id)
+        try:
+            with pytest.raises(DBAPIError, match=message):
+                await connection.execute(text(statement), {"id": wallet.portfolio_id})
+        finally:
+            await connection.rollback()
+            await connection.close()
+
+
+async def test_a_role_that_merely_inherits_the_app_cannot_write_the_lock_row_either(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Astra's escape from the T3.1b diff review, closed twice over.
+
+    The first fix compared ``current_user = 'hunter_app'``. A login that merely
+    *inherits* ``hunter_app`` keeps every privilege of the role while reporting
+    its own name, so the guard did not recognise it and the peak went to 999999.
+    Two things close it and both are asserted: the privilege it inherits is now
+    ``UPDATE (updated_at)`` and nothing more, and the trigger asks
+    ``pg_has_role`` instead of comparing a string.
+    """
+    wallet, _other = wallets
+    probe = f"probe_inherits_{uuid.uuid4().hex[:8]}"
+    async with schema_engine.begin() as connection:
+        await connection.execute(text(f"CREATE ROLE {probe} NOLOGIN INHERIT"))
+        await connection.execute(text(f"GRANT hunter_app TO {probe}"))
+    try:
+        connection = await _as(schema_engine, text(f"SET LOCAL ROLE {probe}"), wallet.org_id)
+        try:
+            with pytest.raises(DBAPIError, match=_DENIED):
+                await connection.execute(
+                    text(
+                        "UPDATE portfolio_risk_state SET peak_equity = 999999 "
+                        "WHERE portfolio_id = :id"
+                    ),
+                    {"id": wallet.portfolio_id},
+                )
+        finally:
+            await connection.rollback()
+            await connection.close()
+        connection = await _as(schema_engine, text(f"SET LOCAL ROLE {probe}"), wallet.org_id)
+        try:
+            with pytest.raises(DBAPIError, match="may not be updated by"):
+                await connection.execute(
+                    text(
+                        "UPDATE portfolio_risk_state SET updated_at = now() "
+                        "WHERE portfolio_id = :id"
+                    ),
+                    {"id": wallet.portfolio_id},
+                )
+        finally:
+            await connection.rollback()
+            await connection.close()
+    finally:
+        async with schema_engine.begin() as connection:
+            await connection.execute(text(f"REVOKE hunter_app FROM {probe}"))
+            await connection.execute(text(f"DROP ROLE {probe}"))
+
+
+async def test_a_data_modifying_cte_cannot_open_a_wallet_ahead_of_its_own_capital(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Astra's second escape: write the child before the parent, in one statement.
+
+    With the ceiling checked ``BEFORE INSERT`` the wallet did not exist yet, the
+    guard had nothing to compare against and skipped; the foreign key, verified
+    at the *end* of the statement, found the parent already there and was happy.
+    Result: capital 20.000 and a peak of 999.999, as ``hunter_app``. The check is
+    now a deferred constraint trigger, so it runs when the whole picture exists.
+    """
+    wallet, _other = wallets
+    portfolio = uuid7()
+    connection = await _as(schema_engine, _AS_APP, wallet.org_id)
+    try:
+        with pytest.raises(DBAPIError, match="above every equity this wallet has shown"):
+            await connection.execute(
+                text(
+                    "WITH child AS ("
+                    "  INSERT INTO portfolio_risk_state "
+                    "    (organization_id, portfolio_id, peak_equity, peak_equity_at) "
+                    "  VALUES (:org, :pf, 999999, now()) RETURNING portfolio_id) "
+                    "INSERT INTO portfolios "
+                    "  (id, organization_id, workspace_id, name, type, is_arena, "
+                    "   initial_capital) "
+                    "SELECT portfolio_id, :org, :ws, 'cte', 'paper', true, 20000 FROM child"
+                ),
+                {"org": wallet.org_id, "pf": portfolio, "ws": wallet.workspace_id},
+            )
+            # The statement itself succeeds — that is the point of the escape.
+            # The refusal is at COMMIT, which is where the deferred trigger can
+            # finally see the wallet the CTE wrote after its own lock row.
+            await connection.commit()
+    finally:
+        await connection.rollback()
+        await connection.close()
+
+
+async def test_the_day_reference_cannot_vouch_for_the_peak_it_is_written_with(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Astra's third escape: one statement declaring its own ceiling.
+
+    ``NEW.equity_day_start`` was inside the ``greatest`` that bounds the peak, so
+    an ``INSERT`` carrying ``peak_equity = 999999`` *and* ``equity_day_start =
+    999999`` passed with no snapshot at all — the wallet born in a fictional 98 %
+    drawdown, which monotonicity then makes permanent. Both columns are equities
+    of the same wallet: both are capped by what it showed, neither vouches for
+    the other.
+    """
+    wallet, _other = wallets
+    portfolio = uuid7()
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO portfolios (id, organization_id, workspace_id, name, type, "
+                "is_arena, initial_capital) VALUES (:id, :org, :ws, 'vouch', 'paper', true, 20000)"
+            ),
+            {"id": portfolio, "org": wallet.org_id, "ws": wallet.workspace_id},
+        )
+    with pytest.raises(DBAPIError, match="above every equity this wallet has shown"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO portfolio_risk_state (organization_id, portfolio_id, "
+                    "peak_equity, peak_equity_at, trading_day, trading_day_start_utc, "
+                    "equity_day_start, day_reference_observed_at) VALUES "
+                    "(:org, :pf, 999999, :ts, '2026-09-06', :ts, 999999, :ts)"
+                ),
+                {"org": wallet.org_id, "pf": portfolio, "ts": _NOW},
+            )
+    # The same statement with a reference the wallet really has is legal.
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO portfolio_risk_state (organization_id, portfolio_id, "
+                "peak_equity, peak_equity_at, trading_day, trading_day_start_utc, "
+                "equity_day_start, day_reference_observed_at) VALUES "
+                "(:org, :pf, 20000, :ts, '2026-09-06', :ts, 20000, :ts)"
+            ),
+            {"org": wallet.org_id, "pf": portfolio, "ts": _NOW},
+        )
+
+
+async def test_the_peak_may_not_be_set_above_the_equity_that_was_observed(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review, **must-fix 5** — the peak is a measurement, not a setting.
+
+    ``peak_equity`` only had to rise, so writing 999999 latched the wallet into a
+    drawdown of 98 % that nothing could ever undo: the peak never comes back
+    down. "Observed" is defined as the largest ``portfolio_equity_snapshots``
+    equity for the wallet, or the day reference, or the peak it already carries.
+    """
+    wallet, _other = wallets
+    with pytest.raises(DBAPIError, match="above every equity observed"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "UPDATE portfolio_risk_state SET peak_equity = 999999 WHERE portfolio_id = :id"
+                ),
+                {"id": wallet.portfolio_id},
+            )
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO portfolio_equity_snapshots (organization_id, portfolio_id, "
+                "resolution, ts, cash, equity, exposure_notional, unrealized_pnl, "
+                "realized_pnl_cum, peak_equity) VALUES "
+                "(:org, :pf, '1m', :ts, 0, 25000, 0, 0, 0, 25000)"
+            ),
+            {"org": wallet.org_id, "pf": wallet.portfolio_id, "ts": _NOW},
+        )
+        await connection.execute(
+            text("UPDATE portfolio_risk_state SET peak_equity = 25000 WHERE portfolio_id = :id"),
+            {"id": wallet.portfolio_id},
+        )
+    with pytest.raises(DBAPIError, match="above every equity observed"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "UPDATE portfolio_risk_state SET peak_equity = 25000.0000000001 "
+                    "WHERE portfolio_id = :id"
+                ),
+                {"id": wallet.portfolio_id},
+            )
+
+
+async def test_a_wallet_cannot_open_with_a_peak_it_never_reached(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """The same ceiling on ``INSERT``: the guard was ``UPDATE``-only.
+
+    Refusing only the ``UPDATE`` would leave the identical latch one statement
+    away, because ``hunter_app`` writes this row when the wallet opens.
+    """
+    wallet, _other = wallets
+    portfolio = uuid7()
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO portfolios (id, organization_id, workspace_id, name, type, "
+                "is_arena, initial_capital) VALUES (:id, :org, :ws, 'peaky', 'paper', true, 1000)"
+            ),
+            {"id": portfolio, "org": wallet.org_id, "ws": wallet.workspace_id},
+        )
+    with pytest.raises(DBAPIError, match="above every equity this wallet has shown"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO portfolio_risk_state (organization_id, portfolio_id, "
+                    "peak_equity, peak_equity_at) VALUES (:org, :pf, 999999, :ts)"
+                ),
+                {"org": wallet.org_id, "pf": portfolio, "ts": _NOW},
+            )
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO portfolio_risk_state (organization_id, portfolio_id, "
+                "peak_equity, peak_equity_at) VALUES (:org, :pf, 1000, :ts)"
+            ),
+            {"org": wallet.org_id, "pf": portfolio, "ts": _NOW},
+        )
+
+
+async def test_the_trading_day_only_advances_and_its_reference_is_set_once(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review, **must-fix 5** — rewriting either is an accounting reset.
+
+    ``trading_day`` going backwards re-opens a day whose loss was already
+    counted; ``equity_day_start`` rewritten inside the same day re-bases today's
+    loss on a number chosen *after* the loss. Unknown to known stays allowed —
+    that is the reference becoming available, which §18.7 requires to be
+    representable.
+    """
+    wallet, _other = wallets
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE portfolio_risk_state SET trading_day = '2026-09-06', "
+                "trading_day_start_utc = :ts, equity_day_start = 19000, "
+                "day_reference_observed_at = :ts WHERE portfolio_id = :id"
+            ),
+            {"ts": _NOW, "id": wallet.portfolio_id},
+        )
+    for statement, message in (
+        (
+            "UPDATE portfolio_risk_state SET trading_day = '2026-09-05', "
+            "trading_day_start_utc = :ts WHERE portfolio_id = :id",
+            "would move from",
+        ),
+        (
+            "UPDATE portfolio_risk_state SET trading_day = NULL, "
+            "trading_day_start_utc = NULL, equity_day_start = NULL, "
+            "day_reference_observed_at = NULL WHERE portfolio_id = :id",
+            "would move from",
+        ),
+        (
+            "UPDATE portfolio_risk_state SET equity_day_start = 1 WHERE portfolio_id = :id",
+            "is set once per trading day",
+        ),
+        (
+            "UPDATE portfolio_risk_state SET day_reference_observed_at = :ts2 "
+            "WHERE portfolio_id = :id",
+            "is set once per trading day",
+        ),
+    ):
+        with pytest.raises(DBAPIError, match=message):
+            async with schema_engine.begin() as connection:
+                await connection.execute(
+                    text(statement),
+                    {"ts": _NOW, "ts2": _NOW + timedelta(hours=1), "id": wallet.portfolio_id},
+                )
+    # The turn of the day is exactly when a new reference is legal.
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE portfolio_risk_state SET trading_day = '2026-09-07', "
+                "trading_day_start_utc = :ts, equity_day_start = 18000, "
+                "day_reference_observed_at = :ts WHERE portfolio_id = :id"
+            ),
+            {"ts": _NOW + timedelta(days=1), "id": wallet.portfolio_id},
+        )
+
+
+async def test_an_anchor_refuses_an_observation_of_another_currency_pair(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review, **must-fix 6** — "R$1,2 bilhão", and it would be permanent.
+
+    ``conversion_is_exact`` only proves the arithmetic is internally consistent.
+    An anchor naming a ``BTCUSDT`` observation at 60000 and copying that rate
+    satisfies it perfectly, opens the wallet with a credited amount nobody
+    credited, and the anchor is immutable — so the error can never be corrected.
+    The pair is ``operating_currency || origin_currency``.
+    """
+    wallet, _other = wallets
+    portfolio, wrong_pair = uuid7(), uuid7()
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO fx_observations (id, pair, rate, source, observed_at, available_at) "
+                "VALUES (:id, 'BTCUSDT', 60000, :source, :ts, :ts)"
+            ),
+            {"id": wrong_pair, "ts": _NOW, "source": f"btc.ticker#{wallet.slug}"},
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO portfolios (id, organization_id, workspace_id, name, type, "
+                "is_arena, initial_capital) VALUES "
+                "(:id, :org, :ws, 'fx', 'paper', true, 1.6666666667)"
+            ),
+            {"id": portfolio, "org": wallet.org_id, "ws": wallet.workspace_id},
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO portfolio_risk_state (organization_id, portfolio_id, peak_equity, "
+                "peak_equity_at) VALUES (:org, :pf, 1.6666666667, :ts)"
+            ),
+            {"org": wallet.org_id, "pf": portfolio, "ts": _NOW},
+        )
+    with pytest.raises(DBAPIError, match="on pair BTCUSDT"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO portfolio_currency_anchor (id, organization_id, portfolio_id, "
+                    "origin_amount, credited_amount, fx_observation_id, rate, "
+                    "conversion_residual, rounding_policy) VALUES "
+                    "(:id, :org, :pf, 100000, 1.6666666667, :fx, 60000, 0.0002, 'floor_10dp_v1')"
+                ),
+                {"id": uuid7(), "org": wallet.org_id, "pf": portfolio, "fx": wrong_pair},
+            )
+
+
+async def test_a_participation_release_cannot_exceed_its_own_reservation(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review, **suggestion 8** — ``notional > 0`` was the only bound.
+
+    The budget is ``Σ(reserved − executed − released)``, so a release of 900
+    against a reservation of 80 handed the market 820 USDT of a minute it never
+    had. A CHECK cannot reach ``trade_proposals``, hence the trigger.
+    """
+    wallet, _other = wallets
+    async with schema_engine.begin() as connection:
+        proposal = await _proposal(connection, wallet)
+        await connection.execute(
+            text(
+                "UPDATE trade_proposals SET reservation_state = 'held', reserved_notional = 80, "
+                "reserved_cash = 80.1, reserved_risk = 2, reserved_until = :until WHERE id = :id"
+            ),
+            {"until": _NOW + timedelta(minutes=5), "id": proposal},
+        )
+
+    def _entry(notional: int) -> dict[str, object]:
+        return {
+            "id": uuid7(),
+            "org": wallet.org_id,
+            "pf": wallet.portfolio_id,
+            "m": wallet.market_id,
+            "p": proposal,
+            "n": notional,
+            "ts": _NOW,
+        }
+
+    statement = text(
+        "INSERT INTO participation_consumptions (id, organization_id, portfolio_id, market_id, "
+        "proposal_id, kind, notional, occurred_at) VALUES "
+        "(:id, :org, :pf, :m, :p, 'released', :n, :ts)"
+    )
+    with pytest.raises(DBAPIError, match="is larger than the"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(statement, _entry(900))
+    async with schema_engine.begin() as connection:
+        await connection.execute(statement, _entry(50))
+
+
+async def test_a_release_against_a_proposal_that_reserved_nothing_is_refused(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """The other half of suggestion 8: there is nothing to give back."""
+    wallet, _other = wallets
+    async with schema_engine.begin() as connection:
+        proposal = await _proposal(connection, wallet)
+    with pytest.raises(DBAPIError, match="never quantified a reservation"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO participation_consumptions (id, organization_id, portfolio_id, "
+                    "market_id, proposal_id, kind, notional, occurred_at) VALUES "
+                    "(:id, :org, :pf, :m, :p, 'released', 10, :ts)"
+                ),
+                {
+                    "id": uuid7(),
+                    "org": wallet.org_id,
+                    "pf": wallet.portfolio_id,
+                    "m": wallet.market_id,
+                    "p": proposal,
+                    "ts": _NOW,
+                },
+            )
+
+
+async def test_an_automatic_transition_must_carry_its_evidence(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review, **suggestion 9**.
+
+    A ``system`` row has ``actor_id IS NULL`` by definition and ``reason`` is
+    prose, so ``evidence`` is the only thing on it that says *why* the wallet was
+    latched. Empty, the row records that something happened and nothing about
+    what.
+    """
+    wallet, _other = wallets
+    with pytest.raises(IntegrityError, match="an_automatic_move_shows_its_numbers"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO kill_switch_transitions (id, organization_id, scope, scope_id, "
+                    "from_state, to_state, actor_type) VALUES "
+                    "(:id, :org, 'portfolio', :pf, 'ACTIVE', 'WARNING', 'system')"
+                ),
+                {"id": uuid7(), "org": wallet.org_id, "pf": wallet.portfolio_id},
+            )
+    # A person may still move it without numbers: they are the evidence.
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO kill_switch_transitions (id, organization_id, scope, scope_id, "
+                "from_state, to_state, actor_type, actor_id) VALUES "
+                "(:id, :org, 'portfolio', :pf, 'ACTIVE', 'WARNING', 'user', :actor)"
+            ),
+            {"id": uuid7(), "org": wallet.org_id, "pf": wallet.portfolio_id, "actor": uuid7()},
+        )
+
+
+async def test_the_kill_switch_trail_outlives_the_tenant(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review, **suggestion 10** — the teardown erased the latch.
+
+    ``app.portfolio_teardown`` is a ``SET LOCAL`` any role can write, and with
+    the cascading foreign key in place ``DELETE FROM organizations`` took the
+    kill-switch history with it: latching a wallet and then removing the tenant
+    was a way to make the latch never have happened. ``audit_logs`` has had no
+    foreign key here since ``0001`` for the same reason (§15.4); the orphan is
+    deliberate and RLS is what keeps it unreadable.
+    """
+    wallet, _other = wallets
+    await _latch(schema_engine, wallet, "TRADING_DISABLED", actor="system")
+    async with schema_engine.begin() as connection:
+        await connection.execute(text(f"SET LOCAL {_TEARDOWN} = 'on'"))
+        await connection.execute(
+            text("DELETE FROM organizations WHERE id = :id"), {"id": wallet.org_id}
+        )
+    async with schema_engine.connect() as connection:
+        survived = await connection.scalar(
+            text("SELECT count(*) FROM kill_switch_transitions WHERE organization_id = :org"),
+            {"org": wallet.org_id},
+        )
+        gone = await connection.scalar(
+            text("SELECT count(*) FROM portfolios WHERE id = :pf"), {"pf": wallet.portfolio_id}
+        )
+    assert survived == 1, "the record of a latched kill switch is not the tenant's to delete"
+    assert gone == 0, "the tenant itself did go"
+
+
+async def test_the_teardown_orphan_is_still_invisible_to_every_other_tenant(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """The price of suggestion 10, paid where it is safe to pay it.
+
+    Dropping the foreign key leaves rows whose ``organization_id`` names nothing.
+    ``tenant_isolation`` filters on that column and not on the referenced row, so
+    an orphan is readable by exactly nobody — which is the RLS half of the
+    isolation test, on the table the trail lives in.
+    """
+    first, second = wallets
+    await _latch(schema_engine, first, "TRADING_DISABLED", actor="system")
+    async with schema_engine.begin() as connection:
+        await connection.execute(text(f"SET LOCAL {_TEARDOWN} = 'on'"))
+        await connection.execute(
+            text("DELETE FROM organizations WHERE id = :id"), {"id": first.org_id}
+        )
+    connection = await _as(schema_engine, _AS_APP, second.org_id)
+    try:
+        theirs = await connection.scalar(
+            text("SELECT count(*) FROM kill_switch_transitions WHERE organization_id = :org"),
+            {"org": first.org_id},
+        )
+        assert theirs == 0, "an orphaned trail leaked to another organization"
+    finally:
+        await connection.rollback()
+        await connection.close()
+
+
+def _shipped_paper_limits() -> dict[str, Any]:
+    """``infra/scripts/seed_reference.PAPER_V1_LIMITS``, loaded as the seed loads it.
+
+    By path and not by ``import``, for the reason
+    ``test_schema_seed_and_partitions._load_script`` records: ``infra/scripts``
+    is on ``sys.path`` when the seed runs as a script and is not a package
+    anywhere else.
+    """
+    if str(SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS_DIR))
+    spec = importlib.util.spec_from_file_location(
+        "hunter_infra_seed_reference", SCRIPTS_DIR / "seed_reference.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    limits: dict[str, Any] = module.PAPER_V1_LIMITS
+    return limits
+
+
+def test_the_seeded_paper_profile_has_exactly_one_source() -> None:
+    """Security review, **must-fix 7** — the seed and the engine had drifted.
+
+    ``RiskLimits.model_validate(profile.limits)`` failed with ten errors against
+    the row the seed writes: six keys the engine requires were missing
+    (``max_entry_deviation_pct`` and the four input ages of v2.1, plus
+    ``day_timezone``) and four it forbids were present. This loads both and
+    compares the serialised bytes, so an edit to either has to move both.
+    """
+    shipped = _shipped_paper_limits()
+    assert json.dumps(shipped, sort_keys=True) == json.dumps(
+        PAPER_V1.model_dump(mode="json"), sort_keys=True
+    ), "the seed and the engine disagree about paper_v1"
+    assert RiskLimits.model_validate(shipped) == PAPER_V1
+    # And the directive's numbers are unchanged by the derivation.
+    assert shipped["risk_per_trade_pct"] == "0.0025"
+    assert shipped["max_participation_pct"] == "0.01"
+    assert shipped["max_total_exposure_pct"] == "0.40"
+    assert shipped["max_concurrent_positions"] == 5
