@@ -67,6 +67,7 @@ from hunter_core.admission.sources import (
 )
 from hunter_core.domain.enums import ProposalSource, ProposalStatus
 from hunter_core.domain.types import uuid7
+from hunter_core.strategies.envelope import PURPOSE_PAPER
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -179,6 +180,7 @@ async def file_manual_order(
             stop=stop,
             requested_notional=requested_notional,
             assumed_costs=assumed_costs,
+            purpose=PURPOSE_PAPER,
             actor_id=str(context.principal.user_id),
             actor_type="user",
         )

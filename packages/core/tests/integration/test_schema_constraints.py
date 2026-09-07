@@ -295,10 +295,14 @@ async def test_a_system_kill_switch_row_can_never_carry_an_organization(
     an organization would be a cross-tenant leak by construction.
     """
     org_a, _pf_a, _org_b, _pf_b = portfolios
+    # ``evidence`` is filled so the 0006 CHECK "an automatic move shows its
+    # numbers" (which Postgres evaluates first, by name) is satisfied and the
+    # only invariant left to fail is the one this test is about.
     insert = text(
         "INSERT INTO kill_switch_transitions "
-        "(id, organization_id, scope, from_state, to_state, actor_type) "
-        "VALUES (:id, :org, :scope, 'ACTIVE', 'WARNING', 'system')"
+        "(id, organization_id, scope, from_state, to_state, actor_type, evidence) "
+        "VALUES (:id, :org, :scope, 'ACTIVE', 'WARNING', 'system', "
+        '\'{"daily_loss_pct": "0.011"}\'::jsonb)'
     )
     invariant = "ck_kill_switch_transitions_system_scope_has_no_org"
 

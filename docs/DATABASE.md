@@ -3539,3 +3539,96 @@ e não foi tocado):
 | `services/execution-worker/.../admission_cycle.py` | `pending_requests` passa a ler `request_payload`, reconstrói o `ProposalRequest` (linha + payload + `markets`) e chama `decide_pending`; `report_unreadable`/`pending_request_without_geometry` deixa de existir para a linha que tem payload |
 | `packages/core/hunter_core/admission/decide.py` | `coalesce(request_digest, :digest)` vira `:digest`: o motor recomputa e grava o seu, nunca herda o do chamador (S1) |
 | `packages/core/hunter_core/admission/sources.py` (T3.8) | `target: Decimal \| None = None` em `ProposalRequest`, incluído em `request_digest` e em `request_payload` — a chave já está reservada (§21.1) e é o pedido da `notes-T3.14.md` §5.1 |
+
+## 22. O propósito na versão, e o rótulo `paper` — M3 (`0010_strategy_purpose`)
+
+Décima revisão. Uma coluna, um CHECK, a trigger de congelamento da `0002`
+alargada e um estreitamento de grant. Ela fecha o achado da D10
+(`.claude/state/decisions-delegated-2026-09-07.md`): o produtor só escrevia
+`research_only` (literal cravado em `record.py`), os dois consumidores só
+aceitavam `live`, e **o rótulo que a carteira paper precisa não existia em
+lugar nenhum** — não era um valor de linha que faltava, era uma coluna.
+
+`0010_strategy_purpose` tem 22 caracteres; o teto de `alembic_version.version_num`
+continua sendo 32 (§17.6). As listas desta revisão estão congeladas em
+`ddl/strategy_purpose.py`, no padrão de §15.6/§16.5/§17.6/§18.9/§19/§20/§21.
+
+### 22.1 A coluna
+
+```
+strategy_versions  (+) purpose text NOT NULL DEFAULT 'research_only'
+  CHECK purpose IN ('research_only', 'paper', 'live')   -- ck_strategy_versions_purpose_is_a_known_label
+```
+
+Sem guarda de upgrade, e isso é uma afirmação: toda linha existente é, e só
+foi, `research_only` — o default preenche o que já era verdade (mesmo
+raciocínio da §21.4). Os três rótulos:
+
+| Rótulo | Quem escreve | Quem aceita |
+|---|---|---|
+| `research_only` | default da coluna; toda versão do Lab nasce assim | ninguém admite: evidência de sombra nunca vira ordem (decisão conjunta, item 9) |
+| `paper` | **só** o script de ativação (`--paper-line`), na conexão de migração | a admissão (`hunter_core.admission.sources`) e, pela T3.15b, o portão da ponte |
+| `live` | ninguém hoje | ninguém: recusado **por nome** no catálogo do worker (a versão nem é avaliada), na admissão e no script (`live é Fase 4; ENABLE_LIVE_TRADING=false`) |
+
+### 22.2 Congelada depois da ativação
+
+A trigger `shadow_freeze_strategy_version` da `0002` (§16.1) é **substituída, não
+duplicada**: `ddl/strategy_purpose.py` copia a lista congelada de `ddl/shadow.py`,
+acrescenta `purpose`, e recria a função e as duas triggers com o mesmo nome — o
+mesmo desenho que a `0009` usou para o corpo da guarda do pedido (§21.2). O
+downgrade chama o criador da própria `ddl/shadow.py`: voltar à `0009` é ter a
+trigger que a `0002` descreve.
+
+Consequência prática: a linha `paper` nasce **antes** da ativação (`draft`,
+`activated_at IS NULL`) já com o rótulo, e a ativação a congela junto com
+`code_ref`. Não existe "mudar uma versão de pesquisa para paper": é uma linha
+nova, derivada (§22.4).
+
+### 22.3 Grants — medido, não suposto
+
+`REVOKE` de coluna **não estreita** um `GRANT` de tabela: o Postgres checa o
+acesso à coluna como a **união** da ACL da tabela e da ACL da coluna (foi
+exatamente isso que a `0007` usou ao contrário, §19.1). `hunter_worker` tinha
+`INSERT, UPDATE` de tabela em `strategy_versions` desde a `0001`, então a
+revisão faz o que de fato estreita: revoga os dois de tabela e os reconcede
+**por coluna**, para todas as colunas exceto `purpose`. Omitir `purpose` na
+lista de um `INSERT` continua usando o `DEFAULT` sem precisar do privilégio.
+
+| Papel | `strategy_versions.purpose` | Demais colunas |
+|---|---|---|
+| `hunter_app` | SELECT | SELECT (só leitura desde a `0001`; nada a estreitar) |
+| `hunter_worker` | SELECT | SELECT, INSERT, UPDATE por coluna — como a `0001` deu, menos esta |
+| dono / `DATABASE_URL_MIGRATIONS` | tudo — é por aí que `infra/scripts/activate_strategy_version.py` escreve | tudo |
+
+Provado em `packages/core/tests/integration/test_schema_privileges.py` (os dois
+papéis leem; o worker não nomeia `purpose` num INSERT nem num UPDATE, e continua
+inserindo uma versão que confia no default) e em `test_migrations.py` (CHECK
+recusa um quarto rótulo; trigger alargada lida do `pg_proc`; `purpose`
+congelado depois da ativação; round trip; downgrade recusado enquanto houver
+linha com propósito diferente de `research_only`).
+
+### 22.4 A linha `paper` é derivada, nunca convertida
+
+`activate_strategy_version.py momentum v1 --paper-line --changelog "..."` cria a
+linha `v<n+1>` (próximo `v<n>` livre da estratégia, para não colidir com um
+`--supersede`) copiando `parameters_schema`, `default_parameters` e
+`params_format` **da linha congelada**, com `code_ref` recalculado do módulo que
+o digest congelado nomeia (recusa se o build atual divergir), `status = 'draft'`,
+`activated_at = NULL`, `purpose = 'paper'`, e uma linha em `system_events`. A
+fonte não é tocada; a coorte `research_only` continua rodando ao lado. Uma
+linha `paper` não deprecada por estratégia. **Nada é ativado**: ativar a linha
+derivada é um `activate` separado, auditado, que resolve o código pelo
+`code_ref` congelado (o `v2` não tem entrada no registro) — e as sete condições
+da D10 vêm antes dele.
+
+### 22.5 O que as tarefas vizinhas ajustam
+
+- `services/strategy-worker`: o catálogo lê `purpose` e recusa `live` na origem
+  (`purpose_live_forbidden`); `record.py` carimba `envelope["purpose"] =
+  version.purpose` — o `SignalEnvelope` das estratégias continua nascendo
+  `research_only` porque o código não sabe para que coorte roda.
+- `hunter_core.admission.sources`: `ProposalRequest.purpose` default `paper`;
+  `origin()` recusa `live` por nome e `research_only` como antes.
+- `apps/api` (ordem manual): nasce `purpose = paper`.
+- T3.15b (`services/execution-worker/bridge_screen.py`): importa
+  `PURPOSE_PAPER` de `hunter_core.strategies.envelope` e admite `paper`.

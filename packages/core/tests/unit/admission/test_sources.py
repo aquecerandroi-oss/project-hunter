@@ -13,13 +13,14 @@ from decimal import Decimal
 import pytest
 
 from hunter_core.admission.sources import (
+    PURPOSE_LIVE,
     OriginRefused,
     ProposalRequest,
     admission_key,
     resolve_source,
 )
 from hunter_core.domain.enums import MarketType, ProposalSource, TradeDirection
-from hunter_core.strategies.envelope import PURPOSE_RESEARCH_ONLY, AssumedCosts
+from hunter_core.strategies.envelope import PURPOSE_PAPER, PURPOSE_RESEARCH_ONLY, AssumedCosts
 from hunter_risk.inputs import MarketIdentity
 
 pytestmark = pytest.mark.unit
@@ -67,6 +68,14 @@ class TestOnlyTwoOriginsExist:
         with pytest.raises(OriginRefused, match=PURPOSE_RESEARCH_ONLY):
             request(purpose=PURPOSE_RESEARCH_ONLY).origin(ProposalSource.MANUAL)
 
+    def test_live_is_refused_by_name_until_phase_4(self) -> None:
+        """D10: the wallet's only admissible label is ``paper``; ``live`` is
+        refused *by name*, with the message saying when it stops being one."""
+        with pytest.raises(OriginRefused, match="Fase 4"):
+            request(purpose=PURPOSE_LIVE).origin(ProposalSource.MANUAL)
+        with pytest.raises(OriginRefused, match="ENABLE_LIVE_TRADING"):
+            request(purpose=PURPOSE_LIVE).origin(ProposalSource.MANUAL)
+
     def test_an_agent_proposal_names_the_agent_that_asked(self) -> None:
         with pytest.raises(OriginRefused, match="agent_id"):
             request().origin(ProposalSource.AGENT)
@@ -75,8 +84,12 @@ class TestOnlyTwoOriginsExist:
         with pytest.raises(OriginRefused, match="manual"):
             request(agent_id=uuid.uuid4()).origin(ProposalSource.MANUAL)
 
-    def test_a_live_manual_order_passes(self) -> None:
+    def test_a_paper_manual_order_passes(self) -> None:
         assert request().origin(ProposalSource.MANUAL) is ProposalSource.MANUAL
+
+    def test_the_default_purpose_is_paper(self) -> None:
+        """D10: the manual order used to default to ``live``; it is born ``paper``."""
+        assert request().purpose == PURPOSE_PAPER
 
     def test_the_stop_geometry_of_a_long_is_refused_at_the_door(self) -> None:
         """A stop at or above the reference is not a stop; it is a caller bug."""

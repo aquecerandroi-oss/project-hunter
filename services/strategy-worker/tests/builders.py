@@ -148,12 +148,20 @@ async def activate_version(
     version: str = "v1",
     code_ref: str | None = _RUNNING_CODE_REF,
     active: bool = True,
+    purpose: str = "research_only",
 ) -> tuple[uuid.UUID, uuid.UUID]:
     """A ``strategy`` and an already-activated ``strategy_version``.
 
     Inserted activated rather than updated into activation: the freeze trigger
     fires on ``UPDATE``/``DELETE`` of an already-activated row, which is exactly
     what the ops script has to respect and what this fixture must not fight.
+
+    ``purpose`` is named in the INSERT only when it is not the default:
+    ``0010_strategy_purpose`` revoked the column from ``hunter_worker`` (only the
+    activation script, on the owner connection, writes it), so a non-default
+    label is written with the role reset to the session owner for that one
+    statement and ``SET LOCAL ROLE`` restored right after — the same path the
+    ops script takes, not a grant the tests pretend the worker has.
     """
     strategy_id, version_id = uuid7(), uuid7()
     await session.execute(
@@ -179,26 +187,41 @@ async def activate_version(
         return strategy_id, existing
     import json
 
-    await session.execute(
-        text(
+    names_purpose = purpose != "research_only"
+    params: dict[str, Any] = {
+        "id": version_id,
+        "strategy_id": strategy_id,
+        "version": version,
+        "status": (
+            StrategyVersionStatus.ACTIVE.value if active else StrategyVersionStatus.DRAFT.value
+        ),
+        "schema": json.dumps(dict(VOLUME_ANOMALY_V1.parameters_schema)),
+        "params": canonical_json(dict(VOLUME_ANOMALY_V1.default_parameters)).decode(),
+        "code_ref": code_ref,
+        "activated_at": utcnow() if active else None,
+    }
+    if names_purpose:
+        params["purpose"] = purpose
+        statement = (
+            "INSERT INTO strategy_versions (id, strategy_id, version, status, "
+            "parameters_schema, default_parameters, code_ref, params_format, purpose, "
+            "activated_at) "
+            "VALUES (:id, :strategy_id, :version, :status, CAST(:schema AS jsonb), "
+            "CAST(:params AS jsonb), :code_ref, 1, :purpose, :activated_at)"
+        )
+    else:
+        statement = (
             "INSERT INTO strategy_versions (id, strategy_id, version, status, "
             "parameters_schema, default_parameters, code_ref, params_format, activated_at) "
             "VALUES (:id, :strategy_id, :version, :status, CAST(:schema AS jsonb), "
             "CAST(:params AS jsonb), :code_ref, 1, :activated_at)"
-        ),
-        {
-            "id": version_id,
-            "strategy_id": strategy_id,
-            "version": version,
-            "status": (
-                StrategyVersionStatus.ACTIVE.value if active else StrategyVersionStatus.DRAFT.value
-            ),
-            "schema": json.dumps(dict(VOLUME_ANOMALY_V1.parameters_schema)),
-            "params": canonical_json(dict(VOLUME_ANOMALY_V1.default_parameters)).decode(),
-            "code_ref": code_ref,
-            "activated_at": utcnow() if active else None,
-        },
-    )
+        )
+    current_role = await session.scalar(text("SELECT current_user")) if names_purpose else None
+    if names_purpose:
+        await session.execute(text("RESET ROLE"))
+    await session.execute(text(statement), params)
+    if names_purpose and current_role is not None:
+        await session.execute(text(f"SET LOCAL ROLE {current_role}"))
     return strategy_id, version_id
 
 

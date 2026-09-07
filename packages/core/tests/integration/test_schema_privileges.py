@@ -693,3 +693,116 @@ async def test_the_engine_still_writes_every_execution_table(
     # through the privilege check the API now fails.
     await worker_connection.execute(text("UPDATE positions SET qty = qty WHERE false"))
     await worker_connection.execute(text("DELETE FROM trades WHERE false"))
+
+
+# --------------------------------------------------------------------------
+# 0010_strategy_purpose: the wallet label, written by nobody but the
+# activation/migration connection — DATABASE.md section 22
+# --------------------------------------------------------------------------
+
+
+async def test_both_roles_read_purpose(schema_engine: AsyncEngine) -> None:
+    async with schema_engine.connect() as connection:
+        for role in ("hunter_app", "hunter_worker"):
+            readable = await connection.scalar(
+                text("SELECT has_column_privilege(:r, 'strategy_versions', 'purpose', 'SELECT')"),
+                {"r": role},
+            )
+            assert readable, f"{role} lost SELECT on strategy_versions.purpose"
+
+
+async def _set_as_worker(connection: AsyncConnection) -> None:
+    """Re-enter the role after a rollback poisons the transaction and drops
+    ``SET LOCAL``'s scope with it."""
+    await connection.begin()
+    await connection.execute(text("SET LOCAL ROLE hunter_worker"))
+
+
+async def test_the_worker_cannot_name_purpose_in_an_insert(
+    worker_connection: AsyncConnection,
+) -> None:
+    """Measured, not assumed: a column-level ``REVOKE`` alone cannot narrow the
+    table-level ``INSERT``/``UPDATE`` ``0001`` already gave ``hunter_worker`` —
+    Postgres checks a column access as the *union* of the table and column ACL.
+    ``0010`` takes the table-level grant back and re-grants every column but
+    ``purpose``, so this proves it as the role, not through
+    ``has_column_privilege`` alone (which the module docstring's own probe
+    against a real Postgres already found insufficient to trust blindly).
+    """
+    strategy_id, version_id = uuid7(), uuid7()
+    await worker_connection.execute(
+        text("INSERT INTO strategies (id, key, name) VALUES (:id, :key, :key)"),
+        {"id": strategy_id, "key": f"purpose-priv-{uuid.uuid4().hex[:8]}"},
+    )
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await worker_connection.execute(
+            text(
+                "INSERT INTO strategy_versions (id, strategy_id, version, purpose) "
+                "VALUES (:id, :strategy, 'v1', 'paper')"
+            ),
+            {"id": version_id, "strategy": strategy_id},
+        )
+    await worker_connection.rollback()
+
+
+async def test_the_worker_can_still_insert_a_version_relying_on_the_purpose_default(
+    worker_connection: AsyncConnection,
+) -> None:
+    """Omitting ``purpose`` uses its ``DEFAULT`` and needs no privilege on it at
+    all — Postgres only checks a column's privilege when the caller *names* it.
+    """
+    strategy_id, version_id = uuid7(), uuid7()
+    await worker_connection.execute(
+        text("INSERT INTO strategies (id, key, name) VALUES (:id, :key, :key)"),
+        {"id": strategy_id, "key": f"purpose-priv-default-{uuid.uuid4().hex[:8]}"},
+    )
+    await worker_connection.execute(
+        text(
+            "INSERT INTO strategy_versions (id, strategy_id, version) VALUES (:id, :strategy, 'v1')"
+        ),
+        {"id": version_id, "strategy": strategy_id},
+    )
+    purpose = await worker_connection.scalar(
+        text("SELECT purpose FROM strategy_versions WHERE id = :id"), {"id": version_id}
+    )
+    assert purpose == "research_only"
+
+
+async def test_the_worker_cannot_update_purpose_but_keeps_every_other_column(
+    worker_connection: AsyncConnection,
+) -> None:
+    strategy_id, version_id = uuid7(), uuid7()
+    await worker_connection.execute(
+        text("INSERT INTO strategies (id, key, name) VALUES (:id, :key, :key)"),
+        {"id": strategy_id, "key": f"purpose-priv-update-{uuid.uuid4().hex[:8]}"},
+    )
+    await worker_connection.execute(
+        text(
+            "INSERT INTO strategy_versions (id, strategy_id, version) VALUES (:id, :strategy, 'v1')"
+        ),
+        {"id": version_id, "strategy": strategy_id},
+    )
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await worker_connection.execute(
+            text("UPDATE strategy_versions SET purpose = 'paper' WHERE id = :id"),
+            {"id": version_id},
+        )
+    await worker_connection.rollback()
+    # A fresh row in the new transaction — the rollback above discarded the one
+    # made before it, and this proves the *other* columns' privilege survived
+    # the narrowing, which ``0010``'s own docstring claims and this checks.
+    await _set_as_worker(worker_connection)
+    await worker_connection.execute(
+        text("INSERT INTO strategies (id, key, name) VALUES (:id, :key, :key)"),
+        {"id": strategy_id, "key": f"purpose-priv-survives-{uuid.uuid4().hex[:8]}"},
+    )
+    await worker_connection.execute(
+        text(
+            "INSERT INTO strategy_versions (id, strategy_id, version) VALUES (:id, :strategy, 'v1')"
+        ),
+        {"id": version_id, "strategy": strategy_id},
+    )
+    await worker_connection.execute(
+        text("UPDATE strategy_versions SET changelog = 'still writable' WHERE id = :id"),
+        {"id": version_id},
+    )

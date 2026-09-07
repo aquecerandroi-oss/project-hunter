@@ -4,6 +4,8 @@
         --changelog "S2 operational proof" [--dry-run]
     uv run python infra/scripts/activate_strategy_version.py momentum v1 --supersede \
         --changelog "code_ref per version (MUST-FIX 1)"
+    uv run python infra/scripts/activate_strategy_version.py momentum v1 --paper-line \
+        --changelog "D10: the paper coorte" [--dry-run]
 
 The first activation is irreversible by design (docs/DATABASE.md §16.1): the
 ``0002_shadow_lab`` trigger freezes ``code_ref``, ``parameters_schema``,
@@ -29,11 +31,25 @@ one transaction. Copying from the row rather than recomputing from code is the
 point: the successor has to continue the experiment that was frozen, not
 whatever the code says today.
 
+``--paper-line`` (T3.15, D10) derives the coorte that may reach the paper
+wallet from a **frozen** ``research_only`` version: a *new* row, next free
+``v<n>``, carrying the source row's own ``parameters_schema``,
+``default_parameters`` and ``params_format`` byte for byte, the ``code_ref``
+recomputed from the module the frozen digest names, ``status = 'draft'``,
+``activated_at = NULL`` and ``purpose = 'paper'``. The source row is not
+touched — the research coorte keeps running beside the paper one — and
+**nothing is activated**: activating the paper line later is a separate,
+audited ``activate`` run, and D10 names the seven conditions that come first.
+``purpose`` is written only here, on the migration/owner connection:
+``0010_strategy_purpose`` revoked it from every application role.
+
 Every run writes a ``system_events`` row, activation or refusal alike: an
 experiment whose start nobody can date is not an experiment.
 
 Connects with ``DATABASE_URL_MIGRATIONS`` (direct, never the pooler), like
-``infra/scripts/seed.py``.
+``infra/scripts/seed.py``. The shared checks and the row reader live in
+:mod:`hunter_strategy_worker.activation_db`; ``--paper-line`` itself in
+:mod:`hunter_strategy_worker.paper_line` (file budget, T3.15).
 """
 
 from __future__ import annotations
@@ -41,7 +57,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import re
 import sys
 from typing import Any
 
@@ -52,66 +67,43 @@ from hunter_core.settings import Settings
 from hunter_core.strategies.canonical import PARAMS_FORMAT, canonical_json
 from hunter_core.strategies.registry import DEFAULT_REGISTRY, StrategyRegistry
 from hunter_strategy_worker.activation import validate_parameters
+from hunter_strategy_worker.activation_db import (
+    PURPOSE_LIVE,
+    VERSION_RE,
+    Refused,
+    load_row,
+    migration_applied,
+    purpose_column_present,
+    record_event,
+)
 from hunter_strategy_worker.catalogue import registry_key, resolve_strategy
 from hunter_strategy_worker.code_ref import strategy_module, version_code_ref
+from hunter_strategy_worker.paper_line import paper_line
 
-REQUIRED_TABLES = ("shadow_episodes", "shadow_outbox")
-_VERSION_RE = re.compile(r"^v(\d+)$")
-
-
-class Refused(RuntimeError):
-    """A prerequisite failed; nothing was activated."""
+__all__ = ["Refused", "activate", "main", "paper_line", "supersede"]
 
 
-async def _migration_applied(conn: AsyncConnection) -> bool:
-    for table in REQUIRED_TABLES:
-        if await conn.scalar(text("SELECT to_regclass(:name)"), {"name": table}) is None:
-            return False
-    column = await conn.scalar(
-        text(
-            "SELECT 1 FROM information_schema.columns WHERE table_name = 'signal_outcomes' "
-            "AND column_name = 'tracking_state'"
-        )
-    )
-    return column is not None
-
-
-async def _record_event(conn: AsyncConnection, level: str, event: str, message: str) -> None:
-    await conn.execute(
-        text(
-            "INSERT INTO system_events (id, created_at, level, component, event, message) "
-            "VALUES (gen_random_uuid(), now(), CAST(:level AS event_severity), "
-            "'activate_strategy_version', :event, :message)"
-        ),
-        {"level": level, "event": event, "message": message[:1000]},
-    )
-
-
-async def _load_row(conn: AsyncConnection, key: str, version: str) -> Any:
-    return (
-        await conn.execute(
-            text(
-                "SELECT v.id, v.strategy_id, v.status, v.activated_at, v.code_ref, "
-                "v.default_parameters, v.parameters_schema, v.params_format "
-                "FROM strategy_versions v JOIN strategies s ON s.id = v.strategy_id "
-                "WHERE s.key = :key AND v.version = :version"
-            ),
-            {"key": key, "version": version},
-        )
-    ).first()
-
-
-def _resolve(registry: StrategyRegistry, key: str, version: str) -> Any:
+def _resolve(
+    registry: StrategyRegistry, key: str, version: str, code_ref: str | None = None
+) -> Any:
+    """The registry first; then, for a row the registry does not name (a paper
+    line keeps its source's code under a bumped version label), the module its
+    frozen ``code_ref`` points at — the same resolution the worker uses
+    (:func:`resolve_strategy`)."""
     code_key = registry_key(key, version)
     try:
         return registry.get(code_key, version)
     except KeyError as exc:
+        if code_ref is not None:
+            strategy = resolve_strategy(key, version, code_ref, registry)
+            if strategy is not None:
+                return strategy
         raise Refused(f"this build has no code registered as {code_key} {version}") from exc
 
 
 def _next_version(version: str) -> str:
     """``v1 -> v2``. Anything else is refused rather than guessed at."""
-    match = _VERSION_RE.fullmatch(version)
+    match = VERSION_RE.fullmatch(version)
     if match is None:
         raise Refused(f"cannot derive the next version from {version!r}: expected 'v<n>'")
     return f"v{int(match.group(1)) + 1}"
@@ -127,12 +119,19 @@ async def activate(
     registry: StrategyRegistry = DEFAULT_REGISTRY,
 ) -> str:
     """Run every check and, unless ``dry_run``, activate. Returns a summary line."""
-    if not await _migration_applied(conn):
+    if not await migration_applied(conn):
         raise Refused("0002_shadow_lab is not applied: apply the migration before activating")
-    row = await _load_row(conn, key, version)
+    if not await purpose_column_present(conn):
+        raise Refused("0010_strategy_purpose is not applied: apply the migration before activating")
+    row = await load_row(conn, key, version)
     if row is None:
         raise Refused(f"no strategy_version for {key} {version} (run infra/scripts/seed.py first)")
-    strategy = _resolve(registry, key, version)
+    if row.purpose == PURPOSE_LIVE:
+        raise Refused(
+            f"{key} {version} carries purpose 'live': live é Fase 4; ENABLE_LIVE_TRADING=false. "
+            "Nothing with that label is activated by this script."
+        )
+    strategy = _resolve(registry, key, version, row.code_ref)
     code_ref = version_code_ref(strategy_module(strategy))
     schema: dict[str, Any] = json.loads(canonical_json(dict(strategy.parameters_schema)))
     params: dict[str, Any] = json.loads(canonical_json(dict(strategy.default_parameters)))
@@ -150,7 +149,10 @@ async def activate(
             )
         return f"{key} {version} was already activated at {row.activated_at.isoformat()}; nothing to do"
     if dry_run:
-        return f"would activate {key} {version} with code_ref {code_ref} ({len(params)} parameters)"
+        return (
+            f"would activate {key} {version} (purpose {row.purpose}) with code_ref {code_ref} "
+            f"({len(params)} parameters)"
+        )
     updated = await conn.execute(
         text(
             "UPDATE strategy_versions SET status = 'active', activated_at = now(), "
@@ -171,13 +173,17 @@ async def activate(
     activated = updated.first()
     if activated is None:
         raise Refused(f"{key} {version} was activated concurrently; nothing was written")
-    await _record_event(
+    await record_event(
         conn,
         "info",
         "strategy_version_activated",
-        f"{key} {version} activated with code_ref={code_ref} params_format={PARAMS_FORMAT}: {changelog}",
+        f"{key} {version} (purpose {row.purpose}) activated with code_ref={code_ref} "
+        f"params_format={PARAMS_FORMAT}: {changelog}",
     )
-    return f"activated {key} {version} at {activated[0].isoformat()} with code_ref {code_ref}"
+    return (
+        f"activated {key} {version} (purpose {row.purpose}) at {activated[0].isoformat()} "
+        f"with code_ref {code_ref}"
+    )
 
 
 async def supersede(
@@ -197,9 +203,9 @@ async def supersede(
     from that row (schema, parameters, ``params_format``), so the only thing
     that actually changes is the ``code_ref`` and the version label.
     """
-    if not await _migration_applied(conn):
+    if not await migration_applied(conn):
         raise Refused("0002_shadow_lab is not applied: apply the migration before superseding")
-    row = await _load_row(conn, key, version)
+    row = await load_row(conn, key, version)
     if row is None:
         raise Refused(f"no strategy_version for {key} {version}")
     if row.activated_at is None:
@@ -221,7 +227,7 @@ async def supersede(
     if row.code_ref == code_ref:
         raise Refused(f"{key} {version} is already frozen against this code ({code_ref})")
     successor = _next_version(version)
-    if await _load_row(conn, key, successor) is not None:
+    if await load_row(conn, key, successor) is not None:
         raise Refused(f"{key} {successor} already exists: it may already be the successor")
     schema: dict[str, Any] = dict(row.parameters_schema or {})
     params: dict[str, Any] = dict(row.default_parameters or {})
@@ -262,7 +268,7 @@ async def supersede(
         ),
         {"changelog": note, "id": row.id},
     )
-    await _record_event(
+    await record_event(
         conn,
         "info",
         "strategy_version_superseded",
@@ -286,13 +292,13 @@ async def _run(args: argparse.Namespace) -> int:
     engine = create_async_engine(migration_url(), connect_args={"statement_cache_size": 0})
     try:
         async with engine.connect() as conn, conn.begin():
-            action = supersede if args.supersede else activate
+            action = paper_line if args.paper_line else supersede if args.supersede else activate
             try:
                 message = await action(
                     conn, args.strategy, args.version, args.changelog, dry_run=args.dry_run
                 )
             except Refused as refusal:
-                await _record_event(
+                await record_event(
                     conn, "warning", "strategy_version_activation_refused", str(refusal)
                 )
                 print(f"REFUSED: {refusal}", file=sys.stderr)
@@ -309,10 +315,17 @@ def main() -> int:
     parser.add_argument("version", help="strategy_versions.version, e.g. v1")
     parser.add_argument("--changelog", required=True, help="why this version is being activated")
     parser.add_argument("--dry-run", action="store_true", help="run every check, write nothing")
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--supersede",
         action="store_true",
         help="retire this frozen version and activate version+1 with the current code_ref",
+    )
+    mode.add_argument(
+        "--paper-line",
+        action="store_true",
+        help="derive a draft purpose=paper line (next free v<n>) from this frozen research "
+        "version; activates nothing (T3.15, D10)",
     )
     return asyncio.run(_run(parser.parse_args()))
 

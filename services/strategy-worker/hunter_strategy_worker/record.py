@@ -13,8 +13,10 @@ shadow decision:
 - ``signal_outcomes.meta`` — the entry plan, the cost hypothesis, the walker's
   starting progress and everything needed to rebuild the tracking plan without
   re-reading the strategy code;
-- the ``shadow.signals.emitted`` payload, carrying ``purpose = research_only``
-  so any consumer can refuse it (the proposal builder must).
+- the ``shadow.signals.emitted`` payload, carrying the emitting version's own
+  ``purpose`` (T3.15, D10: ``research_only`` or ``paper`` — never ``live``,
+  which :mod:`hunter_strategy_worker.catalogue` refuses before a version this
+  old even reaches :func:`build_record`) so a consumer can decide by name.
 """
 
 from __future__ import annotations
@@ -28,7 +30,7 @@ from typing import TYPE_CHECKING, Any
 
 from hunter_core.domain.enums import ShadowTrackingState
 from hunter_core.strategies.canonical import canonical_json
-from hunter_core.strategies.envelope import PURPOSE_RESEARCH_ONLY, AssumedCosts
+from hunter_core.strategies.envelope import AssumedCosts
 from hunter_strategy_worker.levels import to_db_scale, to_db_scale_all
 from hunter_strategy_worker.plan import EntryPlan
 from hunter_strategy_worker.walker import Progress, TrackingPlan
@@ -161,6 +163,11 @@ def build_record(
     envelope = decision.supporting_features.to_jsonable()
     envelope["decision_at"] = _jsonable(decision_at)
     envelope["cohort"] = cohort
+    # T3.15/D10: the label is the *version's*, not the strategy's. A strategy
+    # builds its envelope with ``SignalEnvelope``'s default (``research_only``)
+    # because the code has no idea which coorte it is running for; the row that
+    # activated it does, and this is the one place that label is stamped.
+    envelope["purpose"] = version.purpose
     envelope["provenance"] = _jsonable(
         {
             "available_through": provenance.available_through,
@@ -195,7 +202,7 @@ def build_record(
             "entry_plan": plan.to_jsonable(),
             "assumed_costs": costs.model_dump(),
             "cohort": cohort,
-            "purpose": PURPOSE_RESEARCH_ONLY,
+            "purpose": version.purpose,
             "horizon_s": decision.horizon_s,
             "reference_price": tracking.reference_price,
             "invalidation": (
@@ -226,7 +233,7 @@ def build_record(
             "exchange": market.exchange,
             "symbol": market.symbol,
             "cohort": cohort,
-            "purpose": PURPOSE_RESEARCH_ONLY,
+            "purpose": version.purpose,
             "params_hash": version.params_hash,
             "source_bar_close": decision.supporting_features.observation_ts,
             "decision_at": decision_at,

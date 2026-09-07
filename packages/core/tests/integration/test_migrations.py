@@ -37,7 +37,7 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0009_paper_geometry"
+HEAD_REVISION = "0010_strategy_purpose"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -49,6 +49,7 @@ LOCK_GRANT_REVISION = "0005_baseline_lock_grant"
 PAPER_WALLET_REVISION = "0006_paper_wallet"
 PAPER_ROLES_REVISION = "0007_paper_roles"
 PAPER_ROLES_2_REVISION = "0008_paper_roles_2"
+PAPER_GEOMETRY_REVISION = "0009_paper_geometry"
 
 _PENDING_PREDICATE = "dispatched_at IS NULL"
 """What makes an index a *pending* index, spelled out here rather than imported:
@@ -1690,13 +1691,21 @@ def test_0009_refuses_to_downgrade_while_a_request_carries_its_geometry(
             ],
         )
     )
+    # The head is ``0010`` since T3.15, and it reverses cleanly over a filed
+    # request — it owns ``purpose`` and the freeze trigger, not the geometry. So
+    # step down to ``0009`` first and make ``-1`` mean this guard again (the same
+    # idiom ``test_0006_refuses_to_downgrade_while_a_wallet_is_open`` uses).
+    command.downgrade(config, PAPER_GEOMETRY_REVISION)
     try:
         with pytest.raises(DBAPIError, match="carry a request_payload"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == PAPER_GEOMETRY_REVISION, (
+            "the downgrade must not commit"
+        )
     finally:
         _drop_tenant(upgraded, ids["org"])
         _forget_market(upgraded, ids)
+        command.upgrade(config, "head")
     command.check(config)
 
 
@@ -1732,13 +1741,17 @@ def test_0009_refuses_to_downgrade_while_a_position_is_marked_as_dust(
             ],
         )
     )
+    # See the note in ``test_0009_refuses_to_downgrade_while_a_request_carries_its_geometry``:
+    # head is ``0010`` now, so step down to ``0009`` first.
+    command.downgrade(config, PAPER_GEOMETRY_REVISION)
     try:
         with pytest.raises(DBAPIError, match="marked as residual dust"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+        assert asyncio.run(_revision(upgraded)) == PAPER_GEOMETRY_REVISION
     finally:
         _drop_tenant(upgraded, ids["org"])
         _forget_market(upgraded, ids)
+        command.upgrade(config, "head")
     command.check(config)
 
 
@@ -1787,6 +1800,9 @@ def test_0009_reverses_on_a_populated_database_and_gives_0007s_guard_back(
             ],
         )
     )
+    # Head is ``0010`` since T3.15: step down to ``0009`` first, then ``-1`` is
+    # this revision's own downgrade again (see the note above).
+    command.downgrade(config, PAPER_GEOMETRY_REVISION)
     try:
         command.downgrade(config, "-1")
         assert asyncio.run(_revision(upgraded)) == PAPER_ROLES_2_REVISION
@@ -1801,5 +1817,222 @@ def test_0009_reverses_on_a_populated_database_and_gives_0007s_guard_back(
         command.upgrade(config, "head")
         _drop_tenant(upgraded, ids["org"])
         _forget_market(upgraded, ids)
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+# --------------------------------------------------------------------------
+# 0010_strategy_purpose — the wallet a signal may reach, named on the version
+# --------------------------------------------------------------------------
+
+
+def _strategy_version(
+    url: str,
+    *,
+    key: str,
+    purpose: str | None = None,
+    activated: bool = False,
+) -> uuid.UUID:
+    """A fresh ``strategies``/``strategy_versions`` pair. ``purpose`` omitted
+    means "let the column default decide"."""
+    strategy_id, version_id = uuid7(), uuid7()
+    columns = "id, strategy_id, version, status, code_ref, activated_at"
+    placeholders = ":id, :strategy, 'v1', :status, 'hunter_core.strategies.probe', :activated_at"
+    params: dict[str, object] = {
+        "id": version_id,
+        "strategy": strategy_id,
+        "status": "active" if activated else "draft",
+        "activated_at": datetime(2026, 9, 7, tzinfo=UTC) if activated else None,
+    }
+    if purpose is not None:
+        columns += ", purpose"
+        placeholders += ", :purpose"
+        params["purpose"] = purpose
+    asyncio.run(
+        _write(
+            url,
+            [
+                (
+                    "INSERT INTO strategies (id, key, name) VALUES (:id, :key, :key)",
+                    {"id": strategy_id, "key": key},
+                ),
+                (
+                    f"INSERT INTO strategy_versions ({columns}) VALUES ({placeholders})",  # noqa: S608
+                    params,
+                ),
+            ],
+        )
+    )
+    return version_id
+
+
+def _forget_draft_strategy_version(url: str, version_id: uuid.UUID) -> None:
+    """Undo :func:`_strategy_version` for a **draft** (never-activated) row.
+
+    ``upgraded`` is a module-scoped database shared by every test in this file
+    — unlike the freeze trigger's activated rows, a draft carrying ``purpose =
+    'paper'`` left behind here would trip section 22's downgrade guard for
+    every *later* test that reverses past ``0010``, for a reason that test
+    never created. Only tests that leave the row ``draft`` call this; the one
+    that activates one (proving the freeze) leaves it, like every other frozen
+    probe row in this file.
+    """
+    asyncio.run(
+        _write(
+            url,
+            [
+                (
+                    # ``ON DELETE CASCADE`` (``strategy_versions.strategy_id``)
+                    # takes the version row with it; the freeze trigger's own
+                    # ``DELETE`` guard only fires when ``activated_at`` is set,
+                    # which a draft row never has.
+                    "DELETE FROM strategies WHERE id = "
+                    "(SELECT strategy_id FROM strategy_versions WHERE id = :id)",
+                    {"id": version_id},
+                ),
+            ],
+        )
+    )
+
+
+def test_0010_adds_the_purpose_column_defaulting_research_only(upgraded: str) -> None:
+    """Every row this schema has ever had was, and remains, ``research_only`` —
+    the honest backfill DATABASE.md section 22 describes."""
+    assert asyncio.run(_column_exists(upgraded, "strategy_versions", "purpose"))
+    version_id = _strategy_version(upgraded, key=f"purpose-default-{uuid.uuid4().hex[:8]}")
+    values = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT purpose FROM strategy_versions WHERE id = :id",
+            {"id": version_id},
+        )
+    )
+    assert values == ["research_only"]
+
+
+def test_0010_refuses_a_fourth_label(upgraded: str) -> None:
+    """``research_only`` | ``paper`` | ``live`` — nothing else is representable."""
+    with pytest.raises(DBAPIError, match="purpose"):
+        _strategy_version(upgraded, key=f"purpose-bogus-{uuid.uuid4().hex[:8]}", purpose="bogus")
+
+
+def test_0010_a_paper_version_carries_the_label_the_worker_reads(upgraded: str) -> None:
+    version_id = _strategy_version(
+        upgraded, key=f"purpose-paper-{uuid.uuid4().hex[:8]}", purpose="paper"
+    )
+    try:
+        values = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT purpose FROM strategy_versions WHERE id = :id",
+                {"id": version_id},
+            )
+        )
+        assert values == ["paper"]
+    finally:
+        _forget_draft_strategy_version(upgraded, version_id)
+
+
+def test_0010_widens_the_freeze_trigger_to_cover_purpose(upgraded: str) -> None:
+    """The trigger installed is ``0010``'s body, not ``0002``'s: same function
+    name, wider column list — read from ``pg_proc`` the way ``test_0009_teaches
+    _the_request_guard_to_demand_geometry_and_refuse_a_proof`` reads the request
+    guard's body, since Alembic never compares a function (§17.3)."""
+    body = asyncio.run(_function_source(upgraded, "shadow_freeze_strategy_version"))
+    assert "NEW.purpose IS DISTINCT FROM OLD.purpose" in body
+    # 0002's own checks are still there: this widens the trigger, it does not
+    # replace what it already froze.
+    assert "NEW.code_ref IS DISTINCT FROM OLD.code_ref" in body
+
+
+def test_0010_freezes_purpose_after_activation(upgraded: str) -> None:
+    version_id = _strategy_version(
+        upgraded,
+        key=f"purpose-frozen-{uuid.uuid4().hex[:8]}",
+        purpose="research_only",
+        activated=True,
+    )
+    with pytest.raises(DBAPIError, match="frozen"):
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        "UPDATE strategy_versions SET purpose = 'paper' WHERE id = :id",
+                        {"id": version_id},
+                    )
+                ],
+            )
+        )
+
+
+async def _purpose_column_privilege(url: str, role: str, privilege: str) -> bool:
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            return bool(
+                await connection.scalar(
+                    text(
+                        "SELECT has_column_privilege(:role, 'strategy_versions', "
+                        "'purpose', :privilege)"
+                    ),
+                    {"role": role, "privilege": privilege},
+                )
+            )
+    finally:
+        await engine.dispose()
+
+
+def test_0010_revokes_the_workers_write_on_purpose_but_not_its_read(upgraded: str) -> None:
+    """Read for both roles, write for nobody but the activation/migration
+    connection — DATABASE.md section 22, the same shape ``0007`` used for
+    ``portfolio_risk_state``'s lock column, in reverse."""
+    assert asyncio.run(_purpose_column_privilege(upgraded, "hunter_worker", "SELECT"))
+    assert asyncio.run(_purpose_column_privilege(upgraded, "hunter_app", "SELECT"))
+    assert not asyncio.run(_purpose_column_privilege(upgraded, "hunter_worker", "UPDATE"))
+    assert not asyncio.run(_purpose_column_privilege(upgraded, "hunter_worker", "INSERT"))
+    assert not asyncio.run(_purpose_column_privilege(upgraded, "hunter_app", "UPDATE"))
+    assert not asyncio.run(_purpose_column_privilege(upgraded, "hunter_app", "INSERT"))
+
+
+def test_0010_refuses_to_downgrade_while_a_version_carries_a_non_research_only_purpose(
+    upgraded: str,
+) -> None:
+    """Dropping the column would erase the one thing telling a paper coorte
+    apart from shadow evidence — not derivable from anything that remains."""
+    config = alembic_config(upgraded)
+    version_id = _strategy_version(
+        upgraded, key=f"purpose-guard-{uuid.uuid4().hex[:8]}", purpose="paper"
+    )
+    try:
+        with pytest.raises(DBAPIError, match="purpose other than research_only"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        _forget_draft_strategy_version(upgraded, version_id)
+    command.check(config)
+
+
+def test_0010_reverses_on_a_populated_database_and_gives_0002s_trigger_back(
+    upgraded: str,
+) -> None:
+    """The round trip, over a version that does **not** trip the guard.
+
+    Down one, up to head, and ``alembic check`` at the end — plus the half a
+    privilege test cannot see, which is that the downgrade restores the trigger
+    ``0002`` describes rather than leaving ``0010``'s wider body pointing at a
+    column that no longer exists.
+    """
+    config = alembic_config(upgraded)
+    _strategy_version(upgraded, key=f"purpose-trip-{uuid.uuid4().hex[:8]}")
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == PAPER_GEOMETRY_REVISION
+        assert not asyncio.run(_column_exists(upgraded, "strategy_versions", "purpose"))
+        reverted = asyncio.run(_function_source(upgraded, "shadow_freeze_strategy_version"))
+        assert "purpose" not in reverted, "0010's wider body survived its own downgrade"
+        assert "code_ref" in reverted, "0002's trigger did not come back"
+    finally:
+        command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     command.check(config)

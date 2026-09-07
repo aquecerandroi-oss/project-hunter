@@ -34,7 +34,22 @@ PURPOSE_RESEARCH_ONLY = "research_only"
 """Label persisted in the envelope and in the event (SHADOW-LAB.md §10).
 
 The proposal builder refuses a signal carrying it: shadow evidence never becomes
-an order.
+an order. The default for every signal whose ``strategy_versions`` row has no
+``purpose`` of its own (T3.15, D10) — the column defaults to it too.
+"""
+
+PURPOSE_PAPER = "paper"
+"""The coorte executed with fictitious money against the paper wallet (D10).
+
+Written by a ``strategy_versions`` row whose own ``purpose`` column says so —
+never cravado by the worker (``services/strategy-worker/.../record.py`` copies
+the version's label instead of hardcoding one) — and the only label besides
+``PURPOSE_RESEARCH_ONLY`` the envelope may legally carry: ``live``
+(``hunter_core.admission.sources.PURPOSE_LIVE``) is Phase 4 and is refused by
+name wherever a purpose is checked. Declared here, next to
+``PURPOSE_RESEARCH_ONLY``, so the T3.15b bridge gate
+(``services/execution-worker/.../bridge_screen.py``) imports the same constant
+the admission gate does rather than a second spelling of ``"paper"``.
 """
 
 

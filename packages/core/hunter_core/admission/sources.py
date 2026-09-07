@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from hunter_core.domain.enums import ProposalSource, TradeDirection
 from hunter_core.strategies.canonical import params_hash
-from hunter_core.strategies.envelope import PURPOSE_RESEARCH_ONLY, AssumedCosts
+from hunter_core.strategies.envelope import PURPOSE_PAPER, PURPOSE_RESEARCH_ONLY, AssumedCosts
 from hunter_risk.inputs import MarketIdentity
 
 __all__ = [
@@ -60,8 +60,11 @@ true on the other.
 """
 
 PURPOSE_LIVE = "live"
-"""The only purpose that may reach the wallet. Anything else is refused by name,
-so a new label added upstream fails closed instead of being admitted by default.
+"""Real money, Phase 4. Refused by name — not merely "not paper" — so an
+operator reading a refusal for this one sees *why* rather than a generic
+"not admissible" (D10, ``.claude/state/decisions-delegated-2026-09-07.md``):
+``ENABLE_LIVE_TRADING`` stays ``false`` and ``LiveExecutionAdapter`` raises
+``LiveTradingDisabled`` regardless of what reaches this gate.
 """
 
 
@@ -209,7 +212,10 @@ class ProposalRequest(BaseModel):
     signal_id: uuid.UUID | None = None
     agent_enabled: bool = True
     signal_valid: bool = True
-    purpose: str = PURPOSE_LIVE
+    purpose: str = PURPOSE_PAPER
+    """The wallet the request may reach (D10). Defaults to ``paper`` — the only
+    coorte with a fictitious wallet in front of it today; ``live`` is Phase 4 and
+    ``research_only`` evidence is never a request at all."""
 
     actor_id: str
     """Who asked, for ``audit_logs``. A user's uuid on the manual route, the
@@ -256,10 +262,15 @@ class ProposalRequest(BaseModel):
 
     def origin(self, source: ProposalSource) -> ProposalSource:
         """Refuse the request outright when its origin is not admissible."""
-        if self.purpose != PURPOSE_LIVE:
+        if self.purpose == PURPOSE_LIVE:
             raise OriginRefused(
-                f"purpose {self.purpose!r} may not be admitted; only {PURPOSE_LIVE!r} reaches the "
-                f"wallet. {PURPOSE_RESEARCH_ONLY!r} evidence never becomes an order (M3 joint "
+                f"purpose {PURPOSE_LIVE!r} may not be admitted: live é Fase 4; "
+                "ENABLE_LIVE_TRADING=false"
+            )
+        if self.purpose != PURPOSE_PAPER:
+            raise OriginRefused(
+                f"purpose {self.purpose!r} may not be admitted; only {PURPOSE_PAPER!r} reaches "
+                f"the wallet. {PURPOSE_RESEARCH_ONLY!r} evidence never becomes an order (M3 joint "
                 "decision, item 9)"
             )
         if source is ProposalSource.AGENT and self.agent_id is None:

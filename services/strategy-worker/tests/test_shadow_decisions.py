@@ -342,6 +342,54 @@ class TestOutbox:
         assert len(ids) == 1
 
 
+class TestPurposeComesFromTheVersion:
+    """T3.15/D10: ``record.py`` used to crava ``research_only`` into both
+    payloads; it now copies whatever the emitting ``strategy_versions`` row
+    says. A version with its own ``purpose = 'paper'`` proves the envelope and
+    the event both carry it — on the very same triggering series ``shadow_db``
+    already wired for ``volume_anomaly``, under a second, independent
+    ``strategy_version_id`` so the two coortes do not share a tracking slot.
+    """
+
+    async def test_a_paper_version_writes_purpose_paper_end_to_end(
+        self, shadow_db: dict[str, Any], redis_client: Any
+    ) -> None:
+        import orjson
+
+        async with role_session(shadow_db["factory"], db_role="hunter_worker") as session:
+            await activate_version(session, key="shadow_purpose_paper", purpose="paper")
+        async with role_session(shadow_db["factory"], db_role="hunter_worker") as session:
+            versions = await load_active_versions(session)
+        paper_version = only_version(versions, key="shadow_purpose_paper")
+        assert paper_version.purpose == "paper"
+
+        await evaluate_slot(
+            shadow_db["factory"],
+            redis_client,
+            version=paper_version,
+            market=shadow_db["market"],
+            bar_close=CUT,
+            config=CONFIG,
+            clock=clock_at(CUT + timedelta(seconds=2)),
+        )
+
+        async with role_session(shadow_db["factory"], db_role="hunter_worker") as session:
+            signal = (
+                await session.execute(
+                    select(AgentSignal).where(AgentSignal.strategy_version_id == paper_version.id)
+                )
+            ).scalar_one()
+        assert signal.supporting_features["purpose"] == "paper"
+
+        health = OutboxHealth()
+        assert await dispatch_once(shadow_db["factory"], redis_client, health) == 1
+        entries = await redis_client.xrange(Streams.SHADOW_SIGNALS_EMITTED)
+        assert len(entries) == 1
+        payload = orjson.loads(entries[0][1][b"data"])["payload"]
+        assert payload["purpose"] == "paper"
+        assert payload["strategy_version_id"] == str(paper_version.id)
+
+
 class TestConsumerEntry:
     async def test_the_candle_event_drives_the_whole_decision(
         self, shadow_db: dict[str, Any], redis_client: Any

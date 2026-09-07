@@ -68,7 +68,17 @@ class StrategyVersion(Base, UUIDPrimaryKeyMixin):
     """A frozen, code-referenced version of a strategy. Replaces `agent_versions`."""
 
     __tablename__ = "strategy_versions"
-    __table_args__ = (UniqueConstraint("strategy_id", "version"),)
+    __table_args__ = (
+        UniqueConstraint("strategy_id", "version"),
+        # 0010_strategy_purpose — spelled out here rather than imported from
+        # ``ddl.strategy_purpose`` for the same reason every CHECK in that
+        # package writes its allow-list out: the database's contract must not
+        # silently follow a later edit to the Python constants.
+        CheckConstraint(
+            "purpose IN ('research_only', 'paper', 'live')",
+            name="purpose_is_a_known_label",
+        ),
+    )
 
     strategy_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("strategies.id", ondelete="CASCADE"))
     version: Mapped[str] = mapped_column(Text)
@@ -86,6 +96,13 @@ class StrategyVersion(Base, UUIDPrimaryKeyMixin):
     would silently split one experiment in two (SHADOW-LAB.md §1).
     """
 
+    purpose: Mapped[str] = mapped_column(Text, server_default="research_only")
+    """``research_only`` | ``paper`` | ``live`` (T3.15, D10) — the wallet, if any,
+    a signal emitted by this version may reach. Frozen by the same first-activation
+    trigger as ``code_ref`` (``0010_strategy_purpose``): the envelope copies this
+    value instead of the worker hardcoding one, and a ``live`` row is refused at
+    the origin (``hunter_strategy_worker.catalogue``), never evaluated at all.
+    """
     changelog: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     activated_at: Mapped[datetime | None]

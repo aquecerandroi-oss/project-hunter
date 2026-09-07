@@ -49,10 +49,24 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-REJECTIONS = ("code_ref_mismatch", "code_ref_not_frozen", "no_code", "no_parameters")
+REJECTIONS = (
+    "code_ref_mismatch",
+    "code_ref_not_frozen",
+    "no_code",
+    "no_parameters",
+    "purpose_live_forbidden",
+)
 """Every way an ``active`` row can fail to become a runnable version. Declared up
 front so the gauge publishes a zero for a reason that stopped happening instead
 of leaving the last count standing."""
+
+_PURPOSE_LIVE = "live"
+"""Mirrors ``hunter_core.admission.sources.PURPOSE_LIVE`` — spelled out rather
+than imported, the same choice every migration guard in this package makes for
+its own frozen strings (``ddl/strategy_purpose.py``): a version whose own
+``purpose`` names real money must fail closed here even if the admission
+module's constant ever drifted. Real money is Phase 4 (T3.15, D10); the worker
+refuses to evaluate, let alone emit, a signal under this label at all."""
 
 __all__ = [
     "ActiveVersion",
@@ -88,6 +102,10 @@ class ActiveVersion:
     params_hash: str
     strategy: Strategy
     code_ref: str | None
+    purpose: str
+    """Copied from ``strategy_versions.purpose`` — the envelope carries this,
+    never a literal the worker crava (T3.15, D10). Never ``"live"``: a row
+    naming it is refused before it becomes an :class:`ActiveVersion` at all."""
 
     @property
     def timeframe(self) -> Timeframe:
@@ -213,6 +231,7 @@ async def load_version_roster(session: AsyncSession) -> VersionRoster:
                 StrategyVersion.version,
                 StrategyVersion.default_parameters,
                 StrategyVersion.code_ref,
+                StrategyVersion.purpose,
                 StrategyRow.key,
             )
             .join(StrategyRow, StrategyRow.id == StrategyVersion.strategy_id)
@@ -231,6 +250,10 @@ async def load_version_roster(session: AsyncSession) -> VersionRoster:
 
     for row in rows:
         key = registry_key(row.key, row.version)
+        if row.purpose == _PURPOSE_LIVE:
+            logger.error("shadow_version_purpose_live_forbidden", strategy=key)
+            refuse("purpose_live_forbidden")
+            continue
         strategy = resolve_strategy(row.key, row.version, row.code_ref)
         if strategy is None:
             refuse("no_code")
@@ -253,6 +276,7 @@ async def load_version_roster(session: AsyncSession) -> VersionRoster:
                 params_hash=compute_params_hash(params),
                 strategy=strategy,
                 code_ref=row.code_ref,
+                purpose=row.purpose,
             )
         )
     roster = VersionRoster(versions=versions, active_rows=len(rows), rejected=rejected)

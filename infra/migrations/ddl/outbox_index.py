@@ -82,9 +82,7 @@ def _create(table: str, index: str, columns: tuple[str, ...]) -> str:
     )
 
 
-def rebuild_pending_indexes(
-    indexes: tuple[tuple[str, str], ...], columns: tuple[str, ...]
-) -> None:
+def rebuild_pending_indexes(indexes: tuple[tuple[str, str], ...], columns: tuple[str, ...]) -> None:
     """Re-key every pending index in ``indexes`` onto ``columns``, concurrently.
 
     ``outbox_events`` is a hot write path: every business transaction of the

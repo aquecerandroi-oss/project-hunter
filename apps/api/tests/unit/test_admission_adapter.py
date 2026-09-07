@@ -41,7 +41,7 @@ from hunter_core.domain.enums import (
     ProposalStatus,
     TradeDirection,
 )
-from hunter_core.strategies.envelope import AssumedCosts
+from hunter_core.strategies.envelope import PURPOSE_PAPER, AssumedCosts
 from hunter_risk.inputs import MarketIdentity
 
 pytestmark = pytest.mark.unit
@@ -280,3 +280,30 @@ class TestTheOriginIsAlwaysManual:
         filed = await file_order(monkeypatch, idempotency_key="k")
 
         assert filed.idempotency_key.startswith(f"{ProposalSource.MANUAL.value}:")
+
+
+class TestTheManualOrderIsBornPaper:
+    async def test_the_request_is_built_with_purpose_paper(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """D10: the manual order used to default to ``live``; it migrates to
+        ``paper`` in the same diff that adds the label (``sources.py:212``).
+
+        Not observable through the row written or through ``FiledRequest`` —
+        ``purpose`` decides admissibility (``ProposalRequest.origin``) and is
+        never persisted in ``request_payload`` or hashed into the digest — so
+        this spies on the constructor call itself.
+        """
+        captured: dict[str, object] = {}
+        original = adapter.ProposalRequest
+
+        class _Spy(original):  # type: ignore[misc,valid-type]
+            def __init__(self, **kwargs: object) -> None:
+                captured.update(kwargs)
+                super().__init__(**kwargs)
+
+        monkeypatch.setattr(adapter, "ProposalRequest", _Spy)
+
+        await file_order(monkeypatch, session=RecordingSession())
+
+        assert captured["purpose"] == PURPOSE_PAPER

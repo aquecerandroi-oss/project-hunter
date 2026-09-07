@@ -13,8 +13,10 @@ from typing import Any
 
 import pytest
 from sqlalchemy import text
+from structlog.testing import capture_logs
 
 from hunter_core.db.session import role_session
+from hunter_core.strategies.envelope import PURPOSE_PAPER, PURPOSE_RESEARCH_ONLY
 from hunter_strategy_worker.catalogue import VersionRoster, load_version_roster
 from hunter_strategy_worker.code_ref import version_code_ref
 from hunter_strategy_worker.config import ShadowConfig
@@ -22,7 +24,7 @@ from hunter_strategy_worker.consumer import ConsumerHealth
 from hunter_strategy_worker.health import readiness_checks
 from hunter_strategy_worker.outbox import OutboxHealth
 
-from .builders import activate_version, seed_market
+from .builders import activate_version, only_version, seed_market
 
 CONFIG = ShadowConfig()
 
@@ -70,6 +72,61 @@ class TestRosterCounts:
             roster = await load_version_roster(session)
         assert "volume_anomaly" in {v.strategy_key for v in roster.versions}
         assert roster.blind is False
+
+    async def test_the_roster_carries_the_versions_own_purpose(
+        self, db_session_factory: Any
+    ) -> None:
+        """T3.15/D10: the envelope reads ``purpose`` from the version, not a
+        literal the worker crava — the roster is where that value first arrives."""
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(
+                session,
+                key="roster_paper",
+                code_ref=version_code_ref("volume_anomaly_v1"),
+                purpose=PURPOSE_PAPER,
+            )
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            roster = await load_version_roster(session)
+        assert only_version(roster.versions, key="roster_paper").purpose == PURPOSE_PAPER
+
+    async def test_a_version_with_no_purpose_of_its_own_defaults_research_only(
+        self, db_session_factory: Any
+    ) -> None:
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(
+                session,
+                key="roster_default_purpose",
+                code_ref=version_code_ref("volume_anomaly_v1"),
+            )
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            roster = await load_version_roster(session)
+        found = only_version(roster.versions, key="roster_default_purpose")
+        assert found.purpose == PURPOSE_RESEARCH_ONLY
+
+    async def test_a_live_purpose_version_is_refused_at_the_origin_with_a_log(
+        self, db_session_factory: Any
+    ) -> None:
+        """D10: ``live`` is Phase 4 — the worker must never evaluate, let alone
+        emit, a signal under that purpose. The refusal happens here, before the
+        version ever reaches :mod:`hunter_strategy_worker.record`."""
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(
+                session,
+                key="roster_live_forbidden",
+                code_ref=version_code_ref("volume_anomaly_v1"),
+                purpose="live",
+            )
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            with capture_logs() as logs:
+                roster = await load_version_roster(session)
+        assert "roster_live_forbidden" not in {v.strategy_key for v in roster.versions}
+        assert roster.rejected.get("purpose_live_forbidden", 0) >= 1
+        refusals = [e for e in logs if e["event"] == "shadow_version_purpose_live_forbidden"]
+        assert refusals, "no log recorded the refusal"
+        assert refusals[0]["log_level"] == "error"
 
 
 @pytest.mark.integration

@@ -88,7 +88,7 @@ class TestActivationScript:
         async def no_migration(_conn: Any) -> bool:
             return False
 
-        script._migration_applied = no_migration
+        script.migration_applied = no_migration
         async with db_session_factory() as session, session.begin():
             with pytest.raises(script.Refused, match="0002_shadow_lab is not applied"):
                 await script.activate(session, "volume_anomaly", "v1", "test", dry_run=True)
