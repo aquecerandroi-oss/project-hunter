@@ -18,35 +18,66 @@ Engine"). Esta revisão fecha, no contrato, as três invariantes que a revisão 
 que a v2 já descrevia — nenhum limite do Everton foi alterado; §9.2 lista o que mudou e por quê. O v1
 continua legível em `git show 8f42b4d:docs/RISK_ENGINE.md`; a §9 lista o que mudou entre v1 e v2.
 
-Função pura e determinística:
+Duas funções puras e determinísticas, em `hunter_risk.evaluate`:
 
 ```
-evaluate(proposal, portfolio_state, limits, market_liquidity, kill_switch, regime, beta)
+evaluate(proposal, portfolio, limits, liquidity, kill_switch, beta, *, spec: MarketSpec)
+    -> RiskDecision
+evaluate_exit(proposal, position, limits, kill_switch, *, portfolio: PortfolioState | None = None)
     -> RiskDecision
 ```
 
-Sem rede, sem banco, sem relógio próprio (o instante entra como argumento). Nenhuma ordem de
-**entrada** é criada sem uma `RiskDecision.approved = true` persistida em `trade_proposals.risk_decision`
-**antes** de a ordem existir. Ordens de **saída** (stop, alvo, fechamento manual, redução por kill
-switch) nunca são bloqueadas por este motor — a regra 3 da diretiva é explícita: *"travas de entrada
-não podem impedir saídas de proteção"*.
+Sem rede, sem banco, sem relógio próprio (o instante é `portfolio.as_of`, e toda idade é medida
+contra ele). Nenhuma ordem de **entrada** é criada sem uma `RiskDecision.approved = true` persistida
+em `trade_proposals.risk_decision` **antes** de a ordem existir. Ordens de **saída** (stop, alvo,
+fechamento manual, redução por kill switch) nunca são bloqueadas por este motor — a regra 3 da
+diretiva é explícita: *"travas de entrada não podem impedir saídas de proteção"* — e por isso
+`evaluate_exit` não roda nenhum check de entrada e sempre aprova (§10).
+
+`evaluate_exit` recebe a **posição**, não a carteira: `portfolio` é opcional (§5, "`evaluate_exit`
+funciona sem `PortfolioState`"), porque a âncora diária que `PortfolioState` exige é um limite de
+**entradas**, e um stop de posição existente não pode esperar por ela depois de um restart.
 
 ## 1. Entradas
 
+Nomes e campos de `packages/risk-core/hunter_risk/{inputs,exposure,limits,decision}.py`. `RiskModel`
+(`hunter_risk.base`) é a base de todos: `extra="forbid"`, imutável, e recusa `float` na construção de
+qualquer campo money/limite (§8) — só `Decimal`.
+
 ```
-TradeProposal      agent, portfolio, market, direction, signal (entry_zone, stop, targets),
-                   requested_risk_pct, as_of
-PortfolioState     cash, equity, peak_equity, equity_at_trading_day_start, trading_day (America/Sao_Paulo),
-                   exposure_notional, open_positions[], pending_entries[] (reservas),
-                   planned_risk_open, planned_risk_pending, exposure_by_asset{}, beta_exposure
-RiskLimits         perfil do portfolio (§2), com o preset do sistema como origem
-MarketLiquidity    quote_volume_24h, quote_volume_last_minute, quote_volume_median_30m,
-                   book (níveis, ts), spread_pct, last_price, data_quality, gap_state, in_universe,
-                   min_notional, step_size, tick_size
-KillSwitchState    system, organization, portfolio → efetivo = o mais restritivo
-MarketRegime       regime atual (v0) — só ajusta tamanho, nunca aprova
-MarketBeta         beta contra o BTC, com `valid_until` (§6); ausente ou vencido → check `unavailable`
+EntryProposal      proposal_id, portfolio_id, agent_id?, market (MarketIdentity), direction,
+                   entry_ref, stop, requested_notional? (teto, nunca meta), assumed_costs,
+                   agent_enabled, signal_valid
+ExitProposal       proposal_id, portfolio_id, position_id, market, qty, reason
+PortfolioState     portfolio_id, as_of, equity, cash, peak_equity, day_start_equity, day_start_utc
+                   (validado contra o dia de São Paulo de `as_of`, §5), open_positions[],
+                   pending_entries[] (reservas — cada uma com reserved_notional, reserved_cash,
+                   planned_risk_quote, beta_btc), daily_realized_pnl?/daily_unrealized_pnl?/
+                   daily_costs? (só relato, §5), marks_complete, is_active; deriva
+                   total_exposure, slots_used, committed_planned_risk, exposure_for_asset(),
+                   available_cash, beta_exposure(), daily_loss_pct, drawdown_pct — nunca recebidos
+                   prontos, sempre calculados aqui para não divergir das posições
+RiskLimits         perfil do portfolio (§2) — `RiskLimits.model_validate` do JSON persistido em
+                   `risk_profiles.limits`
+MarketLiquidity    market, data_quality, last_price, mid_price?, best_bid?, best_ask?, price_ts,
+                   asks[] (book, melhor primeiro), book_ts?, quote_volume_24h?,
+                   last_minute_quote_volume?, median_30m_quote_volume?, volume_window_complete,
+                   participation_used_quote, volume_ts?, gap_state?, in_universe?; deriva
+                   reference_mid, spread_pct, participation_reference
+MarketSpec         market (MarketIdentity), step_size, min_notional, tick_size? — regras de
+                   negociação da exchange para o mercado, com filtro **SPOT** implícito em
+                   `max_leverage = 1` (§2); comparado contra `proposal.market` e
+                   `liquidity.market` no check `market_identity` (D1: SPOT executa, o perpétuo
+                   decide, nunca o inverso)
+KillSwitchInputs   system, organization, portfolio (cada um `KillSwitchState`) → efetivo = o mais
+                   restritivo (`most_restrictive`, §5)
+BetaEstimate       value, as_of, validated, bars — `validated` é a palavra da diretiva: uma
+                   estimativa que existe mas não foi validada não é um beta (§6); vencida
+                   (`portfolio.age_s(beta.as_of) > max_beta_age_s`) ou não validada → check
+                   `beta_validity` `unavailable`
 ```
+
+`MarketRegime` **não** é insumo de `evaluate` hoje — reservado para o M4 (§2.1).
 
 Todo insumo carrega carimbo de tempo. Um insumo ausente, vencido ou degradado não vira zero nem
 média: vira o estado `unavailable` do check que depende dele (§7).
@@ -117,10 +148,11 @@ controle não implementado parecer configurado. Cada uma tem destino declarado:
 
 ### 2.1 Reservado para o M4: multiplicador por regime
 
-O motor v2.1/v2.2 **não aplica** `regime_size_multiplier`: `RiskLimits` não tem esse campo, e
-`packages/risk-core` não tem código nenhum que leia ou aplique um multiplicador por regime hoje — só o
-multiplicador de aviso/kill switch (`entry_size_multiplier`, §5) age sobre o tamanho final (§4). A
-gramática abaixo é a do v1, mantida como especificação para quando o insumo de regime for ligado; ela
+O motor v2.1/v2.2 **não recebe** `MarketRegime` como insumo — `evaluate` não tem esse parâmetro — e
+**não aplica** `regime_size_multiplier`: `RiskLimits` não tem esse campo, e `packages/risk-core` não
+tem código nenhum que leia ou aplique um multiplicador por regime hoje — só o multiplicador de
+aviso/kill switch (`entry_size_multiplier`, §5) age sobre o tamanho final (§4). A gramática abaixo é a
+do v1, mantida como especificação para quando o insumo de regime for ligado; ela
 volta como campo de `RiskLimits`, com uma versão nova do preset, nesse momento — não é uma chave que
 falta ao `paper_v1` por descuido, é um controle que ainda não existe.
 
@@ -562,6 +594,7 @@ da revisão original, mas de uma segunda e uma terceira rodada da Astra sobre o 
 |---|---|---|---|
 | 1 | §2 listava quatro chaves para as quais `RiskLimits` não tem campo (`participation_reference`, `market_types`, `auto_close_on_emergency`, `regime_size_multiplier`); `infra/scripts/seed_reference.PAPER_V1_LIMITS` era um segundo literal escrito à mão, já divergente do motor | `risk_profiles.limits` do `paper_v1` é gravado como `hunter_risk.limits.PAPER_V1.model_dump(mode="json")` — uma única fonte; as quatro chaves saem da tabela do perfil (§2), cada uma com destino declarado ali e em `docs/DATABASE.md` §18.8 | T3.1b (`296f3c1`, "deve corrigir 7"): `RiskLimits.model_validate(profile.limits)` falhava com dez erros sobre a linha que o seed antigo gravava — seis chaves que o motor exige faltavam, quatro que ele não tem estavam presentes |
 | 2 | §4 publicava `qty_final = qty_bruta × regime_multiplier × ks_multiplier`, e `size_without_multipliers` como "sem o multiplicador de aviso e o de regime" | `hunter_risk.sizing` só recebe e aplica **um** multiplicador (`entry_size_multiplier`, o de aviso/kill switch, §5); `hunter_risk.evaluate.evaluate` nem recebe `regime` como argumento | Divergência achada nesta revisão, fora do escopo da T3.1b: nenhum código em `packages/risk-core` implementa `regime_size_multiplier` hoje. §4 e §2.1 foram corrigidos para descrever o que o motor faz; o termo de regime volta com uma versão nova do preset no M4 |
+| v2.2.1 | §1 descrevia a assinatura antiga (`evaluate(proposal, portfolio_state, limits, market_liquidity, kill_switch, regime, beta) -> RiskDecision`) e uma entrada `MarketRegime`, sem citar `evaluate_exit` nem `MarketSpec` | §1 alinhada às assinaturas reais de `hunter_risk.evaluate.evaluate`/`evaluate_exit` (`packages/risk-core/hunter_risk/evaluate.py`), com os campos de `EntryProposal`, `ExitProposal`, `PortfolioState`, `RiskLimits`, `MarketLiquidity`, `MarketSpec`, `KillSwitchInputs` e `BetaEstimate` (`packages/risk-core/hunter_risk/{inputs,exposure,limits,decision}.py`); `MarketRegime` movida para a §2.1 | `.claude/state/review-T3.1b-T3.6-T3.12.md` |
 
 O que **não** mudou na v2.2: nenhum valor do perfil `paper_v1`, a estrutura de `risk_decision.checks[]`,
 os `risk_events`, e as garantias da §8.
@@ -589,10 +622,12 @@ demonstrável quando houver dado.
 
 ## 11. Escopo de capital
 
-O escopo é `(organization_id, workspace_id, type=paper, is_arena=false)`: **uma** carteira principal
-permanente por workspace, garantida por índice único parcial no banco. O orçamento de participação
-(§4) tem chave `(market_id, escopo_de_capital)` e é compartilhado por todos os agentes e pela ordem
-manual dentro do escopo.
+O escopo é **por organização**: `(organization_id, type=paper, is_arena=false)`, índice único parcial
+`uq_portfolios_principal_paper` no banco (T3.1b, `296f3c1`) — **não** por workspace. Uma organização
+com dois workspaces não compra uma segunda carteira de R$ 100.000 abrindo o segundo workspace; **uma**
+carteira principal permanente por organização. O orçamento de participação (§4) tem chave
+`(market_id, escopo_de_capital)` e é compartilhado por todos os agentes e pela ordem manual dentro do
+escopo.
 
 Com uma principal por escopo, a trava dessa carteira serializa o orçamento. **Se um dia houver mais
 de uma carteira consumindo o mesmo escopo, uma trava própria do orçamento passa a ser pré-requisito**
@@ -600,7 +635,7 @@ de uma carteira consumindo o mesmo escopo, uma trava própria do orçamento pass
 
 A permanência é parte do contrato: a unicidade vale também para carteira pausada ou arquivada (o
 predicado não depende de `status` nem exclui `deleted_at` preenchido), e os campos que tirariam a
-carteira do escopo não podem ser alterados para liberar uma abertura nova. Transferi-la para outro
-workspace, transformá-la em arena ou trocar o workspace para oferecer um recomeço é a mesma
+carteira do escopo não podem ser alterados para liberar uma abertura nova. Transferi-la para outra
+organização, transformá-la em arena ou trocar a organização para oferecer um recomeço é a mesma
 substituição que a diretiva proíbe quando proíbe reset.
 
