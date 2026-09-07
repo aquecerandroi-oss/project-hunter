@@ -34,13 +34,13 @@ from typing import TYPE_CHECKING
 from sqlalchemy import text
 
 from hunter_core.admission.reservation import ReservationCycleClosed, close_reservation
-from hunter_core.domain.enums import OrderSide, ReservationState
+from hunter_core.domain.enums import ReservationState
 from hunter_core.execution.entries import MarketEntryOrder
 from hunter_core.execution.paper import PaperExecutionAdapter
-from hunter_core.execution.pricing import ExecutionPolicy, eligible_for
 from hunter_core.logging import get_logger
 from hunter_core.risk.scopes import effective_state
 from hunter_execution_worker.apply import EntryApplication, apply_entry
+from hunter_execution_worker.entry_inputs import missing_inputs
 from hunter_execution_worker.positions import load_open_position
 from hunter_execution_worker.reference import MarketReference, load_market
 from hunter_risk.decision import RiskDecision
@@ -49,7 +49,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from hunter_core.risk.scopes import EffectiveKillSwitch
-    from hunter_execution_worker.market_data import SpotMarketData, SpotSnapshot
+    from hunter_execution_worker.market_data import SpotMarketData
     from hunter_execution_worker.wallet import WalletRef
 
 __all__ = ["EntryOutcome", "execute_approved_entries"]
@@ -74,6 +74,11 @@ class _Approved:
     market_id: uuid.UUID
     decision: RiskDecision
     decided_at: datetime
+    reserved_until: datetime | None
+
+    def overdue(self, now: datetime) -> bool:
+        """Has the 30 s tenure already run out at ``now``?"""
+        return self.reserved_until is not None and self.reserved_until <= now
 
 
 async def _approved_with_reservation(
@@ -81,14 +86,23 @@ async def _approved_with_reservation(
 ) -> tuple[_Approved, ...]:
     """Approved proposals still holding their reservation, in FIFO order.
 
-    ``reservation_state = 'held'`` is the whole filter: the first attempt closes
-    the cycle (``consumed`` or ``released``), so a proposal that was attempted
-    never comes back — the durable "one attempt" guarantee, without a flag.
+    ``reservation_state = 'held'`` closes the "one attempt" half: the first
+    attempt closes the cycle (``consumed`` or ``released``), so a proposal that
+    was attempted never comes back — the durable guarantee, without a flag.
+
+    **``reserved_until`` is read with it, and it is not decoration.** The state
+    says the commitment is standing; the tenure says whether it still may be.
+    The guardian's review of ``7ecafd2`` reproduced the gap: a proposal approved
+    at 15:30:00 with ``reserved_until`` 15:30:30 was executed by the cycle of
+    15:35:00, 270 s after the wallet gave the cash, the slot and the
+    participation budget back to everybody else. The row is carried up and the
+    cycle expires it here, in the same transaction, instead of filling it.
     """
     rows = await session.execute(
         text(
-            "SELECT p.id AS proposal_id, p.market_id, p.risk_decision, p.decided_at "
-            "FROM trade_proposals p WHERE p.organization_id = :org AND p.portfolio_id = :pf "
+            "SELECT p.id AS proposal_id, p.market_id, p.risk_decision, p.decided_at, "
+            "p.reserved_until FROM trade_proposals p WHERE p.organization_id = :org "
+            "AND p.portfolio_id = :pf "
             "AND p.status = 'approved' AND p.reservation_state = 'held' "
             "ORDER BY p.admission_seq FOR UPDATE OF p"
         ),
@@ -100,69 +114,10 @@ async def _approved_with_reservation(
             market_id=row.market_id,
             decision=RiskDecision.model_validate(row.risk_decision),
             decided_at=row.decided_at,
+            reserved_until=row.reserved_until,
         )
         for row in rows
     )
-
-
-def _missing_inputs(
-    snapshot: SpotSnapshot,
-    market: MarketReference,
-    *,
-    policy: ExecutionPolicy,
-    decision_at: datetime,
-    now: datetime,
-) -> str:
-    """Why this snapshot cannot be attempted against — or an empty string.
-
-    **An entry is attempted only against an *eligible* book**, and the reason is
-    the whole point of the "one attempt is terminal" rule: the attempt is spent
-    on what the market answered, never on what we had not observed yet. The
-    30-minute proof of 2026-09-07 caught this — a decision taken at 06:48:23,857
-    met a book received at 06:48:22 (the snapshot before it), and
-    ``book_before_latency`` burned the decision on a snapshot that was simply not
-    the one the contract names. A snapshot that is too old, too new, empty or
-    corrupt is the same class of fact: the input is not ready, so nothing is
-    written and nothing is spent, and if it never becomes ready the 30 s
-    reservation expires and is released with its reason.
-    """
-    if snapshot.book is None:
-        return "no_book"
-    if snapshot.last_trade is None:
-        return "no_trade"
-    verdict = eligible_for(
-        policy,
-        snapshot.book,
-        decision_at=decision_at,
-        now=now,
-        side=OrderSide.BUY,
-        market=(market.identity.exchange, market.identity.symbol),
-    )
-    if not verdict.eligible:
-        return verdict.reason
-    if snapshot.avg_price is None and _needs_average(market):
-        # The ``NOTIONAL`` filter of a MARKET order is judged against the
-        # exchange's ``avgPrice`` over ``avgPriceMins`` minutes, and never
-        # against the last trade — which moves with the very book under
-        # suspicion (T3.0a §5). Without it the order cannot be judged, so it is
-        # not attempted: the reservation expires and is released with its
-        # reason, and no absence ever produces a fill.
-        return f"avg_price_{snapshot.avg_price_source}"
-    return ""
-
-
-def _needs_average(market: MarketReference) -> bool:
-    """Does this market's ``NOTIONAL`` filter actually need an ``avgPrice``?
-
-    ``avgPriceMins == 0`` is Binance's own "use the last price" case, and a
-    market that declares no notional floor for MARKET orders needs no reference
-    at all. Deferring those would be refusing an order the exchange would take.
-    """
-    filters = market.filters
-    applies = (filters.min_notional is not None and filters.apply_min_to_market) or (
-        filters.max_notional is not None and filters.apply_max_to_market
-    )
-    return applies and filters.avg_price_mins != 0
 
 
 async def execute_approved_entries(
@@ -180,6 +135,18 @@ async def execute_approved_entries(
     approved = await _approved_with_reservation(session, wallet=wallet)
     outcomes: list[EntryOutcome] = []
     for proposal in approved:
+        if proposal.overdue(now):
+            outcomes.append(
+                await _expire(
+                    session,
+                    wallet=wallet,
+                    proposal=proposal,
+                    data=data,
+                    now=now,
+                    engine=engine,
+                )
+            )
+            continue
         outcomes.append(
             await _execute_one(
                 session,
@@ -192,6 +159,60 @@ async def execute_approved_entries(
             )
         )
     return tuple(outcomes)
+
+
+async def _expire(
+    session: AsyncSession,
+    *,
+    wallet: WalletRef,
+    proposal: _Approved,
+    data: SpotMarketData,
+    now: datetime,
+    engine: PaperExecutionAdapter,
+) -> EntryOutcome:
+    """Give a dead reservation back, saying which input never arrived.
+
+    The expiry cycle sweeps the same rows every 5 s with a generic motive; this
+    one runs in the transaction that *would* have filled, so it is the only
+    place that still knows why the entry kept being deferred
+    (``no_book``, ``book_before_latency``, ``avg_price_not_collected``). Storing
+    that instead of "reserved_until reached" is what turns a wallet that entered
+    nothing into a diagnosable fact (review of ``7ecafd2``, suggestion 7).
+    """
+    missing = await _deferral_reason(session, proposal=proposal, data=data, now=now, engine=engine)
+    await close_reservation(
+        session,
+        organization_id=wallet.organization_id,
+        proposal_id=proposal.proposal_id,
+        target=ReservationState.EXPIRED,
+        now=now,
+        reason=f"reserved_until reached with no order; last deferral: {missing or 'none'}",
+    )
+    logger.warning(
+        "entry_reservation_expired",
+        proposal_id=str(proposal.proposal_id),
+        reserved_until=proposal.reserved_until.isoformat() if proposal.reserved_until else None,
+        reason=missing or "none",
+    )
+    return EntryOutcome(proposal.proposal_id, "expired", missing or "reserved_until_reached")
+
+
+async def _deferral_reason(
+    session: AsyncSession,
+    *,
+    proposal: _Approved,
+    data: SpotMarketData,
+    now: datetime,
+    engine: PaperExecutionAdapter,
+) -> str:
+    """Which input this proposal was still waiting for — or an empty string."""
+    market = await load_market(session, proposal.market_id)
+    if market is None:
+        return "market_unknown"
+    snapshot = await data.snapshot(market.identity)
+    return missing_inputs(
+        snapshot, market, policy=engine.policy, decision_at=proposal.decided_at, now=now
+    )
 
 
 async def _execute_one(
@@ -217,7 +238,7 @@ async def _execute_one(
             session, wallet=wallet, proposal=proposal, reason="position_exists", now=now
         )
     snapshot = await data.snapshot(market.identity)
-    missing = _missing_inputs(
+    missing = missing_inputs(
         snapshot, market, policy=engine.policy, decision_at=proposal.decided_at, now=now
     )
     if missing:

@@ -286,3 +286,84 @@ docker compose ... -f infra/vps/docker-compose.prod.yml config --services → ex
 ```
 
 A prova de 30 minutos, com a linha do tempo e os números, está em `.claude/state/t35-proof.md`.
+
+---
+
+# T3.5b — fechamento da revisão obrigatória (`review-T3.5.md`), 2026-09-07
+
+**Autor:** backend-specialist. **Base:** `7ecafd2` + a revisão do risk-engine-guardian em
+`.claude/state/review-T3.5.md`. **Não commitei.** **Astra continua indisponível** (cota do Codex
+esgotada, retorno previsto 12/09): nenhuma segunda opinião foi feita nesta rodada — limite, não
+aprovação. **T3.14 estava em voo** nos mesmos diretórios: não editei `bridge*.py`, `metrics.py` nem
+`tests/builders.py`; o que precisei de compartilhado nasceu em `tests/scenarios.py`.
+
+## 8. Dívida de coluna: `positions.is_residual` (para a T3.1e)
+
+**Pedido, com o motivo e a forma exata.**
+
+`positions.status = 'closing'` é hoje o **único** marcador de que o que a linha ainda segura é pó —
+resíduo de arredondamento abaixo do `min_qty`, invendável a qualquer preço — e não posição. Ele
+funciona porque `hunter_execution_worker.positions.reduce_position` só escreve `closing` nesse caso
+(`settled and remaining > 0`), mas isso é uma **coincidência de escrita**, não um fato do schema:
+`position_status` tem `closing` como estado genérico de "saindo", e no dia em que alguém escrever
+uma saída parcial em andamento como `closing` — o significado natural da palavra — três leituras
+passam a mentir de uma vez:
+
+- `LedgerRepository.PositionRow.is_residual` (`packages/core/hunter_core/db/repositories/ledger.py`)
+  → `hunter_core.portfolio.state.build_portfolio_state` deixa de contar a posição em `slots_used`,
+  em `assets_held` e no risco planejado comprometido;
+- `hunter_execution_worker.positions.load_open_position` → o ciclo de entrada deixa de ver a
+  posição e aceita uma segunda ordem na mesma moeda, contra a D3;
+- a T3.8c mostra a linha como "pó" na tela da carteira.
+
+**Forma pedida:** `positions.is_residual BOOLEAN NOT NULL DEFAULT false`, escrita por
+`reduce_position` no mesmo `UPDATE` que move `status` para `closing`, com o backfill
+`UPDATE positions SET is_residual = true WHERE status = 'closing' AND qty > 0` (hoje é exatamente o
+conjunto certo). Com ela, as três leituras acima trocam `status = 'closing'` por `is_residual`, e
+`closing` volta a poder significar "saindo" sem quebrar dinheiro. Enquanto a coluna não existir, a
+propriedade `PositionRow.is_residual` é o **único** lugar que sabe a diferença, e está documentada
+como tal.
+
+## 9. O que mudou nesta rodada, item a item
+
+| # | Item da revisão | Onde | Teste que falhava antes |
+|---|---|---|---|
+| 1 | reserva vencida era executada | `entry.py` (`_Approved.reserved_until`, `_expire`) | `test_entry_guards.py::test_the_cycle_five_minutes_late_expires_it_instead_of_filling_it` |
+| 2 | ciclo de proteção sem a trava da carteira | `protection.py` (`effective_state(lock=True)` no topo) + docstring | `test_wallet_lock.py` |
+| 3 | pó matava a vaga e a moeda | `ledger.py` (`status`/`is_residual`), `portfolio/state.py` (filtro), `positions.py` (`load_open_position`) | `test_residual_dust.py`, `test_portfolio_state.py::TestDustIsMarkedButIsNotAPosition` |
+| 4 | warning de geometria por segundo | `admission_cycle.report_unreadable(reported=…)`, `cycles.Cycles.geometry_reported` | `test_scheduling.py::TestAnUnreadableRequestIsNamedOncePerRow` |
+| 5 | proteção degradada sem backoff | `triggering.DegradedRetries`, `protection.py` | `test_protection_backoff.py`, `test_scheduling.py::TestTheDegradedBackoff` |
+| 6 | MTM fora da grade perdia a virada | `schedule.py` (novo), `cycles.every(plan=…)`, `main.py` | `test_scheduling.py::TestTheMarkToMarketSchedule` |
+| 7 | expiração sem o motivo do adiamento | `entry._expire` grava `last deferral: <motivo>` na auditoria | `test_entry_guards.py::test_the_expiry_records_the_input_that_never_arrived` |
+| 9 | testes: execução tardia e §11 no fill | `test_entry_guards.py` (3 cenários) | idem |
+
+Itens **8** (digest da linha `pending`, que é da ponte T3.14) e **10** (flaky `WinError 64` no
+teardown com dois arquivos testcontainers no mesmo processo) **não** foram tratados: o 8 é do dono
+do `bridge*.py` e o 10 continua reproduzindo — `test_portfolio_state.py` inteiro falhou uma vez com
+`ConnectionResetError` no teardown e passou (22/22) na repetição com `-p no:randomly`.
+
+## 10. Arquivos novos desta rodada
+
+- `services/execution-worker/hunter_execution_worker/entry_inputs.py` — "o insumo está pronto?",
+  extraído de `entry.py` (orçamento de 350 linhas) e agora usado pelas duas pontas: adiar uma
+  proposta viva e nomear, na expiração de uma morta, o insumo que nunca chegou.
+- `services/execution-worker/hunter_execution_worker/settlement.py` — a linha `trades` de uma
+  posição assentada, extraída de `positions.py` pelo mesmo motivo e pela linha que o docstring
+  daquele módulo já traçava.
+- `services/execution-worker/hunter_execution_worker/schedule.py` — a grade do minuto e a margem da
+  virada em São Paulo.
+- `services/execution-worker/tests/scenarios.py` — o roteiro compartilhado das suítes novas
+  (admitir, entrar, proteger). Nenhum número mora nele; os números continuam em `builders.py`.
+
+## 11. Duas observações que não são defeito meu, mas mudam número
+
+1. **`reserved_until` é carimbado pelo relógio de parede**, não pelo `now` injetado: `admit(now=NOW)`
+   com `NOW = 15:30:00` gravou `15:30:30,219`. Não afeta produção (lá o `now` é o relógio), mas
+   qualquer teste que compare a tenure ao microssegundo vai piscar. `test_entry_guards.py` compara a
+   janela, e diz por quê.
+2. **`pyright services/execution-worker` acusa 160 erros pré-existentes** nos cinco arquivos de
+   teste da T3.5 original (`test_mtm_and_kill_switch`, `test_protection_cycle`, `test_order_cycle`,
+   `test_restart_recovery`, `test_concurrency`), todos vindos dos *helpers* anotados com
+   `# type: ignore[no-untyped-def]`. Nenhum é de arquivo meu — os meus (produção e testes novos)
+   estão em 0. Registrado como dívida de tipagem dos testes, não corrigido aqui para não misturar
+   um refactor de 5 arquivos numa correção de revisão.

@@ -21,10 +21,11 @@ from typing import TYPE_CHECKING
 from hunter_core.db.session import role_session, tenant_session
 from hunter_core.domain.types import utcnow
 from hunter_core.execution.paper import PaperExecutionAdapter
-from hunter_core.execution.tape import usable_trade
 from hunter_core.logging import get_logger
 from hunter_execution_worker import metrics
 from hunter_execution_worker.admission_cycle import pending_requests, report_unreadable
+from hunter_execution_worker.bridge import run_bridge_cycle
+from hunter_execution_worker.bridge_inputs import marks_for_open_positions
 from hunter_execution_worker.config import WORKER_ROLE, ExecutionConfig
 from hunter_execution_worker.entry import execute_approved_entries
 from hunter_execution_worker.guard import (
@@ -33,9 +34,8 @@ from hunter_execution_worker.guard import (
     read_effective_state,
 )
 from hunter_execution_worker.mtm import run_mtm_cycle
-from hunter_execution_worker.positions import load_open_positions
 from hunter_execution_worker.protection import TriggerWatermarks, run_protection_cycle
-from hunter_execution_worker.reference import load_markets
+from hunter_execution_worker.triggering import DegradedRetries
 from hunter_execution_worker.wallet import WalletRef, principal_wallets
 
 if TYPE_CHECKING:
@@ -46,15 +46,23 @@ if TYPE_CHECKING:
     from hunter_execution_worker.market_data import SpotMarketData
     from hunter_execution_worker.state import CycleHealth
 
-__all__ = ["Clock", "Cycles", "every"]
+__all__ = ["Clock", "Cycles", "Planner", "every"]
 
 logger = get_logger(__name__)
 
 Clock = Callable[[], datetime]
+Planner = Callable[[datetime], datetime]
+"""Given the instant a pass ended, the instant the next one starts."""
 
 
 async def every(
-    seconds: float, run: Callable[[], Awaitable[None]], *, name: str, health: CycleHealth
+    seconds: float,
+    run: Callable[[], Awaitable[None]],
+    *,
+    name: str,
+    health: CycleHealth,
+    clock: Clock = utcnow,
+    plan: Planner | None = None,
 ) -> None:
     """Run ``run`` for ever, on a fixed cadence. A failure is logged, never fatal.
 
@@ -62,6 +70,11 @@ async def every(
     to keep running while the admission loop cannot reach a market, and vice
     versa. What *is* fatal is a loop **returning** — that is
     :func:`hunter_execution_worker.main.forever`'s job.
+
+    ``plan`` names the next instant instead of "``seconds`` from the end of this
+    pass". Without it the two are the same; with it the period stops carrying
+    the duration of the work, which for the mark-to-market decides whether the
+    trading day has a reference at all (:mod:`hunter_execution_worker.schedule`).
     """
     while True:
         try:
@@ -69,7 +82,11 @@ async def every(
         except Exception:
             health.errors += 1
             logger.exception("execution_cycle_failed", cycle=name)
-        await asyncio.sleep(seconds)
+        if plan is None:
+            await asyncio.sleep(seconds)
+            continue
+        now = clock()
+        await asyncio.sleep(max(0.0, (plan(now) - now).total_seconds()))
 
 
 class Cycles:
@@ -91,6 +108,13 @@ class Cycles:
         self.clock = clock
         self.adapter = PaperExecutionAdapter()
         self.watermarks = TriggerWatermarks()
+        self.retries = DegradedRetries()
+        """The backoff of the protections that fired and found no book. One per
+        process, like the watermarks, and losable for the same reason."""
+
+        self.geometry_reported: dict[uuid.UUID, set[uuid.UUID]] = {}
+        """Per wallet, the filed requests already named as unreadable. Keeps the
+        1 s admission loop from writing the same WARNING 86.400 times a day."""
 
     async def wallets(self) -> tuple[WalletRef, ...]:
         """Every managed wallet, re-read each pass (one opened later is picked up)."""
@@ -111,7 +135,11 @@ class Cycles:
 
         async def run(session: AsyncSession, wallet: WalletRef) -> None:
             filed = await pending_requests(session, wallet=wallet)
-            unreadable = report_unreadable(wallet, filed)
+            unreadable = report_unreadable(
+                wallet,
+                filed,
+                reported=self.geometry_reported.setdefault(wallet.portfolio_id, set()),
+            )
             self.health.pending_requests = len(filed)
             self.health.unreadable_requests = unreadable
             metrics.execution_pending_requests.labels(readable="false").set(unreadable)
@@ -145,6 +173,7 @@ class Cycles:
                 data=self.data,
                 now=now,
                 watermarks=self.watermarks,
+                retries=self.retries,
                 adapter=self.adapter,
                 clock=self.clock,
             )
@@ -208,25 +237,43 @@ class Cycles:
 
         await self._for_each(run)
 
+    async def bridge(self) -> None:
+        """One slot of the autonomy bridge — T3.14, only wired behind the flag.
+
+        The periodic pass is what makes "the ones that were not chosen stay
+        eligible next cycle" true without a second event: the durable queue is a
+        query, so a candidate that lost this slot is simply read again.
+        """
+
+        async def run(session: AsyncSession, wallet: WalletRef) -> None:
+            now = self.clock()
+            outcome = await run_bridge_cycle(
+                session,
+                wallet=wallet,
+                data=self.data,
+                now=now,
+                exit_cost_rate=self.config.exit_cost_rate,
+                adapter=self.adapter,
+            )
+            self.health.bridge_candidates = outcome.candidates
+            self.health.bridge_at = now
+
+        await self._for_each(run)
+
     async def _marks(
         self, session: AsyncSession, *, wallet: WalletRef, now: datetime
     ) -> dict[uuid.UUID, Decimal]:
         """A price per open market, from the **last valid SPOT trade** and nothing else.
 
-        A market whose tape has nothing usable is simply absent from the map, and
-        the ledger then falls back to the last durable mark and flags the state
-        incomplete. Marking at a price we could not validate would be the
-        invented number the directive forbids.
+        Delegated to :func:`bridge_inputs.marks_for_open_positions` so the bridge
+        and the mark-to-market cycle cannot disagree about what a mark is.
         """
-        positions = await load_open_positions(session, wallet=wallet)
-        markets = await load_markets(session, {position.market_id for position in positions})
-        marks: dict[uuid.UUID, Decimal] = {}
-        for market_id, market in markets.items():
-            snapshot = await self.data.snapshot(market.identity)
-            trade, _ = usable_trade(
-                snapshot.last_trade, now=now, policy=self.adapter.policy.marking_policy
-            )
-            if trade is not None:
-                marks[market_id] = trade.price
-        self.health.open_positions = len(positions)
+        marks, open_positions = await marks_for_open_positions(
+            session,
+            wallet=wallet,
+            data=self.data,
+            policy=self.adapter.policy.marking_policy,
+            now=now,
+        )
+        self.health.open_positions = open_positions
         return marks

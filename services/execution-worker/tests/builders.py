@@ -76,7 +76,7 @@ class Wallet:
         self.market_id = tenant.market_id
 
 
-def _filters_metadata() -> str:
+def filters_metadata() -> str:
     """``markets.metadata`` exactly as ``binance_spot.normalize`` writes it."""
     return json.dumps(
         {
@@ -156,7 +156,7 @@ async def create_tenant(engine: AsyncEngine, *, step: Decimal = STEP) -> Tenant:
                 "VALUES (:market, :ex, :symbol, 'spot', :base, :quote, :tick, :step, "
                 ":min_notional, true, CAST(:meta AS jsonb))"
             ),
-            params | {"meta": _filters_metadata()},
+            params | {"meta": filters_metadata()},
         )
     return tenant
 
@@ -351,11 +351,15 @@ class SecondMarket:
         self.step = tenant.step
 
 
-async def add_market(engine: AsyncEngine, tenant: Tenant) -> SecondMarket:
-    """One more market, so a pending entry can exist where a position does not."""
+async def add_market(engine: AsyncEngine, tenant: Tenant, *, suffix: str = "B") -> SecondMarket:
+    """One more market, so a pending entry can exist where a position does not.
+
+    ``suffix`` names the extra coin: the bridge suites need several distinct
+    ones in the same tenant, and ``assets.symbol`` is globally unique.
+    """
     market_id, base_id = uuid7(), uuid7()
-    symbol = f"{tenant.base_symbol}B{'USDT'}"
-    base = f"{tenant.base_symbol}B"
+    symbol = f"{tenant.base_symbol}{suffix}USDT"
+    base = f"{tenant.base_symbol}{suffix}"
     async with engine.begin() as connection:
         await connection.execute(
             text("INSERT INTO assets (id, symbol) VALUES (:id, :symbol)"),
@@ -377,7 +381,7 @@ async def add_market(engine: AsyncEngine, tenant: Tenant) -> SecondMarket:
                 "tick": TICK,
                 "step": tenant.step,
                 "min_notional": MIN_NOTIONAL,
-                "meta": _filters_metadata(),
+                "meta": filters_metadata(),
             },
         )
     return SecondMarket(tenant, market_id, symbol, base)

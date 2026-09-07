@@ -114,6 +114,7 @@ async def _buy(
     ts: datetime = _NOW,
     fee_asset: str = "USDT",
     position_qty: Decimal | None = None,
+    status: str = "open",
 ) -> uuid.UUID:
     """One filled entry: an order, its fill and the position it opened.
 
@@ -139,6 +140,7 @@ async def _buy(
         "client": f"cli-{order_id}",
         "fee_asset": fee_asset,
         "position_qty": qty if position_qty is None else position_qty,
+        "status": status,
     }
     async with engine.begin() as connection:
         await connection.execute(
@@ -163,7 +165,7 @@ async def _buy(
                 "INSERT INTO positions (id, organization_id, portfolio_id, market_id, direction, "
                 "qty, avg_entry_price, mark_price, stop_price, status, opened_at) "
                 "VALUES (:position, :org, :pf, :market, 'long', :position_qty, :price, :mark, "
-                ":stop, 'open', :ts)"
+                ":stop, :status, :ts)"
             ),
             params,
         )
@@ -917,3 +919,95 @@ class TestTheCurveRefusesAnFxItMayNotUse:
                 {"pf": wallet.portfolio_id, "ts": later},
             )
         assert stored is None
+
+
+class TestDustIsMarkedButIsNotAPosition:
+    """T3.5b item 3 — the residual of a spot exit stays in the patrimony and
+    leaves the slot.
+
+    ``positions.status = 'closing'`` is what the execution worker writes when
+    the leftover of an exit is below the exchange minimum: 0,000482 units that
+    no price makes sellable. It is owned, so the exposure and the equity count
+    it; it is not a position, so the engine never sees it — before this it held
+    one of five slots and refused that coin a second order for ever.
+    """
+
+    async def test_a_residual_is_valued_in_the_equity_and_takes_no_slot(
+        self, factory: async_sessionmaker[AsyncSession], ledger_engine: AsyncEngine, wallet: Wallet
+    ) -> None:
+        await _buy(
+            ledger_engine,
+            wallet,
+            qty=Decimal("0.5"),
+            price=Decimal(4000),
+            fee=Decimal("2.0"),
+            mark=Decimal(4000),
+            stop=Decimal(3900),
+            position_qty=Decimal("0.000482"),
+            status="closing",
+        )
+
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
+            build = await build_portfolio_state(
+                session,
+                organization_id=wallet.org_id,
+                portfolio_id=wallet.portfolio_id,
+                as_of=_NOW,
+                marks={wallet.market_id: Decimal(4200)},
+                exit_cost_rate=_NO_EXIT_COST,
+            )
+
+        dust_notional = Decimal("0.000482") * Decimal(4200)
+        assert build.cash == _CREDITED - Decimal(2000) - Decimal("2.0")
+        # Visible and valued — the coins are owned and the patrimony says so.
+        assert build.exposure_notional == dust_notional
+        assert build.equity == build.cash + dust_notional
+        assert build.state is not None
+        assert build.state.equity == build.equity
+        # And invisible to the engine: no slot, no coin held, no planned risk.
+        assert build.state.open_positions == ()
+        assert build.state.slots_used == 0
+        assert build.state.assets_held == frozenset()
+        assert build.state.committed_planned_risk == Decimal(0)
+        # The mark was found, so nothing is degraded by the residual's presence.
+        assert build.state.marks_complete is True
+
+    async def test_a_residual_next_to_a_real_position_leaves_exactly_one_slot(
+        self, factory: async_sessionmaker[AsyncSession], ledger_engine: AsyncEngine, wallet: Wallet
+    ) -> None:
+        await _buy(
+            ledger_engine,
+            wallet,
+            qty=Decimal("0.5"),
+            price=Decimal(4000),
+            fee=Decimal("2.0"),
+            mark=Decimal(4000),
+            position_qty=Decimal("0.000482"),
+            status="closing",
+        )
+        await _buy(
+            ledger_engine,
+            wallet,
+            qty=Decimal("0.25"),
+            price=Decimal(4000),
+            fee=Decimal("1.0"),
+            mark=Decimal(4000),
+            stop=Decimal(3900),
+        )
+
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
+            build = await build_portfolio_state(
+                session,
+                organization_id=wallet.org_id,
+                portfolio_id=wallet.portfolio_id,
+                as_of=_NOW,
+                marks={wallet.market_id: Decimal(4200)},
+                exit_cost_rate=_NO_EXIT_COST,
+            )
+
+        assert build.state is not None
+        assert build.state.slots_used == 1
+        assert [p.qty for p in build.state.open_positions] == [Decimal("0.25")]
+        # The dust is still in the exposure, next to the position that counts.
+        assert build.exposure_notional == (Decimal("0.000482") + Decimal("0.25")) * Decimal(4200)
+        assert build.state.assets_held == frozenset({wallet.tenant.base_symbol})

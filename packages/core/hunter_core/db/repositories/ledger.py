@@ -78,10 +78,32 @@ class PositionRow(BaseModel):
     qty: Decimal
     avg_entry_price: Decimal
     stop_price: Decimal | None
+    status: str
+    """``positions.status`` — ``open`` or ``closing``. Read because the two are
+    not the same kind of holding: see :attr:`is_residual`."""
+
     durable_mark_price: Decimal | None
     """``positions.mark_price`` — the last mark the writer persisted. Used only
     as the *fallback* when the live source has no valid price, and never as an
     excuse to report a fresh equity: the state is flagged incomplete instead."""
+
+    @property
+    def is_residual(self) -> bool:
+        """Is what this row still holds *dust* rather than a position?
+
+        A spot buy pays its fee in the coin, so the wallet receives
+        ``qty × 0,999`` and almost never a whole number of ``step_size``: after
+        the exit, a leftover below ``min_qty`` stays for ever because no price
+        makes it sellable. The writer marks that with ``status = 'closing'``
+        (``hunter_execution_worker.positions.reduce_position``), which today is
+        exactly and only the dust case.
+
+        The residual is still **owned, marked and part of the patrimony** — it
+        is simply not a position: it takes no slot, is not the coin "already in
+        the wallet" for D3, and commits no planned risk (T3.5b review, item 3).
+        A durable ``positions.is_residual`` is filed for T3.1e; until it lands,
+        this property is the single place that reading knows the difference."""
+        return self.status == "closing"
 
 
 class ReservationRow(BaseModel):
@@ -125,7 +147,8 @@ class LedgerRepository(TenantRepository):
         # (column list and join). Every value is a bound parameter.
         statement = text(
             "SELECT p.id AS position_id, p.market_id, p.direction::text AS direction, p.qty, "  # noqa: S608
-            "p.avg_entry_price, p.stop_price, p.mark_price AS durable_mark_price, "
+            "p.avg_entry_price, p.stop_price, p.status::text AS status, "
+            "p.mark_price AS durable_mark_price, "
             f"{_MARKET_COLUMNS} FROM positions p "
             + _MARKET_JOIN.format(alias="p")
             + " WHERE p.organization_id = :org AND p.portfolio_id = :pf "

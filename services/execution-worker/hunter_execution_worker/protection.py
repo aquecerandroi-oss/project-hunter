@@ -1,10 +1,20 @@
 """The protection cycle: what a crossing means, and what it is allowed to sell.
 
 Once a tick of the last valid SPOT trade crosses a protection, the attempt runs
-**under the wallet's lock, then the position's own row lock**, and the quantity
-it may sell comes from :func:`hunter_core.execution.intents.allocate_sellable`
-over every live intention of that position. That is what stops a stop and a
-target selling the same unit twice — a short, on spot (RISK_ENGINE.md §10).
+**under the wallet's lock row, then the position's own row lock**, and the
+quantity it may sell comes from
+:func:`hunter_core.execution.intents.allocate_sellable` over every live
+intention of that position. That is what stops a stop and a target selling the
+same unit twice — a short, on spot (RISK_ENGINE.md §10).
+
+Until 2026-09-07 that first lock was a claim in this docstring and nowhere in
+the code: the cycle took ``FOR UPDATE`` on ``positions`` and on the intentions
+and never touched ``portfolio_risk_state``. ``build_portfolio_state`` reads cash
+and positions in two statements under READ COMMITTED, so a protection that
+committed between them made the mark-to-market write 18.148,2458 for a wallet
+holding 19.903,8934 — 8,78 % low, which latches BLOCKED for real and needs a
+human to unlatch. It is taken here now, in the contract's order (system →
+organization → wallet), before a single position is read.
 
 Three things keep a fired protection alive until it is really liquidated:
 
@@ -19,8 +29,9 @@ Three things keep a fired protection alive until it is really liquidated:
   *is* the decision to exit, and it uses this same lock and this same intention.
 
 Kill switch: a blocked wallet never stops this cycle. "Travas de entrada não
-podem impedir saídas de proteção" is rule 3 of the directive, so the state is not
-even read here — the entry cycle is where it binds.
+podem impedir saídas de proteção" is rule 3 of the directive, so the state is
+read **only to take its locks** and its value is deliberately never consulted —
+the entry cycle is where it binds.
 """
 
 from __future__ import annotations
@@ -36,11 +47,13 @@ from hunter_core.execution.intents import ExitAttempt, ExitIntent, allocate_sell
 from hunter_core.execution.paper import PaperExecutionAdapter
 from hunter_core.execution.triggers import TriggerEvaluation
 from hunter_core.logging import get_logger
+from hunter_core.risk.scopes import effective_state
 from hunter_execution_worker.apply import ExitApplication, apply_exit
 from hunter_execution_worker.intents_repo import live_intents
 from hunter_execution_worker.positions import OpenPositionRow, load_open_positions
 from hunter_execution_worker.reference import MarketReference, load_markets
 from hunter_execution_worker.triggering import (
+    DegradedRetries,
     TriggerWatermarks,
     due,
     fired_key,
@@ -53,7 +66,12 @@ if TYPE_CHECKING:
     from hunter_execution_worker.market_data import SpotMarketData, SpotSnapshot
     from hunter_execution_worker.wallet import WalletRef
 
-__all__ = ["ProtectionOutcome", "TriggerWatermarks", "run_protection_cycle"]
+__all__ = [
+    "DegradedRetries",
+    "ProtectionOutcome",
+    "TriggerWatermarks",
+    "run_protection_cycle",
+]
 
 logger = get_logger(__name__)
 _ZERO = Decimal(0)
@@ -80,8 +98,13 @@ async def run_protection_cycle(
     watermarks: TriggerWatermarks | None = None,
     adapter: PaperExecutionAdapter | None = None,
     clock: Callable[[], datetime] | None = None,
+    retries: DegradedRetries | None = None,
 ) -> tuple[ProtectionOutcome, ...]:
     """Evaluate every live position's protections and attempt whatever fired.
+
+    ``retries`` carries the backoff of the protections that fired and found no
+    book. Without one, every call is the first: that is what a single-shot test
+    wants, and it is also why the worker keeps exactly one per process.
 
     ``clock`` re-stamps the evaluation instant **after** the tape is read. The
     30-minute proof of 2026-09-07 showed why: ``now`` taken at the top of the
@@ -93,6 +116,11 @@ async def run_protection_cycle(
     """
     engine = adapter or PaperExecutionAdapter()
     marks = watermarks or TriggerWatermarks()
+    backoff = retries or DegradedRetries()
+    # The wallet's lock row, first and always — the value is never read (rule 3
+    # of the directive: an entry latch may not stop an exit). Taking it here is
+    # what makes a mark-to-market either see this whole sale or none of it.
+    await effective_state(session, wallet.portfolio_id, lock=True)
     positions = await load_open_positions(session, wallet=wallet, lock=True)
     if not positions:
         return ()
@@ -113,6 +141,7 @@ async def run_protection_cycle(
                 snapshot=snapshot,
                 now=max(now, clock()) if clock is not None else now,
                 marks=marks,
+                backoff=backoff,
                 engine=engine,
                 source=data.source,
             )
@@ -129,6 +158,7 @@ async def _protect_one(
     snapshot: SpotSnapshot,
     now: datetime,
     marks: TriggerWatermarks,
+    backoff: DegradedRetries,
     engine: PaperExecutionAdapter,
     source: str,
 ) -> list[ProtectionOutcome]:
@@ -164,6 +194,13 @@ async def _protect_one(
     for intent in intents:
         if not due(intent, fired, pending_stop):
             continue
+        if intent.degraded_since is not None and not backoff.ready(intent.intent_id, now):
+            # Already degraded and inside its backoff: the crossing keeps
+            # printing every second, and attempting on every print is what
+            # wrote 86.400 refused ``orders`` rows a day for one stop the
+            # market cannot fill. Nothing is written and nothing is lost — the
+            # intention stays open, degraded, with its reason.
+            continue
         share = allocations.get(intent, _ZERO)
         if share <= _ZERO:
             logger.warning(
@@ -186,6 +223,10 @@ async def _protect_one(
             source=source,
         )
         outcomes.append(outcome)
+        if outcome.status == "pending_degraded":
+            backoff.defer(intent.intent_id, now)
+        else:
+            backoff.clear(intent.intent_id)
         if outcome.application is not None and outcome.application.filled_qty > 0:
             # The next intention of this cycle sees the quantity the previous one
             # really took: the whole point of one lock over one balance.

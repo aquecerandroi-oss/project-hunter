@@ -26,8 +26,9 @@ from hunter_core.logging import get_logger
 from hunter_execution_worker import events
 from hunter_execution_worker.booking import book_fill
 from hunter_execution_worker.intents_repo import live_intents, save_intent
-from hunter_execution_worker.positions import OpenPositionRow, close_position, reduce_position
+from hunter_execution_worker.positions import OpenPositionRow, reduce_position
 from hunter_execution_worker.rows import insert_fill, insert_order
+from hunter_execution_worker.settlement import close_position
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession

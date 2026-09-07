@@ -103,13 +103,33 @@ async def pending_requests(
     )
 
 
-def report_unreadable(wallet: WalletRef, rows: Sequence[PendingRow]) -> int:
-    """Say, once per cycle, which filed requests cannot be decided from the row.
+def report_unreadable(
+    wallet: WalletRef, rows: Sequence[PendingRow], *, reported: set[uuid.UUID] | None = None
+) -> int:
+    """Name each filed request that cannot be decided from the row — **once**.
 
     Not a refusal and not a decision: refusing would destroy an operator's order
-    over a schema gap, and deciding would need numbers nobody wrote down.
+    over a schema gap, and deciding would need numbers nobody wrote down. But
+    saying it every second is not saying it either: this cycle polls at 1 s, so
+    one unreadable request wrote 86.400 identical WARNING lines a day and buried
+    everything else in the worker's log (review of ``7ecafd2``, item 4).
+
+    ``reported`` is the set of proposals already named, kept per process by
+    :class:`hunter_execution_worker.cycles.Cycles`. A line is written on the
+    **transition** — the first cycle that sees a given row — and the row is
+    forgotten when it stops being pending, so a request filed, decided and filed
+    again under a new id is named again. The *level* of the problem is the gauge
+    ``hunter_execution_pending_requests{readable="false"}``, which is a number
+    and does not decay; the log is the event. Without a set (a single-shot
+    caller, a test) every row is named, which is the old behaviour of one call.
     """
+    seen: set[uuid.UUID] = reported if reported is not None else set()
+    current = {row.proposal_id for row in rows}
+    seen.intersection_update(current)
     for row in rows:
+        if row.proposal_id in seen:
+            continue
+        seen.add(row.proposal_id)
         logger.warning(
             "pending_request_without_geometry",
             portfolio_id=str(wallet.portfolio_id),

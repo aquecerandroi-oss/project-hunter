@@ -24,6 +24,7 @@ from prometheus_client import Counter, Gauge
 from hunter_core.observability import registry
 
 __all__ = [
+    "bridge_candidates_total",
     "execution_mtm_age_seconds",
     "execution_orders_total",
     "execution_pending_degraded_total",
@@ -60,6 +61,19 @@ execution_reservations_total = Counter(
     ["state"],
     registry=registry,
 )
+bridge_candidates_total = Counter(
+    "hunter_bridge_candidates_total",
+    "Shadow signals screened by the autonomy bridge, by what happened to them.",
+    ["outcome"],
+    registry=registry,
+)
+"""T3.14 item 2. ``outcome`` is either a refusal reason (``research_only``,
+``beta_unavailable``, ``duplicate_position``, ``entry_window_closed``, ...), a
+deferral (``spot_book_unavailable``), ``waiting`` for the candidates that lost
+the slot, or ``approved``/``rejected`` for the one that was submitted. A bridge
+that admits nothing because the beta job is down and a bridge that admits
+nothing because nobody is emitting look identical without it."""
+
 execution_pending_requests = Gauge(
     "hunter_execution_pending_requests",
     "Filed requests waiting for a decision, by readability.",

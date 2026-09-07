@@ -230,7 +230,7 @@ não evento: seis laços com cadência própria, cada passada uma transação, s
 | `protection` | 1 s | `check_triggers` pelo último negócio SPOT válido; disparo → tentativa de saída |
 | `expiry` | 5 s | `expire_reservations` sob a trava (30 s sem ordem) |
 | `kill_switch` | 10 s | relê o estado efetivo; BLOQUEADO cancela pendentes e **não** toca proteções |
-| `mtm` | 60 s | ponto da curva `1m` → `evaluate_and_persist` → publica `kill_switch.changed` |
+| `mtm` | 60 s, **na grade do minuto** | ponto da curva `1m` → `evaluate_and_persist` → publica `kill_switch.changed`; grava um ponto extra 5 s antes da virada em São Paulo, para a referência do dia sempre ter uma âncora dentro dos 60 s que ela aceita (`hunter_execution_worker.schedule`) |
 
 1. **Entrada — uma tentativa, e só contra livro elegível.** A ordem carrega a `RiskDecision`
    aprovada (`MarketEntryOrder`), o `client_order_id` e o `execution_key` são `entry:{proposal_id}`
@@ -248,13 +248,28 @@ não evento: seis laços com cadência própria, cada passada uma transação, s
 3. **Proteção — a tentativa acaba, a intenção não.** Cada tentativa tem identidade própria
    (`exit:{attempt_id}`); sem livro utilizável a saída fica `pending_degraded`, com alerta, e a
    intenção guarda a quantidade — vela **nunca** dá fill retroativo. Uma tentativa degradada é
-   repetida no ciclo seguinte sem esperar novo cruzamento. Stop, alvo e fechamento manual dividem a
-   mesma quantidade vendável (`allocate_sellable`) sob a trava da posição.
-4. **Resíduo.** Uma compra spot paga a taxa em moeda, então a quantidade líquida quase nunca é
-   múltiplo do `step_size`: o que sobra abaixo do mínimo é **pó**, fica na posição (status
-   `closing`), continua valendo no patrimônio e a intenção termina em `blocked_residual` — nunca
-   `fulfilled`. O `trades` é escrito nesse instante, com a quantidade realmente liquidada e o preço
-   de saída **efetivo** (o que faz `qty × (saída − entrada)` bater com o realizado acumulado).
+   repetida sem esperar novo cruzamento, com **backoff de 1 s dobrando até 60 s**: cada tentativa
+   escreve uma linha `orders`, e uma por segundo eram 86.400 por dia para um mercado sem livro
+   (T3.5b item 5). Stop, alvo e fechamento manual dividem a mesma quantidade vendável
+   (`allocate_sellable`) sob a trava da carteira e depois a da posição.
+4. **Resíduo — o pó não é posição.** Uma compra spot paga a taxa em moeda, então a quantidade
+   líquida quase nunca é múltiplo do `step_size`: o que sobra abaixo do mínimo é **pó**, fica na
+   posição (status `closing`), e a intenção termina em `blocked_residual` — nunca `fulfilled`. O
+   `trades` é escrito nesse instante, com a quantidade realmente liquidada e o preço de saída
+   **efetivo** (o que faz `qty × (saída − entrada)` bater com o realizado acumulado).
+
+   **Semântica do pó (T3.5b, revisão do `7ecafd2` item 3).** O resíduo continua **visível e
+   valorizado no patrimônio** pela mesma marca das outras posições — as moedas são da carteira e a
+   exposição e o equity dizem isso. Mas ele **não é uma posição** para o Risk Engine: não ocupa
+   vaga (`slots_used`), não conta como a moeda "já na carteira" da D3 (`duplicate_position`) e não
+   compromete risco planejado. Antes disso, 0,000482 unidades valendo 4,6 centavos seguravam uma
+   das cinco vagas e recusavam aquela moeda para sempre — quatro horas depois do stop a carteira
+   ainda tinha `slots_used=1`. O marcador de leitura é `positions.status='closing'` mais a intenção
+   `blocked_residual` (`LedgerRepository.PositionRow.is_residual`); uma coluna durável
+   `positions.is_residual` está pedida à T3.1e. **Assentamento:** quando o pó acumulado da moeda
+   voltar a ≥ `min_qty` (ou `min_notional`), a proteção o vende junto da próxima saída, ou num
+   ciclo de varredura diário; até lá ele não é tentado de novo (uma tentativa por segundo numa
+   quantidade invendável era uma linha `orders` recusada por ciclo, para sempre).
 5. **MTM e curva.** `build_portfolio_state` com marcas do último negócio válido → ponto em
    `portfolio_equity_snapshots` na resolução `1m`, com `fx_observation_id` **ou**
    `brl_unavailable_reason`, e `marks_stale` quando alguma marca é estimada. O ponto é escrito

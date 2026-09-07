@@ -26,15 +26,18 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable
+from functools import partial
 from typing import TYPE_CHECKING
 
 from hunter_core.db.session import create_session_factory
 from hunter_core.logging import get_logger
+from hunter_execution_worker.bridge_consumer import autonomy_status, bridge_tasks
 from hunter_execution_worker.config import load_config
 from hunter_execution_worker.cycles import Cycles, every
 from hunter_execution_worker.health import migration_present, readiness_checks
 from hunter_execution_worker.heartbeat import run_heartbeat
 from hunter_execution_worker.market_data import RedisSpotMarketData
+from hunter_execution_worker.schedule import next_mtm_tick
 from hunter_execution_worker.state import CycleHealth
 
 if TYPE_CHECKING:
@@ -58,6 +61,10 @@ async def run_execution(runtime: WorkerRuntime) -> None:
     health = CycleHealth()
     checks = readiness_checks(factory, config, health)
     runtime.readiness_checks.extend(checks)
+    # A status detail, never a verdict: autonomy being off is the normal, correct
+    # state of this worker, and it must not turn ``/ready`` red. What it must do
+    # is *say so* — "the wallet entered nothing" has two very different causes.
+    runtime.status_details["autonomy"] = lambda: autonomy_status(config)
     logger.info(
         "execution_worker_starting",
         paper_autonomy=config.enable_paper_autonomy,
@@ -69,7 +76,8 @@ async def run_execution(runtime: WorkerRuntime) -> None:
                 "0006_paper_wallet/0007_paper_roles are not applied; refusing to run. There is no "
                 "wallet lock to take and nowhere to record why a curve point has no BRL"
             )
-        cycles = Cycles(factory, RedisSpotMarketData(runtime.redis), config, health)
+        data = RedisSpotMarketData(runtime.redis)
+        cycles = Cycles(factory, data, config, health)
         async with asyncio.TaskGroup() as group:
             loops = {
                 "admission": (config.admission_poll_s, cycles.admission),
@@ -79,16 +87,41 @@ async def run_execution(runtime: WorkerRuntime) -> None:
                 "kill_switch": (config.kill_switch_poll_s, cycles.kill_switch),
                 "mtm": (config.mtm_poll_s, cycles.mark_to_market),
             }
+            if config.enable_paper_autonomy:
+                loops["bridge"] = (config.admission_poll_s, cycles.bridge)
+            # The MTM is the one loop whose period decides whether the trading
+            # day has a reference at all: aligned to the minute grid, plus one
+            # point just before the Sao Paulo turn (``schedule``).
+            mtm_plan = partial(next_mtm_tick, period_s=config.mtm_poll_s)
             for name, (cadence, run) in loops.items():
                 group.create_task(
-                    forever(name, every(cadence, run, name=name, health=health)),
+                    forever(
+                        name,
+                        every(
+                            cadence,
+                            run,
+                            name=name,
+                            health=health,
+                            plan=mtm_plan if name == "mtm" else None,
+                        ),
+                    ),
                     name=f"execution-{name}",
                 )
             group.create_task(
                 forever("heartbeat", run_heartbeat(runtime, health, config)),
                 name="execution-heartbeat",
             )
+            for name, coro in bridge_tasks(
+                config,
+                redis=runtime.redis,
+                factory=factory,
+                data=data,
+                health=health,
+                consumer=runtime.instance,
+            ):
+                group.create_task(forever(name, coro), name=f"execution-{name}")
     finally:
         for check in checks:
             if check in runtime.readiness_checks:
                 runtime.readiness_checks.remove(check)
+        runtime.status_details.pop("autonomy", None)

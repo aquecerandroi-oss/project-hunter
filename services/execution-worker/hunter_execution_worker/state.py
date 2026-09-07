@@ -43,6 +43,12 @@ class CycleHealth:
     open_positions: int = 0
     pending_requests: int = 0
     unreadable_requests: int = 0
+    bridge_at: datetime | None = None
+    """When the autonomy bridge last completed a cycle. ``None`` for ever while
+    ``ENABLE_PAPER_AUTONOMY`` is false, which is the normal state."""
+
+    bridge_events: int = 0
+    bridge_candidates: int = 0
     degraded_protections: dict[uuid.UUID, datetime] = field(default_factory=lambda: {})
     """Intent id -> when it first went degraded. Emptied when it fills."""
 

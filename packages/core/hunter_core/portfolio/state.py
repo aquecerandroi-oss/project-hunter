@@ -148,7 +148,15 @@ async def build_portfolio_state(
     if stale:
         unavailable.append("marks")
 
-    open_positions, identity_gaps = to_open_positions(marked, betas or {})
+    # **Dust is marked but it is not a position.** Everything above — exposure,
+    # unrealised, equity — counts every row the wallet holds, residual included:
+    # the coins are owned and the patrimony has to say so. What the *engine*
+    # receives excludes the residual, because a leftover of 0,000482 units worth
+    # 4,6 cents was holding one of five slots and refusing that coin a second
+    # order for ever (T3.5b review, item 3; ``PositionRow.is_residual``).
+    open_positions, identity_gaps = to_open_positions(
+        tuple(item for item in marked if not item.row.is_residual), betas or {}
+    )
     pending_entries, pending_gaps = to_pending_entries(reservations, betas or {})
     if identity_gaps or pending_gaps:
         unavailable.append("market_identity")

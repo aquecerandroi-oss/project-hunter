@@ -10,16 +10,45 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 from hunter_core.domain.enums import ExitIntentState
 from hunter_core.execution.intents import ExitIntent
 from hunter_core.execution.triggers import ProtectedPosition, TriggerEvaluation
 from hunter_execution_worker.positions import OpenPositionRow
 
-__all__ = ["MANUAL_KEY", "STOP_KEY", "TriggerWatermarks", "due", "fired_key", "protected"]
+__all__ = [
+    "BACKOFF_MAX_S",
+    "BACKOFF_START_S",
+    "MANUAL_KEY",
+    "STOP_KEY",
+    "DegradedRetries",
+    "TriggerWatermarks",
+    "due",
+    "fired_key",
+    "protected",
+]
 
 MANUAL_KEY = "manual"
 STOP_KEY = "stop"
+
+BACKOFF_START_S = 1.0
+"""The first retry of a degraded protection is one cycle later — no slower.
+
+A stop that fired and found no book is *late*, and being late is the only
+failure of a paper wallet that destroys information. The first retry must
+therefore be immediate; what may not stay immediate is the thousandth."""
+
+BACKOFF_MAX_S = 60.0
+"""The ceiling. Doubling from 1 s reaches it in six refusals (~63 s of tape).
+
+Before this, a degraded protection wrote one refused ``orders`` row **per
+second, for ever** — 86.400 a day for one stop the market cannot fill — and
+``intents_repo._applied_attempts`` rebuilt a UNION over every one of them on
+every cycle, so the cost of being late grew quadratically with how late it was
+(review of ``7ecafd2``, item 5). One minute is short enough that a book which
+came back is used within a minute, and bounded enough that a market that never
+comes back costs 1.440 rows a day instead of 86.400."""
 
 
 @dataclass
@@ -45,6 +74,40 @@ class TriggerWatermarks:
         current = self.seen.get(market_id)
         if current is None or accepted > current:
             self.seen[market_id] = accepted
+
+
+@dataclass
+class DegradedRetries:
+    """When each degraded protection may be attempted again, kept in memory.
+
+    Deliberately **not** durable, for the same reason as
+    :class:`TriggerWatermarks`: losing it on a restart can only make a retry
+    happen *earlier*, and an early retry cannot sell an extra unit — the
+    quantity is allocated under the lock from what the position and the
+    intention still hold. A durable backoff would be a second source of truth
+    about a protection nobody could reconcile with the intention.
+    """
+
+    next_at: dict[uuid.UUID, datetime] = field(default_factory=lambda: {})
+    delay_s: dict[uuid.UUID, float] = field(default_factory=lambda: {})
+
+    def ready(self, intent_id: uuid.UUID, now: datetime) -> bool:
+        """May this degraded intention be attempted at ``now``?"""
+        due_at = self.next_at.get(intent_id)
+        return due_at is None or now >= due_at
+
+    def defer(self, intent_id: uuid.UUID, now: datetime) -> float:
+        """Record one more refusal and return the delay until the next attempt."""
+        current = self.delay_s.get(intent_id)
+        delay = BACKOFF_START_S if current is None else min(current * 2, BACKOFF_MAX_S)
+        self.delay_s[intent_id] = delay
+        self.next_at[intent_id] = now + timedelta(seconds=delay)
+        return delay
+
+    def clear(self, intent_id: uuid.UUID) -> None:
+        """The protection filled (or is gone): the backoff has nothing to hold."""
+        self.next_at.pop(intent_id, None)
+        self.delay_s.pop(intent_id, None)
 
 
 def protected(position: OpenPositionRow, intents: tuple[ExitIntent, ...]) -> ProtectedPosition:

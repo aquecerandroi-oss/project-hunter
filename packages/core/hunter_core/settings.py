@@ -122,6 +122,16 @@ class Settings(BaseSettings):
     enable_llm_analysis: bool = False
     enable_arena: bool = False
     enable_backtests: bool = False
+    enable_paper_autonomy: bool = False
+    """T3.14: whether the execution-worker consumes ``shadow.signals.emitted`` and
+    submits eligible signals to admission on its own.
+
+    Default ``false``, and it stays ``false`` in production until the nine
+    verifications of T3.9 are accepted (``docs/plans/M3.md``, joint decision item
+    9). Declared here so every role can *see* the mode the deployment is in;
+    the execution-worker reads the same ``ENABLE_PAPER_AUTONOMY`` variable in
+    ``hunter_execution_worker.config``, where its cadences live.
+    """
     system_kill_switch: KillSwitchState = KillSwitchState.ACTIVE
 
     # ---- Dimensionamento ----
@@ -140,6 +150,29 @@ class Settings(BaseSettings):
     market_universe_refresh_s: int = 900
     market_oi_poll_s: int = 300
     market_snapshot_interval_s: int = 60
+
+    # ---- market-worker SPOT collection (docs/plans/M3.md T3.0c) ----
+    market_spot_enabled: bool = False
+    """Collect the tradable SPOT universe alongside the perpetual one.
+
+    D1 makes spot the venue the wallet executes on, so this has to be *on* before
+    the paper portfolio can run for real — and it is nonetheless **off by
+    default**, because the spot path is a second WebSocket connection, a second
+    REST budget and a second parse loop **inside the perpetual collector's own
+    event loop**.
+
+    Measured, not assumed (``.claude/state/t30-proof.md``): on the local stack,
+    with ``MARKET_SHARD=0/1`` and 200 perpetuals — a topology T2.5g already
+    showed saturates one core — turning this on made the *perpetual* socket miss
+    its keepalive (``sent 1011 keepalive ping timeout``), reconnect 8 times in 6
+    minutes and persist zero candles, while with it off the same process stayed
+    connected and wrote 600. A default that changes the behaviour of a running,
+    already-saturated collector on its next restart is not a default.
+
+    Turning it on is one variable, and the thing to check first is event-loop
+    headroom on the shard that will carry it (only shard 0 does —
+    ``hunter_market_worker.spot.collects_spot``): a shard whose process already
+    sits at ~100% CPU has none."""
 
     # ---- Runtime (nao documentado em .env.example; ver CONCERNS do T03) ----
     health_port: int = 8001
