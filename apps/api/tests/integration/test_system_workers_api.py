@@ -242,6 +242,52 @@ async def test_workers_reports_market_extension_fields_when_present(
     assert rows[0]["open_gaps"] == 0
 
 
+async def test_workers_reports_execution_extension_fields_when_present(
+    client: httpx.AsyncClient,
+    redis_client: redis_asyncio.Redis,
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """T3.13: ``hb:execution:paper`` rides the generic scan (no execution-
+    specific code in ``scan_heartbeats``) and its eleven extra fields come
+    through the response exactly as published."""
+    await redis_client.hset(
+        keys.heartbeat("execution", "paper"),
+        mapping={
+            "ts": datetime.now(UTC).isoformat(),
+            "errors": "0",
+            "equity": "10000.0000000000",
+            "kill_switch": "ACTIVE",
+            "open_positions": "2",
+            "pending_requests": "0",
+            "unreadable_requests": "0",
+            "degraded_protections": "0",
+            "protection_delay_s": "0.0",
+            "last_mtm": datetime.now(UTC).isoformat(),
+            "last_protection": "",
+            "last_kill_switch_read": datetime.now(UTC).isoformat(),
+            "paper_autonomy": "false",
+        },
+    )
+    try:
+        actor: Actor = make_actor("workers-execution-reader")
+
+        response = await client.get("/api/v1/system/workers", headers=actor.headers)
+
+        assert response.status_code == 200, response.text
+        rows = [row for row in response.json() if row["role"] == "execution"]
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["instance"] == "paper"
+        assert row["equity"] == "10000.0000000000"
+        assert row["kill_switch"] == "ACTIVE"
+        assert row["open_positions"] == 2
+        assert row["protection_delay_s"] == 0.0
+        assert row["paper_autonomy"] is False
+        assert row["last_protection"] is None
+    finally:
+        await redis_client.delete(keys.heartbeat("execution", "paper"))
+
+
 async def test_workers_returns_503_problem_json_when_a_heartbeat_key_has_the_wrong_redis_type(
     client: httpx.AsyncClient,
     redis_client: redis_asyncio.Redis,

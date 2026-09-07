@@ -67,6 +67,55 @@ docker compose -f infra/docker/docker-compose.yml --profile shards up -d
   `hunter:processed:` por grupo. Remover à mão, depois de conferir que não há
   pendência (`XINFO GROUPS market.backfill.requested`).
 
+### 3.2 `execution-worker` (T3.5/T3.13)
+
+O que é: `HUNTER_ROLE=execution` (`services/execution-worker/`), o motor da
+carteira de papel — seis laços (`admissão`, `entradas`, `proteção`, `expiração`
+de reserva, `kill switch`, `mark-to-market`) sob a trava da carteira, mais o
+heartbeat. Nada em memória é fonte de verdade: todo laço relê posições,
+intenções e reservas do Postgres a cada passada.
+
+Como sobe: mesma imagem `hunter-api:${GIT_SHA:-dev}` dos demais workers, papel
+selecionado por `entrypoint.sh` (`case "$role" in ... scanner | strategy |
+execution | analytics) exec python -m "hunter_${role}_worker"`). No compose de
+dev (`infra/docker/docker-compose.yml`) e no override de produção
+(`infra/vps/docker-compose.prod.yml`) já existe o serviço `execution-worker`
+desde a T3.5, com `restart: unless-stopped`/`always`, `*prod-db-env` na VPS e
+healthcheck em `http://localhost:8001/ready` (cinco checks:
+`paper_schema`, `kill_switch_legible`, `mtm_fresh`, `protection_prompt`,
+`outbox_not_lagging`, além dos genéricos `database`/`redis`). Depende de
+`migrate` concluído e de Postgres/Redis saudáveis; depende do `market-worker`
+só com `service_started` (não `service_healthy`) — sem book utilizável uma
+proteção fica pendente **com alerta** em vez de fabricar um fill.
+
+O que **não** faz nesta tarefa (T3.13 é só integração operacional, nenhuma
+ativação de produção):
+
+- **nunca movimenta dinheiro real.** `ENABLE_LIVE_TRADING` é lido uma vez no
+  boot (`hunter_execution_worker/config.py: load_config`) e, se `true`, o
+  processo recusa subir (`LiveTradingRefused`) — não existe adaptador live
+  (`LiveExecutionAdapter` levanta em toda chamada). Os dois composes fixam
+  `ENABLE_LIVE_TRADING: "false"` explicitamente, para que a variável nunca
+  dependa de um `.env` esquecido;
+- **não decide pedidos sozinho por padrão.** `ENABLE_PAPER_AUTONOMY` (default
+  `false`) é o portão da ponte sinal→proposta que a T3.14 constrói; com ele
+  desligado (o estado de todo ambiente hoje, inclusive a VPS) o worker só
+  decide os pedidos que a API arquivou manualmente (`decide_requests`,
+  `source="manual"`). Ligá-lo é o dia em que o worker passa a decidir pedidos
+  que ninguém digitou — mudança de comportamento, não de infraestrutura, e
+  fora do escopo desta tarefa;
+- **não expõe HTTP além do `/health`/`/ready`/`/metrics` do `HEALTH_PORT`**
+  (ARCHITECTURE.md §4: "é o único processo que, no futuro, terá acesso a
+  chaves descriptografadas de exchange... não expõe HTTP além de `/health`").
+
+Deploy na VPS: o mesmo comando único que já sobe os shards do coletor sobe o
+`execution-worker` junto, porque ambos vivem no mesmo par de arquivos de
+compose que `compose.sh` sempre passa para o Docker:
+
+```bash
+MARKET_SHARDS=4 bash infra/vps/compose.sh update
+```
+
 ## 4. CI (GitHub Actions)
 
 `ci.yml` em cada PR e push na `main`:
@@ -91,6 +140,63 @@ Deploy só roda se o `gate` passou. `deploy-api.yml` faz `railway up` por servi�
 - Health: `/health` (processo vivo), `/ready` (Postgres e Redis alcançáveis). Railway/Fly usam `/ready`.
 - Alarmes mínimos: worker `stale` > 60 s; lag de stream > 5 000; erro de exchange > 10/min; partição faltando; Sentry error rate.
 - Backups: Neon PITR (7 dias no plano padrão); exportação semanal de `trades`, `audit_logs`, `risk_events` para object storage (Fase 2).
+
+### 5.1 Monitoração (`/metrics`, por processo — T3.13)
+
+Cada processo expõe `hunter_*` no seu próprio `HEALTH_PORT` (`api` usa a
+própria `API_PORT`), registro compartilhado `hunter_core.observability.registry`
+(Prometheus, atrás de `METRICS_TOKEN` na `api`; sem porta publicada no host nos
+demais papéis — só a rede interna do compose alcança). Confirmado ao vivo no
+stack local (`docker exec <container> ... /metrics`):
+
+**`execution-worker`** (`hunter_execution_worker/metrics.py`):
+
+| Métrica | Tipo | Rótulos | O que mede |
+|---|---|---|---|
+| `hunter_execution_orders_total` | Counter | `kind` (entry/exit), `outcome` | tentativas de execução |
+| `hunter_execution_protection_delay_seconds` | Gauge | — | segundos desde que a proteção degradada mais antiga passou a esperar um livro — o "atraso de proteção" |
+| `hunter_execution_mtm_age_seconds` | Gauge | — | segundos desde o último ponto gravado da curva de equity — o "atraso do MTM" |
+| `hunter_execution_pending_degraded_total` | Counter | `reason` | tentativas de proteção sem livro utilizável |
+| `hunter_execution_reservations_total` | Counter | `state` | ciclos de reserva fechados, por estado terminal |
+| `hunter_execution_pending_requests` | Gauge | `readable` | pedidos arquivados aguardando decisão |
+
+O atraso de outbox **não** tem métrica própria hoje: só o booleano
+`outbox_not_lagging` de `/ready` (abaixo) e o heartbeat `hb:execution:paper`
+(sem um campo de contagem/atraso do outbox — ver `apps/api/hunter_api/schemas/
+system.py`, seção "o que deliberadamente não está aqui"). Registrado como
+lacuna para quem tocar `hunter_execution_worker/heartbeat.py` a seguir
+(T3.14 em voo).
+
+`/ready` do `execution-worker` (5 checks + `database`/`redis`, confirmado ao
+vivo): `{"database":true,"redis":true,"paper_schema":true,
+"kill_switch_legible":true,"mtm_fresh":true,"protection_prompt":true,
+"outbox_not_lagging":true}`.
+
+**Coletor de câmbio USDTBRL** (`hunter_market_worker/fx.py`, T3.11a, roda
+dentro do `market-worker` shard 0):
+
+| Métrica | Tipo | Rótulos | O que mede |
+|---|---|---|---|
+| `hunter_fx_observations_total` | Counter | `outcome` (ok/duplicate/malformed/rate_limited/network_error/error) | coletas da cotação, por desfecho |
+| `hunter_fx_implausible_total` | Counter | — | cotação gravada fora da banda `[1, 100]` |
+| `hunter_fx_age_seconds` | Gauge | — | idade da última coleta bem-sucedida |
+
+`WorkerRuntime.status_details["fx"]` no `/ready` do `market-worker` (shard 0)
+é `"ok"`/`"stale"`/`"unknown"` — **detalhe, nunca check de prontidão**: uma
+cotação velha não derruba `/ready` (a carteira pode não abrir; a coleta de
+mercado continua).
+
+**Fonte SPOT** (`hunter_market_worker/spot.py`, T3.0c): sem família de
+métrica própria (`hunter_spot_*` não existe hoje — os contadores de
+persistência/backfill que o SPOT usa são os genéricos, sem rótulo por
+mercado). A visibilidade operacional de hoje é o *status detail*
+`WorkerRuntime.status_details["spot"]` no `/ready` do `market-worker`:
+`"connected"` | `"degraded"` (socket spot reconectando com o perpétuo saudável)
+| `"absent"` (shard != 0, ou `MARKET_SPOT_ENABLED=false`) — nunca um check de
+prontidão, pelo mesmo motivo do `fx`: o caminho perpétuo é o que o M2 inteiro
+depende, e um socket spot reconectando não pode derrubar o coletor inteiro.
+Registrado como lacuna (sem métrica numérica de idade/erro do SPOT) para quem
+continuar a T3.0/T3.M.
 
 ## 6. Playbook de incidente
 

@@ -94,6 +94,48 @@ exactly the shard that is missing. With nothing reporting,
 collector does **not** publish ``rt:system`` at all: that message replaces a
 whole exchange row on the System page, and one shard knows only its own 50
 markets.
+
+**Per-execution-worker heartbeat extension (T3.13).** The paper wallet
+(``HUNTER_ROLE=execution``) writes its own hash,
+``hb:execution:paper`` (``services/execution-worker/hunter_execution_worker/
+heartbeat.py``), on the *same* ``hb:{role}:{instance}`` shape the generic scan
+above already parses (``role="execution"``, ``instance="paper"``) — no
+execution-specific code was needed in ``scan_heartbeats`` itself, exactly as
+T2.6 already proved for the scanner role. On top of the four generic fields,
+that hash carries:
+
+- ``equity``: the last equity written, as a decimal string (never a float);
+- ``kill_switch``: the kill switch state this process last read and is
+  obeying (``ACTIVE``/``WARNING``/``TRADING_DISABLED``/``EMERGENCY``);
+- ``open_positions``, ``pending_requests``, ``unreadable_requests``: counts,
+  as decimal-integer strings;
+- ``degraded_protections``: how many fired-but-unfilled protections are
+  currently waiting for a book;
+- ``protection_delay_s``: seconds the *oldest* of those has been waiting —
+  ``0`` when none are degraded. This is the number ``docs/DEPLOYMENT.md``
+  calls "atraso de proteção";
+- ``last_mtm``, ``last_protection``, ``last_kill_switch_read``: ISO-8601 UTC
+  timestamps of the last successful pass of each cycle, or ``""`` before the
+  first one. The age of ``last_mtm`` against ``ts`` is "atraso do MTM" —
+  reported here as the raw timestamp, not a pre-computed age, so a client
+  reads it against its own clock the same way ``age_s`` already is for the
+  generic fields;
+- ``paper_autonomy``: ``"true"``/``"false"`` — whether ``ENABLE_PAPER_AUTONOMY``
+  is set on this process (T3.14's gate; always ``false`` until that task
+  lands).
+
+These eleven are optional on every row (``None`` when absent, which is every
+non-``execution`` role) — same rule as the market extension above: this API
+never fabricates a field a worker did not publish.
+
+**What is deliberately *not* here: outbox lag.** ``heartbeat.py`` does not
+write an ``outbox_pending`` (or similar) field to ``hb:execution:paper`` —
+only the worker's own ``/ready`` (``outbox_not_lagging``, on its
+``HEALTH_PORT``, not reachable through this API) turns outbox lag into a
+boolean. Adding a numeric field here would mean inventing one the worker does
+not publish, which the brief for this task explicitly forbids; it is
+registered as a gap for whoever next touches
+``hunter_execution_worker/heartbeat.py`` (T3.14 is in flight there).
 """
 
 from __future__ import annotations
@@ -125,6 +167,18 @@ class WorkerHeartbeatOut(BaseModel):
     reconnects: int | None = None
     markets_monitored: int | None = None
     open_gaps: int | None = None
+    # T3.13 — hb:execution:paper only (schemas/system.py module docstring).
+    equity: str | None = None
+    kill_switch: str | None = None
+    open_positions: int | None = None
+    pending_requests: int | None = None
+    unreadable_requests: int | None = None
+    degraded_protections: int | None = None
+    protection_delay_s: float | None = None
+    last_mtm: datetime | None = None
+    last_protection: datetime | None = None
+    last_kill_switch_read: datetime | None = None
+    paper_autonomy: bool | None = None
 
 
 class MarketStatusExchangeOut(BaseModel):

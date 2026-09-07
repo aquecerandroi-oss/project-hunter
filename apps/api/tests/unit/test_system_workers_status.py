@@ -4,12 +4,12 @@ no IO, no Redis.
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
 import redis.exceptions
+from structlog.testing import capture_logs
 
 from hunter_api.schemas.system import WorkerLivenessStatus
 from hunter_api.services.system_status import (
@@ -26,6 +26,7 @@ from hunter_api.services.system_status import (
     parse_heartbeat_key,
     scan_heartbeats,
 )
+from hunter_core.domain.types import utcnow
 from hunter_core.redis import keys
 
 pytestmark = pytest.mark.unit
@@ -144,6 +145,52 @@ def test_heartbeat_from_hash_reads_the_market_extension_fields_when_present() ->
     assert heartbeat.open_gaps == 3
 
 
+def test_heartbeat_from_hash_reads_the_execution_extension_fields_when_present() -> None:
+    """T3.13: ``hb:execution:paper`` rides the same generic scan; these eleven
+    fields are read verbatim from what ``hunter_execution_worker/heartbeat.py``
+    actually writes -- nothing here is invented.
+    """
+    fields = {
+        "ts": NOW.isoformat(),
+        "errors": "0",
+        "equity": "10234.5678901234",
+        "kill_switch": "ACTIVE",
+        "open_positions": "3",
+        "pending_requests": "1",
+        "unreadable_requests": "0",
+        "degraded_protections": "1",
+        "protection_delay_s": "2.5",
+        "last_mtm": (NOW - timedelta(seconds=30)).isoformat(),
+        "last_protection": (NOW - timedelta(seconds=2)).isoformat(),
+        "last_kill_switch_read": (NOW - timedelta(seconds=1)).isoformat(),
+        "paper_autonomy": "false",
+    }
+    heartbeat = heartbeat_from_hash("execution", "paper", fields, now=NOW)
+    assert heartbeat is not None
+    assert heartbeat.equity == "10234.5678901234"
+    assert heartbeat.kill_switch == "ACTIVE"
+    assert heartbeat.open_positions == 3
+    assert heartbeat.pending_requests == 1
+    assert heartbeat.unreadable_requests == 0
+    assert heartbeat.degraded_protections == 1
+    assert heartbeat.protection_delay_s == pytest.approx(2.5)
+    assert heartbeat.last_mtm == NOW - timedelta(seconds=30)
+    assert heartbeat.last_protection == NOW - timedelta(seconds=2)
+    assert heartbeat.last_kill_switch_read == NOW - timedelta(seconds=1)
+    assert heartbeat.paper_autonomy is False
+
+
+def test_heartbeat_from_hash_execution_fields_are_none_for_other_roles() -> None:
+    """The market row above must not pick up execution-only fields it never
+    published -- ``None``, never a fabricated ``0``/``False``."""
+    fields = {"ts": NOW.isoformat(), "errors": "0"}
+    heartbeat = heartbeat_from_hash("market", "binance", fields, now=NOW)
+    assert heartbeat is not None
+    assert heartbeat.equity is None
+    assert heartbeat.protection_delay_s is None
+    assert heartbeat.paper_autonomy is None
+
+
 def test_heartbeat_from_hash_missing_errors_defaults_to_zero() -> None:
     heartbeat = heartbeat_from_hash("api", "host:1", {"ts": NOW.isoformat()}, now=NOW)
     assert heartbeat is not None
@@ -254,12 +301,12 @@ async def test_scan_heartbeats_reraises_when_redis_is_unavailable(
     ``503`` instead; only the error's type is logged, never ``str(exc)``.
     """
     fake_redis = _RaisingScanRedis(redis.exceptions.ConnectionError("connection refused"))
-    with (
-        caplog.at_level(logging.WARNING, logger="hunter_api.services.system_status"),
-        pytest.raises(redis.exceptions.ConnectionError),
-    ):
+    # structlog renders to stdout, not the stdlib handlers, so caplog never
+    # sees it -- capture at the structlog layer (T2.5g moved this path to SCAN).
+    with capture_logs() as records, pytest.raises(redis.exceptions.ConnectionError):
         await scan_heartbeats(fake_redis)  # pyright: ignore[reportArgumentType]
-    assert "ConnectionError" in caplog.text
+    assert any(r.get("error_type") == "ConnectionError" for r in records)
+    assert all("connection refused" not in str(r) for r in records)
 
 
 def test_decode_never_raises_on_invalid_utf8_hash_values() -> None:
@@ -287,6 +334,13 @@ class _StaticHgetallRedis:
         if isinstance(value, Exception):
             raise value
         return value
+
+    async def scan_iter(self, match: str | bytes = "*", count: int | None = None):
+        """T2.5g made the shard reader SCAN for per-shard heartbeats; this
+        fake has no shards, so the scan yields nothing and the solo
+        heartbeat path (``hgetall``) is what the tests exercise."""
+        return
+        yield  # pragma: no cover  (makes this an async generator)
 
 
 def _patched_repository(*, exchange_codes: list[str], monitored: dict[str, int] | None = None):
@@ -333,7 +387,12 @@ async def test_build_market_status_isolates_a_single_exchange_heartbeat_failure(
         fake_redis = _StaticHgetallRedis(
             {
                 keys.heartbeat("market", "binance"): redis.exceptions.ResponseError("WRONGTYPE"),
-                keys.heartbeat("market", "bybit"): {b"ws_state": b"connected"},
+                # T2.5g: a solo heartbeat only counts while fresh, so the fake
+                # carries a current ``ts`` like the real hash does.
+                keys.heartbeat("market", "bybit"): {
+                    b"ws_state": b"connected",
+                    b"ts": utcnow().isoformat().encode(),
+                },
             }
         )
         result = await build_market_status(object(), fake_redis)  # pyright: ignore[reportArgumentType]

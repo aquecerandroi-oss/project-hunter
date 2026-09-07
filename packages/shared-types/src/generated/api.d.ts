@@ -96,7 +96,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List markets */
+        /**
+         * List markets
+         * @description ``market_type`` (T3.0c) defaults to ``perpetual``, which is what this
+         *     route has always answered. ``?market_type=spot`` returns the tradable spot
+         *     universe (D1's 50M floor) — the same shape, a different product. There is
+         *     deliberately no "both": one page mixing two listings of ``BTCUSDT`` would
+         *     show two rows the UI has no way to tell apart today.
+         */
         get: operations["list_markets_api_v1_markets_get"];
         put?: never;
         post?: never;
@@ -441,7 +448,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Resume trading on a latched kill switch (TRADER+) */
+        /** Resume trading on a latched kill switch (OWNER only) */
         post: operations["resume_kill_switch_api_v1_orgs__org_id__portfolios__portfolio_id__risk_kill_switch_resume_post"];
         delete?: never;
         options?: never;
@@ -2891,18 +2898,38 @@ export interface components {
         WorkerHeartbeatOut: {
             /** Age S */
             age_s: number;
+            /** Degraded Protections */
+            degraded_protections?: number | null;
+            /** Equity */
+            equity?: string | null;
             /** Errors */
             errors: number;
             /** Instance */
             instance: string;
+            /** Kill Switch */
+            kill_switch?: string | null;
             /** Last Event At */
             last_event_at?: string | null;
+            /** Last Kill Switch Read */
+            last_kill_switch_read?: string | null;
+            /** Last Mtm */
+            last_mtm?: string | null;
+            /** Last Protection */
+            last_protection?: string | null;
             /** Last Success */
             last_success?: string | null;
             /** Markets Monitored */
             markets_monitored?: number | null;
             /** Open Gaps */
             open_gaps?: number | null;
+            /** Open Positions */
+            open_positions?: number | null;
+            /** Paper Autonomy */
+            paper_autonomy?: boolean | null;
+            /** Pending Requests */
+            pending_requests?: number | null;
+            /** Protection Delay S */
+            protection_delay_s?: number | null;
             /** Reconnects */
             reconnects?: number | null;
             /** Role */
@@ -2915,6 +2942,8 @@ export interface components {
              * Format: date-time
              */
             ts: string;
+            /** Unreadable Requests */
+            unreadable_requests?: number | null;
             /** Version */
             version?: string | null;
             /** Ws State */
@@ -3149,6 +3178,7 @@ export interface operations {
                 exchange?: string | null;
                 q?: string | null;
                 monitored?: boolean | null;
+                market_type?: components["schemas"]["MarketType"];
                 limit?: number | null;
                 cursor?: string | null;
             };

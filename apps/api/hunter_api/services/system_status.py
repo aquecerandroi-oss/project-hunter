@@ -151,6 +151,24 @@ def parse_heartbeat_int(value: str | None) -> int | None:
         return None
 
 
+def parse_heartbeat_float(value: str | None) -> float | None:
+    """(T3.13) ``protection_delay_s`` is a float string, unlike the ints above."""
+    if not value:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def parse_heartbeat_bool(value: str | None) -> bool | None:
+    """(T3.13) ``paper_autonomy`` is ``str(bool).lower()`` — anything else is ``None``."""
+    if value is None:
+        return None
+    lowered = value.strip().lower()
+    return {"true": True, "false": False}.get(lowered)
+
+
 def parse_heartbeat_key(key: bytes) -> tuple[str, str]:
     """``hb:{role}:{instance}`` -> ``(role, instance)``. Split once, so an
     ``instance`` that itself contains ``:`` (``WorkerRuntime``'s default is
@@ -192,6 +210,18 @@ def heartbeat_from_hash(
         reconnects=parse_heartbeat_int(fields.get("reconnects")),
         markets_monitored=parse_heartbeat_int(fields.get("markets_monitored")),
         open_gaps=parse_heartbeat_int(fields.get("open_gaps")),
+        # T3.13 — hb:execution:paper only; None for every other role.
+        equity=fields.get("equity") or None,
+        kill_switch=fields.get("kill_switch") or None,
+        open_positions=parse_heartbeat_int(fields.get("open_positions")),
+        pending_requests=parse_heartbeat_int(fields.get("pending_requests")),
+        unreadable_requests=parse_heartbeat_int(fields.get("unreadable_requests")),
+        degraded_protections=parse_heartbeat_int(fields.get("degraded_protections")),
+        protection_delay_s=parse_heartbeat_float(fields.get("protection_delay_s")),
+        last_mtm=parse_heartbeat_datetime(fields.get("last_mtm")),
+        last_protection=parse_heartbeat_datetime(fields.get("last_protection")),
+        last_kill_switch_read=parse_heartbeat_datetime(fields.get("last_kill_switch_read")),
+        paper_autonomy=parse_heartbeat_bool(fields.get("paper_autonomy")),
     )
 
 
