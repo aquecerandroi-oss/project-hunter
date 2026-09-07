@@ -12,6 +12,7 @@ from hunter_core.logging import get_logger
 from hunter_market_worker.backfill import run_backfill
 from hunter_market_worker.config import build_adapter, exchange_code
 from hunter_market_worker.funding import run_funding
+from hunter_market_worker.fx import run_fx_collector
 from hunter_market_worker.heartbeat import (
     HeartbeatState,
     run_heartbeat,
@@ -124,6 +125,9 @@ async def run_market(runtime: WorkerRuntime) -> None:
                 ),
                 "heartbeat": run_heartbeat(runtime, adapter, universe, state, factory),
                 "watchdog": run_watchdog(watchdog, universe),
+                # T3.11a: one USDTBRL collector per venue, never N — the task
+                # itself idles on every shard but shard 0 (fx.run_fx_collector).
+                "fx": run_fx_collector(factory, runtime.redis, adapter.code, runtime),
             }
             for name, coro in tasks.items():
                 group.create_task(forever(name, coro), name=f"market-{name}")

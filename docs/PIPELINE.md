@@ -75,6 +75,20 @@ Definição exata do fluxo (item 80.6). Cada etapa: gatilho, entrada, saída, on
 
 **Limite conhecido:** `infra/scripts/create_partitions.py` provisiona o mês corrente e os seguintes, então um pedido de 7 dias no começo do mês nomeia minutos sem partição — eles são recusados com motivo em vez de abortar a transação, e o pedido volta a ser avaliado na republicação seguinte. Provisionar meses **para trás** é trabalho do job de partições. E o teto de 7 dias por pedido é política: a referência de 30 dias do regime precisa pedir o restante em outras janelas, o que ainda não está combinado.
 
+## 1c. Câmbio USDTBRL — `fx_observations` (T3.11a)
+
+**Onde:** `market-worker` (`hunter_market_worker/fx.py`). **Gatilho:** contínuo, independente do pipeline de mercado acima — não consome nem publica em nenhum stream de `market.*`.
+
+A carteira paper (M3) opera em USDT mas a diretiva parte de R$100.000; a abertura (`hunter_core.portfolio.opening.open_paper_wallet`, T3.3b) e a curva de equity (`record_equity_point`) precisam de uma cotação `USDTBRL` sempre disponível e nunca fabricada, sob a mesma política de frescor (`FxPolicy`, `docs/DATABASE.md` §18.2): `available_at` ≤ 300 s e `observed_at` ≤ 600 s no instante do ato.
+
+1. **Coleta.** A cada ~60 s (± 5 s de jitter), `GET /api/v3/ticker/24hr?symbol=USDTBRL` (peso 2) no bucket de peso do spot (`rl:binance:spot_request_weight`, token bucket Redis, pesos oficiais — `packages/exchange-adapters/hunter_exchanges/binance_spot/http.py`). `429`/`418` vira `RateLimited` e um `system_event` (`warning`), nunca um laço de retentativa silenciosa; falha de transporte após as retentativas internas do `SpotHttp` também não fabrica cotação — o ciclo seguinte tenta de novo, com backoff (5 s → 60 s, com jitter) entre tentativas mal sucedidas.
+2. **Persistência.** `fx_observations` recebe `pair="USDTBRL"`, `source="binance.spot.ticker"` (a mesma constante que `PAPER_FX_POLICY.source`, T3.3 — uma fonte com outra grafia nunca abre carteira), `rate` = `lastPrice`, `observed_at` = `closeTime` (relógio da Binance), `available_at` = `utcnow()` no instante do INSERT, `raw` = corpo cru da resposta. Idempotente por `(pair, source, observed_at)` (`uq_fx_observations_observation`) via `ON CONFLICT DO NOTHING`: uma repetição do mesmo segundo fechado nunca duplica.
+3. **Banda de plausibilidade.** Uma cotação fora de `[1, 100]` (a banda declarada em `FxPolicy`, revisão adversarial de `8a6a69f`, bloqueante 3) é **gravada do mesmo jeito** — o coletor registra o que a exchange imprimiu, sem editar — mas loga em `warning` e incrementa `hunter_fx_implausible_total`. Quem recusa uma cotação implausível é o **consumo** (`validate_fx_observation`), no instante do ato, nunca o coletor.
+4. **Sharding: um coletor por venue, nunca N.** Só o shard 0 do market-worker cujo `exchange_code == "binance"` coleta câmbio (`MARKET_SHARD=i/N`, `hunter_core.settings.Settings.shard_index`); todo outro shard — e qualquer market-worker de outra exchange — idla essa tarefa para sempre. A fonte é fixa em Binance spot independentemente de qual perpétuo o processo ingere.
+5. **Observabilidade.** `hunter_fx_observations_total{outcome}` (`ok`, `duplicate`, `malformed`, `rate_limited`, `network_error`, `error`), `hunter_fx_implausible_total`, `hunter_fx_age_seconds` (idade da última coleta bem-sucedida). A idade também aparece como *status detail* — nunca um readiness check — em `WorkerRuntime.status_details["fx"]` (`"ok"`/`"stale"`/`"unknown"`, limiar igual a `FxPolicy.availability_max_age_s`, 300 s): uma cotação velha pode impedir a abertura da carteira ou a valorização em BRL da curva, mas o resto da coleta de mercado continua, então `/ready` nunca fica vermelho por isso.
+
+**Falha:** Redis fora do ar suspende o bucket de peso do spot como qualquer outro REST do worker (§1 item 7); Postgres fora do ar propaga da inserção (nunca silenciada) e o ciclo seguinte tenta de novo. Nunca há aporte, fabricação de cotação nem escrita sob o lock de `portfolio_risk_state` — a transação do coletor é só o INSERT em `fx_observations`, fora de qualquer unidade de trabalho da carteira.
+
 ## 2. Feature Engine
 
 **Onde:** `scanner-worker`. **Gatilho:** `market.ticks` (tick-features, throttle 1 s por símbolo) e `market.candles.closed` (bar-features).
@@ -213,7 +227,7 @@ Lista completa de checks em `RISK_ENGINE.md`.
 6. **Shadow.** `mode=shadow` grava ordens e fills com `simulated=true` e `execution_mode=shadow`, sem alterar cash. Idêntico ao paper em tudo o mais.
 7. **Live.** `LiveExecutionAdapter` existe como interface e levanta `LiveTradingDisabled` enquanto `ENABLE_LIVE_TRADING=false` ou entitlement ausente. Sem implementação até a Fase 4.
 
-**Falha:** worker reinicia → relê posições `open` do Postgres, reconstrói estado, retoma; propostas `approved` sem ordem após 30 s expiram (`status=expired`), nunca são executadas tarde; market data `degraded` para o mercado → não abre, mas continua gerenciando saídas com o último preço válido e gera `risk_event` se ficar sem preço por > 60 s.
+**Falha:** worker reinicia → relê posições `open` do Postgres, reconstrói estado, retoma; propostas `approved` sem ordem após 30 s **perdem a reserva** (`reservation_state=expired`, `reserved_slot=false`), nunca são executadas tarde — o `status` continua `approved`, porque ele registra o que o Risk Engine decidiu e isso não deixa de ser verdade; o que expira é o compromisso, que é o outro eixo (DATABASE.md §18.3, T3.12); market data `degraded` para o mercado → não abre, mas continua gerenciando saídas com o último preço válido e gera `risk_event` se ficar sem preço por > 60 s.
 
 ## 9. Analytics e Learning
 

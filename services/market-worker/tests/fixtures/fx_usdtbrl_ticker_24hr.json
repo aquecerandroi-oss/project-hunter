@@ -1,0 +1,23 @@
+{
+  "symbol": "USDTBRL",
+  "priceChange": "0.02310000",
+  "priceChangePercent": "0.427",
+  "weightedAvgPrice": "5.41823017",
+  "prevClosePrice": "5.40990000",
+  "lastPrice": "5.43210000",
+  "lastQty": "120.00000000",
+  "bidPrice": "5.43100000",
+  "bidQty": "3400.15000000",
+  "askPrice": "5.43300000",
+  "askQty": "2100.40000000",
+  "openPrice": "5.40900000",
+  "highPrice": "5.44500000",
+  "lowPrice": "5.39800000",
+  "volume": "184320.51000000",
+  "quoteVolume": "1001542.83210000",
+  "openTime": 1788652039012,
+  "closeTime": 1788738439012,
+  "firstId": 12345,
+  "lastId": 23456,
+  "count": 8421
+}
