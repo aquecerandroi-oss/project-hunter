@@ -1,4 +1,14 @@
-# Risk Engine — contrato v2.1
+# Risk Engine — contrato v2.2
+
+**Versão 2.2, 2026-09-07.** Fecha a divergência que a T3.1b (`296f3c1`, `.claude/state/notes-T3.1.md`
+§5, `docs/DATABASE.md` §18.8) deixou registrada como pendência: `risk_profiles.limits` do preset
+`paper_v1` é, por construção do seed, exatamente `hunter_risk.limits.PAPER_V1.model_dump(mode="json")`
+— uma única fonte, provada byte a byte por `test_the_seeded_paper_profile_has_exactly_one_source`
+(`packages/core/tests/integration/test_schema_paper.py`). A §2 desta v2.1 ainda descrevia quatro
+chaves para as quais `RiskLimits` não tem campo (`participation_reference`, `market_types`,
+`auto_close_on_emergency`, `regime_size_multiplier`); esta revisão as retira da tabela do perfil, com
+o destino de cada uma declarado onde a informação de fato vive. Nenhum limite do Everton mudou de
+valor — §9.3 lista o que mudou e por quê.
 
 **Versão 2.1, 2026-09-06.** A v2 (mesma data) foi reescrita a partir da diretiva do Everton de
 2026-09-06 (`.claude/state/directive-risk-engine-2026-09-06.md`, verbatim) e das medições da oitava
@@ -47,25 +57,43 @@ Preset novo (`risk_preset` ganha `paper_v1`), sistema, `organization_id IS NULL`
 carteira virtual do M3. Os presets `conservative`/`balanced`/`aggressive` do v1 continuam existindo e
 **não** são o perfil da carteira.
 
+**Invariante: o perfil persistido é o objeto do motor, não uma cópia dele.** `risk_profiles.limits`
+desta linha é gravado pelo seed como `hunter_risk.limits.PAPER_V1.model_dump(mode="json")`, e
+`RiskLimits.model_validate` desse mesmo JSON devolve o `PAPER_V1` de volta — uma fonte, não duas que
+alguém tem de lembrar de manter iguais. `test_the_seeded_paper_profile_has_exactly_one_source`
+(`packages/core/tests/integration/test_schema_paper.py`) compara os bytes serializados dos dois e
+falha se divergirem; `test_the_seeded_paper_preset_refuses_to_be_rewritten` recusa o seed que tentaria
+devolver um valor divergente a uma linha já semeada.
+
+A tabela abaixo segue a ordem de campos de `RiskLimits`
+(`packages/risk-core/hunter_risk/limits.py`), a mesma ordem em que o JSON acima é validado.
+
 | Chave | Valor | O que é |
 |---|---|---|
+| `profile` | `"paper_v1"` | Identifica o preset; é o mesmo valor de `risk_profiles.preset` |
 | `risk_per_trade_pct` | `0.0025` | Perda planejada no stop, **incluindo custos estimados**, sobre o patrimônio **atual** |
 | `max_aggregate_planned_risk_pct` | `0.01` | Soma dos riscos planejados de posições abertas **e** entradas pendentes |
 | `max_participation_pct` | `0.01` | Fração do volume de referência de um minuto (§4) |
-| `participation_reference` | `min(last_complete_minute, median_30_complete_minutes)` | A referência que ele definiu |
-| `max_total_exposure_pct` | `0.40` | Σ notional / equity, incluindo pendentes |
+| `participation_window_s` | `60` | Janela móvel de consumo do orçamento de participação (§4, "Orçamento agregado de participação") |
 | `max_asset_exposure_pct` | `0.10` | Por moeda (base asset), somando exchanges |
-| `max_concurrent_positions` | `5` | Abertas + pendentes |
+| `max_total_exposure_pct` | `0.40` | Σ notional / equity, incluindo pendentes |
 | `max_beta_btc_exposure` | `0.5` | `Σ \|notional_i × β_i\| / equity` (módulo, R-CORR-1) |
-| `min_liquidity_usd_24h` | `50_000_000` | Volume 24 h do par, **na exchange de execução** |
-| `max_volume_age_s` | `120` | **Novo em v2.1.** Idade máxima do volume do minuto e do volume de 24 h (mesmo carimbo, R-OPS-2); acima disso, sem carimbo, ou carimbo no futuro, `liquidity_24h` e `participation` viram `unavailable` (§3.1 checks 9 e 19). Origem: a própria v2 já prometia "os insumos com idade máxima declarada... volume de 24 h, volume do minuto" em §7 (R-OPS-2); a revisão adversarial de 2026-09-06 (bloqueante 3) achou que o valor existia no perfil e nunca era lido |
-| `max_leverage` | `1` | SPOT, sem empréstimo, sem alavancagem, sem short |
+| `max_concurrent_positions` | `5` | Abertas + pendentes |
 | `kill_switch_warning` | `{daily_loss_pct: 0.01, drawdown_pct: 0.04}` | Modo AVISO (§5) |
 | `kill_switch_blocked` | `{daily_loss_pct: 0.02, drawdown_pct: 0.08}` | Modo BLOQUEADO (§5) |
 | `warning_size_multiplier` | `0.5` | Aplicado ao **tamanho final aprovado** (§4) |
-| `regime_size_multiplier` | gramática do v1 (§2.1) | Aplicado ao **tamanho final aprovado** |
+| `min_liquidity_usd_24h` | `50_000_000` | Volume 24 h do par, **na exchange de execução** |
+| `max_slippage_pct` | `0.001` | Guarda técnica herdada do preset `conservative` do v1, revisável |
+| `max_spread_pct` | `0.0005` | Guarda técnica herdada do preset `conservative` do v1, revisável |
+| `min_stop_distance_pct` | `0.003` | Guarda técnica herdada do preset `conservative` do v1, revisável |
+| `max_stop_distance_pct` | `0.03` | Guarda técnica herdada do preset `conservative` do v1, revisável |
 | `max_entry_deviation_pct` | `0.005` | **Novo em v2.1.** Meia largura da zona de entrada em torno do **preço observado** (§3.1 check 7, "entrada fora da zona"). Origem: a v2 já nomeava a zona no texto do check sem publicar o número no perfil; R-OPS-2 e a revisão adversarial de 2026-09-06 (bloqueante 2) exigiram a chave, porque sem ela `entry_ref` nunca era confrontado com o mercado |
-| `max_spread_pct`, `max_slippage_pct`, `[min,max]_stop_distance_pct` | herdados do preset conservador, revisáveis | Guardas técnicas, não limites de capital |
+| `max_price_age_s` | `10` | Idade máxima do preço (R-OPS-2); vencido, ausente ou no futuro → `data_quality` (check 4) |
+| `max_book_age_s` | `10` | Idade máxima do book (R-OPS-2); vencido, ausente ou no futuro → `book_depth` (check 11) `unavailable` |
+| `max_volume_age_s` | `120` | **Novo em v2.1.** Idade máxima do volume do minuto e do volume de 24 h (mesmo carimbo, R-OPS-2); acima disso, sem carimbo, ou carimbo no futuro, `liquidity_24h` e `participation` viram `unavailable` (§3.1 checks 9 e 19). Origem: a própria v2 já prometia "os insumos com idade máxima declarada... volume de 24 h, volume do minuto" em §7 (R-OPS-2); a revisão adversarial de 2026-09-06 (bloqueante 3) achou que o valor existia no perfil e nunca era lido |
+| `max_beta_age_s` | `7200` | Idade máxima do β (R-OPS-2); vencido → `beta_validity` (check 12) `unavailable` (§6) |
+| `max_leverage` | `1` | SPOT, sem empréstimo, sem alavancagem, sem short — o que a chave retirada `market_types: ["spot"]` (abaixo) dizia; o validador de `RiskLimits` recusa qualquer outro valor |
+| `day_timezone` | `"America/Sao_Paulo"` | Fuso do dia de negociação (§5) |
 
 **O que a diretiva não define e este contrato não inventa:** nenhum limite acima foi criado por nós.
 `max_spread_pct`, a banda de distância de stop e `max_slippage_pct` são as guardas técnicas do v1,
@@ -75,7 +103,26 @@ mantidas porque nenhuma foi provada redundante; qualquer alteração de valor é
 **O limite é teto, não meta.** Nada no motor aumenta posição nem afasta stop para "chegar" a 0,25 %.
 Se o sinal pede menos risco que o teto, o tamanho é o do sinal.
 
-### 2.1 Gramática de `regime_size_multiplier` (mantida do v1)
+**Quatro chaves saíram da tabela do perfil na v2.2 — T3.1b (`296f3c1`), `docs/DATABASE.md` §18.8.**
+`RiskLimits` não tem campo para nenhuma delas; carregá-las em `risk_profiles.limits` fazia
+`RiskLimits.model_validate` falhar (`extra="forbid"`, dez erros na linha do seed antigo) e fazia um
+controle não implementado parecer configurado. Cada uma tem destino declarado:
+
+| Chave retirada | Onde a informação vive agora |
+|---|---|
+| `participation_reference` | é **fórmula**, não limite — calculada de `MarketLiquidity` em §4, "Janela da referência de volume": `min(último minuto completo, mediana das 30 barras completas)` |
+| `market_types: ["spot"]` | é o que `max_leverage = 1` (acima) já significa; o validador de `RiskLimits` recusa qualquer outro valor |
+| `auto_close_on_emergency: false` | comportamento **fixo** do motor, não interruptor — §5 declara que nenhum estado do kill switch liquida posições automaticamente |
+| `regime_size_multiplier` | reservado para o M4 — §2.1 |
+
+### 2.1 Reservado para o M4: multiplicador por regime
+
+O motor v2.1/v2.2 **não aplica** `regime_size_multiplier`: `RiskLimits` não tem esse campo, e
+`packages/risk-core` não tem código nenhum que leia ou aplique um multiplicador por regime hoje — só o
+multiplicador de aviso/kill switch (`entry_size_multiplier`, §5) age sobre o tamanho final (§4). A
+gramática abaixo é a do v1, mantida como especificação para quando o insumo de regime for ligado; ela
+volta como campo de `RiskLimits`, com uma versão nova do preset, nesse momento — não é uma chave que
+falta ao `paper_v1` por descuido, é um controle que ainda não existe.
 
 Uma chave é `<REGIME>` ou `<REGIME>_<DIRECTION>`, com `<REGIME>` um rótulo de `market_regime` e
 `<DIRECTION>` um rótulo de `trade_direction`, ambos em maiúsculas; o valor é **string** JSON para
@@ -196,8 +243,15 @@ qty_by_cash         = (available_cash − taxas_estimadas) / sizing_price
 
 qty_bruta   = min(todos os acima)
 limitante   = argmin(...)                          → sizing.binding_constraint   (R-PROV-1)
-qty_final   = floor_to_step(qty_bruta × regime_multiplier × ks_multiplier, step_size)
+qty_final   = floor_to_step(qty_bruta × ks_multiplier, step_size)
 ```
+
+**`regime_multiplier` não é um termo desta fórmula hoje — divergência fechada na v2.2.** A v2.1
+publicava `qty_bruta × regime_multiplier × ks_multiplier`, mas `packages/risk-core` não tem código
+que calcule ou aplique um multiplicador por regime: `hunter_risk.evaluate.evaluate` nem recebe
+`regime` como argumento, e `entry_size_multiplier` (§5) é o único multiplicador que `sizing.py`
+aplica. O termo volta à fórmula, com uma versão nova do preset, quando o M4 ligar o insumo de regime
+(§2.1).
 
 `qty_by_beta` com `β = 0` não divide por zero: a contribuição incremental ao teto de β é nula, o teto
 não morde, e os outros continuam valendo.
@@ -253,19 +307,21 @@ soma caber. Saídas de proteção **não** consomem este orçamento.
 quem monta a proposta, antes do Risk Engine. O motor recebe esse número, nunca o recalcula, e usa
 `sizing_price` (acima) em toda a aritmética; os dois ficam publicados lado a lado na decisão.
 
-**Os multiplicadores agem sobre o tamanho final (R-KS-1).** No v1 eles multiplicavam o orçamento de
+**O multiplicador age sobre o tamanho final (R-KS-1).** No v1 ele multiplicava o orçamento de
 risco, e a redução prometida pelo §5 não era garantida: com stop estreito, outro teto vencia e a
 posição saía do mesmo tamanho. No v2 a garantia é estrutural e testada:
 `multiplicador ≤ 1 ⇒ qty_final ≤ qty_bruta`, e `ks = 0,5 ⇒ qty_final ≤ ⌊qty_bruta/2⌋` no passo.
 Depois do arredondamento o `min_notional` é revalidado: se o tamanho reduzido não chega ao mínimo
-negociável, a proposta é **rejeitada** — nunca arredondada para cima.
+negociável, a proposta é **rejeitada** — nunca arredondada para cima. Hoje o único multiplicador que
+existe é o de aviso/kill switch (`entry_size_multiplier`, §5); o de regime é reservado ao M4 (§2.1) e
+não corre neste cálculo.
 
 A decisão grava, para a mesma proposta e o mesmo estado, cada teto calculado com o seu valor, qual
 venceu, e **dois contrafactuais distintos, que nunca podem ser reportados como um só**:
 
 | Contrafactual | O que responde |
 |---|---|
-| `size_without_multipliers` | o tamanho que sairia sem o multiplicador de aviso e o de regime (R-KS-2) — mede o degrau do kill switch |
+| `size_without_multipliers` | o tamanho que sairia sem o multiplicador de aviso/kill switch (R-KS-2) — mede o degrau do kill switch. Nomeado no plural porque a v1 já compunha o de aviso com o de regime; hoje só o de aviso existe (§2.1) |
 | `size_without_participation` | o tamanho que sairia se o teto de participação não existisse — mede quanto a regra 3 da diretiva está mordendo |
 
 Confundi-los produziria a frase errada nos dois sentidos. É o segundo que responde "em quantos
@@ -316,6 +372,15 @@ para este motor punir.
 | `WARNING` (AVISO) | permitidas com **tamanho final × 0,5** | normais | normal | perda do dia ≥ 1 % **OU** drawdown ≥ 4 % |
 | `TRADING_DISABLED` (BLOQUEADO) | bloqueadas; **pendentes canceladas** | permitidas | continua, com proteções ativas | perda do dia ≥ 2 % **OU** drawdown ≥ 8 % |
 | `EMERGENCY` | bloqueadas | permitidas | só saídas | manual (OWNER/ADMIN) |
+
+**`auto_close_on_emergency` não é uma chave do perfil — é este comportamento, fixo no motor (T3.1b,
+`docs/DATABASE.md` §18.8).** Em `EMERGENCY`, como em `TRADING_DISABLED`, o motor **nunca liquida tudo
+automaticamente**: "só saídas" na linha acima significa que saídas de proteção continuam permitidas,
+não que o motor dispara uma liquidação da carteira inteira. A diretiva (§5) proíbe esse caminho; não
+há em `hunter_risk.kill_switch` nenhum código que feche posição por decisão própria — fechar é sempre
+um `ExitPlan` de uma saída de proteção já existente ou de um ato manual auditado. Carregar
+`auto_close_on_emergency: false` no perfil faria parecer que existe um interruptor que alguém lê;
+não existe.
 
 Em `TRADING_DISABLED` **não há liquidação automática**: as posições continuam sendo geridas, os stops
 e alvos continuam valendo. A retomada é **sempre** manual e autorizada pelo Everton, auditada em
@@ -451,8 +516,8 @@ ao Sentry.
 | 9 | Sem checks operacionais de lacuna e universo | `market_gap` e `market_in_universe` | R-OPS-3 (34 de 232 mercados com lacuna em 24 h) e R-OPS-4 (27 sinais em 14 mercados desmonitorados em 15 h) |
 | 10 | Três presets genéricos | Preset `paper_v1` com os valores do Everton; os três antigos continuam existindo e não são o perfil da carteira | A diretiva nomeia valores, não perfis |
 
-O que **não** mudou: a gramática de `regime_size_multiplier` (§2.1), a pureza da função, a estrutura
-de `risk_decision.checks[]`, os `risk_events`, e as garantias da §8.
+O que **não** mudou: a gramática de `regime_size_multiplier` (§2.1, reservada para o M4 desde a v2.2),
+a pureza da função, a estrutura de `risk_decision.checks[]`, os `risk_events`, e as garantias da §8.
 
 ### 9.1 Matriz dos controles do v1
 
@@ -469,7 +534,7 @@ declarado, e nada de margem, futuros ou preset mais permissivo entra de carona.
 | `correlation` por `beta > 0.8` | **substituído** pela exposição agregada em β em módulo (0,5×) |
 | `max_leverage` | **mantido com valor 1**; margem, empréstimo, short e futuros são **inaplicáveis** nesta etapa |
 | `max_exchange_exposure_pct` | **inaplicável** enquanto houver uma exchange de execução; volta a valer no M1b |
-| `auto_close_on_emergency` | **mantido em `false`**; a diretiva proíbe liquidação automática |
+| `auto_close_on_emergency` | **mantido como comportamento fixo do motor** (§5); a diretiva proíbe liquidação automática. Desde a v2.2, não é chave do perfil (T3.1b, `docs/DATABASE.md` §18.8) — `RiskLimits` não tem campo para ele |
 | Presets `conservative`/`balanced`/`aggressive` | **continuam existindo e não são o perfil da carteira**; nada neles pode elevar os limites do `paper_v1` |
 
 ### 9.2 O que mudou da v2.0 para a v2.1, e por quê
@@ -490,6 +555,16 @@ mesma revisão: `resume` recusa retomar enquanto a avaliação automática ainda
 tem desempate estável por `CAP_ORDER` (§4); e `evaluate_exit` funciona sem `PortfolioState`, com a
 quantidade vendável como o mínimo entre a posição entregue e a da carteira (§5) — este último não veio
 da revisão original, mas de uma segunda e uma terceira rodada da Astra sobre o mesmo diff.
+
+### 9.3 O que mudou da v2.1 para a v2.2, e por quê
+
+| # | v2.1 (texto) | v2.2 (código provado) | Achado |
+|---|---|---|---|
+| 1 | §2 listava quatro chaves para as quais `RiskLimits` não tem campo (`participation_reference`, `market_types`, `auto_close_on_emergency`, `regime_size_multiplier`); `infra/scripts/seed_reference.PAPER_V1_LIMITS` era um segundo literal escrito à mão, já divergente do motor | `risk_profiles.limits` do `paper_v1` é gravado como `hunter_risk.limits.PAPER_V1.model_dump(mode="json")` — uma única fonte; as quatro chaves saem da tabela do perfil (§2), cada uma com destino declarado ali e em `docs/DATABASE.md` §18.8 | T3.1b (`296f3c1`, "deve corrigir 7"): `RiskLimits.model_validate(profile.limits)` falhava com dez erros sobre a linha que o seed antigo gravava — seis chaves que o motor exige faltavam, quatro que ele não tem estavam presentes |
+| 2 | §4 publicava `qty_final = qty_bruta × regime_multiplier × ks_multiplier`, e `size_without_multipliers` como "sem o multiplicador de aviso e o de regime" | `hunter_risk.sizing` só recebe e aplica **um** multiplicador (`entry_size_multiplier`, o de aviso/kill switch, §5); `hunter_risk.evaluate.evaluate` nem recebe `regime` como argumento | Divergência achada nesta revisão, fora do escopo da T3.1b: nenhum código em `packages/risk-core` implementa `regime_size_multiplier` hoje. §4 e §2.1 foram corrigidos para descrever o que o motor faz; o termo de regime volta com uma versão nova do preset no M4 |
+
+O que **não** mudou na v2.2: nenhum valor do perfil `paper_v1`, a estrutura de `risk_decision.checks[]`,
+os `risk_events`, e as garantias da §8.
 
 ## 10. Saídas: tentativa e intenção não são a mesma coisa
 
