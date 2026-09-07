@@ -120,6 +120,50 @@ linhas.)*
 | **T3.9 — as nove verificações** | O portão do milestone | V1/V2/V3 e §11 **feitas** (`eccb648`); o resto é **T3.9b**, a fazer |
 | **T3.5c · T3.10 · deploy** | Assentamento do pó e `kill_switch.changed` na retomada (T3.5c, **em voo**); runbook de ativação (T3.10); e o deploy único na VPS, que recria a rede e aplica `0008`+`0009` | a fazer / pendente |
 
+## D10 — qual versão de estratégia vai alimentar a carteira (delegada em 2026-09-07)
+
+Everton, 2026-09-07: **"sexta feira pode decider esses 4"**. Esta é a primeira das quatro, e é a que
+decide de onde virá a primeira entrada não manual da carteira. Registro completo em
+`.claude/state/decisions-delegated-2026-09-07.md`; ver também [[Strategies]], [[Paper Trading]],
+[[EXP-0001-momentum-v1]], [[EXP-0002-volume-anomaly-v1]] e [[Dialogos/M3]].
+
+**Decisão: `momentum`**, e **não** virando o propósito de uma versão existente. A coorte de paper
+nasce como uma **linha nova e congelada** em `strategy_versions`, com `purpose = paper`, parâmetros
+copiados bit a bit da versão de momentum ativa na VPS e `code_ref` recalculado. A coorte
+`research_only` continua **ativa e intocada** ao lado — o que dá de graça a comparação que interessa:
+o mesmo gatilho medido pelas barras (hipotético) e medido pela carteira (com os custos do simulador).
+
+**O achado que mudou a pergunta.** O rótulo `paper` **não existe no código**: o `strategy-worker` só
+sabe escrever `research_only` (cravado em `record.py:198,229`), a ponte e a admissão só aceitam
+`"live"` (`bridge_screen.py:156`, `admission/sources.py:259`), e `strategy_versions` **não tem coluna
+`purpose`**. Falta exatamente um rótulo entre o produtor e o consumidor — e ele é coluna, migração,
+envelope e portão, não uma linha de banco. Decidido junto: o rótulo admissível para carteira
+`type=paper` passa a ser **`paper`**, e `live` fica **recusado por nome** até a Fase 4. Vira a
+**T3.15**.
+
+**Por que momentum, com o dado** (leitura datada da VPS, `as_of = 2026-09-06T13:00:00Z`):
+
+| | `momentum v1` | `volume_anomaly v1` |
+|---|---|---|
+| Emitidos / entradas | 208 / 208 | 459 / 443 |
+| Recusas por **geometria** (o que a ponte revalida) | **0** | **16** |
+| Avaliáveis / dias distintos | 105 / **1** | 352 / **1** |
+| Expectancy líquida hipotética | **−0,2102 R** | **−0,2304 R** |
+
+Zero recusas de geometria em 208, e momentum não carrega a janela de **288 barras de 5 min
+contíguas** que deixa o volume_anomaly refém de um único minuto ausente por ~24 h — que é justamente
+o defeito que este sistema tem hoje (63.793 avaliações `unavailable` no `hb:strategy:shadow`).
+
+**Não é escolha de desempenho, e ninguém deve ler assim.** As duas têm expectancy negativa e **1 dia
+distinto** contra o limiar editorial de 100 outcomes **e** 30 dias — inconclusivas, as duas. A coorte
+de paper existe para provar o **caminho** (sinal → ponte → admissão → Risk Engine → fill paper →
+ledger → proteção), não para ganhar dinheiro.
+
+**Nada foi ativado.** A ativação exige as sete condições da D10 — T3.9b verde, T3.14b e T3.15
+revisadas, spot ligado na VPS depois da T3.0d, β válido, `EXP-0005` aberto **antes** do primeiro
+sinal, e o parecer da Astra — e é ato manual, auditado em `system_events`, anunciado ao Everton
+antes. `ENABLE_PAPER_AUTONOMY` continua `false`.
+
 ## Modelo (schema aplicado — `0006_paper_wallet`)
 
 `portfolios`: `organization_id`, `workspace_id`, `name`, `type` (`paper|shadow|live`),

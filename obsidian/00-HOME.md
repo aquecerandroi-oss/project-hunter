@@ -46,8 +46,14 @@ em `/system` e a **ponte sinal → admissão desligada** (T3.14).
 **A carteira continua parada, e isso é de propósito.** A ponte tem **duas travas independentes**:
 `ENABLE_PAPER_AUTONOMY=false` (com ela falsa a ponte nem cria o grupo de consumo) e, mesmo se ligada,
 **todo sinal do Shadow Lab hoje é `research_only`** — propósito que a ponte recusa. Nada é admitido
-até existir uma `strategy_version` ativada com propósito de paper, e **essa ativação é decisão do
-Everton**. Nenhum `ENABLE_*` de autonomia está ligado e o M3 **não** declara modo autônomo. Falta
+até existir uma `strategy_version` ativada com propósito de paper. **Em 2026-09-07 o Everton delegou
+essa escolha** ("sexta feira pode decider esses 4"): a decisão **D10** escolheu o `momentum`, como
+linha nova e congelada, com a coorte `research_only` intocada ao lado — e descobriu, no caminho, que
+**o rótulo `paper` não existe no código** (o worker só escreve `research_only`, a ponte só aceita
+`live`, e `strategy_versions` não tem coluna `purpose`), o que virou a **T3.15**. **Nada foi
+ativado**: a ativação depende de sete condições escritas e continua sendo ato manual, auditado e
+anunciado. Ver [[Portfolio]] e `.claude/state/decisions-delegated-2026-09-07.md` (D10–D13: versão
+paper, alvo do p99, histerese do piso spot, domínio). Nenhum `ENABLE_*` de autonomia está ligado e o M3 **não** declara modo autônomo. Falta
 **T3.5c, T3.0c/T3.0d, T3.9b, T3.10 e o deploy na VPS** — que roda a era do `2688ef1` e ainda não tem
 nada disto no ar.
 

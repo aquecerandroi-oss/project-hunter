@@ -174,3 +174,44 @@ cancelamento terminal do restante — vale só para a **entrada**.
 Ver [[Risk Engine]], [[Portfolio]], [[Paper Trading]], [[Execution Engine]] e a seção "Regras
 propostas para o Risk Engine (M3/M4)" do [[Strategy Backlog]], onde cada uma das vinte e uma regras
 ficou marcada como adotada, substituída pela decisão do Everton, ou pendente com a pergunta.
+
+---
+
+## Decisões delegadas de 2026-09-07 (D10–D13) — a Sexta-feira decidindo em nome do Everton
+
+Everton, 2026-09-07: **"sexta feira pode decider esses 4"**. Quatro decisões, registro completo com
+os números em `.claude/state/decisions-delegated-2026-09-07.md`; tabela resumida em
+`docs/plans/M3.md` ("Respostas às perguntas"). Continuação de D1–D3 (2026-09-06) e D4–D9.
+**Astra indisponível até 2026-09-12** — as quatro foram tomadas com um motor só e vão a ela quando a
+cota voltar. **Nenhuma liga nada, e nenhum limite escrito pelo Everton foi tocado.**
+
+| # | Assunto | Decisão em uma linha | Tarefa |
+|---|---|---|---|
+| **D10** | Versão com propósito paper | `momentum`, como **linha nova e congelada** com `purpose = paper`, a coorte `research_only` intocada ao lado; ativação só com sete condições, ato manual e auditado | **T3.15** |
+| **D11** | Alvo do p99 tick→oportunidade | O **número 3 s fica**; o universo passa a ser os 19 perpétuos com contraparte spot negociável. Vitrine do Radar ganha alvo próprio, p99 ≤ 15 s | **T2.5h** |
+| **D12** | Histerese do piso de 50 M no spot | **Banda só na saída**: entra com ≥ 50 M, só sai abaixo de 40 M em 3 refreshes consecutivos | **T3.0e** |
+| **D13** | Domínio da VPS | Recomendação (`projecthunter.app`, Cloudflare Registrar, proxy desligado no início); **a compra é ato do Everton** | — |
+
+### As três lições que estas decisões deixam, e que valem para as próximas
+
+**1. Um propósito que o worker crava não é propósito da versão — é opinião do processo.** A D10 foi
+pedida como "escolha a versão", e a resposta honesta foi: **nenhuma pode receber hoje**. O rótulo
+mora no envelope do sinal, cravado literalmente em `record.py`; `strategy_versions` não tem coluna
+`purpose`; e o único valor que a ponte aceita é `"live"`. Quem decide o que uma coorte é tem de ser a
+**linha congelada da versão**, não o código que a emite — senão a mesma versão significa uma coisa
+antes do deploy e outra depois, e a coorte deixa de ser auditável. Da mesma família da lição do
+Risk Engine v2: *um controle que não publica o que o fez agir é uma frase, não um controle.*
+
+**2. Um rótulo do caminho do dinheiro não pode ter o nome do que ainda é proibido.** `live` era o
+único propósito admissível, num repositório cuja regra dura é "nada de dinheiro real antes da Fase
+4". Nada estava errado no comportamento — e o nome estava a uma leitura apressada de virar
+autorização. Carteira paper passa a admitir **`paper`**; `live` fica recusado **por nome**, com a
+mensagem dizendo por quê. Falha fechada nos dois sentidos.
+
+**3. Um critério de aprovação que o autor satisfaz reescrevendo não é critério.** A condição 3 do M2
+admitia, na letra, ser cumprida por uma renegociação. A renegociação aconteceu — do **universo**, não
+do número — e a condição **continua aberta**, exigindo a medição. Quando quem escreve o critério é
+quem aprova, a única defesa é essa: renegociar o alvo nunca conta como medir.
+
+Ver [[Portfolio]], [[Strategies]], [[Paper Trading]], [[EXP-0001-momentum-v1]],
+[[EXP-0002-volume-anomaly-v1]], [[Diario/2026-09-07]], [[Dialogos/M3]] e [[Open Bugs]].
