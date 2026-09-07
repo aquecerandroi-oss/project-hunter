@@ -6,7 +6,10 @@ answered yet", and this one answers the four questions asked *about* one of thos
 decisions before it may become a proposal.
 
 - **the SPOT pair** the perpetual maps to (D1: same venue, same ``base/quote``),
-  with the 24h volume T3.0c measured on spot itself;
+  with the 24h volume T3.0c measured on spot itself — including the **scaled**
+  perpetuals (``1000SHIBUSDT`` quotes 1.000x the spot ``SHIBUSDT``) that Binance
+  names by prefixing the base asset's own symbol, never by guessing a factor
+  from the market symbol (review-T3.14.md item 4);
 - **the beta revision in force**, under RISK_ENGINE.md §6's three conditions
   together;
 - **whether the coin is already committed** — an open or ``closing`` position, or
@@ -20,8 +23,9 @@ Reading "the latest" would be the look-ahead the Lab spent a whole plan avoiding
 
 from __future__ import annotations
 
+import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -74,6 +78,12 @@ class SpotPair:
     base_asset_id: uuid.UUID | None
     is_monitored: bool
     volume_24h_usd: Decimal | None
+    scale: Decimal = Decimal(1)
+    """How many spot units one perpetual unit's price is quoted at — ``1000`` for
+    ``1000SHIBUSDT`` against spot ``SHIBUSDT``, ``1`` for every ordinary pair.
+    ``Screened`` divides the frozen ``entry_ref``/``stop``/``target`` by this
+    before they reach admission, so the numbers the engine sizes and checks for
+    ``signal_validity`` are the spot market's own scale, never the perpetual's."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,14 +94,23 @@ class CoinCommitment:
     market_id: uuid.UUID
 
 
-async def spot_pair_for(session: AsyncSession, signal: ShadowSignal) -> SpotPair | None:
-    """The tradable SPOT pair of the same venue and ``base/quote`` (D1).
+_SCALED_ASSET = re.compile(r"^1(0{3,6})([A-Z][A-Z0-9]*)$")
+"""Binance's own convention for a scaled perpetual: the base asset's symbol is
+the literal decimal multiplier (``1000``, ``10000``, ``1000000``, ...) followed
+by the unscaled asset's own symbol (``1000SHIB`` -> ``1000`` x ``SHIB``). The
+factor is **read off this name**, never guessed from a price ratio: a market
+whose symbol does not fit the pattern has no scale to recover, and is refused
+exactly like a pair with no spot listing at all (item 4)."""
 
-    ``None`` when there is none — the asset then stays in shadow, which is
-    exactly what the decision says happens.
-    """
-    if signal.base_asset_id is None or signal.quote_asset_id is None:
-        return None
+
+async def _spot_market(
+    session: AsyncSession,
+    *,
+    exchange_id: uuid.UUID,
+    base_asset_id: uuid.UUID,
+    quote_asset_id: uuid.UUID,
+) -> SpotPair | None:
+    """The tradable SPOT market of one exact ``(exchange, base, quote)``, or ``None``."""
     row = (
         await session.execute(
             text(
@@ -100,11 +119,7 @@ async def spot_pair_for(session: AsyncSession, signal: ShadowSignal) -> SpotPair
                 "AND base_asset_id = :base AND quote_asset_id = :quote "
                 "AND status = 'active' AND delisted_at IS NULL LIMIT 1"
             ),
-            {
-                "ex": signal.exchange_id,
-                "base": signal.base_asset_id,
-                "quote": signal.quote_asset_id,
-            },
+            {"ex": exchange_id, "base": base_asset_id, "quote": quote_asset_id},
         )
     ).one_or_none()
     if row is None:
@@ -116,6 +131,60 @@ async def spot_pair_for(session: AsyncSession, signal: ShadowSignal) -> SpotPair
         is_monitored=bool(row.is_monitored),
         volume_24h_usd=decimal_or_none(row.volume_24h_usd),
     )
+
+
+async def _scaled_spot_pair(session: AsyncSession, signal: ShadowSignal) -> SpotPair | None:
+    """The unscaled spot twin of a perpetual named like ``1000SHIBUSDT``.
+
+    Reads the perpetual's own base asset symbol, matches it against
+    :data:`_SCALED_ASSET`, and looks the *remainder* up as its own asset. A
+    remainder that names no asset, or a symbol that does not fit the pattern
+    at all, means there is no mapping to recover — ``None``, the same refusal
+    (``spot_pair_unavailable``) an unlisted pair already gets, per item 4:
+    "se o mapeamento de escala não existir, recuse (não invente fator)".
+    """
+    if signal.base_asset_id is None or signal.quote_asset_id is None:
+        return None
+    symbol = await session.scalar(
+        text("SELECT symbol FROM assets WHERE id = :id"), {"id": signal.base_asset_id}
+    )
+    if symbol is None:
+        return None
+    match = _SCALED_ASSET.match(symbol.upper())
+    if match is None:
+        return None
+    scale = Decimal("1" + match.group(1))  # the zeros captured, with the leading "1" put back
+    base_id = await session.scalar(
+        text("SELECT id FROM assets WHERE symbol = :symbol"), {"symbol": match.group(2)}
+    )
+    if base_id is None:
+        return None
+    pair = await _spot_market(
+        session,
+        exchange_id=signal.exchange_id,
+        base_asset_id=base_id,
+        quote_asset_id=signal.quote_asset_id,
+    )
+    return None if pair is None else replace(pair, scale=scale)
+
+
+async def spot_pair_for(session: AsyncSession, signal: ShadowSignal) -> SpotPair | None:
+    """The tradable SPOT pair of the same venue and ``base/quote`` (D1).
+
+    Tries the exact ``base_asset_id`` first — the ordinary case, ``scale=1`` —
+    and only then the scaled mapping of :func:`_scaled_spot_pair`. ``None`` when
+    neither exists: the asset then stays in shadow, which is exactly what the
+    decision says happens.
+    """
+    if signal.base_asset_id is None or signal.quote_asset_id is None:
+        return None
+    exact = await _spot_market(
+        session,
+        exchange_id=signal.exchange_id,
+        base_asset_id=signal.base_asset_id,
+        quote_asset_id=signal.quote_asset_id,
+    )
+    return exact if exact is not None else await _scaled_spot_pair(session, signal)
 
 
 async def spot_pair_of(session: AsyncSession, market_id: uuid.UUID) -> SpotPair | None:

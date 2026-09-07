@@ -371,7 +371,7 @@ número nenhum.
 | `executions.completed` | execution | analytics, api (rt) | 20k |
 | `positions.updated` | execution | api (rt), analytics | 50k |
 | `risk.events` | strategy, execution, api | api (rt), analytics (alerts) | 10k |
-| `kill_switch.changed` | api | strategy, execution | 1k |
+| `kill_switch.changed` | execution (§8 item 6; automático e retomadas de usuário) | strategy, execution | 1k |
 | `audit` | api, workers | (persistido pelo produtor; stream só para rt) | 10k |
 
 ## 10b. Outbox transacional (T2.9)

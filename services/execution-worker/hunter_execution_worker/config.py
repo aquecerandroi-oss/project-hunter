@@ -10,9 +10,15 @@ and the two flags the contract requires the process to refuse to start without.
 worker; ``LiveExecutionAdapter`` raises whatever the flag says, and a process
 that came up anyway would be a process an operator believes is live.
 
-``ENABLE_PAPER_AUTONOMY`` (default ``false``) gates the T3.14 bridge, which is
-not in this task: with it off the worker only decides requests it is handed. The
-flag exists here so the point of extension is explicit rather than implied.
+``ENABLE_PAPER_AUTONOMY`` (default ``false``) gates the T3.14 bridge: with it
+off the worker only decides requests it is handed. It is read through
+``hunter_core.settings.Settings`` — the **single** source, so a compose file or
+an operator's shell that only export it under one of the two names cannot leave
+this process and any other role disagreeing about which mode the deployment is
+in (review-T3.14.md item 5: two independent parsers of the same variable is two
+chances to read it differently). Every other knob in this module stays a local
+env read on purpose (see the module docstring): only this one is a flag another
+role's ``/ready`` or dashboard also needs to see the same way.
 """
 
 from __future__ import annotations
@@ -20,6 +26,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from decimal import Decimal
+
+from hunter_core.settings import Settings
 
 __all__ = [
     "HEARTBEAT_KEY",
@@ -108,5 +116,8 @@ def load_config() -> ExecutionConfig:
         expiry_poll_s=_float("EXECUTION_EXPIRY_POLL_S", 5.0),
         kill_switch_poll_s=_float("EXECUTION_KILL_SWITCH_POLL_S", 10.0),
         mtm_poll_s=_float("EXECUTION_MTM_POLL_S", 60.0),
-        enable_paper_autonomy=_flag("ENABLE_PAPER_AUTONOMY", False),
+        # Single source (item 5): ``Settings`` reads ``ENABLE_PAPER_AUTONOMY``
+        # from the environment the same way every other role does. No local
+        # ad-hoc parser touches this variable any more.
+        enable_paper_autonomy=Settings().enable_paper_autonomy,
     )

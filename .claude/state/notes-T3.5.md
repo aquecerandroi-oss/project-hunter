@@ -511,3 +511,139 @@ test_scheduling}.py`,
 - **Não verifiquei** a rota HTTP de T3.8 em si (não existe ainda — só o serviço); o teste novo chama
   `file_manual_order` diretamente, como a própria `notes-T3.5.md` §5.1 previu para "o script do
   operador hoje".
+
+---
+
+# T3.5d — `kill_switch.changed`: um formato, uma publicação, e a retomada chega ao stream, 2026-09-07
+
+**Autor:** backend-specialist. **Base:** `90f1862`. **Não commitei.** **Não editei**
+`packages/core/hunter_core/risk/**` nem `apps/api/**` (só **chamei** `resume`/`record_transition` de
+dentro de um teste novo do execution-worker). **Astra indisponível até 12/09** — sem segunda opinião,
+limite registrado.
+
+## Os dois achados, um a um
+
+### 1. Publicação dupla, dois formatos — corrigido removendo a segunda
+
+`mtm.py::run_mtm_cycle` chamava `evaluate_and_persist(..., publish=True)` — que já enfileira, **na
+mesma transação da latch**, `hunter_core.risk.transitions.record_transition`'s próprio evento
+(`{scope, scope_id, organization_id, from_state, to_state, reason, actor_type, evidence}`,
+`event_id = transition_id`) — e **depois**, se `evaluation.changed`, chamava
+`events.publish_kill_switch`, um **segundo** evento, formato próprio do worker (`{event,
+organization_id, portfolio_id, scope, previous, state, effective, reason, ts}`, `event_id` derivado
+de `(portfolio_id, latched, ts)`). Um consumidor via dois eventos por transição automática, em dois
+formatos.
+
+**Correção:** a chamada a `events.publish_kill_switch` saiu de `mtm.py` (o `logger.warning("kill_switch_moved")`
+ficou); a função `publish_kill_switch` em si **não sobrou** — virou `publish_resumed_transitions`
+(achado 2, abaixo), porque as duas coisas resolvem o mesmo problema (um formato só) e o brief
+autorizava "some ou vira delegação". `KILL_SWITCH_CHANGED` (o nome do stream) continua declarado em
+`events.py` para quem precisar dele.
+
+**Consumidores verificados**: nenhum em `apps/api` nem `apps/web` lê `kill_switch.changed` hoje
+(`grep` nos dois diretórios não encontrou nada) — nada para adaptar. `docs/PIPELINE.md` §8 item 6 e
+a tabela de streams (§10) documentam o formato único e quem de fato publica.
+
+**Prova**: `test_mtm_and_kill_switch.py`'s teste de crash já existia; **estendido** para contar as
+linhas do outbox (`stream = 'kill_switch.changed'` **e** `payload->>'key'`) — `len(rows) == 1`, não
+"in" uma lista — e para decodificar o corpo (`payload->>'payload'`, o campo aninhado do envelope) e
+provar o formato do core (`scope`, `scope_id`, `from_state`, `to_state`, `actor_type`, `evidence`) e a
+**ausência** do campo `event` que só o formato retirado tinha.
+
+### 2. Retomada pela API nunca chegava ao stream — o worker publica em nome dela
+
+`apps/api/hunter_api/routers/risk.py::resume_kill_switch` chama `resume(..., publish=False)` (o
+default; a rota nem passa `publish`) porque roda como `hunter_app`, a quem a `0007_paper_roles` nega
+`INSERT` em `outbox_events` — de propósito (SECURITY.md: a API nunca fala com o transporte
+diretamente). A transição é escrita, auditada, a trava move — e nada é enfileirado. O adendo da T3.5
+original pedia o worker publicar "ao processar uma retomada"; não tinha sido entregue.
+
+**Entregue:** `events.publish_resumed_transitions(session, *, wallet, now)`, nova, chamada no fim do
+laço de 10 s do kill switch (`Cycles.kill_switch`, depois de `cancel_pending_entries`). A consulta:
+
+```sql
+SELECT id, organization_id, from_state::text, to_state::text, reason, actor_type, evidence, created_at
+FROM kill_switch_transitions kt
+WHERE scope = 'portfolio' AND scope_id = :pf AND actor_type = 'user'
+  AND created_at >= :cutoff   -- 24h de lookback, sobre o índice (scope, scope_id, created_at)
+  AND NOT EXISTS (SELECT 1 FROM outbox_events oe WHERE oe.event_id = kt.id)
+ORDER BY created_at
+```
+
+Cada linha encontrada é enfileirada com `event_id = transition_id`, no **mesmo formato** de
+`record_transition` (`scope/scope_id/organization_id/from_state/to_state/reason/actor_type/evidence`)
+— um formato único, venha a transição do lado automático ou do lado manual.
+
+**Idempotência: por `event_id`, não por cursor em memória.** `enqueue`'s `ON CONFLICT (event_id) DO
+NOTHING` faz uma releitura da mesma linha (segundo ciclo, ou um processo reiniciado) um no-op; um
+processo morto **entre** a leitura e o `enqueue` não deixa nada meio-escrito, porque a leitura e o
+`enqueue` estão na mesma transação do ciclo — ou committam os dois, ou nenhum, e o próximo ciclo relê
+exatamente a mesma linha "ainda não publicada".
+
+**O marcador durável, decidido e documentado (o brief pedia exatamente isto).** "Ainda não publicada"
+é testado com `NOT EXISTS` contra `outbox_events` — durável **até** aquela linha ser podada
+(`outbox_store.prune_dispatched`, 7 dias após o **despacho**, `DATABASE.md` §1.3, um job que a
+stack do M3 ainda não roda em lugar nenhum). Só um worker que perdesse o ciclo de 10 s por uma semana
+inteira reenfileiraria uma retomada já entregue, sob o **mesmo** `event_id` — uma redelivery
+redundante e inofensiva para um consumidor que o CLAUDE.md já exige ser idempotente por `event_id`,
+nunca uma segunda transição. Documentado no próprio docstring de `publish_resumed_transitions`, não
+resolvido com uma coluna nova (fora do escopo: nenhuma migração).
+
+## Arquivos
+
+**Modificados:** `services/execution-worker/hunter_execution_worker/{mtm,events,cycles}.py`,
+`services/execution-worker/tests/test_mtm_and_kill_switch.py`, `docs/PIPELINE.md` (§8 item 6, §10).
+**Novos:** `services/execution-worker/tests/test_kill_switch_resume_publish.py` (3 testes de
+integração: primeiro ciclo publica, segundo ciclo nada, e um "crash" simulado — a transação do ciclo
+é revertida de propósito, como um `kill -9` deixaria — que não publica nada e o ciclo seguinte
+publica exatamente uma vez).
+
+## O que a suíte prova, literalmente
+
+1. **Primeiro ciclo enfileira um evento** (`test_the_first_cycle_publishes_the_unreachable_resume`):
+   `resume()` como `hunter_app`, `publish=False` — outbox vazio confirmado antes; depois de
+   `publish_resumed_transitions` como `hunter_worker`, exatamente uma linha, no formato do core,
+   `actor_type = "user"`, `from_state/to_state = WARNING/ACTIVE`.
+2. **Segundo ciclo, nenhum** (`test_a_second_cycle_publishes_nothing_more`): duas chamadas seguidas,
+   a segunda devolve `0`, o outbox continua com uma linha só.
+3. **Processo morto entre a leitura e o `enqueue`, ainda um só**
+   (`test_a_process_killed_between_the_read_and_the_enqueue_still_leaves_exactly_one`): a chamada
+   roda dentro de uma transação que **nunca comita** (uma exceção forçada depois dela, capturada
+   fora do `async with`) — o outbox continua vazio depois disso — e só a chamada seguinte, numa
+   transação que comita de verdade, produz a única linha.
+
+Nenhum dos três precisou fabricar a lógica de negócio da retomada: `resume()` e `record_transition`
+são os reais de `packages/core`, chamados exatamente como a rota e o motor automático os chamam. O
+que é sintético é a *evidência* que a retomada usa (`PortfolioState` construído à mão, totalmente
+recuperado — `equity == day_start_equity == peak_equity`), o mesmo parâmetro (`state=`) que um chamador
+real com um estado fresco calculado usaria; a escada de elegibilidade do `resume` em si já tem uma
+suíte extensa em `packages/core/tests/integration/test_risk_kill_switch.py`, não duplicada aqui.
+
+## Pendências e limites honestos
+
+- **Astra**: sem segunda opinião (cota esgotada até 12/09).
+- **A pruning do outbox não roda em lugar nenhum do M3** (achado, não meu de resolver): o risco do
+  marcador `NOT EXISTS` documentado acima é teórico enquanto isso for verdade. Registrado para quem
+  ligar o job do M5.
+- **`test_kill_switch_resume_publish.py` não testa duas instâncias do worker correndo o mesmo ciclo
+  ao mesmo tempo** — coberto por construção (idempotência por `event_id`), não por um teste de
+  concorrência real; o mesmo padrão que `notes-T3.14.md` §2.2b já registrou para a ponte.
+
+## Comandos e saída real
+
+```
+uv run pytest services/execution-worker/tests/test_kill_switch_resume_publish.py -q → 3 passed in 29.59s
+uv run pytest services/execution-worker/tests/test_mtm_and_kill_switch.py -q        → 2 passed in 37.65s
+uv run pytest services/execution-worker/tests -q  (por arquivo, 17 arquivos)        → 132 testes, todos
+  verdes (dois flakes conhecidos, WinError 64, verdes na repetição — notas T3.5b §9 item 10)
+uv run ruff check services/execution-worker packages/core apps/api                  → All checks passed!
+uv run ruff format --check services/execution-worker packages/core apps/api         → 1 arquivo alheio
+  (test_schema_privileges.py, outra tarefa em voo) precisa reformatar; nada meu
+uv run pyright services/execution-worker/hunter_execution_worker                    → 0 errors
+uv run pyright services/execution-worker/tests/test_kill_switch_resume_publish.py
+                services/execution-worker/tests/test_mtm_and_kill_switch.py         → 0 errors / 54
+  erros pré-existentes em test_mtm_and_kill_switch.py (helpers `# type: ignore[no-untyped-def]`,
+  nenhum em linha que toquei — mesma dívida da notas-T3.5b §11 item 2)
+uv run python infra/scripts/check_file_size.py                                     → scanned 463 files;
+                                                                                       0 over budget
+```

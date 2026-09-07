@@ -243,6 +243,7 @@ async def test_three_signals_in_one_cycle_submit_the_highest_score_and_the_rest_
     assert outcome.candidates == 3
     assert outcome.waiting == 2
     assert outcome.signal_id == signals[1], "the score of 90 has to win"
+    assert outcome.refusals == [], "the two runners-up wait, they are not refused"
 
     async with db_engine.begin() as connection:
         rows = (
@@ -252,6 +253,28 @@ async def test_three_signals_in_one_cycle_submit_the_highest_score_and_the_rest_
             )
         ).all()
     assert [row.signal_id for row in rows] == [signals[1]]
+
+    # T3.14b review item 2: the next cycle still sees both runners-up — neither
+    # was refused, so the durable queue (a query, not memory) reads them again
+    # — and this time the second-highest score (50) wins the one slot.
+    second_cycle = await _cycle(
+        db_session_factory, lab, _data(lab, extra=extra), now=NOW + timedelta(seconds=1)
+    )
+    assert second_cycle.candidates == 2
+    assert second_cycle.waiting == 1
+    assert second_cycle.signal_id == signals[2], "the score of 50 wins the second slot"
+    assert second_cycle.refusals == []
+
+    async with db_engine.begin() as connection:
+        rows = (
+            await connection.execute(
+                text(
+                    "SELECT signal_id FROM trade_proposals WHERE portfolio_id = :pf ORDER BY created_at"
+                ),
+                {"pf": lab.wallet.portfolio_id},
+            )
+        ).all()
+    assert [row.signal_id for row in rows] == [signals[1], signals[2]]
 
 
 async def test_a_second_cycle_does_not_file_the_same_signal_twice(
@@ -304,3 +327,84 @@ async def test_without_a_usable_book_the_slot_is_deferred_and_nothing_is_written
             {"pf": lab.wallet.portfolio_id},
         )
     assert count == 0
+
+
+async def test_a_scaled_perpetual_within_band_is_approved_at_the_spot_scale(
+    db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
+) -> None:
+    """T3.14b review item 4, case 1: ``1000SHIBUSDT``-shaped perpetual, mapped to
+    the spot pair and scaled correctly, sizes exactly like the unscaled
+    contract (spot at 100, scaled ``entry_ref``/``stop`` of 100/97,5)."""
+    lab = await _lab(db_session_factory, db_engine)
+    scaled_perp_id = await shadow.add_scaled_perp_market(db_engine, lab.tenant, scale=1000)
+    signal_id = await shadow.emit_signal(
+        db_engine,
+        version_id=lab.version_id,
+        market_id=scaled_perp_id,
+        source_bar_close=BAR,
+        purpose=shadow.PURPOSE_LIVE,
+        entry_ref=Decimal(100_000),
+        stop=Decimal(97_500),
+        target=Decimal(105_000),
+    )
+    outcome = await _cycle(db_session_factory, lab, _data(lab))
+    assert outcome.deferred is None, outcome.deferred
+    assert outcome.submitted is not None
+    assert outcome.submitted.approved, outcome.submitted.decision.rejection_reasons
+    assert outcome.submitted.reservation_state is ReservationState.HELD
+    assert outcome.signal_id == signal_id
+
+    async with db_engine.begin() as connection:
+        row = (
+            await connection.execute(
+                text("SELECT request_payload FROM trade_proposals WHERE portfolio_id = :pf"),
+                {"pf": lab.wallet.portfolio_id},
+            )
+        ).one()
+    assert Decimal(row.request_payload["entry_ref"]) == Decimal(100)
+    assert Decimal(row.request_payload["stop"]) == Decimal("97.5")
+    assert Decimal(row.request_payload["target"]) == Decimal(105)
+
+
+async def test_a_scaled_perpetual_out_of_band_is_rejected_by_the_risk_engine_with_no_reservation(
+    db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
+) -> None:
+    """T3.14b review item 4, case 2: correctly mapped and scaled, but the
+    signal's own reference (scaled to 150) is nowhere near what spot last
+    traded (100) — the Risk Engine's ``signal_validity`` check
+    (``max_entry_deviation_pct`` = 0,5 %, ``docs/RISK_ENGINE.md`` §2) refuses
+    it, and nothing is reserved. The bridge did not need its own copy of that
+    check: mapping and scaling correctly is enough for the existing engine to
+    catch a reference that is three orders of magnitude off if the scale is
+    ever wrong."""
+    lab = await _lab(db_session_factory, db_engine)
+    scaled_perp_id = await shadow.add_scaled_perp_market(db_engine, lab.tenant, scale=1000)
+    await shadow.emit_signal(
+        db_engine,
+        version_id=lab.version_id,
+        market_id=scaled_perp_id,
+        source_bar_close=BAR,
+        purpose=shadow.PURPOSE_LIVE,
+        entry_ref=Decimal(150_000),  # scales to 150; spot last traded at 100
+        stop=Decimal(145_000),
+        target=Decimal(160_000),
+    )
+    outcome = await _cycle(db_session_factory, lab, _data(lab))
+    assert outcome.deferred is None, outcome.deferred
+    assert outcome.submitted is not None
+    assert not outcome.submitted.approved
+    assert "signal_validity" in outcome.submitted.decision.rejection_reasons
+    assert outcome.submitted.reservation_state is not ReservationState.HELD
+
+    async with db_engine.begin() as connection:
+        row = (
+            await connection.execute(
+                text(
+                    "SELECT status::text AS status, reservation_state::text AS reservation "
+                    "FROM trade_proposals WHERE portfolio_id = :pf"
+                ),
+                {"pf": lab.wallet.portfolio_id},
+            )
+        ).one()
+    assert row.status == "rejected"
+    assert row.reservation != "held"

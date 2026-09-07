@@ -14,14 +14,25 @@ stream name is a contract with consumers that PIPELINE.md owns. So the two
 events travel on the canonical streams with an explicit ``event`` field naming
 which one they are, and a consumer filters on that. Registered as a deviation in
 ``.claude/state/notes-T3.5.md``.
+
+**``kill_switch.changed`` has exactly one shape, the core's.**
+``hunter_core.risk.transitions.record_transition`` already enqueues this event
+— same transaction as the latch, ``event_id = transition_id`` — whenever a
+caller passes ``publish=True``. This module used to publish a *second* event in
+its own shape whenever the worker's own MTM cycle moved the latch (T3.5d review
+finding 1); that call is gone, and :func:`publish_resumed_transitions` is the
+other side of finding 2 — the worker enqueues, in the same shape, the
+transitions the API authorised but could not publish itself.
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
+
+from sqlalchemy import text
 
 from hunter_core.audit import AuditEvent, SqlAuditSink
 from hunter_core.events.outbox_event import event_id_for
@@ -35,7 +46,13 @@ if TYPE_CHECKING:
     from hunter_execution_worker.reference import MarketReference
     from hunter_execution_worker.wallet import WalletRef
 
-__all__ = ["PRODUCER", "audit", "publish_order_filled", "publish_position", "publish_kill_switch"]
+__all__ = [
+    "PRODUCER",
+    "audit",
+    "publish_order_filled",
+    "publish_position",
+    "publish_resumed_transitions",
+]
 
 PRODUCER = "execution-worker"
 
@@ -134,42 +151,83 @@ async def publish_position(
     )
 
 
-async def publish_kill_switch(
-    session: AsyncSession,
-    *,
-    wallet: WalletRef,
-    previous: str,
-    latched: str,
-    effective: str,
-    reason: str,
-    ts: datetime,
-) -> None:
-    """``kill_switch.changed`` — the reaction the contract asks for in < 1 s.
+_RESUME_LOOKBACK = timedelta(hours=24)
+"""How far back :func:`publish_resumed_transitions` scans. A resume is expected
+to reach the outbox within one kill-switch cycle (10 s); a day is headroom for
+a worker that was briefly down, kept an index range over
+``ix_kill_switch_transitions_scope_created`` rather than a full-table scan."""
 
-    Published by the **worker**, which is the only role that may
-    (``0007_paper_roles`` §19.6: the engine moves the latch and enqueues the
-    event in one transaction; the API's resume still cannot, deliberately).
+_UNPUBLISHED_USER_RESUMES = (
+    "SELECT id, organization_id, from_state::text AS from_state, to_state::text AS to_state, "
+    "reason, actor_type, evidence, created_at FROM kill_switch_transitions kt "
+    "WHERE scope = 'portfolio' AND scope_id = :pf AND actor_type = 'user' "
+    "AND created_at >= :cutoff "
+    "AND NOT EXISTS (SELECT 1 FROM outbox_events oe WHERE oe.event_id = kt.id) "
+    "ORDER BY created_at"
+)
+
+
+async def publish_resumed_transitions(
+    session: AsyncSession, *, wallet: WalletRef, now: datetime
+) -> int:
+    """Enqueue ``kill_switch.changed`` for every user resume the API could not publish.
+
+    ``0007_paper_roles`` denies ``hunter_app`` ``INSERT`` on ``outbox_events``
+    by design (SECURITY.md: the API never talks to the transport directly), so
+    ``apps/api/hunter_api/routers/risk.py`` calls
+    ``hunter_core.risk.resume.resume(..., publish=False)`` — the transition is
+    written, audited and the latch moves, but nothing is queued (T3.5d review
+    finding 2). This is the other side, run every 10 s
+    (:meth:`hunter_execution_worker.cycles.Cycles.kill_switch`): the worker
+    looks at this wallet's own ``actor_type='user'`` transitions and enqueues
+    the ones with no matching outbox row yet, in **the same shape**
+    ``hunter_core.risk.transitions.record_transition`` already uses for an
+    automatic move (T3.5d finding 1) — one format, whichever side moved the
+    latch.
+
+    Idempotent by construction, not by a cursor kept in memory:
+    ``event_id = transition_id``, so ``enqueue``'s own
+    ``ON CONFLICT (event_id) DO NOTHING`` makes re-reading an already-queued
+    row a no-op, and a process killed between this read and the ``enqueue``
+    below simply re-reads and re-queues the same row next cycle — never a
+    second transition, never two different shapes.
+
+    **Caveat, documented rather than fixed** (the brief's own words: "decidir e
+    documentar"): "not yet published" is tested with ``NOT EXISTS`` against
+    ``outbox_events``, durable only until that row is pruned
+    (``outbox_store.prune_dispatched`` — 7 days after *dispatch*, DATABASE.md
+    §1.3, a job the M3 stack does not yet run anywhere). Only a worker that
+    missed every 10 s cycle for that whole week would re-enqueue an
+    already-delivered resume under the same ``event_id`` — a redundant, harmless
+    redelivery to a consumer that is required to be idempotent by
+    ``event_id`` (CLAUDE.md), not a second move of the latch.
     """
-    payload = {
-        "event": KILL_SWITCH_CHANGED,
-        "organization_id": str(wallet.organization_id),
-        "portfolio_id": str(wallet.portfolio_id),
-        "scope": "portfolio",
-        "previous": previous,
-        "state": latched,
-        "effective": effective,
-        "reason": reason,
-        "ts": ts.isoformat(),
-    }
-    await enqueue(
-        session,
-        Streams.KILL_SWITCH_CHANGED,
-        event_id_for(Streams.KILL_SWITCH_CHANGED, wallet.portfolio_id, latched, ts.isoformat()),
-        payload,
-        producer=PRODUCER,
-        key=str(wallet.portfolio_id),
-        ts=ts,
+    rows = await session.execute(
+        text(_UNPUBLISHED_USER_RESUMES),
+        {"pf": wallet.portfolio_id, "cutoff": now - _RESUME_LOOKBACK},
     )
+    count = 0
+    for row in rows:
+        await enqueue(
+            session,
+            Streams.KILL_SWITCH_CHANGED,
+            row.id,
+            {
+                "scope": "portfolio",
+                "scope_id": str(wallet.portfolio_id),
+                "organization_id": str(row.organization_id),
+                "from_state": row.from_state,
+                "to_state": row.to_state,
+                "reason": row.reason,
+                "actor_type": row.actor_type,
+                "evidence": row.evidence,
+            },
+            producer=PRODUCER,
+            key=str(wallet.portfolio_id),
+            ts=row.created_at,
+        )
+        count += 1
+    return count
 
 
 async def audit(

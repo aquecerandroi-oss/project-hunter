@@ -106,6 +106,45 @@ async def add_perp_market_for(
     return market_id
 
 
+async def add_scaled_perp_market(
+    engine: AsyncEngine, tenant: Tenant, *, scale: int = 1000
+) -> uuid.UUID:
+    """A perpetual quoted at ``scale``x the spot price, Binance's own naming:
+    ``1000SHIBUSDT`` is a distinct ``assets`` row (``1000SHIB``) from spot's own
+    ``SHIB`` — never the same asset id at a different price (T3.14b review item
+    4, ``bridge_universe._scaled_spot_pair``).
+    """
+    base_id = uuid7()
+    base_symbol = f"{scale}{tenant.base_symbol}"
+    symbol = f"{scale}{tenant.symbol}"
+    market_id = uuid7()
+    async with engine.begin() as connection:
+        await connection.execute(
+            text("INSERT INTO assets (id, symbol) VALUES (:id, :symbol)"),
+            {"id": base_id, "symbol": base_symbol},
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO markets (id, exchange_id, symbol, market_type, base_asset_id, "
+                "quote_asset_id, tick_size, step_size, min_notional, is_monitored, metadata) "
+                "VALUES (:id, :ex, :symbol, 'perpetual', :base, :quote, :tick, :step, "
+                ":min_notional, true, CAST(:meta AS jsonb))"
+            ),
+            {
+                "id": market_id,
+                "ex": tenant.exchange_id,
+                "symbol": symbol,
+                "base": base_id,
+                "quote": tenant.quote_asset_id,
+                "tick": TICK,
+                "step": tenant.step,
+                "min_notional": MIN_NOTIONAL,
+                "meta": filters_metadata(),
+            },
+        )
+    return market_id
+
+
 async def set_spot_volume(
     engine: AsyncEngine,
     market_id: uuid.UUID,

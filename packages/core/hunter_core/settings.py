@@ -128,9 +128,10 @@ class Settings(BaseSettings):
 
     Default ``false``, and it stays ``false`` in production until the nine
     verifications of T3.9 are accepted (``docs/plans/M3.md``, joint decision item
-    9). Declared here so every role can *see* the mode the deployment is in;
-    the execution-worker reads the same ``ENABLE_PAPER_AUTONOMY`` variable in
-    ``hunter_execution_worker.config``, where its cadences live.
+    9). This field is the **single** source: ``hunter_execution_worker.config``
+    reads it off a plain ``Settings()`` (T3.14b review item 5) rather than
+    parsing ``ENABLE_PAPER_AUTONOMY`` a second time, so this class and the
+    worker cannot disagree about which mode a deployment is in.
     """
     system_kill_switch: KillSwitchState = KillSwitchState.ACTIVE
 

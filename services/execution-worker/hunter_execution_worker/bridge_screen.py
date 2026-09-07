@@ -15,6 +15,14 @@ Order matters. The cheapest and most categorical refusals come first — a
 ``research_only`` signal or an inactive version is refused **at the door**,
 before any market data is read (item 5) — and only then the ones that need the
 reference tables.
+
+A refusal is logged and counted **once per (signal, reason)**, not once per
+pass: the durable queue (``bridge_repo.pending_signals``) re-reads the same
+still-eligible signal for up to 240 s, so without a dedupe a single refused
+signal wrote ~240 identical lines and counter increments — one a second — for
+the whole time it stayed in the lookback window (review-T3.14.md item 1, the
+same "once-per-row" doctrine ``admission_cycle.report_unreadable`` already
+applies to an unreadable manual request).
 """
 
 from __future__ import annotations
@@ -46,7 +54,7 @@ if TYPE_CHECKING:
     from hunter_execution_worker.wallet import WalletRef
     from hunter_risk.inputs import BetaEstimate
 
-__all__ = ["PURPOSE_LIVE", "Screened", "screen_signal"]
+__all__ = ["PURPOSE_LIVE", "Screened", "report_refusal", "screen_signal"]
 
 logger = get_logger(__name__)
 
@@ -62,7 +70,10 @@ class Screened:
     The geometry is read back off the signal rather than copied: an eligible
     candidate is exactly one whose frozen levels were already validated by
     :func:`_geometry_reason`, so there is no second copy of the numbers that
-    decide money to keep in step with the first.
+    decide money to keep in step with the first. When ``spot`` maps the
+    perpetual at a scale other than 1 (``1000SHIBUSDT`` -> spot ``SHIBUSDT``,
+    item 4), ``entry_ref``/``stop``/``target`` divide by it: what reaches
+    admission is always the spot market's own price, never the perpetual's.
     """
 
     signal: ShadowSignal
@@ -71,6 +82,11 @@ class Screened:
     beta: BetaEstimate | None = None
     score: Decimal | None = None
     agent_id: uuid.UUID | None = None
+    freshly_refused: bool = True
+    """``False`` when this exact (signal, reason) was already logged and
+    counted by an earlier pass — see :func:`report_refusal`. A caller that
+    counts refusals (``hunter_bridge_candidates_total``) reads this to avoid
+    incrementing the same outcome once a second for up to 240 s."""
 
     @property
     def signal_id(self) -> uuid.UUID:
@@ -84,24 +100,49 @@ class Screened:
     def spot_market_id(self) -> uuid.UUID | None:
         return None if self.spot is None else self.spot.market_id
 
+    def _scaled(self, value: Decimal | None) -> Decimal | None:
+        if value is None or self.spot is None:
+            return value
+        return value / self.spot.scale
+
     @property
     def entry_ref(self) -> Decimal | None:
-        return self.signal.entry_ref
+        return self._scaled(self.signal.entry_ref)
 
     @property
     def stop(self) -> Decimal | None:
-        return self.signal.stop
+        return self._scaled(self.signal.stop)
 
     @property
     def target(self) -> Decimal | None:
-        return self.signal.target
+        return self._scaled(self.signal.target)
 
     @property
     def assumed_costs(self) -> AssumedCosts | None:
         return self.signal.assumed_costs
 
 
-def _refuse(signal: ShadowSignal, reason: str, **extra: object) -> Screened:
+def report_refusal(
+    signal: ShadowSignal,
+    reason: str,
+    *,
+    reported: dict[uuid.UUID, str] | None = None,
+    **extra: object,
+) -> bool:
+    """Log ``bridge_candidate_refused`` once per (signal, reason) — never per pass.
+
+    ``reported`` is a per-wallet map of the last reason logged for each signal
+    id, owned by :class:`hunter_execution_worker.cycles.Cycles` across passes
+    (the same shape ``report_unreadable`` uses a ``set`` for). A repeat of the
+    *same* reason returns ``False`` and logs nothing; a *different* reason for a
+    signal already seen is a real transition and is logged again. Without a map
+    (a one-shot caller, most of the tests in ``test_bridge_eligibility.py``)
+    every call logs, exactly like ``report_unreadable``'s single-call caller.
+    """
+    if reported is not None and reported.get(signal.signal_id) == reason:
+        return False
+    if reported is not None:
+        reported[signal.signal_id] = reason
     logger.info(
         "bridge_candidate_refused",
         signal_id=str(signal.signal_id),
@@ -109,7 +150,18 @@ def _refuse(signal: ShadowSignal, reason: str, **extra: object) -> Screened:
         reason=reason,
         **extra,
     )
-    return Screened(signal=signal, refused=reason)
+    return True
+
+
+def _refuse(
+    signal: ShadowSignal,
+    reason: str,
+    *,
+    reported: dict[uuid.UUID, str] | None = None,
+    **extra: object,
+) -> Screened:
+    fresh = report_refusal(signal, reason, reported=reported, **extra)
+    return Screened(signal=signal, refused=reason, freshly_refused=fresh)
 
 
 def _geometry_reason(signal: ShadowSignal) -> str | None:
@@ -150,50 +202,62 @@ async def _agent_for(
 
 
 async def screen_signal(
-    session: AsyncSession, *, wallet: WalletRef, signal: ShadowSignal, now: datetime
+    session: AsyncSession,
+    *,
+    wallet: WalletRef,
+    signal: ShadowSignal,
+    now: datetime,
+    reported: dict[uuid.UUID, str] | None = None,
 ) -> Screened:
-    """Apply the whole eligibility of T3.14 item 2 to one signal."""
+    """Apply the whole eligibility of T3.14 item 2 to one signal.
+
+    ``reported`` threads the once-per-(signal, reason) dedupe of
+    :func:`report_refusal` through every named refusal below; ``None`` (the
+    default, used by every test that screens a signal once) logs and counts
+    every call, unchanged from before item 1.
+    """
     if signal.purpose != PURPOSE_LIVE:
-        return _refuse(signal, "research_only", purpose=signal.purpose)
+        return _refuse(signal, "research_only", reported=reported, purpose=signal.purpose)
     if not signal.version_active:
-        return _refuse(signal, "version_inactive")
+        return _refuse(signal, "version_inactive", reported=reported)
     closes_at = signal.window_closes_at()
     if closes_at is None:
-        return _refuse(signal, "source_bar_unavailable")
+        return _refuse(signal, "source_bar_unavailable", reported=reported)
     if now > closes_at:
         return _refuse(
             signal,
             "entry_window_closed",
+            reported=reported,
             window_s=int(ENTRY_WINDOW.total_seconds()),
             source_bar_close=signal.source_bar_close.isoformat() if signal.source_bar_close else "",
         )
     malformed = _geometry_reason(signal)
     if malformed is not None:
-        return _refuse(signal, malformed)
+        return _refuse(signal, malformed, reported=reported)
 
     spot = await spot_pair_for(session, signal)
     if spot is None:
-        return _refuse(signal, "spot_pair_unavailable")
+        return _refuse(signal, "spot_pair_unavailable", reported=reported)
     if not spot.is_monitored:
-        return _refuse(signal, "spot_not_monitored", spot=spot.symbol)
+        return _refuse(signal, "spot_not_monitored", reported=reported, spot=spot.symbol)
     if spot.volume_24h_usd is None:
-        return _refuse(signal, "spot_volume_unavailable", spot=spot.symbol)
+        return _refuse(signal, "spot_volume_unavailable", reported=reported, spot=spot.symbol)
     if spot.volume_24h_usd < SPOT_VOLUME_FLOOR_USDT:
-        return _refuse(signal, "spot_volume_below_floor", spot=spot.symbol)
+        return _refuse(signal, "spot_volume_below_floor", reported=reported, spot=spot.symbol)
 
     beta = await current_beta(session, market_id=spot.market_id, now=now)
     if beta is None:
-        return _refuse(signal, "beta_unavailable", spot=spot.symbol)
+        return _refuse(signal, "beta_unavailable", reported=reported, spot=spot.symbol)
 
     committed = await coin_commitment(session, wallet=wallet, base_asset_id=spot.base_asset_id)
     if committed is not None:
-        return _refuse(signal, "duplicate_position", held_by=committed.kind)
+        return _refuse(signal, "duplicate_position", reported=reported, held_by=committed.kind)
 
     agent_id = await _agent_for(
         session, wallet=wallet, strategy_version_id=signal.strategy_version_id
     )
     if agent_id is None:
-        return _refuse(signal, "agent_unavailable")
+        return _refuse(signal, "agent_unavailable", reported=reported)
 
     score = await radar_score(
         session, market_id=signal.perp_market_id, at=signal.source_bar_close or now

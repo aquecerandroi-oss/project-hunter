@@ -144,15 +144,28 @@ async def _rank(
     data: SpotMarketData,
     now: datetime,
     result: BridgeOutcome,
+    reported: dict[uuid.UUID, str] | None = None,
 ) -> list[_Ranked]:
-    """Screen every pending signal and order the survivors by D3."""
+    """Screen every pending signal and order the survivors by D3.
+
+    ``reported`` is the once-per-(signal, reason) map item 1 asks for, forgotten
+    once a signal stops appearing so it cannot grow without bound.
+    """
+    signals = await pending_signals(session, wallet=wallet, now=now)
+    if reported is not None:
+        current = {signal.signal_id for signal in signals}
+        for stale in set(reported) - current:
+            del reported[stale]
     ranked: list[_Ranked] = []
-    for signal in await pending_signals(session, wallet=wallet, now=now):
-        screened = await screen_signal(session, wallet=wallet, signal=signal, now=now)
+    for signal in signals:
+        screened = await screen_signal(
+            session, wallet=wallet, signal=signal, now=now, reported=reported
+        )
         if not screened.eligible or screened.spot_market_id is None:
             reason = screened.refused or "spot_pair_unavailable"
             result.refusals.append(reason)
-            _count(reason)
+            if screened.freshly_refused:
+                _count(reason)
             continue
         market = await load_market(session, screened.spot_market_id)
         if market is None:  # pragma: no cover - the pair was just read from markets
@@ -181,6 +194,10 @@ def _request(chosen: _Ranked, *, wallet: WalletRef) -> ProposalRequest:
     (``0009_paper_geometry``, DATABASE.md §21.6, closing the pendency
     ``notes-T3.14.md`` §5.1 registered) — ``signal_id`` also travels, so the
     level stays reachable by a join even where the payload is absent.
+
+    ``entry_ref``/``stop``/``target`` are read off ``screened``, not
+    ``screened.signal``: for a scaled perpetual (``1000SHIBUSDT``, item 4)
+    ``Screened`` already divides the frozen levels by the spot market's scale.
     """
     screened = chosen.screened
     entry_ref, stop, costs = screened.entry_ref, screened.stop, screened.assumed_costs
@@ -203,7 +220,7 @@ def _request(chosen: _Ranked, *, wallet: WalletRef) -> ProposalRequest:
         direction=screened.signal.direction,
         entry_ref=entry_ref,
         stop=stop,
-        target=screened.signal.target,
+        target=screened.target,
         requested_notional=None,
         assumed_costs=costs,
         agent_id=screened.agent_id,
@@ -296,11 +313,18 @@ async def run_bridge_cycle(
     now: datetime,
     exit_cost_rate: Decimal,
     adapter: PaperExecutionAdapter | None = None,
+    reported: dict[uuid.UUID, str] | None = None,
 ) -> BridgeOutcome:
-    """One slot: screen, order by D3, submit at most one proposal."""
+    """One slot: screen, order by D3, submit at most one proposal.
+
+    ``reported`` is the per-wallet once-per-(signal, reason) map — see
+    :func:`_rank`. ``None`` logs and counts every refusal every pass.
+    """
     engine = adapter or PaperExecutionAdapter()
     result = BridgeOutcome()
-    ranked = await _rank(session, wallet=wallet, data=data, now=now, result=result)
+    ranked = await _rank(
+        session, wallet=wallet, data=data, now=now, result=result, reported=reported
+    )
     result.candidates = len(ranked)
     if not ranked:
         return result

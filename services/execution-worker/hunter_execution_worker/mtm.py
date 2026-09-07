@@ -48,7 +48,6 @@ from hunter_core.portfolio.ledger import EquityPoint, record_equity_point
 from hunter_core.portfolio.state import build_portfolio_state
 from hunter_core.risk.curve import OPERATIONAL_RESOLUTION
 from hunter_core.risk.kill_switch import KillSwitchEvaluation, evaluate_and_persist
-from hunter_execution_worker import events
 from hunter_risk.limits import PAPER_V1
 
 if TYPE_CHECKING:
@@ -108,15 +107,12 @@ async def run_mtm_cycle(
         session, wallet.portfolio_id, build.state, now, limits=limits, publish=True
     )
     if evaluation.changed:
-        await events.publish_kill_switch(
-            session,
-            wallet=wallet,
-            previous=evaluation.previous.value,
-            latched=evaluation.latched.value,
-            effective=evaluation.effective.value,
-            reason=evaluation.reason,
-            ts=now,
-        )
+        # ``publish=True`` above already enqueued ``kill_switch.changed`` in the
+        # core's own shape, same transaction as the latch
+        # (``hunter_core.risk.transitions.record_transition``). This cycle used
+        # to publish a *second* event here, in its own shape — removed, so a
+        # consumer sees exactly one event per transition (T3.5d review finding
+        # 1, ``.claude/state/notes-T3.5.md`` T3.5d section).
         logger.warning(
             "kill_switch_moved",
             portfolio_id=str(wallet.portfolio_id),

@@ -55,6 +55,43 @@ class TestTheProcessRefusesWhatItCannotBe:
 
         assert load_config().enable_paper_autonomy is True
 
+    def test_the_flag_has_a_single_source_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """T3.14b review item 5: two independent env parsers of the same
+        variable is two chances to read it differently. There is exactly one
+        now — ``load_config`` reads it off ``hunter_core.settings.Settings``,
+        never off ``os.environ`` a second time with its own ad-hoc parser."""
+        from hunter_core.settings import Settings
+
+        monkeypatch.setenv("ENABLE_PAPER_AUTONOMY", "true")
+        calls: list[bool] = []
+        original_init = Settings.__init__
+
+        def _spy(self: Settings, *args: object, **kwargs: object) -> None:
+            calls.append(True)
+            original_init(self, *args, **kwargs)
+
+        monkeypatch.setattr(Settings, "__init__", _spy)
+
+        config = load_config()
+
+        assert calls, "load_config must construct Settings to read the flag"
+        assert config.enable_paper_autonomy is True
+
+    def test_env_and_compose_cannot_disagree_about_which_mode_is_on(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A single source means the worker's config and any other role reading
+        ``Settings`` (a diagnostics endpoint, ``/ready``) always agree, whatever
+        the exact casing or truthy spelling an operator's env/compose used."""
+        from hunter_core.settings import Settings
+
+        for raw in ("true", "TRUE", "1", "yes", "on"):
+            monkeypatch.setenv("ENABLE_PAPER_AUTONOMY", raw)
+            assert load_config().enable_paper_autonomy is Settings().enable_paper_autonomy is True
+
+        monkeypatch.setenv("ENABLE_PAPER_AUTONOMY", "false")
+        assert load_config().enable_paper_autonomy is Settings().enable_paper_autonomy is False
+
 
 class TestReadinessSaysWhatIsDegraded:
     def _health(self) -> CycleHealth:

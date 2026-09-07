@@ -266,3 +266,124 @@ uv run python infra/scripts/check_file_size.py  → scanned 459 files; 0 over bu
 
 `uv run ruff check services/execution-worker packages/core` acusa **1 erro**, em
 `packages/core/tests/integration/test_schema_paper.py` (T3.1e) — §5.4.
+
+---
+
+# T3.14b — os quatro itens de `review-T3.14.md`, 2026-09-07
+
+**Autor:** backend-specialist. **Base:** `90f1862` (T3.5c commitada). **Não commitei.** **Não
+editei** `.env*`, `infra/migrations/**`, `packages/core/hunter_core/risk/**`,
+`tests/integration/paper/**`, `services/market-worker/**`, `apps/web/**`. Editei **um** arquivo em
+`packages/core`: `hunter_core/settings.py` (só o docstring de `enable_paper_autonomy`, item 5 —
+nenhuma mudança de comportamento). **Astra indisponível até 12/09** — sem segunda opinião, limite
+registrado, não aprovação.
+
+## Os quatro itens
+
+1. **Dedupe de `bridge_candidate_refused`.** `bridge_screen.py`'s `_refuse` chamava
+   `logger.info` incondicionalmente a cada passada; com a fila-consulta re-lendo o mesmo sinal
+   recusado pelas duas janelas de entrada (240 s de lookback) e o laço a 1 Hz, isso era ~240
+   linhas e ~240 incrementos de `hunter_bridge_candidates_total{outcome}` por sinal recusado.
+   **Corrigido** com `report_refusal(signal, reason, *, reported=None)`, novo, exportado — o
+   mesmo padrão de `admission_cycle.report_unreadable` (T3.5b): um `dict[signal_id, reason]` por
+   carteira, dono é `Cycles.bridge_refusals_reported`, log e contador só na **transição** (sinal
+   novo, ou razão diferente da última vez), esquecido quando o sinal sai da consulta
+   (`bridge.py::_rank` faz `set(reported) - current` e apaga). `Screened.freshly_refused: bool`
+   é o que `_rank` lê para decidir se conta; sem `reported` (todo teste existente de
+   `screen_signal`), o comportamento é o de antes — log e contador em toda chamada. Teste
+   **unitário**, sem banco (`test_bridge_refusal_dedupe.py`, 5 casos): 240 passadas da mesma
+   (sinal, motivo) escrevem uma linha; motivo diferente para o mesmo sinal escreve de novo; dois
+   sinais são nomeados independentemente; um sinal esquecido (saiu do mapa) é nomeado de novo; sem
+   mapa, toda chamada nomeia.
+2. **Vários candidatos, uma vaga.** `test_three_signals_in_one_cycle_submit_the_highest_score_and_the_rest_wait`
+   já provava candidatos=3/waiting=2/um pedido só; **estendido** com `outcome.refusals == []`
+   (esperar não é recusar) e um **segundo ciclo** (próximo segundo): os dois que esperaram
+   continuam candidatos (`candidates == 2`), nenhum foi recusado, e o de score 50 vence a segunda
+   vaga — dois `trade_proposals`, na ordem certa. Nada mudou em `bridge.py`/`bridge_screen.py`
+   para este item: o comportamento já existia (a fila é uma *query*, T3.14 §2.1), faltava o
+   teste da continuação.
+3. **`agent_unavailable`.** Sem teste antes. `test_bridge_eligibility.py::_setup` ganhou
+   `agent_status: str = "enabled"`; novo teste com `agent_status="paused"` — a linha `agents`
+   existe (a `EXISTS` de `pending_signals` não filtra `status`, de propósito, §2.4 das notas
+   originais), mas não está `enabled` nesta carteira. Recusa nomeada
+   (`["agent_unavailable"]`), zero linhas em `trade_proposals`.
+4. **`1000SHIBUSDT` → spot `SHIBUSDT`, e preço fora da banda.** O maior item. `bridge_universe.py`:
+   `SpotPair` ganhou `scale: Decimal = Decimal(1)`; `spot_pair_for` tenta o casamento exato de
+   `base_asset_id` primeiro (como antes, `scale=1`) e só então `_scaled_spot_pair`, que lê o
+   símbolo do **ativo** do perpétuo (`assets.symbol`), casa contra `^1(0{3,6})([A-Z][A-Z0-9]*)$`
+   (a convenção real da Binance: `1000`, `10000`, `1000000`, ...), recupera o fator **da própria
+   string** (nunca de uma razão de preço) e busca o ativo remanescente (`SHIB`) como o `base_asset_id`
+   do par spot. Sem casamento em nenhuma das duas etapas → `None` → `spot_pair_unavailable`, a
+   mesma recusa de sempre (nenhum fator é inventado; o par simplesmente não é elegível, exatamente
+   como pede o item). `bridge_screen.Screened` ganhou `_scaled()`: `entry_ref`/`stop`/`target`
+   dividem por `spot.scale` antes de qualquer coisa rio abaixo — `bridge.py::_request` foi
+   corrigido para ler `screened.target` (a versão escalada) em vez de `screened.signal.target`
+   (bug que este item revelou: o alvo cru do perpétuo estava vazando sem escala).
+   **A banda de preço não ganhou um segundo check na ponte.** Uma vez que a ponte mapeia e escala
+   corretamente, o número que chega em `admit()` já está na escala do spot, e o `signal_validity`
+   do Risk Engine (`max_entry_deviation_pct = 0,5%`, já existente, não tocado) recusa sozinho um
+   `entry_ref` que diverge do último negócio spot além da banda — exatamente a prova que o item
+   pede ("recusado pelo Risk Engine... antes de qualquer reserva"), sem duplicar a doutrina na
+   ponte. Quatro testes novos: mapeamento correto (`test_a_scaled_perpetual_maps_to_its_spot_pair_and_scales_the_geometry`,
+   screening puro), sem mapeamento conhecido (`test_a_perpetual_with_no_known_scale_mapping_is_refused_spot_pair_unavailable`),
+   e os dois de ciclo completo com Postgres real —
+   `test_a_scaled_perpetual_within_band_is_approved_at_the_spot_scale` (aprovado, `request_payload`
+   com `entry_ref="100"`/`stop="97.5"`/`target="105"`, os números fechados de sempre, não os
+   1000×) e `test_a_scaled_perpetual_out_of_band_is_rejected_by_the_risk_engine_with_no_reservation`
+   (`entry_ref` escalado a 150 contra um spot que negociou a 100 → `"signal_validity"` em
+   `rejection_reasons`, `status = 'rejected'`, `reservation_state <> 'held'`).
+5. **Flag de uma fonte só (sugestão 5, promovida a item da T3.14b).** `hunter_execution_worker/config.py::load_config`
+   parava de ler `ENABLE_PAPER_AUTONOMY` com seu próprio `_flag()` e passou a ler
+   `Settings().enable_paper_autonomy` (`hunter_core.settings`) — a mesma fonte que qualquer outro
+   papel vê. `Settings()` não exige banco (todo campo tem default), então não pesa o boot nem os
+   testes. Três testes novos em `test_supervision.py`: um espiona `Settings.__init__` para provar
+   estruturalmente que `load_config` constrói `Settings` (não é coincidência de valor); outro
+   varre `true/TRUE/1/yes/on/false` e compara `load_config().enable_paper_autonomy is Settings().enable_paper_autonomy`
+   em cada um.
+
+## Arquivos
+
+**Novos:** `services/execution-worker/tests/test_bridge_refusal_dedupe.py`.
+**Modificados (produção):** `services/execution-worker/hunter_execution_worker/{bridge,bridge_screen,
+bridge_universe,cycles,config}.py`, `packages/core/hunter_core/settings.py` (docstring).
+**Modificados (testes):** `services/execution-worker/tests/{test_bridge_eligibility,test_bridge_cycle,
+test_supervision,shadow_builders}.py` (`shadow_builders.add_scaled_perp_market`, novo).
+
+`bridge.py` ficou em **350** linhas exatas (orçamento) depois de comprimir os três docstrings que os
+itens 1 e 4 acrescentaram — nada foi cortado de conteúdo, só de repetição.
+
+## Pendências e limites honestos
+
+- **Astra**: sem segunda opinião (cota esgotada até 12/09).
+- O piso de 50 M (`SPOT_VOLUME_FLOOR_USDT`) continua duplicado com `hunter_market_worker.spot_universe`
+  — já registrado em §5.3 da rodada anterior, não é deste brief.
+- A regex de escala (`^1(0{3,6})([A-Z][A-Z0-9]*)$`) cobre a convenção observada da Binance (`1000`,
+  `10000`, `1000000`); um multiplicador fora desse padrão (ex.: `100X`, dois zeros) não casa e o par
+  fica `spot_pair_unavailable` — fail closed, doutrina do item 4, mas registrado como o limite exato
+  do que a regex reconhece.
+
+## Comandos e saída real
+
+```
+uv run pytest services/execution-worker/tests/test_bridge_refusal_dedupe.py -q   → 5 passed in 3.22s
+uv run pytest services/execution-worker/tests/test_bridge_eligibility.py -q      → 12 passed in 64.24s
+uv run pytest services/execution-worker/tests/test_bridge_cycle.py -q -p no:randomly
+                                                                                  → 7 passed in 80.24s
+uv run pytest services/execution-worker/tests/test_supervision.py -q             → 11 passed in 2.74s
+uv run pytest services/execution-worker/tests -q  (por arquivo, 17 arquivos)     → 132 testes, todos
+  verdes (dois arquivos, test_bridge_cycle.py e test_order_cycle.py, piscaram uma vez com o
+  ConnectionResetError [WinError 64] já documentado na notes-T3.5b §9 item 10 e passaram limpos
+  na repetição com -p no:randomly)
+uv run pytest packages/core/tests/unit -q                                       → 706 passed in 34.73s
+uv run pytest apps/api/tests/unit -q                                            → 382 passed in 68.26s
+uv run ruff check services/execution-worker packages/core apps/api              → All checks passed!
+uv run ruff format --check services/execution-worker packages/core apps/api     → 1 arquivo não meu
+  (packages/core/tests/integration/test_schema_privileges.py, de outra tarefa em voo) precisa de
+  reformatação; todos os meus estão formatados
+uv run pyright services/execution-worker/hunter_execution_worker
+                packages/core/hunter_core/settings.py                           → 0 errors
+uv run pyright <meus arquivos de teste novos/tocados>                           → 0 errors (depois de
+  corrigir `list[dict]` → `list[dict[str, Any]]` em test_kill_switch_resume_publish.py, ver notas T3.5d)
+uv run python infra/scripts/check_file_size.py                                  → scanned 463 files;
+                                                                                    0 over budget
+```

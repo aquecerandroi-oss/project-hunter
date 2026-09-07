@@ -16,6 +16,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import pytest
+from sqlalchemy import text
 
 from hunter_core.db.session import tenant_session
 from hunter_execution_worker.bridge_repo import ENTRY_WINDOW, pending_signals
@@ -55,6 +56,7 @@ async def _setup(
     spot_volume: Decimal | None = Decimal(120_000_000),
     with_beta: bool = True,
     active_version: bool = True,
+    agent_status: str = "enabled",
 ) -> Fixture:
     tenant = await create_tenant(engine)
     wallet = await open_wallet(factory, engine, tenant)
@@ -67,6 +69,7 @@ async def _setup(
         workspace_id=tenant.workspace_id,
         portfolio_id=wallet.portfolio_id,
         version_id=version_id,
+        status=agent_status,
     )
     if with_beta:
         await shadow.set_beta(engine, tenant.market_id, as_of=NOW)
@@ -204,8 +207,6 @@ async def test_an_expired_entry_window_is_refused(
 async def _insert_coin_position(
     engine: AsyncEngine, fixture: Fixture, *, is_residual: bool
 ) -> None:
-    from sqlalchemy import text
-
     async with engine.begin() as connection:
         await connection.execute(
             text(
@@ -240,6 +241,100 @@ async def test_a_position_closing_in_the_same_coin_refuses_duplicate_position(
     await _insert_coin_position(db_engine, fixture, is_residual=False)
     screened = await _screen(db_session_factory, fixture)
     assert [item.refused for item in screened] == ["duplicate_position"]
+
+
+async def test_a_scaled_perpetual_maps_to_its_spot_pair_and_scales_the_geometry(
+    db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
+) -> None:
+    """T3.14b review item 4: ``1000SHIBUSDT`` (base asset ``1000SHIB``) maps to
+    spot ``SHIBUSDT`` (base asset ``SHIB``), and the frozen ``entry_ref``/
+    ``stop``/``target`` reach the candidate divided by 1.000 — the spot
+    market's own scale, not the perpetual's."""
+    fixture = await _setup(db_session_factory, db_engine)
+    scaled_perp_id = await shadow.add_scaled_perp_market(db_engine, fixture.tenant, scale=1000)
+    await shadow.emit_signal(
+        db_engine,
+        version_id=fixture.version_id,
+        market_id=scaled_perp_id,
+        source_bar_close=BAR,
+        purpose=shadow.PURPOSE_LIVE,
+        entry_ref=Decimal(100_000),
+        stop=Decimal(97_500),
+        target=Decimal(105_000),
+    )
+    screened = await _screen(db_session_factory, fixture)
+    assert len(screened) == 1
+    candidate = screened[0]
+    assert candidate.refused is None, candidate.refused
+    assert candidate.spot_market_id == fixture.tenant.market_id
+    assert candidate.entry_ref == Decimal(100)
+    assert candidate.stop == Decimal("97.5")
+    assert candidate.target == Decimal(105)
+
+
+async def test_a_perpetual_with_no_known_scale_mapping_is_refused_spot_pair_unavailable(
+    db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
+) -> None:
+    """No factor is ever invented: a base asset that does not fit the
+    ``1<zeros><SYMBOL>`` convention (here, one whose remainder names no asset at
+    all) leaves the perpetual with no spot pair, exactly like an unlisted one."""
+    fixture = await _setup(db_session_factory, db_engine)
+    unmapped_base = uuid.uuid4()
+    async with db_engine.begin() as connection:
+        await connection.execute(
+            text("INSERT INTO assets (id, symbol) VALUES (:id, '1000NOSUCHCOIN')"),
+            {"id": unmapped_base},
+        )
+        market_id = uuid.uuid4()
+        await connection.execute(
+            text(
+                "INSERT INTO markets (id, exchange_id, symbol, market_type, base_asset_id, "
+                "quote_asset_id, tick_size, step_size, min_notional, is_monitored, metadata) "
+                "VALUES (:id, :ex, '1000NOSUCHCOINUSDT', 'perpetual', :base, :quote, 0.01, "
+                "0.001, 5, true, '{}')"
+            ),
+            {
+                "id": market_id,
+                "ex": fixture.tenant.exchange_id,
+                "base": unmapped_base,
+                "quote": fixture.tenant.quote_asset_id,
+            },
+        )
+    await shadow.emit_signal(
+        db_engine,
+        version_id=fixture.version_id,
+        market_id=market_id,
+        source_bar_close=BAR,
+        purpose=shadow.PURPOSE_LIVE,
+    )
+    screened = await _screen(db_session_factory, fixture)
+    assert [item.refused for item in screened] == ["spot_pair_unavailable"]
+
+
+async def test_a_paused_agent_is_refused_agent_unavailable_with_no_request_and_no_reservation(
+    db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
+) -> None:
+    """T3.14b review item 3: the agent row exists (``pending_signals`` still
+    returns the signal — its ``EXISTS`` clause does not filter on status), but
+    it is not ``enabled`` in this wallet — a version this wallet has paused,
+    not one it never ran. Named, counted, and nothing is written."""
+    fixture = await _setup(db_session_factory, db_engine, agent_status="paused")
+    await shadow.emit_signal(
+        db_engine,
+        version_id=fixture.version_id,
+        market_id=fixture.perp_market_id,
+        source_bar_close=BAR,
+        purpose=shadow.PURPOSE_LIVE,
+    )
+    screened = await _screen(db_session_factory, fixture)
+    assert [item.refused for item in screened] == ["agent_unavailable"]
+
+    async with db_engine.begin() as connection:
+        count = await connection.scalar(
+            text("SELECT count(*) FROM trade_proposals WHERE portfolio_id = :pf"),
+            {"pf": fixture.wallet.portfolio_id},
+        )
+    assert count == 0
 
 
 async def test_a_residual_position_in_the_same_coin_does_not_refuse(

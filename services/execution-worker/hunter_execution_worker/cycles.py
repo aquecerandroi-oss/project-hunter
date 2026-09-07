@@ -22,7 +22,7 @@ from hunter_core.db.session import role_session, tenant_session
 from hunter_core.domain.types import utcnow
 from hunter_core.execution.paper import PaperExecutionAdapter
 from hunter_core.logging import get_logger
-from hunter_execution_worker import metrics
+from hunter_execution_worker import events, metrics
 from hunter_execution_worker.admission_cycle import (
     RequestInputs,
     decide_requests,
@@ -125,6 +125,12 @@ class Cycles:
         self.geometry_reported: dict[uuid.UUID, set[uuid.UUID]] = {}
         """Per wallet, the filed requests already named as unreadable. Keeps the
         1 s admission loop from writing the same WARNING 86.400 times a day."""
+
+        self.bridge_refusals_reported: dict[uuid.UUID, dict[uuid.UUID, str]] = {}
+        """Per wallet, the last refusal reason logged for each pending signal.
+        Same purpose as ``geometry_reported`` for the bridge's own 1 s loop
+        (review-T3.14.md item 1): a signal refused for the same reason is not
+        named again every pass, only on the first pass and on a transition."""
 
     async def wallets(self) -> tuple[WalletRef, ...]:
         """Every managed wallet, re-read each pass (one opened later is picked up)."""
@@ -247,7 +253,8 @@ class Cycles:
         await self._for_each(run)
 
     async def kill_switch(self) -> None:
-        """Re-read the latch, and cancel pendings while it blocks entries."""
+        """Re-read the latch, cancel pendings while it blocks entries, and
+        publish any user resume the API itself could not (T3.5d)."""
 
         async def run(session: AsyncSession, wallet: WalletRef) -> None:
             now = self.clock()
@@ -257,6 +264,7 @@ class Cycles:
             cancelled = await cancel_pending_entries(session, wallet=wallet, now=now, scopes=scopes)
             for _ in cancelled:
                 metrics.execution_reservations_total.labels(state="released").inc()
+            await events.publish_resumed_transitions(session, wallet=wallet, now=now)
 
         await self._for_each(run)
 
@@ -299,6 +307,7 @@ class Cycles:
                 now=now,
                 exit_cost_rate=self.config.exit_cost_rate,
                 adapter=self.adapter,
+                reported=self.bridge_refusals_reported.setdefault(wallet.portfolio_id, {}),
             )
             self.health.bridge_candidates = outcome.candidates
             self.health.bridge_at = now

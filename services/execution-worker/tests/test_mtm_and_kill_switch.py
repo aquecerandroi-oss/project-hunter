@@ -8,6 +8,7 @@ curve records it, and the evaluation that follows finds it.
 
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -192,16 +193,29 @@ class TestTheCurveIsWrittenBeforeTheSwitchReadsIt:
         assert result.evaluation.latched is KillSwitchState.TRADING_DISABLED
         assert result.evaluation.changed is True
         async with db_engine.begin() as connection:
-            events = [
-                row.stream
-                for row in await connection.execute(
+            rows = (
+                await connection.execute(
                     # The stored payload is the whole envelope; the business body
                     # is nested under it, and ``key`` is the wallet.
-                    text("SELECT stream FROM outbox_events WHERE payload->>'key' = :pf"),
+                    text(
+                        "SELECT stream, payload->>'payload' AS body FROM outbox_events "
+                        "WHERE payload->>'key' = :pf AND stream = 'kill_switch.changed'"
+                    ),
                     {"pf": str(wallet.portfolio_id)},
                 )
-            ]
-        assert "kill_switch.changed" in events
+            ).all()
+        # T3.5d review finding 1: exactly one publication, one shape — the
+        # core's (``hunter_core.risk.transitions.record_transition``), never a
+        # second one in the worker's own shape.
+        assert len(rows) == 1
+        body = json.loads(rows[0].body)
+        assert body["scope"] == "portfolio"
+        assert body["scope_id"] == str(wallet.portfolio_id)
+        assert body["from_state"] == "ACTIVE"
+        assert body["to_state"] == "TRADING_DISABLED"
+        assert body["actor_type"] == "system"
+        assert "evidence" in body
+        assert "event" not in body, "the worker's own retired shape must not reappear"
 
         # The blocked wallet gives the pending entry back — audited, and only
         # what was not executed.
