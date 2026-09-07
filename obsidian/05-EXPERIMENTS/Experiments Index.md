@@ -184,6 +184,19 @@ nova, datada**, com o SQL colado, o `as_of` do turno e os números de saída rea
 nunca é reescrita; hipótese e protocolo nunca mudam; a variante "vencedora" nunca é ativada
 automaticamente. A rotina está em `.claude/agents/sexta-feira.md`, seção "Plantão permanente".
 
+**Turno sem avaliação — registrado, porque a regra manda registrar.** O plantão da madrugada de
+**2026-09-07 (04:20–04:50Z)** **não** acrescentou avaliação datada a nenhum `EXP-NNNN`: foi um turno
+de documentação, com escopo de escrita fechado em `obsidian/**` (changelog, bugs, diário, páginas de
+trading, home) por instrução do Everton. Fica anotado aqui em vez de o log ficar mudo — silêncio num
+registro de pesquisa é indistinguível de instrumento quebrado. Dois fatos medidos naquele turno que
+importam para a próxima leitura: o `hb:strategy:shadow` da VPS às **04:33:15Z** trazia
+`evaluated_bars = 0`, `open_trackings = 36`, `errors = 0`, `outbox_pending = 0` — número compatível
+com um **restart recente** do `strategy-worker` durante o deploy dos 4 shards, não necessariamente
+com uma parada; e a **cobertura do tape voltou a andar** (`covered_until` a 0,7–0,9 s do relógio,
+sessão contínua desde 04:33:05Z), o que muda a disponibilidade das features de tape rio acima de
+[[EXP-0003-baselines-v1]]. A avaliação datada do próximo turno tem de começar por confirmar as duas
+coisas com SQL. Ver [[Diario/2026-09-07]].
+
 ## Relacionadas
 
 [[Strategies]] · [[Agents Overview]] · [[Momentum Agent]] · [[Volume Agent]] · [[Performance Overview]] · [[Strategy Performance]] · [[Dialogos/SHADOW]] · [[Architecture Decisions]]

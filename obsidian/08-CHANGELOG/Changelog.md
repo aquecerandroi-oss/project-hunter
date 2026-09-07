@@ -9,6 +9,152 @@ Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado p
 
 ## 2026-09-07
 
+- **`096d8c5` — BRL na convenção brasileira na tela da carteira.** `R$ 100.725,19`, `−R$ 1.234,50`,
+  por um `formatBrl` que **nunca passa a magnitude por `Number`** — o valor vem do banco como string
+  decimal e é agrupado como string, então nada de dinheiro toca ponto flutuante no caminho até o
+  olho do Everton. `formatMoney` ficou como estava. Fecha a pendência declarada na própria T3.8b
+  ("BRL usa agrupamento en-US, follow-up"). *(Entrou depois do corte `09eb6de` deste plantão.)*
+
+- **`7304709` — o Caddy volta a ter o IP fixo dele, e o deploy da VPS vira um comando só.** Para o
+  Everton: **o site ficou fora do ar por volta de 20 minutos hoje de madrugada, e a causa era
+  minha.** O Caddy (o porteiro que atende `https://`) está preso ao endereço `172.28.0.10` porque a
+  API usa esse endereço para contar requisições por cliente; o Docker distribuía endereços dinâmicos
+  **dentro da mesma faixa** e, quando o perfil de 4 shards recriou os contêineres, entregou o `.10`
+  ao `scanner-worker` — o Caddy subiu com "Address already in use" e ninguém atendia a porta 443.
+  Correção: a faixa dinâmica passa a ser `172.28.0.128/25`, longe do endereço fixo. No mesmo
+  incidente, um `docker compose` **na mão**, sem o `compose.sh`, perdeu duas variáveis que só o
+  script deriva: `GIT_SHA` (a migração rodou com a imagem velha e não achou a revisão `0006`) e
+  `HUNTER_DEFAULT_SNI` (o Caddy serviu um certificado de `localhost` e o HTTPS quebrou no IP).
+  Agora `compose.sh up/update` lê `MARKET_SHARDS` e acrescenta sozinho `--profile shards`, e
+  qualquer serviço que fique `created/exited/dead` faz o script imprimir `docker compose ps` e as
+  últimas 50 linhas de log e **sair com erro** em vez de dar o deploy por terminado. Deploy é uma
+  linha: `MARKET_SHARDS=4 bash infra/vps/compose.sh update`. Ver [[Open Bugs]] — o item de processo
+  ("deploy manual sem `compose.sh`") continua aberto, porque a correção é técnica e o hábito é
+  humano. *(Entrou depois do corte `09eb6de` deste plantão.)*
+
+- **`09eb6de` — T3.11a: o coletor de câmbio USDTBRL, uma observação por minuto, jamais inventada.**
+  Para o Everton: é a peça que dá **preço do dólar-cripto em real** para a carteira — sem ela os
+  R$100.000 não viram USDT e a tela não sabe dizer quanto a carteira vale em reais. Uma tarefa nova
+  no `market-worker` busca `GET /api/v3/ticker/24hr?symbol=USDTBRL` a cada ~60 s ± 5 s **somente no
+  shard 0** (os outros três ficam ociosos nessa tarefa para sempre), e grava em `fx_observations`
+  com `observed_at = closeTime` (relógio da Binance), `available_at` no instante do `INSERT` e a
+  resposta crua junto. As constantes vêm de `hunter_core.portfolio.fx_policy.PAPER_FX_POLICY`, a
+  mesma que a abertura da carteira usa — coletor e abertura **não podem divergir**. `ON CONFLICT
+  (pair, source, observed_at) DO NOTHING`: repetir a coleta não duplica nada. Taxa fora de `[1, 100]`
+  **é gravada assim mesmo** (quem recusa é a política que consome, não o coletor) com aviso e o
+  contador `hunter_fx_implausible_total`. Prova: 10 minutos contra a Binance real, 11 coletas, a
+  última observação com 27 s no fim da janela, 0 erros. Astra fora (cota do Codex até 12/09),
+  registrado no próprio commit.
+
+- **`3519107` + `8e4b26b` — a revisão adversarial da T3.1b/T3.6/T3.12, e as cinco condições que ela
+  impôs à T3.5.** Revisão em `.claude/state/review-T3.1b-T3.6-T3.12.md`: **APPROVE_WITH_NITS**, com
+  sondas SQL rodadas como os papéis reais do banco e mutações que matam os testes pelo motivo certo.
+  Cinco itens têm de ser fechados **antes** da T3.5/T3.8, e viraram condições escritas do brief da
+  T3.5: (1) a deduplicação por chave de idempotência casa também um pedido **ainda não decidido** e
+  explode ao validar uma decisão vazia; (2) a admissão do lado da API roda inteira como `hunter_app`
+  e vira erro 500 quando os grants novos entrarem — a API **registra o pedido**, o worker admite;
+  (3) o teto do pico conta snapshot de **qualquer** resolução, e um roll-up de 1 h/1 d futuro
+  travaria a carteira em `TRADING_DISABLED` para sempre; (4) a documentação ainda diz "uma principal
+  por workspace" quando a `0006` já é por organização; (5) **nenhuma transição publica
+  `kill_switch.changed`**, e o contrato exige reação em menos de 1 s. Os cinco estão em
+  [[Open Bugs]].
+
+- **`817f129` — T3.8b: a tela da carteira, `/[org]/portfolio`.** Para o Everton: é a primeira tela do
+  projeto que fala de **dinheiro** — patrimônio em USDT e em BRL, caixa, reservas, exposição, e a
+  decomposição que a diretiva pediu: quanto do resultado é **operacional** (a carteira ganhou ou
+  perdeu operando) e quanto é **cambial** (o dólar mexeu). Cartão de risco com o dia de negociação e
+  o fuso, o patrimônio de abertura do dia, o pico, a perda do dia e o drawdown — e nulo aparece como
+  **"indisponível"**, nunca como `0 %`. O kill switch efetivo vem do endpoint real com os três
+  escopos, o motivo e a última transição com a evidência. Curva de patrimônio com alternância
+  USDT/BRL, e os pontos sem BRL ficam como **buraco visível**, não interpolados. Tabelas de posições,
+  ordens e trades com estado vazio honesto e o `as_of` ao lado; o bloco de propostas diz, em
+  português, que a ponte de admissão ainda não existe. Sem carteira principal, a página **explica o
+  comando do operador** e não oferece botão que finja abrir uma. Nada de `any`: tipos gerados do
+  OpenAPI. 528 testes de web verdes.
+
+- **`8c53b30` — contrato v2.2 do Risk Engine: uma fonte só para o `paper_v1`.** O perfil gravado no
+  banco (`risk_profiles.limits`) passa a ser **exatamente** `hunter_risk.limits.PAPER_V1` serializado,
+  com ida e volta provada por teste — antes as duas fontes discordavam em 10 campos e validar o
+  perfil do banco contra o motor falhava. Quatro chaves saíram do perfil **com destino escrito**
+  (não sumiram), o multiplicador por regime fica **reservado para o M4** e `auto_close` fica fixo em
+  *nunca liquidar*. **Nenhum limite que o Everton escreveu mudou.** `docs/RISK_ENGINE.md` v2.2.
+
+- **`d23b7bd` — T3.3b: fechando a revisão do ledger, com a banda que impede uma carteira nascer
+  errada para sempre.** Para o Everton: a abertura da carteira é **irreversível** (a âncora de
+  câmbio é imutável por decisão sua), então um erro de escala do coletor — `0,54321` em vez de
+  `5,4321` — abriria a carteira com 184.081 USDT e não haveria como desfazer. Agora a política de
+  câmbio declara a banda plausível `[1, 100]` para USDTBRL e, opcionalmente, compara com a última
+  observação aceita (20 % em 600 s, com causalidade: mesmo par, mesma fonte, estritamente anterior).
+  Taxa `1e-10` e `0,54321` são recusadas; `5,4321` passa. Também: a indisponibilidade de BRL e as
+  marcações velhas passam a gerar **evento de auditoria** em vez de sumir na memória; o escopo da
+  carteira principal vira uma constante só (`organization`), alinhada com o índice corrigido; duas
+  aberturas concorrentes sincronizadas por barreira — uma vence, a outra recebe `WalletAlreadyOpen`
+  e nunca o erro cru; o capital é **fixo em R$100.000** e uma varredura de AST prova que nenhum
+  módulo de produção usa o override de teste; `mark_positions` recusa qualquer linha que não seja
+  comprada (spot é long-only).
+
+- **`2f9007b` — o build da web quebrou na VPS por dois esquemas com o mesmo nome.** `TradeOut` da
+  carteira colidia com `TradeOut` de mercados; o gerador de OpenAPI **estropiou os dois nomes** e o
+  `recent-trades.tsx` perdeu o tipo do trade. Renomeado para `PortfolioTradeOut`. Vale como lição: o
+  nome de um schema Pydantic é global no documento gerado.
+
+- **`12553e3` — nota de rastreabilidade do relatório do M2.** O relatório e o parecer do M2 foram
+  varridos para dentro de um commit de outra tarefa (`6c60653`) por um agente concorrente no mesmo
+  worktree, e `6c60653` **já estava empurrado** quando percebi. Não reescrevi histórico empurrado —
+  `--force` é decisão do Everton. A nota no topo de `docs/reports/M2.md` diz onde o conteúdo está de
+  verdade. O bug de processo continua em [[Open Bugs]].
+
+- **`6c60653` + `15b6dd2` — os briefs da T3.5 (execution-worker) e da T3.1c (modelo de papéis).**
+  A **T3.5** é o worker que vai fazer a carteira andar: ciclo de admissão, ciclo de ordem aplicando o
+  `ExecutionReport` **por fill**, ciclo de proteção, marcação a mercado **antes** do kill switch,
+  recuperação após restart e supervisão. A **T3.1c** fecha uma decisão que tomei em nome do Everton e
+  que muda quem pode o quê no banco: **quem decide e grava estado de risco é o worker**; **a API
+  pede, lê e autoriza pessoas** (ela registra o pedido manual como `status='requested'`, sem decisão
+  e sem reserva, e o `execution-worker` admite); e a **retomada do kill switch exige o papel OWNER da
+  organização** — a diretiva do Everton diz "retomar somente com minha autorização", então TRADER não
+  basta. Entram também duas colunas de dívida do ledger (`brl_unavailable_reason`, `marks_stale`) e o
+  `request_digest` que a T3.12 pediu.
+
+- **`296f3c1` — T3.1b: a `0006` corrigida no lugar, antes de qualquer banco persistente aplicá-la.**
+  Para o Everton: a revisão de segurança achou **dois furos que dariam para burlar a sua diretiva**, e
+  os dois foram fechados no banco, não no código de aplicação. **Primeiro:** o kill switch auditado
+  aceitava uma transição **antiga ou forjada** — depois do primeiro ciclo de trava e retomada
+  legítimas, qualquer `UPDATE` destravava a carteira para sempre (reproduzido: 3 transições para 4
+  movimentos). Agora a trava exige que a **última** transição do escopo case com o movimento **e**
+  tenha sido escrita **pela transação corrente** (`xmin = pg_current_xact_id()`). **Segundo:** dava
+  para ganhar uma **segunda carteira principal com R$100.000 novos** só criando um workspace novo — o
+  índice único era por `(organização, workspace)`. Agora é por **organização**, como a sua decisão D7
+  diz. Mais: identidade composta descendo até a posição (uma ordem de uma organização não pode mais
+  apontar para a posição de outra); `portfolio_risk_state` só o worker escreve, o dia só avança, o
+  patrimônio de abertura só se define uma vez por dia e o pico nunca passa do maior patrimônio já
+  observado (gravar `999999` travaria a carteira em drawdown permanente); a âncora confere o **par**
+  da observação de câmbio; e o `paper_v1` do banco é literalmente o do motor.
+
+- **`ec78727` — T3.4b: um print inválido não apaga mais um stop que já foi tocado.** Para o Everton:
+  este é o pior tipo de bug possível num sistema de risco — **a proteção sumia em silêncio**. O
+  verificador de gatilhos validava o lote inteiro de negócios antes de procurar o cruzamento; um
+  único print malformado (relógio de outro host, id não numérico) fazia o lote inteiro virar
+  "indisponível" e o stop já tocado ser descartado; no ciclo seguinte aquele preço já estava velho e
+  a posição ficava sem proteção. Agora o cruzamento é decidido **sobre o prefixo que deu para
+  validar** e só o resto é reportado como indeciso. Junto: reaplicar o mesmo relatório de execução
+  virou **idempotente** por tentativa (antes somava o fill duas vezes e marcava a saída como cumprida
+  com metade da quantidade ainda na posição); um replay com quantidade ou decisão diferente **falha
+  alto** em vez de devolver o relatório antigo; e o filtro de preço da exchange passa a ser uma banda
+  de sanidade do fill — entradas são recusadas, mas **saídas de proteção sempre executam com
+  alerta**, porque uma queda real de 20 % é exatamente quando o stop importa. Astra fez quatro
+  rodadas neste diff; a quinta não rodou (cota do Codex até 12/09).
+
+- **`ae2657d` — T3.12: um caminho só, da proposta à decisão.** Para o Everton: era possível existirem
+  dois jeitos de uma ordem entrar (o do agente e o da tela) e eles divergirem. Agora existe **um**
+  serviço de admissão: ele pega as travas na ordem sistema → organização → carteira, monta o estado
+  da carteira, roda o Risk Engine e grava, **numa transação só**, a proposta com a decisão canônica e
+  o limitante vencedor, a sequência FIFO durável, a reserva (`held`, válida por 30 s), a linha de
+  auditoria e o evento de saída. Uma recusa é gravada com todos os checks e **nenhuma reserva**.
+  Repetir o mesmo pedido devolve a mesma decisão sem reavaliar nem reservar de novo; repetir com
+  conteúdo diferente é conflito. O orçamento de participação de 60 s por (mercado, carteira) soma o
+  consumo já executado ao que está reservado. `research_only` é recusado na origem — o Shadow Lab
+  não entra na carteira por acidente.
+
 - **`9ceb389` — T2.5g: 200 mercados em N shards, com heartbeat por shard agregado pela API.** Para o
   Everton: a página System volta a poder dizer a verdade com mais de um coletor no ar, e o mercado
   chega ao Radar seis vezes mais rápido. A dívida nº 1 do M1 — todos os shards escrevendo a mesma
@@ -20,6 +166,21 @@ Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado p
   (`KOMAUSDT` sem dono, 201 campos para 200 mercados). Medido: latência de publicação de
   `market.ticks` p50 **25,82 s → 4,31 s** com 4 shards, e 0,41 s com 8. Os descartes finalmente são
   contados. Ver [[Open Bugs]]: **não implantado na VPS**.
+- **`9a0ac45` — T3.6 kill switch durável e T3.8a a API de leitura da carteira, com o script que abre
+  a carteira.** Para o Everton: até aqui o kill switch era uma **conta**, não uma **trava** — se o
+  processo reiniciasse, ele voltava sozinho para `ACTIVE`. Agora a avaliação compara com a trava
+  gravada e escreve a transição auditada (de onde, para onde, motivo, evidência, ator) **na mesma
+  transação** que muda o estado da carteira: o AVISO só sai na virada do dia e só quando os **dois**
+  gatilhos sumiram; o BLOQUEADO **nunca** sai sozinho; a retomada é recusada enquanto a avaliação
+  automática ainda bloqueia, e ela **não** redefine o pico nem as perdas. Provado: um `UPDATE` cru da
+  trava é **recusado pelo banco**; −1 % → AVISO → −2 % → BLOQUEADO → recuperação no mesmo dia
+  continua BLOQUEADO → retomada recusada e depois aceita com o pico intacto; o reinício encontra a
+  mesma trava; duas avaliações concorrentes escrevem **uma** transição. A API de leitura entrega
+  carteira, âncora, curva de patrimônio, posições, ordens e trades — com a decomposição em BRL, a
+  observação de câmbio usada e o motivo quando não há taxa válida —, 404 entre organizações, e
+  páginas honestamente vazias com `as_of`. E `infra/scripts/open_paper_wallet.py`: busca o USDTBRL do
+  ticker público, grava a observação e abre a carteira; recusa uma segunda abertura.
+
 - **Fecho do M2 (T2.8): relatório, parecer e `EXP-0003`.** Para o Everton: o Radar tem linhas reais
   pela primeira vez, e eu **não aprovei** o milestone. `docs/reports/M2.md` traz o formato estendido
   inteiro, com o que foi entregue por tarefa e o que não foi cumprido **com número**: estágio
@@ -35,6 +196,70 @@ Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado p
   maior parte, **tempo de coleta**; as quatro condições objetivas de aprovação estão no VEREDITO.
 
 ## 2026-09-06
+
+- **`e48f7e4` + `c35fd40` — as revisões adversariais que seguraram a T3.1, a T3.3 e a T3.4.** Duas
+  revisões independentes com veredito **REQUEST_CHANGES**, e é por isso que existem as correções
+  `T3.1b`, `T3.3b` e `T3.4b` acima. A de segurança da `0006`
+  (`.claude/state/review-T3.1-security.md`) reproduziu tudo em Postgres 16 real, como os papéis
+  reais: o kill switch auditado aceitando transição antiga ou forjada, e a segunda carteira principal
+  de R$100.000 por um workspace novo. A do ledger e do simulador
+  (`.claude/state/review-T3.3-T3.4.md`) achou o print inválido que apagava um stop tocado, a
+  reaplicação de fill não idempotente e a taxa de câmbio sem banda de plausibilidade. **Nenhum destes
+  achados veio de leitura de código sozinha — cada um tem um script de cenário que o reproduz**, e é
+  isso que os torna obrigatórios em vez de opinião.
+
+- **`edd5d7e` — T3.4: o simulador de execução paper, sem um único fill inventado.** Para o Everton:
+  é a peça que finge ser a corretora, e a regra dela é dura — **ela nunca preenche uma ordem que o
+  mercado não mostrou**. Só ordem a mercado. Stop e alvo são gatilhos locais pelo **último negócio
+  SPOT válido** (nunca `mark_price`, que é conceito de perpétuo): o negócio vale se tem no máximo
+  10 s, se chegou antes de agora e se o id é estritamente crescente — e **"indisponível" é um
+  terceiro veredito**, porque um pedaço de fita que não vimos não prova que o stop não foi tocado.
+  Uma caminhada única no livro elegível decide o preço; entrada com fill parcial cancela o restante
+  **terminalmente**; saída de proteção termina a tentativa mas a **intenção durável permanece** para
+  a quantidade que sobrou, com nova tentativa de identidade própria — nunca se vende a mesma unidade
+  duas vezes. Sem livro utilizável, a saída fica **pendente, degradada e com alerta**, e nenhuma vela
+  fornece fill retroativo. A execução pior que o stop é **publicada, nunca corrigida** (stop 95,
+  melhor oferta 90 → 526,3 pontos-base de deslize, escritos). `LiveExecutionAdapter` só sabe levantar
+  `LiveTradingDisabled`.
+
+- **`8a6a69f` — T3.3: o ledger da carteira, a abertura com câmbio validado e o resultado em reais.**
+  Para o Everton: é aqui que os R$100.000 viram USDT e é aqui que a tela aprende a dizer **quanto
+  disso é a operação e quanto é o dólar**. A abertura valida a observação de câmbio **antes de
+  qualquer escrita** (par USDTBRL, fonte declarada, taxa > 0, disponibilidade ≤ 300 s e observação
+  ≤ 600 s — dois limites para que um backfill não rejuvenesça uma cotação velha) e grava carteira,
+  estado de risco, âncora imutável, o primeiro ponto de patrimônio e a linha de auditoria **numa
+  transação só**. A conversão usa `floor_10dp_v1` e a fração descartada fica registrada como
+  `conversion_residual` — nada evapora. A atribuição é sobre o **patrimônio**, não sobre o caixa:
+  operacional `(E − E0)·F0`, cambial `E·(Ft − F0)`, identidade `total = E·Ft − E0·F0`. E **não existe
+  rota de aporte nem de reset**: uma varredura de AST sobre `packages/`, `apps/` e `services/` prova
+  isso — é a diretiva do Everton virando teste.
+
+- **`a88daac` — a especificação executável das nove verificações da diretiva (T3.9).** As nove
+  verificações que o Everton listou viraram um documento com número fechado onde já havia teste
+  verde, e **seis decisões pendentes** escritas em vez de resolvidas por conta própria.
+
+- **`078d6ef` — T3.0a: o adaptador SPOT da Binance.** Para o Everton: a carteira executa **no spot**
+  (comprar de verdade a moeda, sem alavancagem), enquanto os sinais continuam vindo do perpétuo — é
+  a decisão D1 que tomei em seu nome. Este commit entrega o lado do adaptador: REST em `/api/v3` num
+  balde de peso próprio (6000/min, independente dos 2400/min do perpétuo), `exchangeInfo` com
+  **todos os filtros que se aplicam a uma ordem a mercado**, WebSocket próprio com rotação de 24 h, e
+  taxas spot **declaradas com fonte** (0,1 %/0,1 %; 0,075 % com BNB), nunca herdadas de futuros.
+  Teste ao vivo: 487 pares USDT, **19 acima do piso de 50 M/24 h**, 2.684 eventos em 19,9 s, nenhum
+  fora de ordem. Bloqueio declarado para a integração (T3.0b/T3.0c): os modelos de evento **não
+  carregam `market_type`**, então spot e perpétuo de `BTCUSDT` ainda dividiriam a mesma chave no
+  Redis — isso tem de ser resolvido antes de o `market-worker` ingerir spot.
+
+- **`11faba8` — `0006_paper_wallet`: a carteira virtual no schema (T3.1).** Seis tabelas novas mais
+  extensões de `portfolios`, `trade_proposals`, `orders` e `fills`. As que importam para o Everton
+  entender o produto: `portfolio_currency_anchor` (**imutável**, uma por carteira: o capital de
+  origem em BRL, a observação de câmbio usada e o instante); `fx_observations` (global, imutável,
+  **nunca apagada**, nem quando um cliente é removido); `market_betas` (revisões imutáveis do β);
+  `portfolio_risk_state` (a referência do dia em `America/Sao_Paulo` com o instante real de avaliação
+  e o pico durável); `portfolio_exit_intents` (a **intenção** de proteção, durável e distinta da
+  tentativa); `participation_consumptions`; e `kill_switch_transitions` **com evidência**. O preset
+  `paper_v1` entra no seed com os valores da diretiva. Verificado em Postgres 16: subida do zero,
+  `alembic check` limpo, ida e volta do downgrade, privilégios por papel e isolamento RLS nas tabelas
+  novas.
 
 - **`766f8b6` — T2.9c: a recuperação histórica anuncia **um** evento por lote inserido, não um por
   minuto.** Para o Everton: o histórico de 7 dias que o scanner pede deixa de sufocar a fila de

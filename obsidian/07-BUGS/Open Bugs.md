@@ -7,6 +7,76 @@ updated: 2026-09-07
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
+## Abertos no plantão da madrugada de 2026-09-07 (M3 ondas 1–3 + incidente de deploy da VPS)
+
+Os cinco primeiros vêm da revisão adversarial de `.claude/state/review-T3.1b-T3.6-T3.12.md`
+(APPROVE_WITH_NITS) e são **condições escritas para a T3.5/T3.8** — estão no addendum do brief
+(`3519107`). Os dois últimos são do incidente de deploy desta madrugada. Nada aqui bloqueia a
+carteira paper que está aberta na VPS, porque nada nela executa ainda.
+
+- **HIGH (admissão, `packages/core`) — a deduplicação casa um pedido que ninguém decidiu ainda, e
+  explode.** `admission/dedupe.py:94-105` + `service.py:188-201`: `by_idempotency_key` também acha
+  linhas com `status='pending'` e `risk_decision='{}'`, e `RiskDecision.model_validate({})` levanta
+  **10 erros de validação**. **Cenário concreto no modelo de papéis que acabei de decidir (T3.1c):**
+  a API registra a ordem manual como pedido não decidido, o `execution-worker` vai admitir, encontra
+  a própria linha pelo dedupe e **nunca decide nada** — a ordem manual do Everton some em silêncio.
+  **Correção:** `find_admitted` só considera linhas **decididas**, e o worker **decide a linha
+  existente** em vez de inserir outra. Junto: `service.py:115` fabrica `decided_at`. Dono: **T3.5**.
+
+- **HIGH (papéis, `apps/api`) — a admissão do lado da API roda inteira como `hunter_app` e vira 500
+  com os grants novos.** `apps/api/hunter_api/services/admission.py:129-187`. O `hunter_app` não pode
+  avançar o contador FIFO nem enfileirar outbox — a T3.12 já provou isso e contornou nos testes com
+  um grant explícito rotulado como experimento condicionado. **Cenário:** assim que a T3.1c aplicar o
+  modelo de papéis, a primeira ordem manual pela tela devolve erro 500. **Correção (decidida):** o
+  adaptador da API **registra o pedido** (`source='manual'`, `status='requested'`, sem decisão, sem
+  reserva) e o `execution-worker` admite. Dono: **T3.5/T3.8**.
+
+- **HIGH (kill switch, `infra/migrations/ddl/paper.py`) — o teto do pico conta snapshot de qualquer
+  resolução, e isso pode travar a carteira para sempre.** `_OBSERVED_EQUITY` (linhas 411-417) faz
+  `max(s.equity) FROM portfolio_equity_snapshots` **sem filtrar `resolution`**, mas a curva
+  operacional é só a de 1 min (`curve.py:36`). **Cenário:** no dia em que existir um roll-up de 1 h
+  ou 1 d guardando o **máximo do período**, o teto sobe; o pico é monotônico e nunca desce; o
+  drawdown medido contra esse pico inflado estoura o limite de 8 % e a carteira fica
+  `TRADING_DISABLED` **permanentemente**, sem que nenhuma perda real tenha acontecido. **Correção:**
+  `resolution = '1m'` no subselect. Dono: **T3.1c** (ou follow-up imediato se não couber).
+  Confirmado ainda aberto em 2026-09-07 04:40Z.
+
+- **HIGH (contrato, `packages/core` + `apps/api`) — nenhuma transição publica `kill_switch.changed`.**
+  O nome do evento existe (`events/streams.py:57`) e o tipo existe (`domain/enums.py:686`), mas
+  `risk/transitions.py` só o cita num docstring: **todos** os chamadores passam `publish=False`.
+  **Cenário:** o kill switch trava a carteira e a tela do Everton continua mostrando `ACTIVE` até o
+  próximo poll — o contrato v2.2 exige reação em **menos de 1 s**. Estava bloqueado porque o
+  `hunter_worker` não tinha `INSERT` em `outbox_events`; a T3.1c destrava. **Correção:** o worker
+  publica depois de `evaluate_and_persist`; a API publica na retomada. Dono: **T3.5**.
+
+- **MEDIUM (documentação divergente do banco) — `docs/` ainda diz "uma carteira principal por
+  workspace"; a `0006` corrigida é por organização.** `docs/RISK_ENGINE.md:593` e
+  `docs/plans/M3.md:118`. **Por que importa mais do que um typo:** foi exatamente esse escopo que o
+  `security-reviewer` provou ser um furo (workspace novo = segunda carteira com R$100.000 novos), a
+  `T3.1b` fechou no banco, e a documentação normativa continua descrevendo o comportamento **antigo**
+  — quem ler o contrato para implementar a T3.5 implementa o furo de volta. Dono: **T3.1c/docs**.
+
+- **MEDIUM (infra, VPS — corrigido no código, ainda não aplicado na VPS) — o Caddy estava preso a um
+  IP dentro da faixa dinâmica do Docker.** O Caddy é fixado em `172.28.0.10` porque a API depende
+  desse endereço para limitar requisições por cliente (`FORWARDED_ALLOW_IPS`), mas a faixa dinâmica
+  da rede cobria o mesmo endereço. **Aconteceu de verdade hoje:** ao recriar os contêineres com o
+  perfil de shards, o Docker entregou o `.10` ao `scanner-worker`, o Caddy falhou com "Address
+  already in use" e **o site ficou fora por volta de 20 minutos**. Corrigido em `7304709` (faixa
+  dinâmica em `172.28.0.128/25`), mas **aplicar o `ip_range` exige recriar a rede no próximo
+  deploy** — até lá a VPS continua com a rede antiga. Dono: devops.
+
+- **MEDIUM (processo de deploy) — um `docker compose` na mão perde variáveis que só o `compose.sh`
+  deriva.** No mesmo incidente, o deploy manual perdeu `GIT_SHA` (a migração rodou com a imagem
+  `hunter-api:dev` velha e **não achou a revisão `0006`**) e `HUNTER_DEFAULT_SNI` (o Caddy serviu um
+  certificado de `localhost` e **o HTTPS quebrou no IP** até o contêiner ser recriado com o SNI
+  certo). O `7304709` fez o `compose.sh up/update` ler `MARKET_SHARDS` sozinho e falhar alto quando um
+  serviço não sobe — mas **a correção é técnica e o hábito é humano**: o item fica aberto até o
+  runbook estar escrito e o próximo deploy ter sido feito só com
+  `MARKET_SHARDS=4 bash infra/vps/compose.sh update`. Dono: devops + orquestração.
+
+- *(`AssumedCosts` aceita `float` — já registrado no plantão da noite de 2026-09-06, mais abaixo
+  nesta mesma página; reconfirmado aberto em 2026-09-07.)*
+
 ## Abertos no fecho do M2 (2026-09-07, tarefa T2.8 — ver `docs/reports/M2.md`)
 
 - **MEDIUM (processo, aconteceu de verdade hoje) — dois agentes commitando no mesmo worktree, e um
@@ -23,8 +93,17 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
   worktree compartilhado — commit sempre com pathspec explícito dos próprios arquivos — ou cada
   tarefa em voo ganha o próprio worktree (`isolation: worktree`). Dono: orquestração.
 
-- **HIGH (operacional, VPS — remedido hoje) — a cobertura continua congelada, e agora sabemos o
-  custo dela.** Leitura de **2026-09-07T03:19:20Z**: `mkt:binance:coverage.covered_until =
+- **[FECHADA em 2026-09-07 04:36Z pelo deploy dos 4 shards na VPS — medição abaixo]** ~~HIGH
+  (operacional, VPS)~~ — **a cobertura do tape voltou a andar.** Duas leituras somente-leitura desta
+  madrugada, no Redis da VPS: às **04:33:16.150Z** `covered_until = 2026-09-07T04:33:15.264548Z`
+  (**0,89 s** atrás do relógio) e às **04:36:58.058Z** `covered_until = 04:36:57.366387Z` (**0,69 s**),
+  com `session_since = 04:33:05.426833Z` **inalterado entre as duas** — ou seja, uma sessão contínua,
+  sem quebra, com 200 campos `sym:` e `HLEN = 202`. A causa era a topologia: um processo com 200
+  mercados não dava conta, e é exatamente o que o T2.5g resolve. **Ressalva honesta, e ela importa
+  para o M2:** a condição nº 1 de aprovação do M2 exige `covered_until` avançando por **≥ 30 min
+  contínuos**, e na hora desta medição a sessão tinha **3 min 52 s**. O sintoma sumiu; o portão de
+  30 minutos ainda não foi provado, e é a primeira coisa a medir no próximo plantão.
+  *Texto original do achado, preservado:* Leitura de **2026-09-07T03:19:20Z**: `mkt:binance:coverage.covered_until =
   2026-09-07T02:34:57Z` — **44 minutos parado**. `hb:scanner:*` declara `coverage = unproven`;
   `hb:strategy:shadow` conta `{"unavailable": 63.793}` avaliações contra 11.479 `not_triggered` e
   460 `triggered`. **O custo, agora quantificado:** enquanto o carimbo não anda, `trade_velocity_1m`,
@@ -33,7 +112,17 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
   publicado** — 0 estágios ≠ `NONE` em 299 amostras. É o bloqueio nº 1 do M2 e a razão nº 1 do
   parecer de não aprovação. **Próximo passo inalterado:** medir `queue_oldest_pending_ts` e o motivo
   de quebra **dentro do contêiner da VPS** antes de mudar qualquer linha.
-- **HIGH (implantação) — o T2.5g está commitado e provado, e não está na VPS.** A chave
+- **[FECHADA em 2026-09-07 04:33Z — implantado]** ~~HIGH (implantação)~~ — **o T2.5g está na VPS.**
+  Medido às **04:32–04:33Z**, somente leitura: quatro heartbeats por shard vivos —
+  `hb:market:binance:0of4` (52 mercados, 312 assinaturas), `:1of4` (44/264), `:2of4` (45/270),
+  `:3of4` (59/354) —, todos `ws_state = connected`, `reconnects = 0`, com o último evento a menos de
+  1 s do relógio; **`EXISTS hb:market:binance` devolve `0`**, a chave compartilhada do desenho antigo
+  não existe mais. CPU por shard no `docker stats`: **21,85 % · 28,84 % · 41,66 % · 42,50 %**.
+  `dropped_events`: **97 no shard 0 e 0 nos outros três** — o 0 é o shard que também coleta o câmbio.
+  Contra os **7.073.659** descartes do processo único de ontem, é outra ordem de grandeza.
+  *Ressalva:* `open_gaps` somados dão **5.038** (1.329 + 1.092 + 1.097 + 1.520) — o backlog de
+  recuperação continua alto e é o item MEDIUM separado ("gaps de mercados não monitorados nunca
+  fecham"), não este. *Texto original do achado, preservado:* A chave
   compartilhada `hb:market:binance` (desenho antigo, o HIGH que decidiu a topologia entregue no M1)
   **ainda existe** no Redis da VPS, ao lado de um único `hb:market:<instance>`: a VPS roda **1 shard
   com 200 mercados**, exatamente a topologia em que o tick nasce com 3,7 s de atraso mediano. No
@@ -60,8 +149,11 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
 
 ## Abertos no plantão da noite de 2026-09-06 (integração das ondas T2.5 / T2.9c / T3.2 / T3.7)
 
-- **HIGH (operacional, VPS — medido agora) — `mkt:binance:coverage` voltou a congelar depois do
-  deploy de `fe8872c`, e o Lab está perdendo barras.** O commit `fe8872c` (T2.5e) foi entregue
+- **[FECHADA em 2026-09-07 04:36Z — mesma causa da entrada acima, mesma prova]** ~~HIGH
+  (operacional, VPS)~~ — `mkt:binance:coverage` congelado depois do deploy de `fe8872c`. A hipótese
+  que ficou escrita aqui ("ou o produtor saturado — ver o item seguinte") era a certa: com 4 shards a
+  cobertura anda a menos de 1 s do relógio e a sessão não quebra. *Texto original do achado,
+  preservado:* O commit `fe8872c` (T2.5e) foi entregue
   exatamente para descongelar a cobertura do tape e foi verificado no stack local (`t25e-proof.md`:
   o carimbo passou a avançar a cada ~250 ms). **Na VPS o sintoma reapareceu:** imagem confirmada em
   `fe8872c` (build `2026-09-06T23:34:58Z`, `oldest_pending_ts` presente no código do contêiner em
@@ -77,8 +169,13 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
   é a mesma causa (a igualdade exata morreu no código), uma sessão que não se reabre depois da
   reconexão dupla do boot, ou o produtor saturado (ver o item seguinte). **Próximo passo:** medir
   `queue_oldest_pending_ts` e o motivo de quebra no contêiner da VPS antes de mudar qualquer linha.
-- **HIGH (capacidade, T2.5g em voo) — o coletor de um processo satura com 200 mercados: o tick nasce
-  com 3,7 s.** Medido na prova da T2.5d, com a fila de `market.ticks` já em zero: entre o carimbo que
+- **[FECHADA em 2026-09-07 04:33Z pelo T2.5g na VPS]** ~~HIGH (capacidade)~~ — o coletor de um
+  processo satura com 200 mercados. Fechado pela topologia de 4 shards: **nenhum shard passa de
+  42,5 % de um core** e os descartes caíram de 7,07 milhões para 97 (shard 0) e 0 (os outros três).
+  **O que NÃO está fechado por isto:** o p99 tick→oportunidade dentro de 3 s continua sendo a
+  condição nº 3 de aprovação do M2 — a prova da T2.5g mediu **0,3 %** de cumprimento com 4 shards
+  (média 7,74 s), porque `crc32(symbol) % N` equilibra **contagem** e não **tráfego**. Isso é um item
+  de produto em aberto, não este bug de capacidade. *Texto original do achado, preservado:* Medido na prova da T2.5d, com a fila de `market.ticks` já em zero: entre o carimbo que
   o coletor põe no payload e o `XADD` da mensagem há **mediana de 3,70 s e máximo de 34 s** nas 200
   entradas mais novas; no fim daquela janela a entrada mais nova tinha **130–147 s** de idade porque
   o `market-worker`, a 99,7 % de **um** core, parou de publicar por mais de dois minutos. O orçamento
