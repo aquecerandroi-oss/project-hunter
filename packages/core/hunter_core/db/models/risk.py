@@ -73,6 +73,21 @@ class KillSwitchTransition(Base, UUIDPrimaryKeyMixin):
         CheckConstraint(
             "(scope = 'system') = (organization_id IS NULL)", name="system_scope_has_no_org"
         ),
+        CheckConstraint("from_state <> to_state", name="a_transition_moves"),
+        CheckConstraint("actor_type IN ('user', 'system')", name="actor_type_is_known"),
+        # **Leaving a latched block is an authenticated act, in the schema.**
+        # RISK_ENGINE.md §5: there is no automatic return from
+        # TRADING_DISABLED/EMERGENCY — resumption is manual, authorised and
+        # audited. A CHECK is what makes that unrepresentable rather than merely
+        # discouraged: no system or automatic path can write the row that
+        # unblocks the wallet. It does not say *which* person, which is policy
+        # the API enforces; it says a person, identified.
+        CheckConstraint(
+            "NOT (from_state IN ('TRADING_DISABLED', 'EMERGENCY') "
+            "AND to_state IN ('ACTIVE', 'WARNING')) "
+            "OR (actor_type = 'user' AND actor_id IS NOT NULL)",
+            name="resuming_a_block_is_authenticated",
+        ),
         Index("ix_kill_switch_transitions_scope_created", "scope", "scope_id", "created_at"),
     )
 
@@ -84,4 +99,11 @@ class KillSwitchTransition(Base, UUIDPrimaryKeyMixin):
     reason: Mapped[str | None] = mapped_column(Text)
     actor_type: Mapped[str] = mapped_column(Text)
     actor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    evidence: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=JSONB_EMPTY)
+    """The numbers that justified the move — daily loss, drawdown, equity, peak,
+    the trading day and the thresholds in force (§18.7). ``reason`` is prose; this
+    is what makes the transition *auditable* instead of merely logged, and it is
+    what a resumption must not be able to quietly recompute away: resuming
+    redefines neither the peak nor the losses."""
+
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

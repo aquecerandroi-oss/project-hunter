@@ -467,11 +467,19 @@ class StatsWindow(StrEnum):
 
 
 class RiskPreset(StrEnum):
-    """``risk_preset`` — DATABASE.md §7 (risk_profiles.preset)."""
+    """``risk_preset`` — DATABASE.md §7 (risk_profiles.preset).
+
+    ``PAPER_V1`` is the M3 virtual wallet's profile (RISK_ENGINE.md §2): the
+    Everton directive's numbers, seeded as a system preset. It sits *before*
+    ``CUSTOM`` because ``CUSTOM`` is the open-ended wildcard and every named
+    preset precedes it — the same ordering argument ``0003`` used to put
+    ``EXTENDED`` before the terminal ``EXPIRED`` (DATABASE.md §17.1).
+    """
 
     CONSERVATIVE = "conservative"
     BALANCED = "balanced"
     AGGRESSIVE = "aggressive"
+    PAPER_V1 = "paper_v1"
     CUSTOM = "custom"
 
 
@@ -500,6 +508,81 @@ class ProposalStatus(StrEnum):
     EXPIRED = "expired"
     EXECUTED = "executed"
     FAILED = "failed"
+
+
+class ProposalSource(StrEnum):
+    """``proposal_source`` — DATABASE.md §18.3 (trade_proposals.source).
+
+    *Where the admission request came in through*, which is not *who asked*:
+    ``agent_id`` and the audit actor answer that. The M3 wallet has one live
+    origin, ``MANUAL`` (RISK_ENGINE.md §8 — the operator's paper order, which
+    goes through the same admission service as anything else); ``AGENT`` is
+    frozen here as the interface T3.12/M4 will use so the bridge does not need
+    a migration of its own. The shadow bridge is deliberately **not** a member:
+    the joint decision leaves signal -> proposal to M4 (`docs/plans/M3.md`
+    §"Decisão conjunta", item 9), and a label is a promise that something
+    exists.
+    """
+
+    MANUAL = "manual"
+    AGENT = "agent"
+
+
+class ReservationState(StrEnum):
+    """``reservation_state`` — DATABASE.md §18.3 (trade_proposals.reservation_state).
+
+    The reservation's *tenure*, deliberately a different axis from
+    ``proposal_status``, which is the decision's *label*. A proposal can be
+    ``approved`` (a label that never changes: the Risk Engine did approve it)
+    while its reservation has already been consumed by a fill, released by a
+    cancellation or expired under the portfolio lock. Folding the two together
+    is how a stale label ends up holding a slot nobody owns.
+
+    ``CONSUMED`` is the fill *converting* the reserved slot into the position's
+    slot — never a second slot for the same entry (M3 joint decision, item 4).
+    """
+
+    NONE = "none"
+    HELD = "held"
+    CONSUMED = "consumed"
+    RELEASED = "released"
+    EXPIRED = "expired"
+
+
+class ExitIntentState(StrEnum):
+    """``exit_intent_state`` — DATABASE.md §18.4 (portfolio_exit_intents.state).
+
+    RISK_ENGINE.md §10: an exit *attempt* ends, but the *intention* survives for
+    the remaining quantity. ``BLOCKED_RESIDUAL`` is the leftover below the
+    exchange minimum — accounted and visible, never fictitiously settled — and
+    is **not** terminal: it returns to ``OPEN`` when price or filters make the
+    remainder tradable again. ``VOIDED`` is the honest terminal for an intention
+    whose quantity was liquidated by a *competing* protection (a stop that took
+    the whole position leaves the target with nothing to sell); it exists so
+    that intention never has to be handed a fictitious fill to reach
+    ``FULFILLED``.
+    """
+
+    OPEN = "open"
+    BLOCKED_RESIDUAL = "blocked_residual"
+    FULFILLED = "fulfilled"
+    SUPERSEDED = "superseded"
+    VOIDED = "voided"
+
+
+class ParticipationEntryKind(StrEnum):
+    """``participation_entry_kind`` — DATABASE.md §18.5.
+
+    The three effects the participation budget of RISK_ENGINE.md §4 knows:
+    ``RESERVED`` when an admission commits notional, ``EXECUTED`` when a fill
+    turns part of that commitment into real consumption inside the 60 s window,
+    and ``RELEASED`` when a terminal cancellation gives back **only the
+    unexecuted** part.
+    """
+
+    RESERVED = "reserved"
+    EXECUTED = "executed"
+    RELEASED = "released"
 
 
 class OrderType(StrEnum):
@@ -577,16 +660,28 @@ class ExitReason(StrEnum):
 
 class RiskEventType(StrEnum):
     """``risk_event_type`` — DATABASE.md §7 (risk_events.type); members spelled
-    out in RISK_ENGINE.md §6 (v1).
+    out in RISK_ENGINE.md §8 (v2).
+
+    ``0006_paper_wallet`` adds the three the v2 contract names and v1 did not
+    have. Each is a distinction the engine has to be able to *publish*, not just
+    compute: ``proposal_unavailable_input`` because "rejected for not fitting"
+    and "not evaluated for want of data" are different facts (§7);
+    ``participation_capped`` because the 1 % participation ceiling is the limit
+    the directive expects to bind most often and D2 promises to measure; and
+    ``beta_missing`` because "no validated beta, shadow only" is a directive
+    rule whose firing has to be visible.
     """
 
     LIMITS_CHANGED = "limits_changed"
     PROPOSAL_REJECTED = "proposal_rejected"
+    PROPOSAL_UNAVAILABLE_INPUT = "proposal_unavailable_input"
     DAILY_LOSS_WARNING = "daily_loss_warning"
     DAILY_LOSS_LIMIT = "daily_loss_limit"
     DRAWDOWN_WARNING = "drawdown_warning"
     DRAWDOWN_LIMIT = "drawdown_limit"
     EXPOSURE_LIMIT = "exposure_limit"
+    PARTICIPATION_CAPPED = "participation_capped"
+    BETA_MISSING = "beta_missing"
     DATA_DEGRADED_IN_POSITION = "data_degraded_in_position"
     KILL_SWITCH_CHANGED = "kill_switch_changed"
     STOP_SLIPPAGE_EXCESS = "stop_slippage_excess"
@@ -719,6 +814,10 @@ ALL_ENUMS: dict[str, type[StrEnum]] = {
     "portfolio_type": PortfolioType,
     "portfolio_status": PortfolioStatus,
     "proposal_status": ProposalStatus,
+    "proposal_source": ProposalSource,
+    "reservation_state": ReservationState,
+    "exit_intent_state": ExitIntentState,
+    "participation_entry_kind": ParticipationEntryKind,
     "order_type": OrderType,
     "order_purpose": OrderPurpose,
     "execution_mode": ExecutionMode,

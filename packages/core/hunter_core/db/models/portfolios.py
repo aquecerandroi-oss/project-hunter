@@ -82,6 +82,21 @@ class Portfolio(Base, UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin):
         UniqueConstraint("id", "organization_id", name="uq_portfolios_id_org"),
         CheckConstraint("initial_capital >= 0", name="initial_capital_non_negative"),
         Index("ix_portfolios_org_type_status", "organization_id", "type", "status"),
+        # **One principal paper wallet per (organization, workspace), for ever.**
+        # RISK_ENGINE.md §11 and the M3 joint decision, item 2. The predicate is
+        # exactly ``type = 'paper' AND NOT is_arena`` and deliberately does *not*
+        # mention ``status`` and does *not* exclude ``deleted_at IS NOT NULL``:
+        # archiving or soft-deleting the wallet and opening another one would
+        # preserve the old rows and still restart the equity and the peak, and
+        # would release a TRADING_DISABLED kill switch nobody authorised — the
+        # same substitution the directive forbids when it forbids a reset.
+        Index(
+            "uq_portfolios_principal_paper",
+            "organization_id",
+            "workspace_id",
+            unique=True,
+            postgresql_where=text("type = 'paper' AND NOT is_arena"),
+        ),
     )
 
     workspace_id: Mapped[uuid.UUID] = mapped_column(
@@ -145,3 +160,13 @@ class PortfolioEquitySnapshot(Base, TenantMixin):
     peak_equity: Mapped[Decimal]
     drawdown_pct: Mapped[Decimal | None] = mapped_column(PERCENT)
     open_positions: Mapped[int] = mapped_column(Integer, server_default="0")
+    fx_observation_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("fx_observations.id", ondelete="RESTRICT"), index=True
+    )
+    """The FX observation this point of the curve was converted with (§18.2).
+
+    Every point names the rate it used, so the past is never recomputed with
+    today's rate — the joint M3 decision, item 1. **Nullable on purpose**: when
+    FX is unavailable after the wallet opened, USDT stays computable and BRL
+    becomes *unavailable with a reason*, never extrapolated. ``RESTRICT``
+    because the observation is the explanation for a stored number."""

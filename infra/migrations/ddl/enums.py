@@ -365,6 +365,63 @@ ANALYSIS_ENUMS: Final[Mapping[str, tuple[str, ...]]] = {
 policy has to arrive as a migration, and every baseline row already records
 which policy produced it, so two populations cannot be silently merged."""
 
+PAPER_ENUMS: Final[Mapping[str, tuple[str, ...]]] = {
+    "proposal_source": (
+        "manual",
+        "agent",
+    ),
+    "reservation_state": (
+        "none",
+        "held",
+        "consumed",
+        "released",
+        "expired",
+    ),
+    "exit_intent_state": (
+        "open",
+        "blocked_residual",
+        "fulfilled",
+        "superseded",
+        "voided",
+    ),
+    "participation_entry_kind": (
+        "reserved",
+        "executed",
+        "released",
+    ),
+}
+"""The types ``0006_paper_wallet`` adds. Frozen.
+
+Four axes the M3 wallet needs and that no existing type expresses: where an
+admission came in through, whether a reservation is still in force (as opposed
+to what the decision was *labelled*), where a durable exit intention stands, and
+which effect a participation-budget entry records. ``exit_reason`` is
+deliberately **reused** for *why* an exit intention exists rather than
+duplicated — it already spells stop/target/manual/kill_switch/risk_event, which
+is exactly that vocabulary (DATABASE.md §1: one enum per concept).
+"""
+
+PAPER_ADDED_VALUES: Final[tuple[tuple[str, str, str | None], ...]] = (
+    ("risk_preset", "paper_v1", "custom"),
+    ("risk_event_type", "proposal_unavailable_input", "daily_loss_warning"),
+    ("risk_event_type", "participation_capped", "data_degraded_in_position"),
+    ("risk_event_type", "beta_missing", "data_degraded_in_position"),
+)
+"""``(type, new label, the label to insert it before)`` for ``0006_paper_wallet``.
+
+``paper_v1`` goes before ``custom`` for the reason ``EXTENDED`` goes before
+``EXPIRED``: every *named* preset precedes the open-ended wildcard. The three
+``risk_event_type`` labels land in the order RISK_ENGINE.md §8 lists them, which
+is also the order ``hunter_core.domain.enums.RiskEventType`` declares them —
+``enumsortorder`` is compared by the schema tests, so the two cannot drift.
+
+Same Postgres rule as ``0003`` (§17.1): a value added by ``ALTER TYPE ... ADD
+VALUE`` may not be *used* in the same transaction, in DDL or in a default.
+``0006`` adds these four and writes none of them; ``paper_v1`` reaches the
+database through ``infra/scripts/seed.py``, which runs after the migration has
+committed.
+"""
+
 ANALYSIS_ADDED_VALUES: Final[tuple[tuple[str, str, str | None], ...]] = (
     ("opportunity_status", "EXTENDED", "EXPIRED"),
     ("anomaly_type", "TRADE_VELOCITY_SPIKE", "SOCIAL_SPIKE"),

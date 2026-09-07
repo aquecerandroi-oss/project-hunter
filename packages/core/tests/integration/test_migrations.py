@@ -37,7 +37,7 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0005_baseline_lock_grant"
+HEAD_REVISION = "0006_paper_wallet"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -45,6 +45,7 @@ INITIAL_REVISION = "0001_initial_schema"
 SHADOW_REVISION = "0002_shadow_lab"
 ANALYSIS_REVISION = "0003_analysis"
 OUTBOX_INDEX_REVISION = "0004_outbox_pending_index"
+LOCK_GRANT_REVISION = "0005_baseline_lock_grant"
 
 _PENDING_PREDICATE = "dispatched_at IS NULL"
 """What makes an index a *pending* index, spelled out here rather than imported:
@@ -62,6 +63,7 @@ def _frozen_enums() -> tuple[Mapping[str, tuple[str, ...]], ...]:
         cast("Mapping[str, tuple[str, ...]]", enums.INITIAL_ENUMS),
         cast("Mapping[str, tuple[str, ...]]", enums.SHADOW_ENUMS),
         cast("Mapping[str, tuple[str, ...]]", enums.ANALYSIS_ENUMS),
+        cast("Mapping[str, tuple[str, ...]]", enums.PAPER_ENUMS),
     )
 
 
@@ -624,9 +626,10 @@ def test_each_revision_creates_exactly_the_labels_it_froze(upgraded: str) -> Non
     lands before ``EXPIRED`` and the two detectors before ``SOCIAL_SPIKE``
     because the migration says ``BEFORE``, and the Python classes declare them
     in the same places. A member moved in one and not the other is drift this
-    catches.
+    catches. ``0006`` is held to the same rule: ``paper_v1`` before ``custom``
+    and the three v2 risk events in the order RISK_ENGINE.md §8 lists them.
     """
-    initial, shadow, analysis = _frozen_enums()
+    initial, shadow, analysis, paper = _frozen_enums()
     config = alembic_config(upgraded)
     try:
         command.downgrade(config, "base")
@@ -647,6 +650,12 @@ def test_each_revision_creates_exactly_the_labels_it_froze(upgraded: str) -> Non
         after_head = asyncio.run(_enum_labels(upgraded))
         assert after_head == {name: [m.value for m in cls] for name, cls in ALL_ENUMS.items()}
         assert set(analysis) <= set(after_head)
+        assert set(paper) <= set(after_head)
+        # ``0006`` adds four labels to types ``0001`` created; none of them may
+        # exist before that revision runs, or the ``ADD VALUE`` is a no-op that
+        # nobody notices and ``0001`` no longer describes what it builds.
+        assert "paper_v1" not in after_initial["risk_preset"]
+        assert "beta_missing" not in after_initial["risk_event_type"]
     finally:
         command.upgrade(config, "head")
 
@@ -1037,3 +1046,206 @@ def test_0005_leaves_the_api_role_read_only_on_baselines(upgraded: str) -> None:
     for table in _frozen_lock_tables():
         held = asyncio.run(_table_privileges(upgraded, "hunter_app", table))
         assert held == {"SELECT"}, (table, held)
+
+
+async def _write(url: str, statements: list[tuple[str, dict[str, object]]]) -> None:
+    """Run statements as the owner, each with its own parameters."""
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            for statement, parameters in statements:
+                await connection.execute(text(statement), parameters)
+    finally:
+        await engine.dispose()
+
+
+def _tenant(url: str, slug: str, *, portfolios: int) -> dict[str, uuid.UUID]:
+    """An organization, a workspace and ``portfolios`` principal paper wallets."""
+    ids: dict[str, uuid.UUID] = {"org": uuid7(), "workspace": uuid7()}
+    statements: list[tuple[str, dict[str, object]]] = [
+        (
+            "INSERT INTO organizations (id, slug, name) VALUES (:id, :slug, :slug)",
+            {"id": ids["org"], "slug": slug},
+        ),
+        (
+            "INSERT INTO workspaces (id, organization_id, name, objective) "
+            "VALUES (:id, :org, :slug, 'paper_trading')",
+            {"id": ids["workspace"], "org": ids["org"], "slug": slug},
+        ),
+    ]
+    for index in range(portfolios):
+        key = f"portfolio_{index}"
+        ids[key] = uuid7()
+        statements.append(
+            (
+                "INSERT INTO portfolios (id, organization_id, workspace_id, name, type, "
+                "initial_capital) VALUES (:id, :org, :ws, :name, 'paper', 20000)",
+                {
+                    "id": ids[key],
+                    "org": ids["org"],
+                    "ws": ids["workspace"],
+                    "name": f"{slug}-{index}",
+                },
+            )
+        )
+    asyncio.run(_write(url, statements))
+    return ids
+
+
+def _drop_tenant(url: str, org: uuid.UUID) -> None:
+    """Remove the probe tenant, declaring the teardown ``0006`` demands."""
+    asyncio.run(
+        _write(
+            url,
+            [
+                ("SET LOCAL app.portfolio_teardown = 'on'", {}),
+                ("DELETE FROM organizations WHERE id = :id", {"id": org}),
+            ],
+        )
+    )
+
+
+def test_0006_refuses_a_database_that_already_holds_two_principal_wallets(
+    upgraded: str,
+) -> None:
+    """``0006`` cannot choose which of two wallets is the permanent one.
+
+    The unique index is the directive's "no reset" in schema form, and on a
+    database that already violates it there is no honest backfill: marking one of
+    them ``is_arena`` is a decision about which history is the real one, and that
+    is an operator's, not a migration's. ``0002``'s precedent, restated.
+    """
+    config = alembic_config(upgraded)
+    command.downgrade(config, LOCK_GRANT_REVISION)
+    ids = _tenant(upgraded, f"twin-{uuid.uuid4().hex[:8]}", portfolios=2)
+    try:
+        with pytest.raises(DBAPIError, match="more than one principal paper wallet"):
+            command.upgrade(config, "head")
+        assert asyncio.run(_revision(upgraded)) != HEAD_REVISION, "the upgrade must not commit"
+    finally:
+        asyncio.run(
+            _write(
+                upgraded,
+                [("DELETE FROM portfolios WHERE id = :id", {"id": ids["portfolio_1"]})],
+            )
+        )
+        command.upgrade(config, "head")
+        _drop_tenant(upgraded, ids["org"])
+    command.check(config)
+
+
+def _open_a_wallet(url: str, slug: str) -> dict[str, uuid.UUID]:
+    """A tenant whose wallet is opened: risk state, FX observation and anchor."""
+    ids = _tenant(url, slug, portfolios=1)
+    ids["fx"] = uuid7()
+    asyncio.run(
+        _write(
+            url,
+            [
+                (
+                    "INSERT INTO portfolio_risk_state (organization_id, portfolio_id, "
+                    "peak_equity, peak_equity_at) VALUES (:org, :pf, 20000, now())",
+                    {"org": ids["org"], "pf": ids["portfolio_0"]},
+                ),
+                (
+                    "INSERT INTO fx_observations (id, pair, rate, source, observed_at, "
+                    "available_at) VALUES (:id, 'USDTBRL', 5, :source, now(), now())",
+                    {"id": ids["fx"], "source": f"probe#{slug}"},
+                ),
+                (
+                    "INSERT INTO portfolio_currency_anchor (id, organization_id, portfolio_id, "
+                    "origin_amount, credited_amount, fx_observation_id, rate, "
+                    "conversion_residual, rounding_policy) VALUES "
+                    "(:id, :org, :pf, 100000, 20000, :fx, 5, 0, 'floor_10dp_v1')",
+                    {
+                        "id": uuid7(),
+                        "org": ids["org"],
+                        "pf": ids["portfolio_0"],
+                        "fx": ids["fx"],
+                    },
+                ),
+            ],
+        )
+    )
+    return ids
+
+
+def test_0006_refuses_to_downgrade_while_a_wallet_is_open(upgraded: str) -> None:
+    """Reversing is allowed; losing the opening of a wallet is not.
+
+    ``portfolio_currency_anchor`` holds the ``F0`` and ``E0`` every BRL number is
+    measured from, and the directive forbids opening the wallet again to recreate
+    them, so "the migration reversed cleanly" would be the only report of a loss
+    that cannot be undone. The guard names it instead.
+    """
+    config = alembic_config(upgraded)
+    ids = _open_a_wallet(upgraded, f"open-{uuid.uuid4().hex[:8]}")
+    try:
+        with pytest.raises(DBAPIError, match="anchored to an opening rate"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        _drop_tenant(upgraded, ids["org"])
+    command.downgrade(config, "-1")
+    command.upgrade(config, "head")
+    command.check(config)
+
+
+def test_0006_refuses_to_downgrade_while_a_reservation_is_still_held(upgraded: str) -> None:
+    """A held reservation is cash, risk, exposure and a slot nobody released.
+
+    Dropping the columns releases all four silently, and nothing afterwards knows
+    they were ever held: the reservation would simply cease to exist while the
+    proposal that owns it survives.
+    """
+    config = alembic_config(upgraded)
+    slug = f"held-{uuid.uuid4().hex[:8]}"
+    ids = _tenant(upgraded, slug, portfolios=1)
+    exchange, market, proposal = uuid7(), uuid7(), uuid7()
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (
+                    "INSERT INTO exchanges (id, code, name) VALUES (:id, :code, 'Probe')",
+                    {"id": exchange, "code": f"probe-{slug}"},
+                ),
+                (
+                    "INSERT INTO markets (id, exchange_id, symbol, market_type) "
+                    "VALUES (:id, :exchange, :symbol, 'spot')",
+                    {"id": market, "exchange": exchange, "symbol": f"S{slug.upper()[:8]}"},
+                ),
+                (
+                    "INSERT INTO trade_proposals (id, organization_id, portfolio_id, market_id, "
+                    "direction, idempotency_key, reservation_state, reserved_notional, "
+                    "reserved_cash, reserved_risk, reserved_slot, reserved_until) VALUES "
+                    "(:id, :org, :pf, :m, 'long', :key, 'held', 1800, 1801, 45, true, now())",
+                    {
+                        "id": proposal,
+                        "org": ids["org"],
+                        "pf": ids["portfolio_0"],
+                        "m": market,
+                        "key": slug,
+                    },
+                ),
+            ],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="still hold a reservation"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    finally:
+        _drop_tenant(upgraded, ids["org"])
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    ("DELETE FROM markets WHERE id = :id", {"id": market}),
+                    ("DELETE FROM exchanges WHERE id = :id", {"id": exchange}),
+                ],
+            )
+        )
+    command.downgrade(config, "-1")
+    command.upgrade(config, "head")
+    command.check(config)

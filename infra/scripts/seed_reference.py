@@ -285,3 +285,41 @@ because v2 already exists by then. And a version outside this tuple is never
 demoted: if some future v3 is live and v2 has been deleted, the seed recreates
 v2 inactive rather than taking the live profile away from a running scorer.
 """
+
+
+PAPER_V1_NAME = "Paper v1"
+
+PAPER_V1_LIMITS: dict[str, Any] = {
+    # RISK_ENGINE.md §2 — Everton's directive of 2026-09-06, verbatim. Every
+    # fraction is a JSON *string* so it becomes a ``Decimal`` without ever
+    # passing through a float, exactly like REGIME_MULTIPLIERS above.
+    "risk_per_trade_pct": "0.0025",  # 0,25 % planned loss at the stop, costs included
+    "max_aggregate_planned_risk_pct": "0.01",  # 1 % across open positions AND pendings
+    "max_participation_pct": "0.01",  # 1 % of the one-minute reference volume
+    "participation_reference": "min(last_complete_minute, median_30_complete_minutes)",
+    "participation_window_s": 60,  # the rolling budget window of §4, not a new limit
+    "max_total_exposure_pct": "0.40",  # 40 %
+    "max_asset_exposure_pct": "0.10",  # 10 % per currency
+    "max_concurrent_positions": 5,  # open + pending
+    "max_beta_btc_exposure": "0.5",  # Σ|notional × β| / equity
+    "min_liquidity_usd_24h": "50000000",  # 50 M on the execution venue
+    "max_leverage": 1,  # SPOT: no borrowing, no leverage, no short
+    "market_types": ["spot"],
+    "kill_switch_warning": {"daily_loss_pct": "0.01", "drawdown_pct": "0.04"},
+    "kill_switch_blocked": {"daily_loss_pct": "0.02", "drawdown_pct": "0.08"},
+    "warning_size_multiplier": "0.5",  # applied to the FINAL size (§4, R-KS-1)
+    "auto_close_on_emergency": False,  # the directive forbids automatic liquidation
+    # Technical guards inherited from the conservative preset, not capital limits.
+    # RISK_ENGINE.md §2: none of them was invented here, and changing a value is a
+    # question to Everton.
+    "max_spread_pct": "0.0005",
+    "max_slippage_pct": "0.001",
+    "min_stop_distance_pct": "0.003",
+    "max_stop_distance_pct": "0.03",
+    "regime_size_multiplier": {"BTC_BEAR_LONG": "0.5", "HIGH_VOLATILITY": "0.7"},
+}
+"""The wallet's profile. ``max_exchange_exposure_pct`` and ``max_position_pct``
+are deliberately **absent**: §9.1 declares the first inapplicable while there is
+one execution venue (it returns in M1b) and replaces the second with
+``max_asset_exposure_pct`` plus the participation ceiling. Recording them as
+``null`` would read as "no limit" rather than "not applicable here"."""

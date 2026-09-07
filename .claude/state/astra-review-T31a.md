@@ -1,0 +1,7 @@
+- **Book: teto em gasto convertido indevidamente em quantidade pelo preço de referência.** [sizing.py:125](C:/dev/project-hunter/packages/risk-core/hunter_risk/sizing.py:125), [sizing.py:256](C:/dev/project-hunter/packages/risk-core/hunter_risk/sizing.py:256) e [confirmations.py:89](C:/dev/project-hunter/packages/risk-core/hunter_risk/confirmations.py:89). Cenário: `mid=entry_ref=100`, slippage máximo `1%`, asks `1@100` e `10@102`. O walk permite **2 unidades**, devolvendo gasto `202`. Com multiplicador `1`, demais tetos maiores e step `0,01`, sizing produz **2,02 unidades**. O VWAP real é `204,04/2,02 ≈ 101,0099`, acima de `101`; a confirmação aprova porque `202 <= 202`.
+
+- **Caixa: falta o produto entre deslocamento do preço e taxa, se a taxa incidir sobre o valor executado.** [sizing.py:79](C:/dev/project-hunter/packages/risk-core/hunter_risk/sizing.py:79), [sizing.py:212](C:/dev/project-hunter/packages/risk-core/hunter_risk/sizing.py:212) e [confirmations.py:56](C:/dev/project-hunter/packages/risk-core/hunter_risk/confirmations.py:56). Cenário: caixa `102`, deslocamento de entrada `1%`, fee `1%`. O teto permite notional de referência `100`; execução custa `101` e taxa `1,01`: total **102,01**, excedendo caixa. A confirmação calcula `102` e aprova. A fórmula cobre apenas a hipótese aditiva sobre o notional de referência.
+
+**OBSIDIAN**
+
+- Nenhuma página identificada para atualização: leitura restrita aos dois arquivos solicitados.

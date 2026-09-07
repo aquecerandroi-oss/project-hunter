@@ -6,15 +6,14 @@ Idempotent: most writes are an upsert on the row's natural key (``exchanges.code
 ``strategies.key``, ``(strategy_id, version)``, ``(plan, key)``, ``feature_flags.key``,
 the system-preset ``risk_profiles.preset``), so running it twice leaves the same counts.
 
-Three things are **never** rewritten, because their content is frozen once
-published and something stored elsewhere names it: ``opportunity_weights.version``,
-which every score cites, ``(feature_definitions.name, version)``, hashed into
-every ``feature_snapshots.feature_set_version``, and a ``strategy_version`` past
-its first activation, which every shadow signal points at. The first two are
-inserted when missing, *verified* when present, and a divergence stops the seed.
-The third does not even stop it: the frozen row is the truth, a registry that has
-moved on is answered by a successor version rather than by this script, so the
-row is left untouched and reported (DATABASE.md §16.1 and §17.8).
+Four things are **never** rewritten, because something elsewhere names them:
+``opportunity_weights.version``, cited by every score; ``(feature_definitions.name,
+version)``, hashed into ``feature_snapshots.feature_set_version``; the ``paper_v1``
+preset, every number of which is Everton's directive (``seed_paper``); and a
+``strategy_version`` past its first activation. The first three are inserted when
+missing, *verified* when present, and a divergence stops the seed. The fourth does
+not: the frozen row is the truth, answered by a successor version, never by this
+script (DATABASE.md §16.1, §17.8 and §18.8).
 
 The content is the sibling ``seed_reference`` module (fractions as JSON strings
 included); this file is the writes. ``is_active`` on ``opportunity_weights`` is
@@ -35,6 +34,7 @@ import sys
 import uuid
 from typing import Any
 
+from seed_paper import seed_paper_preset
 from seed_reference import (
     ENTITLEMENTS,
     EXCHANGES,
@@ -331,7 +331,7 @@ async def seed() -> dict[str, int]:
                 "strategy_versions": strategy_versions,
                 "plan_entitlements": await seed_plan_entitlements(conn),
                 "feature_flags": await seed_feature_flags(conn),
-                "risk_profiles": await seed_risk_profiles(conn),
+                "risk_profiles": await seed_risk_profiles(conn) + await seed_paper_preset(conn),
                 "feature_definitions": await seed_feature_definitions(conn),
                 "opportunity_weights": await seed_opportunity_weights(conn),
             }

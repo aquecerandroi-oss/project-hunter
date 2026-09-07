@@ -1,9 +1,21 @@
-"""Proposals, orders, fills, positions and trades — DATABASE.md §7 (tenant).
+"""Proposals and orders — DATABASE.md §7 and §18.3 (tenant).
 
 ``trade_proposals`` is the PROPOSAL of AGENT -> PROPOSAL -> RISK ENGINE ->
 EXECUTION: no entry order exists without a row here carrying
-``risk_decision.approved = true`` (RISK_ENGINE.md §7). Exit orders are always
+``risk_decision.approved = true`` (RISK_ENGINE.md §8). Exit orders are always
 allowed and are the only ones that may reference a null proposal.
+
+``0006_paper_wallet`` adds three things to this file and moves ``fills`` and
+``positions`` to ``execution_fills.py`` and ``trades`` to
+``execution_trades.py`` to stay inside the 350-line budget:
+
+- the **reservation**, whose tenure is a different axis from the decision's
+  label (``reservation_state`` next to ``status``), plus the durable ``fifo_v1``
+  admission sequence;
+- **composite identity** down the chain proposal -> order -> fill, so no row can
+  claim one organization's wallet while pointing at another's parent;
+- ``fills.execution_key``, the idempotency key that makes a redelivered
+  execution a no-op rather than a second fill.
 """
 
 from __future__ import annotations
@@ -14,13 +26,15 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
-    Integer,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -29,27 +43,36 @@ from hunter_core.db.base import Base, TenantMixin, UUIDPrimaryKeyMixin
 from hunter_core.db.models._common import (
     CONFIDENCE,
     JSONB_EMPTY,
-    JSONB_EMPTY_LIST,
     PERCENT,
     SCORE,
     SQL_FALSE,
-    SQL_TRUE,
     org_fk,
     pg_enum,
     tenant_scoped_fk,
 )
+from hunter_core.db.models.execution_fills import Fill, Position
+from hunter_core.db.models.execution_trades import Trade
 from hunter_core.domain.enums import (
     ExecutionMode,
-    ExitReason,
-    LiquidityRole,
     OrderPurpose,
     OrderSide,
     OrderStatus,
     OrderType,
-    PositionStatus,
+    ProposalSource,
     ProposalStatus,
+    ReservationState,
     TradeDirection,
 )
+
+__all__ = ["Fill", "Order", "Position", "Trade", "TradeProposal"]
+"""``Fill``, ``Position`` and ``Trade`` are re-exported, not defined here.
+
+The split above is a file-size measure, not a change of API:
+``from hunter_core.db.models.execution import Position`` is a public path with
+callers outside this package (``apps/api``), and a module split that breaks an
+import is a refactor that broke something. Re-exporting keeps the old path
+working while the classes live where they fit.
+"""
 
 _MARKET_FK = "markets.id"
 
@@ -71,6 +94,25 @@ class TradeProposal(Base, UUIDPrimaryKeyMixin, TenantMixin):
         # client, so a global unique lets tenant A's retry collide with — and be
         # silently swallowed as a duplicate of — tenant B's proposal.
         UniqueConstraint("organization_id", "idempotency_key", name="uq_trade_proposals_idem"),
+        # The target of the composite FK from ``orders``: an order may not name a
+        # proposal belonging to another organization or another wallet.
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            "portfolio_id",
+            "market_id",
+            name="uq_trade_proposals_id_scope",
+        ),
+        # ``fifo_v1``: the wallet's admission order, assigned under the portfolio
+        # lock from ``portfolio_risk_state.last_admission_seq``. Unique per
+        # wallet, so a retry that recovers an existing proposal keeps its place
+        # instead of taking a second one.
+        UniqueConstraint(
+            "organization_id",
+            "portfolio_id",
+            "admission_seq",
+            name="uq_trade_proposals_admission_seq",
+        ),
         Index(
             "ix_trade_proposals_org_portfolio_created",
             "organization_id",
@@ -78,6 +120,46 @@ class TradeProposal(Base, UUIDPrimaryKeyMixin, TenantMixin):
             "created_at",
         ),
         Index("ix_trade_proposals_status_expires", "status", "expires_at"),
+        # The expiry sweep, which competes for the same portfolio lock.
+        Index(
+            "ix_trade_proposals_reservation_expiry",
+            "organization_id",
+            "portfolio_id",
+            "reserved_until",
+            postgresql_where=text("reservation_state = 'held'"),
+        ),
+        # Quantified exactly when there is a reservation — stated as two
+        # implications rather than one biconditional so that ``consumed``,
+        # ``released`` and ``expired`` keep the *original* amounts as history.
+        # What counts against a limit is gated by the state, never by the
+        # columns going null.
+        CheckConstraint(
+            "reservation_state = 'none' OR (reserved_notional IS NOT NULL "
+            "AND reserved_cash IS NOT NULL AND reserved_risk IS NOT NULL "
+            "AND reserved_until IS NOT NULL)",
+            name="a_reservation_is_quantified",
+        ),
+        CheckConstraint(
+            "reservation_state <> 'none' OR (reserved_notional IS NULL "
+            "AND reserved_cash IS NULL AND reserved_risk IS NULL "
+            "AND reserved_until IS NULL)",
+            name="an_unreserved_proposal_holds_nothing",
+        ),
+        # A slot only exists while the reservation is in force: the fill
+        # *converts* the reserved slot into the position's slot, and a converted
+        # reservation that kept counting would be two slots for one entry.
+        CheckConstraint(
+            "NOT reserved_slot OR reservation_state = 'held'", name="a_slot_is_held_or_gone"
+        ),
+        CheckConstraint(
+            "(reserved_notional IS NULL OR reserved_notional > 0) "
+            "AND (reserved_cash IS NULL OR reserved_cash > 0) "
+            "AND (reserved_risk IS NULL OR reserved_risk >= 0)",
+            name="reserved_amounts_are_sane",
+        ),
+        CheckConstraint(
+            "admission_seq IS NULL OR admission_seq > 0", name="admission_seq_positive"
+        ),
     )
 
     portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
@@ -102,6 +184,44 @@ class TradeProposal(Base, UUIDPrimaryKeyMixin, TenantMixin):
     opportunity_score: Mapped[Decimal | None] = mapped_column(SCORE)
     confidence: Mapped[Decimal | None] = mapped_column(CONFIDENCE)
     idempotency_key: Mapped[str] = mapped_column(Text)
+    source: Mapped[ProposalSource] = mapped_column(
+        pg_enum("proposal_source"), server_default=ProposalSource.MANUAL.value
+    )
+    """Which admission path this came in through — not who asked, which is
+    ``agent_id`` plus the audit actor. ``MANUAL`` is the only live origin in M3."""
+
+    admission_seq: Mapped[int | None] = mapped_column(BigInteger)
+    """``fifo_v1``. Null until admitted; assigned once, under the portfolio lock."""
+
+    reservation_state: Mapped[ReservationState] = mapped_column(
+        pg_enum("reservation_state"), server_default=ReservationState.NONE.value
+    )
+    """The reservation's tenure, separate from ``status``, the decision's label.
+    ``status`` records what the Risk Engine decided and never stops being true;
+    this records whether the commitment is still standing."""
+
+    reserved_notional: Mapped[Decimal | None]
+    """What the entry commits to exposure and to the participation budget."""
+
+    reserved_cash: Mapped[Decimal | None]
+    """What it commits to *cash*, fees included — a separate number on purpose.
+    With 100 of cash, a notional reservation of 100 and an estimated fee of 0,10,
+    a single column passes every check and the purchase still needs 100,10;
+    folding the fee into the notional would instead distort exposure and
+    participation (Astra's counter-example)."""
+
+    reserved_risk: Mapped[Decimal | None]
+    """Planned loss at the stop, costs included, in the operating currency and
+    **not** as a fraction: the aggregate ceiling is a percentage of an equity
+    that moves, while the commitment already made is an amount. The aggregate is
+    a sum of per-position non-negative risks — never ``max(0, Σ signed)``, which
+    would let a −80 and a +100 net to a commitment of 20."""
+
+    reserved_slot: Mapped[bool] = mapped_column(server_default=SQL_FALSE)
+    reserved_until: Mapped[datetime | None]
+    """The reservation's own validity, distinct from ``expires_at``, the
+    proposal's. Expiry competes for the same lock as admission."""
+
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     decided_at: Mapped[datetime | None]
     expires_at: Mapped[datetime | None]
@@ -115,19 +235,67 @@ class Order(Base, UUIDPrimaryKeyMixin, TenantMixin):
         org_fk(),
         tenant_scoped_fk("portfolio_id", "portfolios"),
         tenant_scoped_fk("agent_id", "agents", ondelete=_AGENT_SET_NULL),
+        # proposal -> order, on organization, wallet *and market*. A
+        # single-column FK is satisfied by a proposal of any organization, any
+        # wallet and any market, and RLS only ever reads the row's own
+        # ``organization_id``, so nothing catches the mismatch. The market is in
+        # the key because an order placed in a market the decision never
+        # evaluated is an unpriced entry wearing an approval.
+        # ``SET NULL`` names the column (Postgres 15+) because a bare one would
+        # also null ``organization_id`` and ``portfolio_id``, both NOT NULL —
+        # the §15.4 precedent, and the action ``0001`` already used here.
+        ForeignKeyConstraint(
+            ["proposal_id", "organization_id", "portfolio_id", "market_id"],
+            [
+                "trade_proposals.id",
+                "trade_proposals.organization_id",
+                "trade_proposals.portfolio_id",
+                "trade_proposals.market_id",
+            ],
+            ondelete="SET NULL (proposal_id)",
+        ),
+        # order -> exit intent: which durable intention this attempt serves.
+        ForeignKeyConstraint(
+            ["exit_intent_id", "organization_id", "portfolio_id", "market_id"],
+            [
+                "portfolio_exit_intents.id",
+                "portfolio_exit_intents.organization_id",
+                "portfolio_exit_intents.portfolio_id",
+                "portfolio_exit_intents.market_id",
+            ],
+            ondelete="SET NULL (exit_intent_id)",
+        ),
         UniqueConstraint("portfolio_id", "client_order_id", name="uq_orders_client_order_id"),
+        # The target of the composite FK from ``fills`` (which has no market of
+        # its own) and, with the market, of the participation ledger's.
+        UniqueConstraint("id", "organization_id", "portfolio_id", name="uq_orders_id_scope"),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            "portfolio_id",
+            "market_id",
+            name="uq_orders_id_market_scope",
+        ),
         CheckConstraint("qty > 0", name="qty_positive"),
         CheckConstraint("price IS NULL OR price > 0", name="price_positive"),
         CheckConstraint("stop_price IS NULL OR stop_price > 0", name="stop_price_positive"),
         CheckConstraint("filled_qty >= 0 AND filled_qty <= qty", name="filled_qty_within_qty"),
+        # An entry is one attempt and is never part of a protection.
+        CheckConstraint(
+            "purpose <> 'entry' OR exit_intent_id IS NULL", name="an_entry_serves_no_exit_intent"
+        ),
         Index("ix_orders_org_portfolio_created", "organization_id", "portfolio_id", "created_at"),
         Index("ix_orders_status", "status"),
     )
 
     portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
-    proposal_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("trade_proposals.id", ondelete="SET NULL"), index=True
-    )
+    proposal_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
+    exit_intent_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
+    """The intention this attempt is for. Null for entries and for anything not
+    driven by a durable protection. Each attempt keeps its own identity, so a
+    second attempt at the same intention is a second order, never a rewrite of
+    the first (RISK_ENGINE.md §10)."""
+
     agent_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
     market_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey(_MARKET_FK, ondelete="RESTRICT"), index=True
@@ -159,134 +327,3 @@ class Order(Base, UUIDPrimaryKeyMixin, TenantMixin):
     reason: Mapped[str | None] = mapped_column(Text)
     meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, server_default=JSONB_EMPTY)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-
-
-class Fill(Base, UUIDPrimaryKeyMixin, TenantMixin):
-    """One execution against an order. ``simulated`` is true for paper and shadow."""
-
-    __tablename__ = "fills"
-    __table_args__ = (
-        org_fk(),
-        tenant_scoped_fk("portfolio_id", "portfolios"),
-        CheckConstraint("qty > 0", name="qty_positive"),
-        CheckConstraint("price > 0", name="price_positive"),
-        Index("ix_fills_org_portfolio_ts", "organization_id", "portfolio_id", "ts"),
-    )
-
-    order_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("orders.id", ondelete="CASCADE"), index=True
-    )
-    portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
-    ts: Mapped[datetime] = mapped_column(server_default=func.now())
-    qty: Mapped[Decimal]
-    price: Mapped[Decimal]
-    fee: Mapped[Decimal] = mapped_column(server_default="0")
-    fee_asset: Mapped[str | None] = mapped_column(Text)
-    liquidity: Mapped[LiquidityRole | None] = mapped_column(pg_enum("liquidity_role"))
-    slippage_bps: Mapped[Decimal | None]
-    simulated: Mapped[bool] = mapped_column(server_default=SQL_TRUE)
-    book_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, server_default=JSONB_EMPTY)
-
-
-class Position(Base, UUIDPrimaryKeyMixin, TenantMixin):
-    """An open (or closing) exposure. Closed positions also produce a ``trades`` row."""
-
-    __tablename__ = "positions"
-    __table_args__ = (
-        org_fk(),
-        tenant_scoped_fk("portfolio_id", "portfolios"),
-        tenant_scoped_fk("agent_id", "agents", ondelete=_AGENT_SET_NULL),
-        # a closing position legitimately reaches 0 before it becomes a trade
-        CheckConstraint("qty >= 0", name="qty_non_negative"),
-        CheckConstraint("avg_entry_price > 0", name="avg_entry_price_positive"),
-        Index("ix_positions_org_portfolio_status", "organization_id", "portfolio_id", "status"),
-        Index("ix_positions_market_status", "market_id", "status"),
-    )
-
-    portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
-    agent_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
-    market_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(_MARKET_FK, ondelete="RESTRICT"))
-    direction: Mapped[TradeDirection] = mapped_column(pg_enum("trade_direction"))
-    qty: Mapped[Decimal]
-    avg_entry_price: Mapped[Decimal]
-    mark_price: Mapped[Decimal | None]
-    notional: Mapped[Decimal | None]
-    leverage: Mapped[Decimal | None]
-    unrealized_pnl: Mapped[Decimal] = mapped_column(server_default="0")
-    realized_pnl: Mapped[Decimal] = mapped_column(server_default="0")
-    fees_paid: Mapped[Decimal] = mapped_column(server_default="0")
-    stop_price: Mapped[Decimal | None]
-    targets: Mapped[list[Any]] = mapped_column(JSONB, server_default=JSONB_EMPTY_LIST)
-    trailing: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    mfe: Mapped[Decimal | None]
-    mae: Mapped[Decimal | None]
-    status: Mapped[PositionStatus] = mapped_column(
-        pg_enum("position_status"), server_default=PositionStatus.OPEN.value
-    )
-    opened_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    closed_at: Mapped[datetime | None]
-    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
-    meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, server_default=JSONB_EMPTY)
-
-
-class Trade(Base, UUIDPrimaryKeyMixin, TenantMixin):
-    """One row per closed position — the truth analytics reads."""
-
-    __tablename__ = "trades"
-    __table_args__ = (
-        org_fk(),
-        tenant_scoped_fk("portfolio_id", "portfolios"),
-        tenant_scoped_fk("agent_id", "agents", ondelete=_AGENT_SET_NULL),
-        UniqueConstraint("position_id"),
-        CheckConstraint("qty > 0", name="qty_positive"),
-        CheckConstraint("entry_price > 0", name="entry_price_positive"),
-        CheckConstraint("exit_price > 0", name="exit_price_positive"),
-        Index("ix_trades_org_portfolio_closed", "organization_id", "portfolio_id", "closed_at"),
-        Index("ix_trades_agent_closed", "agent_id", "closed_at"),
-        Index("ix_trades_market_closed", "market_id", "closed_at"),
-    )
-
-    portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
-    agent_id: Mapped[uuid.UUID | None]
-    strategy_version_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("strategy_versions.id", ondelete="SET NULL"), index=True
-    )
-    market_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(_MARKET_FK, ondelete="RESTRICT"))
-    position_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("positions.id", ondelete="SET NULL")
-    )
-    signal_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("agent_signals.id", ondelete="SET NULL"), index=True
-    )
-    proposal_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("trade_proposals.id", ondelete="SET NULL"), index=True
-    )
-    opportunity_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("opportunities.id", ondelete="SET NULL"), index=True
-    )
-    execution_mode: Mapped[ExecutionMode] = mapped_column(pg_enum("execution_mode"))
-    direction: Mapped[TradeDirection] = mapped_column(pg_enum("trade_direction"))
-    entry_price: Mapped[Decimal]
-    exit_price: Mapped[Decimal]
-    qty: Mapped[Decimal]
-    notional: Mapped[Decimal | None]
-    fees: Mapped[Decimal] = mapped_column(server_default="0")
-    slippage_cost: Mapped[Decimal] = mapped_column(server_default="0")
-    pnl: Mapped[Decimal]
-    pnl_pct: Mapped[Decimal | None] = mapped_column(PERCENT)
-    r_multiple: Mapped[Decimal | None]
-    duration_s: Mapped[int | None] = mapped_column(Integer)
-    mfe: Mapped[Decimal | None]
-    mae: Mapped[Decimal | None]
-    regime_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("market_regimes.id", ondelete="SET NULL"), index=True
-    )
-    opportunity_score: Mapped[Decimal | None] = mapped_column(SCORE)
-    confidence: Mapped[Decimal | None] = mapped_column(CONFIDENCE)
-    entry_reason: Mapped[str | None] = mapped_column(Text)
-    exit_reason: Mapped[ExitReason | None] = mapped_column(pg_enum("exit_reason"))
-    entry_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=JSONB_EMPTY)
-    exit_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=JSONB_EMPTY)
-    opened_at: Mapped[datetime]
-    closed_at: Mapped[datetime]

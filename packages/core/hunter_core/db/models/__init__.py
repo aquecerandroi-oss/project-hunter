@@ -55,6 +55,7 @@ from hunter_core.db.models.analysis import (
 )
 from hunter_core.db.models.analysis_baselines import FeatureBaseline
 from hunter_core.db.models.backtests import Backtest, BacktestResult, BacktestTrade
+from hunter_core.db.models.betas import MarketBeta
 from hunter_core.db.models.billing import (
     FeatureFlag,
     OrganizationFeatureOverride,
@@ -62,7 +63,10 @@ from hunter_core.db.models.billing import (
     Subscription,
 )
 from hunter_core.db.models.exchanges import ExchangeConnection
-from hunter_core.db.models.execution import Fill, Order, Position, Trade, TradeProposal
+from hunter_core.db.models.execution import Order, TradeProposal
+from hunter_core.db.models.execution_fills import Fill, Position
+from hunter_core.db.models.execution_trades import Trade
+from hunter_core.db.models.fx import FxObservation
 from hunter_core.db.models.identity import (
     ApiKey,
     Organization,
@@ -81,6 +85,8 @@ from hunter_core.db.models.market_data import (
     OpenInterestHistory,
 )
 from hunter_core.db.models.markets import Asset, Exchange, Market
+from hunter_core.db.models.paper_execution import ParticipationConsumption, PortfolioExitIntent
+from hunter_core.db.models.paper_wallet import PortfolioCurrencyAnchor, PortfolioRiskState
 from hunter_core.db.models.portfolios import Portfolio, PortfolioEquitySnapshot, RiskProfile
 from hunter_core.db.models.risk import KillSwitchTransition, RiskEvent
 from hunter_core.db.models.system import (
@@ -175,12 +181,14 @@ __all__ = [
     "FeatureSnapshot",
     "Fill",
     "FundingRate",
+    "FxObservation",
     "IngestionGap",
     "IntelligenceEvent",
     "IntelligenceSource",
     "KillSwitchTransition",
     "Liquidation",
     "Market",
+    "MarketBeta",
     "MarketRegimeRow",
     "MarketSnapshot",
     "Notification",
@@ -194,9 +202,13 @@ __all__ = [
     "OrganizationInvitation",
     "OrganizationMember",
     "OutboxEvent",
+    "ParticipationConsumption",
     "PlanEntitlement",
     "Portfolio",
+    "PortfolioCurrencyAnchor",
     "PortfolioEquitySnapshot",
+    "PortfolioExitIntent",
+    "PortfolioRiskState",
     "Position",
     "ProcessedEvent",
     "RiskEvent",

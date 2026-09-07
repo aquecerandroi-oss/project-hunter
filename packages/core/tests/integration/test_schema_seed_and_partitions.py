@@ -157,7 +157,8 @@ def test_seeding_twice_leaves_the_same_rows(seed_db: str) -> None:
     assert counts_after_first["strategy_versions"] == 8
     assert counts_after_first["plan_entitlements"] == 36
     assert counts_after_first["feature_flags"] == 7
-    assert counts_after_first["risk_profiles"] == 3
+    # three generic presets plus the frozen paper_v1 of RISK_ENGINE.md §2
+    assert counts_after_first["risk_profiles"] == 4
     assert counts_after_first["feature_definitions"] == len(default_definitions_rows()) == 28
     assert counts_after_first["opportunity_weights"] == 2
 
@@ -186,6 +187,103 @@ def test_seeded_risk_presets_carry_the_documented_limits(seed_db: str) -> None:
     assert limits["max_drawdown_pct"] == "0.10"
     assert limits["max_concurrent_positions"] == 6
     assert limits["auto_close_on_emergency"] is False
+
+
+def test_the_seeded_paper_preset_is_the_directive(seed_db: str) -> None:
+    """``paper_v1`` carries Everton's numbers, spelled out here, not imported.
+
+    Every value below is read from
+    ``.claude/state/directive-risk-engine-2026-09-06.md`` and RISK_ENGINE.md §2,
+    typed out rather than imported from ``seed_reference`` — a test that imports
+    the constant it is checking agrees with the seed by construction and would
+    not notice a digit moving. Fractions are JSON *strings* so they reach
+    ``Decimal`` without passing through a float.
+    """
+    _use(seed_db)
+    seed = _load_script("seed")
+    asyncio.run(seed.seed())
+
+    async def _paper_limits() -> dict[str, Any]:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.connect() as connection:
+                value = await connection.scalar(
+                    text(
+                        "SELECT limits FROM risk_profiles "
+                        "WHERE organization_id IS NULL AND preset = 'paper_v1'"
+                    )
+                )
+        finally:
+            await engine.dispose()
+        assert isinstance(value, dict), "paper_v1 was never seeded"
+        return cast("dict[str, Any]", value)
+
+    limits = asyncio.run(_paper_limits())
+    assert limits["risk_per_trade_pct"] == "0.0025"
+    assert limits["max_aggregate_planned_risk_pct"] == "0.01"
+    assert limits["max_participation_pct"] == "0.01"
+    assert limits["max_total_exposure_pct"] == "0.40"
+    assert limits["max_asset_exposure_pct"] == "0.10"
+    assert limits["max_concurrent_positions"] == 5
+    assert limits["max_beta_btc_exposure"] == "0.5"
+    assert limits["min_liquidity_usd_24h"] == "50000000"
+    assert limits["max_leverage"] == 1
+    assert limits["market_types"] == ["spot"]
+    assert limits["warning_size_multiplier"] == "0.5"
+    assert limits["kill_switch_warning"] == {"daily_loss_pct": "0.01", "drawdown_pct": "0.04"}
+    assert limits["kill_switch_blocked"] == {"daily_loss_pct": "0.02", "drawdown_pct": "0.08"}
+    assert limits["auto_close_on_emergency"] is False
+
+
+def test_the_seeded_paper_preset_refuses_to_be_rewritten(seed_db: str) -> None:
+    """A limit change is a question to Everton, never a deploy (§18.8).
+
+    The three generic presets are refreshed in place because they are defaults
+    nobody has committed money to. ``paper_v1`` is the wallet's profile and every
+    number in it is his, so the seed *verifies* it and stops on a divergence
+    instead of quietly putting the shipped value back.
+    """
+    _use(seed_db)
+    seed = _load_script("seed")
+    asyncio.run(seed.seed())
+
+    async def _tamper() -> None:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    text(
+                        "UPDATE risk_profiles SET limits = jsonb_set(limits, "
+                        "'{risk_per_trade_pct}', '\"0.01\"') "
+                        "WHERE organization_id IS NULL AND preset = 'paper_v1'"
+                    )
+                )
+        finally:
+            await engine.dispose()
+
+    async def _forget() -> None:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    text(
+                        "DELETE FROM risk_profiles "
+                        "WHERE organization_id IS NULL AND preset = 'paper_v1'"
+                    )
+                )
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_tamper())
+    try:
+        with pytest.raises(SystemExit, match="risk_per_trade_pct"):
+            asyncio.run(seed.seed())
+    finally:
+        # The database of this module is shared: leaving a tampered preset behind
+        # would make every later test in the file fail on the same refusal, which
+        # is the guard working and would look like ten unrelated regressions.
+        asyncio.run(_forget())
+        asyncio.run(seed.seed())
 
 
 def test_the_seeded_catalogue_is_exactly_the_feature_registry(seed_db: str) -> None:
@@ -686,8 +784,8 @@ def test_the_seed_writes_system_presets_under_a_nosuperuser_owner(owner_db: str)
     reported: dict[str, int] = asyncio.run(seed.seed())
     stored = asyncio.run(_row_counts(owner_db))
 
-    assert reported["risk_profiles"] == 3
-    assert stored["risk_profiles"] == 3, (
+    assert reported["risk_profiles"] == 4
+    assert stored["risk_profiles"] == 4, (
         "the seed reported rows it did not write: FORCE ROW LEVEL SECURITY filtered "
         "the table owner and the upsert matched nothing"
     )

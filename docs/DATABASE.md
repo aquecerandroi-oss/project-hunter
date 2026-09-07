@@ -1680,3 +1680,663 @@ Nada nesta revisão depende de estado de sessão: sem prepared statement de sess
 sem `LISTEN/NOTIFY`, sem advisory lock de sessão. O único GUC envolvido,
 `app.baseline_retention`, é lido com `NULLIF(current_setting(..., true), '')` e
 escrito com `SET LOCAL`, exatamente como `app.current_org` (§15.4).
+
+## 18. Carteira virtual e Risk Engine — M3 (`0006_paper_wallet`)
+
+Sexta revisão. Entrega o estado durável do Milestone 3 (tarefa T3.1) conforme a
+**"Decisão conjunta Claude ⇄ Astra (2026-09-06)"** de `docs/plans/M3.md`, que
+prevalece sobre o resto daquele plano, e o contrato `docs/RISK_ENGINE.md` **v2**.
+Seis tabelas novas: duas globais e imutáveis (`fx_observations`, `market_betas`)
+e quatro de tenant (`portfolio_currency_anchor`, `portfolio_risk_state`,
+`portfolio_exit_intents`, `participation_consumptions`).
+
+A regra que organiza tudo o que vem abaixo: **a diretiva do Everton proíbe aporte
+e reset**, e uma proibição que só existe em prosa é uma proibição que o primeiro
+`DELETE` derrota. Cada seção diz qual frase da diretiva virou constraint, índice
+ou trigger — e, quando não deu para virar, diz isso também em vez de deixar o
+leitor supor.
+
+### 18.1 Enums (`ddl/enums.py`)
+
+Tipos novos, congelados em `PAPER_ENUMS`: `proposal_source` (`manual|agent`),
+`reservation_state` (`none|held|consumed|released|expired`), `exit_intent_state`
+(`open|blocked_residual|fulfilled|superseded|voided`) e
+`participation_entry_kind` (`reserved|executed|released`). `exit_reason` é
+**reusado** para o motivo de uma intenção de saída em vez de duplicado: ele já
+soletra stop/alvo/invalidação/manual/kill switch/risk event, que é exatamente
+esse vocabulário (§1, "um ENUM por conceito").
+
+`proposal_source` nasce com dois membros e **sem** `shadow_bridge`: a decisão
+conjunta deixa a ponte sinal → proposta para o M4 (item 9), e um rótulo é uma
+promessa de que algo existe. `manual` é a única origem viva no M3; `agent` entra
+congelado como a interface que a T3.12/M4 vai usar, para a ponte não precisar de
+migração só para isso. **Origem não é ator**: quem pediu continua sendo
+`agent_id` mais o ator da auditoria.
+
+Valores acrescentados a tipos da `0001` (`PAPER_ADDED_VALUES`):
+
+| Tipo | Rótulo novo | Posição |
+|---|---|---|
+| `risk_preset` | `paper_v1` | `BEFORE 'custom'` (todo preset nomeado precede o coringa) |
+| `risk_event_type` | `proposal_unavailable_input` | `BEFORE 'daily_loss_warning'` |
+| `risk_event_type` | `participation_capped` | `BEFORE 'data_degraded_in_position'` |
+| `risk_event_type` | `beta_missing` | `BEFORE 'data_degraded_in_position'` |
+
+Os três eventos são os que o contrato v2 (§8) nomeia e o v1 não tinha, e cada um
+é uma distinção que o motor precisa **publicar**, não só calcular: "reprovado por
+não caber" e "não avaliado por falta de dado" são fatos diferentes (§7 do
+contrato); o teto de participação é o limitante que a diretiva espera que mais
+morda e que a D2 promete medir; e "sem beta validado, manter o ativo apenas em shadow" é uma
+regra dele cujo disparo tem de ser visível. A ordem é parte do contrato (§17.1) e
+`test_each_revision_creates_exactly_the_labels_it_froze` compara `enumsortorder`.
+
+Mesma restrição do Postgres da `0003`: um valor acrescentado por `ALTER TYPE ...
+ADD VALUE` não pode ser **usado** na mesma transação. A `0006` acrescenta os
+quatro e não escreve nenhum; `paper_v1` chega ao banco por
+`infra/scripts/seed.py`, depois do commit da migração.
+
+### 18.2 O ledger: `fx_observations` e `portfolio_currency_anchor`
+
+```
+fx_observations                              (global, imutável)
+  id, pair, rate NUMERIC(28,10), source, observed_at, available_at, raw JSONB, created_at
+  UNIQUE (pair, source, observed_at)          -- uq_fx_observations_observation
+  INDEX  (pair, available_at)                 -- ix_fx_observations_lookup
+  CHECKs: rate > 0; observed_at <= available_at; pair e source não vazios
+
+portfolio_currency_anchor                    (tenant, imutável, 1 linha por carteira)
+  id, organization_id, portfolio_id (UNIQUE), origin_currency (BRL), origin_amount,
+  operating_currency (USDT), credited_amount, fx_observation_id -> fx_observations (RESTRICT),
+  rate, conversion_residual, rounding_policy, anchored_at
+  CHECKs: origin_amount > 0; credited_amount > 0; rate > 0; conversion_residual >= 0;
+          round(credited_amount * rate + conversion_residual, 10) = round(origin_amount, 10)
+```
+
+**Dois carimbos, não um.** `observed_at` é quando a corretora diz que a taxa
+valia; `available_at` é quando **nós** poderíamos ter agido sobre ela. Uma
+decisão das 10:00 não pode ser explicada por uma cotação que chegou às 10:02 — o
+mesmo corte causal das baselines (§17.2).
+
+**A identidade do dinheiro é um CHECK.** `origin = credited × rate + residual`,
+arredondado à escala armazenada porque `credited × rate` é um produto de 20 casas
+e as colunas guardam dez. Para isso a taxa é **copiada** para a âncora: um CHECK
+não alcança outra tabela. E uma cópia que possa discordar da fonte é pior que
+nenhuma cópia, então a trigger `portfolio_currency_anchor_matches_observation`
+recusa a inserção cuja `rate` não seja a da observação nomeada.
+
+O **resíduo** é gravado, não absorvido: absorvê-lo faria a carteira começar num
+número que ninguém escolheu, e a política que o produziu (`rounding_policy`) fica
+ao lado dele.
+
+**A âncora também tem de concordar com a carteira que ela abre.** A mesma
+trigger recusa (a) uma âncora para carteira sem `portfolio_risk_state` — a linha
+de trava tem de existir antes, porque `SELECT ... FOR UPDATE` numa linha que não
+existe não serializa nada — e (b) `credited_amount` diferente de
+`portfolios.initial_capital`, ou `operating_currency` diferente de
+`base_currency`. O segundo é achado da revisão de diff da Astra: sem ele duas
+fontes persistidas discordavam sobre o capital de abertura, e uma reconstrução
+que lesse `initial_capital` enquanto a atribuição lê `credited_amount` parte de
+um número que ninguém creditou.
+
+**O que isso *não* prova**, e a frase honesta é esta: que carteira, crédito,
+âncora e auditoria nasceram no mesmo commit. A trigger exige que a linha de trava
+exista, não que ela tenha sido criada na mesma transação. A atomicidade da
+abertura é invariante do caminho único de escrita (T3.3), com teste.
+
+`portfolio_equity_snapshots` ganha `fx_observation_id` **anulável**, com FK
+`RESTRICT`. Anulável de propósito: FX indisponível depois da abertura deixa o
+USDT apurável e o BRL **indisponível com motivo**, nunca extrapolado. `RESTRICT`
+porque a observação é a explicação de um número guardado.
+
+`fx_observations` é imutável por trigger para **todo papel, inclusive o dono** —
+que é mais do que qualquer `REVOKE` promete. Consequência aceita e declarada: uma
+observação nunca é apagada, nem em limpeza de tenant; são poucas linhas por
+minuto e são a evidência de toda a curva em BRL.
+
+### 18.3 A reserva, o FIFO e a identidade composta (`trade_proposals`, `orders`, `fills`)
+
+```
+trade_proposals  (+) source proposal_source NOT NULL DEFAULT 'manual'
+                 (+) admission_seq BIGINT
+                 (+) reservation_state reservation_state NOT NULL DEFAULT 'none'
+                 (+) reserved_notional, reserved_cash, reserved_risk NUMERIC(28,10)
+                 (+) reserved_slot BOOLEAN NOT NULL DEFAULT false
+                 (+) reserved_until TIMESTAMPTZ
+  UNIQUE (id, organization_id, portfolio_id)                 -- uq_trade_proposals_id_scope
+  UNIQUE (organization_id, portfolio_id, admission_seq)      -- uq_trade_proposals_admission_seq
+  INDEX  (organization_id, portfolio_id, reserved_until) WHERE reservation_state = 'held'
+
+orders  (+) exit_intent_id UUID
+  UNIQUE (id, organization_id, portfolio_id)                 -- uq_orders_id_scope
+  FK (proposal_id, organization_id, portfolio_id) -> trade_proposals, ON DELETE SET NULL (proposal_id)
+  FK (exit_intent_id, organization_id, portfolio_id, market_id) -> portfolio_exit_intents
+  CHECK purpose <> 'entry' OR exit_intent_id IS NULL
+
+fills  (+) execution_key TEXT NOT NULL
+  UNIQUE (organization_id, execution_key)                    -- uq_fills_execution_key
+  FK (order_id, organization_id, portfolio_id) -> orders, ON DELETE CASCADE
+
+positions  UNIQUE (id, organization_id, portfolio_id, market_id)  -- uq_positions_id_scope
+```
+
+**Vigência separada do rótulo.** `status` é o que o Risk Engine **decidiu** e não
+para de ser verdade; `reservation_state` é se o compromisso ainda está de pé. Uma
+proposta pode ser `approved` para sempre e ter a reserva já consumida por um
+fill, liberada por um cancelamento ou expirada sob a trava do portfolio. Juntar
+os dois eixos é como um rótulo velho acaba segurando uma vaga que ninguém tem.
+
+**Três dinheiros, não um.** `reserved_notional` é o que a entrada compromete de
+exposição e de participação; `reserved_cash` é o que ela compromete de **caixa,
+taxas incluídas**; `reserved_risk` é a perda planejada no stop, com custos.
+Separar caixa de notional é a correção da Astra, com o cenário: caixa 100,
+reserva de notional 100, taxa estimada 0,10 — todos os CHECKs passam e a compra
+precisa de 100,10. Embutir a taxa no notional resolveria o caixa distorcendo
+exposição e participação.
+
+`reserved_risk` é **dinheiro na moeda operacional, não fração**: o teto agregado
+é um percentual de um patrimônio que se move, enquanto o compromisso já assumido
+é um valor. E o agregado é a soma de riscos por posição, **nunca**
+`max(0, Σ assinado)` — riscos de −80 e +100 não podem virar um compromisso de 20.
+Isso é invariante do motor (T3.2), não DDL, e está escrito aqui para não ser
+descoberto depois.
+
+Um eixo só **não** impede um escritor de reabrir um ciclo por `UPDATE`
+(`consumed` de volta para `held`); o que o schema garante é que existe **um** eixo
+por proposta, e é isso que torna `proposal_id` identidade suficiente da reserva
+no ledger de participação (§18.5). Manter o ciclo único é regra do serviço de
+admissão (T3.12), com teste.
+
+Os CHECKs são duas implicações e não uma bicondicional, de propósito: quantificada
+se e somente se `reservation_state <> 'none'`, o que deixa `consumed`, `released`
+e `expired` **guardarem os valores originais** como histórico. O que conta contra
+um limite é decidido pelo estado, nunca pelas colunas irem a nulo. E
+`NOT reserved_slot OR reservation_state = 'held'`: o fill **converte** a vaga
+reservada na vaga da posição, e uma reserva convertida que continuasse contando
+seriam duas vagas para a mesma entrada.
+
+**`fifo_v1` é um contador de linha, não uma `SEQUENCE`.** `admission_seq` é
+atribuído sob a trava de `portfolio_risk_state`, então é ordem de commit por
+construção. Uma sequence do Postgres tem lacunas no rollback e a ordem dela não é
+a de commit — a transação A pode pegar 10, a B pegar 11 e commitar primeiro (o
+mesmo argumento que a §16.4 faz sobre `outbox_events.id`) —, e ordem de admissão
+é uma promessa ao operador. O `UNIQUE` por carteira é o que faz um retry que
+recupera a proposta existente **manter o lugar** em vez de tomar um segundo.
+
+**Identidade composta descendo a cadeia.** Com FK de uma coluna só, uma ordem
+podia declarar-se da organização A apontando para a proposta da B: a FK ficava
+satisfeita e a RLS só olha o `organization_id` da própria linha (§15.4). Agora
+proposta → ordem é pelo **quádruplo** `(id, organization_id, portfolio_id,
+market_id)` — uma ordem colocada num mercado que a decisão nunca avaliou é uma
+entrada sem preço vestindo uma aprovação — e ordem → fill pelo **trio**
+`(id, organization_id, portfolio_id)`, porque `fills` não tem mercado próprio.
+As ações de `ON DELETE` que a `0001` tinha são preservadas —
+`SET NULL (proposal_id)` nomeando a coluna, porque um `SET NULL` simples também
+anularia `organization_id` e `portfolio_id`, ambos `NOT NULL`.
+
+**O que continua não sendo DDL, e por quê.** "Nenhuma ordem de entrada sem
+proposta aprovada" (§8 do contrato) **não** virou CHECK. Um
+`purpose <> 'entry' OR proposal_id IS NOT NULL` seria derrotado pela própria FK:
+uma remoção de tenant faz `SET NULL (proposal_id)` e a ordem de entrada
+sobrevivente violaria o CHECK, travando a remoção. Fica como invariante do
+caminho único de escrita da T3.12, com teste — e registrado aqui em vez de
+suposto.
+
+`fills.execution_key` é a chave de idempotência da **execução**, escopada por
+tenant pela mesma razão da chave da proposta (§15.3): ela é cunhada pelo
+adaptador de um tenant, e um único global faria a reentrega do tenant A ser
+engolida como duplicata do fill do B. A coluna nasce anulável, recebe
+`execution_key = id::text` nas linhas preexistentes e só então vira `NOT NULL` —
+backfill do que as colunas existentes **implicam**, a fronteira da `0002`. Isso é
+uma **identidade legada**, não uma alegação de que aquelas linhas já tiveram
+proteção contra duplicata, e a guarda de downgrade distingue as duas exatamente
+por essa igualdade.
+
+### 18.4 Intenção não é tentativa (`portfolio_exit_intents`)
+
+```
+portfolio_exit_intents                       (tenant)
+  id, organization_id, portfolio_id, position_id, market_id,
+  reason exit_reason, protection_key TEXT, state exit_intent_state,
+  intended_qty, filled_qty, trigger_price, degraded_since, degraded_reason,
+  superseded_by_id -> self (RESTRICT), closed_reason, closed_at, created_at, updated_at
+  FK (position_id, organization_id, portfolio_id, market_id) -> positions (CASCADE)
+  UNIQUE (id, organization_id, portfolio_id, market_id)   -- alvo da FK de orders
+  UNIQUE (id, position_id)                                -- alvo da FK do sucessor
+  UNIQUE (position_id, protection_key) WHERE state IN ('open','blocked_residual')
+  CHECKs: intended_qty > 0; 0 <= filled_qty <= intended_qty;
+          (state='fulfilled') = (filled_qty = intended_qty);
+          (state='superseded') = (superseded_by_id IS NOT NULL);
+          state='voided' -> closed_reason NOT NULL;
+          (state IN ('fulfilled','superseded','voided')) = (closed_at IS NOT NULL);
+          id <> superseded_by_id; (degraded_since IS NULL) = (degraded_reason IS NULL)
+```
+
+O cenário que a tabela existe para impedir (§10 do contrato): um stop de 10
+unidades encontra 4 vendáveis; se o cancelamento do restante encerrasse a
+intenção, 6 unidades ficariam abertas sem proteção, inclusive depois de um
+restart. A **tentativa** continua sendo a linha de `orders` — que agora carrega
+`exit_intent_id`, com identidade própria por tentativa — e a **intenção** é a
+linha daqui.
+
+**A unicidade é por proteção, não por motivo.** O primeiro rascunho usava
+`(position_id, reason)`, e a Astra derrubou com um contraexemplo: uma posição de
+10 com alvo A para 4 e alvo B para 6 são duas intenções `target` a preços
+diferentes, e a §10 nunca pede alvo único — ela pede que a mesma unidade não seja
+vendida duas vezes, o que a trava compartilhada faz. Daí `protection_key`
+(`stop`, `target:1`, `target:2`, `manual`), com o preço **fora** da identidade:
+mover um stop é revisão da mesma proteção, não uma proteção nova.
+
+**`blocked_residual` é estado, não eixo separado.** É o resíduo abaixo do mínimo
+negociável, contabilizado e visível, sem quitação fictícia — e não é terminal:
+volta a `open` quando preço e filtros voltarem a permitir. **`voided`** é o
+terminal honesto para uma intenção cuja quantidade foi liquidada por uma proteção
+**concorrente** (um stop que levou a posição inteira deixa o alvo sem nada para
+vender): ele existe para que nenhuma intenção precise receber um fill fictício
+para chegar a `fulfilled`, que é o que a bicondicional `fulfilled = (filled_qty =
+intended_qty)` impede.
+
+`degraded_since`/`degraded_reason` andam juntos: sem livro utilizável **não se
+fabrica fill** — a saída fica pendente e *marcada* degradada, com alerta, e vela
+nunca fornece fill retroativo.
+
+A FK para `positions` é pelo **quádruplo** `(id, organization_id, portfolio_id,
+market_id)`. Com FK de uma coluna só, o contraexemplo da Astra: a intenção aponta
+a posição certa mas declara a carteira B e o mercado ETH da mesma organização;
+todas as constraints passam, o worker trava a carteira errada e segura o mercado
+errado na coleta.
+
+**A FK do sucessor é `DEFERRABLE INITIALLY DEFERRED`, e é isso que torna uma
+substituição escrevível.** Trocar A por B sob a mesma `protection_key` não tem
+ordem legal com a FK imediata: inserir B primeiro esbarra no único parcial (A
+ainda está viva) e aposentar A primeiro aponta para um B que ainda não existe. Com
+a verificação adiada para o COMMIT o protocolo é (1) aposentar A nomeando o id de
+B — UUIDs são gerados pela aplicação, então o id é conhecido antes — e (2)
+inserir B. A Astra levantou isso na revisão de diff; é melhor fechado aqui do que
+descoberto pela T3.4.
+
+O que o DDL **não** garante e por isso é invariante da T3.4/T3.5: que ciclos de
+substituição com mais de um passo não existam (`id <> superseded_by_id` só fecha
+o auto-ciclo), e que a reconciliação de intenções concorrentes aconteça na mesma
+transação que a liquidação.
+
+### 18.5 O orçamento de participação (`participation_consumptions`)
+
+```
+participation_consumptions                   (tenant, log de eventos imutável)
+  id, organization_id, portfolio_id, market_id, proposal_id,
+  order_id, fill_id, kind participation_entry_kind, notional, occurred_at, created_at
+  FK (proposal_id, organization_id, portfolio_id, market_id) -> trade_proposals  -- NO ACTION
+  FK (order_id, organization_id, portfolio_id, market_id)    -> orders           -- NO ACTION
+  FK (fill_id, order_id)                                     -> fills            -- NO ACTION
+  UNIQUE (proposal_id) WHERE kind = 'reserved'
+  UNIQUE (proposal_id) WHERE kind = 'released'
+  UNIQUE (fill_id)     WHERE kind = 'executed'
+  INDEX  (organization_id, portfolio_id, market_id, occurred_at)
+  CHECKs: notional > 0; (kind='executed') = (fill_id NOT NULL AND order_id NOT NULL)
+```
+
+A fórmula do contrato (§4), sobre este log:
+
+```
+disponivel = max(0, max_participation_pct × referencia
+                    − Σ(executed com occurred_at > as_of − 60s)
+                    − Σ(reserved − executed − released das reservas ainda 'held'))
+```
+
+A Astra percorreu a álgebra com teto de 100 e todos os efeitos dentro dos 60 s
+(reserva de 80 → fill parcial de 30 → cancelamento terminal de 50 → nova reserva
+de 70) e **não encontrou excesso**, com uma condição: o saldo é calculado **por
+reserva**, com o histórico inteiro dela; só o executado recebe o corte móvel, e
+uma reserva executável não desaparece por ter mais de 60 segundos.
+
+**A identidade do lançamento é fechada, e o motivo é um cenário.** Na primeira
+redação `fill_id` referenciava só `fills.id` e `market_id` era livre: uma execução
+de 80 USDT em BTC podia ser lançada no orçamento de ETH — os 80 continuavam
+disponíveis para a próxima entrada em BTC, e unicidade por fill não corrige
+atribuição errada (Astra, revisão de diff). As três FKs agora prendem o
+lançamento ao mercado da proposta, ao mercado da ordem e ao fill **daquela**
+ordem.
+
+**Idempotência por efeito lógico, não por UUID novo a cada tentativa.** Um
+`INSERT` com id novo não deduplica evento nenhum. Os três índices parciais únicos
+são a chave: uma reserva e uma liberação por proposta, uma execução por fill.
+Assim um fill reentregue não gasta o minuto duas vezes, e um retry não renova
+`occurred_at` para empurrar a janela de 60 s para a frente. `proposal_id` basta
+como identidade da reserva **porque uma proposta tem exatamente um ciclo de
+reserva** — `reservation_state` é um eixo só, numa linha só; se um dia houver
+mais de um, isto passa a exigir um `reservation_id`.
+
+**`occurred_at` acompanha o efeito durável** (o `ts` do fill para uma execução),
+não a hora em que a linha foi escrita: a janela é chaveada nele, então a virada
+do minuto não perdoa nada dentro dos 60 s.
+
+`ON DELETE NO ACTION` nas três FKs é escolha, não descuido: um `DELETE FROM
+orders` avulso é recusado, porque apagar um consumo executado devolve em silêncio
+o orçamento daquele mercado; já uma cascata de organização passa, porque as
+linhas do log vão junto no mesmo comando.
+
+O que **não** é DDL: que a soma por reserva nunca fique negativa e que o saldo
+negativo de uma reserva não compense o positivo de outra. São invariantes da
+T3.12, com teste.
+
+**Escopo de capital.** A chave do orçamento é `(market_id, escopo)` e o escopo é
+a carteira principal (§11 do contrato). Com uma principal por
+`(organization_id, workspace_id)`, a trava dessa carteira serializa o orçamento;
+**mais de uma carteira no mesmo escopo exige trava própria antes de ser
+habilitada** — condição escrita, não suposição.
+
+### 18.6 `market_betas` — revisões imutáveis e qual delas vale
+
+```
+market_betas                                 (global, imutável)
+  id, market_id -> markets (CASCADE), reference_market_id -> markets (RESTRICT),
+  as_of, window_start, window_end, input_start, last_pair_end, valid_until,
+  computed_at, available_at, beta_version, estimator,
+  beta NUMERIC(18,8), alpha NUMERIC(18,8), r_squared NUMERIC(9,6),
+  n, contiguous_bars, valid, reason, input_digest, estimate JSONB, params JSONB, superseded_at
+  UNIQUE (market_id, as_of, beta_version, input_digest)              -- uq_market_betas_revision
+  UNIQUE (market_id, as_of, beta_version) WHERE superseded_at IS NULL -- uq_market_betas_current
+  INDEX  (market_id, beta_version, available_at, as_of)              -- ix_market_betas_asof
+  CHECKs: input_start < window_start < window_end <= as_of; window_end <= available_at;
+          valid_until > window_end; valid = (reason IS NULL); valid -> beta NOT NULL;
+          n >= 0; contiguous_bars entre 0 e n; superseded_at >= computed_at
+```
+
+Segue o §6 das notas da T3.7 (`.claude/state/notes-T3.7-beta.md`) com **três
+desvios declarados**, os três acordados com a Astra:
+
+1. **Sem `organization_id`.** β é dado global de mercado, calculado pelo
+   scanner-worker a partir de velas globais, como `feature_baselines` (§1.1). O
+   rascunho da T3.7 previa a coluna "como o resto do schema"; carregá-la
+   significaria uma cópia por tenant ou uma coluna que é a mesma mentira para
+   todo mundo.
+2. **`input_digest` na chave de idempotência, no lugar de `computed_at`.** É a
+   doutrina do `input_fingerprint` da §17.2: uma **retentativa** byte a byte
+   colide e é no-op, uma **recomputação** real entra como revisão nova.
+   `computed_at` na chave faria de todo retry uma revisão. O digest tem de cobrir
+   a identidade da referência, os insumos efetivos e as evidências de qualidade
+   que mudam o resultado — hashear só os coeficientes faria uma reexecução
+   corrigida por lacuna parecer idêntica à execução que ela corrige.
+3. **A vigência é decidida pelo banco.** `uq_market_betas_current` é único em
+   `(market_id, as_of, beta_version) WHERE superseded_at IS NULL`: gravar uma
+   revisão nova sem aposentar a anterior na mesma transação é **recusado**. Um
+   índice parcial `WHERE valid` não daria isso — o cenário da Astra é uma revisão
+   posterior que registra *invalidez*, onde filtrar por `valid` ressuscita a
+   anterior.
+
+**A consulta vigente, definida:**
+
+```sql
+SELECT * FROM market_betas
+ WHERE market_id = :market
+   AND beta_version = :version            -- o leitor escolhe a versão compatível
+   AND available_at <= :t
+   AND (superseded_at IS NULL OR superseded_at > :t)
+ ORDER BY as_of DESC, available_at DESC, id DESC
+ LIMIT 1;
+```
+
+`superseded_at IS NULL` **sozinho não serve** para replay histórico, e o cenário
+é da Astra: revisão A disponível às 10:00, decisão às 10:05, revisão B chega às
+10:10 e supersede A. Perguntar depois por `t = 10:05` com `IS NULL` devolve
+**nada** — A falha no `IS NULL` e B falha no `available_at <= t`. Daí o `OR
+superseded_at > :t`, e daí o índice não ser parcial. `beta_version` é fixado pelo
+chamador porque duas versões podem estar vigentes no mesmo corte; sem isso o
+`ORDER BY` escolheria arbitrariamente. E a ordem é: **primeiro a revisão
+aplicável, depois `valid`/`valid_until`** — nunca procurar uma revisão antiga
+válida para esconder uma nova inválida.
+
+**A exceção à imutabilidade, declarada.** O §6 do contrato diz "só INSERT"; aqui
+o `UPDATE` de `superseded_at` (`NULL` → valor, uma vez) é permitido, e
+`market_betas_immutable` recusa qualquer outra alteração, `DELETE` inclusive,
+para todo papel. É metadado de ciclo de vida com payload imutável — o precedente
+é o freeze de `strategy_versions` (§16.1), que também deixa `status` mutável — e
+é registrado aqui em vez de alegado como conformidade literal. `hunter_worker`
+precisa de `UPDATE` só por causa disso, no mesmo espírito da `0005`.
+
+`beta`/`alpha` são `NUMERIC(18,8)` — nem dinheiro (`NUMERIC(28,10)`) nem fração de
+apresentação (`NUMERIC(9,6)`): coeficiente de regressão. A largura é a correção da
+Astra ao rascunho `NUMERIC(12,8)`, que deixava quatro dígitos inteiros; uma
+referência quase constante produz inclinação maior, e o carregador deve recusar em
+vez de truncar em silêncio. `n` conta **retornos pareados**, não fechamentos.
+`valid` significa *elegível pelo protocolo* e **nunca** precisão — o Risk Engine
+não pode ler `valid = true` como exatidão (T3.7 §7).
+
+### 18.7 Kill switch: a linha de trava e a retomada autenticada
+
+```
+portfolio_risk_state                         (tenant, PK portfolio_id)
+  organization_id, portfolio_id (PK), last_admission_seq BIGINT,
+  trading_day DATE, trading_day_timezone TEXT, trading_day_start_utc,
+  equity_day_start, day_reference_observed_at,
+  peak_equity, peak_equity_at, peak_sampling_interval_s, created_at, updated_at
+
+kill_switch_transitions  (+) evidence JSONB NOT NULL DEFAULT '{}'
+  CHECK from_state <> to_state
+  CHECK actor_type IN ('user','system')
+  CHECK NOT (from_state IN ('TRADING_DISABLED','EMERGENCY') AND to_state IN ('ACTIVE','WARNING'))
+        OR (actor_type = 'user' AND actor_id IS NOT NULL)
+```
+
+**Uma linha que é quatro coisas, de propósito.** `portfolio_risk_state` é ao
+mesmo tempo (a) a linha de trava da carteira, na ordem sistema → organização →
+portfolio, (b) o contador FIFO, (c) a referência diária e (d) o pico durável.
+Quatro tabelas seriam quatro travas disputando a mesma carteira sem ganho nenhum,
+e a decisão conjunta manda serializar os quatro sob a mesma trava. É trava de
+**linha**, nunca advisory lock de sessão (§1.2, pooler). A PK é `portfolio_id`,
+então "uma linha por carteira" é chave e não convenção.
+
+**O pico só sobe e a sequência só avança**, garantido por
+`portfolio_risk_state_guard` — e o mesmo trigger recusa `DELETE`, porque um
+`DELETE` seguido de `INSERT` é exatamente como um pico de 110 vira 100 sem que
+nenhum `UPDATE` aconteça para uma trigger de `UPDATE` ver (Astra). O pico é
+**amostrado**, com `peak_sampling_interval_s` declarando a cadência: não é o
+máximo intratick, e o schema diz isso em vez de fingir precisão.
+
+**A referência diária pode ser desconhecida.** `equity_day_start` e
+`day_reference_observed_at` são anuláveis, juntos (CHECK): não conseguir
+reconstruí-la é um estado que o motor precisa representar, porque ele bloqueia
+entradas e preserva proteções em vez de inventar um patrimônio de meia-noite a
+partir do primeiro preço visto depois de um restart.
+`day_reference_observed_at` é o instante **real** da avaliação — avaliar às 03:17
+não faz do equity de 03:17 o equity da meia-noite.
+
+**Não há CHECK provando o fuso, e o motivo está aqui.** A intenção era provar que
+`trading_day_start_utc` é a meia-noite de `trading_day` em `America/Sao_Paulo`.
+`timezone(text, timestamp)` é catalogada `IMMUTABLE`, mas a base de fusos por
+trás dela **não** é congelada entre instalações e atualizações: uma correção de
+tzdata poderia fazer uma linha existente falhar num `UPDATE` sem relação ou num
+restore (Astra). A conversão é validada uma vez, na virada do dia, o instante
+resolvido é o que fica gravado, e o fuso é gravado **por linha**
+(`trading_day_timezone`) em vez de assumido.
+
+**Sair de um bloqueio é ato registrado e atribuído — e o CHECK sozinho não dava
+isso.** O contrato (§5) diz que não há volta automática de
+`TRADING_DISABLED`/`EMERGENCY`, e o CHECK torna uma retomada não auditada
+irrepresentável **no histórico**. Sobre a coluna que os workers de fato leem
+(`portfolios.kill_switch_state`) ele não dizia nada: `UPDATE portfolios SET
+kill_switch_state = 'ACTIVE'` era um desbloqueio completo e silencioso — sem
+linha, sem ator, sem evidência (Astra, revisão de diff; reproduzido).
+
+O que fecha é uma **constraint trigger adiada**,
+`portfolios_kill_switch_is_audited`: no COMMIT, toda mudança de
+`kill_switch_state` precisa ter uma transição correspondente escrita na mesma
+transação. Adiada porque isso não dita ordem de statement — a T3.6 escreve os
+dois na ordem que quiser. Com ela o CHECK passa a valer transitivamente: sair de
+um bloqueio exige uma pessoa nomeada também na coluna efetiva.
+
+**O que continua não sendo prova, e o schema não finge que é:** *qual* pessoa.
+`actor_id` não tem FK para `users` de propósito — um usuário removido depois não
+pode invalidar a trilha —, então um UUID preenchido prova que alguém foi nomeado,
+não que alguém se autenticou. Autenticar a identidade autorizada é da API, na
+T3.6. `evidence` guarda os números que justificaram o movimento (perda do dia,
+drawdown, equity, pico, o dia de negociação e os limiares vigentes): `reason` é
+prosa, e é `evidence` que torna a transição auditável em vez de apenas
+registrada.
+
+### 18.8 Permanência: o buraco do `DELETE`, e o que fecha
+
+O índice único parcial da §11 do contrato está em `portfolios`:
+
+```sql
+CREATE UNIQUE INDEX uq_portfolios_principal_paper ON portfolios (organization_id, workspace_id)
+  WHERE type = 'paper' AND NOT is_arena;
+```
+
+Sem `status` e sem excluir `deleted_at` preenchido, exatamente como a decisão
+conjunta manda — arquivar ou apagar logicamente a carteira e abrir outra
+preservaria as linhas antigas e ainda assim reiniciaria patrimônio e pico, e
+destravaria um kill switch bloqueado que ninguém autorizou. Como o Alembic não
+compara predicado de índice (§17.3), o predicado é lido de `pg_indexes` por
+`test_schema_paper.py`.
+
+**O índice impede uma segunda carteira e não impede nada sobre a primeira.** E
+`portfolios` está em `APP_WRITE_TABLES` (§15.6), então `hunter_app` tem `DELETE`:
+um comando apaga a carteira, a âncora e o pico, e a requisição seguinte abre uma
+R$100.000 nova. Isso é o reset que a diretiva proíbe, alcançável de dentro de um
+request handler. A trigger `portfolios_permanence` fecha por dois lados:
+
+- **`DELETE` de uma carteira ancorada é recusado para o papel da aplicação
+  *mesmo com o marcador*.** Um `SET LOCAL` que qualquer um pode escrever não
+  autentica ninguém (Astra): ele é escopado à transação, o que o torna seguro
+  atrás do pooler, mas isso é isolamento, não autorização. Para os demais papéis
+  a remoção exige `SET LOCAL app.portfolio_teardown = 'on'` — remover um tenant
+  continua possível para o operador, e passa a ser um ato e não um acidente. O
+  mesmo vale para `portfolio_currency_anchor` e `portfolio_risk_state`.
+- **Os campos de identidade ficam congelados** enquanto houver âncora:
+  `organization_id`, `workspace_id`, `type`, `is_arena`, `base_currency` e
+  `initial_capital`. Virar `is_arena = true` tira a linha do índice, libera uma
+  principal nova com R$100.000 e **nenhum `DELETE` acontece** para uma trigger de
+  `DELETE` ver. `base_currency` e `initial_capital` entram pela razão vizinha: a
+  âncora declara o que foi creditado, e uma carteira que reescreve o próprio
+  capital de abertura não precisa de reset para ter um.
+
+**A cascata do workspace era a porta dos fundos, e ela foi reproduzida.**
+`hunter_app` também tem `DELETE` em `workspaces`, e `workspaces → portfolios` é
+`ON DELETE CASCADE`. Com o marcador ligado, `DELETE FROM workspaces` respondia
+`DELETE 1` e levava a carteira aberta junto. O motivo: **uma ação referencial roda
+o delete em cascata como o *dono* da tabela referenciante**, então quando
+`portfolios_permanence` disparava, `current_user` já não era `hunter_app` e a
+metade de papel do teste não mordia — a prova é que, sem o marcador, o mesmo
+comando falhava com *"may not be deleted by hunter"*, o dono, não o chamador
+(Astra, revisão de diff). `workspaces_permanence` guarda a **origem** da cascata,
+onde o chamador ainda é o chamador. É a mesma regra, uma tabela antes.
+
+**Consequência aceita e declarada:** remover uma organização ou um workspace com
+carteira aberta (cascata) passa a exigir o marcador, como apagar uma
+`feature_baselines` exige o dela (§17.2). A
+alternativa considerada e descartada foi revogar o `DELETE` de `portfolios` do
+`hunter_app` — não porque a `0001` seja intocável (uma revisão posterior pode
+mudar grants; a `0005` já acrescenta um), mas porque sozinha ela bloquearia
+também a exclusão legítima de carteiras de experimento e não fecharia nem a
+cascata nem a alteração de identidade.
+
+**Seed.** `paper_v1` é semeado por `infra/scripts/seed_paper.py` com os valores da
+diretiva gravados como **strings JSON** (viram `Decimal` sem passar por float),
+e é a quarta coisa congelada do seed: inserido quando falta, **verificado** quando
+presente, com divergência parando o seed. Os três presets genéricos continuam
+sendo reescritos no lugar porque são padrões em que ninguém apostou dinheiro;
+`paper_v1` é o perfil da carteira, todo número nele é do Everton, e o contrato
+(§2) faz de qualquer mudança de valor uma pergunta a ele, não um deploy. O custo
+operacional é zero: o preset de sistema é **modelo**, as organizações copiam no
+onboarding (§15.4) e uma edição auditada de limite (§2.1) acontece na cópia.
+
+`max_exchange_exposure_pct` e `max_position_pct` estão deliberadamente **ausentes**
+do JSON: a §9.1 do contrato declara o primeiro inaplicável enquanto houver uma
+exchange de execução (volta no M1b) e substitui o segundo por
+`max_asset_exposure_pct` mais o teto de participação. Gravá-los como `null` se
+leria como "sem limite" em vez de "não se aplica aqui".
+
+### 18.9 Grants, RLS e guardas
+
+**Classes congeladas em `ddl/paper.py`**, no padrão de §15.6/§16.5/§17.6:
+
+| Classe | Papel | Privilégios | Tabelas |
+|---|---|---|---|
+| `PAPER_APP_READ_ONLY_TABLES` | `hunter_app` | `SELECT` | `fx_observations`, `market_betas` |
+| `PAPER_APPEND_TABLES` | ambos | `SELECT`/`INSERT` | `portfolio_currency_anchor`, `participation_consumptions` |
+| `PAPER_NO_DELETE_TABLES` | ambos | `SELECT`/`INSERT`/`UPDATE` | `portfolio_exit_intents`, `portfolio_risk_state` |
+| `PAPER_WORKER_APPEND_TABLES` | `hunter_worker` | `SELECT`/`INSERT` | `fx_observations` |
+| `PAPER_WORKER_SUPERSEDE_TABLES` | `hunter_worker` | `SELECT`/`INSERT`/`UPDATE` | `market_betas` |
+
+`test_schema_privileges.py` une estas listas às das revisões anteriores — toda
+tabela continua classificada exatamente uma vez.
+
+`PAPER_TENANT_TABLES` são as quatro de tenant, com RLS habilitada, **forçada** e
+`tenant_isolation` própria. `fx_observations` e `market_betas` ficam fora por
+serem globais (§1.1).
+
+**Guardas de upgrade** (a migração conta os infratores e recusa com instruções —
+o precedente da `0002`; em todo banco de hoje cada uma conta zero):
+
+| Guarda | Por que não há backfill honesto |
+|---|---|
+| mais de uma carteira principal paper por `(organização, workspace)` | escolher qual delas é a permanente é decisão de operador sobre qual história é a real |
+| `kill_switch_transitions.actor_type` fora de (`user`,`system`) | o ator verdadeiro é conhecimento de quem moveu o switch |
+| `from_state = to_state` | uma transição que não moveu não é transição |
+| saída de bloqueio sem `actor_type='user'` e `actor_id` | a migração não inventa a identidade que autorizou |
+| ordem cujo `(organization_id, portfolio_id)` diverge do da proposta | nenhuma inferência diz qual dos dois escopos era o verdadeiro |
+| fill divergente da ordem | idem |
+
+**Guardas de downgrade** — reverter é permitido, perder obrigação ou evidência
+não é, e "a migração reverteu sem erro" seria o único relatório da perda:
+`risk_profiles` com `paper_v1`; `risk_events` com um dos três rótulos novos;
+qualquer `portfolio_currency_anchor`; qualquer `portfolio_risk_state`; intenção
+de saída em `open`/`blocked_residual`; proposta com `reservation_state = 'held'`;
+consumo `executed` dentro dos últimos 60 s; consumo cuja reserva ainda está
+`held`; transição de kill switch com `evidence` não vazia (o caso independente de
+carteira: uma transição de escopo `system` não dispara nenhuma das guardas de
+carteira e mesmo assim perderia a razão do movimento — Astra); ponto de equity
+com `fx_observation_id`; decisão preservada citando uma
+revisão de β em `risk_decision -> 'beta' ->> 'revision_id'` (o caminho é o
+contrato que esta revisão fixa para a T3.2); fill com `execution_key <> id::text`
+(chave real, não a identidade legada do backfill); proposta com `admission_seq`;
+ordem com `exit_intent_id`.
+
+O que **não** é guardado, declarado em vez de descoberto: revisões de β que
+nenhuma decisão preservada nomeia e observações de FX que nenhuma âncora ou
+snapshot nomeia — ambas recomputáveis ou recoletáveis, e recusar por causa delas
+tornaria o downgrade impossível em qualquer banco que os coletores já tenham
+tocado. É a mesma fronteira da §17.7.
+
+**As instruções das guardas dizem "exporte antes", e exportar não muda
+predicado nenhum.** É deliberado, e a frase completa é esta: o downgrade de um
+banco com carteira aberta **não** é uma operação de rotina. Ele exige uma decisão
+operacional — exportar a evidência *e* remover as linhas que a guarda nomeia,
+sabendo o que isso significa (a carteira deixa de ter abertura, pico e referência
+diária, e a diretiva proíbe reabri-la). Nenhuma guarda apaga nada sozinha, e é
+por isso que a instrução não é um comando pronto.
+
+**Consequência declarada:** depois de o seed rodar, a guarda de `paper_v1`
+impede o downgrade mesmo num banco sem carteira aberta. Isso é a política
+funcionando, não algo a resolver apagando o preset automaticamente.
+
+### 18.10 Pooler e orçamento de nome
+
+Nada nesta revisão depende de estado de sessão: sem prepared statement de sessão,
+sem `LISTEN`/`NOTIFY`, sem advisory lock de sessão — a serialização é a linha de
+`portfolio_risk_state`, dentro da transação. O único GUC envolvido,
+`app.portfolio_teardown`, é escrito com `SET LOCAL` e lido com
+`NULLIF(current_setting(..., true), '')`, exatamente como `app.current_org`
+(§15.4) e `app.baseline_retention` (§17.2).
+
+`0006_paper_wallet` tem 17 caracteres; o teto de `alembic_version.version_num`
+continua sendo 32 (§17.6).
+
+**`execution.py` foi dividido em três, e o caminho público continua o mesmo.**
+`Fill`, `Position` e `Trade` moraram nele até esta revisão; a reserva, a sequência
+FIFO e as identidades compostas empurraram o módulo para além das 350 linhas
+(`infra/scripts/check_file_size.py`), então eles passaram para
+`execution_fills.py` e `execution_trades.py`. `execution.py` **reexporta os três**:
+`from hunter_core.db.models.execution import Position` é caminho público com
+chamador fora deste pacote (`apps/api`), e uma divisão de módulo que quebra um
+import é uma refatoração que quebrou alguma coisa (Astra reproduziu o
+`ImportError` na revisão de diff).
+
+Dois nomes de constraint tiveram de encolher porque a convenção de nomes gerava
+mais de 63 caracteres e o Postgres trunca identificadores: a bicondicional da
+retomada é `ck_kill_switch_transitions_resuming_a_block_is_authenticated` e a FK
+do sucessor de uma intenção é nomeada à mão
+(`fk_portfolio_exit_intents_superseded_by_id`). O sintoma, se alguém repetir o
+erro: `alembic check` acusa drift permanente, comparando o nome truncado que o
+banco tem com o nome inteiro que o modelo declara.

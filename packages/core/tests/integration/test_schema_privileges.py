@@ -65,6 +65,18 @@ def _analysis_tables(name: str) -> tuple[str, ...]:
     return cast(tuple[str, ...], getattr(migration_ddl("analysis"), name))
 
 
+def _paper_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0006_paper_wallet``'s lists in ``ddl/paper.py``.
+
+    It adds two ``hunter_app`` classes on top of ``0001``'s four — an append-only
+    pair (the currency anchor and the participation ledger, which are records of
+    fact) and a no-delete pair (the exit intentions and the risk state, which are
+    mutable but may never be removed) — plus read-only access to the two new
+    global archives.
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("paper"), name))
+
+
 def _lock_tables(name: str) -> tuple[str, ...]:
     """The same, for ``0005_feature_baselines_lock_grant``'s ``ddl/baseline_lock.py``.
 
@@ -244,6 +256,7 @@ async def test_read_only_tables_grant_the_app_role_nothing_but_select(
         *_security_tables("APP_READ_ONLY_TABLES"),
         *_shadow_tables("SHADOW_APP_READ_ONLY_TABLES"),
         *_analysis_tables("ANALYSIS_APP_READ_ONLY_TABLES"),
+        *_paper_tables("PAPER_APP_READ_ONLY_TABLES"),
     )
     assert read_only, "the read-only grant list is empty"
 
@@ -302,6 +315,9 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
 
     shadow_read_only = _shadow_tables("SHADOW_APP_READ_ONLY_TABLES")
     analysis_read_only = _analysis_tables("ANALYSIS_APP_READ_ONLY_TABLES")
+    paper_read_only = _paper_tables("PAPER_APP_READ_ONLY_TABLES")
+    paper_append = _paper_tables("PAPER_APPEND_TABLES")
+    paper_no_delete = _paper_tables("PAPER_NO_DELETE_TABLES")
 
     classified = (
         list(write)
@@ -310,6 +326,9 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(append_only)
         + list(shadow_read_only)
         + list(analysis_read_only)
+        + list(paper_read_only)
+        + list(paper_append)
+        + list(paper_no_delete)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 

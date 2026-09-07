@@ -258,12 +258,18 @@ async def test_rls_is_forced_on_every_relation_that_holds_tenant_data(
     and so must carry RLS, and before this fix it did not.
     """
     security = migration_ddl("security")
-    frozen: tuple[str, ...] = security.TENANT_TABLES
     self_scoped: tuple[str, ...] = security.SELF_SCOPED_TABLES
+    # ``ddl.tables.TENANT_TABLES`` is frozen as of ``0001``; every later revision
+    # that adds a tenant table states its own tuple, so the union is what has to
+    # match the models. ``0006_paper_wallet`` adds four.
+    frozen: tuple[str, ...] = (
+        *security.TENANT_TABLES,
+        *migration_ddl("paper").PAPER_TENANT_TABLES,
+    )
 
     assert set(frozen) == set(tenant_tables()), (
         "a model gained or lost organization_id without a migration updating "
-        "ddl.tables.TENANT_TABLES"
+        "the frozen tenant list of its revision"
     )
     async with schema_engine.connect() as connection:
         with_org = await connection.execute(
