@@ -9,6 +9,17 @@ import { WhyPanel } from "@/components/opportunities/why-panel";
 import { makeOpportunityAnomaly, makeOpportunityDetail, makeRegime } from "@/tests/fixtures/radar";
 
 describe("WhyPanel: score/direction summary and component contributions", () => {
+  it("titles the panel 'Por que estamos olhando isso?' with the scorer's resumo right below it", () => {
+    render(<WhyPanel detail={makeOpportunityDetail()} currentRegime={null} orgId="org-1" />);
+    const title = screen.getByTestId("why-panel-title");
+    expect(title).toHaveTextContent("Por que estamos olhando isso?");
+    expect(title.tagName).toBe("H2");
+    // The resumo shows up twice on purpose: once as the panel's own subtitle
+    // (this assertion) and once inside the existing summary section
+    // (why-summary.tsx) -- neither replaces the other.
+    expect(screen.getAllByText("Score 70,00 de 100, confiança 0,6500, direção long.").length).toBeGreaterThan(0);
+  });
+
   it("shows score, confidence, direction and the explanation's real pt-BR resumo", () => {
     render(<WhyPanel detail={makeOpportunityDetail()} currentRegime={null} orgId="org-1" />);
     // "70.00" also appears in the history list below (the newest sample
@@ -16,7 +27,9 @@ describe("WhyPanel: score/direction summary and component contributions", () => 
     // the summary's big number.
     expect(screen.getAllByText("70.00").length).toBeGreaterThan(0);
     expect(screen.getByText("Long")).toBeInTheDocument();
-    expect(screen.getByText(/Score 70,00 de 100/)).toBeInTheDocument();
+    // Also rendered as the panel-title subtitle above the summary section --
+    // both are asserted, so a single-match query would break here on purpose.
+    expect(screen.getAllByText(/Score 70,00 de 100/).length).toBeGreaterThan(1);
   });
 
   it("draws a component's contribution bar with its real weight/normalized/contribution", () => {
