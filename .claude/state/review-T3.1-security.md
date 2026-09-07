@@ -1,0 +1,24 @@
+# Revisão de segurança — 0006_paper_wallet (`11faba8`) — security-reviewer, 2026-09-07
+
+Reproduzido em Postgres 16 próprio, como `hunter_app`/`hunter_worker` reais (`SET LOCAL ROLE` + `app.current_org`), duas organizações com carteira ancorada.
+
+## BLOQUEIA
+1. **`ddl/paper.py:492-498` `portfolios_kill_switch_is_audited` aceita transição antiga ou forjada.** O `EXISTS` casa só `(scope, scope_id, organization_id, from_state, to_state)`; sem prova de mesma transação nem "última transição". Depois do primeiro ciclo trava→retomada legítima, `UPDATE portfolios SET kill_switch_state='ACTIVE'` passa para sempre (reproduzido: 3 transições para 4 movimentos). Variante: `actor_id` sem FK → grava-se uma linha `EMERGENCY→ACTIVE` com ator inexistente uma vez e todo destravamento passa. O teste `test_schema_paper.py:1242-1248` só exercita a primeira ocorrência de cada par. **Correção:** exigir prova de mesma transação (`t.xmin` = xid corrente) **e/ou** comparar com a última transição do escopo (`ORDER BY created_at DESC, id DESC LIMIT 1` tem de ser `from=OLD.state, to=NEW.state`); opcionalmente `portfolios.current_transition_id` com FK ("um movimento, uma linha" como chave). Teste com dois ciclos.
+2. **Segunda carteira principal via workspace novo** (`0006_paper_wallet.py:889-895`, `models/portfolios.py:88-96`): índice único parcial é por `(organization_id, workspace_id)`; `hunter_app` insere workspace + portfolio + risk_state + âncora com R$100.000 novos, sem DELETE, sem auditoria (reproduzido). **Correção:** permanência por **organização** (índice parcial em `(organization_id) WHERE type='paper' AND NOT is_arena`) — decisão D7 do Everton é "uma carteira principal"; se um dia houver várias, é ato auditado OWNER. Atualizar §18.5/§18.8.
+
+## DEVE CORRIGIR
+3. **`organizations.kill_switch_state` move-se sem transição** (só `portfolios` tem a constraint trigger; `ddl/paper.py:511-516`); lido como bloqueante em `apps/api/.../radar_org_derivation.py:111-122`. Mesma trigger adiada em `organizations` com `scope='organization'`.
+4. **Identidade composta para na posição**: `orders.position_id`, `trades.position_id`, `trades.proposal_id` são FKs simples; ordem da org A referenciando posição da org B aceita; `exit_intent_id` (FK quádrupla) e `position_id` podem discordar. Correção: `FK (position_id, organization_id, portfolio_id, market_id) → positions(...)` (`uq_positions_id_scope` já existe) + amarrar `position_id` ao `position_id` da intenção.
+5. **`portfolio_risk_state` com UPDATE do `hunter_app`** (`ddl/paper.py:74-83, 749-750`): `trading_day`/`equity_day_start` reescrevíveis (zera a perda do dia = reset contábil) e `peak_equity` só sobe (gravar 999999 trava a carteira em drawdown permanente). Correção: `UPDATE` só para `hunter_worker` (dono da linha é o motor); triggers: `trading_day` estritamente crescente, `equity_day_start` definível uma vez por dia, `peak_equity ≤` equity observado. **Implicação para a T3.6:** a retomada pela API (`hunter_app`) escreve a transição e o `kill_switch_state`; a referência diária e o pico são do worker.
+6. **Âncora aceita `fx_observations` de par errado** (`ddl/paper.py:243-288`): âncora com observação BTCUSDT rate 60000 abre carteira com "R$1,2 bilhão"; âncora imutável → erro permanente. Correção: trigger confere `fx_observations.pair = operating_currency || origin_currency` (convenção declarada).
+7. **Duas fontes do `paper_v1` discordam**: `seed_reference.py:288-320` vs `hunter_risk/limits.py:131-160`; `RiskLimits.model_validate(profile.limits)` falha com 10 erros (faltam `max_entry_deviation_pct`, `max_price_age_s`, `max_book_age_s`, `max_volume_age_s`, `max_beta_age_s`, `day_timezone`; extras `participation_reference`, `market_types`, `regime_size_multiplier`, `auto_close_on_emergency`). Correção: uma fonte (`PAPER_V1.model_dump(mode="json")` como conteúdo do seed, ou o seed como fonte e o motor lendo dele) + teste que compara as duas. **Nenhum valor da diretiva muda.**
+
+## SUGESTÕES
+8. `released` maior que a reserva aceito (`0006:686-692`) — trigger contra `trade_proposals.reserved_notional`.
+9. `evidence='{}'` aceito em transição automática; `actor_id` sem prova — `CHECK (actor_type <> 'system' OR evidence <> '{}')`.
+10. Teardown (`app.portfolio_teardown='on'`, GUC que qualquer papel escreve) apaga `kill_switch_transitions` em cascata — trilha do kill switch deveria sobreviver ao tenant como `audit_logs` (sem FK).
+11. Ciclo de reserva reabrível (`consumed → held`) — invariante da T3.12, registrar.
+12. §18 "não guardado" no downgrade também inclui intenções terminais e consumos > 60 s — declarar.
+
+## Correto
+RLS ENABLE+FORCE nas quatro tabelas de tenant; globais (`fx_observations`, `market_betas`) sem INSERT para `hunter_app`; `market_betas_immutable`; permanência contra DELETE com e sem marcador para `hunter_app`; FK quádrupla da intenção de saída; reservas com CHECKs; seed idempotente e valores da diretiva; sem segredos; larguras NUMERIC coerentes.
