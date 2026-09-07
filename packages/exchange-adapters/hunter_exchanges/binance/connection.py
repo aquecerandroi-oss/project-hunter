@@ -17,7 +17,7 @@ from contextlib import AbstractAsyncContextManager
 from typing import Protocol
 
 from hunter_core.logging import get_logger
-from hunter_exchanges.base import ConnectionState, ExchangeUnavailable
+from hunter_exchanges.base import ConnectionState, ExchangeUnavailable, StreamChannel
 from hunter_exchanges.binance.streams import combined_stream_url, stream_name
 from hunter_exchanges.binance.subscriptions import SubscriptionController
 
@@ -72,7 +72,12 @@ class ConnectionRunner:
         connect_timeout_s: float = CONNECT_TIMEOUT_S,
         max_reconnect_failures: int = MAX_RECONNECT_FAILURES,
         on_reconnect: Callable[[], None] | None = None,
+        stream_name_fn: Callable[[str, StreamChannel], str] = stream_name,
     ) -> None:
+        # ``stream_name_fn`` (T3.0a) defaults to the USDS-M naming, so no
+        # existing caller changes; the SPOT client injects its own so this
+        # whole connect/rotate/backoff loop is reused rather than copied.
+        self._stream_name_fn = stream_name_fn
         self._base_urls = base_urls
         self._subs = subs
         self._states = states
@@ -135,7 +140,7 @@ class ConnectionRunner:
         try:
             while True:
                 group = self._subs.groups[key]
-                names = [stream_name(s, c) for s in group.symbols for c in group.channels]
+                names = [self._stream_name_fn(s, c) for s in group.symbols for c in group.channels]
                 state.subscriptions = tuple(names)
                 url = combined_stream_url(self._base_urls[route], names)
                 # "reconnects" counts every pass through this loop beyond the

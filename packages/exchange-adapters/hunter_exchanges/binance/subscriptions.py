@@ -16,8 +16,9 @@ from typing import Any, Protocol
 
 from hunter_core.logging import get_logger
 from hunter_exchanges.base import ConnectionState, StreamChannel
-from hunter_exchanges.binance.streams import split_channels_by_route
+from hunter_exchanges.binance.streams import split_channels_by_route, stream_name
 from hunter_exchanges.binance.subscription_plan import (
+    StreamNameFn,
     SubscriptionPlan,
     SymbolGroup,
     assert_stream_budget,
@@ -28,6 +29,11 @@ from hunter_exchanges.binance.subscription_plan import (
 )
 
 logger = get_logger(__name__)
+
+#: How a channel list is split into routes (one connection family each).
+#: Injectable for the same reason as ``StreamNameFn`` (T3.0a): spot has a
+#: single route, USDS-M has ``public``/``market``.
+SplitChannelsFn = Callable[[Sequence[StreamChannel]], dict[str, list[StreamChannel]]]
 
 
 class _Sendable(Protocol):
@@ -55,10 +61,20 @@ class SubscriptionController:
         restart: Callable[[str], Awaitable[None]] | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         ack_timeout_s: float = DEFAULT_ACK_TIMEOUT_S,
+        stream_name_fn: StreamNameFn = stream_name,
+        split_channels_fn: SplitChannelsFn = split_channels_by_route,
     ) -> None:
+        # T3.0a: both default to the USDS-M behaviour, so no existing call
+        # site changes. The SPOT client injects its own pair (one route,
+        # ``@depth20@100ms``, no markPrice/forceOrder) and reuses this
+        # controller instead of duplicating the ack/restart bookkeeping —
+        # mixing the two splitters would plan ``public:*``/``market:*``
+        # groups for a client whose URL map only knows ``spot``.
         self._start = start
         self._restart = restart
         self._sleep = sleep
+        self._stream_name_fn = stream_name_fn
+        self._split_channels_fn = split_channels_fn
         self._ack_timeout_s = ack_timeout_s
         self.groups: dict[str, SymbolGroup] = {}
         self.live_ws: dict[str, _Sendable] = {}
@@ -107,9 +123,17 @@ class SubscriptionController:
     ) -> None:
         """Apply an incremental universe diff without touching unaffected symbols."""
         async with self._lock:
-            for route, route_channels in split_channels_by_route(channels).items():
+            for route, route_channels in self._split_channels_fn(channels).items():
                 next_index = self.next_index(route)
-                plan = plan_updates(self.groups, route, route_channels, added, removed, next_index)
+                plan = plan_updates(
+                    self.groups,
+                    route,
+                    route_channels,
+                    added,
+                    removed,
+                    next_index,
+                    stream_name_fn=self._stream_name_fn,
+                )
                 for key, names in plan.unsubscribe.items():
                     # Report the diff on `states[key].subscriptions` only
                     # once it actually reached the socket (Astra review,
@@ -139,7 +163,7 @@ class SubscriptionController:
         T1.2b resume round 3, finding 1)."""
         async with self._lock:
             group = self.groups[key]
-            current = names_for(group.symbols, group.channels)
+            current = names_for(group.symbols, group.channels, stream_name_fn=self._stream_name_fn)
             to_add = [n for n in current if n not in opened_with]
             to_remove = [n for n in opened_with if n not in current]
             # F5: UNSUBSCRIBE before SUBSCRIBE (update()'s order) — the
@@ -249,6 +273,8 @@ class SubscriptionController:
 
 
 __all__ = [
+    "SplitChannelsFn",
+    "StreamNameFn",
     "SubscriptionController",
     "SubscriptionPlan",
     "SymbolGroup",

@@ -1,3 +1,4 @@
+# pyright: reportPrivateUsage=false
 """BoundedEventQueue: overflow eviction policy, never a dropped final kline,
 backpressure instead of unbounded growth.
 

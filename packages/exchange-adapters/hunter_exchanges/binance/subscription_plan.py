@@ -18,7 +18,7 @@ capacity (``MAX_SYMBOLS_PER_CONNECTION``) opens a brand-new one.
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -54,8 +54,21 @@ def is_control_ack(envelope: dict[str, Any]) -> bool:
     return "id" in envelope and "stream" not in envelope
 
 
-def names_for(symbols: Sequence[str], channels: Sequence[StreamChannel]) -> list[str]:
-    return [stream_name(s, c) for s in symbols for c in channels]
+#: How a ``(symbol, channel)`` pair becomes a stream name. Injectable
+#: (T3.0a) so the SPOT client can reuse this whole planner with its own
+#: names (``btcusdt@depth20@100ms`` instead of the USDS-M cadence, no
+#: ``markPrice``/``forceOrder``) — the default is exactly the previous
+#: behaviour, so no USDS-M call site changes.
+StreamNameFn = Callable[[str, StreamChannel], str]
+
+
+def names_for(
+    symbols: Sequence[str],
+    channels: Sequence[StreamChannel],
+    *,
+    stream_name_fn: StreamNameFn = stream_name,
+) -> list[str]:
+    return [stream_name_fn(s, c) for s in symbols for c in channels]
 
 
 def assert_stream_budget(group: SymbolGroup) -> None:
@@ -97,6 +110,8 @@ def plan_updates(
     added: Sequence[str],
     removed: Sequence[str],
     next_index: int,
+    *,
+    stream_name_fn: StreamNameFn = stream_name,
 ) -> SubscriptionPlan:
     removed_set = set(removed)
     unsubscribe: dict[str, list[str]] = {}
@@ -106,7 +121,7 @@ def plan_updates(
         hit = [s for s in group.symbols if s in removed_set]
         if not hit:
             continue
-        unsubscribe[key] = names_for(hit, route_channels)
+        unsubscribe[key] = names_for(hit, route_channels, stream_name_fn=stream_name_fn)
         group.symbols = [s for s in group.symbols if s not in removed_set]
 
     subscribe: dict[str, list[str]] = {}
@@ -124,7 +139,7 @@ def plan_updates(
         if free <= 0:
             continue
         take, pending = pending[:free], pending[free:]
-        subscribe[key] = names_for(take, route_channels)
+        subscribe[key] = names_for(take, route_channels, stream_name_fn=stream_name_fn)
         group.symbols.extend(take)
         assert_stream_budget(group)
 
@@ -141,6 +156,7 @@ def plan_updates(
 
 
 __all__ = [
+    "StreamNameFn",
     "SubscriptionPlan",
     "SymbolGroup",
     "assert_stream_budget",

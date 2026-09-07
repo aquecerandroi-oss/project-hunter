@@ -32,6 +32,12 @@ class BinanceAdapter:
     """``ExchangeAdapter`` for Binance USDS-M Futures, public endpoints only."""
 
     code = "binance"
+    #: T3.0a, additive and declarative (no behaviour changes): the same venue
+    #: also has a spot adapter, and ``BTCUSDT`` means a different market on
+    #: each. Callers build the collision-free identity with
+    #: ``hunter_exchanges.binance_spot.identity.market_identity(code, symbol,
+    #: market_type)``; nothing may infer a default here.
+    market_type = MarketType.PERPETUAL
 
     def __init__(
         self,
