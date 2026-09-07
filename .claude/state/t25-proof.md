@@ -1122,3 +1122,7 @@ passou a responder `500 Internal Server Error` a **toda** chamada da API
 com o agregado `shards_expected/reporting = 4/4` e 200 campos `sym:` para 200 mercados) e não
 reiniciei o Docker Desktop por conta própria: outras tarefas usam o mesmo daemon. Fica registrado
 para quem for operar em seguida — a última leitura boa do stack é a de 02:32Z, nesta prova.
+
+## M2 — condição nº 1 do veredito, medida na VPS em 2026-09-07 06:28:46Z (orquestrador)
+
+`mkt:binance:coverage`: `session_since = 2026-09-07T05:46:17Z`, `covered_until = 06:28:45Z` (1,1 s atrás do relógio) → **42 min contínuos** de cobertura avançando, acima dos 30 min exigidos. Quatro shards `hb:market:binance:{0..3}of4`, `hb:market:binance` compartilhada extinta (medição da Sexta-feira no plantão `8f8be1e`), `dropped_events = 0` nos quatro, `reconnects = 0`. No shard 0, nos últimos 45 min: 136 quebras `queue_backlog` com 136 retomadas (congelamentos curtos que **não** reiniciam a sessão) e 1 `reconnect` (o do boot do deploy `3519107`/`2688ef1`). Comandos: `HMGET mkt:binance:coverage session_since covered_until`; `docker logs --since 45m hunter-market-worker-1 | grep tape_coverage_interval_broken | uniq -c`. **Condição 1 satisfeita**; fica para a Sexta-feira registrar no `docs/reports/M2.md` junto com a leitura datada de 09/10 de setembro (condição 2).
