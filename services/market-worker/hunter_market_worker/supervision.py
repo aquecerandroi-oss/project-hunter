@@ -16,6 +16,44 @@ def connection_field(state: Any, name: str) -> Any:
     return getattr(state, name, None)
 
 
+def counter_delta(previous: int, current: int) -> int:
+    """How much a monotonic per-connection counter advanced since ``previous``.
+
+    A counter that went *down* was not decremented: the adapter replaced the
+    whole :class:`~hunter_exchanges.base.ConnectionState` on reconnect
+    (``binance/ws.py`` ``_start_group``), so everything it reports now happened
+    since the reset. ``max(0, current - previous)`` — what this replaces —
+    silently swallowed exactly those losses (Astra, T2.5g design review).
+    """
+    return current - previous if current >= previous else current
+
+
+class DroppedEventsLedger:
+    """Monotonic total of events the adapter's bounded queue discarded.
+
+    T2.5g: ``streaming.py`` used to read ``dropped_events`` off the *adapter*
+    itself, which never had that attribute — so the coverage tracker was told
+    "nothing was lost" on every stamp and its "a drop breaks the interval" rule
+    never fired in production (1.2M drops on the VPS, 8.3M on the local stack,
+    zero breaks). The counter lives on each :class:`ConnectionState`, and each
+    of those is recreated by a reconnect, hence :func:`counter_delta`.
+    """
+
+    def __init__(self) -> None:
+        self._seen: dict[str, int] = {}
+        self.total = 0
+
+    def observe(self, adapter: Any) -> int:
+        states = getattr(adapter, "connection_states", None)
+        if states is None:
+            return self.total
+        for name, connection in states().items():
+            current = int(connection_field(connection, "dropped_events") or 0)
+            self.total += counter_delta(self._seen.get(name, 0), current)
+            self._seen[name] = current
+        return self.total
+
+
 def rest_gate_status(adapter: Any) -> str:
     """``"ok"``/``"suspended"``: is this adapter admitting REST calls? (T2.9)
 

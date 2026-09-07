@@ -990,3 +990,135 @@ deveria. Isso não invalida a prova: o mesmo código foi exercitado uma vez cont
 reais (§2) e a vazão em regime está provada pela suíte de integração. Registrado como observação
 para quem for medir de novo: repetir esta prova depois que o estrato vivo drenar (ou numa janela sem
 um bootstrap concorrente ativo) mostraria o laço natural produzindo os agregados sozinho.
+
+# Prova operacional — T2.5g (latência de publicação e 4 shards) — 2026-09-07
+
+Stack local (Docker Desktop, 22 vCPU disponíveis ao engine), imagem `hunter-api:dev` reconstruída da
+árvore da T2.5g. `scanner-worker` e `strategy-worker` **não** foram recriados (continuam na imagem da
+T2.5d/T2.9c), então o número tick→oportunidade abaixo mede o mesmo consumidor de antes contra um
+produtor diferente — que é exatamente a comparação que interessa.
+
+## 1. Antes: 1 processo, 200 mercados (00:44Z)
+
+`XADD − payload.ts` nas 400 entradas mais novas de cada stream, lido de dentro do contêiner `api`:
+
+| stream | p50 | p95 | p99 | máx |
+|---|---|---|---|---|
+| `market.ticks` | **25,82 s** | 26,47 s | 26,73 s | 26,83 s |
+| `market.derivatives` | 3,46 s | 32,60 s | 56,16 s | 73,93 s |
+| `market.liquidations` | 4,83 s | 8,28 s | 12,23 s | 23,99 s |
+
+Decomposto: `XADD − envelope.ts` = **0,018 s** (p50) e `envelope.ts − payload.ts` = **25,80 s**. O
+coalescer e o Redis não são o atraso; o evento chega velho ao `handle_event`.
+
+`docker stats`: `market-worker` **99,45 %** de um core, 290,9 MiB. Heartbeat: `subscriptions` 1 200,
+`dropped_events` **8 354 085**, `ws_state` connected. `mkt:binance:coverage`:
+`covered_until == session_since == 23:11:13Z` — congelado havia **34 minutos**.
+
+py-spy 60 s (6 191 amostras): `_handle_raw_message` **43,66 %** cumulativo · `parse_stream_message`
+25,81 % + 16,44 % · `model_construct` (pydantic) **20,90 %** · `_is_final_kline` 5,59 % *self* +
+`_evict_one` 3,38 % *self* (fila do adapter cheia) · `handle_event` (worker) **1,02 %** ·
+`run_recovery` 0,53 %.
+
+## 2. Depois: 4 shards × ~50 mercados (00:58:40Z → 01:25:01Z, 26 min 21 s)
+
+`MARKET_SHARDS=4 docker compose -f infra/docker/docker-compose.yml --profile shards up -d`.
+
+| | p50 | p95 | p99 | máx |
+|---|---|---|---|---|
+| `market.ticks` (fim da janela) | **4,31 s** | **5,54 s** | **5,65 s** | 6,06 s |
+| `market.derivatives` | 1,20 s | 6,52 s | 13,10 s | 35,89 s |
+| `market.liquidations` | 7,96 s | 12,52 s | 16,06 s | 23,99 s |
+
+Série do p50 de `market.ticks` ao longo da janela (3, 8, 11, 15, 20 e 26 min): 7,16 · 5,68 · 8,48 ·
+6,26 · 9,82 · **4,31 s**. O `XADD − envelope.ts` ficou entre 0,008 e 0,015 s o tempo todo.
+
+| shard | mercados | CPU | `ws_state` | reconnects | `dropped_events` na janela |
+|---|---|---|---|---|---|
+| `0of4` | 53 | 98,1 % | connected | 0 | 2 787 581 |
+| `1of4` | 44 | 164,2 % | connected | 0 | 707 719 |
+| `2of4` | 45 | 99,4 % | connected | 0 | 1 169 149 |
+| `3of4` | 58 | 99,2 % | connected | 0 | 2 318 412 |
+
+`/ready` **200** nos quatro shards (`{"database":true,"redis":true,"ingestion":true,"persistence":true,"partitions":true,"outbox":true,"rest_gate":"ok"}`)
+e na `api`. Exceções no log dos quatro em 30 min: **4 ocorrências**, todas
+`market_persist_flush_failed` (`CancelledError`→`TimeoutError` dentro do `flush_batch`, a mesma
+classe pré-existente registrada nas provas da T2.5-backfill e da T2.9c); **nenhuma exceção nova**.
+
+Agregação da API pelo mesmo caminho de serviço dos handlers autenticados:
+
+```
+market-status: {"exchanges":[{"exchange":"binance","ws_state":"connected",
+  "last_event_at":"2026-09-07T01:03:02.949000Z","last_event_age_ms":13601,
+  "markets_monitored":200,"open_gaps":4726,"reconnects":0,
+  "shards_expected":4,"shards_reporting":4},
+  {"exchange":"bybit","ws_state":"unavailable","last_event_at":null,"markets_monitored":0,
+   "open_gaps":0,"reconnects":null,"shards_expected":null,"shards_reporting":0}],
+  "markets_monitored_total":200}
+shards para o rótulo do /markets: 4 4
+```
+
+`markets_monitored` 200 vem do Postgres (não da soma dos shards) e `bybit`, sem coletor, declara
+topologia **desconhecida** (`null`), não "1 shard".
+
+Tick→oportunidade (histograma do `scanner-worker`, delta de 2 min às 01:19–01:21, 2 649 amostras):
+média **7,74 s**, ≤ 3 s **0,3 %**, ≤ 8 s 59,6 %, ≤ 13 s 97,8 %, ≤ 21 s 100 %. Contra a T2.5d
+(p50 ~6,4 s, ≤ 3 s 3,7 %, p95 **e** p99 > 21 s): o p99 saiu de "> 21 s" para "≤ 21 s", mas **o
+orçamento de 3 s continua não cumprido**.
+
+## 3. Experimento extra: 8 shards × ~25 mercados (01:26Z → 01:40Z)
+
+Perfil `shards8` do compose. Aos 4 min ainda era pior que 4 shards (p50 15,31 s — transiente de
+partida); aos 9–11 min:
+
+| | p50 | p95 | p99 |
+|---|---|---|---|
+| `market.ticks` | **0,41 s** | 11,28 s | 11,51 s |
+
+Tick→oportunidade na mesma janela (2 530 amostras): média **2,55 s**, ≤ 1 s **54,2 %**, ≤ 3 s
+**70,5 %**, ≤ 8 s 93,0 %, ≤ 13 s 99,9 %.
+
+O número é bimodal e a razão está nos descartes por shard: 73 · 10 232 · 21 799 · 3 231 · 50 867 ·
+0 · **162 386** · **175 839**. A fatia é por `crc32(symbol) % N`, que equilibra **contagem**
+(21 a 35 mercados) e não **tráfego** — dois ou três shards ficam com os majors e continuam saturados
+enquanto os outros publicam com 0,4 s. É esse resíduo, e não o número de processos, que segura o p95.
+
+py-spy num shard de 25 mercados (4 116 amostras): `_handle_raw_message` cai para **13,63 %**, e
+aparece o novo primeiro colocado da tarefa seguinte — `queue_oldest_pending_ts` **11,25 %**
+cumulativo (`_effective_ts` 4,59 % + `oldest_pending_ts` 2,87 % de *self*): o gate de cobertura da
+T2.5e varre a fila **inteira** a cada 250 ms, o que numa fila cheia (10 000 itens) custa 40 000
+`_effective_ts` por segundo e realimenta a saturação que ela está medindo.
+
+## 4. Mudança de topologia ao vivo, e o órfão que ela revelou
+
+Ao voltar de 8 para 4 shards (01:40Z) os registros `0of8..7of8` foram removidos sozinhos pelo
+primeiro stamp dos novos shards e sobraram só `0of4..3of4` — a reconciliação funcionou. Mas a
+contagem de campos `sym:` ficou em **201 para 200 mercados monitorados**: `KOMAUSDT` tinha ficado
+sem dono, e nada iria apagá-lo (o TTL da chave é renovado a cada stamp). Um campo órfão é o scanner
+reivindicando cobertura de um mercado que ninguém coleta — a mentira exata que o módulo existe para
+impedir.
+
+Corrigido no script Lua (reconciliação total: os `sym:` publicados são exatamente a união das listas
+dos shards vivos), com teste que reproduz o órfão. Verificado em produção depois do redeploy
+(01:58Z): **200 campos `sym:` para 200 mercados monitorados**, `covered_until` avançando.
+
+## 5. Veredito
+
+| Item do brief | Situação |
+|---|---|
+| 1. Medir antes (delay por stream, CPU, py-spy) | **cumprido** — §1 |
+| 2. Heartbeat por shard + agregação na API + rótulo na web | **cumprido** — chave por shard, `shards_expected`/`shards_reporting`, `stale` com shard faltando, `null` sem coletor; rótulo "N shards, M mercados" com dado real (`SummaryChips`) |
+| 3. Latência de publicação dentro de um shard | **medido e reduzido**: 25,82 s → 4,31 s (p50) com 4 shards e 0,41 s com 8; a cadência do coalescer (250 ms) **não** era a causa e não foi mexida — o que mudou foi o custo por mensagem (`model_construct` com todos os campos, 96 µs → 32 µs) e o número de processos |
+| 4. Prova de 30 min com 4 shards | **cumprido** — 26 min 21 s de janela, `/ready` verde nos quatro, 0 exceções novas, `markets_ok` = 200 mercados nos quatro heartbeats |
+| p99 tick→oportunidade ≤ 3 s | **não cumprido**: 4 shards deixam 0,3 % dentro do orçamento; 8 shards levam **70,5 %** para dentro dele (média 2,55 s) mas o p95 fica em ~11 s por causa do desbalanceamento de tráfego entre shards |
+| 5. Instruções para a VPS | **cumprido** — `infra/vps/docker-compose.prod.yml` com os três serviços extras e o comando com `--profile shards`; DEPLOYMENT.md §3.1 |
+
+## 6. Estado do stack ao fim (ressalva honesta)
+
+Às **02:52Z**, depois de todas as medições acima e do último redeploy, o engine do Docker Desktop
+passou a responder `500 Internal Server Error` a **toda** chamada da API
+(`http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.55/containers/json`), inclusive `docker ps` e
+`docker version`. Não é efeito do código desta tarefa (os quatro shards estavam *healthy* às 02:32Z,
+com o agregado `shards_expected/reporting = 4/4` e 200 campos `sym:` para 200 mercados) e não
+reiniciei o Docker Desktop por conta própria: outras tarefas usam o mesmo daemon. Fica registrado
+para quem for operar em seguida — a última leitura boa do stack é a de 02:32Z, nesta prova.

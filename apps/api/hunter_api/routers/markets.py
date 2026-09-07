@@ -22,9 +22,10 @@ from hunter_api.errors import HunterError
 from hunter_api.repositories.base import MAX_PAGE_SIZE
 from hunter_api.repositories.markets import CandleRepository, MarketRepository
 from hunter_api.schemas.markets import CandleOut, MarketDetailOut, MarketListPage
+from hunter_api.services.market_shards import summarize_collectors
 from hunter_api.services.markets import build_market_detail, build_market_list_page
 from hunter_core.domain.enums import Timeframe
-from hunter_core.domain.types import ensure_utc
+from hunter_core.domain.types import ensure_utc, utcnow
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
@@ -70,7 +71,7 @@ async def list_markets(
     cursor: str | None = None,
 ) -> MarketListPage:
     rows = await MarketRepository(session).list_markets(exchange=exchange, q=q, monitored=monitored)
-    return await build_market_list_page(
+    page = await build_market_list_page(
         session,
         rows,
         redis,
@@ -78,6 +79,16 @@ async def list_markets(
         cursor=cursor,
         stale_after_s=settings.market_stale_after_s,
     )
+    # T2.5g: how many collector shards stand behind these rows — read here and
+    # not inside ``build_market_list_page`` (which is at the 350-line budget
+    # and owns hot-state merging, not collector topology).
+    expected, reporting = await summarize_collectors(
+        redis, (row.exchange for row in rows), now=utcnow()
+    )
+    summary = page.summary.model_copy(
+        update={"collector_shards_expected": expected, "collector_shards_reporting": reporting}
+    )
+    return page.model_copy(update={"summary": summary})
 
 
 @router.get("/{exchange}/{symbol}", response_model=MarketDetailOut, summary="Read one market")

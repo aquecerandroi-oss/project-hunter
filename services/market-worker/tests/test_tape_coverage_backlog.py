@@ -25,12 +25,16 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+import pytest
+
 from hunter_core.domain.enums import OrderSide
 from hunter_core.domain.market import NormalizedTrade
 from hunter_core.redis import keys
 from hunter_exchanges.base import ConnectionState
 from hunter_exchanges.binance.event_queue import StreamConsumer
 from hunter_market_worker.coverage import COVERAGE_SAFETY_S, CoverageTracker
+
+pytestmark = pytest.mark.integration
 
 
 def _at(second: float) -> datetime:
@@ -49,26 +53,20 @@ def _trade(seq: int, ts: datetime) -> NormalizedTrade:
     )
 
 
-class FakeRedis:
-    def __init__(self) -> None:
-        self.hashes: dict[str, dict[str, str]] = {}
-
-    async def hset(self, key: str, *, mapping: dict[str, str]) -> int:
-        self.hashes.setdefault(key, {}).update(mapping)
-        return len(mapping)
-
-    async def hdel(self, key: str, *fields: str) -> int:
-        entry = self.hashes.get(key, {})
-        return sum(1 for field in fields if entry.pop(field, None) is not None)
-
-    async def expire(self, key: str, ttl: int) -> bool:
-        return True
+async def _hash(redis: Any, exchange: str = "binance") -> dict[str, str]:
+    """The published coverage hash, decoded. Real Redis since T2.5g: the stamp
+    is one Lua script (``coverage_publish``), so a hand-written double would be
+    testing a different writer than production runs."""
+    raw = await redis.hgetall(keys.tape_coverage(exchange))
+    return {k.decode(): v.decode() for k, v in raw.items()}
 
 
 # ---- Item 1: reproduction ----------------------------------------------------
 
 
-async def test_a_continuous_producer_and_a_keeping_up_consumer_do_not_break_coverage() -> None:
+async def test_a_continuous_producer_and_a_keeping_up_consumer_do_not_break_coverage(
+    redis_client: Any,
+) -> None:
     """The brief's reproduction: a real ``BoundedEventQueue``/``StreamConsumer``
     pair, one producer that never stops, one consumer that drains as fast as
     it can (no artificial slowness). Confirms the hypothesis first (exact
@@ -104,7 +102,7 @@ async def test_a_continuous_producer_and_a_keeping_up_consumer_do_not_break_cove
     consumer_task = asyncio.ensure_future(consume())
     tracker = CoverageTracker("binance")
     tracker.session_started(["BTCUSDT"])
-    redis: Any = FakeRedis()
+    redis: Any = redis_client
 
     exact_equality_hits = 0
     total_stamps = 0
@@ -125,7 +123,7 @@ async def test_a_continuous_producer_and_a_keeping_up_consumer_do_not_break_cove
                 queue_progress=(enqueued, delivered, evicted),
                 oldest_pending_ts=consumer.oldest_pending_ts(),
             )
-            covered_untils.append(redis.hashes[keys.tape_coverage("binance")]["covered_until"])
+            covered_untils.append((await _hash(redis))["covered_until"])
     finally:
         stop.set()
         producer_task.cancel()
@@ -158,17 +156,19 @@ async def test_a_continuous_producer_and_a_keeping_up_consumer_do_not_break_cove
 # ---- Item 2: honesty ----------------------------------------------------
 
 
-async def test_a_consumer_that_falls_behind_still_breaks_by_queue_backlog() -> None:
+async def test_a_consumer_that_falls_behind_still_breaks_by_queue_backlog(
+    redis_client: Any,
+) -> None:
     """A backlog that is not bounded -- growing, and old enough that its
     oldest member has itself reached the claimed window -- must still break.
     The bounded-delay rule is not "any backlog is fine"."""
-    redis: Any = FakeRedis()
+    redis: Any = redis_client
     tracker = CoverageTracker("binance")
     tracker.session_started(["BTCUSDT"], at=_at(0))
     await tracker.stamp(
         redis, dropped_events=0, now=_at(1), queue_progress=(1, 1, 0), oldest_pending_ts=None
     )
-    healthy = redis.hashes[keys.tape_coverage("binance")]["covered_until"]
+    healthy = (await _hash(redis))["covered_until"]
 
     # The consumer has stopped keeping up: backlog grows, and the oldest
     # pending event is well behind the safety margin by the time of this
@@ -182,7 +182,7 @@ async def test_a_consumer_that_falls_behind_still_breaks_by_queue_backlog() -> N
         oldest_pending_ts=stale_pending,
     )
 
-    frozen = redis.hashes[keys.tape_coverage("binance")]["covered_until"]
+    frozen = (await _hash(redis))["covered_until"]
     assert frozen == healthy
     assert tracker._break_reason == "queue_backlog"
 
@@ -194,15 +194,17 @@ async def test_a_consumer_that_falls_behind_still_breaks_by_queue_backlog() -> N
         queue_progress=(90, 1, 0),
         oldest_pending_ts=stale_pending,
     )
-    assert redis.hashes[keys.tape_coverage("binance")]["covered_until"] == healthy
+    assert (await _hash(redis))["covered_until"] == healthy
 
 
-async def test_an_item_stuck_past_the_safety_margin_freezes_even_with_a_backlog_of_one() -> None:
+async def test_an_item_stuck_past_the_safety_margin_freezes_even_with_a_backlog_of_one(
+    redis_client: Any,
+) -> None:
     """A single pending item is enough to break the interval once its own
     timestamp reaches the window a stamp is about to claim -- and enough,
     while it has not, to leave the interval advancing (the two halves of the
     rule tested independently)."""
-    redis: Any = FakeRedis()
+    redis: Any = redis_client
     tracker = CoverageTracker("binance")
     tracker.session_started(["BTCUSDT"], at=_at(0))
 
@@ -217,15 +219,14 @@ async def test_an_item_stuck_past_the_safety_margin_freezes_even_with_a_backlog_
         oldest_pending_ts=fresh_pending,
     )
     assert stamped is True
-    assert (
-        redis.hashes[keys.tape_coverage("binance")]["covered_until"]
-        == (_at(2) - timedelta(seconds=COVERAGE_SAFETY_S)).isoformat()
-    )
+    assert (await _hash(redis))["covered_until"] == (
+        _at(2) - timedelta(seconds=COVERAGE_SAFETY_S)
+    ).isoformat()
     assert tracker._break_reason is None
 
     # now=_at(3): candidate cut is _at(2.5). The *same* pending item
     # (_at(1.6)) has now reached it -- the claim freezes.
-    healthy = redis.hashes[keys.tape_coverage("binance")]["covered_until"]
+    healthy = (await _hash(redis))["covered_until"]
     await tracker.stamp(
         redis,
         dropped_events=0,
@@ -233,17 +234,17 @@ async def test_an_item_stuck_past_the_safety_margin_freezes_even_with_a_backlog_
         queue_progress=(5, 4, 0),
         oldest_pending_ts=fresh_pending,
     )
-    frozen = redis.hashes[keys.tape_coverage("binance")]["covered_until"]
+    frozen = (await _hash(redis))["covered_until"]
     assert frozen == healthy
     assert tracker._break_reason == "queue_backlog"
 
 
-async def test_a_pending_item_exactly_at_the_candidate_cut_still_breaks() -> None:
+async def test_a_pending_item_exactly_at_the_candidate_cut_still_breaks(redis_client: Any) -> None:
     """The comparison is ``<=``, not ``<``: a pending item timestamped
     exactly at the candidate cut is inside the window a stamp would claim
     (the cut is the window's inclusive end, ``windows.trades_between``), so
     it must break rather than just barely pass."""
-    redis: Any = FakeRedis()
+    redis: Any = redis_client
     tracker = CoverageTracker("binance")
     tracker.session_started(["BTCUSDT"], at=_at(0))
 
@@ -261,6 +262,7 @@ async def test_a_pending_item_exactly_at_the_candidate_cut_still_breaks() -> Non
 
 
 async def test_resuming_from_a_queue_backlog_logs_how_long_it_was_frozen(
+    redis_client: Any,
     monkeypatch: Any,
 ) -> None:
     """Astra diff review nice-to-have: a resumption log with the frozen
@@ -286,7 +288,7 @@ async def test_resuming_from_a_queue_backlog_logs_how_long_it_was_frozen(
     monotonic_values = iter([100.0, 103.0])
     monkeypatch.setattr(coverage_module, "monotonic", lambda: next(monotonic_values))
 
-    redis: Any = FakeRedis()
+    redis: Any = redis_client
     tracker = CoverageTracker("binance")
     tracker.session_started(["BTCUSDT"], at=_at(0))
     await tracker.stamp(

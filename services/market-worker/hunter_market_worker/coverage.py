@@ -2,10 +2,9 @@
 
 ``hunter_indicators.features.windows.trades_between`` refuses a trade window
 unless the collector proves it stayed connected through it: the tape alone
-cannot tell a quiet market from a dropped connection, and a trade right before
-the cut only says the collector came back (T2.2 notes §12.3/§13). Until that
-proof exists, ``trade_velocity_1m``, ``buy_pressure_5m`` and ``sell_pressure_5m``
-are ``insufficient_coverage`` and no EARLY stage is ever confirmed.
+cannot tell a quiet market from a dropped connection (T2.2 notes §12.3/§13).
+Until that proof exists, ``trade_velocity_1m``, ``buy_pressure_5m`` and
+``sell_pressure_5m`` are ``insufficient_coverage`` and no EARLY is confirmed.
 
 Only this process can produce the proof, and only about the interval it can
 actually stand behind:
@@ -24,78 +23,72 @@ actually stand behind:
 
 The scanner then evaluates each market at ``as_of = covered_until`` instead of
 at its own clock: "as it was observable at ``as_of``" is what ``MarketContext``
-means, and moving the cut is the only honest way to satisfy a proof that is,
-by construction, always slightly behind.
+means, and moving the cut is the only honest way to satisfy a proof that is
+always slightly behind.
 
 **T2.5-adapter** (full account: ``.claude/state/astra-review-T2.5-adapter-diff.md``)
 closed two gaps the 0.5s margin alone cannot see through, both read at
 **stamp time** (every housekeeping tick, ~250ms), never per event:
 
 - **an internal reconnect.** ``ConnectionRunner.run`` (``binance/connection.py``)
-  retries a dropped socket without ever ending :meth:`stream`'s generator, so
-  a session that only broke when that generator ended could keep publishing
-  "continuous" straight through a real gap. Two signals catch it: ``ws_state``
-  (the adapter's own ``connection_state()``, mandatory, set to
-  ``"reconnecting"`` *before* the close awaits, worst state across every
-  connection key) and ``connection_generation`` (a monotonic counter, bumped
-  on every reconnect — catches a full connect→disconnect→reconnect cycle that
-  completes *between* two stamps, which ``ws_state`` alone would read as
-  "connected" throughout). Either changing forces ``reason="reconnect"``;
-  once both agree healthy again, a *fresh* session starts at the resumption
-  instant rather than stretching the old one across a gap this process could
-  not see through;
-- **a backlogged queue without drops.** ``_in_flight == 0`` means no write
-  *this process* started is unfinished, never that the adapter's own inbound
-  queue was empty — an item its reader task already popped is not delivered
-  until actually yielded. ``queue_progress`` (``enqueued``, ``delivered``,
-  ``evicted``) fixes that: an eviction counts on its own side of the ledger
-  so the one break it already causes (``dropped_events``) does not read as
-  permanent backlog afterwards. Unlike a reconnect, this kind of backlog
-  clearing without ever losing ``ws_state`` never invalidates the session —
-  nothing was lost, only delayed.
+  retries a dropped socket without ever ending :meth:`stream`'s generator, so a
+  session that only broke when that generator ended could publish "continuous"
+  straight through a real gap. Two signals catch it: ``ws_state`` (mandatory,
+  worst across connection keys, set to ``"reconnecting"`` *before* the close
+  awaits) and ``connection_generation`` (bumped on every reconnect — catches a
+  full cycle completing *between* two stamps). Either changing forces
+  ``reason="reconnect"``, and resumption starts a *fresh* session rather than
+  stretching the old one across a gap this process could not see through;
+- **a backlogged queue without drops.** ``_in_flight == 0`` says no write *this
+  process* started is unfinished, never that the adapter's inbound queue was
+  empty. ``queue_progress`` (``enqueued``, ``delivered``, ``evicted``) fixes
+  that; an eviction counts on its own side of the ledger, so the break it
+  already causes (``dropped_events``) does not read as permanent backlog
+  afterwards. Unlike a reconnect, backlog clearing never invalidates the
+  session: nothing was lost, only delayed.
 
 **T2.5e** (``.claude/state/brief-T2.5e-coverage-caught-up.md``, full account
-in ``.claude/state/notes-T2.5.md`` T2.5e section) found the ledger above
-right but the bar wrong: at ~150 msg/s across 200 markets there is almost
-always one item between an ``append`` and the matching ``get``, so
-``enqueued == delivered + evicted`` was true only in the instant the queue
-was fully empty — nearly never, and once broken the interval stayed
-``reason="queue_backlog"`` forever (the warning only fires on *entering* the
-break, measured on the local stack and the VPS). "Caught up" is now a
-**bounded delay**: a nonzero backlog only breaks the interval if the oldest
-pending event's own timestamp (:func:`hunter_exchanges.binance.event_queue._effective_ts`,
-wall clock — ``queue_oldest_pending_ts()``) has itself reached the window
-this stamp is about to claim covered (``moment - COVERAGE_SAFETY_S``); ahead
-of that cut, the event's absence from ``delivered`` costs nothing the claim
-depends on, and the 0.5s margin is doing exactly the job declared for it
-above. A plain count threshold was rejected in design review (magnitude
-decides nothing a timestamp does not already decide correctly), and so was a
-*locally measured* age: an event can sit longer than the margin upstream of
-this queue, invisibly, before ever being ``put``, so its own ``ts`` — not
-how long *this* queue has known about it — is what must be checked, taken as
-the *minimum* over every still-pending event (arrival order across several
-reader tasks is not timestamp order) including one already popped from the
-queue but not yet delivered (``queue_oldest_pending_ts()`` covers both; see
-that module's docstring for how).
+in ``.claude/state/notes-T2.5.md`` T2.5e section) found that ledger right but
+its bar wrong: under continuous flow ``enqueued == delivered + evicted`` holds
+only in the instant the queue is fully empty, so the interval broke on nearly
+every stamp and stayed broken. "Caught up" is now a **bounded delay**: a
+nonzero backlog only breaks the interval if the oldest pending event's own
+timestamp (``queue_oldest_pending_ts()``, which covers both the deque and an
+item already popped but not yet delivered) has itself reached the window this
+stamp is about to claim (``moment - COVERAGE_SAFETY_S``). Its *own* ``ts``,
+never how long this queue has known about it — an event can sit upstream of
+here invisibly; and the minimum over pending events, since arrival order
+across reader tasks is not timestamp order. A plain count threshold was
+rejected in design review: magnitude decides nothing a timestamp does not
+already decide correctly.
+
+**T2.5g** made the collector N processes (``MARKET_SHARD=i/N``) while the
+scanner still reads one hash per exchange. What this shard can stand behind is
+decided here as before; *publishing* it moved to
+:mod:`hunter_market_worker.coverage_publish` (one Lua script, conservative
+merge — its module docstring has the aggregate's rules). Fixed on the way:
+``dropped_events`` arrived here as a constant ``0``, because ``streaming.py``
+read it off the adapter instead of its connections, so the break below never
+fired on the VPS while 1.2M events were dropped (``DroppedEventsLedger``).
 
 All four signals are read in the same housekeeping task that already calls
 :meth:`writing`/:meth:`written`. ``connection_generation``/``queue_progress``/
 ``queue_oldest_pending_ts`` are read defensively (``getattr``, additive
-capability, same pattern as ``rest_gate_status``); ``ws_state`` is not, since
-``connection_state()`` is mandatory. An adapter implementing none of the
-additive methods behaves exactly as before this module existed: ``ws_state``
-defaults to ``"connected"``, the other three to ``None``.
+capability, like ``rest_gate_status``); ``ws_state`` is not, since
+``connection_state()`` is mandatory. An adapter implementing none of them
+behaves as before this module existed: ``ws_state`` ``"connected"``, the rest
+``None``.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 from time import monotonic
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
-from hunter_core.redis import keys
+from hunter_market_worker import coverage_publish
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -118,10 +111,6 @@ COVERAGE_TTL_S = 60
 """A dead collector's proof must expire on its own: a scanner that kept reading
 a stale hash would keep publishing windows nobody is collecting."""
 
-_SESSION_SINCE = "session_since"
-_COVERED_UNTIL = "covered_until"
-_SYMBOL_PREFIX = "sym:"
-
 __all__ = [
     "COVERAGE_SAFETY_S",
     "COVERAGE_STAMP_S",
@@ -133,27 +122,29 @@ __all__ = [
 class CoverageTracker:
     """The coverage interval of one exchange's stream, and how it is published."""
 
-    def __init__(self, exchange: str) -> None:
+    def __init__(self, exchange: str, shard_index: int = 0, shard_total: int = 1) -> None:
         self.exchange = exchange
+        #: T2.5g: which slice of the universe this process proves. N shards
+        #: write one shared hash, so the aggregate is computed by the Lua
+        #: script in ``coverage_publish`` and never by whoever wrote last.
+        self.shard = coverage_publish.shard_id(shard_index, shard_total)
         self._session_since: datetime | None = None
         self._symbols: dict[str, datetime] = {}
-        self._published: set[str] = set()
+        self._claiming = False
         self._dropped: int | None = None
         self._in_flight = 0
         self._last_stamp: float | None = None
         # T2.5-adapter: the last ``covered_until`` computed while genuinely
         # caught up (already margin-adjusted) — frozen, not the raw clock,
-        # while ``ws_state``/``queue_progress`` say otherwise (Astra review:
-        # freezing on the raw clock would let the very first backlogged tick
-        # unduly regain the 0.5s the margin had been holding back).
+        # while ``ws_state``/``queue_progress`` say otherwise (freezing on the
+        # raw clock would regain the 0.5s the margin was holding back).
         self._last_safe_covered_until: datetime | None = None
-        #: ``None`` while caught up; otherwise the reason the *last* stamp
-        #: was not — ``"reconnect"`` (ws_state or connection_generation) vs
+        #: ``None`` while caught up; otherwise why the *last* stamp was not —
+        #: ``"reconnect"`` (ws_state/connection_generation) vs
         #: ``"queue_backlog"`` decide whether resuming starts a fresh session
-        #: or simply un-freezes the current one (see module docstring).
+        #: or merely un-freezes this one (see module docstring).
         self._break_reason: str | None = None
-        #: Monotonic reading when the current break started (T2.5e resumption
-        #: log; monotonic so a wall-clock adjustment cannot go negative).
+        #: Monotonic reading when the break started (T2.5e resumption log).
         self._broken_since_monotonic: float | None = None
         #: Last ``connection_generation`` observed, baselined fresh each
         #: session so a number that does not reset across sessions never
@@ -235,10 +226,9 @@ class CoverageTracker:
         ever moves the claim forward faster than the existing rules allow.
         """
         moment = now or utcnow()
-        key = keys.tape_coverage(self.exchange)
         if self._session_since is None:
-            if self._published:
-                await self._clear(redis, key)
+            if self._claiming:
+                await self._clear(redis, moment)
             return False
         if self._in_flight:
             return False
@@ -323,26 +313,38 @@ class CoverageTracker:
         )
         if covered_until < self._session_since:
             covered_until = self._session_since
-        mapping = {
-            _SESSION_SINCE: self._session_since.isoformat(),
-            _COVERED_UNTIL: covered_until.isoformat(),
+        # Per symbol, the truth is ``max(this session, that symbol's own
+        # subscription)``: the aggregate ``session_since`` published by
+        # ``coverage_publish`` is the MIN across shards, a lower bound that
+        # must never lift a symbol's own start (the reader takes the max of
+        # the two).
+        symbols = {
+            symbol: max(since, self._session_since) for symbol, since in self._symbols.items()
         }
-        for symbol, since in self._symbols.items():
-            mapping[f"{_SYMBOL_PREFIX}{symbol}"] = since.isoformat()
-        stale = self._published - {f"{_SYMBOL_PREFIX}{symbol}" for symbol in self._symbols}
-        await cast(Any, redis).hset(key, mapping=mapping)
-        if stale:
-            await cast(Any, redis).hdel(key, *sorted(stale))
-        await redis.expire(key, COVERAGE_TTL_S)
-        self._published = set(mapping) - {_SESSION_SINCE, _COVERED_UNTIL}
+        await coverage_publish.publish(
+            redis,
+            self.exchange,
+            shard=self.shard,
+            session_since=self._session_since,
+            covered_until=covered_until,
+            symbols=symbols,
+            now=moment,
+            key_ttl_s=COVERAGE_TTL_S,
+        )
+        self._claiming = True
         return True
 
-    async def _clear(self, redis: redis_asyncio.Redis, key: str) -> None:
-        """Say the interval ended. Deleting the key would be read as "no
-        collector", which is a different fact from "the collector is here and
-        stopped being able to prove continuity"."""
-        await cast(Any, redis).hset(key, mapping={_SESSION_SINCE: "", _COVERED_UNTIL: ""})
-        if self._published:
-            await cast(Any, redis).hdel(key, *sorted(self._published))
-        await redis.expire(key, COVERAGE_TTL_S)
-        self._published = set()
+    async def _clear(self, redis: redis_asyncio.Redis, moment: datetime) -> None:
+        """This shard's interval ended — an empty record, not a deleted key
+        (``coverage_publish.publish``)."""
+        await coverage_publish.publish(
+            redis,
+            self.exchange,
+            shard=self.shard,
+            session_since=None,
+            covered_until=None,
+            symbols={},
+            now=moment,
+            key_ttl_s=COVERAGE_TTL_S,
+        )
+        self._claiming = False

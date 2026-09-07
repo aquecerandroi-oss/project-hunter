@@ -93,6 +93,13 @@ services:
       <<: *api-env
       HUNTER_ROLE: market
       HEALTH_PORT: "8001"
+      # T2.5g: shard 0 of ``MARKET_SHARDS`` (default 1 = the whole universe in
+      # one process, exactly as before). ``MARKET_SHARDS=4 docker compose
+      # --profile shards up -d`` starts this one as 0/4 plus the three
+      # services below. Forgetting the variable does not silently double the
+      # collection: the extra shards would be ``1/1``, which
+      # ``_parse_market_shard`` refuses at startup (visible crash loop).
+      MARKET_SHARD: 0/${MARKET_SHARDS:-1}
     env_file:
       - path: ../../.env
         required: false
@@ -120,6 +127,96 @@ services:
       timeout: 30s
       start_period: 60s
       retries: 5
+
+  # T2.5g — the other three shards, behind the `shards` profile so a plain
+  # `up` still runs one collector. Explicit services, not `deploy.replicas`:
+  # compose does not expose a replica's index, and each shard needs its own
+  # MARKET_SHARD, its own heartbeat key and its own health port mapping. Start
+  # them with:
+  #
+  #   MARKET_SHARDS=4 docker compose -f infra/docker/docker-compose.yml \
+  #     --profile shards up -d
+  #
+  # Universe leadership is a Redis lock (universe_leader.py), so start order
+  # does not matter and no shard's readiness depends on its siblings.
+  market-worker-1:
+    extends:
+      service: market-worker
+    profiles: [shards]
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+      MARKET_SHARD: 1/${MARKET_SHARDS:-1}
+
+  market-worker-2:
+    extends:
+      service: market-worker
+    profiles: [shards]
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+      MARKET_SHARD: 2/${MARKET_SHARDS:-1}
+
+  market-worker-3:
+    extends:
+      service: market-worker
+    profiles: [shards]
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+      MARKET_SHARD: 3/${MARKET_SHARDS:-1}
+
+  # Perfil `shards8`: os shards 4..7, para uma topologia de 8 x ~25 mercados.
+  # Medido na T2.5g: com 4 x 50 o coletor ainda descarta eventos e publica o
+  # tick com 4,3 s (p50); a fatia por `crc32 % N` também é desbalanceada (53 a
+  # 58 mercados por shard, e o tráfego mais ainda). Só faz sentido onde há
+  # core sobrando — 8 processos de coleta na VPS de 12 vCPU deixam pouco para
+  # scanner/strategy/api.
+  #
+  #   MARKET_SHARDS=8 docker compose -f infra/docker/docker-compose.yml \
+  #     --profile shards --profile shards8 up -d
+  market-worker-4:
+    extends:
+      service: market-worker
+    profiles: [shards8]
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+      MARKET_SHARD: 4/${MARKET_SHARDS:-1}
+
+  market-worker-5:
+    extends:
+      service: market-worker
+    profiles: [shards8]
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+      MARKET_SHARD: 5/${MARKET_SHARDS:-1}
+
+  market-worker-6:
+    extends:
+      service: market-worker
+    profiles: [shards8]
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+      MARKET_SHARD: 6/${MARKET_SHARDS:-1}
+
+  market-worker-7:
+    extends:
+      service: market-worker
+    profiles: [shards8]
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+      MARKET_SHARD: 7/${MARKET_SHARDS:-1}
 
   # Market intelligence (docs/plans/M2.md, task T2.5). Consumes the market.*
   # streams, evaluates every monitored market against the engines of

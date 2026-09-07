@@ -89,6 +89,47 @@ services:
       HEALTH_PORT: "8001"
     logging: *prod-logging
 
+  # T2.5g - os outros tres shards do coletor (perfil `shards` do compose base).
+  # Com 200 mercados num processo so, a VPS mediu CPU 101%, 1,2M eventos
+  # descartados e `covered_until` congelado em `session_since` desde o boot: a
+  # fila do adapter nunca alcanca o corte de 0,5 s, entao o coletor (com razao)
+  # nao prova continuidade nenhuma. Quatro processos x ~50 mercados cabem nos
+  # 12 vCPU e cada um escreve o proprio `hb:market:binance:{i}of4`, que a API
+  # agrega. Subir com:
+  #
+  #   MARKET_SHARDS=4 docker compose --env-file .env -p hunter \
+  #     -f infra/docker/docker-compose.yml -f infra/vps/docker-compose.prod.yml \
+  #     --profile shards up -d
+  #
+  # `MARKET_SHARDS` mora no ambiente do comando (ou no .env, que os agentes nao
+  # escrevem); sem ele os tres extras recusam `1/1` no boot em vez de duplicar
+  # a coleta em silencio. Ao mudar N ficam grupos de consumidor orfaos do
+  # backfill (`market-worker.backfill.binance.{i}of{N}`, PIPELINE.md 1b item 2):
+  # removidos a mao, depois de conferir que nao ha pendencia neles.
+  market-worker-1:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+    logging: *prod-logging
+
+  market-worker-2:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+    logging: *prod-logging
+
+  market-worker-3:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+    logging: *prod-logging
+
   # Shadow Lab (docs/plans/SHADOW-LAB.md, S2). Sem este bloco o servico existe
   # no compose base mas herda o `x-api-env` de desenvolvimento, entao na VPS ele
   # sobe com a senha de dev e morre em loop com

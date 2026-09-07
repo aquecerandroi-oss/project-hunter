@@ -11,6 +11,13 @@ from typing import Any
 import pytest
 
 from hunter_core.domain.enums import OrderSide
+from hunter_core.domain.market import (
+    NormalizedCandle,
+    NormalizedFunding,
+    NormalizedOrderBook,
+    NormalizedTicker,
+    NormalizedTrade,
+)
 from hunter_exchanges.base import MalformedMessage, StreamChannel
 from hunter_exchanges.binance import streams
 
@@ -546,3 +553,42 @@ def test_parse_stream_message_accepts_a_valid_deferred_book_ticker() -> None:
     event = streams.parse_stream_message("btcusdt@bookTicker", raw, last_price=None)
 
     assert event is None
+
+
+# ---- T2.5g: the hot path never lets pydantic resolve a default ---------------
+
+
+@pytest.mark.parametrize(
+    ("parser", "fixture", "model"),
+    [
+        (streams.parse_agg_trade, "ws_agg_trade.json", NormalizedTrade),
+        (streams.parse_depth20, "ws_depth20.json", NormalizedOrderBook),
+        (streams.parse_kline_ws, "ws_kline_1m.json", NormalizedCandle),
+        (streams.parse_mark_price, "ws_mark_price.json", NormalizedFunding),
+    ],
+)
+def test_every_field_is_provided_explicitly_on_the_hot_path(
+    parser: Any, fixture: str, model: Any
+) -> None:
+    """T2.5g, measured: ``model_construct`` with fields missing costs **96 us**
+    against **32 us** with every field passed (pydantic 2.13, inside the
+    running container) — for each omitted field it goes through
+    ``resolve_default_value``, which ``inspect.signature``s the default factory
+    *per call*. That was 7.3% of the collector's CPU in the py-spy profile and
+    a third of ``parse_stream_message``'s cost, on the exact path whose latency
+    the M2 budget is measured against.
+
+    So: every parser fills every field of its model. This test fails the day a
+    model gains a field and a parser forgets it — which would be correct output
+    at three times the cost, invisible without this assertion.
+    """
+    parsed = parser(_load(fixture))
+    assert parsed.model_fields_set == set(model.model_fields), (
+        "fields left to pydantic's default machinery: "
+        f"{sorted(set(model.model_fields) - parsed.model_fields_set)}"
+    )
+
+
+def test_book_ticker_also_fills_every_field() -> None:
+    parsed = streams.parse_book_ticker(_load("ws_book_ticker.json"), last=Decimal("100"))
+    assert parsed.model_fields_set == set(NormalizedTicker.model_fields)

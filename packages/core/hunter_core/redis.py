@@ -218,6 +218,31 @@ class keys:
         return f"hb:{role}:{instance}"
 
     @staticmethod
+    def market_heartbeat(exchange: str, shard_index: int = 0, shard_total: int = 1) -> str:
+        """The collector's per-exchange heartbeat — one key **per shard**.
+
+        T2.5g: with ``MARKET_SHARD=i/N`` and ``N > 1`` each shard owns
+        ``hb:market:{exchange}:{i}of{N}``; the API unions them
+        (``hunter_api.services.market_shards``). A single shared
+        ``hb:market:{exchange}`` is what kept the 200 already-proven markets
+        undelivered in M1: four shards writing one hash makes a dead shard
+        invisible. ``N == 1`` keeps the classic key byte for byte.
+        """
+        if shard_total <= 1:
+            return f"hb:market:{exchange}"
+        return f"hb:market:{exchange}:{shard_index}of{shard_total}"
+
+    @staticmethod
+    def market_heartbeat_shard_pattern(exchange: str) -> str:
+        """``SCAN MATCH`` pattern for every shard key of one exchange. Never
+        matches the classic solo key (which has no trailing segment) nor
+        ``WorkerRuntime``'s generic ``hb:market:{hostname}:{pid}`` — that one
+        lives under ``hb:market:`` too, so a consumer must still validate the
+        ``{i}of{N}`` suffix and the hash's own ``shard_index``/``shard_total``
+        fields instead of trusting the pattern alone."""
+        return f"hb:market:{exchange}:*of*"
+
+    @staticmethod
     def rate_limit(exchange: str, bucket: str) -> str:
         return f"rl:{exchange}:{bucket}"
 

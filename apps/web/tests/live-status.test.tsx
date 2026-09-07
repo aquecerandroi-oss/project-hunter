@@ -32,6 +32,8 @@ const withData: MarketStatusResponse = {
       markets_monitored: 200,
       open_gaps: 0,
       reconnects: 0,
+      shards_expected: 1,
+      shards_reporting: 1,
     },
   ],
   markets_monitored_total: 200,
@@ -91,7 +93,7 @@ describe("LiveStatus (full): the header total never contradicts the rows (F7)", 
 
     const twoExchanges: MarketStatusResponse = {
       exchanges: [
-        { exchange: "binance", ws_state: "connected", last_event_at: new Date().toISOString(), last_event_age_ms: 100, markets_monitored: 200, open_gaps: 0, reconnects: 0 },
+        { exchange: "binance", ws_state: "connected", last_event_at: new Date().toISOString(), last_event_age_ms: 100, markets_monitored: 200, open_gaps: 0, reconnects: 0, shards_expected: 1, shards_reporting: 1 },
       ],
       markets_monitored_total: 200,
       updated_at: new Date().toISOString(),
@@ -131,8 +133,8 @@ describe("LiveStatus (compact): the exchange's own ws_state is in the visible te
   it("names the worst exchange's ws_state in the label for a mixed set", () => {
     const mixed: MarketStatusResponse = {
       exchanges: [
-        { exchange: "binance", ws_state: "connected", last_event_at: new Date().toISOString(), last_event_age_ms: 100, markets_monitored: 200, open_gaps: 0, reconnects: 0 },
-        { exchange: "bybit", ws_state: "reconnecting", last_event_at: new Date().toISOString(), last_event_age_ms: 100, markets_monitored: 50, open_gaps: 0, reconnects: 2 },
+        { exchange: "binance", ws_state: "connected", last_event_at: new Date().toISOString(), last_event_age_ms: 100, markets_monitored: 200, open_gaps: 0, reconnects: 0, shards_expected: 1, shards_reporting: 1 },
+        { exchange: "bybit", ws_state: "reconnecting", last_event_at: new Date().toISOString(), last_event_age_ms: 100, markets_monitored: 50, open_gaps: 0, reconnects: 2, shards_expected: 1, shards_reporting: 1 },
       ],
       markets_monitored_total: 250,
       updated_at: new Date().toISOString(),
@@ -146,8 +148,8 @@ describe("LiveStatus (compact): the worst-state reducer respects down > reconnec
   it("does not render green for a connected + reconnecting mix", () => {
     const mixed: MarketStatusResponse = {
       exchanges: [
-        { exchange: "binance", ws_state: "connected", last_event_at: new Date().toISOString(), last_event_age_ms: 100, markets_monitored: 200, open_gaps: 0, reconnects: 0 },
-        { exchange: "bybit", ws_state: "reconnecting", last_event_at: new Date().toISOString(), last_event_age_ms: 100, markets_monitored: 50, open_gaps: 0, reconnects: 2 },
+        { exchange: "binance", ws_state: "connected", last_event_at: new Date().toISOString(), last_event_age_ms: 100, markets_monitored: 200, open_gaps: 0, reconnects: 0, shards_expected: 1, shards_reporting: 1 },
+        { exchange: "bybit", ws_state: "reconnecting", last_event_at: new Date().toISOString(), last_event_age_ms: 100, markets_monitored: 50, open_gaps: 0, reconnects: 2, shards_expected: 1, shards_reporting: 1 },
       ],
       markets_monitored_total: 250,
       updated_at: new Date().toISOString(),
@@ -175,6 +177,8 @@ describe("LiveStatus: reconciles a fresh server snapshot, not just the value rea
           markets_monitored: 150,
           open_gaps: 0,
           reconnects: 0,
+          shards_expected: 1,
+          shards_reporting: 1,
         },
       ],
       markets_monitored_total: 150,

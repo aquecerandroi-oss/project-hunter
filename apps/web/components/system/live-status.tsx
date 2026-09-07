@@ -61,7 +61,8 @@ function totalMonitoredFrom(exchanges: ExchangeStatus[], initialTotal: number): 
 
 function mergeExchangeUpdate(prev: ExchangeStatus[], msg: RtSystemMessage): ExchangeStatus[] {
   const idx = prev.findIndex((e) => e.exchange === msg.exchange);
-  const reconnects = idx >= 0 ? (prev[idx]?.reconnects ?? 0) : 0;
+  const previous = idx >= 0 ? prev[idx] : undefined;
+  const reconnects = previous?.reconnects ?? 0;
   const updated: ExchangeStatus = {
     exchange: msg.exchange,
     ws_state: msg.ws_state,
@@ -70,6 +71,12 @@ function mergeExchangeUpdate(prev: ExchangeStatus[], msg: RtSystemMessage): Exch
     markets_monitored: msg.markets_monitored,
     open_gaps: msg.open_gaps,
     reconnects,
+    // T2.5g: only a *solo* collector publishes `rt:system` (a shard knows one
+    // slice, and this patch replaces the whole exchange row), so the message
+    // carries no topology. Keep what the last server snapshot said instead of
+    // inventing or erasing it.
+    shards_expected: previous?.shards_expected ?? null,
+    shards_reporting: previous?.shards_reporting ?? 0,
   };
   if (idx < 0) return [...prev, updated];
   const next = [...prev];

@@ -230,6 +230,10 @@ async def test_list_markets_ok_row_and_summary(
         "markets_stale": 0,
         "markets_degraded": 0,
         "markets_unavailable": 0,
+        # T2.5g: no collector heartbeat was written for this seeded exchange,
+        # so the API declares the topology unknown instead of inventing one.
+        "collector_shards_expected": None,
+        "collector_shards_reporting": None,
     }
     row = body["items"][0]
     assert row["exchange"] == exchange

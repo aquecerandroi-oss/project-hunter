@@ -99,6 +99,8 @@ const marketStatus = {
       markets_monitored: 200,
       open_gaps: 0,
       reconnects: 0,
+      shards_expected: 1,
+      shards_reporting: 1,
     },
   ],
   markets_monitored_total: 200,

@@ -32,6 +32,41 @@ Funciona sem nenhum `.env` (usa defaults de dev embutidos no compose para as cha
 Comandos reais (instalação, `.env`, subir a stack, migrar/seedar manualmente,
 rodar o web fora do compose) estão no §8.
 
+### 3.1 Coletor em N shards (T2.5g)
+
+Um processo com 200 mercados satura um core: medido em 2026-09-07 no stack
+local (CPU 99,4 %, 8,3 M eventos descartados) e na VPS (101 %, 1,2 M
+descartados), com `market.ticks` publicado **25,8 s** depois do carimbo do
+payload e `covered_until` congelado em `session_since` desde o boot — o
+coletor, corretamente, não conseguia provar continuidade nenhuma. A saída é
+dividir o universo entre N processos (`MARKET_SHARD=i/N`, fatia estável
+`crc32(symbol) % N`, T1.6b-C2).
+
+```powershell
+# 4 shards x ~50 mercados, dev
+$env:MARKET_SHARDS=4
+docker compose -f infra/docker/docker-compose.yml --profile shards up -d
+```
+
+- os três shards extras (`market-worker-1..3`) vivem no perfil `shards`, então
+  um `up` normal continua subindo **um** coletor;
+- `MARKET_SHARDS` é lido pelos quatro serviços (`0/$MARKET_SHARDS` …
+  `3/$MARKET_SHARDS`). Esquecer a variável **não** duplica a coleta em
+  silêncio: os extras receberiam `1/1`, que `Settings` recusa no boot
+  (`MARKET_SHARD index must satisfy 0 <= index < total`), e o container fica
+  em restart loop visível;
+- cada shard escreve `hb:market:{exchange}:{i}of{N}` e a API agrega
+  (`/api/v1/system/market-status`, `shards_expected`/`shards_reporting`;
+  `ws_state = "stale"` se faltar shard). O `/markets` mostra "N shards, M
+  mercados"; a página System deixa de receber patch por `rt:system` em modo
+  sharded — ver PIPELINE.md §1 item 8;
+- ordem de subida é irrelevante (a liderança do universo é um lock em Redis) e
+  nenhum `/ready` depende dos irmãos;
+- **mudar N deixa grupos de consumidor órfãos** do backfill
+  (`market-worker.backfill.{exchange}.{i}of{N}`) e uma chave
+  `hunter:processed:` por grupo. Remover à mão, depois de conferir que não há
+  pendência (`XINFO GROUPS market.backfill.requested`).
+
 ## 4. CI (GitHub Actions)
 
 `ci.yml` em cada PR e push na `main`:
@@ -190,6 +225,8 @@ AGENT → PROPOSAL → RISK → EXECUTION (`CLAUDE.md`).
 | Variável | Obrigatória em prod? | Default | Propósito |
 |---|---|---|---|
 | `MARKET_UNIVERSE_SIZE` | não | `200` | tamanho do universo de mercados monitorados (M1) |
+| `MARKET_SHARD` | não | `0/1` | fatia do universo deste processo, `i/N` (T1.6b-C, T2.5g) |
+| `MARKET_SHARDS` | não | `1` | só no compose: quantos shards o perfil `shards` sobe (§3.1) |
 | `BOOK_DEPTH` | não | `25` | níveis de book capturados (M1) |
 | `TICK_COALESCE_MS` | não | `250` | janela de coalescência de ticks (M1) |
 | `FEATURE_THROTTLE_MS` | não | `1000` | cadência de cálculo de features (M2) |

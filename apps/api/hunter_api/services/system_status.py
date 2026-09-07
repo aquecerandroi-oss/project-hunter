@@ -20,9 +20,9 @@ from hunter_api.schemas.system import (
     WorkerHeartbeatOut,
     WorkerLivenessStatus,
 )
+from hunter_api.services.market_shards import CollectorView, read_collector
 from hunter_core.domain.types import ensure_utc, utcnow
 from hunter_core.logging import get_logger
-from hunter_core.redis import keys
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
@@ -253,18 +253,20 @@ async def build_market_status(session: AsyncSession, redis: redis_asyncio.Redis)
     monitored_counts = await repository.monitored_market_counts()
     gap_counts = await repository.open_gap_counts()
 
-    raw_fields: list[tuple[str, dict[str, str]]] = []
+    collectors: list[tuple[str, CollectorView]] = []
     failed_reads = 0
     for code in exchange_codes:
         try:
-            fields = await _hgetall(redis, keys.heartbeat("market", code))
+            # T2.5g: the union of this exchange's shard heartbeats (or the solo
+            # key), never a single hash N processes would overwrite.
+            view = await read_collector(redis, code, now=utcnow())
         except redis_exceptions.RedisError as exc:
             logger.warning(
                 "market_status_redis_error", error_type=type(exc).__name__, exchange=code
             )
             failed_reads += 1
-            fields = {}
-        raw_fields.append((code, fields))
+            view = CollectorView(ws_state="unavailable")
+        collectors.append((code, view))
     # (G5) captured after every Redis read above, not before the loop --
     # `now` must reflect when the reads actually completed.
     now = utcnow()
@@ -272,9 +274,9 @@ async def build_market_status(session: AsyncSession, redis: redis_asyncio.Redis)
         raise redis_exceptions.RedisError("every exchange heartbeat read failed")
 
     exchanges: list[MarketStatusExchangeOut] = []
-    for code, fields in raw_fields:
-        last_event_at = parse_heartbeat_datetime(fields.get("last_event_at"))
-        ws_state = fields.get("ws_state") or "unavailable"
+    for code, view in collectors:
+        last_event_at = view.last_event_at
+        ws_state = view.ws_state
         age_ms: int | None = None
         if last_event_at is not None:
             age_s = (now - last_event_at).total_seconds()
@@ -301,7 +303,9 @@ async def build_market_status(session: AsyncSession, redis: redis_asyncio.Redis)
                 last_event_age_ms=age_ms,
                 markets_monitored=monitored_counts.get(code, 0),
                 open_gaps=gap_counts.get(code, 0),
-                reconnects=parse_heartbeat_int(fields.get("reconnects")),
+                reconnects=view.reconnects,
+                shards_expected=view.shards_expected,
+                shards_reporting=view.shards_reporting,
             )
         )
     return MarketStatusOut(

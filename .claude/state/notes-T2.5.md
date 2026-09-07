@@ -1345,3 +1345,158 @@ aparecem lá).
    rodava a imagem anterior, então o número aqui **não** mede a correção dele.
 4. **`consume_batches` para o `market-worker` e o `strategy-worker`**, se algum dia um deles ficar
    para trás: a API está pronta e o default deles não mudou. Hoje nenhum dos dois tem fila.
+
+# T2.5g — 4 shards, heartbeat agregado, e por que o tick nascia velho
+
+## 48. A medição "antes", no mesmo stack, com 1 processo e 200 mercados
+
+`XADD − payload.ts` nas 400 entradas mais novas de cada stream, lido de dentro do contêiner `api`
+(2026-09-07T00:44Z, worker a 99,45 % de CPU, 8,35 M eventos descartados, `covered_until` congelado
+em `session_since` havia 34 min):
+
+| stream | p50 | p95 | p99 | máx |
+|---|---|---|---|---|
+| `market.ticks` | **25,82 s** | 26,47 s | 26,73 s | 26,83 s |
+| `market.derivatives` | 3,46 s | 32,60 s | 56,16 s | 73,93 s |
+| `market.liquidations` | 4,83 s | 8,28 s | 12,23 s | 23,99 s |
+
+O mesmo número decomposto derruba duas hipóteses de uma vez: `XADD − envelope.ts` (o trecho Redis,
+depois de o coletor montar a mensagem) é **0,018 s** na mediana, e `envelope.ts − payload.ts` é
+**25,80 s**. Ou seja: **o coalescer de 250 ms não é o problema** — o evento já chega velho ao
+`handle_event`. A T2.5d media 3,70 s no mesmo lugar; a diferença entre 3,7 s e 25,8 s é só o quanto
+o produtor tinha se enterrado a mais nessa noite.
+
+py-spy de 60 s no processo único (6 191 amostras): `_handle_raw_message` **43,66 %** cumulativo,
+`parse_stream_message` 25,81 + 16,44 %, `model_construct` do pydantic **20,90 %**, `_is_final_kline`
++ `_evict_one` (a fila do adapter, permanentemente cheia) **~9 %**; `handle_event` do worker,
+**1,02 %**. O gargalo é o parse por mensagem do WS, e nada do que está depois dele.
+
+## 49. Três defeitos que a medição encontrou antes de qualquer otimização
+
+1. **`dropped_events` chegava sempre `0` ao `CoverageTracker`.** `streaming.py` pedia o contador ao
+   *adapter* (`connection_field(adapter, "dropped_events")` é um `getattr` puro) e o `BinanceAdapter`
+   nunca teve esse atributo — o contador vive em cada `ConnectionState`. Resultado: a regra "um
+   evento perdido quebra o intervalo" era **código morto em produção**, com 8,3 M descartes no stack
+   local e 1,2 M na VPS sem uma única quebra por esse motivo. Corrigido com `DroppedEventsLedger`
+   (soma por conexão, com reset tratado: `ws.py` recria o `ConnectionState` no reconnect, e um
+   `max(0, delta)` engoliria justamente as perdas depois do reset — achado da Astra). Depois da
+   correção, na janela de 4 shards, as quebras por `reason="dropped_events"` aparecem de verdade nos
+   logs.
+2. **`model_construct` sem todos os campos custa 3×.** Para cada campo ausente o pydantic 2.13 passa
+   por `resolve_default_value`, que faz `inspect.signature` da default factory **a cada chamada**:
+   medido dentro do contêiner, 96,2 µs por `NormalizedTicker` contra 31,6 µs com todos os campos
+   preenchidos. No perfil isso aparecia como `resolve_default_value` 4,39 % + `inspect` 2,9 % de
+   *self time*, dentro dos 25 % de `model_construct`. Todos os `parse_*` do caminho quente agora
+   passam todos os campos (inclusive `received_at`, que era o `default_factory` mais caro), e um
+   teste novo falha se um modelo ganhar campo e um parser esquecer dele.
+3. **A cobertura com N shards seria uma mentira.** `mkt:{exchange}:coverage` é uma hash só por
+   exchange (o leitor é o scanner, fora do meu escopo) e os 4 processos escreveriam `covered_until`
+   por cima uns dos outros: o shard saudável passaria a provar a cobertura dos mercados do shard
+   travado. Agora cada stamp é **um script Lua** que funde os registros por shard —
+   `covered_until = MIN`, `session_since = MIN` (só piso; cada `sym:` carrega a sessão do próprio
+   dono) e o shard que para de carimbar **perde seus símbolos** em vez de herdar a prova do vizinho.
+
+## 50. O heartbeat por shard, e por que a página System perde o push
+
+Cada shard escreve `hb:market:{exchange}:{i}of{N}` com `shard_index`/`shard_total`; `N == 1` mantém
+`hb:market:{exchange}` byte a byte. A API une (`services/market_shards.py`): pior `ws_state`,
+`last_event_at` mais **antigo**, `reconnects` somado, `stale` se faltar shard esperado,
+`shards_expected = null` quando ninguém reporta (topologia desconhecida, nunca "1").
+`markets_monitored` e `open_gaps` continuam vindo do Postgres — somar os campos auto-declarados
+perderia exatamente o shard ausente, que é o caso que isto existe para mostrar.
+
+O `rt:system` **não** é publicado em modo sharded: `mergeExchangeUpdate`
+(`apps/web/components/system/live-status.tsx`) substitui a linha inteira da exchange pela última
+mensagem, e um shard conhece 50 dos 200 mercados — a página passaria a piscar entre "200 mercados,
+connected" e "50 mercados, o que este shard achar". Foi o primeiro must-fix da Astra nesta tarefa.
+Custo declarado: em modo sharded o widget é atualizado pelo polling do agregado, não pelo push.
+
+## 51. O que a prova mostrou, e o que ela não conseguiu comprar
+
+Números completos em `t25-proof.md` (seção T2.5g). Resumo: `market.ticks` saiu de **25,82 s** de
+atraso de publicação (p50) para **4,31 s** com 4 shards e **0,41 s** com 8; tick→oportunidade saiu
+de "3,7 % dentro do orçamento de 3 s" (T2.5d) para 0,3 % com 4 shards — pior no p50 porque a janela
+de 2 min pegou o pior momento — e **70,5 % dentro do orçamento com 8 shards**, com média 2,55 s.
+
+O que **não** foi cumprido: p99 ≤ 3 s. E a causa agora tem nome e medida: a fatia por
+`crc32(symbol) % N` equilibra **contagem de mercados**, não **tráfego**. Com 8 shards, dois deles
+descartaram 162 k e 175 k eventos enquanto outro descartou **zero** — os majors caem juntos em
+poucas fatias. Enquanto isso não mudar, adicionar processos melhora a mediana e não o p95.
+
+Segundo achado para a próxima tarefa, medido no perfil de um shard leve:
+`queue_oldest_pending_ts` (o gate de "caught up" da T2.5e) é **11,25 %** do CPU porque varre a fila
+inteira a cada 250 ms — numa fila cheia de 10 000 itens são 40 000 `_effective_ts` por segundo,
+realimentando a saturação que ele mede. Não mexi: a regra é da T2.5e e trocar "mínimo exato" por
+"mínimo de um prefixo" muda uma garantia de honestidade que precisa de revisão de desenho, não de
+um atalho meu.
+
+## 52. Um órfão de cobertura que só a produção mostrou
+
+Ao voltar de 8 para 4 shards, a hash de cobertura ficou com **201 campos `sym:` para 200 mercados**:
+`KOMAUSDT` sem dono vivo, e nada no desenho original iria apagá-lo — o TTL da chave é renovado a
+cada stamp. Um campo órfão é cobertura reivindicada para um mercado que ninguém coleta. A primeira
+versão do script só apagava os símbolos listados por um registro **stale**; agora todo stamp
+restabelece a invariante inteira (os `sym:` publicados são exatamente a união das listas dos shards
+vivos). Teste `test_a_symbol_no_live_shard_claims_is_removed_whoever_left_it_there` reproduz o
+órfão; produção confirmada em 200/200 depois do redeploy.
+
+## 53. O que muda no compose da VPS
+
+`infra/vps/docker-compose.prod.yml` ganha `market-worker-1/2/3` com o mesmo `*prod-db-env`,
+`restart: always` e `logging` do `market-worker` (sem esse bloco eles herdariam o `x-api-env` de
+dev e morreriam em loop com a senha errada — a mesma armadilha já registrada para o `strategy-worker`
+e o `scanner-worker`). O comando passa a ser:
+
+```
+MARKET_SHARDS=4 docker compose --env-file .env -p hunter \
+  -f infra/docker/docker-compose.yml -f infra/vps/docker-compose.prod.yml \
+  --profile shards up -d
+```
+
+Três avisos para quem executar: (1) `MARKET_SHARDS` precisa estar no ambiente do comando — sem ela
+os extras recusam `1/1` no boot em vez de duplicar a coleta em silêncio; (2) mudar N deixa grupos de
+consumidor órfãos do backfill (`market-worker.backfill.binance.{i}of{N}`) e uma chave
+`hunter:processed:` por grupo, que saem à mão depois de conferir `XINFO GROUPS`; (3) na VPS de
+12 vCPU, 4 shards ocupam ~4 cores e deixam espaço para scanner/strategy/api — 8 shards, que é o que
+levaria 70 % dos ticks para dentro do orçamento aqui, não cabem junto com o resto.
+
+## 54. As duas rodadas da Astra
+
+**Antes de implementar** (`astra-review-T2.5g-desenho.md`), seis must-fix. Adotei cinco:
+
+1. *"Agregar só o `build_market_status` não impede a System de mentir"* — o `rt:system` substitui a
+   linha inteira da exchange no widget. Adotado da forma mais simples que não mente: em modo sharded
+   **ninguém publica** `rt:system`; o agregado HTTP é a única verdade.
+2. *"`open_gaps=max` está errado"* — mantive Postgres como fonte de `markets_monitored` e
+   `open_gaps`, como ela recomendou; a soma dos campos auto-declarados perderia justo o shard
+   ausente.
+3. *"Identidade, frescor e topologia precisam ser validados"* — conjunto exato de índices `0..N-1`
+   com o mesmo `shard_total`, dedup do `SCAN` (dicionário, não lista), frescor por `ts` com
+   tolerância de relógio, e `shards_expected = null` quando nada reporta.
+4. *"A cobertura precisa mudar de escritor, não ganhar um Lua depois"* — o `HSET` direto dos
+   escalares sumiu; tudo acontece dentro do script.
+5. *"Corrigir `dropped_events` é parte desta tarefa"*, com o cuidado dos **resets** por conexão.
+   Adotado (`counter_delta`, `DroppedEventsLedger`), inclusive no `connection_summary` do heartbeat,
+   que tinha o mesmo `max(0, delta)`.
+6. *"O perfil local precisa reconfigurar também o primeiro worker"* — adotado com
+   `MARKET_SHARD=0/${MARKET_SHARDS:-1}` no serviço base.
+
+**Sobre o diff** (`astra-review-T2.5g-lua.md`, `astra-review-T2.5g-api.md`), três must-fix, os três
+corrigidos com teste antes deste relatório:
+
+- na troca de dono com **sobreposição**, o dono antigo reescrevia `sym:X` com um início mais antigo e
+  o leitor aceitaria uma janela cruzando o hand-over. Agora o valor publicado é o **mais recente**
+  entre os donos vivos (`test_during_a_handover_the_later_start_wins`);
+- um heartbeat solo **vencido** (ou com relógio adiantado) tinha seu `ws_state` repassado: a linha
+  lia `connected` ao lado de "0 shards reportando". Agora é `unavailable`
+  (`test_a_stale_solo_heartbeat_is_unavailable_not_connected`);
+- um shard **sem nenhum evento** desaparecia do `min` e herdava o frescor do irmão. Agora, se
+  qualquer shard vivo não tem `last_event_at` válido, a exchange não tem
+  (`test_a_shard_with_no_event_yet_is_not_covered_by_its_siblings_freshness`).
+
+Ela não viu erro de Lua 5.1 no script (`unpack` com ~400 argumentos, `string.match` pelo último
+`:`, `HKEYS` por stamp, duas chaves declaradas no `EVALSHA`) e concordou que o MIN/MIN é conservador
+com propriedade exclusiva. Ficou registrado como limite aceito do contrato: se **todos** os
+`*of4` expirarem e um cluster antigo `*of2` completo voltar, ele parece saudável — a topologia é
+auto-declarada e detectar divergência exigiria uma referência externa (variável de ambiente na API,
+que eu deliberadamente não quis duplicar).

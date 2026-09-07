@@ -10,10 +10,9 @@ from typing import Any
 from hunter_core.logging import get_logger
 from hunter_exchanges.base import ExchangeError
 from hunter_market_worker.coverage import CoverageTracker
-from hunter_market_worker.heartbeat import connection_field
 from hunter_market_worker.hot_state import TradeMemory
 from hunter_market_worker.ingest import CHANNELS, AcceptedEvents, TickCoalescer, handle_event
-from hunter_market_worker.supervision import IngestionHealth, Watchdog
+from hunter_market_worker.supervision import DroppedEventsLedger, IngestionHealth, Watchdog
 
 logger = get_logger(__name__)
 
@@ -34,6 +33,7 @@ async def consume_once(
     health: IngestionHealth | None = None,
     watchdog: Watchdog | None = None,
     coverage: CoverageTracker | None = None,
+    dropped: DroppedEventsLedger | None = None,
 ) -> None:
     """Drain ``adapter.stream(...)`` with a plain ``async for`` (B1 —
     t16b-profile.md ACHADO-2: the old loop created one ``Task`` and one timer
@@ -69,7 +69,7 @@ async def consume_once(
                 oldest_pending_ts = getattr(adapter, "queue_oldest_pending_ts", None)
                 await coverage.stamp(
                     redis,
-                    dropped_events=int(connection_field(adapter, "dropped_events") or 0),
+                    dropped_events=(dropped.observe(adapter) if dropped is not None else 0),
                     ws_state=adapter.connection_state(),
                     queue_progress=queue_progress() if queue_progress is not None else None,
                     connection_generation=generation() if generation is not None else None,
@@ -175,7 +175,10 @@ async def run_ingest(
     producer = f"market-worker@{runtime.instance}"
     memory = AcceptedEvents()
     trade_memory = TradeMemory()
-    coverage = CoverageTracker(adapter.code)
+    coverage = CoverageTracker(adapter.code, settings.shard_index, settings.shard_total)
+    # One ledger per process, never per session: a reconnect recreates the
+    # adapter's per-connection counters, and a loss must never un-happen.
+    dropped = DroppedEventsLedger()
     while True:
         if not universe.symbols:
             if universe.initialized:
@@ -203,6 +206,7 @@ async def run_ingest(
                 health,
                 watchdog,
                 coverage,
+                dropped,
             )
         except ExchangeError as exc:
             heartbeat_state.last_error = str(exc)

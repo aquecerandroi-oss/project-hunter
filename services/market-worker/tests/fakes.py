@@ -24,6 +24,7 @@ from hunter_core.domain.market import (
     NormalizedOrderBook,
     NormalizedTicker,
 )
+from hunter_core.settings import Settings
 from hunter_exchanges.base import ExchangeUnavailable, StreamChannel
 
 
@@ -147,9 +148,14 @@ class FakeRuntime:
     ``.redis`` and the two ``mark_*`` counters — never a real Postgres/Redis
     connected process."""
 
-    def __init__(self, redis: object = None, instance: str = "test:1") -> None:
+    def __init__(
+        self, redis: object = None, instance: str = "test:1", settings: object = None
+    ) -> None:
         self.redis = redis
         self.instance = instance
+        # T2.5g: ``run_heartbeat`` reads ``settings.shard_index``/``shard_total``
+        # to pick its own key; the default is the solo topology.
+        self.settings = settings if settings is not None else Settings()
         self.success = asyncio.Event()
         self.success_count = 0
         self.error_count = 0

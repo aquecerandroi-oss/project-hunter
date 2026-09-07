@@ -79,6 +79,21 @@ row in the (global, no-RLS) ``exchanges`` table, alongside
 ``markets.is_monitored`` counts and open ``ingestion_gaps`` counts from
 Postgres. ``ws_state`` is reported ``"unavailable"`` — not one of the three
 worker-written states — when the exchange has no heartbeat hash at all.
+
+**Sharded collector (T2.5g).** With ``MARKET_SHARD=i/N`` and ``N > 1`` the
+market worker writes ``hb:market:{exchange}:{i}of{N}`` instead, adding
+``shard_index``/``shard_total`` (also present, as ``0``/``1``, on the solo
+key). ``/system/market-status`` unions them
+(``services/market_shards.py``): ``ws_state`` is the worst shard's, or
+``"stale"`` — a fifth value, meaning the *cluster*, not one socket — whenever
+``shards_reporting < shards_expected``; ``last_event_at`` is the **oldest**
+shard's; ``reconnects`` is the sum. ``markets_monitored`` and ``open_gaps``
+stay Postgres's, never a sum of self-reported shard fields, which would lose
+exactly the shard that is missing. With nothing reporting,
+``shards_expected`` is ``null`` (unknown topology), never ``1``. A sharded
+collector does **not** publish ``rt:system`` at all: that message replaces a
+whole exchange row on the System page, and one shard knows only its own 50
+markets.
 """
 
 from __future__ import annotations
@@ -120,6 +135,15 @@ class MarketStatusExchangeOut(BaseModel):
     markets_monitored: int
     open_gaps: int
     reconnects: int | None = None
+    shards_expected: int | None = None
+    """T2.5g: how many collector shards this exchange declares
+    (``shard_total`` in every ``hb:market:{exchange}:{i}of{N}`` hash), or
+    ``None`` when no collector is reporting at all — the API never invents a
+    topology it was not told about."""
+    shards_reporting: int = 0
+    """How many of them answered this read. Fewer than ``shards_expected``
+    forces ``ws_state = "stale"``: a shard that is gone is its whole slice of
+    the universe uncollected."""
 
 
 class MarketStatusOut(BaseModel):

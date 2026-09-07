@@ -5,6 +5,15 @@ docs/plans/M1.md T1.3 item 5. In addition to the generic
 ``hb:{role}:{instance}`` the runtime already writes, this is the
 exchange-scoped heartbeat the API's ``/system/market-status`` and the
 frontend's live-status widget read.
+
+**T2.5g — one heartbeat per shard.** With ``MARKET_SHARD=i/N`` and ``N > 1``
+this process writes ``hb:market:{exchange}:{i}of{N}`` and nothing else: N
+shards sharing one hash is what kept the 200 already-proven markets from
+being delivered in M1 (``.claude/state/milestone.json`` ``m1_result``) —
+whoever wrote last won, and a dead shard stayed invisible. The API unions the
+shard keys (``hunter_api.services.market_shards``) and says how many of the
+declared ``shard_total`` are actually reporting. ``N == 1`` is unchanged, key
+and payload alike.
 """
 
 from __future__ import annotations
@@ -26,8 +35,9 @@ from hunter_core.observability import (
     market_dropped_events_total,
     market_system_event_record_failures_total,
 )
+from hunter_core.redis import keys
 from hunter_exchanges.rate_limit import REST_GATE_OK
-from hunter_market_worker.supervision import connection_field, rest_gate_status
+from hunter_market_worker.supervision import connection_field, counter_delta, rest_gate_status
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
@@ -60,8 +70,10 @@ class HeartbeatState:
     only ever receives the per-tick delta."""
 
 
-def hb_key(exchange: str) -> str:
-    return f"hb:market:{exchange}"
+def hb_key(exchange: str, shard_index: int = 0, shard_total: int = 1) -> str:
+    """``hb:market:{exchange}`` solo, ``hb:market:{exchange}:{i}of{N}`` sharded
+    — the same builder the API reads with (:meth:`keys.market_heartbeat`)."""
+    return keys.market_heartbeat(exchange, shard_index, shard_total)
 
 
 async def _write_hash(
@@ -73,8 +85,10 @@ async def _write_hash(
     now: datetime,
     subscriptions: int | None = None,
     rest_gate: str = REST_GATE_OK,
+    shard_index: int = 0,
+    shard_total: int = 1,
 ) -> None:
-    key = hb_key(exchange)
+    key = hb_key(exchange, shard_index, shard_total)
     mapping = {
         "last_event_at": state.last_event_at.isoformat() if state.last_event_at else "",
         "ws_state": ws_state,
@@ -88,6 +102,11 @@ async def _write_hash(
         # degradation reported next to a healthy ``ws_state`` — never a
         # readiness failure, since ingestion continues over the WebSocket.
         "rest_gate": rest_gate,
+        # T2.5g: the topology, self-declared, so the API can tell "3 of 4
+        # shards reporting" from "3 shards is all there is" without knowing
+        # this process's MARKET_SHARD.
+        "shard_index": str(shard_index),
+        "shard_total": str(shard_total),
         "ts": now.isoformat(),
     }
     await cast(Any, redis).hset(key, mapping=mapping)
@@ -172,10 +191,10 @@ def connection_summary(
         active = connection_field(connection, "subscriptions") or ()
         subscriptions += active if isinstance(active, int) else len(active)
         count = int(connection_field(connection, "reconnects") or 0)
-        reconnects += max(0, count - previous_reconnects.get(name, 0))
+        reconnects += counter_delta(previous_reconnects.get(name, 0), count)
         previous_reconnects[name] = count
         dropped_count = int(connection_field(connection, "dropped_events") or 0)
-        dropped += max(0, dropped_count - previous_dropped.get(name, 0))
+        dropped += counter_delta(previous_dropped.get(name, 0), dropped_count)
         previous_dropped[name] = dropped_count
     return subscriptions, reconnects, dropped
 
@@ -189,6 +208,8 @@ async def _safe_publish(
     now: datetime,
     subscriptions: int | None,
     rest_gate: str,
+    shard_index: int = 0,
+    shard_total: int = 1,
 ) -> bool:
     """Publish the heartbeat, degrading instead of raising. True if it landed.
 
@@ -208,8 +229,27 @@ async def _safe_publish(
     depend on this succeeding.
     """
     try:
-        await _write_hash(redis, exchange, universe, state, ws_state, now, subscriptions, rest_gate)
-        await _publish_status(redis, exchange, universe, state, ws_state, now, rest_gate)
+        await _write_hash(
+            redis,
+            exchange,
+            universe,
+            state,
+            ws_state,
+            now,
+            subscriptions,
+            rest_gate,
+            shard_index,
+            shard_total,
+        )
+        if shard_total <= 1:
+            # T2.5g: ``rt:system`` patches the *whole* exchange row on the
+            # System page (``apps/web/components/system/live-status.tsx``
+            # ``mergeExchangeUpdate``), so a shard publishing here would
+            # replace 200 markets with its own 50 and a dead sibling would
+            # keep reading "connected". In sharded mode the aggregate on
+            # ``/system/market-status`` is the only truth and the widget is
+            # refreshed by polling — declared in docs/PIPELINE.md §1.
+            await _publish_status(redis, exchange, universe, state, ws_state, now, rest_gate)
     except Exception:
         logger.warning("market_heartbeat_publish_failed", exchange=exchange, exc_info=True)
         return False
@@ -234,6 +274,8 @@ async def run_heartbeat(
     database outage must degrade this loop to "no system_events written",
     never to "the whole TaskGroup dies".
     """
+    shard_index = runtime.settings.shard_index
+    shard_total = runtime.settings.shard_total
     previous_ws_state: str | None = None
     previous_rest_gate: str | None = None
     last_sent = float("-inf")
@@ -265,7 +307,16 @@ async def run_heartbeat(
             continue
         now = utcnow()
         published = await _safe_publish(
-            runtime.redis, adapter.code, universe, state, ws_state, now, subscriptions, rest_gate
+            runtime.redis,
+            adapter.code,
+            universe,
+            state,
+            ws_state,
+            now,
+            subscriptions,
+            rest_gate,
+            shard_index,
+            shard_total,
         )
         if reconnects:
             await safe_record_system_event(

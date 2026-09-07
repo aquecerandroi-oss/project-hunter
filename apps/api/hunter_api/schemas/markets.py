@@ -185,6 +185,13 @@ class MarketsSummary(BaseModel):
     markets_stale: int
     markets_degraded: int
     markets_unavailable: int
+    collector_shards_expected: int | None = None
+    """T2.5g: how many market-worker shards the exchanges on this page declare
+    (``hb:market:{exchange}:{i}of{N}``), summed. ``None`` when no collector is
+    reporting — the UI then prints no shard label at all rather than a zero."""
+    collector_shards_reporting: int | None = None
+    """How many of them answered. Lower than ``collector_shards_expected``
+    means part of the universe is not being collected right now."""
 
 
 class MarketListPage(BaseModel):

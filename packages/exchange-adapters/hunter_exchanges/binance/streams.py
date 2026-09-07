@@ -15,6 +15,13 @@ decides what happens next (log + count, never propagate). T1.6b-A: every
 parser builds its model with ``.model_construct()``, not ``Model(...)`` (no
 validators run — 20.36% self time at 200 markets, ``t16b-profile.md``), so
 each parser keeps their guarantees explicit instead.
+
+T2.5g: every parser also passes **every** field of its model, ``None``s and
+``received_at`` included. ``model_construct`` resolves each *missing* field
+through ``resolve_default_value``, which ``inspect.signature``s the default
+factory on every call: 96 us per ticker against 32 us with all fields supplied
+(pydantic 2.13, measured inside the running collector; 7.3% of its CPU in the
+py-spy profile). ``tests/unit/test_streams.py`` pins it.
 """
 
 from __future__ import annotations
@@ -33,6 +40,7 @@ from hunter_core.domain.market import (
     NormalizedTrade,
     close_time_for,
 )
+from hunter_core.domain.types import utcnow
 from hunter_exchanges.base import MalformedMessage, StreamChannel
 from hunter_exchanges.binance.normalize import (
     EXCHANGE,
@@ -150,6 +158,9 @@ def parse_agg_trade(raw: dict[str, Any]) -> NormalizedTrade:
             price=to_decimal(raw["p"], field="p"),
             qty=to_decimal(raw["q"], field="q"),
             side=OrderSide.SELL if raw["m"] else OrderSide.BUY,
+            kind="trade",
+            is_block=None,
+            received_at=utcnow(),
         )
     except KeyError as exc:
         raise MalformedMessage(
@@ -179,6 +190,16 @@ def parse_book_ticker(raw: dict[str, Any], *, last: Decimal) -> NormalizedTicker
             ask=to_decimal(raw["a"], field="a"),
             bid_qty=to_decimal(raw["B"], field="B"),
             ask_qty=to_decimal(raw["A"], field="A"),
+            kind="ticker",
+            # No 24h aggregates on a bookTicker frame; the REST refresh owns
+            # them in hot state (KB-0044). Explicit ``None`` for the reason in
+            # the module docstring, not because they are unknown here.
+            volume_24h=None,
+            quote_volume_24h=None,
+            high_24h=None,
+            low_24h=None,
+            change_24h_pct=None,
+            received_at=utcnow(),
         )
     except KeyError as exc:
         raise MalformedMessage(
@@ -221,6 +242,8 @@ def parse_depth20(raw: dict[str, Any]) -> NormalizedOrderBook:
             asks=asks,
             sequence=int(raw["u"]),
             is_snapshot=True,
+            kind="book",
+            received_at=utcnow(),
         )
     except (KeyError, ValueError, TypeError) as exc:
         raise MalformedMessage(
@@ -251,6 +274,8 @@ def parse_kline_ws(raw: dict[str, Any]) -> NormalizedCandle:
             taker_buy_volume=to_decimal(k["V"], field="k.V"),
             is_final=bool(k["x"]),
             event_ts=ms_to_datetime(raw["E"], field="E") if "E" in raw else None,
+            kind="candle",
+            received_at=utcnow(),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise MalformedMessage(
@@ -276,6 +301,8 @@ def parse_mark_price(raw: dict[str, Any]) -> NormalizedFunding:
             index_price=to_decimal_or_none(raw.get("i"), field="i"),
             funding_kind="estimated",
             metadata=metadata,
+            kind="funding",
+            received_at=utcnow(),
         )
     except KeyError as exc:
         raise MalformedMessage(
