@@ -19,17 +19,19 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import update
+from sqlalchemy import insert, update
 
 from hunter_core.db.models.analysis import Anomaly, MarketRegimeRow, Opportunity
 from hunter_core.db.models.execution import Position
 from hunter_core.db.models.identity import Organization
 from hunter_core.db.models.markets import Exchange, Market
 from hunter_core.db.models.portfolios import Portfolio
+from hunter_core.db.models.risk import KillSwitchTransition
 from hunter_core.domain.enums import (
     AnomalyEvaluationState,
     AnomalyStatus,
     AnomalyType,
+    KillSwitchScope,
     KillSwitchState,
     MarketRegime,
     MarketType,
@@ -40,6 +42,8 @@ from hunter_core.domain.enums import (
     RegimeScope,
     TradeDirection,
 )
+from hunter_core.domain.types import uuid7
+from hunter_core.risk.transitions import ACTOR_SYSTEM
 from hunter_core.strategies.canonical import canonical_json
 from hunter_indicators.opportunity import (
     ScoreContext,
@@ -302,9 +306,42 @@ async def set_org_kill_switch(
     state: KillSwitchState,
     reason: str | None = None,
 ) -> None:
+    """Moves ``organizations.kill_switch_state`` and writes the transition that
+    audits it, in the same transaction. ``organizations_kill_switch_is_audited``
+    (DATABASE.md §18.7, 0006) is a constraint trigger deferred to COMMIT: it
+    refuses any change of the column unless the newest ``kill_switch_transitions``
+    row for ``(scope='organization', scope_id=org_id)`` was written in *this*
+    transaction (``xmin`` match) and matches ``from``/``to`` exactly.
+    ``hunter_core.risk.transitions.record_transition`` is the one production path
+    that writes this shape, but it is hard-coded to the portfolio scope (it locks
+    and updates ``Portfolio``, not ``Organization``), so it cannot be reused here.
+    This is the org-scope equivalent: same INSERT-then-UPDATE order, no
+    ``SAVEPOINT``/``begin_nested`` between them (§18.7 — a row inserted inside one
+    carries the subtransaction's ``xid``, not the top-level one, and the trigger
+    would reject it as a false failure).
+    """
     async with session_factory() as session:
         org = await session.get(Organization, org_id)
         assert org is not None
+        from_state = org.kill_switch_state
+        await session.execute(
+            insert(KillSwitchTransition).values(
+                id=uuid7(),
+                organization_id=org_id,
+                scope=KillSwitchScope.ORGANIZATION,
+                scope_id=org_id,
+                from_state=from_state,
+                to_state=state,
+                reason=reason,
+                actor_type=ACTOR_SYSTEM,
+                actor_id=None,
+                # actor_type='system' requires non-empty evidence
+                # (``an_automatic_move_shows_its_numbers``, §18.7) — a fixture
+                # moving the switch is not a person, so it must publish a reason.
+                evidence={"source": "test-fixture", "reason": reason or ""},
+                created_at=datetime.now(UTC),
+            )
+        )
         org.kill_switch_state = state
         org.kill_switch_reason = reason
         await session.commit()

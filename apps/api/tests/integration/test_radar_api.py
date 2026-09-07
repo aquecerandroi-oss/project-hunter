@@ -520,7 +520,9 @@ async def test_list_radar_volatility_filter_and_volume_sort_read_the_real_envelo
     assert str(high_id) in market_ids
     assert str(low_id) not in market_ids
 
-    sorted_response = await client.get("/api/v1/radar?sort=volume&order=desc", headers=actor.headers)
+    sorted_response = await client.get(
+        "/api/v1/radar?sort=volume&order=desc", headers=actor.headers
+    )
     assert sorted_response.status_code == 200, sorted_response.text
     ids_in_order = [item["market_id"] for item in sorted_response.json()["items"]]
     assert ids_in_order.index(str(high_id)) < ids_in_order.index(str(low_id))
