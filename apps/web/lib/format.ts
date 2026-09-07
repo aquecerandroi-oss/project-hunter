@@ -115,6 +115,28 @@ export function formatMoney(value: string | number, opts: FormatMoneyOptions = {
   return `${sign}${prefix}${numberStr}${suffix}`;
 }
 
+/**
+ * USDT has no ISO 4217 code, so `formatMoney`'s Intl currency style cannot
+ * render it (`Intl.NumberFormat` throws `RangeError` for an unknown currency).
+ * Reuses `formatMoney`'s decimal-safe grouping/rounding under "USD" (same
+ * digit grouping, en-US locale) and swaps the "$" for an explicit "USDT"
+ * suffix -- the wallet's operating currency (M3, ADR 0005) must never read as
+ * US dollars just because it shares USD's digit formatting.
+ */
+export function formatUsdt(value: string | number, decimals = 2): string {
+  const bare = formatMoney(value, { currency: "USD", decimals }).replace(/[^0-9.,-]/g, "");
+  return `${bare} USDT`;
+}
+
+/** `formatUsdt` with an explicit leading "+" on a non-zero, non-negative amount (docs/DESIGN.md §2: signed numbers), e.g. for PnL/decomposition lines where "10.00 USDT" and "-10.00 USDT" alone would not visually separate gain from loss. */
+export function formatUsdtSigned(value: string | number, decimals = 2): string {
+  const raw = typeof value === "number" ? value.toString() : value;
+  const isZero = /^[+-]?0+(\.0+)?$/.test(raw.trim());
+  const negative = raw.trim().startsWith("-");
+  const sign = isZero || negative ? "" : "+";
+  return `${sign}${formatUsdt(value, decimals)}`;
+}
+
 function toNumber(value: string | number): number {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : 0;

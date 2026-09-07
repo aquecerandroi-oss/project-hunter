@@ -69,7 +69,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: "radar", label: "Radar", segment: "radar", icon: "radar", status: "available", minRole: "VIEWER" },
   { key: "markets", label: "Markets", segment: "markets", icon: "line-chart", status: "available", minRole: "VIEWER" },
   { key: "opportunities", label: "Opportunities", segment: "opportunities", icon: "target", status: "available", minRole: "VIEWER" },
-  { key: "portfolio", label: "Portfolio", segment: "portfolio", icon: "wallet", status: "planned", plannedMilestone: "M3", minRole: "VIEWER" },
+  // T3.8b: the wallet screen is real (apps/api's portfolio.py/risk.py, GET-only) --
+  // "Carteira" per the brief, not the English "Portfolio" every other M3+ item
+  // still uses, since this is the one nav label the orchestrator named explicitly.
+  { key: "portfolio", label: "Carteira", segment: "portfolio", icon: "wallet", status: "available", minRole: "VIEWER" },
   { key: "trades", label: "Trades", segment: "trades", icon: "activity", status: "planned", plannedMilestone: "M3", minRole: "VIEWER" },
   // Shadow Lab (docs/plans/SHADOW-LAB.md, S3): a research track parallel to
   // the milestone sequence -- not in docs/PRODUCT.md §4's original 17-route
