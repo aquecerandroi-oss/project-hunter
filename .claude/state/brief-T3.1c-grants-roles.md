@@ -1,0 +1,20 @@
+# Brief T3.1c — modelo de papéis da carteira paper: quem escreve o quê (grants sobre a 0006)
+
+**Owner:** database-architect (opus). **Revisor obrigatório depois:** security-reviewer. **Não commitar.** **Regra operacional: nunca Bash em background; comandos em primeiro plano com timeout ≤ 5 min; suítes com testcontainers por arquivo.** Despachar **depois** que a T3.1b (correções de segurança da 0006) estiver commitada. Se nenhum banco persistente tiver a 0006 ainda (VPS e stack local estavam em `0005` em 2026-09-07 00:30Z — verifique de novo), corrija a própria 0006/`ddl/paper.py`; senão, revisão `0007_paper_roles`.
+
+## Decisão (orquestrador em nome do Everton, 2026-09-07) — fecha os achados da T3.6 (concern 1 e 2), da T3.12 (bloqueante A–D) e do security-reviewer (achado 5)
+1. **Quem decide e grava estado de risco é o worker.** `hunter_worker`: `UPDATE (kill_switch_state, updated_at)` em `portfolios`; `UPDATE` em `portfolio_risk_state` (T3.1b já); `INSERT` em `kill_switch_transitions`; `UPDATE (updated_at)` em `organizations` (só para `FOR SHARE`/`FOR UPDATE` da trava da organização — mesma técnica da 0005: o lock exige `ACL_UPDATE`, um grant de coluna basta e não permite mudar o kill switch da organização, que continua da API); `INSERT` em `outbox_events` (já tem); DML completo em `portfolio_equity_snapshots`, `trade_proposals` (admissão), `orders`, `fills`, `positions`, `trades`, `portfolio_exit_intents`, `participation_consumptions`.
+2. **A API pede, lê e autoriza pessoas.** `hunter_app`: `SELECT` em tudo da carteira; `INSERT` em `trade_proposals` **só** para registrar um pedido manual (`proposal_source='manual'`, `status='requested'`, sem decisão, sem reserva — o worker admite); **sem** `UPDATE` em `portfolio_risk_state` (T3.1b), **sem** DML em `portfolio_equity_snapshots` (evidência da recuperação — achado 5 do security-reviewer), **sem** `INSERT` em `outbox_events` (o worker publica). Retomada do kill switch (`resume`): a API grava `kill_switch_transitions` (INSERT, `actor_type='user'`) e `portfolios.kill_switch_state` (já tem UPDATE) — **somente com o papel OWNER da organização** (diretiva §5: "Retomar somente com minha autorização"); o router `apps/api/hunter_api/routers/risk.py` passa de TRADER para OWNER (edite o router e `docs/SECURITY.md` §2; é a única exceção ao "não toque em apps/**").
+3. **`organizations.kill_switch_state`** continua da API (OWNER), auditado pela constraint trigger da T3.1b.
+4. **`request_digest`** em `trade_proposals` (pedido da T3.12 para replays de recusa): digest canônico do pedido; parte da chave de idempotência.
+5. **`brl_unavailable_reason`** (texto, nulo) e **`marks_stale`** (bool) em `portfolio_equity_snapshots` (dívida da T3.3b) — colunas simples, gravadas pelo worker.
+6. `docs/DATABASE.md` §18: tabela "papel × tabela × privilégio" completa e a frase de cada decisão; `docs/PIPELINE.md` (a T3.12 achou `status=expired` onde o §18.3 diz `reservation_state`): corrigir.
+
+## Provar (testes em `packages/core/tests/integration/test_schema_paper.py` e `test_schema_privileges.py`, como o papel real)
+- `evaluate_and_persist` da T3.6 roda inteiro como `hunter_worker` (as duas metades na mesma transação) — reuse o teste `test_no_deployed_role_can_write_both_halves_of_one_evaluation`, invertido.
+- `admit()` da T3.12 roda inteiro como `hunter_worker` sem `apply_pending_grants` (remova o rótulo `ORG_ROW_LOCK_GRANT` dos testes da admissão e prove com o schema íntegro).
+- `hunter_app` não consegue: avançar o FIFO, escrever `portfolio_risk_state`, escrever `portfolio_equity_snapshots`, enfileirar outbox, mudar `organizations.kill_switch_state` sem transição.
+- `hunter_worker` não consegue mudar `organizations.kill_switch_state` (grant de coluna só em `updated_at`).
+- `resume` pela API como TRADER → 403; como OWNER → transição gravada.
+- `alembic check` limpo, round trip, privilégios antes/depois.
+Comandos e PATH como nas outras tarefas; Astra antes (modelo de papéis) e depois (diff). Relatório em português no formato estendido com a tabela papel × tabela e a saída real.
