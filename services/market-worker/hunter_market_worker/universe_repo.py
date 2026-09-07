@@ -59,7 +59,19 @@ async def upsert_markets(
     markets: list[NormalizedMarket],
     asset_ids: dict[str, Any],
     tickers: dict[str, NormalizedTicker],
+    *,
+    write_metadata: bool = False,
 ) -> None:
+    """``write_metadata`` (T3.0c) opts a caller into persisting
+    ``NormalizedMarket.metadata`` into the ``metadata`` JSONB column.
+
+    Off by default, deliberately: the spot path needs it (the MARKET-order
+    filters of ``exchangeInfo`` have no column of their own, and T3.4 reads
+    them), while the perpetual path has run for two milestones without
+    writing that column. Turning it on for everyone would rewrite every
+    perpetual row with ``{"contractType": ...}`` in the same release that
+    introduces spot — an unasked-for change to the rows four shards are live on.
+    """
     now = utcnow()
     values = [
         {
@@ -77,6 +89,7 @@ async def upsert_markets(
             "max_leverage": m.max_leverage,
             "volume_24h_usd": (tickers[m.symbol].quote_volume_24h if m.symbol in tickers else None),
             "last_seen_at": now,
+            **({"meta": m.metadata} if write_metadata else {}),
         }
         for m in markets
     ]
@@ -84,9 +97,14 @@ async def upsert_markets(
         return
     stmt = pg_insert(Market).values(values)
     excluded = stmt.excluded
+    # Column keyed by ``Market.meta`` and read as ``excluded["metadata"]``:
+    # the plain name ``metadata`` resolves to SQLAlchemy's own ``MetaData``
+    # on a declarative class, and the mapping silently does the wrong thing.
+    updates: dict[Any, Any] = {Market.meta: excluded["metadata"]} if write_metadata else {}
     stmt = stmt.on_conflict_do_update(
         index_elements=["exchange_id", "symbol", "market_type"],
         set_={
+            **updates,
             "status": excluded.status,
             "tick_size": excluded.tick_size,
             "step_size": excluded.step_size,
@@ -170,6 +188,40 @@ async def _apply_ranks(session: AsyncSession, rows: list[tuple[Any, int, bool]])
         .where(Market.id == v.c.id)
         .values(monitor_rank=v.c.rank, is_monitored=v.c.monitored)
     )
+
+
+async def monitor_by_floor(
+    session: AsyncSession,
+    exchange_id: Any,
+    market_type: MarketType,
+    eligible: set[str],
+) -> tuple[set[str], set[str]]:
+    """Monitor exactly ``eligible`` — the spot rule (T3.0c/D1), not a top-N.
+
+    ``monitor_rank`` is still written, by volume, because an operator asking
+    "how far below the floor is this pair?" deserves an answer; it just does
+    not *decide* anything here, unlike :func:`rank_and_monitor`. A symbol in
+    ``eligible`` that has no active row is silently absent rather than
+    invented: the caller computed the set from the same listing that was just
+    upserted, so the only way to be here is a row that went inactive between
+    the two, and monitoring a suspended pair is never right.
+    """
+    rows = (
+        await session.execute(
+            select(Market.id, Market.symbol, Market.is_monitored)
+            .where(Market.exchange_id == exchange_id)
+            .where(Market.market_type == market_type)
+            .where(Market.status == MarketStatus.ACTIVE)
+            .order_by(Market.volume_24h_usd.desc().nulls_last())
+        )
+    ).all()
+    old_monitored = {row.symbol for row in rows if row.is_monitored}
+    new_monitored = {row.symbol for row in rows if row.symbol in eligible}
+    await _apply_ranks(
+        session,
+        [(row.id, rank, row.symbol in eligible) for rank, row in enumerate(rows, start=1)],
+    )
+    return old_monitored, new_monitored
 
 
 async def rank_and_monitor(

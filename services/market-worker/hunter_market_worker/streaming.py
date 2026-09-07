@@ -5,10 +5,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import time
+from collections.abc import Sequence
 from typing import Any
 
+from hunter_core.domain.enums import MarketType
 from hunter_core.logging import get_logger
-from hunter_exchanges.base import ExchangeError
+from hunter_core.observability import market_spot_events_total
+from hunter_exchanges.base import ExchangeError, StreamChannel
 from hunter_market_worker.coverage import CoverageTracker
 from hunter_market_worker.hot_state import TradeMemory
 from hunter_market_worker.ingest import CHANNELS, AcceptedEvents, TickCoalescer, handle_event
@@ -17,6 +20,16 @@ from hunter_market_worker.supervision import DroppedEventsLedger, IngestionHealt
 logger = get_logger(__name__)
 
 _HOUSEKEEPING_INTERVAL_S = 0.1
+
+SPOT_CHANNELS = (
+    StreamChannel.TRADES,
+    StreamChannel.BOOK_TICKER,
+    StreamChannel.BOOK,
+    StreamChannel.KLINE_1M,
+)
+"""Everything spot has. ``MARK_PRICE``/``LIQUIDATIONS`` are perpetual-only and
+the spot adapter *refuses* them (T3.0a §4) rather than returning a zero, so
+asking for them here would be a startup failure, not a quiet no-op."""
 
 
 async def consume_once(
@@ -34,6 +47,8 @@ async def consume_once(
     watchdog: Watchdog | None = None,
     coverage: CoverageTracker | None = None,
     dropped: DroppedEventsLedger | None = None,
+    market_type: MarketType = MarketType.PERPETUAL,
+    channels: Sequence[StreamChannel] = CHANNELS,
 ) -> None:
     """Drain ``adapter.stream(...)`` with a plain ``async for`` (B1 —
     t16b-profile.md ACHADO-2: the old loop created one ``Task`` and one timer
@@ -42,8 +57,20 @@ async def consume_once(
     health housekeeping now runs on its own 100ms loop, so the consumer
     never has to be interrupted just to check them.
     """
-    stream = adapter.stream(list(symbols), CHANNELS)
+    stream = adapter.stream(list(symbols), list(channels))
     symbols = list(symbols)
+    # T2.5g's performance contract is about *per-event* work on this path:
+    # ``Counter.labels(...)`` resolves a child on every call, so the children
+    # are resolved once per session and only ``inc()`` runs per event. Empty
+    # for the perpetual, which must pay nothing at all for spot existing.
+    spot_counters: dict[str, Any] = (
+        {
+            kind: market_spot_events_total.labels(exchange=adapter.code, kind=kind)
+            for kind in ("ticker", "trade", "book", "candle")
+        }
+        if market_type is MarketType.SPOT
+        else {}
+    )
     if coverage is not None:
         # A fresh stream is a fresh coverage interval: nothing before this
         # instant was collected *by this session*, and the scanner may not
@@ -90,9 +117,12 @@ async def consume_once(
                         raise RuntimeError(
                             "adapter lacks update_subscriptions; cannot apply universe diffs"
                         )
-                    await update(sorted(added), sorted(removed), CHANNELS)
+                    await update(sorted(added), sorted(removed), list(channels))
                     for symbol in removed:
-                        trade_memory.forget(adapter.code, symbol)
+                        # T3.0c: the type is part of the memory key, so a spot
+                        # pair leaving the universe never forgets the trade
+                        # watermark of the perpetual of the same symbol.
+                        trade_memory.forget(adapter.code, symbol, market_type)
                     symbols[:] = list(universe.symbols)
                     if coverage is not None:
                         coverage.subscribed(sorted(added))
@@ -116,6 +146,11 @@ async def consume_once(
                     health.data_event()
                 if watchdog is not None:
                     watchdog.last_event = time.monotonic()
+                # Per venue, by event kind: the spot connection's health is not
+                # readable off the perpetual's series (T3.0c item 4).
+                counter = spot_counters.get(event.kind)
+                if counter is not None:
+                    counter.inc()
             source_ts = getattr(event, "ts", None)
             if accepted and source_ts is not None:
                 previous = heartbeat_state.last_event_at
@@ -171,11 +206,21 @@ async def run_ingest(
     coalescer: TickCoalescer,
     health: IngestionHealth,
     watchdog: Watchdog,
+    *,
+    market_type: MarketType = MarketType.PERPETUAL,
+    channels: Sequence[StreamChannel] = CHANNELS,
+    shard: tuple[int, int] | None = None,
 ) -> None:
+    """``shard`` (T3.0c) overrides the process's own ``MARKET_SHARD`` for the
+    coverage record. The spot collector runs on shard 0 only and owns the whole
+    spot universe, so it publishes a *solo* coverage record — declaring itself
+    "shard 0 of 4" would make the merge script wait for three spot shards that
+    do not exist and never will."""
     producer = f"market-worker@{runtime.instance}"
     memory = AcceptedEvents()
     trade_memory = TradeMemory()
-    coverage = CoverageTracker(adapter.code, settings.shard_index, settings.shard_total)
+    shard_index, shard_total = shard or (settings.shard_index, settings.shard_total)
+    coverage = CoverageTracker(adapter.code, shard_index, shard_total, market_type=market_type)
     # One ledger per process, never per session: a reconnect recreates the
     # adapter's per-connection counters, and a loss must never un-happen.
     dropped = DroppedEventsLedger()
@@ -207,6 +252,8 @@ async def run_ingest(
                 watchdog,
                 coverage,
                 dropped,
+                market_type,
+                channels,
             )
         except ExchangeError as exc:
             heartbeat_state.last_error = str(exc)

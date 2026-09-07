@@ -25,9 +25,11 @@ from collections.abc import Collection
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from hunter_core.domain.enums import MarketType
 from hunter_core.domain.market import to_wire
 from hunter_core.events.outbox import build_envelope, enqueue_many, event_id_for
 from hunter_core.events.streams import Streams
+from hunter_core.redis import keys
 from hunter_market_worker.publication import liquidation_id
 
 if TYPE_CHECKING:
@@ -235,7 +237,12 @@ async def enqueue_liquidations(
     )
 
 
-def universe_event_id(exchange: str, monitored: Collection[str], at: datetime) -> UUID:
+def universe_event_id(
+    exchange: str,
+    monitored: Collection[str],
+    at: datetime,
+    market_type: MarketType = MarketType.PERPETUAL,
+) -> UUID:
     """Identity of one universe change = exchange + the new set + the instant.
 
     There is no business row to derive this from — the change *is* the
@@ -262,7 +269,13 @@ def universe_event_id(exchange: str, monitored: Collection[str], at: datetime) -
     The instant is captured once per refresh cycle and is also the envelope's
     ``ts``, so the two can never disagree about when the change happened.
     """
-    return event_id_for(Streams.MARKET_UNIVERSE_CHANGED, exchange, ",".join(sorted(monitored)), at)
+    # T3.0c: ``keys.market_slug`` spelling for the venue segment — the
+    # perpetual keeps the exact string it always had, so no identity that has
+    # already been announced changes, while the spot universe of the same
+    # symbol set at the same instant is a different event and not a duplicate
+    # the outbox would drop.
+    venue = keys.market_slug(exchange, "", market_type).rstrip(":")
+    return event_id_for(Streams.MARKET_UNIVERSE_CHANGED, venue, ",".join(sorted(monitored)), at)
 
 
 async def enqueue_universe_changed(
@@ -273,6 +286,7 @@ async def enqueue_universe_changed(
     new_monitored: set[str],
     at: datetime,
     producer: str = PRODUCER,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> dict[str, Any]:
     """Queue ``market.universe.changed`` and return the payload it carries.
 
@@ -289,16 +303,20 @@ async def enqueue_universe_changed(
         "added": sorted(new_monitored - old_monitored),
         "removed": sorted(old_monitored - new_monitored),
         "total": len(new_monitored),
+        # T3.0c: additive, and the perpetual keeps saying ``perpetual`` — a
+        # consumer that predates the field ignores it, which is exactly the
+        # behaviour it already had for a payload that never named a product.
+        "market_type": market_type.value,
     }
     await enqueue_many(
         session,
         [
             build_envelope(
                 Streams.MARKET_UNIVERSE_CHANGED,
-                universe_event_id(exchange, new_monitored, at),
+                universe_event_id(exchange, new_monitored, at, market_type),
                 payload,
                 producer=producer,
-                key=exchange,
+                key=keys.market_slug(exchange, "", market_type).rstrip(":"),
                 ts=at,
             )
         ],

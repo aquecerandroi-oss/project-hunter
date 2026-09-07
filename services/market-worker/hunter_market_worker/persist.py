@@ -20,7 +20,7 @@ from sqlalchemy import select
 from hunter_core.db.models.market_data import Candle, IngestionGap
 from hunter_core.db.models.system import SystemEvent
 from hunter_core.db.session import role_session
-from hunter_core.domain.enums import RiskEventSeverity
+from hunter_core.domain.enums import MarketType, RiskEventSeverity
 from hunter_core.domain.market import NormalizedCandle
 from hunter_core.logging import get_logger
 from hunter_market_worker.persist_rows import (
@@ -94,7 +94,12 @@ async def _uncovered_gap_keys(session: Any, keys: set[GapKey]) -> set[GapKey]:
     return {key for key in keys if not covered(key)}
 
 
-async def report_losses(factory: Any, exchange: str, queues: PersistQueues) -> None:
+async def report_losses(
+    factory: Any,
+    exchange: str,
+    queues: PersistQueues,
+    market_type: MarketType = MarketType.PERPETUAL,
+) -> None:
     """Best-effort: a failure here must never propagate (H1) — the loss is
     already recorded in ``losses_total``; failing to also write the
     ``system_events``/``ingestion_gaps`` rows for it is degraded, not fatal.
@@ -120,7 +125,9 @@ async def report_losses(factory: Any, exchange: str, queues: PersistQueues) -> N
             # markets. The losses stay queued for the next iteration.
             logger.debug("market_loss_report_deferred", exchange=exchange)
             return
-        ids = await load_market_ids(session, exchange, {loss.item.symbol for loss in losses})
+        ids = await load_market_ids(
+            session, exchange, {loss.item.symbol for loss in losses}, market_type
+        )
         final_candle_keys: set[GapKey] = set()
         for loss in losses:
             item = loss.item
@@ -163,7 +170,10 @@ async def drain_loop(
     runtime: Any,
     outbox_wake: asyncio.Event | None = None,
     producer: str | None = None,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> None:
+    """``market_type`` (T3.0c): one drain loop per product, each over its own
+    queue. See :func:`flush_batch` for why a mixed batch cannot be resolved."""
     producer = producer or f"market-worker@{getattr(runtime, 'instance', 'unknown')}"
     batch: list[PersistItem] = []
     batch_bytes = 0
@@ -171,7 +181,7 @@ async def drain_loop(
     warned = False
     while True:
         try:
-            await report_losses(factory, exchange_code, queues)
+            await report_losses(factory, exchange_code, queues, market_type)
         except Exception:
             runtime.mark_error()
             logger.exception("market_persist_report_losses_failed")
@@ -214,7 +224,10 @@ async def drain_loop(
             warned = True
         try:
             await asyncio.wait_for(
-                flush_batch(factory, exchange_code, batch, producer=producer), timeout=10
+                flush_batch(
+                    factory, exchange_code, batch, producer=producer, market_type=market_type
+                ),
+                timeout=10,
             )
         except Exception:
             runtime.mark_error()

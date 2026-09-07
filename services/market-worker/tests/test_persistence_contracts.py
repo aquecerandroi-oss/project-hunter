@@ -271,8 +271,10 @@ async def test_report_losses_drain_is_robust_to_concurrent_eviction(
     queues.drop(builders.liquidation("BTCUSDT", exchange=code, qty="2"), "capacity")
     original_load_market_ids = persist.load_market_ids
 
-    async def draining_load_market_ids(session: Any, exchange: str, symbols: set[str]) -> Any:
-        result = await original_load_market_ids(session, exchange, symbols)
+    async def draining_load_market_ids(
+        session: Any, exchange: str, symbols: set[str], *args: Any
+    ) -> Any:
+        result = await original_load_market_ids(session, exchange, symbols, *args)
         queues.losses.clear()  # a concurrent eviction empties the deque mid-flight
         return result
 
@@ -304,8 +306,10 @@ async def test_report_losses_drain_keeps_losses_added_concurrently(
     ]
     original_load_market_ids = persist.load_market_ids
 
-    async def appending_load_market_ids(session: Any, exchange: str, symbols: set[str]) -> Any:
-        result = await original_load_market_ids(session, exchange, symbols)
+    async def appending_load_market_ids(
+        session: Any, exchange: str, symbols: set[str], *args: Any
+    ) -> Any:
+        result = await original_load_market_ids(session, exchange, symbols, *args)
         for item in concurrent_new:
             # each append evicts the oldest *reported* entry — by the time the
             # session below commits, neither reported_a nor reported_b is

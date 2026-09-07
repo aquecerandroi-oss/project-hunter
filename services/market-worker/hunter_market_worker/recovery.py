@@ -9,11 +9,11 @@ from typing import Any
 
 from hunter_core.db.models.market_data import IngestionGap
 from hunter_core.db.session import role_session
-from hunter_core.domain.enums import Timeframe
+from hunter_core.domain.enums import MarketType, Timeframe
 from hunter_core.domain.market import align_open_time
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
-from hunter_core.observability import market_ingestion_gaps
+from hunter_core.observability import market_ingestion_gaps, market_spot_ingestion_gaps
 from hunter_market_worker import recovery_queries as queries
 from hunter_market_worker.persist import load_market_ids
 from hunter_market_worker.recovery_drain import expected_times, recover_one
@@ -113,8 +113,18 @@ def history_deadline(
 
 
 async def check_gaps(
-    session_factory: Any, adapter: Any, symbols: list[str], heartbeat_state: Any
+    session_factory: Any,
+    adapter: Any,
+    symbols: list[str],
+    heartbeat_state: Any,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> None:
+    """``market_type`` (T3.0c) resolves the symbols to **that** product's
+    ``markets`` rows. The gap rows themselves already carry ``market_id``, so
+    everything downstream of here is type-agnostic; this lookup is the one
+    place where ``BTCUSDT`` alone is ambiguous. The advisory lock stays keyed
+    by exchange only, and deliberately: spot and perpetual gap planning for one
+    venue must serialize with each other and with the backfill consumer."""
     cycle_start = time.monotonic()
     now = await server_now(adapter)
     end = align_open_time(now, Timeframe.M1) - DETECTION_GRACE
@@ -126,7 +136,7 @@ async def check_gaps(
         # only a lock held across both halves keeps the two from inserting the
         # same minutes twice (recovery_queries.GAP_PLANNING_LOCK_NAMESPACE).
         await queries.lock_gap_planning(session, adapter.code)
-        ids = await load_market_ids(session, adapter.code, set(symbols))
+        ids = await load_market_ids(session, adapter.code, set(symbols), market_type)
         market_ids = list(ids.values())
         market_watermarks = await queries.watermarks(session, market_ids)
         starts = {
@@ -220,8 +230,13 @@ async def check_gaps(
         open_count = await queries.count_by_status(session, market_ids, "open")
         failed_count = await queries.count_by_status(session, market_ids, "failed")
     heartbeat_state.open_gaps = open_count
-    market_ingestion_gaps.labels(exchange=adapter.code, status="open").set(open_count)
-    market_ingestion_gaps.labels(exchange=adapter.code, status="failed").set(failed_count)
+    # Separate series per product (T3.0c): one gauge shared by two collectors
+    # would have each overwrite the other's value under the same labels.
+    gauge = (
+        market_ingestion_gaps if market_type is MarketType.PERPETUAL else market_spot_ingestion_gaps
+    )
+    gauge.labels(exchange=adapter.code, status="open").set(open_count)
+    gauge.labels(exchange=adapter.code, status="failed").set(failed_count)
 
 
 def _should_check(
@@ -238,7 +253,12 @@ def _should_check(
 
 
 async def run_recovery(
-    session_factory: Any, adapter: Any, universe: Any, heartbeat_state: Any, runtime: Any
+    session_factory: Any,
+    adapter: Any,
+    universe: Any,
+    heartbeat_state: Any,
+    runtime: Any,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> None:
     last_check = float("-inf")
     last_reconnects = heartbeat_state.reconnects
@@ -264,7 +284,9 @@ async def run_recovery(
             waiting_for_gate = False
         last_check, last_reconnects = now, heartbeat_state.reconnects
         try:
-            await check_gaps(session_factory, adapter, universe.symbols, heartbeat_state)
+            await check_gaps(
+                session_factory, adapter, universe.symbols, heartbeat_state, market_type
+            )
             runtime.mark_success()
         except Exception:
             logger.exception("market_recovery_failed")

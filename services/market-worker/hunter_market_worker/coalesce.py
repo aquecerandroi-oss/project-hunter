@@ -23,6 +23,7 @@ from hunter_core.domain.types import utcnow
 from hunter_core.events.envelope import EventEnvelope
 from hunter_core.events.streams import DEFAULT_MAXLEN, Streams
 from hunter_core.logging import get_logger
+from hunter_core.redis import keys
 from hunter_market_worker import hot_state
 from hunter_market_worker.publication import publish
 
@@ -38,12 +39,33 @@ BOOK_IMBALANCE_DEPTH = 5
 _MarketKey = tuple[str, str, MarketType]
 """``(exchange, symbol, market_type)`` — one accumulator per *market*."""
 
-# T3.0c owns the last un-discriminated identity on this path: the
-# ``market.ticks`` payload and the ``rt:market:{exchange}:{symbol}`` channel
-# still name a market by exchange and symbol alone. Changing them means
-# changing the API's channel grammar (``hunter_api.realtime.channels``, which
-# refuses an extra ``:`` segment on purpose) and the web client with it, so it
-# is deliberately not done here — spot is not ingested by this worker yet.
+# T3.0c closed the last un-discriminated identity on this path, and closed it
+# in the cheaper of the two directions the T3.0b note left open:
+#
+# - the ``market.ticks`` **payload** now carries ``market_type``. Additive: a
+#   consumer that predates the field ignores it, and the perpetual's value is
+#   what the payload always implied;
+# - the **pub/sub channel** does not gain a segment. ``rt:market:{ex}:{sym}``
+#   is validated by ``hunter_api.realtime.channels`` with a grammar that
+#   refuses an extra ``:`` (there is a test asserting the refusal) and is
+#   subscribed to by ``apps/web``. Publishing spot on that name would put two
+#   markets' prices on one channel; changing the grammar means changing the
+#   web client, which T3.0c may not touch. So spot publishes on
+#   ``rt:market-spot:{ex}:{sym}``: a name no client subscribes to yet and that
+#   the current grammar refuses on purpose, rather than a name that silently
+#   mixes venues. Giving the API a way to route it is registered for T3.8c.
+_SPOT_CHANNEL_PREFIX = "rt:market-spot:"
+_PERPETUAL_CHANNEL_PREFIX = "rt:market:"
+
+
+def realtime_channel(exchange: str, symbol: str, market_type: MarketType) -> str:
+    """Which pub/sub channel one market's ticks are published on (see above)."""
+    prefix = (
+        _SPOT_CHANNEL_PREFIX
+        if market_type is not MarketType.PERPETUAL
+        else _PERPETUAL_CHANNEL_PREFIX
+    )
+    return f"{prefix}{exchange}:{symbol}"
 
 
 def _max_ts(current: datetime | None, candidate: datetime) -> datetime:
@@ -129,12 +151,19 @@ class TickCoalescer:
         accum.dirty = False
 
 
-def build_tick_payload(exchange: str, symbol: str, accum: _TickAccum, ts: str) -> dict[str, Any]:
+def build_tick_payload(
+    exchange: str,
+    symbol: str,
+    accum: _TickAccum,
+    ts: str,
+    market_type: MarketType = MarketType.PERPETUAL,
+) -> dict[str, Any]:
     """Pure builder for the ``market.ticks`` / ``rt:market:*`` payload â€” no IO,
     so coalescing can be unit-tested without Redis."""
     return {
         "exchange": exchange,
         "symbol": symbol,
+        "market_type": market_type.value,
         "price": str(accum.price) if accum.price is not None else None,
         "bid": str(accum.bid) if accum.bid is not None else None,
         "ask": str(accum.ask) if accum.ask is not None else None,
@@ -170,9 +199,9 @@ async def flush_ticks(
     published: list[str] = []
     async with redis.pipeline(transaction=False) as pipe:
         for key, accum in items:
-            exchange, symbol, _market_type = key
+            exchange, symbol, market_type = key
             ts = accum.ts.isoformat() if accum.ts else utcnow().isoformat()
-            payload = build_tick_payload(exchange, symbol, accum, ts)
+            payload = build_tick_payload(exchange, symbol, accum, ts, market_type)
             coalescer.reset(key)
             if accum.hot_ticker is not None:
                 # KB-0044: this ticker always comes from the WS bookTicker
@@ -186,13 +215,17 @@ async def flush_ticks(
             envelope = EventEnvelope(
                 type=Streams.MARKET_TICKS,
                 producer=producer,
-                key=f"{exchange}:{symbol}",
+                # ``keys.market_slug``: the perpetual keeps ``{ex}:{sym}``
+                # byte for byte, the spot pair routes as ``{ex}:spot:{sym}``.
+                key=keys.market_slug(exchange, symbol, market_type),
                 payload=payload,
             )
             await publish(
                 pipe, Streams.MARKET_TICKS, envelope, DEFAULT_MAXLEN[Streams.MARKET_TICKS]
             )
-            cast(Any, pipe).publish(f"rt:market:{exchange}:{symbol}", orjson.dumps(payload))
+            cast(Any, pipe).publish(
+                realtime_channel(exchange, symbol, market_type), orjson.dumps(payload)
+            )
             published.append(symbol)
         await pipe.execute()
     return published

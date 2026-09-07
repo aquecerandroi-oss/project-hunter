@@ -35,15 +35,31 @@ async def _upsert_exchange(session: Any, code: str) -> Any:
 
 
 async def seed_market(
-    session_factory: Any, exchange_code: str, symbol: str, *, base: str = "BTC", quote: str = "USDT"
+    session_factory: Any,
+    exchange_code: str,
+    symbol: str,
+    *,
+    base: str = "BTC",
+    quote: str = "USDT",
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> Any:
-    """Create (or find) an exchange, its base/quote assets, and one perpetual
-    market for ``symbol``. Returns the market's id."""
+    """Create (or find) an exchange, its base/quote assets, and one market for
+    ``symbol``. Returns the market's id.
+
+    ``market_type`` is part of the lookup (T3.0c), not only of the insert: the
+    two listings of one symbol are two rows, and a helper that found either of
+    them would hand a test the wrong ``market_id`` — the exact class of bug the
+    spot path exists to keep impossible.
+    """
     async with role_session(session_factory, db_role="hunter_worker") as session:
         existing = await session.scalar(
             select(Market.id)
             .join(Exchange, Exchange.id == Market.exchange_id)
-            .where(Exchange.code == exchange_code, Market.symbol == symbol)
+            .where(
+                Exchange.code == exchange_code,
+                Market.symbol == symbol,
+                Market.market_type == market_type,
+            )
         )
         if existing is not None:
             return existing
@@ -53,7 +69,7 @@ async def seed_market(
         market = Market(
             exchange_id=exchange_id,
             symbol=symbol,
-            market_type=MarketType.PERPETUAL,
+            market_type=market_type,
             base_asset_id=base_id,
             quote_asset_id=quote_id,
         )

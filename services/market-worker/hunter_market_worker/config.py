@@ -72,3 +72,47 @@ def build_adapter(code: str, settings: Settings, redis: redis_asyncio.Redis) -> 
     rate_limiter = TokenBucketRateLimiter(code, redis=cast(Any, redis))
     rest = BinanceRestClient(rate_limiter=rate_limiter)
     return BinanceAdapter(rest=rest)
+
+
+def build_spot_adapter(
+    code: str, settings: Settings, redis: redis_asyncio.Redis
+) -> ExchangeAdapter:
+    """The SPOT adapter of the same venue (T3.0c) — a *second* adapter, never a
+    mode of the first.
+
+    Same ``code`` (one ``exchanges`` row, one IP, one 429/418 surface,
+    ``binance_spot/identity.py``) and a different ``market_type``. What it does
+    **not** share is the REST budget: spot is 6000 weight/min on ``/api/v3``
+    and USDS-M is 2400/min on ``/fapi``, two independent quotas, so the client
+    builds its own bucket (``rl:binance:spot_request_weight``). Pointing both at
+    one bucket key with two capacities would corrupt the accounting of both
+    (T3.0a §3).
+    """
+    if code not in _SUPPORTED_CODES:
+        logger.error("market_spot_adapter_unsupported", exchange=code)
+        raise UnsupportedExchangeError(f"no spot adapter registered for exchange code {code!r}")
+    try:
+        from hunter_exchanges.binance_spot import BinanceSpotAdapter
+        from hunter_exchanges.binance_spot.http import (
+            REQUEST_WEIGHT_CAPACITY,
+            REQUEST_WEIGHT_PERIOD_S,
+        )
+        from hunter_exchanges.binance_spot.rest import BinanceSpotRestClient
+        from hunter_exchanges.rate_limit import TokenBucketRateLimiter
+    except ImportError as exc:
+        logger.error("market_spot_adapter_missing", exchange=code)
+        raise UnsupportedExchangeError(
+            f"hunter_exchanges.binance_spot is not importable: {exc}"
+        ) from exc
+    del settings
+    # Redis explicitly, never the client's own default: without it the limiter
+    # falls back to a *per-process* bucket, and N processes with a local budget
+    # each add up to N quotas against one shared exchange quota — the fail-closed
+    # rule of PIPELINE.md §1.7, whose price for getting it wrong is an IP ban.
+    rate_limiter = TokenBucketRateLimiter(
+        code,
+        redis=cast(Any, redis),
+        capacity=REQUEST_WEIGHT_CAPACITY,
+        refill_period_s=REQUEST_WEIGHT_PERIOD_S,
+    )
+    return BinanceSpotAdapter(rest=BinanceSpotRestClient(rate_limiter=rate_limiter))

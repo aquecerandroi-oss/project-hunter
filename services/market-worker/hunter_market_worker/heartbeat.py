@@ -26,17 +26,24 @@ from typing import TYPE_CHECKING, Any, cast
 
 import orjson
 
-from hunter_core.db.models.system import SystemEvent
-from hunter_core.db.session import role_session
-from hunter_core.domain.enums import RiskEventSeverity
+from hunter_core.domain.enums import MarketType, RiskEventSeverity
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
-from hunter_core.observability import (
-    market_dropped_events_total,
-    market_system_event_record_failures_total,
-)
+from hunter_core.observability import market_dropped_events_total
 from hunter_core.redis import keys
 from hunter_exchanges.rate_limit import REST_GATE_OK
+from hunter_market_worker.heartbeat_events import (
+    COMPONENT as COMPONENT,
+)
+from hunter_market_worker.heartbeat_events import (
+    record_system_event as record_system_event,
+)
+from hunter_market_worker.heartbeat_events import (
+    safe_record_system_event as safe_record_system_event,
+)
+from hunter_market_worker.heartbeat_events import (
+    transition_event,
+)
 from hunter_market_worker.supervision import connection_field, counter_delta, rest_gate_status
 
 if TYPE_CHECKING:
@@ -51,7 +58,6 @@ logger = get_logger(__name__)
 
 HEARTBEAT_INTERVAL_S = 5
 HB_TTL_S = 30
-COMPONENT = "market-worker"
 
 
 @dataclasses.dataclass
@@ -70,10 +76,20 @@ class HeartbeatState:
     only ever receives the per-tick delta."""
 
 
-def hb_key(exchange: str, shard_index: int = 0, shard_total: int = 1) -> str:
+def hb_key(
+    exchange: str,
+    shard_index: int = 0,
+    shard_total: int = 1,
+    market_type: MarketType = MarketType.PERPETUAL,
+) -> str:
     """``hb:market:{exchange}`` solo, ``hb:market:{exchange}:{i}of{N}`` sharded
-    — the same builder the API reads with (:meth:`keys.market_heartbeat`)."""
-    return keys.market_heartbeat(exchange, shard_index, shard_total)
+    — the same builder the API reads with (:meth:`keys.market_heartbeat`).
+
+    T3.0c: spot is ``hb:market:spot:{exchange}``. The type goes **before** the
+    exchange deliberately (T3.0b §1): Redis glob matches ``:``, so
+    ``hb:market:{ex}:spot:...`` would be swept up by the perpetual shard scan.
+    """
+    return keys.market_heartbeat(exchange, shard_index, shard_total, market_type=market_type)
 
 
 async def _write_hash(
@@ -87,8 +103,9 @@ async def _write_hash(
     rest_gate: str = REST_GATE_OK,
     shard_index: int = 0,
     shard_total: int = 1,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> None:
-    key = hb_key(exchange, shard_index, shard_total)
+    key = hb_key(exchange, shard_index, shard_total, market_type)
     mapping = {
         "last_event_at": state.last_event_at.isoformat() if state.last_event_at else "",
         "ws_state": ws_state,
@@ -135,45 +152,6 @@ async def _publish_status(
     await cast(Any, redis).publish("rt:system", orjson.dumps(payload))
 
 
-async def record_system_event(
-    session_factory: async_sessionmaker[AsyncSession],
-    event: str,
-    message: str,
-    severity: RiskEventSeverity,
-) -> None:
-    async with role_session(session_factory, db_role="hunter_worker") as session:
-        session.add(SystemEvent(level=severity, component=COMPONENT, event=event, message=message))
-
-
-async def safe_record_system_event(
-    session_factory: async_sessionmaker[AsyncSession],
-    event: str,
-    message: str,
-    severity: RiskEventSeverity,
-) -> None:
-    """``record_system_event``, but a persistence failure is an observability
-    loss, never a reason to stop ingesting (HIGH-2): a real Postgres outage
-    must not take the caller's permanent loop down with it. Logs a warning,
-    increments :data:`market_system_event_record_failures_total`, and
-    returns. ``asyncio.CancelledError`` is never swallowed -- coordinated
-    shutdown must still cancel."""
-    try:
-        await record_system_event(session_factory, event, message, severity)
-    except asyncio.CancelledError:
-        raise
-    except Exception:
-        logger.warning("market_system_event_record_failed", system_event=event, exc_info=True)
-        market_system_event_record_failures_total.labels(event=event).inc()
-
-
-def _transition_event(ws_state: str) -> tuple[str, RiskEventSeverity]:
-    if ws_state == "connected":
-        return "ws_reconnected", RiskEventSeverity.WARNING
-    if ws_state == "disconnected":
-        return "ws_disconnected", RiskEventSeverity.CRITICAL
-    return "ws_state_changed", RiskEventSeverity.WARNING
-
-
 def connection_summary(
     adapter: Any,
     previous_reconnects: dict[str, int],
@@ -210,6 +188,7 @@ async def _safe_publish(
     rest_gate: str,
     shard_index: int = 0,
     shard_total: int = 1,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> bool:
     """Publish the heartbeat, degrading instead of raising. True if it landed.
 
@@ -240,8 +219,9 @@ async def _safe_publish(
             rest_gate,
             shard_index,
             shard_total,
+            market_type,
         )
-        if shard_total <= 1:
+        if shard_total <= 1 and market_type is MarketType.PERPETUAL:
             # T2.5g: ``rt:system`` patches the *whole* exchange row on the
             # System page (``apps/web/components/system/live-status.tsx``
             # ``mergeExchangeUpdate``), so a shard publishing here would
@@ -249,6 +229,9 @@ async def _safe_publish(
             # keep reading "connected". In sharded mode the aggregate on
             # ``/system/market-status`` is the only truth and the widget is
             # refreshed by polling — declared in docs/PIPELINE.md §1.
+            # T3.0c: and never from the spot collector either, for the same
+            # reason — that row is the perpetual exchange row, and a spot
+            # ws_state written into it would describe the wrong connection.
             await _publish_status(redis, exchange, universe, state, ws_state, now, rest_gate)
     except Exception:
         logger.warning("market_heartbeat_publish_failed", exchange=exchange, exc_info=True)
@@ -262,6 +245,9 @@ async def run_heartbeat(
     universe: MonitoredUniverse,
     state: HeartbeatState,
     session_factory: async_sessionmaker[AsyncSession],
+    *,
+    market_type: MarketType = MarketType.PERPETUAL,
+    shard: tuple[int, int] | None = None,
 ) -> None:
     """Write the hash, publish ``rt:system``, and log state transitions —
     every :data:`HEARTBEAT_INTERVAL_S` seconds.
@@ -274,8 +260,11 @@ async def run_heartbeat(
     database outage must degrade this loop to "no system_events written",
     never to "the whole TaskGroup dies".
     """
-    shard_index = runtime.settings.shard_index
-    shard_total = runtime.settings.shard_total
+    # T3.0c: ``shard`` overrides MARKET_SHARD. The spot collector is a single
+    # process owning the whole spot universe, so it reports as solo — claiming
+    # "0 of 4" would make the API wait for three spot shards that never exist.
+    settings = runtime.settings
+    shard_index, shard_total = shard or (settings.shard_index, settings.shard_total)
     previous_ws_state: str | None = None
     previous_rest_gate: str | None = None
     last_sent = float("-inf")
@@ -317,6 +306,7 @@ async def run_heartbeat(
             rest_gate,
             shard_index,
             shard_total,
+            market_type,
         )
         if reconnects:
             await safe_record_system_event(
@@ -326,7 +316,7 @@ async def run_heartbeat(
                 RiskEventSeverity.WARNING,
             )
         if previous_ws_state is not None and ws_state != previous_ws_state:
-            event, severity = _transition_event(ws_state)
+            event, severity = transition_event(ws_state)
             await safe_record_system_event(
                 session_factory, event, f"{previous_ws_state} -> {ws_state}", severity
             )

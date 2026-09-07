@@ -133,6 +133,7 @@ class MarketRepository:
         exchange: str | None = None,
         q: str | None = None,
         monitored: bool | None = None,
+        market_type: MarketType = MarketType.PERPETUAL,
     ) -> list[MarketRow]:
         """Every market matching the filters, ordered ``(exchange, symbol, id)``.
 
@@ -140,8 +141,16 @@ class MarketRepository:
         filtered set to compute the ``summary`` counts and to merge in Redis
         state before paginating, and at M1 scale (``MARKET_UNIVERSE_SIZE``
         default 200) that is one cheap query, not a scalability risk.
+
+        T3.0c: ``market_type`` defaults to ``PERPETUAL`` and is **always**
+        applied. Until this release ``markets`` held nothing else, so this
+        query answered "the perpetual universe" by accident; the spot rows the
+        collector now writes would otherwise appear, unannounced, in the
+        Markets page and in the counts of its ``summary`` — a UI change nobody
+        asked for, shipped inside a data-path task that must not touch
+        ``apps/web``. Asking for the spot listing is explicit.
         """
-        statement = _base_select()
+        statement = _base_select().where(Market.market_type == market_type)
         if exchange:
             statement = statement.where(Exchange.code == exchange)
         if monitored is not None:

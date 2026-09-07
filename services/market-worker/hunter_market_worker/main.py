@@ -10,7 +10,7 @@ from hunter_core.domain.enums import RiskEventSeverity
 from hunter_core.events.outbox import OutboxHealth
 from hunter_core.logging import get_logger
 from hunter_market_worker.backfill import run_backfill
-from hunter_market_worker.config import build_adapter, exchange_code
+from hunter_market_worker.config import build_adapter, build_spot_adapter, exchange_code
 from hunter_market_worker.funding import run_funding
 from hunter_market_worker.fx import run_fx_collector
 from hunter_market_worker.heartbeat import (
@@ -25,6 +25,7 @@ from hunter_market_worker.partitions import PartitionReadiness, assert_writable_
 from hunter_market_worker.persist import PersistQueues, drain_loop, oi_poll_loop, snapshot_loop
 from hunter_market_worker.publication import publication_sessions
 from hunter_market_worker.recovery import run_recovery
+from hunter_market_worker.spot import SpotStatus, collects_spot, run_spot
 from hunter_market_worker.streaming import run_ingest, run_watchdog
 from hunter_market_worker.supervision import (
     IngestionHealth,
@@ -73,6 +74,12 @@ async def run_market(runtime: WorkerRuntime) -> None:
     # WebSocket keeps ingesting, so readiness stays green and an operator
     # still sees the degradation on /ready (and in the heartbeat hash).
     runtime.status_details["rest_gate"] = lambda: rest_gate_status(adapter)
+    # T3.0c: the spot venue, as a *detail* too. "degraded" says the spot socket
+    # is reconnecting while the perpetual one is fine — visible without turning
+    # a healthy collector red, and "absent" on every shard that does not run it.
+    spot_adapter = build_spot_adapter(exchange_code(), settings, runtime.redis)
+    spot_status = SpotStatus()
+    runtime.status_details["spot"] = spot_status
     token = publication_sessions.set(factory)
     logger.info("market_worker_starting", exchange=adapter.code)
     try:
@@ -128,6 +135,20 @@ async def run_market(runtime: WorkerRuntime) -> None:
                 # T3.11a: one USDTBRL collector per venue, never N — the task
                 # itself idles on every shard but shard 0 (fx.run_fx_collector).
                 "fx": run_fx_collector(factory, runtime.redis, adapter.code, runtime),
+                # T3.0c: the whole SPOT path (its own adapter, universe, queue,
+                # coverage, heartbeat and recovery) as one subtree, so a spot
+                # failure is a spot failure and never a perpetual one. Idles on
+                # every shard but 0, like ``fx`` above.
+                "spot": run_spot(
+                    factory,
+                    spot_adapter,
+                    runtime.redis,
+                    settings,
+                    runtime,
+                    coalescer,
+                    spot_status,
+                    outbox_wake=outbox_wake,
+                ),
             }
             for name, coro in tasks.items():
                 group.create_task(forever(name, coro), name=f"market-{name}")
@@ -138,4 +159,10 @@ async def run_market(runtime: WorkerRuntime) -> None:
         runtime.readiness_checks.remove(partitions)
         runtime.readiness_checks.remove(outbox)
         runtime.status_details.pop("rest_gate", None)
+        runtime.status_details.pop("spot", None)
         await adapter.aclose()
+        if not collects_spot(settings):
+            # ``run_spot`` closes the adapter it actually used; a shard that
+            # only idled never opened a socket, but the httpx client built by
+            # the factory is real and must not leak.
+            await spot_adapter.aclose()

@@ -94,7 +94,9 @@ async def test_run_recovery_waits_for_the_rest_gate_instead_of_burning_attempts(
     resumes on its own once the gate re-opens."""
     calls: list[tuple[str, ...]] = []
 
-    async def spy(_factory: object, adapter: object, symbols: list[str], _state: object) -> None:
+    async def spy(
+        _factory: object, adapter: object, symbols: list[str], _state: object, *_args: object
+    ) -> None:
         calls.append(tuple(symbols))
 
     monkeypatch.setattr(recovery, "check_gaps", spy)

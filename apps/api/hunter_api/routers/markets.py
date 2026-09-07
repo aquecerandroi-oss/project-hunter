@@ -24,7 +24,7 @@ from hunter_api.repositories.markets import CandleRepository, MarketRepository
 from hunter_api.schemas.markets import CandleOut, MarketDetailOut, MarketListPage
 from hunter_api.services.market_shards import summarize_collectors
 from hunter_api.services.markets import build_market_detail, build_market_list_page
-from hunter_core.domain.enums import Timeframe
+from hunter_core.domain.enums import MarketType, Timeframe
 from hunter_core.domain.types import ensure_utc, utcnow
 
 if TYPE_CHECKING:
@@ -67,10 +67,18 @@ async def list_markets(
     exchange: Annotated[str | None, Query(max_length=32)] = None,
     q: Annotated[str | None, Query(max_length=64)] = None,
     monitored: bool | None = None,
+    market_type: MarketType = MarketType.PERPETUAL,
     limit: Annotated[int | None, Query(ge=1, le=MAX_PAGE_SIZE)] = None,
     cursor: str | None = None,
 ) -> MarketListPage:
-    rows = await MarketRepository(session).list_markets(exchange=exchange, q=q, monitored=monitored)
+    """``market_type`` (T3.0c) defaults to ``perpetual``, which is what this
+    route has always answered. ``?market_type=spot`` returns the tradable spot
+    universe (D1's 50M floor) — the same shape, a different product. There is
+    deliberately no "both": one page mixing two listings of ``BTCUSDT`` would
+    show two rows the UI has no way to tell apart today."""
+    rows = await MarketRepository(session).list_markets(
+        exchange=exchange, q=q, monitored=monitored, market_type=market_type
+    )
     page = await build_market_list_page(
         session,
         rows,

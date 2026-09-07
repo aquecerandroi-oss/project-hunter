@@ -892,7 +892,12 @@ async def test_spot_and_perpetual_of_one_symbol_are_two_rows_with_their_own_hot_
     """T3.0b: ``markets`` allows both listings of one symbol, and the hot state
     now has a key per listing. The page must show each market its own price —
     before this, both rows read ``mkt:{exchange}:{symbol}:ticker`` and the two
-    were shown the same number, one of which was a lie."""
+    were shown the same number, one of which was a lie.
+
+    T3.0c: the two listings are now on **two pages**, one per ``market_type``,
+    because the collector started writing real spot rows and the default page
+    is the one ``apps/web`` renders. The property this test exists for is
+    unchanged and still asserted: each listing reads its own hot state."""
     exchange, symbol, perpetual_id = await _seed_market(session_factory)
     async with session_factory() as session:
         row = (await session.execute(select(Market).where(Market.id == perpetual_id))).scalar_one()
@@ -915,10 +920,17 @@ async def test_spot_and_perpetual_of_one_symbol_are_two_rows_with_their_own_hot_
     )
     actor: Actor = make_actor("markets-reader-spot")
 
-    response = await client.get(f"/api/v1/markets?exchange={exchange}", headers=actor.headers)
+    perpetual_page = await client.get(f"/api/v1/markets?exchange={exchange}", headers=actor.headers)
+    spot_page = await client.get(
+        f"/api/v1/markets?exchange={exchange}&market_type=spot", headers=actor.headers
+    )
 
-    assert response.status_code == 200, response.text
-    rows = {item["market_type"]: item for item in response.json()["items"]}
+    assert perpetual_page.status_code == 200, perpetual_page.text
+    assert spot_page.status_code == 200, spot_page.text
+    rows = {
+        item["market_type"]: item
+        for item in perpetual_page.json()["items"] + spot_page.json()["items"]
+    }
     assert set(rows) == {"perpetual", "spot"}
     assert rows["perpetual"]["last_price"] == "50000.5"
     assert rows["spot"]["last_price"] == "49000.25"

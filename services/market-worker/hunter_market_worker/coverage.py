@@ -86,9 +86,15 @@ from datetime import datetime, timedelta
 from time import monotonic
 from typing import TYPE_CHECKING
 
+from hunter_core.domain.enums import MarketType
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_market_worker import coverage_publish
+from hunter_market_worker.coverage_limits import (
+    COVERAGE_SAFETY_S,
+    COVERAGE_STAMP_S,
+    COVERAGE_TTL_S,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -97,33 +103,25 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-COVERAGE_SAFETY_S = 0.5
-"""How far short of the clock a stamp stops. Covers the adapter's own inbound
-queue, which this process cannot inspect: an event received 100 ms ago may not
-have been yielded to the ingest loop yet, and claiming it as tape would be
-exactly the fabricated coverage this module exists to avoid."""
-
-COVERAGE_STAMP_S = 0.25
-"""Cadence of the stamp. Bounds how far behind the scanner's cut runs, and with
-it the tick->opportunity latency the cut is measured against (p99 <= 3 s)."""
-
-COVERAGE_TTL_S = 60
-"""A dead collector's proof must expire on its own: a scanner that kept reading
-a stale hash would keep publishing windows nobody is collecting."""
-
-__all__ = [
-    "COVERAGE_SAFETY_S",
-    "COVERAGE_STAMP_S",
-    "COVERAGE_TTL_S",
-    "CoverageTracker",
-]
+__all__ = ["COVERAGE_SAFETY_S", "COVERAGE_STAMP_S", "COVERAGE_TTL_S", "CoverageTracker"]
 
 
 class CoverageTracker:
     """The coverage interval of one exchange's stream, and how it is published."""
 
-    def __init__(self, exchange: str, shard_index: int = 0, shard_total: int = 1) -> None:
+    def __init__(
+        self,
+        exchange: str,
+        shard_index: int = 0,
+        shard_total: int = 1,
+        *,
+        market_type: MarketType = MarketType.PERPETUAL,
+    ) -> None:
         self.exchange = exchange
+        #: T3.0c: one proof per venue **and product** — the spot tape and the
+        #: perpetual tape break independently, so one hash would always be
+        #: wrong about one of them.
+        self.market_type = market_type
         #: T2.5g: which slice of the universe this process proves. N shards
         #: write one shared hash, so the aggregate is computed by the Lua
         #: script in ``coverage_publish`` and never by whoever wrote last.
@@ -330,6 +328,7 @@ class CoverageTracker:
             symbols=symbols,
             now=moment,
             key_ttl_s=COVERAGE_TTL_S,
+            market_type=self.market_type,
         )
         self._claiming = True
         return True
@@ -346,5 +345,6 @@ class CoverageTracker:
             symbols={},
             now=moment,
             key_ttl_s=COVERAGE_TTL_S,
+            market_type=self.market_type,
         )
         self._claiming = False

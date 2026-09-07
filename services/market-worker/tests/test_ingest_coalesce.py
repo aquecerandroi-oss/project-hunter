@@ -67,6 +67,9 @@ def test_build_tick_payload_shape() -> None:
     assert payload == {
         "exchange": "fake",
         "symbol": "BTCUSDT",
+        # T3.0c: additive and always explicit. The perpetual's value is what
+        # the payload always meant; a consumer that predates it ignores it.
+        "market_type": "perpetual",
         "price": "100",
         "bid": None,
         "ask": None,

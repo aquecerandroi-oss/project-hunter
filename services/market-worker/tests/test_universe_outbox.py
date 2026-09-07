@@ -121,7 +121,14 @@ async def test_a_universe_change_is_queued_and_not_published_by_the_producer(
     assert envelope.type == Streams.MARKET_UNIVERSE_CHANGED
     assert envelope.producer == PRODUCER
     assert envelope.key == code
-    assert envelope.payload == {"added": ["AUSDT", "BUSDT"], "removed": [], "total": 2}
+    assert envelope.payload == {
+        "added": ["AUSDT", "BUSDT"],
+        "removed": [],
+        "total": 2,
+        # T3.0c: the perpetual keeps saying so explicitly; the spot universe
+        # of the same venue is a different event with a different identity.
+        "market_type": "perpetual",
+    }
 
 
 async def test_the_event_and_the_monitored_flags_are_one_transaction(
@@ -179,7 +186,12 @@ async def test_redis_down_between_the_commit_and_the_publication_loses_nothing(
     assert len(entries) == 1
     published = EventEnvelope.from_bytes(entries[0][1][b"data"])
     assert published.key == code
-    assert published.payload == {"added": ["AUSDT", "BUSDT"], "removed": [], "total": 2}
+    assert published.payload == {
+        "added": ["AUSDT", "BUSDT"],
+        "removed": [],
+        "total": 2,
+        "market_type": "perpetual",
+    }
     (row,) = await _universe_rows(db_session_factory)
     assert row.dispatched_at is not None
 
@@ -230,6 +242,7 @@ async def test_a_removal_is_announced_with_the_symbol_that_left(
         "added": [],
         "removed": ["BUSDT"],
         "total": 1,
+        "market_type": "perpetual",
     }
 
 

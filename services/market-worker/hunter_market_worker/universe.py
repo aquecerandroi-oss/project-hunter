@@ -229,11 +229,14 @@ async def with_tracking_holds(
     return sorted((set(monitored) | set(extra)) - blocklist)
 
 
-def _retry_delay(
+def retry_delay(
     attempt: int, refresh_s: float, *, rand: Callable[[], float] = random.random
 ) -> float:
     """Backoff for the ``attempt``-th consecutive failed refresh (HIGH-3):
-    exponential, capped well below the normal success interval, plus jitter."""
+    exponential, capped well below the normal success interval, plus jitter.
+
+    Public since T3.0c: the spot universe loop (``spot_universe.py``) has the
+    same failure mode and must not grow a second, subtly different curve."""
     cap = min(UNIVERSE_RETRY_MAX_S, max(UNIVERSE_RETRY_BASE_S, refresh_s / 3))
     # Clamp the exponent before raising it (not after): an outage long enough
     # for ``attempt`` to reach ~1024 would otherwise overflow ``2 ** attempt``.
@@ -295,9 +298,7 @@ async def run_universe(
             logger.exception("market_universe_refresh_failed")
             runtime.mark_error()
             consecutive_failures += 1
-            delay = _retry_delay(
-                consecutive_failures, settings.market_universe_refresh_s, rand=rand
-            )
+            delay = retry_delay(consecutive_failures, settings.market_universe_refresh_s, rand=rand)
         if solo or not is_leader:
             await sleep(delay)
             continue

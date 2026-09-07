@@ -147,6 +147,31 @@ market_dropped_events_total = Counter(
     ["exchange"],
     registry=registry,
 )
+# T3.0c — the SPOT venue reports separately from the perpetual one. New series
+# rather than a ``market_type`` label on the existing ones: adding a label to a
+# live counter resets every dashboard and alert built on it, and the two venues
+# are collected by different connections with different budgets anyway.
+market_spot_universe_size = Gauge(
+    "market_spot_universe_size",
+    "Spot pairs the wallet may execute on: 24h quote volume >= the D1 floor, "
+    "measured on spot itself.",
+    ["exchange"],
+    registry=registry,
+)
+market_spot_events_total = Counter(
+    "market_spot_events_total",
+    "Normalized SPOT events accepted by the collector, by event kind.",
+    ["exchange", "kind"],
+    registry=registry,
+)
+market_spot_ingestion_gaps = Gauge(
+    "market_spot_ingestion_gaps",
+    "Ingestion gaps by status for the SPOT universe. Separate from "
+    "``market_ingestion_gaps`` because both collectors would otherwise write "
+    "the same {exchange,status} series and overwrite each other.",
+    ["exchange", "status"],
+    registry=registry,
+)
 
 
 def metrics_asgi_app() -> ASGIApp:

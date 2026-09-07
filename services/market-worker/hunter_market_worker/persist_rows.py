@@ -31,6 +31,7 @@ from hunter_core.db.models.market_data import (
     OpenInterestHistory,
 )
 from hunter_core.db.session import role_session
+from hunter_core.domain.enums import MarketType
 from hunter_core.domain.market import (
     NormalizedCandle,
     NormalizedFunding,
@@ -309,6 +310,7 @@ async def flush_batch(
     batch: list[PersistItem],
     *,
     producer: str = durable.PRODUCER,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> set[Any]:
     """Persist one drained batch, queueing every durable event with it (T2.9).
 
@@ -316,6 +318,12 @@ async def flush_batch(
     published from here: the rows and their events commit together, and the
     outbox dispatcher is what reaches Redis — so a publication can neither
     outlive a transaction that rolled back nor be lost because one did not.
+
+    ``market_type`` (T3.0c) picks which of the two ``markets`` rows of a symbol
+    this batch belongs to. One queue per product, never one queue with mixed
+    items: ``load_market_ids`` returns ``{symbol: id}``, so a batch holding both
+    listings of ``BTCUSDT`` could only resolve one of them and would silently
+    write spot candles under the perpetual's ``market_id`` (T3.0b §5.1).
     """
     candles = [i for i in batch if isinstance(i, NormalizedCandle)]
     fundings = [i for i in batch if isinstance(i, NormalizedFunding)]
@@ -324,7 +332,7 @@ async def flush_batch(
     interests = [i for i in batch if isinstance(i, NormalizedOpenInterest | OpenInterestSample)]
     symbols = {i.symbol for i in batch}
     async with role_session(session_factory, db_role="hunter_worker") as session:
-        market_ids = await load_market_ids(session, exchange_code, symbols)
+        market_ids = await load_market_ids(session, exchange_code, symbols, market_type)
         await upsert_candles(session, candles, market_ids, source="ws", producer=producer)
         await upsert_funding(session, fundings, market_ids, producer=producer)
         inserted_liquidation_ids = await upsert_liquidations(
