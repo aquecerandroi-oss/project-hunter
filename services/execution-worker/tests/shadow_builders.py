@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import text
 
 from hunter_core.domain.types import uuid7
-from hunter_core.strategies.envelope import PURPOSE_RESEARCH_ONLY
+from hunter_core.strategies.envelope import PURPOSE_PAPER, PURPOSE_RESEARCH_ONLY
 
 from .builders import COSTS, MIN_NOTIONAL, TICK, filters_metadata
 
@@ -32,8 +32,10 @@ if TYPE_CHECKING:
 
     from .builders import Tenant
 
-PURPOSE_LIVE = "live"
-"""The only purpose that may reach the wallet (``admission.sources``)."""
+__all__ = ["PURPOSE_PAPER", "PURPOSE_RESEARCH_ONLY"]
+
+# ``PURPOSE_PAPER`` is the only purpose that may reach the wallet
+# (``admission.sources`` admits ``paper`` and refuses ``live`` by name — D10).
 
 
 def _costs_json() -> dict[str, Any]:

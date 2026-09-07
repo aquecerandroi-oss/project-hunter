@@ -76,7 +76,7 @@ async def _lab(factory: async_sessionmaker[AsyncSession], engine: AsyncEngine): 
         version_id=version,
         market_id=perp,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     data = StaticSpotMarketData(
         {
@@ -145,7 +145,7 @@ async def test_the_consumer_turns_one_event_into_one_proposal_and_acks_it(
             type=Streams.SHADOW_SIGNALS_EMITTED,
             producer="strategy-worker",
             key=str(signal_id),
-            payload={"signal_id": str(signal_id), "purpose": "live"},
+            payload={"signal_id": str(signal_id), "purpose": "paper"},
         ),
         1000,
     )

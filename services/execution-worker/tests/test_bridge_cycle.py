@@ -130,7 +130,7 @@ async def test_one_signal_becomes_one_approved_proposal_holding_a_reservation(
         version_id=lab.version_id,
         market_id=lab.perp_market_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     outcome = await _cycle(db_session_factory, lab, _data(lab))
     assert outcome.deferred is None, outcome.deferred
@@ -171,7 +171,7 @@ async def test_the_entry_cycle_of_t35_picks_the_bridge_proposal_up_next_cycle(
         version_id=lab.version_id,
         market_id=lab.perp_market_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     outcome = await _cycle(db_session_factory, lab, _data(lab))
     assert outcome.submitted is not None and outcome.submitted.approved
@@ -226,7 +226,7 @@ async def test_three_signals_in_one_cycle_submit_the_highest_score_and_the_rest_
             market_id=perp_id,
             source_bar_close=BAR,
             emitted_at=BAR + timedelta(seconds=index + 1),
-            purpose=shadow.PURPOSE_LIVE,
+            purpose=shadow.PURPOSE_PAPER,
         )
         for index, perp_id in enumerate(perps)
     ]
@@ -287,7 +287,7 @@ async def test_a_second_cycle_does_not_file_the_same_signal_twice(
         version_id=lab.version_id,
         market_id=lab.perp_market_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     first = await _cycle(db_session_factory, lab, _data(lab))
     assert first.submitted is not None
@@ -313,7 +313,7 @@ async def test_without_a_usable_book_the_slot_is_deferred_and_nothing_is_written
         version_id=lab.version_id,
         market_id=lab.perp_market_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     empty = StaticSpotMarketData({})
     outcome = await _cycle(db_session_factory, lab, empty)
@@ -342,7 +342,7 @@ async def test_a_scaled_perpetual_within_band_is_approved_at_the_spot_scale(
         version_id=lab.version_id,
         market_id=scaled_perp_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
         entry_ref=Decimal(100_000),
         stop=Decimal(97_500),
         target=Decimal(105_000),
@@ -384,7 +384,7 @@ async def test_a_scaled_perpetual_out_of_band_is_rejected_by_the_risk_engine_wit
         version_id=lab.version_id,
         market_id=scaled_perp_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
         entry_ref=Decimal(150_000),  # scales to 150; spot last traded at 100
         stop=Decimal(145_000),
         target=Decimal(160_000),

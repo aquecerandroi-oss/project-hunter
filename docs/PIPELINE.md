@@ -319,6 +319,12 @@ não evento: seis laços com cadência própria, cada passada uma transação, s
 7. **Live.** `LiveExecutionAdapter` levanta `LiveTradingDisabled` sempre, e o processo **recusa
    subir** com `ENABLE_LIVE_TRADING=true`: um worker de papel que subisse assim seria um que o
    operador acredita estar operando de verdade.
+8. **Ponte shadow → admissão (T3.14/T3.15b).** A ponte admite `purpose = "paper"` apenas;
+   `live` é recusado **por nome** (`live_forbidden`, "live é Fase 4; `ENABLE_LIVE_TRADING=false`")
+   até a Fase 4, `research_only` é recusado como sempre (evidência nunca vira ordem) e qualquer
+   outro rótulo desconhecido é recusado como `unknown_purpose`. A flag `ENABLE_PAPER_AUTONOMY`
+   (default `false`) governa se a ponte chega a consumir; mesmo ligada, nunca em produção antes do
+   aceite da T3.9.
 
 **Falha e reinício:** não há estado em memória para perder. Cada passada relê posições, intenções e
 reservas do Postgres, então o worker depois de um `kill -9` é o worker de antes, menos o que a

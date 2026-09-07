@@ -12,9 +12,13 @@ instant*, not durable state the wallet depends on — so it lives in the
 structured log and the counter (T3.14 item 2 allows either).
 
 Order matters. The cheapest and most categorical refusals come first — a
-``research_only`` signal or an inactive version is refused **at the door**,
-before any market data is read (item 5) — and only then the ones that need the
-reference tables.
+``live`` signal is refused **by name** at the door (Fase 4,
+``ENABLE_LIVE_TRADING=false``), and a ``research_only`` signal or an inactive
+version is refused **at the door** too, before any market data is read (item 5)
+— and only then the ones that need the reference tables. The bridge admits
+``purpose = "paper"`` only; anything else is either ``research_only`` (evidence
+never becomes an order) or ``unknown_purpose`` (a label the bridge does not
+recognise).
 
 A refusal is logged and counted **once per (signal, reason)**, not once per
 pass: the durable queue (``bridge_repo.pending_signals``) re-reads the same
@@ -37,7 +41,11 @@ from sqlalchemy import text
 
 from hunter_core.domain.enums import TradeDirection
 from hunter_core.logging import get_logger
-from hunter_core.strategies.envelope import AssumedCosts
+from hunter_core.strategies.envelope import (
+    PURPOSE_PAPER,
+    PURPOSE_RESEARCH_ONLY,
+    AssumedCosts,
+)
 from hunter_execution_worker.bridge_repo import ENTRY_WINDOW, ShadowSignal
 from hunter_execution_worker.bridge_universe import (
     SPOT_VOLUME_FLOOR_USDT,
@@ -54,13 +62,21 @@ if TYPE_CHECKING:
     from hunter_execution_worker.wallet import WalletRef
     from hunter_risk.inputs import BetaEstimate
 
-__all__ = ["PURPOSE_LIVE", "Screened", "report_refusal", "screen_signal"]
+__all__ = [
+    "PURPOSE_LIVE",
+    "PURPOSE_PAPER",
+    "Screened",
+    "report_refusal",
+    "screen_signal",
+]
 
 logger = get_logger(__name__)
 
 PURPOSE_LIVE = "live"
-"""The only purpose that reaches the wallet, named here as well as in
-``hunter_core.admission.sources`` so a new label upstream fails closed."""
+"""Refused by name at the door, not merely ``not paper`` — so an operator
+reading the refusal sees *why* (D10). ``live`` is Fase 4 and
+``ENABLE_LIVE_TRADING`` stays ``false`` regardless of what reaches this gate.
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,8 +232,18 @@ async def screen_signal(
     default, used by every test that screens a signal once) logs and counts
     every call, unchanged from before item 1.
     """
-    if signal.purpose != PURPOSE_LIVE:
+    if signal.purpose == PURPOSE_LIVE:
+        return _refuse(
+            signal,
+            "live_forbidden",
+            reported=reported,
+            purpose=signal.purpose,
+            message="live é Fase 4; ENABLE_LIVE_TRADING=false",
+        )
+    if signal.purpose == PURPOSE_RESEARCH_ONLY:
         return _refuse(signal, "research_only", reported=reported, purpose=signal.purpose)
+    if signal.purpose != PURPOSE_PAPER:
+        return _refuse(signal, "unknown_purpose", reported=reported, purpose=signal.purpose)
     if not signal.version_active:
         return _refuse(signal, "version_inactive", reported=reported)
     closes_at = signal.window_closes_at()

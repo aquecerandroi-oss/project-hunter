@@ -89,7 +89,7 @@ async def _screen(
         return [await screen_signal(session, wallet=wallet, signal=s, now=now) for s in signals]
 
 
-async def test_a_live_signal_of_an_active_version_is_a_candidate(
+async def test_a_paper_signal_of_an_active_version_is_a_candidate(
     db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
 ) -> None:
     fixture = await _setup(db_session_factory, db_engine)
@@ -98,7 +98,7 @@ async def test_a_live_signal_of_an_active_version_is_a_candidate(
         version_id=fixture.version_id,
         market_id=fixture.perp_market_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     screened = await _screen(db_session_factory, fixture)
     assert len(screened) == 1
@@ -124,6 +124,42 @@ async def test_research_only_is_refused_at_the_door(
     assert [item.refused for item in screened] == ["research_only"]
 
 
+async def test_a_live_signal_is_refused_live_forbidden(
+    db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
+) -> None:
+    """``live`` é Fase 4; ``ENABLE_LIVE_TRADING=false`` — refused by name, not
+    merely ``research_only``, so an operator sees *why* (D10, matching
+    ``admission.sources``)."""
+    fixture = await _setup(db_session_factory, db_engine)
+    await shadow.emit_signal(
+        db_engine,
+        version_id=fixture.version_id,
+        market_id=fixture.perp_market_id,
+        source_bar_close=BAR,
+        purpose="live",
+    )
+    screened = await _screen(db_session_factory, fixture)
+    assert [item.refused for item in screened] == ["live_forbidden"]
+
+
+async def test_an_unknown_purpose_is_refused_unknown_purpose(
+    db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
+) -> None:
+    """A purpose label the bridge does not recognise is refused by name, not
+    silently passed through as ``research_only`` (D10: one spelling of
+    ``"paper"``, everything else fails closed)."""
+    fixture = await _setup(db_session_factory, db_engine)
+    await shadow.emit_signal(
+        db_engine,
+        version_id=fixture.version_id,
+        market_id=fixture.perp_market_id,
+        source_bar_close=BAR,
+        purpose="definitely_not_a_real_purpose",
+    )
+    screened = await _screen(db_session_factory, fixture)
+    assert [item.refused for item in screened] == ["unknown_purpose"]
+
+
 async def test_a_signal_of_an_inactive_version_is_refused(
     db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
 ) -> None:
@@ -133,7 +169,7 @@ async def test_a_signal_of_an_inactive_version_is_refused(
         version_id=fixture.version_id,
         market_id=fixture.perp_market_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     screened = await _screen(db_session_factory, fixture)
     assert [item.refused for item in screened] == ["version_inactive"]
@@ -149,7 +185,7 @@ async def test_without_a_beta_the_signal_is_refused_beta_unavailable(
         version_id=fixture.version_id,
         market_id=fixture.perp_market_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     screened = await _screen(db_session_factory, fixture)
     assert [item.refused for item in screened] == ["beta_unavailable"]
@@ -164,7 +200,7 @@ async def test_a_spot_pair_below_the_floor_is_refused(
         version_id=fixture.version_id,
         market_id=fixture.perp_market_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     screened = await _screen(db_session_factory, fixture)
     assert [item.refused for item in screened] == ["spot_volume_below_floor"]
@@ -181,7 +217,7 @@ async def test_a_spot_pair_without_a_measured_volume_is_refused_unavailable(
         version_id=fixture.version_id,
         market_id=fixture.perp_market_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     screened = await _screen(db_session_factory, fixture)
     assert [item.refused for item in screened] == ["spot_volume_unavailable"]
@@ -198,7 +234,7 @@ async def test_an_expired_entry_window_is_refused(
         version_id=fixture.version_id,
         market_id=fixture.perp_market_id,
         source_bar_close=late_bar,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     screened = await _screen(db_session_factory, fixture)
     assert [item.refused for item in screened] == ["entry_window_closed"]
@@ -236,7 +272,7 @@ async def test_a_position_closing_in_the_same_coin_refuses_duplicate_position(
         version_id=fixture.version_id,
         market_id=fixture.perp_market_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     await _insert_coin_position(db_engine, fixture, is_residual=False)
     screened = await _screen(db_session_factory, fixture)
@@ -257,7 +293,7 @@ async def test_a_scaled_perpetual_maps_to_its_spot_pair_and_scales_the_geometry(
         version_id=fixture.version_id,
         market_id=scaled_perp_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
         entry_ref=Decimal(100_000),
         stop=Decimal(97_500),
         target=Decimal(105_000),
@@ -305,7 +341,7 @@ async def test_a_perpetual_with_no_known_scale_mapping_is_refused_spot_pair_unav
         version_id=fixture.version_id,
         market_id=market_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     screened = await _screen(db_session_factory, fixture)
     assert [item.refused for item in screened] == ["spot_pair_unavailable"]
@@ -324,7 +360,7 @@ async def test_a_paused_agent_is_refused_agent_unavailable_with_no_request_and_n
         version_id=fixture.version_id,
         market_id=fixture.perp_market_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     screened = await _screen(db_session_factory, fixture)
     assert [item.refused for item in screened] == ["agent_unavailable"]
@@ -349,7 +385,7 @@ async def test_a_residual_position_in_the_same_coin_does_not_refuse(
         version_id=fixture.version_id,
         market_id=fixture.perp_market_id,
         source_bar_close=BAR,
-        purpose=shadow.PURPOSE_LIVE,
+        purpose=shadow.PURPOSE_PAPER,
     )
     await _insert_coin_position(db_engine, fixture, is_residual=True)
     screened = await _screen(db_session_factory, fixture)
