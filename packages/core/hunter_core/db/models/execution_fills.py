@@ -28,6 +28,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -36,6 +37,7 @@ from hunter_core.db.base import Base, TenantMixin, UUIDPrimaryKeyMixin
 from hunter_core.db.models._common import (
     JSONB_EMPTY,
     JSONB_EMPTY_LIST,
+    SQL_FALSE,
     SQL_TRUE,
     org_fk,
     pg_enum,
@@ -113,8 +115,27 @@ class Position(Base, UUIDPrimaryKeyMixin, TenantMixin):
         # a closing position legitimately reaches 0 before it becomes a trade
         CheckConstraint("qty >= 0", name="qty_non_negative"),
         CheckConstraint("avg_entry_price > 0", name="avg_entry_price_positive"),
+        # ``0009_paper_geometry`` (§21.1): dust is a *closing* position and never
+        # an open one. An ``open`` row claiming to be residual would be a
+        # position the wallet believes it holds and no reader counts — the worst
+        # of both; a ``closed`` one holds nothing, so it has no dust to declare.
+        CheckConstraint(
+            "NOT is_residual OR status = 'closing'", name="residual_is_a_closing_position"
+        ),
         Index("ix_positions_org_portfolio_status", "organization_id", "portfolio_id", "status"),
         Index("ix_positions_market_status", "market_id", "status"),
+        # The "live positions" question every reader of slots, exposure and
+        # duplicate-market refusal actually asks, now that dust is none of the
+        # three. Leads with ``organization_id`` because §1 requires it of every
+        # composite index on a tenant table; Alembic never compares an index
+        # *predicate* (§17.3), so ``test_schema_paper.py`` reads
+        # ``pg_indexes.indexdef`` rather than trusting ``alembic check``.
+        Index(
+            "ix_positions_org_portfolio_live",
+            "organization_id",
+            "portfolio_id",
+            postgresql_where=text("status <> 'closed' AND NOT is_residual"),
+        ),
     )
 
     portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
@@ -137,6 +158,22 @@ class Position(Base, UUIDPrimaryKeyMixin, TenantMixin):
     status: Mapped[PositionStatus] = mapped_column(
         pg_enum("position_status"), server_default=PositionStatus.OPEN.value
     )
+    is_residual: Mapped[bool] = mapped_column(server_default=SQL_FALSE)
+    """The leftover is dust: below the venue's minimum, unsellable at any price.
+
+    A spot buy pays its fee in the coin, so the sellable quantity is almost never
+    a multiple of ``step_size`` and a few ten-thousandths stay behind. They are
+    **not a position**: they hold no slot, count as no exposure and make no
+    market a duplicate — and they stay **visible and valued** at the mark, never
+    zeroed as if they had been sold (``review-T3.5.md`` item 3, RISK_ENGINE.md
+    §10). Before this column the same row was ``closing`` with ``qty > 0``, which
+    every reader of live positions counted: a slot held for ever, four hours
+    after the stop, and the next order in that coin refused as a duplicate.
+
+    It is a *state of the leftover*, not a second lifecycle: the position is
+    still ``closing`` (the CHECK says so) and settles when the accumulated dust
+    of the coin reaches ``min_qty`` and a later exit carries it out."""
+
     opened_at: Mapped[datetime] = mapped_column(server_default=func.now())
     closed_at: Mapped[datetime | None]
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())

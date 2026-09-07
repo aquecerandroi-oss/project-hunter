@@ -29,7 +29,7 @@ from hunter_core.admission.reservation import (
     ReservationRepository,
     reserved_cash_for,
 )
-from hunter_core.admission.sources import admission_key, request_digest
+from hunter_core.admission.sources import admission_key, request_digest, request_payload
 from hunter_core.audit import AuditEvent, SqlAuditSink
 from hunter_core.domain.enums import (
     ParticipationEntryKind,
@@ -128,14 +128,22 @@ async def insert_proposal(
         "created": as_of,
         "expires": as_of + RESERVATION_TTL if approved else None,
         "digest": request_digest(request, source),
+        # ``0009_paper_geometry`` (§21.1): the archived geometry is not an
+        # API-only column. A proposal the engine writes carries its inputs in the
+        # decision it arrives with, but writing them here too is what makes
+        # "recompute the digest from the payload" true of *every* row rather than
+        # only of the ones a person filed — and it is what
+        # ``notes-T3.14.md`` §5.2 registered as missing on the bridge's path.
+        "payload": json.dumps(request_payload(request)),
     }
     statement = text(
         "INSERT INTO trade_proposals (id, organization_id, portfolio_id, agent_id, signal_id, "
         "market_id, direction, requested_risk_pct, status, risk_decision, rejection_reason, "
-        "kill_switch_snapshot, idempotency_key, request_digest, source, created_at, decided_at, "
-        "expires_at) VALUES (:id, :org, :pf, :agent, :signal, :market, :direction, :risk_pct, "
-        ":status, CAST(:decision AS jsonb), :reason, CAST(:snapshot AS jsonb), :key, :digest, "
-        ":source, :created, :created, :expires)"
+        "kill_switch_snapshot, idempotency_key, request_digest, request_payload, source, "
+        "created_at, decided_at, expires_at) VALUES (:id, :org, :pf, :agent, :signal, :market, "
+        ":direction, :risk_pct, :status, CAST(:decision AS jsonb), :reason, "
+        "CAST(:snapshot AS jsonb), :key, :digest, CAST(:payload AS jsonb), :source, :created, "
+        ":created, :expires)"
     )
     try:
         async with session.begin_nested():

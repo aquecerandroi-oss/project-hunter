@@ -40,6 +40,7 @@ def _row(
         base_asset="HTR",
         quote_asset="USDT",
         direction=direction,
+        status="open",
         qty=qty,
         avg_entry_price=entry,
         stop_price=stop,

@@ -28,6 +28,7 @@ import sys
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -2514,10 +2515,13 @@ async def test_the_app_files_a_request_and_the_engine_is_the_one_that_decides(
         await connection.execute(
             text(
                 "INSERT INTO trade_proposals (id, organization_id, portfolio_id, market_id, "
-                "direction, status, idempotency_key, source, request_digest) VALUES "
-                "(:id, :org, :pf, :market, 'long', 'pending', :key, 'manual', :digest)"
+                "direction, status, idempotency_key, source, request_payload) VALUES "
+                "(:id, :org, :pf, :market, 'long', 'pending', :key, 'manual', "
+                "CAST(:payload AS jsonb))"
             ),
-            {**request, "id": proposal_id, "digest": "sha256:" + uuid.uuid4().hex},
+            # Since ``0009_paper_geometry`` a filed request carries its geometry
+            # and never its own proof: ``request_digest`` here is refused.
+            {**request, "id": proposal_id, "payload": json.dumps(_geometry(wallet))},
         )
         await connection.commit()
     finally:
@@ -2925,3 +2929,331 @@ async def test_the_audited_move_guard_still_proves_the_same_transition(
                 text("UPDATE portfolios SET kill_switch_state = 'WARNING' WHERE id = :id"),
                 {"id": wallet.portfolio_id},
             )
+
+
+# --------------------------------------------------------------------------
+# Geometry and dust — DATABASE.md §21 (``0009_paper_geometry``)
+# --------------------------------------------------------------------------
+
+
+def _geometry(wallet: Wallet, **overrides: Any) -> dict[str, Any]:
+    """The eight keys of ``trade_proposals.request_payload`` (§21.1).
+
+    Spelled out here instead of imported from
+    ``hunter_core.admission.sources.request_payload``: these tests exist to check
+    what the *database* accepts, so agreeing with the writer by construction
+    would prove nothing about the CHECK.
+    """
+    return {
+        "client_key": f"operator-{uuid.uuid4().hex[:8]}",
+        "market_id": str(wallet.market_id),
+        "direction": "long",
+        "entry_ref": "100",
+        "stop": "97.5",
+        "target": None,
+        "requested_notional": None,
+        "assumed_costs": {"spread_bps": "2", "slippage_bps": "5", "fee_bps": "4"},
+        **overrides,
+    }
+
+
+_JSONB_COLUMNS = ("request_payload", "kill_switch_snapshot", "risk_decision")
+
+
+async def _file(connection: AsyncConnection, wallet: Wallet, **columns: Any) -> uuid.UUID:
+    """File one manual request as the API, with ``columns`` spliced in."""
+    proposal_id = uuid7()
+    extra: dict[str, Any] = {"request_payload": json.dumps(_geometry(wallet)), **columns}
+    names = ", ".join(extra)
+    values = ", ".join(
+        f"CAST(:{name} AS jsonb)" if name in _JSONB_COLUMNS else f":{name}" for name in extra
+    )
+    await connection.execute(
+        # S608: the only interpolated fragments are column *names* chosen by the
+        # test itself and the matching ``:name`` placeholders. Every value is a
+        # bound parameter.
+        text(
+            "INSERT INTO trade_proposals (id, organization_id, portfolio_id, market_id, "  # noqa: S608
+            f"direction, status, idempotency_key, source, {names}) VALUES "
+            f"(:id, :org, :pf, :market, 'long', 'pending', :key, 'manual', {values})"
+        ),
+        {
+            "id": proposal_id,
+            "org": wallet.org_id,
+            "pf": wallet.portfolio_id,
+            "market": wallet.market_id,
+            "key": f"idem-{uuid.uuid4().hex[:8]}",
+            **extra,
+        },
+    )
+    return proposal_id
+
+
+async def _position(
+    connection: AsyncConnection, wallet: Wallet, *, status: str, residual: bool
+) -> uuid.UUID:
+    position_id = uuid7()
+    await connection.execute(
+        text(
+            "INSERT INTO positions (id, organization_id, portfolio_id, market_id, direction, "
+            "qty, avg_entry_price, status, is_residual) VALUES (:id, :org, :pf, :market, "
+            "'long', 0.000482, 100, CAST(:status AS position_status), :residual)"
+        ),
+        {
+            "id": position_id,
+            "org": wallet.org_id,
+            "pf": wallet.portfolio_id,
+            "market": wallet.market_id,
+            "status": status,
+            "residual": residual,
+        },
+    )
+    return position_id
+
+
+async def test_a_request_the_api_files_without_its_geometry_is_refused(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """§21.2: a request with no ``request_payload`` can never be decided.
+
+    This is ``notes-T3.5.md`` §5.1 turned into a refusal. Before the column, the
+    execution worker could only log ``pending_request_without_geometry`` once a
+    second, for ever, because ``entry_ref``, ``stop`` and ``assumed_costs``
+    existed nowhere in the schema. A row that arrives without them is not a
+    request the engine can answer, so the schema stops accepting one.
+    """
+    wallet, _other = wallets
+    connection = await _as(schema_engine, _AS_APP, wallet.org_id)
+    try:
+        with pytest.raises(DBAPIError, match="with no request_payload"):
+            await connection.execute(
+                text(
+                    "INSERT INTO trade_proposals (id, organization_id, portfolio_id, "
+                    "market_id, direction, status, idempotency_key, source) VALUES "
+                    "(:id, :org, :pf, :market, 'long', 'pending', :key, 'manual')"
+                ),
+                {
+                    "id": uuid7(),
+                    "org": wallet.org_id,
+                    "pf": wallet.portfolio_id,
+                    "market": wallet.market_id,
+                    "key": f"idem-{uuid.uuid4().hex[:8]}",
+                },
+            )
+    finally:
+        await connection.rollback()
+        await connection.close()
+
+
+async def test_the_api_may_not_write_the_proof_of_its_own_request(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """§21.2 (S1 of the ``0007`` security review): the digest is the engine's.
+
+    ``request_digest`` is what *proves* two requests are the same one, and the
+    engine read it back with ``coalesce(request_digest, ...)`` — so a caller that
+    chose the proof could make a different order replay as an earlier decision.
+    ``kill_switch_snapshot`` is the same shape of lie one level up: it records
+    the scopes a decision was taken **under**, and a filed request has been
+    decided under nothing.
+    """
+    wallet, _other = wallets
+    forged: tuple[dict[str, Any], ...] = (
+        {"request_digest": "sha256:" + uuid.uuid4().hex},
+        {"kill_switch_snapshot": '{"effective": "ACTIVE", "blocks_entries": false}'},
+    )
+    for columns in forged:
+        connection = await _as(schema_engine, _AS_APP, wallet.org_id)
+        try:
+            with pytest.raises(DBAPIError, match="carrying its own proof"):
+                await _file(connection, wallet, **columns)
+        finally:
+            await connection.rollback()
+            await connection.close()
+
+
+async def test_a_geometry_missing_a_key_or_holding_a_json_number_is_refused(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """§21.1: eight keys, all present, money as JSON **strings**.
+
+    Three malformations, and the first is why the CHECK carries a ``coalesce``:
+    ``jsonb_typeof`` of an absent key is SQL ``NULL``, a CHECK is *satisfied* by
+    ``NULL``, and the first version of this constraint accepted a payload with no
+    ``target`` at all (measured on Postgres 16, before this test existed). The
+    second is the ``Decimal`` discipline at the storage boundary — a JSON number
+    returns as a float through most parsers, and a price that comes back as
+    ``0.30000000000000004`` is what the convention exists to prevent.
+    """
+    wallet, _other = wallets
+    honest = _geometry(wallet)
+    malformed: tuple[dict[str, Any], ...] = (
+        {key: value for key, value in honest.items() if key != "target"},
+        {**honest, "entry_ref": 100},
+        {**honest, "assumed_costs": "none"},
+    )
+    for payload in malformed:
+        connection = await _as(schema_engine, _AS_APP, wallet.org_id)
+        try:
+            with pytest.raises(DBAPIError, match="request_payload_is_a_geometry"):
+                await _file(connection, wallet, request_payload=json.dumps(payload))
+        finally:
+            await connection.rollback()
+            await connection.close()
+
+
+async def test_the_honest_request_is_accepted_and_carries_what_the_engine_needs(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """The other half of the guard: it blesses the shape the API actually files."""
+    wallet, _other = wallets
+    connection = await _as(schema_engine, _AS_APP, wallet.org_id)
+    try:
+        proposal_id = await _file(connection, wallet)
+        await connection.commit()
+    finally:
+        await connection.close()
+
+    async with schema_engine.connect() as reader:
+        row = (
+            await reader.execute(
+                text(
+                    "SELECT request_payload, request_digest, status::text AS status "
+                    "FROM trade_proposals WHERE id = :id"
+                ),
+                {"id": proposal_id},
+            )
+        ).one()
+    assert row.status == "pending"
+    assert row.request_digest is None, "the API stamped a proof it may not stamp"
+    assert set(row.request_payload) == {
+        "client_key",
+        "market_id",
+        "direction",
+        "entry_ref",
+        "stop",
+        "target",
+        "requested_notional",
+        "assumed_costs",
+    }
+    assert row.request_payload["entry_ref"] == "100"
+
+
+async def test_dust_is_only_ever_a_closing_position(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """§21.1: ``NOT is_residual OR status = 'closing'``.
+
+    An ``open`` position claiming to be dust would be a position the wallet
+    believes it holds and no reader counts — the worst of both. A ``closed`` one
+    holds nothing, so it has no residual to declare.
+    """
+    wallet, _other = wallets
+    for status in ("open", "closed"):
+        with pytest.raises(DBAPIError, match="residual_is_a_closing_position"):
+            async with schema_engine.begin() as connection:
+                await _position(connection, wallet, status=status, residual=True)
+
+
+async def test_dust_leaves_the_live_positions_index_without_leaving_the_wallet(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """``review-T3.5.md`` item 3: the residual keeps its quantity and loses its slot.
+
+    Reproduced as the bug was: a stop leaves 0,000482 unsellable units behind,
+    the position stays ``closing`` with ``qty > 0``, and every reader of live
+    positions counts it — a slot held for ever, four hours later, and the next
+    order in that coin refused as a duplicate. With ``is_residual`` the row is
+    still there, still holding its quantity to be valued at the mark, and no
+    longer live.
+    """
+    wallet, _other = wallets
+    async with schema_engine.begin() as connection:
+        live = await _position(connection, wallet, status="open", residual=False)
+        dust = await _position(connection, wallet, status="closing", residual=True)
+
+    async with schema_engine.connect() as reader:
+        counted = list(
+            await reader.scalars(
+                text(
+                    "SELECT id FROM positions WHERE organization_id = :org "
+                    "AND portfolio_id = :pf AND status <> 'closed' AND NOT is_residual"
+                ),
+                {"org": wallet.org_id, "pf": wallet.portfolio_id},
+            )
+        )
+        remaining = await reader.scalar(
+            text("SELECT qty FROM positions WHERE id = :id"), {"id": dust}
+        )
+    assert counted == [live], "the dust is still counted as a live position"
+    assert remaining == Decimal("0.0004820000"), "the residual was quitted as if sold"
+
+
+async def test_the_live_positions_index_carries_the_predicate_its_readers_use(
+    schema_engine: AsyncEngine,
+) -> None:
+    """Alembic never compares an index **predicate** (§17.3), so read the catalogue.
+
+    An index left with the old predicate would not be reported as drift and would
+    be serving the wrong question — the failure mode §17.3 records for
+    ``uq_opportunities_open_per_market``.
+    """
+    async with schema_engine.connect() as connection:
+        definition = await connection.scalar(
+            text("SELECT indexdef FROM pg_indexes WHERE indexname = :name"),
+            {"name": "ix_positions_org_portfolio_live"},
+        )
+    assert definition is not None, "the live-positions index is missing"
+    assert "organization_id, portfolio_id" in definition
+    assert "NOT is_residual" in definition
+    assert "status <> 'closed'" in definition
+
+
+async def test_org_a_cannot_read_org_bs_geometry_or_its_dust(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """The isolation test, on the two columns ``0009`` adds.
+
+    ``request_payload`` is the most sensitive thing a proposal has ever carried —
+    it is the operator's order, price and stop, before any decision — and
+    ``is_residual`` says what a wallet still holds. Both live on tables that were
+    already tenant-scoped, so nothing new had to be switched on; this proves that
+    is true rather than assuming a column inherits it.
+    """
+    first, second = wallets
+    async with schema_engine.begin() as connection:
+        for wallet in (first, second):
+            await _file(connection, wallet)
+            await _position(connection, wallet, status="closing", residual=True)
+
+    connection = await _as(schema_engine, _AS_APP, first.org_id)
+    try:
+        payloads = list(
+            await connection.scalars(
+                text(
+                    "SELECT request_payload ->> 'client_key' FROM trade_proposals "
+                    "WHERE request_payload IS NOT NULL"
+                )
+            )
+        )
+        theirs = await connection.scalar(
+            text(
+                "SELECT count(*) FROM trade_proposals WHERE portfolio_id = :pf "
+                "AND request_payload IS NOT NULL"
+            ),
+            {"pf": second.portfolio_id},
+        )
+        dust_here = await connection.scalar(
+            text("SELECT count(*) FROM positions WHERE is_residual")
+        )
+        dust_there = await connection.scalar(
+            text("SELECT count(*) FROM positions WHERE is_residual AND portfolio_id = :pf"),
+            {"pf": second.portfolio_id},
+        )
+    finally:
+        await connection.rollback()
+        await connection.close()
+
+    assert len(payloads) == 1, "another organization's request geometry is readable"
+    assert theirs == 0, "trade_proposals leaked another organization's payload"
+    assert (dust_here, dust_there) == (1, 0), "positions leaked another organization's dust"

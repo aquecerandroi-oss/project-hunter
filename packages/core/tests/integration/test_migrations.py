@@ -37,7 +37,7 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0008_paper_roles_2"
+HEAD_REVISION = "0009_paper_geometry"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -48,6 +48,7 @@ OUTBOX_INDEX_REVISION = "0004_outbox_pending_index"
 LOCK_GRANT_REVISION = "0005_baseline_lock_grant"
 PAPER_WALLET_REVISION = "0006_paper_wallet"
 PAPER_ROLES_REVISION = "0007_paper_roles"
+PAPER_ROLES_2_REVISION = "0008_paper_roles_2"
 
 _PENDING_PREDICATE = "dispatched_at IS NULL"
 """What makes an index a *pending* index, spelled out here rather than imported:
@@ -1510,3 +1511,295 @@ def test_0008_widens_both_kill_switch_guards_to_the_motive(upgraded: str) -> Non
         condition = asyncio.run(_trigger_condition(upgraded, trigger))
         assert "kill_switch_state" in condition, (trigger, condition)
         assert "kill_switch_reason" in condition, (trigger, condition)
+
+
+# --------------------------------------------------------------------------
+# 0009_paper_geometry — the geometry of a request, and the dust that is not one
+# --------------------------------------------------------------------------
+
+
+_GEOMETRY = json.dumps(
+    {
+        "client_key": "operator-0009",
+        "market_id": "00000000-0000-7000-8000-000000000009",
+        "direction": "long",
+        "entry_ref": "100",
+        "stop": "97.5",
+        "target": None,
+        "requested_notional": None,
+        "assumed_costs": {"spread_bps": "2", "slippage_bps": "5", "fee_bps": "4"},
+    }
+)
+"""One well-formed ``request_payload``, written out rather than imported from
+``hunter_core.admission.sources`` so the migration is checked against the
+contract and not against the writer that happens to implement it."""
+
+
+def _wallet_with_a_market(url: str, slug: str) -> dict[str, uuid.UUID]:
+    """A tenant, one wallet and one market — enough to file a request on."""
+    ids = _tenant(url, slug, portfolios=1)
+    ids["exchange"], ids["market"] = uuid7(), uuid7()
+    asyncio.run(
+        _write(
+            url,
+            [
+                (
+                    "INSERT INTO exchanges (id, code, name) VALUES (:id, :code, 'Probe')",
+                    {"id": ids["exchange"], "code": f"probe-{slug}"},
+                ),
+                (
+                    "INSERT INTO markets (id, exchange_id, symbol, market_type) "
+                    "VALUES (:id, :exchange, :symbol, 'spot')",
+                    {
+                        "id": ids["market"],
+                        "exchange": ids["exchange"],
+                        "symbol": f"S{slug.upper()[:8]}",
+                    },
+                ),
+            ],
+        )
+    )
+    return ids
+
+
+def _forget_market(url: str, ids: Mapping[str, uuid.UUID]) -> None:
+    asyncio.run(
+        _write(
+            url,
+            [
+                ("DELETE FROM markets WHERE id = :id", {"id": ids["market"]}),
+                ("DELETE FROM exchanges WHERE id = :id", {"id": ids["exchange"]}),
+            ],
+        )
+    )
+
+
+async def _column_exists(url: str, table: str, column: str) -> bool:
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            return bool(
+                await connection.scalar(
+                    text(
+                        "SELECT count(*) FROM information_schema.columns "
+                        "WHERE table_name = :table AND column_name = :column"
+                    ),
+                    {"table": table, "column": column},
+                )
+            )
+    finally:
+        await engine.dispose()
+
+
+async def _index_definition(url: str, name: str) -> str:
+    """``pg_indexes.indexdef`` — Alembic never compares an index predicate (§17.3)."""
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            definition = await connection.scalar(
+                text("SELECT indexdef FROM pg_indexes WHERE indexname = :name"), {"name": name}
+            )
+            return str(definition or "")
+    finally:
+        await engine.dispose()
+
+
+async def _function_source(url: str, name: str) -> str:
+    """The body of a trigger function, read from ``pg_proc``.
+
+    Alembic never compares a function, so the catalogue is the only honest
+    source — the same reason §17.3 reads ``pg_indexes.indexdef``.
+    """
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            source = await connection.scalar(
+                text("SELECT prosrc FROM pg_proc WHERE proname = :name LIMIT 1"), {"name": name}
+            )
+            return str(source or "")
+    finally:
+        await engine.dispose()
+
+
+def test_0009_adds_the_geometry_the_dust_flag_and_the_live_index(upgraded: str) -> None:
+    """The two columns, their CHECKs and the partial index exist at head.
+
+    ``request_payload`` closes ``notes-T3.5.md`` §5.1 (a filed request that could
+    be identified and never decided) and ``is_residual`` closes item 3 of
+    ``review-T3.5.md`` (dust holding a slot for ever). The index is what the
+    live-position readers need once their predicate grows a term.
+    """
+    assert asyncio.run(_column_exists(upgraded, "trade_proposals", "request_payload"))
+    assert asyncio.run(_column_exists(upgraded, "positions", "is_residual"))
+    definition = asyncio.run(_index_definition(upgraded, "ix_positions_org_portfolio_live"))
+    assert "NOT is_residual" in definition, definition
+    assert "status <> 'closed'" in definition, definition
+
+
+def test_0009_teaches_the_request_guard_to_demand_geometry_and_refuse_a_proof(
+    upgraded: str,
+) -> None:
+    """§21.2: the guard body names the payload and the two forged columns.
+
+    Read from ``pg_proc`` rather than asserted through a statement here because
+    ``test_schema_paper.py`` already runs the refusals as the real role; what
+    this adds is that the **migration** installed the ``0009`` body and not
+    ``0007``'s, which is the copy §21.4 freezes.
+    """
+    body = asyncio.run(_function_source(upgraded, "trade_proposals_the_app_only_files_requests"))
+    assert "NEW.request_payload IS NULL" in body
+    assert "NEW.request_digest IS NOT NULL" in body
+    assert "NEW.kill_switch_snapshot" in body
+    # 0007's clause is still there: this revision extends the guard, never
+    # replaces what it already refused.
+    assert "carrying a decision" in body
+
+
+def test_0009_refuses_to_downgrade_while_a_request_carries_its_geometry(
+    upgraded: str,
+) -> None:
+    """Reversing is allowed; making every pending request undecidable is not.
+
+    Dropping ``request_payload`` from a database that holds one puts the wallet
+    back exactly where ``notes-T3.5.md`` §5.1 found it — a filed order the
+    engine can see and never answer — and nothing in the remaining columns can
+    reconstruct what a person typed. So the guard counts them and names them.
+    """
+    config = alembic_config(upgraded)
+    slug = f"geo-{uuid.uuid4().hex[:8]}"
+    ids = _wallet_with_a_market(upgraded, slug)
+    proposal = uuid7()
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (
+                    "INSERT INTO trade_proposals (id, organization_id, portfolio_id, market_id, "
+                    "direction, status, idempotency_key, source, request_payload) VALUES "
+                    "(:id, :org, :pf, :m, 'long', 'pending', :key, 'manual', "
+                    "CAST(:payload AS jsonb))",
+                    {
+                        "id": proposal,
+                        "org": ids["org"],
+                        "pf": ids["portfolio_0"],
+                        "m": ids["market"],
+                        "key": f"manual:{slug}",
+                        "payload": _GEOMETRY,
+                    },
+                )
+            ],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="carry a request_payload"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        _drop_tenant(upgraded, ids["org"])
+        _forget_market(upgraded, ids)
+    command.check(config)
+
+
+def test_0009_refuses_to_downgrade_while_a_position_is_marked_as_dust(
+    upgraded: str,
+) -> None:
+    """Dropping ``is_residual`` makes dust a live position again.
+
+    Which is precisely the state ``review-T3.5.md`` item 3 reproduced four hours
+    after a stop: a slot held for ever, exposure that is not exposure, and the
+    next order in that coin refused as a duplicate. Losing the column loses the
+    distinction, and "the migration reversed cleanly" would be the only report
+    of it.
+    """
+    config = alembic_config(upgraded)
+    slug = f"dust-{uuid.uuid4().hex[:8]}"
+    ids = _wallet_with_a_market(upgraded, slug)
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (
+                    "INSERT INTO positions (id, organization_id, portfolio_id, market_id, "
+                    "direction, qty, avg_entry_price, status, is_residual) VALUES "
+                    "(:id, :org, :pf, :m, 'long', 0.000482, 100, 'closing', true)",
+                    {
+                        "id": uuid7(),
+                        "org": ids["org"],
+                        "pf": ids["portfolio_0"],
+                        "m": ids["market"],
+                    },
+                )
+            ],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="marked as residual dust"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    finally:
+        _drop_tenant(upgraded, ids["org"])
+        _forget_market(upgraded, ids)
+    command.check(config)
+
+
+def test_0009_reverses_on_a_populated_database_and_gives_0007s_guard_back(
+    upgraded: str,
+) -> None:
+    """The round trip, over a wallet with rows that do **not** trip either guard.
+
+    A tenant, a wallet, a market, a request with no payload and a position that
+    is not dust: everything the revision touches, populated, and none of it an
+    obligation the guards protect. Down one, up to head, and ``alembic check``
+    at the end — plus the half a privilege test cannot see, which is that the
+    downgrade restores the guard ``0007`` describes rather than leaving ``0009``'s
+    body pointing at a column that no longer exists.
+    """
+    config = alembic_config(upgraded)
+    slug = f"trip-{uuid.uuid4().hex[:8]}"
+    ids = _wallet_with_a_market(upgraded, slug)
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (
+                    "INSERT INTO trade_proposals (id, organization_id, portfolio_id, market_id, "
+                    "direction, status, idempotency_key, source) VALUES "
+                    "(:id, :org, :pf, :m, 'long', 'pending', :key, 'manual')",
+                    {
+                        "id": uuid7(),
+                        "org": ids["org"],
+                        "pf": ids["portfolio_0"],
+                        "m": ids["market"],
+                        "key": f"manual:{slug}",
+                    },
+                ),
+                (
+                    "INSERT INTO positions (id, organization_id, portfolio_id, market_id, "
+                    "direction, qty, avg_entry_price, status) VALUES "
+                    "(:id, :org, :pf, :m, 'long', 1.5, 100, 'open')",
+                    {
+                        "id": uuid7(),
+                        "org": ids["org"],
+                        "pf": ids["portfolio_0"],
+                        "m": ids["market"],
+                    },
+                ),
+            ],
+        )
+    )
+    try:
+        command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == PAPER_ROLES_2_REVISION
+        assert not asyncio.run(_column_exists(upgraded, "trade_proposals", "request_payload"))
+        assert not asyncio.run(_column_exists(upgraded, "positions", "is_residual"))
+        reverted = asyncio.run(
+            _function_source(upgraded, "trade_proposals_the_app_only_files_requests")
+        )
+        assert "request_payload" not in reverted, "0009's body survived its own downgrade"
+        assert "carrying a decision" in reverted, "0007's guard did not come back"
+    finally:
+        command.upgrade(config, "head")
+        _drop_tenant(upgraded, ids["org"])
+        _forget_market(upgraded, ids)
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)

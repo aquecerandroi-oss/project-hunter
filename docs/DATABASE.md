@@ -2800,7 +2800,8 @@ API pede, lê e autoriza pessoas.**
 
 O que vale **depois** da `0007` — e, nas duas linhas marcadas **`0008`**, depois
 da `0008_paper_roles_2` (§20), que é a única revisão posterior a mexer nesta
-tabela. Ela é mantida **vigente** aqui, no lugar de ser congelada e reescrita numa
+tabela — a `0009_paper_geometry` acrescenta colunas às tabelas abaixo e **nenhum
+privilégio** (§21.5), então esta tabela continua vigente como está. Ela é mantida **vigente** aqui, no lugar de ser congelada e reescrita numa
 seção nova: quem pergunta "quem pode escrever isto?" tem uma tabela para ler, não
 uma cadeia de revisões para somar. O que cada revisão *fez* continua nas listas
 congeladas de `ddl/`.
@@ -2944,7 +2945,10 @@ uma proposta **recusada** só podia ser comparado com as quatro colunas que est�
 gravadas (carteira, mercado, direção, origem), então um segundo pedido diferente
 que reusasse a chave voltava como a recusa do primeiro (T3.12, pendência 1). É
 anulável porque uma proposta escrita antes desta revisão genuinamente não tem
-digest, e string vazia alegaria um.
+digest, e string vazia alegaria um. **Desde a `0009_paper_geometry` (§21.2) ele é
+nulo em toda linha que a API arquiva**, e por trigger: a API calcula o digest e o
+devolve ao chamador, o motor recomputa e grava o dele quando decide, e o que some
+é a persistência de uma prova escolhida por quem ela vincula.
 
 **`brl_unavailable_reason` e `marks_stale` são a dívida da T3.3b.** A §18.2 já
 dizia que FX indisponível deixa "o USDT apurável e o BRL indisponível **com
@@ -2981,6 +2985,12 @@ o chamador tem os privilégios da aplicação **e nada além deles**
 `status = 'pending'`, sem `risk_decision`, sem `rejection_reason`, sem
 `decided_at`, sem `admission_seq` e sem reserva (`reservation_state = 'none'`,
 `reserved_slot = false`). O motor e o operador inserem à vontade.
+
+**A `0009_paper_geometry` amplia esta trigger (§21.2), e a tabela vigente é a de
+lá.** Ela mantém a cláusula acima palavra por palavra e acrescenta duas: o pedido
+tem de **carregar** `request_payload` e não pode carregar `request_digest` nem
+`kill_switch_snapshot`. O motivo é a S1 da revisão de segurança desta revisão — a
+prova de identidade de um pedido não pode ser escolhida por quem ela vincula.
 
 **`pending`, não `requested`.** O brief desta tarefa pedia `status='requested'`;
 `proposal_status` (§7) não tem esse rótulo e ganhar um exigiria `ALTER TYPE ...
@@ -3299,3 +3309,233 @@ Nada aqui depende de estado de sessão: os grants são fato de catálogo e as du
 triggers leem só `NEW`/`OLD`, `pg_has_role` e `pg_current_xact_id()`. Sem prepared
 statement de sessão, sem `LISTEN`/`NOTIFY`, sem advisory lock de sessão — a
 serialização continua sendo a linha de `portfolio_risk_state` (§18.10, §19.7).
+
+## 21. A geometria do pedido e o pó que não é posição — M3 (`0009_paper_geometry`)
+
+Nona revisão. Duas colunas, um CHECK cada, um índice parcial e três recusas na
+trigger do pedido. Ela fecha uma lacuna **bloqueante** e um "deve corrigir" que
+três tarefas alcançaram por três caminhos diferentes:
+
+| De onde veio | O que estava impossível |
+|---|---|
+| T3.5, `.claude/state/notes-T3.5.md` §5.1 (bloqueante) | um pedido arquivado pela API **não podia ser decidido**: `trade_proposals` guarda carteira, mercado, direção, origem, chave e digest, e nenhuma coluna para `entry_ref`, `stop`, `requested_notional` ou `assumed_costs`. O execution-worker só podia registrar `pending_request_without_geometry` — uma vez por segundo, por pedido, para sempre |
+| `.claude/state/review-T3.5.md` item 3 (deve corrigir) | o **pó** do spot contava como posição viva: `closing` com `qty > 0` segura vaga, exposição e duplicidade. Reproduzido 4 h depois do stop, com a segunda ordem na moeda recusada |
+| S1 da `.claude/state/review-T3.1c-security.md` | `_REQUEST_SHAPE` (§19.4) não cobria `request_digest` nem `kill_switch_snapshot`, e o motor lia o digest de volta com `coalesce(request_digest, :digest)` — isto é, **confiava na prova escrita por quem ela existe para vincular** |
+
+`0009_paper_geometry` tem 19 caracteres; o teto de `alembic_version.version_num`
+continua sendo 32 (§17.6). As listas desta revisão estão congeladas em
+`ddl/paper_geometry.py`, no padrão de §15.6/§16.5/§17.6/§18.9/§19/§20.
+
+A frase que organiza as duas colunas: **uma coluna a menos não é simplicidade
+quando o que falta é o que a decisão precisa ler.** As duas nasceram do mesmo
+sintoma — um worker que sabe que há trabalho e não consegue fazê-lo — e as duas
+são estado durável, não cache.
+
+### 21.1 As duas colunas
+
+```
+trade_proposals  (+) request_payload JSONB NULL
+  CHECK request_payload IS NULL OR (
+        jsonb_typeof(request_payload) = 'object'
+    AND coalesce(jsonb_typeof(request_payload -> 'client_key'),         'absent') IN ('string')
+    AND coalesce(jsonb_typeof(request_payload -> 'market_id'),          'absent') IN ('string')
+    AND coalesce(jsonb_typeof(request_payload -> 'direction'),          'absent') IN ('string')
+    AND coalesce(jsonb_typeof(request_payload -> 'entry_ref'),          'absent') IN ('string')
+    AND coalesce(jsonb_typeof(request_payload -> 'stop'),               'absent') IN ('string')
+    AND coalesce(jsonb_typeof(request_payload -> 'target'),             'absent') IN ('string','null')
+    AND coalesce(jsonb_typeof(request_payload -> 'requested_notional'), 'absent') IN ('string','null')
+    AND coalesce(jsonb_typeof(request_payload -> 'assumed_costs'),      'absent') IN ('object'))
+  -- ck_trade_proposals_request_payload_is_a_geometry
+
+positions        (+) is_residual BOOLEAN NOT NULL DEFAULT false
+  CHECK NOT is_residual OR status = 'closing'   -- ck_positions_residual_is_a_closing_position
+  INDEX (organization_id, portfolio_id) WHERE status <> 'closed' AND NOT is_residual
+  -- ix_positions_org_portfolio_live
+```
+
+**Oito chaves, e todas presentes.** "Ausente" é escrito como `null` de JSON,
+nunca por omissão — a mesma escolha que `opportunity_stage` fez com `NONE` em vez
+de coluna anulável (§17.1). Um leitor não pode ter de decidir se um `target` que
+falta quer dizer "sem alvo" ou "quem escreveu esqueceu", e uma chave obrigatória
+é uma chave que a rota da T3.8 e a ponte da T3.14 preenchem **sem migração
+nova**.
+
+**Dinheiro é string de JSON**, como em todo lugar onde o projeto canonicaliza um
+número (§17.8, `model_dump(mode="json")`): um número de JSON volta como float na
+maioria dos parsers, e um preço que retorna como `0.30000000000000004` é
+exatamente o bug que a disciplina do `Decimal` existe para impedir. O CHECK
+recusa `entry_ref: 100` (número) e aceita `entry_ref: "100"`.
+
+**O `coalesce` do CHECK não é enfeite — ele é a correção de um erro medido.**
+`jsonb_typeof(payload -> 'k')` é SQL `NULL` para chave **ausente** e a string
+`'null'` para chave presente com valor JSON nulo, o que parece ser exatamente a
+distinção desejada. Não basta: **um CHECK é satisfeito quando a expressão dele
+avalia para `NULL`** ("desconhecido não é violação"), então
+`jsonb_typeof(payload -> 'target') IN ('string','null')` **aceitava um payload
+sem `target` nenhum** — reproduzido num Postgres 16 real, na primeira versão
+desta constraint, antes do teste existir. `coalesce(…, 'absent')` transforma o
+desconhecido num valor que nenhuma lista permite, e presença e tipo voltam a ser
+uma comparação só. O operador `?&` faria a metade da presença e não é usado:
+ele põe um `?` literal em DDL que vários paramstyles de DBAPI leem como
+placeholder, e ainda exigiria a metade do tipo. **Desvio declarado** em relação
+ao brief da tarefa, que pedia `jsonb_typeof`/`?&`.
+
+**O que deliberadamente não está no payload:** `organization_id`,
+`portfolio_id`, `agent_id` e `signal_id`. São **colunas**, e um payload que as
+repetisse seria uma segunda resposta para uma pergunta que a linha já responde —
+o argumento que a §19.3 faz sobre `applied_attempts`. `market_id` e `direction`
+*são* repetidos, e essa é a exceção de propósito: são o que torna o payload
+legível sozinho, e as FKs compostas da §18.3 já tornam irrepresentável um
+desacordo entre os dois.
+
+**`request_payload` é anulável, e a nulidade tem dono.** O `INSERT` do motor
+(`hunter_core.admission.record.insert_proposal`) passa a escrevê-lo também — o
+que torna "recomputar o digest a partir do payload" verdade de **toda** linha e
+não só das que uma pessoa arquivou (era a pendência §5.2 de
+`.claude/state/notes-T3.14.md`) —, mas a coluna continua anulável porque
+propostas escritas antes desta revisão genuinamente não têm geometria, e um
+objeto vazio alegaria uma. O que **não** é opcional é o pedido da API: essa é a
+trigger, não a coluna (§21.2).
+
+**`is_residual` é o pó, e o pó não é posição.** Uma compra spot paga a taxa em
+moeda, então a quantidade vendável quase nunca é múltiplo do `step_size` e
+sobram alguns décimos de milésimo abaixo do `min_qty`, invendáveis a qualquer
+preço. A decisão registrada em `review-T3.5.md` item 3 é: o resíduo **não conta
+vaga, nem exposição, nem duplicidade**, e continua **visível e valorizado** pela
+marca. O CHECK prende a marcação ao único estado que pode segurar pó: uma
+posição `open` que se declarasse resíduo seria uma posição que a carteira acha
+que tem e nenhum leitor conta — o pior dos dois lados —, e uma `closed` não
+segura nada, então não tem resíduo a declarar. O assentamento (vender o pó junto
+da próxima saída quando o acumulado da moeda alcançar `min_qty`) é do worker,
+não do schema.
+
+**O índice parcial é a pergunta que os leitores passam a fazer.**
+`(organization_id, portfolio_id) WHERE status <> 'closed' AND NOT is_residual` —
+começando por `organization_id` porque a §1 exige isso de todo índice composto de
+tabela de tenant. Como o Alembic **não compara predicado de índice** (§17.3),
+a chave e o predicado são lidos de `pg_indexes.indexdef` por
+`test_schema_paper.py`.
+
+### 21.2 Um pedido carrega a sua geometria e nunca a sua própria prova
+
+A trigger `trade_proposals_the_app_only_files_requests` (§19.4) ganha dois ramos
+e continua com o primeiro. Quando o chamador tem os privilégios da aplicação **e
+nada além deles**, a linha tem de ser um pedido:
+
+1. **sem decisão** — `source = 'manual'`, `status = 'pending'`, sem
+   `risk_decision`, `rejection_reason`, `decided_at`, `admission_seq` nem
+   reserva (a cláusula da `0007`, copiada sem mudança);
+2. **sem prova própria** — `request_digest IS NULL` e
+   `kill_switch_snapshot = '{}'`;
+3. **com geometria** — `request_payload IS NOT NULL`.
+
+**Por que a prova é do motor (S1).** O digest é o que *prova* que dois pedidos
+são o mesmo; um digest escolhido pelo chamador não vincula ninguém. O motor lia
+`coalesce(request_digest, :digest)`, então um handler — ou uma injeção dentro de
+um, na organização certa, onde a RLS diz sim — podia fazer um segundo pedido
+**diferente** voltar como a decisão do primeiro, que é exatamente o buraco que a
+§19.3 criou o digest para fechar. Agora não há o que "coalescer": a coluna chega
+nula por construção e o motor recomputa o digest a partir de `request_payload`,
+da linha e da referência de mercado, no instante em que decide.
+`kill_switch_snapshot` é a mesma mentira um nível acima — ele registra *os três
+escopos sob os quais a decisão foi tomada*, e um pedido arquivado horas antes não
+foi decidido sob nada; um snapshot fornecido pela API seria um álibi anexado a
+uma decisão que ninguém tinha tomado.
+
+**Consequência para a API, e ela não é perda.** `apps/api/.../services/admission.py`
+deixa de persistir `request_digest`. Ele continua sendo **calculado** e devolvido
+ao chamador como a identidade do que foi pedido; o que some é a persistência dele
+como prova. E o replay de uma linha **pendente** passa a ser comparado pelo
+`request_payload` arquivado (`hunter_core.admission.dedupe._payload_pair`) — a
+mesma informação um passo antes. Sem essa troca, comparar contra um digest sempre
+nulo teria transformado toda chave reutilizada num replay silencioso do primeiro
+pedido, que é o oposto do que a S1 pediu.
+
+**A trigger é derrubada e recriada, com o corpo congelado em cópia.** Ler
+`ddl.paper_roles._REQUEST_SHAPE` em tempo de migração deixaria uma edição futura
+na `0007` redefinir em silêncio o que a `0009` instala — a armadilha retroativa
+que §16.5 e §17.1 congelaram todas as outras listas para evitar. O **downgrade**
+vai no sentido oposto e chama a `create_request_guard()` da própria `0007`:
+reverter para a `0008` é ter a guarda que a `0007` descreve. Ele roda **antes** de
+a coluna cair, porque o corpo da `0009` a nomeia e o da `0007` não.
+
+### 21.3 `signal_id` já existia, e por isso não entra aqui
+
+O brief desta tarefa previa acrescentar `trade_proposals.signal_id UUID NULL
+REFERENCES agent_signals(id)` com índice, caso a T3.14 pedisse.
+**A coluna existe desde a `0001_initial_schema`** (§7), anulável, com
+`ON DELETE SET NULL` e índice próprio, e a ponte da T3.14 já a lê e escreve
+(`bridge_repo.pending_signals` usa `NOT EXISTS … trade_proposals.signal_id = s.id`
+como fila durável, e `hunter_core.admission.record.insert_proposal` a grava).
+Não há nada a migrar, e acrescentar uma segunda coluna com o mesmo nome seria
+impossível — acrescentar uma com outro nome seria a segunda verdade que o §17.8
+descreve. **Desvio declarado em relação ao brief**, e a consequência: o
+downgrade da `0009` **não tem guarda para `signal_id`**, porque esta revisão não
+o remove.
+
+### 21.4 Guardas
+
+**Não há guarda de upgrade, e isso é afirmação.** `request_payload` é anulável e
+toda linha guardada é honestamente nula; `is_residual` tem default `false` e toda
+posição guardada honestamente não é pó; o CHECK do payload só fala de valores não
+nulos e a trigger ampliada dispara só em `INSERT`. Nada que já esteja gravado
+passa a ser irrepresentável, então não há nada que um backfill honesto não
+produza. A `0002`/`0003`/`0006` param quando param porque criam invariantes sobre
+dado existente; esta não cria nenhum — a mesma afirmação da `0007` (§19.5) e da
+`0008` (§20.5).
+
+**O downgrade recusa duas coisas** (§17.7: reverter é permitido, perder obrigação
+ou distinção não é):
+
+| Guarda | O que se perderia |
+|---|---|
+| proposta com `request_payload` | a geometria que uma pessoa de fato pediu — referência de entrada, stop, teto e hipótese de custo. Não é derivável de nenhuma coluna que sobra, e **todo pedido ainda pendente vira indecidível para sempre**, que é o estado que a `notes-T3.5.md` §5.1 mediu e esta revisão encerrou |
+| posição com `is_residual` | cada pó volta a ser posição viva: segura vaga, conta como exposição e recusa a próxima ordem naquela moeda como duplicata — exatamente o que a `review-T3.5.md` item 3 reproduziu 4 h depois de um stop |
+
+Nenhuma das duas apaga nada: elas contam os infratores e recusam nomeando-os,
+com a instrução de exportar antes (o mesmo padrão e o mesmo limite da §18.9 —
+exportar não muda predicado nenhum; o downgrade de um banco com carteira viva
+não é operação de rotina).
+
+**O que não é guardado, declarado em vez de descoberto:** propostas sem payload,
+posições que não são pó, e o próprio `signal_id` (§21.3). E a trigger não tem
+guarda: reverter o corpo dela é declaração de comportamento, não fato sobre dado
+— o que volta é a *capacidade* de a API arquivar um pedido sem geometria, que é
+o estado da `0008`.
+
+### 21.5 Grants, RLS e pooler
+
+**Nenhuma classe de grant muda, e nenhuma tabela é reclassificada.** As duas
+colunas moram em tabelas que a `0001` já classificou e a `0007`/`0008` já
+estreitaram: `trade_proposals` continua `SELECT`/`INSERT` para `hunter_app` e DML
+completo para `hunter_worker`; `positions` continua **só leitura** para
+`hunter_app` desde a `0008` (§20.1) e DML completo para o motor. Um privilégio de
+tabela alcança as colunas novas por construção, então não há `GRANT` nesta
+revisão — a tabela vigente da §19.1 continua correta como está.
+
+**Nenhuma política de RLS muda**: as duas tabelas já são de tenant, com
+`organization_id NOT NULL`, RLS habilitada e forçada e `tenant_isolation` própria
+desde a `0001`. Que isso continue verdade das colunas novas é provado e não
+suposto — `test_schema_paper.py::test_org_a_cannot_read_org_bs_geometry_or_its_dust`
+lê o `request_payload` e o pó da organização A com o `app.current_org` de A e
+conta zero linhas de B.
+
+**Nada aqui depende de estado de sessão:** duas colunas, duas constraints, um
+índice parcial e uma trigger que lê só `NEW` e `pg_has_role`. Sem prepared
+statement de sessão, sem `LISTEN`/`NOTIFY`, sem advisory lock de sessão — a
+serialização continua sendo a linha de `portfolio_risk_state` (§18.10, §19.7,
+§20.6).
+
+### 21.6 O que as tarefas vizinhas têm de ajustar
+
+Declarado aqui porque nenhuma delas é deste diff (`services/**` é da T3.5b/T3.14
+e não foi tocado):
+
+| Onde | Ajuste |
+|---|---|
+| `packages/core/hunter_core/db/repositories/ledger.py` | `PositionRow.is_residual` é hoje uma **propriedade derivada** (`status == 'closing'`) com a nota "a durable `positions.is_residual` is filed for T3.1e"; passa a ler a coluna (`p.is_residual` no `SELECT`), e `open_positions` passa a filtrar `AND NOT p.is_residual` para usar `ix_positions_org_portfolio_live` |
+| `services/execution-worker/.../positions.py` | `reduce_position(dust=True)` grava `is_residual = true` junto de `status = 'closing'` |
+| `services/execution-worker/.../entry.py`, `bridge_repo.py` | as consultas de "moeda já comprometida" e de vagas acrescentam `AND NOT p.is_residual` |
+| `services/execution-worker/.../admission_cycle.py` | `pending_requests` passa a ler `request_payload`, reconstrói o `ProposalRequest` (linha + payload + `markets`) e chama `decide_pending`; `report_unreadable`/`pending_request_without_geometry` deixa de existir para a linha que tem payload |
+| `packages/core/hunter_core/admission/decide.py` | `coalesce(request_digest, :digest)` vira `:digest`: o motor recomputa e grava o seu, nunca herda o do chamador (S1) |
+| `packages/core/hunter_core/admission/sources.py` (T3.8) | `target: Decimal \| None = None` em `ProposalRequest`, incluído em `request_digest` e em `request_payload` — a chave já está reservada (§21.1) e é o pedido da `notes-T3.14.md` §5.1 |

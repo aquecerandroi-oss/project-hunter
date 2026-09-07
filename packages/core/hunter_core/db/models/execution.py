@@ -161,6 +161,32 @@ class TradeProposal(Base, UUIDPrimaryKeyMixin, TenantMixin):
             "request_digest IS NULL OR char_length(request_digest) BETWEEN 1 AND 128",
             name="request_digest_is_meaningful",
         ),
+        # ``0009_paper_geometry`` (§21.1). Eight keys, every one of them present
+        # — "absent" is JSON ``null``, never omission — and money as a JSON
+        # *string*, as everywhere else the project canonicalises a number
+        # (§17.8). The ``coalesce`` is load-bearing: a CHECK is satisfied when
+        # its expression is NULL, and ``jsonb_typeof`` of an absent key *is*
+        # NULL, so without it a payload missing ``target`` passed (measured).
+        CheckConstraint(
+            "request_payload IS NULL OR (jsonb_typeof(request_payload) = 'object' "
+            "AND coalesce(jsonb_typeof(request_payload -> 'client_key'), 'absent') "
+            "IN ('string') "
+            "AND coalesce(jsonb_typeof(request_payload -> 'market_id'), 'absent') "
+            "IN ('string') "
+            "AND coalesce(jsonb_typeof(request_payload -> 'direction'), 'absent') "
+            "IN ('string') "
+            "AND coalesce(jsonb_typeof(request_payload -> 'entry_ref'), 'absent') "
+            "IN ('string') "
+            "AND coalesce(jsonb_typeof(request_payload -> 'stop'), 'absent') "
+            "IN ('string') "
+            "AND coalesce(jsonb_typeof(request_payload -> 'target'), 'absent') "
+            "IN ('string', 'null') "
+            "AND coalesce(jsonb_typeof(request_payload -> 'requested_notional'), 'absent') "
+            "IN ('string', 'null') "
+            "AND coalesce(jsonb_typeof(request_payload -> 'assumed_costs'), 'absent') "
+            "IN ('object'))",
+            name="request_payload_is_a_geometry",
+        ),
     )
 
     portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
@@ -194,7 +220,31 @@ class TradeProposal(Base, UUIDPrimaryKeyMixin, TenantMixin):
     happen to be stored, so a second, different request reusing the key came
     back as the first one's rejection. Nullable because a proposal written
     before ``0007_paper_roles`` (and by any path that does not compute a digest)
-    genuinely has none — an empty string would claim one."""
+    genuinely has none — an empty string would claim one.
+
+    **Written by the engine, never by the API** (``0009_paper_geometry``, §21.2).
+    The digest is what *proves* two requests are the same one, and a proof
+    chosen by the caller binds nobody: the request guard now refuses an
+    ``INSERT`` by the application role that carries one, and the engine
+    recomputes it from ``request_payload``, the row and the market reference at
+    the moment it decides."""
+
+    request_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """What the operator actually asked for — the *geometry* of the request (§21.1).
+
+    ``client_key``, ``market_id``, ``direction``, ``entry_ref``, ``stop``,
+    ``target``, ``requested_notional`` and ``assumed_costs``, with every key
+    present and money as a JSON string. Before this column a request the API
+    filed could be *identified* and never *decided*: the execution worker logged
+    ``pending_request_without_geometry`` once per second because none of the
+    Risk Engine's inputs was stored anywhere (``notes-T3.5.md`` §5.1). Writing
+    them into ``risk_decision`` was not an option — the guard refuses it, and it
+    would be a decision nobody took.
+
+    Nullable, because the engine's own ``INSERT`` writes none: an agent proposal
+    arrives with its geometry already inside the decision it carries. A request
+    filed by the **API** must have one, which is the trigger's business rather
+    than the column's (§19.4, extended in §21.2)."""
 
     source: Mapped[ProposalSource] = mapped_column(
         pg_enum("proposal_source"), server_default=ProposalSource.MANUAL.value

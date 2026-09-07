@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -29,12 +30,34 @@ from hunter_risk.inputs import MarketIdentity
 
 __all__ = [
     "PURPOSE_LIVE",
+    "REQUEST_PAYLOAD_KEYS",
     "OriginRefused",
     "ProposalRequest",
     "admission_key",
     "request_digest",
+    "request_payload",
     "resolve_source",
 ]
+
+REQUEST_PAYLOAD_KEYS: tuple[str, ...] = (
+    "client_key",
+    "market_id",
+    "direction",
+    "entry_ref",
+    "stop",
+    "target",
+    "requested_notional",
+    "assumed_costs",
+)
+"""The keys of ``trade_proposals.request_payload`` — DATABASE.md §21.1.
+
+Frozen here next to the digest because the two answer the same question from
+opposite ends: the payload is *what was asked*, and the digest is the proof that
+two askings are the same one. The database holds the same eight in a CHECK
+(``ck_trade_proposals_request_payload_is_a_geometry``), deliberately written out
+there rather than imported, so a change on one side does not silently become
+true on the other.
+"""
 
 PURPOSE_LIVE = "live"
 """The only purpose that may reach the wallet. Anything else is refused by name,
@@ -106,6 +129,43 @@ def request_digest(request: ProposalRequest, source: ProposalSource) -> str:
             "agent_id": None if request.agent_id is None else str(request.agent_id),
         }
     )
+
+
+def request_payload(request: ProposalRequest) -> dict[str, Any]:
+    """The geometry archived in ``trade_proposals.request_payload`` (§21.1).
+
+    What the operator actually asked for, in the canonical form the rest of the
+    project uses for a number that has to survive a round trip: **money as a
+    JSON string**, never a JSON number, because a JSON number comes back through
+    most parsers as a float and a price that returns as ``0.30000000000000004``
+    is the whole reason ``Decimal`` is enforced at this boundary.
+
+    Every key is always present; "absent" is JSON ``null``, never omission, so a
+    reader never has to decide whether a missing ``target`` means "no target" or
+    "the writer forgot". ``target`` is null for every request M3 can build —
+    :class:`ProposalRequest` has no take-profit field, because the exit geometry
+    comes from the protection cycle — and the key exists so T3.8's form and
+    T3.14's bridge can fill it without another migration.
+
+    ``organization_id``, ``portfolio_id``, ``agent_id`` and ``signal_id`` are
+    **not** here: they are columns, and repeating them would be a second answer
+    to a question the row already answers. ``market_id`` and ``direction`` are
+    the deliberate exception — they are what makes the payload readable on its
+    own, and the composite foreign keys of §18.3 already make the two
+    disagreeing unrepresentable.
+    """
+    return {
+        "client_key": request.client_key,
+        "market_id": str(request.market_id),
+        "direction": request.direction.value,
+        "entry_ref": str(request.entry_ref),
+        "stop": str(request.stop),
+        "target": None,
+        "requested_notional": (
+            None if request.requested_notional is None else str(request.requested_notional)
+        ),
+        "assumed_costs": request.assumed_costs.model_dump(mode="json"),
+    }
 
 
 class ProposalRequest(BaseModel):

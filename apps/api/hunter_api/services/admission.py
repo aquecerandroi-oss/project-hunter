@@ -22,19 +22,32 @@ The database enforces the shape rather than trusting this module:
 ``trade_proposals_the_app_only_files_requests`` (§19.4) refuses an ``INSERT`` by
 the application role that carries a decision, a sequence or a reservation.
 
-**Blocking gap, declared and not worked around.** ``trade_proposals`` has no
-column for the *geometry* of a request — ``entry_ref``, ``stop``,
-``requested_notional`` and ``assumed_costs`` are inputs of the Risk Engine and
-none of them is persisted. A filed request can therefore be identified (key +
-``request_digest``) but **not re-decided from the row alone**, so the manual
-route is not end-to-end until a migration adds somewhere to keep it. Writing the
-geometry into ``risk_decision`` is not an option (the guard refuses it, and it
-would be a decision nobody took) and inventing values is worse. Registered in
-``.claude/state/notes-T3.5.md`` §3 for T3.1d/T3.8.
+**The blocking gap of ``notes-T3.5.md`` §5.1 is closed, and this is the writing
+half.** ``trade_proposals`` used to store the *identity* of a request and none of
+its **geometry**, so a filed row could be recognised and never decided — the
+execution worker logged ``pending_request_without_geometry`` once a second for
+ever. ``0009_paper_geometry`` adds ``request_payload`` (DATABASE.md §21.1) and
+this module fills it: ``client_key``, ``market_id``, ``direction``,
+``entry_ref``, ``stop``, ``target``, ``requested_notional`` and
+``assumed_costs``, money as JSON strings.
+
+**And it stops writing ``request_digest``.** The digest is what *proves* two
+requests are the same one, and a proof written by the caller binds nobody: the
+engine used to read it back with ``coalesce(request_digest, …)``, so a handler —
+or an injection into one — could make a different order replay as an earlier
+decision (S1 of ``.claude/state/review-T3.1c-security.md``). Since ``0009`` the
+request guard **refuses** an ``INSERT`` by the application role that carries a
+digest or a ``kill_switch_snapshot``, and the engine recomputes the digest from
+the payload when it decides. The API still *computes* one and returns it to the
+caller as the identity of what was asked; what it may no longer do is persist it
+as proof. A replay of a pending row is therefore compared on the archived
+payload (``hunter_core.admission.dedupe``), which is the same information one
+step earlier.
 """
 
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -50,6 +63,7 @@ from hunter_core.admission.sources import (
     ProposalRequest,
     admission_key,
     request_digest,
+    request_payload,
 )
 from hunter_core.domain.enums import ProposalSource, ProposalStatus
 from hunter_core.domain.types import uuid7
@@ -177,6 +191,7 @@ async def file_manual_order(
     except ValueError as exc:
         raise OrderRefusedError(str(exc)) from exc
     digest = request_digest(request, source)
+    payload = request_payload(request)
 
     decided = await find_admitted(session, organization_id=context.org_id, idempotency_key=key)
     if decided is not None:
@@ -192,7 +207,11 @@ async def file_manual_order(
         )
     pending = await find_pending(session, organization_id=context.org_id, idempotency_key=key)
     if pending is not None:
-        _refuse_a_different_order(pending.request_digest, digest, pending.proposal_id)
+        # The filed row carries no digest since ``0009`` (the guard refuses one),
+        # so what is compared is the archived geometry — the same information one
+        # step earlier, and the thing that keeps a reused key naming a
+        # *different* order from replaying as this one.
+        _refuse_a_different_order(pending.request_payload, payload, pending.proposal_id)
         return FiledRequest(
             proposal_id=pending.proposal_id,
             portfolio_id=pending.portfolio_id,
@@ -208,9 +227,9 @@ async def file_manual_order(
         await session.execute(
             text(
                 "INSERT INTO trade_proposals (id, organization_id, portfolio_id, market_id, "
-                "direction, status, idempotency_key, request_digest, source, created_at) "
-                "VALUES (:id, :org, :pf, :market, :direction, 'pending', :key, :digest, "
-                "'manual', :now)"
+                "direction, status, idempotency_key, request_payload, source, created_at) "
+                "VALUES (:id, :org, :pf, :market, :direction, 'pending', :key, "
+                "CAST(:payload AS jsonb), 'manual', :now)"
             ),
             {
                 "id": proposal_id,
@@ -219,7 +238,7 @@ async def file_manual_order(
                 "market": market_id,
                 "direction": direction.value,
                 "key": key,
-                "digest": digest,
+                "payload": json.dumps(payload),
                 "now": now,
             },
         )
@@ -241,12 +260,21 @@ async def file_manual_order(
     )
 
 
-def _refuse_a_different_order(stored: str | None, asked: str, proposal_id: uuid.UUID) -> None:
-    """A reused key that names another order is a conflict, never a replay."""
+def _refuse_a_different_order(
+    stored: str | dict[str, object] | None, asked: str | dict[str, object], proposal_id: uuid.UUID
+) -> None:
+    """A reused key that names another order is a conflict, never a replay.
+
+    Two shapes of the same question, because the two rows carry different proof:
+    a **decided** proposal is compared on its ``request_digest`` (the engine
+    stamped it), a **pending** one on its ``request_payload`` (the API archived
+    it, and since ``0009_paper_geometry`` may not stamp a digest at all — §21.2).
+    Dictionaries compare by value, which is what a canonical payload is for.
+    """
     if stored is not None and stored != asked:
         raise OrderReplayConflictError(
             f"idempotency key already names proposal {proposal_id}, which is a different order "
-            f"(request_digest {stored} != {asked})"
+            f"({stored} != {asked})"
         )
 
 

@@ -28,6 +28,7 @@ commits nothing, which is why it is the tolerable half — and
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -36,7 +37,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 
-from hunter_core.admission.sources import request_digest
+from hunter_core.admission.sources import request_digest, request_payload
 from hunter_core.db.repositories.base import TenantRepository
 from hunter_core.domain.enums import (
     ProposalSource,
@@ -130,6 +131,13 @@ class PendingRequest(BaseModel):
     direction: TradeDirection
     source: ProposalSource
     request_digest: str | None
+    """Null on every row the API filed, since ``0009_paper_geometry``: the guard
+    refuses a caller-supplied proof and the engine stamps its own when it decides
+    (DATABASE.md §21.2). What a replay of a *pending* row compares instead is
+    :attr:`request_payload`, the same information one step earlier."""
+
+    request_payload: dict[str, Any] | None
+    """The geometry the API archived (§21.1) — what a pending replay compares."""
 
 
 async def find_admitted(
@@ -163,9 +171,10 @@ async def find_pending(
         await session.execute(
             text(
                 "SELECT id AS proposal_id, portfolio_id, market_id, "
-                "direction::text AS direction, source::text AS source, request_digest "
-                "FROM trade_proposals WHERE organization_id = :org AND idempotency_key = :key "
-                "AND status = 'pending' AND decided_at IS NULL FOR UPDATE"
+                "direction::text AS direction, source::text AS source, request_digest, "
+                "request_payload FROM trade_proposals WHERE organization_id = :org "
+                "AND idempotency_key = :key AND status = 'pending' AND decided_at IS NULL "
+                "FOR UPDATE"
             ),
             {"org": organization_id, "key": idempotency_key},
         )
@@ -217,6 +226,31 @@ def _digest_pair(
     return [] if stored is None else [("request_digest", stored, request_digest(request, source))]
 
 
+def _payload_pair(
+    stored: dict[str, Any] | None, request: ProposalRequest
+) -> list[tuple[str, Any, Any]]:
+    """The archived geometry, when the filed row carries one (§21.1).
+
+    This is what took the digest's place for a **pending** row. Since
+    ``0009_paper_geometry`` the API may not write ``request_digest`` at all — a
+    proof chosen by the caller binds nobody (S1 of the ``0007`` security review)
+    — so without this comparison a reused key naming a *different* order would
+    come back as a replay of the first one: the exact silence
+    :func:`ensure_same_request` exists to prevent, one step earlier in the
+    request's life.
+
+    Compared as canonical JSON because a payload read back from JSONB carries
+    PostgreSQL's key order and not the writer's, and two orderings of the same
+    object are the same object.
+    """
+    if stored is None:
+        return []
+    asked = request_payload(request)
+    return [
+        ("request_payload", json.dumps(stored, sort_keys=True), json.dumps(asked, sort_keys=True))
+    ]
+
+
 def ensure_pending_is_the_same_request(
     pending: PendingRequest, request: ProposalRequest, source: ProposalSource
 ) -> None:
@@ -229,6 +263,7 @@ def ensure_pending_is_the_same_request(
             ("direction", pending.direction.value, request.direction.value),
             ("source", pending.source.value, source.value),
             *_digest_pair(pending.request_digest, request, source),
+            *_payload_pair(pending.request_payload, request),
         ]
         if _differs(stored, asked)
     ]
