@@ -59,6 +59,10 @@ from hunter_core.portfolio.fx_policy import (
     FxObservationRejected as FxObservationRejected,  # re-exported for the same reason
 )
 from hunter_core.portfolio.fx_policy import FxPolicy, validate_fx_observation
+from hunter_core.portfolio.opening_scope import (
+    ScopeViolation as ScopeViolation,  # re-exported: callers import it from here too
+)
+from hunter_core.portfolio.opening_scope import verify_scope as _verify_scope
 from hunter_risk.exposure import SAO_PAULO, sao_paulo_day_start_utc
 
 if TYPE_CHECKING:
@@ -106,6 +110,7 @@ async def open_paper_wallet(
     risk_profile_id: uuid.UUID | None = None,
     created_by: uuid.UUID | None = None,
     actor_id: str = "system",
+    verify_scope: bool = True,
     _testing_capital_override: bool = False,
 ) -> OpeningResult:
     """Open the principal paper wallet of ``organization_id``, once, atomically.
@@ -124,6 +129,15 @@ async def open_paper_wallet(
     capital can, by also passing ``_testing_capital_override=True`` — a name
     deliberately awkward to type, so it is never reached from production code
     by accident (``test_no_funding_route.py`` scans the repository for it).
+
+    ``verify_scope`` (default ``True``) re-reads every row this call writes and
+    refuses to return — raising :class:`ScopeViolation` instead — if any of
+    them landed under a different ``organization_id`` than the one given here
+    (security review of ``open_paper_wallet.py``, S3b: the role this function
+    always runs as, ``hunter_worker``, has ``BYPASSRLS``, so nothing in
+    Postgres itself would catch that on its own). Pass ``False`` only where a
+    caller already re-verifies scope some other way; every production call
+    site (the script, and T3.14's future API route) keeps the default.
     """
     if capital_brl != DEFAULT_CAPITAL_BRL and not _testing_capital_override:
         raise ValueError(
@@ -231,6 +245,13 @@ async def open_paper_wallet(
         rounding_policy=conversion.rounding_policy,
         fx_observation_id=str(fx.id),
     )
+    if verify_scope:
+        await _verify_scope(
+            session,
+            organization_id=organization_id,
+            portfolio_id=portfolio_id,
+            fx_observation_id=fx.id,
+        )
     return OpeningResult(
         portfolio_id=portfolio_id,
         organization_id=organization_id,
