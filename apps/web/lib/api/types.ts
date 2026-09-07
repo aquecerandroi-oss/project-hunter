@@ -149,6 +149,14 @@ export type WorkerStatus = components["schemas"]["WorkerLivenessStatus"];
  * `GET /api/v1/system/workers` -- one row per `hb:{role}:{instance}` key.
  * The `market` role's rows (`instance` = exchange code) additionally carry
  * the exchange fields below; every other role has them `null`, never fabricated.
+ *
+ * The `execution` role's `hb:execution:paper` row (T3.13/T3.14,
+ * `apps/api/hunter_api/schemas/system.py`'s `WorkerHeartbeatOut` module
+ * docstring) additionally carries `equity`, `kill_switch`, `open_positions`,
+ * `pending_requests`, `unreadable_requests`, `degraded_protections`,
+ * `protection_delay_s`, `last_mtm`, `last_protection`,
+ * `last_kill_switch_read`, `paper_autonomy` -- `null`/absent on every other
+ * role, never fabricated. Rendered by `components/system/execution-paper-card.tsx`.
  */
 export type WorkerHeartbeat = components["schemas"]["WorkerHeartbeatOut"];
 

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { AutoRefresh } from "@/components/auto-refresh";
+import { ExecutionPaperCard } from "@/components/system/execution-paper-card";
 import { FeatureFlagsTable } from "@/components/system/feature-flags-table";
 import { ReadinessPanel } from "@/components/system/readiness-panel";
 import { SystemInfoCard } from "@/components/system/system-info-card";
@@ -94,7 +95,10 @@ export default async function SystemPage({ params }: SystemPageProps) {
       <section>
         <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-muted">Workers</h2>
         {workersLoad.ok ? (
-          <WorkersTable workers={workersLoad.workers} />
+          <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+            <WorkersTable workers={workersLoad.workers} />
+            <ExecutionPaperCard worker={workersLoad.workers.find((worker) => worker.role === "execution") ?? null} />
+          </div>
         ) : (
           <p className="rounded-md border border-dashed border-red/40 bg-bg-elevated p-4 text-sm text-fg">
             Workers indisponível: {workersLoad.reason}
