@@ -20,17 +20,28 @@ The venue, however, is the same: one row in ``exchanges`` (``code =
   caller holding an adapter and a symbol can always build the full identity
   with :func:`market_identity`.
 
-**Known gap, deliberately not closed here (T3.0b/core).** The *event* models
-(``NormalizedTicker``/``Trade``/``OrderBook``/``Candle``) have no
-``market_type`` field, and this task must not edit ``packages/core``. So a
-spot ticker and a perpetual ticker for ``BTCUSDT`` are, on the wire, still
-distinguishable only by *which adapter produced them*. Until T3.0b adds
-``market_type`` to those models and to the Redis key builders
-(``hunter_core.redis.keys``), spot events must not be written into the same
-hot state as perpetual ones: ``mkt:binance:BTCUSDT:ticker`` would be
-overwritten by whichever arrived last. This is recorded in
-``.claude/state/notes-T3.0a.md`` as a blocker for the market-worker
-integration, not worked around with a local subclass or an extra field.
+**The gap this docstring used to describe is closed.** T3.0b gave every event
+model (``NormalizedTicker``/``Trade``/``OrderBook``/``Candle``) a
+``market_type`` field, defaulting to ``PERPETUAL`` so every payload already on
+a stream or in Redis keeps meaning exactly what it meant before. The spot
+parsers in this package pass ``SPOT`` explicitly — nothing is ever inferred
+from which adapter produced an event, because a wrong guess here would
+silently relabel a spot market as a perpetual one.
+
+Every Redis key builder in ``hunter_core.redis.keys`` now takes the same
+``market_type`` and folds it into the *venue* segment: the perpetual's key is
+byte-identical to what it always was (``mkt:binance:BTCUSDT:ticker``, no
+segment for ``market_type is PERPETUAL``), and the spot pair gets its own
+(``mkt:binance:spot:BTCUSDT:ticker``). The two listings of one symbol no
+longer share a hot-state key.
+
+**Deliberate exception (KB-0044).** The ticker *hash's own fields* never
+include ``market_type`` — it is already the key's discriminator, and the hash
+is written by two disjoint producers (the REST 24h refresh and the WS
+``bookTicker``) whose whole contract is "touch only the fields you own"; adding
+an unowned field to that shared hash was exactly the class of bug KB-0044
+fixed. So a reader confirms which market it holds from the *key* it asked for,
+never from a field inside the hash.
 """
 
 from __future__ import annotations
@@ -74,8 +85,14 @@ def market_identity(exchange: str, symbol: str, market_type: MarketType) -> str:
 
     Never ``exchange`` + ``symbol`` alone - that string is the same for the
     spot pair and the perpetual, which is exactly the collision T3.0 exists
-    to prevent. Intended as the discriminating part of a Redis key
-    (``mkt:{exchange}:{market_type}:{symbol}:...``) and of any in-memory
-    dict keyed by market.
+    to prevent. Meant for an in-adapter dict keyed by market (the adapter's own
+    ``.identity(symbol)``) — it always spells out the type.
+
+    **Not** the shape of a real hot-state key. ``hunter_core.redis.keys``
+    keeps the perpetual's key byte-identical to what it was before spot
+    existed (``mkt:{exchange}:{symbol}:...``, no segment at all) and only
+    spot gets one (``mkt:{exchange}:spot:{symbol}:...``) — every writer that
+    shipped before T3.0 keeps meaning exactly what it always meant. A template
+    that always inserted ``market_type`` here would break that.
     """
     return f"{exchange}:{market_type.value}:{symbol}"

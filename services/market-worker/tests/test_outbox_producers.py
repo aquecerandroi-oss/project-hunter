@@ -19,7 +19,7 @@ from sqlalchemy import delete, func, select
 from hunter_core.db.models.market_data import Candle
 from hunter_core.db.models.system import OutboxEvent
 from hunter_core.db.session import role_session
-from hunter_core.domain.enums import Timeframe
+from hunter_core.domain.enums import MarketType, Timeframe
 from hunter_core.domain.market import to_wire
 from hunter_core.events.outbox import dispatch_pending
 from hunter_core.events.streams import Streams
@@ -263,6 +263,45 @@ async def test_two_disjoint_backfill_batches_get_different_identities(
     assert rows[0].event_id != rows[1].event_id
 
 
+async def test_a_spot_and_a_perp_history_batch_of_the_same_span_get_different_identities(
+    db_session_factory: Any,
+) -> None:
+    """T3.0d: ``candles_backfilled_event_id`` had the same collision as
+    ``candle_event_id`` -- a spot and a perpetual history recovery batch
+    covering the same ``[start, end)`` for the same symbol/timeframe hashed to
+    one uuid5. The perpetual's id is pinned against the pre-fix formula; the
+    spot batch's is merely required to differ."""
+    code = unique_code()
+    await seed_market(db_session_factory, code, "BTCUSDT")
+    await _clear_outbox(db_session_factory)
+    base = builders.candle("BTCUSDT", exchange=code).open_time
+    perp_batch = [builders.candle("BTCUSDT", open_time=base, exchange=code)]
+    spot_batch = [
+        builders.candle("BTCUSDT", open_time=base, exchange=code, market_type=MarketType.SPOT)
+    ]
+    end = base + timedelta(minutes=1)
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        await backfill_announce.enqueue_candles_backfilled(
+            session, perp_batch, reason="historical_recovery"
+        )
+        await backfill_announce.enqueue_candles_backfilled(
+            session, spot_batch, reason="historical_recovery"
+        )
+
+    rows = await _outbox(db_session_factory)
+    assert len(rows) == 2, "both announcements survive -- neither is dropped as a duplicate"
+    ids_by_type = {row.payload["payload"]["market_type"]: row.event_id for row in rows}
+    assert set(ids_by_type) == {"perpetual", "spot"}
+    assert ids_by_type["perpetual"] != ids_by_type["spot"]
+    assert ids_by_type["perpetual"] == backfill_announce.candles_backfilled_event_id(
+        code, "BTCUSDT", "1m", base, end, MarketType.PERPETUAL
+    )
+    assert ids_by_type["spot"] == backfill_announce.candles_backfilled_event_id(
+        code, "BTCUSDT", "1m", base, end, MarketType.SPOT
+    )
+
+
 # --- liquidations, realized funding, open interest --------------------------
 
 
@@ -365,6 +404,65 @@ async def test_candle_event_ids_are_stable_and_market_specific() -> None:
     assert durable.candle_event_id(first) != durable.candle_event_id(other)
     assert durable.candle_event_id(first) != durable.candle_event_id(later)
     assert isinstance(durable.candle_event_id(first), uuid.UUID)
+
+
+async def test_a_perp_and_a_spot_candle_of_the_same_minute_get_different_ids(
+    db_session_factory: Any,
+) -> None:
+    """T3.0d, bloqueante da T3.0d (review-T3.0b.md item 1, notes-T3.0c.md §12
+    ressalva 9): reproduced live on 2026-09-07 -- the same
+    exchange/symbol/timeframe/``open_time`` on the two listings hashed to one
+    uuid5, and the outbox's ``ON CONFLICT (event_id) DO NOTHING`` silently
+    dropped whichever ``market.candles.closed`` committed second. Fixing the
+    perpetual's id to the exact value it had *before* this fix pins the
+    other, non-negotiable half of the contract: no id already announced in
+    production may change.
+    """
+    code = unique_code()
+    perp_market_id = await seed_market(
+        db_session_factory, code, "BTCUSDT", market_type=MarketType.PERPETUAL
+    )
+    spot_market_id = await seed_market(
+        db_session_factory, code, "BTCUSDT", market_type=MarketType.SPOT
+    )
+    await _clear_outbox(db_session_factory)
+    open_time = builders.candle("BTCUSDT", exchange=code).open_time
+    perp = builders.candle("BTCUSDT", exchange=code, open_time=open_time)
+    spot = builders.candle(
+        "BTCUSDT", exchange=code, open_time=open_time, market_type=MarketType.SPOT
+    )
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        await persist_rows.upsert_candles(session, [perp], {"BTCUSDT": perp_market_id}, source="ws")
+        await persist_rows.upsert_candles(session, [spot], {"BTCUSDT": spot_market_id}, source="ws")
+
+    rows = await _outbox(db_session_factory)
+    assert len(rows) == 2, "both closes are announced -- neither is dropped as a duplicate"
+    ids = {row.event_id for row in rows}
+    assert len(ids) == 2
+    assert durable.candle_event_id(perp) != durable.candle_event_id(spot)
+
+
+def test_the_perpetuals_candle_event_id_is_the_exact_value_it_had_before_market_type_existed() -> (
+    None
+):
+    """The non-negotiable half of the fix above: adding ``market_type`` to the
+    id's inputs must not change a single id already announced in production.
+    ``PERPETUAL`` is the identity's default and its venue segment is the bare
+    ``exchange`` (``keys.market_slug(..., PERPETUAL).rstrip(":")``), so this
+    value is pinned by hand against the formula as it stood before T3.0d."""
+    from datetime import UTC, datetime
+
+    from hunter_core.domain.enums import Timeframe as TF
+
+    candle = builders.candle(
+        "BTCUSDT",
+        exchange="binance",
+        open_time=datetime(2026, 9, 7, 7, 0, tzinfo=UTC),
+        timeframe=TF.M1,
+    )
+
+    assert str(durable.candle_event_id(candle)) == "40b42f73-c29e-5e66-ad43-670b8f7d1ae4"
 
 
 async def test_handle_event_no_longer_publishes_a_closed_candle_directly(

@@ -76,10 +76,27 @@ def _key(exchange: str, symbol: str) -> str:
 
 
 def candle_event_id(candle: NormalizedCandle) -> UUID:
-    """Identity of one closed candle = its ``candles`` natural key."""
+    """Identity of one closed candle = its ``candles`` natural key.
+
+    T3.0d: the first part is the **venue**, not the bare ``exchange`` — the
+    same ``keys.market_slug(exchange, "", market_type).rstrip(":")`` spelling
+    ``universe_event_id`` already uses. Reproduced live on 2026-09-07: the spot
+    and perpetual ``BTCUSDT`` candles closing the same minute hashed to the
+    identical uuid5 (only ``exchange``/``symbol``/``timeframe``/``open_time``
+    fed the id, and those four are equal for the two listings), so the second
+    ``market.candles.closed`` of the pair died silently in the outbox's
+    ``ON CONFLICT (event_id) DO NOTHING`` — the row in ``candles`` was correct
+    for both products (``load_market_ids`` already resolves per
+    ``market_type``, T3.0b), but no consumer of the closed-candle stream ever
+    saw the second product's close. ``PERPETUAL`` keeps the exact id it always
+    had (``venue == exchange``, byte-identical), so no id already announced in
+    production changes; only ``SPOT`` gets a distinct venue segment
+    (``exchange:spot``) and therefore a distinct id.
+    """
+    venue = keys.market_slug(candle.exchange, "", candle.market_type).rstrip(":")
     return event_id_for(
         Streams.MARKET_CANDLES_CLOSED,
-        candle.exchange,
+        venue,
         candle.symbol,
         candle.timeframe.value,
         candle.open_time,
@@ -121,7 +138,10 @@ async def enqueue_candles(
                 candle_event_id(candle),
                 to_wire(candle),
                 producer=producer,
-                key=_key(candle.exchange, candle.symbol),
+                # T3.0d: same ``market_slug`` spelling as the id above, for the
+                # same reason -- the perpetual's key stays ``{ex}:{sym}`` byte
+                # for byte, the spot's is ``{ex}:spot:{sym}``.
+                key=keys.market_slug(candle.exchange, candle.symbol, candle.market_type),
             )
             for candle in candles
         ],

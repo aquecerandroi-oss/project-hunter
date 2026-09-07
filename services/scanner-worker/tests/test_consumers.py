@@ -39,12 +39,19 @@ pytestmark = pytest.mark.unit
 NOW = datetime(2026, 9, 6, 12, 0, tzinfo=UTC)
 
 
-def _tick(symbol: str, ts: datetime) -> EventEnvelope:
+def _tick(symbol: str, ts: datetime, *, market_type: str | None = None) -> EventEnvelope:
+    payload: dict[str, Any] = {"symbol": symbol, "ts": ts.isoformat()}
+    if market_type is not None:
+        payload["market_type"] = market_type
+    if market_type in (None, "perpetual"):
+        key = f"{EXCHANGE}:{symbol}"
+    else:
+        key = f"{EXCHANGE}:spot:{symbol}"
     return EventEnvelope(
         type=Streams.MARKET_TICKS,
         producer="market-worker@test",
-        key=f"{EXCHANGE}:{symbol}",
-        payload={"symbol": symbol, "ts": ts.isoformat()},
+        key=key,
+        payload=payload,
     )
 
 
@@ -248,3 +255,42 @@ class TestTouchHandler:
         await handle(_batch(*[_tick(SYMBOL, NOW) for _ in range(5)]))
 
         assert absorbed() - before == 4
+
+    async def test_a_spot_tick_in_the_stream_never_touches_the_perpetual_state(
+        self,
+    ) -> None:
+        """T3.0d, notes-T3.0c.md §6: the scanner has no spot universe, and a
+        spot tick's ``symbol`` reads the same as the perpetual's. Without the
+        filter this would mark the perpetual dirty from the spot venue's clock
+        and contaminate ``scanner_stream_delay_seconds``."""
+        from hunter_scanner_worker.main import touch_batch_handler
+
+        scanner = self._scanner()
+        handle = touch_batch_handler(scanner, Streams.MARKET_TICKS)
+
+        await handle(_batch(_tick(SYMBOL, NOW, market_type="spot")))
+
+        state = scanner.state.markets[SYMBOL]
+        assert state.last_input_ts is None
+        assert state.dirty_reasons == set()
+
+    async def test_a_spot_tick_does_not_enter_the_perpetual_delay_series(self) -> None:
+        from hunter_core.observability import registry
+        from hunter_scanner_worker.main import touch_batch_handler
+
+        scanner = self._scanner()
+        handle = touch_batch_handler(scanner, Streams.MARKET_TICKS)
+
+        def sample_count() -> float:
+            value = registry.get_sample_value(
+                "hunter_scanner_stream_delay_seconds_count", {"stream": Streams.MARKET_TICKS}
+            )
+            return 0.0 if value is None else value
+
+        before = sample_count()
+        await handle(_batch(_tick(SYMBOL, NOW - timedelta(minutes=10), market_type="spot")))
+
+        assert sample_count() == before, "no perpetual observation from a spot-only batch"
+
+        await handle(_batch(_tick(SYMBOL, NOW)))
+        assert sample_count() == before + 1, "the perpetual tick is still observed"

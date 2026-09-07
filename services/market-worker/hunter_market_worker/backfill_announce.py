@@ -19,8 +19,10 @@ from datetime import timedelta
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from hunter_core.domain.enums import MarketType
 from hunter_core.events.outbox import build_envelope, enqueue_many, event_id_for
 from hunter_core.events.streams import Streams
+from hunter_core.redis import keys
 from hunter_market_worker.durable import PRODUCER
 
 if TYPE_CHECKING:
@@ -35,12 +37,13 @@ _MINUTE = timedelta(minutes=1)
 __all__ = ["candles_backfilled_event_id", "enqueue_candles_backfilled"]
 
 
-def _key(exchange: str, symbol: str) -> str:
-    return f"{exchange}:{symbol}"
-
-
 def candles_backfilled_event_id(
-    exchange: str, symbol: str, timeframe: str, start: datetime, end: datetime
+    exchange: str,
+    symbol: str,
+    timeframe: str,
+    start: datetime,
+    end: datetime,
+    market_type: MarketType = MarketType.PERPETUAL,
 ) -> UUID:
     """Identity of one aggregated ``market.candles.backfilled`` announcement.
 
@@ -59,9 +62,16 @@ def candles_backfilled_event_id(
     second pass over the same still-open gap the same identity as the first,
     and its newly recovered minutes would be silently dropped by the outbox's
     own conflict guard instead of being announced (Astra, T2.9c review).
+
+    ``market_type`` (T3.0d): the same collision ``durable.candle_event_id``
+    had — a spot and a perpetual history recovery that happen to insert the
+    same disjoint ``[start, end)`` span for the same symbol/timeframe would
+    otherwise hash to one id. The venue segment (``keys.market_slug(...,
+    "").rstrip(":")``) keeps ``PERPETUAL``'s id exactly what it was.
     """
+    venue = keys.market_slug(exchange, "", market_type).rstrip(":")
     return event_id_for(
-        Streams.MARKET_CANDLES_BACKFILLED, exchange, symbol, timeframe, "rest", start, end
+        Streams.MARKET_CANDLES_BACKFILLED, venue, symbol, timeframe, "rest", start, end
     )
 
 
@@ -76,11 +86,11 @@ async def enqueue_candles_backfilled(
     history-tier gap recovery actually inserted, in this transaction.
 
     ``candles`` is the whole batch of one recovery unit and is assumed to
-    share one ``(exchange, symbol, timeframe)`` — the caller is one gap's
-    recovery, which is one market. Empty input is a no-op: an attempt that
-    inserted nothing new (every minute already existed) has nothing to
-    announce, and an event with ``count=0`` would describe an insertion that
-    never happened.
+    share one ``(exchange, symbol, timeframe, market_type)`` — the caller is
+    one gap's recovery, which is one market. Empty input is a no-op: an
+    attempt that inserted nothing new (every minute already existed) has
+    nothing to announce, and an event with ``count=0`` would describe an
+    insertion that never happened.
 
     ``reason`` is a description of *why this is history*, never a claim about
     who asked for it: ``ingestion_gaps`` carries no origin, and a gap the live
@@ -94,6 +104,7 @@ async def enqueue_candles_backfilled(
     exchange = candles[0].exchange
     symbol = candles[0].symbol
     timeframe = candles[0].timeframe.value
+    market_type = candles[0].market_type
     start = min(c.open_time for c in candles)
     end = max(c.open_time for c in candles) + _MINUTE
     payload = {
@@ -105,16 +116,22 @@ async def enqueue_candles_backfilled(
         "count": len(candles),
         "source": "rest",
         "reason": reason,
+        # T3.0d: additive, mirroring ``market.candles.closed`` -- the
+        # perpetual keeps saying ``perpetual``, so a consumer written before
+        # this field existed sees exactly the payload it always did.
+        "market_type": market_type.value,
     }
     await enqueue_many(
         session,
         [
             build_envelope(
                 Streams.MARKET_CANDLES_BACKFILLED,
-                candles_backfilled_event_id(exchange, symbol, timeframe, start, end),
+                candles_backfilled_event_id(exchange, symbol, timeframe, start, end, market_type),
                 payload,
                 producer=producer,
-                key=_key(exchange, symbol),
+                # Same ``market_slug`` spelling as ``market.candles.closed``:
+                # byte-identical for the perpetual, ``{ex}:spot:{sym}`` for spot.
+                key=keys.market_slug(exchange, symbol, market_type),
             )
         ],
     )

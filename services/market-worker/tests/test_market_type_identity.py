@@ -89,6 +89,36 @@ async def test_book_trades_and_candles_are_kept_apart(redis_client: Any) -> None
     assert msgpack.unpackb(spot_candles[0])["market_type"] == "spot"
 
 
+async def test_the_ticker_hash_never_carries_a_market_type_field(redis_client: Any) -> None:
+    """review-T3.0b.md item 4: the discriminator is already the *key*
+    (KB-0044, ``binance_spot/identity.py``); the hash's own fields are shared
+    by two disjoint producers that must only touch what they own, and
+    ``market_type`` is not owned by either."""
+    perpetual = builders.ticker_rest("BTCUSDT", "100")
+    spot = builders.ticker_rest("BTCUSDT", "200", market_type=SPOT)
+
+    await hot_state.write_ticker(redis_client, perpetual, source="rest")
+    await hot_state.write_ticker(redis_client, spot, source="rest")
+
+    assert await redis_client.hget(PERP_TICKER_KEY, "market_type") is None
+    assert await redis_client.hget(SPOT_TICKER_KEY, "market_type") is None
+
+
+async def test_a_spot_ticker_write_never_touches_the_perpetuals_key(redis_client: Any) -> None:
+    """review-T3.0b.md item 4: the perpetual's own hash (``mkt:*:{symbol}:ticker``,
+    no venue segment) is written only by the perpetual collector -- the spot
+    collector's write always lands on its own, separately-keyed hash and never
+    creates or mutates the perpetual's."""
+    assert await redis_client.exists(PERP_TICKER_KEY) == 0
+
+    await hot_state.write_ticker(
+        redis_client, builders.ticker_rest("BTCUSDT", "200", market_type=SPOT), source="rest"
+    )
+
+    assert await redis_client.exists(PERP_TICKER_KEY) == 0
+    assert await redis_client.hget(SPOT_TICKER_KEY, "last") == b"200"
+
+
 async def test_the_coalescer_flushes_one_hot_state_write_per_market(redis_client: Any) -> None:
     coalescer = TickCoalescer()
     coalescer.on_ticker(builders.ticker_ws("BTCUSDT", "100"))

@@ -185,10 +185,27 @@ def touch_batch_handler(scanner: Scanner, stream: str) -> Any:
     per market before it is applied: 500 ticks over 40 markets are 40 touches,
     not 500 (T2.5d). Every message of the batch is still acked -- coalescence
     absorbs work, never messages.
+
+    **Perpetual only (T3.0d, notes-T3.0c.md §6).** The scanner has no spot
+    universe, no spot baselines and no spot regime -- it evaluates the
+    perpetual, full stop. Every symbol on Binance already carries a perpetual
+    ticker at ~4 Hz, so a spot tick's payload ``symbol`` (``BTCUSDT``, with no
+    market segment) reads as *the same market* to ``ScannerState.touch``, and
+    without this filter it would mark the perpetual dirty and could set its
+    ``last_input_ts`` from the spot venue's clock -- contaminating
+    ``scanner_stream_delay_seconds`` with a different venue's latency, measured
+    live while spot ingestion was still off (T3.0c §6). The message is still
+    acked with the rest of its batch (``run_batch_consumer``); dropping it here
+    is silent because there is nothing to redeliver it *for*.
     """
 
     async def handle(deliveries: list[tuple[str, EventEnvelope]]) -> None:
-        result = coalesce(deliveries)
+        perpetual_only = [
+            (message_id, envelope)
+            for message_id, envelope in deliveries
+            if envelope.payload.get("market_type", "perpetual") == "perpetual"
+        ]
+        result = coalesce(perpetual_only)
         observe_delay(stream, result.oldest)
         for symbol, stamp in result.newest.items():
             scanner.state.touch(symbol, stream, input_ts=stamp)
