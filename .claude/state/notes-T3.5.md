@@ -367,3 +367,147 @@ do `bridge*.py` e o 10 continua reproduzindo — `test_portfolio_state.py` intei
    `# type: ignore[no-untyped-def]`. Nenhum é de arquivo meu — os meus (produção e testes novos)
    estão em 0. Registrado como dívida de tipagem dos testes, não corrigido aqui para não misturar
    um refactor de 5 arquivos numa correção de revisão.
+
+---
+
+# T3.5c — o execution-worker passa a usar as colunas da 0009, 2026-09-07
+
+**Autor:** backend-specialist. **Base:** `12edda3` (T3.14/T3.5b) + `70acb6f` (`0009_paper_geometry`).
+**Não commitei.** **Não editei** `.env*`, `infra/migrations/**`, `services/market-worker/**`,
+`apps/web/**`, `docs/**`. **Astra indisponível até 12/09** — nenhuma segunda opinião nesta tarefa,
+registrado como limite. Outra tarefa mexia em `tests/integration/paper/**` e `.claude/settings.json`
+ao mesmo tempo — não são meus, não toquei.
+
+## 1. Os seis itens do adendo, um a um
+
+1. **`ledger.py`**: `PositionRow.is_residual` lê a coluna (`p.is_residual` no `SELECT`) em vez de
+   derivar de `status`. **Desvio declarado**: `open_positions` **não** ganhou `AND NOT p.is_residual`
+   — ver §2 abaixo, é a única divergência real do pedido literal.
+2. **`positions.py`**: `reduce_position(dust=True)` grava `is_residual = true` no mesmo `UPDATE` que
+   move `status` para `closing` (variável `residual = dust and remaining > 0`, escrita como
+   `:is_residual`).
+3. **"moeda comprometida / vagas" ganham `AND NOT p.is_residual`**: a consulta real de "vaga" é
+   `positions.py::load_open_position` (usada por `entry.py`), não uma SQL dentro do próprio
+   `entry.py`; a de "moeda comprometida" é `bridge_universe.py::coin_commitment` (usada por
+   `bridge_screen.py`, não por `bridge_repo.py`). Editei as duas nos arquivos reais onde moram —
+   **desvio de nome de arquivo em relação ao brief/§21.6, mesmo comportamento pedido**. Adicionei um
+   teste novo (`test_bridge_eligibility.py::test_a_residual_position_in_the_same_coin_does_not_refuse`)
+   provando que a ponte também para de recusar por pó, já que a doutrina ("não conta vaga, nem
+   exposição, nem duplicidade") vale para os dois caminhos.
+4. **`admission_cycle.py`**: `pending_requests` lê `request_payload`; `readable_and_unreadable`
+   separa o que tem payload do que não tem; `rebuild_request` reconstrói o `ProposalRequest` (linha +
+   payload + `markets`); `report_unreadable`/`pending_request_without_geometry` só nomeia mais a linha
+   sem payload. `cycles.Cycles.admission()` foi reescrito para montar o retrato de mercado
+   (`manual_inputs.manual_request_inputs`, arquivo novo) e chamar `decide_requests` — o pedido manual
+   é decidido de verdade no ciclo seguinte, com deferimento (não recusa) quando falta livro/beta.
+5. **`decide.py`**: `coalesce(request_digest, :digest)` → `:digest`. O motor sempre carimba o seu.
+6. **`sources.py`**: `target: Decimal | None = Field(default=None, gt=0)` em `ProposalRequest`,
+   incluído em `request_digest` e `request_payload` (antes hardcoded `None`); `bridge.py::_request`
+   passa `target=screened.signal.target`. Provado em `test_bridge_cycle.py` com uma asserção nova
+   lendo `request_payload->>'target'` de volta do Postgres.
+
+## 2. Por que `ledger.open_positions` **não** ganhou o filtro que o §21.6 pede
+
+A leitura literal de DATABASE.md §21.6 ("`open_positions` passa a filtrar `AND NOT p.is_residual`")
+quebra `test_residual_dust.py` e `test_portfolio_state.py::TestDustIsMarkedButIsNotAPosition`, os dois
+já verdes e explicitamente citados como "devem continuar verdes". O motivo: `open_positions` é a
+**única** leitura que `build_portfolio_state` usa tanto para o `exposure_notional`/`equity` (que
+**inclui** o pó, "visível e valorizado", doutrina do próprio §21.1) quanto para o `open_positions` do
+motor (que **exclui** o pó, via `to_open_positions` filtrando `not item.row.is_residual` em Python,
+já existente antes desta tarefa). Filtrar na SQL apagaria o pó da valorização também, regressão do
+que o T3.5b já fechou. Fiz a leitura da coluna (`is_residual` real, não mais derivada) e documentei a
+decisão no docstring do método; não toquei em `portfolio/state.py` (não listado, e não precisou
+mudar). Quem quiser a leitura "só linhas realmente abertas" via índice `ix_positions_org_portfolio_live`
+tem isso em `positions.py::load_open_position` (item 3) e `bridge_universe.py::coin_commitment`
+(item 3) — os dois lugares que já precisavam responder "isto é uma posição?", que é uma pergunta
+diferente de "quanto isto vale?".
+
+## 3. Bug real encontrado pelo teste novo: `find_pending` e `FOR UPDATE` sob `hunter_app`
+
+`test_manual_request_decided.py` é o primeiro teste de integração a exercitar
+`apps/api/hunter_api/services/admission.file_manual_order` contra um Postgres real com os papéis
+`hunter_app`/`hunter_worker` de verdade (antes só havia o unitário com `RecordingSession`, que não
+aplica privilégio nenhum). `hunter_core.admission.dedupe.find_pending` sempre fazia
+`SELECT ... FOR UPDATE`, e o Postgres exige o privilégio `UPDATE` (não só `SELECT`) para
+`FOR UPDATE`/`FOR SHARE` — privilégio que `0007_paper_roles` **revogou** de `hunter_app` em
+`trade_proposals` de propósito. Resultado, reproduzido com um script isolado antes de eu tocar em
+qualquer arquivo: `permission denied for table trade_proposals`, não "zero linhas" — a rota manual da
+API nunca poderia ter completado uma segunda chamada com a mesma chave (replay) sem estourar.
+
+**Correção**: `find_pending(..., lock: bool = True)`. `hunter_core/admission/service.py::admit`
+(papel `hunter_worker`, vai decidir a linha) continua com o lock, comportamento inalterado.
+`apps/api/hunter_api/services/admission.py::file_manual_order` (papel `hunter_app`, só lê) passa
+`lock=False`. Nenhum teste existente comparava a *shape* do SQL (`test_admission_adapter.py`
+usa `monkeypatch`), então nada quebrou; os 9+17+10+6 testes de admissão seguem verdes. Isto não está
+na lista dos seis itens do adendo — é uma correção que a própria tarefa pediu para provar (item de
+teste "a API arquiva → o worker decide"), e sem ela o teste não passa nunca, em nenhuma tarefa futura
+que exercite a rota manual de verdade.
+
+## 4. `test_manual_request_decided.py` — o que ele prova e o que ele precisou
+
+Usa `proof/venue.py` (rotulado, `exchange = "proof"`) para o mercado e os números — os mesmos da
+prova de 30 min — e `services/execution-worker/tests/shadow_builders.py` para beta/candles/volume
+(funções genéricas, não específicas de shadow). Fluxo: `file_manual_order` (papel `hunter_app`) →
+`pending_requests` + `readable_and_unreadable` + `rebuild_request` + `manual_request_inputs` +
+`decide_requests` (papel `hunter_worker`, transação **separada** da anterior) → `reservation_state ==
+held` → `execute_approved_entries` → `filled`. Precisa de **dois** `SpotSnapshot` estáticos com
+timestamps diferentes: um `<= as_of` da admissão (`hunter_risk.checks._data_quality`/`_book_depth`
+exigem `0 <= age`, um livro "do futuro" reprova com `data_quality`/`book_depth`) e outro
+`>= decided_at + latência` para o preenchimento (`entry.py`'s `book_before_latency`). Documentado no
+docstring de `_snapshot()` porque não é óbvio e um teste futuro vai tropeçar do mesmo jeito se copiar
+um helper existente sem notar a direção do tempo.
+
+## 5. Comandos e saída real
+
+```
+uv run pytest services/execution-worker/tests -q (por arquivo, 13 arquivos) → todos verdes,
+  incluindo test_manual_request_decided.py (novo, 1 passed) e
+  test_bridge_eligibility.py (9 passed, era 8: +1 teste do pó não recusar)
+uv run pytest packages/core/tests/integration/test_admission.py -q            → 17 passed
+uv run pytest packages/core/tests/integration/test_portfolio_state.py -q      → 22 passed
+uv run pytest packages/core/tests/integration/test_admission_reservation.py -q → 10 passed
+uv run pytest packages/core/tests/integration/test_admission_concurrency.py -q → 6 passed
+uv run pytest packages/core/tests/unit -q                                     → 704 passed
+uv run pytest apps/api/tests/unit/test_admission_adapter.py -q                → 9 passed
+uv run pytest apps/api/tests/unit -q                                          → 381 passed
+uv run ruff check services/execution-worker packages/core apps/api            → All checks passed!
+uv run ruff format --check ... (mesmos)                                       → 406 files already formatted
+uv run pyright services/execution-worker/hunter_execution_worker
+                packages/core/hunter_core                                     → 0 errors, 0 warnings
+uv run pyright apps/api/hunter_api/services/admission.py                      → 0 errors, 0 warnings
+uv run python infra/scripts/check_file_size.py                                → scanned 462 files;
+                                                                                  0 over budget
+```
+
+## 6. Arquivos
+
+**Novos**: `services/execution-worker/hunter_execution_worker/manual_inputs.py` (77 linhas),
+`services/execution-worker/tests/test_manual_request_decided.py`.
+**Modificados**: `packages/core/hunter_core/admission/{decide,dedupe,sources}.py`,
+`packages/core/hunter_core/db/repositories/ledger.py`,
+`apps/api/hunter_api/services/admission.py`,
+`services/execution-worker/hunter_execution_worker/{admission_cycle,bridge,bridge_universe,cycles,
+positions}.py`,
+`services/execution-worker/tests/{test_bridge_cycle,test_bridge_eligibility,test_residual_dust,
+test_scheduling}.py`,
+`packages/core/tests/integration/test_portfolio_state.py`,
+`packages/core/tests/unit/portfolio/test_marking.py`.
+
+## 7. Pendências e limites honestos
+
+- **A identidade de quem filed um pedido manual não sobrevive à decisão.** `trade_proposals` não tem
+  coluna para isso; `rebuild_request` audita a decisão como o próprio worker
+  (`actor_id=PRODUCER, actor_type="worker"`), mesma convenção do `bridge.py`. Se um dia isso importar
+  (ex.: painel de auditoria mostrando "decidido em nome de fulano"), precisa de uma coluna ou de um
+  `audit_logs` na hora da filiação que a decisão possa ler de volta — nenhum dos dois existe hoje e
+  nenhum é meu para criar (migração).
+- **`manual_request_inputs` nunca substitui o candidato**: se o retrato de mercado não puder ser
+  montado (`spot_market_unknown`, `beta_unavailable`, `spot_price_unavailable`,
+  `spot_book_unavailable`), a linha é simplesmente relida no próximo ciclo — nada é escrito. Não há
+  contador dedicado a esse deferimento (o gauge `hunter_execution_pending_requests{readable="true"}`
+  já cobre "quantas linhas ainda esperam"); um contador por motivo, no padrão de
+  `hunter_bridge_candidates_total`, é uma extensão natural para quem pegar T3.8/observabilidade.
+- **`Astra`**: sem segunda opinião (cota esgotada até 12/09).
+- **Não verifiquei** a rota HTTP de T3.8 em si (não existe ainda — só o serviço); o teste novo chama
+  `file_manual_order` diretamente, como a própria `notes-T3.5.md` §5.1 previu para "o script do
+  operador hoje".

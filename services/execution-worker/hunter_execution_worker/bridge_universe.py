@@ -49,6 +49,7 @@ __all__ = [
     "current_beta",
     "radar_score",
     "spot_pair_for",
+    "spot_pair_of",
 ]
 
 logger = get_logger(__name__)
@@ -117,6 +118,35 @@ async def spot_pair_for(session: AsyncSession, signal: ShadowSignal) -> SpotPair
     )
 
 
+async def spot_pair_of(session: AsyncSession, market_id: uuid.UUID) -> SpotPair | None:
+    """One SPOT market's own commitment picture, read by its own id.
+
+    Unlike :func:`spot_pair_for` — which maps a *perpetual* to the spot market
+    it trades — a manual request already names the spot market directly (D1),
+    so there is no perpetual to map from. Shared with it only through the
+    :class:`SpotPair` shape, which is what
+    :func:`hunter_execution_worker.bridge_inputs.liquidity_for` reads.
+    """
+    row = (
+        await session.execute(
+            text(
+                "SELECT id AS market_id, symbol, base_asset_id, is_monitored, volume_24h_usd "
+                "FROM markets WHERE id = :market AND market_type = 'spot'"
+            ),
+            {"market": market_id},
+        )
+    ).one_or_none()
+    if row is None:
+        return None
+    return SpotPair(
+        market_id=row.market_id,
+        symbol=row.symbol,
+        base_asset_id=row.base_asset_id,
+        is_monitored=bool(row.is_monitored),
+        volume_24h_usd=decimal_or_none(row.volume_24h_usd),
+    )
+
+
 _BETA_SELECT = (
     "SELECT market_id, beta, as_of, n FROM market_betas WHERE market_id = ANY(:ids) "
     "AND superseded_at IS NULL AND valid AND beta IS NOT NULL AND available_at <= :now "
@@ -163,9 +193,12 @@ async def coin_commitment(
     "Never two positions in the same coin" (D3) is about the **coin**, not the
     market row, so the join is on ``base_asset_id``: a second listing of the
     same asset would otherwise be a second position by a different name. A
-    ``closing`` position counts — it still holds the dust and still counts in
-    the wallet (notes-T3.5.md §2.3) — and so does a reservation that has not
-    become an order yet, because a pending entry reserves the slot (§4).
+    residual — ``positions.is_residual`` (``0009_paper_geometry``, DATABASE.md
+    §21.1) — does **not** count: it is owned and valued but is not a position
+    (review-T3.5.md item 3, "não conta vaga, nem exposição, nem duplicidade"),
+    the same rule ``entry.py``'s manual duplicate guard applies
+    (``hunter_execution_worker.positions.load_open_position``). A held
+    reservation still counts, because a pending entry reserves the slot (§4).
     """
     if base_asset_id is None:
         return None
@@ -176,7 +209,7 @@ async def coin_commitment(
                 "SELECT 'position' AS kind, p.market_id AS market_id FROM positions p "
                 "JOIN markets m ON m.id = p.market_id WHERE p.organization_id = :org "
                 "AND p.portfolio_id = :pf AND p.status <> 'closed' AND p.qty > 0 "
-                "AND m.base_asset_id = :base "
+                "AND NOT p.is_residual AND m.base_asset_id = :base "
                 "UNION ALL "
                 "SELECT 'reservation' AS kind, t.market_id AS market_id FROM trade_proposals t "
                 "JOIN markets m ON m.id = t.market_id WHERE t.organization_id = :org "

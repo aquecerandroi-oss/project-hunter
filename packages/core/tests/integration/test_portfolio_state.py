@@ -115,6 +115,7 @@ async def _buy(
     fee_asset: str = "USDT",
     position_qty: Decimal | None = None,
     status: str = "open",
+    is_residual: bool = False,
 ) -> uuid.UUID:
     """One filled entry: an order, its fill and the position it opened.
 
@@ -141,6 +142,7 @@ async def _buy(
         "fee_asset": fee_asset,
         "position_qty": qty if position_qty is None else position_qty,
         "status": status,
+        "is_residual": is_residual,
     }
     async with engine.begin() as connection:
         await connection.execute(
@@ -163,9 +165,9 @@ async def _buy(
         await connection.execute(
             text(
                 "INSERT INTO positions (id, organization_id, portfolio_id, market_id, direction, "
-                "qty, avg_entry_price, mark_price, stop_price, status, opened_at) "
+                "qty, avg_entry_price, mark_price, stop_price, status, is_residual, opened_at) "
                 "VALUES (:position, :org, :pf, :market, 'long', :position_qty, :price, :mark, "
-                ":stop, :status, :ts)"
+                ":stop, :status, :is_residual, :ts)"
             ),
             params,
         )
@@ -945,6 +947,7 @@ class TestDustIsMarkedButIsNotAPosition:
             stop=Decimal(3900),
             position_qty=Decimal("0.000482"),
             status="closing",
+            is_residual=True,
         )
 
         async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
@@ -984,6 +987,7 @@ class TestDustIsMarkedButIsNotAPosition:
             mark=Decimal(4000),
             position_qty=Decimal("0.000482"),
             status="closing",
+            is_residual=True,
         )
         await _buy(
             ledger_engine,

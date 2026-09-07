@@ -52,6 +52,7 @@ def _pending(created_at: datetime = NOW) -> PendingRow:
         market_id=uuid.uuid4(),
         idempotency_key=f"manual:{proposal_id}",
         request_digest=None,
+        request_payload=None,
         created_at=created_at,
     )
 

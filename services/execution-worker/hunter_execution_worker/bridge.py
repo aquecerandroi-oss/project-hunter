@@ -177,9 +177,10 @@ def _request(chosen: _Ranked, *, wallet: WalletRef) -> ProposalRequest:
 
     ``requested_notional`` is deliberately absent: the ceiling is the engine's to
     compute, and a bridge that proposed a size would be sizing the entry itself.
-    The signal's target does not travel — ``ProposalRequest`` has no field for it
-    and forbids extras — but ``signal_id`` does, so the level stays one join
-    away (registered in ``notes-T3.14.md``).
+    The signal's own target travels as ``ProposalRequest.target``
+    (``0009_paper_geometry``, DATABASE.md §21.6, closing the pendency
+    ``notes-T3.14.md`` §5.1 registered) — ``signal_id`` also travels, so the
+    level stays reachable by a join even where the payload is absent.
     """
     screened = chosen.screened
     entry_ref, stop, costs = screened.entry_ref, screened.stop, screened.assumed_costs
@@ -202,6 +203,7 @@ def _request(chosen: _Ranked, *, wallet: WalletRef) -> ProposalRequest:
         direction=screened.signal.direction,
         entry_ref=entry_ref,
         stop=stop,
+        target=screened.signal.target,
         requested_notional=None,
         assumed_costs=costs,
         agent_id=screened.agent_id,

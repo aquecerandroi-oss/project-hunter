@@ -125,15 +125,17 @@ async def load_open_position(
 ) -> OpenPositionRow | None:
     """The live position of one market, if there is one — **dust is not one**.
 
-    This is the entry cycle's duplicate guard, and ``status = 'closing'`` is the
-    residual: 0,000482 units that no price makes sellable are not "a position in
-    that coin", and treating them as one refused the wallet a second order in
-    that market for ever (T3.5b review, item 3). The row is still there, still
-    owned and still valued — it just does not answer this question.
+    This is the entry cycle's duplicate guard (``entry.py``'s ``position_exists``
+    refusal). ``positions.is_residual`` (``0009_paper_geometry``, DATABASE.md
+    §21.1) is the durable marker: 0,000482 units that no price makes sellable are
+    not "a position in that coin", and treating them as one refused the wallet a
+    second order in that market for ever (T3.5b review, item 3). The row is
+    still there, still owned and still valued — it just does not answer this
+    question.
     """
     statement = (
         _SELECT
-        + "AND p.market_id = :market AND p.status <> 'closing'"
+        + "AND p.market_id = :market AND NOT p.is_residual"
         + (" FOR UPDATE OF p" if lock else "")
     )
     row = (
@@ -227,7 +229,8 @@ async def reduce_position(
     """Take ``qty`` off the position and accumulate what it realised.
 
     ``dust=True`` says the leftover is below the exchange minimum, so nothing
-    sellable remains: the position moves to ``closing`` and keeps holding the
+    sellable remains: the position moves to ``closing``, ``is_residual`` is set
+    (``0009_paper_geometry``, DATABASE.md §21.1) and it keeps holding the
     residual, which stays in the wallet's equity and stays visible. It is never
     zeroed — "resíduo contabilizado e visível, nunca quitado como se tivesse
     sido vendido" (RISK_ENGINE.md §10, spec V7 item 5).
@@ -244,7 +247,8 @@ async def reduce_position(
         remaining = position.qty - qty
         notional = remaining * exit_price
     closed = remaining == _ZERO
-    settled = closed or (dust and remaining > _ZERO)
+    residual = dust and remaining > _ZERO
+    settled = closed or residual
     status = (
         PositionStatus.CLOSED
         if closed
@@ -256,8 +260,9 @@ async def reduce_position(
         text(
             "UPDATE positions SET qty = :qty, notional = :notional, mark_price = :price, "
             "realized_pnl = realized_pnl + :realized, fees_paid = fees_paid + :fees, "
-            "unrealized_pnl = :unrealized, status = :status, closed_at = :closed_at, "
-            "updated_at = :now WHERE id = :id AND organization_id = :org AND portfolio_id = :pf"
+            "unrealized_pnl = :unrealized, status = :status, is_residual = :is_residual, "
+            "closed_at = :closed_at, updated_at = :now "
+            "WHERE id = :id AND organization_id = :org AND portfolio_id = :pf"
         ),
         {
             "qty": remaining,
@@ -267,6 +272,7 @@ async def reduce_position(
             "fees": fees_quote,
             "unrealized": remaining * (exit_price - position.avg_entry_price),
             "status": status.value,
+            "is_residual": residual,
             "closed_at": now if closed else None,
             "now": now,
             "id": position.position_id,

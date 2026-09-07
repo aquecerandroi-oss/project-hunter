@@ -92,7 +92,8 @@ class TestDustDoesNotHoldASlotOrTheCoin:
             position = (
                 await connection.execute(
                     text(
-                        "SELECT qty, status::text AS status FROM positions WHERE portfolio_id = :pf"
+                        "SELECT qty, status::text AS status, is_residual FROM positions "
+                        "WHERE portfolio_id = :pf"
                     ),
                     {"pf": wallet.portfolio_id},
                 )
@@ -103,6 +104,8 @@ class TestDustDoesNotHoldASlotOrTheCoin:
             )
         assert position.qty == DUST
         assert position.status == PositionStatus.CLOSING.value
+        # DATABASE.md §21.1: the durable column, not a derivation from status.
+        assert position.is_residual is True
         assert intent_state == ExitIntentState.BLOCKED_RESIDUAL.value
 
         build = await _state(db_session_factory, wallet, now=MARK_AT)

@@ -201,13 +201,34 @@ async def test_an_expired_entry_window_is_refused(
     assert [item.refused for item in screened] == ["entry_window_closed"]
 
 
+async def _insert_coin_position(
+    engine: AsyncEngine, fixture: Fixture, *, is_residual: bool
+) -> None:
+    from sqlalchemy import text
+
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO positions (id, organization_id, portfolio_id, market_id, direction, "
+                "qty, avg_entry_price, status, is_residual, opened_at) VALUES "
+                "(gen_random_uuid(), :org, :pf, :market, 'long', 0.000482, 100, 'closing', "
+                ":is_residual, :now)"
+            ),
+            {
+                "org": fixture.tenant.org_id,
+                "pf": fixture.wallet.portfolio_id,
+                "market": fixture.tenant.market_id,
+                "is_residual": is_residual,
+                "now": NOW,
+            },
+        )
+
+
 async def test_a_position_closing_in_the_same_coin_refuses_duplicate_position(
     db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
 ) -> None:
     """Never two positions in the same coin — including one still ``closing``
-    with dust on it (notes-T3.5.md §2.3)."""
-    from sqlalchemy import text
-
+    that has not settled as dust yet (``is_residual = false``)."""
     fixture = await _setup(db_session_factory, db_engine)
     await shadow.emit_signal(
         db_engine,
@@ -216,19 +237,25 @@ async def test_a_position_closing_in_the_same_coin_refuses_duplicate_position(
         source_bar_close=BAR,
         purpose=shadow.PURPOSE_LIVE,
     )
-    async with db_engine.begin() as connection:
-        await connection.execute(
-            text(
-                "INSERT INTO positions (id, organization_id, portfolio_id, market_id, direction, "
-                "qty, avg_entry_price, status, opened_at) VALUES (gen_random_uuid(), :org, :pf, "
-                ":market, 'long', 0.000482, 100, 'closing', :now)"
-            ),
-            {
-                "org": fixture.tenant.org_id,
-                "pf": fixture.wallet.portfolio_id,
-                "market": fixture.tenant.market_id,
-                "now": NOW,
-            },
-        )
+    await _insert_coin_position(db_engine, fixture, is_residual=False)
     screened = await _screen(db_session_factory, fixture)
     assert [item.refused for item in screened] == ["duplicate_position"]
+
+
+async def test_a_residual_position_in_the_same_coin_does_not_refuse(
+    db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
+) -> None:
+    """``0009_paper_geometry``, DATABASE.md §21.1: dust is not a position, so it
+    is not a commitment either — same rule ``entry.py``'s manual duplicate
+    guard applies (T3.1e/review-T3.5.md item 3, "não conta ... duplicidade")."""
+    fixture = await _setup(db_session_factory, db_engine)
+    await shadow.emit_signal(
+        db_engine,
+        version_id=fixture.version_id,
+        market_id=fixture.perp_market_id,
+        source_bar_close=BAR,
+        purpose=shadow.PURPOSE_LIVE,
+    )
+    await _insert_coin_position(db_engine, fixture, is_residual=True)
+    screened = await _screen(db_session_factory, fixture)
+    assert [item.refused for item in screened] == [None]

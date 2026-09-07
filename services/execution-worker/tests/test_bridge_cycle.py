@@ -144,7 +144,7 @@ async def test_one_signal_becomes_one_approved_proposal_holding_a_reservation(
             await connection.execute(
                 text(
                     "SELECT signal_id, source::text AS source, agent_id, idempotency_key, "
-                    "reservation_state::text AS reservation FROM trade_proposals "
+                    "reservation_state::text AS reservation, request_payload FROM trade_proposals "
                     "WHERE portfolio_id = :pf"
                 ),
                 {"pf": lab.wallet.portfolio_id},
@@ -156,6 +156,9 @@ async def test_one_signal_becomes_one_approved_proposal_holding_a_reservation(
     assert row[0].agent_id is not None
     assert row[0].idempotency_key == f"agent:shadow:{signal_id}"
     assert row[0].reservation == "held"
+    # T3.5c item 6: the bridge passes the signal's own target through to the
+    # archived geometry — ``shadow.emit_signal`` defaults it to "105".
+    assert row[0].request_payload["target"] == "105"
 
 
 async def test_the_entry_cycle_of_t35_picks_the_bridge_proposal_up_next_cycle(

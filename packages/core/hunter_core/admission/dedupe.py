@@ -158,23 +158,37 @@ async def find_admitted(
 
 
 async def find_pending(
-    session: AsyncSession, *, organization_id: uuid.UUID, idempotency_key: str
+    session: AsyncSession, *, organization_id: uuid.UUID, idempotency_key: str, lock: bool = True
 ) -> PendingRequest | None:
     """The undecided request this key filed, if there is one.
 
-    Locked ``FOR UPDATE``: it is about to be decided **in its own row**, and two
-    admissions racing for the same request must not both decide it.
+    ``lock=True`` (the default) is ``FOR UPDATE``: it is about to be decided
+    **in its own row**, and two admissions racing for the same request must not
+    both decide it — the shape :func:`~hunter_core.admission.service.admit`
+    needs, running as ``hunter_worker``.
+
+    ``lock=False`` is a plain read, for a caller that only compares a retry
+    against what is already filed and never decides anything —
+    ``apps/api/hunter_api/services/admission.file_manual_order``, running as
+    ``hunter_app``. Postgres requires the ``UPDATE`` privilege for ``SELECT
+    ... FOR UPDATE`` in addition to ``SELECT`` (not documented as an M3 rule,
+    just how the database enforces locking), and ``0007_paper_roles`` revokes
+    exactly that from ``hunter_app`` on this table (DATABASE.md §19.4): a
+    locked read from the API role fails **permission denied**, not merely
+    "no row", which is what a real end-to-end filing surfaced (T3.5c).
     """
     lookup = ProposalLookup(session, organization_id)
     await lookup.require_tenant_context()
     row = (
         await session.execute(
+            # S608: the only variable fragment is the literal " FOR UPDATE" below,
+            # chosen from a closed set of two constants — never caller input.
             text(
-                "SELECT id AS proposal_id, portfolio_id, market_id, "
+                "SELECT id AS proposal_id, portfolio_id, market_id, "  # noqa: S608
                 "direction::text AS direction, source::text AS source, request_digest, "
                 "request_payload FROM trade_proposals WHERE organization_id = :org "
-                "AND idempotency_key = :key AND status = 'pending' AND decided_at IS NULL "
-                "FOR UPDATE"
+                "AND idempotency_key = :key AND status = 'pending' AND decided_at IS NULL"
+                + (" FOR UPDATE" if lock else "")
             ),
             {"org": organization_id, "key": idempotency_key},
         )

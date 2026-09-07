@@ -41,6 +41,7 @@ def _row(
         quote_asset="USDT",
         direction=direction,
         status="open",
+        is_residual=False,
         qty=qty,
         avg_entry_price=entry,
         stop_price=stop,

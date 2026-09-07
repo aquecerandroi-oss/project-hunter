@@ -23,7 +23,14 @@ from hunter_core.domain.types import utcnow
 from hunter_core.execution.paper import PaperExecutionAdapter
 from hunter_core.logging import get_logger
 from hunter_execution_worker import metrics
-from hunter_execution_worker.admission_cycle import pending_requests, report_unreadable
+from hunter_execution_worker.admission_cycle import (
+    RequestInputs,
+    decide_requests,
+    pending_requests,
+    readable_and_unreadable,
+    rebuild_request,
+    report_unreadable,
+)
 from hunter_execution_worker.bridge import run_bridge_cycle
 from hunter_execution_worker.bridge_inputs import marks_for_open_positions
 from hunter_execution_worker.config import WORKER_ROLE, ExecutionConfig
@@ -33,8 +40,10 @@ from hunter_execution_worker.guard import (
     expire_stale_reservations,
     read_effective_state,
 )
+from hunter_execution_worker.manual_inputs import manual_request_inputs
 from hunter_execution_worker.mtm import run_mtm_cycle
 from hunter_execution_worker.protection import TriggerWatermarks, run_protection_cycle
+from hunter_execution_worker.reference import load_market
 from hunter_execution_worker.triggering import DegradedRetries
 from hunter_execution_worker.wallet import WalletRef, principal_wallets
 
@@ -43,6 +52,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+    from hunter_core.admission.sources import ProposalRequest
     from hunter_execution_worker.market_data import SpotMarketData
     from hunter_execution_worker.state import CycleHealth
 
@@ -131,20 +141,55 @@ class Cycles:
     # ------------------------------------------------------------- the loops
 
     async def admission(self) -> None:
-        """Look at what the API filed. Decide what can be decided; say what cannot."""
+        """Look at what the API filed. Decide what can be decided; say what cannot.
+
+        A row with a ``request_payload`` (``0009_paper_geometry``) is rebuilt
+        into the ``ProposalRequest`` the operator asked for and decided through
+        :func:`~hunter_execution_worker.admission_cycle.decide_requests` — the
+        same path the T3.14 bridge submits through. One whose market picture
+        cannot be assembled this pass (no book, no beta yet) is **deferred**,
+        not refused: nothing is written, and the row is simply read again next
+        second, exactly like a bridge candidate waiting on its own market data.
+        """
 
         async def run(session: AsyncSession, wallet: WalletRef) -> None:
+            now = self.clock()
             filed = await pending_requests(session, wallet=wallet)
-            unreadable = report_unreadable(
+            readable, unreadable = readable_and_unreadable(filed)
+            report_unreadable(
                 wallet,
-                filed,
+                unreadable,
                 reported=self.geometry_reported.setdefault(wallet.portfolio_id, set()),
             )
+            requests: list[tuple[ProposalRequest, RequestInputs]] = []
+            for row in readable:
+                market = await load_market(session, row.market_id)
+                if market is None:
+                    logger.warning(
+                        "manual_request_market_unknown", proposal_id=str(row.proposal_id)
+                    )
+                    continue
+                inputs = await manual_request_inputs(
+                    session,
+                    wallet=wallet,
+                    market=market,
+                    data=self.data,
+                    policy=self.adapter.policy.marking_policy,
+                    now=now,
+                    exit_cost_rate=self.config.exit_cost_rate,
+                )
+                if isinstance(inputs, str):
+                    logger.info(
+                        "manual_request_deferred", proposal_id=str(row.proposal_id), reason=inputs
+                    )
+                    continue
+                requests.append((rebuild_request(row, wallet=wallet, market=market), inputs))
+            await decide_requests(session, wallet=wallet, requests=requests, now=now)
             self.health.pending_requests = len(filed)
-            self.health.unreadable_requests = unreadable
-            metrics.execution_pending_requests.labels(readable="false").set(unreadable)
-            metrics.execution_pending_requests.labels(readable="true").set(len(filed) - unreadable)
-            self.health.admission_at = self.clock()
+            self.health.unreadable_requests = len(unreadable)
+            metrics.execution_pending_requests.labels(readable="false").set(len(unreadable))
+            metrics.execution_pending_requests.labels(readable="true").set(len(readable))
+            self.health.admission_at = now
 
         await self._for_each(run)
 

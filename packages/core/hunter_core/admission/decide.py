@@ -56,13 +56,22 @@ async def decide_pending(
 
     ``decided_at`` is the instant of *this* evaluation. Nothing here invents one
     for a row that was never decided (suggestion 9 of the same review).
+
+    ``request_digest`` is always **stamped**, never inherited from the row:
+    since ``0009_paper_geometry`` the request guard refuses an ``INSERT`` from
+    the application role that carries a digest at all (DATABASE.md §21.2, S1 of
+    ``.claude/state/review-T3.1c-security.md``) — a proof chosen by the caller
+    binds nobody, and the engine's own recomputation, from ``request_payload``,
+    the row and the market reference, is the only proof that means anything.
+    ``coalesce(request_digest, :digest)`` used to let a caller-supplied digest
+    win over the engine's; nothing may win over it now.
     """
     approved = decision.approved
     decided = await session.scalar(
         text(
             "UPDATE trade_proposals SET status = :status, risk_decision = CAST(:decision AS jsonb),"
             " rejection_reason = :reason, kill_switch_snapshot = CAST(:snapshot AS jsonb), "
-            "request_digest = coalesce(request_digest, :digest), decided_at = :decided, "
+            "request_digest = :digest, decided_at = :decided, "
             "expires_at = :expires WHERE id = :id AND organization_id = :org "
             "AND status = 'pending' AND decided_at IS NULL RETURNING id"
         ),

@@ -205,12 +205,18 @@ async def file_manual_order(
             status=decided.status,
             decided=True,
         )
-    pending = await find_pending(session, organization_id=context.org_id, idempotency_key=key)
+    pending = await find_pending(
+        session, organization_id=context.org_id, idempotency_key=key, lock=False
+    )
     if pending is not None:
-        # The filed row carries no digest since ``0009`` (the guard refuses one),
-        # so what is compared is the archived geometry — the same information one
-        # step earlier, and the thing that keeps a reused key naming a
-        # *different* order from replaying as this one.
+        # Unlocked: the API only ever reads this row (it never decides), and
+        # ``hunter_app`` lost ``UPDATE`` on ``trade_proposals`` in
+        # ``0007_paper_roles`` — a ``FOR UPDATE`` read under this role is a
+        # permission error, not a lock wait (T3.5c). The filed row carries no
+        # digest since ``0009`` (the guard refuses one), so what is compared is
+        # the archived geometry — the same information one step earlier, and
+        # the thing that keeps a reused key naming a *different* order from
+        # replaying as this one.
         _refuse_a_different_order(pending.request_payload, payload, pending.proposal_id)
         return FiledRequest(
             proposal_id=pending.proposal_id,

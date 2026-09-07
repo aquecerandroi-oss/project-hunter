@@ -119,6 +119,7 @@ def request_digest(request: ProposalRequest, source: ProposalSource) -> str:
             "direction": request.direction.value,
             "entry_ref": str(request.entry_ref),
             "stop": str(request.stop),
+            "target": None if request.target is None else str(request.target),
             "requested_notional": (
                 None if request.requested_notional is None else str(request.requested_notional)
             ),
@@ -142,10 +143,11 @@ def request_payload(request: ProposalRequest) -> dict[str, Any]:
 
     Every key is always present; "absent" is JSON ``null``, never omission, so a
     reader never has to decide whether a missing ``target`` means "no target" or
-    "the writer forgot". ``target`` is null for every request M3 can build —
-    :class:`ProposalRequest` has no take-profit field, because the exit geometry
-    comes from the protection cycle — and the key exists so T3.8's form and
-    T3.14's bridge can fill it without another migration.
+    "the writer forgot". ``target`` is ``request.target`` when the caller named
+    one — the T3.14 bridge passes the shadow signal's own target — and ``null``
+    for every request that does not (the operator's route today has no
+    take-profit field of its own; the exit geometry usually comes from the
+    protection cycle).
 
     ``organization_id``, ``portfolio_id``, ``agent_id`` and ``signal_id`` are
     **not** here: they are columns, and repeating them would be a second answer
@@ -160,7 +162,7 @@ def request_payload(request: ProposalRequest) -> dict[str, Any]:
         "direction": request.direction.value,
         "entry_ref": str(request.entry_ref),
         "stop": str(request.stop),
-        "target": None,
+        "target": None if request.target is None else str(request.target),
         "requested_notional": (
             None if request.requested_notional is None else str(request.requested_notional)
         ),
@@ -193,6 +195,12 @@ class ProposalRequest(BaseModel):
     direction: TradeDirection
     entry_ref: Decimal = Field(gt=0)
     stop: Decimal = Field(gt=0)
+    target: Decimal | None = Field(default=None, gt=0)
+    """The take-profit level, when the caller has one. ``None`` travels as JSON
+    ``null`` (§21.1) — never omission — through both :func:`request_digest` and
+    :func:`request_payload`, so a request without a target and a request whose
+    writer forgot it are never the same fact."""
+
     requested_notional: Decimal | None = Field(default=None, gt=0)
     requested_risk_pct: Decimal | None = Field(default=None, gt=0)
     assumed_costs: AssumedCosts
@@ -210,7 +218,9 @@ class ProposalRequest(BaseModel):
 
     actor_type: str = "user"
 
-    @field_validator("entry_ref", "stop", "requested_notional", "requested_risk_pct", mode="before")
+    @field_validator(
+        "entry_ref", "stop", "target", "requested_notional", "requested_risk_pct", mode="before"
+    )
     @classmethod
     def _never_a_float(cls, value: object) -> object:
         """A float price is refused at the door, not silently converted.

@@ -87,23 +87,17 @@ class PositionRow(BaseModel):
     as the *fallback* when the live source has no valid price, and never as an
     excuse to report a fresh equity: the state is flagged incomplete instead."""
 
-    @property
-    def is_residual(self) -> bool:
-        """Is what this row still holds *dust* rather than a position?
-
-        A spot buy pays its fee in the coin, so the wallet receives
-        ``qty × 0,999`` and almost never a whole number of ``step_size``: after
-        the exit, a leftover below ``min_qty`` stays for ever because no price
-        makes it sellable. The writer marks that with ``status = 'closing'``
-        (``hunter_execution_worker.positions.reduce_position``), which today is
-        exactly and only the dust case.
-
-        The residual is still **owned, marked and part of the patrimony** — it
-        is simply not a position: it takes no slot, is not the coin "already in
-        the wallet" for D3, and commits no planned risk (T3.5b review, item 3).
-        A durable ``positions.is_residual`` is filed for T3.1e; until it lands,
-        this property is the single place that reading knows the difference."""
-        return self.status == "closing"
+    is_residual: bool
+    """``positions.is_residual`` (``0009_paper_geometry``, DATABASE.md §21.1),
+    read straight off the row since the column exists: dust — a leftover below
+    ``min_qty`` that no price makes sellable — is still **owned, marked and
+    part of the patrimony**, it is simply not a position: it takes no slot, is
+    not the coin "already in the wallet" for D3, and commits no planned risk
+    (T3.5b review, item 3). Before this column, the only marker was
+    ``status = 'closing'``, which this class derived it from; that was a
+    coincidence of the writer (``reduce_position`` only ever wrote ``closing``
+    for dust), not a fact of the schema — the CHECK
+    (``NOT is_residual OR status = 'closing'``) is the fact now."""
 
 
 class ReservationRow(BaseModel):
@@ -143,11 +137,22 @@ class LedgerRepository(TenantRepository):
     """Everything the ledger reads about one wallet, scoped to one organization."""
 
     async def open_positions(self, portfolio_id: uuid.UUID) -> tuple[PositionRow, ...]:
+        """Every position this wallet still holds, dust included.
+
+        Filtered on ``status <> 'closed' AND qty > 0`` alone, never on
+        ``is_residual``: dust is still **owned, marked and part of the
+        patrimony** (T3.5b review, item 3), and a caller valuing the wallet's
+        exposure and equity — :func:`hunter_core.portfolio.state.build_portfolio_state`
+        is the only one today — has to see it. What excludes the residual from
+        the *engine's* view (slots, ``assets_held``, planned risk) is
+        :func:`hunter_core.portfolio.positions.to_open_positions` reading
+        :attr:`PositionRow.is_residual` on the caller's side, not this query.
+        """
         # S608: the only interpolated fragments are the module constants above
         # (column list and join). Every value is a bound parameter.
         statement = text(
             "SELECT p.id AS position_id, p.market_id, p.direction::text AS direction, p.qty, "  # noqa: S608
-            "p.avg_entry_price, p.stop_price, p.status::text AS status, "
+            "p.avg_entry_price, p.stop_price, p.status::text AS status, p.is_residual, "
             "p.mark_price AS durable_mark_price, "
             f"{_MARKET_COLUMNS} FROM positions p "
             + _MARKET_JOIN.format(alias="p")
