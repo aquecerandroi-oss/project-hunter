@@ -77,6 +77,19 @@ def _paper_tables(name: str) -> tuple[str, ...]:
     return cast(tuple[str, ...], getattr(migration_ddl("paper"), name))
 
 
+def _paper_roles_2_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0008_paper_roles_2``'s list in ``ddl/paper_roles_2.py``.
+
+    It adds no class: ``APP_READ_ONLY_TABLES_0008`` **moves** four tables
+    (``orders``, ``fills``, ``positions``, ``trades``) out of ``0001``'s
+    ``APP_WRITE_TABLES`` and into read-only, so every test below subtracts it
+    from the write class before counting. The partition stays exact, and
+    ``test_migrations.py::test_0008_reclassifies_only_tables_0001_had_already_classified``
+    is what keeps the move a move.
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("paper_roles_2"), name))
+
+
 def _lock_tables(name: str) -> tuple[str, ...]:
     """The same, for ``0005_feature_baselines_lock_grant``'s ``ddl/baseline_lock.py``.
 
@@ -257,6 +270,10 @@ async def test_read_only_tables_grant_the_app_role_nothing_but_select(
         *_shadow_tables("SHADOW_APP_READ_ONLY_TABLES"),
         *_analysis_tables("ANALYSIS_APP_READ_ONLY_TABLES"),
         *_paper_tables("PAPER_APP_READ_ONLY_TABLES"),
+        # 0008: execution stops being the API's to write (§20.1). The four
+        # arrive here rather than in ``ddl/tables.py`` because that list is
+        # frozen as of ``0001`` and has to keep describing what ``0001`` did.
+        *_paper_roles_2_tables("APP_READ_ONLY_TABLES_0008"),
     )
     assert read_only, "the read-only grant list is empty"
 
@@ -308,7 +325,14 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     schema_engine: AsyncEngine,
 ) -> None:
     """The frozen lists and the database describe the same set of tables."""
-    write = _security_tables("APP_WRITE_TABLES")
+    # 0008 **moves** four tables from the write class to read-only; the lists are
+    # frozen per revision, so the move is expressed here as a subtraction rather
+    # than by editing ``0001``'s tuple. Without it the four would be counted
+    # twice and this test would read a reclassification as a bug.
+    reclassified = set(_paper_roles_2_tables("APP_READ_ONLY_TABLES_0008"))
+    write = tuple(
+        table for table in _security_tables("APP_WRITE_TABLES") if table not in reclassified
+    )
     no_delete = _security_tables("APP_NO_DELETE_TABLES")
     read_only = _security_tables("APP_READ_ONLY_TABLES")
     append_only = _security_tables("APPEND_ONLY_TABLES")
@@ -322,6 +346,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     # of its own — the API gets SELECT/INSERT and ``UPDATE (updated_at)``, which
     # is exactly enough to take the wallet lock and not enough to write a value.
     paper_lock_only = _paper_tables("PAPER_LOCK_ONLY_TABLES")
+    execution_read_only = _paper_roles_2_tables("APP_READ_ONLY_TABLES_0008")
 
     classified = (
         list(write)
@@ -334,6 +359,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(paper_append)
         + list(paper_no_delete)
         + list(paper_lock_only)
+        + list(execution_read_only)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 
@@ -601,3 +627,69 @@ async def test_the_engine_moves_the_kill_switch_column_and_nothing_else(
         await worker_connection.rollback()
         await worker_connection.begin()
         await worker_connection.execute(text("SET LOCAL ROLE hunter_worker"))
+
+
+async def test_the_app_role_reads_execution_and_writes_none_of_it(
+    app_connection: AsyncConnection,
+) -> None:
+    """``0008_paper_roles_2``, D1: the API lists execution and forges nothing.
+
+    The four statements below are the security review's, verbatim in intent:
+    each one was **accepted** against ``0007``, as this role, inside the correct
+    organization, where RLS says yes. That is the point — RLS keeps one tenant
+    out of another's rows and says nothing about a request handler (or an
+    injection into one) rewriting its own tenant's execution history.
+
+    It matters more than it looks, because ``portfolio_equity_snapshots`` is
+    *derived* from these four: with ``0007`` alone, closing the curve to the API
+    only moved the forgery one table down — fabricate the fill and the engine
+    computes, signs and stores the forged point itself, as the role everything
+    downstream trusts.
+
+    Proved as the role, not asked of ``has_table_privilege``: the catalogue is
+    checked by ``test_migrations.py``; what a request handler can actually run
+    is checked here.
+    """
+    for table in _paper_roles_2_tables("APP_READ_ONLY_TABLES_0008"):
+        await app_connection.execute(text(f"SELECT count(*) FROM {table}"))  # noqa: S608
+
+    for statement in (
+        # a fabricated fill — the source the curve is derived from
+        "INSERT INTO fills (id, order_id, organization_id, portfolio_id, ts, qty, price, "
+        "fee, liquidity, execution_key) VALUES (gen_random_uuid(), gen_random_uuid(), "
+        "gen_random_uuid(), gen_random_uuid(), now(), 1, 1, 0, 'taker', 'forged')",
+        "UPDATE positions SET qty = qty * 1000 WHERE false",
+        "DELETE FROM trades WHERE false",
+        "UPDATE orders SET status = 'filled' WHERE false",
+        "INSERT INTO positions (id, organization_id, portfolio_id, market_id, direction, "
+        "qty, avg_entry_price, notional) VALUES (gen_random_uuid(), gen_random_uuid(), "
+        "gen_random_uuid(), gen_random_uuid(), 'long', 1, 1, 1)",
+    ):
+        with pytest.raises(ProgrammingError, match=_DENIED):
+            await app_connection.execute(text(statement))
+        await app_connection.rollback()
+        await app_connection.begin()
+        await app_connection.execute(_AS_APP)
+
+
+async def test_the_engine_still_writes_every_execution_table(
+    worker_connection: AsyncConnection,
+) -> None:
+    """D1 narrows the API and nothing else: execution is the engine's, whole.
+
+    The failure this guards against is over-correction — a ``REVOKE`` written on
+    the wrong side leaves T3.5 with no role able to record a fill, which is the
+    wall ``0007`` hit on ``portfolios`` (§19.2, item 1b) and the reason that one
+    was measured rather than assumed.
+    """
+    for table in _paper_roles_2_tables("APP_READ_ONLY_TABLES_0008"):
+        for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE"):
+            granted = await worker_connection.scalar(
+                text("SELECT has_table_privilege('hunter_worker', :t, :p)"),
+                {"t": table, "p": privilege},
+            )
+            assert granted, f"the engine lost {privilege} on {table}"
+    # and it runs, not merely reports: an UPDATE that matches nothing still goes
+    # through the privilege check the API now fails.
+    await worker_connection.execute(text("UPDATE positions SET qty = qty WHERE false"))
+    await worker_connection.execute(text("DELETE FROM trades WHERE false"))

@@ -2564,3 +2564,364 @@ async def test_the_app_files_a_request_and_the_engine_is_the_one_that_decides(
         )
     assert str(status) == "approved"
     assert seq == 1, "the FIFO counter is the engine's, and only the engine advanced it"
+
+
+# --------------------------------------------------------------------------
+# 0008_paper_roles_2 — a wallet is born audited, and the motive is part of
+# the latch (DATABASE.md §20; security review of ``0007``, D3 and D4)
+# --------------------------------------------------------------------------
+
+
+async def _bare_organization(engine: AsyncEngine) -> tuple[uuid.UUID, uuid.UUID]:
+    """An organization with a workspace and **no** wallet, built as the owner.
+
+    Needed because the ``wallets`` fixture's two organizations already hold their
+    principal wallet, and ``uq_portfolios_principal_paper`` would refuse a second
+    one before the guard under test ever ran — the index would pass the test for
+    the wrong reason.
+    """
+    org_id, workspace_id = uuid7(), uuid7()
+    async with engine.begin() as connection:
+        await connection.execute(
+            text("INSERT INTO organizations (id, slug, name) VALUES (:id, :slug, :slug)"),
+            {"id": org_id, "slug": f"born-{uuid.uuid4().hex[:8]}"},
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO workspaces (id, organization_id, name, objective) "
+                "VALUES (:id, :org, 'born', 'paper_trading')"
+            ),
+            {"id": workspace_id, "org": org_id},
+        )
+    return org_id, workspace_id
+
+
+async def _audit(connection: AsyncConnection, org_id: uuid.UUID, entity: uuid.UUID) -> None:
+    await connection.execute(
+        text(
+            "INSERT INTO audit_logs (id, created_at, organization_id, actor_type, action, "
+            "entity_type, entity_id) VALUES (:id, now(), :org, 'system', 'portfolio.opened', "
+            "'portfolio', :entity)"
+        ),
+        {"id": uuid7(), "org": org_id, "entity": entity},
+    )
+
+
+async def _open_as_the_engine(
+    engine: AsyncEngine,
+    org_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    *,
+    kind: str = "paper",
+    arena: bool = False,
+    audited: bool = True,
+    audit_org: uuid.UUID | None = None,
+) -> uuid.UUID:
+    """Insert one ``portfolios`` row as ``hunter_worker``, and nothing else.
+
+    Deliberately *not* ``open_paper_wallet``: this is the raw capability
+    ``0007``'s grant handed the engine, and the raw capability is what the guard
+    has to bound.
+    """
+    portfolio_id = uuid7()
+    async with engine.begin() as connection:
+        await connection.execute(_AS_WORKER)
+        await connection.execute(
+            text(
+                "INSERT INTO portfolios (id, organization_id, workspace_id, name, type, "
+                "is_arena, initial_capital) VALUES (:id, :org, :ws, 'probe', :kind, "
+                ":arena, 100000)"
+            ),
+            {
+                "id": portfolio_id,
+                "org": org_id,
+                "ws": workspace_id,
+                "kind": kind,
+                "arena": arena,
+            },
+        )
+        if audited:
+            await _audit(connection, audit_org or org_id, portfolio_id)
+    return portfolio_id
+
+
+async def test_the_engine_cannot_open_an_arena_wallet(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review of ``0007``, **D3** — ``is_arena`` was the way past permanence.
+
+    ``uq_portfolios_principal_paper`` is ``WHERE type = 'paper' AND NOT
+    is_arena`` (§18.8), so an arena wallet sits **outside** it: the engine could
+    write a second wallet the index that makes "one wallet" true cannot see, with
+    a capital of its own, no anchor and no history. Reproduced as the role —
+    ``0007`` accepted this row.
+    """
+    wallet, _other = wallets
+    with pytest.raises(DBAPIError, match="the engine opens the paper wallet and nothing else"):
+        await _open_as_the_engine(
+            schema_engine, wallet.org_id, wallet.workspace_id, arena=True, audited=False
+        )
+
+
+async def test_the_engine_cannot_open_a_live_portfolio(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """The directive is paper-only in M3, and ``INSERT`` carries every column.
+
+    Every downstream reader treats a ``live`` portfolio as real money. The grant
+    ``0007`` gave the engine was for opening *the paper wallet*; this is the
+    schema saying so instead of a comment saying so.
+    """
+    wallet, _other = wallets
+    with pytest.raises(DBAPIError, match="the engine opens the paper wallet and nothing else"):
+        await _open_as_the_engine(
+            schema_engine, wallet.org_id, wallet.workspace_id, kind="live", audited=False
+        )
+
+
+async def test_the_engine_cannot_open_a_wallet_it_never_audited(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """A wallet whose birth nobody recorded has no beginning to reconstruct.
+
+    ``hunter_worker`` holds ``BYPASSRLS``, so the organization in the row is
+    checked by no policy at all: the review opened a wallet **in another
+    organization**, with no anchor, no lock row and no audit entry, and nothing
+    refused it. What makes an opening honest is that the audit row is written in
+    the same commit (§18.2) — so that is what the guard asks for.
+    """
+    org_id, workspace_id = await _bare_organization(schema_engine)
+    with pytest.raises(DBAPIError, match="no audit_logs row written in this transaction"):
+        await _open_as_the_engine(schema_engine, org_id, workspace_id, audited=False)
+
+    async with schema_engine.connect() as connection:
+        opened = await connection.scalar(
+            text("SELECT count(*) FROM portfolios WHERE organization_id = :org"), {"org": org_id}
+        )
+    assert opened == 0, "the refusal has to take the row with it"
+
+
+async def test_an_audit_row_of_another_organization_does_not_bless_this_opening(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """The entry has to be *this* tenant's, not any entry the transaction wrote.
+
+    A worker that touches several organizations in one transaction writes audit
+    rows for all of them; without the ``organization_id`` half, one of those
+    would authorise a wallet opened for a tenant nobody recorded.
+    """
+    wallet, _other = wallets
+    org_id, workspace_id = await _bare_organization(schema_engine)
+    with pytest.raises(DBAPIError, match="no audit_logs row written in this transaction"):
+        await _open_as_the_engine(schema_engine, org_id, workspace_id, audit_org=wallet.org_id)
+
+
+async def test_an_audit_row_banked_earlier_does_not_bless_a_later_opening(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """``xmin``, not ``EXISTS`` — the same lesson as blocking 1 of §18.7.
+
+    Being audited *at some point* is not being audited *for this act*: one row
+    banked by an earlier transaction would otherwise authorise every later
+    opening for that organization, for ever.
+    """
+    org_id, workspace_id = await _bare_organization(schema_engine)
+    async with schema_engine.begin() as connection:
+        await _audit(connection, org_id, uuid7())
+
+    with pytest.raises(DBAPIError, match="no audit_logs row written in this transaction"):
+        await _open_as_the_engine(schema_engine, org_id, workspace_id, audited=False)
+
+
+async def test_the_engine_opens_a_paper_wallet_it_audits_in_the_same_transaction(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """And the honest shape passes: the guard bounds the grant, it does not remove it.
+
+    This is the shape ``hunter_core.portfolio.open_paper_wallet`` writes, proved
+    end to end through the real function in ``test_portfolio_opening.py``.
+    """
+    org_id, workspace_id = await _bare_organization(schema_engine)
+    portfolio_id = await _open_as_the_engine(schema_engine, org_id, workspace_id)
+
+    async with schema_engine.connect() as connection:
+        stored = await connection.scalar(
+            text("SELECT type FROM portfolios WHERE id = :id"), {"id": portfolio_id}
+        )
+    assert str(stored) == "paper"
+
+
+async def test_an_operator_holding_both_roles_may_still_write_any_portfolio(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """The guard is scoped to *only* the engine's privileges, as §18.7's is.
+
+    An operator, the owner and a superuser hold both roles, so they are not "only
+    the engine"; ``hunter_app`` is untouched and still creates the arena and
+    shadow portfolios the product offers. Scoping this to ``current_user`` would
+    have been the "name is not a privilege" mistake in reverse.
+    """
+    wallet, _other = wallets
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text("SELECT set_config('app.current_org', :org, true)"), {"org": str(wallet.org_id)}
+        )
+        await connection.execute(_AS_APP)
+        await connection.execute(
+            text(
+                "INSERT INTO portfolios (id, organization_id, workspace_id, name, type, "
+                "is_arena, initial_capital) VALUES (:id, :org, :ws, 'arena', 'paper', true, 1000)"
+            ),
+            {"id": uuid7(), "org": wallet.org_id, "ws": wallet.workspace_id},
+        )
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO portfolios (id, organization_id, workspace_id, name, type, "
+                "initial_capital) VALUES (:id, :org, :ws, 'shadow', 'shadow', 1000)"
+            ),
+            {"id": uuid7(), "org": wallet.org_id, "ws": wallet.workspace_id},
+        )
+
+
+async def test_a_wallet_motive_cannot_be_rewritten_without_a_transition(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review of ``0007``, **D4** — the ``WHEN`` watched the state only.
+
+    ``kill_switch_reason`` is what an OWNER reads on the screen
+    (``routers/risk.py``, ``services/radar_org_derivation.py``), and it was
+    rewritable with no transition, no actor and no history: the latch said one
+    thing and the story explaining it said another, permanently.
+
+    Refused for **every** role, not only the engine: it is a constraint trigger,
+    and the motive of a latch is not a caption anyone gets to edit.
+    """
+    wallet, _other = wallets
+    await _latch(schema_engine, wallet, "WARNING", actor="system")
+
+    for role in (_AS_WORKER, _AS_APP):
+        with pytest.raises(DBAPIError, match="rewrote its kill switch reason"):
+            async with schema_engine.begin() as connection:
+                await connection.execute(
+                    text("SELECT set_config('app.current_org', :org, true)"),
+                    {"org": str(wallet.org_id)},
+                )
+                await connection.execute(role)
+                await connection.execute(
+                    text("UPDATE portfolios SET kill_switch_reason = :why WHERE id = :id"),
+                    {"why": "whatever the screen should say", "id": wallet.portfolio_id},
+                )
+    with pytest.raises(DBAPIError, match="rewrote its kill switch reason"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text("UPDATE portfolios SET kill_switch_reason = 'as the owner' WHERE id = :id"),
+                {"id": wallet.portfolio_id},
+            )
+
+    async with schema_engine.connect() as connection:
+        reason = await connection.scalar(
+            text("SELECT kill_switch_reason FROM portfolios WHERE id = :id"),
+            {"id": wallet.portfolio_id},
+        )
+    assert reason is None, "nothing was rewritten: _latch moves the state, not the motive"
+    await _latch(schema_engine, wallet, "ACTIVE", actor="user")
+
+
+async def test_an_organization_motive_cannot_be_rewritten_without_a_transition(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """The same widening on the organization scope — the two guards are one body."""
+    wallet, _other = wallets
+    with pytest.raises(DBAPIError, match="rewrote its kill switch reason"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text("UPDATE organizations SET kill_switch_reason = 'quiet' WHERE id = :id"),
+                {"id": wallet.org_id},
+            )
+
+
+async def test_a_move_that_carries_its_motive_and_its_transition_still_passes(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """The engine's real path: state, reason and the transition, one transaction.
+
+    ``hunter_core.risk.transitions.record_transition`` writes
+    ``kill_switch_state`` and ``kill_switch_reason`` in the *same* ``UPDATE``,
+    with the transition next to it — which is why the widened ``WHEN`` costs that
+    path nothing, and why ``0007``'s column grant names the two together.
+    """
+    wallet, _other = wallets
+    async with schema_engine.begin() as connection:
+        await connection.execute(_AS_WORKER)
+        await connection.execute(
+            text(
+                "INSERT INTO kill_switch_transitions (id, organization_id, scope, scope_id, "
+                "from_state, to_state, reason, actor_type, evidence) VALUES "
+                "(:id, :org, 'portfolio', :pf, 'ACTIVE', 'WARNING', :why, 'system', :evidence)"
+            ),
+            {
+                "id": uuid7(),
+                "org": wallet.org_id,
+                "pf": wallet.portfolio_id,
+                "why": "daily loss 1.2%",
+                "evidence": '{"daily_loss_pct": "0.012"}',
+            },
+        )
+        await connection.execute(
+            text(
+                "UPDATE portfolios SET kill_switch_state = 'WARNING', kill_switch_reason = :why "
+                "WHERE id = :id"
+            ),
+            {"why": "daily loss 1.2%", "id": wallet.portfolio_id},
+        )
+
+    async with schema_engine.connect() as connection:
+        row = (
+            await connection.execute(
+                text("SELECT kill_switch_state, kill_switch_reason FROM portfolios WHERE id = :id"),
+                {"id": wallet.portfolio_id},
+            )
+        ).one()
+    assert tuple(row) == ("WARNING", "daily loss 1.2%")
+    await _latch(schema_engine, wallet, "ACTIVE", actor="user")
+
+
+async def test_the_audited_move_guard_still_proves_the_same_transition(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """``0008`` re-installs the body; the refusals ``0006`` measured survive it.
+
+    The body is frozen in ``ddl/paper_roles_2.py`` rather than read out of
+    ``0006``'s module (§16.5's rule against a later edit changing what an earlier
+    revision installs), so this is the test that keeps the copy honest: no
+    transition at all, and one banked by an earlier transaction.
+    """
+    wallet, _other = wallets
+    with pytest.raises(DBAPIError, match="without an audited transition"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text("UPDATE portfolios SET kill_switch_state = 'WARNING' WHERE id = :id"),
+                {"id": wallet.portfolio_id},
+            )
+
+    async with schema_engine.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO kill_switch_transitions (id, organization_id, scope, scope_id, "
+                "from_state, to_state, actor_type, evidence) VALUES "
+                "(:id, :org, 'portfolio', :pf, 'ACTIVE', 'WARNING', 'system', :evidence)"
+            ),
+            {
+                "id": uuid7(),
+                "org": wallet.org_id,
+                "pf": wallet.portfolio_id,
+                "evidence": '{"daily_loss_pct": "0.012"}',
+            },
+        )
+    with pytest.raises(DBAPIError, match="written by an earlier transaction"):
+        async with schema_engine.begin() as connection:
+            await connection.execute(
+                text("UPDATE portfolios SET kill_switch_state = 'WARNING' WHERE id = :id"),
+                {"id": wallet.portfolio_id},
+            )

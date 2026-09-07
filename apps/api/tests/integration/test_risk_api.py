@@ -365,3 +365,54 @@ async def test_a_trader_may_not_resume_and_the_owner_may(
     assert after["effective"] == "ACTIVE"
     assert after["last_transition"]["actor_type"] == "user"
     assert after["last_transition"]["actor_id"] == str(wallet.actor.user_id)
+
+
+async def test_an_owner_of_another_organization_cannot_resume_this_wallet(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+    wallet: Wallet,
+) -> None:
+    """T3.1c security review, suggestion 5 — the *write* half of the cross-org 404.
+
+    ``test_another_organizations_wallet_is_a_404_not_a_403`` covers the read.
+    The resume is the one route on this wallet that changes anything, and it is
+    the one the directive reserves for the owner, so "OWNER of A pressing the
+    button on B's wallet" is the scenario worth stating: being an owner
+    *somewhere* must not be being an owner *here*.
+
+    Both spellings of the request are asserted, because they fail in different
+    places and both have to end in the same 404:
+
+    - **A's org id in the path, B's wallet id.** ``require_org(OWNER)`` passes —
+      the caller really is an owner of that organization — and ``_owned`` is what
+      refuses, because the wallet belongs to nobody in it;
+    - **B's org id in the path.** ``require_org`` refuses first, with the same
+      404 and the same body, so the API is not an existence oracle for
+      organizations (SECURITY.md §3.3).
+
+    And nothing is written: the wallet stays latched, and the last transition is
+    still the automatic one the engine wrote.
+    """
+    assert wallet.actor.org_id is not None
+    unique = uuid.uuid4().hex[:8]
+    outsider = await create_org(client, make_actor(f"risk-out-{unique}"), f"Outsider {unique}")
+
+    await block(session_factory, wallet, Decimal(19600))
+    await snapshot(session_factory, wallet, OPENING, age_s=0)
+
+    for org_id, headers in (
+        (outsider.org_id, outsider.headers),
+        (wallet.actor.org_id, outsider.headers),
+    ):
+        response = await client.post(
+            f"/api/v1/orgs/{org_id}/portfolios/{wallet.portfolio_id}/risk/kill-switch/resume",
+            json={"reason": "I am an owner, just not of this"},
+            headers=headers,
+        )
+        assert response.status_code == 404, (org_id, response.text)
+        assert response.headers["content-type"].startswith("application/problem+json")
+
+    after = (await client.get(f"{wallet.base}/kill-switch", headers=wallet.actor.headers)).json()
+    assert after["effective"] == "TRADING_DISABLED", "the wallet stayed latched"
+    assert after["last_transition"]["actor_type"] == "system", "the refusal wrote nothing"

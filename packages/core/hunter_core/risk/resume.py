@@ -98,7 +98,14 @@ async def resume(
     authenticate anybody, and neither does the schema: ``actor_id`` has no FK to
     ``users`` on purpose (§18.7), so a filled UUID proves somebody was *named*,
     not that somebody signed in. Naming them is the API's job (SECURITY.md §2,
-    "Kill switch de portfolio" = TRADER and above).
+    "Retomar um kill switch de portfolio" = **OWNER**).
+
+    OWNER, not TRADER: T3.1c split that one SECURITY.md line in two, because
+    latching is a protection the engine applies by itself and leaving a latched
+    block is what the directive reserves for the owner's authorisation
+    (DATABASE.md §19.2, item 4). This docstring still said TRADER after the route
+    had moved — the T3.1c security review's suggestion 2 — which is the kind of
+    stale line somebody later reads as the contract.
 
     Raises :class:`ResumeRefused` — never writes a no-op transition.
     """

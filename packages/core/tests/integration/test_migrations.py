@@ -37,7 +37,7 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0007_paper_roles"
+HEAD_REVISION = "0008_paper_roles_2"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -47,6 +47,7 @@ ANALYSIS_REVISION = "0003_analysis"
 OUTBOX_INDEX_REVISION = "0004_outbox_pending_index"
 LOCK_GRANT_REVISION = "0005_baseline_lock_grant"
 PAPER_WALLET_REVISION = "0006_paper_wallet"
+PAPER_ROLES_REVISION = "0007_paper_roles"
 
 _PENDING_PREDICATE = "dispatched_at IS NULL"
 """What makes an index a *pending* index, spelled out here rather than imported:
@@ -1387,3 +1388,125 @@ def test_0007_reverses_to_the_privileges_0001_shipped(upgraded: str) -> None:
     finally:
         command.upgrade(config, "head")
     command.check(config)
+
+
+def _frozen_execution_read_only() -> tuple[str, ...]:
+    return cast("tuple[str, ...]", migration_ddl("paper_roles_2").APP_READ_ONLY_TABLES_0008)
+
+
+def test_0008_leaves_the_api_reading_execution_and_writing_none_of_it(upgraded: str) -> None:
+    """D1: ``orders``, ``fills``, ``positions`` and ``trades`` become read-only to the API.
+
+    The security review of ``0007`` reproduced the whole surface as the role, in
+    the *correct* organization, where RLS says yes: a fabricated fill,
+    ``positions.qty × 1000``, ``DELETE FROM trades``, ``UPDATE orders``. The
+    curve ``0007`` closed is *derived* from these four, so forging the source
+    makes the engine compute and sign the forged point itself. ``SELECT`` stays,
+    because T3.8a's seven routes read them (§20.1).
+
+    The worker keeps full DML: it is the one that executes.
+    """
+    frozen = _frozen_execution_read_only()
+    assert frozen, "0008 reclassified no table"
+    for table in frozen:
+        assert asyncio.run(_table_privileges(upgraded, "hunter_app", table)) == {"SELECT"}, table
+        assert asyncio.run(_table_privileges(upgraded, "hunter_worker", table)) == {
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+        }, table
+    # the one execution table the API still writes, and only files into
+    assert asyncio.run(_table_privileges(upgraded, "hunter_app", "trade_proposals")) == {
+        "SELECT",
+        "INSERT",
+    }
+
+
+def test_0008_reclassifies_only_tables_0001_had_already_classified(upgraded: str) -> None:
+    """A grant revision must not smuggle in an unclassified table.
+
+    ``test_schema_privileges.test_the_grant_lists_cover_every_table_exactly_once``
+    keeps the schema partitioned over the *app*-side classes, and ``0008``'s list
+    is a **move** between two of them — so it has to be a subset of what ``0001``
+    already owns, or the subtraction that test performs would silently drop a
+    table out of the partition. Same role
+    ``test_0005_touches_no_table_0003_had_not_already_classified`` plays.
+    """
+    write = set(cast("tuple[str, ...]", migration_ddl("security").APP_WRITE_TABLES))
+    assert set(_frozen_execution_read_only()) <= write, (
+        "0008 reclassifies a table 0001 never put in APP_WRITE_TABLES; give it its own class"
+    )
+
+
+def test_0008_reverses_to_the_execution_privileges_0001_shipped(upgraded: str) -> None:
+    """Rolling back this deploy gives the API its DML back — and only that.
+
+    The downgrade names ``INSERT``/``UPDATE``/``DELETE`` rather than ``GRANT
+    ALL``: a privilege statement should say what it means, and the guards
+    ``0008`` installs come off with it, so a database rolled back to ``0007`` is
+    usable by the code that ran against ``0007``.
+    """
+    config = alembic_config(upgraded)
+    try:
+        command.downgrade(config, PAPER_ROLES_REVISION)
+        for table in _frozen_execution_read_only():
+            held = asyncio.run(_table_privileges(upgraded, "hunter_app", table))
+            assert held == {"SELECT", "INSERT", "UPDATE", "DELETE"}, (table, held)
+        assert asyncio.run(_revision(upgraded)) == PAPER_ROLES_REVISION
+        assert not asyncio.run(_trigger_exists(upgraded, "portfolios_are_born_audited"))
+        assert "kill_switch_reason" not in asyncio.run(
+            _trigger_condition(upgraded, "portfolios_kill_switch_is_audited")
+        ), "the widened WHEN survived the downgrade"
+    finally:
+        command.upgrade(config, "head")
+    for table in _frozen_execution_read_only():
+        assert asyncio.run(_table_privileges(upgraded, "hunter_app", table)) == {"SELECT"}
+    assert asyncio.run(_trigger_exists(upgraded, "portfolios_are_born_audited"))
+    command.check(config)
+
+
+async def _trigger_exists(url: str, name: str) -> bool:
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            return bool(
+                await connection.scalar(
+                    text("SELECT count(*) FROM pg_trigger WHERE tgname = :name"), {"name": name}
+                )
+            )
+    finally:
+        await engine.dispose()
+
+
+async def _trigger_condition(url: str, name: str) -> str:
+    """The ``WHEN`` clause of ``name``, read back from ``pg_get_triggerdef``.
+
+    Alembic never compares a trigger, so the only honest source is the
+    catalogue — the same reason §17.3 reads ``pg_indexes.indexdef`` for an index
+    predicate.
+    """
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            definition = await connection.scalar(
+                text("SELECT pg_get_triggerdef(oid) FROM pg_trigger WHERE tgname = :name LIMIT 1"),
+                {"name": name},
+            )
+            return str(definition or "")
+    finally:
+        await engine.dispose()
+
+
+def test_0008_widens_both_kill_switch_guards_to_the_motive(upgraded: str) -> None:
+    """D4: the guard fires on ``kill_switch_reason`` as well as on the state.
+
+    Before this, ``UPDATE portfolios SET kill_switch_reason = '...'`` rewrote the
+    text an OWNER reads with no transition, no actor and no history — the state
+    and the story it tells could disagree for ever. Read from
+    ``pg_get_triggerdef`` because Alembic does not compare triggers.
+    """
+    for trigger in ("portfolios_kill_switch_is_audited", "organizations_kill_switch_is_audited"):
+        condition = asyncio.run(_trigger_condition(upgraded, trigger))
+        assert "kill_switch_state" in condition, (trigger, condition)
+        assert "kill_switch_reason" in condition, (trigger, condition)

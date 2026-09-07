@@ -49,7 +49,8 @@ ONBOARDING_BODY: dict[str, Any] = {
 
 # (route id, HTTP method — for the assertion message only, the dispatcher
 # below knows the real one — minimum role). Copied by hand from
-# organizations.py, members.py, invitations.py, workspaces.py and audit.py.
+# organizations.py, members.py, invitations.py, workspaces.py, audit.py,
+# risk.py and portfolio.py.
 ROUTES: list[tuple[str, str, OrganizationRole]] = [
     ("org.read", "GET", OrganizationRole.VIEWER),
     ("org.update", "PATCH", OrganizationRole.ADMIN),
@@ -73,6 +74,20 @@ ROUTES: list[tuple[str, str, OrganizationRole]] = [
     # what property 2 allows.
     ("risk.kill_switch.read", "GET", OrganizationRole.VIEWER),
     ("risk.kill_switch.resume", "POST", OrganizationRole.OWNER),
+    # T3.8a (`routers/portfolio.py`) — seven reads, all VIEWER, and they were
+    # missing from this table until the T3.1c security review counted 16
+    # declared against 23 served (D2). Every one of them is a dashboard read:
+    # the wallet, its opening conversion, its curve and the execution history
+    # ``0008_paper_roles_2`` makes read-only to the API in the first place. The
+    # portfolio id is a random UUID, so the 404 it earns is not a role failure —
+    # exactly what property 2 allows.
+    ("portfolios.list", "GET", OrganizationRole.VIEWER),
+    ("portfolios.read", "GET", OrganizationRole.VIEWER),
+    ("portfolios.anchor", "GET", OrganizationRole.VIEWER),
+    ("portfolios.equity_curve", "GET", OrganizationRole.VIEWER),
+    ("portfolios.positions", "GET", OrganizationRole.VIEWER),
+    ("portfolios.orders", "GET", OrganizationRole.VIEWER),
+    ("portfolios.trades", "GET", OrganizationRole.VIEWER),
 ]
 
 
@@ -235,12 +250,34 @@ async def _call(
             json={"reason": "rbac probe"},
             headers=caller.headers,
         )
+    if kind == "portfolios.list":
+        return await client.get(f"/api/v1/orgs/{org_id}/portfolios", headers=caller.headers)
+    portfolio_reads = {
+        "portfolios.read": "",
+        "portfolios.anchor": "/anchor",
+        "portfolios.equity_curve": "/equity-curve",
+        "portfolios.positions": "/positions",
+        "portfolios.orders": "/orders",
+        "portfolios.trades": "/trades",
+    }
+    if kind in portfolio_reads:
+        return await client.get(
+            f"/api/v1/orgs/{org_id}/portfolios/{uuid.uuid4()}{portfolio_reads[kind]}",
+            headers=caller.headers,
+        )
     raise AssertionError(f"unhandled route kind {kind!r}")  # pragma: no cover
 
 
 async def test_the_table_covers_every_tenant_route(app: FastAPI) -> None:
     """A route added under ``/orgs/{org_id}`` without a line above would slip
     past the matrix — same guard as ``test_isolation.py``, same count.
+
+    This guard was **red** between T3.8a and ``0008_paper_roles_2``: 16 routes
+    declared against 23 served, so the seven portfolio reads had no asserted
+    minimum role at all and a change to one of them would have gone unnoticed
+    here (T3.1c security review, D2). The count is never a literal — it is
+    ``len(ROUTES)`` against the live OpenAPI schema, so the failure names the
+    routes rather than a number somebody has to go and interpret.
     """
     paths = cast("dict[str, dict[str, Any]]", app.openapi()["paths"])
     operations = [

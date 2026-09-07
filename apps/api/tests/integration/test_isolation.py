@@ -67,7 +67,29 @@ def _tenant_routes(org_id: uuid.UUID, workspace_id: uuid.UUID, user_id: uuid.UUI
             f"{base}/portfolios/{ANY_UUID}/risk/kill-switch/resume",
             {"reason": "an outsider pressing the button"},
         ),
+        # T3.8a's seven reads. Missing here until the T3.1c security review
+        # counted 16 declared against 23 served (D2), which meant nothing
+        # asserted that a member of A asking for B's wallet, anchor, curve,
+        # positions, orders or trades got the same 404 as everywhere else.
+        ("GET", f"{base}/portfolios", None),
+        ("GET", f"{base}/portfolios/{ANY_UUID}", None),
+        ("GET", f"{base}/portfolios/{ANY_UUID}/anchor", None),
+        ("GET", f"{base}/portfolios/{ANY_UUID}/equity-curve", None),
+        ("GET", f"{base}/portfolios/{ANY_UUID}/positions", None),
+        ("GET", f"{base}/portfolios/{ANY_UUID}/orders", None),
+        ("GET", f"{base}/portfolios/{ANY_UUID}/trades", None),
     ]
+
+
+ROUTE_COUNT = len(_tenant_routes(ANY_UUID, ANY_UUID, ANY_UUID))
+"""How many routes the list above covers — never a literal.
+
+``range(16)`` and ``assert len(operations) == 16`` were the two numbers that
+made this guard red and silent at the same time: the parametrization simply
+stopped at the sixteenth entry, so adding a route without adding a line here
+produced no failure anywhere. Derived from the list, both of them now move
+together (T3.1c security review, D2).
+"""
 
 
 @pytest.fixture
@@ -80,7 +102,7 @@ async def two_orgs(
     return a, b
 
 
-@pytest.mark.parametrize("index", range(16))
+@pytest.mark.parametrize("index", range(ROUTE_COUNT))
 async def test_every_tenant_route_answers_404_for_another_organization(
     client: httpx.AsyncClient, two_orgs: tuple[Actor, Actor], index: int
 ) -> None:
@@ -108,7 +130,7 @@ async def test_the_route_list_covers_every_tenant_route_the_app_serves(app: Fast
         for method in item
     ]
 
-    assert len(operations) == 16, sorted(operations)
+    assert len(operations) == ROUTE_COUNT, sorted(operations)
 
 
 async def test_a_nonexistent_organization_is_the_same_404(

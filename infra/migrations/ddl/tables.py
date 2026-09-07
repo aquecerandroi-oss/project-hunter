@@ -116,7 +116,21 @@ APP_WRITE_TABLES: tuple[str, ...] = (
     "positions",
     "trades",
 )
-"""Full DML for ``hunter_app`` — and every one of them is behind RLS."""
+"""Full DML for ``hunter_app`` **as of ``0001``** — and every one behind RLS.
+
+Frozen, like every list here: it has to keep describing what ``0001`` granted.
+Two later revisions narrow what these grants *are* without moving a name out of
+this tuple, and the vigente picture is DATABASE.md §19.1:
+
+- ``0007_paper_roles`` takes the API's writes on ``portfolio_equity_snapshots``
+  (the curve is the evidence a resume reads) and its ``UPDATE``/``DELETE`` on
+  ``trade_proposals`` (deciding is admission's job);
+- ``0008_paper_roles_2`` takes ``INSERT``/``UPDATE``/``DELETE`` on ``orders``,
+  ``fills``, ``positions`` and ``trades``, which it reclassifies as
+  ``ddl.paper_roles_2.APP_READ_ONLY_TABLES_0008``. That one is a *move* between
+  two classes, so ``test_schema_privileges.py`` subtracts it from this tuple
+  before checking that the classes still partition the schema exactly.
+"""
 
 WORKER_WRITE_TABLES: tuple[str, ...] = (
     # market reference and market data

@@ -28,11 +28,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from hunter_core.db.models.fx import FxObservation
 from hunter_core.db.repositories.fx import FxObservationRepository
 from hunter_core.db.session import create_session_factory, tenant_session
+from hunter_core.portfolio import opening as opening_module
 from hunter_core.portfolio.attribution import OPENING_ROUNDING_POLICY
 from hunter_core.portfolio.opening import (
     DEFAULT_CAPITAL_BRL,
     PAPER_FX_POLICY,
     FxObservationRejected,
+    ScopeViolation,
     WalletAlreadyOpen,
     open_paper_wallet,
 )
@@ -522,3 +524,180 @@ class TestCapitalIsFixed:
             )
 
         assert result.conversion.origin_amount == Decimal("50000")
+
+
+class TestVerifyScope:
+    """S3 (security review of ``open_paper_wallet.py``): ``hunter_worker`` runs
+    ``BYPASSRLS`` (0007_paper_roles), so nothing in Postgres itself stops a
+    wrongly-scoped write from landing under the wrong organization. This
+    re-reads every row the opening just wrote, by ``organization_id``, before
+    the caller may commit — a belt the RLS-bypassing role does not otherwise
+    wear."""
+
+    async def test_a_scope_violation_rolls_back_the_whole_opening(
+        self,
+        factory: async_sessionmaker[AsyncSession],
+        ledger_engine: AsyncEngine,
+        ledger_tenant: LedgerTenant,
+        observe_fx: Callable[..., Awaitable[uuid.UUID]],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Simulates the exact bug ``verify_scope`` exists to catch: everything
+        was written correctly, but the post-condition is fed a different
+        organization than the one that actually owns the wallet. It must raise
+        instead of letting the caller commit, and the whole transaction —
+        wallet, anchor, risk state and curve included — must roll back."""
+        observation_id = await observe_fx(observed_at=_NOW)
+        wrong_org = uuid.uuid4()
+        real_verify_scope = opening_module._verify_scope  # pyright: ignore[reportPrivateUsage]
+
+        async def _verify_against_wrong_org(
+            session: AsyncSession, *, organization_id: uuid.UUID, **kwargs: object
+        ) -> None:
+            await real_verify_scope(session, organization_id=wrong_org, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(opening_module, "_verify_scope", _verify_against_wrong_org)
+
+        with pytest.raises(ScopeViolation):
+            async with tenant_session(
+                factory, ledger_tenant.org_id, db_role=ENGINE_ROLE
+            ) as session:
+                await open_paper_wallet(
+                    session,
+                    organization_id=ledger_tenant.org_id,
+                    workspace_id=ledger_tenant.workspace_id,
+                    fx=await _fx(session, observation_id),
+                    as_of=_NOW,
+                )
+
+        assert await _count(ledger_engine, "portfolios", ledger_tenant.org_id) == 0
+        assert await _count(ledger_engine, "portfolio_currency_anchor", ledger_tenant.org_id) == 0
+        assert await _count(ledger_engine, "portfolio_risk_state", ledger_tenant.org_id) == 0
+        assert await _count(ledger_engine, "portfolio_equity_snapshots", ledger_tenant.org_id) == 0
+
+    async def test_verify_scope_false_skips_the_check(
+        self,
+        factory: async_sessionmaker[AsyncSession],
+        ledger_tenant: LedgerTenant,
+        observe_fx: Callable[..., Awaitable[uuid.UUID]],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The opt-out this kwarg promises: with it off, ``_verify_scope`` is
+        never even called."""
+
+        def _explode(*args: object, **kwargs: object) -> None:
+            raise AssertionError("verify_scope=False must not call the scope check")
+
+        monkeypatch.setattr(opening_module, "_verify_scope", _explode)
+        observation_id = await observe_fx(observed_at=_NOW)
+
+        async with tenant_session(factory, ledger_tenant.org_id, db_role=ENGINE_ROLE) as session:
+            result = await open_paper_wallet(
+                session,
+                organization_id=ledger_tenant.org_id,
+                workspace_id=ledger_tenant.workspace_id,
+                fx=await _fx(session, observation_id),
+                as_of=_NOW,
+                verify_scope=False,
+            )
+
+        assert result.portfolio_id is not None
+
+
+class TestTheBirthGuardBoundsTheEngineGrantWithoutBreakingTheOpening:
+    """``0008_paper_roles_2``, D3 — the real opening goes through it untouched.
+
+    ``portfolios_are_born_audited`` is a deferred constraint trigger that asks a
+    caller holding *only* ``hunter_worker``'s privileges for two things: the
+    wallet is ``paper`` and not arena, and an ``audit_logs`` row of the same
+    organization was written in **this** transaction
+    (``xmin = pg_current_xact_id()``). The raw refusals are proved as the role in
+    ``test_schema_paper.py``; what has to be proved *here* is the other half —
+    that the one legitimate opening still passes, through the real function, as
+    the real role, with nothing added to it for the guard's benefit.
+
+    ``open_paper_wallet`` already writes the audit entry in the same commit
+    (§18.2), so this test needed no change to the code under test. That is the
+    point of it: if a later refactor moved the audit entry to a second
+    transaction, or wrapped it in a ``SAVEPOINT`` (whose xid is not the top
+    level's, §18.7), the opening would stop working and this is where it fails.
+    """
+
+    async def test_the_real_opening_satisfies_the_guard_with_nothing_added(
+        self,
+        factory: async_sessionmaker[AsyncSession],
+        ledger_engine: AsyncEngine,
+        ledger_tenant: LedgerTenant,
+        observe_fx: Callable[..., Awaitable[uuid.UUID]],
+    ) -> None:
+        observation_id = await observe_fx(observed_at=_NOW)
+
+        async with tenant_session(factory, ledger_tenant.org_id, db_role=ENGINE_ROLE) as session:
+            result = await open_paper_wallet(
+                session,
+                organization_id=ledger_tenant.org_id,
+                workspace_id=ledger_tenant.workspace_id,
+                fx=await _fx(session, observation_id),
+                as_of=_NOW,
+            )
+
+        async with ledger_engine.connect() as connection:
+            row = (
+                await connection.execute(
+                    text("SELECT type, is_arena FROM portfolios WHERE id = :id"),
+                    {"id": result.portfolio_id},
+                )
+            ).one()
+            # the audit row the guard demanded, and it names this wallet
+            audited = (
+                await connection.execute(
+                    text(
+                        "SELECT organization_id, entity_id FROM audit_logs "
+                        "WHERE entity_id = :id AND action = 'portfolio.opened'"
+                    ),
+                    {"id": result.portfolio_id},
+                )
+            ).all()
+            guard = await connection.scalar(
+                text("SELECT count(*) FROM pg_trigger WHERE tgname = :name"),
+                {"name": "portfolios_are_born_audited"},
+            )
+
+        assert guard == 1, "the guard is installed, so the opening above passed *through* it"
+        assert row.type == "paper"
+        assert row.is_arena is False
+        assert len(audited) == 1
+        assert audited[0].organization_id == ledger_tenant.org_id
+
+    async def test_an_opening_that_fails_late_still_leaves_no_audited_wallet(
+        self,
+        factory: async_sessionmaker[AsyncSession],
+        ledger_engine: AsyncEngine,
+        ledger_tenant: LedgerTenant,
+        observe_fx: Callable[..., Awaitable[uuid.UUID]],
+    ) -> None:
+        """A deferred guard fires at COMMIT, so a rollback has to beat it to it.
+
+        The failure mode worth stating: a guard that only runs at COMMIT never
+        sees a transaction that never commits, and that is correct — the row is
+        gone either way. Asserted so that "the wallet is absent" is a measured
+        outcome and not an assumption about which of the two removed it.
+        """
+        observation_id = await observe_fx(observed_at=_NOW)
+        boom = RuntimeError("the opening failed after the wallet row")
+
+        with pytest.raises(RuntimeError, match="after the wallet row"):
+            async with tenant_session(
+                factory, ledger_tenant.org_id, db_role=ENGINE_ROLE
+            ) as session:
+                await open_paper_wallet(
+                    session,
+                    organization_id=ledger_tenant.org_id,
+                    workspace_id=ledger_tenant.workspace_id,
+                    fx=await _fx(session, observation_id),
+                    as_of=_NOW,
+                )
+                raise boom
+
+        assert await _count(ledger_engine, "portfolios", ledger_tenant.org_id) == 0
+        assert await _count(ledger_engine, "audit_logs", ledger_tenant.org_id) == 0
