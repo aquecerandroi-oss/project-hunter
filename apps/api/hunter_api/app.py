@@ -41,8 +41,10 @@ from hunter_api.routers import me as me_router
 from hunter_api.routers import members as members_router
 from hunter_api.routers import opportunities as opportunities_router
 from hunter_api.routers import organizations as organizations_router
+from hunter_api.routers import portfolio as portfolio_router
 from hunter_api.routers import radar as radar_router
 from hunter_api.routers import regime as regime_router
+from hunter_api.routers import risk as risk_router
 from hunter_api.routers import system as system_router
 from hunter_api.routers import webhooks as webhooks_router
 from hunter_api.routers import workspaces as workspaces_router
@@ -185,6 +187,8 @@ def create_app(settings: ApiSettings) -> FastAPI:
     app.include_router(anomalies_router.router)
     app.include_router(regime_router.router)
     app.include_router(lab_router.router)
+    app.include_router(portfolio_router.router)
+    app.include_router(risk_router.router)
     app.include_router(system_router.router)
     app.include_router(webhooks_router.router)
     app.include_router(realtime_router)

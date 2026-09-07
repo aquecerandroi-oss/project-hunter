@@ -35,6 +35,12 @@ export type OnboardingObjective = "explore" | "paper_trading" | "research" | "au
 /** `risk_preset` — hunter_core.domain.enums.RiskPreset. */
 export type RiskPreset = "conservative" | "balanced" | "aggressive" | "custom";
 
+/** `portfolio_type` — hunter_core.domain.enums.PortfolioType. */
+export type PortfolioType = "paper" | "shadow" | "live";
+
+/** `portfolio_status` — hunter_core.domain.enums.PortfolioStatus. */
+export type PortfolioStatus = "active" | "paused" | "archived";
+
 /**
  * RFC 9457 `application/problem+json` (apps/api/hunter_api/errors.py). Every
  * non-2xx response from `apps/api` has at least these fields; `errors` is

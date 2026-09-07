@@ -61,6 +61,12 @@ def _tenant_routes(org_id: uuid.UUID, workspace_id: uuid.UUID, user_id: uuid.UUI
             },
         ),
         ("GET", f"{base}/audit", None),
+        ("GET", f"{base}/portfolios/{ANY_UUID}/risk/kill-switch", None),
+        (
+            "POST",
+            f"{base}/portfolios/{ANY_UUID}/risk/kill-switch/resume",
+            {"reason": "an outsider pressing the button"},
+        ),
     ]
 
 
@@ -74,7 +80,7 @@ async def two_orgs(
     return a, b
 
 
-@pytest.mark.parametrize("index", range(14))
+@pytest.mark.parametrize("index", range(16))
 async def test_every_tenant_route_answers_404_for_another_organization(
     client: httpx.AsyncClient, two_orgs: tuple[Actor, Actor], index: int
 ) -> None:
@@ -102,7 +108,7 @@ async def test_the_route_list_covers_every_tenant_route_the_app_serves(app: Fast
         for method in item
     ]
 
-    assert len(operations) == 14, sorted(operations)
+    assert len(operations) == 16, sorted(operations)
 
 
 async def test_a_nonexistent_organization_is_the_same_404(

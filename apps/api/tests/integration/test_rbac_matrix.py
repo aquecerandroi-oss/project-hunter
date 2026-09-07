@@ -65,6 +65,11 @@ ROUTES: list[tuple[str, str, OrganizationRole]] = [
     ("workspaces.update", "PATCH", OrganizationRole.ADMIN),
     ("workspaces.onboarding", "PUT", OrganizationRole.ADMIN),
     ("audit.list", "GET", OrganizationRole.ADMIN),
+    # T3.6 — SECURITY.md §2 puts "Kill switch de portfolio" at TRADER; reading it
+    # is a dashboard read, so VIEWER. The portfolio id is a random UUID here: the
+    # 404 it earns is not a role failure, which is exactly what property 2 allows.
+    ("risk.kill_switch.read", "GET", OrganizationRole.VIEWER),
+    ("risk.kill_switch.resume", "POST", OrganizationRole.TRADER),
 ]
 
 
@@ -216,6 +221,17 @@ async def _call(
         )
     if kind == "audit.list":
         return await client.get(f"/api/v1/orgs/{org_id}/audit", headers=caller.headers)
+    if kind == "risk.kill_switch.read":
+        return await client.get(
+            f"/api/v1/orgs/{org_id}/portfolios/{uuid.uuid4()}/risk/kill-switch",
+            headers=caller.headers,
+        )
+    if kind == "risk.kill_switch.resume":
+        return await client.post(
+            f"/api/v1/orgs/{org_id}/portfolios/{uuid.uuid4()}/risk/kill-switch/resume",
+            json={"reason": "rbac probe"},
+            headers=caller.headers,
+        )
     raise AssertionError(f"unhandled route kind {kind!r}")  # pragma: no cover
 
 

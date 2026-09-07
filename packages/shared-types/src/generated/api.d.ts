@@ -313,6 +313,159 @@ export interface paths {
         patch: operations["update_role_api_v1_orgs__org_id__members__user_id__patch"];
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/portfolios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List portfolios */
+        get: operations["list_portfolios_route_api_v1_orgs__org_id__portfolios_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/portfolios/{portfolio_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one wallet: equity, BRL decomposition and risk state */
+        get: operations["get_portfolio_api_v1_orgs__org_id__portfolios__portfolio_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/portfolios/{portfolio_id}/anchor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the wallet's opening conversion */
+        get: operations["get_portfolio_anchor_api_v1_orgs__org_id__portfolios__portfolio_id__anchor_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/portfolios/{portfolio_id}/equity-curve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the equity curve, in USDT and BRL */
+        get: operations["get_equity_curve_api_v1_orgs__org_id__portfolios__portfolio_id__equity_curve_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/portfolios/{portfolio_id}/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List orders — empty until T3.4/T3.5 land a writer */
+        get: operations["get_orders_api_v1_orgs__org_id__portfolios__portfolio_id__orders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/portfolios/{portfolio_id}/positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List positions — empty until T3.4/T3.5 land a writer */
+        get: operations["get_positions_api_v1_orgs__org_id__portfolios__portfolio_id__positions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/portfolios/{portfolio_id}/risk/kill-switch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the portfolio kill switch, with its motive and evidence */
+        get: operations["read_kill_switch_api_v1_orgs__org_id__portfolios__portfolio_id__risk_kill_switch_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/portfolios/{portfolio_id}/risk/kill-switch/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume trading on a latched kill switch (TRADER+) */
+        post: operations["resume_kill_switch_api_v1_orgs__org_id__portfolios__portfolio_id__risk_kill_switch_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/portfolios/{portfolio_id}/trades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List trades — empty until T3.4/T3.5 land a writer */
+        get: operations["get_trades_api_v1_orgs__org_id__portfolios__portfolio_id__trades_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/workspaces": {
         parameters: {
             query?: never;
@@ -545,6 +698,37 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AnchorOut
+         * @description ``portfolio_currency_anchor`` — the opening conversion, written once.
+         */
+        AnchorOut: {
+            /**
+             * Anchored At
+             * Format: date-time
+             */
+            anchored_at: string;
+            /** Conversion Residual */
+            conversion_residual: string;
+            /** Credited Amount */
+            credited_amount: string;
+            fx_observation: components["schemas"]["FxObservationOut"];
+            /** Operating Currency */
+            operating_currency: string;
+            /** Origin Amount */
+            origin_amount: string;
+            /** Origin Currency */
+            origin_currency: string;
+            /**
+             * Portfolio Id
+             * Format: uuid
+             */
+            portfolio_id: string;
+            /** Rate */
+            rate: string;
+            /** Rounding Policy */
+            rounding_policy: string;
+        };
+        /**
          * AnomalyEvaluationState
          * @description ``anomaly_evaluation_state`` — ``anomalies.evaluation_state``, added by
          *     ``0003_analysis`` (joint M2 decision, "Anomalias").
@@ -646,6 +830,54 @@ export interface components {
          * @enum {string}
          */
         AnomalyType: "VOLUME_SPIKE" | "PRICE_ACCELERATION" | "VOLATILITY_EXPANSION" | "ORDERBOOK_IMBALANCE" | "OPEN_INTEREST_SPIKE" | "FUNDING_ANOMALY" | "LIQUIDATION_CLUSTER" | "CROSS_EXCHANGE_DIVERGENCE" | "TRADE_VELOCITY_SPIKE" | "MOMENTUM_SHIFT" | "SOCIAL_SPIKE" | "WHALE_ACTIVITY";
+        /** AsOfPage[EquityCurvePointOut] */
+        AsOfPage_EquityCurvePointOut_: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Items */
+            items: components["schemas"]["EquityCurvePointOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** AsOfPage[OrderOut] */
+        AsOfPage_OrderOut_: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Items */
+            items: components["schemas"]["OrderOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** AsOfPage[PositionOut] */
+        AsOfPage_PositionOut_: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Items */
+            items: components["schemas"]["PositionOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** AsOfPage[TradeOut] */
+        AsOfPage_TradeOut_: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Items */
+            items: components["schemas"]["hunter_api__schemas__portfolio_lists__TradeOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** AssumedCostsOut */
         AssumedCostsOut: {
             /** Assumed Spread Bps */
@@ -708,6 +940,32 @@ export interface components {
             price: string;
             /** Qty */
             qty: string;
+        };
+        /**
+         * BrlDecompositionOut
+         * @description The operational/exchange split — ``hunter_core.portfolio.attribution``.
+         *
+         *     ``operational_brl`` and ``currency_brl`` sum to ``total_brl``; the
+         *     convention (attribution at the *opening* rate) is declared, not universal,
+         *     and this is why the screen names ``opening_rate``/``current_rate`` instead
+         *     of hiding them behind the totals.
+         */
+        BrlDecompositionOut: {
+            /** Currency Brl */
+            currency_brl: string;
+            /** Current Rate */
+            current_rate: string;
+            /** Equity Brl */
+            equity_brl: string;
+            fx_observation: components["schemas"]["FxObservationOut"];
+            /** Opening Brl */
+            opening_brl: string;
+            /** Opening Rate */
+            opening_rate: string;
+            /** Operational Brl */
+            operational_brl: string;
+            /** Total Brl */
+            total_brl: string;
         };
         /**
          * CandleOut
@@ -813,6 +1071,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** CursorPage[PortfolioListItemOut] */
+        CursorPage_PortfolioListItemOut_: {
+            /** Items */
+            items: components["schemas"]["PortfolioListItemOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** CursorPage[SignalListItemOut] */
         CursorPage_SignalListItemOut_: {
             /** Items */
@@ -828,11 +1093,87 @@ export interface components {
             next_cursor?: string | null;
         };
         /**
+         * DailyReferenceOut
+         * @description The persisted anchor of the São Paulo trading day.
+         *
+         *     ``equity_day_start`` is ``None`` when the reference could not be rebuilt —
+         *     entries blocked, protections preserved. ``observed_at`` is the *real* instant
+         *     of the evaluation, not midnight.
+         */
+        DailyReferenceOut: {
+            /** Available */
+            available: boolean;
+            /** Equity Day Start */
+            equity_day_start: string | null;
+            /** Observed At */
+            observed_at: string | null;
+            /** Trading Day */
+            trading_day: string | null;
+            /** Trading Day Start Utc */
+            trading_day_start_utc: string | null;
+            /** Trading Day Timezone */
+            trading_day_timezone: string;
+        };
+        /**
          * DataQuality
          * @description Freshness of a market's hot state — ``docs/plans/M1.md`` staleness rule.
          * @enum {string}
          */
         DataQuality: "ok" | "stale" | "degraded" | "unavailable";
+        /**
+         * EquityCurvePointOut
+         * @description One ``portfolio_equity_snapshots`` row, with its BRL reading (or lack of one).
+         *
+         *     ``brl_equity``/``brl_unavailable_reason`` mirror
+         *     ``hunter_core.portfolio.ledger.EquityPoint``: the USDT side of a point is
+         *     always present, and the BRL side is either the equity converted at the
+         *     *observation the point itself was recorded with* or a named reason — never
+         *     today's rate applied to yesterday's point (M3 joint decision, item 1).
+         */
+        EquityCurvePointOut: {
+            /** Brl Equity */
+            brl_equity: string | null;
+            /** Brl Unavailable Reason */
+            brl_unavailable_reason: string | null;
+            /** Cash */
+            cash: string;
+            /** Drawdown Pct */
+            drawdown_pct: string | null;
+            /** Equity */
+            equity: string;
+            /** Exposure Notional */
+            exposure_notional: string;
+            /** Exposure Pct */
+            exposure_pct: string | null;
+            /** Fx Observation Id */
+            fx_observation_id: string | null;
+            /** Open Positions */
+            open_positions: number;
+            /** Peak Equity */
+            peak_equity: string;
+            /** Realized Pnl Cum */
+            realized_pnl_cum: string;
+            resolution: components["schemas"]["Timeframe"];
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Unrealized Pnl */
+            unrealized_pnl: string;
+        };
+        /**
+         * ExecutionMode
+         * @description ``execution_mode`` — DATABASE.md §7 (orders.execution_mode).
+         * @enum {string}
+         */
+        ExecutionMode: "paper" | "shadow" | "live";
+        /**
+         * ExitReason
+         * @description ``exit_reason`` — DATABASE.md §7 (trades.exit_reason).
+         * @enum {string}
+         */
+        ExitReason: "target" | "stop" | "invalidation" | "manual" | "kill_switch" | "expired" | "risk_event";
         /**
          * FundingComponentStatusOut
          * @description Funding additionally reports whether the rate is ``estimated`` or
@@ -846,6 +1187,33 @@ export interface components {
             kind?: ("estimated" | "realized") | null;
             /** Ts */
             ts?: string | null;
+        };
+        /**
+         * FxObservationOut
+         * @description One ``fx_observations`` row — global, immutable (DATABASE.md §18.2).
+         */
+        FxObservationOut: {
+            /**
+             * Available At
+             * Format: date-time
+             */
+            available_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Pair */
+            pair: string;
+            /** Rate */
+            rate: string;
+            /** Source */
+            source: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -928,12 +1296,48 @@ export interface components {
             role: components["schemas"]["OrganizationRole"];
         };
         /**
+         * KillSwitchOut
+         * @description The wallet's kill switch, with its motive and its evidence.
+         */
+        KillSwitchOut: {
+            /** Blocks Entries */
+            blocks_entries: boolean;
+            daily_reference: components["schemas"]["DailyReferenceOut"];
+            effective: components["schemas"]["KillSwitchState"];
+            last_transition: components["schemas"]["TransitionOut"] | null;
+            peak: components["schemas"]["PeakOut"];
+            /**
+             * Portfolio Id
+             * Format: uuid
+             */
+            portfolio_id: string;
+            /** Reason */
+            reason: string | null;
+            scopes: components["schemas"]["ScopeStatesOut"];
+        };
+        /**
          * KillSwitchState
          * @description ``kill_switch_state`` — DATABASE.md §2, RISK_ENGINE.md §5. Ordered least to
          *     most restrictive: ACTIVE < WARNING < TRADING_DISABLED < EMERGENCY.
          * @enum {string}
          */
         KillSwitchState: "ACTIVE" | "WARNING" | "TRADING_DISABLED" | "EMERGENCY";
+        /**
+         * KillSwitchSummaryOut
+         * @description The kill switch, embedded in the portfolio summary.
+         *
+         *     Mirrors ``hunter_api.schemas.risk.KillSwitchOut`` minus the daily
+         *     reference/peak (reported once, in ``PortfolioRiskStateOut``, not twice).
+         */
+        KillSwitchSummaryOut: {
+            /** Blocks Entries */
+            blocks_entries: boolean;
+            effective: components["schemas"]["KillSwitchState"];
+            last_transition: components["schemas"]["TransitionOut"] | null;
+            /** Reason */
+            reason: string | null;
+            scopes: components["schemas"]["ScopeStatesOut"];
+        };
         /** MarketComponentsOut */
         MarketComponentsOut: {
             book: components["schemas"]["ComponentStatusOut"];
@@ -1009,7 +1413,7 @@ export interface components {
             /** Quote Volume 24H */
             quote_volume_24h?: string | null;
             /** Recent Trades */
-            recent_trades?: components["schemas"]["TradeOut"][] | null;
+            recent_trades?: components["schemas"]["hunter_api__schemas__markets__TradeOut"][] | null;
             /** Spread Pct */
             spread_pct?: string | null;
             /** Stale After Ms */
@@ -1130,6 +1534,13 @@ export interface components {
             open_gaps: number;
             /** Reconnects */
             reconnects?: number | null;
+            /** Shards Expected */
+            shards_expected?: number | null;
+            /**
+             * Shards Reporting
+             * @default 0
+             */
+            shards_reporting: number;
             /** Ws State */
             ws_state: string;
         };
@@ -1158,6 +1569,10 @@ export interface components {
          *     and what a status header needs ("187 of 200 monitored, 3 stale").
          */
         MarketsSummary: {
+            /** Collector Shards Expected */
+            collector_shards_expected?: number | null;
+            /** Collector Shards Reporting */
+            collector_shards_reporting?: number | null;
             /** Markets Degraded */
             markets_degraded: number;
             /** Markets Monitored */
@@ -1546,11 +1961,67 @@ export interface components {
             ts?: string | null;
         };
         /**
+         * OrderOut
+         * @description One ``orders`` row. Empty today — no writer exists yet (T3.4/T3.5).
+         */
+        OrderOut: {
+            /** Avg Fill Price */
+            avg_fill_price: string | null;
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            execution_mode: components["schemas"]["ExecutionMode"];
+            /** Filled Qty */
+            filled_qty: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Market Id
+             * Format: uuid
+             */
+            market_id: string;
+            /** Price */
+            price: string | null;
+            purpose: components["schemas"]["OrderPurpose"];
+            /** Qty */
+            qty: string;
+            side: components["schemas"]["OrderSide"];
+            status: components["schemas"]["OrderStatus"];
+            /** Stop Price */
+            stop_price: string | null;
+            type: components["schemas"]["OrderType"];
+        };
+        /**
+         * OrderPurpose
+         * @description ``order_purpose`` — DATABASE.md §7 (orders.purpose).
+         * @enum {string}
+         */
+        OrderPurpose: "entry" | "stop" | "target" | "exit" | "reduce";
+        /**
          * OrderSide
          * @description ``order_side`` — DATABASE.md §4 (liquidations.side) and §7 (orders.side).
          * @enum {string}
          */
         OrderSide: "buy" | "sell";
+        /**
+         * OrderStatus
+         * @description ``order_status`` — DATABASE.md §7 (orders.status).
+         * @enum {string}
+         */
+        OrderStatus: "pending" | "submitted" | "partially_filled" | "filled" | "cancelled" | "rejected" | "expired";
+        /**
+         * OrderType
+         * @description ``order_type`` — DATABASE.md §7 (orders.type).
+         * @enum {string}
+         */
+        OrderType: "market" | "limit" | "stop_market" | "stop_limit" | "take_profit";
         /**
          * OrganizationCreate
          * @description Sign-up. The slug is derived from the name — a caller cannot choose it
@@ -1639,11 +2110,212 @@ export interface components {
          */
         OutcomeResult: "target" | "stop" | "expired" | "invalidated" | "open";
         /**
+         * PeakOut
+         * @description The monotonic, **sampled** peak — never the intratick maximum.
+         */
+        PeakOut: {
+            /** Equity */
+            equity: string;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Sampling Interval S */
+            sampling_interval_s: number;
+        };
+        /**
          * Plan
          * @description ``plan_tier`` — DATABASE.md §2.
          * @enum {string}
          */
         Plan: "FREE" | "PRO" | "QUANT" | "ENTERPRISE";
+        /**
+         * PortfolioListItemOut
+         * @description One row of ``GET /api/v1/orgs/{org_id}/portfolios``.
+         */
+        PortfolioListItemOut: {
+            /** Base Currency */
+            base_currency: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Arena */
+            is_arena: boolean;
+            /** Name */
+            name: string;
+            status: components["schemas"]["PortfolioStatus"];
+            type: components["schemas"]["PortfolioType"];
+            /**
+             * Workspace Id
+             * Format: uuid
+             */
+            workspace_id: string;
+        };
+        /**
+         * PortfolioRiskStateOut
+         * @description ``portfolio_risk_state`` plus the engine's own read of it.
+         *
+         *     ``daily_loss_pct``/``drawdown_pct`` are ``None`` exactly when
+         *     ``hunter_core.portfolio.state.build_portfolio_state`` could not rebuild the
+         *     daily reference (a restart before the first evaluation of the day) — never
+         *     a silent zero (RISK_ENGINE.md §5, the "daily_loss PASSED value=0" defect
+         *     this contract was written to close).
+         */
+        PortfolioRiskStateOut: {
+            /** Daily Loss Pct */
+            daily_loss_pct: string | null;
+            /** Day Reference Observed At */
+            day_reference_observed_at: string | null;
+            /** Drawdown Pct */
+            drawdown_pct: string | null;
+            /** Equity Day Start */
+            equity_day_start: string | null;
+            kill_switch: components["schemas"]["KillSwitchSummaryOut"];
+            /** Peak Equity */
+            peak_equity: string;
+            /**
+             * Peak Equity Observed At
+             * Format: date-time
+             */
+            peak_equity_observed_at: string;
+            /** Peak Sampling Interval S */
+            peak_sampling_interval_s: number;
+            /** Trading Day */
+            trading_day: string | null;
+            /** Trading Day Start Utc */
+            trading_day_start_utc: string | null;
+            /** Trading Day Timezone */
+            trading_day_timezone: string;
+        };
+        /**
+         * PortfolioStatus
+         * @description ``portfolio_status`` — DATABASE.md §7 (portfolios.status).
+         * @enum {string}
+         */
+        PortfolioStatus: "active" | "paused" | "archived";
+        /**
+         * PortfolioSummaryOut
+         * @description ``GET /api/v1/orgs/{org_id}/portfolios/{portfolio_id}``.
+         *
+         *     ``unavailable`` names *why*, in the words ``PortfolioStateBuild`` uses
+         *     (``"marks"``, ``"market_identity"``, ``"daily_reference"``,
+         *     ``"daily_decomposition"``) — never a silent gap in the numbers above it.
+         */
+        PortfolioSummaryOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Base Currency */
+            base_currency: string;
+            brl: components["schemas"]["BrlDecompositionOut"] | null;
+            /** Brl Unavailable Detail */
+            brl_unavailable_detail: string | null;
+            /** Brl Unavailable Reason */
+            brl_unavailable_reason: string | null;
+            /** Cash */
+            cash: string;
+            /** Equity */
+            equity: string;
+            /** Exposure Notional */
+            exposure_notional: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Marks Complete */
+            marks_complete: boolean;
+            /** Name */
+            name: string;
+            /** Open Position Count */
+            open_position_count: number;
+            /**
+             * Organization Id
+             * Format: uuid
+             */
+            organization_id: string;
+            /** Realized Pnl Cum */
+            realized_pnl_cum: string;
+            /** Reserved Cash */
+            reserved_cash: string;
+            /** Reserved Notional */
+            reserved_notional: string;
+            /** Reserved Risk */
+            reserved_risk: string;
+            risk_state: components["schemas"]["PortfolioRiskStateOut"];
+            status: components["schemas"]["PortfolioStatus"];
+            type: components["schemas"]["PortfolioType"];
+            /** Unavailable */
+            unavailable: string[];
+            /** Unrealized Pnl */
+            unrealized_pnl: string;
+            /**
+             * Workspace Id
+             * Format: uuid
+             */
+            workspace_id: string;
+        };
+        /**
+         * PortfolioType
+         * @description ``portfolio_type`` — DATABASE.md §7 (portfolios.type).
+         * @enum {string}
+         */
+        PortfolioType: "paper" | "shadow" | "live";
+        /**
+         * PositionOut
+         * @description One ``positions`` row. Empty today — no writer exists yet (T3.4/T3.5).
+         */
+        PositionOut: {
+            /** Avg Entry Price */
+            avg_entry_price: string;
+            /** Closed At */
+            closed_at: string | null;
+            direction: components["schemas"]["TradeDirection"];
+            /** Fees Paid */
+            fees_paid: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mark Price */
+            mark_price: string | null;
+            /**
+             * Market Id
+             * Format: uuid
+             */
+            market_id: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Qty */
+            qty: string;
+            /** Realized Pnl */
+            realized_pnl: string;
+            status: components["schemas"]["PositionStatus"];
+            /** Stop Price */
+            stop_price: string | null;
+            /** Unrealized Pnl */
+            unrealized_pnl: string;
+        };
+        /**
+         * PositionStatus
+         * @description ``position_status`` — DATABASE.md §7 (positions.status).
+         * @enum {string}
+         */
+        PositionStatus: "open" | "closing" | "closed";
         /**
          * ProfitFactorOut
          * @description PF with its denominator spelled out (Astra, contract review, must-fix 3).
@@ -1806,11 +2478,57 @@ export interface components {
          */
         RegimeScope: "global" | "btc";
         /**
+         * ResumeOut
+         * @description What the resume moved, and the assessment it was allowed against.
+         */
+        ResumeOut: {
+            /**
+             * Actor Id
+             * Format: uuid
+             */
+            actor_id: string;
+            /** Daily Loss Pct */
+            daily_loss_pct: string;
+            /** Drawdown Pct */
+            drawdown_pct: string;
+            effective: components["schemas"]["KillSwitchState"];
+            from_state: components["schemas"]["KillSwitchState"];
+            /**
+             * Portfolio Id
+             * Format: uuid
+             */
+            portfolio_id: string;
+            to_state: components["schemas"]["KillSwitchState"];
+        };
+        /**
+         * ResumeRequest
+         * @description A resume states a reason, and the reason is stored on the transition.
+         */
+        ResumeRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /**
          * RiskPreset
          * @description ``risk_preset`` — DATABASE.md §7 (risk_profiles.preset).
+         *
+         *     ``PAPER_V1`` is the M3 virtual wallet's profile (RISK_ENGINE.md §2): the
+         *     Everton directive's numbers, seeded as a system preset. It sits *before*
+         *     ``CUSTOM`` because ``CUSTOM`` is the open-ended wildcard and every named
+         *     preset precedes it — the same ordering argument ``0003`` used to put
+         *     ``EXTENDED`` before the terminal ``EXPIRED`` (DATABASE.md §17.1).
          * @enum {string}
          */
-        RiskPreset: "conservative" | "balanced" | "aggressive" | "custom";
+        RiskPreset: "conservative" | "balanced" | "aggressive" | "paper_v1" | "custom";
+        /**
+         * ScopeStatesOut
+         * @description The three scopes, unmerged — the effective state is the most restrictive.
+         */
+        ScopeStatesOut: {
+            organization: components["schemas"]["KillSwitchState"];
+            portfolio: components["schemas"]["KillSwitchState"];
+            system: components["schemas"]["KillSwitchState"];
+        };
         /**
          * ShadowTrackingState
          * @description ``shadow_tracking_state`` — ``signal_outcomes.tracking_state``, added by
@@ -1963,20 +2681,28 @@ export interface components {
          * @enum {string}
          */
         TradeDirection: "long" | "short" | "neutral";
-        /** TradeOut */
-        TradeOut: {
-            /** Price */
-            price: string;
-            /** Qty */
-            qty: string;
-            side: components["schemas"]["OrderSide"];
-            /** Trade Id */
-            trade_id: string;
+        /**
+         * TransitionOut
+         * @description One audited move. ``evidence`` is the numbers; ``reason`` is the prose.
+         */
+        TransitionOut: {
+            /** Actor Id */
+            actor_id: string | null;
+            /** Actor Type */
+            actor_type: string;
             /**
-             * Ts
+             * Created At
              * Format: date-time
              */
-            ts: string;
+            created_at: string;
+            /** Evidence */
+            evidence: {
+                [key: string]: unknown;
+            };
+            from_state: components["schemas"]["KillSwitchState"];
+            /** Reason */
+            reason: string | null;
+            to_state: components["schemas"]["KillSwitchState"];
         };
         /** UserOut */
         UserOut: {
@@ -2191,6 +2917,61 @@ export interface components {
             /** Name */
             name?: string | null;
             objective?: components["schemas"]["WorkspaceObjective"] | null;
+        };
+        /** TradeOut */
+        hunter_api__schemas__markets__TradeOut: {
+            /** Price */
+            price: string;
+            /** Qty */
+            qty: string;
+            side: components["schemas"]["OrderSide"];
+            /** Trade Id */
+            trade_id: string;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+        };
+        /**
+         * TradeOut
+         * @description One ``trades`` row. Empty today — no writer exists yet (T3.4/T3.5).
+         */
+        hunter_api__schemas__portfolio_lists__TradeOut: {
+            /**
+             * Closed At
+             * Format: date-time
+             */
+            closed_at: string;
+            direction: components["schemas"]["TradeDirection"];
+            /** Entry Price */
+            entry_price: string;
+            /** Exit Price */
+            exit_price: string;
+            exit_reason: components["schemas"]["ExitReason"] | null;
+            /** Fees */
+            fees: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Market Id
+             * Format: uuid
+             */
+            market_id: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Pnl */
+            pnl: string;
+            /** Pnl Pct */
+            pnl_pct: string | null;
+            /** Qty */
+            qty: string;
         };
     };
     responses: never;
@@ -2883,6 +3664,315 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemberOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_portfolios_route_api_v1_orgs__org_id__portfolios_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_PortfolioListItemOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_api_v1_orgs__org_id__portfolios__portfolio_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioSummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_anchor_api_v1_orgs__org_id__portfolios__portfolio_id__anchor_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnchorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_equity_curve_api_v1_orgs__org_id__portfolios__portfolio_id__equity_curve_get: {
+        parameters: {
+            query?: {
+                resolution?: components["schemas"]["Timeframe"];
+                from?: string | null;
+                to?: string | null;
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                portfolio_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AsOfPage_EquityCurvePointOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_orders_api_v1_orgs__org_id__portfolios__portfolio_id__orders_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                portfolio_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AsOfPage_OrderOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_positions_api_v1_orgs__org_id__portfolios__portfolio_id__positions_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                portfolio_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AsOfPage_PositionOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_kill_switch_api_v1_orgs__org_id__portfolios__portfolio_id__risk_kill_switch_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KillSwitchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_kill_switch_api_v1_orgs__org_id__portfolios__portfolio_id__risk_kill_switch_resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResumeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_trades_api_v1_orgs__org_id__portfolios__portfolio_id__trades_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                portfolio_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AsOfPage_TradeOut_"];
                 };
             };
             /** @description Validation Error */
