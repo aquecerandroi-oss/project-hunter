@@ -427,6 +427,33 @@ por endereço — um visitante abusivo derrubaria o limite de todos. Por isso a
 rede do compose tem sub-rede fixa (`172.28.0.0/24`) e o Caddy tem
 `ipv4_address: 172.28.0.10`; os dois valores andam juntos.
 
+**Incidente 2026-09-07 e correção (`ip_range`).** Um IP fixo baixo (`.10`) na
+mesma sub-rede que o alocador dinâmico do Docker usa está sujeito a colisão:
+o alocador preenche a partir do menor endereço livre, então qualquer
+container comum recriado sem endereço fixo pode receber `.10` antes do Caddy
+conseguir subir de novo. Foi o que aconteceu ao recriar containers com o
+perfil `shards` (4 market-workers, commit `9ceb389`) por um comando manual —
+o `scanner-worker` recebeu `172.28.0.10` primeiro e o Caddy morreu com
+`failed to set up container networking: Address already in use` (site fora
+até recriar o scanner). `infra/vps/docker-compose.prod.yml` agora reserva
+`ipam.config.ip_range: 172.28.0.128/25` na mesma rede: o alocador dinâmico só
+distribui endereços dentro dessa faixa, e o `.10` estático do Caddy (fora do
+`ip_range`, dentro do `subnet` — válido para o IPAM do Docker) deixa de ser
+alcançável por acidente. O pin continua em `.10`; detalhe da decisão e das
+alternativas descartadas em `infra/vps/README.md`.
+
+O mesmo incidente teve uma segunda causa, independente da rede: o comando
+manual usado não exportava `GIT_SHA` antes do `docker compose ... up`, então
+a imagem caiu no default `hunter-api:${GIT_SHA:-dev}` — uma tag velha, sem a
+migração nova — e o `migrate` falhou com `Can't locate revision 0006`.
+`infra/vps/compose.sh` já resolvia `GIT_SHA` sozinho para `up`/`update`; agora
+ele também aceita `MARKET_SHARDS` e ativa `--profile shards` (e, acima de 4,
+`--profile shards8`) sozinho nesses dois subcomandos, então o deploy com
+shards passa a ser um comando só: `MARKET_SHARDS=4 bash
+infra/vps/compose.sh update`. Depois do `up`, o script verifica se algum
+serviço ficou em `created`/`exited`/`dead` e, se sim, imprime `docker compose
+ps` e as últimas linhas de log de quem falhou — sem tentar contornar.
+
 **Portas.** Só 22, 80 e 443 em `0.0.0.0`. api (8000) e web (3000) publicam em
 `127.0.0.1` (túnel SSH para depurar); Postgres e Redis não publicam porta
 nenhuma. Isso importa porque **portas publicadas pelo Docker furam o `ufw`**:

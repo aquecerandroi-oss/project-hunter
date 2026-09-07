@@ -97,9 +97,15 @@ services:
   # 12 vCPU e cada um escreve o proprio `hb:market:binance:{i}of4`, que a API
   # agrega. Subir com:
   #
-  #   MARKET_SHARDS=4 docker compose --env-file .env -p hunter \
-  #     -f infra/docker/docker-compose.yml -f infra/vps/docker-compose.prod.yml \
-  #     --profile shards up -d
+  #   MARKET_SHARDS=4 bash infra/vps/compose.sh update
+  #
+  # (`compose.sh update` ja exporta GIT_SHA e, com MARKET_SHARDS>1, ja adiciona
+  # `--profile shards` sozinho - ver infra/vps/README.md.) NAO rode `docker
+  # compose ... up` a mao sem `export GIT_SHA=$(git rev-parse --short HEAD)`
+  # antes: sem o SHA o compose cai no default `hunter-api:dev`, uma imagem
+  # velha, e o `migrate` falha com "Can't locate revision" numa migracao que a
+  # imagem dev nao conhece - foi exatamente isso, mais a colisao de IP do
+  # Caddy acima, que tirou o site do ar em 2026-09-07.
   #
   # `MARKET_SHARDS` mora no ambiente do comando (ou no .env, que os agentes nao
   # escrevem); sem ele os tres extras recusam `1/1` no boot em vez de duplicar
@@ -210,9 +216,22 @@ networks:
     # Sub-rede fixa so para o Caddy ter IP estavel (FORWARDED_ALLOW_IPS acima).
     # Se 172.28.0.0/24 colidir com algo na VPS, troque aqui e no
     # FORWARDED_ALLOW_IPS da api - os dois tem que andar juntos.
+    #
+    # `ip_range` restringe so a alocacao DINAMICA do Docker (o que qualquer
+    # container sem `ipv4_address` recebe) a 172.28.0.128-255; enderecos
+    # estaticos como o .10 do Caddy continuam validos fora do ip_range, desde
+    # que dentro do subnet (comportamento documentado do IPAM do Docker).
+    # Sem isto, o alocador dinamico distribui a partir do menor IP livre
+    # (normalmente .2 em diante) e um container comum pode roubar o .10 antes
+    # do Caddy subir de novo - foi o que aconteceu em 2026-09-07: o perfil
+    # `shards` recriou containers, o scanner-worker recebeu .10 primeiro e o
+    # Caddy morreu com "failed to set up container networking: Address
+    # already in use" (site fora ate recriar o scanner). infra/vps/README.md
+    # tem o detalhe da escolha.
     ipam:
       config:
         - subnet: 172.28.0.0/24
+          ip_range: 172.28.0.128/25
 
 volumes:
   caddy_data:

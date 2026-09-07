@@ -55,6 +55,10 @@ bash infra/vps/compose.sh logs api      # logs de um serviço
 bash infra/vps/compose.sh update        # git pull + rebuild + up
 bash infra/vps/compose.sh down          # para tudo (volumes ficam)
 bash infra/vps/compose.sh exec postgres psql -U hunter -d hunter
+
+# T2.5g — 4 shards do coletor, um comando só (GIT_SHA e --profile shards
+# resolvidos pelo próprio compose.sh, ver "Deploy com shards" abaixo):
+MARKET_SHARDS=4 bash infra/vps/compose.sh update
 ```
 
 Equivalente escrito à mão (é o que `compose.sh` monta):
@@ -68,6 +72,56 @@ docker compose --env-file /opt/project-hunter/.env -p hunter \
 O `--env-file` não é opcional: o diretório de projeto do compose é o do
 **primeiro** `-f` (`infra/docker/`), então o `.env` da raiz não seria lido para
 interpolar `${POSTGRES_PASSWORD}` e companhia.
+
+**Nunca rode esse equivalente à mão sem `export GIT_SHA=$(git rev-parse
+--short HEAD)` antes.** Sem o SHA, `image: hunter-api:${GIT_SHA:-dev}` cai no
+default `dev` — uma tag velha, sem as migrações novas — e o `migrate` falha
+com `Can't locate revision` (foi exatamente isso, em 2026-09-07, numa subida
+manual do perfil `shards`; ver "Incidente" abaixo). `compose.sh` exporta o
+`GIT_SHA` sozinho para todo subcomando; é por isso que ele existe.
+
+### Deploy com shards (T2.5g), um comando só
+
+`compose.sh` lê `MARKET_SHARDS` do ambiente e adiciona `--profile shards`
+(e, acima de 4, também `--profile shards8`) sozinho, tanto em `up` quanto em
+`update` — não precisa mais digitar `--profile shards` à parte nem lembrar do
+`GIT_SHA`:
+
+```bash
+MARKET_SHARDS=4 bash infra/vps/compose.sh update
+```
+
+Depois de qualquer `up`/`update`, o script confere se algum serviço ficou em
+`created`, `exited` ou `dead` — se sim, imprime `docker compose ps` e as
+últimas 50 linhas de log de quem falhou (sem tentar reiniciar nem contornar) e
+sai com código de erro.
+
+### Incidente 2026-09-07 — Caddy fora do ar (colisão de IP)
+
+O Caddy tem `ipv4_address: 172.28.0.10` fixo na rede `hunter_default`
+(`172.28.0.0/24`) — necessário porque `FORWARDED_ALLOW_IPS` da api confia
+nesse IP exato para aceitar `X-Forwarded-For` (docs/DEPLOYMENT.md §9.3). Ao
+subir o perfil `shards` (4 market-workers, commit `9ceb389`) por um comando
+digitado à mão (sem `compose.sh`, sem `GIT_SHA`), o Docker recriou containers
+e seu alocador **dinâmico** de IP — que preenche a partir do menor endereço
+livre do subnet — entregou `172.28.0.10` ao `scanner-worker` antes do Caddy
+conseguir subir de novo. Resultado: `failed to set up container networking:
+Address already in use`, site fora até recriar o scanner manualmente.
+
+**Correção aplicada:** `docker-compose.prod.yml` agora reserva
+`ip_range: 172.28.0.128/25` na mesma rede — o alocador dinâmico do Docker só
+distribui endereços dentro dessa faixa (`.128`–`.255`); o `.10` do Caddy
+continua um endereço estático válido (fora do `ip_range`, mas dentro do
+`subnet`, o que o IPAM do Docker permite) e nenhum container comum pode mais
+recebê-lo por acidente. Alternativas consideradas e descartadas: mover o pin
+do Caddy para `.250` (resolveria o sintoma, mas não a causa — o próximo
+serviço genérico ainda poderia colidir com qualquer IP baixo fixo que viesse
+a existir); remover o pin (não dá — `FORWARDED_ALLOW_IPS` depende do valor
+exato, ver docs/DEPLOYMENT.md §9.3).
+
+A segunda causa do mesmo incidente — `migrate` falhando com `Can't locate
+revision 0006` — foi o comando manual não exportar `GIT_SHA`; ver "Deploy com
+shards" acima e docs/DEPLOYMENT.md §9.3.
 
 ## Backup
 
