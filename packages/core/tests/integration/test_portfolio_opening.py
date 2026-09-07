@@ -12,6 +12,7 @@ the tenant as the container owner, which is the only privileged step.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime, timedelta
@@ -21,6 +22,7 @@ from typing import TYPE_CHECKING
 import pytest
 import pytest_asyncio
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from hunter_core.db.models.fx import FxObservation
@@ -293,6 +295,116 @@ class TestPermanence:
                     as_of=_NOW + timedelta(minutes=1),
                 )
 
+    async def test_a_second_workspace_in_the_same_organization_gets_no_second_wallet(
+        self,
+        factory: async_sessionmaker[AsyncSession],
+        ledger_engine: AsyncEngine,
+        ledger_tenant: LedgerTenant,
+        observe_fx: Callable[..., Awaitable[uuid.UUID]],
+    ) -> None:
+        """T3.1b's security review of ``0006``: the principal wallet is unique
+        per **organization**, not per ``(organization, workspace)`` — a fresh
+        workspace inside the same organization must not open a second one."""
+        other_workspace_id = uuid.uuid4()
+        async with ledger_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO workspaces (id, organization_id, name, objective) "
+                    "VALUES (:id, :org, 'second-workspace', 'paper_trading')"
+                ),
+                {"id": other_workspace_id, "org": ledger_tenant.org_id},
+            )
+        observation_id = await observe_fx(observed_at=_NOW)
+
+        async with tenant_session(factory, ledger_tenant.org_id) as session:
+            await open_paper_wallet(
+                session,
+                organization_id=ledger_tenant.org_id,
+                workspace_id=ledger_tenant.workspace_id,
+                fx=await _fx(session, observation_id),
+                as_of=_NOW,
+            )
+
+        with pytest.raises(WalletAlreadyOpen, match="organization"):
+            async with tenant_session(factory, ledger_tenant.org_id) as session:
+                await open_paper_wallet(
+                    session,
+                    organization_id=ledger_tenant.org_id,
+                    workspace_id=other_workspace_id,
+                    fx=await _fx(session, observation_id),
+                    as_of=_NOW + timedelta(seconds=30),
+                )
+
+        assert await _count(ledger_engine, "portfolios", ledger_tenant.org_id) == 1
+
+    async def test_two_concurrent_openings_in_the_same_scope_do_not_leak_a_raw_db_error(
+        self,
+        factory: async_sessionmaker[AsyncSession],
+        ledger_engine: AsyncEngine,
+        ledger_tenant: LedgerTenant,
+        observe_fx: Callable[..., Awaitable[uuid.UUID]],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Deve-corrigir 7: two real, concurrent transactions race the unique
+        index — Postgres itself serialises the two ``INSERT``s, so exactly one
+        wins and the other must see :class:`WalletAlreadyOpen`, never the
+        driver's own ``IntegrityError``.
+
+        A bare ``asyncio.gather`` does not guarantee this branch is what runs:
+        if the winner's whole transaction finishes before the loser's precheck
+        even executes, the loser is refused by ``principal_paper_id`` and the
+        ``except IntegrityError`` branch this test means to exercise never
+        runs at all (Astra's tightening of this same review). The barrier below
+        holds both transactions until **both** real ``SELECT``s have returned
+        "no wallet yet", so both then race the same ``INSERT``.
+        """
+        from hunter_core.db.repositories.portfolio import PortfolioRepository
+
+        observation_id = await observe_fx(observed_at=_NOW)
+        both_prechecked = asyncio.Barrier(2)
+        original_precheck = PortfolioRepository.principal_paper_id
+
+        async def _barriered_precheck(self: PortfolioRepository) -> uuid.UUID | None:
+            found = await original_precheck(self)
+            await both_prechecked.wait()
+            return found
+
+        monkeypatch.setattr(PortfolioRepository, "principal_paper_id", _barriered_precheck)
+
+        async def _open() -> object:
+            async with tenant_session(factory, ledger_tenant.org_id) as session:
+                fx = await _fx(session, observation_id)
+                return await open_paper_wallet(
+                    session,
+                    organization_id=ledger_tenant.org_id,
+                    workspace_id=ledger_tenant.workspace_id,
+                    fx=fx,
+                    as_of=_NOW,
+                )
+
+        results = await asyncio.gather(_open(), _open(), return_exceptions=True)
+        failures = [r for r in results if isinstance(r, BaseException)]
+        successes = [r for r in results if not isinstance(r, BaseException)]
+
+        assert len(successes) == 1
+        assert len(failures) == 1
+        assert isinstance(failures[0], WalletAlreadyOpen)
+        assert isinstance(failures[0].__cause__, IntegrityError)
+
+        assert await _count(ledger_engine, "portfolios", ledger_tenant.org_id) == 1
+        assert await _count(ledger_engine, "portfolio_currency_anchor", ledger_tenant.org_id) == 1
+        assert await _count(ledger_engine, "portfolio_risk_state", ledger_tenant.org_id) == 1
+        assert await _count(ledger_engine, "portfolio_equity_snapshots", ledger_tenant.org_id) == 1
+        async with ledger_engine.connect() as connection:
+            audited = await connection.scalar(
+                text(
+                    "SELECT count(*) FROM audit_logs WHERE organization_id = :org "
+                    "AND action = 'portfolio.opened'"
+                ),
+                {"org": ledger_tenant.org_id},
+            )
+        assert audited == 1
+
 
 class TestAnInvalidObservationDoesNotOpen:
     @pytest.mark.parametrize(
@@ -334,3 +446,56 @@ class TestAnInvalidObservationDoesNotOpen:
 
         assert await _count(ledger_engine, "portfolios", ledger_tenant.org_id) == 0
         assert await _count(ledger_engine, "portfolio_currency_anchor", ledger_tenant.org_id) == 0
+
+
+class TestCapitalIsFixed:
+    """Adversarial review of ``8a6a69f``, suggestion 14: the directive's §1
+    fixes the paper wallet's opening capital at R$100.000; ``capital_brl`` is
+    not a free parameter of the service."""
+
+    async def test_a_non_default_capital_is_refused_and_writes_nothing(
+        self,
+        factory: async_sessionmaker[AsyncSession],
+        ledger_engine: AsyncEngine,
+        ledger_tenant: LedgerTenant,
+        observe_fx: Callable[..., Awaitable[uuid.UUID]],
+    ) -> None:
+        observation_id = await observe_fx(observed_at=_NOW)
+
+        with pytest.raises(ValueError, match="capital_brl must be"):
+            async with tenant_session(factory, ledger_tenant.org_id) as session:
+                await open_paper_wallet(
+                    session,
+                    organization_id=ledger_tenant.org_id,
+                    workspace_id=ledger_tenant.workspace_id,
+                    fx=await _fx(session, observation_id),
+                    as_of=_NOW,
+                    capital_brl=Decimal("50000"),
+                )
+
+        assert await _count(ledger_engine, "portfolios", ledger_tenant.org_id) == 0
+
+    async def test_the_testing_override_lets_a_test_open_at_a_different_capital(
+        self,
+        factory: async_sessionmaker[AsyncSession],
+        ledger_tenant: LedgerTenant,
+        observe_fx: Callable[..., Awaitable[uuid.UUID]],
+    ) -> None:
+        """The override exists so a test of the conversion arithmetic itself
+        can use a round, easy-to-check number; it is never reached from
+        production code (``test_no_funding_route.py`` proves that by scanning
+        the source)."""
+        observation_id = await observe_fx(observed_at=_NOW)
+
+        async with tenant_session(factory, ledger_tenant.org_id) as session:
+            result = await open_paper_wallet(
+                session,
+                organization_id=ledger_tenant.org_id,
+                workspace_id=ledger_tenant.workspace_id,
+                fx=await _fx(session, observation_id),
+                as_of=_NOW,
+                capital_brl=Decimal("50000"),
+                _testing_capital_override=True,
+            )
+
+        assert result.conversion.origin_amount == Decimal("50000")

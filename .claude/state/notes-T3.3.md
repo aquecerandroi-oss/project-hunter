@@ -149,3 +149,96 @@ por fill precisa ser fechado com ela. Está no item 7 das pendências.
 - `mark_positions(rows, marks, *, exit_cost_rate)` — idem.
 - `record_equity_point(session, *, build, fx, resolution=1h, fx_policy=PAPER_FX_POLICY)` — a FX é validada contra `build.as_of`.
 - `to_open_positions` / `to_pending_entries` / `market_identity` vivem em `hunter_core/portfolio/ledger.py` (movidos de `state.py` pelo orçamento de 350 linhas).
+
+## 10. T3.3b — fechamento da revisão adversarial de `8a6a69f` (2026-09-07)
+
+Bloqueante 3, deve-corrigir 5/6/7 e sugestões 12–14/16 corrigidos, cada um com teste que falhava
+antes. Detalhe por item no relatório da tarefa; aqui só o que muda a superfície e as dívidas novas.
+
+**Reorganização de arquivo (sem mudança de comportamento, só o orçamento de 350 linhas).**
+`opening.py` (376 linhas depois do bloqueante 3) virou dois módulos: `FxPolicy`,
+`FxObservationRejected`, `PAPER_FX_POLICY` e `validate_fx_observation` foram para
+`hunter_core/portfolio/fx_policy.py`; `opening.py` os reimporta com o idioma `import X as X`
+(reexport explícito, para o ruff não acusar F401) — quem importava de `hunter_core.portfolio.opening`
+continua funcionando sem mudar uma linha. Pelo mesmo motivo, `ledger.py` (339 linhas depois das
+auditorias do item 5) perdeu `MarkedPosition`/`mark_positions`/`_planned_risk` para
+`hunter_core/portfolio/marking.py` e `market_identity`/`to_open_positions`/`to_pending_entries` para
+`hunter_core/portfolio/positions.py`, com o mesmo reexport. `hunter_core/portfolio/__init__.py` não
+mudou.
+
+**Dívida nova para a T3.1c (deve-corrigir 5):** `portfolio_equity_snapshots` não tem coluna para
+`brl_unavailable_reason` nem para `stale_marks` — os dois só existiam em memória
+(`EquityPoint`/`PortfolioStateBuild`) e uma linha com `fx_observation_id = NULL` era indistinguível
+de uma marcação obsoleta ou de uma FX recusada. `record_equity_point` agora grava um `AuditEvent`
+(`portfolio.equity_point.brl_unavailable` / `portfolio.equity_point.stale_marks`) e um log
+estruturado (`equity_point_brl_unavailable` / `equity_point_stale_marks`) no instante em que nota
+cada um, mas isso é auditoria, não a coluna — quem consulta o ponto direto na tabela ainda não vê o
+motivo sem juntar `audit_logs`. A T3.1c (ou quem migrar `portfolio_equity_snapshots` a seguir)
+precisa decidir a coluna: `brl_unavailable_reason text NULL` (o enum `Literal["no_fx_observation",
+"fx_rejected"]` já existe em `hunter_core.portfolio.ledger.BrlUnavailableReason`) e algo equivalente
+para os mercados obsoletos do ponto (hoje só `PortfolioStateBuild.stale_marks`, uma tupla de
+`market_id`, nunca persistida por linha da curva).
+
+**Assinaturas que mudaram nesta rodada, para quem já as chama:**
+
+- `PortfolioRepository.principal_paper_id()` — perdeu o parâmetro `workspace_id` (deve-corrigir 6:
+  o índice é `(organization_id)` desde a T3.1b). Nenhum outro chamador existia além de `opening.py`.
+- `open_paper_wallet(..., _testing_capital_override: bool = False)` — parâmetro novo, kwarg-only,
+  default `False`; não quebra chamada existente. Com `capital_brl != DEFAULT_CAPITAL_BRL` e sem essa
+  flag, a função agora recusa com `ValueError` antes de tocar a sessão (sugestão 14). **A T3.8a
+  (`apps/api/tests/integration/test_portfolio_api.py:93`) chama `open_paper_wallet(...,
+  capital_brl=CAPITAL_BRL)` com `CAPITAL_BRL = Decimal("100000")` — igual a `DEFAULT_CAPITAL_BRL`,
+  então não precisa de nenhum ajuste.** `infra/scripts/open_paper_wallet.py --capital-brl` idem: não
+  toquei no script (fora do escopo desta tarefa), e o comportamento novo é o correto por diretiva —
+  um operador que passar um valor diferente de R$100.000 agora recebe a recusa com motivo em vez de
+  abrir uma carteira fora do número da diretiva; vale registrar se alguém quiser trocar o
+  `argparse` por uma constante fixa (removendo `--capital-brl` de vez) numa tarefa futura.
+- `validate_fx_observation(..., last_accepted: FxObservation | None = None)` — parâmetro novo,
+  kwarg-only, default `None` (desativa a comparação). Não usado ainda por nenhum chamador real
+  (`open_paper_wallet`/`record_equity_point` não passam `last_accepted`): a comparação com a última
+  observação aceita ficou pronta e testada, mas **quem vai buscar "a última observação aceita" no
+  banco é uma dívida em aberto** — não há hoje um repositório que responda essa pergunta, e inventar
+  um só para este parâmetro opcional estaria fora do escopo do bloqueante 3 (a review chamou essa
+  parte de "opcionalmente").
+- `mark_positions` recusa qualquer `PositionRow.direction != "long"` com `NonLongPosition` (sugestão
+  13, D1 é spot-only). Nenhum caminho de produção grava posição `short` hoje; se um dia gravar, esse
+  raise é o primeiro lugar que vai doer, de propósito.
+
+## 11. Segunda rodada da Astra sobre o diff da T3.3b (`astra-review-T3.3b-ledger-fixes.md`)
+
+REQUEST_CHANGES com dois MUST-FIX (medium), ambos corrigidos com teste que falhava antes:
+
+1. **O teste de corrida original (`asyncio.gather` puro) não garantia exercitar o ramo
+   `IntegrityError → WalletAlreadyOpen`.** Se a transação vencedora terminasse antes do `SELECT`
+   pré-check da perdedora, esta seria recusada pelo próprio pré-check, e o `except IntegrityError`
+   nunca rodaria — o teste passaria do mesmo jeito com esse ramo quebrado. Corrigido com uma barreira
+   (`asyncio.Barrier(2)`, via `monkeypatch` em `PortfolioRepository.principal_paper_id`) que só libera
+   as duas transações depois que **ambos** os `SELECT`s reais já devolveram "carteira nenhuma", e uma
+   asserção nova em `failures[0].__cause__` provando que é mesmo um `IntegrityError` por trás do
+   `WalletAlreadyOpen` (não outro motivo). Mais contagens: âncora, estado de risco, ponto da curva e
+   auditoria da abertura, todos em exatamente 1.
+2. **A auditoria de indisponibilidade não guardava a chave completa do ponto.** A PK de
+   `portfolio_equity_snapshots` é `(portfolio_id, resolution, ts)`; o evento só levava
+   portfolio+timestamp. Dois pontos na mesma marca (`1m` e `1h`) com destinos diferentes (um recusado,
+   outro saudável) ficariam ambíguos. `_audit_unavailability` e os dois payloads de
+   `record_equity_point` ganharam `"resolution"`; a recusa de FX também ganhou
+   `"rejected_fx_observation_id"` (a observação que falhou, nunca confundida com o
+   `fx_observation_id` gravado no ponto, que continua `NULL` numa recusa).
+
+Sugestões (não bloqueantes, todas endereçadas):
+
+- `last_accepted` (comparação de desvio) ganhou causalidade: só compara contra uma observação do
+  mesmo par/fonte, observada **estritamente antes** da atual e já **disponível** no instante `as_of`
+  — sem isso um replay podia mudar de veredito ao "aprender" sobre uma observação aceita depois.
+  Continua sem uso real (nenhum chamador passa `last_accepted` hoje; ver item 9 acima).
+- Teste novo provando a auditoria também no ramo `fx_rejected` (o primeiro só cobria
+  `no_fx_observation`), com o id da observação recusada conferido.
+- O teste do AST sobre `_testing_capital_override` ganhou um segundo teste dedicado a
+  `infra/scripts/*.py` (fora dos três diretórios que `_modules()` varre) e a docstring passou a
+  declarar os dois limites reais do parser (não pega `**kwargs`, não alcança `infra/scripts` sem essa
+  segunda checagem) em vez de prometer "nenhum módulo de produção" sem qualificação.
+
+Concordância registrada com o restante do parecer dela: escopo por organização alinhado ao índice,
+recusa de posição não-longa e `LEDGER_CONTEXT` na acumulação de custos, todos corretos sem mudança.
+A banda `[1, 100]` continua aceitando um erro de escala 10× (ex. `54,321` no lugar de `5,4321`) — já
+reconhecido como proteção parcial no item 3/9 acima, não reaberto como bloqueante por ela.

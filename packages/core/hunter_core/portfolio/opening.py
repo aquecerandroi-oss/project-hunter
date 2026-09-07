@@ -17,9 +17,11 @@ because ``SELECT ... FOR UPDATE`` on a row that does not exist serialises
 nothing.
 
 **There is no second opening.** A principal paper wallet is one per
-``(organization, workspace)`` for ever (D7). A concurrent second attempt loses
-on ``uq_portfolios_principal_paper`` and is reported as
-:class:`WalletAlreadyOpen`, not as a database error the caller has to interpret.
+organization for ever (D7; the index moved off ``workspace_id`` in T3.1b's
+security review of ``0006`` — a workspace is a grouping, not the permanence
+guarantee D7 asks for). A concurrent second attempt loses on
+``uq_portfolios_principal_paper`` and is reported as :class:`WalletAlreadyOpen`,
+not as a database error the caller has to interpret.
 
 **Nothing in this package can add money afterwards.** The anchor is immutable by
 trigger, ``portfolios.initial_capital`` is frozen once anchored, and no other
@@ -35,22 +37,28 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.exc import IntegrityError
 
 from hunter_core.audit import AuditEvent, SqlAuditSink
 from hunter_core.db.models.fx import FxObservation
 from hunter_core.db.repositories.equity import EquitySnapshotRepository
-from hunter_core.db.repositories.portfolio import PortfolioRepository
+from hunter_core.db.repositories.portfolio import PRINCIPAL_PAPER_SCOPE, PortfolioRepository
 from hunter_core.domain.types import ensure_utc, utcnow, uuid7
 from hunter_core.logging import get_logger
 from hunter_core.portfolio.attribution import (
-    FX_PAIR,
     OPERATING_CURRENCY,
     ORIGIN_CURRENCY,
     OpeningConversion,
     convert_opening,
 )
+from hunter_core.portfolio.fx_policy import (
+    PAPER_FX_POLICY as PAPER_FX_POLICY,  # re-exported: callers import the policy from here too
+)
+from hunter_core.portfolio.fx_policy import (
+    FxObservationRejected as FxObservationRejected,  # re-exported for the same reason
+)
+from hunter_core.portfolio.fx_policy import FxPolicy, validate_fx_observation
 from hunter_risk.exposure import SAO_PAULO, sao_paulo_day_start_utc
 
 if TYPE_CHECKING:
@@ -67,43 +75,8 @@ _ZERO = Decimal(0)
 _PRINCIPAL_INDEX = "uq_portfolios_principal_paper"
 
 
-class FxPolicy(BaseModel):
-    """Which observations may open a wallet. Declared by the service, not the caller."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    pair: str = FX_PAIR
-    source: str = "binance.spot.ticker"
-    """The named producer of T3.11. Compared exactly: a rate without the source
-    we declared is a rate from somewhere nobody reviewed."""
-
-    availability_max_age_s: int = Field(default=300, gt=0)
-    """How old the observation may be **at the instant we could act on it**.
-    Five minutes: the opening is a single auditable act, and a wallet must not
-    be converted at a rate that stopped being reachable a quarter of an hour
-    ago. Measured on ``available_at``."""
-
-    observation_max_age_s: int = Field(default=600, gt=0)
-    """How old the *quote itself* may be. Ten minutes, a second and separate
-    limit (Astra, T3.3 policy review, answer 3): without it a backfill that
-    arrives now turns an hour-old quote into a fresh one, because its
-    ``available_at`` is honest and its ``observed_at`` is not recent."""
-
-
-PAPER_FX_POLICY = FxPolicy()
-"""The policy the paper wallet opens under."""
-
-
-class FxObservationRejected(Exception):
-    """The observation may not open a wallet. Carries the reason, for the audit."""
-
-    def __init__(self, reason: str) -> None:
-        super().__init__(reason)
-        self.reason = reason
-
-
 class WalletAlreadyOpen(Exception):
-    """This workspace already has its principal paper wallet (D7)."""
+    """This organization already has its principal paper wallet (D7)."""
 
 
 class OpeningResult(BaseModel):
@@ -120,52 +93,6 @@ class OpeningResult(BaseModel):
     trading_day_start_utc: datetime
 
 
-def validate_fx_observation(
-    observation: FxObservation, *, as_of: datetime, policy: FxPolicy = PAPER_FX_POLICY
-) -> None:
-    """Raise :class:`FxObservationRejected` unless ``observation`` may open a wallet.
-
-    Pure and clock-free: ``as_of`` is the instant of the act, passed in, so a
-    replay decides the same way the original did.
-    """
-    moment = ensure_utc(as_of)
-    if observation.pair != policy.pair:
-        raise FxObservationRejected(
-            f"pair {observation.pair!r} is not the declared {policy.pair!r}"
-        )
-    if observation.source != policy.source:
-        raise FxObservationRejected(
-            f"source {observation.source!r} is not the declared {policy.source!r}"
-        )
-    if observation.rate <= 0:
-        raise FxObservationRejected(f"rate {observation.rate} is not positive")
-
-    observed_at = ensure_utc(observation.observed_at)
-    available_at = ensure_utc(observation.available_at)
-    if observed_at > available_at:
-        raise FxObservationRejected(
-            f"observed_at {observed_at.isoformat()} is ahead of available_at "
-            f"{available_at.isoformat()}"
-        )
-    if available_at > moment:
-        raise FxObservationRejected(
-            f"available_at {available_at.isoformat()} is ahead of the opening "
-            f"{moment.isoformat()}: the rate had not reached us yet"
-        )
-    availability_age = (moment - available_at).total_seconds()
-    if availability_age > policy.availability_max_age_s:
-        raise FxObservationRejected(
-            f"available_at is {availability_age:.0f}s old, over the "
-            f"{policy.availability_max_age_s}s the policy allows"
-        )
-    observation_age = (moment - observed_at).total_seconds()
-    if observation_age > policy.observation_max_age_s:
-        raise FxObservationRejected(
-            f"observed_at is {observation_age:.0f}s old, over the "
-            f"{policy.observation_max_age_s}s the policy allows"
-        )
-
-
 async def open_paper_wallet(
     session: AsyncSession,
     *,
@@ -179,25 +106,42 @@ async def open_paper_wallet(
     risk_profile_id: uuid.UUID | None = None,
     created_by: uuid.UUID | None = None,
     actor_id: str = "system",
+    _testing_capital_override: bool = False,
 ) -> OpeningResult:
-    """Open the principal paper wallet of ``workspace_id``, once, atomically.
+    """Open the principal paper wallet of ``organization_id``, once, atomically.
 
     Raises :class:`FxObservationRejected` before writing anything when the rate
-    may not open a wallet, and :class:`WalletAlreadyOpen` when the workspace
+    may not open a wallet, and :class:`WalletAlreadyOpen` when the organization
     already has one — including a paused, archived or soft-deleted one, because
     those are the same substitution the directive forbids when it forbids a
     reset.
+
+    ``capital_brl`` **must be** :data:`DEFAULT_CAPITAL_BRL`: the directive's §1
+    fixes the paper wallet's opening capital at R$100.000, and a parameter that
+    silently accepted anything else would be a second, code-level way to change
+    a number the product intentionally hard-codes. It exists at all only so a
+    test that means to exercise the conversion arithmetic at a different
+    capital can, by also passing ``_testing_capital_override=True`` — a name
+    deliberately awkward to type, so it is never reached from production code
+    by accident (``test_no_funding_route.py`` scans the repository for it).
     """
+    if capital_brl != DEFAULT_CAPITAL_BRL and not _testing_capital_override:
+        raise ValueError(
+            f"capital_brl must be {DEFAULT_CAPITAL_BRL} (directive §1 fixes the paper "
+            f"wallet's opening capital); got {capital_brl}. Only a test that means to "
+            "exercise a different capital passes _testing_capital_override=True."
+        )
     moment = ensure_utc(as_of) if as_of is not None else utcnow()
     validate_fx_observation(fx, as_of=moment, policy=fx_policy)
     conversion = convert_opening(capital_brl, fx.rate)
 
     portfolios = PortfolioRepository(session, organization_id)
     await portfolios.require_tenant_context()
-    if await portfolios.principal_paper_id(workspace_id) is not None:
+    if await portfolios.principal_paper_id() is not None:
         raise WalletAlreadyOpen(
-            f"workspace {workspace_id} already has its principal paper wallet; there is no "
-            "second opening, because a second wallet is the reset the directive forbids"
+            f"{PRINCIPAL_PAPER_SCOPE} {organization_id} already has its principal paper "
+            "wallet; there is no second opening, because a second wallet is the reset the "
+            "directive forbids"
         )
 
     portfolio_id = uuid7()
@@ -216,8 +160,8 @@ async def open_paper_wallet(
         if _PRINCIPAL_INDEX not in str(exc.orig):
             raise
         raise WalletAlreadyOpen(
-            f"workspace {workspace_id} got its principal paper wallet from a concurrent "
-            "opening; this one is rolled back whole"
+            f"{PRINCIPAL_PAPER_SCOPE} {organization_id} got its principal paper wallet from "
+            "a concurrent opening; this one is rolled back whole"
         ) from exc
 
     await portfolios.create_risk_state(

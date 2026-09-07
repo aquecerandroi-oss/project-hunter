@@ -33,6 +33,17 @@ _PRINCIPAL_PAPER = "type = 'paper' AND NOT is_arena"
 soft-deleting the wallet must not free a second one (M3 joint decision, item 2).
 """
 
+PRINCIPAL_PAPER_SCOPE = "organization"
+"""What ``uq_portfolios_principal_paper`` is keyed on, named once.
+
+T3.1b's security review of ``0006`` (blocking 2) moved the index from
+``(organization_id, workspace_id)`` to ``organization_id`` alone: a workspace is
+a grouping a request handler can create, not the permanence guarantee D7 asks
+for ("uma carteira principal"). :meth:`PortfolioRepository.principal_paper_id`
+reads the index's own scope, and every ``WalletAlreadyOpen`` message names this
+constant rather than a hand-written word — so the code and the word can only
+change together, in this one place."""
+
 
 class PortfolioRepository(TenantRepository):
     """Reads and writes of one organization's wallets."""
@@ -44,21 +55,22 @@ class PortfolioRepository(TenantRepository):
         )
         return (await self.session.execute(statement)).scalar_one_or_none()
 
-    async def principal_paper_id(self, workspace_id: uuid.UUID) -> uuid.UUID | None:
-        """The id of the principal paper wallet of ``workspace_id``, if it exists.
+    async def principal_paper_id(self) -> uuid.UUID | None:
+        """The id of the organization's principal paper wallet, if it exists.
 
-        Uses the index's own predicate, so what this reads and what the unique
-        index enforces cannot drift apart.
+        Scoped by :data:`PRINCIPAL_PAPER_SCOPE` (``organization_id`` alone,
+        T3.1b) using the index's own predicate, so what this reads and what the
+        unique index enforces cannot drift apart. Takes no ``workspace_id``: a
+        wallet in *any* workspace of this organization is the same principal
+        wallet the index refuses to duplicate.
         """
         # S608: ``_PRINCIPAL_PAPER`` is a module constant copied from the index
-        # definition; the organization and the workspace are bound parameters.
+        # definition; the organization is a bound parameter.
         statement = text(
-            "SELECT id FROM portfolios WHERE organization_id = :org AND workspace_id = :ws "  # noqa: S608
+            "SELECT id FROM portfolios WHERE organization_id = :org "  # noqa: S608
             f"AND {_PRINCIPAL_PAPER} LIMIT 1"
         )
-        found = await self.session.scalar(
-            statement, {"org": self.organization_id, "ws": workspace_id}
-        )
+        found = await self.session.scalar(statement, {"org": self.organization_id})
         return found
 
     async def create_wallet(

@@ -594,6 +594,126 @@ class TestTheEquityCurve:
         assert point.brl_unavailable_reason == "no_fx_observation"
 
 
+class TestUnavailabilityIsAudited:
+    """Adversarial review of ``8a6a69f``, deve-corrigir 5:
+    ``brl_unavailable_reason`` and ``stale_marks`` lived only in memory, and a
+    row with a null ``fx_observation_id`` is indistinguishable from a healthy
+    one that simply had nothing to convert. Both now write an ``AuditEvent``
+    (and a structured log line) at the instant the ledger notices."""
+
+    async def test_no_fx_observation_is_audited(
+        self, factory: async_sessionmaker[AsyncSession], ledger_engine: AsyncEngine, wallet: Wallet
+    ) -> None:
+        later = _NOW + timedelta(hours=2)
+        async with tenant_session(factory, wallet.org_id) as session:
+            build = await build_portfolio_state(
+                session,
+                organization_id=wallet.org_id,
+                portfolio_id=wallet.portfolio_id,
+                as_of=later,
+                marks={},
+                exit_cost_rate=_NO_EXIT_COST,
+            )
+            point = await record_equity_point(session, build=build, fx=None)
+
+        assert point.brl_unavailable_reason == "no_fx_observation"
+        async with ledger_engine.begin() as connection:
+            audited = (
+                await connection.execute(
+                    text(
+                        "SELECT after FROM audit_logs WHERE entity_id = :pf "
+                        "AND action = 'portfolio.equity_point.brl_unavailable'"
+                    ),
+                    {"pf": wallet.portfolio_id},
+                )
+            ).one()
+        assert audited.after["reason"] == "no_fx_observation"
+        assert audited.after["resolution"] == REFERENCE_RESOLUTION.value
+        assert "rejected_fx_observation_id" not in audited.after
+
+    async def test_an_fx_observation_that_fails_validation_is_audited_with_its_id(
+        self,
+        factory: async_sessionmaker[AsyncSession],
+        ledger_engine: AsyncEngine,
+        wallet: Wallet,
+        observe_fx: Callable[..., Awaitable[uuid.UUID]],
+    ) -> None:
+        """Astra's follow-up on deve-corrigir 5: the earlier test only proved
+        the ``no_fx_observation`` branch; the ``fx_rejected`` branch, and the
+        id of the observation that failed, need their own proof."""
+        from hunter_core.db.repositories.fx import FxObservationRepository
+
+        point_at = _NOW + timedelta(minutes=10)
+        future_fx = await observe_fx(
+            rate=Decimal("6.0000000000"), observed_at=_NOW + timedelta(hours=1)
+        )
+
+        async with tenant_session(factory, wallet.org_id) as session:
+            observation = await FxObservationRepository(session).get(future_fx)
+            build = await build_portfolio_state(
+                session,
+                organization_id=wallet.org_id,
+                portfolio_id=wallet.portfolio_id,
+                as_of=point_at,
+                marks={},
+                exit_cost_rate=_NO_EXIT_COST,
+            )
+            point = await record_equity_point(session, build=build, fx=observation)
+
+        assert point.brl_unavailable_reason == "fx_rejected"
+        async with ledger_engine.begin() as connection:
+            audited = (
+                await connection.execute(
+                    text(
+                        "SELECT after FROM audit_logs WHERE entity_id = :pf "
+                        "AND action = 'portfolio.equity_point.brl_unavailable'"
+                    ),
+                    {"pf": wallet.portfolio_id},
+                )
+            ).one()
+        assert audited.after["reason"] == "fx_rejected"
+        assert audited.after["detail"] is not None
+        assert audited.after["rejected_fx_observation_id"] == str(future_fx)
+
+    async def test_a_stale_mark_is_audited(
+        self, factory: async_sessionmaker[AsyncSession], ledger_engine: AsyncEngine, wallet: Wallet
+    ) -> None:
+        later = _NOW + timedelta(minutes=30)
+        await _buy(
+            ledger_engine,
+            wallet,
+            qty=Decimal(1),
+            price=Decimal(4000),
+            fee=Decimal(0),
+            mark=Decimal(4100),
+            stop=Decimal(3900),
+        )
+
+        async with tenant_session(factory, wallet.org_id) as session:
+            build = await build_portfolio_state(
+                session,
+                organization_id=wallet.org_id,
+                portfolio_id=wallet.portfolio_id,
+                as_of=later,
+                marks={},
+                exit_cost_rate=_NO_EXIT_COST,
+            )
+            await record_equity_point(session, build=build, fx=None)
+
+        async with ledger_engine.begin() as connection:
+            audited = (
+                await connection.execute(
+                    text(
+                        "SELECT after FROM audit_logs WHERE entity_id = :pf "
+                        "AND action = 'portfolio.equity_point.stale_marks'"
+                    ),
+                    {"pf": wallet.portfolio_id},
+                )
+            ).one()
+        assert audited.after["market_ids"] == [str(wallet.market_id)]
+        assert audited.after["resolution"] == REFERENCE_RESOLUTION.value
+
+
 class TestTheCostsOfTheDayIncludeFeesPaidInCoins:
     """Astra, review of the T3.3 diff, must-fix A."""
 
@@ -635,6 +755,47 @@ class TestTheCostsOfTheDayIncludeFeesPaidInCoins:
         assert build.state.daily_unrealized_pnl == Decimal(0)
         assert build.state.daily_decomposition_gap == Decimal(0)
         assert build.state.daily_pnl == Decimal(-1)
+
+    async def test_a_base_asset_fee_at_schema_legal_magnitude_is_not_rounded_by_28_digits(
+        self, factory: async_sessionmaker[AsyncSession], ledger_engine: AsyncEngine, wallet: Wallet
+    ) -> None:
+        """Adversarial review of ``8a6a69f``, suggestion 12: ``costs += qty *
+        price`` ran under the ambient default context (28 significant digits),
+        not :data:`hunter_core.portfolio.attribution.LEDGER_CONTEXT`.
+        ``NUMERIC(28,10)`` bounds each *column* to 28 digits, not their
+        *product* — two schema-legal values below round to a different tenth
+        decimal without the wider context."""
+        from decimal import localcontext
+
+        from hunter_core.portfolio.attribution import LEDGER_CONTEXT
+
+        huge_fee = Decimal("123456789012345.6789012345")
+        huge_price = Decimal("987654321098.7654321098")
+        await _buy(
+            ledger_engine,
+            wallet,
+            qty=Decimal(1),
+            price=Decimal(100),
+            fee=huge_fee,
+            mark=huge_price,
+            stop=Decimal(90),
+            fee_asset=wallet.tenant.base_symbol,
+        )
+
+        async with tenant_session(factory, wallet.org_id) as session:
+            build = await build_portfolio_state(
+                session,
+                organization_id=wallet.org_id,
+                portfolio_id=wallet.portfolio_id,
+                as_of=_NOW,
+                marks={wallet.market_id: huge_price},
+                exit_cost_rate=_NO_EXIT_COST,
+            )
+
+        assert build.state is not None
+        with localcontext(LEDGER_CONTEXT):
+            expected = huge_fee * huge_price
+        assert build.state.daily_costs == expected
 
     async def test_without_a_price_for_the_coin_the_costs_are_unavailable_not_zero(
         self, factory: async_sessionmaker[AsyncSession], ledger_engine: AsyncEngine, wallet: Wallet

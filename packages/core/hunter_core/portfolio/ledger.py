@@ -1,22 +1,15 @@
-"""Marking positions and appending to the equity curve.
+"""Appending to the equity curve.
 
-Two jobs, one module, because they are the same arithmetic seen twice: what a
-position is worth *now* is what makes the equity, and the equity is what a point
-of the curve records. Everything here is measured in the operating currency; the
-BRL reading is derived at the end, from the observation the point names.
-
-**No mark is ever fabricated.** When the caller's price source has nothing valid
-for a market, the position keeps the last mark the writer persisted
-(``positions.mark_price``, or its entry price if even that is missing) and the
-build is flagged: ``PortfolioState.marks_complete`` goes false, the risk engine
-refuses new entries, and protective exits — which do not need the state at all
-(RISK_ENGINE.md §10) — keep working. A missing price is never zero: a position
-marked at zero would understate exposure exactly when the data is worst.
+Everything here is measured in the operating currency; the BRL reading is
+derived at the end, from the observation the point names.
 
 **A point of the curve names the rate it used.** With no usable observation the
 USDT side of the point is still written and the BRL side is *unavailable with a
 reason*, never extrapolated and never back-filled with today's rate (M3 joint
-decision, item 1).
+decision, item 1). Both that refusal and a point built on a stale mark are
+audited, not just returned in memory (adversarial review of ``8a6a69f``,
+deve-corrigir 5) — ``portfolio_equity_snapshots`` has no column of its own for
+either yet, which is the debt ``.claude/state/notes-T3.3.md`` files for T3.1c.
 """
 
 from __future__ import annotations
@@ -28,110 +21,42 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from hunter_core.audit import AuditEvent, SqlAuditSink
 from hunter_core.db.models.fx import FxObservation
 from hunter_core.db.repositories.equity import REFERENCE_RESOLUTION, EquitySnapshotRepository
-from hunter_core.db.repositories.ledger import PositionRow, ReservationRow
-from hunter_core.domain.enums import MarketType, Timeframe
+from hunter_core.domain.enums import Timeframe
 from hunter_core.domain.types import ensure_utc
+from hunter_core.logging import get_logger
 from hunter_core.portfolio.attribution import LEDGER_CONTEXT, BrlAttribution, attribute_brl
+from hunter_core.portfolio.marking import (
+    MarkedPosition as MarkedPosition,  # re-exported: callers import marking from here too
+)
+from hunter_core.portfolio.marking import (
+    NonLongPosition as NonLongPosition,  # re-exported for the same reason
+)
+from hunter_core.portfolio.marking import mark_positions as mark_positions  # re-exported
 from hunter_core.portfolio.opening import (
     PAPER_FX_POLICY,
     FxObservationRejected,
     FxPolicy,
     validate_fx_observation,
 )
-from hunter_risk.exposure import OpenPosition, PendingEntry
-from hunter_risk.inputs import MarketIdentity
+from hunter_core.portfolio.positions import market_identity as market_identity  # re-exported
+from hunter_core.portfolio.positions import to_open_positions as to_open_positions  # re-exported
+from hunter_core.portfolio.positions import (
+    to_pending_entries as to_pending_entries,  # re-exported
+)
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from hunter_core.portfolio.state import PortfolioStateBuild
 
+log = get_logger(__name__)
+
 _ZERO = Decimal(0)
 
 BrlUnavailableReason = Literal["no_fx_observation", "fx_rejected"]
-
-
-class MarkedPosition(BaseModel):
-    """One position valued at ``as_of``, with the provenance of its price."""
-
-    model_config = ConfigDict(frozen=True)
-
-    row: PositionRow
-    mark_price: Decimal
-    """Never zero and never absent: the live price, else the last durable mark,
-    else the entry price."""
-
-    is_stale: bool
-    """True when the live source had no valid price for this market."""
-
-    notional: Decimal
-    unrealized_pnl: Decimal
-    planned_risk_quote: Decimal
-    """What the position still loses if its stop is hit. Without a stop it is
-    the whole notional: an unknown planned loss is not a zero planned loss, and
-    the aggregate ceiling must not be freed by a missing column."""
-
-
-def mark_positions(
-    rows: tuple[PositionRow, ...],
-    marks: Mapping[uuid.UUID, Decimal],
-    *,
-    exit_cost_rate: Decimal,
-) -> tuple[MarkedPosition, ...]:
-    """Value every position, falling back to its last durable mark, never to zero.
-
-    ``exit_cost_rate`` is the caller's declared hypothesis for what liquidating a
-    position costs, as a fraction of its notional (the exit's fee plus its
-    slippage). It has **no default**: ``planned_risk_quote`` promises "what this
-    position still loses if its stop is hit, *costs included*"
-    (``hunter_risk.exposure.OpenPosition``), and a ledger that quietly reported
-    the bare stop distance would under-report the aggregate ceiling - 190 of stop
-    distance plus 2 of exit cost fits under a ceiling of 200 only because the 2
-    was never counted (Astra, review of this diff, must-fix B).
-    """
-    marked: list[MarkedPosition] = []
-    for row in rows:
-        live = marks.get(row.market_id)
-        is_stale = live is None or live <= 0
-        price = row.durable_mark_price if is_stale else live
-        if price is None or price <= 0:
-            price = row.avg_entry_price
-        with localcontext(LEDGER_CONTEXT):
-            notional = row.qty * price
-            direction = Decimal(1) if row.direction == "long" else Decimal(-1)
-            unrealized = row.qty * (price - row.avg_entry_price) * direction
-            planned_risk = _planned_risk(row, price, direction, exit_cost_rate)
-        marked.append(
-            MarkedPosition(
-                row=row,
-                mark_price=price,
-                is_stale=is_stale,
-                notional=notional,
-                unrealized_pnl=unrealized,
-                planned_risk_quote=planned_risk,
-            )
-        )
-    return tuple(marked)
-
-
-def _planned_risk(
-    row: PositionRow, price: Decimal, direction: Decimal, exit_cost_rate: Decimal
-) -> Decimal:
-    """Loss at the stop plus the declared cost of getting out.
-
-    Without a stop the position can lose its whole notional *and* still pay to be
-    liquidated: an unknown planned loss is not a zero planned loss, and the
-    aggregate ceiling must not be freed by a missing column.
-    """
-    exit_cost = row.qty * price * exit_cost_rate
-    if row.stop_price is None:
-        return row.qty * price + exit_cost
-    loss = (price - row.stop_price) * direction * row.qty
-    return (loss if loss > 0 else _ZERO) + exit_cost
 
 
 class EquityPoint(BaseModel):
@@ -201,6 +126,34 @@ async def record_equity_point(
                 opening_rate=build.opening_rate,
                 current_rate=fx.rate,
             )
+    if reason is not None:
+        payload: dict[str, object] = {
+            "reason": reason,
+            "detail": detail,
+            "resolution": resolution.value,
+        }
+        if fx is not None:
+            # The observation that failed the check — never the number the
+            # point ends up storing, since a refused rate is never stored.
+            payload["rejected_fx_observation_id"] = str(fx.id)
+        await _audit_unavailability(
+            session,
+            build,
+            action="portfolio.equity_point.brl_unavailable",
+            log_event="equity_point_brl_unavailable",
+            payload=payload,
+        )
+    if build.stale_marks:
+        await _audit_unavailability(
+            session,
+            build,
+            action="portfolio.equity_point.stale_marks",
+            log_event="equity_point_stale_marks",
+            payload={
+                "resolution": resolution.value,
+                "market_ids": [str(market_id) for market_id in build.stale_marks],
+            },
+        )
 
     exposure_pct = None
     drawdown_pct = None
@@ -247,76 +200,40 @@ async def record_equity_point(
     )
 
 
-def market_identity(row: PositionRow | ReservationRow) -> MarketIdentity | None:
-    """The market's identity, or ``None`` when the reference data cannot name it.
+async def _audit_unavailability(
+    session: AsyncSession,
+    build: PortfolioStateBuild,
+    *,
+    action: str,
+    log_event: str,
+    payload: dict[str, object],
+) -> None:
+    """Structured log plus :class:`AuditEvent` for a point this ledger could not
+    build in full — a refused rate or a mark it had to carry stale.
 
-    The engine compares identities (D1: spot executes, the perpetual decides), so
-    a market with no base or quote asset is not a market it can reason about.
+    Neither ``brl_unavailable_reason`` nor ``stale_marks`` has a column of its
+    own on ``portfolio_equity_snapshots`` yet (adversarial review of
+    ``8a6a69f``, deve-corrigir 5); until T3.1c adds one, this audit row plus the
+    log line are what make a degraded point distinguishable, after the fact,
+    from a healthy one whose ``fx_observation_id`` merely happens to be null.
+
+    ``payload`` carries ``resolution`` (Astra's follow-up on this same review):
+    the snapshot's primary key is ``(portfolio_id, resolution, ts)``, not just
+    ``(portfolio_id, ts)``, and two lanes sampled at the same instant — a ``1m``
+    point and the ``1h`` reference — must not collapse into one row here just
+    because ``entity_id`` and ``ts`` happen to match.
     """
-    if row.base_asset is None or row.quote_asset is None:
-        return None
-    return MarketIdentity(
-        exchange=row.exchange,
-        symbol=row.symbol,
-        market_type=MarketType(row.market_type),
-        base_asset=row.base_asset,
-        quote_asset=row.quote_asset,
+    log.warning(log_event, portfolio_id=str(build.portfolio_id), **payload)
+    await SqlAuditSink(session).record(
+        AuditEvent(
+            actor_type="system",
+            actor_id="system",
+            organization_id=build.organization_id,
+            action=action,
+            entity_type="portfolio",
+            entity_id=str(build.portfolio_id),
+            after=payload,
+            metadata={"ts": ensure_utc(build.as_of).isoformat()},
+            ts=ensure_utc(build.as_of),
+        )
     )
-
-
-def to_open_positions(
-    marked: tuple[MarkedPosition, ...], betas: Mapping[uuid.UUID, Decimal]
-) -> tuple[tuple[OpenPosition, ...], int]:
-    """The engine's own ``OpenPosition`` objects, plus how many were unnameable.
-
-    A market whose reference data has no base or quote asset is skipped and
-    counted: the caller turns that count into an unavailability, because an
-    equity that quietly omitted a position would be a smaller number than the
-    wallet really has.
-    """
-    positions: list[OpenPosition] = []
-    gaps = 0
-    for item in marked:
-        identity = market_identity(item.row)
-        if identity is None:
-            gaps += 1
-            continue
-        positions.append(
-            OpenPosition(
-                position_id=item.row.position_id,
-                market=identity,
-                qty=item.row.qty,
-                notional=item.notional,
-                planned_risk_quote=item.planned_risk_quote,
-                beta_btc=betas.get(item.row.market_id),
-            )
-        )
-    return tuple(positions), gaps
-
-
-def to_pending_entries(
-    reservations: tuple[ReservationRow, ...], betas: Mapping[uuid.UUID, Decimal]
-) -> tuple[tuple[PendingEntry, ...], int]:
-    """The engine's ``PendingEntry`` objects, plus how many were unnameable.
-
-    ``reserved_cash`` travels as the reservation's **own** number: re-estimating
-    it with the next candidate's cost hypothesis is how 900 got committed
-    against 500 (notes of T3.2, item 4).
-    """
-    entries: list[PendingEntry] = []
-    gaps = 0
-    for row in reservations:
-        identity = market_identity(row)
-        if identity is None:
-            gaps += 1
-            continue
-        entries.append(
-            PendingEntry(
-                market=identity,
-                reserved_notional=row.reserved_notional,
-                reserved_cash=row.reserved_cash,
-                planned_risk_quote=row.reserved_risk,
-                beta_btc=betas.get(row.market_id),
-            )
-        )
-    return tuple(entries), gaps

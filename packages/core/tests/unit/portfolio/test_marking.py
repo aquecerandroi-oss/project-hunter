@@ -13,7 +13,7 @@ from decimal import Decimal
 import pytest
 
 from hunter_core.db.repositories.ledger import PositionRow
-from hunter_core.portfolio.ledger import mark_positions
+from hunter_core.portfolio.ledger import NonLongPosition, mark_positions
 
 pytestmark = pytest.mark.unit
 
@@ -121,3 +121,14 @@ class TestAnUnknownPlannedLossIsNotZero:
             (_row(stop=None),), {_MARKET: Decimal(120)}, exit_cost_rate=_NO_COST
         )
         assert marked.planned_risk_quote == Decimal(240)
+
+
+class TestTheLedgerIsLongOnly:
+    """Adversarial review of ``8a6a69f``, suggestion 13: D1 is SPOT-only, so a
+    stored "short" position is data corruption, not a state to value."""
+
+    def test_a_short_position_raises(self) -> None:
+        with pytest.raises(NonLongPosition, match="direction 'short'"):
+            mark_positions(
+                (_row(direction="short"),), {_MARKET: Decimal(120)}, exit_cost_rate=_NO_COST
+            )

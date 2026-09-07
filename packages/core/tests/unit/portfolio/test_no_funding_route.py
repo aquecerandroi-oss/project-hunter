@@ -158,3 +158,43 @@ def test_the_package_exports_exactly_one_way_to_open_a_wallet() -> None:
 
     assert "open_paper_wallet" in portfolio.__all__
     assert sum(1 for name in portfolio.__all__ if name.startswith("open_")) == 1
+
+
+def test_no_production_module_uses_the_testing_capital_override() -> None:
+    """Directive §1 fixes the paper wallet's opening capital at R$100.000;
+    ``open_paper_wallet(..., _testing_capital_override=True)`` exists only so a
+    test can exercise a different capital (adversarial review of ``8a6a69f``,
+    suggestion 14). ``_modules()`` already skips every ``tests/`` directory, so
+    finding the keyword at all here means production code reached for it.
+
+    Auxiliary verification, same limits as the rest of this file (Astra's own
+    caveat on this scan, and its follow-up on this specific test): a call that
+    forwards ``**kwargs`` instead of naming the keyword literally would not be
+    caught, and ``_modules()``'s three roots do not include ``infra/scripts``
+    — checked separately below, because that is where the one real operator
+    caller of ``open_paper_wallet`` actually lives.
+    """
+    offenders = {
+        relative
+        for relative, tree in _modules()
+        for node in ast.walk(tree)
+        if isinstance(node, ast.keyword) and node.arg == "_testing_capital_override"
+    }
+    assert offenders == set(), (
+        f"only a test may pass _testing_capital_override; found it in {sorted(offenders)}"
+    )
+
+
+def test_the_operator_script_does_not_use_the_testing_capital_override() -> None:
+    """``infra/scripts/open_paper_wallet.py`` calls ``open_paper_wallet`` too,
+    outside the three roots :func:`_modules` scans."""
+    scripts_dir = REPO_ROOT / "infra" / "scripts"
+    offenders = {
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in sorted(scripts_dir.glob("*.py"))
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+        if isinstance(node, ast.keyword) and node.arg == "_testing_capital_override"
+    }
+    assert offenders == set(), (
+        f"only a test may pass _testing_capital_override; found it in {sorted(offenders)}"
+    )

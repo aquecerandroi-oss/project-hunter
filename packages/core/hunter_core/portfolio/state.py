@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict
@@ -39,6 +39,7 @@ from hunter_core.db.repositories.ledger import LedgerRepository
 from hunter_core.db.repositories.portfolio import PortfolioRepository
 from hunter_core.domain.enums import PortfolioStatus
 from hunter_core.domain.types import ensure_utc
+from hunter_core.portfolio.attribution import LEDGER_CONTEXT
 from hunter_core.portfolio.ledger import mark_positions, to_open_positions, to_pending_entries
 from hunter_risk.exposure import PortfolioState, advance_peak, sao_paulo_day_start_utc
 
@@ -263,6 +264,14 @@ async def _daily_decomposition(
     100 and a patrimony down 1, while a costs figure that only counted quote
     fees reported zero. That fee never touches cash — it reduces the units
     received — but it is a cost of the day and the decomposition has to say so.
+
+    That valuation multiplies two ``NUMERIC(28,10)`` columns, each already up
+    to 18 integer digits; the product can need more than the ambient default
+    context's 28 significant digits, and the ambient default is what Python
+    uses when nothing more specific is asked for. Run under
+    :data:`hunter_core.portfolio.attribution.LEDGER_CONTEXT` (adversarial
+    review of ``8a6a69f``, suggestion 12) — the same reason ``attribute_brl``
+    needs it, for the same product of two ten-decimal numbers.
     """
     if risk_state_observed_at is None:
         return None
@@ -282,5 +291,6 @@ async def _daily_decomposition(
         price = marks.get(market_id)
         if price is None:
             return None
-        costs += qty * price
+        with localcontext(LEDGER_CONTEXT):
+            costs += qty * price
     return realized, unrealized_now - reference.unrealized_pnl, costs
