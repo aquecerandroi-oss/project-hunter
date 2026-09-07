@@ -517,3 +517,13 @@ usa `WEB_ORIGIN`, que é o valor desejado. A correção de verdade
   Fase 4).
 - Sem monitoramento externo: `restart: always` cobre queda de processo, nada
   avisa se a VPS inteira cair.
+
+## Rollback — nota obrigatória a partir de `cefad8c` (2026-09-07)
+
+A partir do commit `cefad8c` (T3.0b) a linha msgpack de vela no hot state (`mkt:*:candles:1m`) e o payload de `market.candles.closed` carregam o campo `market_type`. O código **anterior** a esse commit valida os eventos com `extra="forbid"` e **não lê** a linha nova: uma única linha nova envenena a decodificação da lista inteira (o scanner esvazia o Radar; o strategy-worker avalia com histórico vazio) até a lista rolar por completo (~25 h). Portanto, **qualquer rollback para antes de `cefad8c`, ou deploy parcial em que só o market-worker suba**, exige limpar o hot state de velas antes de subir o código antigo:
+
+```bash
+docker exec hunter-redis-1 sh -c 'redis-cli --scan --pattern "mkt:*:candles:1m" | xargs -r redis-cli DEL'
+```
+
+O hot state é reconstruível (§6); o durável em Postgres não é afetado.
