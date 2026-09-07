@@ -522,3 +522,82 @@ async def test_the_worker_can_actually_insert_into_the_outbox_sequence_and_all(
             assert written is not None
         finally:
             await transaction.rollback()
+
+
+async def test_the_app_role_reads_the_equity_curve_and_never_writes_it(
+    app_connection: AsyncConnection,
+) -> None:
+    """``0007_paper_roles``: the curve is evidence, and the API only reads it.
+
+    ``hunter_core.risk.curve`` reads this table twice — to anchor the trading day
+    and to prove a recovery before a resume — and ``portfolio_risk_state_guard``
+    measures every rising peak against ``max(equity)`` in it (§18.7). RLS keeps
+    one tenant out of another's curve; it does nothing about a request handler
+    writing a number into its *own* tenant's curve, which is exactly how a
+    recovery that never happened becomes the evidence for an unlatch (security
+    review of ``0006``, finding 5). Asserted as the role, not asked of the
+    catalogue.
+    """
+    await app_connection.execute(text("SELECT count(*) FROM portfolio_equity_snapshots"))
+    for statement in (
+        "INSERT INTO portfolio_equity_snapshots (organization_id, portfolio_id, resolution, ts, "
+        "cash, equity, exposure_notional, unrealized_pnl, realized_pnl_cum, peak_equity) "
+        "VALUES (gen_random_uuid(), gen_random_uuid(), '1m', now(), 0, 0, 0, 0, 0, 0)",
+        "UPDATE portfolio_equity_snapshots SET equity = 20000 WHERE false",
+        "DELETE FROM portfolio_equity_snapshots WHERE false",
+    ):
+        with pytest.raises(ProgrammingError, match=_DENIED):
+            await app_connection.execute(text(statement))
+        await app_connection.rollback()
+        await app_connection.begin()
+        await app_connection.execute(_AS_APP)
+
+
+async def test_the_app_role_files_a_proposal_and_never_decides_one(
+    app_connection: AsyncConnection,
+) -> None:
+    """``SELECT``/``INSERT`` stay; ``UPDATE``/``DELETE`` go (§19.2).
+
+    Deciding is admission's job and admission runs as the engine — the ``fifo_v1``
+    counter lives in ``portfolio_risk_state``, which the API may not write. With
+    ``UPDATE`` a handler could turn a rejected proposal into an approved one, or
+    widen a reservation after the decision that sized it.
+    """
+    await app_connection.execute(text("SELECT count(*) FROM trade_proposals"))
+    for statement in (
+        "UPDATE trade_proposals SET status = 'approved' WHERE false",
+        "DELETE FROM trade_proposals WHERE false",
+    ):
+        with pytest.raises(ProgrammingError, match=_DENIED):
+            await app_connection.execute(text(statement))
+        await app_connection.rollback()
+        await app_connection.begin()
+        await app_connection.execute(_AS_APP)
+
+
+async def test_the_engine_moves_the_kill_switch_column_and_nothing_else(
+    worker_connection: AsyncConnection,
+) -> None:
+    """The engine's grant on ``portfolios``/``organizations`` is a column, not a table.
+
+    It writes the latch the workers read (with its reason and ``updated_at``) so
+    one evaluation of the kill switch fits in one transaction (T3.6, finding 1),
+    and it locks the organization row on the way in (``FOR SHARE``, which
+    PostgreSQL charges ``ACL_UPDATE`` for — T3.12, blocking A). It may not rename
+    a wallet, archive it, flip ``is_arena``, or block an organization: those are
+    the API's, and the last one is an OWNER's.
+    """
+    await worker_connection.execute(
+        text("UPDATE portfolios SET kill_switch_state = 'ACTIVE' WHERE false")
+    )
+    await worker_connection.execute(text("SELECT id FROM organizations WHERE false FOR SHARE"))
+    for statement in (
+        "UPDATE portfolios SET name = 'renamed' WHERE false",
+        "UPDATE portfolios SET is_arena = true WHERE false",
+        "UPDATE organizations SET kill_switch_state = 'EMERGENCY' WHERE false",
+    ):
+        with pytest.raises(ProgrammingError, match=_DENIED):
+            await worker_connection.execute(text(statement))
+        await worker_connection.rollback()
+        await worker_connection.begin()
+        await worker_connection.execute(text("SET LOCAL ROLE hunter_worker"))

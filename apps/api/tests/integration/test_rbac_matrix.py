@@ -65,11 +65,14 @@ ROUTES: list[tuple[str, str, OrganizationRole]] = [
     ("workspaces.update", "PATCH", OrganizationRole.ADMIN),
     ("workspaces.onboarding", "PUT", OrganizationRole.ADMIN),
     ("audit.list", "GET", OrganizationRole.ADMIN),
-    # T3.6 — SECURITY.md §2 puts "Kill switch de portfolio" at TRADER; reading it
-    # is a dashboard read, so VIEWER. The portfolio id is a random UUID here: the
-    # 404 it earns is not a role failure, which is exactly what property 2 allows.
+    # T3.6/T3.1c — reading the kill switch is a dashboard read, so VIEWER.
+    # **Resuming is OWNER**: SECURITY.md §2 now separates latching (TRADER+, and
+    # the engine does it by itself) from leaving a latched block, which the
+    # directive reserves for the owner's authorisation. The portfolio id is a
+    # random UUID here: the 404 it earns is not a role failure, which is exactly
+    # what property 2 allows.
     ("risk.kill_switch.read", "GET", OrganizationRole.VIEWER),
-    ("risk.kill_switch.resume", "POST", OrganizationRole.TRADER),
+    ("risk.kill_switch.resume", "POST", OrganizationRole.OWNER),
 ]
 
 

@@ -229,7 +229,13 @@ async def _run(args: argparse.Namespace) -> int:
         )
         print(f"fx_observations: wrote {fx_observation_id} at rate {rate}")
 
-        async with tenant_session(factory, org_id) as session:
+        # As ``hunter_worker``, with ``app.current_org`` set anyway (0007_paper_roles,
+        # DATABASE.md §19.6). The opening writes the wallet, its lock row, its anchor
+        # **and the first point of the equity curve**, in one transaction (§18.2) — and
+        # since 0007 the curve is read-only to ``hunter_app``, because it is the evidence
+        # a resume reads. Opening a wallet is an operator act, the same class as removing
+        # a tenant (§15.4), not a request handler; there is no HTTP route for it.
+        async with tenant_session(factory, org_id, db_role="hunter_worker") as session:
             fx = await FxObservationRepository(session).get(fx_observation_id)
             if fx is None:  # pragma: no cover - just written, same database
                 raise Refused(f"could not read back fx_observation {fx_observation_id}")

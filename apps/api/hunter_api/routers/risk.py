@@ -1,14 +1,18 @@
 """``/api/v1/orgs/{org_id}/portfolios/{portfolio_id}/risk`` — the kill switch.
 
-**Who may resume.** SECURITY.md §2 puts "Kill switch de portfolio" at TRADER and
-above (the organization-wide switch is ADMIN, and it is not exposed here), so the
-resume declares ``require_org(TRADER)`` and the read declares ``VIEWER``. The
-joint M3 decision (``docs/plans/M3.md`` §5) is stricter than the RBAC matrix —
-"ato autenticado **da identidade autorizada do Everton** — não qualquer rótulo
-ADMIN" — and nothing in the codebase names that identity today. The gap is
-recorded in ``.claude/state/notes-T3.6.md`` (finding 3) rather than closed here
-by inventing an allowlist: this route enforces the documented floor, and the
-schema records *which* person acted, on every resume.
+**Who may resume: OWNER, and only OWNER** (T3.1c, 2026-09-07). The read stays at
+``VIEWER``. This route used to declare ``require_org(TRADER)``, the floor
+SECURITY.md §2 documented for "Kill switch de portfolio", and T3.6 recorded the
+conflict rather than closing it: the joint M3 decision (``docs/plans/M3.md`` §5)
+and the directive are stricter — leaving a latched block is "ato autenticado da
+identidade autorizada do Everton", not any ADMIN-shaped label. The concrete
+scenario the old floor allowed: a TRADER invited into the organization resumes a
+wallet the engine blocked, without the owner. OWNER is the closest thing the RBAC
+model has to "the person whose money this is" — an allowlist naming one human
+would be a second identity system next to Clerk — and SECURITY.md §2 now says so
+instead of being contradicted by this file. What the schema adds is orthogonal
+and unchanged: every resume names *which* person acted, in the same transaction
+as the move (§18.7).
 
 **What the resume cannot do.** It never writes ``portfolio_risk_state``, so it
 cannot move the peak or the day's opening; and it is refused outright while the
@@ -56,7 +60,7 @@ if TYPE_CHECKING:
 router = APIRouter(prefix="/api/v1/orgs/{org_id}/portfolios/{portfolio_id}/risk", tags=["risk"])
 
 ViewerOrg = Annotated[OrgContext, Depends(require_org(OrganizationRole.VIEWER))]
-TraderOrg = Annotated[OrgContext, Depends(require_org(OrganizationRole.TRADER))]
+OwnerOrg = Annotated[OrgContext, Depends(require_org(OrganizationRole.OWNER))]
 
 
 class PortfolioNotFoundError(HunterError):
@@ -166,10 +170,10 @@ async def read_kill_switch(
 @router.post(
     "/kill-switch/resume",
     response_model=ResumeOut,
-    summary="Resume trading on a latched kill switch (TRADER+)",
+    summary="Resume trading on a latched kill switch (OWNER only)",
 )
 async def resume_kill_switch(
-    context: TraderOrg, session: OrgSession, portfolio_id: uuid.UUID, body: ResumeRequest
+    context: OwnerOrg, session: OrgSession, portfolio_id: uuid.UUID, body: ResumeRequest
 ) -> ResumeOut:
     await _owned(session, context, portfolio_id)
     try:

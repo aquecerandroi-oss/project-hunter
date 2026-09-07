@@ -36,7 +36,6 @@ from packages.core.tests.integration.admission_fixtures import (
     ENGINE_ROLE,
     Wallet,
     admit_default,
-    apply_pending_grants,
     liquidity_for,
     open_wallet,
     request_for,
@@ -53,7 +52,6 @@ CEILING = Decimal("46.0510")
 
 @pytest_asyncio.fixture
 async def factory(ledger_engine: AsyncEngine) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    await apply_pending_grants(ledger_engine)
     yield create_session_factory(ledger_engine)
 
 
@@ -217,45 +215,65 @@ class TestOneRequestIsOnePlaceInTheQueue:
         assert (proposals, counter, events) == (1, 1, 1)
 
 
-class TestTheApiRoleCannotAdmitToday:
-    async def test_the_wallet_counter_is_refused_to_hunter_app(
-        self, factory: async_sessionmaker[AsyncSession], wallet: Wallet
-    ) -> None:
-        """A blocking coupling for T3.8, kept as a test instead of a paragraph.
-
-        ``fifo_v1`` lives on ``portfolio_risk_state``, and T3.1b gives the API
-        role ``UPDATE (updated_at)`` on that row — enough to take the lock,
-        never enough to write a value (``ddl/paper.py``,
-        ``PAPER_LOCK_ONLY_TABLES``). So the manual order route cannot run this
-        service inside a ``hunter_app`` transaction as it stands: either the
-        privilege is widened to ``last_admission_seq`` or the route hands the
-        admission to a worker-role unit of work. Recorded in
-        ``.claude/state/notes-T3.12.md`` §2; when it is decided, this test is
-        the one that changes.
-        """
-        with pytest.raises(Exception, match="permission denied|may not be updated") as caught:
-            async with tenant_session(factory, wallet.org_id) as session:
-                await admit_default(session, wallet, request_for(wallet))
-        assert "portfolio_risk_state" in str(caught.value)
-
-    async def test_the_engine_role_cannot_take_the_organization_lock_either(
+class TestTheApiRoleCannotAdmit:
+    async def test_admission_is_refused_to_hunter_app(
         self, factory: async_sessionmaker[AsyncSession], ledger_engine: AsyncEngine, wallet: Wallet
     ) -> None:
-        """The other half of the coupling, proved on the schema **as delivered**.
+        """Decided, not pending: the API files a request, the engine admits it.
 
-        ``apply_pending_grants`` adds a privilege the migrations do not have yet;
-        this test removes it for the length of one admission and shows what the
-        delivered schema actually does — *permission denied for table
-        organizations*, because ``SELECT ... FOR SHARE`` is charged
-        ``ACL_UPDATE`` and ``hunter_worker`` holds ``SELECT`` and ``DELETE``
-        only. Without it the green suite above would be claiming an integration
-        the database does not provide (notes-T3.12.md §2, coupling A).
+        ``notes-T3.12.md`` §2 left this as coupling B — either widen the API's
+        privilege to ``last_admission_seq`` or hand the admission to a
+        worker-role unit of work. ``0007_paper_roles`` chose the second
+        (DATABASE.md §19.2), and closed it from both ends: ``fifo_v1`` lives on
+        ``portfolio_risk_state``, where the API holds ``UPDATE (updated_at)`` and
+        nothing more, and a proposal the API *inserts* has to be a request —
+        ``trade_proposals_the_app_only_files_requests`` refuses a row that
+        arrives already decided.
+
+        What this asserts is the invariant behind both: an admission attempted in
+        a ``hunter_app`` transaction fails, and the wallet's queue does not move.
+        """
+        with pytest.raises(Exception, match="permission denied|may not be|carrying a decision"):
+            async with tenant_session(factory, wallet.org_id) as session:
+                await admit_default(session, wallet, request_for(wallet))
+
+        async with ledger_engine.begin() as connection:
+            counter = await connection.scalar(
+                text(
+                    "SELECT last_admission_seq FROM portfolio_risk_state WHERE portfolio_id = :pf"
+                ),
+                {"pf": wallet.portfolio_id},
+            )
+            proposals = await connection.scalar(
+                text("SELECT count(*) FROM trade_proposals WHERE portfolio_id = :pf"),
+                {"pf": wallet.portfolio_id},
+            )
+        assert (counter, proposals) == (0, 0), "the API moved the queue it may not move"
+
+    async def test_the_organization_lock_is_exactly_what_0007_granted(
+        self, factory: async_sessionmaker[AsyncSession], ledger_engine: AsyncEngine, wallet: Wallet
+    ) -> None:
+        """Why the engine needs one column of ``organizations``, as a counterfactual.
+
+        The whole suite above now runs on the migrated schema — that is coupling
+        A of ``notes-T3.12.md`` closed by ``0007_paper_roles``
+        (``ddl/paper_roles.py``, ``WORKER_COLUMN_UPDATES_0007``). This test takes
+        the grant away for the length of one admission to show what it buys:
+        ``SELECT ... FOR SHARE`` on the tenant row — the middle rung of the
+        contract's lock order — is charged ``ACL_UPDATE``, so without it
+        admission dies with *permission denied for table organizations* before
+        deciding anything.
         """
         async with ledger_engine.begin() as connection:
-            await connection.execute(text("REVOKE UPDATE ON organizations FROM hunter_worker"))
+            await connection.execute(
+                text('REVOKE UPDATE ("updated_at") ON organizations FROM hunter_worker')
+            )
         try:
             with pytest.raises(Exception, match="permission denied") as caught:
                 await _admit_in_own_session(factory, wallet, client_key="ungranted")
             assert "organizations" in str(caught.value)
         finally:
-            await apply_pending_grants(ledger_engine)
+            async with ledger_engine.begin() as connection:
+                await connection.execute(
+                    text('GRANT UPDATE ("updated_at") ON organizations TO hunter_worker')
+                )

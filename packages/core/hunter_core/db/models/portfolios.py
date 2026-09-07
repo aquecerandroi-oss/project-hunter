@@ -163,6 +163,16 @@ class PortfolioEquitySnapshot(Base, TenantMixin):
         # partitioned parent, so Postgres propagates it to every partition,
         # including the ones ``create_partitions.py`` adds later.
         Index("ix_portfolio_equity_snapshots_peak_lookup", "portfolio_id", "equity"),
+        # "Unavailable with a reason, never extrapolated" (§18.2), as a
+        # constraint instead of a convention: a point that names an FX
+        # observation was converted, so it may not also declare the conversion
+        # unavailable, and a reason that is the empty string states nothing —
+        # the ``0002`` argument about ``no_entry_reason`` (§16.2).
+        CheckConstraint(
+            "brl_unavailable_reason IS NULL OR (fx_observation_id IS NULL "
+            "AND char_length(brl_unavailable_reason) BETWEEN 1 AND 64)",
+            name="brl_unavailable_reason_is_honest",
+        ),
         {"postgresql_partition_by": "LIST (resolution)"},
     )
 
@@ -188,3 +198,20 @@ class PortfolioEquitySnapshot(Base, TenantMixin):
     FX is unavailable after the wallet opened, USDT stays computable and BRL
     becomes *unavailable with a reason*, never extrapolated. ``RESTRICT``
     because the observation is the explanation for a stored number."""
+
+    brl_unavailable_reason: Mapped[str | None] = mapped_column(Text)
+    """Why this point carries no BRL value (§19.3, the T3.3b debt).
+
+    ``fx_observation_id IS NULL`` says the conversion did not happen; this says
+    what stopped it (no fresh quote, a rate outside the plausibility band, a
+    source refused). Written by the worker that records the point, and paired
+    with the column above by a CHECK: a converted point does not also explain an
+    absence."""
+
+    marks_stale: Mapped[bool] = mapped_column(server_default=SQL_FALSE)
+    """The marks behind this point were older than the policy allows.
+
+    The point is still recorded — refusing to store it would leave a hole in the
+    curve exactly when the wallet is degraded — but it is recorded as an
+    estimate, so a reader (the resume evidence, the equity chart) can tell a
+    measured equity from a stale one instead of inferring it from timestamps."""

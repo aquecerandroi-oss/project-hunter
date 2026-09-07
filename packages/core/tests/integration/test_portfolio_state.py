@@ -44,6 +44,15 @@ if TYPE_CHECKING:
 
 pytestmark = pytest.mark.integration
 
+ENGINE_ROLE = "hunter_worker"
+"""The role the ledger runs as since ``0007_paper_roles`` (DATABASE.md §19.6).
+
+Opening a wallet writes the wallet, its lock row, its anchor **and the first
+point of the equity curve** in one transaction (§18.2), and the curve is now
+read-only to ``hunter_app``: it is the evidence a resume reads, so a role that
+can write it can fabricate the recovery it then claims. Opening and marking are
+the engine's acts — there is no HTTP route for either."""
+
 _NOW = datetime(2026, 9, 6, 15, 30, tzinfo=UTC)
 _RATE = Decimal("5.0000000000")
 _NO_EXIT_COST = Decimal(0)
@@ -80,7 +89,7 @@ async def wallet(
     from hunter_core.db.repositories.fx import FxObservationRepository
 
     fx_id = await observe_fx(rate=_RATE, observed_at=_NOW)
-    async with tenant_session(factory, ledger_tenant.org_id) as session:
+    async with tenant_session(factory, ledger_tenant.org_id, db_role=ENGINE_ROLE) as session:
         observation = await FxObservationRepository(session).get(fx_id)
         assert observation is not None
         result = await open_paper_wallet(
@@ -209,7 +218,7 @@ class TestCashAndEquity:
             stop=Decimal(3900),
         )
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -242,7 +251,7 @@ class TestCashAndEquity:
             mark=Decimal(4000),
             stop=Decimal(3900),
         )
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -267,7 +276,7 @@ class TestCashAndEquity:
             mark=Decimal(4000),
             stop=None,
         )
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -294,7 +303,7 @@ class TestUnavailablePricesNeverBecomeZero:
             stop=Decimal(3900),
         )
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -322,7 +331,7 @@ class TestUnavailablePricesNeverBecomeZero:
             mark=Decimal("4100"),
             stop=Decimal(3900),
         )
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -348,7 +357,7 @@ class TestReservationsAreExposure:
             risk=Decimal("50"),
         )
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -384,7 +393,7 @@ class TestTheDailyDecomposition:
                 {"pf": wallet.portfolio_id},
             )
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -417,7 +426,7 @@ class TestTheDailyDecomposition:
             stop=Decimal(3900),
         )
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -449,7 +458,7 @@ class TestTheStateComesFromTheDatabase:
             mark=Decimal(4000),
             stop=Decimal(3900),
         )
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             first = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -460,7 +469,7 @@ class TestTheStateComesFromTheDatabase:
             )
 
         restarted = create_session_factory(ledger_engine)
-        async with tenant_session(restarted, wallet.org_id) as session:
+        async with tenant_session(restarted, wallet.org_id, db_role=ENGINE_ROLE) as session:
             second = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -484,7 +493,7 @@ class TestTheStateComesFromTheDatabase:
         release = asyncio.Event()
 
         async def hold() -> None:
-            async with tenant_session(factory, wallet.org_id) as session:
+            async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
                 await build_portfolio_state(
                     session,
                     organization_id=wallet.org_id,
@@ -500,7 +509,7 @@ class TestTheStateComesFromTheDatabase:
         await started.wait()
 
         async def contend() -> None:
-            async with tenant_session(factory, wallet.org_id) as session:
+            async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
                 await build_portfolio_state(
                     session,
                     organization_id=wallet.org_id,
@@ -541,7 +550,7 @@ class TestTheEquityCurve:
         later = _NOW + timedelta(hours=1)
         today_fx = await observe_fx(rate=Decimal("6.0000000000"), observed_at=later)
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             observation = await FxObservationRepository(session).get(today_fx)
             build = await build_portfolio_state(
                 session,
@@ -577,7 +586,7 @@ class TestTheEquityCurve:
         self, factory: async_sessionmaker[AsyncSession], wallet: Wallet
     ) -> None:
         later = _NOW + timedelta(hours=2)
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -605,7 +614,7 @@ class TestUnavailabilityIsAudited:
         self, factory: async_sessionmaker[AsyncSession], ledger_engine: AsyncEngine, wallet: Wallet
     ) -> None:
         later = _NOW + timedelta(hours=2)
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -648,7 +657,7 @@ class TestUnavailabilityIsAudited:
             rate=Decimal("6.0000000000"), observed_at=_NOW + timedelta(hours=1)
         )
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             observation = await FxObservationRepository(session).get(future_fx)
             build = await build_portfolio_state(
                 session,
@@ -689,7 +698,7 @@ class TestUnavailabilityIsAudited:
             stop=Decimal(3900),
         )
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -735,7 +744,7 @@ class TestTheCostsOfTheDayIncludeFeesPaidInCoins:
             position_qty=Decimal("0.99"),
         )
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -782,7 +791,7 @@ class TestTheCostsOfTheDayIncludeFeesPaidInCoins:
             fee_asset=wallet.tenant.base_symbol,
         )
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -817,7 +826,7 @@ class TestTheCostsOfTheDayIncludeFeesPaidInCoins:
                 {"pf": wallet.portfolio_id},
             )
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             build = await build_portfolio_state(
                 session,
                 organization_id=wallet.org_id,
@@ -852,7 +861,7 @@ class TestTheCurveRefusesAnFxItMayNotUse:
             rate=Decimal("6.0000000000"), observed_at=_NOW + timedelta(hours=1)
         )
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             observation = await FxObservationRepository(session).get(future_fx)
             build = await build_portfolio_state(
                 session,
@@ -882,7 +891,7 @@ class TestTheCurveRefusesAnFxItMayNotUse:
         later = _NOW + timedelta(hours=3)
         stale_fx = await observe_fx(rate=Decimal("6.0000000000"), observed_at=_NOW)
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             observation = await FxObservationRepository(session).get(stale_fx)
             build = await build_portfolio_state(
                 session,
@@ -899,7 +908,7 @@ class TestTheCurveRefusesAnFxItMayNotUse:
         assert point.brl_unavailable_reason == "fx_rejected"
         assert point.fx_observation_id is None
 
-        async with tenant_session(factory, wallet.org_id) as session:
+        async with tenant_session(factory, wallet.org_id, db_role=ENGINE_ROLE) as session:
             stored = await session.scalar(
                 text(
                     "SELECT fx_observation_id FROM portfolio_equity_snapshots "

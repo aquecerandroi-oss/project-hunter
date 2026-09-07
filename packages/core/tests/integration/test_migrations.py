@@ -37,7 +37,7 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0006_paper_wallet"
+HEAD_REVISION = "0007_paper_roles"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -46,6 +46,7 @@ SHADOW_REVISION = "0002_shadow_lab"
 ANALYSIS_REVISION = "0003_analysis"
 OUTBOX_INDEX_REVISION = "0004_outbox_pending_index"
 LOCK_GRANT_REVISION = "0005_baseline_lock_grant"
+PAPER_WALLET_REVISION = "0006_paper_wallet"
 
 _PENDING_PREDICATE = "dispatched_at IS NULL"
 """What makes an index a *pending* index, spelled out here rather than imported:
@@ -1180,10 +1181,16 @@ def test_0006_refuses_to_downgrade_while_a_wallet_is_open(upgraded: str) -> None
     """
     config = alembic_config(upgraded)
     ids = _open_a_wallet(upgraded, f"open-{uuid.uuid4().hex[:8]}")
+    # The head is ``0007`` since T3.1c, and it reverses cleanly over an opened
+    # wallet — it owns grants and three columns, not the opening. So step down to
+    # ``0006`` first and make ``-1`` mean this guard again.
+    command.downgrade(config, PAPER_WALLET_REVISION)
     try:
         with pytest.raises(DBAPIError, match="anchored to an opening rate"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == PAPER_WALLET_REVISION, (
+            "the downgrade must not commit"
+        )
     finally:
         _drop_tenant(upgraded, ids["org"])
     command.downgrade(config, "-1")
@@ -1231,10 +1238,11 @@ def test_0006_refuses_to_downgrade_while_a_reservation_is_still_held(upgraded: s
             ],
         )
     )
+    command.downgrade(config, PAPER_WALLET_REVISION)  # see the note in the test above
     try:
         with pytest.raises(DBAPIError, match="still hold a reservation"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+        assert asyncio.run(_revision(upgraded)) == PAPER_WALLET_REVISION
     finally:
         _drop_tenant(upgraded, ids["org"])
         asyncio.run(
@@ -1248,4 +1256,134 @@ def test_0006_refuses_to_downgrade_while_a_reservation_is_still_held(upgraded: s
         )
     command.downgrade(config, "-1")
     command.upgrade(config, "head")
+    command.check(config)
+
+
+async def _column_privilege(url: str, role: str, table: str, column: str) -> bool:
+    """Whether ``role`` may ``UPDATE`` one column of ``table`` — the 0007 shape."""
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            return bool(
+                await connection.scalar(
+                    text("SELECT has_column_privilege(:role, :table, :column, 'UPDATE')"),
+                    {"role": role, "table": table, "column": column},
+                )
+            )
+    finally:
+        await engine.dispose()
+
+
+def _frozen_worker_columns() -> Mapping[str, tuple[str, ...]]:
+    return cast(
+        "Mapping[str, tuple[str, ...]]",
+        migration_ddl("paper_roles").WORKER_COLUMN_UPDATES_0007,
+    )
+
+
+def _frozen_app_revocations() -> Mapping[str, tuple[str, ...]]:
+    return cast(
+        "Mapping[str, tuple[str, ...]]",
+        migration_ddl("paper_roles").APP_PRIVILEGES_REVOKED_0007,
+    )
+
+
+def test_0007_grants_the_engine_columns_and_never_the_table(upgraded: str) -> None:
+    """The engine may move a kill switch and lock an organization; nothing more.
+
+    A *column* grant is the whole point (DATABASE.md §19.1): it satisfies the row
+    mark PostgreSQL charges ``ACL_UPDATE`` for and refuses every ``UPDATE`` that
+    writes a value, and — unlike a ``current_user`` test — it travels with role
+    inheritance. Table-level ``UPDATE`` here would let the worker rename a
+    wallet, archive it, flip ``is_arena`` (freeing a second principal wallet,
+    §18.8) or block a whole organization with no transition.
+    """
+    inserts = cast("tuple[str, ...]", migration_ddl("paper_roles").WORKER_INSERT_TABLES_0007)
+    for table in inserts:
+        # Opening a wallet is one transaction and its first curve point is the
+        # engine's, so the wallet row is too — INSERT, and nothing beyond it.
+        assert asyncio.run(_table_privileges(upgraded, "hunter_worker", table)) == {
+            "SELECT",
+            "INSERT",
+        }
+    frozen = _frozen_worker_columns()
+    assert frozen, "0007 froze no column to grant"
+    for table, columns in frozen.items():
+        held = asyncio.run(_table_privileges(upgraded, "hunter_worker", table))
+        assert "UPDATE" not in held, f"{table} was granted at table level: {held}"
+        for column in columns:
+            assert asyncio.run(_column_privilege(upgraded, "hunter_worker", table, column)), (
+                f"the engine cannot update {table}.{column}"
+            )
+    for table, column in (("portfolios", "name"), ("organizations", "kill_switch_state")):
+        assert not asyncio.run(_column_privilege(upgraded, "hunter_worker", table, column)), (
+            f"the engine may write {table}.{column}, which is not its to write"
+        )
+
+
+def test_0007_leaves_the_api_reading_the_curve_and_filing_requests(upgraded: str) -> None:
+    """The API reads the equity curve and files a proposal; it decides neither.
+
+    The curve is the evidence a resume reads and the ceiling a rising peak is
+    measured against, and RLS does not protect a tenant's numbers from that
+    tenant's own request handler (security review of ``0006``, finding 5).
+    """
+    assert asyncio.run(_table_privileges(upgraded, "hunter_app", "portfolio_equity_snapshots")) == {
+        "SELECT"
+    }
+    assert asyncio.run(_table_privileges(upgraded, "hunter_app", "trade_proposals")) == {
+        "SELECT",
+        "INSERT",
+    }
+    # and the worker keeps the whole surface it writes
+    assert asyncio.run(
+        _table_privileges(upgraded, "hunter_worker", "portfolio_equity_snapshots")
+    ) == {"SELECT", "INSERT", "UPDATE", "DELETE"}
+
+
+def test_0007_touches_no_table_that_was_not_already_classified(upgraded: str) -> None:
+    """A grant revision must not smuggle in an unclassified table — the 0005 rule.
+
+    ``test_schema_privileges.test_the_grant_lists_cover_every_table_exactly_once``
+    partitions the schema over the *app*-side classes of ``0001``; a worker-side
+    column grant on a table nobody classified would slip past it.
+    """
+    tables = migration_ddl("tables")
+    owned = set(cast("tuple[str, ...]", tables.APP_WRITE_TABLES)) | set(
+        cast("tuple[str, ...]", tables.APP_NO_DELETE_TABLES)
+    )
+    named = (
+        set(_frozen_worker_columns())
+        | set(_frozen_app_revocations())
+        | set(cast("tuple[str, ...]", migration_ddl("paper_roles").WORKER_INSERT_TABLES_0007))
+    )
+    assert named <= owned, "0007 grants on a table 0001 never classified"
+
+
+def test_0007_reverses_to_the_privileges_0001_shipped(upgraded: str) -> None:
+    """Rolling this deploy back restores ``0001``'s grants exactly — not ``ALL``.
+
+    A database rolled back to ``0006`` has to be usable by the code that ran
+    against ``0006``: the API writes the curve and the proposal again, and the
+    engine loses the two column grants it never had there.
+    """
+    config = alembic_config(upgraded)
+    try:
+        command.downgrade(config, PAPER_WALLET_REVISION)
+        for table, privileges in _frozen_app_revocations().items():
+            held = asyncio.run(_table_privileges(upgraded, "hunter_app", table))
+            assert set(privileges) <= held, (table, held)
+        for table, columns in _frozen_worker_columns().items():
+            for column in columns:
+                assert not asyncio.run(
+                    _column_privilege(upgraded, "hunter_worker", table, column)
+                ), f"{table}.{column} survived the downgrade"
+        for table in cast(
+            "tuple[str, ...]", migration_ddl("paper_roles").WORKER_INSERT_TABLES_0007
+        ):
+            assert "INSERT" not in asyncio.run(
+                _table_privileges(upgraded, "hunter_worker", table)
+            ), f"the engine kept INSERT on {table} after the downgrade"
+    finally:
+        command.upgrade(config, "head")
     command.check(config)

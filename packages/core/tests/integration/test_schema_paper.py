@@ -2305,3 +2305,262 @@ def test_the_seeded_paper_profile_has_exactly_one_source() -> None:
     assert shipped["max_participation_pct"] == "0.01"
     assert shipped["max_total_exposure_pct"] == "0.40"
     assert shipped["max_concurrent_positions"] == 5
+
+
+# --------------------------------------------------------------------------
+# T3.1c — the role model: the engine decides, the API asks (§19)
+# --------------------------------------------------------------------------
+
+
+async def test_the_engine_writes_a_whole_evaluation_in_one_transaction(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """``0007_paper_roles``, and the inverse of T3.6's finding 1.
+
+    One automatic evaluation is four writes the contract puts in one
+    transaction: the daily reference and the peak (``portfolio_risk_state``),
+    the latch the workers read (``portfolios``), the transition that explains it
+    and the ``kill_switch.changed`` projection (``outbox_events``). Before this
+    revision no deployed role held all four — ``hunter_app`` was refused the lock
+    row, ``hunter_worker`` was refused ``portfolios`` — so the São Paulo rollover
+    of a wallet in WARNING had to be split, and a split leaves a window where the
+    reference is today's and the latch is yesterday's.
+
+    Here it is one transaction as ``hunter_worker``, and it commits.
+    """
+    wallet, _other = wallets
+    connection = await _as(schema_engine, _AS_WORKER)
+    try:
+        await connection.execute(
+            text(
+                "INSERT INTO kill_switch_transitions (id, organization_id, scope, scope_id, "
+                "from_state, to_state, reason, actor_type, evidence, created_at) VALUES "
+                "(:id, :org, 'portfolio', :pf, 'ACTIVE', 'WARNING', 'daily loss', 'system', "
+                "CAST(:evidence AS jsonb), :ts)"
+            ),
+            {
+                "id": uuid7(),
+                "org": wallet.org_id,
+                "pf": wallet.portfolio_id,
+                "evidence": '{"daily_loss_pct": "0.0200"}',
+                "ts": _NOW,
+            },
+        )
+        await connection.execute(
+            text(
+                "UPDATE portfolios SET kill_switch_state = 'WARNING', "
+                "kill_switch_reason = 'daily loss', updated_at = now() WHERE id = :pf"
+            ),
+            {"pf": wallet.portfolio_id},
+        )
+        await connection.execute(
+            text(
+                "UPDATE portfolio_risk_state SET trading_day = :day, "
+                "trading_day_start_utc = :ts, updated_at = now() WHERE portfolio_id = :pf"
+            ),
+            {"pf": wallet.portfolio_id, "day": _NOW.date(), "ts": _NOW},
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO outbox_events (event_id, stream, payload) "
+                "VALUES (:id, 'kill_switch.changed', CAST('{}' AS jsonb))"
+            ),
+            {"id": uuid7()},
+        )
+        await connection.commit()
+    finally:
+        await connection.close()
+
+    async with schema_engine.connect() as reader:
+        latch = await reader.scalar(
+            text("SELECT kill_switch_state FROM portfolios WHERE id = :id"),
+            {"id": wallet.portfolio_id},
+        )
+        day = await reader.scalar(
+            text("SELECT trading_day FROM portfolio_risk_state WHERE portfolio_id = :id"),
+            {"id": wallet.portfolio_id},
+        )
+    assert str(latch) == "WARNING", "the engine could not move the latch it decided"
+    assert day == _NOW.date(), "the engine could not write the reference it decided"
+
+
+async def test_the_engine_may_not_rename_or_rescope_the_wallet_it_latches(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """The engine's grant on ``portfolios`` is three columns, not the table.
+
+    Table-level ``UPDATE`` would hand the worker the identity fields §18.8 keeps
+    frozen: flipping ``is_arena`` takes the wallet out of
+    ``uq_portfolios_principal_paper`` and frees a second principal with a fresh
+    R$100.000, with no ``DELETE`` for a delete trigger to see.
+    """
+    wallet, _other = wallets
+    for statement in (
+        "UPDATE portfolios SET name = 'renamed' WHERE id = :pf",
+        "UPDATE portfolios SET is_arena = true WHERE id = :pf",
+        "UPDATE portfolios SET status = 'archived' WHERE id = :pf",
+        "UPDATE portfolios SET initial_capital = 999999 WHERE id = :pf",
+    ):
+        connection = await _as(schema_engine, _AS_WORKER)
+        try:
+            with pytest.raises(DBAPIError, match=_DENIED):
+                await connection.execute(text(statement), {"pf": wallet.portfolio_id})
+        finally:
+            await connection.rollback()
+            await connection.close()
+
+
+async def test_the_engine_locks_the_organization_row_and_never_writes_it(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """T3.12, blocking A: ``FOR SHARE`` needs ``ACL_UPDATE``, and nothing else does.
+
+    ``effective_state(lock=True)`` acquires system → organization → wallet, and
+    without this grant the admission path died with *permission denied for table
+    organizations* before deciding anything. The grant is ``UPDATE (updated_at)``
+    — enough for the row mark, not enough to block a whole organization, which
+    stays an OWNER's act through the API (§19.2).
+    """
+    wallet, _other = wallets
+    connection = await _as(schema_engine, _AS_WORKER)
+    try:
+        locked = await connection.scalar(
+            text("SELECT kill_switch_state FROM organizations WHERE id = :id FOR SHARE"),
+            {"id": wallet.org_id},
+        )
+        assert locked is not None, "the engine cannot take the organization lock"
+    finally:
+        await connection.rollback()
+        await connection.close()
+
+    connection = await _as(schema_engine, _AS_WORKER)
+    try:
+        with pytest.raises(DBAPIError, match=_DENIED):
+            await connection.execute(
+                text("UPDATE organizations SET kill_switch_state = 'EMERGENCY' WHERE id = :id"),
+                {"id": wallet.org_id},
+            )
+    finally:
+        await connection.rollback()
+        await connection.close()
+
+
+async def test_the_app_may_not_write_the_curve_of_its_own_wallet(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """Security review of ``0006``, finding 5 — and RLS is not what closes it.
+
+    The organization in context is the wallet's own, so ``tenant_isolation`` says
+    yes; the refusal is the privilege. That is the point: the curve is the
+    evidence a resume reads, and a fabricated point at the right timestamp is a
+    recovery the next resume believes.
+    """
+    wallet, _other = wallets
+    connection = await _as(schema_engine, _AS_APP, wallet.org_id)
+    try:
+        with pytest.raises(DBAPIError, match=_DENIED):
+            await connection.execute(
+                text(
+                    "INSERT INTO portfolio_equity_snapshots (organization_id, portfolio_id, "
+                    "resolution, ts, cash, equity, exposure_notional, unrealized_pnl, "
+                    "realized_pnl_cum, peak_equity) VALUES (:org, :pf, '1m', :ts, 20000, 20000, "
+                    "0, 0, 0, 20000)"
+                ),
+                {"org": wallet.org_id, "pf": wallet.portfolio_id, "ts": _NOW},
+            )
+    finally:
+        await connection.rollback()
+        await connection.close()
+
+
+async def test_the_app_files_a_request_and_the_engine_is_the_one_that_decides(
+    schema_engine: AsyncEngine, wallets: tuple[Wallet, Wallet]
+) -> None:
+    """§19.4: an ``INSERT`` by the API is a *request*, and afterwards it is read-only.
+
+    A grant cannot describe the shape of an ``INSERT``, so a handler could file a
+    row already stamped ``approved`` with a ``risk_decision`` of its own making
+    and a reservation attached — a decision the Risk Engine never took, holding
+    capital in the participation budget. The trigger refuses that; the honest
+    request passes; and the decision that follows is the engine's.
+    """
+    wallet, _other = wallets
+    proposal_id = uuid7()
+    request = {
+        "id": uuid7(),
+        "org": wallet.org_id,
+        "pf": wallet.portfolio_id,
+        "market": wallet.market_id,
+        "key": f"idem-{uuid.uuid4().hex[:8]}",
+    }
+    connection = await _as(schema_engine, _AS_APP, wallet.org_id)
+    try:
+        with pytest.raises(DBAPIError, match="carrying a decision"):
+            await connection.execute(
+                text(
+                    "INSERT INTO trade_proposals (id, organization_id, portfolio_id, market_id, "
+                    "direction, status, idempotency_key, source, risk_decision) VALUES "
+                    "(:id, :org, :pf, :market, 'long', 'approved', :key, 'manual', "
+                    "CAST(:decision AS jsonb))"
+                ),
+                {**request, "decision": '{"approved": true}'},
+            )
+    finally:
+        await connection.rollback()
+        await connection.close()
+
+    connection = await _as(schema_engine, _AS_APP, wallet.org_id)
+    try:
+        await connection.execute(
+            text(
+                "INSERT INTO trade_proposals (id, organization_id, portfolio_id, market_id, "
+                "direction, status, idempotency_key, source, request_digest) VALUES "
+                "(:id, :org, :pf, :market, 'long', 'pending', :key, 'manual', :digest)"
+            ),
+            {**request, "id": proposal_id, "digest": "sha256:" + uuid.uuid4().hex},
+        )
+        await connection.commit()
+    finally:
+        await connection.close()
+
+    connection = await _as(schema_engine, _AS_APP, wallet.org_id)
+    try:
+        with pytest.raises(DBAPIError, match=_DENIED):
+            await connection.execute(
+                text("UPDATE trade_proposals SET status = 'approved' WHERE id = :id"),
+                {"id": proposal_id},
+            )
+    finally:
+        await connection.rollback()
+        await connection.close()
+
+    connection = await _as(schema_engine, _AS_WORKER)
+    try:
+        await connection.execute(
+            text(
+                "UPDATE trade_proposals SET status = 'approved', decided_at = now(), "
+                "admission_seq = 1 WHERE id = :id"
+            ),
+            {"id": proposal_id},
+        )
+        await connection.execute(
+            text(
+                "UPDATE portfolio_risk_state SET last_admission_seq = 1, updated_at = now() "
+                "WHERE portfolio_id = :pf"
+            ),
+            {"pf": wallet.portfolio_id},
+        )
+        await connection.commit()
+    finally:
+        await connection.close()
+
+    async with schema_engine.connect() as reader:
+        status = await reader.scalar(
+            text("SELECT status FROM trade_proposals WHERE id = :id"), {"id": proposal_id}
+        )
+        seq = await reader.scalar(
+            text("SELECT last_admission_seq FROM portfolio_risk_state WHERE portfolio_id = :pf"),
+            {"pf": wallet.portfolio_id},
+        )
+    assert str(status) == "approved"
+    assert seq == 1, "the FIFO counter is the engine's, and only the engine advanced it"

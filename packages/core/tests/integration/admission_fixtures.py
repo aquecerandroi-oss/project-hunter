@@ -43,30 +43,17 @@ ENGINE_ROLE = "hunter_worker"
 
 ``portfolio_risk_state`` is the engine's row: T3.1b's guard refuses every
 ``UPDATE`` issued by ``hunter_app``, and ``fifo_v1`` is a counter on that row
-(DATABASE.md §18.7). ``hunter_app`` also has no ``INSERT`` on ``outbox_events``.
-Both are recorded as blocking couplings for T3.8 in ``.claude/state/
-notes-T3.12.md`` §2; the tests declare the role instead of hiding the fact.
+(DATABASE.md §18.7). ``hunter_app`` also has no ``INSERT`` on ``outbox_events``,
+and since ``0007_paper_roles`` no ``UPDATE`` on ``trade_proposals`` either: the
+API files a request, the engine decides it (§19.2).
+
+Nothing here applies a pending grant any more. ``0007_paper_roles`` gave the
+engine ``UPDATE (updated_at)`` on ``organizations``, which is what
+``effective_state(lock=True)`` needs for the middle rung of the lock order
+(``FOR SHARE``, charged as ``ACL_UPDATE``), so ``admit()`` now runs end to end
+on the migrated schema — the T3.12 blocking coupling A, closed.
 """
 
-ORG_ROW_LOCK_GRANT = 'GRANT UPDATE ("updated_at") ON organizations TO hunter_worker'
-"""**A privilege T3.1b still has to add**, applied by these tests so the service
-can be proved at all — and reported as a blocking coupling, never hidden.
-
-The contract's lock order is system -> organization -> portfolio, and the middle
-rung is ``SELECT ... FOR SHARE`` on ``organizations``
-(``hunter_core.risk.transitions.organization_kill_switch``). PostgreSQL charges
-``ACL_UPDATE`` for a row mark, and ``hunter_worker`` — the role that owns
-``portfolio_risk_state`` and therefore the only role that can advance
-``fifo_v1`` — has ``SELECT`` and ``DELETE`` on ``organizations`` but no
-``UPDATE``. So admission fails with *permission denied for table organizations*
-before it decides anything.
-
-The shape asked for is the one T3.1b itself measured for ``portfolio_risk_state``
-(``ddl/paper.py``, ``PAPER_LOCK_ONLY_TABLES``): a **column** grant, which lets
-the role take the row lock and refuses every ``UPDATE`` that writes a value. It
-is strictly narrower than the ``DELETE`` the role already holds on the same
-table. ``.claude/state/notes-T3.12.md`` §2 carries the request.
-"""
 
 COSTS = AssumedCosts(
     spread_bps=Decimal(2), slippage_bps=Decimal(5), fee_bps=Decimal(4), max_entry_delay_s=60
@@ -131,12 +118,6 @@ def beta_for(*, as_of: datetime = NOW, validated: bool = True) -> BetaEstimate:
     return BetaEstimate(value=Decimal("1.0"), as_of=as_of, validated=validated, bars=120)
 
 
-async def apply_pending_grants(engine: AsyncEngine) -> None:
-    """Apply :data:`ORG_ROW_LOCK_GRANT`. Additive, and labelled as pending."""
-    async with engine.begin() as connection:
-        await connection.execute(text(ORG_ROW_LOCK_GRANT))
-
-
 class Wallet:
     """An opened paper wallet plus the ids its tests need."""
 
@@ -158,7 +139,10 @@ async def open_wallet(
     from hunter_core.portfolio.opening import open_paper_wallet
 
     fx_id = await observe_fx(rate=RATE, observed_at=as_of)
-    async with tenant_session(factory, tenant.org_id) as session:
+    # As the engine: opening writes the first point of the equity curve in the
+    # same transaction as the wallet (DATABASE.md §18.2), and since
+    # ``0007_paper_roles`` the curve is read-only to ``hunter_app`` (§19.6).
+    async with tenant_session(factory, tenant.org_id, db_role=ENGINE_ROLE) as session:
         observation = await FxObservationRepository(session).get(fx_id)
         assert observation is not None
         result = await open_paper_wallet(

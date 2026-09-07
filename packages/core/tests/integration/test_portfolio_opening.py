@@ -42,6 +42,15 @@ if TYPE_CHECKING:
 
 pytestmark = pytest.mark.integration
 
+ENGINE_ROLE = "hunter_worker"
+"""The role the ledger runs as since ``0007_paper_roles`` (DATABASE.md §19.6).
+
+Opening a wallet writes the wallet, its lock row, its anchor **and the first
+point of the equity curve** in one transaction (§18.2), and the curve is now
+read-only to ``hunter_app``: it is the evidence a resume reads, so a role that
+can write it can fabricate the recovery it then claims. Opening and marking are
+the engine's acts — there is no HTTP route for either."""
+
 _NOW = datetime(2026, 9, 6, 15, 30, tzinfo=UTC)
 """12:30 in Sao Paulo — the same UTC day, so a wrong zone would still be wrong
 in the same direction and the assertion below would not catch it by accident."""
@@ -77,7 +86,7 @@ class TestTheOpeningIsOneCommit:
     ) -> None:
         observation_id = await observe_fx(observed_at=_NOW)
 
-        async with tenant_session(factory, ledger_tenant.org_id) as session:
+        async with tenant_session(factory, ledger_tenant.org_id, db_role=ENGINE_ROLE) as session:
             result = await open_paper_wallet(
                 session,
                 organization_id=ledger_tenant.org_id,
@@ -167,7 +176,7 @@ class TestTheOpeningIsOneCommit:
         just_after_utc_midnight = datetime(2026, 9, 7, 1, 30, tzinfo=UTC)
         observation_id = await observe_fx(observed_at=just_after_utc_midnight)
 
-        async with tenant_session(factory, ledger_tenant.org_id) as session:
+        async with tenant_session(factory, ledger_tenant.org_id, db_role=ENGINE_ROLE) as session:
             result = await open_paper_wallet(
                 session,
                 organization_id=ledger_tenant.org_id,
@@ -214,7 +223,9 @@ class TestTheOpeningIsOneCommit:
         )
 
         with pytest.raises(Exception):  # noqa: B017 - the trigger's DBAPIError
-            async with tenant_session(factory, ledger_tenant.org_id) as session:
+            async with tenant_session(
+                factory, ledger_tenant.org_id, db_role=ENGINE_ROLE
+            ) as session:
                 await open_paper_wallet(
                     session,
                     organization_id=ledger_tenant.org_id,
@@ -239,7 +250,7 @@ class TestPermanence:
         """D7: a new wallet is a reset by another name, and there is no reset."""
         observation_id = await observe_fx(observed_at=_NOW)
 
-        async with tenant_session(factory, ledger_tenant.org_id) as session:
+        async with tenant_session(factory, ledger_tenant.org_id, db_role=ENGINE_ROLE) as session:
             await open_paper_wallet(
                 session,
                 organization_id=ledger_tenant.org_id,
@@ -249,7 +260,9 @@ class TestPermanence:
             )
 
         with pytest.raises(WalletAlreadyOpen):
-            async with tenant_session(factory, ledger_tenant.org_id) as session:
+            async with tenant_session(
+                factory, ledger_tenant.org_id, db_role=ENGINE_ROLE
+            ) as session:
                 await open_paper_wallet(
                     session,
                     organization_id=ledger_tenant.org_id,
@@ -269,7 +282,7 @@ class TestPermanence:
         observe_fx: Callable[..., Awaitable[uuid.UUID]],
     ) -> None:
         observation_id = await observe_fx(observed_at=_NOW)
-        async with tenant_session(factory, ledger_tenant.org_id) as session:
+        async with tenant_session(factory, ledger_tenant.org_id, db_role=ENGINE_ROLE) as session:
             result = await open_paper_wallet(
                 session,
                 organization_id=ledger_tenant.org_id,
@@ -286,7 +299,9 @@ class TestPermanence:
             )
 
         with pytest.raises(WalletAlreadyOpen):
-            async with tenant_session(factory, ledger_tenant.org_id) as session:
+            async with tenant_session(
+                factory, ledger_tenant.org_id, db_role=ENGINE_ROLE
+            ) as session:
                 await open_paper_wallet(
                     session,
                     organization_id=ledger_tenant.org_id,
@@ -316,7 +331,7 @@ class TestPermanence:
             )
         observation_id = await observe_fx(observed_at=_NOW)
 
-        async with tenant_session(factory, ledger_tenant.org_id) as session:
+        async with tenant_session(factory, ledger_tenant.org_id, db_role=ENGINE_ROLE) as session:
             await open_paper_wallet(
                 session,
                 organization_id=ledger_tenant.org_id,
@@ -326,7 +341,9 @@ class TestPermanence:
             )
 
         with pytest.raises(WalletAlreadyOpen, match="organization"):
-            async with tenant_session(factory, ledger_tenant.org_id) as session:
+            async with tenant_session(
+                factory, ledger_tenant.org_id, db_role=ENGINE_ROLE
+            ) as session:
                 await open_paper_wallet(
                     session,
                     organization_id=ledger_tenant.org_id,
@@ -372,7 +389,9 @@ class TestPermanence:
         monkeypatch.setattr(PortfolioRepository, "principal_paper_id", _barriered_precheck)
 
         async def _open() -> object:
-            async with tenant_session(factory, ledger_tenant.org_id) as session:
+            async with tenant_session(
+                factory, ledger_tenant.org_id, db_role=ENGINE_ROLE
+            ) as session:
                 fx = await _fx(session, observation_id)
                 return await open_paper_wallet(
                     session,
@@ -435,7 +454,9 @@ class TestAnInvalidObservationDoesNotOpen:
         observation_id = await observe_fx(**{"observed_at": _NOW, **kwargs})
 
         with pytest.raises(FxObservationRejected, match=reason):
-            async with tenant_session(factory, ledger_tenant.org_id) as session:
+            async with tenant_session(
+                factory, ledger_tenant.org_id, db_role=ENGINE_ROLE
+            ) as session:
                 await open_paper_wallet(
                     session,
                     organization_id=ledger_tenant.org_id,
@@ -463,7 +484,9 @@ class TestCapitalIsFixed:
         observation_id = await observe_fx(observed_at=_NOW)
 
         with pytest.raises(ValueError, match="capital_brl must be"):
-            async with tenant_session(factory, ledger_tenant.org_id) as session:
+            async with tenant_session(
+                factory, ledger_tenant.org_id, db_role=ENGINE_ROLE
+            ) as session:
                 await open_paper_wallet(
                     session,
                     organization_id=ledger_tenant.org_id,
@@ -487,7 +510,7 @@ class TestCapitalIsFixed:
         the source)."""
         observation_id = await observe_fx(observed_at=_NOW)
 
-        async with tenant_session(factory, ledger_tenant.org_id) as session:
+        async with tenant_session(factory, ledger_tenant.org_id, db_role=ENGINE_ROLE) as session:
             result = await open_paper_wallet(
                 session,
                 organization_id=ledger_tenant.org_id,

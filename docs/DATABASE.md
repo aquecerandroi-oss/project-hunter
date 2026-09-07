@@ -2633,6 +2633,13 @@ mede o grant por coluna, está na §18.7 (e a correção da §17.2, lá).
 `test_schema_privileges.py` une estas listas às das revisões anteriores — toda
 tabela continua classificada exatamente uma vez.
 
+**A `0007_paper_roles` muda o que estas classes concedem, não a classificação
+delas (§19).** `hunter_app` perde a escrita em `portfolio_equity_snapshots` e
+fica só com `SELECT`/`INSERT` em `trade_proposals`; `hunter_worker` ganha
+`UPDATE` de coluna em `portfolios` e em `organizations`. As tuplas desta seção
+continuam descrevendo o que a `0006` fez — é o que "congelada por revisão"
+significa —, e a tabela papel × tabela × privilégio **vigente** é a da §19.1.
+
 `PAPER_TENANT_TABLES` são as quatro de tenant, com RLS habilitada, **forçada** e
 `tenant_isolation` própria. `fx_observations` e `market_betas` ficam fora por
 serem globais (§1.1).
@@ -2757,3 +2764,268 @@ Um terceiro nome é à mão por **colisão**, não por tamanho:
 `fk_orders_exit_intent_id_portfolio_exit_intents` para as **duas** FKs que
 `orders` tem para `portfolio_exit_intents` — a do quádruplo e a do par
 `(exit_intent_id, position_id)` — e a segunda derrubaria a primeira.
+
+## 19. Modelo de papéis da carteira paper — M3 (`0007_paper_roles`)
+
+Sétima revisão, e a primeira que muda **quem** escreve a carteira em vez de o que
+ela é. A `0006` desenhou as tabelas e deixou uma pergunta aberta em seis lugares
+diferentes; três tarefas bateram nela pelo mesmo motivo e nenhuma podia fechá-la
+sozinha:
+
+| De onde veio | O que estava impossível |
+|---|---|
+| T3.6, achado 1 | **nenhum papel implantado escrevia uma avaliação inteira do kill switch**: `portfolio_risk_state` é do `hunter_worker` e `portfolios` era do `hunter_app`, e o contrato exige as duas metades na mesma transação |
+| T3.6, achado 2 | `kill_switch.changed` não era publicável por papel nenhum: quem movia a trava não tinha `INSERT` na outbox |
+| T3.6, achado 3 | `docs/SECURITY.md` §2 (TRADER+) contradizia a diretiva ("retomar somente com a minha autorização") |
+| T3.12, bloqueantes A–D | `hunter_worker` não tinha `ACL_UPDATE` em `organizations`, então `effective_state(lock=True)` morria em *permission denied* antes de decidir; e a escalada automática não tinha portador |
+| Revisão de segurança da `0006`, achado 5 | `hunter_app` tinha DML completo em `portfolio_equity_snapshots` — a curva é a **evidência** que a retomada lê |
+| T3.3b, dívida | um ponto da curva sem BRL não tinha onde dizer *por quê* |
+
+**Por que uma revisão nova e não outra emenda na `0006`.** A liberdade que a §15
+registra — uma revisão que nunca rodou em lugar nenhum pode ser corrigida no
+lugar — acabou para a `0006`: ela está sendo aplicada à VPS enquanto isto é
+escrito. Daqui em diante toda mudança é revisão própria, e `0007_paper_roles` tem
+16 caracteres (o teto de `alembic_version.version_num` continua sendo 32, §17.6).
+
+A decisão que organiza tudo abaixo: **o worker decide e grava estado de risco; a
+API pede, lê e autoriza pessoas.**
+
+### 19.1 Papel × tabela × privilégio (a superfície da carteira)
+
+O que vale **depois** da `0007`. "coluna" quer dizer `GRANT UPDATE (col, …)`, que
+é o formato que a §18.7 mediu: satisfaz o row mark (`FOR SHARE`/`FOR UPDATE`) e
+recusa toda escrita de valor — e, ao contrário de um teste por `current_user`,
+viaja com a herança de papel.
+
+| Tabela | `hunter_app` (API) | `hunter_worker` (motor) | Fixado em |
+|---|---|---|---|
+| `portfolios` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` | `SELECT` + **`INSERT`** + **`UPDATE (kill_switch_state, kill_switch_reason, updated_at)`** | `0001` · **`0007`** |
+| `organizations` | `SELECT`/`INSERT`/`UPDATE` | `SELECT`/`DELETE` + **`UPDATE (updated_at)`** | `0001` · **`0007`** |
+| `workspaces` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` | `SELECT` | `0001` |
+| `portfolio_risk_state` | `SELECT`/`INSERT` + `UPDATE (updated_at)` | `SELECT`/`INSERT`/`UPDATE` | `0006` |
+| `portfolio_equity_snapshots` | **`SELECT`** | `SELECT`/`INSERT`/`UPDATE`/`DELETE` | `0001` · **`0007`** |
+| `trade_proposals` | **`SELECT`/`INSERT`** (só pedido; trigger de forma) | `SELECT`/`INSERT`/`UPDATE`/`DELETE` | `0001` · **`0007`** |
+| `orders`, `fills`, `positions`, `trades` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` | `0001` |
+| `portfolio_exit_intents` | `SELECT`/`INSERT`/`UPDATE` | `SELECT`/`INSERT`/`UPDATE` | `0006` |
+| `participation_consumptions` | `SELECT`/`INSERT` | `SELECT`/`INSERT` | `0006` |
+| `portfolio_currency_anchor` | `SELECT`/`INSERT` | `SELECT`/`INSERT` | `0006` |
+| `fx_observations` | `SELECT` | `SELECT`/`INSERT` | `0006` |
+| `market_betas` | `SELECT` | `SELECT`/`INSERT`/`UPDATE` (só `superseded_at`, §18.6) | `0006` |
+| `kill_switch_transitions`, `risk_events`, `audit_logs` | `SELECT`/`INSERT` | `SELECT`/`INSERT` | `0001` |
+| `outbox_events` | `SELECT` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` | `0003` |
+| `risk_profiles` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` (+ presets de sistema só leitura) | `SELECT` | `0001` |
+| `markets`, `candles`, `market_snapshots`, análise | `SELECT` | escrita | `0001`–`0003` |
+
+E a mesma coisa por **ato**, que é como um leitor humano pergunta:
+
+| Ato | Papel | Escreve |
+|---|---|---|
+| Abrir a carteira (uma vez, operador) | `hunter_worker` | `portfolios`, `portfolio_risk_state`, `portfolio_currency_anchor`, o primeiro ponto da curva, `audit_logs` |
+| Gravar um ponto da curva | `hunter_worker` | `portfolio_equity_snapshots` |
+| Avaliar o kill switch (automático) | `hunter_worker` | `portfolio_risk_state` (dia, referência, pico), `portfolios.kill_switch_state`, `kill_switch_transitions`, `risk_events`, `outbox_events` |
+| Retomar um bloqueio | `hunter_app`, **OWNER** | `kill_switch_transitions`, `portfolios.kill_switch_state`, `risk_events` |
+| Pedir uma entrada manual | `hunter_app` | `trade_proposals` (só o pedido) |
+| Admitir (decidir, reservar, FIFO) | `hunter_worker` | `trade_proposals`, `portfolio_risk_state.last_admission_seq`, `participation_consumptions`, `audit_logs`, `outbox_events` |
+| Executar (ordens, fills, posições, saídas) | `hunter_worker` | `orders`, `fills`, `positions`, `trades`, `portfolio_exit_intents`, `participation_consumptions` |
+| Travar a organização inteira | `hunter_app`, ADMIN+ | `organizations.kill_switch_state` + a transição |
+
+### 19.2 As frases, uma por decisão
+
+**1. Quem decide e grava estado de risco é o worker.** Uma avaliação do kill
+switch é uma coisa só: a referência do dia e o pico (`portfolio_risk_state`), a
+trava que os workers leem (`portfolios.kill_switch_state`), a transição que a
+explica e o evento que a publica. Antes da `0007` essas quatro escritas moravam
+em dois papéis que não se combinam numa transação, e o custo era o cenário da
+T3.6: vira o dia em São Paulo com a carteira em AVISO e os gatilhos limpos — como
+`hunter_app`, a referência nova é recusada e a perda do dia passa a ser medida
+contra o patrimônio de ontem; como `hunter_worker`, a limpeza do AVISO é recusada
+e a carteira segue pela metade num dia em que não perdeu nada. Em duas transações
+existe a janela em que a referência é de hoje e a trava é de ontem. O grant é de
+**coluna** (`kill_switch_state`, `kill_switch_reason`, `updated_at`): o motor move
+a trava e nada mais — não renomeia a carteira, não arquiva, não vira `is_arena`
+(que liberaria uma segunda principal, §18.8). `updated_at` está lá porque o
+`onupdate` do `TimestampMixin` escreve a coluna no mesmo `UPDATE`; `kill_switch_reason`
+porque `record_transition` a escreve junto, e uma trava sem motivo é pior que a
+trava.
+
+**1b. E `INSERT` em `portfolios`, porque abrir a carteira é uma transação só.**
+`open_paper_wallet` grava a carteira, a linha de trava, a âncora, **o primeiro
+ponto da curva** e a auditoria num commit — a §18.2 diz que essa atomicidade é a
+única prova de que nasceram juntos. No instante em que a curva virou do motor
+(item 3 abaixo), a linha da carteira teve de ir junto: `hunter_app` não escreve
+mais a curva e `hunter_worker` não escrevia `portfolios`, então a abertura ficou
+**sem papel nenhum capaz de executá-la** — a mesma parede da T3.6, uma tabela ao
+lado. Medido, não suposto: *permission denied for table portfolios*, na primeira
+execução da suíte da admissão depois da revogação. É `INSERT` e nada mais: o
+motor cria a carteira e move a trava, e continua sem poder renomear, arquivar,
+virar `is_arena` ou reescrever o capital de abertura (§18.8 congela esses campos
+depois da âncora, e o grant não os alcança). Segunda carteira principal continua
+impossível para todo mundo — `uq_portfolios_principal_paper` é índice, não
+privilégio.
+
+**2. `organizations` ganha `UPDATE (updated_at)` para o worker, e só isso.** O
+PostgreSQL cobra `ACL_UPDATE` por `SELECT ... FOR SHARE`, e a ordem de travas do
+contrato é sistema → organização → carteira. Sem essa coluna a admissão inteira
+morria em *permission denied for table organizations* antes de decidir qualquer
+coisa (T3.12, bloqueante A). É estritamente mais estreito que o `DELETE` que o
+papel tem nessa tabela desde a `0001` (§15.4) e **não** alcança
+`organizations.kill_switch_state`: travar uma organização continua sendo ato de
+pessoa pela API, auditado pela constraint trigger da §18.7 — medido: `UPDATE
+organizations SET kill_switch_state = 'EMERGENCY'` como `hunter_worker` responde
+*permission denied for table organizations*.
+
+**3. A API pede, lê e autoriza pessoas.** `hunter_app` perde
+`INSERT`/`UPDATE`/`DELETE` em `portfolio_equity_snapshots` e `UPDATE`/`DELETE` em
+`trade_proposals`.
+
+- A curva é a **evidência** de que a carteira se recuperou (`hunter_core.risk.curve`)
+  e o **teto** contra o qual todo pico que sobe é medido (§18.7). A RLS não protege
+  a integridade dos números de um tenant contra o próprio request handler daquele
+  tenant: um ponto fabricado de 20.000 no carimbo certo é uma recuperação que a
+  retomada seguinte aceita. A API lê; o worker escreve.
+- Em `trade_proposals` sobram `SELECT` e `INSERT`, porque registrar um pedido
+  manual *é* trabalho da API. `UPDATE` e `DELETE` saem porque decidir é da
+  admissão, e a admissão roda como o motor (o contador `fifo_v1` mora em
+  `portfolio_risk_state`, §18.3). Sem isso um handler podia virar uma proposta
+  recusada em `approved` ou alargar uma reserva depois da decisão que a
+  dimensionou.
+
+**4. Retomar é de OWNER.** A rota `POST …/risk/kill-switch/resume` declarava
+`require_org(TRADER)`, o piso que `docs/SECURITY.md` §2 documentava numa linha só
+para "kill switch de portfolio". Travar e destravar não são o mesmo ato: travar é
+proteção (o motor faz sozinho); sair de um bloqueio é o que a diretiva reserva
+para a autorização do dono. Com o piso antigo, um TRADER convidado destravava uma
+carteira que o motor bloqueou. `SECURITY.md` §2 passa a ter **duas linhas** e a
+rota exige OWNER. Não há allowlist nomeando uma pessoa — seria um segundo sistema
+de identidade ao lado do Clerk; OWNER é o papel que o modelo já tem para "de quem
+é este dinheiro". Quem retoma continua nomeado na trilha, na mesma transação do
+movimento.
+
+### 19.3 Três colunas — e uma que **não** entrou
+
+```
+trade_proposals             (+) request_digest TEXT
+  CHECK request_digest IS NULL OR char_length(request_digest) BETWEEN 1 AND 128
+
+portfolio_equity_snapshots  (+) brl_unavailable_reason TEXT
+                            (+) marks_stale BOOLEAN NOT NULL DEFAULT false
+  CHECK brl_unavailable_reason IS NULL
+     OR (fx_observation_id IS NULL AND char_length(brl_unavailable_reason) BETWEEN 1 AND 64)
+```
+
+**`request_digest` é parte da identidade do pedido, não um segundo `idempotency_key`.**
+A chave diz "é o mesmo pedido"; o digest é o que **prova**. Sem ele, o replay de
+uma proposta **recusada** só podia ser comparado com as quatro colunas que estão
+gravadas (carteira, mercado, direção, origem), então um segundo pedido diferente
+que reusasse a chave voltava como a recusa do primeiro (T3.12, pendência 1). É
+anulável porque uma proposta escrita antes desta revisão genuinamente não tem
+digest, e string vazia alegaria um.
+
+**`brl_unavailable_reason` e `marks_stale` são a dívida da T3.3b.** A §18.2 já
+dizia que FX indisponível deixa "o USDT apurável e o BRL indisponível **com
+motivo**, nunca extrapolado" — e não havia coluna para o motivo. O CHECK é a
+frase inteira: um ponto que **nomeia** uma observação foi convertido, então não
+pode também declarar a conversão indisponível, e um motivo vazio não declara nada
+(o argumento do §16.2 sobre `no_entry_reason`). `marks_stale` é o outro eixo: o
+ponto é gravado mesmo com marcações velhas — recusar deixaria um buraco na curva
+exatamente quando a carteira está degradada —, mas gravado **como estimativa**,
+para que a evidência da retomada e o gráfico saibam distinguir sem inferir por
+carimbo. As duas colunas são escritas pelo worker; a API só as lê.
+
+**`applied_attempts` não entrou, e isso é decisão.** A T3.4b derivou a
+idempotência da execução de `fills.execution_key` (único por
+`(organization_id, execution_key)`, §18.3) e de `orders.client_order_id` (único
+por carteira, §7) — as duas já existem e já são chave. Um contador de tentativas
+seria uma **segunda resposta** para a pergunta que o schema já responde, e a
+primeira vez que as duas discordassem ninguém saberia qual vale. Fica registrada
+aqui como dívida fechada por não existir, e não como esquecimento.
+
+### 19.4 Um `INSERT` da API é um **pedido**, e o schema diz isso
+
+O grant impede a API de **editar** uma decisão; não impede a API de **escrever**
+uma, porque `INSERT` carrega todas as colunas. Nada impediria um handler de gravar
+uma linha já com `status = 'approved'`, um `risk_decision` de autoria própria e
+uma reserva anexada — uma decisão que o Risk Engine nunca tomou, indistinguível
+depois de uma que ele tomou, e segurando capital no orçamento de participação
+(§18.5).
+
+`trade_proposals_the_app_only_files_requests` (`BEFORE INSERT`) fecha isso: quando
+o chamador tem os privilégios da aplicação **e nada além deles**
+(`pg_has_role(current_user, 'hunter_app', 'USAGE') AND NOT pg_has_role(…, 'hunter_worker', …)`
+— nome não é privilégio, §18.7), a linha tem de ser um pedido: `source = 'manual'`,
+`status = 'pending'`, sem `risk_decision`, sem `rejection_reason`, sem
+`decided_at`, sem `admission_seq` e sem reserva (`reservation_state = 'none'`,
+`reserved_slot = false`). O motor e o operador inserem à vontade.
+
+**`pending`, não `requested`.** O brief desta tarefa pedia `status='requested'`;
+`proposal_status` (§7) não tem esse rótulo e ganhar um exigiria `ALTER TYPE ...
+ADD VALUE` — um rótulo novo é uma promessa de que existe um estado novo, e não
+existe: `pending` já é exatamente "pedida, ainda não decidida". Desvio declarado
+em vez de silencioso.
+
+### 19.5 Guardas
+
+**Não há guarda de upgrade, e isso é afirmação.** Esta revisão acrescenta duas
+colunas anuláveis e uma com default, e **estreita** privilégios: nada que já
+esteja gravado passa a ser irrepresentável, então não há nada que um backfill
+honesto não produza. A `0002`/`0003`/`0006` param quando param porque criam
+invariantes sobre dado existente; esta não cria nenhum.
+
+**O downgrade recusa duas coisas** (§17.7: reverter é permitido, perder obrigação
+ou evidência não é):
+
+| Guarda | O que se perderia |
+|---|---|
+| proposta com `request_digest` | a identidade canônica do pedido que aquela decisão respondeu — não derivável das colunas que sobram, e é contra ela que um replay de recusa é comparado |
+| ponto de equity com `brl_unavailable_reason` ou `marks_stale` | cada um volta a parecer um ponto plenamente precificado e recém-marcado: exatamente a extrapolação que a §18.2 proíbe |
+
+Os **grants** não têm guarda: o downgrade os alarga de volta ao que a `0001`
+concedeu, o que é declaração de privilégio, não fato sobre dado. E ele devolve
+exatamente aquilo — `INSERT`/`UPDATE`/`DELETE` na curva e `UPDATE`/`DELETE` na
+proposta para `hunter_app`, e retira as duas colunas do worker —, nunca um
+`GRANT ALL`.
+
+### 19.6 Consequências operacionais, declaradas
+
+- **A abertura da carteira passa a rodar como `hunter_worker`.**
+  `open_paper_wallet` grava o primeiro ponto da curva na mesma transação da
+  carteira, da linha de trava e da âncora (§18.2), e a API não escreve mais a
+  curva. `infra/scripts/open_paper_wallet.py` abre a transação com
+  `tenant_session(..., db_role="hunter_worker")`. É a mesma classe de ato que
+  remover um tenant (§15.4): operação de operador, não de request handler. O
+  preço é que essa transação atravessa a RLS (o papel tem `BYPASSRLS`), e o que
+  a segura é o caminho único de escrita com o índice `uq_portfolios_principal_paper`
+  do outro lado.
+- **A T3.6, achado 2, fecha pelo lado do worker e continua aberto pelo lado da
+  API.** `hunter_worker` agora move a trava **e** enfileira `kill_switch.changed`
+  na mesma transação, então `record_transition(publish=True)` é possível no
+  caminho automático. A **retomada pela API** continua sem `INSERT` em
+  `outbox_events` — deliberado: o worker publica, e dar à API a capacidade de
+  enfileirar era o que a T3.12 (bloqueante C) pedia e o que esta decisão recusa.
+  O que sobra é a releitura de 10 s, que é a garantia em que o contrato §5 se
+  apoia.
+- **A T3.12 deixa de precisar do grant experimental.** `ORG_ROW_LOCK_GRANT` e
+  `apply_pending_grants` saíram dos testes da admissão: `admit()` roda inteiro
+  como `hunter_worker` no schema íntegro.
+- **O que continua largo, e não foi estreitado aqui:** `hunter_app` mantém DML
+  completo em `orders`, `fills`, `positions` e `trades` (`0001`,
+  `APP_WRITE_TABLES`). Nenhuma rota de hoje escreve essas tabelas — quem executa
+  é o worker —, então o mesmo argumento da curva se aplica a elas, e fechá-las é
+  uma revisão própria com a T3.5/T3.8 na mão para dizer o que a API ainda precisa
+  poder escrever. Declarado aqui em vez de descoberto por uma revisão de
+  segurança depois.
+- **`portfolio_exit_intents` e `participation_consumptions` continuam sem
+  `DELETE` para os dois papéis**, como a §18.9 os classificou. O brief desta
+  tarefa dizia "DML completo" para o worker nas duas; conceder `DELETE` desfaria
+  exatamente o que aquela seção argumenta — apagar um consumo executado devolve
+  em silêncio o orçamento do mercado, e uma intenção é a prova de que uma posição
+  esteve protegida. O worker escreve tudo o que o código dele de fato escreve
+  (`INSERT`/`UPDATE` na intenção, `INSERT` no consumo). Desvio declarado.
+
+### 19.7 Pooler e travas
+
+Nada aqui depende de estado de sessão: os grants são fato de catálogo e a trigger
+lê só `NEW` e `pg_has_role`. Sem prepared statement de sessão, sem
+`LISTEN`/`NOTIFY`, sem advisory lock de sessão — a serialização continua sendo a
+linha de `portfolio_risk_state` e, um nível acima, o `FOR SHARE` na linha da
+organização que esta revisão finalmente torna possível para o motor.

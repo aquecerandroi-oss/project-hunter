@@ -40,7 +40,6 @@ from packages.core.tests.integration.admission_fixtures import (
     NOW,
     Wallet,
     admit_default,
-    apply_pending_grants,
     liquidity_for,
     open_wallet,
     read_proposal,
@@ -61,7 +60,6 @@ PARTICIPATION_CEILING = Decimal("46.0510")
 
 @pytest_asyncio.fixture
 async def factory(ledger_engine: AsyncEngine) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    await apply_pending_grants(ledger_engine)
     yield create_session_factory(ledger_engine)
 
 

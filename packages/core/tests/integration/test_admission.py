@@ -46,7 +46,6 @@ from packages.core.tests.integration.admission_fixtures import (
     NOW,
     Wallet,
     admit_default,
-    apply_pending_grants,
     beta_for,
     buy_filled,
     liquidity_for,
@@ -63,7 +62,6 @@ pytestmark = pytest.mark.integration
 
 @pytest_asyncio.fixture
 async def factory(ledger_engine: AsyncEngine) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    await apply_pending_grants(ledger_engine)
     yield create_session_factory(ledger_engine)
 
 

@@ -30,7 +30,8 @@ WebSocket: token enviado na primeira mensagem (`auth`), nunca na query string. C
 | Ver dashboards, radar, mercados, oportunidades, trades, analytics | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Criar/editar portfolios, agentes, ordens paper | ✓ | ✓ | ✓ | – | – |
 | Editar risk profile de portfolio | ✓ | ✓ | ✓ | – | – |
-| Kill switch de portfolio | ✓ | ✓ | ✓ | – | – |
+| Acionar o kill switch de portfolio (travar) | ✓ | ✓ | ✓ | – | – |
+| **Retomar** um kill switch de portfolio travado | ✓ | – | – | – | – |
 | Kill switch da organização | ✓ | ✓ | – | – | – |
 | Editar risk defaults da organização | ✓ | ✓ | – | – | – |
 | Membros, convites, papéis | ✓ | ✓ (não pode promover a OWNER nem remover OWNER) | – | – | – |
@@ -38,6 +39,8 @@ WebSocket: token enviado na primeira mensagem (`auth`), nunca na query string. C
 | Ativar versão de estratégia, ativar pesos recomendados | ✓ | – | – | – | – |
 | Billing, excluir organização, transferir ownership | ✓ | – | – | – | – |
 | Solicitar live mode (Fase 4) | ✓ | – | – | – | – |
+
+**Retomar não é o mesmo ato que travar (T3.1c, 2026-09-07).** Esta tabela tinha uma linha só — "Kill switch de portfolio: TRADER+" — e `POST .../risk/kill-switch/resume` declarava `require_org(TRADER)` por causa dela. Travar é proteção: quem opera precisa poder acionar, e o motor aciona sozinho. **Sair** de um bloqueio é o oposto — a decisão conjunta do M3 (§5) e a diretiva dizem "retomar somente com a minha autorização", e o piso TRADER deixava um TRADER convidado destravar uma carteira que o motor bloqueou, sem o dono. A rota passa a exigir **OWNER**; a leitura continua em VIEWER. Não há allowlist nomeando uma pessoa: seria um segundo sistema de identidade ao lado do Clerk, e OWNER é o papel que o modelo já tem para "de quem é este dinheiro". O banco continua registrando *qual* pessoa retomou, na mesma transação do movimento (DATABASE.md §18.7), e nenhum papel de banco move a coluna sem essa transição.
 
 Implementação: `require_role(min_role)` como dependência FastAPI; papéis ordenados. Toda rota de tenant declara o papel mínimo. Teste parametrizado garante que cada rota tem declaração.
 

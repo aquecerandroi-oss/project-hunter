@@ -1,8 +1,10 @@
 """The kill switch over HTTP — RISK_ENGINE.md §5, SECURITY.md §2.
 
-Reading it is a dashboard read (VIEWER); resuming it is "Kill switch de
-portfolio", which the RBAC matrix puts at TRADER and above. Both are asserted
-here against a live app, a live Postgres and real signed tokens.
+Reading it is a dashboard read (VIEWER); **resuming is OWNER** — T3.1c split the
+one SECURITY.md §2 line in two, because latching is a protection anyone who
+operates should be able to trigger and leaving a latched block is what the
+directive reserves for the owner's authorisation. Both are asserted here against
+a live app, a live Postgres and real signed tokens.
 
 The refusal matters more than the success: a resume while the automatic
 assessment still blocks answers **409 problem+json with the numbers in it**, and
@@ -112,11 +114,17 @@ def state(wallet: Wallet, equity: Decimal, at: datetime) -> PortfolioState:
 async def block(
     session_factory: async_sessionmaker[AsyncSession], wallet: Wallet, equity: Decimal
 ) -> None:
-    """Drive the wallet down the automatic ladder, the way the worker will."""
+    """Drive the wallet down the automatic ladder, the way the worker does.
+
+    As ``hunter_worker``: since ``0007_paper_roles`` an automatic evaluation is
+    the engine's, in one transaction (DATABASE.md §19.2). The API's business with
+    the kill switch is the *resume*, which is what these tests exercise through
+    the route.
+    """
     now = utcnow()
     assert wallet.actor.org_id is not None
     async with tenant_session(
-        session_factory, wallet.actor.org_id, wallet.actor.user_id
+        session_factory, wallet.actor.org_id, wallet.actor.user_id, db_role="hunter_worker"
     ) as session:
         await evaluate_and_persist(session, wallet.portfolio_id, state(wallet, equity, now), now)
 
@@ -133,10 +141,14 @@ async def snapshot(
     ``age_s=0`` matters: the evidence has to be observed **after** the move being
     resumed, or it describes the wallet before the block (Astra, review of this
     diff). The blocking evaluation runs microseconds earlier in these tests.
+
+    Written as ``hunter_worker``, because since ``0007_paper_roles`` the curve is
+    read-only to the API — it is the evidence a resume reads, and a role that can
+    write it can fabricate the recovery it then claims (§19.2).
     """
     assert wallet.actor.org_id is not None
     async with tenant_session(
-        session_factory, wallet.actor.org_id, wallet.actor.user_id
+        session_factory, wallet.actor.org_id, wallet.actor.user_id, db_role="hunter_worker"
     ) as session:
         await session.execute(
             text(
@@ -301,3 +313,55 @@ def test_the_day_is_sao_paulo_not_utc() -> None:
     midnight_utc = datetime(2026, 9, 7, 1, 0, tzinfo=UTC)
 
     assert sao_paulo_day_start_utc(midnight_utc) == datetime(2026, 9, 6, 3, 0, tzinfo=UTC)
+
+
+async def test_a_trader_may_not_resume_and_the_owner_may(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+    wallet: Wallet,
+) -> None:
+    """T3.1c: leaving a latched block is the owner's act, and only the owner's.
+
+    The old floor was TRADER (SECURITY.md §2 had latching and resuming on one
+    line), so a trader invited into the organization could unblock a wallet the
+    engine had blocked, without the owner. The scenario is the whole point of the
+    directive's "retomar somente com a minha autorização", so it is asserted end
+    to end: same wallet, same recovered curve, two callers.
+    """
+    assert wallet.actor.org_id is not None
+    trader = make_actor(f"trader-{uuid.uuid4().hex[:8]}")
+    invited = await client.post(
+        f"/api/v1/orgs/{wallet.actor.org_id}/invitations",
+        json={"email": trader.email, "role": "TRADER"},
+        headers=wallet.actor.headers,
+    )
+    assert invited.status_code == 201, invited.text
+    accepted = await client.post(
+        f"/api/v1/invitations/{invited.json()['token']}/accept", headers=trader.headers
+    )
+    assert accepted.status_code == 200, accepted.text
+
+    await block(session_factory, wallet, Decimal(19600))
+    await snapshot(session_factory, wallet, OPENING, age_s=0)
+
+    refused = await client.post(
+        f"{wallet.base}/kill-switch/resume",
+        json={"reason": "I can trade, so I can unblock"},
+        headers=trader.headers,
+    )
+    assert refused.status_code == 403, refused.text
+    still = (await client.get(f"{wallet.base}/kill-switch", headers=trader.headers)).json()
+    assert still["effective"] == "TRADING_DISABLED"
+    assert still["last_transition"]["actor_type"] == "system", "the refusal wrote nothing"
+
+    resumed = await client.post(
+        f"{wallet.base}/kill-switch/resume",
+        json={"reason": "reviewed the day"},
+        headers=wallet.actor.headers,
+    )
+    assert resumed.status_code == 200, resumed.text
+    after = (await client.get(f"{wallet.base}/kill-switch", headers=wallet.actor.headers)).json()
+    assert after["effective"] == "ACTIVE"
+    assert after["last_transition"]["actor_type"] == "user"
+    assert after["last_transition"]["actor_id"] == str(wallet.actor.user_id)

@@ -157,6 +157,10 @@ class TradeProposal(Base, UUIDPrimaryKeyMixin, TenantMixin):
         CheckConstraint(
             "admission_seq IS NULL OR admission_seq > 0", name="admission_seq_positive"
         ),
+        CheckConstraint(
+            "request_digest IS NULL OR char_length(request_digest) BETWEEN 1 AND 128",
+            name="request_digest_is_meaningful",
+        ),
     )
 
     portfolio_id: Mapped[uuid.UUID] = mapped_column(index=True)
@@ -181,6 +185,17 @@ class TradeProposal(Base, UUIDPrimaryKeyMixin, TenantMixin):
     opportunity_score: Mapped[Decimal | None] = mapped_column(SCORE)
     confidence: Mapped[Decimal | None] = mapped_column(CONFIDENCE)
     idempotency_key: Mapped[str] = mapped_column(Text)
+    request_digest: Mapped[str | None] = mapped_column(Text)
+    """The canonical digest of the request this decision answered (§19.3).
+
+    Part of the idempotency identity, not a replacement for it: the key says
+    *this is the same request*, and the digest is what proves it. Without it a
+    replayed **refusal** could only be compared against the four columns that
+    happen to be stored, so a second, different request reusing the key came
+    back as the first one's rejection. Nullable because a proposal written
+    before ``0007_paper_roles`` (and by any path that does not compute a digest)
+    genuinely has none — an empty string would claim one."""
+
     source: Mapped[ProposalSource] = mapped_column(
         pg_enum("proposal_source"), server_default=ProposalSource.MANUAL.value
     )

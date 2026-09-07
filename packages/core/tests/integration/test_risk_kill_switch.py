@@ -192,16 +192,18 @@ async def evaluate(
 
 @asynccontextmanager
 async def privileged(engine: AsyncEngine, wallet: Wallet) -> AsyncGenerator[AsyncSession]:
-    """A transaction with the organization in context and **no role downgrade**.
+    """A transaction **as ``hunter_worker``**, the engine's own role.
 
-    Used only by the evaluations that have to write ``portfolio_risk_state`` and
-    ``portfolios`` together — the day's rollover and a rising peak. No deployed
-    role can do both today: ``portfolio_risk_state_guard`` refuses the ``UPDATE``
-    for ``hunter_app`` and ``hunter_worker`` holds ``SELECT`` only on
-    ``portfolios``. That wall is asserted by
-    ``test_no_deployed_role_can_write_both_halves_of_one_evaluation``; these
-    tests are about the engine's behaviour, and they say plainly which privilege
-    they are standing on to observe it (notes-T3.6, finding 1).
+    Used by the evaluations that write ``portfolio_risk_state`` and
+    ``portfolios`` together — the day's rollover and a rising peak. It used to
+    run with no role downgrade at all, standing on a privilege no deployment
+    had, because ``0006`` left the two halves in two roles that do not combine
+    (notes-T3.6, finding 1). ``0007_paper_roles`` gave the engine
+    ``UPDATE (kill_switch_state, kill_switch_reason, updated_at)`` on
+    ``portfolios``, so the evaluation is now one transaction of one deployed
+    role — which is what
+    ``test_the_engine_role_writes_both_halves_of_one_evaluation`` asserts, and
+    what these tests now stand on.
     """
     session = AsyncSession(bind=engine, expire_on_commit=False)
     try:
@@ -210,6 +212,7 @@ async def privileged(engine: AsyncEngine, wallet: Wallet) -> AsyncGenerator[Asyn
                 text("SELECT set_config('app.current_org', :org, true)"),
                 {"org": str(wallet.org_id)},
             )
+            await session.execute(text("SET LOCAL ROLE hunter_worker"))
             yield session
     finally:
         await session.close()
@@ -777,49 +780,45 @@ async def test_the_system_scope_comes_from_configuration_and_still_blocks(
 
 
 # --------------------------------------------------------------------------
-# The grant gap this task found, proved as a statement
+# The grant model: the engine writes an evaluation, the API does not (T3.1c)
 # --------------------------------------------------------------------------
 
 
-async def test_no_deployed_role_can_write_both_halves_of_one_evaluation(
-    factory: async_sessionmaker[AsyncSession], wallet: Wallet
+async def test_the_engine_role_writes_both_halves_of_one_evaluation(
+    engine: AsyncEngine, factory: async_sessionmaker[AsyncSession], wallet: Wallet
 ) -> None:
-    """The wall T3.6 ran into, stated as three statements instead of prose.
+    """The wall T3.6 ran into, inverted by ``0007_paper_roles``.
 
-    One automatic evaluation writes three things that the contract says belong in
-    one transaction: the daily reference and the peak
-    (``portfolio_risk_state``), the latch the workers read (``portfolios``) with
-    its audited transition, and the ``kill_switch.changed`` projection
-    (``outbox_events``). As of this revision:
+    One automatic evaluation writes three things the contract puts in one
+    transaction: the daily reference and the peak (``portfolio_risk_state``), the
+    latch the workers read (``portfolios``) with its audited transition, and the
+    ``kill_switch.changed`` projection (``outbox_events``). Until this revision
+    no deployed role held all three — ``hunter_app`` was refused the lock row and
+    held ``SELECT`` only on the outbox; ``hunter_worker`` held ``SELECT`` only on
+    ``portfolios`` — so the São Paulo rollover of a wallet in WARNING had to be
+    split, and a split leaves a window where the reference is today's and the
+    latch is yesterday's.
 
-    - ``hunter_app`` may move the latch but ``portfolio_risk_state_guard``
-      refuses its ``UPDATE`` of the lock row, and it holds ``SELECT`` only on
-      ``outbox_events``;
-    - ``hunter_worker`` may write the lock row and the outbox but holds
-      ``SELECT`` only on ``portfolios``.
-
-    Failure scenario: the São Paulo day turns while a wallet sits in WARNING with
-    both triggers cleared. The rollover has to write the new daily reference *and*
-    clear the WARNING together. Under ``hunter_app`` the reference write is
-    refused and the wallet keeps yesterday's anchor; under ``hunter_worker`` the
-    clear is refused and the wallet stays halved for a day it never lost anything
-    in. Splitting them into two transactions leaves a window in which the
-    reference is tomorrow's and the latch is yesterday's.
+    ``hunter_worker`` now does the whole evaluation (DATABASE.md §19.2), which is
+    what every ``evaluate_privileged`` call in this module now stands on. And the
+    narrowness is part of the claim: it is a **column** grant, so the engine may
+    move the latch and not rename the wallet, and the API still may not write the
+    lock row nor enqueue the event.
     """
-    # The refusal arrives as a column grant ("permission denied") or as the
-    # ``portfolio_risk_state_guard`` message, depending on how ``0006`` spells it
-    # this week; both say the same thing, and the test asserts the capability
-    # rather than the wording.
-    with pytest.raises(DBAPIError, match="permission denied|may not be updated"):
-        async with tenant_session(factory, wallet.org_id, wallet.user_id) as session:
-            await session.execute(
-                text(
-                    "UPDATE portfolio_risk_state SET peak_equity = peak_equity "
-                    "WHERE portfolio_id = :id"
-                ),
-                {"id": wallet.portfolio_id},
-            )
+    await record_equity(engine, wallet, Decimal(20800), DAY_ONE)
+    await evaluate_privileged(engine, wallet, Decimal(20800), DAY_ONE)  # the peak rises
+    await evaluate_privileged(  # -5 % on the day: the latch moves, with its transition
+        engine, wallet, Decimal(19000), DAY_ONE + timedelta(minutes=1)
+    )
 
+    row = await read_row(engine, wallet)
+    assert row["peak_equity"] == Decimal(20800), "the engine could not write the lock row"
+    assert row["latch"] is KillSwitchState.TRADING_DISABLED, "the engine could not move the latch"
+    assert row["transitions"], "a move with no transition would not have committed at all"
+    assert row["transitions"][-1].to_state is KillSwitchState.TRADING_DISABLED  # type: ignore[index]
+
+    # What the engine still may not do: everything about a wallet that is not
+    # the kill switch (the grant is three columns, not the table).
     with pytest.raises(ProgrammingError, match="permission denied"):
         async with role_session(factory, db_role="hunter_worker") as session:
             await session.execute(
@@ -827,12 +826,25 @@ async def test_no_deployed_role_can_write_both_halves_of_one_evaluation(
                 {"id": wallet.portfolio_id},
             )
 
+    # And what the API still may not do: the engine's own bookkeeping, the
+    # evidence of a recovery, and the publication of the move.
+    for statement in (
+        "UPDATE portfolio_risk_state SET peak_equity = peak_equity WHERE portfolio_id = :id",
+        "INSERT INTO portfolio_equity_snapshots (organization_id, portfolio_id, resolution, ts, "
+        "cash, equity, exposure_notional, unrealized_pnl, realized_pnl_cum, peak_equity) "
+        "SELECT organization_id, id, '1m', now(), 0, 99999, 0, 0, 0, 99999 "
+        "FROM portfolios WHERE id = :id",
+    ):
+        with pytest.raises(DBAPIError, match="permission denied|may not be updated"):
+            async with tenant_session(factory, wallet.org_id, wallet.user_id) as session:
+                await session.execute(text(statement), {"id": wallet.portfolio_id})
+
     with pytest.raises(ProgrammingError, match="permission denied"):
         async with tenant_session(factory, wallet.org_id, wallet.user_id) as session:
             await session.execute(
                 text(
                     "INSERT INTO outbox_events (event_id, stream, payload) "
-                    "VALUES (:id, 'kill_switch.changed', '{}'::jsonb)"
+                    "VALUES (:id, 'kill_switch.changed', CAST('{}' AS jsonb))"
                 ),
                 {"id": uuid7()},
             )
