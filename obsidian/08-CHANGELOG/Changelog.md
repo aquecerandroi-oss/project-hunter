@@ -9,6 +9,221 @@ Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado p
 
 ## 2026-09-07
 
+*(Os dezenove itens abaixo entraram entre `02:40Z` e `10:21Z` e foram consolidados no plantão da
+manhã de 2026-09-07 — de `8f8be1e` a `e57908a`. O dia inteiro é M3, e o eixo dele é um só: **a
+carteira do Everton deixou de ser um número parado e passou a ter um processo que a faz andar.**)*
+
+- **`e57908a` — a revisão da ponte: nada bloqueia, e quatro itens antes de ligar a autonomia.**
+  Revisão adversarial em `.claude/state/review-T3.14.md`, **79 testes rodados**. Ela confirmou o que
+  mais importa para o Everton: com `ENABLE_PAPER_AUTONOMY=false` a ponte **nem cria o grupo de
+  consumo** e não submete nada — o desligado é desligado de verdade, não um `if` no fim do caminho.
+  Também: `purpose != "live"` é recusado (nulo e desconhecido inclusive), o score usado é o da
+  **barra fonte** (`opportunities.last_updated_at <= source_bar_close`, sem olhar o futuro), a ordem
+  total de candidatos tem desempate determinístico por `signal_id`, a ordem de travas é idêntica nos
+  três ciclos, e não há float, `now()` nem `sleep` em lugar nenhum. Os quatro "deve corrigir" **não
+  bloqueiam o commit** — são condições escritas para **ligar** a autonomia (T3.14b, depois da
+  T3.5c), e estão em [[Open Bugs]].
+
+- **`70acb6f` — `0009_paper_geometry`: o pedido carrega a própria geometria, e o pó vira coluna.**
+  Para o Everton: um pedido de ordem arquivado pela tela **não podia ser decidido**. A tabela
+  guardava carteira, mercado, direção e chave, e **não** guardava o preço de referência, o stop, o
+  alvo nem os custos assumidos — o motor via que havia trabalho e não conseguia fazê-lo, registrando
+  `pending_request_without_geometry` uma vez por segundo, por pedido, para sempre. Agora
+  `trade_proposals.request_payload` guarda essa geometria, com **dinheiro escrito como string de
+  JSON** (um número de JSON volta como float na maioria dos parsers, e um preço que retorna
+  `0.30000000000000004` é exatamente o bug que a disciplina do `Decimal` existe para impedir) e um
+  CHECK que exige as **oito chaves presentes e do tipo certo** — ausente se escreve `null`, nunca por
+  omissão. Detalhe que vale guardar: a forma ingênua do CHECK **aceitava um payload sem `target`**,
+  porque um CHECK é satisfeito quando a expressão avalia para `NULL` ("desconhecido não é violação");
+  foi reproduzido num Postgres 16 real durante a verificação e corrigido com
+  `coalesce(jsonb_typeof(...), 'absent')`. Junto vem `positions.is_residual`, a coluna que dá nome ao
+  **pó** (ver o `7091a16` abaixo). E fecha o S1 da revisão de segurança da `0007`: a API **não
+  escreve mais** `request_digest` — o motor recomputa e compara, em vez de confiar na prova escrita
+  por quem ela existe para vincular. `docs/DATABASE.md` §21.
+
+- **`12edda3` — T3.14: a ponte sinal → admissão, desligada; e T3.5b, fechando as cinco condições do
+  guardião.** Duas coisas num commit, e as duas importam.
+  **A ponte (T3.14):** consome `shadow.signals.emitted` e, a cada segundo, escolhe **um** candidato e
+  submete **um** pedido — mas só quando `ENABLE_PAPER_AUTONOMY` for verdadeiro, e o padrão é falso.
+  A elegibilidade tem **um motivo nomeado por recusa** (contador `hunter_bridge_candidates_total`
+  por desfecho): versão de estratégia ativa e com propósito diferente de `research_only`, par spot no
+  mesmo venue pelo ativo base/cotação, β válido no momento, nenhuma posição aberta/fechando nem
+  reserva viva na moeda, janela de entrada de 120 s após o fechamento da barra, e uma linha em
+  `agents` habilitada para aquela versão. **A garantia que vale escrever com todas as letras: todo
+  sinal do Shadow Lab hoje é `research_only`, então nada é admitido — nem com a bandeira ligada —
+  até que exista uma versão de estratégia ativada com propósito de paper, e essa ativação é decisão
+  do Everton.** 16 testes de integração.
+  **T3.5b:** as cinco condições da revisão do guardião, fechadas. Uma reserva **vencida** nunca mais
+  vira ordem (um ciclo cinco minutos atrasado, com livro perfeitamente elegível, agora produz
+  `expired` em vez de fill); o ciclo de proteção **toma a trava da carteira** antes de ler as
+  posições — a prova com duas sessões escreve `19.903,893385` em vez do rasgado `18.148,245790`, que
+  era um BLOQUEADO latchado por dinheiro que nunca foi perdido; o pó fica visível e valorizado no
+  patrimônio mas **não conta vaga, exposição nem duplicidade** (uma segunda ordem na mesma moeda
+  volta a ser aprovada e preenchida); os avisos passam a sair **na transição**, não 86.400 vezes por
+  dia; a proteção degradada faz backoff de 1 s a 60 s e **não grava linha de ordem** enquanto o
+  motivo for "sem livro"; e a marcação a mercado planeja na **grade do minuto** com 5 s de folga
+  antes da virada do dia em São Paulo, para a referência diária sempre achar um ponto (60 deslocamentos
+  provados).
+
+- **`509e4d8` — a tela `/system` passou a mostrar o execution-worker.** Patrimônio, kill switch com
+  **BLOQUEADO destacado**, posições abertas, pedidos pendentes e **pedidos ilegíveis** com a
+  explicação honesta do que são, proteções degradadas, idade da última marcação e da última proteção,
+  e um selo dizendo se a autonomia está ligada. Nulo aparece como **"indisponível"** — nunca como
+  zero. 9 testes.
+
+- **`c1f8c5f` — `0008_paper_roles_2`: a API para de escrever execução, e a carteira nasce auditada.**
+  Fecha os quatro achados da revisão de segurança da `0007`. **D1, o que mais assusta:** o papel da
+  API tinha `INSERT`/`UPDATE`/`DELETE` em `orders`, `fills`, `positions` e `trades` — reproduzido de
+  verdade, um fill fabricado passou, `positions.qty × 1000` passou, `DELETE FROM trades` passou. Como
+  a curva de patrimônio é **derivada** dessas tabelas, forjar a fonte faria o motor assinar o ponto
+  forjado com o papel confiável. Agora os quatro dão `permission denied` na escrita e mantêm a
+  leitura. **D3:** uma carteira inserida por quem só tem os privilégios do motor tem de ser
+  `paper`, não-arena, e trazer a auditoria **na mesma transação** — arena, `live`, outra organização
+  e auditoria "de banco" são recusadas por uma trigger; a abertura real passa. **D4:** o motivo do
+  kill switch não pode mais ser reescrito sem transição. **D2:** as guardas de cobertura de rota
+  voltaram a ser contagens derivadas — um `range(16)` literal é exatamente o que silencia uma rota
+  nova.
+
+- **`7557368` — T3.13: o heartbeat do execution-worker ficou legível, e o runbook existe.**
+  `/system/workers` passa a devolver os onze campos que `hb:execution:paper` **realmente escreve**
+  (patrimônio, kill switch, posições abertas, pedidos pendentes e ilegíveis, proteções degradadas,
+  atraso da proteção, última marcação, última leitura do kill switch, autonomia) — nenhum inventado,
+  e a lacuna que sobra (atraso de outbox só aparece no `/ready` do próprio worker) está escrita.
+  `docs/DEPLOYMENT.md` §3.2 e §5.1 dizem o que o worker é, como ele sobe e **o que ele nunca faz**:
+  `ENABLE_LIVE_TRADING` é conferido no boot e o worker **se recusa a subir** se não for falso.
+
+- **`7091a16` — a revisão do guardião sobre a T3.5: dois bloqueios, e a decisão sobre o pó.**
+  Reproduzida em Postgres real, com script isolado. **Bloqueio 1:** uma proposta com reserva
+  **vencida** era executada — aprovada 15:30:00, executada 15:35:00, 270 s depois do fim da tenure.
+  **Bloqueio 2:** o ciclo de proteção **não travava a carteira**, e com caixa e posições lidos em
+  leituras separadas a marcação escrevia patrimônio 18.148,25 onde a verdade era 19.903,89 — **−8,78 %**,
+  o suficiente para latchar BLOQUEADO por uma perda que não existiu; na ordem inversa, infla o pico
+  monotônico, que nunca desce. A docstring do módulo **afirmava** a trava que não existia. Os dois
+  foram fechados na T3.5b (`12edda3`).
+  **E a decisão do pó, que eu tomei em nome do Everton e é reversível por ele:** uma compra spot paga
+  a taxa no próprio ativo, e o que sobra depois da venda é um resíduo abaixo do mínimo negociável.
+  Ele **não é posição** — não segura vaga, não conta exposição e não bloqueia uma segunda ordem na
+  moeda (foi reproduzido: 4 h depois do stop, a segunda ordem na moeda era recusada por
+  `duplicate_position`). Mas ele **continua visível e valorizado** no patrimônio, marcado como "pó",
+  porque apagar da conta uma quantidade que existe seria mentir sobre o patrimônio. O **assentamento**
+  — vender o pó acumulado junto da próxima saída, ou numa varredura diária, quando ele passar do
+  mínimo — ainda **não existe**, e por isso está em [[Open Bugs]].
+
+- **`7ecafd2` — T3.5: o `execution-worker`. A carteira passou a ter quem a faça andar.** Este é o
+  commit do dia. Para o Everton: até ontem o motor de risco, o ledger, o simulador e o kill switch
+  eram **bibliotecas corretas que ninguém executava**; agora existe um processo, rodando com o papel
+  do motor, que fecha o ciclo. Ele admite um pedido arquivado decidindo **a própria linha** do
+  pedido; leva uma proposta aprovada com reserva viva até o livro spot elegível e aplica o resultado
+  **numa transação só** — ordem, fills, posição com a taxa em ativo base descontada, trade, caixa,
+  consumo de participação, reserva consumida e **as intenções de stop e alvo criadas ali dentro**,
+  de modo que **nunca existe posição sem proteção durável**; verifica gatilhos em cada negócio válido
+  e submete a saída sob a trava sistema → organização → carteira; marca a mercado a cada 60 s
+  **antes** de avaliar o kill switch; relê a trava a cada 10 s e dentro de cada transação de efeito,
+  publicando `kill_switch.changed`; e é idempotente por `execution_key`. Nada em memória é fonte da
+  verdade.
+  **A prova, e ela é real:** 30 minutos no stack local (06:57–07:27Z, saída 0) — ordem manual
+  aprovada (18,518 de quantidade, limite ativo `risk_per_trade`) → fill a 100,01 com taxa de
+  0,018518 em ativo base → posição 18,499482 com stop em 97,5 → salto sintético para 95,00 →
+  **primeira tentativa de saída degradada** (ordem escrita, sem fill) → segunda tentativa 18,499 @
+  95,00 com deslize de 256,41 bps → caixa 19.903,662415 + pó 0,04579 = patrimônio 19.903,708205,
+  **idêntico no heartbeat e no último ponto da curva** → `trades.pnl = −96,28938018`, que é o bruto
+  −92,679990 menos custos 3,60939018 **contados uma vez só** → 30 pontos de 1 min, **0 exceções**. A
+  própria prova achou dois defeitos reais, corrigidos ali: uma entrada gastou a tentativa única
+  contra um livro que ainda não era elegível (agora ela **adia**), e o instante era tomado antes da
+  leitura do tape.
+
+- **`70f2e7b` — a nota de rollback do `cefad8c`, escrita antes de precisar dela.** As linhas de
+  candle passaram a carregar `market_type`, e o **código anterior recusa campo desconhecido**
+  (`extra="forbid"`). Ou seja: se algum dia for preciso voltar atrás neste commit, **uma única linha
+  nova envenena a lista de 1.500** do hot state — o scanner esvazia o Radar e o strategy avalia com
+  a cauda vazia. O rollback exige `DEL mkt:*:candles:1m`, e isso agora está em `docs/DEPLOYMENT.md`
+  em vez de na cabeça de alguém. Junto, a revisão da T3.0b: **deploy é seguro**, cinco itens ficam
+  para a T3.0d.
+
+- **`cdb4bb5` — abrir uma carteira exige dizer o nome dela em voz alta.** A abertura roda com o papel
+  que atravessa o isolamento por tenant e é **permanente**. Agora o script só faz ensaio sem
+  `--yes <slug-da-organização>` **repetido literalmente**, recusa um `--yes` que não case, exige
+  `--actor` (resolvido para o usuário quando é o e-mail de um membro, senão `operator:<texto>`, com
+  hostname e usuário do SO na auditoria para casar com o log de SSH), grava uma **segunda linha de
+  auditoria** `portfolio.opened.confirmed_by` na mesma transação, e **relê as seis escritas por
+  organização antes de retornar** — se alguma caiu no tenant errado, `ScopeViolation` e rollback
+  total. A bandeira `--capital-brl` **saiu**: R$ 100.000 é a diretiva do Everton, não um parâmetro.
+
+- **`e5e57d1` — a condição nº 1 de aprovação do M2 foi provada.** Medição na VPS às **06:28:46Z**:
+  `session_since = 05:46:17Z` e `covered_until = 06:28:45Z`, a 1,1 s do relógio — **42 minutos
+  contínuos** de cobertura avançando, contra os 30 exigidos. Quatro shards, `dropped_events = 0` nos
+  quatro, `reconnects = 0`, e a chave compartilhada `hb:market:binance` extinta. Nos últimos 45 min
+  do shard 0: 136 quebras `queue_backlog` com 136 retomadas — congelamentos curtos que **não**
+  reiniciam a sessão. **Uma das quatro condições caiu**; a nº 2 (estágio e regime com dado real)
+  continua marcada para 09–10/09, e a nº 3 (p99 de 3 s) segue aberta.
+
+- **`d6dbbca` — a revisão de segurança da `0007`: nada bloqueia, quatro correções encomendadas.**
+  Reproduzida como os papéis reais, com duas organizações e carteiras abertas pelo caminho real. O
+  que já estava certo: troca de organização fora do alcance do motor, a trigger do "pedido honesto"
+  recusando oito disfarces, segunda carteira principal impossível, curva somente-leitura para a API
+  **inclusive nas partições**, RLS cruzada intacta, replay de transição bancada recusado. Os quatro
+  "deve corrigir" viraram a `0008` (`c1f8c5f`), e a sugestão S3 virou o `cdb4bb5`.
+
+- **`cefad8c` — T3.0b: `market_type` em toda identidade de mercado fora do banco.** O banco já
+  distinguia spot de perpétuo; as chaves do Redis, os modelos de evento e os leitores de hot state
+  **não** — spot e perpétuo de `BTCUSDT` dividiriam a mesma chave, e um upsert de perpétuo cairia em
+  silêncio na linha do spot. Agora cada construtor de chave recebe o tipo, e o essencial: **o
+  perpétuo mantém as chaves byte por byte** (testadas por snapshot), o spot ganha o segmento próprio.
+  Um detalhe que parece capricho e não é: o tipo vem **antes** da exchange no heartbeat
+  (`hb:market:spot:{ex}:0of4`), porque o glob do Redis casa `:` e `hb:market:binance:spot:0of4`
+  seria contado como um shard de perpétuo — provado nos dois sentidos. Dois bugs latentes fechados de
+  passagem (a linha de spot recebendo upsert de perpétuo; um `LIMIT 1` sem ordenação). O universo
+  continua só perpétuo até a T3.0c.
+
+- **`4688e70` — o painel da oportunidade ganhou o nome de produto.** "Por que estamos olhando isso?"
+  agora é o título (`h2`) do painel, com o resumo determinístico logo abaixo — era exatamente o
+  rótulo que a T2.8b registrou como **ausente** na tela. 534 testes de web.
+
+- **`2ee79c1` — contrato v2.2.1: o §1 passou a descrever as funções que existem.** As assinaturas de
+  `evaluate`/`evaluate_exit` no contrato normativo estavam desalinhadas das reais, `MarketRegime`
+  ficou explicitamente **reservado ao M4**, e o escopo da carteira principal virou "por organização"
+  em **todas** as menções. Este último fecha um dos cinco itens da revisão adversarial: a documentação
+  normativa ainda descrevia o comportamento **antigo** — por workspace —, que foi exatamente o furo
+  que o revisor de segurança provou e a `0006` fechou no banco. Quem lesse o contrato para
+  implementar a T3.5 implantaria o furo de volta.
+
+- **`ff23b4c` — a fixture do M2 escreve a transição que a trigger da `0006` exige.** Os dois testes
+  vermelhos que a T2.8b registrou: a fixture virava `organizations.kill_switch_state` sem escrever a
+  transição, e a trigger nova — corretamente — recusa. 25 passando.
+
+- **`eccb648` — T3.9a: as verificações V1, V2, V3 e §11, pelo caminho que persiste.** Para o Everton:
+  são as primeiras das nove verificações que ele exigiu antes de a carteira andar, e a diferença
+  aqui é que **todo número é lido de volta do banco** — de `trade_proposals`, `reservations`,
+  `kill_switch_transitions`, `portfolio_risk_state` —, não do objeto em memória. V1: 1.851,800 USDT
+  a 0,24999 %, com o limite ativo sendo `risk_per_trade` e a decisão persistida **idêntica campo a
+  campo** à do motor puro; `entry_ref` 100 contra um mercado a 110 recusado com desvio 0,090909. V2:
+  AVISO corta pela metade (925,900) a partir da trava durável, depois de uma perda real de 1 %. V3:
+  −2,5 % no dia → BLOQUEADO com PnL realizado **zero** e transição auditada; o BLOQUEADO libera a
+  reserva pendente e **mantém as saídas aprovadas** pela quantidade inteira. §11: duas admissões
+  simultâneas em duas conexões reais → **uma** reserva, a segunda repete a resposta.
+  **Três divergências ficaram registradas como `xfail` estrito, sem mexer em número nenhum** — entre
+  elas, a aritmética do V2 na especificação supõe patrimônio 20.000 enquanto a própria perda de 1 %
+  dela dá 916,600. Registrar a divergência é o certo; ajustar o teste até o número fechar seria o
+  erro.
+
+- **`dd4d16d` — T2.8b: o teste ponta a ponta do M2, e uma corrida datada de todas as suítes.**
+  Oito testes que percorrem o pipeline inteiro com Postgres e Redis reais: velas sintéticas
+  rotuladas → linhas de `Candle` → bootstrap real (10.080 cortes, 288 buckets, features de tape
+  ausentes **com motivo**) → hot state nos bytes msgpack do próprio `market-worker` → scanner →
+  publicação do Radar → `GET /api/v1/radar`. Números fechados: `VOLUME_SPIKE` + `TRADE_VELOCITY_SPIKE`
+  em severidade 100,00; **EARLY só é publicado quando `covered_until` libera o tape** (a borda
+  inversa recusa); regime `UNKNOWN` **declarado** com `volatility_warmup` (sete dias sintéticos não
+  são trinta); score 35,00 = volume 15 + fluxo 5 + anomalias 5 + Early-Movement 10, com cada
+  componente ausente carregando o motivo; **duas execuções independentes byte a byte idênticas**.
+  Controle por mutação: multiplicador 40 → 4 derruba três testes. Os dois specs de e2e foram escritos
+  e tipados mas **não executados** — o Chromium desta sessão não alcança o loopback —, e isso está
+  escrito em vez de arredondado.
+
+- **`2688ef1` — `0007_paper_roles`: o worker decide, a API pede.** O modelo de papéis que eu decidi
+  em nome do Everton vira privilégio no banco: **o motor decide e grava estado de risco; a API
+  registra pedidos, lê e autoriza pessoas**; e a retomada do kill switch passa a exigir **OWNER** —
+  a diretiva dele diz "retomar somente com minha autorização", e TRADER não bastava.
+
 - **`096d8c5` — BRL na convenção brasileira na tela da carteira.** `R$ 100.725,19`, `−R$ 1.234,50`,
   por um `formatBrl` que **nunca passa a magnitude por `Number`** — o valor vem do banco como string
   decimal e é agrupado como string, então nada de dinheiro toca ponto flutuante no caminho até o

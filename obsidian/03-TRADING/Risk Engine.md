@@ -1,7 +1,7 @@
 ---
 tags: [trading, risco, m3]
 updated: 2026-09-07
-status: parcial — núcleo, schema, ledger, simulador, kill switch durável e admissão implementados; falta o worker que faz tudo isso rodar (T3.5)
+status: implementado e provado no local — o execution-worker existe e roda o ciclo inteiro (T3.5/T3.5b); a ponte sinal → admissão está desligada; falta T3.5c, T3.0c/T3.0d, T3.9b, T3.10 e o deploy na VPS
 ---
 
 # Risk Engine
@@ -25,12 +25,52 @@ aplicada (`max_volume_age_s = 120 s`), caixa líquido das reservas pendentes (`a
 contrato normativo passa a ser **`docs/RISK_ENGINE.md` v2.1**; nenhum limite do Everton mudou. Decisão
 registrada em `docs/decisions/0005-carteira-virtual-e-risk-engine-paper-v1.md`.
 
-## Status — atualizado no plantão de 2026-09-07 04:50Z
+## Status — atualizado no plantão da manhã de 2026-09-07 (11:10Z)
+
+**A frase que governava esta página deixou de ser verdade.** Até a madrugada de hoje ela dizia
+"nenhum worker chama `evaluate`". Agora chama: o **`execution-worker` existe** (T3.5, `7ecafd2`;
+revisão do guardião em `7091a16`; correções em `12edda3`) e roda o ciclo inteiro — admissão de
+pedido arquivado decidido **na própria linha**, ciclo de ordem aplicando o `ExecutionReport` **por
+fill numa transação só** (ordem, fills, posição com taxa em ativo base descontada, trade, caixa,
+consumo de participação, reserva consumida e as **intenções de stop e alvo criadas ali dentro**, de
+modo que nunca existe posição sem proteção durável), ciclo de proteção sob a trava sistema →
+organização → carteira, marcação a mercado **antes** do kill switch, expiração de reserva,
+recuperação após restart, heartbeat e `/ready` com sete verificações. Idempotente por
+`execution_key`; nada em memória é fonte da verdade.
+
+**A prova, de ponta a ponta, 30 minutos no stack local (06:57–07:27Z, saída 0):** ordem manual
+aprovada com quantidade 18,518 e limite ativo `risk_per_trade` → fill a 100,01 com taxa 0,018518 em
+ativo base → posição 18,499482 com stop 97,5 → salto sintético para 95,00 → **primeira saída
+degradada** (ordem escrita, sem fill inventado) → segunda tentativa 18,499 @ 95,00 com deslize de
+256,41 bps → caixa 19.903,662415 + pó 0,04579 = patrimônio **19.903,708205, idêntico no heartbeat e
+no último ponto da curva** → `trades.pnl = −96,28938018` = bruto −92,679990 menos custos 3,60939018
+**contados uma vez só** → 30 pontos de 1 min, **0 exceções**.
+
+**A ponte sinal → admissão existe e está desligada** (T3.14, `12edda3`), e há duas travas
+independentes: `ENABLE_PAPER_AUTONOMY=false` por padrão — e com ela falsa a ponte **nem cria o grupo
+de consumo** —, e, mesmo se ligada, **todo sinal do Lab hoje é `research_only`**, propósito que a
+ponte recusa. Nada é admitido até que exista uma `strategy_version` ativada com propósito de paper,
+e essa ativação é **decisão do Everton**, num ato auditado.
+
+**O que falta agora, e é uma lista curta e nomeada:**
+
+| Tarefa | O que entrega | Estado |
+|---|---|---|
+| **T3.5c** | Assentamento do pó (vender o resíduo quando passar do mínimo); `kill_switch.changed` também na retomada pela API; fechar o dedupe com a suíte de integração | **em voo** |
+| **T3.0c / T3.0d** | Ingestão spot no `market-worker` (T3.0c, **em voo**) e os quatro itens da revisão da T3.0b (T3.0d) — entre eles o **bloqueante**: o `event_id` do candle não inclui `market_type`, e com spot ligado o segundo candle do mesmo minuto é descartado em silêncio | **em voo / a fazer** |
+| **T3.9b** | As verificações restantes das nove da diretiva (V1/V2/V3 e §11 já feitas em `eccb648`) — **o portão do milestone** | a fazer |
+| **T3.10** | Runbook de ativação (a ordem: versão com propósito de paper → linha `agents` habilitada → bandeira) e os quatro itens da revisão da T3.14 | a fazer |
+| **Deploy na VPS** | Um comando (`MARKET_SHARDS=4 bash infra/vps/compose.sh update`), mas recria a rede e aplica `0008` + `0009` num banco com a carteira permanente. **Não antes da T3.9** | pendente |
+
+*(A leitura abaixo é do plantão de 04:50Z e fica preservada — a tabela "o que existe" continua
+válida e ganhou as linhas do execution-worker.)*
+
+## Status — leitura de 2026-09-07 04:50Z (preservada)
 
 **Todas as peças existem, nenhuma roda sozinha ainda.** Entre 2026-09-06 e 2026-09-07 o M3 saiu de
 "núcleo puro sem integração" para "carteira aberta em produção, motor completo e nenhum processo que
 o acione". O que falta é o **`execution-worker` (T3.5)** — é ele que transforma um conjunto de
-funções corretas num sistema que decide.
+funções corretas num sistema que decide. *(Superado às 11:10Z: o worker existe e foi provado.)*
 
 ### O que existe hoje, com o commit e a prova
 
@@ -47,6 +87,13 @@ funções corretas num sistema que decide.
 | Adaptador SPOT da Binance (T3.0a) | `packages/exchange-adapters` | **implementado, lado do adaptador só** (`078d6ef`) |
 | Coletor de câmbio USDTBRL (T3.11a) | `services/market-worker` | **implementado e no ar na VPS** (`09eb6de`) — uma observação por minuto no shard 0 |
 | API de leitura da carteira (T3.8a) + tela (T3.8b) | `apps/api`, `apps/web` | **implementadas** (`9a0ac45`, `817f129`, `096d8c5`) |
+| **`execution-worker` (T3.5 + T3.5b)** | `services/execution-worker` (25 módulos, nenhum acima de 350 linhas) | **implementado e provado** (`7ecafd2`, `12edda3`) — prova de 30 min com saída 0, dois bloqueios do guardião fechados |
+| Modelo de papéis no banco (T3.1c/T3.1d) — `0007` + `0008` | `infra/migrations` | **implementado** (`2688ef1`, `c1f8c5f`): a API perde escrita em `orders`/`fills`/`positions`/`trades`, a carteira nasce auditada, o motivo do kill switch não se reescreve sem transição |
+| Geometria do pedido e o pó como coluna (T3.1e) — `0009` | `infra/migrations` | **implementado** (`70acb6f`): `trade_proposals.request_payload`, `positions.is_residual` |
+| Heartbeat e runbook do worker (T3.13) | `apps/api`, `docs/DEPLOYMENT.md` | **implementado** (`7557368`) — onze campos reais em `/system/workers`, nenhum inventado |
+| Tela `/system` mostrando o worker | `apps/web` | **implementada** (`509e4d8`) — nulo é "indisponível", nunca zero |
+| Ponte sinal → admissão (T3.14) | `services/execution-worker` | **implementada e desligada** (`12edda3`) — `ENABLE_PAPER_AUTONOMY=false` e todo sinal do Lab é `research_only` |
+| Verificações V1/V2/V3 e §11 da diretiva (T3.9a) | `tests/integration/paper` | **implementadas** (`eccb648`) — todo número lido de volta do banco; três divergências registradas como `xfail` estrito, sem ajustar número |
 
 **Três invariantes que valem repetir porque foram provadas contra o banco, não contra um mock:** um
 `UPDATE` cru do kill switch é **recusado pelo Postgres**; a trava exige que a **última** transição do
@@ -65,10 +112,13 @@ principal é única **por organização**, então um workspace novo não compra 
 | **T3.14 — ponte shadow → admissão** | Consome `shadow.signals.emitted`, aplica elegibilidade, ordena pela D3 e submete **uma** proposta por ciclo | Atrás de `ENABLE_PAPER_AUTONOMY=false`, e **mesmo ligada nunca em produção antes do aceite da T3.9**. O M3 **não** declara modo autônomo |
 | **T3.9 — as nove verificações da diretiva** | Tamanho/exposição/risco agregado; redução em AVISO; bloqueio sem desligar proteções; ordens simultâneas e fills duplicados; reconciliação; dado atrasado e reinício; mínimos da exchange; execução pior que o stop; ausência de fill fabricado | É o portão. Espec executável em `a88daac`, com seis decisões pendentes escritas |
 
-**Sete itens em [[Open Bugs]] são condições escritas destas tarefas**, cinco deles da revisão
-adversarial de `.claude/state/review-T3.1b-T3.6-T3.12.md`: dedupe casando pedido não decidido,
-admissão do lado da API, teto do pico sem `resolution='1m'`, `docs/` com o escopo antigo da carteira
-principal, e `kill_switch.changed` nunca publicado.
+**Sete itens em [[Open Bugs]] eram condições escritas destas tarefas** (revisão adversarial de
+`.claude/state/review-T3.1b-T3.6-T3.12.md`). **Na manhã de 2026-09-07, três caíram** — admissão do
+lado da API (`7ecafd2` + `70acb6f`), `kill_switch.changed` (`7ecafd2`, com a metade da retomada ainda
+aberta) e o escopo antigo nos docs (`2ee79c1`) —, o dedupe está corrigido no código e **em
+observação** até a T3.5c aterrissar, e o **teto do pico sem `resolution='1m'` foi reconfirmado
+aberto**: nem a `0008` nem a `0009` o levaram. Doze itens novos entraram, e os quatro da revisão da
+T3.14 são **condições para ligar a autonomia**, não defeitos do que roda.
 
 ### Decisões tomadas pela Sexta-feira em nome do Everton (reversíveis por ele)
 
@@ -108,9 +158,10 @@ escrito no contrato.
 > que "não há carteira virtual persistida, não há proposta, não há execução, e o kill switch durável
 > é da T3.6". Nada disso vale mais: a `0006` está aplicada na VPS, a carteira do Everton está aberta
 > (19.333,0111164813 USDT), o ledger, o simulador, o kill switch durável e a admissão existem e
-> foram provados. **O que continua verdadeiro é a frase que importa: nenhum worker chama `evaluate`.**
-> A lista atual do que falta está na tabela do Status acima (T3.5, T3.1c, T3.0b/T3.0c, T3.13, T3.14,
-> T3.9).
+> foram provados. ~~**O que continua verdadeiro é a frase que importa: nenhum worker chama
+> `evaluate`.**~~ **Superado de novo em 2026-09-07 às 11:10Z: o `execution-worker` existe, chama
+> `evaluate` e foi provado por 30 minutos com saída 0.** A lista atual do que falta está na tabela do
+> Status no topo da página (T3.5c, T3.0c/T3.0d, T3.9b, T3.10 e o deploy na VPS).
 
 Continua valendo a regra de ouro (`CLAUDE.md`): **nenhum agente executa ordens** — todo caminho de
 entrada é AGENTE → PROPOSTA → RISK ENGINE → EXECUÇÃO —, e o `risk-engine-guardian` (opus) é revisor
@@ -142,7 +193,16 @@ Tabela completa (13 chaves) em `docs/RISK_ENGINE.md` §2.
 
 Sistema, organização, portfolio; estado efetivo = mais restritivo entre os três (`ACTIVE < WARNING < TRADING_DISABLED < EMERGENCY`). `WARNING` reduz tamanho pela metade; `TRADING_DISABLED`/`EMERGENCY` bloqueiam toda entrada nova; saídas (stop, alvo, fechamento manual) são sempre permitidas. `SYSTEM_KILL_SWITCH=ACTIVE` já existe em `.env.example` como flag de sistema, acionável sem redeploy — mas hoje não há nenhum worker lendo esse valor para agir sobre ele.
 
-**A trava agora sobrevive ao reinício** (`9a0ac45`): `evaluate_and_persist` compara a avaliação pura com a trava gravada e escreve a transição auditada (de, para, motivo, evidência, ator) **na mesma transação** que muda `portfolios.kill_switch_state` e `portfolio_risk_state`. O AVISO só sai na virada do dia em `America/Sao_Paulo` e só com os **dois** gatilhos eliminados; o BLOQUEADO **nunca** sai sozinho; a retomada é recusada enquanto a avaliação automática ainda bloqueia e **não** redefine pico nem perdas. Um `UPDATE` cru da trava é recusado pelo banco. **Duas coisas ainda faltam:** a transição **não publica `kill_switch.changed`** (o contrato exige reação < 1 s — [[Open Bugs]]), e a retomada pela API ainda exige TRADER, não OWNER (decidido na T3.1c, ainda não aplicado). Na VPS hoje: `kill_switch_state = ACTIVE`, **0** transições registradas.
+**A trava agora sobrevive ao reinício** (`9a0ac45`): `evaluate_and_persist` compara a avaliação pura com a trava gravada e escreve a transição auditada (de, para, motivo, evidência, ator) **na mesma transação** que muda `portfolios.kill_switch_state` e `portfolio_risk_state`. O AVISO só sai na virada do dia em `America/Sao_Paulo` e só com os **dois** gatilhos eliminados; o BLOQUEADO **nunca** sai sozinho; a retomada é recusada enquanto a avaliação automática ainda bloqueia e **não** redefine pico nem perdas. Um `UPDATE` cru da trava é recusado pelo banco.
+
+**Atualizado em 2026-09-07 (manhã) — as duas pendências desta seção mudaram de estado.** A retomada
+pela API **passou a exigir OWNER** (`2688ef1`, T3.1c aplicada), e o `kill_switch.changed`
+**passou a ser publicado pelo `execution-worker`** (`7ecafd2`), que relê a trava a cada 10 s e dentro
+de cada transação de efeito — o que destravou isso foi a `0007` dar ao papel do motor `INSERT` em
+`outbox_events`. **Fica a metade menor:** a retomada pela API ainda **não** publica
+(`routers/risk.py:180` chama `resume()` sem `publish=True`), então a tela pode mostrar BLOQUEADO por
+mais um ciclo de poll depois de o Everton destravar. Está em [[Open Bugs]] como MEDIUM, dono T3.5c.
+Na VPS hoje: `kill_switch_state = ACTIVE`, **0** transições registradas.
 
 ## Testes
 

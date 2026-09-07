@@ -1,7 +1,7 @@
 ---
 tags: [trading, portfolio, carteira, m3]
 updated: 2026-09-07
-status: implementado e aberto em produção — parado por falta do execution-worker (T3.5)
+status: aberta em produção e parada de propósito — o execution-worker existe e foi provado no local; na VPS ainda não; a ponte de sinais está desligada
 ---
 
 # Portfolio — a carteira paper permanente
@@ -38,6 +38,44 @@ entre 04:33Z e 04:34Z, todas `USDTBRL` a `5,1725`, uma por minuto, gravadas apen
 T3.1c entrarem — está em [[Open Bugs]]. A carteira está **parada, correta e visível**, e é exatamente
 isso que ela deveria estar hoje.
 
+## Atualização do plantão da manhã de 2026-09-07 (11:10Z) — a carteira ganhou quem a faça andar
+
+Dois dos três "não faz" do parágrafo acima caíram, e o terceiro caiu por inteiro:
+
+- **O `execution-worker` existe** (T3.5, `7ecafd2`; correções do guardião em `12edda3`) e foi
+  **provado no stack local por 30 minutos, com saída 0**: ordem manual aprovada → fill a 100,01 com
+  taxa em ativo base → posição com stop 97,5 → salto para 95,00 → primeira saída **degradada** (ordem
+  escrita, **sem fill inventado**) → segunda tentativa a 95,00 com deslize de 256,41 bps → caixa
+  19.903,662415 + pó 0,04579 = patrimônio **19.903,708205, idêntico no heartbeat e no último ponto da
+  curva** → `trades.pnl = −96,28938018`, custos contados **uma vez só** → 30 pontos de 1 min, **0
+  exceções**.
+- **A admissão pelo lado da API não vira mais 500:** a API agora só **arquiva um pedido pendente**
+  (sem decisão, sem lugar na fila, sem reserva, sem digest — o motor recomputa), e quem decide é o
+  worker, na própria linha do pedido (`7ecafd2` + `0009_paper_geometry`, `70acb6f`).
+- **A ponte sinal → admissão existe e está desligada** (T3.14, `12edda3`), com **duas travas
+  independentes**: `ENABLE_PAPER_AUTONOMY=false` (e com ela falsa a ponte nem cria o grupo de
+  consumo) e, mesmo se ligada, **todo sinal do Lab hoje é `research_only`** — propósito que a ponte
+  recusa. Nada é admitido até existir uma `strategy_version` ativada com propósito de paper, e essa
+  ativação é **decisão do Everton**.
+
+**O pó agora tem nome.** Uma compra spot paga a taxa no próprio ativo, e a migalha que sobra depois
+da venda **não é posição**: não segura vaga, não conta exposição e não bloqueia uma segunda ordem na
+moeda (antes bloqueava — reproduzido 4 h depois do stop). Mas ela **continua visível e valorizada** no
+patrimônio, marcada como pó (`positions.is_residual`, `0009`). **O assentamento — vender o pó quando
+ele passar do mínimo — ainda não existe**, e está em [[Open Bugs]].
+
+**Na VPS, nada disto está no ar ainda.** A VPS roda a era do `2688ef1` (`0007`, 4 shards, coletor de
+câmbio, carteira aberta). O deploy é **um comando só**
+(`MARKET_SHARDS=4 bash infra/vps/compose.sh update`), mas ele **recria a rede** e **aplica `0008` e
+`0009`** num banco que tem a carteira permanente do Everton — e o `execution-worker` **não deve subir
+lá antes das nove verificações da T3.9**. Fica pendente, com ordem escrita.
+
+**O que falta, nomeado:** **T3.5c** (assentamento do pó; `kill_switch.changed` também na retomada
+pela API; fechar o dedupe com a suíte de integração) · **T3.0c/T3.0d** (ingestão spot e os itens da
+revisão da T3.0b, um deles bloqueante: o `event_id` do candle sem `market_type` descarta o segundo
+candle do minuto em silêncio) · **T3.9b** (as verificações restantes — V1/V2/V3 e §11 já estão feitas
+em `eccb648`) · **T3.10** (runbook de ativação e os quatro itens da revisão da T3.14) · **o deploy**.
+
 ## O que o Everton vê na tela
 
 `/[org]/portfolio` (T3.8b, `817f129`; BRL na convenção brasileira em `096d8c5`): patrimônio em USDT e
@@ -69,14 +107,18 @@ oferecer um botão que finja abrir uma.
 
 ## O que falta para a carteira andar
 
+*(Tabela atualizada no plantão da manhã de 2026-09-07 — a coluna "Estado" mudou em cinco das seis
+linhas.)*
+
 | Tarefa | O que entrega | Estado |
 |---|---|---|
-| **T3.5 — `execution-worker`** | Ciclo de admissão, ciclo de ordem aplicando o `ExecutionReport` por fill, ciclo de proteção, MTM antes do kill switch, expiração de reserva sob a mesma trava, recuperação após restart | brief pronto (`6c60653` + 5 condições em `3519107`), **não implementado** |
-| **T3.1c — grants e papéis** | Worker decide e grava estado de risco; API pede, lê e autoriza; retomada exige **OWNER** | decidido, **não aplicado** |
-| **T3.0b/T3.0c — integração SPOT** | `market_type` nos eventos e nas chaves do Redis; ingestão spot no `market-worker`; hold durável | bloqueio declarado pela T3.0a, **não implementado** |
-| **T3.13 — integração operacional** | Papel no `RoleRegistry`, compose e Dockerfile do worker, prontidão, métricas, visibilidade de atraso | **não implementado** |
-| **T3.14 — ponte shadow → admissão** | Uma proposta por ciclo, atrás de `ENABLE_PAPER_AUTONOMY=false` | **não implementado**; nunca em produção antes da T3.9 |
-| **T3.9 — as nove verificações** | O portão do milestone | espec executável em `a88daac`, **não executada** |
+| **T3.5 — `execution-worker`** | Ciclo de admissão, ciclo de ordem aplicando o `ExecutionReport` por fill, ciclo de proteção, MTM antes do kill switch, expiração de reserva sob a mesma trava, recuperação após restart | **implementado e provado** (`7ecafd2` + `12edda3`): 30 min no local, saída 0, dois bloqueios do guardião fechados |
+| **T3.1c/T3.1d/T3.1e — papéis e geometria** | Worker decide e grava estado de risco; API pede, lê e autoriza; retomada exige **OWNER**; a API perde escrita nas tabelas de execução; o pedido carrega a própria geometria | **implementado** (`2688ef1`, `c1f8c5f`, `70acb6f`) |
+| **T3.0b/T3.0c — integração SPOT** | `market_type` nos eventos e nas chaves do Redis; ingestão spot no `market-worker`; hold durável | T3.0b **implementada** (`cefad8c`); **T3.0c em voo**; T3.0d com quatro itens, um deles bloqueante |
+| **T3.13 — integração operacional** | Papel no `RoleRegistry`, compose e Dockerfile do worker, prontidão, métricas, visibilidade de atraso | **implementado** (`7557368`) + tela `/system` (`509e4d8`) |
+| **T3.14 — ponte shadow → admissão** | Uma proposta por ciclo, atrás de `ENABLE_PAPER_AUTONOMY=false` | **implementada e desligada** (`12edda3`); quatro condições escritas antes de ligar; nunca em produção antes da T3.9 |
+| **T3.9 — as nove verificações** | O portão do milestone | V1/V2/V3 e §11 **feitas** (`eccb648`); o resto é **T3.9b**, a fazer |
+| **T3.5c · T3.10 · deploy** | Assentamento do pó e `kill_switch.changed` na retomada (T3.5c, **em voo**); runbook de ativação (T3.10); e o deploy único na VPS, que recria a rede e aplica `0008`+`0009` | a fazer / pendente |
 
 ## Modelo (schema aplicado — `0006_paper_wallet`)
 

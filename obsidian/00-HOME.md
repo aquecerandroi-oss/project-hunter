@@ -35,13 +35,27 @@ USDT à taxa 5,1725**, com a observação de câmbio que a converteu gravada e *
 (`portfolio_id 01a07a1e-f6ae-7366-a7fe-ab3d9c83d488`; ver [[Portfolio]]). Junto vieram o schema da
 carteira (`0006`, aplicada na VPS), o ledger, o simulador de execução paper, o kill switch
 **durável** com transição auditada, o serviço de admissão único, o coletor de câmbio no ar e a tela
-`/[org]/portfolio`. **A carteira está parada, e isso é correto:** falta o `execution-worker` (T3.5) —
-nenhum processo chama `evaluate` ainda. Nada de execução real existe, nenhum `ENABLE_*` de autonomia
-está ligado, e o M3 **não** declara modo autônomo. Na mesma madrugada os 4 shards do coletor foram
-implantados na VPS e **a cobertura do tape voltou a andar** (atraso de 0,7–0,9 s contra 44 minutos
-parados na véspera) — o HIGH nº 1 do parecer do M2; o portão de 30 minutos contínuos ainda não foi
-provado. Ver `docs/audit/CURRENT_STATE.md` para o levantamento linha a linha e o [[Changelog]] para
-o dia a dia.
+`/[org]/portfolio`. **Atualizado na manhã de 2026-09-07: a carteira ganhou quem a faça andar.** O `execution-worker`
+(T3.5, `7ecafd2`, com as correções do guardião em `12edda3`) **existe e foi provado** — 30 minutos no
+stack local, saída 0, com fill, stop tocado, saída degradada sem fill inventado, patrimônio
+19.903,708205 idêntico no heartbeat e na curva, custos contados uma vez só, 0 exceções. Junto vieram
+a `0008` (a API perde a escrita em `orders`/`fills`/`positions`/`trades`, e a carteira nasce
+auditada), a `0009` (o pedido carrega a própria geometria; o pó vira coluna), o heartbeat do worker
+em `/system` e a **ponte sinal → admissão desligada** (T3.14).
+
+**A carteira continua parada, e isso é de propósito.** A ponte tem **duas travas independentes**:
+`ENABLE_PAPER_AUTONOMY=false` (com ela falsa a ponte nem cria o grupo de consumo) e, mesmo se ligada,
+**todo sinal do Shadow Lab hoje é `research_only`** — propósito que a ponte recusa. Nada é admitido
+até existir uma `strategy_version` ativada com propósito de paper, e **essa ativação é decisão do
+Everton**. Nenhum `ENABLE_*` de autonomia está ligado e o M3 **não** declara modo autônomo. Falta
+**T3.5c, T3.0c/T3.0d, T3.9b, T3.10 e o deploy na VPS** — que roda a era do `2688ef1` e ainda não tem
+nada disto no ar.
+
+Na madrugada os 4 shards do coletor foram implantados na VPS e **a cobertura do tape voltou a
+andar**; de manhã o portão foi provado: às **06:28:46Z**, **42 minutos contínuos** de cobertura
+avançando com 1,1 s de atraso e zero descartes — **a condição nº 1 de aprovação do M2 está
+satisfeita** (`e5e57d1`). Ver `docs/audit/CURRENT_STATE.md` para o levantamento linha a linha e o
+[[Changelog]] para o dia a dia.
 
 ## O pipeline (visão completa; M1 e M2 existem e rodam)
 
@@ -80,11 +94,12 @@ Detalhe completo em [[Data Flow]] e `docs/PIPELINE.md`.
 | Feature Engine | implementado — 28 calculadoras, 108.688 snapshots na VPS; **12 de 27 features com baseline utilizável** | [[Features]] | M2 |
 | Anomaly Engine | implementado — 10 detectores (8 armados); **1 disparou** até agora (`VOLUME_SPIKE`) | [[Anomalies]] | M2 |
 | Regime v0 + Opportunity Score + Radar | implementado; **regime `UNKNOWN` em 100 %** das leituras e estágio nunca publicado — M2 **não aprovado** (`docs/reports/M2.md`) | [[Features]], [[Anomalies]] | M2 |
-| Paper Trading / Execution Engine | **simulador implementado** (`edd5d7e`, `ec78727`) — sem fill fabricado, intenção de saída durável; **falta o `execution-worker` (T3.5)**: nenhum processo o aciona | [[Paper Trading]], [[Execution Engine]] | M3 |
-| Portfolio (carteira permanente em USDT com âncora em BRL) | **aberta em produção em 2026-09-07 04:27Z** — R$ 100.000 → 19.333,0111164813 USDT a 5,1725, âncora imutável, 0 posições | [[Portfolio]] | M3 |
-| Risk Engine (contrato **v2.2**, perfil `paper_v1`) | **núcleo, schema, ledger, kill switch durável e admissão implementados**; **nenhum worker chama `evaluate`** | [[Risk Engine]] | **M3** (era M4; ADR 0005) |
+| Paper Trading / Execution Engine | **`execution-worker` implementado e provado** (`7ecafd2`, `12edda3`) — ciclo de admissão, ordem, proteção, MTM antes do kill switch e recuperação; 30 min de prova com saída 0. **Não está na VPS**, e não sobe lá antes da T3.9 | [[Paper Trading]], [[Execution Engine]] | M3 |
+| Portfolio (carteira permanente em USDT com âncora em BRL) | **aberta em produção em 2026-09-07 04:27Z** — R$ 100.000 → 19.333,0111164813 USDT a 5,1725, âncora imutável, 0 posições. O pó (resíduo de taxa em ativo base) tem coluna própria e **não é posição**; falta o assentamento | [[Portfolio]] | M3 |
+| Risk Engine (contrato **v2.2.1**, perfil `paper_v1`) | **completo e em execução:** núcleo, schema (`0006`→`0009`), ledger, kill switch durável publicando `kill_switch.changed`, admissão e o worker que chama `evaluate`. Falta T3.5c, T3.0c/T3.0d, T3.9b, T3.10 e o deploy | [[Risk Engine]] | **M3** (era M4; ADR 0005) |
+| Ponte sinal → admissão (T3.14) | **implementada e desligada** (`12edda3`) — `ENABLE_PAPER_AUTONOMY=false` **e** todo sinal do Lab é `research_only`; nada é admitido até uma versão com propósito paper ser ativada, e isso é decisão do Everton | [[Risk Engine]], [[Strategies]] | M3 |
 | Câmbio USDTBRL (coletor T3.11a) | **implementado e no ar na VPS** (`09eb6de`) — uma observação por minuto no shard 0, idempotente | [[Portfolio]] | M3 |
-| Adaptador SPOT da Binance (T3.0a) | implementado **só do lado do adaptador** (`078d6ef`); a ingestão spot (T3.0b/T3.0c) está bloqueada por `market_type` nos eventos | [[Exchange Adapters]] | M3 |
+| Adaptador SPOT da Binance (T3.0a/T3.0b) | adaptador (`078d6ef`) e **`market_type` em toda identidade fora do banco** (`cefad8c`, com as chaves do perpétuo byte por byte inalteradas); **a ingestão spot (T3.0c) está em voo**, e a T3.0d tem um item bloqueante: o `event_id` do candle não inclui o tipo | [[Exchange Adapters]] | M3 |
 | β contra o BTC (`beta_v1`, com validade) | implementado como pacote puro (`da2fb49`); `market_betas` **existe no banco e está vazia** (0 linhas na VPS) | [[Risk Engine]] | M3 |
 | Estratégias / Agentes + ponte sinal → proposta | planejado | [[Strategies]], [[Agents Overview]] | M4 |
 | Analytics / Performance | planejado | [[Performance Overview]] | M5 |
@@ -97,8 +112,9 @@ Detalhe completo em [[Data Flow]] e `docs/PIPELINE.md`.
 - **02-MARKET/** — coleta de mercado, adapters de exchange, WebSockets, features, anomalias — **tudo implementado e rodando** (M1 aprovado; M2 entregue e não aprovado, ver [[Features]] e [[Anomalies]] para os números de produção e as limitações medidas).
 - **03-TRADING/** — paper trading, risk engine, execução, portfolio, estratégias. **Deixou de ser
   "planejado" em 2026-09-07:** [[Portfolio]] traz a carteira real aberta na VPS com os números
-  medidos, e [[Risk Engine]] traz o que existe peça a peça e o que falta (T3.5, T3.1c, T3.0b/T3.0c,
-  T3.13, T3.14, T3.9). Estratégias e agentes continuam M4.
+  medidos, e [[Risk Engine]] traz o que existe peça a peça e o que falta — hoje **T3.5c, T3.0c/T3.0d,
+  T3.9b, T3.10 e o deploy**, depois que o `execution-worker` passou a existir e ser provado.
+  Estratégias e agentes continuam M4.
 - **04-AGENTS/** — visão geral de agentes e as quatro estratégias do MVP (planejado M4).
 - **05-EXPERIMENTS/** — índice de experimentos ([[Experiments Index]], `EXP-NNNN`), template e os quatro experimentos abertos: [[EXP-0001-momentum-v1]] e [[EXP-0002-volume-anomaly-v1]] (coortes prospectivas do Shadow Lab desde 2026-09-06), [[EXP-0004-politicas-de-saida]] (replay de oito políticas de saída sobre as entradas já congeladas, `2c6bb2d` — pesquisa que não escreve nada) e [[EXP-0003-baselines-v1]] (2026-09-07, o **instrumento** de baselines do M2: quanto do arquivo amadurece, e o que isso destrava rio abaixo). Todos com avaliações **datadas e acrescentadas** e o SQL que produziu cada número.
 - **06-DECISIONS/** — índice legível das ADRs.

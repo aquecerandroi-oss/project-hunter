@@ -7,11 +7,114 @@ updated: 2026-09-07
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
+## Abertos no plantão da manhã de 2026-09-07 (M3 ondas 3–4: T3.5, T3.13, T3.14, `0008`/`0009`)
+
+Nada aqui bloqueia o que está no `main`, e nada aqui pode custar dinheiro ao Everton: a carteira é
+paper, a ponte está desligada e nenhum sinal do Lab é admissível hoje. Os quatro primeiros são
+**condições para ligar a autonomia**, não defeitos do que roda.
+
+### Condições para ligar `ENABLE_PAPER_AUTONOMY` (de `.claude/state/review-T3.14.md`, dono: T3.14b, depois da T3.5c)
+
+- **MEDIUM (ruído que vira cegueira) — a ponte grita a mesma recusa ~240 vezes por sinal.**
+  `bridge_screen.py:104-112` emite `bridge_candidate_refused` (log **e** contador) a cada passada
+  para o mesmo sinal, durante os 240 s da janela de lookback. **Cenário:** com a autonomia ligada, um
+  punhado de sinais recusados por um motivo banal enterra o log de operação e infla
+  `hunter_bridge_candidates_total` a ponto de o desfecho deixar de significar "quantos sinais foram
+  recusados" e passar a significar "quantas voltas o laço deu" — a métrica que existe para explicar
+  a ponte passa a mentir sobre ela. **Correção:** deduplicar por (sinal, motivo), o mesmo padrão que
+  `report_unreadable` já usa.
+
+- **MEDIUM (teste ausente sobre caminho que decide dinheiro) — o vice não é promovido, e ninguém
+  provou.** `bridge.py::_submit` escolhe um candidato e, quando o livro ainda não é elegível, ele
+  **adia** em vez de ceder o lugar — comportamento correto e deliberado (evita trocar a decisão por
+  quem chegou depois). **Falta o teste com 2+ candidatos** em que o topo é deferido por
+  `spot_book_unavailable` e o vice **não** é promovido. Sem ele, uma refatoração futura inverte isso
+  em silêncio.
+
+- **MEDIUM (teste ausente) — o caminho `agent_unavailable` nunca foi exercitado.**
+  `bridge_screen.py:130-140`: agente existente porém **não habilitado**. É uma das seis recusas
+  nomeadas e a única sem teste.
+
+- **HIGH se a autonomia for ligada antes disto (mapeamento de par) — `1000SHIBUSDT` perp →
+  `SHIBUSDT` spot.** `bridge_universe.py:57-83 spot_pair_for` casa perpétuo e spot pelo
+  `base_asset_id`, e nos mercados com multiplicador de 1.000 no nome o **preço do perpétuo é ~1000×
+  o do spot**. Falta o teste do mapeamento **e** a prova de que um `entry_ref` mil vezes fora da
+  banda é recusado pelo Risk Engine (`signal_validity` / `max_entry_deviation_pct`) **antes de
+  qualquer reserva**. **Cenário:** sem essa prova escrita, uma mudança no cálculo do `entry_ref`
+  passaria a dimensionar uma ordem com o preço errado por três ordens de grandeza, e a defesa está a
+  uma linha de distância de ninguém a estar vigiando.
+
+### Da revisão da T3.0b (`.claude/state/review-T3.0b.md`, dono: T3.0d, junto/depois da T3.0c)
+
+- **HIGH (bloqueante para a T3.0c, `services/market-worker/.../durable.py:74-86`) — o `event_id` do
+  candle não inclui `market_type`, e o segundo candle do minuto é descartado em silêncio.** O
+  `candle_event_id` e a `key` do envelope são derivados sem o tipo; com a ingestão spot ligada, o
+  candle spot e o perpétuo do **mesmo minuto** computam o mesmo uuid5 e o `ON CONFLICT (event_id)` do
+  outbox **joga o segundo fora sem erro**. É um dado que some sem log. A T3.0c está mexendo
+  exatamente nesse arquivo — é para fechar antes de a ingestão spot ser ligada, não depois.
+
+- **MEDIUM — `market_ids.py:47`: o filtro por tipo não tem teste.** Duas linhas no banco (spot e
+  perpétuo do mesmo símbolo) e a asserção de que cada uma volta na consulta certa. Foi um dos dois
+  bugs latentes que a T3.0b fechou; sem teste, ele volta.
+
+- **MEDIUM — o hash `mkt:*:ticker` **não** contém `market_type`, e isso é deliberado (KB-0044):
+  falta o teste que registra a exceção.** Sem ele, alguém "conserta" a exceção achando que é
+  esquecimento.
+
+- **LOW — as docstrings de `binance_spot/identity.py:23-33,78` ficaram falsas.** Elas descrevem um
+  segmento na chave do perpétuo que não existe; o gap foi fechado pela própria T3.0b. Documentação
+  que descreve o contrário do código é pior que documentação nenhuma.
+
+- *(O quinto item da revisão — o runbook de rollback exigindo `DEL mkt:*:candles:1m` — **já foi
+  fechado** por `70f2e7b`, em `docs/DEPLOYMENT.md`. Fica registrado aqui para a revisão poder ser
+  conferida item a item.)*
+
+### Do ciclo de execução e do ferramental
+
+- **MEDIUM (produto, `services/execution-worker`) — o pó tem lugar, e ainda não tem assentamento.**
+  A decisão está tomada e implementada: o resíduo abaixo do mínimo negociável **não é posição** (não
+  segura vaga, não conta exposição, não bloqueia uma segunda ordem na moeda) e **continua visível e
+  valorizado** no patrimônio, marcado como pó (`positions.is_residual`, `0009`). O que **não
+  existe** é a segunda metade da decisão: **vender o pó** quando o acumulado da moeda passar do
+  `min_qty`/`min_notional`, junto da próxima saída ou numa varredura diária. **Cenário:** meses de
+  operação paper acumulam dezenas de linhas `closing` que nunca somem; o patrimônio continua certo,
+  mas a tabela de posições vira um cemitério e o Everton perde a leitura rápida de "o que está
+  aberto". Dono: **T3.5c ou T3.10**. Registrar em `docs/PIPELINE.md` §8 e na tela da carteira
+  (T3.8c: "pó").
+
+- **LOW (duplicação com risco de divergência) — `SPOT_VOLUME_FLOOR_USDT = 50.000.000` está escrito
+  duas vezes.** `services/execution-worker/.../bridge_universe.py:56` e
+  `services/market-worker/.../spot_universe.py:69`. A duplicação é **declarada** no comentário (os
+  dois serviços não compartilham módulo), mas é um número que define **quais mercados a carteira
+  pode tocar**: mudar o piso num lado e não no outro faz a ponte escolher um mercado que o coletor
+  não ingere, e a recusa que aparece é `spot_book_unavailable` — um sintoma que não aponta para a
+  causa. **Correção:** mover a constante para `packages/core` (ou `hunter_risk`), com os dois
+  serviços importando; ou, no mínimo, um teste que compare os dois valores.
+
+- **LOW (ferramental de teste, Windows) — `WinError 64` intermitente no teardown.** Dois arquivos de
+  testcontainers no mesmo processo derrubam o teardown com "The specified network name is no longer
+  available" (item 10 de `.claude/state/review-T3.5.md`). **Por que importa:** é um vermelho que
+  **não é do produto**, e um vermelho que não é do produto ensina a ignorar vermelho. Contorno atual:
+  rodar os arquivos em processos separados. Dono: ferramental.
+
+- **MEDIUM (pré-requisito não escrito da ponte) — `agents` é obrigatório, e a tabela está vazia.**
+  A ponte exige uma linha em `agents` **habilitada** para a versão de estratégia, porque a proposta
+  nasce com `source='agent'` e o schema cobra o agente. Hoje não existe nenhuma. **Cenário:** o
+  Everton (ou eu) liga `ENABLE_PAPER_AUTONOMY`, e **nada acontece** — sem erro, sem alarme, apenas
+  `agent_unavailable` no contador; a conclusão natural e errada é "a ponte está quebrada". A ordem
+  correta de ativação, e ela precisa estar escrita num runbook antes de alguém tentar: (1) ativar
+  uma `strategy_version` com propósito de paper — **decisão do Everton**; (2) criar a linha `agents`
+  habilitada para ela, apontando a carteira; (3) só então a bandeira. Dono: **T3.10** (runbook de
+  ativação) + a decisão do Everton.
+
 ## Abertos no plantão da madrugada de 2026-09-07 (M3 ondas 1–3 + incidente de deploy da VPS)
 
 Os cinco primeiros vêm da revisão adversarial de `.claude/state/review-T3.1b-T3.6-T3.12.md`
-(APPROVE_WITH_NITS) e são **condições escritas para a T3.5/T3.8** — estão no addendum do brief
-(`3519107`). Os dois últimos são do incidente de deploy desta madrugada. Nada aqui bloqueia a
+(APPROVE_WITH_NITS) e eram **condições escritas para a T3.5/T3.8** — estão no addendum do brief
+(`3519107`). **Três deles foram fechados na manhã de 2026-09-07** (admissão do lado da API,
+`kill_switch.changed` e o escopo antigo nos docs), um está corrigido no código e **mantido em
+observação** (dedupe), e um foi **reconfirmado aberto** (o teto do pico) — cada um com a nota datada
+no próprio item. Os dois últimos são do incidente de deploy desta madrugada. Nada aqui bloqueia a
 carteira paper que está aberta na VPS, porque nada nela executa ainda.
 
 - **HIGH (admissão, `packages/core`) — a deduplicação casa um pedido que ninguém decidiu ainda, e
@@ -22,9 +125,24 @@ carteira paper que está aberta na VPS, porque nada nela executa ainda.
   a própria linha pelo dedupe e **nunca decide nada** — a ordem manual do Everton some em silêncio.
   **Correção:** `find_admitted` só considera linhas **decididas**, e o worker **decide a linha
   existente** em vez de inserir outra. Junto: `service.py:115` fabrica `decided_at`. Dono: **T3.5**.
+  **Estado em 2026-09-07 (plantão da manhã): corrigido no código, mantido aberto em observação.**
+  `admission/dedupe.py` hoje tem `find_admitted` casando **só linhas decididas**
+  (`AND decided_at IS NOT NULL AND status <> 'pending'`) e um `find_pending` separado que trava a
+  linha `FOR UPDATE` para ela ser decidida **no próprio lugar**. Não fecho ainda porque a **T3.5c
+  está em voo nos mesmos arquivos** (`packages/core` e `services/execution-worker` aparecem
+  modificados no worktree) e a verificação com as suítes de integração não foi refeita neste turno —
+  fechar um HIGH de admissão por leitura de código, com a tarefa ainda mexendo nele, seria dar por
+  provado o que não foi.
 
-- **HIGH (papéis, `apps/api`) — a admissão do lado da API roda inteira como `hunter_app` e vira 500
-  com os grants novos.** `apps/api/hunter_api/services/admission.py:129-187`. O `hunter_app` não pode
+- **[FECHADA em 2026-09-07 por `7ecafd2` + `70acb6f` — verificada na leitura do código no plantão da
+  manhã]** ~~HIGH (papéis, `apps/api`) — a admissão do lado da API roda inteira como `hunter_app`~~ —
+  **a API virou o cartório e o motor virou o juiz.** `apps/api/hunter_api/services/admission.py`
+  hoje só **arquiva um pedido pendente**: `source='manual'`, `status='pending'`, sem decisão, sem
+  lugar na fila FIFO, sem reserva — e sem `request_digest`, que o motor recomputa. Quem decide é o
+  `execution-worker` (`hunter_core.admission.decide_pending`), **na própria linha do pedido**. A
+  `0009` deu ao pedido a geometria que faltava para isso ser possível (`request_payload`), e a
+  trigger do banco agora **exige** esse payload. O erro 500 que os grants novos causariam deixou de
+  ter caminho. *Texto original do achado, preservado:* `apps/api/hunter_api/services/admission.py:129-187`. O `hunter_app` não pode
   avançar o contador FIFO nem enfileirar outbox — a T3.12 já provou isso e contornou nos testes com
   um grant explícito rotulado como experimento condicionado. **Cenário:** assim que a T3.1c aplicar o
   modelo de papéis, a primeira ordem manual pela tela devolve erro 500. **Correção (decidida):** o
@@ -39,9 +157,27 @@ carteira paper que está aberta na VPS, porque nada nela executa ainda.
   drawdown medido contra esse pico inflado estoura o limite de 8 % e a carteira fica
   `TRADING_DISABLED` **permanentemente**, sem que nenhuma perda real tenha acontecido. **Correção:**
   `resolution = '1m'` no subselect. Dono: **T3.1c** (ou follow-up imediato se não couber).
-  Confirmado ainda aberto em 2026-09-07 04:40Z.
+  Confirmado ainda aberto em 2026-09-07 04:40Z. **Reconfirmado aberto em 2026-09-07, plantão da
+  manhã:** nem a `0008_paper_roles_2` nem a `0009_paper_geometry` tocaram nisso —
+  `infra/migrations/ddl/paper.py:411-416` continua sem filtro de `resolution`, e `docs/DATABASE.md`
+  §20 e §21 não mencionam a correção. **Fica com dono novo: T3.0d/T3.1f**, porque a T3.1c e a T3.1e
+  já passaram e não o levaram. Enquanto `portfolio_equity_snapshots` só tiver linhas de 1 min, o
+  defeito é latente; ele acorda no dia em que existir o primeiro roll-up de 1 h ou 1 d — e, quando
+  acordar, trava a carteira em `TRADING_DISABLED` **permanentemente**, sem perda nenhuma ter
+  acontecido, e o pico não desce para desfazer.
 
-- **HIGH (contrato, `packages/core` + `apps/api`) — nenhuma transição publica `kill_switch.changed`.**
+- **[FECHADA em 2026-09-07 por `7ecafd2` — com uma metade menor reaberta logo abaixo]** ~~HIGH
+  (contrato) — nenhuma transição publica `kill_switch.changed`~~ — **o worker publica.** O
+  `execution-worker` relê a trava a cada 10 s e dentro de cada transação de efeito, e publica
+  `kill_switch.changed` em `outbox_events`
+  (`services/execution-worker/hunter_execution_worker/events.py:147-167`, com `event_id` derivado da
+  carteira, do estado latchado e do instante — repetir não duplica). O que destravou isto foi
+  exatamente a `0007`: o papel do motor ganhou `INSERT` em `outbox_events`. **Fica aberto o que
+  sobrou:** a **retomada pela API** ainda não publica — `routers/risk.py:180` chama `resume()` sem
+  `publish=True`, e `risk/transitions.py:146` mantém o padrão `False`. **Cenário:** o Everton
+  destrava a carteira pela tela e a própria tela continua mostrando BLOQUEADO até o próximo poll,
+  contra o < 1 s do contrato. É MEDIUM, não HIGH: o caso que travava a carteira sem ninguém saber
+  está coberto. Dono: **T3.5c/T3.8**. *Texto original do achado, preservado:*
   O nome do evento existe (`events/streams.py:57`) e o tipo existe (`domain/enums.py:686`), mas
   `risk/transitions.py` só o cita num docstring: **todos** os chamadores passam `publish=False`.
   **Cenário:** o kill switch trava a carteira e a tela do Everton continua mostrando `ACTIVE` até o
@@ -49,8 +185,13 @@ carteira paper que está aberta na VPS, porque nada nela executa ainda.
   `hunter_worker` não tinha `INSERT` em `outbox_events`; a T3.1c destrava. **Correção:** o worker
   publica depois de `evaluate_and_persist`; a API publica na retomada. Dono: **T3.5**.
 
-- **MEDIUM (documentação divergente do banco) — `docs/` ainda diz "uma carteira principal por
-  workspace"; a `0006` corrigida é por organização.** `docs/RISK_ENGINE.md:593` e
+- **[FECHADA em 2026-09-07 por `2ee79c1` — `grep` no plantão da manhã não acha mais nenhuma
+  ocorrência em `docs/`]** ~~MEDIUM (documentação divergente do banco) — `docs/` ainda diz "uma
+  carteira principal por workspace"~~ — o contrato v2.2.1 alinhou o escopo para **por organização**
+  em **todas** as menções, junto com as assinaturas reais de `evaluate`/`evaluate_exit` e com
+  `MarketRegime` marcado como reservado ao M4. Importava mais do que um typo: quem lesse o contrato
+  normativo para implementar a T3.5 reimplantaria o furo que o revisor de segurança provou e a
+  `0006` fechou no banco. *Texto original do achado, preservado:* `docs/RISK_ENGINE.md:593` e
   `docs/plans/M3.md:118`. **Por que importa mais do que um typo:** foi exatamente esse escopo que o
   `security-reviewer` provou ser um furo (workspace novo = segunda carteira com R$100.000 novos), a
   `T3.1b` fechou no banco, e a documentação normativa continua descrevendo o comportamento **antigo**
