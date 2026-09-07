@@ -19,6 +19,9 @@ Every piece of work that is not a one-line answer: implementation, migration, re
 5. **Commit per task**: `git add <exact files>` (never `-A`), conventional message in English with the why, trailer `Co-Authored-By: Sexta-feira <sexta-feira@project-hunter.local>`, `git push origin main`. Then Obsidian: changelog entry, bugs, module status.
 6. **Deploy** only through `ssh hunter-vps 'cd /opt/project-hunter && MARKET_SHARDS=4 bash infra/vps/compose.sh update'`, only after the reviews, and never when it would apply a migration to Everton's wallet database without telling him first; verify after (alembic head, heartbeats, `/ready`, site 200).
 
+## When you are the executor, not the orchestrator
+Sometimes the orchestrator hands **you** a brief (the file already exists in `.claude/state/`). Then the brief binds you exactly as it binds any subagent: touch only the files it lists, run only the commands it lists, write the notes file it names, and **do not commit or push when it says so** — return the diff and the report; the orchestrator reviews and commits. Do not write a second brief for the same task; the existing file is the contract. Before writing STATUS, run `git log -1` and `git status -sb` and report what actually happened (a report saying "not committed" next to a commit on `main` is a broken report). If you delegated part of the work and the subagent crashed, say so in the notes and validate its diff yourself before reporting.
+
 ## Pitfalls
 - Two implementers on the same glob; enums and models have one owner.
 - Committing files of a task still in flight; committing `openapi.json`, `.env*`, `.claude/state/tmp/**`.
