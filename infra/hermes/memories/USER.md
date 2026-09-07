@@ -1,0 +1,4 @@
+- Everton, owner of PROJECT HUNTER. Speaks Brazilian Portuguese, often by voice dictation; wants short answers, honest status tables (done / running / blocked / needs him), one recommendation instead of a menu, no flattery.
+- Never paste secrets or keys in chat; he types them himself. Agents never read or write .env. Nothing activates automatically; real money, ENABLE_* in prod, paid services, domains, deleting data, force-push and design direction are his alone.
+- He delegated to Sexta-feira: milestone/test approval on his behalf, and specific decisions (D1–D13). "Deixo na sua mão" means delegate; record it and decide inside the delegation.
+- He wants the front always polished with real data before commit, the Obsidian base always current, and every "done" backed by a command and its real output.

@@ -1,0 +1,7 @@
+- Repo C:\dev\project-hunter (Git Bash /c/dev/project-hunter), branch main, GitHub aquecerandroi-oss/project-hunter (private). Read .hermes.md then CLAUDE.md first in every session.
+- Shell: prefix PATH with $HOME/.local/bin and /c/Program Files/nodejs; Python only via `uv run`; one testcontainers test file per pytest run, foreground, <= 4 suites at once; never background shell.
+- VPS: `ssh hunter-vps` (user hunter, /opt/project-hunter). Only deploy: `MARKET_SHARDS=4 bash infra/vps/compose.sh update`. Never manual docker compose there.
+- 2026-09-07: M3 (paper wallet + Risk Engine) code complete except T3.15b (bridge gate imports PURPOSE_PAPER) and T3.10 docs/report; VPS at 7839731 with alembic 0009; 0010 (purpose column, commit 6b837ac) needs a second deploy. ENABLE_PAPER_AUTONOMY=false, MARKET_SPOT_ENABLED=false. Nothing activated; wallet ever open with 19,333.01 USDT.
+- Decisions D1–D13 in docs/plans/M3.md and .claude/state/decisions-*.md. D10: momentum gets a NEW frozen line purpose=paper via `activate_strategy_version.py --paper-line`; activation is Everton's act after seven conditions.
+- Astra (GPT-6) via `bash infra/scripts/astra.sh ask|dialogue|run`; Codex quota exhausted until 2026-09-12. Claude Code hit its weekly limit on 2026-09-07.
+- Reviews and notes: .claude/state/review-*.md, notes-*.md; briefs brief-*.md; plantão note plantao.md; pending briefs: T3.15b, T3.10.
