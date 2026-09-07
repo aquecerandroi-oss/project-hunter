@@ -2,7 +2,7 @@
   "current": "M3",
   "status": "in_progress",
   "approved_at": null,
-  "wave": "M3 ondas 1 e 2 em voo (T3.1 migracao 0006 commitada, T3.0a adaptador SPOT, T3.2 risk-core, T3.3 ledger, T3.4 execucao paper, T3.6 kill switch, T3.7 beta, T3.8a API de leitura, T3.12 admissao). O M2 esta entregue em codigo e NAO foi aprovado (docs/reports/M2.md, parecer da Sexta-feira em 2026-09-07): quatro condicoes objetivas de aprovacao, nenhuma delas bloqueia o M3.",
+  "wave": "M3 onda 5: codigo completo (T3.0a-e, T3.1-T3.9b, T3.11-T3.15b). Falta T3.10 (docs + docs/reports/M3.md), revisoes da T3.0e e da T3.15 (0010), e o segundo deploy da VPS (0010 + T3.15b). VPS em 7839731 (0009) desde 2026-09-07 ~16:26Z, execution-worker saudavel, ENABLE_PAPER_AUTONOMY=false, MARKET_SPOT_ENABLED=false. Nada ativado.",
   "repo_path": "C:\\dev\\project-hunter",
   "github": "https://github.com/aquecerandroi-oss/project-hunter",
   "paused_reason": null,
@@ -25,27 +25,27 @@
     ]
   },
   "m3": {
-    "status": "in_progress",
+    "status": "code_complete_pending_docs_and_reviews",
     "planned_at": "2026-09-06",
     "source": ".claude/state/directive-risk-engine-2026-09-06.md",
     "joint_decision": ".claude/state/dialogue-M3.md (3 rodadas, DECISAO CONJUNTA na rodada 3)",
     "contract": "docs/RISK_ENGINE.md v2.1",
     "adr": "docs/decisions/0005-carteira-virtual-e-risk-engine-paper-v1.md",
     "scope": "Carteira SPOT permanente (R$100.000 convertidos em USDT com ancora de cambio), Risk Engine paper_v1 completo, gestao automatica de protecoes. Entradas SOMENTE MANUAIS: a ponte sinal->proposta e M4 e sinal research_only continua recusado. O M3 NAO declara modo autonomo.",
-    "waves": "0 consolidacao+perguntas | 1 T3.1,T3.0(adapter),T3.2 | 2 T3.0(integracao),T3.3,T3.4 | 3 T3.11,T3.7,T3.6 | 4 T3.12,T3.5,T3.8(API),T3.13 | 5 T3.8(Web),T3.9,T3.10,T3.M"
+    "waves": "0 consolidacao+perguntas | 1 T3.1,T3.0(adapter),T3.2 | 2 T3.0(integracao),T3.3,T3.4 | 3 T3.11,T3.7,T3.6 | 4 T3.12,T3.5,T3.8(API),T3.13 | 5 T3.8(Web),T3.9,T3.10,T3.M",
+    "commits_today": "8822b31 999640a 90f1862 ae25e32 abf8e80 7839731 6b837ac 56d2dea (2026-09-07 tarde)"
   },
   "updated": "2026-09-07",
   "blockers": [
-    "HIGH (VPS, aberto e nao diagnosticado) — mkt:binance:coverage congelado: covered_until 2026-09-07T02:34:57Z contra relogio de 03:19:20Z (44 min). hb:scanner declara coverage=unproven; hb:strategy:shadow conta 63.793 avaliacoes unavailable. Consequencia: nenhuma baseline de tape amadurece e nenhum EARLY pode ser publicado. Proximo passo: medir queue_oldest_pending_ts e o motivo de quebra DENTRO do conteiner da VPS antes de mudar qualquer linha.",
-    "HIGH (implantacao) — o T2.5g esta commitado e provado no local (4 shards, hb:market:binance:0of4..3of4, covered_until a 1 s do relogio) e NAO esta na VPS: a chave compartilhada hb:market:binance ainda existe la e a VPS roda 1 shard com 200 mercados.",
-    "MEDIO/produto — teto aritmetico de score 25,00 de 100 (3 de 9 componentes disponiveis, pesos 0,25) contra watching_min=40: nenhum mercado pode ser HOT hoje. Nao e defeito de codigo; e falta de evidencia, e some quando as baselines de tape/livro/derivativos amadurecerem.",
-    "MEDIUM — ninguem consome market.candles.backfilled (so produtores no repositorio).",
-    "MEDIUM — os tres entregaveis de teste da T2.8 nao existem (integracao ponta a ponta, e2e radar.spec.ts e opportunity.spec.ts).",
-    "MEDIUM — AssumedCosts aceita float (packages/core/hunter_core/strategies/envelope.py:45), com impacto em code_ref de versao congelada.",
-    "MEDIUM — funding_rates sem received_at; open_interest_history.ts e o bucket da rodada de poll, nao o instante da leitura.",
-    "Herdados do M1, ainda abertos: gaps de mercados nao monitorados que nunca fecham (4.726 open_gaps medidos na prova da T2.5g); morte de shard sem rebalanceamento; markets_ok misturando capacidade e backlog."
+    "HIGH (cota) - conta Claude no limite semanal desde ~15:30Z; agentes Claude caem; Sexta-feira agora roda no Hermes (docs/HERMES.md) e executa os briefs.",
+    "HIGH (permissao) - o deploy da VPS (ssh hunter-vps ... compose.sh update) e negado pelo classificador desta sessao; Everton roda o comando.",
+    "MEDIUM - revisoes obrigatorias da T3.15 (database-architect, risk-engine-guardian, security-reviewer) e da T3.0e nao rodaram ainda (cota); Astra volta 2026-09-12.",
+    "MEDIUM - 160 erros de pyright pre-existentes em services/execution-worker/tests/test_restart_recovery.py (hunter_execution_worker em 0).",
+    "MEDIUM - ponte T3.14b: todo sinal do Lab e research_only; a linha paper (D10) so nasce por activate_strategy_version.py --paper-line e so ativa por decisao do Everton (sete condicoes).",
+    "MEDIUM - condicoes 2, 3 e 4 do M2 continuam abertas (leitura datada 2026-09-09/10; p99 pos T2.5h; e2e com CLERK_E2E_*).",
+    "Herdados: dust sem assentamento (sweep), avgPrice nao coletado, queue_oldest_pending_ts 11% CPU, gaps de mercados nao monitorados."
   ],
-  "next_action": "1) Fechar o HIGH da cobertura congelada na VPS (medir dentro do conteiner antes de mudar linha). 2) Implantar o T2.5g na VPS (--profile shards, conferir shards_expected/reporting=4/4 e 200 campos sym:). 3) Segunda avaliacao datada do EXP-0003 em 2026-09-09/10 — e ela que decide se estagio e regime saem do papel. 4) Despachar os tres entregaveis de teste da T2.8 (test-engineer) e uma corrida unica de todas as suites do M2 quando os agentes do M3 liberarem os testcontainers. 5) M3 segue: ondas 1 e 2 em voo.",
+  "next_action": "1) Sexta-feira (Hermes): revisao T3.0e (em voo), depois revisao T3.15/0010 como database-architect+guardian+security. 2) T3.10: consolidar docs e escrever docs/reports/M3.md no formato estendido; parecer da Sexta-feira. 3) Everton: segundo deploy da VPS (traz 0010 e T3.15b) depois das revisoes. 4) 2026-09-09/10: segunda avaliacao datada do EXP-0003 (condicao 2 do M2). 5) Quando o Everton decidir: --paper-line momentum v1 e ativacao auditada (D10).",
   "verified": [
     "2026-09-07 03:24:49Z (VPS, somente leitura): 88.746 revisoes de baseline vigentes no corte available_at <= 03:30:00Z, 4.944 utilizaveis (5,57%) pelo portao >= 3 dias distintos E >= 120 observacoes, 211 mercados, 27 features, 1.521 com MAD zero, cobertura media 0,2032. Apenas 12 das 27 features tem algum bucket utilizavel; as 15 mudas sao exatamente tape (trade_velocity_1m, buy/sell_pressure_5m), livro (spread_pct, orderbook_imbalance_20), derivativos (funding_rate, open_interest_change_1h/4h) e todas as _live. No melhor caso, 29 de 200 mercados.",
     "2026-09-07 03:24:49Z (VPS): 108.688 feature_snapshots sobre 212 mercados desde 2026-09-06T18:17Z (9 h 07 min); 15 anomalias, TODAS VOLUME_SPIKE (12 resolved, 3 active, severidade 0,0 a 100,0); 12 oportunidades (8 EXPIRED, 3 NORMAL, 1 ANOMALY), score 0,00 a 11,92; 299 amostras de opportunity_history, TODAS com stage=NONE; 1 linha em market_regimes, regime UNKNOWN com trend_input_unavailable, breadth coverage 0 (200 mercados excluidos por missing_return_4h) e volatility_warmup (146 de 480 amostras, 7 de 20 dias); radar:scores com 10 entradas.",
