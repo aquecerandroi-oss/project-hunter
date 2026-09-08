@@ -8,6 +8,7 @@ import { METRIC_DEFS } from "@/components/lab/lab-metric-defs";
 import { LabMetricItem } from "@/components/lab/lab-metric-item";
 import { LabRExFunding } from "@/components/lab/lab-r-ex-funding";
 import { formatAssumedCosts } from "@/components/lab/lab-costs";
+import { purposeLabel } from "@/components/lab/lab-strategy-cell";
 import type { VersionSummaryOut } from "@/lib/api/lab-types";
 
 export interface LabVersionCardProps {
@@ -42,6 +43,16 @@ export function LabVersionCard({ version, supersededBy }: LabVersionCardProps) {
           <span className="font-mono text-sm font-semibold text-fg">
             {version.strategy_key} / {version.version}
           </span>
+          {/* strategy_versions.purpose (T3.15e, review-T3.15-risk.md item 5): the
+              chip that tells a research-only row (never spends the wallet) apart
+              from the paper coorte (the one that does) -- same label as the
+              signals table's LabStrategyCell. */}
+          <Badge
+            variant={version.purpose === "paper" ? "info" : "outline"}
+            className="px-1.5 py-0 text-[10px]"
+          >
+            {purposeLabel(version.purpose)}
+          </Badge>
           {supersededBy && (
             <a
               href={`#version-${supersededBy.id}`}

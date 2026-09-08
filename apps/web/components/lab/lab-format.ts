@@ -4,6 +4,8 @@
  * `reason`, which must render as readable text, never as `0` or a mute dash).
  */
 
+import type { OutcomeResult } from "@/lib/api/lab-types";
+
 // Known reason codes across `NullableMetric.reason`, `ProfitFactorOut.reason`,
 // `SumOfROut.reason`, `r_multiple_reason`, `no_entry_reason`,
 // `censored_reason` (contract-S3-lab.md, SHADOW-LAB.md §9). Anything not
@@ -24,6 +26,8 @@ const REASON_LABELS: Record<string, string> = {
   zero_stop_distance: "stop igual à entrada (distância zero)",
   no_completed_operations: "nenhuma operação concluída nesta seleção",
   no_brl_wallet: "conversão em BRL indisponível (carteira sem decomposição BRL)",
+  no_profit_operations: "nenhuma operação com lucro nesta página",
+  no_loss_operations: "nenhuma operação com prejuízo nesta página",
 };
 
 /** Human label for a reason code, splitting a `prefix:detail` shape (e.g. `gap:failed`, `late:delay`) so an unlisted detail still shows its known prefix. */
@@ -54,4 +58,74 @@ export function formatR(value: string | null, reason: string | null): DecimalOrR
 export function signColorClass(value: string | null): string {
   if (value === null) return "text-fg-muted";
   return value.trim().startsWith("-") ? "text-red" : "text-green";
+}
+
+/** Same rule as `signColorClass`, for an already-numeric (not Decimal-string) percentage move -- kept as its own named function (rather than an inline ternary at every call site) so `LabSignalRow`'s own cyclomatic complexity stays under the lint config's budget. */
+export function pctColorClass(pctMove: number | null): string {
+  if (pctMove === null) return "text-fg-muted";
+  return pctMove >= 0 ? "text-green" : "text-red";
+}
+
+/**
+ * "Saiu"'s own "why it left" vocabulary (brief T3.17b item 5, Everton's own
+ * wording): a verb-agreement phrasing ("saiu por: alvo/stop/expirou/
+ * invalidada") distinct from `RESULT_LABEL` in `lab-signal-chips.tsx`, which
+ * is an adjective describing "resultado" ("resultado: expirado/invalidado")
+ * used by the chip and the detail panel. Both read correctly in their own
+ * sentence; this one is never applied when `exit_price` is null (the row's
+ * `tracking_state` branch -- "não entrou"/"censurada"/"aberta" -- covers
+ * that case instead, see `saidaText`).
+ */
+export const EXIT_REASON_LABEL: Record<OutcomeResult, string> = {
+  target: "alvo",
+  stop: "stop",
+  expired: "expirou",
+  invalidated: "invalidada",
+  open: "aberta",
+};
+
+/**
+ * "08/09 05:05" -- day/month + hour:minute, always UTC, built from `Date`'s
+ * UTC getters rather than `Intl.DateTimeFormat` so the exact separator/order
+ * never depends on a locale default (brief T3.17b item 3: the previous
+ * `formatUtcWithOffset` output -- "05:05:05 UTC (02:05:05 -03:00)" -- had no
+ * date at all and was long enough to wrap across four lines in the "Quando"
+ * column; this is a fixed-width, one-line replacement). Returns `null` for
+ * an invalid timestamp so a caller can fall back to "--".
+ */
+export function formatWhenShort(iso: string): string | null {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const hours = String(date.getUTCHours()).padStart(2, "0");
+  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${day}/${month} ${hours}:${minutes}`;
+}
+
+export interface DurationResult {
+  text: string;
+  /** Why `text` is "--" -- never absent when it is (SHADOW-LAB.md §9's own rule extended to a derived, not-API-provided field). */
+  reason: string | null;
+}
+
+/**
+ * "Duração" column (brief T3.17b item 5): `exit_ts - entry_ts`, rendered
+ * `h:mm`. Deliberately never computed against "now" for a still-open
+ * position -- that would make a duration grow on every re-render of an
+ * otherwise-static page without a real fetch, and disagree with whatever the
+ * next `revalidate`/`AutoRefresh` cycle recomputes it as.
+ */
+export function durationText(entryTs: string | null, exitTs: string | null): DurationResult {
+  if (entryTs === null) return { text: "--", reason: "sem entrada" };
+  if (exitTs === null) return { text: "--", reason: "em aberto" };
+  const entryMs = new Date(entryTs).getTime();
+  const exitMs = new Date(exitTs).getTime();
+  if (!Number.isFinite(entryMs) || !Number.isFinite(exitMs) || exitMs < entryMs) {
+    return { text: "--", reason: "intervalo inválido" };
+  }
+  const totalMinutes = Math.round((exitMs - entryMs) / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return { text: `${hours}:${String(minutes).padStart(2, "0")}`, reason: null };
 }

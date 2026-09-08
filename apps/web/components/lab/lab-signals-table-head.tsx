@@ -2,33 +2,35 @@ export interface LabHeaderDef {
   label: string;
   align?: "right";
   secondary?: boolean;
+  /** A fixed minimum width so a short-but-important column (e.g. the "Resultado" badge) never gets squeezed off-screen when the table's natural width exceeds its container (brief T3.17b item 6). */
+  minWidthClass?: string;
 }
 
 /**
- * Default view (brief T3.17): what a signal entered with, what it left with,
- * profit or loss -- plain money, no "R". Always visible, never behind the
- * research toggle.
+ * Default view (brief T3.17, extended by T3.17b item 5): which strategy
+ * emitted the signal, what it entered with, what it left with and why, how
+ * long it stayed, profit or loss -- plain money, no "R". Always visible,
+ * never behind the research toggle.
  */
 export const LAB_MONEY_HEADERS: LabHeaderDef[] = [
+  { label: "Estratégia" },
   { label: "Mercado" },
-  { label: "Quando" },
+  { label: "Quando", minWidthClass: "min-w-[110px]" },
   { label: "Entrou", align: "right" },
   { label: "Saiu", align: "right" },
+  { label: "Duração", align: "right" },
   { label: "Variação", align: "right" },
   { label: "Quantia simulada", align: "right" },
-  { label: "Resultado", align: "right" },
+  { label: "Resultado", align: "right", minWidthClass: "min-w-[150px]" },
 ];
 
-/** Research columns (R multiples, raw levels, tracking/touch state) -- only rendered behind the "Detalhes de pesquisa" toggle (brief T3.17 item 3/5: "'R' aparece só no toggle de pesquisa"). */
+/** Research columns (brief T3.17b item 5's own list: "R líquido, R ex-funding, stop, alvo, tracking") -- only rendered behind the "Detalhes de pesquisa" toggle. `Versão`/`Referência`/`Toque` moved out: the strategy is now in "Estratégia" above, and the reference price/touch chip stay in the per-signal detail panel instead of repeating in every row. */
 export const LAB_RESEARCH_HEADERS: LabHeaderDef[] = [
-  { label: "Versão", secondary: true },
-  { label: "Referência", align: "right", secondary: true },
+  { label: "R líquido", align: "right" },
+  { label: "R ex-funding", align: "right", secondary: true },
   { label: "Stop", align: "right", secondary: true },
   { label: "Alvo", align: "right", secondary: true },
   { label: "Tracking" },
-  { label: "Toque" },
-  { label: "R líquido", align: "right" },
-  { label: "R ex-funding", align: "right", secondary: true },
 ];
 
 export function labSignalsHeaders(showResearch: boolean): LabHeaderDef[] {
@@ -45,9 +47,9 @@ export function LabSignalsTableHead({ showResearch }: { showResearch: boolean })
           <th
             key={header.label}
             role="columnheader"
-            className={`h-8 px-3 font-medium ${header.align === "right" ? "text-right" : ""} ${
+            className={`h-8 whitespace-nowrap px-3 font-medium ${header.align === "right" ? "text-right" : ""} ${
               header.secondary ? "hidden lg:table-cell" : ""
-            }`}
+            } ${header.minWidthClass ?? ""}`}
           >
             {header.label}
           </th>

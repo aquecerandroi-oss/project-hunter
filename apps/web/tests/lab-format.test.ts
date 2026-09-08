@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDecimalOrReason, formatR, reasonLabel, signColorClass } from "@/components/lab/lab-format";
+import {
+  durationText,
+  EXIT_REASON_LABEL,
+  formatDecimalOrReason,
+  formatR,
+  formatWhenShort,
+  reasonLabel,
+  signColorClass,
+} from "@/components/lab/lab-format";
 import { commonAssumedCosts, formatAssumedCosts } from "@/components/lab/lab-costs";
 import { makeVersionSummary } from "@/tests/fixtures/lab";
 
@@ -59,6 +67,50 @@ describe("signColorClass", () => {
   it("is red for a negative value and green for a non-negative one", () => {
     expect(signColorClass("-1.5")).toBe("text-red");
     expect(signColorClass("1.5")).toBe("text-green");
+  });
+});
+
+describe("formatWhenShort: one-line 'DD/MM HH:mm', always UTC (brief T3.17b item 3)", () => {
+  it("renders day/month + hour:minute from a real timestamp", () => {
+    expect(formatWhenShort("2026-09-08T05:05:05.123456Z")).toBe("08/09 05:05");
+  });
+
+  it("pads a single-digit day/month/hour/minute", () => {
+    expect(formatWhenShort("2026-01-02T03:04:00Z")).toBe("02/01 03:04");
+  });
+
+  it("returns null (never a garbage string) for an invalid timestamp", () => {
+    expect(formatWhenShort("not-a-date")).toBeNull();
+  });
+});
+
+describe("durationText: 'h:mm' only when both timestamps are known (brief T3.17b item 5)", () => {
+  it("computes the gap between entry and exit", () => {
+    expect(durationText("2026-09-06T00:26:00Z", "2026-09-06T03:41:00Z")).toEqual({ text: "3:15", reason: null });
+  });
+
+  it("is '--' with 'sem entrada' when there was no entry at all", () => {
+    expect(durationText(null, null)).toEqual({ text: "--", reason: "sem entrada" });
+  });
+
+  it("is '--' with 'em aberto' when entry exists but the position never resolved -- never guessed against 'now'", () => {
+    expect(durationText("2026-09-06T00:26:00Z", null)).toEqual({ text: "--", reason: "em aberto" });
+  });
+
+  it("is '--' with 'intervalo inválido' when the exit somehow precedes the entry", () => {
+    expect(durationText("2026-09-06T03:41:00Z", "2026-09-06T00:26:00Z")).toEqual({ text: "--", reason: "intervalo inválido" });
+  });
+});
+
+describe("EXIT_REASON_LABEL: the 'Saiu' column's own why-it-left vocabulary (brief T3.17b item 5)", () => {
+  it("covers every OutcomeResult in lib/api/lab-types.ts", () => {
+    expect(EXIT_REASON_LABEL).toEqual({
+      target: "alvo",
+      stop: "stop",
+      expired: "expirou",
+      invalidated: "invalidada",
+      open: "aberta",
+    });
   });
 });
 

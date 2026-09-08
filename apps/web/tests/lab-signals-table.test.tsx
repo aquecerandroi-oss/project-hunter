@@ -45,7 +45,7 @@ describe("LabSignalsTable: honest empty state", () => {
 });
 
 describe("LabSignalsTable: 'Saiu' column states plain-language reasons (brief T3.17), chips move behind 'Detalhes de pesquisa'", () => {
-  it("the default view shows 'não entrou: <motivo>' in the 'Saiu' column for a no_entry row, and the chip only appears behind the research toggle", () => {
+  it("the default view shows 'não entrou: <motivo>' in the 'Saiu' column for a no_entry row (under the 'Pendentes/sem entrada' segment), and the chip only appears behind the research toggle", () => {
     const row = makeSignal({
       tracking_state: "no_entry",
       no_entry_reason: "late:delay",
@@ -66,6 +66,9 @@ describe("LabSignalsTable: 'Saiu' column states plain-language reasons (brief T3
         ruler={exampleRuler()}
       />,
     );
+    // Default segment is "Concluídas" (brief T3.17b item 4) -- a no_entry row
+    // only shows up under "Pendentes/sem entrada".
+    fireEvent.click(screen.getByRole("tab", { name: /Pendentes\/sem entrada/ }));
     expect(screen.getByText(/não entrou:/)).toBeInTheDocument();
     expect(screen.queryByText(/sem entrada:/)).not.toBeInTheDocument();
 
@@ -73,7 +76,7 @@ describe("LabSignalsTable: 'Saiu' column states plain-language reasons (brief T3
     expect(screen.getByText(/sem entrada:/)).toBeInTheDocument();
   });
 
-  it("the default view shows 'censurada: <motivo>' in the 'Saiu' column for a censored row, and the chip only appears behind the research toggle", () => {
+  it("the default view shows 'censurada: <motivo>' in the 'Saiu' column for a censored row (under the 'Pendentes/sem entrada' segment), and the chip only appears behind the research toggle", () => {
     const row = makeSignal({ tracking_state: "censored", censored_reason: "gap:failed", result: "expired", exit_price: null, exit_ts: null });
     render(
       <LabSignalsTable
@@ -86,6 +89,7 @@ describe("LabSignalsTable: 'Saiu' column states plain-language reasons (brief T3
         ruler={exampleRuler()}
       />,
     );
+    fireEvent.click(screen.getByRole("tab", { name: /Pendentes\/sem entrada/ }));
     expect(screen.getByText(/censurada:/)).toBeInTheDocument();
     expect(screen.queryByText(/^censurado:/)).not.toBeInTheDocument();
 
@@ -183,8 +187,8 @@ describe("LabSignalsTable: cursor pagination via a Server Action", () => {
   });
 });
 
-describe("LabSignalsTable: the endpoint's own window scope is stated, not implied", () => {
-  it("says signals cover the whole available period, distinct from the summary's window filter", () => {
+describe("LabSignalsTable: the endpoint's own window scope is a tooltip, not a paragraph leaking into the UI (brief T3.17b item 2)", () => {
+  it("shows the short 'período: todo o disponível' label, with the full technical fact only in its title tooltip", () => {
     render(
       <LabSignalsTable
         orgSlug="acme"
@@ -196,12 +200,17 @@ describe("LabSignalsTable: the endpoint's own window scope is stated, not implie
         ruler={exampleRuler()}
       />,
     );
-    expect(screen.getByText(/todo o período disponível/)).toBeInTheDocument();
+    const label = screen.getByText("período: todo o disponível");
+    expect(label).toBeInTheDocument();
+    expect(label.title).toMatch(/não aceita janela\/as_of/);
+    // The old paragraph -- "Sinais · todo o período disponível (este endpoint
+    // não aceita janela/`as_of`..." -- must not leak into the visible UI.
+    expect(screen.queryByText(/este endpoint não aceita/)).not.toBeInTheDocument();
   });
 });
 
-describe("LabSignalsTable: the totals card (brief T3.17 item 2)", () => {
-  it("shows the plain-money totals above the table, computed from the loaded rows", () => {
+describe("LabSignalsTable: the totals card (brief T3.17 item 2, extended by T3.17b item 1)", () => {
+  it("shows the plain-money totals above the table, computed from the loaded rows -- never scoped to the currently selected segment", () => {
     const rows = [
       makeSignal({ signal_id: "1", tracking_state: "terminal", r_multiple: "1.0" }),
       makeSignal({ signal_id: "2", tracking_state: "terminal", r_multiple: "-0.5" }),
@@ -223,9 +232,11 @@ describe("LabSignalsTable: the totals card (brief T3.17 item 2)", () => {
     expect(within(card).getByText("3")).toBeInTheDocument(); // total
     expect(within(card).getByText("Resultado acumulado (USDT)")).toBeInTheDocument();
     expect(within(card).getByText("Resultado acumulado (BRL)")).toBeInTheDocument();
+    expect(within(card).getByText("Melhor operação (desta página)")).toBeInTheDocument();
+    expect(within(card).getByText("Pior operação (desta página)")).toBeInTheDocument();
   });
 
-  it("adds 'das N operações listadas' only when a next page exists (the list is truncated)", () => {
+  it("says 'desta página' with the loaded count when a next page exists, and never the old 'há mais sinais além desta página' phrasing", () => {
     const { unmount } = render(
       <LabSignalsTable
         orgSlug="acme"
@@ -237,7 +248,8 @@ describe("LabSignalsTable: the totals card (brief T3.17 item 2)", () => {
         ruler={exampleRuler()}
       />,
     );
-    expect(screen.queryByText(/operações listadas/)).not.toBeInTheDocument();
+    expect(screen.getByText("Resultado de todas as operações do período (1)")).toBeInTheDocument();
+    expect(screen.queryByText(/há mais sinais/)).not.toBeInTheDocument();
     unmount();
 
     render(
@@ -251,6 +263,76 @@ describe("LabSignalsTable: the totals card (brief T3.17 item 2)", () => {
         ruler={exampleRuler()}
       />,
     );
-    expect(screen.getByText(/das 1 operações listadas/)).toBeInTheDocument();
+    expect(screen.getByText("Resultado das operações desta página (1)")).toBeInTheDocument();
+    expect(screen.getByText(/os totais do Lab inteiro chegam com o placar \(T3\.18\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/há mais sinais/)).not.toBeInTheDocument();
+  });
+});
+
+describe("LabSignalsTable: segments (brief T3.17b item 4)", () => {
+  it("defaults to 'Concluídas' -- a terminal row shows, a pending row does not, until the tab changes", () => {
+    const rows = [
+      makeSignal({ signal_id: "done", market: "AAAAUSDT", tracking_state: "terminal" }),
+      makeSignal({ signal_id: "pending", market: "BBBBUSDT", tracking_state: "pending_entry" }),
+    ];
+    render(
+      <LabSignalsTable
+        orgSlug="acme"
+        initialItems={rows}
+        initialCursor={null}
+        baseParams={{ cohort: "prospective" }}
+        versionLabelById={versionLabelById}
+        cohort="prospective"
+        ruler={exampleRuler()}
+      />,
+    );
+    expect(screen.getByRole("tab", { name: /Concluídas/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("AAAAUSDT")).toBeInTheDocument();
+    expect(screen.queryByText("BBBBUSDT")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Todas/ }));
+    expect(screen.getByText("AAAAUSDT")).toBeInTheDocument();
+    expect(screen.getByText("BBBBUSDT")).toBeInTheDocument();
+  });
+
+  it("shows a count next to each segment label, based on every loaded row", () => {
+    const rows = [
+      makeSignal({ signal_id: "1", tracking_state: "terminal" }),
+      makeSignal({ signal_id: "2", tracking_state: "terminal" }),
+      makeSignal({ signal_id: "3", tracking_state: "active" }),
+      makeSignal({ signal_id: "4", tracking_state: "no_entry" }),
+    ];
+    render(
+      <LabSignalsTable
+        orgSlug="acme"
+        initialItems={rows}
+        initialCursor={null}
+        baseParams={{ cohort: "prospective" }}
+        versionLabelById={versionLabelById}
+        cohort="prospective"
+        ruler={exampleRuler()}
+      />,
+    );
+    expect(screen.getByRole("tab", { name: "Concluídas (2)" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Abertas (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Pendentes/sem entrada (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Todas (4)" })).toBeInTheDocument();
+  });
+
+  it("shows its own honest empty state (never the whole-table empty state) when a segment has no rows", () => {
+    const rows = [makeSignal({ tracking_state: "pending_entry" })];
+    render(
+      <LabSignalsTable
+        orgSlug="acme"
+        initialItems={rows}
+        initialCursor={null}
+        baseParams={{ cohort: "prospective" }}
+        versionLabelById={versionLabelById}
+        cohort="prospective"
+        ruler={exampleRuler()}
+      />,
+    );
+    // Default "Concluídas" is empty here (the only row is pending_entry).
+    expect(screen.getByText(/Nenhum sinal em "Concluídas" nesta seleção/)).toBeInTheDocument();
   });
 });

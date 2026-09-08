@@ -21,10 +21,9 @@
  * the rounded-to-2-decimals result `formatUsdt`/`formatBrl` render downstream.
  */
 
-import { reasonLabel } from "@/components/lab/lab-format";
+import { EXIT_REASON_LABEL, formatWhenShort, reasonLabel } from "@/components/lab/lab-format";
 import { formatPrice } from "@/components/markets/format";
-import type { SignalListItemOut } from "@/lib/api/lab-types";
-import { formatUtc } from "@/lib/format";
+import type { OutcomeResult, SignalListItemOut } from "@/lib/api/lab-types";
 
 /** paper_v1's own risk ceiling (`docs/RISK_ENGINE.md` §3) -- a declared product rule, not a per-organization API field, so it is a named constant here rather than fetched per request (mirrors `LAB_LABEL` being a fixed string on the API side, `hunter_api/schemas/lab_common.py`). */
 export const RISK_PER_TRADE_PCT = 0.0025;
@@ -114,15 +113,16 @@ export function moneyForRow(row: SignalListItemOut, ruler: MoneyRuler): RowMoney
   return { pnlUsdt, notionalUsdt, pctMove };
 }
 
-/** "Entrou"/"Saiu" cell text: price + hour on one line (row height is fixed, docs/DESIGN.md §2 density table). */
+/** "Entrou"/"Saiu" cell text: price + short date/time on one line (row height is fixed, docs/DESIGN.md §2 density table). Used by `saidaText`/the signal panel's plain-text rendering; the table's own cells render `LabPriceTimeCell`/`LabExitCell` (two lines) instead. */
 export function priceAndTime(price: string | null, ts: string | null): string {
   if (price === null) return "--";
-  return ts ? `${formatPrice(price)} · ${formatUtc(ts)}` : formatPrice(price);
+  const when = ts ? formatWhenShort(ts) : null;
+  return when ? `${formatPrice(price)} · ${when}` : formatPrice(price);
 }
 
-/** "Saiu" column: the real exit, or an honest reason it never resolved (brief T3.17 item 3: "aberta"/"não entrou: motivo"/"censurada: motivo"). */
+/** "Saiu" column: the real exit (with its own "motivo" -- brief T3.17b item 5), or an honest reason it never resolved (brief T3.17 item 3: "aberta"/"não entrou: motivo"/"censurada: motivo"). */
 export function saidaText(row: SignalListItemOut): string {
-  if (row.exit_price !== null) return priceAndTime(row.exit_price, row.exit_ts);
+  if (row.exit_price !== null) return `${priceAndTime(row.exit_price, row.exit_ts)} · motivo: ${EXIT_REASON_LABEL[row.result]}`;
   if (row.tracking_state === "no_entry") return `não entrou: ${reasonLabel(row.no_entry_reason ?? "sem motivo informado")}`;
   if (row.tracking_state === "censored") return `censurada: ${reasonLabel(row.censored_reason ?? "sem motivo informado")}`;
   if (row.tracking_state === "pending_entry" || row.tracking_state === "active") return "aberta";
@@ -137,6 +137,12 @@ export function resultBadgeKind(pnlUsdt: number | null): ResultBadgeKind {
   if (pnlUsdt > 0) return "lucro";
   if (pnlUsdt < 0) return "prejuizo";
   return "neutro";
+}
+
+export interface RowHighlight {
+  market: string;
+  pnlUsdt: number;
+  result: OutcomeResult;
 }
 
 export interface RowsSummary {
@@ -155,6 +161,12 @@ export interface RowsSummary {
   resultBrl: MoneyOrReason;
   /** `withProfit / (withProfit + withLoss)` -- ties (an exact-zero pnl) are excluded from both sides, same as the API's own `net_profit_rate`. */
   winRate: MoneyOrReason;
+  /** Mean pnl across `withProfit` rows only (brief T3.17b item 1) -- "desta página", the same page-bound scope as every other figure here. */
+  avgProfitUsdt: MoneyOrReason;
+  /** Mean pnl across `withLoss` rows only -- negative when it has a value. */
+  avgLossUsdt: MoneyOrReason;
+  best: RowHighlight | null;
+  worst: RowHighlight | null;
 }
 
 interface Accumulator {
@@ -167,6 +179,10 @@ interface Accumulator {
   censored: number;
   sumUsdt: number;
   sumBrl: number;
+  sumProfitUsdt: number;
+  sumLossUsdt: number;
+  best: RowHighlight | null;
+  worst: RowHighlight | null;
 }
 
 const TRACKING_BUCKET: Partial<Record<SignalListItemOut["tracking_state"], keyof Accumulator>> = {
@@ -185,15 +201,38 @@ function accumulateRow(acc: Accumulator, row: SignalListItemOut, ruler: MoneyRul
   acc.withKnownPnl++;
   const pnl = toNum(row.r_multiple) * ruler.riskUsdt;
   acc.sumUsdt += pnl;
-  if (pnl > 0) acc.withProfit++;
-  else if (pnl < 0) acc.withLoss++;
+  if (pnl > 0) {
+    acc.withProfit++;
+    acc.sumProfitUsdt += pnl;
+  } else if (pnl < 0) {
+    acc.withLoss++;
+    acc.sumLossUsdt += pnl;
+  }
   if (brlAvailable) acc.sumBrl += usdtToBrl(pnl, ruler) ?? 0;
+
+  const highlight: RowHighlight = { market: row.market, pnlUsdt: pnl, result: row.result };
+  if (acc.best === null || pnl > acc.best.pnlUsdt) acc.best = highlight;
+  if (acc.worst === null || pnl < acc.worst.pnlUsdt) acc.worst = highlight;
 }
 
-/** Totals card math (brief T3.17 item 2), computed client-side from whatever rows are currently loaded -- never a second server round-trip. */
+/** Totals card math (brief T3.17 item 2, extended by T3.17b item 1), computed client-side from whatever rows are currently loaded -- never a second server round-trip. */
 export function summarizeRows(rows: SignalListItemOut[], ruler: MoneyRuler): RowsSummary {
   const brlAvailable = ruler.equityBrl !== null;
-  const acc: Accumulator = { completed: 0, withKnownPnl: 0, withProfit: 0, withLoss: 0, pending: 0, noEntry: 0, censored: 0, sumUsdt: 0, sumBrl: 0 };
+  const acc: Accumulator = {
+    completed: 0,
+    withKnownPnl: 0,
+    withProfit: 0,
+    withLoss: 0,
+    pending: 0,
+    noEntry: 0,
+    censored: 0,
+    sumUsdt: 0,
+    sumBrl: 0,
+    sumProfitUsdt: 0,
+    sumLossUsdt: 0,
+    best: null,
+    worst: null,
+  };
   for (const row of rows) accumulateRow(acc, row, ruler, brlAvailable);
 
   const resolvedForRate = acc.withProfit + acc.withLoss;
@@ -215,10 +254,24 @@ export function summarizeRows(rows: SignalListItemOut[], ruler: MoneyRuler): Row
           ? { value: acc.sumBrl, reason: null }
           : { value: null, reason: "no_brl_wallet" },
     winRate: resolvedForRate > 0 ? { value: acc.withProfit / resolvedForRate, reason: null } : { value: null, reason: "no_completed_operations" },
+    avgProfitUsdt: acc.withProfit > 0 ? { value: acc.sumProfitUsdt / acc.withProfit, reason: null } : { value: null, reason: "no_profit_operations" },
+    avgLossUsdt: acc.withLoss > 0 ? { value: acc.sumLossUsdt / acc.withLoss, reason: null } : { value: null, reason: "no_loss_operations" },
+    best: acc.best,
+    worst: acc.worst,
   };
 }
 
-/** "das N operações listadas" (brief T3.17 item 2) -- only when the list is truncated (a `next_cursor` exists), so totals never silently claim to cover more than what is actually on screen. */
-export function truncationNote(rowCount: number, hasMore: boolean): string | null {
-  return hasMore ? `calculado das ${rowCount} operações listadas -- há mais sinais além desta página` : null;
+/**
+ * The totals card's own page-scope heading (brief T3.17b item 1): "these are
+ * only the operations currently loaded, not the whole Lab" -- the old
+ * "há mais sinais além desta página" phrasing is gone (it read as a warning,
+ * not a fact); when nothing is truncated (`next_cursor` is `null`), the page
+ * genuinely holds every operation in the period, so the heading says that
+ * instead of repeating "desta página".
+ */
+export function totalsHeading(rowCount: number, hasMore: boolean): string {
+  return hasMore ? `Resultado das operações desta página (${rowCount})` : `Resultado de todas as operações do período (${rowCount})`;
 }
+
+/** Always shown under `totalsHeading` (brief T3.17b item 1): the whole-Lab totals are T3.18's job, not this page-bound card's. */
+export const LAB_TOTALS_SCOPE_NOTE = "os totais do Lab inteiro chegam com o placar (T3.18)";

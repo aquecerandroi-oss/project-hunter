@@ -9,9 +9,10 @@ import {
   resultBadgeKind,
   saidaText,
   summarizeRows,
-  truncationNote,
+  totalsHeading,
   usdtToBrl,
 } from "@/components/lab/lab-money";
+import type { OutcomeResult, ShadowTrackingState } from "@/lib/api/lab-types";
 import { makeSignal } from "@/tests/fixtures/lab";
 
 describe("buildReferenceRuler: the labelled 10.000 USDT fallback (brief T3.17)", () => {
@@ -100,17 +101,17 @@ describe("moneyForRow: pnl, notional and pct move (brief T3.17 item 2's declared
 });
 
 describe("priceAndTime / saidaText: the plain-language 'Entrou'/'Saiu' text", () => {
-  it("joins price and hour on one line", () => {
-    expect(priceAndTime("27460.0000000000", "2026-09-06T00:26:00Z")).toMatch(/27460\.0000000000 · 00:26:00 UTC/);
+  it("joins price and the short one-line date/time (brief T3.17b item 3)", () => {
+    expect(priceAndTime("27460.0000000000", "2026-09-06T00:26:00Z")).toBe("27460.0000000000 · 06/09 00:26");
   });
 
   it("returns '--' when the price is absent", () => {
     expect(priceAndTime(null, null)).toBe("--");
   });
 
-  it("saidaText shows the real exit when one exists", () => {
-    const row = makeSignal({ exit_price: "27100.0000000000", exit_ts: "2026-09-06T03:41:00Z" });
-    expect(saidaText(row)).toMatch(/27100\.0000000000/);
+  it("saidaText shows the real exit AND its own motivo when one exists (brief T3.17b item 5)", () => {
+    const row = makeSignal({ exit_price: "27100.0000000000", exit_ts: "2026-09-06T03:41:00Z", result: "stop" });
+    expect(saidaText(row)).toBe("27100.0000000000 · 06/09 03:41 · motivo: stop");
   });
 
   it("saidaText says 'não entrou: <motivo>' for a no_entry row", () => {
@@ -126,6 +127,29 @@ describe("priceAndTime / saidaText: the plain-language 'Entrou'/'Saiu' text", ()
   it("saidaText says 'aberta' for a still-active row", () => {
     const row = makeSignal({ exit_price: null, tracking_state: "active" });
     expect(saidaText(row)).toBe("aberta");
+  });
+
+  it("saidaText says 'aberta' for a still pending_entry row", () => {
+    const row = makeSignal({ exit_price: null, tracking_state: "pending_entry" });
+    expect(saidaText(row)).toBe("aberta");
+  });
+
+  it("saidaText falls back to '--' for a tracking_state with no exit and no honest reason to give (terminal but no exit_price)", () => {
+    const row = makeSignal({ exit_price: null, tracking_state: "terminal" });
+    expect(saidaText(row)).toBe("--");
+  });
+
+  const EXIT_RESULTS: OutcomeResult[] = ["target", "stop", "expired", "invalidated"];
+  it.each(EXIT_RESULTS)("saidaText's motivo covers OutcomeResult %s when the row actually exited", (result) => {
+    const row = makeSignal({ exit_price: "1.0", exit_ts: "2026-09-06T00:00:00Z", result });
+    expect(saidaText(row)).toMatch(new RegExp(`motivo: `));
+    expect(saidaText(row).endsWith("--")).toBe(false);
+  });
+
+  const NON_EXIT_STATES: ShadowTrackingState[] = ["pending_entry", "active", "no_entry", "censored"];
+  it.each(NON_EXIT_STATES)("saidaText never claims a price/motivo for a %s row with no exit_price", (tracking_state) => {
+    const row = makeSignal({ exit_price: null, tracking_state, no_entry_reason: "late:delay", censored_reason: "gap:failed" });
+    expect(saidaText(row)).not.toMatch(/motivo: (alvo|stop|expirou|invalidada)$/);
   });
 });
 
@@ -184,14 +208,54 @@ describe("summarizeRows: the totals card math (brief T3.17 item 2)", () => {
     expect(summary.resultUsdt.value).not.toBeNull();
     expect(summary.resultBrl).toEqual({ value: null, reason: "no_brl_wallet" });
   });
-});
 
-describe("truncationNote: 'das N operações listadas' only when the list is truncated", () => {
-  it("is null when there is no further page", () => {
-    expect(truncationNote(200, false)).toBeNull();
+  it("averages profit and loss separately (brief T3.17b item 1)", () => {
+    const rows = [
+      makeSignal({ signal_id: "1", tracking_state: "terminal", r_multiple: "1.0" }),
+      makeSignal({ signal_id: "2", tracking_state: "terminal", r_multiple: "2.0" }),
+      makeSignal({ signal_id: "3", tracking_state: "terminal", r_multiple: "-0.5" }),
+    ];
+    const summary = summarizeRows(rows, ruler);
+    expect(summary.avgProfitUsdt.value).toBeCloseTo(((1.0 + 2.0) / 2) * ruler.riskUsdt, 6);
+    expect(summary.avgLossUsdt.value).toBeCloseTo(-0.5 * ruler.riskUsdt, 6);
   });
 
-  it("names the exact count actually on screen when a next_cursor exists", () => {
-    expect(truncationNote(200, true)).toMatch(/das 200 operações listadas/);
+  it("avgProfitUsdt/avgLossUsdt carry an honest reason instead of a fabricated 0 when a side is empty", () => {
+    const rows = [makeSignal({ tracking_state: "terminal", r_multiple: "1.0" })];
+    const summary = summarizeRows(rows, ruler);
+    expect(summary.avgProfitUsdt.value).not.toBeNull();
+    expect(summary.avgLossUsdt).toEqual({ value: null, reason: "no_loss_operations" });
+  });
+
+  it("names the best and worst operation (market + result) among known-pnl rows", () => {
+    const rows = [
+      makeSignal({ signal_id: "1", market: "AAAAUSDT", tracking_state: "terminal", r_multiple: "1.0", result: "target" }),
+      makeSignal({ signal_id: "2", market: "BBBBUSDT", tracking_state: "terminal", r_multiple: "-2.0", result: "stop" }),
+      makeSignal({ signal_id: "3", market: "CCCCUSDT", tracking_state: "terminal", r_multiple: "0.3", result: "target" }),
+    ];
+    const summary = summarizeRows(rows, ruler);
+    expect(summary.best).toEqual({ market: "AAAAUSDT", pnlUsdt: 1.0 * ruler.riskUsdt, result: "target" });
+    expect(summary.worst).toEqual({ market: "BBBBUSDT", pnlUsdt: -2.0 * ruler.riskUsdt, result: "stop" });
+  });
+
+  it("best/worst are null (never a fabricated row) when nothing has a known pnl", () => {
+    const rows = [makeSignal({ tracking_state: "pending_entry", r_multiple: null, r_multiple_reason: null })];
+    const summary = summarizeRows(rows, ruler);
+    expect(summary.best).toBeNull();
+    expect(summary.worst).toBeNull();
+  });
+});
+
+describe("totalsHeading: the card's own page-scope wording (brief T3.17b item 1)", () => {
+  it("says 'desta página' with the count when the list is truncated (a next_cursor exists)", () => {
+    expect(totalsHeading(200, true)).toBe("Resultado das operações desta página (200)");
+  });
+
+  it("never says 'há mais sinais além desta página' (Everton's screenshot, item 1: that read as if it were the Lab's whole total)", () => {
+    expect(totalsHeading(200, true)).not.toMatch(/há mais sinais/);
+  });
+
+  it("says 'todas as operações do período' with the count when nothing is truncated", () => {
+    expect(totalsHeading(37, false)).toBe("Resultado de todas as operações do período (37)");
   });
 });
