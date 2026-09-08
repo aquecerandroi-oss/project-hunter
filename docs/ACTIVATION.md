@@ -21,8 +21,21 @@ Este é o caminho, na ordem, para a carteira `ever` passar a receber sinais do L
 | 5 | Backfill de 31 dias na VPS e primeira rodada de β | orquestrador (leitura) / script no container da API | `market.candles.backfilled` para os 20 mercados; `hb:scanner` com `beta_valid ≥ 1` |
 | 6 | **Linha `paper` do momentum** | **Everton** (ou orquestrador com o seu "vai") | no container da API: `uv run python infra/scripts/activate_strategy_version.py momentum v1 --paper-line --dry-run --changelog "D10"`; sem `--dry-run` cria `momentum v2` `draft`, `purpose=paper`, `system_events` |
 | 7 | **Ativação auditada** da linha `paper` | **Everton** | `activate_strategy_version.py momentum v2 --changelog "D10: coorte paper"` → `activated_at`, congelada; o strategy-worker passa a emitir sinais `purpose=paper` para essa coorte (a `research_only` continua ao lado) |
-| 8 | **`ENABLE_PAPER_AUTONOMY=true`** no `.env` da VPS + `compose.sh update` — **só depois** de T3.15c e T3.15e implantadas (passo 3) | **Everton** | log `execution_worker_starting paper_autonomy=true`; `hb:execution:paper` com `pending_requests` variando; primeira proposta em `trade_proposals` com `proposal_source=agent` |
+| 8 | **`ENABLE_PAPER_AUTONOMY=true`** no `.env` da VPS + `compose.sh update` — T3.15c e T3.15e **implantadas em 2026-09-08 (`9a291d3`)**: a trava do guardian está liberada | **Everton** | log `execution_worker_starting paper_autonomy=true`; `hb:execution:paper` com `pending_requests` variando; primeira proposta em `trade_proposals` com `proposal_source=agent` |
 | 9 | Primeira avaliação datada do EXP-0005 depois do primeiro fill | Sexta-feira | SQL colado na página |
+
+
+## Estado em 2026-09-08 ~06:50Z
+| Passo | Estado |
+|---|---|
+| 1 spot como serviço | **feito** (`0451066`), na VPS: 14 pares, 0 reconexões |
+| 2 β | job horário na VPS; backfill de 31 dias pedido às 04:35Z (90 janelas), β válido quando a fila terminar (~12:00Z) |
+| 3 revisões / T3.15c / T3.15e | **feito** e implantado (`e4b531a`, `9a291d3`) |
+| 4 segundo deploy | **feito** (0010 e 0011 aplicadas; VPS em `9a291d3`) |
+| 5 backfill + primeira rodada de β | em andamento |
+| 6 linha `paper` | **feito**: `momentum v3` em rascunho (04:34Z) |
+| 7 ativação auditada | **Everton** — `docker exec hunter-api-1 python infra/scripts/activate_strategy_version.py momentum v3 --changelog D10_coorte_paper_ativada_por_Everton_2026-09-08` (sem aspas internas, por causa do PowerShell) |
+| 8 flag | **Everton** — depois do 7 e com β válido |
 
 ## O que continua igual depois do passo 8
 - Só ordens a mercado, só SPOT, sem alavancagem; fill pelo livro elegível após a latência declarada; sem fill fabricado.
