@@ -22,12 +22,15 @@ function ScoreboardPreview() {
   return <LabScoreboardCard row={exampleScoreboardRow()} ruler={exampleRuler()} />;
 }
 
+const PREVIEW_TOTALS = { closed: 1, open: 0, pending: 0, all: 1 };
+const PREVIEW_HREFS = { concluded: "#", open: "#", pending: "#", all: "#" };
+
 function SignalsPreview() {
   const row = exampleSignal();
   const headers = labSignalsHeaders(false);
   return (
     <div className="flex flex-col gap-2">
-      <LabSegmentTabs rows={[row]} value="concluded" onChange={() => {}} />
+      <LabSegmentTabs state="closed" totals={PREVIEW_TOTALS} hrefs={PREVIEW_HREFS} />
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full text-left text-[13px]">
           <LabSignalsTableHead showResearch={false} panelOpen={false} />

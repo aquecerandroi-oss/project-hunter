@@ -188,9 +188,36 @@ export interface SignalListItemOut {
   supporting_features: Record<string, unknown> | null;
 }
 
+// --- T3.37 contract (`GET /lab/shadow/signals` gains a server-side `state`
+// segment filter -- same definitions as `components/lab/lab-signal-
+// segments.ts` -- keyset `cursor` pagination with a fixed `page_size`, and
+// `totals`/`page` computed over the WHOLE filtered dataset, `state` itself
+// not applied to `totals`, so the segment tabs and pager show real numbers
+// instead of counts among the ~200 rows currently loaded; Everton,
+// 2026-09-08: "se tiver 2 mil operações tem que paginar mas mostrar as 2
+// mil"). `totals`/`page` are aliased straight from the regenerated OpenAPI
+// types (T3.37a already ran `pnpm gen:types`), same convention as the T3.18
+// block above; `state`/`page_size` stay hand-written literal unions here
+// (verified against `operations["list_signals_..._get"]["parameters"]
+// ["query"]`) since re-deriving two small, stable literals through that
+// deeply nested operation type would cost more clarity than it buys. ---
+export type LabSignalsState = "closed" | "open" | "pending" | "all";
+
+export const LAB_SIGNALS_PAGE_SIZES = [50, 100, 200, 500] as const;
+export type LabSignalsPageSize = (typeof LAB_SIGNALS_PAGE_SIZES)[number];
+export const DEFAULT_LAB_SIGNALS_PAGE_SIZE: LabSignalsPageSize = 200;
+
+/** Real counts over the whole filtered dataset (cohort/version/window applied, `state` itself not applied) -- never a count among only the currently loaded page. */
+export type LabSignalsTotals = components["schemas"]["SegmentTotalsOut"];
+
+/** 1-based positions of this page's first/last row within the current `state`'s own ordering -- lets the web print "1–200 de 2.135" without recomputing it from a partial page. */
+export type LabSignalsPageRange = components["schemas"]["SignalsPagePositionOut"];
+
 export interface LabSignalsPage {
   items: SignalListItemOut[];
   next_cursor: string | null;
+  totals: LabSignalsTotals;
+  page: LabSignalsPageRange;
 }
 
 // --- T3.18 scoreboard/curve (aliased from the generated OpenAPI types) ---

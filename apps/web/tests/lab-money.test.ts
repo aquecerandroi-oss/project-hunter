@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildReferenceRuler,
   buildWalletRuler,
+  combineClosedSumRUsdt,
   moneyForRow,
   priceAndTime,
   REFERENCE_EQUITY_USDT,
@@ -13,7 +14,7 @@ import {
   usdtToBrl,
 } from "@/components/lab/lab-money";
 import type { OutcomeResult, ShadowTrackingState } from "@/lib/api/lab-types";
-import { makeSignal } from "@/tests/fixtures/lab";
+import { makeSignal, makeVersionSummary } from "@/tests/fixtures/lab";
 
 describe("buildReferenceRuler: the labelled 10.000 USDT fallback (brief T3.17)", () => {
   it("is flagged as a reference, has no BRL, and its risk is 0,25% of 10.000", () => {
@@ -246,16 +247,47 @@ describe("summarizeRows: the totals card math (brief T3.17 item 2)", () => {
   });
 });
 
-describe("totalsHeading: the card's own page-scope wording (brief T3.17b item 1)", () => {
-  it("says 'desta página' with the count when the list is truncated (a next_cursor exists)", () => {
-    expect(totalsHeading(200, true)).toBe("Resultado das operações desta página (200)");
+describe("totalsHeading: the card's own scope-switch wording (brief T3.37, replacing the old hasMore inference)", () => {
+  it("says 'desta página' with the loaded page's own count in the 'page' scope", () => {
+    expect(totalsHeading("page", 200, 2135)).toBe("Resultado das operações desta página (200)");
+  });
+
+  it("says 'todas as operações concluídas' with the real closed total in the 'allClosed' scope, ignoring the page's own count", () => {
+    expect(totalsHeading("allClosed", 200, 2135)).toBe("Resultado de todas as operações concluídas (2135)");
   });
 
   it("never says 'há mais sinais além desta página' (Everton's screenshot, item 1: that read as if it were the Lab's whole total)", () => {
-    expect(totalsHeading(200, true)).not.toMatch(/há mais sinais/);
+    expect(totalsHeading("page", 200, 2135)).not.toMatch(/há mais sinais/);
+  });
+});
+
+describe("combineClosedSumRUsdt: the 'de todas as concluídas' scope's money (brief T3.37)", () => {
+  const ruler = buildWalletRuler("10000", null); // riskUsdt = 25
+
+  it("sums each version's own whole-dataset sum_of_hypothetical_r (never a page sum) and converts through the ruler", () => {
+    const versions = [
+      makeVersionSummary({ metrics: { ...makeVersionSummary().metrics, sum_of_hypothetical_r: { value: "10", reason: null, count: 40, ordered_by: "exit_ts" } } }),
+      makeVersionSummary({
+        strategy_version_id: "v2",
+        metrics: { ...makeVersionSummary().metrics, sum_of_hypothetical_r: { value: "-2", reason: null, count: 9, ordered_by: "exit_ts" } },
+      }),
+    ];
+    const result = combineClosedSumRUsdt(versions, ruler);
+    expect(result).toEqual({ value: 8 * 25, reason: null });
   });
 
-  it("says 'todas as operações do período' with the count when nothing is truncated", () => {
-    expect(totalsHeading(37, false)).toBe("Resultado de todas as operações do período (37)");
+  it("is unavailable (never a silent zero for the missing version) when any relevant version's own sum is null", () => {
+    const versions = [
+      makeVersionSummary({ metrics: { ...makeVersionSummary().metrics, sum_of_hypothetical_r: { value: "10", reason: null, count: 40, ordered_by: "exit_ts" } } }),
+      makeVersionSummary({
+        strategy_version_id: "v2",
+        metrics: { ...makeVersionSummary().metrics, sum_of_hypothetical_r: { value: null, reason: "no_sample", count: 0, ordered_by: "exit_ts" } },
+      }),
+    ];
+    expect(combineClosedSumRUsdt(versions, ruler)).toEqual({ value: null, reason: "no_sample" });
+  });
+
+  it("is unavailable with an honest reason when there is no version in the current selection", () => {
+    expect(combineClosedSumRUsdt([], ruler)).toEqual({ value: null, reason: "no_versions_in_selection" });
   });
 });

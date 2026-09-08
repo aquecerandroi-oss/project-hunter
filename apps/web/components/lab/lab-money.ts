@@ -23,7 +23,7 @@
 
 import { EXIT_REASON_LABEL, formatWhenShort, reasonLabel } from "@/components/lab/lab-format";
 import { formatPrice } from "@/components/markets/format";
-import type { OutcomeResult, SignalListItemOut } from "@/lib/api/lab-types";
+import type { OutcomeResult, SignalListItemOut, VersionSummaryOut } from "@/lib/api/lab-types";
 
 /** paper_v1's own risk ceiling (`docs/RISK_ENGINE.md` §3) -- a declared product rule, not a per-organization API field, so it is a named constant here rather than fetched per request (mirrors `LAB_LABEL` being a fixed string on the API side, `hunter_api/schemas/lab_common.py`). */
 export const RISK_PER_TRADE_PCT = 0.0025;
@@ -261,16 +261,41 @@ export function summarizeRows(rows: SignalListItemOut[], ruler: MoneyRuler): Row
   };
 }
 
+export type TotalsScope = "page" | "allClosed";
+
 /**
- * The totals card's own page-scope heading (brief T3.17b item 1): "these are
- * only the operations currently loaded, not the whole Lab" -- the old
- * "há mais sinais além desta página" phrasing is gone (it read as a warning,
- * not a fact); when nothing is truncated (`next_cursor` is `null`), the page
- * genuinely holds every operation in the period, so the heading says that
- * instead of repeating "desta página".
+ * The totals card's own scope-switch heading (brief T3.37, replacing the old
+ * `hasMore`-inferred wording from T3.17b item 1): the reader now picks the
+ * scope explicitly ("desta página" | "de todas as concluídas") instead of the
+ * card guessing from whether the page happened to be truncated -- an
+ * inference that read wrong the moment a segment's real total (T3.37's
+ * `totals.*`) exceeded the loaded page without the reader knowing it.
  */
-export function totalsHeading(rowCount: number, hasMore: boolean): string {
-  return hasMore ? `Resultado das operações desta página (${rowCount})` : `Resultado de todas as operações do período (${rowCount})`;
+export function totalsHeading(scope: TotalsScope, pageCount: number, closedTotal: number): string {
+  return scope === "page"
+    ? `Resultado das operações desta página (${pageCount})`
+    : `Resultado de todas as operações concluídas (${closedTotal})`;
+}
+
+/**
+ * "De todas as concluídas" scope (brief T3.37, Everton: "se tiver 2 mil
+ * operações tem que paginar mas mostrar as 2 mil"): the money side of the
+ * totals card's scope switch. Never sums a *page* -- each version's own
+ * `metrics.sum_of_hypothetical_r` (`GET /lab/shadow/summary`) is already a
+ * whole-dataset aggregate (cohort/window applied), so adding together a
+ * handful of *complete* per-version totals is not the mistake the brief
+ * warns against (extrapolating a whole-dataset figure from a partial
+ * ~200-row page). If any relevant version's own sum is itself unavailable
+ * (`value: null`, e.g. no mature sample yet), the combined result is
+ * unavailable too -- treating the missing version as a silent zero would
+ * understate the real total rather than say so.
+ */
+export function combineClosedSumRUsdt(versions: VersionSummaryOut[], ruler: MoneyRuler): MoneyOrReason {
+  if (versions.length === 0) return { value: null, reason: "no_versions_in_selection" };
+  const missing = versions.find((v) => v.metrics.sum_of_hypothetical_r.value === null);
+  if (missing) return { value: null, reason: missing.metrics.sum_of_hypothetical_r.reason ?? "no_sample" };
+  const totalR = versions.reduce((sum, v) => sum + toNum(v.metrics.sum_of_hypothetical_r.value as string), 0);
+  return { value: totalR * ruler.riskUsdt, reason: null };
 }
 
 // --- T3.18 scoreboard money (brief item 3: "então os números em dinheiro

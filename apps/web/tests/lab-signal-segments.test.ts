@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  LAB_SEGMENTS,
   matchesSegment,
+  SEGMENT_TO_STATE,
   segmentCounts,
   sortSignalsConcludedFirst,
+  stateToSegment,
   visibleSignalsForSegment,
 } from "@/components/lab/lab-signal-segments";
 import { makeSignal } from "@/tests/fixtures/lab";
@@ -71,5 +74,14 @@ describe("visibleSignalsForSegment: filters the ordered list", () => {
     ];
     expect(visibleSignalsForSegment(rows, "pending").map((r) => r.signal_id)).toEqual(["3", "1"]);
     expect(visibleSignalsForSegment(rows, "concluded").map((r) => r.signal_id)).toEqual(["2"]);
+  });
+});
+
+describe("SEGMENT_TO_STATE / stateToSegment: T3.37's web<->API vocabulary mapping", () => {
+  it("maps every LabSegment to its own API state 1:1, and back", () => {
+    expect(SEGMENT_TO_STATE).toEqual({ concluded: "closed", open: "open", pending: "pending", all: "all" });
+    for (const segment of LAB_SEGMENTS) {
+      expect(stateToSegment(SEGMENT_TO_STATE[segment])).toBe(segment);
+    }
   });
 });

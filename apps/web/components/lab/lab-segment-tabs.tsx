@@ -1,35 +1,69 @@
 "use client";
 
-import { LAB_SEGMENT_LABEL, LAB_SEGMENTS, segmentCounts, type LabSegment } from "@/components/lab/lab-signal-segments";
-import type { SignalListItemOut } from "@/lib/api/lab-types";
+import { useTransition } from "react";
+import { useRouter } from "next/navigation";
+
+import { formatCount } from "@/components/lab/lab-format";
+import { LAB_SEGMENT_LABEL, LAB_SEGMENTS, SEGMENT_TO_STATE, stateToSegment, type LabSegment } from "@/components/lab/lab-signal-segments";
+import type { LabSignalsState, LabSignalsTotals } from "@/lib/api/lab-types";
 import { cn } from "@/lib/utils";
 
 export interface LabSegmentTabsProps {
-  rows: SignalListItemOut[];
-  value: LabSegment;
-  onChange: (segment: LabSegment) => void;
+  /** The API's own `state` -- the source of truth for which tab is active (never re-derived from the loaded rows). */
+  state: LabSignalsState;
+  /** Real counts over the whole filtered dataset (T3.37 contract's `totals`), never a count among only the ~200 rows currently loaded. */
+  totals: LabSignalsTotals;
+  /** One full href per segment, pre-built by `LabSignalsTable` via `buildLabHref` (a function prop cannot cross the Server->Client boundary, so the parent hands over plain strings instead). */
+  hrefs: Record<LabSegment, string>;
 }
 
-/** "Concluídas · Abertas · Pendentes/sem entrada · Todas" (brief T3.17b item 4), each with the count among the rows currently loaded. */
-export function LabSegmentTabs({ rows, value, onChange }: LabSegmentTabsProps) {
-  const counts = segmentCounts(rows);
+/**
+ * "Concluídas · Abertas · Pendentes/sem entrada · Todas" (brief T3.17b item
+ * 4), now with real, whole-dataset counts (brief T3.37, Everton: "se tiver 2
+ * mil operações tem que paginar mas mostrar as 2 mil") and server-side
+ * navigation: clicking a tab rewrites `?state=` and lets the Server Component
+ * refetch (`app/(app)/[orgSlug]/lab/page.tsx`) -- it never filters the
+ * already-loaded page in the browser.
+ */
+export function LabSegmentTabs({ state, totals, hrefs }: LabSegmentTabsProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const activeSegment = stateToSegment(state);
+
+  function handleSelect(segment: LabSegment): void {
+    if (segment === activeSegment) return;
+    startTransition(() => router.push(hrefs[segment]));
+  }
+
   return (
-    <div role="tablist" aria-label="Filtrar sinais por estado" className="flex flex-wrap gap-1">
-      {LAB_SEGMENTS.map((segment) => (
-        <button
-          key={segment}
-          type="button"
-          role="tab"
-          aria-selected={value === segment}
-          onClick={() => onChange(segment)}
-          className={cn(
-            "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-            value === segment ? "border-gold bg-gold-soft text-gold" : "border-border text-fg-muted hover:text-fg",
-          )}
-        >
-          {LAB_SEGMENT_LABEL[segment]} ({counts[segment]})
-        </button>
-      ))}
+    <div className="flex flex-col gap-1">
+      <div role="tablist" aria-label="Filtrar sinais por estado" className="flex flex-wrap gap-1">
+        {LAB_SEGMENTS.map((segment) => (
+          <button
+            key={segment}
+            type="button"
+            role="tab"
+            aria-selected={activeSegment === segment}
+            onClick={() => handleSelect(segment)}
+            className={cn(
+              "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+              activeSegment === segment ? "border-gold bg-gold-soft text-gold" : "border-border text-fg-muted hover:text-fg",
+            )}
+          >
+            {LAB_SEGMENT_LABEL[segment]} ({formatCount(totals[SEGMENT_TO_STATE[segment]])})
+          </button>
+        ))}
+      </div>
+      {/* Visually hidden -- announces the real, whole-dataset count on every
+          tab change for a screen reader (brief T3.37: "aria-live on change"). */}
+      {/* An em dash, not ":" -- "Pendentes/sem entrada" already ends in
+          "entrada", so a colon here would read as the unrelated "sem
+          entrada: <motivo>" chip text elsewhere on this page. */}
+      <p aria-live="polite" className="sr-only">
+        {isPending
+          ? "carregando sinais..."
+          : `${LAB_SEGMENT_LABEL[activeSegment]} — ${formatCount(totals[SEGMENT_TO_STATE[activeSegment]])} sinais no total`}
+      </p>
     </div>
   );
 }

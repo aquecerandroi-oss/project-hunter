@@ -4,11 +4,34 @@
  * operation off the first screen). Pure, unit-testable partition/sort logic
  * -- `lab-segment-tabs.tsx` only renders it.
  */
-import type { SignalListItemOut } from "@/lib/api/lab-types";
+import type { LabSignalsState, SignalListItemOut } from "@/lib/api/lab-types";
 
 export type LabSegment = "concluded" | "open" | "pending" | "all";
 
 export const LAB_SEGMENTS: LabSegment[] = ["concluded", "open", "pending", "all"];
+
+/**
+ * T3.37: the web's own vocabulary (`LabSegment`, pt-BR labels below) mapped
+ * 1:1 to the API's `state` query param (`LabSignalsState`) -- the backend
+ * mirrors `matchesSegment`'s definitions below in SQL (brief T3.37, "read the
+ * web file and mirror it in SQL"), so this mapping is the one place that
+ * translates between the two vocabularies; `matchesSegment`/`segmentCounts`/
+ * `sortSignalsConcludedFirst` themselves are UNCHANGED by T3.37 -- they stay
+ * the canonical, independently-tested definition the backend reads, even
+ * though `LabSignalsTable` no longer calls them to filter a page (the server
+ * does that now).
+ */
+export const SEGMENT_TO_STATE: Record<LabSegment, LabSignalsState> = {
+  concluded: "closed",
+  open: "open",
+  pending: "pending",
+  all: "all",
+};
+
+export function stateToSegment(state: LabSignalsState): LabSegment {
+  const entry = (Object.entries(SEGMENT_TO_STATE) as Array<[LabSegment, LabSignalsState]>).find(([, s]) => s === state);
+  return entry ? entry[0] : "all";
+}
 
 export const LAB_SEGMENT_LABEL: Record<LabSegment, string> = {
   concluded: "Concluídas",

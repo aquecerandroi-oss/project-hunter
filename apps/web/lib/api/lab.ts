@@ -2,7 +2,7 @@ import "server-only";
 
 import { apiFetch } from "@/lib/server/api";
 
-import type { CurveOut, LabSignalsPage, LabSummaryOut, LabVersionsOut, ScoreboardOut } from "./lab-types";
+import type { CurveOut, LabSignalsPage, LabSignalsPageSize, LabSignalsState, LabSummaryOut, LabVersionsOut, ScoreboardOut } from "./lab-types";
 
 /** `GET /api/v1/lab/shadow/versions` -- the small, frozen catalogue (contract-S3-lab.md). */
 export async function listLabVersions(): Promise<LabVersionsOut> {
@@ -36,7 +36,10 @@ export interface LabSignalsParams {
   result?: string;
   cohort?: string;
   cursor?: string;
-  limit?: number;
+  /** T3.37 contract: `closed | open | pending | all` (default `all` server-side; the web defaults to `closed` -- `app/(app)/[orgSlug]/lab/page.tsx`). Server-side segment filter, replacing the old client-side `visibleSignalsForSegment` over a partial page. */
+  state?: LabSignalsState;
+  /** T3.37 contract: one of `LAB_SIGNALS_PAGE_SIZES` (50/100/200/500), default 200 -- replaces the old free `limit` int now that the response carries real `totals`/`page` over the whole dataset. */
+  page_size?: LabSignalsPageSize;
   /** `["envelope"]` includes `supporting_features` -- omitted by default (contract-S3-lab.md). */
   include?: string[];
 }
@@ -49,7 +52,8 @@ function signalsQuery(params: LabSignalsParams): string {
   if (params.result !== undefined) search.set("result", params.result);
   if (params.cohort !== undefined) search.set("cohort", params.cohort);
   if (params.cursor !== undefined) search.set("cursor", params.cursor);
-  if (params.limit !== undefined) search.set("limit", String(params.limit));
+  if (params.state !== undefined) search.set("state", params.state);
+  if (params.page_size !== undefined) search.set("page_size", String(params.page_size));
   for (const item of params.include ?? []) search.append("include", item);
   const value = search.toString();
   return value ? `?${value}` : "";
@@ -57,12 +61,12 @@ function signalsQuery(params: LabSignalsParams): string {
 
 /**
  * `GET /api/v1/lab/shadow/signals` -- cursor-paginated, stable by
- * `(decision_at, id)`. This endpoint does NOT accept `window`/`as_of`
- * (contract-S3-lab.md, confirmed by `routers/lab.py::list_signals`) -- it
- * always returns the full available period for whatever filters are given;
- * only `/summary` is windowed. Callers must say so in the UI rather than
- * imply the summary's window also scopes this list (Astra, S3b hierarchy
- * review, must-fix).
+ * `(decision_at, id)` (T3.37a's own keyset -- never OFFSET on large sets). This
+ * endpoint does NOT accept `window`/`as_of` (contract-S3-lab.md, confirmed by
+ * `routers/lab.py::list_signals`) -- it always returns the full available
+ * period for whatever filters are given; only `/summary` is windowed.
+ * Callers must say so in the UI rather than imply the summary's window also
+ * scopes this list (Astra, S3b hierarchy review, must-fix).
  */
 export async function getLabSignals(params: LabSignalsParams = {}): Promise<LabSignalsPage> {
   return apiFetch<LabSignalsPage>(`/api/v1/lab/shadow/signals${signalsQuery(params)}`);

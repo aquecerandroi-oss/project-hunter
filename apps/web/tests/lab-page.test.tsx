@@ -63,6 +63,9 @@ import LabPage from "@/app/(app)/[orgSlug]/lab/page";
 import { ApiError } from "@/lib/api-error";
 import type { MembershipOut } from "@/lib/api/types";
 import { exampleCurve, exampleScoreboardRow, exampleSignal, exampleSummary, makeVersionSummary } from "@/tests/fixtures/lab";
+import { exampleSignalsPageRange, exampleSignalsTotals } from "@/tests/fixtures/lab-pagination";
+
+const EMPTY_SIGNALS_PAGE = { items: [], next_cursor: null, totals: { closed: 0, open: 0, pending: 0, all: 0 }, page: { from: 0, to: 0 } };
 
 const membership: MembershipOut = {
   onboarding: { completed: true, completed_at: "2026-01-01T00:00:00Z", workspace_id: "ws-1" },
@@ -89,7 +92,7 @@ beforeEach(() => {
   resolveOrgContextMock.mockReset().mockResolvedValue(membership);
   getLabSummaryMock.mockReset();
   listLabVersionsMock.mockReset().mockResolvedValue({ items: [] });
-  getLabSignalsMock.mockReset().mockResolvedValue({ items: [], next_cursor: null });
+  getLabSignalsMock.mockReset().mockResolvedValue(EMPTY_SIGNALS_PAGE);
   // Empty Placar by default (brief T3.18) -- exercised by every existing
   // test unless a case below overrides it.
   getLabScoreboardMock.mockReset().mockResolvedValue({ as_of: "2026-09-08T12:00:00Z", label: "SOMBRA — hipotético, sem capital, custos assumidos", rows: [] });
@@ -105,7 +108,7 @@ afterEach(cleanup);
 describe("LabPage: renders the real contract fixture", () => {
   it("shows the fixed SOMBRA label, as_of, a version card and the signals table", async () => {
     getLabSummaryMock.mockResolvedValue(exampleSummary());
-    getLabSignalsMock.mockResolvedValue({ items: [exampleSignal()], next_cursor: null });
+    getLabSignalsMock.mockResolvedValue({ items: [exampleSignal()], next_cursor: null, totals: exampleSignalsTotals({ closed: 1, open: 0, pending: 0, all: 1 }), page: exampleSignalsPageRange({ to: 1 }) });
 
     const jsx = await renderPage();
     render(jsx);
@@ -302,7 +305,7 @@ describe("LabPage: version <details> collapsed by default, opened by '?version='
 describe("LabPage: DOM order (brief T3.24b §2, opção A -- Placar-primeiro, Aceite)", () => {
   it("renders lab-header before lab-scoreboard-section, before the signals grid ('Sinais do Shadow Lab')", async () => {
     getLabSummaryMock.mockResolvedValue(exampleSummary());
-    getLabSignalsMock.mockResolvedValue({ items: [exampleSignal()], next_cursor: null });
+    getLabSignalsMock.mockResolvedValue({ items: [exampleSignal()], next_cursor: null, totals: exampleSignalsTotals({ closed: 1, open: 0, pending: 0, all: 1 }), page: exampleSignalsPageRange({ to: 1 }) });
     getLabScoreboardMock.mockResolvedValue({
       as_of: "2026-09-08T12:00:00Z",
       label: "SOMBRA — hipotético, sem capital, custos assumidos",
@@ -322,5 +325,52 @@ describe("LabPage: DOM order (brief T3.24b §2, opção A -- Placar-primeiro, Ac
     expect(headerBeforeScoreboard).toBeTruthy();
     expect(scoreboardBeforeSignals).toBeTruthy();
     expect(container).toBeInTheDocument();
+  });
+});
+
+describe("LabPage: T3.37 contract -- state/page_size/cursor read from the URL, real totals passed down", () => {
+  it("defaults to state=closed and page_size=200 when the URL has neither, with no cursor (page 1)", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    await renderPage();
+    expect(getLabSignalsMock).toHaveBeenCalledWith(expect.objectContaining({ cohort: "prospective", state: "closed", page_size: 200 }));
+    const [callArgs] = getLabSignalsMock.mock.calls[0] as [{ cursor?: string }];
+    expect(callArgs.cursor).toBeUndefined();
+  });
+
+  it("reads state/page_size/cursor (the last of repeated '?c=') from the URL and forwards them to getLabSignals", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    await renderPage({ state: "open", page_size: "50" });
+    expect(getLabSignalsMock).toHaveBeenCalledWith(expect.objectContaining({ state: "open", page_size: 50 }));
+  });
+
+  it("ignores an unrecognized state/page_size, falling back to the web's own default", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    await renderPage({ state: "bogus", page_size: "999" });
+    expect(getLabSignalsMock).toHaveBeenCalledWith(expect.objectContaining({ state: "closed", page_size: 200 }));
+  });
+
+  it("shows the tabs' real totals (from the signals response), not a count of the loaded rows", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    getLabSignalsMock.mockResolvedValue({
+      items: [exampleSignal()],
+      next_cursor: null,
+      totals: exampleSignalsTotals(),
+      page: exampleSignalsPageRange({ to: 1 }),
+    });
+    const jsx = await renderPage();
+    render(jsx);
+    expect(screen.getByRole("tab", { name: "Concluídas (929)" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Todas (2.135)" })).toBeInTheDocument();
+  });
+
+  it("shows SectionUnavailable for just 'Sinais — Sombra' when the signals fetch fails, without failing the rest of the page", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    getLabSignalsMock.mockRejectedValue(new Error("network down"));
+    const jsx = await renderPage();
+    render(jsx);
+    expect(screen.getByText(/Sinais — Sombra indisponível: falha ao carregar/)).toBeInTheDocument();
+    // The rest of the page (header, version card) still renders.
+    expect(screen.getByText("momentum / v2")).toBeInTheDocument();
+    expect(screen.queryByText(/sem verificação/)).not.toBeInTheDocument();
   });
 });

@@ -3,26 +3,23 @@ import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { LabCurveSection } from "@/components/lab/lab-curve-section";
 import { LabError } from "@/components/lab/lab-error";
-import { LabFilters } from "@/components/lab/lab-filters";
 import { LabHeader } from "@/components/lab/lab-header";
 import { buildReferenceRuler, buildWalletRuler, type MoneyRuler } from "@/components/lab/lab-money";
+import { LabPageBody, type LabSignalsLoad } from "@/components/lab/lab-page-body";
 import { LabScoreboardSection } from "@/components/lab/lab-scoreboard-section";
-import { LabSignalsTable } from "@/components/lab/lab-signals-table";
-import { LabVersionCard } from "@/components/lab/lab-version-card";
-import { LabVersionsEmpty } from "@/components/lab/lab-versions-empty";
+import { parseLabSignalsQuery, type LabSignalsRawSearchParams } from "@/components/lab/lab-signals-search-params";
 import { SectionUnavailable } from "@/components/ui/section-unavailable";
 import { DEFAULT_AUTO_REFRESH_INTERVAL_MS } from "@/lib/auto-refresh-interval";
 import { isApiError } from "@/lib/api-error";
 import { getLabCurve, getLabScoreboard, getLabSignals, getLabSummary, listLabVersions } from "@/lib/api/lab";
-import type { LabSignalsParams } from "@/lib/api/lab";
-import type { CurveOut, LabSignalsPage, LabSummaryOut, LabVersionsOut, ScoreboardOut, ScoreboardRowOut } from "@/lib/api/lab-types";
+import type { CurveOut, LabSignalsPageSize, LabSignalsState, LabSummaryOut, LabVersionsOut, ScoreboardOut, ScoreboardRowOut } from "@/lib/api/lab-types";
 import { resolveOrgContext } from "@/lib/api/org-context";
 import { getPortfolioSummary, listPortfolios } from "@/lib/api/portfolio";
 import { logger } from "@/lib/logger";
 
 export interface LabPageProps {
   params: Promise<{ orgSlug: string }>;
-  searchParams: Promise<{ window?: string; cohort?: string; version?: string }>;
+  searchParams: Promise<{ window?: string; cohort?: string; version?: string } & LabSignalsRawSearchParams>;
 }
 
 // No realtime channel and no per-response `stale_after_ms` of its own (this
@@ -31,11 +28,6 @@ export interface LabPageProps {
 // (T1.5 review F2's fix, reused here).
 export const revalidate = 15;
 
-// Signals list is fetched once per page load at the API's own max page size
-// (`MAX_PAGE_SIZE = 200`, `repositories/base.py`) so the virtualized table
-// starts with a real >= 200-row budget, exactly like `/markets` (T1.5 M1).
-const SIGNALS_INITIAL_LIMIT = 200;
-
 const WINDOWS = ["7d", "30d", "all"] as const;
 type LabWindow = (typeof WINDOWS)[number];
 
@@ -43,28 +35,54 @@ function isWindow(value: string | undefined): value is LabWindow {
   return WINDOWS.includes(value as LabWindow);
 }
 
-type LabLoad =
-  | { ok: true; summary: LabSummaryOut; versions: LabVersionsOut; signals: LabSignalsPage }
-  | { ok: false; reason: string };
+type LabLoad = { ok: true; summary: LabSummaryOut; versions: LabVersionsOut } | { ok: false; reason: string };
 
 /**
- * Fetches, never constructs JSX (same split as `markets/page.tsx`'s
- * `loadMarkets`: a try/catch around JSX can't actually catch a rendering
- * error, since React doesn't render synchronously inside it).
+ * Summary + the frozen versions catalogue -- independent of the signals list
+ * since T3.37 (its own `loadSignals` below can fail on its own, isolated,
+ * `SectionUnavailable`-scoped failure instead of taking the header/versions
+ * down with it).
  */
-async function loadLab(window: LabWindow, cohort: string, versionId: string | undefined): Promise<LabLoad> {
+async function loadLab(window: LabWindow, cohort: string): Promise<LabLoad> {
   try {
-    const signalsParams: LabSignalsParams = { cohort, limit: SIGNALS_INITIAL_LIMIT };
-    if (versionId) signalsParams.strategy_version_id = versionId;
-    const [summary, versions, signals] = await Promise.all([
-      getLabSummary({ window, cohort }),
-      listLabVersions(),
-      getLabSignals(signalsParams),
-    ]);
-    return { ok: true, summary, versions, signals };
+    const [summary, versions] = await Promise.all([getLabSummary({ window, cohort }), listLabVersions()]);
+    return { ok: true, summary, versions };
   } catch (error) {
     const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
     logger.error("lab_page_load_failed", { error: reason });
+    return { ok: false, reason };
+  }
+}
+
+interface LoadSignalsParams {
+  cohort: string;
+  versionId: string | undefined;
+  state: LabSignalsState;
+  pageSize: LabSignalsPageSize;
+  cursor: string | undefined;
+}
+
+/**
+ * The signals list on its own (T3.37): `state`/`page_size`/`cursor` come
+ * straight from the URL (the segment tabs and the pager both rewrite it and
+ * let this Server Component refetch -- `lab-signals-query.ts`'s
+ * `buildLabHref`), so a failure here degrades to `SectionUnavailable` for
+ * just "Sinais — Sombra" instead of the whole page (mirrors `loadScoreboard`
+ * below).
+ */
+async function loadSignals({ cohort, versionId, state, pageSize, cursor }: LoadSignalsParams): Promise<LabSignalsLoad> {
+  try {
+    const page = await getLabSignals({
+      cohort,
+      state,
+      page_size: pageSize,
+      ...(cursor !== undefined ? { cursor } : {}),
+      ...(versionId ? { strategy_version_id: versionId } : {}),
+    });
+    return { ok: true, page };
+  } catch (error) {
+    const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
+    logger.error("lab_signals_load_failed", { error: reason });
     return { ok: false, reason };
   }
 }
@@ -157,11 +175,13 @@ export default async function LabPage({ params, searchParams }: LabPageProps) {
   const window: LabWindow = isWindow(sp.window) ? sp.window : "30d";
   const cohort = sp.cohort?.trim() || "prospective";
   const versionId = sp.version || undefined;
+  const { state, pageSize, cursorPath, cursor } = parseLabSignalsQuery(sp);
 
-  const [result, ruler, scoreboardResult] = await Promise.all([
-    loadLab(window, cohort, versionId),
+  const [result, ruler, scoreboardResult, signalsResult] = await Promise.all([
+    loadLab(window, cohort),
     loadMoneyRuler(membership.organization.id),
     loadScoreboard(),
+    loadSignals({ cohort, versionId, state, pageSize, cursor }),
   ]);
 
   return (
@@ -201,83 +221,20 @@ export default async function LabPage({ params, searchParams }: LabPageProps) {
       {!result.ok ? (
         <LabError reason={result.reason} />
       ) : (
-        <LabPageBody orgSlug={orgSlug} window={window} cohort={cohort} versionId={versionId} ruler={ruler} {...result} />
+        <LabPageBody
+          orgSlug={orgSlug}
+          window={window}
+          cohort={cohort}
+          versionId={versionId}
+          state={state}
+          pageSize={pageSize}
+          cursorPath={cursorPath}
+          ruler={ruler}
+          summary={result.summary}
+          versions={result.versions}
+          signalsResult={signalsResult}
+        />
       )}
     </div>
-  );
-}
-
-interface LabPageBodyProps {
-  orgSlug: string;
-  window: LabWindow;
-  cohort: string;
-  versionId: string | undefined;
-  ruler: MoneyRuler;
-  summary: LabSummaryOut;
-  versions: LabVersionsOut;
-  signals: LabSignalsPage;
-}
-
-function LabPageBody({ orgSlug, window, cohort, versionId, ruler, summary, versions, signals }: LabPageBodyProps) {
-  const versionLabelById: Record<string, string> = {};
-  for (const v of versions.items) versionLabelById[v.strategy_version_id] = `${v.strategy_key}/${v.version}`;
-  for (const v of summary.versions) versionLabelById[v.strategy_version_id] ??= `${v.strategy_key}/${v.version}`;
-
-  // `superseded_by` only exists on the `/versions` catalogue item (best-effort,
-  // regex-reconstructed from `changelog` -- contract-S3-lab.md), not on the
-  // `/summary` item; resolved to a label only when the target is also
-  // rendered on this page (so the `#version-<id>` anchor always has a match).
-  const catalogueById = new Map(versions.items.map((v) => [v.strategy_version_id, v]));
-
-  const filterVersionOptions = summary.versions.map((v) => ({
-    id: v.strategy_version_id,
-    label: `${v.strategy_key}/${v.version} (${v.status})`,
-  }));
-
-  const cohorts = Array.from(new Set(signals.items.map((s) => s.cohort)));
-
-  return (
-    <>
-      {/* Sinais — Sombra (brief T3.24b §2 item [3]): filters, segments,
-          compact totals, table + panel all live under this one section, so
-          the page reads as "one hierarchy" instead of three stacked
-          summaries before the first signal row. */}
-      <section className="flex flex-col gap-3">
-        <Eyebrow>Sinais — Sombra</Eyebrow>
-        <LabFilters window={window} cohort={cohort} versionId={versionId ?? null} versions={filterVersionOptions} cohorts={cohorts} />
-        <LabSignalsTable
-          orgSlug={orgSlug}
-          initialItems={signals.items}
-          initialCursor={signals.next_cursor}
-          baseParams={{ cohort, limit: SIGNALS_INITIAL_LIMIT, ...(versionId ? { strategy_version_id: versionId } : {}) }}
-          versionLabelById={versionLabelById}
-          cohort={cohort}
-          ruler={ruler}
-        />
-      </section>
-
-      <section className="flex flex-col gap-4">
-        <Eyebrow>Versões (pesquisa)</Eyebrow>
-        {summary.versions.length === 0 ? (
-          <LabVersionsEmpty />
-        ) : (
-          summary.versions.map((v) => {
-            const supersededById = catalogueById.get(v.strategy_version_id)?.superseded_by ?? null;
-            const supersededBy =
-              supersededById && versionLabelById[supersededById]
-                ? { id: supersededById, label: versionLabelById[supersededById] }
-                : null;
-            return (
-              <LabVersionCard
-                key={v.strategy_version_id}
-                version={v}
-                supersededBy={supersededBy}
-                openByDefault={versionId === v.strategy_version_id}
-              />
-            );
-          })
-        )}
-      </section>
-    </>
   );
 }

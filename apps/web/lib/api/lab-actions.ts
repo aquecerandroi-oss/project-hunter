@@ -1,40 +1,11 @@
 "use server";
 
 import { isApiError } from "@/lib/api-error";
-import { getLabCurve, getLabSignals, type LabCurveParams, type LabSignalsParams } from "@/lib/api/lab";
+import { getLabCurve, getLabSignals, type LabCurveParams } from "@/lib/api/lab";
 import { listMarkets } from "@/lib/api/markets";
 import { getServerSession } from "@/lib/server/auth";
 
-import type { CurveOut, LabSignalsPage } from "./lab-types";
-
-export interface LabSignalsActionOutcome {
-  ok: boolean;
-  page: LabSignalsPage;
-  reason?: string;
-}
-
-const EMPTY_PAGE: LabSignalsPage = { items: [], next_cursor: null };
-
-/**
- * Server Action behind `components/lab/lab-signals-table.tsx`'s "load more"
- * (cursor pagination) and filter changes: `lib/api/lab.ts` is
- * `"server-only"`, so the client table cannot call `getLabSignals` directly
- * (ESLint boundary: `components/**` never imports `@/lib/server/**`, and
- * `apiFetch` lives there). Fails closed on a missing session before ever
- * reaching the API, mirroring `markets-actions.ts::searchMarketsAction`.
- */
-export async function loadLabSignalsAction(params: LabSignalsParams): Promise<LabSignalsActionOutcome> {
-  const session = await getServerSession();
-  if (!session) return { ok: false, page: EMPTY_PAGE, reason: "unauthenticated" };
-
-  try {
-    const page = await getLabSignals(params);
-    return { ok: true, page };
-  } catch (error) {
-    const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
-    return { ok: false, page: EMPTY_PAGE, reason };
-  }
-}
+import type { CurveOut } from "./lab-types";
 
 export interface LabCurveActionOutcome {
   ok: boolean;
@@ -46,7 +17,7 @@ export interface LabCurveActionOutcome {
  * Server Action behind `lab-curve-section.tsx`'s "Coorte da curva" selector
  * (brief T3.24b addendum A3): `lib/api/lab.ts` is `"server-only"`, so the
  * client cannot call `getLabCurve` directly for the on-demand "replay"
- * overlay -- same boundary `loadLabSignalsAction` above already crosses.
+ * overlay -- same boundary `loadLabSignalEnvelopeAction` below also crosses.
  */
 export async function loadLabCurveAction(params: LabCurveParams): Promise<LabCurveActionOutcome> {
   const session = await getServerSession();
@@ -92,7 +63,7 @@ export async function loadLabSignalEnvelopeAction(
       strategy_version_id: strategyVersionId,
       cohort,
       include: ["envelope"],
-      limit: 200,
+      page_size: 200,
     });
     const match = page.items.find((item) => item.signal_id === signalId);
     if (!match) return { ok: false, envelope: null, reason: "sinal não encontrado nesta página" };

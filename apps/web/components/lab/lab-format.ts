@@ -29,6 +29,8 @@ const REASON_LABELS: Record<string, string> = {
   no_brl_wallet: "conversão em BRL indisponível (carteira sem decomposição BRL)",
   no_profit_operations: "nenhuma operação com lucro nesta página",
   no_loss_operations: "nenhuma operação com prejuízo nesta página",
+  no_versions_in_selection: "nenhuma versão nesta seleção",
+  not_aggregable_across_versions: "não agregável somando versões diferentes",
 };
 
 /** Human label for a reason code, splitting a `prefix:detail` shape (e.g. `gap:failed`, `late:delay`) so an unlisted detail still shows its known prefix. */
@@ -124,6 +126,11 @@ export const EXIT_REASON_LABEL: Record<OutcomeResult, string> = {
  */
 export function formatWhenShort(iso: string): string | null {
   return formatBrasiliaShort(iso);
+}
+
+/** Plain pt-BR-grouped integer (brief T3.37, D17's numeric convention decided 2026-09-08): `2135` -> `"2.135"` -- used by the segment tabs' real totals and the pager's "X–Y de Z" line, never a raw un-grouped number once it can run into the thousands. */
+export function formatCount(value: number): string {
+  return new Intl.NumberFormat("pt-BR").format(value);
 }
 
 export interface DurationResult {

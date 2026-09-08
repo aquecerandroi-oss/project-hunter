@@ -21,8 +21,7 @@ afterEach(cleanup);
 import { LabSignalPanel } from "@/components/lab/lab-signal-panel";
 import { LabSignalsTable } from "@/components/lab/lab-signals-table";
 import { exampleRuler, exampleSignal, makeSignal } from "@/tests/fixtures/lab";
-
-const versionLabelById = { "098b060c-cdc0-46a6-b88b-70d4a5472b97": "momentum/v2" };
+import { exampleLabSignalsTableProps } from "@/tests/fixtures/lab-pagination";
 
 beforeEach(() => {
   loadLabSignalsActionMock.mockReset();
@@ -37,17 +36,7 @@ beforeEach(() => {
  */
 describe("LabSignalsTable -> LabSignalPanel: selecting a row (click) fills in the side panel", () => {
   it("shows the idle placeholder before any row is selected, then the selected signal's detail after a click", () => {
-    render(
-      <LabSignalsTable
-        orgSlug="acme"
-        initialItems={[exampleSignal()]}
-        initialCursor={null}
-        baseParams={{ cohort: "prospective" }}
-        versionLabelById={versionLabelById}
-        cohort="prospective"
-        ruler={exampleRuler()}
-      />,
-    );
+    render(<LabSignalsTable {...exampleLabSignalsTableProps({ items: [exampleSignal()] })} />);
 
     expect(screen.getByText(/Selecione um sinal na tabela/)).toBeInTheDocument();
 
@@ -59,17 +48,7 @@ describe("LabSignalsTable -> LabSignalPanel: selecting a row (click) fills in th
   });
 
   it("also opens the panel on Enter (keyboard row navigation, hooks/useArrowKeyRowSelection)", () => {
-    render(
-      <LabSignalsTable
-        orgSlug="acme"
-        initialItems={[exampleSignal()]}
-        initialCursor={null}
-        baseParams={{ cohort: "prospective" }}
-        versionLabelById={versionLabelById}
-        cohort="prospective"
-        ruler={exampleRuler()}
-      />,
-    );
+    render(<LabSignalsTable {...exampleLabSignalsTableProps({ items: [exampleSignal()] })} />);
 
     const grid = screen.getByRole("grid", { name: "Sinais do Shadow Lab" });
     fireEvent.keyDown(grid, { key: "ArrowDown" });

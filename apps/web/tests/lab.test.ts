@@ -54,7 +54,7 @@ describe("getLabSignals: query building, including `include=envelope`", () => {
       strategy_version_id: "v1",
       market: "BTCUSDT",
       cohort: "prospective",
-      limit: 200,
+      page_size: 200,
       include: ["envelope"],
     });
     const [path] = apiFetchMock.mock.calls[0] as [string];
@@ -63,12 +63,27 @@ describe("getLabSignals: query building, including `include=envelope`", () => {
     expect(query.get("strategy_version_id")).toBe("v1");
     expect(query.get("market")).toBe("BTCUSDT");
     expect(query.get("cohort")).toBe("prospective");
-    expect(query.get("limit")).toBe("200");
+    expect(query.get("page_size")).toBe("200");
   });
 
   it("supports cursor pagination", async () => {
     await getLabSignals({ cursor: "abc123" });
     const [path] = apiFetchMock.mock.calls[0] as [string];
     expect(new URLSearchParams(path.split("?")[1]).get("cursor")).toBe("abc123");
+  });
+});
+
+describe("getLabSignals: T3.37 contract additions (state + page_size)", () => {
+  it("serializes `state` alongside the other filters", async () => {
+    await getLabSignals({ state: "closed" });
+    const [path] = apiFetchMock.mock.calls[0] as [string];
+    expect(new URLSearchParams(path.split("?")[1]).get("state")).toBe("closed");
+  });
+
+  it("never sends `state`/`page_size` when not given (contract default applies server-side)", async () => {
+    await getLabSignals({ cohort: "prospective" });
+    const [path] = apiFetchMock.mock.calls[0] as [string];
+    expect(path).not.toContain("state=");
+    expect(path).not.toContain("page_size=");
   });
 });

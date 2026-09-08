@@ -259,3 +259,175 @@ que a T3.37b está prestes a habilitar (a visão "Todas" com paginação real).
 5. Os testes de paginação usam 50-55 linhas por caso (o menor `page_size` válido é 50) em vez dos
    2-3 do arquivo original — mais lento (cada teste ~1-2s de setup) mas ainda dentro do orçamento de
    5 min por arquivo.
+
+## T3.37b — Web (frontend-specialist)
+
+**Data:** 2026-09-08. **Base:** `main` local (T3.37a já concluída e commitada nas notas acima
+antes de eu terminar — consumi o contrato real, não fixtures adivinhadas). **Não commitado.**
+
+### STATUS
+
+`DONE`. Tabs e paginador agora mostram os números reais (`totals`/`page` do contrato T3.37),
+navegação 100% por URL (Server Component refaz o fetch, nunca filtro client-side de uma página
+parcial), scope switch do card de totais implementado ("desta página" | "de todas as concluídas",
+nunca soma de página). `pnpm --filter @hunter/web lint|typecheck|test`: 0 erros, 923/923 testes
+passando (saída real abaixo). Único aviso remanescente é pré-existente/de escala (arquivo de teste
+compartilhado 27 linhas acima do orçamento de 350, nível `warn`, não bloqueia `lint`).
+
+### Decisão de arquitetura (por que sem Server Action para paginar)
+
+O brief citava "SectionUnavailable" para erro do paginador — o caminho mais simples e honesto que
+satisfaz isso é reusar o padrão que `loadScoreboard` já usa nesta mesma página: separei o fetch de
+sinais (`loadSignals`) do fetch de resumo/versões (`loadLab`), cada um com seu próprio
+try/catch. Tabs e paginador viram navegação de URL pura (`buildLabHref`, mesmo padrão que
+`lab-filters.tsx` já usava para window/cohort/versão) — o clique reescreve `?state=&page_size=&c=`
+e o Server Component (`page.tsx`) refaz `getLabSignals` com os parâmetros novos. Uma falha nesse
+fetch agora aparece como `SectionUnavailable` só na seção "Sinais — Sombra", sem derrubar o
+cabeçalho/Placar/Versões — antes, uma falha em `getLabSignals` derrubava a página inteira dentro do
+mesmo `Promise.all` que também buscava `summary`/`versions`. Isso elimina a necessidade de uma
+Server Action dedicada para paginação (a antiga `loadLabSignalsAction`/"Carregar mais" foi
+removida — sem acumulação client-side de itens, cada página é uma resposta do servidor completa e
+correta).
+
+### Cursor stack (por que "Anterior" funciona sem "previous cursor" da API)
+
+O contrato T3.37a só dá `next_cursor` (keyset forward). Para "Anterior", a URL carrega a pilha de
+cursores visitados como parâmetros `?c=` repetidos (`lab-signals-query.ts`'s `buildLabHref`):
+clicar "Próxima" empilha o `next_cursor` atual; "Anterior" remove o último da pilha. Trocar de aba
+(`state`) ou de `page_size` sempre zera a pilha (volta pra página 1) -- datasets diferentes, cursor
+não faz sentido carregar entre eles.
+
+### Reset de seleção/scroll sem `useEffect` + `setState`
+
+A primeira versão usava um `useEffect` que chamava `setScrollTop`/`setSelectedSignal`/
+`resetSelection()` a cada troca de página -- o lint (`react-hooks/set-state-in-effect`, erro nesta
+config) rejeitou isso, corretamente: é exatamente o antipadrão que a própria doc do React
+(“You Might Not Need an Effect”) descreve. Corrigido extraindo `LabSignalsGrid` (grade
+virtualizada + painel lateral) como componente próprio, remontado via
+`key={`${state}-${page.from}-${pageSize}`}` pelo pai -- uma nova página vira um mount novo, com
+estado limpo de fábrica, sem efeito nenhum.
+
+### Scope switch do card de totais ("desta página" | "de todas as concluídas")
+
+- **"Desta página"**: exatamente o `summarizeRows` que já existia (T3.17/T3.17b), sem mudança de
+  comportamento.
+- **"De todas as concluídas"**: usa `GET /lab/shadow/summary` — já buscado no carregamento da
+  página com os mesmos filtros (cohort/window) que o brief pede, então reaproveitado como prop em
+  vez de um segundo fetch client-side (que o brief pede para nunca ser "um cálculo de página" — um
+  fetch já feito para os mesmos filtros conta como "usar o endpoint", só que sem round-trip
+  duplicado). Operações concluídas usa `totals.closed` (real, do próprio endpoint de sinais,
+  sempre exato independente de filtro de versão). Resultado acumulado soma
+  `metrics.sum_of_hypothetical_r` de cada versão relevante (`summary.versions`, filtrado pelo
+  `versionId` corrente se houver) via a régua de dinheiro — nunca dado de página, e nunca soma se
+  qualquer versão relevante não tiver amostra madura (retorna motivo explícito em vez de subestimar
+  silenciosamente). **Concern honesto:** "Com lucro/prejuízo" e "Taxa de acerto" (quando mais de uma
+  versão está em vista) não têm dado agregável exato no schema atual de `/summary` (não expõe
+  numerador/denominador por versão) — em vez de inventar uma média ponderada ou arredondar uma taxa
+  de volta pra contagem, mostro "—" com o motivo "não agregável somando versões diferentes". Com
+  exatamente uma versão em vista, a taxa de acerto real da versão aparece. Ponto de revisão pedido
+  ao product-designer/code-reviewer: aceitar essa lacuna honesta ou pedir uma mudança de contrato
+  em `/summary` (fora do escopo cirúrgico deste brief).
+
+### Tipos do contrato (T3.18-style: hand-written até o `pnpm gen:types` real, depois aliased)
+
+`lib/api/lab-types.ts` ganhou `LabSignalsState`, `LAB_SIGNALS_PAGE_SIZES`/`LabSignalsPageSize`
+(hand-written, literais estáveis e pequenos, verificados byte-a-byte contra
+`operations["list_signals_..._get"]["parameters"]["query"]` do OpenAPI já regenerado) e
+`LabSignalsTotals`/`LabSignalsPageRange` — **estes dois já aliased diretamente de
+`components["schemas"]["SegmentTotalsOut"]`/`["SignalsPagePositionOut"]`** porque a T3.37a já
+rodou `pnpm gen:types` antes de eu terminar (vi o arquivo gerado real, conferi campo a campo —
+`SegmentTotalsOut {closed,open,pending,all}`, `SignalsPagePositionOut {from,to}`, `SignalsPage
+{items,next_cursor,page,totals}` batem 100% com o que eu tinha escrito à mão contra o brief).
+`SignalListItemOut`/`LabSignalsPage` continuam hand-written (fora do escopo cirúrgico deste brief
+tocar, mesma nota que already existia no cabeçalho do arquivo para o legado pré-T3.18).
+
+### FILES
+
+**Criados:**
+- `apps/web/components/lab/lab-signal-pager.tsx` — "1–200 de 2.135 · página N", Anterior/Próxima,
+  select de page-size; navega via `router.push` num `useTransition` (indicador "carregando...").
+- `apps/web/components/lab/lab-signals-grid.tsx` — grade virtualizada + painel lateral, extraída de
+  `lab-signals-table.tsx`; remontada por `key` a cada página (ver seção acima).
+- `apps/web/components/lab/lab-signals-query.ts` — `buildLabHref` puro (window/cohort/version/
+  state/page_size/pilha de cursores → querystring), testável sem montar componente.
+- `apps/web/components/lab/lab-signals-search-params.ts` — `parseLabSignalsQuery` puro (parsing de
+  `?state=&page_size=&c=`, com fallback honesto pro default da web quando o valor é desconhecido).
+- `apps/web/components/lab/lab-page-body.tsx` — "Sinais — Sombra" + "Versões (pesquisa)", extraído
+  de `page.tsx` para caber no orçamento de 350 linhas por arquivo.
+- `apps/web/tests/lab-signal-pager.test.tsx`, `apps/web/tests/lab-segment-tabs.test.tsx`,
+  `apps/web/tests/lab-signals-query.test.ts`.
+- `apps/web/tests/fixtures/lab-pagination.ts` — fixtures de `totals`/`page`/props completas de
+  `LabSignalsTable`, separadas de `tests/fixtures/lab.ts` pra não estourar o orçamento de linhas
+  desse arquivo compartilhado (edição líquida em `lab.ts` acabou zero — `git diff` confirma).
+
+**Modificados:**
+- `apps/web/lib/api/lab-types.ts`, `apps/web/lib/api/lab.ts` (`state`/`page_size` substituem
+  `limit` no endpoint de sinais — `limit` nunca fazia parte do contrato novo), `apps/web/lib/api/
+  lab-actions.ts` (removida `loadLabSignalsAction`, sem uso restante; `loadLabSignalEnvelopeAction`
+  migrada para `page_size`).
+- `apps/web/app/(app)/[orgSlug]/lab/page.tsx` — `loadLab` (resumo+versões) separado de
+  `loadSignals` (sinais, T3.37); `parseLabSignalsQuery` para `state`/`page_size`/pilha de cursor.
+- `apps/web/components/lab/lab-signals-table.tsx` — reescrito: sem acumulação client-side, sem
+  filtro client-side por segmento, delega grade/painel para `LabSignalsGrid`.
+- `apps/web/components/lab/lab-segment-tabs.tsx` — usa `totals`/`hrefs` reais em vez de contar
+  `rows` carregadas; `aria-live` anuncia a contagem real a cada troca de aba.
+- `apps/web/components/lab/lab-totals-card.tsx` — scope switch (ver acima).
+- `apps/web/components/lab/lab-money.ts` — `totalsHeading` ganha o parâmetro `scope`;
+  `combineClosedSumRUsdt` (nova, pura, testada).
+- `apps/web/components/lab/lab-format.ts` — `formatCount` (agrupamento pt-BR, D17); dois motivos
+  novos em `REASON_LABELS`.
+- `apps/web/components/lab/lab-signal-segments.ts` — **lógica existente (`matchesSegment` etc.)
+  intocada** (é a definição que a T3.37a espelhou em SQL); só acrescentei `SEGMENT_TO_STATE`/
+  `stateToSegment` (mapeamento pt-BR ↔ contrato).
+- `apps/web/components/lab/lab-filters.tsx` — preserva `state`/`page_size` ao trocar
+  window/cohort/versão (zera a pilha de cursor, nunca o estado da aba).
+- `apps/web/components/design/lab-hierarchy-showcase.tsx` — atualizado para os novos props de
+  `LabSegmentTabs` (é só uma vitrine dev-only, `/_design`).
+- Testes: `lab.test.ts`, `lab-signal-segments.test.ts`, `lab-money.test.ts`,
+  `lab-signals-table.test.tsx` (reescrito), `lab-totals-card-in-table.test.tsx`,
+  `lab-signal-panel.test.tsx`, `lab-page.test.tsx`.
+
+**Removidos:** `apps/web/components/lab/lab-load-more.tsx` ("Carregar mais" não existe mais --
+virou o paginador).
+
+**Não tocados (lista de proibição do brief):** `.env*`, `apps/api/**`, `services/**`,
+`obsidian/**`, `lab-curve-chart.tsx`, `candles-chart.tsx`, `portfolio-equity-chart.tsx`.
+
+### TESTS (saída real)
+
+```
+$ pnpm --filter @hunter/web typecheck
+$ tsc --noEmit
+(sem saída — 0 erros)
+
+$ pnpm --filter @hunter/web lint
+$ eslint .
+apps/web/tests/lab-page.test.tsx
+  1:1  warning  File too large (377 lines | max 350).
+✖ 1 problem (0 errors, 1 warning)
+
+$ pnpm --filter @hunter/web test
+$ vitest run
+ Test Files  101 passed (101)
+      Tests  923 passed (923)
+   Duration  133.53s
+```
+
+### CONCERNS
+
+1. **`tests/lab-page.test.tsx` 27 linhas acima do orçamento** (`warn`, não bloqueia `lint`) --
+   arquivo compartilhado com muito trabalho em voo de outras tasks; não separei pra não arriscar
+   conflito adicional numa árvore compartilhada. Se o code-reviewer preferir, dá pra extrair os 5
+   testes T3.37 novos pra um `lab-page-signals.test.tsx` dedicado.
+2. **Scope "de todas as concluídas" com mais de uma versão em vista**: "Com lucro/prejuízo" e
+   "Taxa de acerto" mostram motivo honesto em vez de número (schema de `/summary` não tem
+   numerador/denominator por versão pra agregar corretamente) -- ver seção própria acima.
+3. **`LabFilters.cohorts`** (a lista de coortes do `<select>`) volta a depender só da página de
+   sinais atualmente carregada (como já era antes de T3.37) -- se a busca de sinais falhar
+   (`SectionUnavailable`), a lista cai pra `["prospective"]` apenas; isso é honesto (nunca inventa
+   uma coorte) mas é uma pequena regressão de descoberta nesse caso raro (API de sinais fora do
+   ar, resto da página ok).
+4. **Prova visual em navegador não feita por mim** -- por instrução do brief e da memória
+   ("in-app-browser-limits"), a captura de tela ("Concluídas" mostrando > 200 na VPS) é trabalho do
+   orquestrador depois do deploy e do rebuild do `docker-web-1`.
+5. Não fiz `git commit` (instrução explícita). Nenhum arquivo de `.env*`/API/serviços foi tocado.

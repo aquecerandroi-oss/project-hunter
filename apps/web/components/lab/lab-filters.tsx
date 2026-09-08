@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 
 import { Select } from "@/components/ui/select";
+import type { LabSignalsPageSize, LabSignalsState } from "@/lib/api/lab-types";
 
 export interface LabFilterVersionOption {
   id: string;
@@ -16,6 +17,17 @@ export interface LabFiltersProps {
   versions: LabFilterVersionOption[];
   /** Distinct cohorts present in the currently loaded signals page (brief T3.24b item [3]) -- `"prospective"` is always offered even when absent from the page, since it is the endpoint's own default. */
   cohorts: string[];
+  /**
+   * T3.37: the signals table's own `state`/`page_size`, preserved across a
+   * window/cohort/version change (never reset to the tab/page-size default
+   * just because a filter changed) -- optional so callers that predate T3.37
+   * (`components/design/lab-hierarchy-showcase.tsx`) keep working unchanged.
+   * The cursor path is intentionally never preserved here: a different
+   * cohort/window/version is a different dataset, so it always goes back to
+   * page 1.
+   */
+  state?: LabSignalsState;
+  pageSize?: LabSignalsPageSize;
 }
 
 const WINDOW_OPTIONS: Array<{ value: "7d" | "30d" | "all"; label: string }> = [
@@ -43,7 +55,7 @@ const WINDOW_OPTIONS: Array<{ value: "7d" | "30d" | "all"; label: string }> = [
  * feedback -- the options are exactly the cohorts this page already knows
  * about (`prospective`, plus whatever else the loaded signals page shows).
  */
-export function LabFilters({ window: activeWindow, cohort, versionId, versions, cohorts }: LabFiltersProps) {
+export function LabFilters({ window: activeWindow, cohort, versionId, versions, cohorts, state, pageSize }: LabFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -54,6 +66,11 @@ export function LabFilters({ window: activeWindow, cohort, versionId, versions, 
     if (nextCohort && nextCohort !== "prospective") params.set("cohort", nextCohort);
     const nextVersion = next.version === undefined ? versionId : next.version;
     if (nextVersion) params.set("version", nextVersion);
+    // Preserved as-is; the cursor path (`c`) is deliberately never carried
+    // over -- a different window/cohort/version is a different dataset, so
+    // the signals table always goes back to page 1 (T3.37).
+    if (state) params.set("state", state);
+    if (pageSize) params.set("page_size", String(pageSize));
     router.push(`${pathname}?${params.toString()}`);
   }
 
