@@ -1,6 +1,28 @@
 {
+  "agent": "sexta-feira",
+  "language": "portuguese",
+  "voice": {
+    "enabled": true,
+    "mode": "tap",
+    "autoSubmit": false
+  },
+  "permissions": {
+    "allow": [
+      "Bash(bash infra/scripts/astra.sh *)",
+      "Bash(codex exec *)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v node >/dev/null 2>&1; then node .claude/hooks/git-guard.mjs; fi"
+          }
+        ]
+      },
       {
         "matcher": "Edit|Write",
         "hooks": [
