@@ -55,7 +55,7 @@ Definição exata do fluxo (item 80.6). Cada etapa: gatilho, entrada, saída, on
    - **não publicar `rt:system`** quando `N > 1`: essa mensagem substitui a linha inteira da exchange na página System, e um shard conhece só a própria fatia. Em modo sharded o widget é atualizado pelo polling do agregado;
    - publicar a **cobertura** (`mkt:{exchange}:coverage`, item 6 do §2 do scanner) por um script Lua que funde os N shards numa hash só, porque o leitor é único por exchange: `covered_until` = **mínimo** entre os shards vivos (o coletor mais atrasado limita a exchange), `session_since` = mínimo (apenas piso — cada `sym:{symbol}` carrega a sessão do seu próprio dono, então um shard que reiniciou penaliza só os mercados dele), e um shard que para de carimbar **perde seus símbolos** em vez de herdar a prova do vizinho. Um `HSET` direto seria last-writer-wins: o shard saudável provaria cobertura dos mercados do shard travado.
 
-9. **Bybit (T3.44b).** A tabela `exchanges` tem a linha `bybit` cadastrada com `status=active`, mas nenhum coletor jamais rodou para ela — `system_status.py` (`build_market_status`) reporta isso honestamente como `ws_state=unavailable` por exchange sem heartbeat, o que aparecia no topbar como "2 exchanges · UNAVAILABLE" e foi lido como um bug de tempo real do navegador (não era: a Binance seguia `connected`). A correção pretendida é marcar `bybit` como `planned` no catálogo (`infra/scripts/seed_reference.py`, nunca seedado como `active` até o worker existir) e excluir exchanges `planned` do agregado do topbar (`exchanges_planned: ["bybit"]` à parte, schema aditivo) — **bloqueada** porque o enum `exchange_status` (`infra/migrations/ddl/enums.py`) só tem os valores `active`/`inactive`; ver `.claude/state/brief-T3.44c-exchange-status-planned.md` para o database-architect decidir a migração antes de qualquer seed ou código usar esse valor.
+9. **Bybit (T3.44b).** A tabela `exchanges` tem a linha `bybit` cadastrada com `status=active`, mas nenhum coletor jamais rodou para ela — `system_status.py` (`build_market_status`) reporta isso honestamente como `ws_state=unavailable` por exchange sem heartbeat, o que aparecia no topbar como "2 exchanges · UNAVAILABLE" e foi lido como um bug de tempo real do navegador (não era: a Binance seguia `connected`). **Resolvido pela T3.44c** (`docs/DATABASE.md` §28): a migração `0016_exchange_status_planned` acrescentou o rótulo `planned` a `exchange_status` (`BEFORE 'active'`), `seed_reference.EXCHANGES` passou a carregar o status por linha (`bybit` = `planned`; `seed_exchanges` não escrevia `status` em nenhuma metade do upsert antes disso) e `build_market_status` deixou de renderizar exchanges `planned` como linha — elas vão em `MarketStatusOut.exchanges_planned` (aditivo, default `[]`), não são lidas no Redis, não contam no teste "todas as leituras falharam" (que decide o `503`) e não entram em `markets_monitored_total`. O topbar passa a ler `binance · CONNECTED · N mercados · há Xs (bybit planejada)`. O comando do operador para aplicar é `seed.py --only exchanges` (que também nasceu nesta tarefa; o `--only` só cobria quatro tabelas).
 
 **Eventos publicados:** `market.ticks` (coalescido 250 ms; payload: preço, bid, ask, volume incremental, trades_count, book_imbalance top 5), `market.candles.closed`, `market.derivatives` (OI, funding, mark), `market.liquidations`, `market.universe.changed`.
 
@@ -209,7 +209,7 @@ O mesmo `scanner-worker` roda dois produtores horários ao lado deste laço, com
 ## 4b. Regime horário — uma linha de `market_regimes` por hora (T3.43)
 
 **Onde:** `scanner-worker` (`hunter_scanner_worker/regime_job.py`, `regime_repo.py`,
-`regime_writer.py`, `regime_hourly.py`; a aritmética é pura, em
+`regime_window.py`, `regime_writer.py`, `regime_hourly.py`; a aritmética é pura, em
 `hunter_indicators.regime.hourly*`). **Gatilho:** cada hora fechada, um produtor por
 exchange, do lado do `beta_job` (§2b). **Quem consome:** a pesquisa — o corte de coorte
 por contexto (`infra/scripts/sql/research/2026-09-09-regime-split.sql`). **Por quê existe:**
@@ -260,25 +260,45 @@ tenha mudado alguma coisa ou não, trinta e um dias para trás.
    escreveria e então não faz nada, atualiza no lugar ou insere. Atualiza — nunca apaga e
    reinsere — porque `agent_signals.regime_id`, `trade_proposals.regime_id` e
    `paper_trades.regime_id` apontam para esses ids com `ON DELETE SET NULL`. A corrida que
-   um índice único fecharia é fechada pela trava `regime:producer:{exchange}:{corte}`;
-   o índice está pedido em `.claude/state/brief-T3.43-db-market-regimes-hourly.md`.
-7. **Backfill é "toda hora sem linha", não "as últimas N horas".** A primeira passada
-   enche 31 dias, as seguintes produzem uma hora, e uma passada depois de um backfill de
-   velas conserta exatamente as horas cujo digest mudou. O corte atual é **sempre**
-   recalculado: é a única hora cujas velas ainda podem estar chegando.
+   um índice único fecharia é fechada pela trava `regime:producer:{exchange}:{corte}`
+   (`claim_cut`, provada com dois produtores simultâneos em
+   `test_two_producers_of_the_same_cut_write_one_row_per_hour`); **a guarda de verdade é o
+   índice único**, ainda pedido em `.claude/state/brief-T3.43-db-market-regimes-hourly.md`
+   — enquanto ele não existir, a trava é tudo o que separa duas passadas simultâneas de
+   uma hora duplicada.
+7. **Duas regras decidem quais horas uma passada produz** (`regime_window.py`), e é a
+   segunda que faz um buraco sarar. *Backfill:* toda hora da janela **sem linha** — 31 dias
+   na primeira passada, nada depois. *Reparo:* toda hora das últimas **72 h**, tenha linha
+   ou não — porque a hora escrita `unknown` durante uma falta de vela **tem** linha e a
+   primeira regra nunca mais olharia para ela; era assim até a T3.43c e a série ficava com
+   o buraco para sempre. Recalcular é barato; **reescrever** é o que custa, e quem decide é
+   o digest: hora cujas velas não mudaram sai `unchanged` sem sequer abrir transação, hora
+   cujas velas mudaram é atualizada **no lugar** (o id sobrevive para as FKs). Mais fundo
+   que 72 h — depois de um backfill grande de velas, como os buracos da T3.7 — é decisão do
+   operador: `--repair-days N` (que também alarga `--backfill-days` para pelo menos N,
+   senão pediria reparo de hora fora da janela). O corte atual está sempre dentro da janela
+   de reparo: é a hora cujas velas ainda podem estar chegando.
 8. **Manivela e observabilidade.** `uv run python -m hunter_scanner_worker.regime_hourly
-   --once [--backfill-days N]` roda uma passada e sai (sem trava: quem pede à mão já
-   decidiu). Métricas `hunter_regime_rows_total{outcome}` (`inserted`, `updated`,
-   `unchanged`, `no_reference`, `failed`) e `hunter_regime_last_hour_timestamp_seconds`;
+   --once [--backfill-days N] [--repair-days N]` roda uma passada e sai (sem trava: quem
+   pede à mão já decidiu). Métricas `hunter_regime_rows_total{outcome}` (`inserted`,
+   `updated`, `unchanged`, `no_reference`, `failed`) e
+   `hunter_regime_last_hour_timestamp_seconds`;
    campo `regime_last_ts` no `hb:scanner:{instance}`; log `scanner_regime_pass`.
    **Prontidão: detalhe de status, nunca check.** Um buraco nesta série custa a uma coorte
    o corte por contexto e não custa nada à faixa viva.
 9. **Custo declarado** (stack local, 2026-09-08, 217 mercados monitorados): a dobra
    horária do BTC em 62 dias custa **0,48 s**; a do universo em 32 dias, **2,3 s por lote
    de 25 mercados** (~21 s no total, uma vez); em regime permanente a leitura do universo
-   é de 25 horas e custa **0,12 s por lote** (~1,1 s). Classificar as 745 horas do
+   é de 25 horas e custa **0,12 s por lote** (~1,1 s) — **número obsoleto desde a T3.43c:**
+   com a janela de reparo de 72 h a leitura em regime permanente passa a cobrir **97 horas**
+   (~4× o volume; estimativa ~4 s por passada, ainda não medida contra o stack real — remedir
+   e substituir esta linha). Classificar as 745 horas do
    backfill custa **1,7 s** de CPU. Cobertura de breadth medida: 199 de 217 mercados com
-   as 25 horas completas.
+   as 25 horas completas. **Escrita** (testcontainer, T3.43c): as 745 linhas do backfill
+   custavam **186,5 s** com uma transação por hora e custam **11–12 s** com uma transação
+   por dia (`WRITE_BATCH_HOURS = 24`; uma leva que falha é repetida hora a hora, então uma
+   hora impossível continua custando só a própria hora). A passada em regime permanente
+   recalcula as 73 horas da janela de reparo, não reescreve nenhuma e custa **0,52 s**.
 
 ## 5. Opportunity Engine
 
@@ -487,6 +507,50 @@ número nenhum.
 - A cada 1 h: `agent_stats` por janela (7d/30d/90d/all), por regime, por mercado, por hora do dia, por bucket de volatilidade.
 - Diário: retenção, partições, consolidação de heartbeats.
 - Learning (Fase 3): importância de features (correlação de componentes da decomposição com `r_multiple`), taxa de falso positivo por anomalia, degradação de performance por versão; produz **recomendações** de pesos (`opportunity_weights` nova versão `is_active=false`) que um OWNER precisa ativar. Nunca altera capital ou risco sozinho.
+
+## 9b. Operações traçadas — o gráfico de cada operação concluída (T3.50)
+
+**Onde:** `infra/scripts/render_operations.py` + os irmãos `_chart.py` (modelo e geometria) e
+`_draw.py` (matplotlib). **Não é serviço, não é worker, não escreve nada na VPS:** é uma ferramenta
+de leitura, rodada à mão, que transforma cada desfecho `terminal` com `r_multiple` conhecido num PNG
+no vault e numa linha de tabela numa nota do Obsidian.
+
+```bash
+# 1. exportar (SOMENTE LEITURA; a consulta viaja pelo stdin do psql e o JSON volta pelo stdout)
+uv run python infra/scripts/render_operations.py export     --version momentum v6 --cohort all --out /tmp/momentum-v6.jsonl
+# 2. desenhar (matplotlib NÃO está no pyproject — árvore compartilhada, lock intocado)
+uv run --with matplotlib python infra/scripts/render_operations.py render     /tmp/momentum-v6.jsonl --max 200          # destino padrão: obsidian/attachments/operacoes/<slug>
+# 3. escrever a nota da versão e reconstruir o índice
+uv run python infra/scripts/render_operations.py note /tmp/momentum-v6.jsonl
+```
+
+1. **O corte da barra da decisão é `date_bin('15 min', observation_ts, 'epoch')`** — a última barra
+   de 15 min **completamente fechada** no instante da decisão. Para uma versão de 15 min é
+   exatamente a barra que ela leu; para uma de 5 min (`volume_anomaly`) é a última barra de 15 min
+   que já existia, nunca a que ainda estava se formando.
+2. **As velas são as de 1 min `is_final`, dobradas em SQL com exigência de completude**
+   (`date_bin` desde a época, `count(*) = 15`): balde a que falta um minuto não é exportado. A
+   janela vai de 96 barras de 15 min terminando na decisão (`pattern_bars` de
+   `trendline_breakout_v1`) até 4 barras depois da saída.
+3. **As linhas de tendência do gráfico são `tl_scan` cortado na barra da decisão**, com
+   `pattern_params(trendline_breakout_v1.default_parameters)` — o mesmo código congelado que decide,
+   não uma reimplementação para desenhar. A janela é a corrida **contígua** de até 96 baldes
+   completos terminando na decisão (`atr_series` levanta em buraco). Nenhuma vela posterior à
+   decisão participa: `tl_scan` aplica o corte uma vez, no topo.
+4. **O que as linhas significam depende da versão.** Só `trendline_breakout_v1` **lê** linha para
+   decidir — nela a linha é o gatilho e a invalidação estrutural, e o `line_id` do envelope é
+   destacado no gráfico junto com o pivô do stop. Em `momentum`, `mean_reversion`, `session_orb`,
+   `volume_anomaly`, `breakout` e `sweep_reclaim` as linhas são **contexto calculado depois** pelo
+   mesmo varredor congelado: servem para olhar a operação, nunca foram entrada dela. Tratar as duas
+   coisas como a mesma é a forma mais barata de inventar uma explicação retrospectiva.
+5. **Idempotência.** `render` pula o PNG que já existe (`--force` redesenha) e `--max` limita o lote,
+   então uma versão de 213 operações se completa em duas invocações sem redesenhar as 200 primeiras.
+   `note` reescreve a nota inteira a partir do JSONL: a nota é derivada, nunca editada à mão.
+6. **Nome do arquivo:** `<YYYYMMDD-HHMM>Z-<mercado>-<resultado>.png`, com o instante em UTC — o
+   título e as tabelas mostram Brasília (UTC−3) com o UTC ao lado, mas o nome do arquivo é ordenável
+   e não muda com horário de verão.
+7. **Teto de 120 KB por PNG** (`figsize 12,8x6,6`, dpi 96). Medido nas 681 imagens da primeira
+   corrida (sete versões, 2026-09-08): entre 47 e 99 KB, 44 MB no total.
 
 ## 10. Streams e consumidores
 
