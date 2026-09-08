@@ -13,6 +13,7 @@ through (review T3.15-risk, "Antes de ligar a ponte" item 1).
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from sqlalchemy import text
@@ -21,7 +22,30 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from hunter_strategy_worker.activation import validate_parameters
 from hunter_strategy_worker.activation_db import Refused, record_event
 
-__all__ = ["activate_derived"]
+__all__ = ["LINEAGE_RE", "activate_derived", "keep_lineage"]
+
+LINEAGE_RE = re.compile(
+    r"^variante de v\d+ \| derived_from=v\d+ \| overrides=[^|]* \| params_hash=[0-9a-f]{12}"
+)
+"""The lineage prefix ``infra/scripts/derive_variant.py`` freezes into a variant's
+``changelog`` (T3.26). Spelled out here rather than imported because a package
+module cannot import from ``infra/scripts`` — the same trade ``catalogue.py``
+makes for ``_PURPOSE_LIVE``; a contract test compares the two spellings."""
+
+
+def keep_lineage(frozen: str | None, changelog: str) -> str:
+    """The operator's ``changelog``, with the row's frozen lineage still in front.
+
+    Activation is the only write a derived row ever gets, and it replaces the
+    ``changelog`` — which is where ``derived_from=v<n>`` lives, and the only
+    thing that ties a variant to its parent for the catalogue exporter
+    (``obsidian_strategy_pages.parse_parent_version``). Losing it at activation
+    would turn every activated variant into an orphan. A row without the prefix
+    (a ``--paper-line`` product, whose lineage the exporter reads from its own
+    phrase) is returned untouched.
+    """
+    match = LINEAGE_RE.match(frozen or "")
+    return f"{match.group(0)} | {changelog}" if match else changelog
 
 
 async def activate_derived(
@@ -62,7 +86,7 @@ async def activate_derived(
             "changelog = :changelog WHERE id = :id AND activated_at IS NULL "
             "RETURNING activated_at"
         ),
-        {"changelog": changelog, "id": row.id},
+        {"changelog": keep_lineage(row.changelog, changelog), "id": row.id},
     )
     activated = updated.first()
     if activated is None:

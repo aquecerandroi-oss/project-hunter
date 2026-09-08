@@ -67,6 +67,7 @@ def sibling_slug_for(strategy_key: str, parent_version: str, k: int) -> str:
 
 _SUCCEEDS_RE = re.compile(r"\bsucceeds (v\d+)\b")
 _PAPER_LINE_RE = re.compile(r"\bpaper line of (v\d+)\b")
+_DERIVED_FROM_RE = re.compile(r"\bderived_from=(v\d+)\b")
 _SIBLING_RE = re.compile(r"^replication:[0-9a-fA-F-]+:(\d+) \| irm[aã] \d+ de (v\d+)\b")
 
 
@@ -87,16 +88,24 @@ def parse_parent_version(changelog: str | None) -> str | None:
     """The parent's ``version`` label from a frozen ``changelog`` string, or
     ``None`` for a version with no parent (a first activation).
 
-    Recognises exactly three frozen spellings: ``activate_strategy_version.py``'s
-    ``supersede`` and ``--paper-line``, and ``replicate_strategy_version.py``'s
-    sibling label. Anything else is a first activation or hand-written prose,
-    and guessing a parent from free text would invent a link nobody asked for."""
+    Recognises exactly four frozen spellings: ``activate_strategy_version.py``'s
+    ``supersede`` and ``--paper-line``, ``replicate_strategy_version.py``'s
+    sibling label, and ``derive_variant.py``'s ``derived_from=v<n>`` (T3.26 — the
+    only one that is an explicit key rather than a phrase, and the only one that
+    survives the variant's own activation, because ``activate_derived`` keeps the
+    lineage prefix in front of the operator's note). Anything else is a first
+    activation or hand-written prose, and guessing a parent from free text would
+    invent a link nobody asked for."""
     if changelog is None:
         return None
     sibling = parse_replication_sibling(changelog)
     if sibling is not None:
         return sibling[0]
-    match = _SUCCEEDS_RE.search(changelog) or _PAPER_LINE_RE.search(changelog)
+    match = (
+        _SUCCEEDS_RE.search(changelog)
+        or _PAPER_LINE_RE.search(changelog)
+        or _DERIVED_FROM_RE.search(changelog)
+    )
     return match.group(1) if match else None
 
 

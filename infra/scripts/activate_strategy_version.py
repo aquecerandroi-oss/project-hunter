@@ -27,27 +27,24 @@ digest: it retires the old row (``deprecated`` + a ``changelog`` saying why) and
 creates ``version + 1`` carrying the **frozen row's own** ``parameters_schema``,
 ``default_parameters`` and ``params_format``, with the new ``code_ref``, both in
 one transaction. Copying from the row rather than recomputing from code is the
-point: the successor has to continue the experiment that was frozen, not
-whatever the code says today.
+point: the successor continues the frozen experiment, not today's code.
 
-``--paper-line`` (T3.15, D10) derives the coorte that may reach the paper
-wallet from a **frozen** ``research_only`` version: a *new* row, next free
-``v<n>``, carrying the source row's own ``parameters_schema``,
-``default_parameters`` and ``params_format`` byte for byte, the ``code_ref``
-recomputed from the module the frozen digest names, ``status = 'draft'``,
-``activated_at = NULL`` and ``purpose = 'paper'``. The source row is untouched
-and **nothing is activated**: activating the derived line later is a
-separate, audited ``activate`` run (:mod:`hunter_strategy_worker.activate_derived`
-keeps its own content, T3.15e), and D10 names the seven conditions that come
-first. ``purpose`` is written only here, on the migration/owner connection.
+``--paper-line`` (T3.15, D10) derives the coorte that may reach the paper wallet
+from a **frozen** ``research_only`` version: a *new* draft row, next free
+``v<n>``, with that row's own content byte for byte and ``purpose = 'paper'``;
+the source is untouched and nothing is activated (``paper_line.py``). A row that
+already carries **its own content** (``_DERIVED``: a paper line, or a research
+variant of ``infra/scripts/derive_variant.py``, T3.26) is activated by
+:mod:`hunter_strategy_worker.activate_derived` — only ``status``, ``activated_at``
+and ``changelog`` move; the plain research path would rewrite its parameters
+from *today's* code and freeze the wrong experiment (review T3.15-risk).
 
-Every run writes a ``system_events`` row — activation, refusal or an
-unexpected failure alike (T3.15c): an experiment whose start nobody can date
-is not an experiment.
+Every run writes a ``system_events`` row — activation, refusal or an unexpected
+failure alike (T3.15c): an experiment whose start nobody can date is not one.
 
 Connects with ``DATABASE_URL_MIGRATIONS`` (direct, never the pooler), like
 ``infra/scripts/seed.py``. Shared checks in :mod:`hunter_strategy_worker.activation_db`;
-``--paper-line`` and derived activation in ``paper_line``/``activate_derived`` (file budget).
+``--paper-line`` and derived activation in ``paper_line``/``activate_derived`` (budget).
 """
 
 from __future__ import annotations
@@ -55,6 +52,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 from typing import Any
 
@@ -83,14 +81,17 @@ from hunter_strategy_worker.paper_line import paper_line
 
 __all__ = ["Refused", "activate", "main", "paper_line", "supersede"]
 
+_DERIVED = re.compile(r"^paper line of v\d+|\bderived_from=v\d+\b")
+"""A ``changelog`` frozen by a deriving tool — spelled out rather than imported
+(like ``activation_db``'s labels): a guard that fails open is not a guard."""
+
 
 def _resolve(
     registry: StrategyRegistry, key: str, version: str, code_ref: str | None = None
 ) -> Any:
-    """The registry first; then, for a row the registry does not name (a paper
-    line keeps its source's code under a bumped version label), the module its
-    frozen ``code_ref`` points at — the same resolution the worker uses
-    (:func:`resolve_strategy`)."""
+    """The registry first; then, for a row the registry does not name (a derived
+    row keeps its source's code under a bumped version label), the module its
+    frozen ``code_ref`` points at — as :func:`resolve_strategy` does."""
     code_key = registry_key(key, version)
     try:
         return registry.get(code_key, version)
@@ -122,8 +123,7 @@ async def activate(
     """Run every check and, unless ``dry_run``, activate. Returns a summary line.
 
     A row already carrying its own content (``purpose != research_only`` or a
-    derived ``changelog``) is a ``--paper-line`` product: :func:`activate_derived`
-    keeps it as-is rather than rewriting it from today's code (T3.15-risk item 1).
+    ``_DERIVED`` changelog) goes to :func:`activate_derived` (T3.15-risk item 1).
     """
     if not await migration_applied(conn):
         raise Refused("0002_shadow_lab is not applied: apply the migration before activating")
@@ -139,7 +139,7 @@ async def activate(
         )
     strategy = _resolve(registry, key, version, row.code_ref)
     code_ref = version_code_ref(strategy_module(strategy))
-    if row.purpose != PURPOSE_RESEARCH_ONLY or (row.changelog or "").startswith("paper line of"):
+    if row.purpose != PURPOSE_RESEARCH_ONLY or _DERIVED.search(row.changelog or ""):
         return await activate_derived(
             conn, key, version, changelog, row, code_ref=code_ref, dry_run=dry_run
         )
