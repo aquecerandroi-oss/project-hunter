@@ -1,7 +1,7 @@
 ---
 tags: [trading, paper, m3]
-updated: 2026-09-05
-status: planejado
+updated: 2026-09-08
+status: carteira aberta e motor rodando; nenhuma ordem paper criada porque a ponte está desligada e o aceite operacional (T3.29) não foi feito
 owner: sexta-feira
 ---
 
@@ -9,7 +9,27 @@ owner: sexta-feira
 
 ## Status
 
-**Planejado para o Milestone 3.** Nenhum `ExecutionAdapter` existe hoje. As tabelas `portfolios`, `orders`, `fills`, `positions`, `trades`, `portfolio_equity_snapshots` existem como schema desde o M0, mas vazias — nenhuma ordem paper foi criada ainda.
+> **Atualizado em 2026-09-08 — a frase antiga desta seção deixou de ser verdade.** Ela dizia
+> "planejado para o Milestone 3; nenhum `ExecutionAdapter` existe hoje". O simulador de execução
+> paper e o `execution-worker` **existem, foram provados e rodam na VPS**, e a carteira permanente do
+> Everton está aberta desde 2026-09-07 04:27Z (19.333,0111164813 USDT — ver [[Portfolio]]).
+
+**O que continua verdadeiro:** `orders`, `fills`, `positions`, `trades` seguem **vazias** — nenhuma
+ordem paper foi criada. Não por falta de motor, e sim porque a **ponte sinal → admissão está
+desligada** (`ENABLE_PAPER_AUTONOMY=false`): a linha `momentum v3` paper, ativa desde **02:57 de
+Brasília de 2026-09-08**, emitiu **154 sinais** e produziu **0 propostas, 0 posições, 0 trades**
+([[Diario/2026-09-08]]).
+
+## Antes de ligar a chave: sete itens, e a maioria ainda **não medida**
+
+A revisão da Astra de 2026-09-08 ([[2026-09-08-shadow-lab-pronto]]) mostrou que as quatro condições
+que a base citava não eram todas. O aceite operacional completo — admissão, `avgPrice`, proteção
+degradada, qualidade do MTM, integração (WS + Redis), backup restaurável e o DSN de dono — está na
+tabela de [[Execution Engine]], com o estado de cada linha e o arquivo:linha do risco. Cinco deles
+estão em [[Open Bugs]]; o brief é `.claude/state/brief-T3.29-autonomy-acceptance-run.md`.
+
+Ligar `ENABLE_PAPER_AUTONOMY` é decisão do **Everton**, e a recomendação registrada é **esperar**:
+com β indisponível em 100% dos mercados, o Risk Engine recusaria as propostas de qualquer jeito.
 
 ## O que está especificado
 
@@ -29,7 +49,8 @@ Fills contra books sintéticos (book raso → partial fill); invariante `equity 
 
 ## Relacionadas
 
-[[Execution Engine]] · [[Portfolio]] · [[Risk Engine]]
+[[Execution Engine]] · [[Portfolio]] · [[Risk Engine]] · [[Open Bugs]] ·
+[[2026-09-08-shadow-lab-pronto]] · [[EXP-0005-momentum-paper]]
 
 ## Fontes
 

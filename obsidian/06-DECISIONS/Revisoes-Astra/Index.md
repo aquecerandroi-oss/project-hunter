@@ -1,6 +1,6 @@
 ---
 tags: [astra, revisao, indice]
-updated: 2026-09-06
+updated: 2026-09-08
 status: registro
 owner: sexta-feira
 decided_on: 2026-09-06
@@ -11,6 +11,7 @@ by: astra
 
 Cada revisão é uma opinião do motor Astra da [[Mente da Sexta-feira]] sobre um plano, um diff ou uma decisão; o resultado (aceito/rejeitado e por quê) fica no kit da tarefa em `.claude/state/review-*.md` e nas páginas de [[Open Bugs]] / [[Resolved Bugs]].
 
+- [[2026-09-08-shadow-lab-pronto]] — "o Lab está pronto?" (2026-09-08): **não** — 4 furos no caminho de replicação (T3.18c), 5 etapas da autonomia paper sem prova (T3.29) e a negação de serviço compartilhada do bucket do `web` (T3.28a-seguimento); `inconclusivo` no EXP-0006 confirmado
 - [[S4-hipoteses]] — as hipóteses de falha do Shadow Lab sobre a coorte da VPS (5 must-fix; "intervalo do contrafactual" e "72 bugs de identidade" caíram)
 - [[S4-vps-lab]] — a prova operacional do Lab na VPS (hashes reproduzidos; 4 achados, incluindo a recomendação que teria quebrado o deploy)
 - [[S4-avaliacoes-shadow]] — as primeiras avaliações datadas do Shadow Lab (5 must-fix, todos aceitos antes de publicar)

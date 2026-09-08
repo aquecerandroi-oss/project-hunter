@@ -12,6 +12,155 @@ closed: ""
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
+## Abertos pela revisão da Astra "o Lab está pronto?" (2026-09-08)
+
+Origem: [[2026-09-08-shadow-lab-pronto]] (transcrição em
+`.claude/state/astra-review-lab-pronto-2026-09-08.md`). **Nenhum destes foi reproduzido por medição
+nesta revisão** — são leitura de código com arquivo:linha e cenário de falha; onde houver número
+operacional, ele vem de leitura já registrada, não de consulta nova. Estado de todos: **aberto
+2026-09-08 (Astra)**.
+
+### Caminho de replicação (dono: **T3.18c**, brief a escrever pelo orquestrador)
+
+- **HIGH — a CLI de replicação pode tornar o pai "promissor" com evidência de replay.** A consulta do
+  worker filtra versão e resultado terminal **sem filtro de coorte**, e `replicate()` usa esse
+  relatório para autorizar a rodada e gravar `promising_at`.
+  `services/strategy-worker/hunter_strategy_worker/replication_stats.py:69`,
+  `services/strategy-worker/hunter_strategy_worker/replication.py:257` e `:296`.
+  **Cenário:** prospectivo pequeno ou negativo + replay positivo com 100 resultados em 30 dias → a
+  CLI aceita sem `--force-research` e **congela um marco que a D14/D15 mandam nascer só do
+  prospectivo**. A correção feita na API **não** fecha este segundo escritor.
+  Estado: **aberto 2026-09-08 (Astra)**.
+
+- **HIGH — "avaliável" tem duas definições no mesmo produto.** O placar exige saída até `as_of` **e**
+  horizonte completo transcorrido (`apps/api/hunter_api/services/lab_summary_metrics.py:68`); a
+  replicação exige só emissão até `as_of`, terminal e `R` não nulo
+  (`apps/api/hunter_api/repositories/lab_replication.py:104`).
+  **Cenários:** (a) leitura histórica inclui resultado encerrado **depois** do corte; (b) no corte
+  atual, saídas rápidas entram antes das operações com horizonte ainda aberto — população enviesada
+  para quem fecha cedo. Estado: **aberto 2026-09-08 (Astra)**.
+
+- **MEDIUM — maturidade e Profit Factor divergem entre os dois vereditos.** O placar conta dias de
+  **saída**, a replicação conta dias de **decisão**; e uma população madura, positiva e **sem
+  perdas** sai `validada` no placar e `reprovada` na replicação.
+  `apps/api/hunter_api/services/lab_scoreboard.py:80`,
+  `apps/api/hunter_api/services/lab_scoreboard_metrics.py:79`,
+  `packages/indicators/hunter_indicators/replication/stats.py:80` e `:154`.
+  **Cenário:** dois vereditos para a mesma versão **sem nenhuma mudança de evidência** — o contrato
+  precisa ser unificado, casos-limite inclusive. Estado: **aberto 2026-09-08 (Astra)**.
+
+- **HIGH — a mesma evidência pode amadurecer uma irmã duas vezes.** `sibling_population()` concatena
+  a população viva com **todos** os replays da irmã, sem deduplicar decisões sobrepostas e sem a
+  comparação com replay do pai na mesma janela que a D15(c) exige.
+  `apps/api/hunter_api/repositories/lab_replication.py:162`,
+  `packages/indicators/hunter_indicators/replication/protocol.py:138`,
+  `.claude/state/decisions-delegated-2026-09-08.md:12`.
+  **Cenário:** 25 resultados em 15 dias, replayados sob dois UUIDs, viram 50 resultados e atingem a
+  meia-régua **sem informação nova**; sete irmãs assim aprovam o bloco 2. O rótulo `mixed`/`replay`
+  informa a origem e **não** corrige a contagem. Estado: **aberto 2026-09-08 (Astra)**.
+
+### Autonomia paper — as cinco etapas sem prova (dono: **T3.29**, `.claude/state/brief-T3.29-autonomy-acceptance-run.md`)
+
+Contexto medido e já registrado: **154 sinais paper, 0 propostas, 0 posições, 0 trades** — o caminho
+autônomo nunca rodou de ponta a ponta ([[Diario/2026-09-08]]). A linha `momentum v3` já está ativa
+desde **02:57 de Brasília**; a ativação **não** é pendência. Os sete itens com o estado de cada um
+estão em [[Execution Engine]], [[Paper Trading]] e [[Risk Engine]].
+
+- **HIGH (admissão) — ativar a versão não basta: falta provar o vínculo em `agents`.** Sem vínculo
+  habilitado para a **versão e a carteira corretas** o sinal nem pertence àquela fila; com agente
+  pausado, `agent_unavailable`.
+  `services/execution-worker/hunter_execution_worker/bridge_repo.py:130`,
+  `services/execution-worker/hunter_execution_worker/bridge_screen.py:215`.
+  Estado: **aberto 2026-09-08 (Astra)** — a medir em T3.29 item 1.
+
+- **HIGH (ordem) — `avgPrice` continua ausente e adia execução.** O leitor devolve `None`, e mercados
+  cujos filtros MARKET exigem preço médio **adiam**, podendo deixar a reserva expirar; β válido não
+  resolve. `services/execution-worker/hunter_execution_worker/market_data.py:149`,
+  `services/execution-worker/hunter_execution_worker/entry_inputs.py:62`.
+  **Cenário:** com a autonomia ligada, o sinal é aprovado e a ordem nunca sai — a carteira parece
+  "sem oportunidade" quando na verdade falta um campo de mercado. Estado: **aberto 2026-09-08
+  (Astra)** — a medir e corrigir em T3.29 item 2.
+
+- **HIGH (proteção) — `pending_degraded` não é proteção executada.** Sem fita/livro utilizável a
+  intenção fica degradada **com a posição exposta**; falta a prova de recuperação após queda/restart,
+  com quantidade remanescente correta e **sem venda duplicada**.
+  `services/execution-worker/hunter_execution_worker/protection.py:183` e `:296`.
+  Estado: **aberto 2026-09-08 (Astra)** — teste de integração em T3.29 item 3.
+
+- **HIGH (MTM) — o check `mtm_fresh` mede a escrita, não a atualidade do preço.** Marca indisponível
+  cai no último valor durável, o ciclo segue escrevendo snapshot e renovando `mtm_written_at`.
+  `services/execution-worker/hunter_execution_worker/bridge_inputs.py:180`,
+  `services/execution-worker/hunter_execution_worker/cycles.py:275`,
+  `services/execution-worker/hunter_execution_worker/health.py:95`.
+  **Cenário:** fita parada, patrimônio aparentemente estável e check de MTM **verde** — o painel diz
+  saúde onde há cegueira. Estado: **aberto 2026-09-08 (Astra)** — `mark_quality` no aceite, T3.29
+  item 4.
+
+- **MEDIUM (integração) — queda de WS com lacuna e perda de Redis durante a decisão não foram
+  cobertas.** A própria prova V6 declara isso;
+  `tests/integration/paper/test_v6_stale_data_reconnect_restart.py:1`. Precisam ser exercitadas
+  agora, com SPOT integrado, incluindo retomada das proteções e reconciliação do ledger.
+  Estado: **aberto 2026-09-08 (Astra)** — T3.29 item 5.
+
+- **HIGH (segurança, pré-requisito da autonomia) — o compose entrega `DATABASE_URL_MIGRATIONS` aos
+  serviços de runtime pelo bloco compartilhado.** `infra/vps/docker-compose.prod.yml:30` e `:59`.
+  **Cenário:** execução de código comprometida em qualquer serviço de runtime usa a conexão de
+  **dono** para contornar os grants de ativação e de isolamento — o risco permanece mesmo com a
+  conexão normal rodando sob papel restrito. Dono: `devops-engineer` (**T3.15d**,
+  `.claude/state/brief-T3.15d-owner-dsn.md`). Estado: **aberto 2026-09-08 (Astra)** — e a Astra o
+  trata como condição **anterior** a ligar `ENABLE_PAPER_AUTONOMY`.
+
+**Backup restaurável não é bug — é prova que falta.** Os registros ainda relatam ausência de dumps
+(`docs/reports/M3.md:261`) e o bootstrap já invoca o script com `bash`
+(`infra/scripts/bootstrap_vps.sh:346`): sem uma verificação atual não se pode chamar o incidente
+antigo de vigente **nem** de resolvido. Registrado como **"a comprovar em T3.29" (item 6)**, não
+como bug aberto.
+
+### Limite de requisições (dono: **T3.28a-seguimento**)
+
+- **MEDIUM — negação de serviço compartilhada no bucket do `web`.** Uma conta dispara SSR
+  repetidamente e **cada** chamada gasta primeiro o bucket de IP do `web`, inclusive as que o limite
+  de principal recusaria depois; passando de 6.000/min, **outras contas recebem 429**.
+  `apps/api/hunter_api/middleware/rate_limit.py:133`.
+  **Cenário:** um usuário com uma aba em laço derruba o site para os demais sem nunca ultrapassar o
+  próprio limite de principal. Aumentar o teto reduz a incidência normal e **não elimina a falha**.
+  A Astra não achou bypass direto por XFF de peer externo no caminho implementado (`apps/web/lib/server/api.ts:7`,
+  `infra/vps/docker-compose.prod.yml:66`, `apps/api/hunter_api/auth/rbac.py:116`) — o desenho da
+  T3.28a está de pé; o que falta é este cenário. Estado: **aberto 2026-09-08 (Astra)**.
+
+- **LOW (texto do brief, já contornado) — `FORWARDED_ALLOW_IPS` não resolve nome por DNS.** O Uvicorn
+  instalado transforma valores não reconhecidos como IP em literais, então `web` como **nome** nunca
+  casa com o peer numérico (`.venv/Lib/site-packages/uvicorn/middleware/proxy_headers.py:128`). A
+  implementação da T3.28a escolheu IP fixo, então não há defeito em produção — fica registrado para
+  que ninguém "simplifique" de volta para o nome. Estado: **aberto 2026-09-08 (Astra)**.
+
+### Correção de texto (dono: **orquestrador**, `docs/` fora do escopo da T3.30)
+
+- **LOW (documento normativo) — a linguagem estatística de `docs/plans/REPLICATION.md` está errada em
+  dois pontos.** §46 diz que "metade da amostra dobra, grosso modo, a largura do intervalo de cada
+  bloco": sob aproximação i.i.d., reduzir a amostra à metade aumenta o erro-padrão por **√2
+  (~1,41×)**, não por ~2×. §78 chama os quatro blocos de "quatro repetições **independentes**": eles
+  **reutilizam dados**, então a conjunção protege menos do que a palavra sugere.
+  **Cenário:** o protocolo é lido como se desse uma garantia estatística que ele não dá, e um
+  veredito `real` ganha mais peso do que merece. Correção só de texto, sem mudar regra.
+  Estado: **aberto 2026-09-08 (Astra)**.
+
+## Aberto na tarde de 2026-09-08 (revisão do commit `50932ec`, fora da revisão da Astra)
+
+- **CRITICAL (perda de dado histórico, já revertido em produção) — `earliest_known` fica obsoleto
+  dentro do ciclo e retira janelas legítimas como `before_listing`.** `recovery.py:147` lê
+  `market_earliest` **uma vez por ciclo**; o laço de histórico (`recovery.py:243-271`) e as
+  verificações em `recovery_drain.py:109` e `:260` comparam `gap.gap_end < earliest_known` contra
+  esse valor velho para **todos** os pedaços do mesmo mercado no mesmo ciclo. Quando o intercalador
+  dá mais de um turno ao mesmo mercado, o pedaço 1 é recuperado e empurra o mínimo real para trás; o
+  pedaço 2 é comparado com o mínimo **velho**, classificado `unrecoverable/before_listing` e, **por
+  desenho, nunca mais reaberto**. **Medido na VPS às 14:00Z de 2026-09-08: BTCUSDT com 5 e UNIUSDT
+  com 5 janelas `unrecoverable`** — dois mercados listados há anos; são janelas de agosto perdidas.
+  **Mitigação já aplicada:** os `market-worker` da VPS voltaram à imagem `385dac6` às ~14:10Z. Dono:
+  `exchange-integration-specialist` (**T3.7e**, `.claude/state/brief-T3.7e-earliest-stale-within-cycle.md`),
+  que inclui o SQL idempotente para reabrir as linhas falsamente terminais. Estado: **aberto
+  2026-09-08 (code-reviewer, confirmado em produção)**.
+
 ## Abertos na T3.21 (higiene da base)
 
 - **LOW (base de conhecimento) — 32 das 75 notas de `11-KNOWLEDGE` estão com

@@ -246,6 +246,38 @@ exigiu que fosse reportado):** 31 de 224 decisões, **−86,2%**. Pelo próprio 
    [[2026-09-08-linhagem-de-momentum-v4-no-changelog-da-vps|00-INBOX: linhagem de `momentum v4`]],
    com a correção proposta e a decisão pendente do Everton.
 
+### Próximas medições (Astra) — 2026-09-08
+
+**Isto não é uma avaliação: nenhum número novo foi medido aqui.** É o que a revisão da Astra de
+2026-09-08 ([[2026-09-08-shadow-lab-pronto]], transcrição em
+`.claude/state/astra-review-lab-pronto-2026-09-08.md`) exige da **próxima** avaliação desta página,
+antes de qualquer variante nova. Ela concordou com o `inconclusivo` por duas razões independentes —
+30 avaliáveis / 9 dias contra 100 **E** 30, **e** o replay ser a mesma janela que gerou a hipótese —
+e disse que a igualdade dos 25 pares é verificação de consistência, **não** prova de equivalência.
+
+1. **Separar seleção de rearme.** Medir o **filtro** sobre as entradas congeladas do pai e,
+   separadamente, a **trajetória completa com slots**. As 25 decisões comuns têm diferença zero;
+   falta investigar as **seis decisões do pai acima do piso que não aparecem** entre essas 25, além
+   das seis exclusivas da variante. A tabela pareada da avaliação de 2026-09-08 permite identificar
+   essa lacuna, mas não a fecha.
+2. **Medir oportunidade por tempo.** Sinais por mercado/dia, tempo ocupado, tempo exposto, motivos de
+   bloqueio/rearme e soma de `R` por período sob uma convenção fixa. Média por operação **sozinha**
+   não compara políticas com frequências tão diferentes — e aqui uma delas toma 86% menos decisões.
+3. **Decompor custos e risco.** Resultado bruto contra líquido, custo em `R`, funding, distância do
+   stop, MFE/MAE, duração e cauda negativa; estratificado por mercado, por dia e por faixas de ATR%
+   **definidas previamente**.
+4. **Medir dependência e influência.** Intervalo da diferença reamostrando dias/blocos comuns às duas
+   versões; e análise retirando um dia/mercado por vez, mostrando a contribuição individual dos
+   **cinco resultados exclusivos avaliáveis** que hoje sustentam sozinhos a vantagem aparente de
+   0,021 R.
+5. **Fechar proveniência e cobertura.** SQL integral colado, `as_of` **e** `read_at` no título,
+   faltantes por braço e comparação prospectiva no universo comum — as mesmas lacunas que as
+   Pendências acima já declaram.
+
+**Ressalva dela, e vale como regra:** *não* usar os decis de ATR% para escolher imediatamente outro
+piso na mesma amostra. Isso iniciaria **outra tentativa exploratória**, a registrar como tal no
+[[Registro de Tentativas]] — não é a continuação desta.
+
 ### Avaliação de <próxima data>
 
 <acrescente uma seção nova; não edite a anterior>

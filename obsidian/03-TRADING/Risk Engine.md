@@ -1,7 +1,7 @@
 ---
 tags: [trading, risco, m3]
-updated: 2026-09-07
-status: implementado e provado no local — o execution-worker existe e roda o ciclo inteiro (T3.5/T3.5b); a ponte sinal → admissão está desligada; falta T3.5c, T3.0c/T3.0d, T3.9b, T3.10 e o deploy na VPS
+updated: 2026-09-08
+status: implementado e rodando na VPS — o execution-worker roda o ciclo inteiro e reporta em hb:execution:paper; a ponte sinal → admissão continua desligada e o aceite operacional da autonomia (T3.29) tem cinco itens não medidos
 owner: sexta-feira
 ---
 
@@ -168,6 +168,34 @@ Continua valendo a regra de ouro (`CLAUDE.md`): **nenhum agente executa ordens**
 entrada é AGENTE → PROPOSTA → RISK ENGINE → EXECUÇÃO —, e o `risk-engine-guardian` (opus) é revisor
 obrigatório de qualquer diff nesses caminhos. Contrato normativo: `docs/RISK_ENGINE.md` **v2.1**.
 
+## Pré-requisitos efetivos da autonomia paper — atualizado em 2026-09-08 (revisão da Astra)
+
+**Sinal paper não é execução paper.** A linha `momentum v3` com `purpose = paper` está ativa desde
+**02:57 de Brasília de 2026-09-08** e já emitiu **154 sinais**; a carteira registrou **0 propostas, 0
+posições, 0 trades**, porque a ponte está desligada. Medir sinais **não** mede o Risk Engine em
+serviço: enquanto a chave estiver `false`, `evaluate` nunca é chamado por um sinal do Lab, e a metade
+da hipótese que passa pela carteira continua sem contrafactual ([[EXP-0005-momentum-paper]]).
+
+A revisão [[2026-09-08-shadow-lab-pronto]] derrubou a ideia de que faltavam **quatro** condições:
+são **sete**, e a maioria está **não medida**. A tabela completa, com o estado e o arquivo:linha de
+cada uma, está em [[Execution Engine]]; o aceite é o brief
+`.claude/state/brief-T3.29-autonomy-acceptance-run.md`. Em resumo, o que toca este motor:
+
+- **Admissão** — o vínculo em `agents` precisa existir **habilitado** para a versão e a carteira
+  certas; ativar a `strategy_version` não basta (**não medido**).
+- **MTM antes do kill switch** — hoje o check `mtm_fresh` prova que **houve escrita**, não que o
+  preço é atual: fita parada com snapshot renovado deixa o kill switch avaliando patrimônio velho
+  com o painel verde. O aceite passa a exigir `mark_quality` (**não medido**).
+- **Proteção** — `pending_degraded` registra a intenção, e a posição segue exposta; falta a prova de
+  recuperação após restart, sem venda duplicada (**não medido**).
+- **β indisponível em 100% dos mercados** — enquanto o BTC (a referência) não tiver 20 dias
+  contíguos, o check `correlation` recusa por `beta_unavailable` e nenhuma proposta passaria de
+  qualquer forma. Ver [[Open Bugs]].
+
+**Nada disto é defeito comprovado em produção** — é cenário nomeado que ninguém verificou, e é por
+isso que `ENABLE_PAPER_AUTONOMY` continua `false`. Ligar é decisão do Everton, depois de todas as
+linhas verdes.
+
 ## Contrato (implementado como função pura em `packages/risk-core`)
 
 `evaluate(proposal, portfolio_state, limits, market_liquidity, kill_switch) -> RiskDecision`. Função **pura e determinística** — sem IO, sem chamada de rede ou banco — testável com tabelas de casos e reutilizável no backtest (M6). LLM não tem acesso ao Risk Engine nem aos limites.
@@ -223,7 +251,7 @@ fill paper, que depende da **T3.5**, e as **nove verificações da T3.9** — o 
 
 ## Relacionadas
 
-[[Execution Engine]] · [[Agents Overview]] · [[Portfolio]] · [[Paper Trading]] · [[Strategy Backlog]] · [[Architecture Decisions]] (regra "nenhum agente executa") · [[Changelog]] · [[Open Bugs]] · [[Dialogos/M3]]
+[[Execution Engine]] · [[Agents Overview]] · [[Portfolio]] · [[Paper Trading]] · [[Strategy Backlog]] · [[Architecture Decisions]] (regra "nenhum agente executa") · [[Changelog]] · [[Open Bugs]] · [[Dialogos/M3]] · [[2026-09-08-shadow-lab-pronto]] · [[EXP-0005-momentum-paper]]
 
 ## Fontes
 

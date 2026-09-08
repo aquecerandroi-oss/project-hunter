@@ -13,6 +13,30 @@ Esta pasta (`obsidian/`) é a base de conhecimento **do projeto**, viva e versio
 
 ## Onde estamos agora
 
+> **Atualizado em 2026-09-08 (fim da tarde) — leia isto antes do resto da seção, que é de 2026-09-07.**
+>
+> - **A linha paper do `momentum` existe e emite.** A `momentum v3` (`purpose = paper`) foi ativada
+>   pelo Everton em **2026-09-08 05:57:30Z (02:57 de Brasília)** pelo caminho auditado e emite desde
+>   06:00:09Z. Na leitura do meio-dia: **154 sinais paper, 0 propostas, 0 posições, 0 trades** — a
+>   ponte continua desligada (`ENABLE_PAPER_AUTONOMY=false`). **Sinal paper não é execução paper.**
+> - **O `execution-worker` está na VPS** e reporta em `hb:execution:paper` (patrimônio
+>   19.333,0111164813 USDT, 0 posições, `kill_switch = ACTIVE`). A frase antiga "não está na VPS" caiu.
+> - **A autonomia paper não está pronta, e agora está escrito por quê.** A revisão da Astra
+>   ([[2026-09-08-shadow-lab-pronto]]) mostrou que são **sete** pré-requisitos, **cinco não medidos**
+>   (admissão, `avgPrice`, proteção degradada, qualidade do MTM, integração WS+Redis), mais o backup
+>   restaurável a comprovar e o DSN de dono a fechar. Tabela com o estado de cada um em
+>   [[Execution Engine]]; aceite operacional na T3.29.
+> - **O caminho de replicação tem quatro furos** que podem carimbar `promising_at` com evidência de
+>   replay — o veredito do placar continua isolado, a replicação não. Em [[Open Bugs]], dono T3.18c.
+> - **Dois deploys hoje:** `385dac6` (fixture do placar; sem ela o `next build` da VPS quebrava) e
+>   `50932ec` (T3.7d). Os `market-worker` foram **revertidos para `385dac6` às ~14:10Z** por um
+>   CRITICAL que marcava janelas legítimas como `before_listing` (hotfix T3.7e).
+> - **Sign-up de teste destravado** no painel do Clerk pelo Everton (e-mail + código, sem
+>   usuário/senha): a auditoria de tela logada voltou a rodar às 13:22Z.
+> - **Um 429 derrubava a tela inteira** (SSR de `/me` sob o limite por IP): T3.28a deu bucket próprio
+>   ao peer interno e T3.28b faz o shell degradar; a negação de serviço **compartilhada** continua
+>   aberta. Ver [[Diario/2026-09-08]].
+
 **Atualizado em 2026-09-07.** M0 (fundação: monorepo, auth Clerk, organizações/workspaces,
 dashboard, schema de 54 tabelas com RLS, Docker, CI) e **M1 fechados e aprovados**
 (`docs/reports/M0.md`, `docs/reports/M1.md`). Hoje, **rodando 24 h por dia na VPS**: o
@@ -102,10 +126,10 @@ Detalhe completo em [[Data Flow]] e `docs/PIPELINE.md`.
 | Feature Engine | implementado — 28 calculadoras, 108.688 snapshots na VPS; **12 de 27 features com baseline utilizável** | [[Features]] | M2 |
 | Anomaly Engine | implementado — 10 detectores (8 armados); **1 disparou** até agora (`VOLUME_SPIKE`) | [[Anomalies]] | M2 |
 | Regime v0 + Opportunity Score + Radar | implementado; **regime `UNKNOWN` em 100 %** das leituras e estágio nunca publicado — M2 **não aprovado** (`docs/reports/M2.md`) | [[Features]], [[Anomalies]] | M2 |
-| Paper Trading / Execution Engine | **`execution-worker` implementado e provado** (`7ecafd2`, `12edda3`) — ciclo de admissão, ordem, proteção, MTM antes do kill switch e recuperação; 30 min de prova com saída 0. **Não está na VPS**, e não sobe lá antes da T3.9 | [[Paper Trading]], [[Execution Engine]] | M3 |
+| Paper Trading / Execution Engine | **implementado, provado e no ar na VPS** (`7ecafd2`, `12edda3`) — admissão, ordem, proteção, MTM antes do kill switch e recuperação; `hb:execution:paper` verde. **0 ordens paper criadas**: a ponte está desligada e o aceite da autonomia (T3.29) tem **cinco itens não medidos** | [[Paper Trading]], [[Execution Engine]] | M3 |
 | Portfolio (carteira permanente em USDT com âncora em BRL) | **aberta em produção em 2026-09-07 04:27Z** — R$ 100.000 → 19.333,0111164813 USDT a 5,1725, âncora imutável, 0 posições. O pó (resíduo de taxa em ativo base) tem coluna própria e **não é posição**; falta o assentamento | [[Portfolio]] | M3 |
 | Risk Engine (contrato **v2.2.1**, perfil `paper_v1`) | **completo e em execução:** núcleo, schema (`0006`→`0009`), ledger, kill switch durável publicando `kill_switch.changed`, admissão e o worker que chama `evaluate`. Falta T3.5c, T3.0c/T3.0d, T3.9b, T3.10 e o deploy | [[Risk Engine]] | **M3** (era M4; ADR 0005) |
-| Ponte sinal → admissão (T3.14) | **implementada e desligada** (`12edda3`) — `ENABLE_PAPER_AUTONOMY=false` **e** todo sinal do Lab é `research_only`; nada é admitido até uma versão com propósito paper ser ativada, e isso é decisão do Everton | [[Risk Engine]], [[Strategies]] | M3 |
+| Ponte sinal → admissão (T3.14) | **implementada e desligada** (`12edda3`). A segunda trava **caiu**: desde 2026-09-08 existe versão com `purpose = paper` ativada (`momentum v3`, 02:57 de Brasília), e ela já emitiu **154 sinais**. Só `ENABLE_PAPER_AUTONOMY=false` separa o Lab da carteira — e ligar é decisão do Everton **depois** dos sete itens da T3.29 | [[Risk Engine]], [[Strategies]], [[Execution Engine]] | M3 |
 | Câmbio USDTBRL (coletor T3.11a) | **implementado e no ar na VPS** (`09eb6de`) — uma observação por minuto no shard 0, idempotente | [[Portfolio]] | M3 |
 | Adaptador SPOT da Binance (T3.0a/T3.0b) | adaptador (`078d6ef`) e **`market_type` em toda identidade fora do banco** (`cefad8c`, com as chaves do perpétuo byte por byte inalteradas); **a ingestão spot (T3.0c) está em voo**, e a T3.0d tem um item bloqueante: o `event_id` do candle não inclui o tipo | [[Exchange Adapters]] | M3 |
 | β contra o BTC (`beta_v1`, com validade) | implementado como pacote puro (`da2fb49`); `market_betas` **existe no banco e está vazia** (0 linhas na VPS) | [[Risk Engine]] | M3 |
@@ -122,14 +146,14 @@ calculam nada, só mostram e ordenam o que as páginas já declaram) e dois **ca
 | [[Experimentos.base]] | um experimento por linha: `EXP`, estratégia, versão, resultado, avaliáveis e dias contra o limiar editorial de **100 E 30**, última avaliação. Tem uma view "Abaixo do limiar editorial" e cartões. |
 | [[Estratégias.base]] | uma versão de estratégia por linha: versão, propósito, status, o EXP onde mora o veredito, de qual versão foi replicada, coortes, `activated_at`. Views "Ativas" e "Linha paper". |
 | [[Fluxo sinal → carteira.canvas]] | o caminho completo `market-worker → scanner → strategy-worker (Lab) → ponte → admissão → execution-worker → carteira`, cada caixa ligada à página do módulo, com as **duas travas** desenhadas onde elas estão. |
-| [[Família momentum.canvas]] | a linhagem do `momentum`: `v1` depreciada → `v2` em pesquisa → `v3` paper (não ativada), com os EXP que medem cada uma. |
+| [[Família momentum.canvas]] | a linhagem do `momentum`: `v1` depreciada → `v2` em pesquisa → `v3` **paper, ativada em 2026-09-08** → `v4` (piso de custo, `research_only`), com os EXP que medem cada uma. |
 
 As convenções da base — frontmatter obrigatório por pasta, os quatro callouts, o linter — estão em
 `docs/OBSIDIAN.md`. O linter roda com `uv run python infra/scripts/obsidian_lint.py`.
 
 ## Como navegar
 
-- [[Mente da Sexta-feira]] — como a assistente pensa (Claude + Astra) e onde cada tipo de memória fica; [[Dialogos/Index|diálogos]] e [[Revisoes-Astra/Index|revisões da Astra]]. Mais recente: [[Dialogos/M3]] — carteira virtual e Risk Engine, a partir da diretiva do Everton de 2026-09-06 (ADR 0005; plano `docs/plans/M3.md`; contrato `docs/RISK_ENGINE.md` v2). O M3 **não** declara modo autônomo: as entradas são manuais e a ponte sinal → proposta é do M4.
+- [[Mente da Sexta-feira]] — como a assistente pensa (Claude + Astra) e onde cada tipo de memória fica; [[Dialogos/Index|diálogos]] e [[Revisoes-Astra/Index|revisões da Astra]]. Revisão mais recente: [[2026-09-08-shadow-lab-pronto]] — "o Lab está pronto?" (não; sete pré-requisitos de autonomia, quatro furos na replicação). Diálogo mais recente: [[Dialogos/M3]] — carteira virtual e Risk Engine, a partir da diretiva do Everton de 2026-09-06 (ADR 0005; plano `docs/plans/M3.md`; contrato `docs/RISK_ENGINE.md` v2). O M3 **não** declara modo autônomo: as entradas são manuais e a ponte sinal → proposta é do M4.
 
 - **00-INBOX/** — pendências **operacionais** datadas: uma escrita em produção, um ajuste de
   ferramenta ou uma correção que espera decisão. Não é bug (isso é `07-BUGS/`) nem decisão de
