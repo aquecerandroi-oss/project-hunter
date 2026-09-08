@@ -226,6 +226,65 @@ O braço publica `duplicates_dropped` e a janela (`window_from`/`window_to`, rec
 qualquer braço amadureceu com replay. `replication.status` pode repousar em replay — rotulado —;
 `verdict` (a régua do placar), nunca.
 
+## 3.6 Controle — a vantagem é uma **diferença**, não um nível (T3.36)
+
+Todo EXP nomeia, **antes da primeira ativação e junto com a hipótese**, o seu controle
+predeclarado. Sem ele, `expectancy_r = +0,08 R` é um número sem contraste: numa janela em que o
+mercado subiu, qualquer regra comprada com stop e alvo em ATR produz R positivo, e o que se mediu
+foi o mês, não o filtro de entrada.
+
+**Controle padrão** (usado quando o EXP não declara outro, e o EXP tem de dizer que usa este):
+*comprar os mesmos mercados nos mesmos horários, com o mesmo stop, o mesmo alvo e o mesmo horizonte,
+**sem o filtro de entrada***. Operacionalmente: entradas de **tempo aleatório** sorteadas com
+semente registrada, na **mesma frequência por mercado e por hora do dia** que a versão produziu,
+com a mesma geometria (stop e alvo derivados da mesma leitura de ATR congelada), os mesmos custos
+assumidos, a mesma política de reentrada e o mesmo corte de dados. A única coisa que muda é *quando*
+se entra — que é exatamente a coisa que a estratégia diz saber escolher.
+
+**Como se reporta.** A vantagem da versão é publicada como **Δ contra o controle**:
+`expectancy_r(versão) − expectancy_r(controle)`, com o intervalo de
+`hunter_indicators.replication.bootstrap` (`bootstrap_mean_ci` para o intervalo i.i.d. e
+`cluster_bootstrap_mean_ci` para o intervalo por blocos de dia, `CONFIDENCE = 0,95`,
+`RESAMPLES = 1000`, semente registrada; recusa com motivo abaixo de `MIN_SAMPLE = 30`). O nível
+absoluto continua sendo publicado — ele é o que a régua do placar usa —, mas o **texto** do EXP
+descreve a vantagem pela diferença, e um Δ cujo intervalo cruza zero é "não distinguível do
+controle", nunca "positivo".
+
+**Não implementado nesta entrega, e o motivo é do banco, não de preguiça.** A T3.36 avaliou pôr um
+"override de entrada" no `replay/run.py` e a conta não fecha barato:
+
+1. **A coorte não é representável.** `shadow_episodes.cohort` tem um `CHECK` (migração
+   `0002_shadow_lab`, linha 138) que aceita exatamente `prospective`, `replay:<uuid>` e
+   `replication:<uuid>:<k>` — o mesmo padrão de `hunter_core.domain.enums.SHADOW_COHORT_PATTERN`.
+   `control:<uuid>` seria recusado **pelo Postgres**, e mudar o padrão é migração
+   (database-architect), nunca decisão de um job de pesquisa.
+2. **O controle é uma `strategy_version`, não uma bandeira.** `evaluate_slot` decide chamando
+   `Strategy.evaluate` de uma versão do catálogo, ligada por `code_ref`; um sorteio semeado é um
+   módulo de estratégia (`control_random_v1`) com `parameters_schema`, `default_parameters`
+   (semente, frequência-alvo por hora, referência da geometria) e `params_hash` próprios, e a linha
+   precisa nascer **congelada e ativada** — `INSERT` em `strategy_versions` que a `0011` reservou ao
+   dono.
+3. **A geometria não é do controle.** Stop e alvo têm de vir da **mesma** leitura de ATR da versão
+   comparada, senão o contraste mistura "quando entrar" com "onde parar" — que é outro experimento
+   (o EXP-0004 já é esse).
+
+Fica então **especificado** para a T3.19f, nestes termos, e o que valer aqui vale sem renegociação:
+
+- **Entrada:** `control_random_v1` decide em fechamentos alinhados ao timeframe da versão comparada;
+  em cada fechamento elegível sorteia com `random.Random(seed_do_experimento, market_id,
+  source_bar_close)` e entra com probabilidade `p = decisões_da_versão / fechamentos_elegíveis`,
+  medida **por mercado e por hora do dia** sobre a mesma janela, de modo que a frequência bata sem
+  copiar os instantes.
+- **Geometria, custos, horizonte, reentrada e corte:** idênticos, lidos do envelope congelado da
+  versão comparada; nenhum parâmetro novo além de semente e frequência.
+- **Coorte:** `control:<uuid>` depois que a migração ampliar o padrão; até lá, `replay:<uuid>` com
+  a versão de controle sendo uma `strategy_version` própria — o que já isola a população, porque a
+  chave do slot é `(strategy_version_id, market_id, cohort)`.
+- **Relatório:** o bloco de controle nunca conta para a régua de maturidade nem para `verdict`
+  (D14/D15); ele entra como Δ rotulado, do mesmo jeito que o replay entra.
+- **Recusa declarada:** um EXP sem seção "Controle" preenchida não passa o portão C1–C8
+  (`_TEMPLATE-EXP.md`), porque uma hipótese sem contraste não é testável.
+
 ## 4. Como as irmãs nascem — `infra/scripts/replicate_strategy_version.py`
 
 ```
