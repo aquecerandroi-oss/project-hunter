@@ -107,3 +107,12 @@ This rule changes orchestration only:
 
 Nothing here changes what an agent does with a task. It only changes how
 many tasks run at once, and who is allowed to commit.
+
+## The working tree is shared (added 2026-09-08 after an agent ran `git stash` on four tasks' work)
+
+Several agents edit `C:\dev\project-hunter` at the same time. Therefore, for every agent and every executor (Claude, Hermes, Codex):
+
+- **Never** `git stash`, `git checkout -- <file>`, `git restore`, `git reset`, `git clean`, `git rebase` or `git commit -a`. Files you did not create in this task belong to someone else, even when they look unrelated or "dirty".
+- A dirty tree is normal. Do not "clean it up" to get a baseline: read `git status --short`, note which paths are yours, and work only on those.
+- If a tool insists on a clean tree, stop and report; do not force it.
+- Commits are made by the orchestrator, per task, with `git add <exact files>` — never `-A`.
