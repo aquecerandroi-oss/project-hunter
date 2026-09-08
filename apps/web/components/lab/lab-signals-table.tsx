@@ -5,7 +5,9 @@ import { useMemo, useRef, useState } from "react";
 import { LabSignalPanel } from "@/components/lab/lab-signal-panel";
 import { LabSignalRow } from "@/components/lab/lab-signal-row";
 import { LabSignalsEmpty } from "@/components/lab/lab-signals-empty";
-import { LAB_SIGNALS_HEADERS, LabSignalsTableHead } from "@/components/lab/lab-signals-table-head";
+import { labSignalsHeaders, LabSignalsTableHead } from "@/components/lab/lab-signals-table-head";
+import { LabTotalsCard } from "@/components/lab/lab-totals-card";
+import type { MoneyRuler } from "@/components/lab/lab-money";
 import { Button } from "@/components/ui/button";
 import { useArrowKeyRowSelection } from "@/hooks/useArrowKeyRowSelection";
 import { useRowHeight } from "@/hooks/useDensity";
@@ -23,6 +25,7 @@ export interface LabSignalsTableProps {
   baseParams: LabSignalsParams;
   versionLabelById: Record<string, string>;
   cohort: string;
+  ruler: MoneyRuler;
 }
 
 const OVERSCAN = 8;
@@ -44,7 +47,7 @@ function rowId(row: SignalListItemOut): string {
  * said explicitly below so it never looks like it shares the summary's
  * clock (Astra, S3b hierarchy review, must-fix).
  */
-export function LabSignalsTable({ orgSlug, initialItems, initialCursor, baseParams, versionLabelById, cohort }: LabSignalsTableProps) {
+export function LabSignalsTable({ orgSlug, initialItems, initialCursor, baseParams, versionLabelById, cohort, ruler }: LabSignalsTableProps) {
   const rowHeight = useRowHeight();
   const [items, setItems] = useState(initialItems);
   const [cursor, setCursor] = useState(initialCursor);
@@ -52,7 +55,9 @@ export function LabSignalsTable({ orgSlug, initialItems, initialCursor, basePara
   const [loadError, setLoadError] = useState<string | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [selectedSignal, setSelectedSignal] = useState<SignalListItemOut | null>(null);
+  const [showResearch, setShowResearch] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const headers = labSignalsHeaders(showResearch);
 
   const { startIndex, endIndex, visibleRows, topPad, bottomPad } = useVirtualizedRows({
     rows: items,
@@ -101,70 +106,81 @@ export function LabSignalsTable({ orgSlug, initialItems, initialCursor, basePara
   if (items.length === 0) return <LabSignalsEmpty cohort={cohort} />;
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row">
-      <div className="flex flex-1 flex-col gap-2">
-        <p className="text-xs text-fg-muted">
-          Sinais · todo o período disponível (este endpoint não aceita janela/`as_of` -- só o resumo acima é filtrado por
-          janela).
-        </p>
-        <div className="overflow-x-auto rounded-md border border-border">
-          <div
-            ref={containerRef}
-            onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-            onKeyDown={handleKeyDown}
-            tabIndex={0}
-            role="grid"
-            aria-label="Sinais do Shadow Lab"
-            aria-activedescendant={selectedRow ? rowId(selectedRow) : undefined}
-            aria-rowcount={items.length + 1}
-            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
-            style={{ height: VIEWPORT_HEIGHT, overflowY: "auto" }}
-          >
-            <table role="presentation" className="w-full text-left text-[13px]">
-              <LabSignalsTableHead />
-              <tbody>
-                {topPad > 0 && (
-                  <tr aria-hidden="true" style={{ height: topPad }}>
-                    <td colSpan={LAB_SIGNALS_HEADERS.length} />
-                  </tr>
-                )}
-                {visibleRows.map((row, visibleOffset) => {
-                  const absoluteIndex = startIndex + visibleOffset;
-                  return (
-                    <LabSignalRow
-                      key={row.signal_id}
-                      id={rowId(row)}
-                      orgSlug={orgSlug}
-                      row={row}
-                      versionLabel={versionLabelFor(row.strategy_version_id)}
-                      rowHeight={rowHeight}
-                      selected={absoluteIndex === selectedIndex}
-                      ariaRowIndex={absoluteIndex + 2}
-                      onOpen={() => setSelectedSignal(row)}
-                    />
-                  );
-                })}
-                {bottomPad > 0 && (
-                  <tr aria-hidden="true" style={{ height: bottomPad }}>
-                    <td colSpan={LAB_SIGNALS_HEADERS.length} />
-                  </tr>
-                )}
-              </tbody>
-            </table>
+    <div className="flex flex-col gap-4">
+      <LabTotalsCard rows={items} ruler={ruler} hasMore={cursor !== null} />
+      <div className="flex flex-col gap-3 lg:flex-row">
+        <div className="flex flex-1 flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-fg-muted">
+              Sinais · todo o período disponível (este endpoint não aceita janela/`as_of` -- só o resumo acima é
+              filtrado por janela).
+            </p>
+            <Button type="button" variant="outline" size="sm" aria-pressed={showResearch} onClick={() => setShowResearch((v) => !v)}>
+              {showResearch ? "Ocultar detalhes de pesquisa" : "Detalhes de pesquisa"}
+            </Button>
+          </div>
+          <div className="overflow-x-auto rounded-md border border-border">
+            <div
+              ref={containerRef}
+              onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+              onKeyDown={handleKeyDown}
+              tabIndex={0}
+              role="grid"
+              aria-label="Sinais do Shadow Lab"
+              aria-activedescendant={selectedRow ? rowId(selectedRow) : undefined}
+              aria-rowcount={items.length + 1}
+              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+              style={{ height: VIEWPORT_HEIGHT, overflowY: "auto" }}
+            >
+              <table role="presentation" className="w-full text-left text-[13px]">
+                <LabSignalsTableHead showResearch={showResearch} />
+                <tbody>
+                  {topPad > 0 && (
+                    <tr aria-hidden="true" style={{ height: topPad }}>
+                      <td colSpan={headers.length} />
+                    </tr>
+                  )}
+                  {visibleRows.map((row, visibleOffset) => {
+                    const absoluteIndex = startIndex + visibleOffset;
+                    return (
+                      <LabSignalRow
+                        key={row.signal_id}
+                        id={rowId(row)}
+                        orgSlug={orgSlug}
+                        row={row}
+                        versionLabel={versionLabelFor(row.strategy_version_id)}
+                        ruler={ruler}
+                        showResearch={showResearch}
+                        rowHeight={rowHeight}
+                        selected={absoluteIndex === selectedIndex}
+                        ariaRowIndex={absoluteIndex + 2}
+                        onOpen={() => setSelectedSignal(row)}
+                      />
+                    );
+                  })}
+                  {bottomPad > 0 && (
+                    <tr aria-hidden="true" style={{ height: bottomPad }}>
+                      <td colSpan={headers.length} />
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => void loadMore()} disabled={!cursor || loadingMore}>
+              {cursor ? (loadingMore ? "Carregando..." : "Carregar mais") : "Fim da lista"}
+            </Button>
+            {loadError && <span className="text-xs text-red">{loadError}</span>}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => void loadMore()} disabled={!cursor || loadingMore}>
-            {cursor ? (loadingMore ? "Carregando..." : "Carregar mais") : "Fim da lista"}
-          </Button>
-          {loadError && <span className="text-xs text-red">{loadError}</span>}
+        <div className="lg:w-96">
+          <LabSignalPanel
+            signal={selectedSignal}
+            versionLabel={selectedSignal ? versionLabelFor(selectedSignal.strategy_version_id) : ""}
+            ruler={ruler}
+          />
         </div>
-      </div>
-      <div className="lg:w-96">
-        <LabSignalPanel
-          signal={selectedSignal}
-          versionLabel={selectedSignal ? versionLabelFor(selectedSignal.strategy_version_id) : ""}
-        />
       </div>
     </div>
   );

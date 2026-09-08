@@ -1,11 +1,13 @@
 "use client";
 
 import { LabAsOf } from "@/components/lab/lab-as-of";
-import { formatPrice } from "@/components/markets/format";
 import { LabMarketLink } from "@/components/lab/lab-market-link";
-import { ResultChip, TrackingStateChip } from "@/components/lab/lab-signal-chips";
-import { formatR, signColorClass } from "@/components/lab/lab-format";
+import { LabResearchCells } from "@/components/lab/lab-research-cells";
+import { reasonLabel } from "@/components/lab/lab-format";
+import { MONEY_TOOLTIP, moneyForRow, priceAndTime, saidaText, usdtToBrl, type MoneyRuler } from "@/components/lab/lab-money";
+import { ResultBadge } from "@/components/lab/lab-result-badge";
 import type { SignalListItemOut } from "@/lib/api/lab-types";
+import { formatBrlSigned, formatPct, formatUsdtSigned } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export interface LabSignalRowProps {
@@ -13,18 +15,25 @@ export interface LabSignalRowProps {
   orgSlug: string;
   row: SignalListItemOut;
   versionLabel: string;
+  ruler: MoneyRuler;
+  showResearch: boolean;
   rowHeight: number;
   selected: boolean;
   ariaRowIndex: number;
   onOpen: () => void;
 }
 
-const SECONDARY_CELL = "hidden px-3 text-right font-mono tabular-nums text-fg-muted lg:table-cell";
-
-/** One row of the Shadow Lab signals table -- essential columns visible on mobile (decision_at, mercado, chips, r_multiple), the rest secondary (docs/DESIGN.md §2). */
-export function LabSignalRow({ id, orgSlug, row, versionLabel, rowHeight, selected, ariaRowIndex, onOpen }: LabSignalRowProps) {
-  const r = formatR(row.r_multiple, row.r_multiple_reason);
-  const rExFunding = row.r_ex_funding;
+/**
+ * One row of the Shadow Lab signals table -- money columns first, always
+ * visible (brief T3.17: what a signal entered with, what it left with,
+ * profit or loss, in plain USDT/BRL); research columns (R, raw levels,
+ * tracking/touch state, `LabResearchCells`) render only when `showResearch`
+ * is on, behind the "Detalhes de pesquisa" toggle in `LabSignalsTable`.
+ */
+export function LabSignalRow({ id, orgSlug, row, versionLabel, ruler, showResearch, rowHeight, selected, ariaRowIndex, onOpen }: LabSignalRowProps) {
+  const { pnlUsdt, notionalUsdt, pctMove } = moneyForRow(row, ruler);
+  const pnlBrl = pnlUsdt.value !== null ? usdtToBrl(pnlUsdt.value, ruler) : null;
+  const pctColor = pctMove === null ? "text-fg-muted" : pctMove >= 0 ? "text-green" : "text-red";
 
   return (
     <tr
@@ -36,31 +45,39 @@ export function LabSignalRow({ id, orgSlug, row, versionLabel, rowHeight, select
       className={cn("cursor-pointer border-t border-border hover:bg-bg-overlay", selected && "bg-bg-overlay ring-1 ring-inset ring-gold")}
       onClick={onOpen}
     >
-      <td role="gridcell" className="px-3 text-xs">
-        <LabAsOf iso={row.decision_at} />
-      </td>
       <td role="gridcell" className="px-3">
         <LabMarketLink orgSlug={orgSlug} symbol={row.market} />
       </td>
-      <td role="gridcell" className="hidden px-3 text-xs text-fg-muted lg:table-cell">
-        {versionLabel}
+      <td role="gridcell" className="px-3 text-xs">
+        <LabAsOf iso={row.decision_at} />
       </td>
-      <td role="gridcell" className={SECONDARY_CELL}>{formatPrice(row.reference_price)}</td>
-      <td role="gridcell" className={SECONDARY_CELL}>{formatPrice(row.stop)}</td>
-      <td role="gridcell" className={SECONDARY_CELL}>{formatPrice(row.target1)}</td>
-      <td role="gridcell" className={SECONDARY_CELL}>{formatPrice(row.virtual_entry)}</td>
-      <td role="gridcell" className="px-3">
-        <TrackingStateChip state={row.tracking_state} reason={row.no_entry_reason ?? row.censored_reason} />
+      <td role="gridcell" title={MONEY_TOOLTIP} className="whitespace-nowrap px-3 text-right font-mono text-xs tabular-nums text-fg">
+        {priceAndTime(row.virtual_entry, row.entry_ts)}
       </td>
-      <td role="gridcell" className="px-3">
-        <ResultChip result={row.result} />
+      <td role="gridcell" title={MONEY_TOOLTIP} className="whitespace-nowrap px-3 text-right font-mono text-xs tabular-nums text-fg">
+        {saidaText(row)}
       </td>
-      <td role="gridcell" className={cn("px-3 text-right font-mono tabular-nums", r.isValue ? signColorClass(row.r_multiple) : "text-fg-muted")}>
-        {r.text}
+      <td role="gridcell" title={MONEY_TOOLTIP} className={cn("whitespace-nowrap px-3 text-right font-mono text-xs tabular-nums", pctColor)}>
+        {pctMove !== null ? formatPct(pctMove) : "--"}
       </td>
-      <td role="gridcell" className={cn(SECONDARY_CELL, rExFunding !== null && signColorClass(rExFunding))}>
-        {rExFunding !== null ? `${rExFunding}R` : "--"}
+      <td role="gridcell" title={MONEY_TOOLTIP} className="whitespace-nowrap px-3 text-right font-mono text-xs tabular-nums text-fg">
+        {notionalUsdt.value !== null ? formatUsdtSigned(notionalUsdt.value) : <span className="text-fg-muted">{reasonLabel(notionalUsdt.reason ?? "")}</span>}
       </td>
+      <td role="gridcell" title={MONEY_TOOLTIP} className="whitespace-nowrap px-3 text-right text-xs">
+        <span className="mr-1.5 inline-block">
+          <ResultBadge pnlUsdt={pnlUsdt.value} />
+        </span>
+        {pnlUsdt.value !== null ? (
+          <span className="font-mono tabular-nums text-fg">
+            {formatUsdtSigned(pnlUsdt.value)}
+            {pnlBrl !== null && <span className="text-fg-muted"> ({formatBrlSigned(pnlBrl)})</span>}
+          </span>
+        ) : (
+          <span className="text-fg-muted">{reasonLabel(pnlUsdt.reason ?? "sem motivo informado")}</span>
+        )}
+      </td>
+
+      {showResearch && <LabResearchCells row={row} versionLabel={versionLabel} />}
     </tr>
   );
 }

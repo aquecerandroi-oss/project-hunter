@@ -18,7 +18,7 @@ vi.mock("next/navigation", () => ({
 afterEach(cleanup);
 
 import { LabSignalsTable } from "@/components/lab/lab-signals-table";
-import { makeSignal } from "@/tests/fixtures/lab";
+import { exampleRuler, makeSignal } from "@/tests/fixtures/lab";
 
 const versionLabelById = { "098b060c-cdc0-46a6-b88b-70d4a5472b97": "momentum/v2" };
 
@@ -37,15 +37,24 @@ describe("LabSignalsTable: honest empty state", () => {
         baseParams={{ cohort: "prospective" }}
         versionLabelById={versionLabelById}
         cohort="prospective"
+        ruler={exampleRuler()}
       />,
     );
     expect(screen.getByText("0 sinais nesta seleção.")).toBeInTheDocument();
   });
 });
 
-describe("LabSignalsTable: chips per tracking_state/result", () => {
-  it("shows a 'sem entrada' chip with its reason for a no_entry row", () => {
-    const row = makeSignal({ tracking_state: "no_entry", no_entry_reason: "late:delay", result: "invalidated" });
+describe("LabSignalsTable: 'Saiu' column states plain-language reasons (brief T3.17), chips move behind 'Detalhes de pesquisa'", () => {
+  it("the default view shows 'não entrou: <motivo>' in the 'Saiu' column for a no_entry row, and the chip only appears behind the research toggle", () => {
+    const row = makeSignal({
+      tracking_state: "no_entry",
+      no_entry_reason: "late:delay",
+      result: "invalidated",
+      virtual_entry: null,
+      entry_ts: null,
+      exit_price: null,
+      exit_ts: null,
+    });
     render(
       <LabSignalsTable
         orgSlug="acme"
@@ -54,13 +63,18 @@ describe("LabSignalsTable: chips per tracking_state/result", () => {
         baseParams={{ cohort: "prospective" }}
         versionLabelById={versionLabelById}
         cohort="prospective"
+        ruler={exampleRuler()}
       />,
     );
+    expect(screen.getByText(/não entrou:/)).toBeInTheDocument();
+    expect(screen.queryByText(/sem entrada:/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Detalhes de pesquisa" }));
     expect(screen.getByText(/sem entrada:/)).toBeInTheDocument();
   });
 
-  it("shows a 'censurado' chip with its reason for a censored row", () => {
-    const row = makeSignal({ tracking_state: "censored", censored_reason: "gap:failed", result: "expired" });
+  it("the default view shows 'censurada: <motivo>' in the 'Saiu' column for a censored row, and the chip only appears behind the research toggle", () => {
+    const row = makeSignal({ tracking_state: "censored", censored_reason: "gap:failed", result: "expired", exit_price: null, exit_ts: null });
     render(
       <LabSignalsTable
         orgSlug="acme"
@@ -69,9 +83,14 @@ describe("LabSignalsTable: chips per tracking_state/result", () => {
         baseParams={{ cohort: "prospective" }}
         versionLabelById={versionLabelById}
         cohort="prospective"
+        ruler={exampleRuler()}
       />,
     );
-    expect(screen.getByText(/censurado:/)).toBeInTheDocument();
+    expect(screen.getByText(/censurada:/)).toBeInTheDocument();
+    expect(screen.queryByText(/^censurado:/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Detalhes de pesquisa" }));
+    expect(screen.getByText(/^censurado:/)).toBeInTheDocument();
   });
 
   it("never colors r_multiple's reason text as if it were a number", () => {
@@ -84,6 +103,7 @@ describe("LabSignalsTable: chips per tracking_state/result", () => {
         baseParams={{ cohort: "prospective" }}
         versionLabelById={versionLabelById}
         cohort="prospective"
+        ruler={exampleRuler()}
       />,
     );
     const cell = screen.getByText(/sem amostra madura/);
@@ -104,6 +124,7 @@ describe("LabSignalsTable: ARIA grid role tree", () => {
         baseParams={{ cohort: "prospective" }}
         versionLabelById={versionLabelById}
         cohort="prospective"
+        ruler={exampleRuler()}
       />,
     );
     expect(screen.getByRole("grid", { name: "Sinais do Shadow Lab" })).toBeInTheDocument();
@@ -128,6 +149,7 @@ describe("LabSignalsTable: cursor pagination via a Server Action", () => {
         baseParams={{ cohort: "prospective" }}
         versionLabelById={versionLabelById}
         cohort="prospective"
+        ruler={exampleRuler()}
       />,
     );
 
@@ -150,6 +172,7 @@ describe("LabSignalsTable: cursor pagination via a Server Action", () => {
         baseParams={{ cohort: "prospective" }}
         versionLabelById={versionLabelById}
         cohort="prospective"
+        ruler={exampleRuler()}
       />,
     );
 
@@ -170,8 +193,64 @@ describe("LabSignalsTable: the endpoint's own window scope is stated, not implie
         baseParams={{ cohort: "prospective" }}
         versionLabelById={versionLabelById}
         cohort="prospective"
+        ruler={exampleRuler()}
       />,
     );
     expect(screen.getByText(/todo o período disponível/)).toBeInTheDocument();
+  });
+});
+
+describe("LabSignalsTable: the totals card (brief T3.17 item 2)", () => {
+  it("shows the plain-money totals above the table, computed from the loaded rows", () => {
+    const rows = [
+      makeSignal({ signal_id: "1", tracking_state: "terminal", r_multiple: "1.0" }),
+      makeSignal({ signal_id: "2", tracking_state: "terminal", r_multiple: "-0.5" }),
+      makeSignal({ signal_id: "3", tracking_state: "pending_entry", r_multiple: null, r_multiple_reason: null }),
+    ];
+    render(
+      <LabSignalsTable
+        orgSlug="acme"
+        initialItems={rows}
+        initialCursor={null}
+        baseParams={{ cohort: "prospective" }}
+        versionLabelById={versionLabelById}
+        cohort="prospective"
+        ruler={exampleRuler()}
+      />,
+    );
+    const card = screen.getByTestId("lab-totals-card");
+    expect(within(card).getByText("Operações simuladas")).toBeInTheDocument();
+    expect(within(card).getByText("3")).toBeInTheDocument(); // total
+    expect(within(card).getByText("Resultado acumulado (USDT)")).toBeInTheDocument();
+    expect(within(card).getByText("Resultado acumulado (BRL)")).toBeInTheDocument();
+  });
+
+  it("adds 'das N operações listadas' only when a next page exists (the list is truncated)", () => {
+    const { unmount } = render(
+      <LabSignalsTable
+        orgSlug="acme"
+        initialItems={[makeSignal()]}
+        initialCursor={null}
+        baseParams={{ cohort: "prospective" }}
+        versionLabelById={versionLabelById}
+        cohort="prospective"
+        ruler={exampleRuler()}
+      />,
+    );
+    expect(screen.queryByText(/operações listadas/)).not.toBeInTheDocument();
+    unmount();
+
+    render(
+      <LabSignalsTable
+        orgSlug="acme"
+        initialItems={[makeSignal()]}
+        initialCursor="cursor-1"
+        baseParams={{ cohort: "prospective" }}
+        versionLabelById={versionLabelById}
+        cohort="prospective"
+        ruler={exampleRuler()}
+      />,
+    );
+    expect(screen.getByText(/das 1 operações listadas/)).toBeInTheDocument();
   });
 });

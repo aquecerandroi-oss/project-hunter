@@ -19,6 +19,11 @@ const REASON_LABELS: Record<string, string> = {
   geometry: "geometria inválida após revalidação (stop/entrada/alvo fora de ordem)",
   blocked: "mercado bloqueado (tracking hold de outra versão)",
   gap: "barra necessária irrecuperável (gap de dados)",
+  no_entry: "sem entrada",
+  no_stop: "sem stop registrado",
+  zero_stop_distance: "stop igual à entrada (distância zero)",
+  no_completed_operations: "nenhuma operação concluída nesta seleção",
+  no_brl_wallet: "conversão em BRL indisponível (carteira sem decomposição BRL)",
 };
 
 /** Human label for a reason code, splitting a `prefix:detail` shape (e.g. `gap:failed`, `late:delay`) so an unlisted detail still shows its known prefix. */

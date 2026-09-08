@@ -20,7 +20,7 @@ afterEach(cleanup);
 
 import { LabSignalPanel } from "@/components/lab/lab-signal-panel";
 import { LabSignalsTable } from "@/components/lab/lab-signals-table";
-import { exampleSignal, makeSignal } from "@/tests/fixtures/lab";
+import { exampleRuler, exampleSignal, makeSignal } from "@/tests/fixtures/lab";
 
 const versionLabelById = { "098b060c-cdc0-46a6-b88b-70d4a5472b97": "momentum/v2" };
 
@@ -45,6 +45,7 @@ describe("LabSignalsTable -> LabSignalPanel: selecting a row (click) fills in th
         baseParams={{ cohort: "prospective" }}
         versionLabelById={versionLabelById}
         cohort="prospective"
+        ruler={exampleRuler()}
       />,
     );
 
@@ -66,6 +67,7 @@ describe("LabSignalsTable -> LabSignalPanel: selecting a row (click) fills in th
         baseParams={{ cohort: "prospective" }}
         versionLabelById={versionLabelById}
         cohort="prospective"
+        ruler={exampleRuler()}
       />,
     );
 
@@ -81,7 +83,7 @@ describe("LabSignalsTable -> LabSignalPanel: selecting a row (click) fills in th
 describe("LabSignalPanel -> LabExcursions: mfe honesty (null+bounds vs. a known value)", () => {
   it("renders 'indeterminado' with the bounds and the 'ambíguo' badge when mfe is null and ambiguous is true", () => {
     // `exampleSignal()`'s excursions: mfe null, bounds.mfe [0, 4.2], ambiguous true.
-    render(<LabSignalPanel signal={exampleSignal()} versionLabel="momentum/v2" />);
+    render(<LabSignalPanel signal={exampleSignal()} versionLabel="momentum/v2" ruler={exampleRuler()} />);
 
     const mfeRow = screen.getByText("MFE (favorável)").closest("div") as HTMLElement;
     expect(within(mfeRow).getByText(/indeterminado/)).toBeInTheDocument();
@@ -99,7 +101,7 @@ describe("LabSignalPanel -> LabExcursions: mfe honesty (null+bounds vs. a known 
         ambiguous: false,
       },
     });
-    render(<LabSignalPanel signal={signal} versionLabel="momentum/v2" />);
+    render(<LabSignalPanel signal={signal} versionLabel="momentum/v2" ruler={exampleRuler()} />);
 
     const mfeRow = screen.getByText("MFE (favorável)").closest("div") as HTMLElement;
     expect(within(mfeRow).getByText(/1\.2500 price/)).toBeInTheDocument();
@@ -111,7 +113,7 @@ describe("LabSignalPanel -> LabExcursions: mfe honesty (null+bounds vs. a known 
 describe("LabSignalPanel -> LabSignalDetail: the envelope is fetched on demand and rendered as JSON", () => {
   it("calls the mocked action and shows the returned envelope as JSON when 'Ver envelope' is clicked", async () => {
     loadLabSignalEnvelopeActionMock.mockResolvedValue({ ok: true, envelope: { rsi_14: "62.3", regime: "trend_up" } });
-    render(<LabSignalPanel signal={exampleSignal()} versionLabel="momentum/v2" />);
+    render(<LabSignalPanel signal={exampleSignal()} versionLabel="momentum/v2" ruler={exampleRuler()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Ver envelope" }));
 
@@ -127,7 +129,7 @@ describe("LabSignalPanel -> LabSignalDetail: the envelope is fetched on demand a
 
   it("shows the honest error reason instead of a blank panel when the action fails", async () => {
     loadLabSignalEnvelopeActionMock.mockResolvedValue({ ok: false, envelope: null, reason: "sinal não encontrado nesta página" });
-    render(<LabSignalPanel signal={exampleSignal()} versionLabel="momentum/v2" />);
+    render(<LabSignalPanel signal={exampleSignal()} versionLabel="momentum/v2" ruler={exampleRuler()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Ver envelope" }));
 

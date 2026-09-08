@@ -5,11 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // (see tests/markets-page.test.tsx and tests/invitations-actions.test.ts).
 vi.mock("server-only", () => ({}));
 
-const { resolveOrgContextMock, getLabSummaryMock, listLabVersionsMock, getLabSignalsMock } = vi.hoisted(() => ({
+const { resolveOrgContextMock, getLabSummaryMock, listLabVersionsMock, getLabSignalsMock, listPortfoliosMock, getPortfolioSummaryMock } = vi.hoisted(() => ({
   resolveOrgContextMock: vi.fn(),
   getLabSummaryMock: vi.fn(),
   listLabVersionsMock: vi.fn(),
   getLabSignalsMock: vi.fn(),
+  listPortfoliosMock: vi.fn(),
+  getPortfolioSummaryMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api/org-context", () => ({ resolveOrgContext: resolveOrgContextMock }));
@@ -17,6 +19,10 @@ vi.mock("@/lib/api/lab", () => ({
   getLabSummary: getLabSummaryMock,
   listLabVersions: listLabVersionsMock,
   getLabSignals: getLabSignalsMock,
+}));
+vi.mock("@/lib/api/portfolio", () => ({
+  listPortfolios: listPortfoliosMock,
+  getPortfolioSummary: getPortfolioSummaryMock,
 }));
 vi.mock("@/lib/api/lab-actions", () => ({
   loadLabSignalsAction: vi.fn(),
@@ -62,6 +68,10 @@ beforeEach(() => {
   getLabSummaryMock.mockReset();
   listLabVersionsMock.mockReset().mockResolvedValue({ items: [] });
   getLabSignalsMock.mockReset().mockResolvedValue({ items: [], next_cursor: null });
+  // No wallet by default -- the reference-ruler fallback (brief T3.17) is
+  // exercised by every existing test unless a case below overrides it.
+  listPortfoliosMock.mockReset().mockResolvedValue({ items: [], next_cursor: null });
+  getPortfolioSummaryMock.mockReset();
 });
 
 afterEach(cleanup);
@@ -142,5 +152,61 @@ describe("LabPage: 503 reads as 'sem verificação', never as '0'", () => {
     render(jsx);
     expect(screen.getByText(/sem verificação/)).toBeInTheDocument();
     expect(screen.getByText(/Shadow Lab data is temporarily unavailable/)).toBeInTheDocument();
+  });
+});
+
+describe("LabPage: the money ruler (brief T3.17)", () => {
+  it("falls back to the labelled 10.000 USDT reference wallet when the organization has no principal paper wallet", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    listPortfoliosMock.mockResolvedValue({ items: [], next_cursor: null });
+
+    const jsx = await renderPage();
+    render(jsx);
+
+    expect(screen.getByText(/Simulação sobre dado real\. Nada foi comprado ou vendido\./)).toBeInTheDocument();
+    expect(screen.getByTestId("lab-money-ruler")).toHaveTextContent("Régua: 0,25% de 10,000.00 USDT (carteira de referência, sem carteira aberta) = 25.00 USDT por operação");
+  });
+
+  it("falls back to the reference wallet when the organization has a wallet but it is not the principal paper one (is_arena)", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    listPortfoliosMock.mockResolvedValue({
+      items: [{ id: "arena-1", workspace_id: "ws-1", name: "Arena", type: "paper", status: "active", is_arena: true, base_currency: "USDT", created_at: "2026-01-01T00:00:00Z" }],
+      next_cursor: null,
+    });
+
+    const jsx = await renderPage();
+    render(jsx);
+
+    expect(getPortfolioSummaryMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId("lab-money-ruler")).toHaveTextContent("carteira de referência, sem carteira aberta");
+  });
+
+  it("uses the real principal paper wallet's equity when it exists (the 'ever' wallet example from the brief)", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    listPortfoliosMock.mockResolvedValue({
+      items: [{ id: "ever-1", workspace_id: "ws-1", name: "ever", type: "paper", status: "active", is_arena: false, base_currency: "USDT", created_at: "2026-01-01T00:00:00Z" }],
+      next_cursor: null,
+    });
+    getPortfolioSummaryMock.mockResolvedValue({ equity: "19333.01", brl: { equity_brl: "115998.06" } });
+
+    const jsx = await renderPage();
+    render(jsx);
+
+    expect(getPortfolioSummaryMock).toHaveBeenCalledWith("org-1", "ever-1");
+    expect(screen.getByTestId("lab-money-ruler")).toHaveTextContent(
+      "Régua: 0,25% de 19,333.01 USDT (carteira principal (paper)) = 48.33 USDT por operação",
+    );
+  });
+
+  it("falls back to the reference wallet, without failing the page, when the portfolio lookup itself errors", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    listPortfoliosMock.mockRejectedValue(new Error("network down"));
+
+    const jsx = await renderPage();
+    render(jsx);
+
+    expect(screen.getByTestId("lab-money-ruler")).toHaveTextContent("carteira de referência, sem carteira aberta");
+    // A ruler-only failure is not a Lab failure -- the rest of the page still renders.
+    expect(screen.queryByText(/sem verificação/)).not.toBeInTheDocument();
   });
 });

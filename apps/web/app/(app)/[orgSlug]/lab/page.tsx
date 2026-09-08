@@ -4,6 +4,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { LabError } from "@/components/lab/lab-error";
 import { LabFilters } from "@/components/lab/lab-filters";
 import { LabHeader } from "@/components/lab/lab-header";
+import { buildReferenceRuler, buildWalletRuler, type MoneyRuler } from "@/components/lab/lab-money";
 import { LabSignalsTable } from "@/components/lab/lab-signals-table";
 import { LabTabs } from "@/components/lab/lab-tabs";
 import { LabVersionCard } from "@/components/lab/lab-version-card";
@@ -14,6 +15,7 @@ import { getLabSignals, getLabSummary, listLabVersions } from "@/lib/api/lab";
 import type { LabSignalsParams } from "@/lib/api/lab";
 import type { LabSignalsPage, LabSummaryOut, LabVersionsOut } from "@/lib/api/lab-types";
 import { resolveOrgContext } from "@/lib/api/org-context";
+import { getPortfolioSummary, listPortfolios } from "@/lib/api/portfolio";
 import { logger } from "@/lib/logger";
 
 export interface LabPageProps {
@@ -65,6 +67,27 @@ async function loadLab(window: LabWindow, cohort: string, versionId: string | un
   }
 }
 
+/**
+ * The organization's real principal paper wallet equity (brief T3.17: "a
+ * quantia do patrimônio, nunca digitada"), or a fixed, labelled reference
+ * when there is none yet -- mirrors `portfolio/page.tsx`'s own `type =
+ * "paper" && !is_arena` lookup. Never throws: any failure (no wallet, no
+ * session, API down) degrades to the honest reference ruler rather than
+ * failing the whole Lab page over a display-only enhancement.
+ */
+async function loadMoneyRuler(orgId: string): Promise<MoneyRuler> {
+  try {
+    const page = await listPortfolios(orgId, { limit: 200 });
+    const mainWallet = page.items.find((p) => p.type === "paper" && !p.is_arena) ?? null;
+    if (!mainWallet) return buildReferenceRuler();
+    const summary = await getPortfolioSummary(orgId, mainWallet.id);
+    return buildWalletRuler(summary.equity, summary.brl?.equity_brl ?? null);
+  } catch (error) {
+    logger.error("lab_money_ruler_load_failed", { error: String(error) });
+    return buildReferenceRuler();
+  }
+}
+
 /** `/[orgSlug]/lab` (docs/plans/SHADOW-LAB.md, S3): the Shadow tab -- hypothetical, no-capital decisions and their tracked outcomes over real M1 data. */
 export default async function LabPage({ params, searchParams }: LabPageProps) {
   const { orgSlug } = await params;
@@ -76,7 +99,7 @@ export default async function LabPage({ params, searchParams }: LabPageProps) {
   const cohort = sp.cohort?.trim() || "prospective";
   const versionId = sp.version || undefined;
 
-  const result = await loadLab(window, cohort, versionId);
+  const [result, ruler] = await Promise.all([loadLab(window, cohort, versionId), loadMoneyRuler(membership.organization.id)]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -86,7 +109,7 @@ export default async function LabPage({ params, searchParams }: LabPageProps) {
       {!result.ok ? (
         <LabError reason={result.reason} />
       ) : (
-        <LabPageBody orgSlug={orgSlug} window={window} cohort={cohort} versionId={versionId} {...result} />
+        <LabPageBody orgSlug={orgSlug} window={window} cohort={cohort} versionId={versionId} ruler={ruler} {...result} />
       )}
     </div>
   );
@@ -97,12 +120,13 @@ interface LabPageBodyProps {
   window: LabWindow;
   cohort: string;
   versionId: string | undefined;
+  ruler: MoneyRuler;
   summary: LabSummaryOut;
   versions: LabVersionsOut;
   signals: LabSignalsPage;
 }
 
-function LabPageBody({ orgSlug, window, cohort, versionId, summary, versions, signals }: LabPageBodyProps) {
+function LabPageBody({ orgSlug, window, cohort, versionId, ruler, summary, versions, signals }: LabPageBodyProps) {
   const versionLabelById: Record<string, string> = {};
   for (const v of versions.items) versionLabelById[v.strategy_version_id] = `${v.strategy_key}/${v.version}`;
   for (const v of summary.versions) versionLabelById[v.strategy_version_id] ??= `${v.strategy_key}/${v.version}`;
@@ -120,7 +144,7 @@ function LabPageBody({ orgSlug, window, cohort, versionId, summary, versions, si
 
   return (
     <>
-      <LabHeader asOf={summary.as_of} versions={summary.versions} />
+      <LabHeader asOf={summary.as_of} versions={summary.versions} ruler={ruler} />
       <LabFilters window={window} cohort={cohort} versionId={versionId ?? null} versions={filterVersionOptions} />
 
       <section className="flex flex-col gap-4">
@@ -145,6 +169,7 @@ function LabPageBody({ orgSlug, window, cohort, versionId, summary, versions, si
         baseParams={{ cohort, limit: SIGNALS_INITIAL_LIMIT, ...(versionId ? { strategy_version_id: versionId } : {}) }}
         versionLabelById={versionLabelById}
         cohort={cohort}
+        ruler={ruler}
       />
     </>
   );

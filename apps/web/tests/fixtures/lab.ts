@@ -1,3 +1,4 @@
+import { buildWalletRuler, type MoneyRuler } from "@/components/lab/lab-money";
 import type { LabSummaryOut, SignalListItemOut, VersionSummaryOut } from "@/lib/api/lab-types";
 
 /**
@@ -127,4 +128,9 @@ export function exampleSignal(): SignalListItemOut {
 
 export function makeSignal(overrides: Partial<SignalListItemOut> = {}): SignalListItemOut {
   return { ...exampleSignal(), ...overrides };
+}
+
+/** The real wallet example from the brief (T3.17): "ever", 19.333,01 USDT. */
+export function exampleRuler(overrides: Partial<MoneyRuler> = {}): MoneyRuler {
+  return { ...buildWalletRuler("19333.01", "115998.06"), ...overrides };
 }

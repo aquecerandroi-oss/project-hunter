@@ -6,11 +6,66 @@ import { LabExcursions } from "@/components/lab/lab-excursions";
 import { LabSignalDetail } from "@/components/lab/lab-signal-detail";
 import { ResultChip, TrackingStateChip } from "@/components/lab/lab-signal-chips";
 import { formatR, reasonLabel, signColorClass } from "@/components/lab/lab-format";
+import { MONEY_TOOLTIP, moneyForRow, priceAndTime, saidaText, usdtToBrl, type MoneyRuler } from "@/components/lab/lab-money";
+import { ResultBadge } from "@/components/lab/lab-result-badge";
 import type { SignalListItemOut } from "@/lib/api/lab-types";
+import { formatBrlSigned, formatPct, formatUsdtSigned } from "@/lib/format";
 
 export interface LabSignalPanelProps {
   signal: SignalListItemOut | null;
   versionLabel: string;
+  ruler: MoneyRuler;
+}
+
+/**
+ * The money block Everton asked for (brief T3.17): what the signal entered
+ * with, what it left with, profit or loss -- above the research block below,
+ * which stays unchanged (raw levels, R, excursions, funding). Every number
+ * here is derived from the one declared ruler (`lab-money.ts`), never a
+ * second, silently different computation.
+ */
+function SignalMoneyBlock({ signal, ruler }: { signal: SignalListItemOut; ruler: MoneyRuler }) {
+  const { pnlUsdt, notionalUsdt, pctMove } = moneyForRow(signal, ruler);
+  const pnlBrl = pnlUsdt.value !== null ? usdtToBrl(pnlUsdt.value, ruler) : null;
+
+  return (
+    <dl title={MONEY_TOOLTIP} className="grid grid-cols-2 gap-2 rounded-md border border-border bg-bg-overlay p-3 text-xs sm:grid-cols-3">
+      <div>
+        <dt className="text-fg-muted">Entrou</dt>
+        <dd className="font-mono tabular-nums text-fg">{priceAndTime(signal.virtual_entry, signal.entry_ts)}</dd>
+      </div>
+      <div>
+        <dt className="text-fg-muted">Saiu</dt>
+        <dd className="font-mono tabular-nums text-fg">{saidaText(signal)}</dd>
+      </div>
+      <div>
+        <dt className="text-fg-muted">Variação</dt>
+        <dd className={`font-mono tabular-nums ${pctMove === null ? "text-fg-muted" : pctMove >= 0 ? "text-green" : "text-red"}`}>
+          {pctMove !== null ? formatPct(pctMove) : "--"}
+        </dd>
+      </div>
+      <div>
+        <dt className="text-fg-muted">Quantia simulada</dt>
+        <dd className="font-mono tabular-nums text-fg">
+          {notionalUsdt.value !== null ? formatUsdtSigned(notionalUsdt.value) : reasonLabel(notionalUsdt.reason ?? "")}
+        </dd>
+      </div>
+      <div className="col-span-2 sm:col-span-1">
+        <dt className="text-fg-muted">Resultado</dt>
+        <dd className="flex items-center gap-1.5">
+          <ResultBadge pnlUsdt={pnlUsdt.value} />
+          {pnlUsdt.value !== null ? (
+            <span className="font-mono tabular-nums text-fg">
+              {formatUsdtSigned(pnlUsdt.value)}
+              {pnlBrl !== null && <span className="text-fg-muted"> ({formatBrlSigned(pnlBrl)})</span>}
+            </span>
+          ) : (
+            <span className="text-fg-muted">{reasonLabel(pnlUsdt.reason ?? "sem motivo informado")}</span>
+          )}
+        </dd>
+      </div>
+    </dl>
+  );
 }
 
 /**
@@ -21,7 +76,7 @@ export interface LabSignalPanelProps {
  * `hooks/useVirtualizedRows.ts` depends on, so this lives beside the table
  * (below it on mobile, `lg:` beside it) instead.
  */
-export function LabSignalPanel({ signal, versionLabel }: LabSignalPanelProps) {
+export function LabSignalPanel({ signal, versionLabel, ruler }: LabSignalPanelProps) {
   if (!signal) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-bg-elevated p-6 text-sm text-fg-muted">
@@ -45,6 +100,9 @@ export function LabSignalPanel({ signal, versionLabel }: LabSignalPanelProps) {
         <LabAsOf iso={signal.source_bar_close} />
       </p>
 
+      <SignalMoneyBlock signal={signal} ruler={ruler} />
+
+      <p className="mt-1 text-[11px] font-semibold uppercase text-fg-muted">Detalhe de pesquisa</p>
       <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
         <div>
           <dt className="text-fg-muted">Referência</dt>
