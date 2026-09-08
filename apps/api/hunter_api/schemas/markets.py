@@ -66,6 +66,7 @@ from typing import TYPE_CHECKING, Annotated, Literal
 
 from pydantic import BaseModel, PlainSerializer
 
+from hunter_api.schemas.lab_common import decimal_plain
 from hunter_core.domain.enums import MarketStatus, MarketType, OrderSide, Timeframe
 from hunter_core.domain.market import DataQuality, timeframe_seconds
 
@@ -74,9 +75,7 @@ if TYPE_CHECKING:
 
     from hunter_core.db.models.market_data import Candle
 
-DecimalStr = Annotated[
-    Decimal, PlainSerializer(lambda v: str(v), return_type=str, when_used="json")
-]
+DecimalStr = Annotated[Decimal, PlainSerializer(decimal_plain, return_type=str, when_used="json")]
 """``Decimal`` fields serialize as JSON strings, never floats/numbers — CLAUDE.md's
 "money and quantities are Decimal" would otherwise be undone the moment a
 response leaves Python, since JSON has no arbitrary-precision number type and

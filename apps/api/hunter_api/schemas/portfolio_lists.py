@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from decimal import Decimal
 
 from pydantic import BaseModel
 
+from hunter_api.schemas.lab_common import DecimalStr
 from hunter_core.domain.enums import (
     ExecutionMode,
     ExitReason,
@@ -56,17 +56,17 @@ class EquityCurvePointOut(BaseModel):
 
     ts: datetime
     resolution: Timeframe
-    cash: Decimal
-    equity: Decimal
-    exposure_notional: Decimal
-    exposure_pct: Decimal | None
-    unrealized_pnl: Decimal
-    realized_pnl_cum: Decimal
-    peak_equity: Decimal
-    drawdown_pct: Decimal | None
+    cash: DecimalStr
+    equity: DecimalStr
+    exposure_notional: DecimalStr
+    exposure_pct: DecimalStr | None
+    unrealized_pnl: DecimalStr
+    realized_pnl_cum: DecimalStr
+    peak_equity: DecimalStr
+    drawdown_pct: DecimalStr | None
     open_positions: int
     fx_observation_id: uuid.UUID | None
-    brl_equity: Decimal | None
+    brl_equity: DecimalStr | None
     brl_unavailable_reason: str | None
 
 
@@ -76,13 +76,13 @@ class PositionOut(BaseModel):
     id: uuid.UUID
     market_id: uuid.UUID
     direction: TradeDirection
-    qty: Decimal
-    avg_entry_price: Decimal
-    mark_price: Decimal | None
-    stop_price: Decimal | None
-    unrealized_pnl: Decimal
-    realized_pnl: Decimal
-    fees_paid: Decimal
+    qty: DecimalStr
+    avg_entry_price: DecimalStr
+    mark_price: DecimalStr | None
+    stop_price: DecimalStr | None
+    unrealized_pnl: DecimalStr
+    realized_pnl: DecimalStr
+    fees_paid: DecimalStr
     status: PositionStatus
     opened_at: datetime
     closed_at: datetime | None
@@ -98,11 +98,11 @@ class OrderOut(BaseModel):
     purpose: OrderPurpose
     execution_mode: ExecutionMode
     status: OrderStatus
-    qty: Decimal
-    price: Decimal | None
-    stop_price: Decimal | None
-    filled_qty: Decimal
-    avg_fill_price: Decimal | None
+    qty: DecimalStr
+    price: DecimalStr | None
+    stop_price: DecimalStr | None
+    filled_qty: DecimalStr
+    avg_fill_price: DecimalStr | None
     created_at: datetime
     completed_at: datetime | None
 
@@ -113,12 +113,12 @@ class PortfolioTradeOut(BaseModel):
     id: uuid.UUID
     market_id: uuid.UUID
     direction: TradeDirection
-    entry_price: Decimal
-    exit_price: Decimal
-    qty: Decimal
-    fees: Decimal
-    pnl: Decimal
-    pnl_pct: Decimal | None
+    entry_price: DecimalStr
+    exit_price: DecimalStr
+    qty: DecimalStr
+    fees: DecimalStr
+    pnl: DecimalStr
+    pnl_pct: DecimalStr | None
     exit_reason: ExitReason | None
     opened_at: datetime
     closed_at: datetime

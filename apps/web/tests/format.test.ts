@@ -157,3 +157,19 @@ describe("formatCompact", () => {
     expect(formatCompact("123456789012345678.99")).toBe("123,456,789,012,345,678.99");
   });
 });
+
+describe("exponent notation from the API (VPS 2026-09-08: the wallet page crashed on \"0E-20\")", () => {
+  it("expands a Python-style zero with scale", () => {
+    expect(formatMoney("0E-20")).toBe(formatMoney("0"));
+  });
+  it("expands positive and negative exponents digit by digit", () => {
+    expect(formatMoney("1E+2")).toBe(formatMoney("100"));
+    expect(formatMoney("1.5e3")).toBe(formatMoney("1500"));
+    expect(formatMoney("-2.5E-1")).toBe(formatMoney("-0.25"));
+    expect(formatMoney("123456E-3")).toBe(formatMoney("123.456"));
+  });
+  it("still refuses garbage", () => {
+    expect(() => formatMoney("E5")).toThrow(TypeError);
+    expect(() => formatMoney("1E")).toThrow(TypeError);
+  });
+});

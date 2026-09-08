@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from decimal import Decimal
 
 from pydantic import BaseModel
 
+from hunter_api.schemas.lab_common import DecimalStr
 from hunter_api.schemas.risk import ScopeStatesOut, TransitionOut
 from hunter_core.domain.enums import KillSwitchState, PortfolioStatus, PortfolioType
 
@@ -38,7 +38,7 @@ class FxObservationOut(BaseModel):
     id: uuid.UUID
     pair: str
     source: str
-    rate: Decimal
+    rate: DecimalStr
     observed_at: datetime
     available_at: datetime
 
@@ -48,11 +48,11 @@ class AnchorOut(BaseModel):
 
     portfolio_id: uuid.UUID
     origin_currency: str
-    origin_amount: Decimal
+    origin_amount: DecimalStr
     operating_currency: str
-    credited_amount: Decimal
-    rate: Decimal
-    conversion_residual: Decimal
+    credited_amount: DecimalStr
+    rate: DecimalStr
+    conversion_residual: DecimalStr
     rounding_policy: str
     anchored_at: datetime
     fx_observation: FxObservationOut
@@ -67,13 +67,13 @@ class BrlDecompositionOut(BaseModel):
     of hiding them behind the totals.
     """
 
-    opening_brl: Decimal
-    operational_brl: Decimal
-    currency_brl: Decimal
-    equity_brl: Decimal
-    total_brl: Decimal
-    opening_rate: Decimal
-    current_rate: Decimal
+    opening_brl: DecimalStr
+    operational_brl: DecimalStr
+    currency_brl: DecimalStr
+    equity_brl: DecimalStr
+    total_brl: DecimalStr
+    opening_rate: DecimalStr
+    current_rate: DecimalStr
     fx_observation: FxObservationOut
 
 
@@ -104,13 +104,13 @@ class PortfolioRiskStateOut(BaseModel):
     trading_day: date | None
     trading_day_timezone: str
     trading_day_start_utc: datetime | None
-    equity_day_start: Decimal | None
+    equity_day_start: DecimalStr | None
     day_reference_observed_at: datetime | None
-    peak_equity: Decimal
+    peak_equity: DecimalStr
     peak_equity_observed_at: datetime
     peak_sampling_interval_s: int
-    daily_loss_pct: Decimal | None
-    drawdown_pct: Decimal | None
+    daily_loss_pct: DecimalStr | None
+    drawdown_pct: DecimalStr | None
     kill_switch: KillSwitchSummaryOut
 
 
@@ -130,15 +130,15 @@ class PortfolioSummaryOut(BaseModel):
     status: PortfolioStatus
     base_currency: str
     as_of: datetime
-    cash: Decimal
-    equity: Decimal
-    exposure_notional: Decimal
-    unrealized_pnl: Decimal
-    realized_pnl_cum: Decimal
+    cash: DecimalStr
+    equity: DecimalStr
+    exposure_notional: DecimalStr
+    unrealized_pnl: DecimalStr
+    realized_pnl_cum: DecimalStr
     open_position_count: int
-    reserved_cash: Decimal
-    reserved_notional: Decimal
-    reserved_risk: Decimal
+    reserved_cash: DecimalStr
+    reserved_notional: DecimalStr
+    reserved_risk: DecimalStr
     marks_complete: bool
     unavailable: list[str]
     brl: BrlDecompositionOut | None

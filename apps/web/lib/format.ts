@@ -38,17 +38,42 @@ function normalizeToDecimalString(value: string | number): string {
   return value;
 }
 
-/** Parses a plain decimal string ("-123.456") into its parts. Throws `TypeError` on anything else. */
+/**
+ * Parses a decimal string ("-123.456") into its parts. Throws `TypeError` on anything else.
+ *
+ * Exponent forms ("0E-20", "1E+2", "1.5e3") are accepted and expanded digit by
+ * digit: Python's `str(Decimal)` writes a NUMERIC(…, 20) zero as `0E-20`, and
+ * the wallet page crashed server-side on exactly that value (VPS, 2026-09-08).
+ * The API now serializes decimals in plain notation, but a reader that only
+ * survives one writer's habits is not a reader.
+ */
 function parseDecimal(raw: string): ParsedDecimal {
-  const match = /^([+-])?(\d+)(?:\.(\d+))?$/.exec(raw.trim());
+  const match = /^([+-])?(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(raw.trim());
   if (!match) {
     throw new TypeError(`Invalid decimal value: ${JSON.stringify(raw)}`);
   }
-  const [, signPart, intPart, fracPart] = match;
+  const [, signPart, intPart, fracPart, expPart] = match;
+  let intDigits = intPart ?? "0";
+  let fracDigits = fracPart ?? "";
+  if (expPart !== undefined) {
+    const exponent = Number.parseInt(expPart, 10);
+    const digits = intDigits + fracDigits;
+    const point = intDigits.length + exponent;
+    if (point <= 0) {
+      intDigits = "0";
+      fracDigits = "0".repeat(-point) + digits;
+    } else if (point >= digits.length) {
+      intDigits = digits + "0".repeat(point - digits.length);
+      fracDigits = "";
+    } else {
+      intDigits = digits.slice(0, point);
+      fracDigits = digits.slice(point);
+    }
+  }
   return {
     negative: signPart === "-",
-    intDigits: (intPart ?? "0").replace(/^0+(?=\d)/, ""),
-    fracDigits: fracPart ?? "",
+    intDigits: intDigits.replace(/^0+(?=\d)/, ""),
+    fracDigits,
   };
 }
 

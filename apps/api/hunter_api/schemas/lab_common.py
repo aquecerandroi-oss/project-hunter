@@ -12,9 +12,23 @@ from typing import Annotated
 
 from pydantic import BaseModel, PlainSerializer
 
-DecimalStr = Annotated[
-    Decimal, PlainSerializer(lambda v: str(v), return_type=str, when_used="json")
-]
+
+def decimal_plain(value: Decimal) -> str:
+    """``Decimal`` as a plain JSON string: never ``0E-20`` or ``1E+2``.
+
+    ``str(Decimal("0E-20"))`` is Python's exponent form for a zero that came out
+    of a NUMERIC column with scale 20; the web decimal parser (``lib/format.ts``)
+    takes plain digits only and the wallet page crashed server-side on it
+    (VPS, 2026-09-08). ``format(v, "f")`` writes every digit; trailing zeros
+    after the point are dropped so ``100.00`` stays ``100`` and ``0E-20`` is ``0``.
+    """
+    text = format(value, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
+
+
+DecimalStr = Annotated[Decimal, PlainSerializer(decimal_plain, return_type=str, when_used="json")]
 
 LAB_LABEL = "SOMBRA — hipotético, sem capital, custos assumidos"
 """Fixed label required on every summary response (SHADOW-LAB.md §9)."""

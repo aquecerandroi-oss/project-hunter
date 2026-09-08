@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from hunter_api.schemas.common import StrictModel
+from hunter_api.schemas.lab_common import DecimalStr
 from hunter_core.domain.enums import KillSwitchState
 
 
@@ -38,7 +38,7 @@ class DailyReferenceOut(BaseModel):
     trading_day: date | None
     trading_day_timezone: str
     trading_day_start_utc: datetime | None
-    equity_day_start: Decimal | None
+    equity_day_start: DecimalStr | None
     observed_at: datetime | None
     available: bool
 
@@ -46,7 +46,7 @@ class DailyReferenceOut(BaseModel):
 class PeakOut(BaseModel):
     """The monotonic, **sampled** peak — never the intratick maximum."""
 
-    equity: Decimal
+    equity: DecimalStr
     observed_at: datetime
     sampling_interval_s: int
 
@@ -92,6 +92,6 @@ class ResumeOut(BaseModel):
     from_state: KillSwitchState
     to_state: KillSwitchState
     actor_id: uuid.UUID
-    daily_loss_pct: Decimal
-    drawdown_pct: Decimal
+    daily_loss_pct: DecimalStr
+    drawdown_pct: DecimalStr
     effective: KillSwitchState
