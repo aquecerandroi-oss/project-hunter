@@ -10,13 +10,17 @@ row follows the real S0/S2 models exactly (``strategy_versions``,
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
+from sqlalchemy import text
+
 from hunter_core.db.models.agents import AgentSignal, SignalOutcome, Strategy, StrategyVersion
 from hunter_core.db.models.markets import Exchange, Market
+from hunter_core.db.session import role_session
 from hunter_core.domain.enums import (
     MarketType,
     OutcomeResult,
@@ -25,6 +29,7 @@ from hunter_core.domain.enums import (
     StrategyVersionStatus,
     TradeDirection,
 )
+from hunter_core.domain.types import uuid7
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -65,7 +70,13 @@ async def seed_strategy_version(
     deprecated_at: datetime | None = None,
     code_ref: str | None = "hunter_core.strategies.momentum_v1@sha256:test",
     default_parameters: dict[str, Any] | None = None,
+    parameters_schema: dict[str, Any] | None = None,
     changelog: str | None = None,
+    purpose: str = "research_only",
+    replication_parent_id: uuid.UUID | None = None,
+    replication_index: int | None = None,
+    promising_at: datetime | None = None,
+    promising_by: str | None = None,
 ) -> tuple[uuid.UUID, uuid.UUID]:
     """Returns ``(strategy_id, strategy_version_id)``.
 
@@ -85,12 +96,17 @@ async def seed_strategy_version(
             strategy_id=strategy_id,
             version=version,
             status=status,
-            parameters_schema={},
+            parameters_schema={} if parameters_schema is None else parameters_schema,
             default_parameters=params,
             code_ref=code_ref,
             activated_at=activated_at,
             deprecated_at=deprecated_at,
             changelog=changelog,
+            purpose=purpose,
+            replication_parent_id=replication_parent_id,
+            replication_index=replication_index,
+            promising_at=promising_at,
+            promising_by=promising_by,
         )
         session.add(sv)
         await session.commit()
@@ -200,3 +216,72 @@ async def seed_shadow_signal(
         )
         await session.commit()
         return signal_id
+
+
+async def seed_replay_slice(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    run_id: uuid.UUID,
+    strategy_version_id: uuid.UUID,
+    window_from: datetime,
+    window_to: datetime,
+    markets: list[str],
+    started_at: datetime,
+    finished_at: datetime,
+    bars_evaluated: int,
+    signals: int,
+    outcomes_resolved: int,
+    outcomes_open: int,
+    seconds: Decimal,
+    decision_lag_s: int = 90,
+    workers: int = 1,
+    evaluations_by_state: dict[str, int] | None = None,
+    errors: int = 0,
+) -> uuid.UUID:
+    """One ``replay_runs`` row (one slice), written as ``hunter_worker`` — the
+    only role granted ``INSERT`` on it (DATABASE.md §25.4). Mirrors
+    ``hunter_strategy_worker.replay.ledger.record_slice`` field for field; no
+    ORM model is used here since ``ReplayRunRow`` carries no Python defaults
+    for most of these columns.
+    """
+    slice_id = uuid7()
+    async with role_session(session_factory, db_role="hunter_worker") as session:
+        await session.execute(
+            text(
+                "INSERT INTO replay_runs (id, run_id, cohort, strategy_version_id, "
+                "window_from, window_to, markets, started_at, finished_at, bars_evaluated, "
+                "signals, outcomes_resolved, outcomes_open, seconds, decision_lag_s, workers, "
+                "evaluations_by_state, errors) VALUES (:id, :run_id, :cohort, :version_id, "
+                ":window_from, :window_to, :markets, :started_at, :finished_at, :bars_evaluated, "
+                ":signals, :outcomes_resolved, :outcomes_open, :seconds, :decision_lag_s, "
+                ":workers, CAST(:evaluations_by_state AS jsonb), :errors)"
+            ),
+            {
+                "id": slice_id,
+                "run_id": run_id,
+                "cohort": f"replay:{run_id}",
+                "version_id": strategy_version_id,
+                "window_from": window_from,
+                "window_to": window_to,
+                "markets": markets,
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "bars_evaluated": bars_evaluated,
+                "signals": signals,
+                "outcomes_resolved": outcomes_resolved,
+                "outcomes_open": outcomes_open,
+                "seconds": str(seconds),
+                "decision_lag_s": decision_lag_s,
+                "workers": workers,
+                "evaluations_by_state": (
+                    "{}" if evaluations_by_state is None else _to_jsonb(evaluations_by_state)
+                ),
+                "errors": errors,
+            },
+        )
+        await session.commit()
+    return slice_id
+
+
+def _to_jsonb(value: dict[str, int]) -> str:
+    return json.dumps(value)

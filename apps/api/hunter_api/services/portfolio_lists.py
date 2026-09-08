@@ -30,6 +30,7 @@ from hunter_api.schemas.portfolio_lists import (
     PortfolioTradeOut,
     PositionOut,
 )
+from hunter_api.services.portfolio_trade_extras import brl_amount, load_exit_intents
 from hunter_core.db.models.execution_fills import Position
 from hunter_core.db.models.execution_orders import Order
 from hunter_core.db.models.execution_trades import Trade
@@ -169,6 +170,9 @@ async def list_positions(
     rows: Sequence[Position] = (await session.execute(statement.limit(size + 1))).scalars().all()
     page = rows[:size]
     next_cursor = encode_id_cursor(page[-1].opened_at, page[-1].id) if len(rows) > size else None
+    intents_by_position = await load_exit_intents(
+        session, org_id, portfolio_id, [row.id for row in page]
+    )
     items = [
         PositionOut(
             id=row.id,
@@ -184,6 +188,7 @@ async def list_positions(
             status=row.status,
             opened_at=ensure_utc(row.opened_at),
             closed_at=None if row.closed_at is None else ensure_utc(row.closed_at),
+            protection_intents=intents_by_position.get(row.id, []),
         )
         for row in page
     ]
@@ -252,21 +257,36 @@ async def list_trades(
     rows: Sequence[Trade] = (await session.execute(statement.limit(size + 1))).scalars().all()
     page = rows[:size]
     next_cursor = encode_id_cursor(page[-1].closed_at, page[-1].id) if len(rows) > size else None
-    items = [
-        PortfolioTradeOut(
-            id=row.id,
-            market_id=row.market_id,
-            direction=row.direction,
-            entry_price=row.entry_price,
-            exit_price=row.exit_price,
-            qty=row.qty,
-            fees=row.fees,
-            pnl=row.pnl,
-            pnl_pct=row.pnl_pct,
-            exit_reason=row.exit_reason,
-            opened_at=ensure_utc(row.opened_at),
-            closed_at=ensure_utc(row.closed_at),
+    position_ids = [row.position_id for row in page if row.position_id is not None]
+    intents_by_position = await load_exit_intents(session, org_id, portfolio_id, position_ids)
+    items: list[PortfolioTradeOut] = []
+    for row in page:
+        closed_at = ensure_utc(row.closed_at)
+        fees_brl, fees_reason = await brl_amount(session, row.fees, as_of=closed_at)
+        pnl_brl, pnl_reason = await brl_amount(session, row.pnl, as_of=closed_at)
+        items.append(
+            PortfolioTradeOut(
+                id=row.id,
+                market_id=row.market_id,
+                direction=row.direction,
+                entry_price=row.entry_price,
+                exit_price=row.exit_price,
+                qty=row.qty,
+                fees=row.fees,
+                fees_brl=fees_brl,
+                fees_brl_unavailable_reason=fees_reason,
+                pnl=row.pnl,
+                pnl_brl=pnl_brl,
+                pnl_brl_unavailable_reason=pnl_reason,
+                pnl_pct=row.pnl_pct,
+                exit_reason=row.exit_reason,
+                entry_snapshot=dict(row.entry_snapshot or {}),
+                exit_snapshot=dict(row.exit_snapshot or {}),
+                protection_intents=(
+                    [] if row.position_id is None else intents_by_position.get(row.position_id, [])
+                ),
+                opened_at=ensure_utc(row.opened_at),
+                closed_at=closed_at,
+            )
         )
-        for row in page
-    ]
     return items, next_cursor

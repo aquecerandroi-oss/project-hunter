@@ -55,6 +55,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lab/shadow/replays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Replay runs (backtests), newest first — honestly empty when none ran */
+        get: operations["list_replays_api_v1_lab_shadow_replays_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/shadow/replays/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One replay run: its slices and the population by evaluation state */
+        get: operations["get_replay_api_v1_lab_shadow_replays__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lab/shadow/scoreboard": {
         parameters: {
             query?: never;
@@ -81,6 +115,23 @@ export interface paths {
         };
         /** Shadow Lab decisions and tracked outcomes */
         get: operations["list_signals_api_v1_lab_shadow_signals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/shadow/strategies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shadow Lab strategy catalogue: versions, parameters, lineage and verdict */
+        get: operations["list_strategies_api_v1_lab_shadow_strategies_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -484,6 +535,23 @@ export interface paths {
         put?: never;
         /** Resume trading on a latched kill switch (OWNER only) */
         post: operations["resume_kill_switch_api_v1_orgs__org_id__portfolios__portfolio_id__risk_kill_switch_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/portfolios/{portfolio_id}/risk/limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the numeric paper_v1 preset and the wallet's usage against it */
+        get: operations["read_risk_limits_api_v1_orgs__org_id__portfolios__portfolio_id__risk_limits_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -919,6 +987,17 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /**
+         * AssetExposureOut
+         * @description One coin's exposure, open plus reserved, across markets — ``PortfolioState.
+         *     exposure_for_asset`` (``packages/risk-core/hunter_risk/exposure.py``).
+         */
+        AssetExposureOut: {
+            /** Base Asset */
+            base_asset: string;
+            /** Notional */
+            notional: string;
+        };
         /** AssumedCostsOut */
         AssumedCostsOut: {
             /** Assumed Spread Bps */
@@ -1119,6 +1198,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** CursorPage[ReplayRunOut] */
+        CursorPage_ReplayRunOut_: {
+            /** Items */
+            items: components["schemas"]["ReplayRunOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** CursorPage[SignalListItemOut] */
         CursorPage_SignalListItemOut_: {
             /** Items */
@@ -1243,6 +1329,57 @@ export interface components {
          * @enum {string}
          */
         ExecutionMode: "paper" | "shadow" | "live";
+        /**
+         * ExitIntentOut
+         * @description One ``portfolio_exit_intents`` row — a protection's durable identity,
+         *     distinct from any single attempt at it (RISK_ENGINE.md §10, DATABASE.md §18.4).
+         */
+        ExitIntentOut: {
+            /** Closed At */
+            closed_at: string | null;
+            /** Closed Reason */
+            closed_reason: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Degraded Reason */
+            degraded_reason: string | null;
+            /** Degraded Since */
+            degraded_since: string | null;
+            /** Filled Qty */
+            filled_qty: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Intended Qty */
+            intended_qty: string;
+            /** Protection Key */
+            protection_key: string;
+            reason: components["schemas"]["ExitReason"];
+            state: components["schemas"]["ExitIntentState"];
+            /** Trigger Price */
+            trigger_price: string | null;
+        };
+        /**
+         * ExitIntentState
+         * @description ``exit_intent_state`` — DATABASE.md §18.4 (portfolio_exit_intents.state).
+         *
+         *     RISK_ENGINE.md §10: an exit *attempt* ends, but the *intention* survives for
+         *     the remaining quantity. ``BLOCKED_RESIDUAL`` is the leftover below the
+         *     exchange minimum — accounted and visible, never fictitiously settled — and
+         *     is **not** terminal: it returns to ``OPEN`` when price or filters make the
+         *     remainder tradable again. ``VOIDED`` is the honest terminal for an intention
+         *     whose quantity was liquidated by a *competing* protection (a stop that took
+         *     the whole position leaves the target with nothing to sell); it exists so
+         *     that intention never has to be handed a fictitious fill to reach
+         *     ``FULFILLED``.
+         * @enum {string}
+         */
+        ExitIntentState: "open" | "blocked_residual" | "fulfilled" | "superseded" | "voided";
         /**
          * ExitReason
          * @description ``exit_reason`` — DATABASE.md §7 (trades.exit_reason).
@@ -1412,6 +1549,26 @@ export interface components {
             /** Reason */
             reason: string | null;
             scopes: components["schemas"]["ScopeStatesOut"];
+        };
+        /** KillSwitchThresholdsOut */
+        KillSwitchThresholdsOut: {
+            /** Daily Loss Pct */
+            daily_loss_pct: string;
+            /** Drawdown Pct */
+            drawdown_pct: string;
+        };
+        /**
+         * LineageOut
+         * @description A replication sibling's parent and arm — DATABASE.md §24.3.
+         */
+        LineageOut: {
+            /** Replication Index */
+            replication_index: number;
+            /**
+             * Replication Parent Id
+             * Format: uuid
+             */
+            replication_parent_id: string;
         };
         /** MarketComponentsOut */
         MarketComponentsOut: {
@@ -2365,7 +2522,9 @@ export interface components {
         };
         /**
          * PortfolioTradeOut
-         * @description One ``trades`` row. Empty today — no writer exists yet (T3.4/T3.5).
+         * @description One ``trades`` row — entry/exit, fees and PnL in both currencies, the
+         *     feature snapshot at entry and exit, and the protections that were live on
+         *     the position this trade closed.
          */
         PortfolioTradeOut: {
             /**
@@ -2376,11 +2535,23 @@ export interface components {
             direction: components["schemas"]["TradeDirection"];
             /** Entry Price */
             entry_price: string;
+            /** Entry Snapshot */
+            entry_snapshot: {
+                [key: string]: unknown;
+            };
             /** Exit Price */
             exit_price: string;
             exit_reason: components["schemas"]["ExitReason"] | null;
+            /** Exit Snapshot */
+            exit_snapshot: {
+                [key: string]: unknown;
+            };
             /** Fees */
             fees: string;
+            /** Fees Brl */
+            fees_brl: string | null;
+            /** Fees Brl Unavailable Reason */
+            fees_brl_unavailable_reason: string | null;
             /**
              * Id
              * Format: uuid
@@ -2398,8 +2569,14 @@ export interface components {
             opened_at: string;
             /** Pnl */
             pnl: string;
+            /** Pnl Brl */
+            pnl_brl: string | null;
+            /** Pnl Brl Unavailable Reason */
+            pnl_brl_unavailable_reason: string | null;
             /** Pnl Pct */
             pnl_pct: string | null;
+            /** Protection Intents */
+            protection_intents: components["schemas"]["ExitIntentOut"][];
             /** Qty */
             qty: string;
         };
@@ -2411,7 +2588,7 @@ export interface components {
         PortfolioType: "paper" | "shadow" | "live";
         /**
          * PositionOut
-         * @description One ``positions`` row. Empty today — no writer exists yet (T3.4/T3.5).
+         * @description One ``positions`` row, with the protections currently held on it.
          */
         PositionOut: {
             /** Avg Entry Price */
@@ -2438,6 +2615,8 @@ export interface components {
              * Format: date-time
              */
             opened_at: string;
+            /** Protection Intents */
+            protection_intents: components["schemas"]["ExitIntentOut"][];
             /** Qty */
             qty: string;
             /** Realized Pnl */
@@ -2629,6 +2808,131 @@ export interface components {
          * @enum {string}
          */
         RegimeScope: "global" | "btc";
+        /** ReplayRunDetailOut */
+        ReplayRunDetailOut: {
+            /** Population By State */
+            population_by_state: {
+                [key: string]: number;
+            };
+            run: components["schemas"]["ReplayRunOut"];
+            /** Slices */
+            slices: components["schemas"]["ReplaySliceOut"][];
+        };
+        /**
+         * ReplayRunOut
+         * @description One run, aggregated across every slice it has (DATABASE.md §25.2).
+         */
+        ReplayRunOut: {
+            /** Bars Evaluated */
+            bars_evaluated: number;
+            /** Bars Per Second */
+            bars_per_second: string | null;
+            /** Cohort */
+            cohort: string;
+            /**
+             * Finished At
+             * Format: date-time
+             */
+            finished_at: string;
+            /** Market Count */
+            market_count: number;
+            /** Outcomes Open */
+            outcomes_open: number;
+            /** Outcomes Resolved */
+            outcomes_resolved: number;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Seconds */
+            seconds: string;
+            /** Signals */
+            signals: number;
+            /** Slice Count */
+            slice_count: number;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Strategy Version Id
+             * Format: uuid
+             */
+            strategy_version_id: string;
+            /** Version Label */
+            version_label: string;
+            /**
+             * Window From
+             * Format: date-time
+             */
+            window_from: string;
+            /**
+             * Window To
+             * Format: date-time
+             */
+            window_to: string;
+        };
+        /**
+         * ReplaySliceOut
+         * @description One ``replay_runs`` row exactly as written — the unit that actually
+         *     happened (DATABASE.md §25.1).
+         */
+        ReplaySliceOut: {
+            /** Bars Evaluated */
+            bars_evaluated: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decision Lag S */
+            decision_lag_s: number;
+            /** Errors */
+            errors: number;
+            /** Evaluations By State */
+            evaluations_by_state: {
+                [key: string]: number;
+            };
+            /**
+             * Finished At
+             * Format: date-time
+             */
+            finished_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Markets */
+            markets: string[];
+            /** Outcomes Open */
+            outcomes_open: number;
+            /** Outcomes Resolved */
+            outcomes_resolved: number;
+            /** Seconds */
+            seconds: string;
+            /** Signals */
+            signals: number;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Window From
+             * Format: date-time
+             */
+            window_from: string;
+            /**
+             * Window To
+             * Format: date-time
+             */
+            window_to: string;
+            /** Workers */
+            workers: number;
+        };
         /**
          * ResumeOut
          * @description What the resume moved, and the assessment it was allowed against.
@@ -2659,6 +2963,92 @@ export interface components {
         ResumeRequest: {
             /** Reason */
             reason: string;
+        };
+        /** RiskLimitsOut */
+        RiskLimitsOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            kill_switch: components["schemas"]["KillSwitchOut"];
+            /**
+             * Portfolio Id
+             * Format: uuid
+             */
+            portfolio_id: string;
+            preset: components["schemas"]["RiskLimitsPresetOut"];
+            /** Recent Transitions */
+            recent_transitions: components["schemas"]["TransitionOut"][];
+            usage: components["schemas"]["UsageOut"];
+        };
+        /**
+         * RiskLimitsPresetOut
+         * @description ``hunter_risk.limits.RiskLimits``, field for field, in its own order.
+         *
+         *     ``source`` names where this copy was read from: ``risk_profile`` when the
+         *     wallet's ``risk_profile_id`` names a row (``risk_profiles.limits``,
+         *     DATABASE.md §7), ``engine_default`` when it does not — the principal wallet
+         *     opened by ``infra/scripts/open_paper_wallet.py`` today never sets that
+         *     column (no production caller of ``open_paper_wallet`` passes one), so the
+         *     number this reports is ``hunter_risk.limits.PAPER_V1`` itself, the same
+         *     object ``hunter_core.admission.service`` defaults every paper evaluation
+         *     to. Either way the two are byte-for-byte the same profile (DATABASE.md §2,
+         *     proved by ``test_schema_paper.py``); this field says which fact the
+         *     response is standing on, never which number is right.
+         */
+        RiskLimitsPresetOut: {
+            /** Day Timezone */
+            day_timezone: string;
+            kill_switch_blocked: components["schemas"]["KillSwitchThresholdsOut"];
+            kill_switch_warning: components["schemas"]["KillSwitchThresholdsOut"];
+            /** Max Aggregate Planned Risk Pct */
+            max_aggregate_planned_risk_pct: string;
+            /** Max Asset Exposure Pct */
+            max_asset_exposure_pct: string;
+            /** Max Beta Age S */
+            max_beta_age_s: number;
+            /** Max Beta Btc Exposure */
+            max_beta_btc_exposure: string;
+            /** Max Book Age S */
+            max_book_age_s: number;
+            /** Max Concurrent Positions */
+            max_concurrent_positions: number;
+            /** Max Entry Deviation Pct */
+            max_entry_deviation_pct: string;
+            /** Max Leverage */
+            max_leverage: string;
+            /** Max Participation Pct */
+            max_participation_pct: string;
+            /** Max Price Age S */
+            max_price_age_s: number;
+            /** Max Slippage Pct */
+            max_slippage_pct: string;
+            /** Max Spread Pct */
+            max_spread_pct: string;
+            /** Max Stop Distance Pct */
+            max_stop_distance_pct: string;
+            /** Max Total Exposure Pct */
+            max_total_exposure_pct: string;
+            /** Max Volume Age S */
+            max_volume_age_s: number;
+            /** Min Liquidity Usd 24H */
+            min_liquidity_usd_24h: string;
+            /** Min Stop Distance Pct */
+            min_stop_distance_pct: string;
+            /** Participation Window S */
+            participation_window_s: number;
+            /** Profile */
+            profile: string;
+            /** Risk Per Trade Pct */
+            risk_per_trade_pct: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "risk_profile" | "engine_default";
+            /** Warning Size Multiplier */
+            warning_size_multiplier: string;
         };
         /**
          * RiskPreset
@@ -2776,6 +3166,18 @@ export interface components {
          * @enum {string}
          */
         ShadowTrackingState: "pending_entry" | "active" | "terminal" | "no_entry" | "censored";
+        /**
+         * SignalCountsOut
+         * @description Emitted signals per cohort family (DATABASE.md §24.1).
+         */
+        SignalCountsOut: {
+            /** Prospective */
+            prospective: number;
+            /** Replay */
+            replay: number;
+            /** Replication */
+            replication: number;
+        };
         /** SignalListItemOut */
         SignalListItemOut: {
             /** Censored Reason */
@@ -2842,6 +3244,72 @@ export interface components {
             tracking_state: components["schemas"]["ShadowTrackingState"];
             /** Virtual Entry */
             virtual_entry: string | null;
+        };
+        /** StrategiesOut */
+        StrategiesOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Items */
+            items: components["schemas"]["StrategyOut"][];
+        };
+        /** StrategyOut */
+        StrategyOut: {
+            /** Category */
+            category: string | null;
+            /** Description */
+            description: string | null;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /**
+             * Strategy Id
+             * Format: uuid
+             */
+            strategy_id: string;
+            /** Versions */
+            versions: components["schemas"]["StrategyVersionDetailOut"][];
+        };
+        /** StrategyVersionDetailOut */
+        StrategyVersionDetailOut: {
+            /** Activated At */
+            activated_at: string | null;
+            /** Code Ref */
+            code_ref: string | null;
+            /** Default Parameters */
+            default_parameters: {
+                [key: string]: unknown;
+            };
+            /** Deprecated At */
+            deprecated_at: string | null;
+            lineage: components["schemas"]["LineageOut"] | null;
+            maturity: components["schemas"]["ScoreboardMaturityOut"];
+            /** Obsidian Page */
+            obsidian_page: string;
+            /** Parameters Schema */
+            parameters_schema: {
+                [key: string]: unknown;
+            };
+            /** Promising At */
+            promising_at: string | null;
+            /** Promising By */
+            promising_by: string | null;
+            /** Purpose */
+            purpose: string;
+            signal_counts: components["schemas"]["SignalCountsOut"];
+            status: components["schemas"]["StrategyVersionStatus"];
+            /**
+             * Strategy Version Id
+             * Format: uuid
+             */
+            strategy_version_id: string;
+            /** Verdict */
+            verdict: string;
+            /** Version */
+            version: string;
         };
         /**
          * StrategyVersionStatus
@@ -2944,6 +3412,51 @@ export interface components {
             /** Reason */
             reason: string | null;
             to_state: components["schemas"]["KillSwitchState"];
+        };
+        /**
+         * UsageOut
+         * @description The wallet's current draw against every cap ``preset`` names.
+         *
+         *     ``total_exposure``/``per_asset``/``beta_weighted_exposure``/``slots_used``/
+         *     ``committed_planned_risk``/``available_cash`` are ``None`` exactly when
+         *     ``hunter_core.portfolio.state.build_portfolio_state`` could not rebuild the
+         *     daily reference (``unavailable`` then names why, the same words
+         *     ``PortfolioSummaryOut.unavailable`` uses) — never a silent zero, for the
+         *     same reason ``PortfolioRiskStateOut.daily_loss_pct`` is nullable.
+         *     ``open_position_count``/``pending_entry_count``/``reserved_*`` do not
+         *     depend on the daily reference and are always reported.
+         */
+        UsageOut: {
+            /** Available Cash */
+            available_cash: string | null;
+            /** Beta Weighted Exposure */
+            beta_weighted_exposure: string | null;
+            /** Beta Weighted Exposure Reason */
+            beta_weighted_exposure_reason: string | null;
+            /** Committed Planned Risk */
+            committed_planned_risk: string | null;
+            /** Daily Loss Pct */
+            daily_loss_pct: string | null;
+            /** Drawdown Pct */
+            drawdown_pct: string | null;
+            /** Open Position Count */
+            open_position_count: number;
+            /** Pending Entry Count */
+            pending_entry_count: number;
+            /** Per Asset */
+            per_asset: components["schemas"]["AssetExposureOut"][] | null;
+            /** Reserved Cash */
+            reserved_cash: string;
+            /** Reserved Notional */
+            reserved_notional: string;
+            /** Reserved Risk */
+            reserved_risk: string;
+            /** Slots Used */
+            slots_used: number | null;
+            /** Total Exposure */
+            total_exposure: string | null;
+            /** Unavailable */
+            unavailable: string[];
         };
         /** UserOut */
         UserOut: {
@@ -3056,6 +3569,8 @@ export interface components {
              * @default not_applicable
              */
             portfolio_pnl_reason: string;
+            /** Purpose */
+            purpose: string;
             r_ex_funding: components["schemas"]["RExFundingBlock"];
             status: components["schemas"]["StrategyVersionStatus"];
             /** Strategy Key */
@@ -3292,6 +3807,69 @@ export interface operations {
             };
         };
     };
+    list_replays_api_v1_lab_shadow_replays_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_ReplayRunOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_replay_api_v1_lab_shadow_replays__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayRunDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_scoreboard_api_v1_lab_shadow_scoreboard_get: {
         parameters: {
             query?: {
@@ -3348,6 +3926,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CursorPage_SignalListItemOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_strategies_api_v1_lab_shadow_strategies_get: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategiesOut"];
                 };
             };
             /** @description Validation Error */
@@ -4210,6 +4819,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResumeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_risk_limits_api_v1_orgs__org_id__portfolios__portfolio_id__risk_limits_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskLimitsOut"];
                 };
             };
             /** @description Validation Error */

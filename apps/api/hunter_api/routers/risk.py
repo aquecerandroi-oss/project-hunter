@@ -41,6 +41,8 @@ from hunter_api.schemas.risk import (
     ScopeStatesOut,
     TransitionOut,
 )
+from hunter_api.schemas.risk_limits import RiskLimitsOut
+from hunter_api.services.risk_limits import build_risk_limits
 from hunter_core.db.models.portfolios import Portfolio
 from hunter_core.domain.enums import OrganizationRole
 from hunter_core.domain.types import utcnow
@@ -102,20 +104,15 @@ async def _owned(session: AsyncSession, context: OrgContext, portfolio_id: uuid.
         raise PortfolioNotFoundError
 
 
-@router.get(
-    "/kill-switch",
-    response_model=KillSwitchOut,
-    summary="Read the portfolio kill switch, with its motive and evidence",
-)
-async def read_kill_switch(
-    context: ViewerOrg, session: OrgSession, portfolio_id: uuid.UUID
-) -> KillSwitchOut:
-    await _owned(session, context, portfolio_id)
-    try:
-        scopes = await effective_state(session, portfolio_id)
-        row = await load_locked_state(session, portfolio_id)
-    except RiskStateMissing as missing:
-        raise PortfolioNotFoundError from missing
+async def build_kill_switch_out(session: AsyncSession, portfolio_id: uuid.UUID) -> KillSwitchOut:
+    """The wallet's kill switch, with its motive and evidence.
+
+    Extracted from the route below (T3.25) so ``services/risk_limits.py`` can
+    embed the identical read inside ``GET .../risk/limits`` instead of a second
+    hand-written copy — the two must never disagree on what "effective" means.
+    """
+    scopes = await effective_state(session, portfolio_id)
+    row = await load_locked_state(session, portfolio_id)
     reason = await session.scalar(
         select(Portfolio.kill_switch_reason).where(Portfolio.id == portfolio_id)
     )
@@ -165,6 +162,35 @@ async def read_kill_switch(
             created_at=transition.created_at,
         ),
     )
+
+
+@router.get(
+    "/kill-switch",
+    response_model=KillSwitchOut,
+    summary="Read the portfolio kill switch, with its motive and evidence",
+)
+async def read_kill_switch(
+    context: ViewerOrg, session: OrgSession, portfolio_id: uuid.UUID
+) -> KillSwitchOut:
+    await _owned(session, context, portfolio_id)
+    try:
+        return await build_kill_switch_out(session, portfolio_id)
+    except RiskStateMissing as missing:
+        raise PortfolioNotFoundError from missing
+
+
+@router.get(
+    "/limits",
+    response_model=RiskLimitsOut,
+    summary="Read the numeric paper_v1 preset and the wallet's usage against it",
+)
+async def read_risk_limits(
+    context: ViewerOrg, session: OrgSession, portfolio_id: uuid.UUID
+) -> RiskLimitsOut:
+    out = await build_risk_limits(session, context.org_id, portfolio_id, utcnow())
+    if out is None:
+        raise PortfolioNotFoundError
+    return out
 
 
 @router.post(
