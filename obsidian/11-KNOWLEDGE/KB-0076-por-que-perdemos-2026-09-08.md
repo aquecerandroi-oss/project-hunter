@@ -51,6 +51,27 @@ do preço custa 0,80 R por operação.** A `volume_anomaly` põe o stop na míni
 piso (`volume_anomaly_v1.py:183`) — mediana de risco **0,406 % do preço** na janela de replay — e
 por isso paga **0,615 R de custo por operação**, mais do que perde no total.
 
+> [!alerta] Nota de rodapé de 2026-09-08 (noite, T3.41) — `risco%` é a **distância do stop**, não o ATR%
+> Nada acima foi editado, e nenhum número **medido** desta nota muda: as tabelas vêm do dado, não da
+> fórmula. O que se corrige é a **aplicação** da identidade em previsões feitas a partir do ATR%.
+> Nas famílias que põem o stop a `stop_atr × ATR` (é o caso da `momentum`, com `stop_atr = 1,5`):
+>
+> ```
+> risco% = stop_atr × ATR%      →      custo_R = 0,0020 / (stop_atr × ATR%)
+> ```
+>
+> Aplicar a identidade ao ATR% direto **superestima o pedágio em 1,5×**. Duas consequências
+> concretas, e só elas: onde esta nota levou a escrever "a `v4` (piso 0,0089) já testa 0,22 R", o
+> número certo é **≈ 0,15 R**; e o piso de 0,020 pedido como "teto de 0,10 R" entrega, na verdade,
+> **≤ 0,067 R** ([[EXP-0012-momentum-teto-de-pedagio]]). **A ordenação das variantes e todas as
+> decisões tomadas continuam as mesmas.** Achado pelo `quant-engineer` na T3.40 (CONCERN 8b),
+> registrado também em [[EXP-0006-momentum-piso-de-custo]].
+>
+> **O que a correção não perdoa:** a `v5` foi ativada, replayada e **aposentada no mesmo dia**
+> (19:39:00Z) com **zero decisão** — o piso ficou acima de todo o ATR% observado ao decidir
+> (máx. 1,756 %). Cortar custo continua sendo necessário e **não** suficiente, que é o item mais
+> repetido desta nota.
+
 ## Os números (cada tabela com a consulta que a produziu)
 
 ### 1. Bruto contra líquido — `2026-09-08-03-custo-vs-edge.sql`
@@ -257,6 +278,7 @@ esta nota não existir, o campo `astra:` fica `pendente` de propósito.
 [[EXP-0001-momentum-v1]] · [[EXP-0002-volume-anomaly-v1]] · [[EXP-0004-politicas-de-saida]] ·
 [[EXP-0005-momentum-paper]] · [[EXP-0006-momentum-piso-de-custo]] ·
 [[EXP-0007-momentum-invalidacao-bracos-INV]] ·
+[[EXP-0012-momentum-teto-de-pedagio]] · [[EXP-0013-momentum-alvo-3-atr]] ·
 [[Strategy Backlog]] · [[Registro de Tentativas]] · [[11-KNOWLEDGE/Index|Index]]
 
 ## Fontes

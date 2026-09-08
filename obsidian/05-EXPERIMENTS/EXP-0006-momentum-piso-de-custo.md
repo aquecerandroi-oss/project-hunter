@@ -278,6 +278,33 @@ e disse que a igualdade dos 25 pares é verificação de consistência, **não**
 piso na mesma amostra. Isso iniciaria **outra tentativa exploratória**, a registrar como tal no
 [[Registro de Tentativas]] — não é a continuação desta.
 
+### Nota de rodapé de 2026-09-08 (noite, T3.41) — a identidade de custo usa a **distância do stop**, não o ATR%
+
+**Não é avaliação: é uma correção aritmética, e ela muda uma magnitude citada nesta página e na
+[[KB-0076-por-que-perdemos-2026-09-08]].** Achada pelo `quant-engineer` ao escrever o
+[[EXP-0012-momentum-teto-de-pedagio]] (`.claude/state/notes-T3.40.md`, CONCERN 8b).
+
+A identidade medida é `custo_R × risco% = 0,0020`, onde **`risco%` é a distância do stop em fração do
+preço**, não o ATR%. Como esta família põe o stop a `stop_atr × ATR` com `stop_atr = 1,5`:
+
+```
+risco% = stop_atr × ATR% = 1,5 × ATR%
+```
+
+Aplicar a identidade ao ATR% direto — que é o que a KB e os briefs que a citam fizeram — **superestima
+o pedágio em 1,5×**:
+
+| versão | `atr_pct_min` | pedágio como escrito antes | pedágio correto |
+|---|---:|---:|---:|
+| `momentum v4` (esta página) | 0,0089 | 0,22 R | **≈ 0,15 R** (0,0020 / 0,01335) |
+| `momentum v5` ([[EXP-0012-momentum-teto-de-pedagio]]) | 0,020 | 0,10 R | **≤ 0,067 R** (0,0020 / 0,03) |
+
+**O que não muda:** o sinal, a ordenação das variantes e todas as decisões já tomadas — o teto pedido
+pelo brief T3.32 (≤ 0,10 R) continua satisfeito com folga pela `v5`, e a `v4` continua sendo o passo
+menor do mesmo eixo. **O que muda:** qualquer conta futura que parta de "a `v4` testa 0,22 R". Nenhum
+número medido desta página foi recalculado — os pedágios **medidos** (0,1065 R prospectivo, tabela da
+avaliação de abertura) sempre vieram do dado, nunca desta fórmula.
+
 ### Avaliação de <próxima data>
 
 <acrescente uma seção nova; não edite a anterior>
@@ -295,6 +322,8 @@ piso na mesma amostra. Isso iniciaria **outra tentativa exploratória**, a regis
 [[Strategy Backlog]] · [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] ·
 [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] ·
 [[KB-0035-momentum-crashes-e-o-piso-que-virou-filtro-de-regime]] · [[Registro de Tentativas]] ·
+[[KB-0076-por-que-perdemos-2026-09-08]] · [[EXP-0012-momentum-teto-de-pedagio]] ·
+[[EXP-0013-momentum-alvo-3-atr]] ·
 [[2026-09-08-linhagem-de-momentum-v4-no-changelog-da-vps|00-INBOX: linhagem de `momentum v4`]]
 
 ## Fontes

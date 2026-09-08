@@ -334,6 +334,66 @@ duas corridas.
 
 Fonte integral (comandos, saídas verbatim, SQL e recibos): `.claude/state/notes-T3.33e.md`.
 
+### Avaliação de 2026-09-08 (2) — passada de estresse sobre a mesma coorte (T3.36)
+
+Não é população nova: é a **mesma** coorte `replay:d0f77894-1e04-454e-a49f-d9a98d894968`, com as
+**entradas congeladas**, reprecificada sob sete cenários e recortada de seis maneiras. O que se move é
+o desfecho; a admissão é a da base (se a base não entrou, não resolveu ou não amadureceu no corte, o
+sinal sai de **todos** os cenários). A dobra usa o **walker de produção**, não uma segunda
+implementação da regra de saída — a lição que a T3.36 congelou.
+
+**`as_of` = 2026-09-08T19:13:53,302037Z** (16:13:53 BRT) · **37 entradas congeladas** · 4 mercados ·
+semente 20260908 · 1000 reamostras · IC por **blocos de dia**.
+
+| cenário | tipo | n | expectancy (R) | PF | Δ vs base | IC 95 % do Δ |
+|---|---|---:|---:|---:|---:|---|
+| `base` | reprecificação | 37 | **+0,0938** | 1,1856 | — | — |
+| `custos_x2` | reprecificação | 37 | **−0,1213** | 0,7878 | **−0,2150** | **[−0,2615; −0,1597]** |
+| `stop_x0.75` | reprecificação | 37 | +0,0812 | 1,1289 | −0,0126 | [−0,1962; +0,1236] |
+| `stop_x1.25` | reprecificação | 37 | +0,1272 | 1,3244 | +0,0335 | [−0,0994; +0,2442] |
+| `alvo_x0.75` | reprecificação | 37 | +0,0438 | 1,0925 | −0,0500 | [−0,2122; +0,1346] |
+| `alvo_x1.25` | reprecificação | 37 | +0,1012 | 1,1881 | +0,0074 | [−0,2255; +0,1723] |
+| `entrada_mais_1_barra` | reprecificação | 37 | +0,0977 | 1,1931 | +0,0039 | [−0,0670; +0,1006] |
+| `sem_binance:DOGEUSDT` | recorte | 25 | +0,1833 | 1,3935 | — | — |
+| `sem_binance:ETHUSDT` | recorte | 31 | +0,0706 | 1,1350 | — | — |
+| `sem_binance:SOLUSDT` | recorte | 29 | +0,0234 | 1,0446 | — | — |
+| `sem_binance:XRPUSDT` | recorte | 26 | +0,1138 | 1,2270 | — | — |
+| `1a_metade_ate_2026-08-28` | recorte | 30 | +0,2456 | 1,5734 | — | — |
+| `2a_metade_apos_2026-08-28` | recorte | **7** | **−0,5568** | 0,3331 | — | — |
+
+**Veredito da passada: `frágil a custos`**, com um segundo motivo publicado junto (a ferramenta
+publica **todos**, não só o que ganhou a precedência):
+
+- **frágil a custos** — `custos_x2` leva a expectancy de +0,0938 R a **−0,1213 R**, com o IC do Δ
+  **inteiramente negativo**. É o único cenário cujo intervalo não toca o zero. Traduzindo: o único
+  resultado líquido positivo que este Lab produziu **inverte de sinal se a hipótese de custo de
+  20 bps estiver otimista pela metade** — e ela é hipótese declarada, não tarifa medida
+  ([[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]]);
+- **dependente de metade** — a segunda metade da janela tem **7** operações e **−0,5568 R**, contra
+  +0,2456 R nas 30 da primeira. Com n = 7 isso descreve, não estima; o que ele mata é a leitura de
+  que a vantagem esteve presente ao longo da janela.
+
+**O que a passada não diz:**
+
+- **os quatro mercados não carregam nada sozinhos.** Nenhum leave-one-out troca o sinal (a
+  expectancy fica entre +0,023 e +0,183 R). Não há um mercado responsável;
+- **os cenários de parâmetro estão dentro do ruído** (stop e alvo a ±25 %, entrada +1 barra: todos os
+  IC contêm zero). **Cuidado com a leitura de `stop_x1.25`:** escalar o stop **renormaliza o R** — o
+  denominador cresce 25 %, as vencedoras encolhem em R e as perdedoras continuam valendo ≈ −1 R. A
+  passada **não separa** essa aritmética de denominador de uma vantagem real, e a linha não deve ser
+  lida como "alargar o stop melhora";
+- **sete cenários sobre a mesma população não são sete experimentos**, e a passada não aplica
+  correção de multiplicidade: o Δ é descritivo e o veredito é sobre o **sinal** da expectancy.
+
+**Result: continua `inconclusivo`** — a passada de estresse **pode matar por fragilidade e nunca
+aprovar**, e a régua de maturidade (100 avaliáveis **E** 30 dias) segue não cumprida com 37 e 11.
+**Next Action:** a coorte `prospective` continua sendo a tentativa de verdade, e a fragilidade a
+custos passa a ser **a primeira coisa a conferir** quando ela amadurecer — junto da medição do custo
+real contra o livro, que a [[KB-0076-por-que-perdemos-2026-09-08]] já pedia.
+
+Fonte: `.claude/state/stress-mean-reversion-v1-2026-09-08.md` (tabela e veredito verbatim) ·
+`.claude/state/notes-T3.36.md` (as decisões de desenho da passada, §2 e §9).
+
 ## Variantes tentadas
 
 | Variante | Quando | Por quê | Onde ficou registrada |

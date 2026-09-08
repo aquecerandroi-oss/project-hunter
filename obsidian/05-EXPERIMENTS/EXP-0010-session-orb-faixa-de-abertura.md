@@ -6,10 +6,10 @@ owner: sexta-feira
 exp: EXP-0010
 strategy: session_orb
 version: v1
-result: nao-iniciado
-evaluable: 0
-days: 0
-last_eval: ""
+result: inconclusivo
+evaluable: 20
+days: 9
+last_eval: 2026-09-08
 ---
 
 # EXP-0010 — rompimento da faixa de abertura de sessão (`session_orb_v1`)
@@ -25,6 +25,12 @@ last_eval: ""
 > commitado (T3.33c, `3ed17bb`), o portão C1–C8 foi preenchido abaixo (**REVISE**, 62,5) e o teto de
 > pedágio (**0,3333 R**) está confirmado. **Nenhuma ativação, nenhuma coorte, nenhuma avaliação** —
 > ativação e replay estão em voo na T3.33f, e `result` continua `nao-iniciado` por isso.
+>
+> **Acréscimo de 2026-09-08 (noite, T3.41), sem apagar nada acima:** a versão foi **ativada** às
+> **19:42:56,116683Z** (16:42:56 BRT) como `research_only` e replayada por 31 dias (T3.33g,
+> commit `e505a02`). O `result` passa a `inconclusivo` com **20 decisões** e **9 dias** — ver a
+> avaliação datada no fim da página. K1 não disparou **por uma decisão**; a condição de mercado de
+> K3 (bruta negativa) **já está cumprida**.
 
 ## Hipótese (congelada)
 
@@ -225,11 +231,198 @@ janela, mercados, recibos do livro-razão, comandos exatos, cobertura completa, 
 denominador explícito, **decomposição por sessão** (a regra dos 70 %), **fração de desfechos cuja
 saída cai numa sessão posterior**, distribuição de `range_risk_atr`, `Result` e `Next Action`.
 
+> **Acréscimo de 2026-09-08 (noite, T3.41), sem apagar o parágrafo acima:** o parágrafo descreve o
+> estado de 14:22 BRT e ficou obsoleto às 16:42:56 BRT. A primeira avaliação **existe** e está
+> logo abaixo — a versão foi ativada, replayada por 31 dias e avaliada no mesmo dia. O parágrafo
+> fica como registro do que se sabia antes, que é o que a regra append-only protege.
+
+### Avaliação de 2026-09-08 — replay do dia um, coorte `replay:3fb9dda2…` — **REPLAY** (T3.33g)
+
+**REPLAY, não coleta prospectiva.** A janela avaliada (2026-08-08 → 2026-09-08) é a **mesma** que
+gerou a hipótese. Nada aqui confirma coisa alguma; serve para **matar**, não para promover.
+
+**Ativação:** `session_orb v1`, `purpose research_only`, em **2026-09-08T19:42:56,116683Z**
+(16:42:56 de Brasília), `code_ref hunter_core.strategies.session_orb_v1@sha256:a4d514adeb0771d5…` —
+o digest que o protocolo exigia, conferido no `--dry-run`, na árvore local e dentro do
+`hunter-strategy-worker-1` **antes** de escrever.
+**Coorte:** `replay:3fb9dda2-256f-49af-9a1e-7ec5bd001d19`, duas fatias contíguas, 4 mercados
+(`binance:ETHUSDT, SOLUSDT, XRPUSDT, DOGEUSDT`), **11 904 barras**, **0 erros**.
+`read_at` das leituras: 19:44–19:57Z.
+
+**População:** 39 barras dispararam; **20** viraram decisão (as 19 restantes caíram na barreira de
+re-arme — um acompanhamento por versão/mercado/coorte; não são dado perdido). 20 terminais,
+**cobertura de `R_net` 100 %**, **9 dias distintos**, 4 mercados.
+
+| métrica | valor | denominador |
+|---|---:|---|
+| decisões | **20** | 124 mercado-dias (0,161 por mercado-dia) |
+| avaliáveis | 20 (100 %) | decisões |
+| expectancy **bruta** (sem custo nenhum) | **−0,0501 R** | 20 avaliáveis |
+| expectancy **ex-funding** | **−0,1930 R** | idem |
+| expectancy **líquida** (`R_net`) | **−0,1928 R** | idem |
+| pedágio medido (`custo_R`) | **0,1428 R** (mín. 0,0825 · máx. 0,2221) | idem |
+| soma de `R_net` | **−3,86 R** | ordenação por barra, não é equity |
+| taxa de alvo entre toques resolvidos | **16,7 %** (2 de 12) | `target + stop` — não é taxa de lucro |
+| taxa de lucro líquido | **40,0 %** (8 de 20) | encerrados avaliáveis com `R_net > 0` |
+| taxa de alvo sobre todas as decisões | **10,0 %** (2 de 20) | decisões — é a "taxa de acerto" da nota de origem |
+| profit factor líquido | **0,662** | Σ+ / \|Σ−\| |
+| **PnL de carteira / Max Drawdown de carteira** | **não aplicável** | não há carteira no Shadow Lab |
+
+**Nota metodológica sobre o "bruto".** `virtual_entry` e `exit_price` **já são os preços adversos**
+(meio-spread + slippage, 6 bps por ponta, aplicados por `pricing.py` antes de persistir). Um bruto
+ingênuo `(exit_price − virtual_entry)/risco` traria 12 bps embutidos e faria o pedágio parecer
+metade do que é. O bruto desta tabela desfaz as duas pontas e é, aí sim, sem custo nenhum; ele é
+**derivado**, não coluna do banco. Confere com a identidade da [[KB-0076-por-que-perdemos-2026-09-08]]
+(`custo_R ≈ 0,0020 / risco%`) em três casas por linha: DOGE 20-08, risco 1,259 % → previsto 0,1589,
+medido 0,1578; ETH 27-08, risco 0,916 % → previsto 0,2183, medido 0,2174.
+
+**Decomposição por sessão (obrigatória nesta página) e o teste dos 70 %:**
+
+| sessão | n | % das decisões | exp. bruta | exp. líquida | soma `R_net` | PF | acerto | dias |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| asia (00:00Z) | 6 | 30,0 % | +0,0086 | **−0,1454** | −0,87 | 0,666 | 0,0 % | 4 |
+| europe (07:00Z) | 7 | 35,0 % | −0,1834 | **−0,3257** | −2,28 | 0,484 | 0,0 % | 4 |
+| us (13:00Z) | 7 | 35,0 % | +0,0328 | **−0,1005** | −0,70 | 0,839 | 28,6 % | 5 |
+
+**A regra dos 70 % não dispara** (máximo 35,0 %): a amostra é notavelmente equilibrada entre as três
+sessões e a hipótese **não** precisa ser reenunciada como "uma hora específica". Este é o achado mais
+limpo do dia — e é o único positivo. **O outro lado da mesma regra morde:** as três expectancies são
+negativas e, com n = 6/7/7, **indistinguíveis entre si**. Pelo critério já congelado nesta página, o
+rótulo de sessão — que é a hipótese inteira — **não fez trabalho nenhum** nesta janela. O que resta é
+um rompimento de faixa de uma hora qualquer, hipótese diferente e mais fraca.
+
+**Transbordo de sessão (o custo declarado, medido e não suposto):**
+
+| leitura | n | fração |
+|---|---:|---:|
+| saída **depois do fim da janela de 5 h** da sessão de entrada | 11 / 20 | **55,0 %** |
+| saída numa **sessão declarada posterior** (outra abertura) | 4 / 20 | **20,0 %** |
+
+As quatro que atravessam: SOL 08-21 03:15 asia→europe (horizonte), DOGE e XRP 08-27 10:30 europe→us
+(horizonte), ETH 08-27 10:30 europe→us (stop). As duas leituras respondem perguntas diferentes e por
+isso as duas ficam publicadas.
+
+**Livro de motivos (`--explain-ledger`, 11 904 linhas, uma por barra avaliada):**
+
+| motivo | n | % das barras | asia | europe | us |
+|---|---:|---:|---:|---:|---:|
+| `outside_session_window` | 4 092 | 34,375 | 868 | 372 | 2 852 |
+| `no_range_break` | 4 003 | 33,627 | 1 305 | 1 431 | 1 267 |
+| `inside_opening_range` | 1 860 | 15,625 | 620 | 620 | 620 |
+| `rvol_low` | 820 | 6,888 | 352 | 255 | 213 |
+| `atr_out_of_range` | 575 | 4,830 | 164 | 152 | 259 |
+| `range_geometry` | 279 | 2,344 | 44 | 67 | 168 |
+| `warmup` (`unavailable`) | 236 | 1,983 | 108 | 64 | 64 |
+| `signal` | 39 | 0,328 | 11 | 15 | 13 |
+| `no_session_open` | **0** | 0,000 | — | — | — |
+
+O histograma do arquivo é **idêntico**, estado por estado, à soma dos dois recibos de `replay_runs`.
+Três leituras que só o livro permite:
+
+1. **`no_session_open` nunca ocorreu** — a CONCERN 3 da T3.33c dizia que, com as aberturas
+   congeladas, o ramo é inalcançável (a asia às 00:00 cobre o dia inteiro). Agora está **medido** em
+   11 904 barras, não argumentado;
+2. **`inside_opening_range` é aritmética pura e fecha exatamente**: 465 por mercado, 620 por sessão
+   (`bars_since_open ≤ 4` = 5 barras × 3 sessões × 31 dias). É o preço fixo, sem grau de liberdade,
+   de manter a primeira hora fora da regra;
+3. **`outside_session_window` é assimétrico por artefato de rótulo, não por mercado**: as 6 horas
+   mortas do dia (18:00–24:00 UTC) recebem o rótulo `us` porque `_session_open` devolve a última
+   abertura ≤ corte. Isso **não** contamina nenhuma métrica desta seção (a decomposição é pela sessão
+   da barra que decidiu), mas mentiria em qualquer painel de "recusas por sessão" — está aberto em
+   [[Open Bugs]].
+
+**A guarda de tamanho é o funil real desta versão.** Das 279 recusas por `range_geometry`,
+**277 são por faixa larga demais** (`range_risk_atr > 2,5`) e apenas **2** por faixa estreita:
+
+```
+range_risk_atr nas recusas: n=279  min 0,921  p25 3,468  mediana 4,438  p75 5,955  max 9,445
+```
+
+Quando o preço rompe a máxima da primeira hora, a **mínima** dessa hora costuma estar a ~4,4 ATR — um
+stop enorme. O teto de 2,5 ATR recusa essas operações e faz o que foi congelado para fazer: o pedágio
+medido ficou em **0,1428 R** de média (máx. 0,2221 R), **abaixo do teto aritmético de 0,3333 R**
+calculado na T3.33c e muito abaixo dos 0,6152 R da coorte da `volume_anomaly v2`. **O custo não é a
+causa da perda aqui** — a expectancy já é negativa **antes** de qualquer custo (−0,0501 R).
+
+**Onde o resultado mora:** 10 stops (−11,03 R), 2 alvos (+3,30 R) e 8 saídas por horizonte (+3,87 R).
+Com 2 alvos em 20, o equilíbrio de 44,5 % projetado na tabela de geometria não foi alcançado nem de
+longe; o que segurou a coorte perto de −0,19 R foram as saídas por tempo. ETHUSDT sozinho responde por
+−2,50 R em 3 decisões, e quatro das cinco decisões de 28-08 são stops no mesmo par de horas (14:45 e
+15:00, rvol 5,3–6,0): **a coorte tem menos independência do que n = 20 sugere**.
+
+**Critérios de morte (`notes-T3.33.md` §5.1):**
+
+| K | condição | medido | dispara? |
+|---|---|---|---|
+| K1 | < 20 decisões | **exatamente 20** | **não — por uma decisão** |
+| K2 | > 1 500 decisões | 20 | não |
+| K3 | ≥ 100 avaliáveis **e** ≥ 30 dias **e** expectancy bruta (`r_ex_funding`) < 0 | 20 (< 100), 9 dias (< 30), `r_ex_funding` **−0,1930** | **não** — faltam as duas condições de régua; a de mercado **já está cumprida** |
+| K4 | `unavailable` > 40 % das barras | **1,98 %** (236/11 904) | não |
+| K5 | cobertura de `R_net` < 70 % | **100 %** | não |
+| — | regra dos 70 % (esta página) | máx. **35,0 %** | não |
+| — | expectancy indistinguível entre as três sessões (esta página) | **sim**, e as três negativas | não mata, mas **esvazia a hipótese** |
+
+#### Passada de estresse (T3.36) — mesma coorte, `as_of` 2026-09-08T19:53:28,833572Z
+
+| cenário | tipo | n | expectancy (R) | PF | Δ vs base | IC 95 % do Δ |
+|---|---|---:|---:|---:|---:|---|
+| `base` | reprecificação | 20 | −0,1928 | 0,6616 | — | — |
+| `custos_x2` | reprecificação | 20 | −0,3186 | 0,4966 | −0,1258 | [−0,1522; −0,1107] |
+| `stop_x0.75` | reprecificação | 20 | −0,1581 | 0,7565 | +0,0347 | [−0,1077; +0,1749] |
+| `stop_x1.25` | reprecificação | 20 | −0,2338 | 0,5632 | −0,0410 | [−0,1187; +0,0058] |
+| `alvo_x0.75` | reprecificação | 20 | −0,1439 | 0,7455 | +0,0489 | [−0,0933; +0,2632] |
+| `alvo_x1.25` | reprecificação | 20 | −0,1497 | 0,7373 | +0,0431 | [+0,0000; +0,1297] |
+| `entrada_mais_1_barra` | reprecificação | 20 | −0,1978 | 0,6572 | −0,0050 | [−0,0674; +0,0659] |
+| `sem_binance:DOGEUSDT` | recorte | 13 | −0,3014 | 0,5091 | — | — |
+| `sem_binance:ETHUSDT` | recorte | 17 | −0,0797 | 0,8476 | — | — |
+| `sem_binance:SOLUSDT` | recorte | 16 | −0,2306 | 0,5995 | — | — |
+| `sem_binance:XRPUSDT` | recorte | 14 | −0,1860 | 0,6782 | — | — |
+| `1a_metade_ate_2026-08-28` | recorte | 18 | −0,2293 | 0,6349 | — | — |
+| `2a_metade_apos_2026-08-28` | recorte | 2 | +0,1361 | 4,1269 | — | — |
+
+**Veredito da passada: `amostra_insuficiente`** — **20 desfechos avaliáveis de 30 exigidos**, e o
+veredito é da própria ferramenta, não de leitura minha. A tabela acima é **descritiva**: nenhuma linha
+dela pode ser citada como "frágil a X" ou "robusto a X". Dois exemplos de por quê: a segunda metade
+tem **duas** operações (o +0,1361 R não é informação) e `alvo_x1.25` sai com limite inferior
+**exatamente** em zero, o que é sintoma de reamostragem por blocos de dia sobre 9 dias, não de
+significância. O único número que eu leria é `custos_x2` (−0,3186 R, IC do Δ inteiro negativo): ele
+não diz "frágil a custos" — a base já perde —, diz que **não há folga nenhuma** para deterioração de
+execução.
+
+**Result: `inconclusivo`.** Nenhum critério de descarte dispara. Registro sem suavizar que **K1 falhou
+por uma decisão** e que a única condição de K3 que depende do mercado — expectancy bruta negativa —
+**já está cumprida**: se a versão chegar a 100 avaliáveis e 30 dias mantendo o sinal desta janela, K3
+decide sozinho e a decisão será `descartar`. Ninguém deve ler "inconclusivo" aqui como "promissor".
+
+**Next Action:** deixar a versão correndo em `prospective` (`research_only`, sem carteira, já no
+roster, 311 avaliações prospectivas nos primeiros cortes de 15 min e nenhuma disparada) e reavaliar
+quando houver **≥ 100 avaliáveis e ≥ 30 dias**. **Não** derivar variante por sessão nem afrouxar
+`range_risk_atr_max` — as duas estão registradas como variantes **recusadas** abaixo, com o motivo.
+
+Fonte integral (comandos, saídas verbatim, recibos e SQL): `.claude/state/notes-T3.33g.md`.
+
+### Avaliação de 2026-09-08 — tentativa de ativação **PARADA antes de qualquer escrita** (T3.33f)
+
+Não é avaliação de mercado: é o registro datado de que o experimento **não começou** às 17:36Z, e por
+quê. Fica na página porque silêncio num registro de pesquisa é indistinguível de instrumento quebrado.
+
+O `code_ref` existia e a imagem publicada o carregava (`import ok session_orb_v1 v1` em
+`hunter-api:cf51c7d`). O que não existia era a **linha do catálogo**: às 17:36Z a tabela `strategies`
+não tinha a chave `session_orb` (13 linhas em `strategy_versions`, nenhuma dela), então
+`activate_strategy_version.py session_orb v1 --dry-run` não teria o que ativar e a corrida foi
+interrompida **antes** de rodar — nada foi escrito, nem um `system_events` de recusa.
+
+O passo que faltava era do operador e era uma linha só (`seed.py`, sem `--dry-run` na época). Ele foi
+executado em 2026-09-08 (`--only strategies`, ~19:3xZ) e a ativação seguiu, como a seção anterior
+registra. **Result: não iniciado** (naquele instante). Fonte: `.claude/state/notes-T3.33f.md`.
+
 ## Variantes tentadas
 
 | Variante | Quando | Por quê | Onde ficou registrada |
 |---|---|---|---|
 | alvo fixo de 2 ATR | 2026-09-08 | recusado **antes** de rodar: com stop no dado, o ganho/risco varia de 4:1 a 1,3:1 | esta página, seção Geometria |
+| versão por **sessão única** | 2026-09-08 | **não derivada**: as três sessões dividiram a amostra 30/35/35 % e as três perderam; escolher a melhor depois de ver as três é o data snooping que esta mesma página proíbe ([[KB-0003-rompimento-de-canal-e-data-snooping]]) | esta página, Avaliação de 2026-09-08 (T3.33g) |
+| afrouxar `range_risk_atr_max` acima de 2,5 | 2026-09-08 | **não derivada**: 277 das 279 recusas de geometria são por faixa larga (mediana 4,44 ATR); afrouxar o teto compraria amostra ao preço de stops de ~4 ATR — exatamente o pedágio que este teto existe para conter | esta página, Avaliação de 2026-09-08 (T3.33g) |
 
 ## Relacionadas
 

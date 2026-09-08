@@ -720,6 +720,45 @@ horizonte e por **dois** dias — retirar qualquer um deles muda o sinal. **A co
 coorte `replay:` por nome. A recomendação de descartar a `breakout v1` está registrada e **não foi
 executada** — depreciar é ato auditado.
 
+## Acréscimo de 2026-09-08 (noite, T3.41) — T-037 **começou**; T-039 e T-040 nascem e uma delas já morreu
+
+Linhas **novas, com as mesmas IDs** onde a ID já existia — as linhas das seções anteriores **não**
+foram editadas. O que mudou: a T-037 ganhou **data de início** (o instante da ativação auditada,
+gravado antes da primeira barra e conferido contra o `system_event`), e duas variantes de parâmetro
+que estavam listadas no [[Strategy Backlog]] desde a T3.32 viraram tentativas com coorte própria.
+
+| ID | Candidata | Nota de origem | Parâmetros | `δ` | Início/fim UTC | Status |
+|---|---|---|---|---|---|---|
+| T-037 | **faixa de abertura de sessão** (`session_orb_v1`) | [[KB-0009-o-efeito-do-quarto-de-hora]] · [[KB-0032-o-relogio-dentro-do-limiar-de-volatilidade]] | os 21 congelados no `brief-T3.33c` §7; `params_hash cdb9516b…d5e0`; `code_ref …session_orb_v1@sha256:a4d514ad…8bba` | **não declarado antes da corrida** — mesma limitação das irmãs, registrada e não corrigida depois | **início = 2026-09-08T19:42:56,116683Z** (16:42:56 BRT); replay retrospectivo `2026-08-08 → 2026-09-08`, coorte `replay:3fb9dda2-256f-49af-9a1e-7ec5bd001d19`; coorte `prospective` **em curso, sem data de fim declarada** | **avaliada em replay — `inconclusivo`**: 20 decisões, 9 dias, bruta −0,0501 R, líquida **−0,1928 R**, PF 0,662, cobertura de `R_net` 100 %. **K1 não disparou por uma decisão**; a condição de mercado de K3 **já está cumprida**. As três sessões perderam com expectancy indistinguível — **o rótulo de sessão não fez trabalho nenhum** — [[EXP-0010-session-orb-faixa-de-abertura]] |
+| T-039 | **teto de pedágio no momentum** (`momentum v5`, `atr_pct_min` 0,003 → 0,020) | [[KB-0076-por-que-perdemos-2026-09-08]] · [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] | `momentum_v1` congelada (`…ab2e0398…`) com **um** parâmetro movido; `params_hash 2aef4a5ff989` | declarado **antes**: corte esperado > 86 % (o da `v4`); critério de descarte do brief = corte acima de 70 % | **início = 2026-09-08T18:57:05,384576Z** (15:57:05 BRT); replay `2026-08-08 → 2026-09-08`, coorte `replay:72cf5671-…`; **fim = 2026-09-08T19:39:00Z** (aposentada pela via auditada) | **avaliada e descartada por construção**: **0 decisões em 11 904 barras** — corte de **100 %**. O piso está **acima de todo o ATR% observado ao decidir** (máx. 1,756 %). Não é amostra pequena, é ausência de população — [[EXP-0012-momentum-teto-de-pedagio]] |
+| T-040 | **alvo de 3 ATR no momentum** (`momentum v6`, `target_atr` 1,5 → 3,0, escada 3/6/9) | [[EXP-0007-momentum-invalidacao-bracos-INV]] (braço `TGT-3`) · [[KB-0076-por-que-perdemos-2026-09-08]] | `momentum_v1` congelada (`…ab2e0398…`) com a escada de alvos deslocada; `params_hash 8cb1aa497956` | declarado **antes**: descarta se `PF_net ≤ 0,80` **ou** `expectancy_net ≤` a do pai | **início = 2026-09-08T19:04:56,213531Z** (16:04:56 BRT); replay `2026-08-08 → 2026-09-08`, coorte `replay:9a08835a-…`; coorte `prospective` **em curso — fim declarado: ~2026-10-08** | **avaliada em replay — `inconclusivo`, manter em pesquisa**: 195 avaliáveis, 24 dias, líquida **−0,0513 R** (pai: −0,1717 R), PF 0,906. Δ pareado **+0,1341 R** em 191 pares com risco inicial idêntico em 191/191 — e **IC por bloco de dia [−0,0939; +0,1866], contém zero**. Nenhum critério de descarte dispara — [[EXP-0013-momentum-alvo-3-atr]] |
+
+**Contagem de multiplicidade, atualizada.** As tentativas **avaliadas** passam de **5 execuções**
+para **8**: T-037, T-039 e T-040 foram ativadas e lidas no mesmo dia, cada uma sobre a janela que
+gerou a própria hipótese. Todo relatório de variante daqui para a frente cita este total.
+
+**Multiplicidade do dia, completa, para quem ler os vereditos:** em 2026-09-08 houve **oito ativações
+auditadas** — a linha `paper momentum v3` (05:57:30Z), `momentum v4` (13:05:13Z), `breakout v1`
+(16:23:39Z), `mean_reversion v1` (16:32:33Z), `breakout v2` (17:35:22Z), `momentum v5` (18:57:05Z),
+`momentum v6` (19:04:56Z) e `session_orb v1` (19:42:56Z). **Três foram aposentadas no mesmo dia** (`breakout v1` 19:35:34Z,
+`breakout v2` 19:35:36Z, `momentum v5` 19:39:00Z). Nenhum dos vereditos acima pode ser lido sem isso
+([[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]]).
+
+**Por que nenhuma destas três confirma coisa alguma.** (1) A coluna `Início/fim UTC` **não** foi
+preenchida antes da janela de replay em nenhuma delas: é retrospectiva sobre população que já
+existia; (2) a janela é a **mesma** que gerou as hipóteses; (3) T-037 está abaixo do limiar editorial
+nas duas pernas (20 avaliáveis, 9 dias) e T-040 passa em avaliáveis (195) mas **não** em dias (24 de
+30); (4) o resultado de T-040 é carregado por **três dias** — retirar qualquer um muda a leitura; (5)
+T-039 não tem resultado nenhum para carregar.
+
+**Aposentar passou a ser possível hoje, e por caminho auditado.** Até a T3.39 não havia via para
+depreciar uma versão substituída **por parâmetro** — `--supersede` recusa uma sucessora com o mesmo
+`code_ref` ("already frozen against this code"). O `--deprecate` (commit `4929b99`) só move `status`,
+recusa `live` sempre, recusa `paper` com posições ou slots abertos e grava
+`system_events / strategy_version_deprecated`. As três aposentadorias do dia passaram por ele. **Nada
+foi ativado por causa de número bonito, e as três que foram depreciadas o foram por ausência de
+população ou por K1, nunca por expectancy feia.**
+
 ## Relacionados
 
 [[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]] ·
@@ -727,4 +766,5 @@ executada** — depreciar é ato auditado.
 [[Strategy Performance]] · [[EXP-0007-momentum-invalidacao-bracos-INV]] ·
 [[EXP-0008-breakout-compressao-de-volatilidade]] · [[EXP-0009-mean-reversion-pullback-em-tendencia]] ·
 [[EXP-0010-session-orb-faixa-de-abertura]] · [[EXP-0011-derivatives-reversao-de-funding]] ·
+[[EXP-0012-momentum-teto-de-pedagio]] · [[EXP-0013-momentum-alvo-3-atr]] ·
 [[KB-0076-por-que-perdemos-2026-09-08]]

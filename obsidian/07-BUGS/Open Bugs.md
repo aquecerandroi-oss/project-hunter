@@ -202,6 +202,67 @@ suspeitas de código, são instrumentos que faltaram na hora de ler o dado. Esta
   `test_isolation` e travar o conjunto com uma asserção de completude, para que a próxima rota nova
   não entre calada.
 
+## Abertos no plantão da noite de 2026-09-08 (T3.41 — fecho do dia no Lab)
+
+Os três abaixo saíram das notas T3.33g, T3.39 e T3.40. **Nenhum foi reproduzido por medição nova
+nesta tarefa**: os números vêm das leituras já registradas naquelas notas, com o arquivo:linha ou o
+recibo citado. Estado de todos: **aberto 2026-09-08 (Sexta-feira)**.
+
+- **HIGH (autonomia paper, com correção em voo) — a trava que impede aposentar a linha `paper` com
+  posições abertas olha uma coluna que nunca é preenchida.** O `--deprecate` da T3.39
+  (`services/strategy-worker/hunter_strategy_worker/deprecate.py`) recusa depreciar uma versão
+  `purpose = paper` se houver posição aberta, e faz essa checagem por **`positions.agent_id`**. Mas
+  `positions.agent_id` **nunca é escrito pelo execution-worker**: o caminho real da linhagem é
+  `positions.metadata->>'proposal_id' → orders.proposal_id → trade_proposals.agent_id →
+  agents.strategy_version_id`. **Cenário concreto:** com `ENABLE_PAPER_AUTONOMY` ligado e a
+  `momentum v3` (a linha `paper`) com posição aberta, um `--deprecate momentum v3` **passaria a trava
+  em silêncio** — a consulta devolveria zero linhas —, o roster descartaria a versão na recarga
+  seguinte e a posição ficaria órfã de versão viva. Não é vazamento observado: hoje a flag está
+  desligada e não há posição. É **a trava certa lendo o campo errado**, que é pior que trava
+  ausente, porque parece protegida. **Correção em voo:** T3.39b
+  (`.claude/state/brief-T3.39b-deprecate-review-fixes.md`), achado ALTA-1 da revisão da T3.39.
+
+- **MEDIUM (instrumento de pesquisa) — `outside_session_window` rotula as 6 horas mortas do dia como
+  sessão `us`.** No livro-razão da `session_orb v1`, **2 852 das 4 092** recusas por janela caem no
+  rótulo `us` — contra 372 em `europe` — só porque `_session_open` devolve a **última abertura ≤
+  corte** e não existe abertura declarada depois das 13:00 UTC. As barras de 18:00–24:00 UTC não
+  pertencem a sessão nenhuma e mesmo assim são contadas como americanas. **Cenário:** qualquer painel
+  ou consulta que plote "recusas por sessão" a partir do livro-razão vai afirmar que a sessão
+  americana rejeita 7,7× mais que a europeia, o que é artefato de rótulo, não fato de mercado.
+  **Não contamina nenhum número publicado** em [[EXP-0010-session-orb-faixa-de-abertura]]: a
+  decomposição das decisões é pela sessão da barra que decidiu. **Correção honesta:** um rótulo
+  `fora_de_sessao` distinto — e isso é **versão nova** da estratégia, não ajuste, porque muda o que a
+  regra grava. Origem: `.claude/state/notes-T3.33g.md`, CONCERN 7.
+
+- **MEDIUM (deploy) — deploys parciais deixam os serviços em imagens diferentes, e o modo de falha
+  que isso arma é o Lab emudecer atrás de um `/ready` verde.** Medido às 19:37Z: `hunter-api-1` e
+  `hunter-web-1` em `c86ed19`, `hunter-strategy-worker-1` em **`c29cbef`** (quatro commits atrás),
+  `execution-worker` e `scanner-worker` em `b5d4f9b`, `market-worker` em `1ca7cf5` — **cinco imagens
+  ao mesmo tempo**. Naquela corrida foi inofensivo (conferido: o worker calculava o **mesmo** digest
+  `a4d514ad…` que o `hunter-api-1` imprimia no dry-run), mas o cenário é claro e é exatamente o que o
+  `code_ref` por versão existe para evitar: **um dia a `api` ativa uma versão cujo `code_ref` o worker
+  não reconhece, a versão entra no roster como `unrunnable` e o Lab para de avaliar sem que nada fique
+  vermelho.** Um segundo efeito já ocorreu no mesmo dia: um redeploy alheio às 19:12Z **apagou os
+  livros-razão em `/tmp`** de outra tarefa em execução (CONCERN 4 da T3.40), destruindo diagnóstico
+  que não pôde ser regenerado sem destruir a medição. **Corrigido nesta noite pelo procedimento** —
+  `compose.sh update` passou a alinhar todos os serviços —, e a **regra fica**: deploy alinha todos os
+  serviços, ou não é deploy. Origem: `.claude/state/notes-T3.33g.md` CONCERN 1 e 9,
+  `.claude/state/notes-T3.40.md` CONCERN 4.
+
+### Duas dívidas de instrumento que continuam abertas e ganharam evidência hoje
+
+- **`replay_runs` não tem `kind`, então a passada de estresse não tem recibo durável.** O recibo vive
+  só no JSONL de quem rodou (`--ledger`). A tabela não pode representar uma linha de estresse: não há
+  `run_id` próprio (a passada fala *sobre* a coorte de outro) e escrever a `run_id` da coorte medida
+  colidiria com `uq_replay_runs_slice`, fazendo uma passada engolir por `ON CONFLICT DO NOTHING` o
+  recibo do replay que ela mediu. Brief com as duas modelagens em
+  `.claude/state/brief-T3.36-db-replay-runs-kind.md`. **Dono: `database-architect`.**
+- **`mfe` é limite inferior em metade das linhas** (98 de 196 na `momentum v6`, 136 de 224 no pai,
+  `ambiguous = true`), e os `bounds` gravados em `meta.excursions` continuam sem uso. É por isso que
+  "1,0 % com MFE ≥ 2 R" convive com "53 alvos de 2 R atingidos" na mesma coorte — os dois números
+  estão certos e medem coisas diferentes. Qualquer leitura de cauda a partir de MFE hoje é
+  conservadora por construção. Mesma pendência que a T3.32 deixou.
+
 ## Abertos na T3.21 (higiene da base)
 
 - **LOW (base de conhecimento) — 32 das 75 notas de `11-KNOWLEDGE` estão com

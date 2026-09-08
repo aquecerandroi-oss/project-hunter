@@ -930,3 +930,85 @@ ETH/SOL/XRP/DOGE fica **abaixo** de 0,006 nos quatro, e o replay da
 0,010 é líquido negativo. Isso não é conserto de parâmetro: é a mesma aritmética de
 [[KB-0076-por-que-perdemos-2026-09-08]] aparecendo de novo, e a resposta continua sendo **teto de
 pedágio declarado**, não piso escolhido a olho.
+
+## Acréscimo de 2026-09-08 (noite, T3.41) — B1 fecha, e a fila muda de forma
+
+Nada acima foi editado; esta seção é datada e acrescentada, como manda a página. O que mudou é que a
+**primeira linha da fila da tarde (B1) foi testada e descartada**, duas variantes de `momentum` que
+estavam pendentes desde a T3.32 **saíram do papel e uma delas já morreu**, e o eixo do "teto de
+pedágio" precisa de um universo diferente para continuar existindo.
+
+### B1 — `breakout v2` por parâmetro: **fechado, testado e descartado**
+
+Não é mais candidata. A variante foi derivada (`stop_atr` 1,25 → 3,5, `params_hash 0e6abf1114cb`,
+mesmo `code_ref`), ativada às 17:35:22Z e replayada: **8 decisões**, bruta +0,0120 R, pedágio
+0,0912 R, líquida **−0,0810 R**, PF 0,798, acerto 50 % em 8 tentativas contra os **65 %** que a
+geometria nova exige para empatar. K1 dispara. **`breakout v1` e `v2` foram aposentadas** pela via
+auditada às **19:35:34Z** e **19:35:36Z** ([[EXP-0008-breakout-compressao-de-volatilidade]]).
+
+O que a família deixou de útil, e é a única pista de desenho que ela produziu: **82,5 % das barras
+nunca chegam comprimidas** e o bucket de `squeeze_ratio` (n = 4 por lado, portanto hipótese e não
+achado) aponta para `squeeze_max` **menor**, não para stop mais largo. Uma `v3` só se justifica se
+atacar compressão **e** assimetria de alvo ao mesmo tempo — **experimento novo, portão C1–C8 próprio,
+nunca conserto**. Fica na fila abaixo como **B7**.
+
+### As duas variantes de `momentum` que estavam pendentes desde a T3.32 — as duas saíram do papel
+
+| # | Variante | O que aconteceu | Estado |
+|---|---|---|---|
+| **V1** → `momentum v5` | `atr_pct_min` 0,003 → 0,020 (teto de pedágio) | ativada 18:57:05Z, replayada, **0 decisões em 11 904 barras**, **aposentada 19:39:00Z** | **descartada por construção** — [[EXP-0012-momentum-teto-de-pedagio]] |
+| **V2** → `momentum v6` | `target_atr` 1,5 → 3,0 (escada 3/6/9, porque a trava recusou mover só o primeiro alvo) | ativada 19:04:56Z, replayada: 196 decisões, bruta +0,203 R, líquida **−0,051 R**, PF 0,906; Δ pareado +0,134 R em 191 pares, **IC por dia contém zero** | **viva, em pesquisa** — [[EXP-0013-momentum-alvo-3-atr]]; reavaliar ~2026-10-08 |
+
+**A V1 não morreu por estatística, morreu por geometria** — e isso muda o eixo, não só a variante: o
+piso de 2,0 % está **acima de todo o ATR% observado ao decidir** nestes quatro mercados (máx. 1,756 %
+nas barras que chegam ao porteiro; 1,623 % nas 224 decisões do pai). Há ainda uma segunda razão, de
+política: com `stop_atr = 1,5`, um piso de 2,0 % põe o stop a ≥ 3,0 % do preço, que é **exatamente o
+teto** `max_stop_distance_pct` do `paper_v1` — toda barra acima do piso teria o sizing recusado pelo
+Risk Engine. **Esta variante decide onde o preset paper não deixa entrar.**
+
+**Correção aritmética que veio junto e vale para a fila inteira:** a identidade
+`custo_R × risco% = 0,0020` usa `risco%` = **distância do stop** (`stop_atr × ATR%`), não o ATR%.
+Onde esta página escreveu "a `v4` (0,0089) já está medindo 0,22 R", o número certo é **≈ 0,15 R**; o
+piso de 0,020 entrega **≤ 0,067 R**, não 0,10 R. Ordenação e decisões inalteradas — ver
+[[KB-0076-por-que-perdemos-2026-09-08]] e [[EXP-0006-momentum-piso-de-custo]].
+
+### A fila, como ela fica hoje
+
+| # | Candidata | Estado | O que ela exige antes de virar EXP |
+|---|---|---|---|
+| **B2** | `mean_reversion` **sem** a porta de tendência de 1 h (irmã de parâmetro) | **proposta** — e agora com um motivo a mais: a passada de estresse mostrou que a base é **frágil a custos** (`custos_x2` → −0,1213 R, IC do Δ inteiro negativo) e **dependente de metade** (2ª metade: 7 operações, −0,5568 R) | a mesma janela replayada; a porta só "paga por si" se o braço sem ela existir no banco |
+| **B3'** | `mean_reversion` com **teto de pedágio declarado**, não piso de ATR% escolhido a olho | **reenunciada** (era "piso acima de 0,010") | a lição da V1: o teto tem de nascer com o universo declarado no desenho, ou corta 100 % da população |
+| **B4** | `derivatives v1` — reexecutar a pré-checagem | **bloqueada até ~2026-10-06**, sem mudança | uma consulta, quando os ~385 mercados de 2026-09-05 tiverem 31 dias |
+| **B5** | `patterns` v2 (`retire_after_break`, leque, nível horizontal, baldes de 1 h, seleção estrutural) | **proposta**, sem mudança | cada diferença muda número já desenhado → versão nova |
+| **B6** | `trendline_breakout_v1` (T3.34b) | **bloqueada por decisão de arquitetura**, sem mudança — `hunter-core` não depende de `hunter-indicators` e `module_closure` só fecha sobre irmãos planos; um import cruzado deixaria a geometria **fora** do digest | decisão de módulo (portar com teste de paridade numérica é a recomendação) — **é pergunta para o Everton**, não para mim |
+| **B7** | `breakout v3` — `squeeze_max` menor **e** alvo proporcional ao stop | **nova, proposta** | portão C1–C8 próprio; nasce do bucket de `squeeze_ratio` da `v2`, que é n = 4 por lado |
+| **B8** | **produtor de regime** (`market_regimes` com mais de uma linha) | **nova, e é pré-requisito de três obrigações de portão já declaradas** | é a obrigação C4 de quatro EXP: hoje dizer "quebramos por regime" seria inventar corte. Sem ele, quatro páginas carregam uma obrigação declarada como não cumprida |
+
+### O que esta rodada explicitamente NÃO propõe
+
+- **Nenhum ajuste de parâmetro em versão viva.** Toda mudança de valor é `derive_variant.py` +
+  ativação auditada + coorte própria, ou não acontece.
+- **Nenhuma promoção a `paper`.** A `v6` reduz a perda em 70 % **na janela que inventou a ideia** e
+  não se distingue de zero quando se conta por dia. Promover isso seria exatamente o erro que a
+  [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] descreve.
+- **Nenhuma variante por sessão da `session_orb`.** As três sessões dividiram a amostra 30/35/35 % e
+  **as três perderam**; escolher a melhor depois de ver as três é data snooping, e está registrado
+  como variante **recusada** em [[EXP-0010-session-orb-faixa-de-abertura]].
+- **Nenhum afrouxamento de `range_risk_atr_max`.** Compraria amostra ao preço de stops de ~4 ATR — o
+  pedágio que o teto existe para conter.
+
+**A leitura que atravessa a fila, e é o achado da noite:** de seis versões novas abertas hoje, **três
+já foram aposentadas** e **nenhuma** produziu vantagem bruta acima do custo típico. O número que
+decide tudo continua sendo o mesmo que a [[KB-0076-por-que-perdemos-2026-09-08]] nomeou: **existe
+alguma família de entrada com expectancy bruta acima de +0,25 R?** Enquanto a resposta for não,
+nenhum filtro de custo, alvo, sessão ou compressão inverte o sinal — e a fila acima é uma fila de
+perguntas, não de promessas.
+
+## Relacionadas
+
+[[Experiments Index]] · [[Registro de Tentativas]] · [[Strategy Performance]] ·
+[[EXP-0006-momentum-piso-de-custo]] · [[EXP-0008-breakout-compressao-de-volatilidade]] ·
+[[EXP-0009-mean-reversion-pullback-em-tendencia]] · [[EXP-0010-session-orb-faixa-de-abertura]] ·
+[[EXP-0011-derivatives-reversao-de-funding]] · [[EXP-0012-momentum-teto-de-pedagio]] ·
+[[EXP-0013-momentum-alvo-3-atr]] · [[KB-0076-por-que-perdemos-2026-09-08]] ·
+[[KB-0077-linhas-de-tendencia]] · [[11-KNOWLEDGE/Index|Index]]

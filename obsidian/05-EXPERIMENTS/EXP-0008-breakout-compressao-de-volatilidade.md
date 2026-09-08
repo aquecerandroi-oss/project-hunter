@@ -7,8 +7,8 @@ exp: EXP-0008
 strategy: breakout
 version: v1
 result: inconclusivo
-evaluable: 0
-days: 0
+evaluable: 8
+days: 7
 last_eval: 2026-09-08
 ---
 
@@ -26,6 +26,14 @@ last_eval: 2026-09-08
 > 31 dias (T3.33e, commit `cf51c7d`). O resultado do dia um está na avaliação datada no fim desta
 > página: **0 decisões em 11 904 barras**, `result: inconclusivo`, **recomendação `descartar` a v1**.
 > A depreciação **não** foi executada — depreciar é ato auditado e não estava autorizado.
+>
+> **Acréscimo de 2026-09-08 (noite, T3.41), sem apagar nada acima:** a `breakout v2` (variante de
+> parâmetro, `stop_atr` 1,25 → 3,5) foi ativada às 17:35:22Z e replayada — **8 decisões**, bruta
+> +0,0120 R, líquida **−0,0810 R**, PF 0,798 (T3.33f, commit `2442796`). **As duas foram
+> aposentadas pela via auditada** (`--deprecate`, T3.39): `v1` às **19:35:34Z** e `v2` às
+> **19:35:36Z**. Os campos `evaluable`/`days` do frontmatter passam a descrever a **última**
+> coorte desta família (a da `v2`: 8 avaliáveis, 7 dias distintos); os da `v1` continuam 0/0 e
+> estão na avaliação de abertura, intacta.
 
 ## Hipótese (congelada)
 
@@ -299,11 +307,180 @@ de `shadow_outbox` e 0 `trade_proposals` ligadas à coorte — nada chegou perto
 
 Fonte integral (comandos, saídas verbatim, SQL e recibos): `.claude/state/notes-T3.33e.md`.
 
+### Avaliação de 2026-09-08 (2) — `breakout v2`, a variante de geometria — **REPLAY** (T3.33f)
+
+**Coorte:** `replay:0def121f-070b-4ce0-ab14-6bb6b9840faa` (duas fatias contíguas, mesma coorte).
+**Janela:** 2026-08-08 → 2026-09-08 (31 d). **Mercados:** `binance:ETHUSDT, SOLUSDT, XRPUSDT,
+DOGEUSDT`. **Versão:** `breakout v2`, derivada da `v1` por parâmetro (`stop_atr` 1,25 → 3,5),
+`params_hash 0e6abf1114cb`, **mesmo `code_ref`** `…breakout_v1@sha256:4c920b0c…64ff1`, ativada em
+**2026-09-08 17:35:22,628018Z** (14:35:22 BRT), `purpose research_only`.
+
+#### Por que 3,5 e não outro número — a medição que faltava na T3.33e
+
+O livro-razão (`--explain-ledger`, T3.33f) sobre as **mesmas** 11 904 barras da `v1` devolveu, pela
+primeira vez, o motivo de cada barra:
+
+| motivo | barras | % |
+|---|---:|---:|
+| `not_compressed` | 9 816 | 82,46 |
+| `no_breakout` | 1 575 | 13,23 |
+| `warmup` (`unavailable`) | 448 | 3,76 |
+| `atr_out_of_range` | 26 | 0,22 |
+| `rvol_low` | 25 | 0,21 |
+| `geometry_invalidation` | 14 | 0,12 |
+
+Nas 14 barras recusadas, a distância do fechamento até a **base** (mínima das 8 barras anteriores),
+medida em ATR pelo próprio nível que a estratégia gravou (`atr = (close − stop)/1,25`):
+
+| n | mín | p25 | mediana | p75 | máx | ATR% mediano |
+|---:|---:|---:|---:|---:|---:|---:|
+| 14 | 2,194 | 2,541 | **3,344** | 4,157 | 5,583 | 0,5896 % |
+
+A guarda `stop < base_low < close` só é satisfazível quando `stop_atr` supera essa distância. A
+alternativa do brief — **encurtar `squeeze_window_bars`** — foi medida nas mesmas 14 barras com os
+auxiliares congelados da própria versão e **não resolve**: a base não é larga por causa da janela, é
+larga porque o rompimento acontece vários ATR acima de qualquer mínima recente.
+
+| `squeeze_window_bars` | mín | mediana | máx | razão de compressão mediana | ainda comprimidas (≤ 0,75) |
+|---:|---:|---:|---:|---:|---:|
+| 2 | 1,393 | 2,663 | 4,973 | 0,844 | 5/14 |
+| 3 | 1,393 | 2,841 | 5,163 | 0,660 | 10/14 |
+| 4 | 1,393 | 2,899 | 5,217 | 0,644 | 10/14 |
+| 5 | 1,840 | 3,137 | 5,298 | 0,654 | 11/14 |
+| 6 | 2,126 | 3,176 | 5,474 | 0,684 | 11/14 |
+| 8 (`v1`) | 2,194 | 3,344 | 5,583 | 0,682 | 14/14 |
+
+Encurtar para 2 barras mudaria a **população** (a compressão deixa de ser observada em 9 das 14) e
+ainda exigiria `stop_atr` > 2,66 na mediana. Logo o parâmetro que se move é `stop_atr`, e o valor é o
+primeiro passo de 0,25 ATR acima da mediana medida: **3,5**.
+
+**A troca, declarada antes de rodar** (identidade do custo, `custo_R = 0,0020 / risco%`):
+
+| | `v1` (`stop_atr` 1,25) | `v2` (`stop_atr` 3,5) |
+|---|---:|---:|
+| pedágio no piso de ATR (0,50 %) | 0,3200 R | **0,1143 R** |
+| R no alvo1 (2,5 ATR congelados) | 2,000 R | **0,714 R** |
+| acerto de equilíbrio com o pedágio (no piso de ATR) | 44,0 % | **65,0 %** |
+
+Um stop mais largo **baixa o pedágio** e **baixa o R por alvo**; com `target_atr` congelado em 2,5 a
+segunda metade domina. Isso é previsão registrada **antes** do replay, não leitura dele.
+
+#### O que o replay devolveu
+
+| fatia | barras | `triggered` | `rejected` | `not_triggered` | `unavailable` | seg | erros |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 2026-08-08 → 08-23 | 5 760 | 1 | 1 | 5 310 | 448 | 91,1 | 0 |
+| 2026-08-23 → 09-08 | 6 144 | 7 | 5 | 6 132 | 0 | 105,0 | 0 |
+| **total** | **11 904** | **8** | **6** | **11 442** | **448** | 196,1 | **0** |
+
+As 14 barras que a `v1` recusou viraram **8 decisões e 6 recusas** — exatamente as 8 cuja base estava
+a menos de 3,5 ATR (as 6 restantes pedem de 3,571 a 5,583 ATR, mediana 4,307). Nenhuma outra barra
+mudou de estado: `not_compressed`, `no_breakout`, `rvol_low`, `atr_out_of_range` e `warmup` são
+idênticos aos da `v1`, porque `stop_atr` só é lido **depois** das quatro portas de entrada.
+
+**As oito decisões** (todas `terminal`; cobertura de `R_net` = 100 %):
+
+| mercado | decisão (UTC) | resultado | ATR% | `squeeze_ratio` | rvol | R bruto | R líquido |
+|---|---|---|---:|---:|---:|---:|---:|
+| SOLUSDT | 2026-08-19 21:00 | alvo | 0,6186 | 0,653 | 14,31 | +0,6421 | **+0,5543** |
+| SOLUSDT | 2026-08-23 11:30 | alvo | 0,5935 | 0,692 | 2,32 | +0,6296 | **+0,5389** |
+| XRPUSDT | 2026-08-23 21:30 | stop | 0,9576 | 0,710 | 1,55 | −0,9828 | **−1,0419** |
+| XRPUSDT | 2026-08-24 11:45 | invalidada | 0,8620 | 0,739 | 2,17 | −0,9235 | **−0,9959** |
+| SOLUSDT | 2026-08-26 21:15 | alvo | 0,5007 | 0,750 | 1,75 | +0,6624 | **+0,5532** |
+| XRPUSDT | 2026-08-27 08:15 | alvo | 0,6013 | 0,672 | 5,09 | +1,0299 | **+0,9186** |
+| DOGEUSDT | 2026-08-31 05:30 | horizonte | 0,5664 | 0,693 | 3,64 | +0,0060 | **−0,0956** |
+| DOGEUSDT | 2026-09-06 03:45 | stop | 0,5404 | 0,708 | 3,45 | −0,9678 | **−1,0794** |
+
+| recorte | n | R bruto médio | custo R médio | R líquido médio | soma líquida | acerto | PF |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **total** | 8 | +0,0120 | 0,0912 | **−0,0810** | **−0,6479** | 50,0 % | **0,798** |
+| alvo | 4 | +0,7410 | 0,0998 | +0,6412 | +2,5650 | — | — |
+| stop | 2 | −0,9753 | 0,0813 | −1,0607 | −2,1213 | — | — |
+| invalidada | 1 | −0,9235 | 0,0689 | −0,9959 | −0,9959 | — | — |
+| horizonte | 1 | +0,0060 | 0,0991 | −0,0956 | −0,0956 | — | — |
+
+`PnL de carteira` e `Max Drawdown de carteira`: **não aplicáveis**.
+
+**Condição do revisor — a banda `0,0050 ≤ ATR% < 0,0059`:**
+
+| recorte | n | ATR% mín | ATR% máx | R bruto médio | R líquido médio | soma líquida | acerto |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| banda 0,0050–0,0059 | 3 | 0,5007 | 0,5664 | −0,0998 | **−0,2073** | −0,6218 | 33,3 % |
+| fora da banda | 5 | 0,5935 | 0,9576 | +0,0791 | −0,0052 | −0,0260 | 60,0 % |
+
+**Decomposição por `squeeze_ratio` (a obrigação C2 desta página, cumprida pela primeira vez):**
+
+| bucket | n | faixa | R bruto médio | R líquido médio | soma líquida | acerto |
+|---|---:|---|---:|---:|---:|---:|
+| < 0,70 | 4 | 0,653–0,693 | +0,5769 | **+0,4790** | +1,9161 | 75,0 % |
+| 0,70–0,75 | 4 | 0,708–0,750 | −0,5529 | **−0,6410** | −2,5640 | 25,0 % |
+
+Com n = 4 por bucket isto **não é evidência**: é a única direção que a amostra permite apontar, e a
+metade mais comprimida carregou tudo o que houve de positivo. Fica como hipótese para um
+`squeeze_max` menor, **não** como achado.
+
+**Critérios de morte congelados (`notes-T3.33` §5.1):**
+
+| Critério | Medido | Dispara? |
+|---|---|---|
+| **K1** — < 20 decisões | **8** em 31 d × 4 mercados | **SIM** |
+| K2 — > 1 500 decisões | 8 (0,065/mercado-dia) | não |
+| K3 — ≥ 100 avaliáveis **e** ≥ 30 dias **e** bruta < 0 | 8 avaliáveis (< 100), 7 dias (< 30), bruta **+0,0120 R** | não (inaplicável) |
+| K4 — `unavailable` > 40 % | 3,76 % | não |
+| K5 — cobertura de `R_net` < 70 % | **100 %** | não |
+| **específico** — `geometry_invalidation` > 20 % das que passariam as portas | **6/14 = 42,9 %** | **SIM** |
+
+**Result: `inconclusivo`** (a régua de maturidade — ≥ 100 avaliáveis **e** ≥ 30 dias — continua não
+cumprida; antes de madura o resultado é sempre este).
+**Next Action: `descartar` `breakout v2`.** K1 dispara de novo, e agora **sabendo por quê**: a
+população não é pequena por causa da guarda de geometria (essa foi corrigida — 8 das 14 passaram), é
+pequena porque **82,5 % das barras nunca chegam comprimidas** e outras 13,2 % não rompem. O que a
+`v2` comprou foi a resposta que a `v1` não deixou perguntar, e ela é dupla: (i) a hipótese da
+contração **passou a ser testável** e devolveu bruta ≈ 0 (+0,0120 R) com pedágio de 0,0912 R — ou
+seja, líquida negativa **por custo**, exatamente o diagnóstico da
+[[KB-0076-por-que-perdemos-2026-09-08]]; (ii) o preço de tornar a guarda satisfazível é uma geometria
+que precisa de **65 % de acerto** para empatar e entregou 50 % em 8 tentativas. Uma `v3` só se
+justifica se atacar a **compressão** (`squeeze_max` menor, sugerido pelo bucket) **e** a assimetria
+(alvo proporcional ao stop) — experimento novo, com portão C1–C8 próprio, nunca conserto deste.
+
+Fonte integral (comandos, saídas verbatim, SQL e recibos): `.claude/state/notes-T3.33f.md`.
+
+### Avaliação de 2026-09-08 (3) — as duas aposentadorias auditadas (T3.39/T3.41)
+
+Não é medição nova: é o registro datado do **fim** das duas coortes desta família, e do fim da dívida
+que esta página carregava desde as 14:22 BRT ("a depreciação não foi executada — depreciar é ato
+auditado e não estava autorizado").
+
+A via auditada passou a existir no mesmo dia: `activate_strategy_version.py --deprecate
+[--successor v<n>] [--force-paper]` (T3.39, commit `4929b99`), que só move `status` — o único campo
+que a trigger de congelamento deixa mutável —, recusa `purpose = live` sempre, recusa `paper` com
+posições ou slots abertos, e grava `system_events / strategy_version_deprecated` com o `code_ref` e o
+`params_hash` congelados. Até então **não havia caminho**: `--supersede` recusa uma sucessora que
+compartilha o mesmo `code_ref` ("already frozen against this code"), que é exatamente o caso de uma
+variante por parâmetro.
+
+| versão | aposentada em (UTC) | Brasília | por quê |
+|---|---|---|---|
+| `breakout v1` | **2026-09-08T19:35:34Z** | 16:35:34 | **0 decisões em 11 904 barras**, 14/14 recusadas pela guarda de geometria; K1 dispara. A hipótese não chegou a ser testada por ela |
+| `breakout v2` | **2026-09-08T19:35:36Z** | 16:35:36 | **8 decisões**, K1 dispara e o critério específico também (42,9 % de recusa por geometria); bruta ≈ 0 e líquida −0,0810 R. A hipótese **foi** testada e não pagou o pedágio |
+
+**O que as duas aposentadorias afirmam:** que estas **duas parametrizações** desta família não
+produzem população avaliável em 31 dias × 4 mercados. **O que elas não afirmam:** que compressão de
+volatilidade não presta. O que a `v2` deixou medido — o bucket de `squeeze_ratio` — é a única pista
+de desenho que a família produziu, e ela aponta para `squeeze_max` **menor**, não para stop mais
+largo. Isso é [[Strategy Backlog]], com portão próprio.
+
+**Custo que some com elas:** 216 avaliações por corte de 15 min por versão viva, para sempre, por
+zero decisão nova. O roster do `strategy-worker` as descartou na recarga seguinte.
+
 ## Variantes tentadas
 
 | Variante | Quando | Por quê | Onde ficou registrada |
 |---|---|---|---|
 | `breakout v2` por **parâmetro** (mesmo `code_ref`, `squeeze_window_bars`/`stop_atr` revistos) | 2026-09-08 | a v1 rejeitou 14/14 por `geometry_invalidation`: a base de 8 barras é mais larga que o stop de 1,25 ATR, e a hipótese da compressão **não chegou a ser testada** | **em voo** na T3.33f (`.claude/state/brief-T3.33f-breakout-v2-explain-ledger-session-orb.md`) e no [[Strategy Backlog]]; experimento novo quando tiver portão próprio |
+| `breakout v2` — `stop_atr` 1,25 → 3,5 (`derive_variant.py`, `params_hash 0e6abf1114cb`) | 2026-09-08 17:33:44Z (derivada) · 17:35:22Z (ativada) · **19:35:36Z (aposentada)** | a guarda `stop < base_low < close` recusou 14/14 barras na `v1`; a base fica a **3,344 ATR** (mediana) do fechamento, e 3,5 é o primeiro passo de 0,25 ATR acima disso | esta página, Avaliação de 2026-09-08 (2) e (3) |
+| encurtar `squeeze_window_bars` (2–6) | 2026-09-08 | **recusada antes de derivar**: medida nas mesmas 14 barras, a base continua a 2,66 ATR na mediana com N=2 **e** a compressão deixa de ser observada em 9 delas — mudaria a população, não a geometria | esta página, Avaliação de 2026-09-08 (2) |
+| `squeeze_max` menor (uma `v3`) | 2026-09-08 | **não derivada**: é a única direção que o bucket de `squeeze_ratio` aponta (n = 4 por bucket, portanto hipótese e não achado), e ela precisa vir junto de alvo proporcional ao stop — experimento novo, portão próprio | esta página, Avaliação de 2026-09-08 (2); [[Strategy Backlog]] |
 
 ## Relacionadas
 
