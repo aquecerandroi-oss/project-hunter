@@ -18,7 +18,7 @@ from hunter_core.observability import market_ingestion_gaps, market_spot_ingesti
 from hunter_market_worker import recovery_lifecycle
 from hunter_market_worker import recovery_queries as queries
 from hunter_market_worker.persist import load_market_ids
-from hunter_market_worker.recovery_drain import MAX_ATTEMPTS, expected_times, recover_one
+from hunter_market_worker.recovery_drain import MAX_ATTEMPTS, Tier, expected_times, recover_one
 from hunter_market_worker.supervision import rest_gate_suspended
 
 logger = get_logger(__name__)
@@ -140,10 +140,10 @@ async def check_gaps(
         ids = await load_market_ids(session, adapter.code, set(symbols), market_type)
         market_ids = list(ids.values())
         market_watermarks = await queries.watermarks(session, market_ids)
-        # T3.7d: the cheapest "before this market's listing" signal — see
-        # recovery_lifecycle.earliest. Read once per cycle, alongside the
-        # watermark it mirrors, and threaded through to every recover_one call
-        # below so a gap classified this way never even reaches REST.
+        # T3.7d: cheapest "before this market's listing" signal (see
+        # recovery_lifecycle.earliest), read once per cycle. T3.7e: this
+        # snapshot goes stale mid-cycle -- `earliest_known_stale` below keeps
+        # a later chunk from trusting a stale value this cycle.
         market_earliest = await recovery_lifecycle.earliest(session, market_ids)
         starts = {
             mid: end
@@ -223,19 +223,33 @@ async def check_gaps(
             history_limit=MAX_HISTORY_GAPS_PER_CYCLE,
         )
     symbol_by_market_id = {v: k for k, v in ids.items()}
-    for gap_id, market_id in live:
-        symbol = symbol_by_market_id.get(market_id)
-        if symbol is None:
-            continue
-        await recover_one(
+    # T3.7e/T3.7f: markets whose `market_earliest` above is now stale because
+    # an earlier gap of the same market, this cycle, *persisted* a candle
+    # reaching further back than it says -- from any persisted candle, not
+    # only a gap that fully reached `"recovered"` (a partial recovery still
+    # counts; see `recover_registered`'s `earliest_known_stale` docstring).
+    earliest_stale_markets: set[Any] = set()
+
+    async def _recover_and_track(gap_id: Any, market_id: Any, symbol: str, tier: Tier) -> None:
+        known = market_earliest.get(market_id)
+        _recovered, min_open_time = await recover_one(
             session_factory,
             adapter,
             gap_id,
             symbol,
             now,
-            tier="live",
-            earliest_known=market_earliest.get(market_id),
+            tier=tier,
+            earliest_known=known,
+            earliest_known_stale=market_id in earliest_stale_markets,
         )
+        if known is not None and min_open_time is not None and min_open_time < known:
+            earliest_stale_markets.add(market_id)
+
+    for gap_id, market_id in live:
+        symbol = symbol_by_market_id.get(market_id)
+        if symbol is None:
+            continue
+        await _recover_and_track(gap_id, market_id, symbol, "live")
 
     # History last, and under a wall-clock budget: what is left of the cycle
     # decides how much of a bootstrap gets served, never the other way round.
@@ -254,21 +268,11 @@ async def check_gaps(
             # cancelled here rolls its transaction back, so the budget running
             # out never spends one of the gap's MAX_ATTEMPTS — that is the
             # difference between "we ran out of time" and "this gap failed".
+            # ``timeout_s`` (inside recover_one) stays the adapter's own
+            # budget; a cancellation from *this* deadline instead must not
+            # spend one of the gap's attempts, which is why it rolls back.
             async with asyncio.timeout(remaining):
-                # ``timeout_s`` stays the adapter's own budget on purpose. If
-                # the *cycle* is what cut the call short, the cancellation must
-                # come from the deadline above — which rolls back — and not from
-                # the gap's own timeout, which would spend an attempt on a slow
-                # cycle rather than on a slow exchange.
-                await recover_one(
-                    session_factory,
-                    adapter,
-                    gap_id,
-                    symbol,
-                    now,
-                    tier="history",
-                    earliest_known=market_earliest.get(market_id),
-                )
+                await _recover_and_track(gap_id, market_id, symbol, "history")
         except TimeoutError:
             logger.warning("market_backfill_unit_timeout", symbol=symbol, budget_s=remaining)
             break

@@ -222,7 +222,10 @@ async def test_five_failed_backfills_mark_the_gap_failed_and_it_reopens_after_co
         reopened = await session.get(IngestionGap, gap.id)
     assert reopened is not None
     assert reopened.status == "recovered"
-    # `_reopen_stale_failed` resets `attempts` to 0 on reopen (D6: a fresh
-    # try, not a continuation of the exhausted one), then `recover_registered`
-    # counts this one attempt.
-    assert reopened.attempts == 1
+    # T3.7d (this assertion predates it): `attempts` is now cumulative across
+    # every reopen -- `recovery_lifecycle.reopen_stale_failed` no longer
+    # resets it to 0, so a life fails on its own MAX_ATTEMPTS-th try (the
+    # loop above already spent exactly `recovery.MAX_ATTEMPTS`), and this
+    # final successful call after the reopen adds one more on top of that,
+    # never restarting the count from a fresh 1 (T3.7f, re-review item 3).
+    assert reopened.attempts == recovery.MAX_ATTEMPTS + 1

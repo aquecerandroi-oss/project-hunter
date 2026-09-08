@@ -349,15 +349,18 @@ async def test_a_window_entirely_before_the_market_listing_becomes_unrecoverable
 ) -> None:
     """The incident's direct cause: MARSCOINUSDT's four pre-listing windows
     returned ``200 OK`` with zero candles, forever, because the exchange will
-    never have data for them. Classified on sight -- before any REST call and
-    before spending an attempt -- from data this worker already has."""
+    never have data for them. T3.7e (reviewer's MEDIUM): classification now
+    requires that actual empty answer -- not ``earliest_known`` alone, which
+    a deep ``request_backfill.py`` window could satisfy without truly being
+    before the listing -- so exactly one REST call is spent confirming it,
+    never zero, and never a second one once it is terminal."""
     code = unique_code()
     market_id = await seed_market(db_session_factory, code, "MARSCOINUSDT")
     now = align_open_time(utcnow(), Timeframe.M1)
     listed_at = now - timedelta(days=7)
     gap_start = listed_at - timedelta(minutes=1440)
     gap_end = listed_at - timedelta(minutes=1)
-    adapter = FakeAdapter(code)  # no candles_response configured for this symbol
+    adapter = FakeAdapter(code)  # no candles_response configured -> 200, zero rows
 
     async with role_session(db_session_factory, db_role="hunter_worker") as session:
         gap = IngestionGap(
@@ -374,7 +377,7 @@ async def test_a_window_entirely_before_the_market_listing_becomes_unrecoverable
             session, adapter, gap, "MARSCOINUSDT", now, earliest_known=listed_at
         )
         assert gap.status == "unrecoverable"
-        assert gap.attempts == 0  # never spent -- this was never an attempt
+        assert gap.attempts == 0  # a conclusive answer, not a failed attempt
         event = await session.scalar(
             select(SystemEvent).where(
                 SystemEvent.event == "market_gap_unrecoverable",
@@ -383,7 +386,7 @@ async def test_a_window_entirely_before_the_market_listing_becomes_unrecoverable
         )
         assert event is not None
         assert event.data["reason"] == "before_listing"
-    assert adapter.fetch_candles_calls == []  # zero REST weight spent
+    assert len(adapter.fetch_candles_calls) == 1  # confirmed once, not zero, not forever
 
 
 async def test_a_window_at_or_after_the_market_listing_still_recovers_normally(
@@ -490,6 +493,263 @@ async def test_check_gaps_classifies_pre_listing_history_and_recovers_post_listi
     assert rows[(pre_start, pre_end)] == "unrecoverable"
     assert rows[(post_start, post_end)] == "recovered"
     assert state.unrecoverable_gaps == 1
+
+
+# ---- T3.7e (hotfix of the above, commit 50932ec, 2026-09-08): a market's
+# `earliest_known` snapshot must not go stale *within* one cycle -----------
+
+
+async def test_a_window_older_than_earliest_known_is_still_fetched_and_recovered_if_data_exists(
+    db_session_factory: Any,
+) -> None:
+    """Reviewer's MEDIUM: ``earliest_known`` can be the start of *live*
+    collection for a market that later got history via
+    ``request_backfill.py --days 90``, not necessarily its listing. A window
+    older than it must still earn a real fetch -- concluding
+    ``before_listing`` needs the exchange's own empty answer too, never
+    ``earliest_known`` alone."""
+    code = unique_code()
+    market_id = await seed_market(db_session_factory, code, "BTCUSDT")
+    now = align_open_time(utcnow(), Timeframe.M1)
+    earliest_known = now - timedelta(minutes=40)  # e.g. the start of live collection
+    gap_start = earliest_known - timedelta(minutes=2)
+    gap_end = earliest_known - timedelta(minutes=1)  # entirely older than earliest_known
+    adapter = FakeAdapter(code)
+    adapter.candles_response["BTCUSDT"] = [
+        builders.candle("BTCUSDT", gap_start, exchange=code),
+        builders.candle("BTCUSDT", gap_end, exchange=code),
+    ]
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        gap = IngestionGap(
+            market_id=market_id,
+            timeframe=Timeframe.M1,
+            gap_start=gap_start,
+            gap_end=gap_end,
+            attempts=0,
+            status="open",
+        )
+        session.add(gap)
+        await session.flush()
+        await recovery_drain.recover_registered(
+            session, adapter, gap, "BTCUSDT", now, earliest_known=earliest_known
+        )
+        assert gap.status == "recovered"
+    assert len(adapter.fetch_candles_calls) == 1  # fetched once; the real data settled it
+
+
+async def test_check_gaps_does_not_misclassify_an_older_chunk_after_a_newer_one_moves_the_true_minimum(
+    db_session_factory: Any,
+) -> None:
+    """The reviewer's exact regression in commit 50932ec (2026-09-08):
+    ``check_gaps`` reads ``market_earliest`` once per cycle, but a market
+    granted more than one history slot in the same cycle
+    (``backfill_priority.interleave``, T3.7d item 2) can have its newer chunk
+    recover candles reaching further back than that snapshot said *before*
+    the older chunk -- processed later in the very same cycle -- is compared
+    against it. BTCUSDT and UNIUSDT lost legitimate August windows this way
+    on the VPS. The older chunk's own REST answer here is empty (as it can
+    genuinely be for reasons that have nothing to do with the listing), but
+    it must not be concluded ``before_listing`` off a minimum a sibling chunk
+    already disproved this cycle -- it stays ``open`` for the next cycle
+    instead, exactly as if ``earliest_known`` were unknown for it."""
+    code = unique_code()
+    market_id = await seed_market(db_session_factory, code, "BTCUSDT")
+    now = align_open_time(utcnow(), Timeframe.M1)
+
+    t0 = now - recovery.DETECTION_GRACE - timedelta(days=20)
+    await ensure_candle_partition(db_session_factory, t0)
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        await upsert_candles(
+            session,
+            [builders.candle("BTCUSDT", t0, exchange=code)],
+            {"BTCUSDT": market_id},
+            source="ws",
+        )
+    # The newer chunk (history_candidates orders gap_end DESC, so this one is
+    # granted its slot first): its own gap_start is before `earliest_known`
+    # (t0) -- recovering it in full is exactly what moves the true minimum
+    # earlier than the cycle's snapshot of it.
+    newer_start, newer_end = t0 - timedelta(hours=4), t0 - timedelta(hours=3, minutes=1)
+    # The older chunk: its gap_end is before the *stale* `earliest_known`
+    # (t0) too, but that says nothing about whether it is really before the
+    # listing -- only the (empty, here) REST answer for its own window does.
+    older_start, older_end = t0 - timedelta(hours=8), t0 - timedelta(hours=5, minutes=1)
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        session.add(
+            IngestionGap(
+                market_id=market_id,
+                timeframe=Timeframe.M1,
+                gap_start=newer_start,
+                gap_end=newer_end,
+                status="open",
+                attempts=0,
+            )
+        )
+        session.add(
+            IngestionGap(
+                market_id=market_id,
+                timeframe=Timeframe.M1,
+                gap_start=older_start,
+                gap_end=older_end,
+                status="open",
+                attempts=0,
+            )
+        )
+        await session.flush()
+
+    class Adapter(FakeAdapter):
+        async def server_time(self) -> Any:
+            return now
+
+        async def fetch_candles(self, symbol: str, timeframe: Any, start: Any, end: Any) -> Any:
+            self.fetch_candles_calls.append((symbol, timeframe, start, end))
+            if start < newer_start:
+                return []  # the older chunk's own REST answer is empty this cycle
+            minutes = int((newer_end - newer_start) / timedelta(minutes=1)) + 1
+            return [
+                builders.candle("BTCUSDT", newer_start + timedelta(minutes=i), exchange=code)
+                for i in range(minutes)
+            ]
+
+    adapter = Adapter(code)
+    state = HeartbeatState()
+    await recovery.check_gaps(db_session_factory, adapter, ["BTCUSDT"], state)
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        rows = {
+            (r.gap_start, r.gap_end): (r.status, r.attempts)
+            for r in (
+                await session.scalars(
+                    select(IngestionGap).where(IngestionGap.market_id == market_id)
+                )
+            ).all()
+        }
+    assert rows[(newer_start, newer_end)] == ("recovered", 1)
+    # The defect: this used to become `unrecoverable`/`before_listing` off
+    # the stale `earliest_known` the newer chunk had just disproved.
+    assert rows[(older_start, older_end)] == ("open", 1)
+    assert state.unrecoverable_gaps == 0
+    event = await session.scalar(
+        select(SystemEvent).where(
+            SystemEvent.event == "market_gap_unrecoverable",
+            SystemEvent.data["market_id"].astext == str(market_id),
+        )
+    )
+    assert event is None
+
+
+async def test_check_gaps_marks_staleness_from_a_partial_recovery_not_only_a_full_one(
+    db_session_factory: Any,
+) -> None:
+    """Re-review HIGH (T3.7f, ``.claude/state/brief-T3.7f-partial-recovery-
+    staleness.md``): the sibling test above only proves the fix for a newer
+    chunk that reaches ``"recovered"`` (every expected minute present). A
+    real trading pause inside the newer chunk's own window (Binance's
+    ``rest.py:254`` stops paginating at a genuine empty page mid-window) can
+    leave it ``open`` -- one expected minute missing -- while it still
+    *persists* candles reaching further back than the cycle's stale
+    ``earliest_known``. That must be enough to protect the older, sibling
+    chunk too: staleness comes from any persisted candle, not from
+    ``gap.status == "recovered"``."""
+    code = unique_code()
+    market_id = await seed_market(db_session_factory, code, "BTCUSDT")
+    now = align_open_time(utcnow(), Timeframe.M1)
+
+    t0 = now - recovery.DETECTION_GRACE - timedelta(days=20)
+    await ensure_candle_partition(db_session_factory, t0)
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        await upsert_candles(
+            session,
+            [builders.candle("BTCUSDT", t0, exchange=code)],
+            {"BTCUSDT": market_id},
+            source="ws",
+        )
+    # The newer chunk (processed first, same ordering as the sibling test
+    # above): its window reaches well before `earliest_known` (t0), but one
+    # minute in the middle is a genuine trading pause -- the gap stays
+    # `open`, never `"recovered"`.
+    newer_start, newer_end = t0 - timedelta(hours=4), t0 - timedelta(hours=3, minutes=1)
+    missing_minute = newer_start + timedelta(minutes=30)
+    # The older chunk: an empty REST answer this cycle, exactly as genuinely
+    # happens for reasons unrelated to the listing.
+    older_start, older_end = t0 - timedelta(hours=8), t0 - timedelta(hours=5, minutes=1)
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        session.add(
+            IngestionGap(
+                market_id=market_id,
+                timeframe=Timeframe.M1,
+                gap_start=newer_start,
+                gap_end=newer_end,
+                status="open",
+                attempts=0,
+            )
+        )
+        session.add(
+            IngestionGap(
+                market_id=market_id,
+                timeframe=Timeframe.M1,
+                gap_start=older_start,
+                gap_end=older_end,
+                status="open",
+                attempts=0,
+            )
+        )
+        await session.flush()
+
+    class Adapter(FakeAdapter):
+        async def server_time(self) -> Any:
+            return now
+
+        async def fetch_candles(self, symbol: str, timeframe: Any, start: Any, end: Any) -> Any:
+            self.fetch_candles_calls.append((symbol, timeframe, start, end))
+            if start < newer_start:
+                return []  # the older chunk's own REST answer is empty this cycle
+            minutes = int((newer_end - newer_start) / timedelta(minutes=1)) + 1
+            return [
+                builders.candle("BTCUSDT", newer_start + timedelta(minutes=i), exchange=code)
+                for i in range(minutes)
+                if newer_start + timedelta(minutes=i) != missing_minute
+            ]
+
+    adapter = Adapter(code)
+    state = HeartbeatState()
+    await recovery.check_gaps(db_session_factory, adapter, ["BTCUSDT"], state)
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        rows = {
+            (r.gap_start, r.gap_end): (r.status, r.attempts)
+            for r in (
+                await session.scalars(
+                    select(IngestionGap).where(IngestionGap.market_id == market_id)
+                )
+            ).all()
+        }
+        newest_candle = await session.scalar(
+            select(func.count())
+            .select_from(Candle)
+            .where(Candle.market_id == market_id, Candle.open_time == newer_start)
+        )
+    # The newer chunk persisted candles (including one at `newer_start`,
+    # below `earliest_known`) but stays `open` -- the missing minute means
+    # this is a partial recovery, never `"recovered"`.
+    assert newest_candle == 1
+    assert rows[(newer_start, newer_end)] == ("open", 1)
+    # The defect this closes: without it, the older chunk's empty answer
+    # would be compared against the still-stale `earliest_known` (the newer
+    # chunk never reached `"recovered"`) and wrongly concluded
+    # `unrecoverable`/`before_listing`.
+    assert rows[(older_start, older_end)] == ("open", 1)
+    assert state.unrecoverable_gaps == 0
+    event = await session.scalar(
+        select(SystemEvent).where(
+            SystemEvent.event == "market_gap_unrecoverable",
+            SystemEvent.data["market_id"].astext == str(market_id),
+        )
+    )
+    assert event is None
 
 
 # ---- T3.7d item 3: a `failed` gap reopens a bounded number of times, then
