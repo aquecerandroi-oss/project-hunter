@@ -376,3 +376,81 @@ de `review-T3.18b-quant.md`. **Nada commitado.**
 - `include` continua com os dois blocos por padrão (decisão minha, declarada acima).
 - O bloco 2 por replay é rotulado, mas a checagem cruzada da D15 (c) — "o mesmo replay rodou para o
   pai na mesma janela" — continua **operacional**, não verificada pelo endpoint.
+
+## T3.18d — um veredito, uma função (backend-specialist, 2026-09-08)
+
+Fecha o achado da revisão de T3.18c: `compute_verdict` (placar) e `scoreboard_verdict`/
+`profit_factor_passes` (`hunter_indicators.replication.stats`) implementavam a mesma regra em dois
+pacotes, concordando por vigilância de teste, não por construção.
+
+### O que mudou
+
+1. **Núcleo único extraído.** `stats.py` ganhou `verdict_from_values(*, mature, expectancy_r,
+   profit_factor, no_losses) -> str`, sobre valores soltos (sem exigir um `PopulationStats`
+   inteiro) — e um `_pf_passes_values` privado que `profit_factor_passes` e `verdict_from_values`
+   compartilham. `scoreboard_verdict` passou a só extrair os campos de `PopulationStats` e chamar
+   `verdict_from_values`; nenhuma comparação de veredito sobrevive fora dela.
+2. **`compute_verdict` delega.** `lab_scoreboard_metrics.compute_verdict` agora chama
+   `hunter_indicators.replication.verdict_from_values` e faz `cast(Verdict, result)` — a única
+   conta que ainda faz sozinha é traduzir o vocabulário do motivo de PF nulo: a API diz
+   `pf_reason == "no_losses"` (inglês, de `lab_summary_metrics.profit_factor`), o pacote puro diz
+   `PF_NO_LOSSES == "sem_perdas"` (português); a fronteira agora é um único `bool` (`no_losses=`) em
+   vez de duas strings que precisavam concordar por acidente. Saída **byte-idêntica**: os literais
+   `VERDICT_INCONCLUSIVE/VALIDATED/REJECTED` do pacote puro já eram
+   `"inconclusivo"/"validada"/"reprovada"`, os mesmos do `Literal["inconclusivo", "validada",
+   "reprovada"]` da API.
+3. **Teste-matriz nas bordas.** `test_lab_scoreboard_metrics.py::TestComputeVerdict` ganhou
+   `test_borderline_matrix` (8 casos parametrizados): imaturo com números ótimos, PF nulo por
+   `no_losses` com expectancy positiva/zero, PF exatamente 1 (reprova — desigualdade estrita), PF
+   logo acima de 1 (valida), só perdas, e o caso positivo comum. Rodado **antes** do refactor
+   (caracterização sobre a implementação antiga — todos os 26 testes do arquivo passavam) e depois
+   (mesmo resultado), provando que a delegação não mudou uma vírgula do comportamento.
+4. **Teste-trava do placar com R nulo após o portão.** A revisão de T3.18c apontava a falta de um
+   teste que semeasse explicitamente uma linha terminal, horizonte vencido, `r_multiple IS NULL`
+   (funding não apurável) e provasse que ela não conta nem para `evaluable` nem para
+   `maturity.days`. `test_scoreboard_excludes_a_terminal_matured_row_with_null_r_multiple`
+   (integração) semeia exatamente isso — uma linha avaliável (dia 2026-09-05) e uma terminal
+   madura com `r_multiple=None`/`r_net_reason="funding_schedule_unknown"` num dia de saída
+   diferente (2026-09-06) — e afirma `evaluable == 1`, `maturity.evaluable == 1`,
+   `maturity.days == 1`, `emitted == 2`. **O teste já passava sem nenhuma mudança em
+   `lab_scoreboard.py`**: `_evaluable_rows` já filtrava `r.r_multiple is not None` separado do
+   portão `is_evaluable` — o comportamento estava certo, só faltava a trava. Isso é honestamente
+   reportado como achado, não como bug corrigido.
+
+### Arquivos
+
+- `packages/indicators/hunter_indicators/replication/stats.py` — `verdict_from_values` (nova),
+  `_pf_passes_values` (novo, privado), `profit_factor_passes` e `scoreboard_verdict` reescritas
+  para delegar.
+- `packages/indicators/hunter_indicators/replication/__init__.py` — exporta `verdict_from_values`.
+- `apps/api/hunter_api/services/lab_scoreboard_metrics.py` — `compute_verdict` delega ao pacote
+  puro.
+- `apps/api/tests/unit/test_lab_scoreboard_metrics.py` — `TestComputeVerdict.test_borderline_matrix`
+  (novo).
+- `apps/api/tests/integration/test_lab_scoreboard_api.py` —
+  `test_scoreboard_excludes_a_terminal_matured_row_with_null_r_multiple` (novo).
+
+### Testes (saída real)
+
+- `uv run pytest apps/api/tests/unit/test_lab_scoreboard_metrics.py -q` → **antes** do refactor: `18
+  passed` (baseline) e `26 passed` (com a matriz nova, ainda sobre a implementação antiga); **depois**
+  do refactor: `26 passed`.
+- `uv run pytest apps/api/tests/integration/test_lab_scoreboard_api.py -q` → `16 passed in ~59-64s`
+  (arquivo único por invocação, testcontainers).
+- `uv run pytest apps/api/tests/integration/test_lab_replication_scoreboard_api.py -q` → `3 passed`
+  (arquivo separado, garante que `scoreboard_verdict`/`stats.py` não regrediram para a replicação).
+- `uv run pytest packages/indicators/tests/unit -q -k "replication or protocol"` → `56 passed, 922
+  deselected`.
+- `uv run ruff check` + `uv run ruff format --check` (após `ruff format` nos dois arquivos que
+  precisaram de reindentação) → limpos nos arquivos tocados.
+- `uv run pyright` nos arquivos de produção e de teste tocados → `0 errors, 0 warnings, 0
+  informations`.
+- `uv run python infra/scripts/check_file_size.py` → os dois arquivos acima do limite
+  (`trendline_breakout_v1.py`, `seed_reference.py`) são de outra frente de trabalho, fora do escopo
+  deste brief; nenhum arquivo tocado aqui estourou.
+
+### Ressalvas
+
+- Nenhuma pendência de comportamento: a delegação é byte-idêntica e o teste-trava do item 2 já
+  passava contra o código existente — a lacuna era só de cobertura, como a revisão de T3.18c
+  apontou.

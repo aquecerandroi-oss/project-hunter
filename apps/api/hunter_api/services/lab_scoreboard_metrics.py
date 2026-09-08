@@ -4,14 +4,22 @@ mechanical verdict rule are new to this brief; everything else (``is_evaluable``
 ``rate``, ``expectancy``, ``profit_factor``, ``sum_of``, ``touch_counts``) is
 reused as-is from ``lab_summary_metrics.py`` by ``services/lab_scoreboard.py`` —
 the brief's "reuse the plantão's definitions, do not invent new ones".
+
+T3.18d: ``compute_verdict`` no longer implements the mechanical rule itself —
+it delegates to ``hunter_indicators.replication.stats.verdict_from_values``,
+the same function ``scoreboard_verdict`` calls for the replication report.
+Two packages agreeing on a rule by test vigilance instead of by construction
+is exactly what let the scoreboard and the replication report disagree on the
+same population once (Astra, 2026-09-08, MEDIUM; T3.18c review).
 """
 
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, cast
 
 from hunter_api.services.lab_summary_metrics import quantize4
+from hunter_indicators.replication import verdict_from_values
 
 __all__ = ["Verdict", "compute_verdict", "max_drawdown_r", "worst_streak"]
 
@@ -55,7 +63,8 @@ def compute_verdict(
     profit_factor: Decimal | None,
     pf_reason: str | None,
 ) -> Verdict:
-    """SHADOW-LAB.md's mechanical rule (brief T3.18, item 1):
+    """SHADOW-LAB.md's mechanical rule (brief T3.18, item 1), delegated to
+    ``hunter_indicators.replication.stats.verdict_from_values`` (T3.18d):
 
     - not mature (< 100 evaluable outcomes or < 30 distinct days) ->
       ``inconclusivo``, regardless of the numbers;
@@ -71,11 +80,16 @@ def compute_verdict(
     outcomes with a known ``r_multiple``, so the profit-factor sample is
     never empty when ``mature`` is ``True``. The same holds for
     ``expectancy_r``, which is never ``None`` when ``mature`` is ``True``.
+
+    ``pf_reason`` speaks this module's vocabulary (``"no_losses"``, from
+    ``lab_summary_metrics.profit_factor``), not the pure package's
+    (``PF_NO_LOSSES == "sem_perdas"``) — translating the string into the
+    boolean ``verdict_from_values`` expects is this function's whole job now.
     """
-    if not mature:
-        return "inconclusivo"
-    if expectancy_r is None or expectancy_r <= 0:
-        return "reprovada"
-    pf_passes = profit_factor is not None and profit_factor > 1
-    pf_passes = pf_passes or (profit_factor is None and pf_reason == "no_losses")
-    return "validada" if pf_passes else "reprovada"
+    result = verdict_from_values(
+        mature=mature,
+        expectancy_r=expectancy_r,
+        profit_factor=profit_factor,
+        no_losses=pf_reason == "no_losses",
+    )
+    return cast(Verdict, result)

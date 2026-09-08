@@ -57,6 +57,7 @@ from hunter_indicators.replication.stats import (
     dedupe_outcomes,
     profit_factor_passes,
     scoreboard_verdict,
+    verdict_from_values,
 )
 
 __all__ = [
@@ -98,4 +99,5 @@ __all__ = [
     "scoreboard_verdict",
     "sign_test",
     "split_by_market",
+    "verdict_from_values",
 ]

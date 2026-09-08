@@ -334,6 +334,66 @@ async def test_scoreboard_profit_factor_is_null_with_a_reason_when_there_are_no_
     }
 
 
+async def test_scoreboard_excludes_a_terminal_matured_row_with_null_r_multiple(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """T3.18d (review of T3.18c): a terminal outcome past its horizon whose
+    ``r_multiple`` is ``NULL`` (funding not resolvable) passes the maturity
+    gate (``is_evaluable``) but must not count as an evaluable outcome nor
+    lend its exit day to ``maturity.days`` — ``lab_scoreboard._evaluable_rows``
+    filters it out separately from the gate itself, and until now nothing
+    proved that isolation held.
+    """
+    _, version_id = await fx.seed_strategy_version(
+        session_factory, activated_at=NOW - timedelta(days=2)
+    )
+    market_id = await fx.seed_lab_market(session_factory)
+
+    # evaluable: resolved, exits on 2026-09-05
+    await _seed_resolved_signal(
+        session_factory,
+        version_id=version_id,
+        market_id=market_id,
+        decision_at=NOW - timedelta(hours=30),
+        exit_offset=timedelta(hours=1),
+        result=OutcomeResult.TARGET,
+        r_multiple=Decimal("1.5"),
+    )
+    # terminal, horizon already elapsed by `as_of`, but r_multiple is NULL
+    # (funding schedule unknown) -- a different exit day from the row above
+    await fx.seed_shadow_signal(
+        session_factory,
+        strategy_version_id=version_id,
+        market_id=market_id,
+        decision_at=NOW - timedelta(hours=10),
+        entry_bar_open=NOW - timedelta(hours=10) + timedelta(minutes=1),
+        entry_ts=NOW - timedelta(hours=10) + timedelta(minutes=1),
+        tracking_state=ShadowTrackingState.TERMINAL,
+        result=OutcomeResult.STOP,
+        exit_ts=NOW - timedelta(hours=8),
+        exit_price=Decimal("100"),
+        r_multiple=None,
+        r_net_reason="funding_schedule_unknown",
+        horizon_s=3600,
+    )
+    actor: Actor = make_actor("scoreboard-null-r-after-gate")
+
+    response = await client.get(
+        "/api/v1/lab/shadow/scoreboard",
+        params={"as_of": NOW.isoformat()},
+        headers=actor.headers,
+    )
+
+    assert response.status_code == 200, response.text
+    row = next(r for r in response.json()["rows"] if r["version"]["id"] == str(version_id))
+    assert row["emitted"] == 2
+    assert row["evaluable"] == 1
+    assert row["maturity"]["evaluable"] == 1
+    assert row["maturity"]["days"] == 1
+
+
 async def test_scoreboard_returns_503_when_postgres_is_unreachable(
     client: httpx.AsyncClient,
     make_actor: Callable[[str], Actor],

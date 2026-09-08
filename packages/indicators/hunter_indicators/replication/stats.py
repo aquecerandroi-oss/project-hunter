@@ -37,6 +37,7 @@ __all__ = [
     "dedupe_outcomes",
     "profit_factor_passes",
     "scoreboard_verdict",
+    "verdict_from_values",
 ]
 
 MATURITY_OUTCOMES = 100
@@ -237,35 +238,73 @@ def dedupe_outcomes(
     return kept, counts, dropped
 
 
+def _pf_passes_values(profit_factor: Decimal | None, *, no_losses: bool) -> bool:
+    """``profit_factor > 1``, ou nulo por ausência de perdas — nada mais.
+
+    Núcleo sem tipo próprio de ``profit_factor_passes``/``scoreboard_verdict``
+    (aqui) e de ``lab_scoreboard_metrics.compute_verdict`` (a API): as duas
+    contas em ``Decimal``/``str`` puros, sem depender de ``PopulationStats``
+    nem do vocabulário de motivo de cada lado (a API diz ``no_losses``, este
+    pacote diz ``sem_perdas`` — quem chama traduz o próprio motivo para este
+    booleano antes de perguntar).
+    """
+    if profit_factor is not None:
+        return profit_factor > PROFIT_FACTOR_MIN
+    return no_losses
+
+
 def profit_factor_passes(stats: PopulationStats) -> bool:
     """``profit_factor > 1``, ou nulo por ``sem_perdas`` — nada mais.
 
     ``sem_amostra`` não passa (não há o que aprovar) e um PF numérico ``<= 1``
     não passa: a desigualdade é estrita (§2).
     """
-    if stats.profit_factor is not None:
-        return stats.profit_factor > PROFIT_FACTOR_MIN
-    return stats.profit_factor_reason == PF_NO_LOSSES
+    return _pf_passes_values(
+        stats.profit_factor, no_losses=stats.profit_factor_reason == PF_NO_LOSSES
+    )
+
+
+def verdict_from_values(
+    *,
+    mature: bool,
+    expectancy_r: Decimal | None,
+    profit_factor: Decimal | None,
+    no_losses: bool,
+) -> str:
+    """A regra mecânica do veredito (T3.18), sobre valores soltos — sem exigir
+    um :class:`PopulationStats` inteiro.
+
+    Ponto único da regra (T3.18d, revisão de T3.18c): ``scoreboard_verdict``
+    (abaixo) e ``hunter_api.services.lab_scoreboard_metrics.compute_verdict``
+    chamam **esta** função; nenhuma das duas reimplementa a comparação.
+    ``inconclusivo`` enquanto imaturo; depois ``validada`` sse
+    ``expectancy_r > 0`` **e** o profit factor passa (``profit_factor > 1``,
+    ou nulo porque não houve perda alguma) — um lado perdedor vazio não pode
+    reprovar uma versão madura e positiva.
+    """
+    if not mature:
+        return VERDICT_INCONCLUSIVE
+    if expectancy_r is None or expectancy_r <= EXPECTANCY_MIN:
+        return VERDICT_REJECTED
+    if not _pf_passes_values(profit_factor, no_losses=no_losses):
+        return VERDICT_REJECTED
+    return VERDICT_VALIDATED
 
 
 def scoreboard_verdict(stats: PopulationStats) -> str:
     """O veredito do placar (T3.18), **a mesma regra**, aqui como função pura.
 
-    ``inconclusivo`` enquanto imaturo; depois ``validada`` sse
-    ``expectancy_r > 0`` **e** o profit factor passa. "Passa" é o contrato do
-    placar (``lab_scoreboard_metrics.compute_verdict``, ``SHADOW-LAB.md``
-    "Placar (T3.18)"): ``profit_factor > 1``, **ou** nulo por ``sem_perdas`` —
-    um lado perdedor vazio não pode reprovar uma versão madura e positiva.
-    Enquanto esta função recusava o nulo, a mesma população era ``validada`` no
-    placar e ``reprovada`` na replicação (Astra, 2026-09-08, MEDIUM).
+    Delega a ``verdict_from_values`` (T3.18d): esta função só extrai os
+    valores soltos de ``PopulationStats``. Enquanto a regra vivia duplicada,
+    a mesma população era ``validada`` no placar e ``reprovada`` na
+    replicação (Astra, 2026-09-08, MEDIUM).
     """
-    if not stats.mature():
-        return VERDICT_INCONCLUSIVE
-    if not stats.positive():
-        return VERDICT_REJECTED
-    if not profit_factor_passes(stats):
-        return VERDICT_REJECTED
-    return VERDICT_VALIDATED
+    return verdict_from_values(
+        mature=stats.mature(),
+        expectancy_r=stats.expectancy_r,
+        profit_factor=stats.profit_factor,
+        no_losses=stats.profit_factor_reason == PF_NO_LOSSES,
+    )
 
 
 def after(outcomes: Sequence[Outcome], moment: datetime) -> list[Outcome]:

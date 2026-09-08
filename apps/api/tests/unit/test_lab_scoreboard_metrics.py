@@ -115,3 +115,78 @@ class TestComputeVerdict:
             mature=True, expectancy_r=None, profit_factor=Decimal("2"), pf_reason=None
         )
         assert verdict == "reprovada"
+
+    @pytest.mark.parametrize(
+        ("mature", "expectancy_r", "profit_factor", "pf_reason", "expected"),
+        [
+            # immature: inconclusivo regardless of how good the numbers look
+            pytest.param(
+                False,
+                Decimal("5"),
+                Decimal("10"),
+                None,
+                "inconclusivo",
+                id="immature-great-numbers",
+            ),
+            pytest.param(
+                False, None, None, "no_losses", "inconclusivo", id="immature-null-pf-no-losses"
+            ),
+            # mature, PF null via no_losses (zero losing outcomes)
+            pytest.param(
+                True,
+                Decimal("0.5"),
+                None,
+                "no_losses",
+                "validada",
+                id="mature-null-pf-no-losses-positive",
+            ),
+            pytest.param(
+                True,
+                Decimal("0"),
+                None,
+                "no_losses",
+                "reprovada",
+                id="mature-null-pf-no-losses-zero-expectancy",
+            ),
+            # mature, PF exactly at the threshold: the inequality is strict
+            pytest.param(
+                True, Decimal("0.1"), Decimal("1"), None, "reprovada", id="mature-pf-exactly-one"
+            ),
+            pytest.param(
+                True,
+                Decimal("0.1"),
+                Decimal("1.0001"),
+                None,
+                "validada",
+                id="mature-pf-just-above-one",
+            ),
+            # mature, only losses in the population (negative expectancy, no PF null reason applies)
+            pytest.param(
+                True, Decimal("-2"), Decimal("0"), None, "reprovada", id="mature-only-losses"
+            ),
+            # mature, positive expectancy and PF above one
+            pytest.param(
+                True,
+                Decimal("0.3"),
+                Decimal("2"),
+                None,
+                "validada",
+                id="mature-positive-and-pf-above-one",
+            ),
+        ],
+    )
+    def test_borderline_matrix(
+        self,
+        mature: bool,
+        expectancy_r: Decimal | None,
+        profit_factor: Decimal | None,
+        pf_reason: str | None,
+        expected: str,
+    ) -> None:
+        verdict = compute_verdict(
+            mature=mature,
+            expectancy_r=expectancy_r,
+            profit_factor=profit_factor,
+            pf_reason=pf_reason,
+        )
+        assert verdict == expected
