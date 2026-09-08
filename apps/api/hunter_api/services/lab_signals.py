@@ -53,6 +53,7 @@ def _to_out(row: SignalRow, *, include_envelope: bool) -> SignalListItemOut:
         market=row.market,
         source_bar_close=source_bar_close,
         entry_price=row.virtual_entry,
+        stop=row.virtual_stop,
         exit_price=row.exit_price,
         exit_reason=_exit_reason(row),
         result=row.result,

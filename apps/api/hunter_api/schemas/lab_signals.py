@@ -44,9 +44,11 @@ class SignalListItemOut(BaseModel):
     supporting_features: dict[str, Any] | None
     """Always present in the schema; ``null`` unless ``?include=envelope``."""
     identity_key: str
-    """T3.38a: stable hash of market + source_bar_close + entry price + exit
-    price + exit reason + result -- sibling versions that decided on the
-    exact same operation share this value (``lab_signal_identity.py``)."""
+    """T3.38a: stable hash of market + source_bar_close + entry price + stop
+    + exit price + exit reason + result -- sibling versions that decided on
+    the exact same operation share this value (``lab_signal_identity.py``;
+    ``stop`` added T3.38c so siblings with a different tracked stop, hence a
+    different R and money, no longer collapse into one)."""
 
 
 class DistinctOperationsOut(BaseModel):

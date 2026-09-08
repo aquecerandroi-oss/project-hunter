@@ -13,13 +13,19 @@ signals share ``identity_key``, a near-miss (different exit) does not, and
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import pytest
+from sqlalchemy import select
 
+from hunter_api.repositories.lab_signals import (
+    _IDENTITY_KEY_TEXT,  # pyright: ignore[reportPrivateUsage]
+)
+from hunter_core.db.models.agents import AgentSignal, SignalOutcome
 from hunter_core.db.models.markets import Market
 from hunter_core.domain.enums import OutcomeResult, ShadowTrackingState
 
@@ -204,3 +210,63 @@ async def test_totals_distinct_operations_counts_the_deduplicated_operations_per
     assert body["totals"]["distinct_operations"]["closed"] == 2
     assert body["totals"]["all"] == 4
     assert body["totals"]["distinct_operations"]["all"] == 2
+
+
+async def test_python_identity_key_matches_the_sql_side_text_for_a_seeded_row(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """T3.38c finding 4: the SQL-side ``_IDENTITY_KEY_TEXT`` expression
+    (``repositories/lab_signals.py``, backing ``distinct_operations``) and the
+    Python-side ``compute_identity_key`` (backing the API's ``identity_key``
+    field) must build the exact same bytes for the same row -- same field
+    order (finding 2's ``stop`` included on both sides), same separator
+    (``chr(31)``, finding 4), same decimal normalization (finding 3). Every
+    field on this row's identity path is non-null, so Postgres's ``concat()``
+    NULL-dropping (documented on ``_IDENTITY_KEY_TEXT``) is not on the path --
+    this reads back the *actual* SQL text Postgres produced for the row
+    rather than re-deriving it in the test, so a future edit that drifts one
+    side from the other fails here.
+    """
+    market_id = await fx.seed_lab_market(session_factory)
+    _, version_id = await fx.seed_strategy_version(session_factory, activated_at=DECISION_AT)
+    signal_id = await fx.seed_shadow_signal(
+        session_factory,
+        strategy_version_id=version_id,
+        market_id=market_id,
+        decision_at=DECISION_AT,
+        entry_bar_open=ENTRY_BAR_OPEN,
+        entry_ts=ENTRY_BAR_OPEN,
+        exit_ts=DECISION_AT.replace(hour=16),
+        reference_price=ENTRY_PRICE,
+        stop=Decimal("1.10000000"),
+        exit_price=EXIT_PRICE,
+        result=OutcomeResult.TARGET,
+        tracking_state=ShadowTrackingState.TERMINAL,
+        r_multiple=Decimal("1.5"),
+    )
+    actor: Actor = make_actor("lab-signals-identity-sql-parity")
+    market_symbol = await _market_symbol(session_factory, market_id)
+
+    response = await client.get(
+        "/api/v1/lab/shadow/signals",
+        params={"market": market_symbol, "page_size": 50},
+        headers=actor.headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert len(body["items"]) == 1
+    api_identity_key = body["items"][0]["identity_key"]
+
+    async with session_factory() as session:
+        stmt = (
+            select(_IDENTITY_KEY_TEXT)
+            .select_from(AgentSignal)
+            .join(SignalOutcome, SignalOutcome.signal_id == AgentSignal.id)
+            .join(Market, Market.id == AgentSignal.market_id)
+            .where(AgentSignal.id == signal_id)
+        )
+        sql_identity_text = (await session.execute(stmt)).scalar_one()
+
+    assert hashlib.sha256(sql_identity_text.encode("utf-8")).hexdigest() == api_identity_key
