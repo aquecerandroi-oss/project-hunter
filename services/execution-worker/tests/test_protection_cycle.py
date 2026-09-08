@@ -9,7 +9,7 @@ intermediate price is negotiated and no candle is consulted — so the fill is
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -20,12 +20,14 @@ from hunter_core.db.session import tenant_session
 from hunter_core.domain.enums import ExitIntentState, PositionStatus
 from hunter_execution_worker.entry import execute_approved_entries
 from hunter_execution_worker.market_data import SpotSnapshot, StaticSpotMarketData
-from hunter_execution_worker.protection import run_protection_cycle
+from hunter_execution_worker.protection import ProtectionOutcome, run_protection_cycle
 from hunter_execution_worker.wallet import WalletRef
 
 from .builders import (
     NO_EXIT_COST,
     NOW,
+    Tenant,
+    Wallet,
     beta_for,
     book,
     create_tenant,
@@ -63,7 +65,7 @@ SLIPPAGE_BPS = Decimal("256.41025641")
 REALIZED = SOLD * (GAP_PRICE - Decimal(100))
 
 
-def _entry_snapshot(tenant):  # type: ignore[no-untyped-def]
+def _entry_snapshot(tenant: Tenant) -> SpotSnapshot:
     return SpotSnapshot(
         market=market_identity(tenant),
         book=book(tenant, received_at=FILL_AT),
@@ -72,7 +74,7 @@ def _entry_snapshot(tenant):  # type: ignore[no-untyped-def]
     )
 
 
-def _gap_snapshot(tenant):  # type: ignore[no-untyped-def]
+def _gap_snapshot(tenant: Tenant) -> SpotSnapshot:
     """A gap: the tape jumps from 100 to 95 and the book gapped with it."""
     return SpotSnapshot(
         market=market_identity(tenant),
@@ -82,7 +84,7 @@ def _gap_snapshot(tenant):  # type: ignore[no-untyped-def]
     )
 
 
-def _no_book_snapshot(tenant):  # type: ignore[no-untyped-def]
+def _no_book_snapshot(tenant: Tenant) -> SpotSnapshot:
     """The tape crosses the stop and there is no book at all: V9."""
     return SpotSnapshot(
         market=market_identity(tenant),
@@ -92,7 +94,9 @@ def _no_book_snapshot(tenant):  # type: ignore[no-untyped-def]
     )
 
 
-async def _open_a_position(factory, engine, tenant):  # type: ignore[no-untyped-def]
+async def _open_a_position(
+    factory: async_sessionmaker[AsyncSession], engine: AsyncEngine, tenant: Tenant
+) -> Wallet:
     from hunter_core.admission.service import admit
 
     wallet = await open_wallet(factory, engine, tenant)
@@ -121,7 +125,12 @@ async def _open_a_position(factory, engine, tenant):  # type: ignore[no-untyped-
     return wallet
 
 
-async def _protect(factory, wallet, snapshot, now=CYCLE_AT):  # type: ignore[no-untyped-def]
+async def _protect(
+    factory: async_sessionmaker[AsyncSession],
+    wallet: Wallet,
+    snapshot: SpotSnapshot,
+    now: datetime = CYCLE_AT,
+) -> tuple[ProtectionOutcome, ...]:
     data = StaticSpotMarketData({(wallet.tenant.slug, wallet.tenant.symbol): snapshot})
     async with tenant_session(factory, wallet.org_id, db_role=WORKER_ROLE) as session:
         return await run_protection_cycle(
@@ -129,7 +138,7 @@ async def _protect(factory, wallet, snapshot, now=CYCLE_AT):  # type: ignore[no-
         )
 
 
-async def _cash(factory, wallet) -> Decimal:  # type: ignore[no-untyped-def]
+async def _cash(factory: async_sessionmaker[AsyncSession], wallet: Wallet) -> Decimal:
     from hunter_core.db.repositories.ledger import LedgerRepository
     from hunter_core.db.repositories.portfolio import PortfolioRepository
 

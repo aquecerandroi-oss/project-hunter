@@ -19,7 +19,7 @@ Two boundaries are exercised:
 from __future__ import annotations
 
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -30,12 +30,18 @@ from hunter_core.db.session import tenant_session
 from hunter_core.domain.enums import ExitIntentState
 from hunter_execution_worker.entry import execute_approved_entries
 from hunter_execution_worker.market_data import SpotSnapshot, StaticSpotMarketData
-from hunter_execution_worker.protection import TriggerWatermarks, run_protection_cycle
+from hunter_execution_worker.protection import (
+    ProtectionOutcome,
+    TriggerWatermarks,
+    run_protection_cycle,
+)
 from hunter_execution_worker.wallet import WalletRef
 
 from .builders import (
     NO_EXIT_COST,
     NOW,
+    Tenant,
+    Wallet,
     beta_for,
     book,
     create_tenant,
@@ -61,7 +67,9 @@ GAP_PRICE = Decimal("95")
 SHALLOW = Decimal(10)
 
 
-async def _open_a_position(factory, engine, tenant):  # type: ignore[no-untyped-def]
+async def _open_a_position(
+    factory: async_sessionmaker[AsyncSession], engine: AsyncEngine, tenant: Tenant
+) -> Wallet:
     from hunter_core.admission.service import admit
 
     wallet = await open_wallet(factory, engine, tenant)
@@ -95,7 +103,14 @@ async def _open_a_position(factory, engine, tenant):  # type: ignore[no-untyped-
     return wallet
 
 
-def _stop(tenant, *, at, depth=Decimal(1_000), trade_id=2, book_present=True):  # type: ignore[no-untyped-def]
+def _stop(
+    tenant: Tenant,
+    *,
+    at: datetime,
+    depth: Decimal = Decimal(1_000),
+    trade_id: int = 2,
+    book_present: bool = True,
+) -> SpotSnapshot:
     return SpotSnapshot(
         market=market_identity(tenant),
         book=(
@@ -114,7 +129,12 @@ def _stop(tenant, *, at, depth=Decimal(1_000), trade_id=2, book_present=True):  
     )
 
 
-async def _cycle(factory, wallet, snapshot, now):  # type: ignore[no-untyped-def]
+async def _cycle(
+    factory: async_sessionmaker[AsyncSession],
+    wallet: Wallet,
+    snapshot: SpotSnapshot,
+    now: datetime,
+) -> tuple[ProtectionOutcome, ...]:
     """One protection pass in a **fresh** object graph — the restart."""
     async with tenant_session(factory, wallet.org_id, db_role=WORKER_ROLE) as session:
         return await run_protection_cycle(

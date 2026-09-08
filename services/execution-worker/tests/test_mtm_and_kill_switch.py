@@ -9,9 +9,9 @@ curve records it, and the evaluation that follows finds it.
 from __future__ import annotations
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from sqlalchemy import text
@@ -21,13 +21,15 @@ from hunter_core.domain.enums import KillSwitchState, ReservationState
 from hunter_execution_worker.entry import execute_approved_entries
 from hunter_execution_worker.guard import cancel_pending_entries
 from hunter_execution_worker.market_data import SpotSnapshot, StaticSpotMarketData
-from hunter_execution_worker.mtm import run_mtm_cycle
+from hunter_execution_worker.mtm import MarkToMarket, run_mtm_cycle
 from hunter_execution_worker.protection import run_protection_cycle
 from hunter_execution_worker.wallet import WalletRef
 
 from .builders import (
     NO_EXIT_COST,
     NOW,
+    Tenant,
+    Wallet,
     add_market,
     beta_for,
     book,
@@ -43,6 +45,9 @@ from .builders import (
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+    from hunter_core.admission.service import AdmissionResult
+    from hunter_core.db.models.fx import FxObservation
+
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
 
 WORKER_ROLE = "hunter_worker"
@@ -54,7 +59,7 @@ CRASH_PRICE = Decimal("78")
 EXIT_COST = Decimal("0.001")
 
 
-def _entry_snapshot(tenant):  # type: ignore[no-untyped-def]
+def _entry_snapshot(tenant: Tenant) -> SpotSnapshot:
     return SpotSnapshot(
         market=market_identity(tenant),
         book=book(tenant, received_at=FILL_AT),
@@ -63,7 +68,9 @@ def _entry_snapshot(tenant):  # type: ignore[no-untyped-def]
     )
 
 
-async def _admit(factory, wallet, **overrides):  # type: ignore[no-untyped-def]
+async def _admit(
+    factory: async_sessionmaker[AsyncSession], wallet: Wallet, **overrides: Any
+) -> AdmissionResult:
     from hunter_core.admission.service import admit
 
     market_id = overrides.pop("market_id", wallet.market_id)
@@ -90,7 +97,9 @@ async def _admit(factory, wallet, **overrides):  # type: ignore[no-untyped-def]
         )
 
 
-async def _open_a_position(factory, engine, tenant):  # type: ignore[no-untyped-def]
+async def _open_a_position(
+    factory: async_sessionmaker[AsyncSession], engine: AsyncEngine, tenant: Tenant
+) -> Wallet:
     wallet = await open_wallet(factory, engine, tenant)
     await _admit(factory, wallet)
     data = StaticSpotMarketData({(tenant.slug, tenant.symbol): _entry_snapshot(tenant)})
@@ -102,7 +111,13 @@ async def _open_a_position(factory, engine, tenant):  # type: ignore[no-untyped-
     return wallet
 
 
-async def _mark(factory, wallet, price, now=MARK_AT, fx=None):  # type: ignore[no-untyped-def]
+async def _mark(
+    factory: async_sessionmaker[AsyncSession],
+    wallet: Wallet,
+    price: Decimal | None,
+    now: datetime = MARK_AT,
+    fx: FxObservation | None = None,
+) -> MarkToMarket:
     async with tenant_session(factory, wallet.org_id, db_role=WORKER_ROLE) as session:
         return await run_mtm_cycle(
             session,
@@ -181,9 +196,9 @@ class TestTheCurveIsWrittenBeforeTheSwitchReadsIt:
             wallet,
             client_key="manual-2",
             market_id=second.market_id,
-            market=market_identity(second),  # type: ignore[arg-type]
-            spec=spec_for(second),  # type: ignore[arg-type]
-            liquidity=liquidity_for(second),  # type: ignore[arg-type]
+            market=market_identity(second),
+            spec=spec_for(second),
+            liquidity=liquidity_for(second),
         )
         assert pending.approved, pending.decision.rejection_reasons
         assert pending.reservation_state is ReservationState.HELD

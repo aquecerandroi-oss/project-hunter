@@ -18,13 +18,15 @@ from sqlalchemy import text
 
 from hunter_core.db.session import tenant_session
 from hunter_core.domain.enums import ExitIntentState, ReservationState
-from hunter_execution_worker.entry import execute_approved_entries
-from hunter_execution_worker.market_data import SpotSnapshot, StaticSpotMarketData
+from hunter_execution_worker.entry import EntryOutcome, execute_approved_entries
+from hunter_execution_worker.market_data import SpotMarketData, SpotSnapshot, StaticSpotMarketData
 from hunter_execution_worker.wallet import WalletRef
 
 from .builders import (
     NO_EXIT_COST,
     NOW,
+    Tenant,
+    Wallet,
     beta_for,
     book,
     create_tenant,
@@ -39,6 +41,8 @@ from .builders import (
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+    from hunter_core.admission.service import AdmissionResult
+
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
 
 WORKER_ROLE = "hunter_worker"
@@ -50,7 +54,9 @@ NET_BASE = Decimal("18.499482")
 CASH_AFTER = Decimal("18148.2000000000")
 
 
-async def _admit(factory, wallet, engine):  # type: ignore[no-untyped-def]
+async def _admit(
+    factory: async_sessionmaker[AsyncSession], wallet: Wallet, engine: AsyncEngine
+) -> AdmissionResult:
     from hunter_core.admission.service import admit
 
     async with tenant_session(factory, wallet.org_id, db_role=WORKER_ROLE) as session:
@@ -68,7 +74,7 @@ async def _admit(factory, wallet, engine):  # type: ignore[no-untyped-def]
         )
 
 
-def _snapshot(tenant):  # type: ignore[no-untyped-def]
+def _snapshot(tenant: Tenant) -> SpotSnapshot:
     """A book received after the declared latency, and one fresh print."""
     return SpotSnapshot(
         market=market_identity(tenant),
@@ -78,7 +84,9 @@ def _snapshot(tenant):  # type: ignore[no-untyped-def]
     )
 
 
-async def _run_entries(factory, wallet, data):  # type: ignore[no-untyped-def]
+async def _run_entries(
+    factory: async_sessionmaker[AsyncSession], wallet: Wallet, data: SpotMarketData
+) -> tuple[EntryOutcome, ...]:
     async with tenant_session(factory, wallet.org_id, db_role=WORKER_ROLE) as session:
         return await execute_approved_entries(
             session,
@@ -88,9 +96,9 @@ async def _run_entries(factory, wallet, data):  # type: ignore[no-untyped-def]
         )
 
 
-async def _counts(engine: AsyncEngine, wallet) -> dict[str, int]:  # type: ignore[no-untyped-def]
+async def _counts(engine: AsyncEngine, wallet: Wallet) -> dict[str, int]:
     async with engine.begin() as connection:
-        rows = {}
+        rows: dict[str, int] = {}
         for table in ("orders", "fills", "positions", "portfolio_exit_intents"):
             rows[table] = int(
                 await connection.scalar(
@@ -114,7 +122,7 @@ async def _counts(engine: AsyncEngine, wallet) -> dict[str, int]:  # type: ignor
         return rows
 
 
-async def _cash(factory, wallet) -> Decimal:  # type: ignore[no-untyped-def]
+async def _cash(factory: async_sessionmaker[AsyncSession], wallet: Wallet) -> Decimal:
     from hunter_core.db.repositories.ledger import LedgerRepository
     from hunter_core.db.repositories.portfolio import PortfolioRepository
 

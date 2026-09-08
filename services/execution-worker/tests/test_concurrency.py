@@ -27,6 +27,8 @@ from hunter_execution_worker.wallet import WalletRef
 from .builders import (
     NO_EXIT_COST,
     NOW,
+    Tenant,
+    Wallet,
     beta_for,
     book,
     create_tenant,
@@ -54,7 +56,7 @@ ATTEMPT_ID = uuid.UUID("0193f7f0-0000-7000-8000-000000000001")
 """A fixed attempt id, so "the same report delivered twice" is literally the same."""
 
 
-def _entry_snapshot(tenant):  # type: ignore[no-untyped-def]
+def _entry_snapshot(tenant: Tenant) -> SpotSnapshot:
     return SpotSnapshot(
         market=market_identity(tenant),
         book=book(tenant, received_at=FILL_AT),
@@ -63,7 +65,7 @@ def _entry_snapshot(tenant):  # type: ignore[no-untyped-def]
     )
 
 
-def _stop_snapshot(tenant):  # type: ignore[no-untyped-def]
+def _stop_snapshot(tenant: Tenant) -> SpotSnapshot:
     return SpotSnapshot(
         market=market_identity(tenant),
         book=book(
@@ -77,7 +79,9 @@ def _stop_snapshot(tenant):  # type: ignore[no-untyped-def]
     )
 
 
-async def _open_a_position(factory, engine, tenant):  # type: ignore[no-untyped-def]
+async def _open_a_position(
+    factory: async_sessionmaker[AsyncSession], engine: AsyncEngine, tenant: Tenant
+) -> Wallet:
     from hunter_core.admission.service import admit
 
     wallet = await open_wallet(factory, engine, tenant)

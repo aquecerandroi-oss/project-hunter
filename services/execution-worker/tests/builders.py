@@ -216,7 +216,7 @@ async def open_wallet(
     return Wallet(tenant, result.portfolio_id)
 
 
-def market_identity(tenant: Tenant) -> MarketIdentity:
+def market_identity(tenant: Tenant | SecondMarket) -> MarketIdentity:
     return MarketIdentity(
         exchange=tenant.slug,
         symbol=tenant.symbol,
@@ -226,7 +226,7 @@ def market_identity(tenant: Tenant) -> MarketIdentity:
     )
 
 
-def spec_for(tenant: Tenant) -> MarketSpec:
+def spec_for(tenant: Tenant | SecondMarket) -> MarketSpec:
     return MarketSpec(
         market=market_identity(tenant),
         step_size=tenant.step,
@@ -236,7 +236,7 @@ def spec_for(tenant: Tenant) -> MarketSpec:
 
 
 def liquidity_for(
-    tenant: Tenant,
+    tenant: Tenant | SecondMarket,
     *,
     as_of: datetime = NOW,
     last_price: Decimal = Decimal(100),

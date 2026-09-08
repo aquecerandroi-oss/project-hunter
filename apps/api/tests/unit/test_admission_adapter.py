@@ -298,7 +298,10 @@ class TestTheManualOrderIsBornPaper:
         original = adapter.ProposalRequest
 
         class _Spy(original):  # type: ignore[misc,valid-type]
-            def __init__(self, **kwargs: object) -> None:
+            # `Any`, not `object`: this passes every keyword straight to the real
+            # (pydantic) constructor, whose fields have their own concrete types —
+            # `object` would make every one of those eighteen arguments a type error.
+            def __init__(self, **kwargs: Any) -> None:
                 captured.update(kwargs)
                 super().__init__(**kwargs)
 
