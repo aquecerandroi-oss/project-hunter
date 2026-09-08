@@ -431,3 +431,260 @@ $ vitest run
    ("in-app-browser-limits"), a captura de tela ("Concluídas" mostrando > 200 na VPS) é trabalho do
    orquestrador depois do deploy e do rebuild do `docker-web-1`.
 5. Não fiz `git commit` (instrução explícita). Nenhum arquivo de `.env*`/API/serviços foi tocado.
+
+## T3.37c — os dois índices de coorte (`0014_lab_signals_indexes`) (database-architect)
+
+### STATUS
+
+**DONE_WITH_CONCERNS.** A migração `0014` entrou com os dois índices, medidos
+antes/depois em 50 000 linhas, reversível e sem deriva (`alembic check` limpo).
+A ressalva é grande e está declarada: **os dois índices que a T3.37a pediu não
+são escrevíveis como ela os escreveu**, e a página do Lab continua sem índice
+até que uma linha de `apps/api/hunter_api/repositories/lab_common.py` mude.
+Detalhes em `docs/DATABASE.md` §26.
+
+O que o Postgres recusa (reproduzido no stack local e no testcontainer):
+
+```
+CREATE INDEX ix_probe_cast ON t337c_probe (((sf->>'decision_at')::timestamptz) DESC, id DESC);
+ERROR:  functions in index expression must be marked IMMUTABLE
+```
+
+`text -> timestamptz` roda `timestamptz_in`, que é `STABLE` (`provolatile = 's'`
+em `pg_proc`; aceita `'now'` e depende de `TimeZone`). Nenhum índice — e nenhuma
+coluna `GENERATED` — pode ser construído sobre esse cast. Como
+`LabSignalsRepository` ordena por
+`CAST(supporting_features ->> 'decision_at' AS TIMESTAMPTZ) DESC, id DESC`,
+**nenhuma migração** consegue tirar o `Sort` daquela consulta.
+
+E não precisa: `emitted_at` **é** o mesmo instante, escrito da mesma variável
+(`persist.py:93` `emitted_at=record.decision_at`; `record.py:164`
+`envelope["decision_at"] = _jsonable(decision_at)`), o placar já ordena por
+`s.emitted_at, s.id` (`replication_stats._ORDER`), e no banco do stack local as
+840 linhas têm zero divergência entre os dois. A correção é uma linha, em
+arquivo fora do meu escopo:
+
+```python
+# apps/api/hunter_api/repositories/lab_common.py
+DECISION_AT = AgentSignal.emitted_at   # hoje: sa_cast(...supporting_features["decision_at"].astext...)
+```
+
+Com ela, a primeira página passa de **264 ms** para **0,96 ms** com 50 000
+linhas (planos abaixo). Sem ela, os índices desta migração servem o placar, o
+`count_population` do replay e o `cohort_cases` do stress — que já rodam hoje —
+e ficam prontos para a página no dia em que a linha mudar.
+
+### FILES
+
+Criados:
+
+- `infra/migrations/versions/0014_lab_signals_indexes.py` — dois `CREATE INDEX`
+  simples, `downgrade` derruba os dois.
+
+Modificados:
+
+- `packages/core/hunter_core/db/models/_common.py` — `SHADOW_COHORT` (a
+  expressão da coorte, byte a byte) e `shadow_cohort_indexes()`, que devolve as
+  duas `Index(...)`.
+- `packages/core/hunter_core/db/models/agents.py` — `*shadow_cohort_indexes()`
+  no `__table_args__` de `AgentSignal`. As declarações moram no `_common` porque
+  este módulo estava a 4 linhas do teto de 350 (`check_file_size.py`); com elas
+  inline ele ia a 364 e quebrava o gate do CI.
+- `apps/api/tests/integration/test_lab_signals_explain.py` — reescrito: 50 000
+  sinais + 50 000 outcomes por SQL em massa, seis versões, três coortes; planos
+  antes/depois/com-só-um-índice; três asserções novas (o `Index Scan` da visão
+  padrão, a recusa `IMMUTABLE` e o `Sort` que ela causa, e o índice de
+  `tracking_state` que ninguém lê).
+- `packages/core/tests/integration/test_migrations.py` — `HEAD_REVISION` para
+  `0014_lab_signals_indexes` (o próprio docstring da constante diz que toda
+  revisão a sobe), `REPLAY_RUNS_REVISION` nova, dois testes da `0013` que usavam
+  `downgrade -1` a partir do head agora descem até a `0013` primeiro (o mesmo
+  padrão das guardas da `0003`), e dois testes novos da `0014`.
+- `docs/DATABASE.md` — §26 inteira (o quê, por quê, medições, o que não entrou,
+  trava, e a tabela de desvios em relação ao brief).
+
+**Não** toquei: `apps/api/hunter_api/**`, `apps/web/**`, `services/**`,
+`obsidian/**`, `.env*`. Nada foi commitado.
+
+### TESTS (saída real)
+
+`alembic` pela CLI, contra um Postgres 16 descartável (`docker run --rm
+postgres:16-alpine`, porta 5434, removido ao final):
+
+```
+$ uv run alembic -c infra/migrations/alembic.ini upgrade head
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_initial_schema, initial schema: ...
+... (14 revisões) ...
+INFO  [alembic.runtime.migration] Running upgrade 0013_replay_runs -> 0014_lab_signals_indexes, agent_signals: the cohort stops being invisible to the planner
+
+$ uv run alembic -c infra/migrations/alembic.ini check
+No new upgrade operations detected.
+
+$ uv run alembic -c infra/migrations/alembic.ini downgrade -1
+INFO  [alembic.runtime.migration] Running downgrade 0014_lab_signals_indexes -> 0013_replay_runs, ...
+$ docker exec pg-t337c psql ... -c "SELECT indexname FROM pg_indexes WHERE tablename='agent_signals'"
+ix_agent_signals_market_emitted
+ix_agent_signals_opportunity_id
+ix_agent_signals_regime_id
+ix_agent_signals_status_expires
+ix_agent_signals_version_emitted
+pk_agent_signals
+uq_agent_signals_id_slot
+
+$ uv run alembic -c infra/migrations/alembic.ini upgrade head
+INFO  [alembic.runtime.migration] Running upgrade 0013_replay_runs -> 0014_lab_signals_indexes, ...
+$ uv run alembic -c infra/migrations/alembic.ini check
+No new upgrade operations detected.
+```
+
+O `alembic check` **enxerga** a falta dos índices (derrubei os dois à mão, com a
+versão ainda em `0014`):
+
+```
+INFO  [alembic.autogenerate.compare.constraints] Detected added index 'ix_agent_signals_cohort_emitted' on '('emitted_at', 'id')'
+INFO  [alembic.autogenerate.compare.constraints] Detected added index 'ix_agent_signals_version_cohort_emitted' on '('strategy_version_id', 'emitted_at', 'id')'
+FAILED: New upgrade operations detected: [...]
+```
+
+— mas repare que ele lista só as colunas **não-expressão**: uma divergência no
+texto da expressão passaria calada. Por isso o teste novo lê
+`pg_indexes.indexdef` e exige `supporting_features ->> 'cohort'` lá dentro.
+
+Definição instalada:
+
+```
+CREATE INDEX ix_agent_signals_cohort_emitted ON public.agent_signals USING btree (((supporting_features ->> 'cohort'::text)), emitted_at, id)
+CREATE INDEX ix_agent_signals_version_cohort_emitted ON public.agent_signals USING btree (strategy_version_id, ((supporting_features ->> 'cohort'::text)), emitted_at, id)
+```
+
+Suítes (testcontainers, um arquivo por invocação, em primeiro plano):
+
+```
+$ uv run pytest packages/core/tests/integration/test_migrations.py -q
+96 passed in 224.97s (0:03:44)
+
+$ uv run pytest apps/api/tests/integration/test_lab_signals_explain.py -q -s
+3 passed in 37.43s
+CREATE INDEX ix_agent_signals_cohort_emitted on 50000 rows: 147.6 ms
+CREATE INDEX ix_agent_signals_version_cohort_emitted on 50000 rows: 191.8 ms
+
+$ uv run pytest apps/api/tests/integration/test_lab_signals_pagination_api.py -q
+8 passed in 42.19s
+
+$ uv run pytest apps/api/tests/integration/test_isolation.py -q -k "another_organization or never_leak or nonexistent_organization or only_the_callers_own"
+26 passed, 3 deselected in 178.79s (0:02:58)
+```
+
+Gates:
+
+```
+$ uv run ruff check .            -> All checks passed! (nos arquivos tocados)
+$ uv run ruff format --check ... -> 4 files already formatted
+$ uv run pyright <arquivos tocados> -> 0 errors, 0 warnings, 0 informations
+$ uv run python infra/scripts/check_file_size.py
+error   386 > 350  packages/core/hunter_core/strategies/session_orb_v1.py
+error   370 > 350  packages/core/hunter_core/strategies/constraints.py
+scanned 547 files; 2 over budget, 0 grandfathered
+```
+
+Os dois arquivos acima do teto são de outra tarefa em voo (`strategies/**`), não
+desta; `models/agents.py` fechou em **349**.
+
+### PLANOS — antes/depois
+
+**VPS, somente `EXPLAIN`, hoje (5 571 linhas em `agent_signals`, sem a `0014`).**
+A consulta de totais da aba, exatamente como o repositório a emite:
+
+```
+Aggregate  (cost=768.69..768.70 rows=1 width=32)
+  ->  Nested Loop  (cost=0.56..768.16 rows=28 width=4)
+        ->  Nested Loop  (cost=0.28..715.97 rows=28 width=20)
+              ->  Seq Scan on agent_signals  (cost=0.00..515.57 rows=28 width=32)
+                    Filter: ((supporting_features ->> 'cohort'::text) = 'prospective'::text)
+              ->  Index Scan using pk_signal_outcomes on signal_outcomes  (cost=0.28..7.16 rows=1 width=20)
+        ->  Index Only Scan using pk_markets on markets  (cost=0.28..1.86 rows=1 width=16)
+```
+
+**28 linhas estimadas** — o palpite de 0,5 % para uma expressão sem estatística —
+quando quase todas as 5 571 casam. A primeira página soma a esse `Seq Scan` um
+`Sort` pela expressão do cast; o placar (`_EVALUABLE_SQL`) usa
+`ix_agent_signals_version_emitted` e ainda paga `Filter` de coorte + `Sort`.
+
+**Testcontainer, 50 000 linhas, 6 versões, 3 coortes (10 % replay, 10 %
+replication, 80 % prospective), `EXPLAIN (ANALYZE, BUFFERS)`:**
+
+| consulta | antes | depois |
+|---|---|---|
+| totais (coorte, todas as versões) | 96,7 ms · 122 633 buffers | **43,3 ms · 3 860 buffers** |
+| página 1, todas as versões, `ORDER BY emitted_at` | 180,7 ms · 122 633 buffers | **0,96 ms · 634 buffers** |
+| página 1, uma versão, `ORDER BY emitted_at` | 33,4 ms · 22 717 buffers | **1,6 ms · 700 buffers** |
+| `count_population(cohort='replay:<run>')` | 27,8 ms · 17 632 buffers | **17,7 ms · 3 899 buffers** |
+| placar: população avaliável de uma versão | 32,2 ms · 22 709 buffers (estimativa 42 × 6 667 reais) | **19,7 ms · 3 871 buffers** (estimativa 6 644) |
+| página 1 **como a API a escreve hoje** | 264 ms · `top-N heapsort` de 40 000 linhas | **inalterada** |
+
+A visão padrão, depois:
+
+```
+Limit  (cost=0.85..155.53 rows=201 width=704) (actual time=0.066..0.833 rows=201 loops=1)
+  Buffers: shared hit=634
+  ->  Nested Loop ...
+        ->  Index Scan Backward using ix_agent_signals_cohort_emitted on agent_signals
+              (actual time=0.025..0.080 rows=201 loops=1)
+              Index Cond: ((supporting_features ->> 'cohort'::text) = 'prospective'::text)
+              Buffers: shared hit=21
+Execution Time: 0.963 ms
+```
+
+E a mesma página como a rota a escreve hoje, **com os índices já instalados**:
+
+```
+Limit  (cost=7267.71..7290.83 rows=201 width=704) (actual time=258.403..263.952 rows=201 loops=1)
+  ->  Gather Merge
+        ->  Sort  (Sort Key: (((supporting_features ->> 'decision_at'::text))::timestamp with time zone) DESC, id DESC)
+              Sort Method: top-N heapsort  Memory: 227kB
+              ->  Parallel Seq Scan on agent_signals (rows=20000 loops=2)
+Execution Time: 264.336 ms
+```
+
+O placar é o caso mais interessante: continua sendo hash join com `Sort` (ele lê
+a população inteira, não uma página) e mesmo assim cai pela metade — **só porque
+a estimativa deixou de ser ficção**. Esse ganho vale hoje, sem nenhuma mudança
+na API.
+
+### CONCERNS
+
+1. **A página do Lab só fica rápida com a linha do `lab_common.py`** (§26.2).
+   Enquanto ela não mudar, a rota tem `Seq Scan` + `top-N heapsort` e 264 ms com
+   50 000 linhas — hoje são ~5 600 linhas na VPS, então é rápido; a curva é
+   linear no tamanho da tabela. Entrego a mudança pronta e testada do lado do
+   banco; quem a fizer deve inverter a asserção de
+   `test_the_lab_page_still_sorts_because_it_orders_by_a_cast` (o teste existe
+   para falhar nesse dia) e conferir que o cursor keyset continua codificando o
+   mesmo instante (é o mesmo valor, então os cursores emitidos antes continuam
+   válidos).
+2. **A consulta de totais é O(n) por natureza** e nenhum índice a conserta: ela
+   conta o conjunto filtrado inteiro, sem `LIMIT`, a cada requisição. Caiu de
+   96,7 ms para 43,3 ms com 50 000 linhas por causa da estimativa, mas com 500
+   mil linhas volta a ser centenas de milissegundos. Se isso incomodar, a saída
+   é do lado da API (cache curto por filtro, ou não recalcular totais quando só
+   a página muda) — não é um índice que falta.
+3. **`docs/reports/M3.md`** tem uma tabela de migrações com o estado de
+   implantação de cada uma; a `0014` precisa de uma linha lá ("commitada, não
+   aplicada em nenhum stack"). Não editei o arquivo por estar fora do escopo do
+   brief.
+4. **`models/agents.py` está em 349 de 350 linhas.** Coube porque as duas
+   `Index(...)` foram para `_common.shadow_cohort_indexes()`. A próxima coisa
+   que esse módulo ganhar vai quebrar o gate; o conserto de verdade é separar as
+   tabelas de tenant (`Agent`, `AgentStats`) num módulo próprio, que toca todos
+   os importadores e não cabia aqui.
+5. **Achado fora do meu escopo, anterior a esta tarefa:**
+   `apps/api/tests/integration/test_isolation.py::test_the_route_list_covers_every_tenant_route_the_app_serves`
+   falha em `assert 24 == 23`. A rota que falta na matriz de isolamento é
+   `GET /api/v1/orgs/{org_id}/portfolios/{portfolio_id}/risk/limits`, servida
+   desde a T3.25 (`79c52c3`) e nunca acrescentada à lista `_tenant_routes`. Ou
+   seja: **nenhum teste afirma que um membro da organização A recebe 404 nos
+   limites de risco da B**. Os outros 26 testes de isolamento passam. Não
+   corrigi (é `apps/api`, fora do meu escopo de escrita) — vale um brief curto.
+6. **A `0014` não foi aplicada em lugar nenhum**: nem no stack local (que segue
+   em `0013`) nem na VPS, onde só rodei `EXPLAIN`. O deploy a aplica; a trava é
+   de dezenas de milissegundos (§26.5).

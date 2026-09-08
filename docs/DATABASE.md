@@ -4268,3 +4268,184 @@ diverge por escrito:
 | CHECKs pedidos: `window_to > window_from`, `finished_at >= started_at`, `bars_evaluated >= 0` | mantidos, mais seis (§25.2). Cada um fecha uma forma de recibo mentiroso que o brief não nomeou; nenhum recusa uma linha que `replay/run.py` possa produzir hoje |
 | — (o brief não fala do escopo dos contadores) | `signals`/`outcomes_resolved`/`outcomes_open` são **da coorte inteira**, não da fatia, porque é assim que `count_population` já os produz. Declarado na §25.2 em vez de corrigido: mudar o número mudaria o que a prova da T3.19b relatou |
 | "`record_run` ganha um terceiro ramo" | ganhou, e ganhou também uma **sonda** de existência da tabela (§25.7). O brief não a pediu; sem ela, um banco atrasado numa revisão perde o recibo inteiro em vez de perder um terço dele |
+
+## 26. A coorte deixa de ser invisível para o planejador — M3 (`0014_lab_signals_indexes`)
+
+Décima quarta revisão. **Dois índices em `agent_signals`, nada mais**: nenhuma
+coluna, nenhuma constraint, nenhum enum, nenhum grant, nenhuma partição. Ela
+responde ao pedido que a T3.37a escreveu em vez de uma migração
+(`.claude/state/notes-T3.37.md` §T3.37a).
+
+```
+agent_signals
+  INDEX (      (supporting_features ->> 'cohort'), emitted_at, id)   -- ix_agent_signals_cohort_emitted
+  INDEX (strategy_version_id,
+               (supporting_features ->> 'cohort'), emitted_at, id)   -- ix_agent_signals_version_cohort_emitted
+```
+
+### 26.1 O problema não era só a varredura: era a **estatística**
+
+A coorte de uma decisão sombra vive dentro do envelope imutável
+(`supporting_features->>'cohort'`, §16) — não é coluna. Quatro consumidores
+filtram por ela: `replay/simulate.count_population`,
+`replay/stress.cohort_cases`, `replication_stats` (o placar) e a listagem
+`GET /lab/shadow/signals`. Uma expressão que ninguém indexou **não tem
+estatística nenhuma**: o Postgres cai no palpite padrão de 0,5 % para ela.
+
+Medido na VPS em 2026-09-08, somente `EXPLAIN`, com 5 571 linhas em
+`agent_signals`:
+
+```
+ Seq Scan on agent_signals  (cost=0.00..515.57 rows=28 width=572)
+   Filter: ((supporting_features ->> 'cohort'::text) = 'prospective'::text)
+```
+
+**28 linhas estimadas** onde quase todas as 5 571 casam. São dois estragos
+distintos, e o segundo é o pior:
+
+1. a varredura é sequencial e cresce com a tabela;
+2. a subestimativa de ~200x sobe para todos os nós acima, e é ela que escolheu
+   um `Nested Loop` de milhares de sondagens em `signal_outcomes` planejando
+   para 28 — inclusive na consulta de totais, que a tela pede a **cada**
+   requisição.
+
+Um índice de expressão corrige o segundo de graça: o `ANALYZE` coleta
+estatística para expressões de índice, então depois da `0014` o planejador
+conhece a seletividade real da coorte **use ou não** o índice para varrer.
+
+### 26.2 Por que a chave de ordenação é `emitted_at`, e não a cópia do envelope
+
+`emitted_at` **é** o instante da decisão: `persist.persist_decision` grava
+`emitted_at=record.decision_at`, e `record.py` carimba
+`supporting_features['decision_at']` a partir da mesma variável. Não é
+coincidência de dado: é um só valor escrito em dois lugares — conferido também
+no banco do stack local (840 linhas, `count(*) FILTER (WHERE emitted_at IS
+DISTINCT FROM (supporting_features->>'decision_at')::timestamptz) = 0`) — e o
+placar (`replication_stats`) já ordena por `ORDER BY s.emitted_at, s.id`.
+
+A coluna é indexável. **A cópia no envelope não é, e isso não é uma escolha:**
+
+```sql
+CREATE INDEX ... ON agent_signals (((supporting_features->>'decision_at')::timestamptz));
+ERROR:  functions in index expression must be marked IMMUTABLE
+```
+
+`text -> timestamptz` executa `timestamptz_in`, que é `STABLE` (aceita `'now'`,
+depende de `TimeZone`) — `provolatile = 's'` no `pg_proc`. Pelo mesmo motivo uma
+coluna `GENERATED ALWAYS AS (...)` com essa expressão também é recusada. Os dois
+índices que a T3.37a pediu **não são escrevíveis como ela os escreveu**, e
+nenhuma migração pode fazer `GET /lab/shadow/signals` usar índice enquanto o
+`ORDER BY` dela for esse cast: hoje a rota ordena por
+`(supporting_features->>'decision_at')::timestamptz`
+(`hunter_api/repositories/lab_common.py`, `DECISION_AT`).
+
+**A correção que falta é de uma linha e não é desta revisão:**
+`DECISION_AT = AgentSignal.emitted_at`. Enquanto ela não vier, a página do Lab
+continua com `Seq Scan` + `top-N heapsort` — **264 ms com 50 000 linhas**,
+contra **0,96 ms** da mesma página ordenada pela coluna. As duas metades estão
+travadas por teste (`apps/api/tests/integration/test_lab_signals_explain.py`):
+o `ERROR ... IMMUTABLE` e o `Sort` que ele causa.
+
+**Desvio declarado da §1.** A convenção diz "JSONB … nunca para campos que serão
+filtrados com frequência". `cohort` e `decision_at` são exatamente isso, e já
+eram antes desta revisão — a S0 congelou o envelope antes de existir uma API que
+filtrasse por ele. A `0014` torna o filtro sustentável (índice de expressão) sem
+desfazer o desvio; desfazê-lo é promover `cohort` a coluna de `agent_signals`,
+com backfill e mudança no `strategy-worker`, e continua sendo a forma certa se a
+tabela crescer uma ordem de grandeza. `decision_at` **não** precisa dessa
+promoção: a coluna já existe e se chama `emitted_at`.
+
+### 26.3 Medido, não suposto (50 000 linhas, 6 versões, 3 coortes, PG 16)
+
+`EXPLAIN (ANALYZE, BUFFERS)` no testcontainer, antes (índices derrubados dentro
+de uma transação revertida, o que também derruba a estatística da expressão) e
+depois:
+
+| consulta | antes | depois |
+|---|---|---|
+| totais da aba (coorte, todas as versões) | 96,7 ms · 122 633 buffers · `Nested Loop` de 40 000 sondagens | **43,3 ms · 3 860 buffers** · `Parallel Hash Join` |
+| página 1, todas as versões, `ORDER BY emitted_at` | 180,7 ms · 122 633 buffers · `Seq Scan` + `top-N heapsort` | **0,96 ms · 634 buffers** · `Index Scan Backward using ix_agent_signals_cohort_emitted` |
+| página 1, uma versão, `ORDER BY emitted_at` | 33,4 ms · 22 717 buffers | **1,6 ms · 700 buffers** · `Index Scan Backward using ix_agent_signals_version_cohort_emitted`, sem `Sort` e sem `Filter` |
+| `count_population(cohort='replay:<run>')` | 27,8 ms · 17 632 buffers · `Seq Scan` | **17,7 ms · 3 899 buffers** · `Bitmap Index Scan` |
+| placar: população avaliável de uma versão | 32,2 ms · 22 709 buffers · estimativa **42** contra 6 667 reais | **19,7 ms · 3 871 buffers** · estimativa **6 644** |
+| página 1 **como a API a escreve hoje** (cast) | 264 ms · `top-N heapsort` de 40 000 linhas | **inalterada** — nenhum índice pode servir esse `ORDER BY` (§26.2) |
+
+O placar é o caso que prova a §26.1 sozinho: o plano continua sendo hash join
+com `Sort` (ele lê a população inteira, não uma página), e ainda assim cai de
+32,2 ms para 19,7 ms e de 22 709 para 3 871 buffers — **só porque a estimativa
+deixou de ser ficção**.
+
+O segundo índice foi medido contra a hipótese de não existir: com apenas
+`ix_agent_signals_cohort_emitted`, a página de uma versão vira `Index Scan` no
+índice antigo `(strategy_version_id, emitted_at)` com `Incremental Sort` e um
+`Filter` de coorte (1,5 ms, 703 buffers — empatado hoje). O que compra o segundo
+índice não é o milissegundo de hoje: é que o `Filter` cresce com a proporção de
+linhas **não** prospectivas da versão, que é justamente o que uma versão
+replayada várias vezes acumula (`Rows Removed by Filter` já é 50 em 252 lidas
+com 10 % de replay).
+
+### 26.4 O que **não** entrou, e por quê
+
+- **Índice parcial `WHERE cohort = 'prospective'`** (item b do pedido): a coorte
+  é a coluna **líder** dos dois índices, então a fatia prospectiva já é um
+  intervalo contíguo dentro de cada um; uma cópia parcial seria uma segunda
+  estrutura para manter e escrever, sem nenhuma consulta que ela sirva melhor. E
+  `prospective` não é privilegiada: `count_population` e `cohort_cases`
+  perguntam por uma coorte `replay:<run>`, que os mesmos índices atendem.
+- **`signal_outcomes (tracking_state)`** (item c): `signal_outcomes` nunca é a
+  tabela dirigente — toda consulta parte do sinal e alcança o desfecho pela
+  chave primária. Um índice de cinco rótulos seria escrito em todo `UPDATE` de
+  outcome e lido por ninguém. **Medido, não suposto:** o teste de `EXPLAIN` cria
+  esse índice dentro de uma transação, mostra que nem os totais nem
+  `state=closed` o mencionam, e o desfaz. Se um dia uma consulta o quiser, o
+  teste falha e ele vira migração em vez de parágrafo.
+
+### 26.5 Trava, downgrade e pooler
+
+`CREATE INDEX` simples, dentro da transação da migração — não
+`CONCURRENTLY`. Ele toma `SHARE` em `agent_signals`, que bloqueia os `INSERT`s
+do strategy-worker durante a construção e deixa todo leitor passar; medido em
+50 000 linhas, os dois índices custam 131/162 ms e 148/192 ms em duas execuções,
+e uns poucos milissegundos nas 5 571 linhas que a VPS tem hoje. A `0004`
+precisou de `CREATE INDEX CONCURRENTLY` em `autocommit_block` porque
+`outbox_events` recebe ~700 mil linhas/dia; `agent_signals` recebe ~1 600, e
+comprar uma migração não atômica — que pode deixar um índice `indisvalid = false`
+e precisa da própria receita de recuperação — seria pagar esse preço por nada. Se
+um dia o volume tornar a construção uma indisponibilidade visível, a receita é a
+da `0004`.
+
+`downgrade` derruba os dois e não perde nada: um índice não guarda fato que a
+tabela não tenha. Não há guarda de downgrade, e a ausência é afirmação (§17.7 só
+protege evidência). Nada aqui depende de estado de sessão: dois `CREATE INDEX`,
+nenhum prepared statement de sessão, nenhum `LISTEN`/`NOTIFY`, nenhum advisory
+lock de sessão — a revisão é transparente para o pooler.
+
+### 26.6 Onde as declarações moram, e o que o `alembic check` de fato compara
+
+As duas `Index(...)` são construídas por
+`hunter_core.db.models._common.shadow_cohort_indexes()` e entram no
+`__table_args__` de `AgentSignal` com `*shadow_cohort_indexes()`. Ficam ali, ao
+lado de `org_fk()`/`tenant_scoped_fk()`, porque `models/agents.py` está no teto
+de 350 linhas do projeto; a expressão da coorte é a constante
+`_common.SHADOW_COHORT`, a mesma string que a `0014` instala.
+
+`alembic check` **detecta** a ausência de qualquer um dos dois (medido: com os
+índices derrubados à mão ele acusa `Detected added index
+'ix_agent_signals_cohort_emitted' on ('emitted_at', 'id')`), mas repare no que
+ele lista: **as colunas não-expressão**. Uma divergência apenas no texto da
+expressão passaria em silêncio — e um índice cuja expressão não bate com a da
+consulta é um índice que ninguém usa. Por isso a prova real é o catálogo:
+`test_0014_installs_the_two_cohort_indexes_and_reverses` lê
+`pg_indexes.indexdef` e exige `supporting_features ->> 'cohort'` lá dentro (a
+mesma razão pela qual a §17.3 lê `indexdef` para um predicado).
+
+### 26.7 Desvios em relação ao brief, declarados
+
+| O brief pedia | O que foi entregue, e por quê |
+|---|---|
+| índice composto `(strategy_version_id, cohort, emitted_at DESC, id DESC)` | entregue, ascendente (§15.3): a leitura `DESC` percorre o mesmo índice de trás para frente |
+| índice parcial `WHERE cohort = 'prospective'` | **não entrou** (§26.4): a coorte é coluna líder, a fatia já é contígua |
+| índice em `signal_outcomes (tracking_state)` | **não entrou** (§26.4), com o plano que prova que ninguém o leria |
+| "`CREATE INDEX CONCURRENTLY` não é possível dentro da transação do Alembic" | é possível, e a `0004` já o faz num `autocommit_block`. Ainda assim escolhi `CREATE INDEX` simples, com a trava medida (§26.5) |
+| "o teste de `EXPLAIN` afirma um `Index Scan` para a visão padrão" | afirma — para a visão padrão **ordenada pela coluna**. Para a rota como ela está escrita hoje o teste afirma o contrário (`Sort` + `Seq Scan`), porque é o que o Postgres permite (§26.2) |
+| (o brief não fala de estatística) | é o ganho maior, e vale mesmo onde o índice não é varrido (§26.1, §26.3) |

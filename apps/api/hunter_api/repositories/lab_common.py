@@ -22,17 +22,16 @@ from datetime import datetime
 from typing import Literal
 
 from fastapi import status
-from sqlalchemy import DateTime
-from sqlalchemy import cast as sa_cast
 
 from hunter_api.errors import HunterError
 from hunter_core.db.models.agents import AgentSignal
 from hunter_core.domain.enums import ShadowTrackingState
 from hunter_core.domain.types import ensure_utc
 
-DECISION_AT = sa_cast(
-    AgentSignal.supporting_features["decision_at"].astext, DateTime(timezone=True)
-)
+# T3.37c: ``emitted_at`` *is* ``decision_at`` (persist.py:93 writes one from the other),
+# and a cast text -> timestamptz is STABLE, not IMMUTABLE, so it can never be indexed;
+# ordering by the column lets ``0014_lab_signals_indexes`` serve the page (264 ms -> 1 ms).
+DECISION_AT = AgentSignal.emitted_at
 COHORT = AgentSignal.supporting_features["cohort"].astext
 
 MAX_CURSOR_LENGTH = 96

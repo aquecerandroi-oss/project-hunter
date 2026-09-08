@@ -13,7 +13,7 @@ import enum
 from functools import cache
 from typing import Any
 
-from sqlalchemy import ForeignKeyConstraint, Numeric, text
+from sqlalchemy import ForeignKeyConstraint, Index, Numeric, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.elements import TextClause
 
@@ -96,3 +96,39 @@ def org_fk(ondelete: str = "CASCADE") -> ForeignKeyConstraint:
     "todo FK indexado" and referential integrity honest.
     """
     return ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete=ondelete)
+
+
+SHADOW_COHORT: TextClause = text("(supporting_features ->> 'cohort')")
+"""The cohort of a shadow decision, inside the immutable envelope (§16).
+
+Byte for byte the expression ``0014_lab_signals_indexes`` indexes and every
+caller writes — ``replay/simulate.count_population``,
+``replay/stress.cohort_cases``, ``replication_stats``,
+``hunter_api.repositories.lab_common.COHORT``. An expression index serves only a
+query that spells the expression identically, so this constant is the contract.
+"""
+
+
+def shadow_cohort_indexes() -> tuple[Index, ...]:
+    """``agent_signals``' two cohort indexes — ``0014``, DATABASE.md §26.
+
+    Built here rather than written inline in ``models/agents.py`` for the reason
+    :func:`org_fk` is: they are ``__table_args__`` entries with a paragraph
+    behind them, and that module is at its 350-line budget.
+
+    Ascending though every caller reads them ``DESC`` (§15.3), and ``id`` is in
+    the key because it is the tiebreak both the Lab's keyset cursor and the
+    scoreboard order by. ``emitted_at`` is the sort key — it *is* the decision
+    instant (``hunter_strategy_worker.persist``), while the envelope's copy of it
+    is a ``STABLE`` cast that Postgres refuses to index at all.
+    """
+    return (
+        Index("ix_agent_signals_cohort_emitted", SHADOW_COHORT, "emitted_at", "id"),
+        Index(
+            "ix_agent_signals_version_cohort_emitted",
+            "strategy_version_id",
+            SHADOW_COHORT,
+            "emitted_at",
+            "id",
+        ),
+    )

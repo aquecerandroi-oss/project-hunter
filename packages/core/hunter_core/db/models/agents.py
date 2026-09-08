@@ -37,6 +37,7 @@ from hunter_core.db.models._common import (
     SQL_FALSE,
     org_fk,
     pg_enum,
+    shadow_cohort_indexes,
     tenant_scoped_fk,
 )
 from hunter_core.domain.enums import (
@@ -175,6 +176,8 @@ class AgentSignal(Base, UUIDPrimaryKeyMixin):
         Index("ix_agent_signals_market_emitted", "market_id", "emitted_at"),
         Index("ix_agent_signals_version_emitted", "strategy_version_id", "emitted_at"),
         Index("ix_agent_signals_status_expires", "status", "expires_at"),
+        # 0014: the cohort expression, keyed for order too (DATABASE.md §26)
+        *shadow_cohort_indexes(),
     )
 
     strategy_version_id: Mapped[uuid.UUID] = mapped_column(

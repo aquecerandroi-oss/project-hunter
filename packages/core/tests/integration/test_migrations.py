@@ -37,7 +37,7 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0013_replay_runs"
+HEAD_REVISION = "0014_lab_signals_indexes"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -52,6 +52,7 @@ PAPER_ROLES_2_REVISION = "0008_paper_roles_2"
 PAPER_GEOMETRY_REVISION = "0009_paper_geometry"
 STRATEGY_PURPOSE_REVISION = "0010_strategy_purpose"
 STRATEGY_ACTIVATION_OWNER_REVISION = "0011_strategy_activation_owner"
+REPLAY_RUNS_REVISION = "0013_replay_runs"
 
 _PENDING_PREDICATE = "dispatched_at IS NULL"
 """What makes an index a *pending* index, spelled out here rather than imported:
@@ -2670,10 +2671,17 @@ def test_0013_refuses_to_downgrade_while_a_receipt_exists(upgraded: str) -> None
         upgraded, _receipt_row(version_id=version_id, run_id=run_id, day_from=8, day_to=11)
     )
     try:
+        # 0014 sits above 0013 and reverses freely, so "-1" from head is not
+        # this guard's step: walk down to the revision under test first, the
+        # way the 0003 guards above already do.
+        command.downgrade(config, REPLAY_RUNS_REVISION)
         with pytest.raises(DBAPIError, match="replay_runs rows would be dropped"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == REPLAY_RUNS_REVISION, (
+            "the downgrade must not commit"
+        )
     finally:
+        command.upgrade(config, "head")
         _forget_receipts(upgraded, run_id)
         _forget_draft_strategy_version(upgraded, version_id)
 
@@ -2687,6 +2695,7 @@ def test_0013_reverses_on_a_database_that_never_replayed(upgraded: str) -> None:
     refusal to reverse.
     """
     config = alembic_config(upgraded)
+    command.downgrade(config, REPLAY_RUNS_REVISION)
     command.downgrade(config, "-1")
     try:
         assert asyncio.run(_revision(upgraded)) == REPLICATION_REVISION
@@ -2705,3 +2714,62 @@ async def _relation_exists(url: str, name: str) -> bool:
             return bool(await connection.scalar(text("SELECT to_regclass(:name)"), {"name": name}))
     finally:
         await engine.dispose()
+
+
+def test_0014_installs_the_two_cohort_indexes_and_reverses(upgraded: str) -> None:
+    """The indexes exist at head, name the cohort expression, and go away.
+
+    Read from ``pg_indexes.indexdef`` rather than from the model: Alembic does
+    not compare an index expression (§17.3 makes the same argument about a
+    predicate), so the catalogue is the only place that can say the index the
+    planner will see is the one the revision meant to build.
+    """
+    config = alembic_config(upgraded)
+    for name in ("ix_agent_signals_cohort_emitted", "ix_agent_signals_version_cohort_emitted"):
+        definition = asyncio.run(_index_definition(upgraded, name))
+        assert "supporting_features ->> 'cohort'" in definition, definition
+        assert "emitted_at" in definition and definition.rstrip().endswith("id)"), definition
+
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == REPLAY_RUNS_REVISION
+        for name in ("ix_agent_signals_cohort_emitted", "ix_agent_signals_version_cohort_emitted"):
+            assert asyncio.run(_index_definition(upgraded, name)) == ""
+        assert asyncio.run(_relation_exists(upgraded, "agent_signals")), (
+            "dropping an index must not touch the table"
+        )
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+def test_0014_cannot_index_the_envelope_copy_of_decision_at(upgraded: str) -> None:
+    """Why the sort key is ``emitted_at`` and not ``supporting_features->>'decision_at'``.
+
+    ``text -> timestamptz`` runs ``timestamptz_in``, which is ``STABLE`` (it
+    accepts ``'now'`` and reads ``TimeZone``), so Postgres refuses to build any
+    index on that cast — and would refuse a ``GENERATED`` column for it too.
+    The two indexes T3.37a asked for are not writable as written; this test is
+    the reason DATABASE.md §26 tells the API to name the column instead.
+    """
+    engine = async_engine(upgraded)
+
+    async def attempt() -> str:
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    text(
+                        "CREATE INDEX ix_agent_signals_decision_at_probe ON agent_signals "
+                        "(((supporting_features ->> 'decision_at')::timestamptz), id)"
+                    )
+                )
+        except DBAPIError as error:
+            return str(error)
+        finally:
+            await engine.dispose()
+        return ""
+
+    message = asyncio.run(attempt())
+    assert "must be marked IMMUTABLE" in message, message
+    assert asyncio.run(_index_definition(upgraded, "ix_agent_signals_decision_at_probe")) == ""
