@@ -1,0 +1,19 @@
+# Brief T3.32b — o diagnóstico do prejuízo (KB-0076, EXP-0007) e os contratos das quatro estratégias novas (EXP-0008..0011) entram no Obsidian; pendências do operador ficam visíveis
+
+**Dona:** sexta-feira. **Não commitar.** **Regra operacional: nunca shell em background; comandos em primeiro plano ≤ 5 min; árvore compartilhada — nunca `git stash`/`checkout --`/`restore`/`reset`/`clean`/`commit -a` (o hook git-guard agora bloqueia); não tocar `.env*`.** Só `obsidian/**`. Base: `main` em `1ca7cf5`.
+
+## Fontes
+`.claude/state/notes-T3.32.md` e `.claude/state/exp-drafts/{KB-0076-por-que-perdemos-2026-09-08.md, EXP-0007-momentum-invalidacao-bracos-INV.md}` (T3.32: o pedágio é a perda; custo_R × risco/preço = 0,0020; bruto entre −0,04 e +0,09 R; invalidação adianta a perda; variantes V1/V2 a derivar; nada de código de invalidação). `.claude/state/notes-T3.33.md` e `exp-drafts/EXP-0008..0011` (as quatro escolhidas, seis rejeitadas com motivo medido, geometria por aritmética de custo). `.claude/state/astra-review-estrategias-novas-2026-09-08.md` (a Astra escolheu 2 iguais e 2 diferentes: spot–perp e força relativa, rejeitadas pelo quant por fecho do code_ref e protocolo de um mercado — registrar a divergência como diálogo). `.claude/state/notes-T3.29.md` (autonomia: β bloqueado pelo BTC, `agents` inexistente, risk_profile NULL). `.claude/state/review-T3.18b-quant.md` e a revisão da T3.18c (dívida: `compute_verdict` × `profit_factor_passes`).
+
+## Entregar
+1. `obsidian/11-KNOWLEDGE/KB-0076-por-que-perdemos-2026-09-08.md` (renumerar se 0076 já foi tomado; atualizar índice da KB) com proveniência SQL (`infra/scripts/sql/research/2026-09-08-*.sql`), `as_of`/`read_at`, e a identidade do custo como a descoberta central; ligar a KB-0006 (a suspeita descrita, o efeito refutado) e KB-0008 (o piso vira teto de pedágio).
+2. `obsidian/05-EXPERIMENTS/EXP-0007-momentum-invalidacao-bracos-INV.md` no formato do template (a avaliação = replay dos braços, `inconclusivo`, "não vale código novo"); T3.27 fica encerrado no `Strategy Backlog` com esse veredito.
+3. `EXP-0008..0011` arquivados (Hipótese/Protocolo congelados, portão C1–C8 preenchido pelo implementador quando existir — deixar a seção com "pendente"), `Experiments Index`, e **`Registro de Tentativas` com quatro linhas novas, data de início = data da ativação (ainda vazia)** — KB-0010 multiplicidade.
+4. `Strategy Backlog`: itens 1 e 2 fechados/redirecionados (piso de custo → "teto de pedágio declarado", invalidação → "refutada como causa"); as duas variantes V1/V2 como próximas; as duas rejeitadas da Astra (spot–perp, força relativa) como itens futuros com o que exigem (campo em `base.py` + supersede; protocolo `evaluate_universe`).
+5. `06-DECISIONS/Dialogos/2026-09-08-quatro-estrategias.md`: a divergência quant × Astra e a decisão (as 4 do quant, com as 2 da Astra no backlog), em primeira pessoa.
+6. `09-OPERATIONS/Diario/2026-09-08.md` (bloco novo, sem tocar os anteriores): deploys (5ee9023 Lab A, 42ec146 shell 429, c8c9dc6 T3.18c, 970c20b T3.26c, 1ca7cf5 hotfix histórico com workers de volta), o incidente dos shards em restart loop 14:10–16:35Z (MARKET_SHARDS ausente no rollback manual), o git-guard, e as **pendências do operador** com o comando exato: (a) `infra/scripts/sql/2026-09-08-momentum-v4-lineage.sql`; (b) `infra/scripts/sql/2026-09-08-reopen-false-unrecoverable.sql` (depois do deploy 1ca7cf5); (c) vínculo `agents` (docs/ACTIVATION.md §8a); (d) backfill do BTC 1m para o β; (e) `ENABLE_PAPER_AUTONOMY` só quando ACTIVATION §8 estiver verde.
+7. `Open Bugs`: fechar os que a T3.18c/T3.28a-d/T3.29 resolveram (com o commit), abrir "compute_verdict duplicado" (dívida), "topbar: tempo real do navegador interrompido na VPS", "System: painel Execução paper todo indisponível".
+8. `uv run python infra/scripts/obsidian_lint.py` verde.
+
+## Provar
+Relatório em português, formato estendido; `.claude/state/notes-T3.32.md` seção "T3.32b".
