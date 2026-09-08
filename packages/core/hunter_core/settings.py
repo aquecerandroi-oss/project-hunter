@@ -24,6 +24,7 @@ from hunter_core.domain.enums import KillSwitchState
 
 Environment = Literal["development", "test", "staging", "production"]
 Role = Literal["api", "market", "scanner", "strategy", "execution", "analytics", "all"]
+MarketRole = Literal["perpetual", "spot", "both"]
 
 
 def _parse_market_shard(value: str) -> tuple[int, int]:
@@ -201,6 +202,84 @@ class Settings(BaseSettings):
     def shard_total(self) -> int:
         """Total number of shards (``>= 1``)."""
         return _parse_market_shard(self.market_shard)[1]
+
+    # ---- market-worker data-path role (T3.0f) ------------------------------
+    market_role: MarketRole | None = None
+    """Which data path(s) this market-worker process runs: ``"perpetual"``
+    (today's shard behaviour, never spot -- ``MARKET_SPOT_ENABLED`` has no
+    effect here regardless of its value), ``"spot"`` (the dedicated spot
+    collector only -- no perpetual universe, ingest, heartbeat or backfill at
+    all), or ``"both"`` (one process runs the perpetual pipeline and, on
+    shard 0 with ``MARKET_SPOT_ENABLED=true``, the spot one too -- today's
+    single-process local-stack behaviour).
+
+    ``None`` (unset, the default) resolves via :attr:`market_role_effective`
+    instead of hardcoding one value: ``"perpetual"`` when this process is
+    part of a shard topology (``shard_total > 1``), ``"both"`` otherwise. The
+    reason is exactly what ``.claude/state/t30-proof.md`` measured -- turning
+    on the spot collector inside an already-saturated ``MARKET_SHARD=0/N``
+    process (``N > 1``) made the *perpetual* WebSocket miss its keepalive and
+    reconnect 8 times in 6 minutes. A sharded deployment should run spot as
+    its own process (``infra/docker/docker-compose.yml``'s
+    ``market-worker-spot``, profile ``spot``) with ``MARKET_ROLE=spot`` set
+    explicitly there -- never implied by a shard happening to be index 0.
+    """
+
+    @property
+    def market_role_effective(self) -> MarketRole:
+        """:attr:`market_role`, or the shard-aware default when unset."""
+        if self.market_role is not None:
+            return self.market_role
+        return "perpetual" if self.shard_total > 1 else "both"
+
+    @model_validator(mode="after")
+    def _validate_market_role(self) -> Settings:
+        """Refuse two ambiguous combinations at startup, loudly, rather than
+        let either silently run something nobody asked for.
+
+        ``"spot"`` is a dedicated, whole-universe collector (never sharded --
+        ``hunter_market_worker.spot`` module docstring): a ``MARKET_ROLE=spot``
+        process declaring ``MARKET_SHARD`` with more than one total shard
+        cannot mean "shard N of the spot universe" (spot never shards) nor
+        "shard N of the perpetual universe" (this role never touches
+        perpetual) -- there is no reading of that combination that is not a
+        misconfiguration, so it is refused rather than silently running as a
+        very confusing solo collector.
+
+        ``"both"`` mixes spot and 200 perpetuals in one event loop -- exactly
+        the combination ``t30-proof.md`` §1 measured breaking the perpetual
+        socket's keepalive. It is fine, and kept, for the single-process local
+        stack (``shard_total == 1``); explicitly requesting it under a shard
+        topology (``shard_total > 1``) is refused rather than silently
+        reproducing that outage on whichever shard happens to be index 0.
+
+        Deliberately **not** refused here: ``MARKET_ROLE=spot`` with
+        ``MARKET_SPOT_ENABLED=false``. That is a legitimate, if inert,
+        configuration -- the dedicated process logs it and idles forever
+        rather than crash-looping (``hunter_market_worker.spot.run_spot``).
+        """
+        role = self.market_role
+        if role is None:
+            return self
+        shard_total = _parse_market_shard(self.market_shard)[1]
+        if role == "spot" and shard_total > 1:
+            raise ValueError(
+                "MARKET_ROLE=spot cannot be combined with a sharded MARKET_SHARD "
+                f"({self.market_shard!r}, shard_total={shard_total}): the spot "
+                "collector owns the whole spot universe as one solo process, "
+                "never a shard of one -- use MARKET_SHARD=0/1 (the default) for "
+                "the dedicated spot process."
+            )
+        if role == "both" and shard_total > 1:
+            raise ValueError(
+                "MARKET_ROLE=both cannot be combined with a sharded MARKET_SHARD "
+                f"({self.market_shard!r}, shard_total={shard_total}): mixing spot "
+                "and a perpetual shard in one event loop is exactly the "
+                "keepalive-starving combination t30-proof.md measured breaking "
+                "the perpetual socket -- use MARKET_ROLE=perpetual on every "
+                "shard and a dedicated MARKET_ROLE=spot process instead."
+            )
+        return self
 
     @model_validator(mode="after")
     def _require_settings_in_prod(self) -> Settings:

@@ -36,6 +36,8 @@ from hunter_market_worker.supervision import (
 from hunter_market_worker.universe import MonitoredUniverse, run_universe
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
     from hunter_core.runtime import WorkerRuntime
 logger = get_logger(__name__)
 
@@ -43,6 +45,24 @@ logger = get_logger(__name__)
 async def run_market(runtime: WorkerRuntime) -> None:
     settings = runtime.settings
     factory = create_session_factory(runtime.engine)
+    role = settings.market_role_effective
+    logger.info(
+        "market_worker_role_selected",
+        role=role,
+        market_shard=settings.market_shard,
+        spot_enabled=settings.market_spot_enabled,
+    )
+    if role == "spot":
+        # T3.0f: a MARKET_ROLE=spot process never runs a perpetual universe,
+        # ingest, heartbeat or backfill task -- see _run_spot_process's
+        # docstring for exactly what it does run instead.
+        if not settings.market_spot_enabled:
+            # Deliberately not a startup error (Settings._validate_market_role's
+            # own docstring): a legitimate, if inert, configuration logs and
+            # idles forever rather than crash-looping.
+            logger.warning("market_spot_role_idle_disabled", exchange=exchange_code())
+        await _run_spot_process(runtime, factory)
+        return
     adapter = build_adapter(exchange_code(), settings, runtime.redis)
     universe, queues, state = MonitoredUniverse(), PersistQueues(), HeartbeatState()
     coalescer, health = TickCoalescer(), IngestionHealth()
@@ -165,4 +185,87 @@ async def run_market(runtime: WorkerRuntime) -> None:
             # ``run_spot`` closes the adapter it actually used; a shard that
             # only idled never opened a socket, but the httpx client built by
             # the factory is real and must not leak.
+            await spot_adapter.aclose()
+
+
+async def _run_spot_process(
+    runtime: WorkerRuntime, factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """The whole process body for ``MARKET_ROLE=spot`` (T3.0f).
+
+    The spot data path and nothing else: no perpetual universe, ingest,
+    coalescer input, persist queue, recovery, backfill, heartbeat, funding,
+    open-interest polling or FX collector. Structurally the minimal shell
+    ``run_spot`` (``spot.py``) needs to run stand-alone in its own process:
+
+    - a partitions gate, because spot candles land in the same
+      ``candles``/``market_snapshots`` partitioned tables the perpetual path
+      writes to;
+    - the outbox dispatcher, so this process's own durable events
+      (``market.candles.closed``/``.backfilled``, ``market.universe.changed``)
+      get swept to Redis -- safe to run alongside every other market-worker
+      process's own outbox task, all of them sharing the same ``SKIP LOCKED``
+      dispatch (``hunter_core.events.outbox``);
+    - the tick coalescer's own flush loop, since this process shares it with
+      nothing else (unlike ``run_market``'s perpetual path, where the same
+      coalescer instance also drains the perpetual ingest).
+
+    ``run_spot`` itself still gates on :func:`collects_spot`: with
+    ``MARKET_SPOT_ENABLED=false`` it idles forever (module docstring), and
+    this process's ``/ready`` stays green throughout -- ``database``/``redis``/
+    ``partitions``/``outbox`` are the only checks it registers.
+    """
+    settings = runtime.settings
+    spot_adapter = build_spot_adapter(exchange_code(), settings, runtime.redis)
+    coalescer = TickCoalescer()
+    outbox_health, outbox_wake = OutboxHealth(), asyncio.Event()
+    spot_status = SpotStatus()
+    runtime.status_details["spot"] = spot_status
+    # This process's only exchange client is the spot one: its own REST gate
+    # is what "rest_gate" means here, exactly parallel to how the
+    # perpetual/both path reports its own (single) adapter's.
+    runtime.status_details["rest_gate"] = lambda: rest_gate_status(spot_adapter)
+    partition_readiness = PartitionReadiness(factory)
+
+    async def partitions() -> bool:
+        return await partition_readiness.ready()
+
+    outbox = outbox_readiness(outbox_health)
+    runtime.readiness_checks.extend([partitions, outbox])
+    token = publication_sessions.set(factory)
+    logger.info("market_spot_process_starting", exchange=spot_adapter.code)
+    try:
+        await assert_writable_partitions(factory)
+        if await partition_readiness.ready():
+            logger.info("partition_lookahead_ready")
+        else:
+            logger.warning("partition_lookahead_missing")
+        async with asyncio.TaskGroup() as group:
+            tasks = {
+                "coalescer": coalesce_loop(
+                    coalescer, runtime.redis, settings, f"market-worker@{runtime.instance}"
+                ),
+                "outbox": run_outbox(factory, runtime.redis, outbox_health, outbox_wake),
+                "spot": run_spot(
+                    factory,
+                    spot_adapter,
+                    runtime.redis,
+                    settings,
+                    runtime,
+                    coalescer,
+                    spot_status,
+                    outbox_wake=outbox_wake,
+                ),
+            }
+            for name, coro in tasks.items():
+                group.create_task(forever(name, coro), name=f"market-{name}")
+    finally:
+        publication_sessions.reset(token)
+        runtime.readiness_checks.remove(partitions)
+        runtime.readiness_checks.remove(outbox)
+        runtime.status_details.pop("rest_gate", None)
+        runtime.status_details.pop("spot", None)
+        if not collects_spot(settings):
+            # Same rule as the perpetual/both path's own finally: run_spot
+            # only closes the adapter it actually used.
             await spot_adapter.aclose()

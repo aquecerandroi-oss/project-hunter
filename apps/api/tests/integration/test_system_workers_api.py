@@ -175,6 +175,39 @@ async def test_workers_keeps_market_role_instance_as_the_exchange_code(
     assert rows[0]["role"] == "market"
 
 
+async def test_workers_reports_the_spot_collector_as_its_own_role_never_hashed(
+    client: httpx.AsyncClient,
+    redis_client: redis_asyncio.Redis,
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """(T3.0f) ``hb:market:spot:{exchange}`` (the dedicated SPOT collector's
+    own heartbeat) surfaces as ``role="market-spot"``, ``instance=exchange``
+    -- its own, legible row -- never anonymized (which the pre-fix ``:``
+    in ``instance="spot:{exchange}"`` would have triggered) and never as
+    ``role="market"`` (which would read, in the web System page, as an
+    unidentifiable extra perpetual venue rather than the spot process)."""
+    exchange = f"testex{uuid.uuid4().hex[:10]}"
+    await redis_client.hset(
+        keys.market_heartbeat(exchange, market_type=MarketType.SPOT),
+        mapping={
+            "ts": datetime.now(UTC).isoformat(),
+            "ws_state": "connected",
+            "errors": "0",
+        },
+    )
+    actor: Actor = make_actor(f"workers-spot-{exchange}")
+
+    response = await client.get("/api/v1/system/workers", headers=actor.headers)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    rows = [row for row in body if row["instance"] == exchange and row["role"] == "market-spot"]
+    assert len(rows) == 1
+    assert rows[0]["ws_state"] == "connected"
+    # Never conflated with a perpetual "market" row for the same exchange.
+    assert not any(row["instance"] == exchange and row["role"] == "market" for row in body)
+
+
 async def test_workers_hashes_market_role_instance_when_it_has_a_colon(
     client: httpx.AsyncClient,
     redis_client: redis_asyncio.Redis,

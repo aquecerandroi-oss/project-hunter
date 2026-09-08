@@ -116,6 +116,59 @@ compose que `compose.sh` sempre passa para o Docker:
 MARKET_SHARDS=4 bash infra/vps/compose.sh update
 ```
 
+### 3.3 Coletor SPOT dedicado (`market-worker-spot`, T3.0f)
+
+Por quê: com 200 perpétuos num só `MARKET_SHARD=0/N`, ligar
+`MARKET_SPOT_ENABLED=true` fez o socket perpétuo perder o keepalive — código
+`1011`, 8 reconnects em 6 min, 0 velas persistidas (`.claude/state/t30-proof.md`
+§1, `docs/PIPELINE.md` §1d). A saída é rodar o spot como processo próprio, nunca
+como um modo de um shard perpétuo.
+
+`hunter_core.settings.Settings.market_role` (`MARKET_ROLE`) escolhe o caminho de
+dados de cada processo `market-worker`:
+
+- `perpetual` — hoje's shards; `MARKET_SPOT_ENABLED` não tem efeito nenhum
+  neste papel, seja qual for o valor;
+- `spot` — só o coletor spot (universo, fitas/livros/velas, heartbeat
+  `hb:market:spot:{ex}`, cobertura); nunca sharded (`Settings` recusa no boot
+  um `MARKET_ROLE=spot` com `MARKET_SHARD` fatiado — não há leitura válida
+  para essa combinação);
+- `both` — o comportamento de hoje do shard único do stack local (perpétuo +,
+  se `MARKET_SPOT_ENABLED=true`, spot no mesmo processo).
+
+Default quando `MARKET_ROLE` não é definido: `perpetual` se `shard_total > 1`
+(topologia de shards), `both` caso contrário (`MARKET_SHARD=0/1`, o stack local
+de processo único). Um `MARKET_ROLE=both` explícito sob `MARKET_SHARD` fatiado
+também é recusado no boot — é exatamente a combinação que satura o event loop.
+`MARKET_ROLE=spot` com `MARKET_SPOT_ENABLED=false` **não** é recusado: o
+processo loga e fica ocioso, nunca em crash loop.
+
+Serviço novo `market-worker-spot` (perfil `spot`), com `MARKET_ROLE=spot`,
+`MARKET_SPOT_ENABLED=true` e `MARKET_SHARD=0/1` fixados **no serviço do
+compose**, nunca no `.env` — para que a decisão de ligar o spot compartilhado
+fique explícita e revisável em `infra/docker/docker-compose.yml`/
+`infra/vps/docker-compose.prod.yml`, e para que a flag nunca alcance por
+acidente um shard perpétuo através de um `.env` compartilhado.
+
+```bash
+# stack local
+docker compose -f infra/docker/docker-compose.yml --profile spot up -d
+
+# VPS — adiciona o perfil `spot` ao mesmo comando que já sobe os shards
+MARKET_SPOT=1 MARKET_SHARDS=4 bash infra/vps/compose.sh update
+```
+
+Verificar depois de subir: `hb:market:spot:{exchange}` vivo (Redis, ou
+`GET /api/v1/system/workers` — aparece com `role: "market-spot"`, sua própria
+linha, nunca como um shard perpétuo faltando ou uma linha ilegível — T3.0f
+corrigiu `hunter_api.services.system_status.parse_heartbeat_key`, que antes
+lia essa chave como `role="market"`/`instance="spot:{exchange}"` e
+anonimizava o `instance` por conter `:`); `docker logs market-worker-spot`;
+e que os heartbeats perpétuos (`hb:market:{exchange}:{i}of{N}`) continuam com
+`reconnects` parado e `last_event_at` fresco — a checagem que
+`docs/PIPELINE.md` §1d já pedia antes de considerar o ambiente estável, agora
+sobre um processo que nunca compartilha event loop com eles.
+
 ## 4. CI (GitHub Actions)
 
 `ci.yml` em cada PR e push na `main`:
@@ -444,6 +497,96 @@ código **1** padrão do Python; os dois nunca compartilham código, exatamente
 para que o status de saída sozinho, sem ler o log, já diga "skip de rotina"
 de "erro real". O agendamento real (cron diário na VPS) está documentado em
 `infra/vps/README.md`, seção "Partições diárias".
+
+### Profundidade de histórico para o β (`request_backfill.py`)
+
+`beta_v1` mede 30 dias de retornos horários e só é válido com **20 dias
+ininterruptos** terminando no corte (`docs/PIPELINE.md` §2b). Em 2026-09-08 a
+VPS tinha 11 dias distintos de `candles`, então toda linha de `market_betas`
+sairia `insufficient_history` e a admissão responderia `unavailable` para todo
+candidato. Quem fecha essa lacuna é o **coletor** — o scanner e este script
+nunca chamam REST (decisão conjunta do M2): o script publica
+`market.backfill.requested` pela outbox e o `market-worker` planeja e busca sob
+o orçamento que já é dele (§1b do `PIPELINE.md`).
+
+```bash
+# 1. as partições dos meses para trás têm de existir, ou o pedido é recusado
+#    com `no_partition` (o consumidor diz o motivo, não aborta)
+docker compose -f infra/docker/docker-compose.yml run --rm --no-deps   -e HUNTER_COMMAND=partitions api                # --months-behind 2 é o default
+
+# 2. o que seria pedido, sem escrever nada
+docker compose -f infra/docker/docker-compose.yml run --rm --no-deps api   python infra/scripts/request_backfill.py --days 31 --dry-run
+
+# 3. de verdade: enfileira na outbox; o dispatcher de qualquer worker publica
+#    em ~1 s (use --publish só se nenhum worker estiver de pé)
+docker compose -f infra/docker/docker-compose.yml run --rm --no-deps api   python infra/scripts/request_backfill.py --days 31
+```
+
+Sem `--markets` a lista é derivada do banco: todo perpétuo monitorado que tem
+**par spot** da mesma venue e mesmo `base/quote` (D1 — o β é medido no
+perpétuo, a carteira executa no spot), mais o `BTCUSDT`, que entra sempre —
+sem a série da referência todo o universo sai `btc_missing`. `--markets
+BTCUSDT,ETHUSDT,SOLUSDT` fixa a lista.
+
+O que o script garante e por quê importa: o teto do coletor é **7 dias por
+pedido** e uma janela maior é *truncada para os sete dias mais recentes*
+dizendo isso só no log dele — pedir 31 dias numa mensagem só entregaria um
+quarto do que se pediu parecendo ter funcionado. Então a faixa vira janelas
+inteiras de 7 dias publicadas **da mais nova para a mais antiga** (a ponta
+recente é a que a regra de contiguidade precisa), a identidade do evento é a
+janela (`uuid5`, igual à do scanner: pedir duas vezes é um pedido só) e a ponta
+recente é cortada em 2 min (`DETECTION_GRACE` do coletor) para o pedido não
+ficar eternamente parcial.
+
+Acompanhar o dreno (o estrato histórico gasta só o que sobra do ciclo,
+`MAX_HISTORY_GAPS_PER_CYCLE = 6` pedaços de 240 min por minuto de relógio — 31
+dias de 3 mercados levam ~1 h):
+
+```sql
+SELECT m.symbol, g.status, count(*) AS pedacos,
+       min(g.gap_start) AS mais_antigo, max(g.gap_end) AS mais_novo
+  FROM ingestion_gaps g JOIN markets m ON m.id = g.market_id
+ WHERE g.detected_at > now() - interval '2 hours'
+ GROUP BY 1, 2 ORDER BY 1, 2;
+```
+
+### O β no heartbeat do scanner (`hb:scanner:{instance}`)
+
+O produtor horário roda dentro do `scanner-worker` (papel `scanner`), um por
+exchange por hora. Dois campos no heartbeat dizem o estado dele:
+
+| Campo | O que é |
+|---|---|
+| `beta_last_run` | ISO-8601 da última passada **deste processo**. Vazio = ainda não rodou nele (um scanner de cinco minutos de vida é isso, honestamente) |
+| `beta_valid` | quantos mercados ficaram com β **válido** no último corte. Elegível pelo protocolo, nunca uma alegação de precisão |
+
+```bash
+docker exec docker-redis-1 sh -c   'redis-cli --scan --pattern "hb:scanner:*" | xargs -I{} redis-cli hmget {} beta_last_run beta_valid'
+```
+
+No `/ready` o β é **status detail**, nunca readiness check: aparece como
+`beta: "ok (12/200 valid, 0.3h ago)"` ou `beta: "stale (1/200 valid, 3.4h ago)"`
+ao lado do veredito e **não** muda o status code. Um produtor parado há 2 h
+significa que a carteira para de abrir posição — o operador tem de ver — e não
+significa nada para o Radar, as baselines ou o regime, que é o que o `/ready`
+do scanner protege. Métricas: `hunter_beta_revisions_total{outcome}` e
+`hunter_beta_valid_markets`.
+
+Reparar uma hora perdida (depois de um backfill, por exemplo) é uma passada à
+mão, idempotente, sem trava:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml run --rm --no-deps api   python -m hunter_scanner_worker.beta --once
+```
+
+```sql
+-- quais revisões estão em vigor agora (as três condições da RISK_ENGINE.md §6)
+SELECT m.symbol, b.beta, b.n, b.contiguous_bars, b.reason, b.valid_until
+  FROM market_betas b JOIN markets m ON m.id = b.market_id
+ WHERE b.superseded_at IS NULL AND b.available_at <= now()
+   AND b.window_end <= now() AND b.valid_until > now()
+ ORDER BY b.valid DESC, m.symbol;
+```
 
 ### Testes de integração locais sem testcontainers
 

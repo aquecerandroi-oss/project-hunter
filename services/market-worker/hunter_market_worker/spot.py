@@ -90,7 +90,22 @@ class SpotStatus:
 
 
 def collects_spot(settings: Settings) -> bool:
-    """Whether *this* process runs the spot path: enabled, and shard 0."""
+    """Whether *this* process runs the spot path (T3.0f: ``MARKET_ROLE``-aware).
+
+    ``"perpetual"`` never collects spot, whatever ``MARKET_SPOT_ENABLED`` says
+    -- the whole point of the role is that the flag cannot reach a perpetual
+    shard by accident. ``"spot"`` (the dedicated process,
+    ``infra/docker/docker-compose.yml``'s ``market-worker-spot``) collects
+    solely on the flag: it is never sharded (``Settings._validate_market_role``
+    refuses a sharded ``MARKET_SHARD`` under this role), so there is no shard
+    index to gate on. ``"both"`` keeps the pre-T3.0f rule -- shard 0 only --
+    for the single-process local stack.
+    """
+    role = settings.market_role_effective
+    if role == "perpetual":
+        return False
+    if role == "spot":
+        return settings.market_spot_enabled
     return settings.market_spot_enabled and settings.shard_index == SPOT_SHARD[0]
 
 

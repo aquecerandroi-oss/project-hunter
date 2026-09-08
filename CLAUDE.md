@@ -78,6 +78,7 @@ Dispatch the specialist whose row matches; never a generic agent for delegable w
 | `test-engineer` | Unit/integration/property tests (pytest, Vitest), fixtures, testcontainers; Playwright E2E for critical flows. | sonnet |
 | `devops-engineer` | Dockerfiles, docker-compose, GitHub Actions, Railway/Vercel/Neon config, health checks, observability wiring. | sonnet |
 | `explorer-agent` | Read-only mapping of the codebase or a dependency's API before planning. Never edits. | haiku |
+| `product-designer` | The SaaS product designer (Everton, 2026-09-08): owns `docs/DESIGN.md` (themes, palette, type, spacing, states, copy), audits every screen in the browser with real data, proposes specs/mockups (options for Everton when the direction changes), writes the brief for `frontend-specialist` and reviews the rendered result. Second opinion from Astra. | sonnet |
 | `documentation-writer` | `docs/*.md` (Portuguese), READMEs, runbooks, ADRs in `docs/decisions/`. | sonnet |
 
 ## Conventions

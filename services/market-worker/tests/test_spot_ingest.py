@@ -16,6 +16,7 @@ from typing import Any
 
 import orjson
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from hunter_core.db.models.market_data import Candle
@@ -401,13 +402,56 @@ async def test_the_spot_heartbeat_is_solo_and_never_publishes_rt_system(
 
 
 @pytest.mark.unit
-def test_only_shard_zero_collects_spot_and_the_switch_is_honoured() -> None:
-    assert collects_spot(Settings(market_shard="0/4", market_spot_enabled=True)) is True
-    assert collects_spot(Settings(market_shard="1/4", market_spot_enabled=True)) is False
+def test_role_both_collects_spot_only_on_a_solo_shard_zero_and_the_switch_is_honoured() -> None:
+    """``"both"`` (default when ``shard_total == 1``, the local single-process
+    stack) keeps the pre-T3.0f rule."""
+    assert collects_spot(Settings(market_shard="0/1", market_spot_enabled=True)) is True
     assert collects_spot(Settings(market_shard="0/1", market_spot_enabled=False)) is False
     # Off unless an operator says otherwise: the switch carries a measured cost
     # to the perpetual collector sharing the event loop (see the field's docstring).
     assert collects_spot(Settings(market_shard="0/1")) is False
+
+
+@pytest.mark.unit
+def test_role_perpetual_never_collects_spot_however_the_switch_is_set() -> None:
+    """T3.0f: ``MARKET_SHARDS > 1`` defaults every shard to ``"perpetual"``, so
+    ``MARKET_SPOT_ENABLED=true`` set broadly (e.g. by mistake, shared across
+    every shard's environment) can no longer reach a perpetual shard -- the
+    exact hazard this task exists to close. Shard 0 is not special here
+    anymore: it is exactly as inert as shard 1."""
+    assert collects_spot(Settings(market_shard="0/4", market_spot_enabled=True)) is False
+    assert collects_spot(Settings(market_shard="1/4", market_spot_enabled=True)) is False
+    assert (
+        collects_spot(
+            Settings(market_shard="0/4", market_spot_enabled=True, market_role="perpetual")
+        )
+        is False
+    )
+
+
+@pytest.mark.unit
+def test_role_spot_collects_on_the_switch_alone_never_on_a_shard_index() -> None:
+    """The dedicated process (``market-worker-spot``) is never sharded, so
+    there is no shard index to gate ``collects_spot`` on -- only the switch."""
+    assert collects_spot(Settings(market_role="spot", market_spot_enabled=True)) is True
+    assert collects_spot(Settings(market_role="spot", market_spot_enabled=False)) is False
+    assert collects_spot(Settings(market_role="spot")) is False
+
+
+@pytest.mark.unit
+def test_ambiguous_role_and_shard_combinations_are_refused_at_startup() -> None:
+    """``Settings._validate_market_role`` (T3.0f): a sharded ``MARKET_ROLE=spot``
+    is never a valid reading (spot never shards, and this role never touches
+    perpetual either), and an explicit ``MARKET_ROLE=both`` under a shard
+    topology would reproduce the exact keepalive-starving combination
+    ``t30-proof.md`` §1 measured -- both refused loudly at construction,
+    never a silent crash loop discovered later."""
+    with pytest.raises(ValidationError, match="MARKET_ROLE=spot"):
+        Settings(market_role="spot", market_shard="1/4")
+    with pytest.raises(ValidationError, match="MARKET_ROLE=both"):
+        Settings(market_role="both", market_shard="0/4")
+    # Not ambiguous, and not refused: spot role with the switch off idles.
+    Settings(market_role="spot", market_spot_enabled=False)
 
 
 @pytest.mark.unit

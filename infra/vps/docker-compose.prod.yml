@@ -136,6 +136,31 @@ services:
       HEALTH_PORT: "8001"
     logging: *prod-logging
 
+  # T3.0f - coletor SPOT dedicado (perfil `spot` do compose base). Nunca no
+  # `.env`: MARKET_ROLE e MARKET_SPOT_ENABLED ficam explicitos AQUI, no
+  # servico, para que um revisor os veja sem grepar o .env e para que a flag
+  # nunca alcance por acidente um dos shards perpetuos acima (foi exatamente
+  # essa combinacao - spot no mesmo event loop de um shard perpetuo carregado
+  # - que a T3.0c mediu quebrando o keepalive do socket perpetuo). Subir com:
+  #
+  #   MARKET_SPOT=1 MARKET_SHARDS=4 bash infra/vps/compose.sh update
+  #
+  # Verificar depois: `hb:market:spot:binance` vivo (SCAN no Redis, ou
+  # `/api/v1/system/workers` - aparece como role `market-spot`, nunca como um
+  # shard perpetuo faltando), `docker logs market-worker-spot`, e que os
+  # heartbeats perpetuos (`hb:market:binance:{i}of4`) continuam com
+  # `reconnects` parado e `last_event_at` fresco.
+  market-worker-spot:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+      MARKET_ROLE: spot
+      MARKET_SPOT_ENABLED: "true"
+      MARKET_SHARD: "0/1"
+    logging: *prod-logging
+
   # Shadow Lab (docs/plans/SHADOW-LAB.md, S2). Sem este bloco o servico existe
   # no compose base mas herda o `x-api-env` de desenvolvimento, entao na VPS ele
   # sobe com a senha de dev e morre em loop com

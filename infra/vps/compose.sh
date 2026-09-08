@@ -8,6 +8,7 @@
 #   bash infra/vps/compose.sh update    # git pull + rebuild + up
 #   bash infra/vps/compose.sh down      # para tudo (dados ficam nos volumes)
 #   MARKET_SHARDS=4 bash infra/vps/compose.sh update   # idem, com os shards do coletor
+#   MARKET_SPOT=1 MARKET_SHARDS=4 bash infra/vps/compose.sh update   # + o coletor SPOT dedicado (T3.0f)
 #   bash infra/vps/compose.sh <qualquer subcomando do docker compose>
 #
 # Existe para nao errar os quatro detalhes que quebram a stack quando alguem
@@ -63,6 +64,15 @@ if [[ "$MARKET_SHARDS" =~ ^[0-9]+$ ]]; then
   fi
 else
   echo "AVISO: MARKET_SHARDS='$MARKET_SHARDS' nao e um numero; ignorando (nenhum perfil de shard ativado)." >&2
+fi
+
+# T3.0f - MARKET_SPOT=1 adiciona o perfil `spot` (market-worker-spot, o
+# coletor SPOT dedicado). Mora no ambiente do comando, como MARKET_SHARDS -
+# nunca no .env - para que a decisao de ligar o spot fique visivel em cada
+# deploy, nunca implicita num arquivo que ninguem esta olhando.
+MARKET_SPOT="${MARKET_SPOT:-0}"
+if [ "$MARKET_SPOT" = "1" ]; then
+  PROFILE_ARGS+=(--profile spot)
 fi
 
 # GIT_SHA resolvido para TODO subcomando, nao so up/update: docker-compose.yml

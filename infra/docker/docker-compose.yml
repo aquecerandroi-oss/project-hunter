@@ -169,6 +169,36 @@ services:
       HEALTH_PORT: "8001"
       MARKET_SHARD: 3/${MARKET_SHARDS:-1}
 
+  # T3.0f — o coletor SPOT como processo dedicado, nunca um modo de um shard
+  # perpétuo. `MARKET_SPOT_ENABLED` ligado *aqui*, no serviço, nunca em `.env`:
+  # a T3.0c/t30-proof.md mediu que ligar o spot dentro do MESMO event loop de
+  # um shard perpétuo carregado faz o socket perpétuo perder o keepalive
+  # (código 1011, 8 reconnects em 6 min, 0 velas persistidas) — este serviço
+  # existe para que `MARKET_SPOT_ENABLED=true` nunca alcance um shard
+  # perpétuo, mesmo que a variável exista em algum ambiente compartilhado.
+  # `MARKET_ROLE=spot` (T3.0f, hunter_core.settings.Settings): nenhuma tarefa
+  # perpétua roda neste processo — sem universo, sem ingest, sem heartbeat,
+  # sem backfill perpétuo. `MARKET_SHARD=0/1` explícito: o coletor spot é um
+  # processo solo dono do universo spot inteiro, nunca um shard (um
+  # `MARKET_ROLE=spot` com `MARKET_SHARD` fatiado é recusado no boot).
+  #
+  #   docker compose -f infra/docker/docker-compose.yml --profile spot up -d
+  #
+  # Healthcheck herdado do `market-worker` base: `/ready` deste processo tem
+  # `spot` como *status detail* (nunca um check — connected/degraded/absent),
+  # então um socket spot reconectando não derruba o container.
+  market-worker-spot:
+    extends:
+      service: market-worker
+    profiles: [spot]
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: market
+      HEALTH_PORT: "8001"
+      MARKET_ROLE: spot
+      MARKET_SPOT_ENABLED: "true"
+      MARKET_SHARD: "0/1"
+
   # Perfil `shards8`: os shards 4..7, para uma topologia de 8 x ~25 mercados.
   # Medido na T2.5g: com 4 x 50 o coletor ainda descarta eventos e publica o
   # tick com 4,3 s (p50); a fatia por `crc32 % N` também é desbalanceada (53 a

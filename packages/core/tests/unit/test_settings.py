@@ -277,6 +277,54 @@ def test_market_shard_single_index_zero_of_one_is_valid() -> None:
     assert settings.shard_index == 0
 
 
+# ---- MARKET_ROLE (T3.0f) ----------------------------------------------
+
+
+def test_market_role_defaults_to_none_and_resolves_by_shard_total() -> None:
+    assert Settings(market_shard="0/1").market_role is None
+    assert Settings(market_shard="0/1").market_role_effective == "both"
+    assert Settings(market_shard="0/4").market_role_effective == "perpetual"
+    assert Settings(market_shard="3/4").market_role_effective == "perpetual"
+
+
+def test_market_role_reads_env_and_wins_over_the_shard_default() -> None:
+    settings = Settings(market_shard="0/1", market_role="perpetual")
+    assert settings.market_role == "perpetual"
+    assert settings.market_role_effective == "perpetual"
+
+
+def test_market_role_spot_refuses_a_sharded_market_shard() -> None:
+    Settings(market_role="spot", market_shard="0/1")  # solo: fine
+    with pytest.raises(ValidationError, match="MARKET_ROLE=spot"):
+        Settings(market_role="spot", market_shard="0/4")
+    with pytest.raises(ValidationError, match="MARKET_ROLE=spot"):
+        Settings(market_role="spot", market_shard="2/4")
+
+
+def test_market_role_both_refuses_a_sharded_market_shard() -> None:
+    Settings(market_role="both", market_shard="0/1")  # solo: fine, today's stack
+    with pytest.raises(ValidationError, match="MARKET_ROLE=both"):
+        Settings(market_role="both", market_shard="0/4")
+
+
+def test_market_role_perpetual_is_never_refused_at_any_shard() -> None:
+    for shard in ("0/1", "0/4", "1/4", "3/4"):
+        Settings(market_role="perpetual", market_shard=shard)
+
+
+def test_market_role_spot_with_the_switch_off_is_not_ambiguous() -> None:
+    """T3.0f brief: an inert configuration, not a startup refusal -- the
+    process logs and idles (``hunter_market_worker.main``), it does not
+    crash-loop."""
+    settings = Settings(market_role="spot", market_spot_enabled=False)
+    assert settings.market_role_effective == "spot"
+
+
+def test_market_role_reads_from_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MARKET_ROLE", "spot")
+    assert Settings().market_role == "spot"
+
+
 def test_statement_timeout_defaults_are_ten_and_fifteen_seconds() -> None:
     settings = Settings()
     assert settings.db_statement_timeout_app_s == 10

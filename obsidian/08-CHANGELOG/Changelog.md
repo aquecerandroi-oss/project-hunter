@@ -9,6 +9,8 @@ Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado p
 
 ## 2026-09-08
 
+- 2026-09-08 — **Novo agente `product-designer`** (pedido do Everton): designer de produto SaaS que cuida de tema, cores, tipografia, UX e estados das telas, audita com dado real no navegador, propõe com mockups e especifica para o `frontend-specialist`; segunda opinião da Astra. Cartão em `.claude/agents/product-designer.md`, página em [[Product Designer]].
+
 *(Os doze itens abaixo entraram entre a tarde de 2026-09-07 e a manhã de
 2026-09-08, consolidados no plantão da madrugada de 2026-09-08. O eixo do dia
 anterior foi a carteira; o deste turno é a **linha paper que vai alimentá-la** —

@@ -40,6 +40,11 @@ async def _open_tracking(session: Any, market_id: uuid.UUID, key: str) -> uuid.U
         text("INSERT INTO strategies (id, key, name) VALUES (:id, :key, :key)"),
         {"id": strategy_id, "key": key},
     )
+    # 0011_strategy_activation_owner: hunter_worker can no longer write
+    # strategy_versions at all (only the activation script, as the owner, does).
+    # This fixture is the owner for that one statement, then the role is put back.
+    current_role = await session.scalar(text("SELECT current_user"))
+    await session.execute(text("RESET ROLE"))
     await session.execute(
         text(
             "INSERT INTO strategy_versions (id, strategy_id, version, status) "
@@ -47,6 +52,7 @@ async def _open_tracking(session: Any, market_id: uuid.UUID, key: str) -> uuid.U
         ),
         {"id": version_id, "strategy_id": strategy_id},
     )
+    await session.execute(text(f"SET LOCAL ROLE {current_role}"))
     await session.execute(
         text(
             "INSERT INTO agent_signals (id, strategy_version_id, market_id, params_hash, "

@@ -171,11 +171,15 @@ def parse_heartbeat_bool(value: str | None) -> bool | None:
 
 def parse_heartbeat_key(key: bytes) -> tuple[str, str]:
     """``hb:{role}:{instance}`` -> ``(role, instance)``. Split once, so an
-    ``instance`` that itself contains ``:`` (``WorkerRuntime``'s default is
-    ``hostname:pid``) stays intact.
-    """
+    ``instance`` with its own ``:`` (``WorkerRuntime``'s default is
+    ``hostname:pid``) stays intact. (T3.0f) ``hb:market:spot:{exchange}``
+    parses as role ``"market-spot"`` with a plain ``instance``, not
+    ``market``/``spot:{exchange}`` (:func:`anonymize_instance` would hash
+    that, hiding spot's own row inside an unidentifiable perpetual one)."""
     remainder = key.decode()[len("hb:") :]
     role, _, instance = remainder.partition(":")
+    if role == "market" and instance.startswith("spot:"):
+        return "market-spot", instance[len("spot:") :]
     return role, instance
 
 

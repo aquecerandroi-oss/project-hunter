@@ -69,12 +69,25 @@ def test_classify_liveness_mildly_future_ts_within_tolerance_is_still_alive() ->
         (b"hb:market:binance", "market", "binance"),
         (b"hb:api:my-host:12345", "api", "my-host:12345"),
         (b"hb:scanner:", "scanner", ""),
+        # T3.0f: the dedicated SPOT collector's own heartbeat is its own role,
+        # never folded into "market" (a perpetual venue elsewhere in this API).
+        (b"hb:market:spot:binance", "market-spot", "binance"),
+        # A sharded perpetual key is unaffected: it does not start with "spot:".
+        (b"hb:market:binance:0of4", "market", "binance:0of4"),
     ],
 )
 def test_parse_heartbeat_key_splits_once_on_the_first_colon(
     key: bytes, expected_role: str, expected_instance: str
 ) -> None:
     assert parse_heartbeat_key(key) == (expected_role, expected_instance)
+
+
+def test_parse_heartbeat_key_spot_instance_is_a_plain_slug_not_hashed() -> None:
+    """The whole point of the T3.0f split: once ``role``/``instance`` are
+    ``"market-spot"``/``"binance"``, :func:`anonymize_instance` leaves the
+    instance verbatim (no ``:``), so the spot row is legible end to end."""
+    role, instance = parse_heartbeat_key(b"hb:market:spot:binance")
+    assert anonymize_instance(role, instance) == "binance"
 
 
 def test_parse_heartbeat_datetime_rejects_a_naive_or_malformed_string() -> None:
