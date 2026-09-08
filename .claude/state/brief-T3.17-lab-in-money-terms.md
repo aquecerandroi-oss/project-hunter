@@ -1,0 +1,24 @@
+# Brief T3.17 — the Lab front in plain money terms: what it entered, what it left with, profit or loss
+
+**Owner:** frontend-specialist (web) — the API already exposes what is needed; touch `apps/api` only if a field is genuinely missing (say which). **Reviewer afterwards:** code-reviewer; Sexta-feira reads the copy. **Do not commit.** **Operational rule: never a background shell; foreground commands with a timeout <= 5 min; testcontainers suites one file per pytest invocation, one at a time (other agents use Docker); do not touch `.env*`.** Base: `main` at `19321aa`. In flight elsewhere: T3.16 edits `apps/web/components/markets/**`, `apps/web/hooks/useAgeTicker.ts`, `apps/web/lib/api/types.ts` (regenerated) and the markets/system pages — **do not touch those**; the Lab pages and `apps/web/components/lab/**` are yours.
+
+## Everton's ask (2026-09-08, verbatim)
+"o front do lab deixa mais facil de saber — quero que ele mostre oque investiu ou simulou a quantia se saiu ou nao no lucro — ta meio confuso o front". Today `/[org]/lab` speaks research: R multiples, target rate, expectancy, funnel, maturity. He wants, per operation, **what went in, what came out, profit or loss**, and a total.
+
+## The honest translation (no invented PnL — CLAUDE.md hard rule)
+The Lab never traded: every outcome is hypothetical, on real data, with declared costs (`SHADOW-LAB.md`, `lab-costs.ts`). Each signal already carries `virtual_entry`, `entry_ts`, `exit_price`, `exit_ts`, `result`, `r_multiple` (net of assumed costs), `r_ex_funding`, `stop`, `target1` (`apps/api/hunter_api/schemas/lab_signals.py`). Money appears only through a **declared ruler**, shown on screen and never hidden:
+- **Regra de tamanho**: "cada operação arrisca 0,25 % do patrimônio da carteira paper" (the paper_v1 rule, `docs/RISK_ENGINE.md` §3). Patrimônio = the organization's principal paper wallet equity from `GET /portfolios` (the `ever` wallet: 19.333,01 USDT today) when it exists; otherwise a fixed, labelled reference of 10.000 USDT ("carteira de referência, sem carteira aberta").
+- **Risco por operação** `risk = equity × 0,0025`; **resultado simulado** `pnl = r_multiple × risk` (USDT, and BRL beside it through the wallet's `equity_brl/equity` ratio when available — `formatBrl`, Brazilian convention). **Quantia simulada** (o que "investiu"): `notional = risk / |entry − stop| × entry` when `stop` exists, else "—" with the reason. Percent move: `exit/entry − 1`.
+- Every money number carries the same suffix/tooltip: "simulado — dado real, custos assumidos, sem dinheiro". Outcomes with `r_multiple = null` show the reason (`r_multiple_reason`), never a zero.
+
+## Deliver (design contract `docs/DESIGN.md`; keep the existing tokens and components; the page must ship polished and be checked in the browser with real data before reporting)
+1. **Lab header**: one banner line — "Simulação sobre dado real. Nada foi comprado ou vendido." — and the ruler: "Régua: 0,25 % de 19.333,01 USDT = 48,33 USDT por operação" (numbers from the API, never typed).
+2. **Totals card** (above the table): Operações simuladas · Concluídas · Com lucro / Com prejuízo · **Resultado acumulado** (USDT and BRL, signed, coloured by sign) · Taxa de acerto (with denominator). Pending/censored are counted separately and named. Reuse `lab_summary` where the numbers already exist; compute the money totals client-side from the rows on screen **and say "das N operações listadas"** when the list is truncated (`limit`).
+3. **Table rows** (replace the research columns as the default view; keep them behind a "Detalhes de pesquisa" toggle): Mercado · Quando · **Entrou** (preço, hora) · **Saiu** (preço, hora, or "aberta"/"não entrou: motivo"/"censurada: motivo") · **Variação** (%) · **Quantia simulada** · **Resultado** (USDT, BRL, badge "lucro"/"prejuízo"/"pendente"). Sort by `decision_at` desc; filters unchanged.
+4. **Signal detail** (`lab-signal-detail.tsx`): the same money block on top, the research block (R, excursions, funding) below, unchanged.
+5. **Copy**: Portuguese, plain, no jargon; "R" appears only in the research toggle. Empty states say which milestone/task brings the data.
+6. **Tests**: Vitest for the money math (risk, notional, pnl, BRL beside, null reasons), for truncation wording and for the reference wallet fallback; existing Lab tests updated. `pnpm --filter web lint|typecheck|test`.
+7. **Browser check** with real data: local stack if up; otherwise the VPS is unreachable from the in-app browser (self-signed cert) — say so and attach the local screenshot or describe exactly what rendered.
+
+## Prove
+`pnpm --filter web lint && pnpm --filter web typecheck && pnpm --filter web test`; if `apps/api` was touched: `uv run pytest apps/api/tests/unit -q -p no:randomly`, `ruff`, `pyright`. Report in Portuguese, extended format; `.claude/state/notes-T3.17.md`. Nothing in this task changes what the Lab does — only how it is read.
