@@ -654,7 +654,13 @@ async def test_signals_empty_list_is_200_not_404(
     assert response.json() == {
         "items": [],
         "next_cursor": None,
-        "totals": {"closed": 0, "open": 0, "pending": 0, "all": 0},
+        "totals": {
+            "closed": 0,
+            "open": 0,
+            "pending": 0,
+            "all": 0,
+            "distinct_operations": {"closed": 0, "open": 0, "pending": 0, "all": 0},
+        },
         "page": {"from": 0, "to": 0},
     }
 

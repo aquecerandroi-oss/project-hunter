@@ -1347,6 +1347,21 @@ export interface components {
          */
         DataQuality: "ok" | "stale" | "degraded" | "unavailable";
         /**
+         * DistinctOperationsOut
+         * @description T3.38a: ``totals`` counted over ``identity_key`` instead of over rows --
+         *     the honest denominator once sibling versions can duplicate an operation.
+         */
+        DistinctOperationsOut: {
+            /** All */
+            all: number;
+            /** Closed */
+            closed: number;
+            /** Open */
+            open: number;
+            /** Pending */
+            pending: number;
+        };
+        /**
          * EquityCurvePointOut
          * @description One ``portfolio_equity_snapshots`` row, with its BRL reading (or lack of one).
          *
@@ -3361,6 +3376,7 @@ export interface components {
             all: number;
             /** Closed */
             closed: number;
+            distinct_operations: components["schemas"]["DistinctOperationsOut"];
             /** Open */
             open: number;
             /** Pending */
@@ -3505,6 +3521,8 @@ export interface components {
             exit_price: string | null;
             /** Exit Ts */
             exit_ts: string | null;
+            /** Identity Key */
+            identity_key: string;
             /** Market */
             market: string;
             /** No Entry Reason */

@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, Text, case, cast, func, select
 
 from hunter_api.repositories.lab_common import (
     COHORT,
@@ -28,6 +28,41 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 __all__ = ["SignalRow", "SignalsPageResult", "LabSignalsRepository"]
+
+_SOURCE_BAR_CLOSE_TEXT = func.coalesce(
+    AgentSignal.supporting_features["observation_ts"].astext,
+    cast(DECISION_AT, Text),
+)
+"""T3.38a: same fallback ``services/lab_signals.py``'s ``_to_out`` applies in
+Python (``observation_ts``, else ``decision_at``) -- an SQL text expression so
+``COUNT(DISTINCT ...)`` can group by it without pulling every row home."""
+
+_EXIT_REASON_TEXT = case(
+    (SignalOutcome.tracking_state == ShadowTrackingState.NO_ENTRY, SignalOutcome.no_entry_reason),
+    (SignalOutcome.tracking_state == ShadowTrackingState.CENSORED, SignalOutcome.censored_reason),
+    else_=cast(SignalOutcome.result, Text),
+)
+"""Mirrors ``services/lab_signals.py``'s ``_exit_reason``: the specific
+no-entry/censored reason when there is one, ``result`` otherwise."""
+
+_IDENTITY_KEY_TEXT = func.concat(
+    Market.symbol,
+    "|",
+    _SOURCE_BAR_CLOSE_TEXT,
+    "|",
+    cast(SignalOutcome.virtual_entry, Text),
+    "|",
+    cast(SignalOutcome.exit_price, Text),
+    "|",
+    _EXIT_REASON_TEXT,
+    "|",
+    cast(SignalOutcome.result, Text),
+)
+"""The SQL-side twin of ``lab_signal_identity.compute_identity_key`` -- same
+six-field tuple, concatenated (not hashed: nothing here needs to match the
+API's opaque ``identity_key`` string byte for byte, only to group the same
+rows together) so ``distinct_operations`` can be one indexed-free aggregate
+instead of a Python fetch-and-hash of the whole filtered dataset."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,12 +96,14 @@ class SignalsPageResult:
     stay; the segment itself does not narrow it) — the brief's fix for tabs
     that used to count only the 200 rows a page happened to load. ``page_from``/
     ``page_to`` are 1-based positions within the *current state's* ordering
-    (``0``/``0`` when the page is empty).
+    (``0``/``0`` when the page is empty). ``totals["distinct_operations"]`` is
+    itself a nested ``{closed, open, pending, all}`` dict (T3.38a) -- the raw
+    row counts next to the ``identity_key``-deduplicated ones.
     """
 
     items: list[SignalRow]
     next_cursor: str | None
-    totals: dict[str, int]
+    totals: dict[str, Any]
     page_from: int
     page_to: int
 
@@ -122,6 +159,36 @@ class LabSignalsRepository:
         row = (await self.session.execute(stmt)).one()
         return {"closed": row.closed, "open": row.open, "pending": row.pending, "all": row.total}
 
+    async def _count_distinct_operations(
+        self, filters: list[ColumnElement[bool]]
+    ) -> dict[str, int]:
+        """T3.38a: ``totals.distinct_operations`` -- the same four ``FILTER``
+        shape as ``_count_totals``, but ``COUNT(DISTINCT identity_key)`` so
+        sibling versions that decided on the exact same operation count once,
+        not once per version.
+        """
+        distinct_identity = func.count(func.distinct(_IDENTITY_KEY_TEXT))
+        stmt = (
+            select(
+                distinct_identity.filter(
+                    SignalOutcome.tracking_state == ShadowTrackingState.TERMINAL
+                ).label("closed"),
+                distinct_identity.filter(
+                    SignalOutcome.tracking_state == ShadowTrackingState.ACTIVE
+                ).label("open"),
+                distinct_identity.filter(
+                    SignalOutcome.tracking_state.in_(tracking_states_for_lab_state("pending") or ())
+                ).label("pending"),
+                distinct_identity.label("total"),
+            )
+            .select_from(AgentSignal)
+            .join(SignalOutcome, SignalOutcome.signal_id == AgentSignal.id)
+            .join(Market, Market.id == AgentSignal.market_id)
+            .where(*filters)
+        )
+        row = (await self.session.execute(stmt)).one()
+        return {"closed": row.closed, "open": row.open, "pending": row.pending, "all": row.total}
+
     async def _rank_of_cursor(
         self, filters: list[ColumnElement[bool]], after: tuple[datetime, uuid.UUID] | None
     ) -> int:
@@ -166,7 +233,8 @@ class LabSignalsRepository:
             result=result,
             cohort=cohort,
         )
-        totals = await self._count_totals(base_filters)
+        totals: dict[str, Any] = await self._count_totals(base_filters)
+        totals["distinct_operations"] = await self._count_distinct_operations(base_filters)
 
         segment_states = tracking_states_for_lab_state(state)
         segment_filters = [*base_filters]

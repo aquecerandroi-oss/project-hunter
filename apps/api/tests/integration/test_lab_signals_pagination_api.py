@@ -162,7 +162,15 @@ async def test_totals_reflect_the_whole_dataset_not_the_loaded_page(
     assert response.status_code == 200, response.text
     body = response.json()
     assert len(body["items"]) == 50  # the loaded page is a strict subset
-    assert body["totals"] == {"closed": 60, "open": 3, "pending": 4, "all": 67}
+    assert body["totals"] == {
+        "closed": 60,
+        "open": 3,
+        "pending": 4,
+        "all": 67,
+        # every fixture row has its own decision_at -> its own source_bar_close,
+        # so no two rows collapse into the same operation here (T3.38a).
+        "distinct_operations": {"closed": 60, "open": 3, "pending": 4, "all": 67},
+    }
 
 
 async def test_totals_are_identical_across_every_page_of_the_same_query(
@@ -210,6 +218,7 @@ async def test_totals_are_identical_across_every_page_of_the_same_query(
             "open": 0,
             "pending": 0,
             "all": 55,
+            "distinct_operations": {"closed": 55, "open": 0, "pending": 0, "all": 55},
         }
     )
     assert first_body["page"] == {"from": 1, "to": 50}

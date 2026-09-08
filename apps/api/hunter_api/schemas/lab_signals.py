@@ -43,6 +43,21 @@ class SignalListItemOut(BaseModel):
     purpose: str
     supporting_features: dict[str, Any] | None
     """Always present in the schema; ``null`` unless ``?include=envelope``."""
+    identity_key: str
+    """T3.38a: stable hash of market + source_bar_close + entry price + exit
+    price + exit reason + result -- sibling versions that decided on the
+    exact same operation share this value (``lab_signal_identity.py``)."""
+
+
+class DistinctOperationsOut(BaseModel):
+    """T3.38a: ``totals`` counted over ``identity_key`` instead of over rows --
+    the honest denominator once sibling versions can duplicate an operation.
+    """
+
+    closed: int
+    open: int
+    pending: int
+    all: int
 
 
 class SegmentTotalsOut(BaseModel):
@@ -54,6 +69,7 @@ class SegmentTotalsOut(BaseModel):
     open: int
     pending: int
     all: int
+    distinct_operations: DistinctOperationsOut
 
 
 class SignalsPagePositionOut(BaseModel):
