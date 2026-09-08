@@ -208,6 +208,14 @@ class MarketListPage(BaseModel):
     computed with — so a client ages a badge locally using the threshold this
     API actually used, instead of a hardcoded value that silently drifts out
     of sync with it."""
+    server_now: datetime
+    """(T3.16) The instant this API's own clock built this response — the same
+    ``now`` every component's ``age_ms``/``quality`` above was computed
+    against. A client re-deriving ages locally between refreshes must anchor
+    on this, never on its own ``Date.now()``: a viewer clock skewed by
+    minutes (VPS ops report, 2026-09-08) otherwise turns every fresh row
+    "atrasado" or hides a genuinely stale one, despite every age/quality
+    field above already being correct."""
 
 
 class BookLevelOut(BaseModel):
@@ -261,6 +269,9 @@ class MarketDetailOut(MarketOut):
     stale_after_ms: int
     """(F8) See ``MarketListPage.stale_after_ms`` — the same value, repeated
     here because a detail response is not paged through ``MarketListPage``."""
+    server_now: datetime
+    """(T3.16) See ``MarketListPage.server_now`` — the same meaning, repeated
+    here for the same reason ``stale_after_ms`` is."""
     hot_state_ok: bool
     book: OrderBookOut | None = None
     recent_trades: list[TradeOut] | None = None

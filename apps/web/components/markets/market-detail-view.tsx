@@ -75,8 +75,11 @@ function applyLiveTick(detail: MarketDetail, tick: RtMarketMessage | undefined):
   };
 }
 
-function AsOf({ ts }: { ts: string | null | undefined }) {
-  const now = useAgeTicker();
+function AsOf({ ts, serverNow }: { ts: string | null | undefined; serverNow: string | null | undefined }) {
+  // T3.16: shares the same server-anchored clock `QualityBadge` above uses --
+  // the fallback hint (when `serverNow` is missing) is disclosed once, on
+  // that badge, not repeated next to every secondary label on this page.
+  const { now } = useAgeTicker(serverNow);
   const ageMs = computeAgeMs(ts, now);
   if (ageMs === null) return null;
   return <span className="ml-2 text-[11px] normal-case text-fg-subtle">atualizado há {formatAge(ageMs)}</span>;
@@ -90,8 +93,8 @@ function AsOf({ ts }: { ts: string | null | undefined }) {
  * header's live quality badge -- "Snapshot · há 2 min", never implying a
  * live feed for data that isn't one.
  */
-function SnapshotLabel({ ts }: { ts: string | null | undefined }) {
-  const now = useAgeTicker();
+function SnapshotLabel({ ts, serverNow }: { ts: string | null | undefined; serverNow: string | null | undefined }) {
+  const { now } = useAgeTicker(serverNow);
   const ageMs = computeAgeMs(ts, now);
   return (
     <span className="ml-2 text-[11px] normal-case text-fg-subtle">
@@ -126,13 +129,14 @@ export function MarketDetailView({ detail, candles, candlesError = null }: Marke
           components={components}
           staleAfterMs={detail.stale_after_ms}
           hasOpenGap={detail.has_open_gap}
+          serverNow={detail.server_now}
         />
         {/* 28px -- the type scale's top tier for "the big number" (docs/DESIGN.md §2), same as the KPI card anchor. */}
         <span className="font-mono text-[28px] tabular-nums text-fg">{formatPrice(lastPrice)}</span>
         <span className="text-xs text-fg-muted">
           bid {formatPrice(bid)} · ask {formatPrice(ask)}
         </span>
-        <AsOf ts={components.ticker.ts} />
+        <AsOf ts={components.ticker.ts} serverNow={detail.server_now} />
       </header>
 
       <section className="rounded-lg border border-border bg-bg-elevated p-4">
@@ -149,14 +153,14 @@ export function MarketDetailView({ detail, candles, candlesError = null }: Marke
         <section className="rounded-lg border border-border bg-bg-elevated p-4">
           <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-muted">
             Book
-            <SnapshotLabel ts={detail.book?.ts} />
+            <SnapshotLabel ts={detail.book?.ts} serverNow={detail.server_now} />
           </h2>
           <OrderBook book={detail.book ?? null} hotStateOk={detail.hot_state_ok} />
         </section>
         <section className="rounded-lg border border-border bg-bg-elevated p-4">
           <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-muted">
             Trades recentes
-            <SnapshotLabel ts={recentTrades?.[0]?.ts} />
+            <SnapshotLabel ts={recentTrades?.[0]?.ts} serverNow={detail.server_now} />
           </h2>
           <RecentTrades trades={recentTrades} hotStateOk={detail.hot_state_ok} />
         </section>
@@ -170,6 +174,7 @@ export function MarketDetailView({ detail, candles, candlesError = null }: Marke
           fundingRate={detail.funding_rate}
           fundingKind={detail.funding_kind}
           components={detail.components}
+          serverNow={detail.server_now}
         />
       </section>
 

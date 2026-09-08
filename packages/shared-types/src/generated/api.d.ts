@@ -1421,6 +1421,11 @@ export interface components {
             quote_volume_24h?: string | null;
             /** Recent Trades */
             recent_trades?: components["schemas"]["TradeOut"][] | null;
+            /**
+             * Server Now
+             * Format: date-time
+             */
+            server_now: string;
             /** Spread Pct */
             spread_pct?: string | null;
             /** Stale After Ms */
@@ -1442,6 +1447,11 @@ export interface components {
             items: components["schemas"]["MarketOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
+            /**
+             * Server Now
+             * Format: date-time
+             */
+            server_now: string;
             /** Stale After Ms */
             stale_after_ms: number;
             summary: components["schemas"]["MarketsSummary"];

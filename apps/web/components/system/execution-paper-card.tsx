@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatSeconds, killSwitchBadgeVariant, killSwitchLabel } from "@/components/system/execution-paper-format";
 import { SystemAsOf } from "@/components/system/system-as-of";
-import { computeAgeMs, formatAge, useAgeTicker } from "@/hooks/useAgeTicker";
+import { computeAgeMs, formatAge, heartbeatServerNowIso, useAgeTicker } from "@/hooks/useAgeTicker";
 import type { WorkerHeartbeat } from "@/lib/api/types";
 import { formatUsdt } from "@/lib/format";
 
@@ -96,7 +96,12 @@ function AgeWithAsOf({ iso, now }: { iso: string | null | undefined; now: number
  * an invented number.
  */
 export function ExecutionPaperCard({ worker }: ExecutionPaperCardProps) {
-  const now = useAgeTicker();
+  // T3.16: `ts + age_s` is the server's own clock at scan time -- see
+  // `heartbeatServerNowIso`'s docstring. `null` worker below never reaches
+  // `useAgeTicker` with a real ts, so this stays `null` (viewer-clock
+  // fallback) harmlessly in that branch -- the empty state renders before
+  // any age is ever read.
+  const { now } = useAgeTicker(worker ? heartbeatServerNowIso(worker.ts, worker.age_s) : null);
 
   if (!worker) {
     return (

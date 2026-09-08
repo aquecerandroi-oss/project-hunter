@@ -394,6 +394,82 @@ def test_market_out_serializes_decimal_and_enum_fields_as_json_strings() -> None
     assert payload["components"]["ticker"]["quality"] == "ok"
 
 
+def test_market_list_page_serializes_server_now_as_utc_iso8601() -> None:
+    """(T3.16) `server_now` is the same clock every item's `age_ms` was
+    computed against -- serialized the same UTC-``Z`` way every other
+    datetime field in this contract is (pydantic v2's default for a
+    tz-aware UTC datetime).
+    """
+    from hunter_api.schemas.markets import MarketListPage, MarketsSummary
+
+    out = _out(ticker_ts=FRESH, book_ts=FRESH, mark_ts=FRESH)
+    summary = MarketsSummary(
+        markets_total=1,
+        markets_monitored=1,
+        markets_ok=1,
+        markets_stale=0,
+        markets_degraded=0,
+        markets_unavailable=0,
+    )
+    page = MarketListPage(
+        items=[out], next_cursor=None, summary=summary, stale_after_ms=10_000, server_now=NOW
+    )
+    assert page.model_dump(mode="json")["server_now"] == "2026-09-05T12:00:00Z"
+
+
+def test_market_list_page_server_now_is_never_older_than_a_components_own_fresh_ts() -> None:
+    """(T3.16) `server_now` is the instant the API's clock built this
+    response -- the same `now` every component's age was computed against --
+    so it can never read *older* than a component `ts` that itself computed
+    as fresh against that same `now`. A client comparing the two must never
+    see the server's own clock contradict itself.
+    """
+    from hunter_api.schemas.markets import MarketListPage, MarketsSummary
+
+    out = _out(ticker_ts=FRESH, book_ts=FRESH, mark_ts=FRESH)
+    summary = MarketsSummary(
+        markets_total=1,
+        markets_monitored=1,
+        markets_ok=1,
+        markets_stale=0,
+        markets_degraded=0,
+        markets_unavailable=0,
+    )
+    page = MarketListPage(
+        items=[out], next_cursor=None, summary=summary, stale_after_ms=10_000, server_now=NOW
+    )
+    ticker_ts, book_ts, mark_ts = (
+        out.components.ticker.ts,
+        out.components.book.ts,
+        out.components.mark.ts,
+    )
+    assert ticker_ts is not None
+    assert book_ts is not None
+    assert mark_ts is not None
+    assert page.server_now >= ticker_ts
+    assert page.server_now >= book_ts
+    assert page.server_now >= mark_ts
+
+
+def test_market_detail_out_carries_its_own_server_now() -> None:
+    """(T3.16) A detail response is not paged through `MarketListPage`, so it
+    repeats `server_now` the same way it already repeats `stale_after_ms`.
+    """
+    from hunter_api.schemas.markets import MarketDetailOut
+
+    out = _out(ticker_ts=FRESH, book_ts=FRESH, mark_ts=FRESH)
+    detail = MarketDetailOut(
+        **out.model_dump(),
+        stale_after_ms=10_000,
+        server_now=NOW,
+        hot_state_ok=True,
+        book=None,
+        recent_trades=None,
+    )
+    assert detail.server_now == NOW
+    assert detail.model_dump(mode="json")["server_now"] == "2026-09-05T12:00:00Z"
+
+
 def test_candle_out_close_time_matches_the_timeframe_duration() -> None:
     """(G8) Asserts a *literal* expected ``close_time`` -- the previous
     version of this test built its own expectation with

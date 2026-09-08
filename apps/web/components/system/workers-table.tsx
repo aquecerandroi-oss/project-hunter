@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { computeAgeMs, formatAge, useAgeTicker } from "@/hooks/useAgeTicker";
+import { computeAgeMs, formatAge, heartbeatServerNowIso, useAgeTicker } from "@/hooks/useAgeTicker";
 import type { WorkerHeartbeat, WorkerStatus } from "@/lib/api/types";
 
 export interface WorkersTableProps {
@@ -15,8 +15,11 @@ const STATUS_VARIANT: Record<WorkerStatus, "positive" | "warning" | "negative"> 
   dead: "negative",
 };
 
-function AgeCell({ ts }: { ts: string }) {
-  const now = useAgeTicker();
+function AgeCell({ ts, ageS }: { ts: string; ageS: number }) {
+  // T3.16: `ts + age_s` is the server's own clock at scan time -- ages here
+  // never come off the viewer's `Date.now()` (see `heartbeatServerNowIso`'s
+  // docstring for why no separate `server_now` field is needed).
+  const { now } = useAgeTicker(heartbeatServerNowIso(ts, ageS));
   const ageMs = computeAgeMs(ts, now);
   return <>{ageMs !== null ? formatAge(ageMs) : "?"}</>;
 }
@@ -62,7 +65,7 @@ export function WorkersTable({ workers }: WorkersTableProps) {
                     <Badge variant={STATUS_VARIANT[worker.status]}>{worker.status}</Badge>
                   </td>
                   <td className="px-3 text-right font-mono tabular-nums text-fg-muted">
-                    <AgeCell ts={worker.ts} />
+                    <AgeCell ts={worker.ts} ageS={worker.age_s} />
                   </td>
                   <td className="px-3 text-right font-mono tabular-nums text-fg-muted">{worker.errors}</td>
                   <td className="px-3 font-mono text-fg-muted">{worker.version ?? "--"}</td>

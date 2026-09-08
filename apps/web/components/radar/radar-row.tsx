@@ -36,7 +36,7 @@ export function RadarRow({
   ariaRowIndex,
   onOpen,
 }: RadarRowProps) {
-  const now = useAgeTicker();
+  const { now } = useAgeTicker();
   const ageMs = computeAgeMs(row.first_seen_at, now);
   return (
     <tr

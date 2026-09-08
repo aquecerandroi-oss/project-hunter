@@ -621,6 +621,59 @@ async def test_get_market_detail_stale_after_ms_matches_the_configured_setting(
     assert response.json()["stale_after_ms"] == int(api_settings.market_stale_after_s * 1000)
 
 
+async def test_list_markets_server_now_is_present_and_matches_the_component_ages(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    redis_client: redis_asyncio.Redis,
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """(T3.16) `server_now` is the same clock the aggregate/component
+    `quality`/`age_ms` fields on this same response were computed against --
+    a ticker written 1s in the past must never read as newer than
+    `server_now`, and `server_now` itself must be close to wall-clock "now"
+    (never a stale, cached, or frozen value).
+    """
+    exchange, symbol, _market_id = await _seed_market(session_factory)
+    await _write_ticker(redis_client, exchange, symbol, age_s=1.0)
+    actor: Actor = make_actor("markets-server-now")
+    before = datetime.now(UTC)
+
+    response = await client.get(f"/api/v1/markets?exchange={exchange}", headers=actor.headers)
+    after = datetime.now(UTC)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    server_now = datetime.fromisoformat(body["server_now"].replace("Z", "+00:00"))
+    # Built strictly inside this request's own handling, so it must fall
+    # within the wall-clock window this test itself observed around the call.
+    assert before <= server_now <= after
+    item = next(row for row in body["items"] if row["symbol"] == symbol)
+    ticker_ts = datetime.fromisoformat(item["components"]["ticker"]["ts"].replace("Z", "+00:00"))
+    assert server_now >= ticker_ts
+
+
+async def test_get_market_detail_server_now_is_present_and_matches_the_component_ages(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    redis_client: redis_asyncio.Redis,
+    make_actor: Callable[[str], Actor],
+) -> None:
+    exchange, symbol, _market_id = await _seed_market(session_factory)
+    await _write_ticker(redis_client, exchange, symbol, age_s=1.0)
+    actor: Actor = make_actor("markets-detail-server-now")
+    before = datetime.now(UTC)
+
+    response = await client.get(f"/api/v1/markets/{exchange}/{symbol}", headers=actor.headers)
+    after = datetime.now(UTC)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    server_now = datetime.fromisoformat(body["server_now"].replace("Z", "+00:00"))
+    assert before <= server_now <= after
+    ticker_ts = datetime.fromisoformat(body["components"]["ticker"]["ts"].replace("Z", "+00:00"))
+    assert server_now >= ticker_ts
+
+
 async def _seed_exchange_with_markets(
     session_factory: async_sessionmaker[AsyncSession], count: int
 ) -> tuple[str, list[str]]:

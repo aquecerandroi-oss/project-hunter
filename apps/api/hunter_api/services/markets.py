@@ -211,6 +211,10 @@ async def build_market_list_page(
         next_cursor=next_cursor,
         summary=summary,
         stale_after_ms=int(stale_after_s * 1000),
+        # (T3.16) The same `now` every item's age/quality above was computed
+        # against — never a fresh `utcnow()` call here, which could drift
+        # from it by however long summarizing/paging took.
+        server_now=now,
     )
 
 
@@ -264,6 +268,9 @@ async def build_market_detail(
     return MarketDetailOut(
         **base.model_dump(),
         stale_after_ms=int(stale_after_s * 1000),
+        # (T3.16) Same `now` `build_market_out` above computed every
+        # component's age/quality against.
+        server_now=now,
         hot_state_ok=hot_state_ok,
         # (G9) `None` on a failed read, not a parsed-from-absent value --
         # see `MarketDetailOut`'s docstring for the full contract.

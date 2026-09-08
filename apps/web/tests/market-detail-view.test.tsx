@@ -54,6 +54,7 @@ const detail: MarketDetail = {
   has_open_gap: false,
   hot_state_ok: true,
   stale_after_ms: 10_000,
+  server_now: lastUpdate,
   components: {
     ticker: { ts: lastUpdate, age_ms: 0, quality: "ok" },
     book: { ts: lastUpdate, age_ms: 0, quality: "ok" },

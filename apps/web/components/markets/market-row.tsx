@@ -14,6 +14,8 @@ export interface MarketRowProps {
   row: MarketRowData;
   /** The API's own `stale_after_ms` (H2) -- `QualityBadge` ages this row's components against it, never a hardcoded client-side guess. */
   staleAfterMs: number;
+  /** `MarketListPage.server_now` (T3.16) -- threaded down to `QualityBadge` so it ages against the API's own clock, never the viewer's. */
+  serverNow?: string | null | undefined;
   /** `hooks/useDensity.ts`'s row height -- the single source both the virtualization math and this row's own height read, so they cannot drift apart (joint decision #6). */
   rowHeight: number;
   /** True when `MarketsTable`'s keyboard navigation (arrow keys) currently points at this row -- gold, one of the few permitted uses (docs/DESIGN.md §2: "foco"). */
@@ -30,7 +32,7 @@ export interface MarketRowProps {
 const SECONDARY_CELL = "hidden px-3 text-right font-mono tabular-nums text-fg-muted md:table-cell";
 
 /** One row of the markets table (docs/DESIGN.md §1: tabular-nums, right-aligned, explicit sign). */
-export function MarketRow({ id, orgSlug, row, staleAfterMs, rowHeight, selected = false, ariaRowIndex, onOpen }: MarketRowProps) {
+export function MarketRow({ id, orgSlug, row, staleAfterMs, serverNow, rowHeight, selected = false, ariaRowIndex, onOpen }: MarketRowProps) {
   // M4 (T1.5b fix pass): a `null`/absent `price_change_24h_pct` used to
   // default `changeNegative` to `false`, which colored the honest "--"
   // placeholder GREEN -- asserting "positive" over data that doesn't exist,
@@ -70,6 +72,7 @@ export function MarketRow({ id, orgSlug, row, staleAfterMs, rowHeight, selected 
           components={row.components}
           staleAfterMs={staleAfterMs}
           hasOpenGap={row.has_open_gap}
+          serverNow={serverNow}
         />
       </td>
       <td

@@ -137,7 +137,7 @@ export function LiveStatus({ initial, variant }: LiveStatusProps) {
       setExchanges((prev) => mergeExchangeUpdate(prev, msg));
     },
   });
-  const now = useAgeTicker();
+  const { now } = useAgeTicker();
   // `ws_state`/dots below still reflect the last server-known state even
   // while our own socket is down -- the ticking "há Ns" age already makes
   // that visibly stale, but this is an explicit, honest flag on top

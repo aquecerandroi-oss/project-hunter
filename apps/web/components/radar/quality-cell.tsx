@@ -22,7 +22,7 @@ function toNumber(value: string | null | undefined): number | null {
  * API never declared a threshold for.
  */
 export function QualityCell({ confidence, lastUpdatedAt }: { confidence: string; lastUpdatedAt: string }) {
-  const now = useAgeTicker();
+  const { now } = useAgeTicker();
   const value = toNumber(confidence);
   const variant = value === null ? "default" : value >= 0.7 ? "positive" : value >= 0.4 ? "default" : "warning";
   const label = value === null ? "confiança indisponível" : `confiança ${confidence}`;

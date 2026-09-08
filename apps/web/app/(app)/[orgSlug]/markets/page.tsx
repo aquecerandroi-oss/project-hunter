@@ -20,7 +20,15 @@ export interface MarketsPageProps {
 const MARKETS_PAGE_LIMIT = 200;
 
 type MarketsLoad =
-  | { ok: true; items: MarketRow[]; summary: MarketsSummary; truncated: boolean; staleAfterMs: number }
+  | {
+      ok: true;
+      items: MarketRow[];
+      summary: MarketsSummary;
+      truncated: boolean;
+      staleAfterMs: number;
+      /** `MarketListPage.server_now` (T3.16) -- threaded down so every row's `QualityBadge` ages against the API's own clock, never the viewer's. */
+      serverNow: string | null;
+    }
   | { ok: false; reason: string };
 
 /**
@@ -32,7 +40,7 @@ type MarketsLoad =
  */
 async function loadMarkets(): Promise<MarketsLoad> {
   try {
-    const { items, summary, next_cursor, stale_after_ms } = await listMarkets({
+    const { items, summary, next_cursor, stale_after_ms, server_now } = await listMarkets({
       monitored: true,
       limit: MARKETS_PAGE_LIMIT,
     });
@@ -41,7 +49,17 @@ async function loadMarkets(): Promise<MarketsLoad> {
     // so a market that exists but sits on page 2 would otherwise read as a
     // false negative ("Nenhum mercado encontrado") instead of the truth
     // (T1.5 review F6).
-    return { ok: true, items, summary, truncated: next_cursor !== null, staleAfterMs: stale_after_ms };
+    return {
+      ok: true,
+      items,
+      summary,
+      truncated: next_cursor !== null,
+      staleAfterMs: stale_after_ms,
+      // T3.16: `undefined` here (an API build predating `server_now`) is
+      // normalized to `null` -- `MarketsTable`/`QualityBadge` treat both the
+      // same (fall back to the viewer's clock, disclosed via the hint).
+      serverNow: server_now ?? null,
+    };
   } catch (error) {
     const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
     logger.error("markets_page_load_failed", { error: reason });
@@ -70,6 +88,7 @@ export default async function MarketsPage({ params }: MarketsPageProps) {
           items={result.items}
           summary={result.summary}
           staleAfterMs={result.staleAfterMs}
+          serverNow={result.serverNow}
           truncated={result.truncated}
         />
       ) : (

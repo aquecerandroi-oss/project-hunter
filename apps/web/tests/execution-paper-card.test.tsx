@@ -16,7 +16,12 @@ function makeWorker(overrides: Partial<WorkerHeartbeat> = {}): WorkerHeartbeat {
     last_success: NOW.toISOString(),
     errors: 0,
     version: "1.0.0",
-    age_s: 1,
+    // T3.16: `ts + age_s` is the server clock every age below is now anchored
+    // to (`heartbeatServerNowIso`) -- `0` keeps `NOW` itself as that anchor,
+    // so `last_mtm`/`last_protection`/`last_kill_switch_read` below age off
+    // exactly the deltas their own fixtures spell out (never `+ age_s` on
+    // top of them).
+    age_s: 0,
     status: "alive",
     last_event_at: null,
     ws_state: null,

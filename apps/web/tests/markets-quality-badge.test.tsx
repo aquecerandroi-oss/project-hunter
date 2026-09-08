@@ -129,3 +129,104 @@ describe("QualityBadge: an open gap must still read as 'gap' even when a compone
     expect(screen.queryByText("sem dado")).not.toBeInTheDocument();
   });
 });
+
+describe("QualityBadge: ages against the API's own server clock, never the viewer's (T3.16, VPS ops report 2026-09-08: a viewer ~60s ahead read every fresh row as 'atrasado 1min')", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reads a genuinely fresh row as OK even when the viewer's clock is skewed 5 minutes ahead", () => {
+    vi.useFakeTimers();
+    const trueNow = new Date("2026-09-08T03:50:00.000Z");
+    vi.setSystemTime(new Date(trueNow.getTime() + 5 * 60_000)); // the environment's Date.now() plays the skewed viewer clock
+    const serverNow = trueNow.toISOString(); // the API's own, honest clock
+
+    render(
+      <QualityBadge
+        quality="ok"
+        components={componentsAt(trueNow.toISOString())}
+        staleAfterMs={STALE_AFTER_MS}
+        hasOpenGap={false}
+        serverNow={serverNow}
+      />,
+    );
+
+    expect(screen.getByText("OK")).toBeInTheDocument();
+    expect(screen.queryByText("relógio local")).not.toBeInTheDocument();
+  });
+
+  it("still reads a genuinely stale row as stale when the viewer's clock is skewed 5 minutes behind (never hides real staleness)", () => {
+    vi.useFakeTimers();
+    const trueNow = new Date("2026-09-08T03:50:00.000Z");
+    vi.setSystemTime(new Date(trueNow.getTime() - 5 * 60_000));
+    const serverNow = trueNow.toISOString();
+    const staleTickerTs = new Date(trueNow.getTime() - 20_000).toISOString(); // 20s old, over the 10s threshold
+
+    render(
+      <QualityBadge
+        quality="ok"
+        components={componentsAt(staleTickerTs)}
+        staleAfterMs={STALE_AFTER_MS}
+        hasOpenGap={false}
+        serverNow={serverNow}
+      />,
+    );
+
+    expect(screen.queryByText("OK")).not.toBeInTheDocument();
+    expect(screen.getByText("atrasado 20s")).toBeInTheDocument();
+  });
+
+  it("falls back to the viewer's clock and discloses it with a muted hint when server_now is missing (an API build predating T3.16)", () => {
+    render(
+      <QualityBadge
+        quality="ok"
+        components={componentsAt(new Date().toISOString())}
+        staleAfterMs={STALE_AFTER_MS}
+        hasOpenGap={false}
+      />,
+    );
+
+    expect(screen.getByText("OK")).toBeInTheDocument();
+    expect(screen.getByText("relógio local")).toBeInTheDocument();
+  });
+
+  it("never shows the fallback hint once server_now is present", () => {
+    render(
+      <QualityBadge
+        quality="ok"
+        components={componentsAt(new Date().toISOString())}
+        staleAfterMs={STALE_AFTER_MS}
+        hasOpenGap={false}
+        serverNow={new Date().toISOString()}
+      />,
+    );
+
+    expect(screen.queryByText("relógio local")).not.toBeInTheDocument();
+  });
+
+  it("a realtime tick's fresher component timestamp still recovers the badge to OK, anchored to the server clock", () => {
+    const trueNow = new Date();
+    const stale = componentsAt(new Date(trueNow.getTime() - 20_000).toISOString());
+    const { rerender } = render(
+      <QualityBadge
+        quality="ok"
+        components={stale}
+        staleAfterMs={STALE_AFTER_MS}
+        hasOpenGap={false}
+        serverNow={trueNow.toISOString()}
+      />,
+    );
+    expect(screen.getByText(/^atrasado/)).toBeInTheDocument();
+
+    rerender(
+      <QualityBadge
+        quality="ok"
+        components={componentsAt(trueNow.toISOString())}
+        staleAfterMs={STALE_AFTER_MS}
+        hasOpenGap={false}
+        serverNow={trueNow.toISOString()}
+      />,
+    );
+    expect(screen.getByText("OK")).toBeInTheDocument();
+  });
+});

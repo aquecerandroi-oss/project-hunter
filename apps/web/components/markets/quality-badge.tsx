@@ -18,6 +18,35 @@ export interface QualityBadgeProps {
   staleAfterMs: number;
   /** `has_open_gap` (H2) -- an open ingestion gap must still read as "gap" even when a required component is also currently absent. */
   hasOpenGap: boolean;
+  /**
+   * `MarketListPage`/`MarketDetailOut`'s own `server_now` (T3.16) -- ages
+   * this row's components against the instant the API's own clock built the
+   * response, never the viewer's `Date.now()` (VPS ops report, 2026-09-08: a
+   * viewer clock skewed ~60s ahead turned every fresh row "atrasado 1min").
+   * `undefined`/`null` (a response from an API build predating T3.16) falls
+   * back to the viewer's clock and renders the muted "relógio local" hint
+   * below instead of silently trusting a clock that might be skewed.
+   */
+  serverNow?: string | null | undefined;
+}
+
+/**
+ * T3.16: the one place this fallback is disclosed on a markets screen --
+ * `AsOf`/`SnapshotLabel`/`DerivativesCard` on the market detail view and
+ * `WorkersTable`'s ages reuse the same clock silently rather than repeating
+ * this next to every secondary label, which docs/DESIGN.md's "menos chips
+ * por célula" would otherwise turn into alarm fatigue for one underlying
+ * fact.
+ */
+function ClockFallbackHint() {
+  return (
+    <span
+      className="text-[10px] text-fg-subtle"
+      title="server_now ausente na resposta da API -- idade calculada com o relógio do navegador, não o do servidor"
+    >
+      relógio local
+    </span>
+  );
 }
 
 const REQUIRED = ["ticker", "book", "mark"] as const;
@@ -42,8 +71,8 @@ function hasAbsentRequired(components: MarketComponents): boolean {
  * that goes quiet must visibly go stale without a new message, and a fresh
  * realtime tick must visibly bring it back).
  */
-export function QualityBadge({ quality, components, staleAfterMs, hasOpenGap }: QualityBadgeProps) {
-  const now = useAgeTicker();
+export function QualityBadge({ quality, components, staleAfterMs, hasOpenGap, serverNow }: QualityBadgeProps) {
+  const { now, hasServerClock } = useAgeTicker(serverNow);
 
   if (quality === "unavailable") {
     return <Badge variant="default">sem dado</Badge>;
@@ -60,15 +89,24 @@ export function QualityBadge({ quality, components, staleAfterMs, hasOpenGap }: 
   const ages = requiredAges(components, now);
   const maxAge = ages.length > 0 ? Math.max(...ages) : null;
   const isStale = maxAge !== null && maxAge > staleAfterMs;
+  const clockHint = !hasServerClock && <ClockFallbackHint />;
 
   if (!isStale) {
     return (
-      <Badge variant="positive" className="gap-1.5">
-        <span className="size-1.5 rounded-full bg-green" aria-hidden="true" />
-        OK
-      </Badge>
+      <span className="inline-flex items-center gap-1.5">
+        <Badge variant="positive" className="gap-1.5">
+          <span className="size-1.5 rounded-full bg-green" aria-hidden="true" />
+          OK
+        </Badge>
+        {clockHint}
+      </span>
     );
   }
 
-  return <Badge variant="warning">{`atrasado ${formatAge(maxAge)}`}</Badge>;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <Badge variant="warning">{`atrasado ${formatAge(maxAge)}`}</Badge>
+      {clockHint}
+    </span>
+  );
 }

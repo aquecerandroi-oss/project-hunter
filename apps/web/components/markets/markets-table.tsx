@@ -20,6 +20,8 @@ export interface MarketsTableProps {
   summary: MarketsSummary;
   /** `MarketListPage.stale_after_ms` (H2) -- threaded down to every row's `QualityBadge`. */
   staleAfterMs: number;
+  /** `MarketListPage.server_now` (T3.16) -- threaded down to every row's `QualityBadge` so ages come off the API's own clock, never the viewer's. `undefined` (an API build predating T3.16) falls back honestly -- see `QualityBadge`'s docstring. */
+  serverNow?: string | null | undefined;
   /** `true` when the API's `next_cursor` was non-null -- the monitored universe is bigger than this page, so search below only covers what was fetched (T1.5 review F6). */
   truncated?: boolean;
 }
@@ -123,7 +125,7 @@ function rowId(row: MarketRowData): string {
 }
 
 /** `/[orgSlug]/markets`'s table: search, sortable columns, virtualized rows, live prices for the visible window, keyboard-navigable rows. */
-export function MarketsTable({ orgSlug, items, summary, staleAfterMs, truncated = false }: MarketsTableProps) {
+export function MarketsTable({ orgSlug, items, summary, staleAfterMs, serverNow, truncated = false }: MarketsTableProps) {
   const { getToken } = useAuth();
   const router = useRouter();
   const rowHeight = useRowHeight();
@@ -300,6 +302,7 @@ export function MarketsTable({ orgSlug, items, summary, staleAfterMs, truncated 
                     orgSlug={orgSlug}
                     row={applyLiveTick(row, messages[`rt:market:${row.exchange}:${row.symbol}`] as RtMarketMessage | undefined)}
                     staleAfterMs={staleAfterMs}
+                    serverNow={serverNow}
                     rowHeight={rowHeight}
                     selected={absoluteIndex === selectedIndex}
                     // Header row is `aria-rowindex` 1 (`MarketsTableHead`), so
