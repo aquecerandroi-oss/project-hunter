@@ -9,7 +9,7 @@ hipotese_testavel: sim
 astra: concorda
 status: curada
 owner: sexta-feira
-updated: 2026-09-06
+updated: 2026-09-08
 confiança: "?"
 ---
 
@@ -146,8 +146,73 @@ o alvo, como candidata única e prospectiva.
 Divergência: nenhuma. Frase dela que fica: o diagnóstico justifica investigação e uma candidata; ele
 **ainda não** justifica concluir que o piso maior terá expectancy melhor.
 
+## Apêndice datado — 2026-09-08: a candidata única desta nota foi rodada, e o que voltou
+
+**Acréscimo, não reescrita.** Nada acima foi alterado: a aritmética de 2026-09-06 continua valendo
+palavra por palavra, e é justamente porque ela estava certa que a candidata foi rodada. O que segue
+são **dois achados** do replay de abertura da variante, medidos e não estimados. Página do
+experimento: [[EXP-0006-momentum-piso-de-custo]] (`momentum v4`, `atr_pct_min = 0,0089`, mesmo
+`code_ref` do pai; replay `2026-08-08 → 2026-09-08`, 4 mercados, `as_of = 2026-09-08T13:09:41Z`).
+
+### Achado 1 — o piso corta **86%** das decisões, e esta nota já tinha dito o que isso significa
+
+Na janela de replay o pai (`momentum v2`) tomou **224** decisões; a variante tomou **31**.
+
+```
+224 → 31 decisões   (−86,2%)
+dias distintos: 24 → 9      avaliáveis: 222 → 30
+```
+
+O critério desta nota — *"um piso que elimina 70% dos sinais é outra estratégia, não a mesma com
+menos ruído"* — foi escrito antes da medição e **é ultrapassado com folga**. A consequência prática
+é editorial e vale para toda comparação futura: `v4` não é "o `momentum` com menos ruído"; é outra
+estratégia, com outra frequência, e comparar as duas expectancies lado a lado sem dizer isso seria
+enganoso. A proporção de corte na coorte **prospectiva** (universo inteiro, não quatro mercados)
+ainda não foi medida e pode ser outra.
+
+### Achado 2 — o lado **acima** do piso foi o **pior** sobre a população do pai
+
+Este é o achado que a nota de 2026-09-06 não podia prever, e ele desmonta a leitura ingênua de que
+"o piso seleciona as operações melhores". Sobre as **mesmas 224 decisões do pai**, separadas pelo
+valor de ATR% na decisão:
+
+| Grupo (população do pai) | n | avaliáveis | expectancy (R) |
+|---|---:|---:|---:|
+| decisões **já acima** do piso 0,0089 — as que `v4` preserva | 31 | 31 | **−0,2135** |
+| decisões **abaixo** do piso — as que `v4` elimina | 193 | 191 | **−0,1650** |
+
+O subconjunto preservado pelo piso perdeu **mais** que o subconjunto eliminado. E a melhora aparente
+de expectancy entre as duas coortes (−0,1717 → −0,1506) não vem de seleção: nas **25 decisões
+pareadas** (mesmo mercado, mesma barra) `v4` e `v2` deram resultado e `R_net` **idênticos**, 0
+divergências; a diferença inteira vem de **6 decisões que o pai nunca tomou** (5 avaliáveis, média
++0,2722 R), porque o slot de reentrada da variante estava livre onde o do pai estava ocupado.
+**Cinco resultados.**
+
+O mecanismo aritmético desta nota **aparece** onde deveria — o `R` médio dos alvos sobe de +0,7599
+para +1,0667, porque 20 bps pesam menos sobre um risco nominal maior. Isso é geometria medida, e não
+é vantagem demonstrada: a taxa de lucro líquido **caiu** (0,4144 → 0,3667) no mesmo movimento.
+
+### O que isto muda nesta nota
+
+Nada da aritmética; duas coisas do enunciado, para quem a citar daqui para frente:
+
+1. **A pressão de custo ser aritmética não implica que corrigi-la melhore o resultado.** A frase que
+   a Astra deixou registrada em 2026-09-06 ("o diagnóstico justifica investigação e uma candidata;
+   ele ainda não justifica concluir que o piso maior terá expectancy melhor") ficou **medida**, não
+   só argumentada.
+2. **Um filtro de entrada muda a exposição de slot, não só a amostra.** Quando o Lab mantém um
+   acompanhamento por `(versão, mercado, coorte)`, recusar uma entrada libera o slot para a próxima —
+   e a comparação passa a misturar *filtro* com *seleção temporal*. Toda candidata de entrada do
+   [[Strategy Backlog]] herda isso.
+
+**O veredito continua `inconclusivo`**, por limiar (30 avaliáveis e 9 dias contra 100 **E** 30) e por
+construção (é a mesma população que gerou a hipótese —
+[[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]]). O teste é a coorte prospectiva
+aberta em 2026-09-08 13:05 UTC.
+
 ## Relacionados
 
 [[Strategy Backlog]] · [[KB-0007-atr-e-escala-por-volatilidade]] ·
 [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]] · [[KB-0009-o-efeito-do-quarto-de-hora]] ·
-[[EXP-0001-momentum-v1]] · [[Market Collector]] · [[Risk Engine]]
+[[EXP-0001-momentum-v1]] · [[EXP-0006-momentum-piso-de-custo]] · [[Registro de Tentativas]] ·
+[[Market Collector]] · [[Risk Engine]]

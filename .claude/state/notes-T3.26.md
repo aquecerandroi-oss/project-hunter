@@ -199,3 +199,119 @@ esta é a mesma janela e a mesma população que geraram a hipótese (KB-0010). 
 - **Everton:** a decisão que este trabalho põe na mesa é se vale gastar `momentum_v2` (código) na
   invalidação **antes** de rodar os braços `INV-B/C/E` que já existem sobre os 31 dias. A minha
   recomendação está no brief: rodar os braços primeiro.
+
+---
+
+# T3.26b — o EXP-0006 arquivado no Obsidian e o backlog religado (sexta-feira, 2026-09-08)
+
+Base: `main` em `be3674a`. **Nada commitado.** Escopo de escrita: `obsidian/**` e esta seção.
+Nada em `.env*`, `apps/**`, `services/**`, `infra/**`, `docs/**` — as tarefas em voo (T3.18b,
+T3.7d, audit de design) não foram tocadas.
+
+## STATUS
+
+**Entregue, com uma decisão de estrutura e duas lacunas de proveniência declaradas.** As cinco
+entregas do brief estão feitas; o linter está verde; a pasta `00-INBOX/` **não existia** e foi
+criada (justificativa e consequência abaixo, em CONCERNS).
+
+| # | Entrega do brief | Estado |
+|---|---|---|
+| 1 | `EXP-0006` arquivado no formato do template, com Hipótese/Protocolo congelados, avaliação datada rotulada **replay**, veredito `inconclusivo` e a tabela pareada inteira | feito |
+| 2 | `Strategy Backlog`: item 1 → brief T3.27 ("replayar os braços `INV-*` antes de escrever código"); item 2 → `EXP-0006`, "no Lab desde 2026-09-08 (`momentum v4`)" | feito |
+| 3 | KB-0008 com apêndice datado: os 86% de corte e o achado dos grupos pareados (o lado **acima** do piso foi o pior sobre a população do pai) | feito |
+| 4 | Pendência operacional do `derived_from` registrada em `00-INBOX/`, com a correção proposta e a decisão do Everton — **exportador de catálogo não rodado** | feito |
+| 5 | `obsidian_lint.py` verde | feito |
+
+Duas coisas que fiz **além** do brief, ambas dentro de `obsidian/**` e por regra escrita da própria
+base — se o escopo era estrito, é aqui que ele se estica:
+
+- **`Registro de Tentativas`, T-007.** A página diz, no seu próprio cabeçalho, que *toda* variante
+  rodada no Lab entra ali, e que correção é **linha nova com a mesma ID**. O `EXP-0006` sem T-007
+  deixaria a contagem de multiplicidade errada (ela passou de "1 execução, 7 contrastes" para "2
+  execuções, 8 contrastes"). Linha nova acrescentada; a antiga **não** foi editada.
+- **`Experiments Index`.** O registro de IDs não tinha `EXP-0006` — e descobri que também não tinha
+  `EXP-0005`, de ontem. Acrescentei os dois e disse na página que o de ontem estava faltando.
+
+## FILES
+
+Criados:
+
+- `obsidian/05-EXPERIMENTS/EXP-0006-momentum-piso-de-custo.md`
+- `obsidian/00-INBOX/2026-09-08-linhagem-de-momentum-v4-no-changelog-da-vps.md` (**pasta nova**)
+
+Modificados:
+
+- `obsidian/11-KNOWLEDGE/Strategy Backlog.md` — status dos itens 1 e 2, "Já em sombra" (com `v3` e
+  `v4`), seção datada "Acréscimo de 2026-09-08", `updated`
+- `obsidian/11-KNOWLEDGE/KB-0008-custos-em-perpetuos-e-o-r-que-sobra.md` — apêndice datado
+  (2 achados + o que muda no enunciado), `updated`, Relacionados
+- `obsidian/11-KNOWLEDGE/Registro de Tentativas.md` — linha nova de T-007 e a contagem de
+  multiplicidade atualizada, `updated`
+- `obsidian/05-EXPERIMENTS/Experiments Index.md` — `EXP-0005` e `EXP-0006` no registro de IDs e na
+  tabela de registrados, nota datada de contagem, `updated`
+- `obsidian/00-HOME.md` — `00-INBOX/` no mapa de pastas e os dois experimentos novos na linha de
+  `05-EXPERIMENTS/`
+
+`git status --short -- obsidian` e `git diff --stat -- obsidian` confirmam: 5 modificados
+(+167 / −8), 2 criados, nada fora de `obsidian/**`.
+
+## TESTS / lint (saída real)
+
+```
+$ uv run python infra/scripts/obsidian_lint.py
+LINT DA BASE OBSIDIAN — 184 NOTA(S) ANALISADA(S)
+Resumo — Links mortos: 0, Links ambíguos: 0, Notas órfãs: 0, Frontmatter incompleto: 0,
+Valores fora do vocabulário: 0, Procedência da Knowledge Base (KB-*): 0,
+Reescrita de experimentos (append-only): 0.
+Info: 1 experimento(s) fora do HEAD ignorado(s) na checagem append-only.
+
+RESULTADO: base limpa
+```
+
+O "1 experimento fora do HEAD" é o próprio `EXP-0006`, que ainda não está no git — a checagem
+append-only compara com `HEAD` e pula o que não existe lá. Depois do commit ela passa a valer para
+esta página, que é exatamente o efeito desejado.
+
+Nenhuma suíte de testes foi executada: não toquei em código.
+
+## CONCERNS
+
+1. **Criei uma pasta de topo (`00-INBOX/`) e não pude documentá-la em `docs/OBSIDIAN.md`.** O brief
+   pedia a pendência em `obsidian/00-INBOX/` e a pasta não existia. Criei, com a nota, e descrevi a
+   convenção na `00-HOME.md` (o que ela é, o que não é, quando a nota sai de lá). Mas as convenções
+   normativas da base moram em `docs/OBSIDIAN.md`, que estava **fora do meu escopo de escrita** —
+   então hoje existe uma pasta de topo que o documento normativo não menciona, e o linter não exige
+   chave nenhuma além das quatro comuns para ela. **Uma linha em `docs/OBSIDIAN.md` fecha isso**, e
+   deixo a decisão de escrevê-la (ou de mover a nota para `09-OPERATIONS/`) para quem tiver `docs/`
+   no escopo.
+2. **O texto do SQL da avaliação não existe em lugar nenhum que eu alcance.** O rascunho do quant
+   cita `/tmp/q7.sql` na VPS e não o colou. O template desta base **exige** a consulta literal, e o
+   `EXP-0006` foi arquivado sem ela. Não inventei SQL nem reescrevi números: pus um alerta na
+   própria avaliação datada dizendo o que falta e por quê, e listei "colar `/tmp/q7.sql`" como
+   entrega da **próxima** avaliação. A seção datada de hoje fica como está — o que ela não teve,
+   não teve.
+3. **Faltou o `read_at`.** Só o `as_of` (`13:09:41Z`) foi registrado. Como `signal_outcomes` avança
+   no lugar, sem o segundo carimbo a leitura não é descritível como snapshot. Mesmo tratamento:
+   declarado na página, cobrado da próxima.
+4. **A `taxa de alvo entre toques resolvidos` é minha, não do quant.** O template a exige e o
+   rascunho não a trouxe; calculei-a das contagens de cobertura da própria leitura (91/136 e 11/21)
+   e escrevi na página que ela é razão dessas contagens, não resultado de consulta. Se isso for
+   considerado número derivado demais para uma página de pesquisa, é remover a linha — mas
+   omiti-la em silêncio me parecia pior, porque é a métrica que mais se confunde com "taxa de
+   lucro".
+5. **MFE/MAE ficaram nulos por ausência de consulta**, não por OHLC indeterminado. Escrevi o motivo
+   exato na tabela, porque os dois nulos significam coisas diferentes e a KB de métricas cobra a
+   distinção.
+6. **A pendência do `derived_from` continua aberta e é do Everton.** A nota do `00-INBOX` traz o
+   `UPDATE` idempotente pronto (chaveado pelo `id` da versão, com `AND changelog NOT LIKE
+   'variante de v%'`), as três saídas possíveis e o custo de cada uma. Não apliquei: é escrita à
+   mão em produção numa tabela de experimento congelado. **E registrei em voz alta o que "esperar o
+   próximo deploy" não resolve:** `keep_lineage` impede a repetição, mas não conserta a linha já
+   ativada, porque o `changelog` de uma linha derivada só é escrito uma vez.
+7. **Não rodei `export_strategies_to_obsidian.py`**, como o brief mandou. Consequência: não existe
+   `03-TRADING/Estrategias/momentum-v4.md`, e a família `momentum` em
+   `03-TRADING/Família momentum.canvas` continua desenhando só até a `v3`. Quem rodar o exportador
+   depois da correção do `changelog` fecha os dois de uma vez.
+8. **`Experiments Index` ficou desatualizado por um dia sem ninguém notar** (o `EXP-0005` existia e
+   não estava no registro de IDs). Corrigi, mas vale como sintoma: quem abre um `EXP-NNNN` precisa
+   fechar o índice no mesmo turno, senão o próximo número livre deixa de ser confiável.

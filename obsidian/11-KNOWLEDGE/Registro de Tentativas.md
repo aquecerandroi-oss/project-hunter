@@ -1,6 +1,6 @@
 ---
 tags: [knowledge, protocolo, tentativas]
-updated: 2026-09-06
+updated: 2026-09-08
 status: aberto
 owner: sexta-feira
 ---
@@ -612,6 +612,37 @@ equivalência; (3) mesmo com seis blocos o menor p atingível (`2/64 = 0,031`) j
 limiar de Holm (`0,05/7`). A confirmação exige repetir a **mesma** execução com janela em ≥ 30 dias
 UTC distintos. **Nada foi ativado**, e o bloco continua sem autorizar combinar o vencedor de T-005
 com o de T-022.
+
+## Acréscimo de 2026-09-08 — T-007 (piso de custo) **saiu do papel** como variante de parâmetro
+
+Linha **nova, com a mesma ID** e o motivo, como manda esta página — a linha de T-007 acima **não** foi
+editada. O que mudou: a candidata foi derivada como `strategy_version` própria
+(`momentum v4`, mesmo `code_ref` do pai, um único parâmetro diferente), ativada como
+`research_only` em **2026-09-08 13:05:13 UTC**, e teve um **replay de abertura** sobre
+`2026-08-08 → 2026-09-08` ([[EXP-0006-momentum-piso-de-custo]]).
+
+| ID | Candidata | Nota de origem | Parâmetros | `δ` | Início/fim UTC | Status |
+|---|---|---|---|---|---|---|
+| T-007 | piso de custo (`atr_pct_min = 0,0089`) | [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] | `atr_pct_min=0.0089`; `code_ref`, alvo, stop, horizonte e invalidação **inalterados** | **não declarado antes da corrida** — e isso é limitação registrada, não descuido corrigido depois | **replay retrospectivo** `2026-08-08 → 2026-09-08`, `as_of = 2026-09-08T13:09:41Z`; **coorte prospectiva aberta em 2026-09-08 13:05 UTC, sem data de fim declarada** | **rodada em replay, inconclusiva** — 31 sinais contra 224 do pai (**−86,2%**), 30 avaliáveis, 9 dias; expectancy −0,1506 contra −0,1717; PF 0,7220 contra 0,6454; **toda** a diferença vem de 6 decisões sem par no pai (5 avaliáveis, +0,2722 R). Coorte prospectiva **em curso** |
+
+**Contagem de multiplicidade, atualizada.** As tentativas avaliadas passam de **1 execução com 7
+contrastes** (o bloco de saídas de 2026-09-06) para **2 execuções**: esta acrescenta **1 contraste**
+(`v4 − v2` em expectancy líquida), lido e registrado. Todo relatório de variante daqui para a frente
+cita esse total.
+
+**Por que esta rodada também não confirma nada.** Pelas mesmas três razões do bloco anterior, mais
+uma própria: (1) a coluna `Início/fim UTC` **não** foi preenchida antes da janela de replay — é
+retrospectiva sobre a população que já existia; (2) a janela é a **mesma** que produziu a hipótese na
+[[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]], o que a
+[[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] proíbe usar como confirmação; (3) 30
+avaliáveis e 9 dias estão abaixo do limiar editorial de 100 **E** 30; e (4) **as duas populações não
+são pareadas** — a variante recusa entradas que o pai aceita, o slot de reentrada fica livre em
+instantes diferentes, e a diferença medida mistura filtro com seleção temporal. **A coorte
+prospectiva aberta em 2026-09-08 13:05 UTC é a tentativa de verdade, e a data de fim dela ainda
+precisa ser declarada** — a próxima avaliação datada da página do experimento tem de trazê-la.
+
+**Nada foi ativado por causa de número bonito.** `momentum v4` é `research_only`, sem linha em
+`agents`; a ponte de execução recusa `research_only` pelo nome e a coorte `replay:` por nome.
 
 ## Relacionados
 

@@ -131,6 +131,11 @@ As convenções da base — frontmatter obrigatório por pasta, os quatro callou
 
 - [[Mente da Sexta-feira]] — como a assistente pensa (Claude + Astra) e onde cada tipo de memória fica; [[Dialogos/Index|diálogos]] e [[Revisoes-Astra/Index|revisões da Astra]]. Mais recente: [[Dialogos/M3]] — carteira virtual e Risk Engine, a partir da diretiva do Everton de 2026-09-06 (ADR 0005; plano `docs/plans/M3.md`; contrato `docs/RISK_ENGINE.md` v2). O M3 **não** declara modo autônomo: as entradas são manuais e a ponte sinal → proposta é do M4.
 
+- **00-INBOX/** — pendências **operacionais** datadas: uma escrita em produção, um ajuste de
+  ferramenta ou uma correção que espera decisão. Não é bug (isso é `07-BUGS/`) nem decisão de
+  arquitetura (isso é `06-DECISIONS/`); é o que está pendurado, com a correção proposta e quem
+  decide. Sai da pasta quando for aplicada ou descartada, com a data e o motivo. Hoje:
+  [[2026-09-08-linhagem-de-momentum-v4-no-changelog-da-vps|a linhagem de `momentum v4` perdida no `changelog` da VPS]].
 - **01-ARCHITECTURE/** — visão de sistema, fluxo de dados, infraestrutura, workers.
 - **02-MARKET/** — coleta de mercado, adapters de exchange, WebSockets, features, anomalias — **tudo implementado e rodando** (M1 aprovado; M2 entregue e não aprovado, ver [[Features]] e [[Anomalies]] para os números de produção e as limitações medidas).
 - **03-TRADING/** — paper trading, risk engine, execução, portfolio, estratégias. **Deixou de ser
@@ -139,7 +144,11 @@ As convenções da base — frontmatter obrigatório por pasta, os quatro callou
   T3.9b, T3.10 e o deploy**, depois que o `execution-worker` passou a existir e ser provado.
   Estratégias e agentes continuam M4.
 - **04-AGENTS/** — visão geral de agentes e as quatro estratégias do MVP (planejado M4).
-- **05-EXPERIMENTS/** — índice de experimentos ([[Experiments Index]], `EXP-NNNN`), template e os quatro experimentos abertos: [[EXP-0001-momentum-v1]] e [[EXP-0002-volume-anomaly-v1]] (coortes prospectivas do Shadow Lab desde 2026-09-06), [[EXP-0004-politicas-de-saida]] (replay de oito políticas de saída sobre as entradas já congeladas, `2c6bb2d` — pesquisa que não escreve nada) e [[EXP-0003-baselines-v1]] (2026-09-07, o **instrumento** de baselines do M2: quanto do arquivo amadurece, e o que isso destrava rio abaixo). Todos com avaliações **datadas e acrescentadas** e o SQL que produziu cada número.
+- **05-EXPERIMENTS/** — índice de experimentos ([[Experiments Index]], `EXP-NNNN`), template e os quatro experimentos abertos: [[EXP-0001-momentum-v1]] e [[EXP-0002-volume-anomaly-v1]] (coortes prospectivas do Shadow Lab desde 2026-09-06), [[EXP-0004-politicas-de-saida]] (replay de oito políticas de saída sobre as entradas já congeladas, `2c6bb2d` — pesquisa que não escreve nada) e [[EXP-0003-baselines-v1]] (2026-09-07, o **instrumento** de baselines do M2: quanto do arquivo amadurece, e o que isso destrava rio abaixo). Todos com avaliações **datadas e acrescentadas** e o SQL que produziu cada número. Desde
+  2026-09-08 são **seis**: [[EXP-0005-momentum-paper]] (a linha `purpose = paper` do `momentum`, D10)
+  e [[EXP-0006-momentum-piso-de-custo]] (`momentum v4` — a primeira **variante de parâmetro** do Lab,
+  mesmo `code_ref` do pai; o replay de abertura é `inconclusivo` e mostra que **o piso corta 86% das
+  decisões**).
 - **06-DECISIONS/** — índice legível das ADRs.
 - **07-BUGS/** — bugs abertos e resolvidos, com hash de commit.
 - **08-CHANGELOG/** — uma entrada por commit, agrupado por dia.

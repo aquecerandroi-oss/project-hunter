@@ -1,0 +1,16 @@
+# Brief T3.28b — um 429 no `/me` ou na barra de status não pode derrubar a tela inteira
+
+**Owner:** frontend-specialist. **Reviewers afterwards:** product-designer (tela renderizada), code-reviewer. **Do not commit.** **Operational rule: never a background shell; foreground commands with a timeout <= 5 min; the tree is shared — never `git stash`/`checkout --`/`restore`/`reset`/`clean`/`commit -a`; add exact files only; do not touch `.env*`; do not stop or recreate local stack containers.** Base: `main` at `385dac6`. In flight elsewhere: T3.24b (`apps/web/components/lab/**`, `apps/web/app/(app)/[orgSlug]/lab/**`, `apps/web/lib/api/lab.ts`, `apps/web/tests/lab-*.test.tsx`), T3.28a (`apps/api/**`, `infra/**`) — do not edit those paths. Scope: `apps/web/app/(app)/[orgSlug]/layout.tsx` (and `app/(app)/layout.tsx`, `app/global-error.tsx`, `app/error.tsx`), `apps/web/components/shell/**` (topbar, org switcher, market status), `apps/web/lib/api/client.ts` (only if the 429 needs a typed error), `apps/web/tests/shell-*.test.tsx`.
+
+## Measured (local stack, 2026-09-08 13:37Z)
+Under the API's per-IP limit the SSR fetch of `/api/v1/me` returned 429 (`api_request_failed status=429`) and five screens in a row rendered Next's default **"Application error: a client-side exception has occurred"** — the T3.24a `error.tsx` routes never got a chance because the throw happens in the org layout. Also seen in the same run: `Uncaught Error: Value is null` (client chunk `3e7f71f0`) and React `#418` (hydration mismatch) on one page — find both (the `Value is null` looks like a non-null assertion on a nullable field in a shell component; the 418 is likely a time rendered on the server in UTC vs client in Brasília — `lib/time.ts`, T3.22).
+
+## Deliver
+1. **Layout never throws for a recoverable API error**: `/me` (and any layout-level fetch) failing with 429/5xx/network renders the shell with a visible, honest banner ("O servidor limitou as requisições por um instante — tentando de novo em {n}s" / "Serviço indisponível") and a retry (`router.refresh()` with backoff, max 3), keeping navigation usable; 401/403 keep their current redirect. Topbar market status uses `SectionUnavailable` (T3.24a) instead of logging and vanishing; never a blank global error for these.
+2. **`global-error.tsx`** in the house style (D16/D17 copy, Portuguese, no backstage — D19): title, one sentence, "Tentar de novo" + "Ir para o Dashboard"; `digest` shown small as "código de referência" (it is what Everton will paste to us).
+3. Fix the `Value is null` and the `#418` root causes if they live in the shell; if they live in a page, write the exact file/line in the notes for the page's owner (do not edit `components/lab/**`).
+4. Tests: layout renders with `me` rejected (429) → banner + nav present; retry called with backoff; `global-error` snapshot; the two root-cause fixes each with a unit test.
+5. Screen proof: `bash .claude/state/tmp/run-design-audit.sh -g "screens 1440"` **while the local API still limits 120/min** (T3.28a may or may not have landed): no screen may show "Application error"; captures in `.claude/state/design/2026-09-08/`.
+
+## Prove
+`pnpm --filter web lint|typecheck|test` with real output; report in Portuguese, extended format; `.claude/state/notes-T3.28b.md`.

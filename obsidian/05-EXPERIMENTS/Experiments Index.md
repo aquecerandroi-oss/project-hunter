@@ -1,6 +1,6 @@
 ---
 tags: [experimentos, indice]
-updated: 2026-09-07
+updated: 2026-09-08
 status: em-andamento
 owner: sexta-feira
 ---
@@ -74,6 +74,17 @@ produção), e com 3 componentes disponíveis somando peso 0,25 **o score não p
 linha de 40 do WATCHING** — nenhum mercado pode ser HOT hoje. Detalhe e parecer do milestone em
 `docs/reports/M2.md`.
 
+**Acréscimo de 2026-09-08 — são seis, não quatro.** Os parágrafos acima ficam como estão (são
+datados); o que mudou é a contagem. Entraram **[[EXP-0005-momentum-paper]]** (a linha
+`purpose = paper` do `momentum`, decisão delegada D10 — mede a mesma decisão pela carteira, e na
+primeira avaliação a carteira estava intocada porque `ENABLE_PAPER_AUTONOMY=false`) e
+**[[EXP-0006-momentum-piso-de-custo]]** (`momentum v4`, a primeira **variante de parâmetro** do Lab:
+mesmo `code_ref` do pai, um único valor diferente). O `EXP-0006` traz um tipo de leitura que ainda
+não existia aqui — **replay de abertura da própria variante**, sobre a mesma janela que gerou a
+hipótese —, e por isso ele nasce com dois motivos de `inconclusivo` escritos lado a lado: o limiar
+editorial e a construção. O achado que sobrevive aos dois é operacional: **o piso corta 86% das
+decisões**.
+
 Cada experimento significativo (uma hipótese testada sobre uma estratégia, um conjunto de parâmetros, um mercado ou período) ganha seu próprio arquivo `EXP-NNNN-<slug>.md` nesta mesma pasta, numerado sequencialmente a partir de `EXP-0001`.
 
 ## Registro de IDs (decisão conjunta SHADOW, 2026-09-05)
@@ -85,7 +96,14 @@ Cada experimento significativo (uma hipótese testada sobre uma estratégia, um 
 | `EXP-0003` | [[EXP-0003-baselines-v1\|baselines por ativo e hora do M2, e o que elas destravam]] (instrumento, não estratégia: maturidade das baselines → anomalias, estágio, regime, score) | `docs/plans/M2.md` (T2.8) | **aberto em 2026-09-07**; primeira avaliação `as_of = 2026-09-07T03:30Z`, **inconclusivo** (1 dia distinto de série viva) |
 | `EXP-0004` | [[EXP-0004-politicas-de-saida\|replay de oito políticas de saída sobre as entradas congeladas]] (bloco T-005 + L1 + L2, 7 contrastes, efeito mínimo 0,05 R) | Rodada 6 de conhecimento → brief R1; commit `2c6bb2d` | **aberto em 2026-09-06**; primeira execução `as_of = 2026-09-06T20:55Z`, **inconclusivo por `B = 1`** |
 
+| `EXP-0005` | [[EXP-0005-momentum-paper\|momentum v3 em carteira paper]] (a linha `purpose = paper` da decisão delegada D10, ao lado da coorte `research_only`) | `docs/plans/M3.md` (D10) | **aberto em 2026-09-08**; primeira avaliação `as_of = 2026-09-08T12:00:00Z`, **inconclusivo** |
+| `EXP-0006` | [[EXP-0006-momentum-piso-de-custo\|piso de custo no momentum]] (`atr_pct_min = 0,0089`, mesmo `code_ref` do pai — variante de **parâmetro**, candidata #2 do [[Strategy Backlog]]) | [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] → T3.26 | **aberto em 2026-09-08**; coorte `prospective` desde 13:05 UTC e um **replay de abertura** `as_of = 2026-09-08T13:09:41Z`, **inconclusivo** |
+
 A reserva está consolidada nos três lugares que a decisão exige: aqui, em `docs/plans/SHADOW-LAB.md` (item 11) e em `docs/plans/M2.md` (T2.8).
+
+**As duas linhas acima entraram em 2026-09-08 (T3.26b), e a de `EXP-0005` estava faltando desde o
+dia anterior** — a página existia e o registro de IDs não a tinha. Fica dito, porque um registro de
+IDs incompleto é pior que nenhum: quem procura o próximo número livre precisa poder confiar nele.
 
 ## Protocolo — o que fica congelado e o que é acrescentado
 
@@ -127,6 +145,8 @@ Todos os números vêm de `agent_signals` / `signal_outcomes` reais, com o SQL c
 | [[EXP-0002-volume-anomaly-v1]] | `volume_anomaly` v1 (deprecated) + v2 (active) | 2026-09-06 | `2026-09-06T02:55:00Z` | **inconclusivo** — 72 avaliáveis (66 + 6), 1 dia, 35 com horizonte maturado |
 | [[EXP-0004-politicas-de-saida]] | replay: `momentum` v1+v2 e `volume_anomaly` v1+v2 (4 versões congeladas), 8 políticas de saída | 2026-09-06 | `2026-09-06T20:55:00Z` | **inconclusivo** — 275 maturados, **1** dia (`B = 1`); reprodução de trajetória 1,0000 em 339 comparáveis |
 | [[EXP-0003-baselines-v1]] | baselines por (mercado, feature, hora UTC) do M2 — instrumento, não estratégia | 2026-09-07 | `2026-09-07T03:30:00Z` | **inconclusivo** — 1 dia distinto de série viva; **4.944 buckets utilizáveis de 88.746 (5,57 %)**, 12 de 27 features com algum bucket utilizável, **teto de score 25,00 de 100** |
+| [[EXP-0005-momentum-paper]] | `momentum` v3 (`purpose = paper`, D10) — a mesma decisão medida pela carteira | 2026-09-08 | `2026-09-08T12:00:00Z` | **inconclusivo** — 30 avaliáveis maturados (31 antes do gate), **1** dia; e a carteira **não foi tocada**: `ENABLE_PAPER_AUTONOMY=false`, 0 propostas / 0 posições / 0 trades |
+| [[EXP-0006-momentum-piso-de-custo]] | `momentum` v4 — variante de **parâmetro** (`atr_pct_min` 0,003 → 0,0089), mesmo `code_ref` do pai `v2` | 2026-09-08 | `2026-09-08T13:09:41Z` (**replay** de abertura) | **inconclusivo** — 30 avaliáveis, **9** dias; **o piso corta 86% das decisões** (31 contra 224 do pai) e toda a diferença de expectancy vem de **6 decisões sem par**, 5 avaliáveis |
 
 ### O que a próxima extração tem de fazer (achados da revisão da Astra, 2026-09-06)
 

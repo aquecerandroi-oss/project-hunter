@@ -1,6 +1,6 @@
 ---
 tags: [knowledge, backlog, estrategias]
-updated: 2026-09-06
+updated: 2026-09-08
 status: vivo
 owner: sexta-feira
 ---
@@ -46,8 +46,8 @@ do mercado no instante da decisão não está no envelope** de nenhum sinal.
 
 | # | Candidata | Notas-fonte | Dado necessário (temos?) | Esforço | Edge esperado e evidência | Status |
 |---|---|---|---|---|---|---|
-| 1 | **Valor incremental da invalidação** — braços `INV-A/B/C/E` (atual · sem invalidação · dois fechamentos · buffer de 0,25 ATR) | [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]] · [[KB-0005-stops-quando-eles-param-perdas]] | velas 1m/15m (sim) · ATR₀ congelado (sim) | médio (4 braços + replay) | **desconhecido.** Os −13,8430 R dos 24 invalidados são atribuição contábil, não efeito; o ganho exige contrafactual pós-saída | especificada |
-| 2 | **Piso de custo** — `atr_pct_min = 0,0089` | [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] | `atr_pct_15m` da decisão (sim) | baixo | pressão de custo é **aritmética**: no piso atual 20 bps consomem 39,2% de 1 R efetivo. Que o piso maior melhore expectancy é hipótese | especificada, exige janela futura |
+| 1 | **Valor incremental da invalidação** — braços `INV-A/B/C/E` (atual · sem invalidação · dois fechamentos · buffer de 0,25 ATR) | [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]] · [[KB-0005-stops-quando-eles-param-perdas]] | velas 1m/15m (sim) · ATR₀ congelado (sim) | médio (4 braços + replay) | **desconhecido.** Os −13,8430 R dos 24 invalidados são atribuição contábil, não efeito; o ganho exige contrafactual pós-saída | **especificada — não é parâmetro** (2026-09-08): a regra de invalidação é código, não `default_parameters`, então virou brief de **versão de código** (`.claude/state/brief-T3.27-momentum-v2-invalidacao.md`). **Próximo passo: replayar os braços `INV-*` sobre as entradas congeladas antes de escrever código** — eles já existem em `hunter_indicators/replay/policies.py` e produzem o pareamento por entrada que a KB-0006 pede; ver [[EXP-0004-politicas-de-saida]] |
+| 2 | **Piso de custo** — `atr_pct_min = 0,0089` | [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] | `atr_pct_15m` da decisão (sim) | baixo | pressão de custo é **aritmética**: no piso atual 20 bps consomem 39,2% de 1 R efetivo. Que o piso maior melhore expectancy é hipótese | **no Lab desde 2026-09-08 (`momentum v4`)** → [[EXP-0006-momentum-piso-de-custo]]. Coorte `prospective` correndo ao lado da do pai; o replay de abertura é `inconclusivo` e **corta 86% das decisões** |
 | 3 | **Diagnóstico por decil de ATR%** (análise, não variante) | [[KB-0007-atr-e-escala-por-volatilidade]] | `atr_pct_15m` persistido (sim) | baixo | nenhum edge prometido; descobre se a estratégia depende de faixa de volatilidade | especificada |
 | 4 | **H1 timing + H2 atraso de execução** (`baseline + 60 s`) | [[KB-0009-o-efeito-do-quarto-de-hora]] | velas 1m com `taker_buy_volume` (existe; **cobertura a conferir**) | baixo (H1) / médio (H2) | artigo mede ~0,5 bps brutos em 10 s — serve para execução, não como estratégia | ideia |
 | 5 | **Família de lookback 10/20/40** | [[KB-0003-rompimento-de-canal-e-data-snooping]] | velas 15m (sim) · 3 `strategy_version_id` | médio | canal breakout tem evidência histórica, muito enfraquecida por data snooping e custos | ideia |
@@ -232,6 +232,40 @@ classificador classifica. Propor um filtro agora seria propor algo cuja refutaç
 ## Já em sombra
 - `momentum_v1` → [[EXP-0001-momentum-v1]] (coortes `v1` e `v2`; `v2` difere só pelo `code_ref`)
 - `volume_anomaly_v1` → [[EXP-0002-volume-anomaly-v1]]
+- `momentum v3` (linha **paper**, D10) → [[EXP-0005-momentum-paper]]
+- `momentum v4` (**variante de parâmetro**, piso de custo — candidata #2 desta fila) →
+  [[EXP-0006-momentum-piso-de-custo]], desde 2026-09-08 13:05 UTC
+
+### Acréscimo de 2026-09-08 — a fila mexeu de verdade pela primeira vez
+
+Duas linhas desta página mudaram de estado no mesmo dia, e por motivos opostos.
+
+**A #2 (piso de custo) entrou no Lab.** `momentum v4` foi derivada de `v2` por
+`infra/scripts/derive_variant.py` — **mesmo `code_ref`, um único parâmetro diferente**
+(`atr_pct_min` 0,003 → 0,0089) — e ativada como `research_only` às 13:05:13 UTC. A coorte
+`prospective` corre ao lado da do pai, que é o que esta linha sempre exigiu (janela futura
+reservada). O replay de abertura sobre os 31 dias é `inconclusivo` por construção e por limiar, e
+deixou um achado operacional que vale mais que o veredito: **o piso corta 86% das decisões** — bem
+acima dos 70% que a [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] fixou como fronteira entre
+"mesma estratégia com menos ruído" e "outra estratégia". Detalhe, tabelas e a decomposição pareada
+em [[EXP-0006-momentum-piso-de-custo]]; registro de tentativa em T-007 do
+[[Registro de Tentativas]].
+
+**A #1 (invalidação) não entrou, e descobriu-se por quê.** A regra de invalidação está no código
+(`Invalidation(kind="close_below", …)`), não em `default_parameters`: nenhuma das 19 chaves a liga,
+desliga ou desloca. Logo ela **não** é variante de parâmetro — é versão de código nova, com
+`code_ref` novo, revisão de protocolo e 30 dias de sombra. O brief está em
+`.claude/state/brief-T3.27-momentum-v2-invalidacao.md`, e ele põe uma entrega **antes** do código:
+replayar os braços `INV-B/C/E` sobre as entradas já congeladas, que é o pareamento por entrada que a
+[[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]] pede como estimando. Se os três contrastes
+forem indistinguíveis de zero ali, o módulo novo não vale a tentativa — e a descoberta custa uma
+corrida de replay.
+
+**O que a #2 já ensinou para toda a fila:** a variante recusa sinais que o pai aceita, então o
+**slot** de reentrada fica livre em instantes diferentes. As duas populações não são "a mesma menos
+um filtro", e no replay de abertura toda a diferença de expectancy veio de **6 decisões que o pai
+nunca tomou** (5 avaliáveis). Qualquer candidata desta fila que mexa em condição de entrada herda
+esse efeito de mistura, e a comparação tem de dizer isso.
 
 ## Relacionados
 
