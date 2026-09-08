@@ -1,0 +1,13 @@
+# Brief T3.43c — fecha a revisão da T3.43 antes do deploy: horas históricas de regime se reparam de verdade após backfill de velas; `status_details` limpo no shutdown; teste de dois produtores
+
+**Owner:** quant-engineer. **Reviewer afterwards:** code-reviewer (same reviewer). **Do not commit.** **Operational rule: never a background shell; foreground commands with a timeout <= 5 min; testcontainers one file per pytest invocation; the tree is shared — never `git stash`/`checkout --`/`restore`/`reset`/`clean`/`commit -a` (git-guard blocks); add exact files only; do not touch `.env*`; do not stop or recreate local stack containers; VPS read-only.** Base: `main` at `259d6f6` (T3.43 = `f7aed39`, **not deployed** — the VPS scanner runs `3bd8f3d`). Scope: `services/scanner-worker/hunter_scanner_worker/{regime_job,regime_hourly,regime_writer,main}.py`, `services/scanner-worker/tests/test_regime_job.py`, `docs/PIPELINE.md` §4b, `.claude/state/notes-T3.43.md`.
+
+## Findings (code-reviewer on f7aed39)
+- **HIGH-1** `regime_job.py:97-113` `hours_due`: only the current cut or hours with no row are recomputed; a historical hour written as `unknown` during a candle gap is never repaired after the gap is backfilled, contrary to the docstring, notes and PIPELINE item 7. Fix: each pass recomputes a **repair window** (last `repair_hours`, default 72 h) and compares digests — rewrite only when the digest changed (upsert already supports it); plus `python -m hunter_scanner_worker.regime_hourly --repair-days N` for a manual deep repair after a big backfill (the T3.7 gaps). Tests: an hour written `unknown` because of a missing candle becomes classified after the candle is inserted and a pass runs; unchanged hours are not rewritten (count of writes).
+- **MEDIUM-2** `main.py:194-195`: add `runtime.status_details.pop("regime_hourly", None)` in the `finally`, symmetric with `baselines`/`beta`; test if the pattern has one.
+- **LOW-3**: a concurrency test: two `regime_job` passes for the same cut in parallel (asyncio.gather) produce exactly one row per hour (the lock) — and document that the unique index (brief `T3.43-db-market-regimes-hourly`) is the real guard.
+- **LOW-4**: measure the end-to-end write cost of the 31-day backfill on the testcontainer (745 hours, one transaction per hour) and paste the number; if > 60 s, batch the writes per day.
+- Fix the three descriptions (docstring, notes, PIPELINE) to say exactly what repairs itself and how.
+
+## Prove
+Per-file tests with real output, `ruff`/`pyright`/`check_file_size.py`; report in Portuguese, extended format; append "T3.43c" to `.claude/state/notes-T3.43.md`.
