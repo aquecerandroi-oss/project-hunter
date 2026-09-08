@@ -1,0 +1,25 @@
+# Brief T3.23 — first design audit: Radar, Lab, Carteira, System, with real data in the browser
+
+**Owner:** product-designer (first task of the role). **Reviewer afterwards:** Sexta-feira (copy), frontend-specialist (feasibility of the specs). **Do not commit.** **Operational rule: never a background shell; foreground commands with a timeout <= 5 min; no testcontainers; the tree is shared — never `git stash`/`checkout --`/`restore`/`reset`/`clean`/`commit -a`; do not read or write `.env*` (the shell may *use* it through the project's own commands, but you never print, cat, grep or edit it).** Base: `main` at `84bc4ec`. In flight elsewhere: T3.22 (`apps/web/lib/format.ts`, `components/lab/lab-format.ts` and time call sites — Brasília time; do not edit those files; note what you see and let it land), T3.19c (`infra/migrations/**`). Do not write application code in this task: your output is the audit, the specs and, if useful, mockups under `apps/web/app/(app)/_design/**` (or wherever `docs/DESIGN.md` §4 says the preview page lives).
+
+## Why you can see the real screens now
+Everton enabled Clerk **Test mode** on the dev instance and set `CLERK_E2E_PUBLISHABLE_KEY`/`CLERK_E2E_SECRET_KEY` in the local `.env` (2026-09-08). Test-mode sign-up: any e-mail with `+clerk_test` (e.g. `designer+clerk_test@example.com`), verification code `424242` (see `tests/e2e/clerk-session.ts`). The real data is in the local Postgres under the organization slug `ever` (840 `signal_outcomes`, paper wallet, markets).
+
+## Setup (read `docs/DEPLOYMENT.md` §2 and `.claude/launch.json` first)
+1. Local DB to head: `uv run alembic -c infra/migrations/alembic.ini upgrade head` from the repo root (it reads the migrations DSN from the project's `.env` by itself; local DB is at `0008`, code expects `0011`). Paste `alembic current` before/after.
+2. The Docker `docker-web-1` container holds port 3000 with a 27-hour-old build: `docker stop docker-web-1` (dev stack only; say so in the notes). Keep `docker-api-1`, postgres, redis, workers running.
+3. `preview_start` with `api-host` (API from source on 8010) and then `web-dev` (Next dev on 3000). Confirm `/ready` on 8010 and the sign-in page on 3000.
+4. Sign up the test user in the in-app browser (`/sign-up`, test e-mail, code 424242), complete onboarding (it creates a scratch org — fine). Then attach the user to `ever` in the **local** DB (dev password is in `infra/docker/docker-compose.yml`): find `users`/`organization_members` (or the memberships table in `docs/DATABASE.md` §3–§5), insert a membership with role OWNER for the Clerk user id of the test user. Open `/ever/dashboard`; if the API still refuses, read `apps/api/hunter_api/auth/**` to see how memberships are resolved and fix the seed, not the code.
+5. Never take the VPS route (self-signed cert) and never touch `.env`.
+
+## Audit (each screen at desktop 1440, tablet 768, mobile 375; dark and light; real data)
+`/ever/radar`, `/ever/lab` (Placar, Curva, tabela com as guias, detalhe de um sinal), `/ever/portfolio`, `/ever/system`, plus `/ever/markets` and one market detail. For each: hierarchy, scanability, states present on screen (empty/loading/error/stale — are they honest and named?), typography scale consistency, spacing rhythm, colour roles (semantic vs accent), **contrast measured** with computed styles (WCAG AA), tables at density, numbers alignment (`tabular-nums`), copy (Portuguese, plain, no jargon — list every English or technical leak like "as_of", "endpoint", "R"), keyboard focus, responsiveness (nothing scrolls the page horizontally), theme parity. Screenshots saved under `.claude/state/design/2026-09-08/*.png` (they are evidence, keep them small), referenced by name in the report.
+
+## Deliver
+1. `.claude/state/review-design-2026-09-08.md` (Portuguese): per screen, findings ranked (bloqueante / alto / médio / baixo) with screenshot reference, the rule broken (`docs/DESIGN.md` § or a named principle), and the **spec** of the fix (tokens/values/components/copy, before → after). Cross-cutting section: what is inconsistent between pages. A section "Só o Everton decide" for anything that changes the visual direction, with 2–3 options each (mockups in `/_design` when words are not enough).
+2. `docs/DESIGN.md`: only if a rule is missing or contradicted — add it with the §5 history line; otherwise untouched.
+3. Three briefs, ready to dispatch, in `.claude/state/brief-T3.24-design-*.md`: (a) quick wins (one day, no direction change), (b) Lab (the core screen), (c) cross-cutting consistency. Each with exact files, acceptance checks and tests to add.
+4. `obsidian/04-AGENTS/Product Designer.md` "O que já entregou": one line.
+
+## Prove
+The report cites real screenshots and measured contrast values; the setup steps pasted with their real output (`alembic current`, `/ready` 200, the org membership row). Report in the designer's format (STATUS · O QUE FOI AUDITADO · ACHADOS · PROPOSTAS · O QUE SÓ O EVERTON DECIDE · PRÓXIMO PASSO); `.claude/state/notes-T3.23.md`.
