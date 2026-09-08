@@ -113,6 +113,31 @@ class TestDigest:
             closure = module_closure(module, STRATEGIES_DIR)
             assert "breakout_v1" not in closure
             assert "constraints" not in closure
+            assert not [name for name in closure if name.startswith("tl_")]
+
+    def test_the_trendline_closure_covers_the_ported_geometry(self) -> None:
+        """T3.34b: the geometry is a *copy* of ``hunter_indicators.patterns`` for
+        exactly this reason. Importing the research package would leave five
+        modules of load-bearing arithmetic outside the digest, so the version
+        would stay frozen at a hash that no longer covers the code producing its
+        decisions — the one direction the freeze must never fail in."""
+        closure = module_closure("trendline_breakout_v1", STRATEGIES_DIR)
+
+        assert closure == (
+            "aggregate",
+            "base",
+            "canonical",
+            "envelope",
+            "indicators",
+            "numeric",
+            "schema",
+            "tl_events",
+            "tl_lines",
+            "tl_pivots",
+            "tl_scan",
+            "tl_setup",
+            "trendline_breakout_v1",
+        )
 
     def test_two_versions_of_the_same_tree_have_different_digests(self) -> None:
         assert version_code_ref("momentum_v1") != version_code_ref("volume_anomaly_v1")

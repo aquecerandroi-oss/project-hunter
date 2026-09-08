@@ -151,6 +151,39 @@ CONSTRAINTS: Final[Mapping[str, Constraints]] = {
             ("range_bars", "session_window_bars"),
         ),
     ),
+    "trendline_breakout_v1": Constraints(
+        positive=frozenset(
+            "pattern_bars pivot_k min_swing_atr tolerance_atr break_atr bounce_atr retest_bars "
+            "bounce_bars parallel_tol angle_bucket_atr level_bucket_atr max_anchors max_lines "
+            "max_channels rvol_window atr_period atr_bars atr_pct_max stop_atr_max max_risk_atr "
+            "target_r horizon_s max_entry_delay_s".split()
+        ),
+        non_negative=frozenset(
+            {"rvol_min", "atr_pct_min", "max_violations_breakout", "max_violations_bounce"}
+        )
+        | _COSTS,
+        unit_interval=frozenset({"base_confidence"}),
+        # ``min_touches`` below 2 is not a loose threshold: ``find_lines`` raises,
+        # so the version would explode on every bar instead of never firing. The
+        # ceilings are structural sanity (a line cannot have more touches than the
+        # anchors it is drawn from), declared and not measured. ``retire_after_break``
+        # is 0/1 because ``schema.py`` — frozen inside the live closures — has no
+        # boolean fragment and may not gain one.
+        bounded=(
+            ("min_touches", Decimal(2), Decimal(20)),
+            ("min_touches_signal", Decimal(2), Decimal(20)),
+            ("retire_after_break", Decimal(0), Decimal(1)),
+        ),
+        # ``stop_atr_max < max_risk_atr`` is the load-bearing pair: the stop sits at
+        # ``min(pivot low, close - stop_atr_max*ATR)``, so risk is never under
+        # ``stop_atr_max`` ATR, and a variant with the two inverted would answer
+        # ``risk_too_wide`` to every bar it ever evaluated.
+        ordered=(
+            ("atr_pct_min", "atr_pct_max"),
+            ("stop_atr_max", "max_risk_atr"),
+            ("min_touches", "max_anchors"),
+        ),
+    ),
     "volume_anomaly_v1": Constraints(
         positive=frozenset(
             {

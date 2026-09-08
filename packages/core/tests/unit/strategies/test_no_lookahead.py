@@ -31,6 +31,7 @@ from hunter_core.strategies.canonical import canonical_json
 from hunter_core.strategies.mean_reversion_v1 import MEAN_REVERSION_V1
 from hunter_core.strategies.momentum_v1 import MOMENTUM_V1
 from hunter_core.strategies.session_orb_v1 import SESSION_ORB_V1
+from hunter_core.strategies.trendline_breakout_v1 import TRENDLINE_BREAKOUT_V1
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 
 from .conftest import EXCHANGE, ORIGIN, SYMBOL, BarSpec, D, explode, flat, minute, series
@@ -44,6 +45,10 @@ from .test_momentum_v1 import CUT as MOMENTUM_CUT
 from .test_momentum_v1 import build_series as momentum_series
 from .test_session_orb_v1 import CUT as SESSION_ORB_CUT
 from .test_session_orb_v1 import build_series as session_orb_series
+from .test_trendline_breakout_v1 import BOUNCE_CUT as TRENDLINE_BOUNCE_CUT
+from .test_trendline_breakout_v1 import CUT as TRENDLINE_CUT
+from .test_trendline_breakout_v1 import build_bounce_series as trendline_bounce_series
+from .test_trendline_breakout_v1 import build_series as trendline_series
 from .test_volume_anomaly_v1 import CUT as VOLUME_CUT
 from .test_volume_anomaly_v1 import build_series as volume_series
 
@@ -402,9 +407,7 @@ def test_breakout_is_identical_under_three_kinds_of_pollution() -> None:
         is_final=False,
     )
     after_the_cut = explode(ABSURD, BREAKOUT_CUT, 15)
-    another_future = explode(
-        BarSpec(D("100"), D("101"), D("1"), D("2"), D("7")), BREAKOUT_CUT, 15
-    )
+    another_future = explode(BarSpec(D("100"), D("101"), D("1"), D("2"), D("7")), BREAKOUT_CUT, 15)
 
     baseline = breakout_decision(clean)
 
@@ -569,4 +572,138 @@ def test_the_session_orb_numbers_do_not_depend_on_the_ambient_decimal_context(
 
     assert baseline is not None and narrowed is not None
     assert narrowed == baseline
+    assert _envelope_json(narrowed) == _envelope_json(baseline)
+
+
+# ------------------------------------------------------- trendline_breakout_v1 (T3.34b)
+
+
+def trendline_decision(
+    candles: list[NormalizedCandle], cut: object = TRENDLINE_CUT
+) -> Decision | None:
+    return TRENDLINE_BREAKOUT_V1.evaluate(
+        ctx_of(candles, cut), TRENDLINE_BREAKOUT_V1.default_parameters
+    )
+
+
+def test_the_trendline_geometry_is_identical_under_three_kinds_of_pollution() -> None:
+    """The point of porting the geometry into the closure instead of importing it:
+    the *whole drawing* — pivots, line, touches, events — is cut at
+    ``source_bar_close``, so a non-final candle inside the window, a final candle
+    that closes after the cut, and a different future must all produce the same
+    line id and the same byte-identical envelope."""
+    clean = trendline_series()
+    forming_inside = minute(
+        TRENDLINE_CUT - timedelta(minutes=1),
+        D("1000"),
+        D("9999"),
+        D("0.01"),
+        D("5000"),
+        D("999999"),
+        is_final=False,
+    )
+    after_the_cut = explode(ABSURD, TRENDLINE_CUT, 15)
+    another_future = explode(
+        BarSpec(D("1000"), D("1001"), D("1"), D("2"), D("7")), TRENDLINE_CUT, 15
+    )
+
+    baseline = trendline_decision(clean)
+
+    assert baseline is not None
+    for polluted in (
+        [*clean, forming_inside],
+        [*clean, *after_the_cut],
+        [*clean, *another_future],
+        [*clean, forming_inside, *after_the_cut],
+    ):
+        decision = trendline_decision(polluted)
+        assert decision == baseline
+        assert _envelope_json(decision) == _envelope_json(baseline)
+
+
+@pytest.mark.parametrize(
+    ("high", "low", "close", "volume"),
+    [
+        (D("9999"), D("0.01"), D("5000"), D("999999")),
+        (D("1000"), D("1000"), D("1000"), D("0")),
+        (D("1002"), D("975"), D("988"), D("300")),
+    ],
+    ids=["absurd", "flat", "plausible"],
+)
+def test_mutating_the_candle_still_forming_never_moves_the_trendline(
+    high: Decimal, low: Decimal, close: Decimal, volume: Decimal
+) -> None:
+    """Not just "a non-final candle is dropped": *whatever* it says, and however
+    many times the exchange revises it, the frozen decision is the same one —
+    including the pivots the line is drawn through."""
+    clean = trendline_series()
+    forming = minute(
+        TRENDLINE_CUT - timedelta(minutes=1), D("1000"), high, low, close, volume, is_final=False
+    )
+
+    baseline = trendline_decision(clean)
+
+    assert baseline is not None
+    assert trendline_decision([*clean, forming]) == baseline
+    assert _envelope_json(trendline_decision([*clean, forming])) == _envelope_json(baseline)
+
+
+def test_the_line_is_the_line_that_was_knowable_at_the_cut() -> None:
+    """Evaluating one bar earlier and one bar later must not retro-fit the
+    drawing: the decision bar of the earlier cut is the bar before the break, so
+    it cannot know about a break that had not printed."""
+    clean = trendline_series()
+    earlier = TRENDLINE_CUT - timedelta(minutes=15)
+
+    at_the_break = trendline_decision(clean)
+    one_bar_before = trendline_decision(clean, earlier)
+
+    assert at_the_break is not None
+    assert one_bar_before is None  # nothing had happened yet
+
+
+def test_trendline_bootstrap_equals_continuous_execution() -> None:
+    """One long read against a context grown bar by bar: the same decision at the
+    same reference close, and **only** at that close."""
+    candles = trendline_series()
+    params = TRENDLINE_BREAKOUT_V1.default_parameters
+
+    bootstrap = TRENDLINE_BREAKOUT_V1.evaluate(ctx_of(candles, TRENDLINE_CUT), params)
+
+    grown: list[NormalizedCandle] = []
+    decisions: list[Decision | None] = []
+    for index in range(120):
+        grown.extend(candles[index * 15 : (index + 1) * 15])
+        bar_close = ORIGIN + timedelta(minutes=15 * (index + 1))
+        decisions.append(TRENDLINE_BREAKOUT_V1.evaluate(ctx_of(list(grown), bar_close), params))
+
+    assert bootstrap is not None
+    assert decisions[-1] == bootstrap
+    assert [decision for decision in decisions[:-1] if decision is not None] == []
+
+
+@pytest.mark.parametrize("prec", [2, 6, 28])
+@pytest.mark.parametrize("rounding", [ROUND_DOWN, ROUND_UP, ROUND_HALF_EVEN])
+def test_the_trendline_numbers_do_not_depend_on_the_ambient_decimal_context(
+    prec: int, rounding: str
+) -> None:
+    """The ported geometry hardens what the research package leaves to the ambient
+    context (``tl_pivots`` module docstring): a library that lowered
+    ``decimal.getcontext().prec`` must not move a single pivot, line or level."""
+    breakout_ctx = ctx_of(trendline_series(), TRENDLINE_CUT)
+    bounce_ctx = ctx_of(trendline_bounce_series(), TRENDLINE_BOUNCE_CUT)
+    params = TRENDLINE_BREAKOUT_V1.default_parameters
+
+    baseline = TRENDLINE_BREAKOUT_V1.evaluate(breakout_ctx, params)
+    bounce_baseline = TRENDLINE_BREAKOUT_V1.evaluate(bounce_ctx, params)
+
+    with localcontext() as context:
+        context.prec = prec
+        context.rounding = rounding
+        narrowed = TRENDLINE_BREAKOUT_V1.evaluate(breakout_ctx, params)
+        narrowed_bounce = TRENDLINE_BREAKOUT_V1.evaluate(bounce_ctx, params)
+
+    assert baseline is not None and bounce_baseline is not None
+    assert narrowed == baseline
+    assert narrowed_bounce == bounce_baseline
     assert _envelope_json(narrowed) == _envelope_json(baseline)

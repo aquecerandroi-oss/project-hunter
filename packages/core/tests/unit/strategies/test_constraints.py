@@ -31,6 +31,7 @@ from hunter_core.strategies.constraints import (
 from hunter_core.strategies.momentum_v1 import MOMENTUM_V1
 from hunter_core.strategies.registry import DEFAULT_REGISTRY
 from hunter_core.strategies.session_orb_v1 import SESSION_ORB_V1
+from hunter_core.strategies.trendline_breakout_v1 import TRENDLINE_BREAKOUT_V1
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 
 pytestmark = pytest.mark.unit
@@ -45,6 +46,7 @@ MOMENTUM = _wire(MOMENTUM_V1)
 VOLUME = _wire(VOLUME_ANOMALY_V1)
 BREAKOUT = _wire(BREAKOUT_V1)
 SESSION_ORB = _wire(SESSION_ORB_V1)
+TRENDLINE = _wire(TRENDLINE_BREAKOUT_V1)
 
 
 def _variant(parent: dict[str, Any], **overrides: str) -> dict[str, Any]:
@@ -66,6 +68,9 @@ class TestTheFrozenContractsPassTheirOwnCheck:
     def test_session_orb_v1_passes_against_itself(self) -> None:
         assert check_ranges(SESSION_ORB_V1, SESSION_ORB, SESSION_ORB) == []
 
+    def test_trendline_breakout_v1_passes_against_itself(self) -> None:
+        assert check_ranges(TRENDLINE_BREAKOUT_V1, TRENDLINE, TRENDLINE) == []
+
     def test_the_variant_that_actually_shipped_passes(self) -> None:
         """``momentum v4``: piso de custo em ``atr_pct_min`` (KB-0008, EXP-0006)."""
         assert check_ranges(MOMENTUM_V1, MOMENTUM, _variant(MOMENTUM, atr_pct_min="0.0089")) == []
@@ -77,6 +82,87 @@ class TestTheFrozenContractsPassTheirOwnCheck:
 
         assert registered <= set(CONSTRAINTS), sorted(registered - set(CONSTRAINTS))
         assert {MOMENTUM_V1.key, VOLUME_ANOMALY_V1.key, BREAKOUT_V1.key} <= registered
+
+
+class TestTrendlineBreakoutV1Ranges:
+    """T3.34b: as faixas da versão de linhas de tendência.
+
+    Duas delas carregam peso de verdade e não são decoração:
+
+    - ``min_touches`` abaixo de 2 **levanta** em ``find_lines`` ("a line needs at
+      least two points"), então a variante não ficaria fraca, ficaria quebrada a
+      cada barra;
+    - ``stop_atr_max < max_risk_atr`` é o par que faz a versão existir: o stop é
+      ``min(pivô de baixa, fechamento − stop_atr_max·ATR)``, logo o risco nunca é
+      menor que ``stop_atr_max`` ATR. Invertido, **toda** barra sairia
+      ``risk_too_wide`` e a coorte inteira só saberia dizer uma palavra.
+    """
+
+    @pytest.mark.parametrize(
+        ("override", "fragment"),
+        [
+            ({"min_touches": "1"}, "min_touches=1 está fora de [2, 20]"),
+            ({"min_touches_signal": "1"}, "min_touches_signal=1 está fora de [2, 20]"),
+            ({"break_atr": "0"}, "break_atr=0 não é positivo"),
+            ({"bounce_atr": "-0.5"}, "bounce_atr=-0.5 não é positivo"),
+            ({"target_r": "0"}, "target_r=0 não é positivo"),
+            ({"pattern_bars": "0"}, "pattern_bars=0 não é positivo"),
+            ({"tolerance_atr": "0"}, "tolerance_atr=0 não é positivo"),
+            ({"rvol_min": "-1.5"}, "rvol_min=-1.5 é negativo"),
+            ({"max_violations_bounce": "-1"}, "max_violations_bounce=-1 é negativo"),
+            ({"base_confidence": "42"}, "base_confidence=42 está fora de (0, 1]"),
+            ({"retire_after_break": "2"}, "retire_after_break=2 está fora de [0, 1]"),
+            (
+                {"atr_pct_min": "0.06", "atr_pct_max": "0.05"},
+                "atr_pct_min=0.06 não é menor que atr_pct_max=0.05",
+            ),
+            (
+                {"stop_atr_max": "3.5"},
+                "stop_atr_max=3.5 não é menor que max_risk_atr=3.0",
+            ),
+            (
+                {"stop_atr_max": "3", "max_risk_atr": "3"},
+                "stop_atr_max=3 não é menor que max_risk_atr=3",
+            ),
+            (
+                {"min_touches": "40", "min_touches_signal": "40"},
+                "min_touches=40 não é menor que max_anchors=20",
+            ),
+        ],
+    )
+    def test_a_variant_out_of_range_is_refused_by_name(
+        self, override: dict[str, str], fragment: str
+    ) -> None:
+        problems = check_ranges(TRENDLINE_BREAKOUT_V1, TRENDLINE, _variant(TRENDLINE, **override))
+
+        assert fragment in problems, problems
+
+    def test_the_geometry_probe_does_not_apply_and_does_not_pretend_to(self) -> None:
+        """Não há ``stop_atr``/``target_atr``: o stop desta versão é estrutural (o
+        pivô de baixa), um dado, não um múltiplo. A prova a seco de geometria
+        simplesmente não se aplica — e ``check_ranges`` não inventa uma."""
+        problems = check_ranges(
+            TRENDLINE_BREAKOUT_V1, TRENDLINE, _variant(TRENDLINE, stop_atr_max="1.9")
+        )
+
+        assert problems == []
+        assert "stop_atr" not in TRENDLINE
+        assert "target_atr" not in TRENDLINE
+
+    def test_the_declared_defaults_are_the_ones_the_module_freezes(self) -> None:
+        assert TRENDLINE["mode"] == "both"
+        assert TRENDLINE["pattern_bars"] == "96"
+        assert TRENDLINE["min_touches"] == TRENDLINE["min_touches_signal"] == "3"
+        assert TRENDLINE["break_atr"] == TRENDLINE["bounce_atr"] == "0.5"
+        assert TRENDLINE["tolerance_atr"] == "0.25"
+        assert TRENDLINE["stop_atr_max"] == "2.0"
+        assert TRENDLINE["max_risk_atr"] == "3.0"
+        assert TRENDLINE["target_r"] == "2.0"
+        assert TRENDLINE["atr_pct_min"] == "0.005"
+        assert TRENDLINE["horizon_s"] == "28800"
+        # a correção do §5 do brief: 0 recusaria todo rompimento que existe
+        assert TRENDLINE["max_violations_breakout"] == "1"
+        assert TRENDLINE["max_violations_bounce"] == "2"
 
 
 class TestBreakoutV1Ranges:

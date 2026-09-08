@@ -30,22 +30,32 @@ from hunter_core.strategies.mean_reversion_v1 import MEAN_REVERSION_V1
 from hunter_core.strategies.momentum_v1 import MOMENTUM_V1
 from hunter_core.strategies.registry import DEFAULT_REGISTRY, StrategyRegistry
 from hunter_core.strategies.session_orb_v1 import SESSION_ORB_V1
+from hunter_core.strategies.trendline_breakout_v1 import TRENDLINE_BREAKOUT_V1
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 
 from .test_breakout_v1 import context as breakout_context
 from .test_mean_reversion_v1 import context as mean_reversion_context
 from .test_momentum_v1 import context as momentum_context
 from .test_session_orb_v1 import context as session_orb_context
+from .test_trendline_breakout_v1 import context as trendline_context
 from .test_volume_anomaly_v1 import context as volume_context
 
 pytestmark = pytest.mark.unit
 
-STRATEGIES = [BREAKOUT_V1, MEAN_REVERSION_V1, MOMENTUM_V1, SESSION_ORB_V1, VOLUME_ANOMALY_V1]
+STRATEGIES = [
+    BREAKOUT_V1,
+    MEAN_REVERSION_V1,
+    MOMENTUM_V1,
+    SESSION_ORB_V1,
+    TRENDLINE_BREAKOUT_V1,
+    VOLUME_ANOMALY_V1,
+]
 CONTEXTS = {
     BREAKOUT_V1.key: breakout_context,
     MEAN_REVERSION_V1.key: mean_reversion_context,
     MOMENTUM_V1.key: momentum_context,
     SESSION_ORB_V1.key: session_orb_context,
+    TRENDLINE_BREAKOUT_V1.key: trendline_context,
     VOLUME_ANOMALY_V1.key: volume_context,
 }
 _KNOWN_KEYWORDS = frozenset(

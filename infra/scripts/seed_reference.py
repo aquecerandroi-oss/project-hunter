@@ -71,6 +71,7 @@ STRATEGIES: tuple[tuple[str, str, str, str], ...] = (
         "trend",
         "Breakout of the opening range of a declared UTC session, confirmed by volume.",
     ),
+    ("trendline_breakout", "Trendline Breakout", "trend", "Break of a drawn trend line."),
     ("narrative", "Narrative", "intelligence", "Narrative and news driven flow (Phase 2)."),
     ("ensemble", "Ensemble", "meta", "Weighted combination of the other strategies."),
 )
