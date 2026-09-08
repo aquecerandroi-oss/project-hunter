@@ -9,7 +9,7 @@ version: v1
 result: inconclusivo
 evaluable: 0
 days: 0
-last_eval: —
+last_eval: 2026-09-08 (REPLAY de abertura, T3.33e)
 ---
 
 # EXP-0008 — rompimento após compressão de volatilidade (`breakout_v1`)
@@ -209,11 +209,74 @@ Duas leituras, e a segunda é uma **concern declarada**:
 
 ## Avaliações (acrescentadas, nunca reescritas)
 
-### Avaliação de <primeira data> — replay de abertura
+### Avaliação de 2026-09-08 — replay de abertura — **REPLAY, não coleta prospectiva** (T3.33e)
 
-<a preencher com: coorte, janela, mercados, recibos do livro-razão, comandos exatos, contagens de
-cobertura completas, métricas com denominador explícito, a decomposição por `squeeze_ratio`, o
-`Result` e a `Next Action`>
+**Ativação (início do experimento, `Registro de Tentativas`):** 2026-09-08T16:23:39,791800Z
+(13:23:39 BRT), `purpose = research_only`, `status = active`,
+`code_ref = hunter_core.strategies.breakout_v1@sha256:4c920b0cc412429c2c4a6a19ca389aca8a215a638f0ff750a8caf61b16264ff1`
+— o digest do dry-run bateu com o exigido no brief antes de qualquer escrita. 20 parâmetros
+congelados, os do `brief-T3.33a` §6.
+
+**Coorte:** `replay:2059ea0c-12d5-46ec-ae4a-1d8944da678e`, uma só, duas fatias contíguas
+(2026-08-08→2026-08-23 e 2026-08-23→2026-09-08), ETHUSDT/SOLUSDT/XRPUSDT/DOGEUSDT, `--workers 3`,
+`decision_lag_s = 2`.
+
+**Recibos do livro-razão (`replay_runs`, `system_events[replay_engine]`, JSONL em `/tmp`):**
+
+| fatia | barras | sinais | desfechos | seg | barras/s | estados | erros |
+|---|---:|---:|---:|---:|---:|---|---:|
+| 08-08 → 08-23 | 5 760 | 0 | 0 | 90,742 | 63,48 | `{"unavailable":448,"not_triggered":5310,"rejected":2}` | 0 |
+| 08-23 → 09-08 | 6 144 | 0 | 0 | 98,808 | 62,18 | `{"not_triggered":6132,"rejected":12}` | 0 |
+
+**Cobertura (denominador = 11 904 barras = 31 dias × 96 × 4 mercados):** `unavailable` 448 (3,76 %),
+`not_triggered` 11 442 (96,12 %), **`triggered` 0 (0,00 %)**, `rejected` 14 (0,118 %), `ineligible` 0.
+`select count(*) from agent_signals` para esta versão = **0**.
+
+**Métricas:** avaliáveis 0; expectancy bruta, líquida, PF, acerto, dias e mercados **indefinidos —
+não há população**. Cobertura de `R_net`: inaplicável.
+
+**Decomposição obrigatória por `squeeze_ratio`: vazia, e declarada como tal.** Não há barra disparada
+para separar em lado comprimido e não comprimido, e as barras `not_triggered`/`rejected` **não
+persistem razão nem detalhe** — o replay conta apenas `evaluations_by_state` por estado
+(`replay/simulate.py`). A obrigação C2 continua aberta e muda de instrumento: precisa de um livro-razão
+de explicação por barra (proposto em `.claude/state/notes-T3.33e.md`, CONCERN 3).
+
+**Faixa `0,0050 ≤ ATR% < 0,0059` (condição do revisor):** **0 decisões**, expectancy indefinida. O
+número que decidiria se a `v2` sobe o piso de ATR% **não existe** nesta janela.
+
+**Corte por regime de BTC (obrigação C4): impossível.** `market_regimes` tem **uma** linha no banco
+inteiro, começando em 2026-09-06 18:18 — não há regime gravado para agosto. Só o prospectivo poderá
+cumprir a obrigação.
+
+**As 14 `REJECTED` são todas `geometry_invalidation` — por construção, não por suposição.** As duas
+portas de geometria são, nesta ordem, `0 < stop < close < target1` e `stop < base_low < close`. A
+primeira não pode falhar depois da porta de ATR% (`ATR% ≤ 0,05` ⇒ `stop = C(1 − 1,25·ATR%) ≥ 0,9375·C
+> 0` e `target1 > C`). Logo as 14 são a segunda: `base_low ≤ stop`. O critério específico congelado
+nesta página — "`REJECTED / geometry_invalidation` acima de 20 % das barras que disparariam" — sai em
+**14/14 = 100 %**.
+
+**Critérios de morte (congelados antes da corrida):**
+
+| # | leitura | disparou? |
+|---|---|---|
+| **K1** — < 20 decisões | **0** | **SIM** |
+| K2 — > 1 500 decisões | 0 | não |
+| K3 — ≥ 100 avaliáveis e ≥ 30 dias e expectancy bruta < 0 | 0 avaliáveis, 0 dias | não (inaplicável) |
+| K4 — `unavailable` > 40 % | 3,76 % | não |
+| K5 — cobertura de `R_net` < 70 % | inaplicável | não |
+| **específico** — `geometry_invalidation` > 20 % das que disparariam | **100 %** | **SIM** |
+
+**Result: `inconclusivo`** (a régua de maturidade — ≥ 100 avaliáveis e ≥ 30 dias — não foi cumprida,
+e antes de madura o resultado é sempre este).
+**Next Action: `descartar` `breakout v1`.** K1 disparou no sentido forte: não é amostra pequena, é
+ausência de população, e mais 30 dias não a criam. **A hipótese da contração não chegou a ser
+testada**: quem matou a população foi a guarda de invalidação, que recusou 100 % das barras que
+passaram pelas quatro portas de entrada — a base de 8 barras de 15 min é, na prática, mais larga que
+um stop de 1,25 ATR de 97 barras, então a invalidação estrutural cairia **abaixo** do stop. Uma `v2`
+que queira testar a hipótese precisa mexer no par `(squeeze_window_bars, stop_atr)` ou na invalidação:
+é experimento novo, com portão C1–C8 novo, não conserto deste.
+
+Fonte integral (comandos, saídas verbatim, SQL e recibos): `.claude/state/notes-T3.33e.md`.
 
 ## Variantes tentadas
 

@@ -9,7 +9,7 @@ version: v1
 result: inconclusivo
 evaluable: 0
 days: 0
-last_eval: —
+last_eval: 2026-09-08 (REPLAY de abertura, T3.33e)
 ---
 
 # EXP-0009 — recuo comprado dentro de tendência de 1 h (`mean_reversion_v1`)
@@ -176,11 +176,114 @@ distribuição de ATR% dos disparos, que só o replay diz.
 
 ## Avaliações (acrescentadas, nunca reescritas)
 
-### Avaliação de <primeira data> — replay de abertura
+### Avaliação de 2026-09-08 — replay de abertura — **REPLAY, não coleta prospectiva** (T3.33e)
 
-<a preencher: coorte, janela, mercados, recibos, comandos exatos, cobertura completa, métricas com
-denominador, decomposição com/sem porta de tendência, distribuição de `z` na decisão, `Result`,
-`Next Action`>
+**Ativação (início do experimento, `Registro de Tentativas`):** 2026-09-08T16:32:33,947955Z
+(13:32:33 BRT), `purpose = research_only`, `status = active`,
+`code_ref = hunter_core.strategies.mean_reversion_v1@sha256:a970c9d98fface2d714abdce25468828ee07087f9287fdb1239dadc3f0bd395f`
+— digest do dry-run igual ao exigido no brief antes de qualquer escrita. 18 parâmetros congelados, os
+do `brief-T3.33b` §6.
+
+**Coorte:** `replay:d0f77894-1e04-454e-a49f-d9a98d894968`, uma só, duas fatias contíguas
+(2026-08-08→2026-08-23 e 2026-08-23→2026-09-08), ETHUSDT/SOLUSDT/XRPUSDT/DOGEUSDT, `--workers 3`,
+`decision_lag_s = 2`.
+
+**Recibos do livro-razão (`replay_runs`, `system_events[replay_engine]`, JSONL em `/tmp`):**
+
+| fatia | barras | sinais* | desfechos* | seg | barras/s | estados | erros |
+|---|---:|---:|---:|---:|---:|---|---:|
+| 08-08 → 08-23 | 5 760 | 17 | 17 | 93,110 | 61,86 | `{"unavailable":448,"not_triggered":5284,"triggered":28}` | 0 |
+| 08-23 → 09-08 | 6 144 | 37 | 37 | 104,545 | 58,77 | `{"not_triggered":6108,"triggered":36}` | 0 |
+
+\* contagem **da coorte inteira** a cada corrida (não da fatia): a população final é **37 decisões**,
+confirmada por `count(*)` em `agent_signals` (uma única coorte; primeira decisão 2026-08-20 03:45:02Z,
+última 2026-09-06 15:15:02Z).
+
+**Cobertura (denominador = 11 904 barras = 31 dias × 96 × 4 mercados):** `unavailable` 448 (3,76 %),
+`not_triggered` 11 392 (95,70 %), `triggered` 64 (0,538 %), `rejected` 0, `ineligible` 0. Das 64
+barras disparadas, **37** viraram decisão; as 27 restantes caíram na barreira de re-arme / regra "um
+acompanhamento por (versão, mercado, coorte)".
+
+**`atr_gap` / `trend_gap` — medidos por diferença, e o resultado é zero.** As razões de
+`unavailable` não são persistidas pelo replay (só o estado). Mas a `breakout v1` rodou **as mesmas
+11 904 barras** no mesmo dia e devolveu **exatamente 448** `unavailable` — e ela **não tem** porta de
+1 h. Como o total não subiu nem uma barra ao acrescentar a exigência de 1 260 minutos contíguos,
+**`trend_gap` = 0 nesta janela**: os 448 são o aquecimento comum do início (112 barras por mercado
+≈ 28 h). A preocupação "a versão estaria medindo a nossa coleta" **não se confirmou**.
+
+**Métricas (denominador explícito: 37 decisões, todas terminais e todas avaliáveis):**
+
+| métrica | valor |
+|---|---:|
+| decisões | 37 (0,298 por mercado-dia) |
+| avaliáveis / cobertura de `R_net` | 37 / **100,0 %** |
+| dias distintos · mercados | 11 · 4 |
+| expectancy **bruta** (`r_gross`) | **+0,3210 R** |
+| expectancy ex-funding | +0,0948 R |
+| expectancy **líquida** (`R_net`) | **+0,0938 R** |
+| pedágio médio (`custo_R`) | 0,2263 R |
+| soma `R_net` | +3,47 R |
+| acerto (`target`) | 40,5 % |
+| profit factor líquido · bruto | 1,186 · 1,800 |
+| risco/preço médio | 1,050 % |
+
+Identidade de custo da T3.32 verificada linha a linha: `custo_R × (risco/preço)` = 0,00200332 em
+média (mín 0,00197308, máx 0,00202846) — desvio ≤ 2,9×10⁻⁵ de 0,0020.
+
+**Por motivo de saída:** `stop` 16 (43,2 %, `R_net` −1,1682, soma −18,69) · `target` 15 (40,5 %,
++1,2732, +19,10) · `expired` 6 (16,2 %, +0,5104, +3,06). **O saldo inteiro está no horizonte:** alvo e
+stop somam +0,41 R em 31 decisões; os +3,47 R da coorte são as seis saídas por tempo. Por isso 40,5 %
+de acerto e expectancy positiva não contradizem o equilíbrio de 53,35 % da tabela congelada — aquela
+conta supõe população binária stop/alvo.
+
+**Profundidade de `z` na decisão (decomposição obrigatória):**
+
+| faixa de z | n | exp. bruta R | exp. líquida R | soma R | acerto |
+|---|---:|---:|---:|---:|---:|
+| −1,25 < z ≤ −1,00 | 11 | +0,8808 | **+0,6879** | +7,57 | 63,6 % |
+| −1,50 < z ≤ −1,25 | 5 | −0,2655 | −0,5027 | −2,51 | 20,0 % |
+| −2,00 < z ≤ −1,50 | 11 | +0,3917 | +0,1379 | +1,52 | 45,5 % |
+| z ≤ −2,00 | 10 | −0,0792 | −0,3101 | −3,10 | 20,0 % |
+
+**Não há monotonicidade**, e o sinal aparente é o inverso do esperado: o balde mais raso — o que passa
+raspando no `zscore_depth_min = 1` — carrega o resultado, e o mais fundo perde. Com n = 10–11 por
+balde isto é ruído do tamanho do efeito; o que fica registrado é que "mais esticado" **não** se mostrou
+melhor, e que `zscore_depth_min` continua sendo convenção declarada, não medida.
+
+**Por faixa de ATR% (piso congelado 0,006):** `0,006–0,008` n = 20, líquida **−0,0814** ·
+`0,008–0,010` n = 6, líquida **−0,0912** · `0,010–0,015` n = 6, +0,5212 · `≥ 0,015` n = 5, +0,5033.
+**26 das 37 decisões (70,3 %) estão abaixo de ATR% 0,010 e são líquidas negativas com bruta positiva**
+— é o pedágio (KB-0008/T3.32). Subir o piso é `v2`, não ajuste.
+
+**Por mercado:** DOGE 12 (−1,11 R, 25,0 %) · ETH 6 (+1,28 R, 50,0 %) · SOL 8 (+2,79 R, 50,0 %) ·
+XRP 11 (+0,51 R, 45,5 %). **Por dia:** 11 dias com decisão; 08-20 e 08-21 valem +11,4 R e os outros
+nove somam −7,9 R.
+
+**A porta de tendência não pôde ser paga: o braço "sem porta" não existe no banco.** Os recuos que a
+porta rejeita saem `not_triggered` e não persistem nada, então a comparação pareada que esta página
+exige precisa de uma irmã de parâmetro (`derive_variant.py`) com a porta desligada, replayada na mesma
+janela. **Não foi feito**; fica declarado como pendência, não como resultado.
+
+**Corte por regime de BTC: impossível** — `market_regimes` tem uma linha no banco, começando em
+2026-09-06 18:18. Só o prospectivo poderá fazê-lo.
+
+**Critérios de morte (congelados antes da corrida):**
+
+| # | leitura | disparou? |
+|---|---|---|
+| K1 — < 20 decisões | 37 | não |
+| K2 — > 1 500 decisões (o risco real desta versão) | 37 (0,298/mercado-dia) | não |
+| K3 — ≥ 100 avaliáveis **e** ≥ 30 dias **e** bruta < 0 | 37 (< 100), 11 dias (< 30), bruta +0,3210 R | não |
+| K4 — `unavailable` > 40 % | 3,76 % | não |
+| K5 — cobertura de `R_net` < 70 % | 100 % | não |
+| gap da porta de 1 h | `trend_gap` = 0 | não |
+
+**Result: `inconclusivo`** — madura exige ≥ 100 avaliáveis **e** ≥ 30 dias distintos; temos 37 e 11.
+**Next Action: seguir prospectivo** (coorte `prospective`, universo elegível inteiro) e reavaliar pela
+régua de 30 dias. O saldo positivo desta janela é da mesma amostra que gerou a hipótese, vem de seis
+saídas por tempo e de dois dias, e **não** é evidência.
+
+Fonte integral (comandos, saídas verbatim, SQL e recibos): `.claude/state/notes-T3.33e.md`.
 
 ## Variantes tentadas
 
