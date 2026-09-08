@@ -1,0 +1,45 @@
+{
+  "theme": "(none=dark)",
+  "title": "404: This page could not be found.",
+  "url": "/_design",
+  "innerWidth": 1440,
+  "docScrollWidth": 1440,
+  "horizontalOverflow": false,
+  "overflowers": [],
+  "families": [
+    "system-ui"
+  ],
+  "sizes": {
+    "14": 1,
+    "24": 1
+  },
+  "failing": [],
+  "pairs": [
+    {
+      "fg": "#000000",
+      "bg": "#ffffff",
+      "ratio": 21,
+      "size": 24,
+      "weight": 500,
+      "large": true,
+      "pass": true,
+      "count": 1,
+      "sample": "404",
+      "where": "h1.next-error-h1",
+      "family": "system-ui"
+    },
+    {
+      "fg": "#000000",
+      "bg": "#ffffff",
+      "ratio": 21,
+      "size": 14,
+      "weight": 400,
+      "large": false,
+      "pass": true,
+      "count": 1,
+      "sample": "This page could not be found.",
+      "where": "h2",
+      "family": "system-ui"
+    }
+  ]
+}

@@ -41,11 +41,12 @@ Três rótulos e um componente:
 
 - `components/layout/sidebar.tsx`: remover o texto "Hunter" do topo (o logotipo dourado já está na topbar); o botão recolher fica sozinho à direita.
 - `components/layout/topbar.tsx`: mostrar `organization.name` (já vem em `resolveOrgContext`) em vez do slug; slug em `title`.
+- **Opcional (SI1, capturado em T3.24d):** a tela do Clerk (`/sign-in`, `/sign-up`) está toda em inglês ("Sign in to ever", "Welcome back!…", "Don't have an account? Sign up"). `apps/web/app/layout.tsx` monta `<ClerkProvider>` sem `localization`; adicionar `@clerk/localizations` e passar `localization={ptBR}` (2 linhas + 1 dependência). Evidência: `.claude/state/design/2026-09-08/sign-in-1440-{dark,light}.png`.
 
 ## Aceite
 
 - `pnpm --filter web lint|typecheck|test` verdes; nenhum teste removido.
 - Testes novos: `tests/time-vocabulary.test.tsx` (grep no render de Radar/Carteira/System por "Consultado em"/"Atualizado há"/"Snapshot · há" e ausência de "Painel consultado", "Estado em", "consultado em" minúsculo); `formatAge` com espaço; `radar-row.test.tsx` (3 chips na célula Mercado, 5 colunas no header, ícones com `sr-only`); `radar-filters.test.tsx` (só navega no "Aplicar"); `portfolio-activity-tables.test.tsx` (13px, `thead` overlay, altura da linha = `useRowHeight`).
 - `grep -rn -E "text-lg|<h3 className=\"text-sm font-semibold" apps/web/components/{portfolio,system,dashboard}` vazio; `grep -rn "Painel consultado\|Estado em \|consultado em" apps/web/components` vazio (exceto "Consultado em").
-- Tela real (product-designer, spec `design-audit`): Radar 375 sem rolagem horizontal no grid (`overflowers` vazio); os três rótulos de tempo idênticos em Radar/Lab/Carteira/System nas capturas; `text-*.txt` de cada tela sem `_` em texto visível fora de `<pre>`.
+- Tela real (product-designer, spec `design-audit`; **pré-condição:** sign-up de teste destravado na instância Clerk — relatório E3, `notes-T3.24d.md` §3): Radar 375 sem rolagem horizontal no grid (`overflowers` vazio); os três rótulos de tempo idênticos em Radar/Lab/Carteira/System nas capturas; `text-*.txt` de cada tela sem `_` em texto visível fora de `<pre>`.
 - `docs/DESIGN.md` §3 ganha "Títulos: eyebrow 12px para seção/card, 20px para página" e "Radar row" como âncora; §5 uma linha DESIGN-6 com o que mudou e por quê.

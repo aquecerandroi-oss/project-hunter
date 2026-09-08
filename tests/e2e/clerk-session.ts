@@ -33,10 +33,10 @@ export async function signUpAndOnboard(page: Page, label: string): Promise<strin
 
   await page.goto("/sign-up");
   await page.getByLabel(/email address/i).fill(clerkTestEmail(label));
-  await page.getByRole("button", { name: /continue/i }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
 
   await page.getByLabel(/verification code/i).fill(CLERK_TEST_OTP);
-  await page.getByRole("button", { name: /continue/i }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
 
   await page.waitForURL(/\/onboarding/, { timeout: 15_000 });
 

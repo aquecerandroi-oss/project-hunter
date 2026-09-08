@@ -1,0 +1,85 @@
+{
+  "theme": "light",
+  "title": "Project Hunter",
+  "url": "/sign-in",
+  "innerWidth": 1440,
+  "docScrollWidth": 1440,
+  "horizontalOverflow": false,
+  "overflowers": [],
+  "families": [
+    "Inter"
+  ],
+  "sizes": {
+    "12": 1,
+    "13": 4,
+    "17": 1
+  },
+  "failing": [],
+  "pairs": [
+    {
+      "fg": "#ffffff",
+      "bg": "#8a6d00",
+      "ratio": 4.92,
+      "size": 13,
+      "weight": 500,
+      "large": false,
+      "pass": true,
+      "count": 1,
+      "sample": "Continue",
+      "where": "span.cl-internal-2iusy0",
+      "family": "Inter"
+    },
+    {
+      "fg": "#8a6d00",
+      "bg": "#ffffff",
+      "ratio": 4.92,
+      "size": 13,
+      "weight": 500,
+      "large": false,
+      "pass": true,
+      "count": 1,
+      "sample": "Sign up",
+      "where": "a.cl-footerActionLink.text-gold.hover:text-gold-strong",
+      "family": "Inter"
+    },
+    {
+      "fg": "#b45309",
+      "bg": "#ffffff",
+      "ratio": 5.02,
+      "size": 12,
+      "weight": 500,
+      "large": false,
+      "pass": true,
+      "count": 1,
+      "sample": "Development mode",
+      "where": "p.cl-internal-8yi57w",
+      "family": "Inter"
+    },
+    {
+      "fg": "#212126",
+      "bg": "#fafafa",
+      "ratio": 15.36,
+      "size": 17,
+      "weight": 700,
+      "large": false,
+      "pass": true,
+      "count": 1,
+      "sample": "Sign in to ever",
+      "where": "h1.cl-headerTitle.🔒️.cl-internal-1pgoci9",
+      "family": "Inter"
+    },
+    {
+      "fg": "#212126",
+      "bg": "#fafafa",
+      "ratio": 15.36,
+      "size": 13,
+      "weight": 500,
+      "large": false,
+      "pass": true,
+      "count": 2,
+      "sample": "Email address or username",
+      "where": "label.cl-formFieldLabel.cl-formFieldLabel__identifier-field.cl-required",
+      "family": "Inter"
+    }
+  ]
+}
