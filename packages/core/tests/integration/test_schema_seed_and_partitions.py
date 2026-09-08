@@ -153,8 +153,10 @@ def test_seeding_twice_leaves_the_same_rows(seed_db: str) -> None:
     assert set(first) == set(SEEDED_TABLES), "the seed no longer reports every table it writes"
     assert first == counts_after_first, "the seed reported rows it did not write"
     assert counts_after_first["exchanges"] == 2
-    assert counts_after_first["strategies"] == 8
-    assert counts_after_first["strategy_versions"] == 8
+    reference = _load_script("seed_reference")
+    expected = len(reference.STRATEGIES)  # o catalogo de referencia e a fonte, nao um numero fixo
+    assert counts_after_first["strategies"] == expected
+    assert counts_after_first["strategy_versions"] == expected
     assert counts_after_first["plan_entitlements"] == 36
     assert counts_after_first["feature_flags"] == 7
     # three generic presets plus the frozen paper_v1 of RISK_ENGINE.md §2

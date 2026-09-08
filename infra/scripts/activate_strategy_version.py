@@ -6,6 +6,17 @@
         --changelog "code_ref per version (MUST-FIX 1)"
     uv run python infra/scripts/activate_strategy_version.py momentum v1 --paper-line \
         --changelog "D10: the paper coorte" [--dry-run]
+    uv run python infra/scripts/activate_strategy_version.py breakout v1 --deprecate \
+        --changelog "K1: 0 decisions" [--successor v2] [--dry-run]
+
+``--deprecate`` (T3.39) sets ``status = 'deprecated'`` on an ``active`` row —
+the audited path for a version whose successor is a *parameter* variant
+(``derive_variant.py``), or that has no successor at all: ``--supersede``
+refuses both, on purpose, because it exists for a *code* change. ``status`` is
+the one field the freeze trigger leaves mutable, so nothing frozen moves.
+Refuses a ``purpose = 'live'`` row outright, and a ``purpose = 'paper'`` row
+unless ``--force-paper`` is given *and* it carries no open ``positions`` or
+``shadow_episodes`` slot (:mod:`hunter_strategy_worker.deprecate`).
 
 The first activation is irreversible by design (docs/DATABASE.md §16.1): the
 ``0002_shadow_lab`` trigger freezes ``code_ref``, ``parameters_schema``,
@@ -51,7 +62,9 @@ failure alike (T3.15c): an experiment whose start nobody can date is not one.
 
 Connects with ``DATABASE_URL_MIGRATIONS`` (direct, never the pooler), like
 ``infra/scripts/seed.py``. Shared checks in :mod:`hunter_strategy_worker.activation_db`;
-``--paper-line`` and derived activation in ``paper_line``/``activate_derived`` (budget).
+``--supersede``, ``--paper-line``, derived activation and ``--deprecate`` each live in
+their own module (``supersede``/``paper_line``/``activate_derived``/``deprecate``) — the
+350-line budget split them out one at a time as each mode was added.
 """
 
 from __future__ import annotations
@@ -75,7 +88,6 @@ from hunter_strategy_worker.activate_derived import (
 from hunter_strategy_worker.activation import validate_parameters
 from hunter_strategy_worker.activation_db import (
     PURPOSE_LIVE,
-    VERSION_RE,
     Refused,
     load_row,
     migration_applied,
@@ -86,9 +98,11 @@ from hunter_strategy_worker.activation_db import (
 )
 from hunter_strategy_worker.catalogue import registry_key, resolve_strategy
 from hunter_strategy_worker.code_ref import strategy_module, version_code_ref
+from hunter_strategy_worker.deprecate import deprecate
 from hunter_strategy_worker.paper_line import paper_line
+from hunter_strategy_worker.supersede import supersede
 
-__all__ = ["Refused", "activate", "main", "paper_line", "supersede"]
+__all__ = ["Refused", "activate", "deprecate", "main", "paper_line", "supersede"]
 
 
 def _resolve(
@@ -106,14 +120,6 @@ def _resolve(
             if strategy is not None:
                 return strategy
         raise Refused(f"this build has no code registered as {code_key} {version}") from exc
-
-
-def _next_version(version: str) -> str:
-    """``v1 -> v2``. Anything else is refused rather than guessed at."""
-    match = VERSION_RE.fullmatch(version)
-    if match is None:
-        raise Refused(f"cannot derive the next version from {version!r}: expected 'v<n>'")
-    return f"v{int(match.group(1)) + 1}"
 
 
 async def activate(
@@ -205,106 +211,28 @@ async def activate(
     )
 
 
-async def supersede(
-    conn: AsyncConnection,
-    key: str,
-    version: str,
-    changelog: str,
-    *,
-    dry_run: bool,
-    registry: StrategyRegistry = DEFAULT_REGISTRY,
-) -> str:
-    """Retire a frozen version and activate its successor, in one transaction.
-
-    The old row keeps every frozen field — the trigger would refuse anything
-    else, and rewriting an experiment's identity is what the freeze exists to
-    prevent. What moves to the successor is the experiment *content* read back
-    from that row (schema, parameters, ``params_format``), so the only thing
-    that actually changes is the ``code_ref`` and the version label.
-    """
-    if not await migration_applied(conn):
-        raise Refused("0002_shadow_lab is not applied: apply the migration before superseding")
-    row = await load_row(conn, key, version)
-    if row is None:
-        raise Refused(f"no strategy_version for {key} {version}")
-    if row.activated_at is None:
-        raise Refused(
-            f"{key} {version} was never activated: nothing is frozen, activate it instead"
-        )
-    # Resolved the way the *worker* resolves it, not by ``(key, version)``: a
-    # successor's version was bumped while its code stayed put, so ``v2`` has no
-    # registry entry and only its frozen ``code_ref`` can name the module. This
-    # is what lets a successor itself be superseded (Astra, S2 fixes diff
-    # review, HIGH b).
-    strategy = resolve_strategy(key, version, row.code_ref, registry)
-    if strategy is None:
-        raise Refused(
-            f"this build cannot bind {key} {version} to code: neither the registry nor its "
-            f"frozen code_ref ({row.code_ref}) names a module it carries"
-        )
-    code_ref = version_code_ref(strategy_module(strategy))
-    if row.code_ref == code_ref:
-        raise Refused(f"{key} {version} is already frozen against this code ({code_ref})")
-    successor = _next_version(version)
-    if await load_row(conn, key, successor) is not None:
-        raise Refused(f"{key} {successor} already exists: it may already be the successor")
-    schema: dict[str, Any] = dict(row.parameters_schema or {})
-    params: dict[str, Any] = dict(row.default_parameters or {})
-    report = validate_parameters(schema, params)
-    if not report.ok:
-        raise Refused(
-            f"the frozen parameters of {key} {version} do not match its own schema: "
-            + "; ".join(report.errors)
-        )
-    note = (
-        f"superseded by {successor} (code_ref {row.code_ref} -> {code_ref}); frozen fields "
-        f"cannot be corrected in place (DATABASE.md §16.1): {changelog}"
-    )
-    if dry_run:
-        return f"would supersede {key} {version} with {successor} at code_ref {code_ref}"
-    await conn.execute(
-        text(
-            "INSERT INTO strategy_versions (id, strategy_id, version, status, "
-            "parameters_schema, default_parameters, code_ref, params_format, changelog, "
-            "activated_at) VALUES (gen_random_uuid(), :strategy_id, :version, 'active', "
-            "CAST(:schema AS jsonb), CAST(:params AS jsonb), :code_ref, :params_format, "
-            ":changelog, now())"
-        ),
-        {
-            "strategy_id": row.strategy_id,
-            "version": successor,
-            "schema": json.dumps(schema, separators=(",", ":"), sort_keys=True),
-            "params": json.dumps(params, separators=(",", ":"), sort_keys=True),
-            "code_ref": code_ref,
-            "params_format": row.params_format,
-            "changelog": f"succeeds {version}: {changelog}",
-        },
-    )
-    await conn.execute(
-        text(
-            "UPDATE strategy_versions SET status = 'deprecated', deprecated_at = now(), "
-            "changelog = :changelog WHERE id = :id"
-        ),
-        {"changelog": note, "id": row.id},
-    )
-    await record_event(
-        conn,
-        "info",
-        "strategy_version_superseded",
-        f"{key} {version} -> {successor} with code_ref={code_ref}: {changelog}",
-    )
-    return f"superseded {key} {version} with {successor} at code_ref {code_ref}"
-
-
 async def _run(args: argparse.Namespace) -> int:
     engine = create_async_engine(migration_url(), connect_args={"statement_cache_size": 0})
     try:
-        action = paper_line if args.paper_line else supersede if args.supersede else activate
         try:
             async with engine.connect() as conn, conn.begin():
-                message = await action(
-                    conn, args.strategy, args.version, args.changelog, dry_run=args.dry_run
-                )
+                if args.deprecate:
+                    message = await deprecate(
+                        conn,
+                        args.strategy,
+                        args.version,
+                        args.changelog,
+                        dry_run=args.dry_run,
+                        successor=args.successor,
+                        force_paper=args.force_paper,
+                    )
+                else:
+                    action = (
+                        paper_line if args.paper_line else supersede if args.supersede else activate
+                    )
+                    message = await action(
+                        conn, args.strategy, args.version, args.changelog, dry_run=args.dry_run
+                    )
         except Refused as refusal:
             await record_failure(
                 engine, "warning", "strategy_version_activation_refused", str(refusal)
@@ -340,6 +268,23 @@ def main() -> int:
         action="store_true",
         help="derive a draft purpose=paper line (next free v<n>) from this frozen research "
         "version; activates nothing (T3.15, D10)",
+    )
+    mode.add_argument(
+        "--deprecate",
+        action="store_true",
+        help="set status=deprecated on this active version (T3.39); refuses purpose=live, and "
+        "refuses purpose=paper without --force-paper and a clean positions/shadow_episodes check",
+    )
+    parser.add_argument(
+        "--successor",
+        default=None,
+        help="--deprecate only: the version (v<n>) that replaces this one, named in the audit "
+        "trail; must already exist",
+    )
+    parser.add_argument(
+        "--force-paper",
+        action="store_true",
+        help="--deprecate only: required to deprecate a purpose=paper version",
     )
     return asyncio.run(_run(parser.parse_args()))
 

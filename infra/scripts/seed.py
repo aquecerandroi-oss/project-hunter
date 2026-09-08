@@ -17,19 +17,23 @@ script (DATABASE.md §16.1, §17.8 and §18.8).
 
 The content is the sibling ``seed_reference`` module (fractions as JSON strings
 included); this file is the writes. ``is_active`` on ``opportunity_weights`` is
-the one *operational* state here, handled as §17.8 says: promoted exactly once,
-on the run that first creates the profile, never touched on a row that exists.
+the one *operational* state here (§17.8): promoted exactly once, on the run
+that first creates the profile, never touched on a row that already exists.
 
-Connects with ``DATABASE_URL_MIGRATIONS`` (direct, never the pooler) over
-asyncpg, the only Postgres driver this workspace installs.
+Connects with ``DATABASE_URL_MIGRATIONS`` (direct, never the pooler) over asyncpg.
+
+The CLI (``__main__``) is :mod:`seed_cli` — ``--dry-run``, ``--only <table>``
+and the ``--yes``-gated risk directive (T3.39), split out for the 350-line
+budget. ``seed()`` below is unchanged, the plain entry point every caller uses.
 
 Usage:
     uv run python infra/scripts/seed.py
+    uv run python infra/scripts/seed.py --dry-run
+    uv run python infra/scripts/seed.py --only strategies
 """
 
 from __future__ import annotations
 
-import asyncio
 import sys
 import uuid
 from typing import Any
@@ -339,11 +343,7 @@ async def seed() -> dict[str, int]:
         await engine.dispose()
 
 
-def main() -> int:
-    for table, count in asyncio.run(seed()).items():
-        print(f"seeded {count:>3} row(s) into {table}")
-    return 0
-
-
 if __name__ == "__main__":
-    sys.exit(main())
+    import seed_cli
+
+    sys.exit(seed_cli.main())

@@ -228,6 +228,41 @@ ssh hunter-vps "docker exec hunter-api-1 python infra/scripts/activate_strategy_
 
 Sem aspas internas, por causa do PowerShell. Se aparecer `REFUSED: ... already carries its own default_parameters`, a imagem está **atrás** da T3.26c: faça o deploy e repita — não contorne editando o `changelog`.
 
+## 7b. Aposentar uma versão substituída por parâmetro (`--deprecate`, T3.39)
+
+`--supersede` só existe para uma sucessora de **código**: quando o `code_ref`
+já bate (uma variante por parâmetro, `derive_variant.py`), ele recusa de
+propósito ("already frozen against this code"). Até a T3.39 não havia via
+auditada para aposentar essa versão — nem uma sem sucessora nenhuma (K1: 0
+decisões, `breakout v1`; recomendação descartar, `breakout v2`). `--deprecate`
+é essa via: um `UPDATE status = 'deprecated'` (o único campo que a trigger de
+congelamento deixa mutável, DATABASE.md §16.1), com o mesmo padrão de
+auditoria em `system_events` — motivo, sucessora (se `--successor v<n>` for
+dado) e o `code_ref`/`params_hash` congelados da versão.
+
+**Recusas estruturais, não configuráveis:**
+- `purpose = 'live'`: nunca aposentada por este script (Fase 4,
+  `ENABLE_LIVE_TRADING=false`);
+- `purpose = 'paper'` (a linha da carteira): exige `--force-paper` **e** nenhuma
+  posição aberta (`positions` via `agents.strategy_version_id`) nem slot de
+  shadow em rastreamento (`shadow_episodes.open_outcome_signal_id`) — a
+  diretriz do risk-engine-guardian para esta tarefa: "uma versão sendo
+  aposentada nunca pode ser a linha paper com posições abertas".
+
+O roster do strategy-worker (`load_version_roster`) já filtra por
+`status = 'active'`; uma versão aposentada some do próximo recarregamento sem
+qualquer outro passo.
+
+```
+uv run python infra/scripts/activate_strategy_version.py breakout v1 --deprecate \
+    --changelog "K1: 0 decisões, custo de 200 avaliações/15min sem sinal" --dry-run
+uv run python infra/scripts/activate_strategy_version.py breakout v2 --deprecate \
+    --changelog "K1: descartar — bruta +0,01R líquida -0,08R em 8 decisões" --dry-run
+```
+
+Sem `--dry-run` para gravar. Na VPS, o mesmo comando dentro do container:
+`docker exec hunter-api-1 python infra/scripts/activate_strategy_version.py breakout v1 --deprecate --changelog "..."`.
+
 ## O que continua igual depois do passo 8
 - Só ordens a mercado, só SPOT, sem alavancagem; fill pelo livro elegível após a latência declarada; sem fill fabricado.
 - Risco 0,25 % por operação incluindo custos, soma ≤ 1 %, participação ≤ 1 % do minuto, β-BTC ≤ 0,5×, total ≤ 40 %, por moeda ≤ 10 %, máx. 5 posições, pendentes contam.
@@ -235,7 +270,38 @@ Sem aspas internas, por causa do PowerShell. Se aparecer `REFUSED: ... already c
 - Uma proposta por ciclo (D3), `research_only` nunca vira ordem, `live` recusado por nome, `ENABLE_LIVE_TRADING=false`.
 
 ## Como desligar
-`ENABLE_PAPER_AUTONOMY=false` + `compose.sh update` para a ponte parar de consumir (posições abertas continuam protegidas pelo worker). `activate_strategy_version.py momentum v2 --deprecate` não existe: deprecar é um `UPDATE status='deprecated'` auditado pelo dono do banco — registrar na T3.10 se virar rotina.
+`ENABLE_PAPER_AUTONOMY=false` + `compose.sh update` para a ponte parar de consumir (posições abertas continuam protegidas pelo worker). Aposentar a própria linha paper é `activate_strategy_version.py <key> <version> --deprecate --force-paper` (§7b) — só depois de zerar posições e slots de shadow.
+
+## 9. Re-seed seguro (`seed.py --dry-run` / `--only`, T3.39)
+
+`seed.py` sem argumentos sempre fez tudo numa transação — inclusive
+`risk_profiles`, cujos limites são a diretriz do Everton (RISK_ENGINE.md §2).
+Duas lacunas fechadas nesta tarefa: não dava para reexecutar só a tabela
+`strategies` (a chave `session_orb` está faltando na VPS; as descrições de
+`breakout`/`mean_reversion` estão desatualizadas na tela do Lab), e não havia
+como ver o que mudaria antes de escrever.
+
+- `--dry-run`: roda todo escritor que a invocação rodaria, imprime o diff
+  exato (`tabela.chave: campo: antigo -> novo`, ou `NEW` para uma linha nova) e
+  desfaz a transação — nada é gravado.
+- `--only strategies|risk_profiles|feature_definitions|opportunity_weights`:
+  restringe a transação a essa tabela só (`strategies` inclui
+  `strategy_versions`, o rascunho `v1`; `risk_profiles` inclui `paper_v1`, como
+  o `seed()` padrão já faz).
+- Sem `--only`, uma mudança nos limites de `risk_profiles` (qualquer um dos
+  três presets ou `paper_v1`) recusa a gravação sem `--yes` — a diretriz:
+  limite não muda sem ser apresentado antes. `--dry-run` é como se apresenta.
+
+**Pendência do operador hoje** (VPS, dentro do container da API):
+
+```
+docker exec hunter-api-1 python infra/scripts/seed.py --only strategies --dry-run
+docker exec hunter-api-1 python infra/scripts/seed.py --only strategies
+```
+
+O primeiro comando mostra exatamente a linha nova (`strategies.session_orb: NEW
+...`) e as descrições que mudariam; o segundo grava. Nenhum dos dois toca
+`risk_profiles`, `feature_definitions` ou `opportunity_weights`.
 
 ## Onde acompanhar
 `/ever/portfolio` (patrimônio, kill switch, curva), `/ever/system` (worker, `autonomy`, pendências, proteções), `hb:execution:paper` no Redis, `obsidian/05-EXPERIMENTS/EXP-0005-momentum-paper.md`.
