@@ -88,6 +88,7 @@ from hunter_core.db.models.markets import Asset, Exchange, Market
 from hunter_core.db.models.paper_execution import ParticipationConsumption, PortfolioExitIntent
 from hunter_core.db.models.paper_wallet import PortfolioCurrencyAnchor, PortfolioRiskState
 from hunter_core.db.models.portfolios import Portfolio, PortfolioEquitySnapshot, RiskProfile
+from hunter_core.db.models.replay_runs import ReplayRunRow
 from hunter_core.db.models.risk import KillSwitchTransition, RiskEvent
 from hunter_core.db.models.system import (
     AuditLog,
@@ -211,6 +212,7 @@ __all__ = [
     "PortfolioRiskState",
     "Position",
     "ProcessedEvent",
+    "ReplayRunRow",
     "RiskEvent",
     "RiskProfile",
     "ShadowEpisode",

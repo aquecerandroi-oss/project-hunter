@@ -36,7 +36,7 @@ from hunter_strategy_worker.replay.environment import (
     ReplayClock,
     ReplayHotState,
 )
-from hunter_strategy_worker.replay.ledger import ReplayRun
+from hunter_strategy_worker.replay.ledger import ReplayRun, record_slice
 from hunter_strategy_worker.replay.simulate import ReplayWindow, bar_closes
 
 pytestmark = pytest.mark.unit
@@ -368,3 +368,30 @@ class TestLedger:
         assert row["market_count"] == 3
         assert row["window_from"] == "2026-08-08T00:00:00+00:00"
         assert row["decision_lag_s"] == REPLAY_DECISION_LAG_S
+
+    async def test_a_database_still_at_0012_keeps_the_other_two_branches(self) -> None:
+        """``replay_runs`` missing degrades; it never poisons the transaction.
+
+        A statement against a relation that does not exist aborts the *whole*
+        transaction, which would take the ``system_events`` half of the receipt
+        down with it — a replay of thirty minutes reporting nothing at all
+        because a deploy ran the image before the migration. So ``record_slice``
+        asks ``to_regclass`` first (the shape DATABASE.md §17.2 gives the
+        scanner's baseline-lock probe), logs an ``error`` naming the revision,
+        and returns ``None`` without issuing an ``INSERT``.
+        """
+        session = _SessionWithoutTheTable()
+        assert await record_slice(cast(Any, session), self._run()) is None
+        assert len(session.statements) == 1, "the probe ran; the INSERT never did"
+        assert "to_regclass" in session.statements[0]
+
+
+class _SessionWithoutTheTable:
+    """A session on a database still at ``0012``: ``to_regclass`` answers NULL."""
+
+    def __init__(self) -> None:
+        self.statements: list[str] = []
+
+    async def scalar(self, statement: Any, params: Any = None) -> Any:
+        self.statements.append(str(statement))
+        return None

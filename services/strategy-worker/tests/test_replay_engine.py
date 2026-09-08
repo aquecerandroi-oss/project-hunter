@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -41,6 +42,7 @@ from hunter_strategy_worker.replay.ledger import (
     ReplayRun,
     append_jsonl,
     record_run,
+    record_slice,
 )
 from hunter_strategy_worker.replay.simulate import (
     ReplayWindow,
@@ -155,12 +157,15 @@ async def replay_db(db_session_factory: Any) -> dict[str, Any]:
             )
     async with db_session_factory() as owner, owner.begin():
         await isolate_catalogue(owner, keep=key)
-        # ``system_events`` is append-only for ``hunter_worker`` (ddl/grants.py):
-        # only the owner may clear the previous scenario's receipts.
+        # ``system_events`` is append-only for ``hunter_worker`` (ddl/grants.py)
+        # and ``replay_runs`` is append-only for it too (0013, DATABASE.md §25.4):
+        # only the owner may clear the previous scenario's receipts. That the
+        # worker cannot is the point of the table, not an inconvenience here.
         await owner.execute(
             text("DELETE FROM system_events WHERE component = :component"),
             {"component": COMPONENT},
         )
+        await owner.execute(text("DELETE FROM replay_runs"))
     async with role_session(db_session_factory, db_role="hunter_worker") as session:
         versions = await load_active_versions(session)
         market = await load_market(session, EXCHANGE, SYMBOL)
@@ -389,6 +394,29 @@ class TestTheCandleCache:
         assert beyond == []
 
 
+def _ledger_row(db: dict[str, Any], *, result: Any, population: Any) -> ReplayRun:
+    """The receipt of the slice ``_run_replay`` just executed."""
+    return ReplayRun(
+        run_id=RUN_ID,
+        cohort=REPLAY_COHORT,
+        strategy_version_id=db["version"].id,
+        version_label="volume_anomaly v1",
+        window_from=WINDOW.start,
+        window_to=WINDOW.end,
+        markets=(f"{EXCHANGE}:{SYMBOL}",),
+        started_at=CUT,
+        finished_at=CUT + timedelta(seconds=5),
+        bars_evaluated=result.bars,
+        signals=population.signals,
+        outcomes_resolved=population.outcomes,
+        outcomes_open=population.open,
+        seconds=5.0,
+        decision_lag_s=2,
+        workers=1,
+        evaluations_by_state=dict(result.states),
+    )
+
+
 @pytest.mark.integration
 class TestTheLedger:
     async def test_the_run_leaves_a_receipt_in_system_events_and_on_disk(
@@ -397,25 +425,7 @@ class TestTheLedger:
         result = await _run_replay(replay_db)
         async with role_session(replay_db["factory"], db_role="hunter_worker") as session:
             population = await count_population(session, cohort=REPLAY_COHORT)
-            run = ReplayRun(
-                run_id=RUN_ID,
-                cohort=REPLAY_COHORT,
-                strategy_version_id=replay_db["version"].id,
-                version_label="volume_anomaly v1",
-                window_from=WINDOW.start,
-                window_to=WINDOW.end,
-                markets=(f"{EXCHANGE}:{SYMBOL}",),
-                started_at=CUT,
-                finished_at=CUT + timedelta(seconds=5),
-                bars_evaluated=result.bars,
-                signals=population.signals,
-                outcomes_resolved=population.outcomes,
-                outcomes_open=population.open,
-                seconds=5.0,
-                decision_lag_s=2,
-                workers=1,
-                evaluations_by_state=dict(result.states),
-            )
+            run = _ledger_row(replay_db, result=result, population=population)
             await record_run(session, run)
         ledger = tmp_path / "replay.jsonl"
         append_jsonl(ledger, run)
@@ -439,3 +449,88 @@ class TestTheLedger:
         assert row.data["bars_evaluated"] == 12
         assert row.data["signals"] == 1
         assert row.data["market_count"] == 1
+        # ``record_run`` writes the durable half first, in the same transaction:
+        # a published event no stored row explains is the disagreement the outbox
+        # pattern exists to prevent, one table over.
+        async with role_session(replay_db["factory"], db_role="hunter_worker") as session:
+            stored = await session.scalar(
+                text("SELECT count(*) FROM replay_runs WHERE run_id = :run"), {"run": RUN_ID}
+            )
+        assert stored == 1
+
+    async def test_the_run_is_written_to_replay_runs_once_per_slice(
+        self, replay_db: dict[str, Any]
+    ) -> None:
+        """The third branch of the receipt — ``0013_replay_runs``, DATABASE.md §25.
+
+        It is the durable one: ``system_events`` keeps the same JSON for 30 days
+        and the JSONL only exists if somebody kept the file. Two assertions,
+        because the table makes two promises: the row is written **as the
+        worker** (``SELECT``/``INSERT`` and nothing else), and re-running the
+        same slice writes one receipt, not two — the idempotence
+        ``uq_replay_runs_slice`` states and ``ON CONFLICT DO NOTHING`` honours.
+        """
+        result = await _run_replay(replay_db)
+        async with role_session(replay_db["factory"], db_role="hunter_worker") as session:
+            population = await count_population(session, cohort=REPLAY_COHORT)
+            run = _ledger_row(replay_db, result=result, population=population)
+            first = await record_slice(session, run)
+            second = await record_slice(session, run)
+        assert first is not None, "the first slice writes its receipt"
+        assert second is None, "the same slice twice is one receipt"
+
+        async with role_session(replay_db["factory"], db_role="hunter_worker") as session:
+            row = (
+                await session.execute(
+                    text(
+                        "SELECT id, run_id, cohort, strategy_version_id, markets, "
+                        "bars_evaluated, signals, outcomes_resolved, seconds, decision_lag_s, "
+                        "workers, evaluations_by_state, errors, window_from, window_to "
+                        "FROM replay_runs WHERE run_id = :run"
+                    ),
+                    {"run": RUN_ID},
+                )
+            ).one()
+        assert row.id == first
+        assert row.cohort == REPLAY_COHORT
+        assert row.strategy_version_id == replay_db["version"].id
+        assert row.markets == [f"{EXCHANGE}:{SYMBOL}"]
+        assert row.bars_evaluated == 12
+        assert row.signals == 1
+        assert row.window_from == WINDOW.start
+        assert row.window_to == WINDOW.end
+        assert row.decision_lag_s == 2
+        assert row.workers == 1
+        assert row.errors == 0
+        assert row.evaluations_by_state == dict(result.states)
+        assert row.seconds == Decimal("5.000"), "seconds is NUMERIC(12,3), never a float"
+
+    async def test_a_second_slice_of_the_same_run_is_its_own_receipt(
+        self, replay_db: dict[str, Any]
+    ) -> None:
+        """One row per slice (§25.1): the window is what tells two apart, and
+        ``bars_evaluated`` is the column that sums back into the run."""
+        result = await _run_replay(replay_db)
+        async with role_session(replay_db["factory"], db_role="hunter_worker") as session:
+            population = await count_population(session, cohort=REPLAY_COHORT)
+            base = _ledger_row(replay_db, result=result, population=population)
+            await record_slice(session, base)
+            await record_slice(
+                session,
+                replace(
+                    base,
+                    window_from=WINDOW.end,
+                    window_to=WINDOW.end + timedelta(minutes=60),
+                ),
+            )
+        async with role_session(replay_db["factory"], db_role="hunter_worker") as session:
+            slices, bars = (
+                await session.execute(
+                    text(
+                        "SELECT count(*), sum(bars_evaluated) FROM replay_runs WHERE run_id = :run"
+                    ),
+                    {"run": RUN_ID},
+                )
+            ).one()
+        assert slices == 2
+        assert bars == 24

@@ -124,7 +124,7 @@ Partições são criadas com 3 meses de antecedência por `infra/scripts/create_
 
 **A promessa vale no mesmo instante**, e é assim que ela é verdadeira (revisão da Astra deste diff). A retenção é contada em dias inteiros, então a expiração de um mês vira à meia-noite UTC: 04:07 → 04:12 não cruza a borda, 23:59 → 00:01 cruza. Um plano montado antes da virada e podado depois pode criar um mês que a poda seguinte derruba — **uma vez**, e o próprio plano do dia seguinte já não o contém. Não é perda de dado: o que é derrubado nesse caso é justamente um mês cuja última linha retida acabou de expirar.
 
-`funding_rates` e `open_interest_history` **não são particionadas** (§4), então backfill de funding e de open interest nunca depende deste job — não há nada a provisionar para elas.
+`funding_rates` e `open_interest_history` **não são particionadas** (§4), então backfill de funding e de open interest nunca depende deste job — não há nada a provisionar para elas. `replay_runs` (`0013`, §25) também não é particionada **e não tem retenção**: é o registro de pesquisa, algumas dezenas de linhas por dia no pior caso, e apagá-la por idade seria apagar exatamente a contagem de tentativas que o protocolo de replicação existe para manter.
 
 Tudo continua idempotente e sem trava longa: só `CREATE TABLE IF NOT EXISTS ... PARTITION OF` de partições **vazias** (nunca `ATTACH` sobre dados), uma transação por pai, `lock_timeout = 3s`. Os meses para trás são criados no nível que de fato os possui — o nível LIST (`candles_1m`, `candles_5m`, …, `portfolio_equity_snapshots_1m`, …), nunca na raiz —, que é a mesma estrutura LIST-depois-RANGE descrita acima; **não há sub-partição por hash em lugar nenhum do schema**. O planejamento mora em `infra/scripts/partition_plan.py` — `create_partitions.py` passou de 341 para além do orçamento de 350 linhas com esta mudança e o *plano* saiu do *executor*; o script reexporta `planned_groups`/`planned_statements`, que são o que os testes carregam por caminho.
 
@@ -1562,6 +1562,8 @@ só com `SELECT`.
 | `WORKER_WRITE_TABLES`, `SHADOW_WORKER_WRITE_TABLES`, `ANALYSIS_WORKER_WRITE_TABLES` | `0001`–`0003` | `hunter_worker` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` — **exceto `strategy_versions`** desde a `0010`/`0011` (nota abaixo) |
 | `ANALYSIS_WORKER_APPEND_TABLES` | `0003` | `hunter_worker` | `SELECT`/`INSERT`/`DELETE` |
 | `BASELINE_LOCK_TABLES_0005` | `0005` | `hunter_worker` | `+ UPDATE` **só como lock** (`ddl/baseline_lock.py`) |
+| `REPLAY_APP_READ_ONLY_TABLES` | `0013` | `hunter_app` | `SELECT` (`ddl/replay_runs.py`, §25.4) |
+| `REPLAY_WORKER_APPEND_TABLES` | `0013` | `hunter_worker` | `SELECT`/`INSERT` — nunca `UPDATE`/`DELETE` (idem) |
 
 A última linha não é uma classe nova de tabela: é um privilégio acrescentado a
 uma tabela que a `0003` já classificou, e
@@ -4024,3 +4026,245 @@ sessão, sem `LISTEN`/`NOTIFY`, sem advisory lock de sessão.
 | `hunter_strategy_worker/replication_stats.py` | `load_promising_at` lê a **coluna** primeiro (depois `changelog`, depois `system_events`); `load_sibling_rows` reconhece irmã por coluna **ou** rótulo |
 | T3.18 (placar) | passa a poder ler `strategy_versions.promising_at` direto para o bloco fora da amostra, em vez de `load_promising_at`. O contrato está em `.claude/state/notes-T3.19c.md`; **a API não foi ligada nesta tarefa** |
 | `services/execution-worker/bridge_screen.py` | **nada a mudar** — ele já recusa toda coorte que não seja `prospective` (T3.15e). A diferença é que agora existe uma coorte de verdade para ele recusar |
+
+## 25. O recibo de um replay vira evidência durável — M3 (`0013_replay_runs`)
+
+Décima terceira revisão. **Uma tabela**, um índice, dois `GRANT`. Nenhuma coluna
+nova em tabela existente, nenhum enum, nenhum trigger, nenhuma partição, nenhuma
+política de RLS. Ela responde ao brief que a T3.19b escreveu **em vez de** uma
+migração (`.claude/state/brief-T3.19b-db-replay-runs.md`), porque o brief daquela
+tarefa proibia o autor de escrever a própria migração.
+
+O motor de replay já produzia a linha de livro-razão e a gravava em dois lugares,
+e nenhum dos dois responde à pergunta que o placar e o plantão fazem — *quantas
+operações simuladas esta versão já acumulou, sobre que janela, e quando?*:
+
+| Onde a linha já morava | Por que não basta |
+|---|---|
+| `system_events` (`component = 'replay_engine'`, `event = 'replay_run_finished'`) | **retenção de 30 dias** (§1.3), enquanto o `docs/plans/REPLICATION.md` conta 15 e 30 dias de resultados *depois* de um marco. O canal operacional expira antes da pergunta que ele deveria sustentar |
+| um JSONL local (`--ledger caminho.jsonl`) | honesto e frágil: prova uma corrida só se alguém guardou o arquivo |
+
+`0013_replay_runs` tem 17 caracteres; o teto de `alembic_version.version_num`
+continua sendo 32 (§17.6). As listas desta revisão estão congeladas em
+`ddl/replay_runs.py`, no padrão de §15.6/§16.5/§17.6/§18.9/§19/§20/§21/§22/§24.
+
+A frase que organiza tudo abaixo: **um recibo que o próprio escritor pode editar
+não é recibo** — e é dessa frase que a forma da tabela decorre, não o contrário.
+
+### 25.1 Uma linha por **fatia**, não por corrida
+
+O brief deixou a decisão para esta tarefa e recomendou (a); a decisão é (a), e a
+razão vai além da recomendação.
+
+| Opção | O que dá | O que custa |
+|---|---|---|
+| **(a) uma linha por fatia** — `id` é `uuid7` novo, `run_id` é coluna, `UNIQUE (run_id, window_from, window_to)` | o histórico de throughput fatia a fatia; somar reconstrói a corrida | uma linha a mais por comando |
+| (b) uma linha por corrida, acumulada por `UPSERT` (`bars_evaluated = bars_evaluated + :n`) | o total | **exige `UPDATE` na própria tabela**, e perde a cadência para sempre |
+
+Duas coisas decidem, e a segunda é a que fecha:
+
+1. **a fatia é a unidade que de fato acontece.** A prova da T3.19b rodou 31 dias
+   em **onze comandos** sob a *mesma* coorte (`.claude/state/notes-T3.19b.md`
+   §4.1). Somar fatias é sempre possível; separar uma corrida de volta em fatias
+   não é;
+2. **(b) exigiria dar `UPDATE` ao escritor.** O único escritor é o
+   strategy-worker (`replay/ledger.py`), e a regra de `audit_logs`,
+   `risk_events` e `kill_switch_transitions` desde a `0001` (§1.2) é que quem
+   escreve evidência não a reescreve. A forma da tabela não é uma preferência de
+   modelagem: é a consequência do grant que a §25.4 fixa.
+
+`UNIQUE (run_id, window_from, window_to)` é o que torna **repetir uma fatia
+idempotente** — a mesma propriedade que a identidade `uuid5` dos sinais já
+garante do outro lado. O escritor usa `ON CONFLICT DO NOTHING` (e não
+`DO UPDATE`, que o grant recusaria): reexecutar uma fatia grava um recibo, não
+dois, e o número de throughput não dobra.
+
+### 25.2 A tabela
+
+```
+replay_runs                                  (global, append-only, não particionada)
+  id uuid PK (uuid7)
+  run_id uuid NOT NULL                       -- o <uuid> de replay:<uuid>
+  cohort text NOT NULL
+  strategy_version_id uuid NOT NULL -> strategy_versions(id) ON DELETE CASCADE
+  window_from, window_to timestamptz NOT NULL          -- [from, to), semiaberto
+  markets text[] NOT NULL                    -- <exchange>:<symbol>
+  started_at, finished_at timestamptz NOT NULL
+  bars_evaluated, signals, outcomes_resolved, outcomes_open integer NOT NULL
+  seconds numeric(12,3) NOT NULL
+  decision_lag_s integer NOT NULL
+  workers smallint NOT NULL
+  evaluations_by_state jsonb NOT NULL DEFAULT '{}'
+  errors integer NOT NULL DEFAULT 0
+  created_at timestamptz NOT NULL DEFAULT now()
+  UNIQUE (run_id, window_from, window_to)              -- uq_replay_runs_slice
+  INDEX  (strategy_version_id, window_from)            -- ix_replay_runs_version_window
+```
+
+Dez CHECKs, e cada um fecha uma forma diferente de escrever um recibo que não é
+um:
+
+| CHECK | O que se tornou irrepresentável |
+|---|---|
+| `ck_replay_runs_cohort_is_a_replay_cohort` (`cohort ~ '^replay:<uuid>$'`) | uma corrida rotulada `prospective` ou `replication:<pai>:<k>`. As duas são populações do relógio vivo; uma linha aqui existe justamente porque uma janela do passado foi replayada |
+| `ck_replay_runs_cohort_names_the_run` (`cohort = 'replay:' \|\| run_id::text`) | o rótulo e o `run_id` discordarem. A redundância é deliberada e, ao contrário de prosa, incapaz de derivar |
+| `ck_replay_runs_window_is_half_open` (`window_to > window_from`) | uma janela vazia, e — com o semiaberto — duas fatias adjacentes visitando a mesma barra |
+| `ck_replay_runs_finished_after_it_started` | uma corrida que terminou antes de começar |
+| `ck_replay_runs_counts_are_not_negative` | barras, sinais, desfechos, erros, segundos ou lag negativos |
+| `ck_replay_runs_resolved_within_the_population` (`outcomes_resolved <= signals`) | mais desfechos resolvidos do que sinais existem |
+| `ck_replay_runs_a_slice_visited_a_market` (`cardinality(markets) > 0`) | um recibo de uma fatia que não visitou mercado nenhum — `run.py` recusa a corrida antes disso (`no market matched the selection`), então o CHECK só torna a recusa durável |
+| `ck_replay_runs_a_slice_had_at_least_one_worker` (`workers >= 1`) | uma fatia executada por zero processos |
+| `ck_replay_runs_evaluations_is_an_object` (`jsonb_typeof(...) = 'object'`) | um `evaluations_by_state` que é lista ou escalar — o precedente é o CHECK de forma de `request_payload` (§21.1) |
+
+**`seconds` é `numeric(12,3)`, nunca `double precision`**, e isso é acréscimo às
+convenções numéricas do §1, no mesmo espírito de `funding_rates.rate` (§15.7) e
+de `market_betas.beta` (§18.6): não é dinheiro (`NUMERIC(28,10)`) nem fração de
+apresentação (`NUMERIC(9,6)`) — é **duração**, e ela vira **taxa** num relatório
+(`bars_evaluated / seconds`). Três casas é a resolução que `time.perf_counter()`
+merece sobre uma corrida de minutos; doze dígitos são onze anos deles. O escritor
+liga o parâmetro como **string** e converte no SQL, pela mesma razão pela qual
+todo número canonicalizado do projeto é string (§17.8, §21.1).
+
+**A coorte é a mesma gramática, escrita três vezes e comparada por teste.**
+`hunter_core.domain.enums.REPLAY_COHORT_PATTERN` é a constante viva (nova nesta
+tarefa), `ddl/replay_runs.py::REPLAY_COHORT_PATTERN_0013` é a **cópia congelada**
+que a revisão instala — cópia e nunca import, pela razão de sempre
+(`ddl/paper_geometry.py`: o contrato do banco não pode seguir em silêncio uma
+edição posterior de uma constante Python) — e o modelo ORM lê a constante viva.
+`test_migrations.py::test_0013_and_the_domain_constant_agree_on_the_replay_grammar`
+compara as três **e** prova que o padrão é o segundo ramo de
+`SHADOW_COHORT_PATTERN` caractere por caractere, de modo que um recibo nunca
+carrega uma coorte que `shadow_episodes` recusaria, nem o contrário.
+
+**Três colunas contam a corrida inteira, não a fatia — e isso está declarado
+aqui em vez de ser descoberto pelo primeiro `SUM`.** `count_population`
+(`replay/simulate.py`) conta as linhas *da coorte*, sem filtro de janela, porque
+um número que um processo guarda na memória não é evidência sobre o que foi
+escrito. Logo:
+
+| Coluna | Escopo |
+|---|---|
+| `bars_evaluated`, `seconds`, `errors`, `workers`, `evaluations_by_state` | **da fatia** — somar reconstrói a corrida |
+| `signals`, `outcomes_resolved`, `outcomes_open` | **da coorte inteira, no instante em que a fatia terminou** — um total corrente. O número da corrida é o da **última** fatia; somá-los multiplica a população |
+
+Mudar isso seria mudar o que a prova da T3.19b relatou (o mesmo JSON já está em
+`system_events` com esse significado), então o que muda é a documentação, não o
+número.
+
+**O que do `to_jsonable()` deliberadamente *não* virou coluna**, pela doutrina do
+§17.8 (uma segunda verdade diverge): `version_label` (é
+`strategies.key || ' ' || strategy_versions.version`, um join a partir de
+`strategy_version_id`), `market_count` (`cardinality(markets)`) e
+`bars_per_second` (`bars_evaluated / seconds`). Os três continuam no JSON do
+`system_events` e do JSONL, que são documentos e não tabelas.
+
+### 25.3 Índices
+
+- PK (`id`);
+- `uq_replay_runs_slice (run_id, window_from, window_to)` — a idempotência da
+  §25.1, e o índice que serve a consulta por `run_id` (ela é a coluna líder);
+- `ix_replay_runs_version_window (strategy_version_id, window_from)` — a
+  pergunta do placar, e o índice que o §1 exige da chave estrangeira.
+  Ascendente, como toda a §15.3 manda, embora a leitura seja decrescente.
+
+**Sem partição**, e a razão é aritmética: uma corrida por versão por janela é da
+ordem de dezenas de linhas por dia, não de milhões. **Sem retenção**, e a razão
+é a regra do `Registro de Tentativas`: estas linhas são o registro de pesquisa, e
+apagá-las por idade apagaria a contagem de tentativas que o protocolo de
+replicação existe para manter (§1.3 registra a ausência em vez de deixá-la
+parecer esquecimento).
+
+### 25.4 Grants — papel × tabela
+
+| Papel | `replay_runs` |
+|---|---|
+| `hunter_app` (API) | `SELECT` |
+| `hunter_worker` (motor) | `SELECT`, `INSERT` — **nunca `UPDATE`, nunca `DELETE`** |
+| dono / `DATABASE_URL_MIGRATIONS` | tudo |
+
+É exatamente a forma que `fx_observations` já tem (§18.9): leitura para o papel
+que lê o placar, acréscimo para o papel que produz o fato. O `UPDATE` ausente não
+é folga sobrando — é a §25.1 inteira: com ele, a opção (b) seria possível e um
+recibo passaria a ser editável pelo processo que o escreveu.
+
+Nenhuma classe de grant nova e nenhuma tabela reclassificada:
+`REPLAY_APP_READ_ONLY_TABLES` e `REPLAY_WORKER_APPEND_TABLES` (ambas
+`("replay_runs",)`) entram na união que
+`test_schema_privileges.py::test_the_grant_lists_cover_every_table_exactly_once`
+compara com o `pg_class` vivo — a partição exata do schema do §15.6 continua
+exata. Provado **como o papel**, não perguntado ao catálogo:
+`test_the_worker_appends_a_replay_receipt_and_can_never_edit_it` (o `INSERT`
+passa; o `UPDATE` e o `DELETE` batem em *permission denied*) e
+`test_the_app_role_reads_a_replay_receipt_and_writes_none_of_it`.
+
+### 25.5 RLS: nenhuma, e isso é afirmação
+
+`replay_runs` é **global** (§1.1), como `agent_signals`, `signal_outcomes`,
+`shadow_episodes` e `feature_baselines`: pesquisa sombra não tem
+`organization_id` e nunca teve RLS. Nada nesta revisão cria dado de tenant, e um
+replay não pode chegar a uma carteira — a coorte é recusada por nome na ponte
+(`cohort_not_live`), a versão é `research_only`, não há linha em `agents` e,
+desde a T3.19b, um replay não escreve `shadow_outbox`.
+
+A ausência é **asserida**, não suposta:
+`test_schema_privileges.py::test_replay_runs_is_global_and_carries_no_tenant_column`
+lê `information_schema.columns` e `pg_policy` e exige zero em ambos — porque "não
+precisa de política" e "alguém esqueceu a política" são indistinguíveis de fora,
+e uma coluna de tenant aparecendo aqui depois passaria a exigir RLS.
+
+### 25.6 Guardas
+
+**Não há guarda de upgrade, e isso é afirmação.** A revisão cria uma tabela que
+não existia; não há linha guardada que ela possa tornar irrepresentável — a mesma
+afirmação da `0007` (§19.5), da `0008` (§20.5), da `0009` (§21.4), da `0010`
+(§22.1) e da `0012` (§24.6).
+
+**O downgrade recusa enquanto houver um recibo** (§17.7: reverter é permitido,
+perder evidência não é):
+
+| Guarda | O que se perderia |
+|---|---|
+| qualquer linha em `replay_runs` | a **única** cópia durável de quantas decisões simuladas uma versão acumulou. `system_events` guarda o mesmo JSON por 30 dias e depois o apaga; o JSONL só existe se alguém passou `--ledger` e guardou o arquivo. "A migração reverteu sem erro" seria o único relatório da perda |
+
+Ela conta os infratores e recusa nomeando-os, com a instrução de exportar antes
+(`COPY (SELECT * FROM replay_runs) TO ...`) — o mesmo limite declarado do §18.9 e
+do §24.6: exportar não muda predicado nenhum, e o downgrade de um banco que já
+replayou não é operação de rotina. Num banco onde nenhum replay rodou a guarda
+conta zero e o downgrade segue —
+`test_0013_reverses_on_a_database_that_never_replayed` é essa metade.
+
+### 25.7 Trava, pooler e o que muda para as tarefas vizinhas
+
+**Trava.** `CREATE TABLE` não toma trava numa relação que ainda não existe, e os
+dois `GRANT` travam só o catálogo (a mesma medição da `0005`, §15.6). Esta
+revisão **não abre janela de manutenção** — ao contrário da `0010` e da `0012`,
+que fazem `ALTER TABLE` validante.
+
+**Pooler.** Nada aqui depende de estado de sessão: uma tabela, um índice, dois
+`GRANT`. Sem prepared statement de sessão, sem `LISTEN`/`NOTIFY`, sem advisory
+lock de sessão.
+
+**Vizinhos.**
+
+| Onde | O que muda |
+|---|---|
+| `hunter_strategy_worker/replay/ledger.py` | ganha `record_slice()` — o **terceiro ramo**, não uma reescrita. `record_run()` chama-o **antes** do `INSERT` em `system_events`, na mesma transação do chamador: um evento publicado que nenhuma linha gravada explica é a discordância que a outbox existe para impedir, uma tabela ao lado. O JSONL continua sendo escrito fora da transação, como sempre |
+| idem | `record_slice` **sonda** `to_regclass('public.replay_runs')` antes de escrever. Não é excesso de zelo: um statement contra relação inexistente **aborta a transação inteira**, e um banco ainda na `0012` perderia junto a metade `system_events` do recibo — meia hora de corrida relatando nada por causa de uma ordem de deploy. Faltando a tabela, o log sai em `error` nomeando a revisão a aplicar (nunca em silêncio) e os outros dois ramos gravam. É a forma que o §17.2 dá à sonda de lock do scanner, uma tabela adiante |
+| `hunter_core.domain.enums` | constante nova `REPLAY_COHORT_PATTERN` (o segundo ramo de `SHADOW_COHORT_PATTERN`, sozinho) |
+| `hunter_core.db.models.replay_runs` | `ReplayRunRow` — `...Row` e não `ReplayRun` pela razão que o §15.9 dá para `MarketRegimeRow`: `hunter_strategy_worker.replay.ledger.ReplayRun` é a forma em memória do mesmo recibo, e duas coisas diferentes com um nome só numa lista de import é como um teste acaba afirmando sobre a errada |
+| API / placar (T3.18) | **nada foi ligado nesta tarefa.** O grant existe (`SELECT`) e a consulta do placar tem índice; escrever o handler é de quem é dono de `apps/**` |
+| `services/execution-worker/**` | **nada a mudar** — nenhuma linha desta tabela é lida por caminho de execução, e nenhuma pode virar entrada |
+
+### 25.8 Desvios em relação ao brief, declarados
+
+O brief da T3.19b é a origem desta revisão; onde esta implementação diverge dele,
+diverge por escrito:
+
+| Brief | O que foi feito, e por quê |
+|---|---|
+| "`id` uuid PK = o `run_id`; **não** um uuid7 novo" | `id` é `uuid7` e `run_id` é coluna. O próprio brief oferece isso como opção (a) e a recomenda; a §25.1 diz por que ela também é a única compatível com o grant sem `UPDATE` |
+| "vale o mesmo CHECK de `shadow_episodes` (`SHADOW_COHORT_PATTERN`) **mais** a exigência do prefixo `replay:`" | o CHECK é a **interseção** escrita uma vez (`^replay:<uuid>$`), não a gramática larga mais um segundo predicado. Duas expressões que precisam concordar são duas expressões que podem divergir; e a interseção é literalmente o segundo ramo da larga, provado caractere a caractere por teste |
+| a tabela de colunas (uma transcrição do `to_jsonable`) | `version_label`, `market_count` e `bars_per_second` **não** viraram colunas: são join e aritmética sobre colunas que já existem (§25.2, doutrina do §17.8) |
+| CHECKs pedidos: `window_to > window_from`, `finished_at >= started_at`, `bars_evaluated >= 0` | mantidos, mais seis (§25.2). Cada um fecha uma forma de recibo mentiroso que o brief não nomeou; nenhum recusa uma linha que `replay/run.py` possa produzir hoje |
+| — (o brief não fala do escopo dos contadores) | `signals`/`outcomes_resolved`/`outcomes_open` são **da coorte inteira**, não da fatia, porque é assim que `count_population` já os produz. Declarado na §25.2 em vez de corrigido: mudar o número mudaria o que a prova da T3.19b relatou |
+| "`record_run` ganha um terceiro ramo" | ganhou, e ganhou também uma **sonda** de existência da tabela (§25.7). O brief não a pediu; sem ela, um banco atrasado numa revisão perde o recibo inteiro em vez de perder um terço dele |

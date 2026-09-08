@@ -90,6 +90,18 @@ def _paper_roles_2_tables(name: str) -> tuple[str, ...]:
     return cast(tuple[str, ...], getattr(migration_ddl("paper_roles_2"), name))
 
 
+def _replay_run_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0013_replay_runs``'s lists in ``ddl/replay_runs.py``.
+
+    It adds no class either: ``replay_runs`` is read-only for ``hunter_app``
+    (the scoreboard reads a receipt) and append-only for ``hunter_worker`` (the
+    replay engine writes one and may never edit it), which is the shape
+    ``fx_observations`` already has — a table in ``PAPER_APP_READ_ONLY_TABLES``
+    on one side and ``PAPER_WORKER_APPEND_TABLES`` on the other (§18.9).
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("replay_runs"), name))
+
+
 def _lock_tables(name: str) -> tuple[str, ...]:
     """The same, for ``0005_feature_baselines_lock_grant``'s ``ddl/baseline_lock.py``.
 
@@ -347,6 +359,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     # is exactly enough to take the wallet lock and not enough to write a value.
     paper_lock_only = _paper_tables("PAPER_LOCK_ONLY_TABLES")
     execution_read_only = _paper_roles_2_tables("APP_READ_ONLY_TABLES_0008")
+    replay_read_only = _replay_run_tables("REPLAY_APP_READ_ONLY_TABLES")
 
     classified = (
         list(write)
@@ -360,6 +373,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(paper_no_delete)
         + list(paper_lock_only)
         + list(execution_read_only)
+        + list(replay_read_only)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 
@@ -1041,3 +1055,103 @@ async def test_the_owner_connection_writes_the_promising_marker(
         )
         assert stored == "scoreboard:validada"
         await connection.rollback()
+
+
+# --------------------------------------------------------------------------
+# 0013_replay_runs: the worker appends a receipt and can never edit it, the
+# API only reads it — DATABASE.md section 25.4
+# --------------------------------------------------------------------------
+
+_RECEIPT_INSERT = (
+    "INSERT INTO replay_runs (id, run_id, cohort, strategy_version_id, window_from, window_to, "
+    "markets, started_at, finished_at, bars_evaluated, signals, outcomes_resolved, "
+    "outcomes_open, seconds, decision_lag_s, workers) "
+    "VALUES (:id, :run, :cohort, :version, :start, :end, "
+    "CAST(:markets AS text[]), now(), now(), 12, 1, 1, 0, CAST('5.000' AS numeric), 2, 1)"
+)
+
+
+def _receipt_params(version_id: uuid.UUID) -> dict[str, object]:
+    run_id = uuid7()
+    return {
+        "id": uuid7(),
+        "run": run_id,
+        "cohort": f"replay:{run_id}",
+        "version": version_id,
+        "start": datetime(2026, 8, 8, tzinfo=UTC),
+        "end": datetime(2026, 8, 11, tzinfo=UTC),
+        "markets": ["binance:BTCUSDT"],
+    }
+
+
+async def test_the_worker_appends_a_replay_receipt_and_can_never_edit_it(
+    worker_connection: AsyncConnection,
+) -> None:
+    """Measured as the role, not asked of the catalogue.
+
+    The replay engine is the only writer of ``replay_runs``
+    (``hunter_strategy_worker.replay.ledger``), and a receipt its own writer may
+    edit is not a receipt — the argument ``audit_logs``,
+    ``kill_switch_transitions`` and ``risk_events`` have carried since ``0001``
+    (§1.2). It is also what decided the shape of the table: the alternative the
+    brief weighed (one row per run, accumulated by ``UPDATE``) would have needed
+    exactly the privilege this test proves is absent.
+    """
+    version_id = await _insert_strategy_version_as_owner(
+        worker_connection, key=f"replay-priv-{uuid.uuid4().hex[:8]}"
+    )
+    await worker_connection.execute(text(_RECEIPT_INSERT), _receipt_params(version_id))
+    assert await worker_connection.scalar(text("SELECT count(*) FROM replay_runs")) == 1
+
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await worker_connection.execute(text("UPDATE replay_runs SET bars_evaluated = 99"))
+    await worker_connection.rollback()
+    await _set_as_worker(worker_connection)
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await worker_connection.execute(text("DELETE FROM replay_runs"))
+    await worker_connection.rollback()
+
+
+async def test_the_app_role_reads_a_replay_receipt_and_writes_none_of_it(
+    app_connection: AsyncConnection,
+) -> None:
+    """The scoreboard reads; it never writes. The same shape ``fx_observations``
+    and ``market_betas`` have (§18.9), for the reason the equity curve got in
+    ``0007``: a number a request handler can write is not evidence.
+    """
+    assert await app_connection.scalar(text("SELECT count(*) FROM replay_runs")) is not None
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await app_connection.execute(text(_RECEIPT_INSERT), _receipt_params(uuid7()))
+    await app_connection.rollback()
+
+
+async def test_replay_runs_is_global_and_carries_no_tenant_column(
+    schema_engine: AsyncEngine,
+) -> None:
+    """Research is global (§1.1), so there is no ``organization_id`` and no RLS
+    policy to isolate — the statement ``0002`` and ``0003`` already make about
+    ``shadow_episodes`` and ``feature_baselines``.
+
+    Asserted rather than assumed, because "no policy is needed" and "a policy
+    nobody wrote" look identical from outside: a tenant column appearing here
+    later would mean the table needs RLS, and this is what would notice.
+    """
+    async with schema_engine.connect() as connection:
+        tenant_column = await connection.scalar(
+            text(
+                "SELECT count(*) FROM information_schema.columns "
+                "WHERE table_name = 'replay_runs' AND column_name = 'organization_id'"
+            )
+        )
+        row = (
+            await connection.execute(
+                text(
+                    "SELECT c.relrowsecurity, count(p.polname) FROM pg_class c "
+                    "LEFT JOIN pg_policy p ON p.polrelid = c.oid "
+                    "WHERE c.relname = 'replay_runs' GROUP BY c.relrowsecurity"
+                )
+            )
+        ).one()
+    assert tenant_column == 0
+    assert row[0] is False
+    assert row[1] == 0

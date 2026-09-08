@@ -373,6 +373,21 @@ mentions.
 (DATABASE.md §24).
 """
 
+REPLAY_COHORT_PATTERN = f"^replay:{_UUID_PATTERN}$"
+"""The replay branch of :data:`SHADOW_COHORT_PATTERN`, alone - ``replay_runs.cohort``.
+
+A replay run's receipt (``0013_replay_runs``, DATABASE.md section 25) is never
+``prospective`` and never a replication arm: those two are populations of the
+live clock, and a row in ``replay_runs`` exists precisely because a window of
+the past was replayed. So the table's CHECK is this pattern and not the wider
+one - the intersection is spelled here once, instead of every reader having to
+remember which of the three branches a receipt may carry.
+
+Byte for byte the second branch of :data:`SHADOW_COHORT_PATTERN`;
+``test_migrations.py`` proves both that and that ``0013``'s frozen copy still
+agrees with this constant.
+"""
+
 _SHADOW_COHORT_RE = re.compile(SHADOW_COHORT_PATTERN)
 
 

@@ -37,7 +37,7 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0012_replication"
+HEAD_REVISION = "0013_replay_runs"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -2430,6 +2430,10 @@ def test_0012_refuses_to_downgrade_while_a_replication_is_on_record(
     that makes ten siblings one experiment, or an episode whose cohort ``0002``
     cannot represent, is not (§17.7)."""
     config = alembic_config(upgraded)
+    # ``0013`` sits on top since T3.19d, so step down to ``0012`` first and make
+    # ``-1`` mean *this* guard again — the same shape the ``0010`` and ``0011``
+    # tests above use.
+    command.downgrade(config, REPLICATION_REVISION)
     parent_id = _strategy_version(upgraded, key=f"replication-guard-{uuid.uuid4().hex[:8]}")
     sibling_id: uuid.UUID | None = None
     episode_id: uuid.UUID | None = None
@@ -2453,7 +2457,9 @@ def test_0012_refuses_to_downgrade_while_a_replication_is_on_record(
     try:
         with pytest.raises(DBAPIError, match=expected):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == REPLICATION_REVISION, (
+            "the downgrade must not commit"
+        )
     finally:
         if episode_id is not None:
             _forget_episode(upgraded, episode_id)
@@ -2465,6 +2471,7 @@ def test_0012_refuses_to_downgrade_while_a_replication_is_on_record(
                 )
             )
         _forget_draft_strategy_version(upgraded, parent_id)
+        command.upgrade(config, "head")
 
 
 def test_0012_reverses_on_a_populated_database_and_gives_0010s_trigger_back(
@@ -2479,6 +2486,7 @@ def test_0012_reverses_on_a_populated_database_and_gives_0010s_trigger_back(
     branches rather than leaving the widened one behind.
     """
     config = alembic_config(upgraded)
+    command.downgrade(config, REPLICATION_REVISION)  # see the note two tests up
     _strategy_version(upgraded, key=f"replication-trip-{uuid.uuid4().hex[:8]}")
     prospective = _episode(upgraded, cohort="prospective")
     command.downgrade(config, "-1")
@@ -2496,3 +2504,204 @@ def test_0012_reverses_on_a_populated_database_and_gives_0010s_trigger_back(
         _forget_episode(upgraded, prospective)
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     command.check(config)
+
+
+# --------------------------------------------------------------------------
+# 0013_replay_runs — the durable receipt of a replay slice
+# — DATABASE.md section 25
+# --------------------------------------------------------------------------
+
+_RECEIPT_COLUMNS = (
+    "id, run_id, cohort, strategy_version_id, window_from, window_to, markets, started_at, "
+    "finished_at, bars_evaluated, signals, outcomes_resolved, outcomes_open, seconds, "
+    "decision_lag_s, workers, evaluations_by_state, errors"
+)
+_RECEIPT_VALUES = (
+    ":id, :run_id, :cohort, :version, :window_from, :window_to, CAST(:markets AS text[]), "
+    ":started_at, :finished_at, :bars, :signals, :resolved, :open, CAST(:seconds AS numeric), "
+    ":lag_s, :workers, CAST(:states AS jsonb), :errors"
+)
+
+
+def _receipt_row(
+    *, version_id: uuid.UUID, run_id: uuid.UUID, day_from: int, day_to: int
+) -> dict[str, object]:
+    """One well-formed ``replay_runs`` slice, ready to be overridden per test."""
+    return {
+        "id": uuid7(),
+        "run_id": run_id,
+        "cohort": f"replay:{run_id}",
+        "version": version_id,
+        "window_from": datetime(2026, 8, day_from, tzinfo=UTC),
+        "window_to": datetime(2026, 8, day_to, tzinfo=UTC),
+        "markets": ["binance:BTCUSDT", "binance:ETHUSDT"],
+        "started_at": datetime(2026, 9, 8, 10, tzinfo=UTC),
+        "finished_at": datetime(2026, 9, 8, 10, 30, tzinfo=UTC),
+        "bars": 864,
+        "signals": 13,
+        "resolved": 13,
+        "open": 0,
+        "seconds": "220.031",
+        "lag_s": 2,
+        "workers": 3,
+        "states": json.dumps({"triggered": 20, "not_triggered": 844}),
+        "errors": 0,
+    }
+
+
+def _write_receipt(url: str, row: dict[str, object]) -> None:
+    asyncio.run(
+        _write(
+            url,
+            [(f"INSERT INTO replay_runs ({_RECEIPT_COLUMNS}) VALUES ({_RECEIPT_VALUES})", row)],  # noqa: S608
+        )
+    )
+
+
+def _forget_receipts(url: str, run_id: uuid.UUID) -> None:
+    """Clear the module-scoped database again: ``upgraded`` is shared, and a
+    receipt left behind trips 0013's downgrade guard for every later test."""
+    asyncio.run(_write(url, [("DELETE FROM replay_runs WHERE run_id = :id", {"id": run_id})]))
+
+
+def test_0013_and_the_domain_constant_agree_on_the_replay_grammar() -> None:
+    """The CHECK, the frozen copy in ``ddl/replay_runs.py`` and
+    ``hunter_core.domain.enums.REPLAY_COHORT_PATTERN`` are one grammar written
+    three times — frozen in the ``ddl`` module on purpose (the contract of the
+    database must not follow a later edit to a Python constant), so this is what
+    keeps the copies honest.
+
+    It also proves the *shape*: 0013's pattern is the replay branch of 0012's
+    wider one, character for character, so a receipt can never carry a cohort
+    ``shadow_episodes`` would reject, or the other way round.
+    """
+    from hunter_core.domain.enums import REPLAY_COHORT_PATTERN, SHADOW_COHORT_PATTERN
+
+    ddl = migration_ddl("replay_runs")
+    assert ddl.REPLAY_COHORT_PATTERN_0013 == REPLAY_COHORT_PATTERN
+    branch = REPLAY_COHORT_PATTERN.removeprefix("^").removesuffix("$")
+    assert f"|{branch}|" in SHADOW_COHORT_PATTERN
+
+
+def test_0013_keeps_one_receipt_per_slice_of_a_run(upgraded: str) -> None:
+    """Two slices of one run are two rows; the same slice twice is one.
+
+    That is the decision of section 25.1 in a single assertion: the unit is the
+    slice (summing them reconstructs a run, and no ``UPDATE`` is ever needed),
+    and ``uq_replay_runs_slice`` is what makes re-running a slice idempotent
+    instead of doubling the throughput number.
+    """
+    version_id = _strategy_version(upgraded, key=f"replay-slices-{uuid.uuid4().hex[:8]}")
+    run_id = uuid7()
+    try:
+        _write_receipt(
+            upgraded, _receipt_row(version_id=version_id, run_id=run_id, day_from=8, day_to=11)
+        )
+        _write_receipt(
+            upgraded, _receipt_row(version_id=version_id, run_id=run_id, day_from=11, day_to=14)
+        )
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT sum(bars_evaluated)::text FROM replay_runs WHERE run_id = :id",
+                {"id": run_id},
+            )
+        ) == ["1728"], "bars_evaluated is the column that sums across slices"
+        with pytest.raises(DBAPIError, match="uq_replay_runs_slice"):
+            _write_receipt(
+                upgraded, _receipt_row(version_id=version_id, run_id=run_id, day_from=8, day_to=11)
+            )
+    finally:
+        _forget_receipts(upgraded, run_id)
+        _forget_draft_strategy_version(upgraded, version_id)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "constraint"),
+    [
+        ("cohort", "prospective", "cohort_is_a_replay_cohort"),
+        ("cohort", "replication:{run}:1", "cohort_is_a_replay_cohort"),
+        ("cohort", "replay:not-a-uuid", "cohort_is_a_replay_cohort"),
+        ("cohort", "replay:11111111-1111-4111-8111-111111111111", "cohort_names_the_run"),
+        ("window_to", datetime(2026, 8, 8, tzinfo=UTC), "window_is_half_open"),
+        ("finished_at", datetime(2026, 9, 8, 9, tzinfo=UTC), "finished_after_it_started"),
+        ("bars", -1, "counts_are_not_negative"),
+        ("seconds", "-0.001", "counts_are_not_negative"),
+        ("resolved", 14, "resolved_within_the_population"),
+        ("markets", [], "a_slice_visited_a_market"),
+        ("workers", 0, "a_slice_had_at_least_one_worker"),
+        ("states", "[]", "evaluations_is_an_object"),
+    ],
+)
+def test_0013_refuses_a_receipt_that_contradicts_itself(
+    upgraded: str, field: str, value: object, constraint: str
+) -> None:
+    """One case per way of writing a receipt that is not one.
+
+    The two cohort clauses say different things and both are needed: a run is
+    never ``prospective`` and never a replication arm (those populations belong
+    to the live clock), and the label may not name a run other than ``run_id``
+    — the redundancy of section 25.2, made unable to drift.
+    """
+    version_id = _strategy_version(upgraded, key=f"replay-refuse-{uuid.uuid4().hex[:8]}")
+    run_id = uuid7()
+    row = _receipt_row(version_id=version_id, run_id=run_id, day_from=8, day_to=11)
+    row[field] = value.format(run=run_id) if isinstance(value, str) and "{run}" in value else value
+    try:
+        with pytest.raises(DBAPIError, match=constraint):
+            _write_receipt(upgraded, row)
+    finally:
+        _forget_receipts(upgraded, run_id)
+        _forget_draft_strategy_version(upgraded, version_id)
+
+
+def test_0013_refuses_to_downgrade_while_a_receipt_exists(upgraded: str) -> None:
+    """Section 17.7 again: reversing is allowed, losing evidence is not.
+
+    ``system_events`` holds the same JSON for 30 days and then deletes it, and
+    the JSONL exists only if somebody kept the file — so this row is the *only*
+    durable proof of how many simulated decisions a version accumulated, which
+    is the number ``docs/plans/REPLICATION.md`` reasons about.
+    """
+    config = alembic_config(upgraded)
+    version_id = _strategy_version(upgraded, key=f"replay-guard-{uuid.uuid4().hex[:8]}")
+    run_id = uuid7()
+    _write_receipt(
+        upgraded, _receipt_row(version_id=version_id, run_id=run_id, day_from=8, day_to=11)
+    )
+    try:
+        with pytest.raises(DBAPIError, match="replay_runs rows would be dropped"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        _forget_receipts(upgraded, run_id)
+        _forget_draft_strategy_version(upgraded, version_id)
+
+
+def test_0013_reverses_on_a_database_that_never_replayed(upgraded: str) -> None:
+    """The round trip an operator runs to roll a deploy back: down one, up to
+    head, ``alembic check`` at the end — over a database that trips no guard.
+
+    A database where no replay ever ran counts zero receipts, and the guard is
+    then exactly what it claims to be: a refusal to lose evidence, never a
+    refusal to reverse.
+    """
+    config = alembic_config(upgraded)
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == REPLICATION_REVISION
+        assert not asyncio.run(_relation_exists(upgraded, "replay_runs"))
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_relation_exists(upgraded, "replay_runs"))
+    command.check(config)
+
+
+async def _relation_exists(url: str, name: str) -> bool:
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            return bool(await connection.scalar(text("SELECT to_regclass(:name)"), {"name": name}))
+    finally:
+        await engine.dispose()
