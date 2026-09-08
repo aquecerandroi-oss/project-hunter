@@ -4,9 +4,21 @@
         --version <strategy_version_id | key:version> \
         --from 2026-08-08 --to 2026-09-08 \
         --markets all | BTCUSDT,ETHUSDT \
-        [--cohort replay:<uuid>] [--workers N] [--ledger path.jsonl] [--dry-run]
+        [--cohort replay:<uuid>] [--workers N] [--ledger path.jsonl] \
+        [--explain-ledger explain.jsonl] [--dry-run]
 
     uv run python -m hunter_strategy_worker.replay.run --drain-queue [--max-runs 1]
+
+    uv run python -m hunter_strategy_worker.replay.run --stress replay:<uuid> \
+        [--as-of ISO] [--ledger stress.jsonl]
+
+``--stress`` não replaya nada: ele **reprecifica** a coorte que um replay já
+deixou gravada, sob custo dobrado, stop e alvo escalados, entrada atrasada,
+cada mercado de fora e cada metade da janela (T3.36,
+:mod:`hunter_strategy_worker.replay.stress`). A sessão é ``READ ONLY``; a
+bandeira está aqui porque a passada de estresse é o passo seguinte do mesmo
+funil, e quem acabou de rodar um replay não deveria precisar procurar outro
+comando.
 
 Nothing here activates, promotes or sizes anything, and no row it writes can
 reach a wallet: every decision carries ``replay:<run_id>``, the execution bridge
@@ -48,6 +60,7 @@ from hunter_strategy_worker.replay.budget import (
     workers_for,
 )
 from hunter_strategy_worker.replay.environment import REPLAY_DECISION_LAG_S
+from hunter_strategy_worker.replay.explain import ledger_for, merge_markets
 from hunter_strategy_worker.replay.ledger import ReplayRun, append_jsonl, record_run
 from hunter_strategy_worker.replay.plan import (
     RunPlan,
@@ -63,6 +76,7 @@ from hunter_strategy_worker.replay.simulate import (
     drain_cohort,
     replay_market,
 )
+from hunter_strategy_worker.replay.stress import run_cli as stress_cli
 
 logger = get_logger(__name__)
 
@@ -82,14 +96,19 @@ async def _one_market(payload: dict[str, Any]) -> dict[str, Any]:
         window = ReplayWindow(
             datetime.fromisoformat(payload["start"]), datetime.fromisoformat(payload["end"])
         )
-        result = await replay_market(
-            factory,
-            version=version,
-            market=markets[0],
-            window=window,
-            config=config_for(payload["cohort"]),
-            lag_s=int(payload["lag_s"]),
-        )
+        market = markets[0]
+        with ledger_for(
+            payload.get("explain"), exchange=market.exchange, symbol=market.symbol
+        ) as ledger:
+            result = await replay_market(
+                factory,
+                version=version,
+                market=market,
+                window=window,
+                config=config_for(payload["cohort"]),
+                lag_s=int(payload["lag_s"]),
+                explain=ledger,
+            )
         return {"bars": result.bars, "states": result.states, "errors": result.errors}
     finally:
         await engine.dispose()
@@ -100,8 +119,21 @@ def _worker(payload: dict[str, Any]) -> dict[str, Any]:
     return asyncio.run(_one_market(payload))
 
 
-async def replay_run(plan: RunPlan, *, workers: int, ledger_path: Path | None) -> ReplayRun:
-    """Run the whole plan and write its ledger row. Returns the row."""
+async def replay_run(
+    plan: RunPlan,
+    *,
+    workers: int,
+    ledger_path: Path | None,
+    explain_path: Path | None = None,
+) -> ReplayRun:
+    """Run the whole plan and write its ledger row. Returns the row.
+
+    ``explain_path`` turns on the explain ledger (T3.33f): one JSONL line per
+    evaluated bar with the strategy's own state, reason and detail. Each market
+    process writes its own shard and the parent concatenates them here, in the
+    order the markets were dispatched, appending to the file — a run sliced in
+    two writes one ledger.
+    """
     started = utcnow()
     clock = time.perf_counter()
     payloads = [
@@ -113,6 +145,7 @@ async def replay_run(plan: RunPlan, *, workers: int, ledger_path: Path | None) -
             "end": plan.window.end.isoformat(),
             "cohort": plan.cohort,
             "lag_s": plan.lag_s,
+            "explain": str(explain_path) if explain_path is not None else None,
         }
         for market in plan.markets
     ]
@@ -165,6 +198,12 @@ async def replay_run(plan: RunPlan, *, workers: int, ledger_path: Path | None) -
         await engine.dispose()
     if ledger_path is not None:
         append_jsonl(ledger_path, run)
+    if explain_path is not None:
+        merge_markets(
+            explain_path,
+            [(market.exchange, market.symbol) for market in plan.markets],
+            bars=run.bars_evaluated,
+        )
     return run
 
 
@@ -185,9 +224,16 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--workers", type=int, default=None, help="override the budget's pool")
     parser.add_argument("--lag-s", type=int, default=REPLAY_DECISION_LAG_S)
     parser.add_argument("--ledger", default=None, help="JSONL ledger to append the run to")
+    parser.add_argument(
+        "--explain-ledger",
+        default=None,
+        help="JSONL file to append one line per evaluated bar (state, reason, detail)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="resolve and count, write nothing")
     parser.add_argument("--drain-queue", action="store_true", help="run what the queue holds")
     parser.add_argument("--max-runs", type=int, default=1)
+    parser.add_argument("--stress", default=None, help="reprice an existing replay:<uuid> (T3.36)")
+    parser.add_argument("--as-of", default=None, help="data cut of --stress (UTC); default: now")
     return parser
 
 
@@ -235,7 +281,8 @@ async def _drain(args: argparse.Namespace, budget: ReplayBudget) -> list[ReplayR
 async def _run(args: argparse.Namespace, plan: RunPlan, budget: ReplayBudget) -> ReplayRun:
     workers = int(args.workers) if args.workers else workers_for(budget, os.cpu_count() or 1)
     ledger = Path(str(args.ledger)) if args.ledger else None
-    run = await replay_run(plan, workers=workers, ledger_path=ledger)
+    explain = Path(str(args.explain_ledger)) if args.explain_ledger else None
+    run = await replay_run(plan, workers=workers, ledger_path=ledger, explain_path=explain)
     sys.stdout.write(f"{run.to_jsonable()}\n")
     return run
 
@@ -243,6 +290,13 @@ async def _run(args: argparse.Namespace, plan: RunPlan, budget: ReplayBudget) ->
 async def _main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     budget = load_budget()
+    if args.stress:
+        forwarded = ["--cohort", str(args.stress)]
+        if args.as_of:
+            forwarded += ["--as-of", str(args.as_of)]
+        if args.ledger:
+            forwarded += ["--ledger", str(args.ledger)]
+        return await stress_cli(forwarded)
     if args.drain_queue:
         return 0 if await _drain(args, budget) else 1
     if not (args.version and args.start and args.end):

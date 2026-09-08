@@ -55,6 +55,7 @@ from hunter_strategy_worker.replay.environment import (
     ReplayHotState,
     as_redis,
 )
+from hunter_strategy_worker.replay.explain import ExplainLedger
 from hunter_strategy_worker.tracking_repo import load_open_trackings, load_tracking
 
 if TYPE_CHECKING:
@@ -158,6 +159,7 @@ async def replay_market(
     window: ReplayWindow,
     config: ShadowConfig,
     lag_s: int = REPLAY_DECISION_LAG_S,
+    explain: ExplainLedger | None = None,
 ) -> MarketReplay:
     """Evaluate every aligned bar of ``window`` for one version and one market.
 
@@ -206,6 +208,10 @@ async def replay_market(
             continue
         result.bars += 1
         result.record(evaluation.state.value)
+        if explain is not None:
+            # Same object the counter above read: the ledger cannot disagree
+            # with ``evaluations_by_state`` about what this bar answered.
+            explain.record(bar_close, evaluation)
     return result
 
 

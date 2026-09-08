@@ -6,10 +6,10 @@ owner: sexta-feira
 exp: EXP-0010
 strategy: session_orb
 version: v1
-result: inconclusivo
+result: não iniciado
 evaluable: 0
 days: 0
-last_eval: —
+last_eval: 2026-09-08 (ativação PARADA: chave `session_orb` ausente em `strategies`, T3.33f)
 ---
 
 # EXP-0010 — rompimento da faixa de abertura de sessão (`session_orb_v1`)
@@ -128,11 +128,33 @@ sazonalidade de volume.
 
 ## Avaliações (acrescentadas, nunca reescritas)
 
-### Avaliação de <primeira data> — replay de abertura
+### 2026-09-08 — tentativa de ativação **PARADA antes de qualquer escrita** (T3.33f)
 
-<a preencher: coorte, janela, mercados, recibos, comandos exatos, cobertura completa, métricas com
-denominador, **decomposição por sessão**, fração de saídas em sessão posterior, distribuição de
-`range_risk_atr`, `Result`, `Next Action`>
+Não é uma avaliação: é o registro datado de que o experimento **não começou**, e por quê.
+
+O `code_ref` existe e a imagem publicada o carrega — `docker exec hunter-strategy-worker-1 python -c
+"import hunter_core.strategies.session_orb_v1"` responde `import ok session_orb_v1 v1` em
+`hunter-api:cf51c7d`. O que não existe é a **linha do catálogo**: em 2026-09-08 17:36 UTC a tabela
+`strategies` não tem a chave `session_orb` (13 linhas em `strategy_versions`, nenhuma dela), então
+`activate_strategy_version.py session_orb v1 --dry-run` não teria o que ativar e a corrida foi
+**interrompida antes** de rodar — nada foi escrito, nem um `system_events` de recusa.
+
+O passo que falta é do operador e é uma linha só:
+
+```
+docker exec hunter-api-1 python infra/scripts/seed.py
+```
+
+`seed.py` grava as tabelas de referência (entre elas `strategies` e os rascunhos `strategy_versions`)
+e **não tem `--dry-run`** — a mesma pendência aberta na T3.33e (CONCERN 1 de `notes-T3.33e.md`).
+Depois dele, a sequência congelada deste experimento é: dry-run conferindo o digest
+`…session_orb_v1@sha256:a4d514ad…` → ativação → 10 min de vigia de capacidade → replay de 31 d em
+duas fatias com uma coorte só.
+
+**Result: não iniciado.** **Next Action:** o operador roda o `seed.py`; a ativação e o replay
+continuam válidos como escritos no protocolo acima, sem mudança.
+
+Fonte (comandos e saídas verbatim): `.claude/state/notes-T3.33f.md`.
 
 ## Variantes tentadas
 
