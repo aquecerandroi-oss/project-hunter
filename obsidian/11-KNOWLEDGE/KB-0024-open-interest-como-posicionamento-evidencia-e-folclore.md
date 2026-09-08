@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado (dois, **lidos em resumo** — os textos completos estão atrás de paywall) para a parte que tem evidência; **anedótico** para os quadrantes
 hipotese_testavel: sim
 astra: concorda com ressalvas
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Open interest como posicionamento: o que a evidência sustenta e o que é folclore

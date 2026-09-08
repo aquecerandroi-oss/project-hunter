@@ -2,6 +2,7 @@
 tags: [performance, analytics, shadow-lab, m5]
 updated: 2026-09-06
 status: parcial
+owner: sexta-feira
 ---
 
 # Performance Overview

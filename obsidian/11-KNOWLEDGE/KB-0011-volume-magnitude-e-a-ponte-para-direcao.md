@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado (survey + estudo revisado), lido por resumos publicados — corpo completo não aberto
 hipotese_testavel: sim
 astra: concorda com correções (tese reformulada)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # Volume, magnitude e a ponte para direção
@@ -151,7 +155,7 @@ tem razão — o correto é "não valida, e serve de motivação". O texto agora
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Registro de Tentativas]] · [[Index]] ·
+[[Strategy Backlog]] · [[Registro de Tentativas]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0014-taker-buy-volume-o-que-temos-medido]] ·
 [[KB-0015-volume-relativo-e-o-pico-como-exaustao]] ·
 [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] ·

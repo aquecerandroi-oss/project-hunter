@@ -2,6 +2,14 @@
 tags: [experimento, momentum, shadow-lab]
 updated: 2026-09-06
 status: em-andamento
+owner: sexta-feira
+exp: EXP-0001
+strategy: momentum
+version: v1
+result: inconclusivo
+evaluable: 91
+days: 1
+last_eval: 2026-09-06
 ---
 
 # EXP-0001 — momentum em modo sombra (perfil "por barras" v0)

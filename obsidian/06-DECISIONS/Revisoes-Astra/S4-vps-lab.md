@@ -1,6 +1,10 @@
 ---
 tags: [astra, revisao, shadow-lab, vps, operacoes]
 updated: 2026-09-06
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-06
+by: astra
 ---
 
 # Revisão da Astra — a prova operacional do Lab na VPS (S4, 2026-09-06)

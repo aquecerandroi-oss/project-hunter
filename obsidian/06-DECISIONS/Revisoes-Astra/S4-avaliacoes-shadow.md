@@ -1,6 +1,10 @@
 ---
 tags: [astra, revisao, shadow-lab, experimentos]
 updated: 2026-09-06
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-06
+by: astra
 ---
 
 # Revisão da Astra — as primeiras avaliações datadas do Shadow Lab (S4, 2026-09-06)

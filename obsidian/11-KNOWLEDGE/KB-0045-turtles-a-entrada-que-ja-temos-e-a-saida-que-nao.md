@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: anedótico
 hipotese_testavel: sim
 astra: concorda com ressalvas
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: anedótico
 ---
 
 # Os Turtles: a entrada nós já temos, a saída não

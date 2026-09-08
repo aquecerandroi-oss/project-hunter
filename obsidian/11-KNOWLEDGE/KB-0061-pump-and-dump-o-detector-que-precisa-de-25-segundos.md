@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: preprint com método declarado (lido em resumo — o PDF não abriu) + leitura de código
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Pump-and-dump — o detector que trabalha em blocos de 25 segundos, e o nosso relógio de 5 minutos
@@ -173,4 +177,4 @@ Revisão de 2026-09-06 (`.claude/state/astra-review-KB-0059-0061-memecoins.md`).
 [[KB-0009-o-efeito-do-quarto-de-hora]] ·
 [[KB-0041-almgren-chriss-ao-contrario-o-custo-dominante-e-o-relogio]] ·
 [[KB-0049-walk-forward-que-nao-temos-e-o-nulo-que-nunca-calculamos]] ·
-[[EXP-0002-volume-anomaly-v1]] · [[Strategy Backlog]] · [[Index]]
+[[EXP-0002-volume-anomaly-v1]] · [[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]]

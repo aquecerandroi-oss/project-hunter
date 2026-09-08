@@ -1,6 +1,8 @@
 ---
 tags: [changelog, historico]
 updated: 2026-09-08
+status: vivo
+owner: sexta-feira
 ---
 
 # Changelog
@@ -8,6 +10,28 @@ updated: 2026-09-08
 Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado por dia, mais novo primeiro. Todo o histórico até agora é do Milestone 0 (fundação) — ver `docs/plans/M0.md` para as ondas T01–T13 e [[Resolved Bugs]] para o detalhe das correções de segurança/qualidade citadas aqui.
 
 ## 2026-09-08
+
+- **T3.21 — a base ganhou padrão, vistas, mapas e um linter.** Frontmatter
+  padronizado nas 162 notas (`status`, `owner`, `updated`, `tags` + chaves por
+  pasta: `exp`/`result`/`evaluable`/`days`/`last_eval` nos experimentos,
+  `severity`/`opened`/`closed` nos bugs, `decided_on`/`by` nas decisões,
+  `fonte`/`lido_em`/`confiança` no conhecimento). Duas Bases nativas
+  ([[Experimentos.base]], [[Estratégias.base]]), dois canvases
+  ([[Fluxo sinal → carteira.canvas]], [[Família momentum.canvas]]), quatro
+  callouts próprios (`veredito`, `medido`, `alerta`, `decisao`) aplicados aos três
+  últimos diários e à [[EXP-0005-momentum-paper]], e o linter
+  `infra/scripts/obsidian_lint.py` — links mortos, links ambíguos, órfãs,
+  frontmatter, vocabulários, procedência do conhecimento e a **regra append-only**
+  das avaliações datadas dos EXP. Convenções em `docs/OBSIDIAN.md`. Adaptado de
+  `AgriciDaniel/claude-obsidian` **sem instalar o plugin** (escrita não suportada
+  fora do WSL, e ele impõe layout próprio de vault). 62 links `[[Index]]`
+  ambíguos qualificados por caminho. O linter foi dividido em três arquivos
+  (`obsidian_lint.py` + `_rules` + `_links`, teto de 350 linhas) e passou a
+  resolver link como o Obsidian resolve — sufixo de caminho em fronteira de
+  barra, `.base`/`.canvas` como alvos, alias escapado de tabela —, o que
+  derrubou os 163 achados da primeira execução: **eram todos falso positivo do
+  instrumento, nenhum defeito da base**. 26 testes em
+  `infra/scripts/tests/test_obsidian_lint.py`; `RESULTADO: base limpa`.
 
 - 2026-09-08 — **Novo agente `product-designer`** (pedido do Everton): designer de produto SaaS que cuida de tema, cores, tipografia, UX e estados das telas, audita com dado real no navegador, propõe com mockups e especifica para o `frontend-specialist`; segunda opinião da Astra. Cartão em `.claude/agents/product-designer.md`, página em [[Product Designer]].
 

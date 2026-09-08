@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: documentação da exchange + aritmética verificada sobre dado próprio
 hipotese_testavel: sim
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Custos em perpétuos e quanto sobra de 1 R

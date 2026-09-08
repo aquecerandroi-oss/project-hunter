@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado (Daniel & Moskowitz lido em resumo; Barroso & Santa-Clara lido em fonte secundária, o original **não foi aberto**)
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # Momentum crashes, escalar ≠ filtrar, e o piso de custo que virou filtro de regime

@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado (SQL colado); a fonte externa **não abriu** e nenhum número dela foi citado como verificado
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # Correlação com o BTC — e a "meme season" que a nossa janela não contém
@@ -162,4 +166,4 @@ corrigida do bloco:
 [[KB-0030-o-regime-nao-chega-ao-sinal]] ·
 [[KB-0031-o-classificador-de-regime-esta-mudo-por-warm-up]] ·
 [[KB-0057-a-volatilidade-das-memes-e-o-piso-que-bane-o-btc]] ·
-[[KB-0056-meme-coin-como-ativo-e-o-rotulo-que-nao-e-medida]] · [[Strategy Backlog]] · [[Index]]
+[[KB-0056-meme-coin-como-ativo-e-o-rotulo-que-nao-e-medida]] · [[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]]

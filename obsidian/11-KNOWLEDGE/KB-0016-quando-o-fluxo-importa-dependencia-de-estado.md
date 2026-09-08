@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: preprint (dois, arXiv), sem revisão por pares; síntese conjunta NÃO demonstrada
 hipotese_testavel: sim
 astra: concorda com correções (H-KB0016a inexecutável hoje; síntese conjunta retirada)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Quando o fluxo importa: dependência de estado
@@ -147,9 +151,9 @@ faixa, concentração por ativo e intervalos que respeitem dependência temporal
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Registro de Tentativas]] · [[Index]] ·
+[[Strategy Backlog]] · [[Registro de Tentativas]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0012-ofi-nao-e-o-nosso-orderbook-imbalance]] ·
 [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] ·
 [[KB-0009-o-efeito-do-quarto-de-hora]] ·
 [[KB-0018-volume-relatado-e-o-denominador-que-usamos]] · [[EXP-0002-volume-anomaly-v1]] ·
-[[Regime]] · [[Features]] · [[Market Collector]]
+[[Features]] · [[Anomalies]] · [[Market Collector]]

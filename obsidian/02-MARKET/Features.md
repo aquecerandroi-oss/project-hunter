@@ -2,6 +2,7 @@
 tags: [mercado, features, m2]
 updated: 2026-09-07
 status: implementado
+owner: sexta-feira
 ---
 
 # Features (Feature Engine)

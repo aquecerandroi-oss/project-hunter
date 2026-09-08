@@ -2,6 +2,7 @@
 tags: [arquitetura, pipeline, eventos, shadow-lab]
 updated: 2026-09-06
 status: parcial
+owner: sexta-feira
 ---
 
 # Data Flow

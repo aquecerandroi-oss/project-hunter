@@ -2,6 +2,7 @@
 tags: [trading, portfolio, carteira, m3]
 updated: 2026-09-07
 status: aberta em produção e parada de propósito — o execution-worker existe e foi provado no local; na VPS ainda não; a ponte de sinais está desligada
+owner: sexta-feira
 ---
 
 # Portfolio — a carteira paper permanente

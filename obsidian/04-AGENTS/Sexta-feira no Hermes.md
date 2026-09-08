@@ -1,6 +1,8 @@
 ---
 tags: [agentes, hermes, sexta-feira]
 updated: 2026-09-08
+status: vivo
+owner: sexta-feira
 ---
 
 # Sexta-feira no Hermes

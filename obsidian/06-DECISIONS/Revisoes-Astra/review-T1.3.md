@@ -2,11 +2,15 @@
 tags: [astra, revisao]
 updated: 2026-09-05
 fonte: .claude/state/astra-review-review-T1.3.md
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-05
+by: astra
 ---
 
 # Revisão da Astra — review-T1.3
 
-Parte da [[Mente da Sexta-feira]]. Índice: [[Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
+Parte da [[Mente da Sexta-feira]]. Índice: [[Revisoes-Astra/Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
 
 **Eu não aprovaria T1.3 como concluída.** Há falhas funcionais além dos bloqueios já reconhecidos no [relatório](/C:/dev/project-hunter/services/market-worker/T1.3-report.md:1). Não demonstrei nenhum CRITICAL; os principais achados são HIGH.
 

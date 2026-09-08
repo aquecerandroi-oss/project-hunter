@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: descrição de método em fontes abertas identificadas (o livro não foi lido)
 hipotese_testavel: sim
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Três barreiras mais uma — e a amostra que não é independente

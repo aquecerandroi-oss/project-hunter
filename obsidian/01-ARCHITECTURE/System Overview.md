@@ -2,6 +2,7 @@
 tags: [arquitetura, sistema, m0]
 updated: 2026-09-05
 status: parcial
+owner: sexta-feira
 ---
 
 # System Overview

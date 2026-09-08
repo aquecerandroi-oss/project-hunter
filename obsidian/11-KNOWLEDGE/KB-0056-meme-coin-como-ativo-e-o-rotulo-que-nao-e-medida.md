@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: preprint (dois) + medição própria
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Meme coin como ativo — e o rótulo que não é uma medida
@@ -173,4 +177,4 @@ entraram no texto acima:
 [[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]] ·
 [[KB-0063-social-e-on-chain-a-linha-que-nao-atravessamos]] ·
 [[KB-0016-quando-o-fluxo-importa-dependencia-de-estado]] ·
-[[KB-0030-o-regime-nao-chega-ao-sinal]] · [[Index]]
+[[KB-0030-o-regime-nao-chega-ao-sinal]] · [[11-KNOWLEDGE/Index|Index]]

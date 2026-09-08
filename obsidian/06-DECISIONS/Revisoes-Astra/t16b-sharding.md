@@ -2,11 +2,15 @@
 tags: [astra, revisao]
 updated: 2026-09-05
 fonte: .claude/state/astra-review-t16b-sharding.md
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-05
+by: astra
 ---
 
 # Revisão da Astra — t16b-sharding
 
-Parte da [[Mente da Sexta-feira]]. Índice: [[Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
+Parte da [[Mente da Sexta-feira]]. Índice: [[Revisoes-Astra/Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
 
 **Minha escolha: sharding explícito no Compose, 6 shards como dimensionamento inicial conservador, universo global versionado e trabalho por símbolo no shard proprietário.** A proposta de heartbeat precisa de correções antes de ser segura.
 

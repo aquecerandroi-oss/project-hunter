@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado (leitura de código + SQL executado e colado)
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # O classificador de regime está mudo — por construção, não por bug

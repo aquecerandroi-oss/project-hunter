@@ -1,11 +1,28 @@
 ---
 tags: [bugs, abertos]
 updated: 2026-09-08
+status: aberto
+owner: sexta-feira
+severity: misto
+opened: 2026-09-05
+closed: ""
 ---
 
 # Open Bugs
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
+
+## Abertos na T3.21 (higiene da base)
+
+- **LOW (base de conhecimento) — 32 das 75 notas de `11-KNOWLEDGE` estão com
+  `confiança: "?"`.** O rótulo só é preenchido quando o campo `evidencia` começa
+  por exatamente um dos quatro valores; evidência mista (documentação + medição
+  própria + preprint) fica `?`. **Cenário:** uma nota em `?` não pode ser filtrada
+  por qualidade de evidência, então uma busca por "o que aqui é replicado" devolve
+  menos do que a base realmente tem, e uma hipótese fraca pode passar por forte
+  no [[Strategy Backlog]] por falta do rótulo. Não é dado errado — é dado ausente,
+  e adivinhar seria pior. Dono: Sexta-feira, em passes de curadoria, uma nota por
+  vez, lendo a fonte.
 
 ## Abertos no plantão da madrugada de 2026-09-08 (β e backfill)
 

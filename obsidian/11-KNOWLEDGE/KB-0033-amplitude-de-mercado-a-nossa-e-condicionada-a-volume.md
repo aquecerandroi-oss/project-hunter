@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: literatura **disputada**, lida só em resumo de busca; medição própria replicada (SQL colado)
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Amplitude de mercado: a evidência é disputada, e a nossa não é uma linha de avanços

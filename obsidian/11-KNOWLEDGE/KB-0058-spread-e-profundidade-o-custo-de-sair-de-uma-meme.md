@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado (duas medições, saídas coladas)
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # Spread e profundidade — o custo de sair de uma meme
@@ -198,4 +202,4 @@ Revisão de 2026-09-06 (`.claude/state/astra-review-KB-0056-0058-memecoins.md`).
 [[KB-0036-o-tamanho-que-a-sombra-nunca-declara]] ·
 [[KB-0037-o-spread-assumido-contra-o-spread-medido]] ·
 [[KB-0038-a-taxa-de-4-bps-nao-e-nem-maker-nem-taker]] ·
-[[KB-0044-o-que-morre-em-dez-segundos]] · [[Strategy Backlog]] · [[Index]]
+[[KB-0044-o-que-morre-em-dez-segundos]] · [[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]]

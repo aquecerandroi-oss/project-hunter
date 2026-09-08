@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: anedótico
 hipotese_testavel: sim
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: anedótico
 ---
 
 # A razão de eficiência de Kaufman: o quanto do caminho foi em linha reta

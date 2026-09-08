@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: dois preprints com dados e método declarados (não revisados por pares); os indicadores que examinaram falharam como alarme universal, o que não é refutação de toda previsão; leitura de código com arquivo e linha
 hipotese_testavel: sim — e a hipótese **não promete previsão**
 astra: concorda com ressalvas
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # O nosso detector de open interest só olha para cima — e o fenômeno documentado é para baixo

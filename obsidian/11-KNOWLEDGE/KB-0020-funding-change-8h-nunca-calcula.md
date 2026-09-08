@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: leitura de código com arquivo e linha, conferida de forma independente pela Astra; **medição no banco não feita** (o portão de permissão desta sessão recusou `psql` na VPS e o Docker local está fora)
 hipotese_testavel: sim
 astra: concorda — e achou o bloqueio maior que eu tinha perdido
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # O bloco de derivativos do M2 não é "não usado": ele não computa

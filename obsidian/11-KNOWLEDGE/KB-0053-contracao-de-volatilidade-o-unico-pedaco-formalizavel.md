@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: anedótico
 hipotese_testavel: sim
 astra: concorda com ressalva forte
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: anedótico
 ---
 
 # Contração de volatilidade: o pedaço dessa família que dá para formalizar

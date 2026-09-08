@@ -1,0 +1,167 @@
+{
+  "nodes": [
+    {
+      "id": "10a0b1c2d3e4f506",
+      "type": "text",
+      "text": "# Família momentum\n\nA linhagem das versões do `momentum`, do que já foi depreciado ao que ainda não nasceu. Uma versão **nunca** é sobrescrita: `draft` → `active` → `deprecated`, e uma linha nova nasce congelada ao lado da anterior.\n\nAs páginas de versão em `03-TRADING/Estrategias/` são **geradas** por `infra/scripts/export_strategies_to_obsidian.py` (T3.20) a partir do catálogo no banco — não edite à mão.",
+      "x": -900,
+      "y": -400,
+      "width": 620,
+      "height": 280,
+      "color": "6"
+    },
+    {
+      "id": "21b1c2d3e4f50617",
+      "type": "file",
+      "file": "03-TRADING/Estrategias/momentum.md",
+      "x": -900,
+      "y": -60,
+      "width": 400,
+      "height": 300,
+      "color": "6"
+    },
+    {
+      "id": "32c2d3e4f5061728",
+      "type": "file",
+      "file": "03-TRADING/Estrategias/momentum-v1.md",
+      "x": -380,
+      "y": -260,
+      "width": 400,
+      "height": 300,
+      "color": "2"
+    },
+    {
+      "id": "43d3e4f506172839",
+      "type": "text",
+      "text": "**v1 — `research_only`, `deprecated`**\nAtivada 2026-09-06T03:36:36Z, depreciada 2026-09-08T04:33:56Z.\nCoorte `prospective`. Medida em [[EXP-0001-momentum-v1]]: 91 outcomes avaliáveis, **1** dia, expectancy **−0,2102 R** — **inconclusivo** pelo limiar (100 E 30).",
+      "x": -380,
+      "y": 60,
+      "width": 400,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "54e4f50617283940",
+      "type": "file",
+      "file": "03-TRADING/Estrategias/momentum-v2.md",
+      "x": 140,
+      "y": -260,
+      "width": 400,
+      "height": 300,
+      "color": "4"
+    },
+    {
+      "id": "65f506172839405a",
+      "type": "text",
+      "text": "**v2 — `research_only`, `active`**\nAtivada 2026-09-08T04:33:56Z, replicada de `v1` (mesmo `params_hash`, `code_ref` novo).\nDuas coortes da mesma estratégia **não são duas hipóteses**: hoje a v2 difere da v1 só pelo `code_ref`.",
+      "x": 140,
+      "y": 60,
+      "width": 400,
+      "height": 180,
+      "color": "4"
+    },
+    {
+      "id": "7606172839405a6b",
+      "type": "file",
+      "file": "03-TRADING/Estrategias/momentum-v3-paper.md",
+      "x": 660,
+      "y": -260,
+      "width": 400,
+      "height": 300,
+      "color": "1"
+    },
+    {
+      "id": "8717283940506b7c",
+      "type": "text",
+      "text": "**v3 — `paper`, `draft` (não ativada)**\nA linha paper da decisão **D10**, derivada da v2. Ainda **não existe no banco da VPS**: depende da migração `0010` chegar lá e da ativação auditada.\n\n🔒 **Ativar é decisão do Everton** — sete condições em `docs/plans/M3.md`.",
+      "x": 660,
+      "y": 60,
+      "width": 400,
+      "height": 200,
+      "color": "1"
+    },
+    {
+      "id": "9828394050607c8d",
+      "type": "file",
+      "file": "05-EXPERIMENTS/EXP-0001-momentum-v1.md",
+      "x": -380,
+      "y": 300,
+      "width": 400,
+      "height": 260,
+      "color": "5"
+    },
+    {
+      "id": "a939405060708d9e",
+      "type": "file",
+      "file": "05-EXPERIMENTS/EXP-0005-momentum-paper.md",
+      "x": 660,
+      "y": 300,
+      "width": 400,
+      "height": 260,
+      "color": "5"
+    },
+    {
+      "id": "ba40506070809eaf",
+      "type": "text",
+      "text": "## Irmãs — quando existirem\n\nO catálogo já tem as chaves fixadas (`breakout`, `volume_anomaly`, `order_flow`, `mean_reversion`, `derivatives`, `narrative`, `ensemble`), e cada uma ganha a sua própria família quando tiver versão com comportamento especificado. Hoje só `momentum` e `volume_anomaly` têm mais de uma versão.\n\nA tabela completa de todas as famílias está na Base `Estratégias.base`.",
+      "x": 1180,
+      "y": -60,
+      "width": 420,
+      "height": 300
+    }
+  ],
+  "edges": [
+    {
+      "id": "f200000000000001",
+      "fromNode": "21b1c2d3e4f50617",
+      "fromSide": "right",
+      "toNode": "32c2d3e4f5061728",
+      "toSide": "left",
+      "color": "6",
+      "label": "família"
+    },
+    {
+      "id": "f200000000000002",
+      "fromNode": "32c2d3e4f5061728",
+      "fromSide": "right",
+      "toNode": "54e4f50617283940",
+      "toSide": "left",
+      "color": "4",
+      "label": "replicada (derived_from)"
+    },
+    {
+      "id": "f200000000000003",
+      "fromNode": "54e4f50617283940",
+      "fromSide": "right",
+      "toNode": "7606172839405a6b",
+      "toSide": "left",
+      "color": "1",
+      "label": "linha paper (D10) — não ativada"
+    },
+    {
+      "id": "f200000000000004",
+      "fromNode": "32c2d3e4f5061728",
+      "fromSide": "bottom",
+      "toNode": "9828394050607c8d",
+      "toSide": "top",
+      "color": "5",
+      "label": "medida em"
+    },
+    {
+      "id": "f200000000000005",
+      "fromNode": "7606172839405a6b",
+      "fromSide": "bottom",
+      "toNode": "a939405060708d9e",
+      "toSide": "top",
+      "color": "5",
+      "label": "será medida em"
+    },
+    {
+      "id": "f200000000000006",
+      "fromNode": "7606172839405a6b",
+      "fromSide": "right",
+      "toNode": "ba40506070809eaf",
+      "toSide": "left"
+    }
+  ]
+}

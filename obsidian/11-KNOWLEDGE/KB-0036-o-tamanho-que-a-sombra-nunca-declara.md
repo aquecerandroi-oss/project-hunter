@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: medição própria (duas leituras de 200 livros, segundos de diferença, saídas coladas; o trecho de script é o núcleo do cálculo, não o script inteiro)
 hipotese_testavel: sim
 astra: concorda após correções (recusou a primeira versão)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # O tamanho que a sombra nunca declara

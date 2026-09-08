@@ -2,6 +2,7 @@
 tags: [operacoes, deploy, vps]
 updated: 2026-09-06
 status: parcial
+owner: sexta-feira
 ---
 
 # Deployment

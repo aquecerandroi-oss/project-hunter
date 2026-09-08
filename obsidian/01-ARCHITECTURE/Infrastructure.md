@@ -2,6 +2,7 @@
 tags: [arquitetura, infra, docker, ci]
 updated: 2026-09-05
 status: implementado
+owner: sexta-feira
 ---
 
 # Infrastructure

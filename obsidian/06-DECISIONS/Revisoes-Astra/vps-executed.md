@@ -2,11 +2,15 @@
 tags: [astra, revisao]
 updated: 2026-09-05
 fonte: .claude/state/astra-review-vps-executed.md
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-05
+by: astra
 ---
 
 # Revisão da Astra — vps-executed
 
-Parte da [[Mente da Sexta-feira]]. Índice: [[Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
+Parte da [[Mente da Sexta-feira]]. Índice: [[Revisoes-Astra/Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
 
 **Astra: com o estado executado que você informou, eu seguiria com o backend privado agora. Não vejo motivo para refazer o bootstrap.** Minha revisão foi estática: não acessei a VPS, não li `.env`, não modifiquei arquivos nem fiz commit.
 

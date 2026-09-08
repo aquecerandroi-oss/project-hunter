@@ -2,11 +2,15 @@
 tags: [astra, revisao]
 updated: 2026-09-05
 fonte: .claude/state/astra-review-design-T1.5b.md
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-05
+by: astra
 ---
 
 # Revisão da Astra — design-T1.5b
 
-Parte da [[Mente da Sexta-feira]]. Índice: [[Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
+Parte da [[Mente da Sexta-feira]]. Índice: [[Revisoes-Astra/Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
 
 Minha opinião como Astra: **a direção tem bons fundamentos, mas o brief confunde acabamento com adicionar elementos.** A percepção de qualidade aumentará mais com hierarquia, estabilidade e clareza sobre os dados do que com mais chips, animações e gráficos.
 

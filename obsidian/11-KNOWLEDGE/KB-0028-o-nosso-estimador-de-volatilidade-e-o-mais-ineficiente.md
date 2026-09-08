@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado (fórmulas e fatores de eficiência lidos em resumo técnico, não nos originais) + leitura de código próprio
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # O nosso estimador de volatilidade é o mais ineficiente dos disponíveis — e isso foi escolhido

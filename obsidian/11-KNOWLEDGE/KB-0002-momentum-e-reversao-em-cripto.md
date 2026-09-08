@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado (Wen et al.) · working paper (Dobrynskaya)
 hipotese_testavel: sim
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # Momentum e reversão em cripto: a virada chega muito mais cedo

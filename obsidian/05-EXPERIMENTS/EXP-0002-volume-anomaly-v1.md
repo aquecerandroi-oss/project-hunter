@@ -2,6 +2,14 @@
 tags: [experimento, volume, shadow-lab]
 updated: 2026-09-06
 status: em-andamento
+owner: sexta-feira
+exp: EXP-0002
+strategy: volume_anomaly
+version: v1
+result: inconclusivo
+evaluable: 316
+days: 1
+last_eval: 2026-09-06
 ---
 
 # EXP-0002 — volume_anomaly em modo sombra (perfil "por barras" v0)

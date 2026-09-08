@@ -1,0 +1,232 @@
+{
+  "nodes": [
+    {
+      "id": "a1f0c3d29b47e510",
+      "type": "text",
+      "text": "# Fluxo sinal → carteira\n\nO caminho completo de um tick da Binance até a carteira paper do Everton, com a página de cada módulo. Nada aqui é aspiracional: cada caixa diz o que **existe** e o que **falta**, e as duas travas do meio estão fechadas hoje.\n\nRegra dura: **nenhum agente executa ordens**. Todo caminho de entrada é AGENTE → PROPOSTA → RISK ENGINE → EXECUÇÃO.",
+      "x": -1000,
+      "y": -420,
+      "width": 620,
+      "height": 260,
+      "color": "6"
+    },
+    {
+      "id": "b2e18a7c04d3f695",
+      "type": "file",
+      "file": "02-MARKET/Market Collector.md",
+      "x": -1000,
+      "y": 0,
+      "width": 380,
+      "height": 240,
+      "color": "4"
+    },
+    {
+      "id": "c3d27b6e15a4f082",
+      "type": "text",
+      "text": "**market-worker** — no ar 24 h na VPS, 200 mercados em 4 shards.\nEntrega: `candles_1m`, tape, funding, open interest.",
+      "x": -1000,
+      "y": 260,
+      "width": 380,
+      "height": 120
+    },
+    {
+      "id": "d4c36a5f26b5e173",
+      "type": "file",
+      "file": "02-MARKET/Features.md",
+      "x": -540,
+      "y": 0,
+      "width": 380,
+      "height": 240,
+      "color": "4"
+    },
+    {
+      "id": "e5b459406c76d284",
+      "type": "text",
+      "text": "**scanner-worker** — no ar, M2 **não aprovado**.\nFeatures → [[Anomalies|anomalias]] → regime → opportunity score. Regime `UNKNOWN` em 100 % das leituras.",
+      "x": -540,
+      "y": 260,
+      "width": 380,
+      "height": 120,
+      "color": "3"
+    },
+    {
+      "id": "f6a5683107d7c395",
+      "type": "file",
+      "file": "03-TRADING/Strategies.md",
+      "x": -80,
+      "y": 0,
+      "width": 380,
+      "height": 240,
+      "color": "4"
+    },
+    {
+      "id": "07946720189e8b46",
+      "type": "text",
+      "text": "**strategy-worker (Shadow Lab)** — no ar, emitindo sinais sobre mercado real.\nSem carteira, sem ordem, sem um centavo. Todo sinal sai com `purpose = research_only`.\nMedições em [[Experiments Index]].",
+      "x": -80,
+      "y": 260,
+      "width": 380,
+      "height": 140
+    },
+    {
+      "id": "18a3785229af9a57",
+      "type": "text",
+      "text": "## 🔒 Duas travas independentes\n\n1. `ENABLE_PAPER_AUTONOMY = false` — com ela falsa a ponte **nem cria** o grupo de consumo.\n2. Mesmo ligada, a ponte só admite `purpose = paper`; `research_only` e `live` são **recusados por nome**.\n\nNada é admitido até uma `strategy_version` com propósito paper ser ativada — ato auditado, e decisão do **Everton**.",
+      "x": 380,
+      "y": -420,
+      "width": 460,
+      "height": 380,
+      "color": "1"
+    },
+    {
+      "id": "29b4896330b0ab68",
+      "type": "file",
+      "file": "03-TRADING/Risk Engine.md",
+      "x": 380,
+      "y": 0,
+      "width": 380,
+      "height": 240,
+      "color": "1"
+    },
+    {
+      "id": "3ac59a7441c1bc79",
+      "type": "text",
+      "text": "**ponte sinal → admissão (T3.14) + admissão (Risk Engine `paper_v1`)** — implementada e **desligada**.\nContrato v2.2.1. Kill switch durável com transição auditada.",
+      "x": 380,
+      "y": 260,
+      "width": 380,
+      "height": 140,
+      "color": "1"
+    },
+    {
+      "id": "4bd6ab8552d2cd8a",
+      "type": "file",
+      "file": "03-TRADING/Execution Engine.md",
+      "x": 840,
+      "y": 0,
+      "width": 380,
+      "height": 240,
+      "color": "3"
+    },
+    {
+      "id": "5ce7bc9663e3de9b",
+      "type": "text",
+      "text": "**execution-worker** — existe e foi provado (30 min, saída 0), **não está na VPS**.\nOrdem paper, proteção, MTM antes do kill switch, recuperação.\nVer [[Paper Trading]].",
+      "x": 840,
+      "y": 260,
+      "width": 380,
+      "height": 140,
+      "color": "3"
+    },
+    {
+      "id": "6df8cda774f4efac",
+      "type": "file",
+      "file": "03-TRADING/Portfolio.md",
+      "x": 1300,
+      "y": 0,
+      "width": 380,
+      "height": 240,
+      "color": "5"
+    },
+    {
+      "id": "7e09deb885050fbd",
+      "type": "text",
+      "text": "**Carteira paper permanente** — aberta em produção em 2026-09-07 04:27:24Z.\nR$ 100.000 → 19.333,0111164813 USDT a 5,1725, âncora de câmbio **imutável**.\n**0 posições**, e isso é de propósito.",
+      "x": 1300,
+      "y": 260,
+      "width": 380,
+      "height": 140,
+      "color": "5"
+    },
+    {
+      "id": "8f1aefc996161ace",
+      "type": "file",
+      "file": "01-ARCHITECTURE/Workers.md",
+      "x": 1760,
+      "y": 0,
+      "width": 380,
+      "height": 240
+    },
+    {
+      "id": "9021f0daa7272bdf",
+      "type": "text",
+      "text": "**analytics-worker** — M5, planejado.\nEstatísticas e outcomes de carteira. Hoje o que mede o Lab são as avaliações datadas dos EXP.",
+      "x": 1760,
+      "y": 260,
+      "width": 380,
+      "height": 140
+    }
+  ],
+  "edges": [
+    {
+      "id": "e100000000000001",
+      "fromNode": "b2e18a7c04d3f695",
+      "fromSide": "right",
+      "toNode": "d4c36a5f26b5e173",
+      "toSide": "left",
+      "color": "4",
+      "label": "market data"
+    },
+    {
+      "id": "e100000000000002",
+      "fromNode": "d4c36a5f26b5e173",
+      "fromSide": "right",
+      "toNode": "f6a5683107d7c395",
+      "toSide": "left",
+      "color": "4",
+      "label": "oportunidade + regime"
+    },
+    {
+      "id": "e100000000000003",
+      "fromNode": "f6a5683107d7c395",
+      "fromSide": "right",
+      "toNode": "29b4896330b0ab68",
+      "toSide": "left",
+      "color": "1",
+      "label": "sinal (hoje research_only → recusado)"
+    },
+    {
+      "id": "e100000000000004",
+      "fromNode": "18a3785229af9a57",
+      "fromSide": "bottom",
+      "toNode": "29b4896330b0ab68",
+      "toSide": "top",
+      "color": "1",
+      "label": "travas"
+    },
+    {
+      "id": "e100000000000005",
+      "fromNode": "29b4896330b0ab68",
+      "fromSide": "right",
+      "toNode": "4bd6ab8552d2cd8a",
+      "toSide": "left",
+      "color": "3",
+      "label": "proposta aprovada"
+    },
+    {
+      "id": "e100000000000006",
+      "fromNode": "4bd6ab8552d2cd8a",
+      "fromSide": "right",
+      "toNode": "6df8cda774f4efac",
+      "toSide": "left",
+      "color": "5",
+      "label": "fill, posição, ledger"
+    },
+    {
+      "id": "e100000000000007",
+      "fromNode": "6df8cda774f4efac",
+      "fromSide": "right",
+      "toNode": "8f1aefc996161ace",
+      "toSide": "left",
+      "label": "patrimônio, curva"
+    },
+    {
+      "id": "e100000000000008",
+      "fromNode": "a1f0c3d29b47e510",
+      "fromSide": "bottom",
+      "toNode": "b2e18a7c04d3f695",
+      "toSide": "top",
+      "color": "6"
+    }
+  ]
+}

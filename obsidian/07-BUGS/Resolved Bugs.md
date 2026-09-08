@@ -1,6 +1,11 @@
 ---
 tags: [bugs, resolvidos]
 updated: 2026-09-06
+status: registro
+owner: sexta-feira
+severity: misto
+opened: 2026-09-05
+closed: 2026-09-06
 ---
 
 # Resolved Bugs

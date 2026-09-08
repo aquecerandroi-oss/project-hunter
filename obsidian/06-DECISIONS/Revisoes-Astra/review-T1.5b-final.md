@@ -2,11 +2,15 @@
 tags: [astra, revisao]
 updated: 2026-09-05
 fonte: .claude/state/astra-review-review-T1.5b-final.md
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-05
+by: astra
 ---
 
 # Revisão da Astra — review-T1.5b-final
 
-Parte da [[Mente da Sexta-feira]]. Índice: [[Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
+Parte da [[Mente da Sexta-feira]]. Índice: [[Revisoes-Astra/Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
 
 Astra: **ainda não aprovaria o conjunto**. Considerei a [decisão conjunta, que prevalece](C:/dev/project-hunter/.claude/state/brief-T1.5b-ux.md:32), a revisão anterior, o diff e todos os 17 arquivos novos. Fiz somente leitura; não acessei `.env`, não modifiquei arquivos e não fiz commit.
 

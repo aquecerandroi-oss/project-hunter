@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado (lido na versão de trabalho, com página citada) + relatório de gestora a regulador (não conferido nesta rodada)
 hipotese_testavel: sim
 astra: concorda com correções (classificação da Binance no estudo verificada por ela)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # Volume relatado e o denominador que usamos
@@ -136,7 +140,7 @@ resto da leitura. **Divergência:** nenhuma.
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Registro de Tentativas]] · [[Index]] ·
+[[Strategy Backlog]] · [[Registro de Tentativas]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0013-vpin-e-a-disputa-sobre-toxicidade]] ·
 [[KB-0015-volume-relativo-e-o-pico-como-exaustao]] ·
 [[KB-0016-quando-o-fluxo-importa-dependencia-de-estado]] · [[EXP-0002-volume-anomaly-v1]] ·

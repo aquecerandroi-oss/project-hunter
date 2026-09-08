@@ -1,6 +1,8 @@
 ---
 tags: [home, hunter, indice]
-updated: 2026-09-07
+updated: 2026-09-08
+status: vivo
+owner: sexta-feira
 ---
 
 # PROJECT HUNTER — Base de Conhecimento
@@ -110,6 +112,21 @@ Detalhe completo em [[Data Flow]] e `docs/PIPELINE.md`.
 | Estratégias / Agentes + ponte sinal → proposta | planejado | [[Strategies]], [[Agents Overview]] | M4 |
 | Analytics / Performance | planejado | [[Performance Overview]] | M5 |
 
+## Vistas e mapas
+
+Duas **Bases** nativas do Obsidian (arquivos `.base`, tabela dinâmica lida do frontmatter — elas não
+calculam nada, só mostram e ordenam o que as páginas já declaram) e dois **canvases**:
+
+| Vista | O que mostra |
+|---|---|
+| [[Experimentos.base]] | um experimento por linha: `EXP`, estratégia, versão, resultado, avaliáveis e dias contra o limiar editorial de **100 E 30**, última avaliação. Tem uma view "Abaixo do limiar editorial" e cartões. |
+| [[Estratégias.base]] | uma versão de estratégia por linha: versão, propósito, status, o EXP onde mora o veredito, de qual versão foi replicada, coortes, `activated_at`. Views "Ativas" e "Linha paper". |
+| [[Fluxo sinal → carteira.canvas]] | o caminho completo `market-worker → scanner → strategy-worker (Lab) → ponte → admissão → execution-worker → carteira`, cada caixa ligada à página do módulo, com as **duas travas** desenhadas onde elas estão. |
+| [[Família momentum.canvas]] | a linhagem do `momentum`: `v1` depreciada → `v2` em pesquisa → `v3` paper (não ativada), com os EXP que medem cada uma. |
+
+As convenções da base — frontmatter obrigatório por pasta, os quatro callouts, o linter — estão em
+`docs/OBSIDIAN.md`. O linter roda com `uv run python infra/scripts/obsidian_lint.py`.
+
 ## Como navegar
 
 - [[Mente da Sexta-feira]] — como a assistente pensa (Claude + Astra) e onde cada tipo de memória fica; [[Dialogos/Index|diálogos]] e [[Revisoes-Astra/Index|revisões da Astra]]. Mais recente: [[Dialogos/M3]] — carteira virtual e Risk Engine, a partir da diretiva do Everton de 2026-09-06 (ADR 0005; plano `docs/plans/M3.md`; contrato `docs/RISK_ENGINE.md` v2). O M3 **não** declara modo autônomo: as entradas são manuais e a ponte sinal → proposta é do M4.
@@ -126,7 +143,7 @@ Detalhe completo em [[Data Flow]] e `docs/PIPELINE.md`.
 - **06-DECISIONS/** — índice legível das ADRs.
 - **07-BUGS/** — bugs abertos e resolvidos, com hash de commit.
 - **08-CHANGELOG/** — uma entrada por commit, agrupado por dia.
-- **09-OPERATIONS/** — deploy, variáveis de ambiente, monitoramento e o **Diário** (`09-OPERATIONS/Diario/AAAA-MM-DD.md`, uma nota por dia de trabalho: o que foi feito, o que foi decidido, o que ficou em voo) — mais recente: [[2026-09-07]].
+- **09-OPERATIONS/** — deploy, variáveis de ambiente, monitoramento e o **Diário** (`09-OPERATIONS/Diario/AAAA-MM-DD.md`, uma nota por dia de trabalho: o que foi feito, o que foi decidido, o que ficou em voo) — [[Diario/2026-09-08|2026-09-08]] · [[Diario/2026-09-07|2026-09-07]] · [[Diario/2026-09-06|2026-09-06]] · [[Diario/2026-09-05|2026-09-05]].
 - **10-PERFORMANCE/** — visão de performance (hoje sem trades, descreve o que vai alimentar as métricas).
 - **11-KNOWLEDGE/** — conhecimento **externo** curado pela Sexta-feira com revisão da Astra: estratégias, análise técnica, microestrutura, perpétuos, risco, estatística de backtest. Cada nota traz fonte, qualidade da evidência e uma hipótese testável no Lab; as candidatas ficam em [[Strategy Backlog]] e só viram experimento pelo caminho normal (nada é ativado sozinho). Índice: [[11-KNOWLEDGE/Index|Conhecimento]].
 

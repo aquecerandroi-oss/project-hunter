@@ -2,6 +2,7 @@
 tags: [agentes, m4]
 updated: 2026-09-05
 status: planejado
+owner: sexta-feira
 ---
 
 # Agents Overview

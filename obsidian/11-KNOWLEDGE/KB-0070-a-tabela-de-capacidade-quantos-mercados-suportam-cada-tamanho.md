@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado (saída colada)
 hipotese_testavel: sim
 astra: discorda em parte (correções aplicadas)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # A tabela de capacidade — quantos mercados suportam 500, 2.000 e 10.000 USDT
@@ -172,7 +176,7 @@ diferentes.
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Index]] ·
+[[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0069-capacidade-e-impacto-o-teto-que-o-livro-impoe]] ·
 [[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]] ·
 [[KB-0036-o-tamanho-que-a-sombra-nunca-declara]] ·

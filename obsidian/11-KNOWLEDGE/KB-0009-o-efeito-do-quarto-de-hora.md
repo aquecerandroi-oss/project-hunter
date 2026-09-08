@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: preprint (arXiv), amostra ampla e método descrito
 hipotese_testavel: sim
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # O efeito do quarto de hora

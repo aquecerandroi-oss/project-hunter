@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: documentação da corretora + leitura de código com arquivo e linha (SQL de confirmação **não** rodado)
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # O que a nossa `funding_rate` mede de fato

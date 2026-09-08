@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado lido em resumo (o PDF do SSRN devolveu 403) + aritmética própria sobre parâmetros do nosso código
 hipotese_testavel: sim
 astra: discorda em parte (correções aplicadas)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # Sizing por volatilidade — a posição já sai do ATR, e o nosso piso decide o tamanho sem dizer
@@ -146,7 +150,7 @@ a distinção central da nota.
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Index]] ·
+[[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]] ·
 [[KB-0067-a-fracao-de-risco-por-operacao-e-o-preco-de-errar-a-expectancy]] ·
 [[KB-0069-capacidade-e-impacto-o-teto-que-o-livro-impoe]] ·

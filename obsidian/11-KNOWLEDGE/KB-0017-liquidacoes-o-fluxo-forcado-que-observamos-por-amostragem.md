@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: documentação da corretora + preprint (arXiv, sem revisão) + medição própria da série já coletada
 hipotese_testavel: sim
 astra: concorda com correções (a série já existe; medição proposta era não identificável)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Liquidações: o fluxo forçado que observamos por amostragem
@@ -183,7 +187,7 @@ apresentar snapshots como total do mercado e separar pesquisa de ativação.
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Registro de Tentativas]] · [[Index]] ·
+[[Strategy Backlog]] · [[Registro de Tentativas]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0014-taker-buy-volume-o-que-temos-medido]] ·
 [[KB-0013-vpin-e-a-disputa-sobre-toxicidade]] ·
 [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] ·

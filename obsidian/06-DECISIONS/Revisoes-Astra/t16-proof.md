@@ -2,11 +2,15 @@
 tags: [astra, revisao]
 updated: 2026-09-05
 fonte: .claude/state/astra-review-t16-proof.md
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-05
+by: astra
 ---
 
 # Revisão da Astra — t16-proof
 
-Parte da [[Mente da Sexta-feira]]. Índice: [[Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
+Parte da [[Mente da Sexta-feira]]. Índice: [[Revisoes-Astra/Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
 
 **Meu veredito é “parcial”.** Está provado que o pipeline recebe dado real, persiste e inicia recuperação automática. Ainda não está provado que sustenta os 200 mercados continuamente e conclui a recuperação sem intervenção. Correções despachadas precisam de uma nova execução operacional para fechar o aceite.
 

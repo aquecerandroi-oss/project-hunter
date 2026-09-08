@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: preprint (dois, lidos em resumo) + leitura de código
 hipotese_testavel: não — é inventário do que faltaria
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Social e on-chain — a linha que não atravessamos
@@ -133,4 +137,4 @@ corrigida do bloco — ela conferiu o inventário e disse que está correto —,
 [[KB-0061-pump-and-dump-o-detector-que-precisa-de-25-segundos]] ·
 [[KB-0020-funding-change-8h-nunca-calcula]] ·
 [[KB-0032-o-relogio-dentro-do-limiar-de-volatilidade]] ·
-[[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]] · [[Index]]
+[[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]] · [[11-KNOWLEDGE/Index|Index]]

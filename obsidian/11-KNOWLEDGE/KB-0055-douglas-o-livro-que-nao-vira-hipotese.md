@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: anedótico
 hipotese_testavel: não
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: anedótico
 ---
 
 # Douglas: o livro que não vira hipótese — e o que dele vira regra de processo
@@ -88,7 +92,7 @@ proíbe é a **inferência** antecipada, não a leitura descritiva diária
 
 ## Relacionados
 
-[[Index]] · [[Registro de Tentativas]] ·
+[[11-KNOWLEDGE/Index|Index]] · [[Registro de Tentativas]] ·
 [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] ·
 [[KB-0046-r-multiplos-e-o-r-que-a-simetria-esconde]] ·
 [[KB-0049-walk-forward-que-nao-temos-e-o-nulo-que-nunca-calculamos]] · [[Experiments Index]]

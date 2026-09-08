@@ -3,6 +3,10 @@ tags: [dialogo, sexta-feira, astra, claude, shadow-lab, experimentos]
 updated: 2026-09-05
 fonte: .claude/state/dialogue-SHADOW.md
 commit: fc336d9
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-05
+by: sexta-feira (claude+astra)
 ---
 
 # Diálogo Claude ⇄ Astra — SHADOW (Shadow Lab v0)

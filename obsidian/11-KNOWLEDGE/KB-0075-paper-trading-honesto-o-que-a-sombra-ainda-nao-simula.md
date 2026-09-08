@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: leitura de código + leitura de contrato + medição própria citada
 hipotese_testavel: sim
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Paper trading honesto — o que a sombra ainda não simula, e por que os números dela não passam para o M4
@@ -125,7 +129,7 @@ negócios** — o contrato prevê stop no mark (`PIPELINE.md:189`) e o walker ob
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Index]] ·
+[[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]] ·
 [[KB-0070-a-tabela-de-capacidade-quantos-mercados-suportam-cada-tamanho]] ·
 [[KB-0039-tipos-de-ordem-e-o-que-a-sombra-assume-sem-dizer]] ·

@@ -2,6 +2,14 @@
 tags: [experimento, momentum, paper-trading, d10]
 updated: 2026-09-08
 status: aguardando-ativacao
+owner: sexta-feira
+exp: EXP-0005
+strategy: momentum
+version: v3
+result: nao-iniciado
+evaluable: 0
+days: 0
+last_eval: ""
 ---
 
 # EXP-0005 — momentum v1 em carteira paper (D10)
@@ -17,6 +25,27 @@ status: aguardando-ativacao
 > são escritas uma vez e **nunca** mudam; as avaliações são **acrescentadas**
 > abaixo, datadas. Ver [[Experiments Index]], [[EXP-0001-momentum-v1]],
 > [[Risk Engine]] e `docs/plans/M3.md` (D10).
+
+> [!decisao] Quem decide, e o que já está decidido
+> **D10** (Everton, delegada em 2026-09-07): a linha paper sai do `momentum`, nasce **nova e
+> congelada**, com a coorte `research_only` do [[EXP-0001-momentum-v1]] intocada ao lado.
+> **Ativar continua sendo dele** — sete condições escritas em `docs/plans/M3.md`, e a ativação é ato
+> auditado (`infra/scripts/activate_strategy_version.py --paper-line`). Nenhum plantão ativa isto
+> porque um número ficou bonito.
+
+> [!medido] O que já foi medido nesta linha
+> **Nada, e por um motivo mecânico:** a coorte paper não existe no banco. Ela nasce quando a migração
+> `0010` (`6b837ac`) chegar à VPS e a versão for ativada. `evaluable = 0`, `days = 0`,
+> `result = nao-iniciado` no frontmatter, e é isso que a Base `Experimentos.base` mostra.
+
+> [!alerta] Divergência de numeração entre o Protocolo congelado e o catálogo
+> O Protocolo abaixo, escrito em 2026-09-08 e **imutável**, chama a linha paper de **`v1` com
+> `purpose = paper`**. O catálogo de estratégias exportado do banco por T3.20 a registra como
+> **`v3`** ([[momentum-v3-paper]], `derived_from: [[momentum-v2]]`). É a **mesma linha** — mesmo
+> `params_hash` (`40e1688e…c41ac2f3`), mesmo `code_ref` da v2 —, só numerada de formas diferentes
+> pelos dois registros. O frontmatter desta página usa `version: v3`, que é o que existe no
+> catálogo; o Protocolo **não foi editado** e não será. Quando a linha for ativada, o `activated_at`
+> da versão `v3` é a data de início da coleta.
 
 ## Hipótese (congelada)
 
@@ -112,6 +141,12 @@ reserva vencida, stop tocado intrabar, funding) e não por defeito do instrument
 
 Nenhuma avaliação ainda. A coorte paper não existe no banco até a ativação
 auditada pela decisão do Everton (D10, sete condições em `docs/plans/M3.md`).
+
+> [!veredito] Resultado corrente
+> **`nao-iniciado`** — não é "inconclusivo", que é o veredito de quem mediu e não pôde concluir.
+> Aqui não houve medição nenhuma porque a população não existe. Abaixo de **100 outcomes avaliáveis
+> E 30 dias distintos** o campo `Result` só poderá ser `inconclusivo`; acima disso continua sendo
+> pesquisa, nunca promessa.
 
 ## Relacionadas
 

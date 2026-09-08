@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado no nosso dado (SQL colado) + literatura lida apenas em resumo de busca
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # O relógio dentro do limiar de volatilidade

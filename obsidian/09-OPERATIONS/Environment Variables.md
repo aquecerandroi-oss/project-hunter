@@ -2,11 +2,12 @@
 tags: [operacoes, env, configuracao]
 updated: 2026-09-05
 status: implementado
+owner: sexta-feira
 ---
 
 # Environment Variables
 
-Tabela completa a partir de `.env.example` (raiz do repo). Este arquivo é só um exemplo — nunca commitar valores reais. `HUNTER_MASTER_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`, `AUTH_SECRET`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `BINANCE_API_SECRET`, `BYBIT_API_SECRET` e qualquer outra chave/segredo desta lista são **segredo, nunca no repo** — vivem só em env do provedor (Railway/Fly secrets) ou KMS em produção. Ver [[../06-DECISIONS/Architecture Decisions]] e `docs/SECURITY.md` §4.
+Tabela completa a partir de `.env.example` (raiz do repo). Este arquivo é só um exemplo — nunca commitar valores reais. `HUNTER_MASTER_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`, `AUTH_SECRET`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `BINANCE_API_SECRET`, `BYBIT_API_SECRET` e qualquer outra chave/segredo desta lista são **segredo, nunca no repo** — vivem só em env do provedor (Railway/Fly secrets) ou KMS em produção. Ver [[Architecture Decisions]] e `docs/SECURITY.md` §4.
 
 ## Ambiente
 

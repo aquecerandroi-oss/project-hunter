@@ -2,6 +2,7 @@
 tags: [agentes, order-flow, fase2]
 updated: 2026-09-05
 status: planejado
+owner: sexta-feira
 ---
 
 # Order Flow Agent

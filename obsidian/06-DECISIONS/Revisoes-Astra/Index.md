@@ -1,6 +1,10 @@
 ---
 tags: [astra, revisao, indice]
 updated: 2026-09-06
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-06
+by: astra
 ---
 
 # Revisões da Astra — índice

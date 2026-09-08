@@ -2,6 +2,7 @@
 tags: [mercado, anomalias, m2]
 updated: 2026-09-07
 status: implementado
+owner: sexta-feira
 ---
 
 # Anomalies (Anomaly Engine)

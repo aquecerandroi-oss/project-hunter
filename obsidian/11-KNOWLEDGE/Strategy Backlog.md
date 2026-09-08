@@ -1,6 +1,8 @@
 ---
 tags: [knowledge, backlog, estrategias]
 updated: 2026-09-06
+status: vivo
+owner: sexta-feira
 ---
 
 # Backlog de estratégias (candidatas ao Shadow Lab)
@@ -233,7 +235,7 @@ classificador classifica. Propor um filtro agora seria propor algo cuja refutaç
 
 ## Relacionados
 
-[[Index]] · [[Registro de Tentativas]] · [[Experiments Index]] · [[Strategy Performance]] ·
+[[11-KNOWLEDGE/Index|Index]] · [[Registro de Tentativas]] · [[Experiments Index]] · [[Strategy Performance]] ·
 [[Features]] · [[Momentum Agent]]
 
 ---

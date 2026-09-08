@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: literatura revisada por pares, com resultados e interpretação DISPUTADOS em quatro textos; ganho incremental não demonstrado no nosso contexto
 hipotese_testavel: sim
 astra: concorda com correções (hipótese reescrita; três erros meus corrigidos)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # VPIN e a disputa sobre toxicidade
@@ -148,7 +152,7 @@ mercado, deixando a hora de emissão como medida operacional.
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Registro de Tentativas]] · [[Index]] ·
+[[Strategy Backlog]] · [[Registro de Tentativas]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0012-ofi-nao-e-o-nosso-orderbook-imbalance]] ·
 [[KB-0014-taker-buy-volume-o-que-temos-medido]] ·
 [[KB-0015-volume-relativo-e-o-pico-como-exaustao]] ·

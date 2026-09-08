@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado
 hipotese_testavel: não (é regra de protocolo, não candidata de estratégia)
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # Overfitting de backtest e o preço de cada variante

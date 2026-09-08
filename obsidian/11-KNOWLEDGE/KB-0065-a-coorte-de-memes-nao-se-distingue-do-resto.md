@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado (SQL colado), **abaixo do limiar editorial** — inconclusivo por construção
 hipotese_testavel: sim, só diagnóstico
 astra: discorda em parte (título e duas explicações retiradas)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # A coorte de memes não se distingue do resto
@@ -195,4 +199,4 @@ título e duas explicações**, e a nota foi reescrita inteira:
 [[KB-0046-r-multiplos-e-o-r-que-a-simetria-esconde]] ·
 [[KB-0051-tres-barreiras-mais-uma-e-a-amostra-que-nao-e-independente]] ·
 [[KB-0049-walk-forward-que-nao-temos-e-o-nulo-que-nunca-calculamos]] ·
-[[EXP-0001-momentum-v1]] · [[EXP-0002-volume-anomaly-v1]] · [[Strategy Backlog]] · [[Index]]
+[[EXP-0001-momentum-v1]] · [[EXP-0002-volume-anomaly-v1]] · [[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]]

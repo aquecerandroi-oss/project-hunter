@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado lido em resumo (Kelly, Grossman & Zhou) + anedótico (Vince, Tharp) + aritmética própria conferida
 hipotese_testavel: sim
 astra: discorda em parte (correções aplicadas)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # A fração de risco por operação — e o preço de errar a expectancy
@@ -160,7 +164,7 @@ contrário.
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Index]] ·
+[[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]] ·
 [[KB-0068-sizing-por-volatilidade-a-posicao-sai-do-atr]] ·
 [[KB-0072-drawdown-e-kill-switch-a-evidencia-e-a-convencao]] ·

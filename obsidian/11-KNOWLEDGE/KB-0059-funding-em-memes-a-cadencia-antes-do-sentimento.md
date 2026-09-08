@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado (SQL colado) + documentação
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # Funding em memes — a cadência antes do sentimento
@@ -181,4 +185,4 @@ Revisão de 2026-09-06 (`.claude/state/astra-review-KB-0059-0061-memecoins.md`).
 [[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]] ·
 [[KB-0023-funding-extremo-como-contrarian-a-afirmacao-mais-repetida]] ·
 [[KB-0026-funding-num-horizonte-de-4h-e-o-vies-de-exclusao]] ·
-[[KB-0056-meme-coin-como-ativo-e-o-rotulo-que-nao-e-medida]] · [[Strategy Backlog]] · [[Index]]
+[[KB-0056-meme-coin-como-ativo-e-o-rotulo-que-nao-e-medida]] · [[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]]

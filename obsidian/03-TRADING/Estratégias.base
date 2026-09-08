@@ -1,0 +1,96 @@
+# Base nativa do Obsidian (Bases). Uma linha por versão de estratégia, lida do
+# frontmatter das páginas geradas por `infra/scripts/export_strategies_to_obsidian.py`
+# (T3.20) em `03-TRADING/Estrategias/`. A Base não escreve nada e não recalcula
+# nada: o gerador é a única fonte daquelas páginas.
+#
+# Duas colunas pedidas no brief não existem como propriedade nas páginas geradas:
+# **veredito** (ele mora na avaliação datada do EXP, não no catálogo) e
+# **replicação**. Em vez de criar colunas vazias — o que faria a Base parecer ter
+# um dado que o vault não tem —, a coluna `exp` aponta para a página onde o
+# veredito está escrito e `derived_from` + `cohorts` mostram a linhagem, que é o
+# que "replicação" significa aqui: de qual versão esta linha foi congelada e em
+# que coortes ela coleta. Passar `veredito`/`replicacao` a propriedade do
+# frontmatter é trabalho do gerador (T3.20), não desta Base.
+#
+# O filtro usa tags e não caminho de pasta pelo mesmo motivo da Experimentos.base:
+# a raiz do vault não está fixada no repositório.
+
+filters:
+  and:
+    - file.hasTag("estrategia")
+    - not:
+        - file.hasTag("familia")
+
+properties:
+  strategy:
+    displayName: "Estratégia"
+  version:
+    displayName: "Versão"
+  purpose:
+    displayName: "Propósito"
+  status:
+    displayName: "Status"
+  exp:
+    displayName: "Veredito (na página do EXP)"
+  derived_from:
+    displayName: "Replicada de"
+  cohorts:
+    displayName: "Coortes"
+  activated_at:
+    displayName: "Ativada em"
+  deprecated_at:
+    displayName: "Depreciada em"
+  code_ref:
+    displayName: "code_ref"
+  params_hash:
+    displayName: "params_hash"
+
+views:
+  - type: table
+    name: "Versões"
+    order:
+      - file.name
+      - strategy
+      - version
+      - purpose
+      - status
+      - exp
+      - derived_from
+      - cohorts
+      - activated_at
+
+  - type: table
+    name: "Ativas"
+    filters:
+      and:
+        - 'status == "active"'
+    order:
+      - file.name
+      - strategy
+      - version
+      - purpose
+      - activated_at
+      - code_ref
+      - params_hash
+
+  - type: table
+    name: "Linha paper"
+    filters:
+      and:
+        - 'purpose == "paper"'
+    order:
+      - file.name
+      - strategy
+      - version
+      - status
+      - derived_from
+      - exp
+      - activated_at
+
+  - type: cards
+    name: "Cartões"
+    order:
+      - file.name
+      - purpose
+      - status
+      - version

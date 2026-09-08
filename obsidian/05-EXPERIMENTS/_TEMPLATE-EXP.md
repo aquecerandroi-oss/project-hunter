@@ -1,7 +1,15 @@
 ---
 tags: [experimento, template]
-updated: 2026-09-05
+updated: 2026-09-08
 status: planejado
+owner: sexta-feira
+exp: EXP-NNNN
+strategy: ""
+version: ""
+result: nao-iniciado
+evaluable: 0
+days: 0
+last_eval: ""
 ---
 
 # EXP-NNNN — <slug curto do experimento>

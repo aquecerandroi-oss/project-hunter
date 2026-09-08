@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: misto — o ferramental estatístico (permutação, Reality Check de White) é estudo revisado; os dois livros são texto de praticante, lidos aqui **só** em página de editora e resumo de capítulo
 hipotese_testavel: sim
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # O walk-forward que não temos e o nulo que nunca calculamos

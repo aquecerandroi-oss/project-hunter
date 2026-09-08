@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado (lido só o resumo — o PDF não foi aberto) + leitura de código próprio
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # BTC como fator, e o "regime global" que é só o BTC

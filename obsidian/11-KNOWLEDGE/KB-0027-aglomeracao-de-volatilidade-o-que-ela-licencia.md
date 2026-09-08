@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado (lido em documentação institucional e em resumo, não no original)
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # Aglomeração de volatilidade: o que ela licencia (e o que não)

@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: pesquisa de praticante com método e amostra declarados (não revisada por pares) + estudo revisado sobre arbitragem; **não replicada por nós**
 hipotese_testavel: sim — mas a recomendação é **não gastar braço de sombra** com ela
 astra: concorda com ressalvas
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Funding prevê retorno? A evidência direta é fraca e desaparece no horizonte à frente

@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: leitura de código + medição própria (spread e book), sem experimento
 hipotese_testavel: sim
 astra: concorda após correções (recusou a primeira versão)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # O `open` não é preço executável, e a decomposição do custo tem um termo com sinal desconhecido

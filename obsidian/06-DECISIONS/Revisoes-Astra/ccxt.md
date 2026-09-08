@@ -2,11 +2,15 @@
 tags: [astra, revisao]
 updated: 2026-09-05
 fonte: .claude/state/astra-review-ccxt.md
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-05
+by: astra
 ---
 
 # Revisão da Astra — ccxt
 
-Parte da [[Mente da Sexta-feira]]. Índice: [[Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
+Parte da [[Mente da Sexta-feira]]. Índice: [[Revisoes-Astra/Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
 
 **Minha opinião: manter Binance própria; fazer Bybit própria no M1b; avaliar CCXT para ampliar cobertura na Fase 3, especialmente nas integrações privadas.** Concordo com a direção do Claude, mas não aprovaria a proposta sem corrigir a configuração numérica e a promessa de isolamento por extra.
 

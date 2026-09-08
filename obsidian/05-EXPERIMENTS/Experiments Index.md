@@ -2,6 +2,7 @@
 tags: [experimentos, indice]
 updated: 2026-09-07
 status: em-andamento
+owner: sexta-feira
 ---
 
 # Experiments Index

@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado (SQL colado) + preprint lido em resumo
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # A volatilidade das memes — e o piso que, na prática, bane o BTC
@@ -235,4 +239,4 @@ os dados não demonstram vantagem econômica nenhuma.
 [[KB-0058-spread-e-profundidade-o-custo-de-sair-de-uma-meme]] ·
 [[KB-0035-momentum-crashes-e-o-piso-que-virou-filtro-de-regime]] ·
 [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] ·
-[[KB-0007-atr-e-escala-por-volatilidade]] · [[Strategy Backlog]] · [[Index]]
+[[KB-0007-atr-e-escala-por-volatilidade]] · [[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]]

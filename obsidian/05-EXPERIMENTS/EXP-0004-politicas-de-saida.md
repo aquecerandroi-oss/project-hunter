@@ -2,6 +2,14 @@
 tags: [experimento, replay, politicas-de-saida, shadow-lab]
 updated: 2026-09-06
 status: em-andamento
+owner: sexta-feira
+exp: EXP-0004
+strategy: ""
+version: ""
+result: inconclusivo
+evaluable: 275
+days: 1
+last_eval: 2026-09-06
 ---
 
 # EXP-0004 — replay de oito políticas de saída sobre as entradas congeladas (R1)

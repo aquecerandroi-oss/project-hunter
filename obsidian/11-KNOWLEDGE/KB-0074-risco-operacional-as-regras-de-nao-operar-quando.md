@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado (SQL colado) + leitura de código
 hipotese_testavel: sim
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # Risco operacional — as regras de "não operar quando…", e o princípio de falhar fechado
@@ -160,7 +164,7 @@ janela sem incidente não descrevem uma queda de exchange**.
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Index]] ·
+[[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0044-o-que-morre-em-dez-segundos]] · [[KB-0020-funding-change-8h-nunca-calcula]] ·
 [[KB-0041-almgren-chriss-ao-contrario-o-custo-dominante-e-o-relogio]] ·
 [[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]] ·

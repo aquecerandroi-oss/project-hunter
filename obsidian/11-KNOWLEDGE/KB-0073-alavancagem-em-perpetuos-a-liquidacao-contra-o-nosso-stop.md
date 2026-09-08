@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: documentação (lida) + leitura de código + aritmética própria
 hipotese_testavel: sim
 astra: discorda em parte (correções aplicadas)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Alavancagem em perpétuos — a liquidação da exchange contra o nosso stop
@@ -171,7 +175,7 @@ prevê stop no mark (`PIPELINE.md:189`) e o walker observa velas (`walker.py:71`
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Index]] ·
+[[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0075-paper-trading-honesto-o-que-a-sombra-ainda-nao-simula]] ·
 [[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]] ·
 [[KB-0026-funding-num-horizonte-de-4h-e-o-vies-de-exclusao]] ·

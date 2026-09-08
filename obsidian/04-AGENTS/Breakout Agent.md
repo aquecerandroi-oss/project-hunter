@@ -2,6 +2,7 @@
 tags: [agentes, breakout, fase2]
 updated: 2026-09-05
 status: planejado
+owner: sexta-feira
 ---
 
 # Breakout Agent

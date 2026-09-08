@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado (SQL colado, contagens exatas) + leitura de código conferida por mim depois do apontamento da Astra
 hipotese_testavel: sim
 astra: concorda após correções (recusou a primeira versão)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # O que morre em dez segundos: o custo não é reconstruível

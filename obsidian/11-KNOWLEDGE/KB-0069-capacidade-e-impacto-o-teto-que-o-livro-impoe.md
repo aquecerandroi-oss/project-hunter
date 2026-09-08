@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: preprint lido em resumo + medição própria (livros e velas, saídas coladas em KB-0070)
 hipotese_testavel: sim
 astra: discorda em parte (correções aplicadas)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Capacidade e impacto — o teto de notional que o livro impõe, e o que ele não é
@@ -173,7 +177,7 @@ usa volume histórico ou volume realizado incluindo a nossa execução.
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Index]] ·
+[[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0070-a-tabela-de-capacidade-quantos-mercados-suportam-cada-tamanho]] ·
 [[KB-0040-a-lei-da-raiz-quadrada-e-o-regime-que-nao-e-o-nosso]] ·
 [[KB-0036-o-tamanho-que-a-sombra-nunca-declara]] ·

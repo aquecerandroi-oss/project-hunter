@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado (SQL colado)
 hipotese_testavel: sim
 astra: discorda em parte (correções aplicadas)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # `beta > 0.8` não separa nada no nosso universo — e a exposição agregada precisa de outra medida
@@ -218,7 +222,7 @@ mais que contagem isolada.
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Index]] ·
+[[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0066-o-risk-engine-ja-esta-escrito-e-a-medicao-o-contraria]] ·
 [[KB-0060-correlacao-com-o-btc-e-a-meme-season]] ·
 [[KB-0034-btc-como-fator-e-o-regime-global-que-e-so-o-btc]] ·

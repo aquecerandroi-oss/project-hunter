@@ -2,6 +2,7 @@
 tags: [trading, risco, m3]
 updated: 2026-09-07
 status: implementado e provado no local — o execution-worker existe e roda o ciclo inteiro (T3.5/T3.5b); a ponte sinal → admissão está desligada; falta T3.5c, T3.0c/T3.0d, T3.9b, T3.10 e o deploy na VPS
+owner: sexta-feira
 ---
 
 # Risk Engine

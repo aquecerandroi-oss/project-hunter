@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: raciocínio sobre o nosso código (arquivo e linha, conferido pela Astra) + **inventário de contagens já publicadas** com populações diferentes entre si — não é medição nova, e a confirmação exige SQL que esta sessão não pôde rodar
 hipotese_testavel: sim
 astra: concorda com ressalvas
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Funding num horizonte de 4 h: o que "0 de 173 atravessaram" pode e não pode dizer

@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: backtest do autor
 hipotese_testavel: sim
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: backtest do autor
 ---
 
 # O teste antes da regra — e o filtro que já estava dentro da regra

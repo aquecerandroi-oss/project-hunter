@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado (Harvey et al.) · texto clássico de praticante (Wilder)
 hipotese_testavel: sim
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # ATR e escala por volatilidade: quatro papéis que não são o mesmo

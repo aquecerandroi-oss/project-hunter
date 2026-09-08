@@ -2,6 +2,7 @@
 tags: [mercado, market-worker, m1]
 updated: 2026-09-06
 status: implementado
+owner: sexta-feira
 ---
 
 # Market Collector

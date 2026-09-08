@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: **anedótico** — nenhum teste publicado da regra contrária ao funding extremo em perpétuos foi localizado nas fontes consultadas
 hipotese_testavel: sim (como diagnóstico, com grupo de controle)
 astra: concorda com ressalvas
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Funding extremo como sinal contrário: a afirmação mais repetida e a menos testada

@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado (dois artigos publicados), lido pelo resumo/abstract — corpo completo não aberto
 hipotese_testavel: sim
 astra: concorda com correções (candidata H-KB0012b retirada)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # OFI não é o nosso `orderbook_imbalance_20`
@@ -144,7 +148,7 @@ registrado aqui para o plantão.
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Registro de Tentativas]] · [[Index]] ·
+[[Strategy Backlog]] · [[Registro de Tentativas]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0016-quando-o-fluxo-importa-dependencia-de-estado]] ·
 [[KB-0013-vpin-e-a-disputa-sobre-toxicidade]] ·
 [[KB-0017-liquidacoes-o-fluxo-forcado-que-observamos-por-amostragem]] · [[EXP-0002-volume-anomaly-v1]] · [[Features]] ·

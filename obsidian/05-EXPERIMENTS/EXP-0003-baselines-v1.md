@@ -2,6 +2,14 @@
 tags: [experimento, baselines, m2, mercado]
 updated: 2026-09-07
 status: aberto
+owner: sexta-feira
+exp: EXP-0003
+strategy: ""
+version: ""
+result: inconclusivo
+evaluable: 0
+days: 1
+last_eval: 2026-09-07
 ---
 
 # EXP-0003 — baselines por ativo e hora (M2), e o que elas destravam

@@ -2,6 +2,7 @@
 tags: [knowledge, indice]
 updated: 2026-09-06
 status: em construção
+owner: sexta-feira
 ---
 
 # Conhecimento — índice
@@ -533,4 +534,4 @@ produção. As limitações são de **janela** (16 h de sinais; 40 h de velas; u
 
 [[Strategy Backlog]] · [[Registro de Tentativas]] · [[Experiments Index]] ·
 [[EXP-0001-momentum-v1]] · [[EXP-0002-volume-anomaly-v1]] · [[Strategy Performance]] ·
-[[Features]] · [[00-HOME]]
+[[Features]] · [[00-HOME]] · [[_TEMPLATE-NOTE|template de nota]]

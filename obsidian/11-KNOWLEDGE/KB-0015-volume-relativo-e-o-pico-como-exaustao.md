@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: versão de trabalho (não a publicada) + dado próprio inconclusivo por limiar
 hipotese_testavel: sim
 astra: concorda com correções (causalidade retirada; teto 12 rebaixado a exploratório)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Volume relativo e o pico como exaustão
@@ -168,7 +172,7 @@ das duas exige declarar exaustão antes.
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Registro de Tentativas]] · [[Index]] ·
+[[Strategy Backlog]] · [[Registro de Tentativas]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0011-volume-magnitude-e-a-ponte-para-direcao]] ·
 [[KB-0014-taker-buy-volume-o-que-temos-medido]] ·
 [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]] ·

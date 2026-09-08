@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: conceito em fonte secundária + dado próprio (192 entradas, SQL colado, amostra selecionada — só entradas realizadas)
 hipotese_testavel: sim
 astra: concorda após correções (recusou a primeira versão)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Almgren-Chriss ao contrário: o termo que sobra para nós é o relógio

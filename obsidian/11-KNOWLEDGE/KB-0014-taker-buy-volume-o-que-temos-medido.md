@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: documentação da corretora + medição própria verificada (SQL colado)
 hipotese_testavel: sim
 astra: concorda com correções (limiar reclassificado; leitura de 1 min retirada)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # `taker_buy_volume`: o que temos, medido
@@ -214,7 +218,7 @@ validam — que é precisamente a distância entre o que eu tinha escrito e o qu
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Registro de Tentativas]] · [[Index]] ·
+[[Strategy Backlog]] · [[Registro de Tentativas]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0009-o-efeito-do-quarto-de-hora]] · [[KB-0011-volume-magnitude-e-a-ponte-para-direcao]] ·
 [[KB-0013-vpin-e-a-disputa-sobre-toxicidade]] ·
 [[KB-0015-volume-relativo-e-o-pico-como-exaustao]] · [[EXP-0002-volume-anomaly-v1]] ·

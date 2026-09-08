@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado (dado próprio, 1 dia, inconclusivo por limiar editorial)
 hipotese_testavel: sim
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # Valor incremental da invalidação (candidata #1 do backlog)

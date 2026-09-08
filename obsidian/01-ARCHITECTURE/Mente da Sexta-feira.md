@@ -2,6 +2,7 @@
 tags: [arquitetura, sexta-feira, astra, claude, memoria]
 updated: 2026-09-05
 status: implementado
+owner: sexta-feira
 ---
 
 # Mente da Sexta-feira

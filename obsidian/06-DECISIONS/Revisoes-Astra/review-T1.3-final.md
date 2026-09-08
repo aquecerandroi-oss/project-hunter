@@ -2,11 +2,15 @@
 tags: [astra, revisao]
 updated: 2026-09-05
 fonte: .claude/state/astra-review-review-T1.3-final.md
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-05
+by: astra
 ---
 
 # Revisão da Astra — review-T1.3-final
 
-Parte da [[Mente da Sexta-feira]]. Índice: [[Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
+Parte da [[Mente da Sexta-feira]]. Índice: [[Revisoes-Astra/Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
 
 - C1 - FECHADO - `handle_event` encaminha `event.event_ts`; o fallback também usa `event_ts` ([ingest.py:297](C:/dev/project-hunter/services/market-worker/hunter_market_worker/ingest.py:297), [hot_state.py:219](C:/dev/project-hunter/services/market-worker/hunter_market_worker/hot_state.py:219)).
 - H1 - FECHADO - Falhas em `report_losses` e no registro de atraso são capturadas; perdas só são removidas após commit ([persist.py:132](C:/dev/project-hunter/services/market-worker/hunter_market_worker/persist.py:132), [persist.py:145](C:/dev/project-hunter/services/market-worker/hunter_market_worker/persist.py:145), [persist.py:179](C:/dev/project-hunter/services/market-worker/hunter_market_worker/persist.py:179)).

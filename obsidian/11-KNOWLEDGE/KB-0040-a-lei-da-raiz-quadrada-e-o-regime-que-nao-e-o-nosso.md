@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado — **o PDF não abriu para mim; a Astra o abriu e conferiu equação, seção e tabela** (registrado)
 hipotese_testavel: sim
 astra: reescrita após a revisão dela (a tese original estava errada)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # A lei da raiz quadrada, e o que ela realmente diz sobre o nosso caso

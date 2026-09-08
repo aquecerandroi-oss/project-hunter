@@ -2,6 +2,7 @@
 tags: [performance, estrategias, shadow-lab, m5, m6]
 updated: 2026-09-06
 status: parcial
+owner: sexta-feira
 ---
 
 # Strategy Performance

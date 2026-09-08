@@ -2,6 +2,7 @@
 tags: [arquitetura, workers, shadow-lab]
 updated: 2026-09-06
 status: parcial
+owner: sexta-feira
 ---
 
 # Workers

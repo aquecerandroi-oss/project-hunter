@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado (SQL e leitura de livro colados) + leitura de contrato
 hipotese_testavel: sim
 astra: discorda em parte (correções aplicadas)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # O Risk Engine já está escrito — e a medição contraria cinco dos seus limites
@@ -288,7 +292,7 @@ nenhum automaticamente.
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Registro de Tentativas]] · [[Index]] ·
+[[Strategy Backlog]] · [[Registro de Tentativas]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0067-a-fracao-de-risco-por-operacao-e-o-preco-de-errar-a-expectancy]] ·
 [[KB-0068-sizing-por-volatilidade-a-posicao-sai-do-atr]] ·
 [[KB-0070-a-tabela-de-capacidade-quantos-mercados-suportam-cada-tamanho]] ·

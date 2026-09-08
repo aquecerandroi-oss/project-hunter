@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: estudo revisado
 hipotese_testavel: sim
 astra: concorda
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # Proximidade da máxima e confirmação por volume

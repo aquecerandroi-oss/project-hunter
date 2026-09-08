@@ -4,6 +4,9 @@ criado: 2026-09-08
 dono: Everton (pedido) · Sexta-feira (cartão)
 cartao: .claude/agents/product-designer.md
 modelo: sonnet
+tags: [agente, design, frontend, ux]
+owner: sexta-feira
+updated: 2026-09-08
 ---
 
 # Product Designer

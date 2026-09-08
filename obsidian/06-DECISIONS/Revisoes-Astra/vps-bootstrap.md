@@ -2,11 +2,15 @@
 tags: [astra, revisao]
 updated: 2026-09-05
 fonte: .claude/state/astra-review-vps-bootstrap.md
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-05
+by: astra
 ---
 
 # Revisão da Astra — vps-bootstrap
 
-Parte da [[Mente da Sexta-feira]]. Índice: [[Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
+Parte da [[Mente da Sexta-feira]]. Índice: [[Revisoes-Astra/Index|todas as revisões]]. Diálogos relacionados: [[Dialogos/M1|M1]], [[Dialogos/M2|M2]].
 
 **Astra: a arquitetura é adequada para essa VPS, mas eu corrigiria os bloqueios abaixo antes de depender dela 24/7.** Não li `.env`, não modifiquei arquivos e não fiz commit. A revisão foi estática; reproduzi somente três expressões Bash em memória, com dados fictícios. Não executei bootstrap, Compose ou backup.
 

@@ -1,6 +1,10 @@
 ---
 tags: [dialogo, indice]
 updated: 2026-09-05
+status: registro
+owner: sexta-feira
+decided_on: 2026-09-05
+by: sexta-feira (claude+astra)
 ---
 
 # Diálogos — índice

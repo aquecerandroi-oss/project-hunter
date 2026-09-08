@@ -2,6 +2,7 @@
 tags: [mercado, websocket, m1]
 updated: 2026-09-05
 status: implementado
+owner: sexta-feira
 ---
 
 # WebSockets

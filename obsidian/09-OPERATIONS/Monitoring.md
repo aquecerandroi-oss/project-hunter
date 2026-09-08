@@ -2,6 +2,7 @@
 tags: [operacoes, monitoramento, observabilidade]
 updated: 2026-09-05
 status: parcial
+owner: sexta-feira
 ---
 
 # Monitoring

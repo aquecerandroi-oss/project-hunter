@@ -4,9 +4,13 @@ tema: Perpétuos: funding, OI, posicionamento
 fonte: He, Manela, Ross & von Wachter, "Fundamentals of Perpetual Futures" (arXiv 2212.06888 / SSRN 4301150); Schmeling, Schrimpf & Todorov, "Crypto carry", BIS Working Paper 1087 (abr/2023, rev. out/2025); Gornall, Rinaldi & Xiao, "Perpetual Futures and Basis Risk" (SSRN 5036933); documentação de Mark Price / Price Index da Binance
 fonte_url: https://arxiv.org/abs/2212.06888 · https://ideas.repec.org/p/bis/biswps/1087.html · https://www.binance.com/en/support/faq/detail/360033525071
 lido_em: 2026-09-06
-evidencia: estudo revisado e working papers **lidos apenas em nível de resumo** (os PDFs não abriram — ver "fontes que não abriram" no [[Index]]); documentação da corretora lida na íntegra
+evidencia: estudo revisado e working papers **lidos apenas em nível de resumo** (os PDFs não abriram — ver "fontes que não abriram" no [[11-KNOWLEDGE/Index|Index]]); documentação da corretora lida na íntegra
 hipotese_testavel: sim
 astra: concorda com ressalvas — quatro retiradas aceitas
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: estudo revisado
 ---
 
 # Funding e base descrevem posicionamento; descrever não é prever

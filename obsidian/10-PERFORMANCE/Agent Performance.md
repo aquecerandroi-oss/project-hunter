@@ -2,6 +2,7 @@
 tags: [performance, agentes, m5]
 updated: 2026-09-06
 status: planejado
+owner: sexta-feira
 ---
 
 # Agent Performance

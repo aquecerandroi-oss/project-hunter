@@ -2,6 +2,7 @@
 tags: [knowledge, protocolo, tentativas]
 updated: 2026-09-06
 status: aberto
+owner: sexta-feira
 ---
 
 # Registro de tentativas (append-only)
@@ -614,6 +615,6 @@ com o de T-022.
 
 ## Relacionados
 
-[[Strategy Backlog]] · [[Index]] ·
+[[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] · [[Experiments Index]] ·
 [[Strategy Performance]]

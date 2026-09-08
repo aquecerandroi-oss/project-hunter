@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: replicado (SQL colado) + preprint lido em resumo
 hipotese_testavel: sim — mas o destinatário é o Risk Engine, não o Lab
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: replicado
 ---
 
 # A cauda de queda — e o que o Risk Engine vai precisar
@@ -182,4 +186,4 @@ Revisão de 2026-09-06 (`.claude/state/astra-review-KB-0062-0065-memecoins.md`).
 [[KB-0063-social-e-on-chain-a-linha-que-nao-atravessamos]] ·
 [[KB-0005-stops-quando-eles-param-perdas]] ·
 [[KB-0039-tipos-de-ordem-e-o-que-a-sombra-assume-sem-dizer]] ·
-[[Risk Engine]] · [[Strategy Backlog]] · [[Index]]
+[[Risk Engine]] · [[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]]

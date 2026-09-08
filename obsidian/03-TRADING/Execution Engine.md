@@ -2,6 +2,7 @@
 tags: [trading, execucao, m3, m4]
 updated: 2026-09-05
 status: planejado
+owner: sexta-feira
 ---
 
 # Execution Engine

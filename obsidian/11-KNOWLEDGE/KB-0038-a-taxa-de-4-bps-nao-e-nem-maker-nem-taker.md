@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: documentação da exchange (página de tabela de tarifas exige login — registrado) + aritmética própria
 hipotese_testavel: sim
 astra: concorda após correções (recusou a primeira versão)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # A taxa de 4 bps não é nem o maker nem o taker do exemplo

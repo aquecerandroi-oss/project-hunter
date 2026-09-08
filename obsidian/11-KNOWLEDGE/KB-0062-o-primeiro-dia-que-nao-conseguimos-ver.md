@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: leitura de código conferida + SQL rodado
 hipotese_testavel: sim
 astra: pendente
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # O primeiro dia que não conseguimos ver
@@ -203,4 +207,4 @@ perdido**.
 [[KB-0031-o-classificador-de-regime-esta-mudo-por-warm-up]] ·
 [[KB-0048-o-teste-antes-da-regra-e-o-filtro-que-ja-estava-dentro]] ·
 [[KB-0016-quando-o-fluxo-importa-dependencia-de-estado]] ·
-[[KB-0044-o-que-morre-em-dez-segundos]] · [[Strategy Backlog]] · [[Index]]
+[[KB-0044-o-que-morre-em-dez-segundos]] · [[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]]

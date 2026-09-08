@@ -1,0 +1,74 @@
+# Base nativa do Obsidian (Bases). Um experimento por linha, lido do frontmatter
+# das páginas EXP-NNNN. Nenhum número aqui é calculado pela Base: `evaluable` e
+# `days` vêm da última avaliação datada da própria página, que por sua vez veio
+# de SQL colado. A Base só mostra e ordena.
+#
+# O filtro usa a tag `experimento` em vez do caminho da pasta de propósito: a
+# raiz do vault não está fixada no repositório (não existe `obsidian/.obsidian`),
+# então o Everton pode abrir tanto `obsidian/` quanto a raiz do repo, e um
+# filtro por pasta quebraria num dos dois casos.
+
+filters:
+  and:
+    - file.hasTag("experimento")
+    - 'exp != "EXP-NNNN"'
+
+formulas:
+  limiar: 'if(evaluable >= 100, if(days >= 30, "acima do limiar", "falta dia"), "falta outcome")'
+
+properties:
+  exp:
+    displayName: "EXP"
+  strategy:
+    displayName: "Estratégia"
+  version:
+    displayName: "Versão"
+  result:
+    displayName: "Resultado"
+  evaluable:
+    displayName: "Avaliáveis (limiar 100)"
+  days:
+    displayName: "Dias distintos (limiar 30)"
+  formula.limiar:
+    displayName: "Limiar editorial"
+  last_eval:
+    displayName: "Última avaliação"
+  status:
+    displayName: "Status"
+
+views:
+  - type: table
+    name: "Experimentos"
+    order:
+      - file.name
+      - exp
+      - strategy
+      - version
+      - result
+      - evaluable
+      - days
+      - formula.limiar
+      - last_eval
+      - status
+
+  - type: table
+    name: "Abaixo do limiar editorial"
+    filters:
+      or:
+        - 'evaluable < 100'
+        - 'days < 30'
+    order:
+      - file.name
+      - exp
+      - evaluable
+      - days
+      - formula.limiar
+      - last_eval
+
+  - type: cards
+    name: "Cartões"
+    order:
+      - file.name
+      - result
+      - formula.limiar
+      - last_eval

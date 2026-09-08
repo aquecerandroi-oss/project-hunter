@@ -7,6 +7,10 @@ lido_em: 2026-09-06
 evidencia: documentação da exchange (lida) + leitura do nosso código
 hipotese_testavel: sim
 astra: concorda após correções (recusou a primeira versão)
+status: curada
+owner: sexta-feira
+updated: 2026-09-06
+confiança: "?"
 ---
 
 # Tipos de ordem, e o que a sombra assume sem dizer

@@ -2,6 +2,7 @@
 tags: [agentes, momentum, m4, shadow-lab]
 updated: 2026-09-06
 status: sombra
+owner: sexta-feira
 ---
 
 # Momentum Agent
