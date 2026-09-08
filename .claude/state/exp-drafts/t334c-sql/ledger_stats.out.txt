@@ -1,0 +1,37 @@
+linhas=11904
+estados: {'not_triggered': 11349, 'unavailable': 448, 'triggered': 91, 'rejected': 16}
+motivos: {'no_event': 9899, 'no_line': 1085, 'warmup': 448, 'atr_out_of_range': 234, 'rvol_low': 105, 'signal': 91, 'line_weak': 26, 'risk_too_wide': 15, 'geometry_invalidation': 1}
+
+(a) GEOMETRIA: avaliaveis=11456 com_linha=10371 (90.53 %) no_line=1085 (9.47 %)
+    (histograma sobre 10984 barras: as `no_line` e as `no_event`, as unicas cujo detalhe traz a contagem de linhas)
+    linhas validas por barra: [(0, 1085), (1, 1692), (2, 2268), (3, 2496), (4, 1779), (5, 1117), (6, 547)]
+    media=2.7038 p50=3.0 p90=5.0 max=6
+    pivos nas barras SEM linha: media=12.079 p50=12.0 max=18 zero=0
+
+(c) RECUSAS: triggered=91 rejected=16 base=107
+    risk_too_wide              15   14.02 % da base
+    geometry_invalidation       1    0.93 % da base
+
+    por mercado (estado):
+    binance:DOGEUSDT     {'not_triggered': 2836, 'unavailable': 112, 'triggered': 23, 'rejected': 5}
+    binance:ETHUSDT      {'not_triggered': 2843, 'unavailable': 112, 'triggered': 19, 'rejected': 2}
+    binance:SOLUSDT      {'not_triggered': 2836, 'unavailable': 112, 'triggered': 25, 'rejected': 3}
+    binance:XRPUSDT      {'not_triggered': 2834, 'unavailable': 112, 'triggered': 24, 'rejected': 6}
+
+    as recusas, uma a uma:
+    binance:ETHUSDT      risk_too_wide          ref=2283.71 stop=2238.23 linha=2265.8645833 risk=45.48
+    binance:XRPUSDT      risk_too_wide          ref=1.4262 stop=1.3616 linha=1.40508125 risk=0.0646
+    binance:DOGEUSDT     geometry_invalidation  ref=0.09038 stop=0.0850289286989673638892779542 linha=0.0827054545 risk=None
+    binance:ETHUSDT      risk_too_wide          ref=2469.5 stop=2427.24 linha=2459.8634146 risk=42.26
+    binance:SOLUSDT      risk_too_wide          ref=96.25 stop=93.22 linha=95.076315789 risk=3.03
+    binance:SOLUSDT      risk_too_wide          ref=109.54 stop=106.62 linha=108.60157894 risk=2.92
+    binance:SOLUSDT      risk_too_wide          ref=100.83 stop=99.14 linha=100.17666666 risk=1.69
+    binance:XRPUSDT      risk_too_wide          ref=1.508 stop=1.4523 linha=1.4846307692 risk=0.0557
+    binance:XRPUSDT      risk_too_wide          ref=1.4213 stop=1.3638 linha=1.41205 risk=0.0575
+    binance:XRPUSDT      risk_too_wide          ref=1.3452 stop=1.3171 linha=1.3412 risk=0.0281
+    binance:XRPUSDT      risk_too_wide          ref=1.348 stop=1.3262 linha=1.3444882352 risk=0.0218
+    binance:XRPUSDT      risk_too_wide          ref=1.351 stop=1.3262 linha=1.3463823529 risk=0.0248
+    binance:DOGEUSDT     risk_too_wide          ref=0.09325 stop=0.09044 linha=0.0923984210 risk=0.00281
+    binance:DOGEUSDT     risk_too_wide          ref=0.09271 stop=0.0902 linha=0.0917989473 risk=0.00251
+    binance:DOGEUSDT     risk_too_wide          ref=0.09323 stop=0.09031 linha=0.0925991666 risk=0.00292
+    binance:DOGEUSDT     risk_too_wide          ref=0.08705 stop=0.08437 linha=0.0867775 risk=0.00268

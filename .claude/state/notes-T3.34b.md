@@ -26,7 +26,7 @@ escrito **depois** do módulo, pelo mesmo quant — autoavaliação, não revis�
 | `C:\dev\project-hunter\packages\core\hunter_core\strategies\tl_events.py` | **novo**, 302 linhas. `LineEvent`, `detect_events` (repique, rompimento, reteste). Porte de `patterns/events.py` |
 | `C:\dev\project-hunter\packages\core\hunter_core\strategies\tl_scan.py` | **novo**, 268 linhas. `TlParams`, `TlScan`, `tl_scan` (o único lugar onde o corte é aplicado), `Channel`/`find_channels`. Porte de `patterns/{scan,channels}.py` **mais** `retire_after_break` |
 | `C:\dev\project-hunter\packages\core\hunter_core\strategies\tl_setup.py` | **novo**, 329 linhas. **Não é porte:** camada de política da estratégia (qual evento abre porta, o pivô do stop, o canal da linha, a frase da razão e o envelope) |
-| `C:\dev\project-hunter\packages\core\hunter_core\strategies\trendline_breakout_v1.py` | **novo**, 350 linhas. A versão congelada, 37 parâmetros |
+| `C:\dev\project-hunter\packages\core\hunter_core\strategies\trendline_breakout_v1.py` | **novo**, 350 linhas. A versão congelada, **36** parâmetros (o "37" desta linha era erro meu, corrigido na T3.34c: `len(default_parameters) == 36`, e o `activate_strategy_version.py --dry-run` da VPS imprimiu `(36 parameters)`) |
 | `C:\dev\project-hunter\packages\core\hunter_core\strategies\registry.py` | **+1 import, +6 linhas** no `DEFAULT_REGISTRY` (a tupla passou a multilinha pelo formatador) |
 | `C:\dev\project-hunter\packages\core\hunter_core\strategies\constraints_table.py` | **+1 entrada** `trendline_breakout_v1` (faixas, dois `bounded` estruturais, três pares `ordered`) |
 | `C:\dev\project-hunter\infra\scripts\seed_reference.py` | **+1 linha** em `STRATEGIES`: `("trendline_breakout", "Trendline Breakout", "trend", …)` |
@@ -354,3 +354,33 @@ pivô/teto está errado, e isso é **versão nova**); e `pattern_retired_lines` 
    Irrelevante enquanto a versão for `research_only` — nada chega à carteira —, e **impeditivo** se
    alguém quiser promovê-la a `paper` sem antes mexer no limite ou no stop. Está declarado no
    C5 do EXP-0016.
+
+---
+
+## T3.34c — o que a revisão de `c9691d0` pediu e o que o dia um respondeu
+
+**Acrescentado em 2026-09-08 (Brasília 19:5x; UTC 22:5x) pela T3.34c. Nada acima foi reescrito.**
+
+1. **"37 parâmetros" era erro meu.** `len(TrendlineBreakoutV1.default_parameters) == 36`, conferido
+   localmente e **de novo pela VPS**: `activate_strategy_version.py … --dry-run` imprimiu
+   `would activate trendline_breakout v1 (purpose research_only) with code_ref
+   hunter_core.strategies.trendline_breakout_v1@sha256:7b83a1ff… (36 parameters)`. A linha da tabela
+   de FILES foi corrigida; **a mensagem do commit `c9691d0` fica como está** (histórico não se
+   reescreve).
+2. **As duas séries de ATR de Wilder são reais e a divergência é minúscula.** `atr_bars = 97` é a
+   leitura oficial (escala stop, risco, alvo e a porta de ATR%); `pattern_bars = 96` é a janela em
+   que `tl_pivots.atr_series` calcula a **sua própria** série (escala proeminência de pivô,
+   tolerância, rompimento, repique e os baldes de deduplicação). Sementes diferentes, um passo de
+   suavização a mais numa delas. Medido em série sintética
+   (`.claude/state/exp-drafts/t334c-sql/atr_divergencia.py`): **0,000861 % a 0,011649 %** em 33
+   cortes, e o limite superior estrutural é o **peso residual da semente**, 0,2295 % (97 barras) /
+   0,2472 % (96 barras). **Observação, não defeito:** nenhum limiar compara uma série com a outra;
+   a divergência só desloca, por uma fração de por cento, qual barra fica de cada lado de um limiar.
+3. **O CONCERN 4 desta nota se confirmou no dado real.** A previsão era "se o replay vier com 0 % de
+   `geometry_invalidation`, é o esperado; a taxa que importa é a de `risk_too_wide`". Dia um, sobre
+   as 107 barras que chegaram às guardas (91 `triggered` + 16 `rejected`):
+   **`risk_too_wide` 15 (14,02 %)** e **`geometry_invalidation` 1 (0,93 %)**. As duas abaixo do
+   limiar de 20 % do brief da implementação.
+4. **O resultado do dia um está em `.claude/state/notes-T3.34c.md`** e a avaliação datada foi
+   acrescentada ao `EXP-0016`. Resumo de uma linha: a versão **sobrevive a K1** (47 decisões) e
+   **dispara K6** (89,4 % das decisões são **repique**, não rompimento).

@@ -1,15 +1,15 @@
 ---
 tags: [experimento, trendline, geometria, shadow-lab]
 updated: 2026-09-08
-status: proposto
+status: em-andamento
 owner: sexta-feira
 exp: EXP-0016
 strategy: trendline_breakout
 version: v1
-result: nao-iniciado
-evaluable: 0
-days: 0
-last_eval: —
+result: inconclusivo
+evaluable: 47
+days: 14
+last_eval: 2026-09-08
 ---
 
 # EXP-0016 — rompimento e repique de linha de tendência (`trendline_breakout_v1`)
@@ -60,7 +60,7 @@ ela já revisou na T3.34) continua **pendente**.
 | C5 | Calibração das saídas | **PASS com ressalva** | Stop **estrutural** (pivô de baixa) com piso de 2 ATR e teto de 3 ATR, então a distância fica entre 2 e 3 ATR; a ~2 % de ATR% isso é 4 %–6 % do preço, **acima** do `max_stop_distance_pct` de 3 % do `paper_v1` — irrelevante aqui (`research_only`, sem carteira) e **impeditivo** se alguém quiser promover a `paper`. Está declarado, não escondido. Alvo `max(largura do canal, 2 R)`: com 2 R o equilíbrio bruto é 33,3 %, e o pedágio medido de 0,1333 R no piso de ATR o leva a ~37,8 % |
 | C6 | Concentração de risco | **PASS** | `research_only`, sem carteira, sem ordens. A única carga é computacional: uma varredura completa custou 194 ms em 1344 barras na T3.34, e aqui a janela é de 96 barras por corte (medido nos testes: a suíte inteira, 32 casos com séries de 120 barras, roda em ~2 s). O `retire_after_break` **reduz** o número de linhas vivas |
 | C7 | Realismo de execução | **PASS** | Custos idênticos aos das outras versões (2 + 5 + 4 bps, `max_entry_delay_s = 120`), entrada na abertura da barra seguinte pelo perfil congelado do SHADOW-LAB §3. O pedágio declarado é **0,1333 R** no piso de ATR e no risco máximo, contra 0,3333 R do `session_orb_v1`: o stop largo desta versão é caro em preço e **barato em R** |
-| C8 | Qualidade da invalidação | **PASS — e é o ponto da versão** | A invalidação é a **linha projetada na barra da decisão**, um nível estrutural que uma guarda obriga a ficar estritamente entre o stop e a referência (`REJECTED / geometry_invalidation` caso contrário). Não é o stop com outro nome (fica acima dele) nem código morto (fica abaixo da referência). É o contraste direto com `momentum_v1`, cuja invalidação por máxima anterior matou 41,8 % dos desfechos da variante de alvo 3 ATR ([[EXP-0013]]) |
+| C8 | Qualidade da invalidação | **REVISE, rebaixado de `PASS` em 2026-09-08 (T3.34c)** | A invalidação é a **linha projetada na barra da decisão**, um nível estrutural que uma guarda obriga a ficar estritamente entre o stop e a referência (`REJECTED / geometry_invalidation` caso contrário). Não é o stop com outro nome (fica acima dele) nem código morto (fica abaixo da referência). **A ressalva que faltava, e ela é grave:** a *forma* desta regra — "fechar de volta abaixo do nível rompido" — já foi medida nesta casa e **não melhorou nada**. O braço `INV-B` (sem invalidação) do [[EXP-0007]] deu **Δ −0,070 R … +0,032 R** conforme a população, com **troca de sinal** entre elas, e a [[KB-0006]] resume o achado: *a invalidação adianta a perda, ela não a cria*. Escrever "é o ponto da versão" sem citar isso era autoavaliação otimista. O contraste tem de ser **medido no dia um**, pré-registrado abaixo, e não assumido |
 
 **Veredito do portão: `REVISE`** — 2026-09-08, quant-engineer, **autoavaliação**. Três `REVISE`
 (C1, C2, C3) e nenhum `FAIL`. As três revisões pedidas, em ordem:
@@ -100,7 +100,9 @@ ela já revisou na T3.34) continua **pendente**.
 - **`retire_after_break` ligado:** uma linha cujo rompimento é mais velho que a janela de reteste
   deixa de ser desenhada. É a **única regra que a cópia acrescenta** à T3.34 (correção 1 da
   KB-0077), e é por isso que existe cópia em vez de edição: as figuras da T3.34 já foram publicadas.
-- **Parâmetros congelados:** 37 chaves, a tabela do brief §5 mais `mode`, os dois
+- **Parâmetros congelados:** **36** chaves (a T3.34b escreveu "37"; é erro de contagem, não de
+  código — `len(default_parameters) == 36`, e o `--dry-run` do `activate_strategy_version.py`
+  na VPS imprimiu `(36 parameters)`), a tabela do brief §5 mais `mode`, os dois
   `max_violations_*` e os seis parâmetros de varredura que viajam no envelope (`pattern_params`).
 - **Universo:** replay em ETHUSDT, SOLUSDT, XRPUSDT, DOGEUSDT; `prospective` no universo elegível.
 
@@ -148,6 +150,22 @@ O recibo padrão (barras, segundos, barras/s, contagem por estado, sinais, desfe
 4. **taxa de `risk_too_wide`** e de `geometry_invalidation` sobre as barras que de outro modo teriam
    disparado. **Acima de 20 %**, o par (pivô estrutural, teto de risco) está errado — e isso é
    **versão nova**, não ajuste (brief §4);
+4b. **O CONTRASTE DA INVALIDAÇÃO, pré-registrado em 2026-09-08 (T3.34c), antes de qualquer replay
+   desta versão.** Não basta publicar a *porcentagem* de saídas por invalidação: a porcentagem não
+   diz se a regra ajudou. O estimando é o do [[EXP-0007]] / [[KB-0006]], pareado por episódio:
+
+       Δ = média_i ( R_i^{sem invalidação} − R_i^{com invalidação} )
+
+   sobre **os mesmos** episódios, com entrada, stop, alvo e horizonte congelados — o braço `INV-B`
+   de `hunter_indicators.replay.policies`, dobrado por `walker.walk` e liquidado por `settle.settle`
+   (o código de produção), via `infra/scripts/replay_exits.py --policies INV-B --cohort <a coorte
+   deste replay>`. **Publicar as duas leituras:** (i) o Δ sobre a população inteira e (ii) o Δ
+   condicionado aos episódios que **de fato** saíram por invalidação — nestes, o contrafactual é o R
+   até stop, alvo ou expiração. **Regra de leitura (escrita ao arquivar, com o número já visto — ver a procedência no topo
+   deste item):** se Δ ≥ 0 (isto é, se
+   remover a invalidação não piorar), a tese de C8 — "a invalidação estrutural corta a cauda esquerda
+   melhor que a de `momentum_v1`" — **não se sustenta nesta janela**, e o EXP tem de dizer isso com
+   a mesma clareza com que a afirmou. Δ < −0,05 R é o único resultado que a sustenta;
 5. **linhas aposentadas por barra** (`pattern_retired_lines`), para medir o efeito da única regra
    que a cópia acrescentou.
 
@@ -164,7 +182,85 @@ O recibo padrão (barras, segundos, barras/s, contagem por estado, sinais, desfe
 
 ## Avaliações (acrescentadas, nunca reescritas)
 
-*(nenhuma: a versão não foi ativada e nenhum replay foi rodado — T3.34b entrega só o código)*
+### Avaliação de 2026-09-08 — **REPLAY** (dia um), T3.34c
+
+**Rótulo: `REPLAY`.** A janela avaliada é a mesma que gerou a hipótese. Serve para **matar**, não
+para promover ([[KB-0010]]).
+
+- **Versão:** `trendline_breakout v1`, `purpose = research_only`, ativada em
+  **2026-09-08T22:29:52,701952Z** (Brasília 19:29:52) com
+  `code_ref = hunter_core.strategies.trendline_breakout_v1@sha256:7b83a1ff07946fa743d12c9d098f15b538c2e2b19f5269363203ee0671e19648`
+  — **o digest previsto pelo protocolo**, conferido no `--dry-run` antes da escrita.
+  `params_hash = f2e8017c7251e22f`, 36 parâmetros.
+- **Coorte:** `replay:d78c14d1-b4c5-424a-8f31-a43100744bb4`, duas fatias
+  (2026-08-08→08-23 e 08-23→09-08), 4 mercados (ETH, SOL, XRP, DOGE), 11 904 barras, **0 erros**.
+- **Leitura do banco:** `read_at` 2026-09-08T22:40:14Z (população), 22:41:27Z (decomposição),
+  22:44:47Z (recibos/isolamento), tudo em `repeatable read read only`.
+
+**Funil (o que o brief mandou publicar primeiro):**
+
+| pergunta | número |
+|---|---|
+| (a) a geometria existe no dado real? | **90,53 %** das 11 456 barras avaliáveis têm ≥ 1 linha válida; `no_line` = 1 085 (**9,47 %**). Entre as 10 984 barras que não tiveram evento, a média é **2,70** linhas contando as sem linha e **3,00** contando só as que tinham uma; nas 47 decisões, **3,43**. Nas barras sem linha há em média **12,1 pivôs** — quem corta é a exigência de 3 toques, não a falta de pivôs |
+| (b) decisões brutas (K1) | **91 `triggered`**, **47 sinais** na coorte (a diferença é ocupação de vaga), **47/47 avaliáveis**, 14 dias distintos |
+| (c) `risk_too_wide` | **15** de 107 barras que chegaram às guardas = **14,02 %** (limiar do brief: 20 %) |
+| (c) `geometry_invalidation` (recusa **na decisão**) | **1** de 107 = **0,93 %** — exatamente o que a `notes-T3.34b` CONCERN 4 previu |
+
+**Expectancy (47 decisões, 47 avaliáveis, 14 dias, 4 mercados):**
+
+| bruta (R) | custo (R) | líquida (R) | soma (R) | acerto | PF líq. | ATR% obs. |
+|---:|---:|---:|---:|---:|---:|---|
+| **+0,1045** | 0,1401 | **−0,0382** | −1,79 | 17,0 % | **0,9220** | 0,00501 … 0,01067 |
+
+**A vantagem bruta existe e o pedágio a come inteira.** É a primeira versão desta casa cuja
+expectancy bruta é positiva e cuja líquida é negativa **só por causa do custo**.
+
+**O contraste da invalidação — o item 4b, medido como pré-registrado** (`replay_exits.py`,
+braço `INV-B`, portão do passo 1 = **1,0000** sobre 47/47):
+
+| leitura | base (com invalidação) | INV-B (sem) | Δ |
+|---|---:|---:|---:|
+| expectancy líq. (R) | **−0,038163** | **+0,054063** | **+0,092226** |
+| PF | 0,9220 | **1,1101** | — |
+| pares / blocos | 47 / 14 | — | IC 95 % **[−0,0618; +0,2151]**, p 0,2646, Holm 1,0000 |
+| Δ condicionado aos 23 que saíram por invalidação | −0,6555 R | **−0,4670 R** | **+0,1885 R** |
+
+**Veredito de C8:** Δ ≥ 0 ⇒ **a tese de C8 não se sustenta nesta janela**. (A métrica veio do brief,
+antes da corrida; o limiar de leitura foi escrito por mim depois — está declarado no item 4b.) Remover a invalidação **inverte o sinal da expectancy** (−0,038 → +0,054) e o Δ
+supera o efeito mínimo de 0,05 R — mas o IC de 95 % por bloco de dia **contém zero** e Holm não
+rejeita, então isto **não** é prova de que a invalidação faz mal: é a repetição exata do achado da
+[[KB-0006]] noutra estratégia. **A invalidação estrutural desta versão não corta a cauda esquerda
+melhor que a de `momentum_v1`; ela adianta a perda.**
+
+**K6 — a regra dos 60 %, e ela dispara:**
+
+| modo | n | % | R líq. médio | alvos | invalidados |
+|---|---:|---:|---:|---:|---:|
+| **repique** em suporte ascendente | **42** | **89,4 %** | +0,0177 | 8 | 19 |
+| rompimento de resistência descendente | 5 | 10,6 % | −0,5075 | **0** | 4 |
+
+Por mercado o maior é SOLUSDT com **31,9 %** — a metade "mercado" de K6 **não** dispara.
+**A metade "modo" dispara com folga:** esta versão, no dado real, **não é** "rompimento de linha de
+tendência". É **repique em suporte ascendente**, com uma porta de rompimento que decidiu 5 vezes em
+31 dias e perdeu as 5.
+
+**C4 — decis de `line_slope_per_bar` (o substituto de regime), e o que eles revelam:**
+os 5 rompimentos são **exatamente** o decil 1 (inclinação de −0,136 a −0,031 ATR/barra) e todos os
+42 repiques têm inclinação positiva. **A inclinação é colinear com o modo por construção** (uma
+resistência que rompe é descendente; um suporte que repica é ascendente), logo ela **não é** um
+substituto independente de regime nesta versão. Dentro dos repiques: faixa quase horizontal
+(0 ≤ slope < 0,02 ATR/barra) **−0,5205 R** em 5 decisões; faixa claramente ascendente
+**+0,0904 R** em 37.
+
+**Régua de maturidade:** 47 avaliáveis (< 100) e **14 dias distintos** (< 30) ⇒ **`inconclusivo`
+por contrato** (SHADOW-LAB §9). Os p-valores acima são exploratórios.
+
+**K1–K5:** K1 não (47 ≥ 20) · K2 não (47 ≪ 1 500) · K3 não se aplica (47 < 100 e 14 < 30; e a
+expectancy **bruta** é positiva) · K4 não (`unavailable` 448/11 904 = **3,76 %**) · K5 não
+(cobertura de `R_net` **100 %**).
+
+**Veredito do funil: `manter em pesquisa`, com a hipótese REENUNCIADA.** Ver
+`.claude/state/notes-T3.34c.md` para os recibos verbatim e as ressalvas.
 
 ## Variantes tentadas
 
@@ -179,10 +275,22 @@ O recibo padrão (barras, segundos, barras/s, contagem por estado, sinais, desfe
 
 [[Experiments Index]] · [[Strategy Backlog]] · [[KB-0077-linhas-de-tendencia]] ·
 [[KB-0003-rompimento-de-canal-e-data-snooping]] ·
+[[KB-0006-invalidacao-vs-stop-vs-tempo]] ·
 [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] ·
 [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] ·
+[[EXP-0007-momentum-invalidacao-bracos-INV]] ·
 [[EXP-0008-breakout-compressao-de-volatilidade]] · [[EXP-0010-session-orb-faixa-de-abertura]] ·
 [[Registro de Tentativas]]
+
+**Por que [[KB-0006]] e [[EXP-0007]] entram aqui, e não são citação de cortesia:** a invalidação
+desta versão tem a **mesma forma** da que o `momentum_v1` usa — fechar de volta abaixo do nível que
+autorizou a entrada — e essa forma **já foi medida**, em quatro populações, com contraste pareado e
+correção de Holm. O resultado foi `Δ −0,070 R … +0,032 R`, trocando de sinal entre populações: nem
+melhora, nem piora distinguível. A frase que a KB-0006 deixou é a que este EXP tem de carregar até
+provar o contrário: **a invalidação adianta a perda, ela não a cria**. O que muda aqui é *qual*
+nível é usado (uma linha inclinada com três toques, não a máxima de 20 fechamentos); se isso for
+diferença real ou só outro nome para o mesmo comportamento é **exatamente** o que o item 4b de "o
+que o dia um tem de publicar" existe para medir.
 
 ## Fontes
 
