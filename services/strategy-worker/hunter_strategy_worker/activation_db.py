@@ -30,6 +30,7 @@ __all__ = [
     "migration_applied",
     "migration_url",
     "next_free_version",
+    "open_paper_exposure",
     "purpose_column_present",
     "record_event",
     "record_failure",
@@ -129,6 +130,55 @@ async def load_row(conn: AsyncConnection, key: str, version: str) -> Any:
             {"key": key, "version": version},
         )
     ).first()
+
+
+async def open_paper_exposure(conn: AsyncConnection, version_id: Any) -> list[str]:
+    """Reasons a ``purpose = 'paper'`` version still has skin in the game.
+
+    Shared by ``deprecate()`` and ``supersede()`` (T3.39b review, ALTA-1/ALTA-2:
+    the two writers that may retire the paper line must refuse on the same
+    evidence, or one of them becomes the back door the other closes).
+
+    ``positions.agent_id`` is never written by the execution worker
+    (``hunter_execution_worker.positions.open_position``'s ``INSERT`` has no
+    such column — confirmed by reading it, not assumed); the link production
+    actually carries is ``positions.metadata->>'proposal_id'`` — the same value
+    ``orders.proposal_id`` holds for the order that opened it — to
+    ``trade_proposals.agent_id`` to ``agents.strategy_version_id``, the same
+    three-table chain ``ddl/paper.py``'s own consistency check joins
+    (``orders o JOIN trade_proposals p ON p.id = o.proposal_id``). ``status <>
+    'closed' AND NOT is_residual`` is the project's own definition of "a live
+    position" (``hunter_execution_worker.positions.load_open_position``): dust
+    no price makes sellable is not exposure a deprecation needs to protect.
+
+    The second reason is a ``shadow_episodes`` slot still tracking an entry
+    (``open_outcome_signal_id IS NOT NULL``) — a research row with a signal in
+    flight, independent of any wallet.
+    """
+    reasons: list[str] = []
+    open_positions = await conn.scalar(
+        text(
+            "SELECT count(DISTINCT p.id) FROM positions p "
+            "JOIN orders o ON o.proposal_id = (p.metadata->>'proposal_id')::uuid "
+            "JOIN trade_proposals tp ON tp.id = o.proposal_id "
+            "JOIN agents a ON a.id = tp.agent_id "
+            "WHERE a.strategy_version_id = :version_id "
+            "AND p.status <> 'closed' AND NOT p.is_residual"
+        ),
+        {"version_id": version_id},
+    )
+    if open_positions:
+        reasons.append(f"{open_positions} open position(s) via its agents")
+    open_slots = await conn.scalar(
+        text(
+            "SELECT count(*) FROM shadow_episodes WHERE strategy_version_id = :version_id "
+            "AND open_outcome_signal_id IS NOT NULL"
+        ),
+        {"version_id": version_id},
+    )
+    if open_slots:
+        reasons.append(f"{open_slots} shadow slot(s) tracking an open outcome")
+    return reasons
 
 
 async def next_free_version(conn: AsyncConnection, strategy_id: Any) -> str:

@@ -226,6 +226,149 @@ async def activate_version(
     return strategy_id, version_id
 
 
+async def seed_paper_exposure(
+    session: AsyncSession, *, org: uuid.UUID, version_id: uuid.UUID, market_id: uuid.UUID
+) -> None:
+    """Org, workspace, portfolio, agent, a proposal, an order and one open
+    position — the *real* production link (T3.39b review, ALTA-1), not a
+    shortcut through a column production never writes.
+
+    ``execution-worker/positions.py``'s ``open_position`` never sets
+    ``positions.agent_id`` — read, not assumed, and left out of this fixture on
+    purpose. What it *does* write is ``positions.metadata->>'proposal_id'``,
+    the same value the entry order's ``proposal_id`` carries; the chain a
+    ``--deprecate``/``--supersede`` guard has to walk is therefore
+    ``positions.metadata->>'proposal_id' -> orders.proposal_id ->
+    trade_proposals.agent_id -> agents.strategy_version_id`` — the same three
+    tables ``ddl/paper.py``'s own consistency check joins. A guard seeded
+    through ``positions.agent_id`` instead would pass every test and refuse
+    nothing on the VPS.
+
+    ``organizations``/``workspaces``/``portfolios``/``agents``/``trade_proposals``/
+    ``orders`` are ``hunter_app``/engine territory, not ``hunter_worker``'s — the
+    same reason ``activate_version`` resets the role for ``strategy_versions``.
+    The role is *not* restored afterwards (unlike that helper): opening a
+    ``portfolios`` row carries a deferred, COMMIT-time audit trigger
+    (``paper_roles_2``'s birth guard) that reads ``current_user`` at commit, not
+    at the ``INSERT`` — restoring ``hunter_worker`` here would make the session
+    look, at commit, like "only the engine" opening a wallet with no
+    ``audit_logs`` row in the same transaction, which is exactly what that
+    trigger refuses. This helper is always the last write of its transaction.
+    """
+    import json
+
+    workspace_id, portfolio_id, agent_id = uuid7(), uuid7(), uuid7()
+    proposal_id, order_id, position_id = uuid7(), uuid7(), uuid7()
+    await session.execute(text("RESET ROLE"))
+    await session.execute(
+        text("INSERT INTO organizations (id, slug, name) VALUES (:id, :slug, :slug)"),
+        {"id": org, "slug": f"t-{org.hex[:8]}"},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO workspaces (id, organization_id, name, objective) "
+            "VALUES (:id, :org, 'w', 'paper_trading')"
+        ),
+        {"id": workspace_id, "org": org},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO portfolios (id, organization_id, workspace_id, name, initial_capital) "
+            "VALUES (:id, :org, :ws, 'paper wallet', 1000)"
+        ),
+        {"id": portfolio_id, "org": org, "ws": workspace_id},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO agents (id, organization_id, workspace_id, portfolio_id, name, "
+            "strategy_version_id, status) "
+            "VALUES (:id, :org, :ws, :pf, 'agent', :version, 'enabled')"
+        ),
+        {"id": agent_id, "org": org, "ws": workspace_id, "pf": portfolio_id, "version": version_id},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO trade_proposals (id, organization_id, portfolio_id, agent_id, "
+            "market_id, direction, idempotency_key) VALUES "
+            "(:id, :org, :pf, :agent, :market, 'long', :key)"
+        ),
+        {
+            "id": proposal_id,
+            "org": org,
+            "pf": portfolio_id,
+            "agent": agent_id,
+            "market": market_id,
+            "key": f"t39b-{proposal_id.hex[:16]}",
+        },
+    )
+    await session.execute(
+        text(
+            "INSERT INTO orders (id, organization_id, portfolio_id, proposal_id, market_id, "
+            "client_order_id, side, type, purpose, qty) VALUES "
+            "(:id, :org, :pf, :proposal, :market, :coid, 'buy', 'market', 'entry', 1)"
+        ),
+        {
+            "id": order_id,
+            "org": org,
+            "pf": portfolio_id,
+            "proposal": proposal_id,
+            "market": market_id,
+            "coid": f"t39b-{order_id.hex[:16]}",
+        },
+    )
+    await session.execute(
+        text(
+            "INSERT INTO positions (id, organization_id, portfolio_id, market_id, direction, "
+            "qty, avg_entry_price, status, metadata) VALUES (:id, :org, :pf, :market, 'long', "
+            "1, 100, 'open', CAST(:meta AS jsonb))"
+        ),
+        {
+            "id": position_id,
+            "org": org,
+            "pf": portfolio_id,
+            "market": market_id,
+            "meta": json.dumps({"proposal_id": str(proposal_id)}),
+        },
+    )
+
+
+async def seed_shadow_exposure(
+    session: AsyncSession, *, version_id: uuid.UUID, market_id: uuid.UUID
+) -> None:
+    """A ``shadow_episodes`` slot still tracking an open outcome (T3.39b review,
+    BAIXA-7): the *other* half of the paper guard, independent of any wallet —
+    a research row with a signal in flight. Worker territory (unlike
+    ``seed_paper_exposure``'s onboarding tables): the shadow lab writes
+    ``agent_signals``/``signal_outcomes``/``shadow_episodes`` itself, so no role
+    reset is needed here.
+    """
+    signal_id, episode_id = uuid7(), uuid7()
+    await session.execute(
+        text(
+            "INSERT INTO agent_signals (id, strategy_version_id, market_id, params_hash, "
+            "direction, confidence) VALUES (:id, :version, :market, 'test', 'long', 0.5)"
+        ),
+        {"id": signal_id, "version": version_id, "market": market_id},
+    )
+    await session.execute(
+        text("INSERT INTO signal_outcomes (signal_id) VALUES (:id)"), {"id": signal_id}
+    )
+    await session.execute(
+        text(
+            "INSERT INTO shadow_episodes (id, strategy_version_id, market_id, cohort, "
+            "episode_id, last_bar_close, open_outcome_signal_id) VALUES "
+            "(:id, :version, :market, 'prospective', :episode, now(), :signal)"
+        ),
+        {
+            "id": uuid7(),
+            "version": version_id,
+            "market": market_id,
+            "episode": episode_id,
+            "signal": signal_id,
+        },
+    )
+
+
 class NamedStrategy:
     """A registry entry under a test-only key, carrying the real v1 contract.
 
@@ -335,6 +478,8 @@ __all__ = [
     "register_gap",
     "registry_for",
     "seed_market",
+    "seed_paper_exposure",
+    "seed_shadow_exposure",
     "series",
 ]
 

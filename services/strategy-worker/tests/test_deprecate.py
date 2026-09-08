@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import importlib.util
 import sys
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +23,7 @@ from hunter_core.db.session import role_session
 from hunter_core.domain.types import uuid7
 from hunter_strategy_worker.catalogue import load_version_roster
 
-from .builders import activate_version, seed_market
+from .builders import activate_version, seed_market, seed_paper_exposure, seed_shadow_exposure
 
 pytestmark = pytest.mark.integration
 
@@ -52,60 +51,6 @@ async def _row(session: Any, key: str) -> Any:
             {"key": key},
         )
     ).one()
-
-
-async def _seed_paper_exposure(
-    session: Any, *, org: uuid.UUID, version_id: uuid.UUID, market_id: uuid.UUID
-) -> None:
-    """Org, workspace, portfolio, agent and one open position on ``version_id``.
-
-    ``organizations``/``workspaces``/``portfolios``/``agents`` are ``hunter_app``
-    territory (onboarding), not ``hunter_worker``'s — the same reason
-    ``builders.activate_version`` resets the role for ``strategy_versions``. The
-    role is *not* restored afterwards (unlike that helper): opening a
-    ``portfolios`` row carries a deferred, COMMIT-time audit trigger
-    (``paper_roles_2``'s birth guard) that reads ``current_user`` at commit, not
-    at the ``INSERT`` — restoring ``hunter_worker`` here would make the session
-    look, at commit, like "only the engine" opening a wallet with no
-    ``audit_logs`` row in the same transaction, which is exactly what that
-    trigger refuses. This helper is always the last write of its transaction.
-    """
-    workspace_id, portfolio_id, agent_id = uuid7(), uuid7(), uuid7()
-    await session.execute(text("RESET ROLE"))
-    await session.execute(
-        text("INSERT INTO organizations (id, slug, name) VALUES (:id, :slug, :slug)"),
-        {"id": org, "slug": f"t-{org.hex[:8]}"},
-    )
-    await session.execute(
-        text(
-            "INSERT INTO workspaces (id, organization_id, name, objective) "
-            "VALUES (:id, :org, 'w', 'paper_trading')"
-        ),
-        {"id": workspace_id, "org": org},
-    )
-    await session.execute(
-        text(
-            "INSERT INTO portfolios (id, organization_id, workspace_id, name, initial_capital) "
-            "VALUES (:id, :org, :ws, 'paper wallet', 1000)"
-        ),
-        {"id": portfolio_id, "org": org, "ws": workspace_id},
-    )
-    await session.execute(
-        text(
-            "INSERT INTO agents (id, organization_id, workspace_id, portfolio_id, name, "
-            "strategy_version_id, status) "
-            "VALUES (:id, :org, :ws, :pf, 'agent', :version, 'enabled')"
-        ),
-        {"id": agent_id, "org": org, "ws": workspace_id, "pf": portfolio_id, "version": version_id},
-    )
-    await session.execute(
-        text(
-            "INSERT INTO positions (id, organization_id, portfolio_id, agent_id, market_id, "
-            "direction, qty, avg_entry_price, status, opened_at) "
-            "VALUES (gen_random_uuid(), :org, :pf, :agent, :market, 'long', 1, 100, 'open', now())"
-        ),
-        {"org": org, "pf": portfolio_id, "agent": agent_id, "market": market_id},
-    )
 
 
 class TestDeprecateResearchOnly:
@@ -179,6 +124,27 @@ class TestDeprecateResearchOnly:
             )
         assert "successor=deprecate_successor v2" in message
 
+    async def test_it_records_params_format_in_the_audit_event(
+        self, db_session_factory: Any
+    ) -> None:
+        """BAIXA-11: the ``system_events`` row names the frozen ``params_format``
+        too, the same way it already names ``code_ref`` and ``params_hash``."""
+        script = _script()
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(session, key="deprecate_audit_format")
+        async with db_session_factory() as session, session.begin():
+            await script.deprecate(session, "deprecate_audit_format", "v1", "K1", dry_run=False)
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            message = await session.scalar(
+                text(
+                    "SELECT message FROM system_events WHERE event = 'strategy_version_deprecated' "
+                    "AND message LIKE 'deprecate_audit_format%' ORDER BY created_at DESC LIMIT 1"
+                )
+            )
+        assert message is not None
+        assert "params_format=1" in message
+
     async def test_it_refuses_an_unknown_successor(self, db_session_factory: Any) -> None:
         script = _script()
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
@@ -249,6 +215,10 @@ class TestDeprecatePaperLine:
     async def test_it_refuses_a_paper_version_with_open_position_even_with_force_paper(
         self, db_session_factory: Any
     ) -> None:
+        """ALTA-1 (T3.39b review): seeded the way production actually links a
+        position to an agent — ``metadata->>'proposal_id' -> orders ->
+        trade_proposals -> agents`` — never through ``positions.agent_id``,
+        which the execution worker's ``INSERT`` never writes."""
         script = _script()
         org = uuid7()
         async with role_session(db_session_factory, db_role="hunter_worker") as session:
@@ -256,12 +226,35 @@ class TestDeprecatePaperLine:
             _strategy_id, version_id = await activate_version(
                 session, key="deprecate_paper_open", purpose="paper"
             )
-            await _seed_paper_exposure(session, org=org, version_id=version_id, market_id=market_id)
+            await seed_paper_exposure(session, org=org, version_id=version_id, market_id=market_id)
         async with db_session_factory() as session, session.begin():
             with pytest.raises(script.Refused, match="skin in the game"):
                 await script.deprecate(
                     session,
                     "deprecate_paper_open",
+                    "v1",
+                    "why",
+                    dry_run=True,
+                    force_paper=True,
+                )
+
+    async def test_it_refuses_a_paper_version_with_an_open_shadow_slot(
+        self, db_session_factory: Any
+    ) -> None:
+        """BAIXA-7: the other half of the guard — no wallet exposure at all, only
+        a ``shadow_episodes`` slot still tracking an entry."""
+        script = _script()
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            _exchange_id, market_id = await seed_market(session)
+            _strategy_id, version_id = await activate_version(
+                session, key="deprecate_paper_shadow", purpose="paper"
+            )
+            await seed_shadow_exposure(session, version_id=version_id, market_id=market_id)
+        async with db_session_factory() as session, session.begin():
+            with pytest.raises(script.Refused, match="shadow slot"):
+                await script.deprecate(
+                    session,
+                    "deprecate_paper_shadow",
                     "v1",
                     "why",
                     dry_run=True,

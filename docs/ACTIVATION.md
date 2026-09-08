@@ -240,18 +240,28 @@ congelamento deixa mutável, DATABASE.md §16.1), com o mesmo padrão de
 auditoria em `system_events` — motivo, sucessora (se `--successor v<n>` for
 dado) e o `code_ref`/`params_hash` congelados da versão.
 
-**Recusas estruturais, não configuráveis:**
-- `purpose = 'live'`: nunca aposentada por este script (Fase 4,
+**Recusas estruturais, não configuráveis** — e **as mesmas em `--supersede`**
+(revisão T3.39b, ALTA-2: um escritor que move uma versão congelada para fora de
+`active` não pode ser mais frouxo que o outro):
+- `purpose = 'live'`: nunca aposentada nem sucedida por este script (Fase 4,
   `ENABLE_LIVE_TRADING=false`);
 - `purpose = 'paper'` (a linha da carteira): exige `--force-paper` **e** nenhuma
-  posição aberta (`positions` via `agents.strategy_version_id`) nem slot de
-  shadow em rastreamento (`shadow_episodes.open_outcome_signal_id`) — a
-  diretriz do risk-engine-guardian para esta tarefa: "uma versão sendo
-  aposentada nunca pode ser a linha paper com posições abertas".
+  posição aberta nem slot de shadow em rastreamento
+  (`shadow_episodes.open_outcome_signal_id`) — a diretriz do
+  risk-engine-guardian para esta tarefa: "uma versão sendo aposentada nunca
+  pode ser a linha paper com posições abertas". A checagem de posições segue o
+  caminho real de produção (revisão T3.39b, ALTA-1) — `positions.metadata->>
+  'proposal_id' -> orders.proposal_id -> trade_proposals.agent_id ->
+  agents.strategy_version_id` — porque `positions.agent_id` nunca é escrito
+  pelo execution-worker; e `--supersede` copia `purpose` explicitamente para a
+  sucessora (ALTA-2), então uma linha paper superada continua paper, nunca cai
+  no padrão `research_only` do schema.
 
 O roster do strategy-worker (`load_version_roster`) já filtra por
-`status = 'active'`; uma versão aposentada some do próximo recarregamento sem
-qualquer outro passo.
+`status = 'active'`, mas o recarregamento tem um TTL de 60 s
+(`ShadowConfig.version_refresh_s`, `SHADOW_VERSION_REFRESH_S`) — uma versão
+recém-aposentada ou superada pode continuar avaliando por até um minuto antes
+de sumir do roster do worker em execução.
 
 ```
 uv run python infra/scripts/activate_strategy_version.py breakout v1 --deprecate \
@@ -270,7 +280,7 @@ Sem `--dry-run` para gravar. Na VPS, o mesmo comando dentro do container:
 - Uma proposta por ciclo (D3), `research_only` nunca vira ordem, `live` recusado por nome, `ENABLE_LIVE_TRADING=false`.
 
 ## Como desligar
-`ENABLE_PAPER_AUTONOMY=false` + `compose.sh update` para a ponte parar de consumir (posições abertas continuam protegidas pelo worker). Aposentar a própria linha paper é `activate_strategy_version.py <key> <version> --deprecate --force-paper` (§7b) — só depois de zerar posições e slots de shadow.
+`ENABLE_PAPER_AUTONOMY=false` + `compose.sh update` para a ponte parar de consumir (posições abertas continuam protegidas pelo worker). Aposentar a própria linha paper é `activate_strategy_version.py <key> <version> --deprecate --force-paper` (§7b) — só depois de zerar posições e slots de shadow; a mesma trava (`--force-paper` + checagem limpa) vale para `--supersede <key> <version> --force-paper` quando o que muda é o código, não o status (revisão T3.39b, ALTA-2).
 
 ## 9. Re-seed seguro (`seed.py --dry-run` / `--only`, T3.39)
 

@@ -100,23 +100,46 @@ async def _count(engine: AsyncEngine, table: str, *, where: str = "true") -> int
     return int(value or 0)
 
 
+async def _delete_strategy(engine: AsyncEngine, key: str) -> None:
+    async with engine.begin() as connection:
+        await connection.execute(text("DELETE FROM strategies WHERE key = :key"), {"key": key})
+
+
 class TestDryRunWritesNothing:
     async def test_a_dry_run_reports_the_diff_and_writes_nothing(
         self, cli: ModuleType, engine: AsyncEngine
     ) -> None:
+        """BAIXA-10 (T3.39b review): never assumes this test runs before another
+        one in the module — tests here share one database (module-scoped
+        fixture) — by clearing one known key first, so this run always has a
+        NEW row to report, whatever else the shared database already holds.
+        Counts are compared to their own *before* value, never to a hardcoded
+        zero, for the same reason.
+        """
+        await _delete_strategy(engine, "session_orb")
+        before_strategies = await _count(engine, "strategies")
+        before_risk_profiles = await _count(engine, "risk_profiles")
         counts, diff = await cli.seed_with_report(dry_run=True)
         assert counts["strategies"] > 0
-        assert any("strategies." in line and "NEW" in line for line in diff)
-        assert await _count(engine, "strategies") == 0
-        assert await _count(engine, "risk_profiles") == 0
+        assert any("strategies.session_orb: NEW" in line for line in diff)
+        assert await _count(engine, "strategies") == before_strategies
+        assert await _count(engine, "risk_profiles") == before_risk_profiles
 
     async def test_a_dry_run_with_only_reports_just_that_table(
         self, cli: ModuleType, engine: AsyncEngine
     ) -> None:
+        """BAIXA-9: ``strategy_versions`` is what actually carries ``code_ref``
+        and parameters, and it moves with ``strategies`` in every real write
+        (``seed_strategies``) — the diff has to show it moving too, including
+        under ``--only strategies``."""
+        await _delete_strategy(engine, "narrative")
+        before = await _count(engine, "strategies")
         counts, diff = await cli.seed_with_report(dry_run=True, only="strategies")
         assert set(counts) == {"strategies", "strategy_versions"}
-        assert all(line.startswith("strategies.") for line in diff)
-        assert await _count(engine, "strategies") == 0
+        assert all(line.startswith(("strategies.", "strategy_versions.")) for line in diff)
+        assert any("strategies.narrative: NEW" in line for line in diff)
+        assert any("strategy_versions.narrative v1: NEW" in line for line in diff)
+        assert await _count(engine, "strategies") == before
 
 
 class TestOnlyNeverTouchesOtherTables:
@@ -183,6 +206,31 @@ class TestTheRiskDirectiveGate:
         # call hit this same gate for a reason it did not introduce.
         await cli.seed_with_report(yes=True)
 
+    async def test_a_changed_limit_refuses_without_yes_via_only_too(
+        self, cli: ModuleType, engine: AsyncEngine
+    ) -> None:
+        """BAIXA-7: the same gate applies to ``--only risk_profiles``, not just
+        a full run — the operator's stated need is re-seeding *one* table."""
+        await cli.seed_with_report(only="risk_profiles")
+        async with engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "UPDATE risk_profiles SET limits = limits || '{\"max_leverage\": 55}'::jsonb "
+                    "WHERE preset = 'balanced' AND organization_id IS NULL"
+                )
+            )
+        with pytest.raises(SystemExit, match="risk_profiles limits would change"):
+            await cli.seed_with_report(only="risk_profiles")
+        async with engine.connect() as connection:
+            leverage = await connection.scalar(
+                text(
+                    "SELECT limits->>'max_leverage' FROM risk_profiles "
+                    "WHERE preset = 'balanced' AND organization_id IS NULL"
+                )
+            )
+        assert leverage == "55"  # untouched: the refusal rolled back the whole run
+        await cli.seed_with_report(only="risk_profiles", yes=True)  # restore the shipped value
+
     async def test_dry_run_shows_the_would_be_change_without_yes(
         self, cli: ModuleType, engine: AsyncEngine
     ) -> None:
@@ -220,3 +268,81 @@ class TestTheRiskDirectiveGate:
                 )
             )
         assert leverage == "3"  # seed_reference's shipped value, restored
+
+
+SEEDED_TABLES = (
+    # Mirrors packages/core/tests/integration/test_schema_seed_and_partitions.py's
+    # constant of the same name — the set of tables ``seed()`` reports.
+    "exchanges",
+    "strategies",
+    "strategy_versions",
+    "plan_entitlements",
+    "feature_flags",
+    "risk_profiles",
+    "feature_definitions",
+    "opportunity_weights",
+)
+
+
+class TestRunEverythingMatchesSeededTables:
+    async def test_it_reports_exactly_the_seeded_tables(
+        self, cli: ModuleType, engine: AsyncEngine
+    ) -> None:
+        """MÉDIA-5: ``seed_cli._run_everything`` and ``seed()``'s own report
+        (``SEEDED_TABLES``, asserted the same way there) describe the same set
+        of tables — a table added to one side and not the other is a count
+        that goes quietly missing from an operator's report."""
+        async with engine.begin() as connection:
+            counts = await cli._run_everything(connection)
+        assert set(counts) == set(SEEDED_TABLES)
+
+
+class TestUnattendedGate:
+    """MÉDIA-4 (T3.39b review): a non-empty diff refuses to commit when nobody
+    is watching (``attended=False``, ``main()``'s ``sys.stdin.isatty()``),
+    unless ``--yes`` or ``--dry-run`` — and the diff is emitted before that
+    decision, never after a commit that already happened."""
+
+    async def test_a_non_empty_diff_refuses_when_unattended_and_not_yes(
+        self, cli: ModuleType, engine: AsyncEngine
+    ) -> None:
+        await _delete_strategy(engine, "derivatives")
+        before = await _count(engine, "strategies")
+        with pytest.raises(SystemExit, match="stdin is not a TTY"):
+            await cli.seed_with_report(only="strategies", attended=False)
+        assert await _count(engine, "strategies") == before
+
+    async def test_yes_writes_even_when_unattended(
+        self, cli: ModuleType, engine: AsyncEngine
+    ) -> None:
+        await _delete_strategy(engine, "derivatives")
+        counts, _diff = await cli.seed_with_report(only="strategies", attended=False, yes=True)
+        assert counts["strategies"] > 0
+        assert await _count(engine, "strategies", where="key = 'derivatives'") == 1
+
+    async def test_dry_run_never_needs_yes_even_when_unattended(
+        self, cli: ModuleType, engine: AsyncEngine
+    ) -> None:
+        await _delete_strategy(engine, "ensemble")
+        counts, diff = await cli.seed_with_report(only="strategies", attended=False, dry_run=True)
+        assert counts["strategies"] > 0
+        assert any("strategies.ensemble: NEW" in line for line in diff)
+        assert await _count(engine, "strategies", where="key = 'ensemble'") == 0
+
+    async def test_the_diff_is_emitted_before_any_write_lands(
+        self, cli: ModuleType, engine: AsyncEngine
+    ) -> None:
+        """The diff is printed (``emit``) before the transaction commits: an
+        ``emit`` that blows up right after the first line must still leave the
+        table untouched, which could not be true if the write had already
+        landed by the time the old code printed anything (it printed only
+        after ``seed_with_report`` had already returned and committed)."""
+        await _delete_strategy(engine, "order_flow")
+        before = await _count(engine, "strategies")
+
+        def _boom(_line: str) -> None:
+            raise RuntimeError("emit raised before commit")
+
+        with pytest.raises(RuntimeError, match="emit raised before commit"):
+            await cli.seed_with_report(only="strategies", emit=_boom)
+        assert await _count(engine, "strategies") == before

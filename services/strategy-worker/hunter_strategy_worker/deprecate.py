@@ -31,8 +31,6 @@ so the record never claims a successor that a typo invented.
 
 from __future__ import annotations
 
-from typing import Any
-
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
@@ -43,41 +41,12 @@ from hunter_strategy_worker.activation_db import (
     Refused,
     load_row,
     migration_applied,
+    open_paper_exposure,
     purpose_column_present,
     record_event,
 )
 
 __all__ = ["deprecate"]
-
-
-async def _open_paper_exposure(conn: AsyncConnection, version_id: Any) -> list[str]:
-    """Reasons a ``purpose=paper`` version still has skin in the game.
-
-    Both are read fresh, in the same transaction that would deprecate it: an
-    ``agents`` row pointing at this version with an open ``positions`` row
-    (real exposure the wallet is carrying), and a ``shadow_episodes`` slot
-    still tracking an entry (``open_outcome_signal_id IS NOT NULL``).
-    """
-    reasons: list[str] = []
-    open_positions = await conn.scalar(
-        text(
-            "SELECT count(*) FROM positions p JOIN agents a ON a.id = p.agent_id "
-            "WHERE a.strategy_version_id = :version_id AND p.status <> 'closed'"
-        ),
-        {"version_id": version_id},
-    )
-    if open_positions:
-        reasons.append(f"{open_positions} open position(s) via its agents")
-    open_slots = await conn.scalar(
-        text(
-            "SELECT count(*) FROM shadow_episodes WHERE strategy_version_id = :version_id "
-            "AND open_outcome_signal_id IS NOT NULL"
-        ),
-        {"version_id": version_id},
-    )
-    if open_slots:
-        reasons.append(f"{open_slots} shadow slot(s) tracking an open outcome")
-    return reasons
 
 
 async def deprecate(
@@ -114,7 +83,7 @@ async def deprecate(
                 "the wallet's own coorte. Pass --force-paper to confirm, and only once its "
                 "positions and shadow slots are clear (checked below)."
             )
-        exposure = await _open_paper_exposure(conn, row.id)
+        exposure = await open_paper_exposure(conn, row.id)
         if exposure:
             raise Refused(
                 f"{key} {version} still has skin in the game: {'; '.join(exposure)}. "
@@ -145,6 +114,7 @@ async def deprecate(
         "info",
         "strategy_version_deprecated",
         f"{key} {version} (purpose {row.purpose}) deprecated at {deprecated[0].isoformat()}, "
-        f"code_ref={row.code_ref} params_hash={frozen_hash} {successor_note}: {changelog}",
+        f"code_ref={row.code_ref} params_hash={frozen_hash} params_format={row.params_format} "
+        f"{successor_note}: {changelog}",
     )
     return f"deprecated {key} {version} (purpose {row.purpose}) at {deprecated[0].isoformat()}, {successor_note}"

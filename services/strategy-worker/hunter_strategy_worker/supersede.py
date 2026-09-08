@@ -13,6 +13,19 @@ successor continues the frozen experiment, not today's code.
 It refuses, on purpose, when the successor would only be a *parameter* change
 (the ``code_ref`` already matches this build) — ``derive_variant.py`` and
 ``--deprecate`` (T3.39) are the paths for that.
+
+Retiring the origin row is exactly what ``--deprecate`` does to a version with
+no code successor, so it carries the same two structural refusals
+(T3.39b review, ALTA-2 — one writer moving a frozen version off ``active``
+cannot be looser than the other): ``purpose = 'live'`` is never touched, and
+``purpose = 'paper'`` needs ``--force-paper`` *and* a clean
+:func:`hunter_strategy_worker.activation_db.open_paper_exposure` check — the
+wallet's own coorte does not lose its code successor while it is still
+carrying open positions. ``purpose`` itself is copied onto the successor
+**explicitly**: the ``INSERT`` used to omit the column, which meant every
+successor of a paper line silently landed on the schema default
+(``research_only``) and the wallet's coorte would have gone dark on its next
+supersede.
 """
 
 from __future__ import annotations
@@ -26,10 +39,13 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from hunter_core.strategies.registry import DEFAULT_REGISTRY, StrategyRegistry
 from hunter_strategy_worker.activation import validate_parameters
 from hunter_strategy_worker.activation_db import (
+    PURPOSE_LIVE,
+    PURPOSE_PAPER,
     VERSION_RE,
     Refused,
     load_row,
     migration_applied,
+    open_paper_exposure,
     record_event,
 )
 from hunter_strategy_worker.catalogue import resolve_strategy
@@ -54,6 +70,7 @@ async def supersede(
     *,
     dry_run: bool,
     registry: StrategyRegistry = DEFAULT_REGISTRY,
+    force_paper: bool = False,
 ) -> str:
     """Retire a frozen version and activate its successor, in one transaction.
 
@@ -68,6 +85,24 @@ async def supersede(
     row = await load_row(conn, key, version)
     if row is None:
         raise Refused(f"no strategy_version for {key} {version}")
+    if row.purpose == PURPOSE_LIVE:
+        raise Refused(
+            f"{key} {version} carries purpose 'live': live é Fase 4; ENABLE_LIVE_TRADING=false. "
+            "This script never retires a live version either, the same as it never activates one."
+        )
+    if row.purpose == PURPOSE_PAPER:
+        if not force_paper:
+            raise Refused(
+                f"{key} {version} is the paper line (purpose 'paper'): superseding it retires "
+                "the wallet's own coorte. Pass --force-paper to confirm, and only once its "
+                "positions and shadow slots are clear (checked below)."
+            )
+        exposure = await open_paper_exposure(conn, row.id)
+        if exposure:
+            raise Refused(
+                f"{key} {version} still has skin in the game: {'; '.join(exposure)}. "
+                "Close or hand them off before superseding the paper line."
+            )
     if row.activated_at is None:
         raise Refused(
             f"{key} {version} was never activated: nothing is frozen, activate it instead"
@@ -106,10 +141,10 @@ async def supersede(
     await conn.execute(
         text(
             "INSERT INTO strategy_versions (id, strategy_id, version, status, "
-            "parameters_schema, default_parameters, code_ref, params_format, changelog, "
-            "activated_at) VALUES (gen_random_uuid(), :strategy_id, :version, 'active', "
-            "CAST(:schema AS jsonb), CAST(:params AS jsonb), :code_ref, :params_format, "
-            ":changelog, now())"
+            "parameters_schema, default_parameters, code_ref, params_format, purpose, "
+            "changelog, activated_at) VALUES (gen_random_uuid(), :strategy_id, :version, "
+            "'active', CAST(:schema AS jsonb), CAST(:params AS jsonb), :code_ref, "
+            ":params_format, :purpose, :changelog, now())"
         ),
         {
             "strategy_id": row.strategy_id,
@@ -118,6 +153,7 @@ async def supersede(
             "params": json.dumps(params, separators=(",", ":"), sort_keys=True),
             "code_ref": code_ref,
             "params_format": row.params_format,
+            "purpose": row.purpose,
             "changelog": f"succeeds {version}: {changelog}",
         },
     )

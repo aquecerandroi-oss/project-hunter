@@ -36,9 +36,14 @@ prerequisites is not met:
 ``--supersede`` is the only way to move an *already frozen* version onto a new
 digest: it retires the old row (``deprecated`` + a ``changelog`` saying why) and
 creates ``version + 1`` carrying the **frozen row's own** ``parameters_schema``,
-``default_parameters`` and ``params_format``, with the new ``code_ref``, both in
-one transaction. Copying from the row rather than recomputing from code is the
-point: the successor continues the frozen experiment, not today's code.
+``default_parameters``, ``params_format`` and ``purpose``, with the new
+``code_ref``, both in one transaction. Copying from the row rather than
+recomputing from code is the point: the successor continues the frozen
+experiment, not today's code — a paper line's successor stays ``purpose =
+'paper'``, never the schema default. Retiring the origin carries the same two
+structural refusals as ``--deprecate`` (T3.39b review, ALTA-2): ``purpose =
+'live'`` is never touched, and ``purpose = 'paper'`` needs ``--force-paper``
+*and* a clean ``positions``/``shadow_episodes`` check.
 
 ``--paper-line`` (T3.15, D10) derives the coorte that may reach the paper wallet
 from a **frozen** ``research_only`` version: a *new* draft row, next free
@@ -216,20 +221,27 @@ async def _run(args: argparse.Namespace) -> int:
     try:
         try:
             async with engine.connect() as conn, conn.begin():
-                if args.deprecate:
+                if getattr(args, "deprecate", False):
                     message = await deprecate(
                         conn,
                         args.strategy,
                         args.version,
                         args.changelog,
                         dry_run=args.dry_run,
-                        successor=args.successor,
-                        force_paper=args.force_paper,
+                        successor=getattr(args, "successor", None),
+                        force_paper=getattr(args, "force_paper", False),
+                    )
+                elif getattr(args, "supersede", False):
+                    message = await supersede(
+                        conn,
+                        args.strategy,
+                        args.version,
+                        args.changelog,
+                        dry_run=args.dry_run,
+                        force_paper=getattr(args, "force_paper", False),
                     )
                 else:
-                    action = (
-                        paper_line if args.paper_line else supersede if args.supersede else activate
-                    )
+                    action = paper_line if args.paper_line else activate
                     message = await action(
                         conn, args.strategy, args.version, args.changelog, dry_run=args.dry_run
                     )
@@ -284,9 +296,14 @@ def main() -> int:
     parser.add_argument(
         "--force-paper",
         action="store_true",
-        help="--deprecate only: required to deprecate a purpose=paper version",
+        help="--deprecate/--supersede only: required to retire a purpose=paper version",
     )
-    return asyncio.run(_run(parser.parse_args()))
+    args = parser.parse_args()
+    if args.successor is not None and not args.deprecate:
+        parser.error("--successor requires --deprecate")
+    if args.force_paper and not (args.deprecate or args.supersede):
+        parser.error("--force-paper requires --deprecate or --supersede")
+    return asyncio.run(_run(args))
 
 
 if __name__ == "__main__":

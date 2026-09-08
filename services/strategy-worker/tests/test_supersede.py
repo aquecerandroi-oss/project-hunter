@@ -20,10 +20,11 @@ import pytest
 from sqlalchemy import text
 
 from hunter_core.db.session import role_session
+from hunter_core.domain.types import uuid7
 from hunter_strategy_worker.catalogue import load_active_versions
 from hunter_strategy_worker.code_ref import version_code_ref
 
-from .builders import activate_version, registry_for, seed_market
+from .builders import activate_version, registry_for, seed_market, seed_paper_exposure
 
 pytestmark = pytest.mark.integration
 
@@ -240,3 +241,151 @@ class TestSupersede:
                 )
             ).all()
         assert [(r.version, r.status) for r in rows] == [("v1", "active")]
+
+
+async def _purpose(session: Any, key: str, version: str) -> str:
+    return await session.scalar(
+        text(
+            "SELECT v.purpose FROM strategy_versions v JOIN strategies s "
+            "ON s.id = v.strategy_id WHERE s.key = :key AND v.version = :version"
+        ),
+        {"key": key, "version": version},
+    )
+
+
+class TestSupersedeCopiesPurpose:
+    """ALTA-2 (T3.39b review): the ``INSERT`` used to omit ``purpose``, so every
+    successor silently landed on the schema default (``research_only``) —
+    including a paper line's, which would have gone dark on its next
+    supersede."""
+
+    async def test_a_research_only_successor_keeps_research_only(
+        self, db_session_factory: Any
+    ) -> None:
+        script = _script()
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await _frozen(
+                session, "supersede_purpose_research", "hunter_core.strategies@sha256:" + "5" * 64
+            )
+        async with db_session_factory() as session, session.begin():
+            await script.supersede(
+                session,
+                "supersede_purpose_research",
+                "v1",
+                "why",
+                dry_run=False,
+                registry=registry_for("supersede_purpose_research"),
+            )
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            purpose = await _purpose(session, "supersede_purpose_research", "v2")
+        assert purpose == "research_only"
+
+
+class TestSupersedePaperGuard:
+    """ALTA-2 (T3.39b review): ``--supersede`` retiring the origin carries the
+    same paper guard ``--deprecate`` does — one writer moving a frozen version
+    off ``active`` cannot be looser than the other."""
+
+    async def test_it_refuses_a_live_version_even_with_force_paper(
+        self, db_session_factory: Any
+    ) -> None:
+        script = _script()
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(
+                session,
+                key="supersede_live",
+                active=True,
+                code_ref="hunter_core.strategies@sha256:" + "6" * 64,
+                purpose="live",
+            )
+        async with db_session_factory() as session, session.begin():
+            with pytest.raises(script.Refused, match="purpose 'live'"):
+                await script.supersede(
+                    session,
+                    "supersede_live",
+                    "v1",
+                    "why",
+                    dry_run=True,
+                    registry=registry_for("supersede_live"),
+                    force_paper=True,
+                )
+
+    async def test_it_refuses_a_paper_version_without_force_paper(
+        self, db_session_factory: Any
+    ) -> None:
+        script = _script()
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(
+                session,
+                key="supersede_paper_noforce",
+                active=True,
+                code_ref="hunter_core.strategies@sha256:" + "7" * 64,
+                purpose="paper",
+            )
+        async with db_session_factory() as session, session.begin():
+            with pytest.raises(script.Refused, match="--force-paper"):
+                await script.supersede(
+                    session,
+                    "supersede_paper_noforce",
+                    "v1",
+                    "why",
+                    dry_run=True,
+                    registry=registry_for("supersede_paper_noforce"),
+                )
+
+    async def test_it_refuses_a_paper_version_with_open_position_even_with_force_paper(
+        self, db_session_factory: Any
+    ) -> None:
+        script = _script()
+        org = uuid7()
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            _exchange_id, market_id = await seed_market(session)
+            _strategy_id, version_id = await activate_version(
+                session,
+                key="supersede_paper_open",
+                active=True,
+                code_ref="hunter_core.strategies@sha256:" + "8" * 64,
+                purpose="paper",
+            )
+            await seed_paper_exposure(session, org=org, version_id=version_id, market_id=market_id)
+        async with db_session_factory() as session, session.begin():
+            with pytest.raises(script.Refused, match="skin in the game"):
+                await script.supersede(
+                    session,
+                    "supersede_paper_open",
+                    "v1",
+                    "why",
+                    dry_run=True,
+                    registry=registry_for("supersede_paper_open"),
+                    force_paper=True,
+                )
+
+    async def test_it_supersedes_a_clean_paper_version_with_force_paper_and_copies_purpose(
+        self, db_session_factory: Any
+    ) -> None:
+        script = _script()
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(
+                session,
+                key="supersede_paper_clean",
+                active=True,
+                code_ref="hunter_core.strategies@sha256:" + "9" * 64,
+                purpose="paper",
+            )
+        async with db_session_factory() as session, session.begin():
+            message = await script.supersede(
+                session,
+                "supersede_paper_clean",
+                "v1",
+                "wallet code moved",
+                dry_run=False,
+                registry=registry_for("supersede_paper_clean"),
+                force_paper=True,
+            )
+        assert "superseded" in message
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            purpose = await _purpose(session, "supersede_paper_clean", "v2")
+        assert purpose == "paper"

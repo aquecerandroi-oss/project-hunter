@@ -79,6 +79,33 @@ async def _snapshot_one(
     return {row[key_column]: dict(row) for row in result.mappings()}
 
 
+async def _snapshot_strategy_versions(conn: AsyncConnection) -> dict[Any, Row]:
+    """``<strategy key> v1`` -> the ``strategy_versions`` row ``seed_strategies`` writes.
+
+    ``strategies`` and ``strategy_versions`` move together (one upsert, two
+    report keys, ``seed.py``'s own convention): a diff that showed the catalogue
+    changing without showing the version row moving alongside it — the actual
+    complaint behind ``--only strategies`` (T3.33e/f, ``session_orb``'s stale
+    description) — would have missed the row that operator was there to check
+    (T3.39b review, BAIXA-9).
+    """
+    keys = [key for key, *_ in STRATEGIES]
+    result = await conn.execute(
+        text(
+            "SELECT s.key AS strategy_key, v.* FROM strategy_versions v "
+            "JOIN strategies s ON s.id = v.strategy_id "
+            "WHERE s.key = ANY(:keys) AND v.version = 'v1'"
+        ),
+        {"keys": keys},
+    )
+    rows: dict[Any, Row] = {}
+    for mapped in result.mappings():
+        row = dict(mapped)
+        strategy_key = row.pop("strategy_key")
+        rows[f"{strategy_key} v1"] = row
+    return rows
+
+
 async def snapshot(conn: AsyncConnection, only: str | None) -> Snapshot:
     """The diffable tables' rows, keyed by natural key, restricted to ``only`` if given."""
     wanted = TABLE_CHOICES if only is None else (only,)
@@ -87,6 +114,7 @@ async def snapshot(conn: AsyncConnection, only: str | None) -> Snapshot:
         out["strategies"] = await _snapshot_one(
             conn, "strategies", "key", [key for key, *_ in STRATEGIES]
         )
+        out["strategy_versions"] = await _snapshot_strategy_versions(conn)
     if "risk_profiles" in wanted:
         out["risk_profiles"] = await _snapshot_one(
             conn,

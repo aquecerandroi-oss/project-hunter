@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
+from collections.abc import Callable
 
 import seed_dry_run
 from seed import (
@@ -45,6 +47,12 @@ _RISK_DIRECTIVE = (
     "Everton's directive: a limit is never changed without being presented first "
     "(.claude/state/directive-risk-engine-2026-09-06.md). Run --dry-run to see the diff, or "
     "re-run with --yes once it has been."
+)
+
+_UNATTENDED_DIRECTIVE = (
+    "stdin is not a TTY (a piped or scripted invocation, e.g. `docker exec -i ... python -`), "
+    "and nobody is watching this diff scroll by: re-run with --yes once it has been reviewed, "
+    "or --dry-run to only preview it (T3.39b review, MÉDIA-4 — a write is never silent in a pipe)."
 )
 
 
@@ -80,14 +88,28 @@ async def _run_everything(conn: AsyncConnection) -> dict[str, int]:
 
 
 async def seed_with_report(
-    *, dry_run: bool = False, only: str | None = None, yes: bool = False
+    *,
+    dry_run: bool = False,
+    only: str | None = None,
+    yes: bool = False,
+    attended: bool = True,
+    emit: Callable[[str], None] = print,
 ) -> tuple[dict[str, int], list[str]]:
     """Seed (or preview) the reference tables. Returns ``(counts, diff_lines)``.
 
     One open transaction for the whole call, committed only at the very end:
-    ``dry_run`` rolls it back regardless of what ran, and a risk-directive
-    refusal rolls back whatever this same call already wrote — a refused run
-    never leaves a partial write behind.
+    ``dry_run`` rolls it back regardless of what ran, and a refusal — the risk
+    directive or the unattended gate below — rolls back whatever this same
+    call already wrote. A refused run never leaves a partial write behind.
+
+    ``attended`` is ``main()``'s ``sys.stdin.isatty()`` at the moment it was
+    invoked (T3.39b review, MÉDIA-4): a caller at a real keyboard sees the diff
+    ``emit`` just printed before the write lands; a caller through a pipe (the
+    VPS runbooks' ``docker exec -i ... python -``) never gets a second chance
+    to look, so a non-empty diff refuses there without ``--yes``. Defaulting to
+    ``True`` keeps every direct caller of this function (tests, other code)
+    unaffected — only ``main()`` measures the real terminal and passes the
+    answer down.
     """
     engine = create_async_engine(migration_url(), connect_args={"statement_cache_size": 0})
     try:
@@ -105,6 +127,11 @@ async def seed_with_report(
             counts = await (_run_only(conn, only) if only is not None else _run_everything(conn))
             after = await seed_dry_run.snapshot(conn, only)
             diff = seed_dry_run.diff_lines(before, after)
+            for line in diff:
+                emit(line)
+            if diff and not dry_run and not yes and not attended:
+                await trans.rollback()
+                raise SystemExit(f"seed would change stored rows and {_UNATTENDED_DIRECTIVE}")
             if dry_run:
                 await trans.rollback()
             else:
@@ -129,9 +156,14 @@ def main() -> int:
         help="confirm a risk_profiles limits change (Everton's directive: never silent)",
     )
     args = parser.parse_args()
-    counts, diff = asyncio.run(seed_with_report(dry_run=args.dry_run, only=args.only, yes=args.yes))
-    for line in diff:
-        print(line)
+    counts, _diff = asyncio.run(
+        seed_with_report(
+            dry_run=args.dry_run,
+            only=args.only,
+            yes=args.yes,
+            attended=sys.stdin.isatty(),
+        )
+    )
     if args.dry_run:
         print("DRY RUN: nothing written")
         return 0
