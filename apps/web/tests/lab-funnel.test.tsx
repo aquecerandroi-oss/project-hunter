@@ -54,3 +54,11 @@ describe("LabFunnel: decisions is null with a reason, never a fabricated count",
     expect(within(decisionsRow as HTMLElement).queryByText("0")).not.toBeInTheDocument();
   });
 });
+
+describe("LabFunnel: terminal results use EXIT_REASON_LABEL, never the raw enum code (brief T3.24b)", () => {
+  it("shows 'alvo: 2', never 'target: 2'", () => {
+    render(<LabFunnel counts={{ ...baseCounts, terminal: { total: 2, by_result: { target: 2 } } }} />);
+    expect(screen.getByText("alvo: 2")).toBeInTheDocument();
+    expect(screen.queryByText(/target:/)).not.toBeInTheDocument();
+  });
+});

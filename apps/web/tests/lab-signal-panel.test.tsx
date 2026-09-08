@@ -110,12 +110,12 @@ describe("LabSignalPanel -> LabExcursions: mfe honesty (null+bounds vs. a known 
   });
 });
 
-describe("LabSignalPanel -> LabSignalDetail: the envelope is fetched on demand and rendered as JSON", () => {
-  it("calls the mocked action and shows the returned envelope as JSON when 'Ver envelope' is clicked", async () => {
+describe("LabSignalPanel -> LabSignalDetail: the raw data (JSON) is fetched on demand (brief T3.24b: 'Ver envelope' -> 'Ver dados brutos (JSON)')", () => {
+  it("calls the mocked action and shows the returned envelope as JSON when 'Ver dados brutos (JSON)' is clicked", async () => {
     loadLabSignalEnvelopeActionMock.mockResolvedValue({ ok: true, envelope: { rsi_14: "62.3", regime: "trend_up" } });
     render(<LabSignalPanel signal={exampleSignal()} versionLabel="momentum/v2" ruler={exampleRuler()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Ver envelope" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ver dados brutos (JSON)" }));
 
     expect(await screen.findByText(/"rsi_14": "62.3"/)).toBeInTheDocument();
     expect(loadLabSignalEnvelopeActionMock).toHaveBeenCalledWith(
@@ -124,14 +124,14 @@ describe("LabSignalPanel -> LabSignalDetail: the envelope is fetched on demand a
       exampleSignal().strategy_version_id,
       exampleSignal().cohort,
     );
-    expect(screen.getByRole("button", { name: "Ocultar envelope" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ocultar dados brutos (JSON)" })).toBeInTheDocument();
   });
 
   it("shows the honest error reason instead of a blank panel when the action fails", async () => {
     loadLabSignalEnvelopeActionMock.mockResolvedValue({ ok: false, envelope: null, reason: "sinal não encontrado nesta página" });
     render(<LabSignalPanel signal={exampleSignal()} versionLabel="momentum/v2" ruler={exampleRuler()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Ver envelope" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ver dados brutos (JSON)" }));
 
     expect(await screen.findByText(/sinal não encontrado nesta página/)).toBeInTheDocument();
   });

@@ -20,9 +20,20 @@ import type { LabSignalsParams } from "@/lib/api/lab";
 import type { SignalListItemOut } from "@/lib/api/lab-types";
 import { logger } from "@/lib/logger";
 
-/** The endpoint-scope fact that used to sit as a plain paragraph above the table (brief T3.17b item 2: it read as a technical leak into the UI) -- now one hover away on the period label instead. */
-const PERIOD_TOOLTIP =
-  "período: todo o disponível — este endpoint não aceita janela/as_of; só o resumo acima é filtrado por janela.";
+/**
+ * The endpoint-scope fact (brief T3.17b item 2, revised T3.24b item [3]):
+ * now a visible 11px line below the segment tabs, not a tooltip -- a reader
+ * should not have to hover to learn the table's own period never matches the
+ * "Janela do resumo" filter above it.
+ */
+const PERIOD_NOTE = "período: todo o disponível — a janela acima só filtra o resumo";
+
+/**
+ * The money-tooltip fact (brief T3.24b item [3]) moved out of every cell's
+ * `title` and into this one visible line at the table's own footer -- a
+ * simulated number should not need a hover to be labelled honestly.
+ */
+const MONEY_NOTE = "Valores simulados: dado real, custos assumidos, sem dinheiro.";
 
 export interface LabSignalsTableProps {
   orgSlug: string;
@@ -131,15 +142,13 @@ export function LabSignalsTable({ orgSlug, initialItems, initialCursor, basePara
       <div className="flex flex-col gap-3 lg:flex-row">
         <div className="flex flex-1 flex-col gap-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="cursor-help text-xs text-fg-muted underline decoration-dotted underline-offset-2" title={PERIOD_TOOLTIP}>
-              período: todo o disponível
-            </span>
+            <LabSegmentTabs rows={items} value={segment} onChange={handleSegmentChange} />
             <Button type="button" variant="outline" size="sm" aria-pressed={showResearch} onClick={() => setShowResearch((v) => !v)}>
               {showResearch ? "Ocultar detalhes de pesquisa" : "Detalhes de pesquisa"}
             </Button>
           </div>
-          <LabSegmentTabs rows={items} value={segment} onChange={handleSegmentChange} />
-          <div className="overflow-x-auto rounded-md border border-border">
+          <p className="text-[11px] text-fg-subtle">{PERIOD_NOTE}</p>
+          <div className="rounded-md border border-border lg:overflow-x-visible">
             <div
               ref={containerRef}
               onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
@@ -152,8 +161,8 @@ export function LabSignalsTable({ orgSlug, initialItems, initialCursor, basePara
               className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
               style={{ height: VIEWPORT_HEIGHT, overflowY: "auto" }}
             >
-              <table role="presentation" className="w-full min-w-max text-left text-[13px]">
-                <LabSignalsTableHead showResearch={showResearch} />
+              <table role="presentation" className="w-full text-left text-[13px]">
+                <LabSignalsTableHead showResearch={showResearch} panelOpen={selectedSignal !== null} />
                 <LabSignalsTableBody
                   orgSlug={orgSlug}
                   visibleItems={visibleItems}
@@ -168,15 +177,17 @@ export function LabSignalsTable({ orgSlug, initialItems, initialCursor, basePara
                   showResearch={showResearch}
                   rowHeight={rowHeight}
                   selectedIndex={selectedIndex}
+                  panelOpen={selectedSignal !== null}
                   rowIdFor={rowId}
                   onOpenRow={setSelectedSignal}
                 />
               </table>
             </div>
           </div>
+          <p className="text-[11px] text-fg-subtle">{MONEY_NOTE}</p>
           <LabLoadMore cursor={cursor} loadingMore={loadingMore} loadError={loadError} onLoadMore={() => void loadMore()} />
         </div>
-        <div className="lg:w-96">
+        <div className="lg:w-80 xl:w-96">
           <LabSignalPanel
             signal={selectedSignal}
             versionLabel={selectedSignal ? versionLabelFor(selectedSignal.strategy_version_id) : ""}

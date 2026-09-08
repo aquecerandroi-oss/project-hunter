@@ -8,9 +8,9 @@ import { LabHeader } from "@/components/lab/lab-header";
 import { buildReferenceRuler, buildWalletRuler, type MoneyRuler } from "@/components/lab/lab-money";
 import { LabScoreboardSection } from "@/components/lab/lab-scoreboard-section";
 import { LabSignalsTable } from "@/components/lab/lab-signals-table";
-import { LabTabs } from "@/components/lab/lab-tabs";
 import { LabVersionCard } from "@/components/lab/lab-version-card";
 import { LabVersionsEmpty } from "@/components/lab/lab-versions-empty";
+import { SectionUnavailable } from "@/components/ui/section-unavailable";
 import { DEFAULT_AUTO_REFRESH_INTERVAL_MS } from "@/lib/auto-refresh-interval";
 import { isApiError } from "@/lib/api-error";
 import { getLabCurve, getLabScoreboard, getLabSignals, getLabSummary, listLabVersions } from "@/lib/api/lab";
@@ -136,7 +136,18 @@ async function loadMoneyRuler(orgId: string): Promise<MoneyRuler> {
   }
 }
 
-/** `/[orgSlug]/lab` (docs/plans/SHADOW-LAB.md, S3): the Shadow tab -- hypothetical, no-capital decisions and their tracked outcomes over real M1 data. */
+function Eyebrow({ children }: { children: string }) {
+  return <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">{children}</p>;
+}
+
+/**
+ * `/[orgSlug]/lab` (docs/plans/SHADOW-LAB.md, S3): the Shadow tab --
+ * hypothetical, no-capital decisions and their tracked outcomes over real M1
+ * data. Page order per brief T3.24b (opção A, "Placar-primeiro"): faixa
+ * SOMBRA -> Placar -> Sinais — Sombra -> Versões (pesquisa) -- the SOMBRA
+ * banner moved above the Placar and now renders even when `loadLab` itself
+ * fails (its own ruler/costs come from independent, always-degrading loads).
+ */
 export default async function LabPage({ params, searchParams }: LabPageProps) {
   const { orgSlug } = await params;
   const membership = await resolveOrgContext(orgSlug);
@@ -154,17 +165,20 @@ export default async function LabPage({ params, searchParams }: LabPageProps) {
   ]);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <AutoRefresh intervalMs={DEFAULT_AUTO_REFRESH_INTERVAL_MS} />
       <h1 className="text-xl font-semibold text-fg">Lab</h1>
 
-      {/* The Placar (brief T3.18, "top of /lab"): every version that has ever
-          emitted a signal, at a glance -- independent of the window/cohort
-          filters below (the scoreboard API only accepts `as_of`, which this
-          page freezes at load time, never a rolling window). */}
+      <LabHeader asOf={result.ok ? result.summary.as_of : null} versions={result.ok ? result.summary.versions : []} ruler={ruler} />
+
+      {/* The Placar (brief T3.18, opção A: "top of /lab" right after the
+          SOMBRA banner): every version that has ever emitted a signal, at a
+          glance -- independent of the window/cohort filters below (the
+          scoreboard API only accepts `as_of`, which this page freezes at
+          load time, never a rolling window). */}
       <section className="flex flex-col gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-fg">Placar</h2>
+          <Eyebrow>Placar</Eyebrow>
           <p className="text-xs text-fg-muted">
             Uma linha por versão que já emitiu sinal, ordenada por status ativo primeiro e depois pelo resultado acumulado (R).
           </p>
@@ -172,14 +186,18 @@ export default async function LabPage({ params, searchParams }: LabPageProps) {
         {scoreboardResult.ok ? (
           <>
             <LabScoreboardSection rows={scoreboardResult.scoreboard.rows} ruler={ruler} />
-            <LabCurveSection rows={scoreboardResult.scoreboard.rows} curvesById={scoreboardResult.curvesById} ruler={ruler} />
+            <LabCurveSection
+              rows={scoreboardResult.scoreboard.rows}
+              curvesById={scoreboardResult.curvesById}
+              ruler={ruler}
+              asOf={scoreboardResult.scoreboard.as_of}
+            />
           </>
         ) : (
-          <p className="text-sm text-red">Placar indisponível: falha ao carregar ({scoreboardResult.reason}).</p>
+          <SectionUnavailable title="Placar" reason={`falha ao carregar (${scoreboardResult.reason})`} />
         )}
       </section>
 
-      <LabTabs />
       {!result.ok ? (
         <LabError reason={result.reason} />
       ) : (
@@ -216,12 +234,30 @@ function LabPageBody({ orgSlug, window, cohort, versionId, ruler, summary, versi
     label: `${v.strategy_key}/${v.version} (${v.status})`,
   }));
 
+  const cohorts = Array.from(new Set(signals.items.map((s) => s.cohort)));
+
   return (
     <>
-      <LabHeader asOf={summary.as_of} versions={summary.versions} ruler={ruler} />
-      <LabFilters window={window} cohort={cohort} versionId={versionId ?? null} versions={filterVersionOptions} />
+      {/* Sinais — Sombra (brief T3.24b §2 item [3]): filters, segments,
+          compact totals, table + panel all live under this one section, so
+          the page reads as "one hierarchy" instead of three stacked
+          summaries before the first signal row. */}
+      <section className="flex flex-col gap-3">
+        <Eyebrow>Sinais — Sombra</Eyebrow>
+        <LabFilters window={window} cohort={cohort} versionId={versionId ?? null} versions={filterVersionOptions} cohorts={cohorts} />
+        <LabSignalsTable
+          orgSlug={orgSlug}
+          initialItems={signals.items}
+          initialCursor={signals.next_cursor}
+          baseParams={{ cohort, limit: SIGNALS_INITIAL_LIMIT, ...(versionId ? { strategy_version_id: versionId } : {}) }}
+          versionLabelById={versionLabelById}
+          cohort={cohort}
+          ruler={ruler}
+        />
+      </section>
 
       <section className="flex flex-col gap-4">
+        <Eyebrow>Versões (pesquisa)</Eyebrow>
         {summary.versions.length === 0 ? (
           <LabVersionsEmpty />
         ) : (
@@ -231,20 +267,17 @@ function LabPageBody({ orgSlug, window, cohort, versionId, ruler, summary, versi
               supersededById && versionLabelById[supersededById]
                 ? { id: supersededById, label: versionLabelById[supersededById] }
                 : null;
-            return <LabVersionCard key={v.strategy_version_id} version={v} supersededBy={supersededBy} />;
+            return (
+              <LabVersionCard
+                key={v.strategy_version_id}
+                version={v}
+                supersededBy={supersededBy}
+                openByDefault={versionId === v.strategy_version_id}
+              />
+            );
           })
         )}
       </section>
-
-      <LabSignalsTable
-        orgSlug={orgSlug}
-        initialItems={signals.items}
-        initialCursor={signals.next_cursor}
-        baseParams={{ cohort, limit: SIGNALS_INITIAL_LIMIT, ...(versionId ? { strategy_version_id: versionId } : {}) }}
-        versionLabelById={versionLabelById}
-        cohort={cohort}
-        ruler={ruler}
-      />
     </>
   );
 }

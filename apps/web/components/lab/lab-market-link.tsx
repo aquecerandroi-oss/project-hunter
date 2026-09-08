@@ -43,7 +43,7 @@ export function LabMarketLink({ orgSlug, symbol }: LabMarketLinkProps) {
         void open();
       }}
       aria-busy={busy}
-      className="font-medium text-fg underline-offset-2 hover:text-gold hover:underline disabled:opacity-60"
+      className="font-medium text-fg underline decoration-dotted underline-offset-2 hover:text-gold disabled:opacity-60"
       disabled={busy}
     >
       {symbol}

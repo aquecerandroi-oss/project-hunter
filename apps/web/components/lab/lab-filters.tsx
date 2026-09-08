@@ -2,6 +2,8 @@
 
 import { usePathname, useRouter } from "next/navigation";
 
+import { Select } from "@/components/ui/select";
+
 export interface LabFilterVersionOption {
   id: string;
   label: string;
@@ -12,6 +14,8 @@ export interface LabFiltersProps {
   cohort: string;
   versionId: string | null;
   versions: LabFilterVersionOption[];
+  /** Distinct cohorts present in the currently loaded signals page (brief T3.24b item [3]) -- `"prospective"` is always offered even when absent from the page, since it is the endpoint's own default. */
+  cohorts: string[];
 }
 
 const WINDOW_OPTIONS: Array<{ value: "7d" | "30d" | "all"; label: string }> = [
@@ -33,8 +37,13 @@ const WINDOW_OPTIONS: Array<{ value: "7d" | "30d" | "all"; label: string }> = [
  * (contract-S3-lab.md, `routers/lab.py::list_signals`) -- labelled
  * separately in `LabSignalsTable` so the two lists never look like they
  * share one clock (Astra, S3b hierarchy review, must-fix).
+ *
+ * `Coorte` is a `<select>` since T3.24b item [3] (X6-class fix, T3.24a): a
+ * free-text input let a reader type an unreachable cohort string with no
+ * feedback -- the options are exactly the cohorts this page already knows
+ * about (`prospective`, plus whatever else the loaded signals page shows).
  */
-export function LabFilters({ window: activeWindow, cohort, versionId, versions }: LabFiltersProps) {
+export function LabFilters({ window: activeWindow, cohort, versionId, versions, cohorts }: LabFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -48,46 +57,40 @@ export function LabFilters({ window: activeWindow, cohort, versionId, versions }
     router.push(`${pathname}?${params.toString()}`);
   }
 
+  const cohortOptions = Array.from(new Set(["prospective", ...cohorts]));
+
   return (
     <div className="flex flex-wrap items-end gap-4 text-sm">
       <label className="flex flex-col gap-1">
         <span className="text-xs text-fg-muted">Janela do resumo</span>
-        <select
-          value={activeWindow}
-          onChange={(e) => navigate({ window: e.target.value })}
-          className="h-8 rounded-md border border-border bg-bg-overlay px-2 text-[13px] text-fg"
-        >
+        <Select value={activeWindow} onChange={(e) => navigate({ window: e.target.value })}>
           {WINDOW_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-fg-muted">Cohort</span>
-        <input
-          type="text"
-          defaultValue={cohort}
-          onBlur={(e) => navigate({ cohort: e.target.value.trim() || "prospective" })}
-          aria-label="Cohort"
-          className="h-8 w-48 rounded-md border border-border bg-bg-overlay px-2 text-[13px] text-fg"
-        />
+        <span className="text-xs text-fg-muted">Coorte</span>
+        <Select value={cohort} onChange={(e) => navigate({ cohort: e.target.value })} aria-label="Coorte">
+          {cohortOptions.map((value) => (
+            <option key={value} value={value}>
+              {value === "prospective" ? "prospective (padrão)" : value}
+            </option>
+          ))}
+        </Select>
       </label>
       <label className="flex flex-col gap-1">
         <span className="text-xs text-fg-muted">Versão (lista de sinais)</span>
-        <select
-          value={versionId ?? ""}
-          onChange={(e) => navigate({ version: e.target.value || null })}
-          className="h-8 rounded-md border border-border bg-bg-overlay px-2 text-[13px] text-fg"
-        >
+        <Select value={versionId ?? ""} onChange={(e) => navigate({ version: e.target.value || null })}>
           <option value="">Todas as versões</option>
           {versions.map((v) => (
             <option key={v.id} value={v.id}>
               {v.label}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
     </div>
   );

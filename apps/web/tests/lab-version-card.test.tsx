@@ -6,16 +6,41 @@ import { makeVersionSummary } from "@/tests/fixtures/lab";
 
 afterEach(cleanup);
 
-describe("LabVersionCard: honest nulls, always-visible label and 'não aplicável'", () => {
+describe("LabVersionCard: <details> collapsed by default (brief T3.24b item [4])", () => {
+  it("renders closed unless openByDefault is true", () => {
+    render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} openByDefault={false} />);
+    const details = screen.getByText("momentum / v2").closest("details");
+    expect(details).not.toBeNull();
+    expect((details as HTMLDetailsElement).open).toBe(false);
+  });
+
+  it("renders open when openByDefault is true (the '?version=' match, resolved by lab/page.tsx)", () => {
+    render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} openByDefault />);
+    const details = screen.getByText("momentum / v2").closest("details");
+    expect((details as HTMLDetailsElement).open).toBe(true);
+  });
+
+  it("shows identity, status, purpose and the compact maturity badge in the <summary>, always visible", () => {
+    render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} openByDefault={false} />);
+    expect(screen.getByText("momentum / v2")).toBeInTheDocument();
+    expect(screen.getByText("ativa")).toBeInTheDocument();
+    expect(screen.getByText("paper")).toBeInTheDocument();
+    expect(screen.getByText("Inconclusivo · 9/100 · 1/30 dias")).toBeInTheDocument();
+  });
+});
+
+describe("LabVersionCard: honest nulls, always-visible label and 'não aplicável' (body, openByDefault)", () => {
   it("renders the real fixture (copied from contract-S3-lab.md) without crashing", () => {
-    render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} />);
+    render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} openByDefault />);
     expect(screen.getByText("momentum / v2")).toBeInTheDocument();
   });
 
-  it("shows both portfolio 'não aplicável' lines with their reasons, always -- never omitted", () => {
-    render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} />);
-    expect(screen.getByText(/PnL de carteira: não aplicável \(not_applicable\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Drawdown de carteira: não aplicável \(not_applicable\)/)).toBeInTheDocument();
+  it("shows both portfolio 'não aplicável' lines, always -- never omitted, with the raw reason code in title", () => {
+    render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} openByDefault />);
+    const pnl = screen.getByText(/PnL de carteira: não aplicável/);
+    expect(pnl).toBeInTheDocument();
+    const drawdown = screen.getByText(/Drawdown de carteira: não aplicável/);
+    expect(drawdown).toBeInTheDocument();
   });
 
   it("never renders a null metric as '0' -- shows its reason text instead, scoped to that metric's own cell", () => {
@@ -25,7 +50,7 @@ describe("LabVersionCard: honest nulls, always-visible label and 'não aplicáve
         net_profit_rate: { value: null, reason: "no_sample" },
       },
     });
-    render(<LabVersionCard version={version} supersededBy={null} />);
+    render(<LabVersionCard version={version} supersededBy={null} openByDefault />);
     // Scoped to the main metrics grid, not the whole card: `r_ex_funding`
     // reuses the same Portuguese label ("Taxa de lucro líquido") for its own
     // (unaffected, non-null) net_profit_rate, so an unscoped query would
@@ -47,13 +72,21 @@ describe("LabVersionCard: honest nulls, always-visible label and 'não aplicáve
         profit_factor: { value: null, reason: "no_losses", sum_positive: "1.5000", sum_negative_abs: "0", sample_size: 3 },
       },
     });
-    render(<LabVersionCard version={version} supersededBy={null} />);
+    render(<LabVersionCard version={version} supersededBy={null} openByDefault />);
     expect(screen.getByText(/\+1.5000 \/ -0 \(n=3\)/)).toBeInTheDocument();
   });
 
-  it("shows the maturity badge text exactly as specified (brief S3b)", () => {
-    render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} />);
-    expect(screen.getByText("Inconclusivo · 9 outcomes avaliáveis / 100 · 1 dias distintos / 30")).toBeInTheDocument();
+  it("shows '{n} resultados, em ordem de saída' instead of the raw 'n=..., ordenada por exit_ts' (brief T3.24b item [4])", () => {
+    render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} openByDefault />);
+    // Both the main metrics grid and the (unaffected) r_ex_funding block
+    // share the same n=9 -- so this reads "at least one", not "exactly one".
+    expect(screen.getAllByText("9 resultados, em ordem de saída").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/ordenada por exit_ts/)).not.toBeInTheDocument();
+  });
+
+  it("shows the compact maturity badge text exactly as specified (brief T3.24b item [4])", () => {
+    render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} openByDefault />);
+    expect(screen.getByText("Inconclusivo · 9/100 · 1/30 dias")).toBeInTheDocument();
   });
 
   it("links superseded_by to the target version's in-page anchor, not itself", () => {
@@ -61,25 +94,34 @@ describe("LabVersionCard: honest nulls, always-visible label and 'não aplicáve
       <LabVersionCard
         version={makeVersionSummary({ strategy_version_id: "v1-id", version: "v1" })}
         supersededBy={{ id: "v2-id", label: "momentum/v2" }}
+        openByDefault
       />,
     );
     const link = screen.getByRole("link", { name: /substituída por momentum\/v2/ });
     expect(link).toHaveAttribute("href", "#version-v2-id");
   });
 
-  it("renders the r_ex_funding block as its own section, separate from the main metrics", () => {
-    render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} />);
-    expect(screen.getByText(/r_ex_funding \(mesma população, sem funding\)/)).toBeInTheDocument();
+  it("renders the r_ex_funding block as its own section, with the technical name in title, plain text visible", () => {
+    render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} openByDefault />);
+    const heading = screen.getByText("Sem funding (mesma população)");
+    expect(heading).toBeInTheDocument();
+    expect(heading).toHaveAttribute("title", "r_ex_funding (mesma população, sem funding)");
+  });
+
+  it("shows 'Código: {hash curto 7}' with the full code_ref in title", () => {
+    render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} openByDefault />);
+    const codeLine = screen.getByText(/Código: c012f75/);
+    expect(codeLine).toHaveAttribute("title", "hunter_core.strategies.momentum_v1@sha256:c012f75c...");
   });
 
   it("shows a 'paper' chip for a purpose=paper version (T3.15e)", () => {
-    render(<LabVersionCard version={makeVersionSummary({ purpose: "paper" })} supersededBy={null} />);
+    render(<LabVersionCard version={makeVersionSummary({ purpose: "paper" })} supersededBy={null} openByDefault={false} />);
     expect(screen.getByText("paper")).toBeInTheDocument();
   });
 
   it("shows a 'pesquisa' chip for a purpose=research_only version (T3.15e)", () => {
     render(
-      <LabVersionCard version={makeVersionSummary({ purpose: "research_only" })} supersededBy={null} />,
+      <LabVersionCard version={makeVersionSummary({ purpose: "research_only" })} supersededBy={null} openByDefault={false} />,
     );
     expect(screen.getByText("pesquisa")).toBeInTheDocument();
   });

@@ -1,6 +1,7 @@
 "use client";
 
 import { LabExitCell } from "@/components/lab/lab-exit-cell";
+import { labCellVisibilityClass } from "@/components/lab/lab-signals-table-head";
 import { LabMarketLink } from "@/components/lab/lab-market-link";
 import { LabMoneyOrReason, LabResultValue } from "@/components/lab/lab-money-cells";
 import { LabPriceTimeCell } from "@/components/lab/lab-price-time-cell";
@@ -8,7 +9,7 @@ import { LabResearchCells } from "@/components/lab/lab-research-cells";
 import { LabStrategyCell } from "@/components/lab/lab-strategy-cell";
 import { WhenCell } from "@/components/lab/lab-when-cell";
 import { durationText, pctColorClass } from "@/components/lab/lab-format";
-import { MONEY_TOOLTIP, moneyForRow, usdtToBrl, type MoneyRuler } from "@/components/lab/lab-money";
+import { moneyForRow, usdtToBrl, type MoneyRuler } from "@/components/lab/lab-money";
 import { ResultBadge } from "@/components/lab/lab-result-badge";
 import type { SignalListItemOut } from "@/lib/api/lab-types";
 import { formatPct } from "@/lib/format";
@@ -24,6 +25,8 @@ export interface LabSignalRowProps {
   rowHeight: number;
   selected: boolean;
   ariaRowIndex: number;
+  /** `true` when the side panel is open (`lg`) -- "Duração"/"Quantia simulada" hide until `xl` (brief T3.24b item [3]), same rule the header applies. */
+  panelOpen: boolean;
   onOpen: () => void;
 }
 
@@ -38,10 +41,12 @@ export interface LabSignalRowProps {
  * to the always-visible set and rewrote `Entrou`/`Saiu` as two-line,
  * fixed-width cells that never wrap or truncate mid-word.
  */
-export function LabSignalRow({ id, orgSlug, row, versionLabel, ruler, showResearch, rowHeight, selected, ariaRowIndex, onOpen }: LabSignalRowProps) {
+export function LabSignalRow({ id, orgSlug, row, versionLabel, ruler, showResearch, rowHeight, selected, ariaRowIndex, panelOpen, onOpen }: LabSignalRowProps) {
   const { pnlUsdt, notionalUsdt, pctMove } = moneyForRow(row, ruler);
   const pnlBrl = pnlUsdt.value !== null ? usdtToBrl(pnlUsdt.value, ruler) : null;
   const duration = durationText(row.entry_ts, row.exit_ts);
+  const mobileHidden = labCellVisibilityClass({ mobileHidden: true }, panelOpen);
+  const panelHidden = labCellVisibilityClass({ panelHidden: true }, panelOpen);
 
   return (
     <tr
@@ -59,29 +64,29 @@ export function LabSignalRow({ id, orgSlug, row, versionLabel, ruler, showResear
       <td role="gridcell" className="px-3">
         <LabMarketLink orgSlug={orgSlug} symbol={row.market} />
       </td>
-      <td role="gridcell" className="whitespace-nowrap px-3 text-xs">
+      <td role="gridcell" className={cn("whitespace-nowrap px-3 text-xs", mobileHidden)}>
         <WhenCell iso={row.decision_at} />
       </td>
-      <td role="gridcell" title={MONEY_TOOLTIP} className="whitespace-nowrap px-3 text-right text-xs">
+      <td role="gridcell" className={cn("whitespace-nowrap px-3 text-right text-xs", mobileHidden)}>
         <LabPriceTimeCell price={row.virtual_entry} ts={row.entry_ts} />
       </td>
-      <td role="gridcell" title={MONEY_TOOLTIP} className="px-3 text-right text-xs">
+      <td role="gridcell" className={cn("px-3 text-right text-xs", mobileHidden)}>
         <LabExitCell row={row} />
       </td>
       <td
         role="gridcell"
         title={duration.reason ?? undefined}
-        className="whitespace-nowrap px-3 text-right font-mono text-xs tabular-nums text-fg-muted"
+        className={cn("whitespace-nowrap px-3 text-right font-mono text-xs tabular-nums text-fg-muted", panelHidden)}
       >
         {duration.text}
       </td>
-      <td role="gridcell" title={MONEY_TOOLTIP} className={cn("whitespace-nowrap px-3 text-right font-mono text-xs tabular-nums", pctColorClass(pctMove))}>
+      <td role="gridcell" className={cn("whitespace-nowrap px-3 text-right font-mono text-xs tabular-nums", mobileHidden, pctColorClass(pctMove))}>
         {pctMove !== null ? formatPct(pctMove) : "--"}
       </td>
-      <td role="gridcell" title={MONEY_TOOLTIP} className="whitespace-nowrap px-3 text-right font-mono text-xs tabular-nums text-fg">
+      <td role="gridcell" className={cn("whitespace-nowrap px-3 text-right font-mono text-xs tabular-nums text-fg", panelHidden)}>
         <LabMoneyOrReason money={notionalUsdt} />
       </td>
-      <td role="gridcell" title={MONEY_TOOLTIP} className="min-w-[150px] whitespace-nowrap px-3 text-right text-xs">
+      <td role="gridcell" className="min-w-[150px] whitespace-nowrap px-3 text-right text-xs">
         <span className="mr-1.5 inline-block">
           <ResultBadge pnlUsdt={pnlUsdt.value} />
         </span>

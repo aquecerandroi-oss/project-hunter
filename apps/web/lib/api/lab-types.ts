@@ -202,3 +202,14 @@ export type ScoreboardRowOut = components["schemas"]["ScoreboardRowOut"];
 export type ScoreboardOut = components["schemas"]["ScoreboardOut"];
 export type CurvePointOut = components["schemas"]["CurvePointOut"];
 export type CurveOut = components["schemas"]["CurveOut"];
+
+// --- T3.18b: replay/replication blocks on ScoreboardRowOut, curve `cohort=` ---
+
+export type ReplayBlockOut = components["schemas"]["ReplayBlockOut"];
+export type ReplicationBlockOut = components["schemas"]["ReplicationBlockOut"];
+export type ReplicationParentOut = components["schemas"]["ReplicationParentOut"];
+export type SiblingArmOut = components["schemas"]["SiblingArmOut"];
+export type SiblingsBlockOut = components["schemas"]["SiblingsBlockOut"];
+export type OutOfSampleBlockOut = components["schemas"]["OutOfSampleBlockOut"];
+export type MarketHalvesBlockOut = components["schemas"]["MarketHalvesBlockOut"];
+export type BootstrapBlockOut = components["schemas"]["BootstrapBlockOut"];

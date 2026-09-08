@@ -97,7 +97,7 @@ describe("LabCurveChart: one line per version, USDT by default with an R toggle"
     const legend = screen.getByTestId("lab-curve-legend");
     expect(legend).toHaveTextContent("momentum/v2");
     expect(legend).toHaveTextContent("curva indisponível: falha ao carregar");
-    expect(legend).toHaveTextContent("capado em 2.000 pontos");
+    expect(legend).toHaveTextContent("(primeiros 2.000 pontos)");
   });
 
   it("never draws a line for a version with no resolved outcome yet, even when another version has one", () => {

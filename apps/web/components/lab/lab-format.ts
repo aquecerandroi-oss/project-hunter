@@ -55,10 +55,35 @@ export function formatR(value: string | null, reason: string | null): DecimalOrR
   return formatDecimalOrReason(value, reason, "R");
 }
 
+/**
+ * Same `null` + reason contract as `formatDecimalOrReason`, but rounded to a
+ * fixed number of decimals (brief T3.24b addendum A1: the Placar's "Replay"
+ * block shows expectancy/PF at "2 casas" instead of the API's own, longer
+ * Decimal string). Falls back to the raw string when it does not parse as a
+ * finite number (never silently drops a real, if unexpected, value).
+ */
+export function formatRounded(value: string | null, reason: string | null, suffix = "", decimals = 2): DecimalOrReason {
+  if (value === null) return { text: reason ? reasonLabel(reason) : "sem motivo informado", isValue: false };
+  const num = Number(value);
+  return { text: `${Number.isFinite(num) ? num.toFixed(decimals) : value}${suffix}`, isValue: true };
+}
+
 /** Semantic color for a signed decimal string -- neutral (never colored) when the value is absent, matching `MarketRow`'s rule that missing data is never painted green. */
 export function signColorClass(value: string | null): string {
   if (value === null) return "text-fg-muted";
   return value.trim().startsWith("-") ? "text-red" : "text-green";
+}
+
+/**
+ * "n=9, ordenada por exit_ts" -> "9 resultados, em ordem de saída" (brief
+ * T3.24b item [4]): the sum-of-R metric's own `count`/`ordered_by` detail,
+ * in plain language instead of the raw field names. `ordered_by` has only
+ * ever been `"exit_ts"` in this contract (`SumOfROut`) -- an unrecognized
+ * value still renders (with its own raw code) rather than disappearing.
+ */
+export function formatSumOfRDetail(count: number, orderedBy: string): string {
+  const orderText = orderedBy === "exit_ts" ? "em ordem de saída" : `ordenada por ${orderedBy}`;
+  return `${count} resultado${count === 1 ? "" : "s"}, ${orderText}`;
 }
 
 /** Same rule as `signColorClass`, for an already-numeric (not Decimal-string) percentage move -- kept as its own named function (rather than an inline ternary at every call site) so `LabSignalRow`'s own cyclomatic complexity stays under the lint config's budget. */

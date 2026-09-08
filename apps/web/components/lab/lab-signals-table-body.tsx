@@ -19,6 +19,7 @@ export interface LabSignalsTableBodyProps {
   showResearch: boolean;
   rowHeight: number;
   selectedIndex: number;
+  panelOpen: boolean;
   rowIdFor: (row: SignalListItemOut) => string;
   onOpenRow: (row: SignalListItemOut) => void;
 }
@@ -45,6 +46,7 @@ export function LabSignalsTableBody({
   showResearch,
   rowHeight,
   selectedIndex,
+  panelOpen,
   rowIdFor,
   onOpenRow,
 }: LabSignalsTableBodyProps) {
@@ -81,6 +83,7 @@ export function LabSignalsTableBody({
             rowHeight={rowHeight}
             selected={absoluteIndex === selectedIndex}
             ariaRowIndex={absoluteIndex + 2}
+            panelOpen={panelOpen}
             onOpen={() => onOpenRow(row)}
           />
         );

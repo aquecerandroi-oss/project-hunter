@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
-import { reasonLabel } from "@/components/lab/lab-format";
-import type { VersionCounts } from "@/lib/api/lab-types";
+import { EXIT_REASON_LABEL, reasonLabel } from "@/components/lab/lab-format";
+import type { OutcomeResult, VersionCounts } from "@/lib/api/lab-types";
 
 export interface LabFunnelProps {
   counts: VersionCounts;
@@ -63,7 +63,7 @@ export function LabFunnel({ counts }: LabFunnelProps) {
             <span className="text-fg-subtle">nenhum</span>
           ) : (
             terminalResults.map(([result, n]) => (
-              <Badge key={result} variant="default">{`${result}: ${n}`}</Badge>
+              <Badge key={result} variant="default" title={result}>{`${EXIT_REASON_LABEL[result as OutcomeResult] ?? result}: ${n}`}</Badge>
             ))
           )}
         </dd>

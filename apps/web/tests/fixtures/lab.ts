@@ -1,5 +1,13 @@
 import { buildWalletRuler, type MoneyRuler } from "@/components/lab/lab-money";
-import type { CurveOut, LabSummaryOut, ScoreboardRowOut, SignalListItemOut, VersionSummaryOut } from "@/lib/api/lab-types";
+import type {
+  CurveOut,
+  LabSummaryOut,
+  ReplayBlockOut,
+  ReplicationBlockOut,
+  ScoreboardRowOut,
+  SignalListItemOut,
+  VersionSummaryOut,
+} from "@/lib/api/lab-types";
 
 /**
  * Fixtures copied from the real example in `.claude/state/contract-S3-lab.md`
@@ -178,6 +186,129 @@ export function exampleScoreboardRow(overrides: Partial<ScoreboardRowOut> = {}):
 
 export function makeScoreboardRow(overrides: Partial<ScoreboardRowOut> = {}): ScoreboardRowOut {
   return exampleScoreboardRow(overrides);
+}
+
+/**
+ * T3.18b (addendum A1) -- shaped from the real integration fixture in
+ * `apps/api/tests/integration/test_lab_scoreboard_replay_api.py::test_replay_positive_and_prospective_negative_never_swap_the_verdict`
+ * (1 run, 288 decisions simulated, 3 operations closed, expectancy_r "2",
+ * net_profit_rate 100%).
+ */
+export function exampleReplayBlock(overrides: Partial<ReplayBlockOut> = {}): ReplayBlockOut {
+  return {
+    runs: 1,
+    decisions_simulated: 288,
+    operations_closed: 3,
+    expectancy_r: { value: "2", reason: null },
+    net_profit_rate: { value: "1", reason: null, numerator: 3, denominator: 3 },
+    profit_factor: { value: "4.5000", reason: null, sum_positive: "6.0000", sum_negative_abs: "1.3333", sample_size: 3 },
+    distinct_days: 1,
+    distinct_markets: 1,
+    window_from: "2026-08-29T12:00:00Z",
+    window_to: "2026-08-29T14:05:00Z",
+    label: "replay — não conta para o veredito",
+    ...overrides,
+  };
+}
+
+/**
+ * T3.18b (addendum A2) -- shaped from
+ * `apps/api/tests/integration/test_lab_replication_scoreboard_api.py::test_one_sibling_cohort_shows_up_with_its_evidence_label`
+ * (one sibling, `evidence: "prospective"`).
+ */
+export function exampleReplicationBlock(overrides: Partial<ReplicationBlockOut> = {}): ReplicationBlockOut {
+  return {
+    status: "replicando",
+    reason: "blocos imaturos: out_of_sample, market_halves, bootstrap",
+    promising_at: "2026-08-19T12:00:00Z",
+    parent: {
+      evaluable: 1,
+      wins: 1,
+      losses: 0,
+      markets: 1,
+      days: 1,
+      sum_r: "1",
+      expectancy_r: "1",
+      profit_factor: null,
+      profit_factor_reason: "sem_perdas",
+      verdict: "validada",
+    },
+    out_of_sample: {
+      days: 1,
+      evaluable: 1,
+      expectancy_r: "1",
+      losses: 0,
+      markets: 1,
+      mature: false,
+      passed: null,
+      profit_factor: null,
+      profit_factor_reason: "sem_perdas",
+      reason: "imaturo: 1",
+      sum_r: "1",
+      wins: 1,
+    },
+    siblings: {
+      n: 1,
+      expected: 10,
+      required: 7,
+      mature: 0,
+      positive: 0,
+      passed: null,
+      reason: null,
+      arms: [
+        {
+          k: 1,
+          version: "v2",
+          evaluable: 4,
+          wins: 4,
+          losses: 0,
+          markets: 1,
+          days: 1,
+          sum_r: "4",
+          expectancy_r: "1",
+          profit_factor: null,
+          profit_factor_reason: "sem_perdas",
+          mature: false,
+          positive: false,
+          evidence: "prospective",
+        },
+      ],
+    },
+    market_halves: {
+      passed: null,
+      reason: "imatura: 1 de 2 mercados, 1 de 4 resultados",
+      a: { half: "a", markets: 1, evaluable: 1, expectancy_r: "1", mature: false, reason: "imatura: 1 de 2 mercados, 1 de 4 resultados" },
+      b: { half: "b", markets: 0, evaluable: 0, expectancy_r: null, mature: false, reason: "imatura: 0 de 2 mercados, 0 de 4 resultados" },
+    },
+    bootstrap: {
+      passed: null,
+      reason: "amostra_insuficiente: 1 < 20",
+      n: 1,
+      mean: null,
+      ci_low: null,
+      ci_high: null,
+      resamples: 0,
+      seed: 99,
+      confidence: "0.90",
+      method: "iid_percentile_v1",
+      refused_reason: "amostra_insuficiente: 1 < 20",
+      groups: null,
+      day_cluster: {
+        n: 1,
+        mean: null,
+        ci_low: null,
+        ci_high: null,
+        resamples: 0,
+        seed: 99,
+        confidence: "0.90",
+        method: "day_cluster_percentile_v1",
+        refused_reason: "grupos_insuficientes: 1 < 20",
+        groups: 1,
+      },
+      sign_test: { method: "sign_test_v1", positives: 1, negatives: 0, zeros: 0, p_sign: null, refused_reason: null },
+    },
+    ...overrides,
+  };
 }
 
 export function exampleCurve(overrides: Partial<CurveOut> = {}): CurveOut {

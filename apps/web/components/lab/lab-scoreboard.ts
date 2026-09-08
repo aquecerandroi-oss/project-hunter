@@ -8,6 +8,7 @@
  */
 
 import { reasonLabel, formatR, formatDecimalOrReason, signColorClass } from "@/components/lab/lab-format";
+import { statusLabel } from "@/components/lab/labels";
 import { scoreboardMoney, type MoneyRuler } from "@/components/lab/lab-money";
 import { formatBrlSigned, formatPct, formatUsdtSigned } from "@/lib/format";
 import { formatBrasiliaDate } from "@/lib/time";
@@ -92,15 +93,12 @@ export function maturityRatios(maturity: ScoreboardMaturityOut): MaturityRatios 
 
 // --- Card header text ---
 
-export const SCOREBOARD_STATUS_LABEL: Record<string, string> = {
-  active: "ativa",
-  deprecated: "descontinuada",
-  draft: "rascunho",
-};
-
-export function scoreboardStatusLabel(status: string): string {
-  return SCOREBOARD_STATUS_LABEL[status] ?? status;
-}
+/**
+ * Thin re-export (brief T3.24b: status vocabulary now lives in one place,
+ * `components/lab/labels.ts`) -- kept under this name so every existing call
+ * site here and in `lab-scoreboard-card.tsx` stays unchanged.
+ */
+export const scoreboardStatusLabel = statusLabel;
 
 /** "desde 08/09/2026"; a version never activated (e.g. still `draft`) reads "ainda não ativada" rather than a blank or a fabricated date. Brasília day (brief T3.22) -- same one-timezone rule as `lab-format.ts`'s `formatWhenShort`, via `lib/time.ts`'s `formatBrasiliaDate`. */
 export function formatSince(iso: string | null): string {
@@ -207,10 +205,22 @@ export interface LabCurveSeriesInput {
   truncated: boolean;
   /** `true` when this version's own `/curve` fetch failed -- the line is simply absent, never a fabricated flat line. */
   failed: boolean;
+  /**
+   * `undefined` for every pre-T3.24b caller (defaults to a solid,
+   * unlabelled line, unchanged behaviour). `"replay"` draws dashed, next to
+   * the (solid) `"prospective"` line for the same version, when both are
+   * loaded (brief T3.24b addendum A3, D14/D15: a replay never counts toward
+   * the veredito, so it is visually distinct, never conflated).
+   */
+  cohort?: "prospective" | "replay";
 }
 
-/** Builds one series per scoreboard row from the per-version curve fetches (`Record<versionId, CurveOut | null>`, `null` meaning "fetch failed for this one"), in the same order as `rows` (callers pass the already-sorted list). */
-export function buildCurveSeries(rows: ScoreboardRowOut[], curvesById: Record<string, CurveOut | null>): LabCurveSeriesInput[] {
+/** Builds one series per scoreboard row from the per-version curve fetches (`Record<versionId, CurveOut | null>`, `null` meaning "fetch failed for this one"), in the same order as `rows` (callers pass the already-sorted list). `cohort` is stamped on every entry so the chart can tell a replay overlay apart from the prospective line of the same version (addendum A3) -- omitted by existing callers that don't need the distinction. */
+export function buildCurveSeries(
+  rows: ScoreboardRowOut[],
+  curvesById: Record<string, CurveOut | null>,
+  cohort?: "prospective" | "replay",
+): LabCurveSeriesInput[] {
   return rows.map((row) => {
     const curve = curvesById[row.version.id];
     const failed = curve === null || curve === undefined;
@@ -221,6 +231,7 @@ export function buildCurveSeries(rows: ScoreboardRowOut[], curvesById: Record<st
       points: curve?.points ?? [],
       truncated: curve?.truncated ?? false,
       failed,
+      ...(cohort ? { cohort } : {}),
     };
   });
 }

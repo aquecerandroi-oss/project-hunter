@@ -109,7 +109,7 @@ describe("formatSince: 'desde DD/MM/AAAA', Brasília (brief T3.22)", () => {
 describe("scoreboardStatusLabel", () => {
   it("translates the known statuses", () => {
     expect(scoreboardStatusLabel("active")).toBe("ativa");
-    expect(scoreboardStatusLabel("deprecated")).toBe("descontinuada");
+    expect(scoreboardStatusLabel("deprecated")).toBe("substituída");
     expect(scoreboardStatusLabel("draft")).toBe("rascunho");
   });
 });

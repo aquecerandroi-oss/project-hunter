@@ -6,6 +6,7 @@ import { BadgesShowcase } from "@/components/design/badges-showcase";
 import { ButtonsShowcase } from "@/components/design/buttons-showcase";
 import { InputsShowcase } from "@/components/design/inputs-showcase";
 import { KpiCardShowcase } from "@/components/design/kpi-card-showcase";
+import { LabHierarchyShowcase } from "@/components/design/lab-hierarchy-showcase";
 import { MotionShowcase } from "@/components/design/motion-showcase";
 import { SidebarStatesShowcase } from "@/components/design/sidebar-states-showcase";
 import { StalenessShowcase } from "@/components/design/staleness-showcase";
@@ -82,6 +83,10 @@ export function DesignPreview() {
 
       <Section title="Command palette (T1.5b)">
         <CommandPalette orgSlug="preview" />
+      </Section>
+
+      <Section title="Lab -- hierarquia (opção A vs B, brief T3.24b §3)">
+        <LabHierarchyShowcase />
       </Section>
     </main>
   );

@@ -187,8 +187,8 @@ describe("LabSignalsTable: cursor pagination via a Server Action", () => {
   });
 });
 
-describe("LabSignalsTable: the endpoint's own window scope is a tooltip, not a paragraph leaking into the UI (brief T3.17b item 2)", () => {
-  it("shows the short 'período: todo o disponível' label, with the full technical fact only in its title tooltip", () => {
+describe("LabSignalsTable: the endpoint's own window scope is now a visible note, not a tooltip (brief T3.24b item [3])", () => {
+  it("shows 'período: todo o disponível — a janela acima só filtra o resumo' as plain visible text", () => {
     render(
       <LabSignalsTable
         orgSlug="acme"
@@ -200,44 +200,13 @@ describe("LabSignalsTable: the endpoint's own window scope is a tooltip, not a p
         ruler={exampleRuler()}
       />,
     );
-    const label = screen.getByText("período: todo o disponível");
-    expect(label).toBeInTheDocument();
-    expect(label.title).toMatch(/não aceita janela\/as_of/);
-    // The old paragraph -- "Sinais · todo o período disponível (este endpoint
-    // não aceita janela/`as_of`..." -- must not leak into the visible UI.
-    expect(screen.queryByText(/este endpoint não aceita/)).not.toBeInTheDocument();
+    expect(screen.getByText("período: todo o disponível — a janela acima só filtra o resumo")).toBeInTheDocument();
   });
 });
 
-describe("LabSignalsTable: the totals card (brief T3.17 item 2, extended by T3.17b item 1)", () => {
-  it("shows the plain-money totals above the table, computed from the loaded rows -- never scoped to the currently selected segment", () => {
-    const rows = [
-      makeSignal({ signal_id: "1", tracking_state: "terminal", r_multiple: "1.0" }),
-      makeSignal({ signal_id: "2", tracking_state: "terminal", r_multiple: "-0.5" }),
-      makeSignal({ signal_id: "3", tracking_state: "pending_entry", r_multiple: null, r_multiple_reason: null }),
-    ];
+describe("LabSignalsTable: the money-tooltip fact is one visible footer note, never a per-cell title (brief T3.24b Aceite)", () => {
+  it("shows the note exactly once and no gridcell carries the old MONEY_TOOLTIP text in its title", () => {
     render(
-      <LabSignalsTable
-        orgSlug="acme"
-        initialItems={rows}
-        initialCursor={null}
-        baseParams={{ cohort: "prospective" }}
-        versionLabelById={versionLabelById}
-        cohort="prospective"
-        ruler={exampleRuler()}
-      />,
-    );
-    const card = screen.getByTestId("lab-totals-card");
-    expect(within(card).getByText("Operações simuladas")).toBeInTheDocument();
-    expect(within(card).getByText("3")).toBeInTheDocument(); // total
-    expect(within(card).getByText("Resultado acumulado (USDT)")).toBeInTheDocument();
-    expect(within(card).getByText("Resultado acumulado (BRL)")).toBeInTheDocument();
-    expect(within(card).getByText("Melhor operação (desta página)")).toBeInTheDocument();
-    expect(within(card).getByText("Pior operação (desta página)")).toBeInTheDocument();
-  });
-
-  it("says 'desta página' with the loaded count when a next page exists, and never the old 'há mais sinais além desta página' phrasing", () => {
-    const { unmount } = render(
       <LabSignalsTable
         orgSlug="acme"
         initialItems={[makeSignal()]}
@@ -248,28 +217,10 @@ describe("LabSignalsTable: the totals card (brief T3.17 item 2, extended by T3.1
         ruler={exampleRuler()}
       />,
     );
-    expect(screen.getByText("Resultado de todas as operações do período (1)")).toBeInTheDocument();
-    expect(screen.queryByText(/há mais sinais/)).not.toBeInTheDocument();
-    unmount();
-
-    render(
-      <LabSignalsTable
-        orgSlug="acme"
-        initialItems={[makeSignal()]}
-        initialCursor="cursor-1"
-        baseParams={{ cohort: "prospective" }}
-        versionLabelById={versionLabelById}
-        cohort="prospective"
-        ruler={exampleRuler()}
-      />,
-    );
-    expect(screen.getByText("Resultado das operações desta página (1)")).toBeInTheDocument();
-    // T3.24a: `LAB_TOTALS_SCOPE_NOTE` (a stale task-id-bearing note) was
-    // removed from `lab-totals-card.tsx` -- the Placar is on the same page
-    // and the heading above already scopes the number, so no note is shown.
-    expect(screen.queryByText(/os totais do Lab inteiro/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/T3\.18/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/há mais sinais/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("Valores simulados: dado real, custos assumidos, sem dinheiro.")).toHaveLength(1);
+    for (const cell of screen.getAllByRole("gridcell")) {
+      expect(cell.title).not.toMatch(/simulado — dado real/);
+    }
   });
 });
 

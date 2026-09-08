@@ -51,7 +51,7 @@ export function LabSignalDetail({ signalId, market, strategyVersionId, cohort }:
   return (
     <div>
       <Button type="button" variant="ghost" size="sm" onClick={() => void toggle()} aria-expanded={state.status === "loaded"}>
-        {state.status === "loaded" ? "Ocultar envelope" : "Ver envelope"}
+        {state.status === "loaded" ? "Ocultar dados brutos (JSON)" : "Ver dados brutos (JSON)"}
       </Button>
       {state.status === "loading" && <p className="mt-1 text-xs text-fg-muted">Carregando envelope...</p>}
       {state.status === "error" && <p className="mt-1 text-xs text-red">Envelope indisponível: {state.reason}</p>}

@@ -15,7 +15,13 @@ export interface LabCurveChartProps {
   ruler: MoneyRuler;
 }
 
-const CHART_HEIGHT = 280;
+const CHART_HEIGHT = 200;
+/** `lightweight-charts`' own `LineStyle.Dashed` (2) / `LineStyle.Solid` (0) --
+ * a literal, not the imported enum, so the module under test never breaks a
+ * mock that only stubs `LineSeries`/`createChart` (brief T3.24b addendum
+ * A3). */
+const DASHED_LINE_STYLE = 2;
+const SOLID_LINE_STYLE = 0;
 type ChartCurrency = "usdt" | "r";
 type ThemeName = "dark" | "light";
 
@@ -71,14 +77,29 @@ function brasiliaCrosshairLabel(time: Time): string {
   return formatBrasiliaWithUtcTooltip(new Date((time as number) * 1000).toISOString());
 }
 
-/** One line per version with resolved points, coloured by its own verdict (brief item 4: "same colours as the cards") -- a version with no resolved outcome yet draws no line at all, never a flat fabricated one. */
+/** Unique per (version, cohort) -- `attachSeries`' own map key, so a replay overlay never collides with the prospective line of the same version (brief T3.24b addendum A3). */
+function seriesKey(entry: LabCurveSeriesInput): string {
+  return `${entry.versionId}:${entry.cohort ?? "prospective"}`;
+}
+
+/**
+ * One line per (version, cohort) with resolved points, coloured by its own
+ * verdict (brief item 4: "same colours as the cards") -- a version with no
+ * resolved outcome yet draws no line at all, never a flat fabricated one.
+ * `cohort: "replay"` draws dashed, alongside the (solid) prospective line for
+ * the same version (addendum A3) -- never conflated into one line.
+ */
 function attachSeries(chart: IChartApi, series: LabCurveSeriesInput[], currency: ChartCurrency, ruler: MoneyRuler): Map<string, ISeriesApi<"Line">> {
   const map = new Map<string, ISeriesApi<"Line">>();
   for (const entry of series) {
     if (entry.points.length === 0) continue;
-    const line = chart.addSeries(LineSeries, { color: cssVar(verdictLineColorVar(entry.verdict)), lineWidth: 2 });
+    const line = chart.addSeries(LineSeries, {
+      color: cssVar(verdictLineColorVar(entry.verdict)),
+      lineWidth: 2,
+      lineStyle: entry.cohort === "replay" ? DASHED_LINE_STYLE : SOLID_LINE_STYLE,
+    });
     line.setData(toSeriesData(entry, currency, ruler));
-    map.set(entry.versionId, line);
+    map.set(seriesKey(entry), line);
   }
   return map;
 }
@@ -140,24 +161,24 @@ export function LabCurveChart({ series, ruler }: LabCurveChartProps) {
     if (!chart) return;
     chart.applyOptions(chartLayoutOptions());
     for (const entry of series) {
-      seriesRefs.current.get(entry.versionId)?.applyOptions({ color: cssVar(verdictLineColorVar(entry.verdict)) });
+      seriesRefs.current.get(seriesKey(entry))?.applyOptions({ color: cssVar(verdictLineColorVar(entry.verdict)) });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `series` is read fresh, not a reactive dependency of a theme-only effect
   }, [theme]);
 
   useEffect(() => {
     for (const entry of series) {
-      seriesRefs.current.get(entry.versionId)?.setData(toSeriesData(entry, currency, ruler));
+      seriesRefs.current.get(seriesKey(entry))?.setData(toSeriesData(entry, currency, ruler));
     }
   }, [series, currency, ruler]);
 
   if (drawable.length === 0) {
-    return <p className="flex h-[280px] items-center justify-center text-sm text-fg-muted">Nenhum resultado resolvido ainda para desenhar a curva.</p>;
+    return <p className="flex h-[200px] items-center justify-center text-sm text-fg-muted">Nenhum resultado resolvido ainda para desenhar a curva.</p>;
   }
 
   if (failed) {
     return (
-      <div className="flex h-[280px] flex-col items-center justify-center gap-1 text-center text-sm">
+      <div className="flex h-[200px] flex-col items-center justify-center gap-1 text-center text-sm">
         <p className="text-fg">Gráfico indisponível.</p>
         <p className="text-fg-muted">Os pontos da curva chegaram, mas o gráfico não pôde ser desenhado. Recarregue a página.</p>
       </div>
@@ -180,11 +201,19 @@ export function LabCurveChart({ series, ruler }: LabCurveChartProps) {
       <div ref={setContainer} className="mt-3 w-full" />
       <ul data-testid="lab-curve-legend" className="mt-3 flex flex-wrap gap-3">
         {series.map((entry) => (
-          <li key={entry.versionId} className="flex items-center gap-1.5 text-xs text-fg-muted">
-            <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: cssVar(verdictLineColorVar(entry.verdict)) }} />
+          <li key={seriesKey(entry)} className="flex items-center gap-1.5 text-xs text-fg-muted">
+            <span
+              className={entry.cohort === "replay" ? "inline-block h-0 w-3 border-t-2 border-dashed" : "inline-block h-2 w-2 rounded-full"}
+              style={entry.cohort === "replay" ? { borderColor: cssVar(verdictLineColorVar(entry.verdict)) } : { backgroundColor: cssVar(verdictLineColorVar(entry.verdict)) }}
+            />
             <span className="font-mono text-fg">{entry.label}</span>
+            {entry.cohort === "replay" ? (
+              <span className="text-fg-subtle">replay — não conta para o veredito</span>
+            ) : (
+              entry.cohort === "prospective" && <span className="text-fg-subtle">prospectiva</span>
+            )}
             <LabVerdictBadge verdict={entry.verdict} />
-            {entry.truncated && <span className="text-fg-subtle">(capado em 2.000 pontos)</span>}
+            {entry.truncated && <span className="text-fg-subtle">(primeiros 2.000 pontos)</span>}
             {entry.failed && <span className="text-warning">(curva indisponível: falha ao carregar)</span>}
             {!entry.failed && entry.points.length === 0 && <span className="text-fg-subtle">(sem resultado resolvido ainda)</span>}
           </li>

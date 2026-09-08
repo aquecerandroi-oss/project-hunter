@@ -5,10 +5,12 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LabMaturityBar } from "@/components/lab/lab-maturity-bar";
+import { LabReplayBlock } from "@/components/lab/lab-replay-block";
+import { LabReplicationBlock } from "@/components/lab/lab-replication-block";
 import { LabVerdictBadge } from "@/components/lab/lab-verdict-badge";
 import { buildScoreboardCardDisplay, VERDICT_RULE_TEXT } from "@/components/lab/lab-scoreboard";
 import { MONEY_TOOLTIP, type MoneyRuler } from "@/components/lab/lab-money";
-import { purposeLabel } from "@/components/lab/lab-strategy-cell";
+import { purposeLabel } from "@/components/lab/labels";
 import type { ScoreboardRowOut } from "@/lib/api/lab-types";
 
 const STATUS_VARIANT: Record<string, "gold" | "default" | "outline"> = {
@@ -21,7 +23,7 @@ function MoneyStat({ label, usdtText, brlText, colorClass }: { label: string; us
   return (
     <div className="rounded-md border border-border p-3" title={MONEY_TOOLTIP}>
       <p className="text-xs font-medium uppercase text-fg-muted">{label} (simulado)</p>
-      <p className={`mt-1 font-mono text-lg tabular-nums ${colorClass}`}>{usdtText}</p>
+      <p className={`mt-1 font-mono text-xl tabular-nums ${colorClass}`}>{usdtText}</p>
       <p className="text-xs text-fg-muted">{brlText}</p>
     </div>
   );
@@ -61,7 +63,7 @@ export function LabScoreboardCard({ row, ruler }: LabScoreboardCardProps) {
         <span className="font-mono text-sm font-semibold text-fg">
           {v.strategy_key}/{v.version}
         </span>
-        <Badge variant={v.purpose === "paper" ? "info" : "outline"} className="px-1.5 py-0 text-[10px]">
+        <Badge variant={v.purpose === "paper" ? "info" : "outline"} className="px-1.5 py-0 text-[11px]">
           {purposeLabel(v.purpose)}
         </Badge>
         <Badge variant={STATUS_VARIANT[v.status] ?? "outline"}>{display.statusLabel}</Badge>
@@ -81,6 +83,9 @@ export function LabScoreboardCard({ row, ruler }: LabScoreboardCardProps) {
           <MoneyStat label="Média por operação" usdtText={display.avgUsdtText} brlText={display.avgBrlText} colorClass={display.avgUsdtColor} />
         </div>
       )}
+
+      {row.replay !== null && <LabReplayBlock replay={row.replay} />}
+      {row.replication !== null && <LabReplicationBlock replication={row.replication} />}
 
       <Button
         type="button"

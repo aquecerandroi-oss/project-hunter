@@ -92,16 +92,24 @@ export async function getLabScoreboard(params: LabScoreboardParams = {}): Promis
 export interface LabCurveParams {
   version_id: string;
   as_of?: string;
+  /**
+   * T3.18b (brief T3.24b addendum A4): `"prospective"` (default), the
+   * `"replay"` wildcard (every `replay:<uuid>` cohort of the version at
+   * once) or one exact cohort string (`replay:<uuid>` /
+   * `replication:<parent>:<k>`) -- anything else is a 422 from the API.
+   */
+  cohort?: string;
 }
 
 function curveQuery(params: LabCurveParams): string {
   const search = new URLSearchParams();
   search.set("version_id", params.version_id);
   if (params.as_of !== undefined) search.set("as_of", params.as_of);
+  if (params.cohort !== undefined) search.set("cohort", params.cohort);
   return `?${search.toString()}`;
 }
 
-/** `GET /api/v1/lab/shadow/curve?version_id=` (brief T3.18) -- one call per version, capped at 2 000 points (`truncated`). */
+/** `GET /api/v1/lab/shadow/curve?version_id=` (brief T3.18, `cohort=` added by T3.18b) -- one call per version, capped at 2 000 points (`truncated`). */
 export async function getLabCurve(params: LabCurveParams): Promise<CurveOut> {
   return apiFetch<CurveOut>(`/api/v1/lab/shadow/curve${curveQuery(params)}`);
 }

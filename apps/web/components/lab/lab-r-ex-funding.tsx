@@ -1,6 +1,7 @@
 "use client";
 
 import { LabMetricItem } from "@/components/lab/lab-metric-item";
+import { formatSumOfRDetail } from "@/components/lab/lab-format";
 import { METRIC_DEFS } from "@/components/lab/lab-metric-defs";
 import type { RExFundingBlock } from "@/lib/api/lab-types";
 
@@ -17,7 +18,9 @@ export interface LabRExFundingProps {
 export function LabRExFunding({ block }: LabRExFundingProps) {
   return (
     <div className="rounded-md border border-border bg-bg-overlay/50 p-3">
-      <p className="mb-2 text-xs font-semibold text-fg-muted">r_ex_funding (mesma população, sem funding)</p>
+      <p className="mb-2 text-xs font-semibold text-fg-muted" title="r_ex_funding (mesma população, sem funding)">
+        Sem funding (mesma população)
+      </p>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <LabMetricItem
           label={METRIC_DEFS.net_profit_rate.label}
@@ -45,7 +48,7 @@ export function LabRExFunding({ block }: LabRExFundingProps) {
           value={block.sum_of_hypothetical_r.value}
           reason={block.sum_of_hypothetical_r.reason}
           suffix="R"
-          detail={`n=${block.sum_of_hypothetical_r.count}, ordenada por ${block.sum_of_hypothetical_r.ordered_by}`}
+          detail={formatSumOfRDetail(block.sum_of_hypothetical_r.count, block.sum_of_hypothetical_r.ordered_by)}
         />
       </div>
       <p className="mt-2 text-[11px] text-fg-subtle">

@@ -1,11 +1,11 @@
 "use server";
 
 import { isApiError } from "@/lib/api-error";
-import { getLabSignals, type LabSignalsParams } from "@/lib/api/lab";
+import { getLabCurve, getLabSignals, type LabCurveParams, type LabSignalsParams } from "@/lib/api/lab";
 import { listMarkets } from "@/lib/api/markets";
 import { getServerSession } from "@/lib/server/auth";
 
-import type { LabSignalsPage } from "./lab-types";
+import type { CurveOut, LabSignalsPage } from "./lab-types";
 
 export interface LabSignalsActionOutcome {
   ok: boolean;
@@ -33,6 +33,31 @@ export async function loadLabSignalsAction(params: LabSignalsParams): Promise<La
   } catch (error) {
     const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
     return { ok: false, page: EMPTY_PAGE, reason };
+  }
+}
+
+export interface LabCurveActionOutcome {
+  ok: boolean;
+  curve: CurveOut | null;
+  reason?: string;
+}
+
+/**
+ * Server Action behind `lab-curve-section.tsx`'s "Coorte da curva" selector
+ * (brief T3.24b addendum A3): `lib/api/lab.ts` is `"server-only"`, so the
+ * client cannot call `getLabCurve` directly for the on-demand "replay"
+ * overlay -- same boundary `loadLabSignalsAction` above already crosses.
+ */
+export async function loadLabCurveAction(params: LabCurveParams): Promise<LabCurveActionOutcome> {
+  const session = await getServerSession();
+  if (!session) return { ok: false, curve: null, reason: "unauthenticated" };
+
+  try {
+    const curve = await getLabCurve(params);
+    return { ok: true, curve };
+  } catch (error) {
+    const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
+    return { ok: false, curve: null, reason };
   }
 }
 

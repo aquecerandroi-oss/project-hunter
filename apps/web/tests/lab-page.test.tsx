@@ -110,20 +110,16 @@ describe("LabPage: renders the real contract fixture", () => {
     const jsx = await renderPage();
     render(jsx);
 
-    expect(screen.getByText(/SOMBRA — hipotético, sem capital/)).toBeInTheDocument();
-    // The fixed top banner (mandatory, brief S3b) shows the costs when every
-    // version in view agrees; each version card also always shows its own
-    // `coverage.assumed_costs` (Astra's S3b review: never let the card's
-    // costs depend on the banner) -- with a single version in this fixture
-    // both legitimately render the same string. Scoped to the banner
-    // specifically (Astra's diff review nice-to-have: don't let a looser
-    // "at least one" check silently pass if the banner itself lost the text),
-    // and asserting the exact required phrase (code-reviewer must-fix): the
-    // "custos assumidos:" prefix is part of the brief's literal wording, not
-    // just the numbers that follow it.
+    expect(screen.getByText("SOMBRA — simulação sobre dado real. Nada foi comprado ou vendido.")).toBeInTheDocument();
+    // The fixed top banner (mandatory, brief S3b, compacted by T3.24b item
+    // [1]) shows the costs when every version in view agrees; each version
+    // card also always shows its own `coverage.assumed_costs` (Astra's S3b
+    // review: never let the card's costs depend on the banner) -- with a
+    // single version in this fixture both legitimately render the same
+    // string.
     expect(
       within(screen.getByTestId("lab-header")).getByText(
-        "SOMBRA — hipotético, sem capital, custos assumidos: spread 2 bps, slippage 5 bps/lado, taxa 4 bps/lado",
+        /custos assumidos: spread 2 bps, slippage 5 bps\/lado, taxa 4 bps\/lado/,
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("momentum / v2")).toBeInTheDocument();
@@ -165,7 +161,7 @@ describe("LabPage: 0 versions is a result, not an error", () => {
     getLabSummaryMock.mockResolvedValue(exampleSummary({ versions: [] }));
     const jsx = await renderPage();
     render(jsx);
-    expect(screen.getByText(/Nenhuma versão de estratégia ativada ainda/)).toBeInTheDocument();
+    expect(screen.getByText(/Nenhuma versão de estratégia ativa nesta janela e coorte/)).toBeInTheDocument();
   });
 });
 
@@ -189,7 +185,7 @@ describe("LabPage: the money ruler (brief T3.17)", () => {
     const jsx = await renderPage();
     render(jsx);
 
-    expect(screen.getByText(/Simulação sobre dado real\. Nada foi comprado ou vendido\./)).toBeInTheDocument();
+    expect(screen.getByText(/simulação sobre dado real\. Nada foi comprado ou vendido\./)).toBeInTheDocument();
     expect(screen.getByTestId("lab-money-ruler")).toHaveTextContent("Régua: 0,25% de 10,000.00 USDT (carteira de referência, sem carteira aberta) = 25.00 USDT por operação");
   });
 
@@ -282,5 +278,49 @@ describe("LabPage: the Placar (brief T3.18) at the top of /lab", () => {
     render(jsx);
 
     expect(screen.getByText(/Nenhum resultado resolvido ainda para desenhar a curva/)).toBeInTheDocument();
+  });
+});
+
+describe("LabPage: version <details> collapsed by default, opened by '?version=' (brief T3.24b item [4], Aceite)", () => {
+  it("renders the version card's <details> closed when no ?version= is given", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    const jsx = await renderPage();
+    render(jsx);
+    const details = screen.getByText("momentum / v2").closest("details");
+    expect((details as HTMLDetailsElement).open).toBe(false);
+  });
+
+  it("renders it open when ?version= matches this card's strategy_version_id", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    const jsx = await renderPage({ version: "098b060c-cdc0-46a6-b88b-70d4a5472b97" });
+    render(jsx);
+    const details = screen.getByText("momentum / v2").closest("details");
+    expect((details as HTMLDetailsElement).open).toBe(true);
+  });
+});
+
+describe("LabPage: DOM order (brief T3.24b §2, opção A -- Placar-primeiro, Aceite)", () => {
+  it("renders lab-header before lab-scoreboard-section, before the signals grid ('Sinais do Shadow Lab')", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    getLabSignalsMock.mockResolvedValue({ items: [exampleSignal()], next_cursor: null });
+    getLabScoreboardMock.mockResolvedValue({
+      as_of: "2026-09-08T12:00:00Z",
+      label: "SOMBRA — hipotético, sem capital, custos assumidos",
+      rows: [exampleScoreboardRow()],
+    });
+
+    const jsx = await renderPage();
+    const { container } = render(jsx);
+
+    const header = screen.getByTestId("lab-header");
+    const scoreboardSection = screen.getByTestId("lab-scoreboard-section");
+    const signalsGrid = screen.getByRole("grid", { name: "Sinais do Shadow Lab" });
+
+    // `Node.compareDocumentPosition` bit 4 (DOCUMENT_POSITION_FOLLOWING) means "b follows a".
+    const headerBeforeScoreboard = header.compareDocumentPosition(scoreboardSection) & Node.DOCUMENT_POSITION_FOLLOWING;
+    const scoreboardBeforeSignals = scoreboardSection.compareDocumentPosition(signalsGrid) & Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(headerBeforeScoreboard).toBeTruthy();
+    expect(scoreboardBeforeSignals).toBeTruthy();
+    expect(container).toBeInTheDocument();
   });
 });
