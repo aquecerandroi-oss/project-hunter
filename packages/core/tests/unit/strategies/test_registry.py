@@ -24,17 +24,27 @@ import pytest
 
 from hunter_core.domain.enums import Timeframe
 from hunter_core.strategies.base import Strategy
+from hunter_core.strategies.breakout_v1 import BREAKOUT_V1
 from hunter_core.strategies.canonical import canonical_json, params_hash
+from hunter_core.strategies.mean_reversion_v1 import MEAN_REVERSION_V1
 from hunter_core.strategies.momentum_v1 import MOMENTUM_V1
 from hunter_core.strategies.registry import DEFAULT_REGISTRY, StrategyRegistry
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 
+from .test_breakout_v1 import context as breakout_context
+from .test_mean_reversion_v1 import context as mean_reversion_context
 from .test_momentum_v1 import context as momentum_context
 from .test_volume_anomaly_v1 import context as volume_context
 
 pytestmark = pytest.mark.unit
 
-STRATEGIES = [MOMENTUM_V1, VOLUME_ANOMALY_V1]
+STRATEGIES = [BREAKOUT_V1, MEAN_REVERSION_V1, MOMENTUM_V1, VOLUME_ANOMALY_V1]
+CONTEXTS = {
+    BREAKOUT_V1.key: breakout_context,
+    MEAN_REVERSION_V1.key: mean_reversion_context,
+    MOMENTUM_V1.key: momentum_context,
+    VOLUME_ANOMALY_V1.key: volume_context,
+}
 _KNOWN_KEYWORDS = frozenset(
     {
         "$schema",
@@ -114,13 +124,16 @@ def test_the_schema_helper_refuses_keywords_it_does_not_implement() -> None:
 def test_get_resolves_key_and_version_exactly() -> None:
     assert DEFAULT_REGISTRY.get("momentum_v1", "v1") is MOMENTUM_V1
     assert DEFAULT_REGISTRY.get("volume_anomaly_v1", "v1") is VOLUME_ANOMALY_V1
+    assert DEFAULT_REGISTRY.get("breakout_v1", "v1") is BREAKOUT_V1
 
 
 def test_an_unknown_version_never_falls_back() -> None:
     with pytest.raises(KeyError, match="momentum_v1 v2"):
         DEFAULT_REGISTRY.get("momentum_v1", "v2")
+    with pytest.raises(KeyError, match="breakout_v1 v2"):
+        DEFAULT_REGISTRY.get("breakout_v1", "v2")
     with pytest.raises(KeyError):
-        DEFAULT_REGISTRY.get("breakout_v1", "v1")
+        DEFAULT_REGISTRY.get("session_orb_v1", "v1")
 
 
 def test_registering_the_same_version_twice_is_refused() -> None:
@@ -130,7 +143,10 @@ def test_registering_the_same_version_twice_is_refused() -> None:
 
 
 def test_all_is_ordered_and_complete() -> None:
-    assert DEFAULT_REGISTRY.all() == (MOMENTUM_V1, VOLUME_ANOMALY_V1)
+    roster = DEFAULT_REGISTRY.all()
+
+    assert roster == tuple(sorted(roster, key=lambda s: (s.key, s.version)))
+    assert set(STRATEGIES) <= set(roster)
 
 
 @pytest.mark.parametrize("strategy", STRATEGIES, ids=lambda s: s.key)
@@ -167,14 +183,14 @@ def test_the_jsonb_round_trip_keeps_the_hash_and_the_decision(strategy: Strategy
 
     assert params_hash(wire) == params_hash(typed)
 
-    ctx = momentum_context() if strategy.key == MOMENTUM_V1.key else volume_context()
+    ctx = CONTEXTS[strategy.key]()
     assert strategy.evaluate(ctx, wire) == strategy.evaluate(ctx, typed)
 
 
-def test_the_two_versions_do_not_share_an_identity() -> None:
-    assert params_hash(MOMENTUM_V1.default_parameters) != params_hash(
-        VOLUME_ANOMALY_V1.default_parameters
-    )
+def test_the_versions_do_not_share_an_identity() -> None:
+    hashes = {params_hash(strategy.default_parameters) for strategy in STRATEGIES}
+
+    assert len(hashes) == len(STRATEGIES)
 
 
 @pytest.mark.parametrize(
@@ -182,8 +198,13 @@ def test_the_two_versions_do_not_share_an_identity() -> None:
     [
         (MOMENTUM_V1, "40e1688e6b5f6385674cb47a81e542b215b320eb5643a1375f6401f5c41ac2f3"),
         (VOLUME_ANOMALY_V1, "fa5dce78173b2b9688578f7c96a5f37544eb504aa7b2227262ad296c32f63bb9"),
+        (BREAKOUT_V1, "ceed5b7c05806eb26b017251237e8f2bc080ce8361cd0630561c24e41a9dfc40"),
+        (
+            MEAN_REVERSION_V1,
+            "8918b39b73fb5b71c6b9dea1f4394464056c8ad94d9c3f09634ffce37667854e",
+        ),
     ],
-    ids=["momentum_v1", "volume_anomaly_v1"],
+    ids=["momentum_v1", "volume_anomaly_v1", "breakout_v1", "mean_reversion_v1"],
 )
 def test_the_params_hash_is_pinned(strategy: Strategy, expected: str) -> None:
     """Golden identity of the frozen v1 parameter sets."""

@@ -101,6 +101,83 @@ Astra nomeou para esta família inteira.
 exploratório. `atr_pct_min = 0,005` é um meio-termo entre o 0,003 do `momentum_v1` e o 0,0089 da
 KB-0008, escolhido pelo equilíbrio de 44,0 % da tabela acima, não por ajuste em amostra.
 
+## Portão C1–C8 — veredito de 2026-09-08, **antes** de escrever o módulo (T3.33a)
+
+Critérios de `.claude/skills/edge-strategy-reviewer/references/review_criteria.md`, aplicados ao
+contrato congelado acima pelo quant-engineer. Cada nota vem da tabela do arquivo, não de opinião.
+
+| # | Critério | Severidade | Nota | Peso | Contribuição | Por quê, literal |
+|---|---|---|---:|---:|---:|---|
+| C1 | Edge Plausibility | pass | 80 | 20 | 16,0 | a tese tem mecanismo causal declarado ("a base comprime porque a oferta secou; a expansão resolve o desequilíbrio") e termos de domínio (`breakout`, `volume`, volatilidade) |
+| C2 | Overfitting Risk | **warn** | **40** | 20 | 8,0 | 5 condições (≤ 10 → 80) **menos 10 por limiar decimal**: `0,75`, `1,5`, `0,005`, `0,05` → −40 |
+| C3 | Sample Adequacy | pass | 80 | 15 | 12,0 | fórmula do arquivo: `252 × 0,8^5 = 82,6` oportunidades/ano ≥ 30. **Não é frequência medida** — a de planejamento é 0,3–1/mercado-dia (`notes-T3.33` §2) |
+| C4 | Regime Dependency | **warn** | **40** | 10 | 4,0 | o plano de validação (`notes-T3.33` §5) **não** menciona regime; não há corte cruzado por regime declarado |
+| C5 | Exit Calibration | pass | 80 | 10 | 8,0 | `stop_loss_pct` no teto da faixa = `1,25 × 0,05 = 0,0625 ≤ 0,15`; `take_profit_rr = 2,5/1,25 = 2,0 ≥ 1,5` |
+| C6 | Risk Concentration | pass | 80 | 10 | 8,0 | não há `risk_per_trade` nesta versão (`research_only`, sem carteira, sem Risk Engine) e o limite de posições é **um acompanhamento por (versão, mercado, coorte)** — 4 mercados ≤ 10. Pontuado por ausência de violação, e isso está dito |
+| C7 | Execution Realism | pass | 80 | 10 | 8,0 | há filtro de volume (`rvol_min = 1,5`); `export_ready_v1` não se aplica a este produto |
+| C8 | Invalidation Quality | **warn** | **40** | 5 | 2,0 | **uma** invalidação (`close_below(base_low)`), e o critério pede duas |
+
+`confidence_score = 66,0`. C1 e C2 não são `fail`, então não há REJECT imediato; 66,0 < 70, então o
+veredito é **REVISE**.
+
+**Veredito: REVISE.** As três revisões são **obrigações de relato na primeira avaliação**, não
+mudanças no protocolo congelado — nenhuma delas altera hipótese, parâmetro ou regra de entrada:
+
+1. **C2** — os quatro limiares decimais são exploratórios e estão declarados como tal. A primeira
+   avaliação **tem** de publicar a distribuição de `squeeze_ratio` sobre barras que disparam e que
+   não disparam, e a sensibilidade da faixa de ATR%, para que uma versão futura escolha um quantil
+   em vez de um palpite. Já está no contrato (§ "Premissas numéricas declaradas"); a nota continua
+   40 porque em v1 nenhum dos quatro foi medido.
+2. **C4** — a primeira avaliação **tem** de quebrar o resultado por regime de BTC, além de mercado e
+   decil de ATR%. O SQL existe (`infra/scripts/sql/research/2026-09-08-07-regime-btc.sql`, T3.32).
+   Não vira condição de entrada: pôr regime na regra seria outra versão.
+3. **C8** — a segunda invalidação **não** entra na v1, de propósito. [[KB-0006]] e a T3.32 mostram
+   que política de saída só se compara **pareada sobre as mesmas entradas** (`brief-T3.27`,
+   `INV-A/B/C/E`); acrescentar uma saída junto com uma entrada nova produziria duas mudanças e
+   nenhuma atribuição. A divergência contra o critério fica registrada aqui.
+
+## Teto de custo declarado — confere, e **não** vale no piso congelado
+
+`notes-T3.32` fechou a identidade aritmética `custo_R × (risco/preço) = 0,0020` nas dez populações
+medidas (desvio ≤ 1,9×10⁻⁵). Aplicada a esta geometria (`stop = C − 1,25·ATR`, entrada
+`C(1+0,0006)`), com `a = 6 bps/lado` dentro dos preços e `f = 4 bps/lado` fora:
+
+```
+$ uv run python  (Decimal, prec 28)
+breakout_v1  stop_atr=1.25 target_atr=2.5
+ atr_pct  risco/preco   custo_R  R_net alvo  R_net stop  equilibrio   <=0.25R?
+   0.005     0.006846    0.2921      1.5310     -1.2035      0.4401        NAO
+0.0059238     0.008000    0.2500      1.5984     -1.1740      0.4235   (fronteira)
+  0.0064     0.008595    0.2327      1.6260     -1.1619      0.4168        sim
+    0.01     0.013092    0.1528      1.7538     -1.1059      0.3867        sim
+    0.02     0.025585    0.0782      1.8730     -1.0537      0.3600        sim
+    0.05     0.063062    0.0317      1.9473     -1.0212      0.3440        sim
+
+momentum_v1  stop_atr=1.5 target_atr=1.5 (referência)
+   0.003     0.005097    0.3924      0.4893     -1.2736      0.7224
+ 0.01401     0.021602    0.0926      0.8787     -1.0638      0.5476
+
+atr_pct mínimo para custo_R <= 0,25 R com stop_atr=1,25: 0.00592384
+atr_pct_min congelado                                  : 0.005
+custo_R no piso congelado                              : 0.2921459854014598540145985401
+```
+
+Duas leituras, e a segunda é uma **concern declarada**:
+
+- as colunas `R_net alvo`, `R_net stop` e `equilibrio` **reproduzem exatamente** a tabela de
+  geometria congelada acima (1,5310 / −1,2035 / 0,4401 a ATR% 0,5 %). A aritmética do brief está
+  correta e a assimetria 1,25/2,5 faz o que promete: 44,0 % de equilíbrio contra 72,2 % do
+  `momentum_v1` no piso dele;
+- **o teto de 25 % que a Astra propôs no contrato comum não vale no piso congelado.** "Custo nominal
+  de 20 bps ≤ 25 % da distância percentual do stop" exige `atr_pct ≥ 0,0059238` com `stop_atr = 1,25`.
+  Com `atr_pct_min = 0,005` o pedágio no piso é **0,2921 R**, isto é **29,2 % da distância do stop** —
+  acima do teto. O piso foi escolhido pelo equilíbrio de 44,0 %, não pelo teto de custo, e as duas
+  regras discordam numa faixa estreita (`0,0050 ≤ atr_pct < 0,0059`).
+  **Não mudei o parâmetro**: ele está congelado no brief e mudá-lo seria outra versão. A obrigação
+  que fica é de relato: a primeira avaliação publica quantas decisões caem nessa faixa e qual a
+  expectancy delas, e é esse número — não este cálculo — que decide se a `v2` sobe o piso para
+  0,0059/0,0064.
+
 ## O que falsifica esta hipótese
 
 - **K1** — menos de 20 decisões no replay de 31 dias × 4 mercados: a regra não dispara; deprecar.

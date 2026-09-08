@@ -83,6 +83,37 @@ class TestDigest:
     def test_it_is_stable_for_unchanged_code(self) -> None:
         assert version_code_ref("momentum_v1") == version_code_ref("momentum_v1")
 
+    @pytest.mark.parametrize(
+        ("module", "digest"),
+        [
+            (
+                "momentum_v1",
+                "hunter_core.strategies.momentum_v1@sha256:"
+                "ab2e039825c9334da5b81666791c0a782f25bb35a3cb9529391bdb238ebaa40c",
+            ),
+            (
+                "volume_anomaly_v1",
+                "hunter_core.strategies.volume_anomaly_v1@sha256:"
+                "9b8c14ab3390646ac9adb26fbbb90e160a800f1c70f128d873a49ffd1dd19f22",
+            ),
+        ],
+    )
+    def test_a_new_strategy_module_does_not_move_the_live_versions(
+        self, module: str, digest: str
+    ) -> None:
+        """T3.33: ``breakout_v1`` (and every version added after it) may *import*
+        ``aggregate``/``base``/``indicators``/``schema`` and may not edit one.
+        These two digests are what the rows activated on the VPS carry — the
+        ``paper`` line included — so if either moves the whole Lab goes silent
+        behind a green ``/ready`` and the change is wrong, not this test."""
+        assert version_code_ref(module) == digest
+
+    def test_the_new_versions_are_outside_the_live_closures(self) -> None:
+        for module in ("momentum_v1", "volume_anomaly_v1"):
+            closure = module_closure(module, STRATEGIES_DIR)
+            assert "breakout_v1" not in closure
+            assert "constraints" not in closure
+
     def test_two_versions_of_the_same_tree_have_different_digests(self) -> None:
         assert version_code_ref("momentum_v1") != version_code_ref("volume_anomaly_v1")
 

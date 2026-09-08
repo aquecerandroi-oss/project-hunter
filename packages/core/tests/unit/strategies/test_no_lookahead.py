@@ -26,11 +26,19 @@ import pytest
 from hunter_core.domain.enums import Timeframe
 from hunter_core.domain.market import NormalizedCandle
 from hunter_core.strategies.base import Decision, StrategyContext, build_context
+from hunter_core.strategies.breakout_v1 import BREAKOUT_V1
 from hunter_core.strategies.canonical import canonical_json
+from hunter_core.strategies.mean_reversion_v1 import MEAN_REVERSION_V1
 from hunter_core.strategies.momentum_v1 import MOMENTUM_V1
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 
 from .conftest import EXCHANGE, ORIGIN, SYMBOL, BarSpec, D, explode, flat, minute, series
+from .test_breakout_v1 import CUT as BREAKOUT_CUT
+from .test_breakout_v1 import PREVIOUS as BREAKOUT_PREVIOUS
+from .test_breakout_v1 import build_series as breakout_series
+from .test_mean_reversion_v1 import CUT as MEAN_REVERSION_CUT
+from .test_mean_reversion_v1 import FORMING_HOUR_CUT, forming_hour_series
+from .test_mean_reversion_v1 import build_series as mean_reversion_series
 from .test_momentum_v1 import CUT as MOMENTUM_CUT
 from .test_momentum_v1 import build_series as momentum_series
 from .test_volume_anomaly_v1 import CUT as VOLUME_CUT
@@ -264,3 +272,211 @@ def test_a_decimal_of_the_ambient_context_cannot_move_the_numbers() -> None:
         assert canonical_json(narrowed.supporting_features.to_jsonable()) == canonical_json(
             baseline.supporting_features.to_jsonable()
         )
+
+
+# ------------------------------------------------------------- mean_reversion_v1 (T3.33b)
+
+
+def mean_reversion_decision(
+    candles: list[NormalizedCandle], cut: object = MEAN_REVERSION_CUT
+) -> Decision | None:
+    return MEAN_REVERSION_V1.evaluate(ctx_of(candles, cut), MEAN_REVERSION_V1.default_parameters)
+
+
+def test_mean_reversion_ignores_the_future_the_forming_candle_and_a_mutated_future() -> None:
+    """As três mutações do brief T3.33a/b, comparadas no JSON canônico do
+    envelope: uma vela **não final** dentro da janela, uma vela final que fecha
+    **depois** do corte, e uma vela futura adulterada."""
+    clean = mean_reversion_series()
+    baseline = mean_reversion_decision(clean)
+
+    forming = minute(
+        MEAN_REVERSION_CUT - timedelta(minutes=1),
+        D("100"),
+        D("9999"),
+        D("1"),
+        D("5000"),
+        D("999"),
+        is_final=False,
+    )
+    with_future = [*clean, *explode(ABSURD, MEAN_REVERSION_CUT, 15)]
+    mutated_future = [
+        *clean,
+        *explode(BarSpec(D("1"), D("2"), D("0.5"), D("1.5"), D("3")), MEAN_REVERSION_CUT, 15),
+    ]
+
+    assert baseline is not None
+    for polluted in ([*clean, forming], with_future, mutated_future):
+        decision = mean_reversion_decision(polluted)
+        assert decision is not None
+        assert canonical_json(decision.supporting_features.to_jsonable()) == canonical_json(
+            baseline.supporting_features.to_jsonable()
+        )
+        assert decision == baseline
+
+
+def test_the_forming_hour_never_reaches_the_trend_gate() -> None:
+    """Corte às :30. A barra 100 está dentro da hora em formação: mexer no
+    fechamento dela move o z-score de 15 min (−4,3589 -> −3, e isso é correto) e
+    **não pode** mover ``close_1h``, ``sma_1h`` nem os níveis da decisão. Se a
+    porta de tendência usasse a hora ainda aberta, ``close_1h`` cairia de 100
+    para 99 e a média de 20 horas andaria junto."""
+    baseline = mean_reversion_decision(forming_hour_series(), FORMING_HOUR_CUT)
+    mutated = mean_reversion_decision(forming_hour_series(forming_close=D("99")), FORMING_HOUR_CUT)
+
+    assert baseline is not None and mutated is not None
+    hourly = [
+        {f.name: f.value for f in decision.supporting_features.features}
+        for decision in (baseline, mutated)
+    ]
+    assert hourly[0]["close_1h"] == hourly[1]["close_1h"] == D("100")
+    assert hourly[0]["sma_1h"] == hourly[1]["sma_1h"] == D("75.2")
+    assert (baseline.reference_price, baseline.stop, baseline.target1) == (
+        mutated.reference_price,
+        mutated.stop,
+        mutated.target1,
+    )
+    # a mutação é real e aparece exatamente onde deve: no z-score de 15 min
+    assert hourly[0]["zscore_15m"] != hourly[1]["zscore_15m"]
+    assert hourly[1]["zscore_15m"] == D("-3")
+
+
+def test_mean_reversion_bootstrap_equals_a_longer_history() -> None:
+    """A janela de ATR (97 barras de 15 min) é a mais longa das três, então uma
+    série cortada nela decide o mesmo que uma com o dobro do histórico."""
+    candles = mean_reversion_series()
+    atr_start = MEAN_REVERSION_CUT - timedelta(minutes=15 * 97)
+    trimmed = [candle for candle in candles if candle.open_time >= atr_start]
+
+    full = mean_reversion_decision(candles)
+    bootstrap = mean_reversion_decision(trimmed)
+
+    assert full is not None
+    assert len(trimmed) < len(candles)
+    # a janela de tendência (1260 min) cabe dentro da de ATR (1455 min), e é por
+    # isso que o contexto aparado ainda decide — ver o teste de domínio da T3.33b
+    assert bootstrap == full
+
+
+def test_mean_reversion_survives_a_hostile_ambient_decimal_context() -> None:
+    ctx = ctx_of(mean_reversion_series(), MEAN_REVERSION_CUT)
+    params = MEAN_REVERSION_V1.default_parameters
+    baseline = MEAN_REVERSION_V1.evaluate(ctx, params)
+
+    with localcontext() as context:
+        context.prec = 6
+        context.rounding = ROUND_DOWN
+        narrowed = MEAN_REVERSION_V1.evaluate(ctx, params)
+
+    assert baseline is not None
+    assert narrowed == baseline
+
+
+# --------------------------------------------------------------------------- breakout_v1 (T3.33a)
+
+
+def breakout_decision(candles: list[NormalizedCandle]) -> Decision | None:
+    return BREAKOUT_V1.evaluate(ctx_of(candles, BREAKOUT_CUT), BREAKOUT_V1.default_parameters)
+
+
+def _envelope_json(decision: Decision | None) -> str:
+    assert decision is not None
+    return canonical_json(decision.supporting_features.to_jsonable())
+
+
+def test_breakout_is_identical_under_three_kinds_of_pollution() -> None:
+    """The whole point of the design, in one test: a candle still forming inside
+    the window, a final candle closing after the cut, and a *different* future —
+    the decision and its canonical envelope must be byte-identical in all three."""
+    clean = breakout_series()
+    forming_inside = minute(
+        BREAKOUT_CUT - timedelta(minutes=1),
+        D("100"),
+        D("9999"),
+        D("0.01"),
+        D("5000"),
+        D("999999"),
+        is_final=False,
+    )
+    after_the_cut = explode(ABSURD, BREAKOUT_CUT, 15)
+    another_future = explode(
+        BarSpec(D("100"), D("101"), D("1"), D("2"), D("7")), BREAKOUT_CUT, 15
+    )
+
+    baseline = breakout_decision(clean)
+
+    assert baseline is not None
+    for polluted in (
+        [*clean, forming_inside],
+        [*clean, *after_the_cut],
+        [*clean, *another_future],
+        [*clean, forming_inside, *after_the_cut],
+    ):
+        assert breakout_decision(polluted) == baseline
+        assert _envelope_json(breakout_decision(polluted)) == _envelope_json(baseline)
+
+
+@pytest.mark.parametrize(
+    ("high", "low", "close", "volume"),
+    [
+        (D("9999"), D("0.01"), D("5000"), D("999999")),
+        (D("100"), D("100"), D("100"), D("0")),
+        (D("102"), D("99"), D("101.9"), D("300")),
+    ],
+    ids=["absurd", "flat", "plausible"],
+)
+def test_mutating_the_candle_still_forming_never_moves_the_breakout(
+    high: Decimal, low: Decimal, close: Decimal, volume: Decimal
+) -> None:
+    """Not just "a non-final candle is dropped": *whatever* it says, and however
+    many times it is revised, the frozen decision is the same one."""
+    clean = breakout_series()
+    forming = minute(
+        BREAKOUT_CUT - timedelta(minutes=1), D("100"), high, low, close, volume, is_final=False
+    )
+
+    baseline = breakout_decision(clean)
+
+    assert baseline is not None
+    assert breakout_decision([*clean, forming]) == baseline
+    assert _envelope_json(breakout_decision([*clean, forming])) == _envelope_json(baseline)
+
+
+def test_breakout_bootstrap_equals_continuous_execution() -> None:
+    """One 1560-minute read against a context grown bar by bar: the same
+    decision at the same reference close, and nothing before it."""
+    candles = breakout_series()
+    params = BREAKOUT_V1.default_parameters
+
+    bootstrap = BREAKOUT_V1.evaluate(ctx_of(candles, BREAKOUT_CUT), params)
+
+    grown: list[NormalizedCandle] = []
+    decisions: list[Decision | None] = []
+    for index in range(BREAKOUT_PREVIOUS + 1):
+        grown.extend(candles[index * 15 : (index + 1) * 15])
+        bar_close = ORIGIN + timedelta(minutes=15 * (index + 1))
+        decisions.append(BREAKOUT_V1.evaluate(ctx_of(list(grown), bar_close), params))
+
+    assert bootstrap is not None
+    assert decisions[-1] == bootstrap
+    assert [decision for decision in decisions[:-1] if decision is not None] == []
+
+
+@pytest.mark.parametrize("prec", [2, 6, 28])
+@pytest.mark.parametrize("rounding", [ROUND_DOWN, ROUND_UP, ROUND_HALF_EVEN])
+def test_the_breakout_numbers_do_not_depend_on_the_ambient_decimal_context(
+    prec: int, rounding: str
+) -> None:
+    ctx = ctx_of(breakout_series(), BREAKOUT_CUT)
+    params = BREAKOUT_V1.default_parameters
+
+    baseline = BREAKOUT_V1.evaluate(ctx, params)
+
+    with localcontext() as context:
+        context.prec = prec
+        context.rounding = rounding
+        narrowed = BREAKOUT_V1.evaluate(ctx, params)
+
+    assert baseline is not None and narrowed is not None
+    assert narrowed == baseline
+    assert _envelope_json(narrowed) == _envelope_json(baseline)

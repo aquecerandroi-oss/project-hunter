@@ -18,6 +18,7 @@ from typing import Any
 
 import pytest
 
+from hunter_core.strategies.breakout_v1 import BREAKOUT_V1
 from hunter_core.strategies.constraints import (
     CONSTRAINTS,
     PROBE_ATR,
@@ -27,6 +28,7 @@ from hunter_core.strategies.constraints import (
     constraints_for,
 )
 from hunter_core.strategies.momentum_v1 import MOMENTUM_V1
+from hunter_core.strategies.registry import DEFAULT_REGISTRY
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 
 pytestmark = pytest.mark.unit
@@ -39,6 +41,7 @@ def _wire(strategy: Any) -> dict[str, Any]:
 
 MOMENTUM = _wire(MOMENTUM_V1)
 VOLUME = _wire(VOLUME_ANOMALY_V1)
+BREAKOUT = _wire(BREAKOUT_V1)
 
 
 def _variant(parent: dict[str, Any], **overrides: str) -> dict[str, Any]:
@@ -54,6 +57,9 @@ class TestTheFrozenContractsPassTheirOwnCheck:
     def test_volume_anomaly_v1_passes_against_itself(self) -> None:
         assert check_ranges(VOLUME_ANOMALY_V1, VOLUME, VOLUME) == []
 
+    def test_breakout_v1_passes_against_itself(self) -> None:
+        assert check_ranges(BREAKOUT_V1, BREAKOUT, BREAKOUT) == []
+
     def test_the_variant_that_actually_shipped_passes(self) -> None:
         """``momentum v4``: piso de custo em ``atr_pct_min`` (KB-0008, EXP-0006)."""
         assert check_ranges(MOMENTUM_V1, MOMENTUM, _variant(MOMENTUM, atr_pct_min="0.0089")) == []
@@ -61,7 +67,65 @@ class TestTheFrozenContractsPassTheirOwnCheck:
     def test_every_strategy_this_build_carries_has_a_table(self) -> None:
         """Uma estratégia sem entrada só ganha as regras universais — legítimo,
         mas não deve acontecer por esquecimento com as duas que existem."""
-        assert set(CONSTRAINTS) == {MOMENTUM_V1.key, VOLUME_ANOMALY_V1.key}
+        registered = {strategy.key for strategy in DEFAULT_REGISTRY.all()}
+
+        assert registered <= set(CONSTRAINTS), sorted(registered - set(CONSTRAINTS))
+        assert {MOMENTUM_V1.key, VOLUME_ANOMALY_V1.key, BREAKOUT_V1.key} <= registered
+
+
+class TestBreakoutV1Ranges:
+    """T3.33a: as faixas que a versão de compressão declara sobre si mesma."""
+
+    @pytest.mark.parametrize(
+        ("override", "fragment"),
+        [
+            ({"squeeze_max": "0"}, "squeeze_max=0 não é positivo"),
+            ({"squeeze_max": "-0.75"}, "squeeze_max=-0.75 não é positivo"),
+            ({"stop_atr": "0"}, "stop_atr=0 não é positivo"),
+            ({"squeeze_window_bars": "0"}, "squeeze_window_bars=0 não é positivo"),
+            ({"breakout_highs": "-20"}, "breakout_highs=-20 não é positivo"),
+            ({"rvol_min": "-1.5"}, "rvol_min=-1.5 é negativo"),
+            ({"atr_pct_min": "-0.005"}, "atr_pct_min=-0.005 é negativo"),
+            ({"base_confidence": "42"}, "base_confidence=42 está fora de (0, 1]"),
+            (
+                {"atr_pct_min": "0.06", "atr_pct_max": "0.05"},
+                "atr_pct_min=0.06 não é menor que atr_pct_max=0.05",
+            ),
+            (
+                {"squeeze_window_bars": "32"},
+                "squeeze_window_bars=32 não é menor que squeeze_baseline_bars=32",
+            ),
+            (
+                {"squeeze_window_bars": "40"},
+                "squeeze_window_bars=40 não é menor que squeeze_baseline_bars=32",
+            ),
+            (
+                {"target_atr": "5"},
+                "target_atr=5 não é menor que target2_atr=4",
+            ),
+        ],
+    )
+    def test_a_variant_out_of_range_is_refused_by_name(
+        self, override: dict[str, str], fragment: str
+    ) -> None:
+        problems = check_ranges(BREAKOUT_V1, BREAKOUT, _variant(BREAKOUT, **override))
+
+        assert fragment in problems, problems
+
+    def test_a_geometry_that_never_closes_is_caught_by_the_dry_probe(self) -> None:
+        """``stop_atr``/``target_atr`` são declarados, então a barra de prova
+        (fechamento 100, ATR 1) roda e recusa a variante antes de congelá-la."""
+        problems = check_ranges(BREAKOUT_V1, BREAKOUT, _variant(BREAKOUT, stop_atr="100"))
+
+        assert any("geometria não fecha" in problem for problem in problems)
+
+    def test_the_declared_defaults_are_the_ones_the_module_freezes(self) -> None:
+        assert BREAKOUT["squeeze_max"] == "0.75"
+        assert BREAKOUT["squeeze_window_bars"] == "8"
+        assert BREAKOUT["squeeze_baseline_bars"] == "32"
+        assert BREAKOUT["stop_atr"] == "1.25"
+        assert BREAKOUT["target_atr"] == "2.5"
+        assert BREAKOUT["atr_pct_min"] == "0.005"
 
 
 class TestTheProbesFromTheReview:

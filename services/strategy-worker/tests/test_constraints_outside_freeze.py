@@ -36,9 +36,15 @@ FROZEN_DIGESTS = {
         "hunter_core.strategies.volume_anomaly_v1@sha256:"
         "9b8c14ab3390646ac9adb26fbbb90e160a800f1c70f128d873a49ffd1dd19f22"
     ),
+    "breakout_v1": (
+        "hunter_core.strategies.breakout_v1@sha256:"
+        "4c920b0cc412429c2c4a6a19ca389aca8a215a638f0ff750a8caf61b16264ff1"
+    ),
 }
-"""Medidos em ``3dd8f3a`` (antes da T3.26c) com
-``version_code_ref(strategy_module(s))`` para cada estratégia registrada."""
+"""``momentum_v1``/``volume_anomaly_v1`` medidos em ``3dd8f3a`` (antes da T3.26c)
+com ``version_code_ref(strategy_module(s))``; ``breakout_v1`` medido na T3.33a,
+antes de qualquer ativação — é o digest que a ativação vai congelar, e a única
+razão para movê-lo é uma mudança **deliberada** no módulo dela."""
 
 
 class TestTheConstraintsTableIsNotFrozenCode:
@@ -61,5 +67,16 @@ class TestTheDigestsDidNotMove:
     def test_the_digest_is_the_one_the_activated_rows_carry(self, module: str) -> None:
         assert version_code_ref(module) == FROZEN_DIGESTS[module]
 
-    def test_every_registered_strategy_is_covered(self) -> None:
-        assert {strategy_module(s) for s in DEFAULT_REGISTRY.all()} == set(FROZEN_DIGESTS)
+    def test_every_frozen_digest_still_belongs_to_a_registered_strategy(self) -> None:
+        """A direção da inclusão importa, e mudou na T3.33.
+
+        ``FROZEN_DIGESTS`` são os digests que as **linhas já ativadas na VPS**
+        carregam. Uma versão registrada e **ainda não ativada** (as novas da
+        T3.33, ``research_only``, que nada ativou) não tem digest a proteger:
+        pinar um aqui faria toda edição legítima *antes* da ativação quebrar o
+        teste, que é o oposto do que ele existe para impedir. O que continua
+        valendo em ferro é que nenhum digest congelado pode perder o código dele
+        — se um módulo ativado sumir do registry, isto acusa."""
+        registered = {strategy_module(s) for s in DEFAULT_REGISTRY.all()}
+
+        assert set(FROZEN_DIGESTS) <= registered, sorted(set(FROZEN_DIGESTS) - registered)

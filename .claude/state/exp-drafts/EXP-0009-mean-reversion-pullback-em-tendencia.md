@@ -114,6 +114,66 @@ honesto que escolher 50 e ver toda barra voltar `warmup`. `atr_pct_min = 0,006` 
   **REPLAY**.
 - **Mistura de slot** com as outras versões, como sempre.
 
+## Portão C1–C8 (`edge-strategy-reviewer`) — aplicado em 2026-09-08, antes de escrever o módulo
+
+Acrescentado pela T3.33b. **Não altera Hipótese nem Protocolo** (congelados acima): registra o
+veredito do portão sobre o rascunho como ele está, com o número de cada critério e a fórmula de
+`.claude/skills/edge-strategy-reviewer/references/review_criteria.md`.
+
+| # | Critério (peso) | Leitura sobre este EXP | Sev. | Nota |
+|---|---|---|---|---|
+| C1 | Edge Plausibility (20) | tese com mecanismo causal nomeado — fluxo impaciente empurra o preço além do valor em minutos, a tendência de 1 h dá a direção; termos de domínio (`reversion`, `momentum`, `breakout` ausente por opção) | pass | 80 |
+| C2 | Overfitting Risk (20) | 5 condições de entrada + 1 porta de tendência = 6 ≤ 10 → 80; penalidade −10 por limiar com casa decimal em condição: `atr_pct_min = 0,006` e `atr_pct_max = 0,05` → −20 | pass | **60** |
+| C3 | Sample Adequacy (15) | 252 ÷ 2 (a porta de 1 h é um filtro de regime declarado) × 0,8⁴ × 0,85 ≈ 44/ano ≥ 30 | pass | 80 |
+| C4 | Regime Dependency (10) | o plano de validação congelado (K1–K5) **não** menciona regime | **warn** | 40 |
+| C5 | Exit Calibration (10) | `stop_loss_pct = stop_atr × ATR% ≤ 1,0 × 0,05 = 0,05 ≤ 0,15`; `take_profit_rr = 1,5/1,0 = 1,5`, que **não** é `< 1,5` | pass | 80 |
+| C6 | Risk Concentration (10) | não aplicável por construção (`research_only`, sem carteira); o perfil que existiria é `PAPER_V1`: `risk_per_trade_pct = 0,0025 ≤ 0,015` e `max_concurrent_positions = 5 ≤ 10` | pass | 80 |
+| C7 | Execution Realism (10) | **não há filtro de volume nas condições**, deliberadamente: um portão de volume confundiria este eixo com o da `volume_anomaly_v1`. `export_ready_v1` não se aplica | **warn** | 50 |
+| C8 | Invalidation Quality (5) | `invalidations = ()` — vazio | **fail** | 10 |
+
+`confidence_score = (80·20 + 60·20 + 80·15 + 40·10 + 80·10 + 80·10 + 50·10 + 10·5)/100 = 65,5`.
+
+**Veredito: `REVISE`** — não é `REJECT` (C1 e C2 não são `fail`) e não é `PASS` (há um `fail` e
+65,5 < 70). As três instruções de revisão, e o que foi feito com cada uma:
+
+1. **C4 — plano de validação sem regime.** Aceita e corrigida **na avaliação**, não no protocolo: a
+   primeira avaliação publica a decomposição por regime de BTC e por decil de ATR%, no mesmo formato
+   do item 5 da `notes-T3.32.md`. Com C4 = 80 o escore vai a **69,5** — ainda `REVISE`, porque C8
+   sozinho já impede o `PASS`.
+2. **C7 — sem filtro de volume.** **Recusada, com motivo.** Acrescentar um portão de volume mudaria
+   a tabela de parâmetros congelada e faria esta versão medir o mesmo eixo da `volume_anomaly_v1`. A
+   mitigação existente é declarada e é outra: o universo elegível (`markets.is_monitored`, top N por
+   volume) e o piso de ATR% de 0,006. Fica como **warn aceito**, e a primeira avaliação publica a
+   distribuição de `quote_volume` dos mercados que dispararam.
+3. **C8 — sem invalidação.** **Recusada, e é o desenho.** Este é o braço `INV-B` de
+   [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]]: uma entrada cuja tese é "o preço está
+   abaixo do que deveria" não pode carregar uma regra que sai quando o preço cai mais. O portão está
+   calibrado para estratégias que **têm** invalidação e pontua a ausência como defeito; aqui a
+   ausência é a hipótese. **Divergência declarada, não conserto.**
+
+**Limite do próprio portão, declarado:** C3 é uma fórmula de barra diária em ações (base 252). Esta
+versão avalia 96 barras por dia por mercado; a leitura honesta da frequência aqui não é escassez de
+amostra, é o **risco oposto** — K2 de `.claude/state/notes-T3.33.md` §5.1 (mais de 1 500 decisões em
+31 dias × 4 mercados = a profundidade é um relógio, não uma condição). O portão não sabe disso.
+
+### O teto de custo desta geometria (confirmação pedida pela `notes-T3.32.md`)
+
+A T3.32 mediu, em dez populações, que `custo_R × risco%_do_preço = 0,0020` **constante**
+(desvio ≤ 1,9×10⁻⁵) — aritmética de 20 bps de ida e volta, não estatística. Para esta geometria
+(`stop = 1,0 ATR`, portanto `risco% = ATR%`), reproduzido em `Decimal` nesta tarefa:
+
+| versão | risco% no piso | **teto de custo** | risco% no teto de ATR% | custo no teto |
+|---|---:|---:|---:|---:|
+| `mean_reversion_v1` (`stop_atr` 1,0, `atr_pct_min` 0,006) | 0,60 % | **0,3333 R** | 5,0 % | 0,0400 R |
+| `momentum_v1` (`stop_atr` 1,5, `atr_pct_min` 0,003) | 0,45 % | 0,4444 R | — | — |
+| `momentum v4` (piso 0,0089) | 1,335 % | 0,1498 R | — | — |
+| `volume_anomaly v2` — **medido** no replay | 0,552 % | 0,6152 R | — | — |
+
+**O teto de custo desta versão é 0,3333 R por operação**, no pior caso admissível (ATR% no piso).
+Está **abaixo** do teto do `momentum_v1` (0,4444 R) apesar do stop mais apertado em ATR, e é isso que
+o piso de ATR% em 0,006 compra. Não é uma previsão de custo médio: o custo médio depende da
+distribuição de ATR% dos disparos, que só o replay diz.
+
 ## Avaliações (acrescentadas, nunca reescritas)
 
 ### Avaliação de <primeira data> — replay de abertura

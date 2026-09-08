@@ -89,6 +89,52 @@ tipada só roda quando o conjunto declara os quatro: um contrato que não os tem
 não está quebrado, é outro contrato."""
 
 CONSTRAINTS: Final[Mapping[str, Constraints]] = {
+    "breakout_v1": Constraints(
+        positive=frozenset(
+            {
+                "squeeze_window_bars",
+                "squeeze_baseline_bars",
+                "squeeze_max",
+                "breakout_highs",
+                "rvol_window",
+                "atr_period",
+                "atr_bars",
+                "atr_pct_max",
+                "stop_atr",
+                "target_atr",
+                "target2_atr",
+                "horizon_s",
+                "max_entry_delay_s",
+            }
+        ),
+        non_negative=frozenset({"rvol_min", "atr_pct_min"}) | _COSTS,
+        unit_interval=frozenset({"base_confidence"}),
+        ordered=(
+            ("atr_pct_min", "atr_pct_max"),
+            ("squeeze_window_bars", "squeeze_baseline_bars"),
+            ("target_atr", "target2_atr"),
+        ),
+    ),
+    "mean_reversion_v1": Constraints(
+        positive=frozenset(
+            {
+                "trend_sma_bars",
+                "zscore_bars",
+                "zscore_depth_min",
+                "atr_period",
+                "atr_bars",
+                "atr_pct_max",
+                "stop_atr",
+                "target_atr",
+                "target2_atr",
+                "horizon_s",
+                "max_entry_delay_s",
+            }
+        ),
+        non_negative=frozenset({"atr_pct_min"}) | _COSTS,
+        unit_interval=frozenset({"base_confidence"}),
+        ordered=(("atr_pct_min", "atr_pct_max"), ("target_atr", "target2_atr")),
+    ),
     "momentum_v1": Constraints(
         positive=frozenset(
             {

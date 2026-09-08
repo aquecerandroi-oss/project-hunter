@@ -50,10 +50,20 @@ EXCHANGES: tuple[tuple[str, str, dict[str, Any]], ...] = (
 
 STRATEGIES: tuple[tuple[str, str, str, str], ...] = (
     ("momentum", "Momentum", "trend", "Continuation with relative volume and breakout strength."),
-    ("breakout", "Breakout", "trend", "Range break confirmed by volume and order flow."),
+    (
+        "breakout",
+        "Breakout",
+        "trend",
+        "Breakout of the previous highs after a contraction of true range, confirmed by volume.",
+    ),
     ("volume_anomaly", "Volume Anomaly", "anomaly", "Entry after a VOLUME_SPIKE with pressure."),
     ("order_flow", "Order Flow", "microstructure", "Book imbalance and taker pressure."),
-    ("mean_reversion", "Mean Reversion", "reversion", "Fade of stretched moves in low volatility."),
+    (
+        "mean_reversion",
+        "Mean Reversion",
+        "reversion",
+        "Pullback bought inside a higher-timeframe uptrend, on a close stretched below its mean.",
+    ),
     ("derivatives", "Derivatives", "derivatives", "Funding, open interest and liquidation setups."),
     ("narrative", "Narrative", "intelligence", "Narrative and news driven flow (Phase 2)."),
     ("ensemble", "Ensemble", "meta", "Weighted combination of the other strategies."),
