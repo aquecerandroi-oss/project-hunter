@@ -242,11 +242,11 @@ async def test_summary_counts_and_metrics_over_a_mixed_population(
     assert counts["censored"]["total"] == 1
     assert counts["censored"]["by_reason"] == {"gap:unknown": 1}
     metrics = version["metrics"]
-    assert metrics["net_profit_rate"]["value"] == "0.5000"
-    assert metrics["hypothetical_net_expectancy_r"]["value"] == "0.2500"
+    assert metrics["net_profit_rate"]["value"] == "0.5"
+    assert metrics["hypothetical_net_expectancy_r"]["value"] == "0.25"
     assert metrics["profit_factor"]["sample_size"] == 2
-    assert metrics["profit_factor"]["sum_positive"] == "1.5000"
-    assert metrics["profit_factor"]["sum_negative_abs"] == "1.0000"
+    assert metrics["profit_factor"]["sum_positive"] == "1.5"
+    assert metrics["profit_factor"]["sum_negative_abs"] == "1"
     assert version["maturity"]["evaluable_outcomes"] == 2
 
 
@@ -372,13 +372,13 @@ async def test_summary_r_ex_funding_block_matches_known_numbers_with_a_funding_g
     assert version["counts"]["funding_not_settleable"] == 1
     block = version["r_ex_funding"]
     assert block["net_profit_rate"] == {"value": "0.3333", "reason": None}
-    assert block["hypothetical_net_expectancy_r"] == {"value": "0.0000", "reason": None}
+    assert block["hypothetical_net_expectancy_r"] == {"value": "0", "reason": None}
     pf = block["profit_factor"]
-    assert pf["value"] == "1.0000"
-    assert pf["sum_positive"] == "1.5000"
-    assert pf["sum_negative_abs"] == "1.5000"
+    assert pf["value"] == "1"
+    assert pf["sum_positive"] == "1.5"
+    assert pf["sum_negative_abs"] == "1.5"
     assert pf["sample_size"] == 3
-    assert block["sum_of_hypothetical_r"]["value"] == "0.0000"
+    assert block["sum_of_hypothetical_r"]["value"] == "0"
     assert block["sum_of_hypothetical_r"]["count"] == 3
     assert block["coverage"] == {"evaluable_outcomes": 3, "r_net_evaluable_outcomes": 2}
 
