@@ -48,6 +48,8 @@ from hunter_scanner_worker.persist import DB_ROLE
 from hunter_scanner_worker.policy import load_policy
 from hunter_scanner_worker.pressure import LivePressure
 from hunter_scanner_worker.regime import BTC_SYMBOL, RegimeEngine
+from hunter_scanner_worker.regime_hourly import regime_hourly_loop
+from hunter_scanner_worker.regime_job import RegimeHealth
 from hunter_scanner_worker.registry import MarketRegistry
 from hunter_scanner_worker.runners import (
     evaluation_loop,
@@ -98,6 +100,7 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
     requester = BackfillRequester(scanner.producer)
     progress = BootstrapProgress()
     beta = BetaHealth()
+    regime_hourly = RegimeHealth()
     universe_wake = asyncio.Event()
     checks = readiness_checks(
         scanner, consumers, cycle, outbox_health, config, runtime.redis, progress
@@ -111,6 +114,10 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
     # which an operator has to see -- and means nothing at all to the Radar, the
     # baselines or the regime, which is the whole of what /ready gates.
     runtime.status_details["beta"] = lambda: beta.describe(utcnow())
+    # The hourly regime producer is a research series: a hole in it costs a
+    # cohort its context split and costs the live path nothing, so it is a
+    # status detail for the same reason beta is -- visible, never a gate.
+    runtime.status_details["regime_hourly"] = lambda: regime_hourly.describe(utcnow())
 
     try:
         await refresh_universe(scanner, factory, runtime.redis)
@@ -142,10 +149,13 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
                     ),
                 ),
                 "beta": beta_loop(scanner, factory, runtime.redis, runtime, beta),
+                "regime_hourly": regime_hourly_loop(
+                    scanner, factory, runtime.redis, runtime, regime_hourly
+                ),
                 "deriv": deriv_loop(scanner, factory, runtime),
                 "outbox": run_dispatcher(runtime.redis, factory, outbox_health, db_role=DB_ROLE),
                 "heartbeat": _heartbeat_loop(
-                    runtime, scanner, cycle, consumers, config, progress, beta
+                    runtime, scanner, cycle, consumers, config, progress, beta, regime_hourly
                 ),
             }
             for stream in (
@@ -314,7 +324,10 @@ async def _heartbeat_loop(
     config: ScannerConfig,
     progress: BootstrapProgress,
     beta: BetaHealth,
+    regime_hourly: RegimeHealth,
 ) -> None:
     while True:
-        await write_heartbeat(runtime.redis, runtime, scanner, cycle, consumers, progress, beta)
+        await write_heartbeat(
+            runtime.redis, runtime, scanner, cycle, consumers, progress, beta, regime_hourly
+        )
         await asyncio.sleep(config.heartbeat_s)

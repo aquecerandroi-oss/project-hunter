@@ -162,6 +162,26 @@ beta_valid_markets = Gauge(
 )
 
 
+regime_rows_total = Counter(
+    "hunter_regime_rows_total",
+    "Hourly market_regimes rows produced, by what the pass did with the hour: "
+    '"inserted" is an hour that had no row, "updated" is one whose inputs moved '
+    '(a candle backfill repaired the window), "unchanged" is a rerun of a cut '
+    'whose digest matched, "no_reference" is a pass with no reference market, '
+    '"failed" is an hour whose transaction raised.',
+    ["outcome"],
+    registry=registry,
+)
+
+regime_last_hour = Gauge(
+    "hunter_regime_last_hour_timestamp_seconds",
+    "The newest hour the regime producer wrote, as a UNIX timestamp. Age against "
+    "now is the hole in the series -- the number the heartbeat's regime_last_ts "
+    "carries in ISO form.",
+    registry=registry,
+)
+
+
 scanner_consumer_events_total = Counter(
     "hunter_scanner_consumer_events_total",
     "Stream messages handled, by stream.",
@@ -195,6 +215,8 @@ scanner_stream_delay_seconds = Histogram(
 __all__ = [
     "beta_revisions_total",
     "beta_valid_markets",
+    "regime_last_hour",
+    "regime_rows_total",
     "scanner_anomalies_open",
     "scanner_backfill_requests_total",
     "scanner_baseline_revisions_total",

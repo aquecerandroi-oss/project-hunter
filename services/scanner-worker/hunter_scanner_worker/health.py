@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     from hunter_scanner_worker.beta_job import BetaHealth
     from hunter_scanner_worker.config import ScannerConfig
     from hunter_scanner_worker.consumers import ConsumerHealth
+    from hunter_scanner_worker.regime_job import RegimeHealth
     from hunter_scanner_worker.scanner import Scanner
 
 logger = get_logger(__name__)
@@ -178,6 +179,7 @@ async def write_heartbeat(
     consumers: ConsumerHealth,
     progress: BootstrapProgress | None = None,
     beta: BetaHealth | None = None,
+    regime_hourly: RegimeHealth | None = None,
 ) -> None:
     """``hb:scanner:<instance>`` plus the gauges the dashboards read."""
     markets = list(scanner.state.markets.values())
@@ -251,6 +253,12 @@ async def write_heartbeat(
         # which is what a scanner started five minutes ago honestly looks like.
         "beta_last_run": beta.last_run_at.isoformat() if beta and beta.last_run_at else "",
         "beta_valid": str(beta.valid_markets if beta else 0),
+        # The newest hour the regime producer wrote. Empty means it has not
+        # produced one in this process; ageing means the cohorts are losing
+        # their context split, hour by hour.
+        "regime_last_ts": (
+            regime_hourly.last_ts.isoformat() if regime_hourly and regime_hourly.last_ts else ""
+        ),
         "consumer_errors": str(consumers.errors),
         "errors": str(runtime.error_count),
     }

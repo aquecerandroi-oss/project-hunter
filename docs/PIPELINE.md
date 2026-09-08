@@ -166,6 +166,8 @@ estados que outro já moveu. `features.updated` continua sendo publicado — par
 - **o scanner nunca chama REST:** falta de histórico vira `market.backfill.requested`, que o
   `market-worker` — dono do rate limit e da tabela de gaps — atende.
 
+O mesmo `scanner-worker` roda dois produtores horários ao lado deste laço, com a mesma regra de corte (a barra fechada, nunca o relógio): o β contra o BTC (§2b) e o **regime horário** (§4b), que grava uma linha de `market_regimes` por hora para que qualquer avaliação possa ser cortada por contexto.
+
 ## 2b. β horário contra o BTC — `market_betas` (T3.7b)
 
 **Onde:** `scanner-worker` (`hunter_scanner_worker/beta*.py`). **Gatilho:** cada hora fechada, um produtor por exchange. **Quem consome:** o Risk Engine, pela §6 do `docs/RISK_ENGINE.md` (`bridge_universe.current_beta`). **Por quê existe:** a T3.7 entregou o estimador (`beta_v1`) e o esquema (`0006`), e o job nunca foi escrito — com `market_betas` vazia a admissão responde `unavailable` para todo candidato ("sem β validado só shadow") e a carteira nunca abre posição. β existir é **pré-condição**, nunca uma operação.
@@ -201,6 +203,80 @@ estados que outro já moveu. `features.updated` continua sendo publicado — par
 - Regras determinísticas com histerese (não muda de regime sem 3 leituras consecutivas). Regimes v0: `BTC_BULL`, `BTC_BEAR`, `SIDEWAYS`, `HIGH_VOLATILITY`, `LOW_VOLATILITY` (volatilidade é uma dimensão separada; o estado é `{trend, volatility}` e o `regime` principal é o mais relevante para o Risk Engine).
 - Persiste `market_regimes` (fecha o anterior com `end_time`). Publica `regime.changed` só em transição.
 - v1 (Fase 2) adiciona `RISK_ON/RISK_OFF`, `ALT_EXPANSION`, `PANIC`, `LIQUIDITY_CONTRACTION` com breadth, funding agregado e liquidações agregadas.
+
+## 4b. Regime horário — uma linha de `market_regimes` por hora (T3.43)
+
+**Onde:** `scanner-worker` (`hunter_scanner_worker/regime_job.py`, `regime_repo.py`,
+`regime_writer.py`, `regime_hourly.py`; a aritmética é pura, em
+`hunter_indicators.regime.hourly*`). **Gatilho:** cada hora fechada, um produtor por
+exchange, do lado do `beta_job` (§2b). **Quem consome:** a pesquisa — o corte de coorte
+por contexto (`infra/scripts/sql/research/2026-09-09-regime-split.sql`). **Por quê existe:**
+o §4 grava **por transição**, e um classificador que está em aquecimento desde que subiu
+nunca transicionou: em 2026-09-08 `market_regimes` tinha **uma linha** (`global`,
+`UNKNOWN`), então nenhuma coorte do Shadow Lab ou de replay podia ser cortada por regime
+(C4 da Astra, T3.32, T3.33e/g). Este produtor é a série que faltava: uma linha por hora,
+tenha mudado alguma coisa ou não, trinta e um dias para trás.
+
+1. **`ts` é o corte, e é por isso que não há antecipação.** Toda entrada da hora `ts`
+   fechou **antes** de `ts` (a última vela horária lida é a de `[ts-1h, ts)`), e a linha
+   vale em `[ts, ts+1h)`. Um sinal das 12:34 casa com a linha das 12:00, decidida com
+   velas que já eram finais às 12:00. Rotular a hora **seguinte** ao dado é o que faz a
+   junção honesta; rotular a hora de onde o dado veio poria os movimentos da hora dentro
+   do próprio rótulo dela.
+2. **Duas versões, duas perguntas, duas séries.** O §4 (`regime_v0`, `scope = global`,
+   intervalos abertos, histerese) responde "como está o mercado agora"; este
+   (`regime_hourly_v1`, `scope = btc`, uma linha fechada por hora) responde "como estava
+   o mercado naquela hora". Escopos separados de propósito: duas séries no mesmo escopo
+   dariam intervalos sobrepostos e `regime_at` escolheria a que mexeu por último. Leia
+   sempre por `scope` **e** `classifier_version`; nunca some as duas numa média.
+3. **O que a hora mede** (`RegimeSnapshot`), tudo sobre fechamentos horários do BTC
+   completos (60 minutos `is_final`, o último exatamente em `bucket+59min`):
+
+   | dimensão | regra | limiar declarado |
+   |---|---|---|
+   | `trend` | fechamento vs SMA200h, SMA50h vs SMA200h **e** inclinação da SMA50 em 24 h | 3 de 3 → `up`/`down`; senão `flat`; inclinação mínima 0,2 % |
+   | `vol_regime` | percentil (mid-rank) da vol realizada de 24 h contra as leituras horárias dos 30 dias anteriores | ≥ 80 → `high`, ≤ 20 → `low` |
+   | `breadth_pct` | % dos mercados **usáveis** acima da própria SMA de 24 h **e** com retorno 24 h positivo | cobertura mínima de 50 % do universo |
+   | `funding_avg` | média da **última** liquidação de funding de cada mercado dentro de 8 h | fora da janela não entra (nunca vira zero) |
+   | `drawdown_pct` | queda do fechamento contra a máxima horária de 30 dias | mínimo de 168 horas para a máxima existir |
+
+4. **`score_0_100` é uma decomposição, não um número.** Cinco componentes, cada um com
+   `raw`, `normalized`, `weight` e `contribution` gravados na linha: tendência 0,35 ·
+   breadth 0,25 · volatilidade 0,20 · drawdown 0,10 · funding 0,10 (todos na direção
+   "maior = fita mais saudável"; funding positivo — comprado pagando — pontua **menos**).
+   Componente sem leitura é `None` e **o peso dele é redistribuído**, nunca lido como
+   zero; `confidence` publica quanto do peso respondeu e abaixo de metade não há score,
+   só `insufficient_components`.
+5. **`unknown` é classificação, não buraco.** Enquanto não houver 224 horas fechadas
+   (tendência) ou 193 (percentil de volatilidade), a resposta honesta é `unknown` com o
+   motivo na linha — e o rótulo projetado é `UNKNOWN`. Medido sobre as velas reais do
+   stack local em 2026-09-08 (762 horas completas desde 2026-08-08): **207 das 745 horas**
+   do backfill saem em aquecimento e 538 saem classificadas.
+6. **Idempotência é do trabalho, não do esquema.** `market_regimes` não tem coluna
+   `exchange` nem índice único em `(scope, start_time)`: o job procura a hora
+   (escopo + versão + `supporting_features->>'exchange'`), compara o **digest** do que
+   escreveria e então não faz nada, atualiza no lugar ou insere. Atualiza — nunca apaga e
+   reinsere — porque `agent_signals.regime_id`, `trade_proposals.regime_id` e
+   `paper_trades.regime_id` apontam para esses ids com `ON DELETE SET NULL`. A corrida que
+   um índice único fecharia é fechada pela trava `regime:producer:{exchange}:{corte}`;
+   o índice está pedido em `.claude/state/brief-T3.43-db-market-regimes-hourly.md`.
+7. **Backfill é "toda hora sem linha", não "as últimas N horas".** A primeira passada
+   enche 31 dias, as seguintes produzem uma hora, e uma passada depois de um backfill de
+   velas conserta exatamente as horas cujo digest mudou. O corte atual é **sempre**
+   recalculado: é a única hora cujas velas ainda podem estar chegando.
+8. **Manivela e observabilidade.** `uv run python -m hunter_scanner_worker.regime_hourly
+   --once [--backfill-days N]` roda uma passada e sai (sem trava: quem pede à mão já
+   decidiu). Métricas `hunter_regime_rows_total{outcome}` (`inserted`, `updated`,
+   `unchanged`, `no_reference`, `failed`) e `hunter_regime_last_hour_timestamp_seconds`;
+   campo `regime_last_ts` no `hb:scanner:{instance}`; log `scanner_regime_pass`.
+   **Prontidão: detalhe de status, nunca check.** Um buraco nesta série custa a uma coorte
+   o corte por contexto e não custa nada à faixa viva.
+9. **Custo declarado** (stack local, 2026-09-08, 217 mercados monitorados): a dobra
+   horária do BTC em 62 dias custa **0,48 s**; a do universo em 32 dias, **2,3 s por lote
+   de 25 mercados** (~21 s no total, uma vez); em regime permanente a leitura do universo
+   é de 25 horas e custa **0,12 s por lote** (~1,1 s). Classificar as 745 horas do
+   backfill custa **1,7 s** de CPU. Cobertura de breadth medida: 199 de 217 mercados com
+   as 25 horas completas.
 
 ## 5. Opportunity Engine
 
