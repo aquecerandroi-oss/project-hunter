@@ -5,6 +5,8 @@ import { CommandPalette } from "@/components/layout/command-palette";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { LiveStatus } from "@/components/system/live-status";
 import { Separator } from "@/components/ui/separator";
+import { SectionUnavailable } from "@/components/ui/section-unavailable";
+import { isApiError } from "@/lib/api-error";
 import { getMarketStatus } from "@/lib/api/system";
 import type { MarketStatusResponse, ReadyStatus } from "@/lib/api/types";
 import { logger } from "@/lib/logger";
@@ -59,18 +61,29 @@ function SystemStatusDot({ status }: { status: ReadyStatus | null }) {
   );
 }
 
-/** `/system/market-status` (T1.4) can 404/500 before that piece deploys -- the topbar must never 500 the whole shell over a missing widget. */
-async function marketStatusOrNull(): Promise<MarketStatusResponse | null> {
+type MarketStatusLoad = { ok: true; status: MarketStatusResponse } | { ok: false; reason: string };
+
+/**
+ * `/system/market-status` (T1.4) can 404/500/429 before that piece deploys
+ * or under load -- the topbar must never 500 the whole shell over a missing
+ * widget. T3.28b: a failed fetch here used to just log and vanish into a
+ * plain "sem verificação" span with no way to retry; it now carries its own
+ * `reason` (mirrors `system/page.tsx`'s `loadWorkers`/`loadSystemInfo`) so
+ * `SectionUnavailable` can render the same honest, retryable message every
+ * other section on the site uses.
+ */
+async function loadMarketStatus(): Promise<MarketStatusLoad> {
   try {
-    return await getMarketStatus();
+    return { ok: true, status: await getMarketStatus() };
   } catch (error) {
-    logger.error("topbar_market_status_load_failed", { error: error instanceof Error ? error.message : String(error) });
-    return null;
+    const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
+    logger.error("topbar_market_status_load_failed", { error: reason });
+    return { ok: false, reason };
   }
 }
 
 export async function Topbar({ orgSlug, systemStatus, children }: TopbarProps) {
-  const marketStatus = await marketStatusOrNull();
+  const marketStatusLoad = await loadMarketStatus();
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-bg-elevated px-4">
       {children}
@@ -104,16 +117,17 @@ export async function Topbar({ orgSlug, systemStatus, children }: TopbarProps) {
         <SystemStatusDot status={systemStatus} />
         <Separator orientation="vertical" className="hidden h-5 shrink-0 md:block" />
         <div className="hidden min-w-0 md:block">
-          {marketStatus ? (
-            <LiveStatus variant="compact" initial={marketStatus} />
+          {marketStatusLoad.ok ? (
+            <LiveStatus variant="compact" initial={marketStatusLoad.status} />
           ) : (
             // The FETCH for this widget failing is not the same fact as the
             // markets themselves being down (LOW, T1.5b fix pass, joint
             // decision #5's vocabulary) -- the old copy read as an outage
-            // that was never actually observed.
-            <span className="text-xs text-fg-subtle" title="Não foi possível carregar o status dos mercados agora">
-              status dos mercados: sem verificação
-            </span>
+            // that was never actually observed. T3.28b: this used to log and
+            // vanish into a retry-less span -- now the same honest,
+            // retryable `SectionUnavailable` treatment every other section
+            // uses, compacted for this one-line slot.
+            <SectionUnavailable title="Status dos mercados" reason={marketStatusLoad.reason} compact />
           )}
         </div>
       </div>

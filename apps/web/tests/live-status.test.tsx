@@ -225,3 +225,39 @@ describe("LiveStatus: reconciles a fresh server snapshot, not just the value rea
     expect(screen.queryByText("200")).not.toBeInTheDocument();
   });
 });
+
+describe("LiveStatus: ages anchor to the snapshot's own clock (T3.16), never the viewer's raw Date.now() (brief T3.28b)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("does not inflate the compact age label under a skewed viewer clock (this call site was missed by T3.16 -- also the React #418 hydration-mismatch root cause: an un-anchored age renders a different string at SSR time vs. hydration time)", () => {
+    vi.useFakeTimers();
+    const trueNow = new Date("2026-09-08T03:50:00.000Z");
+    // Viewer clock 5 minutes ahead of the snapshot's own `updated_at` -- a
+    // naive `Date.now()`-based age would read "~5min", not "0s".
+    vi.setSystemTime(new Date(trueNow.getTime() + 5 * 60_000));
+
+    const fresh: MarketStatusResponse = {
+      exchanges: [
+        {
+          exchange: "binance",
+          ws_state: "connected",
+          last_event_at: trueNow.toISOString(),
+          last_event_age_ms: 0,
+          markets_monitored: 200,
+          open_gaps: 0,
+          reconnects: 0,
+          shards_expected: 1,
+          shards_reporting: 1,
+        },
+      ],
+      markets_monitored_total: 200,
+      updated_at: trueNow.toISOString(),
+    };
+
+    render(<LiveStatus variant="compact" initial={fresh} />);
+
+    expect(screen.getByText(/binance · CONNECTED · 200 mercados · 0s/)).toBeInTheDocument();
+  });
+});

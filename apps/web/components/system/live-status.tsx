@@ -137,7 +137,17 @@ export function LiveStatus({ initial, variant }: LiveStatusProps) {
       setExchanges((prev) => mergeExchangeUpdate(prev, msg));
     },
   });
-  const { now } = useAgeTicker();
+  // T3.16 anchors every other age display in the app to the server's own
+  // clock (`useAgeTicker`'s docstring) so a viewer's skewed wall clock never
+  // inflates/hides an age -- this call site was missed, so this widget was
+  // the one place still reading the browser's raw `Date.now()` with no
+  // anchor at all. Two symptoms, same root cause: (1) the viewer-skew bug
+  // T3.16 already fixed everywhere else, and (2) a React #418 hydration
+  // mismatch -- the SSR pass computes this text at the server's render
+  // instant, the client hydrates a little later, and an un-anchored
+  // `Date.now()`-based age can render a different string on each side
+  // (`updated_at` is `initial`'s own prop value, identical on both sides).
+  const { now } = useAgeTicker(initial.updated_at);
   // `ws_state`/dots below still reflect the last server-known state even
   // while our own socket is down -- the ticking "há Ns" age already makes
   // that visibly stale, but this is an explicit, honest flag on top
