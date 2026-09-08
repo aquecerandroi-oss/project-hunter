@@ -2,6 +2,9 @@
 
 A Sexta-feira continua trabalhando neste repositório; o que muda é o motor onde ela roda: de uma sessão do Claude Code (`.claude/agents/sexta-feira.md`, cota semanal da conta Claude) para um **perfil do Hermes Agent** (Nous Research, desktop instalado em `%LOCALAPPDATA%\hermes`), que roda com outro modelo e outra cota. O papel, as regras e a memória são os mesmos.
 
+
+> **Decisão do Everton, 2026-09-08 (~05:30Z): "Deixa a Sexta-feira aqui mesmo sem contar com o Hermes".** A casa principal da Sexta-feira volta a ser o Claude Code (`.claude/agents/sexta-feira.md`, `"agent": "sexta-feira"` no `.claude/settings.json`). O perfil `sexta-feira` do Hermes continua instalado como **executor opcional** (cota própria) para tarefas isoladas com brief em arquivo, sob as mesmas regras; a rotina horária do Hermes **não** deve ser registrada, para não haver dois plantões. Balanço dos dois dias no Hermes: T3.15b (commitou contra o brief — regra corrigida), revisão da T3.0e (limpa), dois plantões com Obsidian em dia.
+
 ## O que é o quê
 
 | Peça | Onde | O que faz |
