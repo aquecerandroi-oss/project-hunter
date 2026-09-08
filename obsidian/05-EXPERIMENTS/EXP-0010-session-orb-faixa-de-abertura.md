@@ -1,7 +1,7 @@
 ---
 tags: [experimento, session-orb, calendario, shadow-lab]
 updated: 2026-09-08
-status: proposto
+status: em-andamento
 owner: sexta-feira
 exp: EXP-0010
 strategy: session_orb
@@ -20,6 +20,11 @@ last_eval: ""
 > **acrescentadas** abaixo, datadas. Brief: `.claude/state/brief-T3.33c-session_orb_v1.md`.
 > Esta é a única das quatro cuja **família é nova** no catálogo (`session_orb` em
 > `infra/scripts/seed_reference.py`).
+>
+> **Acréscimo de 2026-09-08 (tarde, T3.33h), sem apagar nada acima:** o módulo foi escrito e
+> commitado (T3.33c, `3ed17bb`), o portão C1–C8 foi preenchido abaixo (**REVISE**, 62,5) e o teto de
+> pedágio (**0,3333 R**) está confirmado. **Nenhuma ativação, nenhuma coorte, nenhuma avaliação** —
+> ativação e replay estão em voo na T3.33f, e `result` continua `nao-iniciado` por isso.
 
 ## Hipótese (congelada)
 
@@ -101,16 +106,85 @@ sessão a cinco horas para que as três não se sobreponham na regra; `rvol_min 
 deliberadamente mais frouxo que o 1,5 do `momentum_v1` porque a abertura de sessão já carrega uma
 sazonalidade de volume.
 
-## Portão de desenho (C1–C8) — **pendente**
+## Portão C1–C8 — veredito de 2026-09-08, escrito **antes** do módulo (T3.33c)
 
-O portão de oito critérios é a tarefa **T3.36**
-(`.claude/state/brief-T3.36-validation-gate-and-stress-pass.md`). O **método** já existe como
-referência (`.claude/skills/edge-strategy-reviewer/references/review_criteria.md`); o que ainda não
-existe é a **seção correspondente no [[_TEMPLATE-EXP]]**. O veredito (PASS/REVISE/REJECT) é escrito
-**pelo implementador, antes do código**, e o `code-reviewer` confere que ele existe.
-**C4 (dependência de regime) é o que morde aqui**: a
-hipótese é, por construção, uma afirmação sobre calendário — e a Astra recomendou deixar abertura de
-sessão **fora** desta rodada exatamente por isso ([[Dialogos/2026-09-08-quatro-estrategias]]).
+**Quem escreveu:** **autoavaliação do `quant-engineer`** contra
+`.claude/skills/edge-strategy-reviewer/references/review_criteria.md`. **Não é revisão viva da
+Astra.** Não altera Hipótese nem Protocolo. Condições contadas como "entrada": posição na sessão,
+janela da sessão, `close > range_high`, `rvol ≥ 1,3`, `ATR% ≥ 0,006`, `ATR% ≤ 0,05`,
+`range_risk ≥ 1,0`, `range_risk ≤ 2,5` = **8**; `trend_filter` = 0.
+
+| # | critério | peso | sev. | nota | por quê |
+|---|---|---:|---|---:|---|
+| C1 | plausibilidade do edge | 20 | pass | 80 | mecanismo causal declarado (participação chega em blocos horários; a primeira hora fixa a faixa) e refutável |
+| C2 | risco de sobreajuste | 20 | pass (contagem) | **30** | 8 condições ≤ 10 → 80, **−50**: cinco limiares com casa decimal (1,3 · 0,006 · 0,05 · 1,0 · 2,5) |
+| C3 | amostra | 15 | pass | 80 | `252 × 0,8⁸ = 42,3` oportunidades/ano pela fórmula do portão (ver ressalva) |
+| C4 | dependência de regime | 10 | **warn** | 40 | o plano de validação estratifica por **sessão**, não por regime do BTC |
+| C5 | calibração da saída | 10 | pass | 80 | alvo = 2 R ≥ 1,5; stop máximo possível = `atr_pct_max × range_risk_atr_max` = **12,5 %** < 15 % (tem teste) |
+| C6 | concentração de risco | 10 | pass | 80 | não há sizing: `research_only`, um acompanhamento por (versão, mercado, coorte) |
+| C7 | realismo de execução | 10 | pass | 80 | há filtro de volume (`rvol ≥ 1,3`); `export_ready_v1` não se aplica |
+| C8 | qualidade da invalidação | 5 | **fail** | 10 | `invalidations = ()` |
+
+**Escore ponderado = 62,5 → veredito `REVISE`** (C1/C2 não falham, então não há REJECT imediato; há um
+`fail`, então não há PASS).
+
+**Divergências declaradas em vez de consertadas:**
+
+1. **C8 é a hipótese, não esquecimento.** A mínima da faixa *é* o nível estrutural e já é o **stop**;
+   uma `close_below` separada ficaria acima do stop (um segundo stop que ninguém declarou) ou abaixo
+   dele (código morto). É a mesma forma da `volume_anomaly_v1`, e está amarrada a
+   [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]]: **não** se afirma que remover invalidação
+   melhora nada.
+2. **C2 pune declarar número.** Os cinco "limiares decimais" são exatamente os parâmetros congelados
+   que tornam a versão auditável; escondê-los em constantes redondas seria pior. Fica registrado que
+   o portão não distingue "limiar ajustado" de "limiar declarado".
+3. **C3 mede em dias de pregão.** A fórmula supõe uma barra por dia; aqui são 96 barras de 15 min por
+   dia por mercado. A frequência de planejamento honesta é 0,3–1 entrada/mercado/dia, e o teste de
+   verdade é K1/K2, não este 42,3.
+4. **C4 fica em `warn` de propósito.** Há decomposição obrigatória **por sessão** e a regra dos 70 %,
+   mas **não** há estratificação por regime do BTC. Não foi inventada uma para tirar nota — e o
+   replay das irmãs mostrou que ela seria **impossível** hoje: `market_regimes` tem uma linha no
+   banco inteiro.
+
+**A divergência de método que continua aberta, e é da Astra:** ela recomendou deixar abertura de
+sessão **fora** desta rodada, porque a hipótese é por construção uma afirmação sobre calendário
+([[Dialogos/2026-09-08-quatro-estrategias]]). A decisão foi seguir assim mesmo, com a regra dos 70 %
+como cláusula de morte. **Divergência assumida, registrada, não vencida por argumento.**
+
+**A ressalva da revisão da T3.33c que sobrevive ao commit:** o **horizonte de 4 h transborda de
+sessão** — é custo declarado, não suposto, e a primeira avaliação **tem** de publicar a fração de
+desfechos cuja saída cai numa sessão posterior.
+
+## O teto de pedágio desta geometria (confirmação pedida contra a T3.32)
+
+A T3.32 mostrou que `custo_R × risco%` = **0,0020 constante** nas dez populações medidas —
+aritmética (20 bps de ida e volta divididos pela distância percentual ao stop), não estatística.
+Aplicado aos pisos congelados desta versão (`Decimal`, prec 28, travado em teste):
+
+```
+ida e volta            = 2 + 2×5 + 2×4 bps                = 0,002 do preço
+risco% no pior caso    = range_risk_atr_min × atr_pct_min = 1,0 × 0,006 = 0,006
+pedágio máximo         = 0,002 / 0,006                    = 0,3333 R
+risco% no melhor caso  = 2,5 × 0,05                       = 0,125
+pedágio mínimo         = 0,002 / 0,125                    = 0,0160 R
+```
+
+**O teto de custo desta geometria é 1/3 de R**, contra os **0,6152 R** medidos na coorte de replay da
+`volume_anomaly v2` e os **0,1506 R** da `momentum v1` prospectiva. É o piso
+(`range_risk_atr_min = 1,0` com `atr_pct_min = 0,006`) que impede a versão de repetir a doença da
+`volume_anomaly`: lá o risco inicial mediano era 0,41 % do preço e o pedágio comia mais de meio R
+antes de o mercado abrir a boca.
+
+A tabela de geometria do brief §6 fecha nos quatro dígitos:
+
+| risco da faixa | ATR% | R_net no alvo | R_net no stop | equilíbrio |
+|---:|---:|---:|---:|---:|
+| 1,0 ATR (piso) | 0,006 | 1,5133 | −1,2112 | **0,4446** |
+| 1,5 ATR | 0,010 | 1,7929 | −1,0888 | 0,3778 |
+| 2,5 ATR (teto) | 0,050 | 1,9725 | −1,0102 | 0,3387 |
+
+O alvo em R constante mantém o equilíbrio entre **33,9 % e 44,5 %** em toda a faixa permitida — que é
+a razão de o alvo não ser em ATR.
 
 ## O que falsifica esta hipótese
 
@@ -138,9 +212,18 @@ sessão **fora** desta rodada exatamente por isso ([[Dialogos/2026-09-08-quatro-
 
 ## Avaliações (acrescentadas, nunca reescritas)
 
-**Nenhuma ainda.** A primeira será acrescentada aqui, datada, com: coorte, janela, mercados, recibos,
-comandos exatos, cobertura completa, métricas com denominador, **decomposição por sessão**, fração de
-saídas em sessão posterior, distribuição de `range_risk_atr`, `Result` e `Next Action`.
+**Nenhuma ainda — e o estado em 2026-09-08 é "pendente", não "não existe".** O módulo
+`session_orb_v1` foi escrito e **commitado** em `3ed17bb` (T3.33c: 45 testes próprios, prova de
+mutação, digests das versões vivas idênticos), com `params_hash`
+`cdb9516b293276095f4a8c2210d60ade0a4448cac46cce827f58bc3f8908d5e0`. **A ativação e o replay de dia
+um estão em voo na T3.33f** (`.claude/state/brief-T3.33f-breakout-v2-explain-ledger-session-orb.md`)
+— e a família é **nova** no catálogo, então `infra/scripts/seed.py` roda **antes** de
+`activate_strategy_version.py`, ou a ativação não acha a linha.
+
+Nada é preenchido aqui antes de existir. A primeira avaliação será acrescentada, datada, com: coorte,
+janela, mercados, recibos do livro-razão, comandos exatos, cobertura completa, métricas com
+denominador explícito, **decomposição por sessão** (a regra dos 70 %), **fração de desfechos cuja
+saída cai numa sessão posterior**, distribuição de `range_risk_atr`, `Result` e `Next Action`.
 
 ## Variantes tentadas
 

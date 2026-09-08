@@ -900,3 +900,33 @@ não. As dela ficam aqui como itens futuros, com o preço declarado
 já usados para descobrir e escolher as regras são **exploratórios** e não viram amostra independente
 por ganharem outra `cohort`; e uma leitura positiva a 20 bps que vira negativa a 40 bps recebe o
 rótulo **"frágil a custos"**, nunca "validada".
+
+## Acréscimo de 2026-09-08 (tarde, T3.33h) — o dia um das quatro mudou a fila
+
+Nada acima foi editado. O que mudou é que duas das quatro **rodaram**, uma **morreu na pré-checagem**
+e uma **entrou no código sem rodar** — e cada uma deixou uma candidata nova, todas de **versão nova**,
+nenhuma de ajuste.
+
+| # | Candidata | De onde veio | Por que ela existe | Estado |
+|---|---|---|---|---|
+| **B1** | **`breakout v2` por parâmetro** — mesmo `code_ref`, `(squeeze_window_bars, stop_atr)` revisto | [[EXP-0008-breakout-compressao-de-volatilidade]], avaliação de 2026-09-08 | a v1 fez **0 decisões em 11 904 barras**: 14/14 rejeitadas por `geometry_invalidation`, porque a base de 8 barras de 15 min é mais larga que um stop de 1,25 ATR. **A hipótese da compressão não chegou a ser testada** | **em voo** (T3.33f), com `--supersede` planejado; experimento novo, portão C1–C8 novo |
+| **B2** | **`mean_reversion` sem a porta de tendência de 1 h** — irmã de parâmetro (`derive_variant.py`) | [[EXP-0009-mean-reversion-pullback-em-tendencia]], mesma avaliação | é o **único** jeito de a porta "pagar por si": os recuos que ela rejeita saem `not_triggered` e não persistem, então o braço "sem porta" não existe no banco | **proposta, não derivada**; exige a mesma janela replayada |
+| **B3** | **`mean_reversion` com piso de ATR% acima de 0,010** | idem | **70,3 % das decisões (26/37)** estão abaixo de ATR% 0,010 e são **líquidas negativas com a bruta positiva** — é o pedágio de [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] comendo a vantagem | **proposta**; subir piso é `v2`, nunca ajuste |
+| **B4** | **`derivatives v1` — reexecutar a pré-checagem** | [[EXP-0011-derivatives-reversao-de-funding]] | 5 liquidações negativas em 31 d × 4 mercados (ETH e DOGE: **zero**); teto medido de 158 barras (1,33 %) em 2 dos 4 mercados. **O módulo não foi escrito, de propósito** | **bloqueada até ~2026-10-06**, quando os ~385 mercados de 2026-09-05 tiverem 31 dias. Custo: uma consulta |
+| **B5** | **`patterns` v2** — `retire_after_break`, regra de "mesma âncora inicial" (leque), nível **horizontal** como conceito, baldes de deduplicação por 1 h, e seleção estrutural de swings | [[KB-0077-linhas-de-tendencia]] §7 e a revisão da Astra | as seis diferenças entre o que traçamos e o que um humano traçaria; a nº 1 (linha rompida que não se aposenta: `t=4 v=52`, `v=59`) muda **todas** as figuras publicadas | **proposta**; cada uma muda número já desenhado → **versão nova, nunca edição** |
+| **B6** | **`trendline_breakout_v1`** (T3.34b) | [[KB-0077-linhas-de-tendencia]] §9 | a única forma de saber se rompimento de linha com volume paga o custo é replay com coorte, como as outras | **bloqueada por uma decisão de arquitetura**: `hunter-core` não depende de `hunter-indicators` e `code_ref.module_closure` só fecha sobre irmãos planos — um import cruzado deixaria a geometria **fora** do digest. Recomendação: portar com teste de paridade numérica |
+
+**As duas variantes de parâmetro V1/V2 do `momentum` (T3.32) continuam não derivadas.** Nada mudou
+nelas hoje: `V1` (`atr_pct_min 0,003 → 0,020`, teto de pedágio 0,10 R) e `V2`
+(`target_atr 1,5 → 3,0`) seguem exigindo **janela futura reservada de 30 dias** e **nunca** podem ser
+avaliadas na janela 2026-08-08 → 09-08, que é a que gerou a hipótese. Ficam registradas aqui como
+**pendentes**, para que a fila não pareça mais curta do que é.
+
+**Uma leitura que atravessa a fila inteira, e é o achado do dia:** o piso `atr_pct_min = 0,006`,
+congelado em três das quatro candidatas, **morde mais do que se supunha**. A pré-checagem da
+[[EXP-0011-derivatives-reversao-de-funding]] mostrou que a amplitude **média** de 15 min de
+ETH/SOL/XRP/DOGE fica **abaixo** de 0,006 nos quatro, e o replay da
+[[EXP-0009-mean-reversion-pullback-em-tendencia]] mostrou que, mesmo passando o piso, tudo abaixo de
+0,010 é líquido negativo. Isso não é conserto de parâmetro: é a mesma aritmética de
+[[KB-0076-por-que-perdemos-2026-09-08]] aparecendo de novo, e a resposta continua sendo **teto de
+pedágio declarado**, não piso escolhido a olho.

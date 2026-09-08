@@ -120,6 +120,25 @@ acima ficam como estão. O que mudou:
   página quando aquela tarefa fechar, e não antes — arquivar número de rascunho em movimento é
   arquivar número que pode mudar.
 
+**Acréscimo de 2026-09-08 (tarde, T3.33h) — o dia um das quatro, e o portão deixou de estar
+pendente.** As linhas das tabelas abaixo foram atualizadas (este é um **índice**, não uma página de
+experimento: as avaliações datadas, essas sim append-only, estão nas páginas). O que mudou:
+
+- **duas foram ativadas e replayadas** (`breakout v1` às 16:23:39Z, `mean_reversion v1` às 16:32:33Z,
+  31 dias × 4 mercados, coorte `replay:` própria por versão). A primeira fez **0 decisões** e a
+  segunda **37**, com o primeiro resultado líquido positivo que este Lab mede — e **as duas saem
+  `inconclusivo`**, uma por ausência de população e a outra pela régua de maturidade;
+- **uma morreu antes do código**: a `derivatives v1` foi reprovada pela pré-checagem congelada
+  (5 liquidações negativas em 31 d × 4 mercados) e **o módulo não foi escrito**. É o caso mais barato
+  possível de uma candidata morrer, e é para isso que a pré-checagem existia;
+- **o portão C1–C8 foi preenchido nas quatro**, com o veredito `REVISE` em todas (66,0 · 65,5 · 62,5 ·
+  63,5) e as divergências declaradas em vez de consertadas. **Ele foi autoavaliação do
+  `quant-engineer`**, não revisão viva da Astra — está escrito em cada página, porque ausência de
+  revisor externo não é aprovação. A tarefa T3.36 (a seção no [[_TEMPLATE-EXP]]) continua aberta;
+- **o portão errou o essencial na `derivatives`**: C3 devolveu "amostra adequada" (80) por uma fórmula
+  de barra diária em ações, e a consulta ao dado mostrou o oposto. O portão pontua a **forma** do
+  rascunho e **não substitui a consulta**.
+
 Cada experimento significativo (uma hipótese testada sobre uma estratégia, um conjunto de parâmetros, um mercado ou período) ganha seu próprio arquivo `EXP-NNNN-<slug>.md` nesta mesma pasta, numerado sequencialmente a partir de `EXP-0001`.
 
 ## Registro de IDs (decisão conjunta SHADOW, 2026-09-05)
@@ -137,10 +156,10 @@ Cada experimento significativo (uma hipótese testada sobre uma estratégia, um 
 | ID | Experimento | Origem | Estado |
 |---|---|---|---|
 | `EXP-0007` | [[EXP-0007-momentum-invalidacao-bracos-INV\|os braços de saída (INV/TGT/EXIT) sobre entradas congeladas]] (replay de **política de saída**: 8 braços, 7 contrastes, 4 populações) | `brief-T3.27` → T3.32 | **aberto e avaliado em 2026-09-08**; `read_at = 15:11Z–15:15Z`, **inconclusivo** — e **encerra** o item 1 do [[Strategy Backlog]] |
-| `EXP-0008` | [[EXP-0008-breakout-compressao-de-volatilidade\|rompimento após compressão de volatilidade]] (`breakout_v1`, 1,25/2,5 ATR, invalidação estrutural com guarda de geometria) | T3.33a | **proposto em 2026-09-08** — sem módulo, sem versão, sem coorte: `nao-iniciado` |
-| `EXP-0009` | [[EXP-0009-mean-reversion-pullback-em-tendencia\|recuo comprado dentro de tendência de 1 h]] (`mean_reversion_v1`, 1,0/1,5 ATR, **sem** invalidação) | T3.33b | **proposto em 2026-09-08** — `nao-iniciado` |
-| `EXP-0010` | [[EXP-0010-session-orb-faixa-de-abertura\|rompimento da faixa de abertura de sessão]] (`session_orb_v1`, stop na mínima da faixa, alvo em 2 R; **família nova** no catálogo) | T3.33c | **proposto em 2026-09-08** — `nao-iniciado` |
-| `EXP-0011` | [[EXP-0011-derivatives-reversao-de-funding\|comprar depois de funding liquidado negativo]] (`derivatives_v1`, 2,0/3,0 ATR, horizonte de 8 h) | T3.33d | **proposto em 2026-09-08** — `nao-iniciado`; aberto **contra** a recomendação de [[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]], com a divergência declarada na página |
+| `EXP-0008` | [[EXP-0008-breakout-compressao-de-volatilidade\|rompimento após compressão de volatilidade]] (`breakout_v1`, 1,25/2,5 ATR, invalidação estrutural com guarda de geometria) | T3.33a | **aberto em 2026-09-08T16:23:39Z** (ativação `research_only`); replay de abertura `as_of = 2026-09-08T16:36:58Z`, **inconclusivo** — 0 decisões, recomendação `descartar` (não executada) |
+| `EXP-0009` | [[EXP-0009-mean-reversion-pullback-em-tendencia\|recuo comprado dentro de tendência de 1 h]] (`mean_reversion_v1`, 1,0/1,5 ATR, **sem** invalidação) | T3.33b | **aberto em 2026-09-08T16:32:33Z** (ativação `research_only`); replay de abertura `as_of = 2026-09-08T16:41:07Z`, **inconclusivo** — 37 decisões, 11 dias; coorte `prospective` em curso |
+| `EXP-0010` | [[EXP-0010-session-orb-faixa-de-abertura\|rompimento da faixa de abertura de sessão]] (`session_orb_v1`, stop na mínima da faixa, alvo em 2 R; **família nova** no catálogo) | T3.33c | **módulo commitado em `3ed17bb`, sem ativação e sem coorte** — `nao-iniciado`; portão C1–C8 = REVISE (62,5), teto de pedágio 0,3333 R; ativação e replay em voo (T3.33f) |
+| `EXP-0011` | [[EXP-0011-derivatives-reversao-de-funding\|comprar depois de funding liquidado negativo]] (`derivatives_v1`, 2,0/3,0 ATR, horizonte de 8 h) | T3.33d | **bloqueado por pré-checagem em 2026-09-08** — 5 liquidações negativas em 31 d × 4 mercados; **módulo não escrito**, reexecutar ~2026-10-06. Aberto **contra** a recomendação de [[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]], com a divergência declarada na página |
 
 A reserva está consolidada nos três lugares que a decisão exige: aqui, em `docs/plans/SHADOW-LAB.md` (item 11) e em `docs/plans/M2.md` (T2.8).
 
@@ -191,10 +210,10 @@ Todos os números vêm de `agent_signals` / `signal_outcomes` reais, com o SQL c
 | [[EXP-0005-momentum-paper]] | `momentum` v3 (`purpose = paper`, D10) — a mesma decisão medida pela carteira | 2026-09-08 | `2026-09-08T12:00:00Z` | **inconclusivo** — 30 avaliáveis maturados (31 antes do gate), **1** dia; e a carteira **não foi tocada**: `ENABLE_PAPER_AUTONOMY=false`, 0 propostas / 0 posições / 0 trades |
 | [[EXP-0006-momentum-piso-de-custo]] | `momentum` v4 — variante de **parâmetro** (`atr_pct_min` 0,003 → 0,0089), mesmo `code_ref` do pai `v2` | 2026-09-08 | `2026-09-08T13:09:41Z` (**replay** de abertura) | **inconclusivo** — 30 avaliáveis, **9** dias; **o piso corta 86% das decisões** (31 contra 224 do pai) e toda a diferença de expectancy vem de **6 decisões sem par**, 5 avaliáveis |
 | [[EXP-0007-momentum-invalidacao-bracos-INV]] | replay de **política de saída** sobre entradas congeladas: `momentum` v1/v2 e `volume_anomaly` v2, 8 braços | 2026-09-08 | `2026-09-08T04:00Z` (replay) e `15:00Z` (prospectivas), `read_at = 15:11–15:15Z` | **inconclusivo** — 4 populações (222 · 337 · 189 · 933 avaliáveis; 24 · 29 · 1 · 3 dias), **nenhum dos 7 contrastes rejeita em nenhuma**; a invalidação **adianta** a perda, não a cria |
-| [[EXP-0008-breakout-compressao-de-volatilidade]] | `breakout` v1 — compressão de TR (8/32) antes do rompimento de 20 barras | 2026-09-08 (proposto) | — | **não iniciado** — nada rodado, nada ativado; portão C1–C8 **pendente** |
-| [[EXP-0009-mean-reversion-pullback-em-tendencia]] | `mean_reversion` v1 — z ≤ −1 dentro de tendência de 1 h, sem invalidação | 2026-09-08 (proposto) | — | **não iniciado** — geometria 1,5/1,0 **recusada antes de rodar** (equilíbrio 86,7 %) |
-| [[EXP-0010-session-orb-faixa-de-abertura]] | `session_orb` v1 — faixa da 1ª hora de Ásia/Europa/EUA, stop no dado, alvo em 2 R | 2026-09-08 (proposto) | — | **não iniciado** — a Astra recomendou deixar calendário fora desta rodada; divergência registrada |
-| [[EXP-0011-derivatives-reversao-de-funding]] | `derivatives` v1 — funding liquidado ≤ −0,01 % em 8 h, depois de queda, com estabilização | 2026-09-08 (proposto) | — | **não iniciado** — pré-checagem de funding **antes** de escrever o módulo |
+| [[EXP-0008-breakout-compressao-de-volatilidade]] | `breakout` v1 — compressão de TR (8/32) antes do rompimento de 20 barras | 2026-09-08 | `2026-09-08T16:36:58Z` (**replay** de abertura) | **inconclusivo** — **0 decisões em 11 904 barras**; 14/14 `REJECTED / geometry_invalidation` (100 %, teto 20 %); K1 dispara → **recomendação `descartar`**, não executada. Portão C1–C8 = **REVISE** (66,0), autoavaliação do quant |
+| [[EXP-0009-mean-reversion-pullback-em-tendencia]] | `mean_reversion` v1 — z ≤ −1 dentro de tendência de 1 h, sem invalidação | 2026-09-08 | `2026-09-08T16:41:07Z` (**replay** de abertura) | **inconclusivo** — 37 avaliáveis (< 100), **11** dias (< 30); bruta +0,3210 R, líquida **+0,0938 R**, PF 1,186, cobertura 100 %; **o saldo inteiro está em 6 saídas por horizonte e 2 dias**. Portão C1–C8 = **REVISE** (65,5) |
+| [[EXP-0010-session-orb-faixa-de-abertura]] | `session_orb` v1 — faixa da 1ª hora de Ásia/Europa/EUA, stop no dado, alvo em 2 R | 2026-09-08 | — (**pendente**, T3.33f) | **não iniciado** — módulo commitado (`3ed17bb`), sem ativação; portão C1–C8 = **REVISE** (62,5), teto de pedágio **0,3333 R**; a Astra recomendou deixar calendário fora desta rodada, divergência assumida |
+| [[EXP-0011-derivatives-reversao-de-funding]] | `derivatives` v1 — funding liquidado ≤ −0,01 % em 8 h, depois de queda, com estabilização | 2026-09-08 | `2026-09-08` (**pré-checagem**, sem replay) | **inconclusivo / `bloqueado-por-precheck`** — 5 liquidações negativas em 31 d × 4 mercados (ETH e DOGE: 0), teto medido de 158 barras (1,33 %); **módulo não escrito de propósito**; reexecutar ~2026-10-06 |
 
 ### O que a próxima extração tem de fazer (achados da revisão da Astra, 2026-09-06)
 

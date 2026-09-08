@@ -1,15 +1,15 @@
 ---
 tags: [experimento, mean-reversion, shadow-lab, custos]
 updated: 2026-09-08
-status: proposto
+status: em-andamento
 owner: sexta-feira
 exp: EXP-0009
 strategy: mean_reversion
 version: v1
-result: nao-iniciado
-evaluable: 0
-days: 0
-last_eval: ""
+result: inconclusivo
+evaluable: 37
+days: 11
+last_eval: 2026-09-08
 ---
 
 # EXP-0009 — recuo comprado dentro de tendência de 1 h (`mean_reversion_v1`)
@@ -18,6 +18,13 @@ last_eval: ""
 > (T3.33, `.claude/state/exp-drafts/EXP-0009-mean-reversion-pullback-em-tendencia.md`).
 > **Nada foi rodado. Nada foi ativado.** "Hipótese" e "Protocolo" **congelados**; avaliações
 > **acrescentadas** abaixo, datadas. Brief: `.claude/state/brief-T3.33b-mean_reversion_v1.md`.
+>
+> **Acréscimo de 2026-09-08 (tarde, T3.33h), sem apagar nada acima:** o módulo foi escrito (T3.33a+b,
+> commit `6e9eaa2`), a versão foi **ativada** como `research_only` às 16:32:33Z e replayada por
+> 31 dias (T3.33e, commit `cf51c7d`). O dia um está na avaliação datada no fim desta página:
+> **37 decisões, 11 dias, expectancy líquida +0,0938 R** — o **primeiro** resultado líquido positivo
+> que o Lab mede, e mesmo assim `inconclusivo`: 37 < 100 avaliáveis, 11 < 30 dias, e o saldo inteiro
+> vem de **seis** saídas por horizonte.
 
 ## Hipótese (congelada)
 
@@ -87,21 +94,71 @@ escolhido porque 21 barras horárias **cabem** no orçamento de contexto de 26 h
 (`SHADOW_CONTEXT_MINUTES = 1560`); uma média horária de 50 períodos **não cabe**, e dizer isso é mais
 honesto que escolher 50 e ver toda barra voltar `warmup`. `atr_pct_min = 0,006` sai da tabela acima.
 
-## Portão de desenho (C1–C8) — **pendente**
+## Portão C1–C8 — veredito de 2026-09-08, escrito **antes** do módulo (T3.33b)
 
-O portão de oito critérios é a tarefa **T3.36**
-(`.claude/state/brief-T3.36-validation-gate-and-stress-pass.md`). O **método** já existe como
-referência (`.claude/skills/edge-strategy-reviewer/references/review_criteria.md`); o que ainda não
-existe é a **seção correspondente no [[_TEMPLATE-EXP]]**. O veredito (PASS/REVISE/REJECT) é escrito
-**pelo implementador, antes do código**, e o `code-reviewer` confere que ele existe.
-**C2 (limiares precisos) e C5 (calibração da saída) são os que mordem aqui**: a geometria foi
-escolhida por aritmética de custo e o z-score é convenção; e **C8 é `fail` por construção**, porque
-esta versão não tem invalidação.
+**Quem escreveu, e isso muda como se lê a tabela:** **autoavaliação do `quant-engineer`** contra os
+critérios de `.claude/skills/edge-strategy-reviewer/references/review_criteria.md`, aplicada ao
+contrato congelado acima antes do código. **Não é revisão viva da Astra** — ninguém de fora pontuou
+esta página, e a revisão da T3.33a+b (`code-reviewer`) aprovou com essa ressalva explícita.
+**Não altera Hipótese nem Protocolo.**
 
-**Estado em 2026-09-08:** a **T3.33b está em voo** e já aplicou o portão ao rascunho desta página
-(`.claude/state/exp-drafts/EXP-0009-mean-reversion-pullback-em-tendencia.md`). O veredito e as
-instruções de revisão entram **aqui** quando aquela tarefa fechar — copiar um resultado de um
-rascunho que ainda está sendo escrito seria arquivar um número que pode mudar. Até lá, **pendente**.
+| # | Critério (peso) | Leitura sobre este EXP | Sev. | Nota |
+|---|---|---|---|---|
+| C1 | Edge Plausibility (20) | tese com mecanismo causal nomeado — fluxo impaciente empurra o preço além do valor em minutos, a tendência de 1 h dá a direção | pass | 80 |
+| C2 | Overfitting Risk (20) | 5 condições de entrada + 1 porta de tendência = 6 ≤ 10 → 80; penalidade −10 por limiar com casa decimal: `atr_pct_min = 0,006` e `atr_pct_max = 0,05` → −20 | pass | **60** |
+| C3 | Sample Adequacy (15) | `252 ÷ 2` (a porta de 1 h é filtro de regime declarado) `× 0,8⁴ × 0,85 ≈ 44`/ano ≥ 30 | pass | 80 |
+| C4 | Regime Dependency (10) | o plano de validação congelado (K1–K5) **não** menciona regime | **warn** | 40 |
+| C5 | Exit Calibration (10) | `stop_loss_pct ≤ 1,0 × 0,05 = 0,05 ≤ 0,15`; `take_profit_rr = 1,5/1,0 = 1,5`, que **não** é `< 1,5` | pass | 80 |
+| C6 | Risk Concentration (10) | não aplicável por construção (`research_only`, sem carteira); o perfil que existiria é `PAPER_V1`: `risk_per_trade_pct = 0,0025 ≤ 0,015`, `max_concurrent_positions = 5 ≤ 10` | pass | 80 |
+| C7 | Execution Realism (10) | **não há filtro de volume nas condições**, deliberadamente: um portão de volume confundiria este eixo com o da `volume_anomaly_v1` | **warn** | 50 |
+| C8 | Invalidation Quality (5) | `invalidations = ()` — vazio | **fail** | 10 |
+
+`confidence_score = (80·20 + 60·20 + 80·15 + 40·10 + 80·10 + 80·10 + 50·10 + 10·5)/100 = 65,5`.
+
+**Veredito: `REVISE`** — não é `REJECT` (C1 e C2 não são `fail`) e não é `PASS` (há um `fail` e
+65,5 < 70). As três instruções de revisão, e o que foi feito com cada uma:
+
+1. **C4 — plano de validação sem regime.** Aceita e corrigida **na avaliação**, não no protocolo: a
+   primeira avaliação publica a decomposição por regime de BTC e por decil de ATR%. Com C4 = 80 o
+   escore vai a **69,5** — ainda `REVISE`, porque C8 sozinho já impede o `PASS`. *(Na prática o corte
+   por regime saiu **impossível** no replay — ver a avaliação datada.)*
+2. **C7 — sem filtro de volume.** **Recusada, com motivo.** Um portão de volume mudaria a tabela de
+   parâmetros congelada e faria esta versão medir o mesmo eixo da `volume_anomaly_v1`. A mitigação
+   existente é declarada e é outra: o universo elegível (`markets.is_monitored`, top N por volume) e
+   o piso de ATR% de 0,006.
+3. **C8 — sem invalidação.** **Recusada, e é o desenho.** Este é o braço `INV-B` de
+   [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]]: uma entrada cuja tese é "o preço está
+   abaixo do que deveria" não pode carregar uma regra que sai quando o preço cai mais. O portão está
+   calibrado para estratégias que **têm** invalidação e pontua a ausência como defeito; aqui a
+   ausência **é** a hipótese. **Divergência declarada, não conserto.**
+
+**Limite do próprio portão, declarado:** C3 é uma fórmula de barra diária em ações (base 252). Esta
+versão avalia 96 barras por dia por mercado; o risco honesto aqui não é escassez de amostra, é o
+**oposto** — K2 (mais de 1 500 decisões em 31 dias × 4 mercados, isto é, a profundidade virar relógio
+e não condição). O portão não sabe disso.
+
+**A divergência de fórmula que a revisão da T3.33a+b registrou, e que continua registrada:** a
+definição do `z` implementada **diverge da candidata que a Astra propôs**. A implementada é a
+congelada no Protocolo acima e é a que rodou; a diferença fica aqui como fato, não como conserto —
+mudar a fórmula é versão nova.
+
+### O teto de custo desta geometria (confirmação pedida pela T3.32)
+
+A T3.32 mediu, em dez populações, que `custo_R × risco%_do_preço = 0,0020` **constante**
+(desvio ≤ 1,9×10⁻⁵) — aritmética de 20 bps de ida e volta, não estatística. Para esta geometria
+(`stop = 1,0 ATR`, portanto `risco% = ATR%`), reproduzido em `Decimal`:
+
+| versão | risco% no piso | **teto de custo** | risco% no teto de ATR% | custo no teto |
+|---|---:|---:|---:|---:|
+| `mean_reversion_v1` (`stop_atr` 1,0, `atr_pct_min` 0,006) | 0,60 % | **0,3333 R** | 5,0 % | 0,0400 R |
+| `momentum_v1` (`stop_atr` 1,5, `atr_pct_min` 0,003) | 0,45 % | 0,4444 R | — | — |
+| `momentum v4` (piso 0,0089) | 1,335 % | 0,1498 R | — | — |
+| `volume_anomaly v2` — **medido** no replay | 0,552 % | 0,6152 R | — | — |
+
+**O teto de custo desta versão é 0,3333 R por operação**, no pior caso admissível (ATR% no piso).
+Fica **abaixo** do teto do `momentum_v1` apesar do stop mais apertado em ATR, e é isso que o piso de
+0,006 compra. Não é previsão de custo médio: o médio depende da distribuição de ATR% dos disparos —
+e ela saiu em **0,2263 R** no replay abaixo.
 
 ## O que falsifica esta hipótese
 
@@ -131,15 +188,159 @@ rascunho que ainda está sendo escrito seria arquivar um número que pode mudar.
 
 ## Avaliações (acrescentadas, nunca reescritas)
 
-**Nenhuma ainda.** A primeira será acrescentada aqui, datada, com: coorte, janela, mercados, recibos,
-comandos exatos, cobertura completa, métricas com denominador, decomposição com/sem porta de
-tendência, distribuição de `z` na decisão, `Result` e `Next Action`.
+### Avaliação de 2026-09-08 — replay de abertura — **REPLAY, não coleta prospectiva** (T3.33e)
+
+`as_of` da população: 2026-09-08T16:41:07Z (fim da segunda corrida) · `read_at`: 2026-09-08T16:50Z.
+**Rótulo obrigatório:** é a **mesma janela que gerou a hipótese**; não confirma nada.
+
+**Ativação (início do experimento, [[Registro de Tentativas]] T-036):** 2026-09-08T16:32:33,947955Z
+(13:32:33 em Brasília), `purpose = research_only`, `status = active`,
+`code_ref = hunter_core.strategies.mean_reversion_v1@sha256:a970c9d98fface2d714abdce25468828ee07087f9287fdb1239dadc3f0bd395f`
+— digest do dry-run igual ao exigido no brief antes de qualquer escrita; 18 parâmetros congelados,
+os do `brief-T3.33b` §6.
+
+**Coorte:** `replay:d0f77894-1e04-454e-a49f-d9a98d894968`, uma só, duas fatias contíguas
+(2026-08-08→2026-08-23 e 2026-08-23→2026-09-08), ETHUSDT/SOLUSDT/XRPUSDT/DOGEUSDT, `--workers 3`,
+`decision_lag_s = 2`.
+
+**Recibos do livro-razão (`replay_runs`, `system_events[replay_engine]`, JSONL no worker):**
+
+| fatia | barras | sinais* | desfechos* | seg | barras/s | estados | erros |
+|---|---:|---:|---:|---:|---:|---|---:|
+| 08-08 → 08-23 | 5 760 | 17 | 17 | 93,110 | 61,86 | `{"unavailable":448,"not_triggered":5284,"triggered":28}` | 0 |
+| 08-23 → 09-08 | 6 144 | 37 | 37 | 104,545 | 58,77 | `{"not_triggered":6108,"triggered":36}` | 0 |
+
+\* contagem **da coorte inteira** a cada corrida, não da fatia: a população final é **37 decisões**,
+confirmada por `count(*)` em `agent_signals` (uma única coorte; primeira decisão 2026-08-20 03:45:02Z,
+última 2026-09-06 15:15:02Z). Os 17 e os 37 **não somam**.
+
+**Cobertura (denominador = 11 904 barras = 31 dias × 96 × 4 mercados):** `unavailable` 448 (3,76 %),
+`not_triggered` 11 392 (95,70 %), `triggered` 64 (0,538 %), `rejected` 0, `ineligible` 0. Das 64
+barras disparadas, **37** viraram decisão; as 27 restantes caíram na barreira de re-arme / regra "um
+acompanhamento por (versão, mercado, coorte)" — **não são perda de dado**. Desfechos terminais 37,
+censurados 0, funding indisponível 0. As contagens fecham com o total.
+
+**`atr_gap` / `trend_gap` — medidos por diferença, e o resultado é zero.** As razões de `unavailable`
+não são persistidas pelo replay (só o estado). Mas a `breakout v1` rodou **as mesmas 11 904 barras**
+no mesmo dia e devolveu **exatamente 448** `unavailable` — e ela **não tem** porta de 1 h. Como o
+total não subiu nem uma barra ao acrescentar a exigência de 1 260 minutos contíguos, **`trend_gap` = 0
+nesta janela**: os 448 são o aquecimento comum do início (112 barras por mercado ≈ 28 h). A
+preocupação "a versão estaria medindo a nossa coleta" **não se confirmou**.
+
+**Métricas (denominador explícito: 37 decisões, todas terminais e todas avaliáveis):**
+
+| métrica | valor | denominador |
+|---|---:|---|
+| decisões | 37 | 11 904 barras (0,298 por mercado-dia) |
+| avaliáveis · cobertura de `R_net` | 37 · **100,0 %** | 37 |
+| dias distintos · mercados distintos | **11** · 4 | janela de 31 dias · 4 pedidos |
+| expectancy **bruta** (`r_gross`) | **+0,3210 R** | 37 |
+| expectancy ex-funding (`r_ex_funding`) | +0,0948 R | 37 |
+| **expectancy líquida hipotética em R** (`R_net`) | **+0,0938 R** | 37 |
+| pedágio médio (`custo_R`) | 0,2263 R | 37 |
+| soma de `R_net` | +3,47 R | 37 |
+| **taxa de alvo entre toques resolvidos** (`target/(target+stop)`) | 15/31 = **48,4 %** | 31 toques resolvidos |
+| taxa de `result = target` sobre a população | 40,5 % | 37 |
+| **profit factor** líquido · bruto | **1,186** · 1,800 | 37 |
+| risco/preço médio · funding médio | 1,050 % · +0,001002 R | 37 |
+| **PnL de carteira · Max Drawdown de carteira** | **não aplicável** | sem carteira |
+
+Identidade de custo da T3.32 verificada linha a linha: `custo_R × (risco/preço)` = 0,00200332 em
+média (mín 0,00197308, máx 0,00202846) — desvio ≤ 2,9×10⁻⁵ de 0,0020, a mesma decomposição das dez
+populações de lá.
+
+**Por motivo de saída:**
+
+| motivo | n | % | `R_net` médio | soma `R_net` | `R` bruto médio |
+|---|---:|---:|---:|---:|---:|
+| `stop` | 16 | 43,2 | −1,1682 | −18,69 | −0,9281 |
+| `target` | 15 | 40,5 | +1,2732 | +19,10 | +1,5199 |
+| `expired` (horizonte 4 h) | 6 | 16,2 | +0,5104 | +3,06 | +0,6548 |
+
+**O saldo inteiro está no balde do horizonte.** Alvo e stop quase se anulam (+19,10 − 18,69 =
+**+0,41 R em 31 decisões**, +0,013 R cada); os +3,47 R da coorte são, dentro do arredondamento, os
++3,06 R das **seis** saídas por tempo. Por isso 40,5 % de acerto e expectancy positiva não
+contradizem o equilíbrio de 53,35 % da tabela congelada — aquela conta supõe população binária
+stop/alvo.
+
+**Profundidade de `z` na decisão (decomposição obrigatória):**
+
+| faixa de z | n | z mín | z máx | exp. bruta R | exp. líquida R | soma R | acerto |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| −1,25 < z ≤ −1,00 | 11 | −1,198 | −1,019 | +0,8808 | **+0,6879** | +7,57 | 63,6 % |
+| −1,50 < z ≤ −1,25 | 5 | −1,439 | −1,307 | −0,2655 | −0,5027 | −2,51 | 20,0 % |
+| −2,00 < z ≤ −1,50 | 11 | −1,926 | −1,576 | +0,3917 | +0,1379 | +1,52 | 45,5 % |
+| z ≤ −2,00 | 10 | −3,080 | −2,049 | −0,0792 | −0,3101 | −3,10 | 20,0 % |
+
+**Não há monotonicidade**, e o sinal aparente é o inverso do esperado: o balde mais raso — o que
+passa raspando no `zscore_depth_min = 1` — carrega o resultado, e o mais fundo perde. Com n = 10–11
+por balde isto é ruído do tamanho do efeito; o que fica registrado é que "mais esticado" **não** se
+mostrou melhor, e que `zscore_depth_min` continua sendo convenção declarada, não medida.
+
+**Por faixa de ATR% (piso congelado 0,006):**
+
+| faixa | n | ATR% mín | ATR% máx | exp. bruta R | exp. líquida R | soma R |
+|---|---:|---:|---:|---:|---:|---:|
+| 0,006 ≤ ATR% < 0,008 | 20 | 0,00603 | 0,00775 | +0,1956 | **−0,0814** | −1,63 |
+| 0,008 ≤ ATR% < 0,010 | 6 | 0,00815 | 0,00935 | +0,1201 | **−0,0912** | −0,55 |
+| 0,010 ≤ ATR% < 0,015 | 6 | 0,01044 | 0,01462 | +0,7087 | +0,5212 | +3,13 |
+| ATR% ≥ 0,015 | 5 | 0,01742 | 0,03565 | +0,5987 | +0,5033 | +2,52 |
+
+**26 das 37 decisões (70,3 %) estão abaixo de ATR% 0,010 e são líquidas negativas com a bruta
+positiva nos dois baldes** — é o pedágio comendo a vantagem, o mecanismo da
+[[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] e da T3.32. **Subir o piso é `v2`, não ajuste**, e
+fica registrado como candidato no [[Strategy Backlog]].
+
+**Por mercado** (mistura de slot declarada: seis versões dividem o mesmo mercado): DOGEUSDT 12
+(ATR% médio 0,01083; líquida −0,0927; −1,11 R; 25,0 %) · ETHUSDT 6 (0,00792; +0,2132; +1,28 R;
+50,0 %) · SOLUSDT 8 (0,00849; +0,3490; +2,79 R; 50,0 %) · XRPUSDT 11 (0,01356; +0,0465; +0,51 R;
+45,5 %).
+
+**Por dia** (11 dias com decisão em 31): 08-20 (5, +4,98 R) · 08-21 (6, +6,40) · 08-22 (6, +0,55) ·
+08-23 (1, +1,22) · 08-24 (3, +0,26) · 08-25 (4, −4,62) · 08-27 (3, +1,02) · 08-28 (2, −2,43) ·
+09-03 (3, −3,49) · 09-05 (1, −1,18) · 09-06 (3, +0,78). **Dois dias valem +11,4 R enquanto os outros
+nove somam −7,9 R.**
+
+**A porta de tendência não pôde pagar por si: o braço "sem porta" não existe no banco.** Os recuos
+que a porta rejeita saem `not_triggered` e não persistem nada, então a comparação pareada que esta
+página exige precisa de uma **irmã de parâmetro** (`derive_variant.py`) com a porta desligada,
+replayada na mesma janela. **Não foi feito**; fica declarado como pendência, não como resultado.
+
+**Corte por regime de BTC (obrigação C4): impossível** — `market_regimes` tem uma linha no banco,
+começando em 2026-09-06 18:18. Só o prospectivo poderá fazê-lo; está em [[Open Bugs]].
+
+**Critérios de morte (congelados antes da corrida):**
+
+| # | leitura | disparou? |
+|---|---|---|
+| K1 — < 20 decisões | 37 | não |
+| K2 — > 1 500 decisões (o risco real desta versão) | 37 (0,298/mercado-dia) | não |
+| K3 — ≥ 100 avaliáveis **e** ≥ 30 dias **e** bruta < 0 | 37 (< 100), 11 dias (< 30), bruta +0,3210 R | não |
+| K4 — `unavailable` > 40 % | 3,76 % | não |
+| K5 — cobertura de `R_net` < 70 % | 100 % | não |
+| gap da porta de 1 h | `trend_gap` = 0 | não |
+
+**Result: `inconclusivo`** — madura exige ≥ 100 avaliáveis **e** ≥ 30 dias distintos; temos 37 e 11.
+**Next Action: seguir prospectivo** (coorte `prospective`, universo elegível inteiro) e reavaliar pela
+régua de 30 dias. **O saldo positivo desta janela não é evidência**: vem da mesma amostra que gerou a
+hipótese, de seis saídas por tempo e de dois dias. Nada promove nada; `research_only` continua sem
+carteira.
+
+**Multiplicidade (KB-0010), declarada junto:** esta é a 4ª versão nova aberta em 2026-09-08, e o
+veredito acima deve ser lido sabendo disso.
+
+**Isolamento:** 0 linhas de `shadow_outbox` e 0 `trade_proposals` ligadas à coorte; `errors = 0` nas
+duas corridas.
+
+Fonte integral (comandos, saídas verbatim, SQL e recibos): `.claude/state/notes-T3.33e.md`.
 
 ## Variantes tentadas
 
 | Variante | Quando | Por quê | Onde ficou registrada |
 |---|---|---|---|
 | geometria 1,5/1,0 | 2026-09-08 | recusada **antes** de rodar, por aritmética de custo (equilíbrio 86,7 % no piso) | esta página, seção Geometria |
+| irmã **sem** a porta de tendência de 1 h (`derive_variant.py`, mesmo `code_ref`) | 2026-09-08 | é o único jeito de fazer a porta "pagar por si": os recuos que ela rejeita saem `not_triggered` e não persistem | **proposta, não rodada** — avaliação de 2026-09-08 e [[Strategy Backlog]] |
+| piso de ATR% acima de 0,010 (`v2` por parâmetro) | 2026-09-08 | 70,3 % das decisões estão abaixo de 0,010 e são líquidas negativas com a bruta positiva | **proposta, não rodada** — subir piso é versão nova, nunca ajuste; [[Strategy Backlog]] |
 
 ## Relacionadas
 

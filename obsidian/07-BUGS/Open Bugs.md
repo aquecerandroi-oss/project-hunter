@@ -156,6 +156,52 @@ independentes" que reutilizam dados) foi corrigida pela T3.18c. Movida para [[Re
   distinto de "heartbeat sem estes campos". Estado: **aberto 2026-09-08 (Sexta-feira, observação de
   tela)**.
 
+## Abertos pelo dia um das quatro estratégias novas (2026-09-08, T3.33d/T3.33e, arquivados na T3.33h)
+
+Os três abaixo **bloquearam medição declarada como obrigatória** nas páginas de experimento — não são
+suspeitas de código, são instrumentos que faltaram na hora de ler o dado. Estado de todos: **aberto
+2026-09-08 (Sexta-feira, a partir das notas do `quant-engineer`)**.
+
+- **HIGH (instrumento de pesquisa) — o replay não persiste o *motivo* de cada barra, só o estado.**
+  `services/strategy-worker/hunter_strategy_worker/replay/simulate.py` conta
+  `evaluations_by_state` (`unavailable`/`not_triggered`/`triggered`/`rejected`/`ineligible`) e
+  **descarta a razão** (`atr_gap`, `trend_gap`, `not_compressed`, `no_breakout`, `rvol_low`,
+  `atr_out_of_range`, `geometry_invalidation`). **Cenário concreto, já ocorrido:** a
+  [[EXP-0008-breakout-compressao-de-volatilidade]] exige (obrigação C2) a distribuição de
+  `squeeze_ratio` em barras que disparam e que não disparam, e a
+  [[EXP-0009-mean-reversion-pullback-em-tendencia]] exige a fatia `atr_gap`/`trend_gap` — **nenhuma
+  das duas foi obtível** no replay de 31 dias. O que se conseguiu foi por **diferença** entre duas
+  versões sobre as mesmas barras (`trend_gap = 0`) e por **construção** (as 14 rejeições são a segunda
+  porta de geometria) — dois contornos que só funcionaram porque duas versões rodaram as mesmas
+  11 904 barras no mesmo dia. **Correção proposta e já em voo:** `--explain-ledger` no `replay.run`
+  gravando `(bar_close, market, state, reason, detail)` em JSONL — só arquivo, sem tabela nova, sem
+  mudar uma linha da avaliação (**T3.33f**,
+  `.claude/state/brief-T3.33f-breakout-v2-explain-ledger-session-orb.md`).
+
+- **HIGH (dado ausente) — `market_regimes` tem UMA linha no banco inteiro, e por isso o corte C4 é
+  impossível em replay.** A única linha começa em `2026-09-06 18:18:05`; não há regime gravado para
+  agosto. **Cenário:** o portão C1–C8 marcou **C4 = warn** nas quatro estratégias novas justamente
+  porque o plano de validação não estratificava por regime, e a correção prometida ("a primeira
+  avaliação quebra o resultado por regime de BTC") **não pôde ser cumprida em nenhuma das duas
+  avaliações do dia um** — o SQL existe
+  (`infra/scripts/sql/research/2026-09-08-07-regime-btc.sql`) e não tem o que ler. Consequência: toda
+  obrigação de regime só é cumprível **prospectivamente**, e dizer "quebramos por regime" antes disso
+  seria inventar corte. A causa raiz é o warm-up do classificador, já rastreado em
+  [[KB-0031-o-classificador-de-regime-esta-mudo-por-warm-up]]; o que este item acrescenta é o **efeito
+  medido**: duas avaliações publicadas com uma obrigação de portão declarada como não cumprida.
+
+- **MEDIUM (teste) — `test_isolation` não cobre `/risk/limits`** (achado 3 da revisão da T3.37c).
+  `apps/api/tests/integration/test_isolation.py` enumera à mão as rotas que um intruso tenta
+  (`kill-switch`, `kill-switch/resume`, as sete leituras de portfólio da T3.8a…), e
+  **`GET .../risk/limits`, que `apps/api/hunter_api/routers/risk.py` serve, não está na lista**
+  — conferido nesta tarefa por leitura dos dois arquivos. **Cenário:** alguém acrescenta um filtro por organização errado (ou o
+  remove num refactor) em `/risk/limits` e a suíte inteira continua verde — a regressão só apareceria
+  com dois tenants em produção, que é exatamente o cenário que o teste existe para impedir. Não é
+  vazamento observado: hoje a rota filtra certo. É **cobertura ausente**, e a diferença entre as duas
+  coisas está dita de propósito. **Correção:** incluir `/risk/limits` na tabela de rotas do
+  `test_isolation` e travar o conjunto com uma asserção de completude, para que a próxima rota nova
+  não entre calada.
+
 ## Abertos na T3.21 (higiene da base)
 
 - **LOW (base de conhecimento) — 32 das 75 notas de `11-KNOWLEDGE` estão com

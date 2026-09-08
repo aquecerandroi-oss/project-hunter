@@ -682,6 +682,44 @@ a hipótese, que é exatamente o que a
 [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] proíbe. **Nada foi ativado**, e o
 alvo só volta à pauta com janela reservada de 2026-09-08 em diante.
 
+## Acréscimo de 2026-09-08 (tarde, T3.33e/T3.33d) — T-035 e T-036 **começaram**; T-038 não começou
+
+Linhas **novas, com as mesmas IDs** e o motivo, como manda esta página — as linhas de T-035 a T-038 da
+seção anterior **não** foram editadas. O que mudou: duas das quatro têm **data de início**, que é o
+instante da ativação auditada, gravado **antes da primeira barra** e conferido contra o `system_event`
+de `activate_strategy_version`.
+
+| ID | Candidata | Nota de origem | Parâmetros | `δ` | Início/fim UTC | Status |
+|---|---|---|---|---|---|---|
+| T-035 | **rompimento após compressão de volatilidade** (`breakout_v1`) | [[KB-0053-contracao-de-volatilidade-o-unico-pedaco-formalizavel]] · [[KB-0003-rompimento-de-canal-e-data-snooping]] | os 20 congelados no `brief-T3.33a` §6, `code_ref …breakout_v1@sha256:4c920b0c…64ff1` | **não declarado antes da corrida** — limitação registrada, não corrigida depois | **início = 2026-09-08T16:23:39,791800Z** (13:23:39 BRT); replay retrospectivo `2026-08-08 → 2026-09-08`, coorte `replay:2059ea0c-…`; **fim não declarado** | **avaliada em replay — `inconclusivo`, recomendação `descartar`**: **0 decisões em 11 904 barras**, 14/14 `REJECTED / geometry_invalidation` (100 %, contra o teto de 20 %), K1 dispara. A hipótese da compressão **não chegou a ser testada** — [[EXP-0008-breakout-compressao-de-volatilidade]] |
+| T-036 | **recuo comprado em tendência de 1 h** (`mean_reversion_v1`) | [[KB-0002-momentum-e-reversao-em-cripto]] · [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]] | os 18 congelados no `brief-T3.33b` §6, `code_ref …mean_reversion_v1@sha256:a970c9d9…395f` | **não declarado antes da corrida** — mesma limitação | **início = 2026-09-08T16:32:33,947955Z** (13:32:33 BRT); replay retrospectivo `2026-08-08 → 2026-09-08`, coorte `replay:d0f77894-…`; coorte `prospective` **em curso, sem data de fim declarada** | **avaliada em replay — `inconclusivo`**: 37 decisões, 11 dias, bruta +0,3210 R, líquida **+0,0938 R**, PF 1,186, cobertura de `R_net` 100 %; **nenhum critério de morte disparou**. O saldo inteiro está em **6** saídas por horizonte e em **2** dias — [[EXP-0009-mean-reversion-pullback-em-tendencia]] |
+| T-037 | **faixa de abertura de sessão** (`session_orb_v1`) | [[KB-0009-o-efeito-do-quarto-de-hora]] · [[KB-0032-o-relogio-dentro-do-limiar-de-volatilidade]] | os 21 congelados no `brief-T3.33c` §7; `params_hash cdb9516b…d5e0` | a declarar antes do replay | **início ainda vazio** — módulo commitado em `3ed17bb`, **sem ativação e sem coorte**; ativação e replay em voo na T3.33f | **não iniciada** — portão C1–C8 preenchido (**REVISE**, 62,5) e teto de pedágio **0,3333 R** em [[EXP-0010-session-orb-faixa-de-abertura]] |
+| T-038 | **compra depois de funding liquidado negativo** (`derivatives_v1`) | [[KB-0023-funding-extremo-como-contrarian-a-afirmacao-mais-repetida]] · **contra** [[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]] | os do `brief-T3.33d` §7 — **nenhum chegou a rodar** | — | **não iniciada — pré-checagem** (`2026-08-08 ≤ funding_time < 2026-09-08`, consulta somente-leitura); reexecutar **~2026-10-06** | **não iniciada — reprovada na pré-checagem congelada**: **5** liquidações negativas além do juro em 31 d × 4 mercados (ETH e DOGE: **0**), teto medido de **158 barras** (1,33 %) em 2 dos 4 mercados. **O módulo não foi escrito, de propósito** — [[EXP-0011-derivatives-reversao-de-funding]] |
+
+**Contagem de multiplicidade, atualizada.** As tentativas **avaliadas** passam de **3 execuções** para
+**5**: T-035 e T-036 foram ativadas e lidas no mesmo dia (uma leitura cada, sobre a janela que gerou a
+hipótese). T-037 continua **candidata proposta** e passa a contar no instante da ativação; **T-038 não
+conta como tentativa avaliada** — nada foi medido sobre a hipótese dela, e o que foi refutado é a
+viabilidade do protocolo de dia um, não a ideia. Todo relatório de variante daqui para a frente cita
+este total.
+
+**Multiplicidade do dia, para quem ler os vereditos:** em 2026-09-08 foram abertas **quatro** versões
+novas — a linha `paper momentum v3` (05:57:30Z), `momentum v4` (13:05:13Z), `breakout v1`
+(16:23:39Z) e `mean_reversion v1` (16:32:33Z). Os dois vereditos acima têm de ser lidos sabendo disso
+([[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]]).
+
+**Por que nenhuma destas duas confirma coisa alguma.** (1) A coluna `Início/fim UTC` **não** foi
+preenchida antes da janela de replay: é retrospectiva sobre a população que já existia; (2) a janela é
+a **mesma** que gerou as hipóteses; (3) as duas estão abaixo do limiar editorial (100 avaliáveis
+**E** 30 dias): 0/0 e 37/11; (4) o resultado positivo da T-036 é carregado por **seis** desfechos por
+horizonte e por **dois** dias — retirar qualquer um deles muda o sinal. **A coorte `prospective` da
+`mean_reversion v1` é a tentativa de verdade, e a data de fim dela ainda precisa ser declarada.**
+
+**Nada foi ativado por causa de número bonito, e nada foi depreciado por número feio.** As duas são
+`research_only`, sem linha em `agents`; a ponte de execução recusa `research_only` pelo nome e a
+coorte `replay:` por nome. A recomendação de descartar a `breakout v1` está registrada e **não foi
+executada** — depreciar é ato auditado.
+
 ## Relacionados
 
 [[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]] ·

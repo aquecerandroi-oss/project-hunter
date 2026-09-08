@@ -17,7 +17,7 @@ Cada nota é uma síntese própria (nunca cópia), com fonte, data, qualidade da
 | Momentum e rompimentos | KB-0001, KB-0002, KB-0003, KB-0004, KB-0006 | primeira rodada feita (2026-09-06) |
 | Volume e fluxo de ordens | KB-0009, KB-0011, KB-0012, KB-0013, KB-0014, KB-0015, KB-0016, KB-0018 | segunda rodada feita (2026-09-06) |
 | Perpétuos: funding, OI, posicionamento | KB-0008, KB-0017, KB-0019, KB-0020, KB-0021, KB-0022, KB-0023, KB-0024, KB-0025, KB-0026 | **terceira rodada feita (2026-09-06)** |
-| Análise técnica clássica (o que tem evidência e o que não tem) | KB-0003 | iniciado |
+| Análise técnica clássica (o que tem evidência e o que não tem) | KB-0003, **KB-0077** | iniciado; **KB-0077 (2026-09-08, T3.34) é a primeira nota de *implementação* própria de geometria clássica** — pivôs, linhas, canais e eventos, com as seis figuras e o que um humano traçaria diferente |
 | Regime de mercado e volatilidade | KB-0007, KB-0016, KB-0027, KB-0028, KB-0029, KB-0030, KB-0031, KB-0032, KB-0033, KB-0034, KB-0035 | **quarta rodada feita (2026-09-06)** |
 | Gestão de risco e sizing | KB-0005, KB-0035, KB-0040 | iniciado |
 | **Dimensionamento e risco (Risk Engine M3/M4)** | KB-0066, KB-0067, KB-0068, KB-0069, KB-0070, KB-0071, KB-0072, KB-0073, KB-0074, KB-0075 | **oitava rodada feita (2026-09-06)** |
@@ -108,6 +108,7 @@ _(uma linha por nota: link para a nota — fonte curta — qualidade da evidênc
 | [[KB-0074-risco-operacional-as-regras-de-nao-operar-quando]] | risco operacional / qualidade do dado | medição própria + inventário das rodadas 2 a 7 | replicado + leitura de código | **não** — `R-OPS-1` a `R-OPS-4` |
 | [[KB-0075-paper-trading-honesto-o-que-a-sombra-ainda-nao-simula]] | risco / paper trading | nosso `walker.py`, contrato do M4 | leitura de código + contrato | sim — `D-PAPER-1` (cobertura a medir) e a convenção `C-PAPER` |
 | [[KB-0076-por-que-perdemos-2026-09-08]] | custos / diagnóstico próprio | dado da VPS (10 populações, 4.472 desfechos) + 4 replays de política de saída | medição própria, um snapshot só | sim — orçamento de custo na decisão; e a pergunta que falta: alguma entrada com bruto > 0,25 R? |
+| [[KB-0077-linhas-de-tendencia]] | análise técnica clássica / geometria determinística | implementação própria (`hunter_indicators.patterns`, T3.34) + 6 figuras em velas reais da VPS | implementação + teste de valor conhecido + revisão da Astra (3 defeitos corrigidos) | sim — é a base de `trendline_breakout_v1` (T3.34b); **a nota não afirma valor preditivo** |
 
 ## O que a primeira rodada mudou de fato
 
