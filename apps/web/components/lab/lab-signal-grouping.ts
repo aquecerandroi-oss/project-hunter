@@ -96,7 +96,27 @@ export function hasMultipleVersions(rows: SignalListItemOut[]): boolean {
   return uniqueInOrder(rows.map((row) => row.strategy_version_id)).length > 1;
 }
 
-/** First occurrence per `identity_key`, in loaded order -- the "unique operations" the totals card sums over (brief item 3): a sibling version repeating the same bar/entry/exit is never summed twice. */
-export function dedupeByIdentity(rows: SignalListItemOut[]): SignalListItemOut[] {
-  return groupSignalsByIdentity(rows).map((group) => group.primary);
+/**
+ * Pure `identity_key` dedupe (finding 5 of the T3.38 review): the exact same
+ * rule the server's own `totals.distinct_operations` counts by -- one row
+ * per `identity_key`, in loaded order, regardless of how many distinct
+ * `strategy_version_id`s share it. Deliberately *not* `groupSignalsByIdentity`'s
+ * own rule (which only merges a bucket spanning more than one version, so
+ * the *table* never silently drops a real row when a single-version page
+ * happens to hash the same key twice) -- this function backs money math
+ * only (the totals card's "desta página" scope): counting a same-version
+ * duplicate as two operations there would disagree with the server's own
+ * `totals.distinct_operations` for no visible reason, and "desta página"
+ * vs. "de todas as concluídas" would silently diverge on a real duplicate.
+ */
+export function dedupeByIdentityKey(rows: SignalListItemOut[]): SignalListItemOut[] {
+  const seen = new Set<string>();
+  const out: SignalListItemOut[] = [];
+  for (const row of rows) {
+    const key = identityKeyOf(row);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
 }

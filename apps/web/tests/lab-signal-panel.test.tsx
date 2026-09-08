@@ -127,6 +127,39 @@ describe("LabSignalPanel: sibling-version signals list (brief T3.38 item 1's 'or
   });
 });
 
+/** Finding 2 of the T3.38 review: the panel's own money block never hides a sibling group whose members disagree on money -- shows the real range instead of `signal`'s (the group's primary) own value alone. */
+describe("LabSignalPanel -> SignalMoneyBlock: divergent siblings show a range, never the primary's value alone (finding 2)", () => {
+  it("shows 'Resultado' as a range with '(faixa)' when siblingSignals disagree on r_multiple", () => {
+    const primary = makeSignal({ signal_id: "sig-a", r_multiple: "1.0" });
+    const sibling = makeSignal({ signal_id: "sig-b", r_multiple: "2.0" });
+    render(
+      <LabSignalPanel
+        signal={primary}
+        versionLabel="momentum/v2"
+        ruler={exampleRuler()}
+        siblingSignals={[primary, sibling]}
+        versionLabelFor={(id) => id}
+      />,
+    );
+    expect(screen.getByText(/\(faixa\)/)).toBeInTheDocument();
+  });
+
+  it("shows the ordinary single value (no '(faixa)') when siblings agree", () => {
+    const primary = makeSignal({ signal_id: "sig-a", r_multiple: "1.0" });
+    const sibling = makeSignal({ signal_id: "sig-b", r_multiple: "1.0" });
+    render(
+      <LabSignalPanel
+        signal={primary}
+        versionLabel="momentum/v2"
+        ruler={exampleRuler()}
+        siblingSignals={[primary, sibling]}
+        versionLabelFor={(id) => id}
+      />,
+    );
+    expect(screen.queryByText(/\(faixa\)/)).not.toBeInTheDocument();
+  });
+});
+
 describe("LabSignalPanel -> LabSignalDetail: the raw data (JSON) is fetched on demand (brief T3.24b: 'Ver envelope' -> 'Ver dados brutos (JSON)')", () => {
   it("calls the mocked action and shows the returned envelope as JSON when 'Ver dados brutos (JSON)' is clicked", async () => {
     loadLabSignalEnvelopeActionMock.mockResolvedValue({ ok: true, envelope: { rsi_14: "62.3", regime: "trend_up" } });

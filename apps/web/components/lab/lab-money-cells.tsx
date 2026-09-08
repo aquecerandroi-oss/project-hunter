@@ -1,5 +1,6 @@
 import { reasonLabel } from "@/components/lab/lab-format";
 import type { MoneyOrReason } from "@/components/lab/lab-money";
+import { formatMoneyRange, MONEY_DIVERGENCE_NOTE, type MoneyRange } from "@/components/lab/lab-signal-divergence";
 import { formatBrlSigned, formatUsdtSigned } from "@/lib/format";
 
 /**
@@ -20,6 +21,21 @@ export function LabResultValue({ pnlUsdt, pnlBrl }: { pnlUsdt: MoneyOrReason; pn
     <span className="font-mono tabular-nums text-fg">
       {formatUsdtSigned(pnlUsdt.value)}
       {pnlBrl !== null && <span className="text-fg-muted"> ({formatBrlSigned(pnlBrl)})</span>}
+    </span>
+  );
+}
+
+/**
+ * Renders instead of `LabResultValue`/`LabMoneyOrReason` when a merged
+ * group's members disagree on the money figure (finding 2 of the T3.38
+ * review) -- the real range plus a one-line note, never a single value
+ * standing in for the whole group.
+ */
+export function LabMoneyRangeValue({ range }: { range: MoneyRange }) {
+  return (
+    <span className="font-mono tabular-nums text-fg" title={MONEY_DIVERGENCE_NOTE}>
+      {formatMoneyRange(range)}
+      <span className="ml-1 text-[10px] font-sans font-normal text-warning">(faixa)</span>
     </span>
   );
 }

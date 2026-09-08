@@ -89,6 +89,7 @@ export function LabSignalsTableBody({
             row={group.primary}
             versionLabel={versionLabelFor(group.primary.strategy_version_id)}
             versionChips={chipsFor(group, versionLabelFor)}
+            members={group.members}
             ruler={ruler}
             showResearch={showResearch}
             rowHeight={rowHeight}

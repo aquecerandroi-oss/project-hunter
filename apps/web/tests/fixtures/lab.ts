@@ -140,8 +140,17 @@ export function exampleSignal(): SignalListItemOut {
   };
 }
 
+/**
+ * `identity_key` defaults from `signal_id` when only `signal_id` is
+ * overridden (T3.38c-web, finding 5): the totals card dedupes money by pure
+ * `identity_key` now, so distinct fixture rows must never accidentally
+ * share `exampleSignal()`'s own hard-coded default. An explicit
+ * `identity_key` override (siblings/duplicates) still wins.
+ */
 export function makeSignal(overrides: Partial<SignalListItemOut> = {}): SignalListItemOut {
-  return { ...exampleSignal(), ...overrides };
+  const base = exampleSignal();
+  const identity_key = overrides.identity_key ?? (overrides.signal_id !== undefined ? `idk-${overrides.signal_id}` : base.identity_key);
+  return { ...base, ...overrides, identity_key };
 }
 
 /** The real wallet example from the brief (T3.17): "ever", 19.333,01 USDT. */

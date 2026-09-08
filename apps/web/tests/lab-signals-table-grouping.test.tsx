@@ -18,6 +18,7 @@ afterEach(cleanup);
 import { LabSignalsTable } from "@/components/lab/lab-signals-table";
 import { SIBLING_VERSIONS_NOTE } from "@/components/lab/lab-totals-heading";
 import { exampleNearMissSignal, exampleLabSignalsTableProps, exampleSiblingSignals, SIBLING_VERSION_LABELS } from "@/tests/fixtures/lab-pagination";
+import { makeSignal } from "@/tests/fixtures/lab";
 
 beforeEach(() => {
   resolveMarketHrefActionMock.mockReset().mockResolvedValue("/acme/markets/binance/RAYSOLUSDT");
@@ -104,5 +105,75 @@ describe("LabSignalsTable: identical sibling-version signals collapse into one r
     render(<LabSignalsTable {...exampleLabSignalsTableProps()} />);
     expect(screen.queryByText(SIBLING_VERSIONS_NOTE)).not.toBeInTheDocument();
     expect(screen.getByText("Resultado das operações desta página (1)")).toBeInTheDocument();
+  });
+});
+
+/**
+ * Finding 2 of the T3.38 review: once merged, if a group's members still
+ * disagree on R/money (should now be impossible once T3.38c-api's `stop`
+ * fix is live -- this is the defensive, display-time case), the row shows
+ * the real range instead of silently using the first member's value for
+ * the whole group.
+ */
+describe("LabSignalsTable: a merged group with divergent R/money shows a range and a note, never just the first member (finding 2)", () => {
+  it("the merged row's Resultado cell shows a range, and the totals card names the divergent operation instead of summing it silently", () => {
+    const divergentSiblings = exampleSiblingSignals().map((row, i) => (i === 0 ? { ...row, r_multiple: "5.0000" } : row));
+    render(
+      <LabSignalsTable
+        {...exampleLabSignalsTableProps({
+          items: divergentSiblings,
+          versionLabelById: SIBLING_VERSION_LABELS,
+          totals: { closed: 3, open: 0, pending: 0, all: 3, distinct_operations: { closed: 1, open: 0, pending: 0, all: 1 } },
+        })}
+      />,
+    );
+    // Still one merged row (the visual-fusion rule is unchanged).
+    expect(screen.getAllByText("RAYSOLUSDT")).toHaveLength(1);
+    // The "Resultado" cell shows a range, not a single misleading figure.
+    expect(screen.getByText("(faixa)")).toBeInTheDocument();
+    // The totals card names the one divergent operation instead of silently
+    // summing the first member's money as if it spoke for the group.
+    const card = screen.getByTestId("lab-totals-card");
+    expect(within(card).getByText(/1 operação com R\/dinheiro divergente/)).toBeInTheDocument();
+  });
+
+  it("never shows the divergence note when every merged group's members agree (the healthy, expected case)", () => {
+    render(
+      <LabSignalsTable
+        {...exampleLabSignalsTableProps({
+          items: exampleSiblingSignals(),
+          versionLabelById: SIBLING_VERSION_LABELS,
+          totals: { closed: 3, open: 0, pending: 0, all: 3 },
+        })}
+      />,
+    );
+    expect(screen.queryByText("(faixa)")).not.toBeInTheDocument();
+    expect(screen.queryByText(/R\/dinheiro divergente/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Finding 5 of the T3.38 review: a same-version `identity_key` duplicate
+ * never visually merges (the table's own T3.38b rule: never drop a real row
+ * when a single-version page happens to hash the same key twice), but the
+ * totals card's own money must still count it once -- the same pure-DISTINCT
+ * rule the server's `totals.distinct_operations` uses.
+ */
+describe("LabSignalsTable: a same-version identity_key duplicate still shows two rows, but the card counts one operation (finding 5)", () => {
+  it("keeps both rows on screen while the totals card's 'Operações' stat counts one", () => {
+    const duplicateRows = [makeSignal({ signal_id: "dup-a", identity_key: "same-key" }), makeSignal({ signal_id: "dup-b", identity_key: "same-key" })];
+    render(
+      <LabSignalsTable
+        {...exampleLabSignalsTableProps({
+          items: duplicateRows,
+          totals: { closed: 2, open: 0, pending: 0, all: 2, distinct_operations: { closed: 1, open: 0, pending: 0, all: 1 } },
+        })}
+      />,
+    );
+    // Two rows still show -- the visual-fusion rule never merges same-version rows.
+    expect(screen.getAllByRole("row")).toHaveLength(3); // header + 2 data rows
+    // The card's own money math counts the operation once, not twice.
+    const card = screen.getByTestId("lab-totals-card");
+    expect(within(card).getByText("Resultado das operações desta página (1 única de 2 linhas)")).toBeInTheDocument();
   });
 });

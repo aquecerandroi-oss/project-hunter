@@ -3,17 +3,44 @@
 import { LabExitCell } from "@/components/lab/lab-exit-cell";
 import { labCellVisibilityClass } from "@/components/lab/lab-signals-table-head";
 import { LabMarketLink } from "@/components/lab/lab-market-link";
-import { LabMoneyOrReason, LabResultValue } from "@/components/lab/lab-money-cells";
+import { LabMoneyOrReason, LabMoneyRangeValue, LabResultValue } from "@/components/lab/lab-money-cells";
 import { LabPriceTimeCell } from "@/components/lab/lab-price-time-cell";
 import { LabResearchCells } from "@/components/lab/lab-research-cells";
+import { notionalRangeUsdt, pnlRangeUsdt, type MoneyRange } from "@/components/lab/lab-signal-divergence";
 import { LabStrategyCell, LabStrategyChips, type LabVersionChip } from "@/components/lab/lab-strategy-cell";
 import { WhenCell } from "@/components/lab/lab-when-cell";
 import { durationText, pctColorClass } from "@/components/lab/lab-format";
-import { moneyForRow, usdtToBrl, type MoneyRuler } from "@/components/lab/lab-money";
+import { moneyForRow, usdtToBrl, type MoneyOrReason, type MoneyRuler } from "@/components/lab/lab-money";
 import { ResultBadge } from "@/components/lab/lab-result-badge";
 import type { SignalListItemOut } from "@/lib/api/lab-types";
 import { formatPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
+
+/**
+ * Finding 2 of the T3.38 review: a merged group whose members still disagree
+ * on money (should now be impossible once T3.38c-api's `stop` fix is live)
+ * needs the real range instead of `row`'s (the group's primary) own value
+ * standing in for the whole group. Split out of `LabSignalRow` itself so
+ * that function's own cyclomatic complexity stays under the lint config's
+ * budget.
+ */
+function moneyRangesForRow(members: SignalListItemOut[] | undefined, ruler: MoneyRuler): { pnlRange: MoneyRange | null; notionalRange: MoneyRange | null } {
+  if (!members || members.length <= 1) return { pnlRange: null, notionalRange: null };
+  return { pnlRange: pnlRangeUsdt(members, ruler), notionalRange: notionalRangeUsdt(members, ruler) };
+}
+
+/** "Resultado" cell content -- the range when the group's members diverge, else the ordinary badge + value. Its own component (rather than inline JSX) for the same complexity-budget reason. */
+function ResultCell({ pnlRange, pnlUsdt, pnlBrl }: { pnlRange: MoneyRange | null; pnlUsdt: MoneyOrReason; pnlBrl: number | null }) {
+  if (pnlRange) return <LabMoneyRangeValue range={pnlRange} />;
+  return (
+    <>
+      <span className="mr-1.5 inline-block">
+        <ResultBadge pnlUsdt={pnlUsdt.value} />
+      </span>
+      <LabResultValue pnlUsdt={pnlUsdt} pnlBrl={pnlBrl} />
+    </>
+  );
+}
 
 export interface LabSignalRowProps {
   id: string;
@@ -36,6 +63,14 @@ export interface LabSignalRowProps {
    * from the group's `primary` -- every member shares them by definition.
    */
   versionChips?: LabVersionChip[] | undefined;
+  /**
+   * Every signal behind this row's group (finding 2 of the T3.38 review) --
+   * length <= 1 outside a merged row. Used only to detect (and, when it
+   * happens, render as a range instead of a single figure) money divergence
+   * between siblings; the row's own displayed values still come from `row`
+   * (the group's `primary`) whenever every member actually agrees.
+   */
+  members?: SignalListItemOut[] | undefined;
 }
 
 /**
@@ -62,9 +97,11 @@ export function LabSignalRow({
   panelOpen,
   onOpen,
   versionChips,
+  members,
 }: LabSignalRowProps) {
   const { pnlUsdt, notionalUsdt, pctMove } = moneyForRow(row, ruler);
   const pnlBrl = pnlUsdt.value !== null ? usdtToBrl(pnlUsdt.value, ruler) : null;
+  const { pnlRange, notionalRange } = moneyRangesForRow(members, ruler);
   const duration = durationText(row.entry_ts, row.exit_ts);
   const mobileHidden = labCellVisibilityClass({ mobileHidden: true }, panelOpen);
   const panelHidden = labCellVisibilityClass({ panelHidden: true }, panelOpen);
@@ -109,13 +146,10 @@ export function LabSignalRow({
         {pctMove !== null ? formatPct(pctMove) : "--"}
       </td>
       <td role="gridcell" className={cn("whitespace-nowrap px-3 text-right font-mono text-xs tabular-nums text-fg", panelHidden)}>
-        <LabMoneyOrReason money={notionalUsdt} />
+        {notionalRange ? <LabMoneyRangeValue range={notionalRange} /> : <LabMoneyOrReason money={notionalUsdt} />}
       </td>
       <td role="gridcell" className="min-w-[150px] whitespace-nowrap px-3 text-right text-xs">
-        <span className="mr-1.5 inline-block">
-          <ResultBadge pnlUsdt={pnlUsdt.value} />
-        </span>
-        <LabResultValue pnlUsdt={pnlUsdt} pnlBrl={pnlBrl} />
+        <ResultCell pnlRange={pnlRange} pnlUsdt={pnlUsdt} pnlBrl={pnlBrl} />
       </td>
 
       {showResearch && <LabResearchCells row={row} />}

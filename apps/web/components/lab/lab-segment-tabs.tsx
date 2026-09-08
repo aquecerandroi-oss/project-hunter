@@ -1,12 +1,26 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { formatCount } from "@/components/lab/lab-format";
 import { LAB_SEGMENT_LABEL, LAB_SEGMENTS, SEGMENT_TO_STATE, stateToSegment, type LabSegment } from "@/components/lab/lab-signal-segments";
+import { logger } from "@/lib/logger";
 import type { LabSignalsState, LabSignalsTotals } from "@/lib/api/lab-types";
 import { cn } from "@/lib/utils";
+
+// Finding 6 of the T3.38 review: warn once (never per render, never per tab)
+// when an older API response omits `totals.distinct_operations` (contract
+// T3.38) -- the fallback below stays honest either way (the raw signals
+// count), but a missing field on a contract this screen depends on should
+// never go unnoticed in the logs.
+let warnedMissingDistinctOperations = false;
+
+function warnOnceIfMissingDistinctOperations(totals: LabSignalsTotals): void {
+  if (totals.distinct_operations !== undefined || warnedMissingDistinctOperations) return;
+  warnedMissingDistinctOperations = true;
+  logger.warn("lab_signals_totals_missing_distinct_operations", { all: totals.all });
+}
 
 export interface LabSegmentTabsProps {
   /** The API's own `state` -- the source of truth for which tab is active (never re-derived from the loaded rows). */
@@ -29,6 +43,10 @@ export function LabSegmentTabs({ state, totals, hrefs }: LabSegmentTabsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const activeSegment = stateToSegment(state);
+
+  useEffect(() => {
+    warnOnceIfMissingDistinctOperations(totals);
+  }, [totals]);
 
   function handleSelect(segment: LabSegment): void {
     if (segment === activeSegment) return;

@@ -12,7 +12,8 @@ import {
   type MoneyRuler,
   type RowsSummary,
 } from "@/components/lab/lab-money";
-import { dedupeByIdentity, hasMultipleVersions } from "@/components/lab/lab-signal-grouping";
+import { countDivergentGroups } from "@/components/lab/lab-signal-divergence";
+import { dedupeByIdentityKey, groupSignalsByIdentity, hasMultipleVersions } from "@/components/lab/lab-signal-grouping";
 import { SIBLING_VERSIONS_NOTE, totalsHeading, type TotalsScope } from "@/components/lab/lab-totals-heading";
 import type { LabSummaryOut, SignalListItemOut, VersionSummaryOut } from "@/lib/api/lab-types";
 import { formatBrlSigned, formatPct, formatUsdtSigned } from "@/lib/format";
@@ -142,6 +143,17 @@ function SiblingVersionsNote({ scope, versionsMixed }: { scope: TotalsScope; ver
   return <p className="text-[11px] text-fg-subtle">{SIBLING_VERSIONS_NOTE}</p>;
 }
 
+/** Finding 2 of the T3.38 review's own honesty note: page scope only, and only once at least one loaded group's members actually disagree on money (never the expected case once T3.38c-api's `stop` fix is live) -- never silent about which rows fed an approximate total. */
+function MoneyDivergenceNote({ scope, count }: { scope: TotalsScope; count: number }) {
+  if (scope !== "page" || count === 0) return null;
+  const operacao = count === 1 ? "operação" : "operações";
+  return (
+    <p className="text-[11px] font-medium text-warning">
+      {count} {operacao} com R/dinheiro divergente entre versões irmãs nesta página -- abra a linha na tabela para ver a faixa exata.
+    </p>
+  );
+}
+
 /** The two-button scope switch (brief T3.37): "desta página" is the exact same client math T3.17b already shipped; "de todas as concluídas" never sums a page -- see `combineClosedSumRUsdt`. */
 function ScopeSwitch({ scope, onChange }: { scope: TotalsScope; onChange: (scope: TotalsScope) => void }) {
   return (
@@ -194,10 +206,17 @@ export function LabTotalsCard({ rows, ruler, summary, versionId, closedTotal }: 
   // brief T3.38 item 3: a page that mixes sibling-version duplicates sums
   // each real operation once (first occurrence), never once per version.
   const versionsMixed = hasMultipleVersions(rows);
-  const uniqueRows = dedupeByIdentity(rows);
+  // Finding 5 of the T3.38 review: dedupe by `identity_key` alone -- the
+  // same rule the server's own `totals.distinct_operations` counts by --
+  // rather than `groupSignalsByIdentity`'s version-aware rule, which would
+  // still count a same-version duplicate as two operations here.
+  const uniqueRows = dedupeByIdentityKey(rows);
   const pageSummary = summarizeRows(uniqueRows, ruler);
   const heading = totalsHeading(scope, { uniqueCount: uniqueRows.length, rowCount: rows.length, versionsMixed }, closedTotal);
   const display = buildTotalsDisplay(pageSummary);
+  // Finding 2 of the T3.38 review: never silently sum a group whose members
+  // disagree on money as if the first one spoke for all of them.
+  const divergentGroupCount = countDivergentGroups(groupSignalsByIdentity(rows), ruler);
 
   const allClosed = buildAllClosedDisplay(summary, versionId, ruler);
 
@@ -215,6 +234,7 @@ export function LabTotalsCard({ rows, ruler, summary, versionId, closedTotal }: 
         </div>
       </div>
       <SiblingVersionsNote scope={scope} versionsMixed={versionsMixed} />
+      <MoneyDivergenceNote scope={scope} count={divergentGroupCount} />
 
       {scope === "page" ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

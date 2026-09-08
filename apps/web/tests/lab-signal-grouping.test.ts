@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dedupeByIdentity, groupSignalsByIdentity, hasMultipleVersions } from "@/components/lab/lab-signal-grouping";
+import { dedupeByIdentityKey, groupSignalsByIdentity, hasMultipleVersions } from "@/components/lab/lab-signal-grouping";
 import { exampleNearMissSignal, exampleSiblingSignals } from "@/tests/fixtures/lab-pagination";
 import { makeSignal } from "@/tests/fixtures/lab";
 
@@ -72,15 +72,38 @@ describe("hasMultipleVersions", () => {
   });
 });
 
-describe("dedupeByIdentity: the totals card's own 'first occurrence' rule (brief T3.38 item 3)", () => {
+describe("dedupeByIdentityKey: the totals card's own 'first occurrence' rule (brief T3.38 item 3, finding 5 of the review)", () => {
   it("keeps exactly one row per identity_key, the first loaded", () => {
-    const unique = dedupeByIdentity(exampleSiblingSignals());
+    const unique = dedupeByIdentityKey(exampleSiblingSignals());
     expect(unique).toHaveLength(1);
     expect(unique[0]?.signal_id).toBe("sig-v4");
   });
 
   it("keeps every row when every identity_key is distinct", () => {
     const rows = [exampleNearMissSignal({ signal_id: "x" }), exampleNearMissSignal({ signal_id: "y", identity_key: "other-key" })];
-    expect(dedupeByIdentity(rows)).toHaveLength(2);
+    expect(dedupeByIdentityKey(rows)).toHaveLength(2);
+  });
+
+  it("finding 5: dedupes a same-version duplicate too, unlike groupSignalsByIdentity's own visual-merge rule", () => {
+    // Two rows, same identity_key, same strategy_version_id -- the exact
+    // shape the server's own DISTINCT-by-identity_key `totals.distinct_operations`
+    // would count as ONE operation, but `groupSignalsByIdentity` deliberately
+    // keeps as two separate rows on screen (never drops a real row when a
+    // single-version page happens to hash the same key twice).
+    const rows = [makeSignal({ signal_id: "a", identity_key: "same-key" }), makeSignal({ signal_id: "b", identity_key: "same-key" })];
+    // The table's own visual rule: both rows still show (unchanged).
+    expect(groupSignalsByIdentity(rows)).toHaveLength(2);
+    // The card's own money rule: exactly one operation's worth of money.
+    const unique = dedupeByIdentityKey(rows);
+    expect(unique).toHaveLength(1);
+    expect(unique[0]?.signal_id).toBe("a");
+  });
+
+  it("rows missing identity_key never dedupe by accident -- each falls back to its own signal_id", () => {
+    const rows = [
+      makeSignal({ signal_id: "a", identity_key: "", strategy_version_id: "v1" }),
+      makeSignal({ signal_id: "b", identity_key: "", strategy_version_id: "v2" }),
+    ];
+    expect(dedupeByIdentityKey(rows)).toHaveLength(2);
   });
 });

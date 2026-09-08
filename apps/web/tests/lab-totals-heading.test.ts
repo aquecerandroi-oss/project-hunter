@@ -31,4 +31,10 @@ describe("totalsHeading: the card's own scope-switch wording (brief T3.37, repla
       "Resultado das operações desta página (2 únicas de 2 linhas)",
     );
   });
+
+  it("finding 5 of the T3.38 review: also spells out both counts when a single-version page hides a same-version identity_key duplicate (versionsMixed false, counts differ)", () => {
+    expect(totalsHeading("page", { uniqueCount: 1, rowCount: 2, versionsMixed: false }, 2135)).toBe(
+      "Resultado das operações desta página (1 única de 2 linhas)",
+    );
+  });
 });

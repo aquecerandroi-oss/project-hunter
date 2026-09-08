@@ -7,8 +7,9 @@ import { LabExcursions } from "@/components/lab/lab-excursions";
 import { LabSignalDetail } from "@/components/lab/lab-signal-detail";
 import { ResultChip, TrackingStateChip } from "@/components/lab/lab-signal-chips";
 import { formatR, reasonLabel, signColorClass } from "@/components/lab/lab-format";
-import { MONEY_TOOLTIP, moneyForRow, priceAndTime, saidaText, usdtToBrl, type MoneyRuler } from "@/components/lab/lab-money";
+import { MONEY_TOOLTIP, moneyForRow, priceAndTime, saidaText, usdtToBrl, type MoneyOrReason, type MoneyRuler } from "@/components/lab/lab-money";
 import { ResultBadge } from "@/components/lab/lab-result-badge";
+import { formatMoneyRange, MONEY_DIVERGENCE_NOTE, notionalRangeUsdt, pnlRangeUsdt, type MoneyRange } from "@/components/lab/lab-signal-divergence";
 import type { SignalListItemOut } from "@/lib/api/lab-types";
 import { formatBrlSigned, formatPct, formatUsdtSigned } from "@/lib/format";
 
@@ -51,15 +52,54 @@ function SiblingSignalsBlock({ members, versionLabelFor }: { members: SignalList
 }
 
 /**
+ * Finding 2 of the T3.38 review: a merged group whose members still disagree
+ * on money (should now be impossible once T3.38c-api's `stop` fix is live)
+ * needs the real range instead of `signal`'s (the group's primary) own
+ * value standing in for the whole group. Split out of `SignalMoneyBlock`
+ * itself so that function's own cyclomatic complexity stays under the lint
+ * config's budget.
+ */
+function moneyRangesForSiblings(siblingSignals: SignalListItemOut[], ruler: MoneyRuler): { pnlRange: MoneyRange | null; notionalRange: MoneyRange | null } {
+  if (siblingSignals.length <= 1) return { pnlRange: null, notionalRange: null };
+  return { pnlRange: pnlRangeUsdt(siblingSignals, ruler), notionalRange: notionalRangeUsdt(siblingSignals, ruler) };
+}
+
+/** "Quantia simulada" cell text -- the range (+note) when siblings diverge, else the ordinary single figure or its honest reason. */
+function notionalCellText(notionalRange: MoneyRange | null, notionalUsdt: MoneyOrReason): string {
+  if (notionalRange) return `${formatMoneyRange(notionalRange)} (faixa)`;
+  if (notionalUsdt.value !== null) return formatUsdtSigned(notionalUsdt.value);
+  return reasonLabel(notionalUsdt.reason ?? "");
+}
+
+/** "Resultado" cell content -- same divergence rule as `notionalCellText`, kept as its own component (rather than inline JSX) for the same complexity-budget reason. */
+function ResultCellContent({ pnlRange, pnlUsdt, pnlBrl }: { pnlRange: MoneyRange | null; pnlUsdt: MoneyOrReason; pnlBrl: number | null }) {
+  if (pnlRange) return <span className="font-mono tabular-nums text-warning">{formatMoneyRange(pnlRange)} (faixa)</span>;
+  return (
+    <>
+      <ResultBadge pnlUsdt={pnlUsdt.value} />
+      {pnlUsdt.value !== null ? (
+        <span className="font-mono tabular-nums text-fg">
+          {formatUsdtSigned(pnlUsdt.value)}
+          {pnlBrl !== null && <span className="text-fg-muted"> ({formatBrlSigned(pnlBrl)})</span>}
+        </span>
+      ) : (
+        <span className="text-fg-muted">{reasonLabel(pnlUsdt.reason ?? "sem motivo informado")}</span>
+      )}
+    </>
+  );
+}
+
+/**
  * The money block Everton asked for (brief T3.17): what the signal entered
  * with, what it left with, profit or loss -- above the research block below,
  * which stays unchanged (raw levels, R, excursions, funding). Every number
  * here is derived from the one declared ruler (`lab-money.ts`), never a
  * second, silently different computation.
  */
-function SignalMoneyBlock({ signal, ruler }: { signal: SignalListItemOut; ruler: MoneyRuler }) {
+function SignalMoneyBlock({ signal, ruler, siblingSignals }: { signal: SignalListItemOut; ruler: MoneyRuler; siblingSignals: SignalListItemOut[] }) {
   const { pnlUsdt, notionalUsdt, pctMove } = moneyForRow(signal, ruler);
   const pnlBrl = pnlUsdt.value !== null ? usdtToBrl(pnlUsdt.value, ruler) : null;
+  const { pnlRange, notionalRange } = moneyRangesForSiblings(siblingSignals, ruler);
 
   return (
     <dl title={MONEY_TOOLTIP} className="grid grid-cols-2 gap-2 rounded-md border border-border bg-bg-overlay p-3 text-xs sm:grid-cols-3">
@@ -79,22 +119,14 @@ function SignalMoneyBlock({ signal, ruler }: { signal: SignalListItemOut; ruler:
       </div>
       <div>
         <dt className="text-fg-muted">Quantia simulada</dt>
-        <dd className="font-mono tabular-nums text-fg">
-          {notionalUsdt.value !== null ? formatUsdtSigned(notionalUsdt.value) : reasonLabel(notionalUsdt.reason ?? "")}
+        <dd className="font-mono tabular-nums text-fg" title={notionalRange ? MONEY_DIVERGENCE_NOTE : undefined}>
+          {notionalCellText(notionalRange, notionalUsdt)}
         </dd>
       </div>
       <div className="col-span-2 sm:col-span-1">
         <dt className="text-fg-muted">Resultado</dt>
-        <dd className="flex items-center gap-1.5">
-          <ResultBadge pnlUsdt={pnlUsdt.value} />
-          {pnlUsdt.value !== null ? (
-            <span className="font-mono tabular-nums text-fg">
-              {formatUsdtSigned(pnlUsdt.value)}
-              {pnlBrl !== null && <span className="text-fg-muted"> ({formatBrlSigned(pnlBrl)})</span>}
-            </span>
-          ) : (
-            <span className="text-fg-muted">{reasonLabel(pnlUsdt.reason ?? "sem motivo informado")}</span>
-          )}
+        <dd className="flex items-center gap-1.5" title={pnlRange ? MONEY_DIVERGENCE_NOTE : undefined}>
+          <ResultCellContent pnlRange={pnlRange} pnlUsdt={pnlUsdt} pnlBrl={pnlBrl} />
         </dd>
       </div>
     </dl>
@@ -133,7 +165,7 @@ export function LabSignalPanel({ signal, versionLabel, ruler, siblingSignals = [
         <LabAsOf iso={signal.source_bar_close} />
       </p>
 
-      <SignalMoneyBlock signal={signal} ruler={ruler} />
+      <SignalMoneyBlock signal={signal} ruler={ruler} siblingSignals={siblingSignals} />
 
       {versionLabelFor && <SiblingSignalsBlock members={siblingSignals} versionLabelFor={versionLabelFor} />}
 
