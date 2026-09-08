@@ -322,12 +322,13 @@ class Cycles:
         Delegated to :func:`bridge_inputs.marks_for_open_positions` so the bridge
         and the mark-to-market cycle cannot disagree about what a mark is.
         """
-        marks, open_positions = await marks_for_open_positions(
+        coverage = await marks_for_open_positions(
             session,
             wallet=wallet,
             data=self.data,
             policy=self.adapter.policy.marking_policy,
             now=now,
         )
-        self.health.open_positions = open_positions
-        return marks
+        self.health.record_marks(coverage)
+        metrics.execution_mark_quality.set(float(coverage.quality))
+        return coverage.marks

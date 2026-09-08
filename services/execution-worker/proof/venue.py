@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import uuid
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import text
 
@@ -22,6 +22,9 @@ from hunter_core.db.session import tenant_session
 from hunter_core.domain.enums import MarketType
 from hunter_core.domain.types import utcnow, uuid7
 from hunter_risk.inputs import MarketIdentity
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 EXCHANGE = "proof"
 """Labelled, on purpose: nothing written by this script can be read as Binance."""
@@ -81,8 +84,18 @@ def identity() -> MarketIdentity:
     )
 
 
-async def seed(engine: Any, slug: str) -> dict[str, uuid.UUID]:
-    """Organization, workspace, market, assets and one FX observation."""
+async def seed(engine: Any, slug: str, *, as_of: datetime | None = None) -> dict[str, uuid.UUID]:
+    """Organization, workspace, market, assets and one FX observation.
+
+    ``as_of`` is the instant the FX observation is stamped with, and it exists
+    because a **caller with a fixed clock** has to be able to say so: a test that
+    decides at a hard-coded ``NOW`` and opens the wallet against an observation
+    stamped ``utcnow()`` anchors the trading day (America/Sao_Paulo) on today
+    and the decision on that ``NOW``, and the two stop matching the moment the
+    day turns — ``daily_reference`` goes unavailable and every check of a
+    perfectly good proposal reports ``unavailable`` (spec §12, trap 2: no wall
+    clock). ``None`` keeps the live behaviour ``run_proof.py`` wants.
+    """
     ids = {name: uuid7() for name in ("org", "ws", "exchange", "market", "base", "fx")}
     async with engine.begin() as connection:
         await connection.execute(
@@ -156,7 +169,7 @@ async def seed(engine: Any, slug: str) -> dict[str, uuid.UUID]:
             ),
             {"ex": ids["exchange"], "symbol": SYMBOL},
         )
-        now = utcnow()
+        now = as_of or utcnow()
         await connection.execute(
             text(
                 "INSERT INTO fx_observations (id, pair, rate, source, observed_at, available_at) "
@@ -167,7 +180,9 @@ async def seed(engine: Any, slug: str) -> dict[str, uuid.UUID]:
     return ids
 
 
-async def open_wallet(factory: Any, ids: dict[str, uuid.UUID]) -> uuid.UUID:
+async def open_wallet(
+    factory: Any, ids: dict[str, uuid.UUID], *, as_of: datetime | None = None
+) -> uuid.UUID:
     from hunter_core.db.repositories.fx import FxObservationRepository
     from hunter_core.portfolio.opening import WalletAlreadyOpen, open_paper_wallet
 
@@ -189,7 +204,7 @@ async def open_wallet(factory: Any, ids: dict[str, uuid.UUID]) -> uuid.UUID:
                 organization_id=ids["org"],
                 workspace_id=ids["ws"],
                 fx=observation,
-                as_of=utcnow(),
+                as_of=as_of or utcnow(),
             )
         except WalletAlreadyOpen:
             raise

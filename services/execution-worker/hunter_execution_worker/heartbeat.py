@@ -44,6 +44,10 @@ async def write_heartbeat(
         "equity": health.equity,
         "kill_switch": health.kill_switch,
         "open_positions": str(health.open_positions),
+        "marked_positions": str(health.marked_positions),
+        # T3.29 item 4: ``last_mtm`` says a curve point was written, this says
+        # the prices in it were live. A stopped tape keeps the first green.
+        "mark_quality": str(health.mark_quality()),
         "pending_requests": str(health.pending_requests),
         "unreadable_requests": str(health.unreadable_requests),
         "degraded_protections": str(len(health.degraded_protections)),

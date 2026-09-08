@@ -46,6 +46,7 @@ from hunter_execution_worker.admission_cycle import (
     readable_and_unreadable,
     rebuild_request,
 )
+from hunter_execution_worker.bridge_inputs import marks_for_open_positions
 from hunter_execution_worker.entry import execute_approved_entries
 from hunter_execution_worker.manual_inputs import manual_request_inputs
 from hunter_execution_worker.market_data import SpotSnapshot, StaticSpotMarketData
@@ -116,8 +117,12 @@ def _snapshot(at: datetime) -> SpotSnapshot:
 async def test_a_manual_request_is_filed_decided_and_filled(
     db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
-    ids = await proof_venue.seed(db_engine, "t35c-manual")
-    portfolio_id = await proof_venue.open_wallet(db_session_factory, ids)
+    # The wallet is opened **at this test's own instant**, not at the wall
+    # clock: the trading-day anchor (America/Sao_Paulo) has to be the day the
+    # decision below happens in, or ``build_portfolio_state`` reports
+    # ``daily_reference`` unavailable and every check comes back unmeasured.
+    ids = await proof_venue.seed(db_engine, "t35c-manual", as_of=NOW)
+    portfolio_id = await proof_venue.open_wallet(db_session_factory, ids, as_of=NOW)
     wallet = WalletRef(ids["org"], portfolio_id)
 
     async with db_engine.begin() as connection:
@@ -198,3 +203,37 @@ async def test_a_manual_request_is_filed_decided_and_filled(
             session, wallet=wallet, data=fill_data, now=FILL_AT
         )
     assert [outcome.status for outcome in outcomes] == ["filled"]
+
+    # --- T3.29 item 4: with that position open, a tape the marking policy
+    # cannot use makes the wallet unmeasurable — equity, drawdown and aggregate
+    # risk would all be estimates read off the last durable mark. The next
+    # request is **deferred** (``marks_incomplete``), not decided: the row stays
+    # pending and is read again next second, instead of being burned into a
+    # rejected decision over a transient tape. ---
+    stale_data = StaticSpotMarketData(
+        {(proof_venue.EXCHANGE, proof_venue.SYMBOL): _snapshot(FILL_AT - timedelta(hours=1))}
+    )
+    async with tenant_session(db_session_factory, ids["org"], db_role=WORKER_ROLE) as session:
+        coverage = await marks_for_open_positions(
+            session,
+            wallet=wallet,
+            data=stale_data,
+            policy=PaperExecutionAdapter().policy.marking_policy,
+            now=FILL_AT,
+        )
+        assert (coverage.open_positions, coverage.marked) == (1, 0)
+        assert coverage.quality == Decimal(0)
+        assert coverage.complete is False
+
+        market = await load_market(session, ids["market"])
+        assert market is not None
+        blocked = await manual_request_inputs(
+            session,
+            wallet=wallet,
+            market=market,
+            data=stale_data,
+            policy=PaperExecutionAdapter().policy.marking_policy,
+            now=FILL_AT,
+            exit_cost_rate=Decimal(0),
+        )
+    assert blocked == "marks_incomplete"

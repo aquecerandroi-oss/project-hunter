@@ -17,10 +17,17 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from hunter_core.domain.types import utcnow
 
+if TYPE_CHECKING:
+    from hunter_execution_worker.bridge_inputs import MarkCoverage
+
 __all__ = ["CycleHealth"]
+
+_ONE = Decimal(1)
 
 
 @dataclass
@@ -41,6 +48,12 @@ class CycleHealth:
 
     kill_switch: str = ""
     open_positions: int = 0
+    marked_positions: int = 0
+    """How many of them the last pass priced with a **live** print. The pair is
+    the ``mark_quality`` of T3.29 item 4: ``mtm_fresh`` says a curve point was
+    written, this says the prices in it were observed, and only the second one
+    can tell a stopped tape from a stable wallet."""
+
     pending_requests: int = 0
     unreadable_requests: int = 0
     bridge_at: datetime | None = None
@@ -51,6 +64,21 @@ class CycleHealth:
     bridge_candidates: int = 0
     degraded_protections: dict[uuid.UUID, datetime] = field(default_factory=lambda: {})
     """Intent id -> when it first went degraded. Emptied when it fills."""
+
+    def record_marks(self, coverage: MarkCoverage) -> None:
+        """Take both numbers from one pass, so they can never disagree."""
+        self.open_positions = coverage.open_positions
+        self.marked_positions = coverage.marked
+
+    def mark_quality(self) -> Decimal:
+        """Share of open positions marked live — ``1`` for an empty wallet.
+
+        An empty wallet has nothing whose price could be stale; reporting ``0``
+        would make the normal state a permanent alarm.
+        """
+        if self.open_positions <= 0:
+            return _ONE
+        return Decimal(self.marked_positions) / Decimal(self.open_positions)
 
     def age_since_start(self) -> float:
         return (utcnow() - self.started_at).total_seconds()

@@ -12,19 +12,24 @@ flight while this worker was written: the interface is what lets the worker be
 finished and proved against a **labelled** snapshot source while the real
 producer lands, without a single line of "if test" inside the cycles.
 
-**``avg_price`` is not collected yet, and this module refuses to invent it.**
-The ``NOTIONAL`` filter of a MARKET order is judged against the exchange's own
+**``avg_price`` is the exchange's own, or it is absent — never ours.** The
+``NOTIONAL`` filter of a MARKET order is judged against the exchange's
 ``avgPrice`` over ``avgPriceMins`` minutes (T3.0a §5) — never the last trade,
 which moves with the very book under suspicion. There is no such key in the hot
-state today, so :class:`RedisSpotMarketData` reports it absent with a reason and
-the entry is refused (``avg_price_unavailable``): failing closed on a missing
-input is the contract's rule, and computing our own average and calling it the
-exchange's would be exactly the fabricated number the directive forbids.
+state (the spot collector publishes none), so since T3.29
+:class:`RedisSpotMarketData` takes an optional
+:class:`~hunter_execution_worker.avg_price.AvgPriceReader` that asks the exchange
+itself (``GET /api/v3/avgPrice``, cached and bounded — that module says why that
+endpoint and not a ``fapi`` one). Without a reader, or when the reader has
+nothing honest to report, the value stays absent **with its reason** and the
+entry is deferred: failing closed on a missing input is the contract's rule, and
+computing our own average and calling it the exchange's would be exactly the
+fabricated number the directive forbids.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any, Protocol, cast
@@ -40,6 +45,7 @@ from hunter_core.redis import keys
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
 
+    from hunter_execution_worker.avg_price import AvgPriceQuote, AvgPriceReader
     from hunter_risk.inputs import MarketIdentity
 
 __all__ = [
@@ -75,6 +81,11 @@ class SpotSnapshot:
     avg_price: Decimal | None = None
     avg_price_source: str = "unavailable"
     """Where the ``NOTIONAL`` reference came from — or why there is none."""
+    avg_price_ts: datetime | None = None
+    """**When we received** that reference. Every input carries a stamp
+    (RISK_ENGINE.md §7, R-OPS-2), and this one is what
+    :func:`hunter_execution_worker.entry_inputs.missing_inputs` measures the
+    entry's own age bound against — a price with no stamp is not a reference."""
     tape_gap: bool = False
     source: str = SPOT_DATA_SOURCE_VERSION
     unavailable: tuple[str, ...] = field(default_factory=tuple)
@@ -110,8 +121,29 @@ class StaticSpotMarketData:
     async def snapshot(self, market: MarketIdentity) -> SpotSnapshot:
         found = self._snapshots.get((market.exchange, market.symbol))
         if found is not None:
-            return found
+            return _dated(found)
         return SpotSnapshot(market=market, book=None, unavailable=("no_snapshot",))
+
+
+def _dated(snapshot: SpotSnapshot) -> SpotSnapshot:
+    """A double's reference is as old as the picture it came with.
+
+    ``avg_price_ts`` is what :func:`hunter_execution_worker.entry_inputs
+    .stale_average` bounds the entry against, and a price with no stamp is
+    refused (``avg_price_undated``) — the real reader always stamps. A fixture
+    that hands one snapshot means one instant, so the double declares that
+    instant to be the book's own receipt (else the newest print). A test that
+    wants a **stale** reference says so by setting ``avg_price_ts`` itself: this
+    only ever fills an absence, it never overwrites a stamp.
+    """
+    if snapshot.avg_price is None or snapshot.avg_price_ts is not None:
+        return snapshot
+    observed = snapshot.book.received_at if snapshot.book is not None else None
+    if observed is None and snapshot.last_trade is not None:
+        observed = snapshot.last_trade.ts
+    if observed is None:
+        return snapshot
+    return replace(snapshot, avg_price_ts=observed)
 
 
 def _decimal(raw: object) -> Decimal | None:
@@ -134,62 +166,105 @@ class RedisSpotMarketData:
 
     source = SPOT_DATA_SOURCE_VERSION
 
-    def __init__(self, redis: redis_asyncio.Redis, *, window: int = TAPE_WINDOW) -> None:
+    def __init__(
+        self,
+        redis: redis_asyncio.Redis,
+        *,
+        window: int = TAPE_WINDOW,
+        avg_price: AvgPriceReader | None = None,
+    ) -> None:
         self._redis = redis
         self._window = window
+        self._avg_price = avg_price
+        """The ``NOTIONAL`` reference reader, or ``None`` — in which case every
+        market whose MARKET filter needs an average defers by name
+        (``avg_price_not_collected``), exactly as it did before T3.29."""
 
     async def snapshot(self, market: MarketIdentity) -> SpotSnapshot:
         missing: list[str] = []
-        book = await self._book(market)
+        book, book_unread = await self._book(market)
         if book is None:
             missing.append("no_book")
-        trades = await self._trades(market)
+        trades, tape_unread = await self._trades(market)
         if not trades:
             missing.append("no_trade")
-        # The ``NOTIONAL`` reference is the exchange's ``avgPrice`` and nobody
-        # collects it yet (T3.0b): absent, with the reason, never substituted.
-        missing.append("avg_price")
+        if book_unread or tape_unread:
+            # V6 step 4: Redis went away *during* the decision. The picture is
+            # not "empty", it is "unread", and the difference has to survive
+            # into the snapshot — but the answer is the same, and it is the safe
+            # one: the entry defers, the protection stays degraded, nothing is
+            # written and no absence ever produces a fill.
+            missing.append("hot_state_unreachable")
+        # The ``NOTIONAL`` reference is the exchange's own ``avgPrice``. With no
+        # reader wired there is nothing to report; with one, a failed or expired
+        # quote is still nothing — never the last trade wearing its name.
+        quote = None if self._avg_price is None else await self._avg_price.read(market)
+        if quote is None:
+            missing.append("avg_price")
         return SpotSnapshot(
             market=market,
             book=book,
             trades=trades,
-            avg_price=None,
-            avg_price_source="not_collected",
+            avg_price=None if quote is None else quote.price,
+            avg_price_source=self._avg_price_source(quote),
+            avg_price_ts=None if quote is None else quote.observed_at,
             unavailable=tuple(missing),
         )
 
-    async def _book(self, market: MarketIdentity) -> NormalizedOrderBook | None:
+    def _avg_price_source(self, quote: AvgPriceQuote | None) -> str:
+        if quote is not None:
+            return quote.source
+        return "not_collected" if self._avg_price is None else "unavailable"
+
+    async def _book(self, market: MarketIdentity) -> tuple[NormalizedOrderBook | None, bool]:
+        """The book, and whether Redis itself could not be read."""
         key = keys.book(market.exchange, market.symbol, MarketType.SPOT)
-        raw = cast("bytes | None", await self._redis.get(key))
+        try:
+            raw = cast("bytes | None", await self._redis.get(key))
+        except Exception as exc:
+            # A Redis outage is **not** a fatal cycle. Raising here aborted the
+            # whole pass — every other wallet's protection included — over one
+            # unreachable key; RISK_ENGINE.md's rule 3 ("entry latches may not
+            # stop protective exits") is why that is not acceptable.
+            logger.warning("spot_hot_state_unreachable", key=key, error=str(exc))
+            return None, True
         if raw is None:
-            return None
+            return None, False
         try:
             payload = cast("dict[str, Any]", _codec.unpackb(raw, raw=False))
             ts = ensure_utc(datetime.fromisoformat(str(payload["ts"])))
-            return NormalizedOrderBook(
-                exchange=market.exchange,
-                symbol=market.symbol,
-                market_type=MarketType.SPOT,
-                ts=ts,
-                received_at=ts,
-                bids=_levels(payload.get("bids", [])),
-                asks=_levels(payload.get("asks", [])),
-                sequence=None,
-                is_snapshot=True,
+            return (
+                NormalizedOrderBook(
+                    exchange=market.exchange,
+                    symbol=market.symbol,
+                    market_type=MarketType.SPOT,
+                    ts=ts,
+                    received_at=ts,
+                    bids=_levels(payload.get("bids", [])),
+                    asks=_levels(payload.get("asks", [])),
+                    sequence=None,
+                    is_snapshot=True,
+                ),
+                False,
             )
         except Exception:
             logger.warning("spot_book_unreadable", exchange=market.exchange, symbol=market.symbol)
-            return None
+            return None, False
 
-    async def _trades(self, market: MarketIdentity) -> tuple[NormalizedTrade, ...]:
+    async def _trades(self, market: MarketIdentity) -> tuple[tuple[NormalizedTrade, ...], bool]:
+        """The tape, and whether Redis itself could not be read."""
         key = keys.trades(market.exchange, market.symbol, MarketType.SPOT)
-        rows = cast("list[bytes]", await self._redis.lrange(key, 0, self._window - 1))
+        try:
+            rows = cast("list[bytes]", await self._redis.lrange(key, 0, self._window - 1))
+        except Exception as exc:
+            logger.warning("spot_hot_state_unreachable", key=key, error=str(exc))
+            return (), True
         prints: list[NormalizedTrade] = []
         for raw in reversed(rows):  # the list is newest-first; the tape is not
             parsed = self._trade(market, raw)
             if parsed is not None:
                 prints.append(parsed)
-        return tuple(prints)
+        return tuple(prints), False
 
     def _trade(self, market: MarketIdentity, raw: bytes) -> NormalizedTrade | None:
         try:

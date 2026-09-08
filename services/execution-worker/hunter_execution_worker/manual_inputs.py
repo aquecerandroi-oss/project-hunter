@@ -63,10 +63,17 @@ async def manual_request_inputs(
     beta = await current_beta(session, market_id=market.market_id, now=now)
     if beta is None:
         return "beta_unavailable"
-    marks, _ = await marks_for_open_positions(
+    coverage = await marks_for_open_positions(
         session, wallet=wallet, data=data, policy=policy, now=now
     )
-    prices = prices_with(marks, market_id=market.market_id, price=liquidity.last_price)
+    if not coverage.complete:
+        # A wallet whose own positions cannot all be priced live is a wallet
+        # whose equity, drawdown and aggregate risk are estimates. The engine
+        # would refuse anyway (``marks_complete`` -> ``portfolio_status``
+        # unavailable), but refusing *here* keeps the request pending instead of
+        # burning it into a rejected row over a transient tape.
+        return "marks_incomplete"
+    prices = prices_with(coverage.marks, market_id=market.market_id, price=liquidity.last_price)
     betas = await beta_map(session, market_ids=prices.keys(), now=now)
     return RequestInputs(
         liquidity=liquidity,

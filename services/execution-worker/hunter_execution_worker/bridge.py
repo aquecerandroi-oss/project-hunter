@@ -9,9 +9,8 @@ What happens in a cycle, in order:
    restart is a no-op (item 4);
 2. each one is screened, and every refusal is named, logged and counted
    (:mod:`hunter_execution_worker.bridge_screen`);
-3. the survivors are ordered by **D3** — Radar score of the *perpetual* at the
-   source bar (higher first, no score last), then estimated entry cost in R
-   (lower first), then arrival, then the signal id so the order is total;
+3. the survivors are ordered by **D3**
+   (:mod:`hunter_execution_worker.bridge_rank`);
 4. the **first one only** is submitted, through the same admission service the
    operator's order goes through. One slot per cycle (D3); the others stay
    eligible while their 120 s window is open.
@@ -41,44 +40,29 @@ from typing import TYPE_CHECKING
 from hunter_core.admission.sources import ProposalRequest
 from hunter_core.execution.paper import PaperExecutionAdapter
 from hunter_core.logging import get_logger
-from hunter_execution_worker import metrics
 from hunter_execution_worker.admission_cycle import RequestInputs, decide_requests
 from hunter_execution_worker.bridge_inputs import (
     liquidity_for,
     marks_for_open_positions,
     prices_with,
 )
-from hunter_execution_worker.bridge_repo import pending_signals
-from hunter_execution_worker.bridge_screen import screen_signal
+from hunter_execution_worker.bridge_rank import Ranked, count_outcome, rank_candidates
 from hunter_execution_worker.bridge_universe import beta_map
 from hunter_execution_worker.config import PRODUCER
-from hunter_execution_worker.reference import load_market
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from hunter_core.admission.service import AdmissionResult
-    from hunter_execution_worker.bridge_screen import Screened
-    from hunter_execution_worker.market_data import SpotMarketData, SpotSnapshot
-    from hunter_execution_worker.reference import MarketReference
+    from hunter_execution_worker.market_data import SpotMarketData
     from hunter_execution_worker.wallet import WalletRef
 
-__all__ = ["BridgeOutcome", "entry_cost_r", "run_bridge_cycle"]
+__all__ = ["BridgeOutcome", "run_bridge_cycle"]
 
 logger = get_logger(__name__)
 
 _BPS = Decimal(10_000)
 _TWO = Decimal(2)
-
-
-@dataclass(frozen=True, slots=True)
-class _Ranked:
-    """A candidate with everything the ordering and the submission need."""
-
-    screened: Screened
-    market: MarketReference
-    snapshot: SpotSnapshot
-    cost_r: Decimal | None
 
 
 @dataclass(slots=True)
@@ -97,95 +81,7 @@ class BridgeOutcome:
         return self.submitted is not None and self.submitted.approved
 
 
-def entry_cost_r(screened: Screened, snapshot: SpotSnapshot) -> Decimal | None:
-    """D3's second key: what entering costs, measured in R.
-
-    Half the observed spread of the **spot** book (the part the market is telling
-    us right now) plus the experiment's own declared slippage and fee hypothesis
-    (the part no book can answer without a size), over the distance to the stop.
-    ``None`` when the book was not observed — a candidate without a cost sorts
-    after the ones with one, exactly like a candidate without a score.
-    """
-    book = snapshot.book
-    entry_ref, stop, costs = screened.entry_ref, screened.stop, screened.assumed_costs
-    if book is None or not book.asks or not book.bids or entry_ref is None or stop is None:
-        return None
-    if costs is None or entry_ref <= stop:
-        return None
-    mid = (book.bids[0].price + book.asks[0].price) / _TWO
-    half_spread = max(Decimal(0), book.asks[0].price - mid)
-    hypothesis = entry_ref * (costs.slippage_bps + costs.fee_bps) / _BPS
-    return (half_spread + hypothesis) / (entry_ref - stop)
-
-
-def _priority(item: _Ranked) -> tuple[int, Decimal, int, Decimal, datetime, str]:
-    """D3, as a total order. Ties are broken by the signal id so two workers
-    ranking the same cycle cannot disagree about who goes first."""
-    score = item.screened.score
-    cost = item.cost_r
-    return (
-        0 if score is not None else 1,
-        -(score if score is not None else Decimal(0)),
-        0 if cost is not None else 1,
-        cost if cost is not None else Decimal(0),
-        item.screened.signal.emitted_at,
-        str(item.screened.signal_id),
-    )
-
-
-def _count(outcome: str) -> None:
-    metrics.bridge_candidates_total.labels(outcome=outcome).inc()
-
-
-async def _rank(
-    session: AsyncSession,
-    *,
-    wallet: WalletRef,
-    data: SpotMarketData,
-    now: datetime,
-    result: BridgeOutcome,
-    reported: dict[uuid.UUID, str] | None = None,
-) -> list[_Ranked]:
-    """Screen every pending signal and order the survivors by D3.
-
-    ``reported`` is the once-per-(signal, reason) map item 1 asks for, forgotten
-    once a signal stops appearing so it cannot grow without bound.
-    """
-    signals = await pending_signals(session, wallet=wallet, now=now)
-    if reported is not None:
-        current = {signal.signal_id for signal in signals}
-        for stale in set(reported) - current:
-            del reported[stale]
-    ranked: list[_Ranked] = []
-    for signal in signals:
-        screened = await screen_signal(
-            session, wallet=wallet, signal=signal, now=now, reported=reported
-        )
-        if not screened.eligible or screened.spot_market_id is None:
-            reason = screened.refused or "spot_pair_unavailable"
-            result.refusals.append(reason)
-            if screened.freshly_refused:
-                _count(reason)
-            continue
-        market = await load_market(session, screened.spot_market_id)
-        if market is None:  # pragma: no cover - the pair was just read from markets
-            result.refusals.append("spot_market_unknown")
-            _count("spot_market_unknown")
-            continue
-        snapshot = await data.snapshot(market.identity)
-        ranked.append(
-            _Ranked(
-                screened=screened,
-                market=market,
-                snapshot=snapshot,
-                cost_r=entry_cost_r(screened, snapshot),
-            )
-        )
-    ranked.sort(key=_priority)
-    return ranked
-
-
-def _request(chosen: _Ranked, *, wallet: WalletRef) -> ProposalRequest:
+def _request(chosen: Ranked, *, wallet: WalletRef) -> ProposalRequest:
     """The admission request of one shadow signal.
 
     ``requested_notional`` is deliberately absent: the ceiling is the engine's to
@@ -230,11 +126,25 @@ def _request(chosen: _Ranked, *, wallet: WalletRef) -> ProposalRequest:
     )
 
 
+def _defer(result: BridgeOutcome, chosen: Ranked, reason: str, **extra: object) -> None:
+    """Deferred, not refused: nothing is written, the slot is not spent, and the
+    candidate is read again next cycle while its 120 s window is open."""
+    result.deferred = reason
+    count_outcome(reason)
+    logger.info(
+        "bridge_candidate_deferred",
+        signal_id=str(chosen.screened.signal_id),
+        market=chosen.market.identity.symbol,
+        reason=reason,
+        **extra,
+    )
+
+
 async def _submit(
     session: AsyncSession,
     *,
     wallet: WalletRef,
-    chosen: _Ranked,
+    chosen: Ranked,
     data: SpotMarketData,
     now: datetime,
     exit_cost_rate: Decimal,
@@ -250,21 +160,18 @@ async def _submit(
         session, spot=spot, market=chosen.market, snapshot=chosen.snapshot, now=now
     )
     if isinstance(liquidity, str):
-        # Deferred, not refused: nothing is written, the slot is not spent, and
-        # the candidate is read again next cycle while its window is open.
-        result.deferred = liquidity
-        _count(liquidity)
-        logger.info(
-            "bridge_candidate_deferred",
-            signal_id=str(screened.signal_id),
-            market=chosen.market.identity.symbol,
-            reason=liquidity,
-        )
+        _defer(result, chosen, liquidity)
         return
-    marks, _positions = await marks_for_open_positions(
+    coverage = await marks_for_open_positions(
         session, wallet=wallet, data=data, policy=adapter.policy.marking_policy, now=now
     )
-    prices = prices_with(marks, market_id=spot.market_id, price=liquidity.last_price)
+    if not coverage.complete:
+        # Admission needs a wallet it can measure: with a position priced at the
+        # last durable mark, equity, drawdown and aggregate risk are estimates
+        # (T3.29 item 4). Same rule as the manual path.
+        _defer(result, chosen, "marks_incomplete", mark_quality=str(coverage.quality))
+        return
+    prices = prices_with(coverage.marks, market_id=spot.market_id, price=liquidity.last_price)
     betas = await beta_map(session, market_ids=prices.keys(), now=now)
     admitted = await decide_requests(
         session,
@@ -288,7 +195,7 @@ async def _submit(
         return
     result.submitted = admitted[0]
     result.signal_id = screened.signal_id
-    _count("approved" if admitted[0].approved else "rejected")
+    count_outcome("approved" if admitted[0].approved else "rejected")
     logger.info(
         "bridge_proposal_submitted",
         signal_id=str(screened.signal_id),
@@ -318,12 +225,13 @@ async def run_bridge_cycle(
     """One slot: screen, order by D3, submit at most one proposal.
 
     ``reported`` is the per-wallet once-per-(signal, reason) map — see
-    :func:`_rank`. ``None`` logs and counts every refusal every pass.
+    :func:`~hunter_execution_worker.bridge_rank.rank_candidates`. ``None``
+    logs and counts every refusal every pass.
     """
     engine = adapter or PaperExecutionAdapter()
     result = BridgeOutcome()
-    ranked = await _rank(
-        session, wallet=wallet, data=data, now=now, result=result, reported=reported
+    ranked = await rank_candidates(
+        session, wallet=wallet, data=data, now=now, refusals=result.refusals, reported=reported
     )
     result.candidates = len(ranked)
     if not ranked:
@@ -331,7 +239,7 @@ async def run_bridge_cycle(
     chosen, waiting = ranked[0], ranked[1:]
     result.waiting = len(waiting)
     for item in waiting:
-        _count("waiting")
+        count_outcome("waiting")
         logger.debug(
             "bridge_candidate_waiting",
             signal_id=str(item.screened.signal_id),

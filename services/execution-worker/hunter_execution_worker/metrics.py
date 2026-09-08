@@ -25,6 +25,7 @@ from hunter_core.observability import registry
 
 __all__ = [
     "bridge_candidates_total",
+    "execution_mark_quality",
     "execution_mtm_age_seconds",
     "execution_orders_total",
     "execution_pending_degraded_total",
@@ -47,6 +48,13 @@ execution_protection_delay_seconds = Gauge(
 execution_mtm_age_seconds = Gauge(
     "hunter_execution_mtm_age_seconds",
     "Seconds since the last equity curve point was written.",
+    registry=registry,
+)
+execution_mark_quality = Gauge(
+    "hunter_execution_mark_quality",
+    "Share of open positions marked with a live price on the last MTM pass "
+    "(1 for an empty wallet). The companion of hunter_execution_mtm_age_seconds: "
+    "that one says a point was written, this one says the prices in it were observed.",
     registry=registry,
 )
 execution_pending_degraded_total = Counter(

@@ -27,10 +27,11 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from hunter_core.db.session import create_session_factory
 from hunter_core.logging import get_logger
+from hunter_execution_worker.avg_price import ExchangeAvgPrice
 from hunter_execution_worker.bridge_consumer import autonomy_status, bridge_tasks
 from hunter_execution_worker.config import load_config
 from hunter_execution_worker.cycles import Cycles, every
@@ -46,6 +47,34 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 __all__ = ["forever", "run_execution"]
+
+
+def _avg_price_reader(runtime: WorkerRuntime) -> ExchangeAvgPrice:
+    """The ``NOTIONAL`` reference reader, on the **shared** spot weight budget.
+
+    Redis is passed explicitly, never the client's own default: without it the
+    limiter falls back to a per-process bucket, and every process with a local
+    budget adds up to N quotas against one shared exchange quota, whose price for
+    getting it wrong is an IP ban (the same reasoning as
+    ``hunter_market_worker.config``). ``GET /api/v3/avgPrice`` is weight 2 and
+    this reader asks at most once per market per
+    ``avg_price.AVG_PRICE_REFRESH_S``.
+    """
+    from hunter_exchanges.binance_spot import BinanceSpotAdapter
+    from hunter_exchanges.binance_spot.http import (
+        REQUEST_WEIGHT_CAPACITY,
+        REQUEST_WEIGHT_PERIOD_S,
+    )
+    from hunter_exchanges.binance_spot.rest import BinanceSpotRestClient
+    from hunter_exchanges.rate_limit import TokenBucketRateLimiter
+
+    limiter = TokenBucketRateLimiter(
+        "binance",
+        redis=cast("Any", runtime.redis),
+        capacity=REQUEST_WEIGHT_CAPACITY,
+        refill_period_s=REQUEST_WEIGHT_PERIOD_S,
+    )
+    return ExchangeAvgPrice(BinanceSpotAdapter(rest=BinanceSpotRestClient(rate_limiter=limiter)))
 
 
 async def forever(name: str, coro: Awaitable[None]) -> None:
@@ -76,7 +105,7 @@ async def run_execution(runtime: WorkerRuntime) -> None:
                 "0006_paper_wallet/0007_paper_roles are not applied; refusing to run. There is no "
                 "wallet lock to take and nowhere to record why a curve point has no BRL"
             )
-        data = RedisSpotMarketData(runtime.redis)
+        data = RedisSpotMarketData(runtime.redis, avg_price=_avg_price_reader(runtime))
         cycles = Cycles(factory, data, config, health)
         async with asyncio.TaskGroup() as group:
             loops = {

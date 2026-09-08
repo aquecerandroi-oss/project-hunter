@@ -26,6 +26,7 @@ the reason a paper wallet can be believed.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Literal
@@ -50,7 +51,13 @@ if TYPE_CHECKING:
     from hunter_execution_worker.reference import MarketReference
     from hunter_execution_worker.wallet import WalletRef
 
-__all__ = ["WINDOW_MINUTES", "VolumeWindow", "liquidity_for", "marks_for_open_positions"]
+__all__ = [
+    "WINDOW_MINUTES",
+    "MarkCoverage",
+    "VolumeWindow",
+    "liquidity_for",
+    "marks_for_open_positions",
+]
 
 logger = get_logger(__name__)
 
@@ -58,6 +65,7 @@ WINDOW_MINUTES = 30
 """Complete minutes behind the participation median (RISK_ENGINE.md v2 §4)."""
 
 _TWO = Decimal(2)
+_ONE = Decimal(1)
 
 
 class VolumeWindow:
@@ -170,6 +178,45 @@ async def liquidity_for(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class MarkCoverage:
+    """The marks of one pass, and **how good they are** (T3.29 item 4).
+
+    ``mtm_fresh`` (``health.py``) measures the *write*: whether a curve point was
+    persisted recently. That is not the same question as whether the prices in
+    it were live, and Astra's review of 2026-09-08 named the scenario — a
+    stopped tape, a wallet marked at the last durable price, an equity that
+    looks stable and a green MTM check. :attr:`quality` is the missing number:
+    the share of open positions this pass could mark with a **live** print
+    inside the marking policy's own age budget.
+
+    A wallet with no open positions has quality ``1`` by construction: there is
+    nothing whose price could be stale, and reporting ``0`` would turn the
+    normal, empty wallet into a permanent alarm.
+    """
+
+    marks: dict[uuid.UUID, Decimal]
+    open_positions: int
+    """Positions read from Postgres this pass — the denominator."""
+
+    @property
+    def marked(self) -> int:
+        """How many of them got a live price — the numerator."""
+        return len(self.marks)
+
+    @property
+    def quality(self) -> Decimal:
+        """Share of open positions marked live, in ``[0, 1]``."""
+        if self.open_positions <= 0:
+            return _ONE
+        return Decimal(self.marked) / Decimal(self.open_positions)
+
+    @property
+    def complete(self) -> bool:
+        """Whether **every** open position is marked at a live price."""
+        return self.quality >= _ONE
+
+
 async def marks_for_open_positions(
     session: AsyncSession,
     *,
@@ -177,14 +224,14 @@ async def marks_for_open_positions(
     data: SpotMarketData,
     policy: MarkingPolicy,
     now: datetime,
-) -> tuple[dict[uuid.UUID, Decimal], int]:
+) -> MarkCoverage:
     """A price per open market, from the **last valid SPOT trade** and nothing else.
 
     A market whose tape has nothing usable is simply absent from the map, and
     the ledger then falls back to the last durable mark and flags the state
     incomplete. Marking at a price we could not validate would be the invented
-    number the directive forbids. Returns the marks and how many positions were
-    read, so the caller can report the second without a second query.
+    number the directive forbids. Returns the marks **and** the coverage they
+    achieved, so the caller can report the quality without a second query.
     """
     positions = await load_open_positions(session, wallet=wallet)
     markets = await load_markets(session, {position.market_id for position in positions})
@@ -194,7 +241,7 @@ async def marks_for_open_positions(
         trade, _ = usable_trade(snapshot.last_trade, now=now, policy=policy)
         if trade is not None:
             marks[market_id] = trade.price
-    return marks, len(positions)
+    return MarkCoverage(marks=marks, open_positions=len(positions))
 
 
 def prices_with(

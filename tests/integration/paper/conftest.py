@@ -97,7 +97,11 @@ from hunter_exchanges.binance_spot.filters import parse_filters
 from hunter_execution_worker.entry import execute_approved_entries
 from hunter_execution_worker.guard import cancel_pending_entries, expire_stale_reservations
 from hunter_execution_worker.intents_repo import insert_intent
-from hunter_execution_worker.market_data import SpotSnapshot, StaticSpotMarketData
+from hunter_execution_worker.market_data import (
+    SpotMarketData,
+    SpotSnapshot,
+    StaticSpotMarketData,
+)
 from hunter_execution_worker.positions import open_position
 from hunter_execution_worker.protection import (
     DegradedRetries,
@@ -896,7 +900,7 @@ def static_data(market: Market, snapshot: SpotSnapshot) -> StaticSpotMarketData:
 async def run_entries(
     factory: async_sessionmaker[AsyncSession],
     wallet: Wallet,
-    data: StaticSpotMarketData,
+    data: SpotMarketData,
     *,
     now: datetime,
 ) -> tuple[Any, ...]:
@@ -910,7 +914,7 @@ async def run_entries(
 async def run_protection(
     factory: async_sessionmaker[AsyncSession],
     wallet: Wallet,
-    data: StaticSpotMarketData,
+    data: SpotMarketData,
     *,
     now: datetime,
     watermarks: TriggerWatermarks | None = None,
