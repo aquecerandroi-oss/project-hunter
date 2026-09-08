@@ -1,0 +1,16 @@
+-- T3.32 — bloco comum reutilizado por todas as consultas do diagnóstico.
+-- Somente leitura. Cole este CTE no topo de cada consulta (é repetido de
+-- propósito: cada arquivo tem de ser executável sozinho e auditável sozinho).
+--
+-- Decomposição do R (contrato de hunter_strategy_worker/pricing.py):
+--   P_entry = open x (1 + (spread/2 + slippage)/10000)   -> meta.progress.entry
+--   P_exit  = base x (1 - (spread/2 + slippage)/10000)
+--   R_net   = ((P_exit-P_entry) - fee*P_entry - fee*P_exit - funding) / (P_entry - stop)
+--   risk    = P_entry - stop = signal_outcomes.meta.excursions.initial_risk
+-- Logo, com o MESMO denominador (risco inicial congelado):
+--   r_gross  = (exit_base - open_cru) / risk          (sem nenhum custo)
+--   r_exf    = meta.r_ex_funding                      (com spread+slippage+fee)
+--   custo_R  = r_gross - r_exf
+--   funding_R= r_exf - r_multiple                     (nulo se funding indeterminado)
+-- Todas as linhas do banco em 2026-09-08 têm assumed_costs
+--   {fee_bps 4, spread_bps 2, slippage_bps 5}  => cost_bps por perna = 6 bps.

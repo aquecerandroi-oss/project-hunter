@@ -18,6 +18,20 @@ The run writes two files, byte-identical for the same database and the same
 
 ``--reproduce-only`` stops after step 1 (does the replay land on the outcome the
 Lab recorded?), which is the gate: without it the contrasts have no floor.
+
+**Population selectors (T3.32).** ``--versions`` names *strategy keys*, so a run
+of ``momentum`` folds every activated version and every coorte of that key into
+one contrast. Two selectors narrow the population without touching a single
+rule, and both are inert when absent (the default is exactly the behaviour of
+the R1 run):
+
+- ``--only-version momentum_v2`` — keep only these ``<key>_<version>`` labels;
+- ``--cohort replay:<uuid>`` — keep only the frozen entries of these coortes,
+  read from ``signal_outcomes.meta->>'cohort'`` in the same READ ONLY snapshot.
+
+They exist because a paired contrast is only meaningful inside one population:
+two replay coortes of the same version hold the *same* entries under different
+``signal_id``s, and folding both would count every pair twice.
 """
 
 from __future__ import annotations
@@ -31,7 +45,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pydantic import SecretStr
+from sqlalchemy import select
 
+from hunter_core.db.models.agents import SignalOutcome
 from hunter_core.db.session import create_engine, create_session_factory
 from hunter_core.logging import get_logger
 from hunter_core.settings import Settings
@@ -53,7 +69,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from hunter_strategy_worker.replay.engine import ArmOutcome
-    from hunter_strategy_worker.replay.load import ReplayCase
+    from hunter_strategy_worker.replay.load import ReplayCase, VersionRow
 
 logger = get_logger(__name__)
 
@@ -102,6 +118,56 @@ async def _replay_all(
     return outcomes, digest.hexdigest()
 
 
+def _labels(raw: str | None) -> frozenset[str] | None:
+    """A comma-separated selector, or ``None`` when the flag was not given.
+
+    ``None`` and "given but empty" are deliberately the same thing: a selector
+    that filtered everything away would produce an empty, silently comparable
+    document.
+    """
+    if raw is None:
+        return None
+    wanted = frozenset(item.strip() for item in raw.split(",") if item.strip())
+    return wanted or None
+
+
+def keep_versions(versions: list[VersionRow], *, labels: frozenset[str] | None) -> list[VersionRow]:
+    """``--only-version``: the manifest, narrowed to these ``key_version`` labels."""
+    if labels is None:
+        return versions
+    unknown = labels - {version.label for version in versions}
+    if unknown:
+        raise SystemExit(
+            f"--only-version names labels the manifest does not have: {sorted(unknown)}"
+        )
+    return [version for version in versions if version.label in labels]
+
+
+async def keep_cohorts(
+    session: AsyncSession, cases: list[ReplayCase], *, cohorts: frozenset[str] | None
+) -> list[ReplayCase]:
+    """``--cohort``: the cases whose stored coorte label is one of ``cohorts``.
+
+    The label is read back from ``signal_outcomes.meta`` inside the same READ
+    ONLY snapshot the cases came from, so the filter cannot select a row the
+    replay then reads at a different version.
+    """
+    if cohorts is None or not cases:
+        return cases
+    rows = (
+        await session.execute(
+            select(SignalOutcome.signal_id, SignalOutcome.meta["cohort"].astext).where(
+                SignalOutcome.signal_id.in_([case.signal_id for case in cases])
+            )
+        )
+    ).all()
+    label = {row[0]: row[1] for row in rows}
+    kept = [case for case in cases if label.get(case.signal_id) in cohorts]
+    if not kept:
+        raise SystemExit(f"--cohort {sorted(cohorts)} selected no frozen entry")
+    return kept
+
+
 def _population(cases: list[ReplayCase]) -> dict[str, dict[str, int]]:
     counts: dict[str, Counter[str]] = {}
     for case in cases:
@@ -134,9 +200,21 @@ async def _collect(args: argparse.Namespace) -> dict[str, Any]:
     try:
         factory = create_session_factory(engine)
         async with read_only_session(factory) as session:
-            versions = await load_manifest(session, keys=keys)
-            cases = await load_cases(session, versions=versions, as_of=as_of)
-            logger.info("replay_loaded", versions=len(versions), cases=len(cases))
+            versions = keep_versions(
+                await load_manifest(session, keys=keys), labels=_labels(args.only_version)
+            )
+            cases = await keep_cohorts(
+                session,
+                await load_cases(session, versions=versions, as_of=as_of),
+                cohorts=_labels(args.cohort),
+            )
+            logger.info(
+                "replay_loaded",
+                versions=len(versions),
+                cases=len(cases),
+                only_version=args.only_version,
+                cohort=args.cohort,
+            )
             outcomes, series_digest = await _replay_all(
                 session, cases, policy_keys=policy_keys, as_of=as_of
             )
@@ -198,6 +276,16 @@ def main() -> int:
         "--versions",
         default="momentum,volume_anomaly",
         help="comma-separated strategy keys (every activated version of each is replayed)",
+    )
+    parser.add_argument(
+        "--only-version",
+        default=None,
+        help="comma-separated <key>_<version> labels to keep (default: the whole manifest)",
+    )
+    parser.add_argument(
+        "--cohort",
+        default=None,
+        help="comma-separated coorte labels to keep (default: every coorte)",
     )
     parser.add_argument("--out", default=".claude/state/r1-proof.md")
     parser.add_argument("--policies", default=None, help="subset to run; the base is always in")
