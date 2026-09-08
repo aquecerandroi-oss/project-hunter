@@ -68,7 +68,8 @@ bridge_candidates_total = Counter(
     registry=registry,
 )
 """T3.14 item 2. ``outcome`` is either a refusal reason (``purpose_mismatch``,
-``live_forbidden``, ``research_only``, ``unknown_purpose``, ``version_inactive``, ``beta_unavailable``,
+``live_forbidden``, ``research_only``, ``unknown_purpose``, ``cohort_not_live``,
+``version_inactive``, ``beta_unavailable``,
 ``duplicate_position``, ``entry_window_closed``, ...), a deferral
 (``spot_book_unavailable``), ``waiting`` for the candidates that lost the slot,
 or ``approved``/``rejected`` for the one that was submitted. A bridge that

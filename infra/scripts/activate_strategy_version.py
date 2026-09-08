@@ -20,8 +20,7 @@ prerequisites is not met:
   ``hunter_core.strategies.registry``;
 - ``default_parameters`` validate against the version's ``parameters_schema``;
 - the per-version ``code_ref`` digest can be computed
-  (:mod:`hunter_strategy_worker.code_ref`, the same function and the same
-  directory the worker uses — one resolution, no second answer).
+  (:mod:`hunter_strategy_worker.code_ref`, one resolution, no second answer).
 
 ``--supersede`` is the only way to move an *already frozen* version onto a new
 digest: it retires the old row (``deprecated`` + a ``changelog`` saying why) and
@@ -36,23 +35,19 @@ wallet from a **frozen** ``research_only`` version: a *new* row, next free
 ``v<n>``, carrying the source row's own ``parameters_schema``,
 ``default_parameters`` and ``params_format`` byte for byte, the ``code_ref``
 recomputed from the module the frozen digest names, ``status = 'draft'``,
-``activated_at = NULL`` and ``purpose = 'paper'``. The source row is not
-touched — the research coorte keeps running beside the paper one — and
-**nothing is activated**: activating the paper line later is a separate,
-audited ``activate`` run, and D10 names the seven conditions that come first.
-``purpose`` is written only here, on the migration/owner connection:
-``0010_strategy_purpose`` revoked it from every application role.
+``activated_at = NULL`` and ``purpose = 'paper'``. The source row is untouched
+and **nothing is activated**: activating the derived line later is a
+separate, audited ``activate`` run (:mod:`hunter_strategy_worker.activate_derived`
+keeps its own content, T3.15e), and D10 names the seven conditions that come
+first. ``purpose`` is written only here, on the migration/owner connection.
 
 Every run writes a ``system_events`` row — activation, refusal or an
-unexpected failure alike (T3.15c: the earlier promise covered only ``Refused``;
-any other exception now writes ``strategy_version_activation_error`` before the
-process exits 2): an experiment whose start nobody can date is not an
-experiment.
+unexpected failure alike (T3.15c): an experiment whose start nobody can date
+is not an experiment.
 
 Connects with ``DATABASE_URL_MIGRATIONS`` (direct, never the pooler), like
-``infra/scripts/seed.py``. The shared checks and the row reader live in
-:mod:`hunter_strategy_worker.activation_db`; ``--paper-line`` itself in
-:mod:`hunter_strategy_worker.paper_line` (file budget, T3.15).
+``infra/scripts/seed.py``. Shared checks in :mod:`hunter_strategy_worker.activation_db`;
+``--paper-line`` and derived activation in ``paper_line``/``activate_derived`` (file budget).
 """
 
 from __future__ import annotations
@@ -69,9 +64,11 @@ from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 from hunter_core.settings import Settings
 from hunter_core.strategies.canonical import PARAMS_FORMAT, canonical_json
 from hunter_core.strategies.registry import DEFAULT_REGISTRY, StrategyRegistry
+from hunter_strategy_worker.activate_derived import activate_derived
 from hunter_strategy_worker.activation import validate_parameters
 from hunter_strategy_worker.activation_db import (
     PURPOSE_LIVE,
+    PURPOSE_RESEARCH_ONLY,
     VERSION_RE,
     Refused,
     load_row,
@@ -122,7 +119,12 @@ async def activate(
     dry_run: bool,
     registry: StrategyRegistry = DEFAULT_REGISTRY,
 ) -> str:
-    """Run every check and, unless ``dry_run``, activate. Returns a summary line."""
+    """Run every check and, unless ``dry_run``, activate. Returns a summary line.
+
+    A row already carrying its own content (``purpose != research_only`` or a
+    derived ``changelog``) is a ``--paper-line`` product: :func:`activate_derived`
+    keeps it as-is rather than rewriting it from today's code (T3.15-risk item 1).
+    """
     if not await migration_applied(conn):
         raise Refused("0002_shadow_lab is not applied: apply the migration before activating")
     if not await purpose_column_present(conn):
@@ -137,6 +139,10 @@ async def activate(
         )
     strategy = _resolve(registry, key, version, row.code_ref)
     code_ref = version_code_ref(strategy_module(strategy))
+    if row.purpose != PURPOSE_RESEARCH_ONLY or (row.changelog or "").startswith("paper line of"):
+        return await activate_derived(
+            conn, key, version, changelog, row, code_ref=code_ref, dry_run=dry_run
+        )
     schema: dict[str, Any] = json.loads(canonical_json(dict(strategy.parameters_schema)))
     params: dict[str, Any] = json.loads(canonical_json(dict(strategy.default_parameters)))
     report = validate_parameters(schema, params)
@@ -309,11 +315,7 @@ async def _run(args: argparse.Namespace) -> int:
             return 1
         except Exception as exc:
             # Every run leaves a system_events row, not only a named refusal
-            # (docs/DATABASE.md section 22.4's promise was narrower than it
-            # sounded — security review T3.15 MEDIUM 5): a DBAPIError from a
-            # CHECK/trigger/unique violation, a bad --changelog, or a dropped
-            # connection is audited the same way, then re-raised as a clean
-            # exit rather than a bare traceback.
+            # (T3.15c, security review T3.15 MEDIUM 5).
             print(f"ERROR: {exc}", file=sys.stderr)
             await record_failure(engine, "error", "strategy_version_activation_error", str(exc))
             raise SystemExit(2) from exc

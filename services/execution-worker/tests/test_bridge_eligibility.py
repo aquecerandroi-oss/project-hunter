@@ -176,6 +176,7 @@ async def test_an_unknown_column_purpose_is_refused_unknown_purpose() -> None:
         emitted_at=NOW,
         purpose="definitely_not_a_real_purpose",
         envelope_purpose="definitely_not_a_real_purpose",
+        cohort="prospective",
         version_active=True,
     )
     screened = await screen_signal(
@@ -223,6 +224,44 @@ async def test_a_column_research_only_signal_with_a_paper_envelope_is_refused_pu
     )
     screened = await _screen(db_session_factory, fixture)
     assert [item.refused for item in screened] == ["purpose_mismatch"]
+
+
+async def test_a_replay_cohort_signal_of_a_paper_version_is_refused_cohort_not_live(
+    db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
+) -> None:
+    """T3.15e (review-T3.15-risk.md "Antes de ligar a ponte" item 2): a replay
+    or replication run's cohort is a different population by construction
+    (``ShadowCohort``) and must never reach the wallet, even under a version
+    that is otherwise a legitimate paper coorte."""
+    fixture = await _setup(db_session_factory, db_engine, version_purpose=shadow.PURPOSE_PAPER)
+    await shadow.emit_signal(
+        db_engine,
+        version_id=fixture.version_id,
+        market_id=fixture.perp_market_id,
+        source_bar_close=BAR,
+        purpose=shadow.PURPOSE_PAPER,
+        cohort=f"replay:{uuid.uuid4()}",
+    )
+    screened = await _screen(db_session_factory, fixture)
+    assert [item.refused for item in screened] == ["cohort_not_live"]
+
+
+async def test_a_prospective_cohort_signal_passes_the_cohort_gate(
+    db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
+) -> None:
+    """The live cohort of the version — the only one its own agents run
+    forward for — is not refused by the cohort gate."""
+    fixture = await _setup(db_session_factory, db_engine)
+    await shadow.emit_signal(
+        db_engine,
+        version_id=fixture.version_id,
+        market_id=fixture.perp_market_id,
+        source_bar_close=BAR,
+        purpose=shadow.PURPOSE_PAPER,
+        cohort="prospective",
+    )
+    screened = await _screen(db_session_factory, fixture)
+    assert [item.refused for item in screened] == [None]
 
 
 async def test_a_signal_of_an_inactive_version_is_refused(

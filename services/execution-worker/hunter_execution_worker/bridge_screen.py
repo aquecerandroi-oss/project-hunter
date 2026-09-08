@@ -21,7 +21,13 @@ name** at the door (Fase 4, ``ENABLE_LIVE_TRADING=false``), and a
 before any market data is read (item 5) — and only then the ones that need the
 reference tables. The bridge admits ``purpose = "paper"`` only; anything else
 is either ``research_only`` (evidence never becomes an order) or
-``unknown_purpose`` (a label the bridge does not recognise).
+``unknown_purpose`` (a label the bridge does not recognise). Right after
+purpose, the cohort is judged the same way: only ``"prospective"`` — the
+population a version's own agents actually run forward for — may reach a
+wallet; a ``"replay:<run_id>"`` or a replication sibling's cohort is refused
+``cohort_not_live`` (T3.15e, review-T3.15-risk.md item 2), because both carry
+the same ``strategy_version_id``/``purpose`` as the live coorte and nothing
+else in the pipeline tells them apart.
 
 A refusal is logged and counted **once per (signal, reason)**, not once per
 pass: the durable queue (``bridge_repo.pending_signals``) re-reads the same
@@ -42,7 +48,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import text
 
-from hunter_core.domain.enums import TradeDirection
+from hunter_core.domain.enums import ShadowCohort, TradeDirection
 from hunter_core.logging import get_logger
 from hunter_core.strategies.envelope import (
     PURPOSE_PAPER,
@@ -264,6 +270,8 @@ async def screen_signal(
         return _refuse(signal, "research_only", reported=reported, purpose=signal.purpose)
     if signal.purpose != PURPOSE_PAPER:
         return _refuse(signal, "unknown_purpose", reported=reported, purpose=signal.purpose)
+    if signal.cohort != ShadowCohort.PROSPECTIVE:
+        return _refuse(signal, "cohort_not_live", reported=reported, cohort=signal.cohort)
     if not signal.version_active:
         return _refuse(signal, "version_inactive", reported=reported)
     closes_at = signal.window_closes_at()

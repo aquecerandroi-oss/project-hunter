@@ -71,4 +71,16 @@ describe("LabVersionCard: honest nulls, always-visible label and 'não aplicáve
     render(<LabVersionCard version={makeVersionSummary()} supersededBy={null} />);
     expect(screen.getByText(/r_ex_funding \(mesma população, sem funding\)/)).toBeInTheDocument();
   });
+
+  it("shows a 'paper' chip for a purpose=paper version (T3.15e)", () => {
+    render(<LabVersionCard version={makeVersionSummary({ purpose: "paper" })} supersededBy={null} />);
+    expect(screen.getByText("paper")).toBeInTheDocument();
+  });
+
+  it("shows a 'pesquisa' chip for a purpose=research_only version (T3.15e)", () => {
+    render(
+      <LabVersionCard version={makeVersionSummary({ purpose: "research_only" })} supersededBy={null} />,
+    );
+    expect(screen.getByText("pesquisa")).toBeInTheDocument();
+  });
 });

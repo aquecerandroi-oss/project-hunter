@@ -191,3 +191,72 @@ class TestPaperLine:
                 await script.activate(
                     session, live_key, "v1", "x", dry_run=True, registry=registry_for(live_key)
                 )
+
+    async def test_activating_the_derived_line_preserves_its_own_copied_content(
+        self, db_session_factory: Any
+    ) -> None:
+        """review-T3.15-risk.md "Antes de ligar a ponte" item 1: ``activate()``
+        on a paper line must keep the row's own copied schema/params/
+        params_format, not rewrite them from today's code."""
+        script = _script()
+        key = "paper_line_activate_preserves"
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(session, key=key)
+        async with db_session_factory() as session, session.begin():
+            await script.paper_line(
+                session, key, "v1", "derive", dry_run=False, registry=registry_for(key)
+            )
+        async with db_session_factory() as session, session.begin():
+            message = await script.activate(
+                session,
+                key,
+                "v2",
+                "D10: seven conditions met",
+                dry_run=False,
+                registry=registry_for(key),
+            )
+        assert message.startswith(f"activated {key} v2 (purpose paper)")
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            source, paper = await _rows(session, key)
+        assert paper.status == "active"
+        assert paper.activated_at is not None
+        assert paper.default_parameters == source.default_parameters
+        assert paper.parameters_schema == source.parameters_schema
+        assert paper.params_format == source.params_format
+        assert paper.code_ref == source.code_ref
+        assert paper.changelog == "D10: seven conditions met"
+        # The research row is untouched by activating its derived line.
+        assert source.purpose == PURPOSE_RESEARCH_ONLY
+        assert source.status == "active"
+
+    async def test_a_derived_line_whose_code_drifted_is_refused_not_rewritten(
+        self, db_session_factory: Any
+    ) -> None:
+        """A deploy that touched the module after the line was derived must be
+        refused, not silently activated with today's code (D10's comparison
+        only holds when both coortes ran the same parameters and code)."""
+        script = _script()
+        key = "paper_line_drifted"
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(session, key=key)
+            # A paper line whose frozen code_ref no longer matches this build.
+            await activate_version(
+                session,
+                key=key,
+                version="v2",
+                code_ref="hunter_core.strategies.volume_anomaly_v1@sha256:" + "0" * 64,
+                active=False,
+                purpose=PURPOSE_PAPER,
+            )
+        async with db_session_factory() as session, session.begin():
+            with pytest.raises(script.Refused, match="deploy the matching build or derive again"):
+                await script.activate(
+                    session, key, "v2", "x", dry_run=True, registry=registry_for(key)
+                )
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            source, paper = await _rows(session, key)
+        assert paper.status == "draft"
+        assert paper.activated_at is None
+        assert source.status == "active"

@@ -48,6 +48,7 @@ def _signal(signal_id: uuid.UUID | None = None) -> ShadowSignal:
         emitted_at=NOW,
         purpose="paper",
         envelope_purpose="paper",
+        cohort="prospective",
         version_active=True,
     )
 

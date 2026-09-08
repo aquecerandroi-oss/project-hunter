@@ -223,6 +223,7 @@ def build_version_summary(
         version=meta.version,
         code_ref=meta.code_ref,
         status=meta.status,
+        purpose=meta.purpose,
         activated_at=meta.activated_at,
         deprecated_at=meta.deprecated_at,
         counts=_counts(rows, evaluable),

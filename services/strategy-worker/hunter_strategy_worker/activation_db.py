@@ -101,7 +101,8 @@ async def load_row(conn: AsyncConnection, key: str, version: str) -> Any:
         await conn.execute(
             text(
                 "SELECT v.id, v.strategy_id, v.status, v.activated_at, v.code_ref, "
-                "v.default_parameters, v.parameters_schema, v.params_format, v.purpose "
+                "v.default_parameters, v.parameters_schema, v.params_format, v.purpose, "
+                "v.changelog "
                 "FROM strategy_versions v JOIN strategies s ON s.id = v.strategy_id "
                 "WHERE s.key = :key AND v.version = :version"
             ),

@@ -109,6 +109,9 @@ export interface VersionSummaryOut {
   version: string;
   code_ref: string | null;
   status: StrategyVersionStatus;
+  /** `strategy_versions.purpose` (T3.15e) -- `"research_only"` never spends
+   * the wallet, `"paper"` is the coorte that does. */
+  purpose: string;
   activated_at: string | null;
   deprecated_at: string | null;
   counts: VersionCounts;

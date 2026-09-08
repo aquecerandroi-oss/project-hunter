@@ -15,6 +15,7 @@ export function exampleVersionSummary(): VersionSummaryOut {
     version: "v2",
     code_ref: "hunter_core.strategies.momentum_v1@sha256:c012f75c...",
     status: "active",
+    purpose: "paper",
     activated_at: "2026-09-06T02:08:13.332014Z",
     deprecated_at: null,
     counts: {

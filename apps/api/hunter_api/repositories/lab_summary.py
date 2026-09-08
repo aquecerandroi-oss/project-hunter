@@ -37,6 +37,11 @@ class VersionMeta:
     activated_at: datetime | None
     deprecated_at: datetime | None
     default_parameters: dict[str, Any]
+    purpose: str
+    """``strategy_versions.purpose`` (T3.15e): which coorte this row is — a
+    ``research_only`` row never spends the wallet, a ``paper`` row is the one
+    that does. Without it two rows of the same strategy/code_ref/parameters
+    are indistinguishable on the summary page (review-T3.15-risk.md item 5)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +82,7 @@ class LabSummaryRepository:
                 activated_at=sv.activated_at,
                 deprecated_at=sv.deprecated_at,
                 default_parameters=dict(sv.default_parameters or {}),
+                purpose=sv.purpose,
             )
             for sv, key in rows
         ]

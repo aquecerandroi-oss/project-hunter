@@ -112,6 +112,10 @@ class VersionSummaryOut(BaseModel):
     version: str
     code_ref: str | None
     status: StrategyVersionStatus
+    purpose: str
+    """``research_only`` (evidence only, never spends the wallet) or ``paper``
+    (the coorte that does) — ``strategy_versions.purpose`` (T3.15e), so the
+    summary page can tell apart two rows sharing the same strategy/code_ref."""
     activated_at: datetime | None
     deprecated_at: datetime | None
     counts: VersionCounts

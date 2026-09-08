@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import text
 
+from hunter_core.domain.enums import ShadowCohort
 from hunter_core.domain.types import uuid7
 from hunter_core.strategies.envelope import PURPOSE_PAPER, PURPOSE_RESEARCH_ONLY
 
@@ -283,7 +284,7 @@ async def create_agent(
     return agent_id
 
 
-def envelope(*, source_bar_close: datetime, purpose: str) -> str:
+def envelope(*, source_bar_close: datetime, purpose: str, cohort: str) -> str:
     """``agent_signals.supporting_features`` in the shape S1/S2 persist it."""
     return json.dumps(
         {
@@ -298,6 +299,7 @@ def envelope(*, source_bar_close: datetime, purpose: str) -> str:
             "eligible": True,
             "eligibility_reason": None,
             "purpose": purpose,
+            "cohort": cohort,
             "params_format": 1,
         }
     )
@@ -314,14 +316,22 @@ async def emit_signal(
     stop: Decimal = Decimal("97.5"),
     target: Decimal = Decimal("105"),
     purpose: str = PURPOSE_RESEARCH_ONLY,
+    cohort: str = ShadowCohort.PROSPECTIVE,
 ) -> uuid.UUID:
-    """One shadow decision, both rows, exactly as ``persist_decision`` writes them."""
+    """One shadow decision, both rows, exactly as ``persist_decision`` writes them.
+
+    ``cohort`` defaults to ``"prospective"`` — the live population any agent
+    actually runs forward for (T3.15e): a replay or replication run's cohort
+    (``"replay:<run_id>"`` etc., ``hunter_core.domain.enums.ShadowCohort``) is
+    a different population by construction and must be refused at the bridge.
+    """
     signal_id = uuid7()
     decision_at = emitted_at or (source_bar_close + timedelta(seconds=2))
     meta = json.dumps(
         {
             "reference_price": str(entry_ref),
             "purpose": purpose,
+            "cohort": cohort,
             "assumed_costs": _costs_json(),
         }
     )
@@ -340,7 +350,9 @@ async def emit_signal(
                 "market": market_id,
                 "stop": stop,
                 "targets": json.dumps([str(target)]),
-                "envelope": envelope(source_bar_close=source_bar_close, purpose=purpose),
+                "envelope": envelope(
+                    source_bar_close=source_bar_close, purpose=purpose, cohort=cohort
+                ),
                 "emitted": decision_at,
             },
         )

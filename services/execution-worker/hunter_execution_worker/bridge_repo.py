@@ -95,6 +95,15 @@ class ShadowSignal:
     ``purpose_mismatch`` before any other screening: it means a signal was
     stamped for a coorte other than the one the frozen row now says it belongs
     to (a worker on an older build, or a write it should never have made)."""
+    cohort: str
+    """``agent_signals.supporting_features``/``signal_outcomes.meta``'s
+    ``cohort`` (``hunter_strategy_worker.record.build_record``,
+    ``hunter_core.domain.enums.ShadowCohort``): ``"prospective"`` is the one
+    population any version's own agents ever ran forward for real; a
+    ``"replay:<run_id>"`` or a replication sibling's cohort is a different
+    population by construction (T3.15e, review-T3.15-risk.md "Antes de ligar
+    a ponte" item 2) and must never reach the wallet under the same
+    ``strategy_version_id``/``purpose``."""
     version_active: bool
 
     def window_closes_at(self) -> datetime | None:
@@ -163,6 +172,7 @@ def _signal(row: Any) -> ShadowSignal:
         emitted_at=ensure_utc(row.emitted_at),
         purpose=str(row.version_purpose),
         envelope_purpose=str(envelope.get("purpose") or meta.get("purpose") or ""),
+        cohort=str(envelope.get("cohort") or meta.get("cohort") or ""),
         version_active=row.version_status == "active" and row.activated_at is not None,
     )
 
