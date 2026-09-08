@@ -90,6 +90,27 @@ resolve; link parcial ambíguo é ambíguo e não morto; sufixo só casa em fron
 cobrado por `strategy`. Mais o teste de alias escapado em célula de tabela, que estava na árvore e
 falhava por uma órfã na fixture (`Nota B` sem link de entrada) — corrigido no lugar.
 
+## O commit saiu com a mensagem de outra tarefa — como e por quê
+
+Os 172 arquivos da T3.21 estavam **montados no índice** (`git add` dos caminhos certos, conferidos:
+nada de `03-TRADING/Estrategias/`, nada de outra tarefa) quando uma **sessão concorrente rodou
+`git commit` na mesma árvore**. O commit dela levou o índice inteiro junto e saiu como:
+
+```
+6a17665 chore(state): brief T3.22 — Brasília time as the primary display everywhere, UTC as the
+        detail (Everton, 2026-09-08); dispatch after T3.18 web
+        173 arquivos: os 172 da T3.21 + .claude/state/brief-T3.22-brasilia-time.md
+```
+
+Quando percebi, `main` já estava igual a `origin/main` (0 à frente, 0 atrás): o commit tinha sido
+empurrado. Histórico empurrado não se reescreve — sem `reset`, sem `rebase`, sem force-push —, então
+o conteúdo fica onde está e este arquivo é o registro. Nada se perdeu e nada de outra tarefa entrou.
+
+**A lição, para não repetir:** numa árvore compartilhada o índice é global e não pertence a quem o
+montou. Montar o índice num comando e commitar noutro abre uma janela em que qualquer sessão
+concorrente commita o seu trabalho com a mensagem dela. `git add <caminhos> && git commit -m ...`
+no **mesmo** comando, sempre, e verificação de `git log -1` logo depois.
+
 ## Fora do escopo, registrado
 
 - `packages/core/hunter_core/db/models/agents.py` está com **351 linhas** (teto 350) no
