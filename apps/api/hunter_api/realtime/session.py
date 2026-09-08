@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from hunter_api.auth.clerk import InvalidTokenError
 from hunter_api.auth.principal import Principal, ProvisioningError
+from hunter_api.metrics import ws_closed_total
 from hunter_api.realtime.channels import is_authorized
 from hunter_core.logging import get_logger
 
@@ -151,6 +152,49 @@ def _interval(websocket: WebSocket) -> float:
 async def close_socket(websocket: WebSocket, code: int, reason: str) -> None:
     """Close, swallowing whatever the transport says about a socket that may
     already be gone — the caller is on its way out either way.
+
+    Every path through here logs first (:func:`log_ws_closed`): a close the
+    gateway chooses is never allowed to be silent again (T3.44b) — a 4401 with
+    no matching line was exactly what hid the auth-race bug for days.
     """
+    log_ws_closed(websocket, code, reason)
     with contextlib.suppress(Exception):
         await websocket.close(code=code, reason=reason)
+
+
+def mark_connected(websocket: WebSocket) -> None:
+    """Stamp the accept time ``log_ws_closed`` measures ``duration_ms`` from.
+    Called once, right after ``websocket.accept()`` — before authentication,
+    because the closes that used to hide (4401 on a missing/late token) happen
+    in exactly that window.
+    """
+    websocket.state.connected_at = time.monotonic()
+
+
+def log_ws_closed(websocket: WebSocket, code: int, reason: str) -> None:
+    """One structured line for every WS close this gateway performs
+    (:func:`close_socket`) or merely observes — a client hanging up on its own
+    while a caller here is still waiting on ``receive_text()`` never went
+    through ``close_socket`` at all, so ``endpoint._authenticate``/``_serve``
+    call this directly for that case.
+
+    ``authenticated`` and ``connected_at`` are read off ``websocket.state``
+    rather than threaded through every call site: they are set exactly once
+    each (``mark_connected`` right after ``accept()``, ``authenticated`` in
+    ``endpoint._authenticate`` on success) and every close, gateway-initiated
+    or not, needs both.
+    """
+    client_conn = getattr(websocket, "client", None)
+    client = getattr(client_conn, "host", None) or "unknown"
+    authenticated = getattr(websocket.state, "authenticated", False)
+    connected_at = getattr(websocket.state, "connected_at", None)
+    duration_ms = int((time.monotonic() - connected_at) * 1000) if connected_at is not None else 0
+    ws_closed_total.labels(code=str(code)).inc()
+    logger.info(
+        "ws_closed",
+        code=code,
+        reason=reason,
+        client=client,
+        authenticated=authenticated,
+        duration_ms=duration_ms,
+    )

@@ -216,3 +216,162 @@ Nenhum teste de `apps/api` foi tocado (nenhuma mudança em `apps/api/**`), entã
    `{"level":"warn","msg":"realtime_auth_token_missing",...}` se for esse o motivo; no
    `/system`, o card "Execução paper" deve mostrar Patrimônio/Posições/kill switch reais
    (não mais "indisponível" em bloco).
+
+## T3.44b — todo fechamento do gateway WS loga com contador; Bybit vira `planned` bloqueado por schema
+
+Base: `main` em `8770ff4` (o commit `f6d222f` que salvou o brief já estava em cima dele).
+Brief: `.claude/state/brief-T3.44b-ws-close-logging-and-bybit-status.md`.
+
+### Item 1 — log + contador para todo fechamento do gateway (feito)
+
+Causa raiz confirmada por leitura de código (Achado 1b acima já apontava): `realtime/endpoint.py`
+só logava em alguns ramos de fechamento (`ws_auth_unavailable`, `ws_auth_rejected`,
+`ws_connection_cap_reached`, `ws_channel_denied`); os fechamentos por `4401`
+("authentication required"/"authentication timeout"), `4400` (frame malformado/tipo
+desconhecido) e `4408`/`4409`/`4403` sem exceção nomeada fechavam em silêncio, e um cliente
+que derruba o próprio socket antes de mandar o frame de auth (`WebSocketDisconnect` dentro do
+`receive_text()` de `_authenticate`/`_serve`) não passava por lugar nenhum — nem por
+`close_socket`, porque o socket já tinha ido embora.
+
+**Desenho:** um único ponto de log, `realtime.session.log_ws_closed(websocket, code, reason)`,
+chamado (a) de dentro de `close_socket` — cobre todo fechamento que o próprio gateway decide
+(`_close` em `endpoint.py` sempre delega a `close_socket`) — e (b) diretamente dos dois pontos
+em `endpoint.py` (`_authenticate`, `_serve`) que capturam `WebSocketDisconnect` vindo do
+cliente. `authenticated` e `connected_at` (para `duration_ms`) são lidos de
+`websocket.state` em vez de passados por parâmetro em cada call site: `mark_connected(websocket)`
+carimba `connected_at` uma vez, logo depois de `websocket.accept()` (antes da autenticação —
+é exatamente a janela onde o bug original acontecia), e `websocket.state.authenticated = True`
+é setado uma vez, em `_authenticate`, só no caminho de sucesso. `client` é
+`websocket.client.host` (ou `"unknown"` se ausente, ex.: sockets de teste sem endereço real).
+
+Contador `hunter_ws_closed_total{code}` (Prometheus, `apps/api/hunter_api/metrics.py`, mesmo
+registry compartilhado que `hunter_rate_limit_internal_peer_total`), incrementado dentro de
+`log_ws_closed` — cobre gateway-iniciado e cliente-iniciado com o mesmo rótulo `code` (para o
+cliente, é o código que ele mandou no `websocket.disconnect`, tipicamente `1000`).
+
+**Orçamento de 350 linhas:** `realtime/endpoint.py` já estava em 349 linhas antes desta tarefa.
+Para não estourar, `_handshake_allowed`/`_connection_cap`/`_setting` (limites de admissão —
+responsabilidade separada de "servir um socket já admitido") saíram para um módulo novo,
+`apps/api/hunter_api/realtime/admission.py` (64 linhas), sem mudança de lógica — só
+relocação e queda do prefixo `_` (agora são a API pública desse módulo:
+`handshake_allowed`, `connection_cap`, `setting`). `endpoint.py` ficou em 328 linhas depois de
+tudo. Nenhum teste importava essas três funções diretamente (só `RealtimeHub`/`_serve`); um
+comentário de docstring em `tests/integration/test_websocket.py` que citava
+`realtime.endpoint._handshake_allowed` foi corrigido para o novo caminho.
+
+### Item 2 — Bybit `planned` (bloqueado, conforme a cláusula de escape do brief)
+
+Confirmado por leitura de `infra/migrations/ddl/enums.py:76-79` e
+`infra/migrations/versions/0001_initial_schema.py:144-149`: o enum Postgres `exchange_status`
+só tem `active`/`inactive` — não existe `planned`. Gravar `status='planned'` hoje falharia em
+runtime (`invalid input value for enum`). O brief já previa essa saída ("diga isso e acione o
+database-architect em vez de editar migrações"), então **nenhum código de `seed_reference.py`
+ou `system_status.py` foi alterado** para este item — implementar a exclusão do agregado sem o
+enum existir exigiria ou (a) uma migração, fora do meu escopo nesta tarefa, ou (b) um workaround
+não documentado (ex.: usar `capabilities` JSONB como catálogo paralelo), que decidiria uma
+questão de schema por conta própria — exatamente o que a Regra 1 do CLAUDE.md pede para não
+fazer em silêncio.
+
+Escrito `.claude/state/brief-T3.44c-exchange-status-planned.md` para o database-architect, com:
+a localização exata do enum, as duas opções de desenho (estender o enum vs. um campo separado
+tipo `has_collector`/`onboarding_status`, já que "sem coletor" não é o mesmo que "inactive" no
+sentido operacional), os pontos que passam a mudar depois da migração
+(`seed_reference.py`/`seed.py:seed_exchanges` hoje nem escreve `status` no upsert;
+`system_status.py:build_market_status`; `schemas/system.py`; `pnpm gen:types`), e uma correção:
+`seed.py --only exchanges`, citado no brief como "o comando do operador", **não existe** hoje —
+`--only` (`seed_cli.py`/`seed_dry_run.TABLE_CHOICES`) só cobre `strategies`/`risk_profiles`/
+`feature_definitions`/`opportunity_weights`; `seed_exchanges` roda incondicionalmente dentro de
+`seed()`. Documentado no próprio brief para quem for implementar depois da migração.
+
+`docs/PIPELINE.md` §1 ganhou um item novo (9) explicando o achado e apontando para o brief
+T3.44c, sem inventar um comportamento que ainda não existe.
+
+### Item 3 — nota para o frontend (não implementado, `apps/web` é só leitura para mim)
+
+Quando `exchanges_planned` existir na resposta de `/system/market-status` (depois da T3.44c +
+sua implementação), `apps/web/components/system/live-status.tsx` deve parar de contar exchanges
+`planned` no agregado (`worstExchange`/`CompactStatus`) e mostrar algo como
+"1 exchange · CONNECTED · N mercados (bybit planejada)" — uma linha a mais no texto do topbar,
+lendo a nova lista separada em vez de tratar toda `exchanges[]` como operável. Não é uma
+mudança de uma linha *hoje* porque o campo ainda não existe no schema; é uma linha depois que
+existir.
+
+### FILES
+
+Modificados:
+- `apps/api/hunter_api/realtime/endpoint.py` — `_handshake_allowed`/`_connection_cap`/
+  `_setting` removidos (foram para `admission.py`); `mark_connected(websocket)` chamado logo
+  após `accept()`; `websocket.state.authenticated = True` no sucesso de `_authenticate`;
+  os dois `except WebSocketDisconnect` (`_authenticate`, `_serve`) agora chamam
+  `log_ws_closed` antes de retornar; docstring do módulo documenta o `ws_closed`/contador novo.
+- `apps/api/hunter_api/realtime/session.py` — `close_socket` loga via `log_ws_closed` antes de
+  fechar; `mark_connected` e `log_ws_closed` novos.
+- `apps/api/hunter_api/metrics.py` — `hunter_ws_closed_total` (Counter, label `code`).
+- `apps/api/tests/unit/test_ws_endpoint.py` — 6 testes novos (4401 sem frame de auth, 4401
+  token inválido, cliente que nunca autentica e cai fora, 4403 por membership revogada, close
+  normal 1000 pós-auth, `duration_ms` reflete o tempo desde o accept).
+- `apps/api/tests/integration/test_websocket.py` — comentário corrigido
+  (`realtime.admission.handshake_allowed`, não mais `endpoint._handshake_allowed`).
+- `docs/PIPELINE.md` — item 9 novo no §1 (achado Bybit + link para o brief T3.44c).
+
+Criados:
+- `apps/api/hunter_api/realtime/admission.py` — admissão (`handshake_allowed`,
+  `connection_cap`, `setting`), relocado de `endpoint.py` sem mudança de lógica.
+- `.claude/state/brief-T3.44c-exchange-status-planned.md` — handoff para o
+  database-architect.
+
+Nenhum arquivo em `apps/web/**`, `services/**`, `infra/migrations/**`, `obsidian/**`,
+`.env*`, ou `apps/api/hunter_api/{repositories,services,schemas}/lab_*` foi tocado.
+`infra/scripts/seed_reference.py` aparece modificado no `git status` compartilhado, mas por
+outro agente (trendline_breakout, já presente antes desta tarefa começar) — não toquei nele.
+
+### TESTS (saída real)
+
+```
+$ uv run pytest apps/api/tests/unit/test_ws_endpoint.py -q
+....................................                                     [100%]
+36 passed, 1 warning in 9.02s
+
+$ uv run pytest apps/api/tests/unit -q -k "not lab"
+377 passed, 106 deselected, 1 warning in 77.06s
+
+$ uv run pytest apps/api/tests/integration/test_websocket.py -q
+4 passed, 1 warning in 70.82s
+(uma tentativa anterior deu ConnectionResetError do asyncpg contra o Postgres do
+testcontainer — ambiente/Docker compartilhado, não relacionado ao diff; repetição limpa)
+
+$ uv run ruff check apps/api
+All checks passed!
+
+$ uv run ruff format --check apps/api/hunter_api/realtime/ apps/api/hunter_api/metrics.py apps/api/tests/unit/test_ws_endpoint.py
+10 files already formatted
+
+$ uv run pyright apps/api/hunter_api/realtime/endpoint.py apps/api/hunter_api/realtime/session.py apps/api/hunter_api/realtime/admission.py apps/api/hunter_api/metrics.py apps/api/tests/unit/test_ws_endpoint.py
+0 errors, 0 warnings, 0 informations
+
+$ uv run pyright apps/api
+14 errors — todos em test_lab_signals_pagination_api.py (lab_*, outro agente) e
+test_regime_service.py (regime.py sendo mexido por outro agente agora, git status
+compartilhado mostra M em routers/schemas/services/regime.py); nenhum nos arquivos desta tarefa.
+
+$ uv run python infra/scripts/check_file_size.py
+error   359 > 350  packages/core/hunter_core/settings.py
+scanned 570 files; 1 over budget, 0 grandfathered
+(pré-existente, não tocado nesta tarefa — packages/core/hunter_core/settings.py não faz
+parte do meu diff)
+```
+
+### CONCERNS
+
+1. Item 2 do brief não foi implementado em código (só diagnosticado + handoff) porque o
+   enum `exchange_status` não tem `planned` — a própria cláusula de escape do brief cobre
+   este caso. Sem a migração do database-architect (brief T3.44c), a Bybit continua contada
+   no agregado do topbar como hoje.
+2. Item 3 (nota para o frontend) é só texto — não há campo `exchanges_planned` no schema
+   ainda para `live-status.tsx` ler, então não escrevi o one-liner como um diff pronto, só
+   como especificação do que a linha deve fazer quando o campo existir.
+3. A frase do brief "tipos regenerados" (resumo do despachante) não se aplica: como nenhum
+   schema Pydantic mudou, não há nada novo para `pnpm gen:types` gerar nesta tarefa.
+4. `duration_ms` é medido a partir de `mark_connected` (logo após `accept()`), não do
+   instante em que o TCP chega — a diferença é o tempo de handshake HTTP/WS em si, sub-ms
+   normalmente, irrelevante para o caso que este log existe para diagnosticar (~1,8 s).

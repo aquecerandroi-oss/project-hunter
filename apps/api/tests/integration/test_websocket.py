@@ -34,7 +34,7 @@ these tests run in well under a second instead of a minute-plus.
 Each ``TestClient`` below is given its own ``client=`` address (a distinct
 one in the ``TEST-NET-3`` documentation range, RFC 5737) rather than
 ``TestClient``'s default ``("testclient", 50000)``. The ``/ws`` handshake
-limit's Redis window (``realtime.endpoint._handshake_allowed``, sharing
+limit's Redis window (``realtime.admission.handshake_allowed``, sharing
 ``middleware.rate_limit``'s bucket implementation) is keyed on nothing but
 the peer address and a ``ws`` scope — never on which application or settings
 opened the socket — so every ``TestClient()`` left at the library default

@@ -35,6 +35,14 @@ authentication temporarily unavailable (the JWKS could not be fetched — the
 credential was never judged, so this is not a 4401). ``44xx`` codes are
 application-defined (RFC 6455 §7.4.2); the client maps them in
 ``apps/web``'s realtime hook.
+
+Every close this gateway performs, or merely observes (a client hanging up
+while a caller here is still waiting on a frame), logs one ``ws_closed`` line
+(``code``, ``reason``, ``client``, ``authenticated``, ``duration_ms``) and
+increments ``hunter_ws_closed_total{code}`` — see
+``realtime.session.log_ws_closed``. T3.44b: a 4401 used to close in silence
+whenever the auth frame's token was missing or not a string, which hid a
+race in the browser's own auth flow for days.
 """
 
 from __future__ import annotations
@@ -48,14 +56,20 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from hunter_api.auth.clerk import AuthUnavailableError, InvalidTokenError
 from hunter_api.auth.principal import ProvisioningError
-from hunter_api.middleware.rate_limit import RateLimitRedis, under_ip_limit
+from hunter_api.realtime.admission import connection_cap, handshake_allowed
 from hunter_api.realtime.channels import (
     MAX_CHANNELS_PER_CONNECTION,
     is_authorized,
     throttle_class,
 )
 from hunter_api.realtime.redis_bridge import RedisBridge, RedisClientLike
-from hunter_api.realtime.session import WsSession, close_socket, watch_session
+from hunter_api.realtime.session import (
+    WsSession,
+    close_socket,
+    log_ws_closed,
+    mark_connected,
+    watch_session,
+)
 from hunter_api.realtime.throttle import DEFAULT_INTERVALS_MS, Throttle
 from hunter_api.realtime.ws_manager import ConnectionManager
 from hunter_core.logging import get_logger
@@ -75,11 +89,6 @@ WS_PROTOCOL_ERROR_CODE = 4400
 WS_PONG_TIMEOUT_CODE = 4408
 WS_TOO_MANY_CODE = 4429
 WS_AUTH_UNAVAILABLE_CODE = 4503
-
-DEFAULT_HANDSHAKES_PER_MINUTE = 30
-DEFAULT_MAX_CONNECTIONS_PER_PRINCIPAL = 5
-"""Fallbacks for a bare test app with no settings on ``app.state``; a deployed
-process always has ``ApiSettings``."""
 
 
 class RealtimeHub:
@@ -143,18 +152,19 @@ class RealtimeHub:
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
-    if not await _handshake_allowed(websocket):
+    if not await handshake_allowed(websocket):
         # before accept(): Starlette turns this into a rejected handshake, so
         # nothing is spent on a connection we are not going to keep
         await _close(websocket, WS_TOO_MANY_CODE, "too many handshakes")
         return
     await websocket.accept()
+    mark_connected(websocket)
     session = await _authenticate(websocket)
     if session is None:
         return
     hub: RealtimeHub = websocket.app.state.realtime
     principal_id = str(session.principal.user_id)
-    if not hub.manager.try_register(websocket, principal_id, _connection_cap(websocket)):
+    if not hub.manager.try_register(websocket, principal_id, connection_cap(websocket)):
         logger.info("ws_connection_cap_reached", principal_id=principal_id)
         await _close(websocket, WS_TOO_MANY_CODE, "too many connections")
         return
@@ -171,42 +181,6 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         await hub.detach(websocket)
 
 
-async def _handshake_allowed(websocket: WebSocket) -> bool:
-    """The per-address handshake limit, on the same Redis window the HTTP
-    middleware uses (its own ``ws`` bucket, so the two budgets are separate).
-
-    Fails open when Redis is unreachable, exactly as the HTTP limiter does:
-    losing the cache must not also mean losing realtime.
-    """
-    redis_client: RateLimitRedis | None = getattr(websocket.app.state, "redis", None)
-    if redis_client is None:
-        return True
-    client = websocket.client
-    ip = client.host if client is not None else "unknown"
-    limit = int(_setting(websocket, "ws_handshakes_per_minute", DEFAULT_HANDSHAKES_PER_MINUTE))
-    try:
-        return await under_ip_limit(redis_client, ip, limit, scope="ws")
-    except Exception:
-        logger.warning("ws_handshake_limit_unavailable")
-        return True
-
-
-def _connection_cap(websocket: WebSocket) -> int:
-    return int(
-        _setting(
-            websocket,
-            "ws_max_connections_per_principal",
-            DEFAULT_MAX_CONNECTIONS_PER_PRINCIPAL,
-        )
-    )
-
-
-def _setting(websocket: WebSocket, name: str, default: int) -> int:
-    settings = getattr(websocket.app.state, "settings", None)
-    value: int = getattr(settings, name, default)
-    return value
-
-
 async def _authenticate(websocket: WebSocket) -> WsSession | None:
     """The first frame, or a close. Never logs the token.
 
@@ -219,7 +193,10 @@ async def _authenticate(websocket: WebSocket) -> WsSession | None:
     except TimeoutError:
         await _close(websocket, WS_AUTH_REQUIRED_CODE, "authentication timeout")
         return None
-    except WebSocketDisconnect:
+    except WebSocketDisconnect as exc:
+        # the client hung up on its own before sending an auth frame at all —
+        # never went through close_socket(), so it never got a ws_closed line
+        log_ws_closed(websocket, exc.code, exc.reason or "client disconnected")
         return None
 
     message = _parse(raw)
@@ -245,6 +222,7 @@ async def _authenticate(websocket: WebSocket) -> WsSession | None:
         logger.info("ws_auth_rejected")
         await _close(websocket, WS_AUTH_REQUIRED_CODE, "authentication failed")
         return None
+    websocket.state.authenticated = True
     return WsSession(principal, claims)
 
 
@@ -252,7 +230,8 @@ async def _serve(websocket: WebSocket, session: WsSession, hub: RealtimeHub) -> 
     while True:
         try:
             raw = await websocket.receive_text()
-        except WebSocketDisconnect:
+        except WebSocketDisconnect as exc:
+            log_ws_closed(websocket, exc.code, exc.reason or "client disconnected")
             return
         message = _parse(raw)
         if message is None:

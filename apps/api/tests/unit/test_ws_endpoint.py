@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
 import time
 import uuid
 from collections import defaultdict
@@ -26,6 +27,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from hunter_api.auth.clerk import AuthUnavailableError, StaticKeyAuthProvider, TokenClaims
 from hunter_api.auth.principal import Membership, Principal
+from hunter_api.metrics import ws_closed_total
 from hunter_api.realtime import session as ws_session
 from hunter_api.realtime.endpoint import (
     RealtimeHub,
@@ -735,3 +737,130 @@ async def test_state_survives_while_another_subscriber_is_still_there(
     await hub.unsubscribe(first, channel)
 
     assert hub._intervals[channel] > 0, "the surviving subscriber still needs its throttle"
+
+
+# ---- T3.44b: every gateway close logs one ws_closed line + a counter -----
+#
+# The bug this closes: a 4401 with no auth frame at all closed the socket in
+# ~1.8s with *no* log line anywhere (only some close branches ever logged),
+# so a client-side auth race was invisible from the API's own logs. Every
+# close now goes through ``realtime.session.log_ws_closed`` — either via
+# ``close_socket`` (a close the gateway itself decided on) or called directly
+# from ``endpoint._authenticate``/``_serve`` for a client-initiated
+# ``WebSocketDisconnect`` the gateway merely observed.
+
+
+def _closed_count(code: int) -> float:
+    return float(cast(Any, ws_closed_total).labels(code=str(code))._value.get())
+
+
+def test_no_auth_message_closes_4401_and_logs_it_unauthenticated(
+    ws_client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    before = _closed_count(4401)
+    with caplog.at_level(logging.INFO, logger="hunter_api.realtime.session"):
+        with ws_client.websocket_connect("/ws") as websocket:
+            websocket.send_text(json.dumps({"type": "subscribe", "channels": ["rt:radar"]}))
+            with pytest.raises(WebSocketDisconnect):
+                websocket.receive_text()
+
+    assert "'event': 'ws_closed'" in caplog.text
+    assert "'code': 4401" in caplog.text
+    assert "'reason': 'authentication required'" in caplog.text
+    assert "'authenticated': False" in caplog.text
+    assert _closed_count(4401) == before + 1
+
+
+def test_a_bad_token_closes_4401_and_logs_it_unauthenticated(
+    ws_client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    before = _closed_count(4401)
+    with caplog.at_level(logging.INFO, logger="hunter_api.realtime.session"):
+        with ws_client.websocket_connect("/ws") as websocket:
+            websocket.send_text(json.dumps({"type": "auth", "token": "not-a-real-token"}))
+            with pytest.raises(WebSocketDisconnect):
+                websocket.receive_text()
+
+    assert "'event': 'ws_closed'" in caplog.text
+    assert "'code': 4401" in caplog.text
+    assert "'authenticated': False" in caplog.text
+    assert _closed_count(4401) == before + 1
+
+
+def test_a_client_that_never_sends_an_auth_frame_and_disconnects_is_logged(
+    ws_client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The exact shape of the bug notes T3.44 traced on the VPS: the client
+    hangs up on its own (no frame at all) while the server is still waiting
+    on the auth frame -- this never goes through ``close_socket`` (the socket
+    is already gone), so ``_authenticate`` must log it directly."""
+    before = _closed_count(1000)
+    with caplog.at_level(logging.INFO, logger="hunter_api.realtime.session"):
+        with ws_client.websocket_connect("/ws"):
+            pass  # the TestClient sends a normal 1000 disconnect on exit
+
+    assert "'event': 'ws_closed'" in caplog.text
+    assert "'authenticated': False" in caplog.text
+    assert _closed_count(1000) == before + 1
+
+
+def test_losing_membership_closes_4403_and_logs_it_authenticated(
+    watched_client: TestClient,
+    private_key: rsa.RSAPrivateKey,
+    resolver: _FakeResolver,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    channel = f"rt:org:{ORG_A}:risk"
+    before = _closed_count(4403)
+    with caplog.at_level(logging.INFO, logger="hunter_api.realtime.session"):
+        with watched_client.websocket_connect("/ws") as websocket:
+            websocket.send_text(json.dumps({"type": "auth", "token": sign(private_key)}))
+            websocket.receive_text()
+            websocket.send_text(json.dumps({"type": "subscribe", "channels": [channel]}))
+            websocket.receive_text()
+
+            resolver.principal = Principal(
+                user_id=USER, external_auth_id="user_FAKE_clerk_id", memberships=()
+            )
+            with pytest.raises(WebSocketDisconnect):
+                websocket.receive_text()
+
+    assert "'event': 'ws_closed'" in caplog.text
+    assert "'code': 4403" in caplog.text
+    assert "'reason': 'membership revoked'" in caplog.text
+    assert "'authenticated': True" in caplog.text
+    assert _closed_count(4403) == before + 1
+
+
+def test_a_normal_disconnect_after_auth_is_logged_as_authenticated(
+    ws_client: TestClient, private_key: rsa.RSAPrivateKey, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A client that authenticates and then simply closes the tab: not a
+    protocol error, not a gateway decision -- ``_serve`` observes the
+    ``WebSocketDisconnect`` and logs it the same as any other close."""
+    with caplog.at_level(logging.INFO, logger="hunter_api.realtime.session"):
+        with ws_client.websocket_connect("/ws") as websocket:
+            websocket.send_text(json.dumps({"type": "auth", "token": sign(private_key)}))
+            websocket.receive_text()
+            # normal close: the TestClient sends a 1000 disconnect on exit
+
+    assert "'event': 'ws_closed'" in caplog.text
+    assert "'code': 1000" in caplog.text
+    assert "'authenticated': True" in caplog.text
+
+
+def test_duration_ms_reflects_time_since_accept(
+    ws_client: TestClient, private_key: rsa.RSAPrivateKey, caplog: pytest.LogCaptureFixture
+) -> None:
+    """T3.44's own symptom: the socket died in ~1.8s with nothing to show for
+    it. ``duration_ms`` is what makes that visible without reading code."""
+    with caplog.at_level(logging.INFO, logger="hunter_api.realtime.session"):
+        with ws_client.websocket_connect("/ws") as websocket:
+            websocket.send_text(json.dumps({"type": "auth", "token": sign(private_key)}))
+            websocket.receive_text()
+            time.sleep(0.05)
+            # normal close on exit
+
+    record = next(r for r in caplog.records if "ws_closed" in str(r.msg))
+    duration_ms = cast("dict[str, Any]", record.msg)["duration_ms"]
+    assert duration_ms >= 40
