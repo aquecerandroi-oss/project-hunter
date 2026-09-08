@@ -94,6 +94,28 @@ export function validationProblem(detail: string): Problem {
   };
 }
 
+/**
+ * A synthetic problem for a Server Action's own fail-closed session check
+ * (T3.28c, security-reviewer T3.28a finding 1) -- also never reaches
+ * `apps/api`. `/` is public in `middleware.ts`, so an unauthenticated POST
+ * carrying a `Next-Action` id still reaches any exported action; without
+ * this check first, `apiFetch` issued the outbound request anyway (the API
+ * correctly answered 401, but the request had already spent the web peer's
+ * shared rate-limit bucket, 6 000/min after T3.28a). Pair with
+ * `requireSession()` (lib/server/auth.ts): check the session, and on `null`
+ * return `actionError(unauthenticatedProblem())` before ever calling
+ * `apiFetch` -- same fail-closed shape `markets-actions.ts::searchMarketsAction`
+ * already uses for its own (differently-shaped) outcome type.
+ */
+export function unauthenticatedProblem(): Problem {
+  return {
+    type: "https://hunter.dev/problems/unauthenticated",
+    title: "Unauthenticated",
+    status: 401,
+    detail: "Sessão não encontrada.",
+  };
+}
+
 export { ApiError };
 
 /**

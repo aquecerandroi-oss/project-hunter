@@ -8,13 +8,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // dependency graph grows.
 vi.mock("server-only", () => ({}));
 
-const { apiFetchMock, getOrganizationMock } = vi.hoisted(() => ({
+const { apiFetchMock, getOrganizationMock, requireSessionMock } = vi.hoisted(() => ({
   apiFetchMock: vi.fn(),
   getOrganizationMock: vi.fn(),
+  requireSessionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/server/api", () => ({
   apiFetch: apiFetchMock,
+}));
+
+vi.mock("@/lib/server/auth", () => ({
+  requireSession: requireSessionMock,
 }));
 
 vi.mock("@/lib/api/organizations", () => ({
@@ -22,13 +27,64 @@ vi.mock("@/lib/api/organizations", () => ({
 }));
 
 import { ApiError } from "@/lib/api-error";
-import { acceptInvitation } from "@/lib/api/invitations-actions";
+import { acceptInvitation, createInvitation, revokeInvitation } from "@/lib/api/invitations-actions";
 
 const VALID_TOKEN = "a".repeat(32);
 
 beforeEach(() => {
   apiFetchMock.mockReset();
   getOrganizationMock.mockReset();
+  requireSessionMock.mockReset().mockResolvedValue({ userId: "u1", token: "t1" });
+});
+
+describe("createInvitation/revokeInvitation/acceptInvitation: fail closed with no session (T3.28c, security)", () => {
+  it("createInvitation returns the typed unauthenticated problem and never calls apiFetch when there is no session", async () => {
+    requireSessionMock.mockResolvedValue(null);
+
+    const result = await createInvitation("org-1", { email: "a@b.com", role: "VIEWER" });
+
+    expect(result).toEqual({
+      ok: false,
+      problem: {
+        type: "https://hunter.dev/problems/unauthenticated",
+        title: "Unauthenticated",
+        status: 401,
+        detail: "Sessão não encontrada.",
+      },
+    });
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("revokeInvitation returns the typed unauthenticated problem and never calls apiFetch when there is no session", async () => {
+    requireSessionMock.mockResolvedValue(null);
+
+    const result = await revokeInvitation("org-1", "inv-1");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.problem.status).toBe(401);
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("acceptInvitation returns the typed unauthenticated problem and never calls apiFetch or getOrganization when there is no session", async () => {
+    requireSessionMock.mockResolvedValue(null);
+
+    const result = await acceptInvitation(VALID_TOKEN);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.problem.status).toBe(401);
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(getOrganizationMock).not.toHaveBeenCalled();
+  });
+
+  it("acceptInvitation still validates the token shape before checking the session", async () => {
+    requireSessionMock.mockResolvedValue(null);
+
+    const result = await acceptInvitation("short");
+
+    expect(result.ok).toBe(false);
+    expect(requireSessionMock).not.toHaveBeenCalled();
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("acceptInvitation: token shape validation (zod, before ever calling the API)", () => {

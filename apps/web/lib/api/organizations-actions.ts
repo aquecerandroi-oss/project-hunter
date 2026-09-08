@@ -2,8 +2,9 @@
 
 import { onboardingCreateOrgSchema, organizationNameSchema } from "@/lib/api/schemas";
 import { apiFetch } from "@/lib/server/api";
+import { requireSession } from "@/lib/server/auth";
 
-import { actionError, actionOk, ApiError, problemFromApiError, validationProblem } from "./types";
+import { actionError, actionOk, ApiError, problemFromApiError, unauthenticatedProblem, validationProblem } from "./types";
 import type { ActionResult, OrganizationCreated, OrganizationOut } from "./types";
 
 /**
@@ -19,6 +20,9 @@ export async function createOrganization(input: {
 }): Promise<ActionResult<OrganizationCreated>> {
   const parsed = onboardingCreateOrgSchema.safeParse(input);
   if (!parsed.success) return actionError(validationProblem(parsed.error.issues[0]?.message ?? "Dados inválidos"));
+
+  const session = await requireSession();
+  if (!session) return actionError(unauthenticatedProblem());
 
   try {
     const created = await apiFetch<OrganizationCreated>("/api/v1/orgs", {
@@ -42,6 +46,9 @@ export async function createOrganization(input: {
 export async function updateOrganization(orgId: string, name: string): Promise<ActionResult<OrganizationOut>> {
   const parsed = organizationNameSchema.safeParse(name);
   if (!parsed.success) return actionError(validationProblem(parsed.error.issues[0]?.message ?? "Nome inválido"));
+
+  const session = await requireSession();
+  if (!session) return actionError(unauthenticatedProblem());
 
   try {
     const updated = await apiFetch<OrganizationOut>(`/api/v1/orgs/${orgId}`, {

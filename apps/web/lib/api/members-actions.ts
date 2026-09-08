@@ -2,8 +2,9 @@
 
 import { memberRoleSchema } from "@/lib/api/schemas";
 import { apiFetch } from "@/lib/server/api";
+import { requireSession } from "@/lib/server/auth";
 
-import { actionError, actionOk, ApiError, problemFromApiError, validationProblem } from "./types";
+import { actionError, actionOk, ApiError, problemFromApiError, unauthenticatedProblem, validationProblem } from "./types";
 import type { ActionResult, MemberOut } from "./types";
 
 /**
@@ -20,6 +21,9 @@ export async function updateMemberRole(
   const parsed = memberRoleSchema.safeParse(role);
   if (!parsed.success) return actionError(validationProblem("Papel inválido"));
 
+  const session = await requireSession();
+  if (!session) return actionError(unauthenticatedProblem());
+
   try {
     const member = await apiFetch<MemberOut>(`/api/v1/orgs/${orgId}/members/${userId}`, {
       method: "PATCH",
@@ -34,6 +38,9 @@ export async function updateMemberRole(
 
 /** `DELETE /api/v1/orgs/{org_id}/members/{user_id}` -- OWNER only. */
 export async function removeMember(orgId: string, userId: string): Promise<ActionResult<undefined>> {
+  const session = await requireSession();
+  if (!session) return actionError(unauthenticatedProblem());
+
   try {
     await apiFetch<undefined>(`/api/v1/orgs/${orgId}/members/${userId}`, { method: "DELETE" });
     return actionOk(undefined);

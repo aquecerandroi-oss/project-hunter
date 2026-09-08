@@ -24,3 +24,21 @@ export async function getServerSession(): Promise<ServerSession | null> {
   const token = await getToken();
   return { userId, token };
 }
+
+/**
+ * Fail-closed guard for a Server Action about to call `apiFetch`
+ * (T3.28c, security-reviewer T3.28a finding 1). `/` is public in
+ * `middleware.ts`, so an unauthenticated POST carrying a `Next-Action` id
+ * still reaches every exported action -- `apiFetch` only sets `Authorization`
+ * `if (session?.token)`, so it used to issue the outbound API request
+ * regardless (the API correctly answered 401, but the request had already
+ * spent the web peer's shared rate-limit bucket, 6 000/min after T3.28a).
+ * A thin, intent-revealing alias over `getServerSession` on purpose: every
+ * action that calls `apiFetch` must call this FIRST and return on `null`
+ * without ever calling `apiFetch` -- same pattern
+ * `markets-actions.ts::searchMarketsAction` already used before this
+ * existed; that file is unchanged (docs/SECURITY.md §5).
+ */
+export async function requireSession(): Promise<ServerSession | null> {
+  return getServerSession();
+}

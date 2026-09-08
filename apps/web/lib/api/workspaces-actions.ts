@@ -2,8 +2,9 @@
 
 import { onboardingUpdateSchema } from "@/lib/api/schemas";
 import { apiFetch } from "@/lib/server/api";
+import { requireSession } from "@/lib/server/auth";
 
-import { actionError, actionOk, ApiError, problemFromApiError, validationProblem } from "./types";
+import { actionError, actionOk, ApiError, problemFromApiError, unauthenticatedProblem, validationProblem } from "./types";
 import type { ActionResult, WorkspaceOut } from "./types";
 
 /**
@@ -25,6 +26,9 @@ export async function putOnboarding(
 ): Promise<ActionResult<WorkspaceOut>> {
   const parsed = onboardingUpdateSchema.safeParse(input);
   if (!parsed.success) return actionError(validationProblem(parsed.error.issues[0]?.message ?? "Dados inválidos"));
+
+  const session = await requireSession();
+  if (!session) return actionError(unauthenticatedProblem());
 
   try {
     const workspace = await apiFetch<WorkspaceOut>(

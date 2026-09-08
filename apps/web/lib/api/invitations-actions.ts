@@ -3,8 +3,9 @@
 import { getOrganization } from "@/lib/api/organizations";
 import { invitationCreateSchema, invitationTokenSchema } from "@/lib/api/schemas";
 import { apiFetch } from "@/lib/server/api";
+import { requireSession } from "@/lib/server/auth";
 
-import { actionError, actionOk, ApiError, problemFromApiError, validationProblem } from "./types";
+import { actionError, actionOk, ApiError, problemFromApiError, unauthenticatedProblem, validationProblem } from "./types";
 import type { ActionResult, InvitationCreated } from "./types";
 
 /**
@@ -24,6 +25,9 @@ export async function createInvitation(
   const parsed = invitationCreateSchema.safeParse(input);
   if (!parsed.success) return actionError(validationProblem(parsed.error.issues[0]?.message ?? "Dados inválidos"));
 
+  const session = await requireSession();
+  if (!session) return actionError(unauthenticatedProblem());
+
   try {
     const invitation = await apiFetch<InvitationCreated>(`/api/v1/orgs/${orgId}/invitations`, {
       method: "POST",
@@ -38,6 +42,9 @@ export async function createInvitation(
 
 /** `DELETE /api/v1/orgs/{org_id}/invitations/{invitation_id}` -- ADMIN and above. */
 export async function revokeInvitation(orgId: string, invitationId: string): Promise<ActionResult<undefined>> {
+  const session = await requireSession();
+  if (!session) return actionError(unauthenticatedProblem());
+
   try {
     await apiFetch<undefined>(`/api/v1/orgs/${orgId}/invitations/${invitationId}`, { method: "DELETE" });
     return actionOk(undefined);
@@ -81,6 +88,9 @@ export async function acceptInvitation(token: string): Promise<ActionResult<Acce
   if (!parsed.success) {
     return actionError(validationProblem(parsed.error.issues[0]?.message ?? "Convite inválido, expirado ou já usado."));
   }
+
+  const session = await requireSession();
+  if (!session) return actionError(unauthenticatedProblem());
 
   try {
     const accepted = await apiFetch<InvitationAcceptResponse>(`/api/v1/invitations/${parsed.data}/accept`, {

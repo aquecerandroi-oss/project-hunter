@@ -95,6 +95,8 @@ Implementação: `require_role(min_role)` como dependência FastAPI; papéis ord
 
 Os dois primeiros se aplicam à mesma requisição autenticada e o que estourar primeiro responde `429` problem+json com `Retry-After`. Todos falham em aberto se o Redis estiver indisponível (ARCHITECTURE.md, "degradação segura"); `/health`, `/ready` e `/metrics` são isentos.
 
+Server Actions verificam a sessão antes de qualquer chamada à API (`requireSession()`, `lib/server/auth.ts`) — sem isso, um POST não autenticado com um `Next-Action` id ainda gastava o balde compartilhado do peer `web` (`RATE_LIMIT_PER_MINUTE_INTERNAL` acima) mesmo recebendo 401 da API (T3.28a achado 1, T3.28c).
+
 Além dos limites por janela, uma conexão WebSocket viva conta contra `WS_MAX_CONNECTIONS_PER_PRINCIPAL` (contagem em processo, no `ConnectionManager`): estourar fecha com o código de aplicação `4429`, o mesmo do handshake recusado.
 
 ## 6. LLM (Fase 2+)
