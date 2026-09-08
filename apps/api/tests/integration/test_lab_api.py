@@ -438,11 +438,11 @@ async def test_summary_target_rate_divides_by_target_plus_stop_not_all_terminal(
     assert version["counts"]["terminal"]["total"] == 5
     metrics = version["metrics"]
     assert metrics["target_rate_among_resolved_touches"] == {"value": "0.6667", "reason": None}
-    assert metrics["net_profit_rate"] == {"value": "0.6000", "reason": None}
-    assert metrics["hypothetical_net_expectancy_r"] == {"value": "0.2800", "reason": None}
+    assert metrics["net_profit_rate"] == {"value": "0.6", "reason": None}
+    assert metrics["hypothetical_net_expectancy_r"] == {"value": "0.28", "reason": None}
     pf = metrics["profit_factor"]
-    assert pf["sum_positive"] == "2.6000"
-    assert pf["sum_negative_abs"] == "1.2000"
+    assert pf["sum_positive"] == "2.6"
+    assert pf["sum_negative_abs"] == "1.2"
     assert pf["sample_size"] == 5
 
 
@@ -487,7 +487,7 @@ async def test_summary_coverage_counts_distinct_markets_not_total_signals(
         exit_ts=day_1 + timedelta(hours=1),
         exit_price=Decimal("103"),
         result=OutcomeResult.TARGET,
-        r_multiple=Decimal("1.0"),
+        r_multiple=Decimal("1"),
     )
     await fx.seed_shadow_signal(
         session_factory,
