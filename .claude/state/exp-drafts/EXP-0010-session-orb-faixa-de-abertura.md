@@ -1,15 +1,15 @@
 ---
 tags: [experimento, session-orb, calendario, shadow-lab]
 updated: 2026-09-08
-status: proposto
+status: em curso
 owner: sexta-feira
 exp: EXP-0010
 strategy: session_orb
 version: v1
-result: não iniciado
-evaluable: 0
-days: 0
-last_eval: 2026-09-08 (ativação PARADA: chave `session_orb` ausente em `strategies`, T3.33f)
+result: inconclusivo
+evaluable: 20
+days: 9
+last_eval: 2026-09-08 (replay de 31 d, coorte `replay:3fb9dda2…`, T3.33g — inconclusivo)
 ---
 
 # EXP-0010 — rompimento da faixa de abertura de sessão (`session_orb_v1`)
@@ -128,6 +128,139 @@ sazonalidade de volume.
 
 ## Avaliações (acrescentadas, nunca reescritas)
 
+### 2026-09-08 — Avaliação (replay, dia um) — T3.33g
+
+**REPLAY, não coleta prospectiva.** A janela avaliada (2026-08-08 → 2026-09-08) é a **mesma** que
+gerou a hipótese. Nada aqui confirma coisa alguma; serve para **matar**, não para promover.
+
+**Ativação:** `session_orb v1`, `purpose research_only`, em **2026-09-08T19:42:56,116683Z**
+(16:42:56 de Brasília), `code_ref hunter_core.strategies.session_orb_v1@sha256:a4d514adeb0771d5…`
+— o digest que o protocolo exigia, conferido no `--dry-run` antes de escrever.
+**Coorte:** `replay:3fb9dda2-256f-49af-9a1e-7ec5bd001d19`, duas fatias contíguas, 4 mercados,
+**11 904 barras**, 0 erros.
+
+**População:** 39 barras dispararam; **20** viraram decisão (as 19 restantes caíram na barreira de
+re-arme — um acompanhamento por versão/mercado/coorte). 20 terminais, **cobertura de `R_net` 100 %**,
+**9 dias distintos**, 4 mercados.
+
+| métrica | valor |
+|---|---:|
+| decisões | **20** (0,161 por mercado-dia; 124 mercado-dias) |
+| avaliáveis | 20 (100 %) |
+| expectancy **bruta** (sem custo nenhum) | **−0,0501 R** |
+| expectancy **ex-funding** | **−0,1930 R** |
+| expectancy **líquida** (`R_net`) | **−0,1928 R** |
+| pedágio medido (`custo_R`) | **0,1428 R** (mínimo 0,0825 · máximo 0,2221) |
+| soma de `R_net` | **−3,86 R** |
+| taxa de acerto (`target`) | **10,0 %** (2 de 20) |
+| profit factor líquido | **0,662** |
+
+**Decomposição por sessão (obrigatória, e o teste dos 70 %):**
+
+| sessão | n | % das decisões | exp. bruta | exp. líquida | soma `R_net` | PF | acerto | dias |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| asia (00:00Z) | 6 | 30,0 % | +0,0086 | **−0,1454** | −0,87 | 0,666 | 0,0 % | 4 |
+| europe (07:00Z) | 7 | 35,0 % | −0,1834 | **−0,3257** | −2,28 | 0,484 | 0,0 % | 4 |
+| us (13:00Z) | 7 | 35,0 % | +0,0328 | **−0,1005** | −0,70 | 0,839 | 28,6 % | 5 |
+
+**A regra dos 70 % não dispara** (máximo 35 %). A hipótese **não** precisa ser reenunciada como "uma
+hora específica" — e este é o resultado mais informativo do dia: a amostra é notavelmente equilibrada
+entre as três sessões. O que **não** sobrevive é o outro lado da mesma regra: as três expectancies
+são negativas e, com n = 6/7/7, **indistinguíveis entre si**. Pelo critério já congelado nesta
+página ("se a expectancy por sessão for indistinguível entre as três, o rótulo de sessão não está
+fazendo trabalho nenhum"), o rótulo de sessão **não fez trabalho nenhum** nesta janela. O que resta é
+um rompimento de faixa de uma hora qualquer — hipótese diferente e mais fraca.
+
+**Transbordo de sessão (o custo declarado, medido e não suposto):**
+
+| leitura | n | fração |
+|---|---:|---:|
+| saída **depois do fim da janela de 5 h** da sessão de entrada | 11 / 20 | **55,0 %** |
+| saída numa **sessão declarada posterior** (outra abertura) | 4 / 20 | **20,0 %** |
+
+As quatro que caem em outra sessão: SOL 08-21 03:15 asia→europe (horizonte), DOGE e XRP 08-27 10:30
+europe→us (horizonte), ETH 08-27 10:30 europe→us (stop).
+
+**Livro de motivos (`--explain-ledger`, 11 904 linhas, uma por barra avaliada):**
+
+| motivo | n | % das barras | asia | europe | us |
+|---|---:|---:|---:|---:|---:|
+| `outside_session_window` | 4 092 | 34,375 | 868 | 372 | 2 852 |
+| `no_range_break` | 4 003 | 33,627 | 1 305 | 1 431 | 1 267 |
+| `inside_opening_range` | 1 860 | 15,625 | 620 | 620 | 620 |
+| `rvol_low` | 820 | 6,888 | 352 | 255 | 213 |
+| `atr_out_of_range` | 575 | 4,830 | 164 | 152 | 259 |
+| `range_geometry` | 279 | 2,344 | 44 | 67 | 168 |
+| `warmup` (`unavailable`) | 236 | 1,983 | 108 | 64 | 64 |
+| `signal` | 39 | 0,328 | 11 | 15 | 13 |
+| `no_session_open` | **0** | 0,000 | — | — | — |
+
+`no_session_open` **nunca ocorreu**, como a CONCERN 3 da `notes-T3.33c` previu: com as aberturas
+congeladas, a asia às 00:00 cobre o dia inteiro e o ramo é inalcançável. Fica testado, não afirmado.
+
+**A guarda de tamanho é o funil real desta versão.** Das 279 recusas por `range_geometry`,
+**277 são por faixa larga demais** (`range_risk_atr > 2,5`) e apenas **2** por faixa estreita demais:
+
+```
+range_risk_atr nas recusas: n=279  min 0,921  p25 3,468  mediana 4,438  p75 5,955  max 9,445
+```
+
+Ou seja: na maioria das vezes em que o preço rompe a máxima da primeira hora, a **mínima** dessa hora
+está a ~4,4 ATR de distância — um stop enorme. O teto de 2,5 ATR é o que impede a versão de aceitar
+essas operações, e ele está fazendo o trabalho para o qual foi congelado: o pedágio medido ficou em
+**0,1428 R** de média (máximo 0,2221 R), **abaixo do teto aritmético de 0,3333 R** calculado na
+T3.33c e muito abaixo dos 0,6152 R da coorte da `volume_anomaly v2`. **O custo não é a causa da
+perda aqui** — a expectancy já é negativa **antes** de qualquer custo (−0,0501 R bruta).
+
+**Onde o resultado mora:** 10 stops (−11,03 R), 2 alvos (+3,30 R) e 8 saídas por horizonte
+(+3,87 R). Com 2 alvos em 20, o equilíbrio de 44,5 % projetado na tabela de geometria **não** foi
+alcançado nem de longe (10 %); o que segurou a coorte perto de −0,19 R por operação foram as saídas
+por tempo, positivas. ETHUSDT sozinho responde por −2,50 R em 3 decisões.
+
+**Critérios de morte (`notes-T3.33.md` §5.1):**
+
+| K | condição | medido | dispara? |
+|---|---|---|---|
+| K1 | < 20 decisões | **exatamente 20** | **não — por uma decisão** |
+| K2 | > 1 500 decisões | 20 | não |
+| K3 | ≥ 100 avaliáveis **e** ≥ 30 dias **e** expectancy bruta (`r_ex_funding`) < 0 | 20 avaliáveis (< 100), 9 dias (< 30), `r_ex_funding` **−0,1930** | **não** (as duas primeiras condições faltam; a terceira já está cumprida) |
+| K4 | `unavailable` > 40 % das barras | **1,98 %** (236/11 904) | não |
+| K5 | cobertura de `R_net` < 70 % | **100 %** | não |
+| — | regra dos 70 % (esta página) | máx. 35 % | não |
+
+**Result: inconclusivo.** Nenhum critério de descarte dispara, e nenhum dispara **por pouco**: K1
+falha por uma decisão e K3 tem duas de três condições ausentes. Mas a leitura honesta é que a
+**única** condição de K3 que depende do mercado — expectancy bruta negativa — **já está cumprida**,
+e que o rótulo de sessão, que é a hipótese inteira, não se distinguiu. **Next Action:** deixar a
+versão correndo em `prospective` (ela já está no roster, `research_only`, sem carteira) e reavaliar
+quando houver ≥ 100 avaliáveis e ≥ 30 dias — momento em que K3 decide sozinho. **Não** derivar
+variante por sessão: escolher a melhor das três depois de ver as três é o data snooping que esta
+mesma página proíbe.
+
+#### Passada de estresse (T3.36) — coorte `replay:3fb9dda2…`, `as_of` 2026-09-08T19:53:28,833572Z
+
+| cenário | tipo | n | expectancy (R) | PF | Δ vs base | IC 95 % do Δ |
+|---|---|---:|---:|---:|---:|---|
+| `base` | reprecificação | 20 | −0,1928 | 0,6616 | — | — |
+| `custos_x2` | reprecificação | 20 | −0,3186 | 0,4966 | −0,1258 | [−0,1522; −0,1107] |
+| `stop_x0.75` | reprecificação | 20 | −0,1581 | 0,7565 | +0,0347 | [−0,1077; +0,1749] |
+| `stop_x1.25` | reprecificação | 20 | −0,2338 | 0,5632 | −0,0410 | [−0,1187; +0,0058] |
+| `alvo_x0.75` | reprecificação | 20 | −0,1439 | 0,7455 | +0,0489 | [−0,0933; +0,2632] |
+| `alvo_x1.25` | reprecificação | 20 | −0,1497 | 0,7373 | +0,0431 | [+0,0000; +0,1297] |
+| `entrada_mais_1_barra` | reprecificação | 20 | −0,1978 | 0,6572 | −0,0050 | [−0,0674; +0,0659] |
+| `sem_binance:DOGEUSDT` | recorte | 13 | −0,3014 | 0,5091 | — | — |
+| `sem_binance:ETHUSDT` | recorte | 17 | −0,0797 | 0,8476 | — | — |
+| `sem_binance:SOLUSDT` | recorte | 16 | −0,2306 | 0,5995 | — | — |
+| `sem_binance:XRPUSDT` | recorte | 14 | −0,1860 | 0,6782 | — | — |
+| `1a_metade_ate_2026-08-28` | recorte | 18 | −0,2293 | 0,6349 | — | — |
+| `2a_metade_apos_2026-08-28` | recorte | 2 | +0,1361 | 4,1269 | — | — |
+
+**Veredito da passada: `amostra_insuficiente`** — 20 desfechos avaliáveis de 30 exigidos. A tabela é
+**descritiva**, não um veredito de robustez: nenhuma linha dela deve ser citada como "frágil a X" ou
+"robusto a X". A segunda metade tem **duas** operações; o `+0,1361 R` dela não é informação.
+
+Fonte (comandos e saídas verbatim): `.claude/state/notes-T3.33g.md`.
+
 ### 2026-09-08 — tentativa de ativação **PARADA antes de qualquer escrita** (T3.33f)
 
 Não é uma avaliação: é o registro datado de que o experimento **não começou**, e por quê.
@@ -161,6 +294,8 @@ Fonte (comandos e saídas verbatim): `.claude/state/notes-T3.33f.md`.
 | Variante | Quando | Por quê | Onde ficou registrada |
 |---|---|---|---|
 | alvo fixo de 2 ATR | 2026-09-08 | recusado **antes** de rodar: com stop no dado, o ganho/risco varia de 4:1 a 1,3:1 | esta página, seção Geometria |
+| versão por sessão única | 2026-09-08 | **não** derivada: as três sessões dividiram a amostra 30/35/35 % e as três perderam; escolher a melhor depois de ver as três é o data snooping proibido nesta mesma página | Avaliação (replay, dia um), T3.33g |
+| afrouxar `range_risk_atr_max` acima de 2,5 | 2026-09-08 | **não** derivada: 277 das 279 recusas de geometria são por faixa larga (mediana 4,44 ATR); afrouxar o teto compraria amostra ao preço de stops de 4 ATR — exatamente o pedágio que este teto existe para conter | Avaliação (replay, dia um), T3.33g |
 
 ## Relacionadas
 
