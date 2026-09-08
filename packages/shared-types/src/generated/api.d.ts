@@ -38,6 +38,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lab/shadow/curve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shadow Lab cumulative net-R curve */
+        get: operations["get_curve_api_v1_lab_shadow_curve_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/shadow/scoreboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shadow Lab version scoreboard */
+        get: operations["get_scoreboard_api_v1_lab_shadow_scoreboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lab/shadow/signals": {
         parameters: {
             query?: never;
@@ -1099,6 +1133,40 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** CurveOut */
+        CurveOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /**
+             * Label
+             * @default SOMBRA — hipotético, sem capital, custos assumidos
+             */
+            label: string;
+            /** Points */
+            points: components["schemas"]["CurvePointOut"][];
+            /**
+             * Strategy Version Id
+             * Format: uuid
+             */
+            strategy_version_id: string;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /** CurvePointOut */
+        CurvePointOut: {
+            /** Cum R */
+            cum_r: string;
+            /** R */
+            r: string;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+        };
         /**
          * DailyReferenceOut
          * @description The persisted anchor of the São Paulo trading day.
@@ -1611,6 +1679,19 @@ export interface components {
             evaluable_outcomes: number;
             /** Inconclusive */
             inconclusive: boolean;
+        };
+        /** MaturityThresholdOut */
+        MaturityThresholdOut: {
+            /**
+             * Days
+             * @default 30
+             */
+            days: number;
+            /**
+             * Outcomes
+             * @default 100
+             */
+            outcomes: number;
         };
         /**
          * MeOut
@@ -2484,6 +2565,20 @@ export interface components {
          * @enum {string}
          */
         RadarStatusFilter: "NORMAL" | "WATCHING" | "ANOMALY" | "HOT" | "ENTRY_CANDIDATE" | "EXTENDED" | "EXPIRED" | "IN_POSITION" | "RISK_BLOCKED";
+        /**
+         * RateWithCountsOut
+         * @description A rate that always shows its own numerator/denominator (brief item 1).
+         */
+        RateWithCountsOut: {
+            /** Denominator */
+            denominator: number;
+            /** Numerator */
+            numerator: number;
+            /** Reason */
+            reason?: string | null;
+            /** Value */
+            value: string | null;
+        };
         /** RegimeCurrentOut */
         RegimeCurrentOut: {
             /**
@@ -2585,6 +2680,80 @@ export interface components {
             organization: components["schemas"]["KillSwitchState"];
             portfolio: components["schemas"]["KillSwitchState"];
             system: components["schemas"]["KillSwitchState"];
+        };
+        /** ScoreboardMaturityOut */
+        ScoreboardMaturityOut: {
+            /** Days */
+            days: number;
+            /** Evaluable */
+            evaluable: number;
+            /** Mature */
+            mature: boolean;
+            threshold: components["schemas"]["MaturityThresholdOut"];
+        };
+        /** ScoreboardOut */
+        ScoreboardOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /**
+             * Label
+             * @default SOMBRA — hipotético, sem capital, custos assumidos
+             */
+            label: string;
+            /** Rows */
+            rows: components["schemas"]["ScoreboardRowOut"][];
+        };
+        /** ScoreboardRowOut */
+        ScoreboardRowOut: {
+            /** Censored */
+            censored: number;
+            /** Distinct Days */
+            distinct_days: number;
+            /** Distinct Markets */
+            distinct_markets: number;
+            /** Emitted */
+            emitted: number;
+            /** Evaluable */
+            evaluable: number;
+            expectancy_r: components["schemas"]["NullableMetric"];
+            hit_rate: components["schemas"]["RateWithCountsOut"];
+            maturity: components["schemas"]["ScoreboardMaturityOut"];
+            /** Max Drawdown R */
+            max_drawdown_r: string;
+            net_profit_rate: components["schemas"]["RateWithCountsOut"];
+            /** No Entry */
+            no_entry: number;
+            /** Pending */
+            pending: number;
+            profit_factor: components["schemas"]["ProfitFactorOut"];
+            sum_r: components["schemas"]["SumOfROut"];
+            /** Verdict */
+            verdict: string;
+            version: components["schemas"]["ScoreboardVersionOut"];
+            /** Worst Streak */
+            worst_streak: number;
+        };
+        /** ScoreboardVersionOut */
+        ScoreboardVersionOut: {
+            /** Activated At */
+            activated_at: string | null;
+            /** Code Ref */
+            code_ref: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Purpose */
+            purpose: string;
+            status: components["schemas"]["StrategyVersionStatus"];
+            /** Strategy Key */
+            strategy_key: string;
+            /** Version */
+            version: string;
         };
         /**
          * ShadowTrackingState
@@ -3078,6 +3247,69 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_curve_api_v1_lab_shadow_curve_get: {
+        parameters: {
+            query: {
+                version_id: string;
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_scoreboard_api_v1_lab_shadow_scoreboard_get: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoreboardOut"];
                 };
             };
             /** @description Validation Error */

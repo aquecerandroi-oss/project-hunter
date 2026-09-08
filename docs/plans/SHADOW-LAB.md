@@ -69,5 +69,26 @@ Revisores: `database-architect` (S0 é dela; `code-reviewer` + Astra revisam), `
 - [ ] Reserva de IDs consolidada (aqui, em `docs/plans/M2.md` T2.8 e no índice do Obsidian), protocolo imutável, SQL/parâmetros/`as_of`, avaliações datadas, ligação entre versões; hipótese e histórico preservados.
 - [ ] Limiar editorial aplicado, avaliação futura reservada, variantes/cobertura registradas; `status: sombra` só com prova operacional.
 
+## Placar (T3.18)
+
+`GET /api/v1/lab/shadow/scoreboard?as_of=` e `GET /api/v1/lab/shadow/curve?version_id=&as_of=`
+são a visão ao vivo do mesmo SQL que o plantão roda à mão (`obsidian/05-EXPERIMENTS/EXP-0001-*`,
+`EXP-0002-*`) — mesma população (`prospective`, `emitted_at <= as_of`), mesmas definições do item 9
+(`hit_rate` = alvo entre toques resolvidos, `net_profit_rate` = lucro líquido entre avaliáveis,
+`expectancy_r` = média de `R_net`, `profit_factor` nulo com motivo quando falta um lado), reusadas
+de `lab_summary_metrics.py` sem reabrir a discussão de denominador. `worst_streak` (maior sequência
+de perdas consecutivas) e `max_drawdown_r` (maior queda pico-a-vale na curva de `R_net`
+acumulado, ordenada por `exit_ts`) são novos nesta entrega. **Veredito mecânico:** `inconclusivo`
+enquanto a maturação do item 9 não fechar (**100 outcomes avaliáveis E 30 dias distintos**); madura,
+`validada` se `expectancy_r > 0` **e** `profit_factor > 1`, senão `reprovada` — nunca "lucro
+garantido", sempre "simulado". `profit_factor` nulo por ausência de perdas (`no_losses`, Σ perdas =
+0) conta como `> 1` para o veredito, porque um lado perdedor vazio não pode reprovar a versão; nulo
+por população vazia (`no_sample`) não ocorre aqui, pois madura já exige ≥ 100 outcomes com `R_net`
+conhecido. A curva **não** aplica o portão de maturação do horizonte (`is_evaluable()`): ela plota
+todo resultado já resolvido (`terminal` com `r_multiple` não nulo), porque aquele portão existe para
+não enviesar estatísticas agregadas para operações rápidas — nada disso se aplica a uma trajetória.
+As avaliações do plantão em `obsidian/05-EXPERIMENTS/` continuam sendo o registro histórico
+(datadas, nunca reescritas); o placar é a leitura corrente da mesma régua, não a substitui.
+
 ## Fora de escopo
 Carteira, ordens, fills, posições, PnL de portfolio, Risk Engine, SHORT, sinais sobre features do M2 (v2), execução de qualquer natureza.

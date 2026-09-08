@@ -109,12 +109,14 @@ LabSession = Annotated["AsyncSession", Depends(lab_session)]
 CohortParam = Annotated[str, Query(pattern=SHADOW_COHORT_PATTERN)]
 
 
-def _resolve_as_of(as_of: datetime | None) -> datetime:
+def resolve_as_of(as_of: datetime | None) -> datetime:
     """``utcnow()`` by default; a caller-supplied ``as_of`` must be tz-aware.
 
     Astra, diff review, must-fix 3: a naive ``as_of`` compared against the
     tz-aware ``exit_ts`` inside the maturity gate (``lab_summary_metrics.py``)
-    raises ``TypeError`` instead of a clean 422.
+    raises ``TypeError`` instead of a clean 422. Public (no leading
+    underscore): ``routers/lab_scoreboard.py`` (T3.18) reuses it verbatim
+    rather than duplicating the tz-aware validation.
     """
     if as_of is None:
         return utcnow()
@@ -137,7 +139,7 @@ async def get_summary(
     as_of: datetime | None = None,
     cohort: CohortParam = ShadowCohort.PROSPECTIVE,
 ) -> SummaryOut:
-    resolved_as_of = _resolve_as_of(as_of)
+    resolved_as_of = resolve_as_of(as_of)
     since = window_since(window, resolved_as_of)
     repo = LabSummaryRepository(session)
     versions_meta = await repo.activated_versions()
