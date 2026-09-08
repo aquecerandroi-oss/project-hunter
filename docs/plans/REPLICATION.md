@@ -43,7 +43,11 @@ versão já passou pela régua cheia uma vez, e o que se pede a cada bloco não 
 independente — é **concordância**. Exigir 100 × 4 blocos (e × 10 irmãs) transformaria o protocolo
 em algo inalcançável dentro de um trimestre, e a proteção contra o acaso passa a vir da
 **conjunção** dos quatro blocos e da regra 7-em-10, não do tamanho de cada bloco isolado. O preço
-está declarado em §7: metade da amostra dobra, grosso modo, a largura do intervalo de cada bloco.
+está declarado em §7 e é o seguinte, com o nome certo: sob aproximação i.i.d., **reduzir a amostra
+à metade multiplica o erro-padrão da média por √2 ≈ 1,41** (não por 2), e o intervalo percentil
+acompanha essa ordem de grandeza. Com dados dependentes — que é o nosso caso — o fator real é
+maior, e é por isso que o §3.4 exige também o intervalo por blocos de dia (Astra, revisão do Lab
+de 2026-09-08; correção registrada na T3.18c).
 
 1.6 **`promising_at`** — o instante em que a versão pai foi vista `validada` pela primeira vez.
 É a coluna `strategy_versions.promising_at` (`0012_replication`), gravada (§4.1) e **congelada**;
@@ -75,7 +79,13 @@ Aronson, viés de garimpo e Reality Check de White; [[KB-0003]] — data snoopin
 lookbacks). Este projeto já produziu, numa única rodada de conhecimento, seis famílias de variantes
 sobre os mesmos mercados e dias; o `Registro de Tentativas` existe por isso.
 
-**Real** exige **quatro repetições independentes concordando** (§3). Enquanto qualquer bloco estiver
+**Real** exige os **quatro blocos concordando** (§3) — e a palavra "independentes" está fora desta
+frase de propósito: os quatro blocos **reutilizam os mesmos resultados** (o bloco 1 é um recorte
+temporal da população do pai, o 3 é uma partição dela, o 4 é uma reamostragem dela, e as irmãs
+correm sobre os mesmos minutos). São quatro **eixos de discordância** — tempo, parâmetros,
+mercados e amostragem —, não quatro experimentos independentes; a concordância entre eles é
+evidência mais fraca do que quatro repetições genuínas seriam, e chamá-los de independentes seria
+vender uma força que a amostra não tem (Astra, 2026-09-08; T3.18c). Enquanto qualquer bloco estiver
 imaturo, o veredito de replicação é `replicando`. Quando um bloco **maduro** falha, o veredito é
 `refutada`.
 
@@ -106,9 +116,14 @@ de `promising_at`; qualquer mudança de conteúdo é **versão nova** e recomeç
 
 - **Maturidade da irmã:** meia-régua (§1.5).
 - **Irmã positiva:** madura **E** `expectancy_r > 0`.
-- **Passa** quando `IRMAS_APROVADAS_MIN = 7` das 10 são positivas.
-- **Falha** (→ `refutada`) quando ≥ 4 irmãs são **maduras e negativas** — a maioria necessária já é
-  impossível.
+- **O denominador é sempre o `pool` da rodada** — `max(irmãs existentes, IRMAS_N)` —, nunca o número
+  de irmãs já derivadas: "7 em 10" com 6 braços é uma rodada **incompleta**, não uma refutação
+  (T3.18c). O payload publica `n`, `expected` e `pool` lado a lado.
+- **Passa** quando `IRMAS_APROVADAS_MIN = 7` das 10 são positivas **e a rodada está completa**.
+- **Falha** (→ `refutada`) quando `pool − maduras_negativas < 7` — ou seja, ≥ 4 irmãs maduras e
+  negativas: nem derivando as que faltam a maioria seria alcançável.
+- **Rodada incompleta** (`n < IRMAS_N`, sem refutação) → `replicando`, motivo
+  `rodada incompleta: {n} de {IRMAS_N}`.
 - Caso contrário (irmãs ainda imaturas) → `replicando`.
 
 *O que isso testa:* se o resultado do pai depende de um ponto exato no espaço de parâmetros, o
@@ -201,6 +216,15 @@ faixa viva rende ~600 sinais/dia para a família inteira. A pergunta que ele lev
 **Como o placar mostra (T3.18, contrato):** as coortes de replay são lidas **separadamente** das
 vivas e rotuladas — `replay: N operações sobre <janela>` — e nunca somadas na régua de maturidade.
 Um cartão de versão mostra os dois números lado a lado, com a régua aplicada só ao vivo.
+
+**Contagem única (T3.18c, implementado).** A evidência de uma irmã é a união da coorte viva dela
+(o braço `replication:<pai>:<k>` **e** `prospective`, se ela virou linha viva) com os replays dela,
+**deduplicada por `(mercado, decision_at)`**, com precedência da coorte viva. A mesma janela
+replayada sob dois `run_id` é uma leitura, não duas: 25 resultados replayados duas vezes são 25.
+O braço publica `duplicates_dropped` e a janela (`window_from`/`window_to`, recibos com
+`finished_at <= as_of`), e o bloco 2 publica `label = "siblings: replay sobre <janela>"` sempre que
+qualquer braço amadureceu com replay. `replication.status` pode repousar em replay — rotulado —;
+`verdict` (a régua do placar), nunca.
 
 ## 4. Como as irmãs nascem — `infra/scripts/replicate_strategy_version.py`
 
@@ -367,11 +391,14 @@ version_id, seed=...)` e serializa o que sai:
                     "profit_factor": "1.4", "profit_factor_reason": null, "sum_r": "4.56",
                     "wins": 20, "losses": 18, "mature": false},
   "siblings": {"passed": null, "reason": "imaturo: 5 de 7 positivas", "n": 10, "expected": 10,
-               "required": 7, "mature": 6, "positive": 5,
+               "pool": 10, "required": 7, "mature": 6, "positive": 5,
+               "label": "siblings: replay sobre 2026-08-08 → 2026-09-08",   // null se prospectivo
                "arms": [{"k": 1, "version": "v2", "mature": true, "positive": true,
                          "evaluable": 61, "days": 17, "markets": 9, "expectancy_r": "0.09",
                          "profit_factor": "1.2", "profit_factor_reason": null,
-                         "sum_r": "5.5", "wins": 33, "losses": 28}]},
+                         "sum_r": "5.5", "wins": 33, "losses": 28,
+                         "evidence": "replay", "window_from": "2026-08-08T00:00:00Z",
+                         "window_to": "2026-09-08T00:00:00Z", "duplicates_dropped": 25}]},
   "market_halves": {"passed": false, "reason": "metade_b_negativa",
                     "a": {"half": "a", "markets": 64, "evaluable": 101,
                           "expectancy_r": "0.11", "mature": true, "reason": null},
@@ -380,7 +407,7 @@ version_id, seed=...)` e serializa o que sai:
   "bootstrap": {"passed": false, "reason": "intervalo_cruza_zero", "n": 182, "mean": "-0.2836",
                 "ci_low": "-0.4067", "ci_high": "-0.1491", "resamples": 1000, "seed": 1,
                 "confidence": "0.95", "method": "iid_percentile_v1", "groups": null,
-                "refused_reason": null,
+                "refused_reason": null, "seed_source": "registrada|derivada_do_id",
                 "day_cluster": {"n": 182, "mean": null, "ci_low": null, "ci_high": null,
                                 "resamples": 0, "seed": 1, "confidence": "0.95",
                                 "method": "day_cluster_percentile_v1", "groups": null,
@@ -394,7 +421,20 @@ version_id, seed=...)` e serializa o que sai:
 Convenções: `passed` é **três estados** (`true` passou, `false` falhou maduro, `null` aguardando), e
 `reason` nunca é nulo quando `passed` não é `true`. Todo número em `Decimal` serializado como string
 (dinheiro e R nunca viajam em float), todo nulo com motivo, todo limiar devolvido junto do valor
-(`required`, `expected`, `resamples`, `confidence`, `seed`). As definições são as mesmas do plantão
+(`required`, `expected`, `pool`, `resamples`, `confidence`, `seed`) e toda semente com a
+**proveniência** ao lado (`seed_source`: `registrada`, lida do evento `strategy_version_replicated`
+da rodada, ou `derivada_do_id`, determinística a partir do id da versão quando nenhuma rodada
+existe — T3.18c).
+
+**`parent` é o mesmo contrato do placar, não uma segunda conta** (T3.18c): `evaluable` conta a
+mesma população que `ScoreboardRowOut.evaluable` (portão `is_evaluable`: terminal, `exit_ts <=
+as_of` e horizonte transcorrido), `days` conta os mesmos **dias de saída** que `maturity.days`, e
+`profit_factor` é nulo **apenas** por `sem_perdas` — uma população só de perdas tem PF `0` com
+motivo nulo. Antes disso, o mesmo JSON podia publicar `verdict: reprovada` ao lado de
+`parent.verdict: inconclusivo`. O bloco inteiro é `null` quando a versão não tem `promising_at`
+(e, nesse caso, nada é calculado); `?include=replay,replication` escolhe quais blocos o placar
+monta, com os dois por padrão. Ver `docs/plans/SHADOW-LAB.md`, seção "Placar (T3.18)" e item 9 da
+decisão conjunta. As definições são as mesmas do plantão
 da Sexta-feira — o placar é a **vista viva** do mesmo SQL, e a avaliação datada em
 `obsidian/05-EXPERIMENTS/` segue sendo o registro.
 
@@ -428,7 +468,8 @@ pelo menos uma irmã "dar positiva" por acaso é alta; é literalmente o mecanis
    ([[KB-0036]], [[KB-0069]]).
 
 **O que "real" quer dizer aqui, exatamente:** *o desempenho positivo do pai sobreviveu a quatro
-repetições independentes sob as hipóteses de custo declaradas.* Não quer dizer "vai dar lucro", não
+leituras da mesma evidência, por eixos que erram de formas diferentes, sob as hipóteses de custo
+declaradas* — quatro leituras **correlacionadas**, nunca quatro repetições independentes (§5). Não quer dizer "vai dar lucro", não
 quer dizer "pode ir para a carteira", não quer dizer "está calibrado", não é promessa e não é
 recomendação. Continua pesquisa, com o rótulo **SOMBRA — hipotético, sem capital, custos assumidos**.
 
@@ -467,6 +508,14 @@ de replay** dentro do orçamento, e entrega em uma tacada mais resultados avali�
 viva produziria em meses. A meia-régua do §1.5 (50 resultados × 15 dias por irmã) deixa de ser o
 gargalo de **amostra**; o que ela continua exigindo, e o replay **não** entrega, é **dias distintos
 de decisão vividos para a frente** — o que é exatamente a distinção do §3.5.
+
+**Como a massa é medida (D14, implementado na T3.18c).** `decisions_simulated` no bloco `replay`
+do placar é a soma de `evaluations_by_state` nos estados em que a estratégia **decidiu** —
+`triggered + not_triggered + rejected` —, e não `bars_evaluated`: uma barra em warm-up, com gap ou
+de mercado inelegível (`unavailable`, `ineligible`) não é uma decisão e não conta para a meta de
+500 mil por dia. Os dois números são publicados lado a lado, com o mapa inteiro de estados junto,
+para que o numerador seja conferível; recibos sem o mapa devolvem `null` com motivo
+(`sem_estados_registrados`), nunca zero. Os recibos lidos são só os com `finished_at <= as_of`.
 
 O limite honesto do orçamento: em *operações fechadas por dia* o teto é ~160 mil, não 500 mil. A
 meta de meio milhão de validações por dia é atingida com folga se "validação" for **uma decisão

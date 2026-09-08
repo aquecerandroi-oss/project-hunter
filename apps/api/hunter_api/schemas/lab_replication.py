@@ -60,6 +60,14 @@ class SiblingArmOut(PopulationStatsOut):
     """``null`` when the arm has produced zero outcomes yet; otherwise which
     cohort(s) its population came from (D15: replay may count toward this
     block's maturity, labelled)."""
+    window_from: datetime | None = None
+    """Início da janela replayada deste braço (``replay_runs.window_from``,
+    recibos com ``finished_at <= as_of``) — ``null`` quando o braço não conta
+    replay. REPLICATION.md §3.5 item 4 exige a janela ao lado do rótulo."""
+    window_to: datetime | None = None
+    duplicates_dropped: int = 0
+    """Resultados de replay descartados por repetirem uma (mercado, decisão)
+    que a coorte viva — ou outra corrida — já trazia (T3.18c, item 3)."""
 
 
 class SiblingsBlockOut(BaseModel):
@@ -68,10 +76,20 @@ class SiblingsBlockOut(BaseModel):
     passed: bool | None
     reason: str | None
     n: int
+    """Braços que **existem**."""
     expected: int
+    """Braços que a rodada prevê (``IRMAS_N`` = 10)."""
+    pool: int
+    """``max(n, expected)`` — o denominador da regra 7-em-10. Enquanto ele era
+    ``n``, seis irmãs perfeitas viravam "refutada: 0 negativas" (T3.18c, item
+    4)."""
     required: int
     mature: int
     positive: int
+    label: str | None = None
+    """``"siblings: replay sobre <janela>"`` quando qualquer braço amadureceu
+    com replay (D15 a, REPLICATION.md §3.5 item 4); ``null`` quando o bloco é
+    inteiramente prospectivo."""
     arms: list[SiblingArmOut]
 
 
@@ -106,6 +124,10 @@ class BootstrapIntervalOut(BaseModel):
     method: str
     groups: int | None
     refused_reason: str | None
+    seed_source: str = "derivada_do_id"
+    """``registrada`` (lida do evento ``strategy_version_replicated`` da
+    rodada) ou ``derivada_do_id`` (nenhuma rodada registrada; semente
+    determinística derivada do id da versão). T3.18c, item 6."""
 
 
 class SignTestOut(BaseModel):

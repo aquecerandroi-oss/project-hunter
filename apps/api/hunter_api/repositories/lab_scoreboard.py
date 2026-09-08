@@ -22,13 +22,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from hunter_api.repositories.lab_common import COHORT
 from hunter_api.repositories.lab_summary import OutcomeRow
 from hunter_core.db.models.agents import AgentSignal, SignalOutcome, Strategy, StrategyVersion
 from hunter_core.db.models.replay_runs import ReplayRunRow
 from hunter_core.domain.enums import ShadowCohort, StrategyVersionStatus
+from hunter_core.domain.types import ensure_utc
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "REPLAY_COHORT_WILDCARD",
+    "ReplayRunWindow",
     "ReplayRunsSummary",
     "ScoreboardVersionMeta",
     "LabScoreboardRepository",
@@ -61,19 +63,43 @@ def _cohort_condition(cohort: str) -> ColumnElement[bool]:
 
 
 @dataclass(frozen=True, slots=True)
+class ReplayRunWindow:
+    """Uma corrida de replay e a janela que as fatias dela cobriram."""
+
+    run_id: uuid.UUID
+    window_from: datetime
+    window_to: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class ReplayRunsSummary:
     """The ``replay_runs`` receipts of one version, summed across every run
-    (brief T3.18b, item 1: ``runs``/``decisions_simulated``/``window_from``/
-    ``window_to``) — never per slice, since a slice is not the unit the
-    scoreboard reports (DATABASE.md §25.1)."""
+    (brief T3.18b, item 1) — never per slice, since a slice is not the unit the
+    scoreboard reports (DATABASE.md §25.1).
+
+    **Ponto no tempo** (T3.18c, item 7): só recibos com ``finished_at <=
+    as_of``. Uma leitura histórica que mostrasse a massa de corridas
+    posteriores ao corte descreveria trabalho que, naquele instante, ainda não
+    tinha acontecido.
+    """
 
     runs: int
     """Count of *distinct* ``run_id`` values — the number of times a replay
     was launched for this version, not the number of slices it took."""
     bars_evaluated: int
-    """Sum of every slice's ``bars_evaluated`` — the D14 mass counter."""
+    """Sum of every slice's ``bars_evaluated`` — barras varridas, incluindo as
+    que a estratégia não conseguiu avaliar."""
+    evaluations_by_state: dict[str, int]
+    """Soma dos mapas de cada fatia: ``triggered``, ``not_triggered``,
+    ``rejected``, ``unavailable``, ``ineligible``. É o que torna a massa
+    honesta (T3.18c, item 9): sem ele, "500 mil por dia" era medido contra
+    barras, e uma barra em warm-up ou de mercado inelegível não é uma decisão.
+    """
     window_from: datetime | None
     window_to: datetime | None
+    windows: list[ReplayRunWindow]
+    """Uma linha por corrida — o que permite recusar a soma de corridas com
+    janelas sobrepostas na curva (T3.18c, item 10)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +187,7 @@ class LabScoreboardRepository:
                 AgentSignal.emitted_at <= as_of,
                 _cohort_condition(cohort),
             )
+            .order_by(AgentSignal.emitted_at, AgentSignal.id)
         )
         rows = (await self.session.execute(stmt)).all()
         return [
@@ -179,30 +206,60 @@ class LabScoreboardRepository:
             for r in rows
         ]
 
-    async def replay_runs_summary(self, version_id: uuid.UUID) -> ReplayRunsSummary:
-        """Every ``replay_runs`` slice this version has, summed into the
-        three numbers the replay block needs beyond its outcome rows: how
-        many runs, how many bars they evaluated in total, and the window
-        they span (brief T3.18b, item 1). ``runs == 0`` is how the caller
-        knows there is no replay evidence at all — a version replayed but not
-        yet receipted (DATABASE.md §25, concern 1 of ``notes-T3.19d.md``)
-        would still show its ``operations_closed`` from the outcome rows
-        alone with this block's counters at zero, never a crash.
+    async def replay_runs_summary(
+        self, version_id: uuid.UUID, *, as_of: datetime
+    ) -> ReplayRunsSummary:
+        """Os recibos de ``replay_runs`` desta versão até ``as_of``, agregados.
+
+        Uma consulta, agregação em Python: as fatias por versão são dezenas
+        (a corrida-prova da T3.19b teve onze), e o mesmo SELECT entrega a massa
+        (``bars_evaluated``), os estados de avaliação (``evaluations_by_state``,
+        que o SQL somaria com um ``jsonb_each`` bem mais caro de ler) e a janela
+        **por corrida**, que a curva precisa para recusar sobreposição.
+
+        ``runs == 0`` é como quem chama sabe que não há evidência de replay
+        alguma — uma versão replayada e ainda sem recibo continua mostrando as
+        ``operations_closed`` das linhas de outcome, com estes contadores em
+        zero, nunca um erro.
         """
-        row = (
+        rows = (
             await self.session.execute(
                 select(
-                    func.count(func.distinct(ReplayRunRow.run_id)),
-                    func.coalesce(func.sum(ReplayRunRow.bars_evaluated), 0),
-                    func.min(ReplayRunRow.window_from),
-                    func.max(ReplayRunRow.window_to),
-                ).where(ReplayRunRow.strategy_version_id == version_id)
+                    ReplayRunRow.run_id,
+                    ReplayRunRow.bars_evaluated,
+                    ReplayRunRow.evaluations_by_state,
+                    ReplayRunRow.window_from,
+                    ReplayRunRow.window_to,
+                )
+                .where(
+                    ReplayRunRow.strategy_version_id == version_id,
+                    ReplayRunRow.finished_at <= as_of,
+                )
+                .order_by(ReplayRunRow.window_from, ReplayRunRow.run_id)
             )
-        ).one()
-        runs, bars_evaluated, window_from, window_to = row
+        ).all()
+        bars = 0
+        states: dict[str, int] = {}
+        spans: dict[uuid.UUID, tuple[datetime, datetime]] = {}
+        for row in rows:
+            bars += int(row.bars_evaluated)
+            recorded: dict[str, int] = row.evaluations_by_state or {}
+            for state, count in recorded.items():
+                states[state] = states.get(state, 0) + int(count)
+            start, end = ensure_utc(row.window_from), ensure_utc(row.window_to)
+            known = spans.get(row.run_id)
+            spans[row.run_id] = (
+                (start, end) if known is None else (min(known[0], start), max(known[1], end))
+            )
+        windows = sorted(
+            (ReplayRunWindow(run_id, start, end) for run_id, (start, end) in spans.items()),
+            key=lambda item: (item.window_from, item.window_to),
+        )
         return ReplayRunsSummary(
-            runs=runs,
-            bars_evaluated=int(bars_evaluated),
-            window_from=window_from,
-            window_to=window_to,
+            runs=len(spans),
+            bars_evaluated=bars,
+            evaluations_by_state=states,
+            window_from=windows[0].window_from if windows else None,
+            window_to=max((item.window_to for item in windows), default=None),
+            windows=windows,
         )

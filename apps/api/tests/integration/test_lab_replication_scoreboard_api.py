@@ -101,9 +101,11 @@ async def test_promising_with_no_siblings_yet_is_promissora(
         "reason": "sem_irmas",
         "n": 0,
         "expected": 10,
+        "pool": 10,
         "required": 7,
         "mature": 0,
         "positive": 0,
+        "label": None,
         "arms": [],
     }
 

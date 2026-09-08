@@ -44,8 +44,16 @@ if TYPE_CHECKING:
 __all__ = ["build_scoreboard", "build_scoreboard_row"]
 
 
-def _r_net_series(gate_rows: list[OutcomeRow]) -> list[Decimal]:
+def _evaluable_rows(gate_rows: list[OutcomeRow]) -> list[OutcomeRow]:
     """Gate-passed rows with a known ``r_multiple``, ordered by ``exit_ts``.
+
+    **Esta** é a população avaliável — a que conta resultados, dias de saída,
+    expectancy, PF e veredito, e a mesma que a replicação carrega
+    (``repositories/lab_replication.py``, T3.18c item 2). Uma linha que passou
+    no portão mas não tem R (funding não apurável, ``SHADOW-LAB.md`` §3) não é
+    avaliável, e por isso também não empresta um dia à régua: enquanto ela
+    emprestava, ``maturity.days`` contava dias de uma população maior do que
+    ``maturity.evaluable``.
 
     ``is_evaluable`` guarantees ``exit_ts`` is set on every row it admits, so
     the sort key is never ``None`` in practice; ``cast`` says so to the type
@@ -53,7 +61,7 @@ def _r_net_series(gate_rows: list[OutcomeRow]) -> list[Decimal]:
     """
     candidates = [r for r in gate_rows if r.r_multiple is not None]
     candidates.sort(key=lambda r: cast("datetime", r.exit_ts))
-    return [cast("Decimal", r.r_multiple) for r in candidates]
+    return candidates
 
 
 def build_scoreboard_row(
@@ -65,7 +73,8 @@ def build_scoreboard_row(
     replication: ReplicationBlockOut | None = None,
 ) -> ScoreboardRowOut:
     gate_rows = [r for r in rows if is_evaluable(r, as_of)]
-    series = _r_net_series(gate_rows)
+    evaluable_rows = _evaluable_rows(gate_rows)
+    series = [cast("Decimal", r.r_multiple) for r in evaluable_rows]
 
     target_n, stop_n = touch_counts(gate_rows)
     hit_rate_result = rate(target_n, target_n + stop_n, reason_if_empty="no_resolved_touches")
@@ -78,7 +87,7 @@ def build_scoreboard_row(
     sum_result = sum_of(series)
 
     evaluable_count = len(series)
-    maturity_days = len({r.exit_ts.date() for r in gate_rows if r.exit_ts is not None})
+    maturity_days = len({cast("datetime", r.exit_ts).date() for r in evaluable_rows})
     mature = evaluable_count >= MATURITY_MIN_OUTCOMES and maturity_days >= MATURITY_MIN_DAYS
 
     verdict = compute_verdict(

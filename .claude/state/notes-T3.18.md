@@ -279,3 +279,100 @@ remoções): ReplayBlockOut, ReplicationBlockOut, SiblingArmOut e os campos novo
 9. **pyright do repo inteiro não rodei** (só apps/api, que está limpo: 0 erros); o repo tem histórico
    de erros em services/execution-worker/** de outros agentes (visto em notas de tarefas anteriores)
    que não são meus e não verifiquei se ainda estão lá.
+
+---
+
+## T3.18c — um contrato só para "avaliável", maturidade e PF (quant-engineer, 2026-09-08)
+
+Fecha os MUST-FIX da revisão da Astra (`astra-review-lab-pronto-2026-09-08.md` §1) e os 13 achados
+de `review-T3.18b-quant.md`. **Nada commitado.**
+
+### O que mudou, item a item
+
+1. **A CLI não é enganável por replay.** `replication_stats` passou a filtrar coorte: o pai é lido
+   **só** em `prospective` (D15 b). Teste: prospectivo maduro e negativo (200 resultados, 40 dias,
+   −0,4 R) + replay grande e positivo → `replicate()` recusa sem `--force-research`, nenhuma irmã é
+   criada e `promising_at` continua nulo.
+2. **Uma definição de "avaliável", e é a do placar.** A API carrega as linhas e aplica a **mesma**
+   `lab_summary_metrics.is_evaluable` (terminal, `exit_ts <= as_of`, horizonte transcorrido); o
+   worker aplica a tradução literal disso em SQL. `PopulationStats.days` conta **dias de saída**
+   (`Outcome.exit_at`, campo novo e obrigatório) e `PopulationStats.of` só devolve PF nulo por
+   `sem_perdas` — só-perdas é `0` com motivo nulo. `scoreboard_verdict` passou a aceitar o nulo por
+   `sem_perdas`, como o placar sempre fez. Provado contra Postgres: `row.evaluable ==
+   parent.evaluable`, `row.maturity.days == parent.days`, `row.verdict == parent.verdict` nos três
+   casos (misto, sem perdas, sem ganhos).
+   - **Efeito colateral declarado no placar:** `maturity.days` passou a contar dias de saída da
+     população **avaliável** (com R conhecido). Antes contava também linhas que passavam no portão
+     mas tinham `r_multiple` nulo (funding não apurável), o que fazia `maturity.days` medir uma
+     população maior que `maturity.evaluable`.
+3. **Evidência de irmã contada uma vez.** `sibling_population` deduplica por
+   `(mercado, decision_at)` com precedência da coorte viva (`dedupe_outcomes`, pura, compartilhada
+   com o worker). 25 resultados replayados sob dois `run_id` são 25. Cada braço publica
+   `window_from`/`window_to` (recibos com `finished_at <= as_of`) e `duplicates_dropped`; o bloco
+   publica `label = "siblings: replay sobre <janela>"` quando qualquer braço é `replay`/`mixed`.
+4. **Rodada incompleta é imatura, não refutada.** `pool = max(n, expected)`; refuta só quando
+   `pool − negativas_maduras < required`; `passed=None` com `rodada incompleta: {n} de 10` enquanto
+   as dez não existirem. Testado com n = 1, 6, 7 (todas positivas → aguardando) e 10 (passa).
+5. **Ordem total.** Toda consulta de outcome ordena por `(emitted_at, id)`. Teste com empates
+   deliberados: duas leituras seguidas devolvem o mesmo `bootstrap` e o mesmo `parent`.
+6. **Proveniência da semente.** `seed_source: registrada | derivada_do_id`, lida do evento
+   `strategy_version_replicated` (campo `data->>'seed'`), não de um `seed=` dentro do `changelog`.
+7. **Ponto no tempo.** `replay_runs_summary(version_id, as_of=)` só lê recibos com
+   `finished_at <= as_of`; idem as janelas das irmãs.
+8. **Custo.** Sem `promising_at` o bloco `replication` é `null` **sem** carregar população, irmãs ou
+   rodar o bootstrap. `?include=replay,replication` (padrão: os dois) — **escolhi manter os dois por
+   padrão**, para não mudar o contrato de quem já consome o placar; `include` desconhecido é 422.
+9. **Massa honesta.** `replay.bars_evaluated` (barras varridas) e `replay.decisions_simulated`
+   (`triggered + not_triggered + rejected`) são campos distintos, com `evaluations_by_state`
+   publicado inteiro. Recibo sem o mapa → `decisions_simulated: null` +
+   `decisions_simulated_reason: "sem_estados_registrados"`.
+10. **Curva.** `CurveOut.cohort` ecoado; `cohort=replay` com corridas de janelas sobrepostas é
+    **422** (`janelas_sobrepostas`) em vez de somar o mesmo R duas vezes. Janelas semiabertas
+    adjacentes não são sobreposição.
+11. **Testes reforçados**, 12. **`ensure_utc`** em todo timestamp de outcome, 13. **irmã promovida
+    a viva mantém a evidência prospectiva** (a coorte viva de uma irmã é o braço **e**
+    `prospective`).
+
+### Item 13 do brief — a regra exata que o cartão do Lab tem de mostrar (para a T3.24b)
+
+**`replication.status` pode repousar em replay; `verdict` nunca.**
+
+- `verdict` e `maturity` do cartão vêm **só** de `prospective`. Nunca rotule nem misture: se a tela
+  mostrar um selo de veredito, ele é sobre a faixa viva, ponto.
+- `replication.status` (`promissora`/`replicando`/`real`/`refutada`) **pode** ter sido alcançado com
+  evidência histórica nas irmãs. Sempre que `replication.siblings.label` for não nulo, a tela **tem
+  de** exibir esse texto junto do status (ele já vem pronto:
+  `"siblings: replay sobre 2026-08-08 → 2026-09-08"`). Um `status` de replicação sem esse rótulo,
+  quando o rótulo existe, é apresentar replay como se fosse prospectivo.
+- Por braço: `evidence` (`prospective|replay|mixed|null`) e, quando houver, `window_from`/
+  `window_to`. Um braço `replay`/`mixed` nunca deve aparecer com a mesma aparência de um `prospective`.
+- `replay.decisions_simulated` é **decisão**, não barra; `replay.bars_evaluated` é barra. Se a tela
+  mostrar "500 mil/dia", o número comparável é `decisions_simulated` (e ele pode ser `null` com
+  motivo — mostre o motivo, nunca 0).
+- `parent.verdict` e `verdict` são o **mesmo** veredito por contrato; se algum dia divergirem na
+  tela, é bug de dados e vale dizer isso em vez de escolher um.
+
+### Arquivos
+
+- `packages/indicators/hunter_indicators/replication/{stats,protocol,__init__}.py`
+- `apps/api/hunter_api/repositories/{lab_replication,lab_replication_rows,lab_scoreboard}.py`
+- `apps/api/hunter_api/services/{lab_replication,lab_scoreboard,lab_scoreboard_replay,lab_curve}.py`
+- `apps/api/hunter_api/schemas/{lab_replication,lab_scoreboard,lab_curve}.py`
+- `apps/api/hunter_api/routers/lab_scoreboard.py`
+- `services/strategy-worker/hunter_strategy_worker/{replication_stats,replication}.py`
+- testes: `packages/indicators/tests/**`, `apps/api/tests/unit/test_lab_{replication,curve,scoreboard_replay}.py`,
+  `apps/api/tests/integration/test_lab_replication_{contract,siblings}_api.py` (novos),
+  `apps/api/tests/integration/{lab_fixtures,test_lab_curve_cohort_api,test_lab_scoreboard_replay_api,test_lab_replication_scoreboard_api}.py`,
+  `services/strategy-worker/tests/test_replicate_strategy_version.py`
+- docs: `docs/plans/REPLICATION.md` (§1.5 √2, §3.2 pool, §3.5 contagem única, §5 "não são quatro
+  repetições independentes", §6 contrato, §9 D14), `docs/plans/SHADOW-LAB.md` (seção "Placar")
+- `packages/shared-types/{openapi.json,src/generated/api.d.ts}` (regenerados por `pnpm gen:types`)
+
+### Ressalvas
+
+- O brief cita "SHADOW-LAB.md §19"; o documento não tem §19. Tratei como o **item 9** da decisão
+  conjunta + a seção "Placar (T3.18)", que é onde a régua de PF nulo mora, e é lá que a referência
+  cruzada foi escrita.
+- `include` continua com os dois blocos por padrão (decisão minha, declarada acima).
+- O bloco 2 por replay é rotulado, mas a checagem cruzada da D15 (c) — "o mesmo replay rodou para o
+  pai na mesma janela" — continua **operacional**, não verificada pelo endpoint.

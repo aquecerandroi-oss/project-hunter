@@ -31,7 +31,11 @@ from hunter_core.domain.enums import ShadowCohort, TradeDirection
 from hunter_core.strategies.envelope import PURPOSE_PAPER, PURPOSE_RESEARCH_ONLY
 from hunter_strategy_worker.activation_db import Refused
 from hunter_strategy_worker.catalogue import load_version_roster
-from hunter_strategy_worker.replication_stats import arm_label, load_sibling_rows
+from hunter_strategy_worker.replication_stats import (
+    arm_label,
+    build_report,
+    load_sibling_rows,
+)
 
 from .builders import activate_version, registry_for
 
@@ -47,6 +51,9 @@ fixa porque ela entra no hash; um prefixo por teste moveria as metades."""
 
 WINNER = [Decimal("1"), Decimal("1"), Decimal("1"), Decimal("-0.5"), Decimal("-0.5")]
 """Expectancy 0,4 R e PF 3 — o pai fica ``validada`` na régua do placar."""
+
+LOSER = [Decimal("-1"), Decimal("-1"), Decimal("-1"), Decimal("0.5"), Decimal("0.5")]
+"""Expectancy −0,4 R e PF 1/3 — ``reprovada``, e madura o bastante para isso."""
 
 START = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
 
@@ -106,34 +113,62 @@ async def _seed_outcomes(
     per_day: int,
     values: list[Decimal] = WINNER,
     start: datetime = START,
+    cohort: str = ShadowCohort.PROSPECTIVE,
 ) -> int:
-    """``days × per_day`` resultados avaliáveis, um mercado por vez, em rodízio."""
+    """``days × per_day`` resultados **avaliáveis pela régua do placar**.
+
+    Avaliável tem uma definição só (T3.18c, item 2), e ela exige mais que
+    ``terminal`` com R conhecido: coorte declarada no envelope, ``exit_ts`` e
+    horizonte transcorrido (``entry_plan.entry_bar_open + horizon_s``). Uma
+    fixture que escrevesse menos que isso estaria testando uma população que o
+    worker nunca produz.
+    """
     rows: list[dict[str, Any]] = []
     index = 0
     for day in range(days):
         for slot in range(per_day):
+            emitted = start + timedelta(days=day, minutes=slot * 7)
+            entry_bar_open = emitted + timedelta(minutes=1)
             rows.append(
                 {
                     "id": uuid.uuid4(),
                     "version": version_id,
                     "market": markets[index % len(markets)],
-                    "emitted": start + timedelta(days=day, minutes=slot * 7),
+                    "emitted": emitted,
+                    "exit_ts": emitted + timedelta(hours=1),
                     "r": values[index % len(values)],
+                    "envelope": json.dumps(
+                        {
+                            "cohort": cohort,
+                            "decision_at": emitted.isoformat(),
+                            "observation_ts": (emitted - timedelta(seconds=5)).isoformat(),
+                            "purpose": PURPOSE_RESEARCH_ONLY,
+                        }
+                    ),
+                    "meta": json.dumps(
+                        {
+                            "cohort": cohort,
+                            "horizon_s": 14400,
+                            "entry_plan": {"entry_bar_open": entry_bar_open.isoformat()},
+                        }
+                    ),
                 }
             )
             index += 1
     await session.execute(
         text(
             "INSERT INTO agent_signals (id, strategy_version_id, market_id, params_hash, "
-            "direction, confidence, emitted_at) "
-            "VALUES (:id, :version, :market, 'test', 'long', 0.5, :emitted)"
+            "direction, confidence, emitted_at, supporting_features) "
+            "VALUES (:id, :version, :market, 'test', 'long', 0.5, :emitted, "
+            "CAST(:envelope AS jsonb))"
         ),
         rows,
     )
     await session.execute(
         text(
-            "INSERT INTO signal_outcomes (signal_id, result, tracking_state, r_multiple, exit_ts) "
-            "VALUES (:id, 'target', 'terminal', :r, :emitted)"
+            "INSERT INTO signal_outcomes (signal_id, result, tracking_state, r_multiple, "
+            "exit_ts, meta) "
+            "VALUES (:id, 'target', 'terminal', :r, :exit_ts, CAST(:meta AS jsonb))"
         ),
         rows,
     )
@@ -216,6 +251,71 @@ class TestReplicate:
         assert [event.event for event in events] == ["strategy_version_replicated"]
         assert events[0].level == "warning"
         assert events[0].data["forced"] is True
+
+    async def test_a_positive_replay_never_makes_a_refuted_parent_promising(
+        self, db_session_factory: Any
+    ) -> None:
+        """T3.18c, item 1 (Astra, HIGH): a CLI não é enganável por replay.
+
+        Cenário: prospectivo **maduro e negativo** (200 resultados, 40 dias,
+        expectancy −0,4 R) — ``reprovada`` sem ambiguidade — e um replay
+        histórico grande e positivo (200 resultados, 40 dias, +0,4 R) sob
+        ``replay:<uuid>``. Antes, a consulta do worker não filtrava coorte: as
+        duas populações somavam expectancy zero... e, com um replay maior,
+        viravam ``validada``, a rodada era aceita sem ``--force-research`` e
+        ``promising_at`` — o marco de onde o bloco 1 conta — nascia de
+        evidência histórica.
+        """
+        script = _script()
+        key = "replication_replay_leak"
+        run = uuid.uuid4()
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            markets = await _seed_markets(session)
+            _, version_id = await activate_version(session, key=key)
+            await _seed_outcomes(session, version_id, markets, days=40, per_day=5, values=LOSER)
+            await _seed_outcomes(
+                session,
+                version_id,
+                markets,
+                days=40,
+                per_day=5,
+                values=WINNER,
+                start=START + timedelta(days=100),
+                cohort=ShadowCohort.replay(run),
+            )
+        async with db_session_factory() as session, session.begin():
+            report = await build_report(await session.connection(), version_id, seed=1)
+            assert report.parent.evaluable == 200, "só o prospectivo entra na conta do pai"
+            assert report.parent.expectancy_r == Decimal("-0.4000")
+            assert report.parent_verdict == "reprovada"
+            with pytest.raises(script.Refused, match="não é promissora"):
+                await script.replicate(
+                    session, key, "v1", "x", dry_run=False, seed=1, registry=registry_for(key)
+                )
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            rows = await _versions(session, key)
+        assert [row.version for row in rows] == ["v1"], "nenhuma irmã foi derivada"
+        assert rows[0].promising_at is None, "nenhum carimbo nasceu de replay"
+
+    async def test_an_immature_prospective_population_is_not_promising_either(
+        self, db_session_factory: Any
+    ) -> None:
+        """O outro lado do mesmo portão: 100 resultados em 20 dias de saída não
+        são 30 dias, e imaturidade é ``inconclusivo``, nunca ``validada``."""
+        script = _script()
+        key = "replication_immature"
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            markets = await _seed_markets(session)
+            _, version_id = await activate_version(session, key=key)
+            await _seed_outcomes(session, version_id, markets, days=20, per_day=5)
+        async with db_session_factory() as session, session.begin():
+            report = await build_report(await session.connection(), version_id, seed=1)
+            assert (report.parent.evaluable, report.parent.days) == (100, 20)
+            assert report.parent_verdict == "inconclusivo"
+            with pytest.raises(script.Refused, match="não é promissora"):
+                await script.replicate(
+                    session, key, "v1", "x", dry_run=True, seed=1, registry=registry_for(key)
+                )
 
     async def test_a_dry_run_names_the_siblings_and_writes_nothing(
         self, db_session_factory: Any

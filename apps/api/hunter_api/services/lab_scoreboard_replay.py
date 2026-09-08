@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from hunter_api.schemas.lab_common import NullableMetric, ProfitFactorOut
 from hunter_api.schemas.lab_scoreboard import RateWithCountsOut, ReplayBlockOut
 from hunter_api.services.lab_summary_metrics import expectancy, is_evaluable, profit_factor, rate
+from hunter_core.strategies.base import EvaluationState
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -21,7 +22,33 @@ if TYPE_CHECKING:
     from hunter_api.repositories.lab_scoreboard import ReplayRunsSummary
     from hunter_api.repositories.lab_summary import OutcomeRow
 
-__all__ = ["build_replay_block"]
+__all__ = ["DECIDED_STATES", "NO_STATES_REASON", "build_replay_block", "decisions_simulated"]
+
+DECIDED_STATES = (
+    EvaluationState.TRIGGERED,
+    EvaluationState.NOT_TRIGGERED,
+    EvaluationState.REJECTED,
+)
+"""Os estados em que a estratégia **decidiu** sobre a barra (T3.18c, item 9).
+
+D14 pede massa medida em "barra real avaliada pela estratégia, com a decisão
+registrada". ``unavailable`` (warm-up, gap, indicador incalculável) e
+``ineligible`` (mercado fora do universo no fechamento) não provam nada em
+nenhuma direção — é a mesma distinção que o rearme de slot faz
+(``hunter_strategy_worker.episodes``), e somá-las inflaria a meta de 500 mil
+por dia com barras que ninguém julgou.
+"""
+
+NO_STATES_REASON = "sem_estados_registrados"
+"""Recibos antigos (ou de um build sem o mapa) não sabem dizer quantas barras
+viraram decisão: o número sai **nulo com motivo**, nunca zero inventado."""
+
+
+def decisions_simulated(states: dict[str, int]) -> tuple[int | None, str | None]:
+    """Decisões registradas e o motivo quando não dá para saber."""
+    if not states:
+        return None, NO_STATES_REASON
+    return sum(states.get(state, 0) for state in DECIDED_STATES), None
 
 
 def build_replay_block(
@@ -40,9 +67,13 @@ def build_replay_block(
     expectancy_result = expectancy(series)
     pf_result = profit_factor(series)
 
+    decided, decided_reason = decisions_simulated(runs.evaluations_by_state)
     return ReplayBlockOut(
         runs=runs.runs,
-        decisions_simulated=runs.bars_evaluated,
+        bars_evaluated=runs.bars_evaluated,
+        decisions_simulated=decided,
+        decisions_simulated_reason=decided_reason,
+        evaluations_by_state=dict(runs.evaluations_by_state),
         operations_closed=len(series),
         expectancy_r=NullableMetric(value=expectancy_result.value, reason=expectancy_result.reason),
         net_profit_rate=RateWithCountsOut(

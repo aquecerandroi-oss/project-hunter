@@ -197,7 +197,10 @@ export function makeScoreboardRow(overrides: Partial<ScoreboardRowOut> = {}): Sc
 export function exampleReplayBlock(overrides: Partial<ReplayBlockOut> = {}): ReplayBlockOut {
   return {
     runs: 1,
+    bars_evaluated: 288,
     decisions_simulated: 288,
+    decisions_simulated_reason: null,
+    evaluations_by_state: { triggered: 3, not_triggered: 285 },
     operations_closed: 3,
     expectancy_r: { value: "2", reason: null },
     net_profit_rate: { value: "1", reason: null, numerator: 3, denominator: 3 },
@@ -250,6 +253,8 @@ export function exampleReplicationBlock(overrides: Partial<ReplicationBlockOut> 
     siblings: {
       n: 1,
       expected: 10,
+      pool: 10,
+      label: null,
       required: 7,
       mature: 0,
       positive: 0,
@@ -260,6 +265,7 @@ export function exampleReplicationBlock(overrides: Partial<ReplicationBlockOut> 
           k: 1,
           version: "v2",
           evaluable: 4,
+          duplicates_dropped: 0,
           wins: 4,
           losses: 0,
           markets: 1,
@@ -293,6 +299,7 @@ export function exampleReplicationBlock(overrides: Partial<ReplicationBlockOut> 
       method: "iid_percentile_v1",
       refused_reason: "amostra_insuficiente: 1 < 20",
       groups: null,
+      seed_source: "derivada_do_id",
       day_cluster: {
         n: 1,
         mean: null,
@@ -304,6 +311,7 @@ export function exampleReplicationBlock(overrides: Partial<ReplicationBlockOut> 
         method: "day_cluster_percentile_v1",
         refused_reason: "grupos_insuficientes: 1 < 20",
         groups: 1,
+        seed_source: "derivada_do_id",
       },
       sign_test: { method: "sign_test_v1", positives: 1, negatives: 0, zeros: 0, p_sign: null, refused_reason: null },
     },
@@ -316,6 +324,7 @@ export function exampleCurve(overrides: Partial<CurveOut> = {}): CurveOut {
     strategy_version_id: "098b060c-cdc0-46a6-b88b-70d4a5472b97",
     as_of: "2026-09-08T12:00:00Z",
     label: "SOMBRA — hipotético, sem capital, custos assumidos",
+    cohort: "prospective",
     points: [
       { ts: "2026-09-06T03:41:00Z", r: "-1.0421", cum_r: "-1.0421" },
       { ts: "2026-09-06T05:10:00Z", r: "2.0000", cum_r: "0.9579" },

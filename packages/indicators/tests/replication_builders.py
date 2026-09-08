@@ -24,6 +24,16 @@ como tabela em vez de recalcular o hash."""
 MARKETS = HALF_A_MARKETS + HALF_B_MARKETS
 
 
+HOLD = timedelta(hours=1)
+"""Distância decisão → saída nas séries sintéticas.
+
+Uma hora, e a âncora é meio-dia UTC, para que decisão e saída caiam **no mesmo
+dia**: assim os testes que contam dias continuam contando o mesmo número depois
+que a régua passou a contar dias de saída (T3.18c, item 2), e quem quiser provar
+a diferença entre os dois dias passa um ``hold`` que atravessa a meia-noite.
+"""
+
+
 def population(
     *,
     days: int,
@@ -31,6 +41,7 @@ def population(
     markets: Sequence[str] = MARKETS,
     r_for: Callable[[str, int], Decimal],
     start: datetime = START,
+    hold: timedelta = HOLD,
 ) -> list[Outcome]:
     """``days × per_day`` resultados, um mercado por vez, em rodízio."""
     rows: list[Outcome] = []
@@ -38,11 +49,13 @@ def population(
     for day in range(days):
         for slot in range(per_day):
             market = markets[index % len(markets)]
+            decision_at = start + timedelta(days=day, minutes=slot * 7)
             rows.append(
                 Outcome(
                     r=r_for(market, index),
-                    decision_at=start + timedelta(days=day, minutes=slot * 7),
+                    decision_at=decision_at,
                     market=market,
+                    exit_at=decision_at + hold,
                 )
             )
             index += 1

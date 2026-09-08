@@ -1093,6 +1093,11 @@ export interface components {
             resamples: number;
             /** Seed */
             seed: number;
+            /**
+             * Seed Source
+             * @default derivada_do_id
+             */
+            seed_source: string;
             sign_test: components["schemas"]["SignTestOut"];
         };
         /**
@@ -1120,6 +1125,11 @@ export interface components {
             resamples: number;
             /** Seed */
             seed: number;
+            /**
+             * Seed Source
+             * @default derivada_do_id
+             */
+            seed_source: string;
         };
         /**
          * BrlDecompositionOut
@@ -1286,6 +1296,8 @@ export interface components {
              * Format: date-time
              */
             as_of: string;
+            /** Cohort */
+            cohort: string;
             /**
              * Label
              * @default SOMBRA — hipotético, sem capital, custos assumidos
@@ -2933,12 +2945,23 @@ export interface components {
          *     neither number is allowed to leak into the other.
          */
         ReplayBlockOut: {
+            /** Bars Evaluated */
+            bars_evaluated: number;
             /** Decisions Simulated */
-            decisions_simulated: number;
+            decisions_simulated: number | null;
+            /** Decisions Simulated Reason */
+            decisions_simulated_reason?: string | null;
             /** Distinct Days */
             distinct_days: number;
             /** Distinct Markets */
             distinct_markets: number;
+            /**
+             * Evaluations By State
+             * @default {}
+             */
+            evaluations_by_state: {
+                [key: string]: number;
+            };
             expectancy_r: components["schemas"]["NullableMetric"];
             /**
              * Label
@@ -3360,6 +3383,11 @@ export interface components {
         SiblingArmOut: {
             /** Days */
             days: number;
+            /**
+             * Duplicates Dropped
+             * @default 0
+             */
+            duplicates_dropped: number;
             /** Evaluable */
             evaluable: number;
             /** Evidence */
@@ -3384,6 +3412,10 @@ export interface components {
             sum_r: string | null;
             /** Version */
             version: string;
+            /** Window From */
+            window_from?: string | null;
+            /** Window To */
+            window_to?: string | null;
             /** Wins */
             wins: number;
         };
@@ -3396,12 +3428,16 @@ export interface components {
             arms: components["schemas"]["SiblingArmOut"][];
             /** Expected */
             expected: number;
+            /** Label */
+            label?: string | null;
             /** Mature */
             mature: number;
             /** N */
             n: number;
             /** Passed */
             passed: boolean | null;
+            /** Pool */
+            pool: number;
             /** Positive */
             positive: number;
             /** Reason */
@@ -4133,6 +4169,7 @@ export interface operations {
         parameters: {
             query?: {
                 as_of?: string | null;
+                include?: string;
             };
             header?: never;
             path?: never;

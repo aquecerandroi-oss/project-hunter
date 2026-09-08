@@ -151,9 +151,11 @@ def _siblings(
             }
         )
     total = len(arms)
+    pool = max(total, expected)
     detail: dict[str, Any] = {
         "n": total,
         "expected": expected,
+        "pool": pool,
         "required": required,
         "mature": mature,
         "positive": positive,
@@ -162,12 +164,18 @@ def _siblings(
     if total == 0:
         return Block("siblings", None, "sem_irmas", detail)
     mature_negative = mature - positive
+    # A maioria só é impossível contra o **pool** da rodada (as irmãs que
+    # existem ou ainda serão derivadas): com 6 de 10 braços e 4 negativas
+    # maduras, nem as quatro que faltam bastariam — isso é refutação. Com 6
+    # braços todos positivos não é: o denominador da regra 7-em-10 é 10, e
+    # contar 6 como se fossem 10 chamava de "refutada" uma rodada incompleta
+    # (quant, revisão T3.18b, achado 5).
+    if pool - mature_negative < required:
+        return Block("siblings", False, f"maioria_impossivel: {mature_negative} negativas", detail)
+    if total < expected:
+        return Block("siblings", None, f"rodada incompleta: {total} de {expected}", detail)
     if positive >= required:
         return Block("siblings", True, None, detail)
-    # A maioria só é impossível quando nem todas as irmãs ainda indefinidas
-    # bastariam: irmãs imaturas ainda podem virar positivas.
-    if total - mature_negative < required:
-        return Block("siblings", False, f"maioria_impossivel: {mature_negative} negativas", detail)
     return Block("siblings", None, f"imaturo: {positive} de {required} positivas", detail)
 
 
@@ -178,7 +186,7 @@ def _halves(outcomes: Sequence[Outcome]) -> Block:
 
 def _bootstrap(outcomes: Sequence[Outcome], seed: int) -> Block:
     values = [outcome.r for outcome in outcomes]
-    days = [outcome.day.isoformat() for outcome in outcomes]
+    days = [outcome.decision_day.isoformat() for outcome in outcomes]
     iid: BootstrapResult = bootstrap_mean_ci(values, seed=seed)
     clustered: BootstrapResult = cluster_bootstrap_mean_ci(values, days, seed=seed)
     signs: SignTestResult = sign_test(values)

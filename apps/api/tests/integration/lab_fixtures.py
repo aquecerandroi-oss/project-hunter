@@ -126,8 +126,7 @@ def _envelope(*, decision_at: datetime, source_bar_close: datetime, cohort: str)
     }
 
 
-async def seed_shadow_signal(
-    session_factory: async_sessionmaker[AsyncSession],
+def build_shadow_signal(
     *,
     strategy_version_id: uuid.UUID,
     market_id: uuid.UUID,
@@ -149,15 +148,18 @@ async def seed_shadow_signal(
     stop: Decimal = Decimal("99"),
     target1: Decimal = Decimal("103"),
     excursions: dict[str, Any] | None = None,
-) -> uuid.UUID:
+    signal_id: uuid.UUID | None = None,
+) -> tuple[AgentSignal, SignalOutcome]:
     """One ``agent_signals`` + ``signal_outcomes`` pair, shaped exactly like
-    ``hunter_strategy_worker.record``/``persist`` would write it.
+    ``hunter_strategy_worker.record``/``persist`` would write it — **built**,
+    not written, so a population of a hundred outcomes costs one transaction
+    instead of a hundred (``seed_shadow_population``).
     """
     source_bar_close = decision_at - timedelta(seconds=5)
     entry_bar_open = entry_bar_open or (decision_at + timedelta(minutes=1)).replace(
         second=0, microsecond=0
     )
-    signal_id = uuid.uuid4()
+    signal_id = signal_id or uuid.uuid4()
     meta: dict[str, Any] = {
         "entry_plan": {
             "source_bar_close": source_bar_close.isoformat(),
@@ -179,43 +181,67 @@ async def seed_shadow_signal(
         "r_net_reason": r_net_reason,
         "r_ex_funding": None if r_ex_funding is None else str(r_ex_funding),
     }
+    signal = AgentSignal(
+        id=signal_id,
+        strategy_version_id=strategy_version_id,
+        market_id=market_id,
+        params_hash="test-hash",
+        direction=TradeDirection.LONG,
+        confidence=Decimal("0.5"),
+        stop=stop,
+        targets=[str(target1)],
+        supporting_features=_envelope(
+            decision_at=decision_at, source_bar_close=source_bar_close, cohort=cohort
+        ),
+        emitted_at=decision_at,
+        status=SignalStatus.ACTIVE,
+    )
+    outcome = SignalOutcome(
+        signal_id=signal_id,
+        virtual_stop=stop,
+        virtual_targets=[str(target1)],
+        virtual_entry=reference_price if entry_ts is not None else None,
+        entry_ts=entry_ts,
+        exit_price=exit_price,
+        exit_ts=exit_ts,
+        result=result,
+        r_multiple=r_multiple,
+        tracking_state=tracking_state,
+        no_entry_reason=no_entry_reason,
+        censored_reason=censored_reason,
+        meta=meta,
+    )
+    return signal, outcome
+
+
+async def seed_shadow_signal(
+    session_factory: async_sessionmaker[AsyncSession], **kwargs: Any
+) -> uuid.UUID:
+    """One decision written in its own transaction (the ordinary case)."""
+    signal, outcome = build_shadow_signal(**kwargs)
     async with session_factory() as session:
-        session.add(
-            AgentSignal(
-                id=signal_id,
-                strategy_version_id=strategy_version_id,
-                market_id=market_id,
-                params_hash="test-hash",
-                direction=TradeDirection.LONG,
-                confidence=Decimal("0.5"),
-                stop=stop,
-                targets=[str(target1)],
-                supporting_features=_envelope(
-                    decision_at=decision_at, source_bar_close=source_bar_close, cohort=cohort
-                ),
-                emitted_at=decision_at,
-                status=SignalStatus.ACTIVE,
-            )
-        )
-        session.add(
-            SignalOutcome(
-                signal_id=signal_id,
-                virtual_stop=stop,
-                virtual_targets=[str(target1)],
-                virtual_entry=reference_price if entry_ts is not None else None,
-                entry_ts=entry_ts,
-                exit_price=exit_price,
-                exit_ts=exit_ts,
-                result=result,
-                r_multiple=r_multiple,
-                tracking_state=tracking_state,
-                no_entry_reason=no_entry_reason,
-                censored_reason=censored_reason,
-                meta=meta,
-            )
-        )
+        session.add(signal)
+        session.add(outcome)
         await session.commit()
-        return signal_id
+        return signal.id
+
+
+async def seed_shadow_population(
+    session_factory: async_sessionmaker[AsyncSession], specs: list[dict[str, Any]]
+) -> list[uuid.UUID]:
+    """Uma população inteira numa transação — o que a régua do placar exige.
+
+    Cem resultados avaliáveis em trinta dias distintos é o **mínimo** para uma
+    versão madura (SHADOW-LAB.md §9), e cem commits por teste transformariam a
+    prova de contrato numa prova de paciência.
+    """
+    pairs = [build_shadow_signal(**spec) for spec in specs]
+    async with session_factory() as session:
+        for signal, outcome in pairs:
+            session.add(signal)
+            session.add(outcome)
+        await session.commit()
+    return [signal.id for signal, _ in pairs]
 
 
 async def seed_replay_slice(

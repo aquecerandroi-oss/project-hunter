@@ -90,5 +90,15 @@ não enviesar estatísticas agregadas para operações rápidas — nada disso s
 As avaliações do plantão em `obsidian/05-EXPERIMENTS/` continuam sendo o registro histórico
 (datadas, nunca reescritas); o placar é a leitura corrente da mesma régua, não a substitui.
 
+**Esta régua é a única (T3.18c).** O bloco `replication` do mesmo cartão publica `parent` com a
+população, a maturidade e o veredito **recalculados sobre esta definição** — mesma população
+avaliável (portão `is_evaluable`), mesmos dias de **saída**, mesmo tratamento de `profit_factor`
+nulo (só `no_losses`/`sem_perdas`; só perdas é PF `0` com motivo nulo) —, e
+`hunter_indicators.replication.PopulationStats`/`scoreboard_verdict` são a implementação pura
+compartilhada com a CLI de replicação. Um cartão que mostrasse `verdict` e `parent.verdict`
+diferentes estaria publicando dois vereditos sobre a mesma evidência; ver
+`docs/plans/REPLICATION.md` §5 e §6. O bloco `replay` e o `replication.status` podem repousar em
+evidência de replay, **rotulada**; `verdict` e `maturity`, nunca (D15).
+
 ## Fora de escopo
 Carteira, ordens, fills, posições, PnL de portfolio, Risk Engine, SHORT, sinais sobre features do M2 (v2), execução de qualquer natureza.

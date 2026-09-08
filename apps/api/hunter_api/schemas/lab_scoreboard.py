@@ -72,10 +72,19 @@ class ReplayBlockOut(BaseModel):
     """
 
     runs: int
-    """Distinct replay runs (``replay_runs.run_id``) recorded for this version."""
-    decisions_simulated: int
-    """Sum of ``bars_evaluated`` across every run — the D14 **mass** counter:
-    one replayed bar the strategy was asked to decide on, not one operation."""
+    """Distinct replay runs (``replay_runs.run_id``) recorded for this version,
+    com ``finished_at <= as_of`` (T3.18c, item 7)."""
+    bars_evaluated: int
+    """Soma de ``replay_runs.bars_evaluated`` — barras **varridas**."""
+    decisions_simulated: int | None
+    """As barras em que a estratégia registrou decisão (``triggered +
+    not_triggered + rejected``) — o contador de **massa** da D14, agora medido
+    contra decisões e não contra barras (T3.18c, item 9). ``null`` com motivo
+    quando os recibos não trazem o mapa de estados."""
+    decisions_simulated_reason: str | None = None
+    evaluations_by_state: dict[str, int] = {}
+    """O mapa somado, publicado inteiro: quem duvidar do numerador consegue
+    refazê-lo."""
     operations_closed: int
     """Evaluable outcomes (the same gate as the prospective block's
     ``evaluable``) across every ``replay:<uuid>`` cohort of this version —

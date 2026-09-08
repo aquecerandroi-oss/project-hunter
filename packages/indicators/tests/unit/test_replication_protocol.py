@@ -9,7 +9,7 @@ em ``test_replication_bootstrap.py``).
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from hunter_indicators.replication.protocol import (
@@ -85,12 +85,54 @@ class TestScoreboardVerdict:
         assert stats.expectancy_r == Decimal("-0.4000")
         assert scoreboard_verdict(stats) == VERDICT_REJECTED
 
-    def test_a_null_profit_factor_is_not_greater_than_one(self) -> None:
+    def test_a_population_without_a_single_loss_is_validated_like_the_scoreboard(self) -> None:
+        """T3.18c, item 2: ``sem_perdas`` é o **único** PF nulo, e ele passa.
+
+        Era aqui que a mesma evidência recebia dois vereditos: o placar dizia
+        ``validada`` (``no_losses`` conta como > 1, ``SHADOW-LAB.md`` "Placar")
+        e a replicação dizia ``reprovada``.
+        """
         rows = population(days=40, per_day=5, r_for=alternating(["1"]))
         stats = PopulationStats.of(rows)
+        assert (stats.wins, stats.losses) == (200, 0)
         assert stats.profit_factor is None
         assert stats.profit_factor_reason == "sem_perdas"
+        assert scoreboard_verdict(stats) == VERDICT_VALIDATED
+
+    def test_a_population_without_a_single_win_has_profit_factor_zero(self) -> None:
+        """E o outro lado: 0 / |perdas| é **zero**, não é indefinido — o mesmo
+        ``0.0000`` com motivo nulo que ``profit_factor()`` publica no placar."""
+        rows = population(days=40, per_day=5, r_for=alternating(["-1"]))
+        stats = PopulationStats.of(rows)
+        assert (stats.wins, stats.losses) == (0, 200)
+        assert stats.profit_factor == Decimal("0.0000")
+        assert stats.profit_factor_reason is None
         assert scoreboard_verdict(stats) == VERDICT_REJECTED
+
+    def test_maturity_counts_exit_days_not_decision_days(self) -> None:
+        """A régua conta dias de **saída** — a definição do placar
+        (``maturity.days`` = ``{exit_ts.date()}``), T3.18c item 2.
+
+        Duas decisões no **mesmo** dia, uma delas encerrada depois da
+        meia-noite: um dia de decisão, dois dias de saída. ``days`` diz 2.
+        """
+        day = datetime(2026, 1, 1, tzinfo=UTC)
+        rows = [
+            Outcome(
+                r=Decimal("1"),
+                decision_at=day + timedelta(hours=10),
+                market="binance:BTCUSDT",
+                exit_at=day + timedelta(hours=11),
+            ),
+            Outcome(
+                r=Decimal("-1"),
+                decision_at=day + timedelta(hours=23),
+                market="binance:ETHUSDT",
+                exit_at=day + timedelta(hours=25),
+            ),
+        ]
+        assert len({row.decision_day for row in rows}) == 1
+        assert PopulationStats.of(rows).days == 2
 
     def test_three_hundred_outcomes_in_three_days_are_not_mature(self) -> None:
         rows = population(days=3, per_day=100, r_for=WINNER)
@@ -163,6 +205,46 @@ class TestReplicationVerdict:
         assert report.siblings.detail["positive"] == SIBLINGS_REQUIRED
         assert report.siblings.passed is True
         assert report.status == STATUS_REAL
+
+    def test_an_incomplete_round_waits_even_when_every_arm_is_positive(self) -> None:
+        """Rodada incompleta é **imatura**, nunca refutada (T3.18c, item 4).
+
+        Antes, ``total = len(arms)`` fazia o denominador da regra 7-em-10 ser o
+        número de irmãs **derivadas**: seis irmãs perfeitas viravam
+        "refutada: 0 negativas", porque 6 − 0 < 7. O denominador é o pool da
+        rodada (``max(n, expected)`` = 10), e enquanto as dez não existirem o
+        bloco espera, dizendo quantas faltam.
+        """
+        for n in (1, 6, 7):
+            report = replication_report(
+                parent_outcomes=_parent(),
+                promising_at=PROMISING_AT,
+                siblings=_ten()[:n],
+                seed=5,
+            )
+            assert report.siblings.passed is None, n
+            assert report.siblings.reason == f"rodada incompleta: {n} de 10", n
+            assert report.siblings.detail["pool"] == 10
+            assert report.status == STATUS_REPLICATING, n
+
+    def test_the_complete_round_of_ten_positives_passes(self) -> None:
+        report = replication_report(
+            parent_outcomes=_parent(), promising_at=PROMISING_AT, siblings=_ten(), seed=5
+        )
+        assert report.siblings.detail["n"] == 10
+        assert report.siblings.detail["pool"] == 10
+        assert report.siblings.passed is True
+
+    def test_an_incomplete_round_is_still_refuted_when_the_majority_is_out_of_reach(self) -> None:
+        """A recusa não espera a rodada fechar quando fechá-la não bastaria:
+        com 4 negativas maduras, as dez do pool dão no máximo 6 positivas."""
+        arms = _ten(negative=4)[:5]
+        report = replication_report(
+            parent_outcomes=_parent(), promising_at=PROMISING_AT, siblings=arms, seed=5
+        )
+        assert report.siblings.passed is False
+        assert report.siblings.reason == "maioria_impossivel: 4 negativas"
+        assert report.status == STATUS_REFUTED
 
     def test_immature_siblings_wait_instead_of_refuting(self) -> None:
         report = replication_report(

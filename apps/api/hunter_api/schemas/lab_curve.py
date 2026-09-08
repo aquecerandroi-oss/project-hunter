@@ -23,6 +23,10 @@ class CurvePointOut(BaseModel):
 class CurveOut(BaseModel):
     strategy_version_id: uuid.UUID
     as_of: datetime
+    cohort: str
+    """A coorte que esta curva desenha, ecoada (T3.18c, item 10): sem ela, uma
+    linha de replay e a linha viva chegam ao cliente com o mesmo formato e
+    nenhuma forma de saber qual é qual."""
     label: str = LAB_LABEL
     points: list[CurvePointOut]
     truncated: bool

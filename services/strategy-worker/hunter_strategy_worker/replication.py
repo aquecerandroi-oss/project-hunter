@@ -254,12 +254,16 @@ async def replicate(
             f"({', '.join(item.version for item in existing)}): replicar de novo seria dobrar as "
             "tentativas e inflar o falso positivo que o protocolo combate (REPLICATION.md §4.1)"
         )
+    # A conta que autoriza a rodada é a população **prospectiva** do pai, com o
+    # portão do placar (``replication_stats``, T3.18c 1 e 2): um replay positivo
+    # nem entra nela, então ``promising_at`` não nasce de história.
     report = await build_report(conn, row.id, seed=seed)
     if report.parent_verdict != VERDICT_VALIDATED and force_research is None:
         raise Refused(
             f"{key} {version} não é promissora: o placar diz {report.parent_verdict!r} "
-            f"({report.parent.evaluable} resultados avaliáveis, {report.parent.days} dias, "
-            f"expectancy {report.parent.expectancy_r}, PF {report.parent.profit_factor}). "
+            f"sobre a coorte prospectiva ({report.parent.evaluable} resultados avaliáveis, "
+            f"{report.parent.days} dias de saída, expectancy {report.parent.expectancy_r}, "
+            f"PF {report.parent.profit_factor}). "
             'Use --force-research "<motivo>" para um experimento manual.'
         )
     forced = force_research is not None
