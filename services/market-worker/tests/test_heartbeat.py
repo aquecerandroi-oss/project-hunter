@@ -33,7 +33,7 @@ async def test_write_hash_has_every_documented_field_and_ttl(redis_client: Any) 
     exchange_code = unique_code()
     universe = MonitoredUniverse()
     universe.set(["BTCUSDT", "ETHUSDT"])
-    state = HeartbeatState(last_event_at=utcnow(), reconnects=3, open_gaps=1)
+    state = HeartbeatState(last_event_at=utcnow(), reconnects=3, open_gaps=1, unrecoverable_gaps=4)
 
     await heartbeat._write_hash(  # pyright: ignore[reportPrivateUsage]
         redis_client, exchange_code, universe, state, "connected", utcnow()
@@ -49,6 +49,7 @@ async def test_write_hash_has_every_documented_field_and_ttl(redis_client: Any) 
         "reconnects",
         "markets_monitored",
         "open_gaps",
+        "unrecoverable_gaps",
         "rest_gate",
         "ts",
     ):
@@ -57,6 +58,9 @@ async def test_write_hash_has_every_documented_field_and_ttl(redis_client: Any) 
     assert fields["markets_monitored"] == "2"
     assert fields["reconnects"] == "3"
     assert fields["open_gaps"] == "1"
+    # T3.7d: a terminal count reported apart from open_gaps, so a stuck
+    # backlog and a permanently-closed door never look like the same number.
+    assert fields["unrecoverable_gaps"] == "4"
     ttl = await redis_client.ttl(key)
     assert 0 < ttl <= heartbeat.HB_TTL_S
 

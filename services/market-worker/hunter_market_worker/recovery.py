@@ -8,15 +8,17 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from hunter_core.db.models.market_data import IngestionGap
+from hunter_core.db.models.system import SystemEvent
 from hunter_core.db.session import role_session
-from hunter_core.domain.enums import MarketType, Timeframe
+from hunter_core.domain.enums import MarketType, RiskEventSeverity, Timeframe
 from hunter_core.domain.market import align_open_time
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_core.observability import market_ingestion_gaps, market_spot_ingestion_gaps
+from hunter_market_worker import recovery_lifecycle
 from hunter_market_worker import recovery_queries as queries
 from hunter_market_worker.persist import load_market_ids
-from hunter_market_worker.recovery_drain import expected_times, recover_one
+from hunter_market_worker.recovery_drain import MAX_ATTEMPTS, expected_times, recover_one
 from hunter_market_worker.supervision import rest_gate_suspended
 
 logger = get_logger(__name__)
@@ -128,7 +130,6 @@ async def check_gaps(
     cycle_start = time.monotonic()
     now = await server_now(adapter)
     end = align_open_time(now, Timeframe.M1) - DETECTION_GRACE
-    reopen_cutoff = now - timedelta(seconds=FAILED_RETRY_AFTER_S)
 
     async with role_session(session_factory, db_role="hunter_worker") as session:
         # Taken before the coverage is read: the backfill consumer creates rows
@@ -139,6 +140,11 @@ async def check_gaps(
         ids = await load_market_ids(session, adapter.code, set(symbols), market_type)
         market_ids = list(ids.values())
         market_watermarks = await queries.watermarks(session, market_ids)
+        # T3.7d: the cheapest "before this market's listing" signal — see
+        # recovery_lifecycle.earliest. Read once per cycle, alongside the
+        # watermark it mirrors, and threaded through to every recover_one call
+        # below so a gap classified this way never even reaches REST.
+        market_earliest = await recovery_lifecycle.earliest(session, market_ids)
         starts = {
             mid: end
             - MINUTE
@@ -153,7 +159,32 @@ async def check_gaps(
         by_market = await queries.persisted_by_market(session, market_ids, global_start, end)
         market_gaps = await queries.gaps_by_market(session, market_ids, ("open", "failed"))
 
-        queries.reopen_stale_failed(market_gaps, reopen_cutoff, MAX_REOPEN_PER_CYCLE)
+        _, exhausted = recovery_lifecycle.reopen_stale_failed(
+            market_gaps,
+            now,
+            MAX_REOPEN_PER_CYCLE,
+            retry_after_s=FAILED_RETRY_AFTER_S,
+            max_attempts=MAX_ATTEMPTS,
+        )
+        for gap in exhausted:
+            session.add(
+                SystemEvent(
+                    level=RiskEventSeverity.WARNING,
+                    component="market-worker",
+                    event="market_gap_unrecoverable",
+                    message=(
+                        f"gap [{gap.gap_start.isoformat()}, {gap.gap_end.isoformat()}] "
+                        f"exhausted its reopen budget"
+                    ),
+                    data={
+                        "reason": "exhausted",
+                        "market_id": str(gap.market_id),
+                        "gap_start": gap.gap_start.isoformat(),
+                        "gap_end": gap.gap_end.isoformat(),
+                        "attempts": gap.attempts,
+                    },
+                )
+            )
 
         for mid in market_ids:
             start = starts[mid]
@@ -196,7 +227,15 @@ async def check_gaps(
         symbol = symbol_by_market_id.get(market_id)
         if symbol is None:
             continue
-        await recover_one(session_factory, adapter, gap_id, symbol, now, tier="live")
+        await recover_one(
+            session_factory,
+            adapter,
+            gap_id,
+            symbol,
+            now,
+            tier="live",
+            earliest_known=market_earliest.get(market_id),
+        )
 
     # History last, and under a wall-clock budget: what is left of the cycle
     # decides how much of a bootstrap gets served, never the other way round.
@@ -221,7 +260,15 @@ async def check_gaps(
                 # come from the deadline above — which rolls back — and not from
                 # the gap's own timeout, which would spend an attempt on a slow
                 # cycle rather than on a slow exchange.
-                await recover_one(session_factory, adapter, gap_id, symbol, now, tier="history")
+                await recover_one(
+                    session_factory,
+                    adapter,
+                    gap_id,
+                    symbol,
+                    now,
+                    tier="history",
+                    earliest_known=market_earliest.get(market_id),
+                )
         except TimeoutError:
             logger.warning("market_backfill_unit_timeout", symbol=symbol, budget_s=remaining)
             break
@@ -229,7 +276,12 @@ async def check_gaps(
     async with role_session(session_factory, db_role="hunter_worker") as session:
         open_count = await queries.count_by_status(session, market_ids, "open")
         failed_count = await queries.count_by_status(session, market_ids, "failed")
+        # T3.7d: a terminal status, counted on its own so it never inflates
+        # `open_gaps` — the field the incident's operator read as "still being
+        # worked on" while it was actually 148 rows nothing would ever fetch.
+        unrecoverable_count = await queries.count_by_status(session, market_ids, "unrecoverable")
     heartbeat_state.open_gaps = open_count
+    heartbeat_state.unrecoverable_gaps = unrecoverable_count
     # Separate series per product (T3.0c): one gauge shared by two collectors
     # would have each overwrite the other's value under the same labels.
     gauge = (
@@ -237,6 +289,7 @@ async def check_gaps(
     )
     gauge.labels(exchange=adapter.code, status="open").set(open_count)
     gauge.labels(exchange=adapter.code, status="failed").set(failed_count)
+    gauge.labels(exchange=adapter.code, status="unrecoverable").set(unrecoverable_count)
 
 
 def _should_check(

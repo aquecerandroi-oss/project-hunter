@@ -19,6 +19,7 @@ from sqlalchemy import func, select, text
 from hunter_core.db.models.market_data import Candle, IngestionGap
 from hunter_core.domain.enums import Timeframe
 from hunter_core.logging import get_logger
+from hunter_market_worker.recovery_lifecycle import history_candidates
 
 logger = get_logger(__name__)
 
@@ -148,29 +149,6 @@ async def lock_gap_planning(session: Any, exchange: str) -> None:
     )
 
 
-def reopen_stale_failed(
-    gaps_by_market: dict[Any, list[IngestionGap]], cutoff: datetime, max_reopen: int
-) -> int:
-    """D6: a `failed` gap older than ``cutoff`` gets one more try instead of
-    permanently subtracting its minutes from ``missing``. Bounded per cycle."""
-    reopened = 0
-    for gaps in gaps_by_market.values():
-        for gap in gaps:
-            if reopened >= max_reopen:
-                return reopened
-            if gap.status == "failed" and gap.detected_at <= cutoff:
-                gap.status = "open"
-                gap.attempts = 0
-                reopened += 1
-                logger.info(
-                    "market_gap_reopened",
-                    market_id=gap.market_id,
-                    gap_start=gap.gap_start,
-                    gap_end=gap.gap_end,
-                )
-    return reopened
-
-
 async def pending_gaps(
     session: Any,
     market_ids: list[Any],
@@ -192,17 +170,19 @@ async def pending_gaps(
     window can still *age* into ``history`` here without anyone ever asking
     for it — REST staying down, or the worker itself being stopped, for longer
     than ``BOOTSTRAP_WINDOW_MINUTES``\\ shifts ``live_from`` past a
-    ``gap_end`` that was never touched. ``reopen_stale_failed`` reopens a
-    stale ``failed`` gap without moving its bounds either, so a cooldown does
-    not reset the clock (Astra, T2.9c review — notes-T2.5.md §25 correction,
-    notes-T2.9.md). A caller that needs to say *why* a history-tier chunk was
-    recovered has to say "the window aged past the live threshold", not
-    "someone requested it".
+    ``gap_end`` that was never touched. ``recovery_lifecycle.reopen_stale_failed``
+    reopens a stale ``failed`` gap without moving its bounds either, so a
+    cooldown does not reset the clock (Astra, T2.9c review — notes-T2.5.md §25
+    correction, notes-T2.9.md). A caller that needs to say *why* a
+    history-tier chunk was recovered has to say "the window aged past the
+    live threshold", not "someone requested it".
 
-    Both tiers are ordered by ``gap_end DESC``: the newest missing minute is the
-    one whose absence hurts most (it is the one every rolling window is waiting
-    for), and ordering by ``detected_at`` let fifty day-old bootstrap gaps
-    precede a one-minute hole that had just been detected.
+    The live tier is ordered by ``gap_end DESC``: the newest missing minute is
+    the one whose absence hurts most (it is the one every rolling window is
+    waiting for), and ordering by ``detected_at`` let fifty day-old bootstrap
+    gaps precede a one-minute hole that had just been detected. The history
+    tier is *not* a single global ``gap_end DESC`` any more (T3.7d) — see
+    :func:`history_candidates`.
 
     History is served **only with what the live tier did not spend**, and never
     more than ``history_limit`` — the guarantee is "live collection does not
@@ -223,14 +203,7 @@ async def pending_gaps(
     leftover = min(history_limit, live_limit - len(live))
     if leftover <= 0:
         return list(live), []
-    history = (
-        await session.execute(
-            base.where(IngestionGap.gap_end < live_from)
-            .order_by(IngestionGap.gap_end.desc(), IngestionGap.id)
-            .limit(leftover)
-        )
-    ).all()
-    return list(live), list(history)
+    return list(live), await history_candidates(session, market_ids, live_from, leftover)
 
 
 async def gap_coverage(

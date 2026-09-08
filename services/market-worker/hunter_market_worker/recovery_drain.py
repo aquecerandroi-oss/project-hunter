@@ -26,8 +26,9 @@ from typing import Any, Literal
 from sqlalchemy import select
 
 from hunter_core.db.models.market_data import IngestionGap
+from hunter_core.db.models.system import SystemEvent
 from hunter_core.db.session import role_session
-from hunter_core.domain.enums import Timeframe
+from hunter_core.domain.enums import RiskEventSeverity, Timeframe
 from hunter_core.logging import get_logger
 from hunter_core.observability import candle_gaps_total
 from hunter_exchanges.rate_limit_suspension import is_coordination_outage
@@ -44,6 +45,13 @@ claim about who asked for it -- ``ingestion_gaps`` carries no origin, and a
 gap the live tier itself created can age into history without any
 ``market.backfill.requested`` ever existing
 (``recovery_queries.pending_gaps`` docstring; notes-T2.9.md T2.9c)."""
+
+BEFORE_LISTING_REASON = "before_listing"
+"""T3.7d: the terminal reason for a gap whose whole window is provably before
+the market's first known candle -- the exact shape of the 2026-09-08 incident
+(`.claude/state/notes-T3.7b-diag.md`): `MARSCOINUSDT` was listed mid-request,
+and its four pre-listing windows returned ``200 OK`` with zero candles,
+forever, because the exchange will never have data for them."""
 
 logger = get_logger(__name__)
 MINUTE = timedelta(minutes=1)
@@ -66,6 +74,7 @@ async def recover_registered(
     fetch_error: BaseException | None = None,
     timeout_s: float = FETCH_TIMEOUT_S,
     tier: Tier = "live",
+    earliest_known: datetime | None = None,
 ) -> None:
     """Atomically backfill one gap: candles and the status transition commit
     (or roll back) together via ``begin_nested``.
@@ -83,7 +92,52 @@ async def recover_registered(
     ``market.candles.backfilled`` event instead of one ``market.candles.closed``
     per minute, in the same transaction as the candles and the status
     transition.
+
+    ``earliest_known`` (T3.7d) is ``recovery_lifecycle.earliest``'s answer for
+    this gap's market — the first final candle this worker has ever
+    persisted for it, or ``None`` if it has none yet. A gap entirely older
+    than that is, by construction, asking for candles from before the market
+    existed (or before it entered the monitored universe): the exchange will
+    answer every attempt with zero rows, forever, exactly like
+    `MARSCOINUSDT`'s four pre-listing windows in the incident. That case is
+    classified **before any REST call and before spending an attempt** — it
+    is not a failure, it is known in advance from data this worker already
+    has — and the gap goes straight to ``unrecoverable``
+    (``reason=before_listing``), logged and written to ``system_events`` so
+    the classification is visible, not silent.
     """
+    if earliest_known is not None and gap.gap_end < earliest_known:
+        gap.status = "unrecoverable"
+        message = (
+            f"{symbol}: gap [{gap.gap_start.isoformat()}, {gap.gap_end.isoformat()}] ends "
+            f"before the market's earliest known candle ({earliest_known.isoformat()})"
+        )
+        logger.info(
+            "market_gap_unrecoverable",
+            reason=BEFORE_LISTING_REASON,
+            symbol=symbol,
+            market_id=gap.market_id,
+            gap_start=gap.gap_start,
+            gap_end=gap.gap_end,
+            earliest_known=earliest_known,
+        )
+        session.add(
+            SystemEvent(
+                level=RiskEventSeverity.WARNING,
+                component="market-worker",
+                event="market_gap_unrecoverable",
+                message=message,
+                data={
+                    "reason": BEFORE_LISTING_REASON,
+                    "symbol": symbol,
+                    "market_id": str(gap.market_id),
+                    "gap_start": gap.gap_start.isoformat(),
+                    "gap_end": gap.gap_end.isoformat(),
+                    "earliest_known": earliest_known.isoformat(),
+                },
+            )
+        )
+        return
     gap.attempts += 1
     try:
         if fetch_error is not None:
@@ -159,7 +213,13 @@ async def recover_registered(
             logger.warning("market_gap_deferred_rest_gate", symbol=symbol)
             return
         logger.exception("market_gap_backfill_failed", symbol=symbol, attempt=gap.attempts)
-    if gap.status != "recovered" and gap.attempts >= MAX_ATTEMPTS:
+    # T3.7d: `attempts` is cumulative across every reopen (recovery_lifecycle
+    # .reopen_stale_failed no longer resets it), so a life fails on its own
+    # MAX_ATTEMPTS-th try -- exactly the multiples of MAX_ATTEMPTS (5, 10, 15,
+    # ...) -- never merely "attempts has grown past 5 again", which would
+    # fail a reopened gap after a single retry instead of giving it a full
+    # new life.
+    if gap.status != "recovered" and gap.attempts % MAX_ATTEMPTS == 0:
         gap.status = "failed"
         # D6/Astra: detected_at is the only durable clock the cooldown has.
         # Refresh it on every re-failure, not just the original detection --
@@ -178,10 +238,17 @@ async def recover_one(
     *,
     timeout_s: float = FETCH_TIMEOUT_S,
     tier: Tier = "live",
+    earliest_known: datetime | None = None,
 ) -> None:
     """M3: fetch over REST with no transaction open, then re-check the gap
     ``FOR UPDATE`` and write in one short transaction. ``tier`` passes
-    through to :func:`recover_registered` unchanged."""
+    through to :func:`recover_registered` unchanged.
+
+    ``earliest_known`` (T3.7d) short-circuits **before** the REST call: a gap
+    provably before the market's first known candle never earns a fetch at
+    all, spending zero REST weight on a request the exchange can only ever
+    answer with zero rows.
+    """
     async with role_session(session_factory, db_role="hunter_worker") as session:
         gap = await session.scalar(
             select(IngestionGap).where(IngestionGap.id == gap_id, IngestionGap.status == "open")
@@ -189,6 +256,20 @@ async def recover_one(
         if gap is None:
             return
         gap_start, gap_end = gap.gap_start, gap.gap_end
+
+    if earliest_known is not None and gap_end < earliest_known:
+        async with role_session(session_factory, db_role="hunter_worker") as session:
+            gap = await session.scalar(
+                select(IngestionGap)
+                .where(IngestionGap.id == gap_id, IngestionGap.status == "open")
+                .with_for_update()
+            )
+            if gap is None:
+                return
+            await recover_registered(
+                session, adapter, gap, symbol, now, earliest_known=earliest_known
+            )
+        return
 
     fetch_error: BaseException | None = None
     candles: list[Any] = []

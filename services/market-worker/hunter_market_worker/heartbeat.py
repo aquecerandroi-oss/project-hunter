@@ -71,6 +71,9 @@ class HeartbeatState:
     last_event_at: datetime | None = None
     reconnects: int = 0
     open_gaps: int = 0
+    unrecoverable_gaps: int = 0
+    """T3.7d: terminal gaps (before listing, or reopen-exhausted) — apart from
+    :attr:`open_gaps` so a stuck backlog and a closed door never look equal."""
     last_error: str | None = None
     dropped_events: int = 0
     """Cumulative events discarded by the adapter's bounded queue (HIGH-1b),
@@ -116,6 +119,7 @@ async def _write_hash(
         "reconnects": str(state.reconnects),
         "markets_monitored": str(len(universe.symbols)),
         "open_gaps": str(state.open_gaps),
+        "unrecoverable_gaps": str(state.unrecoverable_gaps),
         "dropped_events": str(state.dropped_events),
         # T2.9: "suspended" while the shared rate-limit coordination is
         # unreachable and this process therefore admits no REST call. A

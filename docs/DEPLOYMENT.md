@@ -356,6 +356,8 @@ marcada **obrigatória** abaixo — as demais têm default de dev seguro.
 | `CORS_ALLOWED_ORIGINS` | não | cai para `WEB_ORIGIN` | allowlist exata do middleware CORS, uma ou mais origens separadas por vírgula |
 | `RATE_LIMIT_PER_MINUTE` | não | `120` | limite por endereço, antes do roteamento — cobre a superfície não autenticada |
 | `RATE_LIMIT_PER_MINUTE_PRINCIPAL` | não | `600` | limite por principal autenticado, checado após verificar o token |
+| `RATE_LIMIT_PER_MINUTE_INTERNAL` | não | `6000` | limite por endereço para um peer listado em `INTERNAL_PEER_IPS` (T3.28a) — ver nota abaixo |
+| `INTERNAL_PEER_IPS` | não | vazio | endereços TCP separados por vírgula que recebem `RATE_LIMIT_PER_MINUTE_INTERNAL` em vez de `RATE_LIMIT_PER_MINUTE`; setado direto no compose (IP fixo do `web`), nunca no `.env` — ver nota abaixo |
 | `ENABLE_OPENAPI_DOCS` | não | `false` | em `HUNTER_ENV=production`, reabre `/docs`, `/redoc`, `/openapi.json` se `true`; em dev/staging ficam sempre abertos |
 | `READY_CHECK_TIMEOUT_S` | não | `3.0` | timeout por dependência (Postgres/Redis) em `/ready` |
 | `FORWARDED_ALLOW_IPS` | não | `127.0.0.1` | em produção, apontar para o ingress da plataforma — só esse IP tem `X-Forwarded-For` confiado pelo uvicorn |
@@ -614,6 +616,36 @@ SELECT m.symbol, g.status, count(*) AS pedacos,
  GROUP BY 1, 2 ORDER BY 1, 2;
 ```
 
+**Lendo `unrecoverable_gaps` (T3.7d).** Um pedido em lote sobre um mercado
+listado há pouco (ou o próprio `--markets` sem checar data de listagem, o que
+aconteceu na VPS em 2026-09-08 com `MARSCOINUSDT` — `.claude/state/notes-T3.7b-diag.md`)
+nomeia janelas que a exchange nunca vai ter: `status = 'unrecoverable'` é o
+destino delas, não `'open'`/`'failed'`, e **nunca** volta a ser reaberto —
+`open_gaps` (no heartbeat `hb:market:{exchange}` e em `/api/v1/system/market-status`)
+não inclui essas linhas, então um `open_gaps` que não zera sozinho depois de um
+lote grande é sinal real de trabalho pendente, não de listagens novas
+misturadas no meio. `hb:market:{exchange}` (ou `:{i}of{N}` sob sharding) ganha
+o campo irmão `unrecoverable_gaps`; um valor crescendo é esperado logo após um
+`request_backfill.py --days N` que incluiu um mercado listado recentemente, e
+estável depois disso — se ele continuar subindo, o candidato é a raiz nova de
+`reason=exhausted` (uma janela que não é antes da listagem mas falha sempre por
+outro motivo), não `before_listing`. Motivo e contagem, por mercado:
+
+```sql
+SELECT m.symbol, count(*) AS lacunas,
+       min(g.gap_start) AS mais_antigo, max(g.gap_end) AS mais_novo
+  FROM ingestion_gaps g JOIN markets m ON m.id = g.market_id
+ WHERE g.status = 'unrecoverable'
+ GROUP BY 1 ORDER BY 2 DESC;
+
+-- o motivo em si não é uma coluna de ingestion_gaps (não há migração nesta
+-- tarefa) -- fica em system_events, uma linha por classificação:
+SELECT created_at, data->>'reason' AS motivo, data->>'market_id', message
+  FROM system_events
+ WHERE event = 'market_gap_unrecoverable'
+ ORDER BY created_at DESC LIMIT 50;
+```
+
 ### Histórico de funding para o replay (`request_backfill.py --kind funding`, T3.7c)
 
 O motor de replay (`docs/PIPELINE.md` §6c) não precifica a perna de funding de
@@ -772,6 +804,32 @@ o `X-Forwarded-For` e todo request vira "o mesmo cliente" para o rate limit
 por endereço — um visitante abusivo derrubaria o limite de todos. Por isso a
 rede do compose tem sub-rede fixa (`172.28.0.0/24`) e o Caddy tem
 `ipv4_address: 172.28.0.10`; os dois valores andam juntos.
+
+**`INTERNAL_PEER_IPS` com IP fixo do `web` (T3.28a).** O `web` fala com a
+`api` direto pela rede do compose (`API_URL=http://api:8000`), nunca pelo
+Caddy — então toda chamada SSR do Next.js (Server Components) chega na `api`
+com o mesmo peer TCP, o do container `web`, não o do navegador. Esse peer
+**não** entra em `FORWARDED_ALLOW_IPS` (o `web` hoje não repassa o endereço
+real do navegador nessa chamada — faria isso lendo `headers()` dentro do
+Server Component e mandando um cabeçalho que a api só confiasse vindo desse
+peer, mudança que fica em `apps/web`, fora do escopo desta tarefa) — sem
+`INTERNAL_PEER_IPS`, esse único endereço do `web` compartilha
+`RATE_LIMIT_PER_MINUTE` (120/min) entre o SSR do site inteiro, e é
+exatamente isso que a auditoria de design de 2026-09-08 mediu: 7 telas
+navegadas duas vezes em ~25 s bastaram para 24 respostas 429 em
+`/api/v1/me` e cinco telas caindo no "Application error" do Next
+(`.claude/state/notes-T3.28a.md`). A correção não pede um cabeçalho novo
+para confiar: `INTERNAL_PEER_IPS` é uma lista de peers que o próprio
+deployment já sabe que são internos (o IP fixo do `web` no compose, igual ao
+pin do Caddy) e que por isso recebem `RATE_LIMIT_PER_MINUTE_INTERNAL`
+(6000/min por padrão) em vez do limite estreito — o limite por principal
+(`RATE_LIMIT_PER_MINUTE_PRINCIPAL`, depois da autenticação) continua
+aplicando por trás dele, sem mudança. `infra/docker/docker-compose.yml`
+fixa o `web` em `172.29.0.10` (rede própria, sem Caddy); o overlay de
+produção (`infra/vps/docker-compose.prod.yml`) fixa o `web` em
+`172.28.0.11`, ao lado do `172.28.0.10` do Caddy, na mesma sub-rede — os
+dois valores (a `api` e o `web`) andam juntos, como o par
+`FORWARDED_ALLOW_IPS`/Caddy acima.
 
 **Incidente 2026-09-07 e correção (`ip_range`).** Um IP fixo baixo (`.10`) na
 mesma sub-rede que o alocador dinâmico do Docker usa está sujeito a colisão:

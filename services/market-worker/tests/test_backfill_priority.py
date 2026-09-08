@@ -17,6 +17,7 @@ T2.5-backfill design review, must-fix 3).
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import timedelta
 from typing import Any
 
@@ -28,7 +29,7 @@ from hunter_core.db.session import role_session
 from hunter_core.domain.enums import Timeframe
 from hunter_core.domain.market import align_open_time
 from hunter_core.domain.types import utcnow
-from hunter_market_worker import recovery
+from hunter_market_worker import backfill_priority, recovery
 from hunter_market_worker import recovery_queries as queries
 from hunter_market_worker.heartbeat import HeartbeatState
 
@@ -264,3 +265,98 @@ async def test_a_unit_that_outlives_the_budget_does_not_spend_an_attempt(
         )
         attempts, status = row.one()
     assert (attempts, status) == (0, "open")
+
+
+# ---- T3.7d item 2: the history tier's fair share -- one market cannot take
+# every slot, even when its own backlog's gap_end is always the newest
+# (`.claude/state/notes-T3.7b-diag.md`) ---------------------------------------
+
+
+def test_interleave_splits_evenly_between_two_equally_sized_queues() -> None:
+    grouped = {"a": [("a1", "a"), ("a2", "a"), ("a3", "a")], "b": [("b1", "b"), ("b2", "b")]}
+
+    picked = backfill_priority.interleave(grouped, limit=4)
+
+    assert picked == [("a1", "a"), ("b1", "b"), ("a2", "a"), ("b2", "b")]
+
+
+def test_interleave_gives_leftover_slots_to_whichever_queue_still_has_rows() -> None:
+    """A market that runs out mid-way never wastes the budget -- the incident
+    in reverse: a *smaller* backlog must not be shortchanged, but a *larger*
+    one is still allowed the slots nobody else needs."""
+    grouped = {
+        "small": [("s1", "small"), ("s2", "small")],
+        "big": [(f"b{i}", "big") for i in range(20)],
+    }
+
+    picked = backfill_priority.interleave(grouped, limit=6)
+
+    counts = Counter(market_id for _, market_id in picked)
+    assert len(picked) == 6
+    assert counts["small"] == 2  # both of its rows, never starved
+    assert counts["big"] == 4  # the rest of the budget, never all six
+
+
+def test_interleave_never_exceeds_the_limit_or_invents_rows() -> None:
+    grouped = {"a": [("a1", "a")], "b": [("b1", "b")]}
+    assert backfill_priority.interleave(grouped, limit=0) == []
+    assert backfill_priority.interleave({}, limit=10) == []
+    assert len(backfill_priority.interleave(grouped, limit=10)) == 2
+
+
+async def test_two_markets_with_equally_large_backlogs_both_get_a_fair_share(
+    db_session_factory: Any,
+) -> None:
+    """The mandatory fairness case: two markets, twelve history gaps each, six
+    slots -> three each, never six-and-zero. Before T3.7d a single global
+    ``ORDER BY gap_end DESC`` let whichever market's oldest hole happened to
+    carry the newest ``gap_end`` win every slot -- exactly how `MARSCOINUSDT`
+    monopolized BTC/UNI's shard in the incident."""
+    exchange_code = unique_code()
+    market_a = await seed_market(db_session_factory, exchange_code, "AAAUSDT")
+    market_b = await seed_market(db_session_factory, exchange_code, "BBBUSDT")
+    now = align_open_time(utcnow(), Timeframe.M1)
+    live_from = now - MINUTE * recovery.BOOTSTRAP_WINDOW_MINUTES
+    for n in range(12):
+        start = live_from - MINUTE * (100 + 10 * n)
+        await add_gap(db_session_factory, market_a, start, start + 2 * MINUTE)
+        await add_gap(db_session_factory, market_b, start, start + 2 * MINUTE)
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        live, history = await queries.pending_gaps(
+            session,
+            [market_a, market_b],
+            live_from=live_from,
+            live_limit=6,
+            history_limit=6,
+        )
+
+    assert live == []
+    assert len(history) == 6
+    counts = Counter(market_id for _, market_id in history)
+    assert counts[market_a] == 3
+    assert counts[market_b] == 3
+
+
+async def test_a_market_with_a_small_backlog_is_never_starved_by_a_bigger_one(
+    db_session_factory: Any,
+) -> None:
+    exchange_code = unique_code()
+    big = await seed_market(db_session_factory, exchange_code, "BIGUSDT")
+    small = await seed_market(db_session_factory, exchange_code, "SMLUSDT")
+    now = align_open_time(utcnow(), Timeframe.M1)
+    live_from = now - MINUTE * recovery.BOOTSTRAP_WINDOW_MINUTES
+    for n in range(20):
+        start = live_from - MINUTE * (100 + 10 * n)
+        await add_gap(db_session_factory, big, start, start + 2 * MINUTE)
+    for n in range(2):
+        start = live_from - MINUTE * (50 + 10 * n)
+        await add_gap(db_session_factory, small, start, start + 2 * MINUTE)
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        history = await queries.history_candidates(session, [big, small], live_from, 6)
+
+    counts = Counter(market_id for _, market_id in history)
+    assert len(history) == 6
+    assert counts[small] == 2  # its whole backlog, never starved by "big"
+    assert counts[big] == 4
