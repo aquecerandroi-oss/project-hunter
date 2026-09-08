@@ -20,44 +20,12 @@ nesta revisão** — são leitura de código com arquivo:linha e cenário de fal
 operacional, ele vem de leitura já registrada, não de consulta nova. Estado de todos: **aberto
 2026-09-08 (Astra)**.
 
-### Caminho de replicação (dono: **T3.18c**, brief a escrever pelo orquestrador)
+### Caminho de replicação (dono: **T3.18c**) — **os quatro fechados em `c8c9dc6`**
 
-- **HIGH — a CLI de replicação pode tornar o pai "promissor" com evidência de replay.** A consulta do
-  worker filtra versão e resultado terminal **sem filtro de coorte**, e `replicate()` usa esse
-  relatório para autorizar a rodada e gravar `promising_at`.
-  `services/strategy-worker/hunter_strategy_worker/replication_stats.py:69`,
-  `services/strategy-worker/hunter_strategy_worker/replication.py:257` e `:296`.
-  **Cenário:** prospectivo pequeno ou negativo + replay positivo com 100 resultados em 30 dias → a
-  CLI aceita sem `--force-research` e **congela um marco que a D14/D15 mandam nascer só do
-  prospectivo**. A correção feita na API **não** fecha este segundo escritor.
-  Estado: **aberto 2026-09-08 (Astra)**.
-
-- **HIGH — "avaliável" tem duas definições no mesmo produto.** O placar exige saída até `as_of` **e**
-  horizonte completo transcorrido (`apps/api/hunter_api/services/lab_summary_metrics.py:68`); a
-  replicação exige só emissão até `as_of`, terminal e `R` não nulo
-  (`apps/api/hunter_api/repositories/lab_replication.py:104`).
-  **Cenários:** (a) leitura histórica inclui resultado encerrado **depois** do corte; (b) no corte
-  atual, saídas rápidas entram antes das operações com horizonte ainda aberto — população enviesada
-  para quem fecha cedo. Estado: **aberto 2026-09-08 (Astra)**.
-
-- **MEDIUM — maturidade e Profit Factor divergem entre os dois vereditos.** O placar conta dias de
-  **saída**, a replicação conta dias de **decisão**; e uma população madura, positiva e **sem
-  perdas** sai `validada` no placar e `reprovada` na replicação.
-  `apps/api/hunter_api/services/lab_scoreboard.py:80`,
-  `apps/api/hunter_api/services/lab_scoreboard_metrics.py:79`,
-  `packages/indicators/hunter_indicators/replication/stats.py:80` e `:154`.
-  **Cenário:** dois vereditos para a mesma versão **sem nenhuma mudança de evidência** — o contrato
-  precisa ser unificado, casos-limite inclusive. Estado: **aberto 2026-09-08 (Astra)**.
-
-- **HIGH — a mesma evidência pode amadurecer uma irmã duas vezes.** `sibling_population()` concatena
-  a população viva com **todos** os replays da irmã, sem deduplicar decisões sobrepostas e sem a
-  comparação com replay do pai na mesma janela que a D15(c) exige.
-  `apps/api/hunter_api/repositories/lab_replication.py:162`,
-  `packages/indicators/hunter_indicators/replication/protocol.py:138`,
-  `.claude/state/decisions-delegated-2026-09-08.md:12`.
-  **Cenário:** 25 resultados em 15 dias, replayados sob dois UUIDs, viram 50 resultados e atingem a
-  meia-régua **sem informação nova**; sete irmãs assim aprovam o bloco 2. O rótulo `mixed`/`replay`
-  informa a origem e **não** corrige a contagem. Estado: **aberto 2026-09-08 (Astra)**.
+Os quatro achados desta seção (CLI que torna o pai promissor com replay, duas definições de
+"avaliável", maturidade/PF divergentes entre placar e replicação, irmã amadurecendo duas vezes com a
+mesma evidência) foram corrigidos pela **T3.18c** e movidos para [[Resolved Bugs]]. Ficou **dívida**
+declarada, aberta abaixo: o contrato é um só, mas continua com **duas implementações**.
 
 ### Autonomia paper — as cinco etapas sem prova (dono: **T3.29**, `.claude/state/brief-T3.29-autonomy-acceptance-run.md`)
 
@@ -66,41 +34,24 @@ autônomo nunca rodou de ponta a ponta ([[Diario/2026-09-08]]). A linha `momentu
 desde **02:57 de Brasília**; a ativação **não** é pendência. Os sete itens com o estado de cada um
 estão em [[Execution Engine]], [[Paper Trading]] e [[Risk Engine]].
 
-- **HIGH (admissão) — ativar a versão não basta: falta provar o vínculo em `agents`.** Sem vínculo
-  habilitado para a **versão e a carteira corretas** o sinal nem pertence àquela fila; com agente
-  pausado, `agent_unavailable`.
+- **HIGH (admissão) — ativar a versão não basta: falta o vínculo em `agents`, e agora está medido.**
+  Sem vínculo habilitado para a **versão e a carteira corretas** o sinal nem pertence àquela fila;
+  com agente pausado, `agent_unavailable`.
   `services/execution-worker/hunter_execution_worker/bridge_repo.py:130`,
   `services/execution-worker/hunter_execution_worker/bridge_screen.py:215`.
-  Estado: **aberto 2026-09-08 (Astra)** — a medir em T3.29 item 1.
+  **Medido na VPS em 2026-09-08 entre 14:03Z e 14:12Z (T3.29): a tabela `agents` tem 0 linhas** — é a
+  causa raiz de "154 sinais paper, 0 propostas". O funil de 24 h fecha assim: 171 sinais → 121 com
+  par spot → 22 acima do piso D1 → **0** com β válido. Estado: **aberto — deixa de ser "a medir" e
+  passa a ser pendência do operador**, com o comando auditado em `docs/ACTIVATION.md` §8a, que
+  **não** foi rodado. Ver [[Diario/2026-09-08]].
 
-- **HIGH (ordem) — `avgPrice` continua ausente e adia execução.** O leitor devolve `None`, e mercados
-  cujos filtros MARKET exigem preço médio **adiam**, podendo deixar a reserva expirar; β válido não
-  resolve. `services/execution-worker/hunter_execution_worker/market_data.py:149`,
-  `services/execution-worker/hunter_execution_worker/entry_inputs.py:62`.
-  **Cenário:** com a autonomia ligada, o sinal é aprovado e a ordem nunca sai — a carteira parece
-  "sem oportunidade" quando na verdade falta um campo de mercado. Estado: **aberto 2026-09-08
-  (Astra)** — a medir e corrigir em T3.29 item 2.
-
-- **HIGH (proteção) — `pending_degraded` não é proteção executada.** Sem fita/livro utilizável a
-  intenção fica degradada **com a posição exposta**; falta a prova de recuperação após queda/restart,
-  com quantidade remanescente correta e **sem venda duplicada**.
-  `services/execution-worker/hunter_execution_worker/protection.py:183` e `:296`.
-  Estado: **aberto 2026-09-08 (Astra)** — teste de integração em T3.29 item 3.
-
-- **HIGH (MTM) — o check `mtm_fresh` mede a escrita, não a atualidade do preço.** Marca indisponível
-  cai no último valor durável, o ciclo segue escrevendo snapshot e renovando `mtm_written_at`.
-  `services/execution-worker/hunter_execution_worker/bridge_inputs.py:180`,
-  `services/execution-worker/hunter_execution_worker/cycles.py:275`,
-  `services/execution-worker/hunter_execution_worker/health.py:95`.
-  **Cenário:** fita parada, patrimônio aparentemente estável e check de MTM **verde** — o painel diz
-  saúde onde há cegueira. Estado: **aberto 2026-09-08 (Astra)** — `mark_quality` no aceite, T3.29
-  item 4.
-
-- **MEDIUM (integração) — queda de WS com lacuna e perda de Redis durante a decisão não foram
-  cobertas.** A própria prova V6 declara isso;
-  `tests/integration/paper/test_v6_stale_data_reconnect_restart.py:1`. Precisam ser exercitadas
-  agora, com SPOT integrado, incluindo retomada das proteções e reconciliação do ledger.
-  Estado: **aberto 2026-09-08 (Astra)** — T3.29 item 5.
+- **MEDIUM (risco, VPS) — `portfolios.risk_profile_id` é NULL e não existe
+  `risk_profiles.preset='paper_v1'` na VPS.** Medido em 2026-09-08 (T3.29). Os limites em vigor
+  continuam **corretos** porque `admit(..., limits=PAPER_V1)` usa o objeto do motor, não a linha do
+  banco — mas o banco não sabe declarar sob que perfil a carteira opera. **Cenário:** um segundo
+  perfil (ou uma auditoria do que estava valendo numa data) não tem de onde ser lido, e o produto
+  passa a depender de uma constante em código para explicar uma decisão de risco já tomada.
+  Estado: **aberto 2026-09-08 (T3.29, medido)**.
 
 - **HIGH (segurança, pré-requisito da autonomia) — o compose entrega `DATABASE_URL_MIGRATIONS` aos
   serviços de runtime pelo bloco compartilhado.** `infra/vps/docker-compose.prod.yml:30` e `:59`.
@@ -127,6 +78,11 @@ como bug aberto.
   A Astra não achou bypass direto por XFF de peer externo no caminho implementado (`apps/web/lib/server/api.ts:7`,
   `infra/vps/docker-compose.prod.yml:66`, `apps/api/hunter_api/auth/rbac.py:116`) — o desenho da
   T3.28a está de pé; o que falta é este cenário. Estado: **aberto 2026-09-08 (Astra)**.
+  **Acréscimo de 2026-09-08 (noite):** a T3.28b (`42ec146`) tirou o **pior sintoma** — um 429 no
+  `/me` não derruba mais a tela, o shell degrada com banner e *retry* com backoff — e a T3.28c
+  (`036b7d9`) fez as Server Actions verificarem a sessão **antes** de chamar a API, o que reduz a
+  superfície. **A causa continua aberta:** uma conta autenticada em laço ainda gasta o balde
+  compartilhado do `web` e as outras contas recebem 429. Não fechar.
 
 - **LOW (texto do brief, já contornado) — `FORWARDED_ALLOW_IPS` não resolve nome por DNS.** O Uvicorn
   instalado transforma valores não reconhecidos como IP em literais, então `web` como **nome** nunca
@@ -134,32 +90,71 @@ como bug aberto.
   implementação da T3.28a escolheu IP fixo, então não há defeito em produção — fica registrado para
   que ninguém "simplifique" de volta para o nome. Estado: **aberto 2026-09-08 (Astra)**.
 
-### Correção de texto (dono: **orquestrador**, `docs/` fora do escopo da T3.30)
+### Correção de texto (dono: **orquestrador**) — **fechada em `c8c9dc6`**
 
-- **LOW (documento normativo) — a linguagem estatística de `docs/plans/REPLICATION.md` está errada em
-  dois pontos.** §46 diz que "metade da amostra dobra, grosso modo, a largura do intervalo de cada
-  bloco": sob aproximação i.i.d., reduzir a amostra à metade aumenta o erro-padrão por **√2
-  (~1,41×)**, não por ~2×. §78 chama os quatro blocos de "quatro repetições **independentes**": eles
-  **reutilizam dados**, então a conjunção protege menos do que a palavra sugere.
-  **Cenário:** o protocolo é lido como se desse uma garantia estatística que ele não dá, e um
-  veredito `real` ganha mais peso do que merece. Correção só de texto, sem mudar regra.
-  Estado: **aberto 2026-09-08 (Astra)**.
+A linguagem estatística de `docs/plans/REPLICATION.md` §46/§78 (√2 em vez de ~2×; "quatro repetições
+independentes" que reutilizam dados) foi corrigida pela T3.18c. Movida para [[Resolved Bugs]].
 
 ## Aberto na tarde de 2026-09-08 (revisão do commit `50932ec`, fora da revisão da Astra)
 
-- **CRITICAL (perda de dado histórico, já revertido em produção) — `earliest_known` fica obsoleto
-  dentro do ciclo e retira janelas legítimas como `before_listing`.** `recovery.py:147` lê
-  `market_earliest` **uma vez por ciclo**; o laço de histórico (`recovery.py:243-271`) e as
-  verificações em `recovery_drain.py:109` e `:260` comparam `gap.gap_end < earliest_known` contra
-  esse valor velho para **todos** os pedaços do mesmo mercado no mesmo ciclo. Quando o intercalador
-  dá mais de um turno ao mesmo mercado, o pedaço 1 é recuperado e empurra o mínimo real para trás; o
-  pedaço 2 é comparado com o mínimo **velho**, classificado `unrecoverable/before_listing` e, **por
-  desenho, nunca mais reaberto**. **Medido na VPS às 14:00Z de 2026-09-08: BTCUSDT com 5 e UNIUSDT
-  com 5 janelas `unrecoverable`** — dois mercados listados há anos; são janelas de agosto perdidas.
-  **Mitigação já aplicada:** os `market-worker` da VPS voltaram à imagem `385dac6` às ~14:10Z. Dono:
-  `exchange-integration-specialist` (**T3.7e**, `.claude/state/brief-T3.7e-earliest-stale-within-cycle.md`),
-  que inclui o SQL idempotente para reabrir as linhas falsamente terminais. Estado: **aberto
-  2026-09-08 (code-reviewer, confirmado em produção)**.
+- **CRITICAL — `earliest_known` obsoleto dentro do ciclo: código corrigido em `1ca7cf5`, o dado ainda
+  não.** O defeito (o mínimo conhecido lido uma vez por ciclo transformava janelas legítimas em
+  `unrecoverable/before_listing`, sem reabertura possível) está fechado no código pela **T3.7e+T3.7f**
+  — `before_listing` agora exige resposta vazia real da exchange **E** `gap_end` abaixo do mínimo
+  conhecido **E** nenhum pedaço do mesmo mercado ter persistido vela mais antiga naquele ciclo — e os
+  `market-worker` voltaram à imagem nova. **O que continua aberto é a reparação do dado:** as
+  **5 janelas de BTCUSDT e 5 de UNIUSDT** marcadas falsamente terminais em 2026-09-08 continuam
+  fechadas no banco da VPS. O SQL idempotente e restrito ao incidente
+  (`infra/scripts/sql/2026-09-08-reopen-false-unrecoverable.sql`) **não foi executado**. Estado:
+  **aberto — pendência do operador**, depois do deploy do `1ca7cf5`. Ver [[Diario/2026-09-08]].
+
+## Abertos no plantão da noite de 2026-09-08 (T3.32b)
+
+- **MEDIUM (dívida de contrato) — o veredito do placar tem um contrato só e duas implementações.**
+  A T3.18c (`c8c9dc6`) unificou a *regra* — imaturo → `inconclusivo`; maduro com
+  `expectancy_r > 0` **e** profit factor passando → `validada`; o resto → `reprovada`, com PF nulo
+  por `sem_perdas` contando como "passa" —, mas ela continua escrita em dois lugares:
+  `apps/api/hunter_api/services/lab_scoreboard_metrics.py:51` (`compute_verdict`) e
+  `packages/indicators/hunter_indicators/replication/stats.py:240` (`profit_factor_passes`) e `:251`
+  (`scoreboard_verdict`). O docstring do segundo diz textualmente que é "**a mesma regra**, aqui como
+  função pura" — o que documenta a duplicação, não a resolve.
+  **Cenário concreto:** o Everton pede para o PF passar a exigir `> 1,1`. Quem mexer no placar e não
+  no pacote (ou vice-versa) reintroduz exatamente o MEDIUM que a Astra achou e a T3.18c fechou —
+  **a mesma população `validada` de um lado e `reprovada` do outro, sem nenhuma mudança de
+  evidência**. E a divergência só aparece quando alguma versão amadurecer, que é o pior momento
+  possível para descobri-la. **Correção:** uma implementação só (a do pacote, que é pura e testável
+  sem banco) e o serviço da API chamando-a. Estado: **aberto 2026-09-08 (Sexta-feira, leitura de
+  código)** — dívida, não regressão: hoje as duas concordam.
+
+- **MEDIUM (produto, VPS, tela) — a topbar mostra "sem tempo real": o socket do navegador para o
+  gateway não abre.** `apps/web/components/system/live-status.tsx:154` define
+  `liveFeedDown = socketStatus !== "open"` (`useMarketChannels`, canal `rt:system`) e a topbar
+  (`apps/web/components/layout/topbar.tsx:121`) renderiza a variante compacta com esse flag.
+  **Observado no navegador contra a VPS em 2026-09-08 pela Sexta-feira; não reproduzido por medição
+  nesta tarefa** — não há SQL, log de Caddy nem contagem de assinaturas anexados aqui, e isso está
+  dito de propósito. **Cenário:** os pontos e o `ws_state` continuam mostrando o **último estado
+  conhecido pelo servidor**, então a tela parece viva enquanto o navegador está desconectado; só a
+  idade "há Ns", que continua correndo, e o texto "sem tempo real" denunciam. **Próximo passo (o que
+  fecha ou reclassifica este item):** confirmar no navegador se o `status` do socket é `connecting`,
+  `closed` ou `error`; se a assinatura de `rt:system` atravessa o Caddy da VPS; e se o token de auth
+  do socket está sendo obtido. Estado: **aberto 2026-09-08 (Sexta-feira, observação de tela)**.
+
+- **MEDIUM (produto, VPS, tela) — o painel "Execução paper" do System aparece inteiro como
+  "indisponível", e a tela não distingue "sem worker" de "worker sem dado".**
+  `apps/web/components/system/execution-paper-card.tsx` recebe `worker: WorkerHeartbeat | null` e
+  imprime `indisponível` em cada linha quando o valor é nulo — o que é a regra certa (nunca fabricar
+  um `0`). O problema é a montagem a montante:
+  `apps/api/hunter_api/services/system_status.py:193` devolve **`None` para a linha inteira** quando
+  o `ts` do heartbeat falta ou não parseia, e o próprio hash `hb:execution:paper` tem `EXPIRE`
+  (`services/execution-worker/hunter_execution_worker/heartbeat.py:40`). **Cenário:** o
+  `execution-worker` parado, reiniciando num deploy, ou com a chave expirada produz **exatamente a
+  mesma tela** que um worker vivo que não conseguiu montar os campos — e a diferença entre as duas
+  é a diferença entre "não tem o que mostrar" e "a carteira está desprotegida agora".
+  **Observado no navegador contra a VPS em 2026-09-08 pela Sexta-feira; não reproduzido por leitura
+  do Redis nesta tarefa.** **Próximo passo:** ler `hb:execution:paper` na VPS (existe? qual a idade
+  do `ts`?) e, independentemente do resultado, dar ao card um estado explícito de "nenhum heartbeat"
+  distinto de "heartbeat sem estes campos". Estado: **aberto 2026-09-08 (Sexta-feira, observação de
+  tela)**.
 
 ## Abertos na T3.21 (higiene da base)
 

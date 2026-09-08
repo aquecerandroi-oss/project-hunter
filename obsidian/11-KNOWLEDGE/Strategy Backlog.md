@@ -823,3 +823,80 @@ dado necessário (e se temos), o que a refutaria ou quando ela erra, e quem deci
 - **Nenhum número de Kelly, de *optimal f* ou de limite diário de *prop firm*.** As três buscas
   devolveram, respectivamente, tabelas ilegíveis, material de fornecedor e material comercial; o que
   entrou nas notas foi a **forma** do argumento, sempre declarada como tal.
+
+---
+
+## Acréscimo de 2026-09-08 (noite, T3.32b) — as duas primeiras linhas da fila fecharam, e por medição
+
+Nada acima foi editado; esta seção é datada e acrescentada, como manda a página. O que mudou é que
+as **duas candidatas do topo da fila** deixaram de ser candidatas — uma porque foi **respondida**, a
+outra porque foi **reenunciada**.
+
+### Item 1 — "valor incremental da invalidação": **fechado, refutada como causa**
+
+O [[EXP-0007-momentum-invalidacao-bracos-INV]] rodou os braços `INV-B/C/E` sobre as **mesmas**
+entradas congeladas, em quatro populações. Δ entre **−0,070 R e +0,032 R**; nenhum passa o efeito
+mínimo declarado de 0,05 R; nenhum é rejeitado por Holm; e o **sinal muda** entre populações.
+
+A [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]] acertou a **descrição** (a invalidação
+encerra 26 % a 43 % dos acompanhamentos, com praticamente nenhum ganhador) e errou ao sugerir que
+soltá-los salvaria dinheiro: **soltos, eles perdem igual**. A invalidação adianta a perda, não a
+cria.
+
+**Consequência:** o brief `T3.27` (versão de código `momentum_v2` com `invalidation_mode`) **não se
+justifica** e não deve ser escrito por este motivo. Status do item 1: **fechado — refutada como
+causa da perda.**
+
+### Item 2 — "piso de custo": **redirecionado para "teto de pedágio declarado"**
+
+A [[KB-0076-por-que-perdemos-2026-09-08]] fechou por aritmética o que era argumento:
+`custo_R = 0,0020 / (risco/preço)`, verificado linha a linha (produto 0,001998–0,002001 em dez
+populações). O nome certo da candidata não é "piso de ATR%" — é **teto de pedágio**: recusar decidir
+quando `0,0020 / (risco/preço) > c`, com `c` declarado antes (`c = 0,10 R` ⇒ risco ≥ 2 % do preço).
+
+E vem com o limite escrito **antes** do teste: **cortar custo não cria vantagem, só deixa de
+destruí-la**. No contrafactual dentro da amostra o piso zera uma população de `momentum` e **piora**
+outra; em `volume_anomaly` o bruto desaba junto com o custo. Status do item 2: **em medição**
+(`momentum v4`, [[EXP-0006-momentum-piso-de-custo]]), com o nome corrigido.
+
+### As duas próximas — variantes de **parâmetro**, sem código novo
+
+Derivadas por `infra/scripts/derive_variant.py` a partir de `momentum v2` (mesmo `code_ref`, um valor
+diferente), ambas `research_only`, ambas exigindo **janela futura reservada de 30 dias**:
+
+| # | de | mudança | por quê | o que a mede |
+|---|---|---|---|---|
+| **V1** | `momentum v2` | `atr_pct_min: 0,003 → 0,020` | teto de pedágio em 0,10 R; a `v4` (0,0089) já está medindo 0,22 R | 30 dias prospectivos reservados |
+| **V2** | `momentum v2` | `target_atr: 1,5 → 3,0` (mantém `stop_atr = 1,5`) | é o braço `TGT-3`, o maior Δ positivo pareado (+0,104 R em P1) e o mais barato de testar prospectivamente | 30 dias, **nunca** avaliada na janela 2026-08-08 → 09-08 |
+| — | `volume_anomaly` | **nada derivável** | não existe parâmetro de piso de risco: o stop é a mínima da barra do pico. Exigiria **versão de código nova**, com brief próprio | — |
+
+### As quatro novas — **especificadas**, protocolo congelado, nenhuma linha de código
+
+Vindas da T3.33, todas `research_only`, todas long-only, nenhuma repetindo a invalidação do
+`momentum`. Estão em [[Registro de Tentativas]] como T-035 a T-038 e cada uma tem o seu `EXP`:
+
+| Família | Página | Eixo | Geometria | Estado |
+|---|---|---|---|---|
+| `breakout` | [[EXP-0008-breakout-compressao-de-volatilidade]] | regime de volatilidade | 1,25 / 2,5 ATR | especificada (brief T3.33a) |
+| `mean_reversion` | [[EXP-0009-mean-reversion-pullback-em-tendencia]] | reversão à média | 1,0 / 1,5 ATR | especificada (brief T3.33b) |
+| `session_orb` | [[EXP-0010-session-orb-faixa-de-abertura]] | calendário intradiário | stop no dado, alvo 2 R | especificada (brief T3.33c) — **família nova** no catálogo |
+| `derivatives` | [[EXP-0011-derivatives-reversao-de-funding]] | posicionamento / carry | 2,0 / 3,0 ATR | especificada (brief T3.33d) |
+
+**O portão de desenho C1–C8 (tarefa T3.36) ainda não existe**, e as quatro páginas trazem essa seção
+como **pendente**. Nenhuma delas pode ir para o código sem o veredito do portão escrito antes.
+
+### As duas da Astra que **não** entraram, e o que cada uma exige
+
+A Astra escolheu quatro candidatas no mesmo dia; duas coincidiram com as do `quant-engineer` e duas
+não. As dela ficam aqui como itens futuros, com o preço declarado
+([[Dialogos/2026-09-08-quatro-estrategias]]):
+
+| # | Candidata (Astra) | Por que não entrou agora | O que ela exige, exatamente |
+|---|---|---|---|
+| 15 | **Recuperação do desconto spot–perp após funding negativo** | o contexto da estratégia não tem velas spot nem `index_price` (o campo **nunca** é preenchido em `NormalizedFunding`), e um campo novo mora em `base.py`, que está **dentro do fecho do `code_ref`** | (a) coletor/preenchimento de `index_price`; (b) campo `spot_candles_1m` em `base.py`; (c) **`--supersede` das duas versões vivas e da linha `paper`**, porque o digest delas muda — operação auditada e planejada, nunca efeito colateral; (d) avaliação **em preços spot**, não a renomeação do `R_net` do perp |
+| 16 | **Força relativa de 24 h descontando β do BTC** | não é falta de dado, é falta de **protocolo**: `Strategy.evaluate(ctx, params)` vê **um** mercado | (a) segunda interface `evaluate_universe` (ranking transversal, com desempate declarado); (b) Lab com carteira para que o ranking signifique alguma coisa; (c) β no contexto — hoje 199 de 200 revisões por corte saem `insufficient_history`. É M4, não M3 |
+
+**A objeção da Astra que vale para as quatro que entraram, e foi absorvida:** os primeiros 31 dias
+já usados para descobrir e escolher as regras são **exploratórios** e não viram amostra independente
+por ganharem outra `cohort`; e uma leitura positiva a 20 bps que vira negativa a 40 bps recebe o
+rótulo **"frágil a custos"**, nunca "validada".

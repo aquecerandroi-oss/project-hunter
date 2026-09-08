@@ -210,9 +210,39 @@ construção (é a mesma população que gerou a hipótese —
 [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]]). O teste é a coorte prospectiva
 aberta em 2026-09-08 13:05 UTC.
 
+## Acréscimo de 2026-09-08 — o piso desta nota virou **teto de pedágio**, e agora tem identidade
+
+Nada acima foi editado. A medição de [[KB-0076-por-que-perdemos-2026-09-08]] (dez populações,
+4.472 desfechos, um snapshot só) fechou por **aritmética** o que aqui era argumento:
+
+```
+custo_R = 0,0020 / (risco_inicial / preço_de_entrada)
+```
+
+— o produto `custo_R × risco%` deu **0,001998 a 0,002001** em todas as dez populações. Um stop de
+1 % do preço custa 0,20 R por operação; um de 0,25 % custa 0,80 R. Por isso a `volume_anomaly`, que
+põe o stop na mínima da barra do pico **sem piso**, paga 0,615 R de custo por operação — mais do que
+perde no total.
+
+**Isso reenuncia a candidata desta nota:** não é "piso de ATR%", é **teto de pedágio declarado** —
+recusar decidir quando `0,0020 / (risco/preço) > c`, com `c` escolhido e escrito antes (ex.: `c =
+0,10 R` ⇒ risco ≥ 2 % do preço). Em `momentum` isso é um parâmetro (`atr_pct_min`, via
+`derive_variant.py`); em `volume_anomaly` **não existe parâmetro nenhum** que faça isso, então seria
+código novo.
+
+**E o limite, escrito antes de qualquer teste:** cortar o custo **não cria** vantagem, só deixa de
+destruí-la. No contrafactual *dentro da amostra* o piso zera `momentum v2` prospective (de −0,163 para
+−0,0006 R) e **piora** a mesma versão no replay (−0,172 → −0,336 R); em `volume_anomaly` o bruto
+desaba junto com o custo. Um teto de pedágio é **necessário e não suficiente** — a pergunta que
+decide tudo continua sendo a expectancy **bruta** por família de entrada, e é ela que abriu as quatro
+candidatas novas ([[EXP-0008-breakout-compressao-de-volatilidade]],
+[[EXP-0009-mean-reversion-pullback-em-tendencia]], [[EXP-0010-session-orb-faixa-de-abertura]],
+[[EXP-0011-derivatives-reversao-de-funding]]), todas com geometria escolhida por esta aritmética.
+
 ## Relacionados
 
 [[Strategy Backlog]] · [[KB-0007-atr-e-escala-por-volatilidade]] ·
 [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]] · [[KB-0009-o-efeito-do-quarto-de-hora]] ·
 [[EXP-0001-momentum-v1]] · [[EXP-0006-momentum-piso-de-custo]] · [[Registro de Tentativas]] ·
-[[Market Collector]] · [[Risk Engine]]
+[[Market Collector]] · [[Risk Engine]] · [[KB-0076-por-que-perdemos-2026-09-08]] ·
+[[EXP-0007-momentum-invalidacao-bracos-INV]]

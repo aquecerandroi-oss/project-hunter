@@ -644,8 +644,49 @@ precisa ser declarada** — a próxima avaliação datada da página do experime
 **Nada foi ativado por causa de número bonito.** `momentum v4` é `research_only`, sem linha em
 `agents`; a ponte de execução recusa `research_only` pelo nome e a coorte `replay:` por nome.
 
+
+## Acréscimo de 2026-09-08 (noite, T3.32b) — T-035 a T-038, as quatro estratégias novas
+
+Linhas **novas**, nada acima editado. As quatro entram **antes** de qualquer coleta, como esta página
+exige, e por isso a coluna `Início/fim UTC` traz **"data de início = data da ativação (ainda
+vazia)"**: nenhuma das quatro tem módulo escrito, versão ativada ou coorte aberta em 2026-09-08. A
+data de início é preenchida com o instante da ativação auditada, **antes da primeira barra** —
+preenchê-la depois invalida a tentativa, e assim teria de ser reportada.
+
+| ID | Candidata | Nota de origem | Parâmetros | `δ` | Início/fim UTC | Status |
+|---|---|---|---|---|---|---|
+| T-035 | **rompimento após compressão de volatilidade** (`breakout_v1`) | [[KB-0053-contracao-de-volatilidade-o-unico-pedaco-formalizavel]] · [[KB-0003-rompimento-de-canal-e-data-snooping]] | `squeeze_max=0.75`, janelas 8/32 até `t−1`, `rvol_min=1.5`, `atr_pct_min=0.005`, stop 1,25 ATR, alvo 2,5 ATR, horizonte 6 h, invalidação `close_below(base_low)` com guarda `stop < base_low < referência` | a declarar antes do replay | **início = data da ativação (ainda vazia)** | **proposta** — [[EXP-0008-breakout-compressao-de-volatilidade]]; sem código |
+| T-036 | **recuo comprado em tendência de 1 h** (`mean_reversion_v1`) | [[KB-0002-momentum-e-reversao-em-cripto]] · [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]] | porta de tendência 1 h (SMA 20 de horas completas), `z ≤ −1` em 20 fechamentos de 15 m, `close ≥ (high+low)/2`, `atr_pct_min=0.006`, stop 1,0 ATR, alvo 1,5 ATR, horizonte 4 h, **sem invalidação** | a declarar antes do replay | **início = data da ativação (ainda vazia)** | **proposta** — [[EXP-0009-mean-reversion-pullback-em-tendencia]]; geometria 1,5/1,0 **recusada antes de rodar** |
+| T-037 | **faixa de abertura de sessão** (`session_orb_v1`) | [[KB-0009-o-efeito-do-quarto-de-hora]] · [[KB-0032-o-relogio-dentro-do-limiar-de-volatilidade]] | aberturas 00:00 / 07:00 / 13:00 UTC, `range_bars=4`, `session_window_bars=20`, `rvol_min=1.3`, `atr_pct_min=0.006`, `1,0 ≤ range_risk_atr ≤ 2,5`, stop = mínima da faixa, alvo = 2 R, horizonte 4 h, **sem invalidação** | a declarar antes do replay | **início = data da ativação (ainda vazia)** | **proposta** — [[EXP-0010-session-orb-faixa-de-abertura]]; a Astra recomendou deixar calendário fora desta rodada (divergência registrada) |
+| T-038 | **compra depois de funding liquidado negativo** (`derivatives_v1`) | [[KB-0023-funding-extremo-como-contrarian-a-afirmacao-mais-repetida]] · **contra** [[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]] | `funding_rate ≤ −0,0001` (o componente de juros de 8 h), `funding_max_age_s=32400`, queda de 8 barras ≤ −1 × ATR%, `close ≥ (high+low)/2`, `atr_pct_min=0.006`, stop 2,0 ATR, alvo 3,0 ATR, horizonte 8 h, **sem invalidação** | a declarar antes do replay | **início = data da ativação (ainda vazia)** | **proposta** — [[EXP-0011-derivatives-reversao-de-funding]]; pré-checagem de funding **antes** de escrever o módulo |
+
+**Contagem de multiplicidade, atualizada.** As tentativas **avaliadas** passam de **2 execuções**
+(o bloco de saídas de 2026-09-06 com 7 contrastes e o `momentum v4` de 2026-09-08 com 1) para
+**3 execuções**: o [[EXP-0007-momentum-invalidacao-bracos-INV]] acrescenta **7 contrastes em 4
+populações** (28 leituras de contraste, lidas e registradas), sobre entradas congeladas e com Holm
+declarado antes. T-035 a T-038 são **candidatas propostas**, não tentativas avaliadas — ainda não
+contam, e **passam a contar no instante da ativação**.
+
+**A linha de T-005 muda de estado, e a linha antiga não foi editada.**
+
+| ID | Candidata | Nota de origem | Parâmetros | `δ` | Início/fim UTC | Status |
+|---|---|---|---|---|---|---|
+| T-005 | valor incremental da invalidação | [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]] | braços `INV-A/B/C/E`, agora com `TGT-3`/`TGT-4.5`/`EXIT-NOTGT`/`EXIT-CHAN` na mesma família de 7 contrastes | **0,05 R** (declarado antes, mantido) | replay retrospectivo, `as_of = 2026-09-08T04:00Z` (coortes de replay) e `15:00Z` (prospectivas) — **sem janela futura reservada** | **executada em 4 populações, inconclusiva** — Δ `INV-B − base`: −0,0062 (P1), +0,0316 (P2), −0,0697 (P3), −0,0382 (P4); nenhum atinge o efeito mínimo, nenhum rejeita por Holm, **o sinal muda entre populações**. **Conclusão: a invalidação não é a causa da perda**, e o item 1 do [[Strategy Backlog]] fecha como "refutada como causa" |
+
+**Por que esta execução também não confirma nada.** (1) A coluna `Início/fim UTC` continua **não**
+preenchida antes da janela — é replay sobre a população que já existia; (2) **P3 tem 1 dia distinto
+e P4 tem 3**: os `p` dessas duas são `1,000` **por construção**, não por equivalência; (3) o maior
+contraste da família (`EXIT-NOTGT − base`, +0,163 R em P1) **troca de sinal** em P3 (−0,226 R) e P4
+(−0,102 R, IC de blocos inteiramente negativo) — decidir por ele seria decidir pela janela que gerou
+a hipótese, que é exatamente o que a
+[[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] proíbe. **Nada foi ativado**, e o
+alvo só volta à pauta com janela reservada de 2026-09-08 em diante.
+
 ## Relacionados
 
 [[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Index]] ·
 [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] · [[Experiments Index]] ·
-[[Strategy Performance]]
+[[Strategy Performance]] · [[EXP-0007-momentum-invalidacao-bracos-INV]] ·
+[[EXP-0008-breakout-compressao-de-volatilidade]] · [[EXP-0009-mean-reversion-pullback-em-tendencia]] ·
+[[EXP-0010-session-orb-faixa-de-abertura]] · [[EXP-0011-derivatives-reversao-de-funding]] ·
+[[KB-0076-por-que-perdemos-2026-09-08]]

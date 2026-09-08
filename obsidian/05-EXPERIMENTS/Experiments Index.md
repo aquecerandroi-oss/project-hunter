@@ -85,6 +85,41 @@ hipótese —, e por isso ele nasce com dois motivos de `inconclusivo` escritos 
 editorial e a construção. O achado que sobrevive aos dois é operacional: **o piso corta 86% das
 decisões**.
 
+**Acréscimo de 2026-09-08 (noite, T3.32b) — são onze, e cinco entraram no mesmo dia.** Os parágrafos
+acima ficam como estão. O que mudou:
+
+- **[[EXP-0007-momentum-invalidacao-bracos-INV]] nasceu já avaliado**, e é o primeiro experimento do
+  Lab que **fecha uma linha do backlog em vez de abrir uma**: os braços `INV-B/C/E` sobre as mesmas
+  entradas congeladas ficam entre −0,070 R e +0,032 R em quatro populações, nenhum passa o efeito
+  mínimo de 0,05 R e o **sinal muda** entre elas. A invalidação **adianta** a perda, não a cria — e a
+  versão de código `momentum_v2` com `invalidation_mode` **não se justifica**. O maior contraste do
+  conjunto (`EXIT-NOTGT`, +0,163 R no replay) **troca de sinal** nas populações prospectivas
+  (−0,226 R e −0,102 R): a [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] em estado
+  puro.
+- **[[EXP-0008-breakout-compressao-de-volatilidade]], [[EXP-0009-mean-reversion-pullback-em-tendencia]],
+  [[EXP-0010-session-orb-faixa-de-abertura]] e [[EXP-0011-derivatives-reversao-de-funding]] entraram
+  `nao-iniciado`** — Hipótese e Protocolo congelados, **nenhuma linha de código escrita, nenhuma
+  versão ativada, nenhuma coorte aberta**. Quatro de uma vez são **quatro tentativas**
+  ([[Registro de Tentativas]], T-035 a T-038), e o veredito de cada uma será lido sabendo que houve
+  quatro.
+- **As quatro nasceram de uma pergunta, não de quatro ideias soltas.** A
+  [[KB-0076-por-que-perdemos-2026-09-08]] mostrou que a expectancy **bruta** de tudo que o Lab mede
+  hoje fica entre −0,04 e +0,09 R (cara ou coroa) enquanto o custo assumido vale 0,11 a 0,62 R por
+  operação. Nenhuma política de saída conserta isso; a única saída é uma **família de entrada** com
+  bruto acima do custo típico. As quatro páginas são quatro tentativas de responder isso, com
+  geometria escolhida por aritmética de custo em vez de gosto.
+- **A escolha das quatro teve divergência entre os dois motores**, e ela está registrada em
+  [[Dialogos/2026-09-08-quatro-estrategias]]: a Astra queria spot–perp e força relativa transversal
+  no lugar de `session_orb` e `derivatives`; as duas dela ficaram no [[Strategy Backlog]] com o que
+  cada uma exige (campo novo em `base.py` + `--supersede` das versões vivas; protocolo
+  `evaluate_universe`).
+- **O portão de desenho C1–C8 existe como método, não como seção do template** (tarefa T3.36; o
+  método está em `.claude/skills/edge-strategy-reviewer/references/review_criteria.md`). As quatro
+  páginas trazem a seção **"pendente"**, para que ninguém leia a ausência do veredito como aprovação.
+  A **T3.33b está em voo** e já aplicou o portão ao rascunho da `EXP-0009`; o veredito entra na
+  página quando aquela tarefa fechar, e não antes — arquivar número de rascunho em movimento é
+  arquivar número que pode mudar.
+
 Cada experimento significativo (uma hipótese testada sobre uma estratégia, um conjunto de parâmetros, um mercado ou período) ganha seu próprio arquivo `EXP-NNNN-<slug>.md` nesta mesma pasta, numerado sequencialmente a partir de `EXP-0001`.
 
 ## Registro de IDs (decisão conjunta SHADOW, 2026-09-05)
@@ -98,6 +133,14 @@ Cada experimento significativo (uma hipótese testada sobre uma estratégia, um 
 
 | `EXP-0005` | [[EXP-0005-momentum-paper\|momentum v3 em carteira paper]] (a linha `purpose = paper` da decisão delegada D10, ao lado da coorte `research_only`) | `docs/plans/M3.md` (D10) | **aberto em 2026-09-08**; primeira avaliação `as_of = 2026-09-08T12:00:00Z`, **inconclusivo** |
 | `EXP-0006` | [[EXP-0006-momentum-piso-de-custo\|piso de custo no momentum]] (`atr_pct_min = 0,0089`, mesmo `code_ref` do pai — variante de **parâmetro**, candidata #2 do [[Strategy Backlog]]) | [[KB-0008-custos-em-perpetuos-e-o-r-que-sobra]] → T3.26 | **aberto em 2026-09-08**; coorte `prospective` desde 13:05 UTC e um **replay de abertura** `as_of = 2026-09-08T13:09:41Z`, **inconclusivo** |
+
+| ID | Experimento | Origem | Estado |
+|---|---|---|---|
+| `EXP-0007` | [[EXP-0007-momentum-invalidacao-bracos-INV\|os braços de saída (INV/TGT/EXIT) sobre entradas congeladas]] (replay de **política de saída**: 8 braços, 7 contrastes, 4 populações) | `brief-T3.27` → T3.32 | **aberto e avaliado em 2026-09-08**; `read_at = 15:11Z–15:15Z`, **inconclusivo** — e **encerra** o item 1 do [[Strategy Backlog]] |
+| `EXP-0008` | [[EXP-0008-breakout-compressao-de-volatilidade\|rompimento após compressão de volatilidade]] (`breakout_v1`, 1,25/2,5 ATR, invalidação estrutural com guarda de geometria) | T3.33a | **proposto em 2026-09-08** — sem módulo, sem versão, sem coorte: `nao-iniciado` |
+| `EXP-0009` | [[EXP-0009-mean-reversion-pullback-em-tendencia\|recuo comprado dentro de tendência de 1 h]] (`mean_reversion_v1`, 1,0/1,5 ATR, **sem** invalidação) | T3.33b | **proposto em 2026-09-08** — `nao-iniciado` |
+| `EXP-0010` | [[EXP-0010-session-orb-faixa-de-abertura\|rompimento da faixa de abertura de sessão]] (`session_orb_v1`, stop na mínima da faixa, alvo em 2 R; **família nova** no catálogo) | T3.33c | **proposto em 2026-09-08** — `nao-iniciado` |
+| `EXP-0011` | [[EXP-0011-derivatives-reversao-de-funding\|comprar depois de funding liquidado negativo]] (`derivatives_v1`, 2,0/3,0 ATR, horizonte de 8 h) | T3.33d | **proposto em 2026-09-08** — `nao-iniciado`; aberto **contra** a recomendação de [[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]], com a divergência declarada na página |
 
 A reserva está consolidada nos três lugares que a decisão exige: aqui, em `docs/plans/SHADOW-LAB.md` (item 11) e em `docs/plans/M2.md` (T2.8).
 
@@ -147,6 +190,11 @@ Todos os números vêm de `agent_signals` / `signal_outcomes` reais, com o SQL c
 | [[EXP-0003-baselines-v1]] | baselines por (mercado, feature, hora UTC) do M2 — instrumento, não estratégia | 2026-09-07 | `2026-09-07T03:30:00Z` | **inconclusivo** — 1 dia distinto de série viva; **4.944 buckets utilizáveis de 88.746 (5,57 %)**, 12 de 27 features com algum bucket utilizável, **teto de score 25,00 de 100** |
 | [[EXP-0005-momentum-paper]] | `momentum` v3 (`purpose = paper`, D10) — a mesma decisão medida pela carteira | 2026-09-08 | `2026-09-08T12:00:00Z` | **inconclusivo** — 30 avaliáveis maturados (31 antes do gate), **1** dia; e a carteira **não foi tocada**: `ENABLE_PAPER_AUTONOMY=false`, 0 propostas / 0 posições / 0 trades |
 | [[EXP-0006-momentum-piso-de-custo]] | `momentum` v4 — variante de **parâmetro** (`atr_pct_min` 0,003 → 0,0089), mesmo `code_ref` do pai `v2` | 2026-09-08 | `2026-09-08T13:09:41Z` (**replay** de abertura) | **inconclusivo** — 30 avaliáveis, **9** dias; **o piso corta 86% das decisões** (31 contra 224 do pai) e toda a diferença de expectancy vem de **6 decisões sem par**, 5 avaliáveis |
+| [[EXP-0007-momentum-invalidacao-bracos-INV]] | replay de **política de saída** sobre entradas congeladas: `momentum` v1/v2 e `volume_anomaly` v2, 8 braços | 2026-09-08 | `2026-09-08T04:00Z` (replay) e `15:00Z` (prospectivas), `read_at = 15:11–15:15Z` | **inconclusivo** — 4 populações (222 · 337 · 189 · 933 avaliáveis; 24 · 29 · 1 · 3 dias), **nenhum dos 7 contrastes rejeita em nenhuma**; a invalidação **adianta** a perda, não a cria |
+| [[EXP-0008-breakout-compressao-de-volatilidade]] | `breakout` v1 — compressão de TR (8/32) antes do rompimento de 20 barras | 2026-09-08 (proposto) | — | **não iniciado** — nada rodado, nada ativado; portão C1–C8 **pendente** |
+| [[EXP-0009-mean-reversion-pullback-em-tendencia]] | `mean_reversion` v1 — z ≤ −1 dentro de tendência de 1 h, sem invalidação | 2026-09-08 (proposto) | — | **não iniciado** — geometria 1,5/1,0 **recusada antes de rodar** (equilíbrio 86,7 %) |
+| [[EXP-0010-session-orb-faixa-de-abertura]] | `session_orb` v1 — faixa da 1ª hora de Ásia/Europa/EUA, stop no dado, alvo em 2 R | 2026-09-08 (proposto) | — | **não iniciado** — a Astra recomendou deixar calendário fora desta rodada; divergência registrada |
+| [[EXP-0011-derivatives-reversao-de-funding]] | `derivatives` v1 — funding liquidado ≤ −0,01 % em 8 h, depois de queda, com estabilização | 2026-09-08 (proposto) | — | **não iniciado** — pré-checagem de funding **antes** de escrever o módulo |
 
 ### O que a próxima extração tem de fazer (achados da revisão da Astra, 2026-09-06)
 

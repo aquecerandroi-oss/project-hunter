@@ -12,6 +12,74 @@ closed: 2026-09-08
 
 Correções reais extraídas do `git log`. A maioria veio de rodadas de revisão de segurança/qualidade, não de bugs reportados em produção — não houve produção ainda.
 
+## Fechados no plantão da noite de 2026-09-08 (T3.32b)
+
+Todos abertos pela revisão da Astra "o Lab está pronto?" ([[2026-09-08-shadow-lab-pronto]]) em
+2026-09-08 e fechados no mesmo dia. Nenhum deles foi reproduzido por medição na abertura — eram
+leitura de código com arquivo:linha —, e o fechamento aqui é pelo **commit que os corrige**, não por
+nova medição em produção; onde essa distinção importa, está dita.
+
+### Caminho de replicação — os quatro, por `c8c9dc6` (T3.18c)
+
+- **HIGH — a CLI de replicação podia tornar o pai "promissor" com evidência de replay.** A consulta
+  do worker filtrava versão e resultado terminal **sem filtro de coorte**
+  (`replication_stats.py:69`, `replication.py:257` e `:296`), e `replicate()` usava esse relatório
+  para gravar `promising_at` — carimbando um marco que a D14/D15 mandam nascer só do prospectivo.
+  **A CLI passou a filtrar `prospective`.**
+- **HIGH — "avaliável" tinha duas definições no mesmo produto.** O placar exigia saída até `as_of`
+  **e** horizonte transcorrido; a replicação exigia só emissão até `as_of`, terminal e `R` não nulo.
+  **Unificado num contrato só.**
+- **MEDIUM — maturidade e Profit Factor divergiam entre os dois vereditos.** Dias de **saída** contra
+  dias de **decisão**, e uma população madura, positiva e **sem perdas** saía `validada` no placar e
+  `reprovada` na replicação. **Unificado** — PF nulo por `sem_perdas` agora "passa" nos dois lados.
+  **Fica a dívida:** o contrato é um só, as implementações continuam duas ([[Open Bugs]]).
+- **HIGH — a mesma evidência podia amadurecer uma irmã duas vezes.** `sibling_population()`
+  concatenava a população viva com **todos** os replays da irmã sem deduplicar decisões sobrepostas.
+  **Corrigido**, e uma rodada incompleta passou a ser **imatura**, não refutada
+  (`pool = max(n, expected)`).
+- **LOW — a linguagem estatística de `docs/plans/REPLICATION.md` §46/§78.** Metade da amostra aumenta
+  o erro-padrão por **√2 (~1,41×)**, não por ~2×; e os quatro blocos **reutilizam dados**, então não
+  são "quatro repetições independentes". **Texto corrigido no mesmo commit.**
+
+### Autonomia paper — quatro dos sete pré-requisitos, por `5ff19ac` (T3.29)
+
+- **HIGH (ordem) — `avgPrice` ausente adiava execução.** Implementado o leitor real
+  (`GET /api/v3/avgPrice`, spot, peso 2 — a única fonte pública do número que o filtro `NOTIONAL` de
+  uma ordem MARKET usa), com reuso de 5 s e **limite duro de 30 s**; relógio que anda para trás é
+  tratado como vencido, e a idade é medida **duas vezes** (no leitor e contra o `now` do ciclo).
+  Os dois endpoints sugeridos no brief foram **recusados por nome**: são USDS-M, e D1 é "SPOT
+  executa, o perpétuo decide".
+- **HIGH (proteção) — `pending_degraded` não era proteção executada.** Coberto por teste de
+  integração novo (`test_v10_degraded_protection_restart.py`): parcial de 4 → `pending_degraded` sem
+  livro → **restart** → a intenção termina o remanescente, **sem unidade vendida duas vezes, sem
+  `client_order_id` reusado e sem `fills` escrito pela tentativa degradada**.
+- **HIGH (MTM) — o check `mtm_fresh` media a escrita, não a atualidade do preço.**
+  `marks_for_open_positions` passou a devolver `MarkCoverage`, com `mark_quality` publicado no
+  `hb:execution:paper` e na métrica `hunter_execution_mark_quality`, e **pré-checagem de admissão**:
+  com `quality < 1` a admissão é **adiada** (`marks_incomplete`), no caminho manual e na ponte.
+  Carteira vazia é `1` por construção — reportar `0` transformaria o estado normal em alarme
+  permanente. O `/ready` **não** foi tocado de propósito: uma marca velha derrubando a prontidão faria
+  o healthcheck reiniciar o worker, e um worker reiniciando é um worker que não protege posição.
+  **Ressalva:** o campo só aparece na VPS **depois do deploy**.
+- **MEDIUM (integração) — queda de WS com lacuna e perda de Redis durante a decisão não cobertas.**
+  Quatro passos novos no V6 contra **Redis real**: chave do livro sumida → adia e a reserva expira em
+  30 s com motivo; livro de antes da queda → `book_stale`; conexão morta durante a decisão →
+  `hot_state_unreachable`, nada escrito, reserva preservada; e a **mesma** reserva vira **uma** ordem
+  quando o Redis volta. Junto veio a correção de causa: `RedisSpotMarketData` deixou de propagar
+  exceção de leitura — antes, um `ConnectionError` numa chave abortava o passe inteiro do ciclo,
+  **inclusive a proteção das outras carteiras**.
+
+### Histórico de velas — por `1ca7cf5` (T3.7e+T3.7f), com o dado ainda por reparar
+
+- **CRITICAL — `earliest_known` obsoleto dentro do ciclo retirava janelas legítimas como
+  `before_listing`.** `before_listing` passou a exigir **resposta vazia real da exchange** E
+  `gap_end` abaixo do mínimo conhecido E **nenhum pedaço do mesmo mercado ter persistido vela mais
+  antiga naquele ciclo** (recuperação parcial inclusive), com teste do cenário do revisor (dois gaps,
+  o mais novo move o mínimo). **O defeito de código está fechado; a reparação do dado não** — as
+  5 janelas de BTCUSDT e 5 de UNIUSDT marcadas falsamente terminais continuam fechadas no banco, e o
+  SQL idempotente restrito ao incidente não foi executado. Continua em [[Open Bugs]] como pendência
+  do operador.
+
 ## Fechados no plantão do meio-dia de 2026-09-08
 
 - **MEDIUM (produto, VPS) — `market_betas` vazia: o produtor horário de β nunca foi entregue**

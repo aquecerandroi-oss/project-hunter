@@ -1,6 +1,6 @@
 ---
 tags: [knowledge, indice]
-updated: 2026-09-06
+updated: 2026-09-08
 status: em construção
 owner: sexta-feira
 ---
@@ -25,6 +25,7 @@ Cada nota é uma síntese própria (nunca cópia), com fonte, data, qualidade da
 | Execução e microestrutura do preenchimento | KB-0036, KB-0037, KB-0038, KB-0039, KB-0040, KB-0041, KB-0042, KB-0043, KB-0044 | quinta rodada feita (2026-09-06) |
 | Livros de estratégia | KB-0045, KB-0046, KB-0047, KB-0048, KB-0049, KB-0050, KB-0051, KB-0052, KB-0053, KB-0054, KB-0055 | sexta rodada feita (2026-09-06) |
 | Meme coins | KB-0056, KB-0057, KB-0058, KB-0059, KB-0060, KB-0061, KB-0062, KB-0063, KB-0064, KB-0065 | **sétima rodada feita (2026-09-06)** |
+| **Diagnóstico do nosso próprio resultado** | KB-0008, KB-0076 | **primeira nota de medição própria em larga escala (2026-09-08, T3.32)** — o custo em R é praticamente toda a perda |
 
 ## Notas
 _(uma linha por nota: link para a nota — fonte curta — qualidade da evidência — hipótese sim/não)_
@@ -106,6 +107,7 @@ _(uma linha por nota: link para a nota — fonte curta — qualidade da evidênc
 | [[KB-0073-alavancagem-em-perpetuos-a-liquidacao-contra-o-nosso-stop]] | risco / alavancagem e liquidação | documentação da Binance (FAQ 360033525271) | documentação lida + aritmética **corrigida pela Astra** | **não** — `R-LEV-1` e `R-LEV-2` |
 | [[KB-0074-risco-operacional-as-regras-de-nao-operar-quando]] | risco operacional / qualidade do dado | medição própria + inventário das rodadas 2 a 7 | replicado + leitura de código | **não** — `R-OPS-1` a `R-OPS-4` |
 | [[KB-0075-paper-trading-honesto-o-que-a-sombra-ainda-nao-simula]] | risco / paper trading | nosso `walker.py`, contrato do M4 | leitura de código + contrato | sim — `D-PAPER-1` (cobertura a medir) e a convenção `C-PAPER` |
+| [[KB-0076-por-que-perdemos-2026-09-08]] | custos / diagnóstico próprio | dado da VPS (10 populações, 4.472 desfechos) + 4 replays de política de saída | medição própria, um snapshot só | sim — orçamento de custo na decisão; e a pergunta que falta: alguma entrada com bruto > 0,25 R? |
 
 ## O que a primeira rodada mudou de fato
 

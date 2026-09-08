@@ -379,3 +379,133 @@ Veredito por variante individual, como o brief manda: **`inconclusivo`** em toda
    se outra tarefa tomar o número antes, renumerar.
 9. **Um arquivo acima do orçamento de linhas** no repositório (`bridge.py`, 365 > 350) é da T3.29 em
    voo; não é meu e não foi tocado.
+
+---
+
+# T3.32b — o arquivamento no Obsidian (Sexta-feira, 2026-09-08)
+
+**Escopo de escrita desta tarefa:** `obsidian/**` e esta seção. **Nada commitado.** Base: `main` em
+`0391f62` (o brief), com `1ca7cf5` como último commit de código. Nenhum comando de banco, de VPS ou
+de suíte foi rodado — o único comando executado foi o linter da base.
+
+## 1. O que entrou na base
+
+| Arquivo | O que é |
+|---|---|
+| `obsidian/11-KNOWLEDGE/KB-0076-por-que-perdemos-2026-09-08.md` | o diagnóstico da T3.32, com a identidade do custo como achado central |
+| `obsidian/05-EXPERIMENTS/EXP-0007-momentum-invalidacao-bracos-INV.md` | os braços de saída sobre entradas congeladas, avaliado e `inconclusivo` |
+| `obsidian/05-EXPERIMENTS/EXP-0008-breakout-compressao-de-volatilidade.md` | `breakout_v1`, protocolo congelado, `nao-iniciado` |
+| `obsidian/05-EXPERIMENTS/EXP-0009-mean-reversion-pullback-em-tendencia.md` | `mean_reversion_v1`, idem |
+| `obsidian/05-EXPERIMENTS/EXP-0010-session-orb-faixa-de-abertura.md` | `session_orb_v1`, idem (família nova no catálogo) |
+| `obsidian/05-EXPERIMENTS/EXP-0011-derivatives-reversao-de-funding.md` | `derivatives_v1`, idem |
+| `obsidian/06-DECISIONS/Dialogos/2026-09-08-quatro-estrategias.md` | a divergência quant × Astra e a decisão, em primeira pessoa |
+
+Editados: `Experiments Index`, `Strategy Backlog`, `Registro de Tentativas`, `11-KNOWLEDGE/Index`,
+`Dialogos/Index`, `KB-0006`, `KB-0008`, `Open Bugs`, `Resolved Bugs`, `Diario/2026-09-08`.
+
+## 2. Decisões de arquivamento que mudam o conteúdo do rascunho
+
+Estas são mudanças minhas sobre o que os rascunhos traziam. Cada uma tem motivo.
+
+1. **`KB-0076` ficou com o número 0076**, que era a próxima vaga livre. **Existe uma colisão a
+   resolver:** `.claude/state/exp-drafts/KB-0076-linhas-de-tendencia.md` (rascunho da T3.34, linhas
+   de tendência) também reivindica o 0076. Quem arquivar aquele **tem de renumerá-lo para KB-0077** —
+   está dito aqui e nos CONCERNS abaixo porque um índice de KB com dois 0076 é pior que nenhum.
+2. **`EXP-0008..0011` foram arquivados com `result: nao-iniciado`, não `inconclusivo`.** Os rascunhos
+   traziam `inconclusivo`; o vocabulário do linter aceita os dois, e `nao-iniciado` é o estado
+   honesto de uma página sem uma única barra avaliada. `inconclusivo` é o veredito de uma leitura que
+   **aconteceu** e não atingiu a régua — usá-lo antes da primeira leitura confundiria "não medi" com
+   "medi e não deu".
+3. **Os links curtos dos rascunhos foram expandidos.** `[[KB-0006]]`, `[[EXP-0007]]`, `[[SHADOW-LAB]]`
+   e `[[PIPELINE]]` **não resolvem** no vault: o linter casa nome de arquivo inteiro ou sufixo de
+   caminho em fronteira de barra. Viraram os nomes completos das notas; `SHADOW-LAB` e `PIPELINE`,
+   que não são notas do vault, viraram referência textual (`docs/plans/SHADOW-LAB.md` §9,
+   `docs/PIPELINE.md` §4/§6c).
+4. **A seção "Portão de desenho (C1–C8)" foi criada nas quatro páginas com o estado "pendente"**, e
+   com os oito critérios nomeados. O portão é a tarefa **T3.36** e ainda não existe no
+   `_TEMPLATE-EXP`. Em duas páginas eu nomeei qual critério morde mais (C2/C5 na 0009, C4 na 0010,
+   C1/C3 na 0011) a partir do que os próprios rascunhos e a Astra já diziam — não inventei veredito.
+5. **`KB-0006` e `KB-0008` ganharam seção datada, não edição.** Na 0006: a descrição estava certa, o
+   remédio não. Na 0008: o piso virou **teto de pedágio declarado**, com a identidade e o aviso de
+   que cortar custo não cria vantagem.
+6. **O `Registro de Tentativas` teve o bloco `## Relacionados` movido para o fim do arquivo.** Ele
+   estava no meio depois do meu append; nenhuma linha de tentativa foi editada, e o bloco movido é
+   navegação, não registro.
+
+## 3. Open Bugs — o que fechei, com o commit, e o que abri
+
+**Fechados (movidos para `Resolved Bugs`), 10 itens:**
+
+| Item | Commit |
+|---|---|
+| CLI de replicação torna o pai promissor com replay (HIGH) | `c8c9dc6` (T3.18c) |
+| "avaliável" com duas definições (HIGH) | `c8c9dc6` |
+| maturidade e PF divergentes entre placar e replicação (MEDIUM) | `c8c9dc6` |
+| irmã amadurece duas vezes com a mesma evidência (HIGH) | `c8c9dc6` |
+| linguagem estatística de `REPLICATION.md` §46/§78 (LOW) | `c8c9dc6` |
+| `avgPrice` ausente adia execução (HIGH) | `5ff19ac` (T3.29) |
+| `pending_degraded` não é proteção executada (HIGH) | `5ff19ac` |
+| `mtm_fresh` mede a escrita, não o preço (HIGH) | `5ff19ac` |
+| queda de WS e perda de Redis não cobertas (MEDIUM) | `5ff19ac` |
+| `earliest_known` obsoleto dentro do ciclo (CRITICAL) | `1ca7cf5` (T3.7e+f) — **código fechado, dado por reparar** |
+
+**Não fechei o que a T3.28a–d não resolve.** A negação de serviço compartilhada no balde do `web`
+continua **aberta**, com nota datada: a T3.28b (`42ec146`) tirou o pior sintoma e a T3.28c
+(`036b7d9`) reduziu a superfície, mas uma conta autenticada em laço ainda gasta o balde e as outras
+recebem 429. Fechar isso seria confundir mitigação com correção.
+
+**Abertos, 3 itens novos + 1 reclassificado + 1 medido:**
+
+- **MEDIUM — `compute_verdict` duplicado.** `apps/api/hunter_api/services/lab_scoreboard_metrics.py:51`
+  e `packages/indicators/hunter_indicators/replication/stats.py:240`/`:251` implementam a **mesma
+  regra** duas vezes; o docstring da segunda diz isso textualmente. Cenário: mudar o limiar de PF num
+  lado só reintroduz exatamente o MEDIUM que a T3.18c fechou, e a divergência só aparece quando
+  alguma versão amadurecer.
+- **MEDIUM — topbar sem tempo real na VPS** (`live-status.tsx:154`, `topbar.tsx:121`).
+- **MEDIUM — painel "Execução paper" todo indisponível** (`execution-paper-card.tsx`,
+  `system_status.py:193`, `heartbeat.py:40`): a tela não distingue "sem worker" de "worker sem dado".
+- **Reclassificado:** o `earliest_known` deixou de ser bug de código e virou **pendência de dado do
+  operador** (as 5+5 janelas de BTCUSDT/UNIUSDT).
+- **Medido, novo:** `portfolios.risk_profile_id` NULL e sem `risk_profiles.preset='paper_v1'` na VPS
+  (T3.29). Os limites em vigor continuam corretos porque o motor usa o objeto `PAPER_V1`, mas o banco
+  não sabe declarar sob que perfil a carteira operou.
+
+## 4. Lint
+
+`uv run python infra/scripts/obsidian_lint.py` → **base limpa**, 192 notas (eram 185).
+
+## CONCERNS
+
+1. **Colisão de número na KB.** `.claude/state/exp-drafts/KB-0076-linhas-de-tendencia.md` (T3.34)
+   reivindica o mesmo 0076 que a nota que arquivei. **A próxima vaga livre é KB-0077** e quem
+   arquivar as linhas de tendência precisa renumerar — inclusive dentro do texto do rascunho, que se
+   auto-referencia.
+2. **Duas das três bugs novas são observação de tela, não medição.** A topbar sem tempo real e o
+   painel de execução paper indisponível foram vistos no navegador contra a VPS e **não** foram
+   reproduzidos por leitura de Redis, log do Caddy ou SQL nesta tarefa. Escrevi o mecanismo com
+   arquivo:linha (que é verificável por leitura de código) e o **próximo passo** que fecha ou
+   reclassifica cada um, e deixei explícito na página que a causa não está afirmada. Se o revisor
+   achar que isso não basta para abrir um bug, o caminho é rebaixá-los a "a confirmar", não apagá-los.
+3. **O portão C1–C8 existe como método, não como seção do template — e a T3.33b já o está
+   aplicando.** Quando comecei, só havia o brief da T3.36; durante a tarefa, a **T3.33b (em voo)**
+   acrescentou ao rascunho `.claude/state/exp-drafts/EXP-0009-...md` uma seção
+   "Portão C1–C8 (`edge-strategy-reviewer`)" com tabela por critério e veredito. **Não copiei esse
+   resultado para a página do vault**: o rascunho está sendo escrito agora, e arquivar um número em
+   movimento é arquivar um número que pode mudar. As quatro páginas continuam com a seção
+   **pendente**, e a da `EXP-0009` diz explicitamente que a T3.33b vai preenchê-la.
+   **Follow-up necessário:** quando T3.33b (e as irmãs a/c/d) fecharem, alguém tem de carregar os
+   quatro vereditos para as páginas do vault. Se a T3.36 entregar o `_TEMPLATE-EXP` com nomes de
+   seção diferentes dos meus, **a versão do template vence**.
+4. **O incidente dos shards (14:10–16:35Z) foi escrito a partir do brief**, não de log da VPS.
+   Duração, causa (`MARKET_SHARDS` ausente no rollback manual) e desfecho (deploy do `1ca7cf5`) vêm
+   do brief desta tarefa; nenhum `docker logs` foi lido aqui. A lição operacional que registrei —
+   *rollback manual não herda o ambiente do compose* — é minha e não depende do log.
+5. **A `KB-0076` fica com `astra: pendente`.** O parecer da Astra do dia é sobre as quatro
+   estratégias novas, não sobre o diagnóstico. Não converti a opinião dela sobre custos numa revisão
+   da nota; absorvi o que se aplica ("frágil a custos") e deixei o campo pendente de propósito.
+6. **`EXP-0007` cita `evaluable: 1681` no frontmatter**, que é a soma das quatro populações
+   (222+337+189+933). O corpo da página diz, em tabela, que as quatro **nunca são somadas** para
+   efeito de veredito. O campo do frontmatter é inventário do linter, não população estatística —
+   mas alguém que leia só o frontmatter pode confundir os dois.
+7. **Não toquei em `docs/`.** O `docs/plans/SHADOW-LAB.md` §9 e o `docs/ROADMAP.md` não sabem das
+   quatro estratégias novas nem do fecho do item 1 do backlog; isso é escopo de outra tarefa.

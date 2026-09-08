@@ -9,7 +9,7 @@ hipotese_testavel: sim
 astra: concorda
 status: curada
 owner: sexta-feira
-updated: 2026-09-06
+updated: 2026-09-08
 confiança: replicado
 ---
 
@@ -166,8 +166,25 @@ identificadores de braço próprios por experimento — o que me fez renomear os
 
 Divergência: nenhuma.
 
+## Acréscimo de 2026-09-08 — a descrição estava certa, o remédio não
+
+Nada acima foi editado; o que segue é leitura nova, datada. O
+[[EXP-0007-momentum-invalidacao-bracos-INV]] rodou os braços `INV-B/C/E` sobre as **mesmas** entradas
+congeladas, em quatro populações, e o resultado é o pareamento que esta nota pedia: **Δ entre
+−0,070 R e +0,032 R**, nenhum passando o efeito mínimo declarado de 0,05 R, nenhum rejeitado por
+Holm, e o **sinal muda** entre populações.
+
+Ou seja: esta nota **acertou a descrição** (a invalidação encerra 26 % a 43 % dos acompanhamentos,
+com praticamente nenhum ganhador) e **errou ao sugerir que soltá-los salvaria dinheiro** — soltos,
+eles perdem igual. A invalidação **adianta** a perda, não a cria. A causa está em
+[[KB-0076-por-que-perdemos-2026-09-08]]: o custo assumido por operação vale entre 0,107 R e 0,615 R
+e o resultado bruto é ~0. **Consequência prática:** a versão de código `momentum_v2` com
+`invalidation_mode` (brief T3.27) **não se justifica**, e o item 1 do [[Strategy Backlog]] foi
+fechado como "refutada como causa".
+
 ## Relacionados
 
 [[Strategy Backlog]] · [[EXP-0001-momentum-v1]] · [[KB-0005-stops-quando-eles-param-perdas]] ·
 [[KB-0007-atr-e-escala-por-volatilidade]] ·
-[[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] · [[Strategy Performance]]
+[[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] · [[Strategy Performance]] ·
+[[EXP-0007-momentum-invalidacao-bracos-INV]] · [[KB-0076-por-que-perdemos-2026-09-08]]
