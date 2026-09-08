@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { LabVerdictBadge } from "@/components/lab/lab-verdict-badge";
 import { rToUsdt, type MoneyRuler } from "@/components/lab/lab-money";
 import { verdictLineColorVar, type LabCurveSeriesInput } from "@/components/lab/lab-scoreboard";
+import { chartColor } from "@/lib/charts/css-var";
+import { alignToUnionTimes, sanitizeLinePoints } from "@/lib/charts/series-data";
 import { logger } from "@/lib/logger";
 import { formatBrasiliaTick, formatBrasiliaWithUtcTooltip } from "@/lib/time";
 
@@ -41,24 +43,20 @@ function useThemeAttribute(): ThemeName {
   return theme;
 }
 
-function cssVar(name: string): string {
-  if (typeof window === "undefined") return "";
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-}
-
 function toUnix(iso: string): UTCTimestamp {
   return Math.floor(new Date(iso).getTime() / 1000) as UTCTimestamp;
 }
 
-/** `cum_r` converted through the ruler for the USDT view, or kept as a plain R number for the toggle (brief item 4: "cumulative simulated result in USDT through the ruler; toggle to R"). */
+/** `cum_r` converted through the ruler for the USDT view, or kept as a plain R number for the toggle (brief item 4: "cumulative simulated result in USDT through the ruler; toggle to R"). Sanitized (T3.31): non-finite values dropped, sorted and deduped by time before this ever reaches `lightweight-charts`. */
 function toSeriesData(entry: LabCurveSeriesInput, currency: ChartCurrency, ruler: MoneyRuler): LineData<Time>[] {
-  return entry.points.map((p) => ({ time: toUnix(p.ts), value: currency === "usdt" ? rToUsdt(p.cum_r, ruler) : Number(p.cum_r) }));
+  const raw = entry.points.map((p) => ({ time: toUnix(p.ts), value: currency === "usdt" ? rToUsdt(p.cum_r, ruler) : Number(p.cum_r) }));
+  return sanitizeLinePoints(raw) as LineData<Time>[];
 }
 
 function chartLayoutOptions() {
   return {
-    layout: { background: { color: "transparent" as const }, textColor: cssVar("--color-fg-muted") },
-    grid: { vertLines: { color: cssVar("--color-border") }, horzLines: { color: cssVar("--color-border") } },
+    layout: { background: { color: "transparent" as const }, textColor: chartColor("--color-fg-muted") },
+    grid: { vertLines: { color: chartColor("--color-border") }, horzLines: { color: chartColor("--color-border") } },
   };
 }
 
@@ -90,17 +88,24 @@ function seriesKey(entry: LabCurveSeriesInput): string {
  * the same version (addendum A3) -- never conflated into one line.
  */
 function attachSeries(chart: IChartApi, series: LabCurveSeriesInput[], currency: ChartCurrency, ruler: MoneyRuler): Map<string, ISeriesApi<"Line">> {
+  const drawable = series.filter((entry) => entry.points.length > 0);
+  // T3.31 root cause: `lightweight-charts` shares one time scale across every
+  // series on this chart -- each version's line only has points for the
+  // timestamps that version actually signalled, so two lines here almost
+  // never share the exact same times. Without this alignment, a series asked
+  // to resolve its own bar at a time only a sibling series has crashes with
+  // "Error: Value is null" (`.claude/state/notes-T3.31.md`).
+  const aligned = alignToUnionTimes(drawable.map((entry) => toSeriesData(entry, currency, ruler)));
   const map = new Map<string, ISeriesApi<"Line">>();
-  for (const entry of series) {
-    if (entry.points.length === 0) continue;
+  drawable.forEach((entry, index) => {
     const line = chart.addSeries(LineSeries, {
-      color: cssVar(verdictLineColorVar(entry.verdict)),
+      color: chartColor(verdictLineColorVar(entry.verdict)),
       lineWidth: 2,
       lineStyle: entry.cohort === "replay" ? DASHED_LINE_STYLE : SOLID_LINE_STYLE,
     });
-    line.setData(toSeriesData(entry, currency, ruler));
+    line.setData(aligned[index] ?? []);
     map.set(seriesKey(entry), line);
-  }
+  });
   return map;
 }
 
@@ -124,6 +129,12 @@ export function LabCurveChart({ series, ruler }: LabCurveChartProps) {
 
   useEffect(() => {
     if (!container) return undefined;
+    // T3.31: a stable, effect-local flag (not the mutable `chartRef`) so a
+    // callback that outlives this effect's own lifetime (e.g. a `resize`
+    // event already queued the instant cleanup runs) can never act on a
+    // chart this same effect has already torn down -- idempotent under
+    // React strict mode's mount/cleanup/mount cycle.
+    let disposed = false;
     let chart: IChartApi | undefined;
     try {
       chart = createChart(container, {
@@ -144,10 +155,14 @@ export function LabCurveChart({ series, ruler }: LabCurveChartProps) {
     }
     chartRef.current = chart;
     setFailed(false);
-    const resize = () => chart?.applyOptions({ width: container.clientWidth });
+    const resize = () => {
+      if (disposed) return;
+      chart?.applyOptions({ width: container.clientWidth });
+    };
     resize();
     window.addEventListener("resize", resize);
     return () => {
+      disposed = true;
       window.removeEventListener("resize", resize);
       chart?.remove();
       chartRef.current = null;
@@ -161,15 +176,20 @@ export function LabCurveChart({ series, ruler }: LabCurveChartProps) {
     if (!chart) return;
     chart.applyOptions(chartLayoutOptions());
     for (const entry of series) {
-      seriesRefs.current.get(seriesKey(entry))?.applyOptions({ color: cssVar(verdictLineColorVar(entry.verdict)) });
+      seriesRefs.current.get(seriesKey(entry))?.applyOptions({ color: chartColor(verdictLineColorVar(entry.verdict)) });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `series` is read fresh, not a reactive dependency of a theme-only effect
   }, [theme]);
 
   useEffect(() => {
-    for (const entry of series) {
-      seriesRefs.current.get(seriesKey(entry))?.setData(toSeriesData(entry, currency, ruler));
-    }
+    const drawableNow = series.filter((entry) => entry.points.length > 0);
+    // Same union-of-times alignment as the creation effect (T3.31) -- a
+    // currency toggle or a refetch calls `setData` again on every series,
+    // and would reopen the exact same gap if only re-sanitized in isolation.
+    const aligned = alignToUnionTimes(drawableNow.map((entry) => toSeriesData(entry, currency, ruler)));
+    drawableNow.forEach((entry, index) => {
+      seriesRefs.current.get(seriesKey(entry))?.setData(aligned[index] ?? []);
+    });
   }, [series, currency, ruler]);
 
   if (drawable.length === 0) {
@@ -204,7 +224,7 @@ export function LabCurveChart({ series, ruler }: LabCurveChartProps) {
           <li key={seriesKey(entry)} className="flex items-center gap-1.5 text-xs text-fg-muted">
             <span
               className={entry.cohort === "replay" ? "inline-block h-0 w-3 border-t-2 border-dashed" : "inline-block h-2 w-2 rounded-full"}
-              style={entry.cohort === "replay" ? { borderColor: cssVar(verdictLineColorVar(entry.verdict)) } : { backgroundColor: cssVar(verdictLineColorVar(entry.verdict)) }}
+              style={entry.cohort === "replay" ? { borderColor: chartColor(verdictLineColorVar(entry.verdict)) } : { backgroundColor: chartColor(verdictLineColorVar(entry.verdict)) }}
             />
             <span className="font-mono text-fg">{entry.label}</span>
             {entry.cohort === "replay" ? (

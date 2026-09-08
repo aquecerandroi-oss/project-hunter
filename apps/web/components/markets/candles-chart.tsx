@@ -4,6 +4,8 @@ import { CandlestickSeries, createChart, type IChartApi, type ISeriesApi, type T
 import { useEffect, useRef, useState } from "react";
 
 import type { Candle } from "@/lib/api/types";
+import { chartColor } from "@/lib/charts/css-var";
+import { sanitizeCandlePoints } from "@/lib/charts/series-data";
 import { logger } from "@/lib/logger";
 import { formatBrasiliaTick, formatBrasiliaWithUtcTooltip } from "@/lib/time";
 
@@ -39,28 +41,27 @@ function useThemeAttribute(): ThemeName {
   return theme;
 }
 
-/** Live value of a docs/DESIGN.md token (`app/globals.css`'s `@theme`); never a hardcoded hex fallback (docs/DESIGN.md §1: "nunca usar hex solto"). */
-function cssVar(name: string): string {
-  if (typeof window === "undefined") return "";
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-}
-
 function toChartData(candles: Candle[]) {
-  return candles.map((candle) => ({
+  const raw = candles.map((candle) => ({
     time: Math.floor(new Date(candle.open_time).getTime() / 1000) as UTCTimestamp,
     open: Number(candle.open),
     high: Number(candle.high),
     low: Number(candle.low),
     close: Number(candle.close),
   }));
+  // T3.31: non-finite OHLC dropped, sorted and deduped by time before this
+  // ever reaches `lightweight-charts` (the same rule the dev build already
+  // enforces via `setData`'s own assertions, absent from the production
+  // bundle -- `.claude/state/notes-T3.31.md`).
+  return sanitizeCandlePoints(raw);
 }
 
 function layoutOptions() {
   return {
-    layout: { background: { color: "transparent" as const }, textColor: cssVar("--color-fg-muted") },
+    layout: { background: { color: "transparent" as const }, textColor: chartColor("--color-fg-muted") },
     grid: {
-      vertLines: { color: cssVar("--color-border") },
-      horzLines: { color: cssVar("--color-border") },
+      vertLines: { color: chartColor("--color-border") },
+      horzLines: { color: chartColor("--color-border") },
     },
   };
 }
@@ -85,8 +86,8 @@ function seriesOptions() {
   // primary action, active item and focus -- candles are the single biggest
   // surface in the app, so painting them gold would make gold dominate the
   // screen instead of staying rare. Astra's T1.5b design review agreed.
-  const green = cssVar("--color-green");
-  const red = cssVar("--color-red");
+  const green = chartColor("--color-green");
+  const red = chartColor("--color-red");
   return {
     upColor: green,
     borderUpColor: green,
@@ -122,6 +123,11 @@ export function CandlesChart({ candles }: CandlesChartProps) {
   useEffect(() => {
     if (!container) return undefined;
 
+    // T3.31: an effect-local flag (not the mutable `chartRef`) so a callback
+    // that outlives this effect (e.g. a `resize` event already queued the
+    // instant cleanup runs) can never act on an already-torn-down chart --
+    // idempotent under React strict mode's mount/cleanup/mount cycle.
+    let disposed = false;
     let chart: IChartApi | undefined;
     try {
       chart = createChart(container, {
@@ -144,10 +150,14 @@ export function CandlesChart({ candles }: CandlesChartProps) {
 
     chartRef.current = chart;
     setFailed(false);
-    const resize = () => chart?.applyOptions({ width: container.clientWidth });
+    const resize = () => {
+      if (disposed) return;
+      chart?.applyOptions({ width: container.clientWidth });
+    };
     resize();
     window.addEventListener("resize", resize);
     return () => {
+      disposed = true;
       window.removeEventListener("resize", resize);
       chart?.remove();
       chartRef.current = null;

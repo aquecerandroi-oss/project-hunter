@@ -105,3 +105,29 @@ describe("LabCurveChart: one line per version, USDT by default with an R toggle"
     expect(addSeriesMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("LabCurveChart: T3.31 -- multiple series never leave a shared-time-scale gap", () => {
+  it("aligns every series to the union of all times before setData (real cause of 'Error: Value is null' -- `.claude/state/notes-T3.31.md`)", async () => {
+    const seriesA = makeSeries({
+      versionId: "v-1",
+      points: [
+        { ts: "2026-09-06T03:41:00Z", r: "1", cum_r: "1" },
+        { ts: "2026-09-06T05:10:00Z", r: "1", cum_r: "2" },
+      ],
+    });
+    const seriesB = makeSeries({
+      versionId: "v-2",
+      points: [{ ts: "2026-09-07T03:41:00Z", r: "1", cum_r: "5" }],
+    });
+    render(<LabCurveChart series={[seriesA, seriesB]} ruler={exampleRuler()} />);
+    await waitFor(() => expect(setDataMock).toHaveBeenCalledTimes(2));
+    const timesA = (setDataMock.mock.calls[0]?.[0] as { time: number }[]).map((p) => p.time);
+    const timesB = (setDataMock.mock.calls[1]?.[0] as { time: number }[]).map((p) => p.time);
+    // Every series must carry all 3 distinct times (as a real point, or as a
+    // whitespace gap) -- a shorter array here is exactly the gap that makes
+    // `lightweight-charts` resolve a missing bar internally and throw.
+    expect(timesA).toHaveLength(3);
+    expect(timesB).toHaveLength(3);
+    expect(timesA).toEqual(timesB);
+  });
+});

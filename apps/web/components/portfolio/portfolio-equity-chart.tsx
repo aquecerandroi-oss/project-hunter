@@ -20,6 +20,8 @@ import { Button } from "@/components/ui/button";
 import { PortfolioAsOf } from "@/components/portfolio/portfolio-as-of";
 import { brlUnavailableLabel } from "@/components/portfolio/portfolio-format";
 import type { EquityCurvePoint } from "@/lib/api/portfolio-types";
+import { chartColor } from "@/lib/charts/css-var";
+import { sanitizeLinePoints } from "@/lib/charts/series-data";
 import { logger } from "@/lib/logger";
 import { formatBrasiliaTick, formatBrasiliaWithUtcTooltip } from "@/lib/time";
 
@@ -48,11 +50,6 @@ function useThemeAttribute(): ThemeName {
   return theme;
 }
 
-function cssVar(name: string): string {
-  if (typeof window === "undefined") return "";
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-}
-
 function toUnix(iso: string): UTCTimestamp {
   return Math.floor(new Date(iso).getTime() / 1000) as UTCTimestamp;
 }
@@ -63,7 +60,7 @@ function attachSeries(
   points: EquityCurvePoint[],
   currency: ChartCurrency,
 ): { series: ISeriesApi<"Line">; markers: ISeriesMarkersPluginApi<Time> } {
-  const series = chart.addSeries(LineSeries, { color: cssVar("--color-info"), lineWidth: 2 });
+  const series = chart.addSeries(LineSeries, { color: chartColor("--color-info"), lineWidth: 2 });
   series.setData(toSeriesData(points, currency));
   return { series, markers: createSeriesMarkers(series, []) };
 }
@@ -71,10 +68,10 @@ function attachSeries(
 /** Mirrors `candles-chart.tsx`'s own `layoutOptions()` -- extracted so the creation effect stays under the statement-count lint budget. */
 function chartLayoutOptions() {
   return {
-    layout: { background: { color: "transparent" as const }, textColor: cssVar("--color-fg-muted") },
+    layout: { background: { color: "transparent" as const }, textColor: chartColor("--color-fg-muted") },
     grid: {
-      vertLines: { color: cssVar("--color-border") },
-      horzLines: { color: cssVar("--color-border") },
+      vertLines: { color: chartColor("--color-border") },
+      horzLines: { color: chartColor("--color-border") },
     },
   };
 }
@@ -102,12 +99,15 @@ function brasiliaCrosshairLabel(time: Time): string {
  * which is what lets a marker attach to it below.
  */
 function toSeriesData(points: EquityCurvePoint[], currency: ChartCurrency): (LineData<Time> | WhitespaceData<Time>)[] {
-  return points.map((p) => {
+  const raw = points.map((p) => {
     const time = toUnix(p.ts);
     if (currency === "usdt") return { time, value: Number(p.equity) };
     if (p.brl_equity === null) return { time };
     return { time, value: Number(p.brl_equity) };
   });
+  // T3.31: non-finite values dropped, sorted and deduped by time before this
+  // ever reaches `lightweight-charts` (`.claude/state/notes-T3.31.md`).
+  return sanitizeLinePoints(raw);
 }
 
 function missingBrlPoints(points: EquityCurvePoint[]): EquityCurvePoint[] {
@@ -152,6 +152,11 @@ export function PortfolioEquityChart({ points, asOf }: PortfolioEquityChartProps
   useEffect(() => {
     if (!container) return undefined;
 
+    // T3.31: an effect-local flag (not the mutable `chartRef`) so a callback
+    // that outlives this effect (e.g. a `resize` event already queued the
+    // instant cleanup runs) can never act on an already-torn-down chart --
+    // idempotent under React strict mode's mount/cleanup/mount cycle.
+    let disposed = false;
     let chart: IChartApi | undefined;
     try {
       chart = createChart(container, {
@@ -182,10 +187,14 @@ export function PortfolioEquityChart({ points, asOf }: PortfolioEquityChartProps
 
     chartRef.current = chart;
     setFailed(false);
-    const resize = () => chart?.applyOptions({ width: container.clientWidth });
+    const resize = () => {
+      if (disposed) return;
+      chart?.applyOptions({ width: container.clientWidth });
+    };
     resize();
     window.addEventListener("resize", resize);
     return () => {
+      disposed = true;
       window.removeEventListener("resize", resize);
       chart?.remove();
       clearRefs();
@@ -198,7 +207,7 @@ export function PortfolioEquityChart({ points, asOf }: PortfolioEquityChartProps
     const series = seriesRef.current;
     if (!chart || !series) return;
     chart.applyOptions(chartLayoutOptions());
-    series.applyOptions({ color: cssVar("--color-info") });
+    series.applyOptions({ color: chartColor("--color-info") });
   }, [theme]);
 
   useEffect(() => {
@@ -206,7 +215,7 @@ export function PortfolioEquityChart({ points, asOf }: PortfolioEquityChartProps
     if (!series) return;
     series.setData(toSeriesData(points, currency));
 
-    const markerColor = cssVar("--color-warning");
+    const markerColor = chartColor("--color-warning");
     const markers: SeriesMarker<Time>[] =
       currency === "brl"
         ? missing.map((p) => ({
