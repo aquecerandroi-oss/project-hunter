@@ -74,10 +74,19 @@ class Constraints:
     unit_interval: frozenset[str] = frozenset()
     """``0 < x <= 1`` — probabilidade declarada, não uma nota de 0 a 100."""
 
+    bounded: tuple[tuple[str, Decimal, Decimal], ...] = ()
+    """Faixas ``(nome, piso, teto)`` **inclusivas** do domínio: uma hora UTC fora
+    de 0..23 não é um limiar frouxo, é uma versão que nunca dispara. Separada de
+    ``ordered`` porque ali os dois lados são parâmetros, aqui nenhum é."""
+
     ordered: tuple[tuple[str, str], ...] = ()
     """Pares ``(piso, teto)`` que a estratégia compara: ``piso < teto``,
     estrito. Igual já seria uma janela vazia, e vazia nunca dispara."""
 
+
+_SESSION_HOURS: Final = ("session_asia_open_h", "session_europe_open_h", "session_us_open_h")
+"""As três horas de abertura da ``session_orb_v1``, na ordem declarada: a mesma
+lista responde pela faixa 0..23 e pela ordem asia < europe < us."""
 
 _COSTS: Final = frozenset({"assumed_spread_bps", "slippage_bps", "fee_bps"})
 """Os três ``bps`` que ``AssumedCosts`` já declara ``ge=0`` — repetidos aqui
@@ -157,6 +166,27 @@ CONSTRAINTS: Final[Mapping[str, Constraints]] = {
             ("atr_pct_min", "atr_pct_max"),
             ("target_atr", "target2_atr"),
             ("target2_atr", "target3_atr"),
+        ),
+    ),
+    "session_orb_v1": Constraints(
+        positive=frozenset(
+            "range_bars session_window_bars rvol_window atr_period atr_bars atr_pct_max "
+            "range_risk_atr_min range_risk_atr_max target_r target2_r horizon_s "
+            "max_entry_delay_s".split()
+        ),
+        non_negative=frozenset({*_SESSION_HOURS, "rvol_min", "atr_pct_min"}) | _COSTS,
+        unit_interval=frozenset({"base_confidence"}),
+        bounded=(
+            *((hour, Decimal(0), Decimal(23)) for hour in _SESSION_HOURS),
+            ("session_window_bars", Decimal(1), Decimal(24)),
+        ),
+        ordered=(
+            ("atr_pct_min", "atr_pct_max"),
+            ("range_risk_atr_min", "range_risk_atr_max"),
+            ("target_r", "target2_r"),
+            ("session_asia_open_h", "session_europe_open_h"),
+            ("session_europe_open_h", "session_us_open_h"),
+            ("range_bars", "session_window_bars"),
         ),
     ),
     "volume_anomaly_v1": Constraints(
@@ -245,6 +275,10 @@ def _table_rules(rules: Constraints, params: Mapping[str, Any]) -> list[str]:
         value = _number(params.get(name))
         if value is not None and not 0 < value <= 1:
             problems.append(f"{name}={value} está fora de (0, 1]")
+    for name, low, high in rules.bounded:
+        value = _number(params.get(name))
+        if value is not None and not low <= value <= high:
+            problems.append(f"{name}={value} está fora de [{low}, {high}]")
     for low, high in rules.ordered:
         floor, ceiling = _number(params.get(low)), _number(params.get(high))
         if floor is not None and ceiling is not None and floor >= ceiling:

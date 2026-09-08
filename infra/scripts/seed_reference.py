@@ -65,6 +65,12 @@ STRATEGIES: tuple[tuple[str, str, str, str], ...] = (
         "Pullback bought inside a higher-timeframe uptrend, on a close stretched below its mean.",
     ),
     ("derivatives", "Derivatives", "derivatives", "Funding, open interest and liquidation setups."),
+    (
+        "session_orb",
+        "Session ORB",
+        "trend",
+        "Breakout of the opening range of a declared UTC session, confirmed by volume.",
+    ),
     ("narrative", "Narrative", "intelligence", "Narrative and news driven flow (Phase 2)."),
     ("ensemble", "Ensemble", "meta", "Weighted combination of the other strategies."),
 )

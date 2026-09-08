@@ -29,20 +29,23 @@ from hunter_core.strategies.canonical import canonical_json, params_hash
 from hunter_core.strategies.mean_reversion_v1 import MEAN_REVERSION_V1
 from hunter_core.strategies.momentum_v1 import MOMENTUM_V1
 from hunter_core.strategies.registry import DEFAULT_REGISTRY, StrategyRegistry
+from hunter_core.strategies.session_orb_v1 import SESSION_ORB_V1
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 
 from .test_breakout_v1 import context as breakout_context
 from .test_mean_reversion_v1 import context as mean_reversion_context
 from .test_momentum_v1 import context as momentum_context
+from .test_session_orb_v1 import context as session_orb_context
 from .test_volume_anomaly_v1 import context as volume_context
 
 pytestmark = pytest.mark.unit
 
-STRATEGIES = [BREAKOUT_V1, MEAN_REVERSION_V1, MOMENTUM_V1, VOLUME_ANOMALY_V1]
+STRATEGIES = [BREAKOUT_V1, MEAN_REVERSION_V1, MOMENTUM_V1, SESSION_ORB_V1, VOLUME_ANOMALY_V1]
 CONTEXTS = {
     BREAKOUT_V1.key: breakout_context,
     MEAN_REVERSION_V1.key: mean_reversion_context,
     MOMENTUM_V1.key: momentum_context,
+    SESSION_ORB_V1.key: session_orb_context,
     VOLUME_ANOMALY_V1.key: volume_context,
 }
 _KNOWN_KEYWORDS = frozenset(
@@ -133,7 +136,8 @@ def test_an_unknown_version_never_falls_back() -> None:
     with pytest.raises(KeyError, match="breakout_v1 v2"):
         DEFAULT_REGISTRY.get("breakout_v1", "v2")
     with pytest.raises(KeyError):
-        DEFAULT_REGISTRY.get("session_orb_v1", "v1")
+        # a family seeded in the reference catalogue with no module in this build
+        DEFAULT_REGISTRY.get("order_flow_v1", "v1")
 
 
 def test_registering_the_same_version_twice_is_refused() -> None:
@@ -203,8 +207,18 @@ def test_the_versions_do_not_share_an_identity() -> None:
             MEAN_REVERSION_V1,
             "8918b39b73fb5b71c6b9dea1f4394464056c8ad94d9c3f09634ffce37667854e",
         ),
+        (
+            SESSION_ORB_V1,
+            "cdb9516b293276095f4a8c2210d60ade0a4448cac46cce827f58bc3f8908d5e0",
+        ),
     ],
-    ids=["momentum_v1", "volume_anomaly_v1", "breakout_v1", "mean_reversion_v1"],
+    ids=[
+        "momentum_v1",
+        "volume_anomaly_v1",
+        "breakout_v1",
+        "mean_reversion_v1",
+        "session_orb_v1",
+    ],
 )
 def test_the_params_hash_is_pinned(strategy: Strategy, expected: str) -> None:
     """Golden identity of the frozen v1 parameter sets."""

@@ -30,6 +30,7 @@ from hunter_core.strategies.breakout_v1 import BREAKOUT_V1
 from hunter_core.strategies.canonical import canonical_json
 from hunter_core.strategies.mean_reversion_v1 import MEAN_REVERSION_V1
 from hunter_core.strategies.momentum_v1 import MOMENTUM_V1
+from hunter_core.strategies.session_orb_v1 import SESSION_ORB_V1
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 
 from .conftest import EXCHANGE, ORIGIN, SYMBOL, BarSpec, D, explode, flat, minute, series
@@ -41,6 +42,8 @@ from .test_mean_reversion_v1 import FORMING_HOUR_CUT, forming_hour_series
 from .test_mean_reversion_v1 import build_series as mean_reversion_series
 from .test_momentum_v1 import CUT as MOMENTUM_CUT
 from .test_momentum_v1 import build_series as momentum_series
+from .test_session_orb_v1 import CUT as SESSION_ORB_CUT
+from .test_session_orb_v1 import build_series as session_orb_series
 from .test_volume_anomaly_v1 import CUT as VOLUME_CUT
 from .test_volume_anomaly_v1 import build_series as volume_series
 
@@ -476,6 +479,93 @@ def test_the_breakout_numbers_do_not_depend_on_the_ambient_decimal_context(
         context.prec = prec
         context.rounding = rounding
         narrowed = BREAKOUT_V1.evaluate(ctx, params)
+
+    assert baseline is not None and narrowed is not None
+    assert narrowed == baseline
+    assert _envelope_json(narrowed) == _envelope_json(baseline)
+
+
+# ------------------------------------------------------------------ session_orb_v1 (T3.33c)
+
+
+def session_orb_decision(candles: list[NormalizedCandle]) -> Decision | None:
+    return SESSION_ORB_V1.evaluate(
+        ctx_of(candles, SESSION_ORB_CUT), SESSION_ORB_V1.default_parameters
+    )
+
+
+def test_session_orb_is_identical_under_three_kinds_of_pollution() -> None:
+    """As três mutações do brief T3.33c §11.6, comparadas no JSON canônico do
+    envelope: uma vela **não final** dentro da janela, uma vela final que fecha
+    **depois** do corte, e um futuro adulterado. A sessão vem de
+    ``source_bar_close``, então nenhuma delas pode mover a faixa de abertura."""
+    clean = session_orb_series()
+    baseline = session_orb_decision(clean)
+
+    forming_inside = minute(
+        SESSION_ORB_CUT - timedelta(minutes=1),
+        D("100"),
+        D("9999"),
+        D("0.01"),
+        D("5000"),
+        D("999999"),
+        is_final=False,
+    )
+    after_the_cut = explode(ABSURD, SESSION_ORB_CUT, 15)
+    another_future = explode(
+        BarSpec(D("100"), D("101"), D("1"), D("2"), D("7")), SESSION_ORB_CUT, 15
+    )
+
+    assert baseline is not None
+    for polluted in (
+        [*clean, forming_inside],
+        [*clean, *after_the_cut],
+        [*clean, *another_future],
+        [*clean, forming_inside, *after_the_cut],
+    ):
+        decision = session_orb_decision(polluted)
+        assert decision == baseline
+        assert _envelope_json(decision) == _envelope_json(baseline)
+
+
+@pytest.mark.parametrize(
+    ("high", "low", "close", "volume"),
+    [
+        (D("9999"), D("0.01"), D("5000"), D("999999")),
+        (D("100"), D("100"), D("100"), D("0")),
+        (D("102"), D("99"), D("101.9"), D("300")),
+    ],
+    ids=["absurd", "flat", "plausible"],
+)
+def test_mutating_the_forming_candle_never_moves_the_session_orb(
+    high: Decimal, low: Decimal, close: Decimal, volume: Decimal
+) -> None:
+    clean = session_orb_series()
+    forming = minute(
+        SESSION_ORB_CUT - timedelta(minutes=1), D("100"), high, low, close, volume, is_final=False
+    )
+
+    baseline = session_orb_decision(clean)
+
+    assert baseline is not None
+    assert session_orb_decision([*clean, forming]) == baseline
+    assert _envelope_json(session_orb_decision([*clean, forming])) == _envelope_json(baseline)
+
+
+@pytest.mark.parametrize("prec", [2, 6, 28])
+@pytest.mark.parametrize("rounding", [ROUND_DOWN, ROUND_UP, ROUND_HALF_EVEN])
+def test_the_session_orb_numbers_do_not_depend_on_the_ambient_decimal_context(
+    prec: int, rounding: str
+) -> None:
+    ctx = ctx_of(session_orb_series(), SESSION_ORB_CUT)
+    params = SESSION_ORB_V1.default_parameters
+
+    baseline = SESSION_ORB_V1.evaluate(ctx, params)
+
+    with localcontext() as context:
+        context.prec = prec
+        context.rounding = rounding
+        narrowed = SESSION_ORB_V1.evaluate(ctx, params)
 
     assert baseline is not None and narrowed is not None
     assert narrowed == baseline

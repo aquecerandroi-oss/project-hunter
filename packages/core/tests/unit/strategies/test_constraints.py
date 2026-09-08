@@ -14,6 +14,7 @@ Run: ``uv run pytest packages/core/tests/unit/strategies/test_constraints.py -q`
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -29,6 +30,7 @@ from hunter_core.strategies.constraints import (
 )
 from hunter_core.strategies.momentum_v1 import MOMENTUM_V1
 from hunter_core.strategies.registry import DEFAULT_REGISTRY
+from hunter_core.strategies.session_orb_v1 import SESSION_ORB_V1
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 
 pytestmark = pytest.mark.unit
@@ -42,6 +44,7 @@ def _wire(strategy: Any) -> dict[str, Any]:
 MOMENTUM = _wire(MOMENTUM_V1)
 VOLUME = _wire(VOLUME_ANOMALY_V1)
 BREAKOUT = _wire(BREAKOUT_V1)
+SESSION_ORB = _wire(SESSION_ORB_V1)
 
 
 def _variant(parent: dict[str, Any], **overrides: str) -> dict[str, Any]:
@@ -59,6 +62,9 @@ class TestTheFrozenContractsPassTheirOwnCheck:
 
     def test_breakout_v1_passes_against_itself(self) -> None:
         assert check_ranges(BREAKOUT_V1, BREAKOUT, BREAKOUT) == []
+
+    def test_session_orb_v1_passes_against_itself(self) -> None:
+        assert check_ranges(SESSION_ORB_V1, SESSION_ORB, SESSION_ORB) == []
 
     def test_the_variant_that_actually_shipped_passes(self) -> None:
         """``momentum v4``: piso de custo em ``atr_pct_min`` (KB-0008, EXP-0006)."""
@@ -126,6 +132,100 @@ class TestBreakoutV1Ranges:
         assert BREAKOUT["stop_atr"] == "1.25"
         assert BREAKOUT["target_atr"] == "2.5"
         assert BREAKOUT["atr_pct_min"] == "0.005"
+
+
+class TestSessionOrbV1Ranges:
+    """T3.33c: a versão que trouxe a regra ``bounded`` — uma hora UTC fora de
+    0..23 não é um limiar frouxo, é uma versão congelada que nunca dispara."""
+
+    @pytest.mark.parametrize(
+        ("override", "fragment"),
+        [
+            ({"session_us_open_h": "24"}, "session_us_open_h=24 está fora de [0, 23]"),
+            ({"session_us_open_h": "99"}, "session_us_open_h=99 está fora de [0, 23]"),
+            ({"session_europe_open_h": "-1"}, "session_europe_open_h=-1 está fora de [0, 23]"),
+            ({"session_europe_open_h": "-1"}, "session_europe_open_h=-1 é negativo"),
+            ({"session_window_bars": "48"}, "session_window_bars=48 está fora de [1, 24]"),
+            ({"session_window_bars": "0"}, "session_window_bars=0 não é positivo"),
+            ({"target_r": "0"}, "target_r=0 não é positivo"),
+            ({"base_confidence": "42"}, "base_confidence=42 está fora de (0, 1]"),
+            (
+                {"range_risk_atr_min": "2.5"},
+                "range_risk_atr_min=2.5 não é menor que range_risk_atr_max=2.5",
+            ),
+            (
+                {"range_risk_atr_min": "3"},
+                "range_risk_atr_min=3 não é menor que range_risk_atr_max=2.5",
+            ),
+            (
+                {"session_asia_open_h": "8"},
+                "session_asia_open_h=8 não é menor que session_europe_open_h=7",
+            ),
+            (
+                {"session_europe_open_h": "13"},
+                "session_europe_open_h=13 não é menor que session_us_open_h=13",
+            ),
+            (
+                {"range_bars": "20"},
+                "range_bars=20 não é menor que session_window_bars=20",
+            ),
+        ],
+    )
+    def test_a_variant_out_of_range_is_refused_by_name(
+        self, override: dict[str, str], fragment: str
+    ) -> None:
+        problems = check_ranges(SESSION_ORB_V1, SESSION_ORB, _variant(SESSION_ORB, **override))
+
+        assert fragment in problems, problems
+
+    @pytest.mark.parametrize(
+        ("name", "hour"), [("session_us_open_h", "23"), ("session_asia_open_h", "0")]
+    )
+    def test_the_two_ends_of_the_declared_day_are_accepted(self, name: str, hour: str) -> None:
+        """A faixa é inclusiva: 0 e 23 são horas UTC legítimas."""
+        assert (
+            check_ranges(SESSION_ORB_V1, SESSION_ORB, _variant(SESSION_ORB, **{name: hour})) == []
+        )
+
+    def test_the_geometry_probe_does_not_apply_and_does_not_pretend_to(self) -> None:
+        """Não há ``stop_atr``: o stop é a mínima da faixa, um dado. A prova de
+        geometria de ``_typed_probe`` fica de fora, como já fica na
+        ``volume_anomaly_v1`` — inventar uma seria inventar um contrato."""
+        problems = check_ranges(SESSION_ORB_V1, SESSION_ORB, SESSION_ORB)
+
+        assert problems == []
+        assert "stop_atr" not in SESSION_ORB
+
+    def test_the_declared_defaults_are_the_ones_the_module_freezes(self) -> None:
+        assert SESSION_ORB["session_asia_open_h"] == "0"
+        assert SESSION_ORB["session_europe_open_h"] == "7"
+        assert SESSION_ORB["session_us_open_h"] == "13"
+        assert SESSION_ORB["range_bars"] == "4"
+        assert SESSION_ORB["session_window_bars"] == "20"
+        assert SESSION_ORB["rvol_min"] == "1.3"
+        assert SESSION_ORB["range_risk_atr_min"] == "1"
+        assert SESSION_ORB["range_risk_atr_max"] == "2.5"
+        assert SESSION_ORB["target_r"] == "2"
+
+
+class TestTheBoundedRuleItself:
+    """A regra nova, isolada da estratégia que a pediu."""
+
+    def test_a_bound_only_bites_the_parameter_it_names(self) -> None:
+        rules = Constraints(bounded=(("hour", Decimal(0), Decimal(23)),))
+
+        assert rules.bounded[0][0] == "hour"
+
+    def test_an_absent_parameter_is_not_out_of_range(self) -> None:
+        """Ausência é problema do schema congelado, não da faixa."""
+        assert check_ranges(SESSION_ORB_V1, SESSION_ORB, {}) == []
+
+    def test_a_bound_is_inclusive_on_both_ends(self) -> None:
+        low = _variant(SESSION_ORB, session_asia_open_h="0")
+        high = _variant(SESSION_ORB, session_window_bars="24")
+
+        assert check_ranges(SESSION_ORB_V1, SESSION_ORB, low) == []
+        assert check_ranges(SESSION_ORB_V1, SESSION_ORB, high) == []
 
 
 class TestTheProbesFromTheReview:

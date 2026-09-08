@@ -15,6 +15,7 @@ from hunter_core.strategies.base import Strategy
 from hunter_core.strategies.breakout_v1 import BREAKOUT_V1
 from hunter_core.strategies.mean_reversion_v1 import MEAN_REVERSION_V1
 from hunter_core.strategies.momentum_v1 import MOMENTUM_V1
+from hunter_core.strategies.session_orb_v1 import SESSION_ORB_V1
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 
 
@@ -45,6 +46,6 @@ class StrategyRegistry:
 
 
 DEFAULT_REGISTRY = StrategyRegistry(
-    (BREAKOUT_V1, MEAN_REVERSION_V1, MOMENTUM_V1, VOLUME_ANOMALY_V1)
+    (BREAKOUT_V1, MEAN_REVERSION_V1, MOMENTUM_V1, SESSION_ORB_V1, VOLUME_ANOMALY_V1)
 )
 """The v0 Shadow Lab roster. LONG only, ``research_only`` (SHADOW-LAB.md §10)."""
