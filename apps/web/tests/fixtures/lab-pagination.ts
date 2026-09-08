@@ -10,7 +10,15 @@ import { exampleRuler, exampleSignal, exampleSummary, makeSignal } from "./lab";
 
 /** Real, whole-dataset totals (never a per-page count); shaped after the brief's "929 evaluable" example, not the buggy counts it describes. */
 export function exampleSignalsTotals(overrides: Partial<LabSignalsTotals> = {}): LabSignalsTotals {
-  return { closed: 929, open: 340, pending: 866, all: 2135, ...overrides };
+  return {
+    closed: 929,
+    open: 340,
+    pending: 866,
+    all: 2135,
+    // T3.38a: operações únicas (versões irmãs contadas uma vez) -- sempre <= o bruto.
+    distinct_operations: { closed: 700, open: 300, pending: 866, all: 1866 },
+    ...overrides,
+  };
 }
 
 export function exampleSignalsPageRange(overrides: Partial<LabSignalsPageRange> = {}): LabSignalsPageRange {

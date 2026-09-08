@@ -37,7 +37,7 @@ describe("LabSignalsTable: identical sibling-version signals collapse into one r
         {...exampleLabSignalsTableProps({
           items: exampleSiblingSignals(),
           versionLabelById: SIBLING_VERSION_LABELS,
-          totals: { closed: 3, open: 0, pending: 0, all: 3 },
+          totals: { closed: 3, open: 0, pending: 0, all: 3, distinct_operations: { closed: 1, open: 0, pending: 0, all: 1 } },
         })}
       />,
     );

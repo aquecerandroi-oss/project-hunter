@@ -22,7 +22,7 @@ function ScoreboardPreview() {
   return <LabScoreboardCard row={exampleScoreboardRow()} ruler={exampleRuler()} />;
 }
 
-const PREVIEW_TOTALS = { closed: 1, open: 0, pending: 0, all: 1 };
+const PREVIEW_TOTALS = { closed: 1, open: 0, pending: 0, all: 1, distinct_operations: { closed: 1, open: 0, pending: 0, all: 1 } };
 const PREVIEW_HREFS = { concluded: "#", open: "#", pending: "#", all: "#" };
 
 function SignalsPreview() {

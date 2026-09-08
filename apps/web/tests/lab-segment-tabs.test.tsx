@@ -73,7 +73,10 @@ describe("LabSegmentTabs: tab title states 'N sinais · K operações únicas' (
   });
 
   it("falls back to the same signals count until the API provides distinct_operations", () => {
-    render(<LabSegmentTabs state="closed" totals={exampleSignalsTotals()} hrefs={hrefs} />);
+    // A fixture traz distinct_operations (T3.38a); este caso é a resposta de uma API mais velha.
+    const withoutDistinct = { ...exampleSignalsTotals() };
+    delete withoutDistinct.distinct_operations;
+    render(<LabSegmentTabs state="closed" totals={withoutDistinct} hrefs={hrefs} />);
     expect(screen.getByRole("tab", { name: "Concluídas (929)" })).toHaveAttribute("title", "929 sinais · 929 operações únicas");
   });
 });

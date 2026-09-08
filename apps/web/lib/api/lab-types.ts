@@ -243,7 +243,9 @@ export interface DistinctOperationsOut {
  * and optional across an intersection to required) -- nothing here needs to
  * change at that point.
  */
-export type LabSignalsTotals = components["schemas"]["SegmentTotalsOut"] & {
+// A API publica `distinct_operations` sempre (T3.38a); a tela tolera a ausência com o
+// fallback honesto (conta bruta), para fixtures antigas e para respostas de uma API mais velha.
+export type LabSignalsTotals = Omit<components["schemas"]["SegmentTotalsOut"], "distinct_operations"> & {
   distinct_operations?: DistinctOperationsOut;
 };
 
