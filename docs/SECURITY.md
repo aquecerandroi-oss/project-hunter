@@ -89,7 +89,7 @@ Implementação: `require_role(min_role)` como dependência FastAPI; papéis ord
 
 | Limite | Onde | Chave Redis | Variável |
 |---|---|---|---|
-| Por endereço | `RateLimitMiddleware`, antes do roteamento | `hunter:rl:ip:{ip}` (+ `hunter:rl:delivery:{svix-id}` no webhook do Clerk) | `RATE_LIMIT_PER_MINUTE` |
+| Por endereço | `RateLimitMiddleware`, antes do roteamento | `hunter:rl:ip:{ip}` (+ `hunter:rl:delivery:{svix-id}` no webhook do Clerk) | `RATE_LIMIT_PER_MINUTE`, ou `RATE_LIMIT_PER_MINUTE_INTERNAL` para um peer em `INTERNAL_PEER_IPS` — o IP fixo do `web` no compose, cujo SSR fala com a api sem passar pelo Caddy (T3.28a, DEPLOYMENT.md) |
 | Por principal | `auth.rbac.get_principal`, depois de verificar o token | `hunter:rl:principal:{user_id}` | `RATE_LIMIT_PER_MINUTE_PRINCIPAL` |
 | Handshake WS | `realtime.endpoint`, antes do `accept()` | `hunter:rl:ws:{ip}` | `WS_HANDSHAKES_PER_MINUTE` |
 

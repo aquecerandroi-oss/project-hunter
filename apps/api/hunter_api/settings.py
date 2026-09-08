@@ -32,6 +32,28 @@ class ApiSettings(Settings):
     browser session is chattier than any single address should be, and this
     exists to bound one account spread over many addresses, not to be the
     tighter of the two."""
+
+    rate_limit_per_minute_internal: int = 6000
+    """Requests per minute for a client address listed in ``internal_peer_ips``
+    (T3.28a). The web service's own server-side (SSR) fetches to this API all
+    arrive from one TCP peer — the ``web`` container's address — no matter how
+    many browsers they are actually rendering for; without a separate, wider
+    limit for that one known address, ``rate_limit_per_minute`` becomes a
+    budget for the whole site's server-rendered traffic instead of a budget
+    for one abusive caller."""
+
+    internal_peer_ips: str = ""
+    """Comma-separated TCP peer addresses that get ``rate_limit_per_minute_internal``
+    instead of ``rate_limit_per_minute`` on the per-address bucket in
+    :mod:`hunter_api.middleware.rate_limit`. This is not a header-trust list —
+    unlike ``forwarded_allow_ips``, nothing here changes what ``uvicorn``
+    trusts or what ``request.client.host`` is rewritten to; it only widens the
+    bucket for a peer address the deployment already knows is internal (the
+    ``web`` service's fixed compose IP — ``infra/docker/docker-compose.yml`` /
+    ``infra/vps/docker-compose.prod.yml``, never ``.env``). Empty by default,
+    so a bare ``ApiSettings()`` in tests keeps the narrow limit for every
+    address."""
+
     enable_openapi_docs: bool = False
     ready_check_timeout_s: float = 3.0
     forwarded_allow_ips: str = "127.0.0.1"
@@ -98,6 +120,12 @@ class ApiSettings(Settings):
         if not self.cors_allowed_origins:
             self.cors_allowed_origins = self.cors_origins()
         return self
+
+    @property
+    def internal_peer_ip_set(self) -> frozenset[str]:
+        """``internal_peer_ips`` parsed once, for the middleware's per-request
+        membership check."""
+        return frozenset(ip.strip() for ip in self.internal_peer_ips.split(",") if ip.strip())
 
     @property
     def openapi_enabled(self) -> bool:

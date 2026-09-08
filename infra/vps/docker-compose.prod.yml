@@ -64,6 +64,14 @@ services:
       # rate limit por endereco (um visitante abusivo derruba o limite de
       # todos). IP fixo definido na rede `default` abaixo.
       FORWARDED_ALLOW_IPS: 172.28.0.10
+      # T3.28a — web's SSR fetches to this api go straight over the compose
+      # network (API_URL below), never through Caddy, so they all arrive
+      # from web's own fixed address, not Caddy's — an address that must
+      # NOT be added to FORWARDED_ALLOW_IPS (web does not forward the
+      # browser's real address on that call today) but that would otherwise
+      # share RATE_LIMIT_PER_MINUTE across the whole site's server-rendered
+      # traffic. Must match web's `networks.default.ipv4_address` below.
+      INTERNAL_PEER_IPS: 172.28.0.11
       WEB_ORIGIN: ${HUNTER_PUBLIC_URL:?defina HUNTER_PUBLIC_URL no .env}
       # CORS_ALLOWED_ORIGINS fica de fora de proposito: ApiSettings declara
       # list[str] e o pydantic-settings tenta json.loads no valor antes do
@@ -219,6 +227,13 @@ services:
       WEB_ORIGIN: ${HUNTER_PUBLIC_URL}
     ports: !override
       - "127.0.0.1:3000:3000"
+    # T3.28a — fixed address so the api's INTERNAL_PEER_IPS (above) can name
+    # it; same ip_range reasoning as Caddy's .10 pin (README.md / the
+    # `networks` block at the bottom of this file), one address away so
+    # the two static pins never collide.
+    networks:
+      default:
+        ipv4_address: 172.28.0.11
     logging: *prod-logging
 
   caddy:

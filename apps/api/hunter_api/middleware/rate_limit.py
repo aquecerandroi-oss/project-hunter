@@ -39,6 +39,33 @@ is started (``main.py``) with ``proxy_headers=True`` and
 peer is that trusted address (the platform ingress in production) — from
 any other peer, including one presenting a forged ``X-Forwarded-For``, the
 real TCP peer address is what lands in ``request.client.host``.
+
+Trust chain, end to end: browser -> Caddy (sets ``X-Forwarded-For`` to the
+browser's address) -> ``api`` (uvicorn rewrites ``request.client`` from it,
+because Caddy's fixed compose IP is in ``forwarded_allow_ips``). A server
+component's own fetch (Next.js SSR) never goes through Caddy — ``web`` calls
+``api`` directly over the compose network (``API_URL=http://api:8000``) — so
+its peer is the ``web`` container, an address that is *not* in
+``forwarded_allow_ips`` and never should be: ``web`` does not currently
+propagate the browser's address on that call (it would need ``Headers()``
+inside the Server Component and a header the API trusts only from that one
+peer — out of this module's scope, since it lives in ``apps/web``), so the
+real TCP peer — ``web``'s own address — is what lands in
+``request.client.host`` for every SSR request, correctly rejecting a forged
+header but also making one shared address of the entire site's
+server-rendered traffic (T3.28a).
+
+``_ip_rate_limit`` is the fix that does not require ``apps/web`` to change:
+a peer address the deployment lists in ``ApiSettings.internal_peer_ips`` (the
+``web`` service's own fixed compose IP, set directly in the compose files —
+see ``ApiSettings.internal_peer_ips``) gets ``rate_limit_per_minute_internal``
+instead of ``rate_limit_per_minute`` for the address bucket. This is a
+peer-address lookup, not a second header to trust: nothing an actual client
+sends can move a request into the wider bucket, since ``request.client.host``
+already went through the rewrite rules above before this check ever runs. The
+principal bucket (``enforce_principal_limit``, 600/min) is untouched by this —
+an authenticated request behind the ``web`` peer is still bound by its own
+account's limit, same as one behind any other address.
 """
 
 from __future__ import annotations
@@ -113,8 +140,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if redis_client is not None:
             try:
                 allowed = await _under_limit(
-                    redis_client, client_keys, self._settings.rate_limit_per_minute
+                    redis_client, client_keys[:1], _ip_rate_limit(request, self._settings)
                 )
+                if allowed and len(client_keys) > 1:
+                    allowed = await _under_limit(
+                        redis_client, client_keys[1:], self._settings.rate_limit_per_minute
+                    )
             except Exception:
                 self._log_fail_open(client_keys[0])
                 allowed = True
@@ -158,6 +189,24 @@ def _client_keys(request: Request) -> list[str]:
     if delivery_key:
         keys.append(f"hunter:rl:delivery:{delivery_key}")
     return keys
+
+
+def _ip_rate_limit(request: Request, settings: ApiSettings) -> int:
+    """The per-address limit for this request's TCP peer (T3.28a).
+
+    ``rate_limit_per_minute`` ordinarily, or ``rate_limit_per_minute_internal``
+    when that peer is listed in ``settings.internal_peer_ips`` — the ``web``
+    service's own fixed address, whose SSR fetches to this API all land on one
+    peer no matter how many browsers they are serving. This is a lookup
+    against the address that already survived the proxy-trust rewrite in
+    ``main.py``/uvicorn, not a second thing to trust: nothing a caller sends
+    on the wire moves its own request into the wider bucket.
+    """
+    client = request.client
+    ip = client.host if client is not None else "unknown"
+    if ip in settings.internal_peer_ip_set:
+        return settings.rate_limit_per_minute_internal
+    return settings.rate_limit_per_minute
 
 
 async def enforce_principal_limit(request: Request, principal_id: str) -> None:

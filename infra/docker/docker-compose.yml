@@ -73,6 +73,16 @@ services:
       <<: *api-env
       HUNTER_ROLE: api
       WEB_ORIGIN: http://localhost:3000
+      # T3.28a — the web container's own SSR fetches to this api all arrive
+      # from one TCP peer (web's fixed address below), which is not in
+      # FORWARDED_ALLOW_IPS and never should be (web does not forward the
+      # browser's real address on that call). Without this, that one address
+      # shares RATE_LIMIT_PER_MINUTE (120/min) across the whole site's
+      # server-rendered traffic — see the design-audit measurement in
+      # .claude/state/notes-T3.28a.md and the trust-chain docstring in
+      # hunter_api/middleware/rate_limit.py. The IP has to match web's
+      # `networks.default.ipv4_address` below.
+      INTERNAL_PEER_IPS: 172.29.0.10
     env_file:
       - path: ../../.env
         required: false
@@ -411,7 +421,24 @@ services:
       - "3000:3000"
     depends_on:
       - api
+    # T3.28a — a fixed address so the api's INTERNAL_PEER_IPS (above) can
+    # name it. The subnet below only exists to make this address stable
+    # across restarts; every other container keeps Docker's normal dynamic
+    # allocation (mirrors infra/vps/docker-compose.prod.yml's Caddy pin,
+    # same reasoning: a fixed low address inside the allocator's own range
+    # can be stolen by a container recreated without one, so the dynamic
+    # range is restricted below to leave .1-.127 for pins like this).
+    networks:
+      default:
+        ipv4_address: 172.29.0.10
 
 volumes:
   hunter_pg:
   hunter_redis:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
+          ip_range: 172.29.0.128/25
