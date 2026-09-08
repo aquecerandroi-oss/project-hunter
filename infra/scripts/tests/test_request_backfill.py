@@ -112,3 +112,74 @@ def test_the_event_id_matches_the_one_the_scanner_would_publish() -> None:
     assert module.envelope_for(chunk, "binance").event_id == event_id_for(
         Streams.MARKET_BACKFILL_REQUESTED, MARKET, chunk.gap_start, chunk.gap_end
     )
+
+
+# ---- --kind funding (T3.7c) -------------------------------------------------
+
+
+def test_the_funding_window_has_no_bar_or_settled_grace() -> None:
+    """Unlike ``window_for`` (candles), funding has no per-minute anchor bar
+    and no settled-grace clamp -- the collector's own ``normalize_window``
+    clamps the tail when the request is actually served."""
+    module = _load_module()
+
+    start, end = module.funding_window_for(NOW, 31)
+
+    assert end == NOW.replace(second=0, microsecond=0)
+    assert end - start == timedelta(days=31)
+
+
+def test_a_funding_window_wider_than_the_ceiling_is_clamped_to_its_recent_end() -> None:
+    module = _load_module()
+    import backfill_funding
+
+    start, end = module.funding_window_for(NOW, 400)
+
+    assert end - start == timedelta(days=backfill_funding.MAX_REQUEST_DAYS)
+
+
+def test_one_funding_request_is_published_per_market_not_per_seven_days() -> None:
+    module = _load_module()
+    start, end = module.funding_window_for(NOW, 31)
+    targets = [
+        module.Target(market_id=MARKET, symbol="BTCUSDT"),
+        module.Target(market_id=UUID("22222222-2222-7222-8222-222222222222"), symbol="ETHUSDT"),
+    ]
+    chunks = [module.Chunk(target=t, gap_start=start, gap_end=end) for t in targets]
+
+    envelopes = module.funding_envelopes_for(chunks, "binance", producer="test")
+
+    assert len(envelopes) == 2
+    assert {e.payload["symbol"] for e in envelopes} == {"BTCUSDT", "ETHUSDT"}
+    assert all(e.payload["kind"] == "funding" for e in envelopes)
+    assert all("timeframe" not in e.payload for e in envelopes)
+
+
+def test_a_funding_requests_identity_never_collides_with_a_candles_request() -> None:
+    """Same market, same nominal window: the literal ``"funding"`` folded into
+    the funding event's id keeps the two kinds from ever sharing an identity,
+    which would let ``ON CONFLICT (event_id) DO NOTHING`` silently drop one."""
+    module = _load_module()
+    target = module.Target(market_id=MARKET, symbol="BTCUSDT")
+    start, end = module.funding_window_for(NOW, 31)
+    candle_chunk = module.Chunk(target=target, gap_start=start, gap_end=end)
+    funding_chunk = module.Chunk(target=target, gap_start=start, gap_end=end)
+
+    candles_envelope = module.envelope_for(candle_chunk, "binance")
+    (funding_envelope,) = module.funding_envelopes_for(
+        [funding_chunk], "binance", producer="test"
+    )
+
+    assert candles_envelope.event_id != funding_envelope.event_id
+
+
+def test_a_rerun_of_the_same_funding_window_is_one_gap() -> None:
+    module = _load_module()
+    target = module.Target(market_id=MARKET, symbol="BTCUSDT")
+    start, end = module.funding_window_for(NOW, 31)
+    chunk = module.Chunk(target=target, gap_start=start, gap_end=end)
+
+    first = module.funding_envelopes_for([chunk], "binance", producer="test")[0]
+    again = module.funding_envelopes_for([chunk], "binance", producer="test")[0]
+
+    assert first.event_id == again.event_id

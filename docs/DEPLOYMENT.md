@@ -614,6 +614,39 @@ SELECT m.symbol, g.status, count(*) AS pedacos,
  GROUP BY 1, 2 ORDER BY 1, 2;
 ```
 
+### Histórico de funding para o replay (`request_backfill.py --kind funding`, T3.7c)
+
+O motor de replay (`docs/PIPELINE.md` §6c) não precifica a perna de funding de
+um outcome sem histórico de liquidação anterior à entrada
+(`hunter_strategy_worker.funding`, `_CADENCE_LOOKBACK` de 3 dias): dois replays
+de 31 dias em 2026-09-08 produziram só 23+2 outcomes avaliáveis de 224+341
+porque `funding_rates` só tinha o período coletado ao vivo (desde ~2026-09-05)
+enquanto os candles já iam até 2026-08-08 (T3.7b). O consumidor do
+`market-worker` (`hunter_market_worker/funding_backfill.py`) atende esse pedido
+com **uma** chamada REST por mercado — `fetch_realized_funding` já pagina até
+~333 dias — em vez do plano por lacunas de 240 min dos candles; nunca
+sobrescreve uma liquidação que a coleta ao vivo já gravou (`ON CONFLICT
+(market_id, funding_time) DO NOTHING`) e não precisa de partição
+(`funding_rates` não é particionada, §1 acima).
+
+```bash
+# depois de um deploy, para os 19 mercados monitorados + BTC (referência do β)
+docker exec hunter-api-1 python infra/scripts/request_backfill.py \
+  --kind funding --days 31 --publish \
+  --markets BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,<...os demais 14>
+```
+
+Sem `--publish` o pedido só enfileira na outbox (algum worker publica em ~1 s);
+`--dry-run` mostra o que seria pedido sem gravar nada. Acompanhar o resultado:
+
+```sql
+SELECT m.symbol, count(*) AS liquidacoes,
+       min(f.funding_time) AS mais_antiga, max(f.funding_time) AS mais_nova
+  FROM funding_rates f JOIN markets m ON m.id = f.market_id
+ WHERE m.symbol = ANY(ARRAY['BTCUSDT','ETHUSDT','SOLUSDT'])
+ GROUP BY 1 ORDER BY 1;
+```
+
 ### O β no heartbeat do scanner (`hb:scanner:{instance}`)
 
 O produtor horário roda dentro do `scanner-worker` (papel `scanner`), um por

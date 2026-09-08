@@ -18,6 +18,7 @@ is not a state a new caller can create by forgetting a line.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -145,14 +146,19 @@ async def upsert_candles(
 
 async def upsert_funding(
     session: AsyncSession,
-    items: list[NormalizedFunding],
+    items: Sequence[NormalizedFunding],
     market_ids: dict[str, Any],
     *,
     producer: str = durable.PRODUCER,
-) -> None:
+) -> int:
     """Only a *realized* settlement is stored — and therefore only a realized
     settlement is durable. The WS estimate is a view of the present that nobody
-    persists, so it stays on the ephemeral path (``durable.py``)."""
+    persists, so it stays on the ephemeral path (``durable.py``).
+
+    Returns how many rows this call actually inserted (T3.7c: the funding
+    backfill lane reports it in ``market.funding.backfilled`` and its metric;
+    every existing caller still ignores the return value, as before).
+    """
     rows: dict[tuple[Any, datetime], dict[str, Any]] = {}
     by_key: dict[tuple[Any, datetime], NormalizedFunding] = {}
     for f in items:
@@ -170,7 +176,7 @@ async def upsert_funding(
             "mark_price": f.mark_price,
         }
     if not rows:
-        return
+        return 0
     stmt = (
         pg_insert(FundingRate)
         .values(_dedupe_last(rows))
@@ -180,6 +186,7 @@ async def upsert_funding(
     result = await session.execute(stmt)
     inserted = [by_key[(row.market_id, row.funding_time)] for row in result.all()]
     await durable.enqueue_realized_funding(session, inserted, producer=producer)
+    return len(inserted)
 
 
 async def upsert_liquidations(

@@ -55,10 +55,11 @@ from hunter_core.logging import get_logger
 from hunter_core.observability import registry
 from hunter_market_worker import backfill_plan as planning
 from hunter_market_worker import backfill_request as requests
+from hunter_market_worker import funding_backfill
 from hunter_market_worker import recovery_queries as queries
+from hunter_market_worker.backfill_outcome import Outcome
 from hunter_market_worker.backfill_reader import CLAIM_IDLE_MS, DEFAULT_BLOCK_MS, read_batch
 from hunter_market_worker.partitions import storable_months
-from hunter_market_worker.persist import load_market_ids
 from hunter_market_worker.recovery import DETECTION_GRACE, server_now
 
 if TYPE_CHECKING:
@@ -94,18 +95,6 @@ market_backfill_minutes_total = Counter(
     "Minutes of history turned into ingestion_gaps rows by a backfill request.",
     registry=registry,
 )
-
-
-@dataclass(frozen=True)
-class Outcome:
-    """What happened to one request, in one word plus the reason."""
-
-    name: str
-    reason: str = ""
-    minutes: int = 0
-    chunks: int = 0
-    deferred: int = 0
-    final: bool = False
 
 
 @dataclass
@@ -200,6 +189,15 @@ class BackfillConsumer:
             return Outcome("ignored", "other_exchange")
         if not self.owns(request.symbol):
             return Outcome("ignored", "other_shard")
+        if request.kind == "funding":
+            return await funding_backfill.serve(
+                request,
+                adapter=self.adapter,
+                universe=self.universe,
+                session_factory=self.session_factory,
+                event_id=event_id,
+                now=now,
+            )
         if request.timeframe != Timeframe.M1.value:
             return self._refuse("unsupported_timeframe", request.symbol, event_id)
         if request.symbol not in set(self.universe.symbols):
@@ -222,7 +220,7 @@ class BackfillConsumer:
             # Held across the read and the insert: the periodic detection runs
             # the same protocol for the same markets (recovery.check_gaps).
             await queries.lock_gap_planning(session, request.exchange)
-            market_id = await _market_id(session, request)
+            market_id = await requests.market_id_for(session, request)
             if market_id is None:
                 return self._refuse("unknown_market", request.symbol, event_id)
             storable = await storable_months(
@@ -319,20 +317,6 @@ class BackfillConsumer:
                 logger.exception("market_backfill_cycle_failed", group=self.group)
                 runtime.mark_error()
                 await asyncio.sleep(IDLE_SLEEP_S)
-
-
-async def _market_id(session: AsyncSession, request: requests.Request) -> Any:
-    """This database's id for the requested market.
-
-    The payload's ``market_id`` is **checked, not trusted**: the symbol and the
-    exchange decide, and an identity that disagrees with them is refused rather
-    than quietly followed (Astra: "identidade inconsistente recusada").
-    """
-    ids = await load_market_ids(session, request.exchange, {request.symbol})
-    market_id = ids.get(request.symbol)
-    if market_id is None or (request.market_id is not None and request.market_id != market_id):
-        return None
-    return market_id
 
 
 async def run_backfill(

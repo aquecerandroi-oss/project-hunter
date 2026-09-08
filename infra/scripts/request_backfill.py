@@ -44,11 +44,15 @@ about a second. ``--publish`` sweeps the outbox from here instead, for the case
 where nothing is running — it publishes whatever else is pending too, which is
 what a dispatcher does and is safe by at-least-once.
 
+**``--kind funding`` (T3.7c)** publishes a different shape of request; see
+``backfill_funding.py`` for why and how it differs from the candles path above.
+
 Usage:
     uv run python infra/scripts/request_backfill.py --days 31 --dry-run
     uv run python infra/scripts/request_backfill.py --days 31
     uv run python infra/scripts/request_backfill.py --days 31 --markets BTCUSDT,ETHUSDT
     uv run python infra/scripts/request_backfill.py --days 31 --publish
+    uv run python infra/scripts/request_backfill.py --kind funding --days 31 --markets BTCUSDT
 """
 
 from __future__ import annotations
@@ -59,8 +63,10 @@ import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
 
+from backfill_funding import envelopes_for as funding_envelopes_for
+from backfill_funding import window_for as funding_window_for
+from backfill_targets import Target, targets_for
 from sqlalchemy import text
 
 from hunter_core.db.session import create_engine, create_session_factory, role_session
@@ -91,36 +97,10 @@ considered closed yet, and a request that names them is planned only partially."
 
 REASON = "beta_history"
 PRODUCER = "infra/scripts/request_backfill.py"
-REFERENCE_SYMBOL = "BTCUSDT"
 BAR = timedelta(hours=1)
 MINUTE = timedelta(minutes=1)
 
-_SPOT_TWINS = text(
-    "SELECT p.id AS market_id, p.symbol AS symbol FROM markets p "
-    "JOIN exchanges e ON e.id = p.exchange_id "
-    "JOIN markets s ON s.exchange_id = p.exchange_id AND s.market_type = 'spot' "
-    "  AND s.base_asset_id = p.base_asset_id AND s.quote_asset_id = p.quote_asset_id "
-    "  AND s.status = 'active' AND s.delisted_at IS NULL "
-    "WHERE e.code = :exchange AND p.market_type = 'perpetual' AND p.is_monitored "
-    "ORDER BY p.symbol"
-)
-"""The perpetuals the wallet can actually execute (D1: beta on the perpetual, the
-wallet executes the spot twin of the same venue and ``base/quote``)."""
-
-_BY_SYMBOL = text(
-    "SELECT p.id AS market_id, p.symbol AS symbol FROM markets p "
-    "JOIN exchanges e ON e.id = p.exchange_id "
-    "WHERE e.code = :exchange AND p.market_type = 'perpetual' "
-    "AND p.symbol = ANY(:symbols) ORDER BY p.symbol"
-)
-
 _PARTITION = text("SELECT to_regclass(:name) IS NOT NULL AS present")
-
-
-@dataclass(frozen=True, slots=True)
-class Target:
-    market_id: UUID
-    symbol: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,31 +166,6 @@ def envelope_for(chunk: Chunk, exchange: str) -> EventEnvelope:
     )
 
 
-async def _targets(
-    session: AsyncSession, exchange: str, symbols: Sequence[str] | None
-) -> list[Target]:
-    """The markets to ask for: the named ones, or every perpetual with a spot twin.
-
-    The reference market is always included when the list is derived, because a
-    beta with no reference series is ``btc_missing`` for the whole universe —
-    backfilling everything *but* the BTC would leave every row invalid.
-    """
-    if symbols:
-        rows = await session.execute(_BY_SYMBOL, {"exchange": exchange, "symbols": list(symbols)})
-    else:
-        rows = await session.execute(_SPOT_TWINS, {"exchange": exchange})
-    found = [Target(market_id=row.market_id, symbol=row.symbol) for row in rows]
-    if symbols or any(target.symbol == REFERENCE_SYMBOL for target in found):
-        return found
-    reference = await session.execute(
-        _BY_SYMBOL, {"exchange": exchange, "symbols": [REFERENCE_SYMBOL]}
-    )
-    return sorted(
-        [*found, *(Target(market_id=row.market_id, symbol=row.symbol) for row in reference)],
-        key=lambda target: target.symbol,
-    )
-
-
 async def _missing_partitions(session: AsyncSession, start: datetime, end: datetime) -> list[str]:
     """Months of ``candles_1m`` the range touches that do not exist yet."""
     missing: list[str] = []
@@ -230,16 +185,27 @@ async def plan(
     days: int,
     symbols: Sequence[str] | None,
     now: datetime,
+    kind: str = "candles",
 ) -> tuple[list[Chunk], list[str]]:
+    if kind == "funding":
+        start, end = funding_window_for(now, days)
+        async with role_session(factory, db_role="hunter_worker") as session:
+            targets = await targets_for(session, exchange, symbols)
+        chunks = [Chunk(target=target, gap_start=start, gap_end=end) for target in targets]
+        return chunks, []  # funding_rates is not partitioned -- nothing to warn about
     start, end = window_for(now, days)
     async with role_session(factory, db_role="hunter_worker") as session:
-        targets = await _targets(session, exchange, symbols)
+        targets = await targets_for(session, exchange, symbols)
         missing = await _missing_partitions(session, start, end)
     return [chunk for target in targets for chunk in chunks_for(target, start, end)], missing
 
 
 async def publish(
-    factory: async_sessionmaker[AsyncSession], chunks: Sequence[Chunk], *, exchange: str
+    factory: async_sessionmaker[AsyncSession],
+    chunks: Sequence[Chunk],
+    *,
+    exchange: str,
+    kind: str = "candles",
 ) -> int:
     """Queue every chunk in one transaction. Returns how many rows were queued.
 
@@ -247,7 +213,10 @@ async def publish(
     whole range is asked for or none of it is, and ``ON CONFLICT (event_id) DO
     NOTHING`` makes a re-run of the same range a no-op.
     """
-    envelopes = [envelope_for(chunk, exchange) for chunk in chunks]
+    if kind == "funding":
+        envelopes = funding_envelopes_for(chunks, exchange, producer=PRODUCER)
+    else:
+        envelopes = [envelope_for(chunk, exchange) for chunk in chunks]
     async with role_session(factory, db_role="hunter_worker") as session:
         await enqueue_many(session, envelopes)
     return len(envelopes)
@@ -255,20 +224,24 @@ async def publish(
 
 async def _run(args: argparse.Namespace) -> int:
     exchange: str = args.exchange
+    kind: str = args.kind
     symbols = [item.strip().upper() for item in args.markets.split(",") if item.strip()] or None
     engine = create_engine(get_settings())
     try:
         factory = create_session_factory(engine)
         now = datetime.now(tz=UTC)
         chunks, missing = await plan(
-            factory, exchange=exchange, days=args.days, symbols=symbols, now=now
+            factory, exchange=exchange, days=args.days, symbols=symbols, now=now, kind=kind
         )
         if not chunks:
             print("no market matched: nothing to request")
             return 1
-        start, end = window_for(now, args.days)
+        start, end = funding_window_for(now, args.days) if kind == "funding" else window_for(
+            now, args.days
+        )
         markets = sorted({chunk.target.symbol for chunk in chunks})
-        print(f"window  {start.isoformat()} -> {end.isoformat()} ({args.days} d + 1 bar)")
+        print(f"kind    {kind}")
+        print(f"window  {start.isoformat()} -> {end.isoformat()}")
         print(f"markets {len(markets)}: {', '.join(markets)}")
         print(
             f"windows {len(chunks)} ({len(chunks) // max(1, len(markets))} per market, newest first)"
@@ -286,7 +259,7 @@ async def _run(args: argparse.Namespace) -> int:
                 print(f"[dry-run] ... {len(chunks) - args.show} more")
             print(f"[dry-run] {len(chunks)} request(s) would be queued on the outbox")
             return 0
-        queued = await publish(factory, chunks, exchange=exchange)
+        queued = await publish(factory, chunks, exchange=exchange, kind=kind)
         print(f"{queued} request(s) queued on outbox_events")
         if args.publish:
             from hunter_core.events.outbox import reconcile
@@ -308,6 +281,12 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--days", type=int, default=31, help="days of history to ask for")
+    parser.add_argument(
+        "--kind",
+        choices=["candles", "funding"],
+        default="candles",
+        help="candles (default, seven-day chunks) or funding (T3.7c, one request per market)",
+    )
     parser.add_argument(
         "--markets",
         default="",

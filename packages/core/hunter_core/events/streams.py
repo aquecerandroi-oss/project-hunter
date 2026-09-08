@@ -40,6 +40,17 @@ class Streams:
     every live-tier minute individually -- WS ingest and REST recovery of
     recent gaps alike -- so no existing consumer changes behaviour."""
 
+    MARKET_FUNDING_BACKFILLED = "market.funding.backfilled"
+    """Completion of one ``kind: funding`` backfill request (T3.7c).
+
+    Realized settlements themselves keep landing on ``market.derivatives``
+    one row at a time, same as live collection (``persist_rows.upsert_funding``
+    -> ``durable.enqueue_realized_funding``, unchanged by this stream) --
+    funding history is small enough (~3 rows/day) that the per-row flood
+    T2.9c fixed for candles never happens here. This event says something
+    ``market.derivatives`` cannot: that a *requested window* is now covered,
+    whether or not it inserted anything new."""
+
     FEATURES_UPDATED = "features.updated"
     ANOMALIES_DETECTED = "anomalies.detected"
     REGIME_CHANGED = "regime.changed"
@@ -66,6 +77,7 @@ DEFAULT_MAXLEN: dict[str, int] = {
     Streams.MARKET_UNIVERSE_CHANGED: 1_000,
     Streams.MARKET_BACKFILL_REQUESTED: 5_000,
     Streams.MARKET_CANDLES_BACKFILLED: 5_000,
+    Streams.MARKET_FUNDING_BACKFILLED: 1_000,
     Streams.FEATURES_UPDATED: 100_000,
     Streams.ANOMALIES_DETECTED: 20_000,
     Streams.REGIME_CHANGED: 1_000,

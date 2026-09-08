@@ -200,7 +200,7 @@ async def test_trade_carries_brl_fees_pnl_snapshots_and_protection_intents(
     market_id = await _seed_market(session_factory)
     closed_at = datetime(2026, 9, 7, 15, 0, tzinfo=UTC)
     await _observe_fx(session_factory, rate=RATE, observed_at=closed_at - timedelta(minutes=1))
-    position_id, trade_id = await _seed_closed_trade(
+    _position_id, trade_id = await _seed_closed_trade(
         session_factory,
         org_id=wallet.actor.org_id,  # type: ignore[arg-type]
         portfolio_id=wallet.portfolio_id,
