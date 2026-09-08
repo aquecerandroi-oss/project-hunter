@@ -46,7 +46,7 @@ from hunter_core.strategies.canonical import canonical_json
 from hunter_scanner_worker.rows import jsonable
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Sequence
     from datetime import datetime
 
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,7 +61,15 @@ HOURLY_SCOPE = RegimeScope.BTC
 """The scope this engine owns. ``regime_v0`` owns ``global``; see the module
 docstring for why they may not share one."""
 
-__all__ = ["HOURLY_SCOPE", "INSERTED", "UNCHANGED", "UPDATED", "existing_hours", "write_snapshot"]
+__all__ = [
+    "HOURLY_SCOPE",
+    "INSERTED",
+    "UNCHANGED",
+    "UPDATED",
+    "existing_hours",
+    "supporting_features",
+    "write_snapshots",
+]
 
 _EXISTING = text(
     "SELECT id, start_time, supporting_features ->> 'digest' AS digest "
@@ -116,62 +124,85 @@ async def existing_hours(
     return {row.start_time: row.digest for row in rows}
 
 
-async def write_snapshot(
+_UPDATE = text(
+    "UPDATE market_regimes SET regime = CAST(:regime AS market_regime), "
+    "confidence = :confidence, end_time = :end_time, "
+    "supporting_features = CAST(:features AS jsonb) WHERE id = :id"
+)
+
+
+def _row(snapshot: RegimeSnapshot, features: dict[str, Any]) -> dict[str, Any]:
+    """The insert values for one hour — closed, hour-aligned, scoped to ``btc``."""
+    return {
+        "id": uuid7(),
+        "scope": HOURLY_SCOPE,
+        "regime": snapshot.regime,
+        "confidence": snapshot.confidence,
+        "start_time": snapshot.ts,
+        "end_time": snapshot.valid_until,
+        "supporting_features": features,
+        "classifier_version": snapshot.version,
+    }
+
+
+async def write_snapshots(
     session: AsyncSession,
-    snapshot: RegimeSnapshot,
+    snapshots: Sequence[RegimeSnapshot],
     *,
     exchange: str,
     thresholds: HourlyThresholds,
-    known: Mapping[datetime, str | None] | None = None,
-) -> str:
-    """Insert, update or recognise the row for ``snapshot.ts``. Returns which."""
-    features, digest = supporting_features(snapshot, exchange=exchange, thresholds=thresholds)
-    if known is not None and known.get(snapshot.ts) == digest:
-        return UNCHANGED
-    current = (
+) -> list[tuple[datetime, str]]:
+    """Write a run of hours in **one** transaction; ``(hour, outcome)`` for each.
+
+    A day at a time, not an hour at a time: the thirty-one-day backfill (745
+    hours) measured 186,5 s against the testcontainer with a transaction per hour
+    and 11-12 s a day at a time — the cost was round trips, not rows (LOW-4,
+    ``.claude/state/notes-T3.43.md`` §T3.43c). What
+    the batching may not change is the shape of each write, and it does not — one
+    ``SELECT`` covering the whole run, one multi-row ``INSERT`` for the hours that
+    have no row, one ``UPDATE`` **in place** for each hour whose digest moved, and
+    nothing at all for the rest. The caller retries a failed batch hour by hour,
+    so a single unrepresentable hour still costs its own hour and no other.
+    """
+    if not snapshots:
+        return []
+    prepared = [
+        (snapshot, *supporting_features(snapshot, exchange=exchange, thresholds=thresholds))
+        for snapshot in snapshots
+    ]
+    rows = await session.execute(
+        _EXISTING,
+        {
+            "scope": HOURLY_SCOPE.value,
+            "version": snapshots[0].version,
+            "exchange": exchange,
+            "first": min(snapshot.ts for snapshot in snapshots),
+            "last": max(snapshot.ts for snapshot in snapshots),
+        },
+    )
+    current = {row.start_time: row for row in rows}
+    outcomes: list[tuple[datetime, str]] = []
+    inserts: list[dict[str, Any]] = []
+    for snapshot, features, digest in prepared:
+        existing = current.get(snapshot.ts)
+        if existing is None:
+            inserts.append(_row(snapshot, features))
+            outcomes.append((snapshot.ts, INSERTED))
+            continue
+        if existing.digest == digest:
+            outcomes.append((snapshot.ts, UNCHANGED))
+            continue
         await session.execute(
-            _EXISTING,
-            {
-                "scope": HOURLY_SCOPE.value,
-                "version": snapshot.version,
-                "exchange": exchange,
-                "first": snapshot.ts,
-                "last": snapshot.ts,
-            },
-        )
-    ).first()
-    if current is not None:
-        if current.digest == digest:
-            return UNCHANGED
-        await session.execute(
-            text(
-                "UPDATE market_regimes SET regime = CAST(:regime AS market_regime), "
-                "confidence = :confidence, end_time = :end_time, "
-                "supporting_features = CAST(:features AS jsonb) WHERE id = :id"
-            ),
+            _UPDATE,
             {
                 "regime": snapshot.regime.value,
                 "confidence": snapshot.confidence,
                 "end_time": snapshot.valid_until,
                 "features": canonical_json(features).decode(),
-                "id": str(current.id),
+                "id": str(existing.id),
             },
         )
-        return UPDATED
-    await session.execute(
-        pg_insert(MarketRegimeRow).values(
-            [
-                {
-                    "id": uuid7(),
-                    "scope": HOURLY_SCOPE,
-                    "regime": snapshot.regime,
-                    "confidence": snapshot.confidence,
-                    "start_time": snapshot.ts,
-                    "end_time": snapshot.valid_until,
-                    "supporting_features": features,
-                    "classifier_version": snapshot.version,
-                }
-            ]
-        )
-    )
-    return INSERTED
+        outcomes.append((snapshot.ts, UPDATED))
+    if inserts:
+        await session.execute(pg_insert(MarketRegimeRow).values(inserts))
+    return outcomes

@@ -1,11 +1,10 @@
-"""One pass of the hourly regime producer: every closed hour that has no row yet.
+"""One pass of the hourly regime producer: the hours that are missing or moved.
 
 ``market_regimes`` held **one** row on 2026-09-08 — the live ``regime_v0``
-classifier writes on transition, and a classifier that has been warming up since
-it started has never transitioned. Every cohort the Shadow Lab and the replays
-produced is therefore uncuttable by context (Astra C4, T3.32, T3.33e/g). This job
-is the missing series: one row per hour per exchange, whether or not anything
-changed, back thirty-one days so the replays already on disk can be split.
+classifier writes on transition, and a classifier warming up since it started has
+never transitioned, so every Shadow Lab and replay cohort was uncuttable by
+context (Astra C4, T3.32, T3.33e/g). This job is the missing series: one row per
+hour per exchange, changed or not, back thirty-one days.
 
 **The cut is the closed hour, never the clock.** A pass at 12:37 produces the
 hour ``12:00`` from data that was final before ``12:00``; the row is in force over
@@ -13,39 +12,37 @@ hour ``12:00`` from data that was final before ``12:00``; the row is in force ov
 from the same candles and writes nothing (``unchanged``) — idempotency is a
 property of the key and the digest, not of the caller's discipline.
 
-**The backfill is "every hour that has no row", not "the last N hours".** The
-pass asks the table which hours it already has and produces the rest, so the
-first run fills thirty-one days, every later run produces one hour, and a run
-after a candle backfill repairs exactly the hours whose inputs moved (the digest
-changes, the row is updated in place, its id survives for the foreign keys that
-point at it). The current cut is **always** recomputed: it is the one hour whose
-candles may still be arriving through a gap repair.
+**Which hours a pass produces is two rules** (``regime_window``): the hours of the
+window with **no row**, and every hour of the **repair window** (the last 72 h,
+row or not). The second is what makes a hole heal — an hour written ``unknown``
+because a minute was missing *has* a row, so the first would never look at it
+again. Recomputing is cheap; *rewriting* is what costs, and the digest gates it:
+an hour whose candles did not move does not even open a transaction, and one
+whose candles moved is updated in place, so its id survives for the foreign keys
+pointing at it. Deeper than 72 h, after a large candle backfill, is an operator
+decision (``regime_hourly --once --repair-days N``).
 
-**Cost, declared.** The reference market needs 745 closed hours behind the
-earliest hour due (the deepest window any component reads), and the universe
-needs 25 hours behind it for the breadth. So a steady-state pass folds ~31 days
-of BTC minutes plus 25 hours x N markets, and a first pass folds ~62 days of BTC
-plus 32 days x N markets, once. Measured numbers are in
-``.claude/state/notes-T3.43.md``.
+**Cost, declared.** The reference needs 745 closed hours behind the earliest hour
+due (the deepest window any component reads) and the universe 25 hours behind it
+for the breadth; the earliest hour due is the start of the repair window, so a
+steady-state pass folds ~34 days of BTC minutes plus 97 hours x N markets, and a
+first pass ~62 days of BTC plus 32 days x N markets, once. The measured numbers
+are in ``.claude/state/notes-T3.43.md``.
 """
 
 from __future__ import annotations
 
 import time
-from bisect import bisect_right
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from decimal import Decimal, localcontext
 from typing import TYPE_CHECKING
 
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import ensure_utc
 from hunter_core.logging import get_logger
-from hunter_core.strategies.numeric import CONTEXT
 from hunter_indicators.regime import (
     DEFAULT_HOURLY_THRESHOLDS,
-    FundingAverage,
     HourlyThresholds,
     build_snapshot,
     count_breadth,
@@ -53,11 +50,29 @@ from hunter_indicators.regime import (
 from hunter_scanner_worker.metrics import regime_last_hour, regime_rows_total
 from hunter_scanner_worker.persist import DB_ROLE
 from hunter_scanner_worker.regime import BTC_SYMBOL
-from hunter_scanner_worker.regime_repo import funding_settlements, hourly_closes
-from hunter_scanner_worker.regime_writer import existing_hours, write_snapshot
+from hunter_scanner_worker.regime_repo import (
+    FUNDING_WINDOW,
+    funding_average,
+    funding_settlements,
+    hourly_closes,
+)
+from hunter_scanner_worker.regime_window import (
+    BACKFILL_DAYS,
+    HOUR,
+    REPAIR_HOURS,
+    floor_hour,
+    hours_due,
+)
+from hunter_scanner_worker.regime_writer import (
+    UNCHANGED,
+    existing_hours,
+    supporting_features,
+    write_snapshots,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
+    from decimal import Decimal
     from uuid import UUID
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -66,16 +81,6 @@ if TYPE_CHECKING:
     from hunter_scanner_worker.registry import MarketRef
 
 logger = get_logger(__name__)
-
-HOUR = timedelta(hours=1)
-
-BACKFILL_DAYS = 31
-"""How far back the first run fills. Thirty-one days is the replay window the
-cohorts on disk cover (``docs/PIPELINE.md`` §6c) plus a day of margin."""
-
-FUNDING_WINDOW = timedelta(hours=8)
-"""One settlement interval. A market whose last settlement is older than this has
-no current funding, and is left out of the average rather than counted at zero."""
 
 STALE_AFTER = timedelta(hours=2)
 """Age at which the producer is *degraded*, never down: one missed hour plus its
@@ -86,6 +91,7 @@ readiness check."""
 __all__ = [
     "BACKFILL_DAYS",
     "FUNDING_WINDOW",
+    "REPAIR_HOURS",
     "STALE_AFTER",
     "RegimeHealth",
     "RegimeRun",
@@ -94,52 +100,6 @@ __all__ = [
     "hours_due",
     "run_regime_once",
 ]
-
-
-def floor_hour(value: datetime) -> datetime:
-    """The cut: the start of the hour that has closed at or before ``value``."""
-    return ensure_utc(value).replace(minute=0, second=0, microsecond=0)
-
-
-def hours_due(cut: datetime, *, days: int, known: Mapping[datetime, str | None]) -> list[datetime]:
-    """Every hour of the window with no row yet, plus the current cut always."""
-    first = cut - timedelta(days=days)
-    due: list[datetime] = []
-    hour = first
-    while hour <= cut:
-        if hour == cut or hour not in known:
-            due.append(hour)
-        hour += HOUR
-    return due
-
-
-def funding_average(
-    settlements: Mapping[UUID, Sequence[tuple[datetime, Decimal]]],
-    *,
-    ts: datetime,
-    window: timedelta = FUNDING_WINDOW,
-) -> FundingAverage:
-    """The mean of each market's **latest** settlement inside ``(ts - window, ts]``.
-
-    One value per market and then the mean, not the mean of every settlement: a
-    market that settled twice inside the window would otherwise weigh twice, and
-    the number is meant to say what the universe pays right now.
-    """
-    values: list[Decimal] = []
-    for series in settlements.values():
-        times = [when for when, _ in series]
-        index = bisect_right(times, ts) - 1
-        if index < 0:
-            continue
-        when, rate = series[index]
-        if when > ts - window:
-            values.append(rate)
-    if not values:
-        return FundingAverage()
-    with localcontext(CONTEXT):
-        return FundingAverage(
-            value=sum(values, Decimal(0)) / Decimal(len(values)), markets=len(values)
-        )
 
 
 @dataclass(slots=True)
@@ -235,31 +195,90 @@ def _snapshot_for(
     )
 
 
-async def _write_hour(
+WRITE_BATCH_HOURS = 24
+"""Hours per transaction. A day: the 31-day backfill (745 hours) measured 186,5 s
+with one transaction per hour against the testcontainer and **11-12 s** at
+twenty-four, because the cost was round trips and not rows. Bigger buys little —
+the fixed cost is already amortised — and makes the retry below coarser."""
+
+
+def _record(run: RegimeRun, outcome: str, ts: datetime) -> None:
+    """One hour's verdict, in the run and in the metric, in one place.
+
+    ``last_ts`` is the newest hour the pass touched, whatever order the hours
+    were written in: the unchanged ones are recorded before the batches, so
+    "the last one processed" would name the wrong hour the day an older hour is
+    repaired and the cut is not.
+    """
+    run.outcomes[outcome] += 1
+    regime_rows_total.labels(outcome=outcome).inc()
+    if outcome != UNCHANGED:
+        run.hours += 1
+    if run.last_ts is None or ts > run.last_ts:
+        run.last_ts = ts
+
+
+async def _write_batch(
     factory: async_sessionmaker[AsyncSession],
-    snapshot: RegimeSnapshot,
+    batch: Sequence[RegimeSnapshot],
+    *,
+    exchange: str,
+    thresholds: HourlyThresholds,
+    run: RegimeRun,
+) -> bool:
+    """One transaction for up to a day of hours. ``False`` if it raised."""
+    try:
+        async with role_session(factory, db_role=DB_ROLE) as session:
+            written = await write_snapshots(
+                session, batch, exchange=exchange, thresholds=thresholds
+            )
+    except Exception:
+        logger.exception(
+            "scanner_regime_batch_failed", first=batch[0].ts.isoformat(), hours=len(batch)
+        )
+        return False
+    for ts, outcome in written:
+        _record(run, outcome, ts)
+    return True
+
+
+async def _write_hours(
+    factory: async_sessionmaker[AsyncSession],
+    snapshots: Sequence[RegimeSnapshot],
     *,
     exchange: str,
     thresholds: HourlyThresholds,
     known: Mapping[datetime, str | None],
     run: RegimeRun,
 ) -> None:
-    """One hour, in one transaction of its own: a failure costs that hour only."""
-    try:
-        async with role_session(factory, db_role=DB_ROLE) as session:
-            outcome = await write_snapshot(
-                session, snapshot, exchange=exchange, thresholds=thresholds, known=known
-            )
-    except Exception:
-        logger.exception("scanner_regime_hour_failed", ts=snapshot.ts.isoformat())
-        run.outcomes["failed"] += 1
-        regime_rows_total.labels(outcome="failed").inc()
-        return
-    run.outcomes[outcome] += 1
-    regime_rows_total.labels(outcome=outcome).inc()
-    if outcome != "unchanged":
-        run.hours += 1
-    run.last_ts = snapshot.ts
+    """The write phase: the digest first, then one transaction per day.
+
+    The digest is compared **before** any session is opened, because the repair
+    window recomputes seventy-two hours on every pass and in steady state every
+    one of them is identical to the row on disk; opening a transaction to find
+    that out would make the common case the expensive one. What did move is
+    written a day at a time, and a batch that raises is retried hour by hour --
+    so a single unrepresentable hour costs its own hour and no other, which is
+    the property the per-hour transaction was there to buy.
+    """
+    changed: list[RegimeSnapshot] = []
+    for snapshot in snapshots:
+        digest = supporting_features(snapshot, exchange=exchange, thresholds=thresholds)[1]
+        if known.get(snapshot.ts) == digest:
+            _record(run, UNCHANGED, snapshot.ts)
+        else:
+            changed.append(snapshot)
+    for start in range(0, len(changed), WRITE_BATCH_HOURS):
+        batch = changed[start : start + WRITE_BATCH_HOURS]
+        if await _write_batch(factory, batch, exchange=exchange, thresholds=thresholds, run=run):
+            continue
+        for snapshot in batch:
+            if await _write_batch(
+                factory, [snapshot], exchange=exchange, thresholds=thresholds, run=run
+            ):
+                continue
+            run.outcomes["failed"] += 1
+            regime_rows_total.labels(outcome="failed").inc()
 
 
 async def run_regime_once(
@@ -270,9 +289,10 @@ async def run_regime_once(
     exchange: str,
     thresholds: HourlyThresholds = DEFAULT_HOURLY_THRESHOLDS,
     days: int = BACKFILL_DAYS,
+    repair_hours: int = REPAIR_HOURS,
     reference_symbol: str = BTC_SYMBOL,
 ) -> RegimeRun:
-    """Produce every missing hour of the window, plus the hour that just closed."""
+    """Produce every missing hour of the window and recompute the repair window."""
     now = ensure_utc(now)
     cut = floor_hour(now)
     run = RegimeRun(cut=cut)
@@ -293,7 +313,7 @@ async def run_regime_once(
             first=cut - timedelta(days=days),
             last=cut,
         )
-        due = hours_due(cut, days=days, known=known)
+        due = hours_due(cut, days=days, known=known, repair_hours=repair_hours)
         inputs = await _read_inputs(
             session,
             refs,
@@ -302,16 +322,13 @@ async def run_regime_once(
             cut=cut,
             thresholds=thresholds,
         )
-    for ts in due:
-        snapshot = _snapshot_for(ts, inputs=inputs, universe_size=len(refs), thresholds=thresholds)
-        await _write_hour(
-            factory,
-            snapshot,
-            exchange=exchange,
-            thresholds=thresholds,
-            known=known,
-            run=run,
-        )
+    snapshots = [
+        _snapshot_for(ts, inputs=inputs, universe_size=len(refs), thresholds=thresholds)
+        for ts in due
+    ]
+    await _write_hours(
+        factory, snapshots, exchange=exchange, thresholds=thresholds, known=known, run=run
+    )
     run.duration_s = time.monotonic() - started
     if run.last_ts is not None:
         regime_last_hour.set(run.last_ts.timestamp())
@@ -319,6 +336,7 @@ async def run_regime_once(
         "scanner_regime_pass",
         cut=cut.isoformat(),
         due=len(due),
+        repair_hours=repair_hours,
         written=run.hours,
         markets=len(refs),
         reference_hours=len(inputs.reference),

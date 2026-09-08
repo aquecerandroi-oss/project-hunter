@@ -10,6 +10,13 @@ reasons:
   and exits — for the first production fill, for an operator repairing hours
   after a candle backfill, and for the proof this task owes.
 
+**``--repair-days`` is the deep repair, and it widens both windows.** Every pass
+already recomputes the last 72 hours and rewrites only the hours whose digest
+moved (``regime_window``); after a backfill that filled *weeks* of candle gaps,
+the hours to heal are older than that. ``--repair-days N`` recomputes N days —
+and raises ``--backfill-days`` to at least N, because repairing an hour that the
+backfill window excludes would be asking for a row nobody would then produce.
+
 **One producer per exchange per hour, and the lock names the hour.** The key is
 ``regime:producer:{exchange}:{cut}``: ``SET NX`` decides who computes *that* cut
 and it expires on its own. Correctness does not depend on it — the digest makes a
@@ -40,6 +47,7 @@ from hunter_scanner_worker.baseline_runner import sleep_for
 from hunter_scanner_worker.config import build_config, exchange_code
 from hunter_scanner_worker.regime_job import (
     BACKFILL_DAYS,
+    REPAIR_HOURS,
     RegimeHealth,
     RegimeRun,
     floor_hour,
@@ -66,15 +74,19 @@ LOCK_TTL_S = 7_200
 """Twice the cadence: long enough that a slow first pass (thirty-one days) never
 loses its own key, short enough that the keys do not accumulate."""
 
-__all__ = ["CHECK_S", "main", "regime_hourly_loop"]
+__all__ = ["CHECK_S", "claim_cut", "main", "regime_hourly_loop"]
 
 
 def _lock_key(exchange: str, cut: datetime) -> str:
     return f"regime:producer:{exchange}:{cut.isoformat()}"
 
 
-async def _claim(redis: redis_asyncio.Redis, exchange: str, cut: datetime) -> bool:
+async def claim_cut(redis: redis_asyncio.Redis, exchange: str, cut: datetime) -> bool:
     """Whether this process is the one that computes ``cut``.
+
+    Public because it is the guard the two-producer test exercises: with no
+    unique index on ``(scope, start_time)`` yet, this function *is* the
+    invariant, and an invariant nobody can call is an invariant nobody tests.
 
     A Redis failure answers **no**: the hour is not lost (the next pass sees it
     as missing and produces it), and two producers inserting the same hour into a
@@ -96,6 +108,7 @@ async def regime_hourly_loop(
     *,
     thresholds: HourlyThresholds = DEFAULT_HOURLY_THRESHOLDS,
     days: int = BACKFILL_DAYS,
+    repair_hours: int = REPAIR_HOURS,
 ) -> None:
     """One pass per closed hour, for as long as the process lives."""
     exchange = scanner.config.exchange
@@ -104,7 +117,7 @@ async def regime_hourly_loop(
         now = utcnow()
         cut = floor_hour(now)
         refs = list(scanner.registry.by_symbol.values())
-        if refs and (computed is None or cut > computed) and await _claim(redis, exchange, cut):
+        if refs and (computed is None or cut > computed) and await claim_cut(redis, exchange, cut):
             computed = cut
             try:
                 run = await run_regime_once(
@@ -114,6 +127,7 @@ async def regime_hourly_loop(
                     exchange=exchange,
                     thresholds=thresholds,
                     days=days,
+                    repair_hours=repair_hours,
                 )
                 health.record(run, now=now)
                 runtime.mark_success()
@@ -125,7 +139,7 @@ async def regime_hourly_loop(
         await asyncio.sleep(sleep_for(now, CHECK_S))
 
 
-async def _run_once(exchange: str, *, days: int) -> RegimeRun:
+async def _run_once(exchange: str, *, days: int, repair_hours: int) -> RegimeRun:
     """One pass over the monitored universe, with a database of its own."""
     from hunter_core.db.session import create_engine, create_session_factory
     from hunter_scanner_worker.registry import MarketRegistry
@@ -141,6 +155,7 @@ async def _run_once(exchange: str, *, days: int) -> RegimeRun:
             now=utcnow(),
             exchange=exchange,
             days=days,
+            repair_hours=repair_hours,
         )
     finally:
         await engine.dispose()
@@ -165,12 +180,25 @@ def main() -> int:
         default=BACKFILL_DAYS,
         help="how far back missing hours are filled (default: %(default)s)",
     )
+    parser.add_argument(
+        "--repair-days",
+        type=int,
+        default=REPAIR_HOURS // 24,
+        help=(
+            "how far back every hour is recomputed and rewritten if its digest "
+            "moved; raises --backfill-days to match (default: %(default)s)"
+        ),
+    )
     args = parser.parse_args()
     configure_logging(get_settings(), "scanner")
-    run = asyncio.run(_run_once(cast(str, args.exchange), days=cast(int, args.backfill_days)))
+    repair_days = cast(int, args.repair_days)
+    days = max(cast(int, args.backfill_days), repair_days)
+    run = asyncio.run(_run_once(cast(str, args.exchange), days=days, repair_hours=repair_days * 24))
     logger.info(
         "scanner_regime_once",
         cut=run.cut.isoformat(),
+        days=days,
+        repair_days=repair_days,
         written=run.hours,
         last_ts=run.last_ts.isoformat() if run.last_ts else None,
         outcomes=dict(run.outcomes),

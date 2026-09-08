@@ -24,21 +24,30 @@ into a market excluded from the breadth.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from decimal import Decimal
+from bisect import bisect_right
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal, localcontext
 from typing import TYPE_CHECKING
 
 from sqlalchemy import bindparam, text
 
 from hunter_core.domain.enums import Timeframe
+from hunter_core.strategies.numeric import CONTEXT
+from hunter_indicators.regime import FundingAverage
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
     from uuid import UUID
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
-__all__ = ["MARKET_BATCH", "funding_settlements", "hourly_closes"]
+__all__ = [
+    "FUNDING_WINDOW",
+    "MARKET_BATCH",
+    "funding_average",
+    "funding_settlements",
+    "hourly_closes",
+]
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 """The origin the hour buckets are counted from. A bound value, never a literal
@@ -126,3 +135,37 @@ async def funding_settlements(
         for row in rows:
             out[row.market_id].append((row.funding_time, row.rate))
     return out
+
+
+FUNDING_WINDOW = timedelta(hours=8)
+"""One settlement interval. A market whose last settlement is older than this has
+no current funding, and is left out of the average rather than counted at zero."""
+
+
+def funding_average(
+    settlements: Mapping[UUID, Sequence[tuple[datetime, Decimal]]],
+    *,
+    ts: datetime,
+    window: timedelta = FUNDING_WINDOW,
+) -> FundingAverage:
+    """The mean of each market's **latest** settlement inside ``(ts - window, ts]``.
+
+    One value per market and then the mean, not the mean of every settlement: a
+    market that settled twice inside the window would otherwise weigh twice, and
+    the number is meant to say what the universe pays right now.
+    """
+    values: list[Decimal] = []
+    for series in settlements.values():
+        times = [when for when, _ in series]
+        index = bisect_right(times, ts) - 1
+        if index < 0:
+            continue
+        when, rate = series[index]
+        if when > ts - window:
+            values.append(rate)
+    if not values:
+        return FundingAverage()
+    with localcontext(CONTEXT):
+        return FundingAverage(
+            value=sum(values, Decimal(0)) / Decimal(len(values)), markets=len(values)
+        )

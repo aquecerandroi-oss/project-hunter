@@ -193,6 +193,11 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
     finally:
         runtime.status_details.pop("baselines", None)
         runtime.status_details.pop("beta", None)
+        # Every detail registered above is removed here, and the symmetry is a
+        # test (``test_health.py``): a status detail left behind holds a
+        # reference to the health object of a run that is over, and /status
+        # would answer with the last numbers of a scanner that stopped.
+        runtime.status_details.pop("regime_hourly", None)
         for check in checks:
             if check in runtime.readiness_checks:
                 runtime.readiness_checks.remove(check)

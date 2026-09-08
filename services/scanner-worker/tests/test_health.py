@@ -18,6 +18,7 @@ from hunter_scanner_worker.beta_job import BetaHealth
 from hunter_scanner_worker.config import ScannerConfig
 from hunter_scanner_worker.consumers import ConsumerHealth
 from hunter_scanner_worker.health import CycleHealth, readiness_checks, write_heartbeat
+from hunter_scanner_worker.regime_job import RegimeHealth
 from hunter_scanner_worker.registry import MarketRegistry
 from hunter_scanner_worker.scanner import Scanner
 from hunter_scanner_worker.state import ScannerState
@@ -25,6 +26,7 @@ from hunter_scanner_worker.state import ScannerState
 from .policies import build_policy
 
 NOW = datetime.now(UTC)
+NOW_HOUR = NOW.replace(minute=0, second=0, microsecond=0)
 QUIET_STREAM = "market.liquidations"
 
 
@@ -250,3 +252,73 @@ async def test_the_heartbeat_carries_when_beta_last_ran_and_how_many_are_valid()
     )
     assert redis.mapping["beta_last_run"] == ""
     assert redis.mapping["beta_valid"] == "0"
+
+
+def _status_detail_keys() -> tuple[set[str], set[str]]:
+    """``(registered, cleared)`` — the two sides of ``main.run``'s bookkeeping.
+
+    Read from the source because that is where the asymmetry lives: registering
+    a detail is one line at the top of ``run`` and removing it is one line in a
+    ``finally`` two hundred lines below, and nothing at runtime notices when the
+    second line is missing — the worker is already shutting down. What it costs
+    is a ``/status`` that keeps answering with the numbers of a producer that no
+    longer exists (``regime_hourly`` was exactly that, code-reviewer MEDIUM-2).
+    """
+    import ast
+    import inspect
+
+    from hunter_scanner_worker import main as scanner_main
+
+    tree = ast.parse(inspect.getsource(scanner_main))
+    registered: set[str] = set()
+    cleared: set[str] = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Subscript)
+            and isinstance(node.value, ast.Attribute)
+            and node.value.attr == "status_details"
+            and isinstance(node.slice, ast.Constant)
+            and isinstance(node.slice.value, str)
+        ):
+            registered.add(node.slice.value)
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "pop"
+            and isinstance(node.func.value, ast.Attribute)
+            and node.func.value.attr == "status_details"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+        ):
+            cleared.add(str(node.args[0].value))
+    return registered, cleared
+
+
+def test_every_status_detail_the_scanner_registers_is_removed_when_it_stops() -> None:
+    """Symmetry, not a list: a fourth detail added tomorrow fails this too."""
+    registered, cleared = _status_detail_keys()
+
+    assert registered == {"baselines", "beta", "regime_hourly"}
+    assert cleared == registered
+
+
+async def test_a_stale_hourly_regime_producer_is_a_sentence_and_never_a_red_check() -> None:
+    """T3.43: a hole in the research series costs a cohort its context split.
+
+    It costs the live path nothing — nothing on it reads these rows — so, like
+    beta, the producer is a status detail and never a readiness check.
+    """
+    consumers = ConsumerHealth(started_at=NOW)
+    consumers.last_iteration_at["market.ticks"] = NOW
+    checks = _checks(consumers, FakeStreams({}), cycle=_loaded_cycle())
+    assert not [name for name in checks if "regime" in name]
+
+    fresh = RegimeHealth(last_run_at=NOW - timedelta(minutes=20), last_ts=NOW_HOUR, hours=1)
+    stale = RegimeHealth(last_run_at=NOW - timedelta(hours=3), last_ts=NOW_HOUR, hours=745)
+
+    assert fresh.stale(NOW) is False
+    assert fresh.describe(NOW) == f"ok (last hour {NOW_HOUR.isoformat()}, 1 written, 0.3h ago)"
+    assert stale.stale(NOW) is True
+    assert stale.describe(NOW).startswith(f"stale (last hour {NOW_HOUR.isoformat()}, 745 written")
+    assert RegimeHealth().describe(NOW) == "never ran"
+    assert RegimeHealth().stale(NOW) is True
