@@ -169,6 +169,9 @@ export function exampleScoreboardRow(overrides: Partial<ScoreboardRowOut> = {}):
     max_drawdown_r: "6.1200",
     maturity: { evaluable: 112, days: 34, threshold: { outcomes: 100, days: 30 }, mature: true },
     verdict: "validada",
+    // T3.18b: blocos nulos por padrão -- os testes de replay/replicação sobrescrevem.
+    replay: null,
+    replication: null,
     ...overrides,
   };
 }
