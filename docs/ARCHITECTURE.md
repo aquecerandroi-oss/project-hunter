@@ -84,6 +84,34 @@ Em desenvolvimento e em deployments pequenos, `HUNTER_ROLE=all` roda todos os wo
 
 **Isolamento do execution-worker.** É o único processo que, no futuro, terá acesso a chaves descriptografadas de exchange. Ele não expõe HTTP além de `/health`. O `api` nunca descriptografa chaves.
 
+## 4.1 Carteira paper, Risk Engine e o caminho SPOT (M3)
+
+Desde o M3 a carteira virtual e o Risk Engine existem em código e rodam com dado real na VPS
+(entradas manuais; a ponte autônoma existe mas está atrás de `ENABLE_PAPER_AUTONOMY=false`). Esta
+seção só orienta onde cada peça vive; os contratos normativos são `docs/RISK_ENGINE.md` e
+`docs/DATABASE.md` §18–§25, e o estado de aceite é `docs/reports/M3.md`.
+
+| Peça | Onde | Contrato/detalhe |
+|---|---|---|
+| Carteira, ledger, BRL/USDT | `packages/core/hunter_core/{ledger,portfolio}/**`, `execution-worker` | `docs/RISK_ENGINE.md` §1, §11; `docs/DATABASE.md` §18 |
+| Risk Engine (`evaluate`/`evaluate_exit`) | `packages/risk-core/hunter_risk/**` — função pura, sem IO | `docs/RISK_ENGINE.md` (contrato completo) |
+| Simulador de execução SPOT | `packages/core/hunter_core/execution/**`, `execution-worker` | `docs/PIPELINE.md` §8 |
+| Adaptador SPOT e universo (piso 50 M, histerese de saída) | `packages/exchange-adapters/hunter_exchanges/binance_spot/**`, `market-worker` (papel `MARKET_ROLE=spot`, serviço `market-worker-spot` dedicado) | `docs/PIPELINE.md` §1d; `docs/DEPLOYMENT.md` §3.3 |
+| Câmbio USDTBRL | coletor no `market-worker` (shard 0) | `docs/PIPELINE.md` §1c |
+| β versionado contra o BTC | produtor horário no `scanner-worker`, estimador em `packages/indicators` | `docs/PIPELINE.md` §2b; `docs/RISK_ENGINE.md` §6 |
+| Ponte sinal → proposta e admissão | `services/execution-worker/hunter_execution_worker/bridge_*.py`, `packages/core/hunter_core/admission/**` | `docs/PIPELINE.md` §7 |
+| Kill switch | `packages/core/hunter_core/risk/kill_switch.py` | `docs/RISK_ENGINE.md` §5 |
+
+**Replay e replicação (pesquisa sobre o Shadow Lab, fora da carteira).** O motor de replay roda a
+mesma função de decisão do caminho vivo sobre velas persistidas (nunca escreve outbox, nunca gera
+ordem); o protocolo de replicação deriva "irmãs" de parâmetro de uma versão promissora para testar
+se o resultado sobrevive a variação — as duas coisas só falam, nunca ativam ou tocam a carteira.
+Detalhe: `docs/PIPELINE.md` §6b/§6c, `docs/plans/REPLICATION.md`.
+
+**Catálogo de estratégias no Obsidian.** `infra/scripts/export_strategies_to_obsidian.py` gera uma
+página por versão (`obsidian/03-TRADING/Estrategias/`) a partir do catálogo real do banco —
+detalhe em `docs/OBSIDIAN.md` §1 (exceção de frontmatter) e §4 (canvas da família).
+
 ## 5. Comunicação
 
 ### 5.1 Redis Streams (worker → worker)

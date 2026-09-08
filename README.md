@@ -2,7 +2,11 @@
 
 Autonomous Crypto Intelligence & Trading SaaS. Plataforma multi-tenant de inteligência quantitativa para criptomoedas: monitora mercados em tempo real, detecta anomalias, pontua oportunidades, gera sinais por agentes, aplica risco e executa em paper e shadow. Live trading só na Fase 4.
 
-**Estado atual:** Milestone 0 entregue em 2026-09-05 (em fechamento — ver `docs/reports/M0.md`); Milestone 1 (market data) é o próximo.
+**Estado atual (2026-09-08):** M0, M1 entregues e aprovados. M2 entregue em código, **não
+aprovado** (`docs/reports/M2.md`). M3 (carteira paper SPOT + Risk Engine) entregue em código,
+**RASCUNHO de fechamento** — ver `docs/reports/M3.md`: carteira `ever` aberta e operando na VPS com
+dado real (câmbio, spot como serviço próprio, Risk Engine completo), entradas ainda só manuais, modo
+autônomo não ativado. Próximo: M4 (agentes + ponte em produção).
 
 ## Quickstart (desenvolvedor novo)
 
@@ -52,6 +56,43 @@ canônicos, roster de especialistas). `docs/ROADMAP.md` tem o escopo de cada
 milestone; `docs/plans/M0.md` o plano de execução do M0 e `docs/reports/M0.md`
 o relatório de fechamento.
 
+## Como rodar hoje (2026-09-08)
+
+A stack local (`docker compose up`, acima) sobe tudo, mas o dado real do M1–M3 — mercados,
+Radar, Shadow Lab, carteira paper — só existe de fato na VPS 24/7 (`docs/DEPLOYMENT.md` §9). O que
+muda dependendo de onde você olha:
+
+| Onde | O que tem | Comando |
+|---|---|---|
+| Stack local (`docker compose up`) | schema completo, workers rodando, sem dado de mercado coletado por horas | `docker compose -f infra/docker/docker-compose.yml up -d --build` |
+| VPS (produção do MVP, `docs/DEPLOYMENT.md` §9) | mercados ao vivo, Radar, Shadow Lab, carteira paper `ever` com câmbio e spot reais | `ssh hunter@<ip> && cd /opt/project-hunter && MARKET_SPOT=1 MARKET_SHARDS=4 bash infra/vps/compose.sh update` |
+
+**Deploy na VPS** (só o dono roda; traz o coletor spot dedicado, 4 shards de mercado e a migração
+mais recente):
+
+```bash
+ssh hunter@<ip>
+cd /opt/project-hunter
+MARKET_SPOT=1 MARKET_SHARDS=4 bash infra/vps/compose.sh update
+```
+
+**Scripts operacionais** (rodam dentro do contêiner da API, conexão de dono — nunca do host sem
+`DATABASE_URL_MIGRATIONS`):
+
+| Script | O que faz | Detalhe |
+|---|---|---|
+| `infra/scripts/open_paper_wallet.py` | abre a carteira paper principal da organização (uma só, permanente) | `docs/RISK_ENGINE.md` §11 |
+| `infra/scripts/activate_strategy_version.py` | ativa/deriva uma versão de estratégia de forma auditada (inclusive a linha `--paper-line`) | `docs/ACTIVATION.md`, D10 em `docs/plans/M3.md` |
+| `infra/scripts/replicate_strategy_version.py` | deriva as dez "irmãs" de parâmetro do protocolo de replicação | `docs/plans/REPLICATION.md` |
+| `infra/scripts/request_backfill.py --days N` | pede backfill histórico de velas (usado para os 31 dias que o β exige) | `docs/DEPLOYMENT.md` §8 |
+| `infra/scripts/export_strategies_to_obsidian.py` | gera as páginas de estratégia do Obsidian a partir do catálogo real do banco | `docs/OBSIDIAN.md` §1 |
+| `infra/scripts/obsidian_lint.py` | audita a base de conhecimento (links, frontmatter, append-only) — só leitura | `docs/OBSIDIAN.md` §5 |
+
+`docs/ACTIVATION.md` tem o runbook completo, passo a passo, para ligar o fluxo paper de ponta a
+ponta (spot dedicado → β → segundo deploy → linha `paper` → ativação auditada →
+`ENABLE_PAPER_AUTONOMY`) — nada dele é automático, e os passos que mexem em dinheiro fictício ou
+ativam algo em produção são atos do Everton.
+
 ## Documentação
 
 | Documento | Conteúdo |
@@ -71,7 +112,13 @@ o relatório de fechamento.
 | [docs/DEV_TOOLING.md](docs/DEV_TOOLING.md) | Ferramentas e MCPs para o desenvolvimento |
 | [docs/DESIGN.md](docs/DESIGN.md) | Identidade visual: paleta dourado/verde/preto/branco, tokens, regras de uso |
 | [docs/WORKFLOW.md](docs/WORKFLOW.md) | Fluxo de desenvolvimento com Claude Code (vibe-coding-toolkit): ondas, revisão, commits, gates, memória |
-| [docs/plans/M0.md](docs/plans/M0.md) | Plano de execução do Milestone 0 em ondas paralelas |
+| [docs/ACTIVATION.md](docs/ACTIVATION.md) | Runbook, passo a passo, para ligar o fluxo paper autônomo (spot dedicado, β, ativação auditada, `ENABLE_PAPER_AUTONOMY`) |
+| [docs/plans/M0.md](docs/plans/M0.md), [M1](docs/plans/M1.md), [M2](docs/plans/M2.md), [M3](docs/plans/M3.md) | Planos de execução de cada milestone, em ondas paralelas |
+| [docs/plans/SHADOW-LAB.md](docs/plans/SHADOW-LAB.md) | Protocolo do Shadow Lab: congelamento, custos, métricas, régua editorial |
+| [docs/plans/REPLICATION.md](docs/plans/REPLICATION.md) | Protocolo de replicação (quando uma versão promissora é considerada real) |
+| [docs/reports/](docs/reports/) | Relatórios de fechamento de milestone, formato §77 (M0–M3) |
+| [docs/OBSIDIAN.md](docs/OBSIDIAN.md) | Padrão, higiene e ferramenta da base de conhecimento em `obsidian/` |
+| [docs/HERMES.md](docs/HERMES.md) | Onde e como a Sexta-feira roda (Claude Code e o perfil opcional no Hermes) |
 | [docs/decisions/](docs/decisions/README.md) | ADRs (camada dois da memória do projeto) |
 | [CLAUDE.md](CLAUDE.md) | Instruções para o agente: regras, comandos canônicos, roster de especialistas |
 

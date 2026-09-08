@@ -87,7 +87,15 @@ agregado pela API); a implantação na VPS continua pendente.
 
 ## Milestone 3 — Carteira virtual e Risk Engine
 
-> **Revisado em 2026-09-06** pela diretiva do Everton (ADR 0005). O escopo abaixo era "paper trading", com o Risk Engine no M4; a diretiva manda **implementar o Risk Engine e integrá-lo à carteira**, então ele desce para cá e o M4 fica com agentes e a ponte sinal → proposta. Acrescentam-se: carteira permanente de R$100.000 convertidos em USDT com âncora de câmbio, caminho de dados **SPOT**, β versionado, e o perfil `paper_v1`. As entradas do M3 são **manuais**; o modo autônomo não é declarado aqui. Plano vigente: `docs/plans/M3.md`; contrato: `docs/RISK_ENGINE.md` v2.
+> **Revisado em 2026-09-06** pela diretiva do Everton (ADR 0005). O escopo abaixo era "paper trading", com o Risk Engine no M4; a diretiva manda **implementar o Risk Engine e integrá-lo à carteira**, então ele desce para cá e o M4 fica com agentes e a ponte sinal → proposta. Acrescentam-se: carteira permanente de R$100.000 convertidos em USDT com âncora de câmbio, caminho de dados **SPOT**, β versionado, e o perfil `paper_v1`. As entradas do M3 são **manuais**; o modo autônomo não é declarado aqui. Plano vigente: `docs/plans/M3.md`; contrato: `docs/RISK_ENGINE.md` v2.2.
+>
+> **Status em 2026-09-08: código completo, RASCUNHO de fechamento, não aprovado.** Relatório
+> estendido: `docs/reports/M3.md`. Tudo do escopo abaixo está implementado e rodando com dado real
+> na VPS (carteira `ever`, câmbio, spot como serviço próprio, β em produção); falta β validado em
+> massa (backfill de 31 dias em andamento), aplicar as migrações `0012`/`0013` em algum stack, uma
+> execução única e datada de todas as suítes, e o parecer da Sexta-feira. A onda 5 do plano original
+> também produziu, fora do escopo original do M3, o protocolo de replicação e o motor de replay
+> histórico (`docs/plans/REPLICATION.md`) — pesquisa sobre o Shadow Lab, que nunca toca a carteira.
 
 **Escopo**
 - `hunter_core.execution`: `ExecutionAdapter`, `PaperExecutionAdapter` (walk do book, partial fills, slippage, fees, latência), `ShadowExecutionAdapter`, `LiveExecutionAdapter` (stub que levanta `LiveTradingDisabled`).
@@ -103,24 +111,45 @@ agregado pela API); a implantação na VPS continua pendente.
 
 ---
 
-## Milestone 4 — Agentes e a ponte sinal → proposta
+## Milestone 4 — Agentes, ponte sinal → proposta em produção e replicação viva
 
-> **Revisado em 2026-09-06** (ADR 0005): o Risk Engine e o kill switch saíram daqui para o M3. O que fica é o que faz a carteira operar **sozinha** — e é aqui que o modo autônomo passa a poder ser declarado, com a ponte entre sinal e proposta provada ponta a ponta (mapeamento explícito de ativo, unidades e geometria de entrada/stop/alvo entre o mercado do sinal e o de execução; sinal `research_only` continua recusado).
+> **Revisado em 2026-09-06** (ADR 0005): o Risk Engine e o kill switch saíram daqui para o M3.
+> **Revisado de novo em 2026-09-08** com o que sobrou depois de o M3 ter antecipado a ponte, a
+> admissão e boa parte do dado de risco: o M4 deixa de ser "construir a ponte" e passa a ser "ligar
+> a ponte em produção com a decisão do Everton", mais a página de agentes, que é a única do nav sem
+> nenhum dado real hoje. O modo autônomo passa a poder ser **declarado** aqui — não porque o código
+> não existisse antes (a ponte T3.14 e o serviço de admissão T3.12 são do M3), mas porque a prova em
+> produção, as sete condições da D10 (`docs/plans/M3.md`) e o ato de ativação são deste milestone.
 
-**Escopo**
-- Framework `Strategy`; `momentum_v1` e `volume_anomaly_v1` ativados; `strategy-worker` gerando sinais globais.
-- ~~`hunter_risk`: `RiskEngine` completo, sizing, kill switch~~ → **movido para o M3**.
-- Proposal builder, `trade_proposals`, fluxo AGENT → PROPOSAL → RISK → PAPER EXECUTION de ponta a ponta.
-- API: agents CRUD (enable/pause/disable, alocação, filtros), signals, proposals (com decisão e checks), risk (limites, estado, eventos, kill switch).
-- Web: `/agents`, `/agents/[id]` (métricas básicas; estatísticas completas no M5), `/risk` (Risk Center com limites editáveis, exposição, kill switch), propostas rejeitadas visíveis com motivo, status `IN_POSITION` e `BLOCKED_BY_RISK` no Radar.
+**O que o M3 já entregou e o M4 reaproveita, sem reconstruir:**
+- Ponte shadow → admissão (`services/execution-worker/hunter_execution_worker/bridge_*.py`), atrás de `ENABLE_PAPER_AUTONOMY=false`.
+- Serviço de admissão único (`packages/core/hunter_core/admission/**`): FIFO, dedupe, decisão+reserva+auditoria+outbox atômicos.
+- Rótulo `purpose` congelado na versão (`0010`/`0011`) e o script de ativação auditado (`activate_strategy_version.py`).
+- Risk Engine completo, kill switch, β versionado (M3).
 
-**Testes:** estratégias com cenários determinísticos (gera sinal / não gera); tabela de casos do Risk Engine (cada check aprovando e reprovando); kill switch por escopo; pipeline de integração: candle sintético → sinal → proposta → fill paper; E2E `enable agent`, `change risk`, `kill switch`.
+**Escopo que falta**
+- **Ativação em produção** da primeira coorte `paper` (`momentum`, D10) pelo Everton, com as sete condições cumpridas (β validado, spot isolado provado, T3.9b/T3.15 revisadas, `EXP-0005` aberto, parecer da Astra) — é aqui que "agentes operando paper sem intervenção" deixa de ser afirmação e vira prova datada.
+- `agents` como tabela **povoada**, com CRUD real (enable/pause/disable, alocação, filtros) — hoje a tabela está vazia, e é um bloqueio conhecido da ponte (`obsidian/07-BUGS/Open Bugs.md`, "agents é obrigatório").
+- Uma segunda coorte paper simultânea, se o Everton quiser, com a medição de folga do `strategy-worker` que a D10 exige antes disso.
+- API: `agents` CRUD completo; `signals` e `proposals` com decisão e checks (parte já coberta pelo Lab e pela T3.25 no Risk Center, ver `docs/PRODUCT.md` §4).
+- Web: `/agents`, `/agents/[id]`; status `IN_POSITION`/`BLOCKED_BY_RISK` no Radar.
+- **Replicação em produção**: quando a primeira versão `paper` ficar `validada` no placar, rodar o protocolo de `docs/plans/REPLICATION.md` sobre dado de produção pela primeira vez (hoje só foi exercitado em teste e em prova local).
 
-**Saída:** agentes operando paper sem intervenção; toda decisão explicável na UI.
+**Testes:** estratégias com cenários determinísticos (gera sinal / não gera); pipeline de integração ponta a ponta com a ponte **ligada** (não só testada isoladamente); E2E `enable agent`, `change risk`; a primeira ativação auditada de verdade, com o log e o `system_events` colados no relatório de fechamento.
+
+**Saída:** agentes operando paper sem intervenção, provado em produção com dado datado; toda decisão explicável na UI.
 
 ---
 
 ## Milestone 5 — Analytics, auditoria, sistema (fecha o MVP)
+
+> **Ajustado em 2026-09-08:** o M3 antecipou o motor por trás de `/trades` (posições, ordens,
+> fills e PnL reais da carteira paper, T3.8a) e o essencial do dado de `/risk` (`RiskLimits`,
+> `portfolio_risk_state`, kill switch, tudo com fonte única provada por teste). A T3.25 despachou os
+> endpoints que faltavam (`docs/plans/M3.md`/`docs/reports/M3.md`) e as telas ficam para assim que o
+> product-designer entregar os specs (T3.24). O que este milestone ainda deve, e que o M3 não tocou:
+> `analytics-worker` de verdade (`agent_stats`, agregações por regime/estratégia/hora), o dashboard
+> completo do §12 e o audit log de `/settings/security`.
 
 **Escopo**
 - `analytics-worker`: `agent_stats`, `signal_outcomes` (shadow de sistema), agregações de equity, retenção e partições.
@@ -139,14 +168,26 @@ agregado pela API); a implantação na VPS continua pendente.
 
 ## Milestone 6 — Shadow, Arena, Backtest, versionamento
 
+> **Ajustado em 2026-09-08.** Duas peças deste milestone **já saíram do papel** no M3, por caminhos
+> que não previam originalmente virar "backtest": o motor de replay histórico (T3.19b,
+> `services/strategy-worker/hunter_strategy_worker/replay/**`) reusa a mesma função de decisão do
+> caminho vivo (`evaluate_slot`) sobre candles persistidos, sem look-ahead **por construção** e
+> **provado por teste de mutação** (`test_replay_lookahead.py`) — é o Backtest Engine descrito
+> abaixo, só que nascido para alimentar o placar do Lab em massa, não para uma tela de backtest. E o
+> catálogo de versões (propósito, veredito, linhagem de replicação) já existe em `strategy_versions`
+> desde `0010`–`0012`, exportado para o Obsidian (T3.20). O que falta do escopo abaixo é **produto**,
+> não motor: telas (`/backtests`, `/strategies`, ambas despachadas na T3.25 e pendentes dos specs do
+> product-designer) e o que o motor de replay explicitamente não é — validação train/validation/oos,
+> walk-forward e detecção de overfitting/leakage sobre o resultado, que continuam em aberto.
+
 **Escopo**
 - Shadow portfolios na UI; comparação shadow vs paper.
 - Agent Arena: organização de sistema, um portfolio `is_arena` por strategy_version ativa, ranking por retorno ajustado a risco (Sortino, drawdown, consistência, expectancy, PF), `/arena`.
-- Backtest Engine: replay de candles do Postgres com o mesmo `Strategy`, `RiskEngine` e `PaperExecutionAdapter` (mesmo código que o realtime; sem look-ahead por construção), validação train/validation/oos e walk-forward, alertas de overfitting (diferença de performance entre segmentos) e leakage (teste de embaralhamento). `/backtests`.
-- Versionamento na UI: `/strategies` com versões, changelog, ativação por OWNER; agente escolhe versão; versão antiga nunca some.
+- Backtest Engine (**motor já existe, T3.19b — falta a tela e a camada de validação estatística**): replay de candles do Postgres com o mesmo `Strategy`, `RiskEngine` e `PaperExecutionAdapter` (mesmo código que o realtime; sem look-ahead por construção — entregue), validação train/validation/oos e walk-forward, alertas de overfitting (diferença de performance entre segmentos) e leakage (teste de embaralhamento) — **em aberto**. `/backtests` lista os recibos de `replay_runs` (`0013`, ver `docs/reports/M3.md` — migração ainda não aplicada em nenhum stack).
+- Versionamento na UI: `/strategies` com versões, changelog, ativação por OWNER; agente escolhe versão; versão antiga nunca some. **O dado já existe** (`purpose`, `promising_at`, linhagem de replicação); falta a tela.
 - Meta Engine v0: recomendação de pesos e alocação (só recomenda; OWNER aprova; histórico).
 
-**Testes:** backtest reproduzível (mesma entrada, mesma saída); backtest de estratégia "cheat" com look-ahead deliberado é detectado; ranking da arena com portfolios sintéticos.
+**Testes:** backtest reproduzível (mesma entrada, mesma saída — provado para o motor de replay, falta para a camada de validação estatística); backtest de estratégia "cheat" com look-ahead deliberado é detectado (**entregue**, `test_replay_lookahead.py`); ranking da arena com portfolios sintéticos.
 
 ---
 
