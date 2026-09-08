@@ -23,7 +23,7 @@ depends on the ambient decimal context of whichever process asked.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, localcontext
 
@@ -92,18 +92,23 @@ def hourly_closes(
     }
 
 
-def hourly_returns(
-    candles: Iterable[NormalizedCandle],
+def returns_from_closes(
+    closes: Mapping[datetime, Decimal],
     *,
     as_of: datetime,
     spec: BetaSpec = DEFAULT_SPEC,
 ) -> tuple[HourlyReturn, ...]:
-    """One simple return per complete bar whose predecessor is also complete.
+    """The arithmetic half of :func:`hourly_returns`, over bar closes already built.
 
-    Oldest first. ``hour_start`` labels the bar the return happened *in*: the
-    move from the close of ``hour_start - 1h`` to the close of ``hour_start``.
+    Extracted so the scanner's hourly job — which aggregates the sixty minutes
+    of each bar **in SQL**, because loading 43 200 candles per market per hour
+    into Python is not a thing a worker may do every hour — runs the *same*
+    return rule as the in-memory path instead of a second spelling of it. The
+    mapping it is given must be exactly what :func:`hourly_closes` would return:
+    complete bars only, keyed by bar start, one anchor bar before the window.
+    A version of the numeric contract that had two implementations would not be
+    one contract (T3.7b).
     """
-    closes = hourly_closes(candles, as_of=as_of, spec=spec)
     start, _ = window_bounds(as_of, spec)
     out: list[HourlyReturn] = []
     with localcontext(CONTEXT):
@@ -119,4 +124,26 @@ def hourly_returns(
     return tuple(out)
 
 
-__all__ = ["floor_bar", "hourly_closes", "hourly_returns", "window_bounds"]
+def hourly_returns(
+    candles: Iterable[NormalizedCandle],
+    *,
+    as_of: datetime,
+    spec: BetaSpec = DEFAULT_SPEC,
+) -> tuple[HourlyReturn, ...]:
+    """One simple return per complete bar whose predecessor is also complete.
+
+    Oldest first. ``hour_start`` labels the bar the return happened *in*: the
+    move from the close of ``hour_start - 1h`` to the close of ``hour_start``.
+    """
+    return returns_from_closes(
+        hourly_closes(candles, as_of=as_of, spec=spec), as_of=as_of, spec=spec
+    )
+
+
+__all__ = [
+    "floor_bar",
+    "hourly_closes",
+    "hourly_returns",
+    "returns_from_closes",
+    "window_bounds",
+]

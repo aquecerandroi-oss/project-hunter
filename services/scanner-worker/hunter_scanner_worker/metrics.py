@@ -143,6 +143,25 @@ scanner_detectors_disarmed = Gauge(
 )
 
 
+beta_revisions_total = Counter(
+    "hunter_beta_revisions_total",
+    "Beta revisions produced by the hourly job, by what the pass did: "
+    '"valid" and "invalid" are revisions that were inserted (an invalid one '
+    'carries its reason and no coefficients), "unchanged" is a rerun of a cut '
+    'whose inputs did not move, "no_reference" is a pass with no reference '
+    'market to measure against, "failed" is a market whose transaction raised.',
+    ["outcome"],
+    registry=registry,
+)
+
+beta_valid_markets = Gauge(
+    "hunter_beta_valid_markets",
+    "Markets whose newest beta revision is valid at the last closed hour. "
+    "Eligible by the protocol -- never a claim of accuracy (RISK_ENGINE.md 6).",
+    registry=registry,
+)
+
+
 scanner_consumer_events_total = Counter(
     "hunter_scanner_consumer_events_total",
     "Stream messages handled, by stream.",
@@ -174,6 +193,8 @@ scanner_stream_delay_seconds = Histogram(
 )
 
 __all__ = [
+    "beta_revisions_total",
+    "beta_valid_markets",
     "scanner_anomalies_open",
     "scanner_backfill_requests_total",
     "scanner_baseline_revisions_total",

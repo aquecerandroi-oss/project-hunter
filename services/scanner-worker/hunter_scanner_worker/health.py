@@ -58,6 +58,7 @@ if TYPE_CHECKING:
     from hunter_core.events.outbox import OutboxHealth
     from hunter_core.runtime import WorkerRuntime
     from hunter_scanner_worker.baseline_runner import BootstrapProgress
+    from hunter_scanner_worker.beta_job import BetaHealth
     from hunter_scanner_worker.config import ScannerConfig
     from hunter_scanner_worker.consumers import ConsumerHealth
     from hunter_scanner_worker.scanner import Scanner
@@ -176,6 +177,7 @@ async def write_heartbeat(
     cycle: CycleHealth,
     consumers: ConsumerHealth,
     progress: BootstrapProgress | None = None,
+    beta: BetaHealth | None = None,
 ) -> None:
     """``hb:scanner:<instance>`` plus the gauges the dashboards read."""
     markets = list(scanner.state.markets.values())
@@ -243,6 +245,12 @@ async def write_heartbeat(
         ),
         "hot_rows_resident": str(resident),
         "coverage": "live" if scanner.coverage.fresh() else "unproven",
+        # The beta producer, in the two numbers an operator needs during an
+        # incident: when it last ran, and how many markets it left admissible.
+        # An empty ``beta_last_run`` means it has not run in this process --
+        # which is what a scanner started five minutes ago honestly looks like.
+        "beta_last_run": beta.last_run_at.isoformat() if beta and beta.last_run_at else "",
+        "beta_valid": str(beta.valid_markets if beta else 0),
         "consumer_errors": str(consumers.errors),
         "errors": str(runtime.error_count),
     }

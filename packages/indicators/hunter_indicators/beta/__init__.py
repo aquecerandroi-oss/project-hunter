@@ -34,7 +34,13 @@ from hunter_indicators.beta.model import (
     beta_version,
     is_known_version,
 )
-from hunter_indicators.beta.returns import floor_bar, hourly_closes, hourly_returns, window_bounds
+from hunter_indicators.beta.returns import (
+    floor_bar,
+    hourly_closes,
+    hourly_returns,
+    returns_from_closes,
+    window_bounds,
+)
 
 __all__ = [
     "BETA_METHOD_VERSION",
@@ -60,5 +66,6 @@ __all__ = [
     "invalidates",
     "is_known_version",
     "reference_beta",
+    "returns_from_closes",
     "window_bounds",
 ]

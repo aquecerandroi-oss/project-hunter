@@ -29,6 +29,8 @@ from hunter_core.logging import get_logger
 from hunter_scanner_worker.backfill import BackfillRequester
 from hunter_scanner_worker.baseline_runner import BootstrapProgress, baseline_loop
 from hunter_scanner_worker.baselines import BaselineCache
+from hunter_scanner_worker.beta import beta_loop
+from hunter_scanner_worker.beta_job import BetaHealth
 from hunter_scanner_worker.config import build_config
 from hunter_scanner_worker.consumers import (
     ConsumerHealth,
@@ -95,6 +97,7 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
     consumers, cycle, outbox_health = ConsumerHealth(), CycleHealth(), OutboxHealth()
     requester = BackfillRequester(scanner.producer)
     progress = BootstrapProgress()
+    beta = BetaHealth()
     universe_wake = asyncio.Event()
     checks = readiness_checks(
         scanner, consumers, cycle, outbox_health, config, runtime.redis, progress
@@ -103,6 +106,11 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
     # A diagnostic, never a verdict: an operator reading a green ``/ready``
     # still has to see "bootstrapping BTCUSDT (37/200)" next to it.
     runtime.status_details["baselines"] = progress.describe
+    # Beta is a *status detail*, never a readiness check (T3.7b): a producer
+    # that has not run for two hours means the wallet stops opening positions,
+    # which an operator has to see -- and means nothing at all to the Radar, the
+    # baselines or the regime, which is the whole of what /ready gates.
+    runtime.status_details["beta"] = lambda: beta.describe(utcnow())
 
     try:
         await refresh_universe(scanner, factory, runtime.redis)
@@ -133,9 +141,12 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
                         resume_s=config.feature_throttle_s / 2,
                     ),
                 ),
+                "beta": beta_loop(scanner, factory, runtime.redis, runtime, beta),
                 "deriv": deriv_loop(scanner, factory, runtime),
                 "outbox": run_dispatcher(runtime.redis, factory, outbox_health, db_role=DB_ROLE),
-                "heartbeat": _heartbeat_loop(runtime, scanner, cycle, consumers, config, progress),
+                "heartbeat": _heartbeat_loop(
+                    runtime, scanner, cycle, consumers, config, progress, beta
+                ),
             }
             for stream in (
                 Streams.MARKET_TICKS,
@@ -171,6 +182,7 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
                 group.create_task(forever(name, coro), name=f"scanner-{name}")
     finally:
         runtime.status_details.pop("baselines", None)
+        runtime.status_details.pop("beta", None)
         for check in checks:
             if check in runtime.readiness_checks:
                 runtime.readiness_checks.remove(check)
@@ -301,7 +313,8 @@ async def _heartbeat_loop(
     consumers: ConsumerHealth,
     config: ScannerConfig,
     progress: BootstrapProgress,
+    beta: BetaHealth,
 ) -> None:
     while True:
-        await write_heartbeat(runtime.redis, runtime, scanner, cycle, consumers, progress)
+        await write_heartbeat(runtime.redis, runtime, scanner, cycle, consumers, progress, beta)
         await asyncio.sleep(config.heartbeat_s)

@@ -470,7 +470,7 @@ não existe em código hoje (KB-0071). O contrato:
   `window_end`, estimador, tipo de retorno, `n_returns` (retornos efetivamente **pareados**, não
   fechamentos), cobertura, `computed_at`, `available_at`, `valid_until`, `algo_version`, motivos de
   invalidez.
-- Calculado **fora** do Risk Engine (o motor é puro) e entregue como argumento.
+- Calculado **fora** do Risk Engine (o motor é puro) e entregue como argumento. O produtor é o job horário do `scanner-worker` (`hunter_scanner_worker/beta*.py`, T3.7b — `docs/PIPELINE.md` §2b): uma revisão imutável por mercado por hora fechada, válidas com os números e inválidas com o motivo, nunca um β fabricado. Quem lê é `bridge_universe.current_beta`, com as três condições abaixo juntas.
 - **Admissão de uma revisão** exige as três condições, juntas: `available_at <= as_of` (uma revisão
   conhecida só depois não reexplica uma decisão anterior), janela **encerrada** até o corte, e prazo
   ainda válido. `valid_until` é ancorado em `window_end`, **não** no relógio do cálculo — recalcular
