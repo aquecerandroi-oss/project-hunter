@@ -13,7 +13,8 @@ from typing import TYPE_CHECKING
 
 from hunter_core.domain.enums import OrderSide
 from hunter_core.execution.pricing import eligible_for
-from hunter_execution_worker.avg_price import AVG_PRICE_MAX_AGE_S
+from hunter_execution_worker import metrics
+from hunter_execution_worker.avg_price import AVG_PRICE_MAX_AGE_S, AVG_PRICE_MAX_SKEW_S
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -85,17 +86,31 @@ def stale_average(snapshot: SpotSnapshot, *, now: datetime) -> str:
     (:mod:`hunter_execution_worker.avg_price`); this second measurement is the
     one the *decision* can be held to, and it is the one that catches a snapshot
     assembled before a stall and used after it. A reference with a price and no
-    stamp is not a reference at all (§7, R-OPS-2) — ``avg_price_undated`` — and a
-    stamp in the future is refused exactly like an expired one.
+    stamp is not a reference at all (§7, R-OPS-2) — ``avg_price_undated``.
+
+    **A stamp slightly ahead of ``now`` is the cycle's own ordering, not a
+    future price (T3.29b).** :meth:`hunter_execution_worker.cycles.Cycles.entries`
+    reads ``now`` and only then assembles the snapshot, so on every cache miss
+    the reader stamps its receipt *after* the instant this entry is judged
+    against. Refusing that negative age threw away a price fetched milliseconds
+    earlier, once per refresh window, until the reservation expired. Inside
+    :data:`~hunter_execution_worker.avg_price.AVG_PRICE_MAX_SKEW_S` the reference
+    is fresh and the event is **counted**; past it the two clocks genuinely
+    disagree and the entry defers as ``avg_price_clock_skew`` — a different
+    incident from ``avg_price_stale``, and named as one.
     """
     if snapshot.avg_price is None:
         return f"avg_price_{snapshot.avg_price_source}"
     if snapshot.avg_price_ts is None:
         return "avg_price_undated"
     age = (now - snapshot.avg_price_ts).total_seconds()
-    if age < 0 or age > AVG_PRICE_MAX_AGE_S:
-        return "avg_price_stale"
-    return ""
+    if age < 0:
+        tolerated = -age <= AVG_PRICE_MAX_SKEW_S
+        metrics.execution_avg_price_clock_skew_total.labels(
+            outcome="tolerated" if tolerated else "refused"
+        ).inc()
+        return "" if tolerated else "avg_price_clock_skew"
+    return "avg_price_stale" if age > AVG_PRICE_MAX_AGE_S else ""
 
 
 def needs_average(market: MarketReference) -> bool:

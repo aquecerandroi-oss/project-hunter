@@ -115,13 +115,27 @@ class StaticSpotMarketData:
 
     source = "static_fixture"
 
-    def __init__(self, snapshots: dict[tuple[str, str], SpotSnapshot]) -> None:
+    def __init__(
+        self,
+        snapshots: dict[tuple[str, str], SpotSnapshot],
+        *,
+        stamp_avg_price: bool = True,
+    ) -> None:
         self._snapshots = snapshots
+        self._stamp_avg_price = stamp_avg_price
+        """Whether an undated ``avg_price`` gets the picture's own instant.
+
+        ``True`` is the fixture's convenience (see :func:`_dated`). ``False`` is
+        the **opt-out** a test asks for when the absence of a stamp *is* the
+        scenario: without it ``avg_price_undated`` (RISK_ENGINE.md §7 — a price
+        with no age is not a reference) was unreachable through this double, so
+        the rule could only be exercised against a hand-built snapshot and never
+        end to end (T3.29b, finding 4)."""
 
     async def snapshot(self, market: MarketIdentity) -> SpotSnapshot:
         found = self._snapshots.get((market.exchange, market.symbol))
         if found is not None:
-            return _dated(found)
+            return _dated(found) if self._stamp_avg_price else found
         return SpotSnapshot(market=market, book=None, unavailable=("no_snapshot",))
 
 
@@ -134,7 +148,9 @@ def _dated(snapshot: SpotSnapshot) -> SpotSnapshot:
     that hands one snapshot means one instant, so the double declares that
     instant to be the book's own receipt (else the newest print). A test that
     wants a **stale** reference says so by setting ``avg_price_ts`` itself: this
-    only ever fills an absence, it never overwrites a stamp.
+    only ever fills an absence, it never overwrites a stamp. A test that wants no
+    stamp at all builds the double with ``stamp_avg_price=False``, which is the
+    only way ``avg_price_undated`` is reachable through a fixture (T3.29b).
     """
     if snapshot.avg_price is None or snapshot.avg_price_ts is not None:
         return snapshot

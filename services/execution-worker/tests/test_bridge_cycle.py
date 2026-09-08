@@ -33,6 +33,7 @@ from . import shadow_builders as shadow
 from .builders import (
     NO_EXIT_COST,
     NOW,
+    SecondMarket,
     Tenant,
     Wallet,
     add_market,
@@ -51,6 +52,8 @@ pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
 WORKER_ROLE = "hunter_worker"
 BAR = NOW - timedelta(seconds=30)
 FILL_AT = NOW + timedelta(seconds=1)
+CYCLE_AT = NOW + timedelta(seconds=2)
+"""The pass after the fill, still inside the signal's 120 s entry window."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -408,3 +411,111 @@ async def test_a_scaled_perpetual_out_of_band_is_rejected_by_the_risk_engine_wit
         ).one()
     assert row.status == "rejected"
     assert row.reservation != "held"
+
+
+async def test_a_wallet_it_cannot_price_defers_the_slot_and_admits_it_back_when_marks_return(
+    db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
+) -> None:
+    """T3.29 item 4, proved on the bridge (T3.29b, finding 2).
+
+    The pre-check lived in ``bridge.py`` with no test of its own, so nothing
+    refuted the two ways it could be wrong: never firing (a wallet holding a
+    position priced at its last durable mark keeps admitting new entries, with
+    equity, drawdown and aggregate risk read off an estimate), and firing for
+    ever (an illiquid position freezing the wallet even after the tape came
+    back).
+
+    The wallet here holds one filled position. Its market's tape then stops, so
+    coverage is 0 of 1: the candidate on a **different** market is *deferred*,
+    not refused — nothing is written, the slot is not spent, and the signal is
+    read again next cycle. When the tape returns, coverage is 1 of 1 and the same
+    candidate is admitted.
+
+    **O que refuta:** a bridge that submits while a held position is marked at
+    yesterday's price; a pre-check that rejects instead of deferring (burning a
+    signal on a transient tape); a pre-check with no way back.
+    """
+    lab = await _lab(db_session_factory, db_engine)
+    await shadow.emit_signal(
+        db_engine,
+        version_id=lab.version_id,
+        market_id=lab.perp_market_id,
+        source_bar_close=BAR,
+        purpose=shadow.PURPOSE_PAPER,
+    )
+    first = await _cycle(db_session_factory, lab, _data(lab))
+    assert first.submitted is not None and first.submitted.approved
+    async with tenant_session(db_session_factory, lab.tenant.org_id, db_role=WORKER_ROLE) as s:
+        outcomes = await execute_approved_entries(
+            s, wallet=lab.ref, data=_data(lab, received_at=FILL_AT), now=FILL_AT
+        )
+    assert [item.status for item in outcomes] == ["filled"]
+
+    # A second market, so the next candidate is not refused as a duplicate of
+    # the position the wallet now holds.
+    other = await add_market(db_engine, lab.tenant, suffix="M")
+    await shadow.set_spot_volume(db_engine, other.market_id, volume=Decimal(120_000_000))
+    await shadow.set_beta(db_engine, other.market_id, as_of=NOW)
+    await shadow.seed_minute_volumes(db_engine, other.market_id, now=NOW)
+    other_perp = await shadow.add_perp_market_for(db_engine, lab.tenant, other.market_id)
+    signal_id = await shadow.emit_signal(
+        db_engine,
+        version_id=lab.version_id,
+        market_id=other_perp,
+        source_bar_close=BAR,
+        emitted_at=BAR + timedelta(seconds=1),
+        purpose=shadow.PURPOSE_PAPER,
+    )
+
+    # The held market's tape stops an hour back: the marking policy cannot use
+    # it, so the wallet's own position has no live price this pass.
+    stopped = _two_markets(lab, other, held_trade_at=CYCLE_AT - timedelta(hours=1))
+    deferred = await _cycle(db_session_factory, lab, stopped, now=CYCLE_AT)
+    assert deferred.candidates == 1
+    assert deferred.submitted is None
+    assert deferred.deferred == "marks_incomplete"
+    assert await _proposals(db_engine, lab) == 1, "nothing was written for the deferred candidate"
+
+    # The tape comes back. Same candidate, same cycle, coverage back to 1.
+    recovered = _two_markets(lab, other, held_trade_at=CYCLE_AT)
+    admitted = await _cycle(db_session_factory, lab, recovered, now=CYCLE_AT)
+    assert admitted.deferred is None, admitted.deferred
+    assert admitted.submitted is not None
+    assert admitted.signal_id == signal_id
+    assert admitted.submitted.approved, admitted.submitted.decision.rejection_reasons
+    assert await _proposals(db_engine, lab) == 2
+
+
+def _two_markets(lab: Lab, other: SecondMarket, *, held_trade_at: datetime) -> StaticSpotMarketData:
+    """The wallet's own market with a tape of the caller's choosing, and the
+    candidate's market always live — so the only thing the two passes differ in
+    is whether the **held position** can be priced."""
+    return StaticSpotMarketData(
+        {
+            (lab.tenant.slug, lab.tenant.symbol): SpotSnapshot(
+                market=market_identity(lab.tenant),
+                book=book(lab.tenant, received_at=CYCLE_AT),
+                trades=(trade(lab.tenant, price=Decimal(100), ts=held_trade_at, trade_id=2),),
+                avg_price=Decimal(100),
+                avg_price_ts=CYCLE_AT,
+            ),
+            (lab.tenant.slug, other.symbol): SpotSnapshot(
+                market=market_identity(other),
+                book=book(lab.tenant, received_at=CYCLE_AT),
+                trades=(trade(lab.tenant, price=Decimal(100), ts=CYCLE_AT, trade_id=3),),
+                avg_price=Decimal(100),
+                avg_price_ts=CYCLE_AT,
+            ),
+        }
+    )
+
+
+async def _proposals(db_engine: AsyncEngine, lab: Lab) -> int:
+    async with db_engine.begin() as connection:
+        return int(
+            await connection.scalar(
+                text("SELECT count(*) FROM trade_proposals WHERE portfolio_id = :pf"),
+                {"pf": lab.wallet.portfolio_id},
+            )
+            or 0
+        )

@@ -57,6 +57,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "AVG_PRICE_MAX_AGE_S",
+    "AVG_PRICE_MAX_SKEW_S",
     "AVG_PRICE_REFRESH_S",
     "AVG_PRICE_SOURCE",
     "AvgPriceExchange",
@@ -76,6 +77,25 @@ AVG_PRICE_REFRESH_S = 5.0
 
 AVG_PRICE_MAX_AGE_S = 30.0
 """How old a quote may be and still judge a filter — the reservation's tenure."""
+
+AVG_PRICE_MAX_SKEW_S = 2.0
+"""How far **ahead** of the cycle's ``now`` a stamp may be and still be fresh.
+
+Not a courtesy: it is the ordering the cycle itself creates.
+:meth:`hunter_execution_worker.cycles.Cycles.entries` reads ``now`` and *then*
+assembles the snapshot, so a quote fetched during that pass is stamped after the
+instant the entry is judged against — a negative age of milliseconds on every
+cache miss. Refusing it (the pre-T3.29b behaviour) threw away a price the reader
+had just received, once per refresh window, and the entry deferred until its
+reservation expired.
+
+The tolerance is small on purpose and it is **not** open-ended: past it the
+reference is refused as ``avg_price_clock_skew``, which is a different incident
+from ``avg_price_stale`` and is counted separately
+(``hunter_execution_avg_price_clock_skew_total``). Two seconds is an order of
+magnitude below the 30 s hard bound and far above any in-pass scheduling delay,
+so it can absorb the race without ever admitting a reference from another minute.
+"""
 
 
 @dataclass(frozen=True, slots=True)

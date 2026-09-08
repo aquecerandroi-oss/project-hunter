@@ -129,3 +129,155 @@ armadilha 2 da §12 ("sem relógio de parede") num arquivo que a tinha.
    `infra/**` fora do meu escopo de escrita).
 6. `hb:execution:paper` só ganha `mark_quality` **depois do deploy**; hoje a VPS roda
    `9a291d3`.
+
+
+---
+
+# T3.29b — fecha a revisão REQUEST_CHANGES da T3.29 (risk-engine-guardian, 2026-09-08)
+
+Base: `main` em `56038a8`, árvore compartilhada. **Nada commitado.** VPS somente leitura
+(nenhuma leitura nova foi necessária nesta rodada; nada foi escrito).
+
+## 1. Achado 1 (HIGH) — a corrida de relógios no `avgPrice`
+
+**O que era.** `Cycles.entries()` lê o seu `now` (`cycles.py:206`) e **só depois** monta a
+foto do mercado; `ExchangeAvgPrice.read()` carimba `observed_at` com o **seu** relógio, que
+é lido dentro desse `data.snapshot(...)` — sempre depois. A cada expiração do cache de 5 s a
+idade medida em `entry_inputs.stale_average` saía **negativa**, e a regra antiga
+(`if age < 0 or age > 30: "avg_price_stale"`) recusava como vencida uma cotação recebida
+milissegundos antes. Com o adiamento repetindo a cada passo, a reserva de 30 s expirava e a
+entrada nunca acontecia.
+
+**Reproduzido, não deduzido.** Com a regra antiga restaurada de propósito, o teste de ciclo
+completo (Postgres real, `RedisSpotMarketData` real, `utcnow` real no leitor) devolveu:
+
+```
+>       assert [(o.status, o.reason) for o in outcomes] == [("filled", "")], [
+E       AssertionError: [('deferred', 'avg_price_stale')]
+```
+
+**O que passou a valer.** `AVG_PRICE_MAX_SKEW_S = 2.0` (`avg_price.py`): um carimbo à frente
+do `now` do ciclo até 2 s é **fresco** e o evento é contado
+(`hunter_execution_avg_price_clock_skew_total{outcome="tolerated"}`); acima disso os dois
+relógios de fato discordam e a entrada adia com **`avg_price_clock_skew`**, contado como
+`refused`. O nome é novo de propósito: "velho demais" e "à frente do ciclo" mandam o
+operador a lugares diferentes (endpoint lento × NTP do host), e chamar os dois de
+`avg_price_stale` era proveniência mentindo. O limite duro de 30 s e o `avg_price_undated`
+não mudaram.
+
+**Um relógio, não dois (`main.py`).** `run_execution` passa a **mesma** callable para o
+leitor e para os ciclos (`_avg_price_reader(runtime, clock=clock)` e
+`Cycles(..., clock=clock)`). Hoje isso **não muda comportamento** — os dois já eram
+`utcnow` — e é dito assim para não parecer correção do bug: o que corrige o bug é a
+tolerância acima. O que a injeção fecha é a divergência futura: um `Cycles` dirigido por
+relógio de teste/replay com o leitor ainda em `utcnow` produziria uma diferença de anos, e
+**toda** entrada adiaria por `avg_price_clock_skew`.
+
+**Por que 2 s.** Uma ordem de grandeza abaixo do limite duro (30 s) e muito acima de
+qualquer atraso de agendamento dentro de um passo — absorve a ordem que o ciclo cria sem
+nunca admitir uma referência de outro minuto.
+
+## 2. Achado 2 (HIGH) — a pré-checagem `marks_incomplete` da ponte, com a volta
+
+`test_bridge_cycle.py::test_a_wallet_it_cannot_price_defers_the_slot_and_admits_it_back_when_marks_return`:
+carteira com **uma posição preenchida**; a fita do mercado dela para (negócio de 1 h antes,
+fora do orçamento da política de marcação) ⇒ cobertura 0 de 1 ⇒ o candidato de **outro**
+mercado é `deferred == "marks_incomplete"`, `submitted is None`, e a contagem de
+`trade_proposals` continua 1 (nada escrito, slot não gasto). No passo seguinte a fita volta
+⇒ cobertura 1 de 1 ⇒ o **mesmo** sinal é submetido e aprovado, contagem 2. Sem intervenção.
+
+**O teste refuta de verdade.** Com o bloco `if not coverage.complete: _defer(...)` removido
+de `bridge.py` de propósito:
+
+```
+>       assert deferred.submitted is None
+E       AssertionError: assert AdmissionResult(... unavailable=('marks',)) is None
+```
+
+— isto é: sem a pré-checagem a ponte **escreve** uma proposta decidida (recusada pelo motor
+puro por `marks`), queimando o sinal numa fita transitória em vez de adiá-lo.
+
+## 3. Achado 3 (MEDIUM) — as regras no documento-fonte
+
+`docs/RISK_ENGINE.md` vira **v2.3** com uma seção nova, §7.1 "Insumos do caminho de execução
+— as três pré-checagens do worker", e uma §9.4 dizendo o que mudou. **Nenhum limite do
+Everton mudou de valor e o motor puro não ganhou insumo nenhum**: as três regras são do
+`execution-worker` e estão no contrato porque são a aplicação literal da R-OPS-2 e da regra
+3 da diretiva ao caminho que gasta dinheiro — e porque o código as citava contra "§7,
+R-OPS-2" sem que elas existissem aqui.
+
+1. **`avgPrice`** como referência do filtro `NOTIONAL`, com os dois prazos publicados numa
+   tabela (reuso 5 s = custo; limite duro 30 s = a vida da reserva) mais a tolerância de
+   relógio de 2 s, e os cinco motivos de adiamento distintos (`avg_price_not_collected`,
+   `_unavailable`, `_undated`, `_stale`, `_clock_skew`).
+2. **`mark_quality`** como pré-checagem de admissão, com a consequência escrita em vez de
+   escondida: *uma única posição ilíquida adia todas as admissões novas daquela carteira até
+   as marcas voltarem* — e é reversível sozinha. **Saídas de proteção nunca são afetadas.**
+3. **`hot_state_unreachable`**: Redis ilegível adia a entrada e **não** derruba o passe —
+   antes um `ConnectionError` numa chave abortava o passe inteiro, inclusive a proteção das
+   outras carteiras, que é o que a regra 3 proíbe.
+
+`docs/ACTIVATION.md` §8 ganha a mesma nota em forma operacional: uma tabela
+`nome no log → o que aconteceu → o que o operador faz`, com a métrica de skew (`refused`
+tem de ficar em zero; `tolerated` sobe de propósito, ~1 por janela de reuso por mercado).
+
+## 4. Achado 4 (LOW) — `avg_price_undated` provado fim a fim
+
+`StaticSpotMarketData` ganhou `stamp_avg_price: bool = True`. O default é o de sempre (uma
+foto entregue por fixture é **um** instante, então o dublê carimba com o recibo do livro);
+`False` é a **recusa explícita de carimbar**, que é a única maneira de um fixture alcançar
+`avg_price_undated`. O par de testes em `test_entry_guards.py` usa a **mesma** foto nos dois
+lados: com carimbo ⇒ `filled`; sem carimbo ⇒ `("deferred", "avg_price_undated")`, zero
+`orders` e zero `positions`. Antes disso a regra do §7 ("preço sem idade não é insumo") só
+era exercitável contra um snapshot montado à mão, e um teste futuro podia ser enganado pelo
+carimbo silencioso do dublê.
+
+## 5. Arquivos
+
+Produção: `services/execution-worker/hunter_execution_worker/{avg_price,entry_inputs,market_data,metrics,main}.py`.
+Testes: `services/execution-worker/tests/{test_avg_price,test_entry_guards,test_bridge_cycle}.py`.
+Docs: `docs/RISK_ENGINE.md` (v2.3, §7.1 e §9.4), `docs/ACTIVATION.md` (§8).
+`cycles.py` e `bridge.py` **não** mudaram (foram tocados só nas reversões temporárias que
+provaram os dois testes, e restaurados byte a byte — `git diff` limpo nos dois).
+
+## 6. Testes (saída real)
+
+```
+uv run pytest services/execution-worker/tests/test_avg_price.py -q              -> 23 passed in 3.13s
+uv run pytest services/execution-worker/tests/test_entry_guards.py -q           ->  7 passed in 55.01s
+uv run pytest services/execution-worker/tests/test_bridge_cycle.py -q           ->  8 passed in 99.09s
+uv run pytest services/execution-worker/tests/test_mark_quality.py -q           ->  9 passed in 2.94s
+uv run pytest services/execution-worker/tests/test_manual_request_decided.py -q ->  1 passed in 25.57s
+uv run pytest services/execution-worker/tests/test_order_cycle.py -q            ->  2 passed in 28.30s
+uv run ruff check .                                                             -> All checks passed!
+uv run ruff format --check services/execution-worker                            -> 64 files already formatted
+uv run pyright services/execution-worker                                        -> 0 errors, 0 warnings
+uv run python infra/scripts/check_file_size.py                                  -> 1 over budget (não é meu, §7)
+```
+
+`test_order_cycle.py` é um arquivo a mais do que o brief listou: mexi em `entry_inputs.py` e
+`market_data.py`, que **todo** o caminho de entrada usa, e uma invocação extra pareceu barata
+perto de entregar uma mudança de caminho de dinheiro sem nenhum vizinho verde. Declarado como
+desvio, não escondido.
+
+## 7. Pendências e ressalvas
+
+1. **`check_file_size.py` está vermelho por mudança de outro agente**, não desta tarefa:
+   `packages/core/hunter_core/db/models/agents.py` tem 371 linhas na árvore de trabalho e
+   **346 em `HEAD`** (`git show HEAD:... | wc -l`). Não toquei `packages/**`. Quem commitar
+   aquele arquivo precisa fechar o orçamento antes.
+2. **A tolerância de 2 s é um relaxamento real da §7** ("carimbo no futuro é `unavailable`"),
+   e por isso está escrita no contrato e contada numa métrica em vez de embutida em
+   silêncio. Se `outcome="refused"` sair de zero em produção, é relógio do host, não mercado.
+3. `stale_average` deixou de ser função sem efeito colateral: ela incrementa o contador de
+   skew. É módulo do worker, não do motor puro (`packages/risk-core` continua sem rede, sem
+   banco, sem relógio e sem métrica). O caminho de expiração (`_deferral_reason`) chama
+   `missing_inputs` de novo, então um mesmo passo pode contar duas observações de skew — é
+   contador de diagnóstico, não de dinheiro.
+4. `test_entry_guards.py::TestTheCycleClockAndTheReadersStampDoNotRace` roda no **relógio
+   real** (é o único jeito de o carimbo do leitor cair depois do `now` do ciclo). Ele abre a
+   carteira e decide em `utcnow() - 1 s`, então uma execução que atravessasse exatamente a
+   meia-noite de São Paulo dentro dessa janela de 1 s veria `daily_reference` indisponível.
+   Janela de falha: ~1 s por dia. Registrado em vez de escondido.
+5. As pendências 1 a 6 da T3.29 (β do BTC, `agents`, restore real, `risk_profiles.paper_v1`,
+   `DATABASE_URL_MIGRATIONS`, deploy) continuam **todas abertas** — nada nesta tarefa as tocou.

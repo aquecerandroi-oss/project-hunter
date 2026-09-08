@@ -1,4 +1,13 @@
-# Risk Engine — contrato v2.2
+# Risk Engine — contrato v2.3
+
+**Versão 2.3, 2026-09-08.** Publica na §7.1 as três regras operacionais que o
+`execution-worker` já aplica e que o código citava contra este documento sem
+encontrá-las aqui: o `avgPrice` como referência do filtro `NOTIONAL` com os seus
+dois prazos, a qualidade das marcas (`mark_quality`) como pré-checagem de
+admissão, e a leitura falha do estado quente (`hot_state_unreachable`) como
+adiamento que nunca derruba o passe de proteção. **Nenhum limite do Everton
+mudou de valor e o motor puro não ganhou insumo nenhum** — §9.4 lista o que mudou
+e por quê.
 
 **Versão 2.2, 2026-09-07.** Fecha a divergência que a T3.1b (`296f3c1`, `.claude/state/notes-T3.1.md`
 §5, `docs/DATABASE.md` §18.8) deixou registrada como pendência: `risk_profiles.limits` do preset
@@ -505,6 +514,82 @@ Esta é a única regra do contrato cuja ausência transforma degradação em apr
 ela, o book some no estresse e a proposta é aprovada sem estimativa de slippage exatamente no
 momento em que o slippage explode.
 
+### 7.1 Insumos do caminho de execução — as três pré-checagens do worker (T3.29/T3.29b)
+
+O motor puro **não vê** nenhum dos três abaixo: são pré-checagens do
+`execution-worker` (`services/execution-worker/hunter_execution_worker/`), feitas
+antes de existir proposta ou ordem. Estão neste contrato porque são a aplicação
+literal da R-OPS-2 ("todo insumo carrega carimbo, nenhum vale para sempre") e da
+regra 3 da diretiva ("travas de entrada não podem impedir saídas de proteção") ao
+caminho que de fato gasta dinheiro — e porque o código as cita por nome contra
+esta seção. As três **adiam**, nunca recusam: nada é escrito, a tentativa não é
+gasta, e se o insumo nunca chegar a reserva de 30 s expira com o motivo gravado
+(§10, e `docs/PIPELINE.md` §8).
+
+**1. `avgPrice` é a referência do filtro `NOTIONAL`, e tem dois prazos.** O filtro
+`NOTIONAL` de uma ordem MARKET é julgado pela Binance contra a **média da própria
+exchange** sobre `avgPriceMins` minutos (`GET /api/v3/avgPrice`), nunca contra o
+último negócio — que se move com o mesmo livro sob suspeita. Um mercado cujo
+filtro não exige média (`avgPriceMins == 0`, ou sem piso/teto aplicável a MARKET)
+não precisa dela e não é adiado por falta dela.
+
+| Prazo | Valor | O que é |
+|---|---|---|
+| reuso do cache | 5 s | quanto tempo uma cotação é reusada antes de outro pedido — controle de custo sobre o orçamento de peso compartilhado, não uma regra de risco |
+| limite duro | 30 s | idade máxima que ainda julga o filtro. É a **própria vida da reserva**: uma referência mais velha que todo o compromisso que ela justificaria não é "agora" |
+| tolerância de relógio | 2 s | quanto o carimbo pode estar **à frente** do `now` do ciclo e ainda ser fresco (abaixo) |
+
+Os motivos de adiamento são distintos de propósito, porque mandam o operador a
+lugares diferentes: `avg_price_not_collected` (não há leitor ligado),
+`avg_price_unavailable` (o leitor não tem nada honesto a dizer),
+`avg_price_undated` (veio preço sem carimbo — §7: um insumo sem idade não é
+insumo), `avg_price_stale` (mais velho que o limite duro) e
+`avg_price_clock_skew` (carimbo à frente do ciclo além da tolerância).
+
+**A tolerância de 2 s não é cortesia: é a ordem que o próprio ciclo cria.** O
+ciclo de entradas lê o seu `now` e **só depois** monta a foto do mercado, então a
+cotação buscada nesse passo é carimbada *depois* do instante contra o qual a
+entrada é julgada — idade negativa de milissegundos a cada expiração do cache.
+Recusar isso (comportamento anterior à T3.29b) jogava fora um preço recebido
+milissegundos antes, uma vez por janela de reuso, até a reserva expirar. Dentro
+da tolerância a referência é fresca e o evento é **contado**
+(`hunter_execution_avg_price_clock_skew_total{outcome="tolerated"}`); acima dela
+os dois relógios de fato discordam, a entrada adia com `avg_price_clock_skew` e o
+contador registra `refused`. A tolerância é uma ordem de grandeza abaixo do
+limite duro de 30 s, então ela nunca admite uma referência de outro minuto.
+
+**2. `mark_quality` é pré-checagem de admissão da carteira inteira.**
+`mark_quality` = fração das posições abertas que este passo conseguiu marcar com
+um preço **vivo** (dentro do orçamento de idade da política de marcação); uma
+carteira sem posição é `1` por construção — reportar `0` transformaria o estado
+normal em alarme permanente. Abaixo de `1`, a admissão é **adiada**
+(`marks_incomplete`), tanto no pedido manual quanto na ponte de autonomia.
+
+O motivo é que patrimônio, drawdown e risco agregado de uma carteira com uma
+posição precificada pela última marca durável são **estimativas**, e são
+exatamente os números com que os checks 15, 16 e 17 decidem. O motor puro
+continua sendo a última trava (`marks_complete = false` → `portfolio_status`
+`unavailable`); adiar antes disso evita queimar um pedido do operador ou um sinal
+da ponte numa fita transitória.
+
+**A consequência é declarada, não escondida: uma única posição ilíquida adia
+todas as admissões novas daquela carteira enquanto a fita não voltar.** Isso é o
+comportamento correto — a carteira não pode dimensionar entrada nova sem saber o
+que já tem —, e é reversível sozinho: no passo em que as marcas voltam a cobrir
+todas as posições, o mesmo candidato é admitido, sem intervenção. **Saídas de
+proteção não são afetadas em nenhum momento** (regra 3): stop, alvo e fechamento
+manual continuam correndo com a carteira inteira sem marca.
+
+**3. `hot_state_unreachable` — Redis ilegível adia a entrada e não derruba o
+passe.** Uma exceção de leitura do estado quente (o livro e a fita SPOT) não
+propaga mais para fora do ciclo: a foto sai com `hot_state_unreachable` no
+`unavailable`, a entrada adia por esse nome e a proteção segue degradada com
+alerta. "Não lido" é diferente de "vazio", e um operador que lesse `no_book` para
+uma queda de Redis iria procurar o problema na exchange. A regra 3 é o motivo de
+não ser exceção: antes, um `ConnectionError` numa chave abortava o passe inteiro
+— **inclusive a proteção das outras carteiras**.
+
+
 ## 8. Risk events e garantias
 
 Tipos: `limits_changed`, `proposal_rejected`, `proposal_unavailable_input`, `daily_loss_warning`,
@@ -598,6 +683,18 @@ da revisão original, mas de uma segunda e uma terceira rodada da Astra sobre o 
 
 O que **não** mudou na v2.2: nenhum valor do perfil `paper_v1`, a estrutura de `risk_decision.checks[]`,
 os `risk_events`, e as garantias da §8.
+
+### 9.4 O que mudou da v2.2 para a v2.3, e por quê
+
+| # | v2.2 (texto) | v2.3 (código provado) | Achado |
+|---|---|---|---|
+| 1 | a §7 declarava "os insumos com idade máxima declarada" e não incluía o `avgPrice`, que é o insumo que decide se uma ordem MARKET passa no filtro `NOTIONAL`; o código o citava contra "§7, R-OPS-2" e a regra não estava escrita aqui | §7.1 publica o `avgPrice` como a referência do filtro, com os dois prazos (reuso 5 s, limite duro 30 s = a vida da reserva) e os cinco motivos de adiamento distintos | revisão da T3.29 (code-reviewer, item 3) |
+| 2 | um carimbo à frente do `now` era recusado como vencido, sem tolerância | tolerância declarada de 2 s para a **ordem que o próprio ciclo cria** (`now` lido antes de a foto ser montada), contada em `hunter_execution_avg_price_clock_skew_total`; acima dela, `avg_price_clock_skew`, que é incidente diferente de `avg_price_stale` | revisão da T3.29, item 1 (HIGH): a cada expiração do cache uma cotação recém-buscada era recusada como vencida, e a entrada adiava até a reserva expirar |
+| 3 | `mark_quality` e `hot_state_unreachable` existiam só no código e nas notas da T3.29 | §7.1 declara as duas como pré-checagens de admissão, com a consequência escrita ("uma posição ilíquida adia todas as admissões novas daquela carteira até as marcas voltarem") e com a garantia de que nenhuma delas toca saída de proteção | revisão da T3.29, item 3 |
+
+O que **não** mudou na v2.3: nenhum valor do perfil `paper_v1`, nenhum insumo ou
+assinatura do motor puro (as três regras são do `execution-worker`), a estrutura
+de `risk_decision.checks[]`, os `risk_events`, e as garantias da §8.
 
 ## 10. Saídas: tentativa e intenção não são a mesma coisa
 

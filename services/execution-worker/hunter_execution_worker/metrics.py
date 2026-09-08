@@ -25,6 +25,7 @@ from hunter_core.observability import registry
 
 __all__ = [
     "bridge_candidates_total",
+    "execution_avg_price_clock_skew_total",
     "execution_mark_quality",
     "execution_mtm_age_seconds",
     "execution_orders_total",
@@ -90,3 +91,16 @@ execution_pending_requests = Gauge(
     ["readable"],
     registry=registry,
 )
+
+execution_avg_price_clock_skew_total = Counter(
+    "hunter_execution_avg_price_clock_skew_total",
+    "avgPrice references stamped ahead of the cycle's own now, by what was done "
+    "with them (tolerated inside the declared skew, refused past it).",
+    ["outcome"],
+    registry=registry,
+)
+"""T3.29b. ``tolerated`` counts the ordering the cycle creates by design (``now``
+is read before the snapshot is assembled) and must sit at roughly one per refresh
+window per market; ``refused`` counts a reference genuinely ahead of us, which is
+a clock incident and never normal. Without the counter the tolerance would be a
+silent relaxation of RISK_ENGINE.md §7's "a stamp in the future is unavailable"."""

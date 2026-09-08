@@ -30,11 +30,12 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
 from hunter_core.db.session import create_session_factory
+from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_execution_worker.avg_price import ExchangeAvgPrice
 from hunter_execution_worker.bridge_consumer import autonomy_status, bridge_tasks
 from hunter_execution_worker.config import load_config
-from hunter_execution_worker.cycles import Cycles, every
+from hunter_execution_worker.cycles import Clock, Cycles, every
 from hunter_execution_worker.health import migration_present, readiness_checks
 from hunter_execution_worker.heartbeat import run_heartbeat
 from hunter_execution_worker.market_data import RedisSpotMarketData
@@ -49,7 +50,7 @@ logger = get_logger(__name__)
 __all__ = ["forever", "run_execution"]
 
 
-def _avg_price_reader(runtime: WorkerRuntime) -> ExchangeAvgPrice:
+def _avg_price_reader(runtime: WorkerRuntime, *, clock: Clock) -> ExchangeAvgPrice:
     """The ``NOTIONAL`` reference reader, on the **shared** spot weight budget.
 
     Redis is passed explicitly, never the client's own default: without it the
@@ -59,6 +60,14 @@ def _avg_price_reader(runtime: WorkerRuntime) -> ExchangeAvgPrice:
     ``hunter_market_worker.config``). ``GET /api/v3/avgPrice`` is weight 2 and
     this reader asks at most once per market per
     ``avg_price.AVG_PRICE_REFRESH_S``.
+
+    **``clock`` is the cycles' own, not a second one (T3.29b).** The stamp this
+    reader puts on a quote is measured against the instant a cycle captured
+    before assembling the snapshot (``entry_inputs.stale_average``); two
+    independent clocks would make that difference mean nothing the day one of
+    them is driven (a replay, a test harness) and the other is not. Passing one
+    callable makes the only difference between the two reads the ordering the
+    skew tolerance is declared for.
     """
     from hunter_exchanges.binance_spot import BinanceSpotAdapter
     from hunter_exchanges.binance_spot.http import (
@@ -74,7 +83,8 @@ def _avg_price_reader(runtime: WorkerRuntime) -> ExchangeAvgPrice:
         capacity=REQUEST_WEIGHT_CAPACITY,
         refill_period_s=REQUEST_WEIGHT_PERIOD_S,
     )
-    return ExchangeAvgPrice(BinanceSpotAdapter(rest=BinanceSpotRestClient(rate_limiter=limiter)))
+    adapter = BinanceSpotAdapter(rest=BinanceSpotRestClient(rate_limiter=limiter))
+    return ExchangeAvgPrice(adapter, clock=clock)
 
 
 async def forever(name: str, coro: Awaitable[None]) -> None:
@@ -105,8 +115,9 @@ async def run_execution(runtime: WorkerRuntime) -> None:
                 "0006_paper_wallet/0007_paper_roles are not applied; refusing to run. There is no "
                 "wallet lock to take and nowhere to record why a curve point has no BRL"
             )
-        data = RedisSpotMarketData(runtime.redis, avg_price=_avg_price_reader(runtime))
-        cycles = Cycles(factory, data, config, health)
+        clock: Clock = utcnow
+        data = RedisSpotMarketData(runtime.redis, avg_price=_avg_price_reader(runtime, clock=clock))
+        cycles = Cycles(factory, data, config, health, clock=clock)
         async with asyncio.TaskGroup() as group:
             loops = {
                 "admission": (config.admission_poll_s, cycles.admission),

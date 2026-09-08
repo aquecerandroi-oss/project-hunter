@@ -18,9 +18,12 @@ from decimal import Decimal
 from typing import Any, cast
 
 from hunter_core.domain.enums import MarketType
+from hunter_core.domain.types import utcnow
+from hunter_core.observability import registry
 from hunter_exchanges.binance_spot.normalize import AvgPrice
 from hunter_execution_worker.avg_price import (
     AVG_PRICE_MAX_AGE_S,
+    AVG_PRICE_MAX_SKEW_S,
     AVG_PRICE_SOURCE,
     ExchangeAvgPrice,
 )
@@ -61,6 +64,27 @@ class _EmptyRedis:
 
     async def lrange(self, key: str, start: int, end: int) -> list[bytes]:
         return []
+
+
+def _skew_count(outcome: str) -> float:
+    """The clock-skew counter, read off the shared registry by name."""
+    value = registry.get_sample_value(
+        "hunter_execution_avg_price_clock_skew_total", {"outcome": outcome}
+    )
+    return 0.0 if value is None else value
+
+
+class _AdvancingClock:
+    """A **labelled double** of a clock that really moves: every read is later
+    than the last, which is what makes the cycle/reader ordering reproducible."""
+
+    def __init__(self, start: datetime, step: timedelta = timedelta(milliseconds=120)) -> None:
+        self.now = start
+        self.step = step
+
+    def __call__(self) -> datetime:
+        self.now += self.step
+        return self.now
 
 
 class _Clock:
@@ -256,12 +280,86 @@ class TestTheEntryMeasuresTheAgeAgainstItsOwnNow:
         )
         assert got == "avg_price_stale"
 
-    def test_a_stamp_in_the_future_is_refused_like_an_expired_one(self) -> None:
-        got = stale_average(self._snapshot(Decimal(100), NOW + timedelta(seconds=5)), now=NOW)
-        assert got == "avg_price_stale"
+    def test_a_stamp_beyond_the_skew_tolerance_is_refused_by_its_own_name(self) -> None:
+        # Not ``avg_price_stale``: "too old" and "ahead of the cycle" are
+        # different incidents and send an operator to different places (a slow
+        # endpoint vs. two clocks that disagree).
+        got = stale_average(
+            self._snapshot(Decimal(100), NOW + timedelta(seconds=AVG_PRICE_MAX_SKEW_S + 1)),
+            now=NOW,
+        )
+        assert got == "avg_price_clock_skew"
 
     def test_a_price_with_no_stamp_is_not_a_reference(self) -> None:
         assert stale_average(self._snapshot(Decimal(100), None), now=NOW) == "avg_price_undated"
 
     def test_an_absent_reference_still_names_its_source(self) -> None:
         assert stale_average(self._snapshot(None, None), now=NOW) == "avg_price_unavailable"
+
+
+class TestTheCycleClockAndTheReadersStampDoNotRace:
+    """``Cycles.entries()`` reads ``now`` (``cycles.py:206``) and only then
+    assembles the snapshot, so on every cache miss the reader stamps its receipt
+    a few milliseconds **after** the instant the entry is judged against. Before
+    T3.29b that negative age was read as "a stamp from the future" and a price
+    fetched microseconds earlier was refused as expired, once per refresh window.
+
+    **O que refuta:** a bound that calls a just-fetched reference stale; a
+    tolerance so wide that a genuinely future stamp (a wrong clock, a fabricated
+    timestamp) walks through it.
+    """
+
+    def _snapshot(self, ts: datetime) -> SpotSnapshot:
+        return SpotSnapshot(
+            market=MARKET,
+            book=None,
+            avg_price=Decimal(100),
+            avg_price_source=AVG_PRICE_SOURCE,
+            avg_price_ts=ts,
+        )
+
+    async def test_a_reference_read_after_the_cycles_now_is_not_stale(self) -> None:
+        """The race, deterministically: a clock that really moves between the
+        two reads the cycle makes. ``_AdvancingClock`` is a **labelled double**
+        of the wall clock precisely because the wall clock's granularity on some
+        platforms is coarser than the pass itself, which would let this
+        regression hide."""
+        clock = _AdvancingClock(NOW)
+        now = clock()  # what ``Cycles.entries()`` captures, before the snapshot
+        data = RedisSpotMarketData(
+            cast("Any", _EmptyRedis()),
+            avg_price=ExchangeAvgPrice(_FakeExchange([Decimal("142.37")]), clock=clock),
+        )
+        snapshot = await data.snapshot(MARKET)
+        assert snapshot.avg_price_ts is not None
+        assert snapshot.avg_price_ts > now, "the race itself: the stamp is later than the cycle"
+        assert stale_average(snapshot, now=now) == ""
+
+    async def test_the_same_race_against_the_real_wall_clock(self) -> None:
+        """Two real ``utcnow()`` reads, in the order the cycle makes them. This
+        one cannot manufacture the gap, so it is a guard and not the proof."""
+        now = utcnow()
+        data = RedisSpotMarketData(
+            cast("Any", _EmptyRedis()),
+            avg_price=ExchangeAvgPrice(_FakeExchange([Decimal("142.37")])),  # real clock
+        )
+        snapshot = await data.snapshot(MARKET)
+        assert snapshot.avg_price_ts is not None
+        assert snapshot.avg_price_ts >= now
+        assert stale_average(snapshot, now=now) == ""
+
+    def test_the_tolerated_skew_is_counted_not_silent(self) -> None:
+        before = _skew_count("tolerated")
+        assert stale_average(self._snapshot(NOW + timedelta(seconds=1)), now=NOW) == ""
+        assert _skew_count("tolerated") == before + 1
+
+    def test_a_refused_skew_is_counted_under_its_own_outcome(self) -> None:
+        before = _skew_count("refused")
+        ahead = NOW + timedelta(seconds=AVG_PRICE_MAX_SKEW_S + 1)
+        assert stale_average(self._snapshot(ahead), now=NOW) == "avg_price_clock_skew"
+        assert _skew_count("refused") == before + 1
+
+    def test_a_reference_exactly_at_the_cycles_now_needs_no_tolerance(self) -> None:
+        before = _skew_count("tolerated")
+        assert stale_average(self._snapshot(NOW), now=NOW) == ""
+        assert _skew_count("tolerated") == before, "zero age is not skew"

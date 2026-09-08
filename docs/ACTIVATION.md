@@ -164,6 +164,27 @@ ordem: o `beta_validity` recusa todos menos BTCUSDT, e BTCUSDT não emitiu sinal
 "sem beta validado, manter o ativo apenas em shadow"), não um defeito — e é
 exatamente por isso que a linha 3 é a que bloqueia o aceite hoje.
 
+**Nota operacional — as três pré-checagens que adiam uma entrada (T3.29/T3.29b,
+regras escritas em `docs/RISK_ENGINE.md` §7.1).** Depois de virar a flag, "a
+carteira não entrou em nada" tem causas diferentes e cada uma tem nome próprio
+no log (`entry_deferred`/`bridge_candidate_deferred`) e no motivo gravado quando
+a reserva de 30 s expira. Nenhuma delas recusa: adiam, nada é escrito, e o
+candidato é lido de novo no segundo seguinte.
+
+| Nome no log | O que aconteceu | O que o operador faz |
+|---|---|---|
+| `avg_price_not_collected` | o worker subiu sem o leitor de `avgPrice` ligado | conferir o deploy (é o que a linha 2 desta tabela mede) |
+| `avg_price_unavailable` | o endpoint respondeu erro, ou preço não positivo, e não há cotação dentro do limite duro | olhar o log `avg_price_fetch_failed` e o orçamento de peso da Binance |
+| `avg_price_stale` | a última cotação passou dos **30 s** (a vida da reserva) | mesmo caminho acima; se persistir, é rede ou rate limit |
+| `avg_price_clock_skew` | o carimbo está **mais de 2 s à frente** do `now` do ciclo | é relógio, não mercado: conferir NTP do host. A métrica `hunter_execution_avg_price_clock_skew_total{outcome="refused"}` deve ficar em zero; `outcome="tolerated"` sobe de propósito, ~1 por janela de reuso por mercado |
+| `avg_price_undated` | veio preço sem carimbo — um insumo sem idade não é insumo (§7) | não deve ocorrer com o leitor real; se ocorrer, é bug e não configuração |
+| `marks_incomplete` | `mark_quality < 1`: alguma posição aberta não pôde ser marcada a preço vivo neste passo | ver `hb:execution:paper.mark_quality` e a fita do mercado da posição. **Uma única posição ilíquida adia todas as admissões novas daquela carteira até as marcas voltarem** — é o comportamento correto (sem saber o que já tem, a carteira não dimensiona entrada nova) e se resolve sozinho no passo em que a fita volta |
+| `hot_state_unreachable` | o Redis do estado quente não pôde ser **lido** (diferente de "vazio") | é incidente de infraestrutura, não de mercado: olhar o Redis, não a exchange |
+
+**As saídas de proteção não são afetadas por nenhuma delas** (regra 3 da
+diretiva): stop, alvo e fechamento manual continuam correndo com a carteira
+inteira sem marca, com o Redis fora e sem `avgPrice`.
+
 **Sobre o restore (linha 5).** Nesta rodada a VPS foi tratada como **somente
 leitura**: `pg_restore --list` foi executado sobre o dump mais recente (1730
 entradas, tabelas do ledger presentes), e **nenhum** banco `hunter_restore_test`
