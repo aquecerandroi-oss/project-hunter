@@ -1,11 +1,95 @@
 ---
 tags: [changelog, historico]
-updated: 2026-09-07
+updated: 2026-09-08
 ---
 
 # Changelog
 
 Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado por dia, mais novo primeiro. Todo o histórico até agora é do Milestone 0 (fundação) — ver `docs/plans/M0.md` para as ondas T01–T13 e [[Resolved Bugs]] para o detalhe das correções de segurança/qualidade citadas aqui.
+
+## 2026-09-08
+
+*(Os doze itens abaixo entraram entre a tarde de 2026-09-07 e a manhã de
+2026-09-08, consolidados no plantão da madrugada de 2026-09-08. O eixo do dia
+anterior foi a carteira; o deste turno é a **linha paper que vai alimentá-la** —
+D10 — e o **ferramental que a rodeia**.)*
+
+- **`58fe32e` — T3.7b: o runbook ordenado para ligar o fluxo paper.** O caminho
+  completo, passo a passo: spot como serviço próprio, o produtor horário de β,
+  o backfill de 31 dias, o segundo deploy da VPS, a linha paper (D10), a ativação
+  auditada, e por último `ENABLE_PAPER_AUTONOMY`. Cada passo com o comando e o
+  pré-requisito. Brief T3.7b escrito.
+
+- **`e26a4ee` — revisão da T3.0e por Sexta-feira no Hermes (nada bloqueia) e
+  brief T3.0f — o coletor spot como serviço próprio.** A revisão adversarial da
+  T3.0e (histerese do piso spot, D12) não achou nada que bloqueie a admissão; a
+  saída só acontece abaixo de 40 M por 3 refreshes consecutivos, e a admissão
+  permanece em ≥ 50 M. O brief T3.0f separa o coletor spot num serviço dedicado.
+
+- **`700d58f` — relatório do M3 em DRAFT, formato estendido.** Código completo,
+  **não aprovado**; aguarda as revisões da T3.0e e da T3.15 (0010), a T3.10 e o
+  segundo deploy da VPS antes do parecer da Sexta-feira.
+
+- **`49281c9` — revisão da T3.15b (gate aprovado) e duas regras da casa para
+  Sexta-feira no Hermes.** A ponte admite `purpose = paper` e recusa `live` por
+  nome (D10, `56d2dea`). As duas regras: um brief **manda em quem o executa**
+  (não commita quando diz "não commita"; relata o que o `git` diz), e um brief
+  por tarefa (não escrever segunda versão de um brief existente). Brief
+  duplicado removido.
+
+- **`56d2dea` — T3.15b: a ponte admite paper, recusa live por nome (D10).**
+  `bridge_screen.py` agora aceita `purpose = "paper"` e recusa `purpose = "live"`
+  explicitamente — um rótulo chamado "live" num repositório cuja regra dura é
+  "nada de dinheiro real antes da Fase 4" é um acidente esperando data. `nulo` e
+  desconhecido continuam recusados. 16 testes de integração.
+
+- **`d2d2d35` — brief T3.15b — a ponte admite paper, recusa live por nome.**
+  Primeira tarefa da Sexta-feira no Hermes.
+
+- **`0db5fbb` — a Sexta-feira ganhou casa nova: o perfil do Hermes.** O pacote
+  `infra/hermes/` com o SOUL, o `.hermes.md` (contexto do projeto), as seeds de
+  memória (`MEMORY.md`/`USER.md`, 2.200 e 1.375 caracteres), as três skills
+  (`sexta-feira-plantao`, `sexta-feira-relatorio`, `sexta-feira-briefs`) e o
+  instalador. Runbook em `docs/HERMES.md`.
+
+- **`6b837ac` — T3.15: `purpose` na versão de estratégia e o rótulo paper (D10).**
+  A coluna `purpose` entra em `strategy_versions` (migração `0010`); a coorte
+  `research_only` permanece viva ao lado. A linha paper nasce por
+  `activate_strategy_version.py --paper-line` — linha nova e congelada, não
+  virando o propósito de uma versão existente. Ativação é ato auditado e decisão
+  do Everton (sete condições em `docs/plans/M3.md`, D10).
+
+- **`7839731` — T3.14b + T3.5d: follow-ups da ponte e eventos do kill switch.**
+  A ponte ganhou quatro condições antes de ligar a autonomia (T3.14b) e o
+  kill switch passa a publicar `kill_switch.changed` em `outbox_events` (T3.5d) —
+  o `execution-worker` relê a trava a cada 10 s e dentro de cada transação de
+  efeito.
+
+- **`abf8e80` — T3.0e: banda de saída do piso spot (D12).** A admissão não muda
+  (≥ 50 M); um par já admitido só sai abaixo de **40 M** por **3 refreshes
+  consecutivos** (~45 min), com a contagem durável em Redis. D12: a histerese
+  não relaxa a admissão, só a saída. `market_spot_dropped_events_total` e
+  `market_type` nos logs de ingestão.
+
+- **`ae25e32` — T3.9b: verificações V4–V9 e §10 (crash boundaries).** As últimas
+  seis verificações que o Everton exigiu antes de a carteira andar, pelo caminho
+  que persiste (todo número lido de volta do banco, não de memória). V4–V9
+  cobrem slippage, stop intrabar, reserva vencida, kill switch, retomada e
+  marcação a mercado; §10 prova as fronteiras de crash.
+
+- **`90f1862` — T3.5c: o worker usa as colunas da 0009.** `is_residual` lido e
+  escrito; o pó excluído de slots e exposição; pedidos manuais reconstruídos de
+  `request_payload` e decididos no ciclo de 1 s; `target` entra no digest.
+
+- **`999640a` — T3.0d: event ids do candle spot carregam `market_type`.** Os
+  ids do perpétuo são **pinned byte-identical**; o scanner descarta entregas
+  não-perpétuas; `load_market_ids` filtra por tipo; docstrings de identidade
+  spot e `PIPELINE §1d`. Fecha o HIGH bloqueante da T3.0c (o segundo candle do
+  minuto era descartado em silêncio).
+
+*(Os itens de `8822b31` para trás — de `8f8be1e` a `8822b31` — foram consolidados
+no plantão da manhã de 2026-09-07 na seção anterior. Ver `git log` para o detalhe
+commit a commit.)*
 
 ## 2026-09-07
 

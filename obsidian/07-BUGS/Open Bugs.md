@@ -1,11 +1,37 @@
 ---
 tags: [bugs, abertos]
-updated: 2026-09-07
+updated: 2026-09-08
 ---
 
 # Open Bugs
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
+
+## Abertos no plantão da madrugada de 2026-09-08 (β e backfill)
+
+- **MEDIUM (produto, VPS) — `market_betas` vazia: o produtor horário de β nunca
+  foi entregue (T3.7b em voo).** `market_betas` tem **0 linhas** na VPS. O
+  `scanner-worker` calcula β contra o BTC (`beta_v1`, `da2fb49`), mas o produtor
+  horário que deveria popular `market_betas` nunca foi implantado — a T3.7b
+  (`58fe32e`, brief do runbook ordenado) está em voo e ainda não executou.
+  **Cenário:** sem β, o Risk Engine não pode validar a correlação de uma
+  proposta contra o BTC, e a ponte (T3.14) recusa por `beta_unavailable`.
+  Dono: **T3.7b** (produtor horário de β + backfill).
+
+- **MEDIUM (produto, VPS) — candles só 11 dias na VPS; β exige 20 contíguos
+  (backfill de 31 d em voo).** `candles_1m` tem dados de ~11 dias na VPS
+  (desde ~2026-08-28). O cálculo de β (`beta_v1`) exige uma janela de **20 dias
+  contíguos**; com 11 dias, toda avaliação de β é `unavailable: insufficient_window`.
+  O backfill de 31 dias (T3.7b) está em voo e ainda não rodou. **Cenário:** sem
+  20 dias contíguos, nenhum β pode ser calculado, e a condição de β da ponte
+  (T3.14) nunca é satisfeita. Dono: **T3.7b** (backfill de 31 dias).
+
+- **MEDIUM (ferramental, local) — 160 erros de pyright em
+  `services/execution-worker/tests/test_restart_recovery.py`.** O arquivo de
+  teste de recuperação de restart tem **160 erros de pyright** (`hunter_execution_worker`
+  em 0). Não bloqueia o `main` (é teste, não produção), mas impede `uv run pyright`
+  de passar limpo no escopo do execution-worker. Dono: `test-engineer` ou
+  `backend-specialist`.
 
 ## Abertos no plantão da manhã de 2026-09-07 (M3 ondas 3–4: T3.5, T3.13, T3.14, `0008`/`0009`)
 
