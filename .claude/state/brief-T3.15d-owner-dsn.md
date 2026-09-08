@@ -70,3 +70,6 @@ pass.
 
 Report in Portuguese, extended format; append to or create
 `.claude/state/notes-T3.15d.md`.
+
+## Adendo 2026-09-08 (orquestrador) — `compose.sh update` e serviços de perfil novos
+No primeiro `MARKET_SPOT=1 MARKET_SHARDS=4 bash infra/vps/compose.sh update` com a T3.0f, o `market-worker-spot` não subiu: o compose tentou **puxar** `hunter-api:<sha>` para o serviço novo do perfil antes de a imagem ser construída ("pull access denied"), enquanto os demais serviços subiram. `bash infra/vps/compose.sh up market-worker-spot` em seguida resolveu. Corrigir no script: construir (`build`) antes do `up` quando há perfis, ou `up --build` com `--pull never` para imagens locais; e o aviso "ERRO: migrate nao subiu" para o contêiner de uma vez só (exit 0) é falso positivo — tratar `migrate` como job (checar exit code), não como serviço.

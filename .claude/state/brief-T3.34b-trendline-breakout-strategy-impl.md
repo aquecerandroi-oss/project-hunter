@@ -1,0 +1,18 @@
+# Brief T3.34b (implementação) — `trendline_breakout_v1`: as linhas de tendência viram estratégia; os primitivos entram no fecho do `code_ref` como módulos irmãos planos
+
+**Owner:** quant-engineer. **Reviewers afterwards:** code-reviewer; Astra on the port parity. **Do not commit.** **Operational rule: never a background shell; foreground commands with a timeout <= 5 min; testcontainers one file per pytest invocation; the tree is shared — never `git stash`/`checkout --`/`restore`/`reset`/`clean`/`commit -a` (git-guard blocks); add exact files only; do not touch `.env*`; do not stop or recreate local stack containers; VPS read-only (activation/replay is a separate brief after review + deploy).** Base: `main` at `7b0edeb`. Do not touch the frozen closure of the live versions (`base, schema, envelope, indicators, numeric, canonical, aggregate, momentum_v1, volume_anomaly_v1`) nor `mean_reversion_v1`, `session_orb_v1`, `breakout_v1`.
+
+## Decision taken by the orchestrator (the open point of `.claude/state/notes-T3.34.md` concern 1 and `brief-T3.34b-trendline-breakout-strategy.md` §0)
+**Option: port.** `hunter_core.strategies` cannot import `hunter_indicators.patterns` (dependency direction + the closure only follows flat sibling modules). Port the primitives needed by the strategy into new flat siblings `hunter_core/strategies/tl_pivots.py`, `tl_lines.py`, `tl_events.py` (≤ 350 lines each, Decimal, no IO), with a **numeric parity test** against `hunter_indicators.patterns` on the synthetic series and on one real exported series (`.claude/state/design/trendlines/` CSV if kept; otherwise the builders). `hunter_indicators.patterns` stays the research/plotting home; the strategy's digest closes over the ported copies. Say in the module docstring which upstream commit was ported (`db798b8`) and that the two must be kept in parity by the test.
+
+## Strategy (from the quant's own brief `brief-T3.34b-trendline-breakout-strategy.md`; adjust only if the contract there conflicts with the closure rule)
+`trendline_breakout_v1`, long-only: breakout of a **valid descending resistance** (≥ 3 touches, respected) with RVOL ≥ `rvol_min`, or bounce off a **valid ascending support** (touch within tolerance then close away ≥ `bounce_atr`) — parameter `mode ∈ {breakout, bounce, both}`; stop below the last pivot low (bounded by `max_stop_atr`); target = channel width when a channel exists else `2 × risk`; invalidation = close back below the broken line (breakout) / below the support (bounce); horizon; ATR floor with the toll identity (state the cap); `retire_after_break` on (a broken line is not reused). Parameters with ranges in `constraints_table.py`; portão C1–C8 filled in the EXP draft **before** the module (`.claude/state/exp-drafts/EXP-0016-trendline-breakout.md`); kill criteria K1–K5 + "≥ 60 % of decisions from one mode or one market".
+
+## Deliver
+1. The three ported modules + parity tests (`packages/core/tests/unit/strategies/test_tl_parity.py`).
+2. `trendline_breakout_v1.py` + `test_trendline_breakout_v1.py` (synthetic series where you know the answer: a clean channel → one breakout decision at the right bar; look-ahead tests in `test_no_lookahead.py` shape; the digests of every live version unchanged — extend `test_code_ref.py`).
+3. Registry line, `constraints_table.py` entry, `seed_reference.py` line (`trendline_breakout`).
+4. Notes with the exact VPS sequence for the follow-up brief (seed `--only strategies`, activate dry-run digest, replay slices).
+
+## Prove
+Per-file tests with real output, `ruff`/`pyright`/`check_file_size.py`; report in Portuguese, extended format; `.claude/state/notes-T3.34b.md`.
