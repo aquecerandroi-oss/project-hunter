@@ -1,0 +1,532 @@
+{
+  "generated_at": "2026-09-08T12:11:27.625Z",
+  "source": "apps/web/app/globals.css (valores exatos dos tokens)",
+  "themes": {
+    "dark": [
+      {
+        "pair": "fg on bg",
+        "fg": "#f5f5f5",
+        "bg": "#0a0a0a",
+        "ratio": 18.16,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "texto principal"
+      },
+      {
+        "pair": "fg-muted on bg",
+        "fg": "#a3a3a3",
+        "bg": "#0a0a0a",
+        "ratio": 7.85,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "labels, notas"
+      },
+      {
+        "pair": "fg-subtle on bg",
+        "fg": "#828282",
+        "bg": "#0a0a0a",
+        "ratio": 5.15,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "metadados (idades, código de exchange)"
+      },
+      {
+        "pair": "fg-subtle on bg-elevated",
+        "fg": "#828282",
+        "bg": "#111111",
+        "ratio": 4.91,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "notas dentro de cards"
+      },
+      {
+        "pair": "fg-subtle on bg-overlay",
+        "fg": "#828282",
+        "bg": "#161616",
+        "ratio": 4.71,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "cabeçalho de tabela, linha hover"
+      },
+      {
+        "pair": "fg-muted on bg-overlay",
+        "fg": "#a3a3a3",
+        "bg": "#161616",
+        "ratio": 7.17,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "thead das tabelas (text-xs)"
+      },
+      {
+        "pair": "fg/80 on bg-elevated",
+        "fg": "#c6c6c6",
+        "bg": "#111111",
+        "ratio": 11.05,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "item de navegação inativo (nav-links.tsx)"
+      },
+      {
+        "pair": "fg-subtle @60% on bg-elevated",
+        "fg": "#525252",
+        "bg": "#111111",
+        "ratio": 2.42,
+        "threshold": 4.5,
+        "pass": false,
+        "where": "item 'Planejado' da sidebar (opacity-60)"
+      },
+      {
+        "pair": "gold on bg",
+        "fg": "#f2b705",
+        "bg": "#0a0a0a",
+        "ratio": 10.89,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "logotipo, links hover"
+      },
+      {
+        "pair": "gold on gold-soft",
+        "fg": "#f2b705",
+        "bg": "#3a2e08",
+        "ratio": 7.34,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "badge gold (HOT, versão ativa, monitorados), guia ativa do Lab"
+      },
+      {
+        "pair": "gold-fg on gold",
+        "fg": "#0a0a0a",
+        "bg": "#f2b705",
+        "ratio": 10.89,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "botão primário"
+      },
+      {
+        "pair": "white on red",
+        "fg": "#ffffff",
+        "bg": "#ef4444",
+        "ratio": 3.76,
+        "threshold": 4.5,
+        "pass": false,
+        "where": "botão destrutivo (button.tsx destructive)"
+      },
+      {
+        "pair": "green on green/15 over bg-elevated",
+        "fg": "#22c55e",
+        "bg": "#142c1d",
+        "ratio": 6.55,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "badge positive (OK, alvo, lucro, alive)"
+      },
+      {
+        "pair": "red on red/15 over bg-elevated",
+        "fg": "#ef4444",
+        "bg": "#321919",
+        "ratio": 4.34,
+        "threshold": 4.5,
+        "pass": false,
+        "where": "badge negative (gap, stop, prejuízo, dead)"
+      },
+      {
+        "pair": "warning on warning/15 over bg-elevated",
+        "fg": "#f59e0b",
+        "bg": "#332610",
+        "ratio": 6.84,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "badge warning (atrasado, ANOMALY, censurado, late)"
+      },
+      {
+        "pair": "info on info/15 over bg-elevated",
+        "fg": "#60a5fa",
+        "bg": "#1d2734",
+        "ratio": 5.92,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "badge info (WATCHING, ativo, paper)"
+      },
+      {
+        "pair": "green on bg",
+        "fg": "#22c55e",
+        "bg": "#0a0a0a",
+        "ratio": 8.69,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "variação positiva, PnL > 0"
+      },
+      {
+        "pair": "red on bg",
+        "fg": "#ef4444",
+        "bg": "#0a0a0a",
+        "ratio": 5.26,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "variação negativa, PnL < 0, mensagens de erro"
+      },
+      {
+        "pair": "warning on bg",
+        "fg": "#f59e0b",
+        "bg": "#0a0a0a",
+        "ratio": 9.22,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "texto de aviso (reconcile, tempo real interrompido)"
+      },
+      {
+        "pair": "info on bg",
+        "fg": "#60a5fa",
+        "bg": "#0a0a0a",
+        "ratio": 7.79,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "links secundários, linha do gráfico"
+      },
+      {
+        "pair": "fg on red-soft",
+        "fg": "#f5f5f5",
+        "bg": "#2a0e0e",
+        "ratio": 16.5,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "painel do kill switch bloqueado"
+      },
+      {
+        "pair": "fg-muted on red-soft",
+        "fg": "#a3a3a3",
+        "bg": "#2a0e0e",
+        "ratio": 7.13,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "labels no painel bloqueado"
+      },
+      {
+        "pair": "red on red-soft",
+        "fg": "#ef4444",
+        "bg": "#2a0e0e",
+        "ratio": 4.78,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "'Entradas bloqueadas' no painel"
+      },
+      {
+        "pair": "fg on gold-soft",
+        "fg": "#f5f5f5",
+        "bg": "#3a2e08",
+        "ratio": 12.24,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "texto sobre seleção dourada"
+      },
+      {
+        "pair": "fg-muted on gold-soft",
+        "fg": "#a3a3a3",
+        "bg": "#3a2e08",
+        "ratio": 5.29,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "código de exchange na linha selecionada do palette"
+      },
+      {
+        "pair": "fg-subtle on gold-soft",
+        "fg": "#828282",
+        "bg": "#3a2e08",
+        "ratio": 3.47,
+        "threshold": 4.5,
+        "pass": false,
+        "where": "(proibido desde DESIGN-3, conferência)"
+      },
+      {
+        "pair": "fg on bg-overlay",
+        "fg": "#f5f5f5",
+        "bg": "#161616",
+        "ratio": 16.6,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "linhas alternadas, popovers"
+      },
+      {
+        "pair": "border on bg",
+        "fg": "#232323",
+        "bg": "#0a0a0a",
+        "ratio": 1.26,
+        "threshold": 3,
+        "pass": false,
+        "where": "bordas 1px (não-texto, referência 3:1 para UI)"
+      },
+      {
+        "pair": "border-strong on bg-elevated",
+        "fg": "#2e2e2e",
+        "bg": "#111111",
+        "ratio": 1.39,
+        "threshold": 3,
+        "pass": false,
+        "where": "separadores (não-texto)"
+      }
+    ],
+    "light": [
+      {
+        "pair": "fg on bg",
+        "fg": "#0a0a0a",
+        "bg": "#ffffff",
+        "ratio": 19.8,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "texto principal"
+      },
+      {
+        "pair": "fg-muted on bg",
+        "fg": "#525252",
+        "bg": "#ffffff",
+        "ratio": 7.81,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "labels, notas"
+      },
+      {
+        "pair": "fg-subtle on bg",
+        "fg": "#666666",
+        "bg": "#ffffff",
+        "ratio": 5.74,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "metadados (idades, código de exchange)"
+      },
+      {
+        "pair": "fg-subtle on bg-elevated",
+        "fg": "#666666",
+        "bg": "#fafafa",
+        "ratio": 5.5,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "notas dentro de cards"
+      },
+      {
+        "pair": "fg-subtle on bg-overlay",
+        "fg": "#666666",
+        "bg": "#f3f3f3",
+        "ratio": 5.17,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "cabeçalho de tabela, linha hover"
+      },
+      {
+        "pair": "fg-muted on bg-overlay",
+        "fg": "#525252",
+        "bg": "#f3f3f3",
+        "ratio": 7.04,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "thead das tabelas (text-xs)"
+      },
+      {
+        "pair": "fg/80 on bg-elevated",
+        "fg": "#3b3b3b",
+        "bg": "#fafafa",
+        "ratio": 10.73,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "item de navegação inativo (nav-links.tsx)"
+      },
+      {
+        "pair": "fg-subtle @60% on bg-elevated",
+        "fg": "#a3a3a3",
+        "bg": "#fafafa",
+        "ratio": 2.41,
+        "threshold": 4.5,
+        "pass": false,
+        "where": "item 'Planejado' da sidebar (opacity-60)"
+      },
+      {
+        "pair": "gold on bg",
+        "fg": "#8a6d00",
+        "bg": "#ffffff",
+        "ratio": 4.92,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "logotipo, links hover"
+      },
+      {
+        "pair": "gold on gold-soft",
+        "fg": "#8a6d00",
+        "bg": "#fff4d6",
+        "ratio": 4.49,
+        "threshold": 4.5,
+        "pass": false,
+        "where": "badge gold (HOT, versão ativa, monitorados), guia ativa do Lab"
+      },
+      {
+        "pair": "gold-fg on gold",
+        "fg": "#ffffff",
+        "bg": "#8a6d00",
+        "ratio": 4.92,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "botão primário"
+      },
+      {
+        "pair": "white on red",
+        "fg": "#ffffff",
+        "bg": "#b91c1c",
+        "ratio": 6.47,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "botão destrutivo (button.tsx destructive)"
+      },
+      {
+        "pair": "green on green/15 over bg-elevated",
+        "fg": "#15803d",
+        "bg": "#d8e8de",
+        "ratio": 3.93,
+        "threshold": 4.5,
+        "pass": false,
+        "where": "badge positive (OK, alvo, lucro, alive)"
+      },
+      {
+        "pair": "red on red/15 over bg-elevated",
+        "fg": "#b91c1c",
+        "bg": "#f0d9d9",
+        "ratio": 4.81,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "badge negative (gap, stop, prejuízo, dead)"
+      },
+      {
+        "pair": "warning on warning/15 over bg-elevated",
+        "fg": "#b45309",
+        "bg": "#f0e1d6",
+        "ratio": 3.93,
+        "threshold": 4.5,
+        "pass": false,
+        "where": "badge warning (atrasado, ANOMALY, censurado, late)"
+      },
+      {
+        "pair": "info on info/15 over bg-elevated",
+        "fg": "#1d4ed8",
+        "bg": "#d9e0f5",
+        "ratio": 5.09,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "badge info (WATCHING, ativo, paper)"
+      },
+      {
+        "pair": "green on bg",
+        "fg": "#15803d",
+        "bg": "#ffffff",
+        "ratio": 5.02,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "variação positiva, PnL > 0"
+      },
+      {
+        "pair": "red on bg",
+        "fg": "#b91c1c",
+        "bg": "#ffffff",
+        "ratio": 6.47,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "variação negativa, PnL < 0, mensagens de erro"
+      },
+      {
+        "pair": "warning on bg",
+        "fg": "#b45309",
+        "bg": "#ffffff",
+        "ratio": 5.02,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "texto de aviso (reconcile, tempo real interrompido)"
+      },
+      {
+        "pair": "info on bg",
+        "fg": "#1d4ed8",
+        "bg": "#ffffff",
+        "ratio": 6.7,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "links secundários, linha do gráfico"
+      },
+      {
+        "pair": "fg on red-soft",
+        "fg": "#0a0a0a",
+        "bg": "#fee2e2",
+        "ratio": 16.21,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "painel do kill switch bloqueado"
+      },
+      {
+        "pair": "fg-muted on red-soft",
+        "fg": "#525252",
+        "bg": "#fee2e2",
+        "ratio": 6.4,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "labels no painel bloqueado"
+      },
+      {
+        "pair": "red on red-soft",
+        "fg": "#b91c1c",
+        "bg": "#fee2e2",
+        "ratio": 5.3,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "'Entradas bloqueadas' no painel"
+      },
+      {
+        "pair": "fg on gold-soft",
+        "fg": "#0a0a0a",
+        "bg": "#fff4d6",
+        "ratio": 18.07,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "texto sobre seleção dourada"
+      },
+      {
+        "pair": "fg-muted on gold-soft",
+        "fg": "#525252",
+        "bg": "#fff4d6",
+        "ratio": 7.13,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "código de exchange na linha selecionada do palette"
+      },
+      {
+        "pair": "fg-subtle on gold-soft",
+        "fg": "#666666",
+        "bg": "#fff4d6",
+        "ratio": 5.24,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "(proibido desde DESIGN-3, conferência)"
+      },
+      {
+        "pair": "fg on bg-overlay",
+        "fg": "#0a0a0a",
+        "bg": "#f3f3f3",
+        "ratio": 17.84,
+        "threshold": 4.5,
+        "pass": true,
+        "where": "linhas alternadas, popovers"
+      },
+      {
+        "pair": "border on bg",
+        "fg": "#e5e5e5",
+        "bg": "#ffffff",
+        "ratio": 1.26,
+        "threshold": 3,
+        "pass": false,
+        "where": "bordas 1px (não-texto, referência 3:1 para UI)"
+      },
+      {
+        "pair": "border-strong on bg-elevated",
+        "fg": "#d4d4d4",
+        "bg": "#fafafa",
+        "ratio": 1.42,
+        "threshold": 3,
+        "pass": false,
+        "where": "separadores (não-texto)"
+      }
+    ]
+  }
+}

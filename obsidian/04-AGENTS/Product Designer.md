@@ -23,7 +23,7 @@ Agente criado em 2026-09-08 a pedido do Everton: "um profissional em design que 
 Dado falso, controle inerte, gráfico decorativo; tocar `.env*`, `services/**`, Risk Engine; commitar; `git stash`/`reset` na árvore compartilhada.
 
 ## O que já entregou
-- (nada ainda — primeira tarefa: auditoria das quatro telas principais, Radar, Lab, Carteira e System, com dado real na VPS)
+- 2026-09-08 — T3.23, primeira auditoria (Radar, Lab, Carteira, System, Markets): relatório `.claude/state/review-design-2026-09-08.md` com contraste medido dos tokens (12 falhas AA: badges com alfa, botão destrutivo, item planejado da sidebar, contorno de campo — valores corrigidos calculados), 40+ achados de hierarquia/copy/escala/estados, `docs/DESIGN.md` DESIGN-5 (escala de 7 degraus, badges `-soft`, contorno ≥ 3:1, vocabulário de tempo, sem backstage na copy) e três briefs T3.24 (quick wins, Lab, consistência). A parte no navegador ficou bloqueada: a imagem `hunter-web:dev` local foi construída com a chave falsa do Clerk (`clerk.example.com`) — diagnosticado, com os dois comandos de rebuild em `notes-T3.23.md`; a spec Playwright de captura (`tests/e2e/design-audit.audit.ts`) está pronta para a segunda passada.
 
 ## Ligações
 [[Agents Overview]] · [[Sexta-feira no Hermes]] · `docs/DESIGN.md` · [[Changelog]]
