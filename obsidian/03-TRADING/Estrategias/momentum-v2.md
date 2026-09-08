@@ -9,7 +9,7 @@ params_hash: 40e1688e6b5f6385674cb47a81e542b215b320eb5643a1375f6401f5c41ac2f3
 activated_at: "2026-09-08T04:33:56.865371+00:00"
 deprecated_at: ""
 derived_from: "[[momentum-v1]]"
-cohorts: ["prospective"]
+cohorts: ["prospective", "replay:31bb3a12-090d-43ee-998b-630b2645bb46", "replay:7598d6c4-c8b6-430e-974e-3a5118d3a288", "replay:f8d8279c-1fba-42ae-95ef-202042f96c60"]
 exp: ["[[EXP-0001-momentum-v1]]"]
 updated: 2026-09-08
 ---
@@ -50,8 +50,11 @@ Nenhum evento de ativação registrado ainda (versão nunca ativada).
 
 | Coorte | Sinais (`agent_signals`) |
 |---|---|
-| `prospective` | 10 |
-| **total** | **10** |
+| `prospective` | 177 |
+| `replay:31bb3a12-090d-43ee-998b-630b2645bb46` | 3 |
+| `replay:7598d6c4-c8b6-430e-974e-3a5118d3a288` | 224 |
+| `replay:f8d8279c-1fba-42ae-95ef-202042f96c60` | 224 |
+| **total** | **628** |
 
 ## Avaliações
 

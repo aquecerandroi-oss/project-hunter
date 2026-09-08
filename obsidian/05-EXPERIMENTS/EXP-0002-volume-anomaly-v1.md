@@ -1,15 +1,15 @@
 ---
 tags: [experimento, volume, shadow-lab]
-updated: 2026-09-06
+updated: 2026-09-08
 status: em-andamento
 owner: sexta-feira
 exp: EXP-0002
 strategy: volume_anomaly
-version: v1
+version: v2
 result: inconclusivo
-evaluable: 316
+evaluable: 194
 days: 1
-last_eval: 2026-09-06
+last_eval: 2026-09-08
 ---
 
 # EXP-0002 — volume_anomaly em modo sombra (perfil "por barras" v0)
@@ -291,6 +291,187 @@ recusa entrar em vez de inventar geometria. Janela de emissões: 03:40:04 a 12:5
   ou desativação decorre destes números.
 - **Segunda opinião (Astra) — [[S4-hipoteses]]:** cinco must-fix, todos aceitos antes de publicar; o
   mais consequente para esta página foi separar as **duas regras de invalidação** (ver abaixo).
+
+### Avaliação de 2026-09-08 (plantão do meio-dia) — **coorte da VPS** — `as_of = 2026-09-08T12:00:00Z`, `read_at = 2026-09-08T12:34:22.305724Z`
+
+**Esta avaliação não continua a série anterior — a versão mudou de linha.** Em 2026-09-08
+**04:32:42.178866+00** o `volume_anomaly v1` da VPS foi **sucedido** pela `v2`, com
+`code_ref = hunter_core.strategies.volume_anomaly_v1@sha256:9b8c14ab3390646a…` (a `v1` estava
+congelada em `…a03d18fece9e0052…`) e o mesmo `params_hash = fa5dce78…c32f63bb9`. São **duas
+populações**: a `v1` fechou em 2026-09-08 04:05:09Z; a `v2` abriu em 04:35:02Z. Não se somam.
+
+**Semântica do corte.** Idêntica à da [[EXP-0001-momentum-v1]] deste mesmo turno: população
+congelada por `decision_at <= as_of`, coorte `prospective`, estados lidos num único snapshot
+`REPEATABLE READ READ ONLY` em `read_at`, gate de avaliável = `is_evaluable()` da S3a
+(`terminal` **e** `exit_ts <= as_of` **e** `entry_bar_open + horizon_s <= as_of`). **A leitura não é
+reconstruível** — `signal_outcomes` avança no lugar.
+
+**SQL usado:** o mesmo `/tmp/p0908b.sql` colado na [[EXP-0001-momentum-v1]] (uma consulta só, as
+duas estratégias no mesmo `GROUP BY`), rodado por
+`ssh hunter-vps` → `docker exec hunter-postgres-1 psql -f /tmp/p0908b.sql`.
+
+**Saída real (colada; só as linhas de `volume_anomaly`, coorte `prospective`):**
+
+```
+      key       | version |   cohort    | emitidos | pendentes | entradas | ne_late_delay | ne_geometry | ne_outros | ativos | target | stop | expired | invalidated | censurados | funding_indisp | mercados | dias_decisao
+----------------+---------+-------------+----------+-----------+----------+---------------+-------------+-----------+--------+--------+------+---------+-------------+------------+----------------+----------+--------------
+ volume_anomaly | v1      | prospective |     2152 |         0 |     2097 |            13 |          42 |         0 |      0 |    556 |  619 |      66 |         856 |          0 |             18 |      237 |            3
+ volume_anomaly | v2      | prospective |      296 |         0 |      285 |             0 |          11 |         0 |      5 |     70 |   83 |       5 |         122 |          0 |             15 |      124 |            1
+
+      key       | version |   cohort    | avaliaveis | funding_nao_liquidavel | aval_target | aval_stop | aval_invalidated | aval_expired | taxa_alvo_toques | taxa_lucro_liquido | expectancy_r |  soma_r   | soma_r_pos | soma_r_neg_abs | profit_factor | mat_avaliaveis | mat_dias
+----------------+---------+-------------+------------+------------------------+-------------+-----------+------------------+--------------+------------------+--------------------+--------------+-----------+------------+----------------+---------------+----------------+----------
+ volume_anomaly | v1      | prospective |       2097 |                     18 |         556 |       619 |              856 |           66 |           0.4732 |             0.2819 |      -0.3301 | -686.2145 |   785.2721 |      1471.4866 |        0.5337 |           2079 |        3
+ volume_anomaly | v2      | prospective |        206 |                     12 |          56 |        57 |               88 |            5 |           0.4956 |             0.2577 |      -0.3714 |  -72.0510 |    60.0565 |       132.1076 |        0.4546 |            194 |        1
+
+      key       | version |   cohort    | outcomes | mfe_nulo | mae_nulo
+----------------+---------+-------------+----------+----------+----------
+ volume_anomaly | v1      | prospective |     2152 |      673 |      617
+ volume_anomaly | v2      | prospective |      296 |       87 |       87
+
+      key       | version |   cohort    |          primeiro           |            ultimo             | dias_emissao
+----------------+---------+-------------+-----------------------------+-------------------------------+--------------
+ volume_anomaly | v1      | prospective | 2026-09-06 03:40:04.45381+00 | 2026-09-08 04:05:09.039989+00 |            3
+ volume_anomaly | v2      | prospective | 2026-09-08 04:35:02.1892+00 | 2026-09-08 11:50:17.949792+00 |            1
+```
+
+**Cobertura — as contagens fecham nas duas.** `v1`: 13 `late:delay` + 42 `geometry` + 556 + 619 + 66
++ 856 = **2.152**, zero pendente, zero ativo, zero censura — coorte **fechada**. `v2`: 11 `geometry`
++ 5 ativos + 70 + 83 + 5 + 122 = **296**. As 11 recusas por geometria são a regra fazendo o que deve:
+com `P_entry` revalidado, `stop < P_entry < target1` deixou de valer e o acompanhamento não abriu.
+
+**Métricas da `v2` (coorte viva; cada uma com o seu denominador):**
+
+| Métrica | Valor | Denominador |
+|---|---|---|
+| taxa de alvo entre toques resolvidos | **0,4956** | 56 target + 57 stop = 113 toques resolvidos |
+| taxa de lucro líquido | **0,2577** | 194 avaliáveis com `R_net` (50 com `R_net > 0`) |
+| expectancy líquida hipotética em R | **−0,3714** | os mesmos 194 |
+| profit factor | **0,4546** | 60,0565 / 132,1076 |
+| soma de R hipotético | **−72,0510** | 194; soma escalar, **não é equity** |
+| MFE/MAE | `mfe` nulo em 87 de 296, `mae` nulo em 87 | toda a coorte |
+| **PnL de carteira** / **Max Drawdown de carteira** | **não aplicável** | não há carteira no Shadow Lab |
+
+**Métricas da `v1` (coorte fechada, para o registro):** taxa de alvo entre toques resolvidos
+**0,4732** (556 de 1.175); taxa de lucro líquido **0,2819** (2.079 com `R_net`); expectancy
+**−0,3301**; profit factor **0,5337**; soma de R **−686,2145**; 2.079 avaliáveis com R em **3** dias.
+
+**Contribuição de R por resultado — `v2`, dentro dos 194 avaliáveis com `R_net`:**
+
+| Resultado | n | Média R | Soma R | Mín | Máx |
+|---|---|---|---|---|---|
+| `target` | 51 | +1,1516 | +58,7305 | −0,6195 | +3,1277 |
+| `stop` | 54 | −1,3313 | −71,8892 | −2,1754 | −1,0296 |
+| `expired` | 5 | −0,1674 | −0,8371 | −0,7897 | +0,3281 |
+| `invalidated` | 84 | −0,6911 | −58,0552 | −1,5642 | −0,1580 |
+
+51 + 54 + 5 + 84 = **194**, fecha com o denominador. O `stop` médio de −1,33 R contra os −1,11 R do
+momentum é a assinatura conhecida desta estratégia: entra depois do pico de volume, e o stop
+simétrico é atravessado com gap mais vezes.
+
+- **Maturação (`v2`):** 206 avaliáveis, 12 sem `R_net` por funding → **194** nas métricas de R, em
+  **1** dia distinto.
+- **Result:** **inconclusivo.** O limiar é 100 outcomes avaliáveis **E** 30 dias distintos. A `v2`
+  tem 194 em 1 dia: cumpre o lado dos outcomes, **falha o dos dias**. A `v1`, com 2.079 em 3 dias,
+  falha igualmente e agora está congelada nesses 3 dias.
+- **Conclusion:** as duas versões dizem a mesma coisa e é a coisa mais negativa da base — −0,33 R e
+  −0,37 R por decisão, profit factor 0,53 e 0,45, taxa de lucro líquido de 26–28 %. Não é ruído de
+  amostra pequena do lado dos outcomes (2.079 resultados na `v1`); é o mesmo defeito medido duas
+  vezes. O que **falta** para chamar de reprovada é só dias: 3 de 30. É por isso que o veredito
+  mecânico não é opinião — se fosse, esta página já teria fechado a estratégia.
+- **Next Action:** deixar rodar; uma avaliação por plantão. Nada ativado, depreciado nem
+  reparametrizado por causa destes números.
+
+## Replay histórico (rotulado `replay`, D14/D15)
+
+> Seção aberta em **2026-09-08**, gêmea da que está na [[EXP-0001-momentum-v1]]. O replay roda **o
+> mesmo código de avaliação** da linha viva sobre velas persistidas (T3.19b, `79379ef`), sob coorte
+> `replay:<run_id>`, sem escrever o outbox, com recibo durável em `replay_runs` (`0013`, `04f949d`).
+>
+> **Replay não conta para a régua `validada`/`reprovada`.** Por **D15** (Everton, 2026-09-08) ele
+> pode amadurecer só o **bloco 2** do protocolo de replicação — as 10 irmãs de parâmetros — pela
+> **metade** da régua (≥ 50 resultados **E** ≥ 15 dias) e **com rótulo**. O bloco 1 e a régua do
+> placar continuam **só** com `prospective`. **D14** fixou as duas medidas de validação: decisões
+> simuladas (massa) e operações fechadas (evidência); o que está abaixo é a segunda.
+
+### Replay de 2026-09-08 — `replay:bac27c12-7e50-4dfa-9eee-35fccc4012d7` (volume_anomaly `v2`)
+
+**Recibo (`replay_runs` — colado):**
+
+```
+                run_id                |      window_from       |       window_to        |                              markets                              | bars_evaluated | signals | outcomes_resolved | outcomes_open | seconds | workers | errors
+--------------------------------------+------------------------+------------------------+-------------------------------------------------------------------+----------------+---------+-------------------+---------------+---------+---------+--------
+ bac27c12-7e50-4dfa-9eee-35fccc4012d7 | 2026-08-08 00:00:00+00 | 2026-09-08 00:00:00+00 | {binance:ETHUSDT,binance:SOLUSDT,binance:XRPUSDT,binance:DOGEUSDT} |          35712 |     341 |               341 |             0 | 577.033 |       3 |      0
+```
+
+**Cobertura e métricas (mesmo `as_of` e `read_at` da avaliação acima — colado):**
+
+```
+      key       | version |                   cohort                    | emitidos | pendentes | entradas | ne_late_delay | ne_geometry | ne_outros | ativos | target | stop | expired | invalidated | censurados | funding_indisp | mercados | dias_decisao
+----------------+---------+---------------------------------------------+----------+-----------+----------+---------------+-------------+-----------+--------+--------+------+---------+-------------+------------+----------------+----------+--------------
+ volume_anomaly | v2      | replay:bac27c12-7e50-4dfa-9eee-35fccc4012d7 |      341 |         0 |      337 |             0 |           4 |         0 |      0 |     99 |   77 |      15 |         146 |          0 |              0 |        4 |           29
+ volume_anomaly | v2      | replay:cd0d5584-b53b-4bb0-bdb0-ec39d960d549 |      341 |         0 |      337 |             0 |           4 |         0 |      0 |     99 |   77 |      15 |         146 |          0 |            335 |        4 |           29
+
+      key       | version |                   cohort                    | avaliaveis | funding_nao_liquidavel | aval_target | aval_stop | aval_invalidated | aval_expired | taxa_alvo_toques | taxa_lucro_liquido | expectancy_r |  soma_r   | soma_r_pos | soma_r_neg_abs | profit_factor | mat_avaliaveis | mat_dias
+----------------+---------+---------------------------------------------+------------+------------------------+-------------+-----------+------------------+--------------+------------------+--------------------+--------------+-----------+------------+----------------+---------------+----------------+----------
+ volume_anomaly | v2      | replay:bac27c12-7e50-4dfa-9eee-35fccc4012d7 |        337 |                      0 |          99 |        77 |              146 |           15 |           0.5625 |             0.2789 |      -0.5957 | -200.7633 |    78.0042 |       278.7675 |        0.2798 |            337 |       29
+ volume_anomaly | v2      | replay:cd0d5584-b53b-4bb0-bdb0-ec39d960d549 |        337 |                    335 |          99 |        77 |              146 |           15 |           0.5625 |             0.5000 |      -0.5335 |   -1.0669 |     0.0164 |         1.0833 |        0.0151 |              2 |        2
+
+      key       | version |                   cohort                    |       primeiro         |         ultimo         | dias_emissao |         simbolos_replay
+----------------+---------+---------------------------------------------+------------------------+------------------------+--------------+----------------------------------
+ volume_anomaly | v2      | replay:bac27c12-7e50-4dfa-9eee-35fccc4012d7 | 2026-08-09 06:55:02+00 | 2026-09-06 03:25:02+00 |           29 | DOGEUSDT,ETHUSDT,SOLUSDT,XRPUSDT
+
+      key       | version |                   cohort                    | outcomes | mfe_nulo | mae_nulo
+----------------+---------+---------------------------------------------+----------+----------+----------
+ volume_anomaly | v2      | replay:bac27c12-7e50-4dfa-9eee-35fccc4012d7 |      341 |      109 |       76
+```
+
+**Mesma fatia, duas execuções, e a diferença é o instrumento.** `cd0d5584` rodou **antes** do
+backfill de funding (T3.7c, `31d2078`): 335 de 337 outcomes ficaram sem `R_net`, sobraram **2**, e
+as "métricas" daquela linha (taxa de lucro 0,5000, PF 0,0151) são artefato de dois pontos, não
+medida de nada. `bac27c12` rodou **depois** e precificou **337 de 337**, com desfechos idênticos.
+Vale a regra da casa: métrica sobre a fração que sobrou não é métrica da estratégia.
+
+**Métricas de `bac27c12` (cada uma com denominador):**
+
+| Métrica | Valor | Denominador |
+|---|---|---|
+| taxa de alvo entre toques resolvidos | **0,5625** | 99 target + 77 stop = 176 toques resolvidos |
+| taxa de lucro líquido | **0,2789** | 337 avaliáveis com `R_net` (94 com `R_net > 0`) |
+| expectancy líquida hipotética em R | **−0,5957** | os mesmos 337 |
+| profit factor | **0,2798** | 78,0042 / 278,7675 |
+| soma de R hipotético | **−200,7633** | 337; soma escalar, **não é equity** |
+| MFE/MAE | `mfe` nulo em 109 de 341, `mae` nulo em 76 | toda a coorte |
+| **PnL de carteira** / **Max Drawdown de carteira** | **não aplicável** | replay não toca carteira |
+
+**Contribuição de R por resultado (337 avaliáveis com `R_net`):**
+
+| Resultado | n | Média R | Soma R | Mín | Máx |
+|---|---|---|---|---|---|
+| `target` | 99 | +0,7345 | +72,7168 | −0,5165 | +3,0082 |
+| `stop` | 77 | −1,6151 | −124,3652 | **−7,6706** | −1,1046 |
+| `expired` | 15 | −0,1060 | −1,5895 | −0,7785 | +0,8094 |
+| `invalidated` | 146 | −1,0104 | −147,5254 | −2,4766 | −0,3700 |
+
+99 + 77 + 15 + 146 = **337**, fecha. O **−7,6706 R num único stop** é o número mais importante desta
+tabela: sobre 31 dias reais o gap de abertura atravessou o stop de 1,5 ATR por quase cinco vezes a
+distância planejada. A coorte `prospective` de 1 dia nunca viu isso (pior stop: −2,18 R). É
+exatamente o tipo de cauda que só aparece com histórico, e é por isso que a régua exige 30 dias.
+
+- **Cobertura da janela:** 35.712 barras avaliadas, 341 sinais, 4 mercados (ETH, SOL, XRP, DOGE),
+  **29 dias distintos de decisão** entre 2026-08-09 06:55Z e 2026-09-06 03:25Z, **29 dias distintos
+  de saída**, 4 recusas por geometria. Só 4 mercados porque só 10 têm 32 dias de velas na VPS — ver
+  o bug do backfill em [[Open Bugs]].
+- **Result (rótulo `replay`, D15):** **inconclusivo para a régua real, e por definição.** 337
+  resultados e 29 dias passariam folgado na **meia régua** do bloco 2 (≥ 50 e ≥ 15), mas **não há
+  irmã de parâmetros criada** — nenhuma versão é `promissora`. Para a régua
+  `validada`/`reprovada`, que só aceita `prospective`, isto vale **zero**.
+- **O que ele diz mesmo assim:** sobre 29 dias reais o `volume_anomaly` perde −0,60 R por decisão
+  com PF 0,28 — **pior** do que os −0,37 R que a coorte `prospective` mediu em 1 dia, e a diferença
+  vem da cauda de stops com gap que o dia único não continha. Duas populações independentes
+  apontando para o mesmo lado, com a de fora sendo a mais dura.
+- **Next Action:** nenhuma. Não se cria irmã, não se ativa, não se reparametriza por causa de
+  replay. Quando esta estratégia chegar aos 30 dias de `prospective`, a régua provavelmente terá o
+  que precisa para dizer `reprovada` — e será a régua a dizer, não este turno.
 
 ## Hipóteses de falha (pesquisa — não muda o protocolo, não ativa nada)
 

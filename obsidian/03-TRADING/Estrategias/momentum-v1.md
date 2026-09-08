@@ -48,6 +48,7 @@ updated: 2026-09-08
 - **2026-09-06T03:36:36.988581+00:00** — `strategy_version_activated` (info): momentum v1 activated with code_ref=hunter_core.strategies.momentum_v1@sha256:6ccbe8b6c8ac18f32e93a6d44e71e0045155646479907b2b1944f39c3cdf4c95 params_format=1: S4: primeira ativacao do Shadow Lab na VPS (2026-09-06)
 - **2026-09-06T12:28:11.592273+00:00** — `strategy_version_activation_refused` (warning): momentum v1 is already frozen against this code (hunter_core.strategies.momentum_v1@sha256:6ccbe8b6c8ac18f32e93a6d44e71e0045155646479907b2b1944f39c3cdf4c95)
 - **2026-09-08T04:26:04.515543+00:00** — `strategy_version_activation_refused` (warning): momentum v1 is frozen at code_ref hunter_core.strategies.momentum_v1@sha256:6ccbe8b6c8ac18f32e93a6d44e71e0045155646479907b2b1944f39c3cdf4c95 but this build is hunter_core.strategies.momentum_v1@sha256:ab2e039825c9334da5b81666791c0a782f25bb35a3cb9529391bdb238ebaa40c: a paper line runs the very code the research coorte ran; supersede first or deploy the matching build
+- **2026-09-08T04:33:56.865371+00:00** — `strategy_version_superseded` (info): momentum v1 -> v2 with code_ref=hunter_core.strategies.momentum_v1@sha256:ab2e039825c9334da5b81666791c0a782f25bb35a3cb9529391bdb238ebaa40c: code_moved_by_funding_slot_fix_d878fd6_lab_refused_v1_on_vps_since_2026-09-07_frozen_parameters_carried_over
 
 ## Coortes e sinais
 

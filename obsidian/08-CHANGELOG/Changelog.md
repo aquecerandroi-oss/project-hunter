@@ -11,6 +11,168 @@ Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado p
 
 ## 2026-09-08
 
+*(Bloco consolidado no plantão do meio-dia de 2026-09-08: os 47 commits de
+`abf8e80..d91fac8` que faltavam, mais novo primeiro. O eixo do dia é o **Lab
+saindo do escuro** — placar, tabela em reais, replay histórico — e a **linha
+paper nascendo**.)*
+
+- **`d91fac8` — T3.23: a primeira auditoria do `product-designer`, com dado real
+  no navegador.** 40+ achados, entre eles **12 falhas de contraste AA medidas** em
+  composições de tokens, rotas de `loading`/`error` inexistentes, enums crus e ids
+  de tarefa aparecendo na cópia da tela, e uma deriva na escala tipográfica.
+  Quatro regras novas em `docs/DESIGN.md` §2 + DESIGN-5 e três briefs prontos
+  (quick wins, Lab, consistência). Ver [[Product Designer]].
+- **`31d2078` — T3.7c: a pista de backfill de histórico de funding.** `kind=funding`
+  no contrato de backfill, uma chamada REST por mercado, `ON CONFLICT DO NOTHING`
+  (idempotente), evento `market.funding.backfilled`, e
+  `request_backfill.py --kind funding`. Provado com histórico real da Binance: 93
+  liquidações por mercado em 31 dias, e a reexecução insere 0. **Consequência
+  medida:** o resolvedor de outcomes voltou a precificar janela histórica — antes
+  disso o replay do momentum tinha 23 de 224 avaliáveis; depois, 222 de 224
+  (ver [[EXP-0001-momentum-v1]], seção "Replay histórico").
+- **`79c52c3` — T3.25 parte A: os dados por trás de quatro páginas "Planejado".**
+  `GET /lab/shadow/strategies` (cada parâmetro com schema, propósito, linhagem,
+  `promising_at`, veredito e contagem de sinais por coorte),
+  `GET /lab/shadow/replays{,/{run_id}}` (recibos de replay), Trades com taxas e
+  PnL em BRL, snapshots e intenções de proteção, e `GET …/risk/limits` (o preset
+  numérico do `paper_v1` igual ao `PAPER_V1`, uso contra cada teto, kill switch).
+- **`a7707dd` — brief T3.7c.** Escrito com o número que o justificava: sem
+  histórico de funding, o replay tinha 23+2 avaliáveis de 224+341.
+- **`4deef9d` — T3.10: o relatório do M3 reescrito no formato estendido** (draft,
+  parecer da Sexta-feira pendente), `ARCHITECTURE` §4.1 (carteira paper, Risk
+  Engine, spot, replay), `PRODUCT` com o estado real por página, `ROADMAP` M3–M6
+  atualizado e um "como rodar hoje" no README. Sem link quebrado.
+- **`d6b8b37` — brief T3.25.** Strategies, Backtests (replay), Trades e Risk Center
+  deixam de ser "Planejado": API primeiro, web depois das especificações do designer.
+- **`1f91c79` — D14 e D15, delegadas pelo Everton em 2026-09-08.** **D14:** o que
+  conta como "validação" são **duas** medidas, as duas no placar — *decisões
+  simuladas* (massa; meta de 500 mil/dia, medidas em ~6,5 M/dia na VPS com 3 de
+  12 vCPU) e *operações fechadas* (evidência para a régua de 100 resultados e 30
+  dias, **sem** meta numérica diária). **D15:** o replay **pode** amadurecer as
+  irmãs do bloco 2 do protocolo de replicação, **com rótulo**, pela **metade** da
+  régua (≥ 50 resultados e ≥ 15 dias); `promissora` só nasce da régua em tempo
+  real, e o bloco 1 e a régua do placar continuam só com `prospective`.
+  Consequência operacional escrita na própria decisão: nenhuma versão é
+  `promissora` hoje, então **não há irmãs a criar**. Ver [[Architecture Decisions]],
+  [[EXP-0001-momentum-v1]] e [[EXP-0002-volume-anomaly-v1]].
+- **`19983dd` — T3.5f: a dívida de tipagem dos testes da carteira foi paga.** De
+  **179 erros de pyright a 0**, com tipos de domínio reais em cada helper — sem
+  `ignore`, sem `cast`. `uv run pyright` no repositório inteiro (o comando do CI)
+  passa limpo. Fecha o bug dos "160 pyright" aberto no plantão da madrugada
+  (ver [[Resolved Bugs]]).
+- **`47cff11` — brief T3.5f** (dívida de pyright no execution-worker e no teste do
+  adaptador de admissão).
+- **`04f949d` — T3.19d: migração `0013_replay_runs`, um recibo durável por fatia de
+  replay.** O worker só faz `INSERT` (nunca `UPDATE`/`DELETE`); a API lê; a tabela
+  é global como as demais do shadow. O ledger a escreve ao lado de `system_events`
+  e do JSONL, e o `downgrade` **se recusa** a derrubar recibos.
+- **`79379ef` — T3.19b: o motor de replay histórico.** O **mesmo código de
+  avaliação** da linha viva rodando sobre velas persistidas (`ReplayClock`, hot
+  state vazio, `WindowCache`), só sob coorte de replay, **nunca** escrevendo o
+  outbox, com portão de orçamento, fila e recibo em `system_events`.
+- **`5c97b18` — T3.19c: migração `0012_replication`.** A coorte
+  `replication:<parent>:<k>` no CHECK de coorte e no `SHADOW_COHORT_PATTERN`,
+  `strategy_versions.promising_at`/`promising_by` e as colunas de linhagem de irmã
+  (id do pai, índice, único por braço), tudo `owner-only` por subtração de ACL.
+  Irmãs emitem sob a própria coorte; `mark_promising()` idempotente e auditado.
+- **`6d142fe` — T3.22: todo horário na tela é horário de Brasília** (America/Sao_Paulo),
+  com UTC/ISO no tooltip. Uma fonte só (`lib/time.ts`), determinística entre
+  runtimes; formatadores que usavam o fuso do visitante foram removidos.
+- **`a9937c9` — brief T3.23** (primeira auditoria do designer com dado real no
+  navegador; modo de teste do Clerk habilitado pelo Everton).
+- **`84bc4ec` — T3.18: o placar do Lab na tela.** Um cartão por versão — veredito
+  `inconclusiva`/`validada`/`reprovada` pela regra 100/30, barra de maturidade,
+  resultado simulado e média pela régua da carteira, números de pesquisa atrás de
+  um toggle — mais a curva acumulada de resultado simulado por versão.
+- **`ee2b472` — T3.21: Bases, callouts, linter e canvases da base Obsidian.**
+  Detalhado na entrada abaixo, que agora tem o hash.
+- **`6a17665` — brief T3.22** (Brasília como exibição primária, UTC como detalhe;
+  pedido do Everton, despachado depois da web da T3.18).
+- **`ce16f20` — estado do runbook de ativação às 06:50Z:** passos 1, 3, 4 e 6
+  feitos; 7 e 8 são do Everton, com o comando à prova de PowerShell.
+- **`9a291d3` — T3.15e: ativar uma linha paper derivada congela o conteúdo que ela
+  copiou**, nunca os parâmetros do build corrente; a ponte admite **uma** coorte
+  (replay e replication recusados como `cohort_not_live`); o `purpose` fica
+  visível no resumo da versão e no cartão.
+- **`2e0dc08` — T3.17b: a tabela do Lab, corrigida e mais detalhada** (pedido do
+  Everton): segmentos Concluídas/Abertas/Pendentes (concluídas primeiro), datas em
+  uma linha, estratégia e propósito por linha, motivo de saída, duração, selo de
+  resultado sempre visível, e totais honestos no escopo da página, com médias e
+  melhor/pior.
+- **`ab32be4` — brief T3.19b** (500 mil validações simuladas por dia pelo motor de
+  replay; despachar depois da `0012` e da T3.15e).
+- **`6878c8b` — brief T3.19c** (migração `0012`, coorte de replicação,
+  `promising_at` e colunas de linhagem de irmã).
+- **`f7c76b8` — T3.20: cada versão de estratégia ganhou a sua página, com todos os
+  parâmetros.** `export_strategies_to_obsidian.py`, que preserva o que está fora
+  dos marcadores; 19 páginas geradas a partir das linhas reais da VPS (momentum
+  v1/v2/v3-paper, volume_anomaly v1/v2, seis rascunhos, duas páginas de família).
+  Virou passo de plantão.
+- **`b378d57` — T3.19: o protocolo de replicação** (`docs/plans/REPLICATION.md`):
+  bloco fora da amostra, 10 irmãs de parâmetros (jitter de ±15 % com semente,
+  validadas contra o schema), metades de mercado, IC por bootstrap e teste de
+  sinal. `replicate_strategy_version.py` deriva irmãs `research_only` auditadas.
+  Os vereditos `promissora`/`replicando`/`real`/`refutada` **só dizem, nunca ativam**.
+- **`fb88d97` e `c0c74e2` — os testes do resumo do Lab passam a esperar `Decimal`
+  em notação simples** (`0.5`, não `0.5000` nem `0E-20`), fechando o par com o
+  `b6f5c2c`. 21 testes passando.
+- **`429a8f4` — T3.18 na API:** `GET /lab/shadow/scoreboard` (uma linha por versão
+  com as definições de métrica do plantão, maturidade 100/30 e o veredito
+  mecânico) e `GET /lab/shadow/curve` (a curva de R acumulado).
+- **`c2ee96b` — a casa da Sexta-feira voltou a ser o agente do Claude Code**
+  (Everton, 2026-09-08). O perfil do Hermes continua existindo como executor
+  opcional, **sem rotina**. Ver [[Sexta-feira no Hermes]] e `docs/HERMES.md`.
+- **`82218c9` — brief T3.21** (Bases, callouts, linter e canvases; adaptado do
+  `claude-obsidian` sem instalar o plugin).
+- **`adc4cb9` — brief T3.17b** (tabela e totais do Lab corrigidos e mais detalhados).
+- **`0451066` — T3.0f: o coletor spot virou processo próprio.** `MARKET_ROLE=spot`,
+  serviço `market-worker-spot` atrás do perfil `spot`, `MARKET_SPOT=1` no
+  `compose.sh`, e `hb:market:spot` interpretado como linha de worker própria. O
+  mesmo commit trouxe o cartão de papel do `product-designer` (detalhado na
+  entrada abaixo) e os trechos de documentação da T3.7b.
+- **`e4b531a` — T3.15c: a ponte julga `strategy_versions.purpose`** (desacordo com
+  o envelope é recusado como `purpose_mismatch`); a `0011` **revoga do worker** o
+  poder de ativar ou apagar uma versão; o script de ativação audita **cada** falha;
+  o instalador do Hermes fixa `obsidian-mcp@2.0.1`.
+- **`6b5cb2b` — brief T3.20** (página por versão com todos os parâmetros, script
+  exportador, passo de plantão).
+- **`b52f23f` — brief T3.19** (o protocolo de replicação que decide se uma
+  estratégia promissora é real; nada chega à carteira).
+- **`2814eec` — brief T3.18** (o placar do Lab, veredito mecânico na regra 100/30,
+  curva de resultado simulado).
+- **`8101d26` — T3.17: o Lab em dinheiro, na língua do Everton.** Entrou, saiu,
+  variação, valor simulado e lucro/prejuízo por operação; cartão de totais; a
+  régua declarada de 0,25 % vinda da carteira paper real; colunas de pesquisa
+  atrás de um toggle.
+- **`7a0fa8d` — T3.16: os selos de obsolescência envelhecem contra o relógio do
+  servidor** (`server_now` nas respostas de mercados, deslocamento por
+  `useServerClock`), nunca contra o do visitante; dica "relógio local" quando uma
+  API antiga omite o campo.
+- **`8424ec9` — T3.7b: o produtor horário de β** (`beta_v1`, revisões imutáveis,
+  idempotente por corte, **nunca** um β fabricado) e `request_backfill.py --days 31`
+  pelo contrato do outbox. Fecha o bug "`market_betas` vazia" (ver
+  [[Resolved Bugs]]) e **abre** o do backfill desbalanceado (ver [[Open Bugs]]).
+- **`5b11438` — regra da casa: a árvore de trabalho é compartilhada.** Nenhum agente
+  usa `stash`, `checkout --`, `restore`, `reset`, `clean` ou `commit -a`. Escrita
+  depois de um agente ter engavetado o trabalho de quatro tarefas em 2026-09-08 —
+  recuperado do stash.
+- **`178e9d2` — brief T3.17** (o front do Lab em dinheiro, com a régua declarada de
+  0,25 %).
+- **`19321aa` — a flag da ponte espera a T3.15c e a T3.15e** (parecer do
+  `risk-engine-guardian` de 2026-09-08).
+- **`3736a62` — revisão do `risk-engine-guardian` sobre a `0010`/T3.15b**: dois
+  bloqueadores, os dois já cobertos pela T3.15c. Mais o brief T3.15e (ativação
+  mantém o conteúdo derivado, uma coorte pela ponte, `purpose` visível).
+- **`b8f3d3f` — briefs T3.15c** (desdobramentos da revisão da `0010`: a ponte lê a
+  coluna, o worker não pode ativar, DSN de owner só em `migrate`/ops, instalador
+  fixado) **e T3.16** (obsolescência contra o relógio do servidor).
+- **`b6f5c2c` — a página da carteira quebrava com um `Decimal` zero serializado
+  como `0E-20`.** Os decimais da API passam a sair em notação simples
+  (`decimal_plain`, schemas da carteira em `DecimalStr`) e o parser da web aceita
+  formas com expoente.
+- **`3c55add` — plantão da madrugada de 2026-09-08** (EXP-0005 aberto, changelog,
+  "Sexta-feira no Hermes", bugs do β).
+
 - **T3.21 — a base ganhou padrão, vistas, mapas e um linter.** Frontmatter
   padronizado nas 162 notas (`status`, `owner`, `updated`, `tags` + chaves por
   pasta: `exp`/`result`/`evaluable`/`days`/`last_eval` nos experimentos,
@@ -118,6 +280,13 @@ no plantão da manhã de 2026-09-07 na seção anterior. Ver `git log` para o de
 commit a commit.)*
 
 ## 2026-09-07
+
+*(Os dois itens a seguir, do fim da tarde, foram acrescentados no plantão do meio-dia de
+2026-09-08 — faltavam no consolidado anterior.)*
+
+- **`6b82ce0` — `milestone.json`: M3 com o código completo**, pendente da T3.10, das revisões e do
+  segundo deploy da VPS; bloqueadores e próximas ações atualizados.
+- **`8eff6d2` — brief da revisão adversarial da T3.0e** (Sexta-feira no Hermes, somente leitura).
 
 *(Os dezenove itens abaixo entraram entre `02:40Z` e `10:21Z` e foram consolidados no plantão da
 manhã de 2026-09-07 — de `8f8be1e` a `e57908a`. O dia inteiro é M3, e o eixo dele é um só: **a

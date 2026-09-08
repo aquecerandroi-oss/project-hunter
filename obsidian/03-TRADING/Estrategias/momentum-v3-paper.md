@@ -3,17 +3,17 @@ tags: ["estrategia", "catalogo", "momentum"]
 strategy: momentum
 version: v3
 purpose: paper
-status: draft
+status: active
 code_ref: "hunter_core.strategies.momentum_v1@sha256:ab2e039825c9334da5b81666791c0a782f25bb35a3cb9529391bdb238ebaa40c"
 params_hash: 40e1688e6b5f6385674cb47a81e542b215b320eb5643a1375f6401f5c41ac2f3
-activated_at: ""
+activated_at: "2026-09-08T05:57:30.922979+00:00"
 deprecated_at: ""
-derived_from: "[[momentum-v2]]"
-cohorts: []
+derived_from: ""
+cohorts: ["prospective"]
 exp: ["[[EXP-0005-momentum-paper]]"]
 updated: 2026-09-08
 ---
-# momentum v3 (paper, draft)
+# momentum v3 (paper, active)
 
 <!-- generated:start -->
 ## Parâmetros
@@ -42,13 +42,17 @@ updated: 2026-09-08
 
 ## Origem
 
-**Changelog congelado:** paper line of v2 (D10, T3.15): D10_coorte_paper_do_momentum_Everton_2026-09-08
+**Changelog congelado:** D10_coorte_paper_ativada_por_Everton_2026-09-08
 
 - **2026-09-08T04:34:18.943524+00:00** — `strategy_version_paper_line_derived` (info): momentum v3 derived from v2 with purpose=paper code_ref=hunter_core.strategies.momentum_v1@sha256:ab2e039825c9334da5b81666791c0a782f25bb35a3cb9529391bdb238ebaa40c, draft, not activated: D10_coorte_paper_do_momentum_Everton_2026-09-08
+- **2026-09-08T05:57:30.922979+00:00** — `strategy_version_activated` (info): momentum v3 (purpose paper) activated with its already-copied code_ref=hunter_core.strategies.momentum_v1@sha256:ab2e039825c9334da5b81666791c0a782f25bb35a3cb9529391bdb238ebaa40c params_format=1: D10_coorte_paper_ativada_por_Everton_2026-09-08
 
 ## Coortes e sinais
 
-Nenhum sinal emitido ainda.
+| Coorte | Sinais (`agent_signals`) |
+|---|---|
+| `prospective` | 156 |
+| **total** | **156** |
 
 ## Avaliações
 
@@ -63,7 +67,6 @@ não iniciada — ver `docs/plans/REPLICATION.md` quando existir (T3.19).
 ## Ligações
 
 - Família: [[momentum]]
-- Versão anterior: [[momentum-v2]]
 - Experimento: [[EXP-0005-momentum-paper]]
 - Risk Engine: [[Risk Engine]]
 <!-- generated:end -->

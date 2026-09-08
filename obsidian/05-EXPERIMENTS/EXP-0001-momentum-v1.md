@@ -1,15 +1,15 @@
 ---
 tags: [experimento, momentum, shadow-lab]
-updated: 2026-09-06
+updated: 2026-09-08
 status: em-andamento
 owner: sexta-feira
 exp: EXP-0001
 strategy: momentum
-version: v1
+version: v2
 result: inconclusivo
-evaluable: 91
+evaluable: 49
 days: 1
-last_eval: 2026-09-06
+last_eval: 2026-09-08
 ---
 
 # EXP-0001 — momentum em modo sombra (perfil "por barras" v0)
@@ -517,6 +517,255 @@ de 1 min às 13:27Z). Janela de emissões: 03:45:01 a 12:45:26 UTC.
   de parâmetro decorre destes números. Pesquisa aberta abaixo, em "Hipóteses de falha".
 - **Segunda opinião (Astra) — [[S4-hipoteses]]:** cinco must-fix, **todos aceitos e aplicados antes
   de publicar**; estão descritos na seção "Hipóteses de falha".
+
+### Avaliação de 2026-09-08 (plantão do meio-dia) — **coorte da VPS** — `as_of = 2026-09-08T12:00:00Z`, `read_at = 2026-09-08T12:34:22.305724Z`
+
+**Esta avaliação não continua a série anterior — a versão mudou de linha.** Em 2026-09-08
+**04:33:56.865371+00** o `momentum v1` da VPS foi **sucedido** pela `v2`
+(`strategy_version_superseded`, motivo congelado
+`code_moved_by_funding_slot_fix_d878fd6_lab_refused_v1_on_vps_since_2026-09-07_frozen_parameters_carried_over`),
+com `code_ref = hunter_core.strategies.momentum_v1@sha256:ab2e039825c9334da5b81666791c0a782f25bb35a3cb9529391bdb238ebaa40c`
+e os **mesmos** `default_parameters` (`params_hash = 40e1688e…c41ac2f3`). São **duas populações**:
+a `v1` fechou em 2026-09-08 04:00:30Z e não recebe sinal novo; a `v2` abriu em 04:45:02Z. Não se
+somam. As duas estão abaixo, cada uma com o seu denominador.
+
+**Semântica do corte.** População congelada por `supporting_features->>'decision_at' <= as_of` e
+coorte `prospective`. Estados lidos num único snapshot `REPEATABLE READ READ ONLY` em `read_at`.
+**A leitura não é reconstruível:** `signal_outcomes` avança no lugar e não há histórico de estados;
+reexecutar amanhã devolve a mesma população com estados diferentes. O gate de avaliável é o
+`is_evaluable()` da S3a: `terminal` **e** `exit_ts <= as_of` **e**
+`entry_bar_open + horizon_s <= as_of`.
+
+**SQL usado** (`ssh hunter-vps` → `docker exec hunter-postgres-1 psql -f /tmp/p0908b.sql`; o
+inventário de versões saiu de `/tmp/p0908a.sql`, as excursões e a janela de emissão de
+`/tmp/p0908d.sql` e `/tmp/p0908c.sql`, a contribuição de R de `/tmp/p0908h.sql` — todos com o mesmo
+`as_of`):
+
+```sql
+\set as_of '2026-09-08T12:00:00Z'
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;
+SELECT now() AS read_at;
+
+-- (1) cobertura por chave/versao/coorte
+WITH pop AS (
+  SELECT st.key, v.version, coalesce(s.supporting_features->>'cohort','(nulo)') AS cohort,
+         s.id, s.market_id, s.emitted_at,
+         (s.supporting_features->>'decision_at')::timestamptz AS decision_at,
+         o.tracking_state, o.result, o.r_multiple, o.entry_ts, o.exit_ts,
+         o.no_entry_reason, o.censored_reason,
+         (o.meta->'funding'->>'reason') AS funding_reason
+  FROM agent_signals s
+  JOIN strategy_versions v ON v.id = s.strategy_version_id
+  JOIN strategies st ON st.id = v.strategy_id
+  LEFT JOIN signal_outcomes o ON o.signal_id = s.id
+  WHERE (s.supporting_features->>'decision_at')::timestamptz <= :'as_of'::timestamptz
+)
+SELECT key, version, cohort,
+  count(*) AS emitidos,
+  count(*) FILTER (WHERE tracking_state='pending_entry') AS pendentes,
+  count(*) FILTER (WHERE entry_ts IS NOT NULL)           AS entradas,
+  count(*) FILTER (WHERE no_entry_reason='late:delay')   AS ne_late_delay,
+  count(*) FILTER (WHERE no_entry_reason='geometry')     AS ne_geometry,
+  count(*) FILTER (WHERE tracking_state='no_entry'
+                    AND no_entry_reason NOT IN ('late:delay','geometry')) AS ne_outros,
+  count(*) FILTER (WHERE tracking_state='active')        AS ativos,
+  count(*) FILTER (WHERE result='target')                AS target,
+  count(*) FILTER (WHERE result='stop')                  AS stop,
+  count(*) FILTER (WHERE result='expired')               AS expired,
+  count(*) FILTER (WHERE result='invalidated')           AS invalidated,
+  count(*) FILTER (WHERE tracking_state='censored')      AS censurados,
+  count(*) FILTER (WHERE funding_reason IS NOT NULL)     AS funding_indisp,
+  count(DISTINCT market_id)                              AS mercados,
+  count(DISTINCT (decision_at AT TIME ZONE 'UTC')::date) AS dias_decisao
+FROM pop GROUP BY 1,2,3 ORDER BY 1,2,3;
+
+-- (2) metricas sobre a populacao AVALIAVEL (gate = is_evaluable da S3a)
+--     [mesmo texto da avaliacao de 2026-09-06, agora agrupado tambem por coorte]
+COMMIT;
+```
+
+**Saída real (colada; só as linhas de `momentum`, coorte `prospective` — as demais estão nas seções
+de replay e na [[EXP-0002-volume-anomaly-v1]]):**
+
+```
+            read_at
+-------------------------------
+ 2026-09-08 12:34:22.305724+00
+(1 row)
+
+   key    | version |   cohort    | emitidos | pendentes | entradas | ne_late_delay | ne_geometry | ne_outros | ativos | target | stop | expired | invalidated | censurados | funding_indisp | mercados | dias_decisao
+----------+---------+-------------+----------+-----------+----------+---------------+-------------+-----------+--------+--------+------+---------+-------------+------------+----------------+----------+--------------
+ momentum | v1      | prospective |      963 |         0 |      947 |            15 |           1 |         0 |      0 |    355 |  236 |       3 |         353 |          0 |             18 |      233 |            3
+ momentum | v2      | prospective |      164 |         0 |      164 |             0 |           0 |         0 |      2 |     53 |   49 |       1 |          59 |          0 |             12 |      121 |            1
+
+   key    | version |   cohort    | avaliaveis | funding_nao_liquidavel | aval_target | aval_stop | aval_invalidated | aval_expired | taxa_alvo_toques | taxa_lucro_liquido | expectancy_r |  soma_r   | soma_r_pos | soma_r_neg_abs | profit_factor | mat_avaliaveis | mat_dias
+----------+---------+-------------+------------+------------------------+-------------+-----------+------------------+--------------+------------------+--------------------+--------------+-----------+------------+----------------+---------------+----------------+----------
+ momentum | v1      | prospective |        947 |                     18 |         355 |       236 |              353 |            3 |           0.6007 |             0.3864 |      -0.1905 | -176.9357 |   280.3326 |       457.2683 |        0.6131 |            929 |        3
+ momentum | v2      | prospective |         52 |                      3 |          23 |        16 |               12 |            1 |           0.5897 |             0.4286 |      -0.1363 |   -6.6767 |    17.2558 |        23.9325 |        0.7210 |             49 |        1
+
+   key    | version |   cohort    | outcomes | mfe_nulo | mae_nulo
+----------+---------+-------------+----------+----------+----------
+ momentum | v1      | prospective |      963 |      375 |      262
+ momentum | v2      | prospective |      164 |       56 |       52
+
+   key    | version |   cohort    |           primeiro            |            ultimo             | dias_emissao
+----------+---------+-------------+-------------------------------+-------------------------------+--------------
+ momentum | v1      | prospective | 2026-09-06 03:45:01.540802+00 | 2026-09-08 04:00:30.358514+00 |            3
+ momentum | v2      | prospective | 2026-09-08 04:45:02.690354+00 | 2026-09-08 11:46:02.758608+00 |            1
+```
+
+**Cobertura — as contagens fecham nas duas.** `v1`: 15 `late:delay` + 1 `geometry` + 355 + 236 + 3 +
+353 = **963**, zero pendente, zero ativo, zero censura — a coorte está **fechada** (a versão foi
+depreciada às 04:33:56Z e o último sinal saiu às 04:00:30Z). `v2`: 2 ativos + 53 + 49 + 1 + 59 =
+**164**, nenhuma recusa de entrada, nenhuma censura. As 15 recusas `late:delay` da `v1` são de toda
+a vida da coorte (3 dias, 233 mercados), não deste turno.
+
+**Métricas da `v2` (coorte viva; nomes do item 9 da decisão conjunta, cada uma com denominador):**
+
+| Métrica | Valor | Denominador |
+|---|---|---|
+| taxa de alvo entre toques resolvidos | **0,5897** | 23 target + 16 stop = 39 toques resolvidos |
+| taxa de lucro líquido | **0,4286** | 49 avaliáveis com `R_net` (21 com `R_net > 0`) |
+| expectancy líquida hipotética em R | **−0,1363** | os mesmos 49 |
+| profit factor | **0,7210** | 17,2558 / 23,9325 — as duas somas existem, então não é nulo |
+| soma de R hipotético | **−6,6767** | 49; soma escalar, **não é equity** |
+| MFE/MAE | `mfe` nulo em 56 de 164, `mae` nulo em 52 | toda a coorte (o OHLC não determina o extremo) |
+| **PnL de carteira** / **Max Drawdown de carteira** | **não aplicável** | não há carteira no Shadow Lab |
+
+**Métricas da `v1` (coorte fechada, para o registro):** taxa de alvo entre toques resolvidos
+**0,6007** (355 de 591); taxa de lucro líquido **0,3864** (929 com `R_net`); expectancy
+**−0,1905**; profit factor **0,6131** (280,3326 / 457,2683); soma de R **−176,9357**; 929
+avaliáveis com R em **3** dias distintos.
+
+**Contribuição de R por resultado — `v2`, dentro dos 49 avaliáveis com `R_net`:**
+
+| Resultado | n | Média R | Soma R | Mín | Máx |
+|---|---|---|---|---|---|
+| `target` | 20 | +0,8564 | +17,1276 | +0,3639 | +1,6818 |
+| `stop` | 16 | −1,1096 | −17,7535 | −1,2958 | −1,0315 |
+| `expired` | 1 | +0,1283 | +0,1283 | +0,1283 | +0,1283 |
+| `invalidated` | 12 | −0,5149 | −6,1790 | −0,8118 | −0,2654 |
+
+20 + 16 + 1 + 12 = **49**, fecha com o denominador.
+
+**Cobertura do instrumento (`hb:strategy:shadow` na VPS, lido às 12:36:07Z):**
+`evaluations_by_state = {"unavailable": 1081, "not_triggered": 2030, "triggered": 76}` sobre
+`evaluated_bars = 3187` — **33,9 % das barras avaliadas foram recusadas por indisponibilidade**
+(gap na janela, ATR sem âncora, baseline curta). `open_trackings = 39`, `outbox_lag_s = 0`,
+`outbox_pending = 0`, `errors = 0`, coorte `prospective`, instância `eec0521321d3:1`. O worker está
+vivo e recusando de propósito; a recusa não é defeito, é a regra de não agregar sobre buraco.
+
+- **Maturação (`v2`):** 52 avaliáveis, 3 sem `R_net` por funding → **49** entram nas métricas de R,
+  em **1** dia distinto.
+- **Result:** **inconclusivo.** O limiar é 100 outcomes avaliáveis **E** 30 dias distintos. A `v2`
+  tem 49 em 1 dia — falham os dois lados. A `v1`, com 929 em 3 dias, cumpre o lado dos outcomes e
+  **falha o dos dias**: também inconclusiva, e agora congelada para sempre nesses 3 dias.
+- **Conclusion:** o sinal das duas leituras é o mesmo e é negativo — `v1` em −0,1905 R sobre 929
+  resultados, `v2` em −0,1363 R sobre 49. A `v2` parece "melhor", mas 49 resultados de um único dia
+  sobre 121 mercados que se movem juntos não distinguem nada de nada: o intervalo de qualquer uma
+  dessas médias engole a outra. O que **está** medido é o instrumento: alvo, stop, invalidação e
+  expiração aparecem, as contagens fecham, o gate de maturação separa as populações, e a sucessão
+  `v1 → v2` foi feita pelo caminho auditado sem tocar em parâmetro congelado.
+- **Next Action:** deixar rodar; uma avaliação por plantão. Nada foi ativado, depreciado nem
+  reparametrizado por causa destes números.
+
+## Replay histórico (rotulado `replay`, D14/D15)
+
+> Seção aberta em **2026-09-08**. O replay histórico roda **o mesmo código de avaliação** da linha
+> viva sobre velas persistidas (T3.19b, `79379ef`), sob coorte `replay:<run_id>`, com o outbox
+> **nunca** escrito e um recibo durável em `replay_runs` (`0013`, `04f949d`).
+>
+> **Replay não conta para a régua `validada`/`reprovada`.** A decisão **D15** (Everton delegou em
+> 2026-09-08, `.claude/state/decisions-delegated-2026-09-08.md`) diz: o replay pode amadurecer o
+> **bloco 2** do protocolo de replicação (as 10 irmãs de parâmetros) pela **metade** da régua
+> (≥ 50 resultados **E** ≥ 15 dias), **com rótulo**; o bloco 1 e a régua do placar continuam
+> **só** com `prospective`. `promissora` só nasce da régua em tempo real. Nada aqui muda o veredito
+> da seção "Avaliações" acima, e nada aqui ativa coisa alguma.
+>
+> **D14** fixou as duas medidas de validação: *decisões simuladas* (massa; meta de 500 mil/dia) e
+> *operações fechadas* (evidência para a régua). Os números abaixo são da segunda.
+
+### Replay de 2026-09-08 — `replay:f8d8279c-1fba-42ae-95ef-202042f96c60` (momentum `v2`)
+
+**Recibo (`replay_runs`, uma linha por fatia — colado):**
+
+```
+                run_id                |      window_from       |       window_to        |                              markets                              | bars_evaluated | signals | outcomes_resolved | outcomes_open | seconds | workers | errors
+--------------------------------------+------------------------+------------------------+-------------------------------------------------------------------+----------------+---------+-------------------+---------------+---------+---------+--------
+ f8d8279c-1fba-42ae-95ef-202042f96c60 | 2026-08-08 00:00:00+00 | 2026-09-08 00:00:00+00 | {binance:ETHUSDT,binance:SOLUSDT,binance:XRPUSDT,binance:DOGEUSDT} |          11904 |     224 |               224 |             0 | 198.746 |       3 |      0
+```
+
+**Cobertura e métricas (mesmo `as_of` e `read_at` da avaliação acima — colado):**
+
+```
+   key    | version |                   cohort                    | emitidos | pendentes | entradas | ne_late_delay | ne_geometry | ne_outros | ativos | target | stop | expired | invalidated | censurados | funding_indisp | mercados | dias_decisao
+----------+---------+---------------------------------------------+----------+-----------+----------+---------------+-------------+-----------+--------+--------+------+---------+-------------+------------+----------------+----------+--------------
+ momentum | v2      | replay:7598d6c4-c8b6-430e-974e-3a5118d3a288 |      224 |         0 |      224 |             0 |           0 |         0 |      0 |     91 |   45 |       6 |          82 |          0 |            201 |        4 |           24
+ momentum | v2      | replay:f8d8279c-1fba-42ae-95ef-202042f96c60 |      224 |         0 |      224 |             0 |           0 |         0 |      0 |     91 |   45 |       6 |          82 |          0 |              2 |        4 |           24
+
+   key    | version |                   cohort                    | avaliaveis | funding_nao_liquidavel | aval_target | aval_stop | aval_invalidated | aval_expired | taxa_alvo_toques | taxa_lucro_liquido | expectancy_r | soma_r   | soma_r_pos | soma_r_neg_abs | profit_factor | mat_avaliaveis | mat_dias
+----------+---------+---------------------------------------------+------------+------------------------+-------------+-----------+------------------+--------------+------------------+--------------------+--------------+----------+------------+----------------+---------------+----------------+----------
+ momentum | v2      | replay:7598d6c4-c8b6-430e-974e-3a5118d3a288 |        224 |                    201 |          91 |        45 |               82 |            6 |           0.6691 |             0.2609 |      -0.6064 | -13.9476 |     3.4155 |        17.3631 |        0.1967 |             23 |        3
+ momentum | v2      | replay:f8d8279c-1fba-42ae-95ef-202042f96c60 |        224 |                      2 |          91 |        45 |               82 |            6 |           0.6691 |             0.4144 |      -0.1717 | -38.1262 |    69.4012 |       107.5274 |        0.6454 |            222 |       25
+
+   key    | version |                   cohort                    |       primeiro         |         ultimo         | dias_emissao |         simbolos_replay
+----------+---------+---------------------------------------------+------------------------+------------------------+--------------+----------------------------------
+ momentum | v2      | replay:f8d8279c-1fba-42ae-95ef-202042f96c60 | 2026-08-11 14:15:02+00 | 2026-09-07 23:15:02+00 |           24 | DOGEUSDT,ETHUSDT,SOLUSDT,XRPUSDT
+
+   key    | version |                   cohort                    | outcomes | mfe_nulo | mae_nulo
+----------+---------+---------------------------------------------+----------+----------+----------
+ momentum | v2      | replay:f8d8279c-1fba-42ae-95ef-202042f96c60 |      224 |       91 |       45
+```
+
+**As duas linhas são a mesma fatia rodada duas vezes, e a diferença entre elas é o achado.**
+`7598d6c4` rodou **antes** do backfill de funding (T3.7c, `31d2078`) e não conseguiu precificar
+**201 de 224** outcomes — sobraram 23 avaliáveis, e a expectancy de −0,6064 R descrevia apenas os 23
+que por acaso tinham funding apurável. `f8d8279c` rodou **depois**, com a mesma janela, os mesmos
+224 sinais e exatamente as mesmas contagens de desfecho, e precificou **222 de 224**. Os desfechos
+não mudaram; o que mudou foi quantos deles podiam virar número. É a mesma lição da avaliação de
+2026-09-06 escrita de outro jeito: uma métrica calculada sobre a fração que sobrou não é a métrica
+da estratégia.
+
+**Métricas de `f8d8279c` (cada uma com denominador):**
+
+| Métrica | Valor | Denominador |
+|---|---|---|
+| taxa de alvo entre toques resolvidos | **0,6691** | 91 target + 45 stop = 136 toques resolvidos |
+| taxa de lucro líquido | **0,4144** | 222 avaliáveis com `R_net` (92 com `R_net > 0`) |
+| expectancy líquida hipotética em R | **−0,1717** | os mesmos 222 |
+| profit factor | **0,6454** | 69,4012 / 107,5274 |
+| soma de R hipotético | **−38,1262** | 222; soma escalar, **não é equity** |
+| MFE/MAE | `mfe` nulo em 91 de 224, `mae` nulo em 45 | toda a coorte |
+| **PnL de carteira** / **Max Drawdown de carteira** | **não aplicável** | replay não toca carteira |
+
+**Contribuição de R por resultado (222 avaliáveis com `R_net`):**
+
+| Resultado | n | Média R | Soma R | Mín | Máx |
+|---|---|---|---|---|---|
+| `target` | 90 | +0,7599 | +68,3916 | −0,0614 | +2,7608 |
+| `stop` | 45 | −1,1883 | −53,4739 | −1,4813 | −1,0608 |
+| `expired` | 6 | −0,1176 | −0,7055 | −0,5485 | +0,6346 |
+| `invalidated` | 81 | −0,6462 | −52,3385 | −1,1791 | +0,0762 |
+
+90 + 45 + 6 + 81 = **222**, fecha com o denominador. (Um `target` com R negativo não é contradição:
+o alvo foi tocado e mesmo assim os custos declarados e o funding assinado comeram o ganho.)
+
+- **Cobertura da janela:** 11.904 barras avaliadas, 224 sinais, 4 mercados
+  (ETH, SOL, XRP, DOGE), **24 dias distintos de decisão** entre 2026-08-11 14:15Z e 2026-09-07
+  23:15Z, **25 dias distintos de saída**. A janela pedida foi de 31 dias (2026-08-08 → 2026-09-08);
+  saíram 24 com sinal porque nem todo dia dispara. Só 4 mercados porque só 10 têm 32 dias de velas
+  na VPS — ver o bug do backfill em [[Open Bugs]].
+- **Result (rótulo `replay`, D15):** **inconclusivo para a régua real, e por definição.** 222
+  resultados e 24 dias cumpririam a **meia régua** do bloco 2 (≥ 50 e ≥ 15), mas o bloco 2 são as
+  **irmãs de parâmetros** e **não existe irmã criada** — nenhuma versão é `promissora` hoje. Para a
+  régua `validada`/`reprovada`, que só aceita `prospective`, este número vale **zero**.
+- **O que ele diz mesmo assim:** o sinal do momentum sobre 24 dias reais e 4 mercados é negativo
+  (−0,17 R por decisão, PF 0,65) e **compatível** com o que a coorte `prospective` mediu em 3 dias
+  (−0,19 R, PF 0,61). Duas populações independentes, mesmo sinal, mesma ordem de grandeza. Isso não
+  reprova a estratégia — reprovar exige a régua real —, mas remove a hipótese de que os dois dias de
+  `prospective` fossem um recorte azarado.
+- **Next Action:** nenhuma. Não se cria irmã, não se ativa, não se reparametriza por causa de
+  replay.
 
 ## Hipóteses de falha (pesquisa — não muda o protocolo, não ativa nada)
 

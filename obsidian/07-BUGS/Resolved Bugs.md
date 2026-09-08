@@ -1,16 +1,54 @@
 ---
 tags: [bugs, resolvidos]
-updated: 2026-09-06
+updated: 2026-09-08
 status: registro
 owner: sexta-feira
 severity: misto
 opened: 2026-09-05
-closed: 2026-09-06
+closed: 2026-09-08
 ---
 
 # Resolved Bugs
 
 Correções reais extraídas do `git log`. A maioria veio de rodadas de revisão de segurança/qualidade, não de bugs reportados em produção — não houve produção ainda.
+
+## Fechados no plantão do meio-dia de 2026-09-08
+
+- **MEDIUM (produto, VPS) — `market_betas` vazia: o produtor horário de β nunca foi entregue**
+  (aberto no plantão da madrugada de 2026-09-08, fechado por `8424ec9`, T3.7b). O produtor foi
+  implantado e está rodando na VPS. Medido em 2026-09-08 12:35Z:
+
+  ```
+   revisoes | validas | mercados | beta_version |     primeira_as_of     |      ultima_as_of      |        ultimo_calculo
+  ----------+---------+----------+--------------+------------------------+------------------------+-------------------------------
+       1800 |       9 |      218 | beta_v1      | 2026-09-08 04:00:00+00 | 2026-09-08 12:00:00+00 | 2026-09-08 12:00:01.008123+00
+  ```
+
+  Nove cortes horários de 04:00Z a 12:00Z, **200 revisões por corte**, 218 mercados, escrita
+  pontual (o corte das 12:00Z foi computado às 12:00:01Z). A tabela não está mais vazia e o
+  produtor cumpre o contrato: revisões imutáveis, idempotente por corte, e **nenhum β
+  fabricado** — quando não dá para calcular, a revisão sai `valid = false` com motivo.
+  **Correção honesta do brief deste plantão:** ele falava em "8 revisões válidas às 09:00Z";
+  o SQL diz **1** válida no corte das 09:00Z (e 9 no total dos nove cortes), e essa única
+  válida é o **próprio BTCUSDT** contra si mesmo (`beta = 1.0000`, `n = 0`). As outras 199 de
+  cada corte são `insufficient_history`. O defeito de entrega está fechado; o que falta é
+  **histórico**, e virou bug próprio em [[Open Bugs]] (o backfill *newest-first* que deixou o
+  BTC em 14 dias).
+
+- **MEDIUM (produto, VPS) — candles só 11 dias na VPS; β exige 20 contíguos** (aberto no plantão
+  da madrugada de 2026-09-08, **fechado por medição** em 2026-09-08 12:35Z). O número do bug
+  ficou obsoleto: o backfill de 31 dias rodou e dez mercados chegaram a **32 dias** de velas de
+  1 min (desde 2026-08-08 03:32Z), não 11. O problema real é outro e mais específico — a fila é
+  global e *newest-first*, e deixou o **mercado de referência** (BTC) em 14 dias —, então este
+  item foi **sucedido** por um bug novo em [[Open Bugs]] com a medição por faixa de dias. Fechado
+  como "descrição superada", não como "resolvido".
+
+- **MEDIUM (ferramental) — 160 erros de pyright em
+  `services/execution-worker/tests/test_restart_recovery.py`** (aberto no plantão da madrugada de
+  2026-09-08, fechado por `19983dd`, T3.5f). A dívida foi paga inteira: **179 erros → 0**, com
+  tipos de domínio reais em cada helper — **sem** `ignore` e **sem** `cast`, que seriam a forma
+  de fazer o número zerar sem consertar nada. `uv run pyright` no repositório inteiro (o mesmo
+  comando do CI) passa limpo.
 
 ## Coleta de mercado — ondas T2.5 (2026-09-06, noite)
 

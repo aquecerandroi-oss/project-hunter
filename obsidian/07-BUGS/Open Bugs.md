@@ -24,31 +24,61 @@ Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.
   e adivinhar seria pior. Dono: Sexta-feira, em passes de curadoria, uma nota por
   vez, lendo a fonte.
 
-## Abertos no plantão da madrugada de 2026-09-08 (β e backfill)
+## Abertos no plantão do meio-dia de 2026-09-08 (backfill e deploy)
 
-- **MEDIUM (produto, VPS) — `market_betas` vazia: o produtor horário de β nunca
-  foi entregue (T3.7b em voo).** `market_betas` tem **0 linhas** na VPS. O
-  `scanner-worker` calcula β contra o BTC (`beta_v1`, `da2fb49`), mas o produtor
-  horário que deveria popular `market_betas` nunca foi implantado — a T3.7b
-  (`58fe32e`, brief do runbook ordenado) está em voo e ainda não executou.
-  **Cenário:** sem β, o Risk Engine não pode validar a correlação de uma
-  proposta contra o BTC, e a ponte (T3.14) recusa por `beta_unavailable`.
-  Dono: **T3.7b** (produtor horário de β + backfill).
+- **HIGH (produto, VPS) — o backfill histórico é uma fila global *newest-first*, e
+  isso deixou o BTC em 14 dias enquanto ETH/SOL/XRP/DOGE têm 32: o β espera o
+  BTC.** Medido na VPS em 2026-09-08 12:35Z sobre `candles` de 1 min (287 mercados,
+  3.294.363 barras):
 
-- **MEDIUM (produto, VPS) — candles só 11 dias na VPS; β exige 20 contíguos
-  (backfill de 31 d em voo).** `candles_1m` tem dados de ~11 dias na VPS
-  (desde ~2026-08-28). O cálculo de β (`beta_v1`) exige uma janela de **20 dias
-  contíguos**; com 11 dias, toda avaliação de β é `unavailable: insufficient_window`.
-  O backfill de 31 dias (T3.7b) está em voo e ainda não rodou. **Cenário:** sem
-  20 dias contíguos, nenhum β pode ser calculado, e a condição de β da ponte
-  (T3.14) nunca é satisfeita. Dono: **T3.7b** (backfill de 31 dias).
+  ```
+   dias | mercados |                                       quais
+  ------+----------+------------------------------------------------------------------------------------
+     32 |       10 | BNBUSDT,DOGEUSDT,ETHUSDT,LINKUSDT,PROMUSDT,SOLUSDT,SUIUSDT,TAOUSDT,XRPUSDT,ZECUSDT
+     14 |        5 | ARBUSDT,BTCUSDT,DASHUSDT,NEARUSDT,UNIUSDT
+     11 |      156 |
+     10 |       16 |
+  ```
 
-- **MEDIUM (ferramental, local) — 160 erros de pyright em
-  `services/execution-worker/tests/test_restart_recovery.py`.** O arquivo de
-  teste de recuperação de restart tem **160 erros de pyright** (`hunter_execution_worker`
-  em 0). Não bloqueia o `main` (é teste, não produção), mas impede `uv run pyright`
-  de passar limpo no escopo do execution-worker. Dono: `test-engineer` ou
-  `backend-specialist`.
+  Dez mercados já têm os 32 dias pedidos (desde 2026-08-08 03:32Z); o **BTC** — que
+  é o mercado de **referência** de todo β — parou em 14 (desde 2026-08-26 04:32Z),
+  ao lado de ARB, DASH, NEAR e UNI. O restante nem começou.
+  **Cenário, medido, não hipotético:** o produtor horário de β roda e escreve
+  (1.800 revisões, 200 por corte, nove cortes de 04:00Z a 12:00Z), mas **199 de 200
+  revisões por corte saem `valid = false` com `reason = insufficient_history`**. A
+  única `valid = true` de cada corte é o **próprio BTCUSDT**, com `beta = 1.0000`,
+  `n = 0` e `contiguous_bars = 0` — a referência contra si mesma, que é β = 1 por
+  definição e não mede nada. Ou seja: **nenhum mercado tem β de verdade hoje**, o
+  Risk Engine não pode validar correlação, e a ponte recusa por `beta_unavailable`.
+  Um segundo efeito já visível: os replays históricos (T3.19b) cobriram **4
+  mercados** (ETH, SOL, XRP, DOGE) em vez do universo, porque são os únicos com
+  janela — ver [[EXP-0001-momentum-v1]] e [[EXP-0002-volume-anomaly-v1]].
+  **Causa provável:** a fila de backfill é global e ordenada do mais novo para o
+  mais antigo, então mercados que entraram na fila depois são servidos antes de o
+  mais importante terminar; não há prioridade para o mercado de referência.
+  **Sugestão (não implementada):** priorizar o `reference_market` do `beta_v1` na
+  fila e só então distribuir o resto. Dono: `exchange-integration-specialist` +
+  `quant-engineer` (T3.7b, seguimento). Sucede o bug "candles só 11 dias na VPS"
+  do plantão da madrugada, que estava com o número errado e foi fechado — ver
+  [[Resolved Bugs]].
+
+- **MEDIUM (deploy, ferramental) — `compose.sh update` não sobe serviço novo de
+  perfil (tenta *pull* antes do *build*), e o aviso do `migrate` é falso
+  positivo.** No primeiro `MARKET_SPOT=1 MARKET_SHARDS=4 bash infra/vps/compose.sh update`
+  com a T3.0f (`0451066`), o `market-worker-spot` **não subiu**: o compose tentou
+  **puxar** `hunter-api:<sha>` para o serviço novo do perfil antes de a imagem ser
+  construída ("pull access denied"), enquanto os demais serviços subiram.
+  `bash infra/vps/compose.sh up market-worker-spot` em seguida resolveu.
+  **Cenário:** um deploy que "termina bem" deixa um serviço novo de perfil parado
+  sem que ninguém veja — e nesse caso o serviço parado era o coletor spot, isto é,
+  o lado da **execução** da carteira paper. Segundo achado no mesmo comando: o
+  aviso `ERRO: migrate nao subiu` para um contêiner de execução única que saiu com
+  `exit 0` é **falso positivo** — `migrate` é job, não serviço; o script tem de
+  checar o código de saída, não a presença do contêiner. **Correção proposta:**
+  `build` antes do `up` quando há perfis (ou `up --build` com `--pull never` para
+  imagens locais), e tratar `migrate` pelo exit code. Registrado no adendo de
+  2026-09-08 do brief `.claude/state/brief-T3.15d-owner-dsn.md`. Dono:
+  `devops-engineer` (T3.15d).
 
 ## Abertos no plantão da manhã de 2026-09-07 (M3 ondas 3–4: T3.5, T3.13, T3.14, `0008`/`0009`)
 

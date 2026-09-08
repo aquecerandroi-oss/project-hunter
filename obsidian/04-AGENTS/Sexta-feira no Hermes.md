@@ -7,6 +7,19 @@ owner: sexta-feira
 
 # Sexta-feira no Hermes
 
+> [!decisao] A casa voltou ao Claude Code em 2026-09-08 (`c2ee96b`)
+> **O Hermes deixou de ser a casa da Sexta-feira.** Em 2026-09-08 o Everton decidiu que a
+> Sexta-feira volta a rodar como **agente do Claude Code** (`.claude/agents/sexta-feira.md`, com o
+> `.claude/settings.json` do projeto apontando para ela); o **perfil do Hermes continua existindo
+> como executor opcional, sem rotina** — ninguém abre plantão nele, e nada agenda tarefa por ele.
+> A mudança está em `docs/HERMES.md` e no commit `c2ee96b`.
+>
+> **Por que a página continua aqui:** ela registra a passagem de 2026-09-07/08 pelo Hermes (o motivo
+> foi a cota semanal da conta Claude estourada) e as **regras da casa** que nasceram lá e valem para
+> qualquer motor — um brief manda em quem o executa, `git` antes do relatório, um brief por tarefa.
+> O que está escrito abaixo descreve **aquele** período; leia como histórico, não como o arranjo de
+> hoje.
+
 > A Sexta-feira continua trabalhando neste repositório; o que muda é o motor onde
 > ela roda: de uma sessão do Claude Code para um **perfil do Hermes Agent** (Nous
 > Research). O papel, as regras e a memória são os mesmos. Runbook completo em

@@ -12,7 +12,7 @@ updated: 2026-09-08
 |---|---|---|---|---|
 | `v1` | `research_only` | `deprecated` | inconclusivo. | [[momentum-v1]] |
 | `v2` | `research_only` | `active` | inconclusivo. | [[momentum-v2]] |
-| `v3` | `paper` | `draft` | - | [[momentum-v3-paper]] |
+| `v3` | `paper` | `active` | inconclusivo. | [[momentum-v3-paper]] |
 
 ## Ligações
 
