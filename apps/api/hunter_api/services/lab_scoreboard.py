@@ -38,6 +38,8 @@ if TYPE_CHECKING:
 
     from hunter_api.repositories.lab_scoreboard import ScoreboardVersionMeta
     from hunter_api.repositories.lab_summary import OutcomeRow
+    from hunter_api.schemas.lab_replication import ReplicationBlockOut
+    from hunter_api.schemas.lab_scoreboard import ReplayBlockOut
 
 __all__ = ["build_scoreboard", "build_scoreboard_row"]
 
@@ -55,7 +57,12 @@ def _r_net_series(gate_rows: list[OutcomeRow]) -> list[Decimal]:
 
 
 def build_scoreboard_row(
-    meta: ScoreboardVersionMeta, rows: list[OutcomeRow], as_of: datetime
+    meta: ScoreboardVersionMeta,
+    rows: list[OutcomeRow],
+    as_of: datetime,
+    *,
+    replay: ReplayBlockOut | None = None,
+    replication: ReplicationBlockOut | None = None,
 ) -> ScoreboardRowOut:
     gate_rows = [r for r in rows if is_evaluable(r, as_of)]
     series = _r_net_series(gate_rows)
@@ -128,6 +135,8 @@ def build_scoreboard_row(
             mature=mature,
         ),
         verdict=verdict,
+        replay=replay,
+        replication=replication,
     )
 
 

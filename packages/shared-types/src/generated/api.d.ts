@@ -1062,6 +1062,66 @@ export interface components {
             qty: string;
         };
         /**
+         * BootstrapBlockOut
+         * @description Bloco 4 — REPLICATION.md §3.4. The i.i.d. interval's own fields sit at
+         *     the top level (matching ``to_jsonable()``'s flattening) with the
+         *     day-cluster interval and the sign test nested beside it.
+         */
+        BootstrapBlockOut: {
+            /** Ci High */
+            ci_high: string | null;
+            /** Ci Low */
+            ci_low: string | null;
+            /** Confidence */
+            confidence: string;
+            day_cluster: components["schemas"]["BootstrapIntervalOut"];
+            /** Groups */
+            groups: number | null;
+            /** Mean */
+            mean: string | null;
+            /** Method */
+            method: string;
+            /** N */
+            n: number;
+            /** Passed */
+            passed: boolean | null;
+            /** Reason */
+            reason: string | null;
+            /** Refused Reason */
+            refused_reason: string | null;
+            /** Resamples */
+            resamples: number;
+            /** Seed */
+            seed: number;
+            sign_test: components["schemas"]["SignTestOut"];
+        };
+        /**
+         * BootstrapIntervalOut
+         * @description One ``BootstrapResult.to_jsonable()`` — i.i.d. or per-day-cluster.
+         */
+        BootstrapIntervalOut: {
+            /** Ci High */
+            ci_high: string | null;
+            /** Ci Low */
+            ci_low: string | null;
+            /** Confidence */
+            confidence: string;
+            /** Groups */
+            groups: number | null;
+            /** Mean */
+            mean: string | null;
+            /** Method */
+            method: string;
+            /** N */
+            n: number;
+            /** Refused Reason */
+            refused_reason: string | null;
+            /** Resamples */
+            resamples: number;
+            /** Seed */
+            seed: number;
+        };
+        /**
          * BrlDecompositionOut
          * @description The operational/exchange split — ``hunter_core.portfolio.attribution``.
          *
@@ -1660,6 +1720,33 @@ export interface components {
             symbol: string;
             /** Volume 24H */
             volume_24h?: string | null;
+        };
+        /** MarketHalfOut */
+        MarketHalfOut: {
+            /** Evaluable */
+            evaluable: number;
+            /** Expectancy R */
+            expectancy_r: string | null;
+            /** Half */
+            half: string;
+            /** Markets */
+            markets: number;
+            /** Mature */
+            mature: boolean;
+            /** Reason */
+            reason: string | null;
+        };
+        /**
+         * MarketHalvesBlockOut
+         * @description Bloco 3 — REPLICATION.md §3.3.
+         */
+        MarketHalvesBlockOut: {
+            a: components["schemas"]["MarketHalfOut"];
+            b: components["schemas"]["MarketHalfOut"];
+            /** Passed */
+            passed: boolean | null;
+            /** Reason */
+            reason: string | null;
         };
         /**
          * MarketListPage
@@ -2359,6 +2446,36 @@ export interface components {
             name: string;
         };
         /**
+         * OutOfSampleBlockOut
+         * @description Bloco 1 — REPLICATION.md §3.1. Always ``prospective`` (D15).
+         */
+        OutOfSampleBlockOut: {
+            /** Days */
+            days: number;
+            /** Evaluable */
+            evaluable: number;
+            /** Expectancy R */
+            expectancy_r: string | null;
+            /** Losses */
+            losses: number;
+            /** Markets */
+            markets: number;
+            /** Mature */
+            mature: boolean;
+            /** Passed */
+            passed: boolean | null;
+            /** Profit Factor */
+            profit_factor: string | null;
+            /** Profit Factor Reason */
+            profit_factor_reason: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Sum R */
+            sum_r: string | null;
+            /** Wins */
+            wins: number;
+        };
+        /**
          * OutcomeResult
          * @description ``outcome_result`` — DATABASE.md §6 (signal_outcomes.result).
          * @enum {string}
@@ -2808,6 +2925,37 @@ export interface components {
          * @enum {string}
          */
         RegimeScope: "global" | "btc";
+        /**
+         * ReplayBlockOut
+         * @description The D14 "mass vs. evidence" pair for one version's replay cohorts,
+         *     kept apart from the prospective block on purpose (D15): a replay may be
+         *     positive while the prospective verdict is negative, or vice-versa, and
+         *     neither number is allowed to leak into the other.
+         */
+        ReplayBlockOut: {
+            /** Decisions Simulated */
+            decisions_simulated: number;
+            /** Distinct Days */
+            distinct_days: number;
+            /** Distinct Markets */
+            distinct_markets: number;
+            expectancy_r: components["schemas"]["NullableMetric"];
+            /**
+             * Label
+             * @default replay — não conta para o veredito
+             */
+            label: string;
+            net_profit_rate: components["schemas"]["RateWithCountsOut"];
+            /** Operations Closed */
+            operations_closed: number;
+            profit_factor: components["schemas"]["ProfitFactorOut"];
+            /** Runs */
+            runs: number;
+            /** Window From */
+            window_from: string | null;
+            /** Window To */
+            window_to: string | null;
+        };
         /** ReplayRunDetailOut */
         ReplayRunDetailOut: {
             /** Population By State */
@@ -2932,6 +3080,46 @@ export interface components {
             window_to: string;
             /** Workers */
             workers: number;
+        };
+        /**
+         * ReplicationBlockOut
+         * @description The whole ``replication`` block — REPLICATION.md §6.
+         */
+        ReplicationBlockOut: {
+            bootstrap: components["schemas"]["BootstrapBlockOut"];
+            market_halves: components["schemas"]["MarketHalvesBlockOut"];
+            out_of_sample: components["schemas"]["OutOfSampleBlockOut"];
+            parent: components["schemas"]["ReplicationParentOut"];
+            /** Promising At */
+            promising_at: string | null;
+            /** Reason */
+            reason: string | null;
+            siblings: components["schemas"]["SiblingsBlockOut"];
+            /** Status */
+            status: string;
+        };
+        /** ReplicationParentOut */
+        ReplicationParentOut: {
+            /** Days */
+            days: number;
+            /** Evaluable */
+            evaluable: number;
+            /** Expectancy R */
+            expectancy_r: string | null;
+            /** Losses */
+            losses: number;
+            /** Markets */
+            markets: number;
+            /** Profit Factor */
+            profit_factor: string | null;
+            /** Profit Factor Reason */
+            profit_factor_reason: string | null;
+            /** Sum R */
+            sum_r: string | null;
+            /** Verdict */
+            verdict: string;
+            /** Wins */
+            wins: number;
         };
         /**
          * ResumeOut
@@ -3119,6 +3307,8 @@ export interface components {
             /** Pending */
             pending: number;
             profit_factor: components["schemas"]["ProfitFactorOut"];
+            replay: components["schemas"]["ReplayBlockOut"] | null;
+            replication: components["schemas"]["ReplicationBlockOut"] | null;
             sum_r: components["schemas"]["SumOfROut"];
             /** Verdict */
             verdict: string;
@@ -3166,6 +3356,74 @@ export interface components {
          * @enum {string}
          */
         ShadowTrackingState: "pending_entry" | "active" | "terminal" | "no_entry" | "censored";
+        /** SiblingArmOut */
+        SiblingArmOut: {
+            /** Days */
+            days: number;
+            /** Evaluable */
+            evaluable: number;
+            /** Evidence */
+            evidence: ("prospective" | "replay" | "mixed") | null;
+            /** Expectancy R */
+            expectancy_r: string | null;
+            /** K */
+            k: number;
+            /** Losses */
+            losses: number;
+            /** Markets */
+            markets: number;
+            /** Mature */
+            mature: boolean;
+            /** Positive */
+            positive: boolean;
+            /** Profit Factor */
+            profit_factor: string | null;
+            /** Profit Factor Reason */
+            profit_factor_reason: string | null;
+            /** Sum R */
+            sum_r: string | null;
+            /** Version */
+            version: string;
+            /** Wins */
+            wins: number;
+        };
+        /**
+         * SiblingsBlockOut
+         * @description Bloco 2 — REPLICATION.md §3.2.
+         */
+        SiblingsBlockOut: {
+            /** Arms */
+            arms: components["schemas"]["SiblingArmOut"][];
+            /** Expected */
+            expected: number;
+            /** Mature */
+            mature: number;
+            /** N */
+            n: number;
+            /** Passed */
+            passed: boolean | null;
+            /** Positive */
+            positive: number;
+            /** Reason */
+            reason: string | null;
+            /** Required */
+            required: number;
+        };
+        /** SignTestOut */
+        SignTestOut: {
+            /** Method */
+            method: string;
+            /** Negatives */
+            negatives: number;
+            /** P Sign */
+            p_sign: string | null;
+            /** Positives */
+            positives: number;
+            /** Refused Reason */
+            refused_reason: string | null;
+            /** Zeros */
+            zeros: number;
+        };
         /**
          * SignalCountsOut
          * @description Emitted signals per cohort family (DATABASE.md §24.1).
@@ -3780,6 +4038,7 @@ export interface operations {
             query: {
                 version_id: string;
                 as_of?: string | null;
+                cohort?: string;
             };
             header?: never;
             path?: never;

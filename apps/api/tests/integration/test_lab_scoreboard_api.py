@@ -524,7 +524,7 @@ async def test_curve_returns_503_when_postgres_is_unreachable(
     make_actor: Callable[[str], Actor],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _boom(self: object, _version_id: object, _as_of: object) -> None:
+    async def _boom(self: object, _version_id: object, _as_of: object, **_kwargs: object) -> None:
         raise OperationalError("SELECT 1", {}, Exception("connection refused"))
 
     monkeypatch.setattr(lab_scoreboard_repo.LabScoreboardRepository, "rows_for", _boom)

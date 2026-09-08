@@ -152,3 +152,130 @@ registrada em `notes-T3.17b.md` item 8) -- não consegui abrir `/ever/lab` de fa
 673 testes de componente/página com fixtures no formato real do contrato (`ScoreboardRowOut`/
 `CurveOut`), incluindo um DOM renderizado real capturado via Testing Library (colado no relatório
 final para o `product-designer`/Everton revisar antes de qualquer merge).
+
+---
+
+## T3.18b — dois blocos por versão (replay, replication), curva por coorte (D14/D15)
+
+Base: `main` em `96cb101`. **Nada commitado.** Caminhos tocados (só os meus, `apps/api/**` e
+`packages/shared-types/src/generated/api.d.ts`):
+`apps/api/hunter_api/{repositories,services,schemas,routers}/lab_scoreboard.py` (editados),
+`apps/api/hunter_api/{repositories,services,schemas}/lab_replication.py` (novos),
+`apps/api/hunter_api/services/lab_scoreboard_replay.py` (novo), `apps/api/pyproject.toml`
+(dependência nova `hunter-indicators`), `uv.lock` (efeito colateral obrigatório de `uv sync` — só
+duas linhas, a entrada da dependência nova), `apps/api/tests/unit/test_lab_replication.py`,
+`apps/api/tests/unit/test_lab_scoreboard_replay.py` (novos),
+`apps/api/tests/integration/test_lab_scoreboard_replay_api.py`,
+`apps/api/tests/integration/test_lab_replication_scoreboard_api.py`,
+`apps/api/tests/integration/test_lab_curve_cohort_api.py` (novos),
+`apps/api/tests/integration/test_lab_scoreboard_api.py` (uma linha: o monkeypatch de `rows_for` no
+teste do 503 precisou aceitar kwargs extras depois que o método ganhou o parâmetro `cohort`),
+`packages/shared-types/src/generated/api.d.ts` (regenerado via `pnpm gen:types`; `openapi.json` não
+commitado — já está no `.gitignore`).
+
+### 1. ScoreboardRowOut.replay (item 1, D14/D15)
+
+Bloco novo e nulo quando não há evidência (`runs == 0` e zero linhas na coorte replay). Campos:
+`runs` (contagem de `run_id` distintos em `replay_runs`), `decisions_simulated` (soma de
+`bars_evaluated` — a métrica de massa do D14), `operations_closed` (avaliáveis pela mesma porta
+`is_evaluable()` do bloco prospectivo, sobre as coortes replay — a métrica de evidência),
+`expectancy_r`/`net_profit_rate`/`profit_factor` (as mesmas funções puras de
+`lab_summary_metrics.py`, nunca reimplementadas), `distinct_days`/`distinct_markets` (mesma
+definição "todo sinal emitido", não só os avaliáveis), `window_from`/`window_to` (min/max sobre os
+runs) e o rótulo fixo "replay — não conta para o veredito".
+
+`LabScoreboardRepository.rows_for` ganhou um parâmetro `cohort` opcional (default `prospective`,
+compatível com o comportamento antigo) com um terceiro valor além de um rótulo exato:
+`REPLAY_COHORT_WILDCARD = replay`, que vira `LIKE 'replay:%'` — a mesma função serve ao bloco
+replay do placar e à curva por coorte (item 3). `replay_runs_summary` é consulta nova (COUNT
+DISTINCT, SUM, MIN, MAX sobre `replay_runs`).
+
+Prova pedida no brief (versão com replay positivo e prospectivo negativo — o veredito nunca troca):
+`test_lab_scoreboard_replay_api.py::test_replay_positive_and_prospective_negative_never_swap_the_verdict`.
+Exemplo real da resposta no relatório final.
+
+### 2. ScoreboardRowOut.replication (item 2, D15) — adaptador, não reimplementação
+
+`apps/api/hunter_api/repositories/lab_replication.py` carrega as três populações que
+`hunter_indicators.replication.protocol.replication_report()` (pura, importada — `hunter-indicators`
+virou dependência declarada de `hunter-api`) precisa, e nada mais: nenhuma conta estatística foi
+copiada. Duas decisões deliberadas, ambas exigidas pelo D15 e ambas registradas no docstring do
+módulo:
+
+1. A população do pai é filtrada a cohort=prospective — `replication_stats.py` (do strategy-worker,
+   fora do meu caminho) não filtra coorte nenhuma, o que era inofensivo antes do motor de replay
+   existir sob o mesmo strategy_version_id do pai e deixaria de ser assim que uma versão puder ser
+   replayada (T3.19b). Sem esse filtro, o bloco 1, o parent.verdict e os blocos 3/4 vazariam replay
+   para dentro da régua — exatamente o que o D15(b) proíbe.
+2. As irmãs são reconhecidas só pelas colunas da 0012 (replication_parent_id/replication_index),
+   nunca pelo changelog — o banco de teste (e o real, hoje) já está pós-migração; o fallback de
+   regex do worker existe para irmãs anteriores à 0012, que este endpoint não precisa cobrir.
+
+D15(a), irmãs por replay: `sibling_population()` lê a coorte viva (replication:pai:k) E qualquer
+replay:uuid gravado sob o strategy_version_id da própria irmã, e rotula
+evidence: prospective|replay|mixed|null (null = zero resultados ainda) — carimbado no JSON de cada
+braço depois que `replication_report()` devolve o relatório, nunca dentro da conta estatística em si.
+
+Seed do bootstrap: lido de volta do changelog da primeira irmã (padrão `seed=(\d+)`, a mesma
+gramática de `sibling_changelog()`); sem irmãs (status none/promissora), uso uma semente
+determinística derivada dos 4 primeiros bytes do version_id — decisão minha, não do brief,
+documentada em `resolve_seed()` e aqui como CONCERN.
+
+Bloco nulo quando status == none (a versão nunca foi validada) — um cartão sem irmãs mas já
+promissora aparece (com siblings.reason == sem_irmas).
+
+Prova: três testes de integração (`test_lab_replication_scoreboard_api.py`) — nulo antes de validar,
+promissora sem irmãs, uma irmã real com evidence: prospective — mais 8 testes de unidade
+(`test_lab_replication.py`) cobrindo os quatro valores de evidence e o `resolve_seed`. Exemplo real
+da resposta no relatório final.
+
+### 3. GET /lab/shadow/curve?cohort=
+
+Aceita prospective (default), replay (coringa — todas as coortes replay: da versão numa linha só)
+ou uma coorte exata (`ShadowCohort.is_valid`: replay:uuid ou replication:pai:k); qualquer outra coisa
+é 422 invalid-cohort. Mesma `rows_for` do item 1, então a curva e o bloco replay do placar nunca
+podem discordar de população.
+
+### 4. pnpm gen:types
+
+`packages/shared-types/openapi.json` gerado e descartado (já ignorado pelo git);
+`packages/shared-types/src/generated/api.d.ts` regenerado — diff puramente aditivo (259 linhas, 0
+remoções): ReplayBlockOut, ReplicationBlockOut, SiblingArmOut e os campos novos em ScoreboardRowOut.
+
+### 5. Concerns
+
+1. **uv.lock mudou** (2 linhas, a entrada de hunter-indicators em hunter-api) — consequência
+   inevitável de declarar a dependência nova; fora de apps/api/** no sentido estrito do caminho, mas
+   é o arquivo de lock de todo o workspace uv e não tem como declarar uma dependência sem tocá-lo.
+2. **infra/docker/Dockerfile.api** (não toquei, é infra/**) pode precisar copiar packages/indicators
+   para a imagem da API agora que hunter-api depende de hunter-indicators — sinalizando para o
+   devops-engineer/database-architect revisarem o build de container antes do deploy.
+3. **Uma irmã não ganha linha própria no placar.** `versions_with_signals` (T3.18, inalterado por
+   mim) só inclui versões com sinal sob coorte prospective; uma irmã emite sob replication:pai:k,
+   nunca prospective, então ela nunca aparece como cartão — só dentro do bloco replication do pai
+   (siblings.arms). Documentado no teste (`test_one_sibling_cohort_shows_up_with_its_evidence_label`);
+   mudar `versions_with_signals` para incluir irmãs como cartões próprios é decisão de escopo maior,
+   fora deste brief.
+4. **resolve_seed()'s fallback determinístico** (sem irmãs registradas) não veio do brief — é meu,
+   documentado no código e aqui.
+5. **Um round de replicação com menos de 10 irmãs pode refutar cedo** por maioria_impossivel mesmo
+   com zero negativas (visto no exemplo real capturado com 1 irmã: total - mature_negative <
+   required já é verdade com total=1). É o comportamento correto da função pura do quant sobre uma
+   população de teste deliberadamente pequena — não é bug, é a aritmética do protocolo.
+6. **Blocos 3/4 (metades de mercado, bootstrap) do replication sempre rodam sobre a população
+   prospective do pai**, nunca sobre uma população de replay do pai — o D15 (item 5) permite a
+   segunda leitura ("se a população do pai for replay, os dois blocos herdam a mesma etiqueta"), mas
+   isso não foi implementado aqui: escopo deliberadamente reduzido (o brief não pediu explicitamente
+   essa variante, e ela exigiria decidir uma segunda fonte de dados e um segundo par de blocos no
+   payload). Fica para quem quiser essa leitura extra.
+7. **Item (c) do D15** ("o mesmo replay rode para o pai na mesma janela, para a comparação ser
+   justa") é regra operacional de quem roda um replay, não algo que o endpoint verifica
+   automaticamente — o placar expõe os dois blocos (replay do pai e replication.siblings das irmãs)
+   lado a lado para essa comparação ser feita visualmente; não inventei uma checagem cruzada de
+   janelas que o brief não pediu.
+8. **infra/scripts/check_file_size.py reporta 1 arquivo fora do orçamento**
+   (services/market-worker/hunter_market_worker/recovery_queries.py, 413 linhas) — não é meu, é
+   services/** (fora do meu escopo), provavelmente trabalho em voo de outro agente.
+9. **pyright do repo inteiro não rodei** (só apps/api, que está limpo: 0 erros); o repo tem histórico
+   de erros em services/execution-worker/** de outros agentes (visto em notas de tarefas anteriores)
+   que não são meus e não verifiquei se ainda estão lá.
