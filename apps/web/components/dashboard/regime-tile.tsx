@@ -1,9 +1,9 @@
+import { BrasiliaInstant } from "@/components/time/brasilia-instant";
 import { Badge } from "@/components/ui/badge";
 import { isApiError } from "@/lib/api-error";
 import { getCurrentRegime } from "@/lib/api/regime";
 import { REGIME_SCOPE_LABELS } from "@/lib/api/regime-types";
 import type { RegimeOut } from "@/lib/api/regime-types";
-import { formatUtc } from "@/lib/format";
 import { logger } from "@/lib/logger";
 
 export type RegimeTileLoad = { ok: true; items: RegimeOut[]; asOf: string } | { ok: false };
@@ -32,7 +32,9 @@ export function RegimeTile({ result }: { result: RegimeTileLoad }) {
       {!result.ok ? (
         <p className="mt-1 text-sm text-fg-muted">sem verificação</p>
       ) : result.items.length === 0 ? (
-        <p className="mt-1 text-sm text-fg-muted">0 regimes classificados · verificado {formatUtc(result.asOf)}</p>
+        <p className="mt-1 text-sm text-fg-muted">
+          0 regimes classificados · verificado <BrasiliaInstant iso={result.asOf} />
+        </p>
       ) : (
         <div className="mt-1 flex flex-col gap-1">
           {result.items.map((item) => (
@@ -42,7 +44,9 @@ export function RegimeTile({ result }: { result: RegimeTileLoad }) {
               {item.is_stale && <Badge variant="warning">stale</Badge>}
             </div>
           ))}
-          <p className="mt-1 text-[11px] text-fg-subtle">verificado {formatUtc(result.asOf)}</p>
+          <p className="mt-1 text-[11px] text-fg-subtle">
+            verificado <BrasiliaInstant iso={result.asOf} />
+          </p>
         </div>
       )}
     </section>

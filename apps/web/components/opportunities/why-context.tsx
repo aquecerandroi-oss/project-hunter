@@ -1,8 +1,8 @@
 import { AnomalyStatusChip } from "@/components/anomalies/anomaly-status-chip";
 import { EvaluationStateChip } from "@/components/anomalies/evaluation-state-chip";
+import { BrasiliaInstant } from "@/components/time/brasilia-instant";
 import type { OpportunityDetailOut } from "@/lib/api/opportunities-types";
 import type { RegimeOut } from "@/lib/api/regime-types";
-import { formatUtc } from "@/lib/format";
 
 /**
  * "Anomalias ativas ligadas" + regime, in one section (brief line 10). The
@@ -49,7 +49,9 @@ export function WhyContext({ detail, currentRegime }: { detail: OpportunityDetai
               <span className="text-xs text-fg-muted">escopo {currentRegime.scope}</span>
               {currentRegime.is_stale && <span className="text-xs text-warning">stale</span>}
             </div>
-            <span className="text-xs text-fg-muted">desde {formatUtc(currentRegime.start_time)}</span>
+            <span className="text-xs text-fg-muted">
+              desde <BrasiliaInstant iso={currentRegime.start_time} />
+            </span>
             {currentRegime.regime === "UNKNOWN" && Object.keys(currentRegime.supporting_features).length > 0 && (
               <p className="text-xs text-fg-muted">
                 Motivo: {JSON.stringify(currentRegime.supporting_features)}

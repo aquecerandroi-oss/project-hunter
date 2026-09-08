@@ -2,8 +2,9 @@ import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { signColorClass } from "@/components/portfolio/portfolio-format";
+import { BrasiliaInstant } from "@/components/time/brasilia-instant";
 import type { OrderRow, PortfolioTradeRow, PositionRow } from "@/lib/api/portfolio-types";
-import { formatPct, formatUsdt, formatUtc } from "@/lib/format";
+import { formatPct, formatUsdt } from "@/lib/format";
 
 /**
  * Positions/orders/trades (brief item 6): honestly empty today, `as_of`
@@ -20,7 +21,7 @@ import { formatPct, formatUsdt, formatUtc } from "@/lib/format";
 function AsOfNote({ asOf, count }: { asOf: string; count: number }) {
   return (
     <p className="text-xs text-fg-subtle">
-      {count} {count === 1 ? "linha" : "linhas"} · consultado em {formatUtc(asOf)}
+      {count} {count === 1 ? "linha" : "linhas"} · consultado em <BrasiliaInstant iso={asOf} />
     </p>
   );
 }
@@ -59,7 +60,7 @@ export function PositionsTable({ items, asOf }: PositionsTableProps) {
             <th className="py-1 pr-3">Stop</th>
             <th className="py-1 pr-3">PnL não realizado</th>
             <th className="py-1 pr-3">Status</th>
-            <th className="py-1 pr-3">Aberta em</th>
+            <th className="py-1 pr-3">Aberta em (Brasília)</th>
           </tr>
         </thead>
         <tbody>
@@ -74,7 +75,9 @@ export function PositionsTable({ items, asOf }: PositionsTableProps) {
               <td className="py-1 pr-3 font-mono tabular-nums">{p.stop_price !== null ? formatUsdt(p.stop_price) : "sem stop"}</td>
               <td className={`py-1 pr-3 font-mono tabular-nums ${signColorClass(p.unrealized_pnl)}`}>{formatUsdt(p.unrealized_pnl)}</td>
               <td className="py-1 pr-3">{p.status}</td>
-              <td className="py-1 pr-3">{formatUtc(p.opened_at)}</td>
+              <td className="py-1 pr-3">
+                <BrasiliaInstant iso={p.opened_at} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -102,7 +105,7 @@ export function OrdersTable({ items, asOf }: OrdersTableProps) {
             <th className="py-1 pr-3">Qtd</th>
             <th className="py-1 pr-3">Preço</th>
             <th className="py-1 pr-3">Preenchida</th>
-            <th className="py-1 pr-3">Criada em</th>
+            <th className="py-1 pr-3">Criada em (Brasília)</th>
           </tr>
         </thead>
         <tbody>
@@ -118,7 +121,9 @@ export function OrdersTable({ items, asOf }: OrdersTableProps) {
               <td className="py-1 pr-3 font-mono tabular-nums">{o.qty}</td>
               <td className="py-1 pr-3 font-mono tabular-nums">{o.price !== null ? formatUsdt(o.price) : "a mercado"}</td>
               <td className="py-1 pr-3 font-mono tabular-nums">{o.filled_qty}</td>
-              <td className="py-1 pr-3">{formatUtc(o.created_at)}</td>
+              <td className="py-1 pr-3">
+                <BrasiliaInstant iso={o.created_at} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -146,7 +151,7 @@ export function TradesTable({ items, asOf }: TradesTableProps) {
             <th className="py-1 pr-3">PnL</th>
             <th className="py-1 pr-3">PnL %</th>
             <th className="py-1 pr-3">Motivo de saída</th>
-            <th className="py-1 pr-3">Fechado em</th>
+            <th className="py-1 pr-3">Fechado em (Brasília)</th>
           </tr>
         </thead>
         <tbody>
@@ -162,7 +167,9 @@ export function TradesTable({ items, asOf }: TradesTableProps) {
               <td className={`py-1 pr-3 font-mono tabular-nums ${signColorClass(t.pnl)}`}>{formatUsdt(t.pnl)}</td>
               <td className="py-1 pr-3 font-mono tabular-nums">{t.pnl_pct !== null ? formatPct(t.pnl_pct) : "indisponível"}</td>
               <td className="py-1 pr-3">{t.exit_reason ?? "--"}</td>
-              <td className="py-1 pr-3">{formatUtc(t.closed_at)}</td>
+              <td className="py-1 pr-3">
+                <BrasiliaInstant iso={t.closed_at} />
+              </td>
             </tr>
           ))}
         </tbody>

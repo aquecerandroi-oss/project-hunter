@@ -70,13 +70,13 @@ describe("signColorClass", () => {
   });
 });
 
-describe("formatWhenShort: one-line 'DD/MM HH:mm', always UTC (brief T3.17b item 3)", () => {
-  it("renders day/month + hour:minute from a real timestamp", () => {
-    expect(formatWhenShort("2026-09-08T05:05:05.123456Z")).toBe("08/09 05:05");
+describe("formatWhenShort: one-line 'DD/MM HH:mm', always Brasília (brief T3.17b item 3, timezone updated by brief T3.22)", () => {
+  it("renders day/month + hour:minute from a real timestamp, converted to Brasília (-03:00)", () => {
+    expect(formatWhenShort("2026-09-08T05:05:05.123456Z")).toBe("08/09 02:05");
   });
 
   it("pads a single-digit day/month/hour/minute", () => {
-    expect(formatWhenShort("2026-01-02T03:04:00Z")).toBe("02/01 03:04");
+    expect(formatWhenShort("2026-01-02T03:04:00Z")).toBe("02/01 00:04");
   });
 
   it("returns null (never a garbage string) for an invalid timestamp", () => {

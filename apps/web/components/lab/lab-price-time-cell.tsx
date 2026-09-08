@@ -17,7 +17,7 @@ export function LabPriceTimeCell({ price, ts }: LabPriceTimeCellProps) {
   return (
     <span className="flex flex-col items-end leading-tight">
       <span className="font-mono tabular-nums text-fg">{formatPrice(price)}</span>
-      <WhenCell iso={ts} suffix={false} className="font-mono text-[11px] tabular-nums text-fg-muted" />
+      <WhenCell iso={ts} className="font-mono text-[11px] tabular-nums text-fg-muted" />
     </span>
   );
 }

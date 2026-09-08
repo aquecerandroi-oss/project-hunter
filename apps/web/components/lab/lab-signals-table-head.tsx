@@ -15,7 +15,7 @@ export interface LabHeaderDef {
 export const LAB_MONEY_HEADERS: LabHeaderDef[] = [
   { label: "Estratégia" },
   { label: "Mercado" },
-  { label: "Quando", minWidthClass: "min-w-[110px]" },
+  { label: "Quando (Brasília)", minWidthClass: "min-w-[150px]" },
   { label: "Entrou", align: "right" },
   { label: "Saiu", align: "right" },
   { label: "Duração", align: "right" },

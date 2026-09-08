@@ -1,6 +1,6 @@
 "use client";
 
-import { createChart, LineSeries, type IChartApi, type ISeriesApi, type LineData, type Time, type UTCTimestamp } from "lightweight-charts";
+import { createChart, LineSeries, type IChartApi, type ISeriesApi, type LineData, type Time, type TickMarkType, type UTCTimestamp } from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { LabVerdictBadge } from "@/components/lab/lab-verdict-badge";
 import { rToUsdt, type MoneyRuler } from "@/components/lab/lab-money";
 import { verdictLineColorVar, type LabCurveSeriesInput } from "@/components/lab/lab-scoreboard";
 import { logger } from "@/lib/logger";
+import { formatBrasiliaTick, formatBrasiliaWithUtcTooltip } from "@/lib/time";
 
 export interface LabCurveChartProps {
   series: LabCurveSeriesInput[];
@@ -55,6 +56,21 @@ function chartLayoutOptions() {
   };
 }
 
+/**
+ * Brief T3.22 (2026-09-08): chart axis ticks and the crosshair label read in
+ * Brasília, never the viewer's browser timezone -- `time` is this chart's
+ * own `UTCTimestamp` (whole seconds since the UTC epoch), the same value
+ * `toUnix` produces below, so the cast to `number` is safe.
+ */
+function brasiliaTickMarkFormatter(time: Time, tickMarkType: TickMarkType): string {
+  return formatBrasiliaTick(time as number, tickMarkType);
+}
+
+/** The crosshair label shows both halves (brief item 6: "tooltip shows Brasília and UTC"). */
+function brasiliaCrosshairLabel(time: Time): string {
+  return formatBrasiliaWithUtcTooltip(new Date((time as number) * 1000).toISOString());
+}
+
 /** One line per version with resolved points, coloured by its own verdict (brief item 4: "same colours as the cards") -- a version with no resolved outcome yet draws no line at all, never a flat fabricated one. */
 function attachSeries(chart: IChartApi, series: LabCurveSeriesInput[], currency: ChartCurrency, ruler: MoneyRuler): Map<string, ISeriesApi<"Line">> {
   const map = new Map<string, ISeriesApi<"Line">>();
@@ -91,7 +107,8 @@ export function LabCurveChart({ series, ruler }: LabCurveChartProps) {
     try {
       chart = createChart(container, {
         height: CHART_HEIGHT,
-        timeScale: { timeVisible: true, secondsVisible: false },
+        timeScale: { timeVisible: true, secondsVisible: false, tickMarkFormatter: brasiliaTickMarkFormatter },
+        localization: { timeFormatter: brasiliaCrosshairLabel },
         ...chartLayoutOptions(),
       });
       seriesRefs.current = attachSeries(chart, series, currency, ruler);

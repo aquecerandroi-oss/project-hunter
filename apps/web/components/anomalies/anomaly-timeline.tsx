@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 
 import { AnomalyStatusChip } from "@/components/anomalies/anomaly-status-chip";
 import { EvaluationStateChip } from "@/components/anomalies/evaluation-state-chip";
+import { BrasiliaInstant } from "@/components/time/brasilia-instant";
 import { loadAnomalyTimelineAction } from "@/lib/api/anomalies-actions";
 import { DEFAULT_ANOMALY_WINDOW_HOURS } from "@/lib/api/anomalies-types";
 import type { AnomalyOut } from "@/lib/api/anomalies-types";
-import { formatUtc } from "@/lib/format";
 import { logger } from "@/lib/logger";
 
 type TimelineState =
@@ -69,7 +69,7 @@ export function AnomalyTimeline({ marketId }: { marketId: string }) {
   if (state.items.length === 0) {
     return (
       <p className="text-sm text-fg-muted">
-        Nenhuma anomalia nas últimas {DEFAULT_ANOMALY_WINDOW_HOURS}h · verificado {formatUtc(state.asOf)}
+        Nenhuma anomalia nas últimas {DEFAULT_ANOMALY_WINDOW_HOURS}h · verificado <BrasiliaInstant iso={state.asOf} />
       </p>
     );
   }
@@ -79,7 +79,7 @@ export function AnomalyTimeline({ marketId }: { marketId: string }) {
       <ul className="flex flex-col gap-2">
         {state.items.map((a) => (
           <li key={a.id} className="flex flex-wrap items-center gap-2 border-t border-border/60 py-1 text-sm first:border-0">
-            <span className="text-xs text-fg-subtle">{formatUtc(a.detected_at)}</span>
+            <BrasiliaInstant iso={a.detected_at} className="text-xs text-fg-subtle" />
             <span className="font-medium text-fg">{a.type}</span>
             <span className="font-mono text-xs tabular-nums text-fg-muted">severidade {a.severity}</span>
             <AnomalyStatusChip status={a.status} />
@@ -88,7 +88,7 @@ export function AnomalyTimeline({ marketId }: { marketId: string }) {
         ))}
       </ul>
       <p className="text-[11px] text-fg-subtle">
-        verificado {formatUtc(state.asOf)}
+        verificado <BrasiliaInstant iso={state.asOf} />
         {state.truncated && " · lista truncada — mais de 200 anomalias nas 24h"}
       </p>
     </div>

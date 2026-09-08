@@ -1,31 +1,27 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
-import { formatLocalOffset, formatUtc } from "@/lib/format";
+import { formatBrasiliaLong } from "@/lib/time";
 
 export interface LabAsOfProps {
   iso: string;
 }
 
 /**
- * UTC + local offset (docs/DESIGN.md joint decision #9), client-only for the
- * local half (H2, mirrors `components/markets/recent-trades.tsx`'s
- * `useTradeTimestampText`): the server container runs UTC, so computing the
- * runtime's own offset during SSR would bake in "+00:00" for every visitor
- * instead of their real timezone -- never a hydration mismatch (this file
- * has no server-rendered counterpart to diverge from), just wrong data if
- * done eagerly. `formatUtc` alone is deterministic everywhere and renders
- * immediately; the offset appends one render after mount.
+ * Full Brasília date+time (brief T3.22, 2026-09-08: every primary timestamp
+ * reads in the organization's own timezone, never UTC and never the
+ * viewer's browser timezone). The exact UTC instant stays one hover away in
+ * the `title` attribute -- the raw ISO string is already UTC and copyable
+ * as-is (CLAUDE.md: "Time is always UTC" in storage/API).
+ *
+ * Deterministic in any runtime timezone (SSR-safe): `Intl.DateTimeFormat`'s
+ * explicit `timeZone` option (`lib/time.ts`) resolves Brasília's own offset
+ * regardless of where this renders, so -- unlike the previous UTC +
+ * browser-local-offset version -- no client-only effect/mount step is
+ * needed to avoid baking in the wrong zone.
  */
 export function LabAsOf({ iso }: LabAsOfProps) {
-  const [local, setLocal] = useState<string | null>(null);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from the runtime's own timezone, an external system, once mounted (H2)
-    setLocal(formatLocalOffset(iso));
-  }, [iso]);
-
-  const utc = formatUtc(iso);
-  return <span className="font-mono tabular-nums">{local ? `${utc} (${local})` : utc}</span>;
+  const long = formatBrasiliaLong(iso) ?? "--";
+  return (
+    <span title={iso} className="font-mono tabular-nums">
+      {long}
+    </span>
+  );
 }

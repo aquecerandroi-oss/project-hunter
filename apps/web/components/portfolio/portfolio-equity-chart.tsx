@@ -9,6 +9,7 @@ import {
   type ISeriesMarkersPluginApi,
   type LineData,
   type SeriesMarker,
+  type TickMarkType,
   type Time,
   type UTCTimestamp,
   type WhitespaceData,
@@ -20,6 +21,7 @@ import { PortfolioAsOf } from "@/components/portfolio/portfolio-as-of";
 import { brlUnavailableLabel } from "@/components/portfolio/portfolio-format";
 import type { EquityCurvePoint } from "@/lib/api/portfolio-types";
 import { logger } from "@/lib/logger";
+import { formatBrasiliaTick, formatBrasiliaWithUtcTooltip } from "@/lib/time";
 
 export interface PortfolioEquityChartProps {
   points: EquityCurvePoint[];
@@ -75,6 +77,21 @@ function chartLayoutOptions() {
       horzLines: { color: cssVar("--color-border") },
     },
   };
+}
+
+/**
+ * Brief T3.22 (2026-09-08): chart axis ticks and the crosshair label read in
+ * Brasília, never the viewer's browser timezone -- `time` is this chart's
+ * own `UTCTimestamp` (whole seconds since the UTC epoch), the same value
+ * `toUnix` produces below, so the cast to `number` is safe.
+ */
+function brasiliaTickMarkFormatter(time: Time, tickMarkType: TickMarkType): string {
+  return formatBrasiliaTick(time as number, tickMarkType);
+}
+
+/** The crosshair label shows both halves (brief item 6: "tooltip shows Brasília and UTC"). */
+function brasiliaCrosshairLabel(time: Time): string {
+  return formatBrasiliaWithUtcTooltip(new Date((time as number) * 1000).toISOString());
 }
 
 /**
@@ -139,7 +156,8 @@ export function PortfolioEquityChart({ points, asOf }: PortfolioEquityChartProps
     try {
       chart = createChart(container, {
         height: CHART_HEIGHT,
-        timeScale: { timeVisible: true, secondsVisible: false },
+        timeScale: { timeVisible: true, secondsVisible: false, tickMarkFormatter: brasiliaTickMarkFormatter },
+        localization: { timeFormatter: brasiliaCrosshairLabel },
         ...chartLayoutOptions(),
       });
       // The initial paint happens inside `attachSeries` (not only in the

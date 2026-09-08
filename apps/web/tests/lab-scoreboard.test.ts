@@ -96,9 +96,9 @@ describe("maturityBarText/maturityRatios: '37 de 100 resultados · 2 de 30 dias'
   });
 });
 
-describe("formatSince: 'desde DD/MM/AAAA', UTC only", () => {
-  it("formats a real activation timestamp", () => {
-    expect(formatSince("2026-09-06T02:08:13.332014Z")).toBe("desde 06/09/2026");
+describe("formatSince: 'desde DD/MM/AAAA', Brasília (brief T3.22)", () => {
+  it("formats a real activation timestamp, converted to Brasília (-03:00) -- 02:08 UTC is still 23:08 the PREVIOUS day in Brasília", () => {
+    expect(formatSince("2026-09-06T02:08:13.332014Z")).toBe("desde 05/09/2026");
   });
 
   it("reads a never-activated version honestly, instead of a blank or a fabricated date", () => {

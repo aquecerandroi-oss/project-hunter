@@ -1,10 +1,11 @@
 "use client";
 
-import { CandlestickSeries, createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
+import { CandlestickSeries, createChart, type IChartApi, type ISeriesApi, type TickMarkType, type Time, type UTCTimestamp } from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
 
 import type { Candle } from "@/lib/api/types";
 import { logger } from "@/lib/logger";
+import { formatBrasiliaTick, formatBrasiliaWithUtcTooltip } from "@/lib/time";
 
 export interface CandlesChartProps {
   candles: Candle[];
@@ -64,6 +65,21 @@ function layoutOptions() {
   };
 }
 
+/**
+ * Brief T3.22 (2026-09-08): chart axis ticks and the crosshair label read in
+ * Brasília, never the viewer's browser timezone -- `time` is this chart's
+ * own `UTCTimestamp` (whole seconds since the UTC epoch), the same value
+ * `toChartData` produces below, so the cast to `number` is safe.
+ */
+function brasiliaTickMarkFormatter(time: Time, tickMarkType: TickMarkType): string {
+  return formatBrasiliaTick(time as number, tickMarkType);
+}
+
+/** The crosshair label shows both halves (brief item 6: "tooltip shows Brasília and UTC"). */
+function brasiliaCrosshairLabel(time: Time): string {
+  return formatBrasiliaWithUtcTooltip(new Date((time as number) * 1000).toISOString());
+}
+
 function seriesOptions() {
   // Green up / red down (joint decision #3): gold is reserved for brand,
   // primary action, active item and focus -- candles are the single biggest
@@ -110,7 +126,8 @@ export function CandlesChart({ candles }: CandlesChartProps) {
     try {
       chart = createChart(container, {
         height: CHART_HEIGHT,
-        timeScale: { timeVisible: true, secondsVisible: false },
+        timeScale: { timeVisible: true, secondsVisible: false, tickMarkFormatter: brasiliaTickMarkFormatter },
+        localization: { timeFormatter: brasiliaCrosshairLabel },
         ...layoutOptions(),
       });
       seriesRef.current = chart.addSeries(CandlestickSeries, seriesOptions());

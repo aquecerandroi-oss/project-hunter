@@ -1,7 +1,7 @@
+import { BrasiliaInstant } from "@/components/time/brasilia-instant";
 import { isApiError } from "@/lib/api-error";
 import { listAnomalies } from "@/lib/api/anomalies";
 import { MAX_ANOMALY_WINDOW_HOURS } from "@/lib/api/anomalies-types";
-import { formatUtc } from "@/lib/format";
 import { logger } from "@/lib/logger";
 
 export type AnomaliesTileLoad = { ok: true; count: number; atLeast: boolean; asOf: string } | { ok: false };
@@ -43,7 +43,9 @@ export function AnomaliesTile({ result }: { result: AnomaliesTileLoad }) {
       ) : (
         <>
           <p className="num mt-1 text-[28px] font-semibold text-fg">{result.atLeast ? `${result.count}+` : result.count}</p>
-          <p className="mt-1 text-[11px] text-fg-subtle">ativas, últimos {MAX_ANOMALY_WINDOW_HOURS / 24}d · verificado {formatUtc(result.asOf)}</p>
+          <p className="mt-1 text-[11px] text-fg-subtle">
+            ativas, últimos {MAX_ANOMALY_WINDOW_HOURS / 24}d · verificado <BrasiliaInstant iso={result.asOf} />
+          </p>
         </>
       )}
     </section>

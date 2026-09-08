@@ -56,7 +56,11 @@ describe("ExecutionPaperCard: honest nulls, never a fabricated 0 (T3.8c)", () =>
     expect(screen.getByText("Autonomia: desligada")).toBeInTheDocument();
     expect(screen.getByText("ATIVO")).toBeInTheDocument();
     expect(screen.getByText(/há 5s/)).toBeInTheDocument(); // last_mtm age
-    expect(screen.getAllByText(/UTC/).length).toBeGreaterThan(0); // same UTC+offset time component as other screens
+    // Brief T3.22: the visible "as of" text is Brasília (SystemAsOf), the
+    // exact UTC instant lives one hover away in `title` -- never visible
+    // text anymore (that was the old UTC+offset time component).
+    const lastMtmIso = new Date(NOW.getTime() - 5_000).toISOString();
+    expect(screen.getByTitle(lastMtmIso)).toBeInTheDocument();
 
     vi.useRealTimers();
   });

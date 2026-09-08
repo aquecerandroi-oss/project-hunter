@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 afterEach(cleanup);
@@ -36,19 +36,19 @@ describe("RecentTrades: buy/sell is never colour-only (F8)", () => {
   });
 });
 
-describe("RecentTrades: timestamp renders UTC immediately, local offset only as a client-only enhancement (H2, T1.5b fix pass)", () => {
-  it("shows the UTC clock on the very first render, matching the ISO timestamp's own UTC components", () => {
+describe("RecentTrades: timestamp renders Brasília immediately, deterministic regardless of runtime timezone (brief T3.22)", () => {
+  it("shows the Brasília clock on the very first render, converted from the ISO timestamp's UTC instant (-03:00)", () => {
     render(<RecentTrades trades={[makeTrade({ ts: "2026-09-05T14:32:10.000Z" })]} hotStateOk />);
-    // A naive split (UTC in one span, local time computed synchronously in
-    // the same render) is exactly the bug: the server and the browser can
-    // disagree on "local", but never on this UTC part -- it must be present
-    // immediately, not only after some client-only effect runs.
-    expect(screen.getByText(/14:32:10 UTC/)).toBeInTheDocument();
+    // No client-only effect is needed anymore (unlike the old UTC +
+    // browser-local-offset version): Brasília is a fixed, explicit
+    // `Intl.DateTimeFormat` timeZone, so the exact same text renders on the
+    // server and the browser without a second render.
+    expect(screen.getByText("05/09/2026 11:32:10")).toBeInTheDocument();
   });
 
-  it("adds the local offset in parentheses once mounted, without ever losing the UTC part", async () => {
+  it("carries the exact UTC instant in the title attribute, copyable as-is", () => {
     render(<RecentTrades trades={[makeTrade({ ts: "2026-09-05T14:32:10.000Z" })]} hotStateOk />);
-    await waitFor(() => expect(screen.getByText(/14:32:10 UTC \(\d{2}:\d{2}:\d{2} [+-]\d{2}:\d{2}\)/)).toBeInTheDocument());
+    expect(screen.getByText("05/09/2026 11:32:10")).toHaveAttribute("title", "2026-09-05T14:32:10.000Z");
   });
 });
 

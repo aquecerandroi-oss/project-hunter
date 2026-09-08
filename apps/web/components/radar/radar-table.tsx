@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { RadarEmpty } from "@/components/radar/radar-empty";
 import { RadarRow } from "@/components/radar/radar-row";
 import { RADAR_TABLE_HEADERS, RadarTableHead } from "@/components/radar/radar-table-head";
+import { BrasiliaInstant } from "@/components/time/brasilia-instant";
 import { Button } from "@/components/ui/button";
 import { useArrowKeyRowSelection } from "@/hooks/useArrowKeyRowSelection";
 import { useRowHeight } from "@/hooks/useDensity";
@@ -15,7 +16,6 @@ import { useRealtime } from "@/hooks/useRealtime";
 import { useVirtualizedRows } from "@/hooks/useVirtualizedRows";
 import type { AnomaliesAggregate } from "@/lib/api/anomalies-types";
 import type { RadarItemOut, RadarParams, RadarSortKey } from "@/lib/api/radar-types";
-import { formatUtc } from "@/lib/format";
 
 export interface RadarTableProps {
   orgSlug: string;
@@ -122,7 +122,8 @@ export function RadarTable({ orgSlug, initialItems, initialCursor, initialAsOf, 
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-fg-muted" title={RT_RADAR_NOTE}>
-        Painel consultado {formatUtc(asOf)} · anomalias verificadas {formatUtc(anomalies.asOf)} · uma linha por episódio de oportunidade, não por mercado.
+        Painel consultado <BrasiliaInstant iso={asOf} /> · anomalias verificadas <BrasiliaInstant iso={anomalies.asOf} /> · uma linha por episódio de
+        oportunidade, não por mercado.
       </p>
       <ReconcileErrorBanner reconcileError={reconcileError} />
       <div className="overflow-x-auto rounded-md border border-border">

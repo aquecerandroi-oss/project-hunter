@@ -4,6 +4,7 @@
  * `reason`, which must render as readable text, never as `0` or a mute dash).
  */
 
+import { formatBrasiliaShort } from "@/lib/time";
 import type { OutcomeResult } from "@/lib/api/lab-types";
 
 // Known reason codes across `NullableMetric.reason`, `ProfitFactorOut.reason`,
@@ -85,22 +86,19 @@ export const EXIT_REASON_LABEL: Record<OutcomeResult, string> = {
 };
 
 /**
- * "08/09 05:05" -- day/month + hour:minute, always UTC, built from `Date`'s
- * UTC getters rather than `Intl.DateTimeFormat` so the exact separator/order
- * never depends on a locale default (brief T3.17b item 3: the previous
- * `formatUtcWithOffset` output -- "05:05:05 UTC (02:05:05 -03:00)" -- had no
- * date at all and was long enough to wrap across four lines in the "Quando"
- * column; this is a fixed-width, one-line replacement). Returns `null` for
- * an invalid timestamp so a caller can fall back to "--".
+ * "08/09 02:05" -- day/month + hour:minute, always Brasília (brief T3.22,
+ * 2026-09-08: every primary timestamp reads in the organization's own
+ * timezone, never UTC and never the viewer's browser zone). A thin re-export
+ * of `lib/time.ts`'s `formatBrasiliaShort` kept under this name so every
+ * existing call site in the Lab (`WhenCell`, `lab-money.ts`'s
+ * `priceAndTime`) stays unchanged. Previously UTC-only (brief T3.17b item 3:
+ * "05:05:05 UTC (02:05:05 -03:00)" wrapped across four lines in the "Quando"
+ * column; the fixed-width one-line replacement is unchanged, only the
+ * timezone is). Returns `null` for an invalid timestamp so a caller can fall
+ * back to "--".
  */
 export function formatWhenShort(iso: string): string | null {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const hours = String(date.getUTCHours()).padStart(2, "0");
-  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-  return `${day}/${month} ${hours}:${minutes}`;
+  return formatBrasiliaShort(iso);
 }
 
 export interface DurationResult {

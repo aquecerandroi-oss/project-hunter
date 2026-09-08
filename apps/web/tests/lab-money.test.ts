@@ -100,9 +100,9 @@ describe("moneyForRow: pnl, notional and pct move (brief T3.17 item 2's declared
   });
 });
 
-describe("priceAndTime / saidaText: the plain-language 'Entrou'/'Saiu' text", () => {
-  it("joins price and the short one-line date/time (brief T3.17b item 3)", () => {
-    expect(priceAndTime("27460.0000000000", "2026-09-06T00:26:00Z")).toBe("27460.0000000000 · 06/09 00:26");
+describe("priceAndTime / saidaText: the plain-language 'Entrou'/'Saiu' text (Brasília timezone, brief T3.22)", () => {
+  it("joins price and the short one-line date/time, converted to Brasília (-03:00) -- 00:26 UTC is 21:26 the PREVIOUS day", () => {
+    expect(priceAndTime("27460.0000000000", "2026-09-06T00:26:00Z")).toBe("27460.0000000000 · 05/09 21:26");
   });
 
   it("returns '--' when the price is absent", () => {
@@ -111,7 +111,7 @@ describe("priceAndTime / saidaText: the plain-language 'Entrou'/'Saiu' text", ()
 
   it("saidaText shows the real exit AND its own motivo when one exists (brief T3.17b item 5)", () => {
     const row = makeSignal({ exit_price: "27100.0000000000", exit_ts: "2026-09-06T03:41:00Z", result: "stop" });
-    expect(saidaText(row)).toBe("27100.0000000000 · 06/09 03:41 · motivo: stop");
+    expect(saidaText(row)).toBe("27100.0000000000 · 06/09 00:41 · motivo: stop");
   });
 
   it("saidaText says 'não entrou: <motivo>' for a no_entry row", () => {

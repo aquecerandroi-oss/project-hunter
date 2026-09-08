@@ -1,43 +1,31 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
 import { formatWhenShort } from "@/components/lab/lab-format";
-import { formatLocalOffset } from "@/lib/format";
 
 export interface WhenCellProps {
   iso: string | null;
-  /**
-   * Appends " UTC" to the visible text -- the "Quando" column's own literal
-   * example (brief T3.17b item 3: "08/09 05:05 UTC"). Entry/exit cells pass
-   * `false` to save width (the row's own "Quando" cell already anchors the
-   * day; a bare "08/09 05:26" next to a price reads as its time, not a
-   * second, unrelated instant).
-   */
-  suffix?: boolean;
   className?: string;
 }
 
 /**
  * One-line date+time, fixed width so it never wraps (brief T3.17b item 3:
  * "05:05:05 UTC (02:05:05 -03:00)" -- the previous text -- had no date at
- * all and wrapped across four lines, so two different days looked
- * identical on screen). The full ISO instant and the local wall-clock time
- * both stay one hover away in a single `title` tooltip, computed
- * client-side after mount (H2, mirrors `LabAsOf`): the local half depends on
- * the *browser's* own timezone, so baking it in during SSR (a UTC container)
- * would show every visitor's own local time as `+00:00`.
+ * all and wrapped across four lines, so two different days looked identical
+ * on screen). Brief T3.22 (2026-09-08, Everton: "sou de sao paulo intao
+ * horario tem que ser de brasilia") made this Brasília, the organization's
+ * one display timezone, instead of UTC -- the "Quando" column header itself
+ * now says "Quando (Brasília)" once (`lab-signals-table-head.tsx`), so this
+ * cell no longer repeats a timezone suffix. The exact UTC instant stays one
+ * hover away in the `title` attribute: the raw ISO string is already UTC
+ * and copyable as-is (CLAUDE.md: "Time is always UTC" in storage/API), so no
+ * separate formatting is needed for that half.
+ *
+ * Deterministic in any runtime timezone (SSR-safe): `Intl.DateTimeFormat`'s
+ * explicit `timeZone` option (`lib/time.ts`) resolves Brasília's own offset
+ * regardless of where this renders, so -- unlike the previous UTC+
+ * browser-local-offset version -- no client-only effect is needed to avoid a
+ * hydration mismatch (H2 no longer applies once the display timezone is
+ * fixed rather than the browser's own).
  */
-export function WhenCell({ iso, suffix = true, className }: WhenCellProps) {
-  const [title, setTitle] = useState<string | undefined>(iso ?? undefined);
-
-  useEffect(() => {
-    if (iso === null) return;
-    const local = formatLocalOffset(iso);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from the runtime's own timezone, an external system, once mounted (H2)
-    setTitle(local ? `${iso} (local ${local})` : iso);
-  }, [iso]);
-
+export function WhenCell({ iso, className }: WhenCellProps) {
   const fallbackClass = className ?? "whitespace-nowrap font-mono tabular-nums";
   if (iso === null) return <span className={fallbackClass}>--</span>;
 
@@ -45,8 +33,8 @@ export function WhenCell({ iso, suffix = true, className }: WhenCellProps) {
   if (short === null) return <span className={fallbackClass}>--</span>;
 
   return (
-    <span title={title} className={fallbackClass}>
-      {suffix ? `${short} UTC` : short}
+    <span title={iso} className={fallbackClass}>
+      {short}
     </span>
   );
 }

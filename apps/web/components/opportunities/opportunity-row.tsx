@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { InPositionChip, RegimeChip, RiskBlockedChip, StageChip, StatusChip } from "@/components/radar/status-chip";
-import { formatUtc } from "@/lib/format";
+import { BrasiliaShort } from "@/components/time/brasilia-instant";
 import type { OpportunitySummaryOut } from "@/lib/api/opportunities-types";
 import { cn } from "@/lib/utils";
 
@@ -55,7 +55,7 @@ export function OpportunityRow({ id, orgSlug, row, rowHeight, selected = false, 
         <RegimeChip regime={row.regime} />
       </td>
       <td role="gridcell" className="hidden px-3 text-right font-mono text-xs tabular-nums text-fg-muted md:table-cell">
-        {formatUtc(row.last_updated_at)}
+        <BrasiliaShort iso={row.last_updated_at} />
       </td>
     </tr>
   );

@@ -10,6 +10,7 @@
 import { reasonLabel, formatR, formatDecimalOrReason, signColorClass } from "@/components/lab/lab-format";
 import { scoreboardMoney, type MoneyRuler } from "@/components/lab/lab-money";
 import { formatBrlSigned, formatPct, formatUsdtSigned } from "@/lib/format";
+import { formatBrasiliaDate } from "@/lib/time";
 import type { CurveOut, ScoreboardMaturityOut, ScoreboardRowOut } from "@/lib/api/lab-types";
 
 // --- Verdict vocabulary (brief item 5: "sempre ao lado da régua que a produziu") ---
@@ -101,15 +102,11 @@ export function scoreboardStatusLabel(status: string): string {
   return SCOREBOARD_STATUS_LABEL[status] ?? status;
 }
 
-/** "desde 08/09/2026"; a version never activated (e.g. still `draft`) reads "ainda não ativada" rather than a blank or a fabricated date. UTC getters only -- same determinism rule as `lab-format.ts`'s `formatWhenShort`. */
+/** "desde 08/09/2026"; a version never activated (e.g. still `draft`) reads "ainda não ativada" rather than a blank or a fabricated date. Brasília day (brief T3.22) -- same one-timezone rule as `lab-format.ts`'s `formatWhenShort`, via `lib/time.ts`'s `formatBrasiliaDate`. */
 export function formatSince(iso: string | null): string {
   if (iso === null) return "ainda não ativada";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "ainda não ativada";
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const year = date.getUTCFullYear();
-  return `desde ${day}/${month}/${year}`;
+  const date = formatBrasiliaDate(iso);
+  return date ? `desde ${date}` : "ainda não ativada";
 }
 
 // --- Empty-card reason (brief item 3: "empty card states say why -- no signals yet / all pending") ---

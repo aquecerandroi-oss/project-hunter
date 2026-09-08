@@ -11,7 +11,7 @@ import { formatPct } from "@/lib/format";
 const UNAVAILABLE_LABELS: Record<string, string> = {
   marks: "marcações de alguma posição aberta estão desatualizadas",
   market_identity: "identidade de mercado incompleta para uma posição ou reserva (ex.: β ainda não validado)",
-  daily_reference: "a referência do dia (abertura em America/Sao_Paulo) não pôde ser reconstruída -- perda diária não é mensurável agora",
+  daily_reference: "a referência do dia (abertura em Brasília) não pôde ser reconstruída -- perda diária não é mensurável agora",
   daily_decomposition: "decomposição diária (realizado, não realizado e custos) indisponível",
 };
 

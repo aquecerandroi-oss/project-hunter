@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { formatBrl, formatBrlSigned, formatCompact, formatLocalOffset, formatMoney, formatPct, formatUtc, formatUtcWithOffset } from "@/lib/format";
+import { formatBrl, formatBrlSigned, formatCompact, formatMoney, formatPct, formatUtc } from "@/lib/format";
 
 describe("formatMoney", () => {
   it("formats a numeric-string USD amount", () => {
@@ -92,24 +92,7 @@ describe("formatPct", () => {
   });
 });
 
-describe("formatUtcWithOffset: time is always UTC, with the local offset visible (no hover required)", () => {
-  it("shows the UTC clock matching the ISO timestamp's own UTC components", () => {
-    const iso = "2026-09-05T14:32:10.000Z";
-    const result = formatUtcWithOffset(iso);
-    expect(result).toContain("14:32:10 UTC");
-  });
-
-  it("always includes a visible, signed local offset in parentheses -- never only in a title attribute", () => {
-    const result = formatUtcWithOffset("2026-09-05T14:32:10.000Z");
-    expect(result).toMatch(/\(\d{2}:\d{2}:\d{2} [+-]\d{2}:\d{2}\)$/);
-  });
-
-  it("returns an honest placeholder for an invalid timestamp instead of 'Invalid Date'", () => {
-    expect(formatUtcWithOffset("not-a-timestamp")).toBe("--");
-  });
-});
-
-describe("formatUtc: the SSR-safe half of a timestamp, independent of the runtime's timezone (H2, T1.5b fix pass)", () => {
+describe("formatUtc: the SSR-safe half of a timestamp, independent of the runtime's timezone (H2, T1.5b fix pass) -- now the secondary/tooltip half since brief T3.22 made Brasília the primary text (see tests/time.test.ts)", () => {
   it("never calls Date#getTimezoneOffset -- only reads the UTC components of the ISO string", () => {
     // A regression here is exactly what caused the hydration mismatch: any
     // reliance on the runtime's own zone makes the output depend on WHERE
@@ -125,17 +108,6 @@ describe("formatUtc: the SSR-safe half of a timestamp, independent of the runtim
 
   it("returns an honest placeholder for an invalid timestamp", () => {
     expect(formatUtc("not-a-timestamp")).toBe("--");
-  });
-});
-
-describe("formatLocalOffset: the client-only enhancement half, never rendered during SSR", () => {
-  it("returns a signed local time distinct from the UTC clock", () => {
-    const result = formatLocalOffset("2026-09-05T14:32:10.000Z");
-    expect(result).toMatch(/^\d{2}:\d{2}:\d{2} [+-]\d{2}:\d{2}$/);
-  });
-
-  it("returns null (not '--') for an invalid timestamp, so a caller can safely fall back to formatUtc alone", () => {
-    expect(formatLocalOffset("not-a-timestamp")).toBeNull();
   });
 });
 

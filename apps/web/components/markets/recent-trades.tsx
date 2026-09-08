@@ -1,8 +1,4 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
-import { formatLocalOffset, formatUtc } from "@/lib/format";
+import { formatBrasiliaLong } from "@/lib/time";
 import type { RecentTrade } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
@@ -15,26 +11,6 @@ export interface RecentTradesProps {
 
 const SIDE_LABEL: Record<"buy" | "sell", string> = { buy: "Compra", sell: "Venda" };
 const SIDE_GLYPH: Record<"buy" | "sell", string> = { buy: "C", sell: "V" };
-
-/**
- * The local offset is a client-only enhancement (H2, T1.5b fix pass): the
- * server (often a UTC container) and the browser (often not) can compute a
- * different local time from the exact same ISO timestamp, so it must never
- * appear in the SSR'd markup -- only `formatUtc` (deterministic everywhere)
- * is safe there. `null` until the effect below runs once after mount; one
- * extra client-only render adds the offset, never a server/client mismatch.
- */
-function useTradeTimestampText(iso: string): string {
-  const [local, setLocal] = useState<string | null>(null);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from the runtime's own timezone, an external system, once mounted (H2)
-    setLocal(formatLocalOffset(iso));
-  }, [iso]);
-
-  const utc = formatUtc(iso);
-  return local ? `${utc} (${local})` : utc;
-}
 
 /** Most recent trade first (docs/plans/M1.md T1.5). Honest empty state when there is nothing yet, never a placeholder row -- and a distinct honest failure state (H3) when the read itself failed, never mistaken for "nothing yet". */
 export function RecentTrades({ trades, hotStateOk }: RecentTradesProps) {
@@ -56,10 +32,12 @@ export function RecentTrades({ trades, hotStateOk }: RecentTradesProps) {
 }
 
 function TradeItem({ trade }: { trade: RecentTrade }) {
-  // Hooks can't be called from inside `.map`'s callback directly -- this
-  // small subcomponent is what lets each row own its own client-only local
-  // offset without breaking the rules of hooks.
-  const timestampText = useTradeTimestampText(trade.ts);
+  // Brief T3.22 (2026-09-08): primary text is Brasília, deterministic in any
+  // runtime timezone (`lib/time.ts`'s explicit `timeZone` option) -- no
+  // client-only effect needed anymore, unlike the previous UTC +
+  // browser-local-offset version (H2 no longer applies once the display
+  // timezone is fixed rather than the browser's own).
+  const timestampText = formatBrasiliaLong(trade.ts) ?? "--";
 
   return (
     // Buy/sell distinguished by more than color alone (docs/DESIGN.md's
@@ -67,22 +45,24 @@ function TradeItem({ trade }: { trade: RecentTrade }) {
     // signed percentages already do) -- a colourblind or screen-reader
     // user gets the glyph/aria-label, not just green/red (T1.5 review F8).
     <li
-      // `flex-col` on narrow widths (the UTC+offset timestamp is long
-      // and unshrinkable) and `sm:flex-row` once there's room -- T1.5b
-      // Astra must-fix #7: this used to force everything onto one
-      // non-wrapping line, squeezing price/qty against the timestamp.
+      // `flex-col` on narrow widths (the timestamp is long and
+      // unshrinkable) and `sm:flex-row` once there's room -- T1.5b Astra
+      // must-fix #7: this used to force everything onto one non-wrapping
+      // line, squeezing price/qty against the timestamp.
       className="flex flex-col gap-x-2 gap-y-0.5 px-2 py-1 font-mono tabular-nums sm:flex-row sm:items-center sm:justify-between sm:py-0.5"
       aria-label={`${SIDE_LABEL[trade.side]} de ${trade.qty} a ${trade.price}, ${timestampText}`}
     >
       {/*
-       * Time is always UTC (CLAUDE.md) with the local offset shown next
-       * to it in visible text -- never only in a `title` attribute,
-       * which a touch or screen-reader user can't reach (T1.5b joint
-       * decision #9: "horários acessíveis sem hover"). UTC renders
-       * immediately (server-safe, H2); the local offset appears a moment
-       * later, once mounted client-side.
+       * Brasília, the organization's one display timezone (brief T3.22),
+       * shown in visible text -- never only in a `title` attribute, which a
+       * touch or screen-reader user can't reach (T1.5b joint decision #9:
+       * "horários acessíveis sem hover"). The exact UTC instant stays one
+       * hover away in `title`: the raw ISO string is already UTC and
+       * copyable as-is.
        */}
-      <span className="text-[11px] text-fg-subtle sm:shrink-0">{timestampText}</span>
+      <span title={trade.ts} className="text-[11px] text-fg-subtle sm:shrink-0">
+        {timestampText}
+      </span>
       <span className="flex items-center justify-between gap-2 sm:contents">
         <span className={cn("flex items-center gap-1", trade.side === "buy" ? "text-green" : "text-red")}>
           <span aria-hidden="true" className="text-[10px] font-semibold uppercase">

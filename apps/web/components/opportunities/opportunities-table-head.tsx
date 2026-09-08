@@ -13,7 +13,7 @@ export const OPPORTUNITIES_TABLE_HEADERS: OpportunitiesHeaderDef[] = [
   { label: "Status" },
   { label: "Estágio" },
   { label: "Regime" },
-  { label: "Atualizado", align: "right", secondary: true },
+  { label: "Atualizado (Brasília)", align: "right", secondary: true },
 ];
 
 export function OpportunitiesTableHead() {

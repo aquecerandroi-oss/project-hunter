@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 
+import { BrasiliaInstant } from "@/components/time/brasilia-instant";
 import { Button } from "@/components/ui/button";
 import { loadOpportunityDetailAction } from "@/lib/api/opportunities-actions";
 import { MAX_ENVELOPE_HISTORY_LIMIT } from "@/lib/api/opportunities-types";
 import type { OpportunityHistoryPointOut } from "@/lib/api/opportunities-types";
-import { formatUtc } from "@/lib/format";
 
 function toNumber(value: string): number {
   const parsed = Number(value);
@@ -85,7 +85,7 @@ export function WhyHistory({ opportunityId, orgId, history }: WhyHistoryProps) {
       <ul className="mt-2 flex max-h-48 flex-col gap-1 overflow-y-auto text-xs">
         {points.map((p) => (
           <li key={p.ts} className="flex flex-wrap items-center gap-2 border-t border-border/60 py-1 first:border-0">
-            <span className="text-fg-subtle">{formatUtc(p.ts)}</span>
+            <BrasiliaInstant iso={p.ts} className="text-fg-subtle" />
             <span className="font-mono tabular-nums text-fg">{p.score}</span>
             <span className="text-fg-muted">{p.status}</span>
             <span className="text-fg-muted">{p.stage}</span>

@@ -1,14 +1,18 @@
+import type { ReactNode } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { formatPctOrUnavailable, killSwitchBadgeVariant, killSwitchLabel } from "@/components/portfolio/portfolio-format";
+import { BrasiliaInstant } from "@/components/time/brasilia-instant";
 import type { KillSwitchDetail, PortfolioRiskState } from "@/lib/api/portfolio-types";
-import { formatUsdt, formatUtc } from "@/lib/format";
+import { formatUsdt } from "@/lib/format";
+import { BRASILIA_LABEL } from "@/lib/time";
 
 export interface PortfolioRiskCardProps {
   riskState: PortfolioRiskState;
   killSwitch: KillSwitchDetail;
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-2 border-b border-border py-1.5 last:border-b-0">
       <span className="text-xs text-fg-muted">{label}</span>
@@ -17,7 +21,7 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-const DAILY_REFERENCE_NOTE = "a referência do dia (abertura em America/Sao_Paulo) não pôde ser reconstruída ainda";
+const DAILY_REFERENCE_NOTE = "a referência do dia (abertura em Brasília) não pôde ser reconstruída ainda";
 
 /**
  * "Risco" (brief item 4): the São Paulo trading day, day-start equity, peak,
@@ -42,13 +46,13 @@ export function PortfolioRiskCard({ riskState, killSwitch }: PortfolioRiskCardPr
       <h3 className="text-sm font-semibold text-fg">Risco</h3>
 
       <div className="mt-2">
-        <Row label={`Dia (${riskState.trading_day_timezone})`} value={riskState.trading_day ?? "indisponível"} />
+        <Row label={`Dia (${BRASILIA_LABEL})`} value={riskState.trading_day ?? "indisponível"} />
         <Row
           label="Patrimônio no início do dia"
           value={riskState.equity_day_start !== null ? formatUsdt(riskState.equity_day_start) : `indisponível (${DAILY_REFERENCE_NOTE})`}
         />
         <Row label="Pico de patrimônio" value={formatUsdt(riskState.peak_equity)} />
-        <Row label="Pico observado em" value={formatUtc(riskState.peak_equity_observed_at)} />
+        <Row label="Pico observado em" value={<BrasiliaInstant iso={riskState.peak_equity_observed_at} />} />
         <Row label="Perda do dia" value={dailyLoss.text} />
         <Row label="Drawdown" value={drawdown.text} />
       </div>
@@ -89,7 +93,7 @@ export function PortfolioRiskCard({ riskState, killSwitch }: PortfolioRiskCardPr
           <details className="mt-3 text-xs text-fg-muted">
             <summary className="cursor-pointer text-fg">
               Última transição: {killSwitch.last_transition.from_state} → {killSwitch.last_transition.to_state} em{" "}
-              {formatUtc(killSwitch.last_transition.created_at)}
+              <BrasiliaInstant iso={killSwitch.last_transition.created_at} />
             </summary>
             <div className="mt-2 space-y-1">
               <p>Ator: {killSwitch.last_transition.actor_type}{killSwitch.last_transition.actor_id ? ` (${killSwitch.last_transition.actor_id})` : ""}</p>

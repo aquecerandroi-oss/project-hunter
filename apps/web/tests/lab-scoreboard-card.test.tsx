@@ -14,7 +14,9 @@ describe("LabScoreboardCard: identity, verdict, maturity bar, money and the rese
     expect(screen.getByText("momentum/v2")).toBeInTheDocument();
     expect(screen.getByText("paper")).toBeInTheDocument();
     expect(screen.getByText("ativa")).toBeInTheDocument();
-    expect(screen.getByText("desde 06/09/2026")).toBeInTheDocument();
+    // Brief T3.22: Brasília, not UTC -- the fixture's `activated_at` crosses
+    // midnight backward into the previous Brasília day.
+    expect(screen.getByText("desde 05/09/2026")).toBeInTheDocument();
   });
 
   it("shows the verdict as a dominant chip with the maturity bar next to it", () => {

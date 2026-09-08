@@ -1,9 +1,9 @@
 import Link from "next/link";
 
+import { BrasiliaInstant } from "@/components/time/brasilia-instant";
 import { Button } from "@/components/ui/button";
 import { isApiError } from "@/lib/api-error";
 import { listRadar } from "@/lib/api/radar";
-import { formatUtc } from "@/lib/format";
 import { logger } from "@/lib/logger";
 
 export type HotOpportunitiesTileLoad = { ok: true; count: number; atLeast: boolean; asOf: string } | { ok: false };
@@ -29,7 +29,9 @@ export function HotOpportunitiesTile({ orgSlug, result }: { orgSlug: string; res
       ) : (
         <>
           <p className="num mt-1 text-[28px] font-semibold text-fg">{result.atLeast ? `${result.count}+` : result.count}</p>
-          <p className="mt-1 text-[11px] text-fg-subtle">verificado {formatUtc(result.asOf)}</p>
+          <p className="mt-1 text-[11px] text-fg-subtle">
+            verificado <BrasiliaInstant iso={result.asOf} />
+          </p>
         </>
       )}
       <Button asChild variant="outline" size="sm" className="mt-3">

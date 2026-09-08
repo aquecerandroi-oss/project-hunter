@@ -18,7 +18,7 @@ export function LabExitCell({ row }: { row: SignalListItemOut }) {
       <span className="flex flex-col items-end leading-tight">
         <span className="font-mono tabular-nums text-fg">{formatPrice(row.exit_price)}</span>
         <span className="flex items-center gap-1 whitespace-nowrap text-[11px] text-fg-muted">
-          <WhenCell iso={row.exit_ts} suffix={false} className="font-mono tabular-nums" />
+          <WhenCell iso={row.exit_ts} className="font-mono tabular-nums" />
           <span>· {EXIT_REASON_LABEL[row.result]}</span>
         </span>
       </span>
