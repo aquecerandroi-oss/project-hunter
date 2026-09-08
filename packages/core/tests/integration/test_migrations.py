@@ -37,7 +37,7 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0011_strategy_activation_owner"
+HEAD_REVISION = "0012_replication"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -51,6 +51,7 @@ PAPER_ROLES_REVISION = "0007_paper_roles"
 PAPER_ROLES_2_REVISION = "0008_paper_roles_2"
 PAPER_GEOMETRY_REVISION = "0009_paper_geometry"
 STRATEGY_PURPOSE_REVISION = "0010_strategy_purpose"
+STRATEGY_ACTIVATION_OWNER_REVISION = "0011_strategy_activation_owner"
 
 _PENDING_PREDICATE = "dispatched_at IS NULL"
 """What makes an index a *pending* index, spelled out here rather than imported:
@@ -2063,6 +2064,10 @@ def test_0011_reverses_and_restores_0010s_grant(upgraded: str) -> None:
     exact state ``0010`` left survives an upgrade/downgrade/upgrade round trip.
     """
     config = alembic_config(upgraded)
+    # ``0012`` sits on top since T3.19c, so step down to ``0011`` first and make
+    # ``-1`` mean *this* revision again — the same shape the two ``0010`` tests
+    # above use for ``0011`` sitting on top of ``0010``.
+    command.downgrade(config, STRATEGY_ACTIVATION_OWNER_REVISION)
     command.downgrade(config, "-1")
     try:
         assert asyncio.run(_revision(upgraded)) == STRATEGY_PURPOSE_REVISION
@@ -2077,4 +2082,417 @@ def test_0011_reverses_and_restores_0010s_grant(upgraded: str) -> None:
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     held = asyncio.run(_table_privileges(upgraded, "hunter_worker", "strategy_versions"))
     assert held == {"SELECT"}, held
+    command.check(config)
+
+
+# --------------------------------------------------------------------------
+# 0012_replication — the replication cohort, the promising marker and a
+# sibling's lineage — DATABASE.md section 24
+# --------------------------------------------------------------------------
+
+REPLICATION_REVISION = "0012_replication"
+
+
+def _episode(url: str, *, cohort: str) -> uuid.UUID:
+    """One ``shadow_episodes`` row on ``cohort``, with its own version and market."""
+    version_id = _strategy_version(url, key=f"cohort-{uuid.uuid4().hex[:8]}")
+    episode_id = uuid7()
+
+    async def _insert() -> None:
+        engine = async_engine(url)
+        try:
+            async with engine.begin() as connection:
+                market_id = await _market(connection)
+                await connection.execute(
+                    text(
+                        "INSERT INTO shadow_episodes (id, strategy_version_id, market_id, "
+                        "cohort, episode_id, last_bar_close) VALUES (:id, :version, :market, "
+                        ":cohort, :episode, now())"
+                    ),
+                    {
+                        "id": episode_id,
+                        "version": version_id,
+                        "market": market_id,
+                        "cohort": cohort,
+                        "episode": uuid7(),
+                    },
+                )
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_insert())
+    return episode_id
+
+
+def _forget_episode(url: str, episode_id: uuid.UUID) -> None:
+    asyncio.run(_write(url, [("DELETE FROM shadow_episodes WHERE id = :id", {"id": episode_id})]))
+
+
+_SELF = object()
+"""Sentinel for :func:`_sibling`'s ``parent``: "the row this one is derived from"."""
+
+
+def _sibling(
+    url: str,
+    *,
+    parent_id: uuid.UUID,
+    index: int | None,
+    parent: object = _SELF,
+) -> uuid.UUID:
+    """A second version of ``parent_id``'s strategy, carrying a lineage.
+
+    ``parent`` defaults to ``parent_id``; passing it explicitly (including
+    ``None``) is how the half-a-lineage tests below write the shapes the CHECK
+    has to refuse.
+    """
+    version_id = uuid7()
+    named_parent = parent_id if parent is _SELF else parent
+    asyncio.run(
+        _write(
+            url,
+            [
+                (
+                    "INSERT INTO strategy_versions (id, strategy_id, version, status, "
+                    "replication_parent_id, replication_index) SELECT :id, strategy_id, "
+                    ":version, 'active', :parent, :index FROM strategy_versions WHERE id = :of",
+                    {
+                        "id": version_id,
+                        "version": f"v{uuid.uuid4().int % 9000 + 1000}",
+                        "parent": named_parent,
+                        "index": index,
+                        "of": parent_id,
+                    },
+                )
+            ],
+        )
+    )
+    return version_id
+
+
+def test_0012_and_the_domain_constant_agree_on_the_cohort_grammar() -> None:
+    """The CHECK and ``hunter_core.domain.enums.SHADOW_COHORT_PATTERN`` are one
+    grammar written twice — frozen in ``ddl/replication.py`` on purpose (the
+    database's contract must not follow a later edit to a Python constant), so
+    this is what keeps the copy honest.
+
+    It also proves the *shape* of the change: ``0002``'s two branches survive
+    inside ``0012``'s pattern character for character, which is the promise this
+    revision makes about every prospective and replay episode already stored.
+    """
+    from hunter_core.domain.enums import SHADOW_COHORT_PATTERN
+
+    ddl = migration_ddl("replication")
+    assert ddl.COHORT_PATTERN_0012 == SHADOW_COHORT_PATTERN
+    kept = ddl.COHORT_PATTERN_0002.removeprefix("^(").removesuffix(")$")
+    assert ddl.COHORT_PATTERN_0012.startswith(f"^({kept}|replication:")
+
+
+@pytest.mark.parametrize("arm", [1, 9, 10, 99])
+def test_0012_accepts_a_replication_arm(upgraded: str, arm: int) -> None:
+    parent = uuid7()
+    episode_id = _episode(upgraded, cohort=f"replication:{parent}:{arm}")
+    try:
+        stored = asyncio.run(
+            _scalars(
+                upgraded, "SELECT cohort FROM shadow_episodes WHERE id = :id", {"id": episode_id}
+            )
+        )
+        assert stored == [f"replication:{parent}:{arm}"]
+    finally:
+        _forget_episode(upgraded, episode_id)
+
+
+def test_0012_keeps_the_two_cohorts_0002_shipped(upgraded: str) -> None:
+    """A superset, never a replacement: the populations already on record keep
+    the exact labels ``0002_shadow_lab`` gave them."""
+    for cohort in ("prospective", f"replay:{uuid7()}"):
+        episode_id = _episode(upgraded, cohort=cohort)
+        try:
+            assert asyncio.run(
+                _scalars(
+                    upgraded,
+                    "SELECT cohort FROM shadow_episodes WHERE id = :id",
+                    {"id": episode_id},
+                )
+            ) == [cohort]
+        finally:
+            _forget_episode(upgraded, episode_id)
+
+
+@pytest.mark.parametrize(
+    "cohort",
+    [
+        "replication:{parent}:0",
+        "replication:{parent}:01",
+        "replication:{parent}:100",
+        "replication:{parent}",
+        "replication:{parent}:1x",
+        "replication:not-a-uuid:1",
+    ],
+)
+def test_0012_refuses_a_cohort_that_is_not_an_arm(upgraded: str, cohort: str) -> None:
+    """``:0`` is not an arm, ``:01`` is a second spelling of arm 1 — a second
+    population under a name the report already uses — and ``:100`` is past the
+    bound the pattern states."""
+    with pytest.raises(DBAPIError, match="cohort_format"):
+        _episode(upgraded, cohort=cohort.format(parent=uuid7()))
+
+
+def test_0012_adds_the_promising_marker_and_the_lineage(upgraded: str) -> None:
+    """Four nullable columns, no default: a version written before this revision
+    honestly has no marker and honestly is not a sibling (section 24)."""
+    for column in ("promising_at", "promising_by", "replication_parent_id", "replication_index"):
+        assert asyncio.run(_column_exists(upgraded, "strategy_versions", column)), column
+    version_id = _strategy_version(upgraded, key=f"replication-null-{uuid.uuid4().hex[:8]}")
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT count(*)::text FROM strategy_versions WHERE id = :id "
+            "AND promising_at IS NULL AND promising_by IS NULL "
+            "AND replication_parent_id IS NULL AND replication_index IS NULL",
+            {"id": version_id},
+        )
+    ) == ["1"]
+
+
+def test_0012_writes_a_whole_lineage(upgraded: str) -> None:
+    parent_id = _strategy_version(upgraded, key=f"replication-lineage-{uuid.uuid4().hex[:8]}")
+    sibling_id = _sibling(upgraded, parent_id=parent_id, index=7)
+    try:
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT replication_index::text FROM strategy_versions WHERE id = :id "
+                "AND replication_parent_id = :parent",
+                {"id": sibling_id, "parent": parent_id},
+            )
+        ) == ["7"]
+    finally:
+        _forget_draft_strategy_version(upgraded, parent_id)
+
+
+@pytest.mark.parametrize(
+    ("index", "parent_kind"),
+    [
+        (None, "parent"),  # a parent with no arm: indistinguishable from its siblings
+        (3, "none"),  # an arm with no parent: an experiment nobody can find again
+        (0, "parent"),  # 0 is not an arm
+        (100, "parent"),  # past the bound the cohort grammar can express
+        (1, "self"),  # a version is not its own sibling
+    ],
+)
+def test_0012_refuses_half_a_lineage(upgraded: str, index: int | None, parent_kind: str) -> None:
+    parent_id = _strategy_version(upgraded, key=f"replication-half-{uuid.uuid4().hex[:8]}")
+    try:
+        with pytest.raises(DBAPIError, match="replication_lineage"):
+            if parent_kind == "self":
+                asyncio.run(
+                    _write(
+                        upgraded,
+                        [
+                            (
+                                "UPDATE strategy_versions SET replication_parent_id = id, "
+                                "replication_index = :index WHERE id = :id",
+                                {"id": parent_id, "index": index},
+                            )
+                        ],
+                    )
+                )
+            else:
+                _sibling(
+                    upgraded,
+                    parent_id=parent_id,
+                    index=index,
+                    parent=parent_id if parent_kind == "parent" else None,
+                )
+    finally:
+        _forget_draft_strategy_version(upgraded, parent_id)
+
+
+@pytest.mark.parametrize(
+    ("promising_at", "promising_by"),
+    [
+        ("now()", "NULL"),  # a marker nobody can attribute is a date, not evidence
+        ("NULL", "'scoreboard'"),  # an attribution for a marker that does not exist
+        ("now()", "''"),  # the empty string attributes nothing (section 16.2)
+    ],
+)
+def test_0012_refuses_a_marker_nobody_attributed(
+    upgraded: str, promising_at: str, promising_by: str
+) -> None:
+    version_id = _strategy_version(upgraded, key=f"promising-half-{uuid.uuid4().hex[:8]}")
+    try:
+        with pytest.raises(DBAPIError, match="promising_is_attributed"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [
+                        (
+                            f"UPDATE strategy_versions SET promising_at = {promising_at}, "  # noqa: S608
+                            f"promising_by = {promising_by} WHERE id = :id",
+                            {"id": version_id},
+                        )
+                    ],
+                )
+            )
+    finally:
+        _forget_draft_strategy_version(upgraded, version_id)
+
+
+def test_0012_gives_an_arm_to_exactly_one_sibling(upgraded: str) -> None:
+    """``UNIQUE (replication_parent_id, replication_index)`` — and, because
+    Postgres treats NULLs as distinct, it costs nothing to every version that is
+    not a sibling."""
+    parent_id = _strategy_version(upgraded, key=f"replication-arm-{uuid.uuid4().hex[:8]}")
+    _sibling(upgraded, parent_id=parent_id, index=1)
+    try:
+        with pytest.raises(DBAPIError, match="uq_strategy_versions_replication_arm"):
+            _sibling(upgraded, parent_id=parent_id, index=1)
+        # two non-siblings coexist: the UNIQUE is about arms, not about rows
+        _strategy_version(upgraded, key=f"replication-arm-b-{uuid.uuid4().hex[:8]}")
+        _strategy_version(upgraded, key=f"replication-arm-c-{uuid.uuid4().hex[:8]}")
+    finally:
+        _forget_draft_strategy_version(upgraded, parent_id)
+
+
+def test_0012_freezes_the_lineage_but_leaves_the_marker_writable(upgraded: str) -> None:
+    """The two halves of section 24's freeze decision, on one activated row.
+
+    Re-pointing a sibling at another parent would silently re-attribute an
+    experiment whose signals are already on record, so the lineage joins the
+    frozen list. ``promising_at`` cannot join it: it is written *after*
+    activation by definition — a version has to run before it can be promising —
+    and freezing it would make the column unwritable on every row that could
+    ever earn one.
+    """
+    body = asyncio.run(_function_source(upgraded, "shadow_freeze_strategy_version"))
+    assert "NEW.replication_parent_id IS DISTINCT FROM OLD.replication_parent_id" in body
+    assert "NEW.replication_index IS DISTINCT FROM OLD.replication_index" in body
+    assert "NEW.promising_at" not in body, "the marker must stay writable after activation"
+    # 0010's and 0002's own columns are still there: this widens the trigger.
+    assert "NEW.purpose IS DISTINCT FROM OLD.purpose" in body
+    assert "NEW.code_ref IS DISTINCT FROM OLD.code_ref" in body
+
+    version_id = _strategy_version(
+        upgraded, key=f"replication-freeze-{uuid.uuid4().hex[:8]}", activated=True
+    )
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (
+                    "UPDATE strategy_versions SET promising_at = now(), "
+                    "promising_by = 'scoreboard:validada' WHERE id = :id",
+                    {"id": version_id},
+                )
+            ],
+        )
+    )
+    with pytest.raises(DBAPIError, match="frozen"):
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        "UPDATE strategy_versions SET replication_index = 2 WHERE id = :id",
+                        {"id": version_id},
+                    )
+                ],
+            )
+        )
+    # leave the shared database without a marker the downgrade guards would trip
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (
+                    "UPDATE strategy_versions SET promising_at = NULL, promising_by = NULL "
+                    "WHERE id = :id",
+                    {"id": version_id},
+                )
+            ],
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("offender", "expected"),
+    [
+        ("promising", "carry a promising_at"),
+        ("lineage", "carry a replication parent"),
+        ("cohort", "carry a replication cohort"),
+    ],
+)
+def test_0012_refuses_to_downgrade_while_a_replication_is_on_record(
+    upgraded: str, offender: str, expected: str
+) -> None:
+    """Reversing is allowed; losing the marker block 1 counts from, the lineage
+    that makes ten siblings one experiment, or an episode whose cohort ``0002``
+    cannot represent, is not (§17.7)."""
+    config = alembic_config(upgraded)
+    parent_id = _strategy_version(upgraded, key=f"replication-guard-{uuid.uuid4().hex[:8]}")
+    sibling_id: uuid.UUID | None = None
+    episode_id: uuid.UUID | None = None
+    if offender == "promising":
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        "UPDATE strategy_versions SET promising_at = now(), "
+                        "promising_by = 'scoreboard:validada' WHERE id = :id",
+                        {"id": parent_id},
+                    )
+                ],
+            )
+        )
+    elif offender == "lineage":
+        sibling_id = _sibling(upgraded, parent_id=parent_id, index=1)
+    else:
+        episode_id = _episode(upgraded, cohort=f"replication:{parent_id}:1")
+    try:
+        with pytest.raises(DBAPIError, match=expected):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        if episode_id is not None:
+            _forget_episode(upgraded, episode_id)
+        if sibling_id is not None:
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [("DELETE FROM strategy_versions WHERE id = :id", {"id": sibling_id})],
+                )
+            )
+        _forget_draft_strategy_version(upgraded, parent_id)
+
+
+def test_0012_reverses_on_a_populated_database_and_gives_0010s_trigger_back(
+    upgraded: str,
+) -> None:
+    """The round trip an operator runs to roll a deploy back: down one, up to
+    head, ``alembic check`` at the end — over rows that do **not** trip a guard.
+
+    Plus the half a column test cannot see: the downgrade puts back the trigger
+    ``0010`` describes instead of leaving ``0012``'s wider body naming columns
+    that no longer exist, and it narrows the cohort CHECK back to ``0002``'s two
+    branches rather than leaving the widened one behind.
+    """
+    config = alembic_config(upgraded)
+    _strategy_version(upgraded, key=f"replication-trip-{uuid.uuid4().hex[:8]}")
+    prospective = _episode(upgraded, cohort="prospective")
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == STRATEGY_ACTIVATION_OWNER_REVISION
+        for column in ("promising_at", "replication_parent_id"):
+            assert not asyncio.run(_column_exists(upgraded, "strategy_versions", column)), column
+        reverted = asyncio.run(_function_source(upgraded, "shadow_freeze_strategy_version"))
+        assert "replication_parent_id" not in reverted, "0012's wider body survived its downgrade"
+        assert "purpose" in reverted, "0010's trigger did not come back"
+        with pytest.raises(DBAPIError, match="cohort_format"):
+            _episode(upgraded, cohort=f"replication:{uuid7()}:1")
+    finally:
+        command.upgrade(config, "head")
+        _forget_episode(upgraded, prospective)
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     command.check(config)

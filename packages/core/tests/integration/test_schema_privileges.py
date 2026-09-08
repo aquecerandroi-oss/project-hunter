@@ -940,3 +940,104 @@ def test_0011_revoked_and_remaining_columns_partition_0010s_grant() -> None:
     granted_by_0010 = set(purpose_ddl.WORKER_COLUMNS_EXCEPT_PURPOSE)
     assert revoked | remaining == granted_by_0010
     assert revoked & remaining == set()
+
+
+# --------------------------------------------------------------------------
+# 0012_replication: the promising marker and a sibling's lineage, written by
+# nobody but the owner connection — DATABASE.md section 24
+# --------------------------------------------------------------------------
+
+_REPLICATION_COLUMNS = (
+    "promising_at",
+    "promising_by",
+    "replication_parent_id",
+    "replication_index",
+)
+
+
+async def test_both_roles_read_the_replication_columns(schema_engine: AsyncEngine) -> None:
+    """``0012`` adds no ``GRANT``: the table-level ``SELECT`` both roles have had
+    since ``0001`` covers a column added later, by construction."""
+    async with schema_engine.connect() as connection:
+        for role in ("hunter_app", "hunter_worker"):
+            for column in _REPLICATION_COLUMNS:
+                readable = await connection.scalar(
+                    text("SELECT has_column_privilege(:r, 'strategy_versions', :c, 'SELECT')"),
+                    {"r": role, "c": column},
+                )
+                assert readable, f"{role} cannot read strategy_versions.{column}"
+
+
+@pytest.mark.parametrize(
+    ("column", "value"),
+    [
+        ("promising_at", "now()"),
+        ("promising_by", "'scoreboard:validada'"),
+        ("replication_parent_id", "id"),
+        ("replication_index", "1"),
+    ],
+)
+async def test_the_worker_cannot_write_any_of_the_replication_columns(
+    worker_connection: AsyncConnection, column: str, value: str
+) -> None:
+    """The assertion ``0012`` makes instead of a ``REVOKE`` — measured as the role.
+
+    ``0010`` took back ``hunter_worker``'s table-level ``INSERT``/``UPDATE`` on
+    ``strategy_versions`` and re-granted twelve named columns; ``0011`` revoked
+    ``INSERT`` outright and ``UPDATE`` on seven of them. A column added *after*
+    both is therefore reachable by neither: there is no table-level write left
+    for it to inherit and no column grant naming it. Writing a no-op ``REVOKE``
+    in ``0012`` would have looked like the guarantee this test actually is
+    (§15.6's ``ALTER DEFAULT PRIVILEGES`` lesson).
+
+    The promising marker is written by
+    ``hunter_strategy_worker.replication.mark_promising`` on the owner
+    connection, exactly like ``purpose`` (§22.3, §23.2).
+    """
+    version_id = await _insert_strategy_version_as_owner(
+        worker_connection, key=f"replication-priv-{column}-{uuid.uuid4().hex[:8]}"
+    )
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await worker_connection.execute(
+            text(f"UPDATE strategy_versions SET {column} = {value} WHERE id = :id"),  # noqa: S608
+            {"id": version_id},
+        )
+    await worker_connection.rollback()
+
+
+async def test_the_owner_connection_writes_the_promising_marker(
+    schema_engine: AsyncEngine,
+) -> None:
+    """The other side of the revocation: the connection
+    ``infra/scripts/replicate_strategy_version.py`` actually uses can write it.
+
+    A revocation written against the wrong role would leave the protocol with
+    nobody able to record that a version became promising — the wall ``0007``
+    hit on ``portfolios`` (§19.2, item 1b), one table over.
+    """
+    strategy_id, version_id = uuid7(), uuid7()
+    async with schema_engine.connect() as connection:
+        await connection.begin()
+        await connection.execute(
+            text("INSERT INTO strategies (id, key, name) VALUES (:id, :key, :key)"),
+            {"id": strategy_id, "key": f"replication-owner-{uuid.uuid4().hex[:8]}"},
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO strategy_versions (id, strategy_id, version, status, activated_at) "
+                "VALUES (:id, :strategy, 'v1', 'active', now())"
+            ),
+            {"id": version_id, "strategy": strategy_id},
+        )
+        await connection.execute(
+            text(
+                "UPDATE strategy_versions SET promising_at = now(), "
+                "promising_by = 'scoreboard:validada' WHERE id = :id"
+            ),
+            {"id": version_id},
+        )
+        stored = await connection.scalar(
+            text("SELECT promising_by FROM strategy_versions WHERE id = :id"), {"id": version_id}
+        )
+        assert stored == "scoreboard:validada"
+        await connection.rollback()

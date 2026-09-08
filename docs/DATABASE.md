@@ -988,6 +988,7 @@ shadow_episodes
   UNIQUE (open_outcome_signal_id) WHERE open_outcome_signal_id IS NOT NULL
   INDEX  (market_id)             WHERE open_outcome_signal_id IS NOT NULL   -- tracking_hold
   CHECK  (cohort ~ prospective|replay:<uuid>)                -- ck_shadow_episodes_cohort_format
+         (a `0012_replication` acrescenta `replication:<pai>:<k>`, k 1..99 — §24.1)
   FK (open_outcome_signal_id) -> signal_outcomes (signal_id)
   FK (open_outcome_signal_id, strategy_version_id, market_id)
      -> agent_signals (id, strategy_version_id, market_id)   -- exige UNIQUE novo em agent_signals
@@ -1011,9 +1012,11 @@ item do aceite S0 "sem acompanhamentos `pending_entry|active` órfãos" está,
 portanto, **parcialmente** coberto por DDL.
 
 Um acompanhamento por (versão, mercado, coorte); replay nunca ocupa o bloqueio
-do prospectivo. `cohort` é texto e não `ENUM` porque um replay carrega o seu
-`run_id` — o conjunto é aberto em valor e fechado em forma, e a mesma regex vive
-em `hunter_core.domain.enums.SHADOW_COHORT_PATTERN` e no CHECK. `armed` nasce
+do prospectivo, e desde a `0012_replication` (§24.1) uma irmã de replicação
+também não. `cohort` é texto e não `ENUM` porque um replay carrega o seu
+`run_id` e uma irmã carrega o id do pai — o conjunto é aberto em valor e fechado
+em forma, e a mesma regex vive em `hunter_core.domain.enums.SHADOW_COHORT_PATTERN`
+e no CHECK. `armed` nasce
 `true` e é durável: rearme depende de uma barra elegível com a condição falsa
 *após* o término do acompanhamento anterior, e dado ausente não rearma — não é
 algo que um worker possa recalcular de memória depois de um restart. O índice
@@ -1568,7 +1571,7 @@ o teste de partição de §15.6 é sobre as classes do `hunter_app` e não veria
 grant só do worker. A partição continua exata.
 
 **Nota sobre `strategy_versions` (desde a `0010`, estreitada pela `0011`,
-§22.3/§23).** A linha de `WORKER_WRITE_TABLES` acima descreve o que `0001`
+§22.3/§23; a `0012` acrescenta quatro colunas e **nenhum** grant, §24.5).** A linha de `WORKER_WRITE_TABLES` acima descreve o que `0001`
 concedeu — a tabela continua nessa classe para fins de classificação, e
 `test_the_grant_lists_cover_every_table_exactly_once` continua vendo-a lá —,
 mas o privilégio efetivo de `hunter_worker` não é mais o de tabela: a `0010`
@@ -3747,3 +3750,277 @@ consegue ativar (`UPDATE status/activated_at`) nem apagar uma linha `draft`,
 e continua lendo (`SELECT`) e escrevendo `changelog`/`id`/`strategy_id`/
 `version`/`created_at`. `test_migrations.py`: round trip da `0011` e
 `alembic check` sem drift.
+
+## 24. A coorte da replicação, o carimbo de promissora e a linhagem da irmã — M3 (`0012_replication`)
+
+Décima segunda revisão. Um CHECK alargado, quatro colunas, um CHECK novo por par
+de colunas, uma UNIQUE, uma FK para a própria tabela e a trigger de congelamento
+da `0010` alargada de novo. Ela fecha as duas pendências que a T3.19 **declarou**
+(`.claude/state/notes-T3.19.md`, CONCERNS 1 e 2) e uma terceira que ninguém
+tinha nomeado — as três da mesma família: uma coisa de que o protocolo depende
+morava em prosa em vez de morar no schema.
+
+| De onde veio | O que estava impossível |
+|---|---|
+| notes-T3.19 CONCERN 2 · REPLICATION.md §4.4 | o rótulo do braço **não podia ser coorte**: `ck_shadow_episodes_cohort_format` (`0002`) e `SHADOW_COHORT_PATTERN` aceitavam só `prospective` e `replay:<uuid>`, então a irmã emitia como `prospective` — exatamente a única coorte que a ponte de execução admite (T3.15e) |
+| notes-T3.19 CONCERN 1 · REPLICATION.md §1.6 | `promising_at` morava no `changelog` das irmãs e num `system_events` com retenção de **30 dias**, para um bloco que exige **15 dias distintos depois dele**. Um marco cuja cópia durável é uma substring de texto livre não é um marco |
+| achado desta tarefa | a **linhagem** da irmã (de quem, qual braço) também era só uma frase no `changelog`, recuperada por regex (`replication_stats.ARM_RE`) — uma família de dez versões que só um `LIKE` distinguia de dez experimentos independentes |
+
+`0012_replication` tem 16 caracteres; o teto de `alembic_version.version_num`
+continua sendo 32 (§17.6). As listas desta revisão estão congeladas em
+`ddl/replication.py`, no padrão de §15.6/§16.5/§17.6/§18.9/§19/§20/§21/§22.
+
+A frase que organiza as três: **o protocolo já dizia essas coisas; o schema
+passa a garanti-las.** Nada aqui muda um veredito, ativa uma linha ou chega
+perto da carteira — pelo contrário, acrescenta a terceira barreira que faltava
+entre uma irmã de pesquisa e a ponte.
+
+### 24.1 A coorte: um ramo novo, os dois antigos byte a byte
+
+```
+shadow_episodes  ck_shadow_episodes_cohort_format
+  antes:  ^(prospective|replay:<uuid>)$
+  depois: ^(prospective|replay:<uuid>|replication:<uuid>:[1-9][0-9]?)$
+```
+
+`<uuid>` é `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`, o
+mesmo de antes. **É um superconjunto estrito:** todo episódio já gravado
+continua válido com o rótulo que tem, e é isso que a revisão promete a quem já
+tem população em disco.
+
+**`[1-9][0-9]?` é 1..99 escrito como forma, não como contagem de dígitos**, e
+isso não é detalhe: `replication:<pai>:01` seria uma **segunda grafia do braço
+1** — duas populações sob um nome que o relatório já usa —, e `replication:<pai>:0`
+não é braço nenhum. Os dois são recusados. O teto 99 vem de a rodada ter dez
+braços (`hunter_indicators.replication.SIBLINGS_N`) com duas ordens de grandeza
+de folga; acima disso o número de tentativas já é o problema que o protocolo
+existe para contar (REPLICATION.md §7), não uma limitação de schema.
+
+A regex vive em dois lugares e é copiada, nunca importada, pela razão de sempre
+(`ddl/paper_geometry.py`): o contrato do banco não pode seguir em silêncio uma
+edição posterior de uma constante Python. `hunter_core.domain.enums.SHADOW_COHORT_PATTERN`
+é a outra cópia, e `test_migrations.py::test_0012_and_the_domain_constant_agree_on_the_cohort_grammar`
+compara as duas string a string — além de provar que os dois ramos da `0002`
+sobrevivem caractere por caractere dentro do novo.
+
+**A coorte é dita pelo worker, não pelo processo.** `SHADOW_COHORT` continua
+sendo a coorte do *processo*; `ActiveVersion.cohort(process_cohort)`
+(`services/strategy-worker/hunter_strategy_worker/catalogue.py`) carimba
+`replication:<pai>:<k>` quando a linha da versão tem linhagem, e a coorte do
+processo quando não tem. **Um replay continua replay**, irmã ou não: coortes
+separam populações *da mesma versão*, um replay nunca é a avaliação prospectiva
+reservada daquela versão (SHADOW-LAB.md §1), e colapsar os dois ainda poria um
+replay no slot que `uq_shadow_episodes_slot` guarda para a corrida para a
+frente.
+
+O que isso compra, em uma frase: a ponte de execução admite `prospective` e
+recusa toda outra coorte com `cohort_not_live` (T3.15e, §22.5) — enquanto o
+rótulo era irrepresentável, essa recusa citava nominalmente "a replication
+sibling's cohort" e recusava um nome que **nada podia escrever**. O isolamento
+nunca dependeu dela (as outras duas barreiras são `purpose = research_only` e a
+ausência de linha em `agents`, as duas com teste); o que muda é que agora são
+três barreiras de verdade em vez de duas mais uma promessa.
+
+### 24.2 `promising_at` e `promising_by`
+
+```
+strategy_versions  (+) promising_at timestamptz NULL
+                   (+) promising_by text NULL
+  CHECK (promising_at IS NULL) = (promising_by IS NULL)
+    AND (promising_by IS NULL OR char_length(promising_by) BETWEEN 1 AND 64)
+    -- ck_strategy_versions_promising_is_attributed
+```
+
+`promising_at` é o instante em que o placar viu a versão `validada` pela
+primeira vez (REPLICATION.md §1.6) e é de onde o bloco 1 (fora da amostra)
+começa a contar. A bicondicional com `promising_by` é o argumento do §16.2 sobre
+`no_entry_reason`, um marco adiante: **um carimbo que ninguém consegue atribuir
+é uma data, não evidência**, e um `NOT NULL` sozinho aceitaria a string vazia,
+que não atribui nada.
+
+**Escrito por um lugar só.** `hunter_strategy_worker.replication.mark_promising(conn,
+version_id, verdict_source)` é o único escritor, na conexão de dono, e ele é
+único porque duas datas seriam a mais recente ganhando sem que ninguém visse a
+outra sumir. Três propriedades, cada uma com uma razão:
+
+- **idempotente por SQL, não por leitura anterior**: o `UPDATE ... WHERE
+  promising_at IS NULL` é quem decide. Um `SELECT` seguido de um `UPDATE` seria
+  a mesma corrida que o §17.8 recusa no seed. Uma segunda chamada não move o
+  carimbo e **não escreve evento nenhum**;
+- **conexão de dono**: a `0010`/`0011` deixaram `hunter_worker` com `SELECT` e
+  nada mais de tabela aqui, então a coluna nova é ilegível para escrita por
+  construção (§24.5);
+- **auditada**: um `system_events` (`component = replicate_strategy_version`,
+  `event = strategy_version_promising`) por marcação de fato feita, com
+  `promising_at` e `promising_by` no `data`.
+
+**`promising_at` é deliberadamente deixado *fora* do congelamento** (§24.4), e é
+a única das quatro colunas novas nessa situação: ele é escrito **depois** da
+ativação por definição — uma versão tem de rodar trinta dias antes de um placar
+poder chamá-la de `validada` —, então congelá-lo tornaria a coluna inescrevível
+em toda linha que poderia ganhá-la.
+
+**Um pai forçado não é um pai promissor.** `replicate_strategy_version.py
+--force-research "<motivo>"` continua **não** gravando o carimbo (REPLICATION.md
+§4.1): ele dispensa a régua, e inventar a data em que a régua passou seria
+inventar o marco do bloco 1.
+
+### 24.3 A linhagem: `replication_parent_id` e `replication_index`
+
+```
+strategy_versions  (+) replication_parent_id uuid NULL REFERENCES strategy_versions(id)
+                   (+) replication_index smallint NULL
+  CHECK (replication_parent_id IS NULL) = (replication_index IS NULL)
+    AND (replication_index IS NULL OR replication_index BETWEEN 1 AND 99)
+    AND replication_parent_id IS DISTINCT FROM id
+    -- ck_strategy_versions_replication_lineage
+  UNIQUE (replication_parent_id, replication_index)  -- uq_strategy_versions_replication_arm
+  FK  (replication_parent_id) -> strategy_versions (id)  -- ON DELETE NO ACTION
+```
+
+Três cláusulas no CHECK e cada uma fecha um jeito de escrever meia linhagem:
+
+- **a bicondicional** — um braço sem pai nomeia um experimento que ninguém
+  encontra de novo; um pai sem braço não se distingue das próprias irmãs;
+- **a faixa 1..99** — a mesma que a gramática da coorte aceita, para que nenhuma
+  linha carregue uma linhagem sem coorte representável;
+- **`IS DISTINCT FROM id`** — uma versão não é irmã de si mesma (o precedente é
+  `id <> superseded_by_id`, §18.4). É `IS DISTINCT FROM` e não `<>` porque `<>`
+  é `NULL` para um pai nulo, e **um CHECK que avalia `NULL` está satisfeito** —
+  a armadilha que a `0009` mediu (§21.1), um operador antes.
+
+`ON DELETE NO ACTION` (o padrão), **nunca `RESTRICT`**, e a diferença é
+operacional: `NO ACTION` é verificada no **fim do statement**, então
+`DELETE FROM strategies` continua derrubando a família inteira num comando só
+(a cascata leva pai e irmãs juntos), enquanto apagar um pai sozinho, deixando as
+irmãs órfãs, é recusado. É a mesma escolha e a mesma razão de
+`participation_consumptions` (§18.5).
+
+**Nenhum índice novo para a FK.** `uq_strategy_versions_replication_arm` começa
+por `replication_parent_id`, então ela *é* o índice que o §1 exige de toda chave
+estrangeira. E como o Postgres trata `NULL`s como distintos numa UNIQUE, ela não
+custa nada às versões que não são irmãs — que são quase todas.
+
+O `changelog` continua carregando o rótulo ao lado (`replication:<pai>:<k> | irmã
+k de v1 | promising_at=… | seed=…`): é o que uma irmã derivada **antes** desta
+migração tem, e é o que um humano lê. `replication_stats.load_sibling_rows`
+consulta os dois — a coluna e o `LIKE` — e prefere a coluna para o `k`; trocar
+por uma das duas sozinha faria daquela irmã antiga ou uma órfã (só coluna) ou
+uma linha que constraint nenhuma protege (só rótulo).
+
+### 24.4 Congelada depois da ativação — as duas colunas certas
+
+A trigger `shadow_freeze_strategy_version` da `0010` (§22.2) é **substituída,
+não duplicada**, pela terceira vez no mesmo padrão (`0008` §20.3, `0009` §21.2,
+`0010` §22.2): `ddl/replication.py` copia a lista congelada de
+`ddl/strategy_purpose.py`, acrescenta `replication_parent_id` e
+`replication_index`, e recria função e triggers com o mesmo nome. O downgrade
+chama o criador da própria `ddl/strategy_purpose.py`: voltar à `0011` é ter a
+trigger que a `0010` descreve.
+
+| Coluna nova | Congelada depois da ativação? | Por quê |
+|---|---|---|
+| `replication_parent_id` | **sim** | a irmã nasce com ela no mesmo `INSERT` que a ativa, então a trigger nunca vê essa escrita; repontar a irmã depois reatribuiria em silêncio um experimento cujos sinais já estão gravados |
+| `replication_index` | **sim** | idem: trocar o braço de lugar renomearia a coorte de uma população que já emitiu sob a antiga |
+| `promising_at` | **não** | escrito depois da ativação por definição (§24.2). Congelá-lo tornaria a coluna inescrevível justamente em quem pode ganhá-la |
+| `promising_by` | **não** | anda com `promising_at`; separá-los violaria a bicondicional no primeiro `UPDATE` |
+
+Consequência prática, e é a mesma da §22.2: **não existe "transformar uma versão
+em irmã"**. Uma irmã é uma linha nova, derivada, com a linhagem no `INSERT` —
+que é exatamente como `infra/scripts/replicate_strategy_version.py` escreve.
+
+### 24.5 Grants: nenhum, e isso é afirmação
+
+Esta revisão **não emite um único `GRANT` ou `REVOKE`**, e a razão é aritmética
+de ACL, não descuido. A `0010` revogou o `INSERT`/`UPDATE` de tabela de
+`hunter_worker` em `strategy_versions` e reconcedeu doze colunas; a `0011`
+revogou `INSERT` por completo, `DELETE` de tabela e `UPDATE` em sete das doze. O
+que sobra para o worker é `SELECT` de tabela mais `UPDATE` em cinco colunas
+nomeadas — então **uma coluna acrescentada depois é legível pelos dois papéis (o
+grant de tabela a alcança) e escrevível por papel de aplicação nenhum**, sem uma
+linha de DDL. É a mesma forma que `purpose` tem, alcançada por subtração em vez
+de por revogação.
+
+Escrever um `REVOKE` no-op aqui para *parecer* uma garantia seria exatamente o
+erro que o §15.6 registra sobre `ALTER DEFAULT PRIVILEGES ... REVOKE ALL`. A
+garantia é teste, e como o papel:
+`test_schema_privileges.py::test_the_worker_cannot_write_any_of_the_replication_columns`
+(quatro `UPDATE`, quatro *permission denied*) e
+`test_the_owner_connection_writes_the_promising_marker` do outro lado — uma
+revogação escrita no papel errado deixaria o protocolo sem ninguém capaz de
+registrar que uma versão virou promissora, que é a parede que a `0007` levou em
+`portfolios` (§19.2, item 1b), uma tabela ao lado.
+
+Medido no head, contra um Postgres 16 real:
+
+| Coluna | `hunter_app` | `hunter_worker` | dono / `DATABASE_URL_MIGRATIONS` |
+|---|---|---|---|
+| `purpose` | `SELECT` | `SELECT` | tudo |
+| `promising_at` | `SELECT` | `SELECT` | tudo (`mark_promising`) |
+| `promising_by` | `SELECT` | `SELECT` | tudo (`mark_promising`) |
+| `replication_parent_id` | `SELECT` | `SELECT` | tudo (`replicate_strategy_version.py`) |
+| `replication_index` | `SELECT` | `SELECT` | tudo (idem) |
+| `changelog` (referência) | `SELECT` | `SELECT` + `UPDATE` | tudo |
+
+Nenhuma classe de grant muda e nenhuma tabela é reclassificada: `strategy_versions`
+continua em `APP_READ_ONLY_TABLES` (`0001`) e em `WORKER_WRITE_TABLES` para fins
+de classificação, com a nota do §17.6 valendo inteira — **nunca reconceder no
+nível de tabela**, porque a ACL de coluna é a *união* com a de tabela.
+`shadow_episodes` continua com as classes que a `0002` lhe deu (§16.5).
+
+**Nenhuma política de RLS muda.** As duas tabelas são globais (§1.1): pesquisa
+sombra e catálogo de estratégias não têm `organization_id` e nunca tiveram RLS.
+Nada nesta revisão cria dado de tenant.
+
+### 24.6 Guardas
+
+**Não há guarda de upgrade, e isso é afirmação.** Quatro colunas anuláveis, sem
+default; um CHECK que só fala de valores não nulos; um CHECK alargado que aceita
+um superconjunto estrito do que aceitava. Nada que já esteja gravado passa a ser
+irrepresentável — a mesma afirmação da `0007` (§19.5), da `0008` (§20.5), da
+`0009` (§21.4) e da `0010` (§22.1).
+
+**O downgrade recusa em três frentes** (§17.7: reverter é permitido, perder
+evidência não é):
+
+| Guarda | O que se perderia |
+|---|---|
+| `strategy_versions` com `promising_at` | o instante de onde o bloco 1 conta. Nunca é recalculado para trás, e a cópia no `changelog` só existe em famílias **já replicadas** — um pai marcado promissor e ainda não replicado (o estado normal entre o veredito e a rodada) não tem outra cópia durável |
+| `strategy_versions` com `replication_parent_id` | dez irmãs voltam a parecer dez experimentos independentes: exatamente a inflação por múltiplas tentativas que o protocolo existe para contar (REPLICATION.md §2) |
+| `shadow_episodes` com coorte `replication:%` | o CHECK da `0002` não a representa. O Postgres recusaria a constraint de qualquer forma; a guarda recusa **antes**, com a contagem e a instrução, em vez de morrer no meio da revisão com uma violação que não nomeia saída |
+
+Nenhuma delas apaga nada: contam os infratores e recusam nomeando-os, com a
+instrução de exportar antes — o mesmo limite declarado do §18.9 (exportar não
+muda predicado nenhum; o downgrade de um banco com replicação viva não é
+operação de rotina). Para a terceira, a instrução diz mais: apagar um episódio
+solta o `tracking_hold` de um mercado cujas velas um outcome aberto ainda
+precisa (§16.3).
+
+**O que não é guardado, declarado em vez de descoberto:** irmãs cuja linhagem
+está só no `changelog` (nada se perde — o texto sobrevive ao downgrade) e o
+`promising_by` sozinho (ele cai junto com `promising_at`, que a primeira guarda
+já cobre).
+
+### 24.7 Trava, pooler e o que muda para as tarefas vizinhas
+
+**Trava.** A revisão faz `ALTER TABLE` em duas relações frias:
+`shadow_episodes` (uma linha por versão × mercado × coorte — milhares) e
+`strategy_versions` (dezenas). O `DROP`/`ADD CONSTRAINT` do CHECK da coorte é
+**validante**, isto é, varre a tabela: é o preço de não instalar uma constraint
+que mente, e nessa escala é a mesma ordem de grandeza da janela de ~15 s que a
+`0010` abriu (§15.6), não uma nova classe de risco. `ADD COLUMN` sem default não
+reescreve tabela no Postgres 11+.
+
+**Pooler.** Nada aqui depende de estado de sessão: um CHECK, quatro colunas, uma
+UNIQUE, uma FK e uma trigger que lê só `NEW`/`OLD`. Sem prepared statement de
+sessão, sem `LISTEN`/`NOTIFY`, sem advisory lock de sessão.
+
+**Vizinhos.**
+
+| Onde | O que muda |
+|---|---|
+| `hunter_strategy_worker/catalogue.py` | `ActiveVersion` lê `replication_parent_id`/`replication_index` e ganha `cohort(process_cohort)`; `decide.py` calcula a coorte **uma vez** por decisão e a usa nos quatro lugares (slot, identidade do sinal, envelope, episódio) |
+| `hunter_strategy_worker/replication.py` | o `INSERT` da irmã carrega a linhagem; a rodada chama `mark_promising` antes de escrever as irmãs (elas citam o carimbo) e não escreve mais o evento `strategy_version_promising` por conta própria; recusa quando a `0012` não está aplicada |
+| `hunter_strategy_worker/replication_stats.py` | `load_promising_at` lê a **coluna** primeiro (depois `changelog`, depois `system_events`); `load_sibling_rows` reconhece irmã por coluna **ou** rótulo |
+| T3.18 (placar) | passa a poder ler `strategy_versions.promising_at` direto para o bloco fora da amostra, em vez de `load_promising_at`. O contrato está em `.claude/state/notes-T3.19c.md`; **a API não foi ligada nesta tarefa** |
+| `services/execution-worker/bridge_screen.py` | **nada a mudar** — ele já recusa toda coorte que não seja `prospective` (T3.15e). A diferença é que agora existe uma coorte de verdade para ele recusar |

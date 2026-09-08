@@ -15,10 +15,14 @@ dez irmãs de parâmetro, as duas metades de mercado e o bootstrap.
 
 O que este script faz: deriva N irmãs ``research_only`` do pai, com cada
 parâmetro numérico deslocado em ±15 % por um RNG semeado, numa única transação,
-com auditoria em ``system_events``. **O que ele nunca faz:** tocar o pai, ativar
-uma linha ``paper``, depreciar uma versão, mudar risco ou chegar perto da
-carteira. Uma irmã nasce com ``purpose = research_only``, que a ponte de execução
-recusa pelo nome, e sem nenhuma linha em ``agents`` que a autorize numa carteira.
+com auditoria em ``system_events``. Do pai ele move **uma** coluna, e é a razão
+da ``0012_replication``: ``promising_at`` (com ``promising_by``), uma vez, por
+``mark_promising`` — nunca de novo e nunca para trás. **O que ele nunca faz:**
+ativar uma linha ``paper``, depreciar uma versão, mudar risco, mexer nos
+parâmetros do pai ou chegar perto da carteira. Uma irmã nasce com
+``purpose = research_only``, que a ponte de execução recusa pelo nome, com a
+coorte ``replication:<pai>:<k>`` (que a ponte recusa de novo, ``cohort_not_live``)
+e sem nenhuma linha em ``agents`` que a autorize numa carteira.
 
 ``--report`` e ``--dry-run`` não escrevem nada. ``--force-research "<motivo>"``
 existe só para os experimentos manuais do Everton: ele dispensa a exigência de o
@@ -27,8 +31,9 @@ pai estar ``validada``, exige um motivo escrito, é auditado como ``warning`` e
 
 Conecta com ``DATABASE_URL_MIGRATIONS`` (direto, nunca pelo pooler), como
 ``infra/scripts/activate_strategy_version.py``: ``0011`` revogou ``INSERT`` em
-``strategy_versions`` de todo papel de aplicação, e ``purpose`` só o dono
-escreve. A lógica mora em :mod:`hunter_strategy_worker.replication` e
+``strategy_versions`` de todo papel de aplicação, e ``purpose``, ``promising_at``
+e a linhagem só o dono escreve (DATABASE.md §24.5). Exige a ``0012_replication``
+aplicada e recusa sem ela. A lógica mora em :mod:`hunter_strategy_worker.replication` e
 :mod:`hunter_strategy_worker.replication_stats`; aqui só a linha de comando.
 """
 

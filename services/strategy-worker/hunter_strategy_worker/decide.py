@@ -131,12 +131,17 @@ async def evaluate_slot(
     ).inc()
 
     record: ShadowRecord | None = None
+    # One cohort for the whole decision: the slot it locks, the identity it
+    # hashes and the envelope it writes have to name the same population. A
+    # replication sibling stamps its arm (``replication:<parent>:<k>``,
+    # 0012_replication); every other version stamps the process cohort.
+    cohort = version.cohort(config.cohort)
     async with role_session(factory, db_role="hunter_worker") as session:
         slot = await slots.lock_slot(
             session,
             strategy_version_id=version.id,
             market_id=market.id,
-            cohort=config.cohort,
+            cohort=cohort,
         )
         await _advance_open_tracking(session, slot, config, now)
         # Re-read under the same lock: the advance above may have released the
@@ -145,7 +150,7 @@ async def evaluate_slot(
             session,
             strategy_version_id=version.id,
             market_id=market.id,
-            cohort=config.cohort,
+            cohort=cohort,
         )
         if not slot.accepts(bar_close):
             logger.debug(
@@ -179,14 +184,14 @@ async def evaluate_slot(
                 market_id=market.id,
                 params_hash=version.params_hash,
                 source_bar_close=bar_close,
-                cohort=config.cohort,
+                cohort=cohort,
             ),
             version=version,
             market=market,
             decision=evaluation.decision,
             costs=costs,
             decision_at=decision_at,
-            cohort=config.cohort,
+            cohort=cohort,
             plan=plan,
             provenance=provenance,
             regime_id=regime_id,

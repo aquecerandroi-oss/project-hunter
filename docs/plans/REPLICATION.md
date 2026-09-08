@@ -46,13 +46,14 @@ em algo inalcançável dentro de um trimestre, e a proteção contra o acaso pas
 está declarado em §7: metade da amostra dobra, grosso modo, a largura do intervalo de cada bloco.
 
 1.6 **`promising_at`** — o instante em que a versão pai foi vista `validada` pela primeira vez.
-É gravado (§4.1) e **congelado**; nunca é recalculado para trás. Sem `promising_at` não existe
+É a coluna `strategy_versions.promising_at` (`0012_replication`), gravada (§4.1) e **congelada**;
+nunca é recalculada para trás. `promising_by` diz qual veredito a carimbou. Sem `promising_at` não existe
 bloco 1: "fora da amostra" só quer dizer alguma coisa contra um marco que já estava escrito.
 
 1.7 **Versão pai**: a `strategy_version` promissora. **Irmã**: uma versão derivada dela por jitter
 de parâmetros (§4.2). **Braço de replicação**: o rótulo `replication:<parent_version_id>:<k>`,
-`k` de 1 a N, que identifica cada irmã (§4.4 diz onde ele vive hoje e por que ainda não é a coorte
-do banco).
+`k` de 1 a N, que identifica cada irmã — e que, desde a `0012_replication`, **é** a coorte de
+`shadow_episodes` que ela carimba (§4.4).
 
 ---
 
@@ -186,12 +187,15 @@ Conexão de **dono** (`DATABASE_URL_MIGRATIONS`), como o script de ativação: `
    tentativas** e inflar exatamente o falso positivo que o protocolo combate; a segunda rodada é
    recusada com o número de irmãs existentes.
 
-Ao passar, `promising_at` é gravado no mesmo commit: `system_events` (`component = 'replicate_strategy_version'`,
-`event = 'strategy_version_promising'`, `data = {strategy_version_id, promising_at, ...}`) **e**,
-de forma durável, no `changelog` de cada irmã (`system_events` tem retenção de 30 dias e o bloco 1
-precisa de mais que isso). **Pendência declarada:** o lugar certo é uma coluna
-`strategy_versions.promising_at`, migração da database-architect; até lá a fonte durável é o
-`changelog` das irmãs, e o script relê `promising_at=` de lá numa rodada posterior.
+Ao passar, `promising_at` é gravado no mesmo commit, e desde a `0012_replication` (T3.19c) o lugar
+durável é a **coluna** `strategy_versions.promising_at`, escrita por
+`hunter_strategy_worker.replication.mark_promising` (conexão de dono, idempotente — um carimbo
+existente nunca se move) junto de `promising_by`, que nomeia o veredito que carimbou. A auditoria
+continua: `system_events` (`component = 'replicate_strategy_version'`,
+`event = 'strategy_version_promising'`, `data = {strategy_version_id, promising_at, promising_by}`),
+e o `changelog` de cada irmã continua carregando `promising_at=` — as duas cópias antigas viram
+redundância legível, não a fonte. `load_promising_at` lê a coluna primeiro, depois o `changelog`,
+depois o evento (que expira em 30 dias). **A pendência declarada da T3.19 está fechada.**
 
 **4.2 O jitter.** Para cada parâmetro numérico do `default_parameters` congelado do pai, um fator
 `U(1 − 0,15; 1 + 0,15)` **independente**, de um `numpy.random.Generator(PCG64(seed))` com semente
@@ -226,24 +230,44 @@ platô só das regras de entrada tem de ler as irmãs sabendo disso.
 `v<n>` livre; `parameters_schema` e `params_format` copiados **byte a byte** do pai;
 `default_parameters` jitterados em forma canônica (`params_format = 1`); `code_ref` recomputado do
 módulo que o `code_ref` congelado do pai nomeia; `status = 'active'`; `activated_at = now()`;
-`purpose = 'research_only'`; `changelog` com o rótulo do braço, `promising_at`, semente e índice.
-O **pai não é tocado** — nenhum UPDATE, nenhum campo, nem o `changelog`. Um evento
-`strategy_version_replicated` resume a rodada em `system_events` com `data` completa (pai, semente,
-irmãs, hashes).
+`purpose = 'research_only'`; `replication_parent_id`/`replication_index` (a linhagem em coluna,
+`0012_replication`); `changelog` com o rótulo do braço, `promising_at`, semente e índice.
+
+**Do pai, uma única coluna se move:** `promising_at` (com `promising_by`), por
+`hunter_strategy_worker.replication.mark_promising`, no mesmo commit — e nunca mais de uma vez.
+Fora isso o pai não é tocado: nem `changelog`, nem `status`, nem parâmetros. A frase original desta
+seção ("o pai não é tocado — nenhum UPDATE") valia enquanto o carimbo morava no `changelog` das
+irmãs e num `system_events` de 30 dias, o que fazia do marco de onde o bloco 1 conta uma substring
+de texto livre; a `0012` trocou isso por uma coluna, e a troca está registrada em
+`docs/DATABASE.md` §24.2. Um evento `strategy_version_replicated` resume a rodada em
+`system_events` com `data` completa (pai, semente, irmãs, hashes).
 
 `--dry-run` imprime os N conjuntos jitterados e não escreve nada. `--report` imprime os quatro
 blocos do pai e não escreve nada.
 
-**4.4 O rótulo `replication:<parent_version_id>:<k>` e a coorte do banco.** O rótulo identifica o
-braço e vive hoje no `changelog` da irmã e no evento de auditoria. **Ele ainda não é a coorte de
-`shadow_episodes`**: o CHECK `ck_shadow_episodes_cohort_format` (migração `0002_shadow_lab`) e
-`hunter_core.domain.enums.SHADOW_COHORT_PATTERN` aceitam **apenas** `prospective` e
-`replay:<uuid>`, e a coorte do worker é de **processo** (`SHADOW_COHORT`), não de versão. Estender o
-padrão para `replication:<uuid>:<k>` é migração + mudança no worker, de outro dono, e fica
-registrada aqui como **pendência declarada**. Do outro lado, a ponte de execução **já está pronta
-para o rótulo**: `bridge_screen.py` (T3.15e) admite `cohort = "prospective"` e recusa qualquer outra
-com `cohort_not_live`, citando nominalmente "a replication sibling's cohort" — quem tem de alcançar o
-outro é o schema, não a ponte.
+**4.4 O rótulo `replication:<parent_version_id>:<k>` É a coorte do banco (desde a
+`0012_replication`, T3.19c).** A pendência que esta seção declarava está fechada. O CHECK
+`ck_shadow_episodes_cohort_format` e `hunter_core.domain.enums.SHADOW_COHORT_PATTERN` aceitam agora
+`prospective`, `replay:<uuid>` **e** `replication:<uuid>:<k>` com `k` de 1 a 99 (`[1-9][0-9]?`: `:0`
+e `:01` são recusados, porque uma segunda grafia do braço 1 seria uma segunda população sob um nome
+que o relatório já usa). Os dois ramos antigos continuam byte a byte iguais — todo episódio já
+gravado segue válido.
+
+A coorte deixou de ser só de **processo** (`SHADOW_COHORT`): `ActiveVersion.cohort()`
+(`catalogue.py`) carimba o braço quando a linha da versão tem linhagem, e a coorte do processo
+quando não tem. **Um replay continua replay**, irmã ou não — coortes separam populações da mesma
+versão, e um replay nunca é a avaliação prospectiva reservada dela (SHADOW-LAB.md §1).
+
+A ponte de execução já estava pronta para o rótulo: `bridge_screen.py` (T3.15e) admite
+`cohort = "prospective"` e recusa qualquer outra com `cohort_not_live`, citando nominalmente "a
+replication sibling's cohort". A diferença é que agora existe uma coorte de verdade para ela
+recusar — antes, essa barreira recusava um nome que nada podia escrever.
+
+**A linhagem também virou coluna.** `strategy_versions.replication_parent_id` e
+`replication_index` (com `CHECK` bicondicional, faixa 1..99, `parent <> id` e
+`UNIQUE (parent, index)`), gravadas no mesmo `INSERT` que ativa a irmã e congeladas depois disso.
+`replication_stats.load_sibling_rows` lê a coluna e, ainda, o rótulo do `changelog` — que é o que
+uma irmã derivada antes da migração tem. Detalhes em `docs/DATABASE.md` §24.
 
 **A separação que importa não depende desse rótulo.** Cada irmã é uma `strategy_version_id`
 distinta, com slot de episódio, `params_hash`, sinais e outcomes próprios (a coorte só separa
@@ -256,7 +280,8 @@ independentes, todas provadas por teste em
 2. nenhuma linha em `agents` liga a irmã a uma carteira — a consulta de candidatos da ponte só
    enxerga versões que a carteira roda;
 3. o filtro de coorte de T3.15e recusa `cohort_not_live` para qualquer coorte que não seja
-   `prospective`, e é ele que passa a valer no dia em que o rótulo virar coorte de verdade.
+   `prospective` — e desde a `0012_replication` ele vale de fato, porque a irmã carimba
+   `replication:<pai>:<k>` nos próprios sinais (§4.4).
 
 ---
 

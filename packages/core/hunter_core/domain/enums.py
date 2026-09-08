@@ -341,35 +341,77 @@ class ShadowTrackingState(StrEnum):
     CENSORED = "censored"
 
 
+_UUID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+"""Lower-case hexadecimal, exactly as ``uuid.UUID.__str__`` renders it."""
+
+REPLICATION_ARM_MIN: Final = 1
+REPLICATION_ARM_MAX: Final = 99
+"""The bounds of ``k`` in ``replication:<parent_version_id>:<k>``.
+
+``1`` because a zeroth arm is not a sibling, and ``99`` because a replication
+round is ten arms (``hunter_indicators.replication.SIBLINGS_N``) and two orders
+of magnitude of headroom is already more tries than the protocol's
+false-positive budget tolerates (REPLICATION.md §7). The pattern spells the
+bound out (``[1-9][0-9]?``) rather than counting digits, so
+``replication:<uuid>:01`` — a second spelling of arm 1 — is refused instead of
+quietly becoming an eleventh population.
+"""
+
 SHADOW_COHORT_PATTERN = (
-    "^(prospective|replay:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
+    f"^(prospective|replay:{_UUID_PATTERN}|replication:{_UUID_PATTERN}:[1-9][0-9]?)$"
 )
 """The exact shape of ``shadow_episodes.cohort`` - also the CHECK in the database.
 
-Not a Postgres ``ENUM``: a replay cohort carries its ``run_id``, so the set is
-open. It is still closed in *shape*, and one regex shared by Python and the
-CHECK constraint is what keeps a typo from quietly creating a third population
-that no report ever mentions.
+Not a Postgres ``ENUM``: a replay cohort carries its ``run_id`` and a
+replication arm carries its parent version, so the set is open. It is still
+closed in *shape*, and one regex shared by Python and the CHECK constraint is
+what keeps a typo from quietly creating a fourth population that no report ever
+mentions.
+
+``prospective`` and ``replay:<uuid>`` are byte-identical to what
+``0002_shadow_lab`` shipped; ``0012_replication`` only adds the third branch
+(DATABASE.md §24).
 """
 
 _SHADOW_COHORT_RE = re.compile(SHADOW_COHORT_PATTERN)
 
 
 class ShadowCohort:
-    """``prospective`` or ``replay:<run_id>`` - SHADOW-LAB.md §1.
+    """``prospective``, ``replay:<run_id>`` or ``replication:<parent>:<k>``.
 
-    Replay and prospective are different populations by construction: the data
-    used to develop a version is never that version's reserved forward
-    evaluation, so a replay must never occupy the prospective tracking slot.
+    SHADOW-LAB.md §1 and REPLICATION.md §4.4. The three are different
+    populations by construction: the data used to develop a version is never
+    that version's reserved forward evaluation, so a replay must never occupy
+    the prospective tracking slot; and a replication sibling's signals have to
+    be nameable as *the sibling's*, so the execution bridge can refuse them by
+    cohort (``cohort_not_live``) and not only by ``purpose``.
     """
 
     PROSPECTIVE: Final = "prospective"
     REPLAY_PREFIX: Final = "replay:"
+    REPLICATION_PREFIX: Final = "replication:"
 
     @staticmethod
     def replay(run_id: uuid.UUID) -> str:
         """The cohort label of one replay run."""
         return f"{ShadowCohort.REPLAY_PREFIX}{run_id}"
+
+    @staticmethod
+    def replication(parent_version_id: uuid.UUID, k: int) -> str:
+        """The cohort label of one replication arm - ``k`` from 1 to 99.
+
+        The label names the *arm*, not the sibling: a sibling is already its own
+        ``strategy_version_id``. What the cohort buys is a name a consumer can
+        refuse on sight, and a slot a sibling can never share with a replay of
+        itself.
+        """
+        if not REPLICATION_ARM_MIN <= k <= REPLICATION_ARM_MAX:
+            raise ValueError(
+                f"replication arm {k} is outside "
+                f"{REPLICATION_ARM_MIN}..{REPLICATION_ARM_MAX}: "
+                "the cohort pattern (and the database CHECK) would refuse it"
+            )
+        return f"{ShadowCohort.REPLICATION_PREFIX}{parent_version_id}:{k}"
 
     @staticmethod
     def is_valid(cohort: str) -> bool:

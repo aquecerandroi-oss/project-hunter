@@ -6,11 +6,12 @@ sintéticas. Aqui ficam as três consultas que o protocolo precisa —
 
 1. a população **avaliável** de uma versão (``tracking_state = 'terminal'`` e
    ``r_multiple IS NOT NULL``, a mesma definição do plantão e do placar);
-2. as irmãs de um pai, reconhecidas pelo rótulo ``replication:<pai>:<k>`` no
-   ``changelog``;
-3. o ``promising_at``, lido do ``changelog`` das irmãs (durável) e, na falta
-   dele, de ``system_events`` (retenção de 30 dias — por isso não é a fonte
-   primária).
+2. as irmãs de um pai, reconhecidas por ``replication_parent_id`` desde a
+   ``0012_replication`` (e ainda pelo rótulo ``replication:<pai>:<k>`` no
+   ``changelog``, para as derivadas antes dela);
+3. o ``promising_at``, lido da **coluna** desde a ``0012_replication`` e, na
+   falta dela, do ``changelog`` das irmãs e de ``system_events`` (retenção de
+   30 dias — por isso nunca foi a fonte primária).
 
 **Chave de mercado.** As metades do bloco 3 são partidas por
 ``<exchange>:<symbol>``, não só pelo símbolo: o mesmo ``BTCUSDT`` em duas
@@ -52,9 +53,11 @@ __all__ = [
 ]
 
 REPLICATION_PREFIX = "replication:"
-"""Prefixo do rótulo do braço. **Ainda não é** a coorte de ``shadow_episodes``:
-o CHECK de ``0002_shadow_lab`` só aceita ``prospective`` e ``replay:<uuid>``
-(REPLICATION.md §4.4 — pendência declarada, não um esquecimento)."""
+"""Prefixo do rótulo do braço — e, desde a ``0012_replication``, também o
+prefixo da coorte de ``shadow_episodes`` (``replication:<pai>:<k>``, ``k`` de 1
+a 99). A pendência da REPLICATION.md §4.4 está fechada: o rótulo que vivia só no
+``changelog`` é uma coorte que o banco aceita e duas colunas
+(``replication_parent_id``, ``replication_index``) que ele garante."""
 
 PROMISING_EVENT = "strategy_version_promising"
 
@@ -76,10 +79,20 @@ _OUTCOMES_SQL = text(
 )
 
 _SIBLINGS_SQL = text(
-    "SELECT v.id, v.version, v.changelog, v.status, v.purpose "
+    "SELECT v.id, v.version, v.changelog, v.status, v.purpose, v.replication_index "
     "FROM strategy_versions v "
-    "WHERE v.changelog LIKE :prefix || :parent || ':%' "
+    "WHERE v.replication_parent_id = CAST(:parent AS uuid) "
+    "OR v.changelog LIKE :prefix || :parent || ':%' "
     "ORDER BY v.version"
+)
+"""A irmã é reconhecida pela **coluna** (``0012_replication``) e, ainda, pelo
+rótulo no ``changelog``: as duas condições, não uma. A coluna é a verdade; o
+``LIKE`` continua aqui porque uma irmã derivada antes da migração só tem o
+rótulo, e trocar a consulta por uma delas sozinha faria dessa irmã ou uma órfã
+(só coluna) ou uma linha que nenhuma constraint protege (só rótulo)."""
+
+_PROMISING_COLUMN_SQL = text(
+    "SELECT promising_at FROM strategy_versions WHERE id = CAST(:parent AS uuid)"
 )
 
 _PROMISING_SQL = text(
@@ -96,11 +109,13 @@ def arm_label(parent_id: uuid.UUID, k: int) -> str:
 
 @dataclass(frozen=True, slots=True)
 class SiblingRow:
-    """Uma irmã como o banco a guarda, com o ``k`` lido do rótulo."""
+    """Uma irmã como o banco a guarda, com o braço que ela ocupa."""
 
     id: uuid.UUID
     version: str
     k: int
+    """O braço. Vem de ``replication_index`` quando a coluna está preenchida e do
+    rótulo do ``changelog`` quando não — nunca de uma contagem de linhas."""
     changelog: str
     status: str
     purpose: str
@@ -142,14 +157,19 @@ async def load_sibling_rows(conn: AsyncConnection, parent_id: uuid.UUID) -> list
     siblings: list[SiblingRow] = []
     for row in rows:
         match = ARM_RE.match(row.changelog or "")
-        if match is None or match.group("parent").lower() != str(parent_id).lower():
+        labelled = match is not None and match.group("parent").lower() == str(parent_id).lower()
+        if row.replication_index is not None:
+            k = int(row.replication_index)
+        elif match is not None and labelled:
+            k = int(match.group("k"))
+        else:
             continue
         siblings.append(
             SiblingRow(
                 id=row.id,
                 version=row.version,
-                k=int(match.group("k")),
-                changelog=row.changelog,
+                k=k,
+                changelog=row.changelog or "",
                 status=row.status,
                 purpose=row.purpose,
             )
@@ -160,12 +180,18 @@ async def load_sibling_rows(conn: AsyncConnection, parent_id: uuid.UUID) -> list
 async def load_promising_at(
     conn: AsyncConnection, parent_id: uuid.UUID, siblings: list[SiblingRow] | None = None
 ) -> datetime | None:
-    """``promising_at`` do pai: primeiro o ``changelog`` das irmãs, depois o evento.
+    """``promising_at`` do pai: a coluna, depois o ``changelog``, depois o evento.
 
-    A ordem não é estética: ``system_events`` tem retenção de 30 dias e o bloco 1
-    precisa de mais que isso; a linha da irmã é permanente. Quando as duas
-    existem, valem o mesmo instante (foram escritas no mesmo commit).
+    A ordem não é estética. A **coluna** (``0012_replication``) é a única fonte
+    que existe para um pai marcado como promissor e ainda não replicado — é o
+    caso normal entre o veredito e a rodada. O ``changelog`` da irmã é
+    permanente e cobre as irmãs derivadas antes da migração. ``system_events``
+    vem por último porque tem retenção de 30 dias e o bloco 1 precisa de mais
+    que isso. Quando duas existem, valem o mesmo instante (mesmo commit).
     """
+    from_column = await conn.scalar(_PROMISING_COLUMN_SQL, {"parent": str(parent_id)})
+    if from_column is not None:
+        return ensure_utc(from_column)
     rows = siblings if siblings is not None else await load_sibling_rows(conn, parent_id)
     stamps = [
         stamp for stamp in (parse_promising_at(row.changelog) for row in rows) if stamp is not None

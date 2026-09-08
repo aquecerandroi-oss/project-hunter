@@ -26,7 +26,7 @@ from sqlalchemy import select
 
 from hunter_core.db.models.agents import Strategy as StrategyRow
 from hunter_core.db.models.agents import StrategyVersion
-from hunter_core.domain.enums import StrategyVersionStatus, Timeframe
+from hunter_core.domain.enums import ShadowCohort, StrategyVersionStatus, Timeframe
 from hunter_core.logging import get_logger
 from hunter_core.strategies.canonical import params_hash as compute_params_hash
 from hunter_core.strategies.registry import DEFAULT_REGISTRY, StrategyRegistry
@@ -107,10 +107,46 @@ class ActiveVersion:
     never a literal the worker crava (T3.15, D10). Never ``"live"``: a row
     naming it is refused before it becomes an :class:`ActiveVersion` at all."""
 
+    replication_parent_id: uuid.UUID | None = None
+    replication_index: int | None = None
+    """``strategy_versions.replication_parent_id``/``replication_index``
+    (``0012_replication``): whose replication sibling this version is, and which
+    arm of it. ``None`` for every ordinary version — which is every version that
+    is not a sibling.
+
+    They are read here, and nowhere else, because :meth:`cohort` is the only
+    thing the worker does with them: the catalogue is where a database row
+    becomes something the run can label.
+    """
+
     @property
     def timeframe(self) -> Timeframe:
         """Bars of this timeframe — and only these — are evaluated for entries."""
         return self.strategy.timeframe
+
+    def cohort(self, process_cohort: str) -> str:
+        """The cohort this version's decisions are stamped with.
+
+        A replication sibling stamps ``replication:<parent>:<k>``
+        (REPLICATION.md §4.4, DATABASE.md §24) instead of the process default,
+        which is what lets a consumer refuse its signals **by name**: the
+        execution bridge admits ``prospective`` and refuses everything else with
+        ``cohort_not_live`` (T3.15e). Before ``0012_replication`` the label was
+        unrepresentable and a sibling emitted as ``prospective`` — the one
+        cohort the bridge admits — leaving only ``purpose`` and the absence of
+        an ``agents`` row between a research sibling and the wallet.
+
+        **A replay keeps its own run label**, sibling or not. Cohorts separate
+        populations *of the same version*, and a replay of a sibling is not the
+        sibling's reserved forward evaluation (SHADOW-LAB.md §1); collapsing the
+        two would also put a replay into the slot
+        ``uq_shadow_episodes_slot`` reserves for the forward run.
+        """
+        if self.replication_parent_id is None or self.replication_index is None:
+            return process_cohort
+        if process_cohort != ShadowCohort.PROSPECTIVE:
+            return process_cohort
+        return ShadowCohort.replication(self.replication_parent_id, self.replication_index)
 
 
 @dataclass(frozen=True, slots=True)
@@ -232,6 +268,8 @@ async def load_version_roster(session: AsyncSession) -> VersionRoster:
                 StrategyVersion.default_parameters,
                 StrategyVersion.code_ref,
                 StrategyVersion.purpose,
+                StrategyVersion.replication_parent_id,
+                StrategyVersion.replication_index,
                 StrategyRow.key,
             )
             .join(StrategyRow, StrategyRow.id == StrategyVersion.strategy_id)
@@ -277,6 +315,8 @@ async def load_version_roster(session: AsyncSession) -> VersionRoster:
                 strategy=strategy,
                 code_ref=row.code_ref,
                 purpose=row.purpose,
+                replication_parent_id=row.replication_parent_id,
+                replication_index=row.replication_index,
             )
         )
     roster = VersionRoster(versions=versions, active_rows=len(rows), rejected=rejected)

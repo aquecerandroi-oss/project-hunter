@@ -29,6 +29,7 @@ from sqlalchemy import text
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import ShadowCohort, TradeDirection
 from hunter_core.strategies.envelope import PURPOSE_PAPER, PURPOSE_RESEARCH_ONLY
+from hunter_strategy_worker.activation_db import Refused
 from hunter_strategy_worker.catalogue import load_version_roster
 from hunter_strategy_worker.replication_stats import arm_label, load_sibling_rows
 
@@ -145,7 +146,9 @@ async def _versions(session: Any, key: str) -> list[Any]:
             await session.execute(
                 text(
                     "SELECT v.id, v.version, v.status, v.purpose, v.activated_at, v.code_ref, "
-                    "v.default_parameters, v.parameters_schema, v.params_format, v.changelog "
+                    "v.default_parameters, v.parameters_schema, v.params_format, "
+                    "v.changelog, v.promising_at, v.promising_by, "
+                    "v.replication_parent_id, v.replication_index "
                     "FROM strategy_versions v JOIN strategies s ON s.id = v.strategy_id "
                     "WHERE s.key = :key ORDER BY length(v.version), v.version"
                 ),
@@ -276,6 +279,15 @@ class TestReplicate:
             assert row.changelog.startswith(arm_label(version_id, index))
             assert "promising_at=" in row.changelog
             assert "seed=20260908" in row.changelog
+            # 0012_replication: a linhagem é coluna, não uma frase do changelog
+            assert row.replication_parent_id == version_id
+            assert row.replication_index == index
+            # e a irmã não é ela própria promissora — o carimbo é do pai
+            assert row.promising_at is None
+        # O pai é tocado numa coluna só, e é a razão da 0012 (DATABASE.md §24).
+        assert parent.promising_at is not None
+        assert parent.promising_by == "replicate_strategy_version:validada"
+        assert parent.replication_parent_id is None and parent.replication_index is None
         assert [event.event for event in events] == [
             "strategy_version_promising",
             "strategy_version_replicated",
@@ -374,11 +386,10 @@ class TestReplicate:
         """Item 4 do brief: as irmãs rodam como qualquer versão de pesquisa ativa,
         e a ponte as recusa pelo ``purpose`` antes de qualquer consulta de carteira.
 
-        O rótulo ``replication:<pai>:<k>`` **ainda não** pode ser a coorte do
-        banco (o CHECK de ``0002_shadow_lab`` só aceita ``prospective`` e
-        ``replay:<uuid>``); a asserção abaixo registra isso como pendência viva —
-        se um dia a migração ampliar o padrão, este teste falha e o protocolo é
-        atualizado junto (REPLICATION.md §4.4).
+        Desde a ``0012_replication`` (T3.19c) o rótulo ``replication:<pai>:<k>``
+        **é** a coorte do banco e a coorte que a irmã carimba, então a terceira
+        barreira deixa de ser hipotética: a ponte recusa por ``purpose`` e, se
+        alguém rotulasse a irmã de ``paper``, recusaria de novo pela coorte.
         """
         pytest.importorskip("hunter_execution_worker")
         from hunter_execution_worker.bridge_repo import ShadowSignal
@@ -452,6 +463,64 @@ class TestReplicate:
                 now=START,
             )
             assert labelled.refused == "cohort_not_live"
-            # Pendência viva: o rótulo do braço ainda não é uma coorte que o
-            # banco aceite (CHECK de 0002_shadow_lab) — REPLICATION.md §4.4.
-            assert ShadowCohort.is_valid(arm_label(version_id, sibling.k)) is False
+            # T3.19c: a pendência da REPLICATION.md §4.4 está fechada. O rótulo
+            # do braço é uma coorte que o banco aceita (0012_replication) **e**
+            # a coorte que esta irmã de fato carimba — a recusa acima deixa de
+            # ser hipotética e passa a descrever o sinal que ela emite.
+            assert ShadowCohort.is_valid(arm_label(version_id, sibling.k)) is True
+            assert version.cohort(ShadowCohort.PROSPECTIVE) == arm_label(version_id, sibling.k)
+        # E o pai, que não é irmã de ninguém, continua carimbando prospective.
+        assert running[version_id].cohort(ShadowCohort.PROSPECTIVE) == ShadowCohort.PROSPECTIVE
+
+
+@pytest.mark.integration
+class TestMarkPromising:
+    """``promising_at`` é escrito por um lugar só (brief T3.19c, entrega 3).
+
+    O carimbo decide onde o bloco 1 do protocolo começa a contar
+    (REPLICATION.md §1.6): dois escritores seriam duas datas, e a mais recente
+    ganharia sem que ninguém visse a outra sumir.
+    """
+
+    async def test_it_stamps_once_and_never_moves_the_stamp(self, db_session_factory: Any) -> None:
+        from hunter_strategy_worker.replication import mark_promising
+
+        key = "replication_mark"
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            _, version_id = await activate_version(session, key=key)
+        async with db_session_factory() as session, session.begin():
+            first = await mark_promising(
+                await session.connection(), version_id, "scoreboard:validada"
+            )
+        async with db_session_factory() as session, session.begin():
+            again = await mark_promising(
+                await session.connection(), version_id, "outra fonte qualquer"
+            )
+        assert again == first, "um carimbo existente nunca se move"
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            rows = await _versions(session, key)
+            events = await _events(session, version_id)
+        assert rows[0].promising_at is not None
+        # A segunda chamada não reescreveu a atribuição da primeira.
+        assert rows[0].promising_by == "scoreboard:validada"
+        # ...nem duplicou a auditoria: um evento por marcação de fato feita.
+        assert [event.event for event in events] == ["strategy_version_promising"]
+        assert events[0].data["promising_by"] == "scoreboard:validada"
+        assert events[0].data["promising_at"] == first.isoformat()
+
+    async def test_it_refuses_an_attribution_the_check_would_refuse(
+        self, db_session_factory: Any
+    ) -> None:
+        """Recusa, nunca truncamento: o CHECK aceita 1..64 caracteres, e cortar
+        um rótulo de 200 inventaria uma atribuição que ninguém escreveu."""
+        from hunter_strategy_worker.replication import PROMISING_BY_MAX, mark_promising
+
+        key = "replication_mark_bad"
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            _, version_id = await activate_version(session, key=key)
+        for source in ("", "   ", "x" * (PROMISING_BY_MAX + 1)):
+            async with db_session_factory() as session, session.begin():
+                with pytest.raises(Refused, match="promising_by"):
+                    await mark_promising(await session.connection(), version_id, source)
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            assert (await _versions(session, key))[0].promising_at is None

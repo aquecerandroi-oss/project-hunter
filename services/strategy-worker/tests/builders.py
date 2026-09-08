@@ -464,7 +464,14 @@ async def isolate_catalogue(session: AsyncSession, *, keep: str = "volume_anomal
     ran have to state which catalogue they expect instead of inheriting it.
     ``status`` is the one lifecycle field the trigger leaves mutable
     (DATABASE.md §16.1), which is exactly what makes this possible.
+
+    Since ``0011_strategy_activation_owner`` the worker role cannot write
+    ``status`` either (only the activation script, as the owner, may): this
+    fixture switches to the session owner for its two statements and puts the
+    role back, the same way ``activate_version`` does.
     """
+    current_role = await session.scalar(text("SELECT current_user"))
+    await session.execute(text("RESET ROLE"))
     await session.execute(
         text(
             "UPDATE strategy_versions v SET status = 'deprecated' FROM strategies s "
@@ -479,3 +486,4 @@ async def isolate_catalogue(session: AsyncSession, *, keep: str = "volume_anomal
         ),
         {"keep": keep},
     )
+    await session.execute(text(f"SET LOCAL ROLE {current_role}"))

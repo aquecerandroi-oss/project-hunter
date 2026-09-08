@@ -18,6 +18,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    SmallInteger,
     Text,
     UniqueConstraint,
     func,
@@ -78,6 +79,25 @@ class StrategyVersion(Base, UUIDPrimaryKeyMixin):
             "purpose IN ('research_only', 'paper', 'live')",
             name="purpose_is_a_known_label",
         ),
+        # 0012_replication (DATABASE.md §24) — a sibling's lineage is a column,
+        # not a sentence in ``changelog``. Spelled out here for the same reason
+        # as the CHECK above.
+        CheckConstraint(
+            "(replication_parent_id IS NULL) = (replication_index IS NULL) "
+            "AND (replication_index IS NULL OR replication_index BETWEEN 1 AND 99) "
+            "AND replication_parent_id IS DISTINCT FROM id",
+            name="replication_lineage",
+        ),
+        CheckConstraint(
+            "(promising_at IS NULL) = (promising_by IS NULL) "
+            "AND (promising_by IS NULL OR char_length(promising_by) BETWEEN 1 AND 64)",
+            name="promising_is_attributed",
+        ),
+        UniqueConstraint(
+            "replication_parent_id",
+            "replication_index",
+            name="uq_strategy_versions_replication_arm",
+        ),
     )
 
     strategy_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("strategies.id", ondelete="CASCADE"))
@@ -103,6 +123,41 @@ class StrategyVersion(Base, UUIDPrimaryKeyMixin):
     value instead of the worker hardcoding one, and a ``live`` row is refused at
     the origin (``hunter_strategy_worker.catalogue``), never evaluated at all.
     """
+    promising_at: Mapped[datetime | None]
+    """When the scoreboard first called this version ``validada`` — the marker the
+    replication protocol counts its out-of-sample block from (``0012_replication``,
+    REPLICATION.md §1.6, DATABASE.md §24).
+
+    Deliberately **not** frozen by the first-activation trigger: it is written
+    *after* activation by definition. What protects it is that only the owner
+    connection may write it (``hunter_strategy_worker.replication.mark_promising``)
+    and that the write never moves an existing timestamp.
+    """
+
+    promising_by: Mapped[str | None] = mapped_column(Text)
+    """Which verdict wrote :attr:`promising_at`. ``NULL`` exactly when it is
+    (CHECK): a marker nobody can attribute is a date, not evidence — the argument
+    ``signal_outcomes.no_entry_reason`` makes about the empty string."""
+
+    replication_parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategy_versions.id", name="fk_strategy_versions_replication_parent")
+    )
+    """The promising version this row is a jittered sibling of, or ``NULL``.
+
+    ``ON DELETE NO ACTION`` (the default), never ``RESTRICT``: NO ACTION is
+    checked at the end of the statement, so a whole ``strategies`` family still
+    cascades away while a lone parent delete that would orphan its siblings is
+    refused — ``participation_consumptions``' choice, and its reason (§18.5).
+    """
+
+    replication_index: Mapped[int | None] = mapped_column(SmallInteger)
+    """``k`` of ``replication:<parent>:<k>``, 1..99 — the arm this sibling runs.
+
+    ``NULL`` if and only if :attr:`replication_parent_id` is (CHECK): half a
+    lineage names an experiment nobody can find again. ``UNIQUE (parent, index)``
+    gives an arm one sibling and is also the foreign key's index (§1).
+    """
+
     changelog: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     activated_at: Mapped[datetime | None]
