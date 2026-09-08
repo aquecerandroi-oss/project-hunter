@@ -161,6 +161,45 @@ reamostras, `BOOTSTRAP_CONFIANCA = 0.95`, semente registrada, intervalo percenti
 
 ---
 
+### 3.5 O que um replay histórico pode e não pode contar (T3.19b — **proposta**, não decisão)
+
+O motor de replay (`docs/PIPELINE.md` §6c) roda a **mesma** versão, com os **mesmos** custos e as
+mesmas regras de não-antecipação, sobre as velas persistidas, e grava sob a coorte `replay:<uuid>`.
+Ele existe porque os blocos 1 e 2 desta seção precisam de 50 resultados e 15 dias **por irmã**, e a
+faixa viva rende ~600 sinais/dia para a família inteira. A pergunta que ele levanta é de método, e
+**quem decide é o Everton** — esta subseção propõe, não altera a régua:
+
+**O que o replay não pode contar, e isto não é negociável dentro do protocolo:**
+
+1. **Bloco 1 (`out_of_sample`) não aceita replay.** O bloco conta resultados com
+   `emitted_at > promising_at`, e "fora da amostra no tempo" quer dizer *o mercado ainda não tinha
+   acontecido quando a versão foi congelada*. Um replay sobre janela anterior a `promising_at` é,
+   por definição, dentro da amostra; um replay sobre janela posterior é a mesma população que a
+   faixa viva já mediu, contada duas vezes. Em nenhuma das duas leituras ele é evidência nova.
+2. **A régua de maturidade do placar (§1.4) continua só com a coorte `prospective`.** É a regra
+   editorial da `SHADOW-LAB.md` §9 e a T3.18 já a implementa; misturar as duas populações num
+   número chamado "validada" é o pior resultado possível.
+3. **Nenhum replay carimba `promising_at`.** O marco é o instante em que a versão foi vista
+   `validada` pela avaliação prospectiva reservada dela.
+
+**O que o replay pode contar, se o Everton aceitar:**
+
+4. **Bloco 2 (`siblings`), com a janela declarada.** É o bloco que o replay resolve de verdade: as
+   dez irmãs nascem hoje e precisariam de 15 dias × 10 para dizer qualquer coisa; um replay das dez
+   sobre os mesmos 31 dias do pai entrega a vizinhança inteira em horas. O bloco pergunta se o
+   **platô** de parâmetros existe, e um platô é uma propriedade da superfície, não do calendário.
+   *Preço declarado:* as dez irmãs replayadas correm sobre exatamente os mesmos minutos do pai —
+   dez leituras correlacionadas, como o §3.3 já dizia, agora sem nem a variação de calendário que a
+   corrida viva dava. Se aceito, o relatório tem de dizer `siblings: replay sobre <janela>` e nunca
+   apresentar o bloco como se fosse prospectivo.
+5. **Bloco 3 (`market_halves`) e bloco 4 (`bootstrap`)** são computação sobre resultados que já
+   existem; sobre uma população de replay eles são calculáveis e **informativos**, nunca
+   substitutos. Se a população do pai for replay, os dois blocos herdam a mesma etiqueta.
+
+**Como o placar mostra (T3.18, contrato):** as coortes de replay são lidas **separadamente** das
+vivas e rotuladas — `replay: N operações sobre <janela>` — e nunca somadas na régua de maturidade.
+Um cartão de versão mostra os dois números lado a lado, com a régua aplicada só ao vivo.
+
 ## 4. Como as irmãs nascem — `infra/scripts/replicate_strategy_version.py`
 
 ```
@@ -408,6 +447,30 @@ família replicada, e cada irmã segura `tracking_hold` dos seus mercados (`SHAD
 de replicar duas famílias ao mesmo tempo, olhe CPU do `strategy-worker`, tamanho de
 `agent_signals`/`signal_outcomes` e o lag do consumidor. **Isto é um limite de recurso, não de
 método** — mas replicar sem olhar transformaria a validação na causa da próxima falha de coleta.
+
+**Com o motor de replay (T3.19b), o "~11×" deixa de ser uma estimativa.** Números medidos em
+2026-09-08 sobre velas reais (`docs/DEPLOYMENT.md` §5.2, `.claude/state/notes-T3.19b.md`) e a
+aritmética que sai deles, com `REPLAY_CPU_SHARE = 0,33` na VPS de 12 vCPU (3 processos, ~20 ms por
+barra projetados, ~72 CPU-h/dia disponíveis para replay):
+
+| Unidade | Barras | CPU-h | Operações simuladas (entrada + desfecho) |
+|---|---:|---:|---:|
+| 1 versão de 5 min × 200 mercados × 31 dias | 1 785 600 | ~9,9 | ~21 400 (densidade medida 1,2 %) |
+| 1 versão de 15 min × 200 mercados × 31 dias | 595 200 | ~3,3 | ~10 700 (densidade medida 1,8 %) |
+| **Rodada completa de 5 min (pai + 10 irmãs), 31 dias** | 19 641 600 | **~109** | **~236 000** |
+| **Rodada completa de 15 min (pai + 10 irmãs), 31 dias** | 6 547 200 | **~36** | **~118 000** |
+
+Ou seja: **uma rodada de replicação inteira de uma família de 5 min cabe em cerca de um dia e meio
+de replay** dentro do orçamento, e entrega em uma tacada mais resultados avaliáveis do que a faixa
+viva produziria em meses. A meia-régua do §1.5 (50 resultados × 15 dias por irmã) deixa de ser o
+gargalo de **amostra**; o que ela continua exigindo, e o replay **não** entrega, é **dias distintos
+de decisão vividos para a frente** — o que é exatamente a distinção do §3.5.
+
+O limite honesto do orçamento: em *operações fechadas por dia* o teto é ~160 mil, não 500 mil. A
+meta de meio milhão de validações por dia é atingida com folga se "validação" for **uma decisão
+simulada** (barra avaliada: ~10,8 milhões/dia); em operações com desfecho ela exigiria ~3,2 × esta
+máquina. A escolha da unidade é do Everton e está registrada aqui para não virar ambiguidade de
+relatório.
 
 ## 10. Referências
 

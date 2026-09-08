@@ -11,6 +11,17 @@ the point of the design:
 - and the envelope is written exactly once. If the insert conflicts, **nothing**
   is rewritten: the second attempt does not get to restate what the strategy
   saw, because by then it would be restating it with today's data.
+
+**One decision writes three rows instead of four when its cohort is a replay**
+(T3.19b). ``shadow_outbox`` exists so a *live* decision reaches the consumers of
+``shadow.signals.emitted`` — and the only consumer that matters is the execution
+bridge, which refuses any cohort other than ``prospective`` by name
+(``cohort_not_live``, ``bridge_screen.py``, T3.15e). A replay is nobody's event:
+publishing it would put half a million rows a day through a dispatcher whose lag
+is a readiness check, to be refused one by one at the far end. The rule is read
+off the cohort here — the one place every decision passes through — and not from
+a flag the caller could forget: an event that must not exist is not a
+responsibility to delegate.
 """
 
 from __future__ import annotations
@@ -22,7 +33,12 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from hunter_core.db.models.agents import AgentSignal, SignalOutcome
 from hunter_core.db.models.agents_shadow import ShadowOutbox
-from hunter_core.domain.enums import OutcomeResult, SignalStatus, TradeDirection
+from hunter_core.domain.enums import (
+    OutcomeResult,
+    ShadowCohort,
+    SignalStatus,
+    TradeDirection,
+)
 from hunter_core.events.streams import Streams
 from hunter_core.logging import get_logger
 
@@ -33,7 +49,19 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-__all__ = ["persist_decision"]
+__all__ = ["is_published_cohort", "persist_decision"]
+
+
+def is_published_cohort(cohort: str) -> bool:
+    """Whether decisions of ``cohort`` get a ``shadow_outbox`` row.
+
+    Everything except a replay does. A replication sibling still publishes: its
+    signals are a forward population that the bridge screens like any other (and
+    refuses, by ``purpose`` and by cohort), and the outbox is where the Lab's
+    consumers see it happen. A ``replay:<run_id>`` is history being recomputed —
+    there is no "it happened" to announce.
+    """
+    return not cohort.startswith(ShadowCohort.REPLAY_PREFIX)
 
 
 async def persist_decision(session: AsyncSession, record: ShadowRecord) -> bool:
@@ -85,13 +113,14 @@ async def persist_decision(session: AsyncSession, record: ShadowRecord) -> bool:
         )
         .on_conflict_do_nothing(index_elements=["signal_id"])
     )
-    await session.execute(
-        pg_insert(ShadowOutbox)
-        .values(
-            event_id=record.signal_id,
-            stream=Streams.SHADOW_SIGNALS_EMITTED,
-            payload=record.payload,
+    if is_published_cohort(record.cohort):
+        await session.execute(
+            pg_insert(ShadowOutbox)
+            .values(
+                event_id=record.signal_id,
+                stream=Streams.SHADOW_SIGNALS_EMITTED,
+                payload=record.payload,
+            )
+            .on_conflict_do_nothing(index_elements=["event_id"])
         )
-        .on_conflict_do_nothing(index_elements=["event_id"])
-    )
     return True

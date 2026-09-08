@@ -48,6 +48,7 @@ if TYPE_CHECKING:
 
     from hunter_strategy_worker.catalogue import ActiveVersion
     from hunter_strategy_worker.config import ShadowConfig
+    from hunter_strategy_worker.context import CandleReader
     from hunter_strategy_worker.record import ShadowRecord
     from hunter_strategy_worker.repo import MarketRow
 
@@ -85,6 +86,7 @@ async def evaluate_slot(
     bar_close: datetime,
     config: ShadowConfig,
     clock: Callable[[], datetime] = utcnow,
+    candles_reader: CandleReader | None = None,
 ) -> Evaluation:
     """Evaluate one (version, market, bar) and apply whatever it implies.
 
@@ -92,6 +94,11 @@ async def evaluate_slot(
     relative to its own timeline instead of the wall clock. It never reaches the
     strategy: the observation is cut at ``bar_close``, which is what forbids
     look-ahead.
+
+    ``candles_reader`` is injectable for cost, never for content: it must answer
+    exactly what :func:`hunter_strategy_worker.repo.load_candles` answers, and a
+    replay passes one that read the whole slice once instead of the same 1560
+    minutes per bar (T3.19b). ``None`` is the live path, unchanged.
     """
     now = clock()
     lag_s = (now - bar_close).total_seconds()
@@ -124,6 +131,7 @@ async def evaluate_slot(
             source_bar_close=bar_close,
             config=config,
             code_ref=version.code_ref,
+            candles_reader=candles_reader,
         )
     evaluation = version.strategy.explain(context, version.params)
     shadow_evaluations_total.labels(

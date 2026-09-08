@@ -251,6 +251,70 @@ depende, e um socket spot reconectando não pode derrubar o coletor inteiro.
 Registrado como lacuna (sem métrica numérica de idade/erro do SPOT) para quem
 continuar a T3.0/T3.M.
 
+### 5.2 Replay histórico — como rodar e quanto custa (T3.19b)
+
+Job, não serviço. Contrato em `docs/PIPELINE.md` §6c; nada aqui ativa nada nem chega à carteira.
+
+```bash
+# uma corrida, direto (a partir do repo, com o .env da máquina)
+uv run python -m hunter_strategy_worker.replay.run \
+    --version volume_anomaly:v2 --from 2026-08-08 --to 2026-09-08 \
+    --markets all --workers 3 --ledger /opt/hunter/replay.jsonl
+
+# o que seria feito, sem escrever nada
+uv run python -m hunter_strategy_worker.replay.run --version momentum:v2 \
+    --from 2026-08-08 --to 2026-09-08 --markets all --dry-run
+
+# drenar a fila que o plantão enfileirou (replay:queue no Redis)
+uv run python -m hunter_strategy_worker.replay.run --drain-queue --max-runs 1
+```
+
+Janelas longas devem ser **fatiadas** (`--from/--to` em pedaços, mesmo `--cohort`): a janela é
+semiaberta, o `signal_id` é `uuid5` e o INSERT é `ON CONFLICT DO NOTHING`, então repetir uma fatia
+não duplica nada — mas cada comando termina, grava seu recibo e libera a máquina.
+
+**Orçamento (`REPLAY_*`, todos opcionais):**
+
+| Variável | Padrão | O que faz |
+|---|---|---|
+| `REPLAY_CPU_SHARE` | `0.33` | fração das vCPU que o pool pode usar. `floor(12 × 0,33) = 3` processos na VPS, deixando nove para coleta/scanner/estratégia/execução |
+| `REPLAY_MAX_WORKERS` | `4` | teto absoluto, para uma máquina maior não virar um experimento maior sem alguém decidir |
+| `REPLAY_MAX_CONCURRENT_RUNS` | `1` | duas corridas entrelaçadas tornam o número de throughput das duas ininterpretável |
+| `REPLAY_PAUSE_ON_DEGRADED` | `true` | lê `hb:strategy:shadow` antes de cada corrida e pausa com motivo (`heartbeat_missing`, `heartbeat_stale:<s>`, `outbox_lag:<s>`, `heartbeat_unreadable`) |
+| `REPLAY_HEARTBEAT_MAX_AGE_S` | `60` | o worker vivo escreve a cada 10 s com TTL 60 |
+| `REPLAY_OUTBOX_LAG_MAX_S` | `60` | espelha `SHADOW_OUTBOX_LAG_ALERT_S` |
+| `REPLAY_QUEUE_KEY` | `replay:queue` | lista Redis, `LPUSH`/`RPOP` |
+
+**Custo medido (2026-09-08, prova real; detalhes e ressalvas em `.claude/state/notes-T3.19b.md`):**
+
+| Medida | Valor |
+|---|---|
+| Round trip até o Postgres, PC de dev (Docker Desktop/Windows, loopback) | **44,88 ms** |
+| Statements SQL por barra replayada | **11,25** (≈ 14,5 round trips com BEGIN/COMMIT) |
+| CPU por barra (cache de janela quente): `build_context` + `explain` | **4,04 + 2,62 = 6,7 ms** |
+| Corrida real: momentum v2 (15 m), 31 dias × 3 mercados | **8 928 barras, 1 820 s, 4,90 barras/s** com 3 processos |
+| Linhas de `shadow_outbox` produzidas por cinco coortes de replay | **0** |
+
+O número do PC é **latência de rede**, não algoritmo: 14,5 × 44,88 ms ≈ 651 ms dos 654 ms medidos
+por barra. Na VPS o Postgres é um contêiner na mesma máquina (§9), com round trip da ordem de
+0,3 ms, e a barra passa a ser limitada por CPU:
+
+```
+barra_vps ≈ 15 ms de CPU (6,7 ms medidos, com margem de 2x para a vCPU da Contabo)
+          + 14,5 × 0,3 ms de round trip
+          ≈ 20 ms  →  ~50 barras/s por processo  →  ~150 barras/s com 3 processos
+```
+
+**~10,8 milhões de barras avaliadas por dia** com 20 h/dia de replay — 21 × a meta de 500 mil. Em
+*operações simuladas com entrada e desfecho* a densidade medida é 1,2 % (5 m) a 1,8 % (15 m) dos
+bars avaliados, o que dá **~160 mil/dia**: a meta de 500 mil operações fechadas por dia exigiria
+~3,2 × este orçamento (≈ 10 vCPU dedicadas, o que faminta a faixa viva). Ver `docs/plans/REPLICATION.md`
+§9 e as notas para a aritmética completa e as alavancas.
+
+**Regra de convívio:** o replay nunca compete com a coleta. Se `/ready` do `strategy-worker` ou do
+`market-worker` estiver vermelho, ou o heartbeat estiver velho, o job pausa sozinho; se for preciso
+parar à mão, basta não drenar a fila — nada fica pela metade (cada fatia commita a sua).
+
 ## 6. Playbook de incidente
 
 | Sintoma | Ação |

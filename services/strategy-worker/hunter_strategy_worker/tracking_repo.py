@@ -149,7 +149,11 @@ def _base_query() -> Any:
 
 
 async def load_open_trackings(
-    session: AsyncSession, *, limit: int = SWEEP_LIMIT, market_id: uuid.UUID | None = None
+    session: AsyncSession,
+    *,
+    limit: int = SWEEP_LIMIT,
+    market_id: uuid.UUID | None = None,
+    cohort: str | None = None,
 ) -> list[OpenTracking]:
     """At most ``limit`` trackings waiting for an entry or in the hypothetical
     market, oldest signal first.
@@ -157,10 +161,18 @@ async def load_open_trackings(
     Ordered by ``signal_id`` (a ``uuid5``, so effectively arbitrary but stable):
     a stable order means a backlog is worked through deterministically instead
     of a random half being starved every pass.
+
+    ``cohort`` narrows the sweep to one population, read from the outcome's own
+    ``meta.cohort`` (written once by ``record.build_record``, never rewritten).
+    The live sweep passes ``None`` and is unchanged; a replay run passes its
+    ``replay:<run_id>`` so that draining *its* trackings can never advance a
+    prospective one with a clock from the past (T3.19b).
     """
     query = _base_query().where(SignalOutcome.tracking_state.in_(_OPEN_STATES))
     if market_id is not None:
         query = query.where(AgentSignal.market_id == market_id)
+    if cohort is not None:
+        query = query.where(SignalOutcome.meta["cohort"].astext == cohort)
     rows = (await session.execute(query.order_by(SignalOutcome.signal_id).limit(limit))).all()
     return [_row_to_tracking(row) for row in rows]
 

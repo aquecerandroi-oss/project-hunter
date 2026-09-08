@@ -36,12 +36,27 @@ from hunter_strategy_worker.record import Provenance
 from hunter_strategy_worker.repo import load_candles, newest_received_at
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     import redis.asyncio as redis_asyncio
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from hunter_core.domain.market import NormalizedCandle
     from hunter_strategy_worker.config import ShadowConfig
     from hunter_strategy_worker.repo import MarketRow
+
+    CandleReader = Callable[..., Awaitable[list[NormalizedCandle]]]
+    """The signature of :func:`hunter_strategy_worker.repo.load_candles`.
+
+    Injectable for one reason and one only: a replay evaluates thousands of
+    consecutive bars of the same market, and consecutive bars share all but a
+    handful of the 1560 minutes behind them. Re-reading (and re-validating) that
+    window per bar is the dominant cost of a historical run, so the replay
+    passes a reader that loaded the slice once and slices it
+    (``replay/candles.py``). It must return **exactly** what ``load_candles``
+    would — same filter, same order, same objects — and the equivalence is a
+    test, not a claim (``test_replay_candle_cache``).
+    """
 
 __all__ = ["build_market_context"]
 
@@ -62,10 +77,12 @@ async def build_market_context(
     source_bar_close: datetime,
     config: ShadowConfig,
     code_ref: str | None = None,
+    candles_reader: CandleReader | None = None,
 ) -> tuple[StrategyContext, Provenance]:
     """The context for one market as of ``source_bar_close``, plus its provenance."""
     start = source_bar_close - timedelta(minutes=config.context_minutes)
-    durable = await load_candles(session, market=market, start=start, end=source_bar_close)
+    read = candles_reader or load_candles
+    durable = await read(session, market=market, start=start, end=source_bar_close)
     tail = await hot_state.read_tail(
         redis,
         exchange=market.exchange,

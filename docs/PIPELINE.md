@@ -243,6 +243,34 @@ Trilha de **pesquisa**, paralela ao §6: mede o que as estratégias teriam feito
 
 **Backfill.** O `strategy-worker` nunca chama REST: quando falta uma vela, ele espera a recuperação do `market-worker` (dono único do REST) e, esgotado o prazo, encerra o acompanhamento como `censored` com o minuto que faltou — nunca como `expired`.
 
+## 6c. Replay histórico: o mesmo código sobre velas persistidas (T3.19b)
+
+**Onde:** `services/strategy-worker/hunter_strategy_worker/replay/` (job, não serviço). **Gatilho:** um comando ou a fila `replay:queue` no Redis. **Nada aqui ativa nada e nada chega à carteira.**
+
+O §6b mede o que as estratégias fariam **para a frente**, e por isso rende ~600 sinais/dia: uma versão só decide quando o mercado real dispara. A massa de validação que o protocolo de replicação precisa (`docs/plans/REPLICATION.md`) vem daqui: a **mesma** versão, os **mesmos** custos, as **mesmas** regras de não-antecipação, rodadas sobre as velas já persistidas.
+
+```
+uv run python -m hunter_strategy_worker.replay.run \
+    --version <strategy_version_id | key:version> \
+    --from 2026-08-08 --to 2026-09-08 \
+    --markets all|BTCUSDT,ETHUSDT --cohort replay:<uuid> [--workers N] [--ledger x.jsonl] [--dry-run]
+```
+
+**Não existe um segundo caminho de avaliação.** Uma barra replayada é uma chamada a `decide.evaluate_slot` — a mesma função que o consumidor chama quando uma vela fecha. O replay só fornece os dois pontos que a função já lê do mundo (`replay/environment.py`):
+
+- **o relógio**: `evaluate_slot` já recebe `clock` por parâmetro; o replay devolve `bar_close + REPLAY_DECISION_LAG_S` (2 s), o que põe a entrada na abertura de `bar_close + 1min`, dentro do `max_entry_delay_s` congelado. Qualquer lag ≥ 60 s moveria a barra de entrada e mudaria a população;
+- **o hot state**: para uma barra que fechou dias atrás o Redis está vazio por construção (o corte descarta tudo ≥ `source_bar_close`), então o adaptador responde "nada" às três leituras que o caminho vivo faz, e o replay lê só a série durável.
+
+Consequências que vêm de graça, por reuso e não por repetição: contexto cortado em `source_bar_close` só com velas `is_final`; máquina de estados do slot, barreira de re-arme e uma-tracking-por-slot; barra de entrada, custos assumidos, níveis congelados, envelope e identidade `uuid5`; saídas pelo `walker.walk` e liquidação pelo `settle.settle` (funding incluído, com o mesmo motivo quando não dá para estabelecer).
+
+**A coorte é o isolamento.** Toda decisão sai com `replay:<run_id>` (gramática de `0002_shadow_lab`, mantida pela `0012_replication`): ela entra no `signal_id`, é a terceira coluna do slot de episódio, e **impede a linha de outbox** — `persist.is_published_cohort` recusa publicar uma coorte de replay, porque um replay não é o evento de ninguém e meio milhão de linhas/dia atravessariam um despachante cujo atraso é check de prontidão. A ponte de execução recusaria de qualquer forma (`cohort_not_live`, T3.15e), e isso continua provado por teste.
+
+**Custo e paralelismo.** O paralelismo é **por mercado, em processos** (não threads: o custo está em `Decimal` sob o GIL; não por fatia de tempo do mesmo mercado: o slot é uma máquina de estados sequencial). As velas da fatia inteira são lidas **uma vez** por mercado (`replay/candles.py`), com a garantia — testada — de devolver exatamente o que `repo.load_candles` devolveria. O orçamento (`REPLAY_*`, `replay/budget.py`) limita CPU e corridas simultâneas e **pausa quando o heartbeat da faixa viva degrada**. Números medidos e projeção em `docs/DEPLOYMENT.md` §5.2 e `.claude/state/notes-T3.19b.md`.
+
+**Livro-razão.** Cada corrida grava um recibo (versão, janela, mercados, início/fim, barras, sinais, desfechos, segundos, lag assumido, workers) em `system_events` (`component = 'replay_engine'`) e, opcionalmente, num JSONL. A tabela `replay_runs` ainda não existe — o brief está em `.claude/state/brief-T3.19b-db-replay-runs.md`.
+
+**O que um replay não prova.** A elegibilidade é lida de `markets.is_monitored` **hoje**: não há histórico de pertencimento por barra no schema, então o conjunto replayado é o conjunto atual, não o da janela. Está declarado no envelope (`provenance.eligibility_observed_at` carrega o relógio da corrida) e é a limitação principal do método.
+
 ## 7. Proposal builder e Risk Engine
 
 **Onde:** `strategy-worker`. **Gatilho:** `signals.emitted`.
