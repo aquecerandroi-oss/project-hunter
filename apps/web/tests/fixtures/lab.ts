@@ -1,5 +1,5 @@
 import { buildWalletRuler, type MoneyRuler } from "@/components/lab/lab-money";
-import type { LabSummaryOut, SignalListItemOut, VersionSummaryOut } from "@/lib/api/lab-types";
+import type { CurveOut, LabSummaryOut, ScoreboardRowOut, SignalListItemOut, VersionSummaryOut } from "@/lib/api/lab-types";
 
 /**
  * Fixtures copied from the real example in `.claude/state/contract-S3-lab.md`
@@ -134,4 +134,59 @@ export function makeSignal(overrides: Partial<SignalListItemOut> = {}): SignalLi
 /** The real wallet example from the brief (T3.17): "ever", 19.333,01 USDT. */
 export function exampleRuler(overrides: Partial<MoneyRuler> = {}): MoneyRuler {
   return { ...buildWalletRuler("19333.01", "115998.06"), ...overrides };
+}
+
+/**
+ * T3.18 scoreboard fixtures -- same `momentum`/`v2` identity as the other
+ * fixtures above, shaped as a mature, `validada` version (the API's own
+ * `compute_verdict`: mature, `expectancy_r > 0`, `profit_factor > 1`).
+ * `overrides` layers shallowly, same convention as `makeVersionSummary`.
+ */
+export function exampleScoreboardRow(overrides: Partial<ScoreboardRowOut> = {}): ScoreboardRowOut {
+  return {
+    version: {
+      id: "098b060c-cdc0-46a6-b88b-70d4a5472b97",
+      strategy_key: "momentum",
+      version: "v2",
+      purpose: "paper",
+      status: "active",
+      activated_at: "2026-09-06T02:08:13.332014Z",
+      code_ref: "hunter_core.strategies.momentum_v1@sha256:c012f75c...",
+    },
+    emitted: 137,
+    evaluable: 112,
+    pending: 8,
+    no_entry: 12,
+    censored: 5,
+    distinct_days: 34,
+    distinct_markets: 9,
+    hit_rate: { value: "0.5893", reason: null, numerator: 33, denominator: 56 },
+    net_profit_rate: { value: "0.4732", reason: null, numerator: 53, denominator: 112 },
+    expectancy_r: { value: "0.1834", reason: null },
+    profit_factor: { value: "1.4200", reason: null, sum_positive: "58.4000", sum_negative_abs: "41.1300", sample_size: 112 },
+    sum_r: { value: "20.5408", reason: null, count: 112, ordered_by: "exit_ts" },
+    worst_streak: 4,
+    max_drawdown_r: "6.1200",
+    maturity: { evaluable: 112, days: 34, threshold: { outcomes: 100, days: 30 }, mature: true },
+    verdict: "validada",
+    ...overrides,
+  };
+}
+
+export function makeScoreboardRow(overrides: Partial<ScoreboardRowOut> = {}): ScoreboardRowOut {
+  return exampleScoreboardRow(overrides);
+}
+
+export function exampleCurve(overrides: Partial<CurveOut> = {}): CurveOut {
+  return {
+    strategy_version_id: "098b060c-cdc0-46a6-b88b-70d4a5472b97",
+    as_of: "2026-09-08T12:00:00Z",
+    label: "SOMBRA — hipotético, sem capital, custos assumidos",
+    points: [
+      { ts: "2026-09-06T03:41:00Z", r: "-1.0421", cum_r: "-1.0421" },
+      { ts: "2026-09-06T05:10:00Z", r: "2.0000", cum_r: "0.9579" },
+    ],
+    truncated: false,
+    ...overrides,
+  };
 }

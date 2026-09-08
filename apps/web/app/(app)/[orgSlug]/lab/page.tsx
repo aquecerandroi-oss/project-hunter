@@ -1,19 +1,21 @@
 import { notFound } from "next/navigation";
 
 import { AutoRefresh } from "@/components/auto-refresh";
+import { LabCurveSection } from "@/components/lab/lab-curve-section";
 import { LabError } from "@/components/lab/lab-error";
 import { LabFilters } from "@/components/lab/lab-filters";
 import { LabHeader } from "@/components/lab/lab-header";
 import { buildReferenceRuler, buildWalletRuler, type MoneyRuler } from "@/components/lab/lab-money";
+import { LabScoreboardSection } from "@/components/lab/lab-scoreboard-section";
 import { LabSignalsTable } from "@/components/lab/lab-signals-table";
 import { LabTabs } from "@/components/lab/lab-tabs";
 import { LabVersionCard } from "@/components/lab/lab-version-card";
 import { LabVersionsEmpty } from "@/components/lab/lab-versions-empty";
 import { DEFAULT_AUTO_REFRESH_INTERVAL_MS } from "@/lib/auto-refresh-interval";
 import { isApiError } from "@/lib/api-error";
-import { getLabSignals, getLabSummary, listLabVersions } from "@/lib/api/lab";
+import { getLabCurve, getLabScoreboard, getLabSignals, getLabSummary, listLabVersions } from "@/lib/api/lab";
 import type { LabSignalsParams } from "@/lib/api/lab";
-import type { LabSignalsPage, LabSummaryOut, LabVersionsOut } from "@/lib/api/lab-types";
+import type { CurveOut, LabSignalsPage, LabSummaryOut, LabVersionsOut, ScoreboardOut, ScoreboardRowOut } from "@/lib/api/lab-types";
 import { resolveOrgContext } from "@/lib/api/org-context";
 import { getPortfolioSummary, listPortfolios } from "@/lib/api/portfolio";
 import { logger } from "@/lib/logger";
@@ -67,6 +69,52 @@ async function loadLab(window: LabWindow, cohort: string, versionId: string | un
   }
 }
 
+type ScoreboardLoad =
+  | { ok: true; scoreboard: ScoreboardOut; curvesById: Record<string, CurveOut | null> }
+  | { ok: false; reason: string };
+
+/**
+ * One `/curve` call per version (brief T3.18 item 4), all in parallel, keyed
+ * by `version_id`. A single version's curve failing never fails the whole
+ * Placar -- its line is simply absent (`LabCurveChart`/`buildCurveSeries`
+ * read a missing/`null` entry as "failed", never a fabricated flat line).
+ */
+async function loadCurves(rows: ScoreboardRowOut[], asOf: string): Promise<Record<string, CurveOut | null>> {
+  const settled = await Promise.allSettled(rows.map((row) => getLabCurve({ version_id: row.version.id, as_of: asOf })));
+  const curvesById: Record<string, CurveOut | null> = {};
+  rows.forEach((row, index) => {
+    const result = settled[index];
+    if (result?.status === "fulfilled") {
+      curvesById[row.version.id] = result.value;
+    } else {
+      logger.error("lab_curve_load_failed", { versionId: row.version.id, error: String(result?.reason) });
+      curvesById[row.version.id] = null;
+    }
+  });
+  return curvesById;
+}
+
+/**
+ * The Placar's own data (brief T3.18 items 1-2): a single frozen `as_of`
+ * shared by the scoreboard call and every per-version curve call, so the
+ * curve lines are guaranteed to reflect the exact same population the cards
+ * summarize -- never two snapshots a few milliseconds apart. Independent of
+ * `loadLab`: a Placar failure degrades to its own inline message instead of
+ * blocking the rest of the page (same philosophy as `loadMoneyRuler`).
+ */
+async function loadScoreboard(): Promise<ScoreboardLoad> {
+  try {
+    const asOf = new Date().toISOString();
+    const scoreboard = await getLabScoreboard({ as_of: asOf });
+    const curvesById = await loadCurves(scoreboard.rows, asOf);
+    return { ok: true, scoreboard, curvesById };
+  } catch (error) {
+    const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
+    logger.error("lab_scoreboard_load_failed", { error: reason });
+    return { ok: false, reason };
+  }
+}
+
 /**
  * The organization's real principal paper wallet equity (brief T3.17: "a
  * quantia do patrimônio, nunca digitada"), or a fixed, labelled reference
@@ -99,12 +147,38 @@ export default async function LabPage({ params, searchParams }: LabPageProps) {
   const cohort = sp.cohort?.trim() || "prospective";
   const versionId = sp.version || undefined;
 
-  const [result, ruler] = await Promise.all([loadLab(window, cohort, versionId), loadMoneyRuler(membership.organization.id)]);
+  const [result, ruler, scoreboardResult] = await Promise.all([
+    loadLab(window, cohort, versionId),
+    loadMoneyRuler(membership.organization.id),
+    loadScoreboard(),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
       <AutoRefresh intervalMs={DEFAULT_AUTO_REFRESH_INTERVAL_MS} />
       <h1 className="text-xl font-semibold text-fg">Lab</h1>
+
+      {/* The Placar (brief T3.18, "top of /lab"): every version that has ever
+          emitted a signal, at a glance -- independent of the window/cohort
+          filters below (the scoreboard API only accepts `as_of`, which this
+          page freezes at load time, never a rolling window). */}
+      <section className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-lg font-semibold text-fg">Placar</h2>
+          <p className="text-xs text-fg-muted">
+            Uma linha por versão que já emitiu sinal, ordenada por status ativo primeiro e depois pelo resultado acumulado (R).
+          </p>
+        </div>
+        {scoreboardResult.ok ? (
+          <>
+            <LabScoreboardSection rows={scoreboardResult.scoreboard.rows} ruler={ruler} />
+            <LabCurveSection rows={scoreboardResult.scoreboard.rows} curvesById={scoreboardResult.curvesById} ruler={ruler} />
+          </>
+        ) : (
+          <p className="text-sm text-red">Placar indisponível: falha ao carregar ({scoreboardResult.reason}).</p>
+        )}
+      </section>
+
       <LabTabs />
       {!result.ok ? (
         <LabError reason={result.reason} />

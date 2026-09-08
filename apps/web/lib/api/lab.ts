@@ -2,7 +2,7 @@ import "server-only";
 
 import { apiFetch } from "@/lib/server/api";
 
-import type { LabSignalsPage, LabSummaryOut, LabVersionsOut } from "./lab-types";
+import type { CurveOut, LabSignalsPage, LabSummaryOut, LabVersionsOut, ScoreboardOut } from "./lab-types";
 
 /** `GET /api/v1/lab/shadow/versions` -- the small, frozen catalogue (contract-S3-lab.md). */
 export async function listLabVersions(): Promise<LabVersionsOut> {
@@ -66,4 +66,42 @@ function signalsQuery(params: LabSignalsParams): string {
  */
 export async function getLabSignals(params: LabSignalsParams = {}): Promise<LabSignalsPage> {
   return apiFetch<LabSignalsPage>(`/api/v1/lab/shadow/signals${signalsQuery(params)}`);
+}
+
+export interface LabScoreboardParams {
+  as_of?: string;
+}
+
+function scoreboardQuery(params: LabScoreboardParams): string {
+  const search = new URLSearchParams();
+  if (params.as_of !== undefined) search.set("as_of", params.as_of);
+  const value = search.toString();
+  return value ? `?${value}` : "";
+}
+
+/**
+ * `GET /api/v1/lab/shadow/scoreboard` (brief T3.18) -- one row per
+ * `strategy_version` that has ever emitted a signal, with the mechanical
+ * verdict. Global/no-RLS like the rest of the Shadow Lab (no tenant scope in
+ * the path -- `notes-T3.18.md`'s recorded architecture decision).
+ */
+export async function getLabScoreboard(params: LabScoreboardParams = {}): Promise<ScoreboardOut> {
+  return apiFetch<ScoreboardOut>(`/api/v1/lab/shadow/scoreboard${scoreboardQuery(params)}`);
+}
+
+export interface LabCurveParams {
+  version_id: string;
+  as_of?: string;
+}
+
+function curveQuery(params: LabCurveParams): string {
+  const search = new URLSearchParams();
+  search.set("version_id", params.version_id);
+  if (params.as_of !== undefined) search.set("as_of", params.as_of);
+  return `?${search.toString()}`;
+}
+
+/** `GET /api/v1/lab/shadow/curve?version_id=` (brief T3.18) -- one call per version, capped at 2 000 points (`truncated`). */
+export async function getLabCurve(params: LabCurveParams): Promise<CurveOut> {
+  return apiFetch<CurveOut>(`/api/v1/lab/shadow/curve${curveQuery(params)}`);
 }

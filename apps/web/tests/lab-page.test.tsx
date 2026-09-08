@@ -5,11 +5,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // (see tests/markets-page.test.tsx and tests/invitations-actions.test.ts).
 vi.mock("server-only", () => ({}));
 
-const { resolveOrgContextMock, getLabSummaryMock, listLabVersionsMock, getLabSignalsMock, listPortfoliosMock, getPortfolioSummaryMock } = vi.hoisted(() => ({
+const {
+  resolveOrgContextMock,
+  getLabSummaryMock,
+  listLabVersionsMock,
+  getLabSignalsMock,
+  getLabScoreboardMock,
+  getLabCurveMock,
+  listPortfoliosMock,
+  getPortfolioSummaryMock,
+} = vi.hoisted(() => ({
   resolveOrgContextMock: vi.fn(),
   getLabSummaryMock: vi.fn(),
   listLabVersionsMock: vi.fn(),
   getLabSignalsMock: vi.fn(),
+  getLabScoreboardMock: vi.fn(),
+  getLabCurveMock: vi.fn(),
   listPortfoliosMock: vi.fn(),
   getPortfolioSummaryMock: vi.fn(),
 }));
@@ -19,6 +30,8 @@ vi.mock("@/lib/api/lab", () => ({
   getLabSummary: getLabSummaryMock,
   listLabVersions: listLabVersionsMock,
   getLabSignals: getLabSignalsMock,
+  getLabScoreboard: getLabScoreboardMock,
+  getLabCurve: getLabCurveMock,
 }));
 vi.mock("@/lib/api/portfolio", () => ({
   listPortfolios: listPortfoliosMock,
@@ -37,10 +50,19 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/acme/lab",
 }));
 
+// `LabCurveChart` (T3.18) creates a real `lightweight-charts` chart when it
+// has at least one drawable series -- mocked the same way
+// `tests/portfolio-equity-chart.test.tsx` mocks it, so this page test never
+// depends on a real canvas.
+vi.mock("lightweight-charts", () => ({
+  LineSeries: "line-series-type",
+  createChart: vi.fn(() => ({ addSeries: vi.fn(() => ({ setData: vi.fn(), applyOptions: vi.fn() })), applyOptions: vi.fn(), remove: vi.fn() })),
+}));
+
 import LabPage from "@/app/(app)/[orgSlug]/lab/page";
 import { ApiError } from "@/lib/api-error";
 import type { MembershipOut } from "@/lib/api/types";
-import { exampleSignal, exampleSummary, makeVersionSummary } from "@/tests/fixtures/lab";
+import { exampleCurve, exampleScoreboardRow, exampleSignal, exampleSummary, makeVersionSummary } from "@/tests/fixtures/lab";
 
 const membership: MembershipOut = {
   onboarding: { completed: true, completed_at: "2026-01-01T00:00:00Z", workspace_id: "ws-1" },
@@ -68,6 +90,10 @@ beforeEach(() => {
   getLabSummaryMock.mockReset();
   listLabVersionsMock.mockReset().mockResolvedValue({ items: [] });
   getLabSignalsMock.mockReset().mockResolvedValue({ items: [], next_cursor: null });
+  // Empty Placar by default (brief T3.18) -- exercised by every existing
+  // test unless a case below overrides it.
+  getLabScoreboardMock.mockReset().mockResolvedValue({ as_of: "2026-09-08T12:00:00Z", label: "SOMBRA — hipotético, sem capital, custos assumidos", rows: [] });
+  getLabCurveMock.mockReset().mockResolvedValue(exampleCurve());
   // No wallet by default -- the reference-ruler fallback (brief T3.17) is
   // exercised by every existing test unless a case below overrides it.
   listPortfoliosMock.mockReset().mockResolvedValue({ items: [], next_cursor: null });
@@ -208,5 +234,53 @@ describe("LabPage: the money ruler (brief T3.17)", () => {
     expect(screen.getByTestId("lab-money-ruler")).toHaveTextContent("carteira de referência, sem carteira aberta");
     // A ruler-only failure is not a Lab failure -- the rest of the page still renders.
     expect(screen.queryByText(/sem verificação/)).not.toBeInTheDocument();
+  });
+});
+
+describe("LabPage: the Placar (brief T3.18) at the top of /lab", () => {
+  it("shows the honest empty state when no version has emitted a signal yet", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    const jsx = await renderPage();
+    render(jsx);
+    expect(screen.getByText("Placar")).toBeInTheDocument();
+    expect(screen.getByText("Nenhuma versão do Lab emitiu sinal ainda.")).toBeInTheDocument();
+    expect(getLabScoreboardMock).toHaveBeenCalledWith({ as_of: expect.any(String) });
+  });
+
+  it("renders one card and one curve fetch per scoreboard row, freezing a single as_of for both", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    getLabScoreboardMock.mockResolvedValue({ as_of: "2026-09-08T12:00:00Z", label: "SOMBRA — hipotético, sem capital, custos assumidos", rows: [exampleScoreboardRow()] });
+
+    const jsx = await renderPage();
+    render(jsx);
+
+    const card = screen.getByTestId("lab-scoreboard-card");
+    expect(within(card).getByText("validada")).toBeInTheDocument();
+    expect(getLabCurveMock).toHaveBeenCalledTimes(1);
+    const scoreboardAsOf = (getLabScoreboardMock.mock.calls[0] as [{ as_of: string }])[0].as_of;
+    expect(getLabCurveMock).toHaveBeenCalledWith({ version_id: exampleScoreboardRow().version.id, as_of: scoreboardAsOf });
+  });
+
+  it("degrades to an inline message, without failing the rest of the page, when the scoreboard fetch itself errors", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    getLabScoreboardMock.mockRejectedValue(new Error("network down"));
+
+    const jsx = await renderPage();
+    render(jsx);
+
+    expect(screen.getByText(/Placar indisponível: falha ao carregar/)).toBeInTheDocument();
+    // The rest of the page (the pre-existing Sombra tab) still renders.
+    expect(screen.getByText("momentum / v2")).toBeInTheDocument();
+  });
+
+  it("never fabricates a curve line when the only version's own curve fetch fails -- the honest empty state, not a flat line", async () => {
+    getLabSummaryMock.mockResolvedValue(exampleSummary());
+    getLabScoreboardMock.mockResolvedValue({ as_of: "2026-09-08T12:00:00Z", label: "SOMBRA — hipotético, sem capital, custos assumidos", rows: [exampleScoreboardRow()] });
+    getLabCurveMock.mockRejectedValue(new Error("timeout"));
+
+    const jsx = await renderPage();
+    render(jsx);
+
+    expect(screen.getByText(/Nenhum resultado resolvido ainda para desenhar a curva/)).toBeInTheDocument();
   });
 });

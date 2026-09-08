@@ -6,7 +6,15 @@
  * these are hand-written against the actual Pydantic models, not guessed
  * from the contract doc alone. Every Decimal field is a `string` (never
  * `number` -- CLAUDE.md: money/PnL/R is never `float`).
+ *
+ * T3.18: `packages/shared-types/src/generated/api.d.ts` WAS regenerated for
+ * the new scoreboard/curve schemas (`hunter_api/schemas/{lab_scoreboard,lab_curve}.py`),
+ * so those (only) are aliased straight from `@hunter/shared-types/api` below
+ * -- same convention as `lib/api/portfolio-types.ts`. Migrating the rest of
+ * this file's hand-written types to the same convention is out of this
+ * brief's surgical scope.
  */
+import type { components } from "@hunter/shared-types/api";
 
 export type StrategyVersionStatus = "draft" | "active" | "deprecated";
 export type OutcomeResult = "target" | "stop" | "expired" | "invalidated" | "open";
@@ -184,3 +192,13 @@ export interface LabSignalsPage {
   items: SignalListItemOut[];
   next_cursor: string | null;
 }
+
+// --- T3.18 scoreboard/curve (aliased from the generated OpenAPI types) ---
+
+export type RateWithCountsOut = components["schemas"]["RateWithCountsOut"];
+export type ScoreboardMaturityOut = components["schemas"]["ScoreboardMaturityOut"];
+export type ScoreboardVersionOut = components["schemas"]["ScoreboardVersionOut"];
+export type ScoreboardRowOut = components["schemas"]["ScoreboardRowOut"];
+export type ScoreboardOut = components["schemas"]["ScoreboardOut"];
+export type CurvePointOut = components["schemas"]["CurvePointOut"];
+export type CurveOut = components["schemas"]["CurveOut"];

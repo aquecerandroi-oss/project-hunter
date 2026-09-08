@@ -275,3 +275,52 @@ export function totalsHeading(rowCount: number, hasMore: boolean): string {
 
 /** Always shown under `totalsHeading` (brief T3.17b item 1): the whole-Lab totals are T3.18's job, not this page-bound card's. */
 export const LAB_TOTALS_SCOPE_NOTE = "os totais do Lab inteiro chegam com o placar (T3.18)";
+
+// --- T3.18 scoreboard money (brief item 3: "então os números em dinheiro
+// através da régua do T3.17 -- resultado acumulado USDT/BRL, média por
+// operação") -- same `R * risco` rule as `moneyForRow`, applied to the
+// whole-version `sum_r`/`expectancy_r` the scoreboard API returns instead of
+// one row's `r_multiple`. The API never computes money (brief item 1): only
+// R multiples and counts cross the wire, and this module is the one and only
+// place that turns an R into a ruler-scaled USDT/BRL figure. ---
+
+/** One R-multiple Decimal string converted to USDT through the ruler -- shared by the curve chart's per-point conversion and `scoreboardMoney` below. */
+export function rToUsdt(rValue: string, ruler: MoneyRuler): number {
+  return toNum(rValue) * ruler.riskUsdt;
+}
+
+function decimalOrReasonToUsdt(metric: { value: string | null; reason?: string | null }, ruler: MoneyRuler): MoneyOrReason {
+  if (metric.value === null) return { value: null, reason: metric.reason ?? null };
+  return { value: rToUsdt(metric.value, ruler), reason: null };
+}
+
+function usdtMoneyToBrl(money: MoneyOrReason, ruler: MoneyRuler): MoneyOrReason {
+  if (money.value === null) return { value: null, reason: money.reason };
+  const brl = usdtToBrl(money.value, ruler);
+  return brl !== null ? { value: brl, reason: null } : { value: null, reason: "no_brl_wallet" };
+}
+
+export interface ScoreboardMoney {
+  /** `sum_r * risk` -- the version's whole simulated result, accumulated over every evaluable outcome. */
+  cumulativeUsdt: MoneyOrReason;
+  cumulativeBrl: MoneyOrReason;
+  /** `expectancy_r * risk` -- the mean simulated result per operation. */
+  avgPerOpUsdt: MoneyOrReason;
+  avgPerOpBrl: MoneyOrReason;
+}
+
+/** The scoreboard card's money block (brief T3.18 item 3), built once per row from the same ruler the rest of the Lab uses. */
+export function scoreboardMoney(
+  sumR: { value: string | null; reason?: string | null },
+  expectancyR: { value: string | null; reason?: string | null },
+  ruler: MoneyRuler,
+): ScoreboardMoney {
+  const cumulativeUsdt = decimalOrReasonToUsdt(sumR, ruler);
+  const avgPerOpUsdt = decimalOrReasonToUsdt(expectancyR, ruler);
+  return {
+    cumulativeUsdt,
+    cumulativeBrl: usdtMoneyToBrl(cumulativeUsdt, ruler),
+    avgPerOpUsdt,
+    avgPerOpBrl: usdtMoneyToBrl(avgPerOpUsdt, ruler),
+  };
+}
