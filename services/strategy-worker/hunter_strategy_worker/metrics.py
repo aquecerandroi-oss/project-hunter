@@ -15,6 +15,7 @@ from hunter_core.observability import registry
 
 __all__ = [
     "shadow_evaluations_total",
+    "shadow_version_failed_total",
     "shadow_funding_unresolved_total",
     "shadow_outbox_dispatched_total",
     "shadow_outbox_pending",
@@ -76,6 +77,20 @@ shadow_trackings_unswept = Gauge(
 )
 """``load_open_trackings`` reads at most 500 rows per pass. Past that the sweep
 silently stopped advancing the rest; this is what makes the backlog visible."""
+
+shadow_version_failed_total = Counter(
+    "hunter_shadow_version_failed_total",
+    "Bar evaluations that raised, by strategy key and version. The other "
+    "versions of the same bar still ran and the message was still acked.",
+    ["strategy_key", "version"],
+    registry=registry,
+)
+"""One broken version used to abort the whole bar: ``handle_candle`` looped over
+every due version with no ``try``, so an exception in the first one skipped the
+rest and left the message un-acked (review T3.26-risk, A3). Labelled by version
+— not only by strategy — because the failure that matters is a *derived
+variant* whose frozen parameters raise on every bar while its siblings are fine.
+The cardinality is bounded by the roster (a handful of active rows)."""
 
 shadow_versions_active = Gauge(
     "hunter_shadow_versions_active",

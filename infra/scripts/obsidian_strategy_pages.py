@@ -95,16 +95,25 @@ def parse_parent_version(changelog: str | None) -> str | None:
     survives the variant's own activation, because ``activate_derived`` keeps the
     lineage prefix in front of the operator's note). Anything else is a first
     activation or hand-written prose, and guessing a parent from free text would
-    invent a link nobody asked for."""
+    invent a link nobody asked for.
+
+    Order matters, and ``derived_from`` comes **first** (review T3.26-risk, A5).
+    An activated variant's changelog is its lineage prefix *plus whatever the
+    operator wrote at activation* (``activate_derived.keep_lineage``), and what
+    the operator wrote is free text: ``"succeeds v1 as the cost-floor arm"`` in
+    that note would have made a variant of ``v4`` claim ``v1`` as its parent,
+    and the page would have said so with a straight face. The explicit key wins
+    over every phrase because only the explicit key was written by a tool.
+    """
     if changelog is None:
         return None
     sibling = parse_replication_sibling(changelog)
     if sibling is not None:
         return sibling[0]
     match = (
-        _SUCCEEDS_RE.search(changelog)
+        _DERIVED_FROM_RE.search(changelog)
+        or _SUCCEEDS_RE.search(changelog)
         or _PAPER_LINE_RE.search(changelog)
-        or _DERIVED_FROM_RE.search(changelog)
     )
     return match.group(1) if match else None
 

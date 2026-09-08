@@ -33,11 +33,18 @@ point: the successor continues the frozen experiment, not today's code.
 from a **frozen** ``research_only`` version: a *new* draft row, next free
 ``v<n>``, with that row's own content byte for byte and ``purpose = 'paper'``;
 the source is untouched and nothing is activated (``paper_line.py``). A row that
-already carries **its own content** (``_DERIVED``: a paper line, or a research
-variant of ``infra/scripts/derive_variant.py``, T3.26) is activated by
+already carries **its own content** (a paper line, or a research variant of
+``infra/scripts/derive_variant.py``, T3.26) is activated by
 :mod:`hunter_strategy_worker.activate_derived` — only ``status``, ``activated_at``
 and ``changelog`` move; the plain research path would rewrite its parameters
 from *today's* code and freeze the wrong experiment (review T3.15-risk).
+
+Recognising such a row has **two** layers, because the first one can be erased:
+``carries_own_content`` reads ``purpose`` and the deriving tool's phrase in the
+``changelog`` (a column no trigger freezes), and
+``refuse_rewriting_own_content`` refuses structurally — a draft whose
+``default_parameters`` are non-empty and are not this code's own set is never
+rewritten, whatever its changelog says (review T3.26-risk, A1).
 
 Every run writes a ``system_events`` row — activation, refusal or an unexpected
 failure alike (T3.15c): an experiment whose start nobody can date is not one.
@@ -52,25 +59,27 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import re
 import sys
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 
-from hunter_core.settings import Settings
 from hunter_core.strategies.canonical import PARAMS_FORMAT, canonical_json
 from hunter_core.strategies.registry import DEFAULT_REGISTRY, StrategyRegistry
-from hunter_strategy_worker.activate_derived import activate_derived
+from hunter_strategy_worker.activate_derived import (
+    activate_derived,
+    carries_own_content,
+    refuse_rewriting_own_content,
+)
 from hunter_strategy_worker.activation import validate_parameters
 from hunter_strategy_worker.activation_db import (
     PURPOSE_LIVE,
-    PURPOSE_RESEARCH_ONLY,
     VERSION_RE,
     Refused,
     load_row,
     migration_applied,
+    migration_url,
     purpose_column_present,
     record_event,
     record_failure,
@@ -80,10 +89,6 @@ from hunter_strategy_worker.code_ref import strategy_module, version_code_ref
 from hunter_strategy_worker.paper_line import paper_line
 
 __all__ = ["Refused", "activate", "main", "paper_line", "supersede"]
-
-_DERIVED = re.compile(r"^paper line of v\d+|\bderived_from=v\d+\b")
-"""A ``changelog`` frozen by a deriving tool — spelled out rather than imported
-(like ``activation_db``'s labels): a guard that fails open is not a guard."""
 
 
 def _resolve(
@@ -122,8 +127,10 @@ async def activate(
 ) -> str:
     """Run every check and, unless ``dry_run``, activate. Returns a summary line.
 
-    A row already carrying its own content (``purpose != research_only`` or a
-    ``_DERIVED`` changelog) goes to :func:`activate_derived` (T3.15-risk item 1).
+    A row already carrying its own content goes to :func:`activate_derived`
+    (T3.15-risk item 1) — by its declared marks first
+    (:func:`carries_own_content`), and, for a row whose marks were lost,
+    structurally (:func:`refuse_rewriting_own_content`, T3.26-risk A1).
     """
     if not await migration_applied(conn):
         raise Refused("0002_shadow_lab is not applied: apply the migration before activating")
@@ -139,12 +146,14 @@ async def activate(
         )
     strategy = _resolve(registry, key, version, row.code_ref)
     code_ref = version_code_ref(strategy_module(strategy))
-    if row.purpose != PURPOSE_RESEARCH_ONLY or _DERIVED.search(row.changelog or ""):
+    if carries_own_content(row):
         return await activate_derived(
             conn, key, version, changelog, row, code_ref=code_ref, dry_run=dry_run
         )
     schema: dict[str, Any] = json.loads(canonical_json(dict(strategy.parameters_schema)))
     params: dict[str, Any] = json.loads(canonical_json(dict(strategy.default_parameters)))
+    if row.activated_at is None:
+        refuse_rewriting_own_content(key, version, row, params)
     report = validate_parameters(schema, params)
     if not report.ok:
         raise Refused(
@@ -285,17 +294,6 @@ async def supersede(
         f"{key} {version} -> {successor} with code_ref={code_ref}: {changelog}",
     )
     return f"superseded {key} {version} with {successor} at code_ref {code_ref}"
-
-
-def migration_url() -> str:
-    """``DATABASE_URL_MIGRATIONS`` on the asyncpg driver (as ``seed.py`` does)."""
-    secret = Settings().database_url_migrations
-    if secret is None or not secret.get_secret_value():
-        raise SystemExit("DATABASE_URL_MIGRATIONS is not configured")
-    url = secret.get_secret_value()
-    if url.startswith("postgresql+"):
-        return url
-    return url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 
 async def _run(args: argparse.Namespace) -> int:

@@ -7,13 +7,12 @@ Terceira forma de derivar uma ``strategy_version``, ao lado de ``--supersede``
 (mesmo conteúdo, código novo) e ``--paper-line`` (mesmo conteúdo, propósito
 novo) de ``infra/scripts/activate_strategy_version.py``, e oposta às duas: **o
 código é o mesmo e o conteúdo muda** — um ou mais parâmetros recebem um valor
-explícito e o resto do conjunto congelado do pai é copiado byte a byte. É o que
-``docs/plans/SHADOW-LAB.md`` §1 chama de versão nova ("conteúdo diferente =
-versão nova"). A linha nasce ``draft``, ``activated_at = NULL``,
-``purpose = 'research_only'``, e **nada é ativado aqui**: ativar é uma corrida
-separada e auditada de ``activate_strategy_version.py``, que reconhece a linha
-derivada pelo ``changelog`` e preserva o conteúdo dela em vez de reescrevê-lo a
-partir do código de hoje.
+explícito e o resto do conjunto congelado do pai é copiado byte a byte
+(``docs/plans/SHADOW-LAB.md`` §1: "conteúdo diferente = versão nova"). A linha
+nasce ``draft``, ``activated_at = NULL``, ``purpose = 'research_only'``, e **nada
+é ativado aqui**: ativar é uma corrida separada e auditada de
+``activate_strategy_version.py``, que reconhece a linha derivada pelo conteúdo
+próprio dela e o preserva em vez de reescrevê-lo a partir do código de hoje.
 
 O ``changelog`` congelado carrega a linhagem legível **e** analisável::
 
@@ -28,18 +27,21 @@ Recusas, todas antes de qualquer escrita e nenhuma um aviso: migração ausente,
 pai inexistente, pai nunca ativado (uma variante deriva de uma coorte
 **congelada**), pai que não é ``research_only``, ``code_ref`` que este build não
 reproduz, parâmetro que o schema congelado não declara, valor que não valida
-contra ele, e um conjunto que já existe (mesmo ``params_hash`` no mesmo
-``code_ref``) — que seria o mesmo experimento contado duas vezes.
+contra ele, valor fora da faixa que a estratégia declara
+(``hunter_core.strategies.constraints``, T3.26c/A2: sinal invertido em relação ao
+pai, piso acima do teto, objeto tipado que não instancia), e um conjunto que já
+existe (mesmo ``params_hash`` no mesmo ``code_ref``) — que seria o mesmo
+experimento contado duas vezes.
 
 Conecta com ``DATABASE_URL_MIGRATIONS`` (direto, nunca pelo pooler), como
 ``activate_strategy_version.py``: a ``0011`` revogou ``INSERT`` em
 ``strategy_versions`` de todo papel de aplicação e ``purpose`` só o dono escreve
 (DATABASE.md §24.5).
 
-**Arquivo único de propósito.** A lógica não foi extraída para um módulo do
-``hunter_strategy_worker`` porque este script precisa rodar dentro de uma imagem
-já publicada (``docker exec -i hunter-api-1 python - ... < derive_variant.py``),
-onde só o pacote instalado existe: ele importa só o que a imagem já carrega.
+**Roda dentro da imagem publicada** (``docker exec -i hunter-api-1 python - ...
+< derive_variant.py``), então importa só o pacote instalado. A partir da T3.26c
+isso inclui ``hunter_core.strategies.constraints``: a imagem precisa ser **deste
+commit ou posterior** — ``docs/ACTIVATION.md`` §7 diz como conferir.
 """
 
 from __future__ import annotations
@@ -55,8 +57,9 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 
-from hunter_core.settings import Settings
+from hunter_core.strategies.base import Strategy
 from hunter_core.strategies.canonical import canonical_json, params_hash
+from hunter_core.strategies.constraints import check_ranges
 from hunter_core.strategies.registry import DEFAULT_REGISTRY, StrategyRegistry
 from hunter_strategy_worker.activation import validate_parameters
 from hunter_strategy_worker.activation_db import (
@@ -64,6 +67,7 @@ from hunter_strategy_worker.activation_db import (
     Refused,
     load_row,
     migration_applied,
+    migration_url,
     next_free_version,
     purpose_column_present,
     record_event,
@@ -77,8 +81,8 @@ __all__ = ["Refused", "build_parameters", "derive_variant", "lineage_of", "main"
 NUMERIC = re.compile(r"^-?[0-9]+(\.[0-9]+)?$")
 """O que ``hunter_core.strategies.schema`` aceita como número: forma posicional,
 sem expoente. Um valor que casa isto **e** cujo schema declara ``number``/
-``integer`` entra como número canônico; qualquer outro entra como a string que
-veio, para o validador recusá-lo com a mensagem do próprio schema."""
+``integer`` entra como número canônico; o resto entra como a string que veio,
+para o validador recusá-lo com a mensagem do próprio schema."""
 
 LINEAGE_RE = re.compile(
     r"^variante de v\d+ \| derived_from=v\d+ \| overrides=[^|]* \| params_hash=[0-9a-f]{12}"
@@ -117,13 +121,20 @@ def _coerce(name: str, raw: str, rule: dict[str, Any]) -> Any:
 
 
 def build_parameters(
-    schema: dict[str, Any], parent: dict[str, Any], overrides: dict[str, str]
+    schema: dict[str, Any],
+    parent: dict[str, Any],
+    overrides: dict[str, str],
+    strategy: Strategy,
 ) -> tuple[dict[str, Any], list[tuple[str, str, str]]]:
     """O conjunto da variante e o que nele se moveu, na forma canônica.
 
     Canonizar **antes** de comparar e de validar é o que faz ``0.00890`` e
     ``0.0089`` serem o mesmo parâmetro (e não duas variantes com hashes
     diferentes), e é a mesma passagem que ``activate()`` faz antes de congelar.
+
+    ``strategy`` é obrigatória, e não um argumento opcional, porque a checagem de
+    faixa que ela habilita (:func:`check_ranges`) é a única que olha o *conteúdo*
+    do número: uma trava que se pode esquecer de ligar não é uma trava.
     """
     properties: dict[str, Any] = schema.get("properties") or {}
     if not overrides:
@@ -143,6 +154,8 @@ def build_parameters(
             "os parâmetros da variante não validam contra o schema congelado do pai: "
             + "; ".join(report.errors)
         )
+    if problems := check_ranges(strategy, before, canonical):
+        raise Refused("a variante sai da faixa declarada: " + "; ".join(problems))
     changes = [
         (name, str(before[name]), str(canonical[name]))
         for name in sorted(overrides)
@@ -238,7 +251,7 @@ async def derive_variant(
             f"os parâmetros congelados de {key} {version} não validam contra o próprio schema: "
             + "; ".join(parent_report.errors)
         )
-    params, changes = build_parameters(schema, parent, overrides)
+    params, changes = build_parameters(schema, parent, overrides, strategy)
     digest = params_hash(params)
     twin = await _collision(conn, row.strategy_id, code_ref, digest)
     if twin is not None:
@@ -284,17 +297,6 @@ async def derive_variant(
         f"derivada {key} {successor} de {version} (purpose {PURPOSE_RESEARCH_ONLY}, draft, "
         f"nada ativado) em code_ref {code_ref}: {moved} [params_hash {digest[:12]}]"
     )
-
-
-def migration_url() -> str:
-    """``DATABASE_URL_MIGRATIONS`` no driver asyncpg (como ``seed.py`` faz)."""
-    secret = Settings().database_url_migrations
-    if secret is None or not secret.get_secret_value():
-        raise SystemExit("DATABASE_URL_MIGRATIONS não está configurada")
-    url = secret.get_secret_value()
-    if url.startswith("postgresql+"):
-        return url
-    return url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 
 async def _run(args: argparse.Namespace) -> int:

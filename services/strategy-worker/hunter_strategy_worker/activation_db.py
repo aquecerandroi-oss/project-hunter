@@ -17,6 +17,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
+from hunter_core.settings import Settings
+
 __all__ = [
     "PURPOSE_LIVE",
     "PURPOSE_PAPER",
@@ -26,6 +28,7 @@ __all__ = [
     "Refused",
     "load_row",
     "migration_applied",
+    "migration_url",
     "next_free_version",
     "purpose_column_present",
     "record_event",
@@ -41,6 +44,23 @@ PURPOSE_LIVE = "live"
 
 class Refused(RuntimeError):
     """A prerequisite failed; nothing was activated."""
+
+
+def migration_url() -> str:
+    """``DATABASE_URL_MIGRATIONS`` on the asyncpg driver (as ``seed.py`` does).
+
+    One spelling for every ops script. It lived, byte for byte identical, in both
+    ``activate_strategy_version.py`` and ``derive_variant.py``; two copies of the
+    rule that decides *which connection writes a frozen version* is one copy too
+    many, and the 350-line budget was what surfaced it (T3.26c).
+    """
+    secret = Settings().database_url_migrations
+    if secret is None or not secret.get_secret_value():
+        raise SystemExit("DATABASE_URL_MIGRATIONS is not configured")
+    url = secret.get_secret_value()
+    if url.startswith("postgresql+"):
+        return url
+    return url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 
 async def migration_applied(conn: AsyncConnection) -> bool:

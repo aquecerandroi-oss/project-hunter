@@ -9,7 +9,9 @@ produce it is worse than no signal at all.
 
 Split from :mod:`.repo` (which stays market data: markets, candles, funding)
 for the 350-line budget, and along the right seam: this is *what to run*, that
-is *what to run it on*.
+is *what to run it on*. The value objects the roster is made of — and the order
+the worker runs them in — live in :mod:`.roster` for the same reason (T3.26c),
+and are re-exported here so no caller had to move.
 
 Reads go through ``role_session(..., db_role="hunter_worker")`` at the call
 sites. Nothing here is tenant data — shadow research is global (DATABASE.md
@@ -18,15 +20,13 @@ sites. Nothing here is tenant data — shadow research is global (DATABASE.md
 
 from __future__ import annotations
 
-import uuid
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
 from hunter_core.db.models.agents import Strategy as StrategyRow
 from hunter_core.db.models.agents import StrategyVersion
-from hunter_core.domain.enums import ShadowCohort, StrategyVersionStatus, Timeframe
+from hunter_core.domain.enums import StrategyVersionStatus
 from hunter_core.logging import get_logger
 from hunter_core.strategies.canonical import params_hash as compute_params_hash
 from hunter_core.strategies.registry import DEFAULT_REGISTRY, StrategyRegistry
@@ -41,6 +41,7 @@ from hunter_strategy_worker.metrics import (
     shadow_versions_runnable,
     shadow_versions_unrunnable,
 )
+from hunter_strategy_worker.roster import ActiveVersion, VersionRoster, roster_order
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -76,6 +77,7 @@ __all__ = [
     "load_active_versions",
     "load_version_roster",
     "registry_key",
+    "roster_order",
     "resolve_strategy",
 ]
 
@@ -89,84 +91,6 @@ def registry_key(strategy_key: str, version: str) -> str:
     lookup keeps the two in step without a hand-written map that could drift.
     """
     return f"{strategy_key}_{version}"
-
-
-@dataclass(frozen=True, slots=True)
-class ActiveVersion:
-    """One activated ``strategy_version`` bound to the code that implements it."""
-
-    id: uuid.UUID
-    strategy_key: str
-    version: str
-    params: dict[str, Any]
-    params_hash: str
-    strategy: Strategy
-    code_ref: str | None
-    purpose: str
-    """Copied from ``strategy_versions.purpose`` — the envelope carries this,
-    never a literal the worker crava (T3.15, D10). Never ``"live"``: a row
-    naming it is refused before it becomes an :class:`ActiveVersion` at all."""
-
-    replication_parent_id: uuid.UUID | None = None
-    replication_index: int | None = None
-    """``strategy_versions.replication_parent_id``/``replication_index``
-    (``0012_replication``): whose replication sibling this version is, and which
-    arm of it. ``None`` for every ordinary version — which is every version that
-    is not a sibling.
-
-    They are read here, and nowhere else, because :meth:`cohort` is the only
-    thing the worker does with them: the catalogue is where a database row
-    becomes something the run can label.
-    """
-
-    @property
-    def timeframe(self) -> Timeframe:
-        """Bars of this timeframe — and only these — are evaluated for entries."""
-        return self.strategy.timeframe
-
-    def cohort(self, process_cohort: str) -> str:
-        """The cohort this version's decisions are stamped with.
-
-        A replication sibling stamps ``replication:<parent>:<k>``
-        (REPLICATION.md §4.4, DATABASE.md §24) instead of the process default,
-        which is what lets a consumer refuse its signals **by name**: the
-        execution bridge admits ``prospective`` and refuses everything else with
-        ``cohort_not_live`` (T3.15e). Before ``0012_replication`` the label was
-        unrepresentable and a sibling emitted as ``prospective`` — the one
-        cohort the bridge admits — leaving only ``purpose`` and the absence of
-        an ``agents`` row between a research sibling and the wallet.
-
-        **A replay keeps its own run label**, sibling or not. Cohorts separate
-        populations *of the same version*, and a replay of a sibling is not the
-        sibling's reserved forward evaluation (SHADOW-LAB.md §1); collapsing the
-        two would also put a replay into the slot
-        ``uq_shadow_episodes_slot`` reserves for the forward run.
-        """
-        if self.replication_parent_id is None or self.replication_index is None:
-            return process_cohort
-        if process_cohort != ShadowCohort.PROSPECTIVE:
-            return process_cohort
-        return ShadowCohort.replication(self.replication_parent_id, self.replication_index)
-
-
-@dataclass(frozen=True, slots=True)
-class VersionRoster:
-    """What the catalogue says versus what this build can actually run."""
-
-    versions: list[ActiveVersion]
-    active_rows: int
-    rejected: dict[str, int]
-
-    @property
-    def blind(self) -> bool:
-        """``active`` rows exist and not one of them can be evaluated here.
-
-        The condition ``main.py`` already treats as fatal for a missing
-        migration, arriving later: the worker consumes bars, drops every one of
-        them and reports itself healthy. ``/ready`` must say so
-        (risk-engine-guardian, S2 review, MUST-FIX 1(b)).
-        """
-        return self.active_rows > 0 and not self.versions
 
 
 def code_ref_matches(stored: str | None, running: str, key: str) -> str | None:
@@ -259,6 +183,8 @@ async def load_version_roster(session: AsyncSession) -> VersionRoster:
     binary cannot honestly run an experiment whose code it does not have, and
     guessing "the closest version" is how a run gets attributed to the wrong
     frozen parameters (``hunter_core.strategies.registry``).
+
+    The runnable half comes back in :func:`roster_order`.
     """
     rows = (
         await session.execute(
@@ -319,6 +245,7 @@ async def load_version_roster(session: AsyncSession) -> VersionRoster:
                 replication_index=row.replication_index,
             )
         )
+    versions.sort(key=roster_order)
     roster = VersionRoster(versions=versions, active_rows=len(rows), rejected=rejected)
     _publish_roster(roster)
     return roster

@@ -233,6 +233,38 @@ def test_parse_parent_version_also_recognises_a_sibling_changelog() -> None:
     assert parse_parent_version(_SIBLING_CHANGELOG) == "v2"
 
 
+# -- T3.26-risk A5: an explicit key beats a phrase in free text ---------------
+
+_ACTIVATED_VARIANT = (
+    "variante de v4 | derived_from=v4 | overrides=atr_pct_min=0.0089 "
+    "| params_hash=1a2b3c4d5e6f | T3.26: succeeds v1 as the cost-floor arm"
+)
+"""What ``activate_derived.keep_lineage`` leaves behind: the frozen lineage
+prefix, then whatever the operator typed — which is free text and may perfectly
+well contain the word ``succeeds``."""
+
+
+def test_derived_from_wins_over_a_succeeds_phrase_in_the_operator_note() -> None:
+    """A5: with ``succeeds`` checked first, this page would have claimed ``v1``
+    as the parent of a variant of ``v4`` — and looked entirely plausible."""
+    assert parse_parent_version(_ACTIVATED_VARIANT) == "v4"
+
+
+def test_derived_from_wins_over_a_paper_line_phrase_too() -> None:
+    assert (
+        parse_parent_version(
+            "variante de v2 | derived_from=v2 | overrides=rvol_min=2 "
+            "| params_hash=0123456789ab | paper line of v9 é o próximo passo"
+        )
+        == "v2"
+    )
+
+
+def test_the_older_spellings_still_win_where_no_explicit_key_exists() -> None:
+    assert parse_parent_version("succeeds v1: code moved") == "v1"
+    assert parse_parent_version("paper line of v2 (D10, T3.15): x") == "v2"
+
+
 def test_sibling_slug_for_matches_the_briefs_own_example() -> None:
     assert sibling_slug_for("momentum", "v2", 3) == "momentum-v2-irma-03"
 

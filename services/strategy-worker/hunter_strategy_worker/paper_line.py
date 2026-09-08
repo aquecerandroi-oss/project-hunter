@@ -65,6 +65,15 @@ async def paper_line(
             f"{key} {version} carries purpose {row.purpose!r}: a paper line is derived from a "
             f"{PURPOSE_RESEARCH_ONLY!r} version only"
         )
+    # OPEN POLICY QUESTION (T3.26c, review T3.26-risk): "frozen research_only"
+    # is the *only* condition on the source. A research **variant** produced by
+    # ``derive_variant.py`` satisfies it the moment it is activated, so a
+    # parameter set that has never emitted a single prospective signal could
+    # become a strategy's paper line tomorrow — which is not what D10 meant by
+    # "prospective evidence first". Deliberately **not** fixed here: adding a
+    # condition would decide, in code, a question that is Everton's (D10 names
+    # the seven conditions, and this is an eighth). Written down rather than
+    # silently accepted; see ``.claude/state/notes-T3.26.md`` §T3.26c.
     strategy = resolve_strategy(key, version, row.code_ref, registry)
     if strategy is None:
         raise Refused(

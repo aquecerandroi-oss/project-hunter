@@ -23,7 +23,11 @@ from hunter_core.logging import get_logger
 from hunter_strategy_worker import slots
 from hunter_strategy_worker.config import CONSUMER_GROUP
 from hunter_strategy_worker.decide import evaluate_slot, versions_for_bar
-from hunter_strategy_worker.metrics import shadow_trackings_open, shadow_trackings_unswept
+from hunter_strategy_worker.metrics import (
+    shadow_trackings_open,
+    shadow_trackings_unswept,
+    shadow_version_failed_total,
+)
 from hunter_strategy_worker.outcomes import advance_tracking
 from hunter_strategy_worker.repo import load_market
 from hunter_strategy_worker.tracking_repo import (
@@ -107,7 +111,18 @@ async def handle_candle(
     health: ConsumerHealth,
     clock: Callable[[], datetime] = utcnow,
 ) -> None:
-    """Evaluate every active version whose timeframe closed with this candle."""
+    """Evaluate every active version whose timeframe closed with this candle.
+
+    **One version's failure is that version's failure.** The loop below used to
+    have no ``try``: a version whose frozen parameters raise — the exact shape a
+    badly derived research variant takes (``derive_variant.py``, T3.26) — aborted
+    the whole bar, so every version after it in the roster silently stopped
+    evaluating and the message was never acked, redelivered forever (review
+    T3.26-risk, A3). Now each version is isolated, counted
+    (``hunter_shadow_version_failed_total``) and logged, the surviving versions
+    still produce their decisions, and the bar is acked: a bar that half the
+    roster could not evaluate is still a bar that was processed.
+    """
     candle = _candle(payload)
     if candle is None or not candle.is_final:
         return
@@ -121,15 +136,31 @@ async def handle_candle(
         logger.warning("shadow_market_unknown", exchange=candle.exchange, symbol=candle.symbol)
         return
     for version in due:
-        evaluation = await evaluate_slot(
-            factory,
-            redis,
-            version=version,
-            market=market,
-            bar_close=bar_close,
-            config=config,
-            clock=clock,
-        )
+        try:
+            evaluation = await evaluate_slot(
+                factory,
+                redis,
+                version=version,
+                market=market,
+                bar_close=bar_close,
+                config=config,
+                clock=clock,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            shadow_version_failed_total.labels(
+                strategy_key=version.strategy_key, version=version.version
+            ).inc()
+            health.errors += 1
+            logger.exception(
+                "shadow_version_evaluation_failed",
+                strategy=version.strategy_key,
+                version=version.version,
+                market=f"{candle.exchange}:{candle.symbol}",
+                bar_close=bar_close.isoformat(),
+            )
+            continue
         health.evaluated_bars += 1
         health.record(evaluation.state.value)
 

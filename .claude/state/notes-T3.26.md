@@ -315,3 +315,45 @@ Nenhuma suíte de testes foi executada: não toquei em código.
 8. **`Experiments Index` ficou desatualizado por um dia sem ninguém notar** (o `EXP-0005` existia e
    não estava no registro de IDs). Corrigi, mas vale como sintoma: quem abre um `EXP-NNNN` precisa
    fechar o índice no mesmo turno, senão o próximo número livre deixa de ser confiável.
+
+---
+
+# T3.26c — a variante não pode mentir sobre si mesma (A1–A5 da revisão risk-engine-guardian)
+
+Fonte: `.claude/state/review-T3.26-risk.md` (A1 ALTA, A2/A3 MÉDIA, A4/A5 BAIXA). Base: `3dd8f3a`. **Nada commitado.**
+
+## O que mudou
+
+**A1 — trava estrutural na ativação.** `activate()` reconhecia uma linha derivada só pelos sinais que a coluna `changelog` carrega, e `changelog` não é congelada pela trigger da `0002`. Agora são duas camadas: `carries_own_content(row)` (purpose + frase, caminho rápido) e `refuse_rewriting_own_content(...)`, que recusa **estruturalmente** — um rascunho cujo `default_parameters` não é vazio e cujo `params_hash` difere do conjunto do código de hoje nunca é reescrito, seja qual for o changelog. Compara por `params_hash` (e não por `==`) porque os dois lados vêm de lugares diferentes: ida e volta pelo JSONB de um lado, `canonical_json` de `Decimal` vivo do outro. Só rascunho é checado — linha ativada já é respondida antes com "already activated".
+
+**A2 — faixa.** Tabela nova em `packages/core/hunter_core/strategies/constraints.py`, chamada por `build_parameters` em `derive_variant.py`. Três camadas: (1) regressão de sinal contra o pai, universal e sem tabela; (2) faixas declaradas por estratégia (`positive`, `non_negative`, `unit_interval`, `ordered`); (3) construção a seco de `AssumedCosts` e `Invalidation`, mais a geometria `0 < stop < close < target` numa barra de prova. As nove sondas da revisão são recusadas; `momentum v4` (`atr_pct_min=0.0089`) continua passando.
+
+**A3 — isolamento e ordem.** `handle_candle` ganhou `try/except` por versão: conta em `hunter_shadow_version_failed_total{strategy_key,version}`, loga `shadow_version_evaluation_failed`, segue para a próxima versão e **volta normalmente**, que é o que faz `run_consumer` chamar `ack`. `CancelledError` continua propagando. `load_version_roster` agora ordena por `roster_order`: estratégia, `paper` antes de pesquisa, versão **numérica** (`v10` depois de `v3`), rótulo ilegível por último.
+
+**A4 —** o evento de ativação de linha derivada passa a carregar `derived_from=<vN>`, o `params_hash` do conjunto **que foi congelado** (não o do código de hoje) e o `changelog` como ficou, com o prefixo de linhagem.
+
+**A5 —** `parse_parent_version` testa `derived_from=` **antes** de `succeeds`/`paper line of`. O changelog de uma variante ativada é linhagem + texto livre do operador; um "succeeds v1" na nota fazia a página inventar um pai errado com toda a cara de certo.
+
+## Decisões que fugiram do brief (e por quê)
+
+1. **A tabela da A2 não foi para `schema.py`.** `code_ref` é o digest do módulo da estratégia **mais o fecho transitivo dos irmãos que ela importa**, e `momentum_v1`/`volume_anomaly_v1` importam `schema`. Uma linha a mais lá moveria o digest das duas e **toda versão ativada na VPS — inclusive a linha `paper` `momentum v3` — viraria `code_ref_mismatch`**: `load_version_roster` pararia de rodar tudo e o Lab ficaria mudo atrás de um `/ready` verde. Módulo próprio, fora do fecho, com `test_constraints_outside_freeze.py` fixando os dois digests medidos antes desta tarefa (`momentum_v1@sha256:ab2e0398…`, `volume_anomaly_v1@sha256:9b8c14ab…`) e provando que `constraints` não entrou no fecho de ninguém. Os dois digests continuam idênticos depois de todas as mudanças.
+2. **`catalogue.py` foi dividido.** Com a ordenação da A3 ele chegou a 375 linhas (orçamento 350). `ActiveVersion`, `VersionRoster` e `roster_order` foram para `hunter_strategy_worker/roster.py` e são re-exportados por `catalogue` — nenhum chamador precisou mudar de import, e há teste disso (`roster_order_from_catalogue is roster_order`).
+3. **`migration_url()` estava duplicado byte a byte** em `activate_strategy_version.py` e `derive_variant.py`; foi para `activation_db.py`. Duas cópias da regra que decide *qual conexão escreve uma versão congelada* é uma a mais — e foi o orçamento de linhas que fez isso aparecer.
+4. **`derive_variant.py` deixou de ser autossuficiente.** Ele agora importa `hunter_core.strategies.constraints`, então **a imagem tem de ser deste commit ou posterior**. Isso é inevitável em qualquer forma da A2 (o brief já mandava pôr a tabela no pacote), e a falha é barulhenta (`ModuleNotFoundError`), não silenciosa. `docs/ACTIVATION.md` §7 traz o comando de conferência antes do de derivar.
+
+## Números que tive de arbitrar
+
+- **Barra de prova da geometria: fechamento 100, ATR 1** (`PROBE_CLOSE`/`PROBE_ATR`), ou seja ATR% = 1 %, dentro da faixa congelada do `momentum_v1` (0,3 % a 5 %). Declarado, não medido. Consequência: `stop_atr >= 100` é recusado por aqui. Nenhuma variante plausível chega perto (a 5 % de ATR real, `stop_atr = 20` já zeraria o preço), mas é um limite meu e está escrito no módulo.
+- **Onde cada parâmetro entrou.** `atr_pct_min`, `rvol_min` e `return_min` são `non_negative`, não `positive`: zero é "desligar o porteiro", que é variante de pesquisa legítima. `stop_atr`/`target_atr`/janelas/`horizon_s`/`max_entry_delay_s` são `positive` porque zero ou negativo torna a versão incapaz de disparar **qualquer** barra. `base_confidence` em `(0, 1]`. `atr_pct_max` é `positive` e forma o par ordenado com `atr_pct_min`.
+- **`_UNNUMBERED = 1 << 30`** em `roster.py`: onde um rótulo que não casa `v<n>` sorteia. Só precisa ser maior que qualquer `v<n>` real.
+
+## Política — D10, para o Everton (não virou código)
+
+`paper_line.py` exige do pai apenas "`research_only` congelada". **Uma variante derivada por `derive_variant.py` satisfaz isso no instante em que é ativada** — inclusive uma variante do `volume_anomaly`, que nunca teve linha `paper` e nunca emitiu um sinal prospectivo. Ou seja: um conjunto de parâmetros sem evidência prospectiva nenhuma poderia virar a linha `paper` de uma estratégia amanhã, o que não é o que a D10 quis dizer com "primeiro a evidência". Não corrigi: acrescentar uma condição seria decidir no código uma oitava condição que a D10 não tem, e essa decisão é do Everton. Está escrito como comentário `OPEN POLICY QUESTION` em `paper_line.py`, ao lado da recusa, para quem ler o código não descobrir isso só na revisão.
+
+## O que **não** foi feito
+
+- Nada de `git commit`, `stash`, `checkout --`, `restore`, `reset`, `clean`. Nenhum `.env*` tocado, nenhum contêiner local parado.
+- `services/execution-worker/hunter_execution_worker/bridge.py` (365 linhas) e `services/strategy-worker/hunter_strategy_worker/replication.py` (352, T3.18c em voo) continuam acima do orçamento — **não são meus** e o brief me proíbe de tocar `replication*.py`.
+- A indireta do `ENTRY_WINDOW=120 s` da revisão (terceira versão ativa atrasando a emissão) não estava no escopo A1–A5 e continua aberta; a ordenação da A3 melhora o caso porque a linha `paper` agora é a primeira a ser avaliada, mas não mede o `bar_close → emitted_at`.
+- Não rodei nada contra a VPS.

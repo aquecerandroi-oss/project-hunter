@@ -52,6 +52,15 @@ FROZEN_PARAMS: dict[str, Any] = {
 ``params_format = 1`` normalises every number to a string (``canonical.py``)."""
 
 
+def _build(overrides: dict[str, str]) -> tuple[dict[str, Any], list[tuple[str, str, str]]]:
+    """``build_parameters`` against ``momentum_v1``'s own frozen contract.
+
+    The strategy is a *required* argument since T3.26c: it is what
+    ``hunter_core.strategies.constraints`` needs to judge the **range** of a
+    value, which the frozen JSON Schema deliberately does not (A2)."""
+    return DV.build_parameters(FROZEN_SCHEMA, FROZEN_PARAMS, overrides, MOMENTUM_V1)
+
+
 class TestParsingOverrides:
     def test_it_splits_on_the_first_equals_only(self) -> None:
         assert DV.parse_overrides(["atr_pct_min=0.0089"]) == {"atr_pct_min": "0.0089"}
@@ -71,9 +80,7 @@ class TestParsingOverrides:
 
 class TestBuildingTheVariantParameters:
     def test_the_override_moves_and_nothing_else_does(self) -> None:
-        params, changes = DV.build_parameters(
-            FROZEN_SCHEMA, FROZEN_PARAMS, {"atr_pct_min": "0.0089"}
-        )
+        params, changes = _build({"atr_pct_min": "0.0089"})
         assert changes == [("atr_pct_min", "0.003", "0.0089")]
         assert params["atr_pct_min"] == "0.0089"
         assert {k: v for k, v in params.items() if k != "atr_pct_min"} == {
@@ -85,46 +92,90 @@ class TestBuildingTheVariantParameters:
         """``0.00300`` is ``0.003``: canonical form first, comparison after —
         otherwise two spellings of one experiment would get two params_hash."""
         with pytest.raises(DV.Refused, match="nenhum parâmetro se moveu"):
-            DV.build_parameters(FROZEN_SCHEMA, FROZEN_PARAMS, {"atr_pct_min": "0.00300"})
+            _build({"atr_pct_min": "0.00300"})
 
     def test_the_value_is_canonicalised_not_copied(self) -> None:
-        params, changes = DV.build_parameters(
-            FROZEN_SCHEMA, FROZEN_PARAMS, {"atr_pct_min": "0.00890"}
-        )
+        params, changes = _build({"atr_pct_min": "0.00890"})
         assert params["atr_pct_min"] == "0.0089"
         assert changes == [("atr_pct_min", "0.003", "0.0089")]
 
     def test_it_refuses_a_parameter_the_frozen_schema_does_not_declare(self) -> None:
         with pytest.raises(DV.Refused, match="não declara esse parâmetro"):
-            DV.build_parameters(FROZEN_SCHEMA, FROZEN_PARAMS, {"invalidation_closes": "2"})
+            _build({"invalidation_closes": "2"})
 
     def test_it_refuses_a_value_that_does_not_validate(self) -> None:
         with pytest.raises(DV.Refused, match="não validam contra o schema"):
-            DV.build_parameters(FROZEN_SCHEMA, FROZEN_PARAMS, {"atr_timeframe": "30m"})
+            _build({"atr_timeframe": "30m"})
 
     def test_it_refuses_a_fraction_where_the_schema_wants_a_whole_number(self) -> None:
         with pytest.raises(DV.Refused, match="não validam contra o schema"):
-            DV.build_parameters(FROZEN_SCHEMA, FROZEN_PARAMS, {"lookback_closes": "20.5"})
+            _build({"lookback_closes": "20.5"})
 
     def test_it_refuses_deriving_nothing(self) -> None:
         with pytest.raises(DV.Refused, match="sem --set"):
-            DV.build_parameters(FROZEN_SCHEMA, FROZEN_PARAMS, {})
+            _build({})
 
     def test_two_overrides_at_once_are_both_recorded(self) -> None:
-        params, changes = DV.build_parameters(
-            FROZEN_SCHEMA, FROZEN_PARAMS, {"atr_pct_min": "0.0089", "rvol_min": "2"}
-        )
+        params, changes = _build({"atr_pct_min": "0.0089", "rvol_min": "2"})
         assert changes == [("atr_pct_min", "0.003", "0.0089"), ("rvol_min", "1.5", "2")]
         assert params["rvol_min"] == "2"
+
+
+class TestTheRangeGuard:
+    """T3.26c/A2: the nine probes of ``review-T3.26-risk.md``, refused *here*.
+
+    They are checked again in
+    ``packages/core/tests/unit/strategies/test_constraints.py`` against the table
+    itself; what this class proves is the wiring — that the ops script actually
+    calls it, and refuses with its own audited ``Refused`` rather than letting a
+    value the schema shrugs at reach an ``INSERT``.
+    """
+
+    @pytest.mark.parametrize(
+        "override",
+        [
+            {"atr_pct_min": "-0.5"},
+            {"stop_atr": "0"},
+            {"stop_atr": "-2"},
+            {"target_atr": "-1.5"},
+            {"rvol_min": "-999999"},
+            {"lookback_closes": "-20"},
+            {"horizon_s": "-3600"},
+            {"fee_bps": "-100"},
+            {"base_confidence": "42"},
+        ],
+    )
+    def test_a_probe_the_frozen_schema_accepts_is_still_refused(
+        self, override: dict[str, str]
+    ) -> None:
+        with pytest.raises(DV.Refused, match="sai da faixa declarada"):
+            _build(override)
+
+    def test_a_declared_inversion_is_refused(self) -> None:
+        with pytest.raises(DV.Refused, match="atr_pct_min"):
+            _build({"atr_pct_min": "0.06", "atr_pct_max": "0.05"})
+
+    def test_the_message_names_every_problem_at_once(self) -> None:
+        """One run, one refusal, all the reasons: an operator fixing them one at
+        a time would need one audited run per parameter."""
+        with pytest.raises(DV.Refused) as refusal:
+            _build({"stop_atr": "-2", "fee_bps": "-100"})
+        assert "stop_atr" in str(refusal.value)
+        assert "fee_bps" in str(refusal.value)
+
+    def test_the_variant_that_actually_shipped_still_passes(self) -> None:
+        """``momentum v4`` (KB-0008): the guard must not refuse the one variant
+        this machinery exists to produce."""
+        params, changes = _build({"atr_pct_min": "0.0089"})
+        assert changes == [("atr_pct_min", "0.003", "0.0089")]
+        assert params["atr_pct_min"] == "0.0089"
 
 
 class TestTheLineageContract:
     """The one string three tools have to agree on."""
 
     def _changelog(self) -> str:
-        params, changes = DV.build_parameters(
-            FROZEN_SCHEMA, FROZEN_PARAMS, {"atr_pct_min": "0.0089"}
-        )
+        params, changes = _build({"atr_pct_min": "0.0089"})
         return DV.variant_changelog("v2", changes, params_hash(params), "KB-0008: piso de custo")
 
     def test_it_reads_like_a_sentence_and_names_the_override(self) -> None:
