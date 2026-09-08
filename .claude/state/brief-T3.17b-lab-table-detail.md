@@ -1,0 +1,24 @@
+# Brief T3.17b — the Lab table and totals, fixed and more detailed (Everton, 2026-09-08: "arruma essa parte deixe mais detalhado")
+
+**Owner:** frontend-specialist. **Reviewer afterwards:** product-designer (rendered screen with real data), code-reviewer. **Do not commit.** **Operational rule: never a background shell; foreground commands with a timeout <= 5 min; testcontainers one file per invocation, one at a time; the tree is shared — never `git stash`/`checkout --`/`restore`/`reset`/`clean`/`commit -a`; do not touch `.env*`.** Base: `main` at `0451066`. In flight elsewhere: T3.18 (API: `apps/api/hunter_api/{routers,services,schemas}/lab*`; do **not** touch the API in this task — the totals over the whole population come from its `scoreboard` endpoint and are wired in T3.18's web part), T3.15e (may touch `apps/web/components/lab/lab-version-card.tsx` — do not edit that file), T3.19/T3.20 (no web files).
+
+## What Everton saw (screenshot, VPS `/ever/lab`, 2026-09-08 ~05:05Z)
+1. Totals header says "calculado das 200 operações listadas — há mais sinais além desta página": the totals are page-bound, so "resultado acumulado −3.683,13 USDT" is not the Lab's total.
+2. A technical note leaks into the UI: "Sinais · todo o período disponível (este endpoint não aceita janela/`as_of` — só o resumo acima é filtrado por janela)".
+3. "Quando" wraps over four lines (`05:05:05` / `UTC` / `(02:05:05` / `-03:00)`); no date, so two days look the same.
+4. The newest rows are all `pendente / sem entrada`, pushing the concluded operations off the first screen; the row reads "Entrou --", "Saiu aberta", "Quantia simulada sem entrada", "pendente motivo: s…" (cut).
+5. Missing per row: which strategy version, stop and target, **why it left** (alvo / stop / expirou / invalidada / censurada: motivo), how long it stayed, the result in R behind the toggle, the result badge is off-screen to the right.
+
+## Deliver (web only; `apps/web/components/lab/**` except `lab-version-card.tsx`, `apps/web/app/(app)/[orgSlug]/lab/**`, tests)
+1. **Totals**: until T3.18's scoreboard is wired, the totals card is honest and explicit: title "Resultado das operações **desta página**" with the count and a muted line "os totais do Lab inteiro chegam com o placar (T3.18)"; remove the "há mais sinais" phrasing. When `next_cursor` is null, say "todas as operações do período". Add **média por operação com lucro / com prejuízo** (USDT) and **melhor / pior** operation (market + result), computed from the page rows — labelled "desta página".
+2. **Remove the endpoint note** from the UI; keep the fact in a tooltip on the period label ("período: todo o disponível").
+3. **Quando** on one line: `08/09 05:05 UTC` with the local time in a tooltip and the full ISO in `title`; width fixed so it never wraps. Same for entry/exit times: `08/09 05:26` next to the price, price and time on one line each (two lines max per cell).
+4. **Order and grouping**: default order `decision_at` desc **but concluded first**: a segmented control `Concluídas · Abertas · Pendentes/sem entrada · Todas` (default Concluídas); counts in each segment; the pending group shows the reason in full (no truncation — wrap or tooltip), never "motivo: s…".
+5. **Per-row detail** (default money view): Estratégia (key + version chip, purpose chip `pesquisa`/`paper`) · Mercado · Quando · Entrou (price · time) · Saiu (price · time · **motivo**: alvo, stop, expirou, invalidada, censurada + reason, or `aberta`) · Duração (h:mm) · Variação % · Quantia simulada · Resultado (USDT, BRL, badge). Research columns (R líquido, R ex-funding, stop, alvo, tracking) behind the existing toggle. Expand-on-click keeps the T3.17 money block + research block.
+6. **Result badge always visible**: the Resultado column is pinned at a readable width; the table scrolls horizontally inside its container on narrow viewports, never the page.
+7. **Copy** in plain Portuguese; every number the API does not provide shows "—" with a reason on hover, never a fabricated zero. Formatting: USDT as the wallet page (`formatUsdt`), BRL Brazilian, percentages with one decimal.
+8. **Tests**: segments and default (concluded first), one-line dates, reason never truncated, per-row exit reason mapping for every `OutcomeResult`/`tracking_state`/`censored_reason` combination that exists in `apps/web/lib/api/types.ts`, best/worst computation, "desta página" wording when truncated. `pnpm --filter web lint|typecheck|test`.
+9. **Browser check** with real data before reporting (local stack if up; say so if not) — then hand the rendered screen to `product-designer` for review (the orchestrator dispatches it; leave a section "Para o designer" in the notes with what you would like a second eye on).
+
+## Prove
+Report in Portuguese, extended format (STATUS · FILES · TESTS with real output · what the screen shows · CONCERNS); `.claude/state/notes-T3.17b.md`.
