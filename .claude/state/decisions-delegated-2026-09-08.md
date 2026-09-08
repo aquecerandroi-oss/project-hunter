@@ -14,3 +14,11 @@ Everton, 2026-09-08 ~09:00Z ("pode tomar a decisão sexta feira"), sobre as duas
 
 ## Consequência operacional
 Nenhuma versão é `promissora` hoje (2 dias de dados, expectancy negativa nas duas), então **não há irmãs a criar**. O primeiro uso do replay é o **histórico das duas versões de pesquisa** (momentum v2, volume_anomaly v2) sobre os 31 dias, quando o backfill terminar, mostrado no placar como "replay" — evidência histórica, não veredito.
+
+## D16–D19 — direção de design (Everton, 2026-09-08 ~09:45 Brasília: "tudo ok pode fazer")
+Aprovadas as quatro propostas do product-designer (`.claude/state/review-design-2026-09-08.md`, "Só o Everton decide"):
+- **D16** — nomes de página em **português**, mantendo "Lab" e "Radar" como nomes próprios.
+- **D17** — convenção numérica **brasileira** para dinheiro e porcentagem (`R$ 1.234,56`, `+1,23 %`); preço cru como a exchange mostra (`27460.00`), USDT com a mesma convenção do dinheiro.
+- **D18** — direção do Lab: **placar primeiro**, depois sinais, depois versões recolhidas; o designer apresenta dois mockups A/B em `/_design` antes do frontend mexer.
+- **D19** — regra "sem bastidor na tela": nenhum id de tarefa, ADR, nome de parâmetro de API ou enum cru na copy; dicionários de rótulos por domínio.
+**Donos:** T3.24a (ganhos rápidos, em voo), T3.24c (consistência: D16, D17, D19), T3.24b (Lab: D18, após os mockups). `docs/DESIGN.md` recebe as quatro como regras (§2) com histórico.
