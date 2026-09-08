@@ -109,6 +109,7 @@ _(uma linha por nota: link para a nota — fonte curta — qualidade da evidênc
 | [[KB-0075-paper-trading-honesto-o-que-a-sombra-ainda-nao-simula]] | risco / paper trading | nosso `walker.py`, contrato do M4 | leitura de código + contrato | sim — `D-PAPER-1` (cobertura a medir) e a convenção `C-PAPER` |
 | [[KB-0076-por-que-perdemos-2026-09-08]] | custos / diagnóstico próprio | dado da VPS (10 populações, 4.472 desfechos) + 4 replays de política de saída | medição própria, um snapshot só | sim — orçamento de custo na decisão; e a pergunta que falta: alguma entrada com bruto > 0,25 R? |
 | [[KB-0077-linhas-de-tendencia]] | análise técnica clássica / geometria determinística | implementação própria (`hunter_indicators.patterns`, T3.34) + 6 figuras em velas reais da VPS | implementação + teste de valor conhecido + revisão da Astra (3 defeitos corrigidos) | sim — é a base de `trendline_breakout_v1` (T3.34b); **a nota não afirma valor preditivo** |
+| [[KB-0078-o-radar-preve]] | radar / anomalias / previsibilidade | dado da VPS (1,8 dia de anomalias, 176 desfechos cruzados, 40 mil barras de retorno futuro) + bootstrap por blocos | seis SQL somente leitura + bootstrap (T3.46) | **não** — nenhuma estratégia lê o Radar; rebaixado a painel até baselines ≥ 60 %, ≥ 150 mercados, ≥ 14 dias |
 
 ## O que a primeira rodada mudou de fato
 

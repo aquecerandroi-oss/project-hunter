@@ -1,0 +1,15 @@
+# Brief T3.48 — documento para Everton decidir: o que muda (e o que não muda) se o risco por operação subir de 0,25 % (Everton, 2026-09-08 19:35: "se necessário aumentar valores de estratégia e ser mais arriscado")
+
+**Owner:** risk-engine-guardian. **Read-only: no code change, no limit change, do not commit.** The Risk Engine directive is in force: "documente e me apresente antes de alterar os limites" — this brief is the document; the decision is Everton's. **Operational rule: never a background shell; foreground commands with a timeout <= 5 min; no testcontainers in this brief (4 other agents hold the slots); VPS read-only (`repeatable read read only`); do not touch `.env*`.** Base: `main` at `2e39774`. Write scope: `.claude/state/proposta-limites-risco-2026-09-08.md`, `infra/scripts/sql/research/2026-09-09-t348-*.sql`.
+
+## Read first
+`packages/risk-core/hunter_risk/limits.py` (`risk_per_trade_pct 0,0025`, `max_aggregate_planned_risk_pct 0,01`, `max_stop_distance_pct 0,03`, the daily loss / kill-switch limits), `docs/RISK.md` (or wherever the directive is written: R$100.000 fictícios, 0,25 % per op, kill switch, SPOT only), `packages/risk-core/hunter_risk/checks.py`, `.claude/state/notes-T3.40.md` (expectancies in R per version, toll identity `custo_R = 0,0020/(stop_atr × ATR%)`), the Lab totals on the VPS (closed outcomes per version: n, expectancy net R, PF, worst day in R, max consecutive losses — SQL you paste).
+
+## Deliver (Portuguese, for a non-quant reader, ≤ 2 pages + tables)
+1. **Fact in one line**: size multiplies R$, never flips the sign — with the current net expectancies (paste them per version) a larger size loses faster; show it: R$ per month at 0,25 % / 0,50 % / 1,00 % for each live version using its measured expectancy and decision rate over 31 d (replay = mass, not verdict; label it).
+2. **What "mais arriscado" can honestly mean and its price**: (a) wider stop per entry (T3.47, allowed now, reduces the toll) — how it interacts with `max_stop_distance_pct 0,03` (which versions would be blocked at `paper` and at what ATR%); (b) higher `risk_per_trade_pct` — the daily/kill-switch limits it would hit sooner: compute, from the observed worst days in R per version, how many consecutive losing operations trigger the daily stop at each size; (c) more concurrent positions (`max_aggregate_planned_risk_pct 0,01` = 4 ops at 0,25 %) — what changes if the per-op risk doubles (2 ops).
+3. **Recommendation** (yours, as guardian): the condition under which raising the size is rational (net expectancy > 0 with the day-block 95 % CI above zero **and** ≥ 100 prospective outcomes) and the size you would propose then; until then, keep 0,25 % and invest in the toll (T3.47) and in concentration on the positive versions.
+4. **The exact change** Everton would approve if he decides to raise: file, field, value, the test that pins it, and the deploy step — written so the change is one commit he can read; nothing applied.
+
+## Prove
+SQL with output; tables with `as_of`; report in Portuguese, extended format; the proposal file above.
