@@ -6,6 +6,7 @@ happen *before* it and every failure has to be a refusal, not a warning.
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import sys
 from pathlib import Path
@@ -105,6 +106,11 @@ class TestActivationScript:
                     "(gen_random_uuid(), 'no_such_strategy', 'x') ON CONFLICT DO NOTHING"
                 )
             )
+            # 0011_strategy_activation_owner (T3.15c) revoked INSERT on
+            # strategy_versions from hunter_worker outright: the row is created
+            # with the role reset to the session owner, the same path the ops
+            # script and paper_line.py actually take.
+            await session.execute(text("RESET ROLE"))
             await session.execute(
                 text(
                     "INSERT INTO strategy_versions (id, strategy_id, version, status) "
@@ -112,6 +118,7 @@ class TestActivationScript:
                     "WHERE key = 'no_such_strategy' ON CONFLICT DO NOTHING"
                 )
             )
+            await session.execute(text("SET LOCAL ROLE hunter_worker"))
         async with db_session_factory() as session, session.begin():
             with pytest.raises(script.Refused, match="no code registered"):
                 await script.activate(session, "no_such_strategy", "v9", "test", dry_run=True)
@@ -237,3 +244,94 @@ class TestActivationScript:
                     dry_run=False,
                     registry=registry_for("frozen_volume"),
                 )
+
+
+@pytest.mark.integration
+class TestEveryRunIsAuditedEvenOnAnUnexpectedFailure:
+    """T3.15c (security review MEDIUM 5): only ``Refused`` used to be audited;
+    a ``DBAPIError``, a bug in ``validate_parameters`` or a dropped connection
+    fell through with no ``system_events`` row, contradicting the module's own
+    docstring. ``_run`` now wraps the whole action and writes
+    ``strategy_version_activation_error`` before re-raising as ``exit(2)``.
+
+    Needs a real database only to prove the audit row lands — ``_run`` builds
+    its own engine from ``DATABASE_URL_MIGRATIONS``, which
+    ``migrated_db_url`` (a dependency of ``db_session_factory``) already points
+    at the test container as a side effect of ``_alembic_config``.
+    """
+
+    async def test_a_forced_exception_is_audited_and_exits_2(
+        self, db_session_factory: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        script = _script()
+
+        async def _boom(*_args: Any, **_kwargs: Any) -> str:
+            raise RuntimeError("boom: forced for T3.15c")
+
+        monkeypatch.setattr(script, "activate", _boom)
+        args = argparse.Namespace(
+            strategy="whatever",
+            version="v1",
+            changelog="probe",
+            dry_run=False,
+            paper_line=False,
+            supersede=False,
+        )
+
+        with pytest.raises(SystemExit) as excinfo:
+            await script._run(args)
+        assert excinfo.value.code == 2
+
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            row = (
+                await session.execute(
+                    text(
+                        "SELECT level::text AS level, message FROM system_events "
+                        "WHERE event = 'strategy_version_activation_error' "
+                        "ORDER BY created_at DESC LIMIT 1"
+                    )
+                )
+            ).first()
+        assert row is not None, "no audit row for the unexpected failure"
+        assert row.level == "error"
+        assert "boom: forced for T3.15c" in row.message
+
+    async def test_a_refusal_still_rolls_back_before_the_audit_write(
+        self, db_session_factory: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Related finding in the same review: the refusal branch used to
+        ``return`` *inside* the action's own transaction, so a future mode that
+        wrote before refusing would have committed that write alongside the
+        refusal event. Moving the ``except`` outside ``conn.begin()`` fixed
+        both at once — this proves the refusal path still audits correctly."""
+        script = _script()
+
+        async def _refuse(*_args: Any, **_kwargs: Any) -> str:
+            raise script.Refused("forced refusal for T3.15c")
+
+        monkeypatch.setattr(script, "activate", _refuse)
+        args = argparse.Namespace(
+            strategy="whatever",
+            version="v1",
+            changelog="probe",
+            dry_run=False,
+            paper_line=False,
+            supersede=False,
+        )
+
+        exit_code = await script._run(args)
+        assert exit_code == 1
+
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            row = (
+                await session.execute(
+                    text(
+                        "SELECT level::text AS level, message FROM system_events "
+                        "WHERE event = 'strategy_version_activation_refused' "
+                        "ORDER BY created_at DESC LIMIT 1"
+                    )
+                )
+            ).first()
+        assert row is not None
+        assert row.level == "warning"
+        assert "forced refusal for T3.15c" in row.message

@@ -13,13 +13,14 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from sqlalchemy import text
 
 from hunter_core.db.session import tenant_session
-from hunter_execution_worker.bridge_repo import ENTRY_WINDOW, pending_signals
+from hunter_core.domain.enums import TradeDirection
+from hunter_execution_worker.bridge_repo import ENTRY_WINDOW, ShadowSignal, pending_signals
 from hunter_execution_worker.bridge_screen import Screened, screen_signal
 from hunter_execution_worker.wallet import WalletRef
 
@@ -57,11 +58,14 @@ async def _setup(
     with_beta: bool = True,
     active_version: bool = True,
     agent_status: str = "enabled",
+    version_purpose: str = shadow.PURPOSE_PAPER,
 ) -> Fixture:
     tenant = await create_tenant(engine)
     wallet = await open_wallet(factory, engine, tenant)
     perp_market_id = await shadow.add_perp_market(engine, tenant)
-    version_id = await shadow.create_version(engine, active=active_version, at=BAR)
+    version_id = await shadow.create_version(
+        engine, active=active_version, at=BAR, purpose=version_purpose
+    )
     await shadow.set_spot_volume(engine, tenant.market_id, volume=spot_volume)
     await shadow.create_agent(
         engine,
@@ -113,7 +117,9 @@ async def test_research_only_is_refused_at_the_door(
     db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
 ) -> None:
     """SHADOW-LAB §10: evidence never becomes an order, and it is *counted*."""
-    fixture = await _setup(db_session_factory, db_engine)
+    fixture = await _setup(
+        db_session_factory, db_engine, version_purpose=shadow.PURPOSE_RESEARCH_ONLY
+    )
     await shadow.emit_signal(
         db_engine,
         version_id=fixture.version_id,
@@ -130,7 +136,7 @@ async def test_a_live_signal_is_refused_live_forbidden(
     """``live`` é Fase 4; ``ENABLE_LIVE_TRADING=false`` — refused by name, not
     merely ``research_only``, so an operator sees *why* (D10, matching
     ``admission.sources``)."""
-    fixture = await _setup(db_session_factory, db_engine)
+    fixture = await _setup(db_session_factory, db_engine, version_purpose="live")
     await shadow.emit_signal(
         db_engine,
         version_id=fixture.version_id,
@@ -142,22 +148,81 @@ async def test_a_live_signal_is_refused_live_forbidden(
     assert [item.refused for item in screened] == ["live_forbidden"]
 
 
-async def test_an_unknown_purpose_is_refused_unknown_purpose(
+async def test_an_unknown_column_purpose_is_refused_unknown_purpose() -> None:
+    """A purpose the bridge does not recognise is refused by name, not silently
+    passed through as ``research_only`` (D10: one spelling of ``"paper"``,
+    everything else fails closed).
+
+    Unit, no database: since ``0010_strategy_purpose`` the column is
+    CHECK-constrained to ``research_only``/``paper``/``live``, so an
+    unrecognised label can no longer reach here through a live row — this is
+    defence in depth for a value a *future* migration adds to the CHECK
+    before this module learns to handle it, exercised directly against
+    :func:`screen_signal` rather than through a database write the schema
+    itself now refuses."""
+    signal = ShadowSignal(
+        signal_id=uuid.uuid4(),
+        strategy_version_id=uuid.uuid4(),
+        perp_market_id=uuid.uuid4(),
+        exchange_id=uuid.uuid4(),
+        base_asset_id=uuid.uuid4(),
+        quote_asset_id=uuid.uuid4(),
+        direction=TradeDirection.LONG,
+        entry_ref=Decimal(100),
+        stop=Decimal("97.5"),
+        target=Decimal(105),
+        assumed_costs=None,
+        source_bar_close=NOW,
+        emitted_at=NOW,
+        purpose="definitely_not_a_real_purpose",
+        envelope_purpose="definitely_not_a_real_purpose",
+        version_active=True,
+    )
+    screened = await screen_signal(
+        cast("AsyncSession", None),
+        wallet=WalletRef(uuid.uuid4(), uuid.uuid4()),
+        signal=signal,
+        now=NOW,
+    )
+    assert screened.refused == "unknown_purpose"
+
+
+async def test_a_column_paper_signal_with_a_research_only_envelope_is_refused_purpose_mismatch(
     db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
 ) -> None:
-    """A purpose label the bridge does not recognise is refused by name, not
-    silently passed through as ``research_only`` (D10: one spelling of
-    ``"paper"``, everything else fails closed)."""
-    fixture = await _setup(db_session_factory, db_engine)
+    """T3.15c (security review HIGH 2): the gate decides on the frozen column,
+    not on the label a worker stamped into JSON — a disagreement is refused by
+    name, not silently resolved in either direction."""
+    fixture = await _setup(db_session_factory, db_engine, version_purpose=shadow.PURPOSE_PAPER)
     await shadow.emit_signal(
         db_engine,
         version_id=fixture.version_id,
         market_id=fixture.perp_market_id,
         source_bar_close=BAR,
-        purpose="definitely_not_a_real_purpose",
+        purpose=shadow.PURPOSE_RESEARCH_ONLY,
     )
     screened = await _screen(db_session_factory, fixture)
-    assert [item.refused for item in screened] == ["unknown_purpose"]
+    assert [item.refused for item in screened] == ["purpose_mismatch"]
+
+
+async def test_a_column_research_only_signal_with_a_paper_envelope_is_refused_purpose_mismatch(
+    db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
+) -> None:
+    """The other direction: a worker cannot promote its own evidence to
+    ``paper`` by stamping the envelope alone, because the column — write-
+    protected since ``0010`` — never agreed."""
+    fixture = await _setup(
+        db_session_factory, db_engine, version_purpose=shadow.PURPOSE_RESEARCH_ONLY
+    )
+    await shadow.emit_signal(
+        db_engine,
+        version_id=fixture.version_id,
+        market_id=fixture.perp_market_id,
+        source_bar_close=BAR,
+        purpose=shadow.PURPOSE_PAPER,
+    )
+    screened = await _screen(db_session_factory, fixture)
+    assert [item.refused for item in screened] == ["purpose_mismatch"]
 
 
 async def test_a_signal_of_an_inactive_version_is_refused(

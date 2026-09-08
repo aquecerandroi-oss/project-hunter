@@ -84,6 +84,17 @@ class ShadowSignal:
     source_bar_close: datetime | None
     emitted_at: datetime
     purpose: str
+    """``strategy_versions.purpose`` — the column, not the envelope. Since the
+    `0011` review this is what the gate decides on: it is written only by the
+    audited activation script (``DATABASE_URL_MIGRATIONS``), never by
+    ``hunter_worker`` (security review T3.15 HIGH 2)."""
+    envelope_purpose: str
+    """The label ``hunter_worker`` stamped on the signal itself
+    (``agent_signals.supporting_features`` / ``signal_outcomes.meta``) — kept
+    only as a cross-check against :attr:`purpose`. A mismatch is refused
+    ``purpose_mismatch`` before any other screening: it means a signal was
+    stamped for a coorte other than the one the frozen row now says it belongs
+    to (a worker on an older build, or a write it should never have made)."""
     version_active: bool
 
     def window_closes_at(self) -> datetime | None:
@@ -93,7 +104,8 @@ class ShadowSignal:
 _SIGNAL_SELECT = (
     "SELECT s.id AS signal_id, s.strategy_version_id, s.market_id, s.direction::text AS direction, "
     "s.stop, s.targets, s.supporting_features, s.emitted_at, o.meta AS outcome_meta, "
-    "v.status::text AS version_status, v.activated_at, m.exchange_id, m.base_asset_id, "
+    "v.status::text AS version_status, v.activated_at, v.purpose AS version_purpose, "
+    "m.exchange_id, m.base_asset_id, "
     "m.quote_asset_id FROM agent_signals s "
     "JOIN strategy_versions v ON v.id = s.strategy_version_id "
     "JOIN markets m ON m.id = s.market_id "
@@ -149,7 +161,8 @@ def _signal(row: Any) -> ShadowSignal:
             else None
         ),
         emitted_at=ensure_utc(row.emitted_at),
-        purpose=str(envelope.get("purpose") or meta.get("purpose") or ""),
+        purpose=str(row.version_purpose),
+        envelope_purpose=str(envelope.get("purpose") or meta.get("purpose") or ""),
         version_active=row.version_status == "active" and row.activated_at is not None,
     )
 

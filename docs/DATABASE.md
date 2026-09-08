@@ -802,6 +802,18 @@ qualquer tabela que esteja em nenhuma delas ou em duas.
   primeira revisão que precisar de uma trava longa numa tabela quente é que
   traz o `SET LOCAL lock_timeout` — e traz junto a decisão de que uma janela de
   manutenção é aceitável ali.
+  **`0006`–`0009` seguem o mesmo padrão** (colunas/triggers/grants sobre
+  tabelas que na VPS têm poucas linhas — `strategy_versions`,
+  `trade_proposals`, `positions` — ou `GRANT`s puros). **A `0010` é a primeira
+  a tomar `ACCESS EXCLUSIVE` de fato**: `ADD COLUMN` + `ADD CONSTRAINT CHECK` +
+  `DROP`/`CREATE TRIGGER` sobre `strategy_versions`, tudo numa única transação,
+  rodando na VPS com `api`/`market-worker`/`strategy-worker` de pé
+  (`docker compose run --rm migrate`, `docs/DEPLOYMENT.md`); o pior caso
+  medido é a `statement_timeout` de 15 s do §1.2a cortando um leitor que ficou
+  na fila atrás do `ALTER TABLE` — aceito porque `strategy_versions` tem uma
+  linha por estratégia semeada (dezenas), não porque a trava é curta. **A
+  `0011` volta a ser só `GRANT`/`REVOKE`** (nenhum DDL sobre a relação), então
+  não abre essa janela.
 - `infra/scripts/create_partitions.py` roda **uma transação por tabela-pai
   particionada**, não uma para todas. `CREATE TABLE ... PARTITION OF` toma
   `ACCESS EXCLUSIVE` na pai, e uma transação única segurava as oito travas até o
@@ -863,9 +875,12 @@ timestamps ISO-8601 UTC com `Z`, ausentes como `null`, listas na ordem dada).
 
 A trigger `strategy_versions_freeze_update` (`BEFORE UPDATE ... WHEN (OLD.activated_at
 IS NOT NULL)`) rejeita qualquer alteração de `strategy_id`, `version`,
-`code_ref`, `parameters_schema`, `default_parameters`, `params_format` e
-`activated_at` — **inclusive `SET activated_at = NULL`**, que de outro modo
-descongelaria a linha — em qualquer `status` (ativa, deprecated, reativada).
+`code_ref`, `parameters_schema`, `default_parameters`, `params_format`,
+`activated_at` e, desde a `0010`, `purpose` (§22.2) — **inclusive
+`SET activated_at = NULL`**, que de outro modo descongelaria a linha — em
+qualquer `status` (ativa, deprecated, reativada). A lista viva desta trigger
+mora em `ddl/strategy_purpose.py:_FROZEN_COLUMNS_0010`, não mais em
+`ddl/shadow.py` (que continua congelada como a `0002` a deixou, §17.1).
 `status`, `changelog` e `deprecated_at` continuam mutáveis: descrevem o ciclo de
 vida da versão, não o seu conteúdo. A comparação é `IS DISTINCT FROM` sobre o
 valor, então reescrever o mesmo JSONB com outra ordem de chaves não é alteração.
@@ -1541,7 +1556,7 @@ só com `SELECT`.
 | `APP_READ_ONLY_TABLES` (+ `SHADOW_*`, `ANALYSIS_APP_READ_ONLY_TABLES`) | `0001`–`0003` | `hunter_app` | `SELECT` |
 | `APPEND_ONLY_TABLES` | `0001` | ambos | `SELECT`/`INSERT` |
 | `WORKER_DELETE_TABLES` | `0001` | `hunter_worker` | `DELETE` (só `organizations`/`users`) |
-| `WORKER_WRITE_TABLES`, `SHADOW_WORKER_WRITE_TABLES`, `ANALYSIS_WORKER_WRITE_TABLES` | `0001`–`0003` | `hunter_worker` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` |
+| `WORKER_WRITE_TABLES`, `SHADOW_WORKER_WRITE_TABLES`, `ANALYSIS_WORKER_WRITE_TABLES` | `0001`–`0003` | `hunter_worker` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` — **exceto `strategy_versions`** desde a `0010`/`0011` (nota abaixo) |
 | `ANALYSIS_WORKER_APPEND_TABLES` | `0003` | `hunter_worker` | `SELECT`/`INSERT`/`DELETE` |
 | `BASELINE_LOCK_TABLES_0005` | `0005` | `hunter_worker` | `+ UPDATE` **só como lock** (`ddl/baseline_lock.py`) |
 
@@ -1551,6 +1566,22 @@ uma tabela que a `0003` já classificou, e
 é o que impede que ela vire a porta de entrada de uma tabela sem classificação —
 o teste de partição de §15.6 é sobre as classes do `hunter_app` e não veria um
 grant só do worker. A partição continua exata.
+
+**Nota sobre `strategy_versions` (desde a `0010`, estreitada pela `0011`,
+§22.3/§23).** A linha de `WORKER_WRITE_TABLES` acima descreve o que `0001`
+concedeu — a tabela continua nessa classe para fins de classificação, e
+`test_the_grant_lists_cover_every_table_exactly_once` continua vendo-a lá —,
+mas o privilégio efetivo de `hunter_worker` não é mais o de tabela: a `0010`
+revogou `INSERT`/`UPDATE` de tabela e regrantou por coluna, exceto `purpose`; a
+`0011` foi além e revogou também `INSERT` por completo, `DELETE` de tabela e
+`UPDATE` nas colunas do ciclo de ativação (`status`, `activated_at`,
+`deprecated_at`, `code_ref`, `parameters_schema`, `default_parameters`,
+`params_format`). O que sobra é `UPDATE` em `id`, `strategy_id`, `version`,
+`changelog`, `created_at` — nenhuma delas escrita por código de produção como
+`hunter_worker` hoje. **Nunca reconceder no nível de tabela**: um `GRANT INSERT,
+UPDATE, DELETE ON strategy_versions TO hunter_worker` "consertando" uma
+divergência aparente contra esta tabela reabre tudo que a `0010`/`0011`
+fecharam, porque a ACL de coluna é a **união** com a de tabela.
 
 **Orçamento de nome de revisão: 32 caracteres.** `alembic_version.version_num` é
 `VARCHAR(32)`; o id `0005_feature_baselines_lock_grant` (33) rodou a revisão
@@ -3549,7 +3580,7 @@ alargada e um estreitamento de grant. Ela fecha o achado da D10
 aceitavam `live`, e **o rótulo que a carteira paper precisa não existia em
 lugar nenhum** — não era um valor de linha que faltava, era uma coluna.
 
-`0010_strategy_purpose` tem 22 caracteres; o teto de `alembic_version.version_num`
+`0010_strategy_purpose` tem 21 caracteres; o teto de `alembic_version.version_num`
 continua sendo 32 (§17.6). As listas desta revisão estão congeladas em
 `ddl/strategy_purpose.py`, no padrão de §15.6/§16.5/§17.6/§18.9/§19/§20/§21.
 
@@ -3632,3 +3663,87 @@ da D10 vêm antes dele.
 - `apps/api` (ordem manual): nasce `purpose = paper`.
 - T3.15b (`services/execution-worker/bridge_screen.py`): importa
   `PURPOSE_PAPER` de `hunter_core.strategies.envelope` e admite `paper`.
+
+### 22.6 Correção de 2026-09-08 (HIGH da revisão de segurança): a ponte decide
+pela coluna, não pelo envelope
+
+A T3.15b (§22.5) fazia o portão ler `purpose` de
+`agent_signals.supporting_features`/`signal_outcomes.meta` — o envelope que
+`hunter_worker` escreve com INSERT/UPDATE de tabela cheios — e nunca chegava a
+olhar a coluna que esta seção protege. Uma escrita indevida no envelope (bug em
+`record.py`, ou qualquer caminho futuro com o papel do worker) carimbando
+`purpose: "paper"` num sinal de uma versão `research_only` chegaria à carteira
+sem nunca ter passado pelo script auditado.
+
+`bridge_repo._SIGNAL_SELECT` agora lê `v.purpose` (a query já fazia `JOIN
+strategy_versions v`) e `ShadowSignal.purpose` é **essa** coluna —
+`ShadowSignal.envelope_purpose` guarda o rótulo do envelope só como
+contraprova. `bridge_screen.screen_signal` compara os dois **antes** de
+qualquer outra triagem: divergência é recusada `purpose_mismatch` e logada em
+`warning` (não `info`, como toda outra recusa) — um sinal com coluna e
+envelope discordando é evidência de uma escrita que não deveria ter
+acontecido, não ruído de operação. Os dois rótulos vão no log
+(`column_purpose`, `envelope_purpose`).
+
+## 23. Nada além de SELECT: fechando o buraco da ativação — M3 (`0011_strategy_activation_owner`)
+
+Décima primeira revisão. A `0010` protegeu o *rótulo*; a revisão de segurança
+(MEDIUM 4) e a de database-architect (A4) mediram o mesmo buraco de lados
+opostos: a trigger de congelamento só dispara `WHEN (OLD.activated_at IS NOT
+NULL)`, então uma linha `draft` — exatamente a forma que
+`--paper-line` deriva, esperando as sete condições da D10 — podia ser
+**ativada** (`UPDATE strategy_versions SET status='active', activated_at=now()`)
+ou **apagada** pelo papel `hunter_worker`, sem linha em `system_events`, sem
+`--changelog` e sem decisão do Everton. Isso é pré-existente desde a `0001`,
+não foi introduzido pela `0010` — mas é a revisão que promete "escrita só pelo
+script auditado", e a promessa era mais estreita do que soava.
+
+### 23.1 O que é revogado
+
+Toda consulta de produção contra `strategy_versions` como `hunter_worker` é
+`SELECT` (`catalogue.py`, `replay/load.py`, `metrics.py`, `bridge_repo.py`); os
+únicos escritores são a conexão de dono (`activate_strategy_version.py`,
+`seed.py`) e `paper_line.py`, que também roda como dono. A `0011` revoga:
+
+| Privilégio | Colunas/escopo |
+|---|---|
+| `UPDATE` | `status`, `activated_at`, `deprecated_at`, `code_ref`, `parameters_schema`, `default_parameters`, `params_format` |
+| `DELETE` | tabela inteira |
+| `INSERT` | tabela inteira (todas as colunas do grant da `0010`) |
+
+`INSERT` sai por completo porque nada insere como `hunter_worker` — o mesmo
+motivo que já tirava `DELETE` de discussão para `hunter_app` desde a `0001`.
+
+### 23.2 O que sobra
+
+`UPDATE` em `id`, `strategy_id`, `version`, `changelog`, `created_at` — as
+cinco colunas de `ddl.strategy_purpose.WORKER_COLUMNS_EXCEPT_PURPOSE` (doze)
+que ficam de fora de `REVOKED_LIFECYCLE_COLUMNS` (sete). Nenhuma delas é
+escrita por código de produção como `hunter_worker` hoje — a lista não nasceu
+de um caso de uso, nasceu de deixar intocado o que nenhuma das duas revisões
+apontou como problema, com a mesma barra de evidência que um `GRANT` exigiria.
+`REMAINING_WORKER_UPDATE_COLUMNS` é calculada por subtração das duas listas
+congeladas, não escrita duas vezes, para as duas nunca divergirem em silêncio.
+
+| Papel | `strategy_versions` |
+|---|---|
+| `hunter_app` | `SELECT` (inalterado desde a `0001`) |
+| `hunter_worker` | `SELECT`; `UPDATE` só em `id`/`strategy_id`/`version`/`changelog`/`created_at` |
+| dono / `DATABASE_URL_MIGRATIONS` | tudo — ativação, derivação `--paper-line` e seed |
+
+### 23.3 Sem trava longa, sem guarda de downgrade
+
+Ao contrário da `0010`, esta revisão não faz `ALTER TABLE`: é só
+`GRANT`/`REVOKE`, que não toma `ACCESS EXCLUSIVE` na relação (mesma medição da
+`0005`, §15.6) — não reabre a janela de ~15 s que a `0010` abriu. E reverter
+não perde dado nenhum: o downgrade apenas regrante o que `0001`/`0010` já
+davam, então não há guarda como a da `0010` (§17.7) — não há nada que uma
+linha existente possa "já ter violado".
+
+### 23.4 Provado em
+
+`packages/core/tests/integration/test_schema_privileges.py`: o worker não
+consegue ativar (`UPDATE status/activated_at`) nem apagar uma linha `draft`,
+e continua lendo (`SELECT`) e escrevendo `changelog`/`id`/`strategy_id`/
+`version`/`created_at`. `test_migrations.py`: round trip da `0011` e
+`alembic check` sem drift.

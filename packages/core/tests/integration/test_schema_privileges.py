@@ -745,42 +745,66 @@ async def test_the_worker_cannot_name_purpose_in_an_insert(
     await worker_connection.rollback()
 
 
-async def test_the_worker_can_still_insert_a_version_relying_on_the_purpose_default(
-    worker_connection: AsyncConnection,
-) -> None:
-    """Omitting ``purpose`` uses its ``DEFAULT`` and needs no privilege on it at
-    all — Postgres only checks a column's privilege when the caller *names* it.
+async def _insert_strategy_version_as_owner(connection: AsyncConnection, *, key: str) -> uuid.UUID:
+    """Create the fixture row with the connecting role's own privilege — the
+    container owner, exactly the connection ``activate_strategy_version.py``,
+    ``seed.py`` and ``paper_line.py`` actually use (T3.15c: ``0011`` revokes
+    ``INSERT`` on ``strategy_versions`` from ``hunter_worker`` outright, so a
+    test that needs a row to test *other* privileges against can no longer
+    create it as the worker).
+
+    ``RESET ROLE`` returns to the session (owner) role for these two
+    statements; the caller is left back in ``hunter_worker`` (the shape
+    :func:`_set_as_worker` already re-enters after a rollback). Nothing here
+    is committed outside the test's own transaction, which the ``worker_connection``
+    fixture rolls back when the test ends.
     """
     strategy_id, version_id = uuid7(), uuid7()
-    await worker_connection.execute(
+    await connection.execute(text("RESET ROLE"))
+    await connection.execute(
         text("INSERT INTO strategies (id, key, name) VALUES (:id, :key, :key)"),
-        {"id": strategy_id, "key": f"purpose-priv-default-{uuid.uuid4().hex[:8]}"},
+        {"id": strategy_id, "key": key},
     )
-    await worker_connection.execute(
+    await connection.execute(
         text(
             "INSERT INTO strategy_versions (id, strategy_id, version) VALUES (:id, :strategy, 'v1')"
         ),
         {"id": version_id, "strategy": strategy_id},
     )
-    purpose = await worker_connection.scalar(
-        text("SELECT purpose FROM strategy_versions WHERE id = :id"), {"id": version_id}
-    )
-    assert purpose == "research_only"
+    await connection.execute(text("SET LOCAL ROLE hunter_worker"))
+    return version_id
 
 
-async def test_the_worker_cannot_update_purpose_but_keeps_every_other_column(
+async def test_the_worker_cannot_insert_a_strategy_version_at_all_since_0011(
     worker_connection: AsyncConnection,
 ) -> None:
-    strategy_id, version_id = uuid7(), uuid7()
+    """``0010`` denied naming ``purpose`` in an ``INSERT``; ``0011`` goes
+    further and revokes ``INSERT`` outright, because nothing that runs as
+    ``hunter_worker`` ever inserts here — ``seed.py``, ``paper_line.py`` and
+    ``activate_strategy_version.py`` all use the owner connection. Omitting
+    ``purpose`` (0010's own finding) no longer saves an ``INSERT`` that names
+    any other column either."""
+    strategy_id = uuid7()
     await worker_connection.execute(
         text("INSERT INTO strategies (id, key, name) VALUES (:id, :key, :key)"),
-        {"id": strategy_id, "key": f"purpose-priv-update-{uuid.uuid4().hex[:8]}"},
+        {"id": strategy_id, "key": f"purpose-priv-noinsert-{uuid.uuid4().hex[:8]}"},
     )
-    await worker_connection.execute(
-        text(
-            "INSERT INTO strategy_versions (id, strategy_id, version) VALUES (:id, :strategy, 'v1')"
-        ),
-        {"id": version_id, "strategy": strategy_id},
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await worker_connection.execute(
+            text(
+                "INSERT INTO strategy_versions (id, strategy_id, version) "
+                "VALUES (:id, :strategy, 'v1')"
+            ),
+            {"id": uuid7(), "strategy": strategy_id},
+        )
+    await worker_connection.rollback()
+
+
+async def test_the_worker_cannot_update_purpose_but_keeps_changelog(
+    worker_connection: AsyncConnection,
+) -> None:
+    version_id = await _insert_strategy_version_as_owner(
+        worker_connection, key=f"purpose-priv-update-{uuid.uuid4().hex[:8]}"
     )
     with pytest.raises(ProgrammingError, match=_DENIED):
         await worker_connection.execute(
@@ -788,21 +812,131 @@ async def test_the_worker_cannot_update_purpose_but_keeps_every_other_column(
             {"id": version_id},
         )
     await worker_connection.rollback()
-    # A fresh row in the new transaction — the rollback above discarded the one
-    # made before it, and this proves the *other* columns' privilege survived
-    # the narrowing, which ``0010``'s own docstring claims and this checks.
+    # The rollback above discarded the row the owner role just inserted, same
+    # as it always discarded a worker-inserted one before ``0011`` — a fresh
+    # row, again created as the owner, proves the *other* columns' privilege
+    # survived the narrowing: ``changelog`` still writes.
     await _set_as_worker(worker_connection)
-    await worker_connection.execute(
-        text("INSERT INTO strategies (id, key, name) VALUES (:id, :key, :key)"),
-        {"id": strategy_id, "key": f"purpose-priv-survives-{uuid.uuid4().hex[:8]}"},
-    )
-    await worker_connection.execute(
-        text(
-            "INSERT INTO strategy_versions (id, strategy_id, version) VALUES (:id, :strategy, 'v1')"
-        ),
-        {"id": version_id, "strategy": strategy_id},
+    version_id = await _insert_strategy_version_as_owner(
+        worker_connection, key=f"purpose-priv-survives-{uuid.uuid4().hex[:8]}"
     )
     await worker_connection.execute(
         text("UPDATE strategy_versions SET changelog = 'still writable' WHERE id = :id"),
         {"id": version_id},
     )
+
+
+# --------------------------------------------------------------------------
+# 0011_strategy_activation_owner: hunter_worker cannot activate, deprecate or
+# delete a version — DATABASE.md section 23
+# --------------------------------------------------------------------------
+
+
+async def test_the_worker_cannot_activate_a_draft(
+    worker_connection: AsyncConnection,
+) -> None:
+    """The gap ``0010`` left open: the freeze trigger only fires on an already-
+    activated row, so before ``0011`` the table-level ``UPDATE`` ``0001`` gave
+    ``hunter_worker`` still let it flip a ``draft`` row (``activated_at IS
+    NULL`` — exactly the shape ``--paper-line`` derives) to ``active`` itself,
+    with no line in ``system_events`` and no decision behind it."""
+    version_id = await _insert_strategy_version_as_owner(
+        worker_connection, key=f"activation-priv-{uuid.uuid4().hex[:8]}"
+    )
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await worker_connection.execute(
+            text(
+                "UPDATE strategy_versions SET status = 'active', activated_at = now() "
+                "WHERE id = :id"
+            ),
+            {"id": version_id},
+        )
+    await worker_connection.rollback()
+
+
+@pytest.mark.parametrize(
+    ("column", "value"),
+    [
+        ("code_ref", "'hunter_core.strategies.tampered'"),
+        ("parameters_schema", "'{}'::jsonb"),
+        ("default_parameters", "'{}'::jsonb"),
+        ("params_format", "2"),
+        ("deprecated_at", "now()"),
+    ],
+)
+async def test_the_worker_cannot_touch_the_other_activation_columns_either(
+    worker_connection: AsyncConnection, column: str, value: str
+) -> None:
+    """The rest of ``REVOKED_LIFECYCLE_COLUMNS`` (``ddl.strategy_activation_owner``):
+    the version's identity and the deprecation cycle, revoked alongside
+    ``status``/``activated_at`` for the same reason — nothing that runs as
+    ``hunter_worker`` writes any of them."""
+    version_id = await _insert_strategy_version_as_owner(
+        worker_connection, key=f"activation-priv-{column}-{uuid.uuid4().hex[:8]}"
+    )
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await worker_connection.execute(
+            text(f"UPDATE strategy_versions SET {column} = {value} WHERE id = :id"),  # noqa: S608
+            {"id": version_id},
+        )
+    await worker_connection.rollback()
+
+
+async def test_the_worker_cannot_delete_a_strategy_version(
+    worker_connection: AsyncConnection,
+) -> None:
+    """The other half of the gap ``0011`` closes: a ``draft`` row's ``DELETE``
+    was never guarded by the freeze trigger either (``BEFORE DELETE ... WHEN
+    (OLD.activated_at IS NOT NULL)``)."""
+    version_id = await _insert_strategy_version_as_owner(
+        worker_connection, key=f"activation-priv-delete-{uuid.uuid4().hex[:8]}"
+    )
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await worker_connection.execute(
+            text("DELETE FROM strategy_versions WHERE id = :id"), {"id": version_id}
+        )
+    await worker_connection.rollback()
+
+
+async def test_the_worker_still_reads_strategy_versions(
+    worker_connection: AsyncConnection,
+) -> None:
+    """``SELECT`` is the one privilege ``0011`` does not touch — every real
+    reader (``catalogue.py``, ``replay/load.py``, ``metrics.py``,
+    ``bridge_repo.py``) still works."""
+    version_id = await _insert_strategy_version_as_owner(
+        worker_connection, key=f"activation-priv-select-{uuid.uuid4().hex[:8]}"
+    )
+    status = await worker_connection.scalar(
+        text("SELECT status::text FROM strategy_versions WHERE id = :id"), {"id": version_id}
+    )
+    assert status == "draft"
+
+
+async def test_the_worker_has_no_table_level_privilege_left_but_select(
+    schema_engine: AsyncEngine,
+) -> None:
+    """The measured end state of §23: ``SELECT`` only, at the table level."""
+    async with schema_engine.connect() as connection:
+        held: set[str] = set()
+        for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE"):
+            granted = await connection.scalar(
+                text("SELECT has_table_privilege('hunter_worker', 'strategy_versions', :p)"),
+                {"p": privilege},
+            )
+            if granted:
+                held.add(privilege)
+    assert held == {"SELECT"}, held
+
+
+def test_0011_revoked_and_remaining_columns_partition_0010s_grant() -> None:
+    """The two lists in ``ddl.strategy_activation_owner`` never drift apart:
+    every column ``0010`` granted ``hunter_worker`` is in exactly one of
+    "revoked by 0011" or "still writable"."""
+    owner_ddl = migration_ddl("strategy_activation_owner")
+    purpose_ddl = migration_ddl("strategy_purpose")
+    revoked = set(owner_ddl.REVOKED_LIFECYCLE_COLUMNS)
+    remaining = set(owner_ddl.REMAINING_WORKER_UPDATE_COLUMNS)
+    granted_by_0010 = set(purpose_ddl.WORKER_COLUMNS_EXCEPT_PURPOSE)
+    assert revoked | remaining == granted_by_0010
+    assert revoked & remaining == set()

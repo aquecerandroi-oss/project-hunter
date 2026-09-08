@@ -37,7 +37,7 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0010_strategy_purpose"
+HEAD_REVISION = "0011_strategy_activation_owner"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -50,6 +50,7 @@ PAPER_WALLET_REVISION = "0006_paper_wallet"
 PAPER_ROLES_REVISION = "0007_paper_roles"
 PAPER_ROLES_2_REVISION = "0008_paper_roles_2"
 PAPER_GEOMETRY_REVISION = "0009_paper_geometry"
+STRATEGY_PURPOSE_REVISION = "0010_strategy_purpose"
 
 _PENDING_PREDICATE = "dispatched_at IS NULL"
 """What makes an index a *pending* index, spelled out here rather than imported:
@@ -2001,15 +2002,23 @@ def test_0010_refuses_to_downgrade_while_a_version_carries_a_non_research_only_p
     """Dropping the column would erase the one thing telling a paper coorte
     apart from shadow evidence — not derivable from anything that remains."""
     config = alembic_config(upgraded)
+    # The head is ``0011`` since T3.15c, and it reverses cleanly (grants only) —
+    # step down to ``0010`` first and make ``-1`` mean this guard again, the same
+    # shape ``test_0006_refuses_to_downgrade_while_a_wallet_is_still_anchored``
+    # uses for ``0007`` sitting on top of ``0006``.
+    command.downgrade(config, STRATEGY_PURPOSE_REVISION)
     version_id = _strategy_version(
         upgraded, key=f"purpose-guard-{uuid.uuid4().hex[:8]}", purpose="paper"
     )
     try:
         with pytest.raises(DBAPIError, match="purpose other than research_only"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == STRATEGY_PURPOSE_REVISION, (
+            "the downgrade must not commit"
+        )
     finally:
         _forget_draft_strategy_version(upgraded, version_id)
+    command.upgrade(config, "head")
     command.check(config)
 
 
@@ -2024,6 +2033,7 @@ def test_0010_reverses_on_a_populated_database_and_gives_0002s_trigger_back(
     column that no longer exists.
     """
     config = alembic_config(upgraded)
+    command.downgrade(config, STRATEGY_PURPOSE_REVISION)  # see the note two tests up
     _strategy_version(upgraded, key=f"purpose-trip-{uuid.uuid4().hex[:8]}")
     command.downgrade(config, "-1")
     try:
@@ -2035,4 +2045,36 @@ def test_0010_reverses_on_a_populated_database_and_gives_0002s_trigger_back(
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+# --------------------------------------------------------------------------
+# 0011_strategy_activation_owner — nothing left for hunter_worker but SELECT
+# and a few inert columns
+# --------------------------------------------------------------------------
+
+
+def test_0011_reverses_and_restores_0010s_grant(upgraded: str) -> None:
+    """Round trip: grants only (no DDL on the relation, no downgrade guard),
+    and ``alembic check`` at the end.
+
+    The behavioural proof (cannot activate, cannot delete, can still SELECT) is
+    ``test_schema_privileges.py`` — this is the migration-machinery half: the
+    exact state ``0010`` left survives an upgrade/downgrade/upgrade round trip.
+    """
+    config = alembic_config(upgraded)
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == STRATEGY_PURPOSE_REVISION
+        held = asyncio.run(_table_privileges(upgraded, "hunter_worker", "strategy_versions"))
+        assert held == {"SELECT", "DELETE"}, held
+        for column in migration_ddl("strategy_purpose").WORKER_COLUMNS_EXCEPT_PURPOSE:
+            assert asyncio.run(
+                _column_privilege(upgraded, "hunter_worker", "strategy_versions", column)
+            ), f"0010's UPDATE grant on {column} did not come back on downgrade"
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    held = asyncio.run(_table_privileges(upgraded, "hunter_worker", "strategy_versions"))
+    assert held == {"SELECT"}, held
     command.check(config)

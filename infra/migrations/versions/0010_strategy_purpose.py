@@ -24,7 +24,7 @@ that told a paper-wallet coorte apart from shadow evidence, and that is not
 recoverable from anything that remains. Nothing is ever activated by this
 migration; it only makes the label representable.
 
-**Named ``0010_strategy_purpose`` (20 characters)** - ``alembic_version.version_num``
+**Named ``0010_strategy_purpose`` (21 characters)** - ``alembic_version.version_num``
 is ``VARCHAR(32)`` (section 17.6).
 
 Revision ID: 0010_strategy_purpose

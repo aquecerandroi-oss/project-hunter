@@ -43,8 +43,11 @@ audited ``activate`` run, and D10 names the seven conditions that come first.
 ``purpose`` is written only here, on the migration/owner connection:
 ``0010_strategy_purpose`` revoked it from every application role.
 
-Every run writes a ``system_events`` row, activation or refusal alike: an
-experiment whose start nobody can date is not an experiment.
+Every run writes a ``system_events`` row — activation, refusal or an
+unexpected failure alike (T3.15c: the earlier promise covered only ``Refused``;
+any other exception now writes ``strategy_version_activation_error`` before the
+process exits 2): an experiment whose start nobody can date is not an
+experiment.
 
 Connects with ``DATABASE_URL_MIGRATIONS`` (direct, never the pooler), like
 ``infra/scripts/seed.py``. The shared checks and the row reader live in
@@ -75,6 +78,7 @@ from hunter_strategy_worker.activation_db import (
     migration_applied,
     purpose_column_present,
     record_event,
+    record_failure,
 )
 from hunter_strategy_worker.catalogue import registry_key, resolve_strategy
 from hunter_strategy_worker.code_ref import strategy_module, version_code_ref
@@ -291,18 +295,28 @@ def migration_url() -> str:
 async def _run(args: argparse.Namespace) -> int:
     engine = create_async_engine(migration_url(), connect_args={"statement_cache_size": 0})
     try:
-        async with engine.connect() as conn, conn.begin():
-            action = paper_line if args.paper_line else supersede if args.supersede else activate
-            try:
+        action = paper_line if args.paper_line else supersede if args.supersede else activate
+        try:
+            async with engine.connect() as conn, conn.begin():
                 message = await action(
                     conn, args.strategy, args.version, args.changelog, dry_run=args.dry_run
                 )
-            except Refused as refusal:
-                await record_event(
-                    conn, "warning", "strategy_version_activation_refused", str(refusal)
-                )
-                print(f"REFUSED: {refusal}", file=sys.stderr)
-                return 1
+        except Refused as refusal:
+            await record_failure(
+                engine, "warning", "strategy_version_activation_refused", str(refusal)
+            )
+            print(f"REFUSED: {refusal}", file=sys.stderr)
+            return 1
+        except Exception as exc:
+            # Every run leaves a system_events row, not only a named refusal
+            # (docs/DATABASE.md section 22.4's promise was narrower than it
+            # sounded — security review T3.15 MEDIUM 5): a DBAPIError from a
+            # CHECK/trigger/unique violation, a bad --changelog, or a dropped
+            # connection is audited the same way, then re-raised as a clean
+            # exit rather than a bare traceback.
+            print(f"ERROR: {exc}", file=sys.stderr)
+            await record_failure(engine, "error", "strategy_version_activation_error", str(exc))
+            raise SystemExit(2) from exc
         print(message)
     finally:
         await engine.dispose()

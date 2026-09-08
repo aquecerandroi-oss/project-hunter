@@ -12,13 +12,16 @@ instant*, not durable state the wallet depends on — so it lives in the
 structured log and the counter (T3.14 item 2 allows either).
 
 Order matters. The cheapest and most categorical refusals come first — a
-``live`` signal is refused **by name** at the door (Fase 4,
-``ENABLE_LIVE_TRADING=false``), and a ``research_only`` signal or an inactive
-version is refused **at the door** too, before any market data is read (item 5)
-— and only then the ones that need the reference tables. The bridge admits
-``purpose = "paper"`` only; anything else is either ``research_only`` (evidence
-never becomes an order) or ``unknown_purpose`` (a label the bridge does not
-recognise).
+disagreement between the frozen ``strategy_versions.purpose`` column and the
+envelope's own label is refused ``purpose_mismatch`` before anything else is
+even asked (T3.15c, security review HIGH 2: the gate decides on the column,
+never on what a worker wrote into JSON), then a ``live`` signal is refused **by
+name** at the door (Fase 4, ``ENABLE_LIVE_TRADING=false``), and a
+``research_only`` signal or an inactive version is refused **at the door** too,
+before any market data is read (item 5) — and only then the ones that need the
+reference tables. The bridge admits ``purpose = "paper"`` only; anything else
+is either ``research_only`` (evidence never becomes an order) or
+``unknown_purpose`` (a label the bridge does not recognise).
 
 A refusal is logged and counted **once per (signal, reason)**, not once per
 pass: the durable queue (``bridge_repo.pending_signals``) re-reads the same
@@ -143,6 +146,7 @@ def report_refusal(
     reason: str,
     *,
     reported: dict[uuid.UUID, str] | None = None,
+    level: str = "info",
     **extra: object,
 ) -> bool:
     """Log ``bridge_candidate_refused`` once per (signal, reason) — never per pass.
@@ -154,12 +158,18 @@ def report_refusal(
     signal already seen is a real transition and is logged again. Without a map
     (a one-shot caller, most of the tests in ``test_bridge_eligibility.py``)
     every call logs, exactly like ``report_unreadable``'s single-call caller.
+
+    ``level`` is ``"info"`` for an ordinary refusal and ``"warning"`` for
+    ``purpose_mismatch`` (T3.15c): a disagreement between the frozen column and
+    the envelope is evidence of a write nobody should have made, not routine
+    screening noise.
     """
     if reported is not None and reported.get(signal.signal_id) == reason:
         return False
     if reported is not None:
         reported[signal.signal_id] = reason
-    logger.info(
+    log = getattr(logger, level)
+    log(
         "bridge_candidate_refused",
         signal_id=str(signal.signal_id),
         market_id=str(signal.perp_market_id),
@@ -174,9 +184,10 @@ def _refuse(
     reason: str,
     *,
     reported: dict[uuid.UUID, str] | None = None,
+    level: str = "info",
     **extra: object,
 ) -> Screened:
-    fresh = report_refusal(signal, reason, reported=reported, **extra)
+    fresh = report_refusal(signal, reason, reported=reported, level=level, **extra)
     return Screened(signal=signal, refused=reason, freshly_refused=fresh)
 
 
@@ -232,6 +243,15 @@ async def screen_signal(
     default, used by every test that screens a signal once) logs and counts
     every call, unchanged from before item 1.
     """
+    if signal.purpose != signal.envelope_purpose:
+        return _refuse(
+            signal,
+            "purpose_mismatch",
+            reported=reported,
+            level="warning",
+            column_purpose=signal.purpose,
+            envelope_purpose=signal.envelope_purpose,
+        )
     if signal.purpose == PURPOSE_LIVE:
         return _refuse(
             signal,

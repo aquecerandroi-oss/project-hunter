@@ -28,6 +28,33 @@ bash infra/hermes/install.sh --routine
 
 Registra também a rotina horária do plantão (aparece em `hermes cron list` e no painel Routines do Bot).
 
+**Servidor MCP `obsidian`, fixado em versão exata (correção de 2026-09-08,
+revisão de segurança T3.15 HIGH 3).** `install.sh` gravava `obsidian-mcp@2` —
+faixa flutuante, instalada via `npx -y` a cada boot do perfil, sem lockfile e
+sem pin de integridade: um `2.x` novo publicado por uma conta de mantenedor
+comprometida rodaria com os direitos do Everton na máquina que tem `~/.ssh`
+(push para `main`, `ssh hunter-vps`) e o `.env` do perfil Hermes. Agora o
+script fixa `OBSIDIAN_MCP_VERSION` (hoje `2.0.1`) e o argumento vira
+`obsidian-mcp@2.0.1`. Para subir a versão: audite o changelog/diff do pacote
+(`npm view obsidian-mcp version`, `npm diff obsidian-mcp@<antiga>@<nova>`),
+edite `OBSIDIAN_MCP_VERSION` em `infra/hermes/install.sh` e rode o instalador
+de novo. **Se o perfil `sexta-feira` já existe** de uma instalação anterior a
+esta correção, o bloco `mcp_servers.obsidian` do `config.yaml` já tem a faixa
+antiga gravada e o instalador é idempotente **só cria quando ausente** —
+apague a seção `obsidian:` de `%LOCALAPPDATA%\hermes\profiles\sexta-feira\config.yaml`
+uma vez e rode `bash infra/hermes/install.sh` de novo para gravar a versão
+fixada.
+
+**O que o instalador lê, exatamente.** O cabeçalho de `install.sh` já dizia
+"never reads .env" de um jeito que confundia qual `.env` — o do repositório
+(esse, de fato, nunca é lido: nenhuma linha do script toca
+`project-hunter/.env`) ou o do Hermes. `hermes profile create --clone` clona o
+perfil **ativo** inteiro, `.env` incluso — uma segunda cópia dos segredos
+daquele perfil em `%LOCALAPPDATA%\hermes\profiles\sexta-feira\`. Rotacionar a
+chave do perfil padrão não rotaciona essa cópia; se isso importa mais do que a
+conveniência do clone, crie o perfil sem `--clone` e configure as chaves à
+mão, para existir um só lugar de onde rotacionar.
+
 ## Depois de instalar (com as suas mãos, Everton)
 
 1. Abra o Hermes Desktop → aba **Bots** → `sexta-feira`. Em **Edit Profile**, fixe o modelo (recomendação: o mesmo GPT-6 da Astra, que já é metade da mente dela; se preferir outro, qualquer par provedor/modelo serve). Confira que a skill `project-hunter/*` e o servidor MCP `obsidian` estão marcados.

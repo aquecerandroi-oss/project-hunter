@@ -152,13 +152,18 @@ class TestReadiness:
             # ``status`` is the one lifecycle field the freeze trigger leaves
             # mutable (DATABASE.md §16.1), so the scenario is arranged and undone
             # without fighting it — and without deleting an activated row, which
-            # the trigger refuses on purpose.
+            # the trigger refuses on purpose. ``0011_strategy_activation_owner``
+            # (T3.15c) took ``status`` out of what ``hunter_worker`` may write at
+            # all, so this — like every other write to the table in this test
+            # module — runs as the session owner instead.
+            await session.execute(text("RESET ROLE"))
             await session.execute(
                 text(
                     "UPDATE strategy_versions SET status = 'deprecated' "
                     "WHERE status = 'active' AND activated_at IS NOT NULL"
                 )
             )
+            await session.execute(text("SET LOCAL ROLE hunter_worker"))
             await activate_version(
                 session,
                 key="roster_blind",
@@ -168,6 +173,7 @@ class TestReadiness:
             assert await checks["shadow_versions"]() is False
         finally:
             async with role_session(db_session_factory, db_role="hunter_worker") as session:
+                await session.execute(text("RESET ROLE"))
                 await session.execute(
                     text(
                         "UPDATE strategy_versions v SET status = 'deprecated' "
@@ -180,3 +186,4 @@ class TestReadiness:
                         "WHERE s.id = v.strategy_id AND s.key = 'volume_anomaly'"
                     )
                 )
+                await session.execute(text("SET LOCAL ROLE hunter_worker"))

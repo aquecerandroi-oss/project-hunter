@@ -214,9 +214,21 @@ async def open_ingestion_gap(engine: AsyncEngine, market_id: uuid.UUID, *, at: d
 
 
 async def create_version(
-    engine: AsyncEngine, *, active: bool = True, at: datetime | None = None
+    engine: AsyncEngine,
+    *,
+    active: bool = True,
+    at: datetime | None = None,
+    purpose: str = PURPOSE_PAPER,
 ) -> uuid.UUID:
-    """A strategy and one of its versions, active or still ``draft``."""
+    """A strategy and one of its versions, active or still ``draft``.
+
+    ``purpose`` (T3.15c) is the frozen column the bridge now decides on
+    (``bridge_repo._SIGNAL_SELECT`` joins ``strategy_versions`` and reads
+    ``v.purpose``) — it defaults to ``paper`` because every existing caller of
+    :func:`emit_signal` in this test package stamps the envelope ``paper`` too;
+    a test that wants a mismatch, or a column of ``research_only``/``live``,
+    passes it explicitly.
+    """
     strategy_id, version_id = uuid7(), uuid7()
     key = f"bridge_probe_{uuid.uuid4().hex[:8]}"
     async with engine.begin() as connection:
@@ -226,15 +238,16 @@ async def create_version(
         )
         await connection.execute(
             text(
-                "INSERT INTO strategy_versions (id, strategy_id, version, status, activated_at) "
-                "VALUES (:id, :strategy, 'v1', CAST(:status AS strategy_version_status), "
-                ":activated)"
+                "INSERT INTO strategy_versions (id, strategy_id, version, status, activated_at, "
+                "purpose) VALUES (:id, :strategy, 'v1', CAST(:status AS strategy_version_status), "
+                ":activated, :purpose)"
             ),
             {
                 "id": version_id,
                 "strategy": strategy_id,
                 "status": "active" if active else "draft",
                 "activated": at if active else None,
+                "purpose": purpose,
             },
         )
     return version_id

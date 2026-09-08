@@ -15,7 +15,7 @@ import re
 from typing import Any
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 __all__ = [
     "PURPOSE_LIVE",
@@ -29,6 +29,7 @@ __all__ = [
     "next_free_version",
     "purpose_column_present",
     "record_event",
+    "record_failure",
 ]
 
 REQUIRED_TABLES = ("shadow_episodes", "shadow_outbox")
@@ -77,6 +78,21 @@ async def record_event(conn: AsyncConnection, level: str, event: str, message: s
         ),
         {"level": level, "event": event, "message": message[:1000]},
     )
+
+
+async def record_failure(engine: AsyncEngine, level: str, event: str, message: str) -> None:
+    """A fresh connection and transaction for the audit row (T3.15c).
+
+    The one that failed may be aborted (a ``DBAPIError`` leaves Postgres
+    refusing every further statement until the transaction ends), so the audit
+    trail cannot share it — and by the time this runs, the caller's own ``async
+    with conn.begin():`` has already rolled the failed attempt back on its own
+    (an exception leaving that block always rolls it back), so nothing partial
+    is ever committed alongside a refusal or an error (security review T3.15
+    MEDIUM 5).
+    """
+    async with engine.connect() as conn, conn.begin():
+        await record_event(conn, level, event, message)
 
 
 async def load_row(conn: AsyncConnection, key: str, version: str) -> Any:

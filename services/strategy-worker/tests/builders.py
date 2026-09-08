@@ -156,12 +156,14 @@ async def activate_version(
     fires on ``UPDATE``/``DELETE`` of an already-activated row, which is exactly
     what the ops script has to respect and what this fixture must not fight.
 
-    ``purpose`` is named in the INSERT only when it is not the default:
-    ``0010_strategy_purpose`` revoked the column from ``hunter_worker`` (only the
-    activation script, on the owner connection, writes it), so a non-default
-    label is written with the role reset to the session owner for that one
-    statement and ``SET LOCAL ROLE`` restored right after — the same path the
-    ops script takes, not a grant the tests pretend the worker has.
+    ``0011_strategy_activation_owner`` (T3.15c) went further than the column and
+    revoked ``INSERT`` on ``strategy_versions`` from ``hunter_worker`` outright
+    — nothing that runs as the worker ever inserts here — so the whole
+    statement below runs with the role reset to the session owner and
+    ``SET LOCAL ROLE`` restored right after, the same path the ops script and
+    ``paper_line.py`` actually take, not a grant the tests pretend the worker
+    has. ``purpose`` is still named in the INSERT only when it is not the
+    default, to keep the statement itself unchanged from before ``0011``.
     """
     strategy_id, version_id = uuid7(), uuid7()
     await session.execute(
@@ -216,11 +218,10 @@ async def activate_version(
             "VALUES (:id, :strategy_id, :version, :status, CAST(:schema AS jsonb), "
             "CAST(:params AS jsonb), :code_ref, 1, :activated_at)"
         )
-    current_role = await session.scalar(text("SELECT current_user")) if names_purpose else None
-    if names_purpose:
-        await session.execute(text("RESET ROLE"))
+    current_role = await session.scalar(text("SELECT current_user"))
+    await session.execute(text("RESET ROLE"))
     await session.execute(text(statement), params)
-    if names_purpose and current_role is not None:
+    if current_role is not None:
         await session.execute(text(f"SET LOCAL ROLE {current_role}"))
     return strategy_id, version_id
 
