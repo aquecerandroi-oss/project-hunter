@@ -99,6 +99,15 @@ services:
 
   market-worker:
     image: hunter-api:${GIT_SHA:-dev}
+    # security-reviewer, T3.28a finding 3 (T3.28d): no worker calls a raw
+    # socket, pings, or otherwise touches the network stack below TCP/UDP --
+    # dropping these closes the one thing a compromised worker container
+    # could otherwise do that a stolen application credential alone can't:
+    # forge/sniff link-layer traffic (e.g. ARP-spoof the fixed .10/.11
+    # addresses `web`/Caddy use for INTERNAL_PEER_IPS/FORWARDED_ALLOW_IPS)
+    # to redirect another container's traffic through itself. See
+    # docs/SECURITY.md §5.
+    cap_drop: [NET_RAW, NET_ADMIN]
     environment:
       <<: *api-env
       HUNTER_ROLE: market
@@ -266,6 +275,8 @@ services:
   # the market-worker over `market.backfill.requested`, which owns REST.
   scanner-worker:
     image: hunter-api:${GIT_SHA:-dev}
+    # security-reviewer, T3.28a finding 3 (T3.28d) -- see market-worker above.
+    cap_drop: [NET_RAW, NET_ADMIN]
     environment:
       <<: *api-env
       HUNTER_ROLE: scanner
@@ -315,6 +326,8 @@ services:
   # entrypoint.sh dispatches on.
   strategy-worker:
     image: hunter-api:${GIT_SHA:-dev}
+    # security-reviewer, T3.28a finding 3 (T3.28d) -- see market-worker above.
+    cap_drop: [NET_RAW, NET_ADMIN]
     environment:
       <<: *api-env
       HUNTER_ROLE: strategy
@@ -355,6 +368,8 @@ services:
   # explicitly and pinned to false: the process refuses to start if it is true.
   execution-worker:
     image: hunter-api:${GIT_SHA:-dev}
+    # security-reviewer, T3.28a finding 3 (T3.28d) -- see market-worker above.
+    cap_drop: [NET_RAW, NET_ADMIN]
     environment:
       <<: *api-env
       HUNTER_ROLE: execution

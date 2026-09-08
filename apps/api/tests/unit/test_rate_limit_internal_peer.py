@@ -12,9 +12,10 @@ same reason: this suite never needs Docker.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections import defaultdict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 import pytest
@@ -27,6 +28,10 @@ from hunter_api.auth.clerk import StaticKeyAuthProvider
 from hunter_api.auth.principal import Principal
 from hunter_api.auth.rbac import CurrentPrincipal
 from hunter_api.errors import register_error_handlers
+from hunter_api.main import (
+    _log_internal_peer_ips,  # pyright: ignore[reportPrivateUsage]
+)
+from hunter_api.metrics import rate_limit_internal_peer_total
 from hunter_api.middleware.rate_limit import (
     _ip_rate_limit,  # pyright: ignore[reportPrivateUsage]
 )
@@ -242,3 +247,104 @@ async def test_internal_peer_status_does_not_widen_the_principal_limit(
     second = await _get(app, INTERNAL_IP, path="/probe", headers=headers)
 
     assert (first.status_code, second.status_code) == (200, 429)
+
+
+# ---- T3.28d: boot-time validation of INTERNAL_PEER_IPS ----
+
+
+@pytest.mark.parametrize(
+    "bad_entry",
+    [
+        "10.0.0.0/24",  # CIDR, not a single address
+        "web",  # hostname -- request.client.host is never a hostname
+        "172.29.0.10.1",  # typo: one octet too many
+        "not-an-ip",
+    ],
+)
+def test_internal_peer_ips_rejects_anything_that_is_not_a_single_ip(
+    api_settings: ApiSettings, bad_entry: str
+) -> None:
+    """A CIDR, a hostname or a typo would never match ``request.client.host``
+    in ``_ip_rate_limit``, silently keeping that peer on the narrow bucket
+    forever -- boot must fail loudly instead (security-reviewer finding 2).
+    Goes through the real constructor (not ``model_copy``, which skips
+    validators) so this is exactly what a bad ``INTERNAL_PEER_IPS`` does at
+    process boot.
+    """
+    data = api_settings.model_dump()
+    data["internal_peer_ips"] = bad_entry
+    with pytest.raises(ValueError, match="INTERNAL_PEER_IPS"):
+        ApiSettings(**data)
+
+
+@pytest.mark.parametrize("good_entries", ["10.0.0.5", "10.0.0.5,172.29.0.10", "::1"])
+def test_internal_peer_ips_accepts_valid_addresses(
+    api_settings: ApiSettings, good_entries: str
+) -> None:
+    """IPv4, IPv6, and a comma-separated list of them all boot cleanly."""
+    settings = api_settings.model_copy(update={"internal_peer_ips": good_entries})
+    assert settings.internal_peer_ip_set == frozenset(
+        entry.strip() for entry in good_entries.split(",")
+    )
+
+
+# ---- T3.28d: one INFO line at boot with the resolved set ----
+
+
+def test_internal_peer_ips_loaded_logs_the_resolved_set(
+    api_settings: ApiSettings, caplog: pytest.LogCaptureFixture
+) -> None:
+    """``_log_internal_peer_ips`` (called once at process boot, right after
+    ``create_app`` in ``main.py``) makes ``INTERNAL_PEER_IPS`` visible
+    without grepping env vars or a compose file -- see
+    ``test_markets_quality.py`` for why this suite uses stdlib ``caplog``
+    rather than ``structlog.testing.capture_logs()``.
+    """
+    settings = api_settings.model_copy(update={"internal_peer_ips": f"{INTERNAL_IP},::1"})
+    with caplog.at_level(logging.INFO, logger="hunter_api.main"):
+        _log_internal_peer_ips(settings)
+
+    assert "internal_peer_ips_loaded" in caplog.text
+    assert INTERNAL_IP in caplog.text
+    assert "::1" in caplog.text
+
+
+def test_internal_peer_ips_loaded_logs_an_empty_set_by_default(
+    api_settings: ApiSettings, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The common case (no ``INTERNAL_PEER_IPS`` set) logs an empty set, not
+    silence -- "never matches" and "not configured" must be distinguishable
+    from the log alone."""
+    with caplog.at_level(logging.INFO, logger="hunter_api.main"):
+        _log_internal_peer_ips(api_settings)
+
+    assert "internal_peer_ips_loaded" in caplog.text
+
+
+# ---- T3.28d: hunter_rate_limit_internal_peer_total ----
+
+
+def test_internal_peer_counter_increments_only_for_a_listed_peer(
+    api_settings: ApiSettings,
+) -> None:
+    """security-reviewer finding 3: "never matches" must be visible on the
+    dashboard, not just inferred from a wall of 429s -- so the counter must
+    move for a listed peer and stay put for anyone else."""
+    settings = api_settings.model_copy(
+        update={"rate_limit_per_minute_internal": 6000, "internal_peer_ips": INTERNAL_IP}
+    )
+    listed = Request(
+        {"type": "http", "method": "GET", "path": "/x", "headers": [], "client": (INTERNAL_IP, 1)}
+    )
+    unlisted = Request(
+        {"type": "http", "method": "GET", "path": "/x", "headers": [], "client": (OUTSIDE_IP, 1)}
+    )
+    metric = rate_limit_internal_peer_total
+    before = float(cast(Any, metric)._value.get())  # pyright: ignore[reportPrivateUsage]
+
+    _ip_rate_limit(unlisted, settings)
+    assert float(cast(Any, metric)._value.get()) == before  # pyright: ignore[reportPrivateUsage]
+
+    _ip_rate_limit(listed, settings)
+    after = float(cast(Any, metric)._value.get())  # pyright: ignore[reportPrivateUsage]
+    assert after == before + 1

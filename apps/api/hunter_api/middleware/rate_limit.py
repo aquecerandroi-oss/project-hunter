@@ -78,6 +78,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from hunter_api.errors import CONTENT_TYPE, HunterError
+from hunter_api.metrics import rate_limit_internal_peer_total
 from hunter_core.domain.types import uuid7
 from hunter_core.logging import get_logger
 
@@ -205,6 +206,7 @@ def _ip_rate_limit(request: Request, settings: ApiSettings) -> int:
     client = request.client
     ip = client.host if client is not None else "unknown"
     if ip in settings.internal_peer_ip_set:
+        rate_limit_internal_peer_total.inc()
         return settings.rate_limit_per_minute_internal
     return settings.rate_limit_per_minute
 

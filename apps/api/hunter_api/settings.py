@@ -7,6 +7,7 @@ FastAPI application from; workers keep using the plain core ``Settings``.
 
 from __future__ import annotations
 
+import ipaddress
 from functools import lru_cache
 
 from pydantic import SecretStr, field_validator, model_validator
@@ -111,6 +112,35 @@ class ApiSettings(Settings):
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @model_validator(mode="after")
+    def _validate_internal_peer_ips(self) -> ApiSettings:
+        """Fail the boot on a typo, a CIDR or a hostname in ``INTERNAL_PEER_IPS``
+        (T3.28d, security-reviewer finding 2 on T3.28a) rather than silently
+        never matching :func:`hunter_api.middleware.rate_limit._ip_rate_limit`
+        — a listed peer that never matches leaves the whole site's
+        server-rendered traffic back on the narrow address bucket, with
+        nothing but a puzzling wall of 429s to point at ``INTERNAL_PEER_IPS``.
+        ``ipaddress.ip_address`` accepts a single IPv4/IPv6 address only —
+        no ``/24`` (that is a network, not one peer's TCP address) and no
+        hostname (this list is compared against ``request.client.host``,
+        which is never a hostname).
+        """
+        for raw in self.internal_peer_ips.split(","):
+            candidate = raw.strip()
+            if not candidate:
+                continue
+            try:
+                ipaddress.ip_address(candidate)
+            except ValueError as exc:
+                message = (
+                    f"INTERNAL_PEER_IPS entry {candidate!r} is not a single IP address "
+                    "(no CIDR, no hostname) -- it would never match "
+                    "request.client.host and this peer would silently keep the narrow "
+                    "rate limit."
+                )
+                raise ValueError(message) from exc
+        return self
 
     @model_validator(mode="after")
     def _default_cors_from_web_origin(self) -> ApiSettings:
