@@ -35,6 +35,18 @@ export function LabSegmentTabs({ state, totals, hrefs }: LabSegmentTabsProps) {
     startTransition(() => router.push(hrefs[segment]));
   }
 
+  // brief T3.38 item 4: each tab still counts signals (the visible number,
+  // unchanged) but its `title` also states the real unique-operations count
+  // (contract T3.38's `totals.distinct_operations`) -- falls back to the
+  // same signals count until T3.38a's field lands, so the tooltip is never
+  // wrong, only uninformative in the interim.
+  function tabTitle(segment: LabSegment): string {
+    const state = SEGMENT_TO_STATE[segment];
+    const signals = totals[state];
+    const uniqueOps = totals.distinct_operations?.[state] ?? signals;
+    return `${formatCount(signals)} sinais · ${formatCount(uniqueOps)} operações únicas`;
+  }
+
   return (
     <div className="flex flex-col gap-1">
       <div role="tablist" aria-label="Filtrar sinais por estado" className="flex flex-wrap gap-1">
@@ -44,6 +56,7 @@ export function LabSegmentTabs({ state, totals, hrefs }: LabSegmentTabsProps) {
             type="button"
             role="tab"
             aria-selected={activeSegment === segment}
+            title={tabTitle(segment)}
             onClick={() => handleSelect(segment)}
             className={cn(
               "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",

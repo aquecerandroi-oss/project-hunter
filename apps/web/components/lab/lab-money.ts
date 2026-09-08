@@ -261,22 +261,6 @@ export function summarizeRows(rows: SignalListItemOut[], ruler: MoneyRuler): Row
   };
 }
 
-export type TotalsScope = "page" | "allClosed";
-
-/**
- * The totals card's own scope-switch heading (brief T3.37, replacing the old
- * `hasMore`-inferred wording from T3.17b item 1): the reader now picks the
- * scope explicitly ("desta página" | "de todas as concluídas") instead of the
- * card guessing from whether the page happened to be truncated -- an
- * inference that read wrong the moment a segment's real total (T3.37's
- * `totals.*`) exceeded the loaded page without the reader knowing it.
- */
-export function totalsHeading(scope: TotalsScope, pageCount: number, closedTotal: number): string {
-  return scope === "page"
-    ? `Resultado das operações desta página (${pageCount})`
-    : `Resultado de todas as operações concluídas (${closedTotal})`;
-}
-
 /**
  * "De todas as concluídas" scope (brief T3.37, Everton: "se tiver 2 mil
  * operações tem que paginar mas mostrar as 2 mil"): the money side of the

@@ -89,6 +89,44 @@ describe("LabSignalPanel -> LabExcursions: mfe honesty (null+bounds vs. a known 
   });
 });
 
+describe("LabSignalPanel: sibling-version signals list (brief T3.38 item 1's 'or the side panel' option)", () => {
+  it("lists every sibling's own version chip and signal_id when the group spans more than one version", () => {
+    const [v4, v2, v3] = [
+      makeSignal({ signal_id: "sig-v4", strategy_version_id: "v4-id", purpose: "research_only" }),
+      makeSignal({ signal_id: "sig-v2", strategy_version_id: "v2-id", purpose: "research_only" }),
+      makeSignal({ signal_id: "sig-v3", strategy_version_id: "v3-id", purpose: "paper" }),
+    ];
+    const versionLabelFor = (id: string) => ({ "v4-id": "momentum/v4", "v2-id": "momentum/v2", "v3-id": "momentum/v3" })[id] ?? id;
+    render(
+      <LabSignalPanel
+        signal={v4}
+        versionLabel="momentum/v4"
+        ruler={exampleRuler()}
+        siblingSignals={[v4, v2, v3]}
+        versionLabelFor={versionLabelFor}
+      />,
+    );
+    expect(screen.getByText("sig-v4")).toBeInTheDocument();
+    expect(screen.getByText("sig-v2")).toBeInTheDocument();
+    expect(screen.getByText("sig-v3")).toBeInTheDocument();
+    expect(screen.getByText("momentum/v3")).toBeInTheDocument();
+    expect(screen.getByText(/3 versões irmãs decidiram/)).toBeInTheDocument();
+  });
+
+  it("shows no sibling block for an ordinary, single-signal group", () => {
+    render(
+      <LabSignalPanel
+        signal={exampleSignal()}
+        versionLabel="momentum/v2"
+        ruler={exampleRuler()}
+        siblingSignals={[exampleSignal()]}
+        versionLabelFor={(id) => id}
+      />,
+    );
+    expect(screen.queryByText(/versões irmãs decidiram/)).not.toBeInTheDocument();
+  });
+});
+
 describe("LabSignalPanel -> LabSignalDetail: the raw data (JSON) is fetched on demand (brief T3.24b: 'Ver envelope' -> 'Ver dados brutos (JSON)')", () => {
   it("calls the mocked action and shows the returned envelope as JSON when 'Ver dados brutos (JSON)' is clicked", async () => {
     loadLabSignalEnvelopeActionMock.mockResolvedValue({ ok: true, envelope: { rsi_14: "62.3", regime: "trend_up" } });

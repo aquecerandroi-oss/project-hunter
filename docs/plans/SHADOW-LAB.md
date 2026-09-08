@@ -100,5 +100,78 @@ diferentes estaria publicando dois vereditos sobre a mesma evidência; ver
 `docs/plans/REPLICATION.md` §5 e §6. O bloco `replay` e o `replication.status` podem repousar em
 evidência de replay, **rotulada**; `verdict` e `maturity`, nunca (D15).
 
+**Sinais idênticos entre versões irmãs são esperados, não um bug (T3.38, Everton, screenshot
+08/09 15:16 Brasília: "não tá duplicando não??").** A replicação (item 3 acima) cria dez irmãs de
+parâmetro de uma versão `validada`; sempre que a barra decisória cai fora da região em que os
+parâmetros de duas irmãs discordam (ex.: `atr_pct_min` mais alto que uma irmã aplica, mas o valor da
+barra passa em ambos os limiares), as duas avaliam a mesma entrada geométrica e emitem, cada uma na
+sua própria linha de `strategy_versions`, um sinal com o mesmo `(market, source_bar_close,
+virtual_entry, exit_price, result)` — inclusive uma cópia byte-idêntica de parâmetros (D10) sempre
+concorda. Cada sinal continua sendo uma linha própria em `signal_outcomes` (uma proposta por
+versão, nunca deduplicada no banco — cada versão é seu próprio experimento e precisa da própria
+amostra para maturar), mas contar a mesma operação de mercado três vezes no placar visual infla a
+amostra sem adicionar informação nova. `GET /lab/shadow/signals` (T3.37) resolve isso no servidor,
+não no navegador: cada item ganha `identity_key` (hash estável do mesmo tuplo, calculado a partir do
+envelope) e `totals` ganha `distinct_operations` por estado — a contagem sobre `identity_key`. A
+tabela do Lab (`components/lab/lab-signal-grouping.ts`) agrupa, só na página carregada e só quando
+ela mistura mais de uma versão, as linhas que compartilham `identity_key` numa única linha com um
+chip por versão (`v2 · v3 paper · v4`); o cartão "Resultado das operações desta página" soma cada
+operação uma única vez (primeira ocorrência) e avisa "versões irmãs decidem a mesma barra; cada
+operação é contada uma vez"; o escopo "de todas as concluídas" e o `title` de cada aba usam
+`totals.distinct_operations` como denominador honesto. Nada disso muda a maturação por versão do
+item 9 (cada irmã ainda precisa dos seus próprios 100 outcomes/30 dias) — é puramente uma leitura
+que evita contar a mesma barra de mercado como três operações independentes.
+
+## Funil de validação (T3.36)
+
+Cinco etapas, nesta ordem, e **cada uma responde a uma pergunta diferente**. A ordem não é
+burocracia: as três primeiras são baratas e matam cedo; as duas últimas custam semanas de calendário
+e só valem a pena sobre o que sobreviveu.
+
+```
+portão C1–C8  →  implementação  →  replay 31 d  →  estresse  →  prospectivo  →  replicação
+ (desenho)        (código)         (mata no dia 1)  (robustez)   (a régua)      (o veredito)
+```
+
+1. **Portão de desenho C1–C8** — `obsidian/05-EXPERIMENTS/_TEMPLATE-EXP.md`, seção congelada,
+   escrita **antes** do código pelo quant e conferida pelo `code-reviewer`. *Pode dizer:* que a tese
+   tem mecanismo, que a entrada não tem oito condições garimpadas, que a estratégia cabe nos limites
+   do `paper_v1` e é executável no SPOT acima do piso de 50 M, e que a frequência esperada chega aos
+   30 desfechos/ano/mercado sem os quais a régua nunca fecha. *Não pode dizer nada sobre
+   desempenho* — nenhum número dele é evidência de vantagem. É o filtro mais barato que existe e o
+   único que roda antes de qualquer linha de código.
+2. **Implementação** — versão nova, `params_hash` congelado, `purpose = research_only` (item 1). Uma
+   mudança de conteúdo depois disto é **versão nova** e recomeça o funil.
+3. **Replay de 31 dias** (`docs/PIPELINE.md` §6c) — *pode dizer:* "isto não funciona", e dizer no
+   primeiro dia. Sobre as velas já persistidas, com o mesmo código, os mesmos custos e as mesmas
+   regras de não-antecipação, uma versão sem vantagem aparece imediatamente e não consome trinta
+   dias de calendário. *Não pode dizer:* que funciona. A elegibilidade é lida **hoje** (§6c, "o que
+   um replay não prova"), a janela é a mesma em que a família inteira foi desenhada, e o veredito do
+   placar (`validada`) e a régua de maturidade **continuam só com `prospective`** (D14/D15,
+   `REPLICATION.md` §3.5).
+4. **Passada de estresse** (`services/strategy-worker/hunter_strategy_worker/replay/stress.py`) —
+   sobre as **entradas congeladas** da coorte de replay, reprecificando os desfechos com custo ×2,
+   stop e alvo ×0,75/×1,25, entrada atrasada uma barra, cada mercado deixado de fora e cada metade
+   da janela. *Pode dizer:* que a vantagem medida **não sobrevive** ao dobro do custo, a um stop 25 %
+   diferente, à ausência de um único mercado ou à segunda metade do período — e cada um desses é
+   motivo suficiente para não gastar trinta dias de prospectivo. *Não pode dizer:* que a vantagem é
+   real. Ela reusa a mesma população; é o mesmo dado visto por sete ângulos, não sete experimentos.
+   Veredito mecânico: `robusto`, `frágil a custos`, `frágil a parâmetros`, `dependente de um
+   mercado`, `dependente de metade` — mais `amostra_insuficiente` (< 30 desfechos avaliáveis) e
+   `sem_vantagem_na_base`, que é o que ela responde quando a expectancy da base já é ≤ 0 e a
+   pergunta "isto é robusto?" não tem sentido.
+5. **Prospectivo** (§6b) — a coorte `prospective`, reservada, com a régua editorial do item 9: antes
+   de **100 desfechos avaliáveis E 30 dias distintos**, `inconclusivo`. *Pode dizer:* `validada` ou
+   `reprovada` pela régua do placar, sobre dado que não existia quando a versão foi congelada. *Não
+   pode dizer:* que a vantagem se repete — um único número bom sobre uma única população é
+   exatamente o que a literatura manda desconfiar.
+6. **Replicação** (`REPLICATION.md`) — os quatro blocos concordando, mais o **controle** declarado do
+   §"Controle". *Pode dizer:* `replicada`, `replicando` ou `refutada`. *Não pode dizer:* que a
+   estratégia deve ser ativada — promover continua sendo o ato auditado do Everton.
+
+Nada neste funil ativa, promove ou dimensiona coisa alguma, e nenhuma etapa dispensa a seguinte: um
+`robusto` no estresse sobre uma coorte de replay é, em toda comunicação, "robusto **no replay**",
+rotulado como tal.
+
 ## Fora de escopo
 Carteira, ordens, fills, posições, PnL de portfolio, Risk Engine, SHORT, sinais sobre features do M2 (v2), execução de qualquer natureza.

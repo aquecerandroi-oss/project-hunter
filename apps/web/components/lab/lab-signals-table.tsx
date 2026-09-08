@@ -114,9 +114,15 @@ export function LabSignalsTable({
 
   if (totals.all === 0) return <LabSignalsEmpty cohort={cohort} />;
 
+  // brief T3.38 item 3: "de todas as concluídas" uses the real, whole-dataset
+  // unique-operations denominator once the API provides it (contract T3.38's
+  // `totals.distinct_operations`) -- falls back to the raw `totals.closed`
+  // (signals, not yet folded by identity) until T3.38a lands.
+  const closedTotal = totals.distinct_operations?.closed ?? totals.closed;
+
   return (
     <div className="flex flex-col gap-4">
-      <LabTotalsCard rows={items} ruler={ruler} summary={summary} versionId={versionId} closedTotal={totals.closed} />
+      <LabTotalsCard rows={items} ruler={ruler} summary={summary} versionId={versionId} closedTotal={closedTotal} />
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <LabSegmentTabs state={state} totals={totals} hrefs={segmentHrefs} />

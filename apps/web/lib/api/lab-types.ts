@@ -186,6 +186,17 @@ export interface SignalListItemOut {
   purpose: string;
   /** Always present in the schema; `null` unless `?include=envelope`. */
   supporting_features: Record<string, unknown> | null;
+  /**
+   * Contrato T3.38 (T3.38a, backend em paralelo -- `hunter_api/schemas/lab_signals.py`
+   * já declara `identity_key: str`, mas `packages/shared-types` ainda não foi
+   * regenerado com `pnpm gen:types`, daí este campo hand-written): hash
+   * estável de market + source_bar_close + entry price + exit price + exit
+   * reason + result, calculado no servidor a partir do envelope -- o web
+   * nunca re-deriva igualdade de Decimal (brief item 2). Duas versões irmãs
+   * que decidem a mesma barra do mesmo jeito compartilham este valor;
+   * `components/lab/lab-signal-grouping.ts` é quem lê -- nunca recalcula.
+   */
+  identity_key: string;
 }
 
 // --- T3.37 contract (`GET /lab/shadow/signals` gains a server-side `state`
@@ -207,8 +218,34 @@ export const LAB_SIGNALS_PAGE_SIZES = [50, 100, 200, 500] as const;
 export type LabSignalsPageSize = (typeof LAB_SIGNALS_PAGE_SIZES)[number];
 export const DEFAULT_LAB_SIGNALS_PAGE_SIZE: LabSignalsPageSize = 200;
 
-/** Real counts over the whole filtered dataset (cohort/version/window applied, `state` itself not applied) -- never a count among only the currently loaded page. */
-export type LabSignalsTotals = components["schemas"]["SegmentTotalsOut"];
+/**
+ * Contrato T3.38 (T3.38a roda em paralelo no backend): per-state count over
+ * `identity_key` -- the honest denominator for "Resultado das operações
+ * desta página"/"de todas as concluídas" and for each tab's own `title`
+ * once sibling-version duplicates are folded into one operation (brief
+ * items 3-4). Same four keys as `SegmentTotalsOut` itself.
+ */
+export interface DistinctOperationsOut {
+  all: number;
+  closed: number;
+  open: number;
+  pending: number;
+}
+
+/**
+ * Real counts over the whole filtered dataset (cohort/version/window
+ * applied, `state` itself not applied) -- never a count among only the
+ * currently loaded page. `distinct_operations` (contrato T3.38) is
+ * intersected in as optional because `SegmentTotalsOut` has not been
+ * regenerated with it yet (T3.38a in flight); once `pnpm gen:types` adds it
+ * as a required field of that same generated schema, this intersection
+ * keeps typechecking correctly (TS resolves a key declared both required
+ * and optional across an intersection to required) -- nothing here needs to
+ * change at that point.
+ */
+export type LabSignalsTotals = components["schemas"]["SegmentTotalsOut"] & {
+  distinct_operations?: DistinctOperationsOut;
+};
 
 /** 1-based positions of this page's first/last row within the current `state`'s own ordering -- lets the web print "1–200 de 2.135" without recomputing it from a partial page. */
 export type LabSignalsPageRange = components["schemas"]["SignalsPagePositionOut"];

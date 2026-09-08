@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/components/markets/format";
 import { LabAsOf } from "@/components/lab/lab-as-of";
 import { LabExcursions } from "@/components/lab/lab-excursions";
@@ -15,6 +16,38 @@ export interface LabSignalPanelProps {
   signal: SignalListItemOut | null;
   versionLabel: string;
   ruler: MoneyRuler;
+  /**
+   * Every signal in this operation's own identity group (brief T3.38) --
+   * length 1 outside a merged row, more than 1 when sibling versions decided
+   * the exact same bar/entry/exit. The panel is the "expanding ... lists the
+   * per-version signal ids" side of the brief's either/or (the row itself
+   * never changes height, which the virtualization math in
+   * `hooks/useVirtualizedRows.ts` depends on).
+   */
+  siblingSignals?: SignalListItemOut[];
+  versionLabelFor?: (id: string) => string;
+}
+
+/** Rendered only when `siblingSignals` spans more than one version (brief T3.38 item 1: "expanding the row (or the side panel) lists the per-version signal ids"). */
+function SiblingSignalsBlock({ members, versionLabelFor }: { members: SignalListItemOut[]; versionLabelFor: (id: string) => string }) {
+  if (members.length <= 1) return null;
+  return (
+    <div className="rounded-md border border-border bg-bg-overlay p-3 text-xs">
+      <p className="mb-1.5 text-fg-muted">
+        {members.length} versões irmãs decidiram esta mesma operação (mesma barra, entrada e saída) -- cada uma com seu próprio sinal:
+      </p>
+      <ul className="flex flex-col gap-1">
+        {members.map((member) => (
+          <li key={member.signal_id} className="flex flex-wrap items-center gap-1.5">
+            <Badge variant={member.purpose === "paper" ? "info" : "outline"} className="px-1.5 py-0 text-[11px]">
+              {versionLabelFor(member.strategy_version_id)}
+            </Badge>
+            <span className="font-mono text-fg-subtle">{member.signal_id}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 /**
@@ -76,7 +109,7 @@ function SignalMoneyBlock({ signal, ruler }: { signal: SignalListItemOut; ruler:
  * `hooks/useVirtualizedRows.ts` depends on, so this lives beside the table
  * (below it on mobile, `lg:` beside it) instead.
  */
-export function LabSignalPanel({ signal, versionLabel, ruler }: LabSignalPanelProps) {
+export function LabSignalPanel({ signal, versionLabel, ruler, siblingSignals = [], versionLabelFor }: LabSignalPanelProps) {
   if (!signal) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-bg-elevated p-6 text-sm text-fg-muted">
@@ -101,6 +134,8 @@ export function LabSignalPanel({ signal, versionLabel, ruler }: LabSignalPanelPr
       </p>
 
       <SignalMoneyBlock signal={signal} ruler={ruler} />
+
+      {versionLabelFor && <SiblingSignalsBlock members={siblingSignals} versionLabelFor={versionLabelFor} />}
 
       <p className="mt-1 text-[11px] font-semibold uppercase text-fg-muted">Detalhe de pesquisa</p>
       <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">

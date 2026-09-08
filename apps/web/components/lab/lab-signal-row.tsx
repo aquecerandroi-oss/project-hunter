@@ -6,7 +6,7 @@ import { LabMarketLink } from "@/components/lab/lab-market-link";
 import { LabMoneyOrReason, LabResultValue } from "@/components/lab/lab-money-cells";
 import { LabPriceTimeCell } from "@/components/lab/lab-price-time-cell";
 import { LabResearchCells } from "@/components/lab/lab-research-cells";
-import { LabStrategyCell } from "@/components/lab/lab-strategy-cell";
+import { LabStrategyCell, LabStrategyChips, type LabVersionChip } from "@/components/lab/lab-strategy-cell";
 import { WhenCell } from "@/components/lab/lab-when-cell";
 import { durationText, pctColorClass } from "@/components/lab/lab-format";
 import { moneyForRow, usdtToBrl, type MoneyRuler } from "@/components/lab/lab-money";
@@ -28,6 +28,14 @@ export interface LabSignalRowProps {
   /** `true` when the side panel is open (`lg`) -- "Duração"/"Quantia simulada" hide until `xl` (brief T3.24b item [3]), same rule the header applies. */
   panelOpen: boolean;
   onOpen: () => void;
+  /**
+   * Present (length > 1) when this row merges more than one sibling-version
+   * signal that decided the exact same operation (brief T3.38) -- the
+   * "Estratégia" cell then renders `LabStrategyChips` instead of the single
+   * `LabStrategyCell`. `row`'s own fields (market/prices/result) still come
+   * from the group's `primary` -- every member shares them by definition.
+   */
+  versionChips?: LabVersionChip[] | undefined;
 }
 
 /**
@@ -41,7 +49,20 @@ export interface LabSignalRowProps {
  * to the always-visible set and rewrote `Entrou`/`Saiu` as two-line,
  * fixed-width cells that never wrap or truncate mid-word.
  */
-export function LabSignalRow({ id, orgSlug, row, versionLabel, ruler, showResearch, rowHeight, selected, ariaRowIndex, panelOpen, onOpen }: LabSignalRowProps) {
+export function LabSignalRow({
+  id,
+  orgSlug,
+  row,
+  versionLabel,
+  ruler,
+  showResearch,
+  rowHeight,
+  selected,
+  ariaRowIndex,
+  panelOpen,
+  onOpen,
+  versionChips,
+}: LabSignalRowProps) {
   const { pnlUsdt, notionalUsdt, pctMove } = moneyForRow(row, ruler);
   const pnlBrl = pnlUsdt.value !== null ? usdtToBrl(pnlUsdt.value, ruler) : null;
   const duration = durationText(row.entry_ts, row.exit_ts);
@@ -59,7 +80,11 @@ export function LabSignalRow({ id, orgSlug, row, versionLabel, ruler, showResear
       onClick={onOpen}
     >
       <td role="gridcell" className="whitespace-nowrap px-3">
-        <LabStrategyCell versionLabel={versionLabel} purpose={row.purpose} />
+        {versionChips && versionChips.length > 1 ? (
+          <LabStrategyChips chips={versionChips} />
+        ) : (
+          <LabStrategyCell versionLabel={versionLabel} purpose={row.purpose} />
+        )}
       </td>
       <td role="gridcell" className="px-3">
         <LabMarketLink orgSlug={orgSlug} symbol={row.market} />

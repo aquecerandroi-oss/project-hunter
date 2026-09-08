@@ -58,3 +58,22 @@ describe("LabSegmentTabs: real, whole-dataset totals (brief T3.37)", () => {
     expect(live?.textContent).toMatch(/Pendentes\/sem entrada — 866 sinais no total/);
   });
 });
+
+/** Brief T3.38 item 4: each tab keeps counting signals visibly, but gains a `title` stating the real unique-operations count from `totals.distinct_operations`. */
+describe("LabSegmentTabs: tab title states 'N sinais · K operações únicas' (brief T3.38 item 4)", () => {
+  it("uses totals.distinct_operations when the contract field is present", () => {
+    render(
+      <LabSegmentTabs
+        state="closed"
+        totals={exampleSignalsTotals({ distinct_operations: { closed: 900, open: 340, pending: 866, all: 2100 } })}
+        hrefs={hrefs}
+      />,
+    );
+    expect(screen.getByRole("tab", { name: "Concluídas (929)" })).toHaveAttribute("title", "929 sinais · 900 operações únicas");
+  });
+
+  it("falls back to the same signals count until the API provides distinct_operations", () => {
+    render(<LabSegmentTabs state="closed" totals={exampleSignalsTotals()} hrefs={hrefs} />);
+    expect(screen.getByRole("tab", { name: "Concluídas (929)" })).toHaveAttribute("title", "929 sinais · 929 operações únicas");
+  });
+});

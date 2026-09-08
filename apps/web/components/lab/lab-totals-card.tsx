@@ -8,12 +8,12 @@ import {
   combineClosedSumRUsdt,
   MONEY_TOOLTIP,
   summarizeRows,
-  totalsHeading,
   usdtToBrl,
   type MoneyRuler,
   type RowsSummary,
-  type TotalsScope,
 } from "@/components/lab/lab-money";
+import { dedupeByIdentity, hasMultipleVersions } from "@/components/lab/lab-signal-grouping";
+import { SIBLING_VERSIONS_NOTE, totalsHeading, type TotalsScope } from "@/components/lab/lab-totals-heading";
 import type { LabSummaryOut, SignalListItemOut, VersionSummaryOut } from "@/lib/api/lab-types";
 import { formatBrlSigned, formatPct, formatUsdtSigned } from "@/lib/format";
 
@@ -136,6 +136,12 @@ function buildAllClosedDisplay(summary: LabSummaryOut, versionId: string | undef
   };
 }
 
+/** Extracted out of `LabTotalsCard` (rather than an inline `&&` chain) so that component's own cyclomatic complexity stays under the lint config's budget -- brief T3.38 item 3's one-line note, page scope only, mixed versions only. */
+function SiblingVersionsNote({ scope, versionsMixed }: { scope: TotalsScope; versionsMixed: boolean }) {
+  if (scope !== "page" || !versionsMixed) return null;
+  return <p className="text-[11px] text-fg-subtle">{SIBLING_VERSIONS_NOTE}</p>;
+}
+
 /** The two-button scope switch (brief T3.37): "desta página" is the exact same client math T3.17b already shipped; "de todas as concluídas" never sums a page -- see `combineClosedSumRUsdt`. */
 function ScopeSwitch({ scope, onChange }: { scope: TotalsScope; onChange: (scope: TotalsScope) => void }) {
   return (
@@ -185,8 +191,12 @@ function ScopeSwitch({ scope, onChange }: { scope: TotalsScope; onChange: (scope
 export function LabTotalsCard({ rows, ruler, summary, versionId, closedTotal }: LabTotalsCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [scope, setScope] = useState<TotalsScope>("page");
-  const pageSummary = summarizeRows(rows, ruler);
-  const heading = totalsHeading(scope, pageSummary.total, closedTotal);
+  // brief T3.38 item 3: a page that mixes sibling-version duplicates sums
+  // each real operation once (first occurrence), never once per version.
+  const versionsMixed = hasMultipleVersions(rows);
+  const uniqueRows = dedupeByIdentity(rows);
+  const pageSummary = summarizeRows(uniqueRows, ruler);
+  const heading = totalsHeading(scope, { uniqueCount: uniqueRows.length, rowCount: rows.length, versionsMixed }, closedTotal);
   const display = buildTotalsDisplay(pageSummary);
 
   const allClosed = buildAllClosedDisplay(summary, versionId, ruler);
@@ -204,6 +214,7 @@ export function LabTotalsCard({ rows, ruler, summary, versionId, closedTotal }: 
           )}
         </div>
       </div>
+      <SiblingVersionsNote scope={scope} versionsMixed={versionsMixed} />
 
       {scope === "page" ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

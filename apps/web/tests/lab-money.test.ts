@@ -10,7 +10,6 @@ import {
   resultBadgeKind,
   saidaText,
   summarizeRows,
-  totalsHeading,
   usdtToBrl,
 } from "@/components/lab/lab-money";
 import type { OutcomeResult, ShadowTrackingState } from "@/lib/api/lab-types";
@@ -244,20 +243,6 @@ describe("summarizeRows: the totals card math (brief T3.17 item 2)", () => {
     const summary = summarizeRows(rows, ruler);
     expect(summary.best).toBeNull();
     expect(summary.worst).toBeNull();
-  });
-});
-
-describe("totalsHeading: the card's own scope-switch wording (brief T3.37, replacing the old hasMore inference)", () => {
-  it("says 'desta página' with the loaded page's own count in the 'page' scope", () => {
-    expect(totalsHeading("page", 200, 2135)).toBe("Resultado das operações desta página (200)");
-  });
-
-  it("says 'todas as operações concluídas' with the real closed total in the 'allClosed' scope, ignoring the page's own count", () => {
-    expect(totalsHeading("allClosed", 200, 2135)).toBe("Resultado de todas as operações concluídas (2135)");
-  });
-
-  it("never says 'há mais sinais além desta página' (Everton's screenshot, item 1: that read as if it were the Lab's whole total)", () => {
-    expect(totalsHeading("page", 200, 2135)).not.toMatch(/há mais sinais/);
   });
 });
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { LabSignalPanel } from "@/components/lab/lab-signal-panel";
+import { groupSignalsByIdentity, type LabSignalGroup } from "@/components/lab/lab-signal-grouping";
 import { LabSignalsTableBody } from "@/components/lab/lab-signals-table-body";
 import { labSignalsHeaders, LabSignalsTableHead } from "@/components/lab/lab-signals-table-head";
 import type { LabSegment } from "@/components/lab/lab-signal-segments";
@@ -25,8 +26,8 @@ const OVERSCAN = 8;
 const VIEWPORT_HEIGHT = 480;
 const HEADER_HEIGHT = 32;
 
-function rowId(row: SignalListItemOut): string {
-  return `lab-signal-row-${row.signal_id}`;
+function rowId(group: LabSignalGroup): string {
+  return `lab-signal-row-${group.primary.signal_id}`;
 }
 
 /**
@@ -41,12 +42,17 @@ function rowId(row: SignalListItemOut): string {
 export function LabSignalsGrid({ orgSlug, items, versionLabelFor, ruler, showResearch, segment }: LabSignalsGridProps) {
   const rowHeight = useRowHeight();
   const [scrollTop, setScrollTop] = useState(0);
-  const [selectedSignal, setSelectedSignal] = useState<SignalListItemOut | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<LabSignalGroup | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const headers = labSignalsHeaders(showResearch);
 
+  // Sibling-version signals that decided the exact same operation collapse
+  // into one visual row here (brief T3.38) -- purely presentational, scoped
+  // to this one loaded page (`items` never spans a page boundary).
+  const groups = useMemo(() => groupSignalsByIdentity(items), [items]);
+
   const { startIndex, endIndex, visibleRows, topPad, bottomPad } = useVirtualizedRows({
-    rows: items,
+    rows: groups,
     rowHeight,
     scrollTop,
     viewportHeight: VIEWPORT_HEIGHT,
@@ -54,15 +60,15 @@ export function LabSignalsGrid({ orgSlug, items, versionLabelFor, ruler, showRes
   });
 
   const { selectedIndex, handleKeyDown } = useArrowKeyRowSelection({
-    rowCount: items.length,
+    rowCount: groups.length,
     rowHeight,
     viewportHeight: VIEWPORT_HEIGHT,
     stickyHeaderHeight: HEADER_HEIGHT,
     getScrollContainer: () => containerRef.current,
-    onOpen: (index) => setSelectedSignal(items[index] ?? null),
+    onOpen: (index) => setSelectedGroup(groups[index] ?? null),
   });
 
-  const selectedRow = selectedIndex >= startIndex && selectedIndex < endIndex ? items[selectedIndex] : undefined;
+  const selectedRow = selectedIndex >= startIndex && selectedIndex < endIndex ? groups[selectedIndex] : undefined;
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row">
@@ -76,15 +82,15 @@ export function LabSignalsGrid({ orgSlug, items, versionLabelFor, ruler, showRes
             role="grid"
             aria-label="Sinais do Shadow Lab"
             aria-activedescendant={selectedRow ? rowId(selectedRow) : undefined}
-            aria-rowcount={items.length + 1}
+            aria-rowcount={groups.length + 1}
             className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
             style={{ height: VIEWPORT_HEIGHT, overflowY: "auto" }}
           >
             <table role="presentation" className="w-full text-left text-[13px]">
-              <LabSignalsTableHead showResearch={showResearch} panelOpen={selectedSignal !== null} />
+              <LabSignalsTableHead showResearch={showResearch} panelOpen={selectedGroup !== null} />
               <LabSignalsTableBody
                 orgSlug={orgSlug}
-                visibleItems={items}
+                visibleGroups={groups}
                 visibleRows={visibleRows}
                 startIndex={startIndex}
                 topPad={topPad}
@@ -96,9 +102,9 @@ export function LabSignalsGrid({ orgSlug, items, versionLabelFor, ruler, showRes
                 showResearch={showResearch}
                 rowHeight={rowHeight}
                 selectedIndex={selectedIndex}
-                panelOpen={selectedSignal !== null}
+                panelOpen={selectedGroup !== null}
                 rowIdFor={rowId}
-                onOpenRow={setSelectedSignal}
+                onOpenRow={setSelectedGroup}
               />
             </table>
           </div>
@@ -106,9 +112,11 @@ export function LabSignalsGrid({ orgSlug, items, versionLabelFor, ruler, showRes
       </div>
       <div className="lg:w-80 xl:w-96">
         <LabSignalPanel
-          signal={selectedSignal}
-          versionLabel={selectedSignal ? versionLabelFor(selectedSignal.strategy_version_id) : ""}
+          signal={selectedGroup?.primary ?? null}
+          versionLabel={selectedGroup ? versionLabelFor(selectedGroup.primary.strategy_version_id) : ""}
           ruler={ruler}
+          siblingSignals={selectedGroup?.members ?? []}
+          versionLabelFor={versionLabelFor}
         />
       </div>
     </div>

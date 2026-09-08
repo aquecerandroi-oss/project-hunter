@@ -1,14 +1,15 @@
 "use client";
 
 import { LabSignalRow } from "@/components/lab/lab-signal-row";
+import type { LabSignalGroup } from "@/components/lab/lab-signal-grouping";
 import { LAB_SEGMENT_LABEL, type LabSegment } from "@/components/lab/lab-signal-segments";
 import type { MoneyRuler } from "@/components/lab/lab-money";
-import type { SignalListItemOut } from "@/lib/api/lab-types";
+import type { LabVersionChip } from "@/components/lab/lab-strategy-cell";
 
 export interface LabSignalsTableBodyProps {
   orgSlug: string;
-  visibleItems: SignalListItemOut[];
-  visibleRows: SignalListItemOut[];
+  visibleGroups: LabSignalGroup[];
+  visibleRows: LabSignalGroup[];
   startIndex: number;
   topPad: number;
   bottomPad: number;
@@ -20,8 +21,17 @@ export interface LabSignalsTableBodyProps {
   rowHeight: number;
   selectedIndex: number;
   panelOpen: boolean;
-  rowIdFor: (row: SignalListItemOut) => string;
-  onOpenRow: (row: SignalListItemOut) => void;
+  rowIdFor: (group: LabSignalGroup) => string;
+  onOpenRow: (group: LabSignalGroup) => void;
+}
+
+/** One group's chips (brief T3.38) -- `undefined` (renders the plain `LabStrategyCell`) unless the group actually spans more than one version. */
+function chipsFor(group: LabSignalGroup, versionLabelFor: (id: string) => string): LabVersionChip[] | undefined {
+  if (group.versionIds.length <= 1) return undefined;
+  return group.versionIds.map((versionId) => {
+    const member = group.members.find((m) => m.strategy_version_id === versionId);
+    return { versionId, label: versionLabelFor(versionId), purpose: member?.purpose ?? "" };
+  });
 }
 
 /**
@@ -34,7 +44,7 @@ export interface LabSignalsTableBodyProps {
  */
 export function LabSignalsTableBody({
   orgSlug,
-  visibleItems,
+  visibleGroups,
   visibleRows,
   startIndex,
   topPad,
@@ -50,7 +60,7 @@ export function LabSignalsTableBody({
   rowIdFor,
   onOpenRow,
 }: LabSignalsTableBodyProps) {
-  if (visibleItems.length === 0) {
+  if (visibleGroups.length === 0) {
     return (
       <tbody>
         <tr>
@@ -69,22 +79,23 @@ export function LabSignalsTableBody({
           <td colSpan={colSpan} />
         </tr>
       )}
-      {visibleRows.map((row, visibleOffset) => {
+      {visibleRows.map((group, visibleOffset) => {
         const absoluteIndex = startIndex + visibleOffset;
         return (
           <LabSignalRow
-            key={row.signal_id}
-            id={rowIdFor(row)}
+            key={group.key}
+            id={rowIdFor(group)}
             orgSlug={orgSlug}
-            row={row}
-            versionLabel={versionLabelFor(row.strategy_version_id)}
+            row={group.primary}
+            versionLabel={versionLabelFor(group.primary.strategy_version_id)}
+            versionChips={chipsFor(group, versionLabelFor)}
             ruler={ruler}
             showResearch={showResearch}
             rowHeight={rowHeight}
             selected={absoluteIndex === selectedIndex}
             ariaRowIndex={absoluteIndex + 2}
             panelOpen={panelOpen}
-            onOpen={() => onOpenRow(row)}
+            onOpen={() => onOpenRow(group)}
           />
         );
       })}
