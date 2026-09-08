@@ -10,6 +10,13 @@ import type { components } from "@hunter/shared-types/api";
 export type PortfolioListItem = components["schemas"]["PortfolioListItemOut"];
 export type PortfolioType = components["schemas"]["PortfolioType"];
 export type PortfolioStatus = components["schemas"]["PortfolioStatus"];
+export type PositionStatus = components["schemas"]["PositionStatus"];
+export type OrderSide = components["schemas"]["OrderSide"];
+export type OrderType = components["schemas"]["OrderType"];
+export type OrderPurpose = components["schemas"]["OrderPurpose"];
+export type OrderStatus = components["schemas"]["OrderStatus"];
+export type ExecutionMode = components["schemas"]["ExecutionMode"];
+export type ExitReason = components["schemas"]["ExitReason"];
 
 export type FxObservation = components["schemas"]["FxObservationOut"];
 export type PortfolioAnchor = components["schemas"]["AnchorOut"];

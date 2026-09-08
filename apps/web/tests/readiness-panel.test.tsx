@@ -25,14 +25,14 @@ beforeEach(() => {
 describe("ReadinessPanel: reconciles a fresh server snapshot, not just the value read at mount (H6)", () => {
   it("shows Redis going down once a newer `initial` prop arrives (AutoRefresh re-rendering the page)", () => {
     const { rerender } = render(<ReadinessPanel initial={ready} />);
-    expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(screen.getByText("Pronto")).toBeInTheDocument();
 
     // Simulates `AutoRefresh`'s `router.refresh()` producing a fresh
     // server-fetched `initial` prop on the next render of this same
     // component instance -- a plain `useState(initial)` ignores this.
     rerender(<ReadinessPanel initial={redisDown} />);
 
-    expect(screen.getByText("Not Ready")).toBeInTheDocument();
+    expect(screen.getByText("Não pronto")).toBeInTheDocument();
     expect(screen.getByText(/Indisponível \(unreachable\)/)).toBeInTheDocument();
   });
 
@@ -43,7 +43,7 @@ describe("ReadinessPanel: reconciles a fresh server snapshot, not just the value
     const { fireEvent } = await import("@testing-library/react");
     fireEvent.click(screen.getByRole("button", { name: /Atualizar/ }));
 
-    await screen.findByText("Not Ready");
+    await screen.findByText("Não pronto");
   });
 });
 
@@ -54,7 +54,7 @@ describe("ReadinessPanel: 'sem verificação' is a distinct, neutral state, neve
     expect(screen.getAllByText("Sem verificação")).toHaveLength(3); // header pill + Postgres + Redis
     // The bug: the raw API sentinel leaking straight into Portuguese UI copy.
     expect(screen.queryByText(/not_configured/)).not.toBeInTheDocument();
-    expect(screen.queryByText("Not Ready")).not.toBeInTheDocument();
+    expect(screen.queryByText("Não pronto")).not.toBeInTheDocument();
     expect(screen.queryByText(/Indisponível/)).not.toBeInTheDocument();
   });
 

@@ -70,8 +70,8 @@ export function OrderBook({ book, hotStateOk }: OrderBookProps) {
 
   return (
     <div className="grid grid-cols-2 gap-3 text-xs">
-      <BookSide title="Bids" levels={bids} maxCumulative={maxCumulative} barColor="bg-green/10" priceColor="text-green" />
-      <BookSide title="Asks" levels={asks} maxCumulative={maxCumulative} barColor="bg-red/10" priceColor="text-red" />
+      <BookSide title="Compras" levels={bids} maxCumulative={maxCumulative} barColor="bg-green/10" priceColor="text-green" />
+      <BookSide title="Vendas" levels={asks} maxCumulative={maxCumulative} barColor="bg-red/10" priceColor="text-red" />
     </div>
   );
 }

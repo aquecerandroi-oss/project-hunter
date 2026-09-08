@@ -93,6 +93,7 @@ function contrastRatio(hexA: string, hexB: string): number {
 }
 
 const AA_NORMAL_TEXT = 4.5;
+const AA_UI_COMPONENT = 3;
 
 describe("theme tokens parsed from app/globals.css", () => {
   it("dark theme defines every token docs/DESIGN.md §1 requires", () => {
@@ -114,7 +115,10 @@ describe("theme tokens parsed from app/globals.css", () => {
       "red",
       "red-soft",
       "warning",
+      "warning-soft",
       "info",
+      "info-soft",
+      "border-input",
     ]) {
       expect(darkTokens[key], `missing dark --color-${key}`).toBeDefined();
     }
@@ -139,7 +143,10 @@ describe("theme tokens parsed from app/globals.css", () => {
       "red",
       "red-soft",
       "warning",
+      "warning-soft",
       "info",
+      "info-soft",
+      "border-input",
     ]) {
       expect(lightTokens[key], `missing light --color-${key}`).toBeDefined();
     }
@@ -205,6 +212,54 @@ describe("theme tokens parsed from app/globals.css", () => {
 
     it("gold on bg", () => {
       expect(contrastRatio(token(tokens, "gold"), token(tokens, "bg"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    });
+
+    // DESIGN-5 (T3.24a, `.claude/state/design/2026-09-08/contrast-tokens.md`):
+    // badge backgrounds moved from an alpha composite (`bg-x/15`, which
+    // measured below AA in several theme/color combinations) to a solid
+    // `-soft` token per color -- these are now plain, directly measurable
+    // token-on-token pairs.
+    it("green on green-soft (badge positive)", () => {
+      expect(contrastRatio(token(tokens, "green"), token(tokens, "green-soft"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    });
+
+    it("red on red-soft (badge negative)", () => {
+      expect(contrastRatio(token(tokens, "red"), token(tokens, "red-soft"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    });
+
+    it("warning on warning-soft (badge warning)", () => {
+      expect(contrastRatio(token(tokens, "warning"), token(tokens, "warning-soft"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    });
+
+    it("info on info-soft (badge info)", () => {
+      expect(contrastRatio(token(tokens, "info"), token(tokens, "info-soft"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    });
+
+    it("gold on gold-soft (badge gold, Lab's active tab)", () => {
+      expect(contrastRatio(token(tokens, "gold"), token(tokens, "gold-soft"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    });
+
+    // `button.tsx`'s `destructive` variant: `text-bg` (never a fixed `white`,
+    // which measured 3.76:1 on the dark theme's `red`) resolves to `bg`'s own
+    // per-theme value (black in dark, white in light).
+    it("bg on red (destructive button text)", () => {
+      expect(contrastRatio(token(tokens, "bg"), token(tokens, "red"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    });
+
+    // `nav-links.tsx`'s "Planejado" item: `fg-subtle` with no `opacity` on
+    // top of it (the opacity used to drop this to 2.4:1 in both themes).
+    it("fg-subtle on bg-elevated (planned sidebar item, no opacity)", () => {
+      expect(contrastRatio(token(tokens, "fg-subtle"), token(tokens, "bg-elevated"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+    });
+
+    // WCAG 1.4.11 (non-text UI component contrast, >= 3:1): the form-field
+    // outline token, against both surfaces a field can sit on.
+    it("border-input on bg-overlay >= 3:1 (form field on a card)", () => {
+      expect(contrastRatio(token(tokens, "border-input"), token(tokens, "bg-overlay"))).toBeGreaterThanOrEqual(AA_UI_COMPONENT);
+    });
+
+    it("border-input on bg >= 3:1 (form field's own background)", () => {
+      expect(contrastRatio(token(tokens, "border-input"), token(tokens, "bg"))).toBeGreaterThanOrEqual(AA_UI_COMPONENT);
     });
   });
 

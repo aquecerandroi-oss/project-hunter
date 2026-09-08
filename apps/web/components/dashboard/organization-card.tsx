@@ -11,7 +11,7 @@ export function OrganizationCard({ organization, role }: OrganizationCardProps) 
   return (
     <section className="rounded-lg border border-border bg-bg-elevated p-4 transition-colors hover:border-border-strong">
       <h2 className="text-xs font-medium uppercase tracking-wide text-fg-muted">Organização</h2>
-      <p className="mt-1 text-lg font-semibold text-fg">{organization.name}</p>
+      <p className="mt-1 text-xl font-semibold text-fg">{organization.name}</p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Badge>{organization.plan}</Badge>
         <Badge variant="outline">Seu papel: {role}</Badge>

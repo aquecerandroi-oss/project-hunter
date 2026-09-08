@@ -21,7 +21,7 @@ describe("OpportunitiesTable: the compact index shares chips with /radar", () =>
   it("shows symbol, score and status/stage chips", () => {
     render(<OpportunitiesTable orgSlug="acme" initialItems={[makeOpportunitySummary()]} initialCursor={null} hasFilters={false} baseParams={baseParams} />);
     expect(screen.getByText("BTCUSDT")).toBeInTheDocument();
-    expect(screen.getByText("WATCHING")).toBeInTheDocument();
+    expect(screen.getByText("Observando")).toBeInTheDocument();
   });
 
   it("links each row straight to /opportunities/[id]", () => {

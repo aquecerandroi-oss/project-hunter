@@ -55,7 +55,7 @@ describe("RadarTable: renders real rows from the T2.6 contract, no invented data
     );
     expect(screen.getByText("BTCUSDT")).toBeInTheDocument();
     expect(screen.getByText("55.00")).toBeInTheDocument();
-    expect(screen.getByText("WATCHING")).toBeInTheDocument();
+    expect(screen.getByText("Observando")).toBeInTheDocument();
   });
 
   it("shows the EXTENDED status distinctly, never hidden behind a default color", () => {
@@ -70,7 +70,7 @@ describe("RadarTable: renders real rows from the T2.6 contract, no invented data
         initialAnomalies={anomalies()}
       />,
     );
-    expect(screen.getByText("EXTENDED")).toBeInTheDocument();
+    expect(screen.getByText("Esticado")).toBeInTheDocument();
   });
 
   it("shows a real EARLY/DEVELOPING/EXTENDED stage chip, and 'estágio indisponível' (never a bare EARLY) for stage NONE", () => {
@@ -117,7 +117,7 @@ describe("RadarTable: the anomalies column is honestly scoped", () => {
         initialAnomalies={anomalies({ byMarket: { "22222222-2222-2222-2222-222222222222": [{ type: "VOLUME_SPIKE" }] } })}
       />,
     );
-    expect(screen.getByText(/VOLUME_SPIKE/)).toBeInTheDocument();
+    expect(screen.getByText(/Pico de volume/)).toBeInTheDocument();
   });
 
   it("still shows a truncation caveat for a market absent from a truncated aggregate, never a silent 'nenhuma'", () => {

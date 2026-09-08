@@ -26,7 +26,7 @@ export function StepExchanges({ data, onChange }: StepExchangesProps) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold text-fg">Exchanges monitoradas</h2>
+        <h2 className="text-xl font-semibold text-fg">Exchanges monitoradas</h2>
         <p className="mt-1 text-sm text-fg-muted">
           Filtro de preferência para o radar (a partir do Milestone 1/2). Sem endpoint de exchanges no M0 -- lista fixa das
           duas exchanges semeadas.

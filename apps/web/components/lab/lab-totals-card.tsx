@@ -1,5 +1,5 @@
 import { EXIT_REASON_LABEL, reasonLabel } from "@/components/lab/lab-format";
-import { LAB_TOTALS_SCOPE_NOTE, MONEY_TOOLTIP, summarizeRows, totalsHeading, type MoneyRuler, type RowsSummary } from "@/components/lab/lab-money";
+import { MONEY_TOOLTIP, summarizeRows, totalsHeading, type MoneyRuler, type RowsSummary } from "@/components/lab/lab-money";
 import type { SignalListItemOut } from "@/lib/api/lab-types";
 import { formatBrlSigned, formatPct, formatUsdtSigned } from "@/lib/format";
 
@@ -98,7 +98,6 @@ export function LabTotalsCard({ rows, ruler, hasMore }: LabTotalsCardProps) {
     <div data-testid="lab-totals-card" className="flex flex-col gap-3">
       <div>
         <p className="text-sm font-medium text-fg">{heading}</p>
-        <p className="text-xs text-fg-muted">{LAB_TOTALS_SCOPE_NOTE}</p>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Stat label="Operações simuladas" value={String(summary.total)} />

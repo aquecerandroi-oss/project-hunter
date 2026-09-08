@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { PORTFOLIO_STATUS_LABEL, PORTFOLIO_TYPE_LABEL } from "@/components/portfolio/labels";
 import { PortfolioAsOf } from "@/components/portfolio/portfolio-as-of";
 import { unavailableLabel } from "@/components/portfolio/portfolio-format";
 import type { PortfolioSummary } from "@/lib/api/portfolio-types";
@@ -41,7 +42,7 @@ export function PortfolioHeader({ summary }: PortfolioHeaderProps) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-semibold text-fg">{summary.name}</h2>
+        <h2 className="text-xl font-semibold text-fg">{summary.name}</h2>
         <p className="text-xs text-fg-muted">
           Consultado em <PortfolioAsOf iso={summary.as_of} />
         </p>
@@ -70,10 +71,10 @@ export function PortfolioHeader({ summary }: PortfolioHeaderProps) {
         <Kpi label="Reservado (notional)" value={formatUsdt(summary.reserved_notional)} />
         <Kpi label="Posições abertas" value={String(summary.open_position_count)} />
         <div className="rounded-md border border-border p-4">
-          <p className="text-xs font-medium uppercase text-fg-muted">Tipo</p>
+          <p className="text-xs font-medium uppercase text-fg-muted">Tipo · Status</p>
           <div className="mt-1 flex gap-1">
-            <Badge variant="outline">{summary.type}</Badge>
-            <Badge variant="outline">{summary.status}</Badge>
+            <Badge variant="outline">{PORTFOLIO_TYPE_LABEL[summary.type]}</Badge>
+            <Badge variant="outline">{PORTFOLIO_STATUS_LABEL[summary.status]}</Badge>
           </div>
         </div>
       </div>

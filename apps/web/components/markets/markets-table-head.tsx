@@ -15,7 +15,7 @@ export interface HeaderDef {
 // hidden below `md` (joint decision #3, #9) via `MarketRow`'s `SECONDARY_CELL`.
 export const MARKETS_TABLE_HEADERS: HeaderDef[] = [
   { key: "symbol", label: "Mercado" },
-  { key: null, label: "Status" },
+  { key: null, label: "Qualidade" },
   { key: "last_price", label: "Último", align: "right" },
   { key: "price_change_24h_pct", label: "24h %", align: "right" },
   { key: null, label: "Bid", align: "right", secondary: true },

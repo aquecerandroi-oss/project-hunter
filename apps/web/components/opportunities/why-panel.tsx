@@ -31,7 +31,7 @@ export function WhyPanel({ detail, currentRegime, orgId }: WhyPanelProps) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 data-testid="why-panel-title" className="text-lg font-semibold text-fg">
+        <h2 data-testid="why-panel-title" className="text-xl font-semibold text-fg">
           Por que estamos olhando isso?
         </h2>
         {explanation.recognized && <p className="mt-1 text-sm text-fg-muted">{explanation.resumo}</p>}

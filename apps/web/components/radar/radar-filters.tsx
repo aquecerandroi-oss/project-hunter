@@ -2,6 +2,10 @@
 
 import { usePathname, useRouter } from "next/navigation";
 
+import { ANOMALY_TYPE_LABEL, REGIME_LABEL, STAGE_LABEL, STATUS_LABEL } from "@/components/radar/labels";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import {
   ANOMALY_TYPE_VALUES,
   MARKET_REGIME_VALUES,
@@ -64,104 +68,96 @@ export function RadarFilters({ state, hasOrg }: RadarFiltersProps) {
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
           <span className="text-xs text-fg-muted">Buscar símbolo</span>
-          <input
+          <Input
             type="search"
             defaultValue={state.q}
             onBlur={(e) => navigate({ q: e.target.value.trim() })}
             aria-label="Buscar símbolo no radar"
-            className="h-8 w-40 rounded-md border border-border bg-bg-overlay px-2 text-[13px] text-fg"
+            className="w-40"
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-fg-muted">Score mínimo</span>
-          <input
+          <span className="text-xs text-fg-muted">Score mínimo (0–100)</span>
+          <Input
             type="number"
             min={0}
             max={100}
             defaultValue={state.scoreMin}
             onBlur={(e) => navigate({ scoreMin: e.target.value })}
             aria-label="Score mínimo"
-            className="h-8 w-24 rounded-md border border-border bg-bg-overlay px-2 text-[13px] text-fg"
+            className="w-24"
           />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs text-fg-muted">Exchange</span>
-          <input
+          <Input
             type="text"
             defaultValue={state.exchange}
             onBlur={(e) => navigate({ exchange: e.target.value.trim() })}
             aria-label="Exchange"
-            className="h-8 w-28 rounded-md border border-border bg-bg-overlay px-2 text-[13px] text-fg"
+            className="w-28"
           />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs text-fg-muted">Regime</span>
-          <select
-            value={state.regime}
-            onChange={(e) => navigate({ regime: e.target.value as MarketRegimeValue | "" })}
-            className="h-8 rounded-md border border-border bg-bg-overlay px-2 text-[13px] text-fg"
-          >
+          <Select value={state.regime} onChange={(e) => navigate({ regime: e.target.value as MarketRegimeValue | "" })}>
             <option value="">Todos</option>
             {MARKET_REGIME_VALUES.map((r) => (
               <option key={r} value={r}>
-                {r}
+                {REGIME_LABEL[r]}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs text-fg-muted">Tipo de anomalia</span>
-          <select
-            value={state.anomalyType}
-            onChange={(e) => navigate({ anomalyType: e.target.value as AnomalyTypeValue | "" })}
-            className="h-8 rounded-md border border-border bg-bg-overlay px-2 text-[13px] text-fg"
-          >
+          <Select value={state.anomalyType} onChange={(e) => navigate({ anomalyType: e.target.value as AnomalyTypeValue | "" })}>
             <option value="">Todos</option>
             {ANOMALY_TYPE_VALUES.map((t) => (
               <option key={t} value={t}>
-                {t}
+                {ANOMALY_TYPE_LABEL[t]}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-fg-muted">Volatilidade min</span>
-          <input
+          <span className="text-xs text-fg-muted">Volatilidade mín. (%)</span>
+          <Input
             type="number"
             step="0.01"
             defaultValue={state.volatilityMin}
             onBlur={(e) => navigate({ volatilityMin: e.target.value })}
             aria-label="Volatilidade mínima"
-            className="h-8 w-24 rounded-md border border-border bg-bg-overlay px-2 text-[13px] text-fg"
+            className="w-24"
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-fg-muted">Volatilidade max</span>
-          <input
+          <span className="text-xs text-fg-muted">Volatilidade máx. (%)</span>
+          <Input
             type="number"
             step="0.01"
             defaultValue={state.volatilityMax}
             onBlur={(e) => navigate({ volatilityMax: e.target.value })}
             aria-label="Volatilidade máxima"
-            className="h-8 w-24 rounded-md border border-border bg-bg-overlay px-2 text-[13px] text-fg"
+            className="w-24"
           />
         </label>
       </div>
-      <fieldset className="flex flex-wrap items-center gap-2">
+      <fieldset className="flex flex-wrap items-center gap-3">
         <legend className="text-xs text-fg-muted">Status</legend>
         {statusOptions.map((s) => (
-          <label key={s} className="flex items-center gap-1 text-xs text-fg">
-            <input type="checkbox" checked={state.status.includes(s)} onChange={() => navigate({ status: toggle(state.status, s) })} />
-            {s}
+          <label key={s} className="flex items-center gap-1.5 text-xs text-fg">
+            <Checkbox checked={state.status.includes(s)} onCheckedChange={() => navigate({ status: toggle(state.status, s) })} />
+            {STATUS_LABEL[s]}
           </label>
         ))}
       </fieldset>
-      <fieldset className="flex flex-wrap items-center gap-2">
+      <fieldset className="flex flex-wrap items-center gap-3">
         <legend className="text-xs text-fg-muted">Estágio</legend>
         {OPPORTUNITY_STAGE_VALUES.map((s) => (
-          <label key={s} className="flex items-center gap-1 text-xs text-fg">
-            <input type="checkbox" checked={state.stage.includes(s)} onChange={() => navigate({ stage: toggle(state.stage, s) })} />
-            {s}
+          <label key={s} className="flex items-center gap-1.5 text-xs text-fg">
+            <Checkbox checked={state.stage.includes(s)} onCheckedChange={() => navigate({ stage: toggle(state.stage, s) })} />
+            {STAGE_LABEL[s]}
           </label>
         ))}
       </fieldset>

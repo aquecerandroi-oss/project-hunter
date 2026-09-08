@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { anomalyTypeLabel } from "@/components/radar/labels";
 
 export interface RadarAnomalySummary {
   type: string;
@@ -44,7 +45,7 @@ export function AnomalyCountCell({
       <div className="flex flex-wrap items-center gap-1">
         <Badge variant="warning">{anomalies.length}</Badge>
         <span className="text-xs text-fg-muted">
-          {types.join(", ")} ({WINDOW_LABEL})
+          {types.map(anomalyTypeLabel).join(", ")} ({WINDOW_LABEL})
         </span>
       </div>
       {truncated && <span className="text-[11px] text-fg-subtle">lista truncada — a contagem pode estar subestimada</span>}

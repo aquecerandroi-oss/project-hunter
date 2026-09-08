@@ -15,7 +15,10 @@ export const buttonVariants = cva(
         secondary: "border border-border-strong bg-transparent text-fg hover:bg-bg-overlay",
         outline: "border border-border bg-transparent text-fg hover:bg-bg-overlay",
         ghost: "text-fg hover:bg-bg-overlay",
-        destructive: "bg-red text-white hover:bg-red/90",
+        // DESIGN-5 (T3.23 audit): fixed `white` measured 3.76:1 on the dark
+        // theme's `red` -- `bg` is `#0A0A0A` in dark and `#FFFFFF` in light,
+        // so this one token clears AA (5.26 dark, 6.47 light) in both.
+        destructive: "bg-red text-bg hover:bg-red/90",
       },
       size: {
         default: "h-9 px-4 py-2",

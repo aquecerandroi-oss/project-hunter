@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import type { badgeVariants } from "@/components/ui/badge";
 import type { VariantProps } from "class-variance-authority";
+import { REGIME_LABEL, STAGE_LABEL, STATUS_LABEL } from "@/components/radar/labels";
 import type { MarketRegimeValue, OpportunityStage, OpportunityStatus } from "@/lib/api/radar-types";
 
 type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
@@ -25,7 +26,7 @@ const STATUS_VARIANT: Record<OpportunityStatus, BadgeVariant> = {
 };
 
 export function StatusChip({ status }: { status: OpportunityStatus }) {
-  return <Badge variant={STATUS_VARIANT[status]}>{status}</Badge>;
+  return <Badge variant={STATUS_VARIANT[status]}>{STATUS_LABEL[status]}</Badge>;
 }
 
 const STAGE_VARIANT: Record<Exclude<OpportunityStage, "NONE">, BadgeVariant> = {
@@ -36,14 +37,14 @@ const STAGE_VARIANT: Record<Exclude<OpportunityStage, "NONE">, BadgeVariant> = {
 
 /** `OpportunityStage.NONE` is a real member ("we cannot tell yet"), not a null -- rendered as muted text, never hidden or mistaken for `EARLY`. */
 export function StageChip({ stage }: { stage: OpportunityStage }) {
-  if (stage === "NONE") return <span className="text-xs text-fg-subtle">estágio indisponível</span>;
-  return <Badge variant={STAGE_VARIANT[stage]}>{stage}</Badge>;
+  if (stage === "NONE") return <span className="text-xs text-fg-subtle">{STAGE_LABEL.NONE}</span>;
+  return <Badge variant={STAGE_VARIANT[stage]}>{STAGE_LABEL[stage]}</Badge>;
 }
 
 /** `regime` is `null` on a radar/opportunity row when the episode has no linked regime -- distinct from `MarketRegime.UNKNOWN`, a real classification. */
 export function RegimeChip({ regime }: { regime: MarketRegimeValue | null | undefined }) {
   if (!regime) return <span className="text-xs text-fg-subtle">sem regime</span>;
-  return <Badge variant="outline">{regime}</Badge>;
+  return <Badge variant="outline">{REGIME_LABEL[regime]}</Badge>;
 }
 
 export function InPositionChip({ inPosition }: { inPosition: boolean | null | undefined }) {

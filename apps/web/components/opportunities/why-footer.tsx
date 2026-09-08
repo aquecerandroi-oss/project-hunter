@@ -54,7 +54,7 @@ function RawJsonBlock({ label, value }: { label: string; value: Record<string, u
   return (
     <div className="mt-3">
       <p className="text-xs text-fg-muted">{label}</p>
-      <pre className="mt-1 max-h-64 overflow-auto rounded-md bg-bg-overlay p-2 text-[10px] text-fg-subtle">{JSON.stringify(value, null, 2)}</pre>
+      <pre className="mt-1 max-h-64 overflow-auto rounded-md bg-bg-overlay p-2 text-[11px] text-fg-subtle">{JSON.stringify(value, null, 2)}</pre>
     </div>
   );
 }

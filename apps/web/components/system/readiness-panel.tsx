@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { readyLabel } from "@/components/system/labels";
 import { wasReadyCheckAttempted } from "@/lib/api/ready-status";
 import { refreshReadiness } from "@/lib/api/system-actions";
 import type { ReadyStatus } from "@/lib/api/types";
@@ -83,7 +84,7 @@ export function ReadinessPanel({ initial }: ReadinessPanelProps) {
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Badge variant={!attempted ? "default" : allOk ? "positive" : "negative"}>
-          {!attempted ? "Sem verificação" : allOk ? "Ready" : "Not Ready"}
+          {!attempted ? "Sem verificação" : readyLabel(allOk)}
         </Badge>
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">

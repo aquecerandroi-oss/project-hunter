@@ -92,7 +92,7 @@ export function WhyHistory({ opportunityId, orgId, history }: WhyHistoryProps) {
             {p.envelope !== null && p.envelope !== undefined && (
               <details className="ml-auto">
                 <summary className="cursor-pointer text-fg-muted">envelope</summary>
-                <pre className="max-w-md overflow-x-auto text-[10px] text-fg-subtle">{JSON.stringify(p.envelope, null, 2)}</pre>
+                <pre className="max-w-md overflow-x-auto text-[11px] text-fg-subtle">{JSON.stringify(p.envelope, null, 2)}</pre>
               </details>
             )}
           </li>

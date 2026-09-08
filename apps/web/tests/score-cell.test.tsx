@@ -12,7 +12,7 @@ const FIRST_SEEN = "2026-09-06T08:00:00Z";
 describe("ScoreCell: change sign, color and the two zeros (new episode vs stable)", () => {
   it("shows an explicit '+' sign and the positive semantic color for a positive change", () => {
     render(<ScoreCell score="72.50" change="3.25" firstSeenAt={FIRST_SEEN} lastUpdatedAt="2026-09-06T09:00:00Z" />);
-    const changeEl = screen.getByText("+3.25");
+    const changeEl = screen.getByText("+3.25 pts");
     expect(changeEl).toBeInTheDocument();
     expect(changeEl.className).toContain("text-green");
     expect(changeEl.className).not.toContain("text-red");
@@ -20,7 +20,7 @@ describe("ScoreCell: change sign, color and the two zeros (new episode vs stable
 
   it("shows the raw negative sign (no double sign) and the negative semantic color for a negative change", () => {
     render(<ScoreCell score="58.10" change="-4.40" firstSeenAt={FIRST_SEEN} lastUpdatedAt="2026-09-06T09:00:00Z" />);
-    const changeEl = screen.getByText("-4.40");
+    const changeEl = screen.getByText("-4.40 pts");
     expect(changeEl).toBeInTheDocument();
     expect(changeEl.className).toContain("text-red");
     expect(changeEl.className).not.toContain("text-green");

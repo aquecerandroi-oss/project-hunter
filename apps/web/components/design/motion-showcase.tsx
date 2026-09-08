@@ -46,7 +46,7 @@ export function MotionShowcase() {
       <div className="flex items-center gap-3">
         <span
           className={cn(
-            "num rounded px-2 py-1 text-lg text-fg",
+            "num rounded px-2 py-1 text-xl text-fg",
             flash === "up" && "flash-up",
             flash === "down" && "flash-down",
           )}

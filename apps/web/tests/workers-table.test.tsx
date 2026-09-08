@@ -44,7 +44,7 @@ describe("WorkersTable: real heartbeats, no invented processes", () => {
   it("renders a worker row with role, status and version", () => {
     render(<WorkersTable workers={[genericWorker]} />);
     expect(screen.getByText("api")).toBeInTheDocument();
-    expect(screen.getByText("alive")).toBeInTheDocument();
+    expect(screen.getByText("vivo")).toBeInTheDocument();
     expect(screen.getByText("1.0.0")).toBeInTheDocument();
   });
 

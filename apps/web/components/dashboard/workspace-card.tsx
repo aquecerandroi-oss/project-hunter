@@ -38,7 +38,7 @@ export function WorkspaceCard({ workspace }: WorkspaceCardProps) {
   return (
     <section className="rounded-lg border border-border bg-bg-elevated p-4 transition-colors hover:border-border-strong">
       <h2 className="text-xs font-medium uppercase tracking-wide text-fg-muted">Workspace</h2>
-      <p className="mt-1 text-lg font-semibold text-fg">{workspace.name}</p>
+      <p className="mt-1 text-xl font-semibold text-fg">{workspace.name}</p>
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
         <div>
           <dt className="text-fg-muted">Objetivo</dt>

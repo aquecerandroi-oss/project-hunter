@@ -28,7 +28,7 @@ export function StepSummary({ org, data }: StepSummaryProps) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold text-fg">Confirme e finalize</h2>
+        <h2 className="text-xl font-semibold text-fg">Confirme e finalize</h2>
         <p className="mt-1 text-sm text-fg-muted">Você pode alterar tudo isso depois em Settings.</p>
       </div>
       <dl className="divide-y divide-border rounded-md border border-border">

@@ -273,9 +273,6 @@ export function totalsHeading(rowCount: number, hasMore: boolean): string {
   return hasMore ? `Resultado das operações desta página (${rowCount})` : `Resultado de todas as operações do período (${rowCount})`;
 }
 
-/** Always shown under `totalsHeading` (brief T3.17b item 1): the whole-Lab totals are T3.18's job, not this page-bound card's. */
-export const LAB_TOTALS_SCOPE_NOTE = "os totais do Lab inteiro chegam com o placar (T3.18)";
-
 // --- T3.18 scoreboard money (brief item 3: "então os números em dinheiro
 // através da régua do T3.17 -- resultado acumulado USDT/BRL, média por
 // operação") -- same `R * risco` rule as `moneyForRow`, applied to the

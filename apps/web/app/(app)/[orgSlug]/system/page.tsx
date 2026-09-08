@@ -6,6 +6,7 @@ import { FeatureFlagsTable } from "@/components/system/feature-flags-table";
 import { ReadinessPanel } from "@/components/system/readiness-panel";
 import { SystemInfoCard } from "@/components/system/system-info-card";
 import { WorkersTable } from "@/components/system/workers-table";
+import { SectionUnavailable } from "@/components/ui/section-unavailable";
 import { isApiError } from "@/lib/api-error";
 import { resolveOrgContext } from "@/lib/api/org-context";
 import { getWorkers, ready, systemInfo } from "@/lib/api/system";
@@ -62,15 +63,6 @@ async function loadSystemInfo(): Promise<SystemInfoLoad> {
   }
 }
 
-function UnavailableSection({ title, reason }: { title: string; reason: string }) {
-  return (
-    <section className="rounded-lg border border-dashed border-red/40 bg-bg-elevated p-4">
-      <h2 className="text-xs font-medium uppercase tracking-wide text-fg-muted">{title}</h2>
-      <p className="mt-2 text-sm text-fg">Indisponível: {reason}</p>
-    </section>
-  );
-}
-
 /** `/system` (docs/PRODUCT.md §4, available from M0) -- API/DB/Redis health, feature flags, honest worker status. */
 export default async function SystemPage({ params }: SystemPageProps) {
   const { orgSlug } = await params;
@@ -84,12 +76,12 @@ export default async function SystemPage({ params }: SystemPageProps) {
       <AutoRefresh />
       <h1 className="text-xl font-semibold text-fg">System</h1>
       <div className="grid gap-4 md:grid-cols-2">
-        {infoLoad.ok ? <SystemInfoCard info={infoLoad.info} /> : <UnavailableSection title="API" reason={infoLoad.reason} />}
+        {infoLoad.ok ? <SystemInfoCard info={infoLoad.info} /> : <SectionUnavailable title="API" reason={infoLoad.reason} />}
         <ReadinessPanel initial={readiness} />
         {infoLoad.ok ? (
           <FeatureFlagsTable features={infoLoad.info.features} />
         ) : (
-          <UnavailableSection title="Feature flags" reason={infoLoad.reason} />
+          <SectionUnavailable title="Feature flags" reason={infoLoad.reason} />
         )}
       </div>
       <section>
@@ -100,9 +92,7 @@ export default async function SystemPage({ params }: SystemPageProps) {
             <ExecutionPaperCard worker={workersLoad.workers.find((worker) => worker.role === "execution") ?? null} />
           </div>
         ) : (
-          <p className="rounded-md border border-dashed border-red/40 bg-bg-elevated p-4 text-sm text-fg">
-            Workers indisponível: {workersLoad.reason}
-          </p>
+          <SectionUnavailable title="Workers" reason={workersLoad.reason} />
         )}
       </section>
     </div>

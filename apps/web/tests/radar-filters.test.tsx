@@ -35,15 +35,15 @@ describe("RadarFilters: state is the URL query string", () => {
 
   it("appends every checked status as its own status= entry", () => {
     render(<RadarFilters state={emptyState} hasOrg />);
-    fireEvent.click(screen.getByLabelText("HOT"));
+    fireEvent.click(screen.getByLabelText("Quente"));
     const [url] = routerPush.mock.calls[0] as [string];
     expect(url).toContain("status=HOT");
   });
 
   it("includes IN_POSITION/RISK_BLOCKED only when hasOrg is true", () => {
     render(<RadarFilters state={emptyState} hasOrg={false} />);
-    expect(screen.queryByLabelText("IN_POSITION")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("RISK_BLOCKED")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Em posição")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Bloqueado (risco)")).not.toBeInTheDocument();
   });
 
   it("drops the field entirely from the query string when it is blank", () => {

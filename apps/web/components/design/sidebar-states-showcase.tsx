@@ -17,7 +17,7 @@ export function SidebarStatesShowcase() {
       <div className="flex items-center gap-2 rounded-md border-l-2 border-gold bg-bg-overlay px-3 py-2 text-sm font-medium text-fg">
         Ativo
       </div>
-      <div className="flex w-full cursor-not-allowed items-center gap-2 rounded-md border-l-2 border-transparent px-3 py-2 text-left text-sm text-fg-subtle opacity-60">
+      <div className="flex w-full cursor-not-allowed items-center gap-2 rounded-md border-l-2 border-transparent px-3 py-2 text-left text-sm text-fg-subtle">
         Planejado
         <PlannedBadge milestone="M2" className="ml-auto" />
       </div>

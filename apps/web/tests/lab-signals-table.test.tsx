@@ -264,7 +264,11 @@ describe("LabSignalsTable: the totals card (brief T3.17 item 2, extended by T3.1
       />,
     );
     expect(screen.getByText("Resultado das operações desta página (1)")).toBeInTheDocument();
-    expect(screen.getByText(/os totais do Lab inteiro chegam com o placar \(T3\.18\)/)).toBeInTheDocument();
+    // T3.24a: `LAB_TOTALS_SCOPE_NOTE` (a stale task-id-bearing note) was
+    // removed from `lab-totals-card.tsx` -- the Placar is on the same page
+    // and the heading above already scopes the number, so no note is shown.
+    expect(screen.queryByText(/os totais do Lab inteiro/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/T3\.18/)).not.toBeInTheDocument();
     expect(screen.queryByText(/há mais sinais/)).not.toBeInTheDocument();
   });
 });

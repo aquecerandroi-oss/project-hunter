@@ -109,11 +109,11 @@ describe("SystemPage: one failing section must not take down the others (F3)", (
     render(jsx);
 
     // The two sections driven by `systemInfo()` show their own honest failure...
-    expect(screen.getAllByText(/Indisponível: system info down/)).toHaveLength(2);
+    expect(screen.getAllByText(/indisponível: system info down/)).toHaveLength(2);
     // ...while readiness (an independent fetch) and workers (its own isolated fetch) still render real data.
     expect(screen.getAllByText("OK")).not.toHaveLength(0);
     expect(screen.getByText("api-1")).toBeInTheDocument();
-    expect(screen.getByText("alive")).toBeInTheDocument();
+    expect(screen.getByText("vivo")).toBeInTheDocument();
   });
 
   it("renders everything normally when all three fetches succeed", async () => {

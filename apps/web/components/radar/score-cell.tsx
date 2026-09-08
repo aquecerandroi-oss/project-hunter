@@ -64,7 +64,7 @@ export function ScoreCell({
         ) : (
           <span className={cn("font-mono text-xs tabular-nums", changeValue > 0 ? "text-green" : "text-red")}>
             {changeValue > 0 ? "+" : ""}
-            {change}
+            {change} pts
           </span>
         )}
       </div>

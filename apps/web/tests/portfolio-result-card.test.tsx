@@ -20,7 +20,7 @@ describe("PortfolioResultCard: opening / operational / currency / total, split a
     render(<PortfolioResultCard summary={makeSummary()} anchor={makeAnchor()} />);
     expect(screen.getByText(/5\.4000000000 BRL\/USDT/)).toBeInTheDocument();
     expect(screen.getByText(/5\.4100000000 BRL\/USDT/)).toBeInTheDocument();
-    expect(screen.getAllByText(/binance\.spot\.ticker/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/Binance spot \(ticker\)/).length).toBeGreaterThanOrEqual(2);
   });
 
   it("never renders a null BRL decomposition as R$ 0,00 -- shows the named reason instead", () => {

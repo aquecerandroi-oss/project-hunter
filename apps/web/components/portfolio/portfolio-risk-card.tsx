@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { actorTypeLabel } from "@/components/portfolio/labels";
 import { formatPctOrUnavailable, killSwitchBadgeVariant, killSwitchLabel } from "@/components/portfolio/portfolio-format";
 import { BrasiliaInstant } from "@/components/time/brasilia-instant";
 import type { KillSwitchDetail, PortfolioRiskState } from "@/lib/api/portfolio-types";
@@ -70,15 +71,15 @@ export function PortfolioRiskCard({ riskState, killSwitch }: PortfolioRiskCardPr
         <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
           <div>
             <p className="text-fg-muted">Sistema</p>
-            <p className="font-mono text-fg">{killSwitch.scopes.system}</p>
+            <p className="font-mono text-fg">{killSwitchLabel(killSwitch.scopes.system)}</p>
           </div>
           <div>
             <p className="text-fg-muted">Organização</p>
-            <p className="font-mono text-fg">{killSwitch.scopes.organization}</p>
+            <p className="font-mono text-fg">{killSwitchLabel(killSwitch.scopes.organization)}</p>
           </div>
           <div>
             <p className="text-fg-muted">Carteira</p>
-            <p className="font-mono text-fg">{killSwitch.scopes.portfolio}</p>
+            <p className="font-mono text-fg">{killSwitchLabel(killSwitch.scopes.portfolio)}</p>
           </div>
         </div>
 
@@ -92,11 +93,11 @@ export function PortfolioRiskCard({ riskState, killSwitch }: PortfolioRiskCardPr
         {killSwitch.last_transition && (
           <details className="mt-3 text-xs text-fg-muted">
             <summary className="cursor-pointer text-fg">
-              Última transição: {killSwitch.last_transition.from_state} → {killSwitch.last_transition.to_state} em{" "}
+              Última transição: {killSwitchLabel(killSwitch.last_transition.from_state)} → {killSwitchLabel(killSwitch.last_transition.to_state)} em{" "}
               <BrasiliaInstant iso={killSwitch.last_transition.created_at} />
             </summary>
             <div className="mt-2 space-y-1">
-              <p>Ator: {killSwitch.last_transition.actor_type}{killSwitch.last_transition.actor_id ? ` (${killSwitch.last_transition.actor_id})` : ""}</p>
+              <p>Ator: {actorTypeLabel(killSwitch.last_transition.actor_type)}{killSwitch.last_transition.actor_id ? ` (${killSwitch.last_transition.actor_id})` : ""}</p>
               {killSwitch.last_transition.reason && <p>Motivo: {killSwitch.last_transition.reason}</p>}
               <pre className="overflow-x-auto rounded-md border border-border bg-bg-overlay p-2 text-[11px]">
                 {JSON.stringify(killSwitch.last_transition.evidence, null, 2)}
@@ -107,9 +108,7 @@ export function PortfolioRiskCard({ riskState, killSwitch }: PortfolioRiskCardPr
       </div>
 
       <p className="mt-3 text-[11px] text-fg-subtle">
-        Limites do preset paper_v1 (risco por operação, exposição, participação): a API ainda não expõe os valores numéricos do preset nesta
-        rota -- só os checks/decisões de propostas os publicariam (docs/plans/M3.md T3.12/T3.14), e este resumo não os inventa a partir da
-        documentação.
+        Os limites numéricos do preset paper (risco por operação, exposição, participação) ainda não aparecem nesta tela.
       </p>
     </div>
   );

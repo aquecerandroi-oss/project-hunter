@@ -15,7 +15,7 @@ export function StepObjective({ data, onChange }: StepObjectiveProps) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold text-fg">Qual é o seu objetivo?</h2>
+        <h2 className="text-xl font-semibold text-fg">Qual é o seu objetivo?</h2>
         <p className="mt-1 text-sm text-fg-muted">Isso ajusta os presets e destaca itens de navegação relevantes.</p>
       </div>
       <div role="radiogroup" aria-label="Objetivo" className="grid gap-2 sm:grid-cols-2">

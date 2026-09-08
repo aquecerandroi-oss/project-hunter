@@ -1,3 +1,4 @@
+import { fxSourceLabel } from "@/components/portfolio/labels";
 import { PortfolioAsOf } from "@/components/portfolio/portfolio-as-of";
 import { brlUnavailableLabel, signColorClass } from "@/components/portfolio/portfolio-format";
 import type { PortfolioAnchor, PortfolioSummary } from "@/lib/api/portfolio-types";
@@ -51,7 +52,7 @@ export function PortfolioResultCard({ summary, anchor }: PortfolioResultCardProp
               <p className="font-medium text-fg-muted">Câmbio de abertura</p>
               <p className="font-mono tabular-nums text-fg">{brl.opening_rate} BRL/USDT</p>
               <p>
-                {anchor.fx_observation.source} · <PortfolioAsOf iso={anchor.fx_observation.observed_at} />
+                {fxSourceLabel(anchor.fx_observation.source)} · <PortfolioAsOf iso={anchor.fx_observation.observed_at} />
               </p>
               <p>
                 R$ {anchor.origin_amount} → {anchor.credited_amount} USDT
@@ -61,7 +62,7 @@ export function PortfolioResultCard({ summary, anchor }: PortfolioResultCardProp
               <p className="font-medium text-fg-muted">Câmbio atual</p>
               <p className="font-mono tabular-nums text-fg">{brl.current_rate} BRL/USDT</p>
               <p>
-                {brl.fx_observation.source} · <PortfolioAsOf iso={brl.fx_observation.observed_at} />
+                {fxSourceLabel(brl.fx_observation.source)} · <PortfolioAsOf iso={brl.fx_observation.observed_at} />
               </p>
             </div>
           </div>

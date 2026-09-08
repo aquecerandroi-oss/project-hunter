@@ -36,9 +36,12 @@ describe("PortfolioRiskCard: kill switch BLOQUEADO in destaque, nulls never beco
         })}
       />,
     );
-    expect(screen.getByText("AVISO")).toBeInTheDocument();
+    // "AVISO" now labels both the top-level effective badge and the
+    // `portfolio` scope (`killSwitchLabel` reused for scopes, T3.24a) --
+    // "ATIVO" labels the other two (unmerged) scopes.
+    expect(screen.getAllByText("AVISO").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("perda diária de 1.20% (limite 1%)")).toBeInTheDocument();
-    expect(screen.getByText("WARNING")).toBeInTheDocument(); // the portfolio scope's own raw state
+    expect(screen.getAllByText("ATIVO").length).toBeGreaterThanOrEqual(2);
   });
 
   it("puts a TRADING_DISABLED kill switch in visible destaque (its own labeled panel, entries-blocked line, red styling)", () => {
@@ -71,13 +74,13 @@ describe("PortfolioRiskCard: kill switch BLOQUEADO in destaque, nulls never beco
         })}
       />,
     );
-    expect(screen.getByText(/Última transição: ACTIVE → WARNING/)).toBeInTheDocument();
+    expect(screen.getByText(/Última transição: ATIVO → AVISO/)).toBeInTheDocument();
     expect(screen.getByText(/"daily_loss_pct": "-0.0120000000"/)).toBeInTheDocument();
   });
 
-  it("never invents paper_v1's numeric limits -- names only that the API does not expose them", () => {
+  it("never invents paper_v1's numeric limits -- names only that they don't appear on this screen", () => {
     render(<PortfolioRiskCard riskState={makeRiskState()} killSwitch={makeKillSwitch()} />);
-    expect(screen.getByText(/a API ainda não expõe os valores numéricos do preset/)).toBeInTheDocument();
+    expect(screen.getByText(/ainda não aparecem nesta tela/)).toBeInTheDocument();
     expect(screen.queryByText(/0,25/)).not.toBeInTheDocument();
     expect(screen.queryByText(/0\.25%/)).not.toBeInTheDocument();
   });

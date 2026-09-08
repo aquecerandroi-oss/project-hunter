@@ -8,8 +8,8 @@ const LABEL: Record<ReturnType<typeof resultBadgeKind>, string> = {
 };
 
 const CLASS: Record<ReturnType<typeof resultBadgeKind>, string> = {
-  lucro: "border-transparent bg-green/15 text-green",
-  prejuizo: "border-transparent bg-red/15 text-red",
+  lucro: "border-transparent bg-green-soft text-green",
+  prejuizo: "border-transparent bg-red-soft text-red",
   pendente: "border-transparent bg-bg-overlay text-fg-muted",
   neutro: "border-transparent bg-bg-overlay text-fg-muted",
 };

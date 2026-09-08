@@ -41,7 +41,7 @@ export interface QualityBadgeProps {
 function ClockFallbackHint() {
   return (
     <span
-      className="text-[10px] text-fg-subtle"
+      className="text-[11px] text-fg-subtle"
       title="server_now ausente na resposta da API -- idade calculada com o relógio do navegador, não o do servidor"
     >
       relógio local

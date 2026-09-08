@@ -18,7 +18,7 @@ export function StepCapital({ data, onChange }: StepCapitalProps) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold text-fg">Capital virtual</h2>
+        <h2 className="text-xl font-semibold text-fg">Capital virtual</h2>
         <p className="mt-1 text-sm text-fg-muted">
           Vira o capital inicial padrão dos portfolios paper (a partir do Milestone 3). Mínimo de{" "}
           {formatMoney(MIN_VIRTUAL_CAPITAL, { currency: "USD" })}.

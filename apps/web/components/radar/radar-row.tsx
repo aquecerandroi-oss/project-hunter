@@ -80,7 +80,7 @@ export function RadarRow({
         <AnomalyCountCell anomalies={anomalies} unavailable={anomaliesUnavailable} truncated={anomaliesTruncated} />
       </td>
       <td role="gridcell" className="hidden px-3 text-right font-mono text-xs tabular-nums text-fg-muted md:table-cell">
-        {ageMs !== null ? formatAge(ageMs) : "—"}
+        {ageMs !== null ? formatAge(ageMs) : "--"}
       </td>
     </tr>
   );

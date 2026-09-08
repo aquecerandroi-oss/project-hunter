@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { workerRoleLabel, workerStatusLabel } from "@/components/system/labels";
 import { computeAgeMs, formatAge, heartbeatServerNowIso, useAgeTicker } from "@/hooks/useAgeTicker";
 import type { WorkerHeartbeat, WorkerStatus } from "@/lib/api/types";
 
@@ -41,7 +42,7 @@ export function WorkersTable({ workers }: WorkersTableProps) {
         <table className="w-full text-left text-[13px]">
           <thead className="bg-bg-overlay text-xs text-fg-muted">
             <tr>
-              <th className="h-8 px-3 font-medium">Role</th>
+              <th className="h-8 px-3 font-medium">Papel</th>
               <th className="h-8 px-3 font-medium">Instância</th>
               <th className="h-8 px-3 font-medium">Status</th>
               <th className="h-8 px-3 font-medium text-right">Idade</th>
@@ -59,10 +60,10 @@ export function WorkersTable({ workers }: WorkersTableProps) {
             ) : (
               workers.map((worker) => (
                 <tr key={`${worker.role}:${worker.instance}`} className="h-8 border-t border-border">
-                  <td className="px-3 text-fg">{worker.role}</td>
+                  <td className="px-3 text-fg">{workerRoleLabel(worker.role)}</td>
                   <td className="px-3 font-mono text-fg-muted">{worker.instance}</td>
                   <td className="px-3">
-                    <Badge variant={STATUS_VARIANT[worker.status]}>{worker.status}</Badge>
+                    <Badge variant={STATUS_VARIANT[worker.status]}>{workerStatusLabel(worker.status)}</Badge>
                   </td>
                   <td className="px-3 text-right font-mono tabular-nums text-fg-muted">
                     <AgeCell ts={worker.ts} ageS={worker.age_s} />

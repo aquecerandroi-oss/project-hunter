@@ -14,6 +14,11 @@ export interface DerivativesCardProps {
   serverNow?: string | null | undefined;
 }
 
+const FUNDING_KIND_LABEL: Record<"estimated" | "realized", string> = {
+  estimated: "estimado",
+  realized: "realizado",
+};
+
 function AgeSuffix({ ts, serverNow }: { ts: string | null | undefined; serverNow: string | null | undefined }) {
   const { now } = useAgeTicker(serverNow);
   const ageMs = computeAgeMs(ts, now);
@@ -48,7 +53,7 @@ export function DerivativesCard({ markPrice, openInterest, fundingRate, fundingK
         <dt className="text-xs uppercase tracking-wide text-fg-muted">Funding</dt>
         <dd className="mt-1 font-mono tabular-nums text-fg">
           {formatFundingRate(fundingRate)}
-          {fundingKind && <span className="ml-1 text-fg-subtle">({fundingKind})</span>}
+          {fundingKind && <span className="ml-1 text-fg-subtle">({FUNDING_KIND_LABEL[fundingKind]})</span>}
           <AgeSuffix ts={components.funding.ts} serverNow={serverNow} />
         </dd>
       </div>

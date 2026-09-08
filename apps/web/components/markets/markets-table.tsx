@@ -8,6 +8,7 @@ import { MarketRow } from "@/components/markets/market-row";
 import { MarketsEmpty } from "@/components/markets/markets-empty";
 import { MarketsTableHead, MARKETS_TABLE_HEADERS, type SortDirection, type SortKey } from "@/components/markets/markets-table-head";
 import { SummaryChips } from "@/components/markets/summary-chips";
+import { Input } from "@/components/ui/input";
 import { useArrowKeyRowSelection } from "@/hooks/useArrowKeyRowSelection";
 import { useMarketChannels } from "@/hooks/useMarketChannels";
 import { useRowHeight } from "@/hooks/useDensity";
@@ -231,14 +232,14 @@ export function MarketsTable({ orgSlug, items, summary, staleAfterMs, serverNow,
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SummaryChips summary={summary} />
-        <input
+        <Input
           ref={searchRef}
           type="search"
           value={q}
           onChange={(e) => handleSearchChange(e.target.value)}
           placeholder="Buscar símbolo... (/)"
           aria-label="Buscar mercado"
-          className="h-8 w-56 rounded-md border border-border bg-bg-overlay px-3 text-[13px] text-fg placeholder:text-fg-subtle"
+          className="w-56 px-3"
         />
       </div>
       {truncated && (

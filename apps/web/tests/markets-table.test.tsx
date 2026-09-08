@@ -62,7 +62,7 @@ describe("MarketsTable: sortable headers expose aria-sort (F9)", () => {
     // Default sort is quote_volume_24h desc (see MarketsTable's initial state).
     expect(screen.getByRole("columnheader", { name: /24h Vol/ })).toHaveAttribute("aria-sort", "descending");
     expect(screen.getByRole("columnheader", { name: "Mercado" })).toHaveAttribute("aria-sort", "none");
-    expect(screen.getByRole("columnheader", { name: "Status" })).not.toHaveAttribute("aria-sort");
+    expect(screen.getByRole("columnheader", { name: "Qualidade" })).not.toHaveAttribute("aria-sort");
   });
 
   it("flips to ascending on a second click of the same header", () => {

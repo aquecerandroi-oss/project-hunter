@@ -40,7 +40,7 @@ export function AcceptInviteCard({ token }: AcceptInviteCardProps) {
 
   return (
     <div className="w-full max-w-md rounded-lg border border-border bg-bg-elevated p-6">
-      <h1 className="text-lg font-semibold text-fg">Convite para organização</h1>
+      <h1 className="text-xl font-semibold text-fg">Convite para organização</h1>
       <p className="mt-2 text-sm text-fg-muted">
         O nome da organização só é revelado depois que o convite é aceito -- a API não expõe essa informação antes
         disso.

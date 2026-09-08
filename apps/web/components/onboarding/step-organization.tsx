@@ -12,7 +12,7 @@ export function StepOrganization({ data, onChange }: StepOrganizationProps) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold text-fg">Crie sua organização</h2>
+        <h2 className="text-xl font-semibold text-fg">Crie sua organização</h2>
         <p className="mt-1 text-sm text-fg-muted">O slug da organização é derivado do nome automaticamente.</p>
       </div>
       <label className="flex flex-col gap-1.5 text-sm">

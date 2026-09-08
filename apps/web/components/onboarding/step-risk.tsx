@@ -16,7 +16,7 @@ export function StepRisk({ data, onChange }: StepRiskProps) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold text-fg">Perfil de risco</h2>
+        <h2 className="text-xl font-semibold text-fg">Perfil de risco</h2>
         <p className="mt-1 text-sm text-fg-muted">O preset é copiado para os limites de risco da sua organização.</p>
       </div>
       <div role="radiogroup" aria-label="Perfil de risco" className="grid gap-2 sm:grid-cols-4">

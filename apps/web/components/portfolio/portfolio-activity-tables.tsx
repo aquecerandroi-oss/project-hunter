@@ -1,6 +1,16 @@
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import {
+  DIRECTION_LABEL,
+  EXECUTION_MODE_LABEL,
+  ORDER_PURPOSE_LABEL,
+  ORDER_STATUS_LABEL,
+  ORDER_TYPE_LABEL,
+  PORTFOLIO_EXIT_REASON_LABEL,
+  POSITION_STATUS_LABEL,
+  SIDE_LABEL,
+} from "@/components/portfolio/labels";
 import { signColorClass } from "@/components/portfolio/portfolio-format";
 import { BrasiliaInstant } from "@/components/time/brasilia-instant";
 import type { OrderRow, PortfolioTradeRow, PositionRow } from "@/lib/api/portfolio-types";
@@ -67,14 +77,14 @@ export function PositionsTable({ items, asOf }: PositionsTableProps) {
           {items.map((p) => (
             <tr key={p.id} className="border-t border-border">
               <td className="py-1 pr-3">
-                <Badge variant={p.direction === "long" ? "positive" : p.direction === "short" ? "negative" : "default"}>{p.direction}</Badge>
+                <Badge variant={p.direction === "long" ? "positive" : p.direction === "short" ? "negative" : "default"}>{DIRECTION_LABEL[p.direction]}</Badge>
               </td>
               <td className="py-1 pr-3 font-mono tabular-nums">{p.qty}</td>
               <td className="py-1 pr-3 font-mono tabular-nums">{formatUsdt(p.avg_entry_price)}</td>
               <td className="py-1 pr-3 font-mono tabular-nums">{p.mark_price !== null ? formatUsdt(p.mark_price) : "indisponível"}</td>
               <td className="py-1 pr-3 font-mono tabular-nums">{p.stop_price !== null ? formatUsdt(p.stop_price) : "sem stop"}</td>
               <td className={`py-1 pr-3 font-mono tabular-nums ${signColorClass(p.unrealized_pnl)}`}>{formatUsdt(p.unrealized_pnl)}</td>
-              <td className="py-1 pr-3">{p.status}</td>
+              <td className="py-1 pr-3">{POSITION_STATUS_LABEL[p.status]}</td>
               <td className="py-1 pr-3">
                 <BrasiliaInstant iso={p.opened_at} />
               </td>
@@ -112,12 +122,12 @@ export function OrdersTable({ items, asOf }: OrdersTableProps) {
           {items.map((o) => (
             <tr key={o.id} className="border-t border-border">
               <td className="py-1 pr-3">
-                <Badge variant={o.side === "buy" ? "positive" : "negative"}>{o.side}</Badge>
+                <Badge variant={o.side === "buy" ? "positive" : "negative"}>{SIDE_LABEL[o.side]}</Badge>
               </td>
-              <td className="py-1 pr-3">{o.type}</td>
-              <td className="py-1 pr-3">{o.purpose}</td>
-              <td className="py-1 pr-3">{o.execution_mode}</td>
-              <td className="py-1 pr-3">{o.status}</td>
+              <td className="py-1 pr-3">{ORDER_TYPE_LABEL[o.type]}</td>
+              <td className="py-1 pr-3">{ORDER_PURPOSE_LABEL[o.purpose]}</td>
+              <td className="py-1 pr-3">{EXECUTION_MODE_LABEL[o.execution_mode]}</td>
+              <td className="py-1 pr-3">{ORDER_STATUS_LABEL[o.status]}</td>
               <td className="py-1 pr-3 font-mono tabular-nums">{o.qty}</td>
               <td className="py-1 pr-3 font-mono tabular-nums">{o.price !== null ? formatUsdt(o.price) : "a mercado"}</td>
               <td className="py-1 pr-3 font-mono tabular-nums">{o.filled_qty}</td>
@@ -158,7 +168,7 @@ export function TradesTable({ items, asOf }: TradesTableProps) {
           {items.map((t) => (
             <tr key={t.id} className="border-t border-border">
               <td className="py-1 pr-3">
-                <Badge variant={t.direction === "long" ? "positive" : t.direction === "short" ? "negative" : "default"}>{t.direction}</Badge>
+                <Badge variant={t.direction === "long" ? "positive" : t.direction === "short" ? "negative" : "default"}>{DIRECTION_LABEL[t.direction]}</Badge>
               </td>
               <td className="py-1 pr-3 font-mono tabular-nums">{formatUsdt(t.entry_price)}</td>
               <td className="py-1 pr-3 font-mono tabular-nums">{formatUsdt(t.exit_price)}</td>
@@ -166,7 +176,7 @@ export function TradesTable({ items, asOf }: TradesTableProps) {
               <td className="py-1 pr-3 font-mono tabular-nums">{formatUsdt(t.fees)}</td>
               <td className={`py-1 pr-3 font-mono tabular-nums ${signColorClass(t.pnl)}`}>{formatUsdt(t.pnl)}</td>
               <td className="py-1 pr-3 font-mono tabular-nums">{t.pnl_pct !== null ? formatPct(t.pnl_pct) : "indisponível"}</td>
-              <td className="py-1 pr-3">{t.exit_reason ?? "--"}</td>
+              <td className="py-1 pr-3">{t.exit_reason ? PORTFOLIO_EXIT_REASON_LABEL[t.exit_reason] : "--"}</td>
               <td className="py-1 pr-3">
                 <BrasiliaInstant iso={t.closed_at} />
               </td>

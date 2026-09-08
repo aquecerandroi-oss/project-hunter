@@ -65,7 +65,7 @@ function TradeItem({ trade }: { trade: RecentTrade }) {
       </span>
       <span className="flex items-center justify-between gap-2 sm:contents">
         <span className={cn("flex items-center gap-1", trade.side === "buy" ? "text-green" : "text-red")}>
-          <span aria-hidden="true" className="text-[10px] font-semibold uppercase">
+          <span aria-hidden="true" className="text-[11px] font-semibold uppercase">
             {SIDE_GLYPH[trade.side]}
           </span>
           {trade.price}
