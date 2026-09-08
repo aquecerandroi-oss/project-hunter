@@ -161,7 +161,9 @@ reamostras, `BOOTSTRAP_CONFIANCA = 0.95`, semente registrada, intervalo percenti
 
 ---
 
-### 3.5 O que um replay histórico pode e não pode contar (T3.19b — **proposta**, não decisão)
+### 3.5 — **decidido (D15, 2026-09-08)**: proposta aceita nos termos de `.claude/state/decisions-delegated-2026-09-08.md`
+
+### 3.5 (texto original da proposta) O que um replay histórico pode e não pode contar (T3.19b — **proposta**, não decisão)
 
 O motor de replay (`docs/PIPELINE.md` §6c) roda a **mesma** versão, com os **mesmos** custos e as
 mesmas regras de não-antecipação, sobre as velas persistidas, e grava sob a coorte `replay:<uuid>`.
