@@ -102,17 +102,43 @@ export class RealtimeClient {
 
   private async authenticate(): Promise<void> {
     const token = await this.options.getAuthToken();
+    if (!this.ws || this.ws.readyState !== this.ws.OPEN) return;
+    // T3.44: a caller whose auth provider hasn't resolved a token yet (e.g.
+    // Clerk's `getToken()` racing this socket's own `open` event) used to
+    // still get `{"type":"auth","token":null}` sent -- the server's
+    // `realtime/endpoint.py` `_authenticate` treats that exactly like a
+    // missing token and closes with 4401 near-instantly, but nothing here
+    // ever logged it, so the topbar just flapped between "open" and
+    // "closed" with no visible reason. Closing proactively (and logging
+    // why) turns that into one visible warning per attempt instead of a
+    // silent, unexplained reconnect loop.
+    if (!token) {
+      logger.warn("realtime_auth_token_missing", {});
+      this.ws.close();
+      return;
+    }
     // Wire shape is `{ type: "auth", token }` -- token at the top level, not
     // `RealtimeMessage`'s usual `payload` envelope. See the class doc.
-    if (this.ws && this.ws.readyState === this.ws.OPEN) {
-      this.ws.send(JSON.stringify({ type: "auth", token }));
-    }
-    this.setStatus("open");
+    this.ws.send(JSON.stringify({ type: "auth", token }));
+    // `status` becomes "open" only in `handleMessage`, once the server
+    // actually answers `{"type":"authenticated"}` -- sending this frame is
+    // not the same fact as the server having accepted it (an expired or
+    // otherwise-rejected token closes the socket, 4401, right after this
+    // point). Flipping to "open" here regardless -- the previous
+    // behaviour -- told every `liveFeedDown` caller (the topbar included)
+    // that the realtime channel was live for the fraction of a second
+    // between sending this frame and the server's close, which is exactly
+    // backwards: it hid the failure instead of reporting it.
   }
 
   private handleMessage(event: MessageEvent): void {
     try {
       const message = JSON.parse(String(event.data)) as RealtimeMessage;
+      // The one frame this class itself acts on -- see `authenticate()`'s
+      // doc. Still forwarded to `onMessage` below like any other frame
+      // (`useMarketChannels`'s `handleFrame` already ignores unrecognized
+      // `type`s harmlessly).
+      if (message.type === "authenticated") this.setStatus("open");
       this.options.onMessage?.(message);
     } catch (error) {
       logger.warn("realtime_message_parse_failed", { error: String(error) });

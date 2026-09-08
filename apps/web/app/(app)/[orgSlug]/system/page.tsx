@@ -89,7 +89,25 @@ export default async function SystemPage({ params }: SystemPageProps) {
         {workersLoad.ok ? (
           <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
             <WorkersTable workers={workersLoad.workers} />
-            <ExecutionPaperCard worker={workersLoad.workers.find((worker) => worker.role === "execution") ?? null} />
+            {/*
+              T3.44: `role === "execution"` alone matches TWO rows -- the
+              generic per-process liveness heartbeat every `WorkerRuntime`
+              writes (`hb:execution:{hostname}:{pid}`, only `ts`/`errors`/
+              `version`) AND the execution-worker's own aggregate
+              (`hb:execution:paper`, the T3.13/T3.14 fields this card reads).
+              `scan_heartbeats` sorts by `(role, instance)`
+              (`services/system_status.py`), and the generic row's anonymized
+              instance is a lowercase hex digest -- always sorting before the
+              literal string "paper" -- so the old `.find(role === "execution")`
+              deterministically picked the WRONG row: `worker` was truthy (no
+              "sem heartbeat" empty state) but every T3.13 field on it was
+              `undefined`, rendering "indisponível" for all of them at once.
+              Matching on `instance === "paper"` too picks the actual
+              aggregate.
+            */}
+            <ExecutionPaperCard
+              worker={workersLoad.workers.find((worker) => worker.role === "execution" && worker.instance === "paper") ?? null}
+            />
           </div>
         ) : (
           <SectionUnavailable title="Workers" reason={workersLoad.reason} />

@@ -157,6 +157,72 @@ describe("SystemPage: AutoRefresh actually mounts and keeps refreshing on this r
   });
 });
 
+describe("SystemPage: two 'execution' heartbeats -- the generic liveness row must never win over the paper aggregate (T3.44)", () => {
+  it("picks hb:execution:paper (role+instance), not the generic hashed-instance liveness row that sorts before it", async () => {
+    systemInfoMock.mockResolvedValue(info);
+    const genericExecutionLiveness: WorkerHeartbeat = {
+      role: "execution",
+      // A real anonymized `hostname:pid` instance is a lowercase hex digest
+      // (`anonymize_instance`), which always sorts before the literal
+      // string "paper" -- this fixture reproduces that ordering, not just
+      // the ordering of the array as written.
+      instance: "3f997610fcc8",
+      ts: new Date().toISOString(),
+      last_success: null,
+      errors: 0,
+      version: "0.0.0",
+      age_s: 1,
+      status: "alive",
+      last_event_at: null,
+      ws_state: null,
+      subscriptions: null,
+      reconnects: null,
+      markets_monitored: null,
+      open_gaps: null,
+    };
+    const executionPaper: WorkerHeartbeat = {
+      role: "execution",
+      instance: "paper",
+      ts: new Date().toISOString(),
+      last_success: new Date().toISOString(),
+      errors: 0,
+      version: "1.0.0",
+      age_s: 1,
+      status: "alive",
+      last_event_at: null,
+      ws_state: null,
+      subscriptions: null,
+      reconnects: null,
+      markets_monitored: null,
+      open_gaps: null,
+      equity: "19333.0111164813",
+      kill_switch: "ACTIVE",
+      open_positions: 0,
+      pending_requests: 0,
+      unreadable_requests: 0,
+      degraded_protections: 0,
+      protection_delay_s: 0,
+      last_mtm: new Date().toISOString(),
+      last_protection: new Date().toISOString(),
+      last_kill_switch_read: new Date().toISOString(),
+      paper_autonomy: false,
+    };
+    // Sorted the way `scan_heartbeats` returns them: the hashed-instance row
+    // first, "paper" second -- `.find()` must not stop at the first one.
+    getWorkersMock.mockReset().mockResolvedValue([genericExecutionLiveness, executionPaper]);
+
+    const jsx = await SystemPage({ params: Promise.resolve({ orgSlug: "acme" }) });
+    render(jsx);
+
+    expect(screen.getByText("19,333.01 USDT")).toBeInTheDocument();
+    expect(screen.getByText("ATIVO")).toBeInTheDocument();
+    expect(screen.getByText("Autonomia: desligada")).toBeInTheDocument();
+    // The generic row has none of the T3.13 fields -- if it had won, every
+    // one of these would read "indisponível" instead.
+    expect(screen.queryAllByText("indisponível")).toHaveLength(0);
+  });
+});
+
 describe("SystemPage: a 503 from getWorkers() is unavailable, never an empty-but-successful list (H3)", () => {
   it("renders the honest failure message, not WorkersTable's own 'Nenhum worker registrado' empty state", async () => {
     systemInfoMock.mockResolvedValue(info);

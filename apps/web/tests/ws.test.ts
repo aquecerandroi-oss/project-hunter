@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { logger } from "@/lib/logger";
 import { RealtimeClient } from "@/lib/ws";
 
 type Listener = (event?: unknown) => void;
@@ -50,6 +51,10 @@ class FakeWebSocket {
     this.dispatch("close");
   }
 
+  simulateMessage(data: unknown): void {
+    this.dispatch("message", { data: JSON.stringify(data) });
+  }
+
   private dispatch(type: string, event?: unknown): void {
     for (const cb of this.listeners[type] ?? []) cb(event);
   }
@@ -88,13 +93,43 @@ describe("auth handshake", () => {
     const [firstMessage] = socket.sent;
     if (!firstMessage) throw new Error("expected a sent message");
     expect(JSON.parse(firstMessage)).toEqual({ type: "auth", token: "tok123" });
-    expect(client.getStatus()).toBe("open");
   });
 
   it("never puts the token in the connection URL", () => {
     const client = newClient({ url: "wss://example.test/ws?channel=radar" });
     client.connect();
     expect(instanceAt(0).url).not.toContain("tok123");
+  });
+
+  // T3.44: the topbar's live-feed indicator (`liveFeedDown = status !== "open"`)
+  // is only honest if "open" means the server actually accepted the
+  // connection -- sending the auth frame and having it accepted are two
+  // different facts, and a bad/expired token is rejected (4401) right after
+  // the frame is sent.
+  it("stays out of 'open' after sending the auth frame, until the server answers {type: 'authenticated'}", async () => {
+    const client = newClient();
+    client.connect();
+    const socket = instanceAt(0);
+    socket.simulateOpen();
+
+    await vi.waitFor(() => expect(socket.sent).toHaveLength(1));
+    expect(client.getStatus()).not.toBe("open");
+
+    socket.simulateMessage({ type: "authenticated" });
+    expect(client.getStatus()).toBe("open");
+  });
+
+  it("never sends a null/missing token, closes and logs instead so a silent server-side 4401 has a visible cause", async () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    const client = newClient({ getAuthToken: () => null });
+    client.connect();
+    const socket = instanceAt(0);
+    socket.simulateOpen();
+
+    await vi.waitFor(() => expect(socket.readyState).toBe(FakeWebSocket.CLOSED));
+    expect(socket.sent).toHaveLength(0);
+    expect(warn).toHaveBeenCalledWith("realtime_auth_token_missing", {});
+    warn.mockRestore();
   });
 });
 
