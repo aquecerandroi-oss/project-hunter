@@ -1275,13 +1275,6 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
-        /** CursorPage[SignalListItemOut] */
-        CursorPage_SignalListItemOut_: {
-            /** Items */
-            items: components["schemas"]["SignalListItemOut"][];
-            /** Next Cursor */
-            next_cursor?: string | null;
-        };
         /** CursorPage[WorkspaceOut] */
         CursorPage_WorkspaceOut_: {
             /** Items */
@@ -3359,6 +3352,21 @@ export interface components {
             version: string;
         };
         /**
+         * SegmentTotalsOut
+         * @description T3.37: real counts over the whole filtered dataset (state not applied),
+         *     so the tabs stop lying about how many rows exist beyond the loaded page.
+         */
+        SegmentTotalsOut: {
+            /** All */
+            all: number;
+            /** Closed */
+            closed: number;
+            /** Open */
+            open: number;
+            /** Pending */
+            pending: number;
+        };
+        /**
          * ShadowTrackingState
          * @description ``shadow_tracking_state`` — ``signal_outcomes.tracking_state``, added by
          *     ``0002_shadow_lab`` (docs/plans/SHADOW-LAB.md "Decisão conjunta" §4).
@@ -3538,6 +3546,26 @@ export interface components {
             tracking_state: components["schemas"]["ShadowTrackingState"];
             /** Virtual Entry */
             virtual_entry: string | null;
+        };
+        /** SignalsPage */
+        SignalsPage: {
+            /** Items */
+            items: components["schemas"]["SignalListItemOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            page: components["schemas"]["SignalsPagePositionOut"];
+            totals: components["schemas"]["SegmentTotalsOut"];
+        };
+        /**
+         * SignalsPagePositionOut
+         * @description 1-based ``from``/``to`` within the current ``state``'s ordering --
+         *     ``"1-200 de 2 135"``. ``0``/``0`` when the page is empty.
+         */
+        SignalsPagePositionOut: {
+            /** From */
+            from: number;
+            /** To */
+            to: number;
         };
         /** StrategiesOut */
         StrategiesOut: {
@@ -4205,8 +4233,9 @@ export interface operations {
                 tracking_state?: components["schemas"]["ShadowTrackingState"] | null;
                 result?: components["schemas"]["OutcomeResult"] | null;
                 cohort?: string;
+                state?: "closed" | "open" | "pending" | "all";
                 cursor?: string | null;
-                limit?: number | null;
+                page_size?: 50 | 100 | 200 | 500;
                 include?: string[] | null;
             };
             header?: never;
@@ -4221,7 +4250,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CursorPage_SignalListItemOut_"];
+                    "application/json": components["schemas"]["SignalsPage"];
                 };
             };
             /** @description Validation Error */

@@ -4,9 +4,13 @@
 schema before this API existed, and both live only inside the immutable
 envelope (``supporting_features``, written once — SHADOW-LAB.md §2). Extracting
 them via ``->>'...'`` is what lets ``/summary`` and ``/signals`` filter, sort
-and paginate by them; there is no index on the expression yet (declared as a
-pending item in ``contract-S3-lab.md`` for ``database-architect`` if volume
-grows past the low hundreds of rows this experiment has today).
+and paginate by them; there is still no index on the expression, and
+``signal_outcomes.tracking_state`` has none either (T3.37, ``EXPLAIN`` against
+a ~6,000-row seed in ``tests/integration/test_lab_signals_explain.py``: fine
+today because a ``strategy_version_id`` filter reaches the existing
+``ix_agent_signals_version_emitted`` index first, but the version-less "every
+strategy" listing already falls back to a ``Seq Scan`` + in-memory sort — a
+brief for ``database-architect`` is in ``.claude/state/notes-T3.37.md`` §T3.37a).
 """
 
 from __future__ import annotations
@@ -15,6 +19,7 @@ import base64
 import binascii
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from fastapi import status
 from sqlalchemy import DateTime
@@ -22,6 +27,7 @@ from sqlalchemy import cast as sa_cast
 
 from hunter_api.errors import HunterError
 from hunter_core.db.models.agents import AgentSignal
+from hunter_core.domain.enums import ShadowTrackingState
 from hunter_core.domain.types import ensure_utc
 
 DECISION_AT = sa_cast(
@@ -30,6 +36,34 @@ DECISION_AT = sa_cast(
 COHORT = AgentSignal.supporting_features["cohort"].astext
 
 MAX_CURSOR_LENGTH = 96
+
+LabSignalState = Literal["closed", "open", "pending", "all"]
+"""T3.37: the four segment tabs of ``GET /lab/shadow/signals``."""
+
+PENDING_TRACKING_STATES: tuple[ShadowTrackingState, ...] = (
+    ShadowTrackingState.PENDING_ENTRY,
+    ShadowTrackingState.NO_ENTRY,
+    ShadowTrackingState.CENSORED,
+)
+
+
+def tracking_states_for_lab_state(
+    state: LabSignalState,
+) -> tuple[ShadowTrackingState, ...] | None:
+    """Mirrors ``apps/web/components/lab/lab-signal-segments.ts``'s
+    ``matchesSegment`` exactly (T3.37 brief): ``closed`` = ``terminal``
+    (resolved with R known), ``open`` = ``active`` (entered, tracking),
+    ``pending`` folds ``pending_entry``/``no_entry``/``censored`` together
+    (no entry yet, never entered, or unrecoverable — none of them a win, a
+    loss, or a still-tracked position). ``all`` -> ``None`` (no filter).
+    """
+    if state == "closed":
+        return (ShadowTrackingState.TERMINAL,)
+    if state == "open":
+        return (ShadowTrackingState.ACTIVE,)
+    if state == "pending":
+        return PENDING_TRACKING_STATES
+    return None
 
 
 class InvalidLabCursorError(HunterError):

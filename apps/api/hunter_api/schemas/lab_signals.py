@@ -8,9 +8,8 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
-from hunter_api.schemas.common import CursorPage
 from hunter_api.schemas.lab_common import DecimalStr
 from hunter_core.domain.enums import OutcomeResult, ShadowTrackingState
 
@@ -46,4 +45,30 @@ class SignalListItemOut(BaseModel):
     """Always present in the schema; ``null`` unless ``?include=envelope``."""
 
 
-SignalsPage = CursorPage[SignalListItemOut]
+class SegmentTotalsOut(BaseModel):
+    """T3.37: real counts over the whole filtered dataset (state not applied),
+    so the tabs stop lying about how many rows exist beyond the loaded page.
+    """
+
+    closed: int
+    open: int
+    pending: int
+    all: int
+
+
+class SignalsPagePositionOut(BaseModel):
+    """1-based ``from``/``to`` within the current ``state``'s ordering --
+    ``"1-200 de 2 135"``. ``0``/``0`` when the page is empty.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    from_: int = Field(alias="from")
+    to: int
+
+
+class SignalsPage(BaseModel):
+    items: list[SignalListItemOut]
+    next_cursor: str | None = None
+    totals: SegmentTotalsOut
+    page: SignalsPagePositionOut

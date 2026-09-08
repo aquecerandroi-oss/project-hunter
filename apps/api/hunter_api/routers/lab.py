@@ -14,12 +14,13 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from pydantic import BeforeValidator
 from sqlalchemy.exc import OperationalError
 
 from hunter_api.auth.rbac import CurrentPrincipal
 from hunter_api.deps import get_session_factory
 from hunter_api.errors import HunterError
-from hunter_api.repositories.base import MAX_PAGE_SIZE, clamp_page_size
+from hunter_api.repositories.lab_common import LabSignalState
 from hunter_api.repositories.lab_signals import LabSignalsRepository
 from hunter_api.repositories.lab_summary import LabSummaryRepository
 from hunter_api.repositories.lab_versions import LabVersionsRepository
@@ -47,6 +48,14 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/lab/shadow", tags=["lab"])
 
 _WindowParam = Literal["7d", "30d", "all"]
+_PageSize = Annotated[
+    Literal[50, 100, 200, 500], BeforeValidator(lambda v: int(v) if isinstance(v, str) else v)
+]
+"""T3.37: never OFFSET on the thousands of rows this listing can hold; a
+client picks how much of one page it wants, always via the keyset cursor.
+``BeforeValidator`` because ``Literal[int, ...]`` does not lenient-coerce a
+query string the way a plain ``int`` annotation does (pydantic strict-matches
+the literal set against the value's own type)."""
 
 
 class LabUnavailableError(HunterError):
@@ -160,18 +169,20 @@ async def list_signals(
     tracking_state: ShadowTrackingState | None = None,
     result: OutcomeResult | None = None,
     cohort: CohortParam = ShadowCohort.PROSPECTIVE,
+    state: LabSignalState = "all",
     cursor: str | None = None,
-    limit: Annotated[int | None, Query(ge=1, le=MAX_PAGE_SIZE)] = None,
+    page_size: _PageSize = 200,
     include: Annotated[list[str] | None, Query()] = None,
 ) -> SignalsPage:
-    rows, next_cursor = await LabSignalsRepository(session).list_page(
+    page = await LabSignalsRepository(session).list_page(
         strategy_version_id=strategy_version_id,
         market=market,
         tracking_state=tracking_state,
         result=result,
         cohort=cohort,
+        state=state,
         cursor=cursor,
-        limit=clamp_page_size(limit),
+        page_size=page_size,
     )
     include_envelope = include is not None and "envelope" in include
-    return build_signals_page(rows, next_cursor, include_envelope=include_envelope)
+    return build_signals_page(page, include_envelope=include_envelope)

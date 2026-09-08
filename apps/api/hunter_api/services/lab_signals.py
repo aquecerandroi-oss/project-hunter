@@ -12,12 +12,12 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from hunter_api.schemas.common import CursorPage
-from hunter_api.schemas.lab_signals import SignalListItemOut
+from hunter_api.schemas.lab_signals import SegmentTotalsOut, SignalListItemOut, SignalsPage
+from hunter_api.schemas.lab_signals import SignalsPagePositionOut as PagePositionOut
 from hunter_core.domain.types import ensure_utc
 
 if TYPE_CHECKING:
-    from hunter_api.repositories.lab_signals import SignalRow
+    from hunter_api.repositories.lab_signals import SignalRow, SignalsPageResult
 
 __all__ = ["build_signals_page"]
 
@@ -60,10 +60,10 @@ def _to_out(row: SignalRow, *, include_envelope: bool) -> SignalListItemOut:
     )
 
 
-def build_signals_page(
-    rows: list[SignalRow], next_cursor: str | None, *, include_envelope: bool
-) -> CursorPage[SignalListItemOut]:
-    return CursorPage[SignalListItemOut](
-        items=[_to_out(row, include_envelope=include_envelope) for row in rows],
-        next_cursor=next_cursor,
+def build_signals_page(result: SignalsPageResult, *, include_envelope: bool) -> SignalsPage:
+    return SignalsPage(
+        items=[_to_out(row, include_envelope=include_envelope) for row in result.items],
+        next_cursor=result.next_cursor,
+        totals=SegmentTotalsOut(**result.totals),
+        page=PagePositionOut(**{"from": result.page_from, "to": result.page_to}),
     )

@@ -651,7 +651,12 @@ async def test_signals_empty_list_is_200_not_404(
     )
 
     assert response.status_code == 200, response.text
-    assert response.json() == {"items": [], "next_cursor": None}
+    assert response.json() == {
+        "items": [],
+        "next_cursor": None,
+        "totals": {"closed": 0, "open": 0, "pending": 0, "all": 0},
+        "page": {"from": 0, "to": 0},
+    }
 
 
 async def test_signals_filters_by_tracking_state_and_result_and_pages(
@@ -659,32 +664,34 @@ async def test_signals_filters_by_tracking_state_and_result_and_pages(
     session_factory: async_sessionmaker[AsyncSession],
     make_actor: Callable[[str], Actor],
 ) -> None:
+    """T3.37: ``page_size`` replaces the old free-form ``limit`` -- 50 is the
+    smallest enumerated size, so this needs 51 terminal rows to force a
+    second page (``seed_shadow_population`` writes them in one transaction).
+    """
     _, version_id = await fx.seed_strategy_version(
         session_factory, activated_at=NOW - timedelta(days=1)
     )
     market_id = await fx.seed_lab_market(session_factory)
-    ids: list[str] = []
-    for offset in range(3):
-        decision_at = NOW - timedelta(hours=offset + 1)
-        entry_bar_open = decision_at + timedelta(minutes=1)
-        signal_id = await fx.seed_shadow_signal(
-            session_factory,
-            strategy_version_id=version_id,
-            market_id=market_id,
-            decision_at=decision_at,
-            entry_bar_open=entry_bar_open,
-            entry_ts=entry_bar_open,
-            exit_ts=decision_at + timedelta(hours=1),
-            exit_price=Decimal("103"),
-            result=OutcomeResult.TARGET,
-            r_multiple=Decimal("1.5"),
-        )
-        ids.append(str(signal_id))
+    specs = [
+        {
+            "strategy_version_id": version_id,
+            "market_id": market_id,
+            "decision_at": NOW - timedelta(hours=offset + 1),
+            "entry_bar_open": (NOW - timedelta(hours=offset + 1)) + timedelta(minutes=1),
+            "entry_ts": (NOW - timedelta(hours=offset + 1)) + timedelta(minutes=1),
+            "exit_ts": (NOW - timedelta(hours=offset + 1)) + timedelta(hours=1),
+            "exit_price": Decimal("103"),
+            "result": OutcomeResult.TARGET,
+            "r_multiple": Decimal("1.5"),
+        }
+        for offset in range(51)
+    ]
+    ids = [str(signal_id) for signal_id in await fx.seed_shadow_population(session_factory, specs)]
     await fx.seed_shadow_signal(
         session_factory,
         strategy_version_id=version_id,
         market_id=market_id,
-        decision_at=NOW - timedelta(hours=10),
+        decision_at=NOW - timedelta(hours=100),
         tracking_state=ShadowTrackingState.NO_ENTRY,
         result=OutcomeResult.OPEN,
         no_entry_reason="geometry",
@@ -692,7 +699,8 @@ async def test_signals_filters_by_tracking_state_and_result_and_pages(
     actor: Actor = make_actor("lab-signals-filter")
 
     filtered = await client.get(
-        f"/api/v1/lab/shadow/signals?strategy_version_id={version_id}&tracking_state=terminal&result=target",
+        f"/api/v1/lab/shadow/signals?strategy_version_id={version_id}&tracking_state=terminal"
+        "&result=target&page_size=100",
         headers=actor.headers,
     )
     assert filtered.status_code == 200, filtered.text
@@ -700,22 +708,28 @@ async def test_signals_filters_by_tracking_state_and_result_and_pages(
     assert filtered_ids == set(ids)
 
     first = await client.get(
-        f"/api/v1/lab/shadow/signals?strategy_version_id={version_id}&tracking_state=terminal&limit=2",
+        f"/api/v1/lab/shadow/signals?strategy_version_id={version_id}&tracking_state=terminal"
+        "&page_size=50",
         headers=actor.headers,
     )
     assert first.status_code == 200, first.text
     first_body = first.json()
-    assert len(first_body["items"]) == 2
+    assert len(first_body["items"]) == 50
     assert first_body["next_cursor"] is not None
+    assert first_body["page"] == {"from": 1, "to": 50}
 
     second = await client.get(
         f"/api/v1/lab/shadow/signals?strategy_version_id={version_id}&tracking_state=terminal"
-        f"&limit=2&cursor={first_body['next_cursor']}",
+        f"&page_size=50&cursor={first_body['next_cursor']}",
         headers=actor.headers,
     )
     assert second.status_code == 200, second.text
+    second_body = second.json()
+    assert len(second_body["items"]) == 1
+    assert second_body["next_cursor"] is None
+    assert second_body["page"] == {"from": 51, "to": 51}
     seen = {item["signal_id"] for item in first_body["items"]} | {
-        item["signal_id"] for item in second.json()["items"]
+        item["signal_id"] for item in second_body["items"]
     }
     assert seen == set(ids)
 
@@ -725,10 +739,11 @@ async def test_signals_cursor_tie_breaks_by_id_when_decision_at_matches_across_m
     session_factory: async_sessionmaker[AsyncSession],
     make_actor: Callable[[str], Actor],
 ) -> None:
-    """Nice-to-have: three signals across two markets share the exact same
+    """Nice-to-have: 51 signals across two markets share the exact same
     ``decision_at``. The cursor's stability depends entirely on the secondary
     sort/compare on ``id`` (``repositories/lab_signals.py``); without it, a
-    tie would let the second page skip or repeat a row.
+    tie would let the second page skip or repeat a row. 51 (not 3) because
+    ``page_size``'s smallest enumerated value is 50 (T3.37).
     """
     _, version_id = await fx.seed_strategy_version(
         session_factory, activated_at=NOW - timedelta(days=1)
@@ -736,37 +751,37 @@ async def test_signals_cursor_tie_breaks_by_id_when_decision_at_matches_across_m
     market_a = await fx.seed_lab_market(session_factory)
     market_b = await fx.seed_lab_market(session_factory)
     tied_decision_at = NOW - timedelta(hours=1)
-    ids: list[str] = []
-    for market_id in (market_a, market_b, market_a):
-        signal_id = await fx.seed_shadow_signal(
-            session_factory,
-            strategy_version_id=version_id,
-            market_id=market_id,
-            decision_at=tied_decision_at,
-            tracking_state=ShadowTrackingState.PENDING_ENTRY,
-            result=OutcomeResult.OPEN,
-        )
-        ids.append(str(signal_id))
+    specs = [
+        {
+            "strategy_version_id": version_id,
+            "market_id": market_a if i % 2 == 0 else market_b,
+            "decision_at": tied_decision_at,
+            "tracking_state": ShadowTrackingState.PENDING_ENTRY,
+            "result": OutcomeResult.OPEN,
+        }
+        for i in range(51)
+    ]
+    ids = [str(signal_id) for signal_id in await fx.seed_shadow_population(session_factory, specs)]
     expected_order = sorted(ids, reverse=True)
     actor: Actor = make_actor("lab-signals-cursor-tie-break")
 
     first = await client.get(
-        f"/api/v1/lab/shadow/signals?strategy_version_id={version_id}&limit=2",
+        f"/api/v1/lab/shadow/signals?strategy_version_id={version_id}&page_size=50",
         headers=actor.headers,
     )
     assert first.status_code == 200, first.text
     first_body = first.json()
-    assert [item["signal_id"] for item in first_body["items"]] == expected_order[:2]
+    assert [item["signal_id"] for item in first_body["items"]] == expected_order[:50]
     assert first_body["next_cursor"] is not None
 
     second = await client.get(
         f"/api/v1/lab/shadow/signals?strategy_version_id={version_id}"
-        f"&limit=2&cursor={first_body['next_cursor']}",
+        f"&page_size=50&cursor={first_body['next_cursor']}",
         headers=actor.headers,
     )
     assert second.status_code == 200, second.text
     second_body = second.json()
-    assert [item["signal_id"] for item in second_body["items"]] == expected_order[2:]
+    assert [item["signal_id"] for item in second_body["items"]] == expected_order[50:]
 
 
 async def test_signals_garbage_cursor_returns_422(
