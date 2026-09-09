@@ -28,7 +28,7 @@ consulta inteira, com o argumento do corte da barra de decisão, está em
 from __future__ import annotations
 
 import argparse
-import statistics
+import shlex
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -87,9 +87,13 @@ def _slug(strategy: str, version: str) -> str:
 
 def export(args: argparse.Namespace) -> int:
     strategy, version = args.version
+    # Every value is quoted for the REMOTE shell: `ssh host <string>` hands
+    # the string to the VPS shell, and an unquoted `--since "x; rm …"` would
+    # run there as the operator (review of T3.50, CRITICAL). psql's `-v`
+    # substitution (`:'var'`) already protects the SQL side.
     remote = (
-        f"{PSQL} -v strategy={strategy} -v ver={version} "
-        f"-v coorte={args.cohort} -v since='{args.since}' -f -"
+        f"{PSQL} -v strategy={shlex.quote(strategy)} -v ver={shlex.quote(version)} "
+        f"-v coorte={shlex.quote(args.cohort)} -v since={shlex.quote(args.since)} -f -"
     )
     with SQL.open("rb") as sql:
         done = subprocess.run(
@@ -119,6 +123,17 @@ def render(args: argparse.Namespace) -> int:
         return 0
     out_dir = Path(args.out) if args.out else ATTACH_DIR / _slug(ops[0].strategy, ops[0].version)
     out_dir.mkdir(parents=True, exist_ok=True)
+    # Two operations of the same version mapping to one file name (same
+    # market, decision bar and outcome -- possible across cohorts) would make
+    # the second one vanish silently behind the first PNG; fail loud instead
+    # (review of T3.50).
+    seen: dict[str, str] = {}
+    for op in ops:
+        other = seen.setdefault(op.filename(), op.signal_id)
+        if other != op.signal_id:
+            raise SystemExit(
+                f"colisão de nome de arquivo: {op.filename()} ({other} e {op.signal_id})"
+            )
     written = skipped = 0
     for op in ops:
         if written >= args.max:
@@ -153,7 +168,9 @@ def table_row(index: int, op: Operation, slug: str) -> str:
 def build_note(ops: list[Operation], slug: str, as_of: datetime) -> str:
     first = ops[0]
     rs = [op.r_multiple for op in ops if op.r_multiple is not None]
-    expectancy = Decimal(statistics.fmean(float(r) for r in rs)).quantize(Decimal("0.0001"))
+    # Decimal all the way: a float mean rebuilt as Decimal can differ in the
+    # 4th place that the note publishes (review of T3.50).
+    expectancy = (sum(rs, Decimal(0)) / len(rs)).quantize(Decimal("0.0001")) if rs else Decimal(0)
     cohorts = ", ".join(sorted({op.coorte for op in ops}))
     reads_lines = first.strategy == "trendline_breakout"
     head = [

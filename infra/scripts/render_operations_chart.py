@@ -38,6 +38,7 @@ from typing import Any, cast
 
 from hunter_core.domain.enums import Timeframe
 from hunter_core.strategies.aggregate import Bar
+from hunter_core.strategies.canonical import canonical_json
 from hunter_core.strategies.tl_scan import TlScan, tl_scan
 from hunter_core.strategies.tl_setup import pattern_params
 from hunter_core.strategies.trendline_breakout_v1 import TrendlineBreakoutV1
@@ -215,6 +216,14 @@ def geometry(op: Operation) -> tuple[TlScan | None, int]:
     cut = decision_index(op)
     if cut < 0:
         return None, 0
+    recorded = op.features.get("pattern_params")
+    if recorded is not None and recorded != canonical_json(PARAMS.as_wire()).decode("utf-8"):
+        # The envelope carries the exact geometry thresholds the decision used;
+        # redrawing it with other defaults would be a different claim about
+        # the same tape (review of T3.50, HIGH). Fail loud, never silently.
+        raise ValueError(
+            f"{op.signal_id}: pattern_params do envelope difere dos defaults congelados do renderer"
+        )
     start = cut
     while (
         start > 0

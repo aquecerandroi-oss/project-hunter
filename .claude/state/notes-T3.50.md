@@ -356,3 +356,10 @@ daquela task. Registro aqui só porque os três conjuntos de gráficos agora exi
    mas significa que uma regressão **no desenho** só é pega por quem rodar com `--with matplotlib`.
 4. **`momentum v7`/`v8` ainda não têm EXP no vault** (EXP-0018 em redação): quando existir, as duas
    notas passam a poder linkar — basta rodar `note` de novo, que a nota é derivada.
+
+## T3.50b — fechamento da revisão de 6a8679b (orquestrador, 2026-09-08 ~22:30 BRT)
+- CRITICAL: `export` cita (`shlex.quote`) strategy/version/cohort/since antes de montar o comando remoto do `ssh` — nada do argv chega ao shell da VPS sem aspas.
+- HIGH: `geometry()` compara o `pattern_params` do envelope com os defaults congelados do renderer e recusa (`ValueError`) em divergência — a igualdade 47/47 passa a ser garantida por código, não por coincidência de datas.
+- MEDIUM: `expectancy` em `Decimal` puro (sem `fmean`/float); colisão de nome de arquivo dentro de um lote falha alto (`SystemExit`) em vez de pular a segunda operação.
+- LOW: os briefs T3.44e/T3.49 entraram no commit 6a8679b por decisão do orquestrador (commit por pathspec agrupando os briefs escritos naquela hora), não pelo agente.
+- Testes: 9 passed (`uv run --with matplotlib pytest infra/scripts/tests/test_render_operations.py`).

@@ -184,3 +184,32 @@ def test_the_note_says_plainly_that_this_version_does_not_read_lines(op: Operati
     assert "contexto, nunca entrada da decisão" in note
     assert "![XRPUSDT session_orb v1 23/08 11:30 BRT]" in note
     assert "# session_orb v1 — operações traçadas" in note
+
+
+def test_an_envelope_drawn_with_other_pattern_params_is_refused_not_redrawn(op: Operation) -> None:
+    """Review of T3.50 (HIGH): the renderer must never redraw a decision with
+    thresholds other than the ones the envelope recorded."""
+    features = {**op.features, "pattern_params": '{"pivot_k": 99}'}
+    with pytest.raises(ValueError, match="pattern_params"):
+        geometry(replace(op, features=features))
+
+
+def test_two_operations_mapping_to_one_file_name_fail_loud(op: Operation, tmp_path: Path) -> None:
+    """Review of T3.50 (MEDIUM): a second operation behind the same PNG name
+    must not vanish silently behind the first one's idempotent skip."""
+    from render_operations import render
+
+    twin = replace(op, signal_id="another-signal")
+    jsonl = tmp_path / "ops.jsonl"
+    payload = json.loads(FIXTURE, parse_float=Decimal)
+    twin_payload = {**payload, "signal_id": "another-signal"}
+    jsonl.write_text(
+        json.dumps(payload, default=str) + "\n" + json.dumps(twin_payload, default=str) + "\n",
+        encoding="utf-8",
+    )
+    assert twin.filename() == op.filename()
+    args = type(
+        "Args", (), {"jsonl": str(jsonl), "out": str(tmp_path / "png"), "max": 10, "force": False}
+    )()
+    with pytest.raises(SystemExit, match="colisão"):
+        render(args)
