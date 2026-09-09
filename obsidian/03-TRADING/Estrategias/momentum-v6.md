@@ -3,17 +3,17 @@ tags: ["estrategia", "catalogo", "momentum"]
 strategy: momentum
 version: v6
 purpose: research_only
-status: active
+status: deprecated
 code_ref: "hunter_core.strategies.momentum_v1@sha256:ab2e039825c9334da5b81666791c0a782f25bb35a3cb9529391bdb238ebaa40c"
 params_hash: 8cb1aa497956
 activated_at: "2026-09-08T19:04:56.213531+00:00"
-deprecated_at: ""
+deprecated_at: "2026-09-09T14:58:00.789121+00:00"
 derived_from: "[[momentum-v2]]"
 cohorts: ["replay:9a08835a-ae13-4c23-b521-734b2f60a3a2", "prospective"]
 exp: ["[[EXP-0013-momentum-alvo-3-atr]]"]
-updated: 2026-09-08
+updated: 2026-09-09
 ---
-# momentum v6 (active)
+# momentum v6 (deprecated)
 
 <!-- generated:start -->
 ## Parâmetros
@@ -72,6 +72,10 @@ não iniciada — ver `docs/plans/REPLICATION.md` quando existir (T3.19).
 
 
 ## Notas
+
+**Aposentada pela via auditada em 2026-09-09T14:58:00Z (T3.56)**, sucessora `momentum v8` (mesma
+linhagem, stop 3 ATR). Veredito medido (`as_of` 2026-09-09T14:52Z): negativa nas duas coortes —
+prospectiva −0,2856 R (n=156), replay −0,0513 R (n=195). Ver `.claude/state/notes-T3.56.md` §5.4.
 
 Página reconciliada à mão pela Sexta-feira em 2026-09-08 a partir de
 `.claude/state/exp-drafts/EXP-0018-stop-largo.md`, `obsidian/05-EXPERIMENTS/EXP-0013-momentum-alvo-3-atr.md`

@@ -3,17 +3,17 @@ tags: ["estrategia", "catalogo", "trendline_breakout"]
 strategy: trendline_breakout
 version: v1
 purpose: research_only
-status: active
+status: deprecated
 code_ref: "hunter_core.strategies.trendline_breakout_v1@sha256:7b83a1ff07946fa743d12c9d098f15b538c2e2b19f5269363203ee0671e19648"
 params_hash: f2e8017c7251e22f
 activated_at: "2026-09-08T22:29:52.701952+00:00"
-deprecated_at: ""
+deprecated_at: "2026-09-09T15:00:10.132127+00:00"
 derived_from: ""
 cohorts: ["replay:d78c14d1-b4c5-424a-8f31-a43100744bb4", "prospective"]
 exp: ["[[EXP-0016-trendline-breakout]]"]
-updated: 2026-09-08
+updated: 2026-09-09
 ---
-# trendline_breakout v1 (research_only, active)
+# trendline_breakout v1 (research_only, deprecated)
 
 <!-- generated:start -->
 ## Parâmetros
@@ -87,3 +87,10 @@ host local não alcança o Postgres da VPS (`export_strategies_to_obsidian.py --
 `ConnectionRefusedError`). A tabela de parâmetros acima é **parcial por desenho**: só reproduz os
 valores citados no corpo do EXP; os 36 valores completos exigem ler `default_parameters` do banco
 (ou o brief T3.34b §5, fora do vault).
+
+**Aposentada pela via auditada em 2026-09-09T15:00:10Z (T3.56)**, sem sucessora — "o módulo fica no
+código para uma v2 com a hipótese de repique reformulada". Veredito medido (`as_of`
+2026-09-09T14:52Z): negativa nas duas coortes — replay −0,0382 R (n=47, sem mudança desde a T3.34c),
+prospectiva **−0,3417 R (n=57)**, 31,6 % das decisões acima do teto de stop do `paper_v1`. A
+prospectiva melhorou frente ao número do brief original (−0,55 R, n=21) com o triplo de amostra, mas
+segue claramente negativa. Ver `.claude/state/notes-T3.56.md` §5.7 e §3.0.

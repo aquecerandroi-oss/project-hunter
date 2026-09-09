@@ -11,7 +11,7 @@ deprecated_at: ""
 derived_from: ""
 cohorts: ["prospective"]
 exp: ["[[EXP-0005-momentum-paper]]"]
-updated: 2026-09-08
+updated: 2026-09-09
 ---
 # momentum v3 (paper, active)
 
@@ -74,3 +74,14 @@ não iniciada — ver `docs/plans/REPLICATION.md` quando existir (T3.19).
 
 ## Notas
 
+**Tentativa de aposentadoria recusada pelo script em 2026-09-09 (T3.56).** O brief pedia matar as
+versões perdedoras do roster e previu o primeiro portão (`--force-paper`, aceito). O segundo portão
+barrou: `open_paper_exposure()` exige zero `shadow_episodes` com acompanhamento aberto, e esta
+versão está `active` — continua decidindo e continua abrindo slots novos (5 às 14:52Z, 6 às
+15:01:36Z). Recibo: `REFUSED: momentum v3 still has skin in the game: 5 shadow slot(s) tracking an
+open outcome`. Veredito medido no mesmo turno: −0,2256 R em n=453 (`as_of` 2026-09-09T14:52Z) —
+negativa como todas as outras nove versões avaliadas naquele dia. **Continua `active`,
+`purpose = paper`**; nada executa (`ENABLE_PAPER_AUTONOMY=false`, 0 posições). Dois caminhos ficaram
+registrados para quem decidir: repetir o comando até pegar uma janela sem slot aberto, ou mover a
+linha `paper` para outra versão antes de aposentar esta — as duas são decisão de produto/risco, fora
+do escopo do script. Ver `.claude/state/notes-T3.56.md` §4 e CONCERN 2.

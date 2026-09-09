@@ -1,6 +1,6 @@
 ---
 tags: [knowledge, indice]
-updated: 2026-09-08
+updated: 2026-09-09
 status: em construção
 owner: sexta-feira
 ---
@@ -17,7 +17,7 @@ Cada nota é uma síntese própria (nunca cópia), com fonte, data, qualidade da
 | Momentum e rompimentos | KB-0001, KB-0002, KB-0003, KB-0004, KB-0006 | primeira rodada feita (2026-09-06) |
 | Volume e fluxo de ordens | KB-0009, KB-0011, KB-0012, KB-0013, KB-0014, KB-0015, KB-0016, KB-0018 | segunda rodada feita (2026-09-06) |
 | Perpétuos: funding, OI, posicionamento | KB-0008, KB-0017, KB-0019, KB-0020, KB-0021, KB-0022, KB-0023, KB-0024, KB-0025, KB-0026 | **terceira rodada feita (2026-09-06)** |
-| Análise técnica clássica (o que tem evidência e o que não tem) | KB-0003, **KB-0077** | iniciado; **KB-0077 (2026-09-08, T3.34) é a primeira nota de *implementação* própria de geometria clássica** — pivôs, linhas, canais e eventos, com as seis figuras e o que um humano traçaria diferente |
+| Análise técnica clássica (o que tem evidência e o que não tem) | KB-0003, **KB-0077**, **KB-0080**, **KB-0081** | iniciado; **KB-0077 (2026-09-08, T3.34) é a primeira nota de *implementação* própria de geometria clássica** — pivôs, linhas, canais e eventos, com as seis figuras e o que um humano traçaria diferente; **KB-0080/KB-0081 (2026-09-09, T3.55) fecham o par literatura + medição própria de candlestick — nada sobrevive no nosso dado, e o único selo tem o sinal invertido** |
 | Regime de mercado e volatilidade | KB-0007, KB-0016, KB-0027, KB-0028, KB-0029, KB-0030, KB-0031, KB-0032, KB-0033, KB-0034, KB-0035 | **quarta rodada feita (2026-09-06)** |
 | Gestão de risco e sizing | KB-0005, KB-0035, KB-0040 | iniciado |
 | **Dimensionamento e risco (Risk Engine M3/M4)** | KB-0066, KB-0067, KB-0068, KB-0069, KB-0070, KB-0071, KB-0072, KB-0073, KB-0074, KB-0075 | **oitava rodada feita (2026-09-06)** |
@@ -25,7 +25,7 @@ Cada nota é uma síntese própria (nunca cópia), com fonte, data, qualidade da
 | Execução e microestrutura do preenchimento | KB-0036, KB-0037, KB-0038, KB-0039, KB-0040, KB-0041, KB-0042, KB-0043, KB-0044 | quinta rodada feita (2026-09-06) |
 | Livros de estratégia | KB-0045, KB-0046, KB-0047, KB-0048, KB-0049, KB-0050, KB-0051, KB-0052, KB-0053, KB-0054, KB-0055 | sexta rodada feita (2026-09-06) |
 | Meme coins | KB-0056, KB-0057, KB-0058, KB-0059, KB-0060, KB-0061, KB-0062, KB-0063, KB-0064, KB-0065 | **sétima rodada feita (2026-09-06)** |
-| **Diagnóstico do nosso próprio resultado** | KB-0008, KB-0076 | **primeira nota de medição própria em larga escala (2026-09-08, T3.32)** — o custo em R é praticamente toda a perda |
+| **Diagnóstico do nosso próprio resultado** | KB-0008, KB-0076, KB-0079 | **primeira nota de medição própria em larga escala (2026-09-08, T3.32)** — o custo em R é praticamente toda a perda; **KB-0079 (2026-09-09, T3.53) controla multiplicidade sobre 2 248 células e sobra uma: `momentum v8` perde em `SIDEWAYS`** |
 
 ## Notas
 _(uma linha por nota: link para a nota — fonte curta — qualidade da evidência — hipótese sim/não)_
@@ -110,6 +110,9 @@ _(uma linha por nota: link para a nota — fonte curta — qualidade da evidênc
 | [[KB-0076-por-que-perdemos-2026-09-08]] | custos / diagnóstico próprio | dado da VPS (10 populações, 4.472 desfechos) + 4 replays de política de saída | medição própria, um snapshot só | sim — orçamento de custo na decisão; e a pergunta que falta: alguma entrada com bruto > 0,25 R? |
 | [[KB-0077-linhas-de-tendencia]] | análise técnica clássica / geometria determinística | implementação própria (`hunter_indicators.patterns`, T3.34) + 6 figuras em velas reais da VPS | implementação + teste de valor conhecido + revisão da Astra (3 defeitos corrigidos) | sim — é a base de `trendline_breakout_v1` (T3.34b); **a nota não afirma valor preditivo** |
 | [[KB-0078-o-radar-preve]] | radar / anomalias / previsibilidade | dado da VPS (1,8 dia de anomalias, 176 desfechos cruzados, 40 mil barras de retorno futuro) + bootstrap por blocos | seis SQL somente leitura + bootstrap (T3.46) | **não** — nenhuma estratégia lê o Radar; rebaixado a painel até baselines ≥ 60 %, ≥ 150 mercados, ≥ 14 dias |
+| [[KB-0079-onde-ganha-e-perde]] | shadow-lab / regime / multiplicidade | dado da VPS (6 187 desfechos, 2 248 células) + bootstrap de blocos de dia com correção de Holm | 4 SQL somente leitura + 86 bootstraps (T3.53) | **sim, uma célula** — `momentum v8` (replay) perde 0,36 R/decisão em `SIDEWAYS`; `HIGH_VOLATILITY` é a única célula de regime líquida positiva; `UNKNOWN`, hora, dia da semana e mercado são artefato/ruído; insumo do portão de regime da T3.52 ([[EXP-0020-regime-gate]]) |
+| [[KB-0080-candlestick-evidencia]] | análise técnica / candlestick / literatura | Marshall Young & Rose 2006; Caginalp & Laurent 1998; Park & Irwin 2004/2007; Kuna 2025; Moser & Brauneis 2026 (resumo, não aberto); TA-Lib | estudos revisados + duas teses + código, **nenhuma medição própria** | sim — 11 famílias/18 rótulos com definições determinísticas para a T3.55b; a literatura em ações e cripto diário diz "não", a única evidência horária com correção de snooping não pôde ser lida |
+| [[KB-0081-candlestick-no-nosso-dado]] | análise técnica / candlestick / medição própria | dado da VPS (58 224 barras, 16 mercados × 31 d, 15 m e 1 h) + bootstrap de blocos de dia + Holm sobre 144 testes | medição própria, um snapshot só (T3.55b) | **não** — nada sobrevive a Holm; o único selo (marubozu de baixa 1 h) tem o sinal invertido e rende só o pedágio (+0,005 R); enforcado e doji não têm invalidação que caiba no custo; portão C1–C8 = FAIL |
 
 ## O que a primeira rodada mudou de fato
 

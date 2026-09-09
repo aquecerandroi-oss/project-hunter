@@ -1,6 +1,6 @@
 ---
 tags: [experimentos, indice]
-updated: 2026-09-08
+updated: 2026-09-09
 status: em-andamento
 owner: sexta-feira
 ---
@@ -202,6 +202,32 @@ famílias de estratégia novas.** Os parágrafos acima ficam como estão. O que 
   (`trendline_breakout`, `sweep_reclaim`), com páginas em
   [[Strategies|03-TRADING/Estrategias]] — ver [[Estrategias/trendline_breakout-v1|trendline_breakout-v1]] e [[sweep_reclaim-v1]].
 
+**Acréscimo de 2026-09-09 (T3.52–T3.56) — dois experimentos novos, e o roster do Lab passa de 16
+para 9 versões vivas.** Os parágrafos acima ficam como estão. O que mudou:
+
+- **[[EXP-0020-regime-gate]]** (portão de elegibilidade por regime horário, um braço por família:
+  `mean_reversion` só decide em `SIDEWAYS`, `momentum` só em `BTC_BULL`) nasce direto de
+  [[KB-0079-onde-ganha-e-perde]] (T3.53, o mapa de onde cada versão ganha e perde). O portão foi
+  **implementado e entrou em produção** (migração `0017`, commit `d21a11d`, T3.52/b/c) — **nenhum dos
+  dois braços foi derivado, ativado ou replayado ainda**. `status: implementado, replay pendente`;
+- **[[EXP-0021-timeframe]]** (mover a referência de ATR de 15 m para 1 h) mede que ATR%(1h)/ATR%(15m)
+  = **2,21×** nos 16 mercados com 31 dias de histórico — não os 3–4× do brief —, e que **nas decisões**
+  o ganho de pedágio encolhe para **1,4× (momentum) e 1,04× (mean_reversion)**, porque o piso de ATR%
+  já selecionava a cauda de volatilidade. `mean_reversion v10` vira a **primeira coorte julgável da
+  família** (54 decisões, 16 dias, estresse `robusto`, +0,2013 R líquido); `momentum v10` fura o teto
+  de stop do `paper_v1` em 37,3 % das decisões (C5 `REJECT`) e foi **aposentada no mesmo dia** pelo
+  T3.56. A irmã que decide em barras de 1 h de verdade (`mean_reversion_h1_v1`, código pronto, 35
+  testes) segue **bloqueada por contexto** até o mesmo commit `d21a11d` subir o teto — o que já
+  aconteceu; falta ativar e replayar;
+- **T3.56 (roster 16 → 9):** pelo veredito medido de cada versão (Everton, 2026-09-09 11:50 BRT,
+  "as que estão dando ruim pode matar"), sete versões foram aposentadas pela via auditada —
+  `volume_anomaly v2`, `momentum v2`, `momentum v4`, `momentum v6` (sucessora `momentum v8`),
+  `momentum v10`, `session_orb v1`, `trendline_breakout v1` — todas negativas em toda coorte que
+  tinham. `momentum v3` (a linha `paper`) foi **poupada por um portão que o brief não previu**: o
+  script recusa aposentar a linha paper enquanto ela tiver acompanhamento aberto (5–6 *shadow slots*
+  em voo, e ela continua ativa abrindo novos). Roster final: `mean_reversion v1/v2/v3/v6/v7/v8/v10` +
+  `momentum v3` (paper) + `momentum v8` — nove versões, nenhuma nova ativada.
+
 Cada experimento significativo (uma hipótese testada sobre uma estratégia, um conjunto de parâmetros, um mercado ou período) ganha seu próprio arquivo `EXP-NNNN-<slug>.md` nesta mesma pasta, numerado sequencialmente a partir de `EXP-0001`.
 
 ## Registro de IDs (decisão conjunta SHADOW, 2026-09-05)
@@ -232,6 +258,11 @@ Cada experimento significativo (uma hipótese testada sobre uma estratégia, um 
 | `EXP-0017` | [[EXP-0017-sweep-reclaim\|comprar a perda falsa de um suporte]] (`sweep_reclaim v1`, **família nova**; stop estrutural, porta de custo por `risk_pct_min`) | T3.45 (contrato) / T3.45b (implementação) | **pré-checagem passou em 2026-09-08** (57 eventos, 17 dias distintos); módulo implementado (commit `a9bacc6`); **nenhuma coorte ativa, replay pendente** |
 | `EXP-0018` | [[EXP-0018-stop-largo\|stop largo: dividir o pedágio pela largura do stop]] (seis braços — `momentum v7`/`v8`, `mean_reversion v4`/`v5`/`v6`/`v7` — variantes de **parâmetro**) | T3.47 | **aberto e avaliado em 2026-09-08**; replay retrospectivo nos seis, seis coortes `prospective` abertas 22:29–22:38Z; **inconclusivo nos seis** (nenhum IC exclui zero); `momentum v7` e `mean_reversion v4`/`v5` **aposentadas** 23:34:42–23:34:59Z |
 | `EXP-0019` | [[EXP-0019-piso-atr\|o piso de ATR%: comprar população de volta e pagar o pedágio com o stop]] (`mean_reversion v8`, mais a irmã por identidade `v1` — variante de **parâmetro**) | T3.47b | **aberto e avaliado em 2026-09-08**; replay retrospectivo, coorte `prospective` da `v8` aberta 23:37:33Z; **inconclusivo pelo limiar editorial (sinal `negativo` no corpo do EXP)** — os quatro dias que só existem com o piso baixo são os quatro negativos |
+
+| ID | Experimento | Origem | Estado |
+|---|---|---|---|
+| `EXP-0020` | [[EXP-0020-regime-gate\|o regime da hora como porteiro]] (`mean_reversion v9` de `v6` só em `SIDEWAYS`, `momentum v9` de `v8` só em `BTC_BULL` — portão por `eligibility_policy`, não por parâmetro) | KB-0079 (T3.53) → brief T3.52 | **implementado em 2026-09-09** (migração `0017`, commit `d21a11d`); **nenhum braço derivado, ativado ou replayado** — `status: implementado, replay pendente` |
+| `EXP-0021` | [[EXP-0021-timeframe\|o eixo de timeframe: ATR de referência em 1 h em vez de 15 m]] (`mean_reversion v10`/`momentum v10` — variantes de **parâmetro**; `mean_reversion_h1_v1` — módulo novo, bloqueado por contexto) | T3.54 | **aberto e avaliado em 2026-09-09**; `mean_reversion v10` **robusto** (54 decisões, 16 dias, +0,2013 R líq.) e viva no roster do T3.56; `momentum v10` `REJECT`/`sem_vantagem_na_base` e **aposentada** no mesmo dia (T3.56); `mean_reversion_h1_v1` código pronto, contexto destravado no mesmo commit que fechou o EXP-0020, replay ainda não rodado |
 
 A reserva está consolidada nos três lugares que a decisão exige: aqui, em `docs/plans/SHADOW-LAB.md` (item 11) e em `docs/plans/M2.md` (T2.8).
 
@@ -292,6 +323,8 @@ Todos os números vêm de `agent_signals` / `signal_outcomes` reais, com o SQL c
 | [[EXP-0017-sweep-reclaim]] | `sweep_reclaim` v1 — **família nova**; varredura de pivô de mínima com recuperação na mesma barra, stop = mínima varrida | 2026-09-08 | `2026-09-08` (**pré-checagem**, sem replay) | **inconclusivo (população, não edge)** — 57 eventos em 31 d × 4 mercados, 17 dias distintos, cobertura 99,5 %; nenhuma regra de morte disparou; módulo implementado (commit `a9bacc6`), **replay pendente** |
 | [[EXP-0018-stop-largo]] | `momentum` v7/v8, `mean_reversion` v4/v5/v6/v7 — seis variantes de **parâmetro** (stop e escada multiplicados por 1,5 ou 2×) | 2026-09-08 | `2026-09-08` (**replay** retrospectivo pareado com cada pai) | **inconclusivo nos seis** — pedágio cai pelo fator pedido (÷1,48 a ÷2,08) nos seis, mas **nenhum IC exclui zero**; só 12 % da economia sobrevive na melhor população julgável (`momentum v8`); `momentum v7` e `mean_reversion v4`/`v5` **descartadas e aposentadas** |
 | [[EXP-0019-piso-atr]] | `mean_reversion` v8 (mais a irmã por identidade `v1`) — variante de **parâmetro** (`atr_pct_min` 0,008 → 0,006 + stop ×1,5) | 2026-09-08 | `2026-09-08` (**replay** retrospectivo, coorte `prospective` da v8 aberta 23:37:33Z) | **inconclusivo (sinal `negativo` no corpo do EXP)** — 33/37 avaliáveis (< 100), 11 dias (< 30); quatro contrastes pré-registrados negativos; o piso escondia dias ruins, não decisões boas; mantida em pesquisa pela mensurabilidade |
+| [[EXP-0020-regime-gate]] | `mean_reversion` v9 (de v6, portão `SIDEWAYS`) + `momentum` v9 (de v8, portão `BTC_BULL`) — portão de elegibilidade por `eligibility_policy`, não variante de parâmetro | 2026-09-09 | — (nenhuma corrida ainda) | **implementado, replay pendente** — migração `0017` em produção (commit `d21a11d`); nenhum braço derivado/ativado/replayado |
+| [[EXP-0021-timeframe]] | `mean_reversion` v10 (de v6) + `momentum` v10 (de v8) — variantes de **parâmetro** (`atr_timeframe` 15m → 1h, `atr_bars` 97 → 24); `mean_reversion_h1_v1` — módulo novo (decide em barras de 1 h) | 2026-09-09 | `2026-09-09` (replay 31 d × 4 mercados, coortes `replay:71c76d86…` e `replay:6eff77c0…`) | **inconclusivo pelo limiar editorial** — `mean_reversion v10`: 54 avaliáveis (< 100), 16 dias (< 30), estresse **robusto**, líquida +0,2013 R, viva no roster T3.56; `momentum v10`: 252 avaliáveis, 29 dias (< 30), estresse `sem_vantagem_na_base`, líquida −0,0357 R, **aposentada** no mesmo dia (T3.56); pedágio cai 2,21× no ATR% incondicional mas só ÷1,40/÷1,04 nas decisões (o piso de ATR% já seleciona a cauda) |
 
 ### O que a próxima extração tem de fazer (achados da revisão da Astra, 2026-09-06)
 

@@ -3,17 +3,17 @@ tags: ["estrategia", "catalogo", "momentum"]
 strategy: momentum
 version: v2
 purpose: research_only
-status: active
+status: deprecated
 code_ref: "hunter_core.strategies.momentum_v1@sha256:ab2e039825c9334da5b81666791c0a782f25bb35a3cb9529391bdb238ebaa40c"
 params_hash: 40e1688e6b5f6385674cb47a81e542b215b320eb5643a1375f6401f5c41ac2f3
 activated_at: "2026-09-08T04:33:56.865371+00:00"
-deprecated_at: ""
+deprecated_at: "2026-09-09T14:56:27.659818+00:00"
 derived_from: "[[momentum-v1]]"
 cohorts: ["prospective", "replay:31bb3a12-090d-43ee-998b-630b2645bb46", "replay:7598d6c4-c8b6-430e-974e-3a5118d3a288", "replay:f8d8279c-1fba-42ae-95ef-202042f96c60"]
 exp: ["[[EXP-0001-momentum-v1]]"]
-updated: 2026-09-08
+updated: 2026-09-09
 ---
-# momentum v2 (research_only, active)
+# momentum v2 (research_only, deprecated)
 
 <!-- generated:start -->
 ## Parâmetros
@@ -76,3 +76,8 @@ não iniciada — ver `docs/plans/REPLICATION.md` quando existir (T3.19).
 
 ## Notas
 
+**Aposentada pela via auditada em 2026-09-09T14:56:27Z (T3.56)**, autorização de Everton
+2026-09-09 11:50 BRT ("as que estão dando ruim pode matar"). Veredito medido (`as_of`
+2026-09-09T14:52Z): negativa nas duas coortes — prospectiva −0,2167 R (n=471), replay −0,2247 R
+(n=248). Sem sucessora declarada: a única `momentum` que fica viva pelo mérito é a `v8`. Ver
+`.claude/state/notes-T3.56.md` §5.2 e [[momentum]].

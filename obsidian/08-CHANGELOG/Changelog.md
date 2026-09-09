@@ -1,6 +1,6 @@
 ---
 tags: [changelog, historico]
-updated: 2026-09-08
+updated: 2026-09-09
 status: vivo
 owner: sexta-feira
 ---
@@ -8,6 +8,58 @@ owner: sexta-feira
 # Changelog
 
 Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado por dia, mais novo primeiro. Todo o histórico até agora é do Milestone 0 (fundação) — ver `docs/plans/M0.md` para as ondas T01–T13 e [[Resolved Bugs]] para o detalhe das correções de segurança/qualidade citadas aqui.
+
+## 2026-09-09
+
+*(18 commits, `7254a46..d21a11d`, das 21:57 de 2026-09-08 (Brasília) à madrugada/manhã de
+2026-09-09, agrupados por tema. O eixo da noite é o **livro de ofertas deixando de mentir sobre a
+própria cobertura** (T3.46d–h: 183/200 recusas para 2–9/200); o eixo da madrugada é **conhecimento e
+pesquisa em paralelo** — o mapa de onde cada versão ganha e perde (T3.53), o eixo de timeframe
+(T3.54) e o par literatura + medição própria de candlestick (T3.55) —; e o eixo da manhã é o **portão
+de regime entrando em produção** (T3.52) e a **limpeza do roster** (T3.56, tratada em detalhe na
+entrada de hoje mais abaixo, fora deste bloco de commits porque aconteceu depois dele).)*
+
+**Livro de ofertas (T3.46b, T3.46d–h)**
+
+- `09b8fa6` — T3.46b: nenhum detector do Radar fica mudo sem motivo — roster cobre os 12 AnomalyType (SOCIAL_SPIKE/WHALE_ACTIVITY desarmados por feature_not_implemented), detectors_disarmed passa a publicar o veredito que evaluate_detector já produzia (silence_reasons: insufficient_history, feature after_cut…), faixa do Radar traduz cada motivo; diagnóstico com corte causal em SQL (prevê VOLUME_SPIKE 23 e MOMENTUM_SHIFT 18 exatos): TRADE_VELOCITY/OI esperam a baseline horária (previsão: 09/09 15:00–16:00 BRT), ORDERBOOK_IMBALANCE recusado em 97,7% por corrida de carimbo do livro (+2…+400 ms à frente de covered_until — brief T3.46d, market-worker); os "17 mercados a mais" são os 17 spot, sem Radar por desenho; revisão APPROVE
+- `2b7cef9` — T3.46d: o corte de cobertura acompanha a prova — covered_until sobe até o ts do último evento já aceito (observe_proof), nunca além do relógio nem durante rompimento; fecha a corrida que deixava o livro de ofertas 339 ms (p50) a 1,47 s (p99) à frente do corte e recusava 89–98% das leituras de orderbook_imbalance/spread (Liquidity/Order Flow do score vazios); 17 testes (4 novos, corrida reproduzida); revisão código + quant: APPROVE com nits (reset da prova na reconexão interna e cláusula de prova pendente aplicados; teste de integração via consume_once = T3.46e)
+- `1ea2d2f` — T3.46e: a fiação consume_once → observe_proof tem teste de integração (covered_until publicado no Redis sobe exatamente até book.ts, nunca received_at; com backlog na fila a prova não levanta o carimbo); 19 passed no arquivo
+- `7e64df1` — T3.46d §4: prova pós-deploy medida — after_cut do livro segue em 174–198/200 após os coletores em 2b7cef9; resíduo = ordem de leitura do scanner (brief T3.46f)
+- `188ff72` — T3.46f: o scanner lê os snapshots primeiro e o corte depois (refreshed_cut via HMGET de 2 campos; advanced_to só avança e só na mesma sessão; livro ainda à frente continua recusado) — medido na VPS: remove ~46 dos ~89 pontos de after_cut; os ~43 restantes são do coletor (fase do carimbo + min entre 4 shards) → brief T3.46g; revisão código + quant APPROVE; briefs T3.52–T3.55
+- `1906977` — T3.46f §4: prova pós-deploy — after_cut do livro cai de 183/200 para 42–77/200 no scanner 188ff72; o livro passa a alimentar a baseline (under_construction 13 → 106–135); resíduo = coletor (T3.46g)
+- `f1475c4` — T3.46g: o carimbo de cobertura é escrito no mesmo pipeline do flush, logo após a gravação do livro/ticker (mesmo stamp(), segundo ponto de chamada; housekeeping vira fallback), e o scanner lê o until do shard dono do símbolo — mapeamento e until no mesmo HGETALL, 0 ou 2+ donos vivos caem no mínimo agregado (reserva da revisão), piso nunca anda para trás; suítes completas dos dois serviços verdes; revisão código + quant APPROVE com ressalvas (teste de fiação real via run_market, corrida de escritor documentada, fixture do shard atrasado) → T3.46h
+- `b16da9b` — T3.46g §3: prova pós-deploy — after_cut do livro de ofertas cai para 2–9/200 (meta < 10 atingida; era 183 antes da T3.46d); o livro alimenta a baseline em ~195/200 mercados
+- `212d1c0` — T3.46h + T3.52c: fiação real de coverage_stamps provada via _run_spot_process (só o adapter é fake); guarda monotônica no Lua de coverage_publish (HMGET do registro anterior do shard, mantém o epoch maior — a corrida de escritor concorrente não anda para trás); fixture do shard atrasado separa dono de mínimo agregado; teste de health.migration_present (coluna obrigatória ausente → False; head → True; parametrizado sobre _REQUIRED_COLUMNS)
+
+**Conhecimento — mapa de regime (T3.53)**
+
+- `6f62ae4` — T3.53: mapa de onde cada versão ganha e perde — 6 187 desfechos, 2 248 células, 86 julgáveis, 5 selos de Holm = 3 hipóteses, 2 morrem no R bruto; sobra uma real: momentum v8 perde 0,36 R/decisão quando a hora anterior do BTC é SIDEWAYS (líquido e bruto, p 0,003); HIGH_VOLATILITY é a única célula de regime positiva (n 282, +0,10 R); UNKNOWN é artefato de aquecimento do classificador; hora, dia da semana e mercado = ruído/sem calendário (prospectivas têm 1–3 dias); KB-0079 rascunho; insumo pré-registrado para a T3.52
+
+**Conhecimento — candlestick (T3.55)**
+
+- `f2791b2` — T3.55a: KB-0080 (rascunho) — evidência publicada sobre candlestick: em ações diárias o "sim" de Caginalp & Laurent 1998 não sobrevive ao bootstrap de Marshall/Young/Rose 2006; cripto diário (Ho 2021, Kuna 2025) nada nas grandes; a única evidência intradiária com correção de snooping (Moser & Brauneis 2026: harami, hikkake, enforcado) não pôde ser aberta; prior para perps 15 m/1 h = poucos bps, abaixo do pedágio; 11 famílias/18 rótulos com definições determinísticas para a T3.55b
+- `fd33ade` — T3.55b: candlestick no nosso dado — 14 padrões clássicos (+18 da KB-0080) em 16 mercados × 31 d, 15 m e 1 h, retorno futuro 1/4/16 barras vs base pareada por (mercado, hora): nenhum sobrevive a Holm em 72/144 testes; o nulo é medido (efeito plantado de 0,92 ATR acende com p 0,0001); único sobrevivente conjunto (marubozu de baixa 1 h) prevê ALTA e, operado invertido, rende +0,005 R = pedágio; geometria mata os de uma barra (enforcado: stop 0,13 ATR → custo 2,78 R por operação); condicionais a linha e regime também não sobrevivem; portão C1–C8 = FAIL, sem contrato; KB-0081 rascunho; 81 testes no protótipo
+
+**Estratégias — eixo de timeframe (T3.54)**
+
+- `72125c3` — T3.54 (pesquisa): eixo de timeframe — ATR%(1h)/ATR%(15m) = 2,21× medido em 16 mercados (não 3–4×); nas decisões o ganho de pedágio encolhe para 1,4× (momentum) e 1,04× (mean_reversion) porque o piso de ATR já selecionava a cauda; mean_reversion v10 (ATR em 1 h, 24 barras) sai de 15 para 54 decisões, +0,20 R/op, +10,87 R, estresse "robusto" — primeira coorte julgável da família; momentum v10 fura o teto de stop de 3% em 37% das decisões; v9s mudas (SHADOW_CONTEXT_MINUTES 1560 < 5820) aposentadas; abertura de NY e virada do dia negativas, 09:00 BRT positiva com n ≤ 16 (hipótese); EXP-0021; brief T3.54b (contexto por versão)
+- `eaebf8f` — T3.54 (código): mean_reversion_h1_v1 — irmã plana da mean_reversion que decide em barras de 1 h (tendência em 4 h, ATR em 1 h, horizonte 16 barras; só três parâmetros diferem da mãe, corpo byte-idêntico; fecho isolado, digests vivos intactos; fragmento local de timeframe aceita 4h sem tocar schema.py; 35 testes incl. barra de 1 h e de 4 h em formação); registry (+2, aprovado pelo orquestrador), constraints, linha do catálogo com o aviso de contexto ≥ 5820 min (ressalva da revisão); só roda após a T3.54b
+
+**Regime gate + contexto por versão (T3.52/T3.54b)**
+
+- `d21a11d` — T3.52/b/c + T3.54b/c: o regime horário vira porteiro de elegibilidade por versão (migração 0017 strategy_versions.eligibility_policy jsonb, congelada após ativação com a lista da 0012 + a nova; regra da hora anterior fechada, UNKNOWN/ausente/stale > 2 h = inelegível com motivo; escopo BTC para todo mercado; replay usa a mesma regra do histórico; envelope grava rótulo + linha; --policy regime=btc:LABEL recusa rótulo/regra desconhecidos e par (scope, classifier) sem série; worker recusa subir sem a 0017) e a janela de contexto passa a ser da versão, não do processo (required_context_minutes por estratégia, piso SHADOW_CONTEXT_MINUTES 1560, teto SHADOW_CONTEXT_MAX_MINUTES 6000, ativação recusa acima do teto com os números, reativação idempotente intocada; replay e ledger gravam context_minutes; versões de 15 m/5 m continuam em 1560, a irmã de 1 h recebe 5 880). Revisões: arquiteto (0017) e código (2×) aprovadas com ressalvas fechadas; 11 arquivos de integração do strategy-worker verdes
+
+**Lab**
+
+- `964b75b` — T3.50b: fecha a revisão do renderer — shlex.quote em todo argumento que vai ao shell remoto (CRITICAL), geometry() recusa envelope cujo pattern_params difere dos defaults congelados (HIGH), expectancy em Decimal puro, colisão de nome de PNG falha alto; 9 testes
+
+**Obsidian**
+
+- `7254a46` — Obsidian: EXP-0016 (trendline: manter em pesquisa, repique), EXP-0017 (sweep + reclaim), EXP-0018 (stop largo: 12% sobra), EXP-0019 (piso de ATR: inconclusivo pela régua, negativo no corpo) arquivados; páginas de estratégia trendline_breakout e sweep_reclaim + 10 páginas de versão (momentum v6–v8, mean_reversion v2–v8) reconciliadas dos EXPs; Changelog 7b0edeb..402c56b por tema; diário: fechamento do dia (incidente da API 20:40–20:45, VPS em 7e9d59c, roster 16 → 14, decisões abertas); lint da base: 223 notas, 0 achados
+
+**Estratégias — roster (T3.56)**
+
+- `240e08d` — T3.56: roster 16 → 9 — aposentadas pelo script auditado volume_anomaly v2, momentum v2/v4/v6 (sucessora v8)/v10, session_orb v1, trendline_breakout v1 (veredito medido no changelog, linhagem preservada pela T3.47c); volume_anomaly v1 e momentum v1 já estavam aposentadas pelo --supersede de 08/09; momentum v3 (linha paper) recusada pelo portão de slots-sombra abertos (5–6 em voo) — fica ativa até a janela limpa ou a mudança da linha paper; 46 acompanhamentos abertos seguem avançando
 
 ## 2026-09-08
 

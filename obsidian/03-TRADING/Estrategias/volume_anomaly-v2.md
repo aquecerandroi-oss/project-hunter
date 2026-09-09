@@ -3,17 +3,17 @@ tags: ["estrategia", "catalogo", "volume_anomaly"]
 strategy: volume_anomaly
 version: v2
 purpose: research_only
-status: active
+status: deprecated
 code_ref: "hunter_core.strategies.volume_anomaly_v1@sha256:9b8c14ab3390646ac9adb26fbbb90e160a800f1c70f128d873a49ffd1dd19f22"
 params_hash: fa5dce78173b2b9688578f7c96a5f37544eb504aa7b2227262ad296c32f63bb9
 activated_at: "2026-09-08T04:32:42.178866+00:00"
-deprecated_at: ""
+deprecated_at: "2026-09-09T14:55:29.448514+00:00"
 derived_from: "[[volume_anomaly-v1]]"
 cohorts: ["prospective", "replay:bac27c12-7e50-4dfa-9eee-35fccc4012d7", "replay:cd0d5584-b53b-4bb0-bdb0-ec39d960d549"]
 exp: ["[[EXP-0002-volume-anomaly-v1]]"]
-updated: 2026-09-08
+updated: 2026-09-09
 ---
-# volume_anomaly v2 (research_only, active)
+# volume_anomaly v2 (research_only, deprecated)
 
 <!-- generated:start -->
 ## Parâmetros
@@ -70,3 +70,7 @@ não iniciada — ver `docs/plans/REPLICATION.md` quando existir (T3.19).
 
 ## Notas
 
+**Aposentada pela via auditada em 2026-09-09T14:55:29Z (T3.56)**, sem sucessora — a família
+`volume_anomaly` sai inteira do roster (`v1` já estava `deprecated` desde 2026-09-08T04:32Z).
+Veredito medido (`as_of` 2026-09-09T14:52Z): negativa nas duas coortes — prospectiva −0,2948 R
+(n=1190), replay −0,5954 R (n=339). Ver `.claude/state/notes-T3.56.md` §5.1.
