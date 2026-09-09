@@ -22,11 +22,20 @@ requires ``covered_until >= end`` where ``end`` is the cut itself: evaluating at
 ``now`` would make every window unprovable forever. Moving the cut back to the
 proven instant is the only honest fix — ``MarketContext`` is defined as "one
 market, as it was observable at ``as_of``".
+
+**When the cut is read matters as much as what it says (T3.46f).** The proof
+only certifies what the collector had already accepted when it was stamped, so
+a cut read *before* a snapshot cannot possibly cover that snapshot: a book that
+updates 5-10x/s has almost always moved on. :func:`refreshed_cut` is therefore
+called after the hot state is in hand (``hunter_scanner_worker.context``), and
+the later of the two published values wins. Nothing is anticipated by this:
+both values are proofs the collector published about the past, and a snapshot
+still ahead of the cut is refused exactly as before.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
 
@@ -48,6 +57,15 @@ under the key's own 60 s TTL, so the verdict does not depend on Redis expiry."""
 _SESSION_SINCE = "session_since"
 _COVERED_UNTIL = "covered_until"
 _SYMBOL_PREFIX = "sym:"
+
+CUT_FIELDS = (_SESSION_SINCE, _COVERED_UNTIL)
+"""The only two fields :func:`read_cut` asks for.
+
+Not ``HGETALL``: the re-read runs once per market per cycle, and the hash also
+carries one ``sym:*`` field per subscribed symbol (200 of them today). Those
+change when the universe changes, not between two reads a microsecond apart, so
+the per-market read takes the interval and leaves the roster to the per-cycle
+:func:`read_coverage`."""
 
 
 def _text(value: Any) -> str:
@@ -99,6 +117,69 @@ class TapeCoverage:
             return (None, None)
         return (max(since, self.session_since), self.covered_until)
 
+    def advanced_to(
+        self, session_since: datetime | None, covered_until: datetime | None
+    ) -> TapeCoverage:
+        """This coverage with a **later** cut, when the re-read proves one (T3.46f).
+
+        The re-read happens after the snapshots were taken, so its
+        ``covered_until`` is a proof that already covers them. Three refusals,
+        all of which keep the value this object was built with:
+
+        - nothing published, or nothing to advance to;
+        - a **different session**: the collector reconnected between the two
+          reads, so this object's ``session_since`` (and the ``sym:*`` roster
+          built from it) no longer describes the interval the new cut belongs
+          to. Lifting the cut while keeping the old start would claim coverage
+          across the gap the reconnection is;
+        - a cut that did not move forward. ``covered_until`` is monotonic within
+          a session, so this only happens on a stale replica read; taking the
+          later of the two is the same rule either way.
+        """
+        if not self.live or session_since is None or covered_until is None:
+            return self
+        if session_since != self.session_since:
+            return self
+        if self.covered_until is not None and covered_until <= self.covered_until:
+            return self
+        return replace(self, covered_until=covered_until)
+
+
+async def read_cut(
+    redis: redis_asyncio.Redis,
+    exchange: str,
+    *,
+    market_type: MarketType = MarketType.PERPETUAL,
+) -> tuple[datetime | None, datetime | None]:
+    """``(session_since, covered_until)`` as published *right now* (T3.46f).
+
+    The cheap half of :func:`read_coverage`, for the one caller that needs the
+    proof re-read after the data it certifies instead of before it.
+    """
+    key = keys.tape_coverage(exchange, market_type)
+    values: list[Any] = list(await cast(Any, redis).hmget(key, list(CUT_FIELDS)) or ())
+    if len(values) < len(CUT_FIELDS):
+        return (None, None)
+    return (_instant(values[0]), _instant(values[1]))
+
+
+async def refreshed_cut(
+    redis: redis_asyncio.Redis,
+    coverage: TapeCoverage,
+    *,
+    exchange: str,
+    market_type: MarketType = MarketType.PERPETUAL,
+) -> TapeCoverage:
+    """``coverage`` with the cut re-read from Redis, later value wins (T3.46f).
+
+    A coverage that proves nothing is returned untouched: there is no cut to
+    advance, and a market with no roster entry stays uncovered either way.
+    """
+    if not coverage.live:
+        return coverage
+    session_since, covered_until = await read_cut(redis, exchange, market_type=market_type)
+    return coverage.advanced_to(session_since, covered_until)
+
 
 async def read_coverage(
     redis: redis_asyncio.Redis,
@@ -136,4 +217,11 @@ async def read_coverage(
     )
 
 
-__all__ = ["MAX_PROOF_AGE_S", "TapeCoverage", "read_coverage"]
+__all__ = [
+    "CUT_FIELDS",
+    "MAX_PROOF_AGE_S",
+    "TapeCoverage",
+    "read_coverage",
+    "read_cut",
+    "refreshed_cut",
+]

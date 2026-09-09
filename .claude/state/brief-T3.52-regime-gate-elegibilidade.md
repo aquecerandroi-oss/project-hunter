@@ -1,0 +1,20 @@
+# Brief T3.52 — o regime horário vira insumo da decisão sem tocar no código congelado: uma regra de elegibilidade por versão, avaliada pelo strategy-worker a partir de `market_regimes`, gravada em cada decisão; mean_reversion só em LATERAL, momentum só em ALTA (Everton, 2026-09-08 23:20: "ele já aprendeu; faz sentido ele consultar")
+
+**Owner:** quant-engineer (owns strategy-worker + strategies). **Second opinion before implementing:** database-architect on where the policy lives (one paragraph in the notes is enough if no migration is needed). **Reviewer afterwards:** code-reviewer (code + non-anticipation). **Do not commit.** **Operational rule: never a background shell; foreground commands with a timeout <= 5 min (`timeout 290` per replay slice); testcontainers one file per pytest invocation (max 2); the tree is shared — never `git stash`/`checkout --`/`restore`/`reset`/`clean`/`commit -a` (git-guard blocks); do not touch `.env*`; VPS writes ONLY through audited scripts (`derive_variant.py --dry-run` first, `activate … --purpose research_only`, replay CLI) and only AFTER the code is deployed by the orchestrator; reads in `repeatable read read only`; never stop or recreate containers.** Base: `main` at HEAD. Scope: `services/strategy-worker/hunter_strategy_worker/**` (context building / eligibility), `infra/scripts/derive_variant.py` (+ `activation_db`) if the policy is a per-version field, `docs/ACTIVATION.md` §policy, `docs/PIPELINE.md` §4b (one paragraph), tests, `.claude/state/notes-T3.52.md`, `exp-drafts/EXP-0020-regime-gate.md`. **Never edit `packages/core/hunter_core/strategies/{aggregate,base,canonical,envelope,indicators,numeric,schema}.py`** — the closure of every live version; `StrategyContext` already carries `eligible`/`eligibility_reason`, which is the hook.
+
+## Design constraints (state them back in the notes before coding)
+- The gate is **outside the closure**: a per-version eligibility policy (e.g. `{"regime": {"scope": "BTC", "allow": ["SIDEWAYS"]}}`) stored on the version row (a new nullable JSON column via migration 0017, or a reserved key in `parameters` only if the strategy schema tolerates unknown keys — decide with the architect; the digest must stay `a970c9d9…`/`ab2e0398…`).
+- Evaluated by the worker when building `StrategyContext`: the regime row is the hourly row whose `[start_time, end_time)` contains `source_bar_close` **and whose `end_time <= source_bar_close`?** No — the hourly row for the hour of the decision is written at the hour's END; using it inside the hour is anticipation. Rule: use the latest hourly row with `end_time <= source_bar_close` (the previous closed hour). Write this argument explicitly and test it (a decision at 15:30 sees the 14:00–15:00 row, never 15:00–16:00).
+- `UNKNOWN`/missing regime → not eligible, reason `regime_gate:unknown` (honest; 27 % of the 31 d is unknown today — report how much of the replay this removes).
+- Recorded in the envelope/decision: `eligibility_reason = regime_gate:<label>` on refusal; on acceptance the regime label and the row id used, so the ledger can decompose by regime.
+- Replay must apply the same rule from the historical `market_regimes` (backfilled 31 d) — and never from the current row.
+
+## Deliver
+1. Design paragraph + the architect's opinion; migration if needed (with the usual round trip tests).
+2. Worker: the gate, tests (fixture regimes table; the 15:30 case; unknown; scope BTC applied to every market).
+3. `derive_variant.py --policy regime=BTC:SIDEWAYS` (or equivalent) with `--dry-run`, refusing unknown labels.
+4. After deploy (orchestrator): derive `mean_reversion v9` from v6 (allow SIDEWAYS) and `momentum v9` from v8 (allow BTC_BULL); activate research_only; replay 31 d × 4 markets; paired evaluation vs parent (subset by construction → `t342-blocos/blocos.py`); stress pass if K1 survives; verdicts; ≤ 10 lines for Everton.
+5. EXP-0020 draft.
+
+## Prove
+Tests per file, `ruff`/`pyright`/`check_file_size.py`; receipts verbatim; report in Portuguese, extended format; `.claude/state/notes-T3.52.md`. Times in Brasília (UTC−3) with UTC as detail.

@@ -170,6 +170,16 @@ estados que outro já moveu. `features.updated` continua sendo publicado — par
   e, até a T3.46d, o livro (`orderbook_imbalance_20`, `spread_pct`) saía `after_cut` em 89 % das
   leituras por essa mesma prova ter sido carimbada por um relógio descoordenado do que realmente
   gravava o livro (§1 item 10);
+- **a ordem de leitura faz parte do corte (T3.46f):** uma prova só certifica o que o coletor já
+  tinha aceitado quando ela foi carimbada, então um corte lido **antes** de um snapshot não pode
+  cobri-lo — o livro de uma perpétua anda 5-10×/s e o corte lido no início do ciclo já estava
+  centenas de milissegundos atrás quando o mercado de índice 150 era avaliado (94,6 % de `after_cut`
+  medidos em 08/09/2026, 23:41 BRT). O scanner passa a ler o hot state primeiro e **reler**
+  `covered_until` depois (`hunter_scanner_worker.coverage.refreshed_cut`), ficando com o valor mais
+  recente dos dois — dentro da mesma sessão, nunca para trás, nunca uma tolerância: um snapshot
+  ainda à frente do corte relido continua recusado por `decode_book` exatamente como antes, e
+  `source_bar_close` é alinhado ao minuto, então um corte que anda milissegundos dentro do mesmo
+  minuto não faz nenhuma estratégia enxergar a barra seguinte;
 - **o scanner nunca chama REST:** falta de histórico vira `market.backfill.requested`, que o
   `market-worker` — dono do rate limit e da tabela de gaps — atende.
 

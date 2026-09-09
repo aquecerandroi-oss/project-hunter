@@ -10,11 +10,15 @@ answer and not a bug to be worked around.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from hunter_core.redis import keys
-from hunter_scanner_worker.context import MAX_CUT_LAG_S, evaluation_cut
-from hunter_scanner_worker.coverage import TapeCoverage, read_coverage
+from hunter_indicators.features import read_hot_state
+from hunter_indicators.features.hotstate import AFTER_CUT, decode_book
+from hunter_scanner_worker.context import MAX_CUT_LAG_S, build_market_context, evaluation_cut
+from hunter_scanner_worker.coverage import TapeCoverage, read_coverage, refreshed_cut
+
+from .builders import EXCHANGE, SYMBOL, FakeHotState, book_payload
 
 SESSION = datetime(2026, 9, 6, 12, 0, 0, tzinfo=UTC)
 
@@ -113,3 +117,110 @@ def test_freshness_is_measured_against_the_proof_not_the_read() -> None:
 
     assert coverage.fresh(now=_at(5)) is True
     assert coverage.fresh(now=_at(600)) is False
+
+
+# --- T3.46f: the read order ------------------------------------------------
+
+
+class TickingCollector(FakeHotState):
+    """A collector that keeps working while the scanner reads it.
+
+    Every read costs one tick, and one tick is what the two loops of the
+    market-worker do together: the coalescer writes a newer book snapshot and
+    the housekeeping loop stamps a ``covered_until`` that covers it. Five lines,
+    and they are the whole race -- a perpetual's book updates 5-10x/s, so a cut
+    read *before* the snapshot has always been left behind by the time the two
+    are compared.
+    """
+
+    def __init__(self, *, start: datetime, step_ms: int = 250) -> None:
+        super().__init__()
+        self.moment = start
+        self.step = timedelta(milliseconds=step_ms)
+        self.load(candles=[], as_of=start, trades=0, with_book=False, with_deriv=False)
+        self.tick()
+
+    def tick(self) -> None:
+        self.moment += self.step
+        self.strings[keys.book(EXCHANGE, SYMBOL)] = book_payload(ts=self.moment)
+        self.publish_coverage(session_since=SESSION, covered_until=self.moment)
+
+    async def get(self, key: str) -> bytes | None:
+        value = await super().get(key)
+        self.tick()  # the collector does not stop while the scanner decodes
+        return value
+
+    async def hgetall(self, key: str) -> dict[str, str]:
+        fields = await super().hgetall(key)
+        self.tick()
+        return fields
+
+    async def hmget(self, key: str, fields: list[str]) -> list[str | None]:
+        values = await super().hmget(key, fields)
+        self.tick()
+        return values
+
+
+async def test_a_cut_read_before_the_book_is_already_behind_it() -> None:
+    """The old order, kept as the oracle of what is being fixed."""
+    redis = TickingCollector(start=SESSION)
+
+    coverage = await read_coverage(cast("Any", redis), EXCHANGE)
+    as_of, _, _ = evaluation_cut(coverage, SYMBOL, now=redis.moment)
+    raw = await read_hot_state(cast("Any", redis), EXCHANGE, SYMBOL)
+
+    # Exactly what production did until T3.46f: the cut proves an instant the
+    # book had already left, and the whole snapshot is refused.
+    assert decode_book(raw.book, as_of).reason == AFTER_CUT
+
+
+async def test_the_cut_read_after_the_snapshots_covers_them() -> None:
+    redis = TickingCollector(start=SESSION)
+    coverage = await read_coverage(cast("Any", redis), EXCHANGE)
+
+    build = await build_market_context(
+        cast("Any", redis), exchange=EXCHANGE, symbol=SYMBOL, coverage=coverage, now=SESSION
+    )
+
+    book = build.context.book
+    assert book.reason is None, "the book the collector had already written was refused"
+    assert book.value is not None
+    # The proof re-read after the snapshot covers it, so the book is usable and
+    # the cut is still a published proof -- never the clock, never a tolerance.
+    assert book.ts is not None and book.ts <= build.context.as_of
+    assert build.covered is True
+
+
+def test_the_re_read_never_lifts_the_cut_across_a_reconnection() -> None:
+    coverage = TapeCoverage(
+        session_since=SESSION, covered_until=_at(10), symbols={"BTCUSDT": SESSION}
+    )
+
+    # The collector reconnected between the two reads: this object's roster and
+    # session start describe an interval that ended, and lifting its cut onto
+    # the new session would claim coverage straight across the gap.
+    advanced = coverage.advanced_to(_at(30), _at(40))
+
+    assert advanced == coverage
+
+
+def test_the_re_read_never_moves_the_cut_backwards() -> None:
+    coverage = TapeCoverage(
+        session_since=SESSION, covered_until=_at(10), symbols={"BTCUSDT": SESSION}
+    )
+
+    assert coverage.advanced_to(SESSION, _at(5)) == coverage
+    assert coverage.advanced_to(SESSION, None) == coverage
+    assert coverage.advanced_to(None, _at(20)) == coverage
+    assert coverage.advanced_to(SESSION, _at(20)).covered_until == _at(20)
+
+
+async def test_an_absent_proof_stays_absent_after_the_re_read() -> None:
+    redis = TickingCollector(start=SESSION)
+    redis.hashes.pop(keys.tape_coverage(EXCHANGE), None)
+
+    coverage = await refreshed_cut(cast("Any", redis), TapeCoverage(), exchange=EXCHANGE)
+
+    # Nothing published is not "a cut of zero": a market nobody proved stays
+    # uncovered, and its trade windows keep saying ``insufficient_coverage``.
+    assert coverage.live is False

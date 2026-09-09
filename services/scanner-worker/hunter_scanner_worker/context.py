@@ -15,6 +15,21 @@ The evaluation therefore happens at ``as_of = covered_until`` whenever a live
 proof exists -- "the market as it was observable at ``as_of``" is what the type
 means -- and falls back to the clock when there is none, in which case the trade
 features come out ``insufficient_coverage``, which is the honest answer.
+
+**Read order: snapshots first, cut second (T3.46f).** The cut used to be the one
+:func:`~hunter_scanner_worker.runners.evaluation_loop` read once at the top of
+the cycle, and every market's book was then read *after* it -- hundreds of
+milliseconds later for the markets at the end of the cycle. A perpetual's book
+advances 5-10x/s, so ``book.ts > as_of`` was the normal case and ``decode_book``
+refused it as ``after_cut`` (89% of readings measured on 2026-09-08, and with it
+``orderbook_imbalance_20`` and ``spread_pct``). Reading the hot state first and
+re-reading the proof afterwards inverts the race: the cut is then a proof
+published *after* the bytes it is compared with were read, so a snapshot can
+only be ahead of it by a genuine race in the collector, which stays refused.
+Nothing is anticipated -- the cut is still a published proof about data the
+collector had already accepted, never the clock, never a tolerance -- and
+``source_bar_close`` is minute-aligned, so a cut that moves by milliseconds
+inside the same minute cannot make a strategy see the next bar.
 """
 
 from __future__ import annotations
@@ -44,6 +59,7 @@ from hunter_indicators.features.hotstate import (
     decode_deriv,
     decode_trades,
 )
+from hunter_scanner_worker.coverage import refreshed_cut
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -82,7 +98,12 @@ class ContextBuild:
     """Whether the trade tape carries a live coverage proof for this market."""
 
     lagged_s: float
-    """How far the cut is behind the clock, in seconds."""
+    """How far the cut is behind the clock, in seconds.
+
+    Clamped at zero: since T3.46f the cut is re-read *after* the snapshots, so
+    it can be a few milliseconds ahead of the ``now`` the cycle started with --
+    ahead of the caller's clock, never ahead of the wall clock, because it is
+    still a proof the collector published about data it had already accepted."""
 
 
 def evaluation_cut(
@@ -123,10 +144,19 @@ async def build_market_context(
     decode of the candle and trade rows that did not change since the last tick.
     Without one -- a caller with no market state, and every cold path -- the
     loaders decode all of them, which is the same answer for more CPU.
+
+    Two round trips since T3.46f, not one: the hot-state pipeline, then the
+    two-field re-read of the coverage proof. Measured cost on the deployment,
+    0.21 ms per round trip (``redis-cli --latency``, 2026-09-08), so ~40 ms over
+    a 200-market cycle -- paid to stop refusing ~90% of the book snapshots.
     """
     moment = now or utcnow()
-    as_of, covers_from, covered_until = evaluation_cut(coverage, symbol, now=moment)
     raw = await read_hot_state(redis, exchange, symbol, market_type=market_type)
+    # T3.46f: after the snapshots, never before them. ``coverage`` is the
+    # per-cycle read (it carries the ``sym:*`` roster); this re-read only moves
+    # ``covered_until`` forward, and only within the same session.
+    coverage = await refreshed_cut(redis, coverage, exchange=exchange, market_type=market_type)
+    as_of, covers_from, covered_until = evaluation_cut(coverage, symbol, now=moment)
     candles = (
         decode_candles(raw.candles, raw.candles_limit)
         if cache is None

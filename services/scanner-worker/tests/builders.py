@@ -214,6 +214,11 @@ class FakeHotState:
     async def hgetall(self, key: str) -> dict[str, str]:
         return dict(self.hashes.get(key, {}))
 
+    async def hmget(self, key: str, fields: list[str]) -> list[str | None]:
+        """T3.46f: the two-field re-read of the coverage proof."""
+        stored = self.hashes.get(key, {})
+        return [stored.get(field) for field in fields]
+
     async def set(self, key: str, value: bytes, ex: int | None = None) -> bool:
         del ex
         self.strings[key] = value
