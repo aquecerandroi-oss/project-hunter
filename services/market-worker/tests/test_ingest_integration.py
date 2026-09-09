@@ -5,7 +5,7 @@ published stream event."""
 from __future__ import annotations
 
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -541,6 +541,136 @@ async def test_backlogged_adapter_queue_holds_covered_until_back(redis_client: A
         await asyncio.sleep(0.4)
         resumed = await redis_client.hgetall(coverage_key)
         assert resumed[b"covered_until"] > frozen[b"covered_until"]
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+
+async def test_consume_once_wires_observe_proof_to_lift_covered_until_to_event_ts(
+    redis_client: Any,
+) -> None:
+    """T3.46e (T3.46d review nit 1): the four T3.46d cases in
+    ``test_tape_coverage.py`` call ``tracker.observe_proof`` directly and
+    never exercise the only real wiring point --
+    ``streaming.py``'s ``consume()`` calling ``coverage.observe_proof(source_ts)``
+    for every event ``handle_event`` just accepted. Push one real
+    ``NormalizedOrderBook`` through the real ``consume_once``/``handle_event``
+    path with ``ts`` set to the exchange clock at push time and a
+    ``received_at`` backdated 30s (so a wiring bug that fed the wrong field
+    to ``observe_proof`` would fail loudly) and confirm the published
+    ``covered_until`` reaches exactly that ``ts`` -- never ``received_at``."""
+    from hunter_core.domain.types import utcnow
+    from hunter_market_worker.coverage import CoverageTracker
+    from hunter_market_worker.heartbeat import HeartbeatState
+    from hunter_market_worker.streaming import consume_once
+
+    adapter = FakeAdapter()
+    universe = MonitoredUniverse()
+    universe.set(["BTCUSDT"])
+    universe.changed.clear()
+    state = HeartbeatState()
+    coverage = CoverageTracker(adapter.code)
+    coverage_key = keys.tape_coverage(adapter.code)
+
+    task = asyncio.create_task(
+        consume_once(
+            adapter,
+            list(universe.symbols),
+            redis_client,
+            PRODUCER,
+            PersistQueues(),
+            TickCoalescer(),
+            AcceptedEvents(),
+            TradeMemory(),
+            universe,
+            state,
+            None,
+            None,
+            coverage,
+        )
+    )
+    try:
+        await adapter.stream_started.wait()
+        book_ts = utcnow()  # the exchange clock, ahead of any margin-based stamp
+        book = builders.order_book("BTCUSDT").model_copy(
+            update={"ts": book_ts, "received_at": book_ts - timedelta(seconds=30)}
+        )
+        await adapter.push_event(book)
+
+        covered_until: datetime | None = None
+        async with asyncio.timeout(5):
+            while covered_until != book_ts:
+                await asyncio.sleep(0.05)
+                raw = await redis_client.hgetall(coverage_key)
+                if b"covered_until" in raw and raw[b"covered_until"]:
+                    covered_until = datetime.fromisoformat(raw[b"covered_until"].decode())
+
+        assert covered_until == book_ts  # never the 30s-stale received_at
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+
+async def test_consume_once_observe_proof_does_not_lift_covered_until_during_backlog(
+    redis_client: Any,
+) -> None:
+    """Negative twin of the wiring test above: ``consume()`` calls
+    ``coverage.observe_proof(source_ts)`` for every accepted event
+    regardless of connection health, but ``stamp``'s T3.46d floor only ever
+    applies once every other break signal already says ``caught_up``
+    (module docstring, T2.5-adapter). A fresh, ahead-of-margin proof
+    recorded while the adapter's own queue reports a backlog must not raise
+    the published ``covered_until`` past the value already frozen by the
+    backlog."""
+    from hunter_core.domain.types import utcnow
+    from hunter_market_worker.coverage import CoverageTracker
+    from hunter_market_worker.heartbeat import HeartbeatState
+    from hunter_market_worker.streaming import consume_once
+
+    adapter = FakeAdapter()
+    universe = MonitoredUniverse()
+    universe.set(["BTCUSDT"])
+    universe.changed.clear()
+    state = HeartbeatState()
+    coverage = CoverageTracker(adapter.code)
+    coverage_key = keys.tape_coverage(adapter.code)
+
+    task = asyncio.create_task(
+        consume_once(
+            adapter,
+            list(universe.symbols),
+            redis_client,
+            PRODUCER,
+            PersistQueues(),
+            TickCoalescer(),
+            AcceptedEvents(),
+            TradeMemory(),
+            universe,
+            state,
+            None,
+            None,
+            coverage,
+        )
+    )
+    try:
+        await adapter.stream_started.wait()
+        await asyncio.sleep(0.9)  # a genuine, non-frozen interval established first
+        healthy = await redis_client.hgetall(coverage_key)
+        assert healthy[b"covered_until"] != healthy[b"session_since"]
+
+        adapter.set_queue_progress(enqueued=5, delivered=3)  # 2 items still in transit
+        book_ts = utcnow() + timedelta(milliseconds=200)  # ahead of margin; would lift it if used
+        book = builders.order_book("BTCUSDT").model_copy(update={"ts": book_ts})
+        await adapter.push_event(book)  # accepted -> observe_proof(book_ts) still runs
+        await asyncio.sleep(0.4)
+
+        frozen = await redis_client.hgetall(coverage_key)
+        # The proof alone did not lift covered_until while broken.
+        assert frozen[b"covered_until"] == healthy[b"covered_until"]
+        frozen_covered_until = datetime.fromisoformat(frozen[b"covered_until"].decode())
+        assert frozen_covered_until < book_ts  # proof observed, never published while broken
     finally:
         task.cancel()
         with pytest.raises(asyncio.CancelledError):

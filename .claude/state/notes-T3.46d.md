@@ -354,3 +354,126 @@ repetir a mesma medição — o mesmo princípio da T3.46b (§1.5, "não repetir
    (industrial: ambas > 85 %), a diferença provável é o método (agregado do Postgres por minuto vs
    amostragem direta do Redis em alta frequência) e não um sinal de que o problema mudou de
    magnitude.
+
+---
+
+## T3.46e
+
+**Owner:** exchange-integration-specialist · **Data:** 2026-09-08 (Brasília) · nit 1 da revisão da
+T3.46d: nenhum teste até aqui exercitava o único ponto de fiação real
+(`streaming.py::consume()` chamando `coverage.observe_proof(source_ts)`) — os 4 testes novos da
+T3.46d chamam `tracker.observe_proof` direto, pulando `consume_once`/`handle_event` por completo.
+
+**STATUS: DONE.**
+
+### O que foi acrescentado
+
+Dois testes de integração em `services/market-worker/tests/test_ingest_integration.py` (arquivo já
+existente, já com `redis_client` via testcontainer e já com os dois testes T2.5-adapter no mesmo
+padrão — nenhum arquivo novo de testcontainer):
+
+1. `test_consume_once_wires_observe_proof_to_lift_covered_until_to_event_ts` — positivo. Sobe
+   `consume_once` de verdade com `FakeAdapter` + `CoverageTracker`, empurra um `NormalizedOrderBook`
+   real com `ts = utcnow()` (relógio da exchange) e `received_at` propositalmente atrasado 30 s
+   (`model_copy`), e espera (polling, timeout 5 s) o `covered_until` publicado no Redis real chegar a
+   **exatamente** `book.ts` — nunca a `received_at`. Prova o `ts` certo é o que atravessa
+   `handle_event` → `observe_proof` → `stamp` → `coverage_publish`, não só a lógica isolada do
+   `CoverageTracker` (que os 4 testes da T3.46d já cobriam).
+2. `test_consume_once_observe_proof_does_not_lift_covered_until_during_backlog` — o gêmeo negativo.
+   Mesma fiação, mas com `adapter.set_queue_progress(enqueued=5, delivered=3)` (backlog, 2 itens em
+   trânsito) antes de empurrar um book com `ts` à frente da margem (`utcnow() + 200ms`). `observe_proof`
+   roda do mesmo jeito (é chamado para todo evento aceito, independente da saúde da conexão), mas o
+   piso do T3.46d só entra quando `stamp()` já diz `caught_up` — com backlog, `caught_up = False`, e o
+   `covered_until` publicado permanece congelado no valor de antes do backlog, comprovadamente menor
+   que o `book_ts` observado.
+
+Não toquei `coverage.py` (permanece 350/350, nada mudou nele nesta tarefa) nem `streaming.py`
+(o ponto de fiação já existente é exatamente o que os dois testes exercitam).
+
+### Comandos e saída real
+
+```
+uv run pytest services/market-worker/tests/test_ingest_integration.py -q -p no:randomly -k "coverage or observe_proof"
+```
+```
+..                                                                       [100%]
+2 passed, 17 deselected in 10.92s
+```
+
+```
+uv run pytest services/market-worker/tests/test_ingest_integration.py -q -p no:randomly
+```
+```
+...................                                                      [100%]
+19 passed in 11.69s
+```
+(17 pré-existentes + 2 novos — nenhuma regressão. Único arquivo de testcontainer tocado, rodado uma
+vez após o ajuste de formatação e mais uma vez depois, para confirmar — ambas as vezes 19/19.)
+
+```
+uv run ruff check services/market-worker/tests/test_ingest_integration.py
+```
+```
+All checks passed!
+```
+
+```
+uv run ruff format --check services/market-worker/tests/test_ingest_integration.py
+```
+```
+1 file already formatted
+```
+(precisou de um ajuste manual — `ruff format` quis quebrar a linha do `assert frozen[...] == healthy[...]  # comentário`; movi o comentário para a linha de cima e reformatei; reconferido depois.)
+
+```
+uv run pyright services/market-worker/tests/test_ingest_integration.py
+```
+```
+0 errors, 0 warnings, 0 informations
+```
+
+```
+uv run python infra/scripts/check_file_size.py
+```
+```
+scanned 580 files; 0 over budget, 0 grandfathered
+```
+
+```
+uv run pytest services/market-worker/tests -q -p no:randomly -m "not integration"
+```
+```
+........................................................................ [ 61%]
+..............................................                           [100%]
+118 passed, 317 deselected in 6.63s
+```
+
+```
+uv run ruff check services/market-worker
+```
+```
+All checks passed!
+```
+
+### Arquivos
+
+| arquivo | o quê |
+|---|---|
+| `services/market-worker/tests/test_ingest_integration.py` | 2 testes novos (positivo + negativo), 1 linha de import ajustada (`datetime` além de `timedelta`) — nada mais tocado |
+
+Nada commitado. `coverage.py`/`streaming.py` do código de produção não foram tocados.
+
+### Concerns
+
+1. O teste positivo depende de o relógio de parede real não avançar mais de `COVERAGE_SAFETY_S`
+   (0,5 s) entre o `push_event` e o próximo `stamp()` do housekeeping (a cada ~0,1-0,35 s na prática)
+   — mesma suposição de timing que os testes T2.5-adapter já existentes no mesmo arquivo fazem (ex.:
+   `test_internal_reconnect_holds_covered_until_back_without_ending_the_generator` já dorme 0,9 s/0,4 s
+   fixos). Não é um teste novo de timing sensível, é o mesmo padrão já aceito no arquivo; o polling com
+   timeout de 5 s (em vez de um sleep fixo) dá folga extra em vez de apostar num sleep exato.
+2. Não criei um teste de "sessão quebrada" (reconexão) como segunda metade do par negativo — usei
+   backlog porque é o cenário que o `FakeAdapter` já sabe simular sem exigir uma terceira via de
+   estado (`set_queue_progress`, já usado no mesmo arquivo). Cobre a mesma cláusula do piso
+   (`caught_up` precisa ser `True`), mas não é literalmente "sessão quebrada" — se o revisor quiser
+   especificamente o caminho `ws_state="reconnecting"`, é um teste adicional de poucas linhas seguindo
+   `test_internal_reconnect_holds_covered_until_back_without_ending_the_generator` como molde.
