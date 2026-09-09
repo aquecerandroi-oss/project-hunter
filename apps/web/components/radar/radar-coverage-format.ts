@@ -103,6 +103,27 @@ const DISARM_REASON_LABEL: Record<string, string> = {
   single_exchange_until_m1b: "só há uma exchange conectada até o M1b (comparar entre exchanges ainda não é possível)",
   funding_unavailable: "funding indisponível para este mercado",
   feature_not_implemented: "a feature que este detector precisa ainda não foi implementada",
+  deriv_history_unavailable: "sem histórico de open interest para este mercado",
+  // T3.46b: as três classes que o scanner passou a declarar por avaliação, e
+  // não mais só por capacidade do deploy.
+  baselines_under_construction: "a baseline deste mercado e hora ainda não passa o portão de maturidade",
+  baseline_absent: "nenhuma baseline foi escrita ainda para este mercado e hora",
+  baseline_version_mismatch: "a baseline existente é de outra versão da feature",
+  baseline_without_dispersion: "a baseline não tem dispersão (MAD zero): não há escala para medir o desvio",
+  data_degraded: "o dado deste minuto está degradado e o pipeline não o usa para anomalia",
+  feature_after_cut: "o livro de ofertas chega depois do corte de cobertura da avaliação",
+  feature_missing_input: "falta a entrada que esta feature precisa",
+  feature_warmup: "a feature ainda está aquecendo (histórico insuficiente)",
+  feature_insufficient_coverage: "a cobertura da janela não pôde ser provada",
+  feature_insufficient_sample: "menos observações do que a definição exige",
+  feature_gap: "há lacuna de dados na janela desta feature",
+  feature_corrupt_input: "a entrada chegou corrompida e foi recusada inteira",
+  feature_zero_divisor: "o divisor desta feature é zero: o valor é indefinido",
+  feature_stale_input: "uma entrada está mais velha que o orçamento de frescor",
+  feature_misaligned: "o corte pedido não cai numa fronteira de barra",
+  feature_not_in_vector: "esta feature não existe no vetor deste build",
+  no_data: "nada chegou deste mercado neste minuto",
+  undeclared: "o detector não declarou motivo (isto é defeito, não estado)",
 };
 
 export function disarmReasonLabel(reason: string): string {

@@ -1,0 +1,96 @@
+BEGIN
+Border style is 2.
+== 1. feature_snapshots existe? ==
++--------+------------------------+------------------------+
+| linhas |        primeira        |         ultima         |
++--------+------------------------+------------------------+
+| 646535 | 2026-09-06 18:17:00+00 | 2026-09-09 00:25:00+00 |
++--------+------------------------+------------------------+
+(1 row)
+
+== 2. particoes de feature_snapshots ==
++---------------------------+--------------------------------------------------------------------------+
+|          relname          |                                  bound                                   |
++---------------------------+--------------------------------------------------------------------------+
+| feature_snapshots_2026_08 | FOR VALUES FROM ('2026-08-01 00:00:00+00') TO ('2026-09-01 00:00:00+00') |
+| feature_snapshots_2026_09 | FOR VALUES FROM ('2026-09-01 00:00:00+00') TO ('2026-10-01 00:00:00+00') |
+| feature_snapshots_2026_10 | FOR VALUES FROM ('2026-10-01 00:00:00+00') TO ('2026-11-01 00:00:00+00') |
+| feature_snapshots_2026_11 | FOR VALUES FROM ('2026-11-01 00:00:00+00') TO ('2026-12-01 00:00:00+00') |
+| feature_snapshots_2026_12 | FOR VALUES FROM ('2026-12-01 00:00:00+00') TO ('2027-01-01 00:00:00+00') |
++---------------------------+--------------------------------------------------------------------------+
+(5 rows)
+
+== 3. baselines dos tres mudos: por que nao passam o gate (sample_size/distinct_days) ==
++-------------------------+-------+---------+------------+-------+-------+-------+-------+-------+-------+------------------------+
+|         feature         |   n   | dias_ok | amostra_ok | ambos | s_min | s_avg | s_max | d_min | d_max |     ultima_janela      |
++-------------------------+-------+---------+------------+-------+-------+-------+-------+-------+-------+------------------------+
+| open_interest_change_1h | 10545 |     783 |       2307 |   783 |     1 |    90 |   180 |     1 |     3 | 2026-09-09 00:00:00+00 |
+| orderbook_imbalance_20  |  8480 |     244 |          0 |     0 |     1 |    20 |    63 |     1 |     3 | 2026-09-09 00:00:00+00 |
+| relative_volume_5m      | 13213 |     649 |       4817 |   649 |     1 |    86 |   420 |     1 |     7 | 2026-09-09 00:00:00+00 |
+| trade_velocity_1m       |  9407 |     314 |        539 |   314 |     1 |    77 |   161 |     1 |     3 | 2026-09-09 00:00:00+00 |
++-------------------------+-------+---------+------------+-------+-------+-------+-------+-------+-------+------------------------+
+(4 rows)
+
+== 4. amostras vivas por feature (baseline_observations existe?) ==
++-----------------+
+|   table_name    |
++-----------------+
+| fx_observations |
++-----------------+
+(1 row)
+
+== 5. as anomalias que EXISTEM: qual severidade e desvio no momento de gravar ==
++------+---+-----------+---------+----------------+
+| type | n | dev_medio | dev_max | sev_meta_media |
++------+---+-----------+---------+----------------+
++------+---+-----------+---------+----------------+
+(0 rows)
+
+== 6. mercados com baseline utilizavel por feature (gate v2) ==
++-------------------------+------------------------------------------+
+|         feature         | mercados_com_pelo_menos_um_bucket_valido |
++-------------------------+------------------------------------------+
+| return_5m               |                                      164 |
+| return_1m               |                                      164 |
+| volume_acceleration     |                                      163 |
+| return_15m              |                                      163 |
+| return_1h               |                                      162 |
+| open_interest_change_1h |                                      157 |
+| trade_velocity_1m       |                                      157 |
+| open_interest_change_4h |                                      157 |
+| sell_pressure_5m        |                                      138 |
+| buy_pressure_5m         |                                      138 |
+| relative_volume_5m      |                                      108 |
+| atr_14_pct              |                                       20 |
+| breakout_strength_20    |                                       20 |
+| momentum_15m            |                                       20 |
+| momentum_acceleration   |                                       20 |
+| relative_volume_15m     |                                       20 |
+| return_4h               |                                       20 |
+| relative_volume_1h      |                                       18 |
+| distance_from_24h_low   |                                       18 |
+| distance_from_24h_high  |                                       18 |
++-------------------------+------------------------------------------+
+(20 rows)
+
+== 7. markets: 217 monitorados x 200 do heartbeat ==
++--------------------------------------+-------------+--------+--------------+-------+
+|             exchange_id              | market_type | status | is_monitored | count |
++--------------------------------------+-------------+--------+--------------+-------+
+| 01a073bb-996c-76eb-b777-7b41fe1a924b | perpetual   | active | f            |   328 |
+| 01a073bb-996c-76eb-b777-7b41fe1a924b | perpetual   | active | t            |   200 |
+| 01a073bb-996c-76eb-b777-7b41fe1a924b | spot        | active | f            |   470 |
+| 01a073bb-996c-76eb-b777-7b41fe1a924b | spot        | active | t            |    17 |
++--------------------------------------+-------------+--------+--------------+-------+
+(4 rows)
+
+== 7b. is_monitored por exchange com nome ==
++---------+-------------+-------------+-------+
+|  code   | market_type | monitorados | total |
++---------+-------------+-------------+-------+
+| binance | perpetual   |         200 |   528 |
+| binance | spot        |          17 |   487 |
++---------+-------------+-------------+-------+
+(2 rows)
+
+COMMIT

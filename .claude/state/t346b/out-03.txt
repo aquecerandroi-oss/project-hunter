@@ -1,0 +1,64 @@
+BEGIN
+Border style is 2.
+== 0. corte ==
++----------------------------+----------------------------+
+|        read_at_utc         |        read_at_brt         |
++----------------------------+----------------------------+
+| 2026-09-09 00:26:53.484148 | 2026-09-08 21:26:53.484148 |
++----------------------------+----------------------------+
+(1 row)
+
+== 1. qualidade por feature na ultima hora (feature_snapshots -> values) ==
++-------------------------+--------+-------+----------+-------------+-------------+
+|         feature         | linhas |  ok   | degraded | unavailable | mercados_ok |
++-------------------------+--------+-------+----------+-------------+-------------+
+| atr_14_pct              |  12002 |  7959 |        0 |        4043 |         194 |
+| buy_pressure_5m         |  12002 | 10520 |        0 |        1482 |         199 |
+| funding_rate            |  12002 |   261 |        0 |       11741 |         108 |
+| momentum_15m            |  12002 |  7959 |        0 |        4043 |         194 |
+| momentum_acceleration   |  12002 |  7959 |        0 |        4043 |         194 |
+| open_interest_change_1h |  12002 | 11851 |        0 |         151 |         200 |
+| orderbook_imbalance_20  |  12002 |   281 |        0 |       11721 |         100 |
+| relative_volume_5m      |  12002 | 11850 |        0 |         152 |         198 |
+| spread_pct              |  12002 |   281 |        0 |       11721 |         100 |
+| trade_velocity_1m       |  12002 | 11758 |        0 |         244 |         201 |
++-------------------------+--------+-------+----------+-------------+-------------+
+(10 rows)
+
+== 2. motivo da indisponibilidade, por feature (ultima hora) ==
++-------------------------+-----------------------+-------+
+|         feature         |        motivo         |   n   |
++-------------------------+-----------------------+-------+
+| open_interest_change_1h | warmup                |    81 |
+| open_interest_change_1h | missing_input         |    70 |
+| orderbook_imbalance_20  | after_cut             | 11717 |
+| orderbook_imbalance_20  | missing_input         |     4 |
+| spread_pct              | after_cut             | 11717 |
+| spread_pct              | missing_input         |     4 |
+| trade_velocity_1m       | insufficient_coverage |   243 |
+| trade_velocity_1m       | gap                   |     1 |
++-------------------------+-----------------------+-------+
+(8 rows)
+
+== 3. distribuicao dos valores das tres features mudas (ultima hora, quality=ok) ==
++-------------------------+-------+-----------+-----------+-----------+-----------+
+|         feature         |   n   |   v_min   |   v_p50   |   v_p99   |   v_max   |
++-------------------------+-------+-----------+-----------+-----------+-----------+
+| open_interest_change_1h | 11851 | -0.031988 | -0.000044 |  0.036700 |  0.147043 |
+| orderbook_imbalance_20  |   281 | -0.699641 |  0.049919 |  0.655149 |  0.789156 |
+| trade_velocity_1m       | 11758 |  0.000000 |  0.516667 | 16.031000 | 32.716667 |
++-------------------------+-------+-----------+-----------+-----------+-----------+
+(3 rows)
+
+== 4. anomalias: chaves do metadata ==
++----------------------+-------+-------+
+|         type         |   k   | count |
++----------------------+-------+-------+
+| VOLUME_SPIKE         | state |   620 |
+| PRICE_ACCELERATION   | state |   353 |
+| VOLATILITY_EXPANSION | state |    51 |
+| MOMENTUM_SHIFT       | state |   356 |
++----------------------+-------+-------+
+(4 rows)
+
+COMMIT

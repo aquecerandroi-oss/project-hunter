@@ -28,6 +28,7 @@ from hunter_core.logging import get_logger
 from hunter_indicators.anomalies import (
     DEFAULT_DETECTORS,
     AnomalyAction,
+    AnomalyEvaluation,
     AnomalyState,
     AnomalyTransition,
     advance_all,
@@ -119,6 +120,12 @@ class Evaluation:
     history: HistoryVerdict | None = None
     history_mark: HistoryMark | None = None
     anomaly_states: tuple[AnomalyState, ...] = ()
+    anomaly_evaluations: tuple[AnomalyEvaluation, ...] = ()
+    """Every detector's verdict at this cut, fired or not.
+
+    Carried out of the pure step so the caller can say *why* a detector produced
+    nothing (``silence_reasons``) without evaluating anything a second time. A
+    second diagnosis would be free to disagree with the decision it explains."""
     scored: bool = False
     """Whether the score throttle let this observation reach the scorer.
 
@@ -201,6 +208,7 @@ def evaluate_market(inputs: EvaluationInputs) -> Evaluation:
             transitions=transitions,
             stage=stage,
             anomaly_states=anomaly_states,
+            anomaly_evaluations=evaluations,
             scored=False,
         )
 
@@ -254,6 +262,7 @@ def evaluate_market(inputs: EvaluationInputs) -> Evaluation:
         history=history,
         history_mark=mark,
         anomaly_states=anomaly_states,
+        anomaly_evaluations=evaluations,
         scored=True,
     )
 

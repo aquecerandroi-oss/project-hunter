@@ -14,7 +14,11 @@ Two jobs that only look unrelated:
    indistinguishable from a calm market, while ``enabled=False`` +
    ``disabled_reason`` travels into the evaluation
    (``evaluate_detector`` -> ``detector_disabled`` + detail), into the heartbeat
-   and into the metric.
+   and into the metric. Since T3.46b the heartbeat reads that reason off the
+   evaluation itself (``hunter_indicators.anomalies.silence.silence_reasons``),
+   not off this roster: capability is only *one* of the ways a detector goes
+   quiet, and the projection that knew only about this one used to publish
+   silence for the other two.
 
 **Capability is not warm-up** (Astra, T2.5b design review, must-fix 6). "There is
 no history at all" is a capability the deployment lacks and this module declares;
@@ -81,7 +85,6 @@ __all__ = [
     "DerivHistory",
     "deriv_loop",
     "detector_roster",
-    "disarmed_reasons",
     "history_entry",
 ]
 
@@ -185,15 +188,6 @@ def detector_roster(*, has_oi_history: bool, has_funding: bool) -> tuple[Detecto
     )
     _ROSTERS[key] = roster
     return roster
-
-
-def disarmed_reasons(roster: Sequence[DetectorDefinition]) -> tuple[tuple[str, str], ...]:
-    """``(type, reason)`` for every detector this market cannot evaluate."""
-    return tuple(
-        (definition.type.value, definition.disabled_reason or "unknown")
-        for definition in roster
-        if not definition.enabled and definition.disabled_reason
-    )
 
 
 async def deriv_loop(

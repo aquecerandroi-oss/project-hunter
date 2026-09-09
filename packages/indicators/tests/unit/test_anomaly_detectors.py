@@ -111,8 +111,8 @@ def vector(values: dict[str, FeatureValue]) -> FeatureVector:
 
 
 class TestRoster:
-    def test_the_ten_v1_detectors_are_registered(self) -> None:
-        types = {detector.type for detector in default_detectors()}
+    def test_the_eight_armed_v1_detectors_are_registered(self) -> None:
+        types = {detector.type for detector in default_detectors() if detector.enabled}
         assert types == {
             AnomalyType.VOLUME_SPIKE,
             AnomalyType.PRICE_ACCELERATION,
@@ -122,9 +122,13 @@ class TestRoster:
             AnomalyType.TRADE_VELOCITY_SPIKE,
             AnomalyType.OPEN_INTEREST_SPIKE,
             AnomalyType.FUNDING_ANOMALY,
-            AnomalyType.LIQUIDATION_CLUSTER,
-            AnomalyType.CROSS_EXCHANGE_DIVERGENCE,
         }
+
+    def test_every_type_the_enum_declares_has_a_detector(self) -> None:
+        """T3.46b: a type absent from the roster produces no evaluation, so it
+        can never declare itself in ``detectors_disarmed`` — it just looks mute.
+        """
+        assert {detector.type for detector in default_detectors()} == set(AnomalyType)
 
     def test_cross_exchange_divergence_is_registered_and_disarmed(self) -> None:
         detector = detector_for(AnomalyType.CROSS_EXCHANGE_DIVERGENCE)

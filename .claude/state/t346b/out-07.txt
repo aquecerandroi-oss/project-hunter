@@ -1,0 +1,47 @@
+BEGIN
+Border style is 2.
+== corte ==
++----------------------------+
+|            utc             |
++----------------------------+
+| 2026-09-09 00:57:04.383312 |
++----------------------------+
+(1 row)
+
+== buckets que passam o portao, por feature e hora, com available_at ==
++-------------------------+-------------+----------+-------------------------------+------------------+----------------+
+|         feature         | hour_of_day | mercados |         publicado_em          | admissivel_agora | e_a_hora_atual |
++-------------------------+-------------+----------+-------------------------------+------------------+----------------+
+| open_interest_change_1h |          19 |      157 | 2026-09-08 20:01:52.040927+00 | t                | f              |
+| open_interest_change_1h |          20 |      157 | 2026-09-08 21:02:02.337908+00 | t                | f              |
+| open_interest_change_1h |          21 |      157 | 2026-09-08 22:01:58.528465+00 | t                | f              |
+| open_interest_change_1h |          22 |      156 | 2026-09-08 23:02:30.553108+00 | t                | f              |
+| open_interest_change_1h |          23 |      156 | 2026-09-09 00:00:35.907083+00 | t                | f              |
+| trade_velocity_1m       |          18 |      157 | 2026-09-08 19:01:34.797773+00 | t                | f              |
+| trade_velocity_1m       |          19 |      157 | 2026-09-08 20:01:52.040927+00 | t                | f              |
++-------------------------+-------------+----------+-------------------------------+------------------+----------------+
+(7 rows)
+
+== quantos buckets utilizaveis existem para a hora corrente, por feature ==
++------------------------+--------------------+
+|        feature         | buckets_hora_atual |
++------------------------+--------------------+
+| atr_14_pct             |                 23 |
+| breakout_strength_20   |                 23 |
+| return_4h              |                 23 |
+| return_5m              |                 23 |
+| volume_acceleration    |                 23 |
+| momentum_15m           |                 23 |
+| momentum_acceleration  |                 23 |
+| relative_volume_15m    |                 23 |
+| relative_volume_5m     |                 23 |
+| return_15m             |                 23 |
+| return_1h              |                 23 |
+| return_1m              |                 23 |
+| distance_from_24h_high |                 20 |
+| distance_from_24h_low  |                 20 |
+| relative_volume_1h     |                 20 |
++------------------------+--------------------+
+(15 rows)
+
+COMMIT

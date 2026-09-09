@@ -23,6 +23,7 @@ from uuid import UUID
 from hunter_core.domain.enums import AnomalyStatus, RegimeScope
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
+from hunter_indicators.anomalies import silence_reasons
 from hunter_indicators.baselines import BaselineCut
 from hunter_indicators.features import Quality
 from hunter_indicators.regime import RegimeDecision
@@ -32,7 +33,7 @@ from hunter_scanner_worker.baselines import BaselineCache
 from hunter_scanner_worker.checkpoint import Checkpoint
 from hunter_scanner_worker.context import build_market_context
 from hunter_scanner_worker.coverage import TapeCoverage
-from hunter_scanner_worker.deriv import DerivHistory, detector_roster, disarmed_reasons
+from hunter_scanner_worker.deriv import DerivHistory, detector_roster
 from hunter_scanner_worker.evaluate import Evaluation, EvaluationInputs, evaluate_market
 from hunter_scanner_worker.metrics import scanner_markets_evaluated_total
 from hunter_scanner_worker.persist import WriteBatch
@@ -144,7 +145,6 @@ class Scanner:
             has_oi_history=bool(observations),
             has_funding=snapshot is not None and snapshot.funding_rate is not None,
         )
-        market.disarmed = disarmed_reasons(detectors)
         cut = BaselineCut(as_of=context.as_of, observation_ts=context.as_of)
         score_due = market.due_for_score(moment, self.config.score_throttle_s)
         evaluation = evaluate_market(
@@ -170,6 +170,15 @@ class Scanner:
                 last_history=market.checkpoint.history,
                 score_due=score_due,
             )
+        )
+        # Read *after* the evaluation, from the verdicts it actually produced:
+        # a capability the deployment lacks (``detector_roster``), an input the
+        # cut refuses and a baseline still under construction are three
+        # different sentences, and before T3.46b only the first one was said
+        # out loud. Detectors holding an open anomaly are producing and are
+        # excluded, so the heartbeat never labels a live episode as mute.
+        market.disarmed = silence_reasons(
+            evaluation.anomaly_evaluations, states=evaluation.anomaly_states
         )
         self._collect(market, evaluation, batch, now=moment)
         market.last_vector = evaluation.vector

@@ -14,13 +14,20 @@ this task. What v2 *does* own — the MAD normalisation — is read from it, and
 evaluation records both versions: the severity depends on the pair, not on the
 detector alone (Astra, T2.3 design review, item 3).
 
-**Two detectors are registered and disarmed**, with the reason machine-readable:
+**Four detectors are registered and disarmed**, with the reason machine-readable:
 
 - ``CROSS_EXCHANGE_DIVERGENCE`` needs a second exchange (M1b);
 - ``LIQUIDATION_CLUSTER`` needs a ``liquidation_pressure_1h`` feature that the
   T2.2 set does not contain — liquidations are not in ``MarketContext`` v1
   (``.claude/state/notes-T2.2.md`` §11). Registering it silently pointed at some
-  other feature would be a fake detector; leaving it out would hide the gap.
+  other feature would be a fake detector; leaving it out would hide the gap;
+- ``SOCIAL_SPIKE`` and ``WHALE_ACTIVITY`` are the phase 2/3 types of
+  ``docs/PIPELINE.md`` §3 (T3.46b). They used to be *absent* from this roster,
+  which is worse than disarmed: an absent detector produces no evaluation, so it
+  cannot appear in ``detectors_disarmed`` and the Radar coverage strip renders
+  it as "silent, no reason" — the exact defect this file argues against. They
+  are registered here pointing at the features their ingestion would have to
+  create, and they can never fire while ``enabled`` is false.
 
 Value choices worth stating, because the joint decision does not fix them: the
 severity floor to fire is 40 (= 3 MADs) and to keep holding 20 (= 2 MADs); the
@@ -201,6 +208,24 @@ _DISARMED: tuple[tuple[AnomalyType, str, DetectorSide, str, str, str], ...] = (
         "The same symbol pricing apart on two exchanges. Registered and "
         "disarmed until a second exchange exists (M1b).",
         "single_exchange_until_m1b",
+    ),
+    (
+        AnomalyType.SOCIAL_SPIKE,
+        "social_mention_velocity",
+        DetectorSide.UP,
+        "mentions_per_minute",
+        "Social chatter about a symbol far above its usual pace. Registered and "
+        "disarmed: phase 2/3 of PIPELINE.md section 3, no ingestion exists.",
+        "feature_not_implemented",
+    ),
+    (
+        AnomalyType.WHALE_ACTIVITY,
+        "whale_net_flow_1h",
+        DetectorSide.BOTH,
+        "usd",
+        "Large wallets moving in one direction. Registered and disarmed: phase "
+        "2/3 of PIPELINE.md section 3, no on-chain ingestion exists.",
+        "feature_not_implemented",
     ),
 )
 

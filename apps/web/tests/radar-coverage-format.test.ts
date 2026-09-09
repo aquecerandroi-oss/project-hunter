@@ -84,6 +84,14 @@ describe("disarmReasonLabel", () => {
   it("falls back to a labeled raw code for an unknown reason -- never hidden", () => {
     expect(disarmReasonLabel("something_new")).toBe("motivo técnico: something_new");
   });
+
+  it("traduz as classes que a T3.46b passou a declarar", () => {
+    // Um detector armado e mudo virou uma frase; se ela aparecer em
+    // snake_case na tela, a entrega não chegou ao operador.
+    expect(disarmReasonLabel("baselines_under_construction")).not.toContain("_");
+    expect(disarmReasonLabel("feature_after_cut")).not.toContain("_");
+    expect(disarmReasonLabel("data_degraded")).not.toContain("_");
+  });
 });
 
 describe("daysBetween", () => {
