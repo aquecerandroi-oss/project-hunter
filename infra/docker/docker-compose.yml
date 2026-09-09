@@ -12,9 +12,17 @@
 
 x-api-env: &api-env
   DATABASE_URL: postgresql+asyncpg://hunter:hunter@postgres:5432/hunter
-  DATABASE_URL_MIGRATIONS: postgresql+asyncpg://hunter:hunter@postgres:5432/hunter
   REDIS_URL: redis://redis:6379/0
   HUNTER_ENV: development
+
+# T3.15d (mirrors infra/vps/docker-compose.prod.yml, same finding —
+# .claude/state/review-T3.15-security.md HIGH 1): DATABASE_URL_MIGRATIONS is
+# the schema owner's DSN. It used to live inside x-api-env above, so every
+# runtime service (api, market-worker and every other worker) inherited it.
+# Split into its own anchor, granted only to `migrate` and the `ops` profile
+# service below.
+x-owner-env: &owner-env
+  DATABASE_URL_MIGRATIONS: postgresql+asyncpg://hunter:hunter@postgres:5432/hunter
 
 services:
   postgres:
@@ -46,8 +54,13 @@ services:
     # hunter-api:${GIT_SHA:-dev} once; migrate/worker just reuse that tag so
     # `docker compose up --build` doesn't build the same image three times.
     image: hunter-api:${GIT_SHA:-dev}
+    # T3.15e (LOW-G): same rationale as market-worker's cap_drop below — a
+    # short-lived container carrying the schema owner's DSN has even less
+    # reason to touch raw sockets/link-layer traffic than a long-running
+    # worker does. See docs/SECURITY.md §5.
+    cap_drop: [NET_RAW, NET_ADMIN]
     environment:
-      <<: *api-env
+      <<: [*api-env, *owner-env]
       # NOT HUNTER_ROLE: "migrate" isn't a valid hunter_core.settings.Role —
       # see infra/docker/entrypoint.sh's comment. HUNTER_COMMAND is the
       # image-only switch entrypoint.sh checks first; HUNTER_ROLE stays at
@@ -61,6 +74,54 @@ services:
       postgres:
         condition: service_healthy
     restart: "no"
+
+  # T3.15d — profile-only shell carrying x-owner-env (DATABASE_URL_MIGRATIONS),
+  # for infra/scripts/activate_strategy_version.py, derive_variant.py, seed.py
+  # and open_paper_wallet.py run from a container instead of directly from the
+  # host (docs/DEPLOYMENT.md §3.4/§8). Same shape as the VPS's `ops`
+  # (infra/vps/docker-compose.prod.yml): `profiles: ["ops"]` keeps it off
+  # every bare `up`; `entrypoint: []` + a no-op `command` mean it is never a
+  # resident process, even if named explicitly (`docker compose up ops`
+  # bypasses the profile gate).
+  #
+  #   docker compose -f infra/docker/docker-compose.yml run --rm ops \
+  #     python infra/scripts/activate_strategy_version.py momentum v1 --paper-line --dry-run --changelog "..."
+  #
+  # T3.15e (LOW): `build:` here, identical to `api`'s below, on purpose —
+  # unlike `migrate` (which only ever runs as part of `up`/`update`, after
+  # that same `up --build` has already tagged `hunter-api:${GIT_SHA:-dev}`),
+  # `ops` is meant to be `run --rm` on its own, any time, including right
+  # after a bare `git pull` that moved `GIT_SHA` without an `up --build` in
+  # between. Without its own `build:`, `docker compose run --rm ops ...`
+  # would find no local image for the new tag and fall back to a registry
+  # `pull` — and this project never pushes `hunter-api` to any registry, so
+  # that pull fails instead of just building the image already on disk.
+  # Compose still reuses one image build across `api`/`migrate`/`ops` when
+  # they run together (same image name, same `up --build`) — this only
+  # matters for the standalone path.
+  ops:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api-workers
+      args:
+        GIT_SHA: ${GIT_SHA:-dev}
+    image: hunter-api:${GIT_SHA:-dev}
+    profiles: ["ops"]
+    entrypoint: []
+    command: ["true"]
+    # T3.15e (LOW-G): same rationale as market-worker's cap_drop above — a
+    # short-lived container carrying the schema owner's DSN has no more
+    # business touching raw sockets/link-layer traffic than a worker does.
+    # docs/SECURITY.md §5.
+    cap_drop: [NET_RAW, NET_ADMIN]
+    environment:
+      <<: [*api-env, *owner-env]
+    env_file:
+      - path: ../../.env
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   api:
     build:

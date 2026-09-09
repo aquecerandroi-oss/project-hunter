@@ -92,12 +92,22 @@ class SubscriptionStatus(StrEnum):
 
 
 class ExchangeStatus(StrEnum):
-    """``exchange_status`` — DATABASE.md §3 (exchanges.status).
+    """``exchange_status`` — DATABASE.md §3 (exchanges.status) and §28.
 
-    INFERRED by T03, confirmed unchanged by T04: no members listed in the doc.
-    Minimal lifecycle — nothing in the docs distinguishes a third state.
+    The venue's lifecycle *for us*, in order: catalogued but not collected yet,
+    collected now, switched off. ``PLANNED`` arrives with
+    ``0016_exchange_status_planned``: a venue that has rows in
+    ``exchanges``/``markets`` and no collector deployed is not ``INACTIVE`` —
+    nobody switched it off — and calling it ``ACTIVE`` made the market-status
+    aggregate count a feed that cannot exist (the topbar's
+    ``2 exchanges · UNAVAILABLE`` with one worker running, T3.44b).
+
+    Declaration order **is** the ``enumsortorder`` the migration installs
+    (``ADD VALUE 'planned' BEFORE 'active'``) and the schema tests compare the
+    two, so a member moved here needs a matching position there.
     """
 
+    PLANNED = "planned"
     ACTIVE = "active"
     INACTIVE = "inactive"
 

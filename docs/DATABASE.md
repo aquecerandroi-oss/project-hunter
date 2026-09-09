@@ -180,7 +180,8 @@ Enums: `org_role` = OWNER, ADMIN, TRADER, ANALYST, VIEWER. `plan_tier` = FREE, P
 
 ```
 exchanges
-  id, code (unique: binance|bybit|okx|coinbase|hyperliquid|kraken), name, status exchange_status,
+  id, code (unique: binance|bybit|okx|coinbase|hyperliquid|kraken), name,
+  status exchange_status (planned|active|inactive; `planned` desde a 0016, §28),
   capabilities JSONB (spot, perpetual, funding, open_interest, liquidations, ws_depth),
   created_at
 
@@ -558,7 +559,8 @@ existência dos papéis): mesma revisão, emendada de novo, pelo mesmo motivo.
   conceito fechado.
 - Enums que a doc tipa mas não enumera foram fixados assim:
   `subscription_status` = `trialing|active|past_due|canceled`;
-  `exchange_status` = `active|inactive`;
+  `exchange_status` = `active|inactive` (a `0016` acrescenta `planned` **antes**
+  de `active`, e o desvio em relação a esta linha está declarado na §28);
   `market_status` = `active|suspended|delisted`;
   `feature_category` = `price|volume|volatility|microstructure|momentum|derivatives|cross`
   (grupos de `PIPELINE.md` §2).
@@ -1700,6 +1702,9 @@ em operação não é decisão de script de deploy.
 350 linhas: `seed_reference.py` (conteúdo, sem IO — literais mais o catálogo de
 features derivado do registry) e `seed_weights.py` (a parte do seed que não é
 upsert simples; `feature_definitions` segue a mesma regra dentro de `seed.py`).
+**A T3.44c acrescenta um terceiro pelo mesmo motivo** — `seed_risk_reference.py`,
+o conteúdo de `risk_profiles` — e a linha acima fica anotada em vez de reescrita,
+como toda descrição congelada por revisão (§28.7).
 
 **Desvio registrado, a ratificar pela T2.4.** A decisão conjunta fixa a aritmética
 (`Σ pesos_i = 0,90`, Agent Consensus 0, Early-Movement assinado ±10 fora da soma,
@@ -3636,6 +3641,9 @@ lista de um `INSERT` continua usando o `DEFAULT` sem precisar do privilégio.
 | `hunter_worker` | SELECT | SELECT, INSERT, UPDATE por coluna — como a `0001` deu, menos esta |
 | dono / `DATABASE_URL_MIGRATIONS` | tudo — é por aí que `infra/scripts/activate_strategy_version.py` escreve | tudo |
 
+Esta tabela descreve o grant **por papel**; o raio de alcance da própria DSN
+de dono (que processos a têm no ambiente) é assunto separado — §23.5.
+
 Provado em `packages/core/tests/integration/test_schema_privileges.py` (os dois
 papéis leem; o worker não nomeia `purpose` num INSERT nem num UPDATE, e continua
 inserindo uma versão que confia no default) e em `test_migrations.py` (CHECK
@@ -3752,6 +3760,91 @@ consegue ativar (`UPDATE status/activated_at`) nem apagar uma linha `draft`,
 e continua lendo (`SELECT`) e escrevendo `changelog`/`id`/`strategy_id`/
 `version`/`created_at`. `test_migrations.py`: round trip da `0011` e
 `alembic check` sem drift.
+
+### 23.5 O raio de alcance da própria DSN de dono — T3.15d, e o que faltava (T3.15f)
+
+Esta seção e a §22.3 protegem quem pode escrever `strategy_versions` **por
+papel de banco** (`hunter_worker` vs. dono); nenhuma das duas protegia a
+conexão de dono **em si** de vazar para um processo que não deveria tê-la.
+`.claude/state/review-T3.15-security.md` HIGH 1 (confirmado por
+`astra-review-lab-pronto-2026-09-08.md` §2: "o compose ainda entrega
+`DATABASE_URL_MIGRATIONS` aos serviços de runtime") mediu exatamente isso:
+até `.claude/state/notes-T3.15d.md`, `api` e todo worker (`market`, `scanner`,
+`strategy`, `execution`) recebiam `DATABASE_URL_MIGRATIONS` no próprio
+ambiente — a `0011` deixa de importar se um desses processos, comprometido,
+simplesmente abre a conexão de dono e ignora o grant por completo.
+
+`infra/docker/docker-compose.yml` e `infra/vps/docker-compose.prod.yml`
+separaram a âncora de ambiente em duas (`x-api-env`/`x-prod-db-env`, sem a
+DSN de dono, para `api` e todo worker; `x-owner-env`/`x-prod-owner-env`, só a
+DSN de dono, para `migrate` e o novo serviço `ops`, `profiles: ["ops"]`,
+nunca `up`d). O raio de alcance da DSN de dono passa a ser exatamente os dois
+serviços desta seção nomeia (§23.1: "os únicos escritores são a conexão de
+dono... e `paper_line.py`") — nunca mais um container de vida longa.
+Detalhe operacional e comandos novos: `docs/DEPLOYMENT.md` §3.4.
+
+**E isso estreitou o HIGH 1 sem fechá-lo.** O que a T3.15d tirou do ambiente
+foi a *segunda* cópia da credencial de dono. A que ficou — `DATABASE_URL` —
+**era a mesma credencial**: `hunter`, `rolsuper = true`, `rolbypassrls = true`.
+`hunter_app` e `hunter_worker` são papéis `NOLOGIN` concedidos a ela
+(`infra/migrations/ddl/security.py`), então o `SET LOCAL ROLE` de
+`hunter_core.db.session` sempre foi uma **redução voluntária**, que um
+`RESET ROLE` desfaz. Todo `REVOKE` das §22.3/§23.1/§24.5 vale contra o papel;
+nenhum deles vale contra um processo que pode deixar de ser esse papel. Um RCE
+em `api` ou em qualquer worker continuava alcançando
+`ALTER TABLE … DISABLE ROW LEVEL SECURITY` e
+`UPDATE strategy_versions SET purpose = 'paper'`.
+
+A `0015_runtime_login_role` (§27) fecha o caminho **silencioso** desse achado:
+um login `hunter_runtime` sem superusuário, sem `BYPASSRLS` e **sem herança**,
+membro de `hunter_app` e `hunter_worker` e de mais nada. O login dono continua
+existindo e continua sendo o de `migrate`/`ops`.
+
+**"Silencioso", e não "fechado", é a palavra — a §27.1 declara o resíduo.** A
+frase que estava aqui até 2026-09-08 dizia "o HIGH 1 está fechado depois de
+(a)–(e)", e a revisão de segurança desta tarefa (ALTA 1) mostrou que ela promete
+mais do que um login único pode dar: `hunter_runtime` é membro dos **dois**
+papéis, e `SET ROLE` depende só da opção `SET` da membership — nunca de
+`INHERIT`. O que (a)–(e) de fato compram, e é muito, é a tabela adiante; o que
+sobra, e o desenho que o fecha de verdade (**dois** logins, T3.15h), está na
+§27.1, no bloco "O que um login único não fecha".
+
+A distinção entre criar o papel e trocar a credencial continua sendo a mesma
+que a §20.1 registra sobre a `0007` ("declarar uma lacuna não é fechá-la"). A
+revisão cria o papel; quem troca a credencial é o deploy:
+
+| Passo | O que é | Onde |
+|---|---|---|
+| (a) | `alembic upgrade head` aplica a `0015` e o papel passa a existir, **sem senha** | serviço `migrate`, em todo deploy |
+| (b) | o operador define a senha (`ALTER ROLE hunter_runtime PASSWORD …`) pelo `ops` | VPS, uma vez |
+| (c) | `HUNTER_RUNTIME_DB_PASSWORD` entra no `.env` | VPS, uma vez |
+| (d) | `compose.sh update` sobe `api` e os workers com o `DATABASE_URL` novo | VPS |
+| (e) | verificação de dentro do `api`: `current_user = 'hunter_runtime'`, `rolsuper`/`rolbypassrls` falsos | VPS |
+
+Enquanto (d) não acontecer, `DATABASE_URL` continua nomeando o dono e **nada**
+do que o achado descreve mudou — a `0015` estando aplicada não muda nada
+sozinha. O runbook completo, com o caminho de rollback, é `docs/DEPLOYMENT.md`
+§3.5.
+
+**O que (a)–(e) compram, na frase mais precisa que se pode escrever hoje.**
+Antes deles, `DATABASE_URL` e `DATABASE_URL_MIGRATIONS` eram **a mesma
+credencial de login** (`hunter`, `rolsuper=true`, `rolbypassrls=true` —
+`infra/migrations/ddl/security.py:12`), e `hunter_app`/`hunter_worker` eram
+papéis `NOLOGIN` concedidos a ela: o `SET LOCAL ROLE` de
+`hunter_core/db/session.py` era uma redução **voluntária**, que um `RESET ROLE`
+desfazia. Depois deles, um processo de runtime comprometido:
+
+| Alcança | Antes de (d) | Depois de (d) |
+|---|---|---|
+| `ALTER TABLE … DISABLE ROW LEVEL SECURITY` | **sim** (é o dono) | não — o login não é dono de nada |
+| `UPDATE strategy_versions SET purpose = 'paper'` | **sim** | não — nenhum papel alcançável tem o privilégio (§22.3/§23.1) |
+| `RESET ROLE` devolvendo a união dos privilégios | **sim** | não — `NOINHERIT` devolve **nada** (§27.1) |
+| `SET ROLE hunter_worker` a partir do `api` | sim | **sim** — é o resíduo declarado da §27.1 |
+
+As três primeiras linhas são o achado como ele foi escrito, e as três fecham. A
+quarta é o que sobra, e é a razão de esta seção **não** dizer mais "HIGH 1
+fechado": ver "O que um login único não fecha", §27.1, incluindo o desenho de
+dois logins (T3.15h) que o fecharia.
 
 ## 24. A coorte da replicação, o carimbo de promissora e a linhagem da irmã — M3 (`0012_replication`)
 
@@ -4449,3 +4542,523 @@ mesma razão pela qual a §17.3 lê `indexdef` para um predicado).
 | "`CREATE INDEX CONCURRENTLY` não é possível dentro da transação do Alembic" | é possível, e a `0004` já o faz num `autocommit_block`. Ainda assim escolhi `CREATE INDEX` simples, com a trava medida (§26.5) |
 | "o teste de `EXPLAIN` afirma um `Index Scan` para a visão padrão" | afirma — para a visão padrão **ordenada pela coluna**. Para a rota como ela está escrita hoje o teste afirma o contrário (`Sort` + `Seq Scan`), porque é o que o Postgres permite (§26.2) |
 | (o brief não fala de estatística) | é o ganho maior, e vale mesmo onde o índice não é varrido (§26.1, §26.3) |
+
+## 27. O runtime deixa de conectar como dono — M3 (`0015_runtime_login_role`)
+
+Décima quinta revisão. **Nenhuma tabela, coluna, constraint, índice, enum,
+trigger, política, partição ou `GRANT` sobre relação nenhuma**: um papel de
+cluster, duas memberships e um `CONNECT`. Ela fecha, do lado do banco, o HIGH 1
+que a §23.5 registra — o achado de que `DATABASE_URL` e
+`DATABASE_URL_MIGRATIONS` eram a **mesma credencial de dono**, e que por isso
+todo `REVOKE` das §22.3/§23.1/§24.5 valia contra o papel e não contra o
+processo, que podia simplesmente deixar de ser o papel com um `RESET ROLE`.
+
+`0015_runtime_login_role` tem 23 caracteres; o teto de
+`alembic_version.version_num` continua sendo 32 (§17.6). As listas desta revisão
+estão congeladas em `ddl/runtime_login_role.py`, no padrão de
+§15.6/§16.5/§17.6/§18.9/§19/§20/§21/§22/§24/§25.
+
+A frase que organiza tudo abaixo: **um papel que o processo pode deixar de ser
+não é um limite, é uma convenção.**
+
+### 27.1 O papel, e por que `NOINHERIT` é a decisão
+
+```sql
+CREATE ROLE hunter_runtime
+  LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION NOINHERIT;
+GRANT hunter_app    TO hunter_runtime WITH INHERIT FALSE, SET TRUE;
+GRANT hunter_worker TO hunter_runtime WITH INHERIT FALSE, SET TRUE;
+GRANT CONNECT ON DATABASE <o banco corrente> TO hunter_runtime;
+```
+
+Membro de `hunter_app` e `hunter_worker` **e de mais nada**; dono de nada. O
+login dono (`hunter`) continua existindo e continua sendo o de `migrate` e do
+serviço `ops` (§23.5).
+
+**`NOINHERIT` é acréscimo ao brief da tarefa, que não fala de herança — e é o
+que decide se esta revisão fecha ou reabre um buraco.** Com o `INHERIT` padrão,
+o login carregaria, **sem `SET ROLE` nenhum**, a *união* das ACLs dos dois
+papéis, e — o que é pior — `pg_has_role(current_user, 'hunter_app', 'USAGE')` e
+`pg_has_role(current_user, 'hunter_worker', 'USAGE')` seriam **as duas
+verdadeiras**. Toda guarda que o schema usa para distinguir "a aplicação e nada
+além dela" de "o motor e nada além dele" está escrita exatamente nessa forma:
+
+| Guarda | Condição | Um login que herda os dois |
+|---|---|---|
+| `trade_proposals_the_app_only_files_requests` (§19.4, §21.2) | `pg_has_role(app,'USAGE') AND NOT pg_has_role(worker,'USAGE')` | **não dispara** |
+| `portfolios_are_born_audited` (§20.2) | `pg_has_role(worker,'USAGE') AND NOT pg_has_role(app,'USAGE')` | **não dispara** |
+| `portfolio_risk_state_guard` (§18.7) | `pg_has_role(worker,'USAGE')` | é lido como o motor |
+
+As duas primeiras são assim de propósito: **quem tem os dois papéis é o
+operador** (§20.2, "quem a guarda deliberadamente não alcança"). Um login de
+*runtime* com os dois herdados é lido pelo schema como o operador — e, com a
+união dos privilégios na mão, isso é um `INSERT INTO trade_proposals` já
+`approved`, com um `risk_decision` que o Risk Engine nunca tomou, escrito de
+dentro de um request handler comprometido. Seria fechar a porta da frente
+reabrindo a janela que a §19.4 existe para fechar.
+
+Com `NOINHERIT`, e **medido** em
+`test_runtime_login_role.py::test_the_guards_still_tell_the_application_and_the_engine_apart`:
+
+| `SET LOCAL ROLE` | `pg_has_role(app,'USAGE')` | `pg_has_role(worker,'USAGE')` |
+|---|---|---|
+| nenhum | `false` | `false` |
+| `hunter_app` | `true` | `false` |
+| `hunter_worker` | `false` | `true` |
+
+Três consequências, e nenhuma delas é estilo:
+
+1. o privilégio efetivo do login é **nenhum**. Um caminho de código que esqueça
+   o `SET LOCAL ROLE` falha alto com *permission denied* em vez de rodar em
+   silêncio com a união (`test_without_set_role_the_runtime_login_reaches_no_table`);
+2. depois do `SET LOCAL ROLE`, `current_user` **é** o papel, e as guardas mordem
+   exatamente como hoje;
+3. `RESET ROLE` — a reversão voluntária que o achado cita como o furo — passa a
+   devolver **nada**.
+
+`SET ROLE` continua permitido: ele depende da opção `SET` da membership, nunca
+de `INHERIT`. E `WITH INHERIT FALSE` é escrito na própria membership, além do
+atributo do papel, porque desde o Postgres 16 a opção mora na membership: um
+`ALTER ROLE hunter_runtime INHERIT` posterior não deve poder ligar a união de
+volta para uma concessão feita sob o padrão antigo.
+
+#### O que um login único não fecha — o resíduo declarado (revisão de segurança da T3.15f, ALTA 1)
+
+`SET ROLE` continuar permitido é o que faz esta revisão funcionar **e** é o que
+ela não fecha. `NOINHERIT` mata o caminho *silencioso*; o caminho *deliberado*
+continua aberto, e a frase honesta é esta:
+
+> um login que é membro dos dois papéis pode `SET ROLE` para qualquer um deles.
+> Um RCE no `api` executa `SET LOCAL ROLE hunter_worker` e passa a ter
+> `BYPASSRLS` (§27.2 é a prova disso, do lado bom) **mais** os grants de escrita
+> da execução (`orders`, `fills`, `positions`, `trades`, `trade_proposals`,
+> `portfolio_equity_snapshots`, §19.1): lê e escreve **toda** organização.
+
+E as guardas não substituem o limite, porque elas foram escritas para distinguir
+papéis, não processos:
+
+| Guarda | Contra uma sessão que virou `hunter_worker` |
+|---|---|
+| `trade_proposals_the_app_only_files_requests` (§19.4/§21.2) | **não morde** — a condição é `app AND NOT worker`, e essa sessão é `worker`. Um `INSERT` já `approved`, com `risk_decision` forjado, passa |
+| `portfolios_are_born_audited` (§20.2) | morde (`worker AND NOT app`), mas só exige uma linha de `audit_logs` na mesma transação — que a mesma sessão escreve |
+| `portfolio_risk_state_guard` (§18.7) | trata a sessão como o motor: `trading_day`, `equity_day_start` e `peak_equity` viram escrita legítima |
+
+É **exatamente** o cenário que o bloco acima usa para justificar o `NOINHERIT`,
+alcançado por outro caminho — e é por isso que a §23.5 deixou de dizer "HIGH 1
+fechado depois de (a)–(e)". Três coisas ficam registradas junto, para que a
+frase não seja lida como mais alarmante do que é:
+
+1. **não é regressão.** Antes de (d) é estritamente pior: a DSN é a do dono,
+   `rolsuper = true`, e nem `SET ROLE` é preciso. A `0015` é melhora estrita;
+2. **não bloqueia o deploy.** (a)–(e) continuam sendo o próximo passo, e fecham
+   as três primeiras linhas da tabela da §23.5;
+3. **o que sobra é uma superfície de *tenant e de execução*, não de schema**: o
+   login não é dono de nada, então `ALTER TABLE`, `DROP`, `TRUNCATE` e a
+   promoção de `strategy_versions` a `paper` (§22.3/§23.1) continuam fora de
+   alcance por **todos** os papéis que ele pode virar.
+
+**O fechamento de verdade são dois logins, e é a T3.15h — nota de desenho, não
+implementada aqui.** Um papel por processo, cada um membro de **um** papel:
+
+```sql
+-- T3.15h (desenho; nenhuma revisão o implementa hoje)
+CREATE ROLE hunter_runtime_api    LOGIN NOSUPERUSER … NOINHERIT;
+CREATE ROLE hunter_runtime_worker LOGIN NOSUPERUSER … NOINHERIT;
+GRANT hunter_app    TO hunter_runtime_api    WITH INHERIT FALSE, SET TRUE;
+GRANT hunter_worker TO hunter_runtime_worker WITH INHERIT FALSE, SET TRUE;
+```
+
+Com eles, `SET ROLE hunter_worker` a partir do `api` responde *permission denied
+to set role* — a lista de papéis alcançáveis **é** a superfície do login
+(§27.3), e um login que só pode virar `hunter_app` não alcança `BYPASSRLS` por
+caminho nenhum. O que a T3.15h precisa resolver, e por isso ela é uma tarefa e
+não uma linha:
+
+- **duas senhas e duas DSNs no compose.** `x-api-env` deixa de ser um bloco só:
+  `api` recebe a do `api`, e os quatro workers a do worker. Duas chaves novas no
+  `.env`, dois passos (b) no runbook;
+- **quem é quem não é óbvio em todo processo, e este é o item difícil.** O `api`
+  usa `hunter_worker` em caminhos legítimos hoje: `auth/principal.py:231`
+  (transformar um id do Clerk no `users.id` — em **toda** requisição
+  autenticada), `services/clerk_webhook.py` e `services/invitations.py:193`
+  (aceitar um convite pelo hash do token). As políticas de `users` são chaveadas
+  em `app.current_user`, então essas buscas *precisam* atravessar a RLS (§1.2a,
+  §15.4). Ou elas mudam — um papel novo, estreito, só para resolver identidade,
+  o que é uma revisão de schema —, ou o login do `api` volta a ser membro dos
+  dois e a T3.15h **não entrega nada**. **Resolver isto é o coração da tarefa**,
+  não um detalhe de configuração;
+- **`infra/scripts/open_paper_wallet.py` e os demais atos de operador** rodam
+  como `hunter_worker` pelo `ops` (§19.6), que continua com a DSN de dono — não
+  são afetados;
+- **a `0015` não precisa ser revertida**: a T3.15h acrescenta dois logins ao
+  lado, e `hunter_runtime` é aposentado quando as duas DSNs estiverem de pé.
+
+Enquanto isso não acontece, o resíduo é **declarado** — que é a única coisa que
+distingue uma lacuna conhecida de uma surpresa (§20.1: "declarar uma lacuna não
+é fechá-la"; esta seção declara, e não finge fechar).
+
+### 27.2 `BYPASSRLS` continua chegando aos workers
+
+Atributo de papel **nunca** é herdado, em nenhuma direção. `hunter_runtime` é
+`NOBYPASSRLS`; `SET ROLE hunter_worker` faz o papel corrente ser
+`hunter_worker`, e `check_enable_rls` lê o `rolbypassrls` do papel **corrente**.
+Então `strategy`/`execution`/`analytics` continuam varrendo todas as
+organizações (§1.2) e `hunter_app` continua sem bypass. Era o jeito óbvio de
+esta revisão quebrar o sistema em silêncio, então é medido e não argumentado:
+`test_the_engine_role_still_bypasses_rls_through_the_runtime_login`.
+
+### 27.3 A migração: idempotente, sem senha, e verificando o resultado
+
+O padrão é o de `create_roles()` (§15.6): tenta, tolera não poder, e **verifica
+o resultado no catálogo**, falhando com os comandos manuais exatos — nunca um
+`NOTICE` que alguém lê como aviso.
+
+| Passo | Tolerado | Verificado |
+|---|---|---|
+| `CREATE ROLE` | `duplicate_object`, `insufficient_privilege` | existe em `pg_roles` |
+| `ALTER ROLE <atributos>` | `insufficient_privilege` | `rolcanlogin` e os seis "no" (`rolsuper`, `rolbypassrls`, `rolcreaterole`, `rolcreatedb`, `rolreplication`, `rolinherit`) |
+| `GRANT hunter_app`/`hunter_worker` | `insufficient_privilege` | `pg_has_role(…, 'MEMBER')` verdadeiro, `…, 'USAGE'` falso, **e nenhuma terceira membership** |
+| `GRANT CONNECT` | `insufficient_privilege` | `has_database_privilege(…, 'CONNECT')` |
+
+O `ALTER ROLE` é emitido em **dois** comandos — os três atributos que só um
+superusuário pode mexer (`NOSUPERUSER`, `NOBYPASSRLS`, `NOREPLICATION`), e o
+resto — para que um papel migrador apenas `CREATEROLE` (a forma usual num
+Postgres gerenciado) ainda consiga consertar `LOGIN`/`NOINHERIT`/`NOCREATEDB`/
+`NOCREATEROLE` em vez de perder o `ALTER` inteiro. Ele é emitido
+incondicionalmente, e é isso que **conserta** um `hunter_runtime` criado à mão
+com a forma errada: um papel que herda, ou que carrega `BYPASSRLS`, é pior que
+papel nenhum, porque a DSN pareceria correta.
+
+**A terceira membership para a migração**, e isso é escolha: a lista de papéis
+que este login pode virar **é** toda a superfície de segurança dele — ele não
+tem privilégio próprio nenhum —, então uma membership que ninguém escreveu aqui
+alarga essa superfície em silêncio. Alargar é revisão nova
+(`RUNTIME_MEMBER_OF_0015`), nunca um `GRANT` que alguém roda uma vez e ninguém
+mais lê.
+
+**O preço, dito com precisão** (revisão de segurança da T3.15f, BAIXA 7 — a
+redação anterior, aqui e em `.claude/state/notes-T3.15f.md` §10.4, dizia
+"derruba o próximo deploy" e prometia um alarme que não existe): a verificação
+roda **quando a `0015` roda**, e a `0015` não roda de novo num banco que já está
+nela. Conceder um papel de monitoração a `hunter_runtime` à mão, hoje, não
+derruba `compose.sh update` nenhum — o `alembic upgrade head` da VPS não tem o
+que aplicar. O que ela de fato pega é: um **banco novo** do mesmo cluster
+subindo do zero (papel é objeto de cluster, a membership extra já está lá), um
+`downgrade` seguido de `upgrade`, e a CI, que migra do zero a cada execução. É
+uma guarda de *provisionamento*, não um monitor contínuo — quem quiser a versão
+contínua tem de escrever um teste que rode contra o banco vivo, e ele não
+existe.
+
+**Postgres 16 ou mais novo, e é requisito, não preferência (BAIXA 8).**
+`GRANT … WITH INHERIT FALSE, SET TRUE` é sintaxe do PG16: a opção `INHERIT` por
+membership e a opção `SET` nasceram lá. Num cluster PG15 a `0015` morre com
+**erro de sintaxe** — e o `DO` só tolera `insufficient_privilege` e
+`duplicate_object`, de propósito (tolerar erro de sintaxe seria seguir sem a
+membership), então o serviço `migrate` falha e o deploy para. Isso não é
+regressão de compatibilidade: `docs/DATABASE.md` abre declarando "PostgreSQL 16
+(Neon em produção)", os dois composes fixam `postgres:16-alpine` e os testes
+rodam em `postgres:16-alpine`. Fica escrito porque um cluster mais velho é
+justamente o tipo de coisa que aparece num ambiente que ninguém previu — e o
+sintoma, `syntax error at or near "INHERIT"` no meio do `migrate`, não sugere
+sozinho "o servidor é velho demais".
+
+**Nada de senha, e nada de afirmar sobre ela.** A migração cria o papel sem
+senha; quem a define é o operador, fora de banda (§23.5, passo (b)). E ela não
+finge verificar: `pg_authid.rolpassword` só é legível por superusuário, então não
+há nada que ela pudesse conferir honestamente.
+
+**Nenhum `GRANT` de tabela, e isso é afirmação.** O privilégio do runtime é
+exatamente o de `hunter_app`/`hunter_worker`, alcançado por `SET ROLE`. Dar ao
+login algo próprio criaria uma terceira ACL a manter em dia — o
+no-op-que-parece-garantia que a §15.6 registra e a §24.5 recusa repetir.
+
+**A tabela de papel × tabela × privilégio da §19.1 não muda.** `hunter_runtime`
+não aparece nela porque não tem linha para aparecer: ele não é um papel que
+recebe privilégio, é o login de onde uma sessão *parte*. Pela mesma razão ele
+não entra em `hunter_core.db.session.DB_ROLES` — nada nunca faz
+`SET ROLE hunter_runtime`.
+
+### 27.4 Downgrade: derruba o papel só quando nada mais depende dele
+
+Papel é objeto de **cluster**; migração é de **banco**. Outro banco do mesmo
+cluster pode já estar na `0015` — é literalmente o caso do container de teste,
+com quatro — e o `GRANT CONNECT` de cada um deixa uma linha em `pg_shdepend`. Um
+`DROP ROLE` incondicional ou falharia com *dependent objects still exist*, ou
+tiraria o login de um banco que ainda o usa. Então o downgrade:
+
+1. `REVOKE CONNECT` no banco corrente;
+2. `REVOKE hunter_app, hunter_worker FROM hunter_runtime`;
+3. conta o que o papel possui (`pg_class`/`pg_namespace`/`pg_proc`/`pg_type`/
+   `pg_database`) e as referências restantes em `pg_shdepend`. **Zero →
+   `DROP ROLE`. Qualquer coisa → deixa o papel de pé**, com um `NOTICE`
+   nomeando o que resta.
+
+O que o downgrade tem de remover é o **alcance**, e o alcance é a membership —
+um login sem membership e sem `CONNECT` aqui não chega a lugar nenhum. É por
+isso que o teste afirma "não pode mais virar nada"
+(`test_0015_reverses_by_taking_the_membership_away`) e não "o papel sumiu"; e é
+o mesmo precedente da `0001`, cujo downgrade nunca derruba
+`hunter_app`/`hunter_worker`.
+
+**Declarado: membership é cluster-wide**, então reverter **num** banco a revoga
+para todos os bancos daquele cluster. É inerente a papel de cluster e vale igual
+para o `CREATE ROLE` do upgrade; a VPS tem um banco só.
+
+**Não há guarda de downgrade, e a ausência é afirmação.** A §17.7 protege
+*dado*; esta revisão não guarda linha nenhuma — ela declara quem pode conectar,
+que é declaração de credencial e nunca fato sobre dado, exatamente como os
+grants da `0007` (§19.5) e da `0008` (§20.5). O que **não** é de graça é o lado
+operacional, e está escrito em `docs/DEPLOYMENT.md` §3.5: reverter esta revisão
+com o `DATABASE_URL` ainda nomeando `hunter_runtime` deixa todo processo de
+runtime sem alcançar tabela nenhuma. Volte a DSN **primeiro**; por isso o
+caminho de rollback do runbook não precisa deste downgrade.
+
+### 27.5 O que o runtime executava que precisava do dono — a varredura, e o único achado
+
+Levantamento sobre `apps/api/hunter_api/**` e `services/*/hunter_*/**`:
+
+| Procurado | Encontrado |
+|---|---|
+| `CREATE` / `ALTER` / `DROP` / `TRUNCATE` | **nada** |
+| criação de partição | **nada** — é `infra/scripts/create_partitions.py`/`prune_partitions.py`, pelo `ops` (T3.15e) |
+| `LISTEN` / `NOTIFY` | **nada** (§16.5, §17.9, §18.10, §19.7, §20.6, §21.5, §24.7, §25.7) |
+| advisory lock | só `pg_advisory_xact_lock` (`market-worker/recovery_queries.py`) — **de transação**, seguro atrás do pooler, e sem privilégio especial |
+| `DATABASE_URL_MIGRATIONS` | nenhum processo de runtime a lê desde a T3.15d |
+
+**Um achado, e não é DDL: quatro conexões sem `SET ROLE`.**
+`services/scanner-worker/hunter_scanner_worker/main.py` (`_warm`) e
+`refresh.py` (três lugares) abrem `engine.begin()` cru — sem `SET LOCAL ROLE` —
+e leem `feature_snapshots`/`feature_baselines` e **escrevem** `feature_baselines`
+(`SqlBaselineStore.append`). Hoje isso funciona porque o login é o dono; sob
+`hunter_runtime` é *permission denied*, que é precisamente o comportamento que a
+§27.1 item 1 comprou.
+
+O conserto é uma linha em cada uma (`SET LOCAL ROLE hunter_worker` como primeiro
+statement da transação) e é do dono de `services/**`. Fica registrado aqui como
+**pré-requisito do passo (d)** do runbook — não da migração: a `0015` pode ser
+aplicada a qualquer momento sem tocar em nada, e é a troca do `DATABASE_URL` que
+depende desse conserto. Declarado em vez de descoberto depois, no padrão da
+§21.6 e da §22.5.
+
+### 27.6 Pooler e trava
+
+Nada aqui depende de estado de sessão: um papel, duas memberships e um grant de
+banco. Sem prepared statement de sessão, sem `LISTEN`/`NOTIFY`, sem advisory
+lock de sessão. E nenhum `ALTER TABLE`: a revisão não toma trava em relação
+nenhuma e **não abre janela de manutenção**, ao contrário da `0010` e da `0012`
+(§15.6, §24.7).
+
+Uma observação que vale para o dia a dia depois de (d): `SET LOCAL ROLE` é
+escopado à transação, então o pooler em modo transação continua entregando a
+mesma conexão física para o próximo chamador **sem** papel herdado — a mesma
+propriedade que o `SET LOCAL statement_timeout` do §1.2a tem, e o motivo pelo
+qual trocar o login não muda nada no comportamento atrás do pooler.
+
+## 28. Uma exchange que ninguém coleta não é um feed quebrado — M3 (`0016_exchange_status_planned`)
+
+Décima sexta revisão. **Um rótulo de enum.** Nenhuma tabela, nenhuma coluna,
+nenhum índice, nenhuma constraint, nenhum trigger, nenhuma política, nenhuma
+partição, nenhum `GRANT`.
+
+Ela responde ao brief `.claude/state/brief-T3.44c-exchange-status-planned.md`,
+que a T3.44b escreveu **em vez de** editar uma migração — o brief dela já previa
+esta saída ("se `exchanges.status` não tiver um valor `planned` no seu
+CHECK/enum, diga isso e acione o database-architect").
+
+O sintoma estava no topbar. `exchanges` tem `binance` e `bybit`, a Bybit nunca
+teve coletor implantado, e `build_market_status` renderiza **uma linha por
+entrada de `exchanges`** de propósito (uma exchange que o worker nunca tocou tem
+de aparecer, e não sumir em silêncio). Então a redução "pior de todas" sobre
+`ws_state` lia **`2 exchanges · UNAVAILABLE`** enquanto a Binance estava
+conectada o tempo inteiro. O rótulo que faltava não era um valor de linha: era um
+estado que o tipo não sabia dizer.
+
+### 28.1 Desvio declarado em relação à §15.1
+
+A §15.1 fixou `exchange_status` = `active|inactive` ("ciclo de vida mínimo — nada
+nos documentos distingue um terceiro estado"). **Este documento agora distingue**,
+e a linha de lá foi anotada em vez de reescrita: ela descreve o que a `0001`
+criou, que é o que "congelado por revisão" significa (§16.5, §17.1). A §1 nomeia
+`ALTER TYPE ... ADD VALUE` por migração como *o* mecanismo para exatamente isto,
+então a extensão é o caminho previsto, não uma exceção a ele — o que muda é a
+afirmação de que dois rótulos bastavam.
+
+**Por que um terceiro rótulo e não uma segunda coluna.** O brief deixou a escolha
+em aberto e nomeou a alternativa (`has_collector boolean`, ou um
+`onboarding_status` próprio). `exchange_status` **já é** o ciclo de vida da
+exchange para nós, e `planned` é um ponto dele, não um segundo eixo: catalogada
+sem coleta → coletada → desligada. Um booleano seria um fato de *implantação* ao
+lado de uma coluna de *ciclo de vida*, duas coisas a manter de acordo sem
+constraint capaz de dizer como, e todo leitor teria de aprender que
+`status = 'active' AND NOT has_collector` significa o que um rótulo significa. E
+`inactive` não serve: ninguém desligou a Bybit — o rótulo diria que alguém
+desligou, e a §16.2 já registra o padrão de recusar um rótulo que mente sobre o
+que aconteceu.
+
+**Posição: `BEFORE 'active'`** (`ddl/enums.py`, `EXCHANGE_PLANNED_ADDED_VALUES`).
+`enumsortorder` faz parte do contrato (§17.1) e
+`hunter_core.domain.enums.ExchangeStatus` declara `PLANNED` primeiro para casar:
+uma exchange é planejada antes de ser coletada.
+
+| Rótulo | O que significa | Quem escreve |
+|---|---|---|
+| `planned` | catalogada, **sem coletor implantado** | `infra/scripts/seed.py` (`seed_reference.EXCHANGES`), depois do commit da migração |
+| `active` | coletada agora — o default de coluna que a `0001` deu, e continua dando | idem, e é o que toda linha existente já era |
+| `inactive` | desligada por alguém | ninguém hoje |
+
+### 28.2 Dentro da transação da migração, e isso não é descuido
+
+O brief pedia o `ADD VALUE` **fora** de um bloco de transação, "como o Postgres
+exige". O Postgres 12+ não exige nada disso: o que ele proíbe é **usar** o rótulo
+novo na mesma transação, em `DEFAULT`, predicado de índice ou qualquer outro DDL
+(§17.1, §18.1). Esta revisão acrescenta o rótulo e não escreve nenhum —
+`exchanges.status` mantém o `server_default 'active'` da `0001` — e `planned`
+alcança uma linha pela primeira vez através do seed, depois do commit. Passar por
+`autocommit_block()` não compraria nada e custaria a atomicidade da revisão, que
+é o preço que a `0004` paga só porque o `CONCURRENTLY` não lhe deixa escolha
+(§17.5). **Desvio declarado em relação ao brief.**
+
+### 28.3 O downgrade reconstrói o tipo, e recusa antes
+
+Não existe `ALTER TYPE ... DROP VALUE`. `ddl/exchange_planned.py` renomeia o
+tipo, recria-o com os rótulos que a `0001` congelou, retipa `exchanges.status`
+**em volta do default** (um default guardado já vem coagido ao tipo antigo e
+bloquearia a troca) e derruba o original — a receita que a `0003` estabeleceu
+(§17.1).
+
+Antes de tudo isso, uma guarda conta as exchanges ainda marcadas `planned` e
+**recusa**, nomeando-as:
+
+| Guarda | O que se perderia |
+|---|---|
+| `exchanges` com `status = 'planned'` | os dois rótulos que sobrevivem mentem sobre essa exchange — `active` a devolve ao agregado que esta revisão existe para consertar, `inactive` diz que alguém a desligou. "A migração reverteu sem erro" seria o único relatório dessa reescrita |
+
+Ela não apaga nada: conta, nomeia e manda decidir qual dos dois rótulos cada
+exchange de fato é — o mesmo limite declarado da §18.9, §24.6 e §25.6 (o
+downgrade de um banco povoado não é operação de rotina). Num banco onde nenhuma
+exchange foi marcada — todo banco antes do próximo seed — a guarda conta zero e o
+downgrade segue.
+
+**A guarda percorre a mesma tupla congelada que o rebuild percorre**, e não a
+única coluna que existe hoje: uma guarda que conferisse uma coluna enquanto o
+rebuild retipa várias falharia *dentro* do rebuild com *invalid input value for
+enum*, que não nomeia saída nenhuma.
+
+**`EXCHANGE_STATUS_COLUMNS_0016` nomeia as colunas em vez de descobri-las**, como
+toda lista congelada deste pacote. Uma revisão futura que ponha `exchange_status`
+numa segunda coluna e não estenda o *próprio* rebuild dela não perde a coluna em
+silêncio: o `DROP TYPE` do tipo renomeado falha enquanto essa coluna ainda depende
+dele, o que é um erro alto nomeando a dependência, e não um retype que esqueceu
+uma.
+
+### 28.4 Guardas de upgrade, grants, RLS e trava
+
+**Não há guarda de upgrade, e isso é afirmação** (§19.5, §20.5, §21.4, §24.6,
+§25.6): o rótulo é acrescentado, nada que já esteja gravado passa a ser
+irrepresentável, e toda linha existente mantém o rótulo que tem — que era
+`active`, e continua sendo até o seed dizer outra coisa.
+
+**Nenhum `GRANT` e nenhuma mudança de RLS.** `exchanges` é tabela de referência
+global (§1.1): sem `organization_id`, sem política, `SELECT` para `hunter_app` e
+escrita para `hunter_worker` desde a `0001`. Um rótulo não é coluna, então
+nenhuma ACL está envolvida — a mesma aritmética que a §24.5 registra, um degrau
+antes.
+
+**Trava.** `ALTER TYPE ... ADD VALUE` toma `ACCESS EXCLUSIVE` no **tipo**, em
+`pg_type`, nunca em `exchanges`: leitor e escritor da tabela não são bloqueados e
+esta revisão **não abre janela de manutenção** (ao contrário da `0010` e da
+`0012`, que fazem `ALTER TABLE` validante). Quem toma `ACCESS EXCLUSIVE` em
+`exchanges` é o downgrade, sobre uma tabela de duas linhas.
+
+**Pooler.** Nada aqui depende de estado de sessão: um `ALTER TYPE`. Sem prepared
+statement de sessão, sem `LISTEN`/`NOTIFY`, sem advisory lock de sessão.
+
+`0016_exchange_status_planned` tem 28 caracteres; o teto de
+`alembic_version.version_num` continua sendo 32 (§17.6).
+
+### 28.5 O seed passa a escrever `status`, e ganha `--only exchanges`
+
+`seed_exchanges` **não nomeava `status`** nem no `INSERT` nem no
+`ON CONFLICT DO UPDATE`: uma linha nova caía no default e uma linha existente
+ficava congelada no rótulo com que foi escrita pela primeira vez. Isso não era
+uma escolha — era a consequência de não haver rótulo a escolher. Agora
+`seed_reference.EXCHANGES` carrega `(code, name, status, capabilities)` e o valor
+viaja nas duas metades do upsert, então **re-semear é como uma exchange que
+ganhou (ou perdeu) coletor é corrigida**. `bybit` é `planned`; no dia em que um
+coletor subir para ela, essa linha vira `ACTIVE` e o comando abaixo aplica.
+
+`exchanges` entra em `seed_dry_run.TABLE_CHOICES` (a quinta tabela "diffável",
+chaveada por `code`) e em `seed_cli._run_only`. O brief T3.44c registrava que
+`seed.py --only exchanges` **não existia** — a correção é esta, e o comando do
+operador é:
+
+```bash
+bash infra/vps/compose.sh run --rm ops python infra/scripts/seed.py --only exchanges --dry-run
+bash infra/vps/compose.sh run --rm ops python infra/scripts/seed.py --only exchanges
+```
+
+O `--dry-run` imprime a linha `exchanges.bybit: status: 'active' -> 'planned'` e
+não commita nada; o segundo comando escreve. O portão de `--yes` continua sendo
+só o de `risk_profiles` (a diretiva de risco, §17.8) — `--only exchanges` não o
+dispara —, e o portão de execução não assistida (diff não vazio, `stdin` sem TTY)
+continua valendo para ele como para qualquer outro.
+
+### 28.6 O que a API passa a devolver, e o que ela deixa de contar
+
+`MarketStatusOut` ganha **`exchanges_planned: list[str]`**, aditivo e com default
+`[]` — nada que já lê o modelo precisa mudar, e o contrato de patch do `rt:system`
+(uma linha de exchange por mensagem, nunca esta lista) fica exatamente como
+estava. `build_market_status` passa a ler `(code, status)`
+(`MarketRepository.list_exchanges_with_status`) e a exchange `planned`:
+
+- **não vira linha** em `exchanges` — não há feed dela para estar em apuros;
+- **não é lida no Redis** — não há heartbeat a procurar;
+- **não conta no teste "todas as leituras falharam"**, e essa é a parte que não é
+  cosmética: com a Bybit na lista, uma queda real do Redis numa implantação de um
+  coletor só seria *uma* falha em *duas* exchanges, ficaria aquém de "todas" e
+  responderia `200` em vez de `503` — exatamente a resposta saudável durante uma
+  indisponibilidade que a regra (G4) existe para impedir;
+- **não entra em `markets_monitored_total`**, que passa a somar só as exchanges
+  coletadas: os mercados de uma exchange planejada podem carregar `is_monitored`
+  de uma sincronização de catálogo e ninguém os lê, então contá-los faria o
+  cabeçalho discordar da soma das linhas abaixo dele — que é o número que o
+  cliente web calcula por conta própria (`totalMonitoredFrom`).
+
+No topbar (`apps/web/components/system/live-status.tsx`) o rótulo passa a ser
+`binance · CONNECTED · 200 mercados · há Ns (bybit planejada)`; o painel completo
+ganha uma linha `bybit planejada · sem coletor` em vez de perder a exchange da
+tela — sumir com ela seria a outra metade da mesma mentira.
+
+**Nenhum status é filtrado além de `planned`.** `inactive` continua entrando no
+agregado como sempre entrou: nenhuma exchange está `inactive` hoje, o brief não
+pediu, e "desligada por alguém" é um fato que o operador deve ver no painel.
+Declarado aqui em vez de descoberto.
+
+### 28.7 O terceiro módulo irmão do seed (`seed_risk_reference.py`)
+
+O rótulo novo custou linhas a `seed_reference.py` (uma coluna a mais em cada
+linha de `EXCHANGES`, o `import` de `ExchangeStatus` e o comentário da tupla), e
+isso o levou a **356 linhas** — sobre o orçamento de 350 do
+`infra/scripts/check_file_size.py`. O corte é o mesmo que a §17.8 fez em T2.1,
+uma tabela adiante: `seed_risk_reference.py` passa a ser o conteúdo de
+**`risk_profiles`** — `RISK_LIMITS`, `REGIME_MULTIPLIERS`, `RISK_PRESETS`,
+`PAPER_V1_NAME` e `PAPER_V1_LIMITS` —, que é uma tabela inteira e nada além dela;
+`seed_reference.py` fica com os catálogos (exchanges, estratégias, entitlements,
+flags, features) e os vetores de peso, e cai para 291 linhas.
+
+**Os cinco nomes continuam sendo lidos de `seed_reference`, por reexportação.** É
+o precedente do `execution.py` da §18.10 e do `create_partitions.py` da §1.3: uma
+divisão de módulo que quebra um import é uma refatoração que quebrou alguma coisa
+— e aqui não são só os irmãos (`seed.py`, `seed_dry_run.py`, `seed_paper.py`),
+são também **três módulos de teste que carregam `seed_reference.py` por caminho**
+e leem os atributos dele (`test_schema_paper.py::_shipped_paper_limits`,
+`packages/indicators/tests/unit/test_weights_contract.py` e
+`services/scanner-worker/tests/policies.py`). Os três põem `infra/scripts` no
+`sys.path` antes de executar o módulo, então o `import` irmão de dentro dele
+resolve — verificado carregando o arquivo pelos três caminhos.
+
+Nenhum valor muda: os dois blocos foram movidos **byte a byte** (comparados entre
+o arquivo antigo e o novo, no espírito da prova que a §18.8 exige do `paper_v1`),
+a ordem das linhas de `EXCHANGES`/`STRATEGIES` é a mesma, e `PAPER_V1_LIMITS`
+continua sendo `hunter_risk.limits.PAPER_V1` despejado — isto é, continua tendo
+uma fonte só (§18.8).

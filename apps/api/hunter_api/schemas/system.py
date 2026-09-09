@@ -204,3 +204,17 @@ class MarketStatusOut(BaseModel):
     exchanges: list[MarketStatusExchangeOut]
     markets_monitored_total: int
     updated_at: datetime
+    exchanges_planned: list[str] = []
+    """Venues catalogued with no collector deployed — ``exchanges.status =
+    'planned'`` (DATABASE.md §28), by code, ordered.
+
+    Additive, and deliberately *outside* ``exchanges``: those rows are the live
+    feeds, reduced worst-of into one aggregate by the topbar, and a venue that
+    cannot report is not a feed in trouble. Reporting Bybit there read
+    ``2 exchanges · UNAVAILABLE`` while Binance was connected the whole time
+    (T3.44b). Naming them here rather than dropping them is the other half: an
+    exchange that simply vanished from the response would be a different lie.
+
+    Defaults to ``[]`` so nothing that already parses this model has to change,
+    and so the ``rt:system`` patch contract above — which carries one exchange
+    row at a time and never this list — stays exactly as it was."""

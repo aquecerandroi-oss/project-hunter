@@ -356,14 +356,29 @@ class _StaticHgetallRedis:
         yield  # pragma: no cover  (makes this an async generator)
 
 
-def _patched_repository(*, exchange_codes: list[str], monitored: dict[str, int] | None = None):
+def _patched_repository(
+    *,
+    exchange_codes: list[str],
+    monitored: dict[str, int] | None = None,
+    planned: list[str] | None = None,
+):
     """A ``patch`` context manager for ``system_status.MarketRepository`` --
     ``build_market_status``'s own Postgres calls never run in these tests.
+
+    (T3.44c) ``exchange_codes`` are the *collected* venues and ``planned`` the
+    catalogued ones with no collector; the fake returns the single
+    ``(code, status)`` list the service now reads, so a test cannot accidentally
+    describe a venue that is in neither state.
     """
-    patcher = patch("hunter_api.services.system_status.MarketRepository")
+    catalogue = [(code, "active") for code in exchange_codes]
+    catalogue += [(code, "planned") for code in planned or []]
+    # T3.44c: `build_market_status` lives in `services/market_status.py` now
+    # (`system_status` re-exports it), so the repository to patch is that
+    # module's -- patching the old name would silently stop patching anything.
+    patcher = patch("hunter_api.services.market_status.MarketRepository")
     repo_cls = patcher.start()
     repo = repo_cls.return_value
-    repo.list_exchange_codes = AsyncMock(return_value=exchange_codes)
+    repo.list_exchanges_with_status = AsyncMock(return_value=sorted(catalogue))
     repo.monitored_market_counts = AsyncMock(return_value=monitored or {})
     repo.open_gap_counts = AsyncMock(return_value={})
     return patcher
@@ -442,3 +457,56 @@ async def test_build_market_status_future_last_event_at_is_not_a_healthy_live_fe
     assert row.ws_state == "unavailable"
     assert row.last_event_at is None
     assert row.last_event_age_ms is None
+
+
+async def test_build_market_status_keeps_a_planned_venue_out_of_the_aggregate() -> None:
+    """(T3.44c) A venue catalogued with no collector is named, never rendered
+    as a dead feed.
+
+    This is the topbar bug of T3.44b, at its source: with Bybit as a normal
+    ``exchanges`` row, the worst-of reduction over ``ws_state`` reported
+    ``2 exchanges · UNAVAILABLE`` while Binance was connected the whole time.
+    Redis is not even read for a planned venue -- there is no heartbeat key to
+    find -- so the fake below carries only Binance's.
+    """
+    patcher = _patched_repository(
+        exchange_codes=["binance"], monitored={"binance": 200, "bybit": 7}, planned=["bybit"]
+    )
+    try:
+        fake_redis = _StaticHgetallRedis(
+            {
+                keys.heartbeat("market", "binance"): {
+                    b"ws_state": b"connected",
+                    b"ts": utcnow().isoformat().encode(),
+                },
+            }
+        )
+        result = await build_market_status(object(), fake_redis)  # pyright: ignore[reportArgumentType]
+    finally:
+        patcher.stop()
+    assert [row.exchange for row in result.exchanges] == ["binance"]
+    assert result.exchanges[0].ws_state == "connected"
+    assert result.exchanges_planned == ["bybit"]
+    # the header must equal the sum of the rows below it: Bybit's 7 catalogued
+    # markets are monitored by nobody.
+    assert result.markets_monitored_total == 200
+
+
+async def test_a_planned_venue_never_counts_toward_the_every_read_failed_test() -> None:
+    """(T3.44c) A real Redis outage on the one collected venue is still a ``503``.
+
+    The "every exchange's read failed" check is a ratio, and a planned venue is
+    not a read at all: had it stayed in the list, one genuine failure out of two
+    exchanges would have fallen short of "every" and answered ``200`` -- a
+    healthy-looking response during an actual outage, which is exactly the
+    failure mode (G4) exists to prevent.
+    """
+    patcher = _patched_repository(exchange_codes=["binance"], planned=["bybit"])
+    try:
+        fake_redis = _StaticHgetallRedis(
+            {keys.heartbeat("market", "binance"): redis.exceptions.ConnectionError("down")}
+        )
+        with pytest.raises(redis.exceptions.RedisError):
+            await build_market_status(object(), fake_redis)  # pyright: ignore[reportArgumentType]
+    finally:
+        patcher.stop()

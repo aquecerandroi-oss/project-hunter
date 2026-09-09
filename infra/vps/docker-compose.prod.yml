@@ -29,9 +29,22 @@ x-prod-logging: &prod-logging
 
 x-prod-db-env: &prod-db-env
   DATABASE_URL: postgresql+asyncpg://hunter:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env (infra/scripts/setup_env.sh --vps)}@postgres:5432/hunter
-  DATABASE_URL_MIGRATIONS: postgresql+asyncpg://hunter:${POSTGRES_PASSWORD}@postgres:5432/hunter
   REDIS_URL: redis://redis:6379/0
   HUNTER_ENV: staging
+
+# T3.15d (.claude/state/review-T3.15-security.md HIGH 1, astra-review-lab-pronto-2026-09-08.md
+# §2): DATABASE_URL_MIGRATIONS is the schema owner's DSN — the connection
+# `activate_strategy_version.py`/`derive_variant.py`/`seed.py`/
+# `open_paper_wallet.py` write through. It used to live inside x-prod-db-env
+# above, so `api` and every worker inherited it: an RCE in any one of them
+# (dependency CVE, path traversal reading /proc/self/environ, an error
+# handler dumping env) could open a connection as the table owner and write
+# `strategy_versions.purpose='paper'`, activate a version outright, or
+# disable RLS on any tenant table. Split into its own anchor, granted only to
+# `migrate` and the `ops` profile service below — no long-running process
+# ever sees it (docs/DATABASE.md §23, docs/DEPLOYMENT.md §3.4).
+x-prod-owner-env: &prod-owner-env
+  DATABASE_URL_MIGRATIONS: postgresql+asyncpg://hunter:${POSTGRES_PASSWORD}@postgres:5432/hunter
 
 services:
   postgres:
@@ -50,8 +63,44 @@ services:
 
   migrate:
     environment:
-      <<: *prod-db-env
+      <<: [*prod-db-env, *prod-owner-env]
       HUNTER_COMMAND: migrate
+    logging: *prod-logging
+
+  # T3.15d — profile-only shell carrying x-prod-owner-env, so the ops scripts
+  # that used to run via `docker exec hunter-api-1 python infra/scripts/...`
+  # (docs/ACTIVATION.md) get the owner DSN from an audited, short-lived
+  # container instead of the long-lived `api` container, which no longer
+  # carries DATABASE_URL_MIGRATIONS at all. `image`/`build`/`profiles: ["ops"]`/
+  # `entrypoint: []`/`command: ["true"]`/`cap_drop: [NET_RAW, NET_ADMIN]` (LOW-G,
+  # same rationale as the workers below — docs/SECURITY.md §5) all come from
+  # the `ops` service this block merges into
+  # (`infra/docker/docker-compose.yml`, not repeated here): the profile keeps
+  # it out of every bare `docker compose up`/`compose.sh up|update`; it exists
+  # to be `run --rm`, never `up`d. Naming it explicitly (`docker compose up
+  # ops`) bypasses the profile gate, so `entrypoint: []` + the no-op `command`
+  # mean that even then it just runs `true` and exits — it never becomes a
+  # resident process holding the owner connection open.
+  ops:
+    environment:
+      <<: [*prod-db-env, *prod-owner-env]
+    # T3.15e: fixed a wrong claim here — `ops` DOES have a counterpart in the
+    # base compose (`infra/docker/docker-compose.yml` declares its own `ops`
+    # service, `build:` included since that same task), and this file's block
+    # merges into it by service name, exactly like `api`/`migrate`/every
+    # worker above. The `env_file` entry below is redundant with the one the
+    # base file already declares (Compose concatenates the list across `-f`
+    # files) and is repeated here only so this block stays self-explanatory
+    # on its own: Settings()'s `_require_settings_in_prod`
+    # (packages/core/hunter_core/settings.py) runs on every construction and,
+    # under HUNTER_ENV=staging (from x-prod-db-env), requires the CLERK_*
+    # secrets too; those live in the VPS `.env`, not in this compose file.
+    env_file:
+      - path: ../../.env
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
     logging: *prod-logging
 
   api:

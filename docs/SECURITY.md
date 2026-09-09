@@ -81,6 +81,7 @@ Implementação: `require_role(min_role)` como dependência FastAPI; papéis ord
 | Headers | HSTS, `X-Content-Type-Options`, `Referrer-Policy`, CSP no web (nonce), `Permissions-Policy` |
 | Audit | `@audited` em serviços; append-only |
 | Segredos | `gitleaks` em CI; `.env*` no `.gitignore` |
+| Credencial do banco em runtime | `api` e todo worker conectam como `hunter_runtime` — login sem superusuário, sem `BYPASSRLS` e **sem herança**, membro só de `hunter_app`/`hunter_worker` (`0015`, docs/DATABASE.md §27), depois do passo (d) do runbook. A DSN de dono existe apenas em `migrate` e no serviço `ops` (§3.4/§3.5 de `docs/DEPLOYMENT.md`). **Resíduo declarado:** um login membro dos dois papéis ainda pode `SET ROLE hunter_worker` — DATABASE.md §27.1, "O que um login único não fecha" |
 | Dependências | `pip-audit`, `pnpm audit`, Dependabot |
 | Webhooks | Assinatura verificada (Svix para Clerk); idempotência por `svix-id` |
 | Idempotência | `Idempotency-Key` em POSTs financeiros; `client_order_id` único |
@@ -102,6 +103,53 @@ Além dos limites por janela, uma conexão WebSocket viva conta contra `WS_MAX_C
 **`INTERNAL_PEER_IPS` valida no boot e conta os casamentos (T3.28d).** Cada entrada passa por `ipaddress.ip_address()` num `model_validator` de `ApiSettings` — um CIDR, um hostname ou um typo derruba o boot com mensagem clara, em vez de ficar silenciosamente sem casar nunca com `request.client.host` (a lista voltaria a compartilhar o balde estreito com todo o tráfego SSR do `web`, sem sinal nenhum disso). Um log `internal_peer_ips_loaded` em `main.py` registra o conjunto resolvido a cada subida (nunca segredo — são endereços internos do compose). O contador Prometheus `hunter_rate_limit_internal_peer_total` incrementa a cada requisição classificada como peer interno, para que "nunca casa" (IP do compose divergiu da lista) apareça no dashboard como a série travada em zero, e não só como uma parede de 429 sem explicação.
 
 **`cap_drop: [NET_RAW, NET_ADMIN]` em todo worker (T3.28d).** `market-worker` (e os shards/`spot` que o estendem via `extends`), `scanner-worker`, `strategy-worker` e `execution-worker` — em `infra/docker/docker-compose.yml` e herdado em `infra/vps/docker-compose.prod.yml` — não abrem socket raw, não fazem ping nem tocam a pilha de rede abaixo de TCP/UDP; nenhum precisa de `NET_RAW`/`NET_ADMIN`. A rede do compose fixa `web` (`.10`/`.11`) e o Caddy em produção (`.10`) em endereços estáticos justamente para `INTERNAL_PEER_IPS`/`FORWARDED_ALLOW_IPS` funcionarem — sem esses caps, um worker comprometido (o `execution-worker`, por exemplo, o único com credencial de exchange) poderia forjar ARP para esses endereços fixos e sequestrar o tráfego de outro container na mesma rede. Derrubar as duas capabilities fecha essa via sem tirar nada que os workers de fato usam.
+
+**O papel de banco do runtime é um limite, não uma convenção (T3.15f).** Até a
+`0015_runtime_login_role`, `DATABASE_URL` e `DATABASE_URL_MIGRATIONS` eram a
+**mesma credencial** (`hunter`: superusuário, `BYPASSRLS`): `hunter_app` e
+`hunter_worker` são papéis `NOLOGIN` concedidos a ela, então o `SET LOCAL ROLE`
+que toda transação faz era uma redução *voluntária* — um `RESET ROLE` a
+desfazia, e um RCE em qualquer processo de runtime alcançava
+`ALTER TABLE … DISABLE ROW LEVEL SECURITY` e
+`UPDATE strategy_versions SET purpose = 'paper'` por cima de todo `REVOKE` das
+revisões `0010`/`0011`. Agora o login é `hunter_runtime`:
+
+- `NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION` — não é dono
+  de nada, então nenhum `ALTER TABLE` é possível para ele;
+- **`NOINHERIT`**, e essa é a metade que importa: sem `SET ROLE` ele não tem
+  privilégio nenhum, e `pg_has_role(current_user, …, 'USAGE')` é falso para os
+  dois papéis. É o que mantém as guardas do schema que separam a API do motor
+  (`trade_proposals_the_app_only_files_requests`, `portfolios_are_born_audited`)
+  funcionando — um login que herdasse os dois seria lido por elas como o
+  operador, e nenhuma dispararia;
+- membro de `hunter_app` e `hunter_worker` **e de mais nada**; a migração recusa
+  uma terceira membership, porque essa lista é toda a superfície do papel.
+
+A senha (`HUNTER_RUNTIME_DB_PASSWORD`) **nunca** está no repositório: a migração
+cria o papel sem senha e o operador a aplica na VPS (`docs/DEPLOYMENT.md` §3.5,
+passo (b)) — pelo `\password` do `psql`, que manda o hash SCRAM, ou por SQL em
+stdin: nunca em `argv`, que é legível em `/proc/<pid>/cmdline` por qualquer
+usuário da máquina. Aplicar a revisão não troca credencial nenhuma; nada muda
+antes do passo (d).
+
+**E o que os cinco passos fecham, com precisão (revisão de segurança da T3.15f,
+ALTA 1).** Esta seção dizia que o achado ficava fechado depois deles. Fica
+fechado o caminho *silencioso*, que era o achado como escrito: o runtime deixa
+de ser o dono, `RESET ROLE` deixa de devolver privilégio, `ALTER TABLE …
+DISABLE ROW LEVEL SECURITY` e `UPDATE strategy_versions SET purpose = 'paper'`
+saem de alcance. **Não** fecha o caminho deliberado: `hunter_runtime` é membro
+dos dois papéis e `SET ROLE` depende só da opção `SET` da membership, então um
+RCE no `api` faz `SET LOCAL ROLE hunter_worker`, ganha `BYPASSRLS` e os grants
+de escrita da execução, e passa a ler e escrever **toda** organização — a
+guarda que limita a API a arquivar pedidos é escrita como
+`app AND NOT worker` e, por construção, não morde uma sessão que virou o
+worker. Não é regressão (hoje, antes do passo (d), a DSN é a de superusuário) e
+não bloqueia a entrega; é **risco residual declarado**. O fechamento de verdade
+são **dois** logins — `hunter_runtime_api` membro só de `hunter_app`,
+`hunter_runtime_worker` membro só de `hunter_worker`, um por serviço no compose
+—, registrado como nota de desenho **T3.15h** em `docs/DATABASE.md` §27.1, com
+o obstáculo real nomeado: o `api` de hoje usa `hunter_worker` para resolver
+identidade em toda requisição autenticada.
 
 ## 6. LLM (Fase 2+)
 

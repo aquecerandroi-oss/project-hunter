@@ -51,6 +51,34 @@ def test_development_defaults_do_not_require_urls(monkeypatch: pytest.MonkeyPatc
     assert settings.database_url is not None
 
 
+def test_database_url_migrations_defaults_to_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    """T3.15e (MEDIUM-C): no ``localhost`` fallback for the schema owner's DSN.
+
+    Unlike ``database_url``, this field must be silent-failure-proof: every
+    owner script's ``migration_url()`` already refuses an empty string loudly
+    (``SystemExit``), and a populated-but-wrong default would instead connect
+    against whatever happens to be listening on localhost instead of raising.
+    Absence must be a loud configuration error everywhere this field is read,
+    including in every environment where nothing sets it explicitly.
+    """
+    monkeypatch.delenv("DATABASE_URL_MIGRATIONS", raising=False)
+    settings = Settings()
+    assert settings.database_url_migrations is not None
+    assert settings.database_url_migrations.get_secret_value() == ""
+
+
+def test_database_url_migrations_reads_env_when_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "DATABASE_URL_MIGRATIONS", "postgresql://owner:pw@postgres:5432/hunter"
+    )
+    settings = Settings()
+    assert (
+        settings.database_url_migrations is not None
+        and settings.database_url_migrations.get_secret_value()
+        == "postgresql://owner:pw@postgres:5432/hunter"
+    )
+
+
 def test_production_fails_fast_without_database_and_redis_url(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -16,6 +16,7 @@ from hunter_core.strategies.breakout_v1 import BREAKOUT_V1
 from hunter_core.strategies.mean_reversion_v1 import MEAN_REVERSION_V1
 from hunter_core.strategies.momentum_v1 import MOMENTUM_V1
 from hunter_core.strategies.session_orb_v1 import SESSION_ORB_V1
+from hunter_core.strategies.sweep_reclaim_v1 import SWEEP_RECLAIM_V1
 from hunter_core.strategies.trendline_breakout_v1 import TRENDLINE_BREAKOUT_V1
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 
@@ -52,6 +53,7 @@ DEFAULT_REGISTRY = StrategyRegistry(
         MEAN_REVERSION_V1,
         MOMENTUM_V1,
         SESSION_ORB_V1,
+        SWEEP_RECLAIM_V1,
         TRENDLINE_BREAKOUT_V1,
         VOLUME_ANOMALY_V1,
     )

@@ -10,11 +10,14 @@ operator-facing needs the plain ``seed()`` did not have:
   from ``RETURNING``/the database mid-transaction); only the commit never
   happens.
 - ``--only <table>``: restrict the run to one table's own transaction —
-  ``strategies``, ``risk_profiles``, ``feature_definitions`` or
+  ``exchanges``, ``strategies``, ``risk_profiles``, ``feature_definitions`` or
   ``opportunity_weights`` (:data:`seed_dry_run.TABLE_CHOICES`). ``strategies``
   and ``strategy_versions`` move together (one upsert, two report keys);
   ``risk_profiles`` and ``paper_v1`` move together the same way ``seed()``
-  already does.
+  already does. ``exchanges`` joined in T3.44c, when ``0016`` gave the venue
+  catalogue a ``planned`` label the seed can actually move a row into
+  (DATABASE.md §28); before that, ``seed_exchanges`` never wrote ``status`` and
+  a re-seed of that table could not change anything a stored row said.
 - the risk directive: a write that would change a stored ``risk_profiles``
   limit — any of the three presets or ``paper_v1`` — refuses before it commits
   unless ``--yes`` is given. "Limits are never changed without being presented
@@ -62,6 +65,8 @@ async def _seed_risk_profiles_table(conn: AsyncConnection) -> int:
 
 
 async def _run_only(conn: AsyncConnection, only: str) -> dict[str, int]:
+    if only == "exchanges":
+        return {"exchanges": await seed_exchanges(conn)}
     if only == "strategies":
         strategies, versions = await seed_strategies(conn)
         return {"strategies": strategies, "strategy_versions": versions}

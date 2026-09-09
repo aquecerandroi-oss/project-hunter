@@ -52,6 +52,7 @@ bash infra/vps/compose.sh up            # sobe/atualiza tudo (build incluso)
 bash infra/vps/compose.sh ps            # estado dos containers
 bash infra/vps/compose.sh logs          # logs ao vivo de tudo
 bash infra/vps/compose.sh logs api      # logs de um serviço
+bash infra/vps/compose.sh ops python infra/scripts/create_partitions.py  # trabalho de dono do schema na imagem já implantada (nunca constrói)
 bash infra/vps/compose.sh update        # git pull + rebuild + up
 bash infra/vps/compose.sh down          # para tudo (volumes ficam)
 bash infra/vps/compose.sh exec postgres psql -U hunter -d hunter
@@ -166,24 +167,31 @@ trás que a retenção já não cubra **não** é criado — seria criado às 04
 derrubado por `prune_partitions.py` logo depois. O cron abaixo não muda: o
 padrão já é 2.
 
-Rodar a mão (mesmo `docker compose run --rm` que `migrate`/`seed` usam —
-`compose.sh` não tem um atalho dedicado para isto, mas encaminha qualquer
-subcomando):
+Rodar a mão pelo serviço `ops` (T3.15d/T3.15e, docs/DEPLOYMENT.md §3.4): é o
+único serviço, além de `migrate`, com `DATABASE_URL_MIGRATIONS` no ambiente —
+`create_partitions.py` conecta como dono (`migration_url()`), e desde a
+T3.15d `api` não carrega mais essa credencial. `ops` chama o script
+diretamente (não por `HUNTER_COMMAND=partitions`/`entrypoint.sh` — `ops` tem
+`entrypoint: []`, então o comando que vem depois do nome do serviço já é o
+processo, sem dispatch de papel):
 
 ```bash
-bash infra/vps/compose.sh run --rm --no-deps -e HUNTER_COMMAND=partitions api
+bash infra/vps/compose.sh ops python infra/scripts/create_partitions.py
 ```
 
-**`--no-deps` não é opcional aqui.** `api` declara `depends_on: migrate:
-condition: service_completed_successfully` no `docker-compose.yml`, e `docker
-compose run` sobe os `depends_on` a menos que se mande não subir. Sem
-`--no-deps`, este comando dispara `alembic upgrade head` (com
-`DATABASE_URL_MIGRATIONS`, a credencial dona do schema) toda vez que roda —
-inclusive às 04:07 sem ninguém olhando. Um `git pull`/`update` que deixou uma
-revisão nova sem release faria essa migração aplicar sozinha; e se a migração
-falhar, `compose run` aborta na dependência e a partição — o motivo do job
-existir — nunca chega a rodar. `--no-deps` faz este comando fazer só uma
-coisa: criar partição, exatamente como o nome do job promete.
+`ops` não declara `depends_on: migrate` como `api` declara (só `postgres:
+condition: service_healthy`), então este comando nunca sobe a migração dona
+do schema de lado — o `--no-deps` que a versão anterior deste comando
+precisava (para não rodar `alembic upgrade head` toda vez, inclusive às 04:07
+sem ninguém olhando) deixou de ser necessário porque `ops` simplesmente não
+tem essa dependência para subir.
+
+A contrapartida de retenção, `prune_partitions.py`, ainda não tem cron
+próprio (ver "Open Bugs"); quando rodada à mão, mesmo caminho:
+
+```bash
+bash infra/vps/compose.sh ops python infra/scripts/prune_partitions.py --dry-run
+```
 
 Agendamento (instalar uma vez, à mão — `bootstrap_vps.sh` só instala o cron do
 backup, não este; segue o mesmo padrão de `/etc/cron.d/hunter-backup`):
@@ -192,7 +200,7 @@ backup, não este; segue o mesmo padrão de `/etc/cron.d/hunter-backup`):
 printf '%s\n' \
   'SHELL=/bin/bash' \
   'PATH=/usr/local/bin:/usr/bin:/bin' \
-  '7 4 * * * hunter cd /opt/project-hunter && bash infra/vps/compose.sh run --rm --no-deps -e HUNTER_COMMAND=partitions api >> /opt/backups/partitions.log 2>&1' \
+  '7 4 * * * hunter cd /opt/project-hunter && bash infra/vps/compose.sh ops python infra/scripts/create_partitions.py >> /opt/backups/partitions.log 2>&1' \
   | sudo tee /etc/cron.d/hunter-partitions >/dev/null
 sudo chmod 644 /etc/cron.d/hunter-partitions
 ```
@@ -215,7 +223,7 @@ Quando falhar:
 
 ```bash
 tail -30 /opt/backups/partitions.log     # o que o cron viu
-bash infra/vps/compose.sh run --rm --no-deps -e HUNTER_COMMAND=partitions api  # rodar a mão para ver o erro na tela
+bash infra/vps/compose.sh ops python infra/scripts/create_partitions.py  # rodar a mão para ver o erro na tela
 ```
 
 Se falhar dias seguidos perto da virada do mês, o readiness check da T1.3 já

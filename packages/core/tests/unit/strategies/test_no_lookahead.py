@@ -31,6 +31,7 @@ from hunter_core.strategies.canonical import canonical_json
 from hunter_core.strategies.mean_reversion_v1 import MEAN_REVERSION_V1
 from hunter_core.strategies.momentum_v1 import MOMENTUM_V1
 from hunter_core.strategies.session_orb_v1 import SESSION_ORB_V1
+from hunter_core.strategies.sweep_reclaim_v1 import SWEEP_RECLAIM_V1
 from hunter_core.strategies.trendline_breakout_v1 import TRENDLINE_BREAKOUT_V1
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 
@@ -45,6 +46,10 @@ from .test_momentum_v1 import CUT as MOMENTUM_CUT
 from .test_momentum_v1 import build_series as momentum_series
 from .test_session_orb_v1 import CUT as SESSION_ORB_CUT
 from .test_session_orb_v1 import build_series as session_orb_series
+from .test_sweep_reclaim_v1 import CUT as SWEEP_CUT
+from .test_sweep_reclaim_v1 import K_CONFIRM_CUT
+from .test_sweep_reclaim_v1 import build_k_confirmation_series as sweep_k_series
+from .test_sweep_reclaim_v1 import build_series as sweep_series
 from .test_trendline_breakout_v1 import BOUNCE_CUT as TRENDLINE_BOUNCE_CUT
 from .test_trendline_breakout_v1 import CUT as TRENDLINE_CUT
 from .test_trendline_breakout_v1 import build_bounce_series as trendline_bounce_series
@@ -706,4 +711,108 @@ def test_the_trendline_numbers_do_not_depend_on_the_ambient_decimal_context(
     assert baseline is not None and bounce_baseline is not None
     assert narrowed == baseline
     assert narrowed_bounce == bounce_baseline
+    assert _envelope_json(narrowed) == _envelope_json(baseline)
+
+
+# ------------------------------------------------------------ sweep_reclaim_v1 (T3.45b)
+
+
+def sweep_decision(candles: list[NormalizedCandle], cut: object = SWEEP_CUT) -> Decision | None:
+    return SWEEP_RECLAIM_V1.evaluate(ctx_of(candles, cut), SWEEP_RECLAIM_V1.default_parameters)
+
+
+def test_sweep_reclaim_is_identical_under_three_kinds_of_pollution() -> None:
+    """As três mutações do brief T3.45b §10.8, comparadas no JSON canônico do
+    envelope: uma vela **não final** dentro da janela, uma vela final que fecha
+    **depois** do corte, e um futuro adulterado. O pivô, a profundidade da
+    varredura e os níveis saem idênticos nos três."""
+    clean = sweep_series()
+    forming_inside = minute(
+        SWEEP_CUT - timedelta(minutes=1),
+        D("100"),
+        D("9999"),
+        D("0.01"),
+        D("5000"),
+        D("999999"),
+        is_final=False,
+    )
+    after_the_cut = explode(ABSURD, SWEEP_CUT, 15)
+    another_future = explode(BarSpec(D("100"), D("101"), D("1"), D("2"), D("7")), SWEEP_CUT, 15)
+
+    baseline = sweep_decision(clean)
+
+    assert baseline is not None
+    for polluted in (
+        [*clean, forming_inside],
+        [*clean, *after_the_cut],
+        [*clean, *another_future],
+        [*clean, forming_inside, *after_the_cut],
+    ):
+        decision = sweep_decision(polluted)
+        assert decision == baseline
+        assert _envelope_json(decision) == _envelope_json(baseline)
+
+
+def test_a_swing_low_still_inside_its_confirmation_window_cannot_be_used() -> None:
+    """O vazamento que esta versão poderia esconder, e o único lugar em que ele
+    caberia: um pivô só é *conhecido* ``k`` barras depois. As **mesmas** velas
+    respondem ``no_pivot`` no corte em que o fundo está em ``t-2`` e produzem a
+    decisão duas barras depois, quando ele virou ``t-4`` — a diferença é o corte,
+    não o dado."""
+    candles = sweep_k_series()
+    params = SWEEP_RECLAIM_V1.default_parameters
+
+    too_early = SWEEP_RECLAIM_V1.explain(ctx_of(candles, K_CONFIRM_CUT), params)
+    confirmed = SWEEP_RECLAIM_V1.explain(ctx_of(candles, SWEEP_CUT), params)
+
+    assert too_early.decision is None
+    assert too_early.reason == "no_pivot"
+    assert confirmed.decision is not None
+    ages = {f.name: f.value for f in confirmed.decision.supporting_features.features}
+    assert ages["pivot_index_back"] == 4
+
+
+@pytest.mark.parametrize(
+    ("high", "low", "close", "volume"),
+    [
+        (D("9999"), D("0.01"), D("5000"), D("999999")),
+        (D("100"), D("100"), D("100"), D("0")),
+        (D("100.4"), D("97.5"), D("99.8"), D("300")),
+    ],
+    ids=["absurd", "flat", "plausible"],
+)
+def test_mutating_the_forming_candle_never_moves_the_sweep(
+    high: Decimal, low: Decimal, close: Decimal, volume: Decimal
+) -> None:
+    """O caso "plausível" é o que morde: uma revisão não final que baixasse a
+    mínima para 97,5 mudaria o stop, o risco e o alvo se ela fosse lida."""
+    clean = sweep_series()
+    forming = minute(
+        SWEEP_CUT - timedelta(minutes=1), D("100"), high, low, close, volume, is_final=False
+    )
+
+    baseline = sweep_decision(clean)
+
+    assert baseline is not None
+    assert sweep_decision([*clean, forming]) == baseline
+    assert _envelope_json(sweep_decision([*clean, forming])) == _envelope_json(baseline)
+
+
+@pytest.mark.parametrize("prec", [2, 6, 28])
+@pytest.mark.parametrize("rounding", [ROUND_DOWN, ROUND_UP, ROUND_HALF_EVEN])
+def test_the_sweep_numbers_do_not_depend_on_the_ambient_decimal_context(
+    prec: int, rounding: str
+) -> None:
+    ctx = ctx_of(sweep_series(), SWEEP_CUT)
+    params = SWEEP_RECLAIM_V1.default_parameters
+
+    baseline = SWEEP_RECLAIM_V1.evaluate(ctx, params)
+
+    with localcontext() as context:
+        context.prec = prec
+        context.rounding = rounding
+        narrowed = SWEEP_RECLAIM_V1.evaluate(ctx, params)
+
+    assert baseline is not None and narrowed is not None
+    assert narrowed == baseline
     assert _envelope_json(narrowed) == _envelope_json(baseline)

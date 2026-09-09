@@ -1,7 +1,12 @@
-"""Worker liveness and market-connectivity views built from Redis ``hb:*``
-hashes and Postgres market/gap counts. The Redis field contract this module
-reads is documented verbatim in ``schemas/system.py``'s module docstring;
-keep the two in sync.
+"""Worker liveness from Redis ``hb:*`` hashes. The Redis field contract this
+module reads is documented verbatim in ``schemas/system.py``'s module
+docstring; keep the two in sync.
+
+The market-connectivity half moved to ``services/market_status.py`` in T3.44c
+(the 350-line budget, and the seam the module already had). It is **re-exported
+here** — ``routers/system.py`` imports ``build_market_status`` from this module
+and a split that breaks an import is a refactor that broke something
+(DATABASE.md §18.10).
 """
 
 from __future__ import annotations
@@ -13,20 +18,14 @@ from typing import TYPE_CHECKING, cast
 
 import redis.exceptions as redis_exceptions
 
-from hunter_api.repositories.markets import MarketRepository
-from hunter_api.schemas.system import (
-    MarketStatusExchangeOut,
-    MarketStatusOut,
-    WorkerHeartbeatOut,
-    WorkerLivenessStatus,
-)
-from hunter_api.services.market_shards import CollectorView, read_collector
+from hunter_api.schemas.system import WorkerHeartbeatOut, WorkerLivenessStatus
+from hunter_api.services.market_status import CLOCK_SKEW_TOLERANCE_S as CLOCK_SKEW_TOLERANCE_S
+from hunter_api.services.market_status import build_market_status as build_market_status
 from hunter_core.domain.types import ensure_utc, utcnow
 from hunter_core.logging import get_logger
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
-    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = get_logger(__name__)
 
@@ -39,21 +38,6 @@ though ``hb:*``'s own 30s TTL (``WorkerRuntime.HEARTBEAT_TTL_S``) means a row
 this old has usually already expired out of Redis. "dead" mostly covers the
 read racing that expiry, not a normal steady state.
 """
-
-CLOCK_SKEW_TOLERANCE_S = 2.0
-"""(F3) A ``ts`` more than this far ahead of ``now`` is a skewed producer
-clock, not a live heartbeat -- reported ``dead`` regardless of how small the
-naive ``now - ts`` looks. Mirrors ``services/markets.py``'s constant of the
-same name and rationale; kept as a separate copy since the two modules are
-independently owned and neither imports the other's internals.
-
-(G6) Reduced from 5s to 2s, for the same reason ``services/markets_quality
-.py`` reduced its copy: the API and every worker that writes a ``ts`` here
-run on the same NTP-synced host, so genuine clock drift between them should
-be near zero -- 2s is generous headroom for jitter, not for a producer that
-has actually stopped. Also now applied to ``build_market_status``'s
-``last_event_at`` handling, which previously only clamped the age and never
-checked it against this tolerance at all."""
 
 HEARTBEAT_SCAN_PATTERN = "hb:*"
 
@@ -265,85 +249,3 @@ async def scan_heartbeats(redis: redis_asyncio.Redis) -> list[WorkerHeartbeatOut
         raise
     out.sort(key=lambda item: (item.role, item.instance))
     return out
-
-
-async def build_market_status(session: AsyncSession, redis: redis_asyncio.Redis) -> MarketStatusOut:
-    """One row per (global, no-RLS) ``exchanges`` entry — not per ``hb:market:*``
-    key found — so an exchange the worker has never touched still appears,
-    reported ``ws_state: "unavailable"``, rather than silently missing.
-
-    (G4) One exchange's own heartbeat hash misbehaving (a lone ``WRONGTYPE``)
-    still degrades only that row -- the same per-item isolation
-    ``services/markets.py`` applies. But if *every* exchange's read failed,
-    that is not "no worker has reported for any exchange yet", it is Redis
-    itself being unreachable -- reported wholesale by re-raising
-    ``redis.exceptions.RedisError`` (after logging only its ``error_type``
-    per exchange, never a key name) so the router can answer an explicit
-    ``503`` instead of a ``200`` indistinguishable from a healthy, idle
-    cluster.
-    """
-    repository = MarketRepository(session)
-    exchange_codes = await repository.list_exchange_codes()
-    monitored_counts = await repository.monitored_market_counts()
-    gap_counts = await repository.open_gap_counts()
-
-    collectors: list[tuple[str, CollectorView]] = []
-    failed_reads = 0
-    for code in exchange_codes:
-        try:
-            # T2.5g: the union of this exchange's shard heartbeats (or the solo
-            # key), never a single hash N processes would overwrite.
-            view = await read_collector(redis, code, now=utcnow())
-        except redis_exceptions.RedisError as exc:
-            logger.warning(
-                "market_status_redis_error", error_type=type(exc).__name__, exchange=code
-            )
-            failed_reads += 1
-            view = CollectorView(ws_state="unavailable")
-        collectors.append((code, view))
-    # (G5) captured after every Redis read above, not before the loop --
-    # `now` must reflect when the reads actually completed.
-    now = utcnow()
-    if exchange_codes and failed_reads == len(exchange_codes):
-        raise redis_exceptions.RedisError("every exchange heartbeat read failed")
-
-    exchanges: list[MarketStatusExchangeOut] = []
-    for code, view in collectors:
-        last_event_at = view.last_event_at
-        ws_state = view.ws_state
-        age_ms: int | None = None
-        if last_event_at is not None:
-            age_s = (now - last_event_at).total_seconds()
-            # (G6) apply the same clock-skew tolerance the component/
-            # heartbeat freshness checks already apply: a `last_event_at`
-            # further ahead of `now` than `CLOCK_SKEW_TOLERANCE_S` is not
-            # evidence of a live feed, however fresh the naive `now - ts`
-            # looks -- previously this branch only clamped the age at 0 and
-            # left `ws_state` free to still read "connected" off an
-            # impossible timestamp. An out-of-tolerance timestamp is treated
-            # the same as no timestamp at all: `last_event_at`/`age_ms` come
-            # back absent and `ws_state` is forced to "unavailable" rather
-            # than trusting a signal that cannot be real.
-            if age_s < -CLOCK_SKEW_TOLERANCE_S:
-                last_event_at = None
-                ws_state = "unavailable"
-            else:
-                age_ms = max(int(age_s * 1000), 0)
-        exchanges.append(
-            MarketStatusExchangeOut(
-                exchange=code,
-                ws_state=ws_state,
-                last_event_at=last_event_at,
-                last_event_age_ms=age_ms,
-                markets_monitored=monitored_counts.get(code, 0),
-                open_gaps=gap_counts.get(code, 0),
-                reconnects=view.reconnects,
-                shards_expected=view.shards_expected,
-                shards_reporting=view.shards_reporting,
-            )
-        )
-    return MarketStatusOut(
-        exchanges=exchanges,
-        markets_monitored_total=sum(monitored_counts.values()),
-        updated_at=now,
-    )

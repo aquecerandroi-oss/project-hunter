@@ -44,6 +44,7 @@ read_existing() {
 }
 
 OLD_PG_PASSWORD="$(read_existing POSTGRES_PASSWORD)"
+OLD_RUNTIME_PASSWORD="$(read_existing HUNTER_RUNTIME_DB_PASSWORD)"
 OLD_AUTH_SECRET="$(read_existing AUTH_SECRET)"
 OLD_MASTER_KEY="$(read_existing HUNTER_MASTER_KEY)"
 OLD_PK="$(read_existing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)"
@@ -59,6 +60,9 @@ if [ -f "$ENV_PATH" ]; then
   esac
   if [ -n "$OLD_PG_PASSWORD" ]; then
     echo "  (POSTGRES_PASSWORD atual preservado - o volume do Postgres ja nasceu com ela)"
+  fi
+  if [ -n "$OLD_RUNTIME_PASSWORD" ]; then
+    echo "  (HUNTER_RUNTIME_DB_PASSWORD atual preservado - o papel hunter_runtime ja tem essa senha)"
   fi
 fi
 
@@ -223,6 +227,14 @@ fi
 OPENAI="$(read_optional_secret OPENAI_API_KEY)"
 
 PG_PASSWORD="${OLD_PG_PASSWORD:-$(gen_secret)}"
+# T3.15f - senha do login hunter_runtime, o papel sem superusuario com que api e
+# workers conectam (docs/DATABASE.md secao 27). Preservada por read_existing pelo
+# mesmo motivo de POSTGRES_PASSWORD, e por um a mais: esta senha vive NO PAPEL do
+# banco, aplicada fora de banda pelo operador (ALTER ROLE, passo (b) de
+# docs/DEPLOYMENT.md secao 3.5). Regerar aqui um valor novo nao troca a senha do
+# papel - so faz api e todo worker pararem de autenticar no proximo update.
+# Quando ela nasce agora (nao havia .env antes), o passo (b) e obrigatorio.
+RUNTIME_DB_PASSWORD="${OLD_RUNTIME_PASSWORD:-$(gen_secret)}"
 AUTH_SECRET="${OLD_AUTH_SECRET:-$(gen_secret)}"
 MASTER_KEY="${OLD_MASTER_KEY:-$(gen_b64_key)}"
 
@@ -258,6 +270,7 @@ trap 'rm -f "$ENV_TMP"' EXIT
     echo "HUNTER_ENV=staging"
     echo "SENTRY_ENVIRONMENT=staging"
     echo "POSTGRES_PASSWORD=$PG_PASSWORD"
+    echo "HUNTER_RUNTIME_DB_PASSWORD=$RUNTIME_DB_PASSWORD"
     echo "HUNTER_PUBLIC_URL=$PUBLIC_URL"
     echo "HUNTER_WS_URL=$WS_URL"
     echo "HUNTER_SITE_ADDRESS=$SITE_ADDRESS"
@@ -289,6 +302,25 @@ echo "  secret key:      $(mask "$SK")"
 if [ "$PROFILE" = "vps" ]; then
   echo "  URL publica:     $PUBLIC_URL"
   echo "  senha do Postgres: gerada/preservada, so dentro do .env"
+  if [ -n "$OLD_RUNTIME_PASSWORD" ]; then
+    echo "  senha do hunter_runtime: preservada (o papel do banco ja a tem)"
+  else
+    # A senha NUNCA vai em argv (revisao de seguranca T3.15f, MEDIA 3):
+    # /proc/<pid>/cmdline e legivel por qualquer usuario da maquina enquanto o
+    # comando roda, entao nem `-c "ALTER ROLE ... '<senha>'"` nem
+    # `-v pw="<senha>"`. Duas formas sem argv: `\password` (o psql manda o hash
+    # SCRAM, o texto puro nao chega nem ao servidor) e o SQL por stdin.
+    echo "  senha do hunter_runtime: GERADA AGORA - aplique-a no banco antes do update."
+    echo "    interativo (preferido; o psql pede duas vezes e manda o hash SCRAM):"
+    echo "      bash infra/vps/compose.sh exec postgres psql -U hunter -d hunter"
+    echo "      psql> \\password hunter_runtime"
+    echo "    sem TTY (o SQL vai por stdin, nada em argv):"
+    echo "      { printf \"ALTER ROLE hunter_runtime PASSWORD '\"; \\"
+    echo "        sed -n 's/^HUNTER_RUNTIME_DB_PASSWORD=//p' .env | head -1 | tr -d '\\n'; \\"
+    echo "        printf \"';\\n\"; } \\"
+    echo "      | bash infra/vps/compose.sh exec -T postgres psql -U hunter -d hunter -q"
+    echo "    (passo (b) de docs/DEPLOYMENT.md secao 3.5; sem ele api/workers nao autenticam)"
+  fi
   echo ""
   echo "Proximo passo: bash infra/vps/compose.sh up"
 else

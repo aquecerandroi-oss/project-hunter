@@ -91,18 +91,19 @@ def _written(result: Any) -> int:
 
 
 async def seed_exchanges(conn: AsyncConnection) -> int:
+    """The venue catalogue. ``status`` is written in **both** halves of the
+    upsert since T3.44c — that is what moves a venue between ``planned`` and
+    ``active`` on a re-seed, and before ``0016`` there was no label to move it
+    to (DATABASE.md §28)."""
     written = 0
-    for code, name, capabilities in EXCHANGES:
+    for code, name, status, capabilities in EXCHANGES:
         statement = insert(Exchange).values(
-            id=uuid7(), code=code, name=name, capabilities=capabilities
+            id=uuid7(), code=code, name=name, status=status, capabilities=capabilities
         )
         result = await conn.execute(
             statement.on_conflict_do_update(
                 index_elements=[Exchange.code],
-                set_={
-                    "name": statement.excluded.name,
-                    "capabilities": statement.excluded.capabilities,
-                },
+                set_={c: statement.excluded[c] for c in ("name", "status", "capabilities")},
             ).returning(Exchange.id)
         )
         written += _written(result)

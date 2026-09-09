@@ -189,6 +189,24 @@ class MarketRepository:
         rows = (await self.session.execute(select(Exchange.code).order_by(Exchange.code))).all()
         return [row[0] for row in rows]
 
+    async def list_exchanges_with_status(self) -> list[tuple[str, str]]:
+        """``(code, status)`` for every venue, ordered by code.
+
+        The status half is what ``build_market_status`` needs to stop reporting a
+        venue nobody collects as a dead feed: ``planned`` (DATABASE.md §28) is a
+        venue catalogued without a collector, and it belongs in a separate list,
+        not in the worst-of aggregate. Read here rather than filtered in SQL
+        because the caller has to *name* the planned ones, not just not see them
+        — an exchange that silently disappeared from the response would be the
+        other half of the same bug.
+        """
+        rows = (
+            await self.session.execute(
+                select(Exchange.code, Exchange.status).order_by(Exchange.code)
+            )
+        ).all()
+        return [(row[0], str(row[1])) for row in rows]
+
     async def monitored_market_counts(self) -> dict[str, int]:
         """``exchange code -> count of is_monitored markets``, for
         ``system/market-status``.

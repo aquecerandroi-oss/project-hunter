@@ -169,6 +169,295 @@ e que os heartbeats perpétuos (`hb:market:{exchange}:{i}of{N}`) continuam com
 `docs/PIPELINE.md` §1d já pedia antes de considerar o ambiente estável, agora
 sobre um processo que nunca compartilha event loop com eles.
 
+### 3.4 A DSN de dono e o serviço `ops` (T3.15d)
+
+`DATABASE_URL_MIGRATIONS` é a conexão do **dono do schema** — a mesma que
+`infra/scripts/activate_strategy_version.py`, `derive_variant.py`, `seed.py`
+e `open_paper_wallet.py` usam para escrever (docs/DATABASE.md §22.3/§23).
+Até esta tarefa ela vivia na âncora (`x-api-env`/`x-prod-db-env`) que **todo**
+serviço herdava — `api` e cada worker (`market`, `scanner`, `strategy`,
+`execution`) tinham a credencial de dono no próprio ambiente, mesmo sem
+nenhum código de produção jamais construir uma conexão com ela. Achado
+HIGH-1 de `.claude/state/review-T3.15-security.md`: um RCE em qualquer um
+desses processos (uma CVE de dependência, um path traversal lendo
+`/proc/self/environ`, um handler de erro que despeja o ambiente) podia abrir
+conexão como dono e escrever `strategy_versions.purpose = 'paper'`, ativar
+uma versão sem passar pelo script, ou `ALTER TABLE ... DISABLE ROW LEVEL
+SECURITY` em qualquer tabela de tenant.
+
+Os dois composes (`infra/docker/docker-compose.yml`,
+`infra/vps/docker-compose.prod.yml`) agora separam a âncora em duas:
+
+- `x-api-env`/`x-prod-db-env` — só o que todo processo de runtime precisa
+  (`DATABASE_URL`, `REDIS_URL`, `HUNTER_ENV`, ...). `api` e cada worker
+  continuam recebendo exatamente isto, sem `DATABASE_URL_MIGRATIONS`.
+- `x-owner-env`/`x-prod-owner-env` — só `DATABASE_URL_MIGRATIONS`. Concedida
+  a exatamente dois serviços: `migrate` (o job de `alembic upgrade head` que
+  já corre em todo `up`/`update`) e o novo `ops`.
+
+`ops` é **só perfil** (`profiles: ["ops"]`): nunca sobe com um `docker
+compose up` normal (nem com `compose.sh up|update`, que não adiciona esse
+perfil sozinho) — existe para ser `run --rm`, nunca `up`d. Não roda processo
+nenhum por padrão (`entrypoint: []` + `command: ["true"]`, que só importa se
+alguém o nomear explicitamente, o único jeito de contornar o filtro de
+perfil): sobe, executa `true`, sai. É a mesma imagem `hunter-api:${GIT_SHA:-dev}`
+de `api`/todo worker — só o ambiente Python, nunca um processo residente
+segurando a conexão de dono aberta.
+
+**Onde cada script roda agora.** O container de vida longa `hunter-api-1` não
+tem mais `DATABASE_URL_MIGRATIONS` no ambiente — `docker exec hunter-api-1
+python infra/scripts/activate_strategy_version.py ...` (o padrão que
+`docs/ACTIVATION.md` documentava até esta tarefa) já não teria a credencial.
+O caminho novo:
+
+```bash
+# dev/local
+docker compose -f infra/docker/docker-compose.yml run --rm ops \
+  python infra/scripts/activate_strategy_version.py momentum v1 --paper-line --dry-run --changelog "..."
+
+# VPS (compose.sh já resolve --env-file, -p hunter e os dois -f; nenhum
+# --profile é preciso: nomear o serviço explicitamente basta para contornar
+# o filtro de perfil, tanto para `run` quanto para `up`)
+ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops \
+  python infra/scripts/activate_strategy_version.py momentum v2 --changelog 'D10: coorte paper'"
+```
+
+`docs/ACTIVATION.md` tem os comandos completos de cada passo do runbook,
+atualizados para este padrão. Depois desta tarefa, "quem consegue rodar
+`activate_strategy_version.py`" tem uma resposta honesta (T3.15e, MEDIUM-E —
+a formulação anterior desta seção, "quem tem shell no host com o `.env` — e
+nenhum container", estava errada em duas frentes): **quem tem acesso ao
+socket do Docker na VPS** (grupo `docker` ou `root`) — via `ops`/`migrate`,
+hoje os dois únicos lugares onde a DSN de dono existe (`x-prod-owner-env`).
+Isso não é o mesmo que "shell no host com o `.env`": o `.env` guarda só
+`POSTGRES_PASSWORD` (e os outros segredos) — a string de conexão inteira
+(usuário, host, porta, banco) mora no template `x-prod-owner-env`, versionado
+em `infra/vps/docker-compose.prod.yml`, não no `.env`; ter o socket do Docker
+já basta para montar esse `.env` em qualquer container próprio e completar a
+DSN lendo o compose file do repositório, sem precisar de `ops`/`migrate` nem
+de shell de verdade na máquina. E "nenhum container" não é verdade: `ops` e
+`migrate` carregam a DSN, por design, enquanto rodam — o que deixou de
+carregá-la foi todo processo de **vida longa** (`api`, todo worker); a frase
+certa é essa, não "nenhum container". `request_backfill.py` não
+precisa da DSN de dono (conecta como `hunter_worker` via `DATABASE_URL`,
+`packages/core/hunter_core/db/session.py::role_session`) mas passou a rodar
+pelo mesmo `ops`, por consistência operacional — um único caminho auditável
+para todo script de `infra/scripts/`, em vez de dois a lembrar.
+
+Prova (`docker compose ... config`, valores redigidos):
+`.claude/state/notes-T3.15d.md`.
+
+### 3.5 Trocar o runtime para `hunter_runtime` (T3.15f)
+
+A §3.4 tirou a **segunda** cópia da credencial de dono do ambiente dos
+processos de runtime. A que ficou — `DATABASE_URL` — **era a mesma
+credencial**: `hunter`, superusuário, `BYPASSRLS`. `hunter_app`/`hunter_worker`
+são papéis `NOLOGIN` concedidos a ela, então o `SET LOCAL ROLE` do
+`hunter_core.db.session` sempre foi uma redução voluntária que um `RESET ROLE`
+desfaz (docs/DATABASE.md §23.5). A migração `0015_runtime_login_role` cria o
+login que substitui essa DSN: `hunter_runtime`, sem superusuário, sem
+`BYPASSRLS`, sem herança, membro de `hunter_app` e `hunter_worker` e de mais
+nada (docs/DATABASE.md §27).
+
+**A migração sozinha não fecha nada.** Ela cria o papel — **sem senha**, porque
+senha no repositório não é senha. Quem troca a credencial é o deploy, nesta
+ordem.
+
+#### Pré-requisito
+
+`services/scanner-worker` tem quatro conexões que abrem transação **sem**
+`SET LOCAL ROLE` (`main.py::_warm`, `refresh.py` ×3): hoje elas funcionam
+porque o login é o dono, e sob `hunter_runtime` respondem *permission denied
+for table feature_baselines*. Elas precisam do `SET LOCAL ROLE hunter_worker`
+como primeiro statement da transação **antes** do passo (d)
+(docs/DATABASE.md §27.5). Os passos (a)–(c) podem ser feitos a qualquer
+momento; nada muda até o (d).
+
+#### (a) aplicar a `0015` — deploy normal
+
+```bash
+ssh hunter-vps "cd /opt/project-hunter && git pull && bash infra/vps/compose.sh update"
+```
+
+O serviço `migrate` roda `alembic upgrade head` em todo `update`. Depois disso
+o papel existe e não consegue conectar (não tem senha). Nada mais mudou: o
+`api` e os workers continuam com o `DATABASE_URL` de dono.
+
+#### (b) o operador define a senha, na VPS
+
+Gere a senha na própria VPS e aplique-a com uma conexão de dono. Ela **não**
+passa por chat, por log de agente nem pelo repositório — e, desde a revisão de
+segurança da T3.15f (MÉDIA 3), **não passa por `argv` nenhum**.
+
+**A forma preferida é `\password`, e ela é a única que não põe a senha em lugar
+nenhum além da sua digitação:** o `psql` faz o hash SCRAM-SHA-256 do lado do
+cliente e manda para o servidor `ALTER ROLE … PASSWORD 'SCRAM-SHA-256$…'`. O
+texto puro não entra na linha de comando, não entra no `~/.psql_history` (o
+metacomando `\password` é gravado sem o valor) e não entra num eventual
+`log_statement = 'all'` do servidor.
+
+```bash
+ssh hunter-vps
+cd /opt/project-hunter
+
+# gere a senha e ponha-a no .env primeiro (passo (c)); depois cole-a aqui
+bash infra/vps/compose.sh exec postgres psql -U hunter -d hunter
+# no prompt do psql (ele pede duas vezes, e não ecoa):
+#   \password hunter_runtime
+#   \q
+```
+
+**Sem TTY (script, sessão não interativa), o SQL vai por stdin — nunca por
+`-c`/`-v`:**
+
+```bash
+{ printf "ALTER ROLE hunter_runtime PASSWORD '"
+  sed -n 's/^HUNTER_RUNTIME_DB_PASSWORD=//p' .env | head -1 | tr -d '\n'
+  printf "';\n"
+} | bash infra/vps/compose.sh exec -T postgres psql -U hunter -d hunter -q
+```
+
+Por que isto e não `psql -v pw="$RUNTIME_PW"`, que é o que esta seção mandava
+até 2026-09-08: um argumento de linha de comando é legível em
+`/proc/<pid>/cmdline` por **qualquer** usuário da máquina enquanto o comando
+roda — o aviso sobre o histórico do shell (que continua valendo) cobria a
+metade errada do problema. A forma por stdin lê o valor que já está no `.env`
+(600, do dono), então não há segunda cópia a limpar; ela pressupõe uma senha
+sem aspas simples, que é o caso de `openssl rand -hex` e do
+`infra/scripts/setup_env.sh`.
+
+Se preferir gerar aqui em vez de no `setup_env.sh`, gere **direto no `.env`**
+(`printf 'HUNTER_RUNTIME_DB_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env`)
+e siga com o bloco de stdin acima: a senha nunca fica numa variável de sessão.
+
+#### (c) a chave no `.env`
+
+```bash
+# no .env da VPS (600, nunca commitado)
+HUNTER_RUNTIME_DB_PASSWORD=<a mesma senha do passo (b)>
+```
+
+`bash infra/scripts/setup_env.sh --vps` gera a chave quando o `.env` é criado ou
+regerado, e **preserva** a existente numa reexecução, exatamente como faz com
+`POSTGRES_PASSWORD`. Se o `.env` foi gerado antes desta tarefa, acrescente a
+linha à mão — e use no passo (b) o mesmo valor.
+
+**(b) e (c) podem trocar de ordem; o que não pode é os dois valores
+diferirem.** A forma por stdin do passo (b) lê a senha *do `.env`*, então nesse
+caminho o (c) vem primeiro; a forma `\password` a lê da sua digitação, e aí
+tanto faz. Nada acontece até o (d) de qualquer jeito: enquanto o `DATABASE_URL`
+nomear o dono, a senha do `hunter_runtime` não é usada por processo nenhum.
+
+#### (d) subir com a DSN nova
+
+```bash
+ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh update"
+```
+
+`x-prod-db-env` passa a montar o `DATABASE_URL` a partir de
+`HUNTER_RUNTIME_DB_PASSWORD`; `migrate` e `ops` continuam com
+`x-prod-owner-env` (a DSN de dono), que é o único lugar onde ela ainda existe.
+
+#### (e) verificar de dentro do `api`
+
+```bash
+bash infra/vps/compose.sh exec -T api python -c "
+import asyncio, os
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+
+async def main() -> None:
+    engine = create_async_engine(os.environ['DATABASE_URL'],
+                                 connect_args={'statement_cache_size': 0})
+    async with engine.connect() as c:
+        print((await c.execute(text(
+            'SELECT current_user, r.rolsuper, r.rolbypassrls, r.rolcreaterole, r.rolinherit '
+            'FROM pg_roles r WHERE r.rolname = current_user'))).one())
+    await engine.dispose()
+
+asyncio.run(main())
+"
+```
+
+Esperado: `('hunter_runtime', False, False, False, False)`. Qualquer `True` ali,
+ou qualquer outro `current_user`, quer dizer que o passo (d) não pegou — o
+achado continua aberto e o `.env`/compose precisam ser conferidos antes de
+declarar o contrário.
+
+**`bash infra/vps/compose.sh exec …`, nunca `docker compose -p hunter exec …`**
+(revisão de segurança da T3.15f, BAIXA 6). Não há `docker-compose.yml` na raiz
+do repositório: o stack de produção é a soma dos **dois** arquivos, na ordem
+certa, mais o `--env-file` — que é a razão de existir do wrapper. `exec` cai no
+catch-all dele e recebe os dois `-f` de graça. Improvisar isso no meio de uma
+troca de credencial é o pior momento para descobrir que faltava um `-f`.
+
+Duas verificações de recusa, opcionais e baratas, **e nenhuma delas precisa da
+senha**: elas rodam pela conexão que o `api` já tem aberta, que é justamente o
+que se quer provar.
+
+```bash
+bash infra/vps/compose.sh exec -T api python -c "
+import asyncio, os
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+
+REFUSALS = [
+    ('hunter_app',    'ALTER TABLE portfolios DISABLE ROW LEVEL SECURITY'),
+    ('hunter_worker', \"UPDATE strategy_versions SET purpose = 'paper'\"),
+]
+
+async def main() -> None:
+    engine = create_async_engine(os.environ['DATABASE_URL'],
+                                 connect_args={'statement_cache_size': 0})
+    for role, statement in REFUSALS:
+        async with engine.begin() as c:
+            await c.execute(text(f'SET LOCAL ROLE {role}'))
+            try:
+                await c.execute(text(statement))
+                print('FALHOU (aceito!):', statement)
+            except Exception as exc:                      # noqa: BLE001
+                print('recusado, como esperado:', str(exc).splitlines()[0])
+    await engine.dispose()
+
+asyncio.run(main())
+"
+```
+
+As duas têm de recusar (`must be owner of table portfolios` e *permission
+denied*), e são as mesmas duas do teste de integração
+(`packages/core/tests/integration/test_runtime_login_role.py`). A forma antiga
+desta verificação abria um `psql` com a senha **na URL de conexão, em `argv`** —
+pelo mesmo motivo do passo (b), não faça isso; e aqui não é sequer necessário,
+porque provar a recusa *pela conexão do `api`* é uma prova mais forte do que
+prová-la por uma conexão que o operador montou à mão.
+
+#### Rollback
+
+**Volte a DSN, não a migração.** Reverter a `0015` com o `DATABASE_URL` ainda
+nomeando `hunter_runtime` deixa `api` e todo worker sem alcançar tabela
+nenhuma. O caminho seguro é o inverso do passo (d):
+
+1. no `.env`, comente/remova `HUNTER_RUNTIME_DB_PASSWORD` e devolva o
+   `DATABASE_URL` de dono no compose (ou faça `git checkout` do compose para o
+   commit anterior);
+2. `bash infra/vps/compose.sh update`;
+3. só então, e só se houver motivo, `alembic downgrade -1` pelo `migrate`.
+
+O papel pode ficar de pé sem problema: sem a senha em uso e — depois do
+downgrade — sem membership nenhuma, ele não alcança nada (docs/DATABASE.md
+§27.4).
+
+**Depois de qualquer downgrade da `0015`, refaça o passo (b) antes de voltar à
+DSN nova.** Na VPS (um banco só, papel sem objetos) o downgrade **derruba** o
+papel, e a senha vai junto; o `alembic upgrade head` que todo `compose.sh
+update` roda o recria **sem senha**, enquanto o `HUNTER_RUNTIME_DB_PASSWORD`
+continua no `.env`, com a cara de estar certo. O sintoma é `api` e **todos** os
+workers falhando autenticação no boot, com um `.env` e um compose que parecem
+corretos. Refazer o passo (b) é `ALTER ROLE` com o valor que já está no `.env`
+— não gere uma senha nova, senão o (c) também tem de mudar. O downgrade avisa
+disso na saída da migração desde a revisão de segurança da T3.15f (MÉDIA 2),
+mas um `NOTICE` no meio de um log de deploy não é o controle; esta linha é.
+
 ## 4. CI (GitHub Actions)
 
 `ci.yml` em cada PR e push na `main`:
@@ -376,6 +665,7 @@ marcada **obrigatória** abaixo — as demais têm default de dev seguro.
 |---|---|---|---|
 | `DATABASE_URL` | **sim** | `postgresql+asyncpg://hunter:hunter@localhost:5432/hunter` | engine assíncrono (SQLAlchemy 2 + asyncpg) |
 | `DATABASE_URL_MIGRATIONS` | não | `postgresql://hunter:hunter@localhost:5432/hunter` | conexão direta (sem pooler) só para o Alembic |
+| `HUNTER_RUNTIME_DB_PASSWORD` | **sim** a partir da T3.15f | vazio | senha do login `hunter_runtime` que o `DATABASE_URL` de `api`/workers usa. Gerada por `setup_env.sh --vps`; aplicada no banco pelo operador (`ALTER ROLE`), nunca pela migração — §3.5 e docs/DATABASE.md §27 |
 | `REDIS_URL` | **sim** | `redis://localhost:6379/0` | Streams + pub/sub |
 | `DB_POOL_SIZE` | não | `5` | tamanho do pool do engine assíncrono |
 | `DB_MAX_OVERFLOW` | não | `5` | conexões extras além do pool sob carga |
@@ -528,28 +818,32 @@ o alcançam). Para isso, ou use `docker-compose.test.yml` (expõe
 `localhost:55432`, ver `infra/docker/docker-compose.test.yml`), ou rode via
 `docker compose run --rm migrate` acima.
 
-### Partições diárias (`HUNTER_COMMAND=partitions`)
+### Partições diárias (serviço `ops`)
 
 `infra/scripts/create_partitions.py` mantém as partições mensais três meses à
 frente (DATABASE.md §1.3); sem um agendamento real, em 2027-01 o primeiro
 insert falharia com `no partition of relation "candles_1m" found for row`
-(docs/plans/M1.md, pendência "Agendamento real das partições"). Igual a
-`migrate`/`seed`, `partitions` não é um `HUNTER_ROLE` — é acionado por
-`HUNTER_COMMAND` (ver `infra/docker/entrypoint.sh`). Não existe um serviço
-`partitions` dedicado no compose (como `seed` também não tem); reaproveita a
-imagem do serviço `api` com o comando trocado:
+(docs/plans/M1.md, pendência "Agendamento real das partições"). O script
+conecta com `DATABASE_URL_MIGRATIONS`, a DSN de dono (`migration_url()`) —
+desde a T3.15d/T3.15e ela só existe no ambiente de `migrate` e do serviço
+`ops` (§3.4), nunca no de `api`. Roda pelo `ops`, chamando o script
+diretamente (não por `HUNTER_COMMAND=partitions`/`infra/docker/entrypoint.sh`
+— `ops` tem `entrypoint: []`, então o comando depois do nome do serviço já é
+o processo, sem passar pelo dispatch de papel):
 
 ```bash
-docker compose -f infra/docker/docker-compose.yml run --rm --no-deps \
-  -e HUNTER_COMMAND=partitions api
+bash infra/vps/compose.sh ops python infra/scripts/create_partitions.py
 ```
 
-`--no-deps` é obrigatório: `api` declara `depends_on: migrate: condition:
-service_completed_successfully`, e `docker compose run` sobe os `depends_on`
-por padrão — sem `--no-deps`, este comando roda `alembic upgrade head` (com
-`DATABASE_URL_MIGRATIONS`, a credencial dona do schema) toda vez, inclusive no
-cron diário sem release nem supervisão. `--no-deps` restringe o comando a
-exatamente o que ele promete: criar partição.
+(equivalente em dev, sem `compose.sh`: `docker compose -f
+infra/docker/docker-compose.yml run --rm ops python
+infra/scripts/create_partitions.py`.) `ops` não declara `depends_on: migrate`
+como `api` declara — só `postgres: condition: service_healthy` — então este
+comando nunca dispara `alembic upgrade head` de lado, com ou sem `--no-deps`;
+a antiga necessidade de `--no-deps` (evitar que `docker compose run` subisse
+o `depends_on` de `api` e rodasse a migração dona do schema junto, todo dia,
+sem release nem supervisão) não existe mais no `ops` porque a única
+dependência dele é o Postgres estar de pé.
 
 Idempotente (`CREATE TABLE IF NOT EXISTS ... PARTITION OF`): rodar de novo sem
 nada de novo para criar não faz nada. Cada `CREATE`/`ALTER` roda dentro de uma
@@ -577,15 +871,18 @@ o orçamento que já é dele (§1b do `PIPELINE.md`).
 
 ```bash
 # 1. as partições dos meses para trás têm de existir, ou o pedido é recusado
-#    com `no_partition` (o consumidor diz o motivo, não aborta)
-docker compose -f infra/docker/docker-compose.yml run --rm --no-deps   -e HUNTER_COMMAND=partitions api                # --months-behind 2 é o default
+#    com `no_partition` (o consumidor diz o motivo, não aborta) — pelo `ops`
+#    (T3.15e; --months-behind 2 é o default)
+docker compose -f infra/docker/docker-compose.yml run --rm ops python infra/scripts/create_partitions.py
 
-# 2. o que seria pedido, sem escrever nada
-docker compose -f infra/docker/docker-compose.yml run --rm --no-deps api   python infra/scripts/request_backfill.py --days 31 --dry-run
+# 2. o que seria pedido, sem escrever nada — request_backfill.py não precisa
+#    da DSN de dono (conecta como hunter_worker via DATABASE_URL), mas roda
+#    pelo mesmo `ops` por consistência operacional (§3.4)
+docker compose -f infra/docker/docker-compose.yml run --rm ops python infra/scripts/request_backfill.py --days 31 --dry-run
 
 # 3. de verdade: enfileira na outbox; o dispatcher de qualquer worker publica
 #    em ~1 s (use --publish só se nenhum worker estiver de pé)
-docker compose -f infra/docker/docker-compose.yml run --rm --no-deps api   python infra/scripts/request_backfill.py --days 31
+docker compose -f infra/docker/docker-compose.yml run --rm ops python infra/scripts/request_backfill.py --days 31
 ```
 
 Sem `--markets` a lista é derivada do banco: todo perpétuo monitorado que tem
@@ -663,7 +960,10 @@ sobrescreve uma liquidação que a coleta ao vivo já gravou (`ON CONFLICT
 
 ```bash
 # depois de um deploy, para os 19 mercados monitorados + BTC (referência do β)
-docker exec hunter-api-1 python infra/scripts/request_backfill.py \
+# T3.15d: docker exec hunter-api-1 não tem mais DATABASE_URL_MIGRATIONS no
+# ambiente (§3.4); request_backfill.py não precisa dela (conecta como
+# hunter_worker via DATABASE_URL), mas roda pelo mesmo `ops` por consistência.
+bash infra/vps/compose.sh ops python infra/scripts/request_backfill.py \
   --kind funding --days 31 --publish \
   --markets BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,<...os demais 14>
 ```

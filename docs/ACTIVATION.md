@@ -19,8 +19,8 @@ Este é o caminho, na ordem, para a carteira `ever` passar a receber sinais do L
 | 3 | Revisões da `0010` (database-architect, guardian, security) — feitas em 2026-09-08: nada bloqueia o **deploy**; o guardian **bloqueia ligar a ponte** até a T3.15c (a ponte passa a julgar a coluna `purpose`, não o envelope; o worker perde o poder de ativar um rascunho) e a T3.15e (ativação da linha derivada mantém o conteúdo copiado; uma coorte só pela ponte) | agentes | `.claude/state/review-T3.15-{db,risk,security}.md`, `notes-T3.15c.md`, `notes-T3.15e.md` |
 | 4 | **Segundo deploy** (traz `0010`, T3.15b, T3.0f, T3.7b) | **Everton** | `ssh hunter-vps 'cd /opt/project-hunter && MARKET_SPOT=1 MARKET_SHARDS=4 bash infra/vps/compose.sh update'` (a flag `MARKET_SPOT=1` nasce na T3.0f) — depois: alembic em `0010`, `hb:market:spot:binance`, perpétuos intactos, `/ready` 200 |
 | 5 | Backfill de 31 dias na VPS e primeira rodada de β | orquestrador (leitura) / script no container da API | `market.candles.backfilled` para os 20 mercados; `hb:scanner` com `beta_valid ≥ 1` |
-| 6 | **Linha `paper` do momentum** | **Everton** (ou orquestrador com o seu "vai") | no container da API: `uv run python infra/scripts/activate_strategy_version.py momentum v1 --paper-line --dry-run --changelog "D10"`; sem `--dry-run` cria `momentum v2` `draft`, `purpose=paper`, `system_events` |
-| 7 | **Ativação auditada** da linha `paper` | **Everton** | `activate_strategy_version.py momentum v2 --changelog "D10: coorte paper"` → `activated_at`, congelada; o strategy-worker passa a emitir sinais `purpose=paper` para essa coorte (a `research_only` continua ao lado) |
+| 6 | **Linha `paper` do momentum** | **Everton** (ou orquestrador com o seu "vai") | pelo serviço `ops` (T3.15d, DEPLOYMENT.md §3.4): `bash infra/vps/compose.sh run --rm ops python infra/scripts/activate_strategy_version.py momentum v1 --paper-line --dry-run --changelog "D10"`; sem `--dry-run` cria `momentum v2` `draft`, `purpose=paper`, `system_events` |
+| 7 | **Ativação auditada** da linha `paper` | **Everton** | `activate_strategy_version.py momentum v2 --changelog "D10: coorte paper"` (mesmo serviço `ops`) → `activated_at`, congelada; o strategy-worker passa a emitir sinais `purpose=paper` para essa coorte (a `research_only` continua ao lado) |
 | 8 | **`ENABLE_PAPER_AUTONOMY=true`** no `.env` da VPS + `compose.sh update` — T3.15c e T3.15e **implantadas em 2026-09-08 (`9a291d3`)**: a trava do guardian está liberada | **Everton** | log `execution_worker_starting paper_autonomy=true`; `hb:execution:paper` com `pending_requests` variando; primeira proposta em `trade_proposals` com `proposal_source=agent` |
 | 8a | **Vínculo `agents`**: a linha que liga `momentum v3` (paper) à carteira `ever`. **Vem antes da flag** — sem ela a ponte não tem público (§8a) | **Everton** | `SELECT count(*) FROM agents WHERE status='enabled'` = 1; `hb:execution:paper` com `bridge_candidates` > 0 |
 | 9 | Primeira avaliação datada do EXP-0005 depois do primeiro fill | Sexta-feira | SQL colado na página |
@@ -105,7 +105,7 @@ existiu", e o operador precisa vê-la.
 | 4 segundo deploy | **feito** (0010 e 0011 aplicadas; VPS em `9a291d3`) |
 | 5 backfill + primeira rodada de β | em andamento |
 | 6 linha `paper` | **feito**: `momentum v3` em rascunho (04:34Z) |
-| 7 ativação auditada | **Everton** — `docker exec hunter-api-1 python infra/scripts/activate_strategy_version.py momentum v3 --changelog D10_coorte_paper_ativada_por_Everton_2026-09-08` (sem aspas internas, por causa do PowerShell) |
+| 7 ativação auditada | **Everton** — `bash infra/vps/compose.sh run --rm ops python infra/scripts/activate_strategy_version.py momentum v3 --changelog D10_coorte_paper_ativada_por_Everton_2026-09-08` (T3.15d: já não é `docker exec hunter-api-1` — esse container não tem mais `DATABASE_URL_MIGRATIONS`, DEPLOYMENT.md §3.4; sem aspas internas, por causa do PowerShell) |
 | 8 flag | **Everton** — depois do 7 e com β válido |
 
 ## §8 — Checklist de aceite do modo autônomo (T3.29, medido na VPS em 2026-09-08 ~14:10Z)
@@ -210,10 +210,36 @@ ssh hunter-vps "docker exec hunter-api-1 python -c \"import hunter_core.strategi
 
 Sem saída ou com `ModuleNotFoundError`: **pare** e faça o deploy antes (`compose.sh update`).
 
-**Derivar** (o script vem do repositório por stdin, porque a imagem publicada pode ainda não tê-lo; `python -` lê o script da entrada padrão e os argumentos vêm depois do `-`):
+**Derivar** (T3.15d: pelo serviço `ops`, não mais `docker exec hunter-api-1` — esse
+container não carrega mais `DATABASE_URL_MIGRATIONS`, DEPLOYMENT.md §3.4). O
+**caminho canônico** é o script *da imagem* — `Dockerfile.api-workers` faz
+`COPY infra/scripts infra/scripts`, então qualquer imagem já implantada
+(`compose.sh update` já rodou depois do commit que trouxe/alterou o script)
+já o tem:
 
 ```
-ssh hunter-vps "docker exec -i hunter-api-1 python - momentum v2 --set atr_pct_min=0.0089 --changelog 'KB-0008: piso de custo' --dry-run" < infra/scripts/derive_variant.py
+ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops python infra/scripts/derive_variant.py momentum v2 --set atr_pct_min=0.0089 --changelog 'KB-0008: piso de custo' --dry-run"
+```
+
+**Fallback por stdin (T3.15e, MEDIUM)** — só quando o script é novo/mudou num
+commit que ainda não foi implantado (a checagem de imagem acima já teria
+mandado parar e fazer o deploy antes; isto é para quem precisa testar *antes*
+de decidir se vale um deploy). `python -` lê o script da entrada padrão, e os
+argumentos vêm depois do `-`; `-T` desliga o pseudo-TTY do `ssh` para o stdin
+do `<` chegar ao `docker compose run` sem ficar preso. **O que roda aqui é o
+arquivo local da máquina que digita o `ssh`** — não o do repositório na VPS,
+não o da imagem — porque o `<` é resolvido pelo shell local antes do `ssh`
+sequer abrir a conexão. Um checkout com edições não commitadas, ou num commit
+diferente do que a VPS tem, roda exatamente esse conteúdo divergente contra o
+banco de produção sem nenhum rastro em `git log`. Confira o hash antes de
+mandar (e cole o hash no `--changelog`, para o `system_events` guardar qual
+versão do script realmente rodou):
+
+```
+git status --short infra/scripts/derive_variant.py   # vazio: sem edição não commitada
+git rev-parse HEAD:infra/scripts/derive_variant.py   # o blob que vai rodar
+
+ssh -T hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm -T ops python - momentum v2 --set atr_pct_min=0.0089 --changelog 'KB-0008: piso de custo (blob <hash acima>)' --dry-run" < infra/scripts/derive_variant.py
 ```
 
 O `--dry-run` roda **todas** as recusas e não escreve nada; a saída nomeia a versão que nasceria, o que se moveu e o `params_hash`. Repita sem `--dry-run` para gravar. Toda corrida — sucesso, recusa ou erro — deixa linha em `system_events` (componente `activate_strategy_version`).
@@ -223,7 +249,7 @@ O que ele recusa, antes de qualquer escrita: migração ausente, pai inexistente
 **Ativar a variante** (corrida separada e auditada, com o script *da imagem* — que agora reconhece a linha derivada e preserva o conteúdo dela):
 
 ```
-ssh hunter-vps "docker exec hunter-api-1 python infra/scripts/activate_strategy_version.py momentum v4 --changelog T3.26_variante_KB-0008_ativada_por_Everton"
+ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops python infra/scripts/activate_strategy_version.py momentum v4 --changelog T3.26_variante_KB-0008_ativada_por_Everton"
 ```
 
 Sem aspas internas, por causa do PowerShell. Se aparecer `REFUSED: ... already carries its own default_parameters`, a imagem está **atrás** da T3.26c: faça o deploy e repita — não contorne editando o `changelog`.
@@ -270,8 +296,10 @@ uv run python infra/scripts/activate_strategy_version.py breakout v2 --deprecate
     --changelog "K1: descartar — bruta +0,01R líquida -0,08R em 8 decisões" --dry-run
 ```
 
-Sem `--dry-run` para gravar. Na VPS, o mesmo comando dentro do container:
-`docker exec hunter-api-1 python infra/scripts/activate_strategy_version.py breakout v1 --deprecate --changelog "..."`.
+Sem `--dry-run` para gravar. Na VPS, o mesmo comando pelo serviço `ops`
+(T3.15d, DEPLOYMENT.md §3.4 — `docker exec hunter-api-1` não serve mais para
+isto, o container não carrega `DATABASE_URL_MIGRATIONS`):
+`bash infra/vps/compose.sh run --rm ops python infra/scripts/activate_strategy_version.py breakout v1 --deprecate --changelog "..."`.
 
 ## O que continua igual depois do passo 8
 - Só ordens a mercado, só SPOT, sem alavancagem; fill pelo livro elegível após a latência declarada; sem fill fabricado.
@@ -294,19 +322,25 @@ como ver o que mudaria antes de escrever.
 - `--dry-run`: roda todo escritor que a invocação rodaria, imprime o diff
   exato (`tabela.chave: campo: antigo -> novo`, ou `NEW` para uma linha nova) e
   desfaz a transação — nada é gravado.
-- `--only strategies|risk_profiles|feature_definitions|opportunity_weights`:
+- `--only exchanges|strategies|risk_profiles|feature_definitions|opportunity_weights`:
   restringe a transação a essa tabela só (`strategies` inclui
   `strategy_versions`, o rascunho `v1`; `risk_profiles` inclui `paper_v1`, como
-  o `seed()` padrão já faz).
+  o `seed()` padrão já faz). `exchanges` entrou na T3.44c, quando a migração
+  `0016` deu ao catálogo de exchanges o rótulo `planned` que o seed consegue de
+  fato mover (DATABASE.md §28) — antes disso `seed_exchanges` não escrevia
+  `status` e um re-seed dessa tabela não mudava nada do que uma linha guardada
+  dizia.
 - Sem `--only`, uma mudança nos limites de `risk_profiles` (qualquer um dos
   três presets ou `paper_v1`) recusa a gravação sem `--yes` — a diretriz:
   limite não muda sem ser apresentado antes. `--dry-run` é como se apresenta.
 
-**Pendência do operador hoje** (VPS, dentro do container da API):
+**Pendência do operador hoje** (VPS, pelo serviço `ops` — T3.15d, DEPLOYMENT.md
+§3.4; `docker exec hunter-api-1` não serve mais para isto, o container não
+carrega `DATABASE_URL_MIGRATIONS`):
 
 ```
-docker exec hunter-api-1 python infra/scripts/seed.py --only strategies --dry-run
-docker exec hunter-api-1 python infra/scripts/seed.py --only strategies
+bash infra/vps/compose.sh run --rm ops python infra/scripts/seed.py --only strategies --dry-run
+bash infra/vps/compose.sh run --rm ops python infra/scripts/seed.py --only strategies
 ```
 
 O primeiro comando mostra exatamente a linha nova (`strategies.session_orb: NEW

@@ -68,9 +68,9 @@ class Settings(BaseSettings):
     database_url: SecretStr | None = SecretStr(
         "postgresql+asyncpg://hunter:hunter@localhost:5432/hunter"
     )
-    database_url_migrations: SecretStr | None = SecretStr(
-        "postgresql://hunter:hunter@localhost:5432/hunter"
-    )
+    database_url_migrations: SecretStr | None = SecretStr("")
+    """Schema owner's DSN, ``migrate``/``ops`` only (DEPLOYMENT.md §3.4); no
+    ``localhost`` default — ``migration_url()`` already refuses an empty one."""
     redis_url: SecretStr | None = SecretStr("redis://localhost:6379/0")
     db_pool_size: int = 5
     db_max_overflow: int = 5

@@ -40,6 +40,25 @@ override (tests use it to prove cancellation), and falls back to the
 process-wide :func:`hunter_core.settings.get_settings` otherwise — the same
 cached singleton the worker entry points already use, so no call site outside
 this module needs to change to pick up an env override.
+
+T3.15f (``0015_runtime_login_role``, DATABASE.md §27): the connection under
+every session below is no longer the schema owner. ``DATABASE_URL`` names
+``hunter_runtime`` — ``LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS
+NOREPLICATION NOINHERIT``, a member of ``hunter_app`` and ``hunter_worker`` and
+of nothing else. Two consequences for anyone reading this module:
+
+- **the ``SET LOCAL ROLE`` stopped being a courtesy.** ``NOINHERIT`` means the
+  login holds no privilege of its own, so a transaction that skips
+  ``_apply_context`` reaches no table at all — it fails with *permission denied*
+  instead of quietly running with the union of both roles. Any new call site
+  that opens ``engine.begin()`` directly has to issue ``SET LOCAL ROLE`` as its
+  first statement;
+- ``BYPASSRLS`` still works for the workers. A role *attribute* is never
+  inherited: after ``SET ROLE hunter_worker`` the current role **is**
+  ``hunter_worker``, and that is whose ``rolbypassrls`` Postgres reads.
+
+``hunter_runtime`` is deliberately absent from ``DB_ROLES`` below: it is where a
+session starts, never somewhere it goes.
 """
 
 from __future__ import annotations
@@ -95,8 +114,24 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
 async def get_session(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> AsyncGenerator[AsyncSession, None]:
-    """A plain (non-tenant) session — for global tables, migrations, or workers
-    that bypass RLS (``hunter_worker`` role; DATABASE.md §1.2).
+    """A session with **no** ``SET LOCAL ROLE`` and no tenant context.
+
+    This docstring used to read "for global tables, migrations, or workers that
+    bypass RLS (``hunter_worker`` role)". That stopped being true with
+    ``0015_runtime_login_role`` (T3.15f, DATABASE.md §27), and the security
+    review of that diff (LOW 5) is why it says something else now: under
+    ``hunter_runtime`` — ``NOINHERIT``, no privilege of its own — a session that
+    never issues ``SET LOCAL ROLE`` **reaches no table at all**. It does not
+    bypass RLS; it does not read a global table either. Every statement comes
+    back *permission denied*.
+
+    So: **no production call site**. Today there is none — ``apps/api`` uses
+    ``user_session``/``tenant_session`` and the workers use ``role_session``;
+    the two callers of this function are integration tests, which connect as the
+    owner and therefore still see everything. Anything that needs a role must
+    open :func:`role_session` (or one of its wrappers) instead, and anything that
+    genuinely needs owner privileges is an ops script on
+    ``DATABASE_URL_MIGRATIONS``, not this.
 
     ``session_factory`` is passed explicitly (built once at process startup via
     ``create_session_factory(create_engine(settings))``) rather than kept as a

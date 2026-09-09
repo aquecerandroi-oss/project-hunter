@@ -37,7 +37,7 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0014_lab_signals_indexes"
+HEAD_REVISION = "0016_exchange_status_planned"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -53,6 +53,8 @@ PAPER_GEOMETRY_REVISION = "0009_paper_geometry"
 STRATEGY_PURPOSE_REVISION = "0010_strategy_purpose"
 STRATEGY_ACTIVATION_OWNER_REVISION = "0011_strategy_activation_owner"
 REPLAY_RUNS_REVISION = "0013_replay_runs"
+LAB_SIGNALS_INDEXES_REVISION = "0014_lab_signals_indexes"
+RUNTIME_LOGIN_ROLE_REVISION = "0015_runtime_login_role"
 
 _PENDING_PREDICATE = "dispatched_at IS NULL"
 """What makes an index a *pending* index, spelled out here rather than imported:
@@ -2730,7 +2732,9 @@ def test_0014_installs_the_two_cohort_indexes_and_reverses(upgraded: str) -> Non
         assert "supporting_features ->> 'cohort'" in definition, definition
         assert "emitted_at" in definition and definition.rstrip().endswith("id)"), definition
 
-    command.downgrade(config, "-1")
+    # Named, not ``-1``: ``0015`` is head now, and a relative step would land on
+    # ``0014`` and assert nothing about the indexes it is here to check.
+    command.downgrade(config, REPLAY_RUNS_REVISION)
     try:
         assert asyncio.run(_revision(upgraded)) == REPLAY_RUNS_REVISION
         for name in ("ix_agent_signals_cohort_emitted", "ix_agent_signals_version_cohort_emitted"):
@@ -2773,3 +2777,296 @@ def test_0014_cannot_index_the_envelope_copy_of_decision_at(upgraded: str) -> No
     message = asyncio.run(attempt())
     assert "must be marked IMMUTABLE" in message, message
     assert asyncio.run(_index_definition(upgraded, "ix_agent_signals_decision_at_probe")) == ""
+
+
+# ---------------------------------------------------------------------------
+# 0015_runtime_login_role — DATABASE.md §27
+# ---------------------------------------------------------------------------
+
+
+async def _role_attributes(url: str, role: str) -> dict[str, bool] | None:
+    """The seven ``pg_roles`` flags that decide what a login may do."""
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            row = (
+                await connection.execute(
+                    text(
+                        "SELECT rolcanlogin, rolsuper, rolbypassrls, rolcreaterole, "
+                        "rolcreatedb, rolreplication, rolinherit "
+                        "FROM pg_roles WHERE rolname = :role"
+                    ),
+                    {"role": role},
+                )
+            ).first()
+    finally:
+        await engine.dispose()
+    if row is None:
+        return None
+    keys = ("login", "super", "bypassrls", "createrole", "createdb", "replication", "inherit")
+    return dict(zip(keys, row, strict=True))
+
+
+async def _memberships(url: str, role: str) -> dict[str, tuple[bool, bool]]:
+    """``{granted role: (may SET ROLE, inherits its privileges)}``.
+
+    Asked through ``pg_has_role`` rather than read out of ``pg_auth_members``:
+    "may become" and "already holds" are two different questions, and it is the
+    second one that ``NOINHERIT`` exists to answer *no* to (§27.1).
+    """
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            rows = (
+                await connection.execute(
+                    text(
+                        "SELECT g.rolname, pg_has_role(:role, g.rolname, 'MEMBER'), "
+                        "pg_has_role(:role, g.rolname, 'USAGE') "
+                        "FROM pg_auth_members m JOIN pg_roles g ON g.oid = m.roleid "
+                        "WHERE m.member = (SELECT oid FROM pg_roles WHERE rolname = :role)"
+                    ),
+                    {"role": role},
+                )
+            ).all()
+    finally:
+        await engine.dispose()
+    return {name: (member, usage) for name, member, usage in rows}
+
+
+def test_0015_creates_a_login_that_owns_nothing_and_bypasses_nothing(upgraded: str) -> None:
+    """The seven attributes of the runtime login, read from the catalogue.
+
+    Every one of them is a way the T3.15d finding stays open if it is wrong:
+    ``rolsuper``/``rolbypassrls`` make the ``SET LOCAL ROLE`` decorative again,
+    ``rolcreaterole`` lets the process mint itself a better credential, and
+    ``rolinherit`` hands it the union of both application roles without any
+    ``SET ROLE`` — which is what makes the schema's own guards stop firing
+    (§27.1).
+    """
+    runtime = migration_ddl("runtime_login_role")
+    role = cast(str, runtime.RUNTIME_ROLE)
+
+    attributes = asyncio.run(_role_attributes(upgraded, role))
+
+    assert attributes is not None, f"{role} was not created by 0015"
+    assert attributes == {
+        "login": True,
+        "super": False,
+        "bypassrls": False,
+        "createrole": False,
+        "createdb": False,
+        "replication": False,
+        "inherit": False,
+    }
+
+
+def test_0015_grants_exactly_two_memberships_and_inherits_neither(upgraded: str) -> None:
+    """``hunter_app`` and ``hunter_worker``, reachable by ``SET ROLE`` and only so.
+
+    The third assertion is the security boundary itself: this login has no
+    privilege of its own, so *which roles it may become* is the whole of what it
+    can do. A membership nobody wrote down would widen that silently, and the
+    migration refuses one — this is the test that proves the refusal has
+    something true to protect.
+    """
+    runtime = migration_ddl("runtime_login_role")
+    role = cast(str, runtime.RUNTIME_ROLE)
+    expected = set(cast(tuple[str, ...], runtime.RUNTIME_MEMBER_OF_0015))
+
+    memberships = asyncio.run(_memberships(upgraded, role))
+
+    assert set(memberships) == expected, memberships
+    for granted, (may_set_role, inherits) in memberships.items():
+        assert may_set_role, f"{role} cannot SET ROLE {granted}"
+        assert not inherits, f"{role} inherits {granted}'s privileges without SET ROLE"
+
+
+def test_0015_reverses_by_taking_the_membership_away(upgraded: str) -> None:
+    """``downgrade -1`` leaves the login unable to become anything, and re-applying
+    restores it.
+
+    The role itself may survive the downgrade and that is deliberate (§27.3): it
+    is a *cluster* object, and another database in this same container is still
+    on ``0015`` with its own ``GRANT CONNECT`` in ``pg_shdepend``. What the
+    downgrade has to remove is the *reach*, and the reach is the membership —
+    which is exactly what is asserted here rather than "the role is gone".
+    """
+    runtime = migration_ddl("runtime_login_role")
+    role = cast(str, runtime.RUNTIME_ROLE)
+    config = alembic_config(upgraded)
+
+    # The head is ``0016`` since T3.44c, and it reverses cleanly (one enum label)
+    # — step down to ``0015`` first so ``-1`` means *this* revision again, the
+    # same shape ``test_0010_refuses_to_downgrade_...`` uses for ``0011`` sitting
+    # on top of ``0010``.
+    command.downgrade(config, RUNTIME_LOGIN_ROLE_REVISION)
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == LAB_SIGNALS_INDEXES_REVISION
+        assert asyncio.run(_memberships(upgraded, role)) == {}, (
+            "the downgrade must leave the runtime login unable to SET ROLE anywhere"
+        )
+    finally:
+        command.upgrade(config, "head")
+
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert set(asyncio.run(_memberships(upgraded, role))) == set(
+        cast(tuple[str, ...], runtime.RUNTIME_MEMBER_OF_0015)
+    )
+    command.check(config)
+
+
+def test_0015_is_idempotent_over_a_role_that_already_exists(upgraded: str) -> None:
+    """Re-applying ``0015`` on a cluster that already has the role is a no-op.
+
+    Roles are cluster-wide, so the *second* database migrated in a cluster always
+    hits this path — ``CREATE ROLE`` raises ``duplicate_object`` and everything
+    after it has to be idempotent anyway. Proved by running the whole revision
+    again over itself, which is what ``downgrade``/``upgrade`` in another database
+    of the same container amounts to.
+    """
+    runtime = migration_ddl("runtime_login_role")
+    role = cast(str, runtime.RUNTIME_ROLE)
+    config = alembic_config(upgraded)
+
+    # Down *past* ``0015`` (the head is ``0016`` since T3.44c, and ``-1`` alone
+    # would stop on top of the role instead of dropping it), then back up, twice.
+    command.downgrade(config, LAB_SIGNALS_INDEXES_REVISION)
+    command.upgrade(config, "head")
+    command.downgrade(config, LAB_SIGNALS_INDEXES_REVISION)
+    command.upgrade(config, "head")
+
+    attributes = asyncio.run(_role_attributes(upgraded, role))
+    assert attributes is not None
+    assert attributes["login"] and not attributes["inherit"] and not attributes["bypassrls"]
+    assert set(asyncio.run(_memberships(upgraded, role))) == set(
+        cast(tuple[str, ...], runtime.RUNTIME_MEMBER_OF_0015)
+    )
+    command.check(config)
+
+
+# --------------------------------------------------------------------------
+# 0016_exchange_status_planned — a venue nobody collects stops being a broken
+# feed
+# --------------------------------------------------------------------------
+
+
+async def _write_exchange(url: str, code: str, status: str) -> uuid.UUID:
+    """One ``exchanges`` row with an explicit ``status``, as the seed writes it."""
+    exchange_id = uuid7()
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO exchanges (id, code, name, status, capabilities) "
+                    "VALUES (:id, :code, :name, CAST(:status AS exchange_status), '{}'::jsonb)"
+                ),
+                {"id": exchange_id, "code": code, "name": code.title(), "status": status},
+            )
+    finally:
+        await engine.dispose()
+    return exchange_id
+
+
+async def _forget_exchange(url: str, exchange_id: uuid.UUID) -> None:
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text("DELETE FROM exchanges WHERE id = :id"), {"id": exchange_id}
+            )
+    finally:
+        await engine.dispose()
+
+
+def test_0016_adds_planned_before_active_and_nowhere_else(upgraded: str) -> None:
+    """The label exists, in the position the contract fixes, on one type only.
+
+    ``enumsortorder`` is part of the contract (§17.1) and
+    ``hunter_core.domain.enums.ExchangeStatus`` declares ``PLANNED`` first;
+    ``test_each_revision_creates_exactly_the_labels_it_froze`` compares the two
+    at head, so what is left to prove here is the *shape* of the change — one
+    type, one label, ``BEFORE 'active'``, and ``inactive`` untouched behind it.
+    """
+    labels = asyncio.run(_enum_labels(upgraded))
+    assert labels["exchange_status"] == ["planned", "active", "inactive"]
+
+
+def test_0016_lets_a_venue_be_catalogued_without_a_collector(upgraded: str) -> None:
+    """The label the whole revision exists for: writable, and the default is not it.
+
+    ``0001`` gave ``exchanges.status`` ``server_default 'active'`` and this
+    revision deliberately leaves it there — a venue is active unless somebody
+    says otherwise, and ``planned`` is said by the seed, never inherited.
+    """
+    planned = asyncio.run(_write_exchange(upgraded, f"planned-{uuid.uuid4().hex[:6]}", "planned"))
+    try:
+        stored = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT status::text FROM exchanges WHERE id = :id",
+                {"id": planned},
+            )
+        )
+        assert stored == ["planned"]
+        default = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT column_default FROM information_schema.columns "
+                "WHERE table_name = 'exchanges' AND column_name = 'status'",
+                {},
+            )
+        )
+        assert default == ["'active'::exchange_status"]
+    finally:
+        asyncio.run(_forget_exchange(upgraded, planned))
+
+
+def test_0016_refuses_to_downgrade_while_a_venue_is_planned(upgraded: str) -> None:
+    """Rebuilding the type under such a row would have to rewrite it into a
+    label that means something else — ``active`` puts it straight back into the
+    market-status aggregate this revision exists to fix, ``inactive`` claims
+    somebody switched it off. The guard counts and names them instead.
+    """
+    config = alembic_config(upgraded)
+    planned = asyncio.run(_write_exchange(upgraded, f"guard-{uuid.uuid4().hex[:6]}", "planned"))
+    try:
+        with pytest.raises(DBAPIError, match="still status = 'planned'"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(_forget_exchange(upgraded, planned))
+    command.check(config)
+
+
+def test_0016_reverses_on_a_database_where_nothing_is_planned(upgraded: str) -> None:
+    """The round trip over a populated ``exchanges``, and what the rebuild keeps.
+
+    A retype that dropped the server default, or reordered the two surviving
+    labels, would leave ``alembic check`` clean and every future ``INSERT``
+    wrong — so the default and the label order are read back from the catalogue
+    at the bottom of the trip, not assumed from the fact that it ran.
+    """
+    config = alembic_config(upgraded)
+    active = asyncio.run(_write_exchange(upgraded, f"trip-{uuid.uuid4().hex[:6]}", "active"))
+    try:
+        command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == RUNTIME_LOGIN_ROLE_REVISION
+        assert asyncio.run(_enum_labels(upgraded))["exchange_status"] == ["active", "inactive"]
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT column_default FROM information_schema.columns "
+                "WHERE table_name = 'exchanges' AND column_name = 'status'",
+                {},
+            )
+        ) == ["'active'::exchange_status"]
+        assert asyncio.run(
+            _scalars(upgraded, "SELECT status::text FROM exchanges WHERE id = :id", {"id": active})
+        ) == ["active"]
+    finally:
+        command.upgrade(config, "head")
+        asyncio.run(_forget_exchange(upgraded, active))
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)

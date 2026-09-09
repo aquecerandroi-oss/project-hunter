@@ -151,6 +151,24 @@ CONSTRAINTS: Final[Mapping[str, Constraints]] = {
             ("range_bars", "session_window_bars"),
         ),
     ),
+    "sweep_reclaim_v1": Constraints(
+        positive=frozenset(
+            "pivot_k min_swing_atr pivot_lookback_bars sweep_atr rvol_window atr_period "
+            "atr_bars stop_buffer_atr risk_pct_min risk_atr_max target_r target2_r horizon_s "
+            "max_entry_delay_s".split()
+        ),
+        non_negative=frozenset({"rvol_min"}) | _COSTS,
+        unit_interval=frozenset({"base_confidence"}),
+        # ``stop_buffer_atr`` é ``positive`` de propósito: folga zero põe o stop no
+        # tick exato que a tese diz que é varrido. ``risk_pct_min`` tem teto de
+        # 0,15 porque ele **é** o eixo ``stop_loss_pct`` desta versão e o C5 do
+        # portão reprova acima disso — uma variante com 0,5 nunca operaria.
+        bounded=(
+            ("pivot_k", Decimal(1), Decimal(10)),
+            ("risk_pct_min", Decimal("0.0001"), Decimal("0.15")),
+        ),
+        ordered=(("target_r", "target2_r"),),
+    ),
     "trendline_breakout_v1": Constraints(
         positive=frozenset(
             "pattern_bars pivot_k min_swing_atr tolerance_atr break_atr bounce_atr retest_bars "

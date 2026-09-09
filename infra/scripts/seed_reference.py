@@ -15,6 +15,14 @@ is the only copy that also computes the numbers; and :data:`PAPER_V1_LIMITS` is
 actually decides by. Both were second literals once, and both had drifted from
 their originals before anyone looked.
 
+The four **risk profiles** moved to the sibling :mod:`seed_risk_reference` in
+T3.44c, when the ``planned`` venue label pushed this file past the budget again:
+``risk_profiles`` is one table's content and the seam was already there. The five
+names it owns (``RISK_LIMITS``, ``REGIME_MULTIPLIERS``, ``RISK_PRESETS``,
+``PAPER_V1_NAME``, ``PAPER_V1_LIMITS``) are **re-exported above**, so every
+caller keeps its import — including the three test modules that load *this* file
+by path and read the attributes off it (DATABASE.md §18.10).
+
 Fractions are JSON **strings**, never JSON numbers: a limit like ``0.0025`` has
 no exact binary float and the Risk Engine and the scorer read these straight
 into ``Decimal``. Counts, periods and booleans stay native — they are integers,
@@ -30,9 +38,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from hunter_core.domain.enums import RiskPreset
+from seed_risk_reference import PAPER_V1_LIMITS as PAPER_V1_LIMITS
+from seed_risk_reference import PAPER_V1_NAME as PAPER_V1_NAME
+from seed_risk_reference import REGIME_MULTIPLIERS as REGIME_MULTIPLIERS
+from seed_risk_reference import RISK_LIMITS as RISK_LIMITS
+from seed_risk_reference import RISK_PRESETS as RISK_PRESETS
+
+from hunter_core.domain.enums import ExchangeStatus
 from hunter_indicators.features import default_definitions_rows
-from hunter_risk.limits import PAPER_V1
 
 _CAPABILITIES = {
     "spot": True,
@@ -43,10 +56,10 @@ _CAPABILITIES = {
     "ws_depth": True,
 }
 
-EXCHANGES: tuple[tuple[str, str, dict[str, Any]], ...] = (
-    ("binance", "Binance", _CAPABILITIES),
-    ("bybit", "Bybit", _CAPABILITIES),
-)
+EXCHANGES: tuple[tuple[str, str, str, dict[str, Any]], ...] = (
+    ("binance", "Binance", ExchangeStatus.ACTIVE.value, _CAPABILITIES),
+    ("bybit", "Bybit", ExchangeStatus.PLANNED.value, _CAPABILITIES),
+)  # (code, name, status, capabilities) — status per row, never the column default (§28)
 
 STRATEGIES: tuple[tuple[str, str, str, str], ...] = (
     ("momentum", "Momentum", "trend", "Continuation with relative volume and breakout strength."),
@@ -72,6 +85,13 @@ STRATEGIES: tuple[tuple[str, str, str, str], ...] = (
         "Breakout of the opening range of a declared UTC session, confirmed by volume.",
     ),
     ("trendline_breakout", "Trendline Breakout", "trend", "Break of a drawn trend line."),
+    (
+        "sweep_reclaim",
+        "Sweep and Reclaim",
+        "reversion",
+        "Long a bar that pierces a confirmed swing low and closes back above it, "
+        "on above-median volume.",
+    ),
     ("narrative", "Narrative", "intelligence", "Narrative and news driven flow (Phase 2)."),
     ("ensemble", "Ensemble", "meta", "Weighted combination of the other strategies."),
 )
@@ -97,43 +117,6 @@ FEATURE_FLAGS: tuple[tuple[str, str], ...] = (
     ("ENABLE_LLM_ANALYSIS", "LLM classification of external content."),
     ("ENABLE_ARENA", "Agent Arena."),
     ("ENABLE_BACKTESTS", "Backtest engine and UI."),
-)
-
-RISK_LIMITS: dict[str, tuple[Any, Any, Any]] = {
-    # key: (conservative, balanced, aggressive) — RISK_ENGINE.md §2
-    "max_position_pct": ("0.02", "0.05", "0.10"),
-    "risk_per_trade_pct": ("0.0025", "0.005", "0.01"),
-    "max_total_exposure_pct": ("0.30", "0.60", "1.00"),
-    "max_daily_loss_pct": ("0.01", "0.02", "0.04"),
-    "max_drawdown_pct": ("0.05", "0.10", "0.20"),
-    "max_concurrent_positions": (3, 6, 12),
-    "max_asset_exposure_pct": ("0.05", "0.10", "0.20"),
-    "max_exchange_exposure_pct": ("0.50", "0.70", "1.00"),
-    "min_liquidity_usd_24h": ("50000000", "20000000", "5000000"),
-    "max_spread_pct": ("0.0005", "0.001", "0.002"),
-    "max_slippage_pct": ("0.001", "0.002", "0.005"),
-    "max_leverage": (1, 2, 3),
-    "max_correlated_positions": (2, 4, 8),
-    "min_stop_distance_pct": ("0.003", "0.002", "0.001"),
-    "max_stop_distance_pct": ("0.03", "0.05", "0.08"),
-    "auto_close_on_emergency": (False, False, False),
-}
-
-REGIME_MULTIPLIERS: tuple[dict[str, str], ...] = (
-    # RISK_ENGINE.md §2 grammar: `<REGIME>` or `<REGIME>_<DIRECTION>`, where
-    # <REGIME> is a `market_regime` label and <DIRECTION> is a `trade_direction`
-    # upper-cased. The engine looks up `<REGIME>_<DIRECTION>` first, then
-    # `<REGIME>`, then falls back to 1.0 — so `BTC_BEAR_LONG` narrows longs in a
-    # bear market while `HIGH_VOLATILITY` applies to both directions.
-    {"BTC_BEAR_LONG": "0.5", "HIGH_VOLATILITY": "0.7"},
-    {"BTC_BEAR_LONG": "0.5", "HIGH_VOLATILITY": "0.7"},
-    {"HIGH_VOLATILITY": "0.85"},
-)
-
-RISK_PRESETS: tuple[tuple[RiskPreset, str], ...] = (
-    (RiskPreset.CONSERVATIVE, "Conservative"),
-    (RiskPreset.BALANCED, "Balanced"),
-    (RiskPreset.AGGRESSIVE, "Aggressive"),
 )
 
 
@@ -305,45 +288,4 @@ _version`` true. An operator who later rolls back to another profile keeps it,
 because v2 already exists by then. And a version outside this tuple is never
 demoted: if some future v3 is live and v2 has been deleted, the seed recreates
 v2 inactive rather than taking the live profile away from a running scorer.
-"""
-
-
-PAPER_V1_NAME = "Paper v1"
-
-PAPER_V1_LIMITS: dict[str, Any] = PAPER_V1.model_dump(mode="json")
-"""The wallet's profile - **derived from the engine, never retyped**.
-
-Until the security review of ``0006_paper_wallet`` this was a second literal
-next to ``hunter_risk.limits.PAPER_V1``, and the two had already drifted:
-``RiskLimits.model_validate(profile.limits)`` failed with ten errors on the row
-this seed writes. Six keys the engine requires were missing
-(``max_entry_deviation_pct``, ``max_price_age_s``, ``max_book_age_s``,
-``max_volume_age_s``, ``max_beta_age_s``, ``day_timezone``), so the ceilings the
-v2.1 contract added existed only in code and never in the profile an
-organization copies at onboarding; and four keys the engine has no field for
-were present, which ``extra="forbid"`` rejects.
-
-``model_dump(mode="json")`` rather than a hand-written mirror: pydantic renders
-every ``Decimal`` as a JSON **string**, which is the rule this module already
-follows for the weight vectors - the Risk Engine reads these straight back into
-``Decimal``, and a JSON number has no exact binary form for 0.0025. **No value
-of the directive changes**; the numbers are the ones in
-``.claude/state/directive-risk-engine-2026-09-06.md``, and now there is one
-place they are written down.
-
-``max_exchange_exposure_pct`` and ``max_position_pct`` remain deliberately
-**absent**: RISK_ENGINE.md §9.1 declares the first inapplicable while there is
-one execution venue (it returns in M1b) and replaces the second with
-``max_asset_exposure_pct`` plus the participation ceiling. Recording them as
-``null`` would read as "no limit" rather than "not applicable here".
-
-Four keys the old literal carried go with it, and each is declared rather than
-dropped in silence (DATABASE.md §18.8): ``participation_reference`` is a formula
-the engine computes from ``MarketLiquidity`` and never read from here;
-``market_types: ["spot"]`` is what ``max_leverage = 1`` already means, kept true
-by ``RiskLimits``' own validator; ``auto_close_on_emergency: false`` is the
-absence of an automatic-liquidation path in ``hunter_risk.kill_switch``, not a
-switch anything reads; and ``regime_size_multiplier`` names the v1 grammar of
-RISK_ENGINE.md §2.1 that the M3 engine **does not implement** - carrying it in
-the profile made an unimplemented control look configured.
 """

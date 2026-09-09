@@ -444,6 +444,25 @@ label it does write into DDL (``'EXPIRED'`` in the expiry CHECK) is one ``0001``
 already created.
 """
 
+EXCHANGE_PLANNED_ADDED_VALUES: Final[tuple[tuple[str, str, str | None], ...]] = (
+    ("exchange_status", "planned", "active"),
+)
+"""``(type, new label, the label to insert it before)`` for ``0016``.
+
+One label, one type. ``BEFORE 'active'`` because ``exchange_status`` reads as a
+lifecycle — catalogued, collected, switched off — and ``planned`` is the state
+*before* a venue is collected, never a variant of "off". The position is part of
+the contract (§17.1): ``hunter_core.domain.enums.ExchangeStatus`` declares
+``PLANNED`` first and ``test_each_revision_creates_exactly_the_labels_it_froze``
+compares ``enumsortorder`` against it.
+
+Same Postgres rule as ``0003`` and ``0006``: a value added by ``ALTER TYPE ...
+ADD VALUE`` may not be *used* in the same transaction, in DDL or in a DEFAULT.
+``0016`` adds this one and writes none of it — ``exchanges.status`` keeps its
+``'active'`` server default and ``planned`` reaches the database afterwards,
+through ``infra/scripts/seed.py``.
+"""
+
 
 def create_enum_types(types: Mapping[str, Sequence[str]] = INITIAL_ENUMS) -> None:
     """Create the given types with the given labels, before any table uses one."""

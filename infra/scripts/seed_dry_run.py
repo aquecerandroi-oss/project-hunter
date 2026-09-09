@@ -7,16 +7,21 @@ What differs is read straight from Postgres, never guessed from the reference
 constants — the guarantee a hand-written diff could not make, and the same one
 ``_written()`` (``seed.py``) already relies on for its counts.
 
-Four tables are diffable, matched to ``--only``'s choices: ``strategies``
-(``strategies.key``), ``risk_profiles`` (the three presets plus ``paper_v1``,
-``organization_id IS NULL``), ``feature_definitions`` (``name`` — this build
-ships one version per name, so it is a natural key in practice even though the
-table's real uniqueness is ``(name, version)``) and ``opportunity_weights``
-(``version``). Other tables the full run touches (``exchanges``,
-``plan_entitlements``, ``feature_flags``) are reported by count only, the way
-``seed()`` always has — the operator's stated need (T3.33e/f: ``session_orb``
-missing, stale descriptions, the risk directive on ``risk_profiles``) is these
-four.
+Five tables are diffable, matched to ``--only``'s choices: ``exchanges``
+(``code``), ``strategies`` (``strategies.key``), ``risk_profiles`` (the three
+presets plus ``paper_v1``, ``organization_id IS NULL``), ``feature_definitions``
+(``name`` — this build ships one version per name, so it is a natural key in
+practice even though the table's real uniqueness is ``(name, version)``) and
+``opportunity_weights`` (``version``). The tables the full run touches and this
+does not (``plan_entitlements``, ``feature_flags``) are reported by count only,
+the way ``seed()`` always has.
+
+``exchanges`` joined in T3.44c, and only because the seed gained something to
+say about it: until ``0016`` added ``planned`` (DATABASE.md §28) the seed never
+wrote ``status`` at all, so re-seeding could not change a stored venue row and a
+diff would always have been empty. Now ``seed.py --only exchanges [--dry-run]``
+is the operator's way to move Bybit between "catalogued" and "collected", and
+the diff prints the label change before it is committed.
 """
 
 from __future__ import annotations
@@ -24,6 +29,7 @@ from __future__ import annotations
 from typing import Any
 
 from seed_reference import (
+    EXCHANGES,
     OPPORTUNITY_WEIGHTS,
     PAPER_V1_LIMITS,
     REGIME_MULTIPLIERS,
@@ -43,6 +49,7 @@ Row = dict[str, Any]
 Snapshot = dict[str, dict[Any, Row]]
 
 TABLE_CHOICES: tuple[str, ...] = (
+    "exchanges",
     "strategies",
     "risk_profiles",
     "feature_definitions",
@@ -110,6 +117,10 @@ async def snapshot(conn: AsyncConnection, only: str | None) -> Snapshot:
     """The diffable tables' rows, keyed by natural key, restricted to ``only`` if given."""
     wanted = TABLE_CHOICES if only is None else (only,)
     out: Snapshot = {}
+    if "exchanges" in wanted:
+        out["exchanges"] = await _snapshot_one(
+            conn, "exchanges", "code", [code for code, *_ in EXCHANGES]
+        )
     if "strategies" in wanted:
         out["strategies"] = await _snapshot_one(
             conn, "strategies", "key", [key for key, *_ in STRATEGIES]

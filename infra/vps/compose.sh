@@ -42,6 +42,26 @@ if grep -q '^CORS_ALLOWED_ORIGINS=[^[]' "$ROOT/.env" 2>/dev/null; then
   exit 1
 fi
 
+# Preflight (T3.15e, MEDIUM-D): DATABASE_URL_MIGRATIONS no .env da VPS
+# reabriria o HIGH-1 que a T3.15d fechou. `api`/todo worker carregam este
+# .env via `env_file:` (infra/docker/docker-compose.yml); a DSN de dono so
+# fica de fora do ambiente deles porque nenhum `environment:` a define mais
+# la - uma linha aqui a reintroduziria em todo processo de runtime por baixo
+# do preflight de qualquer serviço, sem precisar mudar uma linha de compose.
+# A DSN de dono pertence só às âncoras `x-owner-env`/`x-prod-owner-env`
+# (docker-compose.yml/docker-compose.prod.yml), concedidas só a `migrate` e
+# `ops` - nunca ao .env que todo processo lê.
+if grep -Eq '^[[:space:]]*(export[[:space:]]+)?DATABASE_URL_MIGRATIONS=' "$ROOT/.env" 2>/dev/null; then
+  echo "ERRO: o .env define DATABASE_URL_MIGRATIONS." >&2
+  echo "      Essa DSN e do dono do schema e so pertence aos ambientes de" >&2
+  echo "      migrate/ops (x-owner-env/x-prod-owner-env nos dois compose files)" >&2
+  echo "      - api e todo worker leem este mesmo .env via env_file, entao uma" >&2
+  echo "      linha aqui devolveria a credencial a todo processo de runtime" >&2
+  echo "      (o achado HIGH-1 que a T3.15d fechou). Apague a linha do .env;" >&2
+  echo "      docs/DEPLOYMENT.md secao 3.4 explica onde a DSN de dono e usada." >&2
+  exit 1
+fi
+
 COMPOSE=(docker compose --env-file "$ROOT/.env" -p hunter
   -f "$ROOT/infra/docker/docker-compose.yml"
   -f "$ROOT/infra/vps/docker-compose.prod.yml")
@@ -143,6 +163,20 @@ case "$cmd" in
     ;;
   logs)
     "${COMPOSE[@]}" logs -f --tail 200 "$@"
+    ;;
+  ops)
+    # Trabalho de dono do schema (particoes, seeds, scripts auditados) na
+    # imagem JA implantada. Nunca constroi: um `git pull` sem `update` deixa
+    # o HEAD a frente da imagem viva, e `docker compose run` construiria
+    # sozinho, as 04:07, codigo nunca implantado - rodando como dono do banco
+    # (revisao de seguranca da T3.15e, achado F2). Sem imagem, falha alto.
+    if ! docker image inspect "hunter-api:${GIT_SHA:-dev}" >/dev/null 2>&1; then
+      echo "ERRO: imagem hunter-api:${GIT_SHA:-dev} nao existe nesta maquina." >&2
+      echo "      \`ops\` roda so a imagem implantada; rode \`compose.sh update\`" >&2
+      echo "      (ou \`up\`) antes, nunca deixe \`run\` construir sozinho." >&2
+      exit 1
+    fi
+    "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" run --rm ops "$@"
     ;;
   *)
     "${COMPOSE[@]}" "$cmd" "$@"
