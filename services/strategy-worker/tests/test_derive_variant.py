@@ -24,6 +24,7 @@ from sqlalchemy import text
 from hunter_core.db.session import role_session
 from hunter_core.strategies.canonical import params_hash
 from hunter_core.strategies.envelope import PURPOSE_PAPER, PURPOSE_RESEARCH_ONLY
+from hunter_strategy_worker.gate_policy import parse_policy
 
 from .builders import activate_version, insert_hourly_regime, registry_for, seed_market
 
@@ -533,7 +534,10 @@ class TestActivatingTheVariant:
         for argument, message in (
             ("regime=btc:LATERAL", "is not a MarketRegime label"),
             ("regime=btc:UNKNOWN", "UNKNOWN cannot be allowed"),
-            ("sessao=btc:SIDEWAYS", "expected regime="),
+            # T3.59: a gramática passou a ter duas regras, então a recusa de uma
+            # chave desconhecida nomeia as que existem em vez de só ``regime=``.
+            ("sessao=btc:SIDEWAYS", "is not a gate this build knows"),
+            ("hours=12-15+13-16", "overlaps another one"),
             ("none", "não há o que remover"),
         ):
             with pytest.raises(script.Refused, match=message):
@@ -645,3 +649,100 @@ class TestActivatingTheVariant:
                 )
             ).scalar_one()
         assert inherited == GATE_GLOBAL
+
+    async def test_an_hours_gate_is_stored_as_integers_and_reads_back(
+        self, db_session_factory: Any
+    ) -> None:
+        """T3.59, e o achado que este teste existe para prender: a coluna tem de
+        receber **inteiros**. A forma canônica (``params_format = 1``) emite todo
+        número como string — certo para ``default_parameters``, fatal aqui: a
+        janela voltaria do JSONB como ``[["12","15"]]``, o parser recusaria e a
+        versão sairia do roster com ``policy_unreadable``, calada, atrás de um
+        ``/ready`` verde. A prova é dupla: o JSON gravado **e** o
+        ``parse_policy`` do worker lendo aquilo de volta.
+        """
+        script = _script()
+        key = "variant_hours_window"
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(session, key=key)
+        async with db_session_factory() as session, session.begin():
+            message = await script.derive_variant(
+                session,
+                key,
+                "v1",
+                "EXP-0023: só decide entre 12 e 15 UTC",
+                overrides={},
+                dry_run=False,
+                policy="hours=12-15",
+                registry=registry_for(key),
+            )
+        assert "policy -> hours=12-15" in message
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            stored = (
+                await session.execute(
+                    text(
+                        "SELECT eligibility_policy FROM strategy_versions v "
+                        "JOIN strategies s ON s.id = v.strategy_id "
+                        "WHERE s.key = :key AND v.version = 'v2'"
+                    ),
+                    {"key": key},
+                )
+            ).scalar_one()
+        assert stored == {"hours": {"utc": [[12, 15]]}}
+        assert all(isinstance(bound, int) for bound in stored["hours"]["utc"][0])
+        read_back = parse_policy(stored)
+        assert read_back is not None
+        assert read_back.hours is not None
+        assert read_back.hours.hours == frozenset({12, 13, 14})
+
+    async def test_a_gate_argument_that_drops_the_parents_other_rule_is_refused(
+        self, db_session_factory: Any
+    ) -> None:
+        """A única direção perigosa: a filha decidindo em **mais** contexto que o
+        pai. ``--policy hours=12-15`` sobre um pai com portão de regime tiraria o
+        regime em silêncio; nomear os dois grava os dois."""
+        script = _script()
+        key = "variant_hours_over_regime"
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(session, key=key, policy=GATE_SIDEWAYS)
+            await insert_hourly_regime(session, hour=SERIES_HOUR)
+        with pytest.raises(script.Refused, match="não menciona o portão regime"):
+            async with db_session_factory() as session, session.begin():
+                await script.derive_variant(
+                    session,
+                    key,
+                    "v1",
+                    "só a janela",
+                    overrides={},
+                    dry_run=True,
+                    policy="hours=12-15",
+                    registry=registry_for(key),
+                )
+        async with db_session_factory() as session, session.begin():
+            message = await script.derive_variant(
+                session,
+                key,
+                "v1",
+                "EXP-0023: regime e janela",
+                overrides={},
+                dry_run=False,
+                policy="regime=btc:SIDEWAYS,hours=12-15",
+                registry=registry_for(key),
+            )
+        assert "policy -> btc:SIDEWAYS;hours=12-15" in message
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            _parent, variant = await _rows(session, key)
+            stored = (
+                await session.execute(
+                    text(
+                        "SELECT eligibility_policy FROM strategy_versions v "
+                        "JOIN strategies s ON s.id = v.strategy_id "
+                        "WHERE s.key = :key AND v.version = 'v2'"
+                    ),
+                    {"key": key},
+                )
+            ).scalar_one()
+        assert stored == {**GATE_SIDEWAYS, "hours": {"utc": [[12, 15]]}}
+        assert "| policy=btc:SIDEWAYS;hours=12-15 |" in variant.changelog

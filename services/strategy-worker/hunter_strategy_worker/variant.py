@@ -26,11 +26,11 @@ from hunter_core.strategies.canonical import canonical_json
 from hunter_core.strategies.constraints import check_ranges
 from hunter_strategy_worker.activation import validate_parameters
 from hunter_strategy_worker.activation_db import Refused
-from hunter_strategy_worker.regime_gate import PolicyError, policy_argument
+from hunter_strategy_worker.gate_policy import PolicyError, policy_argument, policy_clauses
 
 if TYPE_CHECKING:
     from hunter_core.strategies.base import Strategy
-    from hunter_strategy_worker.regime_gate import EligibilityPolicy
+    from hunter_strategy_worker.gate_policy import GatePolicy
 
 __all__ = [
     "LINEAGE_RE",
@@ -42,6 +42,7 @@ __all__ = [
     "parse_overrides",
     "policy_note",
     "resolve_policy",
+    "stored_policy",
     "variant_changelog",
 ]
 
@@ -157,17 +158,27 @@ def lineage_of(changelog: str | None) -> str:
     return match.group(0) if match else ""
 
 
-def policy_note(policy: EligibilityPolicy | None) -> str:
-    """Como o portão aparece na linhagem: ``btc:SIDEWAYS`` ou ``none``.
+def policy_note(policy: GatePolicy | None) -> str:
+    """Como o portão aparece na linhagem: ``btc:SIDEWAYS``, ``hours=12-15``,
+    ``btc:SIDEWAYS;hours=12-15`` ou ``none``.
 
     Legível pelo operador e analisável por quem for reconciliar as páginas do
     Obsidian; a verdade continua sendo a coluna ``eligibility_policy``, que é
     congelada pelo gatilho — isto é a cópia humana dela, como
     ``overrides=`` é a cópia humana do conjunto.
+
+    Uma política **só** de regime sai exatamente como saía antes da T3.59
+    (``btc:SIDEWAYS``, sem prefixo): as variantes já gravadas continuam legíveis
+    pela mesma leitura, e o ``;`` só aparece quando há de fato dois portões.
     """
     if policy is None:
         return "none"
-    return f"{policy.scope}:{','.join(policy.allow)}"
+    parts: list[str] = []
+    if policy.regime is not None:
+        parts.append(f"{policy.regime.scope}:{','.join(policy.regime.allow)}")
+    if policy.hours is not None:
+        parts.append(policy.hours.note)
+    return ";".join(parts)
 
 
 def variant_changelog(
@@ -176,7 +187,7 @@ def variant_changelog(
     digest: str,
     note: str,
     *,
-    policy: EligibilityPolicy | None = None,
+    policy: GatePolicy | None = None,
     policy_moved: bool = False,
 ) -> str:
     """A linhagem primeiro — é por ela que a variante é encontrada e ligada."""
@@ -200,13 +211,37 @@ def canonical_policy(policy: dict[str, Any] | None) -> str:
     return "" if policy is None else canonical_json(policy).decode("utf-8")
 
 
+def stored_policy(policy: dict[str, Any] | None) -> str | None:
+    """O JSON que vai para a **coluna** — que não é a forma canônica, e o motivo
+    de estarem separadas é um bug pego por teste antes de qualquer escrita.
+
+    ``canonical_json`` emite todo número como string decimal normalizada: é o
+    contrato de ``params_format = 1``, existe para ``Decimal("1.50")`` e ``1.5``
+    serem o mesmo parâmetro, e é a coisa certa para ``default_parameters``. A
+    janela de horas da T3.59 é feita de **inteiros**: gravada por ali, voltaria
+    do JSONB como ``[["12","15"]]``, o parser recusaria (``start '12' is not an
+    integer hour``) e a versão inteira sairia do roster com ``policy_unreadable``
+    — a coorte emudeceria atrás de um ``/ready`` verde. Aqui vai o JSON com os
+    tipos que a política tem. A **comparação** continua em
+    :func:`canonical_policy`, onde os dois lados passam pela mesma função.
+    """
+    return None if policy is None else json.dumps(policy, separators=(",", ":"), sort_keys=True)
+
+
 def resolve_policy(argument: str | None, parent: dict[str, Any] | None) -> dict[str, Any] | None:
     """A política da variante: herdada, trocada ou removida — nunca adivinhada.
 
     Sem ``--policy`` a variante **herda** a do pai (que pode ser ``None``): o
     resto do conteúdo é copiado byte a byte e o portão é conteúdo. ``--policy
-    none`` remove, e recusa quando não há o que remover, porque um comando que
-    não faz nada não deve parecer que fez.
+    none`` remove tudo, e recusa quando não há o que remover, porque um comando
+    que não faz nada não deve parecer que fez.
+
+    Com ``--policy``, o argumento é o portão **inteiro** da filha — e é por isso
+    que ele **recusa** quando deixa de fora uma regra que o pai tinha (T3.59).
+    Escrever ``--policy hours=12-15`` sobre um pai com portão de regime tiraria
+    o portão de regime em silêncio: a filha decidiria em *mais* contexto que o
+    pai, que é a única direção perigosa, e a coorte mediria outra coisa. Para
+    tirar uma regra e manter a outra existe ``<portão>=none``, que é uma frase.
     """
     if argument is None:
         return parent
@@ -215,6 +250,15 @@ def resolve_policy(argument: str | None, parent: dict[str, Any] | None) -> dict[
             raise Refused("--policy none: o pai já não tem portão, não há o que remover")
         return None
     try:
-        return policy_argument(argument)
+        chosen = policy_argument(argument)
+        named = set(policy_clauses(argument))
     except PolicyError as invalid:
         raise Refused(f"--policy {argument!r}: {invalid}") from invalid
+    if dropped := sorted(set(parent or {}) - named):
+        raise Refused(
+            f"--policy {argument!r} não menciona o portão {', '.join(dropped)}, que o pai tem: "
+            "repita-o no argumento, escreva <portão>=none para tirá-lo, ou --policy none para "
+            "tirar o portão inteiro — largar uma regra em silêncio faria a filha decidir em "
+            "mais contexto que o pai"
+        )
+    return chosen

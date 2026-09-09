@@ -364,11 +364,60 @@ O que muda em relação à §7, e vale saber antes de digitar:
   subir os serviços, e o `strategy-worker` **recusa iniciar** sem a coluna (é o que
   `migration_present` passou a exigir). O script recusa antes de escrever qualquer
   coisa: `0017_eligibility_policy não está aplicada`.
-- **O que esperar da população:** um portão só **remove** decisões do pai — a
-  variante é, por construção, um subconjunto. Compare pelo pareado
-  (`t342-blocos/blocos.py`), nunca por médias soltas. Hoje 27 % das horas dos
-  últimos 31 dias saem `UNKNOWN` (aquecimento do classificador, PIPELINE §4b item 5)
-  e **essas horas também são removidas**, junto com as horas do rótulo recusado.
+- **O que esperar da população:** um portão só remove **barras** — e isso **não**
+  faz a filha ser um subconjunto das *decisões* do pai (T3.52d, PIPELINE §4b item
+  11: `INELIGIBLE` não re-arma o slot, então a máquina de estados da filha evolui
+  diferente e ela pode abrir episódio numa barra que o pai nunca considerou).
+  Compare pareado por **(mercado, barra)** sobre as barras elegíveis
+  compartilhadas (`t342-blocos/blocos.py`), nunca por decisão e nunca por médias
+  soltas. Hoje 27 % das horas dos últimos 31 dias saem `UNKNOWN` (aquecimento do
+  classificador, PIPELINE §4b item 5) e **essas horas também são removidas**,
+  junto com as horas do rótulo recusado.
+
+### A janela de horas (`hours=`, T3.59)
+
+A segunda regra do mesmo envelope: `--policy hours=12-15` prende a versão às
+barras que **fecham** entre 12:00 e 14:59:59 **UTC** (09:00–11:59 BRT) — janela
+meia-aberta, uma ou mais por política (`hours=12-15+22-02`, que vira a
+meia-noite), e é a hora da *decisão*, não a hora de onde o dado veio (uma barra
+de 15 min que fecha às 12:00 resume 11:45–12:00 e é a primeira barra elegível da
+janela). O motivo da recusa é `hours_gate:HH` com a hora em dois dígitos. Cinco
+coisas que valem saber antes de digitar:
+
+- **As regras são `AND` e a hora vem primeiro.** `--policy
+  regime=btc:BTC_BULL,hours=12-15` grava as duas e a barra só decide se passar
+  nas duas; a vírgula separa regras **e** rótulos, e quem as distingue é o `=`.
+  A hora é avaliada antes porque não lê nada — logo uma barra fora da janela nem
+  chega a custar a consulta do regime, e uma barra que falharia nas duas é
+  reportada como `hours_gate:HH`.
+- **Um `--policy` que não mencione uma regra do pai é recusado.** Escrever
+  `--policy hours=12-15` sobre um pai com portão de regime tiraria o regime em
+  silêncio e faria a filha decidir em **mais** contexto que o pai, que é a única
+  direção perigosa. Repita a regra, ou escreva `regime=none` para tirá-la de
+  propósito (`--policy none` continua tirando o portão inteiro).
+- **A janela não pode cobrir o dia todo** (`0-24`, ou duas janelas que somem 24 h)
+  nem se sobrepor a si mesma: um portão que nunca recusa é um portão em que
+  alguém acredita e que não existe, e o script recusa antes de escrever.
+- **Não há antecipação a defender aqui**, e é a diferença desta regra para a do
+  regime: a hora de fechamento é propriedade da barra, então não há série que
+  atrase, linha que envelheça nem relógio que ande — a mesma barra dá o mesmo
+  veredito no replay e na faixa viva, hoje e daqui a um mês.
+- **A perda de população é aritmética, não estatística:** `12-15` deixa passar
+  3 das 24 horas, ou seja 12,5 % das **barras** do pai (contra os 30,8 % que o
+  portão de regime deixou passar na T3.52d §3). Em decisões, o rateio uniforme
+  de uma coorte de 184 daria ~23 em 31 dias — a hora 12 sozinha rendeu 16 na
+  coorte de `momentum v10` (T3.54 §5), então pode ser mais; e uma versão que
+  **some** janela ao portão de regime cai para a interseção das duas, que pode
+  não chegar a dez. É por isso que a EXP-0023 pré-registra `n ≥ 30` como porta
+  antes de qualquer leitura.
+
+```
+# a variante da EXP-0023 (janela pré-registrada; --dry-run primeiro, sempre)
+ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops python infra/scripts/derive_variant.py mean_reversion v10 --policy hours=12-15 --changelog EXP-0023_janela_12_15_UTC --dry-run"
+
+# a irmã que mantém o portão de regime do pai — as duas regras, nomeadas
+ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops python infra/scripts/derive_variant.py momentum v11 --policy regime=btc:BTC_BULL,HIGH_VOLATILITY,hours=12-15 --changelog EXP-0023_janela_12_15_UTC --dry-run"
+```
 
 ## O que continua igual depois do passo 8
 - Só ordens a mercado, só SPOT, sem alavancagem; fill pelo livro elegível após a latência declarada; sem fill fabricado.

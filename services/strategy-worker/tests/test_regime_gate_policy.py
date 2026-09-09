@@ -20,16 +20,19 @@ from hunter_strategy_worker.activate_derived import (
 )
 from hunter_strategy_worker.activate_derived import keep_lineage
 from hunter_strategy_worker.activation_db import Refused
+from hunter_strategy_worker.gate_policy import (
+    GatePolicy,
+    PolicyError,
+    parse_policy,
+    policy_argument,
+)
 from hunter_strategy_worker.regime_gate import (
     DEFAULT_CLASSIFIER,
     MAX_STALENESS,
     RULE_PREVIOUS_CLOSED_HOUR,
     EligibilityPolicy,
-    PolicyError,
     RegimeRow,
     evaluate_gate,
-    parse_policy,
-    policy_argument,
 )
 from hunter_strategy_worker.variant import (
     LINEAGE_RE,
@@ -56,10 +59,18 @@ def row(regime: str, *, hour: datetime = PREVIOUS_HOUR) -> RegimeRow:
     return RegimeRow(id=uuid.uuid4(), regime=regime, start_time=hour, end_time=hour + HOUR)
 
 
-def policy(*labels: str) -> EligibilityPolicy:
+def envelope(*labels: str) -> GatePolicy:
     parsed = parse_policy({"regime": {"allow": list(labels)}})
     assert parsed is not None
     return parsed
+
+
+def policy(*labels: str) -> EligibilityPolicy:
+    """A regra de regime sozinha — o que ``evaluate_gate`` recebe. Desde a T3.59
+    ela é *uma* das regras do envelope, e ``parse_policy`` devolve o envelope."""
+    rule = envelope(*labels).regime
+    assert rule is not None
+    return rule
 
 
 class TestParsePolicy:
@@ -71,10 +82,12 @@ class TestParsePolicy:
     def test_a_complete_policy_round_trips(self) -> None:
         parsed = parse_policy(SIDEWAYS_ONLY)
         assert parsed is not None
-        assert parsed.scope == "btc"
-        assert parsed.classifier_version == DEFAULT_CLASSIFIER
-        assert parsed.rule == RULE_PREVIOUS_CLOSED_HOUR
-        assert parsed.allow == ("SIDEWAYS",)
+        assert parsed.hours is None
+        assert parsed.regime is not None
+        assert parsed.regime.scope == "btc"
+        assert parsed.regime.classifier_version == DEFAULT_CLASSIFIER
+        assert parsed.regime.rule == RULE_PREVIOUS_CLOSED_HOUR
+        assert parsed.regime.allow == ("SIDEWAYS",)
         assert parsed.to_jsonable() == SIDEWAYS_ONLY
 
     def test_the_defaults_are_the_hourly_series(self) -> None:
@@ -94,7 +107,7 @@ class TestParsePolicy:
         ("raw", "message"),
         [
             ({"session": {"allow": ["SIDEWAYS"]}}, "unknown key"),
-            ({}, "has no 'regime' policy"),
+            ({}, "has no policy in it and is not NULL"),
             ({"regime": {"allow": ["SIDEWAYS"], "maximo": 3}}, "unknown field"),
             ({"regime": {"allow": ["SIDEWAYS"], "scope": "moon"}}, "is not a RegimeScope"),
             ({"regime": {"allow": ["SIDEWAYS"], "rule": "containing_hour"}}, "is not a rule"),
@@ -122,13 +135,13 @@ class TestPolicyArgument:
         assert policy_argument("regime=BTC:SIDEWAYS") == SIDEWAYS_ONLY
 
     def test_two_labels(self) -> None:
-        assert policy_argument("regime=btc:SIDEWAYS,BTC_BULL")["regime"]["allow"] == [
-            "BTC_BULL",
-            "SIDEWAYS",
-        ]
+        stored = policy_argument("regime=btc:SIDEWAYS,BTC_BULL")
+        assert stored is not None
+        assert stored["regime"]["allow"] == ["BTC_BULL", "SIDEWAYS"]
 
     @pytest.mark.parametrize(
-        "argument", ["regime=btc", "sessao=btc:SIDEWAYS", "regime=btc:LATERAL", "regime=btc:"]
+        "argument",
+        ["regime=btc", "sessao=btc:SIDEWAYS", "regime=btc:LATERAL", "regime=btc:", "btc:SIDEWAYS"],
     )
     def test_it_refuses_what_the_worker_would_refuse(self, argument: str) -> None:
         with pytest.raises(PolicyError):
@@ -205,7 +218,7 @@ class TestVariantPolicy:
         ``params_hash`` do pai: sem o segmento ``policy=`` a linhagem diria que
         nada mudou."""
         changelog = variant_changelog(
-            "v6", [], "a" * 12, "T3.52", policy=policy("SIDEWAYS"), policy_moved=True
+            "v6", [], "a" * 12, "T3.52", policy=envelope("SIDEWAYS"), policy_moved=True
         )
         assert changelog.startswith(
             "variante de v6 | derived_from=v6 | overrides= | params_hash=aaaaaaaaaaaa "
@@ -244,7 +257,7 @@ class TestVariantPolicy:
         ``| policy=...`` segment here would silently un-gate a variant at the
         only write it ever gets (``activate_derived.activate_derived``)."""
         frozen = variant_changelog(
-            "v6", [], "a" * 12, "T3.52", policy=policy("SIDEWAYS"), policy_moved=True
+            "v6", [], "a" * 12, "T3.52", policy=envelope("SIDEWAYS"), policy_moved=True
         )
         kept = keep_lineage(frozen, "ativada para a coorte prospectiva")
         assert kept.startswith(

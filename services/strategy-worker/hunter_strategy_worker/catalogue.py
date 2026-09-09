@@ -41,12 +41,12 @@ from hunter_strategy_worker.context_budget import (
     ContextBudgetUnknown,
     required_context_minutes,
 )
+from hunter_strategy_worker.gate_policy import GatePolicy, PolicyError, parse_policy
 from hunter_strategy_worker.metrics import (
     shadow_versions_active,
     shadow_versions_runnable,
     shadow_versions_unrunnable,
 )
-from hunter_strategy_worker.regime_gate import EligibilityPolicy, PolicyError, parse_policy
 from hunter_strategy_worker.roster import ActiveVersion, VersionRoster, roster_order
 
 if TYPE_CHECKING:
@@ -277,7 +277,7 @@ async def load_version_roster(session: AsyncSession) -> VersionRoster:
             logger.warning("shadow_version_without_parameters", strategy=key)
             refuse("no_parameters")
             continue
-        policy: EligibilityPolicy | None
+        policy: GatePolicy | None
         try:
             policy = parse_policy(row.eligibility_policy)
         except PolicyError as unreadable:

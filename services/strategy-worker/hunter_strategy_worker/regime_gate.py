@@ -46,8 +46,8 @@ answers ``regime_gate:unknown`` with ``detail = "stale"`` — the hourly produce
 having died is exactly when a version must **not** keep deciding on last
 Tuesday's regime.
 
-**Everything unreadable is refused, never ignored**: an unknown key, an unknown
-scope, an unknown rule, a label that is not a ``MarketRegime``, an empty
+**Everything unreadable is refused, never ignored**: an unknown field, an
+unknown scope, an unknown rule, a label that is not a ``MarketRegime``, an empty
 ``allow``, ``UNKNOWN`` inside ``allow`` (a version deciding during the
 classifier's warm-up would be deciding without context and calling it context).
 ``load_version_roster`` refuses to run a version whose policy does not parse.
@@ -81,14 +81,16 @@ __all__ = [
     "RegimeGate",
     "evaluate_gate",
     "load_gate",
-    "parse_policy",
-    "policy_argument",
+    "parse_regime_policy",
+    "regime_clause",
 ]
 
 POLICY_KEY = "regime"
-"""The only policy this build understands. A second gate (session, beta,
-breadth) is a second key, and an unknown key is refused — the envelope is a map
-of policies precisely so that adding one is not editing this one."""
+"""The key this rule occupies in the eligibility envelope. The envelope itself —
+which keys exist, and that every declared one must pass — is
+:mod:`hunter_strategy_worker.gate_policy`, and it was split out when T3.59 added
+the second gate: a rule that had to know about its siblings could not be added
+without editing them."""
 
 DEFAULT_SCOPE = RegimeScope.BTC.value
 DEFAULT_CLASSIFIER = "regime_hourly_v1"
@@ -123,39 +125,24 @@ class EligibilityPolicy:
     rule: str
     allow: tuple[str, ...]
 
-    def to_jsonable(self) -> dict[str, Any]:
+    def to_body(self) -> dict[str, Any]:
         """Exactly the shape that was stored — the canonical order, sorted labels."""
         return {
-            POLICY_KEY: {
-                "allow": list(self.allow),
-                "classifier_version": self.classifier_version,
-                "rule": self.rule,
-                "scope": self.scope,
-            }
+            "allow": list(self.allow),
+            "classifier_version": self.classifier_version,
+            "rule": self.rule,
+            "scope": self.scope,
         }
 
 
-def parse_policy(raw: object | None) -> EligibilityPolicy | None:
-    """``None`` for "no gate"; a policy; or :class:`PolicyError`. Never a default.
+def parse_regime_policy(body: object) -> EligibilityPolicy:
+    """The ``regime`` body of the envelope, or :class:`PolicyError`. Never a default.
 
     Typed ``object`` and not ``dict``: what arrives is whatever JSONB holds, and
     a column someone put a list or a string into must be *refused*, not assumed.
-
-    An empty object (``{}``) is refused rather than read as "no gate": a row
-    someone wrote a policy into and emptied by accident must not be silently
-    promoted to "decides everywhere".
+    Whether the key is there at all — and that an empty envelope is refused
+    rather than read as "no gate" — is :mod:`hunter_strategy_worker.gate_policy`.
     """
-    if raw is None:
-        return None
-    if not isinstance(raw, dict):
-        raise PolicyError(f"eligibility_policy must be a JSON object, got {type(raw).__name__}")
-    stored = cast("dict[str, Any]", raw)
-    unknown_keys = sorted(set(stored) - {POLICY_KEY})
-    if unknown_keys:
-        raise PolicyError(f"eligibility_policy has unknown key(s): {', '.join(unknown_keys)}")
-    if POLICY_KEY not in stored:
-        raise PolicyError(f"eligibility_policy has no {POLICY_KEY!r} policy and is not NULL")
-    body: object = stored[POLICY_KEY]
     if not isinstance(body, dict):
         raise PolicyError(f"{POLICY_KEY} policy must be a JSON object")
     typed = cast("dict[str, Any]", body)
@@ -196,33 +183,26 @@ def _parse_allow(raw: object) -> tuple[str, ...]:
     return tuple(sorted(labels))
 
 
-def policy_argument(argument: str) -> dict[str, Any]:
-    """``"regime=BTC:SIDEWAYS,BTC_BULL"`` -> the JSON to store. Refuses the rest.
+def regime_clause(rest: str) -> dict[str, Any]:
+    """``"BTC:SIDEWAYS,BTC_BULL"`` -> the body to store. Refuses the rest.
 
-    The operator's grammar for ``infra/scripts/derive_variant.py --policy``:
-    ``<key>=<scope>:<LABEL>[,<LABEL>...]``. It goes through :func:`parse_policy`
-    before being returned, so the CLI refuses exactly what the worker would
-    refuse — one validator, not two that can drift.
+    The operator's half of the grammar of ``infra/scripts/derive_variant.py
+    --policy``: ``<scope>:<LABEL>[,<LABEL>...]``. It goes through
+    :func:`parse_regime_policy` before being returned, so the CLI refuses
+    exactly what the worker would refuse — one validator, not two that can
+    drift.
     """
-    key, separator, rest = argument.partition("=")
-    if not separator or key.strip() != POLICY_KEY:
-        raise PolicyError(f"--policy {argument!r}: expected {POLICY_KEY}=<scope>:<LABEL>[,<LABEL>]")
     scope, colon, labels = rest.partition(":")
     if not colon:
-        raise PolicyError(f"--policy {argument!r}: missing ':' between scope and labels")
-    parsed = parse_policy(
+        raise PolicyError(f"--policy {POLICY_KEY}={rest!r}: expected <scope>:<LABEL>[,<LABEL>]")
+    return parse_regime_policy(
         {
-            POLICY_KEY: {
-                "scope": scope.strip().lower(),
-                "classifier_version": DEFAULT_CLASSIFIER,
-                "rule": RULE_PREVIOUS_CLOSED_HOUR,
-                "allow": [label.strip() for label in labels.split(",") if label.strip()],
-            }
+            "scope": scope.strip().lower(),
+            "classifier_version": DEFAULT_CLASSIFIER,
+            "rule": RULE_PREVIOUS_CLOSED_HOUR,
+            "allow": [label.strip() for label in labels.split(",") if label.strip()],
         }
-    )
-    if parsed is None:  # pragma: no cover - parse_policy only answers None for None
-        raise PolicyError(f"--policy {argument!r} produced no policy")
-    return parsed.to_jsonable()
+    ).to_body()
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,7 +237,7 @@ class RegimeGate:
             "hour_start": None if self.hour_start is None else self.hour_start.isoformat(),
             "hour_end": None if self.hour_end is None else self.hour_end.isoformat(),
             "detail": self.detail,
-            "policy": self.policy.to_jsonable()[POLICY_KEY],
+            "policy": self.policy.to_body(),
         }
 
 

@@ -20,7 +20,7 @@ from hunter_strategy_worker.context_budget import context_minutes_for
 if TYPE_CHECKING:
     from hunter_core.strategies.base import Strategy
     from hunter_strategy_worker.config import ShadowConfig
-    from hunter_strategy_worker.regime_gate import EligibilityPolicy
+    from hunter_strategy_worker.gate_policy import GatePolicy
 
 __all__ = ["VERSION_RE", "ActiveVersion", "VersionRoster", "roster_order"]
 
@@ -49,10 +49,10 @@ class ActiveVersion:
     never a literal the worker crava (T3.15, D10). Never ``"live"``: a row
     naming it is refused before it becomes an :class:`ActiveVersion` at all."""
 
-    eligibility_policy: EligibilityPolicy | None = None
+    eligibility_policy: GatePolicy | None = None
     """``strategy_versions.eligibility_policy``, already parsed
-    (``0017_eligibility_policy``, T3.52). ``None`` is no gate — which is every
-    version activated before this column existed.
+    (``0017_eligibility_policy``, T3.52; the hours rule, T3.59). ``None`` is no
+    gate — which is every version activated before this column existed.
 
     Parsed once, here, and not at every bar: the policy is frozen with the row,
     so re-reading it per evaluation would be re-deciding a settled question

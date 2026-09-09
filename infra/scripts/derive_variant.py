@@ -16,22 +16,23 @@ congelado do pai é copiado byte a byte (``docs/plans/SHADOW-LAB.md`` §1:
 ``activated_at = NULL``, ``purpose = 'research_only'``, e **nada é ativado
 aqui**: ativar é uma corrida separada e auditada de
 ``activate_strategy_version.py``, que reconhece a linha derivada pelo conteúdo
-próprio dela e o preserva em vez de reescrevê-lo a partir do código de hoje.
+próprio dela e o preserva em vez de reescrevê-lo do código de hoje.
 
-``--policy`` (T3.52) grava ``strategy_versions.eligibility_policy``
-(``0017_eligibility_policy``): ``regime=<escopo>:<RÓTULO>[,<RÓTULO>...]``, ou
-``none`` para tirar o portão que o pai tinha. **Sem ``--policy`` a variante
-herda o portão do pai**, como herda todo o resto — nunca o perde em silêncio.
-Rótulo desconhecido, escopo desconhecido, ``UNKNOWN`` na lista e lista vazia são
-recusados aqui pela **mesma** função que o worker usa para ler a coluna
-(``hunter_strategy_worker.regime_gate``): um validador, não dois que divergem. E
-um par ``(scope, classifier_version)`` sem série em ``market_regimes`` também é
-recusado (:func:`_refuse_a_gate_with_no_series`).
+``--policy`` grava ``strategy_versions.eligibility_policy``
+(``0017_eligibility_policy``), e **toda** regra declarada tem de passar:
+``regime=<escopo>:<RÓTULO>[,<RÓTULO>…]`` (T3.52) e ``hours=<HH>-<HH>[+…]``,
+meia-aberta e em UTC (T3.59) — juntas em ``regime=btc:BTC_BULL,hours=12-15``;
+``<portão>=none`` tira uma regra, ``none`` sozinho tira todas. **Sem ``--policy``
+a variante herda o portão do pai**, e um ``--policy`` que não mencione uma regra
+do pai é recusado (largá-la calado faria a filha decidir em mais contexto que
+ele). O ilegível — e o par ``(scope, classifier_version)`` sem série em
+``market_regimes`` — é recusado aqui pelas **mesmas** funções que o worker usa
+para ler a coluna (``gate_policy``, :func:`_refuse_a_gate_with_no_series`).
 
 O ``changelog`` congelado carrega a linhagem legível **e** analisável::
 
     variante de v2 | derived_from=v2 | overrides=atr_pct_min=0.0089
-    | params_hash=<12 hex> [| policy=btc:SIDEWAYS] | <o motivo que o operador escreveu>
+    | params_hash=<12 hex> [| policy=btc:SIDEWAYS;hours=12-15] | <o motivo escrito>
 
 ``derived_from=v<n>`` é o que ``infra/scripts/obsidian_strategy_pages.py``
 (``parse_parent_version``) lê para ligar a página da variante à do pai, como já
@@ -44,22 +45,19 @@ reproduz, parâmetro que o schema congelado não declara, valor que não valida
 contra ele, valor fora da faixa que a estratégia declara
 (``hunter_core.strategies.constraints``, T3.26c/A2: sinal invertido em relação ao
 pai, piso acima do teto, objeto tipado que não instancia), política ilegível,
-portão sem série que o sustente, e um conjunto que já existe (mesmo
-``params_hash`` **e** mesma política no mesmo ``code_ref``) — o mesmo
-experimento contado duas vezes.
+portão sem série que o sustente, portão do pai largado em silêncio, e um conjunto
+que já existe (mesmo ``params_hash`` **e** mesma política no mesmo ``code_ref``).
 
 Conecta com ``DATABASE_URL_MIGRATIONS`` (direto, nunca pelo pooler), como
 ``activate_strategy_version.py``: a ``0011`` revogou ``INSERT`` em
-``strategy_versions`` de todo papel de aplicação, e ``purpose``/
-``eligibility_policy`` só o dono escreve (DATABASE.md §24.5, §29).
-
-A metade pura — ``--set``, forma canônica, linhagem — mora em
-``hunter_strategy_worker.variant`` (orçamento de 350 linhas, T3.52) e é
-re-exportada aqui, então quem importava daqui não mudou. **Roda dentro da imagem
-publicada** (``docker exec -i hunter-api-1 python - < derive_variant.py``), então
-importa só o pacote instalado: desde a T3.26c isso inclui
-``hunter_core.strategies.constraints`` e, desde a T3.52,
-``hunter_strategy_worker.variant``/``.regime_gate`` — a imagem precisa ser
+``strategy_versions`` de todo papel, e ``purpose``/``eligibility_policy`` só o
+dono escreve (DATABASE.md §24.5, §29). A metade pura — ``--set``, forma
+canônica, linhagem — mora em ``hunter_strategy_worker.variant`` (orçamento de
+350 linhas, T3.52) e é re-exportada aqui, então quem importava daqui não mudou.
+**Roda dentro da imagem publicada** (``docker exec -i hunter-api-1 python - <
+derive_variant.py``), então importa só o pacote instalado: desde a T3.26c isso
+inclui ``hunter_core.strategies.constraints`` e, desde a T3.52,
+``hunter_strategy_worker.variant``/``.gate_policy`` — a imagem precisa ser
 **deste commit ou posterior** (``docs/ACTIVATION.md`` §7 diz como conferir).
 """
 
@@ -91,7 +89,7 @@ from hunter_strategy_worker.activation_db import (
 )
 from hunter_strategy_worker.catalogue import resolve_strategy
 from hunter_strategy_worker.code_ref import strategy_module, version_code_ref
-from hunter_strategy_worker.regime_gate import EligibilityPolicy, PolicyError, parse_policy
+from hunter_strategy_worker.gate_policy import EligibilityPolicy, PolicyError, parse_policy
 from hunter_strategy_worker.variant import (
     LINEAGE_RE,
     NUMERIC,
@@ -101,6 +99,7 @@ from hunter_strategy_worker.variant import (
     parse_overrides,
     policy_note,
     resolve_policy,
+    stored_policy,
     variant_changelog,
 )
 
@@ -238,8 +237,8 @@ async def derive_variant(
         parsed = parse_policy(chosen)
     except PolicyError as invalid:  # pragma: no cover - resolve_policy já validou o novo
         raise Refused(f"a política herdada de {key} {version} é ilegível: {invalid}") from invalid
-    if policy is not None and parsed is not None:
-        await _refuse_a_gate_with_no_series(conn, parsed)
+    if policy is not None and parsed is not None and parsed.regime is not None:
+        await _refuse_a_gate_with_no_series(conn, parsed.regime)
     params, changes = build_parameters(schema, parent, overrides, strategy, policy_moved=moved)
     digest = params_hash(params)
     twin = await _collision(conn, row.strategy_id, code_ref, digest, chosen)
@@ -278,7 +277,7 @@ async def derive_variant(
                 version, changes, digest, changelog, policy=parsed, policy_moved=moved
             ),
             "purpose": PURPOSE_RESEARCH_ONLY,
-            "policy": None if chosen is None else canonical_json(chosen).decode("utf-8"),
+            "policy": stored_policy(chosen),
         },
     )
     await record_event(
@@ -338,8 +337,9 @@ def main() -> int:
     )
     parser.add_argument(
         "--policy",
-        metavar="regime=ESCOPO:RÓTULO[,RÓTULO]",
-        help="portão da variante (ex.: regime=btc:SIDEWAYS) ou 'none'; sem isto, herda o do pai",
+        metavar="regime=ESCOPO:RÓTULO[,RÓTULO][,hours=HH-HH]",
+        help="portão(ões) da variante (ex.: regime=btc:SIDEWAYS,hours=12-15, hours=12-15, "
+        "regime=none) ou 'none' para tirar todos; sem isto, herda o do pai",
     )
     parser.add_argument("--changelog", required=True, help="por que esta variante existe")
     parser.add_argument("--dry-run", action="store_true", help="roda tudo e não escreve nada")

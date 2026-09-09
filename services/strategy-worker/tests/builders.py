@@ -244,7 +244,12 @@ async def activate_version(
         # written before 0017 is byte for byte the statement it always was — and
         # it has to be written *here*, at insert: the freeze trigger refuses to
         # UPDATE ``eligibility_policy`` on an activated row, which is the point.
-        params["policy"] = canonical_json(policy).decode()
+        # ``json.dumps`` e não ``canonical_json``: a forma canônica emite número
+        # como string (``params_format = 1``), e a janela de horas da T3.59 é de
+        # inteiros — gravá-la por ali faria o roster recusar a versão inteira com
+        # ``policy_unreadable``. É o mesmo JSON que ``variant.stored_policy``
+        # grava em produção, e é por isso que este fixture prova o que ela grava.
+        params["policy"] = json.dumps(policy, separators=(",", ":"), sort_keys=True)
         columns.append("eligibility_policy")
         values.append("CAST(:policy AS jsonb)")
     named = ", ".join(columns)

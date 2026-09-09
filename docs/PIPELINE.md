@@ -345,6 +345,11 @@ tenha mudado alguma coisa ou não, trinta e um dias para trás.
     silenciosa. Linha ausente, `UNKNOWN` do classificador (27 % das horas dos 31 dias, item 5)
     e linha mais velha que 2 h recusam com `regime_gate:unknown`: o portão nunca decide sem
     contexto e nunca envelhece junto com um produtor morto.
+    **A janela de horas (T3.59) é a segunda regra do mesmo envelope**
+    (`{"hours": {"utc": [[12, 15]]}}`, meia-aberta e em UTC, avaliada *antes* da regra de
+    regime porque não lê nada — a hora do `source_bar_close` é propriedade da barra fechada,
+    sem consulta, sem relógio e sem série que possa atrasar): as regras declaradas são `AND`,
+    cada uma só estreita, e uma barra que falha nas duas é reportada como `hours_gate:HH`.
 
 11. **A filha com portão não é subconjunto do pai nas decisões, só nas barras (T3.52d).**
     `INELIGIBLE` não decide, não re-arma o slot e não gasta a barreira (item 10) — logo a

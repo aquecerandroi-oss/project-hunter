@@ -38,6 +38,7 @@ from hunter_strategy_worker.walker import Progress, TrackingPlan
 if TYPE_CHECKING:
     from hunter_core.strategies.base import Decision
     from hunter_strategy_worker.catalogue import ActiveVersion
+    from hunter_strategy_worker.hours_gate import HoursGate
     from hunter_strategy_worker.regime_gate import RegimeGate
     from hunter_strategy_worker.repo import MarketRow
 
@@ -98,6 +99,17 @@ class Provenance:
     be decomposed by regime without re-deriving the join.
     """
 
+    hours_gate: HoursGate | None = None
+    """The hour-of-day verdict that let this decision happen (T3.59), or ``None``
+    when the version's policy carries no ``hours`` rule.
+
+    Same reading as ``regime_gate`` above, and the same absence of refusals: what
+    is written here is which window was open and which UTC hour the bar closed
+    in, so a ledger can be split by hour without re-deriving it from
+    ``emitted_at`` — and so that "this cohort only ever decided at 12-14 UTC" is
+    a fact in the envelope rather than an inference about it.
+    """
+
     context_minutes: int = 0
     """How much 1m history this evaluation actually loaded (T3.54b).
 
@@ -110,7 +122,7 @@ class Provenance:
     deployment's environment (notes-T3.54 §6.5).
 
     ``0`` is the never-set default and exists only so the dataclass can grow a
-    field behind ``regime_gate``; the one place that builds a ``Provenance``
+    field behind the two gates; the one place that builds a ``Provenance``
     (:mod:`hunter_strategy_worker.context`) always passes the real number.
     """
 
@@ -221,6 +233,9 @@ def build_record(
             "regime_reason": regime_reason,
             "regime_gate": (
                 None if provenance.regime_gate is None else provenance.regime_gate.to_jsonable()
+            ),
+            "hours_gate": (
+                None if provenance.hours_gate is None else provenance.hours_gate.to_jsonable()
             ),
         }
     )
