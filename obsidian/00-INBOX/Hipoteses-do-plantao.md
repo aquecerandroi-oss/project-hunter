@@ -1,0 +1,19 @@
+---
+tags: [inbox, plantao, hipoteses]
+title: Fila de hipóteses do plantão de mercado
+status: viva
+owner: sexta-feira
+updated: 2026-09-09
+---
+
+# Fila de hipóteses do plantão de mercado
+
+Cada linha nasce do plantão (T3.64) com fonte aberta. `nova` vira brief ou `descartada` com motivo. Nenhuma hipótese entra em estratégia viva sem passar pelo funil (contrato → replay → estresse → prospectivo). Ver [[KB-0076-por-que-perdemos-2026-09-08]] para a régua de custo que toda hipótese precisa pagar.
+
+| data | hipótese | fonte | como testar no Lab | status |
+|---|---|---|---|---|
+| 2026-09-09 | **H-P1a** — o retorno bruto das decisões congeladas da `mean_reversion` (EXP-0009) excede o de um controle contrarian lag-1 pareado (mesmo mercado/período, mesma execução e saída); se não exceder, o edge "é só reversão de sinal" | arXiv 2608.21888 (Kitron & Wengrowicz, 22/08/2026), https://arxiv.org/html/2608.21888v1 — [[KB-0082-reversao-de-15-minutos-o-sinal-e-o-fluxo]] | replay sobre as decisões congeladas do EXP-0009; células = sinal da última barra fechada de 15 m antes da entrada × tercil de \|2·taker_buy/volume − 1\| (cortes em janela anterior; exige carregar `taker_buy_volume` no `Bar`, `aggregate.py:40,77`); métrica = diferença bruta em bps por decisão contra o controle; régua = IC por blocos de dia conjuntos entre mercados + Holm; só conclui com ≥ 100 E 30 | nova |
+| 2026-09-09 | **H-P1b** — a expectancy líquida a 20 bps das mesmas decisões é > 0 (refuta "não paga o pedágio"); falta de significância não confirma nada | idem | mesma população e células; métrica = R líquido por decisão pela identidade `custo_R = 0,0020/(stop_atr × ATR%)` ([[KB-0076-por-que-perdemos-2026-09-08]]); régua idem; confirmação na janela seguinte | nova |
+| 2026-09-09 | **H-P2** — a expectancy líquida das versões do Lab nas janelas ±60 min de payroll / CPI / FOMC difere da de janelas-controle na mesma hora UTC em dias sem evento (volatilidade agendada como estado; `HIGH_VOLATILITY` é a única célula positiva da KB-0079) | Coin Metrics SOTN #380 (08/09/2026), https://coinmetrics.substack.com/p/state-of-the-network-issue-380 — [[Plantao/2026-09-09]] | 1) carimbar `macro_event` (tipo, instante) no envelope de todo sinal desde já, sem mudar decisão; 2) estudo de eventos por família com MAE, deslocamento referência→entrada e R líquido; régua = blocos de dia + Holm; **hoje é painel**: há 1 payroll (04/09) na série — vira teste com ≥ 6 eventos | nova |
+| 2026-09-09 | **D-P3** (diagnóstico de instrumento, sem edge) — `funding.py::_cadence()` (moda do histórico) devolve custo errado nos 9 perpétuos TradFi que passaram de 8 h para 4 h em 04/09 08:15Z; cenário de falso zero apontado pela Astra (`funding.py:278,322`) | Binance, https://www.binance.com/en/support/announcement/detail/68eb952fbf3e4abbb105c78ed6c406e6 — [[KB-0026-funding-num-horizonte-de-4h-e-o-vies-de-exclusao]] | `markets` ∩ {KODEX200, NAVER, LGELECTRONICS, HANMI, SAMSUNGEL, CXMT, ZHONGJI, CSOPSAMSUNG2L, CSOPSKHYNIX2L}USDT; settlements/dia antes e depois de 04/09 contra `_cadence()`; teste unitário "cadência muda de 8 h para 4 h com settlement ausente" em `test_funding.py` | nova |
+| 2026-09-09 | **D-P6 / D-P7** (painel) — quantos símbolos TradFi/pré-IPO e quantas listagens de setembro (GPRO 03/09, TradFi 07/09, PONS e 哈基米 06/09) entraram no universo top-200, quando, e quantos sinais o Lab emitiu neles antes de 24 h de história | Binance Research Monthly Sept (07/09), https://www.binance.com/en/research/analysis/monthly-market-insights-2026-09; lista de anúncios https://www.binance.com/en/support/announcement/list/48 — [[KB-0062-o-primeiro-dia-que-nao-conseguimos-ver]] | SQL somente leitura sobre `markets`, stream de universo do Redis e `agent_signals`; sem hipótese de edge — mede contaminação do universo | nova |
