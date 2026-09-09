@@ -261,3 +261,68 @@ class TestSlotIdentity:
         assert reading.per_unit is None
         assert reading.reason is not None
         assert reading.reason.startswith("funding_boundary_uncertain")
+
+
+class TestCadenceTransition:
+    """T3.65: Binance moved 9 TradFi perpetuals from an 8h to a 4h funding
+    cadence on 2026-09-04 08:15Z (plantao 2026-09-09, item 3; Astra must-fix
+    in ``.claude/state/astra-review-plantao-20260909-1700.md``).
+
+    ``_cadence()`` used the mode over *all* of ``history``. Right after a
+    cadence change, a ``_CADENCE_LOOKBACK`` (3 days, ``settle.py``) window
+    still holds far more old-cadence gaps than new ones, so the global mode
+    keeps reading the retired schedule. The false-zero scenario: the nominal
+    schedule computed from the stale (8h) cadence never predicts the instant a
+    real 4h settlement was due, so a settlement that is simply missing from
+    ``funding_rates`` is never flagged ``funding_missing`` — the trade prices
+    at a fabricated zero instead of the honest ``None``.
+    """
+
+    _BASE = datetime(2026, 9, 1, 0, 0, tzinfo=UTC)
+
+    @classmethod
+    def _h(cls, hours: int) -> datetime:
+        return cls._BASE + timedelta(hours=hours)
+
+    @classmethod
+    def _row(cls, hours: int, rate: str = "0.0001", price: str = "100") -> Settlement:
+        return Settlement(cls._h(hours), Decimal(rate), Decimal(price))
+
+    def test_a_cadence_change_with_a_missing_settlement_is_not_a_false_zero(self) -> None:
+        """Nine old 8h settlements (hours 0..72) then two real 4h settlements
+        (76, 80) — the market has already run two full 4h periods. Entry at
+        81, exit at 85: the 4h grid says 84 is due, but that row never made it
+        into ``funding_rates``. The global mode over 11 gaps (nine 8h, two 4h)
+        still reads 8h, whose nominal grid from anchor 80 lands on 88 — past
+        the exit — so nothing is ever flagged missing and the reading comes
+        back as a paid-nothing zero. That zero is fabricated, not observed."""
+        history = [self._row(h) for h in range(0, 73, 8)] + [self._row(76), self._row(80)]
+        reading = resolve_funding(history, entry_ts=self._h(81), exit_ts=self._h(85))
+        assert reading.per_unit is None, (
+            "false zero: a settlement the market's *current* 4h cadence "
+            f"predicted at hour 84 is missing from history, got {reading.per_unit!r}"
+        )
+        assert reading.reason is not None
+        assert reading.reason.startswith("funding_missing")
+        assert reading.interval_s == 4 * 3600
+
+    def test_the_same_transition_charges_a_settlement_that_is_actually_there(self) -> None:
+        """Same transition, but the 84 row is present: it must be charged
+        under the (correct) 4h cadence, not treated as extra/off-grid."""
+        history = [self._row(h) for h in range(0, 73, 8)] + [
+            self._row(76),
+            self._row(80),
+            self._row(84, "0.0002"),
+        ]
+        reading = resolve_funding(history, entry_ts=self._h(81), exit_ts=self._h(85))
+        assert reading.per_unit == Decimal("0.02")
+        assert reading.reason is None
+        assert reading.interval_s == 4 * 3600
+
+    def test_a_lone_off_grid_settlement_does_not_flip_the_cadence(self) -> None:
+        """A single stray settlement (the "briefly settles hourly" mechanism
+        already covered above) must not be mistaken for a sustained cadence
+        change: the very next gap goes right back to 8h."""
+        history = [*HISTORY, _settlement(20, "0.0002")]
+        reading = resolve_funding(history, entry_ts=_at(21), exit_ts=_at(21) + timedelta(hours=4))
+        assert reading.interval_s == EIGHT_HOURS

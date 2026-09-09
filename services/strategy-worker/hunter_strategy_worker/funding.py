@@ -8,10 +8,9 @@ lands exactly on the entry is not paid, because the position is taken at that
 instant.
 
 The hard part is not the sum, it is knowing when a settlement was *due*. The
-cadence is read from the market's own observed history (two consecutive
-settlements are enough, and the most common gap wins), never from a hardcoded
-eight hours: not every perpetual settles on the same schedule, and a wrong
-schedule would either invent a charge or hide one.
+cadence is read from the market's own observed history — the most common gap
+among the most *recent* few, never the mode of the whole window nor a
+hardcoded eight hours (T3.65, see ``_cadence()``): a wrong schedule invents or hides a charge.
 
 When funding is applicable but cannot be established — the schedule is unknown,
 a due settlement is missing, its rows disagree, or a settlement has no price to
@@ -102,6 +101,9 @@ __all__ = ["MATCH_TOLERANCE", "FundingReading", "Settlement", "resolve_funding"]
 MATCH_TOLERANCE = timedelta(seconds=2)
 """See the module docstring: far smaller than half the shortest real cadence."""
 
+_CADENCE_RECENT_GAPS = 3
+"""Gaps ``_cadence()`` reads the mode over: 2 new settlements outvote a retired cadence; 1 stray gap does not (T3.65)."""
+
 
 @dataclass(frozen=True, slots=True)
 class Settlement:
@@ -172,25 +174,30 @@ def _distinct_instants(times: Sequence[datetime]) -> list[datetime]:
 
 
 def _cadence(times: Sequence[datetime]) -> int | None:
-    """The market's settlement interval, in seconds, or ``None`` if unknowable.
+    """The market's *current* settlement interval, in seconds, or ``None``.
 
     Rounded to the nearest second, not truncated: a jittered pair such as
     ``00:00:00.010`` -> ``08:00:00.005`` is a 28799.995 s gap, and truncating it
     (the previous behaviour) reads back as 28799 — one second short of the real
     8h grid, which compounds every time the schedule steps (Astra, S2-funding
     review, round 1 must-fix 2).
+
+    Mode over only the last ``_CADENCE_RECENT_GAPS`` gaps, not the whole
+    window (T3.65) — a schedule change else reads as retired. Ties by recency.
     """
     distinct = _distinct_instants(times)
     if len(distinct) < 2:
         return None
-    gaps = Counter(
+    gaps = [
         round((later - earlier).total_seconds())
         for earlier, later in zip(distinct, distinct[1:], strict=False)
         if later > earlier
-    )
+    ]
     if not gaps:
         return None
-    interval, _count = gaps.most_common(1)[0]
+    recent = gaps[-_CADENCE_RECENT_GAPS:]
+    counts = Counter(recent)
+    interval = max(reversed(recent), key=lambda gap: counts[gap])
     return interval or None
 
 
