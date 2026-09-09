@@ -43,6 +43,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from hunter_core.db.base import Base, UUIDPrimaryKeyMixin
 from hunter_core.db.models._common import JSONB_EMPTY
+from hunter_core.domain.digests import MARKETS_DIGEST_PATTERN
 from hunter_core.domain.enums import REPLAY_COHORT_PATTERN
 
 SECONDS = Numeric(12, 3)
@@ -67,7 +68,13 @@ class ReplayRunRow(Base, UUIDPrimaryKeyMixin):
 
     __tablename__ = "replay_runs"
     __table_args__ = (
-        UniqueConstraint("run_id", "window_from", "window_to", name="uq_replay_runs_slice"),
+        UniqueConstraint(
+            "run_id",
+            "window_from",
+            "window_to",
+            "markets_digest",
+            name="uq_replay_runs_slice",
+        ),
         Index("ix_replay_runs_version_window", "strategy_version_id", "window_from"),
         CheckConstraint(f"cohort ~ '{REPLAY_COHORT_PATTERN}'", name="cohort_is_a_replay_cohort"),
         CheckConstraint("cohort = 'replay:' || run_id::text", name="cohort_names_the_run"),
@@ -82,6 +89,12 @@ class ReplayRunRow(Base, UUIDPrimaryKeyMixin):
         CheckConstraint("outcomes_resolved <= signals", name="resolved_within_the_population"),
         CheckConstraint("workers >= 1", name="a_slice_had_at_least_one_worker"),
         CheckConstraint("cardinality(markets) > 0", name="a_slice_visited_a_market"),
+        CheckConstraint(
+            "array_position(markets, NULL::text) IS NULL", name="markets_has_no_unnamed_member"
+        ),
+        CheckConstraint(
+            f"markets_digest ~ '{MARKETS_DIGEST_PATTERN}'", name="markets_digest_is_a_sha256"
+        ),
         CheckConstraint(
             "jsonb_typeof(evaluations_by_state) = 'object'", name="evaluations_is_an_object"
         ),
@@ -129,6 +142,24 @@ class ReplayRunRow(Base, UUIDPrimaryKeyMixin):
     is a different market (REPLICATION.md §3.3). Not a UUID array and not a join
     table: this is a receipt, read by a human and by a report, and a market later
     delisted must not make the receipt unreadable.
+    """
+
+    markets_digest: Mapped[str] = mapped_column(Text)
+    """SHA-256 (hex) of the sorted ``markets`` — the fourth column of the slice
+    key since ``0018_replay_runs_slice_markets`` (§30).
+
+    Until ``0018`` the key was the window alone, so four market slices of one
+    window under one cohort wrote **one** receipt and discarded three under
+    ``ON CONFLICT DO NOTHING``: T3.62 measured 8 rows for 32 runs. A slice is a
+    window *and* a market set, and this column is what makes the key say so.
+
+    Derived, never chosen. ``hunter_core.domain.digests.markets_digest`` is the
+    writer's half and ``replay_runs_digest_names_the_markets`` is the database's:
+    the trigger fills the column in when it arrives ``NULL`` and **refuses** a
+    value that is not the digest of this row's own ``markets`` — a copy that can
+    disagree with its source is worse than no copy (§18.2). The digest is over
+    the *sorted* list so the order the markets were dispatched in cannot
+    fabricate a second slice of work that already has a receipt.
     """
 
     started_at: Mapped[datetime]

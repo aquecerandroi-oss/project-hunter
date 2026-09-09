@@ -34,11 +34,11 @@ from hunter_core.db.models import (
 from hunter_core.domain.enums import ALL_ENUMS
 from hunter_core.domain.types import uuid7
 
-from .conftest import alembic_config, async_engine, create_database, migration_ddl
+from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, migration_ddl
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0017_eligibility_policy"
+HEAD_REVISION = "0018_replay_runs_slice_markets"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -57,6 +57,7 @@ REPLAY_RUNS_REVISION = "0013_replay_runs"
 LAB_SIGNALS_INDEXES_REVISION = "0014_lab_signals_indexes"
 RUNTIME_LOGIN_ROLE_REVISION = "0015_runtime_login_role"
 EXCHANGE_STATUS_REVISION = "0016_exchange_status_planned"
+ELIGIBILITY_POLICY_REVISION = "0017_eligibility_policy"
 
 _PENDING_PREDICATE = "dispatched_at IS NULL"
 """What makes an index a *pending* index, spelled out here rather than imported:
@@ -2555,9 +2556,21 @@ _RECEIPT_VALUES = (
 
 
 def _receipt_row(
-    *, version_id: uuid.UUID, run_id: uuid.UUID, day_from: int, day_to: int
+    *,
+    version_id: uuid.UUID,
+    run_id: uuid.UUID,
+    day_from: int,
+    day_to: int,
+    markets: list[str] | None = None,
 ) -> dict[str, object]:
-    """One well-formed ``replay_runs`` slice, ready to be overridden per test."""
+    """One well-formed ``replay_runs`` slice, ready to be overridden per test.
+
+    ``markets_digest`` (``0018``) is deliberately **not** in the statement: the
+    trigger derives it from ``markets``, and leaving it out here is what proves
+    that every writer predating that revision — this helper, the API's own
+    fixtures, an operator's ``INSERT`` — keeps working and gets the right key.
+    The tests that assert about the digest itself send one explicitly.
+    """
     return {
         "id": uuid7(),
         "run_id": run_id,
@@ -2565,7 +2578,7 @@ def _receipt_row(
         "version": version_id,
         "window_from": datetime(2026, 8, day_from, tzinfo=UTC),
         "window_to": datetime(2026, 8, day_to, tzinfo=UTC),
-        "markets": ["binance:BTCUSDT", "binance:ETHUSDT"],
+        "markets": markets if markets is not None else ["binance:BTCUSDT", "binance:ETHUSDT"],
         "started_at": datetime(2026, 9, 8, 10, tzinfo=UTC),
         "finished_at": datetime(2026, 9, 8, 10, 30, tzinfo=UTC),
         "bars": 864,
@@ -3277,10 +3290,16 @@ def test_0017_refuses_to_downgrade_while_a_version_is_gated(upgraded: str) -> No
     config = alembic_config(upgraded)
     version_id = _strategy_version(upgraded, key=f"gate-guard-{uuid.uuid4().hex[:8]}", policy=_GATE)
     try:
+        # The head is ``0018`` since T3.67 — step down to ``0017`` first so
+        # ``-1`` means *this* revision again (the shape the 0013/0016 tests use).
+        command.downgrade(config, ELIGIBILITY_POLICY_REVISION)
         with pytest.raises(DBAPIError, match="carry an eligibility_policy"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == ELIGIBILITY_POLICY_REVISION, (
+            "the downgrade must not commit"
+        )
     finally:
+        command.upgrade(config, "head")
         _forget_gated_draft(upgraded, version_id)
     command.check(config)
 
@@ -3291,6 +3310,8 @@ def test_0017_reverses_on_a_database_where_nothing_is_gated(upgraded: str) -> No
     ``eligibility_policy`` is."""
     config = alembic_config(upgraded)
     try:
+        # Head is ``0018`` since T3.67: reach ``0017`` before stepping over it.
+        command.downgrade(config, ELIGIBILITY_POLICY_REVISION)
         command.downgrade(config, "-1")
         assert asyncio.run(_revision(upgraded)) == EXCHANGE_STATUS_REVISION
         assert not asyncio.run(_column_exists(upgraded, "strategy_versions", "eligibility_policy"))
@@ -3305,3 +3326,342 @@ def test_0017_reverses_on_a_database_where_nothing_is_gated(upgraded: str) -> No
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     assert asyncio.run(_column_exists(upgraded, "strategy_versions", "eligibility_policy"))
     command.check(config)
+
+
+# --------------------------------------------------------------------------
+# 0018_replay_runs_slice_markets — a slice is a window and the markets it saw
+# --------------------------------------------------------------------------
+
+_T362_SLICES: tuple[tuple[str, ...], ...] = (
+    ("binance:ETHUSDT", "binance:SOLUSDT", "binance:XRPUSDT", "binance:DOGEUSDT"),
+    ("binance:BTCUSDT", "binance:BNBUSDT", "binance:ZECUSDT", "binance:SUIUSDT"),
+    ("binance:NEARUSDT", "binance:UNIUSDT", "binance:ARBUSDT", "binance:TAOUSDT"),
+    ("binance:LINKUSDT", "binance:DASHUSDT", "binance:PROMUSDT", "binance:SAHARAUSDT"),
+)
+"""The four market slices of one window that T3.62 ran under one cohort, and of
+which ``0013``'s key kept exactly one (``.claude/state/notes-T3.62.md`` §2.3)."""
+
+
+def _write_receipt_with_digest(url: str, row: dict[str, object], digest: str) -> None:
+    """Insert a receipt naming its own digest, the way ``replay/ledger.py`` does.
+
+    ``_write_receipt`` leaves the column out and lets the trigger derive it;
+    this is the other half — the writer sending the value it computed, which is
+    what makes the Python and the SQL digest compared on every insert instead of
+    assumed equal.
+    """
+    columns = f"{_RECEIPT_COLUMNS}, markets_digest"
+    values = f"{_RECEIPT_VALUES}, :digest"
+    statement = f"INSERT INTO replay_runs ({columns}) VALUES ({values})"  # noqa: S608
+    asyncio.run(_write(url, [(statement, {**row, "digest": digest})]))
+
+
+def test_0018_the_python_digest_and_the_sql_expression_are_one_function(upgraded: str) -> None:
+    """The writer hashes in Python; the backfill and the trigger hash in SQL.
+
+    They are a copy of one another on purpose (the database's contract must not
+    follow a later edit to a Python constant — ``ddl/paper_geometry.py``), so
+    this is what keeps the copy honest. If the two ever drifted, a receipt
+    written by the worker would be refused by the trigger *or*, worse, two
+    market slices would hash alike again and one of them would vanish under
+    ``ON CONFLICT DO NOTHING`` — the T3.62 failure, re-armed.
+
+    The collation case is the one worth naming: the SQL side sorts ``COLLATE
+    "C"`` and Python sorts code points. Under the database's default collation
+    ``{"A","a","B"}`` orders differently, so the mixed-case list here is what
+    would fail if that clause were ever dropped.
+    """
+    from hunter_core.domain.digests import MARKETS_DIGEST_PATTERN, markets_digest
+
+    ddl = migration_ddl("replay_runs_slice_markets")
+    assert ddl.MARKETS_DIGEST_PATTERN_0018 == MARKETS_DIGEST_PATTERN
+    assert ddl.SLICE_KEY_0018 == (*ddl.SLICE_KEY_0013, "markets_digest"), (
+        "the new key must be a strict superset of 0013's, or a stored row could start colliding"
+    )
+    lists = [
+        list(_T362_SLICES[0]),
+        list(reversed(_T362_SLICES[0])),
+        ["binance:BTCUSDT"],
+        ["A", "a", "B"],
+        ["a", "bc"],
+        ["ab", "c"],
+        ["binance:BTCUSDT", "binance:BTCUSDT"],
+    ]
+    query = f"SELECT {ddl.digest_sql('CAST(:markets AS text[])')}"
+    for markets in lists:
+        assert asyncio.run(_scalars(upgraded, query, {"markets": markets})) == [
+            markets_digest(markets)
+        ], f"the two halves of the digest disagree on {markets}"
+
+
+def test_0018_keeps_the_four_market_slices_of_one_window(upgraded: str) -> None:
+    """The bug this revision exists for, as one assertion.
+
+    T3.62 ran 32 slices under four cohorts — four market slices inside each
+    window — and ``replay_runs`` kept **8** rows, because
+    ``ON CONFLICT (run_id, window_from, window_to) DO NOTHING`` treated the
+    second, third and fourth as the first replayed twice. Nothing failed and
+    nothing logged above ``info``: the receipt read ``mkts = 4, bars = 5760``
+    for work that was 16 markets and 47 616 bars.
+
+    The second half is the property that makes the digest a *key* and not a
+    label: the same four markets in the other dispatch order are the same
+    slice, and re-running it still writes one receipt, not two.
+    """
+    version_id = _strategy_version(upgraded, key=f"slice-markets-{uuid.uuid4().hex[:8]}")
+    run_id = uuid7()
+    try:
+        for markets in _T362_SLICES:
+            _write_receipt(
+                upgraded,
+                _receipt_row(
+                    version_id=version_id,
+                    run_id=run_id,
+                    day_from=8,
+                    day_to=23,
+                    markets=list(markets),
+                ),
+            )
+        measured = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*) || '/' || count(DISTINCT markets_digest) || '/' || "
+                "sum(bars_evaluated) FROM replay_runs WHERE run_id = :id",
+                {"id": run_id},
+            )
+        )
+        assert measured == ["4/4/3456"], (
+            "four market slices of one window are four receipts, and bars_evaluated sums"
+        )
+        with pytest.raises(DBAPIError, match="uq_replay_runs_slice"):
+            _write_receipt(
+                upgraded,
+                _receipt_row(
+                    version_id=version_id,
+                    run_id=run_id,
+                    day_from=8,
+                    day_to=23,
+                    markets=list(reversed(_T362_SLICES[0])),
+                ),
+            )
+    finally:
+        _forget_receipts(upgraded, run_id)
+        _forget_draft_strategy_version(upgraded, version_id)
+
+
+@pytest.mark.parametrize("digest", ["a" * 64, "legacy", ""])
+def test_0018_refuses_a_digest_that_does_not_name_its_own_markets(
+    upgraded: str, digest: str
+) -> None:
+    """A copy that can disagree with its source is worse than no copy (§18.2).
+
+    A *wrong* digest is not a cosmetic error here: two different market slices
+    that happen to share one collide on the slice key again, and the second is
+    discarded in silence — exactly the failure being closed. ``'legacy'`` is in
+    the list because a sentinel is the obvious shortcut a future backfill would
+    reach for, and the schema has to be the thing that refuses it.
+    """
+    version_id = _strategy_version(upgraded, key=f"digest-lies-{uuid.uuid4().hex[:8]}")
+    run_id = uuid7()
+    try:
+        with pytest.raises(DBAPIError, match="does not name its own markets"):
+            _write_receipt_with_digest(
+                upgraded,
+                _receipt_row(version_id=version_id, run_id=run_id, day_from=8, day_to=11),
+                digest,
+            )
+    finally:
+        _forget_receipts(upgraded, run_id)
+        _forget_draft_strategy_version(upgraded, version_id)
+
+
+def test_0018_derives_a_stored_receipt_instead_of_stamping_a_sentinel(upgraded: str) -> None:
+    """The backfill, proved over a real round trip on a populated table.
+
+    ``markets text[] NOT NULL`` has been on the row since ``0013``, so the
+    digest of a receipt written before this revision is *derivable* — the
+    ``0002`` boundary (backfill what the columns imply, refuse what they merely
+    suggest). This drops the column with a receipt in the table and puts it
+    back, then checks the value came back **byte for byte**: nothing was
+    invented, and there is no ``'legacy'`` placeholder to invent it with.
+    """
+    from hunter_core.domain.digests import markets_digest
+
+    config = alembic_config(upgraded)
+    version_id = _strategy_version(upgraded, key=f"digest-backfill-{uuid.uuid4().hex[:8]}")
+    run_id = uuid7()
+    markets = list(_T362_SLICES[0])
+    read = "SELECT markets_digest FROM replay_runs WHERE run_id = :id"
+    _write_receipt(
+        upgraded,
+        _receipt_row(version_id=version_id, run_id=run_id, day_from=8, day_to=11, markets=markets),
+    )
+    try:
+        before = asyncio.run(_scalars(upgraded, read, {"id": run_id}))
+        assert before == [markets_digest(markets)]
+        command.downgrade(config, "-1")
+        assert not asyncio.run(_column_exists(upgraded, "replay_runs", "markets_digest"))
+        command.upgrade(config, "head")
+        assert asyncio.run(_scalars(upgraded, read, {"id": run_id})) == before, (
+            "the backfill re-derived a different value than the one it lost"
+        )
+    finally:
+        command.upgrade(config, "head")
+        _forget_receipts(upgraded, run_id)
+        _forget_draft_strategy_version(upgraded, version_id)
+
+
+def test_0018_refuses_to_downgrade_while_a_window_holds_two_market_slices(upgraded: str) -> None:
+    """§17.7: reversing is allowed, losing evidence is not.
+
+    ``0013``'s key is *narrower*, so a database that already recorded what this
+    revision made recordable cannot go back without deleting receipts of
+    replays that really ran. Postgres would refuse the constraint anyway; the
+    guard refuses **first**, counting the windows and naming the export, rather
+    than dying inside ``ADD CONSTRAINT`` with a message that names no way out
+    (the ``0016`` argument, §28.3).
+    """
+    config = alembic_config(upgraded)
+    version_id = _strategy_version(upgraded, key=f"slice-guard-{uuid.uuid4().hex[:8]}")
+    run_id = uuid7()
+    for markets in _T362_SLICES[:2]:
+        _write_receipt(
+            upgraded,
+            _receipt_row(
+                version_id=version_id, run_id=run_id, day_from=8, day_to=23, markets=list(markets)
+            ),
+        )
+    try:
+        with pytest.raises(DBAPIError, match="hold more than one market slice"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        command.upgrade(config, "head")
+        _forget_receipts(upgraded, run_id)
+        _forget_draft_strategy_version(upgraded, version_id)
+    command.check(config)
+
+
+def test_0018_reverses_on_a_database_whose_windows_hold_one_slice_each(upgraded: str) -> None:
+    """The round trip an operator runs to roll a deploy back — down one, up to
+    head, ``alembic check`` at the end — over a database that trips no guard.
+
+    What the reversal restores is asserted, not assumed: ``0013``'s three-column
+    key, no column, no trigger, no function. Dropping the column is deliberately
+    *not* guarded (unlike ``0013``'s own downgrade, which refuses while any
+    receipt exists): the digest is derived from ``markets``, which stays, so
+    nothing that survives the reversal is unrecoverable.
+    """
+    config = alembic_config(upgraded)
+    key_of = (
+        "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'uq_replay_runs_slice'"
+    )
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == ELIGIBILITY_POLICY_REVISION
+        assert not asyncio.run(_column_exists(upgraded, "replay_runs", "markets_digest"))
+        assert asyncio.run(_scalars(upgraded, key_of, {})) == [
+            "UNIQUE (run_id, window_from, window_to)"
+        ]
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM pg_trigger "
+                "WHERE tgname = 'replay_runs_digest_names_the_markets'",
+                {},
+            )
+        ) == ["0"]
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM pg_proc "
+                "WHERE proname = 'replay_runs_digest_names_the_markets'",
+                {},
+            )
+        ) == ["0"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_scalars(upgraded, key_of, {})) == [
+        "UNIQUE (run_id, window_from, window_to, markets_digest)"
+    ]
+    command.check(config)
+
+
+def test_0018_leaves_replay_runs_global_and_append_only(upgraded: str) -> None:
+    """The column changes what a receipt *is*, never who may touch one.
+
+    Three properties, asserted because "did not need to change" and "was
+    forgotten" are indistinguishable from outside (§25.5): ``replay_runs`` is
+    still global — no ``organization_id``, therefore no RLS policy, and tenant
+    isolation here is the *absence* of tenant data, not a policy someone could
+    forget; the worker still reads and appends the new column through the table
+    grant ``0013`` gave it; and it still cannot ``UPDATE`` or ``DELETE`` a
+    receipt, the property that decided the slice-per-row shape (§25.1).
+    """
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT count(*)::text FROM information_schema.columns "
+            "WHERE table_name = 'replay_runs' AND column_name = 'organization_id'",
+            {},
+        )
+    ) == ["0"]
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT count(*)::text FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid "
+            "WHERE c.relname = 'replay_runs'",
+            {},
+        )
+    ) == ["0"]
+    for role, privilege, expected in (
+        ("hunter_worker", "SELECT", "true"),
+        ("hunter_worker", "INSERT", "true"),
+        ("hunter_worker", "UPDATE", "false"),
+        ("hunter_app", "SELECT", "true"),
+        ("hunter_app", "INSERT", "false"),
+    ):
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT has_column_privilege(:role, 'replay_runs', 'markets_digest', "
+                ":privilege)::text",
+                {"role": role, "privilege": privilege},
+            )
+        ) == [expected], f"{role} / {privilege} on markets_digest"
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT has_table_privilege('hunter_worker', 'replay_runs', 'DELETE')::text",
+            {},
+        )
+    ) == ["false"]
+
+
+def test_every_revision_id_fits_the_alembic_version_column() -> None:
+    """``alembic_version.version_num`` is ``VARCHAR(32)`` (§17.6), and the way
+    the project learned that was expensive: ``0005_feature_baselines_lock_grant``
+    (33 characters) ran the whole revision and only then failed on the final
+    ``UPDATE alembic_version``.
+
+    Every revision docstring since states its own length, which is prose. This
+    is the check (DATABASE.md §30): the declared ``revision`` of every file in
+    ``versions/`` fits, and it is also the file's own name — a revision whose id
+    and filename disagree is one that ``-k <id>`` cannot select and a history
+    nobody can read in ``ls``.
+    """
+    versions = REPO_ROOT / "infra" / "migrations" / "versions"
+    ids: list[str] = []
+    for path in sorted(versions.glob("[0-9][0-9][0-9][0-9]_*.py")):
+        declared = re.search(r'^revision: str = "([^"]+)"', path.read_text("utf-8"), re.MULTILINE)
+        assert declared is not None, f"{path.name} declares no revision id"
+        revision_id = declared.group(1)
+        assert len(revision_id) <= 32, (
+            f"{revision_id} is {len(revision_id)} characters; alembic_version.version_num is "
+            "VARCHAR(32) and the failure lands after the revision has already run"
+        )
+        assert revision_id == path.stem, f"{path.name} declares {revision_id}"
+        ids.append(revision_id)
+    assert len(ids) == len(set(ids)), "two revision files declare the same id"
+    assert ids[-1] == HEAD_REVISION, "the newest revision file is not the head these tests assert"

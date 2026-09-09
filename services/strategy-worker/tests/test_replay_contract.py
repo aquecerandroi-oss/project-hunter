@@ -10,12 +10,14 @@ proofs live in ``test_replay_engine.py`` and ``test_replay_lookahead.py``.
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
 
 import pytest
 
+from hunter_core.domain.digests import markets_digest
 from hunter_core.domain.enums import ShadowCohort, Timeframe, TradeDirection
 from hunter_core.strategies.base import assumed_costs
 from hunter_core.strategies.envelope import AssumedCosts
@@ -368,6 +370,23 @@ class TestLedger:
         assert row["market_count"] == 3
         assert row["window_from"] == "2026-08-08T00:00:00+00:00"
         assert row["decision_lag_s"] == REPLAY_DECISION_LAG_S
+        assert row["markets_digest"] == markets_digest(list(self._run().markets))
+
+    def test_the_digest_follows_the_markets_instead_of_being_a_field(self) -> None:
+        """``markets_digest`` is a property, not a constructor argument — the
+        fourth column of the slice key since ``0018`` (DATABASE.md §30).
+
+        A field could be handed a digest that does not describe ``markets``, and
+        that is precisely the failure mode: two different market slices sharing
+        a digest collide again under ``ON CONFLICT DO NOTHING``, which is how
+        T3.62 wrote 32 slices and kept 8 receipts. Derived, it cannot disagree
+        — and the dispatch order the tuple happens to carry cannot fabricate a
+        second slice of work that already has a receipt.
+        """
+        run = self._run()
+        reordered = replace(run, markets=tuple(reversed(run.markets)))
+        assert run.markets_digest == reordered.markets_digest
+        assert run.markets_digest != markets_digest(list(run.markets)[:2])
 
     async def test_a_database_still_at_0012_keeps_the_other_two_branches(self) -> None:
         """``replay_runs`` missing degrades; it never poisons the transaction.

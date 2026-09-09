@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import text
 
+from hunter_core.domain.digests import markets_digest
 from hunter_core.domain.types import ensure_utc, uuid7
 from hunter_core.logging import get_logger
 
@@ -115,6 +116,22 @@ class ReplayRun:
     def bars_per_second(self) -> float:
         return 0.0 if self.seconds <= 0 else self.bars_evaluated / self.seconds
 
+    @property
+    def markets_digest(self) -> str:
+        """The fourth column of the slice key — ``0018``, DATABASE.md §30.
+
+        A **property** and not a field, deliberately: the digest is a statement
+        about ``self.markets``, so a constructor that could be handed a
+        different one would be a second truth about the same slice (the argument
+        §19.3 makes about ``applied_attempts``). ``run.py`` supplies the markets
+        and the digest follows; there is nothing to keep in sync.
+
+        Until ``0018`` the key was ``(run_id, window_from, window_to)`` and the
+        four market slices of one window collided under ``ON CONFLICT DO
+        NOTHING``: T3.62 wrote 32 runs and kept 8 receipts, in silence.
+        """
+        return markets_digest(self.markets)
+
     def to_jsonable(self) -> dict[str, Any]:
         """The row, with every instant ISO-8601 UTC and every number a number."""
         return {
@@ -126,6 +143,7 @@ class ReplayRun:
             "window_to": ensure_utc(self.window_to).isoformat(),
             "markets": list(self.markets),
             "market_count": len(self.markets),
+            "markets_digest": self.markets_digest,
             "started_at": ensure_utc(self.started_at).isoformat(),
             "finished_at": ensure_utc(self.finished_at).isoformat(),
             "bars_evaluated": self.bars_evaluated,
@@ -144,13 +162,14 @@ class ReplayRun:
 
 _INSERT_SLICE = text(
     f"INSERT INTO {TABLE} (id, run_id, cohort, strategy_version_id, window_from, window_to, "  # noqa: S608
-    "markets, started_at, finished_at, bars_evaluated, signals, outcomes_resolved, "
-    "outcomes_open, seconds, decision_lag_s, workers, evaluations_by_state, errors) "
+    "markets, markets_digest, started_at, finished_at, bars_evaluated, signals, "
+    "outcomes_resolved, outcomes_open, seconds, decision_lag_s, workers, "
+    "evaluations_by_state, errors) "
     "VALUES (:id, :run_id, :cohort, :strategy_version_id, :window_from, :window_to, "
-    "CAST(:markets AS text[]), :started_at, :finished_at, :bars_evaluated, :signals, "
-    ":outcomes_resolved, :outcomes_open, CAST(:seconds AS numeric), :decision_lag_s, "
+    "CAST(:markets AS text[]), :markets_digest, :started_at, :finished_at, :bars_evaluated, "
+    ":signals, :outcomes_resolved, :outcomes_open, CAST(:seconds AS numeric), :decision_lag_s, "
     ":workers, CAST(:evaluations_by_state AS jsonb), :errors) "
-    "ON CONFLICT (run_id, window_from, window_to) DO NOTHING RETURNING id"
+    "ON CONFLICT (run_id, window_from, window_to, markets_digest) DO NOTHING RETURNING id"
 )
 """``seconds`` is bound as a *string* and cast, never as a float.
 
@@ -161,6 +180,14 @@ promises: replaying the same slice twice writes one receipt, the same way
 ``uuid5`` signal identity makes the decisions themselves idempotent. It is
 ``DO NOTHING`` and not ``DO UPDATE`` because the role has no ``UPDATE`` — and
 that is the point, not a limitation to work around.
+
+**``markets_digest`` is in the conflict target since ``0018`` (DATABASE.md
+§30), and it is the whole of that revision.** Without it the arbiter was the
+window alone, so the second, third and fourth *market* slice of one window under
+one cohort each hit ``DO NOTHING`` and left no row: T3.62 ran 32 slices and kept
+8 receipts, reporting a sixteen-market family as a four-market one. The column is
+sent — never left to the trigger to fill — so that the writer's digest and the
+database's are compared on every insert instead of agreeing by assumption.
 """
 
 
@@ -203,6 +230,7 @@ async def record_slice(session: AsyncSession, run: ReplayRun) -> uuid.UUID | Non
             "window_from": ensure_utc(run.window_from),
             "window_to": ensure_utc(run.window_to),
             "markets": list(run.markets),
+            "markets_digest": run.markets_digest,
             "started_at": ensure_utc(run.started_at),
             "finished_at": ensure_utc(run.finished_at),
             "bars_evaluated": run.bars_evaluated,
@@ -222,6 +250,8 @@ async def record_slice(session: AsyncSession, run: ReplayRun) -> uuid.UUID | Non
             cohort=run.cohort,
             window_from=ensure_utc(run.window_from).isoformat(),
             window_to=ensure_utc(run.window_to).isoformat(),
+            markets_digest=run.markets_digest,
+            market_count=len(run.markets),
         )
         return None
     return uuid.UUID(str(stored))

@@ -32,6 +32,7 @@ from sqlalchemy import select, text
 from hunter_core.db.models.agents import AgentSignal, SignalOutcome
 from hunter_core.db.models.agents_shadow import ShadowEpisode, ShadowOutbox
 from hunter_core.db.session import role_session
+from hunter_core.domain.digests import markets_digest
 from hunter_core.domain.enums import ShadowCohort, ShadowTrackingState
 from hunter_strategy_worker.catalogue import load_active_versions
 from hunter_strategy_worker.config import ShadowConfig
@@ -534,3 +535,137 @@ class TestTheLedger:
             ).one()
         assert slices == 2
         assert bars == 24
+
+
+T362_MARKET_SLICES: tuple[tuple[str, ...], ...] = (
+    ("binance:ETHUSDT", "binance:SOLUSDT", "binance:XRPUSDT", "binance:DOGEUSDT"),
+    ("binance:BTCUSDT", "binance:BNBUSDT", "binance:ZECUSDT", "binance:SUIUSDT"),
+    ("binance:NEARUSDT", "binance:UNIUSDT", "binance:ARBUSDT", "binance:TAOUSDT"),
+    ("binance:LINKUSDT", "binance:DASHUSDT", "binance:PROMUSDT", "binance:SAHARAUSDT"),
+)
+"""The four market slices T3.62 ran inside each window, under one cohort."""
+
+
+@pytest.mark.integration
+class TestTheFourMarketSlicesOfOneWindow:
+    """T3.67 — the receipt of a *market* slice stopped being swallowed.
+
+    ``.claude/state/notes-T3.62.md`` concern 1, measured on the VPS: one cohort
+    per version, four market slices inside each window, and ``replay_runs`` kept
+    **8 rows for 32 runs**. ``uq_replay_runs_slice`` was
+    ``(run_id, window_from, window_to)`` and ``record_slice`` inserts with
+    ``ON CONFLICT DO NOTHING``, so the second, third and fourth market slice of
+    a window each looked like the first replayed twice — the idempotence that
+    protects a re-run was eating the neighbouring work. Nothing failed and
+    nothing logged above ``info``; the durable receipt read ``mkts = 4, bars =
+    5760, signals = 11`` for 16 markets, 47 616 bars and 147 decisions.
+
+    ``0018_replay_runs_slice_markets`` put ``markets_digest`` in the key
+    (DATABASE.md §30). This is the writer's half of that revision, through the
+    real ``record_slice``, as the real ``hunter_worker`` role — the role that
+    may append a receipt and may never edit one.
+    """
+
+    def _slice(self, db: dict[str, Any], *, markets: tuple[str, ...], bars: int) -> ReplayRun:
+        """One market slice of the *same* window — only ``markets`` moves.
+
+        Built directly instead of through ``_ledger_row``: what is under test is
+        the receipt's identity, not the replay that produced the numbers, and a
+        slice of four markets is precisely the shape no replay in this module
+        runs.
+        """
+        return ReplayRun(
+            run_id=RUN_ID,
+            cohort=REPLAY_COHORT,
+            strategy_version_id=db["version"].id,
+            version_label="volume_anomaly v1",
+            window_from=WINDOW.start,
+            window_to=WINDOW.end,
+            markets=markets,
+            started_at=CUT,
+            finished_at=CUT + timedelta(seconds=5),
+            bars_evaluated=bars,
+            signals=11,
+            outcomes_resolved=11,
+            outcomes_open=0,
+            seconds=88.623,
+            decision_lag_s=2,
+            workers=3,
+            evaluations_by_state={"not_triggered": bars - 11, "triggered": 11},
+        )
+
+    async def test_four_market_slices_of_one_window_are_four_receipts(
+        self, replay_db: dict[str, Any]
+    ) -> None:
+        """The T3.62 shape exactly: one run, one window, four disjoint market
+        sets. Four rows, four digests, and a ``bars_evaluated`` that sums back to
+        the work the run really did instead of a quarter of it."""
+        slices = [
+            self._slice(replay_db, markets=markets, bars=1_000 + index)
+            for index, markets in enumerate(T362_MARKET_SLICES)
+        ]
+        async with role_session(replay_db["factory"], db_role="hunter_worker") as session:
+            written = [await record_slice(session, one) for one in slices]
+        assert all(row is not None for row in written), (
+            "every market slice writes its own receipt; before 0018 three of the four "
+            "hit ON CONFLICT DO NOTHING and returned None"
+        )
+        async with role_session(replay_db["factory"], db_role="hunter_worker") as session:
+            rows, digests, bars = (
+                await session.execute(
+                    text(
+                        "SELECT count(*), count(DISTINCT markets_digest), sum(bars_evaluated) "
+                        "FROM replay_runs WHERE run_id = :run"
+                    ),
+                    {"run": RUN_ID},
+                )
+            ).one()
+        assert (rows, digests, bars) == (4, 4, sum(one.bars_evaluated for one in slices))
+
+    async def test_the_stored_digest_is_the_one_the_writer_computed(
+        self, replay_db: dict[str, Any]
+    ) -> None:
+        """The writer sends the digest and the database recomputes it from the
+        row's own ``markets``; a disagreement is refused, never absorbed (§18.2).
+
+        This asserts the agreement from the outside: the value in the column is
+        the value ``ReplayRun.markets_digest`` produced, which is the value
+        ``hunter_core.domain.digests.markets_digest`` produces for that list.
+        """
+        one = self._slice(replay_db, markets=T362_MARKET_SLICES[1], bars=2_048)
+        async with role_session(replay_db["factory"], db_role="hunter_worker") as session:
+            await record_slice(session, one)
+        async with role_session(replay_db["factory"], db_role="hunter_worker") as session:
+            stored = await session.scalar(
+                text("SELECT markets_digest FROM replay_runs WHERE run_id = :run"),
+                {"run": RUN_ID},
+            )
+        assert stored == one.markets_digest == markets_digest(list(T362_MARKET_SLICES[1]))
+        assert one.to_jsonable()["markets_digest"] == stored, (
+            "the JSONL and system_events halves of the receipt name the same slice as the row"
+        )
+
+    async def test_the_same_market_slice_twice_is_still_one_receipt(
+        self, replay_db: dict[str, Any]
+    ) -> None:
+        """Widening the key must not cost the idempotence ``0013`` bought.
+
+        Re-running one slice writes one receipt, and re-running it with the
+        markets in the other dispatch order writes none either — the digest is
+        over the *sorted* list, so ``run.py``'s dispatch order cannot fabricate
+        a second receipt for work that already has one.
+        """
+        one = self._slice(replay_db, markets=T362_MARKET_SLICES[2], bars=512)
+        shuffled = replace(one, markets=tuple(reversed(T362_MARKET_SLICES[2])))
+        async with role_session(replay_db["factory"], db_role="hunter_worker") as session:
+            first = await record_slice(session, one)
+            again = await record_slice(session, one)
+            reordered = await record_slice(session, shuffled)
+        assert first is not None
+        assert again is None, "the same slice twice is one receipt"
+        assert reordered is None, "dispatch order is not part of a slice's identity"
+        async with role_session(replay_db["factory"], db_role="hunter_worker") as session:
+            stored = await session.scalar(
+                text("SELECT count(*) FROM replay_runs WHERE run_id = :run"), {"run": RUN_ID}
+            )
+        assert stored == 1

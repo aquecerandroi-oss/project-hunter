@@ -4172,6 +4172,16 @@ garante do outro lado. O escritor usa `ON CONFLICT DO NOTHING` (e não
 `DO UPDATE`, que o grant recusaria): reexecutar uma fatia grava um recibo, não
 dois, e o número de throughput não dobra.
 
+> **Corrigido pela `0018_replay_runs_slice_markets` (§30).** Esta chave nomeia a
+> **janela**, e a unidade que ela deveria nomear é a *fatia* — janela **mais** os
+> mercados sobre os quais ela foi despachada. Com uma coorte por versão e quatro
+> fatias de mercado dentro da mesma janela, a segunda, a terceira e a quarta
+> pareciam a primeira repetida e o `DO NOTHING` as descartava em silêncio: a
+> T3.62 rodou 32 fatias e guardou **8 recibos**. A chave passa a ser
+> `(run_id, window_from, window_to, markets_digest)`. O parágrafo acima fica
+> anotado em vez de reescrito — ele descreve o que a `0013` construiu, que é o
+> que "congelado por revisão" significa (§16.5, §17.1, §28.1).
+
 ### 25.2 A tabela
 
 ```
@@ -4193,6 +4203,12 @@ replay_runs                                  (global, append-only, não particio
   UNIQUE (run_id, window_from, window_to)              -- uq_replay_runs_slice
   INDEX  (strategy_version_id, window_from)            -- ix_replay_runs_version_window
 ```
+
+> **A `0018` (§30) acrescenta `markets_digest text NOT NULL`** (sha256 hex da
+> lista ordenada de `markets`), leva `uq_replay_runs_slice` para
+> `(run_id, window_from, window_to, markets_digest)` e mais dois CHECKs
+> (`markets_digest ~ '^[0-9a-f]{64}$'`, `array_position(markets, NULL::text) IS
+> NULL`). O bloco acima continua descrevendo o que a `0013` criou.
 
 Dez CHECKs, e cada um fecha uma forma diferente de escrever um recibo que não é
 um:
@@ -5327,3 +5343,245 @@ substituiria o portão inteiro, e a filha decidiria em mais contexto que o pai
 sem que isso apareça em lugar nenhum. A saída exige uma frase: repetir a regra
 no argumento, `<portão>=none` para tirar só ela, ou `--policy none` para tirar
 o portão inteiro. Largar um portão continua possível — só não em silêncio.
+
+## 30. Uma fatia é uma janela **e** os mercados que ela visitou — M3 (`0018_replay_runs_slice_markets`)
+
+Décima oitava revisão. **Uma coluna, um gatilho e uma chave trocada.** Nenhuma
+tabela, nenhum enum, nenhum índice próprio, nenhuma partição, nenhum `GRANT`,
+nenhuma política de RLS.
+
+Ela fecha o CONCERN 1 da `.claude/state/notes-T3.62.md`. A `0013` (§25) fez o
+recibo de um replay virar evidência durável e o chaveou em
+`uq_replay_runs_slice (run_id, window_from, window_to)`. Essa chave nomeia uma
+**janela**; a unidade que ela deveria nomear é a **fatia**, que é uma janela
+*mais* os mercados sobre os quais ela foi despachada. A T3.62 mediu a diferença
+com um desenho legítimo — *uma coorte por versão, quatro fatias de mercado
+dentro de cada janela*, porque o `--stress` recebe uma coorte só e é ele que
+produz o veredito:
+
+| | o que aconteceu | o que `replay_runs` guardou |
+|---|---|---|
+| corridas | 32 fatias, 190 464 barras, 806 decisões | **8 linhas** |
+| a `v6` | 16 mercados, 47 616 barras, 147 decisões | `mkts = 4, bars = 5760, signals = 11` |
+
+**Nada falhou e nada logou acima de `info`.** `record_slice` insere com
+`ON CONFLICT ... DO NOTHING`, então a segunda, a terceira e a quarta fatia de
+mercado de uma janela pareciam *a primeira reexecutada* — a idempotência que
+protege uma repetição estava comendo o trabalho vizinho. O recibo inteiro
+sobreviveu só em `system_events` (retenção de 30 dias, §1.3) e num JSONL que
+existe se alguém guardou o arquivo, isto é, exatamente nos dois lugares que a
+`0013` existe porque **não** são duráveis (§25).
+
+`0018_replay_runs_slice_markets` tem 30 caracteres; o teto de
+`alembic_version.version_num` continua sendo 32 (§17.6) — é o id mais longo do
+projeto e sobra por dois (§30.7). As listas desta revisão estão congeladas em
+`ddl/replay_runs_slice_markets.py`, no padrão de
+§15.6/§16.5/§17.6/§18.9/§19/§20/§21/§22/§24/§25/§29.
+
+A frase que organiza tudo abaixo: **uma chave que não distingue duas coisas
+diferentes não protege a segunda — ela apaga.**
+
+### 30.1 A coluna, e por que um digest e não o próprio array
+
+```
+replay_runs  (+) markets_digest text NOT NULL
+  CHECK markets_digest ~ '^[0-9a-f]{64}$'          -- ck_replay_runs_markets_digest_is_a_sha256
+  CHECK array_position(markets, NULL::text) IS NULL -- ck_replay_runs_markets_has_no_unnamed_member
+  UNIQUE (run_id, window_from, window_to, markets_digest)   -- uq_replay_runs_slice (mesmo nome)
+```
+
+`markets_digest` é o **sha256 (hex) da lista ordenada de `markets`**, unida por
+`chr(10)`. Três alternativas foram consideradas e recusadas:
+
+| Alternativa | Por que não |
+|---|---|
+| `UNIQUE (..., markets)` — o próprio `text[]` na chave | igualdade de array é **sensível à ordem**, e `markets` é gravado na ordem em que os mercados foram despachados (`run.py`). Os mesmos quatro mercados na outra ordem seriam uma segunda fatia de um trabalho que já tem recibo. E uma UNIQUE sobre array de tamanho livre é uma chave cujo tamanho ninguém limita |
+| `market_count` na chave | duas fatias **diferentes** de quatro mercados colidiriam. É a coluna que a §25.2 já recusou como coluna, e ela não distingue o que precisa ser distinguido |
+| uma coorte por fatia de mercado | não é decisão de schema, e a T3.62 explica por que ela custa caro: o `--stress` recebe **uma** coorte e é ele que dá o veredito; quatro coortes por versão dariam quatro estresses de 4 mercados e **nenhum** sobre os 16 |
+
+**A chave nova é um superconjunto estrito da antiga**, e é isso que torna esta
+revisão segura em banco povoado: acrescentar coluna a uma UNIQUE só pode
+*afrouxá-la*, então nenhuma linha já gravada passa a colidir. Daí **não haver
+guarda de upgrade sobre a chave**, e isso é afirmação, não esquecimento.
+
+**O nome da constraint não muda.** `uq_replay_runs_slice` sempre significou "a
+chave de uma fatia"; o que esta revisão corrige é *o que uma fatia é*. Toda
+mensagem de erro, log e nota que já cita esse nome continua apontando para a
+constraint certa.
+
+### 30.2 O backfill deriva; não existe sentinela
+
+`markets text[] NOT NULL` está na linha desde a `0013`, então **toda linha já
+guardada carrega exatamente a entrada de que o digest é calculado**: o backfill
+é derivação, não invenção — a fronteira que a `0002` fixou (fazer backfill do
+que as colunas existentes *implicam*; recusar o que elas apenas sugerem, §16.2,
+§17.7). A ordem é: `ADD COLUMN` anulável → `UPDATE` derivando cada linha →
+`SET NOT NULL` → CHECKs.
+
+**Nenhum `'legacy'`, e não por disciplina: por DDL.**
+`ck_replay_runs_markets_digest_is_a_sha256` recusa `'legacy'`, `''` e `'none'`.
+Se o digest não fosse derivável da própria linha, o brief desta tarefa mandava
+usar a sentinela e declarar; ele é, e a sentinela não existe em lugar nenhum.
+Medido num round trip real sobre tabela povoada
+(`test_0018_derives_a_stored_receipt_instead_of_stamping_a_sentinel`): derrubar
+a coluna e reaplicar a revisão devolve o mesmo digest **byte a byte**.
+
+### 30.3 A mesma função escrita duas vezes, e o gatilho que compara as duas
+
+| Metade | Onde | Quem usa |
+|---|---|---|
+| Python | `hunter_core.domain.digests.markets_digest` | o escritor (`ReplayRun.markets_digest`, `replay/ledger.py`) |
+| SQL | `ddl/replay_runs_slice_markets.digest_sql` | o backfill e o gatilho, que rodam **dentro** do banco |
+
+Cópia e nunca import, pela razão de sempre (`ddl/paper_geometry.py`: o contrato
+do banco não pode seguir em silêncio uma edição posterior de uma constante
+Python), e
+`test_migrations.py::test_0018_the_python_digest_and_the_sql_expression_are_one_function`
+compara as duas sobre as mesmas listas. Três detalhes são contrato, não
+implementação:
+
+- **`ORDER BY m COLLATE "C"`** — ordem de byte, que para UTF-8 é ordem de code
+  point, que é o que o `sorted()` do Python dá. Ordenar pela colação padrão do
+  banco faria o digest depender de `lc_collate`: a mesma lista de mercados
+  hashearia diferente em dois clusters, e um recibo escrito por um pareceria
+  trabalho novo para o outro;
+- **`chr(10)` como separador** — `("a","bc")` e `("ab","c")` são dois conjuntos
+  e não podem dividir um digest. Escrito como `chr(10)` para significar a mesma
+  coisa no módulo Python, no corpo do gatilho e numa sessão `psql`;
+- **`convert_to(..., 'UTF8')`** — o digest é sobre bytes, e quais bytes não fica
+  por conta do encoding do servidor.
+
+**Uma cópia que pode discordar da fonte é pior que nenhuma cópia** (§18.2, o
+precedente é `portfolio_currency_anchor_matches_observation`). O digest é cópia
+de algo que a própria linha já tem, então
+`replay_runs_digest_names_the_markets` (`BEFORE INSERT OR UPDATE`) recalcula e:
+
+- **preenche** quando o escritor mandou `NULL` — todo escritor anterior a esta
+  revisão continua correto em vez de quebrar (as fixtures da API, um `INSERT` de
+  operador), e nenhum recibo se perde por ordem de deploy. Preencher uma
+  ausência não é sobrescrever um valor: é a doutrina de backfill da `0002`
+  aplicada linha a linha;
+- **recusa** quando o escritor mandou um digest que não é o de `NEW.markets`. Um
+  digest errado não é erro cosmético aqui: duas fatias de mercado que dividam
+  um digest errado voltam a colidir na chave, que é o defeito inteiro.
+
+O escritor **manda** o digest (não deixa para o gatilho) exatamente para que as
+duas metades sejam comparadas em todo insert, em vez de concordarem por
+suposição.
+
+### 30.4 `array_position(markets, NULL::text) IS NULL` — a única coisa sobre a qual o digest não consegue ser honesto
+
+`array_to_string` **descarta** um membro `NULL`, então `{a, NULL}` e `{a}`
+hashe­ariam igual: uma ambiguidade dentro de uma chave UNIQUE. O CHECK torna
+isso irrepresentável daqui em diante e uma guarda de upgrade fica na frente
+dele, contando os infratores e nomeando a exportação em vez de morrer dentro do
+`ALTER TABLE` com uma violação que não nomeia saída (o argumento da `0016`,
+§28.3). Em todo banco de hoje ela conta **zero**: o único escritor monta cada
+chave como `f"{exchange}:{symbol}"`.
+
+**Limite declarado:** uma chave de mercado que contivesse o próprio separador
+tornaria dois conjuntos indistinguíveis. A metade Python recusa (`ValueError`);
+a metade SQL **não consegue** — um CHECK não carrega subconsulta —, então ela
+calcularia um digest para um valor que o único escritor não produz. Fica escrito
+em vez de descoberto.
+
+### 30.5 Guardas
+
+**Guarda de upgrade:** uma só, a do §30.4. **Nenhuma sobre a chave**, e isso é
+afirmação — a chave nova é superconjunto estrito da antiga (§30.1).
+
+**O downgrade recusa** enquanto qualquer janela já guardar mais de uma fatia de
+mercado (§17.7: reverter é permitido, perder evidência não é). A chave da `0013`
+é **mais estreita**: um banco que já gravou o que esta revisão tornou gravável
+não volta sem **apagar recibos de replays que de fato rodaram**. O Postgres
+recusaria a constraint de qualquer forma; a guarda recusa **antes**, contando as
+janelas e nomeando o `COPY`, em vez de morrer dentro do `ADD CONSTRAINT`.
+
+| Guarda | Momento | O que se perderia |
+|---|---|---|
+| membro `NULL` em `markets` | upgrade | qual mercado o `NULL` era — nenhuma coluna que sobra diz, e o digest ficaria ambíguo dentro da chave |
+| janela com duas fatias de mercado | downgrade | os recibos das fatias excedentes: a evidência que a `0013` existe para guardar |
+
+**Derrubar a coluna não é guardado, e isso é decisão.** O digest é derivado de
+`markets`, que fica; reaplicar a `0018` reproduz cada valor byte a byte. É a
+diferença entre esta guarda e a da `0013` (§25.6): uma protege recibo, a outra
+não protegeria nada. Nenhuma das duas apaga coisa alguma — contam, nomeiam e
+param, com a instrução de exportar antes; o mesmo limite declarado do §18.9, do
+§24.6 e do §25.6 (exportar não muda predicado nenhum, e o downgrade de um banco
+que já replayou não é operação de rotina).
+
+### 30.6 Grants, RLS, trava e pooler
+
+**Nenhum `GRANT`, e é aritmética de ACL, não descuido.** A `0013` concedeu
+`SELECT` de **tabela** ao `hunter_app` e `SELECT`/`INSERT` de **tabela** ao
+`hunter_worker` (§25.4); um privilégio de tabela alcança coluna nova por
+construção. O que **não** existe continua não existindo: nem `UPDATE` nem
+`DELETE`, para nenhum dos dois — que é a §25.1 inteira, porque com `UPDATE` a
+opção (b) (uma linha por corrida, acumulada) voltaria a ser possível e um recibo
+passaria a ser editável pelo processo que o escreveu. Medido como o papel, não
+perguntado ao catálogo:
+`test_0018_leaves_replay_runs_global_and_append_only`.
+
+**Nenhuma política de RLS, e a ausência é asserida.** `replay_runs` continua
+**global** (§1.1, §25.5): sem `organization_id`, portanto sem política. O
+isolamento entre organizações aqui é a *ausência de dado de tenant*, não uma
+política que alguém possa esquecer — e o mesmo teste conta zero em
+`information_schema.columns` (para `organization_id`) e zero em `pg_policy`,
+porque "não precisa de política" e "alguém esqueceu a política" são
+indistinguíveis de fora. Uma coluna de tenant aparecendo aqui um dia passa a
+exigir RLS, e o teste é o que obriga a conversa.
+
+**Trava.** `ADD COLUMN` anulável não reescreve a tabela (PG 11+); o `UPDATE` de
+backfill e a troca de constraint tomam `ACCESS EXCLUSIVE` pelo tempo de uma
+construção de índice sobre uma tabela de dezenas de linhas por dia e sem
+retenção (§1.3) — a mesma ordem de grandeza da janela que a `0012` abre (§24.7),
+não uma classe nova de risco. O único escritor é o CLI de replay, que não roda
+durante um deploy.
+
+**Pooler.** Nada aqui depende de estado de sessão: um `ALTER TABLE`, um `UPDATE`,
+um gatilho que lê só `NEW` e uma constraint trocada. Sem prepared statement de
+sessão, sem `LISTEN`/`NOTIFY`, sem advisory lock de sessão.
+
+### 30.7 A lista de revisões, e o teto de 32 caracteres vira teste
+
+`alembic_version.version_num` é `VARCHAR(32)` (§17.6), e o projeto aprendeu isso
+caro: `0005_feature_baselines_lock_grant` (33) **rodou a revisão inteira** e só
+então falhou no `UPDATE alembic_version`. Desde então cada seção declara o
+tamanho do próprio id — `0016` tem 28, `0017` tem 23, esta tem 30 —, e uma
+declaração em prosa é uma declaração que ninguém executa.
+
+A convenção passa a ter uma verificação:
+`test_migrations.py::test_every_revision_id_fits_the_alembic_version_column`
+percorre `infra/migrations/versions/` e exige, de cada arquivo:
+
+1. que ele **declare** um `revision: str = "..."`;
+2. que o id tenha **≤ 32 caracteres**;
+3. que o id seja **o próprio nome do arquivo** — um id que discorde do nome é um
+   id que `pytest -k <id>` não seleciona e uma história que ninguém lê num `ls`;
+4. que dois arquivos não declarem o mesmo id;
+5. que o **último** arquivo em ordem seja o `HEAD_REVISION` que o módulo afirma —
+   que é o mesmo papel que aquela constante já cumpre desde a `0002` ("o único
+   lugar que percebe um arquivo de revisão que nunca rodou").
+
+A lista viva, portanto, é o diretório; este documento é a *descrição* dela, uma
+seção por revisão, e cada seção continua congelada no que a sua revisão fez —
+anotada quando uma posterior a corrige (§28.1, e o bloco novo no §25.1), nunca
+reescrita.
+
+### 30.8 Desvios em relação ao brief, declarados
+
+| Brief | O que foi feito, e por quê |
+|---|---|
+| "backfill com sentinela `'legacy'` se a lista não estiver persistida — e diga isso" | **está persistida**: `markets text[] NOT NULL` desde a `0013`. O backfill deriva o digest em SQL da própria linha e a sentinela não existe; um CHECK a torna irrepresentável (§30.2) |
+| "o escritor em `replay/run.py` calcula e insere o digest" | `run.py` não muda: o digest é **propriedade** de `ReplayRun` (`replay/ledger.py`), derivada de `markets`, que é o que `run.py` fornece. Um campo de construtor poderia receber um digest que não descreve os mercados — a segunda verdade que a §19.3 recusa sobre `applied_attempts` —, e é justamente um digest errado que faz duas fatias colidirem de novo |
+| (o brief não pede gatilho) | `replay_runs_digest_names_the_markets` entrou (§30.3). Sem ele, "o digest está certo" seria promessa do escritor; com ele, é propriedade do banco — e é o que mantém todo escritor anterior à revisão funcionando em vez de quebrado |
+| (o brief não pede CHECK sobre `markets`) | `ck_replay_runs_markets_has_no_unnamed_member` entrou, com guarda de upgrade (§30.4): sem ele o digest não é total no domínio da coluna, e a ambiguidade fica **dentro** de uma chave UNIQUE |
+
+### 30.9 O que as tarefas vizinhas têm de saber
+
+| Onde | O que muda |
+|---|---|
+| `hunter_strategy_worker/replay/ledger.py` | `ReplayRun.markets_digest` (propriedade), a coluna no `INSERT` e `markets_digest` no alvo do `ON CONFLICT`. `to_jsonable()` passa a carregar o digest, então o JSONL e o `system_events` nomeiam a mesma fatia que a linha — o que torna possível casar as três metades do recibo |
+| `apps/api/**` (placar, `GET /lab/shadow/replays`) | **nada a mudar**, e uma consequência a esperar: uma corrida de quatro fatias de mercado passa a aparecer como **quatro** linhas onde antes aparecia como uma. A listagem já agrupa por `run_id` e soma `bars_evaluated` (T3.25), então o total fica *certo* onde antes estava dividido por quatro |
+| quem lê `replay_runs` em SQL de pesquisa | somar `bars_evaluated` por `run_id` continua reconstruindo a corrida; `signals`/`outcomes_resolved`/`outcomes_open` continuam sendo **da coorte inteira** no instante em que a fatia terminou (§25.2), e agora há quatro linhas com esse total corrente por janela em vez de uma. **Somá-los multiplica a população** — a armadilha do denominador que a §25.2 já declarava, um pouco mais fácil de cair agora |
+| as 32 corridas da T3.62 | **não voltam.** Os 24 recibos perdidos não são reconstruíveis a partir de `replay_runs`; o que existe deles está em `system_events` (`replay_engine`/`replay_run_finished`, 32 linhas, com `market_count` e a lista de mercados no `data`) até a retenção de 30 dias os apagar, e nos 32 JSONL. Quem quiser o recibo durável daquela família precisa **refazer** as corridas depois desta revisão — e a `notes-T3.62.md` §8 já pede o refazimento em 70 dias por outra razão |
