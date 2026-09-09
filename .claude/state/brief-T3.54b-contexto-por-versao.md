@@ -1,0 +1,18 @@
+# Brief T3.54b — o worker deixa de ter UM contexto para todas as versões: cada versão declara quantos minutos de vela precisa (grade × barras da janela mais longa + folga) e o worker carrega exatamente isso, com um teto global; a irmã de 1 h roda sem encarecer as versões de 15 m (T3.54 achou o muro `SHADOW_CONTEXT_MINUTES = 1560`)
+
+**Owner:** quant-engineer (owns strategy-worker + strategies). **Reviewer afterwards:** code-reviewer (code + non-anticipation). **Do not commit.** **Operational rule: never a background shell; foreground commands with a timeout <= 5 min; testcontainers one file per pytest invocation (max 2); the tree is shared — never `git stash`/`checkout --`/`restore`/`reset`/`clean`/`commit -a` (git-guard blocks); do not touch `.env*`; VPS read-only; never edit the closure modules (`aggregate, base, canonical, envelope, indicators, numeric, schema`) — the digests of the seven live versions must stay.** Base: `main` at HEAD (T3.52 may still be uncommitted in `services/strategy-worker` — read `git status` and build on the tree; coordinate by touching only the files below). Scope: `services/strategy-worker/hunter_strategy_worker/{config.py, context.py (or wherever the candle window is loaded), replay/plan.py, activation/catalogue (a read of the version's params)}`, tests, `docs/PIPELINE.md` §6 (one paragraph), `.claude/state/notes-T3.54b.md`.
+
+## Facts (T3.54, `.claude/state/notes-T3.54.md` §3–4)
+- `SHADOW_CONTEXT_MINUTES` default 1560 (26 h) is global; a 1 h grid with `atr_bars = 97` needs 5 820 min; `mean_reversion v9`/`momentum v9` were born mute (`unavailable: atr_warmup`) and retired; `mean_reversion_h1_v1` (348 lines, tests green, uncommitted) cannot run without ≥ 5 880 min.
+- Raising the global knob multiplies candle reads ×3,8 for EVERY live version (15 m ones need ~26 h).
+- `replay/plan.py:141` states a replay with a different `context_minutes` "is not the same experiment" — so the requirement must be a property of the VERSION, recorded, not of the environment.
+
+## Deliver
+1. **A pure function** `required_context_minutes(strategy, params) -> int`: from the strategy's decision `timeframe` and the parameters that size its longest lookback (`zscore_bars`, `atr_bars` on `atr_timeframe`, `trend_sma_bars + 1` on `trend_timeframe`, `pattern_bars`, `rvol_window`… — read each live strategy's `default_parameters` and the `aggregate(...)` calls to enumerate them; never guess), plus one bar of slack; unit-tested against every live version (the 15 m ones must come out ≤ 1560; the h1 sibling ≥ 5820). Where a strategy does not expose the lookback (class attribute), read it from the class.
+2. **The worker** loads, per version, `min(max(required, SHADOW_CONTEXT_MINUTES_MIN), SHADOW_CONTEXT_MAX_MINUTES)` candles — `SHADOW_CONTEXT_MINUTES` keeps its meaning as the floor (backwards compatible: 1560), a new `SHADOW_CONTEXT_MAX_MINUTES` (default 6000) is the ceiling; a version whose requirement exceeds the ceiling is refused at activation (`activate_strategy_version.py`) with the number in the message, never silently mute.
+3. **Replay** records `context_minutes` per version in the cohort plan (so "same experiment" is per version) and uses the same function.
+4. **Envelope/ledger**: the context actually loaded is recorded in the evaluation (`context_minutes`) so a short context is visible as a reason, not a mystery.
+5. Tests: unit for (1); worker test that two versions in the same pass get different windows; replay plan test; `ruff`/`pyright`/`check_file_size.py`.
+
+## Prove
+Tests per file; report in Portuguese, extended format; `.claude/state/notes-T3.54b.md`. Times in Brasília (UTC−3) with UTC as detail.
