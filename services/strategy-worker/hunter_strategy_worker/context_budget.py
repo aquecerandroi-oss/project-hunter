@@ -128,6 +128,14 @@ _ATR: Final = WindowClaim(
 """Every live strategy computes its ATR the same way — the shared claim is the
 shared code path (``atr_end = align_open_time(cut, atr_timeframe)``)."""
 
+_TRENDLINE: Final = WindowClaim(
+    name="signal", timeframe=None, bars=(("pattern_bars", 0), ("rvol_window", 1), ("atr_bars", 0))
+)
+"""The trend-line family's signal window, shared for the same reason ``_ATR`` is:
+``trendline_bounce_v1`` (T3.57) inherited the call site from
+``trendline_breakout_v1`` verbatim, so it really is one code path. Splitting it
+the day they diverge is a two-line change, and the spy test would notice."""
+
 WINDOWS: Final[Mapping[tuple[str, str], tuple[WindowClaim, ...]]] = {
     ("momentum_v1", "v1"): (
         WindowClaim(
@@ -180,14 +188,8 @@ WINDOWS: Final[Mapping[tuple[str, str], tuple[WindowClaim, ...]]] = {
         ),
         _ATR,
     ),
-    ("trendline_breakout_v1", "v1"): (
-        WindowClaim(
-            name="signal",
-            timeframe=None,
-            bars=(("pattern_bars", 0), ("rvol_window", 1), ("atr_bars", 0)),
-        ),
-        _ATR,
-    ),
+    ("trendline_breakout_v1", "v1"): (_TRENDLINE, _ATR),
+    ("trendline_bounce_v1", "v1"): (_TRENDLINE, _ATR),
 }
 """``(strategy.key, strategy.version) -> the windows that version reads``.
 

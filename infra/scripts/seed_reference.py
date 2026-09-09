@@ -95,6 +95,13 @@ STRATEGIES: tuple[tuple[str, str, str, str], ...] = (
     ),
     ("trendline_breakout", "Trendline Breakout", "trend", "Break of a drawn trend line."),
     (
+        "trendline_bounce",
+        "Trendline Bounce",
+        "trend",
+        "Long a confirmed bounce on an ascending trend line, on above-median volume. "
+        "No structural invalidation: exits by stop, target or horizon (T3.57, EXP-0022).",
+    ),
+    (
         "sweep_reclaim",
         "Sweep and Reclaim",
         "reversion",

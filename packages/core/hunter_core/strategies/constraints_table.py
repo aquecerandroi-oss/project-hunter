@@ -194,6 +194,35 @@ CONSTRAINTS: Final[Mapping[str, Constraints]] = {
         ),
         ordered=(("target_r", "target2_r"),),
     ),
+    # T3.57 — a irmã que só abre a porta de repique. As faixas são as da mãe
+    # menos ``max_violations_breakout`` (não existe aqui: não há porta de
+    # rompimento) e menos ``mode`` (a porta virou identidade, não parâmetro).
+    # Escrita por extenso, e não compartilhada com a de baixo: a linha da mãe
+    # descreve um contrato já congelado na VPS e não pode ser tocada nem para
+    # ser refatorada (``check_ranges`` a lê por ``Strategy.key``).
+    # ``rvol_min`` fica em ``non_negative`` e não em ``positive`` de propósito:
+    # ``rvol_min = 0`` é "sem porteiro de volume", que é exatamente a variante
+    # que recupera o comportamento do repique da mãe e é pesquisa legítima.
+    "trendline_bounce_v1": Constraints(
+        positive=frozenset(
+            "pattern_bars pivot_k min_swing_atr tolerance_atr break_atr bounce_atr retest_bars "
+            "bounce_bars parallel_tol angle_bucket_atr level_bucket_atr max_anchors max_lines "
+            "max_channels rvol_window atr_period atr_bars atr_pct_max stop_atr_max max_risk_atr "
+            "target_r horizon_s max_entry_delay_s".split()
+        ),
+        non_negative=frozenset({"rvol_min", "atr_pct_min", "max_violations_bounce"}) | _COSTS,
+        unit_interval=frozenset({"base_confidence"}),
+        bounded=(
+            ("min_touches", Decimal(2), Decimal(20)),
+            ("min_touches_signal", Decimal(2), Decimal(20)),
+            ("retire_after_break", Decimal(0), Decimal(1)),
+        ),
+        ordered=(
+            ("atr_pct_min", "atr_pct_max"),
+            ("stop_atr_max", "max_risk_atr"),
+            ("min_touches", "max_anchors"),
+        ),
+    ),
     "trendline_breakout_v1": Constraints(
         positive=frozenset(
             "pattern_bars pivot_k min_swing_atr tolerance_atr break_atr bounce_atr retest_bars "
