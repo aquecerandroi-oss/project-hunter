@@ -477,3 +477,6 @@ Nada commitado. `coverage.py`/`streaming.py` do código de produção não foram
    (`caught_up` precisa ser `True`), mas não é literalmente "sessão quebrada" — se o revisor quiser
    especificamente o caminho `ws_state="reconnecting"`, é um teste adicional de poucas linhas seguindo
    `test_internal_reconnect_holds_covered_until_back_without_ending_the_generator` como molde.
+
+## §4 (medido pelo orquestrador, 2026-09-08 22:52–23:06 BRT) — prova pós-deploy NÃO atingida
+Coletores em `2b7cef9`, scanner em `09b8fa6`. Heartbeat `detectors_disarmed`, ORDERBOOK_IMBALANCE, a cada minuto por 14 min: `feature_after_cut` = 178, 174, 184, 184, 198, 186, 184, 191, 185, 195, 186, 193, 179 (de 200); `baseline_absent`/`baselines_under_construction` = 1–5 / 1–22. Antes (coletores antigos): 134 de 134. Conclusão: o carimbo por prova está certo, mas o resíduo é a ordem de leitura do scanner (corte antes do livro; o livro anda entre as duas leituras) → T3.46f (`brief-T3.46f-scanner-read-order.md`).
