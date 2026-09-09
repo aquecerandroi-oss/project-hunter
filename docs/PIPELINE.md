@@ -346,6 +346,31 @@ tenha mudado alguma coisa ou não, trinta e um dias para trás.
     e linha mais velha que 2 h recusam com `regime_gate:unknown`: o portão nunca decide sem
     contexto e nunca envelhece junto com um produtor morto.
 
+11. **A filha com portão não é subconjunto do pai nas decisões, só nas barras (T3.52d).**
+    `INELIGIBLE` não decide, não re-arma o slot e não gasta a barreira (item 10) — logo a
+    máquina de estados do slot da versão com portão evolui diferente da do pai: onde o pai
+    estava dentro de um episódio (barreira armada por uma avaliação anterior), a filha, que
+    pulou essa avaliação por `ineligible`, estava livre e pôde abrir um episódio numa barra
+    seguinte que o pai nunca chegou a considerar. Medido: `momentum` com portão
+    (`btc:BTC_BULL,HIGH_VOLATILITY`) tomou **3 decisões que o pai nunca tomou**, todas em
+    2026-09-03, cada uma precedendo a próxima decisão do pai no mesmo mercado
+    (`.claude/state/notes-T3.52d.md` §4.2). "Subconjunto por construção" continua verdadeiro
+    para as **barras** elegíveis; é **falso** para as **decisões**. Consequência para quem
+    desenhar uma avaliação: comparar uma versão com portão contra o pai dela exige parear por
+    **(mercado, barra)** sobre as barras elegíveis compartilhadas — nunca por decisão, e nunca
+    supondo que a lista de decisões da filha é subconjunto da lista do pai.
+12. **K4 (`unavailable` sobre o total, `docs/plans/SHADOW-LAB.md`) deixa de ser mensurável
+    numa versão com portão.** O portão avalia **antes** da checagem de contexto (item 10):
+    uma barra que seria `unavailable` por contexto insuficiente nunca chega lá, porque já foi
+    recusada como `ineligible`. Uma versão com portão sempre mede `unavailable ≈ 0`, mesmo
+    quando o pai dela, na mesma janela, mede `unavailable` alto — o zero é falso verde, não
+    ausência de problema de contexto. Medido: `mean_reversion v11` e `momentum v11` fecham K4
+    em 0 % enquanto os pais mostram `unavailable: 448` na mesma fatia
+    (`.claude/state/notes-T3.52d.md` §6). A leitura honesta de K4 para uma versão com portão é
+    o K4 **do pai**, na mesma janela; a fração `ineligible` da filha é outro número (barras
+    fora do rótulo permitido) e não deve substituir K4 nem ser lida como disponibilidade de
+    contexto.
+
 ## 5. Opportunity Engine
 
 **Onde:** `scanner-worker`. **Gatilho:** `features.updated`, `anomalies.detected`, `signals.emitted` (para o componente de consenso), throttle 2 s por símbolo.

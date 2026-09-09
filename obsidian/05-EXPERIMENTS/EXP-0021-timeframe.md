@@ -194,3 +194,44 @@ momentum       v10 (-0,0357) − v8 (-0,0299) = -0,0057 R   IC95% [-0,1323; +0,1
 `.claude/state/notes-T3.54.md` · `.claude/state/notes-T3.56.md` ·
 `infra/scripts/derive_variant.py` · `infra/scripts/activate_strategy_version.py` ·
 `packages/core/hunter_core/strategies/mean_reversion_h1_v1.py`
+
+## Adendo T3.52d — 2026-09-09 (C1 medido: `mean_reversion_h1 v1`)
+
+> Escrito pela Sexta-feira (T3.58) a partir de `.claude/state/notes-T3.52d.md` §7–§8
+> (quant-engineer, 2026-09-09). O item 1 do "Pré-registro para a próxima rodada" acima foi
+> executado nesta corrida: `seed --only strategies`, ativação e replay de 31 d em 16 mercados.
+> Seção só acrescentada — nada acima foi editado.
+
+**Ativada sem recusa** (`context_minutes = 5880 ≤ SHADOW_CONTEXT_MAX_MINUTES = 6000`, o teto que
+o commit `d21a11d` da T3.52/b/c abriu). Replay: 4 fatias de 4 mercados, 31 d, 16 mercados no total
+(`BTC ETH ZEC SOL` · `XRP BNB DOGE SUI` · `NEAR UNI ARB TAO` · `LINK DASH PROM SAHARA`), 0 erros,
+123 decisões, 123/123 resolvidas.
+
+| versão | n | dias | pedágio (R) | exp. bruta | exp. líquida | soma R | PF | acerto | risco% p50 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `mean_reversion v10` (15 m decisão, ATR 1 h, 4 mkt) | 54 | 16 | 0,1038 | +0,3071 | +0,2013 | +10,87 | 2,4956 | 68,5 % | 0,01990 |
+| **`mean_reversion_h1 v1`** (1 h decisão, 16 mkt) | **123** | 22 | **0,1445** | +0,1524 | **+0,0067** | +0,82 | **1,0116** | 44,7 % | **0,01544** |
+
+**A predição do item 1 acima ("mesma expectativa por decisão, mais população") não se confirmou.**
+O pedágio da irmã de 1 h é **0,1445 R**, *maior* que o da `v10` (0,1038) e maior que o da mãe de
+15 m `v6` (0,1075) — o oposto da promessa de 2,2× menos pedágio deste EXP. A causa: o pedágio em R
+depende do **risco em preço**, e a `h1` entra com stops **mais apertados** em % (0,01544 contra
+0,01990 da `v10`), não mais largos. **O ganho do eixo de timeframe já tinha sido colhido pelo ATR
+em 1 h da `v10`; mudar também a grade de decisão para 1 h não acrescenta nada — cobra.**
+
+**K1–K5** (`.claude/state/notes-T3.52d.md` §8.2): nenhum critério de morte dispara (K1 123, K2 123,
+K3 não se aplica — bruta +0,1524 > 0 —, K4 13,58 % [1616/11904], K5 100 %) — **e a base ainda é
++0,0067 R / PF 1,0116, isto é, zero**: K1–K5 são filtro de população, não selo de qualidade.
+
+**Estresse:** `custos_x2` **−0,1295** R / PF 0,7926; `alvo_x0.75` **−0,0540**; 1ª metade **+0,2467**,
+2ª metade **−0,1691**; sete mercados cuja remoção individual vira o sinal negativo (ARB, DOGE,
+PROM, SUI, UNI, XRP, ZEC). **Veredito: `frágil a custos` + `frágil a parâmetros` + `dependente de
+um mercado` (×7) + `dependente de metade`** — contra o `robusto` da `v10`.
+
+**IC transversal contra `mean_reversion v10`** (bloco = dia, `duas_populacoes.py`, universos
+diferentes): nos 16 mercados, Δ líquido **−0,1947 R** (IC95 [−0,5904; +0,2218]); restrito aos 4
+mercados que as duas correram, Δ líquido **−0,3601 R** (IC95 [−0,8677; +0,1285]). Os quatro IC
+cruzam zero; a `h1` é pior no ponto nos dois cortes.
+
+**Não promover.** Primeira coorte julgável da irmã de 1 h e ela empata com zero, pior que a `v10`
+no ponto em todos os cortes.

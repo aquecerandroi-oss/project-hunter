@@ -20,6 +20,7 @@ updated: 2026-09-09
 | `v8` | `research_only` | `active` | inconclusivo (sinal `negativo` no corpo do EXP) — Δ −0,2006 R contra `v6`; mantida pela mensurabilidade, não pelo mérito. | [[mean_reversion-v8]] |
 | `v9` | `research_only` | `deprecated` | **efêmera, zero decisões** — variante do eixo de timeframe (`atr_timeframe` 1h, de `v6`), morreu por `atr_warmup`: pedia 5 820 min de contexto contra o teto de 1 560 do worker naquele instante; aposentada no mesmo turno (T3.54), sucessora `mean_reversion v10`. Sem página própria. | — |
 | `v10` | `research_only` | `active` | **`robusto`** (estresse) — mesma variante de `v9` com `atr_bars` encolhido (cabe no contexto); 54 decisões de replay, 16 dias, líquida +0,2013 R, PF 2,496; primeira coorte da família com `n ≥ 30` e veredito positivo; portão C1–C8 = `REVISE` (C1/C4 pedem mais janela). Única versão do eixo de timeframe que sobreviveu ao T3.56. Sem página própria nesta sessão. | — |
+| `v11` | `research_only` | `deprecated` | **portão de regime `btc:SIDEWAYS`, de `v6`** (G1 do [[EXP-0020-regime-gate]]) — morta no K1 (1 decisão em 31 dias, 4 mercados): `SIDEWAYS` só tem 6 h na primeira metade da janela de replay. `inconclusivo`, não negativo — as 14 decisões que o portão removeu do pai eram vencedoras (+0,2964 R), evidência **contra** a hipótese; aposentada 2026-09-09T16:07Z, sem sucessora. Sem página própria nesta sessão. | — |
 
 ## Ligações
 
@@ -28,6 +29,7 @@ updated: 2026-09-09
 - Eixo "stop largo" (v2→v6/v7, v3→v4/v5): [[EXP-0018-stop-largo]]
 - Eixo "piso de ATR%" (v2→v8): [[EXP-0019-piso-atr]]
 - Eixo "timeframe" (v6→v9/v10): [[EXP-0021-timeframe]]
+- Eixo "portão de regime" (v6→v11): [[EXP-0020-regime-gate]]
 - Irmã de 1 h (módulo novo, código pronto, replay pendente): [[mean_reversion_h1]]
 <!-- generated:end -->
 
@@ -50,4 +52,13 @@ sessão pelo mesmo motivo acima (exportador sem acesso ao Postgres da VPS). `v10
 **única** coorte de `mean_reversion` com população julgável (`n ≥ 30`) e veredito `robusto` — mas o
 ganho é de amostra (o piso de ATR% quase não morde em 1 h), não de expectativa: a expectativa bruta e
 líquida por decisão não se distingue da `v6` (IC do contraste transversal cobre zero).
+
+**Linha `v11` acrescentada à mão pela Sexta-feira em 2026-09-09** a partir de
+`.claude/state/notes-T3.52d.md` (T3.52d) e [[EXP-0020-regime-gate]]. Portão de elegibilidade por
+regime (`eligibility_policy`, `docs/PIPELINE.md` §4b item 10) — mede exatamente o que o pai
+decidiria dentro do rótulo permitido, sem mudar parâmetro nenhum. Achado de método da mesma
+corrida, registrado em `docs/PIPELINE.md` §4b itens 11–12 e `docs/plans/SHADOW-LAB.md`: uma versão
+com portão **não** é subconjunto do pai nas decisões (só nas barras), e o critério K4
+(`unavailable`) deixa de ser mensurável nela — o número honesto é o K4 do pai. Sem página própria
+nesta sessão.
 

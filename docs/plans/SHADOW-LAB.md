@@ -149,6 +149,27 @@ portão C1–C8  →  implementação  →  replay 31 d  →  estresse  →  pro
    um replay não prova"), a janela é a mesma em que a família inteira foi desenhada, e o veredito do
    placar (`validada`) e a régua de maturidade **continuam só com `prospective`** (D14/D15,
    `REPLICATION.md` §3.5).
+
+   **Critérios de morte K1–K5, congelados por experimento antes da corrida**
+   (`.claude/state/notes-T3.33.md` §5.1; aplicados desde `EXP-0008`, nunca antes trazidos a esta
+   página até T3.58): **K1** população mínima — < 20 decisões, não é amostra pequena, é ausência
+   de população, e mais dias não a criam; **K2** população saturada — > 1 500 decisões (~> 1,2 /
+   mercado-dia), não é uma condição, é um relógio; **K3** ≥ 100 desfechos avaliáveis **e** ≥ 30
+   dias distintos **e** expectancy bruta (`r_ex_funding`) < 0 — perde antes dos custos, não há
+   custo a corrigir; **K4** `unavailable` > 40 % das barras — problema de janela/gap, corrigir é
+   versão nova, não ajuste; **K5** cobertura de `R_net` < 70 % — não mata, rebaixa toda leitura
+   futura. K1 sozinho é `inconclusivo`, não negativo; qualquer outro disparo é deprecar ou
+   declarar.
+
+   **K4 deixa de ser mensurável numa versão com portão de elegibilidade**
+   (`eligibility_policy`, `docs/PIPELINE.md` §4b itens 10–12, T3.52d). O portão avalia **antes**
+   da checagem de contexto: uma barra que seria `unavailable` por contexto insuficiente nunca
+   chega lá, porque já foi recusada como `ineligible`. Uma versão com portão sempre mede
+   `unavailable ≈ 0`, e esse zero é falso verde — não ausência de gap de contexto. Medido:
+   `mean_reversion v11` e `momentum v11` fecham K4 em 0 % enquanto os pais, na mesma fatia,
+   mostram `unavailable: 448` (`.claude/state/notes-T3.52d.md` §6). A leitura honesta de K4 para
+   uma versão com portão é o K4 **do pai**, na mesma janela; a fração `ineligible` da filha é
+   outro número (barras fora do rótulo permitido) e não substitui K4.
 4. **Passada de estresse** (`services/strategy-worker/hunter_strategy_worker/replay/stress.py`) —
    sobre as **entradas congeladas** da coorte de replay, reprecificando os desfechos com custo ×2,
    stop e alvo ×0,75/×1,25, entrada atrasada uma barra, cada mercado deixado de fora e cada metade

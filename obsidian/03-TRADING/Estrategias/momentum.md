@@ -19,6 +19,7 @@ updated: 2026-09-09
 | `v8` | `research_only` | `active` | inconclusivo — Δ pareado +0,0161 R contra `v6` (IC contém zero), ainda perde (PF 0,906). **Única `momentum` viva no roster de 9 do T3.56.** | [[Estrategias/momentum-v8|momentum-v8]] |
 | `v9` | `research_only` | `deprecated` | **efêmera, zero decisões** — variante do eixo de timeframe (`atr_timeframe` 1h, de `v8`), morreu por `atr_warmup`: pedia 5 820 min de contexto contra o teto de 1 560 do worker naquele instante; aposentada no mesmo turno (T3.54), sucessora `momentum v10`. Sem página própria. | — |
 | `v10` | `research_only` | `deprecated` | descartar — mesma variante de `v9` com `atr_bars` encolhido (cabe no contexto); 252 decisões de replay, líquida −0,0357 R, PF 0,809, **37,3 % das decisões furam o teto de stop do `paper_v1`**; portão C1–C8 = `REJECT` em C5 ([[EXP-0021-timeframe]]); aposentada 2026-09-09T14:58:42Z (T3.56), sem sucessora. Sem página própria nesta sessão. | — |
+| `v11` | `research_only` | `active` | **portão de regime `btc:BTC_BULL,HIGH_VOLATILITY`, de `v8`** (G2 do [[EXP-0020-regime-gate]] — dois rótulos, não é o G2 pré-registrado) — 101 decisões, 14 dias, líquida +0,0737 R, PF 1,251; Δ vs `v8` +0,1104 R com IC 95 % [−0,0605; +0,2859] (cruza zero); estresse `frágil a custos` (`custos_x2` reverte o sinal) e dependente de metade. **Não promover — ativa prospectiva**: mantida `research_only` para a coorte prospectiva decidir o que o replay não pode. Sem página própria nesta sessão. | — |
 
 ## Ligações
 
@@ -26,6 +27,7 @@ updated: 2026-09-09
 - Eixo "stop largo" (v6→v7/v8): [[EXP-0018-stop-largo]]
 - Eixo "alvo mais longe" (v2→v6): [[EXP-0013-momentum-alvo-3-atr]]
 - Eixo "timeframe" (v8→v9/v10): [[EXP-0021-timeframe]]
+- Eixo "portão de regime" (v8→v11): [[EXP-0020-regime-gate]]
 - Roster (16 → 9, T3.56): [[EXP-0021-timeframe]] · `.claude/state/notes-T3.56.md`
 <!-- generated:end -->
 
@@ -45,4 +47,12 @@ auditada e a recusa da linha `paper`) e `.claude/state/notes-T3.54.md` (eixo de 
 Postgres da VPS a partir deste host; rodá-lo cria as três páginas que faltam. Os números de `v2`, `v4`
 e `v6` são os **medidos por T3.56** (`as_of` 2026-09-09T14:52Z), não os do brief que a abriu — ver
 `.claude/state/notes-T3.56.md` §3.0 para as pequenas divergências (nenhuma muda o sinal).
+
+**Linha `v11` acrescentada à mão pela Sexta-feira em 2026-09-09** a partir de
+`.claude/state/notes-T3.52d.md` (T3.52d) e [[EXP-0020-regime-gate]]. Portão de elegibilidade por
+regime (`eligibility_policy`, `docs/PIPELINE.md` §4b item 10). Achado de método da mesma corrida,
+registrado em `docs/PIPELINE.md` §4b itens 11–12 e `docs/plans/SHADOW-LAB.md`: uma versão com
+portão **não** é subconjunto do pai nas decisões (só nas barras — 3 das 101 decisões de `v11` não
+têm correspondente no pai, todas em 2026-09-03), e o critério K4 (`unavailable`) deixa de ser
+mensurável nela — o número honesto é o K4 do pai. Sem página própria nesta sessão.
 

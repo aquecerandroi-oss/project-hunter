@@ -126,3 +126,60 @@ trouxe duas peças que o rascunho original não previa:
 `.claude/state/notes-T3.52.md` (implementação do portão, se existir) ·
 `infra/scripts/derive_variant.py` · `infra/scripts/activate_strategy_version.py` ·
 `docs/PIPELINE.md` §4b item 10 · `docs/DATABASE.md` §29
+
+## Adendo T3.52d — 2026-09-09 (medido)
+
+> Escrito pela Sexta-feira (T3.58) a partir de `.claude/state/notes-T3.52d.md` (quant-engineer,
+> 2026-09-09, 12:24→13:10 BRT). Este EXP estava arquivado sem os braços derivados nem replayados
+> (ver nota do topo); a T3.52d correu os dois. Seção só acrescentada — nada acima foi editado.
+
+**Os braços saíram `v11`, não `v9` (numeração já prevista neste EXP); G2 saiu com dois rótulos,
+não o um pré-registrado:**
+
+| braço | versão derivada | política medida | pai | n decisões | dias | veredito do funil |
+|---|---|---|---|---|---|---|
+| G1 `mean_reversion` | `v11` | `btc:SIDEWAYS` | `v6` | 1 | 1 | morto no K1 — `inconclusivo`, não negativo |
+| G2 `momentum` | `v11` | `btc:BTC_BULL,HIGH_VOLATILITY` (**dois rótulos — não é o G2 pré-registrado**) | `v8` | 101 | 14 | `frágil a custos` — não promover |
+
+**A previsão de queda de população deste EXP acertou** (seção "O que o portão remove, e o que
+isso custa de população"):
+
+| braço | queda prevista (≈) | queda medida |
+|---|---:|---:|
+| G1 `mean_reversion v11` | 82,1 % | **82,80 %** |
+| G2 `momentum v11` | 58,7 % | **59,95 %** |
+
+A série não é a suspeita — o ledger fecha na aritmética das horas de regime, barra a barra
+(`.claude/state/notes-T3.52d.md` §3.1).
+
+**Achado 1 — "pareado por construção" (linha "Como julgar" acima) é falso para decisões, verdadeiro
+só para barras.** `INELIGIBLE` não decide, não re-arma o slot e não gasta a barreira
+(`docs/PIPELINE.md` §4b item 10). A máquina de estados do slot da filha evolui diferente da do
+pai: `momentum v11` tomou **3 decisões que o pai nunca tomou**, todas em 2026-09-03, cada uma
+precedendo a próxima decisão do pai no mesmo mercado (§4.2 das notas). Nas 99 decisões
+compartilhadas o `r_multiple` é idêntico bit a bit — o portão só remove, nunca muda uma decisão
+que deixa passar —, mas a avaliação pareada correta compara por **(mercado, barra)** sobre as
+barras elegíveis compartilhadas, nunca pela lista de decisões da filha como subconjunto da do pai.
+
+**Achado 2 — K1 (população mínima) do item "Como julgar" sobreviveu para G2; K4 não é mensurável
+para nenhum dos dois braços.** O portão avalia antes da checagem de contexto, então `ineligible`
+absorve o que seria `unavailable`:
+
+| versão | `unavailable` medido | leitura |
+|---|---:|---|
+| `mean_reversion v6` (pai), fatia A | 448 | K4 real do braço |
+| `mean_reversion v11` (portão) | 0 | falso verde — leia o K4 do pai |
+| `momentum v8` (pai), fatia A | 448 | K4 real do braço |
+| `momentum v11` (portão) | 0 | falso verde — leia o K4 do pai |
+
+Um "K4 = 0 %" numa versão com portão não é ausência de gap de contexto; é o gate absorvendo a
+barra antes que ela pudesse virar `unavailable`. Registrado também em `docs/PIPELINE.md` §4b
+item 12 e em `docs/plans/SHADOW-LAB.md` (funil, item 3).
+
+**Vereditos finais desta corrida (funil completo, `.claude/state/notes-T3.52d.md` §9):** G1
+`inconclusivo` (K1, `SIDEWAYS` só tem 6 h na primeira metade da janela — não aposentar ainda); G2
+`frágil a custos` — Δ de expectativa +0,1104 R com IC 95 % [−0,0605; +0,2859] (cruza zero),
+`custos_x2` reverte o sinal, segunda metade −0,3081 R por operação — **não promover**. Nenhum dos
+dois braços passa o portão C1–C8 do funil de validação com retorno demonstrado; a infraestrutura
+do portão de regime está correta (reproduz o pai bit a bit nas barras elegíveis) e o retorno
+continua não demonstrado.
