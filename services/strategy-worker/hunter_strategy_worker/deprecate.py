@@ -8,7 +8,11 @@ successor is a **parameter** variant (``derive_variant.py``, T3.26) — only
 the successor is not a *code* change ("already frozen against this code").
 ``--deprecate`` is the missing half: it writes only ``status``/``deprecated_at``/
 ``changelog`` (the freeze trigger leaves ``status`` mutable, DATABASE.md
-§16.1) and never touches ``code_ref``, parameters or the schema.
+§16.1) and never touches ``code_ref``, parameters or the schema. ``changelog``
+is **appended** to, never overwritten (:func:`hunter_strategy_worker.activation_db.append_deprecation_note`,
+T3.47c): a derived variant's lineage prefix (``derive_variant.py``'s
+``derived_from=v<n> | overrides=...``) lives in that same column, and a plain
+``changelog = :verdict`` would have erased it (found by T3.47b, CONCERN 3).
 
 Two refusals are structural, not configurable:
 
@@ -39,6 +43,7 @@ from hunter_strategy_worker.activation_db import (
     PURPOSE_LIVE,
     PURPOSE_PAPER,
     Refused,
+    append_deprecation_note,
     load_row,
     migration_applied,
     open_paper_exposure,
@@ -104,7 +109,7 @@ async def deprecate(
             "changelog = :changelog WHERE id = :id AND status = 'active' "
             "RETURNING deprecated_at"
         ),
-        {"changelog": changelog, "id": row.id},
+        {"changelog": append_deprecation_note(row.changelog, changelog), "id": row.id},
     )
     deprecated = updated.first()
     if deprecated is None:

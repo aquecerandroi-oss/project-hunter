@@ -178,6 +178,41 @@ class TestDeprecateResearchOnly:
         assert "deprecate_roster" not in {v.strategy_key for v in roster.versions}
 
 
+class TestDeprecatePreservesLineage:
+    """T3.47c (found by T3.47b, CONCERN 3): a derived variant's analysable
+    lineage (``derive_variant.py``'s ``derived_from=v<n> | overrides=...``,
+    read back by ``infra/scripts/obsidian_strategy_pages.py``) lives only in
+    ``changelog`` — a plain ``changelog = :verdict`` overwrite would erase it."""
+
+    async def test_it_appends_to_an_existing_lineage_prefix_instead_of_erasing_it(
+        self, db_session_factory: Any
+    ) -> None:
+        script = _script()
+        lineage = (
+            "variante de v2 | derived_from=v2 | overrides=atr_pct_min=0.0089 "
+            "| params_hash=aaaaaaaaaaaa | KB-0008: piso de custo"
+        )
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            _strategy_id, version_id = await activate_version(session, key="deprecate_lineage")
+        async with db_session_factory() as session, session.begin():
+            await session.execute(
+                text("UPDATE strategy_versions SET changelog = :changelog WHERE id = :id"),
+                {"changelog": lineage, "id": version_id},
+            )
+        async with db_session_factory() as session, session.begin():
+            message = await script.deprecate(
+                session, "deprecate_lineage", "v1", "K1: 0 decisões", dry_run=False
+            )
+        assert "deprecated deprecate_lineage v1" in message
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            row = await _row(session, "deprecate_lineage")
+        assert row.changelog is not None
+        assert row.changelog.startswith(lineage)
+        assert "\n[deprecated " in row.changelog
+        assert row.changelog.endswith("K1: 0 decisões")
+
+
 class TestDeprecateLive:
     async def test_it_refuses_a_live_version_even_with_force_paper(
         self, db_session_factory: Any

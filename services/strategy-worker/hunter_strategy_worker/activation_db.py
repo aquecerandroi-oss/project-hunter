@@ -12,6 +12,7 @@ their frozen strings.
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import text
@@ -26,6 +27,7 @@ __all__ = [
     "REQUIRED_TABLES",
     "VERSION_RE",
     "Refused",
+    "append_deprecation_note",
     "load_row",
     "migration_applied",
     "migration_url",
@@ -130,6 +132,25 @@ async def load_row(conn: AsyncConnection, key: str, version: str) -> Any:
             {"key": key, "version": version},
         )
     ).first()
+
+
+def append_deprecation_note(existing: str | None, note: str, *, now: datetime | None = None) -> str:
+    """The ``changelog`` for a row moving to ``status = 'deprecated'`` — the
+    existing value kept **verbatim**, with a dated line appended (T3.47c).
+
+    A derived variant's analysable lineage (``derive_variant.py``'s
+    ``derived_from=v<n> | overrides=...``, read back by
+    ``infra/scripts/obsidian_strategy_pages.py``'s ``parse_parent_version``) lives
+    in this same column, and it is the only place it lives — no other column
+    freezes it. ``deprecate()`` and ``supersede()`` (retiring the row it
+    replaces) used to overwrite ``changelog`` outright with the operator's
+    verdict text, which silently erased that prefix on any row that had one
+    (found by T3.47b, CONCERN 3). Both now build the new value through this
+    function instead of assigning a bare string, so the frozen prefix a variant
+    was born with survives every later status change.
+    """
+    timestamp = (now or datetime.now(UTC)).isoformat()
+    return f"{existing or ''}\n[deprecated {timestamp}] {note}"
 
 
 async def open_paper_exposure(conn: AsyncConnection, version_id: Any) -> list[str]:

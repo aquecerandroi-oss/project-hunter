@@ -283,6 +283,20 @@ dado) e o `code_ref`/`params_hash` congelados da versão.
   sucessora (ALTA-2), então uma linha paper superada continua paper, nunca cai
   no padrão `research_only` do schema.
 
+**`changelog` é acrescentado, nunca sobrescrito (T3.47c).** O prefixo de
+linhagem que `derive_variant.py` grava (`variante de v<n> | derived_from=v<n>
+| overrides=... | params_hash=...`) — o mesmo que
+`infra/scripts/obsidian_strategy_pages.py` lê para ligar a página da variante à
+do pai — mora só nessa coluna; nenhuma outra guarda a linhagem. Até esta
+tarefa `--deprecate` (e `--supersede`, na linha que ele aposenta) faziam
+`changelog = :veredito`, apagando esse prefixo sempre que a versão aposentada
+era uma variante (achado da T3.47b, CONCERN 3). Agora os dois passam pelo
+mesmo `append_deprecation_note` (`hunter_strategy_worker.activation_db`): o
+valor anterior sobrevive **byte a byte**, com uma linha datada acrescentada no
+fim — `\n[deprecated <UTC iso>] <veredito>` — então uma variante aposentada
+continua encontrável pelo pai e o veredito de por que foi aposentada fica
+junto, não no lugar.
+
 O roster do strategy-worker (`load_version_roster`) já filtra por
 `status = 'active'`, mas o recarregamento tem um TTL de 60 s
 (`ShadowConfig.version_refresh_s`, `SHADOW_VERSION_REFRESH_S`) — uma versão

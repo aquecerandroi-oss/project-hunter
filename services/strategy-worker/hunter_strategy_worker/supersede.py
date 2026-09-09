@@ -21,7 +21,11 @@ cannot be looser than the other): ``purpose = 'live'`` is never touched, and
 ``purpose = 'paper'`` needs ``--force-paper`` *and* a clean
 :func:`hunter_strategy_worker.activation_db.open_paper_exposure` check — the
 wallet's own coorte does not lose its code successor while it is still
-carrying open positions. ``purpose`` itself is copied onto the successor
+carrying open positions. Retiring the origin appends to its ``changelog``
+through the same :func:`hunter_strategy_worker.activation_db.append_deprecation_note`
+``--deprecate`` uses, rather than overwriting it (T3.47c) — the origin may
+itself be a derived variant whose lineage prefix lives in that column and
+nowhere else. ``purpose`` itself is copied onto the successor
 **explicitly**: the ``INSERT`` used to omit the column, which meant every
 successor of a paper line silently landed on the schema default
 (``research_only``) and the wallet's coorte would have gone dark on its next
@@ -43,6 +47,7 @@ from hunter_strategy_worker.activation_db import (
     PURPOSE_PAPER,
     VERSION_RE,
     Refused,
+    append_deprecation_note,
     load_row,
     migration_applied,
     open_paper_exposure,
@@ -162,7 +167,7 @@ async def supersede(
             "UPDATE strategy_versions SET status = 'deprecated', deprecated_at = now(), "
             "changelog = :changelog WHERE id = :id"
         ),
-        {"changelog": note, "id": row.id},
+        {"changelog": append_deprecation_note(row.changelog, note), "id": row.id},
     )
     await record_event(
         conn,
