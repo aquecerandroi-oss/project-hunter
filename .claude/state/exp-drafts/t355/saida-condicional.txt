@@ -1,0 +1,42 @@
+horizonte 4 barras | tolerancia 0.25 ATR | familia 8
+fatia                      tf   n_pad   n_pop     bruto     delta   IC baixo   IC alto        p   Holm8
+linha:encostado           15m     476    9392    0.0508    0.0642    -0.0796    0.2195   0.4058   1.000
+linha:solto               15m    4509   81808   -0.0434   -0.0424    -0.1016    0.0172   0.1700   1.000
+regime:alinhado           15m     698   13056   -0.0367   -0.0558    -0.2888    0.1784   0.6884   1.000
+regime:contra             15m     749   13056   -0.0322   -0.0080    -0.1347    0.1196   0.9654   1.000
+linha:encostado            1h      97    1942   -0.1047   -0.0537    -0.3766    0.3262   0.7474   1.000
+linha:solto                1h     895   18186    0.0396    0.0312    -0.2475    0.2996   0.7982   1.000
+regime:alinhado            1h     146    3264    0.1122    0.0853    -0.2447    0.5248   0.5994   1.000
+regime:contra              1h     159    3264   -0.3193   -0.2965    -0.8064    0.0590   0.1090   0.872
+sobrevivem a Holm(8): nenhum
+
+descritivo por padrao (sem inferencia): media do residuo em ATR, h=4
+padrao             tf  n encostado    media  n solto    media
+engolfo_alta      15m           74   -0.031      575   -0.136
+engolfo_baixa     15m           65   -0.105      658    0.023
+martelo           15m           73   -0.001      592    0.018
+enforcado         15m           51    0.083      482   -0.194
+estrela_cadente   15m           52    0.084      576    0.060
+doji              15m          471   -0.002     3647   -0.062
+marubozu_alta     15m           56    0.480      609    0.010
+marubozu_baixa    15m           48   -0.046      458   -0.129
+harami_alta       15m           20   -0.138      188    0.010
+harami_baixa      15m           27   -0.126      335   -0.110
+estrela_manha     15m            7    0.604       42    0.155
+estrela_noite     15m            6    0.470       68   -0.239
+tres_soldados     15m            7   -0.064       82    0.252
+tres_corvos       15m            8    0.542       49    0.280
+engolfo_alta       1h           22   -0.234       93    0.271
+engolfo_baixa      1h           20   -0.264      170    0.055
+martelo            1h            7   -0.699      105   -0.091
+enforcado          1h           14    0.381      130   -0.126
+estrela_cadente    1h           16   -0.129      139    0.158
+doji               1h           78   -0.032      846    0.118
+marubozu_alta      1h            6    1.242       87    0.273
+marubozu_baixa     1h            7   -0.201       67    0.102
+harami_alta        1h            0      nan       40    0.321
+harami_baixa       1h            3   -0.713       76   -0.578
+estrela_manha      1h            1    0.425        6   -0.085
+estrela_noite      1h            2   -1.065       16    0.455
+tres_soldados      1h            0      nan        8   -0.013
+tres_corvos        1h            0      nan        0      nan

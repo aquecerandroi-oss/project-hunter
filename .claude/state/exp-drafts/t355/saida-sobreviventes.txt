@@ -1,0 +1,13 @@
+familia da parte (b): 72 | da KB-0080: 72 | uniao: 144
+sobrevivem ao Holm conjunto (m=144, alfa 0,05): ['a/a_marubozu_baixa|1h|h1']
+  a/a_marubozu_baixa|1h|h1       p=0.0001  Holm=0.0144
+  a/a_doji_baixa|15m|h1          p=0.0006  Holm=0.0858
+  b/marubozu_baixa|1h|h1         p=0.0142  Holm=1.0000
+  a/a_martelo_invertido|15m|h16  p=0.0174  Holm=1.0000
+  b/enforcado|15m|h4             p=0.0202  Holm=1.0000
+  a/a_estrela_cadente|15m|h16    p=0.0274  Holm=1.0000
+
+economia do que sobra (o horizonte de cada sobrevivente, nao o h=4 da tabela geral)
+rotulo                         n  delta ATR    atr%  stop nat. custo nat.   R nat.  custo 1ATR   R 1ATR  IC baixo  IC alto
+a/a_marubozu_baixa|1h|h1      90    -0.2037   1.005       1.30      0.155   -0.157       0.199   -0.403    -0.510   -0.294
+  ^ operado ao contrario      90     0.2037   1.005          -          -    0.157       0.199    0.005    -0.104    0.112

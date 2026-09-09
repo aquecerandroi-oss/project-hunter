@@ -1,0 +1,38 @@
+A. controles (horizonte 4 barras, mesma baseline pareada)
+controle                 tf      n     delta   IC baixo   IC alto        p
+trapaca_futuro          15m  23092    0.5047     0.4739    0.5412   0.0001
+trapaca_rara            15m    689    0.9212     0.8531    0.9926   0.0001
+aleatorio               15m    689   -0.0185    -0.1366    0.1043   0.7538
+trapaca_futuro           1h   5787    0.4954     0.4254    0.5715   0.0001
+trapaca_rara             1h    132    1.0412     0.7350    1.3638   0.0001
+aleatorio                1h    132    0.0653    -0.2174    0.3254   0.6218
+
+B. resolucao contra pedagio (horizonte 4 barras)
+padrao             tf     n  meia largura ATR  stop ATR  resolucao R  custo_R  ve o suficiente?
+engolfo_alta      15m   666            0.1261      1.25        0.101    0.335               sim
+engolfo_baixa     15m   740            0.1370      1.21        0.114    0.344               sim
+martelo           15m   689            0.1457      0.81        0.179    0.457               sim
+enforcado         15m   549            0.1463      0.13        1.084    2.779               sim
+estrela_cadente   15m   655            0.1505      0.82        0.183    0.471               sim
+doji              15m  4220            0.0539      0.56        0.096    0.667               sim
+marubozu_alta     15m   683            0.1312      1.34        0.098    0.314               sim
+marubozu_baixa    15m   531            0.1396      1.16        0.121    0.430               sim
+harami_alta       15m   219            0.1572      0.73        0.215    0.590               sim
+harami_baixa      15m   374            0.3152      0.80        0.395    0.470               sim
+estrela_manha     15m    53            0.3167      1.35        0.235    0.287               sim
+estrela_noite     15m    77            0.4589      1.55        0.297    0.249               nao
+tres_soldados     15m    91            0.3515      2.78        0.127    0.157               sim
+tres_corvos       15m    59            0.3347      2.43        0.138    0.137               nao
+engolfo_alta       1h   135            0.2414      1.09        0.221    0.175               nao
+engolfo_baixa      1h   214            0.3896      1.24        0.315    0.134               nao
+martelo            1h   132            0.3799      0.74        0.513    0.258               nao
+enforcado          1h   152            0.7334      0.15        5.016    1.095               nao
+estrela_cadente    1h   166            0.2925      0.82        0.355    0.200               nao
+doji               1h  1048            0.1299      0.55        0.238    0.316               sim
+marubozu_alta      1h   101            0.4557      1.81        0.252    0.109               nao
+marubozu_baixa     1h    87            0.3306      1.16        0.285    0.187               nao
+harami_alta        1h    49            0.3360      0.70        0.478    0.225               nao
+harami_baixa       1h    84            0.9241      0.96        0.965    0.172               nao
+estrela_manha      1h     9            0.7163      1.00        0.720    0.198               nao
+estrela_noite      1h    22            0.6492      1.68        0.386    0.085               nao
+tres_soldados      1h    11            1.2089      4.75        0.255    0.034               nao
