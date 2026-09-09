@@ -480,3 +480,6 @@ introduz tolerância nem antecipação.
    próprio — conferi, e ele *não* tem este defeito:** corta em `source_bar_close` (alinhado ao
    minuto, recebido pelo chamador) e não lê livro nenhum, então não existe corrida de carimbo lá.
    Nada a fazer naquele serviço.
+
+## §4 — prova pós-deploy (orquestrador, 2026-09-09 00:1x BRT, scanner em 188ff72)
+Heartbeat `detectors_disarmed`, ORDERBOOK_IMBALANCE, de 200 mercados: ANTES `feature_after_cut=183` (baselines_under_construction=13). DEPOIS, minuto a minuto: 77, 55, 75, 51, 42, 64 (`baselines_under_construction` 106–135, `baseline_absent` 15–23). Melhor que a previsão (~85–110): a ordem de leitura removeu ~60–70 pontos; o resíduo (21–38 %) é o do coletor → T3.46g. O livro passou a alimentar a baseline: a partir de agora `sample_size` cresce até o portão 120.
