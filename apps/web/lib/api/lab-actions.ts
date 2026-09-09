@@ -2,7 +2,9 @@
 
 import { isApiError } from "@/lib/api-error";
 import { getLabCurve, getLabSignals, type LabCurveParams } from "@/lib/api/lab";
-import { listMarkets } from "@/lib/api/markets";
+import { getCandles, listMarkets } from "@/lib/api/markets";
+import type { Candle } from "@/lib/api/types";
+import { aggregateTo15m } from "@/lib/charts/lab-trendline-series";
 import { getServerSession } from "@/lib/server/auth";
 
 import type { CurveOut } from "./lab-types";
@@ -71,6 +73,62 @@ export async function loadLabSignalEnvelopeAction(
   } catch (error) {
     const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
     return { ok: false, envelope: null, reason };
+  }
+}
+
+export interface LabTrendlineCandlesOutcome {
+  ok: boolean;
+  candles: Candle[];
+  /** `true` when `candles` came from aggregating real 1m final candles rather than native 15m rows -- see the long comment below. Only meaningful when `ok`. */
+  derived: boolean;
+  reason?: string;
+}
+
+/** `MAX_CANDLES_LIMIT` in `apps/api/hunter_api/routers/markets.py` -- the API caps `limit` regardless of timeframe. */
+const MAX_CANDLES_LIMIT = 1500;
+
+/**
+ * 15m candles for the trend-line overlay (brief T3.49): `SignalListItemOut.market`
+ * is a bare symbol (same gap `resolveMarketHrefAction` below already works
+ * around), so this first resolves the real exchange via `listMarkets({ q })`,
+ * then reads a real historical window (`getCandles(..., { before, limit })`,
+ * `lib/api/markets.ts` -- both `server-only`, hence the boundary) around the
+ * operation's own decision/exit instants (`lib/lab-trendline.ts`'s
+ * `computeCandleWindow` computed `beforeIso`/`limit`). Zero or several
+ * exchange matches is an honest failure, never a guess.
+ *
+ * T3.49 finding: `candles.timeframe = '15m'` has zero rows in this system,
+ * dev or the VPS (checked both, read-only) -- nothing ever materializes it;
+ * `hunter_strategy_worker.replay.engine` resamples `1m` in memory for every
+ * strategy evaluation instead. So the native 15m fetch below is tried first
+ * (in case a future aggregator ever fills it), and falls back to fetching
+ * real 1m final candles over the same window and aggregating them
+ * (`aggregateTo15m`) -- real OHLCV, never invented, flagged `derived: true`
+ * so the caller can say so on screen. A window wider than
+ * `MAX_CANDLES_LIMIT` minutes is truncated from its oldest end (the API's
+ * own `before`+`limit` pagination already works this way); the overlay's own
+ * per-element coverage check already renders "not covered" honestly rather
+ * than fabricate past a truncated page.
+ */
+export async function loadLabTrendlineCandlesAction(market: string, beforeIso: string, limit: number): Promise<LabTrendlineCandlesOutcome> {
+  const session = await getServerSession();
+  if (!session) return { ok: false, candles: [], derived: false, reason: "unauthenticated" };
+
+  try {
+    const page = await listMarkets({ q: market, limit: 10 });
+    const exact = page.items.filter((item) => item.symbol === market);
+    const match = exact.length === 1 ? exact[0] : undefined;
+    if (!match) return { ok: false, candles: [], derived: false, reason: "mercado ambíguo ou não encontrado" };
+
+    const native = await getCandles(match.exchange, match.symbol, { timeframe: "15m", before: beforeIso, limit });
+    if (native.length > 0) return { ok: true, candles: native, derived: false };
+
+    const oneMinuteLimit = Math.min(limit * 15, MAX_CANDLES_LIMIT);
+    const oneMinute = await getCandles(match.exchange, match.symbol, { timeframe: "1m", before: beforeIso, limit: oneMinuteLimit });
+    return { ok: true, candles: aggregateTo15m(oneMinute), derived: true };
+  } catch (error) {
+    const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
+    return { ok: false, candles: [], derived: false, reason };
   }
 }
 

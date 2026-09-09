@@ -49,12 +49,15 @@ export async function getMarket(exchange: string, symbol: string): Promise<Marke
 export interface CandlesParams {
   timeframe?: string;
   limit?: number;
+  /** `GET .../candles?before=` (ISO datetime) -- the `limit` most recent final candles strictly before this instant (`hunter_api/repositories/markets.py::list_candles`). Needed by the Lab's trend-line overlay (T3.49) to fetch a real historical window around a past decision, rather than always "the latest N". */
+  before?: string;
 }
 
 function candlesQuery(params: CandlesParams): string {
   const search = new URLSearchParams();
   if (params.timeframe !== undefined) search.set("timeframe", params.timeframe);
   if (params.limit !== undefined) search.set("limit", String(params.limit));
+  if (params.before !== undefined) search.set("before", params.before);
   const value = search.toString();
   return value ? `?${value}` : "";
 }

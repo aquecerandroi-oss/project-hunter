@@ -227,6 +227,14 @@ export function LabSignalPanel({ signal, versionLabel, ruler, siblingSignals = [
         market={signal.market}
         strategyVersionId={signal.strategy_version_id}
         cohort={signal.cohort}
+        decisionBarClose={signal.source_bar_close}
+        entryPrice={signal.virtual_entry}
+        entryTs={signal.entry_ts}
+        stop={signal.stop}
+        target1={signal.target1}
+        exitPrice={signal.exit_price}
+        exitTs={signal.exit_ts}
+        result={signal.result}
       />
     </div>
   );
