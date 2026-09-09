@@ -118,7 +118,7 @@ export function LabSignalDetail(props: LabSignalDetailProps) {
         {trendline.status === "loading" && <p className="mt-1 text-xs text-fg-muted">Carregando linha de tendência...</p>}
         {trendline.status === "error" && <p className="mt-1 text-xs text-red">Linha indisponível: {trendline.reason}</p>}
         {trendline.status === "no_line" && (
-          <p className="mt-1 text-xs text-fg-muted">Esta versão não lê linhas de tendência (só `trendline_breakout v1` persiste geometria de linha).</p>
+          <p className="mt-1 text-xs text-fg-muted">Esta versão não lê linhas de tendência (só as estratégias da família `trendline_*` persistem geometria de linha).</p>
         )}
         {trendline.status === "loaded" && (
           <div className="mt-2 flex flex-col gap-2">

@@ -60,6 +60,10 @@ EXPERIMENT = {
         "`EXP-0016-trendline-breakout` — ainda **rascunho** em "
         "`.claude/state/exp-drafts/`, por isso sem link de nota"
     ),
+    "trendline_bounce-v1": (
+        "`EXP-0022-trendline-bounce` — ainda **rascunho** em "
+        "`.claude/state/exp-drafts/`, por isso sem link de nota"
+    ),
     "momentum-v7": (
         "`EXP-0018-stop-largo` (T3.47 V1, stop ×1,5 sobre a `momentum v6`) — "
         "em redação por outra tarefa, ainda sem nota no vault"
@@ -76,9 +80,9 @@ vault: um link para um EXP que ainda é rascunho seria achado de link morto no
 LEAD = """As linhas de tendência destes gráficos são traçadas pelo **mesmo código congelado**
 que decide (`hunter_core.strategies.tl_scan`, parâmetros de
 `trendline_breakout_v1.default_parameters`), cortado na barra da decisão: nenhuma
-vela posterior à decisão participa do traçado. Para toda versão que **não é**
-`trendline_breakout_v1`, elas são **contexto calculado depois** — a estratégia não
-leu linha nenhuma para decidir. Ver [[Operacoes-tracadas/README]] e [[KB-0076-por-que-perdemos-2026-09-08]]."""
+vela posterior à decisão participa do traçado. Para toda versão fora da família
+`trendline_*`, elas são **contexto calculado depois** — a estratégia não leu linha
+nenhuma para decidir. Ver [[Operacoes-tracadas/README]] e [[KB-0076-por-que-perdemos-2026-09-08]]."""
 
 
 def _slug(strategy: str, version: str) -> str:
@@ -172,7 +176,7 @@ def build_note(ops: list[Operation], slug: str, as_of: datetime) -> str:
     # 4th place that the note publishes (review of T3.50).
     expectancy = (sum(rs, Decimal(0)) / len(rs)).quantize(Decimal("0.0001")) if rs else Decimal(0)
     cohorts = ", ".join(sorted({op.coorte for op in ops}))
-    reads_lines = first.strategy == "trendline_breakout"
+    reads_lines = first.strategy in {"trendline_breakout", "trendline_bounce"}
     head = [
         "---",
         f"tags: [operacoes, {first.strategy.replace('_', '-')}, shadow-lab, graficos]",

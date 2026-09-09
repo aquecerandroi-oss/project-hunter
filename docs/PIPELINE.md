@@ -615,8 +615,10 @@ uv run python infra/scripts/render_operations.py note /tmp/momentum-v6.jsonl
    não uma reimplementação para desenhar. A janela é a corrida **contígua** de até 96 baldes
    completos terminando na decisão (`atr_series` levanta em buraco). Nenhuma vela posterior à
    decisão participa: `tl_scan` aplica o corte uma vez, no topo.
-4. **O que as linhas significam depende da versão.** Só `trendline_breakout_v1` **lê** linha para
-   decidir — nela a linha é o gatilho e a invalidação estrutural, e o `line_id` do envelope é
+4. **O que as linhas significam depende da versão.** Só as estratégias da família `trendline_*`
+   (`trendline_breakout_v1` e, desde a T3.57, `trendline_bounce_v1` — irmã plana, geometria idêntica
+   dígito a dígito, sem invalidação estrutural própria) **leem** linha para decidir — nelas a linha
+   é o gatilho (e, só na `breakout`, também a invalidação estrutural), e o `line_id` do envelope é
    destacado no gráfico junto com o pivô do stop. Em `momentum`, `mean_reversion`, `session_orb`,
    `volume_anomaly`, `breakout` e `sweep_reclaim` as linhas são **contexto calculado depois** pelo
    mesmo varredor congelado: servem para olhar a operação, nunca foram entrada dela. Tratar as duas

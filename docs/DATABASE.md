@@ -5076,6 +5076,15 @@ série horária de regime que a T3.43 passou a escrever (`market_regimes`,
 do regime para o qual ela foi construída precisa de um lugar onde isso esteja
 escrito, e esse lugar não podia ser nenhum dos que já existiam.
 
+**T3.59 acrescenta uma segunda regra ao mesmo envelope, sem migração nova.** A
+coluna já era JSONB e o corpo já era um *mapa* de políticas com uma política
+dentro (a T3.52 escreveu isso de propósito, §29.2); a T3.59 preenche a segunda
+posição do mapa com a regra `hours` (janela de hora do dia, `hours_gate.py`), ao
+lado da regra `regime` (§29.6). O envelope pode conter uma regra, as duas, ou
+nenhuma (`NULL`) — nunca um mapa vazio (§29.2). §29.8 descreve a regra `hours` e
+o desenho de duas regras; as subseções anteriores, que descrevem só `regime`,
+continuam valendo para essa regra e não foram reescritas.
+
 ### 29.1 Por que não é parâmetro (a alternativa que o brief deixou em aberto)
 
 Três razões, cada uma bastando sozinha:
@@ -5109,15 +5118,21 @@ serão filtrados com frequência") não se aplica a um campo filtrado nunca.
             "rule": "previous_closed_hour", "allow": ["SIDEWAYS"]}}
 ```
 
-**Não há CHECK.** A gramática é validada por quem lê — `hunter_strategy_worker.regime_gate.parse_policy`
-—, e o leitor **falha fechado**: chave desconhecida, escopo desconhecido, regra
+**Não há CHECK.** A gramática é validada por quem lê. Desde a T3.59 isso é duas
+camadas: `hunter_strategy_worker.gate_policy.parse_policy` lê o **envelope** —
+recusa chave que não seja `regime`/`hours`, objeto vazio (`{}`, §29.2) e qualquer
+coisa que não seja um objeto JSON — e despacha o corpo de cada chave para o
+parser da regra (`regime_gate.parse_regime_policy`, `hours_gate.parse_hours_policy`,
+§29.8). O leitor **falha fechado** nas duas camadas: escopo desconhecido, regra
 desconhecida, rótulo que não é `MarketRegime`, `allow` vazia e `UNKNOWN` dentro de
-`allow` são recusados, e uma versão cuja política não se lê **não entra no roster**
-(`policy_unreadable`), em vez de decidir sem o portão que ela declara. Um CHECK
-congelaria a gramática em DDL e obrigaria uma migração a cada política nova; a
-recusa do leitor é a mesma garantia com o custo no lugar certo. O `derive_variant.py`
-usa **a mesma função** para validar `--policy`, então o que o operador consegue
-gravar é exatamente o que o worker consegue honrar.
+`allow` (regime); limite fora de 0–24, não inteiro, janela vazia, janelas que se
+sobrepõem ou cobrem as 24 horas (hours) — e uma versão cuja política não se lê
+**não entra no roster** (`policy_unreadable`), em vez de decidir sem o portão que
+ela declara. Um CHECK congelaria a gramática em DDL e obrigaria uma migração a
+cada política nova; a recusa do leitor é a mesma garantia com o custo no lugar
+certo. O `derive_variant.py` usa **as mesmas funções** para validar `--policy`,
+então o que o operador consegue gravar é exatamente o que o worker consegue
+honrar.
 
 `NULL` é "sem portão" — e é o que toda versão anterior a esta revisão honestamente
 é. Não há backfill e não há guarda de upgrade (§22, §28.4): nada que já esteja
@@ -5236,3 +5251,79 @@ horária não existe para ser feita (o alvo é um par de colunas de uma tabela d
 fatos, sem unicidade), e um `CHECK` não consegue consultar outra tabela. A trava
 é do script porque é lá que a intenção do operador entra no sistema — o mesmo
 lugar onde `--set` já é validado contra o `parameters_schema` congelado (§29.2).
+
+### 29.8 T3.59: a regra `hours`, o envelope de duas regras e o bug de tipos pego antes da escrita
+
+**Nenhuma migração.** A coluna já era JSONB e o corpo já era um mapa de
+políticas (§29.2); esta tarefa preenche a segunda posição do mapa
+(`hunter_strategy_worker.hours_gate`, ao lado de `regime_gate`) e move o
+envelope para um módulo próprio (`hunter_strategy_worker.gate_policy`) — o
+`code_ref` congelado de cada estratégia não muda, porque o portão é lido pelo
+worker ao montar o `StrategyContext`, nunca pela estratégia (§29.1).
+
+**A forma, com as duas regras:**
+
+```json
+{"regime": {"scope": "btc", "classifier_version": "regime_hourly_v1",
+            "rule": "previous_closed_hour", "allow": ["SIDEWAYS"]},
+ "hours":  {"utc": [[12, 15]]}}
+```
+
+`hours.utc` é uma lista de janelas meia-abertas `[start, end)`, em UTC — o
+quadro `utc` é escrito no JSON, não suposto, para que um futuro `brt` seja uma
+chave nova com a discussão de horário de verão dela própria. Uma janela pode
+cruzar a meia-noite (`[22, 2]` cobre 22, 23, 0, 1). O parser
+(`hours_gate.parse_hours_policy`) recusa: quadro diferente de `utc`, limite
+fora de 0–24, valor não inteiro (`True` incluído, que é `int` em Python), lista
+vazia, par que não é `[início, fim]`, janelas que se sobrepõem e qualquer
+conjunto de janelas que cubra as 24 horas — um portão que nunca recusa não é
+um portão.
+
+**Toda regra declarada tem de passar — é `AND`, nunca `OR`.** Uma versão com
+`regime` e `hours` decide na interseção das duas; declarar as duas é pedir a
+interseção, não a união. Chave que o envelope não conhece (isto é, que não é
+`regime` nem `hours`) é recusada, e um objeto vazio (`{}`) também — uma linha
+em que a política foi esvaziada por acidente não vira "decide em qualquer
+contexto" (§29.2). A ordem de avaliação (hora antes de regime, em
+`hunter_strategy_worker.context`) é de custo, não de contrato: a janela de
+horas não lê nada (nenhuma consulta, nenhum relógio), e recusar por ela poupa a
+leitura indexada de `market_regimes` (§29.6) em toda barra fora da janela. A
+consequência é de vocabulário, não de dado: uma barra que falharia nas duas
+regras é reportada só como `hours_gate:HH` — a fatia de `regime_gate:*` de uma
+versão com as duas regras não é comparável com a da mesma versão só com
+regime. Está descrito também em `docs/PIPELINE.md` §4b item 10 e no cabeçalho
+de `hours_gate.py`.
+
+**A coluna recebe inteiros nativos; o envelope da decisão guarda strings — e as
+duas coisas estão certas, por contratos diferentes.** `default_parameters`
+passa por `canonical_json`, que emite todo número como string decimal
+normalizada (o contrato de `params_format = 1`, para `Decimal("1.50")` e `1.5`
+serem o mesmo parâmetro) — e é isso que `hunter_strategy_worker.variant` grava
+para o **conjunto de parâmetros**. Uma janela de horas não é um parâmetro
+(§29.1) e não pode passar pela mesma função: `[[12, 15]]` gravado por
+`canonical_json` voltaria da coluna como `[["12", "15"]]`, o parser recusaria
+(`start '12' is not an integer hour`) e a versão sairia do roster com
+`policy_unreadable` — calada, atrás de um `/ready` verde, sem mensagem nenhuma
+para o operador. Por isso `variant.py` separa as duas formas:
+
+| função | usada para | forma dos números |
+|---|---|---|
+| `stored_policy()` | a **escrita** na coluna `eligibility_policy` | os tipos que a política tem — inteiros para `hours` |
+| `canonical_policy()` | a **comparação** (dedup de variante, `--policy` que só troca o portão) | `canonical_json`, números como string — os dois lados da comparação passam pela mesma função, então o comportamento não muda |
+
+Já o envelope de decisão gravado em `agent_signals.supporting_features`
+(`provenance.hours_gate`) **guarda a hora como string** (`{"hour": "12",
+"policy": {"utc": [["12", "15"]]}}`) — e isso é o contrato certo, não outro bug:
+o envelope inteiro é serializado pela forma canônica (o z-score, o ATR e o
+preço também são strings ali), e mudar só a regra `hours` quebraria essa
+uniformidade. **Coluna = inteiros nativos** (senão o parser recusa);
+**envelope de decisão = strings canônicas** (porque é essa a forma do
+envelope). Round-trip provado em `services/strategy-worker/tests/test_hours_gate.py`.
+
+**`--policy` não pode largar uma regra do pai em silêncio.**
+`variant.resolve_policy` recusa quando o argumento novo não menciona uma regra
+que o pai declara: `--policy hours=12-15` sobre um pai com portão de regime
+substituiria o portão inteiro, e a filha decidiria em mais contexto que o pai
+sem que isso apareça em lugar nenhum. A saída exige uma frase: repetir a regra
+no argumento, `<portão>=none` para tirar só ela, ou `--policy none` para tirar
+o portão inteiro. Largar um portão continua possível — só não em silêncio.

@@ -1,13 +1,15 @@
 /**
  * Pure geometry math for the Shadow Lab's trend-line overlay (brief T3.49,
  * Everton 2026-09-08 19:45/19:50: "quero conferir visualmente se a linha
- * estava certa"). Parses `trendline_breakout_v1`'s decision envelope
+ * estava certa"). Parses the decision envelope of any `trendline_*` version
+ * (`trendline_breakout_v1` and, since T3.57, `trendline_bounce_v1` -- both
+ * flat siblings sharing the same geometry digit for digit)
  * (`agent_signals.supporting_features`, written by
  * `packages/core/hunter_core/strategies/tl_setup.py::_line_features` --
  * every Decimal field travels as a string) and re-derives the exact line the
  * decision drew. No I/O, no `lightweight-charts` import -- testable without a
  * DOM (`.claude/state/notes-T3.34c.md` §8 is the proof this data exists and
- * is complete on every one of this version's 47 real decisions).
+ * is complete on every one of `trendline_breakout_v1`'s real decisions).
  *
  * Any other strategy's envelope has no `line_id` at all -- `present: false`
  * below is the honest "esta versão não lê linhas" case, not an error.
