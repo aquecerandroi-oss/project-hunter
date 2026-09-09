@@ -1,11 +1,5 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: pushMock }),
-}));
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
 afterEach(cleanup);
 
@@ -40,16 +34,16 @@ describe("LabSegmentTabs: real, whole-dataset totals (brief T3.37)", () => {
     expect(screen.getByRole("tab", { name: /Concluídas/ })).toHaveAttribute("aria-selected", "false");
   });
 
-  it("clicking a tab navigates to that tab's own href (a query change), never mutates an in-memory array", () => {
+  // T3.51 (Everton on the VPS: "eu clico e não resolve nada"): each tab is a
+  // real `<a href>` now (`<Link>`), not a `<button onClick={() =>
+  // router.push(...)}>` with no fallback -- so the assertion is the anchor's
+  // own `href`, never a `router.push` call that could silently never run.
+  it("renders every tab as a real anchor pointing at that segment's own href (state=open|pending|all|closed)", () => {
     render(<LabSegmentTabs state="closed" totals={exampleSignalsTotals()} hrefs={hrefs} />);
-    fireEvent.click(screen.getByRole("tab", { name: /Abertas/ }));
-    expect(pushMock).toHaveBeenCalledWith("/acme/lab?state=open");
-  });
-
-  it("does nothing when clicking the already-active tab", () => {
-    render(<LabSegmentTabs state="closed" totals={exampleSignalsTotals()} hrefs={hrefs} />);
-    fireEvent.click(screen.getByRole("tab", { name: /Concluídas/ }));
-    expect(pushMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("tab", { name: /Concluídas/ })).toHaveAttribute("href", "/acme/lab?state=closed");
+    expect(screen.getByRole("tab", { name: /Abertas/ })).toHaveAttribute("href", "/acme/lab?state=open");
+    expect(screen.getByRole("tab", { name: /Pendentes\/sem entrada/ })).toHaveAttribute("href", "/acme/lab?state=pending");
+    expect(screen.getByRole("tab", { name: /Todas/ })).toHaveAttribute("href", "/acme/lab?state=all");
   });
 
   it("exposes an aria-live region announcing the active tab's real total", () => {

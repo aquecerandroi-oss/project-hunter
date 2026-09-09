@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { logger } from "@/lib/logger";
-import { RealtimeClient, type RealtimeMessage, type RealtimeStatus } from "@/lib/ws";
+import { RealtimeClient, type RealtimeCloseInfo, type RealtimeMessage, type RealtimeStatus } from "@/lib/ws";
 
 /**
  * Multi-channel realtime subscriptions over ONE WebSocket connection, per
@@ -45,6 +45,10 @@ export interface UseMarketChannelsResult {
   status: RealtimeStatus;
   /** Latest decoded payload per channel name, e.g. `messages["rt:market:binance:BTCUSDT"]`. */
   messages: Record<string, unknown>;
+  /** `Date.now()` the current `status` began, or `null` before the first transition (T3.44d, `lib/realtime-health.ts`). */
+  since: number | null;
+  /** The last close this connection has seen, or `null` before the first one. */
+  lastClose: RealtimeCloseInfo | null;
 }
 
 interface ChannelEnvelope {
@@ -62,11 +66,12 @@ function sendChannels(client: RealtimeClient, type: "subscribe" | "unsubscribe",
   client.send({ type, channels: targets } as unknown as RealtimeMessage);
 }
 
-function handleFrame(envelope: ChannelEnvelope, client: RealtimeClient, onPayload: (channel: string, payload: unknown) => void): void {
-  if (envelope.type === "ping") {
-    client.send({ type: "pong" } as unknown as RealtimeMessage);
-    return;
-  }
+// T3.44d: `ping` no longer reaches here at all -- `RealtimeClient.handleMessage`
+// (`lib/ws.ts`) answers it directly now, the one place every consumer of this
+// client (including `hooks/useRealtime.ts`, which had no reply of its own)
+// gets it for free. This used to have its own `{ type: "ping" }` branch;
+// removed rather than left as dead code.
+function handleFrame(envelope: ChannelEnvelope, onPayload: (channel: string, payload: unknown) => void): void {
   if (envelope.type === "error") {
     logger.warn("market_channel_denied", { code: envelope.code, channel: envelope.channel });
     return;
@@ -83,6 +88,8 @@ export function useMarketChannels(options: UseMarketChannelsOptions): UseMarketC
   const { channels, getAuthToken, enabled = true, onMessage } = options;
   const [status, setStatus] = useState<RealtimeStatus>("idle");
   const [messages, setMessages] = useState<Record<string, unknown>>({});
+  const [since, setSince] = useState<number | null>(null);
+  const [lastClose, setLastClose] = useState<RealtimeCloseInfo | null>(null);
   const clientRef = useRef<RealtimeClient | null>(null);
   const subscribedRef = useRef<Set<string>>(new Set());
   const onMessageRef = useRef(onMessage);
@@ -117,12 +124,15 @@ export function useMarketChannels(options: UseMarketChannelsOptions): UseMarketC
       getAuthToken,
       onStatusChange: (next) => {
         setStatus(next);
+        const diagnostics = client.getDiagnostics();
+        setSince(diagnostics.since);
+        setLastClose(diagnostics.lastClose);
         // A fresh connection means the server has forgotten every previous
         // subscription -- reset so the next diff effect resends them all.
         if (next === "open") subscribedRef.current = new Set();
       },
       onMessage: (raw) => {
-        handleFrame(raw as unknown as ChannelEnvelope, client, (channel, payload) => {
+        handleFrame(raw as unknown as ChannelEnvelope, (channel, payload) => {
           setMessages((prev) => ({ ...prev, [channel]: payload }));
           onMessageRef.current?.(channel, payload);
         });
@@ -153,5 +163,5 @@ export function useMarketChannels(options: UseMarketChannelsOptions): UseMarketC
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `desired` is derived from `desiredKey`
   }, [desiredKey, status]);
 
-  return { status, messages };
+  return { status, messages, since, lastClose };
 }

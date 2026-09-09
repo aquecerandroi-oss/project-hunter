@@ -53,7 +53,10 @@ describe("LabSignalPager: 'X–Y de Z · página N' pager math (brief T3.37)", (
     expect(screen.getByRole("button", { name: "Próxima" })).toBeDisabled();
   });
 
-  it("navigates to nextHref/prevHref on click", () => {
+  // T3.51 (Everton on the VPS: "eu clico e não resolve nada"): "Anterior"/
+  // "Próxima" are real anchors (`<Link>`) now, not `<button onClick={() =>
+  // router.push(...)}>` -- so the assertion is each anchor's own `href`.
+  it("renders 'Anterior'/'Próxima' as real anchors pointing at prevHref/nextHref", () => {
     render(
       <LabSignalPager
         page={{ from: 201, to: 400 }}
@@ -64,10 +67,8 @@ describe("LabSignalPager: 'X–Y de Z · página N' pager math (brief T3.37)", (
         pageSizeHrefs={pageSizeHrefs}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Próxima" }));
-    expect(pushMock).toHaveBeenCalledWith("/acme/lab?next=1");
-    fireEvent.click(screen.getByRole("button", { name: "Anterior" }));
-    expect(pushMock).toHaveBeenCalledWith("/acme/lab?prev=1");
+    expect(screen.getByRole("link", { name: "Próxima" })).toHaveAttribute("href", "/acme/lab?next=1");
+    expect(screen.getByRole("link", { name: "Anterior" })).toHaveAttribute("href", "/acme/lab?prev=1");
   });
 
   it("navigates to the matching page-size href when the select changes", () => {

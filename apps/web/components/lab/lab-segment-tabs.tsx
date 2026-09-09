@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import Link, { useLinkStatus } from "next/link";
+import { useEffect } from "react";
 
 import { formatCount } from "@/components/lab/lab-format";
 import { LAB_SEGMENT_LABEL, LAB_SEGMENTS, SEGMENT_TO_STATE, stateToSegment, type LabSegment } from "@/components/lab/lab-signal-segments";
@@ -32,26 +32,43 @@ export interface LabSegmentTabsProps {
 }
 
 /**
+ * A tiny sr-only marker for exactly the tab whose own `<Link>` navigation is
+ * in flight (`useLinkStatus` reads the status of its nearest ancestor
+ * `<Link>` -- one instance per tab, no lifted/shared pending state needed).
+ */
+function TabPendingMark() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return <span className="sr-only"> (carregando)</span>;
+}
+
+/**
  * "Concluídas · Abertas · Pendentes/sem entrada · Todas" (brief T3.17b item
  * 4), now with real, whole-dataset counts (brief T3.37, Everton: "se tiver 2
  * mil operações tem que paginar mas mostrar as 2 mil") and server-side
  * navigation: clicking a tab rewrites `?state=` and lets the Server Component
  * refetch (`app/(app)/[orgSlug]/lab/page.tsx`) -- it never filters the
  * already-loaded page in the browser.
+ *
+ * T3.51 (Everton on the VPS: "eu clico e não resolve nada"): each tab is a
+ * real `<Link href>` now, not a `<button onClick={() => router.push(...)}>`.
+ * A `router.push` fired from a plain button has no fallback at all if the
+ * click handler's transition never lands (this repo's own repro: clicking
+ * "Abertas" flipped `aria-selected` locally but never touched
+ * `window.location` -- no `pushState`, no RSC fetch, ever -- while
+ * `AutoRefresh`'s next `router.refresh()` tick then re-fetched the
+ * still-unchanged bare URL and the tree fell back to the default segment,
+ * reading as "nothing happened"). An `<a href>` degrades to a real, working
+ * full navigation if the SPA transition never runs, and `state` (read back
+ * from the URL, via the server-provided prop) stays the only source of
+ * truth for which tab is selected -- never a locally tracked click result.
  */
 export function LabSegmentTabs({ state, totals, hrefs }: LabSegmentTabsProps) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const activeSegment = stateToSegment(state);
 
   useEffect(() => {
     warnOnceIfMissingDistinctOperations(totals);
   }, [totals]);
-
-  function handleSelect(segment: LabSegment): void {
-    if (segment === activeSegment) return;
-    startTransition(() => router.push(hrefs[segment]));
-  }
 
   // brief T3.38 item 4: each tab still counts signals (the visible number,
   // unchanged) but its `title` also states the real unique-operations count
@@ -69,20 +86,20 @@ export function LabSegmentTabs({ state, totals, hrefs }: LabSegmentTabsProps) {
     <div className="flex flex-col gap-1">
       <div role="tablist" aria-label="Filtrar sinais por estado" className="flex flex-wrap gap-1">
         {LAB_SEGMENTS.map((segment) => (
-          <button
+          <Link
             key={segment}
-            type="button"
+            href={hrefs[segment]}
             role="tab"
             aria-selected={activeSegment === segment}
             title={tabTitle(segment)}
-            onClick={() => handleSelect(segment)}
             className={cn(
               "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
               activeSegment === segment ? "border-gold bg-gold-soft text-gold" : "border-border text-fg-muted hover:text-fg",
             )}
           >
             {LAB_SEGMENT_LABEL[segment]} ({formatCount(totals[SEGMENT_TO_STATE[segment]])})
-          </button>
+            <TabPendingMark />
+          </Link>
         ))}
       </div>
       {/* Visually hidden -- announces the real, whole-dataset count on every
@@ -91,9 +108,7 @@ export function LabSegmentTabs({ state, totals, hrefs }: LabSegmentTabsProps) {
           "entrada", so a colon here would read as the unrelated "sem
           entrada: <motivo>" chip text elsewhere on this page. */}
       <p aria-live="polite" className="sr-only">
-        {isPending
-          ? "carregando sinais..."
-          : `${LAB_SEGMENT_LABEL[activeSegment]} — ${formatCount(totals[SEGMENT_TO_STATE[activeSegment]])} sinais no total`}
+        {`${LAB_SEGMENT_LABEL[activeSegment]} — ${formatCount(totals[SEGMENT_TO_STATE[activeSegment]])} sinais no total`}
       </p>
     </div>
   );

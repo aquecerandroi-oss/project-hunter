@@ -8,7 +8,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { AutoRefresh } from "@/components/auto-refresh";
-import { MIN_AUTO_REFRESH_INTERVAL_MS, autoRefreshIntervalMs } from "@/lib/auto-refresh-interval";
+import { MIN_AUTO_REFRESH_INTERVAL_MS, autoRefreshIntervalMs, shouldSkipAutoRefreshTick } from "@/lib/auto-refresh-interval";
 
 function setVisibility(state: DocumentVisibilityState): void {
   Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
@@ -61,6 +61,48 @@ describe("AutoRefresh: keeps an already-open Server Component page from reading 
 
     act(() => vi.advanceTimersByTime(50_000));
     expect(refreshMock).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * T3.51 (Everton on the VPS: "eu clico e não resolve nada"): a tab/pager
+ * click rewrites `window.location` via a real `<Link>`; `AutoRefresh` must
+ * never let its own `router.refresh()` tick race that navigation and win
+ * with a stale, pre-click snapshot.
+ */
+describe("AutoRefresh: never races a navigation (T3.51)", () => {
+  it("skips exactly the tick right after window.location changed, then resumes on the next one", () => {
+    render(<AutoRefresh intervalMs={10_000} />);
+
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(refreshMock).toHaveBeenCalledTimes(1); // baseline tick, establishes the current href
+
+    act(() => {
+      window.history.pushState({}, "", "/acme/lab?state=open");
+    });
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(refreshMock).toHaveBeenCalledTimes(1); // this tick notices the URL moved and skips itself
+
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(refreshMock).toHaveBeenCalledTimes(2); // the 2s settle window is long past by the next tick (10s later)
+  });
+});
+
+describe("shouldSkipAutoRefreshTick: the pure per-tick decision (T3.51)", () => {
+  it("skips while the tab is hidden, regardless of the other two guards", () => {
+    expect(shouldSkipAutoRefreshTick({ visible: false, refreshPending: false, msSinceNavigation: 999_999 })).toBe(true);
+  });
+
+  it("skips while a previous refresh from this same AutoRefresh instance hasn't committed yet", () => {
+    expect(shouldSkipAutoRefreshTick({ visible: true, refreshPending: true, msSinceNavigation: 999_999 })).toBe(true);
+  });
+
+  it("skips right after a navigation, inside the settle window", () => {
+    expect(shouldSkipAutoRefreshTick({ visible: true, refreshPending: false, msSinceNavigation: 100 })).toBe(true);
+  });
+
+  it("proceeds once visible, no refresh pending, and well past the settle window", () => {
+    expect(shouldSkipAutoRefreshTick({ visible: true, refreshPending: false, msSinceNavigation: 999_999 })).toBe(false);
   });
 });
 

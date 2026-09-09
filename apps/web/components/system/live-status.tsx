@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { computeAgeMs, formatAge, useAgeTicker } from "@/hooks/useAgeTicker";
 import { useMarketChannels } from "@/hooks/useMarketChannels";
 import type { ExchangeStatus, MarketStatusResponse, RtSystemMessage } from "@/lib/api/types";
+import { deriveConnectionHealth } from "@/lib/realtime-health";
+import { formatBrasiliaLong } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 export interface LiveStatusProps {
@@ -57,6 +59,12 @@ function formatWsState(wsState: string): string {
 function totalMonitoredFrom(exchanges: ExchangeStatus[], initialTotal: number): number {
   if (exchanges.length === 0) return initialTotal;
   return exchanges.reduce((sum, e) => sum + e.markets_monitored, 0);
+}
+
+/** `(bybit planejada)` — venues catalogued with no collector (`exchanges.status = 'planned'`, DATABASE.md §28). They are never rows here, because they have no feed to be down; naming them is what keeps "1 exchange" from reading as "we forgot the other one" (T3.44c). */
+function plannedNote(planned: string[] | undefined): string {
+  if (!planned || planned.length === 0) return "";
+  return ` (${planned.join(", ")} ${planned.length === 1 ? "planejada" : "planejadas"})`;
 }
 
 function mergeExchangeUpdate(prev: ExchangeStatus[], msg: RtSystemMessage): ExchangeStatus[] {
@@ -124,7 +132,11 @@ export function LiveStatus({ initial, variant }: LiveStatusProps) {
     });
   }, [initial]);
 
-  const { status: socketStatus } = useMarketChannels({
+  const {
+    status: socketStatus,
+    since: socketSince = null,
+    lastClose: socketLastClose = null,
+  } = useMarketChannels({
     channels: ["rt:system"],
     getAuthToken: () => getToken(),
     onMessage: (channel, payload) => {
@@ -152,7 +164,18 @@ export function LiveStatus({ initial, variant }: LiveStatusProps) {
   // while our own socket is down -- the ticking "há Ns" age already makes
   // that visibly stale, but this is an explicit, honest flag on top
   // (Astra's T1.5 review: don't let the dot alone imply a live feed).
-  const liveFeedDown = socketStatus !== "open";
+  //
+  // T3.44d: raw `socketStatus !== "open"` used to flip this the INSTANT the
+  // socket dropped, including the ~500ms-15s the client's own backoff
+  // (`lib/ws.ts`) is already busy resolving on its own -- every routine
+  // reconnect (a token refresh, a proxy idle-closing the connection, the
+  // VPS evidence's actual root cause: the browser tearing the socket down
+  // on ordinary navigation) flashed "interrompido" even though the feed was
+  // back within seconds. `deriveConnectionHealth` (`lib/realtime-health.ts`)
+  // only calls it down once the CURRENT disconnection has outlasted a grace
+  // window trusting that backoff to land.
+  const health = deriveConnectionHealth({ status: socketStatus, since: socketSince, now, lastClose: socketLastClose });
+  const liveFeedDown = !health.live;
 
   if (exchanges.length === 0) {
     const message = "Market worker: sem heartbeat";
@@ -172,15 +195,37 @@ export function LiveStatus({ initial, variant }: LiveStatusProps) {
     );
   }
 
-  if (variant === "compact") return <CompactStatus exchanges={exchanges} now={now} liveFeedDown={liveFeedDown} />;
+  if (variant === "compact")
+    return (
+      <CompactStatus
+        exchanges={exchanges}
+        planned={initial.exchanges_planned}
+        now={now}
+        liveFeedDown={liveFeedDown}
+        since={health.since}
+        lastCloseLabel={health.lastCloseLabel}
+      />
+    );
   return (
     <FullStatus
       exchanges={exchanges}
+      planned={initial.exchanges_planned}
       now={now}
       totalMonitored={totalMonitoredFrom(exchanges, initial.markets_monitored_total)}
       liveFeedDown={liveFeedDown}
+      since={health.since}
+      lastCloseLabel={health.lastCloseLabel}
     />
   );
+}
+
+/** "desde 08/09/2026 19:32:10 Brasília" + "último fechamento: <reason> (<code>)" -- appended to the live-feed tooltip only, never the inline note (D16/D17: Brasília time, never bare UTC/local). */
+function liveFeedTooltip(liveFeedNote: string, since: number | null, lastCloseLabel: string | null): string {
+  const parts = [liveFeedNote];
+  const sinceText = since !== null ? formatBrasiliaLong(new Date(since).toISOString()) : null;
+  if (sinceText) parts.push(`desde ${sinceText} Brasília`);
+  if (lastCloseLabel) parts.push(`último fechamento: ${lastCloseLabel}`);
+  return parts.join(" · ");
 }
 
 /**
@@ -192,7 +237,21 @@ export function LiveStatus({ initial, variant }: LiveStatusProps) {
  * (the browser's OWN socket to the realtime gateway, not any exchange's
  * ws_state) and is spelled out as such so the two are never conflated.
  */
-function CompactStatus({ exchanges, now, liveFeedDown }: { exchanges: ExchangeStatus[]; now: number; liveFeedDown: boolean }) {
+function CompactStatus({
+  exchanges,
+  planned,
+  now,
+  liveFeedDown,
+  since,
+  lastCloseLabel,
+}: {
+  exchanges: ExchangeStatus[];
+  planned: string[] | undefined;
+  now: number;
+  liveFeedDown: boolean;
+  since: number | null;
+  lastCloseLabel: string | null;
+}) {
   const primary = exchanges[0];
   if (!primary) return null;
   const worst = worstExchange(exchanges);
@@ -200,11 +259,11 @@ function CompactStatus({ exchanges, now, liveFeedDown }: { exchanges: ExchangeSt
   const ageMs = computeAgeMs(primary.last_event_at, now);
   const totalMonitored = exchanges.reduce((sum, e) => sum + e.markets_monitored, 0);
   const label =
-    exchanges.length === 1
+    (exchanges.length === 1
       ? `${primary.exchange} · ${formatWsState(primary.ws_state)} · ${primary.markets_monitored} mercados · ${ageMs !== null ? formatAge(ageMs) : "?"}`
-      : `${exchanges.length} exchanges · ${formatWsState(worst.ws_state)} · ${totalMonitored} mercados`;
+      : `${exchanges.length} exchanges · ${formatWsState(worst.ws_state)} · ${totalMonitored} mercados`) + plannedNote(planned);
   const liveFeedNote = "tempo real do navegador interrompido";
-  const title = liveFeedDown ? `${label} (${liveFeedNote})` : label;
+  const title = liveFeedDown ? `${label} (${liveFeedTooltip(liveFeedNote, since, lastCloseLabel)})` : label;
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted" title={title}>
       <span className={cn("size-2 rounded-full", DOT_CLASSES[worstState])} aria-hidden="true" />
@@ -233,20 +292,31 @@ function ExchangeRow({ exchange, now }: { exchange: ExchangeStatus; now: number 
 
 function FullStatus({
   exchanges,
+  planned,
   now,
   totalMonitored,
   liveFeedDown,
+  since,
+  lastCloseLabel,
 }: {
   exchanges: ExchangeStatus[];
+  planned: string[] | undefined;
   now: number;
   totalMonitored: number;
   liveFeedDown: boolean;
+  since: number | null;
+  lastCloseLabel: string | null;
 }) {
   return (
     <section className="rounded-lg border border-border bg-bg-elevated p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-medium uppercase tracking-wide text-fg-muted">
-          Mercados monitorados{liveFeedDown && <span className="ml-2 normal-case text-warning">tempo real interrompido</span>}
+          Mercados monitorados
+          {liveFeedDown && (
+            <span className="ml-2 normal-case text-warning" title={liveFeedTooltip("tempo real do navegador interrompido", since, lastCloseLabel)}>
+              tempo real interrompido
+            </span>
+          )}
         </h2>
         <span className="font-mono text-sm tabular-nums text-fg">{totalMonitored}</span>
       </div>
@@ -255,6 +325,10 @@ function FullStatus({
           <ExchangeRow key={exchange.exchange} exchange={exchange} now={now} />
         ))}
       </ul>
+      {/* T3.44c: a planned venue has no row (no collector, so no feed and no age to tick) -- but dropping it from the panel entirely would read as "we stopped tracking it". */}
+      {planned && planned.length > 0 && (
+        <p className="mt-2 text-xs text-fg-subtle">{planned.join(", ")} {planned.length === 1 ? "planejada" : "planejadas"} · sem coletor</p>
+      )}
     </section>
   );
 }

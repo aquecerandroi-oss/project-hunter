@@ -113,10 +113,13 @@ describe("LabSignalsTable: segments show real totals and never filter the loaded
     expect(screen.getByRole("tab", { name: "Todas (2.135)" })).toBeInTheDocument();
   });
 
-  it("clicking a tab navigates to that tab's own ?state= href instead of filtering in place", () => {
+  // T3.51 (Everton on the VPS: "eu clico e não resolve nada"): the tab is a
+  // real `<a href>` (`LabSegmentTabs`, `<Link>`) built from `buildLabHref`,
+  // not a `<button onClick={() => router.push(...)}>` -- the assertion is
+  // the anchor's own `href`, never a `router.push` call.
+  it("renders a tab's own ?state= href built by buildLabHref, instead of filtering in place", () => {
     render(<LabSignalsTable {...exampleLabSignalsTableProps({ state: "closed" })} />);
-    fireEvent.click(screen.getByRole("tab", { name: /Abertas/ }));
-    expect(pushMock).toHaveBeenCalledWith(expect.stringContaining("state=open"));
+    expect(screen.getByRole("tab", { name: /Abertas/ })).toHaveAttribute("href", expect.stringContaining("state=open"));
   });
 
   it("shows its own honest per-segment empty state when the current state's page is empty but totals.all is not 0", () => {

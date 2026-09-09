@@ -37,10 +37,11 @@ const withData: MarketStatusResponse = {
     },
   ],
   markets_monitored_total: 200,
+  exchanges_planned: [],
   updated_at: new Date().toISOString(),
 };
 
-const noHeartbeat: MarketStatusResponse = { exchanges: [], markets_monitored_total: 0, updated_at: new Date().toISOString() };
+const noHeartbeat: MarketStatusResponse = { exchanges: [], markets_monitored_total: 0, exchanges_planned: [], updated_at: new Date().toISOString() };
 
 describe("LiveStatus (full): real per-exchange WS state", () => {
   it("shows the exchange, its WS state and the total monitored count", () => {
@@ -96,6 +97,7 @@ describe("LiveStatus (full): the header total never contradicts the rows (F7)", 
         { exchange: "binance", ws_state: "connected", last_event_at: new Date().toISOString(), last_event_age_ms: 100, markets_monitored: 200, open_gaps: 0, reconnects: 0, shards_expected: 1, shards_reporting: 1 },
       ],
       markets_monitored_total: 200,
+      exchanges_planned: [],
       updated_at: new Date().toISOString(),
     };
     render(<LiveStatus variant="full" initial={twoExchanges} />);
@@ -127,6 +129,24 @@ describe("LiveStatus (compact): topbar summary", () => {
     render(<LiveStatus variant="compact" initial={noHeartbeat} />);
     expect(screen.getByText("Market worker: sem heartbeat")).toBeInTheDocument();
   });
+
+  // T3.44c: bybit is `exchanges.status = 'planned'` (catalogued, no collector),
+  // so the API stops sending it as a row and names it here instead. Before
+  // this, the topbar reduced it worst-of into "2 exchanges · UNAVAILABLE"
+  // while binance was connected the whole time.
+  it("names a planned venue beside the aggregate instead of counting it as a down feed", () => {
+    const withPlanned: MarketStatusResponse = { ...withData, exchanges_planned: ["bybit"] };
+    render(<LiveStatus variant="compact" initial={withPlanned} />);
+    expect(screen.getByText(/binance · CONNECTED · 200 mercados/)).toBeInTheDocument();
+    expect(screen.getByText(/\(bybit planejada\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/2 exchanges/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/UNAVAILABLE/)).not.toBeInTheDocument();
+  });
+
+  it("says nothing at all when no venue is planned", () => {
+    render(<LiveStatus variant="compact" initial={withData} />);
+    expect(screen.queryByText(/planejada/)).not.toBeInTheDocument();
+  });
 });
 
 describe("LiveStatus (compact): the exchange's own ws_state is in the visible text, not colour-only (H8)", () => {
@@ -137,6 +157,7 @@ describe("LiveStatus (compact): the exchange's own ws_state is in the visible te
         { exchange: "bybit", ws_state: "reconnecting", last_event_at: new Date().toISOString(), last_event_age_ms: 100, markets_monitored: 50, open_gaps: 0, reconnects: 2, shards_expected: 1, shards_reporting: 1 },
       ],
       markets_monitored_total: 250,
+      exchanges_planned: [],
       updated_at: new Date().toISOString(),
     };
     render(<LiveStatus variant="compact" initial={mixed} />);
@@ -152,6 +173,7 @@ describe("LiveStatus (compact): the worst-state reducer respects down > reconnec
         { exchange: "bybit", ws_state: "reconnecting", last_event_at: new Date().toISOString(), last_event_age_ms: 100, markets_monitored: 50, open_gaps: 0, reconnects: 2, shards_expected: 1, shards_reporting: 1 },
       ],
       markets_monitored_total: 250,
+      exchanges_planned: [],
       updated_at: new Date().toISOString(),
     };
     const { container } = render(<LiveStatus variant="compact" initial={mixed} />);
@@ -182,6 +204,7 @@ describe("LiveStatus: reconciles a fresh server snapshot, not just the value rea
         },
       ],
       markets_monitored_total: 150,
+      exchanges_planned: [],
       updated_at: new Date(Date.now() + 60_000).toISOString(),
     };
     // Simulates `AutoRefresh`'s `router.refresh()` producing a fresh
@@ -226,6 +249,37 @@ describe("LiveStatus: reconciles a fresh server snapshot, not just the value rea
   });
 });
 
+describe("LiveStatus: a disconnected socket does not alarm the viewer until the reconnect grace window elapses (T3.44d)", () => {
+  it("stays 'ao vivo' (no interrompido note) while the current disconnection is still inside the grace window", () => {
+    useMarketChannelsMock.mockReturnValue({
+      status: "closed" as const,
+      messages: {},
+      since: Date.now(), // just dropped
+      lastClose: { code: 1005, reason: "client disconnected", wasClean: true, at: Date.now() },
+    });
+
+    render(<LiveStatus variant="compact" initial={withData} />);
+    expect(screen.queryByText(/tempo real do navegador interrompido/)).not.toBeInTheDocument();
+  });
+
+  it("shows the interrompido note, with 'desde' and the last close reason in the tooltip, once the disconnection outlasts the grace window", () => {
+    const since = Date.now() - 30_000; // well past RECONNECT_GRACE_MS
+    useMarketChannelsMock.mockReturnValue({
+      status: "closed" as const,
+      messages: {},
+      since,
+      lastClose: { code: 1005, reason: "client disconnected", wasClean: true, at: since },
+    });
+
+    render(<LiveStatus variant="compact" initial={withData} />);
+    expect(screen.getByText(/tempo real do navegador interrompido/)).toBeInTheDocument();
+    const label = screen.getByText(/binance · CONNECTED · 200 mercados/);
+    const wrapper = label.closest("span[title]");
+    expect(wrapper?.getAttribute("title")).toMatch(/desde .* Brasília/);
+    expect(wrapper?.getAttribute("title")).toContain("client disconnected (1005)");
+  });
+});
+
 describe("LiveStatus: ages anchor to the snapshot's own clock (T3.16), never the viewer's raw Date.now() (brief T3.28b)", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -253,6 +307,7 @@ describe("LiveStatus: ages anchor to the snapshot's own clock (T3.16), never the
         },
       ],
       markets_monitored_total: 200,
+      exchanges_planned: [],
       updated_at: trueNow.toISOString(),
     };
 

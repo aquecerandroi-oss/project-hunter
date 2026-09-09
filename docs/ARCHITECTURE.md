@@ -135,6 +135,8 @@ Cada evento tem envelope fixo:
 ### 5.2 Redis pub/sub (workers → api → browser)
 Canais `rt:market:{exchange}:{symbol}`, `rt:radar`, `rt:org:{org_id}:portfolio:{id}`, `rt:org:{org_id}:risk`, `rt:system`. O `api` assina apenas os canais que algum cliente WebSocket pediu, com autorização por organização, e reenvia com throttling (250 ms para preços, 1 s para radar, imediato para risk events).
 
+O gateway fecha (código `4409`) qualquer socket autenticado que fique 15 min sem enviar um frame *cliente-iniciado* (`ping`/`subscribe`/`unsubscribe` — `apps/api/hunter_api/realtime/session.py`, `IDLE_TIMEOUT_SECONDS`); um `pong` respondendo ao `ping` periódico do próprio servidor **não** conta como atividade (`endpoint.py`). Um socket que só recebe (o topbar, `rt:system`) bateria nesse limite a cada ~15 min, então `RealtimeClient` (`apps/web/lib/ws.ts`, T3.44e) manda seu próprio `{"type":"ping"}` a cada 5 min enquanto `document.visibilityState === "visible"`, pausando enquanto a aba está oculta (uma aba abandonada deve mesmo expirar).
+
 ### 5.3 Redis hot state
 | Chave | Tipo | Conteúdo | TTL |
 |---|---|---|---|

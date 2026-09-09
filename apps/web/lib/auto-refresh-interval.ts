@@ -39,3 +39,42 @@ export function autoRefreshIntervalMs(staleAfterMs: number): number {
   return Math.max(MIN_AUTO_REFRESH_INTERVAL_MS, staleAfterMs - AUTO_REFRESH_SAFETY_MARGIN_MS);
 }
 
+/**
+ * How long after `window.location.href` last changed (a navigation just
+ * landed -- a `router.push` from this page's own tabs/pager, or the
+ * browser's back/forward) `AutoRefresh` holds off its next tick (T3.51:
+ * Everton on the VPS, "eu clico e não resolve nada" -- a tick landing right
+ * after a navigation raced it and could win with a stale snapshot of the
+ * pre-navigation URL). `AutoRefresh` reads `window.location.href` directly
+ * rather than `usePathname()`/`useSearchParams()` on purpose: it is mounted
+ * bare in several Server-Component pages it does not own, and
+ * `useSearchParams()` would force every one of them into a `<Suspense>`
+ * boundary it doesn't otherwise need. Comfortably below
+ * `MIN_AUTO_REFRESH_INTERVAL_MS` so a fast-cadence page never has its
+ * refresh disabled outright by this guard, comfortably above a typical RSC
+ * round-trip so the guard actually covers the race it exists for.
+ */
+export const AUTO_REFRESH_NAVIGATION_GUARD_MS = 2_000;
+
+export interface AutoRefreshTickState {
+  /** `document.visibilityState === "visible"`. */
+  visible: boolean;
+  /** A previous `router.refresh()` call from this same `AutoRefresh` instance hasn't committed yet. */
+  refreshPending: boolean;
+  /** Milliseconds since `window.location.href` was last seen to change. */
+  msSinceNavigation: number;
+}
+
+/**
+ * Pure decision for one `AutoRefresh` interval tick -- independently
+ * testable without fake DOM timers or a mocked `next/navigation` router.
+ * All three guards are `router.refresh()`-races-a-navigation defenses
+ * (T3.51); the visibility check alone predates this brief (T1.5 review F2).
+ */
+export function shouldSkipAutoRefreshTick({ visible, refreshPending, msSinceNavigation }: AutoRefreshTickState): boolean {
+  if (!visible) return true;
+  if (refreshPending) return true;
+  if (msSinceNavigation < AUTO_REFRESH_NAVIGATION_GUARD_MS) return true;
+  return false;
+}
+
