@@ -2,9 +2,12 @@
 tags: [decisao, risco, limites, sizing, m3]
 titulo: Limites de risco — o teto de 0,25 % por operação é inerte; quem manda é a participação de 1 % do volume
 data: 2026-09-08
+updated: 2026-09-08
 owner: sexta-feira
 origem: T3.48 (risk-engine-guardian), pedido de Everton 19:35 BRT
 status: aguardando decisão de Everton (participação / universo líquido)
+decided_on: 2026-09-08
+by: risk-engine-guardian
 ---
 
 # Proposta de limites de risco — o que muda (e o que não muda) se o risco por operação subir de 0,25 %

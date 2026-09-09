@@ -162,6 +162,46 @@ as avaliações datadas, essas sim append-only, estão nas páginas e nenhuma fo
   desde a T3.33f: `--supersede` recusa, de propósito, uma sucessora que compartilha o mesmo
   `code_ref` — exatamente o caso de toda variante por parâmetro.
 
+**Acréscimo de 2026-09-08 (arquivamento da Sexta-feira, T3.34c–T3.47c) — dezenove experimentos, quatro
+famílias de estratégia novas.** Os parágrafos acima ficam como estão. O que mudou:
+
+- **[[EXP-0016-trendline-breakout]]** (`trendline_breakout v1`, família nova) — ativada
+  **22:29:52Z** e replayada 31 d × 4 mercados: 47 decisões, bruta +0,1045 R, líquida **−0,0382 R**,
+  PF 0,922, 14 dias distintos. **A regra dos 60 % dispara**: 89,4 % das decisões são **repique em
+  suporte ascendente**, não o rompimento que deu nome ao experimento (5 rompimentos em 31 dias,
+  perdeu os 5). Veredito: **manter em pesquisa, com a hipótese REENUNCIADA** como repique — não
+  como rompimento. O contraste pareado da invalidação (braço `INV-B`, método do [[EXP-0007-momentum-invalidacao-bracos-INV]])
+  repete o achado da [[KB-0006-invalidacao-stop-por-atr-ou-saida-por-tempo]]: Δ +0,0922 R com IC
+  contendo zero — a invalidação estrutural **não** corta a cauda esquerda melhor que a de
+  `momentum_v1`, ela adianta a perda;
+- **[[EXP-0017-sweep-reclaim]]** (`sweep_reclaim v1`, família nova) — pré-checagem por margem
+  estreita (57 eventos em 31 d × 4 mercados, 17 dias distintos, cobertura 99,5 %; portão C1–C8 =
+  70,5 `REVISE`, C8 `fail` por desenho declarado — sem invalidação). O módulo **foi implementado**
+  no mesmo dia (commit `a9bacc6`, T3.45b, 46 testes), mas **nenhuma coorte foi ativada e nenhum
+  replay rodou** até o fechamento do dia: `sweep_reclaim: implemented, replay pending`;
+- **[[EXP-0018-stop-largo]]** (seis braços: `momentum v7`/`v8`, `mean_reversion v4`/`v5`/`v6`/`v7`) —
+  a identidade do pedágio se confirma nos seis (o custo cai pelo fator pedido, ÷1,48 a ÷2,08), mas
+  **os seis intervalos de confiança contêm zero** e só **12 %** da economia de pedágio sobrevive no
+  braço com população julgável (`momentum v8`). Com `risk_per_trade_pct` fixo, dobrar o stop **corta
+  a posição pela metade** — o eixo é alavanca de variância, não de sinal. Recomendações por braço:
+  descartar `momentum v7` e `mean_reversion v4`/`v5`; manter em pesquisa `momentum v8` e
+  `mean_reversion v6`/`v7`;
+- **[[EXP-0019-piso-atr]]** (`mean_reversion v8`, mais a irmã por identidade `v1`) — baixar o piso de
+  ATR% de volta a 0,006 (pagando o pedágio com o stop largo do [[EXP-0018-stop-largo]]) dobra a
+  população (15 → 33 decisões) e **destrói a expectância** (+0,2861 → +0,0855 R); os quatro dias que
+  só existem com o piso baixo são os quatro negativos. **Veredito formal `negativo`** no corpo do
+  EXP — corrigido para `inconclusivo` só no campo de vocabulário controlado do frontmatter (33/37
+  avaliáveis < 100, 11 dias < 30; ver a nota na própria página). Fecham-se três eixos de geometria
+  medidos no dia (alvo, stop, piso) e nenhum fabricou vantagem: falta vantagem na entrada;
+- **Aposentadas pela via auditada em 2026-09-08T23:34:42Z–23:34:59Z:** `momentum v7` (sucessora
+  `momentum v8`), `mean_reversion v4` e `mean_reversion v5` (sem sucessora) — roster de 16 para 14
+  versões vivas. `--deprecate` passou a **acrescentar** ao `changelog` em vez de sobrescrevê-lo
+  (T3.47c, commit `803f648`): o prefixo de linhagem (`derived_from`/`overrides`/`params_hash`) da
+  variante sobrevive à aposentadoria;
+- **Duas famílias novas entram no catálogo de referência no mesmo dia**
+  (`trendline_breakout`, `sweep_reclaim`), com páginas em
+  [[Strategies|03-TRADING/Estrategias]] — ver [[Estrategias/trendline_breakout-v1|trendline_breakout-v1]] e [[sweep_reclaim-v1]].
+
 Cada experimento significativo (uma hipótese testada sobre uma estratégia, um conjunto de parâmetros, um mercado ou período) ganha seu próprio arquivo `EXP-NNNN-<slug>.md` nesta mesma pasta, numerado sequencialmente a partir de `EXP-0001`.
 
 ## Registro de IDs (decisão conjunta SHADOW, 2026-09-05)
@@ -185,6 +225,13 @@ Cada experimento significativo (uma hipótese testada sobre uma estratégia, um 
 | `EXP-0011` | [[EXP-0011-derivatives-reversao-de-funding\|comprar depois de funding liquidado negativo]] (`derivatives_v1`, 2,0/3,0 ATR, horizonte de 8 h) | T3.33d | **bloqueado por pré-checagem em 2026-09-08** — 5 liquidações negativas em 31 d × 4 mercados; **módulo não escrito**, reexecutar ~2026-10-06. Aberto **contra** a recomendação de [[KB-0022-funding-preve-retorno-a-evidencia-direta-e-fraca]], com a divergência declarada na página |
 | `EXP-0012` | [[EXP-0012-momentum-teto-de-pedagio\|teto de pedágio no momentum]] (`momentum v5`, `atr_pct_min` 0,003 → 0,020 — variante de **parâmetro**, mesmo `code_ref` do pai `v2`) | T3.40 (V1 do [[Strategy Backlog]]) | **aberto e encerrado em 2026-09-08**: ativado 18:57:05Z, **0 decisões em 11 904 barras**, aposentado 19:39:00Z. `result` `inconclusivo` por população vazia; `status` **descartada-por-construcao** |
 | `EXP-0013` | [[EXP-0013-momentum-alvo-3-atr\|alvo de 3 ATR no momentum]] (`momentum v6`, `target_atr` 1,5 → 3,0 com a escada em 3/6/9 — variante de **parâmetro**) | T3.40 (V2 do [[Strategy Backlog]]) | **aberto em 2026-09-08T19:04:56Z**; replay pareado com o pai `v2`, **inconclusivo**, mantido em pesquisa; coorte `prospective` até ~2026-10-08 |
+
+| ID | Experimento | Origem | Estado |
+|---|---|---|---|
+| `EXP-0016` | [[EXP-0016-trendline-breakout\|rompimento e repique de linha de tendência]] (`trendline_breakout v1`, **família nova**; stop estrutural, alvo em largura de canal ou 2 R) | T3.34b (contrato) / T3.34c (implementação e replay) | **aberto e avaliado em 2026-09-08**; ativada 22:29:52Z, replay de 31 d × 4 mercados: 47 avaliáveis, 14 dias, líquida −0,0382 R; **manter em pesquisa, hipótese REENUNCIADA como repique** (K6 dispara: 89,4 % repique) |
+| `EXP-0017` | [[EXP-0017-sweep-reclaim\|comprar a perda falsa de um suporte]] (`sweep_reclaim v1`, **família nova**; stop estrutural, porta de custo por `risk_pct_min`) | T3.45 (contrato) / T3.45b (implementação) | **pré-checagem passou em 2026-09-08** (57 eventos, 17 dias distintos); módulo implementado (commit `a9bacc6`); **nenhuma coorte ativa, replay pendente** |
+| `EXP-0018` | [[EXP-0018-stop-largo\|stop largo: dividir o pedágio pela largura do stop]] (seis braços — `momentum v7`/`v8`, `mean_reversion v4`/`v5`/`v6`/`v7` — variantes de **parâmetro**) | T3.47 | **aberto e avaliado em 2026-09-08**; replay retrospectivo nos seis, seis coortes `prospective` abertas 22:29–22:38Z; **inconclusivo nos seis** (nenhum IC exclui zero); `momentum v7` e `mean_reversion v4`/`v5` **aposentadas** 23:34:42–23:34:59Z |
+| `EXP-0019` | [[EXP-0019-piso-atr\|o piso de ATR%: comprar população de volta e pagar o pedágio com o stop]] (`mean_reversion v8`, mais a irmã por identidade `v1` — variante de **parâmetro**) | T3.47b | **aberto e avaliado em 2026-09-08**; replay retrospectivo, coorte `prospective` da `v8` aberta 23:37:33Z; **inconclusivo pelo limiar editorial (sinal `negativo` no corpo do EXP)** — os quatro dias que só existem com o piso baixo são os quatro negativos |
 
 A reserva está consolidada nos três lugares que a decisão exige: aqui, em `docs/plans/SHADOW-LAB.md` (item 11) e em `docs/plans/M2.md` (T2.8).
 
@@ -241,6 +288,10 @@ Todos os números vêm de `agent_signals` / `signal_outcomes` reais, com o SQL c
 | [[EXP-0011-derivatives-reversao-de-funding]] | `derivatives` v1 — funding liquidado ≤ −0,01 % em 8 h, depois de queda, com estabilização | 2026-09-08 | `2026-09-08` (**pré-checagem**, sem replay) | **inconclusivo / `bloqueado-por-precheck`** — 5 liquidações negativas em 31 d × 4 mercados (ETH e DOGE: 0), teto medido de 158 barras (1,33 %); **módulo não escrito de propósito**; reexecutar ~2026-10-06 |
 | [[EXP-0012-momentum-teto-de-pedagio]] | `momentum` v5 — variante de **parâmetro** (`atr_pct_min` 0,003 → 0,020), mesmo `code_ref` do pai `v2` | 2026-09-08 | `2026-09-08` (**replay**, coorte `replay:72cf5671…`, `read_at` 19:11:21Z) | **inconclusivo por população vazia** — **0 decisões em 11 904 barras**, corte de **100 %**; o piso está acima de todo o ATR% observado ao decidir (máx. 1,756 %). **Aposentada 19:39:00Z** pela via auditada |
 | [[EXP-0013-momentum-alvo-3-atr]] | `momentum` v6 — variante de **parâmetro** (`target_atr` 1,5 → 3,0, escada 3/6/9), mesmo `code_ref` do pai `v2` | 2026-09-08 | `2026-09-08` (**replay** pareado com o pai, `read_at` 19:11–19:15Z) | **inconclusivo** — 195 avaliáveis (≥ 100), **24** dias (< 30); líquida **−0,0513 R** contra −0,1717 R do pai, PF 0,906; Δ pareado **+0,1341 R** em 191 pares com risco inicial idêntico, e **IC por dia [−0,0939; +0,1866] contém zero**. Reduz a perda em 70 %, **não a inverte** |
+| [[EXP-0016-trendline-breakout]] | `trendline_breakout` v1 — **família nova**; rompimento de resistência descendente ou repique em suporte ascendente, stop estrutural | 2026-09-08 | `2026-09-08` (**replay** de dia um, coorte `replay:d78c14d1…`, T3.34c) | **inconclusivo** — 47 avaliáveis (< 100), **14** dias (< 30); bruta +0,1045 R, líquida **−0,0382 R**, PF 0,922; **regra dos 60 % dispara** (89,4 % repique) → hipótese **REENUNCIADA** como repique; manter em pesquisa |
+| [[EXP-0017-sweep-reclaim]] | `sweep_reclaim` v1 — **família nova**; varredura de pivô de mínima com recuperação na mesma barra, stop = mínima varrida | 2026-09-08 | `2026-09-08` (**pré-checagem**, sem replay) | **inconclusivo (população, não edge)** — 57 eventos em 31 d × 4 mercados, 17 dias distintos, cobertura 99,5 %; nenhuma regra de morte disparou; módulo implementado (commit `a9bacc6`), **replay pendente** |
+| [[EXP-0018-stop-largo]] | `momentum` v7/v8, `mean_reversion` v4/v5/v6/v7 — seis variantes de **parâmetro** (stop e escada multiplicados por 1,5 ou 2×) | 2026-09-08 | `2026-09-08` (**replay** retrospectivo pareado com cada pai) | **inconclusivo nos seis** — pedágio cai pelo fator pedido (÷1,48 a ÷2,08) nos seis, mas **nenhum IC exclui zero**; só 12 % da economia sobrevive na melhor população julgável (`momentum v8`); `momentum v7` e `mean_reversion v4`/`v5` **descartadas e aposentadas** |
+| [[EXP-0019-piso-atr]] | `mean_reversion` v8 (mais a irmã por identidade `v1`) — variante de **parâmetro** (`atr_pct_min` 0,008 → 0,006 + stop ×1,5) | 2026-09-08 | `2026-09-08` (**replay** retrospectivo, coorte `prospective` da v8 aberta 23:37:33Z) | **inconclusivo (sinal `negativo` no corpo do EXP)** — 33/37 avaliáveis (< 100), 11 dias (< 30); quatro contrastes pré-registrados negativos; o piso escondia dias ruins, não decisões boas; mantida em pesquisa pela mensurabilidade |
 
 ### O que a próxima extração tem de fazer (achados da revisão da Astra, 2026-09-06)
 

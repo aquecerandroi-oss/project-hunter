@@ -10,12 +10,19 @@ astra: pendente
 status: arquivada
 owner: sexta-feira
 updated: 2026-09-08
-confiança: "alta no diagnóstico de cobertura; baixa em qualquer afirmação de previsibilidade (amostra insuficiente, e isso é o achado)"
+confiança: "?"
 ---
 
 # O Radar prevê alguma coisa? — o que 1,8 dia de anomalias e 176 desfechos cruzados dizem
 
 > Arquivada pela Sexta-feira em 2026-09-08 (T3.46). Decisão: Radar rebaixado a painel até a condição de reabertura em §6; nenhuma estratégia lê o Radar. Ver [[KB-0076-por-que-perdemos-2026-09-08]].
+>
+> **Nota de vocabulário controlado (lint, 2026-09-08):** o campo `confiança` do frontmatter aceita
+> só `anedótico | backtest do autor | estudo revisado | replicado | ?` (`obsidian_lint_rules.py`).
+> Esta KB é diagnóstico de dado próprio, não literatura — mesma categoria de [[KB-0076-por-que-perdemos-2026-09-08]]
+> e [[KB-0077-linhas-de-tendencia]], ambas `"?"`. A nuance real ("alta no diagnóstico de cobertura;
+> baixa em qualquer afirmação de previsibilidade — amostra insuficiente, e isso é o achado") não cabe
+> no vocabulário de uma palavra e fica registrada aqui, por extenso, em vez de forçada no frontmatter.
 
 ## O que provocou a pergunta
 
@@ -124,7 +131,7 @@ de **um** dia. E o score:
   hora dá IC95 `[−0,2169; +0,6006]`, que cruza o zero.
 
 **Nenhum dos seis gates testados sobrevive ao bootstrap.** Detalhe metodológico que vale registrar
-como aprendizado: com blocos de **dia** (o padrão do [[KB-0010]] e do T3.42) só existem **2 blocos**,
+como aprendizado: com blocos de **dia** (o padrão do [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] e do T3.42) só existem **2 blocos**,
 e o gate "sem anomalia" aparece com IC `[+0,3143; +0,4500]` — excluindo o zero. É artefato de ter 2
 blocos com o subconjunto quase inteiro dentro de um deles. Com blocos de **hora** (38 blocos) o mesmo
 gate dá `[−0,2669; +0,7754]`. **Um bootstrap por blocos com 2 blocos não é um bootstrap por blocos**;
@@ -191,7 +198,7 @@ baselines maturarem.
 
 ## Ligações
 
-- [[KB-0010]] — por que o bloco é o dia (e, aqui, por que 2 blocos não servem)
+- [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] — por que o bloco é o dia (e, aqui, por que 2 blocos não servem)
 - `PIPELINE.md` §3 (anomalias), §4b (regime horário e a regra de redistribuir peso de componente
   ausente), §5 (score e degraus)
 - `.claude/state/notes-T3.46.md` — tabelas cruas, comandos e `read_at`
