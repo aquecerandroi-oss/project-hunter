@@ -12,6 +12,7 @@ import { useRowHeight } from "@/hooks/useDensity";
 import { useVirtualizedRows } from "@/hooks/useVirtualizedRows";
 import { loadOpportunitiesAction } from "@/lib/api/opportunities-actions";
 import type { OpportunitiesParams, OpportunitySummaryOut } from "@/lib/api/opportunities-types";
+import type { RadarCoverageOut } from "@/lib/api/radar-coverage-types";
 import { logger } from "@/lib/logger";
 
 export interface OpportunitiesTableProps {
@@ -20,6 +21,8 @@ export interface OpportunitiesTableProps {
   initialCursor: string | null;
   hasFilters: boolean;
   baseParams: OpportunitiesParams;
+  /** T3.46 -- passed straight through to `OpportunitiesEmpty`'s "never lit" note; `undefined` when the page did not fetch it. */
+  coverage?: RadarCoverageOut | null | undefined;
 }
 
 const OVERSCAN = 8;
@@ -37,7 +40,7 @@ function rowId(row: OpportunitySummaryOut): string {
  * table is enough; this one relies on `AutoRefresh` on the page for periodic
  * revalidation, same as `/lab`.
  */
-export function OpportunitiesTable({ orgSlug, initialItems, initialCursor, hasFilters, baseParams }: OpportunitiesTableProps) {
+export function OpportunitiesTable({ orgSlug, initialItems, initialCursor, hasFilters, baseParams, coverage }: OpportunitiesTableProps) {
   const router = useRouter();
   const rowHeight = useRowHeight();
   const [items, setItems] = useState(initialItems);
@@ -109,7 +112,7 @@ export function OpportunitiesTable({ orgSlug, initialItems, initialCursor, hasFi
     }
   }
 
-  if (items.length === 0) return <OpportunitiesEmpty orgSlug={orgSlug} hasFilters={hasFilters} />;
+  if (items.length === 0) return <OpportunitiesEmpty orgSlug={orgSlug} hasFilters={hasFilters} coverage={coverage} />;
 
   return (
     <div className="flex flex-col gap-3">

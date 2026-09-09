@@ -104,6 +104,7 @@ const marketStatus = {
     },
   ],
   markets_monitored_total: 200,
+  exchanges_planned: [],
   updated_at: new Date().toISOString(),
 };
 

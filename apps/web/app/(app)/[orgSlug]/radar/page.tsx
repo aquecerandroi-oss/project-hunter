@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { RadarCoverageStrip } from "@/components/radar/radar-coverage-strip";
 import { RadarError } from "@/components/radar/radar-error";
 import { RadarFilters, type RadarFiltersState } from "@/components/radar/radar-filters";
 import { RadarTable } from "@/components/radar/radar-table";
@@ -9,6 +10,8 @@ import { MAX_ANOMALY_WINDOW_HOURS, buildAnomaliesAggregate, unavailableAnomalies
 import type { AnomaliesAggregate } from "@/lib/api/anomalies-types";
 import { resolveOrgContext } from "@/lib/api/org-context";
 import { listRadar } from "@/lib/api/radar";
+import { getRadarCoverage } from "@/lib/api/radar-coverage";
+import type { RadarCoverageOut } from "@/lib/api/radar-coverage-types";
 import type {
   AnomalyTypeValue,
   MarketRegimeValue,
@@ -114,6 +117,24 @@ async function loadAnomaliesAggregate(): Promise<AnomaliesAggregate> {
   }
 }
 
+/**
+ * T3.46's "Estado do Radar" strip data (`.claude/state/notes-T3.46.md`) --
+ * one read per page load, never on the 5s reconciliation loop (this is a
+ * diagnostic snapshot, not a row that needs to move in real time). A failed
+ * read is logged and rendered as `RadarCoverageStrip`'s own honest
+ * "indisponível" fallback, never a 500 for the whole page: the radar table
+ * below is still real data even if this strip cannot load.
+ */
+async function loadRadarCoverage(): Promise<RadarCoverageOut | null> {
+  try {
+    return await getRadarCoverage();
+  } catch (error) {
+    const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
+    logger.error("radar_coverage_load_failed", { error: reason });
+    return null;
+  }
+}
+
 /** `/[orgSlug]/radar` (docs/plans/M2.md T2.7) -- the cross-market opportunity radar. */
 export default async function RadarPage({ params, searchParams }: RadarPageProps) {
   const { orgSlug } = await params;
@@ -124,7 +145,11 @@ export default async function RadarPage({ params, searchParams }: RadarPageProps
   const { filters, sort, order } = parseFilters(sp);
   const radarParams = toRadarParams(filters, sort, order, membership.organization.id);
 
-  const [radarLoad, anomaliesAggregate] = await Promise.all([loadRadarPage(radarParams), loadAnomaliesAggregate()]);
+  const [radarLoad, anomaliesAggregate, coverage] = await Promise.all([
+    loadRadarPage(radarParams),
+    loadAnomaliesAggregate(),
+    loadRadarCoverage(),
+  ]);
 
   const hasFilters =
     filters.q !== "" ||
@@ -140,6 +165,7 @@ export default async function RadarPage({ params, searchParams }: RadarPageProps
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-semibold text-fg">Radar</h1>
+      <RadarCoverageStrip coverage={coverage} />
       <RadarFilters state={filters} hasOrg />
       {!radarLoad.ok ? (
         <RadarError reason={radarLoad.reason} />
@@ -152,6 +178,7 @@ export default async function RadarPage({ params, searchParams }: RadarPageProps
           hasFilters={hasFilters}
           baseParams={radarParams}
           initialAnomalies={anomaliesAggregate}
+          coverage={coverage}
         />
       )}
     </div>

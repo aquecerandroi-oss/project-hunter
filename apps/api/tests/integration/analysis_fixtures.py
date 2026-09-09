@@ -225,6 +225,77 @@ async def seed_anomaly(
         return anomaly.id
 
 
+def hourly_regime_features(*, score: str = "62.00", confidence: str = "0.8000") -> dict[str, Any]:
+    """A ``regime_hourly_v1`` ``supporting_features`` payload, shaped exactly
+    like ``RegimeSnapshot.as_wire()``
+    (``packages/indicators/hunter_indicators/regime/hourly_snapshot.py``) —
+    the same fields ``services/scanner-worker/tests/test_regime_job.py
+    ::test_the_row_carries_the_whole_decomposition`` asserts a real row holds,
+    every number a canonical decimal *string* (T3.43b:
+    ``hunter_core.strategies.canonical.canonical_json`` never emits a JSON
+    number). Used by ``seed_regime(classifier_version="regime_hourly_v1", ...)``
+    so the T3.43b integration tests exercise the real row shape, not one
+    invented for this file.
+    """
+    return {
+        "engine": "regime_hourly",
+        "version": "regime_hourly_v1",
+        "ts": "2026-09-08T15:00:00Z",
+        "trend": "up",
+        "vol_regime": "normal",
+        "breadth_pct": "54.32",
+        "funding_avg": "0.00008",
+        "drawdown_pct": "3.10",
+        "score_0_100": score,
+        "confidence": confidence,
+        "regime": "BTC_BULL",
+        "components": [
+            {
+                "name": "trend",
+                "raw": "0.004",
+                "normalized": "100",
+                "weight": "0.35",
+                "contribution": "35.00",
+                "reason": None,
+            },
+            {
+                "name": "breadth",
+                "raw": "54.32",
+                "normalized": "54.32",
+                "weight": "0.25",
+                "contribution": "13.58",
+                "reason": None,
+            },
+            {
+                "name": "volatility",
+                "raw": "40",
+                "normalized": "60",
+                "weight": "0.20",
+                "contribution": "12.00",
+                "reason": None,
+            },
+            {
+                "name": "drawdown",
+                "raw": "3.10",
+                "normalized": "84.50",
+                "weight": "0.10",
+                "contribution": "8.45",
+                "reason": None,
+            },
+            {
+                "name": "funding",
+                "raw": "0.00008",
+                "normalized": None,
+                "weight": "0.10",
+                "contribution": None,
+                "reason": "funding_unavailable",
+            },
+        ],
+        "inputs": {"closes": 745},
+        "reasons": [],
+    }
+
+
 async def seed_regime(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -234,6 +305,7 @@ async def seed_regime(
     start_time: datetime | None = None,
     end_time: datetime | None = None,
     supporting_features: dict[str, Any] | None = None,
+    classifier_version: str | None = None,
 ) -> uuid.UUID:
     """``market_regimes`` has only two scopes and ``uq_market_regimes_open_per_scope``
     allows at most one open (``end_time IS NULL``) row per scope in the whole
@@ -258,6 +330,7 @@ async def seed_regime(
             supporting_features=(
                 supporting_features if supporting_features is not None else _JSON_EMPTY
             ),
+            classifier_version=classifier_version,
         )
         session.add(row)
         await session.commit()

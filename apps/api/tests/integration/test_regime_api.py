@@ -14,7 +14,7 @@ import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import pytest_asyncio
@@ -209,6 +209,183 @@ async def test_regime_history_pagination_round_trip(
         if cursor is None:
             break
     assert set(ids).issubset(seen)
+
+
+async def _find_in_regime_history(
+    client: httpx.AsyncClient, headers: dict[str, str], *, scope: RegimeScope, regime_id: str
+) -> dict[str, Any]:
+    """Walks ``/regime/history?scope=...`` page by page until ``regime_id`` is
+    found — never ``GET /regime`` (``current_per_scope`` returns only the
+    single newest ``start_time`` per scope, and this shared, session-scoped
+    test database already holds far-future ``BTC`` rows from the
+    ``is_stale``-on-``regime_v0`` tests above, which would always outrank a
+    realistic "a few hours ago" hourly row). ``is_stale`` is computed by the
+    exact same ``services/regime.py::_to_out`` for both endpoints, so history
+    proves the rule identically.
+    """
+    cursor: str | None = None
+    for _ in range(50):
+        params = f"scope={scope.value}&limit=25" + (f"&cursor={cursor}" if cursor else "")
+        page = await client.get(f"/api/v1/regime/history?{params}", headers=headers)
+        assert page.status_code == 200, page.text
+        body = page.json()
+        for item in body["items"]:
+            if item["id"] == regime_id:
+                return item
+        cursor = body["next_cursor"]
+        if cursor is None:
+            break
+    raise AssertionError(f"regime {regime_id} not found in history")
+
+
+@contextlib.asynccontextmanager
+async def _regime_last_ts_heartbeat(
+    redis_client: redis_asyncio.Redis, *, ts: datetime
+) -> AsyncGenerator[None]:
+    """A fresh ``hb:scanner:*`` heartbeat carrying ``regime_last_ts`` — the
+    scanner-only field the T3.43b staleness rule reads raw
+    (``routers/regime.py::_newest_regime_last_ts``), not exposed by
+    ``WorkerHeartbeatOut``. Also carries ``ts`` so the same heartbeat can
+    stand in for :func:`_scanner_heartbeat` where a test needs both signals.
+    """
+    key = keys.heartbeat("scanner", f"scanner-{uuid.uuid4().hex[:8]}")
+    await redis_client.hset(
+        key,
+        mapping={
+            "ts": datetime.now(UTC).isoformat(),
+            "errors": "0",
+            "regime_last_ts": ts.isoformat(),
+        },
+    )
+    try:
+        yield
+    finally:
+        await redis_client.delete(key)
+
+
+async def test_get_current_regime_hourly_row_is_not_stale_with_a_fresh_heartbeat(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    redis_client: redis_asyncio.Redis,
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """T3.43b: an hourly (``regime_hourly_v1``) row is *always* closed by
+    construction (``end_time = start_time + 1h``) — the ``regime_v0`` rule
+    (closed => stale) would mark it stale forever. A recent hour with a fresh
+    ``regime_last_ts`` heartbeat must read ``is_stale: false``.
+    """
+    now = datetime.now(UTC)
+    end_time = now - timedelta(minutes=10)
+    async with _regime_last_ts_heartbeat(redis_client, ts=now - timedelta(minutes=1)):
+        regime_id = await fx.seed_regime(
+            session_factory,
+            scope=RegimeScope.BTC,
+            regime=MarketRegime.BTC_BULL,
+            confidence=Decimal("0.8000"),
+            start_time=end_time - timedelta(hours=1),
+            end_time=end_time,
+            supporting_features=fx.hourly_regime_features(),
+            classifier_version="regime_hourly_v1",
+        )
+        actor: Actor = make_actor("regime-hourly-fresh")
+
+        row = await _find_in_regime_history(
+            client, actor.headers, scope=RegimeScope.BTC, regime_id=str(regime_id)
+        )
+
+    assert row["is_stale"] is False
+    assert row["identity"] == "regime_hourly_v1"
+    assert row["score"] == "62.00"
+    assert row["as_of"] is not None
+    names = [c["name"] for c in row["components"]]
+    assert names == ["trend", "breadth", "volatility", "drawdown", "funding"]
+    funding = next(c for c in row["components"] if c["name"] == "funding")
+    assert funding["normalized"] is None
+    assert funding["weight"] == "0.10"
+
+
+async def test_get_current_regime_hourly_row_is_stale_when_the_hour_is_old(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    redis_client: redis_asyncio.Redis,
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """An hourly row more than two hours past its own ``end_time`` reads
+    stale even with a heartbeat confirmed fresh right now — the row itself
+    has aged out, and a live producer today does not revive an old hour."""
+    now = datetime.now(UTC)
+    end_time = now - timedelta(hours=3)
+    async with _regime_last_ts_heartbeat(redis_client, ts=now - timedelta(minutes=1)):
+        regime_id = await fx.seed_regime(
+            session_factory,
+            scope=RegimeScope.BTC,
+            regime=MarketRegime.BTC_BULL,
+            start_time=end_time - timedelta(hours=1),
+            end_time=end_time,
+            supporting_features=fx.hourly_regime_features(),
+            classifier_version="regime_hourly_v1",
+        )
+        actor: Actor = make_actor("regime-hourly-old-hour")
+
+        row = await _find_in_regime_history(
+            client, actor.headers, scope=RegimeScope.BTC, regime_id=str(regime_id)
+        )
+
+    assert row["is_stale"] is True
+
+
+async def test_get_current_regime_hourly_row_is_stale_without_a_regime_heartbeat(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """A recent hour with **no** ``regime_last_ts`` heartbeat at all (the
+    producer's own liveness signal, distinct from the generic scanner
+    ``ts``) reads stale — the row's own recency is not, by itself, proof the
+    pipeline is still writing.
+    """
+    now = datetime.now(UTC)
+    end_time = now - timedelta(minutes=5)
+    regime_id = await fx.seed_regime(
+        session_factory,
+        scope=RegimeScope.BTC,
+        regime=MarketRegime.BTC_BULL,
+        start_time=end_time - timedelta(hours=1),
+        end_time=end_time,
+        supporting_features=fx.hourly_regime_features(),
+        classifier_version="regime_hourly_v1",
+    )
+    actor: Actor = make_actor("regime-hourly-no-heartbeat")
+
+    row = await _find_in_regime_history(
+        client, actor.headers, scope=RegimeScope.BTC, regime_id=str(regime_id)
+    )
+
+    assert row["is_stale"] is True
+
+
+async def test_get_current_regime_v0_row_carries_none_for_the_hourly_fields(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    make_actor: Callable[[str], Actor],
+) -> None:
+    """A ``regime_v0`` row (no ``classifier_version``, the default the T2.6
+    classifier writes) never fabricates the hourly-only fields."""
+    regime_id = await fx.seed_regime(
+        session_factory,
+        scope=RegimeScope.GLOBAL,
+        regime=MarketRegime.SIDEWAYS,
+    )
+    actor: Actor = make_actor("regime-v0-additive-fields")
+
+    response = await client.get("/api/v1/regime", headers=actor.headers)
+
+    assert response.status_code == 200, response.text
+    row = next(i for i in response.json()["items"] if i["id"] == str(regime_id))
+    assert row["as_of"] is None
+    assert row["score"] is None
+    assert row["components"] == []
+    assert row["identity"] is None
 
 
 async def test_regime_history_garbage_cursor_returns_422(

@@ -2,6 +2,7 @@
 import type { components } from "@hunter/shared-types/api";
 
 export type RegimeOut = components["schemas"]["RegimeOut"];
+export type RegimeComponentOut = components["schemas"]["RegimeComponentOut"];
 export type RegimeCurrentOut = components["schemas"]["RegimeCurrentOut"];
 export type RegimeHistoryPage = components["schemas"]["RegimeHistoryPage"];
 export type RegimeScopeValue = components["schemas"]["RegimeScope"];

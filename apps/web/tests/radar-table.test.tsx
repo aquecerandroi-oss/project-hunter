@@ -32,6 +32,7 @@ afterEach(() => {
 
 import { RadarTable } from "@/components/radar/radar-table";
 import type { AnomaliesAggregate } from "@/lib/api/anomalies-types";
+import { makeRadarCoverage } from "@/tests/fixtures/radar-coverage";
 import { makeRadarItem } from "@/tests/fixtures/radar";
 
 const baseParams = { org_id: "org-1", sort: "score" as const, order: "desc" as const, limit: 200 };
@@ -165,6 +166,23 @@ describe("RadarTable: honest empty states (distinct from a filtered miss)", () =
       />,
     );
     expect(screen.getByText(/Nenhum episódio encontrado para estes filtros/)).toBeInTheDocument();
+  });
+
+  it("adds the T3.46 'never lit' note once a coverage read is passed through, without changing the base message", () => {
+    render(
+      <RadarTable
+        orgSlug="acme"
+        initialItems={[]}
+        initialCursor={null}
+        initialAsOf="2026-09-06T08:00:00Z"
+        hasFilters={false}
+        baseParams={baseParams}
+        initialAnomalies={anomalies()}
+        coverage={makeRadarCoverage()}
+      />,
+    );
+    expect(screen.getByText(/Nenhuma oportunidade pontuada ainda/)).toBeInTheDocument();
+    expect(screen.getByText(/nenhum episódio passou de NORMAL/)).toBeInTheDocument();
   });
 });
 

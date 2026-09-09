@@ -211,6 +211,13 @@ export function makeRegime(overrides: Partial<RegimeOut> = {}): RegimeOut {
     classifier_version: "classifier_v1",
     supporting_features: {},
     is_stale: false,
+    // T3.43b: additive, hourly-engine-only fields -- `null`/`[]` here is the
+    // honest default for every fixture that is not exercising the hourly
+    // decomposition itself.
+    as_of: null,
+    score: null,
+    components: [],
+    identity: null,
     ...overrides,
   };
 }

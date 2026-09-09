@@ -15,6 +15,7 @@ import { useRadarPage } from "@/hooks/useRadarPage";
 import { useRealtime } from "@/hooks/useRealtime";
 import { useVirtualizedRows } from "@/hooks/useVirtualizedRows";
 import type { AnomaliesAggregate } from "@/lib/api/anomalies-types";
+import type { RadarCoverageOut } from "@/lib/api/radar-coverage-types";
 import type { RadarItemOut, RadarParams, RadarSortKey } from "@/lib/api/radar-types";
 
 export interface RadarTableProps {
@@ -26,6 +27,8 @@ export interface RadarTableProps {
   /** The exact filters (minus `cursor`) used for the initial server fetch -- reused for "load more" and every reconciliation. */
   baseParams: RadarParams;
   initialAnomalies: AnomaliesAggregate;
+  /** T3.46 -- passed straight through to `RadarEmpty`'s "never lit" note; `undefined` when the page did not fetch it. */
+  coverage?: RadarCoverageOut | null | undefined;
 }
 
 const OVERSCAN = 8;
@@ -56,7 +59,7 @@ function ReconcileErrorBanner({ reconcileError }: { reconcileError: string | nul
 }
 
 /** `/radar`'s table (brief line 9): virtualized, server-filtered/sorted, cursor-paginated, reconciled on an interval since no realtime publisher exists yet. */
-export function RadarTable({ orgSlug, initialItems, initialCursor, initialAsOf, hasFilters, baseParams, initialAnomalies }: RadarTableProps) {
+export function RadarTable({ orgSlug, initialItems, initialCursor, initialAsOf, hasFilters, baseParams, initialAnomalies, coverage }: RadarTableProps) {
   const { getToken } = useAuth();
   const router = useRouter();
   const rowHeight = useRowHeight();
@@ -117,7 +120,7 @@ export function RadarTable({ orgSlug, initialItems, initialCursor, initialAsOf, 
     router.push(`${window.location.pathname}?${params.toString()}`);
   }
 
-  if (items.length === 0) return <RadarEmpty orgSlug={orgSlug} hasFilters={hasFilters} />;
+  if (items.length === 0) return <RadarEmpty orgSlug={orgSlug} hasFilters={hasFilters} coverage={coverage} />;
 
   return (
     <div className="flex flex-col gap-3">

@@ -650,6 +650,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/radar/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How much of the Radar exists yet (coverage, baselines, detectors)
+         * @description T3.46 (``.claude/state/notes-T3.46.md``): the Radar/Opportunities pages
+         *     read this to say, in numbers, why the list has never had a candidate —
+         *     global, not tenant-scoped (same reasoning as ``list_radar`` above), so no
+         *     ``org_id`` is accepted here.
+         */
+        get: operations["get_radar_coverage_api_v1_radar_coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/regime": {
         parameters: {
             query?: never;
@@ -1897,6 +1920,11 @@ export interface components {
         MarketStatusOut: {
             /** Exchanges */
             exchanges: components["schemas"]["MarketStatusExchangeOut"][];
+            /**
+             * Exchanges Planned
+             * @default []
+             */
+            exchanges_planned: string[];
             /** Markets Monitored Total */
             markets_monitored_total: number;
             /**
@@ -2806,6 +2834,44 @@ export interface components {
             /** R Net Evaluable Outcomes */
             r_net_evaluable_outcomes: number;
         };
+        /** RadarCoverageOut */
+        RadarCoverageOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Baseline Gate V2 Pct */
+            baseline_gate_v2_pct: string | null;
+            /** Baselines Under Construction */
+            baselines_under_construction: number;
+            /** Baselines Usable */
+            baselines_usable: number;
+            /** Bootstrap Pointer */
+            bootstrap_pointer: string | null;
+            /** Detectors */
+            detectors: components["schemas"]["RadarDetectorOut"][];
+            /** First Anomaly At */
+            first_anomaly_at: string | null;
+            /** Markets Monitored */
+            markets_monitored: number;
+            /** Markets With Anomaly */
+            markets_with_anomaly: number;
+            /** Max Score Ever */
+            max_score_ever: string | null;
+        };
+        /**
+         * RadarDetectorOut
+         * @description One of the twelve ``AnomalyType`` members against what it has actually
+         *     produced in the last 31 days, plus why it is silent when it is.
+         */
+        RadarDetectorOut: {
+            /** Disarmed Reason */
+            disarmed_reason?: string | null;
+            /** Rows 31D */
+            rows_31d: number;
+            type: components["schemas"]["AnomalyType"];
+        };
         /**
          * RadarItemOut
          * @description One row of the radar table.
@@ -2895,6 +2961,23 @@ export interface components {
             /** Value */
             value: string | null;
         };
+        /**
+         * RegimeComponentOut
+         * @description One line of the hourly engine's decomposition
+         *     (``hunter_indicators.regime.hourly_snapshot.ScoreComponent``), trimmed to
+         *     what the tile shows — ``raw``/``reason`` stay inside
+         *     ``RegimeOut.supporting_features`` for a reader who wants the full picture.
+         */
+        RegimeComponentOut: {
+            /** Contribution */
+            contribution?: string | null;
+            /** Name */
+            name: string;
+            /** Normalized */
+            normalized?: string | null;
+            /** Weight */
+            weight: string;
+        };
         /** RegimeCurrentOut */
         RegimeCurrentOut: {
             /**
@@ -2914,8 +2997,15 @@ export interface components {
         };
         /** RegimeOut */
         RegimeOut: {
+            /** As Of */
+            as_of?: string | null;
             /** Classifier Version */
             classifier_version?: string | null;
+            /**
+             * Components
+             * @default []
+             */
+            components: components["schemas"]["RegimeComponentOut"][];
             /** Confidence */
             confidence?: string | null;
             /** End Time */
@@ -2925,10 +3015,14 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Identity */
+            identity?: string | null;
             /** Is Stale */
             is_stale: boolean;
             regime: components["schemas"]["MarketRegime"];
             scope: components["schemas"]["RegimeScope"];
+            /** Score */
+            score?: string | null;
             /**
              * Start Time
              * Format: date-time
@@ -5455,6 +5549,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_radar_coverage_api_v1_radar_coverage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RadarCoverageOut"];
                 };
             };
         };

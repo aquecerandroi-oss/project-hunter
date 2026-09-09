@@ -13,6 +13,7 @@ afterEach(() => {
 });
 
 import { OpportunitiesTable } from "@/components/opportunities/opportunities-table";
+import { makeRadarCoverage } from "@/tests/fixtures/radar-coverage";
 import { makeOpportunitySummary } from "@/tests/fixtures/radar";
 
 const baseParams = { org_id: "org-1", limit: 200 };
@@ -38,5 +39,20 @@ describe("OpportunitiesTable: the compact index shares chips with /radar", () =>
   it("says nothing matched the filters when filtered and empty", () => {
     render(<OpportunitiesTable orgSlug="acme" initialItems={[]} initialCursor={null} hasFilters baseParams={baseParams} />);
     expect(screen.getByText(/Nenhuma oportunidade encontrada para estes filtros/)).toBeInTheDocument();
+  });
+
+  it("adds the T3.46 'never lit' note on the filtered empty state (the 'Só HOT' quick filter always lands here today) once coverage is passed through", () => {
+    render(
+      <OpportunitiesTable
+        orgSlug="acme"
+        initialItems={[]}
+        initialCursor={null}
+        hasFilters
+        baseParams={baseParams}
+        coverage={makeRadarCoverage()}
+      />,
+    );
+    expect(screen.getByText(/Nenhuma oportunidade encontrada para estes filtros/)).toBeInTheDocument();
+    expect(screen.getByText(/nenhum episódio passou de NORMAL/)).toBeInTheDocument();
   });
 });

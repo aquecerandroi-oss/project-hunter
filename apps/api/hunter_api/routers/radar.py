@@ -15,11 +15,12 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from hunter_api.auth.rbac import CurrentPrincipal
+from hunter_api.deps import get_redis
 from hunter_api.repositories.base import MAX_PAGE_SIZE
 from hunter_api.repositories.radar import RadarFilters
 from hunter_api.routers.radar_common import analysis_scope
@@ -31,10 +32,17 @@ from hunter_api.schemas.radar import (
     RadarStatusFilter,
     SortOrder,
 )
+from hunter_api.schemas.radar_coverage import RadarCoverageOut
 from hunter_api.services.radar import build_radar_page, resolve_status_tokens
+from hunter_api.services.radar_coverage import build_radar_coverage
 from hunter_core.domain.enums import AnomalyType, MarketRegime, OpportunityStage
 
+if TYPE_CHECKING:
+    import redis.asyncio as redis_asyncio
+
 router = APIRouter(prefix="/api/v1/radar", tags=["radar"])
+
+Redis = Annotated["redis_asyncio.Redis", Depends(get_redis)]
 
 
 @router.get("", response_model=RadarPage, summary="List the opportunity radar")
@@ -78,3 +86,19 @@ async def list_radar(
             cursor=cursor,
             org_derivation=scope.org_derivation,
         )
+
+
+@router.get(
+    "/coverage",
+    response_model=RadarCoverageOut,
+    summary="How much of the Radar exists yet (coverage, baselines, detectors)",
+)
+async def get_radar_coverage(
+    request: Request, principal: CurrentPrincipal, redis: Redis
+) -> RadarCoverageOut:
+    """T3.46 (``.claude/state/notes-T3.46.md``): the Radar/Opportunities pages
+    read this to say, in numbers, why the list has never had a candidate —
+    global, not tenant-scoped (same reasoning as ``list_radar`` above), so no
+    ``org_id`` is accepted here."""
+    async with analysis_scope(request, principal) as scope:
+        return await build_radar_coverage(scope.session, redis)

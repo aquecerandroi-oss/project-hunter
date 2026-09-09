@@ -4,10 +4,13 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { OpportunitiesError } from "@/components/opportunities/opportunities-error";
 import { OpportunitiesFilters, type OpportunitiesFiltersState } from "@/components/opportunities/opportunities-filters";
 import { OpportunitiesTable } from "@/components/opportunities/opportunities-table";
+import { RadarCoverageStrip } from "@/components/radar/radar-coverage-strip";
 import { DEFAULT_AUTO_REFRESH_INTERVAL_MS } from "@/lib/auto-refresh-interval";
 import { isApiError } from "@/lib/api-error";
 import { listOpportunities } from "@/lib/api/opportunities";
 import type { OpportunitiesParams, OpportunityListPage } from "@/lib/api/opportunities-types";
+import { getRadarCoverage } from "@/lib/api/radar-coverage";
+import type { RadarCoverageOut } from "@/lib/api/radar-coverage-types";
 import type { OpportunityStage, OpportunityStatus } from "@/lib/api/radar-types";
 import { resolveOrgContext } from "@/lib/api/org-context";
 import { logger } from "@/lib/logger";
@@ -61,6 +64,17 @@ async function loadOpportunities(params: OpportunitiesParams): Promise<Opportuni
   }
 }
 
+/** Same read/fallback contract as `radar/page.tsx::loadRadarCoverage` (T3.46) -- shared strip, independent fetch per page. */
+async function loadRadarCoverage(): Promise<RadarCoverageOut | null> {
+  try {
+    return await getRadarCoverage();
+  } catch (error) {
+    const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
+    logger.error("opportunities_coverage_load_failed", { error: reason });
+    return null;
+  }
+}
+
 /** `/[orgSlug]/opportunities` (docs/plans/M2.md T2.7) -- the compact opportunities index; the full "why" panel lives at `/opportunities/[id]`. */
 export default async function OpportunitiesPage({ params, searchParams }: OpportunitiesPageProps) {
   const { orgSlug } = await params;
@@ -71,13 +85,14 @@ export default async function OpportunitiesPage({ params, searchParams }: Opport
   const filters = parseFilters(sp);
   const opportunitiesParams = toParams(filters, membership.organization.id);
 
-  const load = await loadOpportunities(opportunitiesParams);
+  const [load, coverage] = await Promise.all([loadOpportunities(opportunitiesParams), loadRadarCoverage()]);
   const hasFilters = filters.q !== "" || filters.scoreMin !== "" || filters.status.length > 0 || filters.stage.length > 0 || filters.exchange !== "";
 
   return (
     <div className="flex flex-col gap-4">
       <AutoRefresh intervalMs={DEFAULT_AUTO_REFRESH_INTERVAL_MS} />
       <h1 className="text-xl font-semibold text-fg">Opportunities</h1>
+      <RadarCoverageStrip coverage={coverage} />
       <OpportunitiesFilters state={filters} />
       {!load.ok ? (
         <OpportunitiesError reason={load.reason} />
@@ -88,6 +103,7 @@ export default async function OpportunitiesPage({ params, searchParams }: Opport
           initialCursor={load.page.next_cursor ?? null}
           hasFilters={hasFilters}
           baseParams={opportunitiesParams}
+          coverage={coverage}
         />
       )}
     </div>

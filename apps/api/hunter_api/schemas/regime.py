@@ -23,6 +23,19 @@ DecimalStr = Annotated[
 ]
 
 
+class RegimeComponentOut(BaseModel):
+    """One line of the hourly engine's decomposition
+    (``hunter_indicators.regime.hourly_snapshot.ScoreComponent``), trimmed to
+    what the tile shows — ``raw``/``reason`` stay inside
+    ``RegimeOut.supporting_features`` for a reader who wants the full picture.
+    """
+
+    name: str
+    normalized: DecimalStr | None = None
+    weight: DecimalStr
+    contribution: DecimalStr | None = None
+
+
 class RegimeOut(BaseModel):
     id: uuid.UUID
     scope: RegimeScope
@@ -33,8 +46,8 @@ class RegimeOut(BaseModel):
     classifier_version: str | None = None
     supporting_features: dict[str, Any]
     is_stale: bool
-    """``true`` in either of two cases, both meaning "do not read this as the
-    live regime":
+    """``regime_v0`` (``classifier_version`` not ``regime_hourly_v1…``): ``true``
+    in either of two cases, both meaning "do not read this as the live regime":
 
     - the row is **closed** (``end_time`` is not ``null``) and is only being
       shown because the caller asked for "current" and nothing newer exists;
@@ -44,7 +57,36 @@ class RegimeOut(BaseModel):
       not that anything is still watching it — a scanner that died right after
       opening it would otherwise read fresh forever.
 
-    ``false`` therefore means "open line **and** a scanner confirmed alive"."""
+    ``regime_hourly_v1…`` rows are *always* closed by construction
+    (``end_time = start_time + 1h``), so the rule above would read them
+    permanently stale — honest about the hour having passed, but a defect on a
+    tile whose newest row is exactly what a live hourly producer keeps writing
+    (T3.43b). For these, ``true`` means the row's own hour is more than two
+    hours past its ``end_time`` **or** the producer's ``regime_last_ts``
+    heartbeat has not confirmed a write that recently
+    (``services/regime.py::HOURLY_STALE_AFTER``)."""
+    as_of: datetime | None = None
+    """The hour this row governs — the same instant as ``start_time``, under
+    its own name because "as of" is the question a reader of the hourly
+    decomposition asks, not "when did this transition begin" (``start_time``'s
+    meaning for ``regime_v0``). ``None`` for every row that is not
+    ``regime_hourly_v1…``."""
+    score: DecimalStr | None = None
+    """``supporting_features.score_0_100`` (0-100) from the hourly engine's
+    weighted decomposition. ``None`` for a non-hourly row, and also ``None``
+    for an hourly row the engine itself could not score (too little of the
+    component weight was available that hour) — never fabricated."""
+    components: list[RegimeComponentOut] = []
+    """The hourly engine's five-line decomposition (trend, breadth,
+    volatility, drawdown, funding), each with its ``normalized``/``weight``/
+    ``contribution``. Empty for every row that is not ``regime_hourly_v1…``."""
+    identity: str | None = None
+    """The hourly engine's own version string (``regime_hourly_v1`` or a
+    ``+<digest>`` threshold-override variant) — the same value as
+    ``classifier_version`` for that engine, exposed under its own name so a
+    reader can key off "this row carries the hourly decomposition" without
+    pattern-matching ``classifier_version``'s prefix itself. ``None`` for
+    ``regime_v0``."""
 
 
 class RegimeCurrentOut(BaseModel):
