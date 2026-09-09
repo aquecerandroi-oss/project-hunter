@@ -501,3 +501,6 @@ parcialmente no mesmo conjunto de leituras).
    do mínimo agregado; mantive a comparação porque é uma linha barata e documenta a invariante, mas
    se ela algum dia disparar de verdade (`floor <= aggregate_min`), é sinal de um bug em outro lugar
    (o script Lua de `coverage_publish`, provavelmente), não deste código.
+
+## §3 — prova pós-deploy (orquestrador, 2026-09-09 ~01:1x BRT, coletores + scanner em 5ceb… HEAD após T3.46g)
+Heartbeat ORDERBOOK_IMBALANCE, de 200 mercados, minuto a minuto: `feature_after_cut` = 8, 5, 9, 2, 4, 9, 7, 3 (antes da T3.46d: 183; após T3.46f: 42–77). **Meta < 10/200 atingida.** `baselines_under_construction` 115–121, `baseline_absent` 72–77 (o livro agora entra na baseline em ~195/200 mercados; a maturação até `sample_size 120` é questão de horas).
