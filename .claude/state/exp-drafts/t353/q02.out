@@ -1,0 +1,296 @@
+BEGIN
+Border style is 2.
++-------------------------------+----------------------------+
+|          read_at_utc          |        read_at_brt         |
++-------------------------------+----------------------------+
+| 2026-09-09 03:05:45.954216+00 | 2026-09-09 00:05:45.954216 |
++-------------------------------+----------------------------+
+(1 row)
+
+
+== 2a. ITEM 4 DO BRIEF: expectancy por rotulo de regime, por familia x coorte ==
++--------------------+-------------+-----------------+------+------------+------+---------------+-------------+-----------+---------+------------+----------+
+|      familia       |   coorte    |     regime      |  n   | pct_da_pop | dias | exp_liquida_r | exp_bruta_r | pedagio_r | soma_r  | acerto_pct |    pf    |
++--------------------+-------------+-----------------+------+------------+------+---------------+-------------+-----------+---------+------------+----------+
+| breakout           | replay      | BTC_BULL        |    4 |       50.0 |    3 |       -0.2573 |     -0.1647 |    0.0908 |   -1.03 |       50.0 |    0.515 |
+| breakout           | replay      | HIGH_VOLATILITY |    2 |       25.0 |    2 |       -0.2208 |     -0.1407 |    0.0785 |   -0.44 |       50.0 |    0.557 |
+| breakout           | replay      | BTC_BEAR        |    1 |       12.5 |    1 |       -0.0956 |      0.0060 |    0.0991 |   -0.10 |        0.0 |          |
+| breakout           | replay      | SIDEWAYS        |    1 |       12.5 |    1 |        0.9186 |      1.0299 |    0.1104 |    0.92 |      100.0 |          |
+| mean_reversion     | prospective | SIDEWAYS        |   84 |      100.0 |    1 |        0.1483 |      0.2970 |    0.1468 |   12.46 |       45.2 |    1.338 |
+| mean_reversion     | replay      | HIGH_VOLATILITY |  113 |       77.4 |    6 |        0.2142 |      0.3544 |    0.1387 |   24.21 |       18.6 |    1.647 |
+| mean_reversion     | replay      | BTC_BULL        |   16 |       11.0 |    2 |        0.6964 |      0.8771 |    0.1785 |   11.14 |       62.5 |    4.176 |
+| mean_reversion     | replay      | SIDEWAYS        |   13 |        8.9 |    1 |       -0.0609 |      0.1468 |    0.2076 |   -0.79 |       30.8 |    0.866 |
+| mean_reversion     | replay      | LOW_VOLATILITY  |    4 |        2.7 |    1 |       -0.1804 |      0.0395 |    0.2154 |   -0.72 |       25.0 |    0.553 |
+| momentum           | prospective | SIDEWAYS        | 1422 |       77.2 |    3 |       -0.2108 |     -0.0694 |    0.1410 | -299.82 |       33.1 |    0.577 |
+| momentum           | prospective | LOW_VOLATILITY  |  382 |       20.7 |    1 |       -0.1961 |     -0.0398 |    0.1564 |  -74.93 |       38.0 |    0.603 |
+| momentum           | prospective | BTC_BULL        |   38 |        2.1 |    1 |       -0.4117 |     -0.2562 |    0.1552 |  -15.64 |       34.2 |    0.360 |
+| momentum           | replay      | HIGH_VOLATILITY |  282 |       33.7 |    8 |        0.1004 |      0.2624 |    0.1614 |   28.30 |       31.6 |    1.259 |
+| momentum           | replay      | BTC_BULL        |  193 |       23.1 |    8 |       -0.1409 |      0.0805 |    0.2203 |  -27.19 |       29.0 |    0.702 |
+| momentum           | replay      | SIDEWAYS        |  165 |       19.7 |    8 |       -0.3530 |     -0.1290 |    0.2239 |  -58.25 |       14.5 |    0.396 |
+| momentum           | replay      | BTC_BEAR        |  108 |       12.9 |    4 |       -0.0631 |      0.1773 |    0.2402 |   -6.82 |       21.3 |    0.848 |
+| momentum           | replay      | LOW_VOLATILITY  |   49 |        5.9 |    3 |       -0.4683 |     -0.2162 |    0.2521 |  -22.95 |       14.3 |    0.226 |
+| momentum           | replay      | UNKNOWN         |   40 |        4.8 |    3 |        0.0209 |      0.2825 |    0.2589 |    0.83 |       25.0 |    1.075 |
+| session_orb        | prospective | SIDEWAYS        |    1 |      100.0 |    1 |       -1.0522 |     -0.9772 |    0.0761 |   -1.05 |        0.0 |          |
+| session_orb        | replay      | HIGH_VOLATILITY |    8 |       40.0 |    4 |       -0.0904 |      0.0376 |    0.1281 |   -0.72 |       12.5 |    0.844 |
+| session_orb        | replay      | BTC_BULL        |    7 |       35.0 |    4 |       -0.3464 |     -0.2025 |    0.1451 |   -2.42 |       14.3 |    0.456 |
+| session_orb        | replay      | SIDEWAYS        |    5 |       25.0 |    2 |       -0.1415 |      0.0228 |    0.1639 |   -0.71 |        0.0 |    0.691 |
+| trendline_breakout | prospective | SIDEWAYS        |   12 |      100.0 |    1 |       -0.7068 |     -0.6024 |    0.1038 |   -8.48 |        0.0 |          |
+| trendline_breakout | replay      | HIGH_VOLATILITY |   21 |       44.7 |    6 |        0.1277 |      0.2591 |    0.1279 |    2.68 |       23.8 |    1.267 |
+| trendline_breakout | replay      | SIDEWAYS        |   14 |       29.8 |    4 |       -0.1715 |     -0.0146 |    0.1562 |   -2.40 |       14.3 |    0.660 |
+| trendline_breakout | replay      | BTC_BULL        |    8 |       17.0 |    4 |       -0.5260 |     -0.3909 |    0.1328 |   -4.21 |       12.5 |    0.287 |
+| trendline_breakout | replay      | BTC_BEAR        |    4 |        8.5 |    3 |        0.5330 |      0.7005 |    0.1619 |    2.13 |        0.0 | 2903.133 |
+| volume_anomaly     | prospective | SIDEWAYS        | 1977 |       69.2 |    3 |       -0.3026 |      0.0269 |    0.3296 | -598.29 |       26.9 |    0.557 |
+| volume_anomaly     | prospective | LOW_VOLATILITY  |  813 |       28.5 |    1 |       -0.3549 |     -0.0103 |    0.3448 | -288.55 |       26.4 |    0.513 |
+| volume_anomaly     | prospective | BTC_BULL        |   66 |        2.3 |    1 |       -0.1497 |      0.1563 |    0.3054 |   -9.88 |       31.8 |    0.769 |
+| volume_anomaly     | replay      | UNKNOWN         |  156 |       46.0 |    9 |       -0.8862 |     -0.0132 |    0.8731 | -138.24 |       24.4 |    0.140 |
+| volume_anomaly     | replay      | HIGH_VOLATILITY |   85 |       25.1 |    9 |       -0.2772 |      0.0906 |    0.3677 |  -23.56 |       35.3 |    0.560 |
+| volume_anomaly     | replay      | BTC_BULL        |   53 |       15.6 |    7 |       -0.3030 |      0.1013 |    0.4042 |  -16.06 |       39.6 |    0.478 |
+| volume_anomaly     | replay      | SIDEWAYS        |   30 |        8.8 |    7 |       -0.7192 |     -0.2949 |    0.4251 |  -21.58 |       16.7 |    0.172 |
+| volume_anomaly     | replay      | BTC_BEAR        |   11 |        3.2 |    4 |       -0.6468 |     -0.2297 |    0.4175 |   -7.11 |       18.2 |    0.177 |
+| volume_anomaly     | replay      | LOW_VOLATILITY  |    4 |        1.2 |    1 |        1.1821 |      1.6581 |    0.4742 |    4.73 |      100.0 |          |
++--------------------+-------------+-----------------+------+------------+------+---------------+-------------+-----------+---------+------------+----------+
+(36 rows)
+
+
+== 2a2. fatia UNKNOWN por familia x coorte (o buraco de contexto, explicito) ==
++--------------------+-------------+------+-----------+-------------+-------------+------------+-------------+
+|      familia       |   coorte    |  n   | n_unknown | pct_unknown | n_sem_linha | unknown_de | unknown_ate |
++--------------------+-------------+------+-----------+-------------+-------------+------------+-------------+
+| breakout           | replay      |    8 |         0 |         0.0 |           0 |            |             |
+| mean_reversion     | prospective |   84 |         0 |         0.0 |           0 |            |             |
+| mean_reversion     | replay      |  146 |         0 |         0.0 |           0 |            |             |
+| momentum           | prospective | 1842 |         0 |         0.0 |           0 |            |             |
+| momentum           | replay      |  837 |        40 |         4.8 |           0 | 2026-08-11 | 2026-08-16  |
+| session_orb        | prospective |    1 |         0 |         0.0 |           0 |            |             |
+| session_orb        | replay      |   20 |         0 |         0.0 |           0 |            |             |
+| trendline_breakout | prospective |   12 |         0 |         0.0 |           0 |            |             |
+| trendline_breakout | replay      |   47 |         0 |         0.0 |           0 |            |             |
+| volume_anomaly     | prospective | 2856 |         0 |         0.0 |           0 |            |             |
+| volume_anomaly     | replay      |  339 |       156 |        46.0 |           0 | 2026-08-09 | 2026-08-17  |
++--------------------+-------------+------+-----------+-------------+-------------+------------+-------------+
+(11 rows)
+
+
+== 2b. trend x vol por familia x coorte (a celula fina que o regime agrega) ==
++--------------------+-------------+-----------------+------+------+---------------+-------------+---------+
+|      familia       |   coorte    |    trend_vol    |  n   | dias | exp_liquida_r | exp_bruta_r | soma_r  |
++--------------------+-------------+-----------------+------+------+---------------+-------------+---------+
+| mean_reversion     | prospective | flat/normal     |   84 |    1 |        0.1483 |      0.2970 |   12.46 |
+| mean_reversion     | replay      | up/high         |  104 |    4 |        0.3022 |      0.4347 |   31.43 |
+| mean_reversion     | replay      | flat/normal     |   13 |    1 |       -0.0609 |      0.1468 |   -0.79 |
+| mean_reversion     | replay      | up/normal       |   10 |    1 |        1.0553 |      1.2161 |   10.55 |
+| momentum           | prospective | flat/normal     | 1422 |    3 |       -0.2108 |     -0.0694 | -299.82 |
+| momentum           | prospective | flat/low        |  382 |    1 |       -0.1961 |     -0.0398 |  -74.93 |
+| momentum           | prospective | up/low          |   38 |    1 |       -0.4117 |     -0.2562 |  -15.64 |
+| momentum           | replay      | up/high         |  220 |    7 |        0.3055 |      0.4630 |   67.21 |
+| momentum           | replay      | flat/normal     |  165 |    8 |       -0.3530 |     -0.1290 |  -58.25 |
+| momentum           | replay      | up/normal       |  151 |    7 |        0.0116 |      0.2080 |    1.75 |
+| momentum           | replay      | down/normal     |  100 |    3 |       -0.0788 |      0.1534 |   -7.88 |
+| momentum           | replay      | flat/high       |   62 |    3 |       -0.6275 |     -0.4496 |  -38.91 |
+| momentum           | replay      | flat/low        |   49 |    3 |       -0.4683 |     -0.2162 |  -22.95 |
+| momentum           | replay      | up/low          |   42 |    2 |       -0.6889 |     -0.3776 |  -28.93 |
+| momentum           | replay      | unknown/unknown |   32 |    2 |        0.0459 |      0.2852 |    1.47 |
+| trendline_breakout | prospective | flat/normal     |   12 |    1 |       -0.7068 |     -0.6024 |   -8.48 |
+| trendline_breakout | replay      | flat/normal     |   14 |    4 |       -0.1715 |     -0.0146 |   -2.40 |
+| trendline_breakout | replay      | up/high         |   13 |    4 |        0.2582 |      0.3823 |    3.36 |
+| volume_anomaly     | prospective | flat/normal     | 1977 |    3 |       -0.3026 |      0.0269 | -598.29 |
+| volume_anomaly     | prospective | flat/low        |  813 |    1 |       -0.3549 |     -0.0103 | -288.55 |
+| volume_anomaly     | prospective | up/low          |   66 |    1 |       -0.1497 |      0.1563 |   -9.88 |
+| volume_anomaly     | replay      | unknown/unknown |  128 |    7 |       -0.8888 |     -0.0178 | -113.77 |
+| volume_anomaly     | replay      | up/high         |   72 |    8 |       -0.1557 |      0.1873 |  -11.21 |
+| volume_anomaly     | replay      | up/normal       |   49 |    6 |       -0.2842 |      0.1251 |  -13.93 |
+| volume_anomaly     | replay      | flat/normal     |   30 |    7 |       -0.7192 |     -0.2949 |  -21.58 |
+| volume_anomaly     | replay      | unknown/low     |   22 |    1 |       -0.8849 |     -0.0214 |  -19.47 |
+| volume_anomaly     | replay      | flat/high       |   13 |    3 |       -0.9501 |     -0.4448 |  -12.35 |
++--------------------+-------------+-----------------+------+------+---------------+-------------+---------+
+(27 rows)
+
+
+== 2c. hora do dia (UMA particao, dois relogios) — familias com coorte de replay ==
++----------------+--------+---------+----------+----+------+---------------+--------+
+|    familia     | coorte | hora_br | hora_utc | n  | dias | exp_liquida_r | soma_r |
++----------------+--------+---------+----------+----+------+---------------+--------+
+| mean_reversion | replay |       7 |       10 | 21 |    2 |        0.4030 |   8.46 |
+| momentum       | replay |       0 |        3 | 49 |    6 |       -0.5160 | -25.28 |
+| momentum       | replay |       3 |        6 | 20 |    5 |        0.3481 |   6.96 |
+| momentum       | replay |       4 |        7 | 29 |    2 |       -0.6462 | -18.74 |
+| momentum       | replay |       5 |        8 | 50 |    5 |        0.7843 |  39.22 |
+| momentum       | replay |       6 |        9 | 22 |    5 |       -0.3293 |  -7.24 |
+| momentum       | replay |       8 |       11 | 50 |    6 |       -0.3695 | -18.48 |
+| momentum       | replay |       9 |       12 | 25 |    4 |        0.6090 |  15.23 |
+| momentum       | replay |      10 |       13 | 78 |    9 |       -0.4318 | -33.68 |
+| momentum       | replay |      11 |       14 | 76 |   13 |       -0.3079 | -23.40 |
+| momentum       | replay |      12 |       15 | 46 |    6 |        0.2440 |  11.22 |
+| momentum       | replay |      13 |       16 | 45 |    5 |       -0.1803 |  -8.11 |
+| momentum       | replay |      14 |       17 | 28 |    5 |       -0.2209 |  -6.19 |
+| momentum       | replay |      15 |       18 | 21 |    5 |       -0.5314 | -11.16 |
+| momentum       | replay |      17 |       20 | 54 |    8 |        0.3902 |  21.07 |
+| momentum       | replay |      18 |       21 | 44 |    5 |        0.3786 |  16.66 |
+| momentum       | replay |      21 |        0 | 24 |    4 |       -0.0034 |  -0.08 |
+| momentum       | replay |      22 |        1 | 35 |    6 |       -0.3209 | -11.23 |
+| momentum       | replay |      23 |        2 | 55 |    7 |       -0.1911 | -10.51 |
+| volume_anomaly | replay |      11 |       14 | 29 |   14 |       -0.3578 | -10.38 |
+| volume_anomaly | replay |      12 |       15 | 38 |   16 |       -0.5897 | -22.41 |
+| volume_anomaly | replay |      13 |       16 | 26 |   11 |       -0.3714 |  -9.66 |
++----------------+--------+---------+----------+----+------+---------------+--------+
+(22 rows)
+
+
+== 2d. dia da semana (Brasilia) x coorte de replay ==
++--------------------+--------+--------+-----+-----+----------------+---------------+--------+
+|      familia       | coorte | dow_br | dia |  n  | dias_distintos | exp_liquida_r | soma_r |
++--------------------+--------+--------+-----+-----+----------------+---------------+--------+
+| breakout           | replay |      1 | seg |   2 |              2 |       -0.5458 |  -1.09 |
+| breakout           | replay |      3 | qua |   2 |              2 |        0.5538 |   1.11 |
+| breakout           | replay |      4 | qui |   1 |              1 |        0.9186 |   0.92 |
+| breakout           | replay |      7 | dom |   3 |              2 |       -0.5275 |  -1.58 |
+| mean_reversion     | replay |      1 | seg |   3 |              1 |       -0.2348 |  -0.70 |
+| mean_reversion     | replay |      2 | ter |  11 |              1 |       -1.1267 | -12.39 |
+| mean_reversion     | replay |      4 | qui |  35 |              3 |        0.3060 |  10.71 |
+| mean_reversion     | replay |      5 | sex |  31 |              1 |        0.7699 |  23.87 |
+| mean_reversion     | replay |      6 | sab |  52 |              2 |        0.0485 |   2.52 |
+| mean_reversion     | replay |      7 | dom |  14 |              2 |        0.7022 |   9.83 |
+| momentum           | replay |      1 | seg | 143 |              3 |       -0.4883 | -69.82 |
+| momentum           | replay |      2 | ter |  60 |              4 |       -0.2845 | -17.07 |
+| momentum           | replay |      3 | qua | 135 |              3 |        0.1186 |  16.01 |
+| momentum           | replay |      4 | qui | 201 |              4 |        0.2538 |  51.01 |
+| momentum           | replay |      5 | sex |  98 |              3 |        0.1226 |  12.01 |
+| momentum           | replay |      6 | sab |  74 |              3 |       -0.3796 | -28.09 |
+| momentum           | replay |      7 | dom | 126 |              4 |       -0.3976 | -50.10 |
+| session_orb        | replay |      1 | seg |   2 |              2 |       -0.3736 |  -0.75 |
+| session_orb        | replay |      3 | qua |   1 |              1 |       -1.1101 |  -1.11 |
+| session_orb        | replay |      4 | qui |   7 |              2 |        0.2111 |   1.48 |
+| session_orb        | replay |      5 | sex |   6 |              2 |       -0.7267 |  -4.36 |
+| session_orb        | replay |      6 | sab |   2 |              2 |        0.5163 |   1.03 |
+| session_orb        | replay |      7 | dom |   2 |              1 |       -0.0741 |  -0.15 |
+| trendline_breakout | replay |      1 | seg |  12 |              2 |        0.0529 |   0.63 |
+| trendline_breakout | replay |      2 | ter |   4 |              2 |       -0.8490 |  -3.40 |
+| trendline_breakout | replay |      3 | qua |   4 |              3 |        0.5544 |   2.22 |
+| trendline_breakout | replay |      4 | qui |  13 |              3 |       -0.0540 |  -0.70 |
+| trendline_breakout | replay |      5 | sex |   9 |              2 |        0.4111 |   3.70 |
+| trendline_breakout | replay |      6 | sab |   1 |              1 |       -0.5640 |  -0.56 |
+| trendline_breakout | replay |      7 | dom |   4 |              1 |       -0.9208 |  -3.68 |
+| volume_anomaly     | replay |      1 | seg |  51 |              4 |       -0.9847 | -50.22 |
+| volume_anomaly     | replay |      2 | ter |  46 |              4 |       -0.4498 | -20.69 |
+| volume_anomaly     | replay |      3 | qua |  68 |              4 |       -0.5224 | -35.52 |
+| volume_anomaly     | replay |      4 | qui |  49 |              4 |       -0.3550 | -17.39 |
+| volume_anomaly     | replay |      5 | sex |  24 |              4 |       -0.2985 |  -7.16 |
+| volume_anomaly     | replay |      6 | sab |  16 |              4 |       -0.2891 |  -4.63 |
+| volume_anomaly     | replay |      7 | dom |  85 |              4 |       -0.7790 | -66.21 |
++--------------------+--------+--------+-----+-----+----------------+---------------+--------+
+(37 rows)
+
+
+== 2e. faixa de pedagio (KB-0076) por familia x coorte ==
++--------------------+-------------+----------------+------+------+---------------+---------------+-------------+---------+
+|      familia       |   coorte    |     faixa      |  n   | dias | pedagio_medio | exp_liquida_r | exp_bruta_r | soma_r  |
++--------------------+-------------+----------------+------+------+---------------+---------------+-------------+---------+
+| breakout           | replay      | a) < 0,10 R    |    5 |    4 |        0.0807 |       -0.2081 |     -0.1257 |   -1.04 |
+| breakout           | replay      | b) 0,10-0,20 R |    3 |    3 |        0.1087 |        0.1308 |      0.2415 |    0.39 |
+| mean_reversion     | prospective | a) < 0,10 R    |   24 |    1 |        0.0683 |        0.2481 |      0.3180 |    5.95 |
+| mean_reversion     | prospective | b) 0,10-0,20 R |   43 |    1 |        0.1547 |        0.1405 |      0.2966 |    6.04 |
+| mean_reversion     | prospective | c) > 0,20 R    |   17 |    1 |        0.2373 |        0.0271 |      0.2681 |    0.46 |
+| mean_reversion     | replay      | a) < 0,10 R    |   46 |    4 |        0.0691 |        0.2998 |      0.3700 |   13.79 |
+| mean_reversion     | replay      | b) 0,10-0,20 R |   67 |    9 |        0.1530 |        0.3206 |      0.4757 |   21.48 |
+| mean_reversion     | replay      | c) > 0,20 R    |   33 |   10 |        0.2624 |       -0.0436 |      0.2199 |   -1.44 |
+| momentum           | prospective | a) < 0,10 R    |  522 |    3 |        0.0671 |       -0.1155 |     -0.0481 |  -60.30 |
+| momentum           | prospective | b) 0,10-0,20 R |  959 |    3 |        0.1439 |       -0.2091 |     -0.0648 | -200.54 |
+| momentum           | prospective | c) > 0,20 R    |  361 |    3 |        0.2579 |       -0.3589 |     -0.1008 | -129.55 |
+| momentum           | replay      | a) < 0,10 R    |   98 |   13 |        0.0813 |       -0.0320 |      0.0497 |   -3.14 |
+| momentum           | replay      | b) 0,10-0,20 R |  358 |   23 |        0.1519 |        0.0025 |      0.1551 |    0.89 |
+| momentum           | replay      | c) > 0,20 R    |  381 |   23 |        0.2921 |       -0.2200 |      0.0727 |  -83.81 |
+| session_orb        | prospective | a) < 0,10 R    |    1 |    1 |        0.0761 |       -1.0522 |     -0.9772 |   -1.05 |
+| session_orb        | replay      | a) < 0,10 R    |    2 |    2 |        0.0859 |       -0.2116 |     -0.1258 |   -0.42 |
+| session_orb        | replay      | b) 0,10-0,20 R |   15 |    9 |        0.1363 |       -0.0702 |      0.0658 |   -1.05 |
+| session_orb        | replay      | c) > 0,20 R    |    3 |    2 |        0.2144 |       -0.7932 |     -0.5796 |   -2.38 |
+| trendline_breakout | prospective | a) < 0,10 R    |    6 |    1 |        0.0493 |       -0.6496 |     -0.5991 |   -3.90 |
+| trendline_breakout | prospective | b) 0,10-0,20 R |    5 |    1 |        0.1474 |       -0.6871 |     -0.5396 |   -3.44 |
+| trendline_breakout | prospective | c) > 0,20 R    |    1 |    1 |        0.2129 |       -1.1480 |     -0.9362 |   -1.15 |
+| trendline_breakout | replay      | a) < 0,10 R    |    4 |    3 |        0.0927 |       -0.0315 |      0.0647 |   -0.13 |
+| trendline_breakout | replay      | b) 0,10-0,20 R |   42 |   13 |        0.1431 |       -0.0862 |      0.0592 |   -3.62 |
+| trendline_breakout | replay      | c) > 0,20 R    |    1 |    1 |        0.2007 |        1.9535 |      2.1664 |    1.95 |
+| volume_anomaly     | prospective | a) < 0,10 R    |  378 |    3 |        0.0715 |       -0.0692 |      0.0018 |  -26.15 |
+| volume_anomaly     | prospective | b) 0,10-0,20 R |  862 |    3 |        0.1509 |       -0.1421 |      0.0085 | -122.52 |
+| volume_anomaly     | prospective | c) > 0,20 R    | 1616 |    3 |        0.4920 |       -0.4629 |      0.0292 | -748.06 |
+| volume_anomaly     | replay      | a) < 0,10 R    |    7 |    2 |        0.0714 |        0.4180 |      0.4898 |    2.93 |
+| volume_anomaly     | replay      | b) 0,10-0,20 R |   25 |    7 |        0.1439 |       -0.3380 |     -0.1940 |   -8.45 |
+| volume_anomaly     | replay      | c) > 0,20 R    |  307 |   28 |        0.6646 |       -0.6394 |      0.0251 | -196.31 |
++--------------------+-------------+----------------+------+------+---------------+---------------+-------------+---------+
+(30 rows)
+
+
+== 2f. tamanho de celula: quantas celulas de cada dimensao alcancam n>=30 E >=7 dias ==
++-------------------+-------------+-------------+---------+---------+-----------+
+|      versao       |   coorte    |     dim     | celulas | com_n30 | julgaveis |
++-------------------+-------------+-------------+---------+---------+-----------+
+| momentum v1       | prospective | dia_semana  |       3 |       2 |         0 |
+| momentum v1       | prospective | hora        |      24 |      16 |         0 |
+| momentum v1       | prospective | mercado     |     230 |       0 |         0 |
+| momentum v1       | prospective | pedagio     |       3 |       3 |         0 |
+| momentum v1       | prospective | regime      |       3 |       3 |         0 |
+| momentum v1       | prospective | trend_x_vol |       3 |       3 |         0 |
+| momentum v2       | prospective | dia_semana  |       1 |       1 |         0 |
+| momentum v2       | prospective | hora        |      23 |       4 |         0 |
+| momentum v2       | prospective | mercado     |     173 |       0 |         0 |
+| momentum v2       | prospective | pedagio     |       3 |       3 |         0 |
+| momentum v2       | prospective | regime      |       1 |       1 |         0 |
+| momentum v2       | prospective | trend_x_vol |       1 |       1 |         0 |
+| momentum v2       | replay      | dia_semana  |       7 |       4 |         0 |
+| momentum v2       | replay      | hora        |      24 |       0 |         0 |
+| momentum v2       | replay      | mercado     |       4 |       4 |         4 |
+| momentum v2       | replay      | pedagio     |       3 |       2 |         2 |
+| momentum v2       | replay      | regime      |       6 |       4 |         3 |
+| momentum v2       | replay      | trend_x_vol |      10 |       3 |         3 |
+| momentum v3       | prospective | dia_semana  |       1 |       1 |         0 |
+| momentum v3       | prospective | hora        |      21 |       4 |         0 |
+| momentum v3       | prospective | mercado     |     168 |       0 |         0 |
+| momentum v3       | prospective | pedagio     |       3 |       3 |         0 |
+| momentum v3       | prospective | regime      |       1 |       1 |         0 |
+| momentum v3       | prospective | trend_x_vol |       1 |       1 |         0 |
+| momentum v4       | prospective | dia_semana  |       1 |       1 |         0 |
+| momentum v4       | prospective | hora        |      14 |       1 |         0 |
+| momentum v4       | prospective | mercado     |      88 |       0 |         0 |
+| momentum v4       | prospective | pedagio     |       3 |       2 |         0 |
+| momentum v4       | prospective | regime      |       1 |       1 |         0 |
+| momentum v4       | prospective | trend_x_vol |       1 |       1 |         0 |
+| momentum v6       | replay      | dia_semana  |       7 |       3 |         0 |
+| momentum v6       | replay      | hora        |      24 |       0 |         0 |
+| momentum v6       | replay      | mercado     |       4 |       4 |         4 |
+| momentum v6       | replay      | pedagio     |       3 |       2 |         2 |
+| momentum v6       | replay      | regime      |       6 |       3 |         3 |
+| momentum v6       | replay      | trend_x_vol |      10 |       3 |         3 |
+| momentum v7       | replay      | dia_semana  |       7 |       3 |         0 |
+| momentum v7       | replay      | hora        |      24 |       0 |         0 |
+| momentum v7       | replay      | mercado     |       4 |       4 |         4 |
+| momentum v7       | replay      | pedagio     |       3 |       2 |         2 |
+| momentum v7       | replay      | regime      |       6 |       3 |         3 |
+| momentum v7       | replay      | trend_x_vol |      10 |       3 |         3 |
+| momentum v8       | replay      | dia_semana  |       7 |       3 |         0 |
+| momentum v8       | replay      | hora        |      24 |       0 |         0 |
+| momentum v8       | replay      | mercado     |       4 |       4 |         4 |
+| momentum v8       | replay      | pedagio     |       3 |       2 |         2 |
+| momentum v8       | replay      | regime      |       6 |       3 |         3 |
+| momentum v8       | replay      | trend_x_vol |      10 |       3 |         3 |
+| volume_anomaly v1 | prospective | dia_semana  |       3 |       3 |         0 |
+| volume_anomaly v1 | prospective | hora        |      24 |      24 |         0 |
+| volume_anomaly v1 | prospective | mercado     |     237 |       1 |         0 |
+| volume_anomaly v1 | prospective | pedagio     |       3 |       3 |         0 |
+| volume_anomaly v1 | prospective | regime      |       3 |       3 |         0 |
+| volume_anomaly v1 | prospective | trend_x_vol |       3 |       3 |         0 |
+| volume_anomaly v2 | prospective | dia_semana  |       1 |       1 |         0 |
+| volume_anomaly v2 | prospective | hora        |      23 |      12 |         0 |
+| volume_anomaly v2 | prospective | mercado     |     199 |       0 |         0 |
+| volume_anomaly v2 | prospective | pedagio     |       3 |       3 |         0 |
+| volume_anomaly v2 | prospective | regime      |       1 |       1 |         0 |
+| volume_anomaly v2 | prospective | trend_x_vol |       1 |       1 |         0 |
+| volume_anomaly v2 | replay      | dia_semana  |       7 |       5 |         0 |
+| volume_anomaly v2 | replay      | hora        |      24 |       1 |         1 |
+| volume_anomaly v2 | replay      | mercado     |       4 |       4 |         3 |
+| volume_anomaly v2 | replay      | pedagio     |       3 |       1 |         1 |
+| volume_anomaly v2 | replay      | regime      |       6 |       4 |         4 |
+| volume_anomaly v2 | replay      | trend_x_vol |      11 |       4 |         3 |
++-------------------+-------------+-------------+---------+---------+-----------+
+(66 rows)
+
+
+== 2g. robustez da juncao de regime: end_time <= barra  VS  janela que contem a barra ==
