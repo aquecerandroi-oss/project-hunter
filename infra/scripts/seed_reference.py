@@ -77,6 +77,15 @@ STRATEGIES: tuple[tuple[str, str, str, str], ...] = (
         "reversion",
         "Pullback bought inside a higher-timeframe uptrend, on a close stretched below its mean.",
     ),
+    (
+        "mean_reversion_h1",
+        "Mean Reversion 1h",
+        "reversion",
+        "The same pullback, decided on 1h bars: the ATR% of a 1h bar is 2.2x that "
+        "of a 15m bar on the same market, so the assumed toll per R is 2.2x smaller. "
+        "Needs >= 5820 min of candle context (SHADOW_CONTEXT_MINUTES / T3.54b); "
+        "with the 1560 default it only ever answers atr_warmup.",
+    ),
     ("derivatives", "Derivatives", "derivatives", "Funding, open interest and liquidation setups."),
     (
         "session_orb",

@@ -86,6 +86,31 @@ CONSTRAINTS: Final[Mapping[str, Constraints]] = {
             ("target_atr", "target2_atr"),
         ),
     ),
+    # T3.54 — a irmã que decide em 1 h declara **as mesmas faixas** da mãe: os
+    # nomes de parâmetro e o papel de cada um são idênticos, só a grade muda. A
+    # entrada é escrita por extenso, e não compartilhada com a de baixo, porque
+    # a linha da mãe descreve um contrato já congelado na VPS e não pode ser
+    # tocada nem para ser refatorada (``check_ranges`` a lê por ``Strategy.key``).
+    "mean_reversion_h1_v1": Constraints(
+        positive=frozenset(
+            {
+                "trend_sma_bars",
+                "zscore_bars",
+                "zscore_depth_min",
+                "atr_period",
+                "atr_bars",
+                "atr_pct_max",
+                "stop_atr",
+                "target_atr",
+                "target2_atr",
+                "horizon_s",
+                "max_entry_delay_s",
+            }
+        ),
+        non_negative=frozenset({"atr_pct_min"}) | _COSTS,
+        unit_interval=frozenset({"base_confidence"}),
+        ordered=(("atr_pct_min", "atr_pct_max"), ("target_atr", "target2_atr")),
+    ),
     "mean_reversion_v1": Constraints(
         positive=frozenset(
             {
