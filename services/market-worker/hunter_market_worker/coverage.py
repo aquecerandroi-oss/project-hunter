@@ -3,73 +3,63 @@
 ``hunter_indicators.features.windows.trades_between`` refuses a trade window
 unless the collector proves it stayed connected through it: the tape alone
 cannot tell a quiet market from a dropped connection (T2.2 notes §12.3/§13).
-Until that proof exists, ``trade_velocity_1m``, ``buy_pressure_5m`` and
-``sell_pressure_5m`` are ``insufficient_coverage`` and no EARLY is confirmed.
+Until then, ``trade_velocity_1m``, ``buy_pressure_5m`` and ``sell_pressure_5m``
+are ``insufficient_coverage`` and no EARLY is confirmed.
 
 Only this process can produce the proof, and only about the interval it can
 actually stand behind: **the session**, not the socket (a *cumulative*
 ``dropped_events`` next to ``ws_state=connected`` would let a connection that
 lost one trade still read as covered — a drop ends the interval and a new one
 starts at that instant); **per symbol** (subscribed mid-session = covered
-only from then, unsubscribed = stops claiming at once); and **short of the
-clock** (an event the adapter already received may not have reached the tape
-yet, so a stamp claims ``now - COVERAGE_SAFETY_S``, never ``now`` —
-:meth:`writing`/:meth:`written` additionally hold the stamp back while a
-hot-state write is in flight).
+only from then); and **short of the clock** (an event already received may
+not have reached the tape yet, so a stamp claims ``now - COVERAGE_SAFETY_S``,
+never ``now`` — :meth:`writing`/:meth:`written` hold it back mid-write too).
 
 The scanner then evaluates each market at ``as_of = covered_until`` instead of
 at its own clock: "as it was observable at ``as_of``" is what ``MarketContext``
-means, and moving the cut is the only honest way to satisfy a proof that is
-always slightly behind.
+means -- the only honest way to satisfy a proof that is always behind.
 
 **T2.5-adapter** (``.claude/state/astra-review-T2.5-adapter-diff.md``) closed
-two gaps the margin alone cannot see through, both read at **stamp time**:
-an **internal reconnect** the adapter retries without ever ending
-:meth:`stream`'s generator (caught by ``ws_state`` and by
-``connection_generation``, which also catches a full cycle completing
-*between* two stamps — either forces ``reason="reconnect"`` and a *fresh*
-session on resumption, never the old one stretched across the gap); and a
-**backlogged queue without drops** (``_in_flight == 0`` only proves no write
-*this process* started is unfinished — ``queue_progress`` covers the
-adapter's own inbound queue; an eviction counts on its own ledger side so it
-never reads as permanent backlog once it clears, unlike a reconnect).
+two gaps the margin alone cannot see through, both read at **stamp time**: an
+**internal reconnect** the adapter retries without ending :meth:`stream`'s
+generator (``ws_state``/``connection_generation``, the latter also catching a
+full cycle *between* two stamps — either forces a *fresh* session on
+resumption); and a **backlogged queue without drops** (``_in_flight == 0``
+only proves no write *this process* started is unfinished — an eviction never
+reads as permanent backlog once it clears, unlike a reconnect).
 
 **T2.5e** (``.claude/state/notes-T2.5.md`` T2.5e) found that ledger right but
-its bar wrong: under continuous flow ``enqueued == delivered + evicted`` holds
-only when the queue is momentarily empty, so the interval broke on nearly
-every stamp. "Caught up" is now a **bounded delay**: a nonzero backlog only
-breaks the interval if the oldest pending event's own ``ts``
-(``queue_oldest_pending_ts()``) has itself reached the window this stamp is
-about to claim — its own timestamp, never how long it has been known about,
-and the minimum over pending events, since arrival order across reader tasks
-is not timestamp order.
+its bar wrong: ``enqueued == delivered + evicted`` holds only when the queue
+is momentarily empty, so the interval broke on nearly every stamp. "Caught
+up" is now a **bounded delay**: a nonzero backlog only breaks the interval if
+the oldest pending event's own ``ts`` (``queue_oldest_pending_ts()``) has
+itself reached the window this stamp is about to claim.
 
-**T2.5g** made the collector N processes (``MARKET_SHARD=i/N``) while the
-scanner still reads one hash per exchange: what this shard can stand behind
-is decided here as before, *publishing* moved to
+**T2.5g** made the collector N processes (``MARKET_SHARD=i/N``); what this
+shard can stand behind is decided here as before, *publishing* moved to
 :mod:`hunter_market_worker.coverage_publish` (one Lua script, conservative
-merge). All four signals above are read in the same housekeeping task that
-already calls :meth:`writing`/:meth:`written`; ``connection_generation``/
-``queue_progress``/``queue_oldest_pending_ts`` are read defensively
-(additive, like ``rest_gate_status``), ``ws_state`` is not. An adapter
+merge). ``connection_generation``/``queue_progress``/``queue_oldest_pending_ts``
+are read defensively (additive), ``ws_state`` is not — an adapter
 implementing none of them behaves as before this module existed.
 
-**T3.46d — the book stamp race** (measurements, full account and the
-non-anticipation argument: ``.claude/state/notes-T3.46d.md`` §1-2). The
+**T3.46d — the book stamp race** (``.claude/state/notes-T3.46d.md`` §1-2). The
 margin above guards events received but not yet yielded upstream — nothing
 about how fresh a live book naturally is, and against this module's own
 independently-scheduled housekeeping tick a book was newer than
-``covered_until`` in 89% of paired VPS reads (a tolerance bounded at the
-brief's own suggested 500 ms would still leave ~28% ``after_cut``, rejected).
-:meth:`observe_proof` closes the race: ``consume_once`` feeds it the
-timestamp of every event *already accepted* (never "in flight" in the sense
-the margin exists for), and ``stamp`` floors ``covered_until`` at that proof
-— never past it or the stamp's own clock, only while ``caught_up``. A session
-that never calls it is unchanged byte-for-byte.
+``covered_until`` in 89% of paired VPS reads (a 500ms tolerance would still
+leave ~28% ``after_cut``, rejected). :meth:`observe_proof` closes the race:
+every event *already accepted* floors ``stamp``'s claim at its own ``ts`` —
+never past it or the stamp's own clock, only while ``caught_up``.
+
+**T3.46g** closes the remaining phase gap: :meth:`stamp` is unchanged, only
+called from a second place — after :mod:`hunter_market_worker.coalesce`'s
+flush writes a cycle's book/ticker, on top of the periodic housekeeping
+fallback. :data:`CoverageStampFn` is the one closure both callers share.
 """
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 from time import monotonic
 from typing import TYPE_CHECKING
@@ -91,7 +81,17 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-__all__ = ["COVERAGE_SAFETY_S", "COVERAGE_STAMP_S", "COVERAGE_TTL_S", "CoverageTracker"]
+CoverageStampFn = Callable[[], Awaitable[bool]]
+"""One session's live :meth:`CoverageTracker.stamp` call, closed over its own
+adapter/ledger (T3.46g module docstring) — built once, shared by two callers."""
+
+__all__ = [
+    "COVERAGE_SAFETY_S",
+    "COVERAGE_STAMP_S",
+    "COVERAGE_TTL_S",
+    "CoverageStampFn",
+    "CoverageTracker",
+]
 
 
 class CoverageTracker:

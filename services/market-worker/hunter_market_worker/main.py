@@ -6,7 +6,7 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from hunter_core.db.session import create_session_factory
-from hunter_core.domain.enums import RiskEventSeverity
+from hunter_core.domain.enums import MarketType, RiskEventSeverity
 from hunter_core.events.outbox import OutboxHealth
 from hunter_core.logging import get_logger
 from hunter_market_worker.backfill import run_backfill
@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from hunter_core.runtime import WorkerRuntime
+    from hunter_market_worker.coverage import CoverageStampFn
 logger = get_logger(__name__)
 
 
@@ -67,6 +68,12 @@ async def run_market(runtime: WorkerRuntime) -> None:
     universe, queues, state = MonitoredUniverse(), PersistQueues(), HeartbeatState()
     coalescer, health = TickCoalescer(), IngestionHealth()
     outbox_health, outbox_wake = OutboxHealth(), asyncio.Event()
+    # T3.46g: the perpetual and spot ingest tasks each register their own
+    # stamp closure here as they start; the coalescer they share reads it
+    # right after flushing a cycle's book/ticker, so a reader who sees that
+    # write and re-reads the coverage proof finds a cut that already covers
+    # it (docs/PIPELINE.md §1-2, hunter_market_worker.coverage module docstring).
+    coverage_stamps: dict[MarketType, CoverageStampFn] = {}
     producer = f"market-worker@{runtime.instance}"
 
     async def warning(message: str) -> None:
@@ -130,9 +137,14 @@ async def run_market(runtime: WorkerRuntime) -> None:
                     coalescer,
                     health,
                     watchdog,
+                    coverage_stamps=coverage_stamps,
                 ),
                 "coalescer": coalesce_loop(
-                    coalescer, runtime.redis, settings, f"market-worker@{runtime.instance}"
+                    coalescer,
+                    runtime.redis,
+                    settings,
+                    f"market-worker@{runtime.instance}",
+                    coverage_stamps=coverage_stamps,
                 ),
                 "persist": drain_loop(
                     factory, adapter.code, queues, runtime, outbox_wake, producer
@@ -168,6 +180,7 @@ async def run_market(runtime: WorkerRuntime) -> None:
                     coalescer,
                     spot_status,
                     outbox_wake=outbox_wake,
+                    coverage_stamps=coverage_stamps,
                 ),
             }
             for name, coro in tasks.items():
@@ -219,6 +232,7 @@ async def _run_spot_process(
     spot_adapter = build_spot_adapter(exchange_code(), settings, runtime.redis)
     coalescer = TickCoalescer()
     outbox_health, outbox_wake = OutboxHealth(), asyncio.Event()
+    coverage_stamps: dict[MarketType, CoverageStampFn] = {}  # T3.46g, same as run_market's
     spot_status = SpotStatus()
     runtime.status_details["spot"] = spot_status
     # This process's only exchange client is the spot one: its own REST gate
@@ -243,7 +257,11 @@ async def _run_spot_process(
         async with asyncio.TaskGroup() as group:
             tasks = {
                 "coalescer": coalesce_loop(
-                    coalescer, runtime.redis, settings, f"market-worker@{runtime.instance}"
+                    coalescer,
+                    runtime.redis,
+                    settings,
+                    f"market-worker@{runtime.instance}",
+                    coverage_stamps=coverage_stamps,
                 ),
                 "outbox": run_outbox(factory, runtime.redis, outbox_health, outbox_wake),
                 "spot": run_spot(
@@ -255,6 +273,7 @@ async def _run_spot_process(
                     coalescer,
                     spot_status,
                     outbox_wake=outbox_wake,
+                    coverage_stamps=coverage_stamps,
                 ),
             }
             for name, coro in tasks.items():

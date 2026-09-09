@@ -28,9 +28,12 @@ from hunter_market_worker import hot_state
 from hunter_market_worker.publication import publish
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     import redis.asyncio as redis_asyncio
 
     from hunter_core.settings import Settings
+    from hunter_market_worker.coverage import CoverageStampFn
 
 logger = get_logger(__name__)
 
@@ -179,7 +182,11 @@ def build_tick_payload(
 
 
 async def flush_ticks(
-    coalescer: TickCoalescer, redis: redis_asyncio.Redis, producer: str
+    coalescer: TickCoalescer,
+    redis: redis_asyncio.Redis,
+    producer: str,
+    *,
+    coverage_stamps: Mapping[MarketType, CoverageStampFn] | None = None,
 ) -> list[str]:
     """Flush every dirty symbol once per cycle (B3): one shared
     ``redis.pipeline(transaction=False)`` carries every symbol's ticker
@@ -191,15 +198,25 @@ async def flush_ticks(
     one must survive, never coalesced) and a final candle must never wait on
     this cycle, so both keep their fully immediate, per-event path in
     :func:`handle_event`.
+
+    **T3.46g:** right after ``pipe.execute()`` writes this cycle's book/ticker,
+    ``coverage_stamps`` is consulted once per market type that had something
+    flushed, so a reader who sees the book this call just wrote and then
+    re-reads the coverage proof (``hunter_scanner_worker.coverage.
+    refreshed_cut``) finds a cut that already accounts for it — the periodic
+    housekeeping tick remains the fallback for a market type with nothing to
+    flush (a quiet shard still needs its clock to move).
     """
     items = coalescer.dirty_items()
     if not items:
         return []
     sha = await hot_state.ensure_script_sha(redis)
     published: list[str] = []
+    flushed_types: set[MarketType] = set()
     async with redis.pipeline(transaction=False) as pipe:
         for key, accum in items:
             exchange, symbol, market_type = key
+            flushed_types.add(market_type)
             ts = accum.ts.isoformat() if accum.ts else utcnow().isoformat()
             payload = build_tick_payload(exchange, symbol, accum, ts, market_type)
             coalescer.reset(key)
@@ -228,17 +245,27 @@ async def flush_ticks(
             )
             published.append(symbol)
         await pipe.execute()
+    if coverage_stamps:
+        for market_type in flushed_types:
+            stamp = coverage_stamps.get(market_type)
+            if stamp is not None:
+                await stamp()
     return published
 
 
 async def coalesce_loop(
-    coalescer: TickCoalescer, redis: redis_asyncio.Redis, settings: Settings, producer: str
+    coalescer: TickCoalescer,
+    redis: redis_asyncio.Redis,
+    settings: Settings,
+    producer: str,
+    *,
+    coverage_stamps: Mapping[MarketType, CoverageStampFn] | None = None,
 ) -> None:
     interval = settings.tick_coalesce_ms / 1000
     try:
         while True:
             await asyncio.sleep(interval)
-            await flush_ticks(coalescer, redis, producer)
+            await flush_ticks(coalescer, redis, producer, coverage_stamps=coverage_stamps)
     finally:
         # B3: a shutdown/cancellation must not silently drop a ticker/book
         # snapshot sitting in the coalescer waiting for the next tick.
@@ -246,7 +273,9 @@ async def coalesce_loop(
         # cut the flush off mid-pipeline; a failure here is logged, not
         # fatal — hot state is allowed to be lost (ARCHITECTURE.md §5.3).
         try:
-            await asyncio.shield(flush_ticks(coalescer, redis, producer))
+            await asyncio.shield(
+                flush_ticks(coalescer, redis, producer, coverage_stamps=coverage_stamps)
+            )
         except asyncio.CancelledError:
             raise
         except Exception:

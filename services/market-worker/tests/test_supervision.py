@@ -111,10 +111,10 @@ async def test_main_supervises_coalescer_and_closes_adapter(
 
     adapter = FakeAdapter()
 
-    async def waiting(*args: Any) -> None:
+    async def waiting(*args: Any, **kwargs: Any) -> None:
         await asyncio.Event().wait()
 
-    async def broken(*args: Any) -> None:
+    async def broken(*args: Any, **kwargs: Any) -> None:
         raise ValueError("coalescer failed")
 
     def build(*args: Any) -> FakeAdapter:

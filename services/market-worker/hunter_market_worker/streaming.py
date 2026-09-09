@@ -12,7 +12,7 @@ from hunter_core.domain.enums import MarketType
 from hunter_core.logging import get_logger
 from hunter_core.observability import market_spot_events_total
 from hunter_exchanges.base import ExchangeError, StreamChannel
-from hunter_market_worker.coverage import CoverageTracker
+from hunter_market_worker.coverage import CoverageStampFn, CoverageTracker
 from hunter_market_worker.hot_state import TradeMemory
 from hunter_market_worker.ingest import CHANNELS, AcceptedEvents, TickCoalescer, handle_event
 from hunter_market_worker.supervision import DroppedEventsLedger, IngestionHealth, Watchdog
@@ -20,6 +20,36 @@ from hunter_market_worker.supervision import DroppedEventsLedger, IngestionHealt
 logger = get_logger(__name__)
 
 _HOUSEKEEPING_INTERVAL_S = 0.1
+
+
+def _coverage_stamp_fn(
+    adapter: Any,
+    redis: Any,
+    coverage: CoverageTracker,
+    dropped: DroppedEventsLedger | None,
+) -> CoverageStampFn:
+    """Build the one :meth:`CoverageTracker.stamp` call both the periodic
+    housekeeping tick and the flush-time nudge (T3.46g) use — same adapter
+    signals, read fresh on every call, so a stamp fired from the coalescer's
+    own pipeline never claims anything the housekeeping loop could not also
+    have claimed at that instant.
+    """
+
+    async def stamp_now() -> bool:
+        queue_progress = getattr(adapter, "queue_progress", None)
+        generation = getattr(adapter, "connection_generation", None)
+        oldest_pending_ts = getattr(adapter, "queue_oldest_pending_ts", None)
+        return await coverage.stamp(
+            redis,
+            dropped_events=(dropped.observe(adapter) if dropped is not None else 0),
+            ws_state=adapter.connection_state(),
+            queue_progress=queue_progress() if queue_progress is not None else None,
+            connection_generation=generation() if generation is not None else None,
+            oldest_pending_ts=(oldest_pending_ts() if oldest_pending_ts is not None else None),
+        )
+
+    return stamp_now
+
 
 SPOT_CHANNELS = (
     StreamChannel.TRADES,
@@ -49,6 +79,7 @@ async def consume_once(
     dropped: DroppedEventsLedger | None = None,
     market_type: MarketType = MarketType.PERPETUAL,
     channels: Sequence[StreamChannel] = CHANNELS,
+    stamp: CoverageStampFn | None = None,
 ) -> None:
     """Drain ``adapter.stream(...)`` with a plain ``async for`` (B1 —
     t16b-profile.md ACHADO-2: the old loop created one ``Task`` and one timer
@@ -56,7 +87,15 @@ async def consume_once(
     ~30k events/s starved the consumer of the loop). Universe-diff/watchdog/
     health housekeeping now runs on its own 100ms loop, so the consumer
     never has to be interrupted just to check them.
+
+    ``stamp`` (T3.46g) is the closure ``run_ingest`` builds and also registers
+    for the coalescer's flush-time nudge; a caller that only passes
+    ``coverage`` (every test predating this task) gets one built here instead,
+    byte-for-byte the same signals, so this call's own housekeeping keeps
+    working unchanged.
     """
+    if stamp is None and coverage is not None:
+        stamp = _coverage_stamp_fn(adapter, redis, coverage, dropped)
     stream = adapter.stream(list(symbols), list(channels))
     symbols = list(symbols)
     # T2.5g's performance contract is about *per-event* work on this path:
@@ -82,28 +121,13 @@ async def consume_once(
             await asyncio.sleep(_HOUSEKEEPING_INTERVAL_S)
             if health is not None:
                 health.observe_adapter(adapter, active=bool(symbols))
-            if coverage is not None and coverage.due(time.monotonic()):
-                # Publishes only what this process can stand behind: nothing
-                # while a hot-state write is in flight, never past
-                # ``now - COVERAGE_SAFETY_S``, and never past what this
-                # adapter's own connection/queue state can actually stand
-                # behind either (T2.5-adapter/T2.5e, hunter_market_worker/coverage.py).
-                # ``connection_state()`` is mandatory; ``queue_progress``/
-                # ``connection_generation``/``queue_oldest_pending_ts`` are
-                # read defensively (additive, like ``rest_gate_status``).
-                queue_progress = getattr(adapter, "queue_progress", None)
-                generation = getattr(adapter, "connection_generation", None)
-                oldest_pending_ts = getattr(adapter, "queue_oldest_pending_ts", None)
-                await coverage.stamp(
-                    redis,
-                    dropped_events=(dropped.observe(adapter) if dropped is not None else 0),
-                    ws_state=adapter.connection_state(),
-                    queue_progress=queue_progress() if queue_progress is not None else None,
-                    connection_generation=generation() if generation is not None else None,
-                    oldest_pending_ts=(
-                        oldest_pending_ts() if oldest_pending_ts is not None else None
-                    ),
-                )
+            if coverage is not None and stamp is not None and coverage.due(time.monotonic()):
+                # The fallback stamp (module docstring): nothing while a
+                # hot-state write is in flight, never past this adapter's own
+                # connection/queue state (T2.5-adapter/T2.5e). The flush-time
+                # nudge (T3.46g, hunter_market_worker.coalesce) is the other
+                # caller of this same closure, after a cycle's own writes.
+                await stamp()
             if watchdog is not None and watchdog.restart_stream:
                 watchdog.restart_stream = False
                 return
@@ -218,12 +242,19 @@ async def run_ingest(
     market_type: MarketType = MarketType.PERPETUAL,
     channels: Sequence[StreamChannel] = CHANNELS,
     shard: tuple[int, int] | None = None,
+    coverage_stamps: dict[MarketType, CoverageStampFn] | None = None,
 ) -> None:
     """``shard`` (T3.0c) overrides the process's own ``MARKET_SHARD`` for the
     coverage record. The spot collector runs on shard 0 only and owns the whole
     spot universe, so it publishes a *solo* coverage record — declaring itself
     "shard 0 of 4" would make the merge script wait for three spot shards that
-    do not exist and never will."""
+    do not exist and never will.
+
+    ``coverage_stamps`` (T3.46g) is where this market type's stamp closure is
+    registered for :mod:`hunter_market_worker.coalesce`'s flush-time nudge —
+    the same object every reconnect passes to housekeeping below, since
+    ``adapter``/``coverage``/``dropped`` all outlive a single ``consume_once``.
+    """
     producer = f"market-worker@{runtime.instance}"
     memory = AcceptedEvents()
     trade_memory = TradeMemory()
@@ -232,6 +263,9 @@ async def run_ingest(
     # One ledger per process, never per session: a reconnect recreates the
     # adapter's per-connection counters, and a loss must never un-happen.
     dropped = DroppedEventsLedger()
+    stamp = _coverage_stamp_fn(adapter, redis, coverage, dropped)
+    if coverage_stamps is not None:
+        coverage_stamps[market_type] = stamp
     while True:
         if not universe.symbols:
             if universe.initialized:
@@ -262,6 +296,7 @@ async def run_ingest(
                 dropped,
                 market_type,
                 channels,
+                stamp,
             )
         except ExchangeError as exc:
             heartbeat_state.last_error = str(exc)

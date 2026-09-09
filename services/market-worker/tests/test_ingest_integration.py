@@ -677,6 +677,70 @@ async def test_consume_once_observe_proof_does_not_lift_covered_until_during_bac
             await task
 
 
+async def test_flush_ticks_stamps_coverage_after_the_book_write_it_just_made(
+    redis_client: Any,
+) -> None:
+    """T3.46g: the coverage stamp fires from *inside* ``flush_ticks``, right
+    after the same ``pipe.execute()`` that just wrote the book -- not from the
+    housekeeping loop's own, independently-scheduled tick (module docstring,
+    ``hunter_market_worker.coverage`` T3.46g section). This test never starts
+    ``consume_once``/housekeeping at all, so there is no other path that could
+    have produced the result: whatever ``covered_until`` reads afterwards, it
+    can only be this call's own doing.
+    """
+    from hunter_core.domain.enums import MarketType
+    from hunter_core.domain.types import utcnow
+    from hunter_market_worker.coverage import CoverageTracker
+
+    adapter = FakeAdapter()
+    coverage = CoverageTracker(adapter.code)
+    coverage.session_started(["BTCUSDT"])
+    book_ts = utcnow()
+    book = builders.order_book("BTCUSDT").model_copy(update={"ts": book_ts})
+    # What ``streaming.py``'s ``consume()`` already does at accept time,
+    # before the coalescer ever sees the event (T3.46d) -- the flush-time
+    # stamp only has to move the *moment* it publishes, not the value.
+    coverage.observe_proof(book_ts)
+
+    coalescer = TickCoalescer()
+    coalescer.on_book(book)
+
+    async def stamp() -> bool:
+        return await coverage.stamp(
+            redis_client, dropped_events=0, ws_state=adapter.connection_state()
+        )
+
+    published = await flush_ticks(
+        coalescer, redis_client, PRODUCER, coverage_stamps={MarketType.PERPETUAL: stamp}
+    )
+
+    assert published == ["BTCUSDT"]
+    raw = await redis_client.hgetall(keys.tape_coverage(adapter.code))
+    covered_until = datetime.fromisoformat(raw[b"covered_until"].decode())
+    assert covered_until >= book_ts
+
+
+async def test_flush_ticks_does_not_stamp_a_market_type_with_nothing_flushed(
+    redis_client: Any,
+) -> None:
+    """The fallback stays the housekeeping tick's job for a quiet shard: a
+    cycle with no dirty items must not invoke any registered stamp at all."""
+    from hunter_core.domain.enums import MarketType
+
+    calls = {"n": 0}
+
+    async def stamp() -> bool:
+        calls["n"] += 1
+        return True
+
+    published = await flush_ticks(
+        TickCoalescer(), redis_client, PRODUCER, coverage_stamps={MarketType.PERPETUAL: stamp}
+    )
+
+    assert published == []
+    assert calls["n"] == 0
+
+
 async def test_handle_event_ticker_and_book_never_touch_redis(
     redis_client: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:

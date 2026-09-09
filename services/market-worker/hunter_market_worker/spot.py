@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from hunter_core.settings import Settings
     from hunter_exchanges.base import ExchangeAdapter
     from hunter_market_worker.coalesce import TickCoalescer
+    from hunter_market_worker.coverage import CoverageStampFn
 
 logger = get_logger(__name__)
 
@@ -119,8 +120,14 @@ async def run_spot(
     status: SpotStatus,
     *,
     outbox_wake: asyncio.Event | None = None,
+    coverage_stamps: dict[MarketType, CoverageStampFn] | None = None,
 ) -> None:
     """Run the whole spot path until cancelled. Never returns on its own.
+
+    ``coverage_stamps`` (T3.46g) is forwarded to ``run_ingest`` unchanged —
+    this path's own stamp closure is registered under
+    ``MarketType.SPOT``, next to whatever the perpetual path registered under
+    ``MarketType.PERPETUAL`` in the same shared dict.
 
     A task on every shard, idle on all but shard 0 (module docstring). Idling
     with an ``Event`` that is never set rather than returning: ``forever()``
@@ -176,6 +183,7 @@ async def run_spot(
                     market_type=MarketType.SPOT,
                     channels=SPOT_CHANNELS,
                     shard=SPOT_SHARD,
+                    coverage_stamps=coverage_stamps,
                 ),
                 "spot-persist": drain_loop(
                     session_factory,

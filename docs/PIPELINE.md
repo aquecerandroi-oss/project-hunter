@@ -59,6 +59,10 @@ Definição exata do fluxo (item 80.6). Cada etapa: gatilho, entrada, saída, on
 
 10. **A corrida de carimbo do livro, fechada (T3.46d).** `covered_until` (item 8 acima) carimbava `agora − 0,5 s` num laço de *housekeeping* independente do laço que grava o livro (`coalesce.py`, a cada ~250 ms) — dois relógios descoordenados comparando um livro que, numa perpétua líquida, é quase sempre mais fresco que a margem contra um corte sempre exatamente uma margem atrás do relógio. Medido na VPS (13 427 leituras pareadas, 5 mercados, `.claude/state/notes-T3.46d.md` §1): o livro vinha depois do corte em 89 % das leituras (p50 +339 ms, p90 +762 ms, p99 +1 472 ms) — cauda grande demais para uma tolerância declarada limitada a 500 ms (deixaria ~28 % `after_cut`), então a correção fecha a corrida em vez de tolerá-la: `CoverageTracker.observe_proof` deixa o laço de consumo informar o `ts` de todo evento que **este processo já aceitou** (livro, ticker, fita — nunca "em trânsito" no sentido em que a margem existe), e `stamp` eleva `covered_until` até essa prova, nunca além dela nem além do próprio relógio do carimbo, e só enquanto os sinais de rompimento (reconexão, atraso de fila, `dropped_events`) já dizem que a sessão está em dia. Uma sessão que nunca chama o método fica idêntica, byte a byte, ao comportamento anterior.
 
+11. **O momento do carimbo, não só o valor (T3.46g).** A T3.46d acertou *o valor* de `observe_proof`, mas o *carimbo* (a escrita em `mkt:{exchange}:coverage`) continuava saindo só do laço de *housekeeping*, numa fase de ~250 ms descoordenada da do `coalesce_loop`/`flush_ticks` que grava o livro — um leitor podia ver o livro novo e ainda ler um `covered_until` do carimbo anterior. `flush_ticks` agora chama, logo depois do `pipe.execute()` que acabou de escrever o livro/ticker do ciclo, o mesmo `CoverageTracker.stamp` que o *housekeeping* usa (`CoverageStampFn`, uma função por tipo de mercado, construída uma vez em `run_ingest` e compartilhada pelos dois chamadores — nenhuma regra nova de `stamp`, o mesmo piso de `observe_proof` e as mesmas recusas de reconexão/backlog). O *housekeeping* continua rodando, inalterado, como reserva para um shard sem eventos (o relógio ainda precisa avançar quando não há nada para escrever). Medido na VPS (`.claude/state/notes-T3.46f.md` §2.3): essa fase valia ~21-26 dos ~43 pontos de `after_cut` que sobravam depois da T3.46f. Junto com o item 12 abaixo (o scanner lendo o `until` do shard dono em vez do mínimo agregado), fecha o resíduo.
+
+12. **O scanner lê o `until` do shard dono, não o mínimo agregado (T3.46g).** `covered_until` publicado em `mkt:{exchange}:coverage` é o **mínimo** entre os N shards (item 8) — a resposta certa para "a exchange inteira está coberta?" e pessimista demais para "este mercado está coberto?": um símbolo de um shard em dia ficava limitado pelo shard mais atrasado. `mkt:{exchange}:coverage:shards` já publica o `until` de cada shard e a lista de símbolos que ele reivindica; `hunter_scanner_worker.coverage.refreshed_cut` agora lê, no mesmo `HGETALL` por ciclo que já lia o agregado, qual shard é o único dono vivo de cada símbolo e relê o `until` **daquele shard** (dois campos, mesmo custo do re-read do T3.46f) em vez do agregado — nunca uma tolerância, nunca uma prova de outro fluxo: o mapeamento e o `until` vêm da mesma leitura, então nunca descrevem uma topologia que já mudou. Um símbolo sem dono vivo único (0 ou 2+ shards reivindicando — um rebalanceamento em andamento) fica com o mínimo agregado, a resposta conservadora. Medido na VPS (`.claude/state/notes-T3.46f.md` §2.3): ~26 dos ~43 pontos restantes de `after_cut` eram essa agregação.
+
 **Eventos publicados:** `market.ticks` (coalescido 250 ms; payload: preço, bid, ask, volume incremental, trades_count, book_imbalance top 5), `market.candles.closed`, `market.derivatives` (OI, funding, mark), `market.liquidations`, `market.universe.changed`.
 
 **Falha:** WS caiu → reconnect com backoff (1 s → 60 s), REST recovery; Redis caiu → buffer em memória por 60 s, depois descarta ticks (efêmeros); os eventos duráveis ficam pendentes em `outbox_events` e saem quando o Redis volta (§10b) e as admissões REST ficam suspensas até lá (item 7, sem orçamento independente por processo); Postgres lento → escrita em lote com fila em memória limitada, alerta se > 10 s de atraso.
@@ -179,7 +183,10 @@ estados que outro já moveu. `features.updated` continua sendo publicado — par
   recente dos dois — dentro da mesma sessão, nunca para trás, nunca uma tolerância: um snapshot
   ainda à frente do corte relido continua recusado por `decode_book` exatamente como antes, e
   `source_bar_close` é alinhado ao minuto, então um corte que anda milissegundos dentro do mesmo
-  minuto não faz nenhuma estratégia enxergar a barra seguinte;
+  minuto não faz nenhuma estratégia enxergar a barra seguinte. **T3.46g** relê esse corte no shard
+  dono do símbolo em vez do mínimo agregado dos N shards, e o market-worker carimba
+  `covered_until` no mesmo pipeline que grava o livro, não mais só no *housekeeping* — §1 itens
+  11-12;
 - **o scanner nunca chama REST:** falta de histórico vira `market.backfill.requested`, que o
   `market-worker` — dono do rate limit e da tabela de gaps — atende.
 
@@ -316,6 +323,28 @@ tenha mudado alguma coisa ou não, trinta e um dias para trás.
    por dia (`WRITE_BATCH_HOURS = 24`; uma leva que falha é repetida hora a hora, então uma
    hora impossível continua custando só a própria hora). A passada em regime permanente
    recalcula as 73 horas da janela de reparo, não reescreve nenhuma e custa **0,52 s**.
+
+10. **Quem consome esta série na decisão — o portão de elegibilidade (T3.52).** O
+    `strategy-worker` lê esta série ao montar o contexto e recusa a decisão de uma versão
+    que declare um portão (`strategy_versions.eligibility_policy`, `0017`, DATABASE.md §29)
+    quando o regime da hora não está na lista dela; o motivo vai no
+    `StrategyContext.eligibility_reason` como `regime_gate:<RÓTULO>`, a estratégia responde
+    `INELIGIBLE` (não decide, não re-arma o slot, não gasta a barreira) e a decisão aceita
+    grava no envelope qual linha a liberou. **A linha usada é a última hora fechada antes do
+    corte** (`end_time <= source_bar_close`): uma decisão das 15:30 é cortada pela linha
+    `[14:00, 15:00)`, nunca pela `[15:00, 16:00)`. Vale dizer por quê, porque a razão óbvia
+    está errada: pelo item 1, a linha que **contém** o corte foi decidida com velas finais em
+    `[15:00)` e usá-la também **não** seria antecipação. A regra mais estrita é escolhida por
+    três motivos do lado de quem lê — ela continua verdadeira se a convenção de rotulagem
+    mudar; não depende da latência do produtor horário (a linha da hora corrente é escrita
+    logo depois do corte dela, e uma decisão às 15:02 com o job atrasado não acharia linha
+    nenhuma); e iguala replay e faixa viva, que é o que permite comparar as duas populações.
+    **Custo declarado:** o contexto que corta a decisão tem entre 61 e 119 minutos de idade,
+    contra 1 a 60 se a linha contendo o corte fosse usada. Mudar isso é uma `rule` nova no
+    JSON da política — o leitor recusa uma regra que não conhece —, nunca uma edição
+    silenciosa. Linha ausente, `UNKNOWN` do classificador (27 % das horas dos 31 dias, item 5)
+    e linha mais velha que 2 h recusam com `regime_gate:unknown`: o portão nunca decide sem
+    contexto e nunca envelhece junto com um produtor morto.
 
 ## 5. Opportunity Engine
 

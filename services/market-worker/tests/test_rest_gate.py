@@ -137,10 +137,10 @@ async def test_run_market_publishes_the_gate_on_ready_without_failing_it(
     adapter = _GatedAdapter("fake", "suspended")
     seen: list[str] = []
 
-    async def waiting(*_args: Any) -> None:
+    async def waiting(*_args: Any, **_kwargs: Any) -> None:
         await asyncio.Event().wait()
 
-    async def probe(*_args: Any) -> None:
+    async def probe(*_args: Any, **_kwargs: Any) -> None:
         seen.append(runtime.status_details["rest_gate"]())
         raise ValueError("stop the worker")
 

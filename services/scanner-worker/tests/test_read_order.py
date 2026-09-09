@@ -144,3 +144,32 @@ async def test_a_book_still_ahead_of_the_re_read_cut_is_refused(seeded: Any) -> 
     )
 
     assert build.context.book.reason == AFTER_CUT
+
+
+async def test_a_symbol_owned_by_a_fresh_shard_uses_that_shards_own_cut(seeded: Any) -> None:
+    """T3.46g, against real Redis: the aggregate ``min`` a lagging sibling set
+    (``CUT_AT_CYCLE_START``) would still refuse this book; the owning shard's
+    own record already covers it, and the mapping comes from the same
+    ``:shards`` hash the ``until`` does -- never a formula, never a guess.
+    """
+    shard_until = BOOK_TS + timedelta(milliseconds=1)
+    await seeded.hset(
+        f"{keys.tape_coverage(EXCHANGE)}:shards",
+        mapping={
+            "0of2:since": f"{SESSION.timestamp()}|{SESSION.isoformat()}",
+            "0of2:until": f"{shard_until.timestamp()}|{shard_until.isoformat()}",
+            "0of2:ts": str(BOOK_TS.timestamp()),
+            "0of2:syms": f"{SYMBOL}\t{SESSION.timestamp()}\t{SESSION.isoformat()}",
+        },
+    )
+
+    coverage = await read_coverage(seeded, EXCHANGE, now=BOOK_TS)
+    assert coverage.shard_owner == {SYMBOL: "0of2"}
+    assert coverage.covered_until == CUT_AT_CYCLE_START  # the aggregate alone is still stale
+
+    build = await build_market_context(
+        seeded, exchange=EXCHANGE, symbol=SYMBOL, coverage=coverage, now=BOOK_TS
+    )
+
+    assert build.context.book.reason is None
+    assert build.context.as_of == shard_until

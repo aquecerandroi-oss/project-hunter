@@ -30,6 +30,12 @@ Nothing is anticipated -- the cut is still a published proof about data the
 collector had already accepted, never the clock, never a tolerance -- and
 ``source_bar_close`` is minute-aligned, so a cut that moves by milliseconds
 inside the same minute cannot make a strategy see the next bar.
+
+**Re-read routes by owning shard (T3.46g).** ``refreshed_cut`` now takes
+``symbol`` and, when it maps to exactly one live collector shard
+(``hunter_scanner_worker.coverage``), re-reads that shard's own record instead
+of the aggregate ``min`` across every shard -- never a fresher cut than this
+symbol's own collector proved.
 """
 
 from __future__ import annotations
@@ -155,7 +161,9 @@ async def build_market_context(
     # T3.46f: after the snapshots, never before them. ``coverage`` is the
     # per-cycle read (it carries the ``sym:*`` roster); this re-read only moves
     # ``covered_until`` forward, and only within the same session.
-    coverage = await refreshed_cut(redis, coverage, exchange=exchange, market_type=market_type)
+    coverage = await refreshed_cut(
+        redis, coverage, exchange=exchange, symbol=symbol, market_type=market_type
+    )
     as_of, covers_from, covered_until = evaluation_cut(coverage, symbol, now=moment)
     candles = (
         decode_candles(raw.candles, raw.candles_limit)

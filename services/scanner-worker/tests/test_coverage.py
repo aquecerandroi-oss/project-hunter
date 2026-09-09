@@ -34,9 +34,33 @@ class FakeRedis:
     async def hgetall(self, key: str) -> dict[str, str]:
         return dict(self.hashes.get(key, {}))
 
+    async def hmget(self, key: str, fields: list[str]) -> list[str | None]:
+        stored = self.hashes.get(key, {})
+        return [stored.get(field) for field in fields]
+
 
 def _published(**fields: str) -> Any:
     return FakeRedis({keys.tape_coverage("binance"): fields})
+
+
+def _shard_stamp(moment: datetime) -> str:
+    return f"{moment.timestamp()}|{moment.isoformat()}"
+
+
+def _shard_record(
+    shard_id: str, *, since: datetime, until: datetime, ts: datetime, symbols: dict[str, datetime]
+) -> dict[str, str]:
+    """One shard's own fields, wire-identical to
+    ``hunter_market_worker.coverage_publish``'s Lua script (T3.46g)."""
+    syms = "\n".join(
+        f"{sym}\t{when.timestamp()}\t{when.isoformat()}" for sym, when in symbols.items()
+    )
+    return {
+        f"{shard_id}:since": _shard_stamp(since),
+        f"{shard_id}:until": _shard_stamp(until),
+        f"{shard_id}:ts": str(ts.timestamp()),
+        f"{shard_id}:syms": syms,
+    }
 
 
 async def test_a_missing_hash_is_no_coverage_not_an_error() -> None:
@@ -219,8 +243,148 @@ async def test_an_absent_proof_stays_absent_after_the_re_read() -> None:
     redis = TickingCollector(start=SESSION)
     redis.hashes.pop(keys.tape_coverage(EXCHANGE), None)
 
-    coverage = await refreshed_cut(cast("Any", redis), TapeCoverage(), exchange=EXCHANGE)
+    coverage = await refreshed_cut(
+        cast("Any", redis), TapeCoverage(), exchange=EXCHANGE, symbol=SYMBOL
+    )
 
     # Nothing published is not "a cut of zero": a market nobody proved stays
     # uncovered, and its trade windows keep saying ``insufficient_coverage``.
     assert coverage.live is False
+
+
+# --- T3.46g: routing a mapped symbol to its owning shard --------------------
+
+AGGREGATE_MIN = _at(100)
+FRESH_SHARD_UNTIL = _at(150)
+SHARDS_KEY = f"{keys.tape_coverage('binance')}:shards"
+
+
+def _redis_with(shard_fields: dict[str, str]) -> Any:
+    """The aggregate hash (``covered_until`` = the min a lagging shard set)
+    plus the ``:shards`` hash the mandatory reserve reads from."""
+    aggregate = {
+        "session_since": SESSION.isoformat(),
+        "covered_until": AGGREGATE_MIN.isoformat(),
+        "sym:BTCUSDT": SESSION.isoformat(),
+        "sym:DOGEUSDT": SESSION.isoformat(),
+    }
+    return FakeRedis({keys.tape_coverage("binance"): aggregate, SHARDS_KEY: shard_fields})
+
+
+async def test_a_symbol_mapped_to_one_live_shard_uses_that_shards_own_until() -> None:
+    """The fresh shard's own record, not the aggregate min a laggard set."""
+    redis = _redis_with(
+        {
+            **_shard_record(
+                "0of2",
+                since=SESSION,
+                until=FRESH_SHARD_UNTIL,
+                ts=AGGREGATE_MIN,
+                symbols={"BTCUSDT": SESSION},
+            ),
+            **_shard_record(
+                "1of2", since=SESSION, until=AGGREGATE_MIN, ts=AGGREGATE_MIN, symbols={}
+            ),
+        }
+    )
+
+    coverage = await read_coverage(redis, "binance", now=_at(101))
+    assert coverage.shard_owner == {"BTCUSDT": "0of2"}
+
+    refreshed = await refreshed_cut(redis, coverage, exchange="binance", symbol="BTCUSDT")
+
+    assert refreshed.covered_until == FRESH_SHARD_UNTIL
+
+
+async def test_a_symbol_on_the_lagging_shard_keeps_its_own_lagging_cut() -> None:
+    """Ownership routes to *this* symbol's shard, never opportunistically to
+    whichever shard happens to be freshest."""
+    redis = _redis_with(
+        {
+            **_shard_record(
+                "0of2", since=SESSION, until=FRESH_SHARD_UNTIL, ts=AGGREGATE_MIN, symbols={}
+            ),
+            **_shard_record(
+                "1of2",
+                since=SESSION,
+                until=AGGREGATE_MIN,
+                ts=AGGREGATE_MIN,
+                symbols={"BTCUSDT": SESSION},
+            ),
+        }
+    )
+
+    coverage = await read_coverage(redis, "binance", now=_at(101))
+    refreshed = await refreshed_cut(redis, coverage, exchange="binance", symbol="BTCUSDT")
+
+    assert refreshed.covered_until == AGGREGATE_MIN
+
+
+async def test_an_unmapped_symbol_falls_back_to_the_aggregate_min() -> None:
+    redis = _redis_with(
+        _shard_record(
+            "0of2",
+            since=SESSION,
+            until=FRESH_SHARD_UNTIL,
+            ts=AGGREGATE_MIN,
+            symbols={"BTCUSDT": SESSION},
+        )
+    )
+
+    coverage = await read_coverage(redis, "binance", now=_at(101))
+    assert "DOGEUSDT" not in coverage.shard_owner  # type: ignore[operator]
+
+    refreshed = await refreshed_cut(redis, coverage, exchange="binance", symbol="DOGEUSDT")
+
+    assert refreshed.covered_until == AGGREGATE_MIN
+
+
+async def test_a_symbol_claimed_by_two_live_shards_falls_back_to_the_aggregate_min() -> None:
+    """Mandatory reserve: a rebalance in flight (two live shards both still
+    claiming the symbol) has no single owner to trust -- never guess."""
+    redis = _redis_with(
+        {
+            **_shard_record(
+                "0of2",
+                since=SESSION,
+                until=FRESH_SHARD_UNTIL,
+                ts=AGGREGATE_MIN,
+                symbols={"BTCUSDT": SESSION},
+            ),
+            **_shard_record(
+                "1of2",
+                since=SESSION,
+                until=AGGREGATE_MIN,
+                ts=AGGREGATE_MIN,
+                symbols={"BTCUSDT": SESSION},
+            ),
+        }
+    )
+
+    coverage = await read_coverage(redis, "binance", now=_at(101))
+    assert "BTCUSDT" not in coverage.shard_owner  # type: ignore[operator]
+
+    refreshed = await refreshed_cut(redis, coverage, exchange="binance", symbol="BTCUSDT")
+
+    assert refreshed.covered_until == AGGREGATE_MIN
+
+
+async def test_a_stale_shard_record_is_excluded_from_ownership() -> None:
+    """A shard that stopped stamping more than ``MAX_PROOF_AGE_S`` ago is not
+    a live owner, exactly like ``coverage_publish.SHARD_RECORD_TTL_S`` drops
+    it from the aggregate itself."""
+    redis = _redis_with(
+        _shard_record(
+            "0of2",
+            since=SESSION,
+            until=FRESH_SHARD_UNTIL,
+            ts=SESSION,  # stamped 100s before ``now`` below -- long stale
+            symbols={"BTCUSDT": SESSION},
+        )
+    )
+
+    coverage = await read_coverage(redis, "binance", now=_at(101))
+
+    assert coverage.shard_owner == {}
+    refreshed = await refreshed_cut(redis, coverage, exchange="binance", symbol="BTCUSDT")
+    assert refreshed.covered_until == AGGREGATE_MIN
