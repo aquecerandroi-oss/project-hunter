@@ -7,77 +7,65 @@ Until that proof exists, ``trade_velocity_1m``, ``buy_pressure_5m`` and
 ``sell_pressure_5m`` are ``insufficient_coverage`` and no EARLY is confirmed.
 
 Only this process can produce the proof, and only about the interval it can
-actually stand behind:
-
-- **the session**, not the socket. ``ws_state = connected`` next to a
-  *cumulative* ``dropped_events`` (``heartbeat.py``) would let a connection that
-  lost a trade read as covered. A drop can have been a trade on any symbol, so
-  it ends the interval and a new one starts at that instant;
-- **per symbol**, because a market subscribed mid-session is only covered from
-  its own subscription, and an unsubscribed one stops claiming coverage at once;
-- **short of the clock**. An event the adapter already received may not have
-  reached the tape yet, so a stamp claims ``now - COVERAGE_SAFETY_S`` and never
-  ``now``. :meth:`CoverageTracker.writing`/:meth:`written` additionally hold the
-  stamp back while a hot-state write is in flight, so the margin covers the
-  adapter's own queue rather than a write this process knows is unfinished.
+actually stand behind: **the session**, not the socket (a *cumulative*
+``dropped_events`` next to ``ws_state=connected`` would let a connection that
+lost one trade still read as covered — a drop ends the interval and a new one
+starts at that instant); **per symbol** (subscribed mid-session = covered
+only from then, unsubscribed = stops claiming at once); and **short of the
+clock** (an event the adapter already received may not have reached the tape
+yet, so a stamp claims ``now - COVERAGE_SAFETY_S``, never ``now`` —
+:meth:`writing`/:meth:`written` additionally hold the stamp back while a
+hot-state write is in flight).
 
 The scanner then evaluates each market at ``as_of = covered_until`` instead of
 at its own clock: "as it was observable at ``as_of``" is what ``MarketContext``
 means, and moving the cut is the only honest way to satisfy a proof that is
 always slightly behind.
 
-**T2.5-adapter** (full account: ``.claude/state/astra-review-T2.5-adapter-diff.md``)
-closed two gaps the 0.5s margin alone cannot see through, both read at
-**stamp time** (every housekeeping tick, ~250ms), never per event:
+**T2.5-adapter** (``.claude/state/astra-review-T2.5-adapter-diff.md``) closed
+two gaps the margin alone cannot see through, both read at **stamp time**:
+an **internal reconnect** the adapter retries without ever ending
+:meth:`stream`'s generator (caught by ``ws_state`` and by
+``connection_generation``, which also catches a full cycle completing
+*between* two stamps — either forces ``reason="reconnect"`` and a *fresh*
+session on resumption, never the old one stretched across the gap); and a
+**backlogged queue without drops** (``_in_flight == 0`` only proves no write
+*this process* started is unfinished — ``queue_progress`` covers the
+adapter's own inbound queue; an eviction counts on its own ledger side so it
+never reads as permanent backlog once it clears, unlike a reconnect).
 
-- **an internal reconnect.** ``ConnectionRunner.run`` (``binance/connection.py``)
-  retries a dropped socket without ever ending :meth:`stream`'s generator, so a
-  session that only broke when that generator ended could publish "continuous"
-  straight through a real gap. Two signals catch it: ``ws_state`` (mandatory,
-  worst across connection keys, set to ``"reconnecting"`` *before* the close
-  awaits) and ``connection_generation`` (bumped on every reconnect — catches a
-  full cycle completing *between* two stamps). Either changing forces
-  ``reason="reconnect"``, and resumption starts a *fresh* session rather than
-  stretching the old one across a gap this process could not see through;
-- **a backlogged queue without drops.** ``_in_flight == 0`` says no write *this
-  process* started is unfinished, never that the adapter's inbound queue was
-  empty. ``queue_progress`` (``enqueued``, ``delivered``, ``evicted``) fixes
-  that; an eviction counts on its own side of the ledger, so the break it
-  already causes (``dropped_events``) does not read as permanent backlog
-  afterwards. Unlike a reconnect, backlog clearing never invalidates the
-  session: nothing was lost, only delayed.
-
-**T2.5e** (``.claude/state/brief-T2.5e-coverage-caught-up.md``, full account
-in ``.claude/state/notes-T2.5.md`` T2.5e section) found that ledger right but
+**T2.5e** (``.claude/state/notes-T2.5.md`` T2.5e) found that ledger right but
 its bar wrong: under continuous flow ``enqueued == delivered + evicted`` holds
-only in the instant the queue is fully empty, so the interval broke on nearly
-every stamp and stayed broken. "Caught up" is now a **bounded delay**: a
-nonzero backlog only breaks the interval if the oldest pending event's own
-timestamp (``queue_oldest_pending_ts()``, which covers both the deque and an
-item already popped but not yet delivered) has itself reached the window this
-stamp is about to claim (``moment - COVERAGE_SAFETY_S``). Its *own* ``ts``,
-never how long this queue has known about it — an event can sit upstream of
-here invisibly; and the minimum over pending events, since arrival order
-across reader tasks is not timestamp order. A plain count threshold was
-rejected in design review: magnitude decides nothing a timestamp does not
-already decide correctly.
+only when the queue is momentarily empty, so the interval broke on nearly
+every stamp. "Caught up" is now a **bounded delay**: a nonzero backlog only
+breaks the interval if the oldest pending event's own ``ts``
+(``queue_oldest_pending_ts()``) has itself reached the window this stamp is
+about to claim — its own timestamp, never how long it has been known about,
+and the minimum over pending events, since arrival order across reader tasks
+is not timestamp order.
 
 **T2.5g** made the collector N processes (``MARKET_SHARD=i/N``) while the
-scanner still reads one hash per exchange. What this shard can stand behind is
-decided here as before; *publishing* it moved to
+scanner still reads one hash per exchange: what this shard can stand behind
+is decided here as before, *publishing* moved to
 :mod:`hunter_market_worker.coverage_publish` (one Lua script, conservative
-merge — its module docstring has the aggregate's rules). Fixed on the way:
-``dropped_events`` arrived here as a constant ``0``, because ``streaming.py``
-read it off the adapter instead of its connections, so the break below never
-fired on the VPS while 1.2M events were dropped (``DroppedEventsLedger``).
+merge). All four signals above are read in the same housekeeping task that
+already calls :meth:`writing`/:meth:`written`; ``connection_generation``/
+``queue_progress``/``queue_oldest_pending_ts`` are read defensively
+(additive, like ``rest_gate_status``), ``ws_state`` is not. An adapter
+implementing none of them behaves as before this module existed.
 
-All four signals are read in the same housekeeping task that already calls
-:meth:`writing`/:meth:`written`. ``connection_generation``/``queue_progress``/
-``queue_oldest_pending_ts`` are read defensively (``getattr``, additive
-capability, like ``rest_gate_status``); ``ws_state`` is not, since
-``connection_state()`` is mandatory. An adapter implementing none of them
-behaves as before this module existed: ``ws_state`` ``"connected"``, the rest
-``None``.
+**T3.46d — the book stamp race** (measurements, full account and the
+non-anticipation argument: ``.claude/state/notes-T3.46d.md`` §1-2). The
+margin above guards events received but not yet yielded upstream — nothing
+about how fresh a live book naturally is, and against this module's own
+independently-scheduled housekeeping tick a book was newer than
+``covered_until`` in 89% of paired VPS reads (a tolerance bounded at the
+brief's own suggested 500 ms would still leave ~28% ``after_cut``, rejected).
+:meth:`observe_proof` closes the race: ``consume_once`` feeds it the
+timestamp of every event *already accepted* (never "in flight" in the sense
+the margin exists for), and ``stamp`` floors ``covered_until`` at that proof
+— never past it or the stamp's own clock, only while ``caught_up``. A session
+that never calls it is unchanged byte-for-byte.
 """
 
 from __future__ import annotations
@@ -148,6 +136,7 @@ class CoverageTracker:
         #: session so a number that does not reset across sessions never
         #: reads as a break at the next ``session_started``.
         self._generation: int | None = None
+        self._observed_proof: datetime | None = None  # T3.46d: newest ts accepted
 
     # --- session lifecycle -------------------------------------------------
 
@@ -162,6 +151,7 @@ class CoverageTracker:
         self._break_reason = None
         self._broken_since_monotonic = None
         self._generation = None
+        self._observed_proof = None
 
     def session_broken(self) -> None:
         """The stream ended (error, restart, universe reconnect): no coverage."""
@@ -171,6 +161,7 @@ class CoverageTracker:
         self._break_reason = None
         self._broken_since_monotonic = None
         self._generation = None
+        self._observed_proof = None
 
     def subscribed(self, symbols: Iterable[str], *, at: datetime | None = None) -> None:
         """Symbols added mid-session — covered from this instant, not earlier."""
@@ -190,6 +181,11 @@ class CoverageTracker:
 
     def written(self) -> None:
         self._in_flight = max(0, self._in_flight - 1)
+
+    def observe_proof(self, ts: datetime | None) -> None:
+        """``ts`` of an event already accepted this session (T3.46d)."""
+        if ts is not None and (self._observed_proof is None or ts > self._observed_proof):
+            self._observed_proof = ts
 
     # --- publication -------------------------------------------------------
 
@@ -276,12 +272,12 @@ class CoverageTracker:
                 frozen_for_s=monotonic() - self._broken_since_monotonic,
             )
         if caught_up and was_broken and self._break_reason == "reconnect":
-            # Confirmed resumption from a real rupture: a fresh, conservative
-            # session starts now rather than stretching the old one across a
-            # gap this process could not see through.
+            # Confirmed resumption from a real rupture: a fresh, conservative session
+            # starts now rather than stretching the old one across an unseen gap.
             self._session_since = moment
             self._symbols = {symbol: moment for symbol in self._symbols}
             self._last_safe_covered_until = None
+            self._observed_proof = None  # a proof from before the gap is not a proof
         if not caught_up:
             if reason != "reconnect" and self._break_reason == "reconnect":
                 # "reconnect" outranks and survives a backlog observed before
@@ -303,7 +299,11 @@ class CoverageTracker:
             self._broken_since_monotonic = None
 
         if caught_up:
-            self._last_safe_covered_until = moment - timedelta(seconds=COVERAGE_SAFETY_S)
+            margin_based = moment - timedelta(seconds=COVERAGE_SAFETY_S)
+            proof = self._observed_proof
+            if proof is not None and proof > margin_based:  # T3.46d floor
+                margin_based = proof if proof < moment else moment
+            self._last_safe_covered_until = margin_based
         covered_until = (
             self._last_safe_covered_until
             if self._last_safe_covered_until is not None

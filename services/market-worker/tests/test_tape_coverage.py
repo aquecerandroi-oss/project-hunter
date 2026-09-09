@@ -329,3 +329,95 @@ async def test_an_eviction_does_not_look_like_permanent_backlog(redis_client: An
     )
     hash_ = await _hash(redis)
     assert hash_["covered_until"] == (_at(1) - timedelta(seconds=COVERAGE_SAFETY_S)).isoformat()
+
+
+# --- T3.46d: the book stamp race -------------------------------------------
+
+
+async def test_book_stamped_150ms_after_the_naive_cut_is_accepted_once_proven(
+    redis_client: Any,
+) -> None:
+    """A live order book is naturally almost as fresh as the clock, so the
+    margin-only ``covered_until`` sits *before* it far more often than not
+    (89% of paired VPS reads, ``.claude/state/notes-T3.46d.md`` §1) — not the
+    rare edge case the fixed margin was designed for. Feeding the tracker the
+    timestamp of the very event ``consume()`` just accepted (before the
+    coalescer's next flush ever runs) closes the race without any tolerance:
+    ``hotstate.decode_book`` still refuses ``ts > as_of`` exactly as before,
+    it is ``as_of`` that catches up to what is already safely known."""
+    redis: Any = redis_client
+    tracker = CoverageTracker("binance")
+    tracker.session_started(["BTCUSDT"], at=_at(0))
+
+    book_ts = _at(0.65)  # 150ms after the naive cut computed below
+
+    # Today: covered_until = now - COVERAGE_SAFETY_S = _at(0.5) < book_ts.
+    # hotstate.decode_book would refuse this exact book as after_cut.
+    await tracker.stamp(redis, dropped_events=0, now=_at(1.0))
+    naive_covered_until = datetime.fromisoformat((await _hash(redis))["covered_until"])
+    assert naive_covered_until == _at(0.5)
+    assert naive_covered_until < book_ts
+
+    # The event that produced this book snapshot was already accepted by
+    # `consume()` — exactly what happens before the coalescer's own,
+    # independently-scheduled flush writes it to `mkt:*:book`.
+    tracker.observe_proof(book_ts)
+    await tracker.stamp(redis, dropped_events=0, now=_at(1.05))
+    fixed_covered_until = datetime.fromisoformat((await _hash(redis))["covered_until"])
+    assert fixed_covered_until >= book_ts  # accepted under the fix
+
+
+async def test_observed_proof_never_lifts_covered_until_while_disconnected(
+    redis_client: Any,
+) -> None:
+    """The floor only ever applies once every other break signal already
+    says ``caught_up`` — a proof observed before a rupture must not let a
+    frozen or never-connected interval advance."""
+    redis: Any = redis_client
+    tracker = CoverageTracker("binance")
+    tracker.session_started(["BTCUSDT"], at=_at(0))
+    tracker.observe_proof(_at(5))  # far ahead of this reconnecting stamp
+
+    await tracker.stamp(redis, dropped_events=0, now=_at(1), ws_state="reconnecting")
+
+    hash_ = await _hash(redis)
+    assert hash_["covered_until"] == hash_["session_since"] == _at(0).isoformat()
+
+
+async def test_observed_proof_resets_when_the_session_breaks(redis_client: Any) -> None:
+    """A proof from a connection that no longer exists must never leak into
+    the fresh session that replaces it."""
+    redis: Any = redis_client
+    tracker = CoverageTracker("binance")
+    tracker.session_started(["BTCUSDT"], at=_at(0))
+    # A proof from *ahead* of the next session's own stamp: if this leaked
+    # across the reset it would wrongly lift ``covered_until`` past what the
+    # new, unrelated session has any right to claim.
+    tracker.observe_proof(_at(25))
+
+    tracker.session_broken()
+    tracker.session_started(["BTCUSDT"], at=_at(20))
+    await tracker.stamp(redis, dropped_events=0, now=_at(20.1))
+
+    hash_ = await _hash(redis)
+    # Margin-based value (_at(19.6)) is before the new session even starts,
+    # so it is clamped up to `session_since` (_at(20)) exactly as a session
+    # with no proof at all would be. Were the stale `_at(25)` proof not
+    # reset, it would instead have won outright and published `_at(20.1)`.
+    assert hash_["covered_until"] == _at(20).isoformat()
+
+
+async def test_observed_proof_never_exceeds_this_stamps_own_clock(redis_client: Any) -> None:
+    """A proof ahead of ``moment`` (clock skew, or a caller passing a bogus
+    value) is clamped to the stamp's own clock rather than published as-is —
+    the floor may only ever *raise* the margin-based value, never invent a
+    claim past what this stamp itself is willing to assert."""
+    redis: Any = redis_client
+    tracker = CoverageTracker("binance")
+    tracker.session_started(["BTCUSDT"], at=_at(0))
+    tracker.observe_proof(_at(100))
+
+    await tracker.stamp(redis, dropped_events=0, now=_at(1))
+
+    hash_ = await _hash(redis)
+    assert hash_["covered_until"] == _at(1).isoformat()

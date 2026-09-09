@@ -155,6 +155,14 @@ async def consume_once(
             if accepted and source_ts is not None:
                 previous = heartbeat_state.last_event_at
                 heartbeat_state.last_event_at = max(previous, source_ts) if previous else source_ts
+                if coverage is not None:
+                    # T3.46d: this event already passed ``handle_event``'s
+                    # ordering/validation, so its own timestamp is a floor
+                    # ``stamp`` may trust — closing the race between the
+                    # coalescer's book write and this loop's independent
+                    # clock (``hunter_market_worker.coverage`` module
+                    # docstring, T3.46d section).
+                    coverage.observe_proof(source_ts)
         # ``async for`` swallows StopAsyncIteration as normal loop exit — the
         # old code caught it explicitly from a manual __anext__() and turned
         # it into a fatal RuntimeError; a plain exhaustion here means the
