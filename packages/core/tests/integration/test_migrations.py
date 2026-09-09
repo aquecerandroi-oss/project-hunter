@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import uuid
 from collections.abc import AsyncIterator, Iterator, Mapping
 from datetime import UTC, datetime
@@ -37,7 +38,7 @@ from .conftest import alembic_config, async_engine, create_database, migration_d
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0016_exchange_status_planned"
+HEAD_REVISION = "0017_eligibility_policy"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -55,6 +56,7 @@ STRATEGY_ACTIVATION_OWNER_REVISION = "0011_strategy_activation_owner"
 REPLAY_RUNS_REVISION = "0013_replay_runs"
 LAB_SIGNALS_INDEXES_REVISION = "0014_lab_signals_indexes"
 RUNTIME_LOGIN_ROLE_REVISION = "0015_runtime_login_role"
+EXCHANGE_STATUS_REVISION = "0016_exchange_status_planned"
 
 _PENDING_PREDICATE = "dispatched_at IS NULL"
 """What makes an index a *pending* index, spelled out here rather than imported:
@@ -1610,6 +1612,26 @@ async def _index_definition(url: str, name: str) -> str:
         await engine.dispose()
 
 
+_PAIR = re.compile(r"NEW\.(\w+) IS DISTINCT FROM OLD\.(\w+)")
+"""One comparison of ``shadow_freeze_strategy_version``'s body, both sides
+captured — a body that compared ``NEW.a`` with ``OLD.b`` would be a bug this
+must not read past."""
+
+
+def _frozen_columns(body: str) -> tuple[str, ...]:
+    """The column list ``shadow_freeze_strategy_version`` actually compares, in
+    the order the installed body compares them.
+
+    Read out of the body rather than asserted with ``in``: a substring check
+    passes on a *superset*, so it can never notice a column that a later
+    revision quietly added to — or dropped from — the freeze. The list is the
+    contract (§22.2, §24, §29.3), so the list is what gets compared.
+    """
+    pairs: list[tuple[str, str]] = re.findall(_PAIR, body)
+    assert all(left == right for left, right in pairs), f"compares two columns: {pairs}"
+    return tuple(left for left, _ in pairs)
+
+
 async def _function_source(url: str, name: str) -> str:
     """The body of a trigger function, read from ``pg_proc``.
 
@@ -1837,9 +1859,11 @@ def _strategy_version(
     key: str,
     purpose: str | None = None,
     activated: bool = False,
+    policy: str | None = None,
 ) -> uuid.UUID:
     """A fresh ``strategies``/``strategy_versions`` pair. ``purpose`` omitted
-    means "let the column default decide"."""
+    means "let the column default decide"; ``policy`` is the ``0017`` JSON, as
+    text, and omitting it leaves the column ``NULL`` — no gate."""
     strategy_id, version_id = uuid7(), uuid7()
     columns = "id, strategy_id, version, status, code_ref, activated_at"
     placeholders = ":id, :strategy, 'v1', :status, 'hunter_core.strategies.probe', :activated_at"
@@ -1853,6 +1877,10 @@ def _strategy_version(
         columns += ", purpose"
         placeholders += ", :purpose"
         params["purpose"] = purpose
+    if policy is not None:
+        columns += ", eligibility_policy"
+        placeholders += ", CAST(:policy AS jsonb)"
+        params["policy"] = policy
     asyncio.run(
         _write(
             url,
@@ -3032,10 +3060,16 @@ def test_0016_refuses_to_downgrade_while_a_venue_is_planned(upgraded: str) -> No
     config = alembic_config(upgraded)
     planned = asyncio.run(_write_exchange(upgraded, f"guard-{uuid.uuid4().hex[:6]}", "planned"))
     try:
+        # The head is ``0017`` since T3.52 — step down to ``0016`` first so
+        # ``-1`` means *this* revision again (the shape the ``0015`` tests use).
+        command.downgrade(config, EXCHANGE_STATUS_REVISION)
         with pytest.raises(DBAPIError, match="still status = 'planned'"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == EXCHANGE_STATUS_REVISION, (
+            "the downgrade must not commit"
+        )
     finally:
+        command.upgrade(config, "head")
         asyncio.run(_forget_exchange(upgraded, planned))
     command.check(config)
 
@@ -3051,6 +3085,8 @@ def test_0016_reverses_on_a_database_where_nothing_is_planned(upgraded: str) -> 
     config = alembic_config(upgraded)
     active = asyncio.run(_write_exchange(upgraded, f"trip-{uuid.uuid4().hex[:6]}", "active"))
     try:
+        # Head is ``0017`` since T3.52: reach ``0016`` before stepping over it.
+        command.downgrade(config, EXCHANGE_STATUS_REVISION)
         command.downgrade(config, "-1")
         assert asyncio.run(_revision(upgraded)) == RUNTIME_LOGIN_ROLE_REVISION
         assert asyncio.run(_enum_labels(upgraded))["exchange_status"] == ["active", "inactive"]
@@ -3069,4 +3105,203 @@ def test_0016_reverses_on_a_database_where_nothing_is_planned(upgraded: str) -> 
         command.upgrade(config, "head")
         asyncio.run(_forget_exchange(upgraded, active))
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+# --------------------------------------------------------------------------
+# 0017_eligibility_policy — the context a version is allowed to decide in
+# --------------------------------------------------------------------------
+
+_GATE = '{"regime": {"allow": ["SIDEWAYS"], "scope": "btc"}}'
+
+
+def _forget_gated_draft(url: str, version_id: uuid.UUID) -> None:
+    """:func:`_forget_draft_strategy_version` by another name — a draft carrying
+    a policy left behind would trip section 29's downgrade guard for every later
+    test that reverses past ``0017``, for a reason that test never created."""
+    _forget_draft_strategy_version(url, version_id)
+
+
+def test_0017_adds_a_nullable_policy_column_with_no_default(upgraded: str) -> None:
+    """``NULL`` is the honest backfill: every version that exists decides in
+    every regime, and that is what "no policy" means (DATABASE.md §29)."""
+    assert asyncio.run(_column_exists(upgraded, "strategy_versions", "eligibility_policy"))
+    shape = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT data_type || '/' || is_nullable || '/' || coalesce(column_default, 'none') "
+            "FROM information_schema.columns WHERE table_name = 'strategy_versions' "
+            "AND column_name = 'eligibility_policy'",
+            {},
+        )
+    )
+    assert shape == ["jsonb/YES/none"]
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT count(*)::text FROM strategy_versions WHERE eligibility_policy IS NOT NULL",
+            {},
+        )
+    ) == ["0"]
+
+
+def test_0017_widens_the_freeze_trigger_to_cover_the_policy(upgraded: str) -> None:
+    """The installed body is ``0017``'s, and it still carries everything
+    ``0002``, ``0010`` and ``0012`` froze — this widens the trigger, it does not
+    replace what it already protected (read from ``pg_proc``: Alembic never
+    compares a function, §17.3).
+
+    The ``0012`` lines are the ones worth naming: a revision that had copied
+    ``0010``'s column list would have *narrowed* the trigger back and unfrozen
+    the replication lineage without a word.
+
+    The comparison is the **whole list**, in order, and not a handful of ``in``
+    checks: a substring passes on any superset, so it can see a column arrive
+    but never see one leave. The promising marker is asserted against the list
+    for the same reason — the words ``promising_at`` do appear in the body, in
+    the ``HINT`` that tells the operator it stays mutable, and a body-wide
+    substring check on them was a test that could only ever pass.
+    """
+    expected = cast("tuple[str, ...]", migration_ddl("eligibility_policy")._FROZEN_COLUMNS_0017)
+    body = asyncio.run(_function_source(upgraded, "shadow_freeze_strategy_version"))
+    assert _frozen_columns(body) == expected
+    assert len(expected) == 11, "0012's ten columns plus eligibility_policy — no more, no fewer"
+    assert "eligibility_policy" in expected
+    assert {"purpose", "code_ref", "replication_parent_id", "replication_index"} <= set(expected)
+    assert not {"promising_at", "promising_by"} & set(expected), (
+        "the marker is written after activation, by definition"
+    )
+    assert "promising_at and deprecated_at stay mutable" in body, "and the HINT still says so"
+
+
+def test_0017_freezes_the_policy_after_activation(upgraded: str) -> None:
+    """A gate that could move after activation would silently change what every
+    already-measured cohort of that version meant.
+
+    The probe is activated **without** a policy and the ``UPDATE`` tries to give
+    it one, rather than the other way round, for a reason about this file and
+    not about the trigger: an activated row can never be deleted (that is what
+    ``0002``'s delete guard is for), so a gated activated row would sit in this
+    module-scoped database forever and trip section 29's downgrade guard for
+    every later test that reverses past ``0017``. The trigger compares ``IS
+    DISTINCT FROM``, so adding a gate and changing one are the same code path —
+    proved once, without leaving a landmine.
+    """
+    version_id = _strategy_version(
+        upgraded, key=f"gate-frozen-{uuid.uuid4().hex[:8]}", activated=True
+    )
+    with pytest.raises(DBAPIError, match="eligibility_policy cannot change"):
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        "UPDATE strategy_versions SET eligibility_policy = "
+                        "CAST(:policy AS jsonb) WHERE id = :id",
+                        {"id": version_id, "policy": _GATE},
+                    )
+                ],
+            )
+        )
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT count(*)::text FROM strategy_versions WHERE id = :id "
+            "AND eligibility_policy IS NULL",
+            {"id": version_id},
+        )
+    ) == ["1"]
+
+
+def test_0017_lets_a_draft_be_gated_before_it_is_activated(upgraded: str) -> None:
+    """``derive_variant.py`` writes the policy into a ``draft`` row and the
+    activation only flips ``status``/``activated_at``/``changelog``: the trigger
+    must not stand in the way of the path that actually writes this column."""
+    version_id = _strategy_version(upgraded, key=f"gate-draft-{uuid.uuid4().hex[:8]}")
+    try:
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        "UPDATE strategy_versions SET eligibility_policy = CAST(:policy AS jsonb) "
+                        "WHERE id = :id",
+                        {"id": version_id, "policy": _GATE},
+                    )
+                ],
+            )
+        )
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT eligibility_policy->'regime'->>'scope' FROM strategy_versions "
+                "WHERE id = :id",
+                {"id": version_id},
+            )
+        ) == ["btc"]
+    finally:
+        _forget_gated_draft(upgraded, version_id)
+
+
+def test_0017_leaves_the_gate_readable_by_both_roles_and_writable_by_neither(
+    upgraded: str,
+) -> None:
+    """No ``GRANT`` in this revision, and that is the point: ``0010`` re-granted
+    ``strategy_versions`` column by column, so a column added later is outside
+    every grant the table has — only the owner connection writes it (§29)."""
+    for role in ("hunter_worker", "hunter_app"):
+        assert not asyncio.run(
+            _column_privilege(upgraded, role, "strategy_versions", "eligibility_policy")
+        ), f"{role} may UPDATE the gate"
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT has_column_privilege(:role, 'strategy_versions', "
+                "'eligibility_policy', 'INSERT')::text",
+                {"role": role},
+            )
+        ) == ["false"], f"{role} may INSERT the gate"
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT has_column_privilege(:role, 'strategy_versions', "
+                "'eligibility_policy', 'SELECT')::text",
+                {"role": role},
+            )
+        ) == ["true"], f"{role} cannot read the gate"
+
+
+def test_0017_refuses_to_downgrade_while_a_version_is_gated(upgraded: str) -> None:
+    """Dropping the column would widen a version built for one regime back to
+    every regime, silently, with nothing left to reconstruct the intent from."""
+    config = alembic_config(upgraded)
+    version_id = _strategy_version(upgraded, key=f"gate-guard-{uuid.uuid4().hex[:8]}", policy=_GATE)
+    try:
+        with pytest.raises(DBAPIError, match="carry an eligibility_policy"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        _forget_gated_draft(upgraded, version_id)
+    command.check(config)
+
+
+def test_0017_reverses_on_a_database_where_nothing_is_gated(upgraded: str) -> None:
+    """The round trip, and what the reversal restores: ``0012``'s trigger — the
+    lineage and ``purpose`` still frozen, and no idea what an
+    ``eligibility_policy`` is."""
+    config = alembic_config(upgraded)
+    try:
+        command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == EXCHANGE_STATUS_REVISION
+        assert not asyncio.run(_column_exists(upgraded, "strategy_versions", "eligibility_policy"))
+        restored = cast("tuple[str, ...]", migration_ddl("replication")._FROZEN_COLUMNS_0012)
+        reverted = asyncio.run(_function_source(upgraded, "shadow_freeze_strategy_version"))
+        assert _frozen_columns(reverted) == restored
+        assert len(restored) == 10, "0017's eleven minus eligibility_policy"
+        assert {"purpose", "replication_parent_id", "replication_index"} <= set(restored)
+        assert "eligibility_policy" not in reverted
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_column_exists(upgraded, "strategy_versions", "eligibility_policy"))
     command.check(config)

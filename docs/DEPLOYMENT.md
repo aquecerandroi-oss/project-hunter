@@ -574,6 +574,13 @@ não duplica nada — mas cada comando termina, grava seu recibo e libera a máq
 | `REPLAY_OUTBOX_LAG_MAX_S` | `60` | espelha `SHADOW_OUTBOX_LAG_ALERT_S` |
 | `REPLAY_QUEUE_KEY` | `replay:queue` | lista Redis, `LPUSH`/`RPOP` |
 
+**Contexto por versão (`SHADOW_CONTEXT_*`, opcionais; `hunter_strategy_worker/config.py`, T3.54b/c — conceito em `docs/PIPELINE.md` §6b):**
+
+| Variável | Padrão | O que faz |
+|---|---|---|
+| `SHADOW_CONTEXT_MINUTES` | `1560` | piso de minutos de 1m carregados por avaliação — nenhuma versão lê menos que isto, mesmo pedindo menos |
+| `SHADOW_CONTEXT_MAX_MINUTES` | `6000` | teto sobre o mesmo requisito — uma versão acima dele é recusada na ativação, nunca ativada muda |
+
 **Custo medido (2026-09-08, prova real; detalhes e ressalvas em `.claude/state/notes-T3.19b.md`):**
 
 | Medida | Valor |

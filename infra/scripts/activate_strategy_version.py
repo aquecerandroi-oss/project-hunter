@@ -103,6 +103,8 @@ from hunter_strategy_worker.activation_db import (
 )
 from hunter_strategy_worker.catalogue import registry_key, resolve_strategy
 from hunter_strategy_worker.code_ref import strategy_module, version_code_ref
+from hunter_strategy_worker.config import load_config
+from hunter_strategy_worker.context_budget import ContextBudgetUnknown, over_ceiling
 from hunter_strategy_worker.deprecate import deprecate
 from hunter_strategy_worker.paper_line import paper_line
 from hunter_strategy_worker.supersede import supersede
@@ -125,6 +127,41 @@ def _resolve(
             if strategy is not None:
                 return strategy
         raise Refused(f"this build has no code registered as {code_key} {version}") from exc
+
+
+def _refuse_unbudgeted_context(strategy: Any, row: Any) -> None:
+    """Refuse a version whose 1m window does not fit ``SHADOW_CONTEXT_MAX_MINUTES``.
+
+    T3.54b, and it is a lesson paid for: T3.54 activated two variants whose ATR
+    window reached 5820 minutes back on a worker that loads at most a few
+    thousand, and they answered ``unavailable: atr_warmup`` on all 5760 bars of
+    their replay before anyone could tell why (notes-T3.54 §3.4). The check is
+    arithmetic on the frozen parameters — the same function the worker uses —
+    so a version that cannot decide is refused *before* it becomes an experiment
+    with an empty population.
+
+    Both activation paths pass through here (a derived row carries its own
+    ``default_parameters``, which is what it will be evaluated with; a plain row
+    is about to be frozen with this build's defaults), and the ceiling read is
+    this process's environment: a worker deployed with a lower
+    ``SHADOW_CONTEXT_MAX_MINUTES`` than the operator's shell would clamp and say
+    so on every envelope, which is why the worker warns instead of going silent.
+
+    Called only for a row not yet activated (T3.54c): an already-activated row
+    reaching this function would mean re-running ``activate`` on a version that
+    already decided under whatever context it was frozen with — the idempotent
+    "nothing to do" reply both activation paths give for that case must stay a
+    no-op even if ``SHADOW_CONTEXT_MAX_MINUTES`` has since been lowered under
+    it. That case is not silent: the worker clamps and logs
+    ``shadow_version_context_truncated`` on every envelope it produces.
+    """
+    params = dict(row.default_parameters or {}) or dict(strategy.default_parameters)
+    try:
+        refusal = over_ceiling(strategy, params, ceiling=load_config().context_max_minutes)
+    except ContextBudgetUnknown as unsizable:
+        raise Refused(str(unsizable)) from unsizable
+    if refusal is not None:
+        raise Refused(refusal)
 
 
 async def activate(
@@ -157,6 +194,8 @@ async def activate(
         )
     strategy = _resolve(registry, key, version, row.code_ref)
     code_ref = version_code_ref(strategy_module(strategy))
+    if row.activated_at is None:
+        _refuse_unbudgeted_context(strategy, row)
     if carries_own_content(row):
         return await activate_derived(
             conn, key, version, changelog, row, code_ref=code_ref, dry_run=dry_run

@@ -256,6 +256,8 @@ Sem aspas internas, por causa do PowerShell. Se aparecer `REFUSED: ... already c
 
 ## 7b. Aposentar uma versão substituída por parâmetro (`--deprecate`, T3.39)
 
+> **Latência do roster (medida na T3.56, 2026-09-09):** o `strategy-worker` recarrega o roster a cada `SHADOW_VERSION_REFRESH_S` (60 s), então uma versão pode emitir decisões por até um minuto depois de `deprecated_at` — `emitted_at > deprecated_at` nessa janela não é vazamento. Os acompanhamentos abertos continuam até o desfecho (o loader não filtra por versão); aposentar para a decisão nova, não a operação em voo. A linha `paper` só aposenta com zero slots-sombra abertos (portão do script), o que exige apanhar a janela ou mover a linha `paper` antes.
+
 `--supersede` só existe para uma sucessora de **código**: quando o `code_ref`
 já bate (uma variante por parâmetro, `derive_variant.py`), ele recusa de
 propósito ("already frozen against this code"). Até a T3.39 não havia via
@@ -314,6 +316,59 @@ Sem `--dry-run` para gravar. Na VPS, o mesmo comando pelo serviço `ops`
 (T3.15d, DEPLOYMENT.md §3.4 — `docker exec hunter-api-1` não serve mais para
 isto, o container não carrega `DATABASE_URL_MIGRATIONS`):
 `bash infra/vps/compose.sh run --rm ops python infra/scripts/activate_strategy_version.py breakout v1 --deprecate --changelog "..."`.
+
+## 7c. Derivar uma variante que só muda o **portão de regime** (`--policy`, T3.52)
+
+Desde a `0017_eligibility_policy` uma versão pode declarar **em que contexto ela
+tem permissão de decidir**: `strategy_versions.eligibility_policy`, congelada pela
+primeira ativação como `default_parameters` e `purpose` (DATABASE.md §29). O
+`strategy-worker` lê a série horária de regime (`market_regimes`, `scope = 'btc'`,
+`classifier_version = 'regime_hourly_v1'`) na **última hora fechada antes do corte**
+e, se o rótulo não estiver na lista, a versão não decide aquela barra — sai
+`ineligible` com `eligibility_reason = regime_gate:<RÓTULO>`, sem re-armar o slot
+(PIPELINE.md §4b item 10).
+
+```
+# mean_reversion só em lateral; nenhum parâmetro muda
+ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops python infra/scripts/derive_variant.py mean_reversion v6 --policy regime=btc:SIDEWAYS --changelog T3.52_regime_gate_lateral --dry-run"
+
+# momentum só em alta
+ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops python infra/scripts/derive_variant.py momentum v8 --policy regime=btc:BTC_BULL --changelog T3.52_regime_gate_alta --dry-run"
+```
+
+Repita sem `--dry-run` para gravar e ative com o mesmo
+`activate_strategy_version.py` da §7 (a variante carrega conteúdo próprio, então a
+rota derivada é a que roda; o `--purpose` continua `research_only`).
+
+O que muda em relação à §7, e vale saber antes de digitar:
+
+- **`--policy` sozinho basta.** Uma variante que só move o portão **não** muda
+  nenhum parâmetro: ela nasce com o *mesmo* `params_hash` do pai, de propósito, e
+  a checagem de duplicata passa a comparar `code_ref` + `params_hash` + **portão**.
+  Duas linhas com o mesmo conjunto e portões diferentes são dois experimentos;
+  com o mesmo portão, seriam o mesmo contado duas vezes (e aí ele recusa).
+- **Sem `--policy`, a variante herda o portão do pai** — como herda o schema, os
+  parâmetros e o `code_ref`. Para tirá-lo, `--policy none` (que recusa quando o
+  pai já não tem portão: um comando que não faz nada não deve parecer que fez).
+- **Gramática:** `regime=<escopo>:<RÓTULO>[,<RÓTULO>…]`, escopo `btc` ou `global`,
+  rótulos de `MarketRegime` (`SIDEWAYS`, `BTC_BULL`, `BTC_BEAR`, …). Recusa
+  rótulo inexistente, lista vazia e **`UNKNOWN`** — deixar uma versão decidir no
+  aquecimento do classificador é decidir sem contexto e chamar isso de contexto.
+  Quem valida é a mesma função que o worker usa para ler a coluna, não uma cópia.
+- **A linhagem carrega o portão:** o `changelog` congelado vira
+  `variante de v6 | derived_from=v6 | overrides= | params_hash=<12 hex> | policy=btc:SIDEWAYS | <o motivo>`,
+  e o segmento `policy=` sobrevive à ativação (sem ele, a linhagem de uma variante
+  sem `--set` diria que nada mudou).
+- **A imagem precisa ser deste commit (T3.52) ou posterior** e o banco precisa da
+  `0017` aplicada — o `compose.sh update` roda `alembic upgrade head` antes de
+  subir os serviços, e o `strategy-worker` **recusa iniciar** sem a coluna (é o que
+  `migration_present` passou a exigir). O script recusa antes de escrever qualquer
+  coisa: `0017_eligibility_policy não está aplicada`.
+- **O que esperar da população:** um portão só **remove** decisões do pai — a
+  variante é, por construção, um subconjunto. Compare pelo pareado
+  (`t342-blocos/blocos.py`), nunca por médias soltas. Hoje 27 % das horas dos
+  últimos 31 dias saem `UNKNOWN` (aquecimento do classificador, PIPELINE §4b item 5)
+  e **essas horas também são removidas**, junto com as horas do rótulo recusado.
 
 ## O que continua igual depois do passo 8
 - Só ordens a mercado, só SPOT, sem alavancagem; fill pelo livro elegível após a latência declarada; sem fill fabricado.

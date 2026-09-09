@@ -19,6 +19,14 @@ instant is recorded in the envelope: the universe is overwritten in place by
 every refresh, so the current flag is only evidence about *now*. The caller
 refuses to evaluate a bar older than ``eligibility_max_lag_s`` for exactly that
 reason (Astra, S2 design review, must-fix 4).
+
+Since T3.52 eligibility has a **second** term, and it is the version's, not the
+market's: the regime gate (:mod:`hunter_strategy_worker.regime_gate`). A version
+carrying an ``eligibility_policy`` only decides in the regimes it names, read
+from the hourly ``market_regimes`` series as of the previous closed hour. It is
+applied *after* the market checks and never before them — a market that is not
+in the universe is not eligible whatever the regime says, and reporting the
+regime as the reason would name the wrong cause.
 """
 
 from __future__ import annotations
@@ -33,6 +41,7 @@ from hunter_strategy_worker import hot_state
 from hunter_strategy_worker.config import PRODUCER
 from hunter_strategy_worker.derivatives import load_derivatives
 from hunter_strategy_worker.record import Provenance
+from hunter_strategy_worker.regime_gate import load_gate
 from hunter_strategy_worker.repo import load_candles, newest_received_at
 
 if TYPE_CHECKING:
@@ -43,6 +52,7 @@ if TYPE_CHECKING:
 
     from hunter_core.domain.market import NormalizedCandle
     from hunter_strategy_worker.config import ShadowConfig
+    from hunter_strategy_worker.regime_gate import EligibilityPolicy, RegimeGate
     from hunter_strategy_worker.repo import MarketRow
 
     CandleReader = Callable[..., Awaitable[list[NormalizedCandle]]]
@@ -78,9 +88,30 @@ async def build_market_context(
     config: ShadowConfig,
     code_ref: str | None = None,
     candles_reader: CandleReader | None = None,
+    policy: EligibilityPolicy | None = None,
+    context_minutes: int | None = None,
 ) -> tuple[StrategyContext, Provenance]:
-    """The context for one market as of ``source_bar_close``, plus its provenance."""
-    start = source_bar_close - timedelta(minutes=config.context_minutes)
+    """The context for one market as of ``source_bar_close``, plus its provenance.
+
+    ``policy`` is the deciding version's own ``eligibility_policy`` (already
+    parsed by the catalogue, which refuses a version whose policy it cannot
+    read). ``None`` — every version before T3.52 — is no gate at all: not one
+    extra query is issued and the eligibility answer is byte for byte what it
+    was.
+
+    ``context_minutes`` is how much 1m history this evaluation loads, which is a
+    property of the *version* since T3.54b and no longer of the process: the
+    caller passes ``ActiveVersion.context_minutes(config)``. ``None`` keeps the
+    old behaviour exactly — ``config.context_minutes``, the shared floor — for
+    the callers that have no version in hand (the derivatives tests).
+
+    Either way the number is recorded in the provenance and reaches the
+    envelope: two versions in the same pass now read different windows, so
+    "which window did this decision see" stops being answerable only by reading
+    the deployment's environment.
+    """
+    minutes = config.context_minutes if context_minutes is None else context_minutes
+    start = source_bar_close - timedelta(minutes=minutes)
     read = candles_reader or load_candles
     durable = await read(session, market=market, start=start, end=source_bar_close)
     tail = await hot_state.read_tail(
@@ -98,6 +129,10 @@ async def build_market_context(
     candles = [merged[key] for key in sorted(merged)]
     eligible, reason = _eligibility(market)
     observed_at = utcnow()
+    gate: RegimeGate | None = None
+    if eligible and policy is not None:
+        gate = await load_gate(session, policy, cut=source_bar_close)
+        eligible, reason = gate.eligible, (None if gate.eligible else gate.reason)
     deriv = await load_derivatives(session, redis, market=market, cut=source_bar_close)
     context = build_context(
         candles,
@@ -113,6 +148,7 @@ async def build_market_context(
         available_through=newest_received_at(durable),
         newest_bar_open=candles[-1].open_time if candles else None,
         bars_in_context=len(context.candles_1m),
+        context_minutes=minutes,
         eligibility_observed_at=observed_at,
         producer=PRODUCER,
         code_ref=code_ref,
@@ -122,5 +158,6 @@ async def build_market_context(
         open_interest_ts=deriv.open_interest_ts,
         open_interest_source=deriv.open_interest_source,
         open_interest_reason=deriv.open_interest_reason,
+        regime_gate=gate,
     )
     return context, provenance

@@ -42,11 +42,38 @@ class ShadowConfig:
     """``prospective`` here; a replay run passes its own ``replay:<run_id>``."""
 
     context_minutes: int = 1560
-    """How much 1m history one evaluation may look at, in minutes.
+    """The **floor** of how much 1m history one evaluation looks at, in minutes.
 
-    The longest frozen window in v1 is the ATR's 97 bars of 15m (1455 minutes);
-    the rest (96 bars of 15m relative volume, 288 bars of 5m) fits inside it.
-    Plus one hour of slack so a warm-up is a real warm-up and not a truncation.
+    Until T3.54b this was the whole answer, the same number for every version:
+    the longest frozen window in v1 is the ATR's 97 bars of 15m (1455 minutes),
+    the rest (96 bars of 15m relative volume, 288 bars of 5m) fits inside it,
+    plus one hour of slack so a warm-up is a real warm-up and not a truncation.
+
+    It was also a ceiling on what a version could *be*. A 1h grid with
+    ``atr_bars = 97`` reaches 5820 minutes back, so the two variants T3.54
+    activated were born mute — 5760 bars, 100 % ``atr_warmup`` — and the only
+    knob available multiplied the candle reads of every other live version by
+    ~3.8 (notes-T3.54 §3.4). Since T3.54b the requirement is derived per version
+    from its own frozen parameters
+    (:func:`hunter_strategy_worker.context_budget.required_context_minutes`) and
+    this number is the floor under it: every version that needs less reads
+    exactly what it read before, so no live population moves.
+    """
+
+    context_max_minutes: int = 6000
+    """The ceiling over that requirement, in minutes.
+
+    Not a safety net — a budget. One version with a long window costs candle
+    reads on every bar it evaluates, and an unbounded derivation would let a
+    single parameter make the whole process expensive without anyone deciding
+    it. 6000 is a round number just over the widest window this build can
+    produce today (``mean_reversion_h1_v1``: 5880), so it admits the 1h sibling
+    and refuses the next escalation until someone raises this deliberately.
+
+    A version whose requirement exceeds it is refused at **activation**
+    (``infra/scripts/activate_strategy_version.py``); the worker clamps and
+    records ``context_minutes`` in the envelope, so a context that was cut short
+    reads as a reason instead of a mystery.
     """
 
     hot_state_tail: int = 20
@@ -117,6 +144,7 @@ def load_config() -> ShadowConfig:
         cohort=os.environ.get("SHADOW_COHORT", ShadowCohort.PROSPECTIVE).strip()
         or ShadowCohort.PROSPECTIVE,
         context_minutes=_int("SHADOW_CONTEXT_MINUTES", 1560),
+        context_max_minutes=_int("SHADOW_CONTEXT_MAX_MINUTES", 6000),
         hot_state_tail=_int("SHADOW_HOT_STATE_TAIL", 20),
         eligibility_max_lag_s=_int("SHADOW_ELIGIBILITY_MAX_LAG_S", 300),
         outcome_poll_s=_float("SHADOW_OUTCOME_POLL_S", 10.0),

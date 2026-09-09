@@ -83,6 +83,22 @@ class ExplainRow:
     detail: Mapping[str, str]
     """The strategy's already-stringified context for that reason."""
 
+    context_minutes: int = 0
+    """How much 1m history this bar was given (T3.54b).
+
+    The sixth field, and the exception to "five and no more" above, for the
+    reason the rule itself gives: the run and the cohort are properties of the
+    file, and until T3.54b so was the window — one process-wide
+    ``SHADOW_CONTEXT_MINUTES``. It is a property of the *version* now, and a
+    ledger of 5760 lines saying ``unavailable: atr_warmup`` is unreadable
+    without it: the question "was the window short or was the market missing
+    minutes?" cost T3.54 an entire experiment to answer (notes-T3.54 §3.4), and
+    it is one integer per line.
+
+    ``0`` means "not recorded" — a caller that does not pass it, which the
+    replay always does.
+    """
+
     def to_jsonable(self) -> dict[str, Any]:
         return {
             "bar_close": ensure_utc(self.bar_close).isoformat(),
@@ -90,6 +106,7 @@ class ExplainRow:
             "state": self.state,
             "reason": self.reason,
             "detail": dict(self.detail),
+            "context_minutes": self.context_minutes,
         }
 
 
@@ -141,7 +158,9 @@ class ExplainLedger:
             self._handle.close()
             self._handle = None
 
-    def record(self, bar_close: datetime, evaluation: Evaluation) -> None:
+    def record(
+        self, bar_close: datetime, evaluation: Evaluation, *, context_minutes: int = 0
+    ) -> None:
         """Write the line for one evaluated bar."""
         if self._handle is None:  # pragma: no cover - misuse, not a runtime path
             raise RuntimeError("ExplainLedger.record outside its context manager")
@@ -151,6 +170,7 @@ class ExplainLedger:
             state=evaluation.state.value,
             reason=evaluation.reason,
             detail=evaluation.detail,
+            context_minutes=context_minutes,
         )
         self._handle.write(json.dumps(row.to_jsonable(), separators=(",", ":")) + "\n")
         self._handle.flush()

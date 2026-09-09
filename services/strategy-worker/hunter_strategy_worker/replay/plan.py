@@ -47,6 +47,22 @@ class RunPlan:
         per_market = sum(1 for _ in bar_closes(self.window, self.version.timeframe))
         return per_market * len(self.markets)
 
+    @property
+    def context_minutes(self) -> int:
+        """The 1m window every bar of this run will load — the *version's*.
+
+        Part of the plan, and printed by ``--dry-run``, because it is part of
+        what makes two runs the same experiment: before T3.54b the window was a
+        single environment variable, so :func:`config_for` could say "same
+        environment, same experiment" and be right. Now the requirement is
+        derived per version, and the plan is where a run declares which one it
+        resolved to — a replay of ``mean_reversion v6`` reads 1560 minutes and a
+        replay of ``mean_reversion_h1 v1`` reads 5880 in the same deployment,
+        and both are reproducible because the number follows from the frozen
+        row, not from the machine.
+        """
+        return self.version.context_minutes(config_for(self.cohort))
+
 
 def day(value: str) -> datetime:
     """``2026-08-08`` or a full ISO instant, always UTC.
@@ -142,9 +158,15 @@ def config_for(cohort: str) -> ShadowConfig:
     """The deployment's operational config, with the cohort replaced by the run's.
 
     Everything else is read from the environment exactly as the live worker
-    reads it (``SHADOW_*``): a replay with a different ``context_minutes`` or a
-    different ``censor_after_s`` would not be the same experiment, and the point
+    reads it (``SHADOW_*``): a replay with a different ``censor_after_s`` — or a
+    different context *budget* — would not be the same experiment, and the point
     of the engine is that it is.
+
+    Since T3.54b the two context knobs are a floor and a ceiling around a
+    requirement the **version** carries (:attr:`RunPlan.context_minutes`), so
+    "the same experiment" is now per version instead of per process: two
+    versions replayed in the same deployment legitimately read different
+    windows, and each of them reads the same window every time.
     """
     base = load_config()
     if not ShadowCohort.is_valid(cohort) or not cohort.startswith(ShadowCohort.REPLAY_PREFIX):
@@ -152,6 +174,7 @@ def config_for(cohort: str) -> ShadowConfig:
     return ShadowConfig(
         cohort=cohort,
         context_minutes=base.context_minutes,
+        context_max_minutes=base.context_max_minutes,
         hot_state_tail=base.hot_state_tail,
         eligibility_max_lag_s=base.eligibility_max_lag_s,
         outcome_poll_s=base.outcome_poll_s,

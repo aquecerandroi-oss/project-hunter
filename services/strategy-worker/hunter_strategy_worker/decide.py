@@ -14,6 +14,14 @@ The global regime in force at ``bar_close`` (:func:`hunter_strategy_worker.repo.
 is looked up under that same lock, right before the record is built, and is
 stamped onto ``agent_signals.regime_id`` — never blocking the decision when
 there is none yet (notes-S2.md, "o regime não chega ao sinal").
+
+That stamp and the T3.52 **gate** are two different reads and must not be
+confused: the stamp is ``regime_v0``'s open interval on ``scope = global``,
+recorded so a signal can be found again; the gate is the hourly ``scope = btc``
+series read while the context is built (:mod:`hunter_strategy_worker.regime_gate`),
+and it is the only one that can stop a decision. They answer "which regime was
+in force" and "may this version decide in it" — a single column could not hold
+both, and merging the two series is what PIPELINE §4b forbids.
 """
 
 from __future__ import annotations
@@ -99,6 +107,12 @@ async def evaluate_slot(
     exactly what :func:`hunter_strategy_worker.repo.load_candles` answers, and a
     replay passes one that read the whole slice once instead of the same 1560
     minutes per bar (T3.19b). ``None`` is the live path, unchanged.
+
+    How much history that window holds is the **version's**, not the process's,
+    since T3.54b: ``version.context_minutes(config)`` derives it from the frozen
+    parameters and clamps it between the floor and the ceiling, so a 1h sibling
+    and a 15m version evaluated in the same pass read different windows and
+    neither pays for the other (:mod:`hunter_strategy_worker.context_budget`).
     """
     now = clock()
     lag_s = (now - bar_close).total_seconds()
@@ -132,6 +146,8 @@ async def evaluate_slot(
             config=config,
             code_ref=version.code_ref,
             candles_reader=candles_reader,
+            policy=version.eligibility_policy,
+            context_minutes=version.context_minutes(config),
         )
     evaluation = version.strategy.explain(context, version.params)
     shadow_evaluations_total.labels(

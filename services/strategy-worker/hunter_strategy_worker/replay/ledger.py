@@ -99,6 +99,17 @@ class ReplayRun:
     workers: int
     evaluations_by_state: Mapping[str, int] = field(default_factory=lambda: {})
     errors: int = 0
+    context_minutes: int = 0
+    """The 1m window this version loaded behind every bar (T3.54b).
+
+    In the receipt and not only in the plan because the receipt is what outlives
+    the run: two cohorts of the same family that read different windows are two
+    different experiments, and after T3.54b that difference is legitimate and
+    derived from the frozen row rather than from the machine. It rides in the
+    ``system_events`` payload and the JSONL — both free-form JSON — and **not**
+    in ``replay_runs``, whose columns are a migration and whose role has no
+    ``UPDATE``: adding one is a schema decision, not a receipt's.
+    """
 
     @property
     def bars_per_second(self) -> float:
@@ -127,6 +138,7 @@ class ReplayRun:
             "workers": self.workers,
             "evaluations_by_state": dict(self.evaluations_by_state),
             "errors": self.errors,
+            "context_minutes": self.context_minutes,
         }
 
 

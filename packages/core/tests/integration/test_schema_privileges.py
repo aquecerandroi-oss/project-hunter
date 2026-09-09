@@ -989,6 +989,8 @@ async def test_both_roles_read_the_replication_columns(schema_engine: AsyncEngin
         ("promising_by", "'scoreboard:validada'"),
         ("replication_parent_id", "id"),
         ("replication_index", "1"),
+        # 0017_eligibility_policy rides along: same closure, one revision later.
+        ("eligibility_policy", "'{}'::jsonb"),
     ],
 )
 async def test_the_worker_cannot_write_any_of_the_replication_columns(

@@ -10,6 +10,7 @@ import argparse
 import importlib.util
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -19,6 +20,7 @@ from hunter_core.db.session import role_session
 from hunter_core.strategies.registry import DEFAULT_REGISTRY
 from hunter_strategy_worker.activation import validate_parameters
 from hunter_strategy_worker.code_ref import PACKAGE, version_code_ref
+from hunter_strategy_worker.context_budget import required_context_minutes
 
 from .builders import activate_version, registry_for, seed_market
 
@@ -79,6 +81,95 @@ class TestParameterValidation:
         report = validate_parameters(schema, {"a": "x"})
         assert not report.ok
         assert "does not check" in report.errors[0]
+
+
+@pytest.mark.unit
+class TestUnbudgetedContextRefusal:
+    """The real entry point (T3.54c item 3), against a fake connection.
+
+    No testcontainer: every prerequisite check that touches the database
+    (``migration_applied``, ``purpose_column_present``, ``load_row``) is a
+    module-level name the script imported with ``from ... import`` — the same
+    seam ``TestActivationScript.test_it_refuses_when_the_migration_is_missing``
+    already patches — so the refusal this test proves is reached without ever
+    opening a connection. ``conn`` itself is never touched before the refusal
+    fires, so ``None`` stands in for it.
+    """
+
+    async def test_the_message_names_both_the_requirement_and_the_ceiling(
+        self, monkeypatch: Any
+    ) -> None:
+        script = _script()
+        key = "budget_ceiling_probe"
+
+        async def fake_true(_conn: Any) -> bool:
+            return True
+
+        async def fake_row(_conn: Any, _key: str, _version: str) -> Any:
+            return SimpleNamespace(
+                id="fake-row",
+                status="draft",
+                activated_at=None,
+                code_ref=None,
+                default_parameters=None,
+                parameters_schema=None,
+                params_format=None,
+                purpose="research_only",
+                changelog=None,
+            )
+
+        monkeypatch.setattr(script, "migration_applied", fake_true)
+        monkeypatch.setattr(script, "purpose_column_present", fake_true)
+        monkeypatch.setattr(script, "load_row", fake_row)
+        monkeypatch.setenv("SHADOW_CONTEXT_MAX_MINUTES", "100")
+
+        registry = registry_for(key)
+        strategy = registry.get(f"{key}_v1", "v1")
+        required = required_context_minutes(strategy, dict(strategy.default_parameters))
+        assert required > 100, "premise of the test: the real contract must not fit a 100m ceiling"
+
+        with pytest.raises(script.Refused) as excinfo:
+            await script.activate(None, key, "v1", "test", dry_run=True, registry=registry)
+        message = str(excinfo.value)
+        assert f"needs {required} minutes" in message
+        assert "SHADOW_CONTEXT_MAX_MINUTES is 100" in message
+
+    async def test_an_already_activated_row_stays_a_no_op_under_a_lowered_ceiling(
+        self, monkeypatch: Any
+    ) -> None:
+        """The other half of item 1: the idempotent reply must not become a
+        refusal just because the ceiling was lowered after activation."""
+        from datetime import UTC, datetime
+
+        script = _script()
+        key = "budget_ceiling_idempotent"
+        registry = registry_for(key)
+        strategy = registry.get(f"{key}_v1", "v1")
+        frozen_code_ref = script.version_code_ref(script.strategy_module(strategy))
+
+        async def fake_true(_conn: Any) -> bool:
+            return True
+
+        async def fake_row(_conn: Any, _key: str, _version: str) -> Any:
+            return SimpleNamespace(
+                id="fake-row",
+                status="active",
+                activated_at=datetime(2026, 1, 1, tzinfo=UTC),
+                code_ref=frozen_code_ref,
+                default_parameters=dict(strategy.default_parameters),
+                parameters_schema=dict(strategy.parameters_schema),
+                params_format=1,
+                purpose="research_only",
+                changelog=None,
+            )
+
+        monkeypatch.setattr(script, "migration_applied", fake_true)
+        monkeypatch.setattr(script, "purpose_column_present", fake_true)
+        monkeypatch.setattr(script, "load_row", fake_row)
+        monkeypatch.setenv("SHADOW_CONTEXT_MAX_MINUTES", "1")
+
+        message = await script.activate(None, key, "v1", "test", dry_run=True, registry=registry)
+        assert "was already activated" in message
 
 
 @pytest.mark.integration

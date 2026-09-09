@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +25,7 @@ from hunter_core.db.session import role_session
 from hunter_core.strategies.canonical import params_hash
 from hunter_core.strategies.envelope import PURPOSE_PAPER, PURPOSE_RESEARCH_ONLY
 
-from .builders import activate_version, registry_for, seed_market
+from .builders import activate_version, insert_hourly_regime, registry_for, seed_market
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -78,6 +79,32 @@ async def _events(session: Any, like: str) -> list[str]:
         .all()
     )
 
+
+GATE_SIDEWAYS: dict[str, Any] = {
+    "regime": {
+        "allow": ["SIDEWAYS"],
+        "classifier_version": "regime_hourly_v1",
+        "rule": "previous_closed_hour",
+        "scope": "btc",
+    }
+}
+"""O portão da T3.52 na forma canônica em que a coluna o guarda."""
+
+SERIES_HOUR = datetime(2026, 9, 8, 14, tzinfo=UTC)
+"""Uma hora fechada da série da T3.43 (``btc``/``regime_hourly_v1``). Existe
+porque ``--policy`` só é aceito quando o par ``(scope, classifier_version)`` tem
+série: um teste que não a semeasse estaria testando a recusa, não a derivação."""
+
+GATE_GLOBAL: dict[str, Any] = {
+    "regime": {
+        "allow": ["SIDEWAYS"],
+        "classifier_version": "regime_hourly_v1",
+        "rule": "previous_closed_hour",
+        "scope": "global",
+    }
+}
+"""Um portão gramaticalmente válido e **sem série nenhuma** por trás: o escopo
+``global`` nunca recebeu linha da passada horária. É o caso da R4."""
 
 OVERRIDE = {"volume_mult": "5.5"}
 """One parameter, explicitly. ``volume_mult`` is the frozen contract's own
@@ -379,3 +406,242 @@ class TestActivatingTheVariant:
             _, variant = await _rows(session, key)
         assert variant.status == "draft"
         assert variant.activated_at is None
+
+    async def test_a_variant_that_only_moves_the_gate_is_a_variant(
+        self, db_session_factory: Any
+    ) -> None:
+        """T3.52: o portão é conteúdo da versão sem ser parâmetro dela, então uma
+        variante sem ``--set`` é legítima — e nasce com o **mesmo**
+        ``params_hash`` do pai, de propósito."""
+        script = _script()
+        key = "variant_gate_only"
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(session, key=key)
+            await insert_hourly_regime(session, hour=SERIES_HOUR)
+        async with db_session_factory() as session, session.begin():
+            message = await script.derive_variant(
+                session,
+                key,
+                "v1",
+                "T3.52: só decide em lateral",
+                overrides={},
+                dry_run=False,
+                policy="regime=btc:SIDEWAYS",
+                registry=registry_for(key),
+            )
+        assert "policy -> btc:SIDEWAYS" in message
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            parent, variant = await _rows(session, key)
+            gate = (
+                await session.execute(
+                    text(
+                        "SELECT eligibility_policy FROM strategy_versions v "
+                        "JOIN strategies s ON s.id = v.strategy_id "
+                        "WHERE s.key = :key AND v.version = 'v2'"
+                    ),
+                    {"key": key},
+                )
+            ).scalar_one()
+        assert variant.status == "draft"
+        assert variant.activated_at is None
+        assert variant.default_parameters == parent.default_parameters
+        assert params_hash(dict(variant.default_parameters)) == params_hash(
+            dict(parent.default_parameters)
+        )
+        assert gate == {
+            "regime": {
+                "allow": ["SIDEWAYS"],
+                "classifier_version": "regime_hourly_v1",
+                "rule": "previous_closed_hour",
+                "scope": "btc",
+            }
+        }
+        assert variant.changelog.startswith(
+            "variante de v1 | derived_from=v1 | overrides= | params_hash="
+        )
+        assert "| policy=btc:SIDEWAYS |" in variant.changelog
+
+    async def test_the_child_inherits_the_parents_gate_and_the_twin_check_sees_it(
+        self, db_session_factory: Any
+    ) -> None:
+        """Sem ``--policy`` a variante herda o portão — e uma segunda variante
+        com o mesmo conjunto **e** o mesmo portão é recusada como duplicata,
+        enquanto a mesma com portão diferente é outro experimento."""
+        derive = _script()
+        key = "variant_gate_inherit"
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(session, key=key, policy=GATE_SIDEWAYS)
+            await insert_hourly_regime(session, hour=SERIES_HOUR)
+        async with db_session_factory() as session, session.begin():
+            await derive.derive_variant(
+                session,
+                key,
+                "v1",
+                "herda o portão",
+                overrides=dict(OVERRIDE),
+                dry_run=False,
+                registry=registry_for(key),
+            )
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            inherited = (
+                await session.execute(
+                    text(
+                        "SELECT eligibility_policy FROM strategy_versions v "
+                        "JOIN strategies s ON s.id = v.strategy_id "
+                        "WHERE s.key = :key AND v.version = 'v2'"
+                    ),
+                    {"key": key},
+                )
+            ).scalar_one()
+        assert inherited == GATE_SIDEWAYS
+        with pytest.raises(derive.Refused, match="mesmo experimento contado duas vezes"):
+            async with db_session_factory() as session, session.begin():
+                await derive.derive_variant(
+                    session,
+                    key,
+                    "v1",
+                    "de novo",
+                    overrides=dict(OVERRIDE),
+                    dry_run=True,
+                    registry=registry_for(key),
+                )
+        async with db_session_factory() as session, session.begin():
+            message = await derive.derive_variant(
+                session,
+                key,
+                "v1",
+                "mesmo conjunto, outro portão",
+                overrides=dict(OVERRIDE),
+                dry_run=True,
+                policy="regime=btc:BTC_BULL",
+                registry=registry_for(key),
+            )
+        assert "policy -> btc:BTC_BULL" in message
+
+    async def test_it_refuses_a_gate_it_cannot_honour_before_writing_anything(
+        self, db_session_factory: Any
+    ) -> None:
+        """O mesmo validador do worker: rótulo que não é ``MarketRegime``,
+        ``UNKNOWN`` (aquecimento do classificador) e ``none`` sem portão do pai."""
+        script = _script()
+        key = "variant_gate_refused"
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(session, key=key)
+        for argument, message in (
+            ("regime=btc:LATERAL", "is not a MarketRegime label"),
+            ("regime=btc:UNKNOWN", "UNKNOWN cannot be allowed"),
+            ("sessao=btc:SIDEWAYS", "expected regime="),
+            ("none", "não há o que remover"),
+        ):
+            with pytest.raises(script.Refused, match=message):
+                async with db_session_factory() as session, session.begin():
+                    await script.derive_variant(
+                        session,
+                        key,
+                        "v1",
+                        "recusa",
+                        overrides={},
+                        dry_run=True,
+                        policy=argument,
+                        registry=registry_for(key),
+                    )
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            assert [r.version for r in await _rows(session, key)] == ["v1"]
+
+    async def test_it_refuses_a_gate_whose_pair_has_no_series_in_market_regimes(
+        self, db_session_factory: Any
+    ) -> None:
+        """R4 da revisão do arquiteto: ``classifier_version`` não tem lista
+        fechada — nem pode ter, o nome vem do produtor (T3.43) —, então o par
+        ``(scope, classifier_version)`` é conferido contra ``market_regimes``
+        na hora de escrever. Sem isso a versão entraria no roster e recusaria
+        **toda** barra por ``regime_gate:unknown``/``no_row``: fecha, como deve,
+        mas em silêncio, e o operador só descobriria pela ausência de sinais.
+        A recusa nomeia o par, e vem antes de qualquer escrita — inclusive num
+        ``--dry-run``, que é onde o operador espera ouvir isso.
+        """
+        script = _script()
+        key = "variant_gate_no_series"
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(session, key=key)
+            await insert_hourly_regime(session, hour=SERIES_HOUR)
+            absent = (
+                await session.execute(
+                    text(
+                        "SELECT count(*) FROM market_regimes WHERE scope = 'global' "
+                        "AND classifier_version = 'regime_hourly_v1'"
+                    )
+                )
+            ).scalar_one()
+        assert absent == 0, "premissa do teste: esse par nunca foi escrito"
+        with pytest.raises(
+            script.Refused, match="scope=global, classifier_version=regime_hourly_v1"
+        ):
+            async with db_session_factory() as session, session.begin():
+                await script.derive_variant(
+                    session,
+                    key,
+                    "v1",
+                    "escopo sem série",
+                    overrides=dict(OVERRIDE),
+                    dry_run=True,
+                    policy="regime=global:SIDEWAYS",
+                    registry=registry_for(key),
+                )
+        async with db_session_factory() as session, session.begin():
+            message = await script.derive_variant(
+                session,
+                key,
+                "v1",
+                "escopo com série",
+                overrides=dict(OVERRIDE),
+                dry_run=True,
+                policy="regime=btc:SIDEWAYS",
+                registry=registry_for(key),
+            )
+        assert "policy -> btc:SIDEWAYS" in message
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            assert [r.version for r in await _rows(session, key)] == ["v1"]
+
+    async def test_an_inherited_gate_is_not_re_checked_against_the_series(
+        self, db_session_factory: Any
+    ) -> None:
+        """O outro lado da R4, e o limite dela: a checagem é de **escrita**, não
+        de leitura. Um portão herdado já passou por ela quando foi escrito, e
+        re-conferi-lo faria uma variante de ``--set`` — que não fala de portão
+        nenhum — ser recusada porque a série do produtor foi podada. Quem cobra
+        a série ausente em tempo de decisão é o próprio portão
+        (``regime_gate:unknown``/``no_row``), que é o lugar certo.
+        """
+        script = _script()
+        key = "variant_gate_inherited_no_series"
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            await seed_market(session)
+            await activate_version(session, key=key, policy=GATE_GLOBAL)
+        async with db_session_factory() as session, session.begin():
+            message = await script.derive_variant(
+                session,
+                key,
+                "v1",
+                "só o parâmetro se move; o portão vem junto",
+                overrides=dict(OVERRIDE),
+                dry_run=False,
+                registry=registry_for(key),
+            )
+        assert "volume_mult" in message
+        async with role_session(db_session_factory, db_role="hunter_worker") as session:
+            inherited = (
+                await session.execute(
+                    text(
+                        "SELECT eligibility_policy FROM strategy_versions v "
+                        "JOIN strategies s ON s.id = v.strategy_id "
+                        "WHERE s.key = :key AND v.version = 'v2'"
+                    ),
+                    {"key": key},
+                )
+            ).scalar_one()
+        assert inherited == GATE_GLOBAL

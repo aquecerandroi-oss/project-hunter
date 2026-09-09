@@ -124,6 +124,7 @@ class StrategyVersion(Base, UUIDPrimaryKeyMixin):
     value instead of the worker hardcoding one, and a ``live`` row is refused at
     the origin (``hunter_strategy_worker.catalogue``), never evaluated at all.
     """
+    eligibility_policy: Mapped[dict[str, Any] | None] = mapped_column(JSONB)  # 0017; §29
     promising_at: Mapped[datetime | None]
     """When the scoreboard first called this version ``validada`` — the marker the
     replication protocol counts its out-of-sample block from (``0012_replication``,

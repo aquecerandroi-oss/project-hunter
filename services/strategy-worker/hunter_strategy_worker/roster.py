@@ -15,9 +15,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from hunter_core.domain.enums import ShadowCohort, Timeframe
+from hunter_strategy_worker.context_budget import context_minutes_for
 
 if TYPE_CHECKING:
     from hunter_core.strategies.base import Strategy
+    from hunter_strategy_worker.config import ShadowConfig
+    from hunter_strategy_worker.regime_gate import EligibilityPolicy
 
 __all__ = ["VERSION_RE", "ActiveVersion", "VersionRoster", "roster_order"]
 
@@ -46,6 +49,20 @@ class ActiveVersion:
     never a literal the worker crava (T3.15, D10). Never ``"live"``: a row
     naming it is refused before it becomes an :class:`ActiveVersion` at all."""
 
+    eligibility_policy: EligibilityPolicy | None = None
+    """``strategy_versions.eligibility_policy``, already parsed
+    (``0017_eligibility_policy``, T3.52). ``None`` is no gate — which is every
+    version activated before this column existed.
+
+    Parsed once, here, and not at every bar: the policy is frozen with the row,
+    so re-reading it per evaluation would be re-deciding a settled question
+    thousands of times a day. A policy this build cannot parse never becomes an
+    :class:`ActiveVersion` at all (``catalogue.load_version_roster`` refuses it
+    with ``policy_unreadable``), which is the same fail-closed rule ``code_ref``
+    already follows: a decision taken under a gate the process misread would be
+    attributed to a version it does not implement.
+    """
+
     replication_parent_id: uuid.UUID | None = None
     replication_index: int | None = None
     """``strategy_versions.replication_parent_id``/``replication_index``
@@ -62,6 +79,25 @@ class ActiveVersion:
     def timeframe(self) -> Timeframe:
         """Bars of this timeframe — and only these — are evaluated for entries."""
         return self.strategy.timeframe
+
+    def context_minutes(self, config: ShadowConfig) -> int:
+        """How much 1m history *this* version loads behind every bar (T3.54b).
+
+        Derived from the frozen row — the decision grid plus the parameters that
+        size its longest lookback — and then clamped between
+        ``SHADOW_CONTEXT_MINUTES`` (floor) and ``SHADOW_CONTEXT_MAX_MINUTES``
+        (ceiling): :mod:`hunter_strategy_worker.context_budget`.
+
+        A method and not a field because it is a pure function of two things the
+        object already holds and one the caller has: computing it at roster load
+        would freeze it against a config the evaluation might not be running
+        with (a replay builds its own :class:`ShadowConfig`), and the arithmetic
+        is a handful of integer operations — far below one candle read.
+
+        It cannot raise here: the catalogue refuses a version whose windows this
+        build cannot size before it ever becomes an :class:`ActiveVersion`.
+        """
+        return context_minutes_for(self.strategy, self.params, config)
 
     def cohort(self, process_cohort: str) -> str:
         """The cohort this version's decisions are stamped with.

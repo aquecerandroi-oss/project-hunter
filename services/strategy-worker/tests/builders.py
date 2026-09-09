@@ -34,6 +34,8 @@ from hunter_core.strategies.canonical import canonical_json
 from hunter_core.strategies.registry import StrategyRegistry
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 from hunter_strategy_worker.code_ref import version_code_ref
+from hunter_strategy_worker.context_budget import WINDOWS
+from hunter_strategy_worker.context_budget import declare as declare_context_windows
 
 MINUTE = timedelta(minutes=1)
 EXCHANGE = "binance"
@@ -92,9 +94,17 @@ async def ensure_partitions(session: AsyncSession, around: datetime) -> None:
 
 
 async def seed_market(
-    session: AsyncSession, *, monitored: bool = True
+    session: AsyncSession,
+    *,
+    monitored: bool = True,
+    symbol: str = SYMBOL,
+    base_asset: str = "BTC",
 ) -> tuple[uuid.UUID, uuid.UUID]:
-    """An exchange and one active, monitored perpetual."""
+    """An exchange and one active, monitored perpetual.
+
+    ``symbol``/``base_asset`` default to the single market every test before
+    T3.52 used. A second one exists so that a gate scoped to ``btc`` can be shown
+    gating a market that is **not** BTC (``test_regime_gate.py``)."""
     exchange_id = uuid7()
     await session.execute(
         text(
@@ -107,13 +117,13 @@ async def seed_market(
         text("SELECT id FROM exchanges WHERE code = :code"), {"code": EXCHANGE}
     )
     base, quote = uuid7(), uuid7()
-    for asset_id, symbol in ((base, "BTC"), (quote, "USDT")):
+    for asset_id, asset_symbol in ((base, base_asset), (quote, "USDT")):
         await session.execute(
             text(
                 "INSERT INTO assets (id, symbol) VALUES (:id, :symbol) "
                 "ON CONFLICT (symbol) DO NOTHING"
             ),
-            {"id": asset_id, "symbol": symbol},
+            {"id": asset_id, "symbol": asset_symbol},
         )
     market_id = uuid7()
     await session.execute(
@@ -127,7 +137,7 @@ async def seed_market(
         {
             "id": market_id,
             "exchange_id": exchange_id,
-            "symbol": SYMBOL,
+            "symbol": symbol,
             "monitored": monitored,
         },
     )
@@ -136,7 +146,7 @@ async def seed_market(
             "SELECT id FROM markets WHERE exchange_id = :exchange_id AND symbol = :symbol "
             "AND market_type = 'perpetual'"
         ),
-        {"exchange_id": exchange_id, "symbol": SYMBOL},
+        {"exchange_id": exchange_id, "symbol": symbol},
     )
     return exchange_id, market_id
 
@@ -149,6 +159,7 @@ async def activate_version(
     code_ref: str | None = _RUNNING_CODE_REF,
     active: bool = True,
     purpose: str = "research_only",
+    policy: dict[str, Any] | None = None,
 ) -> tuple[uuid.UUID, uuid.UUID]:
     """A ``strategy`` and an already-activated ``strategy_version``.
 
@@ -202,22 +213,45 @@ async def activate_version(
         "code_ref": code_ref,
         "activated_at": utcnow() if active else None,
     }
+    columns = [
+        "id",
+        "strategy_id",
+        "version",
+        "status",
+        "parameters_schema",
+        "default_parameters",
+        "code_ref",
+        "params_format",
+        "activated_at",
+    ]
+    values = [
+        ":id",
+        ":strategy_id",
+        ":version",
+        ":status",
+        "CAST(:schema AS jsonb)",
+        "CAST(:params AS jsonb)",
+        ":code_ref",
+        "1",
+        ":activated_at",
+    ]
     if names_purpose:
         params["purpose"] = purpose
-        statement = (
-            "INSERT INTO strategy_versions (id, strategy_id, version, status, "
-            "parameters_schema, default_parameters, code_ref, params_format, purpose, "
-            "activated_at) "
-            "VALUES (:id, :strategy_id, :version, :status, CAST(:schema AS jsonb), "
-            "CAST(:params AS jsonb), :code_ref, 1, :purpose, :activated_at)"
-        )
-    else:
-        statement = (
-            "INSERT INTO strategy_versions (id, strategy_id, version, status, "
-            "parameters_schema, default_parameters, code_ref, params_format, activated_at) "
-            "VALUES (:id, :strategy_id, :version, :status, CAST(:schema AS jsonb), "
-            "CAST(:params AS jsonb), :code_ref, 1, :activated_at)"
-        )
+        columns.append("purpose")
+        values.append(":purpose")
+    if policy is not None:
+        # T3.52: named only when there is one, so the statement of every test
+        # written before 0017 is byte for byte the statement it always was — and
+        # it has to be written *here*, at insert: the freeze trigger refuses to
+        # UPDATE ``eligibility_policy`` on an activated row, which is the point.
+        params["policy"] = canonical_json(policy).decode()
+        columns.append("eligibility_policy")
+        values.append("CAST(:policy AS jsonb)")
+    named = ", ".join(columns)
+    placeholders = ", ".join(values)
+    # Every fragment is a literal of this module; the values travel as bind
+    # parameters exactly as they did before T3.52.
+    statement = f"INSERT INTO strategy_versions ({named}) VALUES ({placeholders})"  # noqa: S608
     current_role = await session.scalar(text("SELECT current_user"))
     await session.execute(text("RESET ROLE"))
     await session.execute(text(statement), params)
@@ -390,6 +424,14 @@ class NamedStrategy:
         self.timeframe = VOLUME_ANOMALY_V1.timeframe
         self.parameters_schema = VOLUME_ANOMALY_V1.parameters_schema
         self.default_parameters = VOLUME_ANOMALY_V1.default_parameters
+        # T3.54c: this throwaway key carries the real volume_anomaly_v1
+        # contract, so it needs that contract's real context windows — the
+        # activation-time budget check (context_budget.py) refuses a strategy
+        # it cannot size, and a synthetic key is never in the frozen WINDOWS
+        # table by construction.
+        declare_context_windows(
+            self.key, self.version, WINDOWS[(VOLUME_ANOMALY_V1.key, VOLUME_ANOMALY_V1.version)]
+        )
 
     def evaluate(self, ctx: Any, params: Any) -> Any:
         return VOLUME_ANOMALY_V1.evaluate(ctx, params)
@@ -580,13 +622,15 @@ async def insert_regime(
     end_time: datetime | None = None,
     regime: str = "SIDEWAYS",
     scope: str = "global",
+    classifier_version: str | None = None,
 ) -> uuid.UUID:
     """One ``market_regimes`` row, like ``hunter_scanner_worker.writers.write_regime``."""
     regime_id = uuid7()
     await session.execute(
         text(
-            "INSERT INTO market_regimes (id, scope, regime, start_time, end_time) "
-            "VALUES (:id, :scope, :regime, :start_time, :end_time)"
+            "INSERT INTO market_regimes (id, scope, regime, start_time, end_time, "
+            "classifier_version) "
+            "VALUES (:id, :scope, :regime, :start_time, :end_time, :classifier_version)"
         ),
         {
             "id": regime_id,
@@ -594,10 +638,31 @@ async def insert_regime(
             "regime": regime,
             "start_time": start_time,
             "end_time": end_time,
+            "classifier_version": classifier_version,
         },
     )
     await session.flush()
     return regime_id
+
+
+async def insert_hourly_regime(
+    session: AsyncSession, *, hour: datetime, regime: str = "SIDEWAYS"
+) -> uuid.UUID:
+    """One row of the T3.43 hourly series: ``scope = 'btc'``,
+    ``classifier_version = 'regime_hourly_v1'``, closed on ``[hour, hour + 1h)``.
+
+    Exactly what ``hunter_scanner_worker.regime_writer`` writes, and the shape
+    ``hunter_strategy_worker.regime_gate`` reads — a test that seeded an open
+    interval, or the ``global`` scope, would be testing another series.
+    """
+    return await insert_regime(
+        session,
+        start_time=hour,
+        end_time=hour + timedelta(hours=1),
+        regime=regime,
+        scope="btc",
+        classifier_version="regime_hourly_v1",
+    )
 
 
 async def isolate_catalogue(session: AsyncSession, *, keep: str = "volume_anomaly") -> None:

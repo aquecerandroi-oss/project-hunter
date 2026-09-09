@@ -5062,3 +5062,177 @@ o arquivo antigo e o novo, no espírito da prova que a §18.8 exige do `paper_v1
 a ordem das linhas de `EXCHANGES`/`STRATEGIES` é a mesma, e `PAPER_V1_LIMITS`
 continua sendo `hunter_risk.limits.PAPER_V1` despejado — isto é, continua tendo
 uma fonte só (§18.8).
+
+## 29. O contexto em que uma versão pode decidir — M3 (`0017_eligibility_policy`)
+
+Décima sétima revisão. **Uma coluna** (`strategy_versions.eligibility_policy jsonb NULL`)
+e **um corpo de gatilho substituído**. Nenhuma tabela, nenhum enum, nenhum índice,
+nenhuma constraint, nenhuma política, nenhuma partição, nenhum `GRANT`.
+
+Ela responde ao brief `.claude/state/brief-T3.52-regime-gate-elegibilidade.md`: a
+série horária de regime que a T3.43 passou a escrever (`market_regimes`,
+`scope = 'btc'`, `classifier_version = 'regime_hourly_v1'`) existe desde
+2026-09-08 e **nada que decide a lê**. Fazer uma versão recusar-se a decidir fora
+do regime para o qual ela foi construída precisa de um lugar onde isso esteja
+escrito, e esse lugar não podia ser nenhum dos que já existiam.
+
+### 29.1 Por que não é parâmetro (a alternativa que o brief deixou em aberto)
+
+Três razões, cada uma bastando sozinha:
+
+1. **O `parameters_schema` congelado do pai é quem valida o conjunto**
+   (`hunter_strategy_worker.activation.validate_parameters`) e ele não declara a
+   chave; `derive_variant.py` recusa explicitamente um `--set` de parâmetro que o
+   schema não declara. Para caber em `default_parameters`, o schema teria de
+   mudar — e schema é congelado por ativação (§16.1).
+2. **`default_parameters` é o que a estratégia lê.** O portão é avaliado pelo
+   worker ao montar o `StrategyContext`; nenhuma linha de
+   `hunter_core.strategies` o consulta. Uma chave que o código do fecho ignora
+   faria `params_hash` distinguir experimentos que o código não distingue.
+3. **Mudar o fecho custaria os digests.** `code_ref` é o sha256 do módulo da
+   estratégia mais o fecho de imports dela (`hunter_strategy_worker.code_ref`);
+   editar `schema.py` moveria `ab2e0398…` (momentum_v1) e `a970c9d9…`
+   (mean_reversion_v1), e o worker recusaria **toda** versão ativada por
+   `code_ref_mismatch`.
+
+Uma tabela 1:1 (`strategy_version_policies`) também foi considerada e recusada: a
+política nasce e morre com a versão, não tem histórico próprio e nunca é filtrada
+em SQL — seria uma junção a mais em todo carregamento de roster para representar
+um campo que é lido junto com a linha. JSONB é exatamente o caso que a §1 reserva
+("dados de forma variável"), e a proibição da mesma seção ("nunca para campos que
+serão filtrados com frequência") não se aplica a um campo filtrado nunca.
+
+### 29.2 A forma, e quem a valida
+
+```json
+{"regime": {"scope": "btc", "classifier_version": "regime_hourly_v1",
+            "rule": "previous_closed_hour", "allow": ["SIDEWAYS"]}}
+```
+
+**Não há CHECK.** A gramática é validada por quem lê — `hunter_strategy_worker.regime_gate.parse_policy`
+—, e o leitor **falha fechado**: chave desconhecida, escopo desconhecido, regra
+desconhecida, rótulo que não é `MarketRegime`, `allow` vazia e `UNKNOWN` dentro de
+`allow` são recusados, e uma versão cuja política não se lê **não entra no roster**
+(`policy_unreadable`), em vez de decidir sem o portão que ela declara. Um CHECK
+congelaria a gramática em DDL e obrigaria uma migração a cada política nova; a
+recusa do leitor é a mesma garantia com o custo no lugar certo. O `derive_variant.py`
+usa **a mesma função** para validar `--policy`, então o que o operador consegue
+gravar é exatamente o que o worker consegue honrar.
+
+`NULL` é "sem portão" — e é o que toda versão anterior a esta revisão honestamente
+é. Não há backfill e não há guarda de upgrade (§22, §28.4): nada que já esteja
+gravado passa a ser irrepresentável.
+
+### 29.3 O gatilho é substituído, e a lista copiada é a da `0012`
+
+`ddl/eligibility_policy.py` derruba e recria `shadow_freeze_strategy_version` com
+`_FROZEN_COLUMNS_0017` = a lista da `0012` (§24) **mais** `eligibility_policy`.
+Congelar é o ponto: uma política que pudesse mudar depois da ativação mudaria em
+silêncio o significado de toda coorte já medida sob aquele `strategy_version_id`
+— "decide em SIDEWAYS" para os sinais de segunda e "decide em qualquer coisa"
+para os de terça, sem nada no ledger capaz de separar os dois.
+
+**Copiar a lista da `0012` e não a da `0010` é o detalhe que quase passou.** A
+primeira versão deste módulo copiou a `0010` (o precedente mais óbvio) e teria
+**estreitado** o gatilho de volta, desprotegendo `replication_parent_id`/
+`replication_index` — um irmão de replicação poderia ser reapontado para outro pai
+depois de ativado, reatribuindo em silêncio um experimento cujos sinais já estão
+gravados. Quem pegou foi `test_0012_freezes_the_lineage_but_leaves_the_marker_writable`,
+que existe exatamente para isso. O downgrade chama o criador da própria `0012`
+(`ddl.replication.replace_strategy_version_freeze`), como o da `0012` chama o da
+`0010` e o da `0010` chama o da `0002`.
+
+`promising_at`/`promising_by` continuam fora, pela razão da §24: são escritos
+**depois** da ativação por definição.
+
+### 29.4 Nenhum `GRANT`, e é isso que dá a permissão certa
+
+A `0010` revogou o `INSERT`/`UPDATE` de tabela do `hunter_worker` em
+`strategy_versions` e re-concedeu **coluna a coluna**, nomeando as colunas de
+então (`WORKER_COLUMNS_EXCEPT_PURPOSE`, §22). Uma coluna acrescentada depois fica,
+por construção, fora de toda concessão que a tabela tem: só a conexão dona
+(`DATABASE_URL_MIGRATIONS` — que é como `infra/scripts/derive_variant.py` escreve)
+consegue gravá-la. É a privilegiação que esta política precisa, e ela não custa uma
+linha de DDL — é a forma que a `0010` deliberadamente deixou pronta. O `SELECT` das
+duas roles vem do `GRANT` de tabela da `0001` e cobre a coluna nova pelo mesmo
+mecanismo (§24.5).
+
+**Duas provas, e a segunda é a que vale.** `test_0017_leaves_the_gate_readable_by_both_roles_and_writable_by_neither`
+(`packages/core/tests/integration/test_migrations.py`) pergunta ao catálogo
+(`has_column_privilege`) — mostra o mapa de concessões, e um mapa é uma afirmação
+sobre o que *deveria* acontecer. A prova de que o banco recusa é feita **como o
+papel**: `test_the_worker_cannot_write_any_of_the_replication_columns`
+(`packages/core/tests/integration/test_schema_privileges.py`) ganhou o caso
+`("eligibility_policy", "'{}'::jsonb")` e roda um `UPDATE` real numa conexão
+`hunter_worker`, esperando `permission denied`. Provar por ausência de concessão
+é exatamente o erro que a §15.6 registrou com `ALTER DEFAULT PRIVILEGES`: a
+ausência de uma linha de `GRANT` não é uma recusa medida.
+
+**Sem índice:** a coluna nunca é predicado — é lida com a linha, pelo
+`load_version_roster`, que já varre a dúzia de versões `active`.
+
+### 29.5 O downgrade recusa
+
+Enquanto existir linha com `eligibility_policy IS NOT NULL`, o downgrade conta,
+nomeia e para (§17.7, como a `0010` e a `0016`): derrubar a coluna faria uma versão
+construída para decidir só em `SIDEWAYS` voltar a decidir em qualquer regime, em
+silêncio, e nada do que sobra permite reconstruir a intenção. Num banco onde
+ninguém foi restringido — todo banco antes da primeira derivação com `--policy` —
+a guarda conta zero e o downgrade segue.
+
+**Trava.** `ADD COLUMN` sem default não reescreve a tabela (PG 11+): `ACCESS
+EXCLUSIVE` pelo tempo de uma atualização de catálogo, sobre uma tabela de algumas
+dezenas de linhas. A troca do gatilho toma a mesma trava, no mesmo instante. Não
+abre janela de manutenção.
+
+`0017_eligibility_policy` tem 23 caracteres; o teto de `alembic_version.version_num`
+continua sendo 32 (§17.6).
+
+### 29.6 Quem lê, e com que regra de corte
+
+`hunter_strategy_worker.regime_gate.load_gate` escolhe **a última linha horária
+fechada antes do corte** (`end_time <= source_bar_close`, `ORDER BY start_time
+DESC LIMIT 1`, `scope` e `classifier_version` da política) e responde
+`regime_gate:<RÓTULO>` na recusa. Uma decisão das 15:30 é cortada pela linha
+`[14:00, 15:00)`, nunca pela `[15:00, 16:00)`. A justificativa completa (inclusive
+por que a linha que **contém** o corte também não seria antecipação, e por que
+mesmo assim não é ela que vale) está em `docs/PIPELINE.md` §4b e no cabeçalho do
+módulo. Linha inexistente, `UNKNOWN` do classificador e linha mais velha que duas
+horas recusam com `regime_gate:unknown` — o portão nunca decide sem contexto.
+
+### 29.7 O par `(scope, classifier_version)` é conferido contra a série, no momento de escrever
+
+`scope`, `rule` e cada rótulo de `allow` têm lista fechada: o parser
+(`hunter_strategy_worker.regime_gate.parse_policy`) recusa o que não conhece.
+**`classifier_version` não tem, e não pode ter** — o nome nasce no produtor
+(T3.43, `regime_hourly_v1`) e um classificador novo aparece lá antes de aparecer
+em qualquer lugar que decida. Uma gramática que fechasse essa lista tornaria
+cada classificador novo uma migração.
+
+O buraco que isso deixava era silencioso, e é a única razão desta subseção: um
+`classifier_version` (ou um `scope`) sem série por trás **passa** na validação, a
+versão entra no roster e recusa **toda** barra com `regime_gate:unknown` /
+`detail = no_row`. Fecha, como deve — mas em silêncio, e o operador só descobre
+pela ausência de sinais, semanas depois, num braço que ele acha que está medindo.
+
+Então quem fecha a lista é o banco, na escrita: `infra/scripts/derive_variant.py`
+(`_refuse_a_gate_with_no_series`) recusa `--policy` quando
+`SELECT 1 FROM market_regimes WHERE scope = ... AND classifier_version = ... LIMIT 1`
+não devolve nada, e a mensagem **nomeia o par**. É `SELECT` puro, pela conexão dona
+que o script já usa, sobre uma tabela global (sem `organization_id`, sem RLS — §5),
+e vale também no `--dry-run`, que é onde o operador espera ouvir isso.
+
+**A checagem é de escrita, não de leitura**, e o limite é deliberado: um portão
+**herdado** não é reconferido. Ele já passou por aqui quando foi escrito, e
+reconferi-lo faria uma variante de `--set` — que não fala de portão nenhum — ser
+recusada porque a série do produtor foi podada. Quem cobra a série ausente em tempo
+de decisão é o próprio portão (§29.6), que é o lugar certo. Provado em
+`services/strategy-worker/tests/test_derive_variant.py`:
+`test_it_refuses_a_gate_whose_pair_has_no_series_in_market_regimes` e
+`test_an_inherited_gate_is_not_re_checked_against_the_series`.
+
+**Não é um `CHECK` nem uma FK.** Uma FK de `strategy_versions` para uma série
+horária não existe para ser feita (o alvo é um par de colunas de uma tabela de
+fatos, sem unicidade), e um `CHECK` não consegue consultar outra tabela. A trava
+é do script porque é lá que a intenção do operador entra no sistema — o mesmo
+lugar onde `--set` já é validado contra o `parameters_schema` congelado (§29.2).

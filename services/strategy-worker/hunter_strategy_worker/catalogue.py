@@ -20,7 +20,7 @@ sites. Nothing here is tenant data — shadow research is global (DATABASE.md
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 
@@ -36,11 +36,17 @@ from hunter_strategy_worker.code_ref import (
     strategy_module,
     version_code_ref,
 )
+from hunter_strategy_worker.config import ShadowConfig, load_config
+from hunter_strategy_worker.context_budget import (
+    ContextBudgetUnknown,
+    required_context_minutes,
+)
 from hunter_strategy_worker.metrics import (
     shadow_versions_active,
     shadow_versions_runnable,
     shadow_versions_unrunnable,
 )
+from hunter_strategy_worker.regime_gate import EligibilityPolicy, PolicyError, parse_policy
 from hunter_strategy_worker.roster import ActiveVersion, VersionRoster, roster_order
 
 if TYPE_CHECKING:
@@ -53,8 +59,10 @@ logger = get_logger(__name__)
 REJECTIONS = (
     "code_ref_mismatch",
     "code_ref_not_frozen",
+    "context_budget_unknown",
     "no_code",
     "no_parameters",
+    "policy_unreadable",
     "purpose_live_forbidden",
 )
 """Every way an ``active`` row can fail to become a runnable version. Declared up
@@ -176,6 +184,42 @@ def resolve_strategy(
         return None
 
 
+def context_budget(
+    strategy: Strategy, params: dict[str, Any], key: str, config: ShadowConfig
+) -> int | None:
+    """The context this version will load, or ``None`` with the reason logged.
+
+    T3.54b. Two failures, and they are not the same failure:
+
+    - **unsizable** — this build carries no declaration of the version's
+      windows (:mod:`hunter_strategy_worker.context_budget`), so the number of
+      minutes behind every bar would be a guess. Refused, like
+      ``code_ref_mismatch``: a version evaluated on a window nobody sized is how
+      T3.54's two ``v9`` variants spent 5760 bars answering ``atr_warmup``;
+    - **clamped** — the requirement is real but above
+      ``SHADOW_CONTEXT_MAX_MINUTES``. Not a refusal: activation already refuses
+      that case, so reaching it here means the ceiling was lowered *after* the
+      version was activated, and an operator who lowers a budget should see a
+      version reading short, not a version that went silent. Warned, with both
+      numbers, and the loaded value is written into every envelope it produces.
+    """
+    try:
+        required = required_context_minutes(strategy, params)
+    except ContextBudgetUnknown as unsizable:
+        logger.error("shadow_version_context_unsizable", strategy=key, error=str(unsizable))
+        return None
+    loaded = min(max(required, config.context_minutes), config.context_max_minutes)
+    if required > loaded:
+        logger.warning(
+            "shadow_version_context_truncated",
+            strategy=key,
+            required_minutes=required,
+            loaded_minutes=loaded,
+            ceiling_minutes=config.context_max_minutes,
+        )
+    return loaded
+
+
 async def load_version_roster(session: AsyncSession) -> VersionRoster:
     """Every ``active`` version, split into runnable and refused with reasons.
 
@@ -186,6 +230,7 @@ async def load_version_roster(session: AsyncSession) -> VersionRoster:
 
     The runnable half comes back in :func:`roster_order`.
     """
+    config = load_config()
     rows = (
         await session.execute(
             select(
@@ -194,6 +239,7 @@ async def load_version_roster(session: AsyncSession) -> VersionRoster:
                 StrategyVersion.default_parameters,
                 StrategyVersion.code_ref,
                 StrategyVersion.purpose,
+                StrategyVersion.eligibility_policy,
                 StrategyVersion.replication_parent_id,
                 StrategyVersion.replication_index,
                 StrategyRow.key,
@@ -231,6 +277,19 @@ async def load_version_roster(session: AsyncSession) -> VersionRoster:
             logger.warning("shadow_version_without_parameters", strategy=key)
             refuse("no_parameters")
             continue
+        policy: EligibilityPolicy | None
+        try:
+            policy = parse_policy(row.eligibility_policy)
+        except PolicyError as unreadable:
+            # Fail closed, like ``code_ref_mismatch``: a version gated to a
+            # context this build cannot read must not decide *ungated* — the
+            # signals would be attributed to an experiment nobody ran.
+            logger.error("shadow_version_policy_unreadable", strategy=key, error=str(unreadable))
+            refuse("policy_unreadable")
+            continue
+        if context_budget(strategy, params, key, config) is None:
+            refuse("context_budget_unknown")
+            continue
         versions.append(
             ActiveVersion(
                 id=row.id,
@@ -241,6 +300,7 @@ async def load_version_roster(session: AsyncSession) -> VersionRoster:
                 strategy=strategy,
                 code_ref=row.code_ref,
                 purpose=row.purpose,
+                eligibility_policy=policy,
                 replication_parent_id=row.replication_parent_id,
                 replication_index=row.replication_index,
             )

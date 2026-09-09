@@ -174,16 +174,22 @@ async def replay_market(
     decision and not a content one: the cache answers exactly what
     ``repo.load_candles`` answers (``replay/candles.py``), and a request outside
     what it holds still goes to the database.
+
+    The warm-up in front of that cache is the **version's** window (T3.54b), the
+    same number ``evaluate_slot`` will ask for bar after bar. Reading the
+    process floor instead would make every bar of a long-window version a cache
+    miss — correct, and one database round trip per bar.
     """
     hot_state = as_redis(ReplayHotState())
     result = MarketReplay()
+    context_minutes = version.context_minutes(config)
     async with role_session(factory, db_role="hunter_worker") as session:
         cache = await load_window(
             session,
             market=market,
             window_start=window.start,
             window_end=window.end,
-            context_minutes=config.context_minutes,
+            context_minutes=context_minutes,
         )
     for bar_close in bar_closes(window, version.timeframe):
         try:
@@ -210,8 +216,10 @@ async def replay_market(
         result.record(evaluation.state.value)
         if explain is not None:
             # Same object the counter above read: the ledger cannot disagree
-            # with ``evaluations_by_state`` about what this bar answered.
-            explain.record(bar_close, evaluation)
+            # with ``evaluations_by_state`` about what this bar answered. The
+            # window is carried on the row because a ``warmup`` is only readable
+            # next to how much history the bar was given (T3.54b).
+            explain.record(bar_close, evaluation, context_minutes=context_minutes)
     return result
 
 

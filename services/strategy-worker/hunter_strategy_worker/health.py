@@ -43,13 +43,25 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 _REQUIRED_OBJECTS = ("shadow_episodes", "shadow_outbox")
-_REQUIRED_COLUMN = ("signal_outcomes", "tracking_state")
+_REQUIRED_COLUMNS = (
+    ("signal_outcomes", "tracking_state"),
+    # 0017_eligibility_policy (T3.52). The catalogue *selects* this column on
+    # every roster load, so a database without it does not degrade — it raises
+    # UndefinedColumn once per readiness poll behind a green process. Refusing to
+    # start is the same choice ``main.py`` already makes for 0002: a worker that
+    # runs while dropping every bar is the worst failure mode for a research log.
+    # ``compose.sh update`` runs ``alembic upgrade head`` before the services come
+    # up (DEPLOYMENT.md §3.4), so this ordering is the deploy's, not a race.
+    ("strategy_versions", "eligibility_policy"),
+)
 
 __all__ = ["migration_present", "newest_stream_entry_at", "readiness_checks"]
 
 
 async def migration_present(factory: async_sessionmaker[AsyncSession]) -> bool:
-    """Whether ``0002_shadow_lab`` has been applied to this database."""
+    """Whether the migrations this worker *reads* have been applied:
+    ``0002_shadow_lab`` (the tables and ``tracking_state``) and, since T3.52,
+    ``0017_eligibility_policy`` (the column the catalogue selects)."""
     async with role_session(factory, db_role="hunter_worker") as session:
         return await _objects_exist(session)
 
@@ -60,16 +72,17 @@ async def _objects_exist(session: AsyncSession) -> bool:
         if found is None:
             logger.warning("shadow_migration_missing", table=table)
             return False
-    column = await session.scalar(
-        text(
-            "SELECT 1 FROM information_schema.columns "
-            "WHERE table_name = :table AND column_name = :column"
-        ),
-        {"table": _REQUIRED_COLUMN[0], "column": _REQUIRED_COLUMN[1]},
-    )
-    if column is None:
-        logger.warning("shadow_migration_missing", column=".".join(_REQUIRED_COLUMN))
-        return False
+    for table, name in _REQUIRED_COLUMNS:
+        column = await session.scalar(
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_name = :table AND column_name = :column"
+            ),
+            {"table": table, "column": name},
+        )
+        if column is None:
+            logger.warning("shadow_migration_missing", column=f"{table}.{name}")
+            return False
     return True
 
 

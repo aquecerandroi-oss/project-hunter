@@ -33,6 +33,7 @@ __all__ = [
     "migration_url",
     "next_free_version",
     "open_paper_exposure",
+    "policy_column_present",
     "purpose_column_present",
     "record_event",
     "record_failure",
@@ -80,15 +81,38 @@ async def migration_applied(conn: AsyncConnection) -> bool:
     return column is not None
 
 
-async def purpose_column_present(conn: AsyncConnection) -> bool:
-    """``0010_strategy_purpose`` applied — the column every mode reads."""
-    column = await conn.scalar(
+async def _version_column_present(conn: AsyncConnection, column: str) -> bool:
+    found = await conn.scalar(
         text(
             "SELECT 1 FROM information_schema.columns WHERE table_name = 'strategy_versions' "
-            "AND column_name = 'purpose'"
-        )
+            "AND column_name = :column"
+        ),
+        {"column": column},
     )
-    return column is not None
+    return found is not None
+
+
+async def purpose_column_present(conn: AsyncConnection) -> bool:
+    """``0010_strategy_purpose`` applied — the column every mode reads."""
+    return await _version_column_present(conn, "purpose")
+
+
+async def policy_column_present(conn: AsyncConnection) -> bool:
+    """``0017_eligibility_policy`` applied — the column ``--policy`` writes.
+
+    Checked by ``derive_variant.py`` before it reads or writes the column, like
+    the other two prerequisites: a statement naming a column that does not exist
+    fails with a Postgres error that names a column and not a migration, and the
+    operator would go looking for a typo instead of running ``alembic upgrade
+    head``.
+
+    :func:`load_row` deliberately does **not** select ``eligibility_policy``:
+    ``--supersede``, ``--paper-line``, ``--deprecate`` and the plain activation
+    neither read nor write it, and widening the shared reader would make all four
+    fail on a database one migration behind for a column none of them uses.
+    ``derive_variant.py`` reads it on its own, after this check.
+    """
+    return await _version_column_present(conn, "eligibility_policy")
 
 
 async def record_event(conn: AsyncConnection, level: str, event: str, message: str) -> None:

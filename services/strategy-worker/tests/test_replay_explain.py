@@ -85,23 +85,52 @@ def _read(path: Path) -> list[dict[str, Any]]:
 
 @pytest.mark.unit
 class TestTheRow:
-    def test_it_is_the_five_fields_and_nothing_else(self) -> None:
-        """The contract of the file, so a reader can be written against it."""
+    def test_it_is_the_six_fields_and_nothing_else(self) -> None:
+        """The contract of the file, so a reader can be written against it.
+
+        Five until T3.54b; the sixth is ``context_minutes``, and it is here for
+        the reason the other five are: the window stopped being a property of
+        the *process* (one ``SHADOW_CONTEXT_MINUTES`` for everybody) and became
+        a property of the version, so a file full of ``unavailable: warmup``
+        cannot be read without it. Appended, never inserted: a reader written
+        against the five keeps working.
+        """
         row = ExplainRow(
             bar_close=BAR,
             market="binance:BTCUSDT",
             state="rejected",
             reason="geometry_invalidation",
             detail={"base_low_15m": "100.5"},
+            context_minutes=1560,
         )
-        assert list(row.to_jsonable()) == ["bar_close", "market", "state", "reason", "detail"]
+        assert list(row.to_jsonable()) == [
+            "bar_close",
+            "market",
+            "state",
+            "reason",
+            "detail",
+            "context_minutes",
+        ]
         assert row.to_jsonable() == {
             "bar_close": "2026-09-05T11:00:00+00:00",
             "market": "binance:BTCUSDT",
             "state": "rejected",
             "reason": "geometry_invalidation",
             "detail": {"base_low_15m": "100.5"},
+            "context_minutes": 1560,
         }
+
+    def test_a_row_nobody_sized_says_zero_instead_of_lying(self) -> None:
+        """``0`` is "not recorded" — the replay always records it."""
+        row = ExplainRow(
+            bar_close=BAR,
+            market="binance:BTCUSDT",
+            state="unavailable",
+            reason="atr_warmup",
+            detail={},
+        )
+
+        assert row.to_jsonable()["context_minutes"] == 0
 
     def test_the_detail_stays_an_object_and_the_instant_is_utc(self, tmp_path: Path) -> None:
         """``detail`` is the strategy's own map, already stringified: written as a

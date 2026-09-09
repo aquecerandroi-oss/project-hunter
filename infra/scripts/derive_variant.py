@@ -3,21 +3,35 @@
     uv run python infra/scripts/derive_variant.py momentum v2 \
         --set atr_pct_min=0.0089 --changelog "KB-0008: piso de custo" [--dry-run]
 
+    uv run python infra/scripts/derive_variant.py mean_reversion v6 \
+        --policy regime=btc:SIDEWAYS --changelog "T3.52: só decide em lateral" [--dry-run]
+
 Terceira forma de derivar uma ``strategy_version``, ao lado de ``--supersede``
 (mesmo conteúdo, código novo) e ``--paper-line`` (mesmo conteúdo, propósito
 novo) de ``infra/scripts/activate_strategy_version.py``, e oposta às duas: **o
 código é o mesmo e o conteúdo muda** — um ou mais parâmetros recebem um valor
-explícito e o resto do conjunto congelado do pai é copiado byte a byte
-(``docs/plans/SHADOW-LAB.md`` §1: "conteúdo diferente = versão nova"). A linha
-nasce ``draft``, ``activated_at = NULL``, ``purpose = 'research_only'``, e **nada
-é ativado aqui**: ativar é uma corrida separada e auditada de
+explícito, ou o **portão de elegibilidade** muda, e o resto do conjunto
+congelado do pai é copiado byte a byte (``docs/plans/SHADOW-LAB.md`` §1:
+"conteúdo diferente = versão nova"). A linha nasce ``draft``,
+``activated_at = NULL``, ``purpose = 'research_only'``, e **nada é ativado
+aqui**: ativar é uma corrida separada e auditada de
 ``activate_strategy_version.py``, que reconhece a linha derivada pelo conteúdo
 próprio dela e o preserva em vez de reescrevê-lo a partir do código de hoje.
+
+``--policy`` (T3.52) grava ``strategy_versions.eligibility_policy``
+(``0017_eligibility_policy``): ``regime=<escopo>:<RÓTULO>[,<RÓTULO>...]``, ou
+``none`` para tirar o portão que o pai tinha. **Sem ``--policy`` a variante
+herda o portão do pai**, como herda todo o resto — nunca o perde em silêncio.
+Rótulo desconhecido, escopo desconhecido, ``UNKNOWN`` na lista e lista vazia são
+recusados aqui pela **mesma** função que o worker usa para ler a coluna
+(``hunter_strategy_worker.regime_gate``): um validador, não dois que divergem. E
+um par ``(scope, classifier_version)`` sem série em ``market_regimes`` também é
+recusado (:func:`_refuse_a_gate_with_no_series`).
 
 O ``changelog`` congelado carrega a linhagem legível **e** analisável::
 
     variante de v2 | derived_from=v2 | overrides=atr_pct_min=0.0089
-    | params_hash=<12 hex> | <o motivo que o operador escreveu>
+    | params_hash=<12 hex> [| policy=btc:SIDEWAYS] | <o motivo que o operador escreveu>
 
 ``derived_from=v<n>`` é o que ``infra/scripts/obsidian_strategy_pages.py``
 (``parse_parent_version``) lê para ligar a página da variante à do pai, como já
@@ -29,19 +43,24 @@ pai inexistente, pai nunca ativado (uma variante deriva de uma coorte
 reproduz, parâmetro que o schema congelado não declara, valor que não valida
 contra ele, valor fora da faixa que a estratégia declara
 (``hunter_core.strategies.constraints``, T3.26c/A2: sinal invertido em relação ao
-pai, piso acima do teto, objeto tipado que não instancia), e um conjunto que já
-existe (mesmo ``params_hash`` no mesmo ``code_ref``) — que seria o mesmo
+pai, piso acima do teto, objeto tipado que não instancia), política ilegível,
+portão sem série que o sustente, e um conjunto que já existe (mesmo
+``params_hash`` **e** mesma política no mesmo ``code_ref``) — o mesmo
 experimento contado duas vezes.
 
 Conecta com ``DATABASE_URL_MIGRATIONS`` (direto, nunca pelo pooler), como
 ``activate_strategy_version.py``: a ``0011`` revogou ``INSERT`` em
-``strategy_versions`` de todo papel de aplicação e ``purpose`` só o dono escreve
-(DATABASE.md §24.5).
+``strategy_versions`` de todo papel de aplicação, e ``purpose``/
+``eligibility_policy`` só o dono escreve (DATABASE.md §24.5, §29).
 
-**Roda dentro da imagem publicada** (``docker exec -i hunter-api-1 python - ...
-< derive_variant.py``), então importa só o pacote instalado. A partir da T3.26c
-isso inclui ``hunter_core.strategies.constraints``: a imagem precisa ser **deste
-commit ou posterior** — ``docs/ACTIVATION.md`` §7 diz como conferir.
+A metade pura — ``--set``, forma canônica, linhagem — mora em
+``hunter_strategy_worker.variant`` (orçamento de 350 linhas, T3.52) e é
+re-exportada aqui, então quem importava daqui não mudou. **Roda dentro da imagem
+publicada** (``docker exec -i hunter-api-1 python - < derive_variant.py``), então
+importa só o pacote instalado: desde a T3.26c isso inclui
+``hunter_core.strategies.constraints`` e, desde a T3.52,
+``hunter_strategy_worker.variant``/``.regime_gate`` — a imagem precisa ser
+**deste commit ou posterior** (``docs/ACTIVATION.md`` §7 diz como conferir).
 """
 
 from __future__ import annotations
@@ -49,17 +68,13 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import re
 import sys
-from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 
-from hunter_core.strategies.base import Strategy
 from hunter_core.strategies.canonical import canonical_json, params_hash
-from hunter_core.strategies.constraints import check_ranges
 from hunter_core.strategies.registry import DEFAULT_REGISTRY, StrategyRegistry
 from hunter_strategy_worker.activation import validate_parameters
 from hunter_strategy_worker.activation_db import (
@@ -69,134 +84,96 @@ from hunter_strategy_worker.activation_db import (
     migration_applied,
     migration_url,
     next_free_version,
+    policy_column_present,
     purpose_column_present,
     record_event,
     record_failure,
 )
 from hunter_strategy_worker.catalogue import resolve_strategy
 from hunter_strategy_worker.code_ref import strategy_module, version_code_ref
-
-__all__ = ["Refused", "build_parameters", "derive_variant", "lineage_of", "main", "parse_overrides"]
-
-NUMERIC = re.compile(r"^-?[0-9]+(\.[0-9]+)?$")
-"""O que ``hunter_core.strategies.schema`` aceita como número: forma posicional,
-sem expoente. Um valor que casa isto **e** cujo schema declara ``number``/
-``integer`` entra como número canônico; o resto entra como a string que veio,
-para o validador recusá-lo com a mensagem do próprio schema."""
-
-LINEAGE_RE = re.compile(
-    r"^variante de v\d+ \| derived_from=v\d+ \| overrides=[^|]* \| params_hash=[0-9a-f]{12}"
+from hunter_strategy_worker.regime_gate import EligibilityPolicy, PolicyError, parse_policy
+from hunter_strategy_worker.variant import (
+    LINEAGE_RE,
+    NUMERIC,
+    build_parameters,
+    canonical_policy,
+    lineage_of,
+    parse_overrides,
+    policy_note,
+    resolve_policy,
+    variant_changelog,
 )
-"""O prefixo de linhagem que a ativação preserva. É formato congelado: mudá-lo
-tornaria ilegíveis as variantes já gravadas, então uma mudança é um formato
-novo — nunca uma edição deste."""
+
+__all__ = [
+    "LINEAGE_RE",
+    "NUMERIC",
+    "Refused",
+    "build_parameters",
+    "derive_variant",
+    "lineage_of",
+    "main",
+    "parse_overrides",
+    "resolve_policy",
+    "variant_changelog",
+]
 
 
-def parse_overrides(pairs: list[str]) -> dict[str, str]:
-    """``["atr_pct_min=0.0089"] -> {"atr_pct_min": "0.0089"}``, cru e sem juízo."""
-    overrides: dict[str, str] = {}
-    for pair in pairs:
-        name, separator, raw = pair.partition("=")
-        name, raw = name.strip(), raw.strip()
-        if not separator or not name:
-            raise Refused(f"--set {pair!r} não tem a forma parametro=valor")
-        if name in overrides:
-            raise Refused(f"--set {name} aparece duas vezes: qual dos dois valeria?")
-        if "|" in raw or "\n" in raw:
-            raise Refused(f"--set {name}: o valor não pode conter '|' nem quebra de linha")
-        overrides[name] = raw
-    return overrides
-
-
-def _coerce(name: str, raw: str, rule: dict[str, Any]) -> Any:
-    """O valor na forma que o schema congelado espera, nunca numa forma nova."""
-    declared = rule.get("type")
-    allowed = {declared} if isinstance(declared, str) else set(declared or ())
-    if not allowed & {"number", "integer"} or NUMERIC.fullmatch(raw) is None:
-        return raw
-    try:
-        return Decimal(raw)
-    except InvalidOperation as exc:  # pragma: no cover - NUMERIC já garante
-        raise Refused(f"--set {name}={raw!r} não é um número finito") from exc
-
-
-def build_parameters(
-    schema: dict[str, Any],
-    parent: dict[str, Any],
-    overrides: dict[str, str],
-    strategy: Strategy,
-) -> tuple[dict[str, Any], list[tuple[str, str, str]]]:
-    """O conjunto da variante e o que nele se moveu, na forma canônica.
-
-    Canonizar **antes** de comparar e de validar é o que faz ``0.00890`` e
-    ``0.0089`` serem o mesmo parâmetro (e não duas variantes com hashes
-    diferentes), e é a mesma passagem que ``activate()`` faz antes de congelar.
-
-    ``strategy`` é obrigatória, e não um argumento opcional, porque a checagem de
-    faixa que ela habilita (:func:`check_ranges`) é a única que olha o *conteúdo*
-    do número: uma trava que se pode esquecer de ligar não é uma trava.
-    """
-    properties: dict[str, Any] = schema.get("properties") or {}
-    if not overrides:
-        raise Refused("uma variante sem --set é o próprio pai: nada seria derivado")
-    merged = dict(parent)
-    for name, raw in overrides.items():
-        if name not in properties:
-            raise Refused(f"--set {name}: o schema congelado do pai não declara esse parâmetro")
-        if name not in parent:
-            raise Refused(f"--set {name}: o pai não tem esse parâmetro em default_parameters")
-        merged[name] = _coerce(name, raw, properties[name])
-    canonical: dict[str, Any] = json.loads(canonical_json(merged))
-    before: dict[str, Any] = json.loads(canonical_json(parent))
-    report = validate_parameters(schema, canonical)
-    if not report.ok:
-        raise Refused(
-            "os parâmetros da variante não validam contra o schema congelado do pai: "
-            + "; ".join(report.errors)
-        )
-    if problems := check_ranges(strategy, before, canonical):
-        raise Refused("a variante sai da faixa declarada: " + "; ".join(problems))
-    changes = [
-        (name, str(before[name]), str(canonical[name]))
-        for name in sorted(overrides)
-        if before[name] != canonical[name]
-    ]
-    if not changes:
-        raise Refused(
-            "nenhum parâmetro se moveu: a variante teria o mesmo params_hash do pai e seria "
-            "o mesmo experimento com outro nome"
-        )
-    return canonical, changes
-
-
-def lineage_of(changelog: str | None) -> str:
-    """O prefixo de linhagem de um ``changelog`` congelado, ou ``""``."""
-    match = LINEAGE_RE.match(changelog or "")
-    return match.group(0) if match else ""
-
-
-def variant_changelog(
-    version: str, changes: list[tuple[str, str, str]], digest: str, note: str
-) -> str:
-    """A linhagem primeiro — é por ela que a variante é encontrada e ligada."""
-    moved = ",".join(f"{name}={after}" for name, _, after in changes)
-    return (
-        f"variante de {version} | derived_from={version} | overrides={moved} "
-        f"| params_hash={digest[:12]} | {note}"
+async def _parent_policy(conn: AsyncConnection, version_id: Any) -> dict[str, Any] | None:
+    """``strategy_versions.eligibility_policy`` do pai — lido à parte de
+    :func:`load_row` de propósito (ver ``activation_db.policy_column_present``)."""
+    raw = await conn.scalar(
+        text("SELECT eligibility_policy FROM strategy_versions WHERE id = :id"), {"id": version_id}
     )
+    return None if raw is None else dict(raw)
 
 
-async def _collision(conn: AsyncConnection, strategy_id: Any, code_ref: str, digest: str) -> Any:
-    """A versão que já roda esse mesmo código com esses mesmos parâmetros, se houver."""
+async def _refuse_a_gate_with_no_series(conn: AsyncConnection, policy: EligibilityPolicy) -> None:
+    """Recusa um ``--policy`` cujo par ``(scope, classifier_version)`` não tem
+    **nenhuma** linha em ``market_regimes``: a gramática não fecha a lista de
+    classificadores (o nome vem do produtor, T3.43), então quem fecha é o banco.
+    Sem isto um par errado entra no roster e recusa **toda** barra por
+    ``regime_gate:unknown``/``no_row`` — em silêncio. DATABASE.md §29.7.
+    """
+    seen = await conn.scalar(
+        text(
+            "SELECT 1 FROM market_regimes WHERE scope = CAST(:scope AS regime_scope) "
+            "AND classifier_version = :classifier LIMIT 1"
+        ),
+        {"scope": policy.scope, "classifier": policy.classifier_version},
+    )
+    if seen is None:
+        raise Refused(
+            f"--policy: market_regimes não tem nenhuma linha para (scope={policy.scope}, "
+            f"classifier_version={policy.classifier_version}): o portão recusaria toda "
+            "barra por regime_gate:unknown/no_row, em silêncio"
+        )
+
+
+async def _collision(
+    conn: AsyncConnection,
+    strategy_id: Any,
+    code_ref: str,
+    digest: str,
+    policy: dict[str, Any] | None,
+) -> Any:
+    """A versão que já roda esse código com esses parâmetros **e** esse portão.
+
+    O portão entra na comparação porque ele é conteúdo: mesmo ``params_hash`` com
+    portões diferentes são dois experimentos (é o que a T3.52 deriva).
+    """
     rows = await conn.execute(
         text(
-            "SELECT version, default_parameters, code_ref FROM strategy_versions "
-            "WHERE strategy_id = :strategy_id"
+            "SELECT version, default_parameters, code_ref, eligibility_policy "
+            "FROM strategy_versions WHERE strategy_id = :strategy_id"
         ),
         {"strategy_id": strategy_id},
     )
+    wanted = canonical_policy(policy)
     for row in rows:
-        if row.code_ref == code_ref and params_hash(dict(row.default_parameters or {})) == digest:
+        same_content = (
+            row.code_ref == code_ref and params_hash(dict(row.default_parameters or {})) == digest
+        )
+        if same_content and canonical_policy(row.eligibility_policy) == wanted:
             return row.version
     return None
 
@@ -209,6 +186,7 @@ async def derive_variant(
     *,
     overrides: dict[str, str],
     dry_run: bool,
+    policy: str | None = None,
     registry: StrategyRegistry = DEFAULT_REGISTRY,
 ) -> str:
     """Deriva a variante de ``(key, version)``. Devolve o resumo da corrida."""
@@ -216,6 +194,8 @@ async def derive_variant(
         raise Refused("0002_shadow_lab não está aplicada: aplique a migração antes de derivar")
     if not await purpose_column_present(conn):
         raise Refused("0010_strategy_purpose não está aplicada: aplique a migração antes")
+    if not await policy_column_present(conn):
+        raise Refused("0017_eligibility_policy não está aplicada: aplique a migração antes")
     row = await load_row(conn, key, version)
     if row is None:
         raise Refused(f"não existe strategy_version para {key} {version}")
@@ -251,28 +231,41 @@ async def derive_variant(
             f"os parâmetros congelados de {key} {version} não validam contra o próprio schema: "
             + "; ".join(parent_report.errors)
         )
-    params, changes = build_parameters(schema, parent, overrides, strategy)
+    inherited = await _parent_policy(conn, row.id)
+    chosen = resolve_policy(policy, inherited)
+    moved = canonical_policy(chosen) != canonical_policy(inherited)
+    try:
+        parsed = parse_policy(chosen)
+    except PolicyError as invalid:  # pragma: no cover - resolve_policy já validou o novo
+        raise Refused(f"a política herdada de {key} {version} é ilegível: {invalid}") from invalid
+    if policy is not None and parsed is not None:
+        await _refuse_a_gate_with_no_series(conn, parsed)
+    params, changes = build_parameters(schema, parent, overrides, strategy, policy_moved=moved)
     digest = params_hash(params)
-    twin = await _collision(conn, row.strategy_id, code_ref, digest)
+    twin = await _collision(conn, row.strategy_id, code_ref, digest, chosen)
     if twin is not None:
         raise Refused(
-            f"{key} {twin} já tem exatamente esses parâmetros neste code_ref "
-            f"(params_hash {digest[:12]}): seria o mesmo experimento contado duas vezes"
+            f"{key} {twin} já tem exatamente esses parâmetros e esse portão neste code_ref "
+            f"(params_hash {digest[:12]}, policy {policy_note(parsed)}): seria o mesmo "
+            "experimento contado duas vezes"
         )
     successor = await next_free_version(conn, row.strategy_id)
-    moved = ", ".join(f"{name} {before} -> {after}" for name, before, after in changes)
+    what = ", ".join(f"{name} {before} -> {after}" for name, before, after in changes)
+    if moved:
+        what = f"{what + ', ' if what else ''}policy -> {policy_note(parsed)}"
     if dry_run:
         return (
             f"derivaria {key} {successor} de {version} (purpose {PURPOSE_RESEARCH_ONLY}, draft, "
-            f"nada ativado) em code_ref {code_ref}: {moved} [params_hash {digest[:12]}]"
+            f"nada ativado) em code_ref {code_ref}: {what} [params_hash {digest[:12]}]"
         )
     await conn.execute(
         text(
             "INSERT INTO strategy_versions (id, strategy_id, version, status, "
             "parameters_schema, default_parameters, code_ref, params_format, changelog, "
-            "activated_at, purpose) VALUES (gen_random_uuid(), :strategy_id, :version, 'draft', "
+            "activated_at, purpose, eligibility_policy) VALUES (gen_random_uuid(), "
+            ":strategy_id, :version, 'draft', "
             "CAST(:schema AS jsonb), CAST(:params AS jsonb), :code_ref, :params_format, "
-            ":changelog, NULL, :purpose)"
+            ":changelog, NULL, :purpose, CAST(:policy AS jsonb))"
         ),
         {
             "strategy_id": row.strategy_id,
@@ -281,8 +274,11 @@ async def derive_variant(
             "params": canonical_json(params).decode("utf-8"),
             "code_ref": code_ref,
             "params_format": row.params_format,
-            "changelog": variant_changelog(version, changes, digest, changelog),
+            "changelog": variant_changelog(
+                version, changes, digest, changelog, policy=parsed, policy_moved=moved
+            ),
             "purpose": PURPOSE_RESEARCH_ONLY,
+            "policy": None if chosen is None else canonical_json(chosen).decode("utf-8"),
         },
     )
     await record_event(
@@ -290,12 +286,12 @@ async def derive_variant(
         "info",
         "strategy_version_variant_derived",
         f"{key} {successor} derived from {version} (variante, purpose {PURPOSE_RESEARCH_ONLY}) "
-        f"code_ref={code_ref} params_hash={digest} overrides: {moved}; draft, "
-        f"não ativada: {changelog}",
+        f"code_ref={code_ref} params_hash={digest} policy={policy_note(parsed)} changes: {what}; "
+        f"draft, não ativada: {changelog}",
     )
     return (
         f"derivada {key} {successor} de {version} (purpose {PURPOSE_RESEARCH_ONLY}, draft, "
-        f"nada ativado) em code_ref {code_ref}: {moved} [params_hash {digest[:12]}]"
+        f"nada ativado) em code_ref {code_ref}: {what} [params_hash {digest[:12]}]"
     )
 
 
@@ -312,6 +308,7 @@ async def _run(args: argparse.Namespace) -> int:
                     args.changelog,
                     overrides=overrides,
                     dry_run=args.dry_run,
+                    policy=args.policy,
                 )
         except Refused as refusal:
             await record_failure(
@@ -338,6 +335,11 @@ def main() -> int:
         action="append",
         metavar="PARAM=VALOR",
         help="sobrescreve um parâmetro do conjunto congelado (repetível)",
+    )
+    parser.add_argument(
+        "--policy",
+        metavar="regime=ESCOPO:RÓTULO[,RÓTULO]",
+        help="portão da variante (ex.: regime=btc:SIDEWAYS) ou 'none'; sem isto, herda o do pai",
     )
     parser.add_argument("--changelog", required=True, help="por que esta variante existe")
     parser.add_argument("--dry-run", action="store_true", help="roda tudo e não escreve nada")

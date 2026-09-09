@@ -38,6 +38,7 @@ from hunter_strategy_worker.walker import Progress, TrackingPlan
 if TYPE_CHECKING:
     from hunter_core.strategies.base import Decision
     from hunter_strategy_worker.catalogue import ActiveVersion
+    from hunter_strategy_worker.regime_gate import RegimeGate
     from hunter_strategy_worker.repo import MarketRow
 
 __all__ = ["Provenance", "ShadowRecord", "build_record"]
@@ -81,6 +82,37 @@ class Provenance:
     lookup happens later, under the slot lock in ``decide.py`` (closer to the
     actual write), and reaches the envelope as :func:`build_record`'s own
     keyword arguments instead."""
+
+    regime_gate: RegimeGate | None = None
+    """The hourly-regime verdict that let this decision happen (T3.52), or
+    ``None`` when the version carries no ``eligibility_policy``. Unlike
+    ``regime_id`` above it *is* part of the provenance of the context: the gate
+    is evaluated while the context is built, because it decides
+    ``StrategyContext.eligible``.
+
+    A **refusal** never reaches here — there is no signal, so there is no
+    envelope; it lives in the ``Evaluation`` (state ``ineligible``, detail
+    ``eligibility_reason = regime_gate:<label>``), which is what the evaluation
+    log and the replay ledger record. What is written here is the other half:
+    which row, which hour and which label allowed the decision, so the ledger can
+    be decomposed by regime without re-deriving the join.
+    """
+
+    context_minutes: int = 0
+    """How much 1m history this evaluation actually loaded (T3.54b).
+
+    A property of the *version* since T3.54b — derived from its own frozen
+    parameters and clamped by the two operational knobs — so it belongs in the
+    provenance next to ``bars_in_context``: that one says how many candles were
+    there, this one says how many were **asked for**. The pair separates a
+    market with a hole from a version reading a window shorter than its longest
+    lookback, which is the difference T3.54 could only establish by reading the
+    deployment's environment (notes-T3.54 §6.5).
+
+    ``0`` is the never-set default and exists only so the dataclass can grow a
+    field behind ``regime_gate``; the one place that builds a ``Provenance``
+    (:mod:`hunter_strategy_worker.context`) always passes the real number.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,6 +205,7 @@ def build_record(
             "available_through": provenance.available_through,
             "newest_bar_open": provenance.newest_bar_open,
             "bars_in_context": provenance.bars_in_context,
+            "context_minutes": provenance.context_minutes,
             "eligibility_observed_at": provenance.eligibility_observed_at,
             "producer": provenance.producer,
             "code_ref": provenance.code_ref,
@@ -186,6 +219,9 @@ def build_record(
             "open_interest_reason": provenance.open_interest_reason,
             "regime_id": regime_id,
             "regime_reason": regime_reason,
+            "regime_gate": (
+                None if provenance.regime_gate is None else provenance.regime_gate.to_jsonable()
+            ),
         }
     )
     late = plan.late_reason

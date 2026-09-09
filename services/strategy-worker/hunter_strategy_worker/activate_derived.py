@@ -39,11 +39,18 @@ __all__ = [
 
 LINEAGE_RE = re.compile(
     r"^variante de v\d+ \| derived_from=v\d+ \| overrides=[^|]* \| params_hash=[0-9a-f]{12}"
+    r"( \| policy=\S+)?"
 )
 """The lineage prefix ``infra/scripts/derive_variant.py`` freezes into a variant's
-``changelog`` (T3.26). Spelled out here rather than imported because a package
-module cannot import from ``infra/scripts`` — the same trade ``catalogue.py``
-makes for ``_PURPOSE_LIVE``; a contract test compares the two spellings."""
+``changelog`` (T3.26). Spelled out here rather than imported because this module
+is the one that has to keep working when the script is piped in from another
+checkout — the same trade ``catalogue.py`` makes for ``_PURPOSE_LIVE``; a
+contract test compares the two spellings.
+
+The optional ``| policy=<scope>:<LABELS>`` segment (T3.52) is inside the prefix
+on purpose: a variant that only moves the regime gate has an empty
+``overrides=`` and the parent's own ``params_hash``, so dropping the segment at
+activation would leave a lineage that says nothing changed."""
 
 DERIVED_RE = re.compile(r"^paper line of v\d+|\bderived_from=v\d+\b")
 """A ``changelog`` frozen by a deriving tool — the *fast* path to recognising a

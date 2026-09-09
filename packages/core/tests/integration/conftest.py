@@ -77,9 +77,16 @@ async def create_database(admin_url: str, name: str) -> str:
 def migration_ddl(name: str) -> ModuleType:
     """Import ``infra/migrations/ddl/<name>.py``.
 
-    Only importable once :func:`alembic_config` has put ``infra/migrations`` on
-    ``sys.path`` — the same way Alembic itself reaches these modules.
+    Puts ``infra/migrations`` on ``sys.path`` itself (T3.52b/T3.54c) rather than
+    relying on a caller having run :func:`alembic_config` first — a pure test
+    like ``test_0012_and_the_domain_constant_agree_on_the_cohort_grammar`` reads
+    a DDL module's own frozen constant with no database and no ``upgraded``
+    fixture in sight, and running it alone (``pytest -k cohort_grammar``) must
+    not depend on session order picking a fixture that happens to share this
+    process.
     """
+    if str(MIGRATIONS_DIR) not in sys.path:
+        sys.path.insert(0, str(MIGRATIONS_DIR))
     return importlib.import_module(f"ddl.{name}")
 
 

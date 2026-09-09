@@ -191,6 +191,7 @@ async def replay_run(
             workers=pool_size,
             evaluations_by_state=dict(totals.states),
             errors=totals.errors,
+            context_minutes=plan.context_minutes,
         )
         async with role_session(factory, db_role="hunter_worker") as session:
             await record_run(session, run)
@@ -313,6 +314,7 @@ async def _main(argv: list[str] | None = None) -> int:
             f"{{'cohort': '{plan.cohort}', 'version': '{plan.version.strategy_key} "
             f"{plan.version.version}', 'markets': {len(plan.markets)}, "
             f"'bars_planned': {plan.bars_planned}, "
+            f"'context_minutes': {plan.context_minutes}, "
             f"'workers': {int(args.workers) if args.workers else workers_for(budget, os.cpu_count() or 1)}}}\n"
         )
         return 0

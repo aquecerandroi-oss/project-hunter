@@ -48,8 +48,12 @@ async def run_strategy(runtime: WorkerRuntime) -> None:
         if not await migration_present(factory):
             # Fatal on purpose: with 0002_shadow_lab missing there is nowhere to
             # write a decision, and a worker that "runs" while dropping every
-            # signal is the worst possible failure mode for a research log.
-            raise RuntimeError("0002_shadow_lab is not applied; refusing to run")
+            # signal is the worst possible failure mode for a research log. Since
+            # T3.52 the same check covers 0017_eligibility_policy, which the
+            # catalogue selects on every roster load.
+            raise RuntimeError(
+                "0002_shadow_lab / 0017_eligibility_policy are not applied; refusing to run"
+            )
         async with asyncio.TaskGroup() as group:
             tasks = {
                 "decisions": run_consumer(factory, runtime.redis, runtime, config, consumer_health),
