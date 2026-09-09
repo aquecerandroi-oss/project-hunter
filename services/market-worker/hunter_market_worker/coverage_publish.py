@@ -50,6 +50,24 @@ The aggregate the reader sees:
 a solo bug this rewrite inherited: symbols dropped from the universe across a
 **restart** used to stay in the hash forever, because reconciliation depended
 on a per-process set that a new process starts empty.
+
+**T3.46h — one shard's own two writers can race each other.** Since T3.46g
+this module has two callers *of the same shard*: ``flush_ticks``'s nudge
+(right after a cycle's book/ticker write) and ``streaming.py``'s periodic
+housekeeping tick, each an independent asyncio task pulling its own
+connection from the pool. Nothing orders their network arrival at Redis --
+a stamp computed *earlier* can still land *after* one computed later, by a
+few ms of jitter. A plain ``HSET`` of ``{id}:since``/``{id}:until`` is
+last-write-wins, so that older, out-of-order call would overwrite this
+shard's own already-published, more-caught-up record with a **regression** —
+not a stale read of a *lagging* shard (the aggregate ``MIN`` already handles
+that), but this shard un-proving something it already proved. The script now
+reads its own previous ``{id}:since``/``{id}:until`` first and keeps whichever
+of the two (previous or incoming) has the later epoch — one extra ``HMGET``,
+still inside the same atomic script, no extra round trip. An explicit
+end-of-session write (``_clear``, empty ``since``/``until``) is exempt from
+the guard on purpose: a genuine "this shard's interval ended" must always
+apply, never be blocked by a rule meant for ongoing stamps.
 """
 
 from __future__ import annotations
@@ -86,6 +104,26 @@ local record_ttl = tonumber(ARGV[3])
 local key_ttl = tonumber(ARGV[4])
 local since, until_ = ARGV[5], ARGV[6]
 local payload = ARGV[7]
+
+-- T3.46h: keep whichever of (this shard's previous record, this call's own
+-- value) is later -- an out-of-order arrival from this shard's *other*
+-- caller (module docstring) must never regress a fact this shard already
+-- published. An empty value (explicit ``_clear``, session ended) always
+-- applies: it is not "older", it is a different kind of write.
+local function newer(new_val, prev_val)
+    if new_val == '' or prev_val == false or prev_val == '' then
+        return new_val
+    end
+    local new_epoch = tonumber(string.match(new_val, '^([^|]+)|'))
+    local prev_epoch = tonumber(string.match(prev_val, '^([^|]+)|'))
+    if new_epoch and prev_epoch and prev_epoch > new_epoch then
+        return prev_val
+    end
+    return new_val
+end
+local prev = redis.call('HMGET', shards, id .. ':since', id .. ':until')
+since = newer(since, prev[1])
+until_ = newer(until_, prev[2])
 
 redis.call('HSET', shards,
     id .. ':since', since,

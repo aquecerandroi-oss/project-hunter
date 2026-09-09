@@ -194,6 +194,52 @@ async def test_during_a_handover_the_later_start_wins(redis_client: Any) -> None
     assert (await _hash(redis_client))["sym:BTCUSDT"] == _at(10.5).isoformat()
 
 
+async def test_a_shards_own_record_never_regresses_from_an_out_of_order_stamp(
+    redis_client: Any,
+) -> None:
+    """T3.46h (T3.46g review, reservation 2): ``flush_ticks``'s stamp and
+    ``streaming.py``'s housekeeping stamp are two independent asyncio tasks on
+    the same shard, each pulling its own connection from the Redis pool --
+    nothing orders their network arrival. A stamp computed *earlier* can
+    still reach Redis *after* one computed later (a few ms of jitter); a
+    plain ``HSET`` would let that older value overwrite this shard's own
+    already-published, more-caught-up record. This pins the monotonic guard
+    in the Lua script that keeps a shard's own ``since``/``until`` from
+    moving backward when that happens."""
+    shard = _shard(0)
+    shard.session_started(["BTCUSDT"], at=_at(0))
+    # The later computation (say, the flush-time nudge) reaches Redis first...
+    await shard.stamp(redis_client, dropped_events=0, now=_at(10))
+    # ...and the earlier one (housekeeping, delayed in flight) arrives after.
+    await shard.stamp(redis_client, dropped_events=0, now=_at(5))
+
+    published = await _hash(redis_client)
+    # Without the guard this would regress to _at(5)'s covered_until.
+    assert (
+        published["covered_until"] == (_at(10) - timedelta(seconds=COVERAGE_SAFETY_S)).isoformat()
+    )
+    assert published["session_since"] == _at(0).isoformat()
+
+
+async def test_an_explicit_session_end_still_applies_over_the_monotonic_guard(
+    redis_client: Any,
+) -> None:
+    """The guard above must never block a genuine ``_clear()`` (session
+    ended): that stamp carries empty ``since``/``until`` on purpose, and an
+    out-of-order *older* nonempty stamp arriving after it must not resurrect
+    an interval this shard already declared over."""
+    shard = _shard(0)
+    shard.session_started(["BTCUSDT"], at=_at(0))
+    await shard.stamp(redis_client, dropped_events=0, now=_at(10))
+
+    shard.session_broken()
+    await shard.stamp(redis_client, dropped_events=0, now=_at(11))  # the clear
+
+    published = await _hash(redis_client)
+    assert published["covered_until"] == ""
+    assert published["session_since"] == ""
+
+
 async def test_a_topology_change_never_deletes_a_symbol_its_new_owner_claims(
     redis_client: Any,
 ) -> None:

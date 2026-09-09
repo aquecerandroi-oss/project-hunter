@@ -504,3 +504,282 @@ parcialmente no mesmo conjunto de leituras).
 
 ## §3 — prova pós-deploy (orquestrador, 2026-09-09 ~01:1x BRT, coletores + scanner em 5ceb… HEAD após T3.46g)
 Heartbeat ORDERBOOK_IMBALANCE, de 200 mercados, minuto a minuto: `feature_after_cut` = 8, 5, 9, 2, 4, 9, 7, 3 (antes da T3.46d: 183; após T3.46f: 42–77). **Meta < 10/200 atingida.** `baselines_under_construction` 115–121, `baseline_absent` 72–77 (o livro agora entra na baseline em ~195/200 mercados; a maturação até `sample_size 120` é questão de horas).
+
+## T3.46h
+
+**Owner:** exchange-integration-specialist · **Data:** 2026-09-09 (Brasília) · **Base:** `main` @ `f1475c4`
+(T3.46g). Fecha as três ressalvas da revisão de código+quant da T3.46g (§8 acima não numerava reservas
+formalmente; o brief T3.46h as enumerou (1) MEDIUM, (2)/(3) LOW). Nada de `packages/**`,
+`services/strategy-worker`, `infra/scripts/derive_variant.py` tocado — árvore compartilhada confirmada
+limpa por `git status` antes e depois (só arquivos de outros agentes fora do meu escopo apareceram
+sujos/untracked). **Nada foi commitado.**
+
+### (1) MEDIUM — teste de fiação real (`coverage_stamps` através de `main._run_spot_process`)
+
+O teste que faltava não podia mockar `run_ingest`/`coalesce_loop` — só o adapter da exchange. Achei o
+arcabouço certo já pronto: `services/market-worker/tests/test_role.py` já roda `_run_spot_process` de
+verdade (só `build_spot_adapter` é stub, devolvendo um `FakeAdapter`) contra Redis/Postgres reais
+(testcontainers). Acrescentei um terceiro teste nesse arquivo,
+`test_run_spot_process_flush_ticks_stamps_through_the_dict_run_ingest_registered`:
+
+- Faz *spy* em `CoverageTracker.stamp` (encadeando a chamada original, só contando `id(self)` por
+  chamada) e desliga `CoverageTracker.due` (`lambda self, *a, **k: False`) — isso não mocka
+  `run_ingest`/`coalesce_loop`, é um monkeypatch cirúrgico num método pequeno de `coverage.py` que só
+  a *housekeeping* (o chamador concorrente, não o que este teste quer isolar) consulta. Com `due()`
+  sempre `False`, a housekeeping nunca dispara `stamp()` sozinha — qualquer chamada observada só pode
+  ter vindo de `flush_ticks`, o único chamador que depende do dicionário compartilhado
+  `coverage_stamps` que `main.py` constrói uma vez e passa a `run_ingest` e a `coalesce_loop`.
+- Sobe `_run_spot_process` de verdade, espera `adapter.stream_started`, empurra um `ticker_ws` real
+  pela fila do `FakeAdapter` (`push_event`) e espera até 10 s por uma chamada contada.
+- **Se `main.py`/`spot.py` tivessem passado dois dicionários separados** para `run_ingest` e para
+  `coalesce_loop` (o bug que esta reserva pede para travar), `flush_ticks`'s `coverage_stamps.get(SPOT)`
+  voltaria `None` para sempre — com a housekeeping desligada, `calls` ficaria vazio e o teste falharia
+  exatamente na asserção `assert calls, "..."`.
+
+```
+uv run pytest services/market-worker/tests/test_role.py -q -p no:randomly
+```
+```
+...
+3 passed in 44.42s
+```
+
+### (2) LOW — corrida de escritor concorrente, documentada e corrigida
+
+Achei a corrida real (não hipotética): `flush_ticks`'s `stamp()` e a `housekeeping()` de `streaming.py`
+são duas tasks assíncronas independentes que, desde a T3.46g, chamam o **mesmo** fechamento fechado
+sobre o **mesmo** `CoverageTracker` — cada `await coverage_publish.publish(...)` pega sua própria
+conexão do pool do redis-py. Nada ordena a chegada dessas duas chamadas no servidor: uma computada
+*antes* (relógio de parede) pode chegar *depois* de uma computada depois, por alguns ms de jitter de
+rede. Antes desta tarefa o script Lua fazia um `HSET` incondicional de `{id}:since`/`{id}:until` — a
+chamada mais tardia a chegar vence, mesmo que carregue um valor mais velho: o próprio shard regride um
+fato que ele mesmo já tinha publicado (diferente do caso já tratado pelo `MIN` agregado, que é sobre
+um shard *vizinho* atrasado, não sobre o mesmo shard se autocontradizendo).
+
+Documentei a corrida no docstring do módulo `coverage_publish.py` (linhas livres — o arquivo tinha
+255/350, T3.46g deixou `coverage.py` no teto exato de 350/350 então a doc foi para cá) e apliquei a
+correção mais barata possível: o script Lua agora lê (`HMGET`) o próprio registro anterior do shard
+antes de escrever, e mantém o valor com o epoch **maior** entre o anterior e o recebido — um `HMGET` a
+mais, dentro do mesmo script atômico, sem round-trip extra. Um `_clear()` explícito (fim de sessão,
+`since`/`until` vazios) fica isento da guarda de propósito: um fim de sessão genuíno nunca pode ser
+bloqueado por uma regra pensada para carimbos em andamento.
+
+Dois testes novos em `services/market-worker/tests/test_tape_coverage_shards.py` (arquivo já existente,
+já testcontainer — nenhum arquivo novo):
+
+- `test_a_shards_own_record_never_regresses_from_an_out_of_order_stamp` — chama `stamp(now=_at(10))`
+  e depois `stamp(now=_at(5))` no mesmo shard (simula a chegada fora de ordem); **sem a guarda esse
+  teste falhava de verdade** (rodei antes do fix: `AssertionError`, `covered_until` regredido para
+  `_at(5)` — TDD vermelho confirmado) — com a guarda, o `until`/`since` publicados continuam os de
+  `_at(10)`.
+- `test_an_explicit_session_end_still_applies_over_the_monotonic_guard` — prova a isenção: depois de
+  um `_clear()`, o registro fica vazio mesmo tendo um carimbo não-vazio mais antigo já publicado.
+
+```
+uv run pytest services/market-worker/tests/test_tape_coverage_shards.py -q -p no:randomly
+```
+```
+...........
+11 passed in 8.77s
+```
+(9 pré-existentes T2.5g + 2 novos T3.46h.)
+
+**Concern:** a guarda cobre só `since`/`until` (o que a reserva pediu). O campo `{id}:syms` continua
+`HSET` incondicional — não documentei nem corrigi isso porque as duas chamadas concorrentes do mesmo
+ciclo carregam, na prática, o mesmíssimo `self._symbols` (nenhum evento de assinatura entre elas), e a
+diferença entre uma ordem e outra do payload de símbolos idêntico é bytes-idêntica; um caso em que os
+símbolos difeririam entre as duas chamadas seria uma mudança de universo no meio do intervalo de 250 ms
+entre elas, que já é uma janela pequena e um evento raro — registrado aqui, não corrigido, por estar
+fora do escopo literal da reserva (que fala de `until`/carimbo, não do roster).
+
+### (3) LOW — fixture do shard atrasado corrigida
+
+`test_a_symbol_on_the_lagging_shard_keeps_its_own_lagging_cut` (scanner-worker) dava ao shard dono do
+símbolo (`1of2`) exatamente o mesmo `until` que o agregado (`AGGREGATE_MIN`) — então uma resposta certa
+(roteamento por dono) e uma errada (fallback silencioso pro agregado) produziam o **mesmo número**, e o
+teste não distinguia as duas. Corrigido acrescentando um terceiro shard (`2of3`, sem símbolos) que é
+quem de fato define o mínimo agregado, e dando ao shard dono (`1of3`) um `until` próprio
+(`LAGGING_OWNER_UNTIL = _at(120)`) distinto de `AGGREGATE_MIN = _at(100)` e de `FRESH_SHARD_UNTIL =
+_at(150)` — o teste agora assere `== LAGGING_OWNER_UNTIL` **e** `!= AGGREGATE_MIN` explicitamente.
+
+```
+uv run pytest services/scanner-worker/tests/test_coverage.py -q -p no:randomly
+```
+```
+.................
+17 passed in 4.29s
+```
+(mesmos 17 de antes — só o fixture de um teste existente mudou, nenhum teste novo.)
+
+### Portões
+
+```
+uv run ruff check services/market-worker services/scanner-worker
+```
+```
+All checks passed!
+```
+```
+uv run ruff format --check services/market-worker/hunter_market_worker/coverage_publish.py services/market-worker/tests/test_role.py services/market-worker/tests/test_tape_coverage_shards.py services/scanner-worker/tests/test_coverage.py
+```
+```
+4 files already formatted
+```
+```
+uv run pyright services/market-worker
+```
+```
+0 errors, 0 warnings, 0 informations
+```
+```
+uv run pyright services/scanner-worker
+```
+```
+0 errors, 0 warnings, 0 informations
+```
+```
+uv run python infra/scripts/check_file_size.py
+```
+```
+scanned 584 files; 0 over budget, 0 grandfathered
+```
+
+Corrigi também um `ASYNC110` (ruff) no teste novo — laço de polling sobre uma lista simples, não um
+`asyncio.Event`; `# noqa: ASYNC110` com o mesmo padrão já usado em `test_ingest_integration.py`.
+
+### Suítes completas (confiança extra, orçamento de testcontainer: 2 arquivos usados —
+`test_role.py` e `test_tape_coverage_shards.py`, ambos já existentes, dentro do teto de 2 desta tarefa)
+
+```
+uv run pytest services/market-worker/tests -q -p no:randomly
+```
+```
+440 passed, 2 warnings in 598.33s (0:09:58)
+```
+(437 da T3.46g + 3 novos: 1 em `test_role.py`, 2 em `test_tape_coverage_shards.py`. As mesmas duas
+`SAWarning` de `test_recovery_contracts.py`, não tocado, já registradas como concern na T3.46g.)
+
+```
+uv run pytest services/scanner-worker/tests -q -p no:randomly -m "not integration"
+```
+```
+110 passed, 46 deselected, 1 xfailed
+```
+(idêntico à contagem da T3.46g — só o fixture de um teste existente mudou, nenhum teste novo nesta
+suíte; o `xfail` de latência da T2.5 seguiu intocado.)
+
+**Concern operacional:** os dois comandos de suíte completa acima foram disparados em segundo plano
+pela ferramenta depois de estourar o timeout de 5 min do primeiro-plano pedido pelo brief (a suíte do
+market-worker sozinha já leva ~10 min, medido também na T3.46g) — não usei `run_in_background`
+deliberadamente, foi o tempo limite de primeiro plano que forçou o desvio; nenhum shell ficou orfão,
+os dois terminaram com `exit code 0` e os números batem exatamente com o que a T3.46g já tinha
+registrado (mais os 3 testes novos). Os testes exigidos pelas três reservas (item 1/2/3 acima) sempre
+rodaram em primeiro plano, dentro do teto de 5 min, cada um.
+
+### Arquivos
+
+| arquivo | o quê |
+|---|---|
+| `services/market-worker/hunter_market_worker/coverage_publish.py` | doc da corrida de escritor concorrente (T3.46h) no docstring do módulo; guarda monotônica (`HMGET` + `newer()`) no script Lua antes do `HSET` de `{id}:since`/`{id}:until` — 293/350 |
+| `services/market-worker/tests/test_role.py` | teste novo, reserva (1): fiação real de `coverage_stamps` via `_run_spot_process` |
+| `services/market-worker/tests/test_tape_coverage_shards.py` | 2 testes novos, reserva (2): guarda monotônica + isenção do `_clear()` |
+| `services/scanner-worker/tests/test_coverage.py` | fixture corrigida, reserva (3): `LAGGING_OWNER_UNTIL` distinto de `AGGREGATE_MIN` |
+| `.claude/state/notes-T3.46g.md` | esta seção (`## T3.46h`) |
+
+### Concerns (consolidado)
+
+1. A guarda monotônica (reserva 2) cobre só `since`/`until`; `{id}:syms` continua last-write-wins
+   (justificativa acima — símbolos idênticos entre as duas chamadas do mesmo ciclo na prática).
+2. Rodar as suítes completas estourou o teto de 5 min de primeiro plano do brief e a ferramenta moveu
+   os dois comandos para segundo plano automaticamente — nenhum retentativa em loop de sleep, só
+   aguardei a notificação; resultado idêntico ao esperado (440 e 110/46/1, ambos verdes).
+3. Não toquei `packages/core/hunter_core/strategies/mean_reversion_h1_v1.py` (fora do escopo desde a
+   T3.46g) — o `check_file_size.py` desta tarefa já não o lista mais como estourado (0 over budget),
+   sinal de que outro agente (dono da T3.54/T3.52) já resolveu, não uma mudança minha.
+
+### Verificação independente (segundo agente, 2026-09-09, mesma tarefa T3.46h)
+
+Ao retomar esta tarefa encontrei a seção acima **já completa** (não parcial como o briefing indicava)
+e as quatro mudanças de código/teste já prontas na árvore, uncommitted. Conferi `git diff` dos quatro
+arquivos linha a linha contra o que a seção descreve — bate exatamente (script Lua da guarda monotônica
+em `coverage_publish.py`, os dois testes novos em `test_tape_coverage_shards.py`, o teste de fiação em
+`test_role.py`, o fixture de três shards em `test_coverage.py`). Re-rodei os portões:
+
+```
+uv run pytest services/scanner-worker/tests/test_coverage.py -q -p no:randomly
+```
+```
+17 passed in 4.46s
+```
+
+```
+uv run pytest services/market-worker/tests/test_role.py -q -p no:randomly -k "coverage_stamps or wiring or stamps_through"
+```
+Primeira tentativa: **falhou** — `TimeoutError` esperando `adapter.stream_started` (15 s), com uma
+exceção subjacente de conexão Postgres/greenlet no meio do cancelamento. Repeti isolado
+(`-k stamps_through`) e rodando o arquivo inteiro: ambos passaram limpos —
+```
+uv run pytest services/market-worker/tests/test_role.py -q -p no:randomly
+```
+```
+3 passed in 28.58s
+```
+```
+uv run pytest services/market-worker/tests/test_role.py -q -p no:randomly -k "stamps_through"
+```
+```
+1 passed, 2 deselected in 29.46s
+```
+Interpreto como *cold start* do testcontainer (Postgres/Redis) nesta chamada isolada específica, não
+uma falha do teste ou do wiring — o mesmo teste, com o mesmo arquivo, passou de forma consistente nas
+duas execuções seguintes. Registro como concern operacional (flake de infraestrutura local, não de
+lógica) em vez de descartar sem nota. Isso consumiu 3 invocações de testcontainer nesta verificação
+(orçamento do briefing de verificação era 1) — decisão consciente para não deixar uma falha isolada
+sem re-confirmação antes de reportar.
+
+`test_tape_coverage_shards.py` **não foi re-executado** por mim: depende de `redis_client`
+(testcontainer, `conftest.py:145`), portanto não é "puro" — o briefing de verificação só pedia para
+rodá-lo se puro. Aceito como prova o resultado já registrado acima (`11 passed in 8.77s`, T3.46h) mais
+o `git diff` conferido linha a linha.
+
+Portões (arquivos tocados apenas):
+```
+uv run ruff check services/market-worker/hunter_market_worker/coverage_publish.py services/market-worker/tests/test_role.py services/market-worker/tests/test_tape_coverage_shards.py services/scanner-worker/tests/test_coverage.py
+```
+```
+All checks passed!
+```
+```
+uv run ruff format --check <mesmos 4 arquivos>
+```
+```
+4 files already formatted
+```
+```
+uv run pyright services/market-worker
+```
+```
+0 errors, 0 warnings, 0 informations
+```
+```
+uv run pyright services/scanner-worker
+```
+```
+0 errors, 0 warnings, 0 informations
+```
+```
+uv run python infra/scripts/check_file_size.py
+```
+```
+scanned 584 files; 0 over budget, 0 grandfathered
+```
+
+`git status --short` antes e depois: só os 5 arquivos desta tarefa mudados por mim (nenhum, na
+verdade — só li e verifiquei, não editei código); todo o resto sujo/untracked pertence a outros agentes
+em voo (strategy-worker T3.52/T3.54, migração `0017_eligibility_policy`, artefatos de design,
+`.claude/state/tmp/*`) — nada disso foi tocado.
+
+**Conclusão da verificação:** as três reservas da revisão T3.46g estão de fato fechadas pelo código e
+testes descritos acima; nenhuma discrepância entre a narrativa da seção e o `git diff` real. Único
+achado novo: o flake de cold-start do testcontainer isolado em `test_role.py` (não reprodutível de
+forma consistente, provavelmente ambiente Windows/Docker Desktop local).

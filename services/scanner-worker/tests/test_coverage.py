@@ -296,20 +296,37 @@ async def test_a_symbol_mapped_to_one_live_shard_uses_that_shards_own_until() ->
     assert refreshed.covered_until == FRESH_SHARD_UNTIL
 
 
+LAGGING_OWNER_UNTIL = _at(120)
+"""Deliberately between ``AGGREGATE_MIN`` and ``FRESH_SHARD_UNTIL``: a third,
+even-more-lagging shard (below) sets the aggregate min in the test that uses
+this constant, so the owning shard's own ``until`` is never numerically equal
+to the aggregate -- a routing bug that silently fell back to the aggregate
+would return a *different* value than the one asserted, not the same one by
+coincidence."""
+
+
 async def test_a_symbol_on_the_lagging_shard_keeps_its_own_lagging_cut() -> None:
     """Ownership routes to *this* symbol's shard, never opportunistically to
-    whichever shard happens to be freshest."""
+    whichever shard happens to be freshest -- and never to the aggregate
+    either. A third shard (``2of3``, unmapped) is the one that actually sets
+    the aggregate min here, distinct from the owning shard's own ``until``:
+    the old fixture gave the owning shard exactly the aggregate's value, so a
+    fallback-to-aggregate bug and correct per-shard routing produced the same
+    number and this test could not tell them apart."""
     redis = _redis_with(
         {
             **_shard_record(
-                "0of2", since=SESSION, until=FRESH_SHARD_UNTIL, ts=AGGREGATE_MIN, symbols={}
+                "0of3", since=SESSION, until=FRESH_SHARD_UNTIL, ts=AGGREGATE_MIN, symbols={}
             ),
             **_shard_record(
-                "1of2",
+                "1of3",
                 since=SESSION,
-                until=AGGREGATE_MIN,
+                until=LAGGING_OWNER_UNTIL,
                 ts=AGGREGATE_MIN,
                 symbols={"BTCUSDT": SESSION},
+            ),
+            **_shard_record(
+                "2of3", since=SESSION, until=AGGREGATE_MIN, ts=AGGREGATE_MIN, symbols={}
             ),
         }
     )
@@ -317,7 +334,8 @@ async def test_a_symbol_on_the_lagging_shard_keeps_its_own_lagging_cut() -> None
     coverage = await read_coverage(redis, "binance", now=_at(101))
     refreshed = await refreshed_cut(redis, coverage, exchange="binance", symbol="BTCUSDT")
 
-    assert refreshed.covered_until == AGGREGATE_MIN
+    assert refreshed.covered_until == LAGGING_OWNER_UNTIL
+    assert refreshed.covered_until != AGGREGATE_MIN
 
 
 async def test_an_unmapped_symbol_falls_back_to_the_aggregate_min() -> None:
