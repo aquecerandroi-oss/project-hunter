@@ -1,0 +1,51 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- C:\dev\project-hunter\.venv\Scripts\python.exe
+hypothesis profile 'default'
+rootdir: C:\dev\project-hunter
+configfile: pyproject.toml
+plugins: anyio-4.15.0, hypothesis-6.167.1, asyncio-1.4.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 40 items
+
+.claude/state/exp-drafts/t360/test_carteira.py::test_a_aposta_e_mercado_x_barra_e_a_versao_mais_antiga_vence PASSED [  2%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_a_escolha_do_dedupe_nao_olha_o_resultado PASSED [  5%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_barras_diferentes_do_mesmo_mercado_sao_apostas_diferentes PASSED [  7%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_a_chave_por_hora_funde_barras_da_mesma_hora PASSED [ 10%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_a_vaga_e_do_motor_cinco_entram_o_sexto_e_recusado PASSED [ 12%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_vinte_vagas_admitem_vinte_e_o_limite_veio_de_RiskLimits PASSED [ 15%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_a_mesma_moeda_duas_vezes_e_duplicate_position PASSED [ 17%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_stop_acima_do_teto_de_3_por_cento_e_recusado_por_stop_distance PASSED [ 20%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_stop_abaixo_do_piso_de_0_3_por_cento_tambem_e_recusado PASSED [ 22%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_stop_dentro_da_banda_passa PASSED [ 25%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_volume_24h_abaixo_do_piso_de_50M_e_recusado_por_liquidity_24h PASSED [ 27%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_volume_24h_acima_do_piso_passa_o_check_de_liquidez PASSED [ 30%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_janela_de_30_barras_incompleta_torna_a_participacao_indisponivel PASSED [ 32%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_o_teto_de_participacao_e_quem_decide_o_tamanho_em_mercado_fino PASSED [ 35%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_num_mercado_grande_quem_vence_e_o_teto_por_moeda_nao_o_de_risco PASSED [ 37%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_o_teto_de_risco_so_vence_com_stop_largo_em_mercado_grande PASSED [ 40%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_quatro_posicoes_cheias_esgotam_a_exposicao_total_de_40_por_cento PASSED [ 42%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_tamanho_abaixo_do_min_notional_e_recusado_pelo_check_sizing PASSED [ 45%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_o_risco_agregado_esgotado_recusa_a_entrada_seguinte PASSED [ 47%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_o_orcamento_agregado_parcial_vira_o_limitante_publicado PASSED [ 50%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_dobrar_o_teto_agregado_tira_o_risco_agregado_da_frente PASSED [ 52%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_o_kill_switch_bloqueia_entradas_depois_de_2_por_cento_de_perda_no_dia PASSED [ 55%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_a_trava_do_kill_switch_nao_se_desfaz_sozinha_no_dia_seguinte PASSED [ 57%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_a_retomada_manual_do_dia_seguinte_e_o_resume_do_motor PASSED [ 60%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_o_patrimonio_e_sempre_caixa_mais_posicoes PASSED [ 62%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_a_curva_de_patrimonio_e_monotonica_no_tempo PASSED [ 65%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_todos_os_checks_aparecem_mesmo_depois_do_primeiro_reprovado PASSED [ 67%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_nenhuma_posicao_nasce_sem_decisao_aprovada PASSED [ 70%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_o_perfil_de_cada_configuracao_e_o_PAPER_V1_com_um_campo_trocado[0.0025] PASSED [ 72%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_o_perfil_de_cada_configuracao_e_o_PAPER_V1_com_um_campo_trocado[0.005] PASSED [ 75%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_o_perfil_de_cada_configuracao_e_o_PAPER_V1_com_um_campo_trocado[0.01] PASSED [ 77%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_o_csv_da_vps_carrega_e_tem_os_campos_do_motor PASSED [ 80%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_invariante_de_patrimonio_na_populacao_real[0.0025-5] PASSED [ 82%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_invariante_de_patrimonio_na_populacao_real[0.0025-10] PASSED [ 85%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_invariante_de_patrimonio_na_populacao_real[0.0025-20] PASSED [ 87%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_invariante_de_patrimonio_na_populacao_real[0.01-5] PASSED [ 90%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_invariante_de_patrimonio_na_populacao_real[0.01-10] PASSED [ 92%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_invariante_de_patrimonio_na_populacao_real[0.01-20] PASSED [ 95%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_a_populacao_real_e_deduplicada_para_uma_aposta_por_mercado_e_barra PASSED [ 97%]
+.claude/state/exp-drafts/t360/test_carteira.py::test_nenhuma_entrada_da_populacao_real_nasce_sem_decisao_aprovada PASSED [100%]
+
+============================= 40 passed in 3.87s ==============================

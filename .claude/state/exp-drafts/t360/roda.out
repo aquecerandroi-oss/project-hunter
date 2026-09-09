@@ -1,0 +1,196 @@
+====================================================================================================
+T3.60 — a familia mean_reversion como UMA carteira sob o motor real
+====================================================================================================
+
+== 1. populacao e o pooling ==
+prospectiva  | n= 279 | apostas=  91 | pooling= 3.07x | dias= 2 | mercados= 69 | versoes=10 | R_bruto_soma=   63.11 | R_unico_soma=   19.54
+replay       | n= 213 | apostas=  64 | pooling= 3.33x | dias=13 | mercados=  4 | versoes=12 | R_bruto_soma=   49.50 | R_unico_soma=    8.21
+hoje 09/09   | n= 168 | apostas=  38 | pooling= 4.42x | dias= 1 | mercados= 32 | versoes= 8 | R_bruto_soma=   43.45 | R_unico_soma=   13.17
+   creditos do dedupe (quem levou a aposta): {'mean_reversion v1': 33, 'mean_reversion v10': 5}
+
+== 2. quantos sinais o motor recusa ANTES de qualquer limite de carteira ==
+   (checks de admissao que so dependem do proprio sinal/mercado)
+prospectiva  | apostas=  91 | stop fora de [0,3%;3%]=   5 (5.5%) | vol24h<50M=  56 (61.5%) | janela 30min incompleta=  0
+replay       | apostas=  64 | stop fora de [0,3%;3%]=   1 (1.6%) | vol24h<50M=   0 (0.0%) | janela 30min incompleta=  0
+
+== 3. varredura de configuracoes (populacao prospectiva 08-09/09) ==
+risco% | agreg% | vagas | cand | aprov | ops/dia | R/dia | R p10 | R p50 | R p90 | pior dia R | USDT/R p50 | PnL USDT | DD USDT | DD% | travou
+ 0.25 |   1.0 |     5 |   91 |    27 |    13.5 |   +2.42 |  +1.12 |  +1.12 |  +3.71 |      +1.12 |       6.67 |   +41.45 |   27.65 |  0.14 | nao
+ 0.25 |   1.0 |    10 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 0.25 |   1.0 |    20 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 0.25 |   2.0 |     5 |   91 |    27 |    13.5 |   +2.42 |  +1.12 |  +1.12 |  +3.71 |      +1.12 |       6.67 |   +41.45 |   27.65 |  0.14 | nao
+ 0.25 |   2.0 |    10 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 0.25 |   2.0 |    20 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 0.25 |   4.0 |     5 |   91 |    27 |    13.5 |   +2.42 |  +1.12 |  +1.12 |  +3.71 |      +1.12 |       6.67 |   +41.45 |   27.65 |  0.14 | nao
+ 0.25 |   4.0 |    10 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 0.25 |   4.0 |    20 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 0.50 |   1.0 |     5 |   91 |    27 |    13.5 |   +2.42 |  +1.12 |  +1.12 |  +3.71 |      +1.12 |       6.67 |   +41.45 |   27.65 |  0.14 | nao
+ 0.50 |   1.0 |    10 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 0.50 |   1.0 |    20 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 0.50 |   2.0 |     5 |   91 |    27 |    13.5 |   +2.42 |  +1.12 |  +1.12 |  +3.71 |      +1.12 |       6.67 |   +41.45 |   27.65 |  0.14 | nao
+ 0.50 |   2.0 |    10 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 0.50 |   2.0 |    20 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 0.50 |   4.0 |     5 |   91 |    27 |    13.5 |   +2.42 |  +1.12 |  +1.12 |  +3.71 |      +1.12 |       6.67 |   +41.45 |   27.65 |  0.14 | nao
+ 0.50 |   4.0 |    10 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 0.50 |   4.0 |    20 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 1.00 |   1.0 |     5 |   91 |    27 |    13.5 |   +2.42 |  +1.12 |  +1.12 |  +3.71 |      +1.12 |       6.67 |   +41.45 |   27.65 |  0.14 | nao
+ 1.00 |   1.0 |    10 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 1.00 |   1.0 |    20 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 1.00 |   2.0 |     5 |   91 |    27 |    13.5 |   +2.42 |  +1.12 |  +1.12 |  +3.71 |      +1.12 |       6.67 |   +41.45 |   27.65 |  0.14 | nao
+ 1.00 |   2.0 |    10 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 1.00 |   2.0 |    20 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 1.00 |   4.0 |     5 |   91 |    27 |    13.5 |   +2.42 |  +1.12 |  +1.12 |  +3.71 |      +1.12 |       6.67 |   +41.45 |   27.65 |  0.14 | nao
+ 1.00 |   4.0 |    10 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+ 1.00 |   4.0 |    20 |   91 |    30 |    15.0 |   +1.82 |  -0.07 |  -0.07 |  +3.71 |      -0.07 |       5.47 |   +19.54 |   49.53 |  0.26 | nao
+
+== 4. a mesma varredura no replay de 31 dias (massa, NAO veredito) ==
+risco% | agreg% | vagas | aprov | ops/dia | R/dia | pior dia R | USDT/R p50 | DD% | travou
+ 0.25 |   1.0 |     5 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.25 |   1.0 |    10 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.25 |   1.0 |    20 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.25 |   2.0 |     5 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.25 |   2.0 |    10 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.25 |   2.0 |    20 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.25 |   4.0 |     5 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.25 |   4.0 |    10 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.25 |   4.0 |    20 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.50 |   1.0 |     5 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.50 |   1.0 |    10 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.50 |   1.0 |    20 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.50 |   2.0 |     5 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.50 |   2.0 |    10 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.50 |   2.0 |    20 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.50 |   4.0 |     5 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.50 |   4.0 |    10 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 0.50 |   4.0 |    20 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 1.00 |   1.0 |     5 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 1.00 |   1.0 |    10 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 1.00 |   1.0 |    20 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 1.00 |   2.0 |     5 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 1.00 |   2.0 |    10 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 1.00 |   2.0 |    20 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 1.00 |   4.0 |     5 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 1.00 |   4.0 |    10 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+ 1.00 |   4.0 |    20 |    61 |     4.7 |   +0.70 |      -4.62 |      20.45 |  0.61 | nao
+
+== 5. onde as entradas morrem, e qual teto decide o tamanho (paper_v1 puro) ==
+-- prospectiva: 91 apostas candidatas, 27 aprovadas
+     recusa liquidity_24h              55  (60.4%)
+     recusa stop_distance               5  (5.5%)
+     recusa concurrent_positions        4  (4.4%)
+     limitante market_participation    24
+     limitante asset_exposure           3
+-- replay: 64 apostas candidatas, 61 aprovadas
+     recusa duplicate_position          2  (3.1%)
+     recusa stop_distance               1  (1.6%)
+     limitante asset_exposure          50
+     limitante market_participation     8
+     limitante risk_per_trade           3
+
+== 6. hoje (09/09), hora a hora, no perfil paper_v1 ==
+hora BRT | ops | R | R medio
+       0 |   2 |   -0.84 |  -0.419
+       1 |   1 |   -1.12 |  -1.115
+       2 |   1 |   +0.68 |  +0.678
+       5 |   1 |   -1.06 |  -1.064
+       7 |   2 |   +1.38 |  +0.688
+       8 |   2 |   +0.43 |  +0.217
+      10 |   1 |   -1.07 |  -1.071
+      12 |   5 |   +5.31 |  +1.063
+TOTAL | 15 ops | +3.71 R | PnL +55.54 USDT = R$ +287.26 | USDT/R mediano 7.26
+
+== 7. a tabela do dinheiro: R$/dia = R unicos/dia x valor de 1 R ==
+   (a) o ROTULO: 1 R = risk_per_trade_pct x patrimonio / (1 + custo_R) — o que o numero promete
+   (b) o REAL: 1 R = notional aprovado x distancia do stop — o que o motor entrega
+   R unicos/dia medido (perfil paper_v1, prospectiva): +2.42 R/dia
+capital | risco% | 1R rotulo R$ (p50) | 1R real R$ (p50) | R$/dia rotulo | R$/dia real (PnL medido) | quanto do rotulo sobra
+ R$100k |  0.25 |             216.11 |            34.48 |        522.09 |                   107.19 |                 15.96%
+ R$100k |  0.50 |             432.22 |            34.48 |       1044.18 |                   107.19 |                  7.98%
+ R$100k |  1.00 |             864.44 |            34.48 |       2088.35 |                   107.19 |                  3.99%
+ R$400k |  0.25 |             865.02 |            34.48 |       2089.76 |                   260.70 |                  3.99%
+ R$400k |  0.50 |            1730.04 |            34.48 |       4179.51 |                   260.70 |                  1.99%
+ R$400k |  1.00 |            3460.09 |            34.48 |       8359.03 |                   260.70 |                  1.00%
+
+== 8. quanto R$/dia cada configuracao entrega (prospectiva, capital R$100k) ==
+risco% | agreg% | vagas | ops/dia | R/dia | R$/dia | R$ pior dia | R$ DD max
+ 0.25 |   1.0 |     5 |    13.5 |   +2.42 |   +107.19 |      +38.60 |    143.03
+ 0.25 |   1.0 |    10 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 0.25 |   1.0 |    20 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 0.25 |   2.0 |     5 |    13.5 |   +2.42 |   +107.19 |      +38.60 |    143.03
+ 0.25 |   2.0 |    10 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 0.25 |   2.0 |    20 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 0.25 |   4.0 |     5 |    13.5 |   +2.42 |   +107.19 |      +38.60 |    143.03
+ 0.25 |   4.0 |    10 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 0.25 |   4.0 |    20 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 0.50 |   1.0 |     5 |    13.5 |   +2.42 |   +107.19 |      +38.60 |    143.03
+ 0.50 |   1.0 |    10 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 0.50 |   1.0 |    20 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 0.50 |   2.0 |     5 |    13.5 |   +2.42 |   +107.19 |      +38.60 |    143.03
+ 0.50 |   2.0 |    10 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 0.50 |   2.0 |    20 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 0.50 |   4.0 |     5 |    13.5 |   +2.42 |   +107.19 |      +38.60 |    143.03
+ 0.50 |   4.0 |    10 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 0.50 |   4.0 |    20 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 1.00 |   1.0 |     5 |    13.5 |   +2.42 |   +107.19 |      +38.60 |    143.03
+ 1.00 |   1.0 |    10 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 1.00 |   1.0 |    20 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 1.00 |   2.0 |     5 |    13.5 |   +2.42 |   +107.19 |      +38.60 |    143.03
+ 1.00 |   2.0 |    10 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 1.00 |   2.0 |    20 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 1.00 |   4.0 |     5 |    13.5 |   +2.42 |   +107.19 |      +38.60 |    143.03
+ 1.00 |   4.0 |    10 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+ 1.00 |   4.0 |    20 |    15.0 |   +1.82 |    +50.54 |       -2.11 |    256.20
+
+== 9. roster: qual subconjunto das versoes entrega mais R unico/dia ==
+passo | versao adicionada | apostas | R unico total | R/dia | ganho do passo
+    1 | mean_reversion v1  |      82 |        +17.78 |   +8.89 |         +17.78
+    2 | mean_reversion v2  |      84 |        +19.53 |   +9.77 |          +1.75
+    3 | mean_reversion v4  |      85 |        +20.19 |  +10.10 |          +0.66
+    4 | mean_reversion v3  |      85 |        +20.19 |  +10.10 |          +0.00
+    5 | mean_reversion v5  |      85 |        +20.19 |  +10.10 |          +0.00
+    6 | mean_reversion v8  |      85 |        +20.19 |  +10.10 |          +0.00
+    7 | mean_reversion v11 |      85 |        +20.19 |  +10.10 |          +0.00
+    8 | mean_reversion v10 |      90 |        +20.03 |  +10.01 |          -0.17
+    9 | mean_reversion v7  |      91 |        +19.65 |   +9.83 |          -0.37
+   10 | mean_reversion v6  |      91 |        +19.54 |   +9.77 |          -0.11
+
+   -- o roster passado pelo motor (perfil paper_v1), por tamanho de roster --
+roster | versoes | aprovadas | R/dia | R$/dia | IC95 do delta vs familia (bloco=dia)
+     1 |       1 |        22 |   +3.46 |   +107.75 | delta +0.0021 R/decisao IC95 [-0.0295; +0.0575] n=82
+     2 |       2 |        22 |   +3.46 |   +107.75 | delta +0.0178 R/decisao IC95 [+0.0013; +0.0575] n=84
+     3 |       3 |        22 |   +3.46 |   +107.75 | delta +0.0228 R/decisao IC95 [+0.0116; +0.0575] n=85
+     4 |       4 |        22 |   +3.46 |   +107.75 | delta +0.0228 R/decisao IC95 [+0.0116; +0.0575] n=85
+     5 |       5 |        22 |   +3.46 |   +107.75 | delta +0.0228 R/decisao IC95 [+0.0116; +0.0575] n=85
+     6 |       6 |        22 |   +3.46 |   +107.75 | delta +0.0228 R/decisao IC95 [+0.0116; +0.0575] n=85
+     7 |       7 |        22 |   +3.46 |   +107.75 | delta +0.0228 R/decisao IC95 [+0.0116; +0.0575] n=85
+     8 |       8 |        26 |   +2.66 |   +108.40 | delta +0.0078 R/decisao IC95 [+0.0000; +0.0116] n=90
+     9 |       9 |        27 |   +2.47 |   +107.19 | delta +0.0078 R/decisao IC95 [+0.0000; +0.0116] n=90
+    10 |      10 |        27 |   +2.42 |   +107.19 | delta +0.0000 R/decisao IC95 [+0.0000; +0.0000] n=91
+
+== 10. estresse: marca no pior ponto (MAE) em vez de marca a custo ==
+marca=custo  | aprovadas=  27 | R/dia=  +2.42 | DD= 0.14% | travou=nao
+marca=mae    | aprovadas=  27 | R/dia=  +2.42 | DD= 0.19% | travou=nao
+
+== 11. quando o kill switch travaria, e quanto custa o dia ruim ==
+prospectiva  | risco  0.25% | dias= 2 | pior dia   +1.12 R = R$    +38.60 | perda diaria maxima medida 0.000% do patrimonio | travou=nao
+prospectiva  | risco  0.50% | dias= 2 | pior dia   +1.12 R = R$    +38.60 | perda diaria maxima medida 0.000% do patrimonio | travou=nao
+prospectiva  | risco  1.00% | dias= 2 | pior dia   +1.12 R = R$    +38.60 | perda diaria maxima medida 0.000% do patrimonio | travou=nao
+replay       | risco  0.25% | dias=13 | pior dia   -4.62 R = R$   -488.75 | perda diaria maxima medida 0.489% do patrimonio | travou=nao
+replay       | risco  0.50% | dias=13 | pior dia   -4.62 R = R$   -488.75 | perda diaria maxima medida 0.489% do patrimonio | travou=nao
+replay       | risco  1.00% | dias=13 | pior dia   -4.62 R = R$   -488.75 | perda diaria maxima medida 0.489% do patrimonio | travou=nao
+
+== 12. a pergunta do Everton: o que R$ 9.000/dia exigiria ==
+   medido hoje: +2.42 R unicos/dia, 1 R = 6.67 USDT (R$ 34.48)
+                notional aprovado mediano 414.91 USDT, stop mediano 1.284%
+   PnL medido: R$ 107.19/dia
+   (a) mesma taxa de R/dia -> 1 R teria de valer 720.23 USDT (R$ 3725.41)
+       = notional de 56100 USDT por operacao (135x o de hoje)
+       teto por moeda (10%) exige patrimonio de 561004 USDT = R$ 2,901,794
+       teto de participacao (1% do minuto) exige um minuto de 5610041 USDT
+       = ~8.1 bi USDT/24h de volume no par
+   (b) mesmo tamanho de hoje -> seriam 261 R unicos/dia (hoje: 2.42)
+       = 108x o fluxo de R da familia inteira
+
+== 13. quantos mercados do universo passam o piso de liquidez de 50 M/24h ==
+prospectiva  | mercados= 69 | passam 50M= 23 (33.3%) | vol24h p50=21.6M | p90=209.8M
+replay       | mercados=  4 | passam 50M=  4 (100.0%) | vol24h p50=4795.7M | p90=27459.8M
