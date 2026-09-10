@@ -65,6 +65,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from hunter_core.domain.market import NormalizedCandle
+    from hunter_strategy_worker.bar_context import BarBundle
     from hunter_strategy_worker.breadth_gate import BreadthGate
     from hunter_strategy_worker.config import ShadowConfig
     from hunter_strategy_worker.gate_policy import GatePolicy
@@ -116,6 +117,7 @@ async def build_market_context(
     candles_reader: CandleReader | None = None,
     policy: GatePolicy | None = None,
     context_minutes: int | None = None,
+    bundle: BarBundle | None = None,
 ) -> tuple[StrategyContext, Provenance]:
     """The context for one market as of ``source_bar_close``, plus its provenance.
 
@@ -135,24 +137,40 @@ async def build_market_context(
     envelope: two versions in the same pass now read different windows, so
     "which window did this decision see" stops being answerable only by reading
     the deployment's environment.
+
+    ``bundle`` is the T3.74g bar bundle (:mod:`hunter_strategy_worker.bar_context`):
+    the candles, the hot-state tail, the derivatives and the validated context
+    read and built **once** for every due version of this ``(market, bar)``.
+    ``None`` — the replay, the tests that pass none, and every bar whose preload
+    failed — takes the pre-T3.74g path below, byte for byte. A bundle that does
+    not cover this market/bar/window is refused by ``covers`` and takes the same
+    path: the fast route is never allowed to answer short.
     """
     minutes = config.context_minutes if context_minutes is None else context_minutes
     start = source_bar_close - timedelta(minutes=minutes)
-    read = candles_reader or load_candles
-    durable = await read(session, market=market, start=start, end=source_bar_close)
-    tail = await hot_state.read_tail(
-        redis,
-        exchange=market.exchange,
-        symbol=market.symbol,
-        count=config.hot_state_tail,
-        cut=source_bar_close,
-        market_type=market.market_type,
+    view = (
+        bundle.view(minutes)
+        if bundle is not None and bundle.covers(market, source_bar_close, minutes)
+        else None
     )
-    merged: dict[datetime, NormalizedCandle] = {
-        c.open_time: c for c in tail if c.open_time >= start
-    }
-    merged.update({c.open_time: c for c in durable})
-    candles = [merged[key] for key in sorted(merged)]
+    if view is None:
+        read = candles_reader or load_candles
+        durable = await read(session, market=market, start=start, end=source_bar_close)
+        tail = await hot_state.read_tail(
+            redis,
+            exchange=market.exchange,
+            symbol=market.symbol,
+            count=config.hot_state_tail,
+            cut=source_bar_close,
+            market_type=market.market_type,
+        )
+        merged: dict[datetime, NormalizedCandle] = {
+            c.open_time: c for c in tail if c.open_time >= start
+        }
+        merged.update({c.open_time: c for c in durable})
+        candles = [merged[key] for key in sorted(merged)]
+    else:
+        durable, candles = list(view.durable), []
     eligible, reason = _eligibility(market)
     observed_at = utcnow()
     gate: RegimeGate | None = None
@@ -169,20 +187,26 @@ async def build_market_context(
             session, policy.breadth, cut=source_bar_close, exchange=market.exchange
         )
         eligible, reason = breadth.eligible, (None if breadth.eligible else breadth.reason)
-    deriv = await load_derivatives(session, redis, market=market, cut=source_bar_close)
-    context = build_context(
-        candles,
-        exchange=market.exchange,
-        symbol=market.symbol,
-        source_bar_close=source_bar_close,
-        funding=deriv.funding,
-        open_interest=deriv.open_interest,
-        eligible=eligible,
-        eligibility_reason=reason,
-    )
+    if view is None:
+        deriv = await load_derivatives(session, redis, market=market, cut=source_bar_close)
+        context = build_context(
+            candles,
+            exchange=market.exchange,
+            symbol=market.symbol,
+            source_bar_close=source_bar_close,
+            funding=deriv.funding,
+            open_interest=deriv.open_interest,
+            eligible=eligible,
+            eligibility_reason=reason,
+        )
+        newest_bar_open = candles[-1].open_time if candles else None
+    else:
+        deriv = view.deriv
+        context = view.with_eligibility(eligible=eligible, eligibility_reason=reason)
+        newest_bar_open = view.newest_bar_open
     provenance = Provenance(
         available_through=newest_received_at(durable),
-        newest_bar_open=candles[-1].open_time if candles else None,
+        newest_bar_open=newest_bar_open,
         bars_in_context=len(context.candles_1m),
         context_minutes=minutes,
         eligibility_observed_at=observed_at,

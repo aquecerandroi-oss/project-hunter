@@ -22,6 +22,7 @@ from hunter_core.domain.types import utcnow
 from hunter_core.events.consume import ack, consume
 from hunter_core.events.streams import Streams
 from hunter_core.logging import get_logger
+from hunter_strategy_worker.bar_context import load_bar_bundle
 from hunter_strategy_worker.context_cache import load_family_readers
 from hunter_strategy_worker.decide import evaluate_slot, versions_for_bar
 from hunter_strategy_worker.dispatch import BarDispatcher, market_key
@@ -155,6 +156,11 @@ async def handle_candle(
     design and honest limits there); each version still reads exactly its own
     ``context_minutes``. A failed preload just means no reader — every member
     falls back to its own query, same as before this existed.
+
+    **One read and one validated context per bar (T3.74g).** The bundle
+    (:mod:`hunter_strategy_worker.bar_context`, measurements and limits there)
+    widens that to the whole bar and to the context object itself, and falls
+    back to the family readers — and so to per-version reads — when it fails.
     """
     candle = _candle(payload)
     if candle is None or not candle.is_final:
@@ -185,8 +191,15 @@ async def handle_candle(
         logger.warning("shadow_market_unknown", exchange=candle.exchange, symbol=candle.symbol)
         return
     with shadow_stage_seconds.labels(stage="family_preload").time():
-        family_readers = await load_family_readers(
-            factory, due, market=market, bar_close=bar_close, config=config
+        bundle = await load_bar_bundle(
+            factory, redis, due, market=market, bar_close=bar_close, config=config
+        )
+        family_readers = (
+            {}
+            if bundle is not None
+            else await load_family_readers(
+                factory, due, market=market, bar_close=bar_close, config=config
+            )
         )
     for version in due:
         try:
@@ -199,6 +212,7 @@ async def handle_candle(
                 config=config,
                 clock=clock,
                 candles_reader=family_readers.get(version.strategy_key),
+                bundle=bundle,
             )
         except asyncio.CancelledError:
             raise

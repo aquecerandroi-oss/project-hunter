@@ -174,6 +174,35 @@ Consultas em `infra/scripts/sql/research/2026-09-10-t373-q0{0..4}-*.sql`, todas 
   stream produzem o mesmo conjunto de decisões, byte a byte, cada barra avaliada exatamente uma vez.
   Notas completas, comandos e a saída real de `docker stats`/`pg_stat_activity`/`XPENDING`:
   `.claude/state/notes-T3.74f.md`.
+  **Atualização T3.74g (2026-09-10, perfil local; nada implantado): o teto por avaliação, medido e
+  cortado pela metade — mas o alvo continua fora.** Com 4 shards a barra ainda levava 37-43 s, o que
+  põe o problema no **custo de uma avaliação**: o trabalho de um shard é linear em
+  `(mercados × versões devidas)` (~50 × ~10 ≈ 500 por fechamento), então `p50 < 5 s` significa
+  **≤ ~8 ms por avaliação**. `cProfile` sobre uma barra inteira (50 mercados × 6000 velas × 10
+  versões, sem Docker): **59 % do tempo não era estratégia** — era o pydantic reexecutando o
+  validador de cada `NormalizedCandle` a cada construção de `StrategyContext`, 1 182 000 execuções
+  por barra, porque cada versão montava o seu próprio contexto sobre a **mesma** janela do mesmo
+  mercado (pydantic 2.13 revalida modelo aninhado mesmo com `revalidate_instances` no padrão —
+  reproduzido num caso mínimo); 39 % era `strategies/aggregate.py` (três agregações por avaliação:
+  sinal 15 m, ATR 1455 min, tendência 1 h); e o banco, invisível no perfil de CPU, aparecia na
+  contagem: dez versões devidas = dez sessões, dez `read_tail`, dez `load_derivatives`.
+  **Corrigido nesta tarefa** (não implantado, não commitado): `hunter_strategy_worker.bar_context`
+  faz **uma** leitura, **uma** montagem e **uma** validação por `(mercado, barra)` e serve a cada
+  versão uma *fatia* da série já validada — sufixo, porque as janelas terminam no mesmo corte — com
+  a elegibilidade dela carimbada por cima. Medido: **13,1 → 8,6 ms** de CPU por avaliação (mediana
+  de 4 execuções, ~1,5×) e **12 → 3** idas ao banco/Redis por barra na leitura de contexto.
+  Decisões idênticas provadas por igualdade de objeto (`StrategyContext`, `Provenance`,
+  `Evaluation`) em unidade e contra Postgres real; `code_ref` dos nove contratos inalterado
+  (`git diff` vazio em `hunter_core/strategies/`, `test_code_ref.py` verde); replay intocado
+  (`bundle=None` é o caminho de antes). **Continua aberto**, e agora com o resto nomeado: (i) as três
+  agregações por avaliação são 72 % do que sobrou e são repetidas entre variantes que compartilham
+  `atr_bars`/`trend_timeframe`, mas quem as chama é o módulo congelado — deduplicar exige família
+  nova, `code_ref` novo, população nova; (ii) materializar a janela crua custa 15,3 µs/vela ≈ 48 ms
+  por (mercado, barra), e só um cache **entre** barras a elimina, ao preço de uma fotografia que um
+  backfill não atualiza (mitigável por `count(*)`/`max(received_at)`) e de 235-540 MB por processo;
+  (iii) o custo é linear no universo e as versões `research_only` decidem sobre ~200 mercados quando
+  só 16 têm 90 dias de histórico. Perfil, comandos, saídas e as três perguntas ao orquestrador:
+  `.claude/state/notes-T3.74g.md`.
 - **LOW — a sonda de elegibilidade divide a janela de 50 entradas com o universo spot.**
   `eligibility.universe_changed_after` lê as `PROBE_ENTRIES = 50` entradas mais recentes de
   `market.universe.changed` e casa por `envelope.key`. O spot publica com chave própria

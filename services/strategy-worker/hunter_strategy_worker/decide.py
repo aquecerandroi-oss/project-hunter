@@ -59,6 +59,7 @@ if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+    from hunter_strategy_worker.bar_context import BarBundle
     from hunter_strategy_worker.catalogue import ActiveVersion
     from hunter_strategy_worker.config import ShadowConfig
     from hunter_strategy_worker.context import CandleReader
@@ -100,6 +101,7 @@ async def evaluate_slot(
     config: ShadowConfig,
     clock: Callable[[], datetime] = utcnow,
     candles_reader: CandleReader | None = None,
+    bundle: BarBundle | None = None,
 ) -> Evaluation:
     """Evaluate one (version, market, bar) and apply whatever it implies.
 
@@ -112,6 +114,13 @@ async def evaluate_slot(
     exactly what :func:`hunter_strategy_worker.repo.load_candles` answers, and a
     replay passes one that read the whole slice once instead of the same 1560
     minutes per bar (T3.19b). ``None`` is the live path, unchanged.
+
+    ``bundle`` is the same idea one layer up (T3.74g,
+    :mod:`hunter_strategy_worker.bar_context`): the whole bar's candles, tail,
+    derivatives and *validated context* read and built once for every due
+    version instead of once per version. Also cost, never content — the view it
+    serves is asserted equal to the context the old path builds — and ``None``
+    (the replay, and any bar whose preload failed) is that old path exactly.
 
     How much history that window holds is the **version's**, not the process's,
     since T3.54b: ``version.context_minutes(config)`` derives it from the frozen
@@ -154,6 +163,7 @@ async def evaluate_slot(
                 candles_reader=candles_reader,
                 policy=version.eligibility_policy,
                 context_minutes=version.context_minutes(config),
+                bundle=bundle,
             )
     with shadow_stage_seconds.labels(stage="evaluate").time():
         evaluation = version.strategy.explain(context, version.params)
