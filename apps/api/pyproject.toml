@@ -9,6 +9,11 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
   "hunter-core",
   "hunter-indicators",
+  # T3.68: the manual order route derives its cost hypothesis from the
+  # wallet's real, declared fee schedule (`hunter_exchanges.binance_spot.fees.
+  # SPOT_VIP0`) instead of duplicating the threshold — a shared `packages/`
+  # dependency, never `services/execution-worker`.
+  "hunter-exchanges",
   "fastapi>=0.115",
   "uvicorn[standard]>=0.32",
   "pyjwt[crypto]>=2.9",

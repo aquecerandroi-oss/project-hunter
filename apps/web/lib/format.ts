@@ -95,6 +95,33 @@ function roundDecimal(dec: ParsedDecimal, decimals: number): ParsedDecimal {
   };
 }
 
+/** Aligns a parsed decimal's fraction to `fracLength` digits and returns its unsigned magnitude as a `BigInt`. */
+function decimalMagnitude(dec: ParsedDecimal, fracLength: number): bigint {
+  const frac = dec.fracDigits.padEnd(fracLength, "0");
+  return BigInt(`${dec.intDigits || "0"}${frac}`);
+}
+
+/**
+ * Exact comparison of two `Decimal` strings (string/`BigInt` arithmetic only,
+ * same parsing as `formatMoney`/`formatBrl` above) -- for rules where two
+ * decimal strings must be compared exactly, `Number(a) >= Number(b)` can
+ * flip once either value moves past `2**53`'s exact-integer range, or once
+ * two distinct decimal strings round to the same float. Returns -1/0/1 like
+ * `Array.prototype.sort`'s comparator contract. Throws `TypeError` (via
+ * `parseDecimal`) if either input is not a valid decimal string.
+ */
+export function compareDecimalStrings(a: string, b: string): number {
+  const pa = parseDecimal(a);
+  const pb = parseDecimal(b);
+  const fracLength = Math.max(pa.fracDigits.length, pb.fracDigits.length);
+  const magA = decimalMagnitude(pa, fracLength);
+  const magB = decimalMagnitude(pb, fracLength);
+  const signedA = pa.negative && magA !== 0n ? -magA : magA;
+  const signedB = pb.negative && magB !== 0n ? -magB : magB;
+  if (signedA === signedB) return 0;
+  return signedA < signedB ? -1 : 1;
+}
+
 /** Locale-groups an all-digit integer string via `Intl.NumberFormat`'s `bigint` support. */
 function groupInteger(digits: string, locale: string): string {
   return new Intl.NumberFormat(locale).format(BigInt(digits || "0"));

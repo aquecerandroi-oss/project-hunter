@@ -13,6 +13,7 @@ import type {
   PortfolioSummary,
   PortfolioTradeRow,
   PositionRow,
+  RiskLimits,
 } from "./portfolio-types";
 
 /**
@@ -127,4 +128,13 @@ export async function getTrades(orgId: string, portfolioId: string, params: Acti
  */
 export async function getKillSwitch(orgId: string, portfolioId: string): Promise<KillSwitchDetail> {
   return apiFetch<KillSwitchDetail>(`${portfoliosBase(orgId)}/${portfolioId}/risk/kill-switch`);
+}
+
+/**
+ * `GET .../risk/limits` (`routers/risk.py::read_risk_limits`) -- the numeric
+ * `paper_v1` preset (T3.72's "Nova ordem paper" needs `max_stop_distance_pct`
+ * for the implied stop-distance-% hint) plus the wallet's current usage.
+ */
+export async function getRiskLimits(orgId: string, portfolioId: string): Promise<RiskLimits> {
+  return apiFetch<RiskLimits>(`${portfoliosBase(orgId)}/${portfolioId}/risk/limits`);
 }

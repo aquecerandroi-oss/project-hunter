@@ -8,6 +8,8 @@ export interface ListMarketsParams {
   exchange?: string;
   q?: string;
   monitored?: boolean;
+  /** `market_type` (T3.0c) -- API defaults to `perpetual`; pass `"spot"` for the tradable spot universe (D1's 50M floor). */
+  marketType?: "spot" | "perpetual";
   limit?: number;
   cursor?: string;
 }
@@ -17,6 +19,7 @@ function listQuery(params: ListMarketsParams): string {
   if (params.exchange !== undefined) search.set("exchange", params.exchange);
   if (params.q !== undefined) search.set("q", params.q);
   if (params.monitored !== undefined) search.set("monitored", String(params.monitored));
+  if (params.marketType !== undefined) search.set("market_type", params.marketType);
   if (params.limit !== undefined) search.set("limit", String(params.limit));
   if (params.cursor !== undefined) search.set("cursor", params.cursor);
   const value = search.toString();

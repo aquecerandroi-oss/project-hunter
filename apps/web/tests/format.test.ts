@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { formatBrl, formatBrlSigned, formatCompact, formatMoney, formatPct, formatUtc } from "@/lib/format";
+import { compareDecimalStrings, formatBrl, formatBrlSigned, formatCompact, formatMoney, formatPct, formatUtc } from "@/lib/format";
 
 describe("formatMoney", () => {
   it("formats a numeric-string USD amount", () => {
@@ -143,5 +143,30 @@ describe("exponent notation from the API (VPS 2026-09-08: the wallet page crashe
   it("still refuses garbage", () => {
     expect(() => formatMoney("E5")).toThrow(TypeError);
     expect(() => formatMoney("1E")).toThrow(TypeError);
+  });
+});
+
+describe("compareDecimalStrings (T3.72b LOW finding #3: exact Decimal-string comparison, never Number())", () => {
+  it("orders two plain decimals without ambiguity", () => {
+    expect(compareDecimalStrings("60000", "65000")).toBe(-1);
+    expect(compareDecimalStrings("65000", "60000")).toBe(1);
+    expect(compareDecimalStrings("65000", "65000")).toBe(0);
+    expect(compareDecimalStrings("65000", "65000.00")).toBe(0);
+  });
+
+  it("stays exact past 2**53, where Number() comparisons can silently flip", () => {
+    // Number("90071992547409929") === Number("90071992547409930") once rounded to a double.
+    expect(compareDecimalStrings("90071992547409929", "90071992547409930")).toBe(-1);
+    expect(Number("90071992547409929") >= Number("90071992547409930")).toBe(true); // the bug this replaces
+  });
+
+  it("handles negatives and zero correctly, including a signed zero", () => {
+    expect(compareDecimalStrings("-1", "1")).toBe(-1);
+    expect(compareDecimalStrings("-0", "0")).toBe(0);
+    expect(compareDecimalStrings("-0.5", "-0.25")).toBe(-1);
+  });
+
+  it("throws a TypeError on an invalid decimal string, same as parseDecimal's other callers", () => {
+    expect(() => compareDecimalStrings("abc", "1")).toThrow(TypeError);
   });
 });

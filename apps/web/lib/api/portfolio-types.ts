@@ -45,6 +45,10 @@ export type Peak = components["schemas"]["PeakOut"];
  * for whether entries are actually blocked right now. */
 export type KillSwitchDetail = components["schemas"]["KillSwitchOut"];
 
+/** `GET .../risk/limits` (T3.72) -- the numeric `paper_v1` preset the "Nova ordem paper" form needs (`max_stop_distance_pct`), plus the wallet's current usage against it. */
+export type RiskLimits = components["schemas"]["RiskLimitsOut"];
+export type RiskLimitsPreset = components["schemas"]["RiskLimitsPresetOut"];
+
 export interface AsOfPage<T> {
   as_of: string;
   items: T[];

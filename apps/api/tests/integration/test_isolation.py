@@ -67,6 +67,9 @@ def _tenant_routes(org_id: uuid.UUID, workspace_id: uuid.UUID, user_id: uuid.UUI
             f"{base}/portfolios/{ANY_UUID}/risk/kill-switch/resume",
             {"reason": "an outsider pressing the button"},
         ),
+        # T3.25's own read (`routers/risk.py::read_risk_limits`) was missing
+        # here — found while adding T3.68's rows below, not part of it.
+        ("GET", f"{base}/portfolios/{ANY_UUID}/risk/limits", None),
         # T3.8a's seven reads. Missing here until the T3.1c security review
         # counted 16 declared against 23 served (D2), which meant nothing
         # asserted that a member of A asking for B's wallet, anchor, curve,
@@ -78,6 +81,14 @@ def _tenant_routes(org_id: uuid.UUID, workspace_id: uuid.UUID, user_id: uuid.UUI
         ("GET", f"{base}/portfolios/{ANY_UUID}/positions", None),
         ("GET", f"{base}/portfolios/{ANY_UUID}/orders", None),
         ("GET", f"{base}/portfolios/{ANY_UUID}/trades", None),
+        # T3.68 (`routers/orders.py`) — the manual paper order request.
+        (
+            "POST",
+            f"{base}/portfolios/{ANY_UUID}/order-requests",
+            {"market_id": str(ANY_UUID), "direction": "long", "stop": "1"},
+        ),
+        ("GET", f"{base}/portfolios/{ANY_UUID}/order-requests", None),
+        ("GET", f"{base}/portfolios/{ANY_UUID}/order-requests/{ANY_UUID}", None),
     ]
 
 

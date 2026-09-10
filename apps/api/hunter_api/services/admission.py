@@ -43,6 +43,14 @@ caller as the identity of what was asked; what it may no longer do is persist it
 as proof. A replay of a pending row is therefore compared on the archived
 payload (``hunter_core.admission.dedupe``), which is the same information one
 step earlier.
+
+**T3.68b.** The filing act itself now writes its own ``audit_logs`` row, with
+the operator's real ``actor_id`` — before, only the engine's later decision
+was audited, as ``hunter_worker`` (``services/admission_audit.py``, finding
+2). A reused idempotency key on a *different* wallet is refused by name
+before its geometry is even compared (finding 5), and a constraint violation
+or a genuine replay conflict never echoes the database's own text or the
+previous order's values back to the caller (finding 3).
 """
 
 from __future__ import annotations
@@ -57,6 +65,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from hunter_api.errors import HunterError
+from hunter_api.services.admission_audit import integrity_reason, record_filing_audit
 from hunter_core.admission.dedupe import IdempotencyConflict, find_admitted, find_pending
 from hunter_core.admission.sources import (
     OriginRefused,
@@ -211,6 +220,22 @@ async def file_manual_order(
         session, organization_id=context.org_id, idempotency_key=key, lock=False
     )
     if pending is not None:
+        # T3.68b finding 5: the idempotency key is unique per
+        # ``(organization_id, idempotency_key)`` — **not** per wallet — so two
+        # different portfolios filing under the same key both land on this
+        # branch. ``request_payload`` alone does not name the wallet
+        # (§21.1: eight keys, none of them ``portfolio_id``), so two requests
+        # for the same market/direction/geometry on two different wallets used
+        # to compare equal and this returned the *other* wallet's
+        # ``proposal_id`` — which ``services/orders.py``'s own read-back then
+        # could not find under the caller's ``portfolio_id``, a 500 in place
+        # of a 409. Checked first, and named, before the payload comparison
+        # even runs.
+        if pending.portfolio_id != portfolio_id:
+            raise OrderReplayConflictError(
+                "idempotency key already names a pending request on a different wallet "
+                f"(reason: order_replay_conflict; proposal {pending.proposal_id})"
+            )
         # Unlocked: the API only ever reads this row (it never decides), and
         # ``hunter_app`` lost ``UPDATE`` on ``trade_proposals`` in
         # ``0007_paper_roles`` — a ``FOR UPDATE`` read under this role is a
@@ -253,10 +278,13 @@ async def file_manual_order(
     except IntegrityError as exc:
         if IDEMPOTENCY_CONSTRAINT in str(exc.orig):
             raise OrderReplayConflictError(
-                f"idempotency key {idempotency_key!r} was filed concurrently; read the proposal "
-                "back instead of filing it again"
+                "idempotency key was filed concurrently (reason: order_replay_conflict); read "
+                "the proposal back instead of filing it again"
             ) from exc
-        raise OrderRefusedError(str(exc.orig)) from exc
+        raise OrderRefusedError(
+            f"order could not be filed (reason: {integrity_reason(exc.orig)})"
+        ) from exc
+    await record_filing_audit(request=request, proposal_id=proposal_id, key=key, payload=payload)
     return FiledRequest(
         proposal_id=proposal_id,
         portfolio_id=portfolio_id,
@@ -278,11 +306,15 @@ def _refuse_a_different_order(
     stamped it), a **pending** one on its ``request_payload`` (the API archived
     it, and since ``0009_paper_geometry`` may not stamp a digest at all — §21.2).
     Dictionaries compare by value, which is what a canonical payload is for.
+
+    T3.68b finding 3: the message names the proposal, never the values that
+    disagreed — ``stored``/``asked`` can carry the previous order's price,
+    stop or notional, and a 409 problem+json is client-facing.
     """
     if stored is not None and stored != asked:
         raise OrderReplayConflictError(
-            f"idempotency key already names proposal {proposal_id}, which is a different order "
-            f"({stored} != {asked})"
+            f"idempotency key already names proposal {proposal_id} (reason: "
+            "order_replay_conflict), which is a different order"
         )
 
 

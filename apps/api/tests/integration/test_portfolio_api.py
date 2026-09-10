@@ -81,7 +81,14 @@ async def _open(
     as_of: datetime,
 ) -> uuid.UUID:
     assert actor.org_id is not None and actor.workspace_id is not None
-    async with tenant_session(session_factory, actor.org_id, actor.user_id) as session:
+    # T3.68b finding 10: ``hunter_app`` (the default role) lost INSERT on
+    # ``portfolio_equity_snapshots`` in ``0007_paper_roles`` — opening writes
+    # the curve's first point, so this has to run as ``hunter_worker``, same
+    # as ``test_manual_orders.py``/``test_risk_limits_api.py``'s own helpers
+    # and the real ``infra/scripts/open_paper_wallet.py``.
+    async with tenant_session(
+        session_factory, actor.org_id, actor.user_id, db_role="hunter_worker"
+    ) as session:
         fx = await FxObservationRepository(session).get(fx_observation_id)
         assert fx is not None
         result = await open_paper_wallet(

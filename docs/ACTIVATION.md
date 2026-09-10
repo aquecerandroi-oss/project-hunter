@@ -576,6 +576,7 @@ ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops
 - Risco 0,25 % por operação incluindo custos, soma ≤ 1 %, participação ≤ 1 % do minuto, β-BTC ≤ 0,5×, total ≤ 40 %, por moeda ≤ 10 %, máx. 5 posições, pendentes contam.
 - Kill switch AVISO/BLOQUEADO como na diretiva; BLOQUEADO só sai com o Everton (OWNER).
 - Uma proposta por ciclo (D3), `research_only` nunca vira ordem, `live` recusado por nome, `ENABLE_LIVE_TRADING=false`.
+- A ordem manual paper (`POST /api/v1/orgs/{org_id}/portfolios/{portfolio_id}/order-requests`, T3.68) não depende de `ENABLE_PAPER_AUTONOMY`: é o caminho do operador, sempre ativo, mesmo com a ponte desligada.
 
 ## Como desligar
 `ENABLE_PAPER_AUTONOMY=false` + `compose.sh update` para a ponte parar de consumir (posições abertas continuam protegidas pelo worker). Aposentar a própria linha paper é `activate_strategy_version.py <key> <version> --deprecate --force-paper` (§7b) — só depois de zerar posições e slots de shadow; a mesma trava (`--force-paper` + checagem limpa) vale para `--supersede <key> <version> --force-paper` quando o que muda é o código, não o status (revisão T3.39b, ALTA-2).

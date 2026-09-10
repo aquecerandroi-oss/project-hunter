@@ -28,7 +28,7 @@ import { formatPct, formatUsdt } from "@/lib/format";
  * contract (revisit once T3.4/T3.5 land).
  */
 
-function AsOfNote({ asOf, count }: { asOf: string; count: number }) {
+export function AsOfNote({ asOf, count }: { asOf: string; count: number }) {
   return (
     <p className="text-xs text-fg-subtle">
       {count} {count === 1 ? "linha" : "linhas"} · consultado em <BrasiliaInstant iso={asOf} />
@@ -36,7 +36,7 @@ function AsOfNote({ asOf, count }: { asOf: string; count: number }) {
   );
 }
 
-function TableShell({ title, emptyNote, asOf, count, children }: { title: string; emptyNote: string; asOf: string; count: number; children: ReactNode }) {
+export function TableShell({ title, emptyNote, asOf, count, children }: { title: string; emptyNote: string; asOf: string; count: number; children: ReactNode }) {
   return (
     <div className="rounded-md border border-border p-4">
       <h3 className="text-sm font-semibold text-fg">{title}</h3>

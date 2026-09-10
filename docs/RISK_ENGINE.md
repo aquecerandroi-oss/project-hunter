@@ -614,6 +614,33 @@ ao Sentry.
   Ordens de saída são sempre permitidas.
 - Ordem manual paper também gera uma `trade_proposal` (`agent_id` nulo, `actor=user`) e passa pelos
   mesmos checks.
+- **O endpoint (T3.68, corrigido em T3.68b).** `POST /api/v1/orgs/{org_id}/portfolios/{portfolio_id}
+  /order-requests` (TRADER+, `Idempotency-Key` obrigatório, charset `[A-Za-z0-9_.:-]`, 8–128) só
+  **arquiva** o pedido — `hunter_api.services.admission.file_manual_order` (T3.12), a mesma admissão
+  compartilhada, sem caminho próprio — e agora audita a própria filiação (`order_request.filed`, ator
+  = o operador; antes só a decisão do motor era auditada). O `entry_ref` vem do último `last` do
+  ticker SPOT no hot state (Redis, `mkt:{ex}:{sym}:ticker`), e é recusado por nome
+  (`spot_ticker_missing`/`spot_ticker_stale`, 422) quando o `ts` do ticker falta ou excede
+  `hunter_risk.limits.PAPER_V1.max_price_age_s`, e `spot_ticker_clock_skew` quando o `ts` está mais de
+  2 s à frente do relógio da API (a mesma tolerância da §7.1 — problema de NTP, não de frescor). `assumed_costs` vem do spread real do mesmo ticker
+  (`bid`/`ask`), da tabela de fees real da carteira (`hunter_exchanges.binance_spot.fees.SPOT_VIP0`,
+  importada sob demanda) e de **5 bps de slippage por perna** — a mesma premissa que toda estratégia
+  declara (`hunter_core.strategies.*.default_parameters["slippage_bps"]`; na rota manual é a constante
+  local de `orders_derive.py`, amarrada às estratégias por teste unitário), nunca
+  `ExecutionPolicy.extra_slippage_bps` (esse é o ajuste *além* da caminhada do livro, não uma hipótese
+  de slippage, e valia 0 por padrão): custear a 0 dimensionava a ordem manual **maior** do que uma
+  estratégia dimensionaria a mesma geometria para o mesmo rótulo de 0,25 % de `risk_per_trade_pct`.
+  O mercado tem de ser SPOT executável (`market_type='spot'`, `status='active'`, `is_monitored`, não
+  deslistado) e a direção `short` é recusada **por nome** (`short_not_supported_spot`): o perfil
+  `paper_v1` tem `max_leverage=1`, sem short, e o check 3 (`modality`) recusaria de qualquer forma —
+  a rota só evita gastar uma volta de Redis antes de descobrir. A resposta é sempre `202`, decidida ou
+  não: quem decide continua sendo o `execution-worker`, um segundo depois, pelo mesmo `admit()` — a
+  API nunca aprova nem rejeita. `GET .../order-requests/{request_id}` lê a mesma linha de volta, com
+  `outcome` (a ordem/fill, se já existir); `GET .../order-requests` é a página cursor das solicitações
+  da carteira, mais nova primeiro. Nome de caminho **diferente** de `.../orders` deliberadamente: esse
+  já serve as ordens executadas (`orders`, T3.8a); o pedido do operador é `trade_proposals`, uma coisa
+  antes da outra. `ENABLE_PAPER_AUTONOMY` não tem efeito algum aqui — a rota manual é o caminho do
+  operador desde o T3.12, com ou sem a ponte autônoma ligada.
 - O motor nunca chama rede nem banco: tudo chega como argumento, o que o torna testável por tabela
   de casos e reutilizável no backtest.
 - LLM não tem acesso ao Risk Engine nem aos limites.

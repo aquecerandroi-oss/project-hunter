@@ -74,6 +74,9 @@ ROUTES: list[tuple[str, str, OrganizationRole]] = [
     # what property 2 allows.
     ("risk.kill_switch.read", "GET", OrganizationRole.VIEWER),
     ("risk.kill_switch.resume", "POST", OrganizationRole.OWNER),
+    # T3.25's own read (`routers/risk.py::read_risk_limits`) was missing here —
+    # found while adding T3.68's rows below, not part of it.
+    ("risk.limits.read", "GET", OrganizationRole.VIEWER),
     # T3.8a (`routers/portfolio.py`) — seven reads, all VIEWER, and they were
     # missing from this table until the T3.1c security review counted 16
     # declared against 23 served (D2). Every one of them is a dashboard read:
@@ -88,6 +91,14 @@ ROUTES: list[tuple[str, str, OrganizationRole]] = [
     ("portfolios.positions", "GET", OrganizationRole.VIEWER),
     ("portfolios.orders", "GET", OrganizationRole.VIEWER),
     ("portfolios.trades", "GET", OrganizationRole.VIEWER),
+    # T3.68 (`routers/orders.py`) — the manual paper order. Reading a filed
+    # request is a dashboard read (VIEWER, matching every wallet read above);
+    # filing one is TRADER+ (SECURITY.md §2, "ordem manual paper (TRADER+)").
+    # The portfolio id is a random UUID here too, so the 404/422 it earns is
+    # not a role failure — exactly what property 2 allows.
+    ("orders.create", "POST", OrganizationRole.TRADER),
+    ("orders.read", "GET", OrganizationRole.VIEWER),
+    ("orders.list", "GET", OrganizationRole.VIEWER),
 ]
 
 
@@ -244,6 +255,11 @@ async def _call(
             f"/api/v1/orgs/{org_id}/portfolios/{uuid.uuid4()}/risk/kill-switch",
             headers=caller.headers,
         )
+    if kind == "risk.limits.read":
+        return await client.get(
+            f"/api/v1/orgs/{org_id}/portfolios/{uuid.uuid4()}/risk/limits",
+            headers=caller.headers,
+        )
     if kind == "risk.kill_switch.resume":
         return await client.post(
             f"/api/v1/orgs/{org_id}/portfolios/{uuid.uuid4()}/risk/kill-switch/resume",
@@ -263,6 +279,22 @@ async def _call(
     if kind in portfolio_reads:
         return await client.get(
             f"/api/v1/orgs/{org_id}/portfolios/{uuid.uuid4()}{portfolio_reads[kind]}",
+            headers=caller.headers,
+        )
+    if kind == "orders.create":
+        return await client.post(
+            f"/api/v1/orgs/{org_id}/portfolios/{uuid.uuid4()}/order-requests",
+            json={"market_id": str(uuid.uuid4()), "direction": "long", "stop": "1"},
+            headers=caller.headers,
+        )
+    if kind == "orders.read":
+        return await client.get(
+            f"/api/v1/orgs/{org_id}/portfolios/{uuid.uuid4()}/order-requests/{uuid.uuid4()}",
+            headers=caller.headers,
+        )
+    if kind == "orders.list":
+        return await client.get(
+            f"/api/v1/orgs/{org_id}/portfolios/{uuid.uuid4()}/order-requests",
             headers=caller.headers,
         )
     raise AssertionError(f"unhandled route kind {kind!r}")  # pragma: no cover
