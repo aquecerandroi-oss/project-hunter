@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any, cast
 
 import pytest
@@ -71,6 +72,41 @@ async def testflush_batch_writes_candle_funding_and_liquidation(db_session_facto
             select(func.count()).select_from(Liquidation).where(Liquidation.market_id == market_id)
         )
     assert (candle_count, funding_count, liq_count) == (1, 1, 1)
+
+
+async def test_drain_loop_persists_final_candle_within_configured_window(
+    db_session_factory: Any,
+) -> None:
+    """T3.81: the real ``drain_loop`` (real Postgres, no monkeypatched
+    ``FLUSH_INTERVAL_S``) writes a final candle's row well under the old ~1s
+    floor -- proves the fix holds with the actual DB write cost included, not
+    only against a stubbed ``flush_batch`` (see also
+    ``test_flush_latency.py``, which isolates the timing without a DB)."""
+    exchange_code = unique_code()
+    market_id = await seed_market(db_session_factory, exchange_code, "BTCUSDT")
+    candle = builders.candle("BTCUSDT")
+    queues = persist.PersistQueues()
+    runtime = FakeRuntime()
+
+    start = time.monotonic()
+    queues.events.put_nowait(candle)
+    task = asyncio.create_task(
+        persist.drain_loop(db_session_factory, exchange_code, queues, runtime, None, "test")
+    )
+    try:
+        await asyncio.wait_for(runtime.success.wait(), timeout=5.0)
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    elapsed = time.monotonic() - start
+    assert elapsed < 1.0, f"drain_loop took {elapsed:.3f}s including the DB write"
+
+    async with role_session(db_session_factory, db_role="hunter_worker") as session:
+        count = await session.scalar(
+            select(func.count()).select_from(Candle).where(Candle.market_id == market_id)
+        )
+    assert count == 1
 
 
 async def test_liquidation_upsert_dedupes_identical_redelivery(db_session_factory: Any) -> None:

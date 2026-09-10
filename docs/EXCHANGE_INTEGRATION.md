@@ -40,6 +40,7 @@ NormalizedLiquidation exchange, symbol, ts, side, qty, price, notional
 - Reconexão: backoff exponencial 1 s → 60 s com jitter; ao reconectar, snapshot REST do book e verificação de gaps de candle.
 - Book: manter livro local a partir de snapshot + diffs (Binance) ou snapshot/delta (Bybit); checar sequência; ressincronizar ao detectar salto.
 - Heartbeat por exchange em `hb:market:{exchange}` com `last_event_at`; `/system` mostra `stale` se > 10 s.
+- Kline final (`x=true`) e o lote de escrita (T3.81): o `market-worker` não escreve cada vela final assim que ela chega — acumula por `MARKET_CANDLE_FLUSH_MS` (padrão 200 ms) antes do `INSERT` em `candles`, para não abrir uma transação por mercado a cada minuto. Esse número é deliberadamente pequeno: a Binance já emite o kline final com um jitter próprio de ~0-2 s depois do fechamento da barra, e um lote longo (1 s, valor anterior) somava o próprio atraso da exchange ao nosso — um candle que chegasse um instante depois do corte do lote pagava outro ciclo inteiro por conta própria (`PIPELINE.md` §6b, T3.81). `MARKET_CANDLE_FLUSH_MS` nunca muda `is_final`, `source` nem a matemática de cobertura (§4 acima) — só quando o lote fecha.
 
 ## 5. REST e rate limit
 

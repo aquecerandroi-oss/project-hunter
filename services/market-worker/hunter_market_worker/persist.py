@@ -11,6 +11,7 @@ backlog visible in ``outbox_events`` (Astra, T2.9 round 1).
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from collections import defaultdict, deque
 from typing import Any
@@ -48,7 +49,32 @@ __all__ = [
     "write_snapshots",
 ]
 logger = get_logger(__name__)
-FLUSH_INTERVAL_S = 1.0
+
+
+def _flush_interval_s() -> float:
+    """T3.81: how long a batch may sit before it is written, in seconds.
+
+    Was a hardcoded 1.0s. Measured on the VPS (``notes-T3.81.md`` §1): almost
+    every final candle of a minute lands within ~0-2s of the bar close (a mix
+    of Binance's own emission jitter and our WS parse time), and the old fixed
+    1.0s wait did two things wrong at once — it forced the *common* case (a
+    candle that was ready to flush within a couple hundred ms) to sit idle for
+    the rest of a full second, **and** it forced any straggler that missed
+    that first batch's cutoff to wait a second *full* second of its own before
+    its own batch flushed, compounding the exchange's own jitter instead of
+    absorbing it. ``MARKET_CANDLE_FLUSH_MS`` (default 200ms, the same cadence
+    ``tick_coalesce_ms`` already uses for the ephemeral path) still batches
+    everything that lands within one short window into a single write, but
+    stops padding every candle's latency with up to a second of dead time.
+    Read once at import (into the ``FLUSH_INTERVAL_S`` module constant below),
+    exactly like the old hardcoded value — a test that needs a different
+    number monkeypatches ``persist.FLUSH_INTERVAL_S`` directly, same as every
+    existing test in this suite already does, rather than the environment.
+    """
+    return float(os.environ.get("MARKET_CANDLE_FLUSH_MS", "200")) / 1000
+
+
+FLUSH_INTERVAL_S = _flush_interval_s()
 FLUSH_MAX_ROWS = 500
 FLUSH_MAX_BYTES = 1024 * 1024
 LAG_WARNING_S = 10.0
