@@ -14,6 +14,7 @@ from hunter_api.services.lab_daily_goal_sizing import (
     label_brl,
     percentile,
     price_bet,
+    usdt_to_brl,
 )
 
 pytestmark = pytest.mark.unit
@@ -84,6 +85,25 @@ class TestPriceBet:
 class TestLabelBrl:
     def test_is_the_paper_v1_risk_budget_over_a_hundred_thousand(self) -> None:
         assert label_brl() == Decimal("250.00")
+
+
+class TestUsdtToBrl:
+    """USDT x observed rate = BRL, exact ``Decimal`` — brief T3.78b (Everton,
+    2026-09-10): the FX leg is a plain multiplication by the observed rate,
+    never a float and never rounded to a fixed number of places here."""
+
+    def test_a_whole_amount_at_a_two_decimal_rate_is_exact_to_the_cent(self) -> None:
+        assert usdt_to_brl(Decimal("28"), Decimal("5.00")) == Decimal("140.00")
+
+    def test_fractional_usdt_and_rate_multiply_exactly_no_float_drift(self) -> None:
+        # 28.567 * 5.4321, computed by hand with Decimal, not float.
+        assert usdt_to_brl(Decimal("28.567"), Decimal("5.4321")) == Decimal("155.1788007")
+
+    def test_a_tiny_amount_never_rounds_away_the_sub_cent_remainder(self) -> None:
+        assert usdt_to_brl(Decimal("0.01"), Decimal("5.6789")) == Decimal("0.056789")
+
+    def test_zero_usdt_converts_to_zero_regardless_of_rate(self) -> None:
+        assert usdt_to_brl(Decimal("0"), Decimal("5.4321")) == Decimal("0.0000")
 
 
 class TestPercentile:

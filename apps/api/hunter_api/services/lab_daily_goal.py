@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 from hunter_api.schemas.lab_daily_goal import (
     AxisOut,
     DailyGoalOut,
+    FxOut,
     PortfolioReferenceOut,
     ProgressOut,
     SeriesPointOut,
@@ -32,11 +33,13 @@ from hunter_api.services.lab_daily_goal_sizing import (
     label_brl,
     percentile,
     price_bet,
+    usdt_to_brl,
 )
 from hunter_risk.exposure import SAO_PAULO, sao_paulo_day_start_utc
 
 if TYPE_CHECKING:
     from hunter_api.repositories.lab_daily_goal import DailyOutcomeRow, LabDailyGoalRepository
+    from hunter_core.db.models.fx import FxObservation
 
 __all__ = ["build_daily_goal", "resolve_day_window"]
 
@@ -78,8 +81,9 @@ async def _rows_in_window(
 async def _price_bets(
     repo: LabDailyGoalRepository, deduped: list[DedupedBet], *, equity_usdt: Decimal | None
 ) -> list[Decimal]:
-    """Real-BRL value of 1R for every priceable bet — ``fx``/``equity``
-    unavailable means nothing is priceable, never a guessed rate or capital.
+    """Real-USDT value of 1R for every priceable bet, before any FX
+    conversion — ``equity`` unavailable means nothing is priceable, never a
+    guessed capital.
     """
     if equity_usdt is None:
         return []
@@ -113,6 +117,27 @@ def _bucket_by_brt_day(rows: list[DailyOutcomeRow]) -> dict[date, list[DailyOutc
     return buckets
 
 
+async def _day_unique_usdt(
+    repo: LabDailyGoalRepository,
+    deduped: list[DedupedBet],
+    *,
+    unique_r: Decimal,
+    window_end: datetime,
+) -> Decimal | None:
+    """Same USDT-before-FX arithmetic as ``progress.real_usdt``, for one
+    series day. A bet-less day is a real ``0``, never ``None``; ``None`` is
+    reserved for a day that had bets but priced none of them (no equity yet,
+    no volume/cost data) — the day's own version of ``value_of_1r``'s
+    "no_priceable_bets", without a per-point reason field to spell it in."""
+    if not deduped:
+        return _ZERO
+    equity = await repo.principal_portfolio_equity_usdt(window_end)
+    priced = await _price_bets(repo, deduped, equity_usdt=equity.equity_usdt)
+    if not priced:
+        return None
+    return unique_r * percentile(priced, _PERCENTILES[1])
+
+
 async def _series_30d(repo: LabDailyGoalRepository, *, target_day: date) -> list[SeriesPointOut]:
     series_end = sao_paulo_day_start_utc(
         datetime.combine(target_day, time(12, 0), tzinfo=SAO_PAULO)
@@ -124,29 +149,52 @@ async def _series_30d(repo: LabDailyGoalRepository, *, target_day: date) -> list
     for offset in range(_SERIES_DAYS - 1, -1, -1):
         day = target_day - timedelta(days=offset)
         day_rows = buckets.get(day, [])
-        sums = sum_axis(day_rows, dedupe_bets(day_rows))
-        points.append(SeriesPointOut(day=day, unique_r=sums.unique_r, pooled_r=sums.pooled_r))
+        deduped = dedupe_bets(day_rows)
+        sums = sum_axis(day_rows, deduped)
+        unique_usdt = await _day_unique_usdt(
+            repo, deduped, unique_r=sums.unique_r, window_end=series_end - timedelta(days=offset)
+        )
+        points.append(
+            SeriesPointOut(
+                day=day, unique_r=sums.unique_r, pooled_r=sums.pooled_r, unique_usdt=unique_usdt
+            )
+        )
     return points
 
 
-def _value_of_1r(priced_brl: list[Decimal]) -> ValueOfOneROut:
+def _value_of_1r(priced_usdt: list[Decimal], fx: FxObservation | None) -> ValueOfOneROut:
+    """``real_usdt_*`` needs only priceable bets; ``real_brl_*`` additionally
+    needs ``fx`` — a missing FX observation alone never zeroes ``sample_size``
+    or sets ``reason`` (module docstring update, brief T3.78b)."""
     label = label_brl()
-    if not priced_brl:
+    if not priced_usdt:
         return ValueOfOneROut(
             label_brl=label,
             real_brl_p10=None,
             real_brl_p50=None,
             real_brl_p90=None,
+            real_usdt_p10=None,
+            real_usdt_p50=None,
+            real_usdt_p90=None,
             sample_size=0,
             reason="no_priceable_bets",
         )
-    p10, p50, p90 = (percentile(priced_brl, pct) for pct in _PERCENTILES)
+    p10_usdt, p50_usdt, p90_usdt = (percentile(priced_usdt, pct) for pct in _PERCENTILES)
+    if fx is None:
+        p10_brl = p50_brl = p90_brl = None
+    else:
+        p10_brl, p50_brl, p90_brl = (
+            usdt_to_brl(value, fx.rate) for value in (p10_usdt, p50_usdt, p90_usdt)
+        )
     return ValueOfOneROut(
         label_brl=label,
-        real_brl_p10=p10,
-        real_brl_p50=p50,
-        real_brl_p90=p90,
-        sample_size=len(priced_brl),
+        real_brl_p10=p10_brl,
+        real_brl_p50=p50_brl,
+        real_brl_p90=p90_brl,
+        real_usdt_p10=p10_usdt,
+        real_usdt_p50=p50_usdt,
+        real_usdt_p90=p90_usdt,
+        sample_size=len(priced_usdt),
     )
 
 
@@ -154,6 +202,9 @@ def _progress(*, unique_r: Decimal, value_of_1r: ValueOfOneROut, goal_brl: Decim
     label_progress = unique_r * value_of_1r.label_brl
     real_progress = (
         None if value_of_1r.real_brl_p50 is None else unique_r * value_of_1r.real_brl_p50
+    )
+    real_progress_usdt = (
+        None if value_of_1r.real_usdt_p50 is None else unique_r * value_of_1r.real_usdt_p50
     )
     required_1r = None if unique_r <= _ZERO else goal_brl / unique_r
     required_unique_r = (
@@ -163,6 +214,7 @@ def _progress(*, unique_r: Decimal, value_of_1r: ValueOfOneROut, goal_brl: Decim
     )
     return ProgressOut(
         real_brl=real_progress,
+        real_usdt=real_progress_usdt,
         label_brl=label_progress,
         distance_to_goal_real_brl=None if real_progress is None else goal_brl - real_progress,
         distance_to_goal_label_brl=goal_brl - label_progress,
@@ -182,19 +234,7 @@ async def build_daily_goal(
     fx = await repo.latest_fx_brl(window_end)
     equity = await repo.principal_portfolio_equity_usdt(window_end)
     priced_usdt = await _price_bets(repo, deduped, equity_usdt=equity.equity_usdt)
-    priced_brl = [value * fx.rate for value in priced_usdt] if fx is not None else []
-    value_of_1r = _value_of_1r(priced_brl)
-    if fx is None and priced_usdt:
-        # Priceable in USDT but not convertible: still "no priceable bets" in
-        # BRL terms, never a guessed rate (module docstring).
-        value_of_1r = ValueOfOneROut(
-            label_brl=value_of_1r.label_brl,
-            real_brl_p10=None,
-            real_brl_p50=None,
-            real_brl_p90=None,
-            sample_size=0,
-            reason="no_fx_observation",
-        )
+    value_of_1r = _value_of_1r(priced_usdt, fx)
 
     hit_rate = RateWithCountsOut(
         value=None if sums.unique_bets == 0 else Decimal(sums.unique_wins) / sums.unique_bets,
@@ -221,6 +261,15 @@ async def build_daily_goal(
         goal_brl=goal_brl,
         progress=_progress(unique_r=sums.unique_r, value_of_1r=value_of_1r, goal_brl=goal_brl),
         portfolio=PortfolioReferenceOut(equity_usdt=equity.equity_usdt, source=equity.source),
+        fx=_fx_out(fx),
         fx_reason=None if fx is not None else "no_fx_observation",
         series_30d=await _series_30d(repo, target_day=local_day),
+    )
+
+
+def _fx_out(fx: FxObservation | None) -> FxOut | None:
+    if fx is None:
+        return None
+    return FxOut(
+        rate=fx.rate, source=fx.source, observed_at=fx.observed_at, available_at=fx.available_at
     )

@@ -48,6 +48,12 @@ export const dailyGoalValueOfOneRSchema = z.object({
   real_brl_p10: decimalString.nullable(),
   real_brl_p50: decimalString.nullable(),
   real_brl_p90: decimalString.nullable(),
+  // T3.78b (Everton, 2026-09-10): profit is real in USDT -- the traded
+  // currency -- first; independent of `fx` (a missing rate never nulls
+  // these, only the sibling `real_brl_*` above).
+  real_usdt_p10: decimalString.nullable(),
+  real_usdt_p50: decimalString.nullable(),
+  real_usdt_p90: decimalString.nullable(),
   sample_size: z.number(),
   reason: z.string().nullable().optional(),
 });
@@ -55,6 +61,7 @@ export type DailyGoalValueOfOneR = z.infer<typeof dailyGoalValueOfOneRSchema>;
 
 export const dailyGoalProgressSchema = z.object({
   real_brl: decimalString.nullable(),
+  real_usdt: decimalString.nullable(),
   label_brl: decimalString,
   distance_to_goal_real_brl: decimalString.nullable(),
   distance_to_goal_label_brl: decimalString,
@@ -67,8 +74,18 @@ export const dailyGoalSeriesPointSchema = z.object({
   day: z.string(),
   unique_r: decimalString,
   pooled_r: decimalString,
+  unique_usdt: decimalString.nullable(),
 });
 export type DailyGoalSeriesPoint = z.infer<typeof dailyGoalSeriesPointSchema>;
+
+/** The `fx_observations` (T3.11) row a day's BRL conversion used -- rate, source and both timestamps, so the number is never trusted blind (Everton, 2026-09-10). `null` exactly when `fx_reason` is set. */
+export const dailyGoalFxSchema = z.object({
+  rate: decimalString,
+  source: z.string(),
+  observed_at: z.string(),
+  available_at: z.string(),
+});
+export type DailyGoalFx = z.infer<typeof dailyGoalFxSchema>;
 
 export const dailyGoalOutSchema = z.object({
   day: z.string(),
@@ -85,6 +102,7 @@ export const dailyGoalOutSchema = z.object({
   goal_brl: decimalString,
   progress: dailyGoalProgressSchema,
   portfolio: dailyGoalPortfolioSchema,
+  fx: dailyGoalFxSchema.nullable().optional(),
   fx_reason: z.string().nullable().optional(),
   series_30d: z.array(dailyGoalSeriesPointSchema),
 });

@@ -326,6 +326,20 @@ class TestParticipationBinds:
         assert body["value_of_1r"]["sample_size"] == 1
         assert body["progress"]["real_brl"] == "140"
         assert body["progress"]["required_1r_brl"] == "9000"
+        # T3.78b: profit is real in USDT first (before FX), then in BRL by
+        # the observed rate -- both present here, fx block names the source.
+        assert body["value_of_1r"]["real_usdt_p50"] == "28"
+        assert body["progress"]["real_usdt"] == "28"
+        assert body["fx"] == {
+            "rate": "5",
+            "source": "binance.spot.ticker",
+            "observed_at": wallet_as_of.isoformat().replace("+00:00", "Z"),
+            "available_at": wallet_as_of.isoformat().replace("+00:00", "Z"),
+        }
+        assert body["fx_reason"] is None
+        # The series day matching this scenario carries its own USDT figure.
+        series_point = next(p for p in body["series_30d"] if p["day"] == self.DAY.isoformat())
+        assert series_point["unique_usdt"] == "28"
 
 
 class TestFxMissing:
@@ -383,6 +397,7 @@ class TestFxMissing:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["unique_r"] == "1"  # the bet itself is real
+        assert body["fx"] is None
         assert body["fx_reason"] == "no_fx_observation"
         assert body["portfolio"]["source"] == "no_portfolio"
         assert body["value_of_1r"]["real_brl_p50"] is None
@@ -392,3 +407,11 @@ class TestFxMissing:
         assert body["progress"]["real_brl"] is None
         assert body["progress"]["distance_to_goal_real_brl"] is None
         assert body["progress"]["required_unique_r"] is None
+        # T3.78b: no equity known here either (no_portfolio), so USDT pricing
+        # never even ran -- real_usdt_* is None for the same reason as
+        # real_brl_*, not a separate FX-only gap (that branch is covered
+        # without a database in test_lab_daily_goal_service.py, concern 5).
+        assert body["value_of_1r"]["real_usdt_p50"] is None
+        assert body["progress"]["real_usdt"] is None
+        series_point = next(p for p in body["series_30d"] if p["day"] == self.DAY.isoformat())
+        assert series_point["unique_usdt"] is None

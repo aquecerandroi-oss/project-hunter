@@ -6,12 +6,13 @@ import {
   distanceToGoalLine,
   formatBrlOrReason,
   formatDailyGoalDay,
+  formatUsdtOrReason,
+  fxLine,
   goalStatus,
   goalStatusClass,
   hitRateLine,
   POOLED_EXPLANATION,
   requiredLines,
-  USDT_PROFIT_UNAVAILABLE_REASON,
 } from "@/components/lab/lab-daily-goal-format";
 import { LabDailyGoalSparkline } from "@/components/lab/lab-daily-goal-sparkline";
 import type { DecimalOrReason } from "@/components/lab/lab-format";
@@ -32,15 +33,17 @@ function Stat({ label, item, colorClass }: { label: string; item: DecimalOrReaso
   );
 }
 
-/** "1 R real hoje", the panel's own hero number (Everton 2026-09-10: "o valor de limites reais de 1 R é o número grande"): p50, with the p10-p90 range as its own sub-line, and the fixed R$250 label as a footnote -- never the other way around. */
+/** "1 R real hoje", the panel's own hero number (Everton 2026-09-10: "o valor de limites reais de 1 R é o número grande"): USDT (the traded currency) as the primary figure, BRL by the observed rate right under it, the p10-p90 range in BRL, and the fixed R$250 label as a footnote -- never the other way around. */
 function ValueOfOneRStat({ data }: { data: DailyGoalOut }) {
   const v = data.value_of_1r;
-  const hero = formatBrlOrReason(v.real_brl_p50, v.reason);
+  const hero = formatUsdtOrReason(v.real_usdt_p50, v.reason);
+  const brl = formatBrlOrReason(v.real_brl_p50, v.reason ?? data.fx_reason ?? null);
   const range = v.real_brl_p10 !== null && v.real_brl_p90 !== null ? `faixa p10-p90: ${formatBrl(v.real_brl_p10)} - ${formatBrl(v.real_brl_p90)}` : null;
   return (
     <div className="rounded-md border border-border p-3">
       <p className="text-xs font-medium uppercase text-fg-muted">1 R real hoje (p50)</p>
       <p className={`mt-1 text-2xl tabular-nums ${hero.isValue ? "text-fg" : "text-fg-muted"}`}>{hero.text}</p>
+      <p className="mt-0.5 text-sm tabular-nums text-fg-muted">{brl.text}</p>
       {range && <p className="mt-0.5 text-[11px] text-fg-subtle">{range}</p>}
       <p className="mt-1 text-[11px] text-fg-subtle">
         rótulo fictício de onboarding (não o valor real): {formatBrl(v.label_brl)} por R
@@ -49,14 +52,17 @@ function ValueOfOneRStat({ data }: { data: DailyGoalOut }) {
   );
 }
 
-/** "Lucro real hoje" -- BRL from the API's own `progress.real_brl` (unique_r x real_brl_p50); USDT is deliberately not computed here (`USDT_PROFIT_UNAVAILABLE_REASON`'s own doc in `lab-daily-goal-format.ts`). */
+/** "Lucro real hoje" -- USDT (the traded currency, always priceable once a bet has entry/stop/volume/cost data) as the primary figure, BRL by the observed rate right under it, and the FX observation's own line naming rate/source/instant (Everton, 2026-09-10: "nunca um número sem a fonte e o instante"). */
 function RealProfitStat({ data }: { data: DailyGoalOut }) {
-  const item = formatBrlOrReason(data.progress.real_brl, data.value_of_1r.reason ?? data.fx_reason ?? null);
+  const usdt = formatUsdtOrReason(data.progress.real_usdt, data.value_of_1r.reason ?? null);
+  const brl = formatBrlOrReason(data.progress.real_brl, data.value_of_1r.reason ?? data.fx_reason ?? null);
+  const fx = fxLine(data.fx, data.fx_reason);
   return (
     <div className="rounded-md border border-border p-3">
       <p className="text-xs font-medium uppercase text-fg-muted">Lucro real hoje</p>
-      <p className={`mt-1 text-xl tabular-nums ${item.isValue ? "text-fg" : "text-fg-muted"}`}>{item.text}</p>
-      <p className="mt-1 text-[11px] text-fg-subtle">{USDT_PROFIT_UNAVAILABLE_REASON}</p>
+      <p className={`mt-1 text-xl tabular-nums ${usdt.isValue ? "text-fg" : "text-fg-muted"}`}>{usdt.text}</p>
+      <p className="mt-0.5 text-sm tabular-nums text-fg-muted">{brl.text}</p>
+      <p className={`mt-1 text-[11px] ${fx.isValue ? "text-fg-subtle" : "text-fg-muted"}`}>{fx.text}</p>
     </div>
   );
 }
@@ -87,10 +93,10 @@ function PortfolioNote({ data }: { data: DailyGoalOut }) {
  * "Meta diária" (brief T3.78, Everton 2026-09-10): the honest, real-money
  * daily-profit panel at the top of the Placar. Every figure comes straight
  * from `GET /api/v1/orgs/{org_id}/lab/daily-goal` (`.claude/state/notes-T3.78.md`
- * §1) -- a `null` value here always renders its own API-given (or, for the
- * USDT footnote, this frontend's own documented) reason, never a fabricated
- * number. A pure Server Component: the only interactive piece is the date
- * picker, its own small client component.
+ * §1, `fx`/`real_usdt_*`/`unique_usdt` added additively by brief T3.78b) --
+ * a `null` value here always renders its own API-given reason, never a
+ * fabricated number. A pure Server Component: the only interactive piece is
+ * the date picker, its own small client component.
  */
 export function LabDailyGoalPanel({ day, data }: LabDailyGoalPanelProps) {
   const required = requiredLines(data.progress);

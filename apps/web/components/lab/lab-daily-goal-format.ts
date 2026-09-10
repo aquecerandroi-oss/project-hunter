@@ -8,8 +8,10 @@
  * `components/lab/lab-format.ts`/`lab-money.ts`).
  */
 import { reasonLabel, type DecimalOrReason } from "@/components/lab/lab-format";
-import { formatBrl } from "@/lib/format";
-import type { DailyGoalAxis, DailyGoalOut, DailyGoalRateWithCounts } from "@/lib/api/lab-daily-goal-types";
+import { fxSourceLabel } from "@/components/portfolio/labels";
+import { formatBrl, formatUsdt } from "@/lib/format";
+import { formatBrasiliaShort } from "@/lib/time";
+import type { DailyGoalAxis, DailyGoalFx, DailyGoalOut, DailyGoalRateWithCounts } from "@/lib/api/lab-daily-goal-types";
 
 // Reason codes specific to this endpoint (`.claude/state/notes-T3.78.md` §1)
 // that `components/lab/lab-format.ts::REASON_LABELS` does not already know
@@ -129,6 +131,41 @@ export function requiredLines(progress: DailyGoalOut["progress"]): DailyGoalRequ
   return { requiredOneR, requiredUniqueR };
 }
 
-/** USDT profit is deliberately NOT derived here: the frozen schema (`.claude/state/notes-T3.78.md` §1) publishes `real_brl_*`/`progress.real_brl` only, never the USDT amount or the FX rate itself that produced them. Converting BRL back to USDT through an unrelated ratio (e.g. the wallet's own current equity/BRL split) would be a projected number wearing a real one's clothes -- the panel shows this fixed, honest sentence instead of a computed figure. */
-export const USDT_PROFIT_UNAVAILABLE_REASON =
-  "em USDT: não publicado por este endpoint (só a conversão em BRL é exposta) -- ver CONCERNS do frontend em notes-T3.78.md";
+/** A USDT money field that is `null` exactly when it carries a reason -- same contract as `formatBrlOrReason`, T3.78b (Everton, 2026-09-10: profit is real in USDT -- the traded currency -- first, independent of any FX rate). */
+export function formatUsdtOrReason(value: string | null, reason: string | null | undefined): DecimalOrReason {
+  if (value !== null) return { text: formatUsdt(value), isValue: true };
+  return { text: reason ? dailyGoalReasonLabel(reason) : "sem motivo informado", isValue: false };
+}
+
+/** "5,00" -- `fx.rate` in the pt-BR decimal-comma convention, without a currency prefix (a rate is a ratio, not itself money): reuses `formatBrl`'s decimal-safe rounding/grouping and strips its leading "R$ ". */
+function formatRatePlain(rate: string): string {
+  return formatBrl(rate).replace(/^\D*/, "");
+}
+
+/** "14:32" from an ISO instant, Brasília time only (no date) -- `formatBrasiliaShort` already resolves the zone; this drops its "dd/mm " prefix for a line that already names the day elsewhere. */
+function brasiliaTimeOnly(iso: string): string | null {
+  const short = formatBrasiliaShort(iso);
+  if (!short) return null;
+  const time = short.split(" ")[1];
+  return time ?? null;
+}
+
+/**
+ * "cotação USDT/BRL 5,00 — Binance spot (ticker), 14:32 Brasília" -- the FX
+ * observation behind every `real_brl_*` figure on this panel, rate + source
+ * + instant visible together (Everton, 2026-09-10: "nunca um número sem a
+ * fonte e o instante"), or the API's own reason when no observation was
+ * available. Time renders in Brasília, plain-Portuguese, never the raw "BRT"
+ * abbreviation (`lib/time.ts`'s own convention, brief T3.22 item 8).
+ */
+export function fxLine(fx: DailyGoalFx | null | undefined, fxReason: string | null | undefined): DecimalOrReason {
+  if (!fx) {
+    return { text: fxReason ? dailyGoalReasonLabel(fxReason) : "sem motivo informado", isValue: false };
+  }
+  const time = brasiliaTimeOnly(fx.observed_at);
+  const when = time ? `, ${time} Brasília` : "";
+  return {
+    text: `cotação USDT/BRL ${formatRatePlain(fx.rate)} — ${fxSourceLabel(fx.source)}${when}`,
+    isValue: true,
+  };
+}

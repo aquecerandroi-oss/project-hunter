@@ -43,6 +43,7 @@ __all__ = [
     "label_brl",
     "percentile",
     "price_bet",
+    "usdt_to_brl",
 ]
 
 LABEL_REFERENCE_EQUITY_BRL = Decimal("100000")
@@ -106,6 +107,16 @@ def price_bet(inputs: BetPricingInput, *, equity_usdt: Decimal) -> BetPricingRes
             capped_notional, binding = risk_budget_notional, "risk_per_trade"
         value_1r_usdt = capped_notional * loss_fraction
     return BetPricingResult(value_1r_usdt, None, binding)
+
+
+def usdt_to_brl(value_usdt: Decimal, rate: Decimal) -> Decimal:
+    """A USDT amount converted by one observed ``fx_observations.rate``
+    (brief T3.78b, Everton 2026-09-10: profit is real in USDT first, then in
+    BRL by the *observed* rate — never a guessed one). Exact ``Decimal``
+    multiplication; no rounding to the cent here — that is the caller's
+    display concern, not this module's arithmetic."""
+    with localcontext(CONTEXT):
+        return value_usdt * rate
 
 
 def label_brl() -> Decimal:

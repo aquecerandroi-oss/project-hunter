@@ -7,12 +7,14 @@ import {
   distanceToGoalLine,
   formatBrlOrReason,
   formatDailyGoalDay,
+  formatUsdtOrReason,
+  fxLine,
   goalStatus,
   goalStatusClass,
   hitRateLine,
   requiredLines,
 } from "@/components/lab/lab-daily-goal-format";
-import type { DailyGoalOut } from "@/lib/api/lab-daily-goal-types";
+import type { DailyGoalFx, DailyGoalOut } from "@/lib/api/lab-daily-goal-types";
 
 describe("formatDailyGoalDay: calendar day reshuffle, no timezone math", () => {
   it("reformats YYYY-MM-DD to DD/MM/YYYY", () => {
@@ -60,6 +62,57 @@ describe("formatBrlOrReason: null with a reason, never a fake BRL amount", () =>
   });
 });
 
+describe("formatUsdtOrReason: null with a reason, never a fake USDT amount (T3.78b)", () => {
+  it("formats a real value in USDT", () => {
+    const result = formatUsdtOrReason("28", null);
+    expect(result.isValue).toBe(true);
+    expect(result.text).toBe("28.00 USDT");
+  });
+
+  it("renders the reason sentence when the value is null", () => {
+    const result = formatUsdtOrReason(null, "no_priceable_bets");
+    expect(result.isValue).toBe(false);
+    expect(result.text).not.toBe("0");
+    expect(result.text).toMatch(/precificad/);
+  });
+
+  it("never needs an FX reason -- USDT pricing does not depend on a rate", () => {
+    // Priceable in USDT with no FX observation at all: still a real value.
+    const result = formatUsdtOrReason("28", null);
+    expect(result.isValue).toBe(true);
+  });
+});
+
+describe("fxLine: rate + source + instant together, or the reason when absent (T3.78b, Everton 2026-09-10)", () => {
+  const fx: DailyGoalFx = {
+    rate: "5.00",
+    source: "binance.spot.ticker",
+    observed_at: "2026-09-06T17:32:00Z",
+    available_at: "2026-09-06T17:32:05Z",
+  };
+
+  it("names the rate (pt-BR comma), the source and the Brasília instant together", () => {
+    const result = fxLine(fx, null);
+    expect(result.isValue).toBe(true);
+    expect(result.text).toContain("USDT/BRL 5,00");
+    expect(result.text).toContain("Binance");
+    expect(result.text).toContain("Brasília");
+    expect(result.text).not.toMatch(/\bBRT\b/);
+  });
+
+  it("renders the reason, never a guessed rate, when fx is null", () => {
+    const result = fxLine(null, "no_fx_observation");
+    expect(result.isValue).toBe(false);
+    expect(result.text).toMatch(/cotação/);
+  });
+
+  it("falls back to a generic 'no reason given' when both fx and reason are absent", () => {
+    const result = fxLine(null, null);
+    expect(result.isValue).toBe(false);
+    expect(result.text.length).toBeGreaterThan(0);
+  });
+});
+
 describe("betsCountsLine: unique vs pooled, one-line explanation of the difference", () => {
   it("shows only the two counts when they match (no sibling-version duplicates)", () => {
     expect(betsCountsLine(1, 1)).toBe("1 aposta única · 1 linha somada (pooled)");
@@ -99,6 +152,7 @@ describe("hitRateLine: numerator/denominator always shown, null carries a reason
 function baseProgress(): DailyGoalOut["progress"] {
   return {
     real_brl: "140",
+    real_usdt: "28",
     label_brl: "250.00",
     distance_to_goal_real_brl: "8860",
     distance_to_goal_label_brl: "8750.00",

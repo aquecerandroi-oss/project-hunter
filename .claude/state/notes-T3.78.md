@@ -317,3 +317,151 @@ logada só é possível fora deste sandbox.
 ?? apps/web/tests/lab-daily-goal-types.test.ts
 ?? apps/web/tests/lab-daily-goal.test.ts
 ```
+
+---
+
+## 8. T3.78b — lucro real também em USDT + FX visível (backend-specialist, 2026-09-10)
+
+### STATUS: DONE
+
+Everton (2026-09-10): a API só publicava lucro real em BRL; a regra é lucro em **USDT**
+(a moeda operada) **e** BRL pela taxa **observada**, com fonte e instante visíveis. Aditivo —
+nenhum campo do §1 foi renomeado ou removido.
+
+### 8.1 O que mudou no schema (aditivo)
+
+- `value_of_1r.real_usdt_p10/p50/p90` — mesma população de `real_brl_*`, em USDT, **antes** da
+  conversão por câmbio. `sample_size`/`reason` agora descrevem exclusivamente a precificação em
+  USDT (a `reason`/`sample_size` originais já documentavam isso; o código não seguia — corrigido).
+  Uma cotação ausente **nunca** zera `sample_size` nem seta `reason`: só `real_brl_*` fica `None`
+  nesse caso, explicado pelo `fx`/`fx_reason` do topo — nunca por `value_of_1r.reason`.
+- `progress.real_usdt` = `unique_r × real_usdt_p50`, mesma aritmética de `progress.real_brl`,
+  independente de câmbio.
+- `fx: {rate, source, observed_at, available_at}` — a linha de `fx_observations` (T3.11) usada na
+  conversão do dia; `null` exatamente quando `fx_reason` está setado (nunca uma taxa adivinhada).
+- `series_30d[].unique_usdt` — mesma aritmética "USDT antes do câmbio", por dia: `"0"` num dia sem
+  apostas únicas (zero real), `null` só quando o dia teve apostas mas nenhuma foi precificável
+  (sem patrimônio/volume/custo daquele instante). Recomputa patrimônio e precifica as apostas de
+  cada um dos 30 dias (`principal_portfolio_equity_usdt`/`entry_minute_quote_volume` por dia) —
+  custo de IO adicional real, ver CONCERNS.
+
+### 8.2 Arquivos
+
+- `apps/api/hunter_api/schemas/lab_daily_goal.py` — `FxOut`; campos novos em `ValueOfOneROut`,
+  `ProgressOut`, `SeriesPointOut`, `DailyGoalOut.fx`.
+- `apps/api/hunter_api/services/lab_daily_goal_sizing.py` — `usdt_to_brl(value_usdt, rate)` (pura,
+  `Decimal`, sem arredondamento fixo).
+- `apps/api/hunter_api/services/lab_daily_goal.py` — `_value_of_1r` reescrita (usdt/brl
+  desacoplados), `_progress` com `real_usdt`, `_day_unique_usdt`/`_fx_out` novas, `_series_30d`
+  chama `_day_unique_usdt` por dia, `build_daily_goal` monta `fx=_fx_out(fx)`.
+- Testes: `apps/api/tests/unit/test_lab_daily_goal_sizing.py` (+4 casos, `TestUsdtToBrl`),
+  `apps/api/tests/unit/test_lab_daily_goal_service.py` (novo — 8 casos, `_value_of_1r`/`_progress`/
+  `_fx_out` sem banco; cobre a lacuna do CONCERN 5 original: apostas precificáveis em USDT sem FX),
+  `apps/api/tests/integration/test_lab_daily_goal_api.py` (estendido: `TestParticipationBinds`
+  ganha as asserções de `real_usdt_p50`/`progress.real_usdt`/`fx`/`series_30d[].unique_usdt`;
+  `TestFxMissing` ganha as mesmas em modo "ausente").
+
+### 8.3 Comandos e saídas reais
+
+```
+$ timeout 120 uv run pytest apps/api/tests/unit/test_lab_daily_goal_bets.py apps/api/tests/unit/test_lab_daily_goal_sizing.py apps/api/tests/unit/test_lab_daily_goal_service.py -q
+.................................                                        [100%]
+33 passed in 0.68s
+
+$ timeout 290 uv run pytest apps/api/tests/integration/test_lab_daily_goal_api.py -q -p no:randomly --tb=short
+......                                                                   [100%]
+6 passed in 41.87s
+
+$ timeout 120 uv run ruff check apps/api/hunter_api/schemas/lab_daily_goal.py apps/api/hunter_api/services/lab_daily_goal.py apps/api/hunter_api/services/lab_daily_goal_sizing.py apps/api/tests/integration/test_lab_daily_goal_api.py apps/api/tests/unit/test_lab_daily_goal_sizing.py apps/api/tests/unit/test_lab_daily_goal_service.py
+All checks passed!
+
+$ timeout 60 uv run ruff format --check <mesmos arquivos>
+already formatted (6 files)
+
+$ timeout 290 uv run pyright apps/api/hunter_api/schemas/lab_daily_goal.py apps/api/hunter_api/services/lab_daily_goal.py apps/api/hunter_api/services/lab_daily_goal_sizing.py apps/api/hunter_api/repositories/lab_daily_goal.py apps/api/hunter_api/routers/lab_daily_goal.py apps/api/tests/integration/test_lab_daily_goal_api.py apps/api/tests/unit/test_lab_daily_goal_service.py apps/api/tests/unit/test_lab_daily_goal_sizing.py
+0 errors, 0 warnings, 0 informations
+
+$ timeout 120 uv run python infra/scripts/check_file_size.py
+scanned 617 files; 0 over budget, 0 grandfathered
+```
+
+Frontend (`apps/web`, mesma sessão, arquivos: `lib/api/lab-daily-goal-types.ts`,
+`components/lab/lab-daily-goal-format.ts`, `components/lab/lab-daily-goal-panel.tsx`, e os três
+arquivos de teste correspondentes):
+
+```
+$ cd apps/web && timeout 120 npx vitest run tests/lab-daily-goal-format.test.ts \
+    tests/lab-daily-goal-types.test.ts tests/lab-daily-goal.test.ts \
+    tests/lab-daily-goal-sparkline.test.ts tests/lab-page.test.tsx
+ Test Files  5 passed (5)
+      Tests  65 passed (65)
+
+$ timeout 290 npx turbo run typecheck lint test --filter=@hunter/web
+@hunter/web:typecheck -> sem erros (silencioso = ok)
+@hunter/web:lint -> 0 errors, 2 warnings (pré-existentes: tests/lab-page.test.tsx e tests/ws.test.ts,
+                     > 350 linhas antes desta tarefa, não tocados aqui)
+@hunter/web:test -> 1 failed | 1225 passed (1226) -- a falha é
+                     tests/latency-panel.test.tsx, arquivo NOVO e não-commitado de outro agente
+                     (T3.79, `components/system/latency-panel.tsx`), nada meu; confirmado que não
+                     toquei nenhum arquivo que ele importa (`git diff --stat` vazio em
+                     labels.ts/format.ts/time.ts, que eu só importei, nunca editei)
+ Tasks:    2 successful, 3 total (typecheck, lint) — o `test` falhou só pela linha acima
+
+$ cd apps/web && timeout 60 npx tsc --noEmit          -> sem saída (0 erros)
+$ timeout 60 npx eslint lib/api/lab-daily-goal-types.ts components/lab/lab-daily-goal-format.ts \
+    components/lab/lab-daily-goal-panel.tsx tests/lab-daily-goal-format.test.ts \
+    tests/lab-daily-goal-types.test.ts tests/lab-daily-goal.test.ts   -> sem saída (0 erros, 0 avisos)
+```
+
+### 8.4 CONCERNS (T3.78b)
+
+1. **`series_30d[].unique_usdt` recomputa patrimônio e precifica apostas para cada um dos 30 dias**
+   (uma leitura de `principal_portfolio_equity_usdt` + `entry_minute_quote_volume`/aposta, por
+   dia) — custo de IO real, adicional ao já existente na série. Aceitável para um painel de
+   pesquisa lido sob demanda; não medi latência com um dia de 100+ apostas.
+2. **Mudança de comportamento em `value_of_1r.reason`/`sample_size`** (não de contrato — nenhum
+   campo mudou de nome): antes, "precificável em USDT mas sem FX" forçava `sample_size=0` e
+   `reason="no_fx_observation"`; agora `sample_size` conta as apostas precificadas em USDT e
+   `reason` fica `None` nesse caso — só `real_brl_*` é `None`, explicado pelo `fx`/`fx_reason` do
+   topo. O frontend já lia esse fallback (`valueOfOneRReason ?? fxReason`, escrito na T3.78
+   original) — texto exibido não muda, mas um consumidor que dependesse do `reason` antigo sendo
+   sempre setado quando `real_brl_p50` é `null` precisa saber que isso não é mais verdade.
+3. **Linha do câmbio usa "Brasília", não "BRT"** (`lib/time.ts` proíbe "BRT" em prosa, brief T3.22
+   item 8; o exemplo do brief orquestrador dizia "14:32 BRT" — segui a convenção já codificada do
+   produto em vez do exemplo literal).
+4. **`fxSourceLabel("binance.spot.ticker")` → "Binance spot (ticker)"**, não "Binance" (reusei o
+   mapeamento já existente em `components/portfolio/labels.ts` em vez de inventar um novo "Binance"
+   solto — mais verboso que o exemplo do brief, mas uma única fonte de verdade para o nome da
+   fonte).
+5. **`test_lab_daily_goal_service.py` importa funções privadas** (`_value_of_1r`, `_progress`,
+   `_fx_out`) do serviço, com `# pyright: ignore[reportPrivateUsage]` — mesmo padrão já usado em
+   `test_regime_service.py`/`test_system_workers_status.py`. Cobre com um teste sem banco a
+   combinação "precificável em USDT, sem FX" que o CONCERN 5 original apontava como inalcançável
+   pelo testcontainer com dado real (carteira aberta sempre carrega uma observação de FX).
+6. **Removi `USDT_PROFIT_UNAVAILABLE_REASON`** de `lab-daily-goal-format.ts` (a frase fixa que
+   dizia "USDT não publicado por este endpoint") — obsoleta agora que o backend publica
+   `real_usdt_*`. Substituída por `formatUsdtOrReason`/`fxLine`. Nenhum outro arquivo a importava.
+7. Não toquei `apps/api/hunter_api/routers/system.py`, `services/**`, `packages/risk-core/**`,
+   `.env*`; nenhuma migração; nada commitado. `test_lab_daily_goal_api.py` continua um único
+   arquivo de testcontainer, invocado uma vez.
+
+### 8.5 `git status --porcelain` (só os meus arquivos, T3.78b)
+
+```
+ M apps/api/hunter_api/schemas/lab_daily_goal.py
+ M apps/api/hunter_api/services/lab_daily_goal.py
+ M apps/api/hunter_api/services/lab_daily_goal_sizing.py
+ M apps/api/tests/integration/test_lab_daily_goal_api.py
+ M apps/api/tests/unit/test_lab_daily_goal_sizing.py
+ M apps/web/components/lab/lab-daily-goal-format.ts
+ M apps/web/components/lab/lab-daily-goal-panel.tsx
+ M apps/web/lib/api/lab-daily-goal-types.ts
+ M apps/web/tests/lab-daily-goal-format.test.ts
+ M apps/web/tests/lab-daily-goal-types.test.ts
+ M apps/web/tests/lab-daily-goal.test.ts
+ M .claude/state/notes-T3.78.md
+?? apps/api/tests/unit/test_lab_daily_goal_service.py
+```
+
+(A árvore tem ~286 arquivos não-meus em andamento de outros agentes na mesma sessão — não listados
+aqui, não tocados por mim.)
