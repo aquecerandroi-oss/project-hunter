@@ -18,45 +18,19 @@ value it — the reading is ``None`` with a reason. The caller then persists
 ``r_multiple = NULL`` plus ``meta.r_net_reason`` and keeps ``meta.r_ex_funding``
 as the separate, lower-coverage metric. A zero would be an invented number.
 
-Identity, not proximity (S2-funding, EXP-0001-momentum-v1.md H2). 69 of 73
-outcomes with ``R_net = null`` for a "missing" settlement had a real row in
-``funding_rates`` less than 2 s away — the exchange's real grid is not round
-(851 of 1883 rows have a non-zero second) and the old code matched by *exact*
-timestamp equality. A blanket ``±2s`` tolerance is forbidden on its own: the old
-code unioned the schedule's nominal instant with the observed one for the same
-real settlement, so a naive tolerant lookup on that union would count a single
-settlement twice.
+Identity, not proximity (S2-funding, EXP-0001-momentum-v1.md H2): 69 of 73
+``R_net = null`` outcomes had a real row less than 2 s from the "missing" instant
+(the exchange's grid is not round), and a blanket ``±2s`` lookup on the old
+nominal-plus-observed union would have counted one settlement twice.
 
-Three designs were tried and rejected here before this one, all by Astra's
-review (``.claude/state/astra-review-S2-funding.md``, three rounds):
-
-1. An epoch-anchored slot grid (``floor(epoch_seconds / interval_s)``) so an
-   observed row always falls in the same bucket as its nominal instant. Killed
-   by: ``_cadence()`` truncating the gap to whole seconds (a jittered
-   ``00:00:00.010``/``08:00:00.005`` pair read as 28799 s, not 28800, and an
-   epoch-anchored bucket then lands nowhere near the real grid); and a market
-   that briefly settles hourly after its usual 8h settlement (a real Binance
-   mechanism) putting two distinct, both-due real settlements in the same 8h
-   bucket, with "the oldest wins" silently dropping the second payment.
-2. Nearest-within-tolerance matching *against the nominal schedule only*,
-   leaving unmatched real rows to stand alone. Killed by three more concrete
-   failures: (a) the ambiguous-exit guard compared the *nominal* instant to
-   the exit bar's open instead of the *real* one, so a settlement recorded a
-   few ms after the bar open (genuinely uncertain) passed as fine; (b) two
-   rows within tolerance of the same nominal but with *conflicting* rate or
-   mark price were silently resolved by picking the nearer one, when
-   disagreement is evidence they are not the same event; (c) two rows that are
-   duplicates of each other but land off-schedule (no nearby nominal instant)
-   were never deduplicated, since matching only ever looked at the schedule.
-3. Clustering restricted to rows already inside ``(entry_ts, exit_ts]``, with
-   the cluster's *first* member as the instant compared to every boundary.
-   Killed by: a cluster whose members straddle ``ambiguous_from`` (one before,
-   one after) reported the earlier, convenient one and skipped the guard; and
-   a cluster whose members straddle ``entry_ts`` itself — one exactly at entry
-   (rightly excluded) and one a few ms later (included) — was seen only from
-   the included side, so a duplicate recording of the very settlement that
-   should not be charged was charged anyway. Agreement that two rows are one
-   event never proves *which* timestamp is the true one.
+Three designs were tried and rejected before this one, all by Astra's review
+(``.claude/state/astra-review-S2-funding.md``, three rounds): an epoch-anchored
+slot grid (killed by second-truncated cadences and by two due settlements in one
+bucket), nearest-within-tolerance matching against the nominal schedule only
+(killed by the ambiguous-exit guard comparing the nominal instant, by silently
+resolving conflicting rows, and by never deduplicating off-schedule duplicates),
+and clustering restricted to rows inside the window with the first member as
+the instant (killed by clusters straddling ``ambiguous_from`` or ``entry_ts``).
 
 What is here instead: **all** of ``history`` is first grouped into clusters
 purely by mutual time proximity (``MATCH_TOLERANCE``), with no reference to
@@ -72,17 +46,15 @@ is unestablishable (``funding_conflicting_rows``); a multi-row cluster that
 agrees is one charge (``duplicate_settlement_row``), never two. Only then is
 it matched to the nearest *unclaimed* nominal instant within tolerance, purely
 to say which nominal instants remain genuinely missing — the schedule
-identifies gaps, it never manufactures or merges a charge.
+identifies gaps, it never manufactures or merges a charge. A nominal instant
+that *any* real row of the history answers — including one that landed just
+outside ``(entry_ts, exit_ts]`` — is not a gap either (``_fulfilled``, T3.65b):
+the settlement exists, it simply was not paid by this position.
 
-The tolerance (``MATCH_TOLERANCE``, 2 s) is a documented limit, not a proof:
-it must stay far smaller than half the shortest real gap between two distinct
-settlements of the same market, and every cadence read back so far (1h/4h/8h)
-clears that by three orders of magnitude. A market whose genuine, distinct
-settlements are legitimately less than a few seconds apart would be
-misclassified; none has been observed. Chaining is also sequential, not
-transitive-safe: three real settlements each ~1.5 s from the next (A-B and B-C
-within tolerance, A-C not) would cluster as one. Real funding settlements are
-hours apart, so this has not been observed either.
+The tolerance (``MATCH_TOLERANCE``, 2 s) is a documented limit, not a proof: it
+must stay far smaller than half the shortest real gap between two distinct
+settlements of one market (every cadence read so far — 1h/4h/8h — clears it by
+three orders of magnitude), and chaining is sequential, not transitive-safe.
 """
 
 from __future__ import annotations
@@ -237,6 +209,30 @@ def _conflict_reason(cluster: Sequence[Settlement]) -> str | None:
     return None
 
 
+def _fulfilled(instant: datetime, times: Sequence[datetime]) -> bool:
+    """``True`` if some real row of the history is this nominal instant.
+
+    Identity, not proximity — but identity does not care which side of a
+    boundary the real row landed on. A nominal instant within
+    ``MATCH_TOLERANCE`` of a real settlement **is** that settlement, and a
+    settlement that exists is not missing: if it fell outside
+    ``(entry_ts, exit_ts]`` it simply was not paid (T3.65b).
+
+    Measured on the real series: PROMUSDT settles at ``20:00:00.000`` and again
+    at ``00:00:00.003``. A trade exiting exactly at ``00:00:00`` anchors its
+    nominal grid on the ms-zero row, so the grid predicts ``00:00:00.000`` —
+    inside the window — while the real row is 3 ms outside it. Without this
+    check the window is refused as ``funding_missing`` even though nothing was
+    due and nothing is absent: 3 376 of 175 416 windows swept over the real
+    90 days of PROM/SAHARA/TAO (``.claude/state/notes-T3.65b.md`` §3).
+
+    It can never hide a genuine absence: a nominal instant is only silenced
+    when a real row for it exists. Inside the window that row is charged by the
+    cluster loop; outside it, the position was not holding when it settled.
+    """
+    return any(abs(t - instant) <= MATCH_TOLERANCE for t in times)
+
+
 def _claim_nominal(
     anchor: datetime, nominal: Sequence[datetime], claimed: set[datetime]
 ) -> datetime | None:
@@ -323,7 +319,11 @@ def resolve_funding(
             label = matched if matched is not None else anchor_ts
             notes.append(f"duplicate_settlement_row:{label.isoformat()}"[:64])
         items.append((anchor_ts, cluster[0]))
-    items.extend((instant, None) for instant in nominal if instant not in claimed)
+    items.extend(
+        (instant, None)
+        for instant in nominal
+        if instant not in claimed and not _fulfilled(instant, times)
+    )
     items.sort(key=lambda pair: pair[0])
 
     if not items:

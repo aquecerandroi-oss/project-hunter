@@ -326,3 +326,96 @@ class TestCadenceTransition:
         history = [*HISTORY, _settlement(20, "0.0002")]
         reading = resolve_funding(history, entry_ts=_at(21), exit_ts=_at(21) + timedelta(hours=4))
         assert reading.interval_s == EIGHT_HOURS
+
+
+class TestRealPromUsdtAroundTheCadenceReversion:
+    """T3.65b: as linhas REAIS de PROMUSDT (Binance, perpétuo) ao redor de
+    2026-08-14, lidas de ``funding_rates`` na VPS em 2026-09-10 15:05Z.
+
+    A premissa da tarefa era "PROM passou de 8 h para 4 h em 14/08". A série
+    diz outra coisa: PROM já estava em **4 h**, **acelerou para 1 h** em
+    2026-08-11 05:00Z (a regra de teto da Binance) e **voltou para 4 h** em
+    14/08 — o último assentamento de 1 h foi 10:00Z, o seguinte 12:00Z, e daí
+    em diante 16/20/00/04… Essa é a transição 1 h → 4 h que a Astra apontou
+    (`.claude/state/astra-review-plantao-20260910-0730.md`).
+
+    Os carimbos abaixo são cópia literal do banco, milissegundos inclusive —
+    é justamente o jitter de ms que produz o defeito medido aqui.
+    """
+
+    ROWS = [
+        ("2026-08-14T09:00:00.007", "-0.0000650100", "2.6450000000"),
+        ("2026-08-14T10:00:00.000", "-0.0000252800", "2.6130000000"),
+        ("2026-08-14T12:00:00.002", "-0.0000824900", "2.6505366700"),
+        ("2026-08-14T16:00:00.001", "-0.0006577100", "2.4545761400"),
+        ("2026-08-14T20:00:00.000", "-0.0009318200", "2.3137533300"),
+        ("2026-08-15T00:00:00.003", "-0.0026831000", "2.3993120000"),
+        ("2026-08-15T04:00:00.000", "-0.0036496800", "2.3515793300"),
+    ]
+    HOLE_ROWS = [
+        ("2026-06-23T16:00:00.002", "0.0000500000", "1.0400793100"),
+        ("2026-06-23T20:00:00.000", "0.0000500000", "1.0460000000"),
+        ("2026-06-24T00:00:00.005", "-0.0000123900", "1.0530000000"),
+        ("2026-06-24T08:00:00.005", "0.0000500000", "1.0845000000"),
+    ]
+
+    @staticmethod
+    def _history(rows: list[tuple[str, str, str]]) -> list[Settlement]:
+        return [
+            Settlement(datetime.fromisoformat(ts).replace(tzinfo=UTC), Decimal(rate), Decimal(mark))
+            for ts, rate, mark in rows
+        ]
+
+    @staticmethod
+    def _ts(text: str) -> datetime:
+        return datetime.fromisoformat(text).replace(tzinfo=UTC)
+
+    def test_a_settlement_stamped_after_the_exit_is_not_a_missing_one(self) -> None:
+        """Saída às 2026-08-15 00:00:00.000; o assentamento real é 00:00:00.003.
+
+        A âncora (2026-08-14 20:00:00.000) tem ms zero, então a grade nominal
+        cai em 00:00:00.000 — dentro de ``(entry, exit]`` — enquanto a linha
+        real caiu 3 ms **depois** da saída. Ela existe, e a posição saiu antes
+        dela: nada foi pago e nada está ausente. Chamar isso de
+        ``funding_missing`` recusa uma janela que o dado resolve.
+        """
+        reading = resolve_funding(
+            self._history(self.ROWS),
+            entry_ts=self._ts("2026-08-14T20:30:00"),
+            exit_ts=self._ts("2026-08-15T00:00:00"),
+        )
+        assert reading.reason is None, (
+            "a linha de 2026-08-15 00:00:00.003 existe e ficou FORA da janela: "
+            f"não é ausência, got {reading.reason!r}"
+        )
+        assert reading.per_unit == Decimal("0")
+        assert reading.settlements == 0
+        assert reading.interval_s == 4 * 3600
+
+    def test_the_settlement_exactly_at_the_exit_is_still_charged(self) -> None:
+        """O contrário do teste acima: 2026-08-14 20:00:00.000 é exatamente a
+        saída, logo está em ``(entry, exit]`` e é cobrado. -0,00093182 x
+        2,31375333 = -0,002156 e picos, recebido pelo long."""
+        reading = resolve_funding(
+            self._history(self.ROWS),
+            entry_ts=self._ts("2026-08-14T19:00:00"),
+            exit_ts=self._ts("2026-08-14T20:00:00"),
+        )
+        assert reading.reason is None
+        assert reading.settlements == 1
+        assert reading.per_unit == Decimal("-0.0009318200") * Decimal("2.3137533300")
+
+    def test_the_real_collection_hole_of_24_06_is_still_reported_missing(self) -> None:
+        """A garantia contrária: PROM/SAHARA/TAO perdem o assentamento de
+        2026-06-24 04:00Z (o mesmo instante nos três — lacuna de coleta, não
+        mudança de cadência). Esta é a janela de um desfecho REAL
+        (``replay:c7d138eb``, 06-24 01:31 -> 05:31) e tem de continuar
+        recusada: a cobrança existiu e o dado não a tem."""
+        reading = resolve_funding(
+            self._history(self.HOLE_ROWS),
+            entry_ts=self._ts("2026-06-24T01:31:00"),
+            exit_ts=self._ts("2026-06-24T05:31:00"),
+        )
+        assert reading.per_unit is None
+        assert reading.reason is not None
+        assert reading.reason.startswith("funding_missing:2026-06-24T04:00:00.005")
