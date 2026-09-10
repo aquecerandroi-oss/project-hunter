@@ -31,7 +31,12 @@ from typing import Any
 
 from hunter_core.domain.types import ensure_utc
 from hunter_indicators.replay.stats import ContrastResult, Pair, contrast
-from hunter_indicators.replay.stress import BASE, REWALK_SCENARIOS, STRESS_VERSION
+from hunter_indicators.replay.stress import (
+    BASE,
+    REWALK_SCENARIOS,
+    STRESS_VERSION,
+    StressAxis,
+)
 from hunter_indicators.replay.stress_table import StressOutcome, StressRow, StressVerdict
 
 __all__ = ["StressRun", "append_jsonl", "deltas"]
@@ -62,9 +67,27 @@ class StressRun:
         a leitura da coorte."""
         return self.limit is not None
 
+    @property
+    def axis(self) -> StressAxis:
+        """O eixo mais fraco que alguma linha desta passada usou (T3.75)."""
+        weak = any(row.axis is StressAxis.R_EX_FUNDING for row in self.rows)
+        return StressAxis.R_EX_FUNDING if weak else StressAxis.R_NET
+
+    @property
+    def funding_indeterminate(self) -> int:
+        """Quantas decisões da **base** entraram por ``r_ex_funding``.
+
+        A base é a população da passada: contar sobre todas as linhas somaria a
+        mesma decisão uma vez por cenário e por recorte.
+        """
+        base = next((row for row in self.rows if row.key == BASE), None)
+        return 0 if base is None else base.funding_indeterminate
+
     def to_jsonable(self) -> dict[str, Any]:
         return {
             "stress_version": STRESS_VERSION,
+            "axis": self.axis.value,
+            "funding_indeterminado": self.funding_indeterminate,
             "cohort": self.cohort,
             "as_of": ensure_utc(self.as_of).isoformat(),
             "generated_at": ensure_utc(self.generated_at).isoformat(),
@@ -84,16 +107,22 @@ class StressRun:
 
     def render(self) -> str:
         """A tabela como ela vai para o relatório e para o EXP."""
+        axis = f"axis: {self.axis.value}" + (
+            f", funding_indeterminado: {self.funding_indeterminate}"
+            if self.axis is StressAxis.R_EX_FUNDING
+            else ""
+        )
         head = (
             f"coorte {self.cohort} · as_of {ensure_utc(self.as_of).isoformat()} · "
-            f"{self.cases} entradas congeladas · {len(self.markets)} mercados"
+            f"{self.cases} entradas congeladas · {len(self.markets)} mercados · {axis}"
             + (" · TABELA PARCIAL (--limit)" if self.partial else "")
         )
         lines = [
             head,
             "",
-            "| cenário | tipo | n | expectancy (R) | PF | Δ vs base | IC 95 % do Δ | descartes |",
-            "|---|---|---:|---:|---:|---:|---|---|",
+            "| cenário | tipo | n | eixo | expectancy (R) | PF | Δ vs base "
+            "| IC 95 % do Δ | descartes |",
+            "|---|---|---:|---|---:|---:|---:|---|---|",
         ]
         lines.extend(_render_row(row, self.deltas.get(row.key)) for row in self.rows)
         lines.append("")
@@ -114,6 +143,8 @@ def _row_json(row: StressRow, delta: ContrastResult | None) -> dict[str, Any]:
         "kind": row.kind.value,
         "total": row.total,
         "n": row.n,
+        "axis": row.axis.value,
+        "axis_r_ex_funding": row.funding_indeterminate,
         "targets": metrics.targets,
         "stops": metrics.stops,
         "expectancy_r": None if metrics.expectancy_r is None else format(metrics.expectancy_r, "f"),
@@ -150,8 +181,9 @@ def _render_row(row: StressRow, delta: ContrastResult | None) -> str:
             else f"nulo ({delta.ci_reason})"
         )
     dropped = ", ".join(f"{k}={v}" for k, v in row.dropped.items()) or "—"
+    axis = row.axis.value + (f" ({row.funding_indeterminate})" if row.funding_indeterminate else "")
     return (
-        f"| `{row.key}` | {row.kind.value} | {row.n} | {_num(row.expectancy_r)} | {pf} | "
+        f"| `{row.key}` | {row.kind.value} | {row.n} | {axis} | {_num(row.expectancy_r)} | {pf} | "
         f"{change} | {interval} | {dropped} |"
     )
 
@@ -172,7 +204,13 @@ def deltas(
                 # reconstruir um ``datetime`` para reformatá-lo só criaria a
                 # chance de um instante ingênuo.
                 block=base.entry_day.isoformat(),
-                delta=(arm.r_net or Decimal(0)) - (base.r_net or Decimal(0)),
+                # ``r``, não ``r_net``: cada membro entra no eixo que ele
+                # próprio declara (T3.75). Os dois membros de um par são a
+                # mesma decisão no mesmo mercado, então na prática partilham o
+                # eixo; quando não partilham, o Δ mistura os dois e a coluna
+                # `eixo` da linha é o que avisa — descartar o par seria voltar
+                # a emudecer exatamente a metade da janela que motivou a queda.
+                delta=(arm.r or Decimal(0)) - (base.r or Decimal(0)),
             )
             for case in outcomes
             for base, arm in [(case[BASE], case.get(spec.key))]

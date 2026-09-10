@@ -62,6 +62,7 @@ __all__ = [
     "BASE",
     "REWALK_SCENARIOS",
     "STRESS_VERSION",
+    "StressAxis",
     "StressFamily",
     "StressKind",
     "StressScenario",
@@ -97,6 +98,29 @@ class StressKind(StrEnum):
 
     REWALK = "reprecificacao"
     SUBSET = "recorte"
+
+
+class StressAxis(StrEnum):
+    """Em que R a linha foi medida — e por que existe um segundo eixo (T3.75).
+
+    ``r_net`` é o eixo desta passada por construção: ele inclui a perna de
+    funding. Mas ``funding_schedule_unknown`` não é uma dúvida sobre a operação
+    e sim sobre a **cobertura de ``funding_rates``** — a tabela não tem
+    assentamento nenhum perto daquela entrada, então nem a cadência do mercado
+    pode ser lida. Descartar essas linhas fazia o denominador da tabela virar
+    "a janela em que houve coleta de funding" com o rótulo de "a coorte
+    inteira" (T3.62b §7.2: `base` com n = 300 de 798 e a primeira metade do
+    calendário com n = 0, veredito `dependente de metade` como artefato).
+
+    Nesse caso — e **só** nesse — a linha é medida em ``r_ex_funding``, que
+    existe em 100 % dos desfechos e é o eixo que a própria régua K3 da
+    ``SHADOW-LAB.md`` usa. Um agregado que contenha uma única linha assim é
+    declarado ``r_ex_funding``: a média de um pool misto não pode reivindicar
+    o eixo mais forte de que ela é feita em parte.
+    """
+
+    R_NET = "r_net"
+    R_EX_FUNDING = "r_ex_funding"
 
 
 @dataclass(frozen=True, slots=True)

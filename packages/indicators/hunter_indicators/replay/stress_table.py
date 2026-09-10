@@ -24,7 +24,7 @@ from decimal import Decimal
 from typing import Final
 
 from hunter_indicators.replay.metrics import LabMetrics, lab_metrics
-from hunter_indicators.replay.stress import BASE, StressFamily, StressKind
+from hunter_indicators.replay.stress import BASE, StressAxis, StressFamily, StressKind
 
 __all__ = [
     "MIN_SAMPLE",
@@ -56,10 +56,28 @@ class StressOutcome:
     r_net: Decimal | None
     dropped: str | None = None
     """Por que este sinal não produziu R avaliável neste cenário — nunca zero."""
+    r_ex_funding: Decimal | None = None
+    """O mesmo R **sem** a perna de funding (``settle`` grava os dois)."""
+    funding_indeterminate: bool = False
+    """``True`` só quando ``R_net`` faltou por ``funding_schedule_unknown`` —
+    ausência de histórico em ``funding_rates``, não dúvida sobre a operação
+    (T3.75; ver :class:`~hunter_indicators.replay.stress.StressAxis`)."""
+
+    @property
+    def axis(self) -> StressAxis:
+        """Em que R esta linha entra na conta."""
+        if self.r_net is None and self.funding_indeterminate and self.r_ex_funding is not None:
+            return StressAxis.R_EX_FUNDING
+        return StressAxis.R_NET
+
+    @property
+    def r(self) -> Decimal | None:
+        """O R que esta linha contribui, no eixo que :attr:`axis` declara."""
+        return self.r_ex_funding if self.axis is StressAxis.R_EX_FUNDING else self.r_net
 
     @property
     def evaluable(self) -> bool:
-        return self.dropped is None and self.r_net is not None
+        return self.dropped is None and self.r is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +90,10 @@ class StressRow:
     total: int
     metrics: LabMetrics
     dropped: Mapping[str, int]
+    axis: StressAxis = StressAxis.R_NET
+    """``r_ex_funding`` assim que **uma** linha avaliável tiver caído nele."""
+    funding_indeterminate: int = 0
+    """Quantas das linhas avaliáveis vieram de ``r_ex_funding`` (T3.75)."""
 
     @property
     def n(self) -> int:
@@ -105,7 +127,8 @@ def aggregate(
     kind: StressKind = StressKind.REWALK,
 ) -> StressRow:
     """Uma linha a partir dos desfechos de um cenário."""
-    evaluable = [(o.result or "", o.r_net) for o in outcomes if o.evaluable]
+    evaluable = [(o.result or "", o.r) for o in outcomes if o.evaluable]
+    fallbacks = sum(1 for o in outcomes if o.evaluable and o.axis is StressAxis.R_EX_FUNDING)
     return StressRow(
         key=key,
         family=family,
@@ -113,6 +136,8 @@ def aggregate(
         total=len(outcomes),
         metrics=lab_metrics(evaluable),
         dropped=_counted(outcomes),
+        axis=StressAxis.R_EX_FUNDING if fallbacks else StressAxis.R_NET,
+        funding_indeterminate=fallbacks,
     )
 
 

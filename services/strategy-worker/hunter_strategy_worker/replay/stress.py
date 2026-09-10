@@ -98,6 +98,9 @@ logger = get_logger(__name__)
 __all__ = ["cohort_cases", "main", "run_cli", "run_stress", "stress_case"]
 
 MINUTE = timedelta(minutes=1)
+_INDETERMINATE_SCHEDULE = "funding_schedule_unknown"
+"""Vocabulário congelado de ``hunter_strategy_worker.funding``; ver
+:class:`~hunter_indicators.replay.stress.StressAxis` para por que só ele cai."""
 DEFAULT_SEED = 20260908
 DEFAULT_RESAMPLES = 1000
 """``BOOTSTRAP_REAMOSTRAS`` da REPLICATION.md §3.4 — a mesma máquina, o mesmo
@@ -143,14 +146,22 @@ def _plan_for(case: ReplayCase, spec: StressScenario, entry: Decimal) -> Trackin
 
 
 def _as_outcome(case: ReplayCase, arm: ArmOutcome, *, dropped: str | None = None) -> StressOutcome:
-    """Um braço já folheado, no vocabulário da tabela de estresse."""
+    """Um braço já folheado, no vocabulário da tabela de estresse.
+
+    Precedência intocada — não resolvido, horizonte imaturo — e só então o
+    funding. **T3.75:** ``funding_schedule_unknown`` deixa de ser descarte e
+    passa a ser medido em ``r_ex_funding``; todo outro motivo continua descarte,
+    nomeado pelo prefixo, porque ali a dúvida é sobre *aquela* operação.
+    """
     reason = dropped
     if reason is None and arm.tracking_state is not ShadowTrackingState.TERMINAL:
         reason = (arm.reason or "nao_resolvido").split(":", 1)[0]
     if reason is None and not arm.matured:
         reason = "horizonte_imaturo"
-    if reason is None and arm.r_net is None:
-        reason = "funding_indeterminado"
+    indeterminate = arm.r_net is None and arm.funding_reason == _INDETERMINATE_SCHEDULE
+    fallback = indeterminate and arm.r_ex_funding is not None
+    if reason is None and arm.r_net is None and not fallback:
+        reason = (arm.funding_reason or "funding_indeterminado").split(":", 1)[0]
     return StressOutcome(
         signal_id=str(case.signal_id),
         market=f"{case.market.exchange}:{case.market.symbol}",
@@ -158,6 +169,8 @@ def _as_outcome(case: ReplayCase, arm: ArmOutcome, *, dropped: str | None = None
         result=None if arm.result is None else arm.result.value,
         r_net=arm.r_net,
         dropped=reason,
+        r_ex_funding=arm.r_ex_funding,
+        funding_indeterminate=indeterminate,
     )
 
 

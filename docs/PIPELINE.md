@@ -375,6 +375,29 @@ tenha mudado alguma coisa ou não, trinta e um dias para trás.
     o K4 **do pai**, na mesma janela; a fração `ineligible` da filha é outro número (barras
     fora do rótulo permitido) e não deve substituir K4 nem ser lida como disponibilidade de
     contexto.
+13. **K5 mede cobertura de `funding_rates`, não qualidade da estratégia — e o estresse tem um
+    segundo eixo declarado (T3.75).** `R_net` inclui a perna de funding, e `settle()` recusa
+    inventá-la: sem assentamento nenhum perto da entrada nem a cadência do mercado pode ser
+    lida, então `r_multiple` sai `NULL` com `meta.r_net_reason = funding_schedule_unknown`.
+    Isso é um fato sobre a **tabela**, não sobre a operação — e ele contaminava a leitura
+    inteira: na coorte de 90 d da `mean_reversion v10`, 498 de 798 desfechos terminais eram
+    nulos por esse motivo (K5 disparado nas três versões), e o `--stress`, que reprecifica a
+    partir de `r_multiple`, descartava aquelas linhas: a base saía com **n = 300** e a
+    primeira metade do calendário com **n = 0**, produzindo o veredito `dependente de metade`
+    como artefato de cobertura (`.claude/state/notes-T3.62b.md` §3 e §7.2). A correção é dupla
+    e as duas metades importam. (i) O histórico existe: a faixa `--kind funding` do §1b traz a
+    série realizada da exchange numa chamada por mercado — 3 265 assentamentos de 2026-06-12 a
+    2026-08-08 nos 16 mercados, `ON CONFLICT DO NOTHING`, segunda passada insere 0. (ii) Onde
+    `R_net` continuar ausente **por esse motivo e só por ele**, o estresse mede em
+    `r_ex_funding` (`hunter_indicators.replay.stress.StressAxis`), que existe em 100 % dos
+    desfechos e é o eixo que a própria régua K3 usa, e **declara** o que fez: cada linha da
+    tabela publica o seu `eixo` e a passada carimba `axis: r_ex_funding, funding_indeterminado:
+    N` no cabeçalho e no JSONL. Um agregado com uma única linha assim é declarado
+    `r_ex_funding` — a média de um pool misto não reivindica o eixo mais forte de que ela é
+    feita em parte. Todo outro motivo (`funding_ambiguous_exit`, `funding_missing`,
+    `funding_conflicting_rows`) **continua descarte**, nomeado pelo próprio prefixo: ali a
+    dúvida é sobre aquela operação, e trocar o eixo esconderia uma ambiguidade real. Nada disso
+    move limiar ou regra de veredito — muda o denominador, nunca a régua.
 
 ## 5. Opportunity Engine
 
@@ -429,6 +452,8 @@ Trilha de **pesquisa**, paralela ao §6: mede o que as estratégias teriam feito
 **`tracking_hold`.** O `market-worker` mantém a coleta de um mercado que saiu do top N enquanto houver `shadow_episodes.open_outcome_signal_id IS NOT NULL` apontando para ele (`universe.with_tracking_holds`). O hold amplia a *coleta*, nunca a *elegibilidade*: `markets.is_monitored` continua sendo o conjunto elegível e é o que o `strategy-worker` lê. A blocklist explícita do operador prevalece sobre o hold; os acompanhamentos afetados terminam como `censored`.
 
 **Backfill.** O `strategy-worker` nunca chama REST: quando falta uma vela, ele espera a recuperação do `market-worker` (dono único do REST) e, esgotado o prazo, encerra o acompanhamento como `censored` com o minuto que faltou — nunca como `expired`.
+
+**Funding tem a sua própria faixa de backfill, e um desfecho já gravado não se recalcula sozinho (T3.7c/T3.75).** A vela e o funding são duas séries diferentes com dois pedidos diferentes: o backfill de 90 dias da T3.62 (`request_backfill.py`, §1b) trouxe **vela**, e `funding_rates` continuou começando na data em que a coleta viva subiu — foi assim que a coorte de 90 d nasceu com 498 de 798 desfechos sem `R_net`. Quem fecha isso é `request_backfill.py --kind funding --days N` (`backfill_funding.py` + `market-worker/funding_backfill.py`): uma requisição por mercado, uma chamada REST (uma página da Binance cobre ~333 dias a três assentamentos por dia), sem partição para checar, `upsert_funding` com `ON CONFLICT (market_id, funding_time) DO NOTHING` — a linha que chegou primeiro sobrevive, viva ou de backfill, e uma segunda passada insere 0. O que **não** acontece de graça é a consequência: `signal_outcomes` é append-honesto (SHADOW-LAB.md §6), então os desfechos gravados antes do histórico chegar continuam com `r_multiple = NULL` e o mesmo `meta.r_net_reason` — medido em 2026-09-10, as três coortes da T3.62b ficaram com exatamente as mesmas contagens (498, 288+1, 126+1) depois de o histórico entrar. Existe caminho de re-liquidação e ele é humano: `infra/scripts/recompute_funding.py --apply` recalcula a leitura de funding com o código atual sobre as **entradas gravadas** (`entry_ts`, `exit_ts`, `virtual_entry`, `virtual_stop`, `exit_price`, `meta.assumed_costs`, `meta.progress`), preserva `meta.r_ex_funding`, guarda o objeto anterior em `meta.funding.previous` e nunca toca numa linha que continue indeterminável. Re-rodar o replay **não** é necessário para isso e produziria uma coorte nova; a escolha entre os dois é do orquestrador, não deste caminho.
 
 ## 6c. Replay histórico: o mesmo código sobre velas persistidas (T3.19b)
 
