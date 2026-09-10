@@ -558,6 +558,34 @@ uv run python -m hunter_strategy_worker.replay.run --version momentum:v2 \
 uv run python -m hunter_strategy_worker.replay.run --drain-queue --max-runs 1
 ```
 
+**Na VPS, o replay roda no serviço `replay-worker`, nunca por `docker exec` no
+worker vivo (T3.80).** Em 10/09/2026 um replay do T3.76 rodou dentro de
+`hunter-strategy-worker-1` (`docker exec ... replay.run`) e o atraso de decisão
+da linha viva subiu de 26 s de mediana para 90 s (p95 171 s) enquanto durou —
+compartilhava CPU e pool de banco com o processo que precisa ficar instantâneo,
+e nem `outbox_lag_s` nem o `lag` do `XINFO GROUPS` (§5.2, T3.74b) acusaram nada
+(ambos ficaram nos valores saudáveis o tempo todo). `replay-worker`
+(`infra/docker/docker-compose.yml`) é a mesma imagem `hunter-api:${GIT_SHA}`,
+perfil `replay`, `cpus`/`mem` limitados (`deploy.resources.limits`, honrado
+pelo `docker compose` mesmo fora do Swarm) e pool de banco próprio e menor
+(`DB_POOL_SIZE`/`DB_MAX_OVERFLOW=2`, contra 5+5 do worker vivo):
+
+```
+bash infra/vps/compose.sh replay python -m hunter_strategy_worker.replay.run \
+    --version volume_anomaly:v2 --from 2026-08-08 --to 2026-09-08 --markets all
+
+bash infra/vps/compose.sh replay python -m hunter_strategy_worker.replay.run \
+    --drain-queue --max-runs 1
+```
+
+Mesma regra do `ops` (§3.4): `replay` **nunca constrói**, só roda a imagem já
+implantada — sem imagem, recusa alto e pede `compose.sh update`/`up` antes.
+`replay/run.py` tem sua própria trava: recusa rodar se `HUNTER_ROLE=strategy`
+estiver no ambiente (o valor do container do worker vivo, que sobrevive a um
+`docker exec` mesmo pulando o `entrypoint.sh`) — então mesmo um operador que
+digitasse `docker exec hunter-strategy-worker-1 ...` por engano seria recusado
+com o motivo na tela, não silenciosamente aceito.
+
 Janelas longas devem ser **fatiadas** (`--from/--to` em pedaços, mesmo `--cohort`): a janela é
 semiaberta, o `signal_id` é `uuid5` e o INSERT é `ON CONFLICT DO NOTHING`, então repetir uma fatia
 não duplica nada — mas cada comando termina, grava seu recibo e libera a máquina.
@@ -569,9 +597,11 @@ não duplica nada — mas cada comando termina, grava seu recibo e libera a máq
 | `REPLAY_CPU_SHARE` | `0.33` | fração das vCPU que o pool pode usar. `floor(12 × 0,33) = 3` processos na VPS, deixando nove para coleta/scanner/estratégia/execução |
 | `REPLAY_MAX_WORKERS` | `4` | teto absoluto, para uma máquina maior não virar um experimento maior sem alguém decidir |
 | `REPLAY_MAX_CONCURRENT_RUNS` | `1` | duas corridas entrelaçadas tornam o número de throughput das duas ininterpretável |
-| `REPLAY_PAUSE_ON_DEGRADED` | `true` | lê `hb:strategy:shadow` antes de cada corrida e pausa com motivo (`heartbeat_missing`, `heartbeat_stale:<s>`, `outbox_lag:<s>`, `heartbeat_unreadable`) |
+| `REPLAY_PAUSE_ON_DEGRADED` | `true` | lê `hb:strategy:shadow` antes de cada corrida e pausa com motivo (`heartbeat_missing`, `heartbeat_stale:<s>`, `outbox_lag:<s>`, `decision_lag:p50=..,p95=..` / `decision_lag_cooldown:<s>`, `heartbeat_unreadable`, `consumer_lag:<n>`, `consumer_lag_unreadable`) |
 | `REPLAY_HEARTBEAT_MAX_AGE_S` | `60` | o worker vivo escreve a cada 10 s com TTL 60 |
 | `REPLAY_OUTBOX_LAG_MAX_S` | `60` | espelha `SHADOW_OUTBOX_LAG_ALERT_S` |
+| `REPLAY_DECISION_LAG_P50_MAX_S` / `REPLAY_DECISION_LAG_P95_MAX_S` | `10` / `30` | T3.80: espelham `SHADOW_DECISION_LAG_P50_ALERT_S`/`_P95_ALERT_S` — pausa quando a mediana/p95 de `decision_lag_p50_s`/`_p95_s` do heartbeat (T3.74c) passa disso. É o sinal que o `outbox_lag_s` e o `consumer_lag` (abaixo) não viram em 10/09: replay dentro do container vivo, mediana 90 s / p95 171 s, os outros dois nos valores saudáveis o tempo todo |
+| `REPLAY_DECISION_LAG_RESUME_HEALTHY_S` | `300` | T3.80: só retoma depois de leituras saudáveis contínuas por este tanto (5 min) — uma leitura boa isolada pode ser um pico que já passou, e retomar cedo demais devolve o replay para um atraso que ainda está drenando por causa dele mesmo. Estado guardado no Redis (`replay:decision_lag_last_bad_at`), não na memória do processo, porque um dreno é tipicamente um processo por fatia |
 | `REPLAY_QUEUE_KEY` | `replay:queue` | lista Redis, `LPUSH`/`RPOP` |
 
 **Contexto por versão (`SHADOW_CONTEXT_*`, opcionais; `hunter_strategy_worker/config.py`, T3.54b/c — conceito em `docs/PIPELINE.md` §6b):**
@@ -616,8 +646,11 @@ bars avaliados, o que dá **~160 mil/dia**: a meta de 500 mil operações fechad
 §9 e as notas para a aritmética completa e as alavancas.
 
 **Regra de convívio:** o replay nunca compete com a coleta. Se `/ready` do `strategy-worker` ou do
-`market-worker` estiver vermelho, ou o heartbeat estiver velho, o job pausa sozinho; se for preciso
-parar à mão, basta não drenar a fila — nada fica pela metade (cada fatia commita a sua).
+`market-worker` estiver vermelho, o heartbeat estiver velho, o atraso de decisão estiver acima do
+limiar (T3.80) ou o `consumer_lag` estiver alto, o job pausa sozinho; se for preciso parar à mão,
+basta não drenar a fila — nada fica pela metade (cada fatia commita a sua). E, desde T3.80, o
+replay em si roda em `replay-worker`, seu próprio processo/container — nunca mais dentro do
+container do worker vivo, que era a própria causa da degradação que o parágrafo acima descreve.
 
 ## 6. Playbook de incidente
 

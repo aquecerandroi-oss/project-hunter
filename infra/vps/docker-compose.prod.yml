@@ -234,6 +234,23 @@ services:
       HEALTH_PORT: "8001"
     logging: *prod-logging
 
+  # Replay lane (T3.80, infra/docker/docker-compose.yml). `*prod-db-env` for
+  # the same reason as every other worker above -- without it this profile
+  # service inherits the dev password and fails to connect the moment
+  # `compose.sh replay ...` runs it. No `HUNTER_ROLE` here (nor in the base
+  # file): unset is what lets `run.py`'s own guard pass; setting it to
+  # anything by mistake would just make every replay refuse to start, never
+  # silently share the live worker's container.
+  replay-worker:
+    environment:
+      <<: *prod-db-env
+      DB_POOL_SIZE: "2"
+      DB_MAX_OVERFLOW: "2"
+    env_file:
+      - path: ../../.env
+        required: false
+    logging: *prod-logging
+
   # M2 scanner (T2.5). Mesma regra acima: sem `*prod-db-env` ele sobe com a
   # senha de dev e reinicia em loop (medido em 2026-09-06 no deploy fa9f957).
   scanner-worker:

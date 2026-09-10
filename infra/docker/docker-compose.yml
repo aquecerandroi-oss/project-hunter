@@ -423,6 +423,56 @@ services:
       start_period: 60s
       retries: 5
 
+  # Replay lane, in its own process (T3.80). T3.76 ran a replay via `docker
+  # exec hunter-strategy-worker-1 ... replay.run` -- inside the live worker's
+  # own container, sharing its CPU and DB pool with the process that has to
+  # stay instant; the live median decision lag climbed from 26 s to 90 s (p95
+  # 171 s) for the duration, and `replay/run.py`'s own guard now refuses to
+  # run at all if `HUNTER_ROLE=strategy` is set (that container's value,
+  # surviving `docker exec` even though it bypasses `entrypoint.sh`). Same
+  # `hunter-api:${GIT_SHA:-dev}` image, `profiles: ["replay"]`/`entrypoint:
+  # []`/`command: ["true"]`/`cap_drop` all copied from the `ops` service above
+  # -- a `run --rm` job, never a resident process, never named by a bare `up`.
+  # Its own (smaller) DB pool: a replay process opens up to `REPLAY_MAX_WORKERS`
+  # (default 4) concurrent connections of its own, on top of whatever the live
+  # `strategy-worker` already holds against the same Postgres.
+  #
+  #   bash infra/vps/compose.sh replay python -m hunter_strategy_worker.replay.run \
+  #     --version <key>:<version> --from ... --to ... [--markets all]
+  #
+  # `deploy.resources.limits` caps CPU/memory even outside Swarm (Compose v2,
+  # honoured by `docker compose up`/`run` directly) -- 3 vCPU matches
+  # `workers_for(ReplayBudget(), cpu_count=12)` on the VPS's 12 vCPU, so the
+  # cgroup ceiling and the budget's own pool-size math agree.
+  replay-worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api-workers
+      args:
+        GIT_SHA: ${GIT_SHA:-dev}
+    image: hunter-api:${GIT_SHA:-dev}
+    profiles: ["replay"]
+    entrypoint: []
+    command: ["true"]
+    cap_drop: [NET_RAW, NET_ADMIN]
+    environment:
+      <<: *api-env
+      DB_POOL_SIZE: "2"
+      DB_MAX_OVERFLOW: "2"
+    env_file:
+      - path: ../../.env
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "3"
+          memory: 2g
+
   # M3 execution (T3.5). Runs as the engine (`hunter_worker`): the wallet lock,
   # `fifo_v1`, `portfolios.kill_switch_state`, the equity curve and the outbox are
   # worker-only since `0007_paper_roles` (§19.1). `ENABLE_LIVE_TRADING` is passed

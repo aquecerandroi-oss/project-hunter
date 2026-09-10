@@ -26,7 +26,10 @@ operational and never part of a frozen experiment (``config.py``'s rule):
   (:mod:`.consumer_lag`, ``REPLAY_CONSUMER_LAG_MAX``) — the heartbeat alone
   missed the worst decision lag ever measured (125 s+, T3.74 notes §3), where
   ``outbox_lag_s`` read ``0.0`` throughout because the outbox was never the
-  bottleneck.
+  bottleneck. Since T3.80 it also reads the heartbeat's own
+  ``decision_lag_p50_s``/``_p95_s`` (:mod:`.decision_lag`) — T3.76 ran a
+  replay inside the live worker's own container and neither the outbox lag
+  nor the consumer's own backlog moved while the live median climbed to 90 s.
 
 The queue is a Redis list, ``replay:queue``, oldest at the tail
 (``LPUSH``/``RPOP``): the plantão enqueues "replicate version X over this
@@ -37,17 +40,22 @@ a malformed entry can do is be refused with its reason.
 
 from __future__ import annotations
 
-import json
 import os
-import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
-from hunter_core.domain.enums import ShadowCohort
 from hunter_core.domain.types import ensure_utc, utcnow
 from hunter_core.logging import get_logger
 from hunter_strategy_worker.replay.consumer_lag import group_lag
+from hunter_strategy_worker.replay.decision_lag import decision_lag_reason
+from hunter_strategy_worker.replay.queue import (
+    QUEUE_KEY,
+    ReplayRequest,
+    enqueue,
+    queue_depth,
+    take_next,
+)
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
@@ -56,7 +64,6 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-QUEUE_KEY = "replay:queue"
 LIVE_HEARTBEAT_KEY = "hb:strategy:shadow"
 
 __all__ = [
@@ -107,6 +114,16 @@ class ReplayBudget:
     outbox_lag_max_s: float = 60.0
     """Mirrors ``ShadowConfig.outbox_lag_alert_s`` — the same number that makes
     the live worker's own ``/ready`` false."""
+    decision_lag_p50_max_s: float = 10.0
+    decision_lag_p95_max_s: float = 30.0
+    decision_lag_resume_healthy_s: float = 300.0
+    """T3.80: mirrors ``ShadowConfig.decision_lag_p50_alert_s``/``_p95_alert_s``
+    — pause while the live worker's own heartbeat reports a median/p95 past
+    these, the signal T3.76's in-container replay moved (90 s / 171 s) while
+    ``outbox_lag_s`` and :func:`.consumer_lag.group_lag` stayed healthy. Resumes
+    only after ``decision_lag_resume_healthy_s`` (5 min) of continuously-healthy
+    readings (:mod:`.decision_lag`), so a lane that just recovered is not handed
+    a new slice while the backlog the replay itself caused is still draining."""
     consumer_lag_max: int = 100
     """T3.74b, :func:`.consumer_lag.group_lag`'s reading: entries the stream
     has added minus entries the group has read, independent of
@@ -144,6 +161,9 @@ def load_budget() -> ReplayBudget:
         or LIVE_HEARTBEAT_KEY,
         heartbeat_max_age_s=_float("REPLAY_HEARTBEAT_MAX_AGE_S", 60.0),
         outbox_lag_max_s=_float("REPLAY_OUTBOX_LAG_MAX_S", 60.0),
+        decision_lag_p50_max_s=_float("REPLAY_DECISION_LAG_P50_MAX_S", 10.0),
+        decision_lag_p95_max_s=_float("REPLAY_DECISION_LAG_P95_MAX_S", 30.0),
+        decision_lag_resume_healthy_s=_float("REPLAY_DECISION_LAG_RESUME_HEALTHY_S", 300.0),
         consumer_lag_max=_int("REPLAY_CONSUMER_LAG_MAX", 100),
         queue_key=os.environ.get("REPLAY_QUEUE_KEY", QUEUE_KEY).strip() or QUEUE_KEY,
     )
@@ -168,8 +188,9 @@ async def live_lane_degraded(
 
     Reasons are names, never booleans: ``heartbeat_missing``,
     ``heartbeat_stale:<age>s``, ``outbox_lag:<lag>s``, ``heartbeat_unreadable``,
-    ``consumer_lag:<n>`` (T3.74b), ``consumer_lag_unreadable``. A Redis failure
-    answers *degraded*, on the same principle as
+    ``decision_lag:p50=..,p95=..`` / ``decision_lag_cooldown:<s>`` (T3.80,
+    :mod:`.decision_lag`), ``consumer_lag:<n>`` (T3.74b), ``consumer_lag_unreadable``.
+    A Redis failure answers *degraded*, on the same principle as
     ``eligibility.universe_changed_after``: when health cannot be established,
     the answer that costs a replay is the safe one.
     """
@@ -202,6 +223,16 @@ async def live_lane_degraded(
         return "heartbeat_unreadable"
     if lag > budget.outbox_lag_max_s:
         return f"outbox_lag:{lag:.0f}s"
+    lag_reason = await decision_lag_reason(
+        redis,
+        fields,
+        p50_max_s=budget.decision_lag_p50_max_s,
+        p95_max_s=budget.decision_lag_p95_max_s,
+        resume_healthy_s=budget.decision_lag_resume_healthy_s,
+        now=clock,
+    )
+    if lag_reason is not None:
+        return lag_reason
     consumer_lag = await group_lag(redis)
     if consumer_lag is None:
         return "consumer_lag_unreadable"
@@ -224,115 +255,3 @@ async def refuse_direct_run(settings: Settings, budget: ReplayBudget) -> str | N
         return await live_lane_degraded(redis, budget)
     finally:
         await redis.aclose()
-
-
-@dataclass(frozen=True, slots=True)
-class ReplayRequest:
-    """ "Replicate version X over this window" — what the plantão enqueues.
-
-    The cohort travels with the request instead of being minted at drain time so
-    that whoever enqueued it can find the population afterwards: a request whose
-    label is decided by the consumer is a run nobody can name until it is over.
-    """
-
-    strategy_version_id: uuid.UUID
-    window_from: datetime
-    window_to: datetime
-    markets: tuple[str, ...]
-    """Symbols, or empty for "every monitored market of the exchange"."""
-    cohort: str
-    requested_by: str
-    requested_at: datetime
-
-    @staticmethod
-    def new(
-        *,
-        strategy_version_id: uuid.UUID,
-        window_from: datetime,
-        window_to: datetime,
-        markets: tuple[str, ...] = (),
-        requested_by: str,
-        run_id: uuid.UUID | None = None,
-        requested_at: datetime | None = None,
-    ) -> ReplayRequest:
-        """A request with a freshly minted ``replay:<run_id>`` cohort."""
-        return ReplayRequest(
-            strategy_version_id=strategy_version_id,
-            window_from=ensure_utc(window_from),
-            window_to=ensure_utc(window_to),
-            markets=markets,
-            cohort=ShadowCohort.replay(run_id or uuid.uuid4()),
-            requested_by=requested_by,
-            requested_at=ensure_utc(requested_at or utcnow()),
-        )
-
-    def to_json(self) -> str:
-        return json.dumps(
-            {
-                "strategy_version_id": str(self.strategy_version_id),
-                "window_from": self.window_from.isoformat(),
-                "window_to": self.window_to.isoformat(),
-                "markets": list(self.markets),
-                "cohort": self.cohort,
-                "requested_by": self.requested_by,
-                "requested_at": self.requested_at.isoformat(),
-            },
-            ensure_ascii=False,
-        )
-
-    @staticmethod
-    def from_json(raw: str | bytes) -> ReplayRequest:
-        """Parse one queue entry, refusing anything the cohort grammar would not
-        accept — a malformed cohort here would become a row the database CHECK
-        rejects halfway through a run."""
-        text = raw.decode("utf-8") if isinstance(raw, bytes) else raw
-        data: dict[str, Any] = json.loads(text)
-        cohort = str(data["cohort"])
-        if not cohort.startswith(ShadowCohort.REPLAY_PREFIX) or not ShadowCohort.is_valid(cohort):
-            raise ValueError(f"{cohort!r} is not a replay cohort")
-        return ReplayRequest(
-            strategy_version_id=uuid.UUID(str(data["strategy_version_id"])),
-            window_from=ensure_utc(datetime.fromisoformat(str(data["window_from"]))),
-            window_to=ensure_utc(datetime.fromisoformat(str(data["window_to"]))),
-            markets=tuple(str(s) for s in data.get("markets") or ()),
-            cohort=cohort,
-            requested_by=str(data.get("requested_by") or "unknown"),
-            requested_at=ensure_utc(datetime.fromisoformat(str(data["requested_at"]))),
-        )
-
-
-async def enqueue(
-    redis: redis_asyncio.Redis, request: ReplayRequest, *, key: str = QUEUE_KEY
-) -> int:
-    """Put one request at the head of the queue; returns the new depth."""
-    depth: int = await cast("Any", redis).lpush(key, request.to_json())
-    logger.info(
-        "replay_run_enqueued",
-        cohort=request.cohort,
-        strategy_version_id=str(request.strategy_version_id),
-        depth=depth,
-    )
-    return depth
-
-
-async def take_next(redis: redis_asyncio.Redis, *, key: str = QUEUE_KEY) -> ReplayRequest | None:
-    """Pop the oldest request, or ``None`` when the queue is empty.
-
-    A malformed entry is dropped with its reason logged rather than blocking the
-    queue forever — and it is *dropped*, not retried: a request that cannot be
-    parsed cannot be run, and leaving it at the tail would starve every valid
-    one behind it.
-    """
-    raw: Any = await cast("Any", redis).rpop(key)
-    if raw is None:
-        return None
-    try:
-        return ReplayRequest.from_json(cast("str | bytes", raw))
-    except Exception as exc:
-        logger.error("replay_queue_entry_unreadable", error=str(exc))
-        return None
-
-
-async def queue_depth(redis: redis_asyncio.Redis, *, key: str = QUEUE_KEY) -> int:
-    """How many requests are waiting."""
-    return int(await cast("Any", redis).llen(key))

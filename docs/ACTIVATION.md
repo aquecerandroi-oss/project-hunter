@@ -417,6 +417,25 @@ ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops
 
 Sem aspas internas, por causa do PowerShell. Se aparecer `REFUSED: ... already carries its own default_parameters`, a imagem está **atrás** da T3.26c: faça o deploy e repita — não contorne editando o `changelog`.
 
+**Rodar o replay de validação da variante (T3.80).** Nunca por `docker exec
+hunter-strategy-worker-1 ...` — em 10/09/2026 um replay rodado assim, dentro do
+container do worker vivo, fez o atraso de decisão da linha viva subir de 26 s
+para 90 s de mediana (p95 171 s) enquanto durou, competindo por CPU e pool de
+banco com o processo que precisa ficar instantâneo. O serviço dedicado é
+`replay-worker` (`docs/DEPLOYMENT.md` §5.2 tem o orçamento e o portão
+completos):
+
+```
+ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh replay python -m hunter_strategy_worker.replay.run --version momentum:v4 --from 2026-08-08 --to 2026-09-08 --markets all"
+```
+
+Pausa sozinho (motivo na saída) se a linha viva estiver degradada em qualquer
+um dos eixos que o portão lê — heartbeat velho/ausente, `outbox_lag_s`, atraso
+de decisão (`decision_lag_p50_s`/`_p95_s`, o eixo que a T3.80 fechou) ou
+`consumer_lag` — e `replay/run.py` recusa de saída se `HUNTER_ROLE=strategy` estiver no
+ambiente, então mesmo um `docker exec` no worker vivo por engano é recusado
+com o motivo na tela, nunca aceito em silêncio.
+
 ## 7b. Aposentar uma versão substituída por parâmetro (`--deprecate`, T3.39)
 
 > **Latência do roster (medida na T3.56, 2026-09-09):** o `strategy-worker` recarrega o roster a cada `SHADOW_VERSION_REFRESH_S` (60 s), então uma versão pode emitir decisões por até um minuto depois de `deprecated_at` — `emitted_at > deprecated_at` nessa janela não é vazamento. Os acompanhamentos abertos continuam até o desfecho (o loader não filtra por versão); aposentar para a decisão nova, não a operação em voo. A linha `paper` só aposenta com zero slots-sombra abertos (portão do script), o que exige apanhar a janela ou mover a linha `paper` antes.

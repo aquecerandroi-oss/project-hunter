@@ -7,6 +7,9 @@
 #   bash infra/vps/compose.sh logs api  # logs de um servico
 #   bash infra/vps/compose.sh update    # git pull + rebuild + up
 #   bash infra/vps/compose.sh down      # para tudo (dados ficam nos volumes)
+#   bash infra/vps/compose.sh replay python -m hunter_strategy_worker.replay.run \
+#     --version <key>:<version> --from ... --to ...   # T3.80: replay em processo proprio,
+#                                                       # nunca `docker exec` no worker vivo
 #   MARKET_SHARDS=4 bash infra/vps/compose.sh update   # idem, com os shards do coletor
 #   MARKET_SPOT=1 MARKET_SHARDS=4 bash infra/vps/compose.sh update   # + o coletor SPOT dedicado (T3.0f)
 #   bash infra/vps/compose.sh <qualquer subcomando do docker compose>
@@ -177,6 +180,26 @@ case "$cmd" in
       exit 1
     fi
     "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" run --rm ops "$@"
+    ;;
+  replay)
+    # T3.80: same rule as `ops` above, same reason -- the replay lane runs
+    # the already-deployed image, never builds. A drain kicked off from a
+    # stale working tree must not silently build and run undeployed code
+    # against the same Postgres a replay's smaller DB pool still shares.
+    # This is also the reason a replay must never run via `docker exec
+    # hunter-strategy-worker-1 ...` again (measured 2026-09-10: the live
+    # lane's own decision lag climbed from a 26 s to a 90 s median while
+    # sharing that container) -- `replay-worker` is its own container, with
+    # its own (smaller) DB pool and its own CPU/memory ceiling, and
+    # `replay/run.py`'s own guard refuses outright if `HUNTER_ROLE=strategy`
+    # is ever set on it by mistake.
+    if ! docker image inspect "hunter-api:${GIT_SHA:-dev}" >/dev/null 2>&1; then
+      echo "ERRO: imagem hunter-api:${GIT_SHA:-dev} nao existe nesta maquina." >&2
+      echo "      \`replay\` roda so a imagem implantada; rode \`compose.sh update\`" >&2
+      echo "      (ou \`up\`) antes, nunca deixe \`run\` construir sozinho." >&2
+      exit 1
+    fi
+    "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" run --rm replay-worker "$@"
     ;;
   *)
     "${COMPOSE[@]}" "$cmd" "$@"

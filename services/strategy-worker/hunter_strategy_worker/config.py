@@ -141,6 +141,16 @@ class ShadowConfig:
     outbox_lag_alert_s: float = 60.0
     """Oldest undispatched outbox row tolerated before ``/ready`` turns false."""
 
+    decision_lag_p50_alert_s: float = 10.0
+    decision_lag_p95_alert_s: float = 30.0
+    """T3.80: the canonical numbers for "this process's decisions are
+    running behind" -- above a 10 s median or a 30 s p95 of
+    ``decision_lag_p50_s``/``_p95_s`` (T3.74c, this same heartbeat). Not read
+    by ``/ready`` today (a slow decision is not a dead process); mirrored by
+    ``replay.budget.ReplayBudget``'s own thresholds, which pause the replay
+    lane on exactly these numbers -- T3.76 measured a live median of 90 s /
+    p95 of 171 s while a replay ran inside this same worker's container."""
+
     censor_after_s: int = 7200
     """How long a missing 1m bar **that nobody registered** is waited for.
 
@@ -283,6 +293,8 @@ def load_config() -> ShadowConfig:
         outcome_poll_s=_float("SHADOW_OUTCOME_POLL_S", 10.0),
         outbox_poll_s=_float("SHADOW_OUTBOX_POLL_S", 1.0),
         outbox_lag_alert_s=_float("SHADOW_OUTBOX_LAG_ALERT_S", 60.0),
+        decision_lag_p50_alert_s=_float("SHADOW_DECISION_LAG_P50_ALERT_S", 10.0),
+        decision_lag_p95_alert_s=_float("SHADOW_DECISION_LAG_P95_ALERT_S", 30.0),
         censor_after_s=_int("SHADOW_CENSOR_AFTER_S", 7200),
         gap_recovery_max_s=_int("SHADOW_GAP_RECOVERY_MAX_S", 86_400),
         version_refresh_s=_float("SHADOW_VERSION_REFRESH_S", 60.0),

@@ -28,7 +28,11 @@ is a no-op once the slot barrier has moved.
 
 from __future__ import annotations
 
+import asyncio
 import functools
+import subprocess
+import sys
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -40,6 +44,7 @@ from sqlalchemy import text
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import MarketType, Timeframe
 from hunter_core.domain.market import NormalizedCandle, to_wire
+from hunter_core.logging import get_logger
 from hunter_core.strategies.base import Evaluation
 from hunter_core.strategies.canonical import params_hash
 from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
@@ -224,4 +229,122 @@ class TestConcurrentDispatchAgreesWithSerial:
         triggered = [key for key in serial_sink if key[0] == spike_symbol]
         assert any(serial_sink[key].state.value == "triggered" for key in triggered), (
             "the one designed-to-trigger market produced no TRIGGERED evaluation at all"
+        )
+
+
+_CONTENDER_SCRIPT = """
+import asyncio, hashlib, os, sys, time
+import asyncpg
+
+url, duration_s, connections = sys.argv[1], float(sys.argv[2]), int(sys.argv[3])
+
+
+async def hammer() -> None:
+    conn = await asyncpg.connect(url)
+    try:
+        deadline = time.monotonic() + duration_s
+        while time.monotonic() < deadline:
+            await conn.fetchval("SELECT 1")
+            hashlib.sha256(os.urandom(4096)).digest()  # stand-in for Decimal-heavy work
+    finally:
+        await conn.close()
+
+
+async def main() -> None:
+    await asyncio.gather(*(hammer() for _ in range(connections)))
+
+
+asyncio.run(main())
+"""
+"""A separate OS process (T3.80), never imported from this test module -- a
+plain ``python -c`` script started with :func:`subprocess.Popen`, exactly the
+shape a real replay is (``python -m hunter_strategy_worker.replay.run``, its
+own process, not a thread or a task in this loop). It opens its own
+connections to the SAME testcontainer Postgres this test's own dispatch uses
+and spends CPU on every iteration -- the two resources T3.76 measured the live
+lane losing to a replay that shared its container (CPU and DB pool)."""
+
+
+class TestSurvivesAConcurrentReplayProcess:
+    """T3.80: a replay running as its own OS process, contending for the SAME
+    Postgres, must not push the live dispatch's own drain past its p95 budget
+    (< 20 s, T3.74c, ``docs/PIPELINE.md`` §6c "Orçamento de latência").
+
+    T3.76 measured the opposite when the replay shared the live worker's own
+    *container* — median decision lag 26 s -> 90 s, p95 -> 171 s. This proves
+    the mechanism this task's fix actually relies on (a *separate* OS process,
+    its own smaller DB pool) does not reproduce that failure against the
+    closest thing to production this suite has: a real Postgres, real
+    concurrent connections from a second process, real CPU contention on the
+    same host.
+
+    **What this does not prove**, honestly: it does not reproduce the VPS's
+    cgroup CPU/memory ceiling (``replay-worker``'s ``deploy.resources.limits``,
+    ``infra/docker/docker-compose.yml``) or the VPS's own core count and disk —
+    a container limit changes *how much* contention is even possible, and a
+    dev machine's core count/disk shape are not the VPS's. That half of the
+    proof is the live measurement this task's notes (`.claude/state/
+    notes-T3.80.md`) ask the orchestrator to take after this deploys: run
+    ``compose.sh replay ...`` concurrently with the live worker for one window
+    and read `decision_lag_p50_s`/`_p95_s` off `hb:strategy:shadow` during it,
+    expecting them to stay under `ShadowConfig`'s 10 s/30 s thresholds — unlike
+    the 90 s/171 s the `docker exec`-into-the-container run produced.
+    """
+
+    CONTENTION_CONNECTIONS = 3
+    """One below ``REPLAY_MAX_WORKERS``'s default (4): the live dispatch in
+    this same test already holds sessions of its own against the same pool,
+    so 3 + the live side's own connections still fits comfortably under
+    ``db_pool_size + db_max_overflow`` (5 + 5 = 10, ``Settings``)."""
+    ROUNDS = 6
+    CONTENTION_DURATION_S = 40.0
+
+    async def test_the_live_drain_p95_stays_under_budget_with_a_concurrent_replay(
+        self,
+        db_session_factory: Any,
+        redis_client: Any,
+        markets: list[Any],
+        versions: list[ActiveVersion],
+        migrated_db_url: str,
+    ) -> None:
+        plain_url = migrated_db_url.replace("postgresql+asyncpg://", "postgresql://")
+        process = subprocess.Popen(  # noqa: ASYNC220 -- Popen itself doesn't block; wait() below does, off-loop
+            [
+                sys.executable,
+                "-c",
+                _CONTENDER_SCRIPT,
+                plain_url,
+                str(self.CONTENTION_DURATION_S),
+                str(self.CONTENTION_CONNECTIONS),
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        try:
+            await asyncio.sleep(1.0)  # let the contention actually ramp up first
+            assert process.poll() is None, "the contending process exited early"
+            durations: list[float] = []
+            for _ in range(self.ROUNDS):
+                started = time.perf_counter()
+                await _deliver_all(
+                    db_session_factory, redis_client, markets, versions, concurrency=8
+                )
+                durations.append(time.perf_counter() - started)
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+
+        durations.sort()
+        p95 = durations[int(0.95 * (len(durations) - 1))]
+        get_logger(__name__).info(
+            "t380_replay_contention_proof",
+            durations_s=[round(d, 2) for d in durations],
+            p95_s=round(p95, 2),
+        )
+        assert p95 < 20.0, (
+            f"live drain p95={p95:.2f}s with a concurrent replay process on the "
+            f"same host -- durations={[f'{d:.2f}' for d in durations]}"
         )

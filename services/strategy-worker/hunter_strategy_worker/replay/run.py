@@ -71,6 +71,7 @@ from hunter_strategy_worker.replay.plan import (
     resolve_markets,
     resolve_version,
 )
+from hunter_strategy_worker.replay.role_guard import refuse_inside_live_worker
 from hunter_strategy_worker.replay.simulate import (
     MarketReplay,
     ReplayWindow,
@@ -301,6 +302,9 @@ async def _run(args: argparse.Namespace, plan: RunPlan, budget: ReplayBudget) ->
 
 
 async def _main(argv: list[str] | None = None) -> int:
+    if (role_reason := refuse_inside_live_worker()) is not None:
+        sys.stdout.write(f"refused: {role_reason}\n")
+        return 1
     args = _parser().parse_args(argv)
     budget = load_budget()
     if args.stress:
