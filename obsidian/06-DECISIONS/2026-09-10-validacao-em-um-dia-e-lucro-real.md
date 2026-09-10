@@ -93,3 +93,5 @@ de decisão, visibilidade de latência, honestidade de moeda) — a diferença e
 
 `.claude/state/brief-T3.76-validacao-em-um-dia.md` · `.claude/state/notes-T3.76.md` §7 ·
 `.claude/state/notes-T3.79.md` §8 · `.claude/state/notes-T3.78.md` §8 (T3.78b)
+
+Ver também [[2026-09-10-universo-de-pesquisa-90-dias]] (quarta regra do dia, aprovada 19:1x BRT).
