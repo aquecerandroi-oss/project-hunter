@@ -190,3 +190,49 @@ Todo o resto em `git status --porcelain` da árvore (breadth, T3.74d em `service
 - Não implantei nada na VPS (regra do brief) — os números de `ingest`/`flush`/`admission`/`fill` das heartbeats só existirão depois de um deploy; até lá `/api/v1/system/latency` responde `unknown` para `ingest` (sem instrumentação histórica possível) e para `admission`/`fill` (zero linhas em produção, ponte de autonomia desligada).
 - Não escrevi um teste HTTP de ponta a ponta da rota (`TestClient` com auth) — cobri `build_latency` diretamente (service-level) com 7 casos, e a rota em si só delega para ele exatamente como as duas irmãs (`/workers`, `/market-status`) já fazem, sem lógica própria a mais que o try/except 503 (mesmo padrão, revisável a olho).
 - A união dos 4 shards do market-worker perpétuo para `ingest`/`flush` não existe (item 5) — hoje reporta só o primeiro shard que o `SCAN` devolver.
+
+## 8. web (frontend-specialist, 2026-09-10) — bloco "Latência" em `/system`
+
+Consumiu o contrato congelado em §4 tal como está: `p50_s`/`p95_s`/`target_*_s` são **números JSON** (`float | null`), não strings `Decimal` — `LatencyHopOut` do backend não os tipa como `Decimal`/`NUMERIC` (não é dinheiro); documentado explicitamente no docstring de `lib/api/latency-types.ts` e coberto por um teste que rejeita strings nesses campos.
+
+**Arquivos:**
+- `apps/web/lib/api/latency-types.ts` (novo) — zod: `latencyHopSchema`, `latencyOutSchema`, `latencySloStatusSchema`.
+- `apps/web/lib/api/latency.ts` (novo) — `getLatency()`, `GET /api/v1/system/latency`, `.parse()` antes de confiar (mesma convenção de `lab-daily-goal.ts`: rota ainda não passou por `pnpm gen:types`).
+- `apps/web/components/system/latency-labels.ts` (novo) — rótulos PT-BR por hop (`Evento da Binance → recebido`, `Vela fechada → publicada`, `Vela → decisão`, `Decisão → admissão`, `Admissão → fill`, `Ponta a ponta`), rótulo/variant de badge por status (`ok`→positive, `warn`→warning, `critical`→negative, `unknown`→default), motivo honesto por hop para `unknown` (a API não manda um campo `reason` por hop, só `status` — o motivo aqui nomeia qual heartbeat ainda não reporta, nunca inventa uma causa específica que o frontend não observa) e `formatLatencySeconds`.
+- `apps/web/components/system/latency-panel.tsx` (novo) — Server Component, tabela de 6 linhas (5 hops + ponta a ponta). Linha `critical`: fundo `bg-red-soft`, números em vermelho/negrito, ícone `AlertTriangle` ao lado do badge — pedido do Everton ("quero tudo instantâneo") de que um hop vermelho seja impossível de não notar, não só um badge pequeno. Linha `unknown`: célula única (`colSpan`) "sem medição: `<motivo>`", nunca um número. `as_of`/`generated_at` via `SystemAsOf` (Brasília, T3.22), hover mostra o ISO UTC.
+- `apps/web/app/(app)/[orgSlug]/system/page.tsx` (modificado) — `loadLatency()` isolado (mesmo padrão de `loadWorkers`/`loadSystemInfo`, T1.5 F3): uma falha em `/system/latency` não derruba o resto da página, e nunca vira um "tudo `unknown`" fabricado. `AutoRefresh` já montado na página cobre o novo bloco (mesmo padrão do `/lab`).
+- `apps/web/tests/latency-types.test.ts`, `latency.test.ts`, `latency-labels.test.ts`, `latency-panel.test.tsx` (novos); `apps/web/tests/system-page.test.tsx` (modificado, mock de `getLatency` + 2 testes de isolamento).
+
+**Rótulos por hop:** o brief lista 4 frases PT-BR + "ponta a ponta" para o que a API publica como 5 hops (`ingest`/`flush`/`decision`/`admission`/`fill`) + `end_to_end`. `services/latency.py` já documenta `ingest`+`flush` como uma família só ("evento da exchange → vela no nosso stream"); dei um rótulo a cada um dentro dessa família em vez de fundir dois SLOs com p50/p95/status independentes numa única linha — decisão registrada aqui, não escondida.
+
+**Comandos (todos foreground, `timeout 290`):**
+```
+$ npx turbo run lint --filter=@hunter/web
+✖ 2 problems (0 errors, 2 warnings)   # ambos pré-existentes (lab-page.test.tsx, ws.test.ts), nenhum arquivo meu
+
+$ npx turbo run typecheck --filter=@hunter/web --force
+$ tsc --noEmit   # 0 erros
+
+$ npx turbo run test --filter=@hunter/web --force
+ Test Files  130 passed (130)
+      Tests  1226 passed (1226)
+  Duration  98.54s
+```
+
+**Playwright:** não executado — o brief já assinalava "provavelmente bloqueado"; nenhum fluxo Playwright nomeado para esta tarefa, e o navegador embutido não abre localhost/Clerk (memória "in-app-browser-limits") nem há servidor dev + sessão Clerk viva neste ambiente foreground. Cobertura ficou 100% Vitest (schema, mapeamento status→rótulo, renderização null/motivo, integração da página).
+
+**`git status --porcelain` (só os meus arquivos web):**
+```
+ M apps/web/app/(app)/[orgSlug]/system/page.tsx
+ M apps/web/tests/system-page.test.tsx
+?? apps/web/components/system/latency-labels.ts
+?? apps/web/components/system/latency-panel.tsx
+?? apps/web/lib/api/latency-types.ts
+?? apps/web/lib/api/latency.ts
+?? apps/web/tests/latency-labels.test.ts
+?? apps/web/tests/latency-panel.test.tsx
+?? apps/web/tests/latency-types.test.ts
+?? apps/web/tests/latency.test.ts
+```
+
+**Concerns:** nenhum arquivo `apps/api/**` tocado; nada commitado; `pnpm gen:types` não foi rodado (fora do escopo desta tarefa e do brief) — `latency-types.ts` continua hand-mirrored até a rota passar pelo OpenAPI generator.

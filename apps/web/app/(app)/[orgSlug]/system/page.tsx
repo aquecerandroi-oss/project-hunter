@@ -3,11 +3,14 @@ import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { ExecutionPaperCard } from "@/components/system/execution-paper-card";
 import { FeatureFlagsTable } from "@/components/system/feature-flags-table";
+import { LatencyPanel } from "@/components/system/latency-panel";
 import { ReadinessPanel } from "@/components/system/readiness-panel";
 import { SystemInfoCard } from "@/components/system/system-info-card";
 import { WorkersTable } from "@/components/system/workers-table";
 import { SectionUnavailable } from "@/components/ui/section-unavailable";
 import { isApiError } from "@/lib/api-error";
+import { getLatency } from "@/lib/api/latency";
+import type { LatencyOut } from "@/lib/api/latency-types";
 import { resolveOrgContext } from "@/lib/api/org-context";
 import { getWorkers, ready, systemInfo } from "@/lib/api/system";
 import type { SystemInfo, WorkerHeartbeat } from "@/lib/api/types";
@@ -26,6 +29,7 @@ export const revalidate = 15;
 
 type WorkersLoad = { ok: true; workers: WorkerHeartbeat[] } | { ok: false; reason: string };
 type SystemInfoLoad = { ok: true; info: SystemInfo } | { ok: false; reason: string };
+type LatencyLoad = { ok: true; latency: LatencyOut } | { ok: false; reason: string };
 
 /**
  * A fetch failure (API down, bad `API_URL`) is NOT the same fact as "zero
@@ -63,13 +67,35 @@ async function loadSystemInfo(): Promise<SystemInfoLoad> {
   }
 }
 
+/**
+ * Isolated the same way `loadWorkers`/`loadSystemInfo` are (T1.5 review F3):
+ * a `/system/latency` outage must not take down the rest of the page, and
+ * "the API call failed" is not the same fact as "every hop is `unknown`" --
+ * conflating the two would show a fabricated all-unknown budget for a real
+ * outage instead of the honest per-section failure box.
+ */
+async function loadLatency(): Promise<LatencyLoad> {
+  try {
+    return { ok: true, latency: await getLatency() };
+  } catch (error) {
+    const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
+    logger.error("system_latency_load_failed", { error: reason });
+    return { ok: false, reason };
+  }
+}
+
 /** `/system` (docs/PRODUCT.md §4, available from M0) -- API/DB/Redis health, feature flags, honest worker status. */
 export default async function SystemPage({ params }: SystemPageProps) {
   const { orgSlug } = await params;
   const membership = await resolveOrgContext(orgSlug);
   if (!membership) notFound();
 
-  const [infoLoad, readiness, workersLoad] = await Promise.all([loadSystemInfo(), ready(), loadWorkers()]);
+  const [infoLoad, readiness, workersLoad, latencyLoad] = await Promise.all([
+    loadSystemInfo(),
+    ready(),
+    loadWorkers(),
+    loadLatency(),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -84,6 +110,7 @@ export default async function SystemPage({ params }: SystemPageProps) {
           <SectionUnavailable title="Feature flags" reason={infoLoad.reason} />
         )}
       </div>
+      {latencyLoad.ok ? <LatencyPanel data={latencyLoad.latency} /> : <SectionUnavailable title="Latência" reason={latencyLoad.reason} />}
       <section>
         <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-muted">Workers</h2>
         {workersLoad.ok ? (

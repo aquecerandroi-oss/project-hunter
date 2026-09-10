@@ -5,14 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // build condition, which Vitest never sets (see tests/invitations-actions.test.ts).
 vi.mock("server-only", () => ({}));
 
-const { resolveOrgContextMock, systemInfoMock, readyMock, getWorkersMock, refreshMock, useRouterMock } = vi.hoisted(() => ({
-  resolveOrgContextMock: vi.fn(),
-  systemInfoMock: vi.fn(),
-  readyMock: vi.fn(),
-  getWorkersMock: vi.fn(),
-  refreshMock: vi.fn(),
-  useRouterMock: vi.fn(),
-}));
+const { resolveOrgContextMock, systemInfoMock, readyMock, getWorkersMock, getLatencyMock, refreshMock, useRouterMock } = vi.hoisted(
+  () => ({
+    resolveOrgContextMock: vi.fn(),
+    systemInfoMock: vi.fn(),
+    readyMock: vi.fn(),
+    getWorkersMock: vi.fn(),
+    getLatencyMock: vi.fn(),
+    refreshMock: vi.fn(),
+    useRouterMock: vi.fn(),
+  }),
+);
 
 vi.mock("@/lib/api/org-context", () => ({ resolveOrgContext: resolveOrgContextMock }));
 vi.mock("@/lib/api/system", () => ({
@@ -20,6 +23,7 @@ vi.mock("@/lib/api/system", () => ({
   ready: readyMock,
   getWorkers: getWorkersMock,
 }));
+vi.mock("@/lib/api/latency", () => ({ getLatency: getLatencyMock }));
 vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("notFound() should not be called in these tests");
@@ -38,6 +42,7 @@ vi.mock("next/navigation", () => ({
 import SystemPage from "@/app/(app)/[orgSlug]/system/page";
 import { DEFAULT_AUTO_REFRESH_INTERVAL_MS } from "@/lib/auto-refresh-interval";
 import { ApiError } from "@/lib/api-error";
+import type { LatencyOut } from "@/lib/api/latency-types";
 import type { MembershipOut, SystemInfo, WorkerHeartbeat } from "@/lib/api/types";
 
 function apiError(detail: string): ApiError {
@@ -90,11 +95,18 @@ const aliveWorker: WorkerHeartbeat = {
   open_gaps: null,
 };
 
+const latencyOk: LatencyOut = {
+  hops: [{ hop: "ingest", p50_s: 0.09, p95_s: 0.31, target_p50_s: 0.5, target_p95_s: 1.0, status: "ok" }],
+  end_to_end: { hop: "end_to_end", p50_s: null, p95_s: null, target_p50_s: 5.0, target_p95_s: 10.0, status: "unknown" },
+  generated_at: "2026-09-10T16:24:00Z",
+};
+
 beforeEach(() => {
   resolveOrgContextMock.mockReset().mockResolvedValue(membership);
   systemInfoMock.mockReset();
   readyMock.mockReset().mockResolvedValue({ database: true, redis: true });
   getWorkersMock.mockReset().mockResolvedValue([aliveWorker]);
+  getLatencyMock.mockReset().mockResolvedValue(latencyOk);
   refreshMock.mockReset();
   useRouterMock.mockReset().mockReturnValue({ refresh: refreshMock });
 });
@@ -220,6 +232,31 @@ describe("SystemPage: two 'execution' heartbeats -- the generic liveness row mus
     // The generic row has none of the T3.13 fields -- if it had won, every
     // one of these would read "indisponível" instead.
     expect(screen.queryAllByText("indisponível")).toHaveLength(0);
+  });
+});
+
+describe("SystemPage: Latência section (T3.79) -- isolated the same way Workers/API info are", () => {
+  it("renders the Latência panel with a real hop row when getLatency() succeeds", async () => {
+    systemInfoMock.mockResolvedValue(info);
+
+    const jsx = await SystemPage({ params: Promise.resolve({ orgSlug: "acme" }) });
+    render(jsx);
+
+    expect(screen.getByTestId("latency-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("latency-row-ingest")).toBeInTheDocument();
+  });
+
+  it("shows the honest 'Latência indisponível' box, without taking down Workers or API info, when getLatency() rejects", async () => {
+    systemInfoMock.mockResolvedValue(info);
+    getLatencyMock.mockRejectedValue(apiError("latency down"));
+
+    const jsx = await SystemPage({ params: Promise.resolve({ orgSlug: "acme" }) });
+    render(jsx);
+
+    expect(screen.getByText(/Latência indisponível: latency down/)).toBeInTheDocument();
+    expect(screen.queryByTestId("latency-panel")).not.toBeInTheDocument();
+    expect(screen.getByText("test")).toBeInTheDocument();
+    expect(screen.getByText("api-1")).toBeInTheDocument();
   });
 });
 
