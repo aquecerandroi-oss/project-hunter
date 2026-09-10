@@ -22,6 +22,7 @@ HEARTBEAT_KEY = "hb:strategy:shadow"
 PRODUCER = "strategy-worker.shadow"
 
 __all__ = [
+    "CLAIM_IDLE_MS_CEILING",
     "CONSUMER_GROUP",
     "EXPECTED_BAR_COST_S",
     "HEARTBEAT_KEY",
@@ -64,14 +65,37 @@ still pays its own DB round trips per version. 11 / 1.4 ~= 7.9s, rounded up.
 """
 
 
+CLAIM_IDLE_MS_CEILING: int = 90_000
+"""Hard ceiling on :func:`default_claim_idle_ms`'s output (T3.74e).
+
+The naive product (``worker_concurrency x EXPECTED_BAR_COST_S``) was sized
+when ``worker_concurrency`` was 8 and assumed a bar queued behind a full
+dispatcher waits for at most *one round* of already-running bars -- true only
+when the burst is shallow. T3.74e measured the real burst depth instead: the
+whole monitored universe (~200 perpetuals) shares every 15m/30m/1h boundary,
+so at ``worker_concurrency`` raised to absorb that (32, this module's new
+default) the naive product is 32 x 8.0 x 1000 = 256 000 ms -- 85 % of
+``consumer_stall_s``'s 300 000 ms default, violating the "well under" bound
+``ShadowConfig.claim_idle_ms`` documents (``test_claim_idle_ms.py``). The
+realistic worst wait at that concurrency, measured live (``notes-T3.74e.md``
+§1), is an order of magnitude smaller (~10 s for a 200-market burst); 90 000 ms
+keeps an 8x+ safety margin over that measurement while staying at 30 % of the
+stall bound, comfortably under the "less than half" the existing test already
+enforces.
+"""
+
+
 def default_claim_idle_ms(worker_concurrency: int) -> int:
     """Default for :data:`ShadowConfig.claim_idle_ms`: ``worker_concurrency ×
-    EXPECTED_BAR_COST_S``, in milliseconds (T3.74d).
+    EXPECTED_BAR_COST_S``, in milliseconds (T3.74d), capped at
+    :data:`CLAIM_IDLE_MS_CEILING` (T3.74e -- see that constant's docstring for
+    why the uncapped product stops being a meaningful bound once
+    ``worker_concurrency`` is sized for a universe-wide burst).
 
     See ``ShadowConfig.claim_idle_ms``'s own docstring for the review finding
     this answers and the bound it must respect.
     """
-    return int(max(1, worker_concurrency) * EXPECTED_BAR_COST_S * 1000)
+    return min(int(max(1, worker_concurrency) * EXPECTED_BAR_COST_S * 1000), CLAIM_IDLE_MS_CEILING)
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,18 +211,37 @@ class ShadowConfig:
     consumer_stall_s: float = 300.0
     """No consumer iteration for this long makes ``/ready`` false."""
 
-    worker_concurrency: int = 8
+    worker_concurrency: int = 32
     """Bars handled concurrently by one process (T3.74c), bounded by the DB
-    pool (``Settings.db_pool_size`` + ``db_max_overflow``, 5 + 5 = 10 today):
-    a bar in flight holds at most one connection at a time (each
-    ``role_session`` closes before the next opens), so 8 leaves headroom for
-    the outbox/heartbeat loops' own short-lived sessions in the same process
-    without starving them. Different markets never share state -- a session,
-    a slot row, a candle window -- so processing them concurrently changes
-    nothing about *what* is decided, only *when*; the ordering that does
-    matter (two bars of the *same* market) is still enforced per-market
-    (``consumer._market_key``), never by this number. 1 reproduces the
-    strictly serial behaviour every version before T3.74c had.
+    pool a bar in flight holds at most one connection at a time (each
+    ``role_session`` closes before the next opens).
+
+    **Why 32, not 8 (T3.74e).** ``dispatch.py``'s own docstring already named
+    the shape: ``market.candles.closed`` delivers the *whole* monitored
+    universe (~200 perpetuals) within the same few seconds at every shared
+    timeframe boundary (15m/30m/1h). At concurrency 8 a burst drains in
+    ``≈ total_burst_work_s / 8``; T3.74e measured the real total
+    (``hunter_shadow_stage_seconds`` summed across every stage for one
+    200-market burst) at ≈ 325 s, and confirmed it live in ``agent_signals``:
+    decisions of the *same* 18:45:00Z bar landed anywhere from 4.9 s to 61.2 s
+    after it closed, spread by queue position (notes-T3.74e.md §1) -- bounded,
+    unlike the fully-serial predecessor's unbounded 20-170 s+ spread, but still
+    far from instant. 32 cuts the same math to ≈ 10 s (325 / 32) -- inside
+    ``decision_lag_p95_alert_s``; the next lever, if a live remeasurement still
+    shows more, is CPU-bound sharding across processes (T3.74c §4, not
+    attempted here), not this knob alone.
+
+    **The DB pool must move with it.** ``Settings.db_pool_size`` +
+    ``db_max_overflow`` default to 5 + 5 = 10 process-wide (shared by
+    ``api``/every worker), far too small for 32 -- the strategy-worker compose
+    service now overrides ``DB_POOL_SIZE``/``DB_MAX_OVERFLOW`` to 20/20 (40
+    total, the same ~1.25x headroom ratio 10/8 had) so the outbox/heartbeat/
+    outcome-sweep loops' own short-lived sessions are never starved. Different
+    markets never share state -- a session, a slot row, a candle window -- so
+    concurrency changes only *when* a decision lands, never *what* it is; the
+    ordering that does matter (two bars of the *same* market) is still
+    enforced per-market (``dispatch.market_key``), never by this number. 1
+    reproduces the strictly serial behaviour every version before T3.74c had.
     """
 
     late_delay_backlog_max_s: float = 120.0
@@ -299,7 +342,7 @@ def load_config() -> ShadowConfig:
         gap_recovery_max_s=_int("SHADOW_GAP_RECOVERY_MAX_S", 86_400),
         version_refresh_s=_float("SHADOW_VERSION_REFRESH_S", 60.0),
         consumer_stall_s=_float("SHADOW_CONSUMER_STALL_S", 300.0),
-        worker_concurrency=_int("SHADOW_WORKER_CONCURRENCY", 8),
+        worker_concurrency=_int("SHADOW_WORKER_CONCURRENCY", 32),
         late_delay_backlog_max_s=_float("SHADOW_LATE_DELAY_BACKLOG_MAX_S", 120.0),
         claim_idle_ms=_int("SHADOW_CLAIM_IDLE_MS", _CLAIM_IDLE_MS_UNSET),
     )

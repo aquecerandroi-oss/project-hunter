@@ -126,6 +126,31 @@ Consultas em `infra/scripts/sql/research/2026-09-10-t373-q0{0..4}-*.sql`, todas 
   (regra: nenhuma escrita/reinício de contêiner) — o número "depois" ao vivo depende do deploy do
   orquestrador; o que existe aqui é a prova local de que o mecanismo funciona e não muda nenhuma
   decisão. Notas completas: `.claude/state/notes-T3.74c.md`.
+  **Atualização T3.74e (2026-09-10, 15:45 BRT / 18:45Z): implantado, mas o atraso continua alto
+  numa amostra estreita — causa raiz nova, ainda dentro do `strategy-worker`.** 14 min depois do
+  deploy do T3.74c/d + T3.81, uma amostra de 8 sinais reportava `hb:strategy:shadow`:
+  `decision_lag_p50_s 54.1`/`p95_s 56.2`. Uma consulta mais ampla contra `agent_signals` mostrou o
+  quadro completo: as decisões da **mesma** barra (`observation_ts = 2026-09-10 18:45:00Z`) saíram
+  entre **4,9 s e 61,2 s** depois dela fechar, espalhadas conforme a posição de cada mercado na fila
+  do despachante — a amostra de 8 do heartbeat pegou só a cauda alta desse espalhamento. Uma segunda
+  consulta (janela de 3h) confirma que o padrão se repete a cada fronteira de 15 min com magnitude
+  variável (2,4 s a 163 s de `max_lag` por janela) — bem mais contido que o espalhamento sem limite
+  da versão totalmente serial (20–170 s+), mas ainda longe de instantâneo. Descartado o lado do
+  `market-worker`: `hunter_candle_flush_lag_seconds`/
+  `hunter_market_ingest_lag_seconds` (T3.79/T3.81, já implantados) mostraram o hop
+  exchange→vela-durável em 0,5–2 s, dentro do orçamento — e `parse_kline_ws` já usa o `k.x` da
+  própria Binance como `is_final`, nunca esperando a vela seguinte. **Causa**: `hunter_shadow_stage_seconds`
+  por estágio (fila/mercado/família/contexto/avaliação/persistência) veio rápido em todos os
+  estágios — a soma não chega a 2 s por barra — mas o `BarDispatcher` (T3.74c) só processa
+  `ShadowConfig.worker_concurrency` (padrão 8) mercados por vez, e a rajada real mede ~200 mercados
+  simultâneos a cada fechamento de timeframe compartilhado (15/30/60 min), com ~325 s de trabalho
+  total por rajada (soma dos estágios medida ao vivo) — drenar isso a 8 por vez toma
+  `≈ 325/8 ≈ 41 s`, batendo com a banda observada. **Corrigido nesta tarefa** (não implantado):
+  `worker_concurrency` sobe de 8 para 32 (`config.py`), `CLAIM_IDLE_MS_CEILING` (90 s) novo evita que
+  o teto de `claim_idle_ms` se aproxime de `consumer_stall_s` na concorrência maior, e o pool de
+  conexões do serviço `strategy-worker` sobe para 20+20 nos dois composes (dev e VPS) — projeção:
+  `325/32 ≈ 10 s`, dentro de `decision_lag_p95_alert_s` (30 s). Notas completas, timeline das três
+  decisões reais e comandos: `.claude/state/notes-T3.74e.md`.
 - **LOW — a sonda de elegibilidade divide a janela de 50 entradas com o universo spot.**
   `eligibility.universe_changed_after` lê as `PROBE_ENTRIES = 50` entradas mais recentes de
   `market.universe.changed` e casa por `envelope.key`. O spot publica com chave própria

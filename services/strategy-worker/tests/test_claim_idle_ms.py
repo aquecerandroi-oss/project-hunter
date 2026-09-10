@@ -12,6 +12,7 @@ from __future__ import annotations
 import pytest
 
 from hunter_strategy_worker.config import (
+    CLAIM_IDLE_MS_CEILING,
     EXPECTED_BAR_COST_S,
     ShadowConfig,
     default_claim_idle_ms,
@@ -29,6 +30,19 @@ def test_a_config_with_no_override_derives_it_from_its_own_worker_concurrency() 
     config = ShadowConfig(worker_concurrency=4)
     assert config.claim_idle_ms == default_claim_idle_ms(4)
     assert config.claim_idle_ms != default_claim_idle_ms(8)
+
+
+def test_the_default_is_capped_so_a_high_concurrency_never_approaches_the_stall_bound() -> None:
+    """T3.74e: a 200-market burst (the whole monitored universe sharing one
+    15m/30m/1h boundary) needs a ``worker_concurrency`` well above the T3.74c
+    default (8) to drain in single-digit seconds -- the naive product
+    (``worker_concurrency x EXPECTED_BAR_COST_S``) would then push the reclaim
+    window uncomfortably close to ``consumer_stall_s`` (notes-T3.74e.md §2).
+    A ceiling keeps the interval meaningful at high concurrency without
+    reproducing that risk."""
+    uncapped = int(64 * EXPECTED_BAR_COST_S * 1000)
+    assert uncapped > CLAIM_IDLE_MS_CEILING, "the test needs a concurrency that would overflow"
+    assert default_claim_idle_ms(64) == CLAIM_IDLE_MS_CEILING
 
 
 def test_an_explicit_value_is_never_overridden() -> None:
@@ -55,4 +69,31 @@ def test_load_config_reads_the_env_override(monkeypatch: pytest.MonkeyPatch) -> 
 def test_load_config_derives_the_default_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SHADOW_CLAIM_IDLE_MS", raising=False)
     monkeypatch.delenv("SHADOW_WORKER_CONCURRENCY", raising=False)
-    assert load_config().claim_idle_ms == default_claim_idle_ms(8)
+    config = load_config()
+    assert config.worker_concurrency == 32, (
+        "T3.74e raised the live default from 8 -- see ShadowConfig.worker_concurrency"
+    )
+    assert config.claim_idle_ms == default_claim_idle_ms(32)
+
+
+def test_the_new_default_projects_the_measured_burst_under_the_p95_alert() -> None:
+    """Encodes the arithmetic ``ShadowConfig.worker_concurrency``'s docstring
+    argues from, so a future change to either number cannot silently drift
+    past the projection without this test also changing.
+
+    ``MEASURED_BURST_WORK_S`` is the real total (T3.74e, notes-T3.74e.md §1):
+    ``hunter_shadow_stage_seconds`` summed across every stage, for one live
+    200-market burst on the VPS at the old concurrency (8) -- market_lookup
+    32.23 + family_preload 43.47 + context_load 237.36 + evaluate 11.25 +
+    persist 1.10 = 325.41 s. Dividing by the new default projects the
+    burst-drain time a market at the back of the queue would see.
+    """
+    MEASURED_BURST_WORK_S = 325.41
+    config = ShadowConfig()
+    projected_drain_s = MEASURED_BURST_WORK_S / config.worker_concurrency
+    assert projected_drain_s < config.decision_lag_p95_alert_s, (
+        f"projected drain {projected_drain_s:.1f}s at concurrency="
+        f"{config.worker_concurrency} would still miss the p95 alert budget "
+        f"({config.decision_lag_p95_alert_s}s) -- raise worker_concurrency "
+        "(and the matching DB pool override) further"
+    )

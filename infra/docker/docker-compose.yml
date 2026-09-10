@@ -393,6 +393,14 @@ services:
       <<: *api-env
       HUNTER_ROLE: strategy
       HEALTH_PORT: "8001"
+      # T3.74e: worker_concurrency's default rose from 8 to 32 (config.py
+      # docstring for the burst math) -- the shared Settings default
+      # (5 + 5 = 10) is far too small for that, so this service overrides its
+      # own pool to 20 + 20 = 40 (~1.25x headroom over concurrency, the same
+      # ratio 10/8 had before), the same override pattern replay-worker below
+      # already uses for its own, smaller pool.
+      DB_POOL_SIZE: "20"
+      DB_MAX_OVERFLOW: "20"
     env_file:
       - path: ../../.env
         required: false

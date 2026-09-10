@@ -232,6 +232,15 @@ services:
       <<: *prod-db-env
       HUNTER_ROLE: strategy
       HEALTH_PORT: "8001"
+      # T3.74e: worker_concurrency's default rose from 8 to 32 (config.py
+      # docstring) to drain a whole-universe burst (~200 markets sharing one
+      # 15m/30m/1h boundary) in ~10s instead of ~35-60s (notes-T3.74e.md §1,
+      # measured live). The shared pool default (5 + 5 = 10) starves that;
+      # 20 + 20 = 40 keeps the same ~1.25x headroom the old 10/8 ratio had.
+      # Postgres max_connections is 100 and every other service combined held
+      # ~33 at measurement time, so this leaves comfortable room.
+      DB_POOL_SIZE: "20"
+      DB_MAX_OVERFLOW: "20"
     logging: *prod-logging
 
   # Replay lane (T3.80, infra/docker/docker-compose.yml). `*prod-db-env` for
