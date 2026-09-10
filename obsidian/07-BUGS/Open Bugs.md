@@ -1,6 +1,6 @@
 ---
 tags: [bugs, abertos]
-updated: 2026-09-08
+updated: 2026-09-10
 status: aberto
 owner: sexta-feira
 severity: misto
@@ -11,6 +11,46 @@ closed: ""
 # Open Bugs
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
+
+## Abertos na T3.73 (2026-09-10, medição na VPS; achado do D-P9)
+
+Consultas em `infra/scripts/sql/research/2026-09-10-t373-q0{0..4}-*.sql`, todas dentro de
+`repeatable read read only`; leitura de 2026-09-10 01:07 BRT (04:07Z). Notas:
+`.claude/state/notes-T3.73.md`.
+
+- **~~O Lab decidia sobre a linha `spot` com o modelo de custo do perpétuo~~ — corrigido na T3.73,
+  aguardando deploy.** `markets` tem duas linhas por símbolo (528 perpétuas, 490 spot; 200 e 18
+  monitoradas) e o consumidor do `strategy-worker` avaliava a vela que chegasse. Números: **340
+  sinais** em linha spot (93 em 08/09, 247 em 09/09, nenhum antes — o caminho spot subiu em 08/09),
+  **133 desfechos terminais e os 133 com `r_multiple` NULL**, todos por `funding_schedule_unknown`
+  — `funding_rates` tem 8 235 linhas e **zero** para mercado spot, por construção. Contra 6 557
+  terminais perpétuos com só 76 sem R. **179 trios (versão, símbolo, barra) foram decididos nas
+  duas linhas**, o que duplica qualquer contagem de aposta única (NEAR e ZEC de 09/09 são os casos
+  do D-P9). Duas versões `paper` participaram (`momentum v3`: 44 sinais spot; `mean_reversion v14`:
+  7). Correção: `hunter_strategy_worker/consumer.py` recusa toda vela que não seja `perpetual`
+  antes de resolver o mercado, contando em `hunter_shadow_bars_skipped_total{reason}`
+  (`DECISION_MARKET_TYPE`, T3.73). **Não há reprocessamento**: as 340 linhas antigas ficam na base
+  e toda leitura de pesquisa precisa filtrar `markets.market_type = 'perpetual'`.
+- **HIGH — o Lab está perdendo metade das entradas por atraso de processamento, não por mercado.**
+  `no_entry` com `late:delay` foi de 18 (06/09) e 10 (07/09) para **105 (08/09), 1 637 (09/09) e 73
+  nas primeiras horas de 10/09** — **47,2 %** de todos os sinais prospectivos de 09/09 e **53,7 %**
+  dos de 10/09. `late:delay` não é o preço fugindo da zona: `plan.py::plan_entry` marca assim
+  quando `entry_bar_open − source_bar_close > max_entry_delay_s` (120 s), e `entry_bar_open` é o
+  minuto seguinte à decisão — ou seja, é o **worker chegando tarde à barra**. O atraso mediano
+  decisão-menos-barra saiu de **2,0 s** (01 a 05/09) para **11,8 s** (07/09), **21,8 s** (08/09),
+  **107,9 s** (09/09) e **125,1 s** (10/09), com p95 de 263,8 s em 09/09. Acima de
+  `eligibility_max_lag_s` (300 s) a barra nem vira sinal (`unavailable`), então o denominador real
+  é ainda maior e **não está na base**. Sem dono nesta tarefa (T3.73 é só medição); o candidato
+  natural é o custo por barra do roster (21 versões decidindo em 232 mercados em 09/09, contra 14
+  versões e 12 mercados em 01/09).
+- **LOW — a sonda de elegibilidade divide a janela de 50 entradas com o universo spot.**
+  `eligibility.universe_changed_after` lê as `PROBE_ENTRIES = 50` entradas mais recentes de
+  `market.universe.changed` e casa por `envelope.key`. O spot publica com chave própria
+  (`binance:spot`, `durable.enqueue_universe_changed` + `keys.market_slug`), então **não** rotula o
+  perpétuo errado — verificado no código, era a suspeita natural e está descartada. O que resta é
+  diluição: eventos spot ocupam lugares da janela e podem empurrar o último evento **perpétuo**
+  para fora dela, caso em que a sonda responde "nada mudou" (a direção otimista já declarada no
+  módulo). Sem medição; só vale registrar antes que alguém aperte `PROBE_ENTRIES`.
 
 ## Abertos pela revisão da Astra "o Lab está pronto?" (2026-09-08)
 

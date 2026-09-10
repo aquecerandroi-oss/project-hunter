@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from hunter_core.db.session import role_session
+from hunter_core.domain.enums import MarketType
 from hunter_core.domain.market import NormalizedCandle, from_wire
 from hunter_core.domain.types import utcnow
 from hunter_core.events.consume import ack, consume
@@ -24,6 +25,7 @@ from hunter_strategy_worker import slots
 from hunter_strategy_worker.config import CONSUMER_GROUP
 from hunter_strategy_worker.decide import evaluate_slot, versions_for_bar
 from hunter_strategy_worker.metrics import (
+    shadow_bars_skipped_total,
     shadow_trackings_open,
     shadow_trackings_unswept,
     shadow_version_failed_total,
@@ -62,6 +64,37 @@ learned to treat it as a backoff.
 
 RESTART_BACKOFF_S = 1.0
 RESTART_BACKOFF_MAX_S = 30.0
+
+DECISION_MARKET_TYPE = MarketType.PERPETUAL
+"""The only listing the Shadow Lab decides on (T3.73).
+
+``markets`` holds two rows per symbol since T3.0b/T3.0c and the market-worker
+publishes ``market.candles.closed`` for both (T3.0d), so this consumer — which
+evaluates whatever bar arrives — started deciding on the ``spot`` row of a
+symbol the day the spot path was switched on. That is not a second population,
+it is the *same* bet counted twice (measured on the VPS on 2026-09-10: 179
+(version, symbol, bar) triples decided on both rows), priced with a cost model
+that does not exist there: ``funding_rates`` has no row for a spot market by
+construction, so ``resolve_funding`` never establishes a cadence and every one
+of the 133 terminal spot outcomes closed with ``r_multiple = NULL`` and
+``funding_schedule_unknown``.
+
+Perpetual-only is what the documents already say, in three places: PIPELINE §1d
+item 1 (the spot path exists as the wallet's *execution price* while "todo o
+resto do pipeline … continua raciocinando só sobre o perpétuo"), §1d item 7 (the
+scanner drops spot ticks at the same kind of door, before coalescing) and
+``replay/plan.py``, which has always restricted a replay to
+``MarketType.PERPETUAL``. Nothing is lost on the wallet side: the execution
+bridge maps a perpetual signal to its spot twin itself
+(``bridge_universe.spot_pair_for``, scaling ``1000SHIBUSDT`` -> ``SHIBUSDT``),
+so a paper signal never had to be born on a spot row to be executable on one.
+
+Researching spot deliberately is a different task with its own cost model — it
+would need a funding rule (zero, named, not merely unreadable), spot-native
+assumed costs and a dedup rule for the perpetual twin. Refusing here is
+fail-closed until that exists, never a silent omission: every refusal is
+counted in ``hunter_shadow_bars_skipped_total{reason}``.
+"""
 
 __all__ = [
     "CONSUME_BLOCK_MS",
@@ -125,6 +158,11 @@ async def handle_candle(
     """
     candle = _candle(payload)
     if candle is None or not candle.is_final:
+        return
+    if candle.market_type is not DECISION_MARKET_TYPE:
+        # Not in the decision universe at all — refused before the market row is
+        # even resolved, so it costs one comparison and not one query per bar.
+        shadow_bars_skipped_total.labels(reason=f"market_type:{candle.market_type.value}").inc()
         return
     bar_close = candle.close_time
     due = versions_for_bar(await versions.get(factory), bar_close)

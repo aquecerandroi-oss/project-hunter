@@ -14,6 +14,7 @@ from prometheus_client import Counter, Gauge
 from hunter_core.observability import registry
 
 __all__ = [
+    "shadow_bars_skipped_total",
     "shadow_evaluations_total",
     "shadow_version_failed_total",
     "shadow_funding_unresolved_total",
@@ -27,6 +28,17 @@ __all__ = [
     "shadow_versions_runnable",
     "shadow_versions_unrunnable",
 ]
+
+shadow_bars_skipped_total = Counter(
+    "hunter_shadow_bars_skipped_total",
+    "Closed candles the shadow consumer refused before any evaluation, by reason.",
+    ["reason"],
+    registry=registry,
+)
+"""A bar that never reaches a version is not an evaluation in any state, so it
+cannot be counted in ``shadow_evaluations_total`` — and it must not be invisible
+either: the ``spot`` listing of a symbol is refused at the door (T3.73) and this
+is what says so out loud."""
 
 shadow_evaluations_total = Counter(
     "hunter_shadow_evaluations_total",
