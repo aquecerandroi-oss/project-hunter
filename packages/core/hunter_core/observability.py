@@ -188,6 +188,47 @@ market_spot_dropped_events_total = Counter(
 )
 
 
+# T3.79: the market-worker's two new end-to-end-latency hops. Buckets run
+# sub-second (the whole point is proving the "<1s exchange->stream" budget of
+# docs/PIPELINE.md §11), unlike the decision hop's own histogram
+# (hunter_shadow_decision_lag_seconds, T3.74c) which is allowed minutes.
+market_ingest_lag_seconds = Histogram(
+    "hunter_market_ingest_lag_seconds",
+    "Exchange event time to this process's own receive time, by event kind "
+    "(trade/candle) -- the network leg of the exchange-to-stream budget. A "
+    "reading is only observed here when hunter_core.latency.measure_lag found "
+    "no clock-skew/missing-timestamp reason; see the *_anomalies_total "
+    "counter below for those.",
+    ["kind"],
+    buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0),
+    registry=registry,
+)
+market_ingest_lag_anomalies_total = Counter(
+    "hunter_market_ingest_lag_anomalies_total",
+    "Ingest-lag readings that could not enter hunter_market_ingest_lag_seconds, "
+    "by kind and reason (missing_timestamp/clock_skew) -- never silently "
+    "dropped, never folded into the histogram as a fabricated 0.",
+    ["kind", "reason"],
+    registry=registry,
+)
+candle_flush_lag_seconds = Histogram(
+    "hunter_candle_flush_lag_seconds",
+    "A closed 1m candle's own close_time to this process observing it durably "
+    "queued for the outbox -- the docs/PIPELINE.md §6b 'exchange event -> "
+    "candle on our stream' budget's dominant term (the outbox's own wake-"
+    "triggered dispatch adds only the publication itself on top).",
+    buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0),
+    registry=registry,
+)
+candle_flush_lag_anomalies_total = Counter(
+    "hunter_candle_flush_lag_anomalies_total",
+    "Flush-lag readings that could not enter hunter_candle_flush_lag_seconds, "
+    "by reason (missing_timestamp/clock_skew).",
+    ["reason"],
+    registry=registry,
+)
+
+
 def metrics_asgi_app() -> ASGIApp:
     """A ``/metrics`` ASGI app exposing :data:`registry` in Prometheus text format."""
     app: ASGIApp = prometheus_client.make_asgi_app(registry=registry)  # type: ignore

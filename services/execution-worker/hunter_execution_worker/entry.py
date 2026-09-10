@@ -39,6 +39,7 @@ from hunter_core.execution.entries import MarketEntryOrder
 from hunter_core.execution.paper import PaperExecutionAdapter
 from hunter_core.logging import get_logger
 from hunter_core.risk.scopes import effective_state
+from hunter_execution_worker import metrics
 from hunter_execution_worker.apply import EntryApplication, apply_entry
 from hunter_execution_worker.entry_inputs import missing_inputs
 from hunter_execution_worker.positions import load_open_position
@@ -295,6 +296,10 @@ async def _execute_one(
         now=now,
         source=data.source,
     )
+    if report.filled:
+        # T3.79: the fill hop -- the admission decision's own decided_at to
+        # this attempt's own clock, the instant the fill actually applied.
+        metrics.observe_fill_lag(decided_at=proposal.decided_at, filled_at=now)
     return EntryOutcome(proposal.proposal_id, report.status, report.reason, application)
 
 

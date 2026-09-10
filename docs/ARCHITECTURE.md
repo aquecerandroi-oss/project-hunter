@@ -313,6 +313,7 @@ Uma classe `Settings` (pydantic-settings) em `hunter_core.settings`, carregada d
 - Heartbeat por worker em Redis (`hb:*`) e consolidado a cada minuto em `worker_heartbeats`.
 - Sentry em `api` e workers com `release` = SHA do commit.
 - Métricas mínimas: eventos por stream (produzidos, consumidos, lag), latência por exchange, gaps de candle, propostas aprovadas/rejeitadas por check, fills simulados, erro por worker.
+- **Orçamento de latência de ponta a ponta (T3.79).** Cinco trechos — ingest e flush do `market-worker`, decisão do `strategy-worker` (T3.74c), admissão e fill do `execution-worker` — cada um com histograma Prometheus (`hunter_market_ingest_lag_seconds`, `hunter_candle_flush_lag_seconds`, `hunter_shadow_decision_lag_seconds`, `hunter_execution_admission_lag_seconds`, `hunter_execution_fill_lag_seconds`) e p50/p95 no próprio heartbeat do worker (`hb:market:{exchange}`, `hb:strategy:shadow`, `hb:execution:paper`), lido sem precisar de um servidor Prometheus. Um lag negativo (relógios desalinhados) nunca vira `0`: é contado à parte como `clock_skew` (`hunter_core.latency`, tolerância de 2 s como `hunter_api.services.market_status.CLOCK_SKEW_TOLERANCE_S`). Publicado em `GET /api/v1/system/latency`; alvos e desenho completos em `docs/PIPELINE.md` §6b.
 
 ## 12. Ordem de implementação
 

@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, cast
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_execution_worker.config import HEARTBEAT_KEY
+from hunter_execution_worker.metrics import admission_lag_percentiles, fill_lag_percentiles
 
 if TYPE_CHECKING:
     from hunter_core.runtime import WorkerRuntime
@@ -32,6 +33,14 @@ __all__ = ["run_heartbeat", "write_heartbeat"]
 
 def _stamp(value: object) -> str:
     return "" if value is None else str(value)
+
+
+def _lag_fields(prefix: str, percentiles: tuple[float | None, float | None]) -> dict[str, str]:
+    p50, p95 = percentiles
+    return {
+        f"{prefix}_p50_s": "" if p50 is None else f"{p50:.3f}",
+        f"{prefix}_p95_s": "" if p95 is None else f"{p95:.3f}",
+    }
 
 
 async def write_heartbeat(
@@ -60,6 +69,9 @@ async def write_heartbeat(
         "last_kill_switch_read": _stamp(health.kill_switch_read_at),
         "errors": str(health.errors),
         "paper_autonomy": str(config.enable_paper_autonomy).lower(),
+        # T3.79: signal-emitted -> decision-persisted, decision -> fill-applied.
+        **_lag_fields("admission_lag", admission_lag_percentiles()),
+        **_lag_fields("fill_lag", fill_lag_percentiles()),
     }
     await cast("Any", runtime.redis).hset(HEARTBEAT_KEY, mapping=payload)
     await runtime.redis.expire(HEARTBEAT_KEY, TTL_S)

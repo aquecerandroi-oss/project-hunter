@@ -18,7 +18,9 @@ from fastapi import APIRouter, Depends, status
 from hunter_api.auth.rbac import CurrentPrincipal
 from hunter_api.deps import PrincipalSession, get_redis
 from hunter_api.errors import HunterError
+from hunter_api.schemas.latency import LatencyOut
 from hunter_api.schemas.system import MarketStatusOut, WorkerHeartbeatOut
+from hunter_api.services.latency import build_latency
 from hunter_api.services.system_status import build_market_status, scan_heartbeats
 
 if TYPE_CHECKING:
@@ -61,6 +63,22 @@ class MarketStatusUnavailableError(HunterError):
         )
 
 
+class LatencyUnavailableError(HunterError):
+    """(G4) The same rule as the two errors above: a Redis outage while
+    reading any of the three heartbeat sources answers ``503``, never a
+    ``200`` a healthy-but-unmeasured pipeline would be indistinguishable
+    from.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            type_slug="latency-unavailable",
+            title="Service Unavailable",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="End-to-end latency data is temporarily unavailable.",
+        )
+
+
 @router.get("/workers", response_model=list[WorkerHeartbeatOut], summary="Worker liveness")
 async def list_workers(principal: CurrentPrincipal, redis: Redis) -> list[WorkerHeartbeatOut]:
     """No Postgres involved — ``CurrentPrincipal`` alone is enough
@@ -82,3 +100,18 @@ async def market_status(session: PrincipalSession, redis: Redis) -> MarketStatus
         return await build_market_status(session, redis)
     except redis_exceptions.RedisError as exc:
         raise MarketStatusUnavailableError from exc
+
+
+@router.get(
+    "/latency",
+    response_model=LatencyOut,
+    summary="End-to-end latency budget: market -> decision -> admission -> fill",
+)
+async def latency(principal: CurrentPrincipal, redis: Redis) -> LatencyOut:
+    """No Postgres involved, same as ``/workers`` — every hop is read off a
+    heartbeat hash a worker already writes (``schemas/latency.py``)."""
+    del principal  # authentication only; VIEWER+ i.e. any authenticated member
+    try:
+        return await build_latency(redis)
+    except redis_exceptions.RedisError as exc:
+        raise LatencyUnavailableError from exc

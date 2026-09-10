@@ -22,7 +22,9 @@ from hunter_core.db.models.system import SystemEvent
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import MarketType, RiskEventSeverity
 from hunter_core.domain.market import NormalizedCandle
+from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
+from hunter_market_worker.latency import observe_flush_lag
 from hunter_market_worker.persist_rows import (
     flush_batch,
     load_market_ids,
@@ -246,6 +248,15 @@ async def drain_loop(
         queues.last_flush = queues.clock()
         queues.in_flight = False
         runtime.mark_success()
+        # T3.79: bar close -> "durably queued for the outbox" (the dispatcher's
+        # own wake-triggered publish, below, adds only its own publication on
+        # top). Every final candle *attempted* in this batch, not only the ones
+        # ``ON CONFLICT DO NOTHING`` actually inserted -- a redelivered minute
+        # is measured again, a known simplification for a diagnostic gauge
+        # (hunter_market_worker.latency module docstring).
+        observe_flush_lag(
+            (item for item in batch if isinstance(item, NormalizedCandle)), now=utcnow()
+        )
         # The events for everything this flush inserted are already committed
         # alongside their rows; all that is left is to let the dispatcher know
         # there is work, so a closed candle does not wait out its poll interval.

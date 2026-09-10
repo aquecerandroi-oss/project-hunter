@@ -50,6 +50,7 @@ from hunter_market_worker.coalesce import (
 from hunter_market_worker.coalesce import (
     flush_ticks as flush_ticks,
 )
+from hunter_market_worker.latency import observe_ingest_lag
 from hunter_market_worker.publication import publish
 
 if TYPE_CHECKING:
@@ -170,6 +171,10 @@ async def handle_event(
     elif isinstance(event, NormalizedTrade):
         if not await hot_state.push_trade(redis, event, trade_memory):
             return False
+        # T3.79: the exchange's own trade time (``ts``) to this process's
+        # parse-time receive (``received_at``) -- the ingest hop of the
+        # exchange-to-stream budget.
+        observe_ingest_lag("trade", event_ts=event.ts, received_at=event.received_at)
         coalescer.on_trade(event)
     elif isinstance(event, NormalizedOrderBook):
         coalescer.on_book(event)
@@ -184,6 +189,10 @@ async def handle_event(
         if not await hot_state.push_candle(redis, event, event_ts=event.event_ts):
             return False
         if event.is_final:
+            # T3.79: ``event_ts`` is the WS push time (Binance kline ``E``);
+            # a REST-backfilled candle has none and is counted, not measured
+            # (missing_timestamp) -- see hunter_market_worker.latency.
+            observe_ingest_lag("candle", event_ts=event.event_ts, received_at=event.received_at)
             # Durable (T2.9): queued here, published by the outbox once the
             # candle row itself has committed. The eager publish that used to
             # sit on this line put candles on the stream that a failed flush

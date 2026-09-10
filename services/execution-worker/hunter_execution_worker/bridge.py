@@ -40,6 +40,7 @@ from typing import TYPE_CHECKING
 from hunter_core.admission.sources import ProposalRequest
 from hunter_core.execution.paper import PaperExecutionAdapter
 from hunter_core.logging import get_logger
+from hunter_execution_worker import metrics
 from hunter_execution_worker.admission_cycle import RequestInputs, decide_requests
 from hunter_execution_worker.bridge_inputs import (
     liquidity_for,
@@ -204,6 +205,13 @@ async def _submit(
         return
     result.submitted = admitted[0]
     result.signal_id = screened.signal_id
+    # T3.79: the admission hop -- the signal's own emitted_at (agent_signals,
+    # read into ShadowSignal by bridge_repo) to this decision's decided_at.
+    # Only the autonomy path has a signal to time against; a manual request
+    # never reaches this function.
+    metrics.observe_admission_lag(
+        emitted_at=screened.signal.emitted_at, decided_at=admitted[0].decided_at
+    )
     count_outcome("approved" if admitted[0].approved else "rejected")
     logger.info(
         "bridge_proposal_submitted",

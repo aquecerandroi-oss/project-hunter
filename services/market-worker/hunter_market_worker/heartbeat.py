@@ -1,19 +1,17 @@
-"""Per-exchange heartbeat: ``hb:market:{exchange}`` hash, ``rt:system``
-pub/sub, and ``system_events`` on reconnect/adapter errors.
+"""Per-exchange heartbeat: ``hb:market:{exchange}`` hash, ``rt:system`` pub/sub, and
+``system_events`` on reconnect/adapter errors.
 
-docs/plans/M1.md T1.3 item 5. In addition to the generic
-``hb:{role}:{instance}`` the runtime already writes, this is the
-exchange-scoped heartbeat the API's ``/system/market-status`` and the
-frontend's live-status widget read.
+docs/plans/M1.md T1.3 item 5. In addition to the generic ``hb:{role}:{instance}`` the
+runtime already writes, this is the exchange-scoped heartbeat the API's
+``/system/market-status`` and the frontend's live-status widget read.
 
-**T2.5g — one heartbeat per shard.** With ``MARKET_SHARD=i/N`` and ``N > 1``
-this process writes ``hb:market:{exchange}:{i}of{N}`` and nothing else: N
-shards sharing one hash is what kept the 200 already-proven markets from
-being delivered in M1 (``.claude/state/milestone.json`` ``m1_result``) —
-whoever wrote last won, and a dead shard stayed invisible. The API unions the
-shard keys (``hunter_api.services.market_shards``) and says how many of the
-declared ``shard_total`` are actually reporting. ``N == 1`` is unchanged, key
-and payload alike.
+**T2.5g — one heartbeat per shard.** With ``MARKET_SHARD=i/N`` and ``N > 1`` this process
+writes ``hb:market:{exchange}:{i}of{N}`` and nothing else: N shards sharing one hash is
+what kept the 200 already-proven markets from being delivered in M1
+(``.claude/state/milestone.json`` ``m1_result``) — whoever wrote last won, and a dead
+shard stayed invisible. The API unions the shard keys (``hunter_api.services.
+market_shards``) and says how many of the declared ``shard_total`` are actually
+reporting. ``N == 1`` is unchanged, key and payload alike.
 """
 
 from __future__ import annotations
@@ -47,6 +45,7 @@ from hunter_market_worker.heartbeat_events import (
 from hunter_market_worker.heartbeat_events import (
     transition_event,
 )
+from hunter_market_worker.latency import heartbeat_fields as latency_heartbeat_fields
 from hunter_market_worker.supervision import connection_field, counter_delta, rest_gate_status
 
 if TYPE_CHECKING:
@@ -131,6 +130,8 @@ async def _write_hash(
         # this process's MARKET_SHARD.
         "shard_index": str(shard_index),
         "shard_total": str(shard_total),
+        # T3.79: ingest_lag_*/flush_lag_* -- see hunter_market_worker.latency.
+        **latency_heartbeat_fields(),
         "ts": now.isoformat(),
     }
     await cast(Any, redis).hset(key, mapping=mapping)
@@ -199,20 +200,17 @@ async def _safe_publish(
 ) -> bool:
     """Publish the heartbeat, degrading instead of raising. True if it landed.
 
-    T2.9/Astra: ``run_heartbeat`` is a ``forever()`` task in the market
-    ``TaskGroup``, so an exception out of these two writes cancels every
-    sibling — including the WebSocket ingestion that suspending REST
-    admissions exists to keep alive. A Redis outage must degrade this loop to
-    "no heartbeat published" (the hash then expires on its own TTL, so the API
-    correctly shows the worker as stale) exactly like a Postgres outage
-    already degrades it to "no system_events written" via
-    :func:`safe_record_system_event`. The next tick republishes the *current*
-    state, so the snapshot converges within ``HEARTBEAT_INTERVAL_S`` of the
-    outage ending. What a skipped tick does lose is a transition that both
-    happened and reverted during the outage: ``rt:system`` is a live feed with
-    no replay. The durable record of a connection transition is the
-    ``system_events`` row, which is written on the Postgres path and does not
-    depend on this succeeding.
+    T2.9/Astra: ``run_heartbeat`` is a ``forever()`` task in the market ``TaskGroup``, so
+    an exception out of these two writes cancels every sibling — including the WebSocket
+    ingestion that suspending REST admissions exists to keep alive. A Redis outage must
+    degrade this loop to "no heartbeat published" (the hash then expires on its own TTL,
+    so the API correctly shows the worker as stale) exactly like a Postgres outage already
+    degrades it to "no system_events written" via :func:`safe_record_system_event`. The
+    next tick republishes the *current* state, so the snapshot converges within
+    ``HEARTBEAT_INTERVAL_S`` of the outage ending. What a skipped tick does lose is a
+    transition that both happened and reverted during the outage: ``rt:system`` is a live
+    feed with no replay. The durable record of a connection transition is the
+    ``system_events`` row, written on the Postgres path, which does not depend on this.
     """
     try:
         await _write_hash(
