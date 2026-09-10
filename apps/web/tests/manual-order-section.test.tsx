@@ -1,8 +1,8 @@
 /**
  * T3.72b MEDIUM finding #2: `blockReason`'s priority order -- role (VIEWER)
- * first, then the wallet's own open state, then the kill switch -- each with
- * its own visible reason (never a bare disabled button, `manual-order-
- * section.tsx`'s own docstring).
+ * first, then the wallet's own open state, then the kill switch, then the
+ * linked risk profile (T3.72d) -- each with its own visible reason (never a
+ * bare disabled button, `manual-order-section.tsx`'s own docstring).
  */
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,6 +17,7 @@ const BASE = {
   orgId: "org-1",
   portfolioId: "wallet-1",
   maxStopDistancePct: "0.03",
+  riskProfileReason: null,
 };
 
 afterEach(cleanup);
@@ -83,5 +84,40 @@ describe("ManualOrderSection: blockReason priority", () => {
     expect(screen.queryByText(/requer o papel trader/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/carteira não está aberta/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/kill switch acionado/i)).not.toBeInTheDocument();
+  });
+
+  it("falls through to the risk-profile reason (T3.72d) once role, wallet and kill switch are all fine", () => {
+    render(
+      <ManualOrderSection
+        {...BASE}
+        canTrade
+        walletOpenReason={null}
+        killSwitchReason={null}
+        riskProfileReason="Carteira sem perfil de risco vinculado -- o motor não admite entradas até o vínculo (ACTIVATION.md §8b)."
+      >
+        <div />
+      </ManualOrderSection>,
+    );
+
+    const button = screen.getByRole("button", { name: "Nova ordem paper" });
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/carteira sem perfil de risco vinculado/i)).toBeInTheDocument();
+  });
+
+  it("shows the kill-switch reason ahead of the risk-profile reason when both block", () => {
+    render(
+      <ManualOrderSection
+        {...BASE}
+        canTrade
+        walletOpenReason={null}
+        killSwitchReason="Kill switch acionado (blocks_entries) -- novas entradas suspensas."
+        riskProfileReason="Carteira sem perfil de risco vinculado -- o motor não admite entradas até o vínculo (ACTIVATION.md §8b)."
+      >
+        <div />
+      </ManualOrderSection>,
+    );
+
+    expect(screen.getByText("Kill switch acionado (blocks_entries) -- novas entradas suspensas.")).toBeInTheDocument();
+    expect(screen.queryByText(/carteira sem perfil de risco vinculado/i)).not.toBeInTheDocument();
   });
 });

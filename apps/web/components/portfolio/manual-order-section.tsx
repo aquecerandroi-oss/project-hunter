@@ -13,6 +13,16 @@ export interface ManualOrderSectionProps {
   canTrade: boolean;
   walletOpenReason: string | null;
   killSwitchReason: string | null;
+  /**
+   * `riskProfileGateReason(riskLimits.preset)` (T3.72d) -- the wallet-level
+   * banner's own sentence (`risk-profile-banner.tsx`), repeated here: the
+   * execution-worker admits nothing while it is set (`risk_profile_missing`/
+   * `_invalid`/`_diverged`, `hunter_execution_worker.risk_profile`, T3.69b),
+   * so the button must say why alongside the wallet-open and kill-switch
+   * reasons, never leave a trader to file a request the engine will only
+   * ever leave pending.
+   */
+  riskProfileReason: string | null;
   maxStopDistancePct: string | null;
   /**
    * The requests table/empty-state, rendered by `portfolio/page.tsx` (a
@@ -27,11 +37,12 @@ export interface ManualOrderSectionProps {
 /**
  * "Nova ordem paper" action + the requests table (brief items 1-2). Gating
  * is layered, each with its own visible reason (never a bare disabled
- * button): role (TRADER+) first, then the wallet's own open/kill-switch
- * state -- all three read from GETs the screen already has, never a new
- * source of truth. The button stays visible and disabled (not hidden) for a
- * VIEWER, so a member without the role still sees the capability exists and
- * why it is off, matching `manual-order-form.tsx`'s own "short" treatment.
+ * button): role (TRADER+) first, then the wallet's own open state, then the
+ * kill switch, then the linked risk profile (T3.72d) -- all four read from
+ * GETs the screen already has, never a new source of truth. The button
+ * stays visible and disabled (not hidden) for a VIEWER, so a member without
+ * the role still sees the capability exists and why it is off, matching
+ * `manual-order-form.tsx`'s own "short" treatment.
  */
 export function ManualOrderSection({
   orgId,
@@ -39,6 +50,7 @@ export function ManualOrderSection({
   canTrade,
   walletOpenReason,
   killSwitchReason,
+  riskProfileReason,
   maxStopDistancePct,
   children,
 }: ManualOrderSectionProps) {
@@ -46,7 +58,7 @@ export function ManualOrderSection({
 
   const blockReason = !canTrade
     ? "Requer o papel Trader ou superior nesta organização."
-    : (walletOpenReason ?? killSwitchReason);
+    : (walletOpenReason ?? killSwitchReason ?? riskProfileReason);
   const canOpen = blockReason === null;
 
   return (

@@ -11,7 +11,9 @@ import { PortfolioHeader } from "@/components/portfolio/portfolio-header";
 import { PortfolioProposalsEmpty } from "@/components/portfolio/portfolio-proposals-empty";
 import { PortfolioResultCard } from "@/components/portfolio/portfolio-result-card";
 import { PortfolioRiskCard } from "@/components/portfolio/portfolio-risk-card";
+import { RiskProfileBanner } from "@/components/portfolio/risk-profile-banner";
 import { PORTFOLIO_STATUS_LABEL } from "@/components/portfolio/labels";
+import { riskProfileGateReason } from "@/components/portfolio/portfolio-format";
 import { SectionUnavailable } from "@/components/ui/section-unavailable";
 import { DEFAULT_AUTO_REFRESH_INTERVAL_MS } from "@/lib/auto-refresh-interval";
 import { isApiError } from "@/lib/api-error";
@@ -89,6 +91,13 @@ function reasonOf(error: unknown): string {
 
 interface ManualOrdersData {
   maxStopDistancePct: string | null;
+  /**
+   * `riskProfileGateReason(riskLimits.preset)` (T3.72d) -- `null` when the
+   * wallet's linked profile matches the engine's own `PAPER_V1`, the same
+   * fact both the wallet-level banner and the "Nova ordem paper" gate below
+   * read from this one GET, never two.
+   */
+  riskProfileReason: string | null;
   items: ManualOrderListItem[];
   asOf: string;
 }
@@ -112,6 +121,7 @@ async function loadManualOrdersSection(orgId: string, portfolioId: string): Prom
       ok: true,
       data: {
         maxStopDistancePct: riskLimits.preset.max_stop_distance_pct,
+        riskProfileReason: riskProfileGateReason(riskLimits.preset),
         items: ordersPage.items,
         // The list contract is a plain cursor page with no `as_of` of its
         // own (unlike `AsOfPage`'s reads) -- this is when the web server
@@ -164,6 +174,12 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
   ]);
 
   const canTrade = roleAtLeast(membership.role, "TRADER");
+  // One ternary for both fields the manual-orders read feeds downstream
+  // (brief items 1-2) -- never a second `manualOrders.ok ? ... : null` next
+  // to the first one, which would just repeat the same check.
+  const manualOrderGate = manualOrders.ok
+    ? { maxStopDistancePct: manualOrders.data.maxStopDistancePct, riskProfileReason: manualOrders.data.riskProfileReason }
+    : { maxStopDistancePct: null, riskProfileReason: null };
 
   return (
     <div className="flex flex-col gap-4">
@@ -174,6 +190,7 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
       ) : (
         <>
           <PortfolioHeader summary={result.data.summary} />
+          <RiskProfileBanner reason={manualOrderGate.riskProfileReason} />
           <div className="grid gap-4 lg:grid-cols-2">
             <PortfolioResultCard summary={result.data.summary} anchor={result.data.anchor} />
             <PortfolioRiskCard riskState={result.data.summary.risk_state} killSwitch={result.data.killSwitch} />
@@ -193,7 +210,8 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
                 ? `Kill switch bloqueando entradas${result.data.killSwitch.reason ? `: ${result.data.killSwitch.reason}` : "."}`
                 : null
             }
-            maxStopDistancePct={manualOrders.ok ? manualOrders.data.maxStopDistancePct : null}
+            maxStopDistancePct={manualOrderGate.maxStopDistancePct}
+            riskProfileReason={manualOrderGate.riskProfileReason}
           >
             {!manualOrders.ok ? (
               <SectionUnavailable title="Propostas" reason={manualOrders.reason} />

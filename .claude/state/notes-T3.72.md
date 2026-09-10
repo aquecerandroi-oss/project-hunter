@@ -214,3 +214,83 @@ substituíram os quatro chutes que não existiam. Header `Idempotency-Key` e o
 shape de `RiskDecision`/`Sizing` já estavam certos, sem mudança. `apps/api/**`
 só foi lido. Typecheck/lint/testes do `@hunter/web` verdes (121 arquivos,
 1138 testes); nenhum commit feito.
+
+## T3.72d — banner "perfil de risco divergente" + gate na Nova ordem paper (2026-09-10)
+
+`apps/api` (HEAD `718c347`, só lido): `RiskLimitsPresetOut.diverged_from_engine`
+(`schemas/risk_limits.py`) é `True` em dois casos que `services/risk_limits.py::_load_preset`
+distingue: `source="risk_profile"` com a linha divergindo campo a campo de `PAPER_V1`
+(`risk_profile_diverged` no worker), e `source="engine_default"` com a linha existindo mas não
+validando como `RiskLimits` (`risk_profile_invalid`, forçado `diverged=True` mesmo mostrando a
+constante). O terceiro motivo do worker, `risk_profile_missing` (`portfolios.risk_profile_id` NULL),
+não tem flag própria: é `source="engine_default"` com `diverged_from_engine=False`. `/risk-limits`
+**não** expõe a string do worker (`hb:execution:paper.risk_profile`) — só `source`/`diverged_from_engine`
+— então usei exatamente a proxy que o brief autoriza: `source !== "risk_profile"` para o "sem vínculo".
+
+**Onde entra.** `riskProfileGateReason(preset)` (novo, `components/portfolio/portfolio-format.ts`,
+puro, testado): `diverged_from_engine` → frase "perfil divergente" (cobre `_diverged` e `_invalid`
+juntos, corretamente — em ambos o motor não admite nada); senão `source !== "risk_profile"` → frase
+"sem vínculo"; senão `null` (perfil vinculado e igual ao motor, nada a avisar). Uma função, dois
+consumidores, nunca duas frases que podem divergir entre si:
+1. **Banner na Carteira** (`components/portfolio/risk-profile-banner.tsx`, novo, Server Component,
+   `data-testid="risk-profile-banner"`): renderizado logo após `PortfolioHeader` em
+   `portfolio/page.tsx`, usando o mesmo GET `/risk-limits` que `loadManualOrdersSection` já fazia para
+   `max_stop_distance_pct` — nenhuma chamada nova. Retorna `null` (nada no DOM) quando o motivo é
+   `null` ou quando a leitura de `/risk-limits` falhou (honesto: não inventa estado a partir de um erro).
+2. **Gate da "Nova ordem paper"** (`manual-order-section.tsx`): novo prop `riskProfileReason`, quarto
+   elo da cadeia já existente (`!canTrade` > `walletOpenReason` > `killSwitchReason` >
+   `riskProfileReason`) — mesma frase do banner, nunca uma segunda redação.
+
+**Tipos.** Este HEAD do `apps/api` já manda `diverged_from_engine`, mas
+`packages/shared-types/src/generated/api.d.ts` (gerado por `pnpm gen:types` →
+`uv run python infra/scripts/dump_openapi.py`, fora de `apps/web/**` e fora do escopo desta tarefa)
+ainda não foi regenerado — `grep diverged_from_engine` nele não acha nada. Resolvido só dentro de
+`apps/web`: `lib/api/portfolio-types.ts` define `RiskLimitsPreset` como
+`components["schemas"]["RiskLimitsPresetOut"] & { diverged_from_engine: boolean }`, e `RiskLimits`
+passou a `Omit<..., "preset"> & { preset: RiskLimitsPreset }` (o aninhado dentro de `RiskLimitsOut`
+não enxergava o alias por conta própria — primeira tentativa falhou no `tsc`, corrigida). **Concern**:
+quando o `api.d.ts` for regenerado por quem tem escopo lá, este `Omit`/intersection vira redundante e
+deve cair fora (comentário no arquivo já diz isso).
+
+**Complexidade.** `PortfolioPage` bateu `complexity 14` (máximo 12) na primeira versão (um `&&` para
+o banner + uma segunda ocorrência do ternário `manualOrders.ok ? ... : null`). Corrigido calculando
+`manualOrderGate` uma vez (um único ternário devolvendo `{ maxStopDistancePct, riskProfileReason }`)
+e deixando o banner se autoproteger contra `reason === null` em vez de um `&&` no JSX — `lint` limpo
+de novo (0 erros, os 2 warnings pré-existentes de tamanho de arquivo em `tests/lab-page.test.tsx`/
+`tests/ws.test.ts`, não tocados).
+
+### Comandos (todos em primeiro plano, `C:/dev/project-hunter`, `timeout 290`)
+
+```
+npx turbo run typecheck --filter=@hunter/web
+  → 1ª rodada: erro TS2345 (preset aninhado sem diverged_from_engine) — corrigido com o Omit acima.
+  → 2ª rodada: OK.
+
+npx turbo run lint --filter=@hunter/web
+  → 1ª rodada: 0 erros, 3 warnings (2 pré-existentes + complexity 14 em PortfolioPage, novo).
+  → 2ª rodada (após manualOrderGate): 0 erros, 2 warnings (só os pré-existentes de tamanho de arquivo).
+
+npx turbo run test --filter=@hunter/web
+  → 122 arquivos, 1147 testes, todos verdes (108.9s) — inclui os novos
+    tests/risk-profile-banner.test.tsx (3) e os casos novos em
+    tests/manual-order-section.test.tsx (2) e tests/portfolio-format.test.ts (4).
+
+npx vitest run tests/manual-order-section.test.tsx (rodado à parte de apps/web/)
+  → 1 arquivo, 6 testes, verdes.
+```
+
+### Arquivos (git status --porcelain, só os meus)
+
+```
+ M apps/web/app/(app)/[orgSlug]/portfolio/page.tsx
+ M apps/web/components/portfolio/manual-order-section.tsx
+ M apps/web/components/portfolio/portfolio-format.ts
+ M apps/web/lib/api/portfolio-types.ts
+ M apps/web/tests/manual-order-section.test.tsx
+ M apps/web/tests/portfolio-format.test.ts
+?? apps/web/components/portfolio/risk-profile-banner.tsx
+?? apps/web/tests/risk-profile-banner.test.tsx
+```
+
+Nenhum commit feito. `apps/api/**` não foi tocado (só lido, conforme instruído). Nada em `.env*` tocado.
+`git stash`/`checkout --`/`restore`/`reset`/`clean`/`commit -a` não usados.

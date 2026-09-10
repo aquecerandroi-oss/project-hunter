@@ -45,9 +45,35 @@ export type Peak = components["schemas"]["PeakOut"];
  * for whether entries are actually blocked right now. */
 export type KillSwitchDetail = components["schemas"]["KillSwitchOut"];
 
-/** `GET .../risk/limits` (T3.72) -- the numeric `paper_v1` preset the "Nova ordem paper" form needs (`max_stop_distance_pct`), plus the wallet's current usage against it. */
-export type RiskLimits = components["schemas"]["RiskLimitsOut"];
-export type RiskLimitsPreset = components["schemas"]["RiskLimitsPresetOut"];
+/**
+ * `RiskLimitsPresetOut` (`apps/api/hunter_api/schemas/risk_limits.py`) plus
+ * `diverged_from_engine` (T3.69b/T3.72d), added here by hand: the generated
+ * `packages/shared-types/src/generated/api.d.ts` at this HEAD (`718c347`)
+ * still predates that field -- regenerating it runs `uv run python
+ * infra/scripts/dump_openapi.py` (`pnpm gen:types`) and writes outside
+ * `apps/web/**`, out of this task's scope. Drop this intersection once the
+ * generated type carries the field itself.
+ */
+export type RiskLimitsPreset = components["schemas"]["RiskLimitsPresetOut"] & {
+  /** True when the wallet's stored profile is not byte-for-byte `PAPER_V1`
+   * (or does not validate as a profile at all) -- the execution-worker
+   * admits nothing in either case (`risk_profile_diverged`/`risk_profile_invalid`,
+   * `services/execution-worker/hunter_execution_worker/risk_profile.py`). */
+  diverged_from_engine: boolean;
+};
+
+/**
+ * `GET .../risk/limits` (T3.72) -- the numeric `paper_v1` preset the "Nova
+ * ordem paper" form needs (`max_stop_distance_pct`), plus the wallet's
+ * current usage against it. `preset` is overridden with the hand-augmented
+ * `RiskLimitsPreset` above (`components["schemas"]["RiskLimitsOut"]["preset"]`
+ * on its own still points at the stale generated `RiskLimitsPresetOut`,
+ * unaware of this file's own alias by the same name) -- everything else is
+ * exactly the generated shape.
+ */
+export type RiskLimits = Omit<components["schemas"]["RiskLimitsOut"], "preset"> & {
+  preset: RiskLimitsPreset;
+};
 
 export interface AsOfPage<T> {
   as_of: string;

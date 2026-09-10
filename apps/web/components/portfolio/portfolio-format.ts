@@ -30,6 +30,33 @@ export function brlUnavailableLabel(reason: string): string {
   return BRL_REASON_LABELS[reason] ?? `motivo não catalogado: ${reason}`;
 }
 
+/**
+ * `RiskLimitsPresetOut` (T3.72d): the sentence for the wallet's own Risk
+ * profile banner and, unchanged, for the "Nova ordem paper" gate -- one
+ * function, both call sites, so the two never drift apart.
+ *
+ * `/risk-limits` does not carry the execution-worker's own
+ * `risk_profile_missing`/`risk_profile_invalid`/`risk_profile_diverged`
+ * reason (`hunter_execution_worker.risk_profile`, T3.69b); only
+ * `preset.source` and `preset.diverged_from_engine` travel over the wire.
+ * `diverged_from_engine` alone already covers both `_invalid` (forced
+ * `true` with `source="engine_default"`, an unreadable row) and
+ * `_diverged` (`source="risk_profile"`, a row that validates but differs
+ * from `PAPER_V1`); `source !== "risk_profile"` with the flag `false` is
+ * the third case, `_missing` (no `risk_profile_id` at all) -- the proxy
+ * this task's brief allows in the absence of a dedicated reason field.
+ */
+const RISK_PROFILE_DIVERGED_MESSAGE =
+  "Os limites mostrados não são os que o motor aplica -- perfil divergente; procedimento no ACTIVATION.md §8b.";
+const RISK_PROFILE_MISSING_MESSAGE =
+  "Carteira sem perfil de risco vinculado -- o motor não admite entradas até o vínculo (ACTIVATION.md §8b).";
+
+export function riskProfileGateReason(preset: { source: string; diverged_from_engine: boolean }): string | null {
+  if (preset.diverged_from_engine) return RISK_PROFILE_DIVERGED_MESSAGE;
+  if (preset.source !== "risk_profile") return RISK_PROFILE_MISSING_MESSAGE;
+  return null;
+}
+
 /** Semantic color for a signed decimal string -- neutral when the value is absent or exactly zero (a flat result is not a gain), never colored as if it were a real number. */
 export function signColorClass(value: string | null): string {
   if (value === null) return "text-fg-muted";

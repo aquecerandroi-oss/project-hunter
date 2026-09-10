@@ -5,6 +5,7 @@ import {
   formatPctOrUnavailable,
   killSwitchBadgeVariant,
   killSwitchLabel,
+  riskProfileGateReason,
   signColorClass,
   unavailableLabel,
 } from "@/components/portfolio/portfolio-format";
@@ -96,5 +97,28 @@ describe("killSwitchLabel / killSwitchBadgeVariant", () => {
   it("gives WARNING the warning variant and ACTIVE the default", () => {
     expect(killSwitchBadgeVariant("WARNING")).toBe("warning");
     expect(killSwitchBadgeVariant("ACTIVE")).toBe("default");
+  });
+});
+
+describe("riskProfileGateReason (T3.72d): never shows a limit the engine does not apply", () => {
+  it("is null when the linked profile matches the engine (source=risk_profile, not diverged)", () => {
+    expect(riskProfileGateReason({ source: "risk_profile", diverged_from_engine: false })).toBeNull();
+  });
+
+  it("names the missing-link case (source=engine_default, not diverged -- risk_profile_missing proxy)", () => {
+    const reason = riskProfileGateReason({ source: "engine_default", diverged_from_engine: false });
+    expect(reason).toMatch(/sem perfil de risco vinculado/i);
+    expect(reason).toMatch(/ACTIVATION\.md §8b/);
+  });
+
+  it("names the divergence case when the linked row differs from PAPER_V1 (source=risk_profile, diverged)", () => {
+    const reason = riskProfileGateReason({ source: "risk_profile", diverged_from_engine: true });
+    expect(reason).toMatch(/perfil divergente/i);
+    expect(reason).toMatch(/ACTIVATION\.md §8b/);
+  });
+
+  it("also treats the unreadable-row case as divergence (source=engine_default, forced diverged=true)", () => {
+    const reason = riskProfileGateReason({ source: "engine_default", diverged_from_engine: true });
+    expect(reason).toMatch(/perfil divergente/i);
   });
 });
