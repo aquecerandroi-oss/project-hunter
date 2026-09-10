@@ -38,6 +38,7 @@ from sqlalchemy import select, text
 from hunter_api.auth.principal import Principal
 from hunter_api.auth.rbac import OrgContext
 from hunter_api.services import admission
+from hunter_api.settings import ApiSettings
 from hunter_core.admission.service import admit
 from hunter_core.admission.sources import ProposalRequest
 from hunter_core.db.models.markets import Asset, Exchange, Market
@@ -80,6 +81,11 @@ STOP = Decimal("29000")
 # ([0,3 %, 3 %]) — ``STOP`` above (3,33 %) is refused by design, everywhere
 # else in this file, and deliberately so (see ``TestFilingAndDeciding``).
 STOP_APPROVABLE = LAST_PRICE - Decimal("300")
+DEFAULT_MAX_PENDING = ApiSettings.model_fields["manual_order_max_pending_per_portfolio"].default
+"""T3.68c: read off the real field default rather than hardcoded twice, so a
+call to ``admission.file_manual_order`` made directly (bypassing the router,
+which reads it from ``settings``) still asks for exactly what a real caller
+would get."""
 COSTS = AssumedCosts(
     spread_bps=Decimal(2), slippage_bps=Decimal(5), fee_bps=Decimal(4), max_entry_delay_s=60
 )
@@ -684,6 +690,93 @@ class TestApprovedGeometry:
         assert Decimal(sizing["qty"]) > 0
 
 
+class TestPendingCap:
+    """T3.68c — ``MANUAL_ORDER_MAX_PENDING_PER_PORTFOLIO``.
+
+    Exercised against the real, unmodified default (``ApiSettings``'s field
+    default — read by reflection here, never hardcoded twice, so this test
+    cannot silently drift from the value ``settings.py`` documents) rather
+    than a smaller cap injected into the test app: ``conftest.py``'s
+    ``api_settings`` fixture builds one ``ApiSettings()`` per test and there
+    is no seam today to override a single field on it without duplicating
+    every other required secret that fixture supplies — smaller in scope, and
+    it proves the number a caller would actually see in production.
+    """
+
+    CAP = DEFAULT_MAX_PENDING
+
+    async def test_reaching_the_cap_is_a_named_409_and_a_decided_one_frees_a_slot(
+        self,
+        client: httpx.AsyncClient,
+        session_factory: async_sessionmaker[AsyncSession],
+        redis_client: redis_asyncio.Redis,
+        wallet: Wallet,
+        market: Market368,
+    ) -> None:
+        org_id = wallet.actor.org_id
+        assert org_id is not None
+        # T3.68b finding 4/RISK_ENGINE.md §7.1: the ticker's own ``ts`` must be
+        # inside ``max_price_age_s`` (10 s) of *this request's* clock, not the
+        # test's start — with a real cap of 20, a loop of sequential HTTP round
+        # trips against testcontainers Postgres/Redis is not reliably faster
+        # than that, so the ticker is rewritten fresh before every call.
+        first_ids: list[uuid.UUID] = []
+        for i in range(self.CAP):
+            await _write_ticker(redis_client, market.exchange, market.symbol)
+            filed = await client.post(
+                wallet.base,
+                json=_body(market.market_id),
+                headers={
+                    **wallet.actor.headers,
+                    "Idempotency-Key": f"t368c-fill-{i}-{uuid.uuid4().hex[:8]}",
+                },
+            )
+            assert filed.status_code == 202, filed.text
+            first_ids.append(uuid.UUID(filed.json()["request_id"]))
+
+        # One more undecided request, past the cap, is refused by name —
+        # never a 500 — and nothing new was written for this wallet.
+        await _write_ticker(redis_client, market.exchange, market.symbol)
+        refused = await client.post(
+            wallet.base,
+            json=_body(market.market_id),
+            headers={
+                **wallet.actor.headers,
+                "Idempotency-Key": f"t368c-over-{uuid.uuid4().hex[:8]}",
+            },
+        )
+        assert refused.status_code == 409, refused.text
+        assert refused.headers["content-type"].startswith("application/problem+json")
+        assert "too_many_pending_requests" in refused.json()["detail"]
+
+        async with tenant_session(session_factory, org_id, wallet.actor.user_id) as session:
+            pending_count = (
+                await session.execute(
+                    text(
+                        "SELECT count(*) FROM trade_proposals WHERE organization_id = :org "
+                        "AND portfolio_id = :pf AND source = 'manual' AND status = 'pending'"
+                    ),
+                    {"org": org_id, "pf": wallet.portfolio_id},
+                )
+            ).scalar_one()
+        assert pending_count == self.CAP
+
+        # Deciding one of the pending requests frees a slot: a decided request
+        # no longer counts toward the cap.
+        await _decide(session_factory, wallet, market, first_ids[0])
+
+        await _write_ticker(redis_client, market.exchange, market.symbol)
+        after_decision = await client.post(
+            wallet.base,
+            json=_body(market.market_id),
+            headers={
+                **wallet.actor.headers,
+                "Idempotency-Key": f"t368c-after-decision-{uuid.uuid4().hex[:8]}",
+            },
+        )
+        assert after_decision.status_code == 202, after_decision.text
+
+
 async def _insert_arena_portfolio(
     session_factory: async_sessionmaker[AsyncSession], actor: Actor
 ) -> uuid.UUID:
@@ -755,6 +848,7 @@ class TestReplayAcrossWallets:
                 stop=STOP,
                 assumed_costs=COSTS,
                 now=utcnow(),
+                max_pending=DEFAULT_MAX_PENDING,
             )
         assert not first.decided
 
@@ -774,5 +868,6 @@ class TestReplayAcrossWallets:
                     stop=STOP,
                     assumed_costs=COSTS,
                     now=utcnow(),
+                    max_pending=DEFAULT_MAX_PENDING,
                 )
         assert "order_replay_conflict" in str(exc_info.value)

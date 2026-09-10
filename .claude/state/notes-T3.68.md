@@ -499,3 +499,189 @@ sem relação com T3.68/T3.68b.
 **Não toquei:** `apps/web/**`, `packages/risk-core/**`,
 `services/execution-worker/**`, `apps/api/hunter_api/settings.py` (achado 8,
 declarado T3.68c), nenhum `.env*`.
+
+---
+
+# T3.68c — teto de pedidos manuais pendentes por carteira (achado 8 do T3.68b)
+
+**Status:** DONE.
+
+## 1. O que foi implementado
+
+- `ApiSettings.manual_order_max_pending_per_portfolio` (padrão 20,
+  `apps/api/hunter_api/settings.py`) — documentado inline; **não** escrito em
+  `.env.example` porque este despacho proíbe tocar qualquer `.env*` (registrado
+  como limitação conhecida no próprio docstring do campo).
+- `hunter_api.services.admission.file_manual_order` ganhou o parâmetro
+  obrigatório `max_pending: int`. O teto é checado **dentro do mesmo `INSERT`**
+  que arquiva o pedido, nunca num `SELECT count(*)` separado antes: o `INSERT`
+  virou `INSERT ... SELECT ... WHERE (SELECT count(*) FROM trade_proposals
+  WHERE organization_id = :org AND portfolio_id = :pf AND source = 'manual'
+  AND status = 'pending') < :cap`. Zero linhas inseridas (`result.rowcount ==
+  0`) é o sinal de "carteira cheia" — nomeado, nunca um 500 — e nunca se
+  confunde com a violação de unicidade da chave de idempotência (essa continua
+  levantando `IntegrityError`, um caminho totalmente separado).
+- `TooManyPendingRequestsError` (409, `type_slug="too-many-pending-requests"`,
+  `detail` carrega `reason: too_many_pending_requests`) — nova, em
+  `services/admission_audit.py` (não em `admission.py`: colocá-la lá estourava
+  o orçamento de 350 linhas; `admission_audit.py` já era "por que uma escrita
+  falhou", a mesma família de `integrity_reason`).
+- `services/orders.py::file_order` e `routers/orders.py` passam
+  `max_pending=settings.manual_order_max_pending_per_portfolio` adiante — o
+  mesmo padrão que `routers/markets.py` já usa para `market_stale_after_s`
+  (`Depends(get_settings)`, valor lido uma vez, passado como argumento
+  explícito ao serviço, nunca lido de dentro dele).
+
+## 2. Por que nunca uma corrida deixa passar o 21º pedido (quase)
+
+O brief pediu para usar o lock/`SELECT ... FOR UPDATE` por carteira já
+existente, **ou** declarar por que uma corrida benigna é aceitável para papel.
+Não existe nenhum dos dois em `admission.py` hoje — conferido por grep
+(`advisory_lock|pg_advisory|FOR UPDATE` em `apps/api` e `packages`, zero
+ocorrências fora do comentário que **explica por que não há um**): desde
+`0007_paper_roles`, `hunter_app` perdeu `UPDATE`/`DELETE` em `trade_proposals`,
+então um `SELECT ... FOR UPDATE` sob esse papel é erro de permissão, não espera
+de lock (comentário "Unlocked" já existente, section T3.5c). E
+`docs/SPEC_REVIEW.md` R7 já decidiu, para todo o produto, **sem locks
+consultivos de sessão** — o motivo é o pooler (Neon/PgBouncer em modo
+*transaction*): um lock de sessão (`pg_advisory_lock`) sobrevive a uma conexão
+que o pooler pode devolver a outro chamador no meio do que pareceria ser a
+mesma "sessão". Um lock **de transação** (`pg_advisory_xact_lock`) seria seguro
+sob esse modo de pooling (é liberado no `COMMIT`/`ROLLBACK`, que é exatamente o
+limite do pooler) — mas introduzir *qualquer* lock novo no vocabulário do
+produto é uma decisão de arquitetura (`database-architect`/
+`risk-engine-guardian`), não um "fix cirúrgico" cabível neste despacho, que
+não me dá permissão para tocar `packages/risk-core/**` nem para inventar
+convenções novas fora do escopo.
+
+**A solução que ficou:** uma única instrução (`INSERT ... SELECT ... WHERE
+<count> < :cap`) em vez de duas (`SELECT count(*)` depois `INSERT`) — isso
+fecha a janela óbvia (não há mais um instante entre "eu contei 19" e "eu
+inserí o 20º" *para esta conexão*), mas duas conexões genuinamente
+concorrentes ainda podem, cada uma, avaliar a subquery antes de a outra ter
+commitado a sua própria linha (MVCC: uma linha não commitada não é visível
+para a subquery da outra transação) — as duas passam, o teto estoura por
+exatamente o tamanho da concorrência real.
+
+**Por que isso é aceitável para papel:** (1) o caminho manual é um humano
+clicando um botão numa tela — concorrência genuína na casa de milissegundos,
+na mesma carteira, contra a mesma chave de idempotência diferente, não é um
+padrão de uso real, é um teste de estresse; (2) mesmo se acontecer, nada é
+perdido nem corrompido — cada linha extra ainda passa pelo motor de risco de
+verdade um segundo depois, exatamente como qualquer outro pedido; (3) é
+dinheiro de papel. O teto existe para conter um operador (ou um bug de
+cliente) que empilha pedidos sem parar, não para ser uma garantia
+criptográfica de exclusão mútua.
+
+## 3. TDD — testes escritos primeiro, vistos falhar pelo motivo certo
+
+Unitários (`apps/api/tests/unit/test_admission_adapter.py`,
+`TestThePerPortfolioPendingCap`, e `test_orders_service.py`,
+`TestManualOrderMaxPendingPerPortfolioSetting`) escritos antes da
+implementação; rodados e vistos falhar com `TypeError: file_manual_order() got
+an unexpected keyword argument 'max_pending'` (o parâmetro ainda não existia)
+antes de qualquer código de produção mudar. `RecordingSession` (o dublê de
+sessão desses testes) ganhou um `_FakeResult(rowcount=...)` porque o produto
+agora lê `result.rowcount` depois do `INSERT` — sem isso os testes existentes
+quebravam com `AttributeError` num `None`, então o dublê foi atualizado junto
+(não é um teste novo, é o mesmo dublê ficando honesto sobre o que a função real
+agora faz com o retorno de `execute()`).
+
+Integração (`test_manual_orders.py::TestPendingCap`): dois achados reais,
+achados pelo próprio teste, corrigidos antes de reportar:
+
+- **Teste esqueceu de repassar `max_pending`** em
+  `TestReplayAcrossWallets::test_same_key_two_wallets_is_409_never_500`, que
+  chama `admission.file_manual_order` direto (sem passar pelo router) —
+  `TypeError: missing 1 required keyword-only argument`. Corrigido com uma
+  constante `DEFAULT_MAX_PENDING = ApiSettings.model_fields[...].default`
+  (nunca hardcoded duas vezes) passada nas duas chamadas diretas do arquivo.
+- **Ticker ficava obsoleto no meio do laço de 20 requisições.** O teto real
+  (20) exige 20 `POST`s sequenciais contra Postgres/Redis via testcontainers;
+  a suíte inteira já leva ~2 min, e o limite de idade do ticker
+  (`max_price_age_s`, 10 s, RISK_ENGINE §7.1) estourava antes do laço
+  terminar — `422 spot_ticker_stale` em vez do `202` esperado. Corrigido
+  reescrevendo o ticker (`_write_ticker`) a cada iteração do laço, não uma vez
+  antes dele.
+
+Depois dos dois consertos: `TestPendingCap` cobre as duas metades do achado 8 —
+`test_reaching_the_cap_is_a_named_409_and_a_decided_one_frees_a_slot` enche o
+teto real (20) de pedidos indecisos, confere que o 21º é 409 nomeado
+(`too_many_pending_requests`) e que nada novo foi escrito (`SELECT count(*)`
+direto no banco == 20), depois decide um dos vinte
+(`hunter_core.admission.service.admit`, o mesmo caminho de produção do
+worker) e confere que a vaga libera — um pedido *decidido* não conta mais.
+
+## 4. `admission.py` estourou 350 linhas — resolvido por split, não por prosa curta demais
+
+A implementação inicial (docstring completa explicando a corrida + a nova
+exceção *dentro* de `admission.py`) chegou a 395 linhas. Resolvido em duas
+frentes, na ordem que o CLAUDE.md pede ("split by responsibility, not by line
+count", só depois enxugar prosa):
+
+1. `TooManyPendingRequestsError` mudou de `admission.py` para
+   `services/admission_audit.py` — o mesmo módulo que T3.68b já tinha criado
+   para tirar de `admission.py` exatamente esta classe de coisa ("por que uma
+   escrita falha/é recusada", ao lado de `integrity_reason`). Reexportada por
+   `admission.py` (`from .admission_audit import TooManyPendingRequestsError`
+   + `__all__`), então `adapter.TooManyPendingRequestsError` nos testes
+   continua funcionando sem mudança de import nos consumidores.
+2. A prosa da docstring de `file_manual_order` sobre a corrida foi enxugada
+   várias vezes (de ~30 linhas para 5), com o raciocínio completo movido para
+   aqui (§2 acima) em vez de duplicado em comentário de código.
+
+Resultado: `admission.py` 349 linhas, `admission_audit.py` 122 linhas.
+
+## 5. Comandos e saídas reais
+
+```
+cd apps/api && uv run pytest tests/unit/test_admission_adapter.py tests/unit/test_orders_service.py -q
+  40 passed in 0.62s
+
+cd apps/api && uv run pytest tests/unit -q
+  553 passed in 68.21s   (suíte inteira; 6 a mais que o fim do T3.68b — os
+                          testes novos deste achado, nada quebrou)
+
+cd apps/api && uv run pytest tests/integration/test_manual_orders.py -q -p no:randomly
+  11 passed in 134.93s   (Postgres + Redis reais; 1 teste a mais,
+                          TestPendingCap, que exercita o teto real de 20)
+
+uv run ruff check <9 arquivos meus>              → All checks passed!
+uv run ruff format --check <os mesmos>            → 8 files already formatted
+uv run pyright <os mesmos>                        → 0 errors, 0 warnings
+uv run python infra/scripts/check_file_size.py
+  scanned 596 files; 0 over budget, 0 grandfathered
+```
+
+Uma corrida anterior de `pyright apps/api` (o pacote inteiro, não só os meus
+arquivos) mostrou 11 erros pré-existentes em `test_lab_signals_pagination_api.py`
+e `test_risk_limits_api.py` — nenhum dos dois é meu arquivo, nenhum dos dois
+citado neste despacho; não mexi.
+
+## 6. Arquivos criados/modificados (`git status --porcelain`, só os meus)
+
+```
+ M apps/api/hunter_api/routers/orders.py
+ M apps/api/hunter_api/services/admission.py
+ M apps/api/hunter_api/services/admission_audit.py
+ M apps/api/hunter_api/services/orders.py
+ M apps/api/hunter_api/settings.py
+ M apps/api/tests/integration/test_manual_orders.py
+ M apps/api/tests/unit/test_admission_adapter.py
+ M apps/api/tests/unit/test_orders_service.py
+ M docs/RISK_ENGINE.md
+ M .claude/state/notes-T3.68.md
+```
+
+Fora desta lista, no mesmo `git status --porcelain` (não são meus — outro
+agente trabalhando em paralelo na mesma árvore, tarefa alheia a T3.68/T3.68b/
+T3.68c): `apps/api/hunter_api/schemas/risk_limits.py`,
+`apps/api/hunter_api/services/risk_limits.py`,
+`apps/api/tests/integration/test_risk_limits_api.py` — os mesmos que
+apareceram na corrida de `pyright apps/api` do pacote inteiro (§5), não
+tocados por mim.
+
+**Não toquei:** `apps/web/**`, `services/**`, `packages/risk-core/**`,
+nenhum `.env*` (inclusive `.env.example` — o valor default de
+`MANUAL_ORDER_MAX_PENDING_PER_PORTFOLIO` não está documentado lá por essa
+razão, só no docstring do campo em `settings.py`). Não fiz `git commit`.

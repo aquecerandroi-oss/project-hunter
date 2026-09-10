@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, Header, Query, status
 
 from hunter_api.auth.rbac import OrgContext, require_org
-from hunter_api.deps import OrgSession, get_redis
+from hunter_api.deps import OrgSession, get_redis, get_settings
 from hunter_api.errors import HunterError
 from hunter_api.repositories.base import MAX_PAGE_SIZE
 from hunter_api.schemas.common import CursorPage
@@ -47,6 +47,8 @@ if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from hunter_api.settings import ApiSettings
+
 router = APIRouter(
     prefix="/api/v1/orgs/{org_id}/portfolios/{portfolio_id}/order-requests", tags=["orders"]
 )
@@ -54,6 +56,7 @@ router = APIRouter(
 ViewerOrg = Annotated[OrgContext, Depends(require_org(OrganizationRole.VIEWER))]
 TraderOrg = Annotated[OrgContext, Depends(require_org(OrganizationRole.TRADER))]
 Redis = Annotated["redis_asyncio.Redis", Depends(get_redis)]
+Settings = Annotated["ApiSettings", Depends(get_settings)]
 _IDEMPOTENCY_KEY_PATTERN = r"^[A-Za-z0-9_.:-]+$"
 """T3.68b finding 7: a restricted charset, no whitespace. Without it a caller
 could send a key padded with leading/trailing spaces that ``admission_key``
@@ -125,6 +128,7 @@ async def file_manual_order_route(
     context: TraderOrg,
     session: OrgSession,
     redis: Redis,
+    settings: Settings,
     portfolio_id: uuid.UUID,
     body: ManualOrderCreate,
     idempotency_key: IdempotencyKey,
@@ -133,11 +137,13 @@ async def file_manual_order_route(
     (documented deviation from "200 or 202": one status keeps the response
     shape the only thing a caller has to branch on). A *different* order under
     the same key is a 409 (``OrderReplayConflictError``); the wallet never
-    opened is a 409 (``WalletNotOpenError``); anything about the market or the
-    direction that keeps this from ever becoming a proposal is a 422
-    (``OrderRefusedError``, reason named in ``detail``). None of these reach
-    this function as anything but the ``HunterError`` the global handler
-    already renders as problem+json.
+    opened is a 409 (``WalletNotOpenError``); the wallet already has
+    ``settings.manual_order_max_pending_per_portfolio`` undecided manual
+    requests pending is a 409 (``TooManyPendingRequestsError``, T3.68c);
+    anything about the market or the direction that keeps this from ever
+    becoming a proposal is a 422 (``OrderRefusedError``, reason named in
+    ``detail``). None of these reach this function as anything but the
+    ``HunterError`` the global handler already renders as problem+json.
     """
     await _owned(session, context, portfolio_id)
     return await file_order(
@@ -148,6 +154,7 @@ async def file_manual_order_route(
         idempotency_key=idempotency_key,
         body=body,
         now=utcnow(),
+        max_pending=settings.manual_order_max_pending_per_portfolio,
     )
 
 

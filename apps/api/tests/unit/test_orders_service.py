@@ -22,6 +22,7 @@ from hunter_api.services.orders_derive import (
     costs_from_ticker,
     spot_eligibility_reason,
 )
+from hunter_api.settings import ApiSettings
 from hunter_core.domain.enums import MarketStatus, MarketType, TradeDirection
 from hunter_core.strategies.base import assumed_costs as strategy_assumed_costs
 from hunter_core.strategies.breakout_v1 import BreakoutV1
@@ -208,3 +209,17 @@ class TestCostsFromTicker:
         _, manual_costs = result
         strategy_costs = strategy_assumed_costs(BreakoutV1.default_parameters)
         assert manual_costs.slippage_bps == strategy_costs.slippage_bps == MANUAL_ORDER_SLIPPAGE_BPS
+
+
+class TestManualOrderMaxPendingPerPortfolioSetting:
+    """T3.68c — the setting a bare ``ApiSettings()`` falls back to, and the one
+    an env var overrides, the same way every other integer field on this class
+    already works (``rate_limit_per_minute`` et al.)."""
+
+    def test_the_default_is_20(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("MANUAL_ORDER_MAX_PENDING_PER_PORTFOLIO", raising=False)
+        assert ApiSettings().manual_order_max_pending_per_portfolio == 20
+
+    def test_an_env_var_overrides_it(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("MANUAL_ORDER_MAX_PENDING_PER_PORTFOLIO", "5")
+        assert ApiSettings().manual_order_max_pending_per_portfolio == 5

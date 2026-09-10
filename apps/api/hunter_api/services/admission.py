@@ -58,14 +58,18 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import status
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from hunter_api.errors import HunterError
-from hunter_api.services.admission_audit import integrity_reason, record_filing_audit
+from hunter_api.services.admission_audit import (
+    TooManyPendingRequestsError,
+    integrity_reason,
+    record_filing_audit,
+)
 from hunter_core.admission.dedupe import IdempotencyConflict, find_admitted, find_pending
 from hunter_core.admission.sources import (
     OriginRefused,
@@ -82,6 +86,7 @@ if TYPE_CHECKING:
     from datetime import datetime
     from decimal import Decimal
 
+    from sqlalchemy.engine import CursorResult
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from hunter_api.auth.rbac import OrgContext
@@ -93,6 +98,7 @@ __all__ = [
     "FiledRequest",
     "OrderRefusedError",
     "OrderReplayConflictError",
+    "TooManyPendingRequestsError",
     "WalletNotOpenError",
     "file_manual_order",
 ]
@@ -169,6 +175,7 @@ async def file_manual_order(
     stop: Decimal,
     assumed_costs: AssumedCosts,
     now: datetime,
+    max_pending: int,
     requested_notional: Decimal | None = None,
 ) -> FiledRequest:
     """Record one operator order as a pending request. The engine decides it.
@@ -176,6 +183,12 @@ async def file_manual_order(
     Idempotent by ``(organization_id, idempotency_key)``: filing the same order
     twice returns the row that already exists — decided or not — and filing a
     *different* order under the same key is a 409, never a silent overwrite.
+
+    ``max_pending`` (T3.68c) caps this wallet's undecided requests, checked
+    inside this ``INSERT`` — never a separate ``SELECT count(*)`` first (would
+    reopen the race "Unlocked" below accepts). A benign race across two truly
+    concurrent connections remains (no lock available here) — accepted for
+    paper, reasoning in ``notes-T3.68.md`` §T3.68c.
     """
     try:
         request = ProposalRequest(
@@ -257,23 +270,30 @@ async def file_manual_order(
 
     proposal_id = uuid7()
     try:
-        await session.execute(
-            text(
-                "INSERT INTO trade_proposals (id, organization_id, portfolio_id, market_id, "
-                "direction, status, idempotency_key, request_payload, source, created_at) "
-                "VALUES (:id, :org, :pf, :market, :direction, 'pending', :key, "
-                "CAST(:payload AS jsonb), 'manual', :now)"
+        # Only ``CursorResult`` carries ``rowcount`` (``outbox_store.py``, same cast).
+        result = cast(
+            "CursorResult[Any]",
+            await session.execute(
+                text(
+                    "INSERT INTO trade_proposals (id, organization_id, portfolio_id, market_id, "
+                    "direction, status, idempotency_key, request_payload, source, created_at) "
+                    "SELECT :id, :org, :pf, :market, :direction, 'pending', :key, "
+                    "CAST(:payload AS jsonb), 'manual', :now "
+                    "WHERE (SELECT count(*) FROM trade_proposals WHERE organization_id = :org "
+                    "AND portfolio_id = :pf AND source = 'manual' AND status = 'pending') < :cap"
+                ),
+                {
+                    "id": proposal_id,
+                    "org": context.org_id,
+                    "pf": portfolio_id,
+                    "market": market_id,
+                    "direction": direction.value,
+                    "key": key,
+                    "payload": json.dumps(payload),
+                    "now": now,
+                    "cap": max_pending,
+                },
             ),
-            {
-                "id": proposal_id,
-                "org": context.org_id,
-                "pf": portfolio_id,
-                "market": market_id,
-                "direction": direction.value,
-                "key": key,
-                "payload": json.dumps(payload),
-                "now": now,
-            },
         )
     except IntegrityError as exc:
         if IDEMPOTENCY_CONSTRAINT in str(exc.orig):
@@ -284,6 +304,8 @@ async def file_manual_order(
         raise OrderRefusedError(
             f"order could not be filed (reason: {integrity_reason(exc.orig)})"
         ) from exc
+    if result.rowcount == 0:
+        raise TooManyPendingRequestsError(portfolio_id=portfolio_id, max_pending=max_pending)
     await record_filing_audit(request=request, proposal_id=proposal_id, key=key, payload=payload)
     return FiledRequest(
         proposal_id=proposal_id,

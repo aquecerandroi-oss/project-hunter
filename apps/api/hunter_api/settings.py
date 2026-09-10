@@ -77,6 +77,20 @@ class ApiSettings(Settings):
     streamed — the header is written by the client, and a chunked upload sends
     none at all."""
 
+    manual_order_max_pending_per_portfolio: int = 20
+    """How many manual paper order requests (``trade_proposals``, ``source =
+    'manual'``, ``status = 'pending'`` — filed, not yet decided) one wallet may
+    have outstanding at once (T3.68c, ``notes-T3.68.md`` §T3.68b finding 8).
+    Enforced by :func:`hunter_api.services.admission.file_manual_order`, inside
+    the same ``INSERT`` that files the request, against a 409 named
+    ``too_many_pending_requests``. A decided request (approved, rejected,
+    expired, executed or failed) never counts, no matter how it was decided —
+    only a row still awaiting the engine's pass does. Not documented in
+    ``.env.example``: this task's dispatch forbids touching any ``.env*``
+    file; ``MANUAL_ORDER_MAX_PENDING_PER_PORTFOLIO`` follows the same
+    ``UPPER_SNAKE_CASE`` env var name as every other field here and can be set
+    the same way once that file is next touched by someone allowed to."""
+
     webhook_claim_stale_s: float = 300.0
     """How long a ``processed_events`` claim may sit unfinished before a
     redelivery may take it over. This is what turns a process killed between

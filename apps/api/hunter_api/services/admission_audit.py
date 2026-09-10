@@ -19,6 +19,11 @@ the uncommitted T3.68 diff, ``.claude/state/notes-T3.68.md``):
   is the row that carries the real operator's identity, written in the
   caller's own transaction through the sink ``hunter_api.deps.org_session``
   already bound.
+
+T3.68c adds a third tenant of the same kind: :class:`TooManyPendingRequestsError`
+is *why a write is refused before it is even attempted* — the same family as
+:func:`integrity_reason`, just for a business rule rather than a constraint —
+kept here rather than in ``admission.py`` for the same 350-line reason.
 """
 
 from __future__ import annotations
@@ -26,13 +31,34 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
+from fastapi import status
+
+from hunter_api.errors import HunterError
 from hunter_core.audit import AuditEvent, get_audit_sink
 from hunter_core.strategies.canonical import params_hash
 
 if TYPE_CHECKING:
     from hunter_core.admission.sources import ProposalRequest
 
-__all__ = ["integrity_reason", "record_filing_audit"]
+__all__ = ["TooManyPendingRequestsError", "integrity_reason", "record_filing_audit"]
+
+
+class TooManyPendingRequestsError(HunterError):
+    """409 — the wallet already has ``max_pending`` undecided manual requests
+    pending (T3.68c). A decided one never counts again."""
+
+    def __init__(self, *, portfolio_id: uuid.UUID, max_pending: int) -> None:
+        super().__init__(
+            type_slug="too-many-pending-requests",
+            title="Conflict",
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"portfolio {portfolio_id} already has {max_pending} undecided manual order "
+                "requests pending (reason: too_many_pending_requests); wait for one to be "
+                "decided before filing another"
+            ),
+        )
+
 
 _INTEGRITY_REASONS: dict[str, str] = {
     "fk_trade_proposals_organization_id_organizations": "organization_unknown",

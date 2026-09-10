@@ -66,15 +66,26 @@ def context() -> OrgContext:
     return OrgContext(org_id=uuid.uuid4(), role=OrganizationRole.OWNER, principal=principal)
 
 
+@dataclass(frozen=True)
+class _FakeResult:
+    """Stands in for the ``CursorResult`` the real INSERT returns — T3.68c: the
+    cap is enforced by making the ``INSERT`` conditional (``INSERT ... SELECT
+    ... WHERE <count> < :cap``), so the production code reads ``.rowcount`` to
+    tell "filed" (1) from "the wallet is full" (0) apart."""
+
+    rowcount: int
+
+
 class RecordingSession:
     """A session that only remembers the statement it was handed."""
 
-    def __init__(self) -> None:
+    def __init__(self, insert_rowcount: int = 1) -> None:
         self.statements: list[tuple[str, dict[str, Any]]] = []
+        self._insert_rowcount = insert_rowcount
 
     async def execute(self, statement: Any, params: dict[str, Any] | None = None) -> Any:
         self.statements.append((str(statement), params or {}))
-        return None
+        return _FakeResult(self._insert_rowcount)
 
 
 @dataclass(frozen=True)
@@ -114,6 +125,7 @@ async def file_order(
         "stop": Decimal("97.5"),
         "assumed_costs": COSTS,
         "now": NOW,
+        "max_pending": 20,
     }
     fields.update(overrides)
     # The double is a session only in the one method this adapter calls, which is
@@ -280,6 +292,47 @@ class TestTheOriginIsAlwaysManual:
         filed = await file_order(monkeypatch, idempotency_key="k")
 
         assert filed.idempotency_key.startswith(f"{ProposalSource.MANUAL.value}:")
+
+
+class TestThePerPortfolioPendingCap:
+    """T3.68c — ``MANUAL_ORDER_MAX_PENDING_PER_PORTFOLIO``, enforced inside the
+    same ``INSERT`` that files the request (never a separate ``SELECT count(*)``
+    beforehand: that would be exactly the two-statement TOCTOU this module's own
+    ``file_manual_order`` docstring already avoids for the idempotency check).
+    """
+
+    async def test_the_insert_carries_the_cap_and_counts_only_manual_pending(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        session = RecordingSession()
+
+        await file_order(monkeypatch, session=session, max_pending=7)
+
+        sql, params = session.statements[0]
+        assert "INSERT INTO trade_proposals" in sql
+        assert "SELECT count(*)" in sql or "SELECT count(*)".lower() in sql.lower()
+        assert "source = 'manual'" in sql
+        assert "status = 'pending'" in sql
+        assert params["cap"] == 7
+
+    async def test_a_full_wallet_is_refused_by_name_never_a_500(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        session = RecordingSession(insert_rowcount=0)
+
+        with pytest.raises(adapter.TooManyPendingRequestsError) as refusal:
+            await file_order(monkeypatch, session=session, max_pending=20)
+
+        assert refusal.value.status_code == 409
+        assert "too_many_pending_requests" in str(refusal.value)
+
+    async def test_room_left_still_files_the_request(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        session = RecordingSession(insert_rowcount=1)
+
+        filed = await file_order(monkeypatch, session=session, max_pending=20)
+
+        assert filed.status is ProposalStatus.PENDING
+        assert filed.decided is False
 
 
 class TestTheManualOrderIsBornPaper:

@@ -162,6 +162,7 @@ async def file_order(
     idempotency_key: str,
     body: ManualOrderCreate,
     now: datetime,
+    max_pending: int,
 ) -> ManualOrderOut:
     """Derive, then file through :func:`hunter_api.services.admission.file_manual_order`.
 
@@ -192,6 +193,7 @@ async def file_order(
         stop=body.stop,
         assumed_costs=costs,
         now=now,
+        max_pending=max_pending,
         requested_notional=body.requested_notional,
     )
     row = await _load_row(
