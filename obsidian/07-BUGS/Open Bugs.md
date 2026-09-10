@@ -43,6 +43,25 @@ Consultas em `infra/scripts/sql/research/2026-09-10-t373-q0{0..4}-*.sql`, todas 
   é ainda maior e **não está na base**. Sem dono nesta tarefa (T3.73 é só medição); o candidato
   natural é o custo por barra do roster (21 versões decidindo em 232 mercados em 09/09, contra 14
   versões e 12 mercados em 01/09).
+  **Atualização T3.74 (2026-09-10, 01:48 BRT / 04:48Z):** o atraso continua alto (mediana 94–207 s
+  hora a hora entre 09/09 23:00Z e 10/09 04:00Z) e **começou a subir na noite de 08/09, antes dos
+  dois deploys do dia** (`d21a11d` 09/09 12:19 BRT, `572d3b6` 18:36 BRT) — às 08/09 00:00Z a mediana
+  já era 11,9 s e fechou o dia em 87–110 s, então os dois deploys não são a causa isolada. **Achado
+  novo, confirmado por grep**: o portão que existe para exatamente este cenário —
+  `replay/budget.py::live_lane_degraded`, escrito, testado e documentado como "checado antes de toda
+  fatia" — **nunca era chamado** por `replay/run.py` (nem no dreno da fila nem na invocação direta),
+  então um replay/backfill continuava fatiando no orçamento cheio mesmo com a linha viva agonizando.
+  `replay_runs` mostra o dreno praticamente sem folga (93,7 % de uma hora ocupada às 10/09 03:00Z) e
+  `docker stats` pegou `hunter-postgres-1` em 178 % de CPU num instante *sem* replay rodando — a
+  linha viva sozinha, com 11 versões ativas sobre 200 mercados perpétuos monitorados e sem cache de
+  contexto entre versões da mesma barra (`context.py`/`decide.py`), já pressiona o Postgres que
+  qualquer replay concorrente satura. **Corrigido nesta tarefa**: `_drain` e o caminho direto de
+  `replay/run.py` agora chamam o portão antes de consumir a fila/rodar a fatia (testes cobrindo os
+  dois ramos). **Ressalva importante**: o portão só lê `outbox_lag_s` e o heartbeat, nunca o atraso
+  decisão-menos-barra — no instante da medição `outbox_lag_s` estava em 0,0 com heartbeat fresco, ou
+  seja, o portão teria dito "saudável" durante o pior período já visto. A causa dominante do atraso
+  segue sem correção: custo N×M por barra e um portão cego ao próprio sintoma — plano em
+  `.claude/state/brief-T3.74b-consumer-lag-e-custo-por-barra.md`.
 - **LOW — a sonda de elegibilidade divide a janela de 50 entradas com o universo spot.**
   `eligibility.universe_changed_after` lê as `PROBE_ENTRIES = 50` entradas mais recentes de
   `market.universe.changed` e casa por `envelope.key`. O spot publica com chave própria

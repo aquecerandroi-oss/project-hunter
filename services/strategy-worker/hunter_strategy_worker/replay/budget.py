@@ -46,6 +46,8 @@ from hunter_core.logging import get_logger
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
 
+    from hunter_core.settings import Settings
+
 logger = get_logger(__name__)
 
 QUEUE_KEY = "replay:queue"
@@ -60,6 +62,7 @@ __all__ = [
     "live_lane_degraded",
     "load_budget",
     "queue_depth",
+    "refuse_direct_run",
     "take_next",
     "workers_for",
 ]
@@ -169,6 +172,22 @@ async def live_lane_degraded(
     if lag > budget.outbox_lag_max_s:
         return f"outbox_lag:{lag:.0f}s"
     return None
+
+
+async def refuse_direct_run(settings: Settings, budget: ReplayBudget) -> str | None:
+    """:func:`live_lane_degraded`, for a direct (non-queued) invocation (T3.74).
+
+    A queue drain already holds one Redis client for the whole loop; a single
+    ``--version``/``--from``/``--to`` run has none in hand, so this opens and
+    closes its own just for the check.
+    """
+    from hunter_core.redis import create_redis
+
+    redis = create_redis(settings)
+    try:
+        return await live_lane_degraded(redis, budget)
+    finally:
+        await redis.aclose()
 
 
 @dataclass(frozen=True, slots=True)

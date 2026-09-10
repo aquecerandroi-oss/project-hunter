@@ -55,7 +55,9 @@ from hunter_core.settings import Settings
 from hunter_strategy_worker.replay.budget import (
     ReplayBudget,
     ReplayRequest,
+    live_lane_degraded,
     load_budget,
+    refuse_direct_run,
     take_next,
     workers_for,
 )
@@ -253,7 +255,13 @@ async def _plan_from(args: argparse.Namespace, cohort: str, factory: Any) -> Run
 
 
 async def _drain(args: argparse.Namespace, budget: ReplayBudget) -> list[ReplayRun]:
-    """Take up to ``--max-runs`` requests off the queue and run them."""
+    """Take up to ``--max-runs`` requests off the queue and run them.
+
+    Checked **before** ``take_next``, not after (T3.74): the readiness gate
+    existed and was tested but nothing here ever called it, so a drain kept
+    slicing at full budget while live decision lag passed two minutes on
+    09-10/09; checking after would pop a request and then lose it.
+    """
     from hunter_core.redis import create_redis
 
     settings = Settings()
@@ -264,6 +272,10 @@ async def _drain(args: argparse.Namespace, budget: ReplayBudget) -> list[ReplayR
         factory = create_session_factory(engine)
         limit = min(int(args.max_runs), budget.max_concurrent_runs)
         for _ in range(max(1, limit)):
+            reason = await live_lane_degraded(redis, budget)
+            if reason is not None:
+                logger.warning("replay_drain_paused_live_lane_degraded", reason=reason)
+                break
             request: ReplayRequest | None = await take_next(redis, key=budget.queue_key)
             if request is None:
                 break
@@ -304,6 +316,9 @@ async def _main(argv: list[str] | None = None) -> int:
         raise SystemExit("--version, --from and --to are required without --drain-queue")
     cohort = str(args.cohort) if args.cohort else ShadowCohort.replay(uuid.uuid4())
     settings = Settings()
+    if not args.dry_run and (reason := await refuse_direct_run(settings, budget)) is not None:
+        sys.stdout.write(f"refused: live lane degraded ({reason})\n")
+        return 1
     engine = create_engine(settings)
     try:
         plan = await _plan_from(args, cohort, create_session_factory(engine))

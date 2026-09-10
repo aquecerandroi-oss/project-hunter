@@ -31,6 +31,7 @@ from hunter_strategy_worker.replay.budget import (
     ReplayBudget,
     ReplayRequest,
     live_lane_degraded,
+    refuse_direct_run,
     workers_for,
 )
 from hunter_strategy_worker.replay.environment import (
@@ -291,6 +292,57 @@ class TestReadinessGate:
     async def test_the_gate_can_be_turned_off_deliberately(self) -> None:
         budget = ReplayBudget(pause_on_degraded=False)
         assert await live_lane_degraded(cast("Any", _FakeRedis({})), budget, now=self.NOW) is None
+
+
+class _ClosingFakeRedis(_FakeRedis):
+    """``_FakeRedis`` plus a spy on ``aclose`` (:func:`refuse_direct_run` owns its client)."""
+
+    def __init__(self, fields: dict[str, str] | None = None) -> None:
+        super().__init__(fields)
+        self.closed = False
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+class TestRefuseDirectRun:
+    """The same gate, wired for a one-off ``--version``/``--from``/``--to`` run (T3.74).
+
+    Before this, only :data:`live_lane_degraded` itself was reachable from a test:
+    nothing in ``replay/run.py`` ever called it, on either entry point (T3.74
+    notes §2).
+    """
+
+    async def test_a_healthy_lane_returns_no_reason_and_closes_the_client(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # No ``now=`` on this path (it reads the real heartbeat), so the fixture
+        # heartbeat has to be fresh against the wall clock, not a frozen date.
+        fresh = (datetime.now(UTC)).isoformat()
+        fake = _ClosingFakeRedis({"ts": fresh, "outbox_lag_s": "0"})
+
+        def fake_create_redis(settings: object) -> _ClosingFakeRedis:
+            del settings
+            return fake
+
+        monkeypatch.setattr("hunter_core.redis.create_redis", fake_create_redis)
+        reason = await refuse_direct_run(cast("Any", object()), ReplayBudget())
+        assert reason is None
+        assert fake.closed is True
+
+    async def test_a_degraded_lane_is_reported_and_the_client_still_closes(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fake = _ClosingFakeRedis({})
+
+        def fake_create_redis(settings: object) -> _ClosingFakeRedis:
+            del settings
+            return fake
+
+        monkeypatch.setattr("hunter_core.redis.create_redis", fake_create_redis)
+        reason = await refuse_direct_run(cast("Any", object()), ReplayBudget())
+        assert reason == "heartbeat_missing"
+        assert fake.closed is True
 
 
 class TestQueue:
