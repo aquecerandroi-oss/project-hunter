@@ -19,6 +19,7 @@ from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_strategy_worker.config import HEARTBEAT_KEY
+from hunter_strategy_worker.metrics import decision_lag_percentiles
 from hunter_strategy_worker.tracking_repo import load_open_trackings
 
 if TYPE_CHECKING:
@@ -43,6 +44,7 @@ async def write_heartbeat(
     open_trackings: int | None = None,
 ) -> None:
     """One ``HSET`` + ``EXPIRE`` of ``hb:strategy:shadow``."""
+    lag_p50, lag_p95 = decision_lag_percentiles()
     payload = {
         "ts": utcnow().isoformat(),
         "instance": runtime.instance,
@@ -56,6 +58,11 @@ async def write_heartbeat(
         "last_iteration": (
             consumer.last_iteration_at.isoformat() if consumer.last_iteration_at else ""
         ),
+        # T3.74c: the bar-close-to-persisted-decision latency this process has
+        # actually seen, last 500 signals -- see metrics.py for why this is
+        # not read out of the Prometheus histogram instead.
+        "decision_lag_p50_s": "" if lag_p50 is None else f"{lag_p50:.1f}",
+        "decision_lag_p95_s": "" if lag_p95 is None else f"{lag_p95:.1f}",
     }
     await cast("Any", runtime.redis).hset(HEARTBEAT_KEY, mapping=payload)
     await runtime.redis.expire(HEARTBEAT_KEY, TTL_S)

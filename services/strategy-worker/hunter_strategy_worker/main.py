@@ -17,10 +17,11 @@ from typing import TYPE_CHECKING
 from hunter_core.db.session import create_session_factory
 from hunter_core.logging import get_logger
 from hunter_strategy_worker.config import load_config
-from hunter_strategy_worker.consumer import ConsumerHealth, run_consumer, run_outcomes
+from hunter_strategy_worker.consumer import ConsumerHealth, run_consumer
 from hunter_strategy_worker.health import migration_present, readiness_checks
 from hunter_strategy_worker.heartbeat import run_heartbeat
 from hunter_strategy_worker.outbox import OutboxHealth, run_outbox
+from hunter_strategy_worker.outcome_sweep import run_outcomes
 
 if TYPE_CHECKING:
     from hunter_core.runtime import WorkerRuntime

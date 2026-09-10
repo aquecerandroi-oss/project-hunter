@@ -10,6 +10,7 @@ deterministic and the slot barrier has already moved past the bar.
 from __future__ import annotations
 
 import asyncio
+import functools
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -21,23 +22,16 @@ from hunter_core.domain.types import utcnow
 from hunter_core.events.consume import ack, consume
 from hunter_core.events.streams import Streams
 from hunter_core.logging import get_logger
-from hunter_strategy_worker import slots
 from hunter_strategy_worker.config import CONSUMER_GROUP
 from hunter_strategy_worker.context_cache import load_family_readers
 from hunter_strategy_worker.decide import evaluate_slot, versions_for_bar
+from hunter_strategy_worker.dispatch import BarDispatcher, market_key
 from hunter_strategy_worker.metrics import (
     shadow_bars_skipped_total,
-    shadow_trackings_open,
-    shadow_trackings_unswept,
+    shadow_stage_seconds,
     shadow_version_failed_total,
 )
-from hunter_strategy_worker.outcomes import advance_tracking
 from hunter_strategy_worker.repo import load_market
-from hunter_strategy_worker.tracking_repo import (
-    count_open_trackings,
-    load_open_trackings,
-    load_tracking,
-)
 from hunter_strategy_worker.versions import VersionCache
 
 if TYPE_CHECKING:
@@ -47,7 +41,6 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from hunter_core.runtime import WorkerRuntime
-    from hunter_core.settings import Settings
     from hunter_strategy_worker.config import ShadowConfig
 
 logger = get_logger(__name__)
@@ -102,7 +95,6 @@ __all__ = [
     "ConsumerHealth",
     "handle_candle",
     "run_consumer",
-    "run_outcomes",
 ]
 
 
@@ -173,17 +165,29 @@ async def handle_candle(
         shadow_bars_skipped_total.labels(reason=f"market_type:{candle.market_type.value}").inc()
         return
     bar_close = candle.close_time
+    backlog_s = (clock() - bar_close).total_seconds()
+    if backlog_s > config.late_delay_backlog_max_s:
+        # Safety valve, not the fix (T3.74c, ShadowConfig.late_delay_backlog_max_s
+        # docstring) — a bar this far behind would almost always end up
+        # ``no_entry: late:delay`` even fully evaluated, so during a real
+        # backlog this stops paying load_market/context/evaluate for every
+        # due version just to reach that same conclusion later and slower.
+        shadow_bars_skipped_total.labels(reason="late_delay_backlog").inc()
+        logger.warning("shadow_bar_skipped_late_backlog", backlog_s=f"{backlog_s:.0f}")
+        return
     due = versions_for_bar(await versions.get(factory), bar_close)
     if not due:
         return
-    async with role_session(factory, db_role="hunter_worker") as session:
-        market = await load_market(session, candle.exchange, candle.symbol, candle.market_type)
+    with shadow_stage_seconds.labels(stage="market_lookup").time():
+        async with role_session(factory, db_role="hunter_worker") as session:
+            market = await load_market(session, candle.exchange, candle.symbol, candle.market_type)
     if market is None:
         logger.warning("shadow_market_unknown", exchange=candle.exchange, symbol=candle.symbol)
         return
-    family_readers = await load_family_readers(
-        factory, due, market=market, bar_close=bar_close, config=config
-    )
+    with shadow_stage_seconds.labels(stage="family_preload").time():
+        family_readers = await load_family_readers(
+            factory, due, market=market, bar_close=bar_close, config=config
+        )
     for version in due:
         try:
             evaluation = await evaluate_slot(
@@ -224,6 +228,16 @@ async def run_consumer(
 ) -> None:
     """Consume closed candles forever.
 
+    **Bounded concurrency across markets, serial within one (T3.74c).** Up to
+    ``config.worker_concurrency`` bars run at once, one per distinct market
+    (:mod:`hunter_strategy_worker.dispatch`, docstring there for the measured
+    burst this answers) — the read loop itself only blocks on the semaphore,
+    never on a bar's own handling, so a slow bar no longer holds up reading
+    the next one for a *different* market off the stream. ``claim_idle_ms``
+    (``config.claim_idle_ms``) is passed through to ``consume()`` instead of
+    its own default -- see ``ShadowConfig.claim_idle_ms`` for the arithmetic
+    and why a dispatcher-aware value matters here (T3.74d).
+
     Two independent failure budgets, because they are different failures: one
     unreadable message is skipped (it must not block the stream), while an error
     from the *iteration itself* — Redis restarting, a dropped connection, the
@@ -232,8 +246,28 @@ async def run_consumer(
     """
     versions = VersionCache(config.version_refresh_s)
     consumer = f"strategy-worker@{runtime.instance}"
+    dispatcher = BarDispatcher(config.worker_concurrency)
     backoff = RESTART_BACKOFF_S
     health.started_at = utcnow()
+
+    async def _handle_and_ack(message_id: str, envelope: Any) -> None:
+        try:
+            await handle_candle(
+                factory,
+                redis,
+                payload=envelope.payload,
+                versions=versions,
+                config=config,
+                health=health,
+            )
+        except Exception:
+            health.errors += 1
+            runtime.mark_error()
+            logger.exception("shadow_candle_handling_failed", event_id=str(envelope.event_id))
+            return
+        await ack(redis, Streams.MARKET_CANDLES_CLOSED, CONSUMER_GROUP, message_id, envelope)
+        runtime.mark_success()
+
     while True:
         try:
             async for message_id, envelope in consume(
@@ -242,35 +276,27 @@ async def run_consumer(
                 CONSUMER_GROUP,
                 consumer,
                 block_ms=CONSUME_BLOCK_MS,
+                claim_idle_ms=config.claim_idle_ms,
             ):
                 health.touch()
                 backoff = RESTART_BACKOFF_S
-                try:
-                    await handle_candle(
-                        factory,
-                        redis,
-                        payload=envelope.payload,
-                        versions=versions,
-                        config=config,
-                        health=health,
-                    )
-                except Exception:
-                    health.errors += 1
-                    runtime.mark_error()
-                    logger.exception(
-                        "shadow_candle_handling_failed", event_id=str(envelope.event_id)
-                    )
-                    continue
-                await ack(
-                    redis, Streams.MARKET_CANDLES_CLOSED, CONSUMER_GROUP, message_id, envelope
+                shadow_stage_seconds.labels(stage="queue_wait").observe(
+                    max(0.0, (utcnow() - envelope.ts).total_seconds())
                 )
-                runtime.mark_success()
+                await dispatcher.submit(
+                    market_key(envelope.payload),
+                    message_id,
+                    functools.partial(_handle_and_ack, message_id, envelope),
+                )
             # ``consume()`` is an infinite generator; reaching here means it
-            # stopped without raising. Back off rather than spin, and say so.
+            # stopped without raising. Every bar already accepted gets to
+            # finish before the backoff sleep, not just abandoned mid-flight.
+            await dispatcher.drain()
             logger.warning("shadow_consumer_stream_ended", backoff_s=backoff)
             await asyncio.sleep(backoff)
             backoff = min(RESTART_BACKOFF_MAX_S, backoff * 2)
         except asyncio.CancelledError:
+            await dispatcher.cancel_all()
             raise
         except Exception:
             runtime.mark_error()
@@ -279,61 +305,7 @@ async def run_consumer(
             backoff = min(RESTART_BACKOFF_MAX_S, backoff * 2)
 
 
-async def sweep_outcomes(
-    factory: async_sessionmaker[AsyncSession],
-    config: ShadowConfig,
-    *,
-    blocked: frozenset[str] = frozenset(),
-    now: datetime | None = None,
-) -> int:
-    """Advance up to ``SWEEP_LIMIT`` open trackings once.
-
-    Returns how many of the ones it *visited* are still open. The pass is
-    bounded (``tracking_repo.SWEEP_LIMIT``), and the rows past the bound would
-    otherwise be indistinguishable from a quiet market, so the backlog is
-    published as ``hunter_shadow_trackings_unswept`` rather than left invisible.
-    """
-    async with role_session(factory, db_role="hunter_worker") as session:
-        pending = await load_open_trackings(session)
-        total_open = await count_open_trackings(session)
-    unswept = max(0, total_open - len(pending))
-    shadow_trackings_unswept.set(unswept)
-    if unswept:
-        logger.warning("shadow_sweep_incomplete", visited=len(pending), unswept=unswept)
-    still_open = 0
-    for tracking in pending:
-        async with role_session(factory, db_role="hunter_worker") as session:
-            await slots.lock_slot(
-                session,
-                strategy_version_id=tracking.strategy_version_id,
-                market_id=tracking.market_id,
-                cohort=str(tracking.meta.get("cohort") or config.cohort),
-            )
-            fresh = await load_tracking(session, tracking.signal_id)
-            if fresh is None:
-                continue
-            result = await advance_tracking(session, fresh, config=config, blocked=blocked, now=now)
-            if not result.finished:
-                still_open += 1
-    shadow_trackings_open.set(still_open)
-    return still_open
-
-
-async def run_outcomes(
-    factory: async_sessionmaker[AsyncSession],
-    runtime: WorkerRuntime,
-    config: ShadowConfig,
-    settings: Settings,
-) -> None:
-    """The outcome sweep loop. Postgres down is a backoff, never a death."""
-    blocked = frozenset(s.upper() for s in settings.market_universe_blocklist)
-    while True:
-        try:
-            await sweep_outcomes(factory, config, blocked=blocked)
-            runtime.mark_success()
-        except Exception:
-            runtime.mark_error()
-            logger.exception("shadow_outcome_sweep_failed")
-            await asyncio.sleep(min(60.0, config.outcome_poll_s * 6))
-            continue
-        await asyncio.sleep(config.outcome_poll_s)
+# ``sweep_outcomes``/``run_outcomes`` moved to :mod:`hunter_strategy_worker.outcome_sweep`
+# in T3.74c — a separate responsibility (advancing already-open trackings on
+# their own timer) from consuming the candle stream, split out when the
+# bar-dispatch work above grew past this file's own budget.

@@ -9,13 +9,19 @@ strategy look identical.
 
 from __future__ import annotations
 
-from prometheus_client import Counter, Gauge
+from collections import deque
+
+from prometheus_client import Counter, Gauge, Histogram
 
 from hunter_core.observability import registry
 
 __all__ = [
+    "decision_lag_percentiles",
+    "observe_decision_lag",
     "shadow_bars_skipped_total",
+    "shadow_decision_lag_seconds",
     "shadow_evaluations_total",
+    "shadow_stage_seconds",
     "shadow_version_failed_total",
     "shadow_funding_unresolved_total",
     "shadow_outbox_dispatched_total",
@@ -123,3 +129,57 @@ shadow_versions_unrunnable = Gauge(
 """``runnable == 0`` with ``active > 0`` is the failure the readiness check
 turns red on; the per-reason gauge is what shows a *partly* dead roster, which
 one surviving version would otherwise hide."""
+
+shadow_decision_lag_seconds = Histogram(
+    "hunter_shadow_decision_lag_seconds",
+    "Time from a bar's close to its persisted decision -- the in-process "
+    "twin of `agent_signals.emitted_at - supporting_features.observation_ts` "
+    "(T3.74c), observed once per signal actually written, not per evaluation.",
+    buckets=(0.5, 1, 2, 3, 5, 8, 13, 21, 34, 60, 90, 120, 180, 300),
+    registry=registry,
+)
+
+shadow_stage_seconds = Histogram(
+    "hunter_shadow_stage_seconds",
+    "Wall time of one stage of handle_candle, by stage, so a p95 violation "
+    "of hunter_shadow_decision_lag_seconds names its own cause instead of a "
+    "single end-to-end number. Stages: queue_wait (stream publish to pickup), "
+    "market_lookup, family_preload (T3.74b context cache), context_load "
+    "(per version), persist (slot lock through outbox write).",
+    ["stage"],
+    buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0),
+    registry=registry,
+)
+
+_LAG_SAMPLE_WINDOW = 500
+"""Bounded reservoir for the heartbeat's own p50/p95 (T3.74c).
+
+Prometheus already has the full histogram (`shadow_decision_lag_seconds`), but
+reading a quantile out of it needs a Prometheus server (`histogram_quantile`)
+this worker does not run. The heartbeat (`hb:strategy:shadow`) is read directly
+with `HGETALL` on the VPS, no scrape needed, so it keeps its own small window
+purely for that -- last 500 persisted signals, in memory, lost on restart like
+every other `ConsumerHealth` counter.
+"""
+
+_decision_lag_samples: deque[float] = deque(maxlen=_LAG_SAMPLE_WINDOW)
+
+
+def observe_decision_lag(seconds: float) -> None:
+    """Record one bar-close-to-persisted-decision latency, in both places."""
+    shadow_decision_lag_seconds.observe(seconds)
+    _decision_lag_samples.append(seconds)
+
+
+def decision_lag_percentiles() -> tuple[float | None, float | None]:
+    """p50/p95 of the last :data:`_LAG_SAMPLE_WINDOW` persisted signals.
+
+    ``None`` for both before the first signal of this process's lifetime --
+    never ``0.0``, which would read as "instantaneous" instead of "unknown".
+    """
+    if not _decision_lag_samples:
+        return None, None
+    ordered = sorted(_decision_lag_samples)
+    p50 = ordered[int(0.50 * (len(ordered) - 1))]
+    p95 = ordered[int(0.95 * (len(ordered) - 1))]
+    return p50, p95

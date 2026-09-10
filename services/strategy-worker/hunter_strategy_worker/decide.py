@@ -40,7 +40,12 @@ from hunter_strategy_worker.context import build_market_context
 from hunter_strategy_worker.eligibility import universe_changed_after
 from hunter_strategy_worker.episodes import SlotState, next_slot
 from hunter_strategy_worker.identity import signal_id
-from hunter_strategy_worker.metrics import shadow_evaluations_total, shadow_signals_total
+from hunter_strategy_worker.metrics import (
+    observe_decision_lag,
+    shadow_evaluations_total,
+    shadow_signals_total,
+    shadow_stage_seconds,
+)
 from hunter_strategy_worker.outcomes import advance_tracking
 from hunter_strategy_worker.persist import persist_decision
 from hunter_strategy_worker.plan import plan_entry
@@ -137,19 +142,21 @@ async def evaluate_slot(
         ).inc()
         return evaluation
 
-    async with role_session(factory, db_role="hunter_worker") as session:
-        context, provenance = await build_market_context(
-            session,
-            redis,
-            market=market,
-            source_bar_close=bar_close,
-            config=config,
-            code_ref=version.code_ref,
-            candles_reader=candles_reader,
-            policy=version.eligibility_policy,
-            context_minutes=version.context_minutes(config),
-        )
-    evaluation = version.strategy.explain(context, version.params)
+    with shadow_stage_seconds.labels(stage="context_load").time():
+        async with role_session(factory, db_role="hunter_worker") as session:
+            context, provenance = await build_market_context(
+                session,
+                redis,
+                market=market,
+                source_bar_close=bar_close,
+                config=config,
+                code_ref=version.code_ref,
+                candles_reader=candles_reader,
+                policy=version.eligibility_policy,
+                context_minutes=version.context_minutes(config),
+            )
+    with shadow_stage_seconds.labels(stage="evaluate").time():
+        evaluation = version.strategy.explain(context, version.params)
     shadow_evaluations_total.labels(
         strategy=version.strategy_key, state=evaluation.state.value
     ).inc()
@@ -221,7 +228,8 @@ async def evaluate_slot(
             regime_id=regime_id,
             regime_reason=regime_reason,
         )
-        written = await persist_decision(session, record)
+        with shadow_stage_seconds.labels(stage="persist").time():
+            written = await persist_decision(session, record)
         # A decision born ``no_entry`` (late) never occupies the slot — it would
         # hold the market's candles for a tracking nobody follows — and its
         # barrier is the decision instant, since that is when it ended.
@@ -234,6 +242,7 @@ async def evaluate_slot(
             new_episode=True,
         )
         if written:
+            observe_decision_lag(max(0.0, (decision_at - bar_close).total_seconds()))
             shadow_signals_total.labels(
                 strategy=version.strategy_key, tracking_state=record.tracking_state.value
             ).inc()

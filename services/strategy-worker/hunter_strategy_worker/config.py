@@ -21,7 +21,15 @@ CONSUMER_GROUP = "strategy-worker.shadow"
 HEARTBEAT_KEY = "hb:strategy:shadow"
 PRODUCER = "strategy-worker.shadow"
 
-__all__ = ["CONSUMER_GROUP", "HEARTBEAT_KEY", "PRODUCER", "ShadowConfig", "load_config"]
+__all__ = [
+    "CONSUMER_GROUP",
+    "EXPECTED_BAR_COST_S",
+    "HEARTBEAT_KEY",
+    "PRODUCER",
+    "ShadowConfig",
+    "default_claim_idle_ms",
+    "load_config",
+]
 
 
 def _int(name: str, default: int) -> int:
@@ -32,6 +40,38 @@ def _int(name: str, default: int) -> int:
 def _float(name: str, default: float) -> float:
     raw = os.environ.get(name)
     return default if raw is None or not raw.strip() else float(raw)
+
+
+_CLAIM_IDLE_MS_UNSET: int = -1
+"""Sentinel for ``ShadowConfig.claim_idle_ms``: 'derive it from
+``worker_concurrency`` in ``__post_init__``', not a real duration -- kept an
+``int`` (not ``int | None``) so the field's own type stays a plain ``int``
+everywhere it is used (``consume()``'s ``claim_idle_ms: int`` parameter above
+all), instead of forcing every caller to narrow an ``Optional`` that is never
+actually ``None`` by the time ``__init__`` returns.
+"""
+
+EXPECTED_BAR_COST_S: float = 8.0
+"""Conservative worst-case wall time of one ``handle_candle`` call under load,
+grounding :data:`ShadowConfig.claim_idle_ms`'s default -- not a guess.
+
+``docs/DEPLOYMENT.md``'s "Custo medido" measured ~1.4-1.5 evaluations/s per
+*due version* on this shape of workload (T3.74b). A bar can have up to 11
+versions of one family due at once (T3.74's roster) and ``handle_candle``'s
+per-version loop is sequential by design -- the T3.74b family cache shares the
+candle *read* across versions, never the ``evaluate_slot``/persist call, which
+still pays its own DB round trips per version. 11 / 1.4 ~= 7.9s, rounded up.
+"""
+
+
+def default_claim_idle_ms(worker_concurrency: int) -> int:
+    """Default for :data:`ShadowConfig.claim_idle_ms`: ``worker_concurrency ×
+    EXPECTED_BAR_COST_S``, in milliseconds (T3.74d).
+
+    See ``ShadowConfig.claim_idle_ms``'s own docstring for the review finding
+    this answers and the bound it must respect.
+    """
+    return int(max(1, worker_concurrency) * EXPECTED_BAR_COST_S * 1000)
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,6 +177,99 @@ class ShadowConfig:
     consumer_stall_s: float = 300.0
     """No consumer iteration for this long makes ``/ready`` false."""
 
+    worker_concurrency: int = 8
+    """Bars handled concurrently by one process (T3.74c), bounded by the DB
+    pool (``Settings.db_pool_size`` + ``db_max_overflow``, 5 + 5 = 10 today):
+    a bar in flight holds at most one connection at a time (each
+    ``role_session`` closes before the next opens), so 8 leaves headroom for
+    the outbox/heartbeat loops' own short-lived sessions in the same process
+    without starving them. Different markets never share state -- a session,
+    a slot row, a candle window -- so processing them concurrently changes
+    nothing about *what* is decided, only *when*; the ordering that does
+    matter (two bars of the *same* market) is still enforced per-market
+    (``consumer._market_key``), never by this number. 1 reproduces the
+    strictly serial behaviour every version before T3.74c had.
+    """
+
+    late_delay_backlog_max_s: float = 120.0
+    """Bar-level safety valve, not the fix (T3.74c).
+
+    ``eligibility_max_lag_s`` (300 s) already refuses a bar too stale to *prove*
+    eligibility, but only after the version loop has already paid for
+    ``load_market``/``load_family_readers`` and is about to spend a context
+    read per due version. During a real backlog (worker behind the stream by
+    minutes, not seconds) that cost compounds: every extra bar processed late
+    is itself slower to process, which makes the next one later still.
+
+    This gate is checked once per **bar** (``handle_candle``, before any of
+    that), not once per version, and at 120 s -- the ``max_entry_delay_s`` a
+    version's own frozen costs use for ``late:delay`` (``plan.py``) is
+    per-version and unknown this early, so 120 s is a conservative process-wide
+    proxy for it, not a replacement. A bar this stale would almost always end
+    up ``no_entry: late:delay`` anyway if it were fully evaluated and happened
+    to trigger -- this only skips paying for that outcome when the backlog is
+    real. Named and counted
+    (``hunter_shadow_bars_skipped_total{reason="late_delay_backlog"}``), never
+    silent: it trades a slice of the ``no_entry: late:delay`` research
+    population for the worker's ability to catch back up, and only in the
+    window where the alternative was compounding delay, not a clean decision.
+
+    Independent of ``eligibility_max_lag_s``: a healthy worker never reaches
+    120 s in the first place, so this only fires under exactly the backlog
+    conditions T3.74c measured (median 22-65 s, p95 80-154 s on 10/09).
+    """
+
+    claim_idle_ms: int = _CLAIM_IDLE_MS_UNSET
+    """How long, in ms, a message may sit unacked in this consumer's own
+    pending list before ``consume()``'s ``XAUTOCLAIM``
+    (``hunter_core.events.consume``) reclaims -- and redelivers -- it. Left
+    unset (the default), it is derived from ``worker_concurrency`` in
+    ``__post_init__`` (:func:`default_claim_idle_ms`); pass a number to pin it
+    regardless of ``worker_concurrency``.
+
+    **The bug this answers (T3.74d code review, HIGH).** ``BarDispatcher``
+    (T3.74c) lets ``run_consumer`` keep reading past a bar still queued behind
+    the concurrency semaphore or a busy per-market lock -- exactly the shape
+    ``claim_idle_ms`` exists to reclaim *dead* work from, not slow-but-alive
+    work. ``consume()``'s own flat default (30 000 ms) has no relationship to
+    how long this process might legitimately hold a message: a deep burst, or
+    a bar with several due versions each paying their own DB round trip,
+    could exceed 30 s while still making real progress. Past that,
+    ``XAUTOCLAIM`` redelivers a message this *same* consumer already holds,
+    and without the dispatcher's own guard (``BarDispatcher.submit``,
+    ``hunter_shadow_bars_skipped_total{reason="already_in_flight"}``) that
+    redelivery would be resubmitted and run a second time -- doubling work
+    exactly during the burst the dispatcher exists to absorb. That guard
+    makes a redelivery like this safe (never double-run), but it is still a
+    wasted ``XAUTOCLAIM`` round trip and a log line every time it fires, so
+    the interval should still be sized to the real queueing delay.
+
+    **The arithmetic.** ``worker_concurrency × EXPECTED_BAR_COST_S`` (both in
+    this module): a conservative stand-in for "a bar queued behind a full
+    dispatcher may have to wait for up to a full round of `worker_concurrency`
+    already-running bars, each costing up to the worst-case per-bar time,
+    before it is even handed to a handler" -- deliberately generous (not a
+    tight queueing-theory bound) so the reclaim interval clears the reasoned
+    worst case, not just the median. At the defaults (8 × 8.0 s) that is
+    64 000 ms.
+
+    **The bound.** Must stay well under ``consumer_stall_s`` (300 s, this same
+    class): that is already the threshold at which ``/ready`` calls this
+    process not making progress, so a truly dead consumer's pending messages
+    should be reclaimable well before an operator or orchestrator would
+    otherwise have to intervene on the liveness signal alone. Raising this
+    much past a small fraction of ``consumer_stall_s`` would mean a crashed
+    consumer's own backlog sits un-reclaimed for longer than the system
+    already tolerates before declaring it dead by another signal -- never
+    raise it that high. 64 000 ms is ~21 % of the 300 000 ms default.
+    """
+
+    def __post_init__(self) -> None:
+        if self.claim_idle_ms == _CLAIM_IDLE_MS_UNSET:
+            object.__setattr__(
+                self, "claim_idle_ms", default_claim_idle_ms(self.worker_concurrency)
+            )
+
 
 def load_config() -> ShadowConfig:
     """Read the operational knobs from the environment."""
@@ -154,4 +287,7 @@ def load_config() -> ShadowConfig:
         gap_recovery_max_s=_int("SHADOW_GAP_RECOVERY_MAX_S", 86_400),
         version_refresh_s=_float("SHADOW_VERSION_REFRESH_S", 60.0),
         consumer_stall_s=_float("SHADOW_CONSUMER_STALL_S", 300.0),
+        worker_concurrency=_int("SHADOW_WORKER_CONCURRENCY", 8),
+        late_delay_backlog_max_s=_float("SHADOW_LATE_DELAY_BACKLOG_MAX_S", 120.0),
+        claim_idle_ms=_int("SHADOW_CLAIM_IDLE_MS", _CLAIM_IDLE_MS_UNSET),
     )
