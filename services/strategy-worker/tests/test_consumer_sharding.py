@@ -77,8 +77,12 @@ async def _drive(
     monkeypatch.setattr(consumer_mod.asyncio, "sleep", fake_sleep)
 
     runtime, health = _Runtime(), ConsumerHealth()
+    # T3.82: the shadow-universe gate is out of scope here (shard ownership
+    # only) and would otherwise refuse every bar -- a query against a real
+    # database with `factory=None` -- so it is disabled for this test.
+    config = ShadowConfig(universe_min_history_days=0)
     with pytest.raises(asyncio.CancelledError):
-        await run_consumer(None, None, runtime, ShadowConfig(), health, **shard_kwargs)  # type: ignore[arg-type]
+        await run_consumer(None, None, runtime, config, health, **shard_kwargs)  # type: ignore[arg-type]
     return handled, acked
 
 

@@ -79,6 +79,13 @@ async def write_heartbeat(
         # not read out of the Prometheus histogram instead.
         "decision_lag_p50_s": "" if lag_p50 is None else f"{lag_p50:.1f}",
         "decision_lag_p95_s": "" if lag_p95 is None else f"{lag_p95:.1f}",
+        # T3.82: the shadow universe policy. The threshold is always present
+        # (part of this process's config, "0" means disabled); the counts are
+        # "" until the first perpetual bar refreshes the cache, and forever
+        # "" while disabled -- hunter_strategy_worker.universe module docstring.
+        "universe_min_history_days": str(config.universe_min_history_days),
+        "universe_size": "" if consumer.universe_size is None else str(consumer.universe_size),
+        "universe_total": "" if consumer.universe_total is None else str(consumer.universe_total),
     }
     await cast("Any", runtime.redis).hset(key, mapping=payload)
     await runtime.redis.expire(key, TTL_S)

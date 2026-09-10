@@ -187,7 +187,10 @@ async def _drain(
                 factory,
                 redis,
                 _Runtime(f"shard-{index}of{total}"),  # type: ignore[arg-type]
-                ShadowConfig(hot_state_tail=0),
+                # T3.82: this test's fixture markets do not carry 90 days of
+                # candles, and the equivalence being proved (shard topology,
+                # not the shadow-universe gate) is orthogonal to it.
+                ShadowConfig(hot_state_tail=0, universe_min_history_days=0),
                 ConsumerHealth(),
                 shard_index=index,
                 shard_total=total,

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import asyncio
 import functools
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -23,6 +22,7 @@ from hunter_core.events.consume import ack, consume
 from hunter_core.events.streams import Streams
 from hunter_core.logging import get_logger
 from hunter_strategy_worker.bar_context import load_bar_bundle
+from hunter_strategy_worker.consumer_health import ConsumerHealth
 from hunter_strategy_worker.context_cache import load_family_readers
 from hunter_strategy_worker.decide import evaluate_slot, versions_for_bar
 from hunter_strategy_worker.dispatch import BarDispatcher, market_key
@@ -31,8 +31,10 @@ from hunter_strategy_worker.metrics import (
     shadow_stage_seconds,
     shadow_version_failed_total,
 )
+from hunter_strategy_worker.pre_dispatch import refuse_before_dispatch
 from hunter_strategy_worker.repo import load_market
-from hunter_strategy_worker.shard import consumer_group, owns_market
+from hunter_strategy_worker.shard import consumer_group
+from hunter_strategy_worker.universe import UniverseCache
 from hunter_strategy_worker.versions import VersionCache
 
 if TYPE_CHECKING:
@@ -97,25 +99,6 @@ __all__ = [
     "handle_candle",
     "run_consumer",
 ]
-
-
-@dataclass
-class ConsumerHealth:
-    """Liveness of the decision loop, read by ``/ready``."""
-
-    last_iteration_at: datetime | None = None
-    started_at: datetime | None = None
-    """When the loop entered ``consume()`` — a worker that has started but has
-    seen no message yet is not stuck, it is idle."""
-    evaluated_bars: int = 0
-    errors: int = 0
-    states: dict[str, int] = field(default_factory=lambda: {})
-
-    def touch(self) -> None:
-        self.last_iteration_at = utcnow()
-
-    def record(self, state: str) -> None:
-        self.states[state] = self.states.get(state, 0) + 1
 
 
 def _candle(payload: dict[str, Any]) -> NormalizedCandle | None:
@@ -256,15 +239,12 @@ async def run_consumer(
     its own default -- see ``ShadowConfig.claim_idle_ms`` for the arithmetic
     and why a dispatcher-aware value matters here (T3.74d).
 
-    **Sharding across processes (T3.74f).** ``shard_total > 1`` reads the
-    *whole* stream through this shard's own consumer group
-    (:func:`hunter_strategy_worker.config.consumer_group`) and refuses --
-    acks without evaluating, counted as
-    ``hunter_shadow_bars_skipped_total{reason="not_my_shard"}`` -- any bar
-    whose symbol :func:`hunter_strategy_worker.shard.owns_market` says
-    belongs to a different shard, *before* the dispatcher or any stage timer
-    ever sees it. ``hunter_strategy_worker.shard`` module docstring has the
-    full reasoning for per-shard groups over one shared group.
+    **Refusals before the dispatcher.** :func:`hunter_strategy_worker.
+    pre_dispatch.refuse_before_dispatch` acks and counts by name, before the
+    semaphore or any stage timer runs, a bar this shard does not own (T3.74f)
+    or -- unless ``config.universe_min_history_days`` is ``0`` -- outside the
+    shadow universe (T3.82); that module has the mechanics, :mod:`.shard`/
+    :mod:`.universe` the reasoning behind each.
 
     Two independent failure budgets, because they are different failures: one
     unreadable message is skipped (it must not block the stream), while an error
@@ -278,6 +258,8 @@ async def run_consumer(
     without every one of them reading as hours or years late.
     """
     versions = VersionCache(config.version_refresh_s)
+    min_days = config.universe_min_history_days
+    universe = UniverseCache(min_days) if min_days > 0 else None
     group = consumer_group(shard_index, shard_total)
     consumer = f"strategy-worker@{runtime.instance}"
     dispatcher = BarDispatcher(config.worker_concurrency)
@@ -315,9 +297,19 @@ async def run_consumer(
             ):
                 health.touch()
                 backoff = RESTART_BACKOFF_S
-                if not owns_market(envelope.payload.get("symbol", "?"), shard_index, shard_total):
-                    shadow_bars_skipped_total.labels(reason="not_my_shard").inc()
-                    await ack(redis, Streams.MARKET_CANDLES_CLOSED, group, message_id, envelope)
+                if await refuse_before_dispatch(
+                    factory,
+                    redis,
+                    message_id=message_id,
+                    envelope=envelope,
+                    group=group,
+                    health=health,
+                    universe=universe,
+                    shard_index=shard_index,
+                    shard_total=shard_total,
+                    ack_fn=ack,
+                    clock=clock,
+                ):
                     continue
                 shadow_stage_seconds.labels(stage="queue_wait").observe(
                     max(0.0, (utcnow() - envelope.ts).total_seconds())

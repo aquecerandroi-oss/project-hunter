@@ -8,7 +8,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
-from hunter_api.schemas.latency import LatencyHopOut, LatencyOut, LatencySloStatus
+from hunter_api.schemas.latency import (
+    LatencyHopOut,
+    LatencyOut,
+    LatencySloStatus,
+    ResearchUniverseOut,
+)
 from hunter_core.domain.types import utcnow
 from hunter_core.latency import classify_slo
 from hunter_core.logging import get_logger
@@ -83,6 +88,15 @@ def _float(value: str | None) -> float | None:
         return None
 
 
+def _int(value: str | None) -> int | None:
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
 async def _read_hash(redis: redis_asyncio.Redis, key: str) -> dict[str, str]:
     return _decode(await cast("object", redis).hgetall(key))  # type: ignore[attr-defined]
 
@@ -130,6 +144,48 @@ async def _shadow_decision_lag(redis: redis_asyncio.Redis) -> tuple[float | None
         return (max(p50s) if p50s else None, max(p95s) if p95s else None)
     solo = await _read_hash(redis, STRATEGY_SHADOW_KEY)
     return _float(solo.get("decision_lag_p50_s")), _float(solo.get("decision_lag_p95_s"))
+
+
+async def _shadow_universe(redis: redis_asyncio.Redis) -> ResearchUniverseOut | None:
+    """T3.82: ``universe_size``/``universe_total``/``universe_min_history_days``,
+    summed across every ``STRATEGY_SHARDS`` shard (each owns a disjoint slice
+    of symbols, module docstring on :class:`~hunter_api.schemas.latency.
+    ResearchUniverseOut`), falling back to the solo key with no shards
+    reporting -- the same two-step ``_shadow_decision_lag`` already uses.
+    ``None`` when nothing has published the counts yet (worker not deployed,
+    or the gate is disabled and every shard's ``universe_size`` is empty).
+    """
+    client = cast("object", redis)
+    total_size = 0
+    total_candidates = 0
+    min_days: int | None = None
+    found = False
+    async for raw_key in client.scan_iter(  # type: ignore[attr-defined]
+        match=STRATEGY_SHADOW_SHARD_PATTERN, count=SCAN_COUNT
+    ):
+        raw_key = cast("bytes | str", raw_key)
+        key = raw_key.decode(errors="replace") if isinstance(raw_key, bytes) else raw_key
+        fields = await _read_hash(redis, key)
+        size, total = _int(fields.get("universe_size")), _int(fields.get("universe_total"))
+        if min_days is None:
+            min_days = _int(fields.get("universe_min_history_days"))
+        if size is not None and total is not None:
+            found = True
+            total_size += size
+            total_candidates += total
+    if not found:
+        solo = await _read_hash(redis, STRATEGY_SHADOW_KEY)
+        size, total = _int(solo.get("universe_size")), _int(solo.get("universe_total"))
+        if min_days is None:
+            min_days = _int(solo.get("universe_min_history_days"))
+        if size is None or total is None:
+            return None
+        total_size, total_candidates = size, total
+    return ResearchUniverseOut(
+        markets_in_universe=total_size,
+        markets_total=total_candidates,
+        min_history_days=min_days or 0,
+    )
 
 
 def _hop(name: str, p50: float | None, p95: float | None) -> LatencyHopOut:
@@ -182,7 +238,10 @@ async def build_latency(redis: redis_asyncio.Redis) -> LatencyOut:
         _sum_or_none([hop.p50_s for hop in hops]),
         _sum_or_none([hop.p95_s for hop in hops]),
     )
-    return LatencyOut(hops=hops, end_to_end=end_to_end, generated_at=utcnow())
+    research_universe = await _shadow_universe(redis)
+    return LatencyOut(
+        hops=hops, end_to_end=end_to_end, generated_at=utcnow(), research_universe=research_universe
+    )
 
 
 __all__ = ["build_latency"]

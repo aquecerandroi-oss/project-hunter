@@ -204,6 +204,57 @@ async def test_build_latency_falls_back_to_the_solo_key_with_no_shards_reporting
     assert by_hop["decision"].p95_s == pytest.approx(4.0)
 
 
+async def test_build_latency_research_universe_is_none_when_unpublished() -> None:
+    """T3.82: no ``universe_size``/``universe_total`` field anywhere (worker
+    not deployed, or the gate is disabled) -- never a fabricated ``0 of 0``."""
+    redis = _FakeRedis(
+        hashes={
+            STRATEGY_SHADOW_KEY: _bytes({"decision_lag_p50_s": "1.0", "decision_lag_p95_s": "2.0"})
+        }
+    )
+    result = await build_latency(redis)  # pyright: ignore[reportArgumentType]
+    assert result.research_universe is None
+
+
+async def test_build_latency_research_universe_from_the_solo_key() -> None:
+    redis = _FakeRedis(
+        hashes={
+            STRATEGY_SHADOW_KEY: _bytes(
+                {
+                    "universe_size": "16",
+                    "universe_total": "200",
+                    "universe_min_history_days": "90",
+                }
+            )
+        }
+    )
+    result = await build_latency(redis)  # pyright: ignore[reportArgumentType]
+    assert result.research_universe is not None
+    assert result.research_universe.markets_in_universe == 16
+    assert result.research_universe.markets_total == 200
+    assert result.research_universe.min_history_days == 90
+
+
+async def test_build_latency_research_universe_sums_across_shards() -> None:
+    """T3.82: each shard owns a disjoint slice of symbols -- a sum, not the
+    worst-shard-wins union ``decision`` uses."""
+    redis = _FakeRedis(
+        scan_keys=["hb:strategy:shadow:0of2", "hb:strategy:shadow:1of2"],
+        hashes={
+            "hb:strategy:shadow:0of2": _bytes(
+                {"universe_size": "9", "universe_total": "100", "universe_min_history_days": "90"}
+            ),
+            "hb:strategy:shadow:1of2": _bytes(
+                {"universe_size": "7", "universe_total": "100", "universe_min_history_days": "90"}
+            ),
+        },
+    )
+    result = await build_latency(redis)  # pyright: ignore[reportArgumentType]
+    assert result.research_universe is not None
+    assert result.research_universe.markets_in_universe == 16
+    assert result.research_universe.markets_total == 200
+
+
 async def test_build_latency_propagates_redis_errors() -> None:
     class _RaisingScan:
         async def scan_iter(self, match: str | None = None, count: int | None = None):

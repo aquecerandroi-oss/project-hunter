@@ -109,7 +109,10 @@ class TestReclaimWhileStillInFlight:
         monkeypatch.setattr(consumer_mod.asyncio, "sleep", fake_sleep)
 
         runtime, health = _Runtime(), ConsumerHealth()
-        config = ShadowConfig()
+        # T3.82: disabled here -- this test is about redelivery dedup, not the
+        # shadow-universe gate, which would otherwise query a real database
+        # against `factory=None`.
+        config = ShadowConfig(universe_min_history_days=0)
         before = _skipped("already_in_flight")
 
         bg_task = asyncio.ensure_future(

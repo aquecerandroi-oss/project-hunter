@@ -54,7 +54,27 @@ class LatencyHopOut(BaseModel):
     status: LatencySloStatus
 
 
+class ResearchUniverseOut(BaseModel):
+    """T3.82: the Shadow Lab's shadow universe -- markets with enough 1m
+    history for the replay + replication funnel to ever validate a decision
+    on them (``docs/PIPELINE.md`` §6b, ``hunter_strategy_worker.universe``).
+
+    Summed across every ``STRATEGY_SHARDS`` shard's own heartbeat, the same
+    union ``_shadow_decision_lag`` already does for the ``decision`` hop --
+    each shard owns a disjoint slice of symbols, so a sum (not a max) is the
+    cluster-wide count. ``None`` on ``LatencyOut`` itself when no shard has
+    published these fields yet (worker not deployed, or
+    ``SHADOW_UNIVERSE_MIN_HISTORY_DAYS=0`` disables the gate) -- never a
+    fabricated ``0 of 0``.
+    """
+
+    markets_in_universe: int
+    markets_total: int
+    min_history_days: int
+
+
 class LatencyOut(BaseModel):
     hops: list[LatencyHopOut]
     end_to_end: LatencyHopOut
     generated_at: datetime
+    research_universe: ResearchUniverseOut | None = None

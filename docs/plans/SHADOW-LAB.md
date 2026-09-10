@@ -194,5 +194,18 @@ Nada neste funil ativa, promove ou dimensiona coisa alguma, e nenhuma etapa disp
 `robusto` no estresse sobre uma coorte de replay é, em toda comunicação, "robusto **no replay**",
 rotulado como tal.
 
+## Universo de pesquisa (T3.82)
+
+Desde 09/2026 o `strategy-worker` não decide mais sobre todo o universo monitorado (~200
+perpétuos): decide só sobre o mercado cujo `candles_1m` cobre `SHADOW_UNIVERSE_MIN_HISTORY_DAYS`
+(90 por padrão) — a mesma janela que o passo 3 do funil (replay de 31 dias, mas a coorte
+prospectiva precisa de 90 d de contexto real) e o passo 6 (replicação) exigem para sequer avaliar
+uma versão. Medido em 2026-09-10: 16 de ~200 mercados qualificam. Os outros 184 nunca vão passar
+por esse funil enquanto não acumularem histórico — decidir sobre eles ao vivo é custo de pesquisa
+não validável, não uma população menor do mesmo experimento. Detalhe da regra, do cache e da
+métrica: `docs/PIPELINE.md` §6b, `hunter_strategy_worker.universe`. Decisão registrada em
+`obsidian/06-DECISIONS/2026-09-10-universo-de-pesquisa-90-dias.md` — aprovação do Everton, o que
+muda e o que **não** muda (limites de risco, versões, universo executável da carteira paper).
+
 ## Fora de escopo
 Carteira, ordens, fills, posições, PnL de portfolio, Risk Engine, SHORT, sinais sobre features do M2 (v2), execução de qualquer natureza.
