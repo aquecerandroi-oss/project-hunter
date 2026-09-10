@@ -199,6 +199,22 @@ custos` (−0,0706, PF 0,875). Custo dobrado sobre os 90 dias, primeira ordem: `
 | `--stress` sobre os 90 dias inteiros | 2026-09-10 | tentado; o motor reprecifica só a partir de `r_multiple` e devolve `n = 0` fora da janela com funding — artefato, não achado | esta página, Concern 2 |
 | corte por `market_regimes` em vez de calendário | — | mais barato depois desta nota; não feito aqui | próxima tarefa |
 
+## Acréscimo 2026-09-10 04:45 BRT — estresse na coorte real da v10 (T3.75 implantado, worker `9d561f4`)
+
+Fonte: `python -m hunter_strategy_worker.replay.stress --cohort replay:c7d138eb-a633-4457-a4fa-aa82a5df95e3`,
+rodado na VPS depois do backfill de funding dos 90 dias (T3.75): a base saiu com **n = 796 no eixo `r_net`**
+(só 2 `funding_missing`), não mais 300.
+
+- **Veredito: `sem_vantagem_na_base`** — expectancy da base **−0,0317 R**.
+- Deixar um mercado de fora nunca salva: os 16 recortes `sem_<mercado>` ficam entre −0,0196 R (sem ARB) e
+  −0,0417 R (sem SOL), PF 0,87–0,94.
+- `entrada_mais_1_barra`: −0,0245 R, PF 0,93 (Δ +0,007, IC cruza zero).
+- Metades: 1ª (até 26/07) **−0,1125 R, PF 0,70**; 2ª (após 26/07) **+0,0581 R, PF 1,22** — o mesmo desenho da
+  §T3.62b: a vantagem é uma janela, não a estratégia.
+
+Conclusão inalterada: nenhuma `mean_reversion` vira linha paper; a família volta a `research_only` como
+objeto de estudo (H-P7 aposta única × pooled, H-P8 amplitude como estado), não como candidata.
+
 ## Relacionadas
 
 [[Experiments Index]] · [[mean_reversion]] · [[EXP-0009-mean-reversion-pullback-em-tendencia]] ·
