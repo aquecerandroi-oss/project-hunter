@@ -62,6 +62,18 @@ sem tela própria ainda (T3.25 despacha os endpoints, não as telas):
   `real`/`refutada`/`replicando`; nunca ativa, deprecia ou reparametriza nada sozinho — só o
   Everton, pelo script de ativação auditado. Detalhe: `docs/plans/REPLICATION.md`.
 
+### 4.2 Meta diária
+
+Everton fixou (2026-09-10) um lucro mínimo diário de R$9.000 para o Lab. `GET
+/api/v1/orgs/{org_id}/lab/daily-goal` (T3.78) responde, todo dia, com dado real, o quanto falta e
+por quê: `unique_r` (a família inteira como uma carteira, uma aposta por `(mercado, barra)` — a
+mesma dedupe da T3.60) contra `pooled_r` (a soma bruta de todas as versões, o "barulho" que a T3.60
+mediu em 3–4×); e o valor de **1 R** em duas réguas lado a lado — o `label_brl` do onboarding
+(0,25 % × R$100.000 = R$250) e o `real_brl_p10/p50/p90`, calculado dos volumes de 1 minuto reais dos
+mercados apostados sob o teto de participação (`hunter_risk.limits.PAPER_V1`), que é a régua que
+paga a conta. A tela ainda não existe (T3.78 entrega só a API); o schema congelado está em
+`.claude/state/notes-T3.78.md`.
+
 ## 5. Planos e entitlements (schema no M0, cobrança na Fase 3)
 
 | Entitlement | FREE | PRO | QUANT | ENTERPRISE |

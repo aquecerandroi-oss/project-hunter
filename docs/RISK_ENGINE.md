@@ -278,6 +278,11 @@ não pode sustentar o teto de participação como se fosse agora.
 
 ## 4. Sizing — mínimo entre os tetos, com o limitante vencedor publicado
 
+**O rótulo de 0,25 % (R$250 sobre R$100.000) não é o dinheiro real: quando o teto de participação
+morde — o caso comum, T3.60 — o valor de 1 R sai de `notional_com_teto × d_efetiva`, tipicamente uma
+fração pequena do rótulo; `GET /api/v1/orgs/{org_id}/lab/daily-goal` (T3.78) publica as duas réguas
+lado a lado, nunca uma no lugar da outra.**
+
 **O preço do sizing é o pior entre `entry_ref` e o preço observado — novo em v2.1.** Para um LONG o
 pior é o maior. Toda linha abaixo, a perda planejada, o arredondamento por `step_size`, os dois
 contrafactuais e a distância de stop (check 8) são medidos em `sizing_price =

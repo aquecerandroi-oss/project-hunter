@@ -8,6 +8,7 @@ FastAPI application from; workers keep using the plain core ``Settings``.
 from __future__ import annotations
 
 import ipaddress
+from decimal import Decimal
 from functools import lru_cache
 
 from pydantic import SecretStr, field_validator, model_validator
@@ -113,6 +114,11 @@ class ApiSettings(Settings):
     of the organizations it is subscribed to. A socket outlives the request that
     authorized it; without this, removing someone from an organization leaves
     their open socket receiving that organization's data."""
+
+    daily_goal_brl: Decimal = Decimal("9000")
+    """The minimum daily profit Everton set for the Lab (2026-09-10, T3.78).
+    ``GET /api/v1/orgs/{org_id}/lab/daily-goal`` compares the day's unique R
+    against this, never a number written into the endpoint itself."""
 
     # market_stale_after_s lives on the core hunter_core.Settings (T1.3 added
     # it there first — services/markets.py and routers/markets.py read it off
