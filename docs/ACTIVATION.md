@@ -338,7 +338,7 @@ SELECT p.id                AS carteira,
  WHERE p.type = 'paper' AND NOT p.is_arena;
 -- verde: preset = paper_v1, risco_por_trade = 0.0025, exposicao_total = 0.40, vagas = 5
 
-SELECT action, actor_type, before, after, metadata->>'actor_input' AS quem
+SELECT action, actor_type, before, after, metadata->>'actor_input' AS actor_input_nao_verificado
   FROM audit_logs
  WHERE action = 'portfolio.risk_profile_linked'
  ORDER BY created_at DESC LIMIT 5;

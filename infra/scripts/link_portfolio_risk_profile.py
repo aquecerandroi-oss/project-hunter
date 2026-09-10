@@ -9,13 +9,9 @@
 
 ``docs/RISK_ENGINE.md`` §2 calls the persisted row "the single source" of the
 wallet's profile, and ``portfolios.risk_profile_id`` is how a wallet names it.
-Nothing in the product sets that column: ``open_paper_wallet`` accepts a
-``risk_profile_id`` and every production caller leaves it ``None``, and the
-default profile an organization gets at sign-up
-(``apps/api/hunter_api/services/organizations.py``) lands on
-``workspaces.default_risk_profile_id``, which is a different column on a
-different table. So the link is an operator act, like opening the wallet — and
-this is its script.
+Nothing in the product sets that column (``open_paper_wallet`` callers leave it
+``None``; sign-up writes ``workspaces.default_risk_profile_id``, another column
+on another table), so the link is an operator act — and this is its script.
 
 **It changes no limit, and refuses to be the place where one changes.** The
 only accepted ``--preset`` is ``paper_v1``: pointing the wallet at
@@ -31,10 +27,8 @@ already refuses on the seed side.
 ``hunter_core.admission.admit`` takes ``limits: RiskLimits = PAPER_V1`` and
 ``execution-worker``'s ``admission_cycle`` never passes the argument, so the row
 this script links is the **declared** source while the constant is the
-**enforced** one; the two are proved equal by
-``test_the_seeded_paper_profile_has_exactly_one_source`` and by the round-trip
-test in ``infra/scripts/tests/test_link_portfolio_risk_profile.py``. Making
-``admit`` read the wallet's profile is T3.69b, and it is not this script.
+**enforced** one (proved equal by the round-trip tests). Making ``admit`` read
+the wallet's profile is T3.69b, and it is not this script.
 
 Connects with ``DATABASE_URL_MIGRATIONS`` (the owner DSN of the ``ops`` service,
 never the pooler), like ``infra/scripts/seed.py`` and
@@ -49,6 +43,7 @@ import argparse
 import asyncio
 import getpass
 import json
+import re
 import socket
 import uuid
 from dataclasses import dataclass
@@ -192,7 +187,10 @@ async def plan_link(
 
 def describe(plan: Plan, *, written: bool) -> list[str]:
     """``before``/``after``, always both, whether or not anything was written."""
-    verb = "linked" if written else "would link"
+    # "linking", never "linked": the confirmation is printed only after the
+    # commit (security review of T3.69, item 2 — a transcript must not say
+    # "linked" when the audit INSERT rolled back).
+    verb = "linking" if written else "would link"
     return [
         f"portfolio {plan.portfolio_id} ({plan.portfolio_name})",
         f"  before: risk_profile_id = {plan.before}",
@@ -285,6 +283,7 @@ async def run(args: argparse.Namespace) -> int:
                     return 0
                 await write_link(conn, plan, actor=args.actor)
                 await transaction.commit()
+                print(f"linked — replacing an existing link: {plan.replacing}")
             except Refused:
                 await transaction.rollback()
                 raise
@@ -295,6 +294,20 @@ async def run(args: argparse.Namespace) -> int:
         return 1
     finally:
         await engine.dispose()
+
+
+_ACTOR_INPUT = re.compile(r"^[ -~]{1,120}$")
+
+
+def _actor_input(raw: str) -> str:
+    """Free text stays free text — but bounded and printable, so the audit row
+    cannot carry control characters or a kilobyte of prose (security review of
+    T3.69, item 4). It is never an identity: ``actor_type`` stays ``system``."""
+    if not _ACTOR_INPUT.fullmatch(raw):
+        raise argparse.ArgumentTypeError(
+            "--actor must be printable ASCII, 1–120 characters (it is recorded unverified)"
+        )
+    return raw
 
 
 def main() -> int:
@@ -320,7 +333,13 @@ def main() -> int:
         help="required when the wallet already points at another risk profile",
     )
     parser.add_argument(
-        "--actor", default=None, help="who asked for this; recorded in audit_logs.metadata"
+        "--actor",
+        default=None,
+        type=_actor_input,
+        help=(
+            "who asked for this; recorded UNVERIFIED in audit_logs.metadata.actor_input "
+            "next to hostname/os_user (never actor_id) — printable ASCII, at most 120 chars"
+        ),
     )
     args = parser.parse_args()
     if args.dry_run and args.yes:
