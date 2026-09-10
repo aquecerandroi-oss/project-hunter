@@ -1,6 +1,6 @@
 ---
 tags: [changelog, historico]
-updated: 2026-09-09
+updated: 2026-09-10
 status: vivo
 owner: sexta-feira
 ---
@@ -8,6 +8,86 @@ owner: sexta-feira
 # Changelog
 
 Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado por dia, mais novo primeiro. Todo o histórico até agora é do Milestone 0 (fundação) — ver `docs/plans/M0.md` para as ondas T01–T13 e [[Resolved Bugs]] para o detalhe das correções de segurança/qualidade citadas aqui.
+
+## 2026-09-10
+
+*(9 commits, `6008eb8..40bb39a`, de 00:44 a 01:52 BRT — a madrugada do plantão de arquivamento. Três
+eixos: **pesquisa sobre o resultado da família `mean_reversion`** (D-P9 e T3.62b, a mesma pergunta —
+"de onde vieram os −34 R?" — vista pela hora e depois pelos 90 dias), **dois achados de instrumento
+no Shadow Lab** (spot decidindo com custo de perpétuo, atraso de decisão de 2 s a 125 s) e **as
+condições de ativação da linha `paper`** (perfil `paper_v1` persistido, restore de backup provado na
+VPS). Nenhum destes commits ativa, promove ou depreda uma `strategy_version`.)*
+
+- `6008eb8` — Plantão run 2 (lane 2, notícias/macro, 10/09 00:35–01:15 BRT): nenhuma fonte carimba
+  evento macro às 21:00Z de 09/09 (pano de fundo: recompra do Tesouro, juros de 10 anos no maior nível
+  desde nov/2023, BTC 79,7k→77,6k sem hora da mínima); calendário oficial conferido — PPI 10/09, CPI
+  11/09, FOMC 16/09; ZEC > US$ 1.000, parabólico dentro do universo da família (Astra veta banir por
+  manchete); abre a fila D-P9 (−34 R por mercado × versão × hora) e as hipóteses H-P4/H-P5/H-P6, mais
+  reforço de H-P2; diário de 09/09 fechado (−31,08 R/420 operações, β válido nos 16 mercados)
+- `e5b5a6c` — T3.71: ensaio real de restore de backup na VPS — `pg_restore -j 2` do dump de 10/09
+  (1,09 GB) em ~6 min, 0 erros, contagens iguais ao banco vivo em 9 de 11 tabelas (as 2 restantes
+  diferem só pelo intervalo entre o dump e a leitura), RLS `tenant_isolation` ativa no banco
+  restaurado, `GRANTs` do `hunter_runtime` não voltam com `--no-privileges` (limitação anotada);
+  retenção do backup poda em 7 dias, ~1 GB/dia hoje — proposta (não aplicada) de reduzir antes de um
+  backfill maior; `docs/DEPLOYMENT.md` §9.4
+- `3753792` — T3.69 + T3.71 (docs): o perfil `paper_v1` persistido em `risk_profiles` e a carteira
+  apontando para ele — `link_portfolio_risk_profile.py` (preview por padrão, `--yes` escreve `UPDATE`
+  + `audit_logs` numa transação, só aceita `paper_v1`, recusa linha divergente campo a campo, recusa
+  trocar vínculo sem `--replace`; 16 testes em Postgres real); achado: `portfolios.risk_profile_id` é
+  coluna que nenhum caminho de produção preenche; residual T3.69b aberto — `admission_cycle` não passa
+  `limits`, a linha do banco é fonte declarada e a constante do código é a aplicada
+  (`RISK_ENGINE.md` §2, `ACTIVATION.md` §8b); `ACTIVATION.md` §8 re-medida em 10/09 (β válido em 16/200
+  mercados pelo backfill, `avgPrice` 18/18, restore real provado — T3.71)
+- `9efcfd9` — T3.70: as nove verificações da diretiva re-provadas no `HEAD` `572d3b6` — V1–V9 + §10 +
+  §11 + V10: 447 passed, 4 xfailed (os mesmos quatro `strict` de 07/09, nenhum virou `XPASS`), 0
+  failed; suíte de `execution-worker` 174 testes, `risk-core` 204, admissão da API 10; V6 cresceu de 3
+  para 7 testes sem regressão
+- `63e45d6` — D-P9 (do plantão): a hora de −34 R de 09/09 (21:00Z / 18:00 BRT) decomposta — 39
+  decisões pooled = **9 apostas únicas** (−7,5 R) × 4,33 versões; `ZKUSDT` 21:30Z tomada por 8
+  versões; **deriva** mata os stops de 1 ATR entre 18:22 e 18:45 BRT e o **impulso** de 22:08Z (194 de
+  200 perpétuos caindo, média −3,71 %, BTC −0,20 %) fecha 43 % da perda; regime `BTC_BEAR` o dia
+  inteiro; 08/09 a mesma hora foi +1,3 R → H-P4 (relógio) vira painel, não teste; achados de
+  instrumento — linhas spot da família saem com `funding_schedule_unknown`, 512 `no_entry` por
+  `late:delay`; o "+32 R" de 08/09 não se reproduz em nenhuma das oito definições testadas (melhor
+  recorte +20 R); novas H-P7 (correlação de barra) e H-P8 (amplitude do universo como estado); 9 SQL
+  somente leitura → [[KB-0083-uma-hora-de-34-r-deriva-e-impulso]]
+- `9c15f50` — T3.69 (revisão de segurança, APPROVE-WITH-NOTES): `"linked"` só é impresso depois do
+  commit (antes dizia `linked` antes do `INSERT` em `audit_logs`); `--actor` limitado a ASCII
+  imprimível ≤ 120 chars e documentado como não verificado (`actor_type` continua `system`); docstring
+  encurtada para caber no orçamento de 350 linhas; 16 testes
+- `b2feb86` — T3.69: `link_portfolio_risk_profile.py` de volta ao orçamento de 350 linhas (349)
+- `5006646` — T3.73 (do D-P9): o Shadow Lab decidia também sobre as linhas **spot** dos mercados —
+  340 sinais spot desde 08/09, 133 desfechos terminais e os 133 sem R
+  (`funding_schedule_unknown`: `funding_rates` tem zero linhas spot, por construção), 179 trios
+  (versão, símbolo, barra) decididos nas duas linhas — a duplicação de aposta única que o D-P9 viu em
+  NEAR/ZEC; decisão **(a)**, que `PIPELINE.md` §1d já dizia: `consumer.handle_candle` recusa vela
+  não-perpétua antes de resolver o mercado, contado em `hunter_shadow_bars_skipped_total{reason}`;
+  `funding.py`/`settle.py`/`decide.py` intocados; 5 unitários + 1 testcontainer (spot → 0/0/0/0,
+  perpétuo → 1/1/1/1); achado grave aberto — `late:delay` é lag de processamento, não regra de
+  mercado: atraso mediano decisão-menos-barra 2,0 s (01–05/09) → 107,9 s (09/09) → 125,1 s (10/09),
+  `no_entry:late:delay` em 47 % dos sinais de 09/09; `PIPELINE.md` §6b; 5 SQL somente leitura →
+  [[07-BUGS/Open Bugs|Open Bugs]] (T3.73)
+- `2ba27dc` — T3.62b: a família `mean_reversion` replayada em **90 dias** (12/06→10/09, 16 mercados,
+  fita 100 % completa, 36 corridas, 414 720 barras, 1 644 decisões, 0 erros): **agosto era a história
+  inteira** — `v10` −0,029 R ex-funding / PF 0,91 (IC de blocos de dia cruza zero), `v1` −0,091 / PF
+  0,85, `v2` −0,034 / PF 0,94; por janela (`v10`): jun–jul −0,12 (PF 0,70), jul–ago −0,09 (PF 0,73),
+  ago–set +0,12 (PF 1,48) — o +0,11 R que a T3.62 mediu é só a janela 3; os 4 mercados originais dão
+  +0,0002 R (zero) em 90 dias; **K3 dispara nas três** — primeira vez que a régua tem população para
+  julgar a família (≥ 100 avaliáveis e ≥ 30 dias); C5 (teto de risco 3 %) é propriedade de versão ×
+  regime (32 % em agosto vs. 6 % em julho); nenhuma das três deve ser a linha `paper`; concerns
+  declarados: `funding_rates` só desde 08/08 (K5 dispara, eixo `r_ex_funding` usado), `--stress` cego
+  fora de agosto (`n = 0` na primeira metade é artefato, não achado); `replay_runs` agora persiste as
+  12 fatias de cada coorte (T3.67 fechou o concern homônimo da T3.62); 5 SQL somente leitura +
+  bootstrap de blocos de dia (14 testes) → [[EXP-0025-mean-reversion-90-dias]]
+- `40bb39a` — T3.74: atraso de decisão de 2 s a 125 s — três fatores medidos na VPS, nenhum isolado:
+  já subia na noite de 08/09, antes dos dois deploys do dia; `replay/budget.py::live_lane_degraded`
+  (o portão que pausa o replay quando a linha viva degrada) **nunca era chamado** por `replay/run.py`
+  — código morto —, e o dreno de replay/backfill ocupou até 93,7 % de uma hora; custo por barra N×M
+  (11 versões × 200 mercados) sem cache de contexto entre versões, Postgres a 178 % de CPU mesmo sem
+  replay rodando; correção: o portão ligado nos dois pontos de entrada (`_drain` e o caminho direto),
+  TDD; ressalva honesta: o portão só lê `outbox_lag_s`/heartbeat, nunca o atraso decisão-menos-barra
+  que é o sintoma medido — brief `T3.74b` (motivo `consumer_lag` no portão + cache de contexto); 292
+  unitários; 4 SQL somente leitura → [[07-BUGS/Open Bugs|Open Bugs]] (T3.74)
 
 ## 2026-09-09
 
