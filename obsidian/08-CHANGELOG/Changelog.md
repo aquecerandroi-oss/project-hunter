@@ -89,6 +89,93 @@ VPS). Nenhum destes commits ativa, promove ou depreda uma `strategy_version`.)*
   que é o sintoma medido — brief `T3.74b` (motivo `consumer_lag` no portão + cache de contexto); 292
   unitários; 4 SQL somente leitura → [[07-BUGS/Open Bugs|Open Bugs]] (T3.74)
 
+*(mais 13 commits, `5a7bbcc..e81d53e`, de 11:52 a 15:23 BRT — a tarde do plantão de arquivamento.
+Três regras novas do Everton (um candidato validado por dia; tudo instantâneo com SLO por trecho;
+lucro real em USDT+BRL) guiaram um lote que fechou com o veredito de
+[[EXP-0026-regime-como-estrategia|EXP-0026]] (o portão de regime não salva a família) e três
+correções de latência prontas para deploy. Ver [[Diario/2026-09-10]] §Tarde e
+[[06-DECISIONS/2026-09-10-validacao-em-um-dia-e-lucro-real]].)*
+
+- `5a7bbcc` — ACTIVATION §8 linha 8 verde: `paper_v1` semeado e a carteira vinculada pelo Everton em
+  10/09 11:51 BRT (`audit portfolio.risk_profile_linked` 14:51:25Z, heartbeat `risk_profile_linked`);
+  nenhum limite mudou de valor
+- `2e2c223` — Plantão run 5 (lane 1, pesquisa/dados, 10/09 07:35–12:08 BRT): KB-0085 (Aldridge
+  2606.29018, regret = Σ Cov(c_t, π_t); "três regimes" não existe no texto, são episódios; N² só como
+  frase) e KB-0086 (Zeng et al. 2608.25348, BTC perp 5 min: 460/460 células de custo negativas mesmo
+  com IC 0,16–0,24) lidos por inteiro; Binance desde 25/08 sem mudança de fee, PROM/SAHARA/TAO em
+  funding de 4 h (13 dos 16 do universo em 8 h); Astra corrige o mecanismo do resolver → D-P15; PPI
+  +0,4 % m/m (BLS), BTC −1,48 % em 30 min com 8× volume às 12:30Z; fila D-P13/D-P14/D-P15/D-P16/H-P16
+- `52cb0d6` — T3.65b (D-P15 do plantão): o resolvedor de funding medido contra os mercados de 4 h —
+  premissa corrigida (PROM nunca esteve em 8 h; a transição de 14/08 é a volta 1 h → 4 h, não uma
+  aceleração; o único gap de 8 h dos três é lacuna de coleta em 24/06, recusa correta); cadência não
+  erra em nenhum dos 807 desfechos reais; defeito real corrigido com TDD sobre carimbos reais de PROM
+  — `_fulfilled`: um assentamento real respondendo o instante nominal não é ausência, mesmo do outro
+  lado de uma barreira de saída em minuto redondo; 3 376 de 175 416 janelas hipotéticas (1,9 %)
+  deixam de ser `funding_missing` indevido; nenhum zero fabricado; 207 janelas (0,35 %) seguem
+  recusadas de propósito nas transições; 27 + 41 + 341 testes → [[KB-0087-o-atraso-de-decisao-e-as-tres-correcoes]]
+- `ba79337` — T3.78 (API): meta diária — `GET /api/v1/orgs/{org}/lab/daily-goal`, apostas únicas
+  (dedupe por mercado × barra, versão mais antiga vence) vs. pooled, taxa de acerto, valor de 1 R
+  real (volume real do minuto sob `PAPER_V1.max_participation_pct`, p10/p50/p90) vs. rótulo R$250,
+  progresso e distância à meta (`DAILY_GOAL_BRL=9000`), eixo nomeado (`r_net`, funding nulo contado,
+  nunca recomputado), série de 30 dias; 21 unit + 6 integração; `PRODUCT.md` §4.2, `RISK_ENGINE.md` §4
+- `dfedff6` — T3.78 (web): painel "Meta diária" no Lab — apostas únicas, R único vs. pooled, acerto,
+  1 R real hoje (p50, p10–p90), meta R$9.000, distância, sparkline de 30 dias (SVG próprio); nulo vira
+  frase com o motivo, nunca número; verde só com valor real ≥ meta; 1 183 testes web
+- `e6b962f` — T3.74c + T3.74d: o worker deixa de processar uma vela por vez — causa medida na VPS
+  (92,7 % de um núcleo, 303 entradas atrás do stream, ~200 mercados fechando a vela no mesmo
+  segundo); `BarDispatcher` processa mercados em paralelo (`SHADOW_WORKER_CONCURRENCY=8`) e serializa
+  velas do mesmo mercado; decisões byte-idênticas serial vs. concorrente em banco real; mais de 4× de
+  vazão no benchmark sintético 11×200; válvula `SHADOW_LATE_DELAY_BACKLOG_MAX_S=120`; T3.74d fecha
+  achado HIGH da revisão — dedupe por id em voo (`already_in_flight`) e `SHADOW_CLAIM_IDLE_MS`
+  derivado de concorrência × custo por barra; 353 unitários + benchmark; **não implantado** por esta
+  tarefa (replay do T3.76 em curso) → [[KB-0087-o-atraso-de-decisao-e-as-tres-correcoes]]
+- `ac03216` — T3.79: latência ponta a ponta medida por trecho e publicada — histogramas e heartbeat
+  para `ingest` (nunca existia carimbo) e `flush` no market-worker, `admissão`/`fill` no
+  execution-worker; `GET /api/v1/system/latency` com p50/p95 e SLO `ok`/`warn`/`critical` (alvos:
+  flush < 1 s, decisão p50 < 5 s / p95 < 20 s, admissão < 2 s, fill < 2 s, ponta a ponta < 10 s);
+  medido na VPS 24 h: flush p50 1,03 s / p95 3,5–4,1 s (`critical`), decisão p50 20–208 s (`critical`,
+  T3.74c/d ainda não implantados nesta leitura), ingest/admissão/fill `unknown`; 105 testes
+- `fd30528` — T3.77 + T3.77b + T3.77c: amplitude do universo como estado (H-P8/H-P10) — série
+  `breadth_5m` (fração de perpétuos monitorados com fechamento abaixo do de 5 min antes, só as 6
+  velas completas, cobertura < 80 % → `insufficient_coverage`), produtor por minuto no
+  scanner-worker com trava Redis, migração `0019 market_breadth` (global, imutável por privilégio,
+  `end_time`-ancorada), terceira regra de elegibilidade `breadth` no envelope (ordem hora → regime →
+  amplitude); medição: 200 perpétuos, só 4 de 91 dias passariam o piso de cobertura → `EXP-0027`
+  prospectiva, não retroativa; `DATABASE.md` §31, `ACTIVATION.md` §7c
+- `2a1869d` — T3.78b: lucro real em USDT (moeda negociada) **e** em BRL pela cotação USDT/BRL
+  observada, com fonte e instante (`fx: {rate, source, observed_at, available_at}`, `null` com
+  motivo) — aditivo à API da meta diária (`value_of_1r.real_usdt_p10/50/90`, `progress.real_usdt`,
+  `series_30d[].unique_usdt`); painel mostra USDT como número principal, BRL abaixo e a linha da
+  cotação; 33 unit + 6 integração
+- `60f3fe6` — T3.79 (web): bloco "Latência" na tela de status do sistema — uma linha por trecho
+  (evento → vela, vela → publicação, vela → decisão, decisão → admissão, admissão → fill, ponta a
+  ponta) com p50/p95, alvo e selo de estado; linha crítica em vermelho com ícone; "sem medição:
+  `<motivo>`" nunca vira número; 1 226 testes web
+- `107abc6` — T3.81: o flush da vela esperava 1,0 s fixo (`persist.py::drain_loop`,
+  `FLUSH_INTERVAL_S`) desde o primeiro item do lote, e quem chegava depois do corte pagava outro
+  segundo inteiro sozinho — uniforme nos 4 shards e em todos os minutos (não é desbalanceamento);
+  correção: `MARKET_CANDLE_FLUSH_MS` (padrão 200 ms, cadência do `tick_coalesce_ms`) sem tocar
+  semântica de vela/cobertura; ganho real só verificável após deploy; `PIPELINE.md` §6b →
+  [[KB-0087-o-atraso-de-decisao-e-as-tres-correcoes]]
+- `2a44996` — T3.80: o replay sai do container da linha viva — serviço `replay-worker` (mesma
+  imagem, pool 2, 3 vCPU/2 GB, sem `HUNTER_ROLE`) + subcomando `compose.sh replay`; `run.py` recusa
+  rodar dentro do worker vivo (`role_guard`); portão de pausa ganha o motivo `decision_lag` lido do
+  heartbeat (p50 > 10 s ou p95 > 30 s, histerese de 5 min); prova local: dreno vivo com replay em
+  processo separado no mesmo Postgres, p95 3,33 s (< 20 s); 16 + 64 testes; `DEPLOYMENT.md` §5.2,
+  `ACTIVATION.md` §7, `PIPELINE.md` §6c → [[KB-0087-o-atraso-de-decisao-e-as-tres-correcoes]]
+- `e81d53e` — T3.76 (lote de validação em um dia, `EXP-0026` "regime como estratégia"): backfill do
+  regime horário do BTC de 784 (36 %) para 2 161/2 161 horas dos 90 d via `regime_hourly
+  --repair-days 90` pela `ops` (idempotente: 3ª passada escreveu 0; 205 `UNKNOWN` restantes são
+  aquecimento de tendência antes de 21/06); pré-registro corrigido (Δ pareado por barra mede zero por
+  construção num portão puro → o contraste vira condicional × incondicional; o pareado vira prova de
+  que o portão é só portão); 48 fatias, 552 960 barras, 0 erros; `v15` (SIDEWAYS+LOW_VOL) +0,036 R,
+  `v16` (SIDEWAYS) +0,045, `v17` (HIGH_VOL, falseamento) +0,061 — nenhum IC de blocos de dia exclui
+  zero (±0,2 R com 21–35 dias), estresse frágil a custos, o braço de falseamento venceu (hipótese
+  refutada); `momentum v11` em 90 d: −0,0595 R (n=1 167), `sem_vantagem_na_base`, 16/16
+  leave-one-market-out negativos; veredito: descartar os quatro; aposentadorias bloqueadas pela `ops`
+  (HEAD sem imagem construída) — executadas pelo orquestrador após `compose.sh update` para este
+  mesmo commit, 15:26 BRT → [[EXP-0026-regime-como-estrategia]]
+
 ## 2026-09-09
 
 *(18 commits, `7254a46..d21a11d`, das 21:57 de 2026-09-08 (Brasília) à madrugada/manhã de

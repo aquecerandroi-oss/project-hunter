@@ -1,6 +1,6 @@
 ---
 tags: [knowledge, indice]
-updated: 2026-09-09
+updated: 2026-09-10
 status: em construção
 owner: sexta-feira
 ---
@@ -26,7 +26,7 @@ Cada nota é uma síntese própria (nunca cópia), com fonte, data, qualidade da
 | Livros de estratégia | KB-0045, KB-0046, KB-0047, KB-0048, KB-0049, KB-0050, KB-0051, KB-0052, KB-0053, KB-0054, KB-0055 | sexta rodada feita (2026-09-06) |
 | Meme coins | KB-0056, KB-0057, KB-0058, KB-0059, KB-0060, KB-0061, KB-0062, KB-0063, KB-0064, KB-0065 | **sétima rodada feita (2026-09-06)** |
 | **Plantão de mercado (T3.64) — literatura recente ligada ao resultado do Lab** | KB-0082, **KB-0085**, **KB-0086** | **iniciado (2026-09-09, run 1, faixa 1); run 5 (2026-09-10, faixa 1) acrescenta a auditoria de liquidez de Aldridge e o estudo negativo de custo de Zeng et al.** — reversão de 15 m em cripto: o sinal está no sinal do candle e no fluxo taker, e sozinho não paga custo |
-| **Diagnóstico do nosso próprio resultado** | KB-0008, KB-0076, KB-0079, **KB-0083** | **primeira nota de medição própria em larga escala (2026-09-08, T3.32)** — o custo em R é praticamente toda a perda; **KB-0079 (2026-09-09, T3.53) controla multiplicidade sobre 2 248 células e sobra uma: `momentum v8` perde em `SIDEWAYS`**; **KB-0083 (2026-09-10, D-P9) decompõe a hora de −34 R de 09/09: 9 apostas × 4,3 versões, deriva + impulso de amplitude de 194/200 perpétuos, BTC não caiu** |
+| **Diagnóstico do nosso próprio resultado** | KB-0008, KB-0076, KB-0079, KB-0083, **KB-0087** | **primeira nota de medição própria em larga escala (2026-09-08, T3.32)** — o custo em R é praticamente toda a perda; **KB-0079 (2026-09-09, T3.53) controla multiplicidade sobre 2 248 células e sobra uma: `momentum v8` perde em `SIDEWAYS`**; **KB-0083 (2026-09-10, D-P9) decompõe a hora de −34 R de 09/09: 9 apostas × 4,3 versões, deriva + impulso de amplitude de 194/200 perpétuos, BTC não caiu**; **KB-0087 (2026-09-10, tarde) fecha as três causas do atraso decisão-menos-barra que a KB-0083 tinha aberto — despacho serial, replay dentro do worker vivo, flush de 1,0 s fixo — com correção medida nas três** |
 
 ## Notas
 _(uma linha por nota: link para a nota — fonte curta — qualidade da evidência — hipótese sim/não)_
@@ -119,6 +119,7 @@ _(uma linha por nota: link para a nota — fonte curta — qualidade da evidênc
 | [[KB-0084-tres-motores-abertos-funding-latencia-e-nulo]] | ferramentas / backtest / funding / latência / nulo | Freqtrade, Jesse e Hummingbot — documentação e código lidos em 2026-09-10 (plantão T3.64, run 4, faixa 4) + correções da Astra | documentação e código; uma medição de usuário de 2023; **nenhuma medição própria** | sim — reforço da H-P11 (dois testes de nulo separados) e H-P13 (cap por ocupação sob o mesmo orçamento de risco); D-P11 (cobertura de funding por versão) e D-P12 (latência por etapa e build) |
 | [[KB-0085-auditoria-de-liquidez-o-sinal-de-uma-covariancia]] | liquidez / covariância / mean_reversion / redundância | Aldridge, arXiv 2606.29018v2 (2026-08-13) — HTML completo lido três vezes em 2026-09-10 (plantão T3.64, run 5, faixa 1) + correções da Astra | teoria + calibração em CRSP diário 2016–2025; nada de cripto; **nenhuma medição própria** | sim — D-P13 (descritivo, por último): Cov(c_t causal, π na grade completa) por versão × mercado, sem expectativa de sinal; a redundância entre versões **não** se mede com o N² (fica na H-P13) |
 | [[KB-0086-ic-positivo-nao-paga-o-pedagio-btc-perp-5-min]] | custos / funding / auditoria point-in-time / BTC perp | Zeng, Yang, Han & He, arXiv 2608.25348 (2026-08) — HTML completo lido em 2026-09-10 (plantão T3.64, run 5) + correções da Astra | preprint dos autores: 2 anos, 5 min, um instrumento, 23 × 20 células de custo dependentes; **nenhuma medição própria** | sim — D-P14 (fronteira de custo por versão viva: taxa {2, 4…10} × slippage {1…10} bp, funding só nos settlements cruzados, maior custo suportável com IC) e auditoria point-in-time própria dos mark/index/funding antes de somar o replay |
+| [[KB-0087-o-atraso-de-decisao-e-as-tres-correcoes]] | diagnóstico do resultado / instrumento / latência | dado próprio da VPS e local (T3.74c/d, T3.80, T3.81, T3.79) — `hb:strategy:shadow`, `docker stats`, benchmark sintético e testcontainer | medição própria (VPS) + prova local (benchmark/testcontainer), **não relida em produção depois do deploy** | não — é correção de instrumento; fecha a causa que a KB-0083 tinha aberto (despacho serial, replay no worker vivo, flush de 1,0 s fixo) |
 
 ## O que a primeira rodada mudou de fato
 
