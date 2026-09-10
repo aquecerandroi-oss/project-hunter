@@ -1198,6 +1198,33 @@ Os arquivos ficam no **mesmo disco**: é proteção contra erro humano e
 corrupção lógica, não contra perda da máquina. Cópia para fora do host ainda
 não existe.
 
+**Restore — rehearsal, não o comando destrutivo do topo do script.** O
+comentário em `infra/vps/backup_postgres.sh` documenta o restore
+**destrutivo** (`pg_restore --clean --if-exists -d hunter`, sobrescreve o
+banco vivo) — só para um incidente real. Para **provar** que um dump restaura
+sem tocar em nada que importa, o caminho é um banco descartável, nunca o
+`hunter`:
+
+```bash
+docker exec hunter-postgres-1 createdb -U hunter hunter_restore_check
+docker cp /opt/backups/<arquivo>.dump hunter-postgres-1:/tmp/restore_check.dump
+docker exec hunter-postgres-1 pg_restore -U hunter -d hunter_restore_check \
+  --no-owner --no-privileges -j 2 /tmp/restore_check.dump
+# comparar count(*) das tabelas do ledger contra o banco vivo (leitura,
+# repeatable read read only), depois:
+docker exec hunter-postgres-1 dropdb -U hunter hunter_restore_check
+docker exec hunter-postgres-1 rm -f /tmp/restore_check.dump
+```
+
+`-j 2` (restore paralelo) exige um arquivo com seek — por isso o `docker cp`
+antes; `pg_restore -j` não funciona lendo de um pipe/stdin. `--no-owner
+--no-privileges` é suficiente para checar integridade de dados; não recria os
+`GRANT` para `hunter_runtime`, então não serve como restore de produção sem
+reconceder os privilégios depois (ou rodar sem essas duas flags). Rehearsal
+real executado em 2026-09-10 (T3.71): dump de 1,09 G restaurado em ~6 min sem
+erros, 6,4 G no disco, contagens batendo com o banco vivo; números completos
+em `docs/ACTIVATION.md` §8 linha 5 e "§restore".
+
 ### 9.5 Bug encontrado ao configurar (fora desta seção)
 
 `CORS_ALLOWED_ORIGINS` **não pode** ser definida como no `.env.example`
