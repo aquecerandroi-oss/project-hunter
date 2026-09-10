@@ -239,12 +239,16 @@ services:
       # 20 + 20 = 40 keeps the same ~1.25x headroom the old 10/8 ratio had.
       # Postgres max_connections is 100 and every other service combined held
       # ~33 at measurement time, so this leaves comfortable room.
-      DB_POOL_SIZE: "20"
-      DB_MAX_OVERFLOW: "20"
+      DB_POOL_SIZE: "5"
+      DB_MAX_OVERFLOW: "5"
+      SHADOW_WORKER_CONCURRENCY: "8"
     logging: *prod-logging
 
   # T3.74f — the other three shards (profile `strategy-shards` of the base
   # compose). `STRATEGY_SHARD` itself is not repeated here: the base file's
+  # T3.74f-hotfix (10/09 17:50 BRT): 4 shards x (20+20) = 160 conexoes > max_connections=100
+  # (asyncpg TooManyConnectionsError em producao). Cada shard atende ~50 mercados:
+  # pool 5+5 e concorrencia 8 por shard (32 no total) cabem em 100 com folga.
   # `strategy-worker-{1,2,3}` (each `extends: strategy-worker`) already set
   # it to `{i}/${STRATEGY_SHARDS:-1}`, and this override only merges in the
   # production DSN/role/pool, the same minimal shape `market-worker-{1,2,3}`
@@ -263,8 +267,9 @@ services:
       <<: *prod-db-env
       HUNTER_ROLE: strategy
       HEALTH_PORT: "8001"
-      DB_POOL_SIZE: "20"
-      DB_MAX_OVERFLOW: "20"
+      DB_POOL_SIZE: "5"
+      DB_MAX_OVERFLOW: "5"
+      SHADOW_WORKER_CONCURRENCY: "8"
     logging: *prod-logging
 
   strategy-worker-2:
@@ -273,8 +278,9 @@ services:
       <<: *prod-db-env
       HUNTER_ROLE: strategy
       HEALTH_PORT: "8001"
-      DB_POOL_SIZE: "20"
-      DB_MAX_OVERFLOW: "20"
+      DB_POOL_SIZE: "5"
+      DB_MAX_OVERFLOW: "5"
+      SHADOW_WORKER_CONCURRENCY: "8"
     logging: *prod-logging
 
   strategy-worker-3:
@@ -283,8 +289,9 @@ services:
       <<: *prod-db-env
       HUNTER_ROLE: strategy
       HEALTH_PORT: "8001"
-      DB_POOL_SIZE: "20"
-      DB_MAX_OVERFLOW: "20"
+      DB_POOL_SIZE: "5"
+      DB_MAX_OVERFLOW: "5"
+      SHADOW_WORKER_CONCURRENCY: "8"
     logging: *prod-logging
 
   # Replay lane (T3.80, infra/docker/docker-compose.yml). `*prod-db-env` for
