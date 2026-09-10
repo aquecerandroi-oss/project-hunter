@@ -227,3 +227,93 @@ criei migração.
 9. `real_brl` é teto superior: só participação e risco por operação, não a carteira inteira do dia
    (T3.60 mede o motor completo; aqui é uma leitura por requisição, mais barata e mais otimista).
 10. Nada em `apps/web`, `services`, `packages/risk-core`; nenhuma migração; nada commitado.
+
+---
+
+## 7. Web — painel "Meta diária" (T3.78, frontend-specialist, 2026-09-10)
+
+### STATUS: DONE_WITH_CONCERNS
+
+Consome o schema congelado em §1 exatamente como publicado, sem editar `apps/api/**`.
+
+### 7.1 Arquivos
+
+- `apps/web/lib/api/lab-daily-goal-types.ts` — `zod` mirror do `DailyGoalOut` (não passou por
+  `pnpm gen:types` ainda, mesma convenção de `manual-orders-types.ts`).
+- `apps/web/lib/api/lab-daily-goal.ts` — `getLabDailyGoal(orgId, {day?})`, `"server-only"`,
+  `.parse()` antes de confiar na resposta.
+- `apps/web/components/lab/lab-daily-goal-format.ts` — formatação/mapeamento puro (dedupe, eixo,
+  taxa de acerto, `null` → frase com motivo, cor semântica da meta, "sobrou"/"faltam" com sinal
+  correto).
+- `apps/web/components/lab/lab-daily-goal-sparkline.tsx` — SVG sem biblioteca, `sparklineGeometry`
+  pura exportada para teste; `stroke="currentColor"` (compatível com os dois temas sem branch).
+- `apps/web/components/lab/lab-daily-goal-date-picker.tsx` — `<input type="date">` client,
+  reescreve `?day=` (mesma convenção de `lab-filters.tsx`).
+- `apps/web/components/lab/lab-daily-goal-panel.tsx` — o painel em si (Server Component).
+- `apps/web/app/(app)/[orgSlug]/lab/page.tsx` — `loadDailyGoal` isolado (falha própria vira
+  `SectionUnavailable`, nunca derruba o resto de `/lab`), painel inserido logo após `LabHeader` e
+  antes do Placar (topo do scoreboard, por brief); `DailyGoalSection` extraído para manter a
+  complexidade de `LabPage` dentro do orçamento do lint.
+
+### 7.2 Testes (novos)
+
+- `apps/web/tests/lab-daily-goal-types.test.ts` — parse do exemplo real do §1 verbatim, ramos
+  `null`+motivo (FX ausente, sem apostas), rejeita drift de tipo (`goal_brl` número).
+- `apps/web/tests/lab-daily-goal.test.ts` — path/query, `.parse()` na resposta.
+- `apps/web/tests/lab-daily-goal-format.test.ts` — dedupe/eixo/taxa de acerto/meta/sinal de
+  distância/"o que 1R precisaria valer"/"quantos R únicos faltariam", todos os ramos `null`.
+- `apps/web/tests/lab-daily-goal-sparkline.test.ts` — geometria pura (flat series, flip de Y,
+  espaçamento, linha de zero só quando cruza zero).
+
+### 7.3 Comandos e saídas reais
+
+```
+$ cd apps/web && npx vitest run tests/lab-page.test.tsx tests/lab-daily-goal-format.test.ts \
+    tests/lab-daily-goal.test.ts tests/lab-daily-goal-types.test.ts tests/lab-daily-goal-sparkline.test.ts
+ Test Files  5 passed (5)
+      Tests  57 passed (57)
+
+$ npx turbo run typecheck lint test --filter=@hunter/web
+@hunter/web:typecheck: $ tsc --noEmit   -> sem erros
+@hunter/web:lint: $ eslint .            -> 0 errors, 2 warnings (pré-existentes: tests/lab-page.test.tsx
+                                            e tests/ws.test.ts, ambos > 350 linhas antes desta tarefa,
+                                            não tocados aqui)
+@hunter/web:test:                       -> Test Files 126 passed (126); Tests 1183 passed (1183)
+ Tasks:    3 successful, 3 total
+```
+
+Playwright não foi executado: sem servidor dev rodando e o Chromium deste ambiente não alcança
+`localhost`/Clerk (nota de memória "in-app-browser-limits" já registrada) — checagem visual
+logada só é possível fora deste sandbox.
+
+### 7.4 CONCERNS (frontend)
+
+1. **Lucro real em USDT não é exibido como número.** O schema congelado (§1) publica só
+   `real_brl_p10/50/90` e `progress.real_brl` — nunca o valor em USDT nem a taxa FX usada para
+   chegar até ele. Converter o BRL de volta para USDT por uma razão diferente (ex.: a proporção
+   atual `equity_brl/equity_usdt` da carteira, já calculada por `lab-money.ts` para outra parte da
+   tela) seria misturar duas fontes/dois instantes de câmbio e produzir um número projetado
+   vestido de real — na contramão explícita da regra de Everton. O painel mostra uma frase fixa e
+   honesta (`USDT_PROFIT_UNAVAILABLE_REASON`) em vez de um valor. Se Everton quiser o USDT na tela,
+   é o backend quem precisa publicar `real_usdt_p50` (ou o `fx_rate` observado) no schema — mudança
+   de contrato, fora do escopo "frontend consome o schema congelado" deste brief.
+2. **`goalStatus`/cor semântica dependem só de `progress.real_brl`.** Segue a regra literal de
+   Everton (verde só com valor real >= meta); um dia com `real_brl` nulo (FX ausente, sem apostas)
+   sempre renderiza neutro, nunca "quase lá" por extrapolação do rótulo fictício.
+3. Não toquei `apps/api/**`, nenhum `.env*`, nenhum commit.
+
+### 7.5 `git status --porcelain` (só os meus arquivos)
+
+```
+ M apps/web/app/(app)/[orgSlug]/lab/page.tsx
+?? apps/web/components/lab/lab-daily-goal-date-picker.tsx
+?? apps/web/components/lab/lab-daily-goal-format.ts
+?? apps/web/components/lab/lab-daily-goal-panel.tsx
+?? apps/web/components/lab/lab-daily-goal-sparkline.tsx
+?? apps/web/lib/api/lab-daily-goal-types.ts
+?? apps/web/lib/api/lab-daily-goal.ts
+?? apps/web/tests/lab-daily-goal-format.test.ts
+?? apps/web/tests/lab-daily-goal-sparkline.test.ts
+?? apps/web/tests/lab-daily-goal-types.test.ts
+?? apps/web/tests/lab-daily-goal.test.ts
+```

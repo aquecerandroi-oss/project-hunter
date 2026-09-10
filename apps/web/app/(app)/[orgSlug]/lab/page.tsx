@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { LabCurveSection } from "@/components/lab/lab-curve-section";
+import { LabDailyGoalPanel } from "@/components/lab/lab-daily-goal-panel";
 import { LabError } from "@/components/lab/lab-error";
 import { LabHeader } from "@/components/lab/lab-header";
 import { buildReferenceRuler, buildWalletRuler, type MoneyRuler } from "@/components/lab/lab-money";
@@ -12,6 +13,8 @@ import { SectionUnavailable } from "@/components/ui/section-unavailable";
 import { DEFAULT_AUTO_REFRESH_INTERVAL_MS } from "@/lib/auto-refresh-interval";
 import { isApiError } from "@/lib/api-error";
 import { getLabCurve, getLabScoreboard, getLabSignals, getLabSummary, listLabVersions } from "@/lib/api/lab";
+import { getLabDailyGoal } from "@/lib/api/lab-daily-goal";
+import type { DailyGoalOut } from "@/lib/api/lab-daily-goal-types";
 import type { CurveOut, LabSignalsPageSize, LabSignalsState, LabSummaryOut, LabVersionsOut, ScoreboardOut, ScoreboardRowOut } from "@/lib/api/lab-types";
 import { resolveOrgContext } from "@/lib/api/org-context";
 import { getPortfolioSummary, listPortfolios } from "@/lib/api/portfolio";
@@ -19,7 +22,7 @@ import { logger } from "@/lib/logger";
 
 export interface LabPageProps {
   params: Promise<{ orgSlug: string }>;
-  searchParams: Promise<{ window?: string; cohort?: string; version?: string } & LabSignalsRawSearchParams>;
+  searchParams: Promise<{ window?: string; cohort?: string; version?: string; day?: string } & LabSignalsRawSearchParams>;
 }
 
 // No realtime channel and no per-response `stale_after_ms` of its own (this
@@ -133,6 +136,27 @@ async function loadScoreboard(): Promise<ScoreboardLoad> {
   }
 }
 
+type DailyGoalLoad = { ok: true; data: DailyGoalOut } | { ok: false; reason: string };
+
+/**
+ * The "Meta diária" panel's own data (brief T3.78, Everton 2026-09-10),
+ * independent of every other load on this page: a failure here degrades to
+ * its own `SectionUnavailable`, exactly like `loadScoreboard` below, never
+ * blocking the rest of `/lab`. `day` is the raw `?day=` query value (Brasília
+ * calendar day, `lib/time.ts::BRASILIA_TIME_ZONE`) -- omitted, the API
+ * resolves its own default (today in America/Sao_Paulo).
+ */
+async function loadDailyGoal(orgId: string, day: string | undefined): Promise<DailyGoalLoad> {
+  try {
+    const data = await getLabDailyGoal(orgId, day ? { day } : {});
+    return { ok: true, data };
+  } catch (error) {
+    const reason = isApiError(error) ? (error.detail ?? error.message) : "erro desconhecido";
+    logger.error("lab_daily_goal_load_failed", { error: reason });
+    return { ok: false, reason };
+  }
+}
+
 /**
  * The organization's real principal paper wallet equity (brief T3.17: "a
  * quantia do patrimônio, nunca digitada"), or a fixed, labelled reference
@@ -159,6 +183,17 @@ function Eyebrow({ children }: { children: string }) {
 }
 
 /**
+ * "Meta diária" (brief T3.78): rendering-only ternary pulled out of `LabPage`
+ * itself so that Server Component's own cyclomatic complexity stays under
+ * the lint config's budget -- same reasoning as `lab-totals-card.tsx`'s
+ * `SiblingVersionsNote`/`MoneyDivergenceNote` extractions.
+ */
+function DailyGoalSection({ result, day }: { result: DailyGoalLoad; day: string | undefined }) {
+  if (!result.ok) return <SectionUnavailable title="Meta diária" reason={`falha ao carregar (${result.reason})`} />;
+  return <LabDailyGoalPanel day={day ?? result.data.day} data={result.data} />;
+}
+
+/**
  * `/[orgSlug]/lab` (docs/plans/SHADOW-LAB.md, S3): the Shadow tab --
  * hypothetical, no-capital decisions and their tracked outcomes over real M1
  * data. Page order per brief T3.24b (opção A, "Placar-primeiro"): faixa
@@ -176,12 +211,14 @@ export default async function LabPage({ params, searchParams }: LabPageProps) {
   const cohort = sp.cohort?.trim() || "prospective";
   const versionId = sp.version || undefined;
   const { state, pageSize, cursorPath, cursor } = parseLabSignalsQuery(sp);
+  const day = sp.day?.trim() || undefined;
 
-  const [result, ruler, scoreboardResult, signalsResult] = await Promise.all([
+  const [result, ruler, scoreboardResult, signalsResult, dailyGoalResult] = await Promise.all([
     loadLab(window, cohort),
     loadMoneyRuler(membership.organization.id),
     loadScoreboard(),
     loadSignals({ cohort, versionId, state, pageSize, cursor }),
+    loadDailyGoal(membership.organization.id, day),
   ]);
 
   return (
@@ -190,6 +227,12 @@ export default async function LabPage({ params, searchParams }: LabPageProps) {
       <h1 className="text-xl font-semibold text-fg">Lab</h1>
 
       <LabHeader asOf={result.ok ? result.summary.as_of : null} versions={result.ok ? result.summary.versions : []} ruler={ruler} />
+
+      {/* "Meta diária" (brief T3.78, Everton 2026-09-10): real-money profit
+          panel at the top of the Placar, independent of the window/cohort
+          filters below and of `loadLab`/`loadScoreboard` -- its own
+          `?day=` query param, its own isolated failure. */}
+      <DailyGoalSection result={dailyGoalResult} day={day} />
 
       {/* The Placar (brief T3.18, opção A: "top of /lab" right after the
           SOMBRA banner): every version that has ever emitted a signal, at a
