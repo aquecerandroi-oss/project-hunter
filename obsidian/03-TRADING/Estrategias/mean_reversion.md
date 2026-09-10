@@ -83,3 +83,40 @@ depreciada por esta tarefa (recomendação para o orquestrador). O que sobra de 
 um portão de regime que restrinja a família à janela em que ela funciona — versão nova, não ajuste,
 no mesmo desenho do [[EXP-0020-regime-gate]].
 
+
+**Acréscimo de 2026-09-10 (T3.76, quant-engineer) — o portão de regime foi medido em 90 dias, e não
+salva a família.** O parágrafo acima terminava dizendo que "o que sobra de valioso é a hipótese de um
+portão de regime que restrinja a família à janela em que ela funciona". Ela foi testada hoje, com
+pré-registro em [[EXP-0026-regime-como-estrategia]] escrito **antes** das corridas. Três braços
+derivados da `v10` (conjunto congelado byte a byte, só `eligibility_policy` muda) e replayados nos
+mesmos 90 dias × 16 mercados, 12 fatias cada, 138 240 barras cada, 0 erros:
+
+| braço | portão | n / dias | ex-funding | PF | Δ vs pai | IC 95 % do Δ (blocos de dia) | estresse |
+|---|---|---:|---:|---:|---:|---|---|
+| `v15` | `SIDEWAYS,LOW_VOLATILITY` | 209 / 35 | **+0,0359** | 1,134 | +0,0651 | [−0,0832; +0,2024] | frágil a custos, dependente de metade |
+| `v16` | `SIDEWAYS` | 169 / 30 | **+0,0451** | 1,175 | +0,0744 | [−0,1135; +0,2362] | frágil a custos |
+| `v17` | `HIGH_VOLATILITY` (falseamento) | 222 / **21** | **+0,0613** | 1,223 | +0,0905 | [−0,1540; +0,2763] | frágil a custos, dependente de metade |
+
+Pai `v10` na mesma janela: −0,0293 R, PF 0,910, 798 decisões em 89 dias.
+
+Três leituras, e a terceira é a que decide. **(1) O portão funciona exatamente como portão:** o Δ
+pareado por (mercado, barra) contra o pai é **0,0000 R** nos três braços (202/209, 159/169 e 216/222
+barras compartilhadas), e as 7/10/6 decisões que sobram são a divergência de máquina de estados do
+slot que o `docs/PIPELINE.md` §4b item 11 já previa. **(2) O sinal de calendário sobrevive ao corte
+por regime:** os três braços passam "positivo em 2 das 3 janelas" e nenhum leave-one-market-out fica
+negativo, mas o estresse marca os três como **frágeis a custos** (custo ×2 leva os três a expectativa
+negativa) e dois deles como **dependentes de metade**. **(3) O intervalo não exclui zero em nenhum
+braço.** O portão compra expectativa **pagando em dias**: a `v17` concentra 222 decisões em 21 dias, e
+o bootstrap de blocos de dia tem 21 blocos — o IC nasce com ±0,2 R de largura. É por isso que os três
+foram **descartados** pela regra pré-registrada, apesar de todos terem ponto positivo.
+
+**E o braço de falseamento venceu.** `HIGH_VOLATILITY` — pré-registrado como "esperado pior" — tem o
+maior ponto (+0,0613 R) e o maior PF (1,223), acima dos dois braços de consolidação. A hipótese
+"a vantagem é a consolidação" está **refutada**; o que sobrou é a hipótese oposta, e ela **não** pode
+ser declarada vencedora aqui: `HIGH_VOLATILITY` é candidata a disfarce de calendário (176 das suas 337
+horas estão em agosto–setembro, e o estresse mostra 1ª metade −0,0960 contra 2ª metade +0,2000).
+
+Recomendação ao orquestrador: aposentar `v15`, `v16` e `v17` (a tarefa não conseguiu — ver
+`.claude/state/notes-T3.76.md` §7: o HEAD da VPS foi para um commit sem imagem construída e
+`compose.sh ops` recusa por desenho). Enquanto isso as três estão **`active`** e decidindo na faixa
+viva.

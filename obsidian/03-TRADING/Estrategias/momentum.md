@@ -56,3 +56,24 @@ portão **não** é subconjunto do pai nas decisões (só nas barras — 3 das 1
 têm correspondente no pai, todas em 2026-09-03), e o critério K4 (`unavailable`) deixa de ser
 mensurável nela — o número honesto é o K4 do pai. Sem página própria nesta sessão.
 
+
+**Acréscimo de 2026-09-10 (T3.76, quant-engineer) — `v11` medida em 90 dias pela primeira vez, e
+negativa.** Pré-registro em [[EXP-0026-regime-como-estrategia]]. A `v11` (portão
+`btc:BTC_BULL,HIGH_VOLATILITY` sobre a `v8`) foi replayada em **90 dias × 16 mercados** (12 fatias,
+138 240 barras, 0 erros, coorte `replay:70f55430…`): **1 167 desfechos terminais em 47 dias**,
+ex-funding **−0,0595 R**, `R_net` −0,0588, PF 0,815, soma −69,4 R. **K3 dispara** (≥ 100 avaliáveis,
+≥ 30 dias, expectativa bruta negativa) e o estresse fecha em **`sem_vantagem_na_base`**. Por janela de
+30 d: −0,1101 / −0,2137 / +0,0931 — **1 de 3**, a mesma assinatura de calendário da família
+`mean_reversion`. Leave-one-market-out: **negativo nos 16** reajustes. Desfechos: 743 `invalidated`,
+272 `expired`, 111 `target`, 41 `stop`.
+
+**O contraste pré-declarado não existe, e isso é um fato sobre o roster, não sobre a versão.** O pai
+da `v11` é a `momentum v8`, que está `deprecated` desde 2026-09-09T19:21Z — e o replay recusa versão
+não executável (`momentum:v8 is not one runnable version`). Sem coorte de 90 d do pai não há Δ contra
+o controle pré-registrado; o veredito acima é da **população própria** da `v11`, que já é suficiente
+para descartar (K3 + `sem_vantagem_na_base` + 16 LOO negativos) sem precisar do contraste.
+
+Recomendação ao orquestrador: aposentar `momentum v11` (a tarefa não conseguiu — mesmo bloqueio de
+`compose.sh ops` descrito em `.claude/state/notes-T3.76.md` §7). Se alguém quiser o contraste contra o
+pai algum dia, ele exige reviver a `momentum v8` por via auditada — decisão de quem cuida do roster,
+não deste caminho.
