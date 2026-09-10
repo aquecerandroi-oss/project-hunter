@@ -49,6 +49,7 @@ from hunter_execution_worker.bridge_inputs import (
 from hunter_execution_worker.bridge_rank import Ranked, count_outcome, rank_candidates
 from hunter_execution_worker.bridge_universe import beta_map
 from hunter_execution_worker.config import PRODUCER
+from hunter_execution_worker.risk_profile import wallet_limits
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -171,6 +172,13 @@ async def _submit(
         # (T3.29 item 4). Same rule as the manual path.
         _defer(result, chosen, "marks_incomplete", mark_quality=str(coverage.quality))
         return
+    resolved = await wallet_limits(session, wallet=wallet)
+    if resolved.limits is None:
+        # T3.69b: the wallet's limits are its linked ``risk_profiles`` row, and
+        # without a usable one nothing is admitted — deferred, so the signal's
+        # own window keeps running and the slot is not spent (ACTIVATION.md §8b).
+        _defer(result, chosen, resolved.state, detail=resolved.detail)
+        return
     prices = prices_with(coverage.marks, market_id=spot.market_id, price=liquidity.last_price)
     betas = await beta_map(session, market_ids=prices.keys(), now=now)
     admitted = await decide_requests(
@@ -190,6 +198,7 @@ async def _submit(
         ],
         now=now,
         source="agent",
+        limits=resolved.limits,
     )
     if not admitted:  # pragma: no cover - decide_requests only skips unknown markets
         return

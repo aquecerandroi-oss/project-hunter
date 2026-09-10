@@ -50,6 +50,9 @@ async def write_heartbeat(
         "mark_quality": str(health.mark_quality()),
         "pending_requests": str(health.pending_requests),
         "unreadable_requests": str(health.unreadable_requests),
+        # T3.69b: which source the engine is applying. Anything other than
+        # ``risk_profile_linked`` means this wallet is admitting nothing.
+        "risk_profile": health.risk_profile,
         "degraded_protections": str(len(health.degraded_protections)),
         "protection_delay_s": f"{health.protection_delay_s():.1f}",
         "last_mtm": _stamp(health.mtm_written_at),

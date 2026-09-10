@@ -23,12 +23,11 @@ if a single field differs — a wallet linked to a divergent row would be a limi
 change made by nobody, which is what ``seed_paper._refuse_diverging_preset``
 already refuses on the seed side.
 
-**What the engine reads today is the code constant, not this column.**
-``hunter_core.admission.admit`` takes ``limits: RiskLimits = PAPER_V1`` and
-``execution-worker``'s ``admission_cycle`` never passes the argument, so the row
-this script links is the **declared** source while the constant is the
-**enforced** one (proved equal by the round-trip tests). Making ``admit`` read
-the wallet's profile is T3.69b, and it is not this script.
+**Since T3.69b the engine reads this column, so this link is what turns the
+wallet on.** ``hunter_execution_worker.risk_profile`` resolves the limits from
+``portfolios.risk_profile_id`` on every admission pass and admits nothing
+without a usable row (RISK_ENGINE.md §2 v2.4) — before this script runs the
+paper wallet admits **zero** entries, while protections and MTM keep running.
 
 Connects with ``DATABASE_URL_MIGRATIONS`` (the owner DSN of the ``ops`` service,
 never the pooler), like ``infra/scripts/seed.py`` and

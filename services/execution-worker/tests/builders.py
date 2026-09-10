@@ -191,14 +191,56 @@ async def observe_fx(
     return observation_id
 
 
+async def link_paper_profile(
+    factory: async_sessionmaker[AsyncSession],
+    wallet: Wallet,
+    *,
+    limits: dict[str, Any] | None = None,
+) -> uuid.UUID:
+    """``docs/ACTIVATION.md`` §8b in test form: a ``paper_v1`` row, and the link.
+
+    T3.69b made the linked row the **applied** source of the wallet's limits, so
+    a wallet without one admits nothing. Written as ``hunter_app`` because
+    ``risk_profiles`` and ``portfolios`` are its tables (``ddl/tables.py``:
+    ``APP_WRITE_TABLES``) — the worker may read them, never write them — and
+    tenant-scoped rather than a system preset, which only the migrating role may
+    write under ``FORCE ROW LEVEL SECURITY``.
+    """
+    from hunter_risk.limits import PAPER_V1
+
+    profile_id = uuid7()
+    stored = PAPER_V1.model_dump(mode="json") if limits is None else limits
+    async with tenant_session(factory, wallet.tenant.org_id) as session:
+        await session.execute(
+            text(
+                "INSERT INTO risk_profiles (id, organization_id, name, preset, limits) VALUES "
+                "(:id, :org, 'Paper v1', 'paper_v1', CAST(:limits AS jsonb))"
+            ),
+            {"id": profile_id, "org": wallet.tenant.org_id, "limits": json.dumps(stored)},
+        )
+        await session.execute(
+            text("UPDATE portfolios SET risk_profile_id = :profile WHERE id = :id"),
+            {"profile": profile_id, "id": wallet.portfolio_id},
+        )
+    return profile_id
+
+
 async def open_wallet(
     factory: async_sessionmaker[AsyncSession],
     engine: AsyncEngine,
     tenant: Tenant,
     *,
     as_of: datetime = NOW,
+    link_profile: bool = True,
 ) -> Wallet:
-    """Open the wallet **as the engine** — §19.6: the curve is the worker's."""
+    """Open the wallet **as the engine** — §19.6: the curve is the worker's.
+
+    ``link_profile`` is on by default because since T3.69b a wallet without a
+    linked ``risk_profiles`` row admits nothing: every suite here is about what
+    happens *after* admission, so the operator act of ``ACTIVATION.md`` §8b is
+    part of opening a wallet in these tests. The one suite that is about the
+    link itself opens without it.
+    """
     from hunter_core.db.repositories.fx import FxObservationRepository
     from hunter_core.portfolio.opening import open_paper_wallet
 
@@ -213,7 +255,10 @@ async def open_wallet(
             fx=observation,
             as_of=as_of,
         )
-    return Wallet(tenant, result.portfolio_id)
+    wallet = Wallet(tenant, result.portfolio_id)
+    if link_profile:
+        await link_paper_profile(factory, wallet)
+    return wallet
 
 
 def market_identity(tenant: Tenant | SecondMarket) -> MarketIdentity:

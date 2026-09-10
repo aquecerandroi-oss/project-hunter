@@ -71,10 +71,14 @@ class Lab:
 
 
 async def _lab(
-    factory: async_sessionmaker[AsyncSession], engine: AsyncEngine, *, now: datetime = NOW
+    factory: async_sessionmaker[AsyncSession],
+    engine: AsyncEngine,
+    *,
+    now: datetime = NOW,
+    link_profile: bool = True,
 ) -> Lab:
     tenant = await create_tenant(engine)
-    wallet = await open_wallet(factory, engine, tenant)
+    wallet = await open_wallet(factory, engine, tenant, link_profile=link_profile)
     perp_market_id = await shadow.add_perp_market(engine, tenant)
     version_id = await shadow.create_version(engine, active=True, at=BAR)
     await shadow.set_spot_volume(engine, tenant.market_id, volume=Decimal(120_000_000))
@@ -519,3 +523,32 @@ async def _proposals(db_engine: AsyncEngine, lab: Lab) -> int:
             )
             or 0
         )
+
+
+async def test_an_unlinked_risk_profile_defers_the_candidate_and_writes_nothing(
+    db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
+) -> None:
+    """T3.69b: the bridge admits against the wallet's own limits, and a wallet
+    with no linked ``risk_profiles`` row has none — so the candidate is
+    **deferred** (nothing written, the 120 s window still running), never
+    admitted against the code constant. This is the VPS state before
+    ``docs/ACTIVATION.md`` §8b is run."""
+    lab = await _lab(db_session_factory, db_engine, link_profile=False)
+    await shadow.emit_signal(
+        db_engine,
+        version_id=lab.version_id,
+        market_id=lab.perp_market_id,
+        source_bar_close=BAR,
+        purpose=shadow.PURPOSE_PAPER,
+    )
+
+    outcome = await _cycle(db_session_factory, lab, _data(lab))
+
+    assert outcome.deferred == "risk_profile_missing"
+    assert outcome.submitted is None
+    async with db_engine.begin() as connection:
+        proposals = await connection.scalar(
+            text("SELECT count(*) FROM trade_proposals WHERE portfolio_id = :pf"),
+            {"pf": lab.wallet.portfolio_id},
+        )
+    assert proposals == 0

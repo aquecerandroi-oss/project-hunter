@@ -34,7 +34,7 @@ from hunter_risk.kill_switch import (
     most_restrictive,
     resume,
 )
-from hunter_risk.limits import PAPER_V1, RiskLimits
+from hunter_risk.limits import PAPER_V1, RiskLimits, diverged_fields
 from hunter_risk.observations import book_capacity_qty, observed_price, worst_entry_price
 from hunter_risk.sizing import round_trip_cost_fraction, size_entry
 
@@ -66,6 +66,7 @@ __all__ = [
     "advance_peak",
     "assess",
     "book_capacity_qty",
+    "diverged_fields",
     "entry_size_multiplier",
     "evaluate",
     "evaluate_exit",

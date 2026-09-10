@@ -56,6 +56,12 @@ class CycleHealth:
 
     pending_requests: int = 0
     unreadable_requests: int = 0
+    risk_profile: str = "unknown"
+    """How the wallet's linked ``risk_profiles`` row resolved on the last
+    admission pass — ``risk_profile_linked`` when the engine is applying it, or
+    the named refusal that is admitting nothing (T3.69b). ``unknown`` until the
+    first pass: a process that has not looked yet must not claim it is fine."""
+
     bridge_at: datetime | None = None
     """When the autonomy bridge last completed a cycle. ``None`` for ever while
     ``ENABLE_PAPER_AUTONOMY`` is false, which is the normal state."""

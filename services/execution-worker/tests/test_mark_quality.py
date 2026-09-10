@@ -114,6 +114,17 @@ class TestTheOperatorSeesTheQualityNextToTheWrite:
         assert redis.written["marked_positions"] == "1"
         assert redis.written["open_positions"] == "2"
 
+    async def test_the_heartbeat_names_which_risk_profile_the_engine_applies(self) -> None:
+        # T3.69b: a wallet whose ``risk_profiles`` link is missing, unvalidatable
+        # or diverged admits nothing, and the operator has to be able to read
+        # that from the same key the shift report already reads.
+        redis = _Redis()
+        health = CycleHealth()
+        assert health.risk_profile == "unknown"
+        health.risk_profile = "risk_profile_missing"
+        await write_heartbeat(cast("Any", _Runtime(redis)), health, ExecutionConfig())
+        assert redis.written["risk_profile"] == "risk_profile_missing"
+
     async def test_an_empty_wallet_publishes_one_not_an_alarm(self) -> None:
         redis = _Redis()
         await write_heartbeat(cast("Any", _Runtime(redis)), CycleHealth(), ExecutionConfig())

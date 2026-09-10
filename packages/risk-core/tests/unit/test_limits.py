@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from hunter_risk.limits import PAPER_V1, RiskLimits
+from hunter_risk.limits import PAPER_V1, RiskLimits, diverged_fields
 
 pytestmark = pytest.mark.unit
 
@@ -85,3 +85,44 @@ def test_a_float_never_becomes_a_limit() -> None:
 def test_at_least_one_position_slot() -> None:
     with pytest.raises(ValidationError):
         _with(max_concurrent_positions=0)
+
+
+class TestDivergenceFromTheEngineConstant:
+    """``diverged_fields`` — T3.69b: the constant is the guard of the row.
+
+    ``risk_profiles.paper_v1`` is written as ``PAPER_V1.model_dump(mode="json")``
+    by construction (RISK_ENGINE.md §2), so a stored row that differs on any
+    field is a limit moved by nobody. This is the comparison both the
+    execution-worker's resolver and the API's ``/risk-limits`` run.
+    """
+
+    def test_the_engine_constant_never_diverges_from_itself(self) -> None:
+        assert diverged_fields(PAPER_V1) == ()
+
+    def test_a_row_round_tripped_through_json_does_not_diverge(self) -> None:
+        stored = RiskLimits.model_validate(PAPER_V1.model_dump(mode="json"))
+        assert diverged_fields(stored) == ()
+
+    def test_a_widened_ceiling_is_named(self) -> None:
+        # 0,25 % -> 1 % of equity per trade: four times Everton's number.
+        assert diverged_fields(_with(risk_per_trade_pct=Decimal("0.01"))) == ("risk_per_trade_pct",)
+
+    def test_a_nested_kill_switch_rung_is_named(self) -> None:
+        rungs = PAPER_V1.kill_switch_blocked.model_dump() | {"daily_loss_pct": Decimal("0.05")}
+        assert diverged_fields(_with(kill_switch_blocked=rungs)) == ("kill_switch_blocked",)
+
+    def test_the_same_number_written_differently_is_not_a_divergence(self) -> None:
+        # Decimal("0.50") == Decimal("0.5"): the number is the limit, not its
+        # spelling — a row re-serialised with fewer zeros never blocks a wallet.
+        assert diverged_fields(_with(max_beta_btc_exposure=Decimal("0.5000"))) == ()
+
+    def test_another_preset_diverges_on_its_own_name(self) -> None:
+        # A wallet linked to `balanced` would move every ceiling at once; the
+        # profile label is the first field that says so.
+        assert "profile" in diverged_fields(_with(profile="balanced"))
+
+    def test_several_moved_ceilings_are_all_named_in_field_order(self) -> None:
+        # Not only the first: the operator needs the whole list to reconcile the
+        # row, and the order is the model's, never a set's iteration order.
+        moved = _with(profile="balanced", risk_per_trade_pct=Decimal("0.01"), max_book_age_s=20)
+        assert diverged_fields(moved) == ("profile", "risk_per_trade_pct", "max_book_age_s")

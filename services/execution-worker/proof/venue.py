@@ -208,4 +208,37 @@ async def open_wallet(
             )
         except WalletAlreadyOpen:
             raise
-        return result.portfolio_id
+    await link_paper_profile(factory, ids["org"], result.portfolio_id)
+    return result.portfolio_id
+
+
+async def link_paper_profile(factory: Any, org_id: uuid.UUID, portfolio_id: uuid.UUID) -> uuid.UUID:
+    """``docs/ACTIVATION.md`` §8b for a proof wallet: the row, and the link.
+
+    Since T3.69b the execution-worker reads the wallet's limits from its linked
+    ``risk_profiles`` row and admits **nothing** without one, so a wallet opened
+    for a proof run has to carry the operator's act as well. The row is
+    ``PAPER_V1.model_dump(mode="json")`` — the same bytes the seed writes, no
+    number of Everton's changed. Written as ``hunter_app``: both tables are its
+    own (``ddl/tables.py``), and the worker may only read them.
+    """
+    from hunter_risk.limits import PAPER_V1
+
+    profile_id = uuid7()
+    async with tenant_session(factory, org_id, db_role="hunter_app") as session:
+        await session.execute(
+            text(
+                "INSERT INTO risk_profiles (id, organization_id, name, preset, limits) VALUES "
+                "(:id, :org, 'Paper v1', 'paper_v1', CAST(:limits AS jsonb))"
+            ),
+            {
+                "id": profile_id,
+                "org": org_id,
+                "limits": json.dumps(PAPER_V1.model_dump(mode="json")),
+            },
+        )
+        await session.execute(
+            text("UPDATE portfolios SET risk_profile_id = :profile WHERE id = :id"),
+            {"profile": profile_id, "id": portfolio_id},
+        )
+    return profile_id

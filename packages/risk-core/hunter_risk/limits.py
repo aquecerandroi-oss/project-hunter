@@ -160,3 +160,30 @@ PAPER_V1: Final = RiskLimits(
 )
 """The profile of the virtual paper wallet - docs/RISK_ENGINE.md v2 §2. Frozen: a
 change here is a decision of Everton's, not a refactor."""
+
+
+def diverged_fields(limits: RiskLimits, *, reference: RiskLimits = PAPER_V1) -> tuple[str, ...]:
+    """Which fields of ``limits`` differ from the frozen constant, in field order.
+
+    ``risk_profiles.limits`` of the ``paper_v1`` row is written as
+    ``PAPER_V1.model_dump(mode="json")`` by construction (RISK_ENGINE.md §2), so
+    the two are the *same* object persisted twice — and a stored row that
+    differs on any field is a ceiling that moved without a decision of
+    Everton's. This is the comparison the execution-worker runs before it admits
+    anything (``hunter_execution_worker.risk_profile``) and the one the API
+    publishes as ``diverged_from_engine``; the constant stays the guard of the
+    row, never the other way round.
+
+    Values are compared, not their spelling: ``Decimal("0.50") ==
+    Decimal("0.5")``, so a row re-serialised with fewer zeros is not a
+    divergence. Nested rungs (``kill_switch_warning``/``kill_switch_blocked``)
+    compare as whole models and are named by their own field.
+
+    Pure and total: no clock, no database, no exception path — a caller that
+    cannot validate the row into a :class:`RiskLimits` at all never gets here.
+    """
+    return tuple(
+        field
+        for field in type(reference).model_fields
+        if getattr(limits, field) != getattr(reference, field)
+    )

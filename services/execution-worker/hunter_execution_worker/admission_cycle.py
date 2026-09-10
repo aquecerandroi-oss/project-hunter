@@ -45,6 +45,7 @@ from hunter_core.logging import get_logger
 from hunter_core.strategies.envelope import AssumedCosts
 from hunter_execution_worker.config import PRODUCER
 from hunter_execution_worker.reference import MarketReference, load_market
+from hunter_execution_worker.risk_profile import wallet_limits
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -53,6 +54,7 @@ if TYPE_CHECKING:
 
     from hunter_execution_worker.wallet import WalletRef
     from hunter_risk.inputs import BetaEstimate, MarketLiquidity
+    from hunter_risk.limits import RiskLimits
 
 __all__ = [
     "PendingRow",
@@ -236,13 +238,35 @@ async def decide_requests(
     requests: Sequence[tuple[ProposalRequest, RequestInputs]],
     now: datetime,
     source: str = "manual",
+    limits: RiskLimits | None = None,
 ) -> tuple[AdmissionResult, ...]:
     """Admit every request handed in, through the one shared admission service.
 
     The market's ``MarketSpec`` is read from ``markets`` rather than taken from
     the caller: the engine's step and floor have to be the exchange's, and a
     caller that supplied them could size an order the venue would refuse.
+
+    ``limits`` are the wallet's own, resolved from its linked ``risk_profiles``
+    row (T3.69b, :mod:`hunter_execution_worker.risk_profile`). A caller that has
+    already resolved them for this pass hands them in; one that has not gets the
+    resolution here, and **nothing is admitted** when the wallet has no usable
+    profile — this function is the last place where an entry could be created
+    against the code constant instead of the persisted profile, so the question
+    is answered here even when the caller forgot to ask it.
     """
+    applied = limits
+    if applied is None:
+        resolved = await wallet_limits(session, wallet=wallet)
+        if resolved.limits is None:
+            logger.warning(
+                "admission_refused_no_risk_profile",
+                portfolio_id=str(wallet.portfolio_id),
+                reason=resolved.state,
+                detail=resolved.detail,
+                requests=len(requests),
+            )
+            return ()
+        applied = resolved.limits
     origin = resolve_source(source)
     results: list[AdmissionResult] = []
     for request, inputs in requests:
@@ -265,6 +289,7 @@ async def decide_requests(
             betas=inputs.betas,
             exit_cost_rate=inputs.exit_cost_rate,
             now=now,
+            limits=applied,
         )
         logger.info(
             "request_admitted",

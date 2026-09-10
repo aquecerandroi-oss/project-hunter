@@ -8,6 +8,7 @@ PAPER_V1``, per the brief's "prove by test that the numbers equal PAPER_V1".
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -179,3 +180,88 @@ async def test_a_wallet_from_another_organization_is_404(
         headers=other.headers,
     )
     assert response.status_code == 404
+
+
+async def _link_profile(
+    session_factory: async_sessionmaker[AsyncSession], wallet: Wallet, limits: dict[str, object]
+) -> None:
+    """Give the wallet a ``risk_profiles`` row of its own and point it there.
+
+    The tenant-scoped equivalent of ``ACTIVATION.md`` §8b's two commands (the
+    real one seeds the *system* preset, ``organization_id IS NULL``, which only
+    the migrating role may write under ``FORCE ROW LEVEL SECURITY``).
+    """
+    from sqlalchemy import text
+
+    profile_id = uuid7()
+    async with tenant_session(
+        session_factory, wallet.actor.org_id, wallet.actor.user_id, db_role="hunter_app"
+    ) as session:
+        await session.execute(
+            text(
+                "INSERT INTO risk_profiles (id, organization_id, name, preset, limits) "
+                "VALUES (:id, :org, 'Paper v1', 'paper_v1', CAST(:limits AS jsonb))"
+            ),
+            {"id": profile_id, "org": wallet.actor.org_id, "limits": json.dumps(limits)},
+        )
+        await session.execute(
+            text("UPDATE portfolios SET risk_profile_id = :profile WHERE id = :id"),
+            {"profile": profile_id, "id": wallet.portfolio_id},
+        )
+
+
+async def test_a_linked_profile_equal_to_the_engine_is_not_diverged(
+    client: httpx.AsyncClient, wallet: Wallet, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """ACTIVATION.md §8b done: the row is the source, and it is the engine's own."""
+    await _link_profile(session_factory, wallet, PAPER_V1.model_dump(mode="json"))
+
+    response = await client.get(f"{wallet.base}/limits", headers=wallet.actor.headers)
+
+    assert response.status_code == 200, response.text
+    preset = response.json()["preset"]
+    assert preset["source"] == "risk_profile"
+    assert preset["diverged_from_engine"] is False
+    assert Decimal(preset["risk_per_trade_pct"]) == PAPER_V1.risk_per_trade_pct
+
+
+async def test_a_linked_profile_that_moved_a_ceiling_is_reported_as_diverged(
+    client: httpx.AsyncClient, wallet: Wallet, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """T3.69b: the execution-worker admits nothing against this row, so the
+    screen must not show 1 % as if it were a limit in force."""
+    await _link_profile(
+        session_factory, wallet, PAPER_V1.model_dump(mode="json") | {"risk_per_trade_pct": "0.01"}
+    )
+
+    response = await client.get(f"{wallet.base}/limits", headers=wallet.actor.headers)
+
+    assert response.status_code == 200, response.text
+    preset = response.json()["preset"]
+    assert preset["source"] == "risk_profile"
+    assert preset["diverged_from_engine"] is True
+
+
+async def test_a_stored_profile_that_does_not_validate_is_not_a_500(
+    client: httpx.AsyncClient, wallet: Wallet, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """A row with a key ``RiskLimits`` has no field for used to raise straight out
+    of ``model_validate`` — the Risk Center went blank exactly when an operator
+    needed to see why the worker had stopped admitting."""
+    broken = {key: value for key, value in PAPER_V1.model_dump(mode="json").items()}
+    broken.pop("max_leverage")
+    await _link_profile(session_factory, wallet, broken)
+
+    response = await client.get(f"{wallet.base}/limits", headers=wallet.actor.headers)
+
+    assert response.status_code == 200, response.text
+    preset = response.json()["preset"]
+    assert preset["source"] == "engine_default"
+    assert preset["diverged_from_engine"] is True
+
+
+async def test_no_linked_profile_is_not_reported_as_diverged(
+    client: httpx.AsyncClient, wallet: Wallet
+) -> None:
+    response = await client.get(f"{wallet.base}/limits", headers=wallet.actor.headers)
+    assert response.json()["preset"]["diverged_from_engine"] is False

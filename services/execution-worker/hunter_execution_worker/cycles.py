@@ -44,6 +44,7 @@ from hunter_execution_worker.manual_inputs import manual_request_inputs
 from hunter_execution_worker.mtm import run_mtm_cycle
 from hunter_execution_worker.protection import TriggerWatermarks, run_protection_cycle
 from hunter_execution_worker.reference import load_market
+from hunter_execution_worker.risk_profile import RiskProfileGate
 from hunter_execution_worker.triggering import DegradedRetries
 from hunter_execution_worker.wallet import WalletRef, principal_wallets
 
@@ -126,6 +127,9 @@ class Cycles:
         """Per wallet, the filed requests already named as unreadable. Keeps the
         1 s admission loop from writing the same WARNING 86.400 times a day."""
 
+        self.risk_profile = RiskProfileGate()
+        """Each wallet's limits, from its linked ``risk_profiles`` row (T3.69b)."""
+
         self.bridge_refusals_reported: dict[uuid.UUID, dict[uuid.UUID, str]] = {}
         """Per wallet, the last refusal reason logged for each pending signal.
         Same purpose as ``geometry_reported`` for the bridge's own 1 s loop
@@ -156,6 +160,11 @@ class Cycles:
         cannot be assembled this pass (no book, no beta yet) is **deferred**,
         not refused: nothing is written, and the row is simply read again next
         second, exactly like a bridge candidate waiting on its own market data.
+
+        **Nothing is decided until the wallet's own limits are resolved**
+        (T3.69b, :mod:`hunter_execution_worker.risk_profile`): with no linked
+        ``risk_profiles`` row, one that does not validate, or one that diverges
+        from ``PAPER_V1``, this pass admits nothing and names which of the three.
         """
 
         async def run(session: AsyncSession, wallet: WalletRef) -> None:
@@ -167,6 +176,15 @@ class Cycles:
                 unreadable,
                 reported=self.geometry_reported.setdefault(wallet.portfolio_id, set()),
             )
+            self.health.pending_requests = len(filed)
+            self.health.unreadable_requests = len(unreadable)
+            metrics.execution_pending_requests.labels(readable="false").set(len(unreadable))
+            metrics.execution_pending_requests.labels(readable="true").set(len(readable))
+            self.health.admission_at = now
+            resolved = await self.risk_profile.resolve(session, wallet=wallet)
+            self.health.risk_profile = resolved.state
+            if resolved.limits is None:
+                return
             requests: list[tuple[ProposalRequest, RequestInputs]] = []
             for row in readable:
                 market = await load_market(session, row.market_id)
@@ -190,12 +208,9 @@ class Cycles:
                     )
                     continue
                 requests.append((rebuild_request(row, wallet=wallet, market=market), inputs))
-            await decide_requests(session, wallet=wallet, requests=requests, now=now)
-            self.health.pending_requests = len(filed)
-            self.health.unreadable_requests = len(unreadable)
-            metrics.execution_pending_requests.labels(readable="false").set(len(unreadable))
-            metrics.execution_pending_requests.labels(readable="true").set(len(readable))
-            self.health.admission_at = now
+            await decide_requests(
+                session, wallet=wallet, requests=requests, now=now, limits=resolved.limits
+            )
 
         await self._for_each(run)
 

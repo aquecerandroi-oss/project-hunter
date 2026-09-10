@@ -1,4 +1,12 @@
-# Risk Engine — contrato v2.3
+# Risk Engine — contrato v2.4
+
+**Versão 2.4, 2026-09-10.** Fecha o residual que a v2.3 registrava na §2 como
+nota da T3.69 ("fonte declarada × fonte aplicada"): o `execution-worker` passou a
+**ler o perfil da carteira** e a recusar admissão quando não pode confiar nele.
+A §2 abaixo publica a regra nova, com os três motivos nomeados; a §9.5 lista o
+que mudou e por quê. **Nenhum limite do Everton mudou de valor** — a mudança é
+sobre *de onde* o número vem, e a constante `PAPER_V1` continua sendo a guarda da
+linha.
 
 **Versão 2.3, 2026-09-08.** Publica na §7.1 as três regras operacionais que o
 `execution-worker` já aplica e que o código citava contra este documento sem
@@ -105,17 +113,31 @@ alguém tem de lembrar de manter iguais. `test_the_seeded_paper_profile_has_exac
 falha se divergirem; `test_the_seeded_paper_preset_refuses_to_be_rewritten` recusa o seed que tentaria
 devolver um valor divergente a uma linha já semeada.
 
-**Nota operacional (T3.69, 2026-09-10) — fonte declarada × fonte aplicada. Nenhuma regra e nenhum
-valor mudam nesta nota; ela só registra onde o número é lido hoje.** O motor **não** lê o perfil da
-carteira: `hunter_core.admission.admit` recebe `limits: RiskLimits = PAPER_V1` e o `admission_cycle`
-do `execution-worker` nunca passa o argumento, então quem decide é a **constante do código**. A linha
-`risk_profiles.preset='paper_v1'` é a fonte **declarada** (é o que a API publica em `/risk-limits`
-com `source='risk_profile'` no lugar de `engine_default`) e a constante é a fonte **aplicada** — as
-duas são o mesmo objeto por construção e provadamente iguais pelos dois testes acima e pelo
-round-trip de `infra/scripts/tests/test_link_portfolio_risk_profile.py`, que lê o `jsonb` de volta do
-Postgres. Semear a linha e apontar `portfolios.risk_profile_id` para ela é `docs/ACTIVATION.md` §8b;
-fazer `admit` ler o perfil da carteira (e então as duas fontes virarem uma só de fato) é a **T3.69b**,
-ainda aberta.
+**A linha vinculada é a fonte aplicada, e sem ela a carteira não admite nada (T3.69b, v2.4).** O
+`execution-worker` resolve os limites da carteira a partir de `portfolios.risk_profile_id` →
+`risk_profiles.limits` no início de cada passo de admissão
+(`hunter_execution_worker.risk_profile.wallet_limits`), valida o JSON em `RiskLimits` (frações como
+string; `RiskModel._refuse_float` recusa número JSON) e passa o objeto lido a
+`hunter_core.admission.admit`. **Falha fechada, com três motivos distintos** — nada é escrito, nenhuma
+proposta, nenhuma reserva, nenhuma ordem, e **saídas de proteção não são afetadas** (regra 3):
+
+| Motivo | Quando | O que o operador faz |
+|---|---|---|
+| `risk_profile_missing` | a carteira não tem perfil vinculado, ou o vínculo aponta para linha invisível | rodar os dois comandos de `docs/ACTIVATION.md` §8b |
+| `risk_profile_invalid` | a linha não valida como `RiskLimits` (chave a mais, chave a menos, fração como número) | reconciliar a linha; ela não é um perfil |
+| `risk_profile_diverged` | valida, mas difere de `hunter_risk.limits.PAPER_V1` campo a campo | **parar**: é limite movido por ninguém; os campos divergentes vêm nomeados |
+
+**A constante continua sendo a guarda da linha, não a sua substituta.** O motor não adota a linha
+divergente (seria mudança de limite sem decisão do Everton) e também **não** cai de volta na constante
+(seria a substituição silenciosa que esta versão fecha): recusa, e a divergência aparece por nome no
+heartbeat `hb:execution:paper` (campo `risk_profile`) e no log, uma linha por transição. A API
+continua publicando `source='risk_profile'` em `/risk-limits` e ganhou `diverged_from_engine`, para a
+tela nunca mostrar como vigente um número que o motor não aplica.
+
+`admit` mantém `limits: RiskLimits = PAPER_V1` como padrão — é o que os testes de tabela do núcleo e o
+caminho de backtest usam —, mas nenhum caminho de produção depende dele: `decide_requests`
+(`execution-worker`), por onde passam tanto o pedido manual quanto a ponte de autonomia, resolve o
+perfil da carteira e recusa antes de chamar `admit`.
 
 A tabela abaixo segue a ordem de campos de `RiskLimits`
 (`packages/risk-core/hunter_risk/limits.py`), a mesma ordem em que o JSON acima é validado.
@@ -640,7 +662,11 @@ ao Sentry.
   da carteira, mais nova primeiro. Nome de caminho **diferente** de `.../orders` deliberadamente: esse
   já serve as ordens executadas (`orders`, T3.8a); o pedido do operador é `trade_proposals`, uma coisa
   antes da outra. `ENABLE_PAPER_AUTONOMY` não tem efeito algum aqui — a rota manual é o caminho do
-  operador desde o T3.12, com ou sem a ponte autônoma ligada.
+  operador desde o T3.12, com ou sem a ponte autônoma ligada. **T3.68c:** a carteira aceita no máximo
+  `MANUAL_ORDER_MAX_PENDING_PER_PORTFOLIO` (padrão 20) pedidos manuais ainda não decididos ao mesmo
+  tempo — acima disso, um novo pedido é recusado com 409 nomeado (`too_many_pending_requests`), checado
+  dentro do mesmo `INSERT` que arquiva o pedido; a ponte autônoma tem seus próprios limites, distintos
+  (§7).
 - O motor nunca chama rede nem banco: tudo chega como argumento, o que o torna testável por tabela
   de casos e reutilizável no backtest.
 - LLM não tem acesso ao Risk Engine nem aos limites.
@@ -734,6 +760,21 @@ os `risk_events`, e as garantias da §8.
 O que **não** mudou na v2.3: nenhum valor do perfil `paper_v1`, nenhum insumo ou
 assinatura do motor puro (as três regras são do `execution-worker`), a estrutura
 de `risk_decision.checks[]`, os `risk_events`, e as garantias da §8.
+
+### 9.5 O que mudou da v2.3 para a v2.4, e por quê
+
+| # | v2.3 (texto) | v2.4 (código provado) | Achado |
+|---|---|---|---|
+| 1 | a §2 declarava a linha `risk_profiles.paper_v1` como fonte **declarada** e a constante `PAPER_V1` como fonte **aplicada**, com a T3.69b aberta | o `execution-worker` lê o perfil vinculado da carteira e passa o objeto lido a `admit`; sem perfil usável **não admite nada**, com `risk_profile_missing`/`risk_profile_invalid`/`risk_profile_diverged` | residual declarado pela T3.69 (`.claude/state/notes-T3.69.md` §6): a coluna que o `ACTIVATION.md` §8b manda apontar não era lida por ninguém, então editar a linha não mudava nada e não vincular também não |
+| 2 | uma linha divergente era só um risco descrito no script de vínculo | a divergência é recusa de admissão em tempo de execução, publicada em `hb:execution:paper.risk_profile` e em `/risk-limits.preset.diverged_from_engine` | mesma T3.69b: a linha é gravada por um script de operador e lida por um worker; se o motor a adotasse, um `UPDATE` à mão moveria um teto sem decisão do Everton |
+
+**Consequência operacional declarada, não escondida:** com a v2.4 no ar e a carteira ainda **sem**
+vínculo (o estado da VPS enquanto o §8b não for rodado), a carteira paper admite **zero** entradas —
+manual e autônoma. As saídas de proteção, o MTM e o kill switch continuam correndo normalmente.
+
+O que **não** mudou na v2.4: nenhum valor do perfil `paper_v1`, nenhum insumo ou assinatura do motor
+puro (a resolução é do `execution-worker`, antes de existir proposta), a estrutura de
+`risk_decision.checks[]`, os `risk_events`, e as garantias da §8.
 
 ## 10. Saídas: tentativa e intenção não são a mesma coisa
 

@@ -128,7 +128,7 @@ real; MTM e `paper_autonomy=false` já verdes; `risk_profile_id` NULL.
 | 5 | **Backup restaurável** | rehearsal real de restore executado nesta rodada (ver §restore abaixo): `pg_restore -j 2` do dump `hunter-20260910T011701Z.dump` (1,09 G) num banco descartável `hunter_restore_check`, **0 erros**, contagens batendo com o banco vivo | 🟢 — linha fechada |
 | 6 | **MTM vivo** | `hb:execution:paper`: `ts=2026-09-10T03:32:45Z`, `last_mtm=03:32:00Z` (~46 s antes); equity 19.333,0111164813 USDT (sem mudança — carteira sem posição); kill switch `ACTIVE` | 🟢 |
 | 7 | **`paper_autonomy` desligado até aqui** | `hb:execution:paper.paper_autonomy = false` | 🟢 (é o estado correto antes do aceite) |
-| 8 | **Perfil de risco persistido** (`RISK_ENGINE.md` §2) | `portfolios.risk_profile_id` continua **NULL**; `risk_profiles` tem **4** linhas mas nenhuma com `preset='paper_v1'` (`SELECT count(*) FROM risk_profiles WHERE preset='paper_v1'` → 0). Sem mudança desde 08/09 | 🟡 — **procedimento pronto (T3.69, §8b): dois comandos, nenhum limite muda de valor**; falta o orquestrador rodá-los na VPS |
+| 8 | **Perfil de risco persistido** (`RISK_ENGINE.md` §2) | `portfolios.risk_profile_id` continua **NULL**; `risk_profiles` tem **4** linhas mas nenhuma com `preset='paper_v1'` (`SELECT count(*) FROM risk_profiles WHERE preset='paper_v1'` → 0). Sem mudança desde 08/09. **Desde a T3.69b esta linha virou bloqueante de verdade:** o `execution-worker` lê os limites da linha vinculada e, sem ela, **não admite nada** (`risk_profile_missing` no log e em `hb:execution:paper.risk_profile`) — nem pedido manual, nem ponte autônoma; saídas de proteção, MTM e kill switch seguem normais | 🔴 — **dois comandos, nenhum limite muda de valor (§8b)**; enquanto não rodarem, a carteira paper admite zero entradas |
 
 **Consultas, verbatim.** As duas que decidem as linhas 2 e 3:
 
@@ -261,16 +261,27 @@ nem tem a flag) deixa em `None`. Por isso a carteira da VPS está NULL: não é
 regressão, é uma coluna que nenhum caminho preenche. Daí o script novo,
 `infra/scripts/link_portfolio_risk_profile.py`.
 
-**Fonte declarada × fonte aplicada — dito, não escondido (residual T3.69b).**
-O motor **não** lê o perfil da carteira hoje: `hunter_core.admission.admit`
-recebe `limits: RiskLimits = PAPER_V1` e o `admission_cycle` do
-`execution-worker` nunca passa o argumento, então quem decide é a **constante do
-código**. A linha do banco é a fonte **declarada** (`RISK_ENGINE.md` §2, e o que
-a API mostra em `/risk-limits` com `source='risk_profile'` em vez de
-`engine_default`); a constante é a fonte **aplicada**. As duas são provadamente
-iguais pelos testes acima, e o próprio script recusa o vínculo se a linha
-divergir de `PAPER_V1` em qualquer campo. Fazer `admit` ler o perfil da carteira
-é a **T3.69b** e não foi feito aqui.
+**A partir da T3.69b estes dois comandos ligam a carteira, e antes deles ela não
+admite nada — dito com todas as letras.** O `execution-worker` resolve os limites
+da carteira a partir de `portfolios.risk_profile_id` a cada passo de admissão
+(`hunter_execution_worker.risk_profile`) e recusa admitir enquanto não puder
+confiar na linha, com o motivo no log e em `hb:execution:paper.risk_profile`:
+
+| O que o Everton vê antes do §8b | O que ele vê depois |
+|---|---|
+| `risk_profile: risk_profile_missing` no heartbeat; nenhuma proposta nova, nem manual nem autônoma; `POST /order-requests` continua respondendo `202` e a solicitação fica **pendente**, sem decisão | `risk_profile: risk_profile_linked`; a admissão volta a decidir exatamente como antes, com **os mesmos números** — agora lidos da linha |
+
+Nada disso afeta saída de proteção, MTM, kill switch ou a tela: stops e alvos de
+qualquer posição aberta continuam correndo (regra 3 da diretiva). E a recusa é
+reversível sem restart: no passo seguinte ao vínculo, a mesma carteira admite.
+
+Dois outros motivos aparecem no mesmo campo quando a linha existe mas não serve:
+`risk_profile_invalid` (não valida como `RiskLimits` — chave a mais, chave a
+menos, fração gravada como número JSON) e `risk_profile_diverged` (valida, mas
+difere de `hunter_risk.limits.PAPER_V1` campo a campo, e os campos vêm nomeados
+no log). Nos dois casos o motor **não** adota a linha e **não** volta para a
+constante: recusa. A tela do Risk Center mostra o mesmo fato em
+`preset.diverged_from_engine`.
 
 **Os dois comandos, pelo serviço `ops`** (T3.15d — a imagem implantada, com o
 DSN de dono; `compose.sh ops` recusa rodar se a imagem do `GIT_SHA` não existir

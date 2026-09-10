@@ -29,7 +29,7 @@ from hunter_core.db.models.risk import KillSwitchTransition
 from hunter_core.db.repositories.ledger import LedgerRepository
 from hunter_core.domain.enums import KillSwitchScope
 from hunter_core.portfolio.state import WalletNotOpen, build_portfolio_state
-from hunter_risk.limits import PAPER_V1, RiskLimits
+from hunter_risk.limits import PAPER_V1, RiskLimits, diverged_fields
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -41,9 +41,13 @@ RECENT_TRANSITIONS_LIMIT = 5
 
 
 def _preset_out(
-    limits: RiskLimits, *, source: Literal["risk_profile", "engine_default"]
+    limits: RiskLimits,
+    *,
+    source: Literal["risk_profile", "engine_default"],
+    diverged: bool | None = None,
 ) -> RiskLimitsPresetOut:
     return RiskLimitsPresetOut(
+        diverged_from_engine=bool(diverged_fields(limits)) if diverged is None else diverged,
         profile=limits.profile,
         risk_per_trade_pct=limits.risk_per_trade_pct,
         max_aggregate_planned_risk_pct=limits.max_aggregate_planned_risk_pct,
@@ -79,12 +83,28 @@ def _preset_out(
 
 
 async def _load_preset(session: AsyncSession, wallet: Portfolio) -> RiskLimitsPresetOut:
+    """The wallet's profile as the engine resolves it (T3.69b), never a guess.
+
+    Same three answers as ``hunter_execution_worker.risk_profile``: the row when
+    it validates (with ``diverged_from_engine`` saying whether the worker will
+    apply it or refuse), and the engine constant — flagged as diverged — when
+    the row exists but cannot be validated at all. This never reports a number
+    as being in force that the worker would refuse to enforce.
+    """
     if wallet.risk_profile_id is not None:
         profile = await session.get(RiskProfile, wallet.risk_profile_id)
         if profile is not None:
-            return _preset_out(RiskLimits.model_validate(profile.limits), source="risk_profile")
-    # No profile wired (every principal wallet today, §see module docstring):
-    # the engine's own default is the one number this can honestly report.
+            try:
+                # A fraction re-typed as a JSON number raises TypeError, not
+                # ValidationError (``RiskModel._refuse_float``): both are "this
+                # row is not a profile", and neither may blank the screen.
+                stored = RiskLimits.model_validate(profile.limits)
+            except Exception:
+                return _preset_out(PAPER_V1, source="engine_default", diverged=True)
+            return _preset_out(stored, source="risk_profile")
+    # No profile wired (every principal wallet until ACTIVATION.md §8b is run):
+    # the engine's own constant is the one number this can honestly report — and
+    # with T3.69b deployed it is also a wallet the worker admits nothing for.
     return _preset_out(PAPER_V1, source="engine_default")
 
 

@@ -62,6 +62,21 @@ class RiskLimitsPresetOut(BaseModel):
     max_leverage: DecimalStr
     day_timezone: str
     source: Literal["risk_profile", "engine_default"]
+    diverged_from_engine: bool = False
+    """True when the wallet's stored row is **not** ``hunter_risk.limits.PAPER_V1``
+    field by field — the same comparison the execution-worker runs before it
+    admits anything (T3.69b, ``hunter_execution_worker.risk_profile``).
+
+    It matters because the two are not two profiles: the seeded row *is*
+    ``PAPER_V1.model_dump(mode="json")`` by construction (RISK_ENGINE.md §2), so
+    a difference is a ceiling moved by nobody — and against such a row the
+    engine admits **nothing**. With ``source="risk_profile"`` and this flag set,
+    the numbers below are the row's and none of them is in force; with
+    ``source="engine_default"`` and this flag set, the row exists but does not
+    validate as ``RiskLimits`` at all, and the numbers below are the engine
+    constant's, reported so the Risk Center still renders while an operator
+    reconciles the row (the alternative was a 500 exactly when it is needed).
+    """
 
 
 class AssetExposureOut(BaseModel):

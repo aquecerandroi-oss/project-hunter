@@ -149,6 +149,7 @@ async def test_a_manual_request_is_filed_decided_and_filled(
             stop=proof_venue.STOP,
             assumed_costs=COSTS,
             now=NOW,
+            max_pending=20,  # T3.68c: the router passes the setting; here the default
         )
     assert filed.status == ProposalStatus.PENDING
     assert not filed.decided
