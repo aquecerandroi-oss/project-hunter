@@ -22,7 +22,6 @@ from hunter_core.domain.types import utcnow
 from hunter_core.events.consume import ack, consume
 from hunter_core.events.streams import Streams
 from hunter_core.logging import get_logger
-from hunter_strategy_worker.config import CONSUMER_GROUP
 from hunter_strategy_worker.context_cache import load_family_readers
 from hunter_strategy_worker.decide import evaluate_slot, versions_for_bar
 from hunter_strategy_worker.dispatch import BarDispatcher, market_key
@@ -32,6 +31,7 @@ from hunter_strategy_worker.metrics import (
     shadow_version_failed_total,
 )
 from hunter_strategy_worker.repo import load_market
+from hunter_strategy_worker.shard import consumer_group, owns_market
 from hunter_strategy_worker.versions import VersionCache
 
 if TYPE_CHECKING:
@@ -225,6 +225,10 @@ async def run_consumer(
     runtime: WorkerRuntime,
     config: ShadowConfig,
     health: ConsumerHealth,
+    *,
+    shard_index: int = 0,
+    shard_total: int = 1,
+    clock: Callable[[], datetime] = utcnow,
 ) -> None:
     """Consume closed candles forever.
 
@@ -238,13 +242,29 @@ async def run_consumer(
     its own default -- see ``ShadowConfig.claim_idle_ms`` for the arithmetic
     and why a dispatcher-aware value matters here (T3.74d).
 
+    **Sharding across processes (T3.74f).** ``shard_total > 1`` reads the
+    *whole* stream through this shard's own consumer group
+    (:func:`hunter_strategy_worker.config.consumer_group`) and refuses --
+    acks without evaluating, counted as
+    ``hunter_shadow_bars_skipped_total{reason="not_my_shard"}`` -- any bar
+    whose symbol :func:`hunter_strategy_worker.shard.owns_market` says
+    belongs to a different shard, *before* the dispatcher or any stage timer
+    ever sees it. ``hunter_strategy_worker.shard`` module docstring has the
+    full reasoning for per-shard groups over one shared group.
+
     Two independent failure budgets, because they are different failures: one
     unreadable message is skipped (it must not block the stream), while an error
     from the *iteration itself* — Redis restarting, a dropped connection, the
     idle-block timeout — backs off and re-enters ``consume()``. Neither is
     allowed to leave this coroutine, because returning is fatal (``forever``).
+
+    ``clock`` is forwarded to ``handle_candle`` unchanged (default ``utcnow``,
+    real production behaviour) -- a test seam so a sharding-equivalence proof
+    can run the real consumer loop against fixed, historical bar timestamps
+    without every one of them reading as hours or years late.
     """
     versions = VersionCache(config.version_refresh_s)
+    group = consumer_group(shard_index, shard_total)
     consumer = f"strategy-worker@{runtime.instance}"
     dispatcher = BarDispatcher(config.worker_concurrency)
     backoff = RESTART_BACKOFF_S
@@ -259,13 +279,14 @@ async def run_consumer(
                 versions=versions,
                 config=config,
                 health=health,
+                clock=clock,
             )
         except Exception:
             health.errors += 1
             runtime.mark_error()
             logger.exception("shadow_candle_handling_failed", event_id=str(envelope.event_id))
             return
-        await ack(redis, Streams.MARKET_CANDLES_CLOSED, CONSUMER_GROUP, message_id, envelope)
+        await ack(redis, Streams.MARKET_CANDLES_CLOSED, group, message_id, envelope)
         runtime.mark_success()
 
     while True:
@@ -273,13 +294,17 @@ async def run_consumer(
             async for message_id, envelope in consume(
                 redis,
                 Streams.MARKET_CANDLES_CLOSED,
-                CONSUMER_GROUP,
+                group,
                 consumer,
                 block_ms=CONSUME_BLOCK_MS,
                 claim_idle_ms=config.claim_idle_ms,
             ):
                 health.touch()
                 backoff = RESTART_BACKOFF_S
+                if not owns_market(envelope.payload.get("symbol", "?"), shard_index, shard_total):
+                    shadow_bars_skipped_total.labels(reason="not_my_shard").inc()
+                    await ack(redis, Streams.MARKET_CANDLES_CLOSED, group, message_id, envelope)
+                    continue
                 shadow_stage_seconds.labels(stage="queue_wait").observe(
                     max(0.0, (utcnow() - envelope.ts).total_seconds())
                 )

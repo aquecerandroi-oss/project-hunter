@@ -82,9 +82,32 @@ async def run_outcomes(
     runtime: WorkerRuntime,
     config: ShadowConfig,
     settings: Settings,
+    *,
+    shard_index: int = 0,
 ) -> None:
-    """The outcome sweep loop. Postgres down is a backoff, never a death."""
+    """The outcome sweep loop. Postgres down is a backoff, never a death.
+
+    **Leader-only under sharding (T3.74f).** ``sweep_outcomes`` is
+    unpartitioned by design -- it advances whatever tracking is open,
+    regardless of which shard's decision opened it, because a tracking
+    outlives the bar that created it. Running it on every shard of a
+    ``STRATEGY_SHARDS > 1`` topology would multiply Postgres load (the exact
+    thing this task exists to relieve) for no benefit: N processes competing
+    over ``slots.lock_slot`` for the same rows. Only ``shard_index == 0``
+    runs the real sweep; every other shard idles on the same cadence, the
+    same convention ``hunter_market_worker``'s ``fx``/``spot`` tasks already
+    use for a once-per-cluster loop ("idles on every shard but shard 0").
+    """
     blocked = frozenset(s.upper() for s in settings.market_universe_blocklist)
+    if shard_index != 0:
+        # Idling on an ``Event`` that is never set rather than returning:
+        # ``forever()`` treats a task that returns as fatal, and "this shard
+        # is not the sweep leader" is a topology fact, not a failure --
+        # exactly the idiom ``hunter_market_worker.spot.run_spot`` already
+        # uses for a once-per-cluster task idle on every non-leader shard.
+        logger.info("shadow_outcome_sweep_idle_non_leader_shard", shard_index=shard_index)
+        await asyncio.Event().wait()
+        return
     while True:
         try:
             await sweep_outcomes(factory, config, blocked=blocked)

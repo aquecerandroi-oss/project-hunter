@@ -151,6 +151,29 @@ Consultas em `infra/scripts/sql/research/2026-09-10-t373-q0{0..4}-*.sql`, todas 
   conexões do serviço `strategy-worker` sobe para 20+20 nos dois composes (dev e VPS) — projeção:
   `325/32 ≈ 10 s`, dentro de `decision_lag_p95_alert_s` (30 s). Notas completas, timeline das três
   decisões reais e comandos: `.claude/state/notes-T3.74e.md`.
+  **Atualização T3.74f (2026-09-10, medição 16:45-17:02 BRT / 19:45-20:02Z): a projeção de ~10 s não se confirmou —
+  o teto é CPU de um processo só, não o pool de conexões nem o Postgres.** Medido ao vivo em dois
+  fechamentos reais (19:45Z e 20:00Z, `docker stats` a cada ~5-7 s por 90-100 s): `hunter-strategy-
+  worker-1` ficou preso em 97-100 % de **um** núcleo pelos ~36-70 s inteiros que cada rajada levou
+  para drenar, enquanto `hunter-postgres-1` ficou em 20-25 % dos seus 12 núcleos no mesmo intervalo
+  (picos curtos a 150-260 %, longe da saturação) e `pg_stat_activity` no pico mostrou 17 backends
+  `active`/14 `idle in transaction`, todos esperando o **cliente** (`wait_event_type=Client`) — só 1
+  backend de fato executando algo no Postgres. `decision_lag_p50_s`/`_p95_s` ficaram em 49,2/61,1,
+  bem acima da meta e do que a T3.74e projetou. O custo por estágio piora com o tamanho da rajada em
+  vez de ficar constante — `context_load` médio: ~0,13 s (linha de base) → ~0,55 s (rajada de 15m/
+  30m, ~200 mercados) → ~0,93 s (rajada de hora cheia, 15/30/60 min juntos) — a assinatura de
+  contenção de CPU/escalonamento, não de um Postgres lento. **Conclusão**: um processo `asyncio` não
+  gasta mais que um núcleo de CPU (GIL); `worker_concurrency` além do ponto em que o trabalho
+  agregado é limitado por CPU deixa de comprar vazão. Provado em bancada local sem Docker
+  (`test_shard_cpu_benchmark.py`): concorrência 32 sobre carga presa à CPU não move o tempo de
+  parede (~1,0x), 4 processos reais batem a mesma carga em ~2,2-3,8× menos tempo. **Corrigido nesta
+  tarefa** (não implantado): `STRATEGY_SHARDS=N` (`docs/DEPLOYMENT.md` §3.1b) divide o universo
+  entre N processos pela mesma fatia `crc32(symbol) % N` do `MARKET_SHARD` (`hunter_core.sharding`,
+  reaproveitada — nunca rederivada), cada shard com grupo consumidor e heartbeat próprios. Provado
+  com testcontainer (`test_shard_dispatch_equivalence.py`): duas topologias de grupo sobre o mesmo
+  stream produzem o mesmo conjunto de decisões, byte a byte, cada barra avaliada exatamente uma vez.
+  Notas completas, comandos e a saída real de `docker stats`/`pg_stat_activity`/`XPENDING`:
+  `.claude/state/notes-T3.74f.md`.
 - **LOW — a sonda de elegibilidade divide a janela de 50 entradas com o universo spot.**
   `eligibility.universe_changed_after` lê as `PROBE_ENTRIES = 50` entradas mais recentes de
   `market.universe.changed` e casa por `envelope.key`. O spot publica com chave própria

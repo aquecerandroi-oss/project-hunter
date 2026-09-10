@@ -19,7 +19,6 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import random
-import zlib
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select, update
@@ -29,6 +28,7 @@ from hunter_core.db.session import role_session
 from hunter_core.domain.enums import MarketType
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
+from hunter_core.sharding import owns as shard_owns
 from hunter_exchanges.base import ExchangeError
 from hunter_market_worker.durable import enqueue_universe_changed
 from hunter_market_worker.hot_state import write_ticker
@@ -79,12 +79,15 @@ def shard_symbols(symbols: list[str], shard_index: int, shard_total: int) -> lis
     """C2: stable slice -- ``crc32(symbol) % total == index``. ``total == 1``
     yields every symbol unchanged (``x % 1`` is always ``0``).
 
-    UTF-8, not ASCII: Binance USDS-M lists perpetuals whose symbol is written in
-    Chinese (``牛来USDT`` was rank 19 by 24h volume on 2026-09-05). Encoding as
-    ASCII raises ``UnicodeEncodeError`` inside ``run_universe``, which catches it,
-    logs ``market_universe_refresh_failed`` and leaves the universe empty --- the
+    ``hunter_core.sharding.owns`` (T3.74f: moved there so the strategy-worker's
+    own sharding reuses this exact formula, never a re-derivation with a
+    chance to drift) is UTF-8, not ASCII, deliberately: Binance USDS-M lists
+    perpetuals whose symbol is written in Chinese (``牛来USDT`` was rank 19 by
+    24h volume on 2026-09-05). Encoding as ASCII raises ``UnicodeEncodeError``
+    inside ``run_universe``, which catches it, logs
+    ``market_universe_refresh_failed`` and leaves the universe empty --- the
     worker goes blind for every market, not just the non-ASCII ones."""
-    return sorted(s for s in symbols if zlib.crc32(s.encode("utf-8")) % shard_total == shard_index)
+    return sorted(s for s in symbols if shard_owns(s, shard_index, shard_total))
 
 
 @dataclasses.dataclass

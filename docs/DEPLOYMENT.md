@@ -67,6 +67,67 @@ docker compose -f infra/docker/docker-compose.yml --profile shards up -d
   `hunter:processed:` por grupo. Remover à mão, depois de conferir que não há
   pendência (`XINFO GROUPS market.backfill.requested`).
 
+### 3.1b `strategy-worker` em N shards (T3.74f)
+
+Concorrência 32 num processo só (T3.74e) não bastou: medido ao vivo em
+2026-09-10 (`docker stats`, dois fechamentos de 15m/30m/1h),
+`hunter-strategy-worker-1` ficou preso em 97-100 % de **um** núcleo pelos
+~36-70 s inteiros que uma rajada de ~200 mercados levou para drenar, enquanto
+`hunter-postgres-1` ficou em 20-25 % dos seus 12 núcleos e `pg_stat_activity`
+mostrava a maioria dos backends parados esperando o *cliente* (o próprio
+processo Python), não executando. `decision_lag_p50_s`/`_p95_s` ficaram em
+49,2/61,1 — bem acima do alvo (mediana < 5 s, p95 < 20 s, PIPELINE.md §6b). A
+causa é CPU de um processo Python só (GIL: coroutines não são núcleos), não o
+pool de conexões nem o Postgres — subir a concorrência não ajuda mais (provado
+em `test_shard_cpu_benchmark.py`: concorrência 32 sobre uma carga presa à CPU
+não move o tempo de parede, ~1,0x). A saída é a mesma do coletor: dividir o
+universo entre N processos, `STRATEGY_SHARD=i/N`, a mesma fatia estável
+`crc32(symbol) % N` (`hunter_core.sharding`, reaproveitada — nunca rederivada
+— do `MARKET_SHARD` do coletor).
+
+```bash
+STRATEGY_SHARDS=4 docker compose -f infra/docker/docker-compose.yml \
+  --profile strategy-shards up -d
+```
+
+- os três shards extras (`strategy-worker-1..3`) vivem no perfil
+  `strategy-shards`, então um `up` normal continua subindo **um** worker de
+  decisão (comportamento de hoje, `STRATEGY_SHARD=0/1`);
+- ao contrário do coletor, cada shard lê o stream `market.candles.closed`
+  **inteiro**, através do seu próprio grupo consumidor
+  (`strategy-worker.shadow.{i}of{N}`, mesma forma de
+  `hunter_market_worker.backfill.BackfillConsumer.group` para "stream
+  compartilhado, dono fatiado") — um grupo único compartilhado entre shards
+  não funcionaria: o Redis entrega cada entrada nova a qualquer consumidor do
+  grupo que chamar `XREADGROUP` primeiro, não ao shard dono do símbolo, então
+  perderia barras em silêncio em vez de garantir uma avaliação por barra. Uma
+  barra de um mercado que este shard não possui é confirmada (`ack`) sem
+  avaliar, contada por nome
+  (`hunter_shadow_bars_skipped_total{reason="not_my_shard"}`);
+- cada shard escreve `hb:strategy:shadow:{i}of{N}` (`hb:strategy:shadow` sem
+  sufixo com `STRATEGY_SHARDS=1`); a varredura genérica de `/api/v1/system/
+  workers` já mostra uma linha por shard sem mudança nenhuma (ela separa
+  `role`/`instance` no primeiro `:`), e `/api/v1/system/latency` agrega o
+  hop `decision` pelo pior shard (maior p50/p95 entre os que estão vivos);
+- a varredura de outcomes (`sweep_outcomes`, não particionada por mercado) e o
+  contador de `open_trackings` do heartbeat só rodam no shard 0 — os outros
+  ficam ociosos nesse laço (mesma convenção de `fx`/`spot` no coletor: uma
+  tarefa por cluster, não por shard). O outbox (`SKIP LOCKED`) continua
+  rodando em todos, é seguro por design;
+- a guarda de replay (`replay/role_guard.py`) continua recusando rodar dentro
+  de **qualquer** shard: ela olha `HUNTER_ROLE=strategy`, que não muda com o
+  shard — replay continua isolado no `replay-worker` (T3.80);
+- `STRATEGY_SHARDS` só sobe até 4 (`strategy-worker-1..3` declarados); um
+  universo bem maior pediria um perfil `strategy-shards8` análogo ao do
+  coletor, não criado aqui;
+- **mudar N deixa grupos de consumidor órfãos**
+  (`strategy-worker.shadow.{i}of{N}`) no stream `market.candles.closed`.
+  Remover à mão, depois de conferir que não há pendência (`XINFO GROUPS
+  market.candles.closed`).
+
+VPS: `STRATEGY_SHARDS=4 bash infra/vps/compose.sh update` (mesmo padrão de
+`MARKET_SHARDS`, perfil ativado automaticamente pelo script).
+
 ### 3.2 `execution-worker` (T3.5/T3.13)
 
 O que é: `HUNTER_ROLE=execution` (`services/execution-worker/`), o motor da

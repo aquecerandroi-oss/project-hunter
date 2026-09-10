@@ -243,6 +243,50 @@ services:
       DB_MAX_OVERFLOW: "20"
     logging: *prod-logging
 
+  # T3.74f — the other three shards (profile `strategy-shards` of the base
+  # compose). `STRATEGY_SHARD` itself is not repeated here: the base file's
+  # `strategy-worker-{1,2,3}` (each `extends: strategy-worker`) already set
+  # it to `{i}/${STRATEGY_SHARDS:-1}`, and this override only merges in the
+  # production DSN/role/pool, the same minimal shape `market-worker-{1,2,3}`
+  # above already use for their own shards. Subir com:
+  #
+  #   STRATEGY_SHARDS=4 bash infra/vps/compose.sh update
+  #
+  # Verificar depois: `decision_lag_p50_s`/`_p95_s` em cada `hb:strategy:
+  # shadow:{i}of4` (`docker exec hunter-redis-1 redis-cli HGETALL ...`),
+  # nenhum grupo consumidor orfao (`XINFO GROUPS market.candles.closed`
+  # deve listar 4 grupos `strategy-worker.shadow.{i}of4` com `pending`
+  # baixo em cada).
+  strategy-worker-1:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: strategy
+      HEALTH_PORT: "8001"
+      DB_POOL_SIZE: "20"
+      DB_MAX_OVERFLOW: "20"
+    logging: *prod-logging
+
+  strategy-worker-2:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: strategy
+      HEALTH_PORT: "8001"
+      DB_POOL_SIZE: "20"
+      DB_MAX_OVERFLOW: "20"
+    logging: *prod-logging
+
+  strategy-worker-3:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: strategy
+      HEALTH_PORT: "8001"
+      DB_POOL_SIZE: "20"
+      DB_MAX_OVERFLOW: "20"
+    logging: *prod-logging
+
   # Replay lane (T3.80, infra/docker/docker-compose.yml). `*prod-db-env` for
   # the same reason as every other worker above -- without it this profile
   # service inherits the dev password and fails to connect the moment

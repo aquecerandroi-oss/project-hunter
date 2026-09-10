@@ -12,6 +12,7 @@
 #                                                       # nunca `docker exec` no worker vivo
 #   MARKET_SHARDS=4 bash infra/vps/compose.sh update   # idem, com os shards do coletor
 #   MARKET_SPOT=1 MARKET_SHARDS=4 bash infra/vps/compose.sh update   # + o coletor SPOT dedicado (T3.0f)
+#   STRATEGY_SHARDS=4 bash infra/vps/compose.sh update   # idem, com os shards do worker de decisao (T3.74f)
 #   bash infra/vps/compose.sh <qualquer subcomando do docker compose>
 #
 # Existe para nao errar os quatro detalhes que quebram a stack quando alguem
@@ -87,6 +88,27 @@ if [[ "$MARKET_SHARDS" =~ ^[0-9]+$ ]]; then
   fi
 else
   echo "AVISO: MARKET_SHARDS='$MARKET_SHARDS' nao e um numero; ignorando (nenhum perfil de shard ativado)." >&2
+fi
+
+# STRATEGY_SHARDS>1 precisa do perfil `strategy-shards` do compose base
+# (strategy-worker-1..3, T3.74f) - mesmo padrao de MARKET_SHARDS acima, mesmo
+# motivo: sem isto quem subisse os shards do worker de decisao tinha que
+# lembrar de `--profile strategy-shards` na mao. So ate 4 shards por enquanto
+# (nao ha um `strategy-worker-4..7`/perfil `strategy-shards8` -- o burst
+# medido na T3.74f satura em ~1 nucleo por shard, 4 shards cobrem os ~200
+# mercados monitorados hoje; um universo bem maior pediria essa extensao,
+# nao adicionada aqui).
+STRATEGY_SHARDS="${STRATEGY_SHARDS:-1}"
+if [[ "$STRATEGY_SHARDS" =~ ^[0-9]+$ ]]; then
+  if [ "$STRATEGY_SHARDS" -gt 1 ]; then
+    PROFILE_ARGS+=(--profile strategy-shards)
+  fi
+  if [ "$STRATEGY_SHARDS" -gt 4 ]; then
+    echo "ERRO: STRATEGY_SHARDS='$STRATEGY_SHARDS' > 4, mas so ha strategy-worker-1..3 declarados (perfil strategy-shards)." >&2
+    exit 1
+  fi
+else
+  echo "AVISO: STRATEGY_SHARDS='$STRATEGY_SHARDS' nao e um numero; ignorando (nenhum perfil de shard ativado)." >&2
 fi
 
 # T3.0f - MARKET_SPOT=1 adiciona o perfil `spot` (market-worker-spot, o

@@ -169,6 +169,41 @@ async def test_build_latency_end_to_end_sums_only_when_every_hop_has_a_p95() -> 
     assert result.end_to_end.status == LatencySloStatus.OK
 
 
+async def test_build_latency_unions_decision_hop_across_shards_worst_wins() -> None:
+    """T3.74f: two ``STRATEGY_SHARDS`` shards reporting, the slower one wins
+    both p50 and p95 -- a fast shard must not hide a slow one."""
+    redis = _FakeRedis(
+        scan_keys=["hb:strategy:shadow:0of2", "hb:strategy:shadow:1of2"],
+        hashes={
+            "hb:strategy:shadow:0of2": _bytes(
+                {"decision_lag_p50_s": "3.0", "decision_lag_p95_s": "9.0"}
+            ),
+            "hb:strategy:shadow:1of2": _bytes(
+                {"decision_lag_p50_s": "7.0", "decision_lag_p95_s": "22.0"}
+            ),
+        },
+    )
+    result = await build_latency(redis)  # pyright: ignore[reportArgumentType]
+    by_hop = {hop.hop: hop for hop in result.hops}
+    assert by_hop["decision"].p50_s == pytest.approx(7.0)
+    assert by_hop["decision"].p95_s == pytest.approx(22.0)
+    assert by_hop["decision"].status == LatencySloStatus.CRITICAL
+
+
+async def test_build_latency_falls_back_to_the_solo_key_with_no_shards_reporting() -> None:
+    """``STRATEGY_SHARDS=1`` (default): no ``:{i}of{N}`` key exists at all,
+    so the union finds nothing and the classic solo key is read unchanged."""
+    redis = _FakeRedis(
+        hashes={
+            STRATEGY_SHADOW_KEY: _bytes({"decision_lag_p50_s": "1.5", "decision_lag_p95_s": "4.0"}),
+        }
+    )
+    result = await build_latency(redis)  # pyright: ignore[reportArgumentType]
+    by_hop = {hop.hop: hop for hop in result.hops}
+    assert by_hop["decision"].p50_s == pytest.approx(1.5)
+    assert by_hop["decision"].p95_s == pytest.approx(4.0)
+
+
 async def test_build_latency_propagates_redis_errors() -> None:
     class _RaisingScan:
         async def scan_iter(self, match: str | None = None, count: int | None = None):

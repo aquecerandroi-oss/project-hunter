@@ -401,6 +401,15 @@ services:
       # already uses for its own, smaller pool.
       DB_POOL_SIZE: "20"
       DB_MAX_OVERFLOW: "20"
+      # T3.74f: shard 0 of STRATEGY_SHARDS (default 1 = the whole monitored
+      # universe in one process, exactly as before -- notes-T3.74f.md §1
+      # measured that one process pinned at ~99% of one core for the whole
+      # ~36s a 200-market burst took to drain, while Postgres stayed at
+      # 20-25% of its 12 cores over the same window: Python CPU, not
+      # Postgres, is the wall). ``STRATEGY_SHARDS=4 docker compose --profile
+      # strategy-shards up -d`` starts this one as 0/4 plus the three
+      # services below, mirroring MARKET_SHARD's own pattern above.
+      STRATEGY_SHARD: 0/${STRATEGY_SHARDS:-1}
     env_file:
       - path: ../../.env
         required: false
@@ -430,6 +439,55 @@ services:
       timeout: 30s
       start_period: 60s
       retries: 5
+
+  # T3.74f -- the other three shards of the decision worker, behind the
+  # `strategy-shards` profile so a plain `up` still runs one process (today's
+  # behaviour). Each shard reads the *whole* `market.candles.closed` stream
+  # through its own consumer group (`STRATEGY_SHARD` -> `hunter_strategy_
+  # worker.config.consumer_group`) and refuses -- acks without evaluating --
+  # any bar whose symbol it does not own (`hunter_core.sharding.owns`, same
+  # crc32 slice `MARKET_SHARD` already uses, so a symbol lands on the same
+  # shard index in both services). Explicit services, not `deploy.replicas`,
+  # for the same reason the market-worker shards are explicit: each one needs
+  # its own STRATEGY_SHARD and its own consumer group/heartbeat key.
+  #
+  #   STRATEGY_SHARDS=4 docker compose -f infra/docker/docker-compose.yml \
+  #     --profile strategy-shards up -d
+  strategy-worker-1:
+    extends:
+      service: strategy-worker
+    profiles: [strategy-shards]
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: strategy
+      HEALTH_PORT: "8001"
+      DB_POOL_SIZE: "20"
+      DB_MAX_OVERFLOW: "20"
+      STRATEGY_SHARD: 1/${STRATEGY_SHARDS:-1}
+
+  strategy-worker-2:
+    extends:
+      service: strategy-worker
+    profiles: [strategy-shards]
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: strategy
+      HEALTH_PORT: "8001"
+      DB_POOL_SIZE: "20"
+      DB_MAX_OVERFLOW: "20"
+      STRATEGY_SHARD: 2/${STRATEGY_SHARDS:-1}
+
+  strategy-worker-3:
+    extends:
+      service: strategy-worker
+    profiles: [strategy-shards]
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: strategy
+      HEALTH_PORT: "8001"
+      DB_POOL_SIZE: "20"
+      DB_MAX_OVERFLOW: "20"
+      STRATEGY_SHARD: 3/${STRATEGY_SHARDS:-1}
 
   # Replay lane, in its own process (T3.80). T3.76 ran a replay via `docker
   # exec hunter-strategy-worker-1 ... replay.run` -- inside the live worker's

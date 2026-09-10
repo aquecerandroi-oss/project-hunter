@@ -38,7 +38,6 @@ planned in full is marked. (Astra, T2.5-backfill design review, must-fix 1 and 4
 from __future__ import annotations
 
 import asyncio
-import zlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -53,6 +52,7 @@ from hunter_core.events.consume import ack, is_processed
 from hunter_core.events.streams import Streams
 from hunter_core.logging import get_logger
 from hunter_core.observability import registry
+from hunter_core.sharding import owns as shard_owns
 from hunter_market_worker import backfill_plan as planning
 from hunter_market_worker import backfill_request as requests
 from hunter_market_worker import funding_backfill
@@ -119,11 +119,9 @@ class BackfillConsumer:
         )
 
     def owns(self, symbol: str) -> bool:
-        """The same slice ``universe.shard_symbols`` applies, for one symbol."""
-        return (
-            zlib.crc32(symbol.encode("utf-8")) % self.settings.shard_total
-            == self.settings.shard_index
-        )
+        """The same slice ``universe.shard_symbols`` applies, for one symbol
+        (``hunter_core.sharding.owns``, T3.74f)."""
+        return shard_owns(symbol, self.settings.shard_index, self.settings.shard_total)
 
     async def run_once(self, *, block_ms: int | None = None) -> list[Outcome]:
         messages = await read_batch(

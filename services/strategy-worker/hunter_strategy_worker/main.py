@@ -40,11 +40,17 @@ async def forever(name: str, coro: Awaitable[None]) -> None:
 async def run_strategy(runtime: WorkerRuntime) -> None:
     """Entry point registered for ``HUNTER_ROLE=strategy``."""
     config = load_config()
+    settings = runtime.settings
+    shard_index, shard_total = settings.strategy_shard_index, settings.strategy_shard_total
     factory = create_session_factory(runtime.engine)
     consumer_health, outbox_health = ConsumerHealth(), OutboxHealth()
     checks = readiness_checks(factory, config, consumer_health, outbox_health, runtime.redis)
     runtime.readiness_checks.extend(checks)
-    logger.info("shadow_worker_starting", cohort=config.cohort)
+    logger.info(
+        "shadow_worker_starting",
+        cohort=config.cohort,
+        strategy_shard=settings.strategy_shard,
+    )
     try:
         if not await migration_present(factory):
             # Fatal on purpose: with 0002_shadow_lab missing there is nowhere to
@@ -57,10 +63,29 @@ async def run_strategy(runtime: WorkerRuntime) -> None:
             )
         async with asyncio.TaskGroup() as group:
             tasks = {
-                "decisions": run_consumer(factory, runtime.redis, runtime, config, consumer_health),
-                "outcomes": run_outcomes(factory, runtime, config, runtime.settings),
+                "decisions": run_consumer(
+                    factory,
+                    runtime.redis,
+                    runtime,
+                    config,
+                    consumer_health,
+                    shard_index=shard_index,
+                    shard_total=shard_total,
+                ),
+                # T3.74f: unpartitioned by design -- only shard 0 runs it
+                # (outcome_sweep.run_outcomes docstring).
+                "outcomes": run_outcomes(
+                    factory, runtime, config, settings, shard_index=shard_index
+                ),
                 "outbox": run_outbox(factory, runtime.redis, runtime, config, outbox_health),
-                "heartbeat": run_heartbeat(runtime, config, consumer_health, outbox_health),
+                "heartbeat": run_heartbeat(
+                    runtime,
+                    config,
+                    consumer_health,
+                    outbox_health,
+                    shard_index=shard_index,
+                    shard_total=shard_total,
+                ),
             }
             for name, coro in tasks.items():
                 group.create_task(forever(name, coro), name=f"shadow-{name}")

@@ -18,8 +18,8 @@ import orjson
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
-from hunter_strategy_worker.config import HEARTBEAT_KEY
 from hunter_strategy_worker.metrics import decision_lag_percentiles
+from hunter_strategy_worker.shard import heartbeat_key
 from hunter_strategy_worker.tracking_repo import load_open_trackings
 
 if TYPE_CHECKING:
@@ -42,13 +42,29 @@ async def write_heartbeat(
     outbox: OutboxHealth,
     *,
     open_trackings: int | None = None,
+    shard_index: int = 0,
+    shard_total: int = 1,
 ) -> None:
-    """One ``HSET`` + ``EXPIRE`` of ``hb:strategy:shadow``."""
+    """One ``HSET`` + ``EXPIRE`` of this shard's own heartbeat key.
+
+    T3.74f: ``shard_total <= 1`` writes ``hb:strategy:shadow`` unchanged; a
+    sharded deployment writes ``hb:strategy:shadow:{i}of{N}`` instead
+    (:func:`hunter_strategy_worker.config.heartbeat_key`), mirroring
+    ``hunter_market_worker.heartbeat.hb_key``'s convention closely enough
+    that the API's generic ``/system/workers`` scan
+    (``parse_heartbeat_key``, splits on the first ``:``) shows one row per
+    shard with no change on that side -- the two extra fields below are what
+    a reader needs to tell "N shards, this is one of them" from "one of N
+    is missing", the same pair ``hb:market:*`` already carries.
+    """
     lag_p50, lag_p95 = decision_lag_percentiles()
+    key = heartbeat_key(shard_index, shard_total)
     payload = {
         "ts": utcnow().isoformat(),
         "instance": runtime.instance,
         "cohort": config.cohort,
+        "shard_index": str(shard_index),
+        "shard_total": str(shard_total),
         "evaluated_bars": str(consumer.evaluated_bars),
         "evaluations_by_state": orjson.dumps(consumer.states).decode(),
         "errors": str(consumer.errors),
@@ -64,8 +80,8 @@ async def write_heartbeat(
         "decision_lag_p50_s": "" if lag_p50 is None else f"{lag_p50:.1f}",
         "decision_lag_p95_s": "" if lag_p95 is None else f"{lag_p95:.1f}",
     }
-    await cast("Any", runtime.redis).hset(HEARTBEAT_KEY, mapping=payload)
-    await runtime.redis.expire(HEARTBEAT_KEY, TTL_S)
+    await cast("Any", runtime.redis).hset(key, mapping=payload)
+    await runtime.redis.expire(key, TTL_S)
 
 
 async def run_heartbeat(
@@ -73,22 +89,40 @@ async def run_heartbeat(
     config: ShadowConfig,
     consumer: ConsumerHealth,
     outbox: OutboxHealth,
+    *,
+    shard_index: int = 0,
+    shard_total: int = 1,
 ) -> None:
-    """Write the heartbeat forever; a failure is logged, never fatal."""
+    """Write the heartbeat forever; a failure is logged, never fatal.
+
+    ``open_trackings`` is a cluster-wide count (every open tracking, not just
+    this shard's own markets -- ``load_open_trackings`` is unpartitioned by
+    design, T3.74f), so only shard 0 pays for it; every other shard reports
+    an empty value for that one field, same as when the query itself fails.
+    """
     factory = None
     while True:
         open_trackings: int | None = None
-        try:
-            if factory is None:
-                from hunter_core.db.session import create_session_factory
+        if shard_index == 0:
+            try:
+                if factory is None:
+                    from hunter_core.db.session import create_session_factory
 
-                factory = create_session_factory(runtime.engine)
-            async with role_session(factory, db_role="hunter_worker") as session:
-                open_trackings = len(await load_open_trackings(session, limit=10_000))
-        except Exception:
-            logger.warning("shadow_heartbeat_count_failed")
+                    factory = create_session_factory(runtime.engine)
+                async with role_session(factory, db_role="hunter_worker") as session:
+                    open_trackings = len(await load_open_trackings(session, limit=10_000))
+            except Exception:
+                logger.warning("shadow_heartbeat_count_failed")
         try:
-            await write_heartbeat(runtime, config, consumer, outbox, open_trackings=open_trackings)
+            await write_heartbeat(
+                runtime,
+                config,
+                consumer,
+                outbox,
+                open_trackings=open_trackings,
+                shard_index=shard_index,
+                shard_total=shard_total,
+            )
         except Exception:
             logger.warning("shadow_heartbeat_write_failed")
         await asyncio.sleep(INTERVAL_S)

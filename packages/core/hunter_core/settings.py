@@ -21,33 +21,11 @@ from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from hunter_core.domain.enums import KillSwitchState
+from hunter_core.sharding import parse_shard_spec
 
 Environment = Literal["development", "test", "staging", "production"]
 Role = Literal["api", "market", "scanner", "strategy", "execution", "analytics", "all"]
 MarketRole = Literal["perpetual", "spot", "both"]
-
-
-def _parse_market_shard(value: str) -> tuple[int, int]:
-    """``"<index>/<total>"`` -> ``(index, total)``, validated (T1.6b-C1).
-
-    Fails loudly and immediately -- a market-worker that silently fell back
-    to "the whole universe" on a typo'd ``MARKET_SHARD`` would duplicate
-    every other shard's REST/WS load instead of refusing to start.
-    """
-    parts = value.split("/")
-    if len(parts) != 2:
-        raise ValueError(f"MARKET_SHARD must be '<index>/<total>', got {value!r}")
-    try:
-        index, total = int(parts[0]), int(parts[1])
-    except ValueError as exc:
-        raise ValueError(
-            f"MARKET_SHARD must be '<index>/<total>' with integers, got {value!r}"
-        ) from exc
-    if total < 1:
-        raise ValueError(f"MARKET_SHARD total must be >= 1, got {value!r}")
-    if not (0 <= index < total):
-        raise ValueError(f"MARKET_SHARD index must satisfy 0 <= index < total, got {value!r}")
-    return index, total
 
 
 class Settings(BaseSettings):
@@ -184,24 +162,45 @@ class Settings(BaseSettings):
     """``"<index>/<total>"`` — which stable hash slice of the monitored
     universe this process owns (:func:`hunter_market_worker.universe.shard_symbols`).
     Default ``"0/1"`` is exactly today's behaviour: one process, the whole
-    universe, no coordination. Parsed eagerly by :func:`_parse_market_shard`
-    so a malformed value fails at construction, never silently at the first
-    symbol-assignment call."""
+    universe, no coordination. Parsed eagerly by
+    :func:`hunter_core.sharding.parse_shard_spec` so a malformed value fails
+    at construction, never silently at the first symbol-assignment call."""
 
     @model_validator(mode="after")
     def _validate_market_shard(self) -> Settings:
-        _parse_market_shard(self.market_shard)
+        parse_shard_spec("MARKET_SHARD", self.market_shard)
         return self
 
     @property
     def shard_index(self) -> int:
         """This process's shard index, ``0 <= shard_index < shard_total``."""
-        return _parse_market_shard(self.market_shard)[0]
+        return parse_shard_spec("MARKET_SHARD", self.market_shard)[0]
 
     @property
     def shard_total(self) -> int:
         """Total number of shards (``>= 1``)."""
-        return _parse_market_shard(self.market_shard)[1]
+        return parse_shard_spec("MARKET_SHARD", self.market_shard)[1]
+
+    # ---- strategy-worker sharding (T3.74f, mirrors market_shard above) ----
+    strategy_shard: str = "0/1"
+    """Which crc32 slice (:func:`hunter_core.sharding.owns`, same formula
+    ``market_shard`` uses) of the monitored universe this strategy-worker
+    process decides on. ``"0/1"``: today's behaviour, one process. T3.74f
+    measured one process pinned at ~99% of one core for a whole burst while
+    Postgres stayed at 20-25% of its cores -- CPU, not the pool, is why."""
+
+    @model_validator(mode="after")
+    def _validate_strategy_shard(self) -> Settings:
+        parse_shard_spec("STRATEGY_SHARD", self.strategy_shard)
+        return self
+
+    @property
+    def strategy_shard_index(self) -> int:
+        return parse_shard_spec("STRATEGY_SHARD", self.strategy_shard)[0]
+
+    @property
+    def strategy_shard_total(self) -> int:
+        return parse_shard_spec("STRATEGY_SHARD", self.strategy_shard)[1]
 
     # ---- market-worker data-path role (T3.0f) ------------------------------
     market_role: MarketRole | None = None
@@ -261,7 +260,7 @@ class Settings(BaseSettings):
         role = self.market_role
         if role is None:
             return self
-        shard_total = _parse_market_shard(self.market_shard)[1]
+        shard_total = parse_shard_spec("MARKET_SHARD", self.market_shard)[1]
         if role == "spot" and shard_total > 1:
             raise ValueError(
                 "MARKET_ROLE=spot cannot be combined with a sharded MARKET_SHARD "

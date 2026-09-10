@@ -16,7 +16,9 @@ from dataclasses import dataclass
 from hunter_core.domain.enums import ShadowCohort
 
 CONSUMER_GROUP = "strategy-worker.shadow"
-"""Own group on ``market.candles.closed`` — never shared with another service."""
+"""Own group on ``market.candles.closed`` -- never shared with another
+service. The unsharded name; ``hunter_strategy_worker.shard.consumer_group``
+derives a sharded one from it (T3.74f)."""
 
 HEARTBEAT_KEY = "hb:strategy:shadow"
 PRODUCER = "strategy-worker.shadow"

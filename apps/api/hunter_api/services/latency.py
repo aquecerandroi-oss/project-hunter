@@ -23,6 +23,11 @@ STRATEGY_SHADOW_KEY = "hb:strategy:shadow"
 ``apps/api`` does not depend on ``services/*`` packages, so the literal is
 kept in sync by convention, same as this module's other two keys."""
 
+STRATEGY_SHADOW_SHARD_PATTERN = "hb:strategy:shadow:*of*"
+"""Every ``STRATEGY_SHARDS > 1`` shard's own heartbeat (T3.74f, mirrors
+``hunter_market_worker.heartbeat.hb_key``'s ``{i}of{N}`` suffix). Never
+matches the solo key above, which has no trailing segment."""
+
 EXECUTION_PAPER_KEY = "hb:execution:paper"
 """``hunter_execution_worker.config.HEARTBEAT_KEY``."""
 
@@ -96,6 +101,37 @@ async def _market_hop_fields(redis: redis_asyncio.Redis) -> dict[str, str]:
     return {}
 
 
+async def _shadow_decision_lag(redis: redis_asyncio.Redis) -> tuple[float | None, float | None]:
+    """``(p50, p95)`` for the ``decision`` hop, unioned across every
+    ``STRATEGY_SHARDS`` shard (T3.74f) -- the worst shard wins for each
+    number, the same principle ``hunter_api.services.market_shards`` already
+    uses for ``ws_state`` ("a fast shard must not hide a slow one"). Falls
+    back to the solo key when no sharded heartbeat exists (``STRATEGY_
+    SHARDS=1``, today's default) -- unchanged behaviour in that case.
+    """
+    client = cast("object", redis)
+    p50s: list[float] = []
+    p95s: list[float] = []
+    async for raw_key in client.scan_iter(  # type: ignore[attr-defined]
+        match=STRATEGY_SHADOW_SHARD_PATTERN, count=SCAN_COUNT
+    ):
+        raw_key = cast("bytes | str", raw_key)
+        key = raw_key.decode(errors="replace") if isinstance(raw_key, bytes) else raw_key
+        fields = await _read_hash(redis, key)
+        p50, p95 = (
+            _float(fields.get("decision_lag_p50_s")),
+            _float(fields.get("decision_lag_p95_s")),
+        )
+        if p50 is not None:
+            p50s.append(p50)
+        if p95 is not None:
+            p95s.append(p95)
+    if p50s or p95s:
+        return (max(p50s) if p50s else None, max(p95s) if p95s else None)
+    solo = await _read_hash(redis, STRATEGY_SHADOW_KEY)
+    return _float(solo.get("decision_lag_p50_s")), _float(solo.get("decision_lag_p95_s"))
+
+
 def _hop(name: str, p50: float | None, p95: float | None) -> LatencyHopOut:
     warn_s, critical_s = _HOP_TARGETS[name] if name != _END_TO_END else _END_TO_END_TARGET
     status = LatencySloStatus(classify_slo(p95, warn_s=warn_s, critical_s=critical_s))
@@ -115,7 +151,7 @@ def _sum_or_none(values: list[float | None]) -> float | None:
 
 async def build_latency(redis: redis_asyncio.Redis) -> LatencyOut:
     market_fields = await _market_hop_fields(redis)
-    shadow_fields = await _read_hash(redis, STRATEGY_SHADOW_KEY)
+    decision_p50, decision_p95 = await _shadow_decision_lag(redis)
     execution_fields = await _read_hash(redis, EXECUTION_PAPER_KEY)
 
     hops = [
@@ -129,11 +165,7 @@ async def build_latency(redis: redis_asyncio.Redis) -> LatencyOut:
             _float(market_fields.get("flush_lag_p50_s")),
             _float(market_fields.get("flush_lag_p95_s")),
         ),
-        _hop(
-            _DECISION,
-            _float(shadow_fields.get("decision_lag_p50_s")),
-            _float(shadow_fields.get("decision_lag_p95_s")),
-        ),
+        _hop(_DECISION, decision_p50, decision_p95),
         _hop(
             _ADMISSION,
             _float(execution_fields.get("admission_lag_p50_s")),
