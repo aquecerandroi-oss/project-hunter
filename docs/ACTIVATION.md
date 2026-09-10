@@ -108,22 +108,27 @@ existiu", e o operador precisa vê-la.
 | 7 ativação auditada | **Everton** — `bash infra/vps/compose.sh run --rm ops python infra/scripts/activate_strategy_version.py momentum v3 --changelog D10_coorte_paper_ativada_por_Everton_2026-09-08` (T3.15d: já não é `docker exec hunter-api-1` — esse container não tem mais `DATABASE_URL_MIGRATIONS`, DEPLOYMENT.md §3.4; sem aspas internas, por causa do PowerShell) |
 | 8 flag | **Everton** — depois do 7 e com β válido |
 
-## §8 — Checklist de aceite do modo autônomo (T3.29, medido na VPS em 2026-09-08 ~14:10Z)
+## §8 — Checklist de aceite do modo autônomo (T3.29, medido na VPS em 2026-09-08 ~14:10Z; remedido em 2026-09-10 ~00:47Z BRT / 03:47Z UTC, T3.71)
 
 O Everton vira a flag do passo 8 **quando toda linha estiver verde**. Cada linha
 é uma medição, com a consulta que a produziu; nenhuma é opinião. Leituras feitas
-como `docker exec hunter-postgres-1 psql -U hunter -d hunter` (somente `SELECT`).
+como `docker exec hunter-postgres-1 psql -U hunter -d hunter` (somente `SELECT`,
+transação `repeatable read read only`). **Histórico 2026-09-08** (referência,
+não repetido linha a linha): 0 `agents`; 15/15 spot com `avgPrice` mas sem
+deploy; β válido só para BTCUSDT por identidade (1/200) e 0/171 sinais de 24 h
+passariam; `mark_quality` sem deploy; backup só com TOC provado, sem restore
+real; MTM e `paper_autonomy=false` já verdes; `risk_profile_id` NULL.
 
-| # | Condição | Medido em 2026-09-08 | Verde? |
+| # | Condição | Medido em 2026-09-10 (00:47 BRT / 03:47Z) | Verde? |
 |---|---|---|---|
-| 1 | **Vínculo `agents`** habilitado para `momentum v3` + carteira `ever` | `SELECT count(*) FROM agents;` → **0** | 🔴 — rodar o §8a |
-| 2 | **`avgPrice`** disponível para os mercados executáveis | 15/15 SPOT monitorados com `applyMinToMarket=true` e `avgPriceMins=5`; **22 de 22** sinais admissíveis de `momentum v3` em 24 h adiariam por `avg_price_not_collected` | 🟡 — código pronto (T3.29, `avg_price.py`), falta o **deploy** |
-| 3 | **β válido** para algum mercado com sinal | 200 revisões vigentes, **1 válida** (BTCUSDT, β=1 por identidade); 199 `insufficient_history` com 423 barras contíguas contra 480 exigidas. Causa: o **próprio BTC** (a referência) só tem 1m desde `2026-08-21 20:32Z` (≈ 425 h). Resultado: **0** dos 171 sinais de 24 h passariam no `beta_validity` | 🔴 — falta backfill do BTC perpétuo até ≥ 20 dias contíguos |
-| 4 | **Qualidade das marcas** (`mark_quality`) publicada e barrando admissão | campo novo no `hb:execution:paper` (T3.29); carteira sem posição ⇒ `1` por construção | 🟡 — falta o deploy |
-| 5 | **Backup restaurável** | 3 dumps em `/opt/backups` (último `hunter-20260908T011701Z.dump`, 387 M, 01:18Z); cron `/etc/cron.d/hunter-backup` 03:17 diário com `bash`; `pg_restore --list` legível com **1730 entradas**, incluindo `TABLE DATA public {portfolios,trade_proposals,orders,fills,positions,trades,agents,risk_profiles,portfolio_exit_intents,market_betas,kill_switch_transitions}` | 🟡 — TOC provado; **restore real ainda não** (§restore abaixo) |
-| 6 | **MTM vivo** | último ponto `1m` 36 s antes da leitura; `marks_stale=false`; equity 19.333,0111164813 USDT; kill switch `ACTIVE` | 🟢 |
+| 1 | **Vínculo `agents`** habilitado para `momentum v3` + carteira `ever` | `SELECT count(*) FROM agents;` → **0**, sem mudança | 🔴 — rodar o §8a (aguardando o Everton) |
+| 2 | **`avgPrice`** disponível para os mercados executáveis | universo monitorado cresceu de 15 para **18/18** SPOT com `applyMinToMarket=true`/`avgPriceMins=5`; `avg_price.py` confirmado dentro da imagem em execução do `execution-worker` (`hunter-api:d21a11d`, `hunter_execution_worker/avg_price.py`, no ar desde 2026-09-09T15:20:52Z, 0 erros/avisos de `avg_price_*` nas últimas 500 linhas de log) | 🟢 — implantado e rodando; sem exercício real de admissão ainda porque `paper_autonomy=false` (linha 7) |
+| 3 | **β válido** para algum mercado com sinal | **16 de 200** revisões vigentes válidas (perpétuos: ARB, BNB, BTC, DASH, DOGE, ETH, LINK, NEAR, PROM, SAHARA, SOL, SUI, TAO, UNI, XRP, ZEC) — os 16 mercados do backfill de 90 dias (T3.62); no funil real de `momentum v3`/24 h: **366 sinais, 51 passam `d1` (liquidez), 23 passam `d1`+β** (era 171/22/0 em 08/09). Dos 18 mercados SPOT monitorados, **12** têm β válido (ARB, BNB, BTC, DOGE, ETH, NEAR, PROM, SOL, SUI, UNI, XRP, ZEC); **6** ainda não (HOLO, IOST, MARSCOIN, PUMP, USD1, USDC — listagens mais novas, sem 20 dias contíguos de perpétuo) | 🟡 — melhora real (T3.62 fechou a causa-raiz do BTC), mas ainda não é toda a linha 3; falta backfill dos 6 restantes |
+| 4 | **Qualidade das marcas** (`mark_quality`) publicada e barrando admissão | `hb:execution:paper.mark_quality = 1` (carteira sem posição); campo em produção desde o deploy de T3.29 | 🟢 |
+| 5 | **Backup restaurável** | rehearsal real de restore executado nesta rodada (ver §restore abaixo): `pg_restore -j 2` do dump `hunter-20260910T011701Z.dump` (1,09 G) num banco descartável `hunter_restore_check`, **0 erros**, contagens batendo com o banco vivo | 🟢 — linha fechada |
+| 6 | **MTM vivo** | `hb:execution:paper`: `ts=2026-09-10T03:32:45Z`, `last_mtm=03:32:00Z` (~46 s antes); equity 19.333,0111164813 USDT (sem mudança — carteira sem posição); kill switch `ACTIVE` | 🟢 |
 | 7 | **`paper_autonomy` desligado até aqui** | `hb:execution:paper.paper_autonomy = false` | 🟢 (é o estado correto antes do aceite) |
-| 8 | **Perfil de risco persistido** (`RISK_ENGINE.md` §2) | `portfolios.risk_profile_id` é **NULL** e não existe linha `risk_profiles.preset='paper_v1'`. Os limites em vigor são os certos — `admit(..., limits=PAPER_V1)` usa o objeto do motor —, mas a linha que a §2 chama de "única fonte" não foi semeada nesta VPS | 🟡 — não altera limite nenhum hoje; fecha antes de alguém fazer `admit` ler o perfil da carteira |
+| 8 | **Perfil de risco persistido** (`RISK_ENGINE.md` §2) | `portfolios.risk_profile_id` continua **NULL**; `risk_profiles` tem **4** linhas mas nenhuma com `preset='paper_v1'` (`SELECT count(*) FROM risk_profiles WHERE preset='paper_v1'` → 0). Sem mudança desde 08/09 | 🟡 — **procedimento pronto (T3.69, §8b): dois comandos, nenhum limite muda de valor**; falta o orquestrador rodá-los na VPS |
 
 **Consultas, verbatim.** As duas que decidem as linhas 2 e 3:
 
@@ -134,7 +139,8 @@ SELECT symbol,
        metadata->'spot_market_filters'->>'avg_price_mins' AS avg_mins
   FROM markets
  WHERE market_type='spot' AND status='active' AND delisted_at IS NULL AND is_monitored;
--- 15 linhas, todas min_mkt=t e avg_mins=5
+-- 08/09: 15 linhas, todas min_mkt=t e avg_mins=5
+-- 10/09: 18 linhas, todas min_mkt=t e avg_mins=5 (universo monitorado cresceu)
 
 -- linhas 2 e 3: o funil real de momentum v3 nas ultimas 24 h
 WITH sig AS (
@@ -154,15 +160,24 @@ SELECT count(*) AS sinais,
        count(*) FILTER (WHERE is_monitored AND volume_24h_usd>=50000000 AND beta_valida) AS d1_e_beta_ok
   FROM sig;
 --  sinais | d1_ok | d1_e_beta_ok
---     171 |    22 |            0
+-- 08/09:  171 |    22 |            0
+-- 10/09:  366 |    51 |           23   (16/200 β válidos, os do backfill T3.62)
 ```
 
-**Leitura honesta do resultado.** Mesmo com o vínculo `agents` criado e com o
-`avgPrice` implantado, **nenhum** dos 171 sinais das últimas 24 h teria virado
-ordem: o `beta_validity` recusa todos menos BTCUSDT, e BTCUSDT não emitiu sinal
-`momentum v3` na janela. Isso é a regra do Everton funcionando (§6 do contrato:
-"sem beta validado, manter o ativo apenas em shadow"), não um defeito — e é
-exatamente por isso que a linha 3 é a que bloqueia o aceite hoje.
+**Leitura honesta do resultado — 08/09.** Mesmo com o vínculo `agents` criado
+e com o `avgPrice` implantado, **nenhum** dos 171 sinais das últimas 24 h teria
+virado ordem: o `beta_validity` recusava todos menos BTCUSDT, e BTCUSDT não
+emitiu sinal `momentum v3` na janela.
+
+**Leitura honesta do resultado — 10/09.** Com o backfill de 90 dias das 16
+séries de referência (T3.62) concluído, o β passou a validar 12 dos 18
+mercados SPOT monitorados (faltam HOLO, IOST, MARSCOIN, PUMP, USD1, USDC —
+listagens recentes sem histórico contíguo suficiente de perpétuo) e **23 dos
+366** sinais de 24 h já passariam `d1`+`beta_validity`. A linha 3 deixou de
+ser um bloqueio total e virou parcial: ainda não é "toda a linha verde", mas a
+causa-raiz do BTC identificada em 08/09 está fechada. Isso continua sendo a
+regra do Everton funcionando (§6 do contrato: "sem beta validado, manter o
+ativo apenas em shadow"), não um defeito.
 
 **Nota operacional — as três pré-checagens que adiam uma entrada (T3.29/T3.29b,
 regras escritas em `docs/RISK_ENGINE.md` §7.1).** Depois de virar a flag, "a
@@ -185,13 +200,150 @@ candidato é lido de novo no segundo seguinte.
 diretiva): stop, alvo e fechamento manual continuam correndo com a carteira
 inteira sem marca, com o Redis fora e sem `avgPrice`.
 
-**Sobre o restore (linha 5).** Nesta rodada a VPS foi tratada como **somente
-leitura**: `pg_restore --list` foi executado sobre o dump mais recente (1730
-entradas, tabelas do ledger presentes), e **nenhum** banco `hunter_restore_test`
-foi criado — um restore real é `CREATE DATABASE` + escrita, e a instrução desta
-tarefa era não escrever nada na VPS. O restore real continua **pendente** e é a
-única prova que fecha a linha 5; ele deve rodar num banco separado e ser
-derrubado no fim.
+**Sobre o restore (linha 5) — 08/09.** Naquela rodada a VPS foi tratada como
+**somente leitura**: `pg_restore --list` foi executado sobre o dump mais
+recente (1730 entradas, tabelas do ledger presentes), e **nenhum** banco foi
+criado — a instrução daquela tarefa era não escrever nada na VPS. O restore
+real ficou pendente.
+
+**Restore real — 10/09 (T3.71), rehearsal completo.** Banco descartável
+`hunter_restore_check` criado em `hunter-postgres-1` às 03:38:57Z; dump mais
+novo (`hunter-20260910T011701Z.dump`, 1,09 G, gerado 03:20Z do mesmo dia)
+copiado para dentro do container (`docker cp`, 4,1 s) e restaurado com
+`pg_restore -U hunter -d hunter_restore_check --no-owner --no-privileges -j 2`.
+Restore terminou **sem nenhum erro** (log completo, 4990 linhas) em
+**~6 min** (lançado 03:39:21Z, processos encerrados ~03:45:25Z); banco
+restaurado ocupou 6,4 G no disco. Wall-clock total do rehearsal (criar → medir
+→ derrubar): **~8 min**. Contagens no banco restaurado batem com o banco vivo
+(lido em transação `repeatable read read only`, sem escrever nada):
+`portfolios` 1=1, `agents` 0=0, `risk_profiles` 4=4, `orders` 0=0, `fills`
+0=0, `positions` 0=0, `trades` 0=0, `strategy_versions` 40=40,
+`kill_switch_transitions` 0=0; `market_betas` 9.200 (restaurado) vs 9.600
+(vivo) e `candles_1m` 5.248.305 vs 5.384.882 — as duas diferenças batem
+exatamente com o intervalo de ~2h30 entre o instante do dump (01:20Z) e a
+leitura do vivo (03:46Z): β roda de hora em hora (~400 linhas/execução) e
+candles entram a cada minuto por mercado. `\dp` em `orders` e `positions`
+mostrou a política `tenant_isolation` restaurada e ativa em ambas
+(`organization_id = current_setting('app.current_org')`, `USING`/`CHECK`
+idênticos ao vivo); a *role* `hunter_runtime` existe no cluster (roles são
+globais, não por banco) — como o restore usou `--no-privileges`, os `GRANT`
+para `hunter_runtime` **não** foram reaplicados nesse banco descartável
+(esperado e correto para uma checagem de integridade de dados; um restore de
+produção real precisaria reconceder os grants ou rodar sem `--no-privileges`).
+Banco `hunter_restore_check` e o arquivo `/tmp/restore_check.dump` dentro do
+container foram removidos ao final (`dropdb` + `rm`); disco da VPS antes/depois
+do rehearsal: 62%→65% usado, 133 G→124 G livres (a alta é o dump de 1,09 G
+que já existia em `/opt/backups` desde 03:20Z, não o rehearsal, que limpou
+depois de si). **Linha 5 fechada**: dado restaurável e restaurado de verdade.
+
+## 8b. Perfil de risco persistido: semear `paper_v1` e apontar a carteira (T3.69, linha 8)
+
+**Nenhum limite muda de valor neste passo.** Os dois comandos abaixo persistem
+exatamente os números que já estão em vigor — a linha semeada é
+`hunter_risk.limits.PAPER_V1.model_dump(mode="json")` por construção
+(`infra/scripts/seed_risk_reference.py`: `PAPER_V1_LIMITS = PAPER_V1.model_dump(...)`,
+uma fonte, nunca duas). A diretiva do Everton ("documente e me apresente antes de
+alterar os limites") vale para **valores**, e aqui nenhum valor muda. Prova
+automatizada: `infra/scripts/tests/test_link_portfolio_risk_profile.py` semeia a
+linha num Postgres real, lê o `jsonb` de volta e compara campo a campo com
+`PAPER_V1` (frações são **strings** JSON, nunca números — `RiskModel` recusa
+`float` na construção), e
+`packages/core/tests/integration/test_schema_paper.py::test_the_seeded_paper_profile_has_exactly_one_source`
+compara os bytes serializados do seed e do motor.
+
+**Quem grava `portfolios.risk_profile_id` hoje: ninguém.** A auditoria da T3.69
+percorreu todos os escritores. `apps/api/hunter_api/services/organizations.py`
+grava `default_risk_profile_id` no **workspace** (uma cópia do preset `balanced`
+para a org) — outra coluna, outra tabela;
+`hunter_core.portfolio.opening.open_paper_wallet` **aceita** `risk_profile_id` e
+todo chamador de produção (inclusive `infra/scripts/open_paper_wallet.py`, que
+nem tem a flag) deixa em `None`. Por isso a carteira da VPS está NULL: não é
+regressão, é uma coluna que nenhum caminho preenche. Daí o script novo,
+`infra/scripts/link_portfolio_risk_profile.py`.
+
+**Fonte declarada × fonte aplicada — dito, não escondido (residual T3.69b).**
+O motor **não** lê o perfil da carteira hoje: `hunter_core.admission.admit`
+recebe `limits: RiskLimits = PAPER_V1` e o `admission_cycle` do
+`execution-worker` nunca passa o argumento, então quem decide é a **constante do
+código**. A linha do banco é a fonte **declarada** (`RISK_ENGINE.md` §2, e o que
+a API mostra em `/risk-limits` com `source='risk_profile'` em vez de
+`engine_default`); a constante é a fonte **aplicada**. As duas são provadamente
+iguais pelos testes acima, e o próprio script recusa o vínculo se a linha
+divergir de `PAPER_V1` em qualquer campo. Fazer `admit` ler o perfil da carteira
+é a **T3.69b** e não foi feito aqui.
+
+**Os dois comandos, pelo serviço `ops`** (T3.15d — a imagem implantada, com o
+DSN de dono; `compose.sh ops` recusa rodar se a imagem do `GIT_SHA` não existir
+na máquina):
+
+```
+# 1. semear a linha risk_profiles.paper_v1 (mostra o que inseriria, depois insere)
+bash infra/vps/compose.sh ops python infra/scripts/seed.py --only risk_profiles --dry-run
+bash infra/vps/compose.sh ops python infra/scripts/seed.py --only risk_profiles --yes
+
+# 2. apontar a carteira paper principal para ela
+bash infra/vps/compose.sh ops python infra/scripts/link_portfolio_risk_profile.py \
+    --portfolio 01a07a1e-f6ae-7366-a7fe-ab3d9c83d488 --preset paper_v1 --dry-run
+bash infra/vps/compose.sh ops python infra/scripts/link_portfolio_risk_profile.py \
+    --portfolio 01a07a1e-f6ae-7366-a7fe-ab3d9c83d488 --preset paper_v1 --yes \
+    --actor <email ou identificação de quem pediu>
+```
+
+O `--dry-run` do passo 1 imprime uma linha `risk_profiles.paper_v1: NEW {...}`
+com o perfil inteiro (medido localmente contra um banco que espelha a VPS —
+4 linhas, sem `paper_v1`):
+
+```
+risk_profiles.paper_v1: NEW {'organization_id': None, 'name': 'Paper v1', 'preset': 'paper_v1',
+ 'limits': {'profile': 'paper_v1', 'day_timezone': 'America/Sao_Paulo', 'max_leverage': '1',
+ 'max_beta_age_s': 7200, 'max_book_age_s': 10, 'max_spread_pct': '0.0005', 'max_price_age_s': 10,
+ 'max_slippage_pct': '0.001', 'max_volume_age_s': 120, 'risk_per_trade_pct': '0.0025',
+ 'kill_switch_blocked': {'drawdown_pct': '0.08', 'daily_loss_pct': '0.02'},
+ 'kill_switch_warning': {'drawdown_pct': '0.04', 'daily_loss_pct': '0.01'},
+ 'max_beta_btc_exposure': '0.50', 'max_participation_pct': '0.01', 'max_stop_distance_pct': '0.03',
+ 'min_liquidity_usd_24h': '50000000', 'min_stop_distance_pct': '0.003',
+ 'max_asset_exposure_pct': '0.10', 'max_total_exposure_pct': '0.40', 'participation_window_s': 60,
+ 'max_entry_deviation_pct': '0.005', 'warning_size_multiplier': '0.5',
+ 'max_concurrent_positions': 5, 'max_aggregate_planned_risk_pct': '0.01'}, 'created_by': None}
+```
+
+Conferir esses números contra a tabela de `docs/RISK_ENGINE.md` §2 **antes** de
+rodar o `--yes` é o passo de apresentação; se algum diferir, **não** rode o
+`--yes` e volte ao Everton.
+
+**O que cada recusa quer dizer** (todas com saída ≠ 0 e nada escrito):
+
+| Recusa | Causa | O que fazer |
+|---|---|---|
+| `there is no system risk_profiles row with preset 'paper_v1'` | o passo 1 não rodou | rodar o passo 1 |
+| `the stored paper_v1 limits differ from hunter_risk.limits.PAPER_V1 on: <campos>` | a linha do banco não é o objeto do motor | **parar** — é mudança de limite feita por ninguém; reconciliar deliberadamente e apresentar ao Everton |
+| `already points at risk_profile <outro>` | a carteira já aponta para outro perfil | só com `--replace`, e só se mover for deliberado |
+| `no portfolio <uuid> is visible to this connection` | id errado, ou DSN sem privilégio (`portfolios` é `FORCE ROW LEVEL SECURITY`) | conferir o uuid e que é o `ops` (DSN de dono) |
+| `is type=<x>`/`is_arena` | não é a carteira paper principal | conferir o uuid |
+
+Rodar o passo 2 de novo depois de pronto imprime `already points at paper_v1
+(...); nothing to do` e **não** escreve uma segunda linha de auditoria.
+
+**Verificação, somente leitura** (`docker exec hunter-postgres-1 psql -U hunter -d hunter`):
+
+```sql
+SELECT p.id                AS carteira,
+       p.name,
+       rp.preset::text     AS preset,
+       rp.limits->>'risk_per_trade_pct'    AS risco_por_trade,
+       rp.limits->>'max_total_exposure_pct' AS exposicao_total,
+       rp.limits->>'max_concurrent_positions' AS vagas
+  FROM portfolios p
+  LEFT JOIN risk_profiles rp ON rp.id = p.risk_profile_id
+ WHERE p.type = 'paper' AND NOT p.is_arena;
+-- verde: preset = paper_v1, risco_por_trade = 0.0025, exposicao_total = 0.40, vagas = 5
+
+SELECT action, actor_type, before, after, metadata->>'actor_input' AS quem
+  FROM audit_logs
+ WHERE action = 'portfolio.risk_profile_linked'
+ ORDER BY created_at DESC LIMIT 5;
+-- uma linha por vínculo escrito, na mesma transação do UPDATE
+```
 
 ## 7. Derivar uma variante de pesquisa na VPS (T3.26 / T3.26c)
 
@@ -464,6 +616,30 @@ bash infra/vps/compose.sh run --rm ops python infra/scripts/seed.py --only strat
 O primeiro comando mostra exatamente a linha nova (`strategies.session_orb: NEW
 ...`) e as descrições que mudariam; o segundo grava. Nenhum dos dois toca
 `risk_profiles`, `feature_definitions` ou `opportunity_weights`.
+
+**`--only risk_profiles`: a linha `paper_v1` e o vínculo da carteira (T3.69).**
+O procedimento completo — os dois comandos, a saída do `--dry-run` verbatim, as
+recusas e a consulta de verificação — está na **§8b**, porque é a linha 8 do
+aceite. Em resumo, e sempre nesta ordem:
+
+```
+bash infra/vps/compose.sh ops python infra/scripts/seed.py --only risk_profiles --dry-run
+bash infra/vps/compose.sh ops python infra/scripts/seed.py --only risk_profiles --yes
+bash infra/vps/compose.sh ops python infra/scripts/link_portfolio_risk_profile.py \
+    --portfolio 01a07a1e-f6ae-7366-a7fe-ab3d9c83d488 --preset paper_v1 --dry-run
+bash infra/vps/compose.sh ops python infra/scripts/link_portfolio_risk_profile.py \
+    --portfolio 01a07a1e-f6ae-7366-a7fe-ab3d9c83d488 --preset paper_v1 --yes --actor <quem>
+```
+
+`compose.sh ops <cmd>` e `compose.sh run --rm ops <cmd>` chegam no mesmo
+container; prefira o primeiro — o subcomando `ops` recusa antes de rodar se a
+imagem `hunter-api:${GIT_SHA}` não existir na máquina, e o `run` genérico
+deixaria o Compose **construir** uma imagem de código nunca implantado
+(revisão de segurança da T3.15e, achado F2). O `--yes` do `seed.py` é a
+confirmação da diretriz de limites; como a linha `paper_v1` está **ausente** na
+VPS, o que ele faz é um `INSERT` — nenhum valor guardado é reescrito, e se
+algum dia a linha divergir do que o build carrega o próprio seed **para** com o
+nome do campo divergente em vez de sobrescrever.
 
 ## Onde acompanhar
 `/ever/portfolio` (patrimônio, kill switch, curva), `/ever/system` (worker, `autonomy`, pendências, proteções), `hb:execution:paper` no Redis, `obsidian/05-EXPERIMENTS/EXP-0005-momentum-paper.md`.

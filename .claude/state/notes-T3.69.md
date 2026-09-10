@@ -1,0 +1,10 @@
+# T3.69 — perfil `paper_v1` persistido + vínculo da carteira (10/09, BRT). NENHUM limite mudou de valor.
+
+1. `uv run pytest infra/scripts/tests/test_link_portfolio_risk_profile.py -q -p no:randomly` → **16 passed in 51.20s** (banco espelhando a VPS: 4 perfis, sem `paper_v1`). Mutação de controle: tirar a recusa do `--replace` e pular o `audit_logs` → 3 e 1 falhas, respectivamente; testes mordem.
+2. `--only risk_profiles --dry-run` local imprime `risk_profiles.paper_v1: NEW {... 'risk_per_trade_pct': '0.0025', 'max_total_exposure_pct': '0.40', 'max_concurrent_positions': 5 ...}` (frações como **string**, contagens `int`) e não grava; com `--yes` grava e o `jsonb` volta igual a `PAPER_V1` campo a campo.
+3. Divergência: linha alterada à mão → seed para (`SystemExit`, nomeia `risk_per_trade_pct`) e o script novo recusa o vínculo. Provado nos dois lados.
+4. `packages/core/.../test_schema_paper.py::test_the_seeded_paper_profile_has_exactly_one_source` → **1 passed in 1.80s**.
+5. Auditoria do vínculo: **ninguém** grava `portfolios.risk_profile_id`. `services/organizations.py:84` grava `workspaces.default_risk_profile_id` (outra coluna/tabela); `open_paper_wallet` aceita o parâmetro e todo chamador de produção passa `None`. Daí o script.
+6. **Residual T3.69b (aberto, não silencioso):** `admit(..., limits=PAPER_V1)` e o `admission_cycle` não passam o argumento — a linha é a fonte **declarada**, a constante é a **aplicada**. Registrado em `RISK_ENGINE.md` §2 e `ACTIVATION.md` §8b.
+7. `ruff check` + `ruff format --check` (meus arquivos) + `pyright` (0 erros) + `check_file_size.py` (592 arquivos, 0 acima do teto; script novo 332 linhas) — limpos. Nada rodado na VPS, nada commitado.
+8. Tocados/criados: `M docs/ACTIVATION.md` · `M docs/RISK_ENGINE.md` · `?? infra/scripts/link_portfolio_risk_profile.py` · `?? infra/scripts/tests/test_link_portfolio_risk_profile.py` · `?? .claude/state/brief-T3.69-perfil-paper-v1.md` · `?? .claude/state/notes-T3.69.md` (as demais linhas de `git status --porcelain` são de outros agentes: `docs/DEPLOYMENT.md`, `docs/DESIGN.md`, `infra/scripts/tests/test_seed_dry_run.py`, `infra/scripts/sql/research/*`).

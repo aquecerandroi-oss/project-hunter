@@ -105,6 +105,18 @@ alguém tem de lembrar de manter iguais. `test_the_seeded_paper_profile_has_exac
 falha se divergirem; `test_the_seeded_paper_preset_refuses_to_be_rewritten` recusa o seed que tentaria
 devolver um valor divergente a uma linha já semeada.
 
+**Nota operacional (T3.69, 2026-09-10) — fonte declarada × fonte aplicada. Nenhuma regra e nenhum
+valor mudam nesta nota; ela só registra onde o número é lido hoje.** O motor **não** lê o perfil da
+carteira: `hunter_core.admission.admit` recebe `limits: RiskLimits = PAPER_V1` e o `admission_cycle`
+do `execution-worker` nunca passa o argumento, então quem decide é a **constante do código**. A linha
+`risk_profiles.preset='paper_v1'` é a fonte **declarada** (é o que a API publica em `/risk-limits`
+com `source='risk_profile'` no lugar de `engine_default`) e a constante é a fonte **aplicada** — as
+duas são o mesmo objeto por construção e provadamente iguais pelos dois testes acima e pelo
+round-trip de `infra/scripts/tests/test_link_portfolio_risk_profile.py`, que lê o `jsonb` de volta do
+Postgres. Semear a linha e apontar `portfolios.risk_profile_id` para ela é `docs/ACTIVATION.md` §8b;
+fazer `admit` ler o perfil da carteira (e então as duas fontes virarem uma só de fato) é a **T3.69b**,
+ainda aberta.
+
 A tabela abaixo segue a ordem de campos de `RiskLimits`
 (`packages/risk-core/hunter_risk/limits.py`), a mesma ordem em que o JSON acima é validado.
 
