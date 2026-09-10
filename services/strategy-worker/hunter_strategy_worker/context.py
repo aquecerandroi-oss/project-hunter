@@ -66,14 +66,23 @@ if TYPE_CHECKING:
     CandleReader = Callable[..., Awaitable[list[NormalizedCandle]]]
     """The signature of :func:`hunter_strategy_worker.repo.load_candles`.
 
-    Injectable for one reason and one only: a replay evaluates thousands of
-    consecutive bars of the same market, and consecutive bars share all but a
-    handful of the 1560 minutes behind them. Re-reading (and re-validating) that
-    window per bar is the dominant cost of a historical run, so the replay
-    passes a reader that loaded the slice once and slices it
-    (``replay/candles.py``). It must return **exactly** what ``load_candles``
-    would — same filter, same order, same objects — and the equivalence is a
-    test, not a claim (``test_replay_candle_cache``).
+    Injectable for two reasons, on two different axes of reuse, both optional
+    and both ``None`` by default (unchanged behaviour):
+
+    - a **replay** (T3.19b) evaluates thousands of consecutive bars of the same
+      market, and consecutive bars share all but a handful of the 1560 minutes
+      behind them. ``replay/candles.py``'s ``WindowCache`` loads the slice once
+      per market and slices it per bar;
+    - the **live consumer** (T3.74b) evaluates several versions of the same
+      family (same code, different frozen parameters) against the same market
+      at the same ``source_bar_close`` in one pass. ``context_cache.py`` reuses
+      the same ``WindowCache`` for that axis instead: one preload per family
+      per bar, sliced per version.
+
+    Either way it must return **exactly** what ``load_candles`` would — same
+    filter, same order, same objects — and the equivalence is a test, not a
+    claim (``test_replay_engine.py::TestTheCandleCache``, reused rather than
+    re-proved by T3.74b's own tests).
     """
 
 __all__ = ["build_market_context"]

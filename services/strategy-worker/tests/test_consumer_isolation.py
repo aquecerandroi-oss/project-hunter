@@ -107,9 +107,16 @@ def wired(monkeypatch: pytest.MonkeyPatch) -> list[str]:
             raise ValueError("lookback_closes must be a whole number, got '-20.5'")
         return _Evaluation()
 
+    async def _no_family_cache(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        # T3.74b: this suite is about per-*version* isolation, not the family
+        # cache (covered by ``test_context_cache.py``) — the fake ``factory``
+        # here (``object()``) has nothing for a real ``role_session`` to open.
+        return {}
+
     monkeypatch.setattr(consumer_mod, "role_session", _session)
     monkeypatch.setattr(consumer_mod, "load_market", _load_market)
     monkeypatch.setattr(consumer_mod, "evaluate_slot", _evaluate)
+    monkeypatch.setattr(consumer_mod, "load_family_readers", _no_family_cache)
 
     def _due(versions: list[ActiveVersion], _bar: datetime) -> list[ActiveVersion]:
         return versions

@@ -62,6 +62,39 @@ Consultas em `infra/scripts/sql/research/2026-09-10-t373-q0{0..4}-*.sql`, todas 
   seja, o portão teria dito "saudável" durante o pior período já visto. A causa dominante do atraso
   segue sem correção: custo N×M por barra e um portão cego ao próprio sintoma — plano em
   `.claude/state/brief-T3.74b-consumer-lag-e-custo-por-barra.md`.
+  **Atualização T3.74b (2026-09-10):** dois avanços parciais, nenhum fecha o item sozinho.
+  (1) `live_lane_degraded` ganhou um terceiro motivo, `consumer_lag:<n>`, lendo `XINFO GROUPS` de
+  `market.candles.closed`/`strategy-worker.shadow` (`replay/consumer_lag.py`, novo;
+  `REPLAY_CONSUMER_LAG_MAX = 100`, provisório — Astra, revisão do diff: "um blip de 13 observado
+  durante degradação confirmada não estabelece uma distribuição saudável"). **Medido ao vivo às
+  05:52–05:56Z do mesmo dia**: esse `lag` ficou em 0 quase o tempo todo (um blip de 13 num burst de
+  5m) **enquanto o atraso decisão-menos-barra medido por SQL no mesmo intervalo continuava em
+  97,8–185,0 s** (mesma barra de 05:45Z, `agent_signals.emitted_at` escalonado por até 148 s entre
+  mercados) — ou seja, este terceiro motivo é um sinal real e independente (pega um consumidor
+  travado/morto), mas **não captura o sintoma medido**: o atraso é hipoteticamente do lado do
+  publicador (candles da mesma barra chegando escalonados ao longo de ~3 min), não um backlog do
+  grupo consumidor, e isso é hipótese, não causa estabelecida (Astra: `consume()` entrega lotes de
+  até 10 e marca como lidas antes de cada uma ser processada e confirmada, então trabalho já
+  entregue e ainda não terminado também não apareceria neste `lag`). (2) Desenho aprovado e
+  implementado do cache de contexto por família: `hunter_strategy_worker/context_cache.py` agrupa as
+  versões devidas por `strategy_key` e reaproveita `replay/candles.py::WindowCache` (já provado
+  byte-idêntico a `load_candles`) para pré-carregar uma vez o teto do grupo — reduzindo, no
+  benchmark de 11 versões (8+3) × 16 mercados, as chamadas a `load_candles` de 176 para 32 (uma por
+  família por mercado). Prova de equivalência (`test_context_cache_engine.py::TestEquivalence`):
+  cada versão de uma família de 4 (duas janelas distintas, 1560 e 1570 min) decide byte a byte igual
+  com e sem o cache. Benchmark (mesmo arquivo, `TestBenchmark`, testcontainer local, 2026-09-10):
+  **176 → 32 chamadas a `load_candles`** (11 versões × 16 mercados → 2 famílias × 16 mercados, exato,
+  como desenhado) e **128,4 s → 116,3 s (1,4 → 1,5 avaliações/s, ~9,5 %)** de tempo total nesta
+  execução local (revalidado com relógio determinístico após a revisão da Astra apontar que o teste
+  original dependia do relógio real) — **a hipótese é que custos por versão que o cache não afeta
+  (`slots.lock_slot`, `load_regime_asof`,
+  `persist_decision`, `slots.advance`) limitem o ganho, mas a composição desse tempo não foi
+  decomposta nesta tarefa, e o efeito na VPS real (Postgres já em 178 % de CPU, 200 mercados,
+  janelas de até 6000 min) não foi medido aqui** (Astra, revisão final do diff: "esse diagnóstico
+  orienta a próxima otimização para um custo não estabelecido"). Benchmark completo:
+  `.claude/state/notes-T3.74b.md` §2.
+  Desenho, com as duas ressalvas que a Astra levantou (semântica de fotografia do candle, isolamento
+  de falha por família): `docs/plans/T3.74b-CONTEXT-CACHE.md`.
 - **LOW — a sonda de elegibilidade divide a janela de 50 entradas com o universo spot.**
   `eligibility.universe_changed_after` lê as `PROBE_ENTRIES = 50` entradas mais recentes de
   `market.universe.changed` e casa por `envelope.key`. O spot publica com chave própria

@@ -25,6 +25,7 @@ from hunter_core.strategies.volume_anomaly_v1 import VOLUME_ANOMALY_V1
 from hunter_execution_worker.bridge_repo import ShadowSignal
 from hunter_execution_worker.bridge_screen import screen_signal
 from hunter_execution_worker.wallet import WalletRef
+from hunter_strategy_worker.config import CONSUMER_GROUP
 from hunter_strategy_worker.persist import is_published_cohort
 from hunter_strategy_worker.plan import plan_entry
 from hunter_strategy_worker.replay.budget import (
@@ -243,16 +244,38 @@ class TestBudget:
 
 
 class _FakeRedis:
-    """Only ``hgetall``; the gate reads nothing else."""
+    """``hgetall`` for the heartbeat, ``xinfo_groups`` for the consumer's own lag.
 
-    def __init__(self, fields: dict[str, str] | None = None, *, fail: bool = False) -> None:
+    ``xinfo_groups`` defaults to one healthy entry (``lag=0``) for the group the
+    gate reads (T3.74b's ``CONSUMER_GROUP``), so every heartbeat-only test above
+    keeps passing without knowing the consumer-lag check exists at all — only
+    :class:`TestConsumerLagGate` overrides ``groups``.
+    """
+
+    def __init__(
+        self,
+        fields: dict[str, str] | None = None,
+        *,
+        fail: bool = False,
+        groups: list[dict[Any, Any]] | None = None,
+        groups_fail: bool = False,
+    ) -> None:
         self._fields = fields
         self._fail = fail
+        self._groups = groups
+        self._groups_fail = groups_fail
 
     async def hgetall(self, _key: str) -> dict[str, str]:
         if self._fail:
             raise RuntimeError("redis down")
         return dict(self._fields or {})
+
+    async def xinfo_groups(self, _stream: str) -> list[dict[Any, Any]]:
+        if self._groups_fail:
+            raise RuntimeError("redis down")
+        if self._groups is not None:
+            return self._groups
+        return [{b"name": CONSUMER_GROUP.encode(), b"lag": 0}]
 
 
 class TestReadinessGate:
@@ -292,6 +315,117 @@ class TestReadinessGate:
     async def test_the_gate_can_be_turned_off_deliberately(self) -> None:
         budget = ReplayBudget(pause_on_degraded=False)
         assert await live_lane_degraded(cast("Any", _FakeRedis({})), budget, now=self.NOW) is None
+
+
+class TestConsumerLagGate:
+    """The third reason (T3.74b): the live lane's own consumer group, not just its
+    heartbeat.
+
+    ``hb:strategy:shadow`` only ever carried ``outbox_lag_s``, which was ``0.0``
+    at the exact instant T3.74 measured the worst decision lag on record (125 s+,
+    notes-T3.74.md §3) — the heartbeat would have said "healthy" throughout. The
+    stream's own ``XINFO GROUPS`` ``lag`` (entries added minus entries the group
+    has read) is a second, independent signal the heartbeat never carried.
+    """
+
+    NOW = datetime(2026, 8, 1, 12, tzinfo=UTC)
+
+    def _healthy_heartbeat(self) -> dict[str, str]:
+        return {"ts": self.NOW.isoformat(), "outbox_lag_s": "0.0"}
+
+    async def test_a_healthy_group_does_not_pause(self) -> None:
+        redis = _FakeRedis(
+            self._healthy_heartbeat(), groups=[{b"name": CONSUMER_GROUP.encode(), b"lag": 5}]
+        )
+        assert await live_lane_degraded(cast("Any", redis), ReplayBudget(), now=self.NOW) is None
+
+    async def test_a_lag_past_the_threshold_pauses_with_its_count(self) -> None:
+        redis = _FakeRedis(
+            self._healthy_heartbeat(), groups=[{b"name": CONSUMER_GROUP.encode(), b"lag": 250}]
+        )
+        assert (
+            await live_lane_degraded(cast("Any", redis), ReplayBudget(), now=self.NOW)
+            == "consumer_lag:250"
+        )
+
+    async def test_a_lag_exactly_at_the_threshold_does_not_pause(self) -> None:
+        budget = ReplayBudget()
+        redis = _FakeRedis(
+            self._healthy_heartbeat(),
+            groups=[{b"name": CONSUMER_GROUP.encode(), b"lag": budget.consumer_lag_max}],
+        )
+        assert await live_lane_degraded(cast("Any", redis), budget, now=self.NOW) is None
+
+    async def test_another_groups_lag_is_never_confused_with_ours(self) -> None:
+        """``scanner-worker.market.candles.closed`` shares the stream; its own
+        backlog must never pause this lane's replay."""
+        redis = _FakeRedis(
+            self._healthy_heartbeat(),
+            groups=[
+                {b"name": b"scanner-worker.market.candles.closed", b"lag": 99_999},
+                {b"name": CONSUMER_GROUP.encode(), b"lag": 0},
+            ],
+        )
+        assert await live_lane_degraded(cast("Any", redis), ReplayBudget(), now=self.NOW) is None
+
+    async def test_our_group_missing_from_the_stream_pauses(self) -> None:
+        redis = _FakeRedis(self._healthy_heartbeat(), groups=[])
+        assert (
+            await live_lane_degraded(cast("Any", redis), ReplayBudget(), now=self.NOW)
+            == "consumer_lag_unreadable"
+        )
+
+    async def test_xinfo_failure_pauses_rather_than_assuming_health(self) -> None:
+        redis = _FakeRedis(self._healthy_heartbeat(), groups_fail=True)
+        assert (
+            await live_lane_degraded(cast("Any", redis), ReplayBudget(), now=self.NOW)
+            == "consumer_lag_unreadable"
+        )
+
+    async def test_a_missing_lag_field_pauses(self) -> None:
+        """Redis omits ``lag`` for a group with no ``entries-read`` yet (a group
+        just created); treated the same as unreadable, never as zero."""
+        redis = _FakeRedis(self._healthy_heartbeat(), groups=[{b"name": CONSUMER_GROUP.encode()}])
+        assert (
+            await live_lane_degraded(cast("Any", redis), ReplayBudget(), now=self.NOW)
+            == "consumer_lag_unreadable"
+        )
+
+    async def test_an_explicit_null_lag_pauses_the_same_as_missing(self) -> None:
+        """Redis answers ``lag: null`` (not just an absent field) when a group's
+        first PEL entry was trimmed by the stream's ``MAXLEN`` before it was ever
+        read — Astra, T3.74b review: this must read the same as unreadable, not
+        as ``0``."""
+        redis = _FakeRedis(
+            self._healthy_heartbeat(), groups=[{b"name": CONSUMER_GROUP.encode(), b"lag": None}]
+        )
+        assert (
+            await live_lane_degraded(cast("Any", redis), ReplayBudget(), now=self.NOW)
+            == "consumer_lag_unreadable"
+        )
+
+    async def test_a_fully_textual_response_reads_the_same(self) -> None:
+        """redis-py's own parser hands back ``str`` keys (and, for some fields,
+        already-decoded values) even with ``decode_responses=False`` — Astra,
+        T3.74b review. The all-bytes fixture above must not be the only shape
+        this gate tolerates."""
+        redis = _FakeRedis(self._healthy_heartbeat(), groups=[{"name": CONSUMER_GROUP, "lag": 250}])
+        assert (
+            await live_lane_degraded(cast("Any", redis), ReplayBudget(), now=self.NOW)
+            == "consumer_lag:250"
+        )
+
+    async def test_an_unreadable_other_groups_name_does_not_crash_the_gate(self) -> None:
+        """A malformed *other* group must never take our own group's healthy
+        answer down with it (Astra, T3.74b review)."""
+        redis = _FakeRedis(
+            self._healthy_heartbeat(),
+            groups=[
+                {b"name": b"\xff\xfe not utf-8", b"lag": 3},
+                {b"name": CONSUMER_GROUP.encode(), b"lag": 0},
+            ],
+        )
+        assert await live_lane_degraded(cast("Any", redis), ReplayBudget(), now=self.NOW) is None
 
 
 class _ClosingFakeRedis(_FakeRedis):

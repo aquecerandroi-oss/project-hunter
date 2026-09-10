@@ -23,6 +23,7 @@ from hunter_core.events.streams import Streams
 from hunter_core.logging import get_logger
 from hunter_strategy_worker import slots
 from hunter_strategy_worker.config import CONSUMER_GROUP
+from hunter_strategy_worker.context_cache import load_family_readers
 from hunter_strategy_worker.decide import evaluate_slot, versions_for_bar
 from hunter_strategy_worker.metrics import (
     shadow_bars_skipped_total,
@@ -155,6 +156,13 @@ async def handle_candle(
     (``hunter_shadow_version_failed_total``) and logged, the surviving versions
     still produce their decisions, and the bar is acked: a bar that half the
     roster could not evaluate is still a bar that was processed.
+
+    **One candle read per family, not per version (T3.74b).** Due versions
+    sharing a ``strategy_key`` (same code, different frozen parameters) share
+    one preloaded candle window (:mod:`hunter_strategy_worker.context_cache`,
+    design and honest limits there); each version still reads exactly its own
+    ``context_minutes``. A failed preload just means no reader — every member
+    falls back to its own query, same as before this existed.
     """
     candle = _candle(payload)
     if candle is None or not candle.is_final:
@@ -173,6 +181,9 @@ async def handle_candle(
     if market is None:
         logger.warning("shadow_market_unknown", exchange=candle.exchange, symbol=candle.symbol)
         return
+    family_readers = await load_family_readers(
+        factory, due, market=market, bar_close=bar_close, config=config
+    )
     for version in due:
         try:
             evaluation = await evaluate_slot(
@@ -183,6 +194,7 @@ async def handle_candle(
                 bar_close=bar_close,
                 config=config,
                 clock=clock,
+                candles_reader=family_readers.get(version.strategy_key),
             )
         except asyncio.CancelledError:
             raise

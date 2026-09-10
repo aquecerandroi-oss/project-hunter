@@ -22,6 +22,11 @@ operational and never part of a frozen experiment (``config.py``'s rule):
   reporting an outbox lag past the alert threshold pauses the replay. The gate
   reads what the live lane already publishes (``hb:strategy:shadow``,
   ``heartbeat.write_heartbeat``) instead of inventing a second health model.
+  Since T3.74b it also reads the live consumer's own backlog
+  (:mod:`.consumer_lag`, ``REPLAY_CONSUMER_LAG_MAX``) — the heartbeat alone
+  missed the worst decision lag ever measured (125 s+, T3.74 notes §3), where
+  ``outbox_lag_s`` read ``0.0`` throughout because the outbox was never the
+  bottleneck.
 
 The queue is a Redis list, ``replay:queue``, oldest at the tail
 (``LPUSH``/``RPOP``): the plantão enqueues "replicate version X over this
@@ -42,6 +47,7 @@ from typing import TYPE_CHECKING, Any, cast
 from hunter_core.domain.enums import ShadowCohort
 from hunter_core.domain.types import ensure_utc, utcnow
 from hunter_core.logging import get_logger
+from hunter_strategy_worker.replay.consumer_lag import group_lag
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
@@ -101,6 +107,29 @@ class ReplayBudget:
     outbox_lag_max_s: float = 60.0
     """Mirrors ``ShadowConfig.outbox_lag_alert_s`` — the same number that makes
     the live worker's own ``/ready`` false."""
+    consumer_lag_max: int = 100
+    """T3.74b, :func:`.consumer_lag.group_lag`'s reading: entries the stream
+    has added minus entries the group has read, independent of
+    ``outbox_lag_s`` (which measures what happens *after* a decision is made).
+
+    100, **provisional** (Astra, T3.74b review): read live on the VPS
+    (2026-09-10, notes-T3.74b.md §1) the group sat at ``lag=0`` almost always
+    and briefly touched 13 on an ordinary 5-minute-aligned burst with no
+    reported degradation — one sample, not a calibrated distribution. 100
+    clears that one observed blip with margin; it is not claimed to be the
+    right size for the confirmed 125 s+ decision lag (below), and moving it
+    needs synchronized samples of lag, ``XPENDING`` and decision lag across
+    several aligned bars, healthy and degraded, not one more live read.
+
+    Honest limit: the same live read caught that confirmed 125 s+ decision lag
+    (T3.74 notes §3) with this group's ``lag`` at or near zero throughout.
+    Upstream publish stagger is a *hypothesis* for why, not an established
+    cause — ``consume()`` delivers batches of up to 10 entries and marks them
+    read before each is individually processed and ACKed
+    (``hunter_core.events.consume``), so work already delivered but not yet
+    finished would not raise this ``lag`` either. This gate catches a stalled
+    or crashed consumer group; it is not a substitute for a lag measured in
+    seconds from the consumer's own timings (open, notes-T3.74b.md §1)."""
     queue_key: str = QUEUE_KEY
 
 
@@ -115,6 +144,7 @@ def load_budget() -> ReplayBudget:
         or LIVE_HEARTBEAT_KEY,
         heartbeat_max_age_s=_float("REPLAY_HEARTBEAT_MAX_AGE_S", 60.0),
         outbox_lag_max_s=_float("REPLAY_OUTBOX_LAG_MAX_S", 60.0),
+        consumer_lag_max=_int("REPLAY_CONSUMER_LAG_MAX", 100),
         queue_key=os.environ.get("REPLAY_QUEUE_KEY", QUEUE_KEY).strip() or QUEUE_KEY,
     )
 
@@ -137,8 +167,9 @@ async def live_lane_degraded(
     """The reason the replay should pause, or ``None`` when the live lane is fine.
 
     Reasons are names, never booleans: ``heartbeat_missing``,
-    ``heartbeat_stale:<age>s``, ``outbox_lag:<lag>s``, ``heartbeat_unreadable``.
-    A Redis failure answers *degraded*, on the same principle as
+    ``heartbeat_stale:<age>s``, ``outbox_lag:<lag>s``, ``heartbeat_unreadable``,
+    ``consumer_lag:<n>`` (T3.74b), ``consumer_lag_unreadable``. A Redis failure
+    answers *degraded*, on the same principle as
     ``eligibility.universe_changed_after``: when health cannot be established,
     the answer that costs a replay is the safe one.
     """
@@ -171,6 +202,11 @@ async def live_lane_degraded(
         return "heartbeat_unreadable"
     if lag > budget.outbox_lag_max_s:
         return f"outbox_lag:{lag:.0f}s"
+    consumer_lag = await group_lag(redis)
+    if consumer_lag is None:
+        return "consumer_lag_unreadable"
+    if consumer_lag > budget.consumer_lag_max:
+        return f"consumer_lag:{consumer_lag}"
     return None
 
 

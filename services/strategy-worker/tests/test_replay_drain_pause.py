@@ -23,6 +23,7 @@ from typing import Any
 
 import pytest
 
+from hunter_strategy_worker.config import CONSUMER_GROUP
 from hunter_strategy_worker.replay import run as run_module
 from hunter_strategy_worker.replay.budget import ReplayBudget
 
@@ -35,12 +36,21 @@ class _FakeEngine:
 
 
 class _FakeRedis:
-    def __init__(self, fields: dict[str, str]) -> None:
+    """``hgetall`` plus a healthy ``xinfo_groups`` default (T3.74b): this suite
+    exercises the *wiring*, not the gate's consumer-lag arithmetic (that is
+    ``test_replay_contract.py::TestConsumerLagGate``), so every case here is
+    healthy on that axis unless it overrides ``lag``."""
+
+    def __init__(self, fields: dict[str, str], *, lag: int = 0) -> None:
         self._fields = fields
+        self._lag = lag
         self.closed = False
 
     async def hgetall(self, _key: str) -> dict[str, str]:
         return dict(self._fields)
+
+    async def xinfo_groups(self, _stream: str) -> list[dict[bytes, Any]]:
+        return [{b"name": CONSUMER_GROUP.encode(), b"lag": self._lag}]
 
     async def aclose(self) -> None:
         self.closed = True
@@ -50,9 +60,11 @@ def _args() -> argparse.Namespace:
     return argparse.Namespace(max_runs=3)
 
 
-async def _run_drain(monkeypatch: pytest.MonkeyPatch, *, fields: dict[str, str]) -> list[str]:
+async def _run_drain(
+    monkeypatch: pytest.MonkeyPatch, *, fields: dict[str, str], lag: int = 0
+) -> list[str]:
     calls: list[str] = []
-    fake_redis = _FakeRedis(fields)
+    fake_redis = _FakeRedis(fields, lag=lag)
 
     async def fake_take_next(_redis: Any, *, key: str) -> None:
         del key
@@ -97,3 +109,20 @@ class TestDrainPausesOnDegraded:
         fresh = datetime.now(UTC).isoformat()
         calls = await _run_drain(monkeypatch, fields={"ts": fresh, "outbox_lag_s": "0"})
         assert calls == ["take_next"], "the gate must not block a healthy live lane"
+
+    async def test_a_backlogged_consumer_group_never_pops_a_request(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """T3.74b: a healthy heartbeat is not enough — the consumer's own
+        backlog (Astra's must-fix scenario for the drain wiring, not just the
+        gate's arithmetic) has to reach ``_drain`` too."""
+        from datetime import UTC, datetime
+
+        fresh = datetime.now(UTC).isoformat()
+        budget = ReplayBudget()
+        calls = await _run_drain(
+            monkeypatch,
+            fields={"ts": fresh, "outbox_lag_s": "0"},
+            lag=budget.consumer_lag_max + 1,
+        )
+        assert calls == [], "take_next must not run while the consumer group is backlogged"
