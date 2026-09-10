@@ -300,9 +300,8 @@ _ACTOR_INPUT = re.compile(r"^[ -~]{1,120}$")
 
 
 def _actor_input(raw: str) -> str:
-    """Free text stays free text — but bounded and printable, so the audit row
-    cannot carry control characters or a kilobyte of prose (security review of
-    T3.69, item 4). It is never an identity: ``actor_type`` stays ``system``."""
+    """Bounded, printable free text — never an identity (``actor_type`` stays
+    ``system``); security review of T3.69, item 4."""
     if not _ACTOR_INPUT.fullmatch(raw):
         raise argparse.ArgumentTypeError(
             "--actor must be printable ASCII, 1–120 characters (it is recorded unverified)"
