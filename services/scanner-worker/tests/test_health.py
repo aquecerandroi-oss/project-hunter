@@ -298,7 +298,7 @@ def test_every_status_detail_the_scanner_registers_is_removed_when_it_stops() ->
     """Symmetry, not a list: a fourth detail added tomorrow fails this too."""
     registered, cleared = _status_detail_keys()
 
-    assert registered == {"baselines", "beta", "regime_hourly"}
+    assert registered == {"baselines", "beta", "regime_hourly", "breadth"}
     assert cleared == registered
 
 

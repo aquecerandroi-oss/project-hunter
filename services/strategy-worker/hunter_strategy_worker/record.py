@@ -37,6 +37,7 @@ from hunter_strategy_worker.walker import Progress, TrackingPlan
 
 if TYPE_CHECKING:
     from hunter_core.strategies.base import Decision
+    from hunter_strategy_worker.breadth_gate import BreadthGate
     from hunter_strategy_worker.catalogue import ActiveVersion
     from hunter_strategy_worker.hours_gate import HoursGate
     from hunter_strategy_worker.regime_gate import RegimeGate
@@ -108,6 +109,17 @@ class Provenance:
     in, so a ledger can be split by hour without re-deriving it from
     ``emitted_at`` — and so that "this cohort only ever decided at 12-14 UTC" is
     a fact in the envelope rather than an inference about it.
+    """
+
+    breadth_gate: BreadthGate | None = None
+    """The universe-amplitude verdict that let this decision happen (T3.77), or
+    ``None`` when the version's policy carries no ``breadth`` rule.
+
+    Same reading as the two gates above, and the same absence of refusals. What
+    is written here is the **exact** value (four decimals) and the id of the
+    ``market_breadth`` row it came from — the refusal reason rounds to two
+    decimals so the ``ineligible`` histogram stays a histogram, and this is where
+    that rounding is not allowed to be the only copy.
     """
 
     context_minutes: int = 0
@@ -236,6 +248,9 @@ def build_record(
             ),
             "hours_gate": (
                 None if provenance.hours_gate is None else provenance.hours_gate.to_jsonable()
+            ),
+            "breadth_gate": (
+                None if provenance.breadth_gate is None else provenance.breadth_gate.to_jsonable()
             ),
         }
     )

@@ -28,10 +28,17 @@ They are applied *after* the market checks and never before them — a market th
 is not in the universe is not eligible whatever the regime says, and reporting
 the regime as the reason would name the wrong cause.
 
-Between themselves the order is: **hours first, regime second**, and both must
-pass. The hours gate reads nothing at all, so refusing there costs no query and
-saves the regime gate's; the visible consequence is that a bar failing both
-rules is reported as ``hours_gate:HH``.
+Since T3.77 there is a **third** term, also the version's: the share of the
+monitored universe that was falling in the five minutes before the bar closed
+(:mod:`hunter_strategy_worker.breadth_gate`), read from the persisted
+``market_breadth`` series and never recomputed here.
+
+Between themselves the order is: **hours first, regime second, breadth last**,
+and every declared rule must pass. The hours gate reads nothing at all, so
+refusing there costs no query and saves the other two theirs; breadth is last so
+that a version carrying only the two older rules reports exactly the reason it
+reported before T3.77. The visible consequence is that a bar failing several
+rules is reported by the first of them in that order.
 """
 
 from __future__ import annotations
@@ -43,6 +50,7 @@ from hunter_core.domain.enums import MarketStatus
 from hunter_core.domain.types import utcnow
 from hunter_core.strategies.base import StrategyContext, build_context
 from hunter_strategy_worker import hot_state
+from hunter_strategy_worker.breadth_gate import load_breadth_gate
 from hunter_strategy_worker.config import PRODUCER
 from hunter_strategy_worker.derivatives import load_derivatives
 from hunter_strategy_worker.hours_gate import evaluate_hours_gate
@@ -57,6 +65,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from hunter_core.domain.market import NormalizedCandle
+    from hunter_strategy_worker.breadth_gate import BreadthGate
     from hunter_strategy_worker.config import ShadowConfig
     from hunter_strategy_worker.gate_policy import GatePolicy
     from hunter_strategy_worker.hours_gate import HoursGate
@@ -148,12 +157,18 @@ async def build_market_context(
     observed_at = utcnow()
     gate: RegimeGate | None = None
     hours: HoursGate | None = None
+    breadth: BreadthGate | None = None
     if eligible and policy is not None and policy.hours is not None:
         hours = evaluate_hours_gate(policy.hours, cut=source_bar_close)
         eligible, reason = hours.eligible, (None if hours.eligible else hours.reason)
     if eligible and policy is not None and policy.regime is not None:
         gate = await load_gate(session, policy.regime, cut=source_bar_close)
         eligible, reason = gate.eligible, (None if gate.eligible else gate.reason)
+    if eligible and policy is not None and policy.breadth is not None:
+        breadth = await load_breadth_gate(
+            session, policy.breadth, cut=source_bar_close, exchange=market.exchange
+        )
+        eligible, reason = breadth.eligible, (None if breadth.eligible else breadth.reason)
     deriv = await load_derivatives(session, redis, market=market, cut=source_bar_close)
     context = build_context(
         candles,
@@ -181,5 +196,6 @@ async def build_market_context(
         open_interest_reason=deriv.open_interest_reason,
         regime_gate=gate,
         hours_gate=hours,
+        breadth_gate=breadth,
     )
     return context, provenance

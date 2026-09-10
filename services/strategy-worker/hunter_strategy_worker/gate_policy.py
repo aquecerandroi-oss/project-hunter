@@ -12,13 +12,27 @@ module is the seam it was designed for:
  "hours":  {"utc": [[12, 15]]}}
 ```
 
+T3.77 adds the third (:mod:`hunter_strategy_worker.breadth_gate`), the share of
+the monitored universe falling in the five minutes before the bar closed:
+
+```json
+{"regime": {"scope": "btc", "allow": ["BTC_BULL"], ...},
+ "hours":  {"utc": [[12, 15]]},
+ "breadth": {"window_m": 5, "min": "0.10", "max": "0.60"}}
+```
+
 **Every declared rule must pass.** They are ``AND``, never ``OR``: each rule
-narrows, and a version that declares two gates is asking to decide in the
+narrows, and a version that declares three gates is asking to decide in the
 intersection. The order they are evaluated in is not arbitrary either — the
 hours gate first, because it reads nothing (no query, no clock) and refusing
-there saves the regime gate's indexed read on every bar outside the window; the
-consequence, worth saying because it shows up in the ``ineligible`` histogram,
-is that a bar that fails *both* rules is reported as ``hours_gate:HH``.
+there saves the other two their indexed reads on every bar outside the window;
+the regime gate second and the breadth gate **last**, which is a deliberately
+conservative choice: appending the new rule at the end means a version carrying
+only ``regime`` and ``hours`` reports byte for byte the reason it reported before
+T3.77 existed, so no already-measured ``ineligible`` histogram changes shape
+because a third rule was added to the build. The consequence, worth saying for
+the same reason, is that a bar failing *several* rules is reported by the first
+one in that order.
 
 **Why this lives outside** :mod:`hunter_strategy_worker.regime_gate`: that
 module is at 300+ of the 350 lines the repo allows, and — the real reason — it
@@ -37,6 +51,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, cast
 
+from hunter_strategy_worker.breadth_gate import (
+    BREADTH_KEY,
+    BreadthPolicy,
+    breadth_clause,
+    parse_breadth_policy,
+)
 from hunter_strategy_worker.hours_gate import (
     HOURS_KEY,
     HoursPolicy,
@@ -54,9 +74,11 @@ from hunter_strategy_worker.regime_gate import (
 )
 
 __all__ = [
+    "BREADTH_KEY",
     "HOURS_KEY",
     "NONE_CLAUSE",
     "REGIME_KEY",
+    "BreadthPolicy",
     "EligibilityPolicy",
     "GatePolicy",
     "HoursPolicy",
@@ -74,10 +96,11 @@ NONE_CLAUSE = "none"
 spelled out for the same reason ``--policy none`` removes all of them: dropping
 a gate is a sentence the operator writes, never the absence of one."""
 
-_KEYS = (REGIME_KEY, HOURS_KEY)
+_KEYS = (REGIME_KEY, HOURS_KEY, BREADTH_KEY)
 _CLAUSE_PARSERS: dict[str, Callable[[str], dict[str, Any]]] = {
     REGIME_KEY: regime_clause,
     HOURS_KEY: hours_clause,
+    BREADTH_KEY: breadth_clause,
 }
 
 
@@ -89,6 +112,8 @@ class GatePolicy:
     """The hourly-regime rule (T3.52), or ``None`` when the version declares none."""
     hours: HoursPolicy | None = None
     """The hour-of-day rule (T3.59), or ``None`` when the version declares none."""
+    breadth: BreadthPolicy | None = None
+    """The universe-amplitude rule (T3.77), or ``None`` when none is declared."""
 
     def to_jsonable(self) -> dict[str, Any]:
         """Exactly the shape that was stored, rule by rule."""
@@ -97,6 +122,8 @@ class GatePolicy:
             stored[REGIME_KEY] = self.regime.to_body()
         if self.hours is not None:
             stored[HOURS_KEY] = self.hours.to_body()
+        if self.breadth is not None:
+            stored[BREADTH_KEY] = self.breadth.to_body()
         return stored
 
 
@@ -126,6 +153,7 @@ def parse_policy(raw: object | None) -> GatePolicy | None:
     return GatePolicy(
         regime=parse_regime_policy(stored[REGIME_KEY]) if REGIME_KEY in stored else None,
         hours=parse_hours_policy(stored[HOURS_KEY]) if HOURS_KEY in stored else None,
+        breadth=parse_breadth_policy(stored[BREADTH_KEY]) if BREADTH_KEY in stored else None,
     )
 
 

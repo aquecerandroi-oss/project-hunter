@@ -160,7 +160,8 @@ def lineage_of(changelog: str | None) -> str:
 
 def policy_note(policy: GatePolicy | None) -> str:
     """Como o portão aparece na linhagem: ``btc:SIDEWAYS``, ``hours=12-15``,
-    ``btc:SIDEWAYS;hours=12-15`` ou ``none``.
+    ``breadth=0.10-0.60``, ``btc:SIDEWAYS;hours=12-15;breadth=0.10-0.60`` ou
+    ``none``.
 
     Legível pelo operador e analisável por quem for reconciliar as páginas do
     Obsidian; a verdade continua sendo a coluna ``eligibility_policy``, que é
@@ -178,6 +179,8 @@ def policy_note(policy: GatePolicy | None) -> str:
         parts.append(f"{policy.regime.scope}:{','.join(policy.regime.allow)}")
     if policy.hours is not None:
         parts.append(policy.hours.note)
+    if policy.breadth is not None:
+        parts.append(policy.breadth.note)
     return ";".join(parts)
 
 

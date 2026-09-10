@@ -102,6 +102,18 @@ def _replay_run_tables(name: str) -> tuple[str, ...]:
     return cast(tuple[str, ...], getattr(migration_ddl("replay_runs"), name))
 
 
+def _breadth_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0019_market_breadth``'s lists in ``ddl/breadth.py``.
+
+    It adds no class either: ``market_breadth`` is read-only for ``hunter_app``
+    and append-only for ``hunter_worker`` — the scanner produces one reading per
+    closed minute, the strategy-worker's gate reads it, and neither may edit a
+    minute that a decision may already have been gated by. Exactly the
+    ``replay_runs`` shape (§18.9, T3.77).
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("breadth"), name))
+
+
 def _lock_tables(name: str) -> tuple[str, ...]:
     """The same, for ``0005_feature_baselines_lock_grant``'s ``ddl/baseline_lock.py``.
 
@@ -360,6 +372,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     paper_lock_only = _paper_tables("PAPER_LOCK_ONLY_TABLES")
     execution_read_only = _paper_roles_2_tables("APP_READ_ONLY_TABLES_0008")
     replay_read_only = _replay_run_tables("REPLAY_APP_READ_ONLY_TABLES")
+    breadth_read_only = _breadth_tables("BREADTH_APP_READ_ONLY_TABLES")
 
     classified = (
         list(write)
@@ -374,6 +387,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(paper_lock_only)
         + list(execution_read_only)
         + list(replay_read_only)
+        + list(breadth_read_only)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 
@@ -1151,6 +1165,209 @@ async def test_replay_runs_is_global_and_carries_no_tenant_column(
                     "SELECT c.relrowsecurity, count(p.polname) FROM pg_class c "
                     "LEFT JOIN pg_policy p ON p.polrelid = c.oid "
                     "WHERE c.relname = 'replay_runs' GROUP BY c.relrowsecurity"
+                )
+            )
+        ).one()
+    assert tenant_column == 0
+    assert row[0] is False
+    assert row[1] == 0
+
+
+# --------------------------------------------------------------------------
+# 0019_market_breadth: the scanner appends a reading and can never edit it, the
+# API only reads it, and the runtime login reaches neither without SET ROLE —
+# DATABASE.md section 31
+# --------------------------------------------------------------------------
+
+_READING_INSERT = (
+    "INSERT INTO market_breadth (id, exchange_id, end_time, window_minutes, breadth_version, "
+    "universe_size, covered, falling, value, coverage, usable, reason, inputs) "
+    "VALUES (:id, :exchange, :end_time, 5, 'breadth_v1', 200, 194, 188, "
+    "CAST(:value AS numeric), CAST(:coverage AS numeric), true, NULL, '{}'::jsonb)"
+)
+"""The storm minute of 2026-09-09 22:08Z, which is the row the whole revision
+exists to be able to hold (``.claude/state/notes-D-P9.md`` §4)."""
+
+
+def _reading_params(exchange_id: uuid.UUID, *, minute: int = 8) -> dict[str, object]:
+    return {
+        "id": uuid7(),
+        "exchange": exchange_id,
+        "end_time": datetime(2026, 9, 9, 22, minute, tzinfo=UTC),
+        "value": Decimal("0.969072"),
+        "coverage": Decimal("0.970000"),
+    }
+
+
+async def _exchange(connection: AsyncConnection) -> uuid.UUID:
+    """A throwaway venue for the reading to point at, written as the caller."""
+    exchange_id = uuid7()
+    await connection.execute(
+        text("INSERT INTO exchanges (id, code, name) VALUES (:id, :code, 'Probe')"),
+        {"id": exchange_id, "code": f"breadth-{uuid.uuid4().hex[:8]}"},
+    )
+    return exchange_id
+
+
+async def test_the_worker_appends_a_breadth_reading_and_can_never_edit_it(
+    worker_connection: AsyncConnection,
+) -> None:
+    """Measured as the role, not asked of the catalogue.
+
+    The scanner's producer is the only writer of ``market_breadth``
+    (``hunter_scanner_worker.breadth_repo.write_readings``), and this is what
+    makes the series immutable: ``0019`` installs no trigger because there is no
+    legal ``UPDATE`` for one to police — unlike ``market_betas``, which needed
+    one because ``superseded_at`` is a legal edit (§18.6). Withholding
+    ``UPDATE``/``DELETE`` from the writer itself is the whole mechanism, so it is
+    the thing that has to be proved.
+
+    It is also what decided the shape of the table: a minute recomputed after a
+    candle backfill is a new ``breadth_version`` — a different row by the unique
+    key — precisely because rewriting the old one is not a privilege anybody
+    holds. A reading a live decision was gated by may never change afterwards.
+    """
+    exchange_id = await _exchange(worker_connection)
+    await worker_connection.execute(text(_READING_INSERT), _reading_params(exchange_id))
+    assert (
+        await worker_connection.scalar(
+            text("SELECT count(*) FROM market_breadth WHERE exchange_id = :id"),
+            {"id": exchange_id},
+        )
+        == 1
+    )
+
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await worker_connection.execute(text("UPDATE market_breadth SET falling = 0"))
+    await worker_connection.rollback()
+    await _set_as_worker(worker_connection)
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await worker_connection.execute(text("DELETE FROM market_breadth"))
+    await worker_connection.rollback()
+
+
+async def test_the_app_role_reads_a_breadth_reading_and_writes_none_of_it(
+    app_connection: AsyncConnection,
+) -> None:
+    """A dashboard may show what the universe was doing; it never produces a
+    reading. The ``replay_runs``/``fx_observations`` shape (§18.9): a number a
+    request handler can write is not evidence.
+
+    The ``exchange_id`` here points at nothing on purpose — the ``INSERT``
+    privilege is checked before the foreign key, so a denial that arrives is a
+    denial about the table and not about the row.
+    """
+    assert await app_connection.scalar(text("SELECT count(*) FROM market_breadth")) is not None
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await app_connection.execute(text(_READING_INSERT), _reading_params(uuid7()))
+    await app_connection.rollback()
+
+
+async def test_the_app_role_holds_only_select_on_market_breadth(
+    schema_engine: AsyncEngine,
+) -> None:
+    """``UPDATE`` and ``DELETE`` are absent from the catalogue too, not merely
+    unreachable through a statement this file happened to write.
+
+    ``hunter_app`` is the role a bug in a request handler runs as, and "the API
+    never issues that statement" is a property of today's code; this is a
+    property of the database.
+    """
+    async with schema_engine.connect() as connection:
+        held = {
+            privilege
+            for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
+            if await connection.scalar(
+                text("SELECT has_table_privilege('hunter_app', 'market_breadth', :p)"),
+                {"p": privilege},
+            )
+        }
+    assert held == {"SELECT"}
+
+
+async def test_the_worker_role_holds_only_select_and_insert_on_market_breadth(
+    schema_engine: AsyncEngine,
+) -> None:
+    """Append-only for the producer, asserted as a set so a later revision that
+    hands out ``UPDATE`` for "just a backfill" fails here instead of in a
+    post-mortem about a number that changed under a decision.
+    """
+    async with schema_engine.connect() as connection:
+        held = {
+            privilege
+            for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
+            if await connection.scalar(
+                text("SELECT has_table_privilege('hunter_worker', 'market_breadth', :p)"),
+                {"p": privilege},
+            )
+        }
+    assert held == {"SELECT", "INSERT"}
+
+
+async def test_the_runtime_login_reaches_market_breadth_only_through_set_role(
+    schema_engine: AsyncEngine,
+) -> None:
+    """``hunter_runtime`` is the login every container actually uses (§27), and
+    ``0019`` grants it nothing directly — deliberately, because that is what
+    turns a forgotten ``SET LOCAL ROLE`` into a loud failure instead of a silent
+    escalation.
+
+    Both halves are asserted: it holds no privilege of its own on the table
+    (``has_table_privilege`` honours ``NOINHERIT``, so this is the privilege it
+    has *without* ``SET ROLE``), and it is a member of both application roles, so
+    ``SET ROLE`` is a door that exists. Only one of the two would be
+    indistinguishable from a role that was simply forgotten.
+    """
+    async with schema_engine.connect() as connection:
+        reachable = {
+            privilege
+            for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
+            if await connection.scalar(
+                text("SELECT has_table_privilege('hunter_runtime', 'market_breadth', :p)"),
+                {"p": privilege},
+            )
+        }
+        memberships = {
+            role: await connection.scalar(
+                text("SELECT pg_has_role('hunter_runtime', :role, 'MEMBER')"), {"role": role}
+            )
+            for role in ("hunter_app", "hunter_worker")
+        }
+        inherited = {
+            role: await connection.scalar(
+                text("SELECT pg_has_role('hunter_runtime', :role, 'USAGE')"), {"role": role}
+            )
+            for role in ("hunter_app", "hunter_worker")
+        }
+    assert reachable == set(), "hunter_runtime must reach market_breadth only via SET ROLE"
+    assert memberships == {"hunter_app": True, "hunter_worker": True}
+    assert inherited == {"hunter_app": False, "hunter_worker": False}, "NOINHERIT (0015, §27.1)"
+
+
+async def test_market_breadth_is_global_and_carries_no_tenant_column(
+    schema_engine: AsyncEngine,
+) -> None:
+    """The universe belongs to the exchange, not to an organization (§1.1), so
+    there is no ``organization_id`` and no RLS policy to isolate.
+
+    Asserted rather than assumed, for ``replay_runs``' reason: "no policy is
+    needed" and "a policy nobody wrote" look identical from outside. A tenant
+    column appearing here later would mean the table needs RLS forced and a
+    ``tenant_isolation`` policy, and this is what would notice.
+    """
+    async with schema_engine.connect() as connection:
+        tenant_column = await connection.scalar(
+            text(
+                "SELECT count(*) FROM information_schema.columns "
+                "WHERE table_name = 'market_breadth' AND column_name = 'organization_id'"
+            )
+        )
+        row = (
+            await connection.execute(
+                text(
+                    "SELECT c.relrowsecurity, count(p.polname) FROM pg_class c "
+                    "LEFT JOIN pg_policy p ON p.polrelid = c.oid "
+                    "WHERE c.relname = 'market_breadth' GROUP BY c.relrowsecurity"
                 )
             )
         ).one()

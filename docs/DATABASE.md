@@ -124,7 +124,7 @@ Partições são criadas com 3 meses de antecedência por `infra/scripts/create_
 
 **A promessa vale no mesmo instante**, e é assim que ela é verdadeira (revisão da Astra deste diff). A retenção é contada em dias inteiros, então a expiração de um mês vira à meia-noite UTC: 04:07 → 04:12 não cruza a borda, 23:59 → 00:01 cruza. Um plano montado antes da virada e podado depois pode criar um mês que a poda seguinte derruba — **uma vez**, e o próprio plano do dia seguinte já não o contém. Não é perda de dado: o que é derrubado nesse caso é justamente um mês cuja última linha retida acabou de expirar.
 
-`funding_rates` e `open_interest_history` **não são particionadas** (§4), então backfill de funding e de open interest nunca depende deste job — não há nada a provisionar para elas. `replay_runs` (`0013`, §25) também não é particionada **e não tem retenção**: é o registro de pesquisa, algumas dezenas de linhas por dia no pior caso, e apagá-la por idade seria apagar exatamente a contagem de tentativas que o protocolo de replicação existe para manter.
+`funding_rates` e `open_interest_history` **não são particionadas** (§4), então backfill de funding e de open interest nunca depende deste job — não há nada a provisionar para elas. `replay_runs` (`0013`, §25) também não é particionada **e não tem retenção**: é o registro de pesquisa, algumas dezenas de linhas por dia no pior caso, e apagá-la por idade seria apagar exatamente a contagem de tentativas que o protocolo de replicação existe para manter. `market_breadth` (`0019`, §31) também não é particionada, por outro motivo: a conta cabe (525 600 linhas/ano **por série**, isto é, por `(exchange, breadth_version, window_minutes)`), e o dia em que não couber é uma revisão que reconstrói a tabela, porque a PK é `id` sozinha (§15.2).
 
 Tudo continua idempotente e sem trava longa: só `CREATE TABLE IF NOT EXISTS ... PARTITION OF` de partições **vazias** (nunca `ATTACH` sobre dados), uma transação por pai, `lock_timeout = 3s`. Os meses para trás são criados no nível que de fato os possui — o nível LIST (`candles_1m`, `candles_5m`, …, `portfolio_equity_snapshots_1m`, …), nunca na raiz —, que é a mesma estrutura LIST-depois-RANGE descrita acima; **não há sub-partição por hash em lugar nenhum do schema**. O planejamento mora em `infra/scripts/partition_plan.py` — `create_partitions.py` passou de 341 para além do orçamento de 350 linhas com esta mudança e o *plano* saiu do *executor*; o script reexporta `planned_groups`/`planned_statements`, que são o que os testes carregam por caminho.
 
@@ -5585,3 +5585,43 @@ reescrita.
 | `apps/api/**` (placar, `GET /lab/shadow/replays`) | **nada a mudar**, e uma consequência a esperar: uma corrida de quatro fatias de mercado passa a aparecer como **quatro** linhas onde antes aparecia como uma. A listagem já agrupa por `run_id` e soma `bars_evaluated` (T3.25), então o total fica *certo* onde antes estava dividido por quatro |
 | quem lê `replay_runs` em SQL de pesquisa | somar `bars_evaluated` por `run_id` continua reconstruindo a corrida; `signals`/`outcomes_resolved`/`outcomes_open` continuam sendo **da coorte inteira** no instante em que a fatia terminou (§25.2), e agora há quatro linhas com esse total corrente por janela em vez de uma. **Somá-los multiplica a população** — a armadilha do denominador que a §25.2 já declarava, um pouco mais fácil de cair agora |
 | as 32 corridas da T3.62 | **não voltam.** Os 24 recibos perdidos não são reconstruíveis a partir de `replay_runs`; o que existe deles está em `system_events` (`replay_engine`/`replay_run_finished`, 32 linhas, com `market_count` e a lista de mercados no `data`) até a retenção de 30 dias os apagar, e nos 32 JSONL. Quem quiser o recibo durável daquela família precisa **refazer** as corridas depois desta revisão — e a `notes-T3.62.md` §8 já pede o refazimento em 70 dias por outra razão |
+
+## 31. A amplitude do universo vira série — M3 (`0019_market_breadth`)
+
+`market_breadth` guarda uma leitura de `breadth_5m` por minuto fechado por exchange: a fração das perpétuas monitoradas cuja `close` caiu na janela que termina em `end_time`, com `covered`/`universe_size` ao lado. **Global e sem RLS** (§1.1) — o universo é da exchange, não de uma organização —, e **imutável por privilégio, não por gatilho**: `SELECT` para `hunter_app`, `SELECT`/`INSERT` para `hunter_worker`, nada mais para nenhum dos dois, e nada para `hunter_runtime`, que chega pelos dois papéis via `SET ROLE` (§27.1). Não existe `UPDATE` legal, então o gatilho que `market_betas` precisou (§18.6) aqui não teria o que proteger. O portão da T3.77 lê por igualdade exata (`end_time = source_bar_close`) e o replay lê a mesma linha — é isso que faz a decisão viva e a simulada compararem o mesmo número em vez de dois folds de tabelas diferentes.
+
+| Decisão | Como está escrita |
+|---|---|
+| idempotência | `uq_market_breadth_reading (exchange_id, breadth_version, window_minutes, end_time)` mais `ON CONFLICT ... DO NOTHING RETURNING id`. Dois produtores no mesmo minuto: o segundo não escreve **e sabe** que não escreveu |
+| linha inutilizável | `value IS NULL` com `reason`, sob `usable = (reason IS NULL)`. "O universo não respondeu" é fato daquele minuto e sobrevive; "ninguém rodou" é a **ausência** da linha, e são dois problemas de operação diferentes |
+| **sem reparo** | não há regra de conserto: um minuto gravado como `insufficient_coverage` está **encerrado** naquele `breadth_version`, inclusive depois de um backfill de velas — refazê-lo é uma versão nova da série, nunca uma reescrita. Consequência operacional: uma recusa **é** uma escrita, e a linha resultante é lápide permanente |
+| o backfill pula o que o relatório reprovou | por isso `infra/scripts/backfill_breadth.py --apply` dobra **só** os minutos dos dias cuja cobertura densa alcança `MIN_COVERAGE`; os demais não são tentados. Noventa dias com onze aproveitáveis seriam ~114 mil lápides compradas para ganhar ~15 mil leituras. `--include-unusable` dobra a janela inteira mesmo assim, para o operador que quer a ausência registrada como fato — escolha feita diante do relatório, nunca padrão. O plano é puro e vive em `infra/scripts/breadth_windows.py` (`days_above_the_floor`, `fold_windows`), separado do executor pelo mesmo motivo que `partition_plan` (§1.3). Fronteira declarada: os cinco primeiros minutos de um dia mantido dobram velas do dia anterior, então, se aquele dia foi pulado, esses poucos minutos ainda podem cair como `insufficient_coverage` — lápides **medidas**, não adivinhadas |
+| **não particionada, e a conta** | 525 600 linhas/ano **por (exchange, `breadth_version`, `window_minutes`)** — uma série numa venue é 53 % do limiar de 1 M/ano; duas venues, ou uma segunda janela, cruzam o limiar. A leitura do portão não mudaria com `RANGE (end_time)`, mas a **troca não é indolor**: a PK é `id` sozinha e a §15.2 exige a coluna de partição na PK, então particionar é uma revisão que **reconstrói** a tabela, não um `ATTACH` |
+| **um índice só** | o índice da UNIQUE é o único que a tabela carrega. O portão faz quatro igualdades sobre exatamente as quatro colunas de `uq_market_breadth_reading`, na ordem dela, e a checagem `RESTRICT` da FK usa `exchange_id`, que é a coluna líder — nada mais tem leitor. A primeira versão da `0019` (antes de sair de container de teste) tinha ainda `ix_market_breadth_lookup`, cópia coluna a coluna da UNIQUE, e `ix_market_breadth_exchange_id`, prefixo dela: três btrees mantidos num caminho de escrita de uma linha por minuto onde um responde tudo |
+| FK indexada pelo prefixo | o modelo **não** declara `index=True` em `exchange_id`. A §1 exige "todo FK indexado" e um composto que *começa* pela coluna da FK **é** esse índice — a mesma regra que os compostos liderados por `organization_id` já expressam nas tabelas de tenant. Registrado aqui porque "não precisava" e "esqueceram" se parecem de fora |
+| nomes de constraint | `pk_market_breadth`, `fk_market_breadth_exchange_id_exchanges` e `uq_market_breadth_reading` são escritos à mão no DDL literal da `0019`, iguais aos que `hunter_core.db.base.NAMING_CONVENTION` dá ao modelo. Sem isso o Postgres cunharia `market_breadth_pkey`/`market_breadth_exchange_id_fkey`, o `alembic check` **não** notaria (ele não compara nomes de constraint) e a revisão que um dia particionar esta tabela — que precisa de `DROP CONSTRAINT` pelo nome para pôr `end_time` na PK (§15.2) — seria escrita contra um nome que não existe |
+| provas | imutabilidade por privilégio é medida *como o papel*, não perguntada ao catálogo: `packages/core/tests/integration/test_schema_privileges.py` prova que `hunter_worker` insere e apanha `permission denied` em `UPDATE`/`DELETE`, que `hunter_app` só lê, que os dois conjuntos de privilégios são exatamente `{SELECT}` e `{SELECT, INSERT}`, e que `hunter_runtime` não alcança a tabela sem `SET ROLE` (`NOINHERIT`, §27.1). A recusa do downgrade com uma leitura na mesa, o *round trip* com a tabela vazia (incluindo os grants que voltam), os três nomes de constraint e o plano do portão estão em `test_migrations.py` (`-k 0019`) |
+
+**O plano do portão, medido uma vez.** Com `enable_seqscan = off` (a tabela está
+vazia no banco de teste; a pergunta é se *existe* índice capaz, que é uma
+propriedade do schema e não da cardinalidade do momento), a consulta de
+`hunter_strategy_worker.breadth_gate._LOOKUP` sai assim:
+
+```
+Nested Loop  (cost=0.30..20.96 rows=1 width=79)
+  Join Filter: (b.exchange_id = e.id)
+  ->  Index Scan using uq_market_breadth_reading on market_breadth b
+        Index Cond: ((breadth_version = 'breadth_v1'::text)
+                 AND (window_minutes = '5'::smallint)
+                 AND (end_time = '2026-09-09 22:08:00+00'::timestamptz))
+  ->  Index Scan using uq_exchanges_code on exchanges e
+        Index Cond: (code = 'binance'::text)
+```
+
+A sonda cai no índice da UNIQUE, que é o que a queda dos dois redundantes tinha
+de preservar. Registrado com honestidade: numa tabela vazia o planejador começa
+por `market_breadth` e deixa `exchange_id` como *join filter*, isto é, usa três
+das quatro colunas como `Index Cond`; com estatísticas reais ele resolve a venue
+primeiro (uma linha em `exchanges`) e as quatro viram condição de índice. Em
+nenhum dos dois casos há `Seq Scan`, e é por isso que a asserção do teste é sobre
+o **nome do índice**, não sobre a forma do *join*.

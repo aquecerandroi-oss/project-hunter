@@ -28,8 +28,8 @@ from hunter_core.domain.enums import OutcomeResult, ShadowTrackingState, Timefra
 from hunter_indicators.replay.policies import POLICIES, policy
 from hunter_strategy_worker.catalogue import load_active_versions
 from hunter_strategy_worker.config import ShadowConfig
-from hunter_strategy_worker.consumer import sweep_outcomes
 from hunter_strategy_worker.decide import evaluate_slot
+from hunter_strategy_worker.outcome_sweep import sweep_outcomes
 from hunter_strategy_worker.replay.engine import load_series, replay_case
 from hunter_strategy_worker.replay.load import load_cases, load_manifest, read_only_session
 from hunter_strategy_worker.replay.reproduce import audit_case

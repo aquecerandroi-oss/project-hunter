@@ -31,6 +31,8 @@ from hunter_scanner_worker.baseline_runner import BootstrapProgress, baseline_lo
 from hunter_scanner_worker.baselines import BaselineCache
 from hunter_scanner_worker.beta import beta_loop
 from hunter_scanner_worker.beta_job import BetaHealth
+from hunter_scanner_worker.breadth import breadth_loop
+from hunter_scanner_worker.breadth_job import BreadthHealth
 from hunter_scanner_worker.config import build_config
 from hunter_scanner_worker.consumers import (
     ConsumerHealth,
@@ -101,6 +103,7 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
     progress = BootstrapProgress()
     beta = BetaHealth()
     regime_hourly = RegimeHealth()
+    breadth = BreadthHealth()
     universe_wake = asyncio.Event()
     checks = readiness_checks(
         scanner, consumers, cycle, outbox_health, config, runtime.redis, progress
@@ -118,6 +121,11 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
     # cohort its context split and costs the live path nothing, so it is a
     # status detail for the same reason beta is -- visible, never a gate.
     runtime.status_details["regime_hourly"] = lambda: regime_hourly.describe(utcnow())
+    # ``breadth_5m`` (T3.77): same reason again -- a hole makes a *gated* version
+    # refuse (``breadth_unavailable``, fail-closed) and costs nobody else anything.
+    runtime.status_details["breadth"] = lambda: (
+        "stale" if breadth.stale(now=utcnow()) else f"universe {breadth.universe_size}"
+    )
 
     try:
         await refresh_universe(scanner, factory, runtime.redis)
@@ -151,6 +159,9 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
                 "beta": beta_loop(scanner, factory, runtime.redis, runtime, beta),
                 "regime_hourly": regime_hourly_loop(
                     scanner, factory, runtime.redis, runtime, regime_hourly
+                ),
+                "breadth": breadth_loop(
+                    factory, runtime.redis, runtime, breadth, exchange=config.exchange
                 ),
                 "deriv": deriv_loop(scanner, factory, runtime),
                 "outbox": run_dispatcher(runtime.redis, factory, outbox_health, db_role=DB_ROLE),
@@ -198,6 +209,7 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
         # reference to the health object of a run that is over, and /status
         # would answer with the last numbers of a scanner that stopped.
         runtime.status_details.pop("regime_hourly", None)
+        runtime.status_details.pop("breadth", None)
         for check in checks:
             if check in runtime.readiness_checks:
                 runtime.readiness_checks.remove(check)

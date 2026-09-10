@@ -62,6 +62,7 @@ from hunter_core.db.models.billing import (
     PlanEntitlement,
     Subscription,
 )
+from hunter_core.db.models.breadth import MarketBreadth
 from hunter_core.db.models.exchanges import ExchangeConnection
 from hunter_core.db.models.execution import Order, TradeProposal
 from hunter_core.db.models.execution_fills import Fill, Position
@@ -190,6 +191,7 @@ __all__ = [
     "Liquidation",
     "Market",
     "MarketBeta",
+    "MarketBreadth",
     "MarketRegimeRow",
     "MarketSnapshot",
     "Notification",

@@ -21,9 +21,9 @@ from hunter_core.db.session import role_session
 from hunter_core.domain.enums import OutcomeResult, ShadowTrackingState
 from hunter_strategy_worker.catalogue import load_active_versions
 from hunter_strategy_worker.config import ShadowConfig
-from hunter_strategy_worker.consumer import sweep_outcomes
 from hunter_strategy_worker.decide import evaluate_slot
 from hunter_strategy_worker.metrics import shadow_funding_unresolved_total, shadow_trackings_unswept
+from hunter_strategy_worker.outcome_sweep import sweep_outcomes
 from hunter_strategy_worker.repo import load_market
 from hunter_strategy_worker.tracking_repo import count_open_trackings, load_open_trackings
 
@@ -352,12 +352,12 @@ class TestSweepBudget:
         """``load_open_trackings`` reads at most ``SWEEP_LIMIT`` rows a pass.
         A backlog past it advances nothing, which looks exactly like a quiet
         market — so it has to be a number somebody can see."""
-        from hunter_strategy_worker import consumer as consumer_module
+        from hunter_strategy_worker import outcome_sweep as outcome_sweep_module
 
         async def nothing(session: Any, **_kwargs: Any) -> list[Any]:
             return await load_open_trackings(session, limit=0)
 
-        monkeypatch.setattr(consumer_module, "load_open_trackings", nothing)
+        monkeypatch.setattr(outcome_sweep_module, "load_open_trackings", nothing)
         async with role_session(tracked["factory"], db_role="hunter_worker") as session:
             assert await count_open_trackings(session) == 1
         await sweep_outcomes(tracked["factory"], CONFIG, now=CUT + timedelta(minutes=5))

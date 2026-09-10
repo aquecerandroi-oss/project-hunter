@@ -38,7 +38,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0018_replay_runs_slice_markets"
+HEAD_REVISION = "0019_market_breadth"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -58,6 +58,12 @@ LAB_SIGNALS_INDEXES_REVISION = "0014_lab_signals_indexes"
 RUNTIME_LOGIN_ROLE_REVISION = "0015_runtime_login_role"
 EXCHANGE_STATUS_REVISION = "0016_exchange_status_planned"
 ELIGIBILITY_POLICY_REVISION = "0017_eligibility_policy"
+REPLAY_SLICE_REVISION = "0018_replay_runs_slice_markets"
+"""Named because three tests below are about what reversing **0018** does.
+
+``"-1"`` means "one step back from whatever the head is", which stopped meaning
+0018 the day ``0019_market_breadth`` landed: a test whose subject follows the
+head is a test that silently changes what it proves."""
 
 _PENDING_PREDICATE = "dispatched_at IS NULL"
 """What makes an index a *pending* index, spelled out here rather than imported:
@@ -410,6 +416,24 @@ async def _seed_history_across_two_partitions(url: str) -> uuid.UUID:
     finally:
         await engine.dispose()
     return market
+
+
+async def _explain(url: str, sql: str, params: dict[str, object]) -> list[str]:
+    """The plan for ``sql``, with sequential scans disabled for the statement.
+
+    ``SET LOCAL enable_seqscan = off`` because the table is empty in this
+    database and the planner would read three pages faster than any index: the
+    question here is whether an index *can* serve the predicates, which is a
+    property of the schema, not of how many rows happen to be in it.
+    """
+    engine = async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(text("SET LOCAL enable_seqscan = off"))
+            result = await connection.execute(text(f"EXPLAIN {sql}"), params)
+            return [row[0] for row in result]
+    finally:
+        await engine.dispose()
 
 
 async def _scalars(url: str, sql: str, params: dict[str, object]) -> list[str]:
@@ -3499,7 +3523,7 @@ def test_0018_derives_a_stored_receipt_instead_of_stamping_a_sentinel(upgraded: 
     try:
         before = asyncio.run(_scalars(upgraded, read, {"id": run_id}))
         assert before == [markets_digest(markets)]
-        command.downgrade(config, "-1")
+        command.downgrade(config, ELIGIBILITY_POLICY_REVISION)
         assert not asyncio.run(_column_exists(upgraded, "replay_runs", "markets_digest"))
         command.upgrade(config, "head")
         assert asyncio.run(_scalars(upgraded, read, {"id": run_id})) == before, (
@@ -3532,9 +3556,15 @@ def test_0018_refuses_to_downgrade_while_a_window_holds_two_market_slices(upgrad
             ),
         )
     try:
+        # Down to 0018 first: this test is about **0018**'s guard, and the
+        # revisions above it have guards of their own that would fire (or not)
+        # for reasons that have nothing to do with a replay slice.
+        command.downgrade(config, REPLAY_SLICE_REVISION)
         with pytest.raises(DBAPIError, match="hold more than one market slice"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == REPLAY_SLICE_REVISION, (
+            "the downgrade must not commit"
+        )
     finally:
         command.upgrade(config, "head")
         _forget_receipts(upgraded, run_id)
@@ -3556,7 +3586,11 @@ def test_0018_reverses_on_a_database_whose_windows_hold_one_slice_each(upgraded:
     key_of = (
         "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'uq_replay_runs_slice'"
     )
-    command.downgrade(config, "-1")
+    # Named, not ``-1``: this test is about what reversing **0018** restores, and
+    # ``-1`` means "one step back from whatever the head is". It stopped meaning
+    # 0017 the day 0019 landed, and a test whose subject moves with the head is
+    # a test that silently changes what it proves.
+    command.downgrade(config, ELIGIBILITY_POLICY_REVISION)
     try:
         assert asyncio.run(_revision(upgraded)) == ELIGIBILITY_POLICY_REVISION
         assert not asyncio.run(_column_exists(upgraded, "replay_runs", "markets_digest"))
@@ -3637,6 +3671,199 @@ def test_0018_leaves_replay_runs_global_and_append_only(upgraded: str) -> None:
             {},
         )
     ) == ["false"]
+
+
+# --------------------------------------------------------------------------
+# 0019_market_breadth — the amplitude of the universe becomes a series
+# --------------------------------------------------------------------------
+
+_READING_INSERT = (
+    "INSERT INTO market_breadth (id, exchange_id, end_time, window_minutes, breadth_version, "
+    "universe_size, covered, falling, value, coverage, usable, reason, inputs) "
+    "VALUES (:id, :exchange, :end_time, 5, 'breadth_v1', 200, 194, 188, 0.969072, 0.970000, "
+    "true, NULL, '{}'::jsonb)"
+)
+"""The storm minute of 2026-09-09 22:08Z — 194 of 200 monitored perpetuals
+falling together — which is the row this whole revision exists to hold."""
+
+_GATE_LOOKUP = (
+    "SELECT b.id, b.end_time, b.value, b.usable, b.reason, b.covered, b.universe_size "
+    "  FROM market_breadth b JOIN exchanges e ON e.id = b.exchange_id "
+    " WHERE e.code = :exchange AND b.breadth_version = :version "
+    "   AND b.window_minutes = :window AND b.end_time = :cut"
+)
+"""``hunter_strategy_worker.breadth_gate._LOOKUP``, written out again rather than
+imported: ``packages/core`` may not depend on a service, and a copy is also what
+makes this an assertion about the *schema* — four equality predicates on the four
+columns of ``uq_market_breadth_reading``, in its order — instead of an assertion
+about whatever the gate happens to spell today."""
+
+
+def _write_reading(url: str, exchange_id: uuid.UUID, *, minute: int = 8) -> uuid.UUID:
+    reading_id = uuid7()
+    asyncio.run(
+        _write(
+            url,
+            [
+                (
+                    _READING_INSERT,
+                    {
+                        "id": reading_id,
+                        "exchange": exchange_id,
+                        "end_time": datetime(2026, 9, 9, 22, minute, tzinfo=UTC),
+                    },
+                )
+            ],
+        )
+    )
+    return reading_id
+
+
+def _forget_readings(url: str, exchange_id: uuid.UUID) -> None:
+    """``upgraded`` is module-scoped, and one reading left behind trips 0019's
+    downgrade guard for every later test — the ``_forget_receipts`` rule."""
+    asyncio.run(
+        _write(
+            url,
+            [
+                ("DELETE FROM market_breadth WHERE exchange_id = :id", {"id": exchange_id}),
+                ("DELETE FROM exchanges WHERE id = :id", {"id": exchange_id}),
+            ],
+        )
+    )
+
+
+def test_0019_names_its_constraints_the_way_the_model_does(upgraded: str) -> None:
+    """``0019`` writes literal SQL, so the three constraint names are spelled out
+    in it; left implicit, Postgres would mint ``market_breadth_pkey`` and
+    ``market_breadth_exchange_id_fkey`` while
+    ``hunter_core.db.base.NAMING_CONVENTION`` says otherwise.
+
+    ``alembic check`` does not compare constraint names, so nothing else would
+    notice — until the revision that partitions this table has to
+    ``DROP CONSTRAINT`` by name to put ``end_time`` into the primary key (§15.2)
+    and is written against a name that is not there.
+    """
+    names = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid "
+            "WHERE t.relname = 'market_breadth' AND c.contype IN ('p', 'f', 'u') "
+            "ORDER BY conname",
+            {},
+        )
+    )
+    assert names == [
+        "fk_market_breadth_exchange_id_exchanges",
+        "pk_market_breadth",
+        "uq_market_breadth_reading",
+    ]
+
+
+def test_0019_carries_one_reading_index_and_answers_the_gates_probe_from_it(
+    upgraded: str,
+) -> None:
+    """One btree, and it is the unique key's — T3.77c dropped the two redundant
+    ones (a copy of the unique's columns, and a standalone index on its leading
+    ``exchange_id``) before the revision ever shipped.
+
+    Both halves matter. The count is the write path: this table takes one row per
+    minute per venue, and three indexes to maintain where one answers everything
+    is a cost paid forever. The plan is the read path: with sequential scans off,
+    the gate's four equality predicates have to land on
+    ``uq_market_breadth_reading`` — if they did not, dropping the copy would have
+    cost the gate its index, which is the one way this change could be wrong.
+    """
+    indexes = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT indexname FROM pg_indexes WHERE tablename = 'market_breadth' "
+            "ORDER BY indexname",
+            {},
+        )
+    )
+    assert indexes == ["pk_market_breadth", "uq_market_breadth_reading"]
+
+    plan = "\n".join(
+        asyncio.run(
+            _explain(
+                upgraded,
+                _GATE_LOOKUP,
+                {
+                    "exchange": "binance",
+                    "version": "breadth_v1",
+                    "window": 5,
+                    "cut": datetime(2026, 9, 9, 22, 8, tzinfo=UTC),
+                },
+            )
+        )
+    )
+    assert "uq_market_breadth_reading" in plan, plan
+
+
+def test_0019_refuses_a_downgrade_that_would_lose_a_reading(upgraded: str) -> None:
+    """§17.7: reversing is allowed, losing evidence is not.
+
+    The series is the one thing here that is **not recomputable after the fact**.
+    A reading is the share of the *monitored* universe that fell, and
+    ``markets.is_monitored`` is overwritten in place by every refresh — so the
+    universe a minute of 2026-09-09 was measured against stops existing the
+    moment the row does. Folding those candles again tomorrow answers a different
+    question with the same name.
+    """
+    config = alembic_config(upgraded)
+    exchange_id = asyncio.run(_write_exchange(upgraded, f"br-{uuid.uuid4().hex[:8]}", "active"))
+    _write_reading(upgraded, exchange_id)
+    try:
+        with pytest.raises(DBAPIError, match="market_breadth readings exist"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_relation_exists(upgraded, "market_breadth")), (
+            "a refused downgrade must leave the table exactly where it was"
+        )
+    finally:
+        command.upgrade(config, "head")
+        _forget_readings(upgraded, exchange_id)
+    command.check(config)
+
+
+def test_0019_reverses_on_a_database_that_never_read_the_universe(upgraded: str) -> None:
+    """The round trip an operator runs to roll a deploy back — down one, up to
+    head, ``alembic check`` at the end — over a database that trips no guard.
+
+    A database where the producer never ran counts zero readings, and the guard
+    is then exactly what it claims to be: a refusal to lose evidence, never a
+    refusal to reverse. What comes back is asserted too, because "the table
+    returned" and "the table returned with its grants" are different facts:
+    ``0019`` re-grants ``SELECT`` to ``hunter_app`` and ``SELECT``/``INSERT`` to
+    ``hunter_worker``, and a re-applied revision that forgot them would leave the
+    scanner unable to write and nothing else would say so.
+    """
+    config = alembic_config(upgraded)
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == REPLAY_SLICE_REVISION
+        assert not asyncio.run(_relation_exists(upgraded, "market_breadth"))
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_relation_exists(upgraded, "market_breadth"))
+    for role, privilege, expected in (
+        ("hunter_worker", "SELECT", "true"),
+        ("hunter_worker", "INSERT", "true"),
+        ("hunter_worker", "UPDATE", "false"),
+        ("hunter_worker", "DELETE", "false"),
+        ("hunter_app", "SELECT", "true"),
+        ("hunter_app", "INSERT", "false"),
+    ):
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT has_table_privilege(:role, 'market_breadth', :privilege)::text",
+                {"role": role, "privilege": privilege},
+            )
+        ) == [expected], f"{role} / {privilege} on market_breadth"
+    command.check(config)
 
 
 def test_every_revision_id_fits_the_alembic_version_column() -> None:

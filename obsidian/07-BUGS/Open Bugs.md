@@ -95,6 +95,37 @@ Consultas em `infra/scripts/sql/research/2026-09-10-t373-q0{0..4}-*.sql`, todas 
   `.claude/state/notes-T3.74b.md` §2.
   Desenho, com as duas ressalvas que a Astra levantou (semântica de fotografia do candle, isolamento
   de falha por família): `docs/plans/T3.74b-CONTEXT-CACHE.md`.
+  **Atualização T3.74c (2026-09-10, 12:20 BRT / 15:01–15:04Z): causa raiz encontrada — dispatch
+  estritamente serial, um mercado por vez, contra uma rajada de ~200 fechamentos simultâneos.**
+  Medido ao vivo, **sem replay concorrente** (`replay_runs` não tem nenhuma linha entre 04:28Z e
+  15:28Z — confirmado, `2026-09-10-t374c-q02-replay-hoje.sql`): `docker stats` pegou
+  `hunter-strategy-worker-1` (um único processo Python) em **92,72 % de um núcleo**, e o próprio
+  grupo consumidor já estava **303 entradas atrás** de `market.candles.closed`
+  (`XINFO GROUPS`/`strategy-worker.shadow`) — o processo não conseguia nem *ler* a próxima vela
+  antes de terminar a que segurava. `run_consumer` processava uma vela por vez
+  (`await handle_candle(...)` sequencial), então o custo de uma barra × N versões × 1 mercado se
+  multiplica pelos ~200 mercados que fecham quase juntos a cada minuto — exatamente a rampa que o
+  T3.74b já via por SQL (uma barra lógica produzindo sinais de 36,7 s a 185,0 s de atraso). Mediana
+  do dia (`2026-09-10-t374c-q01-lag-recente.sql`, hora a hora): 21,4–168,8 s, sem tendência de queda
+  monótona — a T3.74b (cache de contexto) reduziu leituras mas não o gargalo de *dispatch*.
+  **Corrigido nesta tarefa**: `hunter_strategy_worker/dispatch.py` (novo) — `BarDispatcher` processa
+  mercados diferentes em paralelo (`ShadowConfig.worker_concurrency`, padrão 8, limitado pelo pool
+  de conexões) e serializa qualquer barra do **mesmo** mercado (lock por
+  `exchange:symbol:market_type`); `run_consumer` só bloqueia no semáforo, nunca no processamento de
+  uma barra específica. Prova de equivalência com Postgres real
+  (`test_dispatch_benchmark.py`, 5 mercados, um deles com gatilho real): decisões byte-idênticas
+  seriais vs. concorrentes. Benchmark sintético na forma medida (`test_dispatch.py`, 11 × 200,
+  custo simulado por barra): mais de 4× de ganho de vazão com concorrência 8 vs. serial. **Válvula
+  de segurança, não a correção** (`ShadowConfig.late_delay_backlog_max_s`, 120 s): uma barra já mais
+  velha que isso ao chegar em `handle_candle` é recusada antes de qualquer leitura de banco
+  (`hunter_shadow_bars_skipped_total{reason="late_delay_backlog"}`), para que uma fila real não
+  componha até os 300 s do portão de elegibilidade. **Instrumentação nova**:
+  `hunter_shadow_stage_seconds{stage}` (fila/mercado/família/avaliação/persistência) e
+  `hunter_shadow_decision_lag_seconds`, mais `decision_lag_p50_s`/`decision_lag_p95_s` direto em
+  `hb:strategy:shadow`. **Ressalva honesta**: a correção não foi implantada na VPS por este agente
+  (regra: nenhuma escrita/reinício de contêiner) — o número "depois" ao vivo depende do deploy do
+  orquestrador; o que existe aqui é a prova local de que o mecanismo funciona e não muda nenhuma
+  decisão. Notas completas: `.claude/state/notes-T3.74c.md`.
 - **LOW — a sonda de elegibilidade divide a janela de 50 entradas com o universo spot.**
   `eligibility.universe_changed_after` lê as `PROBE_ENTRIES = 50` entradas mais recentes de
   `market.universe.changed` e casa por `envelope.key`. O spot publica com chave própria

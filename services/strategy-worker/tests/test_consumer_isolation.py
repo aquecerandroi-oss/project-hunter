@@ -135,6 +135,11 @@ async def _run(
         versions=_Versions(versions),  # type: ignore[arg-type]
         config=ShadowConfig(),
         health=health,
+        # BAR_CLOSE is a fixed past date; without this the real clock (T3.74c's
+        # new bar-level backlog valve, ShadowConfig.late_delay_backlog_max_s)
+        # would see this bar as ~2 years late and skip it before the loop this
+        # suite actually tests ever runs.
+        clock=lambda: BAR_CLOSE + timedelta(seconds=2),
     )
 
 

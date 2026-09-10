@@ -574,6 +574,37 @@ coisas que valem saber antes de digitar:
   não chegar a dez. É por isso que a EXP-0023 pré-registra `n ≥ 30` como porta
   antes de qualquer leitura.
 
+### A amplitude do universo (`breadth=`, T3.77)
+
+A terceira regra do mesmo envelope: `--policy breadth=0.10-0.60` prende a versão
+às barras em que a fração das perpétuas monitoradas que **caíram nos 5 minutos
+completos antes do fechamento** ficou entre 0,10 (inclusive) e 0,60 (exclusive) —
+faixa meia-aberta no topo, lida da série persistida `market_breadth` (`0019`,
+`breadth_v1`, uma linha imutável por minuto fechado, produzida pelo
+`scanner-worker`). A recusa por valor é `breadth_gate:0.97` (duas casas, para o
+histograma de `ineligible` continuar sendo um histograma; o valor exato com
+quatro casas vai no envelope) e a recusa por ausência de série é
+`breadth_unavailable`. Quatro coisas que valem saber antes de digitar: (i) **a
+âncora é exata** — a linha vale para o minuto que ela nomeia, então um produtor
+atrasado *emudece* a versão em vez de deixá-la decidir com o valor de três
+minutos atrás, e não há janela de tolerância a calibrar; (ii) **cobertura recusa,
+nunca inclina para baixo** — abaixo de 80 % do universo monitorado o produtor
+grava a linha como inutilizável e o portão responde `breadth_unavailable`, porque
+"0,97 de seis mercados" diria "o universo desabou" quando a verdade é "não deu
+para olhar"; (iii) **a ordem é hora, regime, amplitude**, e a amplitude é a última
+de propósito: uma versão que só declare as duas regras antigas reporta byte a byte
+o motivo que reportava antes da T3.77 existir; (iv) **o número que motivou a
+regra** é o de 09/09 às 22:08Z, quando 194 das 200 perpétuas caíram no mesmo
+minuto (KB-0083) — e a faixa é **célula, não filtro**, até a EXP-0027 dizer o
+contrário. Como toda regra do envelope, largar a amplitude do pai em silêncio é
+recusado: repita `breadth=…`, escreva `breadth=none` para tirá-la, ou
+`--policy none` para tirar o portão inteiro.
+
+```
+# a variante da EXP-0027 (faixa pré-registrada; --dry-run primeiro, sempre)
+ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops python infra/scripts/derive_variant.py mean_reversion v10 --policy breadth=0.10-0.60 --changelog EXP-0027_amplitude_010_060 --dry-run"
+```
+
 ```
 # a variante da EXP-0023 (janela pré-registrada; --dry-run primeiro, sempre)
 ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops python infra/scripts/derive_variant.py mean_reversion v10 --policy hours=12-15 --changelog EXP-0023_janela_12_15_UTC --dry-run"
