@@ -136,6 +136,16 @@ _TRENDLINE: Final = WindowClaim(
 ``trendline_breakout_v1`` verbatim, so it really is one code path. Splitting it
 the day they diverge is a two-line change, and the spy test would notice."""
 
+_MEAN_REVERSION: Final = (
+    WindowClaim(name="signal", timeframe=None, bars=(("zscore_bars", 0),)),
+    _ATR,
+    WindowClaim("trend", "trend_timeframe", (("trend_sma_bars", 1),), aligned=True),
+)
+"""Shared for the reason ``_TRENDLINE`` is: ``mean_reversion_h1_v1`` (T3.54) and
+``mean_reversion_m5_v1`` (T3.84) transport the mother's body onto another grid, so the
+three are one code path — what differs is the *timeframe parameters* each claim reads,
+which a claim already defers to the frozen row."""
+
 WINDOWS: Final[Mapping[tuple[str, str], tuple[WindowClaim, ...]]] = {
     ("momentum_v1", "v1"): (
         WindowClaim(
@@ -155,20 +165,9 @@ WINDOWS: Final[Mapping[tuple[str, str], tuple[WindowClaim, ...]]] = {
         ),
         _ATR,
     ),
-    ("mean_reversion_v1", "v1"): (
-        WindowClaim(name="signal", timeframe=None, bars=(("zscore_bars", 0),)),
-        _ATR,
-        WindowClaim(
-            name="trend", timeframe="trend_timeframe", bars=(("trend_sma_bars", 1),), aligned=True
-        ),
-    ),
-    ("mean_reversion_h1_v1", "v1"): (
-        WindowClaim(name="signal", timeframe=None, bars=(("zscore_bars", 0),)),
-        _ATR,
-        WindowClaim(
-            name="trend", timeframe="trend_timeframe", bars=(("trend_sma_bars", 1),), aligned=True
-        ),
-    ),
+    ("mean_reversion_v1", "v1"): _MEAN_REVERSION,
+    ("mean_reversion_h1_v1", "v1"): _MEAN_REVERSION,
+    ("mean_reversion_m5_v1", "v1"): _MEAN_REVERSION,
     ("session_orb_v1", "v1"): (
         # ``bars_since_open`` is the real term, and the branch above the call
         # refuses anything past ``session_window_bars`` (``outside_session_window``),

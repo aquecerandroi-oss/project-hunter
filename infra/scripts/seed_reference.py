@@ -78,6 +78,16 @@ STRATEGIES: tuple[tuple[str, str, str, str], ...] = (
         "Pullback bought inside a higher-timeframe uptrend, on a close stretched below its mean.",
     ),
     (
+        "mean_reversion_m5",
+        "Mean Reversion 5m",
+        "reversion",
+        "The same pullback, decided on 5m bars, with the trend gate on the next step "
+        "of the grid (15m: 4x5m=20m is not a timeframe). The ATR% of a 5m bar is "
+        "smaller than that of a 15m bar, so by KB-0076 the assumed toll per R is "
+        "LARGER: the pre-registered expectation (EXP-0028) is to discard it. "
+        "Needs 490 min of candle context, below the 1560 floor: it costs nothing.",
+    ),
+    (
         "mean_reversion_h1",
         "Mean Reversion 1h",
         "reversion",

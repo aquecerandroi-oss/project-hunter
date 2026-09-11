@@ -83,6 +83,9 @@ EXPECTED: dict[tuple[str, str], int] = {
     # 5m: o ATR é de 15m e o corte de 5m cai no meio da barra de 15m,
     # 97 × 15 + (15 − 5) = 1465, + 15 de folga
     ("volume_anomaly_v1", "v1"): 1480,
+    # 5m com o ATR na própria grade (T3.84): 97 × 5 = 485, + 5 de folga. A
+    # tendência de 15m alcança 21 × 15 + (15 − 5) = 325 e não domina.
+    ("mean_reversion_m5_v1", "v1"): 490,
     # 1h: 97 barras de 1 h = 5820, + 60 de folga (notes-T3.54 §6.5)
     ("mean_reversion_h1_v1", "v1"): 5880,
 }
@@ -164,12 +167,14 @@ def test_the_fifteen_minute_versions_all_fit_the_floor_that_is_deployed() -> Non
     Todas as versões de 15 m/5 m pedem menos que os 1560 que o worker já
     carregava, então o ``min``/``max`` devolve exatamente 1560 para elas e a
     janela que a faixa viva lê hoje é a mesma de ontem. Eram sete até a T3.57;
-    ``trendline_bounce_v1`` entra como a oitava e pede os mesmos 1470 da mãe.
+    ``trendline_bounce_v1`` entra como a oitava e pede os mesmos 1470 da mãe, e
+    ``mean_reversion_m5_v1`` (T3.84) como a nona — ela pede 490, o menor
+    requisito do roster, porque mede o ATR na própria grade de 5 m.
     """
     config = ShadowConfig()
     fifteen = [s for s in DEFAULT_REGISTRY.all() if s.timeframe is not Timeframe.H1]
 
-    assert len(fifteen) == 8
+    assert len(fifteen) == 9
     for strategy in fifteen:
         assert required_context_minutes(strategy, defaults(strategy)) <= 1560
         assert context_minutes_for(strategy, defaults(strategy), config) == 1560
