@@ -510,6 +510,17 @@ services:
   # honoured by `docker compose up`/`run` directly) -- 3 vCPU matches
   # `workers_for(ReplayBudget(), cpu_count=12)` on the VPS's 12 vCPU, so the
   # cgroup ceiling and the budget's own pool-size math agree.
+  #
+  # T3.87: `STRATEGY_SHARDS` (the same count `STRATEGY_SHARD=i/N` above is
+  # rendered from) must reach this container too -- `replay/budget.py`'s
+  # readiness gate reads it to derive the live worker's own set of heartbeat
+  # keys/consumer groups (`hunter_strategy_worker.shard.heartbeat_keys`/
+  # `consumer_groups`), never a second formula. Before this, the gate held
+  # one hard-coded key/group that stopped being any live shard's the moment
+  # `STRATEGY_SHARDS > 1` shipped (T3.74f): the key nobody wrote anymore read
+  # `heartbeat_missing`, and the group nobody advanced anymore (the orphan
+  # `strategy-worker.shadow`, notes-T3.84.md §3) grew its `lag` without
+  # bound -- refusing every replay on the VPS since the shards went live.
   replay-worker:
     build:
       context: ../..
@@ -525,6 +536,7 @@ services:
       <<: *api-env
       DB_POOL_SIZE: "2"
       DB_MAX_OVERFLOW: "2"
+      STRATEGY_SHARDS: ${STRATEGY_SHARDS:-1}
     env_file:
       - path: ../../.env
         required: false

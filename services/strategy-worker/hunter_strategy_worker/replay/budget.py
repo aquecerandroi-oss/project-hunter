@@ -47,7 +47,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from hunter_core.domain.types import ensure_utc, utcnow
 from hunter_core.logging import get_logger
-from hunter_strategy_worker.replay.consumer_lag import group_lag
+from hunter_strategy_worker.replay.consumer_lag import LIVE_CONSUMER_GROUP, topology_group_lag
 from hunter_strategy_worker.replay.decision_lag import decision_lag_reason
 from hunter_strategy_worker.replay.queue import (
     QUEUE_KEY,
@@ -56,6 +56,7 @@ from hunter_strategy_worker.replay.queue import (
     queue_depth,
     take_next,
 )
+from hunter_strategy_worker.shard import consumer_groups, heartbeat_keys
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
@@ -148,6 +149,32 @@ class ReplayBudget:
     or crashed consumer group; it is not a substitute for a lag measured in
     seconds from the consumer's own timings (open, notes-T3.74b.md §1)."""
     queue_key: str = QUEUE_KEY
+    shard_total: int = 1
+    """T3.87: how many ``strategy-worker`` shards the live lane runs as
+    (``STRATEGY_SHARDS``, the same count ``infra/vps/compose.sh``/the compose
+    profile use to render ``STRATEGY_SHARD=i/N`` for shards ``0..N-1``).
+
+    The bug this closes: T3.74f split the live worker into ``N`` processes,
+    each with its **own** heartbeat key and consumer group
+    (``hunter_strategy_worker.shard.heartbeat_key``/``consumer_group``), but
+    this gate kept reading one hard-coded key/group -- a key nobody wrote
+    anymore and a group nobody advanced anymore, so every replay refused
+    forever with ``heartbeat_missing``/a ``lag`` that only ever grew
+    (notes-T3.84.md §3). ``shard_total <= 1`` (the default) reproduces every
+    reason string byte-for-byte from before this field existed --
+    :attr:`heartbeat_key` and :data:`.consumer_lag.LIVE_CONSUMER_GROUP` are
+    still read directly, not derived, so ``REPLAY_HEARTBEAT_KEY`` keeps
+    working exactly as it always did. ``shard_total > 1`` derives every
+    shard's heartbeat key and consumer group from the *same*
+    :mod:`hunter_strategy_worker.shard` functions every shard itself uses
+    (never a second formula that could drift) and takes the **worst** of the
+    ``N`` readings on every axis: any missing heartbeat fails the whole gate
+    closed, naming which shard; every other reason (staleness, outbox lag,
+    decision lag, consumer lag) is the maximum across all ``N`` shards. A
+    consumer group on the stream that belongs to no shard in this topology
+    (e.g. the pre-shard ``strategy-worker.shadow`` left behind by a resize) is
+    never counted toward that maximum -- it is not live -- and is logged once
+    per check as ``orphan_consumer_group`` so an operator can destroy it."""
 
 
 def load_budget() -> ReplayBudget:
@@ -166,6 +193,7 @@ def load_budget() -> ReplayBudget:
         decision_lag_resume_healthy_s=_float("REPLAY_DECISION_LAG_RESUME_HEALTHY_S", 300.0),
         consumer_lag_max=_int("REPLAY_CONSUMER_LAG_MAX", 100),
         queue_key=os.environ.get("REPLAY_QUEUE_KEY", QUEUE_KEY).strip() or QUEUE_KEY,
+        shard_total=_int("STRATEGY_SHARDS", 1),
     )
 
 
@@ -181,51 +209,111 @@ def workers_for(budget: ReplayBudget, cpu_count: int) -> int:
     return max(1, min(budget.max_workers, allowed))
 
 
+def _decode_fields(raw: dict[Any, Any]) -> dict[str, str]:
+    return {
+        (k.decode() if isinstance(k, bytes) else str(k)): (
+            v.decode() if isinstance(v, bytes) else str(v)
+        )
+        for k, v in raw.items()
+    }
+
+
+def _try_float(value: str | None) -> float | None:
+    if not value:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def _worst_decision_lag_fields(all_fields: list[dict[str, str]]) -> dict[str, str]:
+    """The single ``(p50, p95)`` pair fed to :func:`.decision_lag.decision_lag_reason`
+    (T3.87) -- the maximum of each axis across every shard's own heartbeat, so
+    one slow shard's backlog pauses the whole lane even while the others read
+    healthy. A shard with no reading yet (``""``, T3.74c's "nobody has decided
+    anything this process lifetime") contributes nothing to either axis,
+    matching :func:`.decision_lag.decision_lag_reason`'s own "no evidence"
+    rule for the single-heartbeat case."""
+    p50s = [v for f in all_fields if (v := _try_float(f.get("decision_lag_p50_s"))) is not None]
+    p95s = [v for f in all_fields if (v := _try_float(f.get("decision_lag_p95_s"))) is not None]
+    worst: dict[str, str] = {}
+    if p50s:
+        worst["decision_lag_p50_s"] = str(max(p50s))
+    if p95s:
+        worst["decision_lag_p95_s"] = str(max(p95s))
+    return worst
+
+
 async def live_lane_degraded(
     redis: redis_asyncio.Redis, budget: ReplayBudget, *, now: datetime | None = None
 ) -> str | None:
     """The reason the replay should pause, or ``None`` when the live lane is fine.
 
-    Reasons are names, never booleans: ``heartbeat_missing``,
+    Reasons are names, never booleans: ``heartbeat_missing`` (or, with
+    ``shard_total > 1``, ``heartbeat_missing:<key>`` naming the absent shard),
     ``heartbeat_stale:<age>s``, ``outbox_lag:<lag>s``, ``heartbeat_unreadable``,
     ``decision_lag:p50=..,p95=..`` / ``decision_lag_cooldown:<s>`` (T3.80,
     :mod:`.decision_lag`), ``consumer_lag:<n>`` (T3.74b), ``consumer_lag_unreadable``.
     A Redis failure answers *degraded*, on the same principle as
     ``eligibility.universe_changed_after``: when health cannot be established,
     the answer that costs a replay is the safe one.
+
+    **Sharded topologies (T3.87).** ``budget.shard_total <= 1`` reproduces the
+    single-key/single-group behaviour above byte-for-byte (``budget.heartbeat_key``,
+    honouring ``REPLAY_HEARTBEAT_KEY``, and :data:`.consumer_lag.LIVE_CONSUMER_GROUP`).
+    ``shard_total > 1`` reads every shard's own heartbeat
+    (:func:`hunter_strategy_worker.shard.heartbeat_keys`) and consumer group
+    (:func:`hunter_strategy_worker.shard.consumer_groups`) -- the same functions
+    every live shard already uses to name itself, never a second formula.
+    A missing heartbeat on *any* shard fails the gate closed immediately,
+    naming which one; every other axis takes the **worst** (maximum) reading
+    across all ``N`` shards. A consumer group on the stream that is not part of
+    this topology (e.g. a pre-resize orphan) never counts toward that maximum
+    and is logged once per check as ``orphan_consumer_group``.
     """
     if not budget.pause_on_degraded:
         return None
     clock = ensure_utc(now or utcnow())
-    try:
-        raw: dict[Any, Any] = await cast("Any", redis).hgetall(budget.heartbeat_key)
-    except Exception:
-        logger.warning("replay_heartbeat_unreadable", key=budget.heartbeat_key)
-        return "heartbeat_unreadable"
-    fields = {
-        (k.decode() if isinstance(k, bytes) else str(k)): (
-            v.decode() if isinstance(v, bytes) else str(v)
-        )
-        for k, v in raw.items()
-    }
-    if not fields:
-        return "heartbeat_missing"
-    stamp = fields.get("ts") or ""
-    try:
-        age = (clock - ensure_utc(datetime.fromisoformat(stamp))).total_seconds()
-    except ValueError:
-        return "heartbeat_unreadable"
-    if age > budget.heartbeat_max_age_s:
-        return f"heartbeat_stale:{age:.0f}s"
-    try:
-        lag = float(fields.get("outbox_lag_s") or 0.0)
-    except ValueError:
-        return "heartbeat_unreadable"
-    if lag > budget.outbox_lag_max_s:
-        return f"outbox_lag:{lag:.0f}s"
+    shard_total = max(1, budget.shard_total)
+    keys = heartbeat_keys(shard_total) if shard_total > 1 else (budget.heartbeat_key,)
+    groups = consumer_groups(shard_total) if shard_total > 1 else (LIVE_CONSUMER_GROUP,)
+
+    all_fields: list[dict[str, str]] = []
+    for key in keys:
+        try:
+            raw: dict[Any, Any] = await cast("Any", redis).hgetall(key)
+        except Exception:
+            logger.warning("replay_heartbeat_unreadable", key=key)
+            return "heartbeat_unreadable"
+        fields = _decode_fields(raw)
+        if not fields:
+            return "heartbeat_missing" if shard_total <= 1 else f"heartbeat_missing:{key}"
+        all_fields.append(fields)
+
+    max_age = 0.0
+    max_outbox_lag = 0.0
+    for fields in all_fields:
+        stamp = fields.get("ts") or ""
+        try:
+            age = (clock - ensure_utc(datetime.fromisoformat(stamp))).total_seconds()
+        except ValueError:
+            return "heartbeat_unreadable"
+        max_age = max(max_age, age)
+        try:
+            outbox_lag = float(fields.get("outbox_lag_s") or 0.0)
+        except ValueError:
+            return "heartbeat_unreadable"
+        max_outbox_lag = max(max_outbox_lag, outbox_lag)
+
+    if max_age > budget.heartbeat_max_age_s:
+        return f"heartbeat_stale:{max_age:.0f}s"
+    if max_outbox_lag > budget.outbox_lag_max_s:
+        return f"outbox_lag:{max_outbox_lag:.0f}s"
+
     lag_reason = await decision_lag_reason(
         redis,
-        fields,
+        _worst_decision_lag_fields(all_fields),
         p50_max_s=budget.decision_lag_p50_max_s,
         p95_max_s=budget.decision_lag_p95_max_s,
         resume_healthy_s=budget.decision_lag_resume_healthy_s,
@@ -233,7 +321,10 @@ async def live_lane_degraded(
     )
     if lag_reason is not None:
         return lag_reason
-    consumer_lag = await group_lag(redis)
+
+    consumer_lag, orphans = await topology_group_lag(redis, groups=groups)
+    for orphan in orphans:
+        logger.warning("orphan_consumer_group", name=orphan)
     if consumer_lag is None:
         return "consumer_lag_unreadable"
     if consumer_lag > budget.consumer_lag_max:

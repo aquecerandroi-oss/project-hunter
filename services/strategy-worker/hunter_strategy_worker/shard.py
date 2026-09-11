@@ -57,7 +57,13 @@ from __future__ import annotations
 from hunter_core.sharding import owns
 from hunter_strategy_worker.config import CONSUMER_GROUP, HEARTBEAT_KEY
 
-__all__ = ["consumer_group", "heartbeat_key", "owns_market"]
+__all__ = [
+    "consumer_group",
+    "consumer_groups",
+    "heartbeat_key",
+    "heartbeat_keys",
+    "owns_market",
+]
 
 
 def owns_market(symbol: str, shard_index: int, shard_total: int) -> bool:
@@ -97,3 +103,25 @@ def heartbeat_key(shard_index: int, shard_total: int) -> str:
     if shard_total <= 1:
         return HEARTBEAT_KEY
     return f"{HEARTBEAT_KEY}:{shard_index}of{shard_total}"
+
+
+def consumer_groups(shard_total: int) -> tuple[str, ...]:
+    """Every shard's own consumer group for a topology of ``shard_total``
+    processes (T3.87) -- ``tuple(consumer_group(i, shard_total) for i in
+    range(shard_total))``, spelled out here so the replay gate's readiness
+    check (``hunter_strategy_worker.replay.budget``) derives the whole set
+    from the *same* function every shard already uses, never a second
+    formula that could drift from it (the bug this closes: the gate held its
+    own hard-coded ``"strategy-worker.shadow"`` literal, which stopped being
+    any live shard's group the moment ``STRATEGY_SHARDS > 1`` shipped,
+    T3.74f)."""
+    total = max(1, shard_total)
+    return tuple(consumer_group(i, total) for i in range(total))
+
+
+def heartbeat_keys(shard_total: int) -> tuple[str, ...]:
+    """Every shard's own heartbeat key for a topology of ``shard_total``
+    processes (T3.87) -- the heartbeat-side twin of :func:`consumer_groups`,
+    same reasoning."""
+    total = max(1, shard_total)
+    return tuple(heartbeat_key(i, total) for i in range(total))

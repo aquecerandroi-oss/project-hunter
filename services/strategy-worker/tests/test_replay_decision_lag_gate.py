@@ -24,6 +24,7 @@ import pytest
 from hunter_strategy_worker.config import CONSUMER_GROUP
 from hunter_strategy_worker.replay.budget import ReplayBudget, live_lane_degraded
 from hunter_strategy_worker.replay.decision_lag import DECISION_LAG_SINCE_KEY, decision_lag_reason
+from hunter_strategy_worker.shard import consumer_groups, heartbeat_keys
 
 pytestmark = pytest.mark.unit
 
@@ -248,4 +249,135 @@ class TestTheFullGateSurfacesDecisionLag:
         budget = ReplayBudget(decision_lag_p50_max_s=10.0)
         assert await live_lane_degraded(cast("Any", redis), budget, now=NOW) == (
             "decision_lag:p50=15s,p95=9s"
+        )
+
+
+class _ShardedFakeRedis:
+    """A ``STRATEGY_SHARDS``-topology fake (T3.87): one heartbeat hash per
+    shard key, one shared ``XINFO GROUPS`` answer for the whole stream (every
+    shard's own group plus, optionally, an orphan), and the same in-memory
+    ``get``/``set`` the hysteresis marker needs."""
+
+    def __init__(
+        self,
+        heartbeats: dict[str, dict[str, str]],
+        *,
+        group_lags: dict[str, int] | None = None,
+        extra_groups: dict[str, int] | None = None,
+    ) -> None:
+        self._heartbeats = heartbeats
+        self._group_lags = dict(group_lags or {})
+        self._extra_groups = dict(extra_groups or {})
+        self._store: dict[str, str] = {}
+
+    async def hgetall(self, key: str) -> dict[str, str]:
+        return dict(self._heartbeats.get(key, {}))
+
+    async def xinfo_groups(self, _stream: str) -> list[dict[Any, Any]]:
+        entries = [{b"name": name.encode(), b"lag": lag} for name, lag in self._group_lags.items()]
+        entries += [
+            {b"name": name.encode(), b"lag": lag} for name, lag in self._extra_groups.items()
+        ]
+        return entries
+
+    async def set(self, key: str, value: str, *, ex: int | None = None) -> None:
+        del ex
+        self._store[key] = value
+
+    async def get(self, key: str) -> str | None:
+        return self._store.get(key)
+
+
+class TestShardedTopology:
+    """``STRATEGY_SHARDS > 1`` (T3.87): the gate derives keys/groups from
+    :mod:`hunter_strategy_worker.shard`, takes the worst of the N shards on
+    every axis, fails closed naming a missing shard, and ignores an orphan
+    consumer group left behind by a resize (notes-T3.84.md §3)."""
+
+    TOTAL = 4
+    KEYS = heartbeat_keys(TOTAL)
+    GROUPS = consumer_groups(TOTAL)
+
+    def _healthy(self, **extra: str) -> dict[str, str]:
+        return {"ts": NOW.isoformat(), "outbox_lag_s": "0.0", **extra}
+
+    def _all_healthy_heartbeats(self) -> dict[str, dict[str, str]]:
+        return {key: self._healthy() for key in self.KEYS}
+
+    def _all_healthy_groups(self) -> dict[str, int]:
+        return dict.fromkeys(self.GROUPS, 0)
+
+    async def test_four_healthy_shards_do_not_pause(self) -> None:
+        redis = _ShardedFakeRedis(
+            self._all_healthy_heartbeats(), group_lags=self._all_healthy_groups()
+        )
+        budget = ReplayBudget(shard_total=self.TOTAL)
+        assert await live_lane_degraded(cast("Any", redis), budget, now=NOW) is None
+
+    async def test_one_missing_shard_heartbeat_fails_closed_and_names_it(self) -> None:
+        heartbeats = self._all_healthy_heartbeats()
+        del heartbeats[self.KEYS[2]]
+        redis = _ShardedFakeRedis(heartbeats, group_lags=self._all_healthy_groups())
+        budget = ReplayBudget(shard_total=self.TOTAL)
+        assert await live_lane_degraded(cast("Any", redis), budget, now=NOW) == (
+            f"heartbeat_missing:{self.KEYS[2]}"
+        )
+
+    async def test_the_staleness_reported_is_the_worst_of_the_four(self) -> None:
+        heartbeats = self._all_healthy_heartbeats()
+        stale = (NOW - timedelta(seconds=90)).isoformat()
+        heartbeats[self.KEYS[1]] = self._healthy(ts=stale)
+        redis = _ShardedFakeRedis(heartbeats, group_lags=self._all_healthy_groups())
+        budget = ReplayBudget(shard_total=self.TOTAL)
+        assert (
+            await live_lane_degraded(cast("Any", redis), budget, now=NOW) == "heartbeat_stale:90s"
+        )
+
+    async def test_the_outbox_lag_reported_is_the_worst_of_the_four(self) -> None:
+        heartbeats = self._all_healthy_heartbeats()
+        heartbeats[self.KEYS[3]] = self._healthy(outbox_lag_s="185.0")
+        redis = _ShardedFakeRedis(heartbeats, group_lags=self._all_healthy_groups())
+        budget = ReplayBudget(shard_total=self.TOTAL)
+        assert await live_lane_degraded(cast("Any", redis), budget, now=NOW) == "outbox_lag:185s"
+
+    async def test_the_decision_lag_reported_is_the_worst_of_the_four(self) -> None:
+        heartbeats = self._all_healthy_heartbeats()
+        heartbeats[self.KEYS[0]] = self._healthy(decision_lag_p50_s="3.0", decision_lag_p95_s="9.0")
+        heartbeats[self.KEYS[2]] = self._healthy(
+            decision_lag_p50_s="94.0", decision_lag_p95_s="171.0"
+        )
+        redis = _ShardedFakeRedis(heartbeats, group_lags=self._all_healthy_groups())
+        budget = ReplayBudget(shard_total=self.TOTAL)
+        assert await live_lane_degraded(cast("Any", redis), budget, now=NOW) == (
+            "decision_lag:p50=94s,p95=171s"
+        )
+
+    async def test_the_consumer_lag_reported_is_the_worst_of_the_four(self) -> None:
+        lags = self._all_healthy_groups()
+        lags[self.GROUPS[1]] = 250
+        redis = _ShardedFakeRedis(self._all_healthy_heartbeats(), group_lags=lags)
+        budget = ReplayBudget(shard_total=self.TOTAL)
+        assert await live_lane_degraded(cast("Any", redis), budget, now=NOW) == "consumer_lag:250"
+
+    async def test_the_orphan_pre_shard_group_is_ignored_and_logged(self) -> None:
+        """The exact regression T3.84 measured: the abandoned
+        ``strategy-worker.shadow`` group (no ``.NofM`` suffix) sat at
+        ``lag=50000`` and climbing while all four live groups read ``lag=0``.
+        It must never be counted toward the gate's own reading."""
+        redis = _ShardedFakeRedis(
+            self._all_healthy_heartbeats(),
+            group_lags=self._all_healthy_groups(),
+            extra_groups={CONSUMER_GROUP: 50_000},
+        )
+        budget = ReplayBudget(shard_total=self.TOTAL)
+        assert await live_lane_degraded(cast("Any", redis), budget, now=NOW) is None
+
+    async def test_a_shard_missing_from_the_stream_entirely_is_unreadable(self) -> None:
+        lags = self._all_healthy_groups()
+        del lags[self.GROUPS[0]]
+        redis = _ShardedFakeRedis(self._all_healthy_heartbeats(), group_lags=lags)
+        budget = ReplayBudget(shard_total=self.TOTAL)
+        assert (
+            await live_lane_degraded(cast("Any", redis), budget, now=NOW)
+            == "consumer_lag_unreadable"
         )

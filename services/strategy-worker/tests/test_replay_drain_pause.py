@@ -26,6 +26,7 @@ import pytest
 from hunter_strategy_worker.config import CONSUMER_GROUP
 from hunter_strategy_worker.replay import run as run_module
 from hunter_strategy_worker.replay.budget import ReplayBudget
+from hunter_strategy_worker.shard import consumer_groups, heartbeat_keys
 
 pytestmark = pytest.mark.unit
 
@@ -126,3 +127,102 @@ class TestDrainPausesOnDegraded:
             lag=budget.consumer_lag_max + 1,
         )
         assert calls == [], "take_next must not run while the consumer group is backlogged"
+
+
+class _ShardedFakeRedis:
+    """A ``STRATEGY_SHARDS``-topology fake (T3.87): one heartbeat hash per
+    shard key, one shared ``XINFO GROUPS`` answer for every shard's own group."""
+
+    def __init__(self, heartbeats: dict[str, dict[str, str]], group_lags: dict[str, int]) -> None:
+        self._heartbeats = heartbeats
+        self._group_lags = group_lags
+        self.closed = False
+
+    async def hgetall(self, key: str) -> dict[str, str]:
+        return dict(self._heartbeats.get(key, {}))
+
+    async def xinfo_groups(self, _stream: str) -> list[dict[Any, Any]]:
+        return [{b"name": name.encode(), b"lag": lag} for name, lag in self._group_lags.items()]
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+class TestDrainPausesOnDegradedShardedTopology:
+    """T3.87: the same wiring, with ``STRATEGY_SHARDS > 1`` -- ``_drain`` must
+    reach a gate that derives keys/groups from the topology, not the old
+    single hard-coded key/group that stopped matching any live shard."""
+
+    TOTAL = 4
+    KEYS = heartbeat_keys(TOTAL)
+    GROUPS = consumer_groups(TOTAL)
+
+    async def _run(
+        self, monkeypatch: pytest.MonkeyPatch, redis: _ShardedFakeRedis, budget: ReplayBudget
+    ) -> list[str]:
+        calls: list[str] = []
+
+        async def fake_take_next(_redis: Any, *, key: str) -> None:
+            del key
+            calls.append("take_next")
+            return None
+
+        def fake_create_redis(settings: object) -> _ShardedFakeRedis:
+            del settings
+            return redis
+
+        def fake_create_engine(settings: object) -> _FakeEngine:
+            del settings
+            return _FakeEngine()
+
+        def fake_create_session_factory(engine: object) -> object:
+            del engine
+            return object()
+
+        monkeypatch.setattr("hunter_core.redis.create_redis", fake_create_redis)
+        monkeypatch.setattr(run_module, "create_engine", fake_create_engine)
+        monkeypatch.setattr(run_module, "create_session_factory", fake_create_session_factory)
+        monkeypatch.setattr(run_module, "take_next", fake_take_next)
+
+        runs = await run_module._drain(_args(), budget)
+        assert runs == []
+        assert redis.closed is True
+        return calls
+
+    async def test_four_healthy_shards_still_reach_take_next(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from datetime import UTC, datetime
+
+        fresh = datetime.now(UTC).isoformat()
+        heartbeats = {key: {"ts": fresh, "outbox_lag_s": "0"} for key in self.KEYS}
+        redis = _ShardedFakeRedis(heartbeats, dict.fromkeys(self.GROUPS, 0))
+        calls = await self._run(monkeypatch, redis, ReplayBudget(shard_total=self.TOTAL))
+        assert calls == ["take_next"]
+
+    async def test_one_shard_missing_its_heartbeat_never_pops_a_request(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from datetime import UTC, datetime
+
+        fresh = datetime.now(UTC).isoformat()
+        heartbeats = {key: {"ts": fresh, "outbox_lag_s": "0"} for key in self.KEYS}
+        del heartbeats[self.KEYS[1]]
+        redis = _ShardedFakeRedis(heartbeats, dict.fromkeys(self.GROUPS, 0))
+        calls = await self._run(monkeypatch, redis, ReplayBudget(shard_total=self.TOTAL))
+        assert calls == [], "a single shard missing its heartbeat must still pause the whole drain"
+
+    async def test_the_orphan_pre_shard_group_never_blocks_a_healthy_drain(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The exact T3.84 regression: the abandoned unsharded group must not
+        be read as *the* live group and must not stop a healthy drain."""
+        from datetime import UTC, datetime
+
+        fresh = datetime.now(UTC).isoformat()
+        heartbeats = {key: {"ts": fresh, "outbox_lag_s": "0"} for key in self.KEYS}
+        lags = dict.fromkeys(self.GROUPS, 0)
+        lags[CONSUMER_GROUP] = 50_000
+        redis = _ShardedFakeRedis(heartbeats, lags)
+        calls = await self._run(monkeypatch, redis, ReplayBudget(shard_total=self.TOTAL))
+        assert calls == ["take_next"]

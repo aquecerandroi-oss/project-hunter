@@ -110,6 +110,18 @@ if [[ "$STRATEGY_SHARDS" =~ ^[0-9]+$ ]]; then
 else
   echo "AVISO: STRATEGY_SHARDS='$STRATEGY_SHARDS' nao e um numero; ignorando (nenhum perfil de shard ativado)." >&2
 fi
+# T3.87: exportado explicitamente (nao so herdado do prefixo do comando) para
+# que o `docker compose run --rm replay-worker` do subcomando `replay` abaixo
+# sempre repasse esta variavel ao container - o portao de pausa do replay
+# (`replay/budget.py::live_lane_degraded`) deriva dela o conjunto de chaves de
+# heartbeat/grupos consumidores de TODOS os shards vivos
+# (`hunter_strategy_worker.shard.heartbeat_keys`/`consumer_groups`, a mesma
+# formula que cada shard ja usa para se nomear - nunca uma segunda formula).
+# Quem rodar `replay` precisa passar o MESMO STRATEGY_SHARDS que o `update`/
+# `up` mais recente usou - do contrario o portao le a topologia errada (ex.:
+# `STRATEGY_SHARDS=1` contra 4 shards vivos volta a olhar so o grupo/chave
+# orfaos pre-shard, exatamente o bug que a T3.84/T3.87 mediram).
+export STRATEGY_SHARDS
 
 # T3.0f - MARKET_SPOT=1 adiciona o perfil `spot` (market-worker-spot, o
 # coletor SPOT dedicado). Mora no ambiente do comando, como MARKET_SHARDS -
@@ -221,6 +233,11 @@ case "$cmd" in
       echo "      (ou \`up\`) antes, nunca deixe \`run\` construir sozinho." >&2
       exit 1
     fi
+    # T3.87: visivel a cada corrida - o portao de pausa deste container deriva
+    # sua topologia de STRATEGY_SHARDS; se isto nao bater com o `update`/`up`
+    # mais recente (ex.: a stack viva tem 4 shards e ninguem passou
+    # STRATEGY_SHARDS=4 aqui), o portao olha a topologia errada.
+    echo "replay-worker: STRATEGY_SHARDS=$STRATEGY_SHARDS (deve bater com o update/up mais recente)" >&2
     "${COMPOSE[@]}" "${PROFILE_ARGS[@]}" run --rm replay-worker "$@"
     ;;
   *)

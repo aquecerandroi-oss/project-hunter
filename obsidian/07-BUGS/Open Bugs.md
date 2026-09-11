@@ -12,6 +12,47 @@ closed: ""
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
+## Código corrigido na T3.87 (2026-09-11) — o portão do replay ficou cego quando o worker vivo foi shardado, pendente de deploy
+
+**CRITICAL, achado e medido pela T3.84 (05:36 BRT), corrigido pela T3.87.** Desde que a T3.74f
+shardou o `strategy-worker` (`STRATEGY_SHARDS=4`, não implantado antes da T3.84 rodar contra a VPS
+já sharded), **nenhum replay conseguia rodar**: `bash infra/vps/compose.sh replay ...` recusava
+toda corrida com `refused: live lane degraded (heartbeat_missing)`.
+
+- **Causa raiz: duas fórmulas, uma delas obsoleta.** `replay/budget.py::LIVE_HEARTBEAT_KEY` era o
+  literal `"hb:strategy:shadow"` (chave que ninguém mais escreve — cada shard escreve
+  `hb:strategy:shadow:{i}of{N}` desde a T3.74f) e `replay/consumer_lag.py::LIVE_CONSUMER_GROUP` era
+  o grupo pré-shard `strategy-worker.shadow`, abandonado: `pending` parado, `lag` só crescendo
+  (medido em 50 000 pela T3.84, notes-T3.84.md §3.2), enquanto os quatro grupos vivos
+  (`strategy-worker.shadow.{0..3}of4`) ficavam em `lag=0`.
+- **Corrigido:** `replay/budget.py::live_lane_degraded` deriva o conjunto de `N` chaves de
+  heartbeat/grupos consumidores de `STRATEGY_SHARDS` através das **mesmas** funções que cada shard
+  já usa para se nomear (`hunter_strategy_worker.shard.heartbeat_keys`/`consumer_groups`, nunca uma
+  segunda fórmula), responde com o **pior** dos `N` em cada eixo (`outbox_lag`, frescor do
+  heartbeat, `consumer_lag`, `decision_lag`), recusa fechado se **qualquer** shard estiver sem
+  heartbeat (nomeando qual) e **ignora** um grupo consumidor fora da topologia atual — o órfão
+  `strategy-worker.shadow` nunca mais conta para o cálculo, só é logado uma vez por checagem
+  (`orphan_consumer_group`) para o operador destruí-lo. `STRATEGY_SHARDS<=1` (o padrão) reproduz o
+  comportamento anterior a esta tarefa, byte a byte.
+- **Composição:** o serviço `replay-worker` (`infra/docker/docker-compose.yml`) ganhou
+  `STRATEGY_SHARDS: ${STRATEGY_SHARDS:-1}` no seu `environment` (confirmado com `docker compose
+  config` que o merge com `infra/vps/docker-compose.prod.yml` preserva a variável); `infra/vps/
+  compose.sh` agora exporta `STRATEGY_SHARDS` explicitamente e ecoa o valor a cada corrida de
+  `replay` — **quem rodar `replay` precisa passar o mesmo `STRATEGY_SHARDS` que o `update`/`up` mais
+  recente usou**, do contrário o portão olha a topologia errada (o mesmo risco que já existia para
+  `update`/`up` em si, T3.74f).
+- **Arquivos:** `services/strategy-worker/hunter_strategy_worker/shard.py` (`heartbeat_keys`/
+  `consumer_groups`, novas), `.../replay/consumer_lag.py` (`topology_group_lag`,
+  `find_orphan_groups`), `.../replay/budget.py` (`ReplayBudget.shard_total`, `live_lane_degraded`
+  reescrito), `infra/docker/docker-compose.yml`, `infra/vps/compose.sh`. Testes novos/estendidos:
+  `test_shard_topology.py`, `test_replay_decision_lag_gate.py` (`TestShardedTopology`),
+  `test_replay_drain_pause.py` (`TestDrainPausesOnDegradedShardedTopology`) — N=1 backward-compatible
+  byte a byte, N=4 pior-dos-quatro, shard faltando nomeado, órfão ignorado.
+- **Pendente:** deploy na VPS (esta tarefa não escreve nem reinicia contêiner, regra do brief); o
+  grupo órfão `strategy-worker.shadow` (item já registrado abaixo, seção T3.85) continua existindo
+  no Redis até alguém rodar `XGROUP DESTROY` à mão — o portão agora o ignora, mas não o apaga.
+  Comandos, saída real e a checagem somente-leitura por shard: `.claude/state/notes-T3.87.md`.
+
 ## Código corrigido na T3.85 (2026-09-11), config e faxina pendentes de aprovação
 
 Achado pela inspeção read-only da T3.85 (`.claude/state/notes-T3.85.md`), continuação da T3.83:

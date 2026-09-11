@@ -123,7 +123,13 @@ STRATEGY_SHARDS=4 docker compose -f infra/docker/docker-compose.yml \
 - **mudar N deixa grupos de consumidor órfãos**
   (`strategy-worker.shadow.{i}of{N}`) no stream `market.candles.closed`.
   Remover à mão, depois de conferir que não há pendência (`XINFO GROUPS
-  market.candles.closed`).
+  market.candles.closed`). Desde a T3.87 o portão de replay (§5.2) já ignora
+  um grupo órfão para o próprio cálculo de saúde e o nomeia
+  (`orphan_consumer_group`) — a remoção continua sendo faxina manual, não
+  automática;
+- `replay-worker` precisa do **mesmo** `STRATEGY_SHARDS` que este `up`/`update`
+  usou — o portão de pausa do replay (§5.2, T3.87) deriva dele o conjunto de
+  chaves/grupos de todos os shards vivos, nunca uma fórmula própria.
 
 VPS: `STRATEGY_SHARDS=4 bash infra/vps/compose.sh update` (mesmo padrão de
 `MARKET_SHARDS`, perfil ativado automaticamente pelo script).
@@ -664,6 +670,23 @@ não duplica nada — mas cada comando termina, grava seu recibo e libera a máq
 | `REPLAY_DECISION_LAG_P50_MAX_S` / `REPLAY_DECISION_LAG_P95_MAX_S` | `10` / `30` | T3.80: espelham `SHADOW_DECISION_LAG_P50_ALERT_S`/`_P95_ALERT_S` — pausa quando a mediana/p95 de `decision_lag_p50_s`/`_p95_s` do heartbeat (T3.74c) passa disso. É o sinal que o `outbox_lag_s` e o `consumer_lag` (abaixo) não viram em 10/09: replay dentro do container vivo, mediana 90 s / p95 171 s, os outros dois nos valores saudáveis o tempo todo |
 | `REPLAY_DECISION_LAG_RESUME_HEALTHY_S` | `300` | T3.80: só retoma depois de leituras saudáveis contínuas por este tanto (5 min) — uma leitura boa isolada pode ser um pico que já passou, e retomar cedo demais devolve o replay para um atraso que ainda está drenando por causa dele mesmo. Estado guardado no Redis (`replay:decision_lag_last_bad_at`), não na memória do processo, porque um dreno é tipicamente um processo por fatia |
 | `REPLAY_QUEUE_KEY` | `replay:queue` | lista Redis, `LPUSH`/`RPOP` |
+| `STRATEGY_SHARDS` | `1` | **T3.87, não é `REPLAY_*` de propósito** — é a mesma contagem que `update`/`up` usam para renderizar `STRATEGY_SHARD=i/N` em cada `strategy-worker-i` (§3.1b); `replay-worker` precisa do **mesmo** número para que o portão saiba quantos shards vivos existem |
+
+**Portão com topologia (T3.87).** Com `STRATEGY_SHARDS > 1` o portão não lê mais uma chave/grupo únicos: deriva o conjunto inteiro de `N` chaves de heartbeat (`hb:strategy:shadow:{i}ofN`) e `N` grupos consumidores (`strategy-worker.shadow.{i}ofN`) das mesmas funções que cada shard já usa para se nomear (`hunter_strategy_worker.shard.heartbeat_keys`/`consumer_groups`, nunca uma segunda fórmula), e responde com o **pior** dos `N` em cada eixo (`outbox_lag`, frescor do heartbeat, `consumer_lag`, `decision_lag`). Falta de heartbeat de **qualquer** shard recusa fechado, nomeando qual (`heartbeat_missing:hb:strategy:shadow:2of4`); um grupo consumidor no stream que não pertence à topologia atual (ex.: `strategy-worker.shadow` sem sufixo, sobra de um resize) nunca conta para esse pior-caso — é logado uma vez por checagem como `orphan_consumer_group` para o operador destruí-lo (`XGROUP DESTROY`). **Este é exatamente o bug fechado pela T3.87**: T3.74f shardou o worker vivo mas o portão continuou lendo a chave/grupo pré-shard, que ninguém mais escrevia/avançava — todo `compose.sh replay ...` era recusado com `heartbeat_missing` desde então (`.claude/state/notes-T3.84.md` §3). `STRATEGY_SHARDS` precisa ser passado ao `replay` **igual** ao que o `update`/`up` mais recente usou (`compose.sh` ecoa o valor a cada corrida de `replay` para isto ser visível); com `STRATEGY_SHARDS<=1` (o padrão) o portão se comporta byte a byte como antes desta tarefa.
+
+**Checagem somente-leitura na VPS** (o que o portão vai ver, sem rodar nada):
+
+```bash
+N=4  # o STRATEGY_SHARDS vivo
+for i in $(seq 0 $((N - 1))); do
+  echo "shard $i:"
+  docker exec hunter-redis-1 redis-cli HGET "hb:strategy:shadow:${i}of${N}" ts
+  docker exec hunter-redis-1 redis-cli XINFO GROUPS market.candles.closed \
+    | grep -A1 "\"strategy-worker.shadow.${i}of${N}\""
+done
+docker exec hunter-redis-1 redis-cli XINFO GROUPS market.candles.closed \
+  | grep -B1 -A1 '"strategy-worker.shadow"'   # o grupo órfão, se ainda existir
+```
 
 **Contexto por versão (`SHADOW_CONTEXT_*`, opcionais; `hunter_strategy_worker/config.py`, T3.54b/c — conceito em `docs/PIPELINE.md` §6b):**
 
