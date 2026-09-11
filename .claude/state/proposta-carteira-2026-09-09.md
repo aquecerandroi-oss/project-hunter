@@ -191,3 +191,87 @@ inertes ou negativos, e os dois últimos são a sua própria regra de não engol
    nenhuma escolha de limite de risco muda isso.
 5. **A população cresce entre leituras.** A família fechou 168 operações até 15:44 BRT hoje; às 15:35
    eram 164. Todos os números vêm dos snapshots declarados.
+
+---
+
+## D-P19: a meta em dinheiro — 2026-09-11 (05:05–05:23 BRT)
+
+**Para:** Everton. **De:** risk-engine-guardian. **Origem:** D-P19, primeiro da fila da Astra no
+plantão run 7. **Estado:** nada alterado, nada commitado, nenhum limite tocado, VPS somente leitura.
+**Nota completa:** `.claude/state/notes-D-P19.md`. **Câmbio:** USDTBRL 5,1198 (observado 05:05 BRT).
+
+Na T3.60 (09/09) a conta foi feita sobre o universo de 253 mercados e dois dias. Desde a T3.82 o Lab
+só observa **16 mercados** (os com 90 dias de histórico), e a carteira compra no **SPOT**. Refiz a
+conta nesse recorte, com **30 dias de velas de 1 min**, hora a hora de Brasília. A conclusão não
+mudou de direção; ficou mais precisa, e apareceu um teto que ninguém tinha colocado na conta.
+
+### 1. Quanto vale 1 R hoje, mercado a mercado
+
+Com R$ 100 mil, participação 1 %, no minuto mediano de cada mercado:
+
+| onde | 1 R mediano | quem limita |
+|---|---|---|
+| 16 perpétuos | **R$ 53,57** | participação em 11 deles; **teto de 10 % por moeda** em BTC, ETH, SOL, ZEC e XRP |
+| 16 SPOT (onde a carteira compra) | **R$ 18,14** | participação em 11 de 13; o minuto SPOT é 10–19 % do perpétuo |
+
+O intervalo vai de **R$ 0,33** (SAHARA) a **R$ 211** (BTC, ETH, SOL). A novidade em relação à T3.60:
+nos cinco mercados fundos **não é mais a participação que segura, é o seu próprio patrimônio** — e
+nesses cinco, capital compra tamanho.
+
+### 2. O dinheiro por dia — teto e esperado, nunca um no lugar do outro
+
+A família fez **6,33 apostas únicas por dia** nesses 16 mercados (3 dias: 08–10/09). Nove dos
+dezesseis não receberam nenhuma.
+
+| universo | teto R$/dia (**toda** aposta fechando +1 R) | esperado R$/dia (com o R medido, −0,0994) |
+|---|---|---|
+| 16 perpétuos | **+393,60** | **−310,58** |
+| 16 SPOT executando o sinal do perpétuo | **+157,41** | **−137,56** |
+
+A meta de R$ 9.000 é **23×** o teto do perpétuo e **57×** o do SPOT. E o esperado tem o sinal
+trocado: hoje a família **perde** dinheiro por dia, em qualquer tamanho.
+
+### 3. O teto que faltava: as vagas
+
+`max_concurrent_positions = 5` com o horizonte de 4 h da família = **no máximo 30 entradas por dia**,
+haja quantos sinais houver. Invertendo a meta contra esse teto:
+
+| se o R médio por aposta fosse | 1 R precisaria valer | notional | minuto de volume necessário | quantos dos 16 têm | patrimônio necessário |
+|---|---|---|---|---|---|
+| +0,05 | R$ 6.000 | 55.431 USDT | 5,54 M USDT | **0** | R$ 2,84 mi |
+| +0,10 | R$ 3.000 | 27.716 USDT | 2,77 M USDT | **0** | R$ 1,42 mi |
+| +0,20 | R$ 1.500 | 13.858 USDT | 1,39 M USDT | **2** (BTC, ETH) | **R$ 709 mil** |
+| +0,40 | R$ 750 | 6.929 USDT | 693 k USDT | 2 | R$ 355 mil |
+
+(O "1 R = R$ 3.719" da T3.60 é o ponto R̄ ≈ +0,08 desta tabela — as duas contas batem.)
+
+### 4. Se eu afrouxasse a participação (cenário; **não mexi em nada**)
+
+| participação | patrimônio | teto R$/dia | esperado R$/dia |
+|---|---|---|---|
+| 1 % | R$ 100 k | +393,60 | −310,58 |
+| 2 % | R$ 100 k | +485,17 | −346,06 |
+| 5 % | R$ 100 k | +734,91 | −434,76 |
+| 5 % | R$ 400 k | +1.666,00 | **−1.277,78** |
+
+**Quintuplicar a participação multiplica o teto por 1,87, não por 5**, e **piora** o esperado —
+porque com expectancy negativa tamanho maior é prejuízo maior. A célula mais agressiva da tabela
+entrega 18,5 % da meta, e só se **todas** as apostas ganharem.
+
+### 5. A hora do dia importa, e estamos na hora errada
+
+O minuto mediano das **11 h BRT** vale 4,8× o das **18 h**; 1 R mediano vai de **R$ 87,95** (11 h)
+para **R$ 37,21** (18 h). **14 das 22 apostas da família nos 16 mercados caem entre 16 h e 18 h** —
+a janela de menor capacidade. Com 22 apostas isso não vira regra; vira pergunta.
+
+### 6. O que decide a meta, em ordem
+
+1. **Expectancy.** Enquanto o R médio por aposta for ≤ 0, **não existe tamanho positivo que
+   resolva** — a frase é da Astra e a conta confirma: todo cenário maior perde mais.
+2. **Capital.** Para R$ 9.000/dia com um R médio generoso (+0,20), o teto de 10 % por moeda exige
+   **R$ 709 mil**; com +0,10, R$ 1,42 milhão.
+3. **Universo.** Só **BTC e ETH** têm o minuto de volume que esse tamanho pede, e a família não
+   entrou em nenhum dos dois em três dias. O universo executável precisa incluir os mercados fundos
+   **e** a estratégia precisa de fato operar neles.
+4. **O que NÃO é alavanca:** mais versões da mesma ideia. O dedupe já mostra que 859 desfechos são
+   191 apostas; versões novas multiplicam decisões e não movem nenhum dos três itens acima.
