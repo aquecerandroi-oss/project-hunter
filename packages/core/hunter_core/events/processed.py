@@ -167,6 +167,7 @@ async def ack_many(
     items: Sequence[tuple[str, EventEnvelope]],
     *,
     now: Callable[[], datetime] = utcnow,
+    record: bool = True,
 ) -> None:
     """:func:`ack` for a whole batch: same order, same guarantees, one round trip.
 
@@ -179,12 +180,25 @@ async def ack_many(
     finished messages, and acking only the representative would leave 499
     pending for ``XAUTOCLAIM`` to bring back forever (Astra, T2.5d design
     review, must-fix 3).
+
+    ``record=False`` (T3.85) skips the ``SADD``/``EXPIRE`` and only ``XACK``s:
+    for a group whose stream carries no durable effect (ticks, derivatives,
+    liquidations — PIPELINE.md §10b calls them *efêmero*), a duplicate delivery
+    costs nothing to redo, so there is nothing worth remembering. At real
+    volume the daily set this would otherwise grow into is tens of millions of
+    members — 3-4 GB per day, per group (found in prod, notes-T3.85.md): the
+    guard's own memory budget assumed ~700k events/day and the market-worker's
+    real tick rate is ~45-48M/day, ~65x that.
     """
     if not items:
+        return
+    message_ids = [message_id for message_id, _envelope in items]
+    if not record:
+        await client.xack(stream, group, *message_ids)
         return
     processed_key = keys.processed(group, now().date())
     async with client.pipeline(transaction=False) as pipe:
         pipe.sadd(processed_key, *[str(envelope.event_id) for _id, envelope in items])
         pipe.expire(processed_key, PROCESSED_TTL_S)
-        pipe.xack(stream, group, *[message_id for message_id, _envelope in items])
+        pipe.xack(stream, group, *message_ids)
         await pipe.execute()

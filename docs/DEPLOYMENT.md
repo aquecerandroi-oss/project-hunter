@@ -1283,6 +1283,15 @@ conta na máquina.
 custa um ciclo inteiro de reconexão de streams; `appendfsync everysec` encurta
 isso de minutos para segundos.
 
+**Redis com `--maxmemory` (T3.85).** Sem teto, `used_memory` chegou a 12,57 GiB
+numa VPS de 47 GiB dividida com o Postgres — achado e detalhado em §9.7.
+`--maxmemory 4gb --maxmemory-policy noeviction`: o Redis passa a **recusar
+escrita** (erro `OOM command not allowed`) em vez de crescer sem limite ou —
+pior, com qualquer política `*-lru`/`*-random` — apagar dado de stream ainda
+não consumido em silêncio. `noeviction` já era o padrão de fábrica desta
+instância antes desta mudança (`CONFIG GET maxmemory-policy`); faltava só o
+teto.
+
 ### 9.4 Backup
 
 `pg_dump -Fc` diário às 03:17 (hora da máquina) para `/opt/backups`, retenção
@@ -1357,6 +1366,132 @@ usa `WEB_ORIGIN`, que é o valor desejado. A correção de verdade
   Fase 4).
 - Sem monitoramento externo: `restart: always` cobre queda de processo, nada
   avisa se a VPS inteira cair.
+
+### 9.7 Redis sem teto de memória — achado e correção (T3.85, 2026-09-11)
+
+**O sintoma que a T3.83 viu primeiro:** `INFO memory` na VPS mostrava
+`used_memory_human 12.57G`, `maxmemory 0`, `rdb_saves=2467`, um `BGSAVE` em
+andamento e o último `bgsave` levando 161 s — o fork longo (13 GB de COW) é o
+que estourava o `read timeout` nos 4 shards de `strategy-worker` na virada
+UTC. A hipótese natural era stream sem `MAXLEN` crescendo sem limite.
+
+**O que a inspeção read-only realmente encontrou.** `redis-cli --bigkeys` +
+`XLEN`/`MEMORY USAGE` de cada uma das 19 streams do `PIPELINE.md` §10
+mostrou que o `MAXLEN` **está e sempre esteve em vigor** — `market.ticks` em
+100 003 entradas (alvo 100k), `market.candles.closed` em 50 000,
+`market.derivatives`/`market.liquidations` em ~20k, `features.updated` em
+100 003, `opportunities.updated` em 50 005 — as 19 streams somadas custam
+**~256 MB**, 2% do total. O culpado real é outro: o guarda de idempotência
+por `event_id` (`hunter_core.events.processed`, `SADD` num `SET` por dia por
+grupo consumidor, `hunter:processed:{group}:{YYYYMMDD}`). Seu próprio
+docstring estimava a memória a partir de "~700k eventos/dia" do
+market-worker; o volume real de `market.ticks` é **~45-48 milhões/dia** —
+~65x a estimativa — porque a stream carrega um tick por atualização de preço
+de cada mercado monitorado, não um evento por minuto. `SCARD`/`MEMORY USAGE`
+de cada chave `hunter:processed:*` (44 chaves, todas as que existiam):
+
+| Chave (grupo) | Maior SCARD/dia | Bytes (soma dos dias vivos) |
+|---|---:|---:|
+| `scanner-worker.market.ticks` | 47 997 135 (2026-09-10) | ~12,29 GB (4 dias) |
+| `scanner-worker.market.derivatives` | 17 276 430 (2026-09-10) | ~4,48 GB (4 dias) |
+| `strategy-worker.shadow*` (5 grupos, sharded) | 372 573 | ~124 MB (total) |
+| `scanner-worker.market.candles.closed` | 388 765 | ~111 MB (total) |
+| `scanner-worker.market.liquidations` | 39 077 | ~10 MB (total) |
+
+Ticks + derivatives sozinhos já somam mais que o `used_memory` total medido
+(a soma de `MEMORY USAGE` de sets grandes superestima um pouco via
+amostragem interna do comando) — na prática são efetivamente **toda** a
+memória do Redis. As streams em si (o que a hipótese original suspeitava)
+não são o problema.
+
+**Por que essas três streams não precisavam do guarda.** `PIPELINE.md` §10b
+já classifica `market.ticks` como *efêmero* ("a próxima mensagem o
+substitui"), e `hunter_scanner_worker/consumers.py` já documentava, antes
+desta tarefa, que ticks/derivatives/liquidations "have no durable effect of
+their own" — o consumidor só marca o mercado sujo a partir do hot state, não
+grava nada a partir do payload. Um evento redundante custa reprocessar (uma
+leitura do hot state), não custa nada de errado. O guarda existe para
+proteger um efeito duro (uma linha em Postgres); aqui não há efeito para
+proteger, só um `SET` que nunca parava de crescer intradia (o TTL de 3 dias
+só limita quantos dias ficam vivos, não o tamanho de um dia).
+
+**Correção de código (sem mudança de comportamento para streams duráveis).**
+`consume_batches(..., track=False)` pula o `SMISMEMBER` de checagem e entrega
+tudo que foi lido; `ack_many(..., record=False)` só dá `XACK`, sem
+`SADD`/`EXPIRE`. `run_batch_consumer` (o único chamador de ambos, e o único
+caminho das três streams notificação) ganhou `track: bool = True` e o
+`scanner-worker/main.py` passa `track=False` nas três — `market.ticks`,
+`market.derivatives`, `market.liquidations`. `market.candles.closed` (durável)
+e todo o resto continuam no caminho de sempre, sem mudança. Ficou provado por
+teste (`packages/core/tests/unit/test_events_consume_batch.py`,
+`services/scanner-worker/tests/test_consumers.py`) que `track=False` nunca
+lê o guarda e `record=False` nunca escreve a chave `hunter:processed:*`.
+
+**Efeito colateral esperado.** Com o dataset caindo de ~13 GB para a ordem de
+~300 MB (streams + hot state), o `BGSAVE`/`aof_rewrite` deixa de precisar de
+um fork de segundos-a-minutos — o que deve **também resolver** o sintoma
+original da T3.83 (timeout de leitura na virada UTC), como consequência, não
+como correção direta.
+
+**`--maxmemory` como fusível, não como estratégia.** Ver a entrada em §9.3.
+`4gb` contra um estado estável esperado de ~300 MB dá folga de ~13x para
+crescimento legítimo (mais mercados monitorados, mais grupos consumidores)
+sem chegar perto do teto real da máquina (47 GiB, compartilhado com o
+Postgres — `free -h` mostrou 18 GiB em uso, 28 GiB disponível no momento da
+inspeção). Alerta: não existe métrica dedicada para "Redis recusou escrita
+por OOM" hoje — o que já existe e cobre o caso é a cadeia de tratamento de
+erro de todo consumidor/produtor (`runtime.mark_error()`, log
+`scanner_batch_failed`/`scanner_message_failed`, contadores de heartbeat) e o
+check `redis` de `/ready`, que já fica vermelho numa queda ou recusa de
+comando do Redis (`PIPELINE.md` §10b, "Prontidão"). Registrado como lacuna
+(sem contador `hunter_redis_oom_total` dedicado) para quem tocar
+observabilidade em seguida.
+
+**Proposta de faxina única — NÃO EXECUTAR sem aprovação do Everton.** As
+chaves `hunter:processed:*` datadas de dois dias atrás ou mais **já não são
+lidas por ninguém**: o guarda (`PROCESSED_DAYS = 2`) só consulta hoje e
+ontem; um dia mais velho que isso só ainda existe porque o TTL (3 dias) não
+zerou. Apagar essas chaves não perde nenhuma linha de Postgres — é lixo de
+transporte já expirado por contrato, só ainda não coletado pelo TTL. Comando
+genérico (recalcula "hoje"/"ontem" no momento da execução, não usa as datas
+fixas abaixo):
+
+```bash
+# Lista o que seria apagado (hoje/ontem ficam de fora automaticamente,
+# porque so existem 4 dias de chave e o guarda so cobre os 2 mais novos):
+today=$(date -u +%Y%m%d); yesterday=$(date -u -d yesterday +%Y%m%d)
+docker exec hunter-redis-1 redis-cli KEYS 'hunter:processed:*' \
+  | grep -vE ":(${today}|${yesterday})$"
+
+# Para cada chave da lista acima, UNLINK (nao-bloqueante — DEL travaria o
+# Redis por um tempo perceptivel num SET de dezenas de milhoes de membros):
+docker exec hunter-redis-1 redis-cli UNLINK <chave>
+```
+
+Estado no momento da inspeção (2026-09-11, ~08h18 UTC / 05h18 America/Sao_Paulo)
+— datas `20260908` e `20260909` já fora da janela de leitura, `20260910` e
+`20260911` ainda dentro dela e **não devem ser tocadas**:
+
+```
+UNLINK hunter:processed:scanner-worker.market.ticks:20260908        # ~3,38 GB
+UNLINK hunter:processed:scanner-worker.market.derivatives:20260908  # ~1,18 GB
+UNLINK hunter:processed:scanner-worker.market.candles.closed:20260908  # ~29 MB
+UNLINK hunter:processed:strategy-worker.shadow:20260908              # ~29 MB
+UNLINK hunter:processed:scanner-worker.market.liquidations:20260908  # ~2 MB
+UNLINK hunter:processed:scanner-worker.market.ticks:20260909        # ~3,82 GB
+UNLINK hunter:processed:scanner-worker.market.derivatives:20260909  # ~1,51 GB
+UNLINK hunter:processed:scanner-worker.market.candles.closed:20260909  # ~28 MB
+UNLINK hunter:processed:strategy-worker.shadow:20260909              # ~30 MB
+UNLINK hunter:processed:scanner-worker.market.liquidations:20260909  # ~3 MB
+# + 10 chaves de market-worker.backfill.binance.*of4:2026090{8,9} e
+# market.universe.changed:2026090{8,9}, poucos KB cada, sem efeito no total.
+```
+
+Total estimado liberado: **~9,3 GiB** (de ~12,57 GiB usados). Depois do
+deploy do código desta tarefa a faxina deixa de ser necessária de tempos em
+tempos — `market.ticks`/`market.derivatives`/`market.liquidations` nunca mais
+escrevem `hunter:processed:*`, então essas três chaves simplesmente param de
+existir a partir do primeiro dia após o deploy.
 
 ## Rollback — nota obrigatória a partir de `cefad8c` (2026-09-07)
 

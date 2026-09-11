@@ -166,6 +166,46 @@ class TestBatchConsumer:
         assert health.last_iteration_at.get(Streams.MARKET_TICKS) is not None
         assert health.last_message_at.get(Streams.MARKET_TICKS) is None
 
+    async def test_track_false_is_forwarded_to_the_read_and_the_ack(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """T3.85: the caller's ``track=False`` must reach both ``consume_batches``
+        (so the guard is never read) and ``ack_many`` (so nothing is remembered) --
+        this is the wiring that keeps ``hunter:processed:*`` from growing for the
+        three notification streams (notes-T3.85.md)."""
+        delivered = _batch(_tick(SYMBOL, NOW))
+        seen: dict[str, Any] = {}
+
+        async def one_batch(
+            *_args: Any, **kwargs: Any
+        ) -> AsyncIterator[list[tuple[str, EventEnvelope]]]:
+            seen["consume_track"] = kwargs.get("track")
+            yield delivered
+            raise asyncio.CancelledError
+
+        async def record_ack(*_args: Any, **kwargs: Any) -> None:
+            seen["ack_record"] = kwargs.get("record")
+
+        monkeypatch.setattr(consumers_mod, "consume_batches", one_batch)
+        monkeypatch.setattr(consumers_mod, "ack_many", record_ack)
+
+        async def handle(_deliveries: list[tuple[str, EventEnvelope]]) -> None:
+            return None
+
+        with pytest.raises(asyncio.CancelledError):
+            await run_batch_consumer(
+                None,  # type: ignore[arg-type]
+                _Runtime(),  # type: ignore[arg-type]
+                Streams.MARKET_TICKS,
+                ConsumerHealth(),
+                handle,
+                block_ms=2000,
+                batch=500,
+                track=False,
+            )
+
+        assert seen == {"consume_track": False, "ack_record": False}
+
     async def _run_once(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -193,7 +233,11 @@ class TestBatchConsumer:
             raise asyncio.CancelledError
 
         async def record_ack(
-            _redis: Any, _stream: str, _group: str, items: list[tuple[str, EventEnvelope]]
+            _redis: Any,
+            _stream: str,
+            _group: str,
+            items: list[tuple[str, EventEnvelope]],
+            **_kwargs: Any,
         ) -> None:
             acked.append(list(items))
 

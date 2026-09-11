@@ -348,3 +348,60 @@ async def test_consume_still_guards_one_message_at_a_time() -> None:
 
     assert client.sismember_calls == 2, "today and yesterday, for the first message only"
     assert client.smismember_calls == 0
+
+
+# -- T3.85: ``track=False`` / ``record=False`` for streams with no durable
+# effect (market.ticks, market.derivatives, market.liquidations). Found in
+# prod: the idempotency SET this guard writes grew to ~48M members/day
+# (~3.8 GB) for market.ticks alone -- notes-T3.85.md.
+
+
+async def test_track_false_skips_the_guard_entirely_even_for_a_marked_event() -> None:
+    """A duplicate is delivered again rather than filtered: for a stream with
+    no durable effect, redoing the work is cheaper than remembering it."""
+    envelopes = [_envelope(index) for index in range(3)]
+    client = _client([_read(envelopes)])
+    client.mark("g", str(envelopes[1].event_id))
+
+    batch = await _first_batch(client, track=False)
+
+    assert [envelope.payload["n"] for _id, envelope in batch] == [0, 1, 2]
+    assert client.smismember_calls == 0, "no guard read at all, not even a skipped one"
+    assert client.acked == [], "nothing is acked away as 'already seen'"
+
+
+async def test_track_false_costs_zero_round_trips_before_the_handler_runs() -> None:
+    """The whole point: no ``SMISMEMBER``, no per-message overhead, for a
+    consumer whose handling is a dict touch on a market that moves ~50M
+    times/day."""
+    client = _client([_read([_envelope(index) for index in range(500)])])
+
+    batch = await _first_batch(client, track=False)
+
+    assert len(batch) == 500
+    assert client.round_trips == 0
+
+
+async def test_ack_many_record_false_only_xacks_no_sadd_no_expire() -> None:
+    """The other half of the fix: completing the batch does not write the
+    ``event_id`` anywhere, so the daily processed set never grows for this
+    group in the first place."""
+    envelopes = [_envelope(index) for index in range(4)]
+    client = _client([])
+    items = [(f"1-{index}", envelope) for index, envelope in enumerate(envelopes, start=1)]
+
+    await ack_many(client, "market.ticks", "g", items, now=lambda: NOW, record=False)
+
+    assert client.acked == ["1-1", "1-2", "1-3", "1-4"]
+    assert client.round_trips == 1
+    key = keys.processed("g", NOW.date())
+    assert key not in client.members, "record=False must never create the processed key"
+    assert client.ttls == {}
+
+
+async def test_ack_many_record_false_of_nothing_touches_the_server_at_all() -> None:
+    client = _client([])
+
+    await ack_many(client, "market.ticks", "g", [], now=lambda: NOW, record=False)
+
+    assert client.round_trips == 0

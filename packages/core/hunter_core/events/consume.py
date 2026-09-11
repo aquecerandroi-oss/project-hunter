@@ -1,8 +1,7 @@
 """Reading a stream, idempotently: XREADGROUP + XAUTOCLAIM, one message or a batch.
 
 Where the mark lives and how it is written is :mod:`hunter_core.events.processed`;
-what this module owns is the reading loop and the two shapes a consumer can ask
-for.
+what this module owns is the reading loop and the two shapes a consumer can ask for.
 
 ``consume()`` is a pre-filter: it skips (and acks away) messages already marked
 processed, so a redelivery of a completed message is never re-yielded to the
@@ -15,8 +14,8 @@ idempotency, per ARCHITECTURE.md §5.1).
 ``consume_batches()`` (T2.5d) is the same reading with the guard and the ack
 paid **per batch** instead of per message. It exists because the scanner's
 ``market.ticks`` consumer sustained 71 msg/s against 151 produced and sat ~95 000
-messages behind, spending three round trips on every message whose whole
-handling is a dict touch (``.claude/state/t25-proof.md``, T2.5c §3).
+messages behind, spending three round trips on a message that is a dict touch
+(``.claude/state/t25-proof.md``, T2.5c §3).
 
 T2.9: an *idle* stream is a normal state, not a failure. The blocking read is
 therefore budgeted strictly under the socket read deadline, and a deadline that
@@ -123,6 +122,7 @@ async def _unprocessed(
     entries: list[tuple[Any, dict[Any, Any]]],
     *,
     now: datetime,
+    track: bool = True,
 ) -> list[tuple[str, EventEnvelope]]:
     """Decode a raw batch and drop what this group already applied.
 
@@ -130,6 +130,7 @@ async def _unprocessed(
     hide it, and raising would cost the rest of the batch its progress. It comes
     back on the next ``XAUTOCLAIM``, is skipped again in microseconds, and is
     visible in the log every time (Astra, T2.5d design review, must-fix 5).
+    ``track=False`` (T3.85) skips the guard: no durable effect, nothing to remember.
     """
     decoded: list[tuple[str, EventEnvelope]] = []
     for message_id, fields in entries:
@@ -145,8 +146,8 @@ async def _unprocessed(
             )
             continue
         decoded.append((_decode_id(message_id), envelope))
-    if not decoded:
-        return []
+    if not decoded or not track:
+        return decoded
     seen = await processed_many(
         client, group, [str(envelope.event_id) for _id, envelope in decoded], now=now
     )
@@ -312,6 +313,7 @@ async def consume_batches(
     claim_idle_ms: int = 30_000,
     timeout_backoff_s: float = TIMEOUT_BACKOFF_S,
     now: Callable[[], datetime] = utcnow,
+    track: bool = True,
 ) -> AsyncGenerator[list[tuple[str, EventEnvelope]], None]:
     """Yield whole read batches, already filtered by the ``event_id`` guard.
 
@@ -322,19 +324,18 @@ async def consume_batches(
     for the whole batch. That is the difference between 71 msg/s and a consumer
     that keeps up (``.claude/state/t25-proof.md``, T2.5c section 3).
 
-    Three properties the caller can rely on:
+    Four properties the caller can rely on:
 
     - **every unprocessed entry is delivered, repeats included.** Two deliveries
-      of one ``event_id`` are two entries here: collapsing them would ack a
-      message whose effect may have failed on the first try (Astra, T2.5d design
-      review, must-fix 1). Coalescing is the caller's decision, and the caller
-      must still pass *every* absorbed entry to :func:`ack_many`;
+      of one ``event_id`` are two entries: collapsing them would ack a message
+      whose effect may have failed on the first try (Astra, T2.5d design review,
+      must-fix 1); the caller still passes *every* absorbed entry to :func:`ack_many`;
     - **an unreadable message is skipped, not fatal.** One garbage entry in a
-      batch of 500 must not cost the other 499 their progress, so it is logged
-      and left pending rather than raised (which is what :func:`consume` still
-      does, one message at a time);
+      batch of 500 must not cost the other 499, so it is logged and left pending
+      rather than raised (:func:`consume` still raises, one message at a time);
     - **an empty list is a real yield.** It means the whole batch was already
       processed or unreadable — the caller's liveness clock should tick.
+    - **``track=False`` drops the guard** (T3.85); pair with ``ack_many(record=False)``.
     """
     async for entries in _read_loop(
         client,
@@ -346,4 +347,4 @@ async def consume_batches(
         claim_idle_ms=claim_idle_ms,
         timeout_backoff_s=timeout_backoff_s,
     ):
-        yield await _unprocessed(client, stream, group, entries, now=now())
+        yield await _unprocessed(client, stream, group, entries, now=now(), track=track)

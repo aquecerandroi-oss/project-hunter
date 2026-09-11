@@ -244,6 +244,7 @@ async def run_batch_consumer(
     *,
     block_ms: int,
     batch: int,
+    track: bool = True,
 ) -> None:
     """Consume ``stream`` in batches, handing each whole batch to ``handle``.
 
@@ -251,6 +252,15 @@ async def run_batch_consumer(
     they have no durable effect of their own, so the whole batch is acked as
     soon as the handler returns, in one round trip. ``market.candles.closed``
     stays on :func:`run_stream_consumer`, whose ACK the persist cycle owns.
+
+    ``track=False`` (T3.85, notes-T3.85.md) skips the ``event_id`` idempotency
+    guard for these three: a duplicate notification costs nothing to redo, so
+    there is nothing worth remembering, and remembering it anyway is what grew
+    ``hunter:processed:scanner-worker.market.ticks:*`` to ~48M members/day
+    (~3.8 GB) in production — the guard's own memory budget assumed ~700k
+    events/day; real tick volume is ~65x that. Caller passes the same flag to
+    both :func:`~hunter_core.events.consume.consume_batches` and
+    :func:`~hunter_core.events.processed.ack_many` (as ``record``).
 
     The failure budgets are the ones above, with the batch as the unit: a
     handler that raises leaves the **whole** batch pending and the next
@@ -270,7 +280,7 @@ async def run_batch_consumer(
     while True:
         try:
             async for deliveries in consume_batches(
-                redis, stream, group, consumer, block_ms=block_ms, batch=batch
+                redis, stream, group, consumer, block_ms=block_ms, batch=batch, track=track
             ):
                 health.touch(stream, message=bool(deliveries))
                 if not deliveries:
@@ -286,7 +296,7 @@ async def run_batch_consumer(
                         "scanner_batch_failed", stream=stream, messages=len(deliveries)
                     )
                     continue
-                await ack_many(redis, stream, group, deliveries)
+                await ack_many(redis, stream, group, deliveries, record=track)
                 runtime.mark_success()
             logger.warning("scanner_consumer_stream_ended", stream=stream, backoff_s=backoff)
             await asyncio.sleep(backoff)

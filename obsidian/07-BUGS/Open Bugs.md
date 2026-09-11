@@ -12,6 +12,44 @@ closed: ""
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
 
+## Código corrigido na T3.85 (2026-09-11), config e faxina pendentes de aprovação
+
+Achado pela inspeção read-only da T3.85 (`.claude/state/notes-T3.85.md`), continuação da T3.83:
+Redis na VPS em **12,57 GiB de `used_memory` sem `maxmemory`** (2 014 chaves só). A hipótese inicial
+era stream sem `MAXLEN` — **descartada**: `XLEN`/`MEMORY USAGE` das 19 streams do `PIPELINE.md` §10
+bateram com o alvo (`market.ticks` 100 003/100k, `features.updated` 100 003/100k etc.), somando
+~256 MB, 2% do total.
+
+- **Causa raiz: o guarda de idempotência por `event_id`, não as streams.**
+  `hunter_core.events.processed` grava um `SADD` por evento processado num `SET` por dia por grupo
+  (`hunter:processed:{group}:{YYYYMMDD}`) — necessário para efeitos duráveis, mas
+  `market.ticks`/`market.derivatives`/`market.liquidations` já eram documentadas, antes desta
+  tarefa, como **sem** efeito durável (`hunter_scanner_worker/consumers.py`: "no durable effect of
+  their own"; `PIPELINE.md` §10b classifica `market.ticks` como *efêmero*). O docstring do módulo
+  estimava a memória a partir de "~700k eventos/dia"; o volume real de `market.ticks` é **~45-48
+  milhões/dia** (~65x). `SCARD`/`MEMORY USAGE` medidos: `hunter:processed:scanner-worker.market.ticks:*`
+  chegou a **47 997 135 membros / 3,88 GB num único dia**; `...market.derivatives:*` a 17 276 430
+  membros / 1,4 GB/dia. Ticks + derivatives sozinhos são, na prática, toda a memória do Redis.
+- **Corrigido (código, testado):** `ack_many(..., record=False)` (só `XACK`, sem `SADD`/`EXPIRE`) e
+  `consume_batches(..., track=False)` (pula o `SMISMEMBER`) em
+  `packages/core/hunter_core/events/{processed,consume}.py`; `run_batch_consumer(..., track=True)`
+  em `hunter_scanner_worker/consumers.py` repassa a flag; `hunter_scanner_worker/main.py` passa
+  `track=False` só nas três streams sem efeito durável. `market.candles.closed` e todo o resto do
+  sistema não mudam. Testes novos em `test_events_consume_batch.py` e `test_consumers.py`; `ruff`,
+  `pyright`, `check_file_size.py` limpos. **Dono: entregue nesta tarefa, pendente de deploy.**
+- **Pendente (config, não aplicada):** `infra/vps/docker-compose.prod.yml` ganhou `--maxmemory 4gb
+  --maxmemory-policy noeviction` (a política já era `noeviction` de fábrica) como fusível — não
+  implantado nesta tarefa (exigiria recriar o container `redis`, proibido pela regra da tarefa).
+  Detalhe e justificativa em `docs/DEPLOYMENT.md` §9.3/§9.7.
+- **Pendente (faxina única, NÃO EXECUTADA — decisão do Everton):** as chaves
+  `hunter:processed:*` datadas de dois dias atrás ou mais já estão fora da janela de leitura do
+  guarda (`PROCESSED_DAYS=2`) — apagá-las (`UNLINK`, não-bloqueante) não perde nenhuma linha de
+  Postgres, é lixo de transporte que o TTL de 3 dias ainda não coletou. Runbook completo (comando
+  genérico + lista concreta de 2026-09-11, ~9,3 GiB estimados) em `docs/DEPLOYMENT.md` §9.7.
+- **Observação fora de escopo, registrada e não investigada:** grupo órfão
+  `strategy-worker.shadow` (sem sufixo `.NofM`) em `market.candles.closed` com lag 50 000, pending
+  36 — resquício de sharding anterior.
+
 ## Corrigido na T3.83 (2026-09-11, achado e corrigido na mesma tarefa — plantão overnight)
 
 Sintoma relatado: os 4 shards do `strategy-worker` registraram `shadow_consumer_restarting` e

@@ -182,6 +182,7 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
                     touch_batch_handler(scanner, stream),
                     block_ms=config.consume_block_ms,
                     batch=config.consume_batch,
+                    track=False,  # T3.85: no durable effect, no idempotency SET
                 )
             tasks["consume:candles"] = run_stream_consumer(
                 runtime.redis,
@@ -222,8 +223,7 @@ def touch_batch_handler(scanner: Scanner, stream: str) -> Any:
     losing one of these costs nothing, because the next evaluation reads the
     same Redis keys either way. And for the same reason the batch is coalesced
     per market before it is applied: 500 ticks over 40 markets are 40 touches,
-    not 500 (T2.5d). Every message of the batch is still acked -- coalescence
-    absorbs work, never messages.
+    not 500 (T2.5d) -- every message is still acked; coalescence absorbs work.
 
     **Perpetual only (T3.0d, notes-T3.0c.md §6).** The scanner has no spot
     universe, no spot baselines and no spot regime -- it evaluates the

@@ -58,7 +58,36 @@ services:
     # Persistencia: AOF everysec. O hot state e reconstruivel (docs/DEPLOYMENT.md
     # secao 6), mas um restart limpo custa um ciclo inteiro de reconexao de
     # streams; o AOF encurta isso de minutos para segundos.
-    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    #
+    # T3.85 (docs/DEPLOYMENT.md secao 9.7): sem --maxmemory o Redis cresceu ate
+    # 12,57 GiB numa VPS de 47 GiB dividida com Postgres, sem teto nenhum. A
+    # causa real nao eram as streams (MAXLEN ja em vigor desde o M0 e provado
+    # certo na inspecao) e sim o guarda de idempotencia por event_id
+    # (hunter_core.events.processed) escrevendo um SADD por mensagem das
+    # streams "sem efeito duravel" (market.ticks, market.derivatives) num SET
+    # por dia sem teto proprio -- ~48M ticks/dia, nao os ~700k/dia que o
+    # comentario original estimava. O codigo (T3.85) para de gravar isso para
+    # essas tres streams; --maxmemory fica como fusivel, nao como estrategia:
+    # noeviction faz o Redis recusar escrita com erro (OOM command not
+    # allowed) em vez de apagar dado de stream em silencio, e 4gb da ~4-8x de
+    # folga sobre o estado estavel esperado apos a correcao (streams+hot state
+    # medidos em ~300 MB) sem se aproximar do limite real da maquina.
+    # ORQUESTRADOR 11/09: enquanto os SETs antigos nao expiram (TTL 3 dias a
+    # partir da correcao), o fusivel fica em 24gb (host 47 GiB, uso 12,6 GiB) --
+    # 4gb agora faria noeviction recusar escrita no primeiro `update`. Baixar
+    # para 4gb depois de 14/09, quando `INFO memory` estiver abaixo de 1 GiB.
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--appendfsync",
+        "everysec",
+        "--maxmemory",
+        "24gb",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
     logging: *prod-logging
 
   migrate:
