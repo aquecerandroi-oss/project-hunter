@@ -206,6 +206,139 @@ régua.
 *Nenhuma ainda. Esta seção existe vazia de propósito: a página foi criada no pré-registro, antes de
 o primeiro replay rodar, e a primeira avaliação será **acrescentada** aqui sem tocar em nada acima.*
 
+### Avaliação de 2026-09-11 — `as_of = 2026-09-11T08:50:10Z` (05:50 BRT) — **parcial: P1–P3 medidas, P4/P5 não**
+
+**Estado da página: continua `pré-registrada`.** Nenhum replay rodou, nenhuma decisão existe, nenhum
+desfecho existe, e por isso **nenhum veredito é emitido aqui**. `result` segue `nao-iniciado` e
+`evaluable` segue `0` — a régua editorial não é sequer alcançada. O que esta seção acrescenta é o
+que era mensurável **sem** população: as três previsões numéricas derivadas (P1, P2, P3) e o portão
+de desenho C5, medidos com o mesmo `wilder_atr` congelado que a versão chama.
+
+**O que rodou e o que não rodou** (T3.84 passo 2, `.claude/state/notes-T3.84.md`):
+
+| Passo | Resultado |
+|---|---|
+| `seed.py --only strategies` (ensaio e escrita) | **OK**, 05:31 BRT — só as duas linhas novas (`strategies.mean_reversion_m5`, `strategy_versions … v1`) |
+| ativação `research_only` | **OK**, 05:32:18 BRT — `code_ref … @sha256:f733467f…`, idêntico ao congelado acima, 18 parâmetros |
+| replay 90 d × 16 mercados | **NÃO RODOU** — o portão do replay recusa **toda** corrida na VPS desde que o worker vivo foi shardado (ver abaixo) |
+| estresse, bootstrap, leave-one-market-out, janelas | **NÃO RODARAM** — dependem da coorte |
+
+**Por que o replay não rodou, com a leitura à vista.** O `replay-worker` se pausa quando a faixa
+viva degrada (T3.74b/T3.80) — e essa é a regra certa, que não se contorna. Só que, com
+`STRATEGY_SHARDS=4`, os dois sinais que ele lê deixaram de existir:
+
+```
+heartbeat_key = hb:strategy:shadow          <- ninguem escreve: os shards escrevem hb:strategy:shadow:{i}of4
+live_lane_degraded = heartbeat_missing
+group_lag(strategy-worker.shadow)       = 50000   <- grupo ABANDONADO (todo consumidor ocioso ha >= 11,9 h)
+group_lag(strategy-worker.shadow.0of4)  = 0       <- os quatro grupos vivos estao em 0
+  live_lane_degraded(hb:strategy:shadow:0of4) = consumer_lag:50000
+```
+
+A faixa viva está **saudável** (os quatro grupos em `lag = 0`), e mesmo assim o portão recusa, porque
+mede um cadáver. Não há variável de ambiente para o **nome do grupo** — só
+`REPLAY_CONSUMER_LAG_MAX`, cujo único uso aqui seria desligar o eixo. Desligar seria combater o
+portão, que é exatamente o que o brief proíbe. Fica como bloqueio declarado, com o conserto nomeado
+nas notas (`replay/budget.py` e `replay/consumer_lag.py` precisam ser cientes de shard).
+
+#### P1 — **confirmada**, e com precisão desconfortável
+
+Fonte: `infra/scripts/sql/research/2026-09-11-t384-q01-barras-5m-15m.sql` (mesma janela de 31 d da
+T3.54: 2026-08-08 → 2026-09-08) e `…-q02-…-90d.sql` (a janela própria do experimento, 90 d,
+2026-06-12 → 2026-09-10), as duas com a mesma dobra no servidor e exigência de completude; ATR de
+Wilder(14) sobre 97 barras rolantes **fora** do SQL, por
+`.claude/state/exp-drafts/t384/medir_atr_5m.py`.
+
+**Controle de método primeiro:** na janela da T3.54 esta conta devolve ATR%(15m) p50 =
+**0,5582 %** contra os **0,5585 %** publicados — 0,05 % de diferença, explicada pelo backfill que
+fechou os buracos daquela janela desde então. A conta é a mesma.
+
+| medida | previsto (P1) | medido 31 d | medido 90 d |
+|---|---:|---:|---:|
+| ATR%(5m) p50 (mediana das medianas, 16 mkt) | **0,298 %** | **0,2984 %** | **0,2714 %** |
+| razão 5m/15m | 0,534 | **0,5345** | **0,5449** |
+| pedágio incondicional p50 (`0,0020/ATR%`) | 0,67 R | 0,6702 R | 0,7370 R |
+
+A previsão dizia: *se `ATR%(5m) p50 > 0,40 %` esta previsão está errada*. Mediu-se 0,2984 % e
+0,2714 %. **P1 não foi falsificada**; o expoente `H = 0,571` medido entre 15 m e 1 h vale também
+entre 5 m e 15 m (implícito no dado de 90 d: `H = ln(1/0,5449)/ln 3 = 0,552`).
+
+#### P2 — **mecanismo confirmado, número falsificado**
+
+| medida | previsto (P2) | medido 31 d | medido 90 d |
+|---|---:|---:|---:|
+| fração de barras de 5 m no portão `[0,6 %; 5 %]` | corta quase tudo | **15,73 %** | **8,85 %** |
+| a mesma fração a 15 m (a mãe) | — | 42,14 % | 33,04 % |
+| ATR% p50 **condicional ao portão**, 5 m | **0,60–0,75 %** | **0,8211 %** | **0,7875 %** |
+| ATR% p50 condicional, 15 m (a mãe) | 0,922 % (derivado do pedágio) | **0,9223 %** | 0,8149 % |
+
+A última linha merece ser dita: a página derivou o ATR% realizado da mãe **de trás para frente**, do
+pedágio p50 de 0,2169 R (`0,0020/0,2169 = 0,922 %`). A medição direta, na mesma janela, devolve
+**0,9223 %**. Os dois caminhos se encontram na quarta casa — é a melhor prova disponível de que nem
+a identidade de custo nem esta medição estão erradas.
+
+O **mecanismo** de P2 está confirmado e é mais forte do que o previsto: o piso derruba de 33,04 %
+para **8,85 %** das barras na janela do experimento. O **número** está errado: o ATR% condicional é
+**0,79 %**, acima da banda 0,60–0,75 % que a página congelou.
+
+#### P3 — **falsificada**, e é a descoberta desta seção
+
+| medida | previsto (P3) | medido 31 d | medido 90 d |
+|---|---:|---:|---:|
+| pedágio p50 das decisões de 5 m | **0,267–0,333 R** | **0,2436 R** | **0,2540 R** |
+| pedágio p50 da mãe, mesma janela | 0,2169 R | **0,2169 R** | 0,2454 R |
+| Δ de pedágio (5 m − 15 m) | **+0,05 a +0,12 R** | +0,0267 R | **+0,0086 R** |
+
+Na janela em que a versão seria avaliada, a filha de 5 min paga **oito milésimos de R a mais** por
+operação do que a mãe — **uma ordem de grandeza abaixo** do que esta página previu. A razão está em
+P2: o piso de 0,6 % não filtra a distribuição de 5 min, ele **seleciona a cauda volátil dela**, e a
+cauda que sobrevive tem quase o mesmo ATR% que a mãe realiza. O prior de custo — KB-0076 aplicado à
+mediana **incondicional** — estava certo sobre a grade e errado sobre as **decisões**.
+
+**Consequência declarada, contra o interesse do prior desta página:** o argumento de custo
+pré-registrado para `descartar` **não sobrevive à medição**. O veredito passa a depender inteiramente
+da expectativa **bruta** a 5 min (P4), que é precisamente o que o replay mediria. A página fica mais
+cara de fechar, não mais barata.
+
+#### C5 — o `REVISE` estava certo, e pelo motivo que ele mesmo deu
+
+| medida (90 d, leituras agregadas dos 16 mercados) | 5 m | 15 m |
+|---|---:|---:|
+| barras com ATR% ≤ 0,3 % (o piso de risco do `paper_v1`) | **60,29 %** | 21,51 % |
+| barras com ATR% > 3 % (o teto) | 0,11 % | 0,63 % |
+| **condicional ao portão `atr_pct_min`**: ≤ 0,3 % | **0,00 %** | 0,00 % |
+| **condicional ao portão**: > 3 % | **1,11 %** | 1,69 % |
+| mercados cuja **mediana** de 5 m cai sob o piso de 0,3 % | **11 de 16** | 0 de 16 |
+
+As duas metades do `REVISE` estão medidas. (i) A coincidência **funciona**: nenhum stop emissível
+cai fora da faixa `[0,3 %; 3 %]`, e a versão de 5 min está **menos** exposta ao teto (1,11 %) do que
+a mãe (1,69 %). (ii) E o preço dela é o que o portão temia, em voz alta: **91,15 % das barras de
+5 min ficam de fora**, e em **11 dos 16 mercados** a mediana da grade está abaixo até do piso de
+risco. Esta versão não *escolhe* volatilidade alta — ela é **definida** pelo piso. Um experimento
+que rodasse assim mediria o piso, e a frase que a página escreveu antes de qualquer dado continua
+sendo a leitura correta do que ele significaria.
+
+#### P5 — reestimada (não medida)
+
+Com 3× mais barras e um portão 3,73× mais seletivo (33,04 % → 8,85 %), a expectativa de população é
+`542 × 3 × 0,0885/0,3304 =` **≈ 436 decisões** em 90 d × 16 mercados, dentro da banda pré-registrada
+de 160 a 810. *Assunção declarada:* que as outras três condições (tendência de 15 m, `z ≤ −1`,
+fechamento acima do meio) são independentes do ATR% — não verificado, e só o replay verifica.
+
+#### Limites desta seção, ditos
+
+1. Nada aqui mede **retorno**. P4 — o eixo primário, `r_ex_funding` — continua sem uma única
+   observação, e é ele que decide a página.
+2. O ATR% condicional ao portão é condicional **só ao portão de ATR**, não às outras três condições
+   de entrada; a distribuição real das decisões pode diferir.
+3. A cobertura de velas foi de **100 %** nas duas janelas (414 720 barras de 5 m e 138 240 de 15 m
+   em 90 d × 16 mercados, sem um balde incompleto), o que confirma a regra de elegibilidade da T3.82
+   e remove "falta de dado" da lista de explicações possíveis.
+4. A versão **não foi aposentada**. A regra do Everton — versão ruim morre no mesmo dia — vale para
+   versão **medida** ruim; esta não foi medida. `--deprecate` aqui congelaria a linha sem resposta e
+   jogaria fora a única coisa que o replay ainda pode dar. Ela segue `active`/`research_only`, e o
+   custo disso está dito nas notas.
+
 ## Variantes tentadas
 
 | Variante | Quando | Por quê | Onde ficou registrada |

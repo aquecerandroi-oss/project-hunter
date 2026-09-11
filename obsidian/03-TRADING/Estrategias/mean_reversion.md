@@ -1,7 +1,7 @@
 ---
 tags: ["estrategia", "catalogo", "mean_reversion", "familia"]
 strategy: mean_reversion
-updated: 2026-09-10
+updated: 2026-09-11
 ---
 # mean_reversion
 
@@ -32,6 +32,7 @@ updated: 2026-09-10
 - Eixo "portão de regime" (v6→v11): [[EXP-0020-regime-gate]]
 - Replicação de 90 dias (v1/v2/v10): [[EXP-0025-mean-reversion-90-dias]]
 - Irmã de 1 h (módulo novo, código pronto, replay pendente): [[mean_reversion_h1]]
+- Irmã de 5 min (módulo novo, ativada `research_only` em 2026-09-11, replay bloqueado): [[mean_reversion_m5]] — [[EXP-0028-mean-reversion-5-min]]
 <!-- generated:end -->
 
 
