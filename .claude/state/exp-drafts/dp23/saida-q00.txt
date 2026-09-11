@@ -1,0 +1,37 @@
+BEGIN
+SET
+== §1 as duas coortes ==
+                   coorte                    |        versao        | terminais | com_entry_ts | com_atr | atr_positivo |    primeira_entrada    |     ultima_entrada     | mercados | dias 
+---------------------------------------------+----------------------+-----------+--------------+---------+--------------+------------------------+------------------------+----------+------
+ replay:92c8d080-6009-4a59-9868-31282b1bd493 | mean_reversion_m5 v1 |       373 |          373 |     373 |          373 | 2026-06-12 10:46:00+00 | 2026-09-09 17:56:00+00 |       14 |   72
+ replay:fa005985-0b55-4820-904c-8ada589e441c | mean_reversion v1    |       542 |          542 |     542 |          542 | 2026-06-12 21:01:00+00 | 2026-09-09 20:16:00+00 |       16 |   83
+(2 rows)
+
+== §2 direcao (long-only e conferido, nao assumido) ==
+                   coorte                    | direcao | count 
+---------------------------------------------+---------+-------
+ replay:92c8d080-6009-4a59-9868-31282b1bd493 | long    |   373
+ replay:fa005985-0b55-4820-904c-8ada589e441c | long    |   542
+(2 rows)
+
+== §3 horizonte declarado por versao (expected_holding_s) ==
+                   coorte                    | horizonte_s | count 
+---------------------------------------------+-------------+-------
+ replay:92c8d080-6009-4a59-9868-31282b1bd493 |        4800 |   373
+ replay:fa005985-0b55-4820-904c-8ada589e441c |       14400 |   542
+(2 rows)
+
+== §4 a barra de entrada existe como vela 1m is_final? ==
+                   coorte                    | decisoes | com_open_da_barra_de_entrada | open_inconsistente_com_virtual_entry 
+---------------------------------------------+----------+------------------------------+--------------------------------------
+ replay:92c8d080-6009-4a59-9868-31282b1bd493 |      373 |                          373 |                                    0
+ replay:fa005985-0b55-4820-904c-8ada589e441c |      542 |                          542 |                                    0
+(2 rows)
+
+== §5 o recorte de comparacao: pares (mercado, dia) da irma de 5 min ==
+ pares_da_irma | mercados_da_irma | dias_da_irma | decisoes_da_mae | mae_em_par_exato | mae_em_mercado_e_dia 
+---------------+------------------+--------------+-----------------+------------------+----------------------
+           200 |               14 |           72 |             542 |              249 |                  473
+(1 row)
+
+COMMIT

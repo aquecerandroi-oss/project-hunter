@@ -11,7 +11,7 @@ hipotese_testavel: "sim — o portão de regime de §5 é pré-registrável: `mo
 astra: pendente
 status: arquivada
 owner: sexta-feira
-updated: 2026-09-09
+updated: 2026-09-11
 confiança: "?"
 ---
 
@@ -182,6 +182,89 @@ um segundo filtro pequeno em cima daquele.
 5. **A população se move:** 6 187 → 6 189 → 6 192 desfechos em 18 minutos com o `as_of` fixo na
    emissão. Todo bootstrap desta nota vem do snapshot de 6 187 (2026-09-08 23:51 BRT).
 
+## Adendo 2026-09-11 (D-P23) — o eixo que faltava: **onde no tempo**, não só onde no mercado
+
+> **Acrescentado pelo `quant-engineer` em 2026-09-11, 10:20 BRT (13:20 UTC).** Nada acima desta
+> linha foi editado — nenhum número da leitura de 2026-09-09 foi tocado. Nada commitado, nada
+> escrito na VPS (três consultas em `repeatable read read only`).
+> **Proveniência:** `.claude/state/notes-D-P23.md`,
+> `infra/scripts/sql/research/2026-09-11-dp23-q0{0,1,2}-*.sql`,
+> `.claude/state/exp-drafts/dp23/{curva.py,test_curva.py,analise.py,dp23-curva.csv,saida-*.txt}`.
+> **Coorte:** `replay:fa005985-0b55-4820-904c-8ada589e441c` (`mean_reversion v1`, 542 desfechos
+> terminais, 16 mercados, 83 dias, EXP-0025) e `replay:92c8d080-6009-4a59-9868-31282b1bd493`
+> (`mean_reversion_m5 v1`, 373, 14 mercados, 72 dias, EXP-0028). **Nenhum replay novo.**
+
+Esta KB mapeou **onde** a família ganha e perde por mercado, hora, dia da semana, regime e faixa de
+pedágio. Faltava um eixo que nenhuma daquelas células enxerga: **onde, ao longo do próprio período de
+manutenção, o movimento bruto acontece.** O D-P23 mede isso como diagnóstico, sem régua causal.
+
+**Método (a régua da Astra, `astra-review-plantao-20260911-0935.md` MUST-FIX 3).** Curva
+`(close em t+h − open da barra de entrada) / ATR congelado da decisão`, long-only, **sem stop e sem
+alvo**. A base é o **open da barra de entrada** e não `virtual_entry`, que já carrega 6 bps de
+spread + slippage (`pricing.py:47`) — conferido: `virtual_entry = open × 1,0006` nas **915** decisões
+das duas coortes, a menos de 1e-9. O ponto de `+h` é o `close` da vela que **fecha** em `entry_ts + h`
+(`open_time = entry_ts + h − 1 min`), nunca a que abre nele. Velas de 1 min `is_final`. Ausência
+sairia do denominador — **não houve nenhuma: 542/542 nos nove horizontes e 373/373 nos seis.**
+
+**A curva da mãe (`mean_reversion v1`, 542 decisões, ATR de 15 m da própria decisão):**
+
+| +min | 5 | 10 | 15 | 30 | 60 | **80** | 120 | 180 | **240** |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| média (ATR) | +0,014 | +0,026 | +0,024 | +0,087 | +0,121 | **+0,204** | +0,259 | +0,341 | **+0,505** |
+| mediana | 0,000 | 0,000 | 0,000 | +0,066 | +0,120 | +0,094 | +0,208 | +0,153 | +0,274 |
+| p25 | −0,182 | −0,226 | −0,304 | −0,345 | −0,485 | −0,525 | −0,741 | −0,923 | −1,122 |
+| p75 | +0,204 | +0,316 | +0,342 | +0,509 | +0,707 | +0,840 | +1,069 | +1,323 | +1,492 |
+| % > 0 | 47,4 | 49,1 | 49,6 | 52,4 | 56,5 | 54,1 | 54,8 | 53,0 | 55,7 |
+
+**O achado, e a ressalva que é o achado de verdade.** O Δ **pareado por decisão** (a mesma linha nos
+dois horizontes; IC 95 % por blocos de dia, 20 000 reamostragens, semente 20260910, `blocos90.py`
+reusado):
+
+- **média Δ(240 − 80) = +0,3007 ATR, IC [+0,0071; +0,5820]** — exclui zero, por pouco;
+- **mediana do mesmo Δ = +0,0598 ATR, IC [−0,1864; +0,3470]** — **não** exclui zero;
+- **51,8 %** dos 542 pares têm Δ > 0.
+
+Isto é: **há** acumulação adicional de movimento bruto entre +80 e +240 min nas entradas da mãe, e ela
+é feita por uma **minoria de decisões com movimento tardio grande**, não por um deslocamento da
+distribuição inteira. A distinção não é cosmética — "metade anda mais um pouco" pediria alongar o
+horizonte de todas; "uma em vinte anda muito mais" pede um gatilho que diga *qual*, porque alongar
+todas paga a cauda esquerda das outras dezenove.
+
+**O freio que impede ler isto como expectancy.** A curva é MTM **sem barreiras**; a operação real não
+espera. Duração real da mãe: média 85,3 min, **p50 61 min**, p75 127 min; **222 de 542 (41,0 %)** ainda
+abertas depois dos 80 min e **só 45 (8,3 %)** chegando aos 240 (os `expired`). 281 saem por stop
+(p50 43 min) e 216 por alvo (p50 68 min). **O trecho 80 → 240 min é contrafactual para nove de cada
+dez decisões da mãe como ela está configurada hoje.**
+
+**A irmã de 5 min, no horizonte dela** (373 decisões, ATR de 5 m): mesma forma — negativa nos
+primeiros 15 min (−0,072 / −0,079 / −0,017 ATR) e positiva depois (+0,112 aos 30, +0,175 aos 60,
++0,226 aos 80). Duração real: p50 **18 min**, máximo 80. **Cuidado com a comparação fácil:** o ATR da
+mãe é de 15 m e o da irmã é de 5 m (ATR% p50 0,5585 % contra 0,2714 %, EXP-0028), então "+0,20 ATR"
+nas duas **não é o mesmo movimento**. Na única unidade comum (% do preço de entrada), aos 80 min as
+entradas da mãe andaram **+0,223 %** e as da irmã **+0,119 %** — cerca de metade. Populações
+diferentes, comparação descritiva, nenhum contraste pareado.
+
+**Restrito aos mercados/dias em que a irmã operou** (só comparação; a irmã tocou 14 dos 16 mercados,
+72 dias, 200 pares (mercado, dia)): o padrão se repete com Δ médio **maior** e mediana **menor** —
+249 pares exatos dão média +0,5311 [+0,1417; +0,9225] e mediana +0,0758 [−0,1927; +0,5067]; os 473 do
+recorte largo dão +0,3543 [+0,0385; +0,6517] e +0,0812 [−0,1816; +0,3853]. Os três recortes (cheio,
+estrito, largo) estão todos reportados, **sem** correção de multiplicidade, porque nenhum deles é
+teste de hipótese aqui.
+
+**O que este adendo acrescenta à KB, em uma linha:** o mapa desta nota é de **células de contexto**
+(mercado, hora, regime); este eixo é de **posição no tempo dentro da operação**, e nele o dado diz que
+o movimento bruto da família continua chegando depois dos 80 min — **pela cauda** — enquanto a
+configuração atual já fechou 6 de cada 10 operações antes dos 61 min. É insumo para um pré-registro,
+**não** um pré-registro: o experimento que valeria a pena separa "deslocamento" de "cauda", e este
+diagnóstico não os separa.
+
+**O que este adendo explicitamente não diz.** Nada sobre a **causa** da diferença de desempenho entre
+a mãe e a irmã de 5 min: a transposição mudou tendência (1 h → 15 min), ATR (15 → 5 min) e horizonte
+(14 400 → 4 800 s) de uma vez (`mean_reversion_m5_v1.py:27`). A aposentadoria da
+`mean_reversion_m5 v1` (2026-09-11T10:54:08Z, `successor=none`) continua de pé e **nada aqui a
+reabre**. E nada aqui contradiz o "a perda ainda é o custo" da seção acima: a curva é **bruta**, e o
+resultado líquido da mãe em 90 dias continua sendo `r_ex_funding` **−0,0910 R** (EXP-0025).
+
 ## Proveniência
 
 | arquivo | o que produz |
@@ -194,6 +277,12 @@ um segundo filtro pequeno em cima daquele.
 | `.claude/state/exp-drafts/t353/mapa.py` | as tabelas A–E da nota |
 | `.claude/state/exp-drafts/t353/celulas.csv` | as 2 248 células com n, dias, Δ, IC 95 %, p, selo, julgabilidade |
 | `.claude/state/notes-T3.53.md` | as tabelas cruas e as seis CONCERNs |
+| `infra/scripts/sql/research/2026-09-11-dp23-q00-catalogo.sql` | **(adendo D-P23)** catálogo das duas coortes: n, `entry_ts`, ATR, direção, horizonte, vela de entrada, recortes de comparação |
+| `infra/scripts/sql/research/2026-09-11-dp23-q01-curva-mtm.sql` | **(adendo D-P23)** a curva pós-entrada em CSV, uma linha por (decisão, horizonte) — 7 116 linhas |
+| `infra/scripts/sql/research/2026-09-11-dp23-q02-duracao-real.sql` | **(adendo D-P23)** duração real de cada operação — o que torna o trecho 80→240 min contrafactual |
+| `.claude/state/exp-drafts/dp23/curva.py` + `test_curva.py` | **(adendo D-P23)** curva, resumo por horizonte, Δ pareado por decisão, IC da mediana por blocos de dia, escolha do endpoint; **22 testes** com valor esperado à mão, 5 deles de anti-antecipação |
+| `.claude/state/exp-drafts/dp23/analise.py` + `saida-analise.txt` | **(adendo D-P23)** as seis seções da leitura e a saída verbatim |
+| `.claude/state/notes-D-P23.md` | **(adendo D-P23)** a nota inteira, com as oito assunções numéricas |
 
 **Sem antecipação:** o relógio de toda a nota é `meta->'entry_plan'->>'source_bar_close'` (a última
 vela fechada que a estratégia leu), e a linha de regime usada é a última com
@@ -206,4 +295,6 @@ linhas e não muda conclusão nenhuma.
 [[11-KNOWLEDGE/Index|Index]] · [[Strategy Backlog]] · [[Registro de Tentativas]] ·
 [[KB-0010-overfitting-de-backtest-e-o-preco-de-cada-variante]] ·
 [[KB-0076-por-que-perdemos-2026-09-08]] · [[KB-0078-o-radar-preve]] ·
-[[EXP-0020-regime-gate]]
+[[EXP-0020-regime-gate]] ·
+[[EXP-0025-mean-reversion-90-dias]] · [[EXP-0028-mean-reversion-5-min]] ·
+[[KB-0082-reversao-de-15-minutos-o-sinal-e-o-fluxo]]

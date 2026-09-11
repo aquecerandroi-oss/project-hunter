@@ -1,0 +1,21 @@
+BEGIN
+SET
+== §1 duracao real da operacao (minutos) ==
+        versao        |  n  | media_min |  p25  |  p50  |  p75   |        maximo        | aberta_apos_80 | aberta_em_240 
+----------------------+-----+-----------+-------+-------+--------+----------------------+----------------+---------------
+ mean_reversion v1    | 542 |     85.28 | 27.25 | 61.00 | 126.75 | 240.0000000000000000 |            222 |            45
+ mean_reversion_m5 v1 | 373 |     26.34 |  7.00 | 18.00 |  38.00 |  80.0000000000000000 |              0 |             0
+(2 rows)
+
+== §2 por desfecho real ==
+        versao        |  saida  |  n  | p50_min 
+----------------------+---------+-----+---------
+ mean_reversion v1    | stop    | 281 |   43.00
+ mean_reversion v1    | target  | 216 |   68.00
+ mean_reversion v1    | expired |  45 |  240.00
+ mean_reversion_m5 v1 | stop    | 197 |    9.00
+ mean_reversion_m5 v1 | target  | 142 |   22.00
+ mean_reversion_m5 v1 | expired |  34 |   80.00
+(6 rows)
+
+COMMIT
