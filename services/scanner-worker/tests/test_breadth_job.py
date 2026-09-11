@@ -35,7 +35,13 @@ from hunter_core.db.models.market_data import Candle
 from hunter_core.db.models.markets import Asset, Exchange, Market
 from hunter_core.db.session import role_session
 from hunter_core.domain.enums import MarketStatus, MarketType, Timeframe
-from hunter_indicators.breadth import WINDOW_MINUTES, window_open_times
+from hunter_indicators.breadth import (
+    BREADTH_V1,
+    BREADTH_V2,
+    SPECS,
+    WINDOW_MINUTES,
+    window_open_times,
+)
 from hunter_scanner_worker.breadth import claim_minute
 from hunter_scanner_worker.breadth_job import minutes_due, run_breadth_once
 
@@ -53,6 +59,30 @@ WINDOW = window_open_times(CUT, WINDOW_MINUTES)
 """The six ``open_time``s the reading needs, oldest first: ``CUT-6min`` through
 ``CUT-1min``. Computed with the same function the job imports, so a change to
 the window's shape moves both sides of every test here together."""
+
+V1 = SPECS[BREADTH_V1]
+"""Every test above ``TestOUniversoDaSerie`` folds **``breadth_v1``** explicitly:
+its universe is "every monitored active perpetual", which is what those six
+proofs (the exact fraction, the coverage floor, idempotency, look-ahead, the lock,
+spot) were written against and what they still mean. The default spec is now
+``breadth_v2`` (T3.88), whose universe asks for 90 days of history — seeding that
+is the job of the class at the end of this file, and pinning v1 here is what keeps
+these tests about the arithmetic instead of about membership."""
+
+V2 = SPECS[BREADTH_V2]
+
+V2_CUT = datetime(2026, 12, 10, 12, 6, tzinfo=UTC)
+"""The minute ``breadth_v2`` is folded at. Chosen so that ``V2_CUT - 90 days`` is
+**2026-09-11 12:06**: both instants fall inside partitions ``0001`` creates
+(2026-09 … 2026-12), so a market can be given ninety days of history without the
+test having to create a partition of its own."""
+
+V2_WINDOW = window_open_times(V2_CUT, WINDOW_MINUTES)
+
+NINETY_DAYS_BEFORE_V2_CUT = V2_CUT - timedelta(days=90)
+"""The oldest candle that still qualifies (``<=``, the inclusive boundary
+``hunter_core.universe.has_min_history`` states and ``test_universe_history.py``
+proves)."""
 
 
 async def _upsert_asset(session: Any, symbol: str) -> Any:
@@ -233,7 +263,9 @@ class TestAFracaoExata:
             final=set(WINDOW[:-1]),  # every candle final except the one the window ends on
         )
 
-        run = await run_breadth_once(db_session_factory, exchange=exchange, cut=CUT, back=0)
+        run = await run_breadth_once(
+            db_session_factory, exchange=exchange, cut=CUT, back=0, spec=V1
+        )
 
         assert run.universe_size == 10
         assert run.written == 1
@@ -273,7 +305,9 @@ class TestCoberturaInsuficiente:
                 _full_window(first=Decimal("100"), last=Decimal("90")),
             )
 
-        run = await run_breadth_once(db_session_factory, exchange=exchange, cut=CUT, back=0)
+        run = await run_breadth_once(
+            db_session_factory, exchange=exchange, cut=CUT, back=0, spec=V1
+        )
 
         assert run.universe_size == 10
         assert run.outcomes["insufficient_coverage"] == 1
@@ -301,13 +335,17 @@ class TestIdempotencia:
                 db_session_factory, market_id, _full_window(first=Decimal("100"), last=last)
             )
 
-        first = await run_breadth_once(db_session_factory, exchange=exchange, cut=CUT, back=0)
+        first = await run_breadth_once(
+            db_session_factory, exchange=exchange, cut=CUT, back=0, spec=V1
+        )
         assert first.due == 1
         assert first.written == 1
         before = await _row(db_session_factory, exchange, end_time=CUT)
         assert before is not None
 
-        second = await run_breadth_once(db_session_factory, exchange=exchange, cut=CUT, back=0)
+        second = await run_breadth_once(
+            db_session_factory, exchange=exchange, cut=CUT, back=0, spec=V1
+        )
         after = await _row(db_session_factory, exchange, end_time=CUT)
 
         assert second.due == 0  # minutes_due already excludes the known minute
@@ -377,7 +415,7 @@ class TestNaoAntecipacaoNoCaminhoDoProdutor:
         )
         await _seed_candles(db_session_factory, clean_id, rising)
 
-        await run_breadth_once(db_session_factory, exchange=exchange, cut=CUT, back=0)
+        await run_breadth_once(db_session_factory, exchange=exchange, cut=CUT, back=0, spec=V1)
 
         row = await _row(db_session_factory, exchange, end_time=CUT)
         assert row is not None
@@ -407,7 +445,7 @@ class TestOTrancaDoRedis:
         async def producer() -> str:
             if not await claim_minute(redis_client, exchange, CUT):
                 return "skipped"
-            await run_breadth_once(db_session_factory, exchange=exchange, cut=CUT, back=0)
+            await run_breadth_once(db_session_factory, exchange=exchange, cut=CUT, back=0, spec=V1)
             return "ran"
 
         outcomes = await asyncio.gather(producer(), producer())
@@ -445,7 +483,9 @@ class TestUniversoSomentePerpetuo:
             db_session_factory, spot_id, _full_window(first=Decimal("100"), last=Decimal("1"))
         )
 
-        run = await run_breadth_once(db_session_factory, exchange=exchange, cut=CUT, back=0)
+        run = await run_breadth_once(
+            db_session_factory, exchange=exchange, cut=CUT, back=0, spec=V1
+        )
 
         assert run.universe_size == 4
         row = await _row(db_session_factory, exchange, end_time=CUT)
@@ -454,3 +494,179 @@ class TestUniversoSomentePerpetuo:
         assert row.covered == 4
         assert row.falling == 0
         assert row.value == Decimal("0.0000")
+
+
+def _window_of(
+    window: tuple[datetime, ...], *, first: Decimal, last: Decimal
+) -> dict[datetime, Decimal]:
+    """``_full_window`` for an arbitrary window tuple (``V2_WINDOW``)."""
+    return dict.fromkeys(window, first) | {window[-1]: last}
+
+
+class TestOUniversoDaSerie:
+    """T3.88: ``breadth_v2`` folds the markets with 90 days of 1m history — the
+    same rule the shadow universe applies (``hunter_core.universe``), through the
+    same helper, so "the sixteen" cannot mean two things."""
+
+    async def test_um_mercado_sem_noventa_dias_nao_entra_no_universo_nem_na_conta(
+        self, db_session_factory: Any
+    ) -> None:
+        """Seis perpétuas monitoradas. Quatro têm uma vela em ``V2_CUT - 90 d``
+        (entram); uma não tem vela antiga nenhuma e outra tem a dela **um minuto
+        dentro** dos 90 dias (ficam fora, pela fronteira inclusiva). Todas as seis
+        têm a janela completa, e as duas de fora **caem forte**: se entrassem, o
+        universo iria de 4 para 6 e o valor de 0,2500 para 0,5000. Então a prova
+        não é "o número bate" — é que excluí-las mudou o numerador, não só o
+        denominador.
+        """
+        exchange = "binance-v2universe"
+        old_ids = [
+            await _seed_market(db_session_factory, exchange, f"O{index}USDT") for index in range(4)
+        ]
+        young_id = await _seed_market(db_session_factory, exchange, "YOUNGUSDT")
+        edge_id = await _seed_market(db_session_factory, exchange, "EDGEUSDT")
+
+        for index, market_id in enumerate(old_ids):
+            # one of the four falls: 1/4 = 0,2500
+            last = Decimal("99") if index == 0 else Decimal("101")
+            await _seed_candles(
+                db_session_factory,
+                market_id,
+                _window_of(V2_WINDOW, first=Decimal("100"), last=last),
+            )
+            await _seed_candles(
+                db_session_factory, market_id, {NINETY_DAYS_BEFORE_V2_CUT: Decimal("100")}
+            )
+        for market_id in (young_id, edge_id):
+            await _seed_candles(
+                db_session_factory,
+                market_id,
+                _window_of(V2_WINDOW, first=Decimal("100"), last=Decimal("10")),
+            )
+        await _seed_candles(
+            db_session_factory,
+            edge_id,
+            {NINETY_DAYS_BEFORE_V2_CUT + MINUTE: Decimal("100")},  # one minute short
+        )
+
+        run = await run_breadth_once(
+            db_session_factory,
+            exchange=exchange,
+            cut=V2_CUT,
+            back=0,
+            spec=V2,
+            universe_as_of=V2_CUT,
+        )
+
+        assert run.universe_size == 4
+        row = await _row(db_session_factory, exchange, end_time=V2_CUT)
+        assert row is not None
+        assert row.breadth_version == "breadth_v2"
+        assert row.universe_size == 4
+        assert row.covered == 4
+        assert row.falling == 1
+        assert row.value == Decimal("0.2500")
+        assert row.coverage == Decimal("1.0000")
+        assert row.usable is True
+        assert row.inputs["universe_rule"] == "monitored_perpetual_min_history_90d"
+
+    async def test_o_piso_de_cobertura_vale_sobre_o_universo_da_serie(
+        self, db_session_factory: Any
+    ) -> None:
+        """Cinco mercados com 90 dias, e só três com a janela completa: 3/5 = 60 %,
+        abaixo do piso de 80 % **do universo de v2** — a linha é gravada
+        inutilizável. O piso não foi relaxado pela T3.88; ele passou a medir um
+        denominador que pode ser coberto."""
+        exchange = "binance-v2floor"
+        ids = [
+            await _seed_market(db_session_factory, exchange, f"H{index}USDT") for index in range(5)
+        ]
+        for index, market_id in enumerate(ids):
+            await _seed_candles(
+                db_session_factory, market_id, {NINETY_DAYS_BEFORE_V2_CUT: Decimal("100")}
+            )
+            if index < 3:
+                await _seed_candles(
+                    db_session_factory,
+                    market_id,
+                    _window_of(V2_WINDOW, first=Decimal("100"), last=Decimal("90")),
+                )
+
+        run = await run_breadth_once(
+            db_session_factory,
+            exchange=exchange,
+            cut=V2_CUT,
+            back=0,
+            spec=V2,
+            universe_as_of=V2_CUT,
+        )
+
+        assert run.universe_size == 5
+        assert run.outcomes["insufficient_coverage"] == 1
+        row = await _row(db_session_factory, exchange, end_time=V2_CUT)
+        assert row is not None
+        assert (row.covered, row.universe_size) == (3, 5)
+        assert row.coverage == Decimal("0.6000")
+        assert row.value is None
+        assert row.reason == "insufficient_coverage"
+
+    async def test_as_duas_series_do_mesmo_minuto_coexistem_e_nao_se_reescrevem(
+        self, db_session_factory: Any
+    ) -> None:
+        """O mesmo minuto dobrado duas vezes, uma por série: duas linhas, dois
+        universos, dois valores, nenhuma colisão (``breadth_version`` está na chave
+        única). ``breadth_v1`` vê os três mercados (dois caindo, 0,6667) e
+        ``breadth_v2`` só os dois com histórico (um caindo, 0,5000) — e rodar v2
+        **não** toca a linha de v1, que é a única garantia que uma célula já medida
+        tem.
+        """
+        exchange = "binance-v2coexist"
+        old_ids = [
+            await _seed_market(db_session_factory, exchange, f"C{index}USDT") for index in range(2)
+        ]
+        young_id = await _seed_market(db_session_factory, exchange, "NEWUSDT")
+        for index, market_id in enumerate(old_ids):
+            await _seed_candles(
+                db_session_factory,
+                market_id,
+                _window_of(
+                    V2_WINDOW,
+                    first=Decimal("100"),
+                    last=Decimal("99") if index == 0 else Decimal("101"),
+                ),
+            )
+            await _seed_candles(
+                db_session_factory, market_id, {NINETY_DAYS_BEFORE_V2_CUT: Decimal("100")}
+            )
+        await _seed_candles(
+            db_session_factory,
+            young_id,
+            _window_of(V2_WINDOW, first=Decimal("100"), last=Decimal("50")),
+        )
+
+        v1_run = await run_breadth_once(
+            db_session_factory, exchange=exchange, cut=V2_CUT, back=0, spec=V1
+        )
+        v1_row = await _row(db_session_factory, exchange, end_time=V2_CUT)
+        assert v1_row is not None
+        before = dict(v1_row._mapping)
+
+        v2_run = await run_breadth_once(
+            db_session_factory,
+            exchange=exchange,
+            cut=V2_CUT,
+            back=0,
+            spec=V2,
+            universe_as_of=V2_CUT,
+        )
+
+        assert (v1_run.written, v2_run.written) == (1, 1)
+        assert (v1_run.universe_size, v2_run.universe_size) == (3, 2)
+        rows = await _rows(db_session_factory, exchange)
+        assert len(rows) == 2
+        by_version = {row.breadth_version: row for row in rows}
+        assert by_version["breadth_v1"].falling == 2
+        assert by_version["breadth_v1"].value == Decimal("0.6667")
+        assert by_version["breadth_v2"].falling == 1
+        assert by_version["breadth_v2"].value == Decimal("0.5000")
+        assert dict(by_version["breadth_v1"]._mapping) == before  # not one column moved

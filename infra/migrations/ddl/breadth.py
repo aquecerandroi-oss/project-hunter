@@ -77,7 +77,8 @@ from hunter_core.db.models import APP_ROLE, WORKER_ROLE
 TABLE = "market_breadth"
 
 BREADTH_VERSION_0019 = "breadth_v1"
-"""A **copy** of :data:`hunter_indicators.breadth.BREADTH_VERSION`, never an
+"""A **copy** of the version string the first rows carried
+(``hunter_indicators.breadth.BREADTH_V1``), never an
 import — the same rule ``ddl/replay_runs.py`` states for the cohort pattern: the
 database's contract must not silently follow a later edit to a Python constant.
 Nothing in the DDL compares against it; it is here so that a reviewer reading

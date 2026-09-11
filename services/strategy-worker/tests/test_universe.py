@@ -1,10 +1,12 @@
 """The shadow-universe history gate (T3.82): boundary, TTL join, disabled.
 
-No database here -- :func:`hunter_strategy_worker.universe._is_eligible` is
-the pure boundary check, and :class:`~hunter_strategy_worker.universe.
-UniverseCache` accepts an injected ``loader`` that never opens a session
-(``universe.py``'s own ``_load_via_session`` is the only piece that does, and
-it is exercised by the testcontainer proof, ``test_universe_gate.py``).
+No database here -- :func:`hunter_core.universe.has_min_history` is the pure
+boundary check (moved there by T3.88, where the ``breadth_5m`` producer reads the
+same rule; the numbers and the inclusive ``<=`` are unchanged, which is what these
+tests still assert), and :class:`~hunter_strategy_worker.universe.UniverseCache`
+accepts an injected ``loader`` that never opens a session (``universe.py``'s own
+``_load_via_session`` is the only piece that does, and it is exercised by the
+testcontainer proof, ``test_universe_gate.py``).
 """
 
 from __future__ import annotations
@@ -14,12 +16,9 @@ from typing import Any
 
 import pytest
 
+from hunter_core.universe import has_min_history
 from hunter_strategy_worker.pre_dispatch import refuse_before_dispatch
-from hunter_strategy_worker.universe import (
-    UniverseCache,
-    UniverseSnapshot,
-    _is_eligible,  # pyright: ignore[reportPrivateUsage]
-)
+from hunter_strategy_worker.universe import UniverseCache, UniverseSnapshot
 
 pytestmark = pytest.mark.unit
 
@@ -29,26 +28,28 @@ NINETY_DAYS = timedelta(days=90)
 
 class TestEligibilityBoundary:
     def test_none_history_is_never_eligible(self) -> None:
-        assert _is_eligible(None, as_of=AS_OF, min_history_days=90) is False
+        assert has_min_history(None, as_of=AS_OF, min_history_days=90) is False
 
     def test_exactly_ninety_days_old_is_eligible(self) -> None:
         """Inclusive boundary (``<=``), matching every other gate's own
         convention in this package (``ShadowConfig`` docstrings)."""
-        assert _is_eligible(AS_OF - NINETY_DAYS, as_of=AS_OF, min_history_days=90) is True
+        assert has_min_history(AS_OF - NINETY_DAYS, as_of=AS_OF, min_history_days=90) is True
 
     def test_one_second_short_of_ninety_days_is_not_eligible(self) -> None:
         boundary = AS_OF - NINETY_DAYS + timedelta(seconds=1)
-        assert _is_eligible(boundary, as_of=AS_OF, min_history_days=90) is False
+        assert has_min_history(boundary, as_of=AS_OF, min_history_days=90) is False
 
     def test_far_older_than_ninety_days_is_eligible(self) -> None:
-        assert _is_eligible(AS_OF - timedelta(days=400), as_of=AS_OF, min_history_days=90) is True
+        assert (
+            has_min_history(AS_OF - timedelta(days=400), as_of=AS_OF, min_history_days=90) is True
+        )
 
     def test_zero_days_admits_anything_with_any_history_at_all(self) -> None:
         """``min_history_days=0`` is disabled at the ``ShadowConfig``/
         ``run_consumer`` level (no ``UniverseCache`` is even built), but the
         pure function stays honest about what ``0`` means arithmetically:
         any candle at or before ``as_of`` qualifies."""
-        assert _is_eligible(AS_OF, as_of=AS_OF, min_history_days=0) is True
+        assert has_min_history(AS_OF, as_of=AS_OF, min_history_days=0) is True
 
 
 def _snapshot(eligible: set[tuple[str, str]], candidates: set[tuple[str, str]]) -> UniverseSnapshot:

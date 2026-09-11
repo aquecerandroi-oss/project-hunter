@@ -41,7 +41,7 @@ from sqlalchemy import select, text
 from hunter_core.db.models.agents import AgentSignal
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import uuid7
-from hunter_indicators.breadth import BREADTH_VERSION, WINDOW_MINUTES
+from hunter_indicators.breadth import BREADTH_V1, CURRENT_BREADTH_VERSION, WINDOW_MINUTES
 from hunter_strategy_worker.catalogue import load_active_versions
 from hunter_strategy_worker.config import ShadowConfig
 from hunter_strategy_worker.decide import evaluate_slot
@@ -82,7 +82,18 @@ BLIND = datetime(2026, 9, 9, 23, 0, tzinfo=UTC)
 
 CUTS = (STORM, CALM, SILENT, BLIND)
 
-BAND: dict[str, Any] = {"breadth": {"window_m": WINDOW_MINUTES, "min": "0.10", "max": "0.60"}}
+BAND: dict[str, Any] = {
+    "breadth": {
+        "window_m": WINDOW_MINUTES,
+        "min": "0.10",
+        "max": "0.60",
+        "version": CURRENT_BREADTH_VERSION,
+    }
+}
+"""A faixa pré-registrada da EXP-0027, agora **nomeando a série** (T3.88): a
+política carrega ``breadth_v2``, e é essa série que o portão procura. Uma linha de
+``breadth_v1`` no mesmo minuto não responde por ela — é o que
+``TestASerieEParteDaChave`` prova."""
 HOURS_AND_BAND: dict[str, Any] = {"hours": {"utc": [[12, 15]]}, **BAND}
 REGIME_ONLY: dict[str, Any] = {
     "regime": {
@@ -129,9 +140,17 @@ async def insert_breadth(
     universe_size: int = 200,
     falling: int = 194,
     reason: str | None = None,
+    version: str = CURRENT_BREADTH_VERSION,
 ) -> uuid.UUID:
     """Uma linha de ``market_breadth`` exatamente como o produtor do scanner a
-    escreve — ``end_time``-ancorada, imutável, com ``breadth_v1``.
+    escreve — ``end_time``-ancorada, imutável, na série que ``version`` nomear
+    (padrão: a atual, ``breadth_v2``).
+
+    As contagens padrão são as do minuto do KB-0083 (194 de 200) porque é esse o
+    fato que motivou a regra; o portão lê **só o ``value``** e nunca interpreta
+    ``covered``/``universe_size``, então elas são proveniência semeada à mão, não
+    uma afirmação sobre o universo de 16. Quem prova que a série escolhida importa
+    é ``TestASerieEParteDaChave``, com as contagens do universo de v2.
 
     Escrita como ``hunter_worker``, que é o único papel com ``INSERT`` nesta
     tabela (``0019``); um teste que a semeasse como dono estaria provando uma
@@ -153,7 +172,7 @@ async def insert_breadth(
             "exchange_id": exchange_id,
             "end_time": end_time,
             "window": WINDOW_MINUTES,
-            "version": BREADTH_VERSION,
+            "version": version,
             "universe_size": universe_size,
             "covered": covered,
             "falling": falling if value is not None else 0,
@@ -265,7 +284,12 @@ class TestOMinutoDoKb0083:
         assert gate["detail"] == "allowed"
         assert gate["value"] == "0.350000"
         assert gate["end_time"] == CALM.isoformat()
-        assert gate["policy"] == {"max": "0.60", "min": "0.10", "window_m": "5"}
+        assert gate["policy"] == {
+            "max": "0.60",
+            "min": "0.10",
+            "version": "breadth_v2",
+            "window_m": "5",
+        }
         assert provenance["hours_gate"] is None
         assert provenance["regime_gate"] is None
 
@@ -334,3 +358,67 @@ class TestAVersaoSemAmplitudeNaoMuda:
         ]
         assert provenance["breadth_gate"] is None
         assert provenance["regime_gate"]["label"] == "SIDEWAYS"
+
+
+class TestASerieEParteDaChave:
+    """T3.88: a política nomeia a série, e uma linha da outra série não responde
+    por ela — nem para liberar, nem para recusar."""
+
+    async def test_a_linha_de_v1_no_mesmo_minuto_nao_libera_uma_versao_presa_a_v2(
+        self, gated_by_breadth: dict[str, Any], redis_client: Any
+    ) -> None:
+        """O minuto ``SILENT`` não tem linha de ``breadth_v2``. Escrever uma de
+        ``breadth_v1`` ali — **dentro** da faixa, 5 de 16 caindo — não faz a versão
+        decidir: ela continua muda com ``breadth_unavailable``.
+
+        É a prova de que a série é parte da chave e não um detalhe do build. Antes
+        da T3.88 o portão lia ``breadth_version = BREADTH_VERSION``, uma constante
+        de módulo: a mesma linha teria liberado a barra, e a célula pré-registrada
+        da EXP-0027 teria sido medida contra um universo de 200 mercados sem que
+        nada no envelope dissesse isso.
+        """
+        async with role_session(gated_by_breadth["factory"], db_role="hunter_worker") as session:
+            await insert_breadth(
+                session,
+                end_time=SILENT,
+                value="0.3125",
+                covered=16,
+                universe_size=16,
+                falling=5,
+                version=BREADTH_V1,
+            )
+
+        evaluation = await _decide(gated_by_breadth, redis_client, cut=SILENT)
+
+        assert evaluation.state.value == "ineligible"
+        assert evaluation.detail["eligibility_reason"] == "breadth_unavailable"
+        assert await _signals(gated_by_breadth["factory"]) == []
+
+    async def test_as_duas_series_coexistem_no_mesmo_minuto_com_valores_diferentes(
+        self, gated_by_breadth: dict[str, Any], redis_client: Any
+    ) -> None:
+        """O minuto ``CALM`` já tem ``breadth_v2 = 0,3500``. Uma linha de
+        ``breadth_v1`` com 0,9700 no **mesmo** minuto entra sem colidir (a chave
+        única inclui ``breadth_version``) e a versão presa a v2 decide como antes:
+        duas leituras honestas do mesmo minuto, duas séries, nenhuma reescrita.
+        """
+        async with role_session(gated_by_breadth["factory"], db_role="hunter_worker") as session:
+            await insert_breadth(session, end_time=CALM, value="0.9700", version=BREADTH_V1)
+            rows = list(
+                (
+                    await session.execute(
+                        text(
+                            "SELECT breadth_version, value FROM market_breadth "
+                            " WHERE end_time = :cut ORDER BY breadth_version"
+                        ),
+                        {"cut": CALM},
+                    )
+                ).all()
+            )
+
+        assert [(row.breadth_version, str(row.value)) for row in rows] == [
+            ("breadth_v1", "0.970000"),
+            ("breadth_v2", "0.350000"),
+        ]
+        evaluation = await _decide(gated_by_breadth, redis_client, cut=CALM)
+        assert evaluation.state.value == "triggered"

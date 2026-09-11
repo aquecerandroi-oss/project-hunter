@@ -619,6 +619,28 @@ contrário. Como toda regra do envelope, largar a amplitude do pai em silêncio 
 recusado: repita `breadth=…`, escreva `breadth=none` para tirá-la, ou
 `--policy none` para tirar o portão inteiro.
 
+**A série mudou de nome, e a política passa a dizer qual (T3.88).** A regra agora
+grava um quarto campo: `{"breadth": {"window_m": 5, "min": "0.10", "max": "0.60",
+"version": "breadth_v2"}}`. `breadth_v2` é a **mesma aritmética** da `breadth_v1`
+(5 min, `<` estrito, piso de 80 %) sobre **outro universo**: os mercados com ≥ 90
+dias de velas de 1 min — os 16 do universo sombra (T3.82) — em vez dos ~200
+monitorados. O motivo é o custo que a T3.77 declarou e ninguém pagou: com 200 no
+denominador, 87 dos últimos 91 dias saíam `insufficient_coverage`, e a EXP-0027
+não tinha passado nenhum para ler. Quatro coisas para o operador: (i) `--policy
+breadth=0.10-0.60` grava `breadth_v2` (a série atual, resolvida **na derivação** e
+nunca relida por um build posterior) e `--policy breadth=0.10-0.60@breadth_v1`
+grava a antiga, byte a byte como era; (ii) a nota humana da linhagem **não muda**
+(`breadth=0.10-0.60`), então nenhuma variante já gravada parece diferente — a série
+é auditável no corpo da política e em todo envelope que a versão escreve; (iii) uma
+política sem `version` é **recusada** (a versão emudece, o operador vê) em vez de
+completada com o padrão do build: era exatamente assim que uma célula
+pré-registrada podia ser reapontada para outro universo entre dois deploys; (iv)
+uma versão presa a `breadth_v2` num dia em que o produtor só escreveu `breadth_v1`
+responde `breadth_unavailable` — falha fechada, nunca "a outra série serve".
+Popular os 90 dias é o `infra/scripts/backfill_breadth.py --days 90` (relatório
+primeiro, `--apply --reason` depois, sempre pelo `compose.sh run --rm ops`):
+129 600 minutos, ~3,5 min medidos em testcontainer.
+
 ```
 # a variante da EXP-0027 (faixa pré-registrada; --dry-run primeiro, sempre)
 ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops python infra/scripts/derive_variant.py mean_reversion v10 --policy breadth=0.10-0.60 --changelog EXP-0027_amplitude_010_060 --dry-run"

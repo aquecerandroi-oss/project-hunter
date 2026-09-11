@@ -4,7 +4,8 @@ sem banco.
 T3.77 / H-P8. A metade pura: o que a faixa pode dizer, o que ela **não** pode
 dizer (e é recusada em vez de ignorada), onde ficam as fronteiras (``min``
 inclusivo, ``max`` exclusivo), como a regra convive com as duas antigas no mesmo
-envelope, e o que ``--policy breadth=0.10-0.60`` grava. O caminho do worker
+envelope, qual **série** ela nomeia (T3.88), e o que ``--policy
+breadth=0.10-0.60`` grava. O caminho do worker
 contra um Postgres real — a versão 0,10-0,60 que pula a barra em que a amplitude
 é 0,97 com ``breadth_gate:0.97`` — está em ``test_breadth_gate.py``.
 
@@ -21,6 +22,7 @@ from uuid import UUID
 
 import pytest
 
+from hunter_indicators.breadth import BREADTH_V1, BREADTH_V2
 from hunter_strategy_worker.activation_db import Refused
 from hunter_strategy_worker.breadth_gate import (
     REASON_UNAVAILABLE,
@@ -45,8 +47,12 @@ from hunter_strategy_worker.variant import (
     variant_changelog,
 )
 
-BAND: dict[str, Any] = {"breadth": {"window_m": 5, "min": "0.10", "max": "0.60"}}
-"""A faixa pré-registrada da EXP-0027, exatamente como o brief a escreve."""
+BAND: dict[str, Any] = {
+    "breadth": {"max": "0.60", "min": "0.10", "version": BREADTH_V2, "window_m": 5}
+}
+"""A faixa pré-registrada da EXP-0027, exatamente como o brief a escreve — e,
+desde a T3.88, **nomeando a série** que ela é uma faixa de (``breadth_v2``, o
+universo de 16 mercados com 90 dias de histórico)."""
 
 SIDEWAYS_ONLY: dict[str, Any] = {
     "regime": {
@@ -61,8 +67,8 @@ CUT = datetime(2026, 9, 9, 22, 8, tzinfo=UTC)
 ROW_ID = UUID("0192f000-0000-7000-8000-000000000001")
 
 
-def band(minimum: str = "0.10", maximum: str = "0.60") -> BreadthPolicy:
-    return parse_breadth_policy({"window_m": 5, "min": minimum, "max": maximum})
+def band(minimum: str = "0.10", maximum: str = "0.60", version: str = BREADTH_V2) -> BreadthPolicy:
+    return parse_breadth_policy({"window_m": 5, "min": minimum, "max": maximum, "version": version})
 
 
 def reading(value: str | None, *, usable: bool = True, reason: str | None = None) -> BreadthRow:
@@ -91,17 +97,20 @@ class TestLerAFaixa:
     @pytest.mark.parametrize(
         "body",
         [
-            {"window_m": 5, "min": "0.10"},
-            {"window_m": 5, "min": "0.10", "max": "0.60", "scope": "btc"},
-            {"window_m": 15, "min": "0.10", "max": "0.60"},
-            {"window_m": 5, "min": 0.10, "max": "0.60"},
-            {"window_m": 5, "min": "0.60", "max": "0.10"},
-            {"window_m": 5, "min": "0.30", "max": "0.30"},
-            {"window_m": 5, "min": "0", "max": "1"},
-            {"window_m": 5, "min": "-0.1", "max": "0.60"},
-            {"window_m": 5, "min": "0.10", "max": "1.5"},
-            {"window_m": True, "min": "0.10", "max": "0.60"},
-            {"window_m": 5, "min": "abc", "max": "0.60"},
+            {"window_m": 5, "min": "0.10", "version": BREADTH_V2},
+            {"window_m": 5, "min": "0.10", "max": "0.60"},
+            {"window_m": 5, "min": "0.10", "max": "0.60", "version": "breadth_v9"},
+            {"window_m": 5, "min": "0.10", "max": "0.60", "version": 2},
+            {"window_m": 5, "min": "0.10", "max": "0.60", "version": BREADTH_V2, "scope": "btc"},
+            {"window_m": 15, "min": "0.10", "max": "0.60", "version": BREADTH_V2},
+            {"window_m": 5, "min": 0.10, "max": "0.60", "version": BREADTH_V2},
+            {"window_m": 5, "min": "0.60", "max": "0.10", "version": BREADTH_V2},
+            {"window_m": 5, "min": "0.30", "max": "0.30", "version": BREADTH_V2},
+            {"window_m": 5, "min": "0", "max": "1", "version": BREADTH_V2},
+            {"window_m": 5, "min": "-0.1", "max": "0.60", "version": BREADTH_V2},
+            {"window_m": 5, "min": "0.10", "max": "1.5", "version": BREADTH_V2},
+            {"window_m": True, "min": "0.10", "max": "0.60", "version": BREADTH_V2},
+            {"window_m": 5, "min": "abc", "max": "0.60", "version": BREADTH_V2},
             ["breadth"],
         ],
     )
@@ -116,11 +125,13 @@ class TestLerAFaixa:
         forma canônica emite todo número como string decimal. Limites já em
         string atravessam as duas serializações sem mudar."""
         with pytest.raises(PolicyError, match="decimal \\*string\\*"):
-            parse_breadth_policy({"window_m": 5, "min": 0.1, "max": "0.60"})
+            parse_breadth_policy({"window_m": 5, "min": 0.1, "max": "0.60", "version": BREADTH_V2})
 
     def test_a_janela_que_este_build_nao_calcula_e_recusada_por_nome(self) -> None:
         with pytest.raises(PolicyError, match="not a window this build computes"):
-            parse_breadth_policy({"window_m": 15, "min": "0.10", "max": "0.60"})
+            parse_breadth_policy(
+                {"window_m": 15, "min": "0.10", "max": "0.60", "version": BREADTH_V2}
+            )
 
 
 class TestAFronteira:
@@ -254,3 +265,41 @@ class TestHerdarTrocarERemover:
 
     def test_policy_none_tira_o_portao_inteiro(self) -> None:
         assert resolve_policy("none", BAND) is None
+
+
+class TestASerieNaPolitica:
+    """T3.88: qual série a faixa é uma faixa **de** — declarado, nunca implícito."""
+
+    def test_a_serie_esta_no_corpo_gravado_e_no_envelope(self) -> None:
+        parsed = band()
+        assert parsed.version == BREADTH_V2
+        assert parsed.to_body()["version"] == "breadth_v2"
+
+    def test_faltar_a_serie_e_recusado_como_qualquer_campo_faltando(self) -> None:
+        """A direção que importa: uma política antiga sem ``version`` **não** é
+        completada com o padrão do build. Silenciosamente escolher a série é
+        exatamente o que a T3.88 fecha — o portão recusa e a versão fica muda, o
+        que um operador vê, em vez de decidir contra um universo que ninguém
+        pré-registrou."""
+        with pytest.raises(PolicyError, match="is missing version"):
+            parse_breadth_policy({"window_m": 5, "min": "0.10", "max": "0.60"})
+
+    def test_uma_serie_que_este_build_nao_le_e_recusada_por_nome(self) -> None:
+        with pytest.raises(PolicyError, match="not a series this build reads"):
+            parse_breadth_policy(
+                {"window_m": 5, "min": "0.10", "max": "0.60", "version": "breadth_v9"}
+            )
+
+    def test_o_operador_pode_nomear_a_serie_antiga_com_arroba(self) -> None:
+        """``breadth=0.10-0.60@breadth_v1`` existe para reproduzir a série antiga;
+        sem ``@`` a cláusula grava a atual, resolvida **na derivação** e nunca
+        relida por um build posterior."""
+        assert breadth_clause("0.10-0.60")["version"] == BREADTH_V2
+        assert breadth_clause("0.10-0.60@breadth_v1")["version"] == BREADTH_V1
+
+    def test_a_nota_humana_nao_muda_de_forma(self) -> None:
+        """A linhagem que a T3.77 gravou continua igual: a série é auditável no
+        corpo e no envelope, e a cópia humana não ganha um campo novo que faria
+        toda variante antiga parecer diferente."""
+        assert band().note == "breadth=0.10-0.60"
+        assert band(version=BREADTH_V1).note == "breadth=0.10-0.60"

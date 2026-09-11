@@ -125,10 +125,12 @@ class MarketBreadth(Base, UUIDPrimaryKeyMixin):
     reinterpretation of this one."""
 
     breadth_version: Mapped[str] = mapped_column(Text)
-    """``breadth_v1`` — the frozen numeric protocol
-    (:data:`hunter_indicators.breadth.BREADTH_VERSION`). Relaxing the coverage
-    floor, changing the completeness rule or moving the strict ``<`` is a new
-    version by construction."""
+    """``breadth_v1`` | ``breadth_v2`` — the frozen protocol, numeric *and*
+    universe (:data:`hunter_indicators.breadth.SPECS`). Relaxing the coverage
+    floor, changing the completeness rule, moving the strict ``<`` **or changing
+    which markets the fraction is a fraction of** is a new version by
+    construction: T3.88 added ``breadth_v2``, which folds only the markets with 90
+    days of 1m history (the shadow universe), and left every v1 row untouched."""
 
     universe_size: Mapped[int] = mapped_column(Integer)
     """Monitored active perpetuals of the venue **at the moment of the pass**.

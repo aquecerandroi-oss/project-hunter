@@ -20,11 +20,16 @@ version -- ``research_only`` and ``paper`` purposes alike. The paper wallet's
 own executable universe (``execution-worker``/the admission bridge) is a
 separate concept and is not read or written here.
 
-**The rule.** A market is in the shadow universe when it is monitored
-(``markets.is_monitored``, the T3.73 perpetual-only door already narrows the
-venue before this ever runs) and the oldest **final** 1m candle on record for
-it closes far enough in the past --
+**The rule, and where it lives since T3.88.** A market is in the shadow
+universe when it is monitored (``markets.is_monitored``, the T3.73
+perpetual-only door already narrows the venue before this ever runs), its
+status is ``active`` and the oldest **final** 1m candle on record for it closes
+far enough in the past --
 ``min(candles.open_time) <= as_of - SHADOW_UNIVERSE_MIN_HISTORY_DAYS days``.
+That sentence is now written once, in :mod:`hunter_core.universe`, because the
+``breadth_5m`` producer (``breadth_v2``, T3.88) must fold **this** universe and
+not the ~200 it folded in T3.77; this module keeps the caching, the sharding
+and the per-bar answer.
 ``as_of`` is this cache's own load time (``utcnow()`` by default), not the
 bar's own ``bar_close`` -- a deliberate approximation: the cache is refreshed
 at most once an hour (:data:`CACHE_TTL_S`), so within one refresh window every
@@ -52,16 +57,12 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import and_, func, select
-
-from hunter_core.db.models.market_data import Candle
-from hunter_core.db.models.markets import Exchange, Market
-from hunter_core.domain.enums import MarketType, Timeframe
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
+from hunter_core.universe import MarketKey, load_history_universe
 from hunter_strategy_worker.shard import owns_market
 
 if TYPE_CHECKING:
@@ -76,9 +77,10 @@ CACHE_TTL_S = 3600.0
 ``SHADOW_UNIVERSE_MIN_HISTORY_DAYS`` this is an implementation detail of the
 cache, not a parameter of the experiment."""
 
-MarketKey = tuple[str, str]
-"""``(exchange_code, symbol)`` -- the same identity :func:`.dispatch.market_key`
-uses, minus the market type (this module only ever looks at perpetuals)."""
+# ``MarketKey`` is re-exported from ``hunter_core.universe`` (T3.88): it is
+# ``(exchange_code, symbol)``, the same identity ``dispatch.market_key`` uses minus
+# the market type (this module only ever looks at perpetuals), and it is now the
+# shared helper's type because the shared helper is what produces it.
 
 __all__ = [
     "CACHE_TTL_S",
@@ -106,70 +108,31 @@ class UniverseSnapshot:
     loaded_at: datetime
 
 
-def _is_eligible(min_open_time: datetime | None, *, as_of: datetime, min_history_days: int) -> bool:
-    """Pure boundary check, unit-testable without a database.
-
-    ``min_history_days`` counts whole days: a market whose oldest final candle
-    opened *exactly* ``min_history_days`` days before ``as_of`` qualifies
-    (``<=``, not ``<``) -- the same inclusive convention
-    ``ShadowConfig.eligibility_max_lag_s`` and ``late_delay_backlog_max_s``
-    already use for their own boundaries elsewhere in this package.
-    """
-    if min_open_time is None:
-        return False
-    return min_open_time <= as_of - timedelta(days=min_history_days)
-
-
 async def load_universe_snapshot(
     session: AsyncSession, *, min_history_days: int, clock: Callable[[], datetime] = utcnow
 ) -> UniverseSnapshot:
-    """One query: every monitored perpetual market and the open time of its
-    oldest final 1m candle (``NULL`` when it has none yet).
+    """One query, in the shared helper: every candidate and whether it qualifies.
 
-    A plain ``GROUP BY``/``MIN`` over a ``LEFT JOIN`` -- not the per-market
-    ``LATERAL ... ORDER BY open_time LIMIT 1`` an index-per-group skip-scan
-    would use. ~200 monitored perpetuals, once an hour, is not the budget this
-    module needs to protect (that fight is T3.74g's, on the per-*bar* path);
-    kept simple on purpose, with the tradeoff named rather than silently
-    accepted.
+    Since T3.88 the membership rule -- monitored, perpetual, active, and the
+    oldest **final** 1m candle at or before ``as_of - min_history_days days`` --
+    lives in :func:`hunter_core.universe.load_history_universe`, because the
+    ``breadth_5m`` producer in the scanner has to ask the *same* question and a
+    rule stated in two packages is a rule that drifts. This function is now the
+    shadow path's view of it: a snapshot keyed by ``(exchange, symbol)``, which
+    is what :mod:`.consumer` and the heartbeat read.
+
+    One clause moved with it, and it narrows: the shared rule requires
+    ``markets.status = 'active'``, which T3.82's own query did not. A
+    suspended-but-monitored perpetual prints no candles and could not be replayed
+    either, so it leaves both the eligible set and the candidate denominator --
+    ``universe_total`` may report a hair fewer than 200. Declared, not silent.
     """
-    as_of = clock()
-    rows = (
-        await session.execute(
-            select(
-                Exchange.code.label("exchange"),
-                Market.symbol.label("symbol"),
-                func.min(Candle.open_time).label("min_open_time"),
-            )
-            .select_from(Market)
-            .join(Exchange, Exchange.id == Market.exchange_id)
-            .outerjoin(
-                Candle,
-                and_(
-                    Candle.market_id == Market.id,
-                    Candle.timeframe == Timeframe.M1,
-                    Candle.is_final.is_(True),
-                ),
-            )
-            .where(
-                Market.market_type == MarketType.PERPETUAL,
-                Market.is_monitored.is_(True),
-            )
-            .group_by(Exchange.code, Market.symbol)
-        )
-    ).all()
-    candidates: set[MarketKey] = set()
-    eligible: set[MarketKey] = set()
-    for row in rows:
-        key = (row.exchange, row.symbol)
-        candidates.add(key)
-        if _is_eligible(row.min_open_time, as_of=as_of, min_history_days=min_history_days):
-            eligible.add(key)
+    universe = await load_history_universe(session, min_history_days=min_history_days, clock=clock)
     return UniverseSnapshot(
-        eligible=frozenset(eligible),
-        candidates=frozenset(candidates),
+        eligible=universe.eligible_keys,
+        candidates=universe.candidate_keys,
         min_history_days=min_history_days,
-        loaded_at=as_of,
+        loaded_at=universe.as_of,
     )
 
 

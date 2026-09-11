@@ -53,11 +53,12 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from datetime import datetime
 
-BREADTH_VERSION = "breadth_v1"
-"""The frozen numeric protocol: this window rule, this completeness rule, this
-strict ``<``, monitored active perpetuals only. Changing any of them is a new
-version string, never an edit — the same rule ``beta_version`` and
-``classifier_version`` state."""
+# The version *strings* and the universe each one folds live in
+# ``hunter_indicators.breadth.spec`` (T3.88), not here: this module is the frozen
+# numeric protocol (this window rule, this completeness rule, this strict ``<``),
+# and the universe is the other half of what a version names. Changing either is
+# a new version string, never an edit — the same rule ``beta_version`` and
+# ``classifier_version`` state.
 
 WINDOW_MINUTES = 5
 """The only window this build computes. A policy asking for another one finds no
@@ -74,7 +75,6 @@ REASON_INSUFFICIENT_COVERAGE = "insufficient_coverage"
 REASON_EMPTY_UNIVERSE = "empty_universe"
 
 __all__ = [
-    "BREADTH_VERSION",
     "MIN_COVERAGE",
     "RATIO_QUANTUM",
     "REASON_EMPTY_UNIVERSE",

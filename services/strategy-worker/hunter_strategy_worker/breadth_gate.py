@@ -2,7 +2,9 @@
 
 T3.77 / H-P8. The third rule of the eligibility envelope
 (:mod:`hunter_strategy_worker.gate_policy`), after the hour of the day (T3.59)
-and the hourly regime (T3.52).
+and the hourly regime (T3.52). The rule the version *declares* — band, window and
+series — is :mod:`hunter_strategy_worker.breadth_policy`; this module is what a
+declared rule does to one bar.
 
 **Where it comes from.** ``.claude/state/notes-D-P9.md`` §4 (KB-0083): at 22:08Z
 on 2026-09-09, **194 of the 200 monitored perpetuals fell in the same minute**
@@ -17,8 +19,9 @@ instead of behind it.
 ``market_breadth`` (``0019``, PIPELINE §4b item 14) is written by the scanner, one
 immutable row per closed minute, folded only from candles that closed at or
 before that minute. The gate looks up **the row whose ``end_time`` is exactly
-``source_bar_close``** and nothing else: no tolerance, no "most recent before",
-no recomputation. Three consequences worth stating:
+``source_bar_close`` in the series the policy names** and nothing else: no
+tolerance, no "most recent before", no recomputation. Four consequences worth
+stating:
 
 - a replay applies the same rule to the same rows the live bar read, so the two
   populations remain comparable — which is the entire reason the value is a table
@@ -27,12 +30,13 @@ no recomputation. Three consequences worth stating:
   instead of letting it decide on a value from three minutes ago. There is no
   staleness window to tune because there is no window at all;
 - because the anchor is exact, this rule cannot be "almost right". It is right
-  for the minute it names or it abstains.
-
-**The band is half-open on the top**: ``min <= value < max``. ``0.10-0.60`` is
-"between a tenth and three fifths of the universe falling"; a bar measuring
-exactly ``0.60`` is refused and one measuring exactly ``0.10`` passes, so two
-adjacent bands tile the line without overlapping and without a hole.
+  for the minute it names or it abstains;
+- and since T3.88 the **series** is as exact as the minute: the version names
+  ``breadth_v1`` or ``breadth_v2`` in its stored policy, and a build that changed
+  its own default cannot re-point a pre-registered band at a different universe.
+  A version pinned to ``breadth_v2`` whose producer only ever wrote ``breadth_v1``
+  rows is muted, which is the fail-closed answer — never "the other series was
+  close enough".
 
 **The refusal reason is rounded to two decimals on purpose.** The ``ineligible``
 histogram groups by this string, and a reason carrying four decimals would give
@@ -40,12 +44,7 @@ almost every refused bar its own bucket — a histogram with one row per bar
 measures nothing. The exact value, unrounded, travels in the envelope's
 provenance block, which is where a number is supposed to be exact.
 
-**Everything unreadable is refused, never ignored**, and the bounds are stored as
-**strings**. That is not decoration: ``variant.canonical_policy`` emits every
-number as a normalised decimal string, and T3.59's hours rule had to keep its
-integers out of that path (``variant.stored_policy``'s docstring). A pair of
-decimal *strings* round-trips byte for byte through both, so this rule cannot be
-made unreadable by the serialisation that broke the last one.
+**Everything unreadable is refused, never ignored.**
 """
 
 from __future__ import annotations
@@ -53,14 +52,20 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING, Any, cast
+from decimal import Decimal
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import text
 
 from hunter_core.domain.types import ensure_utc
-from hunter_indicators.breadth import BREADTH_VERSION, WINDOW_MINUTES
-from hunter_strategy_worker.regime_gate import PolicyError
+from hunter_strategy_worker.breadth_policy import (
+    BREADTH_KEY,
+    SUPPORTED_VERSIONS,
+    SUPPORTED_WINDOWS,
+    BreadthPolicy,
+    breadth_clause,
+    parse_breadth_policy,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -68,8 +73,9 @@ if TYPE_CHECKING:
 __all__ = [
     "BREADTH_KEY",
     "BREADTH_REASON_PREFIX",
-    "REASON_UNAVAILABLE",
     "REASON_QUANTUM",
+    "REASON_UNAVAILABLE",
+    "SUPPORTED_VERSIONS",
     "SUPPORTED_WINDOWS",
     "BreadthGate",
     "BreadthPolicy",
@@ -79,117 +85,19 @@ __all__ = [
     "load_breadth_gate",
     "parse_breadth_policy",
 ]
-
-BREADTH_KEY = "breadth"
-"""The key this rule occupies in the eligibility envelope."""
+"""The policy's own names are re-exported: the envelope (``gate_policy``) and the
+variant CLI ask this module for "the breadth rule", and which file the parser
+happens to live in is not their business."""
 
 BREADTH_REASON_PREFIX = "breadth_gate"
 REASON_UNAVAILABLE = "breadth_unavailable"
-"""One word for every way the series fails to answer — no row for the minute, or
-a row the producer itself marked unusable (coverage below its floor). They are
-told apart by :attr:`BreadthGate.detail`, never by a second reason grammar."""
+"""One word for every way the series fails to answer — no row for the minute, a
+row the producer itself marked unusable (coverage below its floor), or no row in
+*that series* at all. They are told apart by :attr:`BreadthGate.detail`, never by
+a second reason grammar."""
 
 REASON_QUANTUM = Decimal("0.01")
 """Two decimals in the refusal string, so ``ineligible`` stays a histogram."""
-
-SUPPORTED_WINDOWS = frozenset({WINDOW_MINUTES})
-"""The windows this build's producer actually writes. A policy asking for another
-one is refused at parse time rather than silently served the 5-minute series: the
-version would be attributed to an experiment nobody ran."""
-
-_FIELDS = frozenset({"window_m", "min", "max"})
-_ZERO = Decimal(0)
-_ONE = Decimal(1)
-
-
-def _bound(raw: object, *, label: str) -> Decimal:
-    if not isinstance(raw, str):
-        raise PolicyError(
-            f"{BREADTH_KEY} policy: {label} must be a decimal *string* (got "
-            f"{type(raw).__name__}); quoting it is what keeps the bound byte-identical "
-            "through the canonical form"
-        )
-    try:
-        value = Decimal(raw)
-    except InvalidOperation as invalid:
-        raise PolicyError(f"{BREADTH_KEY} policy: {label} {raw!r} is not a decimal") from invalid
-    if not value.is_finite() or not _ZERO <= value <= _ONE:
-        raise PolicyError(f"{BREADTH_KEY} policy: {label} {raw} is outside 0-1")
-    return value
-
-
-@dataclass(frozen=True, slots=True)
-class BreadthPolicy:
-    """A parsed ``{"breadth": {"window_m": 5, "min": "0.10", "max": "0.60"}}``."""
-
-    window_m: int
-    minimum: Decimal
-    maximum: Decimal
-    """Half-open: ``minimum <= value < maximum``."""
-
-    def to_body(self) -> dict[str, Any]:
-        """Exactly the shape that was stored — canonical order, bounds as strings.
-
-        ``str(Decimal("0.10"))`` is ``"0.10"``: a ``Decimal`` keeps the exponent
-        it was built with, so the round-trip is byte-identical and a stored
-        policy never drifts from the one the operator typed.
-        """
-        return {"max": str(self.maximum), "min": str(self.minimum), "window_m": self.window_m}
-
-    @property
-    def note(self) -> str:
-        """The human copy that travels in the lineage: ``breadth=0.10-0.60``."""
-        return f"{BREADTH_KEY}={self.minimum}-{self.maximum}"
-
-
-def parse_breadth_policy(body: object) -> BreadthPolicy:
-    """The ``breadth`` body of the envelope, or :class:`PolicyError`."""
-    if not isinstance(body, dict):
-        raise PolicyError(f"{BREADTH_KEY} policy must be a JSON object")
-    typed = cast("dict[str, Any]", body)
-    unknown = sorted(set(typed) - _FIELDS)
-    if unknown:
-        raise PolicyError(f"{BREADTH_KEY} policy has unknown field(s): {', '.join(unknown)}")
-    missing = sorted(_FIELDS - set(typed))
-    if missing:
-        raise PolicyError(f"{BREADTH_KEY} policy is missing {', '.join(missing)}")
-    window = typed["window_m"]
-    if isinstance(window, bool) or not isinstance(window, int):
-        raise PolicyError(f"{BREADTH_KEY} policy: window_m {window!r} is not an integer")
-    if window not in SUPPORTED_WINDOWS:
-        raise PolicyError(
-            f"{BREADTH_KEY} policy: window_m {window} is not a window this build computes "
-            f"({', '.join(str(known) for known in sorted(SUPPORTED_WINDOWS))})"
-        )
-    minimum = _bound(typed["min"], label="min")
-    maximum = _bound(typed["max"], label="max")
-    if minimum >= maximum:
-        raise PolicyError(
-            f"{BREADTH_KEY} policy: [{minimum}, {maximum}) is empty — a gate that refuses "
-            "every value is a gate someone believes in and does not have"
-        )
-    if minimum == _ZERO and maximum == _ONE:
-        raise PolicyError(
-            f"{BREADTH_KEY} policy: [0, 1) lets every reading through, so nothing is ever "
-            "refused except an unavailable series"
-        )
-    return BreadthPolicy(window_m=window, minimum=minimum, maximum=maximum)
-
-
-def breadth_clause(rest: str) -> dict[str, Any]:
-    """``"0.10-0.60"`` -> the body to store. Refuses the rest.
-
-    The operator's half of the grammar of ``infra/scripts/derive_variant.py
-    --policy``. It goes through :func:`parse_breadth_policy` before returning, so
-    the CLI refuses exactly what the worker would refuse — one validator, not two
-    that can drift.
-    """
-    low, dash, high = rest.strip().partition("-")
-    if not dash:
-        raise PolicyError(f"--policy {BREADTH_KEY}={rest!r}: expected <min>-<max>, e.g. 0.10-0.60")
-    return parse_breadth_policy(
-        {"window_m": WINDOW_MINUTES, "min": low.strip(), "max": high.strip()}
-    ).to_body()
 
 
 @dataclass(frozen=True, slots=True)
@@ -231,7 +139,7 @@ class BreadthGate:
 
     def to_jsonable(self) -> dict[str, Any]:
         """What the envelope's provenance block carries — the exact value, the
-        row it came from and the band that let it through."""
+        row it came from and the band (and series) that let it through."""
         return {
             "eligible": self.eligible,
             "value": None if self.value is None else str(self.value),
@@ -268,17 +176,14 @@ columns are exactly these four predicates, in this order (T3.77c).
 
 Written as SQL rather than through the ORM for the reason ``regime_gate.load_gate``
 gives for living outside ``repo.py``: ``end_time = :cut`` **is** the anchoring
-rule, and a query that spelled it loosely would be a different gate.
+rule, and a query that spelled it loosely would be a different gate. Since T3.88
+``:version`` comes from the policy the version stored, so this probe cannot land
+in a series the experiment did not name.
 """
 
 
 async def load_breadth_gate(
-    session: AsyncSession,
-    policy: BreadthPolicy,
-    *,
-    cut: datetime,
-    exchange: str,
-    version: str = BREADTH_VERSION,
+    session: AsyncSession, policy: BreadthPolicy, *, cut: datetime, exchange: str
 ) -> BreadthGate:
     """Read the reading anchored exactly at ``cut`` for ``exchange`` and decide.
 
@@ -286,6 +191,10 @@ async def load_breadth_gate(
     matters to a Binance perpetual is Binance's. The policy deliberately does not
     name a venue — a version that decides on two venues would otherwise have to
     pick one universe for both, which is a claim nobody has evidence for.
+
+    The series, by contrast, **is** the policy's (``policy.version``): there is no
+    ``version=`` parameter left to default, because a default here was exactly how
+    a band could be silently re-pointed at another universe by a deploy.
 
     An unusable row is fetched, not filtered out in SQL, for ``load_gate``'s own
     reason: "the producer could not see the universe" and "nobody produced this
@@ -297,7 +206,7 @@ async def load_breadth_gate(
             _LOOKUP,
             {
                 "exchange": exchange,
-                "version": version,
+                "version": policy.version,
                 "window": policy.window_m,
                 "cut": cut_utc,
             },

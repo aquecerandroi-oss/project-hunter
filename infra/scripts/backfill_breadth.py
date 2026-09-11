@@ -1,13 +1,19 @@
 """Fill ``market_breadth`` backwards — and, first, say what that fill would be worth.
 
-T3.77 / H-P8. ``breadth_5m`` is universe-wide: unlike a per-market feature, it
-cannot be backfilled for "the sixteen markets we backfilled candles for" and mean
-anything. A reading is the share of the *monitored universe* that fell, so a day
-on which only sixteen of two hundred perpetuals have 1-minute candles produces a
-reading with 8 % coverage — which this build refuses as
-``insufficient_coverage`` rather than publishing as a number.
+T3.77 / H-P8, rewritten by T3.88. ``breadth_5m`` is universe-wide: unlike a
+per-market feature it cannot be backfilled for "the sixteen markets we backfilled
+candles for" and mean anything *as v1*, because a v1 reading is the share of ~200
+monitored perpetuals that fell and a day on which only sixteen of them have
+1-minute candles is 8 % coverage — refused as ``insufficient_coverage``, which is
+why 87 of the last 91 days were unfoldable and EXP-0027 was prospective-only.
 
-That is why the default is not a fill but a **measurement**::
+**T3.88's answer is a different series, not a relaxed floor.** ``breadth_v2``
+declares the universe to be the sixteen markets with 90 days of 1-minute history
+— the shadow universe (T3.82), and the only population any replay cohort is drawn
+from. The floor stays at 80 % and now it is 80 % of *that* universe, so the same
+ninety days are measurable. ``breadth_v1`` rows are never rewritten: a different
+universe is a different series, and ``--series breadth_v1`` still reproduces the
+old one::
 
     uv run python infra/scripts/backfill_breadth.py --days 90            # coverage report
     uv run python infra/scripts/backfill_breadth.py --days 90 --plan     # + what would be written
@@ -16,29 +22,34 @@ That is why the default is not a fill but a **measurement**::
 ``--apply`` is the only mode that writes, and it writes two things in two
 transactions: the readings (via the same :func:`run_breadth_once` the scanner
 runs, never a second implementation) and one system-scope ``audit_logs`` row
-naming who asked, for how many days, and what landed.
+naming who asked, for how many days, on which series, and what landed.
 
 On the VPS this runs inside the published image, like every other audited tool::
 
     ./compose.sh run --rm ops python infra/scripts/backfill_breadth.py --days 90
 
+**One universe for the whole span.** Membership is resolved once, at the top cut,
+and every minute of the ninety days is folded over that one list
+(``run_breadth_once(universe_as_of=...)``). Asking the question again per chunk
+would let the series change universe halfway through; asking it at each historical
+minute would answer "nobody", since no market had ninety days of retained candles
+ninety days ago. ``market_breadth.universe_size`` has always documented itself as
+evidence about the fold rather than about the historical minute, and this is that
+sentence made executable.
+
 **What this tool will not do.** It never relaxes the coverage floor and never
 writes a reading for a day it could not cover: an unusable minute is stored as
 unusable, with the producer's own reason, or the operator learns from the report
-that the day is not worth folding at all. A number that would look like breadth
-and be a fold over sixteen markets is the exact mistake ``breadth_unavailable``
-exists to prevent.
+that the day is not worth folding at all.
 
 **And it skips the days the report just failed** (T3.77c). ``--apply`` folds only
-the minutes of days whose dense coverage reaches
-:data:`~hunter_indicators.breadth.MIN_COVERAGE`; the rest are not attempted. The
-reason is that a refusal *is* a write here: a minute folded over a day with no
-candles lands as a ``reason = 'insufficient_coverage'`` row, and ``0019`` grants
-nobody ``UPDATE`` or ``DELETE`` on ``market_breadth``, so that row is a
-**permanent tombstone** for that minute in ``breadth_v1`` — never recomputable,
-only superseded by a whole new ``breadth_version`` (``ddl/breadth.py``,
-DATABASE.md §31). Filling ninety days of which eleven have candles would have
-written ~114 000 tombstones to gain ~15 000 readings.
+the minutes of days whose dense coverage reaches the series' floor; the rest are
+not attempted. The reason is that a refusal *is* a write here: a minute folded
+over a day with no candles lands as a ``reason = 'insufficient_coverage'`` row,
+and ``0019`` grants nobody ``UPDATE`` or ``DELETE`` on ``market_breadth``, so that
+row is a **permanent tombstone** for that minute in that series — never
+recomputable, only superseded by a whole new ``breadth_version``
+(``ddl/breadth.py``, DATABASE.md §31).
 
 ``--include-unusable`` folds the whole window anyway, tombstones included, for the
 operator who wants the *absence* recorded as a fact rather than left as a gap. It
@@ -55,22 +66,24 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
-from datetime import timedelta
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
-from breadth_windows import MINUTES_PER_DAY, days_above_the_floor, fold_windows
+from breadth_coverage import day_coverage, print_coverage, universe_ids
+from breadth_windows import MINUTES_PER_DAY, fold_windows
 from sqlalchemy import text
 
 from hunter_core.db.session import create_engine, create_session_factory, role_session
 from hunter_core.domain.types import utcnow, uuid7
 from hunter_core.settings import get_settings
-from hunter_indicators.breadth import BREADTH_VERSION, MIN_COVERAGE, WINDOW_MINUTES
+from hunter_indicators.breadth import CURRENT_BREADTH_VERSION, SPECS, spec_for
 from hunter_scanner_worker.breadth_job import BreadthRun, floor_minute, run_breadth_once
 
 if TYPE_CHECKING:
-    from datetime import date, datetime
+    from datetime import datetime
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    from hunter_indicators.breadth import BreadthSpec
 
 DB_ROLE = "hunter_worker"
 MAX_DAYS = 90
@@ -78,38 +91,6 @@ MAX_DAYS = 90
 is dangerous but because nothing reads it: no replay slice reaches past it."""
 
 ACTION = "market_breadth.backfill"
-
-_COVERAGE_SQL = text(
-    "WITH universe AS ("
-    "  SELECT m.id FROM markets m JOIN exchanges e ON e.id = m.exchange_id"
-    "   WHERE e.code = :exchange AND m.is_monitored AND m.status = 'active'"
-    "     AND m.market_type = 'perpetual'"
-    "), per_day AS ("
-    "  SELECT date_trunc('day', c.open_time) AS day, c.market_id, count(*) AS minutes"
-    "    FROM candles c JOIN universe u ON u.id = c.market_id"
-    "   WHERE c.timeframe = '1m' AND c.is_final"
-    "     AND c.open_time >= :start AND c.open_time < :end"
-    "   GROUP BY 1, 2"
-    ") "
-    "SELECT day, count(*) AS markets,"
-    "       count(*) FILTER (WHERE minutes >= :dense) AS dense_markets,"
-    "       sum(minutes) AS candles "
-    "  FROM per_day GROUP BY day ORDER BY day"
-)
-"""How many monitored perpetuals have 1-minute candles on each day of the window.
-
-``dense_markets`` counts the ones with at least ``:dense`` of the day's 1 440
-minutes — a market with forty candles on a day contributes to *some* minutes and
-to almost none, and counting it the same as a complete one would overstate what a
-backfill could cover. Read-only, one statement, no temporary objects: safe to run
-against production inside a ``READ ONLY`` transaction.
-"""
-
-_UNIVERSE_SIZE = text(
-    "SELECT count(*) FROM markets m JOIN exchanges e ON e.id = m.exchange_id "
-    " WHERE e.code = :exchange AND m.is_monitored AND m.status = 'active' "
-    "   AND m.market_type = 'perpetual'"
-)
 
 _AUDIT = text(
     "INSERT INTO audit_logs (id, created_at, organization_id, actor_type, actor_id, action, "
@@ -120,15 +101,6 @@ _AUDIT = text(
 """System scope (``organization_id IS NULL``): the series belongs to the exchange,
 not to a tenant, and a global fill attributed to one organization would be a lie
 about who it affects."""
-
-
-async def _coverage(session: AsyncSession, *, exchange: str, days: int, dense: int) -> list[Any]:
-    end = floor_minute(utcnow())
-    rows = await session.execute(
-        _COVERAGE_SQL,
-        {"exchange": exchange, "start": end - timedelta(days=days), "end": end, "dense": dense},
-    )
-    return list(rows)
 
 
 def _merge(runs: list[BreadthRun], *, cut: datetime) -> BreadthRun:
@@ -145,26 +117,6 @@ def _merge(runs: list[BreadthRun], *, cut: datetime) -> BreadthRun:
     return total
 
 
-def _print_coverage(rows: list[Any], *, universe: int, dense: int) -> set[date]:
-    """Print the report and return the days a fill would actually cover."""
-    floor = (MIN_COVERAGE * universe).to_integral_value(rounding="ROUND_CEILING")
-    print(f"universo monitorado agora: {universe} perpétuas")
-    print(f"piso de cobertura: {MIN_COVERAGE} -> {floor} mercados densos por minuto")
-    print(f"denso = ao menos {dense} de 1440 velas de 1 min no dia")
-    print("")
-    print(f"{'dia':<12}{'mercados':>10}{'densos':>10}{'cobertura':>12}{'velas':>12}")
-    above = days_above_the_floor(rows, universe=universe)
-    for row in rows:
-        coverage = 0.0 if universe <= 0 else row.dense_markets / universe
-        print(
-            f"{row.day.date().isoformat():<12}{row.markets:>10}{row.dense_markets:>10}"
-            f"{coverage:>11.1%}{int(row.candles):>12}"
-        )
-    print("")
-    print(f"dias que passariam o piso de cobertura: {len(above)} de {len(rows)}")
-    return above
-
-
 async def _write_audit(
     factory: async_sessionmaker[AsyncSession],
     *,
@@ -174,6 +126,7 @@ async def _write_audit(
     run: BreadthRun,
     windows: list[tuple[datetime, int]],
     include_unusable: bool,
+    spec: BreadthSpec,
 ) -> None:
     import json
 
@@ -203,8 +156,10 @@ async def _write_audit(
                     {
                         "reason": reason,
                         "include_unusable": include_unusable,
-                        "breadth_version": BREADTH_VERSION,
-                        "window_minutes": WINDOW_MINUTES,
+                        "breadth_version": spec.version,
+                        "universe_rule": spec.universe_rule,
+                        "min_history_days": spec.min_history_days,
+                        "window_minutes": spec.window_minutes,
                         "tool": "infra/scripts/backfill_breadth.py",
                     },
                     separators=(",", ":"),
@@ -214,9 +169,9 @@ async def _write_audit(
         )
 
 
-def _summarise(run: BreadthRun, *, applied: bool, windows: int) -> None:
+def _summarise(run: BreadthRun, *, applied: bool, windows: int, spec: BreadthSpec) -> None:
     print("")
-    print(f"corte: {run.cut.isoformat()}  universo: {run.universe_size}")
+    print(f"série: {spec.version}  corte: {run.cut.isoformat()}  universo: {run.universe_size}")
     print(f"janelas dobradas: {windows}")
     print(f"minutos sem linha na janela: {run.due}")
     for outcome, count in sorted(run.outcomes.items()):
@@ -234,27 +189,26 @@ async def _run(args: argparse.Namespace) -> int:
     if apply_it and not cast("str", args.reason or "").strip():
         print("RECUSADO: --apply exige --reason (vai para audit_logs)", file=sys.stderr)
         return 1
+    spec = spec_for(cast("str", args.series))
     exchange = cast("str", args.exchange)
+    dense = cast("int", args.dense)
     engine = create_engine(get_settings())
     try:
         factory = create_session_factory(engine)
+        cut = floor_minute(utcnow())
         async with role_session(factory, db_role=DB_ROLE) as session:
-            universe = await session.scalar(_UNIVERSE_SIZE, {"exchange": exchange}) or 0
-            rows = await _coverage(
-                session, exchange=exchange, days=days, dense=cast("int", args.dense)
-            )
-        above = _print_coverage(rows, universe=universe, dense=cast("int", args.dense))
+            ids = await universe_ids(session, exchange=exchange, spec=spec, as_of=cut)
+            rows = await day_coverage(session, market_ids=ids, days=days, end=cut, dense=dense)
+        above = print_coverage(rows, universe=len(ids), dense=dense, spec=spec)
         if not (apply_it or args.plan):
             return 0
         include_unusable = bool(args.include_unusable)
-        cut = floor_minute(utcnow())
         windows = fold_windows(cut, days=days, keep=None if include_unusable else above)
         skipped = days - sum(back for _, back in windows) // MINUTES_PER_DAY
         if not windows:
             print(
                 "RECUSADO: nenhum dia da janela alcança o piso de cobertura. Gravar assim "
-                "mesmo é --include-unusable, e são lápides permanentes em "
-                f"{BREADTH_VERSION}",
+                f"mesmo é --include-unusable, e são lápides permanentes em {spec.version}",
                 file=sys.stderr,
             )
             return 1
@@ -266,13 +220,15 @@ async def _run(args: argparse.Namespace) -> int:
                     exchange=exchange,
                     cut=window,
                     back=back,
+                    spec=spec,
+                    universe_as_of=cut,
                     dry_run=not apply_it,
                 )
                 for window, back in windows
             ],
             cut=cut,
         )
-        _summarise(run, applied=apply_it, windows=len(windows))
+        _summarise(run, applied=apply_it, windows=len(windows), spec=spec)
         if apply_it:
             await _write_audit(
                 factory,
@@ -282,6 +238,7 @@ async def _run(args: argparse.Namespace) -> int:
                 run=run,
                 windows=windows,
                 include_unusable=include_unusable,
+                spec=spec,
             )
             print(f"audit_logs: uma linha {ACTION} gravada")
     finally:
@@ -292,6 +249,12 @@ async def _run(args: argparse.Namespace) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--exchange", default="binance", help="código da exchange")
+    parser.add_argument(
+        "--series",
+        default=CURRENT_BREADTH_VERSION,
+        choices=sorted(SPECS),
+        help="qual série dobrar (padrão: %(default)s)",
+    )
     parser.add_argument(
         "--days", type=int, default=MAX_DAYS, help="janela para trás (padrão: %(default)s)"
     )
