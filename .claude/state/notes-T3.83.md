@@ -178,12 +178,16 @@ $ uv run pyright packages/core/hunter_core/events/consume.py services/strategy-w
 
 `uv run pytest services/strategy-worker -q` (suíte completa do serviço, incluindo os marcadores
 `integration`) foi disparada em foreground mas excedeu o timeout de 120 s do shell e o harness a
-moveu para segundo plano automaticamente — não foi uma escolha deliberada de rodar em background,
-e ela nunca terminou dentro da janela desta tarefa (provável testcontainer/Docker, fora do escopo
-lido nesta investigação). Substituída por um escopo equivalente e conclusivo: `uv run pytest
-services/strategy-worker -m unit -q` → **438 passed, 383 deselected in 47.94s**, cobrindo todos os
-arquivos tocados; os testes de integração do serviço não tocam `consumer.py`/`consume.py` neste
-diff.
+moveu para segundo plano automaticamente — não foi uma escolha deliberada de rodar em background.
+Terminou depois (24m30s, banco Postgres local compartilhado com outros agentes na mesma árvore):
+**819 passed, 2 failed**. As duas falhas (`test_spot_not_in_shadow_universe.py::
+test_a_spot_candle_writes_no_shadow_row` — `ForeignKeyViolationError` em `candles`/`markets`; e
+`test_version_roster.py::TestRosterCounts::test_a_version_frozen_with_this_code_is_runnable` —
+roster com conteúdo de outra sessão) passam isoladas
+(`uv run pytest <os dois ids> -q` → **2 passed in 20.85s**), confirmando ruído de concorrência no
+banco de teste compartilhado, não regressão deste diff. Nesse meio tempo também rodei o escopo
+equivalente e conclusivo `uv run pytest services/strategy-worker -m unit -q` →
+**438 passed, 383 deselected in 47.94s**.
 
 Depois do `ruff format` (2 arquivos reformatados por linha longa), `consume.py` voltou a passar de
 350 linhas (354) — cortado de volta para **349** encurtando dois comentários (mesmo conteúdo, menos
