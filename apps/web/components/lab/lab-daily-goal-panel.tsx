@@ -59,10 +59,14 @@ function RealProfitStat({ data }: { data: DailyGoalOut }) {
   const fx = fxLine(data.fx, data.fx_reason);
   return (
     <div className="rounded-md border border-border p-3">
-      <p className="text-xs font-medium uppercase text-fg-muted">Lucro real hoje</p>
+      <p className="text-xs font-medium uppercase text-fg-muted">Lucro que a carteira real teria feito hoje</p>
       <p className={`mt-1 text-xl tabular-nums ${usdt.isValue ? "text-fg" : "text-fg-muted"}`}>{usdt.text}</p>
       <p className="mt-0.5 text-sm tabular-nums text-fg-muted">{brl.text}</p>
       <p className={`mt-1 text-[11px] ${fx.isValue ? "text-fg-subtle" : "text-fg-muted"}`}>{fx.text}</p>
+      <p className="mt-1 text-[11px] text-fg-muted">
+        contrafactual: R único do Lab × valor real de 1 R (tamanho p50 sob os limites reais); nenhuma ordem foi
+        executada pela carteira paper hoje
+      </p>
     </div>
   );
 }
