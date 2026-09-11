@@ -1,6 +1,6 @@
 ---
 tags: [changelog, historico]
-updated: 2026-09-10
+updated: 2026-09-11
 status: vivo
 owner: sexta-feira
 ---
@@ -8,6 +8,97 @@ owner: sexta-feira
 # Changelog
 
 Uma entrada por commit (`git log --date=short --format='%h %ad %s'`), agrupado por dia, mais novo primeiro. Todo o histórico até agora é do Milestone 0 (fundação) — ver `docs/plans/M0.md` para as ondas T01–T13 e [[Resolved Bugs]] para o detalhe das correções de segurança/qualidade citadas aqui.
+
+## 2026-09-11
+
+*(13 commits, `6fa5c7b..3e7bfe9`, de 05:01 a 08:08 BRT — madrugada/manhã do plantão de arquivamento,
+continuação direta da noite de 10/09. Três eixos: **a campanha de latência fecha** (`decision_lag_p50_s`
+em 2,2 s, condição que libera o experimento de 5 minutos), **o próprio sharding quebra e conserta o
+portão do replay** (T3.84 achou, T3.87 corrigiu) e **D-P19 traduz a meta de R$ 9.000/dia em dinheiro**.
+A irmã de 5 minutos (`mean_reversion_m5 v1`) nasce, é bloqueada pelo portão cego e morre no mesmo dia,
+como o protocolo prevê. Ver [[Diario/2026-09-11]].)*
+
+- `6fa5c7b` — Plantão run 7 (lane 3, fóruns/praticantes, 11/09 04:46–05:00 BRT): Gatto (SSRN 6636018
+  via DaruFinance) — 437 911 configurações × 160 janelas walk-forward em perpétuos: só 28–39 % lucram
+  na janela seguinte, taxa ×2 derruba 34 → 28 % → H-P19/D-P18; sentinel-trader-research (HN):
+  direcional +0,035 R bruto → −0,243 R líquido, só carry com participação 5 % sobrevive →
+  [[00-INBOX/Hipoteses-do-plantao|D-P19]] (a meta de R$ 9 000/dia em dinheiro, não em R); Binance Dev
+  Community: entrega `x=true` em 1–3 s → D-P20; post-mortem freqtrade (7 estratégias/10 pares/24
+  meses, todas negativas) → D-P21; 0 KB
+- `d044ab9` — T3.83: timeouts de leitura do Redis nos 4 shards — causa: rajada da meia-noite UTC
+  (todos os timeframes fechando juntos) contra um Redis sem `maxmemory` (12,47 GiB, `noeviction`,
+  `BGSAVE`/AOF quase contínuos); `XINFO` pending=0 (a barra sempre foi redistribuída pelo
+  `XAUTOCLAIM`), mas só `XREADGROUP` tinha retry: `XAUTOCLAIM` e `SISMEMBER` (guarda de idempotência)
+  ganham retry-com-backoff; um timeout dentro de `evaluate_slot` deixa de ser engolido como bug de
+  versão (`RedisTimeoutError`: `hunter_shadow_redis_timeouts_total{stage}`, log próprio, relança para
+  redelivery — antes a barra era confirmada com a decisão perdida em silêncio); 53 + 438 testes;
+  residual: Redis de 12,5 GiB sem teto → T3.85
+- `e517f69` — T3.84 (lote diário 11/09, passo 1): irmã de 5 minutos `mean_reversion_m5_v1` — módulo
+  de fecho próprio, ATR em 5 m, tendência em 15 m, horizonte 4 800 s, os outros 15 parâmetros byte a
+  byte da mãe; contexto 490 min; 39 testes incl. não-antecipação; `EXP-0028` pré-registrado ANTES do
+  replay com previsões falsificáveis (veredito previsto: descartar) →
+  [[05-EXPERIMENTS/EXP-0028-mean-reversion-5-min|EXP-0028]]; 1 229 unit
+- `9a7883d` — notas T3.83: suíte completa do strategy-worker 819 passed / 2 failed por ruído de banco
+  de teste compartilhado (passam isoladas); status final DONE
+- `dfd51e1` — D-P19 (do plantão): a meta de R$ 9 000/dia em DINHEIRO por mercado e hora, com os
+  limites reais — 1 R vale de R$ 0,33 (SAHARA) a R$ 211 (BTC/ETH/SOL), mediano R$ 53,57 no perpétuo e
+  R$ 18,14 no SPOT; teto (toda aposta +1 R) R$ 393,60/dia perp e R$ 157,41 SPOT (a meta é 23× e 57×
+  isso); esperado com o R medido (−0,0994/aposta) −R$ 310,58/dia; teto escondido:
+  `max_concurrent_positions=5` × horizonte 4 h = 30 entradas/dia; R$ 9 000 com R̄ +0,20 pede 1 R =
+  R$ 1 500, minuto de 1,39 M USDT (só BTC/ETH) e R$ 709 mil de patrimônio; achado de risco:
+  `volume_24h_usd` do ticker vs. velas discordam até 7× → T3.86; 23 testes; 6 SQL →
+  [[11-KNOWLEDGE/KB-0090-a-meta-em-dinheiro|KB-0090]]
+- `7a5c3a0` — T3.85: os 12,57 GiB do Redis não eram as streams (~256 MB) e sim o guarda de
+  idempotência (`hunter_core.events.processed`) gravando um `SADD` por `event_id` num `SET` diário
+  para streams sem efeito durável — `market.ticks` até 48 M membros/dia (~12,3 GB em 4 dias), 65× o
+  que o docstring assumia; correção: o guarda deixa de gravar para as 3 streams efêmeras; fusível
+  `--maxmemory noeviction` no compose de prod (24gb agora; baixar para 4gb depois de 14/09 quando os
+  SETs antigos expirarem pelo TTL de 3 dias); runbook de faxina (~9,3 GiB via `UNLINK`) documentado,
+  **NÃO executado** (decisão do Everton); `DEPLOYMENT.md` §9.3/§9.7; grupo órfão
+  `strategy-worker.shadow` (lag 50 000) registrado
+- `464dedf` — Plantão run 8 (lane 4, ferramentas/concorrentes, 11/09 05:20–05:51 BRT):
+  [[11-KNOWLEDGE/KB-0088-o-teto-de-participacao-nos-motores-de-backtest|KB-0088]] — nenhum bot cripto
+  aberto impõe teto de participação; o teto vive nos motores de ações (Zipline 2,5 % da barra com
+  impacto `0,1×share²`; LEAN só piora o preço; backtrader 100 %); a participação de 1 % da D-P19 é
+  mais conservadora que qualquer padrão; fila D-P22 nova + reforços D-P14/D-P18
+- `62c13e5` — T3.84 passo 2 (BLOQUEADO): `mean_reversion_m5` v1 semeada e ativada `research_only` às
+  05:32 BRT; o replay de 90 d NÃO rodou — o portão do replay-worker ficou cego com os 4 shards (lê
+  `hb:strategy:shadow`, que ninguém escreve, e o grupo órfão `strategy-worker.shadow` com lag 50 000)
+  → nenhum replay roda na VPS desde os shards (achado que a T3.87 corrige); medido sem replay:
+  ATR%(5m) p50 0,2714 % (P1 confirmada), portão passa 8,85 % das barras (mãe 33 %), pedágio 0,254 R
+  vs. 0,245 R da mãe (P3 falsificada); versão NÃO aposentada (não medida ≠ medida ruim); `EXP-0028`
+  append-only; 93 testes
+- `ad627bc` — T3.86 (achado da D-P19): o volume de 24 h do check 9 (piso de liquidez 50 M) vinha de
+  `markets.volume_24h_usd` (snapshot do ticker sem carimbo próprio, refresh de 900 s contra
+  `max_volume_age_s=120`; ARB SPOT com vela de 16 h atrás publicando 21 M; DASH/LINK/TAO SPOT sem
+  vela publicando 14–25 M) → agora o 24 h é somado das velas na mesma leitura (1,99 ms) e `volume_ts`
+  é o fechamento da vela mais nova; a divergência de 7× da D-P19 era ADV 30 d × soma 24 h (janelas
+  diferentes); mercado SPOT com < 24 h de série reprova por falta de prova; TDD: proposta aprovada
+  com 31 M reais/120 M na coluna virou reprovação; 2 + 10 + 221 + 198 testes; `RISK_ENGINE.md` v2.5
+  (§2, §3.1 check 9, §7.1, §9.6); residual: `bridge_screen.py` ainda peneira pela coluna → T3.86b
+- `7b3eb66` — Plantão: corrida 9 pulada às 06:03 BRT (regra de 50 min; run 8 começou 05:20)
+- `283a904` — T3.87: o portão do replay-worker ficou cego com os 4 shards (lia `hb:strategy:shadow`,
+  que ninguém escreve, e o grupo órfão `strategy-worker.shadow` com lag 50 001) — nenhum replay
+  rodava desde 17:45 BRT de 10/09; `shard.py` expõe `heartbeat_keys`/`consumer_groups` pela
+  topologia, `consumer_lag.py` lê a topologia e detecta órfãos, `budget.py` toma o pior dos N
+  (`ReplayBudget.shard_total` de `STRATEGY_SHARDS`), recusa nomeando o shard sem heartbeat e
+  ignora/loga o órfão uma vez; `replay-worker` recebe `STRATEGY_SHARDS` no compose e `compose.sh`
+  ecoa a topologia a cada replay; N=1 byte-idêntico; 595 testes; `DEPLOYMENT.md` §5.2/§3.1b →
+  [[07-BUGS/Open Bugs|Open Bugs]]
+- `7507dfb` — Plantão run 9 (lane 1, pesquisa/dados, 11/09 06:25–06:37 BRT, antes do CPI): Binance
+  sem anúncio nos 16; `fundingInfo` 467 símbolos em 4 h / 313 em 8 h / 2 em 1 h; SOPHUSDT voltou 1 h
+  → 4 h após exatamente 16 settlements ≤ 0,025 % (a regra oficial funciona como escrita); Gatto
+  (SSRN) 403 — pedir ao autor é decisão do orquestrador; Dutta (arXiv 2607.28577): promoção por
+  vantagem pareada com banda morta reduz trocas 78 % → H-P22; 0 KB
+- `3e7bfe9` — T3.84 passo 3 (`EXP-0028`): `mean_reversion_m5` v1 replayada em 90 d × 16 mercados no
+  replay-worker (23 fatias de 4 × 15 d, 414 720 barras, 0 erros, 06:28–07:41 BRT; portão do T3.87
+  funcionando, órfão logado) — 373 desfechos em 72 dias, −0,1940 R, PF 0,697, IC de blocos de dia
+  [−0,289; −0,094] inteiro abaixo de zero, LOMO negativo nos 16, estresse `sem_vantagem_na_base`;
+  veredito descartar, APOSENTADA às 07:54 BRT; o motivo contraria o pré-registro: o pedágio subiu só
+  +0,0105 R (0,2285 vs. 0,2180 da mãe), a vantagem bruta caiu de +0,127 para +0,035 R — **89,8 % da
+  piora é sinal, 10,2 % é custo**; BTC e BNB sem nenhuma decisão em 90 d; Redis reiniciou sozinho
+  06:25 BRT com ~2 min de coletores em crash-loop (`BusyLoadingError`) — investigar →
+  [[05-EXPERIMENTS/EXP-0028-mean-reversion-5-min|EXP-0028]]
 
 ## 2026-09-10
 
@@ -175,6 +266,64 @@ correções de latência prontas para deploy. Ver [[Diario/2026-09-10]] §Tarde 
   leave-one-market-out negativos; veredito: descartar os quatro; aposentadorias bloqueadas pela `ops`
   (HEAD sem imagem construída) — executadas pelo orquestrador após `compose.sh update` para este
   mesmo commit, 15:26 BRT → [[EXP-0026-regime-como-estrategia]]
+
+*(mais 8 commits, `e7255bb..2509ceb`, de 15:39 a 20:21 BRT — a noite do plantão de arquivamento. A
+campanha de latência da KB-0087 continuou depois do deploy `e81d53e`: concorrência 32 não bastou
+(CPU-bound), a correção virou sharding por processo, e a noite fechou com a decisão do Everton que
+reduz o universo de pesquisa a 16 mercados. Ver [[Diario/2026-09-10]] §Noite e
+[[11-KNOWLEDGE/KB-0089-o-teto-de-cpu-de-um-processo-so|KB-0089]].)*
+
+- `e7255bb` — Obsidian (arquivista, 10/09 tarde): diário com o lote T3.76/[[EXP-0026-regime-como-estrategia|EXP-0026]]
+  e as quatro aposentadorias, o deploy `e81d53e` (sete tarefas represadas no ar), tabela de latência
+  (T3.79), lucro real/meta diária, roster pós-aposentadoria e decisões em aberto;
+  [[11-KNOWLEDGE/KB-0087-o-atraso-de-decisao-e-as-tres-correcoes|KB-0087]] "o atraso de decisão e as
+  três correções" (despacho serial, replay no worker vivo, flush de 1,0 s); Changelog com os 13
+  commits da tarde; decisão [[06-DECISIONS/2026-09-10-validacao-em-um-dia-e-lucro-real]] (as três
+  regras do Everton)
+- `baaf7ad` — T3.74e: o "atraso constante de 55 s" pós-deploy era o espalhamento 4,9–61,2 s dentro da
+  mesma barra fechada — a cada fronteira de 15/30/60 min ~200 mercados chegam juntos e o
+  `BarDispatcher` drena 8 por vez (trabalho da rajada ≈ 325 s → ≈ 41 s); market-worker 0,5–2 s
+  (saudável); hipótese "espera a próxima vela" descartada (`k.x` da Binance); correção:
+  `worker_concurrency` 8 → 32, `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` 20/20 nos dois composes,
+  `CLAIM_IDLE_MS_CEILING=90 000`; projeção ≈ 10 s (não confirmada — T3.74f mostra que não bastou);
+  384 unit + benchmark byte-idêntico; `PIPELINE.md` §6b; [[07-BUGS/Open Bugs|Open Bugs]]; 2 SQL
+- `27de922` — Plantão run 6 (lane 2, notícias/macro, 10/09 16:09–16:20 BRT): PPI +0,4 % m/m / 5,4 %
+  a/a → BTC perp 77 782 → 76 634 em 15 min com 8,8× volume, FedWatch 62 → ~70 %; CPI 11/09 09:30 BRT,
+  BCE +25 bp, FOMC 16/09; dispersão BTC −1,5 % vs. alts (DASH −12 %, ZEC −10 % após rali de +50 % em
+  7 d) — primeiro episódio completo da H-P5; fila D-P17, H-P18, H-P17, reforço D-P16; 0 KB
+- `fe36532` — T3.74f: o teto é CPU de um processo Python (GIL), não o Postgres — duas rajadas reais
+  medidas (16:45/17:00 BRT): `strategy-worker` 97–100 % de UM núcleo por 36–100 s, Postgres (12
+  núcleos) 20–25 % com 31 de 32 backends esperando o cliente; concorrência 32 não move o tempo de
+  parede em carga presa a CPU (~1,0×), 4 processos reais 2,2–3,8× mais rápidos; `STRATEGY_SHARDS=N`
+  (mesma fatia `crc32(symbol) % N` do market-worker, movida para `hunter_core.sharding`), grupo
+  consumidor e heartbeat por shard; 2 shards vs. 1 worker: decisões byte-idênticas, zero duplicatas
+  em banco real; 409+ unit + 1 221 core; gap declarado: `replay/budget.py` ainda lê um heartbeat só
+  (fechado depois pela T3.87); **não implantado neste commit** — o deploy usa `STRATEGY_SHARDS=4` →
+  [[11-KNOWLEDGE/KB-0089-o-teto-de-cpu-de-um-processo-so|KB-0089]]
+- `b339117` — hotfix T3.74f: 4 shards × (pool 20 + overflow 20) = 160 conexões > `max_connections=100`
+  → `asyncpg.TooManyConnectionsError` em toda avaliação (20:45Z); cada shard passa a pool 5 + overflow
+  5 e `SHADOW_WORKER_CONCURRENCY=8` (32 no total, ~40 conexões)
+- `a94aae6` — T3.74g: custo por avaliação — `cProfile` de uma barra (50 mercados × 10 versões): 59 %
+  em `build_context` (1 182 000 revalidações Pydantic de `NormalizedCandle`, cada versão remontando o
+  contexto sobre a MESMA janela), 39 % em `aggregate`; `bar_context.py` (novo): uma leitura, uma
+  montagem, uma validação por (mercado, barra), cada versão recebe uma fatia + a própria
+  elegibilidade; 13,1 → 8,6 ms por avaliação local (1,3–1,9×), 12 → 3 idas ao banco/Redis por barra;
+  equivalência por `==` de objeto em unidade e Postgres real; módulos congelados e replay intocados;
+  residual nomeado: `aggregate` repetido entre variantes da mesma família, e o universo do sombra
+  decidindo sobre 200 mercados quando só 16 têm 90 d de histórico (~8×, pergunta ao Everton) →
+  decisão T3.82; 479 testes
+- `5c6a891` — T3.82 (decisão do Everton, 10/09 19:1x BRT: "boaaa perfeito"): o universo de pesquisa do
+  Shadow Lab vira "mercados com ≥ 90 dias de velas de 1 min" (hoje 16 de 200: ARB, BNB, BTC, DASH,
+  DOGE, ETH, LINK, NEAR, PROM, SAHARA, SOL, SUI, TAO, UNI, XRP, ZEC) — `universe.py` +
+  `pre_dispatch.py` antes do `BarDispatcher`, cache de 1 h; `SHADOW_UNIVERSE_MIN_HISTORY_DAYS=90`
+  (`0` desliga); barras fora do universo são ACKadas e contadas em
+  `hunter_shadow_bars_skipped_total{reason="universe_history"}`; heartbeat com `universe_size`/
+  `universe_total`/`universe_min_history_days`, somado em `/system/latency` (`research_universe`);
+  não toca versão, limite de risco nem o universo executável da carteira; testcontainer: 3 mercados
+  (2 com 90 d, 1 com 30 d) → decisões só nos 2, byte-idênticas; 434 unit + 51 api →
+  [[06-DECISIONS/2026-09-10-universo-de-pesquisa-90-dias]]
+- `2509ceb` — Obsidian: a decisão "universo de pesquisa 90 dias" deixa de ser órfã (linkada do diário
+  10/09 e da decisão do dia)
 
 ## 2026-09-09
 
