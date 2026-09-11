@@ -1,6 +1,6 @@
 ---
 tags: [bugs, abertos]
-updated: 2026-09-10
+updated: 2026-09-11
 status: aberto
 owner: sexta-feira
 severity: misto
@@ -11,6 +11,57 @@ closed: ""
 # Open Bugs
 
 Levantado de `.claude/state/milestone.json` (histórico de M0) e `docs/SECURITY.md`. Nenhum destes bloqueia o fechamento do M0 — foram conscientemente registrados como conhecidos em vez de resolvidos, mas continuam abertos.
+
+## Corrigido na T3.83 (2026-09-11, achado e corrigido na mesma tarefa — plantão overnight)
+
+Sintoma relatado: os 4 shards do `strategy-worker` registraram `shadow_consumer_restarting` e
+`shadow_version_evaluation_failed` com `redis.exceptions.TimeoutError` na madrugada de 10→11/09.
+Medição na VPS (`docker logs`, `redis-cli INFO`/`SLOWLOG`/`XINFO GROUPS`) e correção no mesmo
+código — notas completas em `.claude/state/notes-T3.83.md`.
+
+- **Causa raiz: rajada de meia-noite UTC + Redis sob pressão de memória/BGSAVE, não os 15 min nem o
+  backup das 03:17 UTC.** Os 4 shards logaram o incidente **no mesmo intervalo de ~12 s**
+  (2026-09-11T00:00:06Z–00:00:18Z), o que descarta conexão isolada — é o Redis compartilhado que
+  estagnou. Nenhum evento coincidiu com o cron do backup (`17 3 * * *`, `/etc/cron.d/hunter-backup`)
+  nem com fronteiras de 15 min fora da meia-noite. `00:00 UTC` é o fechamento simultâneo de **todos**
+  os timeframes (1h/4h/1d) para o universo inteiro — a mesma rajada que T3.74f já mediu saturando um
+  core de CPU — e, na leitura ao vivo (07:48 BRT/UTC), o Redis está com `used_memory` 12,47 GiB
+  (pico 14,3 GiB), `maxmemory=0`/`noeviction`, `rdb_saves: 2459` e um `BGSAVE` em andamento (`save`
+  `"3600 1 300 100 60 10000"` dispara sozinho sob ~9 585 ops/s) — condição madura para um fork/COW
+  empurrar alguns comandos além do `socket_timeout` de 5 s durante a rajada. `XINFO GROUPS` mostrou
+  `pending: 0` em todos os 4 grupos no momento da leitura: a **mensagem** (a barra inteira) sempre
+  foi redistribuída corretamente pelo `XAUTOCLAIM` já existente.
+- **Lacuna real, achada no código: `XAUTOCLAIM` e o `SISMEMBER` da guarda de idempotência não tinham
+  a mesma tolerância a timeout que o `XREADGROUP`.** Em `packages/core/hunter_core/events/consume.py`,
+  só o `XREADGROUP` bloqueante era envolvido em retry-com-backoff (até `MAX_CONSECUTIVE_TIMEOUTS`);
+  um único timeout em `XAUTOCLAIM` (não bloqueante, mas sujeito ao mesmo `socket_timeout`) ou no
+  `SISMEMBER` de `is_processed` derrubava o consumidor inteiro na primeira ocorrência — exatamente o
+  que os tracebacks da VPS mostram (dois dos quatro `shadow_consumer_restarting` vieram de
+  `XAUTOCLAIM`, um de `SISMEMBER`). **Corrigido**: os três agora compartilham o mesmo padrão
+  retry-com-backoff, com contadores independentes por operação (`consume_read_deadline` ganhou um
+  campo `op`).
+- **Lacuna nomeada: um timeout durante `evaluate_slot` era engolido como se fosse um bug de versão,
+  perdendo a decisão em silêncio.** `handle_candle` trata "uma versão que levanta" como falha isolada
+  daquela versão (T3.26, correto para um parâmetro congelado quebrado) — mas um
+  `redis.exceptions.TimeoutError` caía no mesmo `except Exception` genérico, era contado em
+  `hunter_shadow_version_failed_total` e a barra **ainda era confirmada** (`ack`) ao fim do loop, o
+  que descarta a decisão daquele (mercado, versão, barra) para sempre — nunca reprocessada, nunca
+  visível como falha de infraestrutura. Batizado: **decisão silenciosamente perdida por timeout de
+  Redis**. **Corrigido**: `RedisTimeoutError` agora tem seu próprio ramo — conta em
+  `hunter_shadow_redis_timeouts_total{stage="version_evaluate"}`, loga `shadow_version_redis_timeout`
+  e **relança**, deixando a mensagem inteira sem `ack` para ser reentregue via `XAUTOCLAIM` (seguro:
+  o docstring do módulo já garante que uma versão que commitou é *no-op* na redelivery). O mesmo
+  contador também marca `stage="consumer_loop"` quando é o próprio `run_consumer` que reinicia por
+  timeout.
+- **Arquivos:** `packages/core/hunter_core/events/consume.py`,
+  `services/strategy-worker/hunter_strategy_worker/consumer.py` (dividido: a constante
+  `DECISION_MARKET_TYPE` e seu docstring longo saíram para
+  `hunter_strategy_worker/decision_market_type.py` só para caber no orçamento de 350 linhas),
+  `services/strategy-worker/hunter_strategy_worker/metrics.py`. Testes novos em
+  `packages/core/tests/unit/test_events_consume.py`,
+  `services/strategy-worker/tests/test_consumer_isolation.py`,
+  `services/strategy-worker/tests/test_consumer_supervision.py`. **Dono:** entregue nesta tarefa,
+  pendente de deploy na VPS.
 
 ## Abertos na T3.73 (2026-09-10, medição na VPS; achado do D-P9)
 

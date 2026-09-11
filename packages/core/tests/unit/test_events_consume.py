@@ -37,9 +37,19 @@ pytestmark = pytest.mark.unit
 class FakeRedis:
     """The three calls ``consume()`` makes, scripted per test."""
 
-    def __init__(self, reads: list[Any]) -> None:
+    def __init__(
+        self,
+        reads: list[Any],
+        *,
+        claims: list[Any] | None = None,
+        sismember_outcomes: list[Any] | None = None,
+    ) -> None:
         self.reads = list(reads)
+        self.claims = list(claims) if claims is not None else []
+        self.sismember_outcomes = list(sismember_outcomes) if sismember_outcomes is not None else []
         self.read_calls = 0
+        self.claim_calls = 0
+        self.sismember_calls = 0
         self.acked: list[str] = []
         self.block_values: list[int] = []
 
@@ -47,6 +57,12 @@ class FakeRedis:
         return None
 
     async def xautoclaim(self, *args: Any, **kwargs: Any) -> Any:
+        self.claim_calls += 1
+        if self.claims:
+            outcome = self.claims.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
         return [b"0-0", [], []]
 
     async def xreadgroup(self, *args: Any, **kwargs: Any) -> Any:
@@ -60,6 +76,12 @@ class FakeRedis:
         return outcome
 
     async def sismember(self, *args: Any, **kwargs: Any) -> bool:
+        self.sismember_calls += 1
+        if self.sismember_outcomes:
+            outcome = self.sismember_outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
         return False
 
     async def xack(self, _stream: str, _group: str, message_id: Any) -> None:
@@ -127,6 +149,53 @@ async def test_a_connection_error_still_propagates_immediately() -> None:
     client = FakeRedis([RedisConnectionError("gone")])
     gen = consume(client, "test.stream", "g", "c", timeout_backoff_s=0)  # type: ignore[arg-type]
     with pytest.raises(RedisConnectionError):
+        await gen.__anext__()
+
+
+# --- T3.83: XAUTOCLAIM and the idempotency guard share the same socket read
+# deadline as XREADGROUP but, before this, neither was retried — one stall on
+# either killed the whole consumer on the very first timeout instead of
+# tolerating MAX_CONSECUTIVE_TIMEOUTS the way the blocking read already does.
+# Found on the VPS: four strategy-worker shards all hit this within the same
+# 12s window during a midnight burst (notes-T3.83.md).
+
+
+async def test_xautoclaim_timeout_is_retried_not_fatal() -> None:
+    client = FakeRedis([_message(1)], claims=[RedisTimeoutError("stalled"), [b"0-0", [], []]])
+    gen = consume(client, "test.stream", "g", "c", timeout_backoff_s=0)  # type: ignore[arg-type]
+    _message_id, envelope = await gen.__anext__()
+    await gen.aclose()
+    assert envelope.payload == {"n": 1}
+    assert client.claim_calls == 2
+
+
+async def test_relentless_xautoclaim_timeouts_are_escalated() -> None:
+    client = FakeRedis(
+        [], claims=[RedisTimeoutError("dead") for _ in range(MAX_CONSECUTIVE_TIMEOUTS + 1)]
+    )
+    gen = consume(client, "test.stream", "g", "c", timeout_backoff_s=0)  # type: ignore[arg-type]
+    with pytest.raises(RedisTimeoutError):
+        await gen.__anext__()
+    assert client.claim_calls == MAX_CONSECUTIVE_TIMEOUTS + 1
+
+
+async def test_is_processed_timeout_is_retried_not_fatal() -> None:
+    """A single SISMEMBER timeout must not drop a batch that was already read
+    successfully off the stream."""
+    client = FakeRedis([_message(1)], sismember_outcomes=[RedisTimeoutError("stalled"), False])
+    gen = consume(client, "test.stream", "g", "c", timeout_backoff_s=0)  # type: ignore[arg-type]
+    _message_id, envelope = await gen.__anext__()
+    await gen.aclose()
+    assert envelope.payload == {"n": 1}
+
+
+async def test_relentless_is_processed_timeouts_are_escalated() -> None:
+    client = FakeRedis(
+        [_message(1)],
+        sismember_outcomes=[RedisTimeoutError("dead") for _ in range(MAX_CONSECUTIVE_TIMEOUTS + 1)],
+    )
+    gen = consume(client, "test.stream", "g", "c", timeout_backoff_s=0)  # type: ignore[arg-type]
+    with pytest.raises(RedisTimeoutError):
         await gen.__anext__()
 
 

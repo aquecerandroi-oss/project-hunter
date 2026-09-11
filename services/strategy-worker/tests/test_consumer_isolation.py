@@ -193,3 +193,68 @@ async def test_a_non_final_candle_never_reaches_the_loop(wired: list[str]) -> No
     await _run([_version("v4")], health, payload=_payload(is_final=False))
     assert wired == []
     assert health.evaluated_bars == 0
+
+
+class TestRedisTimeoutIsNotACodeBug:
+    """T3.83: a ``redis.exceptions.TimeoutError`` mid-evaluation is a transient
+    infra failure, not a broken version — swallowing it the same way as a
+    ``ValueError`` (Astra's T3.26 fix) would silently drop a decision for that
+    market/version forever, since the message still gets acked either way. It
+    must instead propagate out of ``handle_candle`` so the whole bar is left
+    un-acked and redelivered once Redis recovers (idempotent per the module's
+    own docstring: the slot barrier has already moved past a version that did
+    commit)."""
+
+    async def test_it_propagates_instead_of_being_swallowed(
+        self, wired: list[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from redis.exceptions import TimeoutError as RedisTimeoutError
+
+        async def _evaluate(*_args: Any, version: ActiveVersion, **_kwargs: Any) -> Any:
+            wired.append(version.version)
+            if version.version == "v10":
+                raise RedisTimeoutError("Timeout reading from redis:6379")
+            return _Evaluation()
+
+        monkeypatch.setattr(consumer_mod, "evaluate_slot", _evaluate)
+        health = ConsumerHealth()
+        with pytest.raises(RedisTimeoutError):
+            await _run([_version("v10"), _version("v4")], health)
+        # the version after the timeout never ran this attempt — it will on
+        # the redelivery the un-acked message now gets.
+        assert wired == ["v10"]
+
+    async def test_it_is_not_counted_as_a_version_failure(
+        self, wired: list[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from redis.exceptions import TimeoutError as RedisTimeoutError
+
+        async def _evaluate(*_args: Any, version: ActiveVersion, **_kwargs: Any) -> Any:
+            raise RedisTimeoutError("Timeout reading from redis:6379")
+
+        monkeypatch.setattr(consumer_mod, "evaluate_slot", _evaluate)
+        before = _failed_count("momentum", "v10")
+        with pytest.raises(RedisTimeoutError):
+            await _run([_version("v10")], ConsumerHealth())
+        assert _failed_count("momentum", "v10") == before
+
+    async def test_it_is_counted_as_a_redis_timeout(
+        self, wired: list[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from redis.exceptions import TimeoutError as RedisTimeoutError
+
+        from hunter_core.observability import registry
+
+        async def _evaluate(*_args: Any, version: ActiveVersion, **_kwargs: Any) -> Any:
+            raise RedisTimeoutError("Timeout reading from redis:6379")
+
+        monkeypatch.setattr(consumer_mod, "evaluate_slot", _evaluate)
+        before = registry.get_sample_value(
+            "hunter_shadow_redis_timeouts_total", {"stage": "version_evaluate"}
+        )
+        with pytest.raises(RedisTimeoutError):
+            await _run([_version("v10")], ConsumerHealth())
+        after = registry.get_sample_value(
+            "hunter_shadow_redis_timeouts_total", {"stage": "version_evaluate"}
+        )
+        assert (after or 0.0) == (before or 0.0) + 1

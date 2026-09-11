@@ -21,8 +21,10 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from hunter_core.events.envelope import EventEnvelope
+from hunter_core.observability import registry
 from hunter_strategy_worker import consumer as consumer_mod
 from hunter_strategy_worker.config import ShadowConfig
 from hunter_strategy_worker.consumer import CONSUME_BLOCK_MS, ConsumerHealth, run_consumer
@@ -129,3 +131,35 @@ class TestSupervision:
         assert handled == 3, "the third message was still delivered"
         assert health.errors == 1
         assert runtime.successes == 2, "only the messages that worked were acked"
+
+
+class TestRedisTimeoutCounted:
+    """T3.83: a Redis timeout that escalates out of ``consume()`` itself
+    (``XAUTOCLAIM``/``XREADGROUP`` exhausting their retry budget) is a named,
+    countable event — distinct from ``shadow_consumer_stream_ended`` or any
+    other reason the loop restarts."""
+
+    async def test_a_redis_timeout_is_counted_by_stage(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def flaky(*_args: Any, **_kwargs: Any) -> AsyncIterator[tuple[str, EventEnvelope]]:
+            raise RedisTimeoutError("Timeout reading from redis:6379")
+            yield ("unreachable", _envelope())  # pragma: no cover - makes this an async generator
+
+        async def fake_sleep(_delay: float) -> None:
+            raise asyncio.CancelledError
+
+        monkeypatch.setattr(consumer_mod, "consume", flaky)
+        monkeypatch.setattr(consumer_mod.asyncio, "sleep", fake_sleep)
+
+        before = registry.get_sample_value(
+            "hunter_shadow_redis_timeouts_total", {"stage": "consumer_loop"}
+        )
+        runtime, health = _Runtime(), ConsumerHealth()
+        with pytest.raises(asyncio.CancelledError):
+            await run_consumer(None, None, runtime, ShadowConfig(), health)  # type: ignore[arg-type]
+
+        after = registry.get_sample_value(
+            "hunter_shadow_redis_timeouts_total", {"stage": "consumer_loop"}
+        )
+        assert (after or 0.0) == (before or 0.0) + 1

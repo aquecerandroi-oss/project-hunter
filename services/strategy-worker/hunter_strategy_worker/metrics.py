@@ -21,6 +21,7 @@ __all__ = [
     "shadow_bars_skipped_total",
     "shadow_decision_lag_seconds",
     "shadow_evaluations_total",
+    "shadow_redis_timeouts_total",
     "shadow_stage_seconds",
     "shadow_version_failed_total",
     "shadow_funding_unresolved_total",
@@ -109,6 +110,21 @@ rest and left the message un-acked (review T3.26-risk, A3). Labelled by version
 — not only by strategy — because the failure that matters is a *derived
 variant* whose frozen parameters raise on every bar while its siblings are fine.
 The cardinality is bounded by the roster (a handful of active rows)."""
+
+shadow_redis_timeouts_total = Counter(
+    "hunter_shadow_redis_timeouts_total",
+    "redis.exceptions.TimeoutError observed by the shadow consumer, by stage.",
+    ["stage"],
+    registry=registry,
+)
+"""T3.83: a Redis timeout is a transient infra failure, not a broken version —
+counted apart from ``shadow_version_failed_total`` so the two are never
+confused when reading a dashboard. ``stage="version_evaluate"`` is
+``handle_candle``'s per-version loop re-raising instead of swallowing (the bar
+gets redelivered instead of silently missing that version's decision);
+``stage="consumer_loop"`` is ``run_consumer``'s own restart. Found on the VPS:
+four shards, same ~12s window, a midnight burst stalling Redis
+(notes-T3.83.md)."""
 
 shadow_versions_active = Gauge(
     "hunter_shadow_versions_active",

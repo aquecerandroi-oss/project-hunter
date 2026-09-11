@@ -102,6 +102,13 @@ def _decode_id(message_id: bytes | str) -> str:
     return message_id.decode() if isinstance(message_id, bytes) else message_id
 
 
+def _deadline(stream: str, group: str, op: str, count: int) -> None:
+    """One log line for any read-path timeout, ``op``-labelled (T3.83): shared
+    by ``_read_loop``'s two calls and ``consume()``'s own guard so a shared
+    counter is never required across operations that fail independently."""
+    logger.warning("consume_read_deadline", stream=stream, group=group, op=op, consecutive=count)
+
+
 def _envelope_from_fields(fields: dict[Any, Any]) -> EventEnvelope:
     raw: Any = fields.get(FIELD_NAME) if FIELD_NAME in fields else fields.get(FIELD_NAME.decode())
     if raw is None:
@@ -171,13 +178,34 @@ async def _read_loop(
     if block_ms <= 0:
         raise ValueError("block_ms must be positive; 0 blocks XREADGROUP forever")
     await ensure_group(client, stream, group)
-    timeouts = 0
+
+    # T3.83: XAUTOCLAIM shares XREADGROUP's socket read deadline but had no
+    # retry of its own — one stall killed the consumer on the first timeout
+    # (VPS: four shards, same 12s window, notes-T3.83.md). Separate counters:
+    # one op's success must not erase the other's timeout streak.
+    claim_timeouts = 0
+    read_timeouts = 0
     while True:
         cursor: Any = "0-0"
         while True:
-            claimed: list[Any] = await client.xautoclaim(
-                stream, group, consumer, min_idle_time=claim_idle_ms, start_id=cursor, count=batch
-            )
+            try:
+                claimed: list[Any] = await client.xautoclaim(
+                    stream,
+                    group,
+                    consumer,
+                    min_idle_time=claim_idle_ms,
+                    start_id=cursor,
+                    count=batch,
+                )
+            except RedisTimeoutError:
+                claim_timeouts += 1
+                _deadline(stream, group, "xautoclaim", claim_timeouts)
+                if claim_timeouts > MAX_CONSECUTIVE_TIMEOUTS:
+                    raise
+                if timeout_backoff_s > 0:
+                    await asyncio.sleep(timeout_backoff_s)
+                continue
+            claim_timeouts = 0
             next_cursor: Any = claimed[0]
             entries: list[tuple[Any, dict[Any, Any]]] = claimed[1]
             if entries:
@@ -191,16 +219,14 @@ async def _read_loop(
                 group, consumer, streams={stream: ">"}, count=batch, block=block_ms
             )
         except RedisTimeoutError:
-            timeouts += 1
-            logger.warning(
-                "consume_read_deadline", stream=stream, group=group, consecutive=timeouts
-            )
-            if timeouts > MAX_CONSECUTIVE_TIMEOUTS:
+            read_timeouts += 1
+            _deadline(stream, group, "xreadgroup", read_timeouts)
+            if read_timeouts > MAX_CONSECUTIVE_TIMEOUTS:
                 raise
             if timeout_backoff_s > 0:
                 await asyncio.sleep(timeout_backoff_s)
             continue
-        timeouts = 0
+        read_timeouts = 0
         if not response:
             continue
         for _stream_name, new_entries in response:
@@ -240,6 +266,7 @@ async def consume(
     first — worth it for a stream that is 95 000 messages behind, not for every
     consumer in the system.
     """
+    guard_timeouts = 0
     async for entries in _read_loop(
         client,
         stream,
@@ -252,7 +279,23 @@ async def consume(
     ):
         for message_id, fields in entries:
             envelope = _envelope_from_fields(fields)
-            if await is_processed(client, group, str(envelope.event_id), now=now()):
+            # T3.83: the guard's SISMEMBER had zero timeout tolerance, unlike
+            # ``_read_loop``'s calls — own budget, since "have we seen this?"
+            # is a different failure than a stall reading the stream.
+            while True:
+                try:
+                    seen = await is_processed(client, group, str(envelope.event_id), now=now())
+                except RedisTimeoutError:
+                    guard_timeouts += 1
+                    _deadline(stream, group, "is_processed", guard_timeouts)
+                    if guard_timeouts > MAX_CONSECUTIVE_TIMEOUTS:
+                        raise
+                    if timeout_backoff_s > 0:
+                        await asyncio.sleep(timeout_backoff_s)
+                    continue
+                guard_timeouts = 0
+                break
+            if seen:
                 await client.xack(stream, group, message_id)
                 continue
             yield _decode_id(message_id), envelope

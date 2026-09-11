@@ -14,8 +14,9 @@ import functools
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from redis.exceptions import TimeoutError as RedisTimeoutError
+
 from hunter_core.db.session import role_session
-from hunter_core.domain.enums import MarketType
 from hunter_core.domain.market import NormalizedCandle, from_wire
 from hunter_core.domain.types import utcnow
 from hunter_core.events.consume import ack, consume
@@ -25,9 +26,11 @@ from hunter_strategy_worker.bar_context import load_bar_bundle
 from hunter_strategy_worker.consumer_health import ConsumerHealth
 from hunter_strategy_worker.context_cache import load_family_readers
 from hunter_strategy_worker.decide import evaluate_slot, versions_for_bar
+from hunter_strategy_worker.decision_market_type import DECISION_MARKET_TYPE
 from hunter_strategy_worker.dispatch import BarDispatcher, market_key
 from hunter_strategy_worker.metrics import (
     shadow_bars_skipped_total,
+    shadow_redis_timeouts_total,
     shadow_stage_seconds,
     shadow_version_failed_total,
 )
@@ -62,37 +65,6 @@ learned to treat it as a backoff.
 RESTART_BACKOFF_S = 1.0
 RESTART_BACKOFF_MAX_S = 30.0
 
-DECISION_MARKET_TYPE = MarketType.PERPETUAL
-"""The only listing the Shadow Lab decides on (T3.73).
-
-``markets`` holds two rows per symbol since T3.0b/T3.0c and the market-worker
-publishes ``market.candles.closed`` for both (T3.0d), so this consumer — which
-evaluates whatever bar arrives — started deciding on the ``spot`` row of a
-symbol the day the spot path was switched on. That is not a second population,
-it is the *same* bet counted twice (measured on the VPS on 2026-09-10: 179
-(version, symbol, bar) triples decided on both rows), priced with a cost model
-that does not exist there: ``funding_rates`` has no row for a spot market by
-construction, so ``resolve_funding`` never establishes a cadence and every one
-of the 133 terminal spot outcomes closed with ``r_multiple = NULL`` and
-``funding_schedule_unknown``.
-
-Perpetual-only is what the documents already say, in three places: PIPELINE §1d
-item 1 (the spot path exists as the wallet's *execution price* while "todo o
-resto do pipeline … continua raciocinando só sobre o perpétuo"), §1d item 7 (the
-scanner drops spot ticks at the same kind of door, before coalescing) and
-``replay/plan.py``, which has always restricted a replay to
-``MarketType.PERPETUAL``. Nothing is lost on the wallet side: the execution
-bridge maps a perpetual signal to its spot twin itself
-(``bridge_universe.spot_pair_for``, scaling ``1000SHIBUSDT`` -> ``SHIBUSDT``),
-so a paper signal never had to be born on a spot row to be executable on one.
-
-Researching spot deliberately is a different task with its own cost model — it
-would need a funding rule (zero, named, not merely unreadable), spot-native
-assumed costs and a dedup rule for the perpetual twin. Refusing here is
-fail-closed until that exists, never a silent omission: every refusal is
-counted in ``hunter_shadow_bars_skipped_total{reason}``.
-"""
-
 __all__ = [
     "CONSUME_BLOCK_MS",
     "ConsumerHealth",
@@ -123,15 +95,24 @@ async def handle_candle(
 ) -> None:
     """Evaluate every active version whose timeframe closed with this candle.
 
-    **One version's failure is that version's failure.** The loop below used to
-    have no ``try``: a version whose frozen parameters raise — the exact shape a
-    badly derived research variant takes (``derive_variant.py``, T3.26) — aborted
-    the whole bar, so every version after it in the roster silently stopped
-    evaluating and the message was never acked, redelivered forever (review
-    T3.26-risk, A3). Now each version is isolated, counted
-    (``hunter_shadow_version_failed_total``) and logged, the surviving versions
-    still produce their decisions, and the bar is acked: a bar that half the
-    roster could not evaluate is still a bar that was processed.
+    **One version's failure is that version's failure — unless it is Redis's.**
+    The loop below used to have no ``try``: a version whose frozen parameters
+    raise — the exact shape a badly derived research variant takes
+    (``derive_variant.py``, T3.26) — aborted the whole bar, so every version
+    after it in the roster silently stopped evaluating and the message was
+    never acked, redelivered forever (review T3.26-risk, A3). Now each version
+    is isolated, counted (``hunter_shadow_version_failed_total``) and logged,
+    the surviving versions still produce their decisions, and the bar is
+    acked: a bar that half the roster could not evaluate is still a bar that
+    was processed.
+
+    ``redis.exceptions.TimeoutError`` is deliberately **not** isolated the
+    same way (T3.83, VPS: four shards, same ~12s window, a midnight burst
+    stalling Redis): it is transient, unlike a broken version, and every other
+    due version is at the same risk, so it re-raises — the bar stays un-acked
+    and comes back via ``XAUTOCLAIM``, a no-op for whatever already committed
+    (module docstring). Swallowing it here would silently drop that one
+    (market, version, bar) decision forever instead.
 
     **One candle read per family, not per version (T3.74b).** Due versions
     sharing a ``strategy_key`` (same code, different frozen parameters) share
@@ -198,6 +179,16 @@ async def handle_candle(
                 bundle=bundle,
             )
         except asyncio.CancelledError:
+            raise
+        except RedisTimeoutError:
+            shadow_redis_timeouts_total.labels(stage="version_evaluate").inc()
+            logger.warning(
+                "shadow_version_redis_timeout",
+                strategy=version.strategy_key,
+                version=version.version,
+                market=f"{candle.exchange}:{candle.symbol}",
+                bar_close=bar_close.isoformat(),
+            )
             raise
         except Exception:
             shadow_version_failed_total.labels(
@@ -329,7 +320,9 @@ async def run_consumer(
         except asyncio.CancelledError:
             await dispatcher.cancel_all()
             raise
-        except Exception:
+        except Exception as error:
+            if isinstance(error, RedisTimeoutError):
+                shadow_redis_timeouts_total.labels(stage="consumer_loop").inc()
             runtime.mark_error()
             logger.exception("shadow_consumer_restarting", backoff_s=backoff)
             await asyncio.sleep(backoff)
