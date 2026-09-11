@@ -1,6 +1,6 @@
 ---
 tags: [knowledge, indice]
-updated: 2026-09-10
+updated: 2026-09-11
 status: em construção
 owner: sexta-feira
 ---
@@ -120,6 +120,7 @@ _(uma linha por nota: link para a nota — fonte curta — qualidade da evidênc
 | [[KB-0085-auditoria-de-liquidez-o-sinal-de-uma-covariancia]] | liquidez / covariância / mean_reversion / redundância | Aldridge, arXiv 2606.29018v2 (2026-08-13) — HTML completo lido três vezes em 2026-09-10 (plantão T3.64, run 5, faixa 1) + correções da Astra | teoria + calibração em CRSP diário 2016–2025; nada de cripto; **nenhuma medição própria** | sim — D-P13 (descritivo, por último): Cov(c_t causal, π na grade completa) por versão × mercado, sem expectativa de sinal; a redundância entre versões **não** se mede com o N² (fica na H-P13) |
 | [[KB-0086-ic-positivo-nao-paga-o-pedagio-btc-perp-5-min]] | custos / funding / auditoria point-in-time / BTC perp | Zeng, Yang, Han & He, arXiv 2608.25348 (2026-08) — HTML completo lido em 2026-09-10 (plantão T3.64, run 5) + correções da Astra | preprint dos autores: 2 anos, 5 min, um instrumento, 23 × 20 células de custo dependentes; **nenhuma medição própria** | sim — D-P14 (fronteira de custo por versão viva: taxa {2, 4…10} × slippage {1…10} bp, funding só nos settlements cruzados, maior custo suportável com IC) e auditoria point-in-time própria dos mark/index/funding antes de somar o replay |
 | [[KB-0087-o-atraso-de-decisao-e-as-tres-correcoes]] | diagnóstico do resultado / instrumento / latência | dado próprio da VPS e local (T3.74c/d, T3.80, T3.81, T3.79) — `hb:strategy:shadow`, `docker stats`, benchmark sintético e testcontainer | medição própria (VPS) + prova local (benchmark/testcontainer), **não relida em produção depois do deploy** | não — é correção de instrumento; fecha a causa que a KB-0083 tinha aberto (despacho serial, replay no worker vivo, flush de 1,0 s fixo) |
+| [[KB-0088-o-teto-de-participacao-nos-motores-de-backtest]] | capacidade / participação / backtest / ferramentas | Zipline, LEAN, backtrader, vectorbt, Freqtrade, Hummingbot, NautilusTrader — código e docs lidos em 2026-09-11 (plantão T3.64, run 8, faixa 4) + correções da Astra; D-P19 como ponto de comparação | convenções de código (2,5 % da barra e `share² × 0,1` em Zipline/LEAN; LEAN só piora o preço; backtrader 100 % por padrão; bots cripto sem teto); **nenhuma calibração própria de impacto** | sim, instrumento — D-P22 (teto causal e sequencial dentro do replay, orçamento compartilhado, cortes por participação, 1 R monetário ≠ PnL líquido); reforços D-P14 (regra de preenchimento maker declarada) e D-P18 (nulo estacionário centrado como sensibilidade) |
 
 ## O que a primeira rodada mudou de fato
 
