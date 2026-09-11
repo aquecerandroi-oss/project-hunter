@@ -32,7 +32,7 @@ updated: 2026-09-11
 - Eixo "portão de regime" (v6→v11): [[EXP-0020-regime-gate]]
 - Replicação de 90 dias (v1/v2/v10): [[EXP-0025-mean-reversion-90-dias]]
 - Irmã de 1 h (módulo novo, código pronto, replay pendente): [[mean_reversion_h1]]
-- Irmã de 5 min (módulo novo, ativada `research_only` em 2026-09-11, replay bloqueado): [[mean_reversion_m5]] — [[EXP-0028-mean-reversion-5-min]]
+- Irmã de 5 min (módulo novo, ativada e **aposentada** em 2026-09-11: `descartar`, ex-funding −0,1940 R em 373 desfechos — e **o custo não foi a causa**, 89,8 % da piora é a vantagem bruta caindo de +0,1270 para +0,0346 R): [[mean_reversion_m5]] — [[EXP-0028-mean-reversion-5-min]]
 <!-- generated:end -->
 
 

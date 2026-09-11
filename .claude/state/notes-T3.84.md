@@ -361,3 +361,443 @@ RESULTADO: base limpa
    portão recusou antes), então a decisão pode ser revista sem custo por quem retomar.
 5. **11,9 h para a idade do grupo abandonado** é `idle = 42 828 070 ms` do consumidor **menos
    ocioso** dos 57 — isto é, um limite inferior.
+
+---
+
+# PASSO 3 — a coorte existiu, e o veredito é `descartar` (11/09/2026, 06:25 → 08:05 BRT)
+
+Horários em **BRT (UTC−3)**; o UTC aparece ao lado quando é o que a saída mostra.
+Esta seção é **acrescentada**; nada do passo 2 acima foi reescrito.
+
+## 8. RESUMO HONESTO DO PASSO 3
+
+| # | O que o brief pediu | Resultado |
+|---|---|---|
+| 1 | replay 90 d × 16 mercados via `compose.sh replay`, uma fatia por vez | **OK** — 23 fatias, **414 720 barras**, **0 erros**, nenhuma recusa do portão |
+| 2 | estresse na coorte | **OK** — `sem_vantagem_na_base` |
+| 3 | análise (blocos de dia, LOMO, 3 janelas, K1–K6, C5, pedágio medido vs 0,254 R) | **OK** — tudo medido, §11 e §12 |
+| 4 | veredito na EXP-0028 (append-only) | **OK** — **`descartar`**, seção nova de 200 linhas, 0 remoções |
+| 5 | páginas de estratégia e `Experiments Index` | **OK** |
+| 6 | aposentar se falhar a regra pré-registrada | **OK** — `deprecated` às **07:54:08 BRT**, 13 min depois do último número |
+| 7 | notas, SQL, `obsidian_lint` | **OK** — esta seção, 2 SQL novos, `RESULTADO: base limpa` |
+
+**A frase que resume o dia:** a versão morreu como o pré-registro previu — **e pelo motivo oposto ao
+que ele deu**. O custo a 5 min é praticamente o mesmo da mãe (+0,0105 R); o que não existe a 5 min é
+o **sinal** (vantagem bruta +0,1270 R → +0,0346 R). **89,8 % da piora é sinal, 10,2 % é custo.**
+
+## 9. PRÉ-VOO — O QUE ENCONTREI ÀS 06:25 BRT (E NÃO É MEU)
+
+`HEAD` implantado `283a904` (T3.87, o conserto do portão). Mas a pilha estava assim:
+
+```
+$ ssh hunter-vps 'docker ps --format "{{.Names}}\t{{.Status}}" | sort'      # 06:25 BRT / 09:25Z
+hunter-market-worker-1        Restarting (1) 2 seconds ago
+hunter-market-worker-1-1      Restarting (1) 2 seconds ago
+hunter-market-worker-2-1      Restarting (1) 3 seconds ago
+hunter-market-worker-3-1      Restarting (1) 2 seconds ago
+hunter-market-worker-spot-1   Restarting (1) 2 seconds ago
+hunter-redis-1                Up About a minute (healthy)
+...
+$ docker logs --tail 15 hunter-market-worker-1
+redis.exceptions.BusyLoadingError: Redis is loading the dataset in memory
+```
+
+**Causa: o Redis reiniciou e estava carregando o dump**; os cinco coletores entravam em *crash-loop*
+contra ele. Não é desta tarefa, **não toquei em nada** e não recriei container nenhum: esperei em
+primeiro plano, medindo.
+
+```
+$ ssh hunter-vps 'for i in $(seq 1 28); do r=$(docker exec hunter-redis-1 redis-cli PING 2>&1); \
+    echo "$(date -u +%T) $r"; [ "$r" = "PONG" ] && break; sleep 10; done'
+09:25:44 LOADING Redis is loading the dataset in memory
+... (10 leituras) ...
+09:27:25 PONG
+```
+
+Às 08:01 BRT os cinco estavam `Up 2 hours (healthy)` sozinhos. **Custo declarado:** ~2 min de
+ingestão perdidos por volta de 06:25 BRT — quem for olhar `ingestion_gaps` de hoje vai achar isso, e
+a causa está aqui.
+
+Estado do portão do replay depois que o Redis voltou (leitura, nenhuma escrita):
+
+```
+hb:strategy:shadow:0of4 … 3of4   (as quatro existem; `hb:strategy:shadow` continua não existindo)
+XINFO GROUPS market.candles.closed:
+  strategy-worker.shadow        consumers 57  pending 36  lag 50004   <- o ORFAO pre-shard
+  strategy-worker.shadow.{0..3}of4  consumers 7  pending 0  lag 0     <- os quatro vivos
+decision_lag_p50_s = 3.0 … 4.2 s (shards 0 e 3)
+```
+
+É exatamente o quadro que bloqueou o passo 2 — e é exatamente o que a **T3.87** ensinou o portão a
+ler. A prova de que o conserto funciona aparece uma vez por corrida, no log do `replay-worker`:
+
+```
+2026-09-11 09:28:50 [warning  ] orphan_consumer_group          name=strategy-worker.shadow
+```
+
+O grupo morto é **nomeado e ignorado**, os quatro vivos são consultados, e a corrida segue.
+**Nenhuma recusa `live lane degraded` nas 23 fatias.**
+
+## 10. AS 23 FATIAS — E POR QUE NÃO SÃO 12
+
+Ensaio primeiro (o ensaio pula o portão por construção):
+
+```
+$ ssh hunter-vps 'cd /opt/project-hunter && timeout 240 env STRATEGY_SHARDS=4 MARKET_SPOT=1 MARKET_SHARDS=4 \
+    bash infra/vps/compose.sh replay python -m hunter_strategy_worker.replay.run \
+    --version mean_reversion_m5:v1 --from 2026-06-12 --to 2026-07-12 \
+    --markets ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT --cohort replay:92c8d080-6009-4a59-9868-31282b1bd493 --dry-run'
+replay-worker: STRATEGY_SHARDS=4 (deve bater com o update/up mais recente)
+{'cohort': 'replay:92c8d080-6009-4a59-9868-31282b1bd493', 'version': 'mean_reversion_m5 v1',
+ 'markets': 4, 'bars_planned': 34560, 'context_minutes': 1560, 'workers': 3}
+```
+
+**A primeira fatia de verdade estourou o relógio, e isso é um dado, não um acidente.** 4 mercados ×
+30 d = 34 560 barras levaram **495,1 s** — o `timeout 265` do cliente matou o `docker compose run`,
+**mas o container continuou** (o `timeout` mata o cliente, não o processo lá dentro), terminou os
+quatro mercados e gravou o recibo. Conferi o desfecho pelo banco em vez de supor:
+
+```
+$ psql -c "select mk.symbol, e.last_bar_close, e.created_at, e.updated_at from shadow_episodes e ..."
+ DOGEUSDT | 2026-06-23 12:35:00+00 | 09:33:14 | 09:34:39     <- ainda andando quando o cliente morreu
+ ETHUSDT  | 2026-07-11 23:55:00+00 | 09:28:53 | 09:33:12     <- fim da janela
+ SOLUSDT  | 2026-07-11 23:55:00+00 | 09:28:53 | 09:33:12
+ XRPUSDT  | 2026-07-11 23:55:00+00 | 09:28:53 | 09:33:13
+$ ssh hunter-vps 'for i in ...; do docker ps | grep -c replay-worker-run; sleep 10; done'
+09:35:29 replay_containers=1  ...  09:37:11 replay_containers=0      <- ele terminou sozinho
+$ psql -x -c "select ... from system_events where component='replay_engine' ..."
+ bars_evaluated 34560 · seconds 495.062 · errors 0 · evaluations_by_state {triggered 2, unavailable 184,
+ not_triggered 34374}
+```
+
+**Medida de taxa:** 3 mercados em paralelo (3 CPUs do `replay-worker`) fazem ~100 barras/s; um
+mercado sozinho, ~37 barras/s. Logo **o relógio de uma fatia é o tamanho do maior mercado dela**, e
+30 dias de um mercado (8 640 barras) custam ~250 s — colado no teto de 290 s do brief.
+
+**A saída que o brief autorizou:** `4 mercados × 15 d`. Com `--workers 4` (1 acima do que
+`workers_for` escolhe; sobreinscrição contida pelo *cgroup* de 3 CPUs do próprio `replay-worker`,
+nunca disputa com a faixa viva, que é outro container) cada fatia ficou em **~156 s**, 108–112
+barras/s. As 22 fatias seguintes são assim. Comando, verbatim (só mudam janela e mercados):
+
+```
+$ timeout 290 ssh hunter-vps 'cd /opt/project-hunter && date -u +%FT%TZ && timeout 260 \
+    env STRATEGY_SHARDS=4 MARKET_SPOT=1 MARKET_SHARDS=4 bash infra/vps/compose.sh replay \
+    python -m hunter_strategy_worker.replay.run --version mean_reversion_m5:v1 \
+    --from 2026-07-12 --to 2026-07-27 --markets ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT \
+    --workers 4 --explain-ledger /tmp/t384-m5-s1-w2a.jsonl \
+    --cohort replay:92c8d080-6009-4a59-9868-31282b1bd493 ...'
+2026-09-11 09:41:38 [info  ] replay_explain_ledger  bars=17280 lines=17280 path=/tmp/t384-m5-s1-w2a.jsonl
+{'run_id': '92c8d080-...', 'bars_evaluated': 17280, 'signals': 1, 'outcomes_resolved': 1,
+ 'outcomes_open': 0, 'seconds': 160.24, 'bars_per_second': 107.84, 'workers': 4,
+ 'evaluations_by_state': {'not_triggered': 17280}, 'errors': 0, 'context_minutes': 1560}
+```
+
+O recibo das 23, lido do banco (`system_events`, `component = 'replay_engine'`) e não da minha
+transcrição:
+
+```
+ fim_utc  |     de     |    ate     |               mercados                | barras | trig | unav |   s   | w | sinais_acum
+----------+------------+------------+---------------------------------------+--------+------+------+-------+---+------------
+ 09:37:06 | 2026-06-12 | 2026-07-12 | ETHUSDT+SOLUSDT+XRPUSDT+DOGEUSDT      |  34560 | 2    | 184  | 495.1 | 3 |           1
+ 09:41:38 | 2026-07-12 | 2026-07-27 | ETHUSDT+SOLUSDT+XRPUSDT+DOGEUSDT      |  17280 | 0    | 0    | 160.2 | 4 |           1
+ 09:44:35 | 2026-07-27 | 2026-08-11 | ETHUSDT+SOLUSDT+XRPUSDT+DOGEUSDT      |  17280 | 0    | 0    | 159.7 | 4 |           1
+ 09:47:28 | 2026-08-11 | 2026-08-26 | ETHUSDT+SOLUSDT+XRPUSDT+DOGEUSDT      |  17280 | 31   | 0    | 159.3 | 4 |          24
+ 09:50:18 | 2026-08-26 | 2026-09-10 | ETHUSDT+SOLUSDT+XRPUSDT+DOGEUSDT      |  17280 | 2    | 0    | 154.6 | 4 |          25
+ 09:53:10 | 2026-06-12 | 2026-06-27 | BTCUSDT+BNBUSDT+ZECUSDT+SUIUSDT       |  17280 | 8    | 184  | 155.9 | 4 |          32
+ 09:56:01 | 2026-06-27 | 2026-07-12 | BTCUSDT+BNBUSDT+ZECUSDT+SUIUSDT       |  17280 | 10   | 0    | 156.0 | 4 |          38
+ 09:58:51 | 2026-07-12 | 2026-07-27 | BTCUSDT+BNBUSDT+ZECUSDT+SUIUSDT       |  17280 | 1    | 0    | 156.3 | 4 |          39
+ 10:01:46 | 2026-07-27 | 2026-08-11 | BTCUSDT+BNBUSDT+ZECUSDT+SUIUSDT       |  17280 | 0    | 0    | 158.8 | 4 |          39
+ 10:04:42 | 2026-08-11 | 2026-08-26 | BTCUSDT+BNBUSDT+ZECUSDT+SUIUSDT       |  17280 | 34   | 0    | 160.0 | 4 |          58
+ 10:07:34 | 2026-08-26 | 2026-09-10 | BTCUSDT+BNBUSDT+ZECUSDT+SUIUSDT       |  17280 | 29   | 0    | 156.3 | 4 |          76
+ 10:10:26 | 2026-06-12 | 2026-06-27 | NEARUSDT+UNIUSDT+ARBUSDT+TAOUSDT      |  17280 | 41   | 184  | 156.4 | 4 |         102
+ 10:13:15 | 2026-06-27 | 2026-07-12 | NEARUSDT+UNIUSDT+ARBUSDT+TAOUSDT      |  17280 | 25   | 0    | 155.0 | 4 |         116
+ 10:16:06 | 2026-07-12 | 2026-07-27 | NEARUSDT+UNIUSDT+ARBUSDT+TAOUSDT      |  17280 | 1    | 0    | 155.8 | 4 |         117
+ 10:18:57 | 2026-07-27 | 2026-08-11 | NEARUSDT+UNIUSDT+ARBUSDT+TAOUSDT      |  17280 | 3    | 0    | 156.4 | 4 |         119
+ 10:21:50 | 2026-08-11 | 2026-08-26 | NEARUSDT+UNIUSDT+ARBUSDT+TAOUSDT      |  17280 | 40   | 0    | 157.8 | 4 |         141
+ 10:24:42 | 2026-08-26 | 2026-09-10 | NEARUSDT+UNIUSDT+ARBUSDT+TAOUSDT      |  17280 | 99   | 0    | 156.4 | 4 |         202
+ 10:27:33 | 2026-06-12 | 2026-06-27 | LINKUSDT+DASHUSDT+PROMUSDT+SAHARAUSDT |  17280 | 35   | 184  | 154.2 | 4 |         221
+ 10:30:28 | 2026-06-27 | 2026-07-12 | LINKUSDT+DASHUSDT+PROMUSDT+SAHARAUSDT |  17280 | 2    | 0    | 158.9 | 4 |         223
+ 10:33:18 | 2026-07-12 | 2026-07-27 | LINKUSDT+DASHUSDT+PROMUSDT+SAHARAUSDT |  17280 | 28   | 0    | 156.5 | 4 |         239
+ 10:36:09 | 2026-07-27 | 2026-08-11 | LINKUSDT+DASHUSDT+PROMUSDT+SAHARAUSDT |  17280 | 38   | 0    | 156.2 | 4 |         261
+ 10:39:01 | 2026-08-11 | 2026-08-26 | LINKUSDT+DASHUSDT+PROMUSDT+SAHARAUSDT |  17280 | 84   | 0    | 156.4 | 4 |         312
+ 10:41:56 | 2026-08-26 | 2026-09-10 | LINKUSDT+DASHUSDT+PROMUSDT+SAHARAUSDT |  17280 | 84   | 0    | 158.2 | 4 |         373
+```
+
+Soma: **414 720 barras** = 16 × 90 × 288, **597 `triggered`**, **736 `unavailable` (0,1775 %)**,
+**0 erros**. `sinais_acum` é cumulativo por coorte (o `count_population` conta a coorte inteira, não
+a fatia) — por isso ele fecha em **373**.
+
+**As 184 barras `unavailable` aparecem só nas quatro fatias que começam em 2026-06-12**: é o
+aquecimento de contexto na borda esquerda da janela, uma vez por mercado, não um buraco de dado.
+
+**Cobertura conferida mercado a mercado** (`…-q04…sql`, bloco 8): **25 920 barras para cada um dos
+16**, sem exceção. Nenhum mercado ficou de fora, nenhum foi contado duas vezes.
+
+## 11. O ESTRESSE (07:42 BRT / 10:42Z)
+
+```
+$ ... bash infra/vps/compose.sh replay python -m hunter_strategy_worker.replay.run \
+    --stress replay:92c8d080-6009-4a59-9868-31282b1bd493
+coorte replay:92c8d080-... · as_of 2026-09-11T10:42:26.326179+00:00 · 373 entradas congeladas
+· 14 mercados · axis: r_ex_funding, funding_indeterminado: 1
+| cenário | tipo | n | expectancy (R) | PF | Δ vs base | IC 95 % do Δ |
+| base                    | reprecificacao | 371 | -0.1937 | 0.6977 |    —    | — |
+| custos_x2               | reprecificacao | 371 | -0.3899 | 0.4637 | -0.1962 | [-0.2116, -0.1818] |
+| stop_x0.75              | reprecificacao | 371 | -0.3448 | 0.5725 | -0.1511 | [-0.2279, -0.0748] |
+| stop_x1.25              | reprecificacao | 371 | -0.1411 | 0.7429 | +0.0526 | [-0.0045, +0.1186] |
+| alvo_x0.75              | reprecificacao | 371 | -0.2265 | 0.6246 | -0.0328 | [-0.0737, +0.0078] |
+| alvo_x1.25              | reprecificacao | 371 | -0.1947 | 0.7095 | -0.0010 | [-0.0656, +0.0507] |
+| entrada_mais_1_barra    | reprecificacao | 366 | -0.2065 | 0.6835 | -0.0238 | [-0.0692, +0.0304] |
+| sem ARBUSDT   343 -0.1816 | sem DASHUSDT  335 -0.1937 | sem DOGEUSDT 358 -0.1797 | sem ETHUSDT 370 -0.1966
+| sem LINKUSDT  362 -0.1890 | sem NEARUSDT  344 -0.1546 | sem PROMUSDT 268 -0.2679 | sem SAHARAUSDT 350 -0.1973
+| sem SOLUSDT   369 -0.2013 | sem SUIUSDT   363 -0.1831 | sem TAOUSDT  346 -0.1679 | sem UNIUSDT 325 -0.1931
+| sem XRPUSDT   362 -0.1964 | sem ZECUSDT   328 -0.2281
+| 1a_metade_ate_2026-07-26  | recorte |  92 | -0.2387 | 0.6363 |
+| 2a_metade_apos_2026-07-26 | recorte | 279 | -0.1788 | 0.7186 |
+**Veredito:** sem_vantagem_na_base
+- expectancy da base = -0.1937018205162866619411394157
+```
+
+O estresse reprecifica 371 das 373 (duas saem por funding: `funding_ambiguous_exit`,
+`funding_missing`). **Não há vantagem para estressar** — e mesmo assim toda a grade é negativa, nas
+duas metades da janela e sem qualquer um dos 14 mercados.
+
+## 12. A ANÁLISE — SQL, BOOTSTRAP E A DECOMPOSIÇÃO QUE INVERTE O ARGUMENTO
+
+Dois SQL somente-leitura (`repeatable read read only`, `statement_timeout 240s`):
+
+```
+$ timeout 280 ssh hunter-vps "docker exec -i hunter-postgres-1 psql -U hunter -d hunter \
+    -v ON_ERROR_STOP=1 -f -" < infra/scripts/sql/research/2026-09-11-t384-q03-dump-decisoes-m5.sql
+(915 rows)   # 373 da filha + 542 da mae (o controle pre-declarado, NAO re-rodado)
+$ ... < infra/scripts/sql/research/2026-09-11-t384-q04-funil-k-c5-pedagio.sql
+```
+
+*(Nota de método: o `q04` nasceu com `create temporary view` e o Postgres recusou —
+`cannot execute CREATE VIEW in a read-only transaction`. A recusa está certa e é a prova de que o
+contrato "somente leitura" destes arquivos vale; a CTE passou a ser repetida em cada consulta, com o
+texto idêntico nas seis, e o motivo ficou escrito no cabeçalho do arquivo.)*
+
+### 12.1 População, K1–K6 e as duas expectativas
+
+```
+        versao        | desfechos | avaliaveis | dias | exp_exf | exp_bruta | pf_exf | cobertura_rnet | maior_mkt
+ mean_reversion v1    |       542 |        542 |   83 | -0.0910 |    0.1270 | 0.8509 |         46.68% |    13.10%
+ mean_reversion_m5 v1 |       373 |        373 |   72 | -0.1940 |    0.0346 | 0.6971 |         99.20% |    28.15%
+```
+
+| K | filha | dispara? |
+|---|---|---|
+| K1 (< 20) | 373 | não |
+| K2 (> 1 500) | 373 | não |
+| **K3** (≥ 100 **e** ≥ 30 d **e** bruta < 0) | 373 · 72 d · **+0,0346** | **não, pela letra** |
+| K4 (`unavailable` > 40 %) | **0,1775 %** | não |
+| K5 (cobertura `R_net` < 70 %) | **99,20 %** | não (a mãe **dispara**: 46,68 %) |
+| K6 (≥ 60 % num mercado) | 28,15 % (PROM 105/373) | não |
+
+**Nenhum critério de morte dispara e a versão morre assim mesmo** — pela regra de sucesso, que é mais
+exigente e foi escrita antes. K4 é mensurável de verdade aqui (esta versão não tem
+`eligibility_policy`, logo não há o falso verde da T3.52d). **K5 saltando de 46,68 % para 99,20 % é
+geometria, não qualidade de dado**: o horizonte de 80 min atravessa uma liquidação de funding muito
+mais raramente que as 4 h da mãe.
+
+### 12.2 O bootstrap de blocos de dia (20 000 reamostragens, semente 20260910)
+
+```
+$ uv run python .claude/state/exp-drafts/t384/analise.py \
+    .claude/state/exp-drafts/t384/decisoes-m5-e-mae.csv
+
+-- 1. REGRA No 1
+mean_reversion_m5 v1 | r_ex_funding n= 373 dias= 72 media=-0.1940 IC95=[-0.2889; -0.0943] (abaixo de zero)  PF=0.6971
+mean_reversion v1    | r_ex_funding n= 542 dias= 83 media=-0.0910 IC95=[-0.2129; +0.0311] (cruza zero)      PF=0.8509
+-- expectativa BRUTA
+mean_reversion_m5 v1 | r_bruto      n= 373 dias= 72 media=+0.0346 IC95=[-0.0625; +0.1387] (cruza zero)      PF=1.0687
+mean_reversion v1    | r_bruto      n= 542 dias= 83 media=+0.1270 IC95=[+0.0047; +0.2500] (acima de zero)   PF=1.2595
+
+-- 2. REGRA No 2 (PF por janela de 30 d)
+filha J1 n= 75 dias=22 media=-0.3168 IC95=[-0.4780; -0.1622]  PF=0.5278
+filha J2 n= 42 dias=21 media=+0.0925 IC95=[-0.2458; +0.4174]  PF=1.1657
+filha J3 n=256 dias=29 media=-0.2050 IC95=[-0.3252; -0.0812]  PF=0.6821
+
+-- 3. REGRA No 3 (leave-one-market-out, 16 reajustes) — TODOS negativos, IC inteiro abaixo de zero:
+sem ARBUSDT -0.1820 · sem BNBUSDT -0.1940 (sem decisao: populacao inteira) · sem BTCUSDT -0.1940 (idem)
+sem DASHUSDT -0.1941 · sem DOGEUSDT -0.1802 · sem ETHUSDT -0.1969 · sem LINKUSDT -0.1894
+sem NEARUSDT -0.1551 · sem PROMUSDT -0.2676 · sem SAHARAUSDT -0.1972 · sem SOLUSDT -0.2016
+sem SUIUSDT -0.1834 · sem TAOUSDT -0.1684 · sem UNIUSDT -0.1935 · sem XRPUSDT -0.1967 · sem ZECUSDT -0.2282
+
+-- 4. filha contra a mae, Delta PAREADO POR DIA
+filha n=373 media=-0.1940 | mae n=542 media=-0.0910 | Delta=-0.1030 IC95=[-0.2670; +0.0686]
+
+-- 5. DE ONDE VEM A PIORA (identidade: custo = media(bruta) - media(liquida))
+mean_reversion_m5 v1   bruta=+0.0346  liquida=-0.1940  custo=0.2285 R | 0,0020/ATR% p50 = 0.2518 R (ATR% p50 0.7943 %)
+mean_reversion v1      bruta=+0.1270  liquida=-0.0910  custo=0.2180 R | 0,0020/ATR% p50 = 0.2354 R (ATR% p50 0.8495 %)
+Delta liquida (filha - mae) = -0.1030 R  =  Delta bruta -0.0925 R  -  Delta custo +0.0105 R
+fracao da piora explicada pela vantagem BRUTA = 89.8 % | pelo CUSTO = 10.2 %
+
+-- 6. C5 (banda [0,3 %; 3 %])
+mean_reversion_m5 v1   n= 373 p50=0.8892 % abaixo de 0,3 % = 1 (0.27 %) acima de 3 % = 7 (1.88 %)
+mean_reversion v1      n= 542 p50=0.9242 % abaixo de 0,3 % = 2 (0.37 %) acima de 3 % = 12 (2.21 %)
+```
+
+### 12.3 O pedágio medido contra os 0,254 R previstos no passo 2
+
+| fonte | número |
+|---|---|
+| previsto no passo 2 (distribuição de **barras** condicionada ao portão de ATR) | **0,2540 R** |
+| medido agora nas **decisões**, `0,0020/ATR%` com o ATR% realizado de cada uma | **0,2518 R** (p50) |
+| medido agora pela **identidade** `bruta − líquida` (não depende de nenhuma fórmula de custo) | **0,2285 R** |
+
+A assunção nº 2 do passo 2 (independência entre o portão de ATR e as outras três condições) **se
+sustenta**: 0,2518 contra 0,2540 é **0,9 % de diferença**. A identidade fica 0,023 R abaixo das duas
+porque `0,0020/ATR%` é uma aproximação dos custos assumidos e o custo real por decisão varia com a
+geometria da entrada — as três concordam na segunda casa, o que é o que importa aqui.
+
+**E o número que decide:** o pedágio da filha é **+0,0105 R** acima do da mãe. O pré-registro previu
+**+0,05 a +0,12 R**. P3 está falsificada pela segunda vez, agora sobre decisões reais.
+
+### 12.4 Por mercado e por saída
+
+```
+filha:  PROM 105 -0.0060 | UNI 46 -0.1971 | ZEC 43 +0.0688 | DASH 36 -0.1924 | ARB 28 -0.3418
+        NEAR 27 -0.6915 | TAO 25 -0.5503 | SAHARA 21 -0.1391 | DOGE 13 -0.5763 | XRP 9 -0.0850
+        LINK 9 -0.3805 | SUI 8 -0.6744 | SOL 2 +1.2131 | ETH 1 +0.8879 | BNB 0 | BTC 0
+funil de saida: filha stop 197 (52,82 %, -1,1696) · target 142 (38,07 %, +1,1106) · expired 34 (9,12 %, +0,0106)
+                mae   stop 281 (51,85 %, -1,1575) · target 216 (39,85 %, +1,2183) · expired 45 (8,30 %, +0,2844)
+```
+
+**BTC e BNB não produziram uma única decisão em 90 dias** (ATR% de 5 min p50 0,1250 % e 0,1245 %;
+passam o piso em 0,15 % das barras): o universo **efetivo** é de **14 mercados**, e os dois ausentes
+são os dois mais líquidos. A forma do funil é praticamente a mesma da mãe — a filha não perde por
+sair diferente, perde porque 38,07 % de acerto não paga um R/R de 1,5 depois do pedágio.
+
+## 13. O VEREDITO E A APOSENTADORIA
+
+A regra congelada exige **as quatro**; **as quatro falham**. A régua editorial (≥ 100 avaliáveis
+**e** ≥ 30 dias) é alcançada com folga — 373 e 72 —, então a página **pode** e **deve** decidir.
+
+```
+$ ... compose.sh ops python infra/scripts/activate_strategy_version.py mean_reversion_m5 v1 \
+    --deprecate --changelog "T3.84/EXP-0028: descartada pela regra de sucesso pre-registrada. ..." --dry-run
+2026-09-11T10:53:50Z
+would deprecate mean_reversion_m5 v1 (purpose research_only), code_ref hunter_core.strategies.
+  mean_reversion_m5_v1@sha256:f733467f..., params_hash 5eaf76a71880, successor=none: ...
+
+$ ... (sem --dry-run)
+2026-09-11T10:54:05Z
+deprecated mean_reversion_m5 v1 (purpose research_only) at 2026-09-11T10:54:08.545106+00:00, successor=none
+
+$ psql -c "select s.key, sv.version, sv.status, sv.purpose, sv.activated_at, sv.deprecated_at ..."
+ mean_reversion_m5 | v1 | deprecated | research_only | 2026-09-11 08:32:18.437633+00 | 2026-09-11 10:54:08.545106+00
+```
+
+**Aposentada 13 minutos depois do último número.** A avaliação parcial das 05:50 BRT havia recusado
+aposentar com o argumento de que "a regra do Everton vale para versão **medida** ruim"; agora ela é
+uma. O `changelog` gravado na auditoria carrega os **números** (coorte, 373 desfechos, IC, PF por
+janela, LOMO, veredito do estresse, decomposição bruta/custo), não a conclusão.
+
+Contrato do passo 1 reconferido nesta árvore antes de escrever qualquer página:
+
+```
+$ uv run pytest packages/core/tests/unit/strategies/test_mean_reversion_m5_v1.py -q \
+    -k "look_ahead or antecipa or forming or nao_antecip"
+5 passed, 34 deselected in 0.62s
+
+$ uv run pytest packages/core/tests/unit/strategies/test_mean_reversion_m5_v1.py \
+    services/strategy-worker/tests/test_context_budget.py -q
+75 passed in 3.58s
+
+$ uv run pytest .claude/state/exp-drafts/t362b/test_blocos90.py -q      # o bootstrap que a analise usa
+14 passed in 1.28s
+
+$ uv run ruff check . && uv run ruff format --check .
+All checks passed!
+10 files would be reformatted, 1506 files already formatted
+   # os 10 sao de OUTRAS tarefas nao commitadas (backfill_funding.py, request_backfill.py,
+   # funding_announce.py, quatro notas do Obsidian, tres testes); nenhum e meu, conferido um a um.
+   # `.claude/**` nao e varrido pelo ruff (diretorio oculto), como o irmao `t362b/analise.py` ja mostra.
+
+$ uv run python infra/scripts/check_file_size.py
+scanned 629 files; 0 over budget, 0 grandfathered
+```
+
+## 14. AS PÁGINAS
+
+```
+$ uv run python infra/scripts/obsidian_lint.py
+LINT DA BASE OBSIDIAN — 252 NOTA(S) ANALISADA(S)
+Resumo — Links mortos: 0, Links ambíguos: 0, Notas órfãs: 0, Frontmatter incompleto: 0,
+Valores fora do vocabulário: 0, Procedência da Knowledge Base (KB-*): 0,
+Reescrita de experimentos (append-only): 0.
+RESULTADO: base limpa
+```
+
+- **`EXP-0028`**: seção **acrescentada** (`### Avaliação de 2026-09-11 — as_of = 10:42:26Z`), 201
+  linhas, **0 remoções**; frontmatter passa a `status: avaliado`, `result: reprovada`,
+  `evaluable: 373`, `days: 72`, `last_eval: 2026-09-11`. (`reprovada` é o vocabulário do linter para
+  o que a página chama de `descartar` — `ENUM_VOCAB` em `obsidian_lint_rules.py` aceita
+  `inconclusivo|validada|reprovada|nao-iniciado`.) As duas seções de avaliação anteriores ficaram
+  intactas, inclusive a que dizia "a versão não foi aposentada" — o append-only existe para que o
+  erro do meio-dia continue legível depois da correção da tarde.
+- **`mean_reversion_m5.md`** e **`mean_reversion_m5-v1.md`**: veredito, coorte, decomposição,
+  `deprecated_at`, e a substituição da nota "segue `active`" pela explicação do que mudou.
+- **`Experiments Index`**: as duas linhas da EXP-0028 (catálogo e placar).
+- **`mean_reversion.md`**: a linha da irmã de 5 min.
+
+## 15. ARQUIVOS DESTA PASSADA
+
+```
+$ git -C C:/dev/project-hunter status --porcelain -- <os arquivos desta passada>
+ M obsidian/03-TRADING/Estrategias/mean_reversion.md
+ M obsidian/03-TRADING/Estrategias/mean_reversion_m5-v1.md
+ M obsidian/03-TRADING/Estrategias/mean_reversion_m5.md
+ M obsidian/05-EXPERIMENTS/EXP-0028-mean-reversion-5-min.md
+ M "obsidian/05-EXPERIMENTS/Experiments Index.md"
+ M .claude/state/notes-T3.84.md
+?? .claude/state/exp-drafts/t384/analise.py
+?? .claude/state/exp-drafts/t384/analise.out
+?? .claude/state/exp-drafts/t384/decisoes-m5-e-mae.csv
+?? .claude/state/exp-drafts/t384/q04-funil-k-c5-pedagio.out
+?? infra/scripts/sql/research/2026-09-11-t384-q03-dump-decisoes-m5.sql
+?? infra/scripts/sql/research/2026-09-11-t384-q04-funil-k-c5-pedagio.sql
+```
+
+A árvore é compartilhada: uma `git status` sem pathspec mostra dezenas de arquivos de **outras**
+tarefas. Nada disso é meu e nada disso foi tocado. **Nenhum commit foi feito.**
+
+| Arquivo | O quê |
+|---|---|
+| `…/2026-09-11-t384-q03-dump-decisoes-m5.sql` | dump por decisão (CSV) da coorte da filha **e** do controle pré-declarado, com `atr_pct` e o desfecho da saída |
+| `…/2026-09-11-t384-q04-funil-k-c5-pedagio.sql` | K1–K6, por janela, por mercado, C5, pedágio medido, funil de saída, K4 pelo recibo do replay e cobertura de barras por mercado |
+| `.claude/state/exp-drafts/t384/analise.py` | blocos de dia (semente 20260910), LOMO, 3 janelas, Δ pareado filha × mãe, decomposição bruta/custo, C5 |
+| `…/analise.out`, `…/q04-funil-k-c5-pedagio.out` | as saídas, gravadas para não depender da minha transcrição |
+| `…/decisoes-m5-e-mae.csv` | 915 decisões (373 + 542) |
+
+## 16. ASSUNÇÕES NUMÉRICAS QUE EU TIVE DE FAZER NESTE PASSO
+
+1. **Fatias de 15 d, não de 30 d.** Medido: 4 × 30 d = 495 s, acima do teto de 290 s do brief. A
+   saída autorizada era "4 mercados × 15 d" e foi a usada. **Efeito declarado:** em cada fronteira
+   nova (06-27, 07-27, 08-26) um acompanhamento aberto é liquidado pelo `drain_cohort` no fim da
+   fatia — com velas **reais** até o horizonte dele, nunca truncado — e a fatia seguinte encontra o
+   slot já rearmado. O horizonte é de 80 min, logo o efeito vive em **3 × 80 min por mercado = 4 h de
+   2 160 h (0,19 %)** e só pode **adicionar** entradas perto da fronteira. É a única diferença de
+   método contra a EXP-0025.
+2. **`--workers 4` num container de 3 CPUs**, 1 acima do que `workers_for` escolheria. Sobreinscrição
+   contida pelo *cgroup* do `replay-worker`; não disputa com a faixa viva (outro container, outro
+   limite) e não altera número nenhum — o paralelismo é por mercado e cada mercado é uma máquina de
+   estados independente.
+3. **Uma coorte para as 23 fatias** (a assunção nº 4 do passo 2, mantida). O CLI **aceitou** reusar a
+   coorte entre fatias: `--cohort` é repassado sem verificação de unicidade, `count_population` conta
+   a coorte inteira (por isso `signals` é cumulativo no recibo) e `--stress` recebeu **uma** coorte,
+   como os braços "metades" e "sem-mercado" exigem.
+4. **A primeira fatia foi contada como válida**, mesmo com o cliente morto pelo `timeout`: o container
+   terminou os quatro mercados, gravou `bars_evaluated 34560` e `errors 0` no recibo, e os quatro
+   `last_bar_close` batem no fim da janela. Não houve reexecução — reexecutar teria reavaliado barras
+   já decididas.
+5. **`r_bruto`** é `(exit_base − entry/1,0006) / initial_risk`, a mesma fórmula da T3.76 q04 e da
+   EXP-0025 — o `1,0006` é o meio-spread assumido, removido para chegar ao preço "sem custo". Trocar
+   essa fórmula mudaria a decomposição do §12.2 item 5; usei a existente de propósito.
+6. **O explain-ledger não sobreviveu.** 23 JSONL (414 720 linhas) foram escritos em `/tmp` dentro de
+   containers `docker compose run --rm` — o `replay-worker` não declara volume — e morreram com eles.
+   O funil por estado que eu precisava está **durável** no recibo de cada corrida
+   (`evaluations_by_state`), e é dele que as linhas `unavailable`/`triggered` desta nota saem. Se
+   alguém quiser os JSONL, o conserto é um `volumes:` no serviço, e é commit de outra tarefa.

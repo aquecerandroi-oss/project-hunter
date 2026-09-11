@@ -1,0 +1,115 @@
+BEGIN
+SET
+Output format is aligned.
+== 1. populacao, K1/K2/K3/K5/K6 e expectativa (eixo r_ex_funding) ==
+        versao        | desfechos | avaliaveis | dias | exp_exf | exp_bruta | pf_exf | cobertura_rnet_pct | maior_mercado_pct 
+----------------------+-----------+------------+------+---------+-----------+--------+--------------------+-------------------
+ mean_reversion v1    |       542 |        542 |   83 | -0.0910 |    0.1270 | 0.8509 |              46.68 |             13.10
+ mean_reversion_m5 v1 |       373 |        373 |   72 | -0.1940 |    0.0346 | 0.6971 |              99.20 |             28.15
+(2 rows)
+
+== 2. por janela de 30 d (regra de sucesso no 2: PF > 1 em >= 2 de 3) ==
+        versao        | janela |  n  | dias | exp_exf | exp_bruta | pf_exf 
+----------------------+--------+-----+------+---------+-----------+--------
+ mean_reversion v1    | J1     | 196 |   28 | -0.2382 |    0.0012 | 0.6562
+ mean_reversion v1    | J2     |  95 |   29 | -0.1600 |    0.0791 | 0.7600
+ mean_reversion v1    | J3     | 251 |   26 |  0.0502 |    0.2434 | 1.0958
+ mean_reversion_m5 v1 | J1     |  75 |   22 | -0.3168 |   -0.0547 | 0.5278
+ mean_reversion_m5 v1 | J2     |  42 |   21 |  0.0925 |    0.3067 | 1.1657
+ mean_reversion_m5 v1 | J3     | 256 |   29 | -0.2050 |    0.0161 | 0.6821
+(6 rows)
+
+== 3. por mercado (K6 e a decomposicao obrigatoria) ==
+        versao        |  mercado   |  n  | exp_exf | pf_exf | atr_pct_medio 
+----------------------+------------+-----+---------+--------+---------------
+ mean_reversion v1    | PROMUSDT   |  71 |  0.0898 | 1.1650 |        1.7488
+ mean_reversion v1    | ZECUSDT    |  68 | -0.1970 | 0.7110 |        0.9401
+ mean_reversion v1    | UNIUSDT    |  64 |  0.1500 | 1.3109 |        0.9681
+ mean_reversion v1    | NEARUSDT   |  61 | -0.2223 | 0.6778 |        0.9362
+ mean_reversion v1    | ARBUSDT    |  52 | -0.2367 | 0.6606 |        1.1001
+ mean_reversion v1    | SAHARAUSDT |  47 | -0.2020 | 0.6947 |        0.9300
+ mean_reversion v1    | TAOUSDT    |  46 | -0.0571 | 0.9021 |        0.9960
+ mean_reversion v1    | DASHUSDT   |  43 | -0.1545 | 0.7632 |        1.1250
+ mean_reversion v1    | SUIUSDT    |  20 | -0.2529 | 0.6011 |        0.9008
+ mean_reversion v1    | LINKUSDT   |  17 | -0.2416 | 0.6546 |        0.9597
+ mean_reversion v1    | SOLUSDT    |  17 |  0.0849 | 1.1737 |        0.7713
+ mean_reversion v1    | XRPUSDT    |  15 | -0.0631 | 0.8823 |        1.1792
+ mean_reversion v1    | DOGEUSDT   |  12 | -0.0914 | 0.8442 |        1.0830
+ mean_reversion v1    | ETHUSDT    |   7 |  0.2783 | 1.7870 |        0.7781
+ mean_reversion v1    | BTCUSDT    |   1 |  0.0303 |        |        0.6370
+ mean_reversion v1    | BNBUSDT    |   1 |  0.5342 |        |        0.9529
+ mean_reversion_m5 v1 | PROMUSDT   | 105 | -0.0060 | 0.9893 |        1.4124
+ mean_reversion_m5 v1 | UNIUSDT    |  46 | -0.1971 | 0.6832 |        0.8282
+ mean_reversion_m5 v1 | ZECUSDT    |  43 |  0.0688 | 1.1352 |        0.8155
+ mean_reversion_m5 v1 | DASHUSDT   |  36 | -0.1924 | 0.6847 |        1.0513
+ mean_reversion_m5 v1 | ARBUSDT    |  28 | -0.3418 | 0.5412 |        0.9699
+ mean_reversion_m5 v1 | NEARUSDT   |  27 | -0.6915 | 0.1928 |        0.7367
+ mean_reversion_m5 v1 | TAOUSDT    |  25 | -0.5503 | 0.3618 |        0.7666
+ mean_reversion_m5 v1 | SAHARAUSDT |  21 | -0.1391 | 0.7720 |        0.8076
+ mean_reversion_m5 v1 | DOGEUSDT   |  13 | -0.5763 | 0.3219 |        0.7367
+ mean_reversion_m5 v1 | XRPUSDT    |   9 | -0.0850 | 0.8324 |        1.3196
+ mean_reversion_m5 v1 | LINKUSDT   |   9 | -0.3805 | 0.4599 |        0.6867
+ mean_reversion_m5 v1 | SUIUSDT    |   8 | -0.6744 | 0.2430 |        0.6995
+ mean_reversion_m5 v1 | SOLUSDT    |   2 |  1.2131 |        |        0.6842
+ mean_reversion_m5 v1 | ETHUSDT    |   1 |  0.8879 |        |        0.7516
+(30 rows)
+
+== 4. C5 -- banda de risco do paper_v1 [0,003; 0,03] sobre initial_risk/entry ==
+        versao        | janela |  n  | risco_pct_p50 | abaixo_do_piso | acima_do_teto | abaixo_pct | acima_pct 
+----------------------+--------+-----+---------------+----------------+---------------+------------+-----------
+ mean_reversion v1    | J1     | 196 |        0.8551 |              1 |             0 |       0.51 |      0.00
+ mean_reversion v1    | J2     |  95 |        0.8118 |              0 |             2 |       0.00 |      2.11
+ mean_reversion v1    | J3     | 251 |        1.0634 |              1 |            10 |       0.40 |      3.98
+ mean_reversion v1    | TODAS  | 542 |        0.9242 |              2 |            12 |       0.37 |      2.21
+ mean_reversion_m5 v1 | J1     |  75 |        0.7856 |              0 |             0 |       0.00 |      0.00
+ mean_reversion_m5 v1 | J2     |  42 |        0.9139 |              0 |             3 |       0.00 |      7.14
+ mean_reversion_m5 v1 | J3     | 256 |        0.9403 |              1 |             4 |       0.39 |      1.56
+ mean_reversion_m5 v1 | TODAS  | 373 |        0.8892 |              1 |             7 |       0.27 |      1.88
+(8 rows)
+
+== 5. PEDAGIO medido nas decisoes: ATR% realizado e 0,0020/ATR% (stop_atr=1) ==
+        versao        |  n  | atr_pct_p50 | atr_pct_p25 | atr_pct_p75 | pedagio_r_p50 | pedagio_r_medio | sob_o_piso_006 
+----------------------+-----+-------------+-------------+-------------+---------------+-----------------+----------------
+ mean_reversion v1    | 542 |      0.8495 |      0.6906 |      1.1839 |        0.2354 |          0.2239 |              0
+ mean_reversion_m5 v1 | 373 |      0.7943 |      0.6791 |      1.1118 |        0.2518 |          0.2337 |              0
+(2 rows)
+
+== 6. funil de saida ==
+        versao        |  saida  |  n  |  pct  | exp_exf 
+----------------------+---------+-----+-------+---------
+ mean_reversion v1    | stop    | 281 | 51.85 | -1.1575
+ mean_reversion v1    | target  | 216 | 39.85 |  1.2183
+ mean_reversion v1    | expired |  45 |  8.30 |  0.2844
+ mean_reversion_m5 v1 | stop    | 197 | 52.82 | -1.1696
+ mean_reversion_m5 v1 | target  | 142 | 38.07 |  1.1106
+ mean_reversion_m5 v1 | expired |  34 |  9.12 |  0.0106
+(6 rows)
+
+== 7. K4 -- unavailable lido do recibo de cada corrida de replay ==
+                   coorte                    | corridas | barras | unavailable | triggered | unavailable_pct | erros |            de             |            ate            
+---------------------------------------------+----------+--------+-------------+-----------+-----------------+-------+---------------------------+---------------------------
+ replay:92c8d080-6009-4a59-9868-31282b1bd493 |       23 | 414720 |         736 |       597 |          0.1775 |     0 | 2026-06-12T00:00:00+00:00 | 2026-09-10T00:00:00+00:00
+(1 row)
+
+== 8. cobertura de barras por mercado (as 23 fatias cobrem 16 x 90 d?) ==
+   symbol   | fatias | barras 
+------------+--------+--------
+ ARBUSDT    |      6 |  25920
+ BNBUSDT    |      6 |  25920
+ BTCUSDT    |      6 |  25920
+ DASHUSDT   |      6 |  25920
+ DOGEUSDT   |      5 |  25920
+ ETHUSDT    |      5 |  25920
+ LINKUSDT   |      6 |  25920
+ NEARUSDT   |      6 |  25920
+ PROMUSDT   |      6 |  25920
+ SAHARAUSDT |      6 |  25920
+ SOLUSDT    |      5 |  25920
+ SUIUSDT    |      6 |  25920
+ TAOUSDT    |      6 |  25920
+ UNIUSDT    |      6 |  25920
+ XRPUSDT    |      5 |  25920
+ ZECUSDT    |      6 |  25920
+(16 rows)
+
+COMMIT

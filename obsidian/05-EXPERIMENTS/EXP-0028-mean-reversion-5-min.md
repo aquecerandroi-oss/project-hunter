@@ -1,15 +1,15 @@
 ---
 tags: [experimento, mean-reversion, timeframe, custo, 90-dias, pre-registro]
 updated: 2026-09-11
-status: pre-registrado
+status: avaliado
 owner: quant-engineer
 exp: EXP-0028
 strategy: "mean_reversion_m5"
 version: "v1 (módulo novo, code_ref próprio)"
-result: nao-iniciado
-evaluable: 0
-days: 0
-last_eval: ""
+result: reprovada
+evaluable: 373
+days: 72
+last_eval: "2026-09-11"
 ---
 
 # EXP-0028 — a reversão à média decidida em 5 minutos
@@ -338,6 +338,207 @@ fechamento acima do meio) são independentes do ATR% — não verificado, e só 
    versão **medida** ruim; esta não foi medida. `--deprecate` aqui congelaria a linha sem resposta e
    jogaria fora a única coisa que o replay ainda pode dar. Ela segue `active`/`research_only`, e o
    custo disso está dito nas notas.
+
+### Avaliação de 2026-09-11 — `as_of = 2026-09-11T10:42:26Z` (07:42 BRT) — **final: `descartar`, e o motivo não é o custo**
+
+**Veredito: `descartar`.** A coorte existe, a régua editorial é alcançada com folga (**373 desfechos
+avaliáveis** em **72 dias distintos**, contra o piso de 100 e 30) e **as quatro condições da regra de
+sucesso congelada falham**. A versão foi aposentada na mesma tarefa, como a própria regra manda —
+`deprecated` em **2026-09-11T10:54:08Z (07:54:08 BRT)**.
+
+O que mudou desde a avaliação parcial de 05:50 BRT: o portão do `replay-worker` foi consertado pela
+**T3.87** (`shard.py` expõe `heartbeat_keys`/`consumer_groups` pela topologia, `budget.py` toma o pior
+dos N shards, o grupo órfão `strategy-worker.shadow` é detectado e ignorado com um log). Com ele de pé,
+o replay rodou **sem uma única recusa e sem um único erro**.
+
+#### A corrida
+
+| item | valor |
+|---|---|
+| coorte | `replay:92c8d080-6009-4a59-9868-31282b1bd493` (uma só para as 23 fatias) |
+| fatias | **23** — 1 de 4 mercados × 30 d e 22 de 4 mercados × 15 d, uma por vez, primeiro plano |
+| barras avaliadas | **414 720** = 16 mercados × 90 d × 288 · conferido mercado a mercado: **25 920 cada, sem exceção** |
+| janela | 2026-06-12 → 2026-09-10 (as três janelas de 30 d da EXP-0025) |
+| `unavailable` | **736 barras (0,1775 %)** — K4 longe de disparar, e mensurável de verdade (esta versão não tem `eligibility_policy`, logo não há o falso verde da T3.52d) |
+| erros | **0** · `decision_lag_s` assumido: 2 s · `context_minutes`: 1 560 (o piso, como previsto) |
+| decisões | **597 `triggered`** → **373 desfechos terminais** com `r_ex_funding` (os 224 restantes são rearmes que não viraram entrada elegível) |
+| tempo | 06:28 → 07:41 BRT, ~158 s por fatia de 15 d (≈ 110 barras/s com 4 processos) |
+
+#### As quatro condições, uma a uma
+
+| # | Condição congelada | Medido | Veredito |
+|---|---|---|---|
+| 1 | expectativa ex-funding em 90 d **> 0** com **IC 95 % de blocos de dia acima de zero** | **−0,1940 R**, IC95 **[−0,2889; −0,0943]** — o intervalo **inteiro** abaixo de zero; PF 0,6971 | **FALHA** |
+| 2 | **PF > 1 em ao menos 2 das 3 janelas** de 30 d | J1 **0,5278** (n=75) · J2 **1,1657** (n=42) · J3 **0,6821** (n=256) → **1 de 3** | **FALHA** |
+| 3 | **leave-one-market-out nunca negativo** (16 reajustes) | **negativo nos 16**, do melhor (`sem NEARUSDT` −0,1551) ao pior (`sem PROMUSDT` −0,2676); os IC95 dos 16 ficam **inteiramente abaixo de zero** | **FALHA** |
+| 4 | estresse **não `frágil`** | `--stress` responde **`sem_vantagem_na_base`**: não há vantagem para estressar. Custos ×2 pioram para −0,3899 (Δ −0,1962 [−0,2116; −0,1818]); as **duas metades** da janela são negativas (1ª −0,2387, 2ª −0,1788) | **FALHA** (não avaliável por ausência de base) |
+
+Bootstrap: blocos de **dia inteiro**, 20 000 reamostragens, semente **20260910** — as mesmas das
+EXP-0025 e EXP-0026, de propósito, para que os IC sejam comparáveis entre as três páginas
+(`.claude/state/exp-drafts/t362b/blocos90.py`, `.claude/state/exp-drafts/t384/analise.py`).
+
+#### Funil K1–K6 — e o que ele **não** diz
+
+| critério | medido | dispara? |
+|---|---|---|
+| K1 (< 20 decisões) | 373 | não |
+| K2 (> 1 500) | 373 | não |
+| **K3** (≥ 100 desfechos **e** ≥ 30 dias **e** bruta < 0) | 373 · 72 d · bruta **+0,0346 R** | **não, pela letra** |
+| K4 (`unavailable` > 40 %) | 0,1775 % | não |
+| K5 (cobertura de `R_net` < 70 %) | **99,20 %** (a mãe: 46,68 %) | não |
+| K6 (≥ 60 % num mercado) | 28,15 % (PROMUSDT, 105/373) | não |
+
+**Nenhum critério de morte dispara, e a versão morre de qualquer forma** — pela regra de sucesso, que
+é mais exigente do que a régua de morte, e que foi escrita antes. Dito o que K3 esconde: a expectativa
+bruta é positiva no ponto (+0,0346 R) mas o IC de blocos de dia é **[−0,0625; +0,1387]**, isto é,
+**indistinguível de zero**. A cláusula "perde antes dos custos" não se aplica pela letra; a frase
+honesta é "**não há vantagem bruta que um trabalho de custo possa resgatar**".
+
+O K5 merece nota própria: a cobertura de `R_net` salta de 46,68 % na mãe para **99,20 %** aqui. Não é
+melhoria de dado — é geometria: o horizonte de 4 800 s (1 h 20) atravessa uma liquidação de funding
+muito mais raramente que as 4 h da mãe. Um efeito colateral do eixo, medido e não procurado.
+
+#### De onde vem a piora — a decomposição que inverte o argumento desta página
+
+O custo médio por decisão em R é uma **identidade**, não um modelo:
+`custo = média(r_bruto) − média(r_ex_funding)`.
+
+| | vantagem **bruta** | líquida (ex-funding) | **custo** medido | `0,0020/ATR%` (KB-0076) | ATR% p50 realizado |
+|---|---:|---:|---:|---:|---:|
+| mãe `mean_reversion v1` (15 m) | **+0,1270 R** | −0,0910 R | **0,2180 R** | 0,2354 R | 0,8495 % |
+| filha `mean_reversion_m5 v1` (5 m) | **+0,0346 R** | −0,1940 R | **0,2285 R** | 0,2518 R | 0,7943 % |
+
+`Δ líquida = −0,1030 R = Δ bruta (−0,0925 R) − Δ custo (+0,0105 R)`. Ou seja: **89,8 % da piora é a
+vantagem bruta encolhendo e 10,2 % é o custo subindo.**
+
+Isto é a terceira e última vez que esta página erra contra a própria versão pelo mesmo motivo. O
+pré-registro apostou `descartar` **por custo** (KB-0076, KB-0086); a medição de 05:50 BRT já havia
+falsificado P3 sobre a distribuição de barras; agora a medição **sobre as decisões que existiram**
+confirma aquela falsificação com o número exato: o pedágio subiu **+0,0105 R**, não os +0,05 a +0,12 R
+previstos. **O custo a 5 min é quase o mesmo da mãe. O que não existe a 5 min é o sinal.**
+
+E o pré-registro nomeou este caminho antes: *"o que também seria informativo e não está previsto: uma
+expectativa bruta a 5 min **maior** que +0,1270 R significaria que o sinal de reversão é mais forte no
+relógio curto e que o problema é só custo"*. Aconteceu o **oposto exato**: a vantagem bruta a 5 min é
+**3,7× menor** que a da mãe. Não há versão de custo (maker, alvo maior) a escrever — não há de onde
+tirar o ganho. É este achado, e não o veredito, o que esta página entrega.
+
+#### As cinco previsões, fechadas
+
+| Previsão | Resultado | Número |
+|---|---|---|
+| **P1** ATR%(5m) p50 ≈ 0,30 % | **confirmada** (05:50 BRT) | 0,2984 % / 0,2714 % |
+| **P2** o piso define a versão; condicional 0,60–0,75 % | **mecanismo sim, número não** | portão passa 8,85 %; ATR% realizado **nas decisões** p50 **0,7943 %** (p25 0,6791 · p75 1,1118) — o piso 0,006 é o p≈15 da própria população de decisões |
+| **P3** pedágio 0,267–0,333 R, Δ +0,05…+0,12 R | **falsificada duas vezes** | 0,2518 R por KB-0076, **0,2285 R** pela identidade; Δ **+0,0105 R** |
+| **P4** ex-funding −0,25 a −0,09 R, PF 0,65–0,90, veredito `descartar` | **confirmada, e no centro da faixa** | **−0,1940 R**, **PF 0,6971**, `descartar` |
+| **P5** 160–810 decisões | **confirmada** | **373** (a reestimativa de 05:50 BRT era ≈ 436) |
+
+**P4 acertou o resultado pelo motivo errado.** A faixa prevista foi construída somando um pedágio
+maior a uma vantagem bruta intacta; o mundo entregou o mesmo número com pedágio intacto e vantagem
+bruta destruída. Registrar isso importa mais do que o acerto: um pré-registro que acerta o número e
+erra o mecanismo não valida o mecanismo.
+
+#### C5 (`REVISE`) — as duas metades, agora sobre decisões e não sobre barras
+
+Banda de risco do `paper_v1` `[0,3 %; 3 %]` sobre `initial_risk / entry`, 373 decisões:
+**p50 0,8892 %**, **1 decisão (0,27 %)** abaixo do piso de 0,3 % e **7 (1,88 %)** acima do teto de 3 %
+(a mãe, mesma leitura: p50 0,9242 %, 0,37 % e 2,21 %). Por janela: J1 0/0, J2 0/3 (7,14 % acima do
+teto), J3 1/4.
+
+A previsão de 05:50 BRT era **0,00 %** abaixo do piso; o medido é **uma** decisão. A explicação é
+mecânica e vale registrar: o portão exige `ATR% ≥ 0,6 %` na **barra de decisão**, mas `risco_pct` é
+medido contra o **preço de entrada** da barra seguinte — quando o preço sobe entre as duas, a mesma
+distância de stop vale uma fração menor. C5 fica onde estava: **a versão cabe na banda por
+dependência de um piso que existe por outro motivo**, e a exceção de 0,27 % é a prova de que a
+dependência não é uma garantia.
+
+#### Filha contra mãe, Δ pareado por dia — a honestidade que o número exige
+
+As duas dividem o calendário de 90 d, então o contraste é **pareado por dia**: filha −0,1940 (n=373),
+mãe −0,0910 (n=542), **Δ −0,1030 R, IC95 [−0,2670; +0,0686]** — **o intervalo cruza zero**. Dito sem
+enfeite: a filha é pior no ponto, e **não é estatisticamente distinguível da mãe** com blocos de dia.
+As duas são negativas; o que a coorte prova com IC é que **a filha é negativa** (condição 1), não que
+ela seja *pior* que a mãe. O braço de falseamento pré-declarado cumpriu o papel: ele não salvou a
+versão nem foi derrubado por ela.
+
+#### Decomposição obrigatória por mercado (K6 não dispara, mas a régua exige a tabela)
+
+| mercado | n | ex-funding | PF | ATR% médio |
+|---|---:|---:|---:|---:|
+| PROMUSDT | 105 | −0,0060 | 0,9893 | 1,4124 |
+| UNIUSDT | 46 | −0,1971 | 0,6832 | 0,8282 |
+| ZECUSDT | 43 | **+0,0688** | 1,1352 | 0,8155 |
+| DASHUSDT | 36 | −0,1924 | 0,6847 | 1,0513 |
+| ARBUSDT | 28 | −0,3418 | 0,5412 | 0,9699 |
+| NEARUSDT | 27 | −0,6915 | 0,1928 | 0,7367 |
+| TAOUSDT | 25 | −0,5503 | 0,3618 | 0,7666 |
+| SAHARAUSDT | 21 | −0,1391 | 0,7720 | 0,8076 |
+| DOGEUSDT | 13 | −0,5763 | 0,3219 | 0,7367 |
+| XRPUSDT | 9 | −0,0850 | 0,8324 | 1,3196 |
+| LINKUSDT | 9 | −0,3805 | 0,4599 | 0,6867 |
+| SUIUSDT | 8 | −0,6744 | 0,2430 | 0,6995 |
+| SOLUSDT | 2 | +1,2131 | — | 0,6842 |
+| ETHUSDT | 1 | +0,8879 | — | 0,7516 |
+| **BNBUSDT** | **0** | — | — | — |
+| **BTCUSDT** | **0** | — | — | — |
+
+**Dois dos 16 mercados elegíveis não produziram uma única decisão em 90 dias** (BNB e BTC, cujo ATR%
+de 5 min tem mediana 0,1245 % e 0,1250 % e passa o piso em 0,15 % das barras). O universo **efetivo**
+desta versão é de **14 mercados**, e os dois ausentes são justamente os dois de maior liquidez. Isso
+é o C3 ("adequação da amostra") cobrando o preço previsto: a versão não escolhe onde operar, o piso
+escolhe por ela — e ele escolhe as pontas.
+
+Concentração de calendário, declarada: **J3 tem 256 das 373 decisões (68,6 %)** em 29 dias. O eixo de
+volatilidade que abre a porta desta versão é o mesmo que concentra a amostra na janela mais agitada —
+exatamente o efeito que a EXP-0025 mediu na mãe (C5 por regime) e que C4 pediu para medir em vez de
+assumir.
+
+#### Funil de saída
+
+`stop` 197 (52,82 %, ex-funding médio −1,1696) · `target` 142 (38,07 %, +1,1106) · `expired` 34
+(9,12 %, +0,0106). A mãe: 51,85 % / 39,85 % / 8,30 %. **A forma do funil é praticamente idêntica** —
+a filha não perde por sair diferente, perde porque a taxa de acerto de 38,07 % não paga um R/R de 1,5
+depois do pedágio (o ponto de equilíbrio bruto é ~40 %).
+
+#### Aposentadoria — a regra do Everton aplicada ao caso que ela descreve
+
+```
+activate_strategy_version.py mean_reversion_m5 v1 --deprecate --changelog "T3.84/EXP-0028: ..."
+deprecated mean_reversion_m5 v1 (purpose research_only) at 2026-09-11T10:54:08.545106+00:00, successor=none
+```
+
+A avaliação parcial de 05:50 BRT havia recusado aposentar com um argumento explícito: *"a regra vale
+para versão **medida** ruim; esta não foi medida"*. Agora foi. O `changelog` gravado na auditoria
+carrega os números, não a conclusão: coorte, 373 desfechos, IC, PF por janela, LOMO, veredito do
+estresse e a decomposição bruta/custo.
+
+#### Limites desta seção, ditos
+
+1. **As fatias de 15 d não são as fatias de 30 d do protocolo.** Uma fatia de 4 mercados × 30 d levou
+   **495 s** e estourou o `timeout` de 265 s do cliente (o container terminou sozinho e gravou o
+   recibo; nada ficou pela metade). As 22 fatias seguintes foram de **15 d** com `--workers 4` — a
+   saída que o brief autorizou. Consequência numérica, declarada: em cada fronteira nova
+   (06-27, 07-27, 08-26) um acompanhamento aberto é liquidado pelo `drain_cohort` no fim da fatia, com
+   velas reais até o seu próprio horizonte, e a fatia seguinte encontra o slot já rearmado. O
+   horizonte é de 80 min, então o efeito vive em **3 × 80 min por mercado = 4 h de 2 160 h (0,19 %)** e
+   só pode **adicionar** entradas perto da fronteira. Não há como o efeito produzir uma expectativa
+   negativa; ele é a única diferença de método contra a EXP-0025, e é esta.
+2. **`--workers 4` num container de 3 CPUs** é 1 acima do que o orçamento (`workers_for`) escolheria.
+   É sobreinscrição contida pelo *cgroup* do `replay-worker`, nunca disputa com a faixa viva (outro
+   container, outro limite). Não altera nenhum número: o paralelismo do replay é por mercado e cada
+   mercado é uma máquina de estados independente.
+3. **A elegibilidade é lida hoje**, não por barra (PIPELINE §6c). Os 16 são o universo de 2026-09-11.
+4. **Dois mercados com zero decisões** não são um leave-one-market-out de verdade: o recorte
+   "sem BNB" e "sem BTC" **é** a população inteira, e está na tabela dizendo isso.
+5. **O explain-ledger não sobreviveu.** 23 JSONL (414 720 linhas) foram escritos em `/tmp` dentro de
+   containers `docker compose run --rm` e morreram com eles — `replay-worker` não tem volume. O funil
+   por estado que eu precisava deles está **durável** no recibo de cada corrida
+   (`system_events.component = 'replay_engine'`, `evaluations_by_state`), e é dele que a linha
+   `unavailable` desta seção sai.
+6. **O que esta página não mediu:** nenhuma variante. `atr_pct_min` mais alto, alvo maior, `stop_atr`
+   maior ou entrada maker seriam **versões novas**, com pré-registro novo. A leitura da decomposição
+   acima recomenda **não** escrevê-las: sem vantagem bruta, mexer em custo não tem de onde tirar
+   ganho.
 
 ## Variantes tentadas
 

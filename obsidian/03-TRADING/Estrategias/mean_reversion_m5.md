@@ -10,7 +10,7 @@ updated: 2026-09-11
 
 | Versão | Propósito | Status | Veredito | Página |
 |---|---|---|---|---|
-| `v1` | `research_only` | `active` (ativada em 2026-09-11T08:32:18Z / 05:32 BRT) | sem avaliação — replay bloqueado pelo portão do `replay-worker`, ver [[EXP-0028-mean-reversion-5-min]] | [[mean_reversion_m5-v1]] |
+| `v1` | `research_only` | `deprecated` (ativada 2026-09-11T08:32:18Z / 05:32 BRT, aposentada 2026-09-11T10:54:08Z / 07:54 BRT) | **`descartar`** — 90 d × 16 mkt, 373 desfechos: ex-funding **−0,1940 R** (IC95 [−0,2889; −0,0943]), PF 0,6971; as quatro condições da [[EXP-0028-mean-reversion-5-min]] falham | [[mean_reversion_m5-v1]] |
 
 ## Ligações
 
@@ -38,8 +38,19 @@ cauda volátil, o pedágio por operação sobe apenas **+0,0086 R** sobre o da m
 +0,12 R que o pré-registro apostou. **O argumento de custo contra esta versão não sobreviveu à
 medição**; o que decide passou a ser a expectativa bruta, que só o replay mede.
 
-**Estado operacional em 2026-09-11:** semeada e ativada como `research_only` na VPS; decide na faixa
-viva do Lab desde 05:32 BRT; **sem coorte de replay** — o portão do `replay-worker` recusa toda
-corrida na VPS desde que o worker vivo foi shardado (lê `hb:strategy:shadow` e o grupo
-`strategy-worker.shadow`, que com `STRATEGY_SHARDS=4` ninguém escreve e ninguém consome). Detalhes e
-conserto em `.claude/state/notes-T3.84.md`.
+**Estado operacional em 2026-09-11:** semeada e ativada como `research_only` às 05:32 BRT e
+**aposentada às 07:54 BRT do mesmo dia** — a regra do Everton ("versão ruim morre no mesmo dia")
+aplicada à primeira medição que existiu. O replay bloqueado pela manhã (o portão do `replay-worker`
+lia a topologia pré-shard) foi destravado pela **T3.87**, e a coorte de 90 d
+`replay:92c8d080-6009-4a59-9868-31282b1bd493` rodou em 23 fatias, **414 720 barras, zero erro**.
+
+**O que a medição disse, e ela contradiz o próprio pré-registro em cima do motivo:** a família de
+5 min **não perde por custo**. O pedágio subiu apenas **+0,0105 R** sobre o da mãe (0,2285 R contra
+0,2180 R, pela identidade `bruta − líquida`), e não os +0,05 a +0,12 R previstos. Quem desapareceu foi
+a **vantagem bruta**: **+0,0346 R** a 5 min contra **+0,1270 R** a 15 min, com IC de blocos de dia
+`[−0,0625; +0,1387]` — indistinguível de zero. **89,8 % da piora é sinal, 10,2 % é custo.**
+
+**Consequência para quem pensar em voltar aqui:** não há versão de custo a escrever nesta grade
+(maker, alvo maior, `atr_pct_min` mais alto). Sem vantagem bruta, mexer em custo não tem de onde
+tirar ganho — e dois dos 16 mercados elegíveis (BTC e BNB, os dois mais líquidos) não produziram
+**nenhuma** decisão em 90 dias, porque o piso de ATR% herdado corta a grade curta deles inteira.

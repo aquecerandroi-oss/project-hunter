@@ -3,17 +3,17 @@ tags: ["estrategia", "catalogo", "mean_reversion_m5"]
 strategy: mean_reversion_m5
 version: v1
 purpose: research_only
-status: "active — ativada em 2026-09-11T08:32:18Z (05:32 BRT), sem coorte de replay"
+status: "deprecated — ativada em 2026-09-11T08:32:18Z (05:32 BRT), aposentada em 2026-09-11T10:54:08Z (07:54 BRT) pelo veredito descartar da EXP-0028"
 code_ref: "hunter_core.strategies.mean_reversion_m5_v1@sha256:f733467fedc529c661f53cf84653e9c5a514d86767471757ee43679af763734b"
 params_hash: "5eaf76a7188078e773341b3e509d67509326107a80c5f0e2a1e781d5934fa6c7"
 activated_at: "2026-09-11T08:32:18Z"
-deprecated_at: ""
+deprecated_at: "2026-09-11T10:54:08Z"
 derived_from: ""
-cohorts: []
+cohorts: ["replay:92c8d080-6009-4a59-9868-31282b1bd493"]
 exp: ["[[EXP-0028-mean-reversion-5-min]]", "[[EXP-0021-timeframe]]"]
 updated: 2026-09-11
 ---
-# mean_reversion_m5 v1 (research_only, ativada — sem replay)
+# mean_reversion_m5 v1 (research_only, medida e aposentada no mesmo dia)
 
 ## Parâmetros
 
@@ -63,6 +63,56 @@ pré-registrou antes de qualquer escrita — a página descreve a versão que ro
 
 ## Avaliações
 
+### 2026-09-11, 07:42 BRT (`as_of = 2026-09-11T10:42:26Z`) — a medição, e o veredito `descartar`
+
+**Coorte:** `replay:92c8d080-6009-4a59-9868-31282b1bd493` · 23 fatias · **414 720 barras**
+(16 mercados × 90 d × 288, conferido mercado a mercado) · **0 erros** · `unavailable` 0,1775 %
+· 597 `triggered` → **373 desfechos terminais** em **72 dias distintos**.
+
+| condição congelada da [[EXP-0028-mean-reversion-5-min]] | medido | |
+|---|---|---|
+| ex-funding > 0 com IC de blocos de dia acima de zero | **−0,1940 R**, IC95 **[−0,2889; −0,0943]**, PF 0,6971 | **falha** |
+| PF > 1 em ≥ 2 de 3 janelas de 30 d | J1 0,5278 · J2 1,1657 · J3 0,6821 → **1 de 3** | **falha** |
+| leave-one-market-out nunca negativo | **negativo nos 16 recortes** (−0,1551 a −0,2676) | **falha** |
+| estresse não `frágil` | `--stress`: **`sem_vantagem_na_base`** | **falha** |
+
+**O custo não foi a causa** — e este é o achado da versão, não o veredito. Pela identidade
+`custo = média(r_bruto) − média(r_ex_funding)`:
+
+| | vantagem bruta | líquida | custo medido | ATR% p50 realizado |
+|---|---:|---:|---:|---:|
+| mãe `mean_reversion v1` (15 m) | +0,1270 R | −0,0910 R | 0,2180 R | 0,8495 % |
+| **esta versão** (5 m) | **+0,0346 R** | **−0,1940 R** | **0,2285 R** | 0,7943 % |
+
+`Δ líquida −0,1030 R = Δ bruta −0,0925 R − Δ custo +0,0105 R`: **89,8 % da piora é vantagem bruta,
+10,2 % é custo**. A vantagem bruta desta versão tem IC de blocos de dia `[−0,0625; +0,1387]`, isto é,
+**indistinguível de zero** — não há ganho para um trabalho de custo resgatar. O pedágio previsto pelo
+pré-registro (+0,05 a +0,12 R) foi **falsificado duas vezes**: +0,0086 R pela distribuição de barras
+(manhã) e **+0,0105 R** pelas decisões que existiram.
+
+Dito com a honestidade que o IC exige: o Δ contra a mãe, **pareado por dia**, é −0,1030 R com IC95
+`[−0,2670; +0,0686]` — **cruza zero**. A coorte prova que **esta versão é negativa**, não que ela seja
+estatisticamente pior que a mãe (que também é negativa).
+
+**Funil K1–K6:** nenhum critério dispara (K1 373 · K2 373 · K3 bruta +0,0346 → não dispara pela letra
+· K4 0,1775 % · **K5 cobertura de `R_net` 99,20 %**, contra 46,68 % da mãe, porque o horizonte de
+80 min atravessa funding muito mais raramente · K6 28,15 %). A versão morre pela **regra de sucesso**,
+que é mais exigente que a régua de morte e foi escrita antes.
+
+**Dois dos 16 mercados elegíveis não produziram nenhuma decisão em 90 dias** — BTCUSDT e BNBUSDT, os
+dois mais líquidos, cujo ATR% de 5 min passa o piso `0,006` em 0,15 % das barras. O universo efetivo
+foram **14 mercados**, e a amostra concentrou-se em J3 (256 das 373 decisões).
+
+**C5 sobre decisões** (banda `paper_v1` `[0,3 %; 3 %]`): p50 **0,8892 %**, **1** decisão (0,27 %)
+abaixo do piso e **7** (1,88 %) acima do teto. A previsão da manhã era 0,00 % abaixo; a exceção
+existe porque o portão mede ATR% na **barra de decisão** e o risco é medido contra o **preço de
+entrada** da barra seguinte.
+
+**Aposentadoria:** `deprecated` em **2026-09-11T10:54:08Z (07:54:08 BRT)**, `successor=none`, pelo
+`activate_strategy_version.py --deprecate` via `compose.sh ops`, com os números no `changelog`.
+
+### 2026-09-11, 05:50 BRT — a leitura parcial, quando o replay ainda estava bloqueado
+
 **Nenhuma sobre desfechos.** O replay de 90 d × 16 mercados **não rodou**: o portão do
 `replay-worker` (T3.74b/T3.80) recusa toda corrida na VPS desde que o worker vivo foi shardado —
 ele lê `hb:strategy:shadow` (ninguém escreve; os shards escrevem `hb:strategy:shadow:{i}of4`) e o
@@ -90,7 +140,9 @@ ficam de fora, e em **11 dos 16 mercados** a mediana da grade está abaixo até 
 
 ## Replicação
 
-não iniciada — depende da coorte de replay.
+**Não será iniciada.** O protocolo de replicação (`docs/plans/REPLICATION.md`) existe para versões
+que passam; esta falhou as quatro condições do próprio pré-registro e está `deprecated`. Uma
+sucessora seria uma `v2` com pré-registro novo — e a decomposição acima recomenda **não** escrevê-la.
 
 ## Ligações
 
@@ -103,5 +155,10 @@ não iniciada — depende da coorte de replay.
 ## Notas
 
 `code_ref` e `params_hash` acima são **leituras do que o banco congelou na ativação** (a saída do
-`activate_strategy_version.py`), não valores copiados do código. A versão segue `active` e
-`research_only`: aposentá-la sem medição jogaria fora a única resposta que ainda falta.
+`activate_strategy_version.py`), não valores copiados do código.
+
+A nota anterior desta seção dizia que aposentar sem medição jogaria fora a única resposta que
+faltava. A resposta chegou às 07:41 BRT do mesmo dia, e a versão foi aposentada treze minutos depois.
+A regra do Everton — versão ruim morre no mesmo dia — vale para versão **medida** ruim; esta agora é
+uma. A linha `deprecated` fica: o `code_ref` e o `params_hash` congelados são o que torna esta página
+auditável contra a coorte que a condenou.

@@ -1,0 +1,70 @@
+============================================================================================================
+T3.84 / EXP-0028 -- leitura da coorte replay:92c8d080-6009-4a59-9868-31282b1bd493
+bootstrap: blocos de DIA, 20 000 reamostragens, semente 20260910 (as mesmas das EXP-0025/0026)
+============================================================================================================
+
+-- 1. REGRA DE SUCESSO No 1 -- expectativa ex-funding em 90 d com IC de blocos de dia
+mean_reversion_m5 v1 | r_ex_funding n= 373 dias= 72 media=-0.1940 IC95=[-0.2889; -0.0943] (abaixo de zero)  PF=0.6971
+mean_reversion v1 | r_ex_funding   n= 542 dias= 83 media=-0.0910 IC95=[-0.2129; +0.0311] (cruza zero)  PF=0.8509
+
+-- expectativa BRUTA (a clausula de K3: bruta < 0 com >= 100 desfechos e >= 30 dias)
+mean_reversion_m5 v1 | r_bruto     n= 373 dias= 72 media=+0.0346 IC95=[-0.0625; +0.1387] (cruza zero)  PF=1.0687
+mean_reversion v1 | r_bruto        n= 542 dias= 83 media=+0.1270 IC95=[+0.0047; +0.2500] (acima de zero)  PF=1.2595
+
+-- 2. REGRA No 2 -- PF por janela de 30 d (precisa de PF > 1 em >= 2 de 3)
+mean_reversion_m5 v1 | J1 | r_ex_funding n=  75 dias= 22 media=-0.3168 IC95=[-0.4780; -0.1622] (abaixo de zero)  PF=0.5278
+mean_reversion_m5 v1 | J2 | r_ex_funding n=  42 dias= 21 media=+0.0925 IC95=[-0.2458; +0.4174] (cruza zero)  PF=1.1657
+mean_reversion_m5 v1 | J3 | r_ex_funding n= 256 dias= 29 media=-0.2050 IC95=[-0.3252; -0.0812] (abaixo de zero)  PF=0.6821
+mean_reversion v1 | J1 | r_ex_funding n= 196 dias= 28 media=-0.2382 IC95=[-0.4271; -0.0500] (abaixo de zero)  PF=0.6562
+mean_reversion v1 | J2 | r_ex_funding n=  95 dias= 29 media=-0.1600 IC95=[-0.3607; +0.0788] (cruza zero)  PF=0.7600
+mean_reversion v1 | J3 | r_ex_funding n= 251 dias= 26 media=+0.0502 IC95=[-0.1241; +0.2182] (cruza zero)  PF=1.0958
+
+-- 3. REGRA No 3 -- leave-one-market-out (16 reajustes, um por mercado do universo)
+   [mean_reversion_m5 v1]
+   sem ARBUSDT                        n= 345 dias= 70 media=-0.1820 IC95=[-0.2836; -0.0738] (abaixo de zero)  PF=0.7120
+   sem BNBUSDT                        n= 373 dias= 72 media=-0.1940 IC95=[-0.2889; -0.0943] (abaixo de zero)  PF=0.6971  (mercado sem decisao: a populacao nao muda)
+   sem BTCUSDT                        n= 373 dias= 72 media=-0.1940 IC95=[-0.2889; -0.0943] (abaixo de zero)  PF=0.6971  (mercado sem decisao: a populacao nao muda)
+   sem DASHUSDT                       n= 337 dias= 72 media=-0.1941 IC95=[-0.2991; -0.0815] (abaixo de zero)  PF=0.6984
+   sem DOGEUSDT                       n= 360 dias= 72 media=-0.1802 IC95=[-0.2738; -0.0842] (abaixo de zero)  PF=0.7153
+   sem ETHUSDT                        n= 372 dias= 72 media=-0.1969 IC95=[-0.2897; -0.0997] (abaixo de zero)  PF=0.6934
+   sem LINKUSDT                       n= 364 dias= 72 media=-0.1894 IC95=[-0.2880; -0.0851] (abaixo de zero)  PF=0.7036
+   sem NEARUSDT                       n= 346 dias= 70 media=-0.1551 IC95=[-0.2572; -0.0438] (abaixo de zero)  PF=0.7512
+   sem PROMUSDT                       n= 268 dias= 48 media=-0.2676 IC95=[-0.3913; -0.1642] (abaixo de zero)  PF=0.6014
+   sem SAHARAUSDT                     n= 352 dias= 72 media=-0.1972 IC95=[-0.3008; -0.0874] (abaixo de zero)  PF=0.6929
+   sem SOLUSDT                        n= 371 dias= 72 media=-0.2016 IC95=[-0.2964; -0.1021] (abaixo de zero)  PF=0.6870
+   sem SUIUSDT                        n= 365 dias= 72 media=-0.1834 IC95=[-0.2841; -0.0782] (abaixo de zero)  PF=0.7111
+   sem TAOUSDT                        n= 348 dias= 71 media=-0.1684 IC95=[-0.2681; -0.0588] (abaixo de zero)  PF=0.7304
+   sem UNIUSDT                        n= 327 dias= 69 media=-0.1935 IC95=[-0.3040; -0.0800] (abaixo de zero)  PF=0.6990
+   sem XRPUSDT                        n= 364 dias= 72 media=-0.1967 IC95=[-0.2919; -0.0990] (abaixo de zero)  PF=0.6945
+   sem ZECUSDT                        n= 330 dias= 68 media=-0.2282 IC95=[-0.3267; -0.1247] (abaixo de zero)  PF=0.6529
+   [mean_reversion v1]
+   sem ARBUSDT                        n= 490 dias= 82 media=-0.0755 IC95=[-0.2037; +0.0538] (cruza zero)  PF=0.8743
+   sem BNBUSDT                        n= 541 dias= 83 media=-0.0921 IC95=[-0.2142; +0.0302] (cruza zero)  PF=0.8492
+   sem BTCUSDT                        n= 541 dias= 83 media=-0.0912 IC95=[-0.2134; +0.0311] (cruza zero)  PF=0.8508
+   sem DASHUSDT                       n= 499 dias= 82 media=-0.0855 IC95=[-0.2093; +0.0382] (cruza zero)  PF=0.8590
+   sem DOGEUSDT                       n= 530 dias= 83 media=-0.0910 IC95=[-0.2111; +0.0289] (cruza zero)  PF=0.8510
+   sem ETHUSDT                        n= 535 dias= 83 media=-0.0958 IC95=[-0.2148; +0.0221] (cruza zero)  PF=0.8438
+   sem LINKUSDT                       n= 525 dias= 81 media=-0.0861 IC95=[-0.2077; +0.0350] (cruza zero)  PF=0.8582
+   sem NEARUSDT                       n= 481 dias= 82 media=-0.0743 IC95=[-0.2048; +0.0567] (cruza zero)  PF=0.8761
+   sem PROMUSDT                       n= 471 dias= 78 media=-0.1182 IC95=[-0.2598; +0.0190] (cruza zero)  PF=0.8093
+   sem SAHARAUSDT                     n= 495 dias= 82 media=-0.0804 IC95=[-0.2099; +0.0460] (cruza zero)  PF=0.8671
+   sem SOLUSDT                        n= 525 dias= 83 media=-0.0967 IC95=[-0.2148; +0.0223] (cruza zero)  PF=0.8425
+   sem SUIUSDT                        n= 522 dias= 83 media=-0.0848 IC95=[-0.2052; +0.0357] (cruza zero)  PF=0.8608
+   sem TAOUSDT                        n= 496 dias= 82 media=-0.0941 IC95=[-0.2226; +0.0331] (cruza zero)  PF=0.8463
+   sem UNIUSDT                        n= 478 dias= 79 media=-0.1232 IC95=[-0.2578; +0.0106] (cruza zero)  PF=0.8035
+   sem XRPUSDT                        n= 527 dias= 83 media=-0.0918 IC95=[-0.2082; +0.0255] (cruza zero)  PF=0.8501
+   sem ZECUSDT                        n= 474 dias= 81 media=-0.0758 IC95=[-0.2024; +0.0485] (cruza zero)  PF=0.8737
+
+-- 4. filha contra a mae, Delta PAREADO POR DIA (as duas dividem o calendario de 90 d)
+   filha n=373 media=-0.1940 | mae n=542 media=-0.0910 | Delta=-0.1030 IC95=[-0.2670; +0.0686] (reamostragens validas 20000)
+
+-- 5. DE ONDE VEM A PIORA: custo medido vs vantagem bruta (identidade, nao modelo)
+   custo medio por decisao em R = media(r_bruto) - media(r_ex_funding), exato por construcao
+   mean_reversion_m5 v1   bruta=+0.0346  liquida=-0.1940  custo=0.2285 R   |  KB-0076 0,0020/ATR% p50 = 0.2518 R  (ATR% p50 = 0.7943 %)
+   mean_reversion v1      bruta=+0.1270  liquida=-0.0910  custo=0.2180 R   |  KB-0076 0,0020/ATR% p50 = 0.2354 R  (ATR% p50 = 0.8495 %)
+   Delta liquida (filha - mae) = -0.1030 R  =  Delta bruta -0.0925 R  -  Delta custo +0.0105 R
+   fracao da piora explicada pela vantagem BRUTA = 89.8 % | pelo CUSTO = 10.2 %
+
+-- 6. as duas metades de C5 (banda de risco do paper_v1 [0,3 %; 3 %])
+   mean_reversion_m5 v1   n= 373 p50=0.8892 % abaixo de 0,3 % = 1 (0.27 %) acima de 3 % = 7 (1.88 %)
+   mean_reversion v1      n= 542 p50=0.9242 % abaixo de 0,3 % = 2 (0.37 %) acima de 3 % = 12 (2.21 %)
