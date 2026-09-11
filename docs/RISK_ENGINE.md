@@ -1,4 +1,14 @@
-# Risk Engine — contrato v2.4
+# Risk Engine — contrato v2.5
+
+**Versão 2.5, 2026-09-11.** Fecha o achado MÉDIO da D-P19 (`.claude/state/notes-D-P19.md`
+§9.6): o volume de 24 h do check 9 vinha de `markets.volume_24h_usd` — uma foto
+do ticker, de **outro instante** — enquanto o `volume_ts` que julga a idade dele
+vinha das velas. A §3.1 (check 9 e o parágrafo "Idade do volume") e a §7.1
+publicam a regra nova: as **duas** medidas de volume saem da **mesma leitura de
+velas** do mercado de execução, e o carimbo é o fechamento da vela mais nova que
+essa leitura encontrou — nunca o `now` do ciclo arredondado. A §9.6 lista o que
+mudou e por quê. **Nenhum limite do Everton mudou de valor e o motor puro não
+ganhou insumo nenhum** — a mudança é de *onde o número vem*, como na v2.4.
 
 **Versão 2.4, 2026-09-10.** Fecha o residual que a v2.3 registrava na §2 como
 nota da T3.69 ("fonte declarada × fonte aplicada"): o `execution-worker` passou a
@@ -156,7 +166,7 @@ A tabela abaixo segue a ordem de campos de `RiskLimits`
 | `kill_switch_warning` | `{daily_loss_pct: 0.01, drawdown_pct: 0.04}` | Modo AVISO (§5) |
 | `kill_switch_blocked` | `{daily_loss_pct: 0.02, drawdown_pct: 0.08}` | Modo BLOQUEADO (§5) |
 | `warning_size_multiplier` | `0.5` | Aplicado ao **tamanho final aprovado** (§4) |
-| `min_liquidity_usd_24h` | `50_000_000` | Volume 24 h do par, **na exchange de execução** |
+| `min_liquidity_usd_24h` | `50_000_000` | Volume 24 h do par, **na exchange de execução** — medido nas velas de 1 min desse mercado, na mesma leitura que carimba `volume_ts` (§3.1, v2.5) |
 | `max_slippage_pct` | `0.001` | Guarda técnica herdada do preset `conservative` do v1, revisável |
 | `max_spread_pct` | `0.0005` | Guarda técnica herdada do preset `conservative` do v1, revisável |
 | `min_stop_distance_pct` | `0.003` | Guarda técnica herdada do preset `conservative` do v1, revisável |
@@ -226,7 +236,7 @@ estado é novo no v2 (R-OPS-1) e **reprova por padrão**.
 | 6 | `market_in_universe` | o mercado saiu do universo entre o sinal e a proposta (R-OPS-4) | universo |
 | 7 | `signal_validity` | sinal inativo; **ou** stop fora de `(0, entry_ref)`; **ou** stop não abaixo do preço observado; **ou** `\|entry_ref − observado\| / observado > max_entry_deviation_pct` | proposta + preço observado |
 | 8 | `stop_distance` | fora de `[min_stop_distance_pct, max_stop_distance_pct]`, medida no preço do sizing (§4, `sizing_price`) | proposta |
-| 9 | `liquidity_24h` | `quote_volume_24h` < `min_liquidity_usd_24h` (50 M); **ou** o volume (minuto ou 24 h) tem idade > `max_volume_age_s`, sem carimbo, ou carimbo no futuro → `unavailable` | velas 24 h |
+| 9 | `liquidity_24h` | `quote_volume_24h` < `min_liquidity_usd_24h` (50 M); **ou** o volume (minuto ou 24 h) tem idade > `max_volume_age_s`, sem carimbo, ou carimbo no futuro → `unavailable` | velas de 1 min do **mercado de execução**, somadas nas 24 h que terminam no mesmo minuto de `volume_ts` (v2.5) |
 | 10 | `spread` | `spread_pct` > `max_spread_pct` | book |
 | 11 | `book_depth` | book ausente, vencido, ou raso demais para qualquer tamanho admissível | book (10 s) |
 | 12 | `beta_validity` | sem β válido para o mercado (§6) — o ativo fica só em shadow | `market_betas` |
@@ -265,6 +275,18 @@ futuro invalida os dois de uma vez — `liquidity_24h` (check 9) vira `unavailab
 (§4), e `participation`, `sizing`, `slippage_estimate`, `cash` e `exposure_after` saem `unavailable`
 em cascata, pelo motivo declarado. Cenário: um volume do minuto observado 45 minutos antes do `as_of`
 não pode sustentar o teto de participação como se fosse agora.
+
+**Um carimbo só é um carimbo se os dois números vierem da mesma observação — v2.5.** O motor puro não
+tem como verificar a procedência do que recebe: se o produtor preenche `quote_volume_24h` de uma fonte
+e `volume_ts` de outra, a idade é medida contra um número que ela não descreve, e o check 9 aprova uma
+foto de horas atrás. Por isso o contrato passa a **declarar a fonte**: o volume de 24 h é a soma das
+velas de 1 min do **mercado de execução** na janela `[t−24 h, t)`, com `t` o mesmo minuto que fecha a
+janela de participação (§4), e `volume_ts` é o **fechamento da vela mais nova que essa leitura
+encontrou** — nunca o relógio do ciclo arredondado para o minuto. Duas consequências, declaradas:
+(i) cobertura parcial da janela só **diminui** a soma, então ela nunca aprova o que não deveria, e um
+buraco não recuperado já é `open_gap` (check 5); (ii) uma coleta de velas que parou faz o carimbo
+envelhecer sozinho, e os checks 9 e 19 saem `unavailable` com a idade escrita na mensagem, em vez de
+serem salvos por um número fresco de outra fonte.
 
 ### 3.2 Sizing (§4) e checks posteriores
 
@@ -628,6 +650,22 @@ uma queda de Redis iria procurar o problema na exchange. A regra 3 é o motivo d
 não ser exceção: antes, um `ConnectionError` numa chave abortava o passe inteiro
 — **inclusive a proteção das outras carteiras**.
 
+**4. O volume que o worker entrega ao motor sai todo de uma leitura de velas, e
+o carimbo é da vela — v2.5 (T3.86).** A foto de mercado
+(`bridge_inputs.liquidity_for`, usada tanto pela ponte quanto pelo pedido
+manual) soma `quote_volume_24h` das velas de 1 min do próprio mercado SPOT, na
+mesma transação e com o mesmo minuto final da janela de participação, e carimba
+`volume_ts` com o **fechamento da vela mais nova encontrada**. A fonte
+anterior era `markets.volume_24h_usd`, que a R-OPS-2 não consegue julgar: a
+coluna não tem carimbo próprio (`last_seen_at` é o instante do *upsert*, e o
+`coalesce` do `upsert_markets` mantém o valor antigo na linha quando o símbolo
+falta na leitura de tickers, então um número congelado guarda um `last_seen_at`
+sempre novo), e o refresh do universo SPOT roda a cada
+`market_universe_refresh_s` — 900 s por padrão, contra os 120 s de
+`max_volume_age_s`; na VPS, às 05:37 BRT de 2026-09-11, todas as 216 linhas
+monitoradas tinham entre 296 s e 370 s. O cenário que isso fecha: um mercado que
+cai de 60 M para 5 M/24 h continuava passando o piso de 50 M com um `volume_ts`
+de 60 s, porque o número e o carimbo descreviam instantes diferentes.
 
 ## 8. Risk events e garantias
 
@@ -779,6 +817,23 @@ manual e autônoma. As saídas de proteção, o MTM e o kill switch continuam co
 
 O que **não** mudou na v2.4: nenhum valor do perfil `paper_v1`, nenhum insumo ou assinatura do motor
 puro (a resolução é do `execution-worker`, antes de existir proposta), a estrutura de
+`risk_decision.checks[]`, os `risk_events`, e as garantias da §8.
+
+### 9.6 O que mudou da v2.4 para a v2.5, e por quê
+
+| # | v2.4 (texto) | v2.5 (código provado) | Achado |
+|---|---|---|---|
+| 1 | a §3.1 dizia que o insumo de liquidez carrega **um** carimbo para o volume de 24 h e para o minuto, sem declarar de onde cada número vem; o `execution-worker` lia `quote_volume_24h` de `markets.volume_24h_usd` (foto do ticker) e `volume_ts` das velas | o volume de 24 h é somado das velas de 1 min do mercado de execução, na mesma leitura e com o mesmo minuto final da janela de participação (§3.1, §7.1 item 4) | D-P19 §9.6 (MÉDIO): "dois volumes de 24 h convivem"; a coluna não tem carimbo próprio e o refresh dela (900 s) é 7,5× o `max_volume_age_s` de 120 s |
+| 2 | `volume_ts` era cunhado do `now` do ciclo arredondado para o minuto — um carimbo que dizia "60 s" mesmo com a coleta parada | `volume_ts` é o fechamento da **vela mais nova que a leitura encontrou**; sem vela nenhuma na janela, é `None` e os checks 9 e 19 saem `unavailable` | mesma T3.86: com a coleta parada há 10 min o motor media 60 s e aprovava; agora mede 600 s e recusa pelo nome (`services/execution-worker/tests/test_volume_24h_source.py`) |
+
+**Cobertura parcial é recusa, nunca aprovação** — a soma de menos minutos é um número **menor**, então
+ela só pode reprovar o piso; e um buraco não recuperado na série já é `open_gap` (check 5). O custo da
+medida foi medido antes de entrar: a soma das 1.440 velas de um mercado é um *bitmap index scan* com
+poda de partição, 1,99 ms e 408 buffers, todos em cache (`EXPLAIN (ANALYZE, BUFFERS)` na VPS,
+`.claude/state/notes-T3.86.md` §3).
+
+O que **não** mudou na v2.5: nenhum valor do perfil `paper_v1`, nenhum insumo ou assinatura do motor
+puro (`MarketLiquidity` não ganhou campo; a mudança é do produtor), a estrutura de
 `risk_decision.checks[]`, os `risk_events`, e as garantias da §8.
 
 ## 10. Saídas: tentativa e intenção não são a mesma coisa

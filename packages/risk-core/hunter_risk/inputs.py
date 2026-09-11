@@ -101,6 +101,9 @@ class MarketLiquidity(RiskModel):
     book_ts: datetime | None = None
 
     quote_volume_24h: Decimal | None = Field(default=None, ge=0)
+    """24 h quote volume **on the execution venue**, from the same observation
+    as :attr:`volume_ts` - check 9's floor and its age are one fact, not two
+    (§3.1, "Idade do volume"; T3.86)."""
     last_minute_quote_volume: Decimal | None = Field(default=None, ge=0)
     """Quote volume of the last **complete** minute on the execution venue."""
     median_30m_quote_volume: Decimal | None = Field(default=None, ge=0)
@@ -115,6 +118,10 @@ class MarketLiquidity(RiskModel):
     see the other proposals of the same cycle - and because a ceiling counted per
     order would be exactly the splitting the directive forbids."""
     volume_ts: datetime | None = None
+    """When the volumes above were observed - **one** stamp for the 24 h figure
+    and for the minute reference, so a single stale observation invalidates both
+    (§3.1). The producer owes the pairing: the close of the newest candle it
+    actually read, never the caller's own ``now`` rounded to the minute."""
 
     gap_state: Literal["ok", "open_gap"] | None = None
     """R-OPS-3. ``None`` is "not known", which rejects: 34 of 232 markets lost a

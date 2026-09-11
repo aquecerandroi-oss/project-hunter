@@ -7,11 +7,15 @@ or reported absent:
 
 - **price and book** — the last valid SPOT print and the eligible book of the
   hot state, through the same :class:`SpotMarketData` the entry cycle uses;
-- **participation volume** — the last complete 1m candle of the **spot** market
-  and the median of the last 30, from ``candles``. Incomplete window means
-  ``volume_window_complete = False``, which makes the engine's participation
-  reference unknown and rejects, exactly as it should: a median over a window
-  with holes is a smaller denominator than the market really has;
+- **volume, all of it** — the last complete 1m candle of the **spot** market,
+  the median of the last 30 and the **24 h sum**, from one ``candles`` read of
+  one venue, stamped with the close of the newest candle it found (T3.86).
+  Incomplete window means ``volume_window_complete = False``, which makes the
+  engine's participation reference unknown and rejects, exactly as it should: a
+  median over a window with holes is a smaller denominator than the market
+  really has. The 24 h figure is **not** ``markets.volume_24h_usd``: that
+  column is a ticker snapshot from another instant, with no timestamp of its
+  own, and the contract gives the two volumes a single ``volume_ts``;
 - **continuity** — an unrecovered ``ingestion_gaps`` row is ``open_gap``
   (R-OPS-3). No row is ``ok``, and that is a claim about *the gap table*, which
   is the artefact whose whole job is to know;
@@ -64,14 +68,32 @@ logger = get_logger(__name__)
 WINDOW_MINUTES = 30
 """Complete minutes behind the participation median (RISK_ENGINE.md v2 §4)."""
 
+DAY_MINUTES = 1440
+"""Complete minutes behind the 24 h figure of check 9 (RISK_ENGINE.md §3.1)."""
+
 _TWO = Decimal(2)
 _ONE = Decimal(1)
 
 
 class VolumeWindow:
-    """The participation numbers of one market, and whether they are complete."""
+    """The volume numbers of one market, all from **one** read, and how old they are.
 
-    __slots__ = ("complete", "last_minute", "median", "volume_ts")
+    The 24 h figure lives here, next to the minute reference, because the
+    contract gives the two a **single** stamp (§3.1, "Idade do volume"): one
+    ``volume_ts`` decides whether check 9 and ``participation`` may be
+    evaluated at all. Two numbers from two sources cannot honour one stamp —
+    T3.86 — so both come from the same ``candles`` read of the same execution
+    venue, in the same transaction, over windows that end at the same minute.
+    """
+
+    __slots__ = (
+        "complete",
+        "day_minutes",
+        "last_minute",
+        "median",
+        "quote_volume_24h",
+        "volume_ts",
+    )
 
     def __init__(
         self,
@@ -80,11 +102,15 @@ class VolumeWindow:
         median: Decimal | None,
         complete: bool,
         volume_ts: datetime | None,
+        quote_volume_24h: Decimal | None = None,
+        day_minutes: int = 0,
     ) -> None:
         self.last_minute = last_minute
         self.median = median
         self.complete = complete
         self.volume_ts = volume_ts
+        self.quote_volume_24h = quote_volume_24h
+        self.day_minutes = day_minutes
 
 
 def _median(values: list[Decimal]) -> Decimal:
@@ -98,7 +124,28 @@ def _median(values: list[Decimal]) -> Decimal:
 async def volume_window(
     session: AsyncSession, *, market_id: uuid.UUID, now: datetime
 ) -> VolumeWindow:
-    """The last complete minute and the median of the last 30, on the spot market."""
+    """Every volume number of one spot market: the minute, the median of 30, the 24 h.
+
+    **The stamp is the close of the newest candle actually observed, never the
+    cycle's own clock (T3.86).** Minting ``volume_ts`` from ``now`` said "this
+    is a picture of the last minute" even when the newest candle was an hour
+    old; the engine then measured 60 s against ``max_volume_age_s`` and
+    believed it. Read off the data, a feed that stopped ten minutes ago reports
+    600 s and ``liquidity_24h``/``participation`` come back ``unavailable`` with
+    the age named, which is R-OPS-2 working.
+
+    **The 24 h figure is summed here and not read from
+    ``markets.volume_24h_usd``.** That column is a ticker snapshot the spot
+    universe refresh rewrites every ``market_universe_refresh_s`` (900 s by
+    default, against a 120 s age budget), it has no timestamp of its own —
+    ``last_seen_at`` is the upsert, and ``upsert_markets`` coalesces the old
+    value onto the row when the symbol is missing from the bulk ticker, so a
+    frozen number keeps a fresh-looking ``last_seen_at`` for ever — and it
+    described a different instant from ``volume_ts``. Partial coverage of the
+    window can only make the sum **smaller**, so it can only refuse: an
+    undercount never buys anything, and an unrecovered hole is already
+    ``open_gap`` (check 5).
+    """
     last_open = now.replace(second=0, microsecond=0) - timedelta(minutes=1)
     first_open = last_open - timedelta(minutes=WINDOW_MINUTES - 1)
     rows = (
@@ -111,6 +158,22 @@ async def volume_window(
             {"market": market_id, "first": first_open, "last": last_open},
         )
     ).all()
+    # Aggregated in Postgres: the 24 h window is 1440 rows per market per pass,
+    # and the cycle needs three numbers out of it, not the rows themselves.
+    day = (
+        await session.execute(
+            text(
+                "SELECT sum(quote_volume) AS total, count(quote_volume) AS minutes, "
+                "max(open_time) AS newest FROM candles WHERE market_id = :market "
+                "AND timeframe = '1m' AND is_final AND open_time BETWEEN :first AND :last"
+            ),
+            {
+                "market": market_id,
+                "first": last_open - timedelta(minutes=DAY_MINUTES - 1),
+                "last": last_open,
+            },
+        )
+    ).one()
     volumes = [row.quote_volume for row in rows]
     complete = len(rows) == WINDOW_MINUTES and all(value is not None for value in volumes)
     newest = rows[0] if rows else None
@@ -125,7 +188,9 @@ async def volume_window(
             else None
         ),
         complete=complete,
-        volume_ts=last_open + timedelta(minutes=1),
+        volume_ts=None if day.newest is None else day.newest + timedelta(minutes=1),
+        quote_volume_24h=None if day.total is None else Decimal(str(day.total)),
+        day_minutes=int(day.minutes or 0),
     )
 
 
@@ -168,7 +233,7 @@ async def liquidity_for(
         price_ts=trade.ts,
         asks=tuple(RiskBookLevel(price=level.price, qty=level.qty) for level in book.asks),
         book_ts=book.received_at,
-        quote_volume_24h=spot.volume_24h_usd,
+        quote_volume_24h=volumes.quote_volume_24h,
         last_minute_quote_volume=volumes.last_minute,
         median_30m_quote_volume=volumes.median,
         volume_window_complete=volumes.complete,

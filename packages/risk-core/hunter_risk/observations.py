@@ -99,6 +99,15 @@ def stale_volume_reason(
     Covers both volumes: the model carries one ``volume_ts`` for the 24 h figure
     and for the minute reference, so one stale snapshot invalidates both. Fails
     closed - no timestamp is not "fresh enough", it is "unknown".
+
+    **One stamp is a duty of the producer, and this engine cannot check it**
+    (T3.86). A caller that fills ``quote_volume_24h`` from one observation and
+    ``volume_ts`` from another gets an age measured against a number it does not
+    describe, and the check passes on a figure that may be hours old - which is
+    exactly what ``markets.volume_24h_usd`` (a ticker snapshot refreshed every
+    900 s, with no timestamp of its own) did to check 9 until the execution
+    worker started summing the 24 h figure from the same candle read that
+    produces this stamp. RISK_ENGINE.md §3.1, "Idade do volume".
     """
     age = volume_age_s(portfolio, liquidity)
     if age is None:
