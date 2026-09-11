@@ -147,3 +147,31 @@ sem resposta.
 [[KB-0014-taker-buy-volume-o-que-temos-medido]] · [[KB-0009-o-efeito-do-quarto-de-hora]] ·
 [[KB-0002-momentum-e-reversao-em-cripto]] · [[KB-0048-o-teste-antes-da-regra-e-o-filtro-que-ja-estava-dentro]] ·
 [[Strategy Backlog]] · [[11-KNOWLEDGE/Index|Conhecimento]]
+
+## Adendo 2026-09-11 (plantão, run 11) — o dado de 5 min e o decaimento por horizonte
+
+Lido de novo em https://arxiv.org/html/2608.21888v1 (09:36 e 09:41 BRT), dois números que a nota
+acima não tinha e que a [[EXP-0028-mean-reversion-5-min|EXP-0028]] tornou relevantes no mesmo dia:
+
+- **Grade 15 min → 5 min:** "the median pair earns 0.46 bp per trade at τ=0.02 where it trades at
+  all against zero for the median stock, and moving to 5-minute bars makes matters worse rather than
+  better (0.15 bp)". Razão **3,1×** a favor da grade de 15 min — no nosso dado, a vantagem bruta da
+  filha de 5 min foi **3,7×** menor que a da mãe (+0,0346 R contra +0,1270 R), com o custo quase
+  igual (+0,0105 R). Mesma direção; **não é replicação** (Astra): mediana entre pares em bp, spot,
+  sinal do candle × média por entrada em R, perp, recuo em tendência — e o contraste líquido
+  filha − mãe da EXP-0028 tem IC95 [−0,2670; +0,0686], cruzando zero.
+- **Horizonte — o que a frase diz e o que não diz:** "the signal decays monotonically and is gone
+  by four hours: the profile of a microstructure effect with finite memory rather than of
+  slow-moving mispricing" (1 h: 58 % dos pares cripto ainda significativos; 4 h: nenhum). Kitron
+  compara **previsibilidade entre intervalos de amostragem** (barras de 15 min, 1 h, 4 h). Isso
+  **não** é a trajetória acumulada de uma posição aberta pelo sinal de 15 min, e não sustenta
+  "some em 4 h ⇒ precisa de 4 h para pagar" — usar a ausência de previsibilidade em barras de 4 h
+  para alongar posições é o cenário de falha nomeado. O que a EXP-0028 deixa em aberto é outra
+  coisa: a transposição mudou três parâmetros de uma vez (tendência 1 h → 15 min, ATR 15 → 5 min,
+  horizonte 14 400 → 4 800 s; `mean_reversion_m5_v1.py:27`), e o diagnóstico D-P23 (curva de
+  movimento após a entrada nas 542 decisões da mãe, +5 … +240 min em ATR, Δ pareado 240−80 com IC
+  de blocos de dia, sem atribuição causal) está na fila em [[Hipoteses-do-plantao]] · rascunho
+  `.claude/state/plantao/2026-09-11-0935-lane3.md` · parecer `astra-review-plantao-20260911-0935.md`.
+
+O que continua valendo da nota: o edge bruto "never leaves the low single digits of a basis point"
+e não paga nem a banda maker de 5 bp — o adendo não muda o veredito, muda a **pergunta** a medir.
