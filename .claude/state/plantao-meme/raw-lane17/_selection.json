@@ -1,0 +1,69 @@
+[
+ {
+  "mint": "25xPUKHqporrJqzKgdShSuckPPPmTMdyVp5Ue256pump",
+  "reason": "worker saw mayhem_state=enabled at 16:4x BRT, then paused"
+ },
+ {
+  "mint": "RF24JxYmxQRYgoshswKYaoH5LBuCuhQjQNVPQvmpump",
+  "symbol": "ASD",
+  "mayhem_state_in_list": "active",
+  "created_timestamp": 1789245810000,
+  "reason": "newest70 by label"
+ },
+ {
+  "mint": "J4dhS84YeBJHhjunTvKY5dMJy99GRC6B9M5BqG4tpump",
+  "symbol": "ASD",
+  "mayhem_state_in_list": "completed",
+  "created_timestamp": 1789245800000,
+  "reason": "newest70 by label"
+ },
+ {
+  "mint": "4h6sDkE5CyfE9RsAjYwPPpezNsF7dfXe5nkxN7i8pump",
+  "symbol": "ASD",
+  "mayhem_state_in_list": "paused",
+  "created_timestamp": 1789245787000,
+  "reason": "newest70 by label"
+ },
+ {
+  "mint": "58yYepkrpWZbBro4cTGgde8VpJHTG4BY8vkQzkCtpump",
+  "symbol": "ALCHEMIST",
+  "mayhem_state_in_list": null,
+  "created_timestamp": 1789245816000,
+  "reason": "newest70 by label"
+ },
+ {
+  "mint": "tgZQEtAS3mERsgVGeviLTnELXeBNyfaKVcfNYZ3pump",
+  "symbol": "H O L D",
+  "mayhem_state_in_list": "active",
+  "created_timestamp": 1789245809000,
+  "reason": "newest70 by label"
+ },
+ {
+  "mint": "2bvbjamtF6ASE3WySvAR6xT2QNYGG6a7Jy2VJ6Rhpump",
+  "symbol": "DERP",
+  "mayhem_state_in_list": "active",
+  "created_timestamp": 1789245807000,
+  "reason": "newest70 by label"
+ },
+ {
+  "mint": "5NJLNT89EHBcLJU79q4Hfh8qeNowLaPNUUs22zJEpump",
+  "symbol": "baby",
+  "mayhem_state_in_list": "active",
+  "created_timestamp": 1789245803000,
+  "reason": "newest70 by label"
+ },
+ {
+  "mint": "7CQDj5xaJgrgiRBHQeVhZviNgPxNLM6QJivbvaRSpump",
+  "symbol": "cap",
+  "mayhem_state_in_list": "active",
+  "created_timestamp": 1789245790000,
+  "reason": "newest70 by label"
+ },
+ {
+  "mint": "HGqM9WnNcqhKUL5mVpJPVmNy7UV9DqrpBw8pide7pump",
+  "symbol": "watch",
+  "mayhem_state_in_list": "active",
+  "created_timestamp": 1789245775000,
+  "reason": "newest70 by label"
+ }
+]

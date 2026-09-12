@@ -80,5 +80,15 @@ nunca vira `false`; ≥ 100 avaliáveis por braço e ≥ 30 dias como piso; IC95
 ## Astra
 Parecer do run 14 (`.claude/state/astra-review-plantao-meme-20260912-1447.md`) resumido na nota do dia [[02-MARKET/Meme/2026-09-12]] (seção "Run 14").
 
+## Adendo — run 17 (lane 1, 17:44–18:1x BRT): `enabled` antecede o upgrade; vocabulário das recompensas
+
+- O rótulo `mayhem_state = "enabled"` que derrubou o worker às 16:4x BRT (`mayhem_labels.py`) **não é efeito deste upgrade**: `docs/PUMPFUN.md` §4.3 já o registrava na
+  listagem `/coins` às 02:32–02:37 BRT (3/653, T4.0c), dez horas antes do deploy do slot 446 462 760; o bundle do site o descreve como "Mayhem mode is enabled and will activate
+  shortly" (chave `status_explainer_enabled`, lida 17:49:32 BRT). Correlação temporal com o deploy não é diagnóstico (mesma regra do 6074 acima).
+- O bundle da página de moeda traz os templates `rewards_to_holders` = "Rewards → holders" e `rewards_to_holders_with_fee` = "Rewards → holders · {{percent}}%" — consistentes
+  com `creator_fee_bps` configurável —, mas **nenhuma moeda** mostrou esse rótulo (3 páginas pós-upgrade = 3 × "Rewards → creator"; 270 linhas REST sem `is_holder_reward`).
+  A exposição de M-P34 continua **não mensurável** fora da cadeia. Detalhe por campo/fonte/data em
+  [[KB-0095-pump-fun-rotulos-observados-do-site-da-rest-e-os-limites-on-chain]] (parecer da Astra do run 17: KB nova + este adendo).
+
 ## Ligações
-[[02-MARKET/Meme/2026-09-12]] · [[00-INBOX/Hipoteses-do-plantao]] · [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]] · [[KB-0093-dex-paid-e-boost-o-que-custam-e-o-que-medem]] · [[03-TRADING/Meme/Estudo-2026-09-12-21-apostas]] · [[README-meme]]
+[[02-MARKET/Meme/2026-09-12]] · [[00-INBOX/Hipoteses-do-plantao]] · [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]] · [[KB-0093-dex-paid-e-boost-o-que-custam-e-o-que-medem]] · [[KB-0095-pump-fun-rotulos-observados-do-site-da-rest-e-os-limites-on-chain]] · [[03-TRADING/Meme/Estudo-2026-09-12-21-apostas]] · [[README-meme]]

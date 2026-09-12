@@ -1,8 +1,11 @@
 """The site's mayhem labels, held to the schema's CHECKs (12/09/2026, 16:4x BRT).
 
-After the holder-rewards upgrade of 12/09 the REST API started emitting
-``mayhem_state = "enabled"`` (seen on ``25xPUKHq…`` minutes after creation; the
-same coin answered ``paused`` a few minutes later). ``meme_tokens`` and
+On 12/09 at 16:4x BRT the REST API answered ``mayhem_state = "enabled"`` for
+``25xPUKHq…`` minutes after creation (the same coin answered ``paused`` a few
+minutes later). The label is **not** new — the site's bundle defines it
+("enabled and will activate shortly") and ``docs/PUMPFUN.md`` §4.3 had it at
+02:32 BRT, 3 of 653 rows (plantão run 17, M-D11); the schema simply never
+admitted it. ``meme_tokens`` and
 ``meme_curve_snapshots`` refuse that label (``ck_…_mayhem_state_is_a_known_label``:
 ``active``, ``paused``, ``completed``, ``unknown``), the poll loop died on the
 CHECK, the process restarted and every other loop died with it (RestartCount 1,

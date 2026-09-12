@@ -1,0 +1,6 @@
+{
+ "mint": "5NJLNT89EHBcLJU79q4Hfh8qeNowLaPNUUs22zJEpump",
+ "state": "paused",
+ "mode": "manual",
+ "pause_reason": "low_sol_reserves"
+}

@@ -1,0 +1,26 @@
+{
+ "activeCoins": 71,
+ "agentVolumeUsd": {
+  "24h": 5302930.400606939,
+  "7d": 45087478.06443318
+ },
+ "distinctTraders": {
+  "24h": 5594,
+  "7d": 26726
+ },
+ "coinsCreated": {
+  "24h": 9545,
+  "7d": 60583
+ },
+ "coinsCreatedByMode": {
+  "auto": {
+   "24h": 7010,
+   "7d": 47346
+  },
+  "manual": {
+   "24h": 2535,
+   "7d": 13237
+  }
+ },
+ "updatedAt": 1789245121239
+}
