@@ -712,7 +712,7 @@ raiz) e `run-<UTC>.log`. A árvore de `/opt/project-hunter` fica limpa; o `git p
 printf '%s\n' \
   'SHELL=/bin/bash' \
   'PATH=/usr/local/bin:/usr/bin:/bin' \
-  '10 5 * * * hunter /opt/project-hunter/infra/vps/meme_close_nightly.sh >> /opt/hunter-close/cron.log 2>&1' \
+  '10 5 * * * hunter bash /opt/project-hunter/infra/vps/meme_close_nightly.sh >> /opt/hunter-close/cron.log 2>&1' \
   | sudo tee /etc/cron.d/hunter-meme-close >/dev/null
 sudo chmod 644 /etc/cron.d/hunter-meme-close
 ```
