@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from hunter_meme_worker.graduation import curve_signals, denominator_for, earliest_completion
+from hunter_meme_worker.mayhem_labels import known_mayhem_mode, known_mayhem_state
 from hunter_meme_worker.repo_rows import SnapshotRow, TokenRow
 from hunter_meme_worker.tracker import TrackedMint
 
@@ -35,8 +36,8 @@ def snapshot_row(state: NormalizedCurveState) -> SnapshotRow:
         slot=state.slot,
         commitment=state.commitment,
         mayhem_enabled=state.mayhem_enabled,
-        mayhem_state=state.mayhem_state,
-        mayhem_mode=state.mayhem_mode,
+        mayhem_state=known_mayhem_state(state.mayhem_state, mint=state.mint, source=state.source),
+        mayhem_mode=known_mayhem_mode(state.mayhem_mode, mint=state.mint, source=state.source),
     )
 
 
@@ -57,8 +58,8 @@ def token_row_from_curve(
         initial_real_token_reserves=denominator.value,
         progress_denominator_source=denominator.source,
         mayhem_enabled=state.mayhem_enabled,
-        mayhem_mode=state.mayhem_mode,
-        mayhem_state=state.mayhem_state,
+        mayhem_mode=known_mayhem_mode(state.mayhem_mode, mint=state.mint, source=state.source),
+        mayhem_state=known_mayhem_state(state.mayhem_state, mint=state.mint, source=state.source),
         rest_complete_seen_at=signals.rest_complete_seen_at,
         curve_filled_seen_at=signals.curve_filled_seen_at,
         completed_at=earliest_completion(signals),
@@ -76,7 +77,7 @@ def tracked_from_curve(
         first_seen_at=known.first_seen_at if known else state.observed_at,
         created_at=known.created_at if known else None,
         bonding_curve=known.bonding_curve if known else None,
-        mayhem_state=state.mayhem_state,
+        mayhem_state=known_mayhem_state(state.mayhem_state, mint=state.mint, source=state.source),
         initial_real_token_reserves=denominator_for(state, params).value,
         complete=state.complete,
         mcap_sol=state.market_cap_sol,
