@@ -229,12 +229,9 @@ run_self_test() {
 
   printf 'ENABLE_LIVE_TRADING=true\n' > flags.py
   assert_hit "flags.py" "ENABLE_LIVE_TRADING=true"
-  printf 'ENABLE_MEME_LIVE_TRADING=true
-' > meme_flags.py
+  printf 'ENABLE_MEME_LIVE_TRADING=true\n' > meme_flags.py
   assert_hit "meme_flags.py" "ENABLE_LIVE_TRADING=true"
-  printf 'environment:
-  ENABLE_LIVE_TRADING: "true"
-' > compose.yml
+  printf 'environment:\n  ENABLE_LIVE_TRADING: "true"\n' > compose.yml
   assert_hit "compose.yml" "ENABLE_LIVE_TRADING=true"
 
   printf 'def add(a, b):\n    return a + b\n' > clean.py
