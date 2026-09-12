@@ -114,8 +114,29 @@ _FEATURE_CHECKS = (
 _TRADES_COMMITMENT_CHECK = "ck_meme_trades_commitment_is_a_known_label"
 
 
+_BACKFILL_REASONS_FOR_EXISTING_ROWS = (
+    # Rows folded before 0023 have every new value NULL and no reason yet; the
+    # CHECKs below demand a named reason next to every NULL. The names are the
+    # vocabulary of ``hunter_core.db.models.meme_features``: no reader had spoken
+    # for those minutes. Production (12/09/2026 07:33 BRT, 4 000+ rows in
+    # ``meme_features_1m_2026_09``) refused the first CHECK without this step.
+    "UPDATE meme_features_1m SET holders_reason = 'no_holders_reader' "
+    "WHERE holders IS NULL AND holders_reason IS NULL",
+    "UPDATE meme_features_1m SET dev_share_reason = 'no_holders_reader' "
+    "WHERE dev_share IS NULL AND dev_share_reason IS NULL",
+    "UPDATE meme_features_1m SET snipers_reason = 'no_holders_reader' "
+    "WHERE snipers IS NULL AND snipers_reason IS NULL",
+    "UPDATE meme_features_1m SET tape_reason = 'no_trade_feed' "
+    "WHERE buys_1m IS NULL AND tape_reason IS NULL",
+    "UPDATE meme_features_1m SET creator_net_seller_reason = 'no_trade_feed' "
+    "WHERE creator_net_seller IS NULL AND creator_net_seller_reason IS NULL",
+)
+
+
 def add_feature_columns() -> None:
     op.execute(_ADD_FEATURE_COLUMNS)
+    for statement in _BACKFILL_REASONS_FOR_EXISTING_ROWS:
+        op.execute(statement)
     for name, predicate in _FEATURE_CHECKS:
         op.execute(f"ALTER TABLE meme_features_1m ADD CONSTRAINT {name} CHECK ({predicate})")
 
