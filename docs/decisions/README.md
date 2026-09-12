@@ -27,3 +27,4 @@ As decisões tomadas na fase de arquitetura estão consolidadas em `docs/SPEC_RE
 | [0003](0003-base-de-conhecimento-obsidian.md) | `obsidian/` como base de conhecimento viva do projeto (separada do `vault/` pessoal) | aceito |
 | [0004](0004-ccxt-como-segunda-implementacao-de-adaptador.md) | CCXT como segunda implementação do `ExchangeAdapter` na Fase 3 (endpoints privados, amplitude certificada); Binance e Bybit próprias | aceito (decisão conjunta Claude ⇄ Astra) |
 | [0005](0005-carteira-virtual-e-risk-engine-paper-v1.md) | Carteira virtual permanente em USDT com âncora em BRL e Risk Engine `paper_v1` (decisões do Everton de 2026-09-06) | aceito (decisão conjunta Claude ⇄ Astra) |
+| [0006](0006-doutrina-de-execucao-meme-pumpfun-solana.md) | Separar a doutrina de execução meme (pump.fun/Solana) do Risk Engine SPOT e exigir fluxo verificado antes de qualquer transação assinada | proposto (aguarda o Everton) |

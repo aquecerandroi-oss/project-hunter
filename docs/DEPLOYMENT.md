@@ -859,6 +859,9 @@ AGENT → PROPOSAL → RISK → EXECUTION (`CLAUDE.md`).
 | Variável | Obrigatória em prod? | Default | Propósito |
 |---|---|---|---|
 | `ENABLE_LIVE_TRADING` | não | `false` | live trading; `LiveExecutionAdapter` levanta `LiveTradingDisabled` enquanto for `false` (sempre, até a Fase 4) |
+| `ENABLE_MEME_LIVE_TRADING` | **proposta (T4.4) — nenhum processo lê hoje** | `false` | execução real na bonding curve do pump.fun (Solana). Contrato: `docs/RISK_ENGINE_MEME.md` §3.4. Só o Everton liga, no `.env` da VPS, e só depois dos três portões da §12 daquele documento; o adaptador levantará `MemeLiveTradingDisabled` enquanto for `false`. **Atenção:** o padrão de `infra/scripts/forbidden_patterns.sh:144` cobre apenas `ENABLE_LIVE_TRADING=true` — este nome precisa do seu próprio padrão antes de a variável existir |
+| `SOLANA_WALLET_SECRET_KEY` | **proposta (T4.4) — nenhum processo lê hoje** | vazio | chave da carteira Solana dedicada ao Hunter. Vive **só** no `.env` da VPS, digitada pelo Everton; lida por **um** processo (`services/meme-executor/`, proposto); nunca em log, métrica, heartbeat, resposta de API ou commit (`docs/RISK_ENGINE_MEME.md` §3.3) |
+| `MEME_WALLET_MAX_SOL`, `MEME_MAX_SOL_PER_TRADE`, `MEME_DAILY_LOSS_CAP_SOL` | **propostas (T4.4) — valores pendentes do Everton** | — | tetos de capital da carteira meme: saldo máximo, teto por compra e perda do dia que trava a carteira (latched, retomada só por OWNER). Tabela completa em `docs/RISK_ENGINE_MEME.md` §3.1 |
 | `ENABLE_SOCIAL_INTELLIGENCE` | não | `false` | Fase 2 |
 | `ENABLE_ONCHAIN` | não | `false` | Fase 3 |
 | `ENABLE_STRIPE` | não | `false` | Fase 3 |

@@ -141,7 +141,9 @@ scan_file() {
       ;;
   esac
 
-  report "$f" "ENABLE_LIVE_TRADING=true" 'ENABLE_LIVE_TRADING[[:space:]]*=[[:space:]]*true' -i
+  # T4.4 finding: also the meme flag and the YAML form (`KEY: "true"`) that
+  # docker-compose uses -- the shell form alone let both through.
+  report "$f" "ENABLE_LIVE_TRADING=true" 'ENABLE_(MEME_)?LIVE_TRADING[[:space:]]*[=:][[:space:]]*"?true' -i
 }
 
 # ---------------------------------------------------------------------------
@@ -227,6 +229,13 @@ run_self_test() {
 
   printf 'ENABLE_LIVE_TRADING=true\n' > flags.py
   assert_hit "flags.py" "ENABLE_LIVE_TRADING=true"
+  printf 'ENABLE_MEME_LIVE_TRADING=true
+' > meme_flags.py
+  assert_hit "meme_flags.py" "ENABLE_LIVE_TRADING=true"
+  printf 'environment:
+  ENABLE_LIVE_TRADING: "true"
+' > compose.yml
+  assert_hit "compose.yml" "ENABLE_LIVE_TRADING=true"
 
   printf 'def add(a, b):\n    return a + b\n' > clean.py
   assert_no_hit "clean.py"
