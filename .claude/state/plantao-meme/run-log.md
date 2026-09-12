@@ -3,3 +3,4 @@
 | run | data/slot (BRT) | lane | itens | KBs | hipóteses | Astra | rascunho |
 |---|---|---|---|---|---|---|---|
 | 1 | 2026-09-12 (despacho "~04:30"; máquina 02:31; leitura 02:33–02:38 BRT; Astra 02:43–02:47) | 1 — pump.fun ao vivo (26 GETs públicos; KOTH/trades/candles 404) | 11 | 0 | 6 novas (M-D1, M-P1..M-P5; Astra: M-P3 primeiro) | ok (`astra-review-plantao-meme-20260912-0430.md`) | `.claude/state/plantao-meme/2026-09-12-0233-lane1.md` |
+| 2 | 2026-09-12 (despacho com guarda de 50 min dispensada; início 03:04; leitura 03:05:47–03:13 BRT; Astra 03:19–03:21) | 2 — notícias e narrativas + feed X do site (10 requisições a hosts pump.fun; feed X não está no HTML; `gd` e campos do indexer no board `movers`) | 12 | 0 | 3 novas (M-P17, M-P18, M-D2) | indisponível (modelo em capacidade, 2 tentativas; pergunta em `astra-q-20260912-0304.txt`) | `.claude/state/plantao-meme/2026-09-12-0304-lane2.md` |
