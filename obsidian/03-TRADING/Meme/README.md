@@ -1,0 +1,74 @@
+---
+tags: [meme, trading, catalogo, m4]
+status: vivo
+owner: sexta-feira
+updated: 2026-09-12
+---
+
+# Meme — o que uma "estratégia" é aqui
+
+Esta pasta é a irmã meme de [[03-TRADING/Estrategias/README|Estrategias]], não uma extensão dela.
+`Estrategias/` é o catálogo gerado por script (T3.20) das versões de `strategy_versions` — um mundo
+com orderbook, `MarketSpec`/`MarketLiquidity` reais (`docs/RISK_ENGINE.md`). pump.fun não tem
+orderbook: o preço é uma função determinística de duas reservas virtuais numa curva de bonding
+(`docs/plans/T4-MEME-RADAR.md` §0, §3). Por isso um conjunto de regras de meme não é uma linha de
+`strategy_versions` — é uma linha de uma tabela irmã, planejada, ainda não escrita:
+`meme_rule_sets` (`.claude/state/brief-T4.6-lab-meme-continuo.md`).
+
+**Origem desta pasta:** decisão do Everton de 2026-09-12,
+[[06-DECISIONS/2026-09-12-meta-7m-e-lab-meme|registrada aqui]] — diretriz (d): "o Lab vai ficar em
+cima das meme coins simulando sem parar".
+
+## O que é uma "estratégia" de meme aqui
+
+Um **conjunto de regras pré-registrado sobre a curva de bonding**: uma porta de entrada (idade do
+token, janela de progresso da curva, criador não vendedor líquido quando conhecido, participação
+limitada ao volume do último minuto da curva) e uma saída (múltiplo-alvo `k×`, trailing a partir do
+pico, time stop, saída forçada em migração/conclusão da curva ou sinal de rug) —
+`hunter_indicators.meme.rules` (planejado, T4.5), funções puras sobre uma linha de
+`meme_features_1m`.
+
+**Pré-registrado** tem o mesmo significado de sempre no projeto: parâmetros congelados **antes** de
+rodar, numa página `EXP-M<n>` no formato de `_TEMPLATE-EXP.md` — protocolo escrito uma vez e nunca
+editado, avaliações acrescentadas abaixo, datadas, nunca reescritas (a mesma regra `exp_reescrita`
+do linter vale aqui). Nenhuma estratégia de meme pula essa porta por causa da meta em dinheiro —
+ver [[06-DECISIONS/2026-09-12-meta-7m-e-lab-meme]] §3.
+
+## Três séries de nome que não se confundem
+
+| Série | O que é | Onde vive |
+|---|---|---|
+| `M-A`, `M-B`, `M-E`, `M-G` | Rótulos informais de candidatos citados nas notas de conhecimento de meme de 2026-09-06 (KB-0057, KB-0058, KB-0059, KB-0064) — nunca viraram pré-registro formal; ficam como histórico de discussão, não como estratégia registrada | dentro do texto das próprias `KB-00xx` — não são páginas |
+| `EXP-M<n>` | Pré-registro formal de um conjunto de regras sobre a curva (T4.5) — protocolo congelado, régua editorial idêntica à de `momentum`/`mean_reversion` (≥ 100 avaliáveis **e** ≥ 30 dias, IC 95 % por blocos de dia, 2 de 3 janelas) | `obsidian/05-EXPERIMENTS/EXP-M<n>-<slug>.md`, listada em [[Experiments Index]] |
+| `M-P<n>` | Hipótese de pesquisa (ainda não é candidata de estratégia) especificamente sobre meme/pump.fun, na fila do plantão | `00-INBOX/Hipoteses-do-plantao.md`, a partir desta decisão — ver o cabeçalho daquele arquivo |
+
+**Estado nesta data (2026-09-12):** nenhuma página `EXP-M*` existe ainda neste vault. A primeira,
+`EXP-M1` ("comprar cedo na curva e vender em ROI alto" — a hipótese que o próprio Everton enunciou),
+está em pré-registro pela T4.5 nesta mesma sessão (`.claude/state/brief-T4.5-simulador-curva.md`
+item 6). Quando a página existir, este README ganha uma tabela "Conjuntos ativos" com uma linha por
+`EXP-M<n>` — status (`research_only`/`paper`), veredito mais recente e link, no mesmo espírito da
+página de família de `03-TRADING/Estrategias/**` (`docs/OBSIDIAN.md` §1).
+
+## O que ainda é planejado, não implementado
+
+| Peça | Tarefa | Status nesta data |
+|---|---|---|
+| Coleta on-chain + WS (curva, criação, migração) | T4.1 | Planejado — sem código no repo nesta data |
+| `meme_tokens`, `meme_curve_snapshots`, `meme_features_1m` (Postgres) | T4.2 | Planejado — nenhuma migração no repo nesta data |
+| Simulador puro da curva + `PaperCurveWallet` + regras + `EXP-M1` | T4.5 | Planejado — em execução nesta sessão |
+| `docs/RISK_ENGINE_MEME.md` (doutrina de risco, tetos em SOL, kill switch) | T4.4 | Planejado — em execução nesta sessão, arquivo ainda não existe |
+| Laço contínuo do Lab (`meme_rule_sets`, apostas paper por minuto, diário automático) | T4.6 | Planejado — depende de T4.2/T4.4/T4.5 |
+| Tela `/meme` e painel Meta | T4.3, T4.3b | Especificação em `docs/plans/T4-MEME-RADAR-UI.md`; painel Meta em [[06-DECISIONS/2026-09-12-meta-7m-e-lab-meme]] §4 |
+
+**Nenhuma execução real em nenhum ponto desta cadeia.** T4.1–T4.3 são só leitura por desenho
+(`docs/plans/T4-MEME-RADAR.md` §0); T4.5/T4.6 são paper sobre dado real da curva; dinheiro real
+depende de switch explícito do Everton (`ENABLE_MEME_LIVE_TRADING`) depois do fluxo verificado — ver
+[[06-DECISIONS/2026-09-12-meta-7m-e-lab-meme]] §3.
+
+## Relacionadas
+
+[[03-TRADING/Estrategias/README|Estrategias (catálogo geral)]] · [[Experiments Index]] ·
+[[Strategy Backlog]] · [[06-DECISIONS/2026-09-12-meta-7m-e-lab-meme]] ·
+[[02-MARKET/Meme/README|Meme (Mercado)]] · [[09-OPERATIONS/Diario-Meme/README|Diário Meme]] ·
+[[11-KNOWLEDGE/README-meme|Meme (Conhecimento)]] · [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]] ·
+`docs/plans/T4-MEME-RADAR.md` · `docs/plans/T4-MEME-RADAR-UI.md`
