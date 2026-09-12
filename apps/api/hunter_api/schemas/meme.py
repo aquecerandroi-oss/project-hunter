@@ -60,6 +60,7 @@ NullReason = Literal[
     "insufficient_coverage",
     "unsupported_quote",
     "no_sells",
+    "out_of_range",
 ]
 """The contract's frozen vocabulary (§4): "a T4.3 renderiza estes, e só
 estes" -- shared by all six ``*_reason`` columns on ``meme_features_1m``."""

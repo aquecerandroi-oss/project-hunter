@@ -20,7 +20,10 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
+from sqlalchemy.exc import IntegrityError
+
 from hunter_core.db.session import role_session
+from hunter_core.logging import get_logger
 from hunter_meme_worker.config import FEATURES_STREAM
 from hunter_meme_worker.features import NOT_POLLED, FeatureRow, MinuteInputs, build_row
 from hunter_meme_worker.features_tape import HoldersObservation, TapeTrade, holders_for, tape_for
@@ -38,6 +41,8 @@ if TYPE_CHECKING:
     from hunter_meme_worker.tracker import TrackedMint
 
 WORKER_ROLE = "hunter_worker"
+
+logger = get_logger(__name__)
 
 
 def _readings(ctx: RadarContext, mint: str) -> list[HoldersObservation]:
@@ -101,14 +106,50 @@ async def fold_minute(ctx: RadarContext, boundary: datetime) -> list[FeatureRow]
             )
         )
     if rows or board_rows:
+        rows = await _insert_features_resiliently(ctx, rows)
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-            await insert_features(session, rows)
             await insert_board_minutes(session, board_rows)
             await _record_uncovered(ctx, session, boundary, rows)
     covered_rows = sum(1 for row in rows if row.coverage > 0)
     meme_features_rows_total.labels(coverage="covered").inc(covered_rows)
     meme_features_rows_total.labels(coverage="uncovered").inc(len(rows) - covered_rows)
     return rows
+
+
+async def _insert_features_resiliently(
+    ctx: RadarContext, rows: list[FeatureRow]
+) -> list[FeatureRow]:
+    """One statement for the minute; if the schema refuses it, one row at a time.
+
+    A single row the CHECKs reject (production, 12/09 10:40Z: a ``top10_share``
+    above 1) must cost that row, not the minute and not the process — before this
+    the ``IntegrityError`` climbed through the TaskGroup and restarted the worker
+    once per minute. Returns the rows that were actually written, so the coverage
+    bookkeeping downstream counts only what exists.
+    """
+    if not rows:
+        return rows
+    try:
+        async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+            await insert_features(session, rows)
+        return rows
+    except IntegrityError:
+        pass
+    written: list[FeatureRow] = []
+    for row in rows:
+        try:
+            async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+                await insert_features(session, [row])
+            written.append(row)
+        except IntegrityError as exc:
+            logger.warning(
+                "meme_feature_row_rejected",
+                mint=row.mint,
+                end_time=row.end_time.isoformat(),
+                error=str(exc.orig)[:200] if exc.orig is not None else str(exc)[:200],
+            )
+            meme_features_rows_total.labels(coverage="rejected").inc()
+    return written
 
 
 async def _record_uncovered(

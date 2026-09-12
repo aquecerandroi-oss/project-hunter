@@ -2190,7 +2190,7 @@ export interface components {
             /** Count */
             count: number | null;
             /** Reason */
-            reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
+            reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
             /** Tracked Tokens */
             tracked_tokens: number;
         };
@@ -2843,17 +2843,17 @@ export interface components {
             /** Buy Sell Ratio */
             buy_sell_ratio: string | null;
             /** Buy Sell Ratio Reason */
-            buy_sell_ratio_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
+            buy_sell_ratio_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
             /** Coverage */
             coverage: string;
             /** Creator Sold */
             creator_sold: boolean | null;
             /** Creator Sold Reason */
-            creator_sold_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
+            creator_sold_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
             /** Curve Progress Pct */
             curve_progress_pct: string | null;
             /** Curve Reason */
-            curve_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
+            curve_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
             /**
              * End Time
              * Format: date-time
@@ -2864,15 +2864,15 @@ export interface components {
             /** Mcap Sol */
             mcap_sol: string | null;
             /** Progress Reason */
-            progress_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
+            progress_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
             /** Top10 Share */
             top10_share: string | null;
             /** Top10 Share Reason */
-            top10_share_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
+            top10_share_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
             /** Unique Buyers */
             unique_buyers: number | null;
             /** Unique Buyers Reason */
-            unique_buyers_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
+            unique_buyers_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
         };
         /** MemeGapListOut */
         MemeGapListOut: {

@@ -61,6 +61,7 @@ export const MEME_NULL_REASONS: readonly MemeNullReason[] = [
   "insufficient_coverage",
   "unsupported_quote",
   "no_sells",
+  "out_of_range",
 ];
 
 const NULL_REASON_LABEL: Record<MemeNullReason, string> = {
@@ -73,6 +74,8 @@ const NULL_REASON_LABEL: Record<MemeNullReason, string> = {
   unsupported_quote: "cotação fora do padrão suportado",
   // T4.2c: a ratio with no sells in the minute has no value, and this says why.
   no_sells: "sem vendas no minuto (razão indefinida)",
+  // A share above 100 % from the site's board in a coin's first minute is not stored.
+  out_of_range: "valor da fonte fora da faixa possível (não gravado)",
 };
 
 export function memeNullReasonLabel(reason: MemeNullReason): string {

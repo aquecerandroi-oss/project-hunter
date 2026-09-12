@@ -39,12 +39,17 @@ from hunter_meme_worker.features_tape import (
     fraction,
 )
 
-FEATURES_VERSION = "meme_features_v1"
+FEATURES_VERSION = "meme_features_v2"
 """Frozen protocol name. A different formula is a different version — a different
 row by the primary key — never an edit of a minute already cut by a hypothesis.
-``0023`` added columns to this version: a NULL with a reason in an old row and a
-number in a new one is the same protocol with more sources, not a new formula
-for a number that already existed."""
+``0023`` added columns to ``meme_features_v1``: a NULL with a reason in an old
+row and a number in a new one is the same protocol with more sources, not a new
+formula for a number that already existed. **``meme_features_v2`` (T4.2d) is a
+new formula for a number that already existed**: ``curve_progress_pct`` may now
+be computed over a denominator taken from the ``/global-params`` record
+(``progress_denominator_source = global_params``) instead of only from a virgin
+photo. The ``v1`` rows are not rewritten; the series breaks at the deploy and
+the Lab reads the version its config names (``lab_repo.load_gate_rows``)."""
 
 NO_TRADE_FEED = "no_trade_feed"
 NO_HOLDERS_READER = "no_holders_reader"
@@ -53,6 +58,9 @@ NOT_POLLED = "not_polled"
 RATE_LIMITED = "rate_limited"
 INSUFFICIENT_COVERAGE = "insufficient_coverage"
 UNSUPPORTED_QUOTE = "unsupported_quote"
+OUT_OF_RANGE = "out_of_range"
+"""A source reported a value the column cannot hold (a share above 100 %): the
+value is not stored, and this says why instead of a silent NULL."""
 
 REASON_VOCABULARY = frozenset(
     {
@@ -64,6 +72,7 @@ REASON_VOCABULARY = frozenset(
         INSUFFICIENT_COVERAGE,
         UNSUPPORTED_QUOTE,
         NO_SELLS,
+        OUT_OF_RANGE,
     }
 )
 """The closed set the API renders (T4.3's acceptance criterion: named states, not
@@ -189,18 +198,37 @@ def _holders_columns(reading: HoldersObservation | None) -> dict[str, object]:
     """The four holder columns plus their provenance, or their reasons."""
     if reading is None:
         return {}
+    top10, top10_reason = share_or_reason(reading.top10_share)
+    dev, dev_reason = share_or_reason(reading.dev_share)
     return {
         "holders": reading.holders,
         "holders_reason": None if reading.holders is not None else NO_HOLDERS_READER,
         "holders_observed_at": reading.observed_at if reading.holders is not None else None,
         "holders_source": reading.source if reading.holders is not None else None,
-        "top10_share": fraction(reading.top10_share),
-        "top10_share_reason": None if reading.top10_share is not None else NO_HOLDERS_READER,
-        "dev_share": fraction(reading.dev_share),
-        "dev_share_reason": None if reading.dev_share is not None else NO_HOLDERS_READER,
+        "top10_share": top10,
+        "top10_share_reason": top10_reason,
+        "dev_share": dev,
+        "dev_share_reason": dev_reason,
         "snipers": reading.snipers,
         "snipers_reason": None if reading.snipers is not None else NO_HOLDERS_READER,
     }
+
+
+def share_or_reason(value: Decimal | None) -> tuple[Decimal | None, str | None]:
+    """A share is a fraction or it is not a share.
+
+    The site's boards report ``t10`` above 100 % in a coin's first minute (the
+    plantão measured 18/50 on the ``new`` board at 05:51 BRT on 12/09; production
+    folded ``1.002162`` at 10:40Z and ``ck_meme_features_1m_top10_share_is_a_fraction``
+    refused the row, which killed the fold loop three times). Clamping would
+    invent a number; the honest value is NULL with its own reason.
+    """
+    if value is None:
+        return None, NO_HOLDERS_READER
+    share = fraction(value)
+    if share is None or share < 0 or share > 1:
+        return None, OUT_OF_RANGE
+    return share, None
 
 
 def _tape_columns(tape: TapeMinute | None, absence: str) -> dict[str, object]:
