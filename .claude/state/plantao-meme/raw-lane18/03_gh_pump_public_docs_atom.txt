@@ -1,0 +1,133 @@
+{"name": "03_gh_pump_public_docs_atom", "url": "https://github.com/pump-fun/pump-public-docs/commits/main.atom", "mode": "text", "http": 200, "request_started_utc": "2026-09-12T21:36:20Z", "observed_utc": "2026-09-12T21:36:21Z", "observed_brt": "18:36:21 BRT", "seconds": 0.7, "bytes": 17267, "content_type": "application/atom+xml; charset=utf-8", "last_modified": "", "date": "Sat, 12 Sep 2026 21:36:21 GMT", "ratelimit_remaining": "", "title": "Recent Commits to pump-public-docs:main", "meta_dates": []}
+
+tag:github.com,2008:/pump-fun/pump-public-docs/commits/main 
+ Recent Commits to pump-public-docs:main 
+ 2026-09-12T15:58:18Z 
+ tag:github.com,2008:Grit::Commit/f216b6724c6ede79d7cef9ce210b741f7e17e93b 
+ Merge pull request #45 from pump-fun/feat/holder-rewards
+ 2026-09-12T15:58:18Z 
+ arv-baton 
+ https://github.com/arv-baton 
+ <pre style='white-space:pre-wrap;width:81ex'>Merge pull request #45 from pump-fun/feat/holder-rewards
+docs: holder rewards coins, cashback deprecated, create_v2 is_holder_reward</pre>
+ tag:github.com,2008:Grit::Commit/e0687ae9b7e064a0f54efc7297c65eecfbba3a8f 
+ chore(idl): refresh pump, pump_amm and pump_fees IDLs
+ 2026-09-12T14:28:42Z 
+ arv-baton 
+ https://github.com/arv-baton 
+ <pre style='white-space:pre-wrap;width:81ex'>chore(idl): refresh pump, pump_amm and pump_fees IDLs
+From pump-programs-monorepo feat/add-holder-fee-distribution @ 062c00b
+(idls-top-level / idls-ts).
+Co-Authored-By: Claude Fable 5.1 &lt;noreply@anthropic.com&gt;
+Claude-Session: https://claude.ai/code/session_01KgjQ6PdurtrD9CS7GGWjve</pre>
+ tag:github.com,2008:Grit::Commit/4795463147b4469fb9a996487b01cbbe13f6826c 
+ docs: holder rewards coins, cashback deprecated, create_v2 is_holder_…
+ 2026-09-12T14:28:42Z 
+ arv-baton 
+ https://github.com/arv-baton 
+ <pre style='white-space:pre-wrap;width:81ex'>docs: holder rewards coins, cashback deprecated, create_v2 is_holder_reward
+New docs/HOLDER_REWARDS_README.md (what a holder rewards coin is, how to create
+one, no trade interface changes, new account / event fields, cashback
+deprecation, contact the CTO team for custom-pair creator fee bps or to convert
+an existing coin). README announcement; COIN_CREATION.md instruction data rows
+7-8 and TS examples; deprecation banners on PUMP_CASHBACK_README.md and
+CLAIM_CASHBACK.md; appended BondingCurve / Pool fields listed in
+PUMP_PROGRAM_README.md and PUMP_SWAP_README.md.
+Co-Authored-By: Claude Fable 5.1 &lt;noreply@anthropic.com&gt;
+Claude-Session: https://claude.ai/code/session_01KgjQ6PdurtrD9CS7GGWjve</pre>
+ tag:github.com,2008:Grit::Commit/9c82f61cb711b044a17f770ab8ce9f9bdf78f333 
+ chore: README virtual quotes reserves
+ 2026-07-15T18:22:27Z 
+ onesatz@batoncorporation.com 
+ <pre style='white-space:pre-wrap;width:81ex'>chore: README virtual quotes reserves</pre>
+ tag:github.com,2008:Grit::Commit/2c22246b670812e2392e5f94b9543f500d6c9e15 
+ feat: pool virtual quotes reserves
+ 2026-07-15T18:13:17Z 
+ onesatz@batoncorporation.com 
+ <pre style='white-space:pre-wrap;width:81ex'>feat: pool virtual quotes reserves</pre>
+ tag:github.com,2008:Grit::Commit/1b822158844a60ca577df6ca122211b595a1a578 
+ Merge pull request #35 from pump-fun/feat/creator-fee-related-examples
+ 2026-05-18T19:24:11Z 
+ sushant-baton 
+ https://github.com/sushant-baton 
+ <pre style='white-space:pre-wrap;width:81ex'>Merge pull request #35 from pump-fun/feat/creator-fee-related-examples
+feat: add rust examples for public docs</pre>
+ tag:github.com,2008:Grit::Commit/a313d980b16f4733a6244734cdc5990fd9c3f8a6 
+ feat: add rust examples for public docs
+ 2026-05-18T19:21:50Z 
+ sushant-baton 
+ https://github.com/sushant-baton 
+ <pre style='white-space:pre-wrap;width:81ex'>feat: add rust examples for public docs</pre>
+ tag:github.com,2008:Grit::Commit/3c6721a67c0b206b39130b454c8ba22a83ce972e 
+ Add creator fee docs
+ 2026-05-18T19:03:28Z 
+ arv-baton 
+ https://github.com/arv-baton 
+ <pre style='white-space:pre-wrap;width:81ex'>Add creator fee docs</pre>
+ tag:github.com,2008:Grit::Commit/91db6800e55bf341696564bd30a08ed4e3fc7491 
+ USDC paired coins
+ 2026-05-07T17:09:01Z 
+ arv-baton 
+ https://github.com/arv-baton 
+ <pre style='white-space:pre-wrap;width:81ex'>USDC paired coins</pre>
+ tag:github.com,2008:Grit::Commit/7de0b959fa2bdab379a2f75f5433d3de1e35d229 
+ Create BREAKING_FEE_RECIPIENT.md
+ 2026-04-22T21:06:52Z 
+ arv-baton 
+ https://github.com/arv-baton 
+ <pre style='white-space:pre-wrap;width:81ex'>Create BREAKING_FEE_RECIPIENT.md</pre>
+ tag:github.com,2008:Grit::Commit/9d874ec2763ac60f510d2bba80c5126c1fe133a8 
+ feat: permanent fee distribution
+ 2026-03-19T11:57:50Z 
+ onesatz@batoncorporation.com 
+ <pre style='white-space:pre-wrap;width:81ex'>feat: permanent fee distribution</pre>
+ tag:github.com,2008:Grit::Commit/1059c0d95d1943c3bed41f2abc0dafbd70cd2e68 
+ feat: github fees
+ 2026-03-05T11:47:41Z 
+ onesatz@batoncorporation.com 
+ <pre style='white-space:pre-wrap;width:81ex'>feat: github fees</pre>
+ tag:github.com,2008:Grit::Commit/5ea63cdb1fbe546769339c659d1529252cd80b4d 
+ Merge pull request #23 from pump-fun/feat/cashback
+ 2026-02-17T18:03:58Z 
+ drew-baton 
+ https://github.com/drew-baton 
+ <pre style='white-space:pre-wrap;width:81ex'>Merge pull request #23 from pump-fun/feat/cashback
+feat: cashback update</pre>
+ tag:github.com,2008:Grit::Commit/a0a28de6073ed351bad1435706ad53024dae8043 
+ chore: mention versions to use with sdks
+ 2026-02-17T18:03:47Z 
+ drewriester@Drew-Baton-Corp.local 
+ <pre style='white-space:pre-wrap;width:81ex'>chore: mention versions to use with sdks</pre>
+ tag:github.com,2008:Grit::Commit/82dacacf15ca93dc0444ab38714f2226210a0a3d 
+ feat: cashback update
+ 2026-02-17T17:35:12Z 
+ drewriester@Drew-Baton-Corp.local 
+ <pre style='white-space:pre-wrap;width:81ex'>feat: cashback update</pre>
+ tag:github.com,2008:Grit::Commit/f0ef005c386adeeb783c27fdcc4ddd9d49b255c5 
+ feat: creator rewards sharing
+ 2026-01-09T17:51:59Z 
+ onesatz@batoncorporation.com 
+ <pre style='white-space:pre-wrap;width:81ex'>feat: creator rewards sharing</pre>
+ tag:github.com,2008:Grit::Commit/7d7abd77403f0646ea17468d7cb6e66b33dbc3ed 
+ Immutable global volume accumulator and reserved fee recipients
+ 2025-11-15T19:58:24Z 
+ arv-baton 
+ https://github.com/arv-baton 
+ <pre style='white-space:pre-wrap;width:81ex'>Immutable global volume accumulator and reserved fee recipients</pre>
+ tag:github.com,2008:Grit::Commit/f5aa8e1589db211eff5526005d60b765995c893f 
+ chore: solscan links
+ 2025-11-11T11:16:49Z 
+ onesatz@batoncorporation.com 
+ <pre style='white-space:pre-wrap;width:81ex'>chore: solscan links</pre>
+ tag:github.com,2008:Grit::Commit/bec9a97a5ce4586c7c889647122be0e9ca12f620 
+ readme for release notes
+ 2025-11-07T15:59:58Z 
+ arv-baton 
+ https://github.com/arv-baton 
+ <pre style='white-space:pre-wrap;width:81ex'>readme for release notes</pre>
+ tag:github.com,2008:Grit::Commit/864c072f4c331354288232e73b88ae849215ce7b 
+ Idl and type files for mayhem mode and create v2
+ 2025-11-07T15:30:21Z 
+ arv-baton 
+ https://github.com/arv-baton 
+ <pre style='white-space:pre-wrap;width:81ex'>Idl and type files for mayhem mode and create v2</pre>

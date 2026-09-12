@@ -1,0 +1,3 @@
+AVISO: a Astra alterou a árvore de trabalho num modo que não permite alterações:
+7a8
+> ?? .claude/state/astra-review-plantao-meme-20260912-1834.md

@@ -1,0 +1,63 @@
+{"name": "40_pumpfun_coinpage_wofi_top", "url": "https://pump.fun/coin/VEY71Uj9G6oZiVHR3dDjhMVrVAXfaTNatTjt226pump", "mode": "text", "http": 200, "request_started_utc": "2026-09-12T21:45:13Z", "observed_utc": "2026-09-12T21:45:14Z", "observed_brt": "18:45:14 BRT", "seconds": 1.4, "bytes": 2046118, "content_type": "text/html; charset=utf-8", "last_modified": "", "date": "Sat, 12 Sep 2026 21:45:13 GMT", "ratelimit_remaining": "", "title": "WOFI (WOFI) Price, Chart & Market Cap | Pump", "meta_dates": []}
+
+Welcome to Pump . fun!
+ Pump lets anyone create coins, giving everyone equal access to buy and sell from the start. Prices can move quickly, so trade carefully.
+ Continue 
+ By clicking this button, you agree to the Terms and Conditions , Privacy Policy , and certify that you are over 18 years old.
+ Home 
+ Explore 
+ GO 
+ Mayhem 
+ Live 
+ Support 
+ Terminal 
+ Home 
+ Explore 
+ GO 
+ Mayhem 
+ Live 
+ Support 
+ Terminal 
+ WOFI (WOFI) Price, Chart & Market Cap | Pump 
+ Home 
+ Explore 
+ GO 
+ Mayhem 
+ Live 
+ Support 
+ Terminal 
+ $PUMP 
+ Create Try app 
+ Trade faster. Pump is better on mobile. 
+ Search for coins and users... ⌘ K 
+ Sign in Signed in 
+ Hot callouts 
+ Resources
+ PumpSwap 
+ Fees 
+ Revenue 
+ Tech updates 
+ Wallet sign-in changes 
+ Legal
+ Privacy policy 
+ Terms of service 
+ Tokenized agent disclaimer 
+ Livestream policy 
+ DMCA policy 
+ Trademark guidelines 
+ Charity coins 
+ Go.fun terms 
+ Blog 
+ © Pump.fun 2026
+ © Pump.fun 2026
+ Blog Resources Legal 
+ WOFI 
+ WOFI 16h ago 
+ VEY71U Chain and launchpad : Pump Creator rewards recipient : Rewards → creator 
+ Market cap. 
+ Stats
+ 5m 1h 24h 
+ View bubble map 
+ Creator 28P64t 
+ MC 
+ Log in to trade

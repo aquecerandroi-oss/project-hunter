@@ -1,0 +1,174 @@
+{"name": "17_airdropalert_holder_rewards", "url": "https://airdropalert.com/blogs/pump-fun-holder-rewards/", "mode": "text", "http": 200, "request_started_utc": "2026-09-12T21:38:03Z", "observed_utc": "2026-09-12T21:38:05Z", "observed_brt": "18:38:05 BRT", "seconds": 2.52, "bytes": 265619, "content_type": "text/html; charset=UTF-8", "last_modified": "Sat, 12 Sep 2026 20:39:46 GMT", "date": "Sat, 12 Sep 2026 21:38:04 GMT", "ratelimit_remaining": "", "title": "Pump Fun Holder Rewards: Get Paid to Hold + Custom Pairs Launch", "meta_dates": [["article:published_time", "2026-09-12T19:19:40+00:00"], ["article:modified_time", "2026-09-12T19:19:47+00:00"]]}
+
+Pump Fun Holder Rewards: Get Paid to Hold + Custom Pairs Launch 
+ExpiresActive On 
+ExpiresByType application/javascript "access plus 1 month" 
+ BTC 
+ $77,168 
+ -0.25%
+ ETH 
+ $2,522 
+ -0.44%
+ BNB 
+ $727 
+ 0.04%
+ SOL 
+ $101 
+ -1.07%
+ XRP 
+ $1.37 
+ 0.06%
+ DOGE 
+ $0.084861 
+ 0.47%
+ PEPE 
+ $0.000003 
+ 3.51%
+ SUI 
+ $0.722997 
+ -0.77%
+ FARTCOIN 
+ $0.143723 
+ -0.01%
+ Home 
+ Airdrops 
+ Featured Airdrops 
+ New Airdrops 
+ NFT Airdrops 
+ DeFi Airdrops 
+ Potential Airdrops 
+ Solana Airdrops 
+ Airdrop Eligibility Checker 
+ Blog 
+ Trading 
+ NFTs 
+ Airdrop Content 
+ Guides 
+ Meme Coins 
+ Airdrop Farming 
+ Cointracker 
+ Select Page 
+ Pump Fun Holder Rewards: Get Paid to Hold as Custom Pairs Go Live
+ September 12, 2026
+ Pump fun just dropped one of its biggest updates since the $PUMP token sale. It lands right in the middle of the stock-paired memecoin wave we have been covering for weeks. In a single announcement, the platform introduced Holder Rewards, killed Cashback mode, and rolled out Custom Pairs with tokenized stocks. It also burned roughly $370M in $PUMP and locked in one year of programmatic buybacks at 50% of revenue. That is a lot to unpack, so let’s go through it piece by piece. At the end, I will share the first trade I placed on this news. What Are Pump Fun Holder Rewards?
+ Holder Rewards are the headline change. Tokens launched as Holder Reward tokens now pay out rewards to anyone simply holding them. Trading fees on these tokens flow into a Pump fun distribution wallet, and rewards get distributed pro-rata several times every hour. The more tokens you hold, the more you earn, and anyone holding over $20 worth of a token is eligible.
+ Payouts arrive in the quote token. A token paired with SOL pays rewards in SOL, and a token paired with $PUMP distributes rewards in $PUMP. If you have farmed airdrops for years like we have, this should sound familiar: it is essentially a continuous airdrop stream for diamond hands, baked into the launchpad itself.
+ Creators launching a new coin now pick between a standard Creator Fee token or a Holder Rewards token. Existing Cashback and Creator Fee tokens can apply to switch through a fee redirection application form. Pump fun says acceptance depends on clear, objective information that benefits the token and its community. One thing to note before applying: the switch is a one-way door. Once a token becomes a Holder Rewards token, it can never change back.
+ Cashback Mode Is Gone
+ The second change is subtraction. Cashback mode is no longer available as a launch option on standard Pump fun launches. It only survives on Custom Pairs, where creators still choose between a Creator Fee or Cashback. Creator Fees run a flat 0.05% to 1%. Cashback charges 0.3% on the bonding curve and 0.05% post-bonding, claimable by traders.
+ Reading between the lines, Pump fun clearly wants fee flows pointed at holders rather than rebated to traders. Rewarding people for holding builds stickier communities than refunding people for churning volume, and that is the entire thesis behind this pivot.
+ Custom Pairs Bring Tokenized Stocks to Pump Fun
+ Here is the part that connects directly to the trend we have tracked all month. Custom Pairs let anyone launch a Pump fun token paired with tokenized stocks, crypto majors, metals, and more, instead of the usual SOL or USDC pairing.
+ Through a partnership with Sunrise, 20 new asset pairs go live on Solana, including tokenized $BABA, $COST, $DJT, $HIMS, $RDDT, $RBLX, $SNAP, and $LMT. Combined with xStocks, Pump fun supports a total of 93 asset pairs, with more on the way. Launching works the same as any Pump fun token: pick a name, image, ticker, and your desired pair on the site or app.
+ A few mechanics worth knowing:
+ Fees on Custom Pairs get paid out in the quote token, so a memecoin paired with tokenized $NVDA distributes fees in tokenized $NVDA.
+ Custom Pairs that switch to Holder Rewards set a flat fee between 0.01% and 3%, which is final once set. SOL and USDC pairs keep the standard tiered fee structure that decreases as market cap rises.
+ Creator Fee sharing supports up to 10 recipients, and the configuration locks after the first setup. A CTO unlocks one update for the new admin.
+ Pairings are final. An existing token can never convert into a Custom Pair, and there is no transfer tax setting.
+ Crucially, 50% of all revenue from Custom Pairs feeds the programmatic $PUMP buyback and burn contract. If stock-paired memecoins keep printing volume the way they have on Robinhood Chain and StonkFun, that is a meaningful new revenue stream pointed straight at supply reduction.
+ The $370M Burn and One Year of Programmatic Buybacks
+ Alongside the product changes, Pump fun burned every $PUMP token it bought back over the past nine months: roughly $370M worth of purchases, around 36% of the circulating supply, removed forever across two on-chain transactions.
+ On top of that, the team initiated a programmatic buyback and burn scheme locked in an irreversible smart contract for one year. Half of all net revenue from the bonding curve, PumpSwap, and Terminal automatically buys $PUMP on the open market and burns 100% of those purchases. The other half funds operations, hiring, marketing, and acquisitions, which founder Alon defends bluntly: he is confident that 50% of the business they are building toward will dwarf 100% of the business they have today.
+ Whatever you think of Pump fun, this is the most aggressive supply-reduction commitment from any major revenue-generating platform in crypto right now, and the market will price that in fast.
+ The Trenches Got a New Life, and Pump Fun Just Made Its Move
+ Zoom out and today’s announcement is the latest escalation in a story we have documented every step of the way. The meme trenches came back to life with the $ANSEM coin , which kicked off the current cycle of degeneracy. Soon after came Robinhood meme season , where stock-adjacent memecoins found product-market fit almost overnight. Then the launchpad wars broke out, with even the Uniswap launchpad joining the fight, and most recently StonkFun pushed tokenized stocks into the memecoin meta. This also reignited the good old holder airdrops.
+ Pump fun watched all of it and just answered with holder payouts, tokenized stock pairs, and a supply burn in one move. The launchpad wars are officially in their arms-race phase.
+ We are not just writing about this from the sidelines either. We have been trading these plays ourselves on the FOMO app , which has become our go-to for this meta. Use code FairSaltySquid for 10% off fees if you want to join us in the trenches.
+ My First Bet Under the New Model: Baton
+ One of the first coins that could benefit from the new Pump fun model is Baton. I bought a bag at a $14M market cap, and it currently sits around $12.7M, so I am slightly underwater as I write this. The thesis is simple: Baton airdrops $PUMP straight into your wallet or FOMO account, which lines up perfectly with the Holder Rewards direction Pump fun just confirmed. If holder payouts become the meta, coins already built around distributing $PUMP look like natural early beneficiaries.
+ Contract address:
+ Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump 
+ To be clear, this is a highly speculative play on a fresh narrative. Do your own research and size your position accordingly. Don’t tail me blindly; this is simply one of the bets I placed right after the announcement dropped, and I will take the outcome either way. Want to follow how this trade and the rest of my meme plays develop? Join our newsletter and you will get every update.
+ Keep This Content Free
+ Breaking down hour-old announcements like this one, with the narrative context and a live trade attached, takes real time. You can keep it coming at zero cost to yourself: sign up on OKX or Bybit through our links and we earn a small commission while you get the same trading conditions.
+ Final Words
+ Pump fun just repositioned itself from a memecoin factory into a full launch-and-hold ecosystem: Holder Rewards for communities, Custom Pairs for the tokenized stock wave, and a locked buyback and burn for $PUMP itself. Every major launchpad now has to respond, and holders finally get paid for doing what they were already doing. Keep an eye on which existing tokens win approval to switch to Holder Rewards, because those approvals will likely become tradeable events in themselves. We will cover them as they land.
+ Use the FOMO app to automatically receive the Stock Airdrops tied to Memecoins and the potential Pump Fun holder rewards. FAQ
+ What are Pump fun Holder Rewards? Holder Rewards are automatic payouts to token holders, funded by trading fees. Rewards get distributed pro-rata several times per hour in the token’s quote asset, and anyone holding over $20 worth of the token qualifies.
+ Can existing Pump fun tokens switch to Holder Rewards? Yes. Existing Cashback and Creator Fee tokens can apply through Pump fun’s fee redirection form. Approval depends on objective information benefiting the community, and the switch is permanent.
+ What are Custom Pairs on Pump fun? Custom Pairs let creators launch tokens paired with tokenized stocks, crypto majors, metals, and other assets instead of SOL or USDC. At launch, 93 asset pairs are supported through Sunrise and xStocks.
+ How much $PUMP did Pump fun burn? Around $370M worth of bought-back $PUMP, roughly 36% of the circulating supply. Going forward, 50% of all net revenue feeds an irreversible one-year buyback and burn contract.
+ Is Cashback mode still available? Not for standard launches. Cashback survives only as an option on Custom Pairs, alongside Creator Fees.
+ Founder, AirdropAlert Written by
+ Morten Christensen 
+ Crypto class of '13, airdrop farmer since 2016. Avid trader and DeFi veteran. His market commentary has been featured by Bloomberg, The Wall Street Journal, The New York Times, Forbes, and CNN.
+ Read full bio → · Follow @mortpoker on X 
+ ← Prev: HYPE Price Support at $79: Update on My Short From the Top 
+ Recent Articles
+ Pump Fun Holder Rewards: Get Paid to Hold as Custom Pairs Go Live 
+ HYPE Price Support at $79: Update on My Short From the Top 
+ Holder Airdrops Are Back, and This Time They Pay in Stocks 
+ What Happens to Your Crypto When an Exchange Goes Bankrupt? 
+ ZCAT Memecoin Explained: The Anonymous Cat That Airdrops Zcash 
+ AirdropAlert Newsletter
+ Crypto Resources
+ Crypto Casinos 
+ Blockchain Bridges 
+ Gaming Platforms 
+ Staking & Restaking 
+ DEX Token Swapping 
+ Crypto Wallets 
+ We publish new crypto airdrops for you every day
+ All Airdrops 
+ Featured Airdrops 
+ DeFi Airdrops 
+ Trade your crypto
+ Support us by using our referral link on these exchanges. Claim their sign up bonus and trade your airdropped coins and other cryptocurrencies.
+ Learn about exchanges 
+  
+ Read More 
+ Sep 2026 
+ ZCAT Memecoin Explained: The Anonymous Cat That Airdrops Zcash 
+ Sep 2026 
+ STONK vs PONS: The Launchpad Buyback War Just Flipped 
+ Sep 2026 
+ Who Is Bonkguy? The $16K to $20 Million BONK Trade and Everything After 
+ Tags
+ memecoins 
+ pump fun 
+ trading 
+ Follow 
+ Follow 
+ AirdropAlert.com is the crypto industry’s #1 rated library to find trusted crypto airdrops, giveaways and more. Helping millions of people discover new projects & find new ways to earn cryptocurrency since 2017.
+ Follow 
+ Follow 
+ Follow 
+ Follow 
+ Follow 
+ Follow 
+ Company 
+ About Us
+ Author
+ Press & Media
+ General Terms
+ Privacy Policy
+ Disclaimer
+ Contact
+ Useful links 
+ Browse Airdrops
+ Search Projects
+ Unclaimed Airdrops
+ Exchanges
+ Stay Safe
+ FAQs
+ RSS Feed
+ List Airdrop 
+ Advertise 
+ Partnerships 
+ Disclaimer: The information provided on this website is for informational purposes only and does not, under any circumstances, constitute investment advice, financial advice, trading advice, or any other form of advice. AirdropAlert explicitly disclaims any recommendation or endorsement for the purchase, sale, or retention of any cryptocurrency by any visitor or user of this website. Prior to making any investment decisions, it is imperative that individuals conduct thorough due diligence and seek consultation with a qualified financial advisor.
+ © AirdropAlert.com 2026 – All rights reserved
+ Cookie Consent
+ To deliver the best AirdropAlert experience, we use digital cookies (not the edible kind). These help us personalise your visit, improve our platform, and keep things secure. You can accept all, adjust your preferences, or reject non-essential cookies at any time.
+ Necessary Cookies 
+ These cookies are essential for the website to function properly.
+ Analytics Cookies 
+ These cookies help us understand how visitors interact with our website.
+ Marketing Cookies 
+ These cookies are used to track visitors across websites to display relevant advertisements.
+ Preferences Cookies 
+ These cookies enable the website to remember information that changes the way the website behaves or looks.
+ Privacy Policy 
+ Customize 
+ Accept Necessary Only 
+ Accept All 
+ Save Preferences

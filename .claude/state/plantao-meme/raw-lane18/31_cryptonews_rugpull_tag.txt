@@ -1,0 +1,432 @@
+{"name": "31_cryptonews_rugpull_tag", "url": "https://crypto.news/tag/rug-pull/", "mode": "text", "http": 200, "request_started_utc": "2026-09-12T21:41:22Z", "observed_utc": "2026-09-12T21:41:23Z", "observed_brt": "18:41:23 BRT", "seconds": 0.94, "bytes": 364611, "content_type": "text/html; charset=UTF-8", "last_modified": "Sat, 12 Sep 2026 21:41:23 GMT", "date": "Sat, 12 Sep 2026 21:41:23 GMT", "ratelimit_remaining": "", "title": "Latest rug pull News | crypto.news", "meta_dates": []}
+
+Latest rug pull News | crypto.news 
+ Skip to content 
+ Buy Crypto 
+ Events 
+ Meme Coins 
+ Contact us 
+ About 
+ Newsletters 
+ Advertise 
+ Follow-up 
+ Best Picks 
+ Glossary 
+ crypto.news 
+ News All 
+ Bitcoin 
+ Blockchain 
+ Ethereum 
+ DeFi 
+ Altcoin 
+ Regulation 
+ Solana 
+ Shiba Inu 
+ Feature 
+ Opinion 
+ US Regulation 
+ Markets 
+ Predictions 
+ Prices 
+ Learn 
+ Search 
+ Search 
+ Search 
+ Close search 
+ Bitcoin (BTC)
+ $77,228.00 
+ -0.18368 
+ Bitcoin price 
+ Ethereum (ETH)
+ $2,524.91 
+ -0.47941 
+ Ethereum price 
+ XRP (XRP)
+ $1.36 
+ 0.1618 
+ XRP price 
+ BNB (BNB)
+ $726.91 
+ 0.01686 
+ BNB price 
+ Solana (SOL)
+ $101.56 
+ -1.13215 
+ Solana price 
+ Hyperliquid (HYPE)
+ $79.65 
+ -1.14046 
+ Hyperliquid price 
+ Cardano (ADA)
+ $0.207203 
+ 0.2338 
+ Cardano price 
+ Chainlink (LINK)
+ $11.52 
+ -0.73313 
+ Chainlink price 
+ POL (ex-MATIC) (POL)
+ $0.096345 
+ -0.08867 
+ POL (ex-MATIC) price 
+ Gram (prev. Toncoin) (GRAM)
+ $1.38 
+ 1.20564 
+ Gram (prev. Toncoin) price 
+ Bitcoin (BTC)
+ $77,228.00 
+ -0.18368 
+ Bitcoin price 
+ Ethereum (ETH)
+ $2,524.91 
+ -0.47941 
+ Ethereum price 
+ XRP (XRP)
+ $1.36 
+ 0.1618 
+ XRP price 
+ BNB (BNB)
+ $726.91 
+ 0.01686 
+ BNB price 
+ Solana (SOL)
+ $101.56 
+ -1.13215 
+ Solana price 
+ Hyperliquid (HYPE)
+ $79.65 
+ -1.14046 
+ Hyperliquid price 
+ Cardano (ADA)
+ $0.207203 
+ 0.2338 
+ Cardano price 
+ Chainlink (LINK)
+ $11.52 
+ -0.73313 
+ Chainlink price 
+ POL (ex-MATIC) (POL)
+ $0.096345 
+ -0.08867 
+ POL (ex-MATIC) price 
+ Gram (prev. Toncoin) (GRAM)
+ $1.38 
+ 1.20564 
+ Gram (prev. Toncoin) price 
+ Bitcoin (BTC)
+ $77,228.00 
+ -0.18368 
+ Bitcoin price 
+ Ethereum (ETH)
+ $2,524.91 
+ -0.47941 
+ Ethereum price 
+ XRP (XRP)
+ $1.36 
+ 0.1618 
+ XRP price 
+ BNB (BNB)
+ $726.91 
+ 0.01686 
+ BNB price 
+ Solana (SOL)
+ $101.56 
+ -1.13215 
+ Solana price 
+ Hyperliquid (HYPE)
+ $79.65 
+ -1.14046 
+ Hyperliquid price 
+ Cardano (ADA)
+ $0.207203 
+ 0.2338 
+ Cardano price 
+ Chainlink (LINK)
+ $11.52 
+ -0.73313 
+ Chainlink price 
+ POL (ex-MATIC) (POL)
+ $0.096345 
+ -0.08867 
+ POL (ex-MATIC) price 
+ Gram (prev. Toncoin) (GRAM)
+ $1.38 
+ 1.20564 
+ Gram (prev. Toncoin) price 
+ Bitcoin (BTC)
+ $77,228.00 
+ -0.18368 
+ Bitcoin price 
+ Ethereum (ETH)
+ $2,524.91 
+ -0.47941 
+ Ethereum price 
+ XRP (XRP)
+ $1.36 
+ 0.1618 
+ XRP price 
+ BNB (BNB)
+ $726.91 
+ 0.01686 
+ BNB price 
+ Solana (SOL)
+ $101.56 
+ -1.13215 
+ Solana price 
+ Hyperliquid (HYPE)
+ $79.65 
+ -1.14046 
+ Hyperliquid price 
+ Cardano (ADA)
+ $0.207203 
+ 0.2338 
+ Cardano price 
+ Chainlink (LINK)
+ $11.52 
+ -0.73313 
+ Chainlink price 
+ POL (ex-MATIC) (POL)
+ $0.096345 
+ -0.08867 
+ POL (ex-MATIC) price 
+ Gram (prev. Toncoin) (GRAM)
+ $1.38 
+ 1.20564 
+ Gram (prev. Toncoin) price 
+ rug pull News 
+ Top rug pull Stories 
+ Top Stories 
+ The Clarity Act, Trump’s memecoin, and the SEC investigation Warren just requested 
+Aug 4, 2026 at 10:02 PM UTC
+ Top Stories 
+ ZK Casino begins partial repayments in long-running $33M rug pull case 
+Nov 10, 2025 at 5:01 AM UTC
+ Top Stories 
+ WORLD token rug pull allegations drag James Wynn back into controversy 
+May 28, 2026 at 9:10 AM UTC
+ Top Stories 
+ South Korea makes first DEX rug pull arrest in CATFI case 
+May 27, 2026 at 7:36 AM UTC
+ Top Stories 
+ Trove token tanks 95% as exchange pivots from Hyperliquid to Solana 
+Jan 20, 2026 at 11:30 AM UTC
+ Latest rug pull News 
+ Feature
+ Read more - The Clarity Act, Trump’s memecoin, and the SEC investigation Warren just requested 
+ The Clarity Act, Trump’s memecoin, and the SEC investigation Warren just requested 
+ The crypto industry's most important regulatory bill is stuck because of the president's memecoin. Warren just asked the SEC to investigate. 
+Aug 4, 2026 at 10:02 PM UTC
+ Feature
+ Read more - SpaceX just posted a $540 million bitcoin loss and every corporate BTC holder felt it 
+ SpaceX just posted a $540 million bitcoin loss and every corporate BTC holder felt it 
+ SpaceX reported a $540M decline in bitcoin holdings in its first public earnings. Here is what the numbers mean for every corporate BTC holder. 
+Aug 4, 2026 at 9:49 PM UTC
+ Learn
+ Read more - How CEX listings work and what they actually cost 
+ How CEX listings work and what they actually cost 
+ Learn how crypto exchange listings work, what they cost from listing fees to market makers, and why token prices often drop after a major exchange listing. 
+Aug 4, 2026 at 9:20 PM UTC
+ Learn
+ Read more - What is PayFi and how stablecoins are replacing wire transfers 
+ What is PayFi and how stablecoins are replacing wire transfers 
+ Learn what PayFi is, how stablecoins settle payments faster and cheaper than wire transfers, and why programmable money is reshaping cross-border payments. 
+Aug 4, 2026 at 9:16 PM UTC
+ Learn
+ Read more - How crypto market makers work: the firms behind every trade you take 
+ How crypto market makers work: the firms behind every trade you take 
+ Learn how crypto market makers provide liquidity, how token listing deals are structured, and what their presence means for the tokens you trade. 
+Aug 4, 2026 at 9:10 PM UTC
+ Learn
+ Read more - How meme coins are made: bonding curves, Pump.fun, and the math behind rug pulls 
+ How meme coins are made: bonding curves, Pump.fun, and the math behind rug pulls 
+ Learn how bonding curves price meme coins, how Pump.fun launches work, why fewer than 2% of tokens graduate, and how to spot rug pulls before they happen. 
+Aug 4, 2026 at 9:05 PM UTC
+ Learn
+ Read more - Why locked liquidity does not mean a token is safe 
+ Why locked liquidity does not mean a token is safe 
+ Every guide says a liquidity lock means safer. On launchpads paying creator fees, the lock is the scam’s revenue engine. What it does and does not cover. 
+Jul 29, 2026 at 4:51 PM UTC
+ News
+ Read more - WORLD token rug pull allegations drag James Wynn back into controversy 
+ WORLD token rug pull allegations drag James Wynn back into controversy 
+ James Wynn has faced fresh backlash across crypto social media after blockchain investigators linked him to a newly launched token that allegedly ended in a rug pull worth only 3.2 SOL, or roughly $260. According to on-chain analytics platform Lookonchain,… 
+May 28, 2026 at 9:10 AM UTC
+ News
+ Read more - South Korea makes first DEX rug pull arrest in CATFI case 
+ South Korea makes first DEX rug pull arrest in CATFI case 
+ South Korea charges CATFI operators in its first DEX rug pull arrest after a Solana meme coin scheme caused $260k in illegal gains. 
+May 27, 2026 at 7:36 AM UTC
+ News
+ Read more - Trove token tanks 95% as exchange pivots from Hyperliquid to Solana 
+ Trove token tanks 95% as exchange pivots from Hyperliquid to Solana 
+ Trove’s TROVE crashes 95% as team pivots from Hyperliquid to Solana while keeping most ICO funds, sparking refund demands and legal threats. Trove Markets confirmed it will retain funds from a token sale originally marketed for integration with Hyperliquid, despite… 
+Jan 20, 2026 at 11:30 AM UTC
+ News
+ Read more - Former NYC Mayor Eric Adams denies role in NYC token crash amid rug pull claims 
+ Former NYC Mayor Eric Adams denies role in NYC token crash amid rug pull claims 
+ Former New York City Mayor Eric Adams has refuted claims that he moved funds or profited from the NYC token after it fell more than 80% within the first hour of its launch. “Recent reports alleging that Eric Adams moved… 
+Jan 15, 2026 at 9:45 AM UTC
+ News
+ Read more - Former NYC mayor Eric Adams unveils NYC token, raising rug pull concerns 
+ Former NYC mayor Eric Adams unveils NYC token, raising rug pull concerns 
+ Former New York City Mayor Eric Adams has launched a Solana-based meme coin, which he says will help combat rising hate and inspire the next wave of innovation in the city. Dubbed the New York City token (NYC), Adams announced… 
+Jan 13, 2026 at 9:10 AM UTC
+ News
+ Read more - Binance Alpha’s Piggycell faces scrutiny after brutal crash 
+ Binance Alpha’s Piggycell faces scrutiny after brutal crash 
+ Piggycell’s PIGGY token crashed after a sudden mint‑and‑dump, raising hard questions over token controls, smart‑contract design and Binance Alpha’s listing safeguards. Piggycell’s PIGGY (PIGGY) token appears to have suffered a violent intraday collapse after a sudden spike in freshly minted… 
+ PIGGY 
+ Piggycell 
+Dec 5, 2025 at 12:46 PM UTC
+ News
+ Read more - ZK Casino begins partial repayments in long-running $33M rug pull case 
+ ZK Casino begins partial repayments in long-running $33M rug pull case 
+ ZK Casino has resurfaced with an unexpected update after months of silence surrounding its collapsed project. ZK Casino is moving forward with slow, partial repayments in one of crypto’s most drawn-out collapse disputes. The update was shared by the project’s… 
+ ETH 
+ Ethereum 
+ LDO 
+ Lido DAO 
+ ZK 
+ ZKsync 
+Nov 10, 2025 at 5:01 AM UTC
+ News
+ Read more - BNB Chain project OracleBNB vanishes in $43k rug pull, wipes socials 
+ BNB Chain project OracleBNB vanishes in $43k rug pull, wipes socials 
+ The crypto community has witnessed another rug pull after fraudulent project OracleBNB abruptly vanished, leaving investors searching for answers. OracleBNB, a project built on BNB Chain, has reportedly executed a rug pull. The alarm was first raised by blockchain security… 
+ BNB 
+ BNB 
+Oct 10, 2025 at 12:17 PM UTC
+ News
+ Read more - HyperVault raises rug pull fears after $3.6m vanishes 
+ HyperVault raises rug pull fears after $3.6m vanishes 
+ Suspicious withdrawals from Hypervault have set off fears of a rug pull, with millions in crypto assets rapidly moved out of the platform.  Hypervault Finance is facing rug pull allegations after about $3.6 million in crypto was drained from the… 
+Sep 26, 2025 at 10:54 AM UTC
+ Show More 
+ Best crypto platforms 
+ Sep 2026 
+ Explore 
+ Deep Dives 
+ Recap
+ Read more - Liquid Network loses $320M, CLARITY vote nears, Bitcoin ETFs shed $463M | Weekly recap 
+ Liquid Network loses $320M, CLARITY vote nears, Bitcoin ETFs shed $463M | Weekly recap 
+15 hours ago
+ Feature
+ Read more - World settles bets with an oracle. That is the third model 
+ World settles bets with an oracle. That is the third model 
+1 day ago
+ Feature
+ Read more - The Treasury Secretary is whipping votes for a bill priced at 10% 
+ The Treasury Secretary is whipping votes for a bill priced at 10% 
+1 day ago
+ Feature
+ Read more - PayPal’s new platform lets anyone issue a dollar backed by a dollar 
+ PayPal’s new platform lets anyone issue a dollar backed by a dollar 
+1 day ago
+ Feature
+ Read more - Germany is ending tax-free bitcoin, and cutting the rate for traders 
+ Germany is ending tax-free bitcoin, and cutting the rate for traders 
+1 day ago
+ Feature
+ Read more - XRP fell 27% while RLUSD crossed $2.3 billion and nobody blinked 
+ XRP fell 27% while RLUSD crossed $2.3 billion and nobody blinked 
+3 days ago
+ Feature
+ Read more - Circle put USDC on Chelsea’s shirt and the FCA did not blink 
+ Circle put USDC on Chelsea’s shirt and the FCA did not blink 
+3 days ago
+ Feature
+ Read more - Pi Network ships Protocol 27 on a network with 14 million users and zero DeFi 
+ Pi Network ships Protocol 27 on a network with 14 million users and zero DeFi 
+3 days ago
+ Feature
+ Read more - Poland blocks its own crypto future for the third time as MiCA deadline passes 
+ Poland blocks its own crypto future for the third time as MiCA deadline passes 
+4 days ago
+ Feature
+ Read more - Hunter Biden is launching a memecoin on Wednesday. He is airdropping it to everyone who lost money on Trump’s. 
+ Hunter Biden is launching a memecoin on Wednesday. He is airdropping it to everyone who lost money on Trump’s. 
+4 days ago
+ Sign up for crypto news and market insights 
+ Get crypto market analysis and curated news delivered right to your inbox every week. 
+ Email 
+ Subscribe 
+ You have successfully joined our subscriber list. 
+ crypto.news
+ News 
+ Markets 
+ Predictions 
+ Feature 
+ Prices 
+ Learn 
+ US Regulation 
+ Glossary 
+ Podcast 
+ Interviews 
+ Sitemap 
+ News
+ Bitcoin 
+ Ethereum 
+ Solana 
+ XRP 
+ Shiba Inu 
+ Blockchain 
+ Altcoin 
+ DeFi 
+ Regulation 
+ Sponsored 
+ Info
+ Advertise 
+ Contact us 
+ About 
+ Careers 
+ Team Verification 
+ Authors 
+ Terms
+ Terms of Service 
+ Privacy Policy 
+ Cookie Policy 
+ Social 
+ X 
+ Telegram 
+ LinkedIn 
+ YouTube 
+ Google News 
+ RSS Feed 
+ crypto.news 
+ © 2015-2026 crypto.news 
+ Search 
+ Search 
+ News All 
+ Bitcoin 
+ Blockchain 
+ Ethereum 
+ DeFi 
+ Altcoin 
+ Regulation 
+ Solana 
+ Shiba Inu 
+ Feature 
+ Opinion 
+ US Regulation 
+ Markets 
+ Prices 
+ Predictions 
+ Learn 
+ Best Picks 
+ Buy Crypto 
+ Follow-up 
+ Events 
+ Meme Coins 
+ Newsletters 
+ Advertise 
+ Info 
+ Contact us 
+ About 
+ Careers 
+ Team Verification 
+ Terms 
+ Terms of Service 
+ Privacy Policy 
+ Cookie Policy 
+ Our site uses cookies and similar technologies. By using our site you consent to the use of cookies. Find additional information on how we use cookies in our Cookie Policy . 
+ I accept cookies

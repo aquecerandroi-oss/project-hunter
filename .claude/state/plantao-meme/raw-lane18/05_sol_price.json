@@ -1,0 +1,22 @@
+{
+ "_meta": {
+  "name": "05_sol_price",
+  "url": "https://frontend-api-v3.pump.fun/sol-price",
+  "mode": "json",
+  "http": 200,
+  "request_started_utc": "2026-09-12T21:36:25Z",
+  "observed_utc": "2026-09-12T21:36:25Z",
+  "observed_brt": "18:36:25 BRT",
+  "seconds": 0.39,
+  "bytes": 75,
+  "content_type": "application/json; charset=utf-8",
+  "last_modified": "",
+  "date": "Sat, 12 Sep 2026 21:36:25 GMT",
+  "ratelimit_remaining": "49"
+ },
+ "payload": {
+  "solPrice": 101.49036899605349,
+  "asOfTimestamp": 1789248984770,
+  "stale": false
+ }
+}

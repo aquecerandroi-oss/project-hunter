@@ -1,0 +1,182 @@
+{
+ "_meta": {
+  "name": "13_x_syndication_pumpfun_2098818822417375528",
+  "url": "https://cdn.syndication.twimg.com/tweet-result?id=2098818822417375528&token=a",
+  "mode": "json",
+  "http": 200,
+  "request_started_utc": "2026-09-12T21:37:54Z",
+  "observed_utc": "2026-09-12T21:37:55Z",
+  "observed_brt": "18:37:55 BRT",
+  "seconds": 0.59,
+  "bytes": 3552,
+  "content_type": "application/json; charset=utf-8",
+  "last_modified": "",
+  "date": "Sat, 12 Sep 2026 21:37:55 GMT",
+  "ratelimit_remaining": ""
+ },
+ "payload": {
+  "__typename": "Tweet",
+  "favorite_count": 5076,
+  "lang": "en",
+  "possibly_sensitive": false,
+  "created_at": "2026-09-12T16:59:36.000Z",
+  "display_text_range": [
+   0,
+   230
+  ],
+  "entities": {
+   "media": [
+    {
+     "display_url": "pic.x.com/Chq1MhsZkD",
+     "expanded_url": "https://x.com/Pumpfun/status/2098818822417375528/video/1",
+     "indices": [
+      231,
+      254
+     ],
+     "url": "https://t.co/Chq1MhsZkD"
+    }
+   ]
+  },
+  "id_str": "2098818822417375528",
+  "text": "We just made two HUGE changes to Pumpfun\n\nWe’re INTRODUCING Holder Rewards and REMOVING Cashback mode\n\nNow, Holder Reward tokens pay out rewards just by holding: for longer hold times, higher ceilings &amp; communities that thrive https://t.co/Chq1MhsZkD",
+  "user": {
+   "id_str": "1622243071806128131",
+   "name": "Pump.fun",
+   "screen_name": "Pumpfun",
+   "is_blue_verified": true,
+   "profile_image_shape": "Square",
+   "verified": false,
+   "verified_type": "Business",
+   "profile_image_url_https": "https://pbs.twimg.com/profile_images/2039436355806416896/V0Hhi9n-_normal.jpg"
+  },
+  "edit_control": {
+   "edit_tweet_ids": [
+    "2098818822417375528"
+   ],
+   "editable_until_msecs": "1789235976000",
+   "edits_remaining": "5",
+   "is_edit_eligible": false
+  },
+  "mediaDetails": [
+   {
+    "additional_media_info": {},
+    "display_url": "pic.x.com/Chq1MhsZkD",
+    "expanded_url": "https://x.com/Pumpfun/status/2098818822417375528/video/1",
+    "ext_media_availability": {
+     "status": "Available"
+    },
+    "indices": [
+     231,
+     254
+    ],
+    "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2098818732508266499/img/HqP94VWiuIq0QwLW.jpg",
+    "original_info": {
+     "focus_rects": [],
+     "height": 1080,
+     "width": 1920
+    },
+    "sizes": {
+     "large": {
+      "h": 1080,
+      "resize": "fit",
+      "w": 1920
+     },
+     "medium": {
+      "h": 675,
+      "resize": "fit",
+      "w": 1200
+     },
+     "small": {
+      "h": 383,
+      "resize": "fit",
+      "w": 680
+     },
+     "thumb": {
+      "h": 150,
+      "resize": "crop",
+      "w": 150
+     }
+    },
+    "type": "video",
+    "url": "https://t.co/Chq1MhsZkD",
+    "video_info": {
+     "aspect_ratio": [
+      16,
+      9
+     ],
+     "duration_millis": 25016,
+     "variants": [
+      {
+       "content_type": "application/x-mpegURL",
+       "url": "https://video.twimg.com/amplify_video/2098818732508266499/pl/rYpsS-O6v_oIzeH6.m3u8?v=cfc"
+      },
+      {
+       "bitrate": 256000,
+       "content_type": "video/mp4",
+       "url": "https://video.twimg.com/amplify_video/2098818732508266499/vid/avc1/480x270/z7jx40fLN4Tc6Y8-.mp4"
+      },
+      {
+       "bitrate": 832000,
+       "content_type": "video/mp4",
+       "url": "https://video.twimg.com/amplify_video/2098818732508266499/vid/avc1/640x360/JKOz--J1j-V786pe.mp4"
+      },
+      {
+       "bitrate": 2176000,
+       "content_type": "video/mp4",
+       "url": "https://video.twimg.com/amplify_video/2098818732508266499/vid/avc1/1280x720/UO2KU88fETQrHgh6.mp4"
+      },
+      {
+       "bitrate": 10368000,
+       "content_type": "video/mp4",
+       "url": "https://video.twimg.com/amplify_video/2098818732508266499/vid/avc1/1920x1080/ATwgvDA6leEtGC8x.mp4"
+      }
+     ]
+    }
+   }
+  ],
+  "photos": [],
+  "video": {
+   "aspectRatio": [
+    16,
+    9
+   ],
+   "contentType": "media_entity",
+   "durationMs": 25016,
+   "mediaAvailability": {
+    "status": "available"
+   },
+   "poster": "https://pbs.twimg.com/amplify_video_thumb/2098818732508266499/img/HqP94VWiuIq0QwLW.jpg",
+   "variants": [
+    {
+     "type": "application/x-mpegURL",
+     "src": "https://video.twimg.com/amplify_video/2098818732508266499/pl/rYpsS-O6v_oIzeH6.m3u8?v=cfc"
+    },
+    {
+     "type": "video/mp4",
+     "src": "https://video.twimg.com/amplify_video/2098818732508266499/vid/avc1/480x270/z7jx40fLN4Tc6Y8-.mp4"
+    },
+    {
+     "type": "video/mp4",
+     "src": "https://video.twimg.com/amplify_video/2098818732508266499/vid/avc1/640x360/JKOz--J1j-V786pe.mp4"
+    },
+    {
+     "type": "video/mp4",
+     "src": "https://video.twimg.com/amplify_video/2098818732508266499/vid/avc1/1280x720/UO2KU88fETQrHgh6.mp4"
+    },
+    {
+     "type": "video/mp4",
+     "src": "https://video.twimg.com/amplify_video/2098818732508266499/vid/avc1/1920x1080/ATwgvDA6leEtGC8x.mp4"
+    }
+   ],
+   "videoId": {
+    "type": "tweet",
+    "id": "2098818822417375528"
+   },
+   "viewCount": 0
+  },
+  "conversation_count": 1285,
+  "news_action_type": "conversation",
+  "isEdited": false,
+  "isStaleEdit": false
+ }
+}

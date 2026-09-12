@@ -1,0 +1,658 @@
+{
+ "_meta": {
+  "name": "29_llama_hacks",
+  "url": "https://api.llama.fi/hacks",
+  "mode": "json",
+  "http": 200,
+  "request_started_utc": "2026-09-12T21:41:18Z",
+  "observed_utc": "2026-09-12T21:41:18Z",
+  "observed_brt": "18:41:18 BRT",
+  "seconds": 0.41,
+  "bytes": 345116,
+  "content_type": "application/json",
+  "last_modified": "Sat, 12 Sep 2026 21:04:32 GMT",
+  "date": "Sat, 12 Sep 2026 21:41:18 GMT",
+  "ratelimit_remaining": "",
+  "trimmed": "rows with date >= 2026-08-17 kept (39 of 1268); full list not stored (size cap 1 MB)"
+ },
+ "payload": [
+  {
+   "date": 1787616000,
+   "name": "CometDEX",
+   "classification": "Token & Share Accounting",
+   "technique": "Incorrect Share Accounting",
+   "amount": 717000,
+   "chain": [
+    "Stellar"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": "Rust"
+  },
+  {
+   "date": 1787443200,
+   "name": "TermFinance Vaults",
+   "classification": "Governance",
+   "technique": "Malicious Proposal",
+   "amount": 8500000,
+   "chain": [
+    "Ethereum"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "5946",
+   "parentProtocolId": "parent#termfinance",
+   "language": "Solidity"
+  },
+  {
+   "date": 1787616000,
+   "name": "FH Token",
+   "classification": "Protocol Logic",
+   "technique": "Swap Logic Flaw",
+   "amount": 20000,
+   "chain": [
+    "BSC"
+   ],
+   "bridgeHack": false,
+   "targetType": "Token",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": "Solidity"
+  },
+  {
+   "date": 1788048000,
+   "name": "Weft V2",
+   "classification": "Oracle Manipulation",
+   "technique": "Spot Price Manipulation",
+   "amount": 47200,
+   "chain": [
+    "Radix"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "5411",
+   "parentProtocolId": "parent#weft-finance",
+   "language": "Scrypto"
+  },
+  {
+   "date": 1787616000,
+   "name": "Enjin",
+   "classification": "Access Control",
+   "technique": "Ownership Takeover",
+   "amount": 162000,
+   "chain": [
+    "Ethereum"
+   ],
+   "bridgeHack": false,
+   "targetType": "NFTfi",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": "Solidity"
+  },
+  {
+   "date": 1787788800,
+   "name": "Moonwell Lending",
+   "classification": "Oracle Manipulation",
+   "technique": "Spot Price Manipulation",
+   "amount": 8700000,
+   "chain": [
+    "Base"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "1853",
+   "parentProtocolId": "parent#moonwell",
+   "language": "Solidity"
+  },
+  {
+   "date": 1788652800,
+   "name": "Liquid Network",
+   "classification": "Bridge & Cross-Chain",
+   "technique": "Unbacked Cross-Chain Mint",
+   "amount": 320000000,
+   "chain": [
+    "Liquid"
+   ],
+   "bridgeHack": true,
+   "targetType": "Chain",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": "C++"
+  },
+  {
+   "date": 1788566400,
+   "name": "Secured Finance Lending",
+   "classification": "Oracle Manipulation",
+   "technique": "Spot Price Manipulation",
+   "amount": 104000,
+   "chain": [
+    "Ethereum"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "4197",
+   "parentProtocolId": "parent#secured-finance",
+   "language": "Solidity"
+  },
+  {
+   "date": 1787443200,
+   "name": "warp.green",
+   "classification": "Bridge & Cross-Chain",
+   "technique": "Bridge Logic Flaw",
+   "amount": 93000,
+   "chain": [
+    "Chia",
+    "Ethereum"
+   ],
+   "bridgeHack": true,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": "Chialisp"
+  },
+  {
+   "date": 1788134400,
+   "name": "Aquifer",
+   "classification": "Access Control",
+   "technique": "Arbitrary External Call",
+   "amount": 2469729,
+   "chain": [
+    "Solana"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "6884",
+   "language": "Rust"
+  },
+  {
+   "date": 1787356800,
+   "name": "TAC",
+   "classification": "Protocol Logic",
+   "technique": "Withdrawal Logic Flaw",
+   "amount": 7500000,
+   "chain": [
+    "TAC"
+   ],
+   "bridgeHack": false,
+   "targetType": "Chain",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "chain#tac",
+   "language": "Go"
+  },
+  {
+   "date": 1788566400,
+   "name": "Dream Health Chain",
+   "classification": "Protocol Logic",
+   "technique": "Reward Logic Flaw",
+   "amount": 71800,
+   "chain": [
+    "BSC"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": "Solidity"
+  },
+  {
+   "date": 1787961600,
+   "name": "Full Sail",
+   "classification": "Oracle Manipulation",
+   "technique": "Oracle Misconfiguration",
+   "amount": null,
+   "chain": [
+    "Sui"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "6413",
+   "language": "Move"
+  },
+  {
+   "date": 1789084800,
+   "name": "ether.fi Liquid",
+   "classification": "Access Control",
+   "technique": "Arbitrary External Call",
+   "amount": 43260,
+   "chain": [
+    "Ethereum"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "4429",
+   "parentProtocolId": "parent#ether-fi",
+   "language": "Solidity"
+  },
+  {
+   "date": 1788912000,
+   "name": "Nomic",
+   "classification": "Bridge & Cross-Chain",
+   "technique": "Unbacked Cross-Chain Mint",
+   "amount": 3150000,
+   "chain": [
+    "Nomic"
+   ],
+   "bridgeHack": true,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": "Rust"
+  },
+  {
+   "date": 1788912000,
+   "name": "Zentra Finance",
+   "classification": "Token & Share Accounting",
+   "technique": "Rounding Error",
+   "amount": 140030,
+   "chain": [
+    "Citrea"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "7419",
+   "language": "Solidity"
+  },
+  {
+   "date": 1787961600,
+   "name": "Permapod",
+   "classification": "Protocol Logic",
+   "technique": "Unknown",
+   "amount": null,
+   "chain": [
+    "ZIGChain"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "7205",
+   "language": null
+  },
+  {
+   "date": 1787356800,
+   "name": "The Sandbox",
+   "classification": "Access Control",
+   "technique": "Improper Access Control",
+   "amount": 675000,
+   "chain": [
+    "Base",
+    "BSC",
+    "Ethereum"
+   ],
+   "bridgeHack": true,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "1065",
+   "language": "Solidity"
+  },
+  {
+   "date": 1788134400,
+   "name": "Ankr",
+   "classification": "Token & Share Accounting",
+   "technique": "Unbacked Mint",
+   "amount": 410000,
+   "chain": [
+    "Flow"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "278",
+   "language": "Solidity"
+  },
+  {
+   "date": 1787270400,
+   "name": "MANTRA Chain",
+   "classification": "Access Control",
+   "technique": "Improper Access Control",
+   "amount": 0,
+   "chain": [
+    "MANTRA"
+   ],
+   "bridgeHack": false,
+   "targetType": "Chain",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "chain#mantra",
+   "language": "Go"
+  },
+  {
+   "date": 1788998400,
+   "name": "Dominion",
+   "classification": "Key Compromise",
+   "technique": "Private Key Compromised",
+   "amount": null,
+   "chain": [
+    "Solana"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": null
+  },
+  {
+   "date": 1787443200,
+   "name": "Arrakis V1",
+   "classification": "Oracle Manipulation",
+   "technique": "Spot Price Manipulation",
+   "amount": 7100,
+   "chain": [
+    "Ethereum"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "641",
+   "parentProtocolId": "parent#arrakis-finance",
+   "language": "Solidity"
+  },
+  {
+   "date": 1787875200,
+   "name": "Ajna V2",
+   "classification": "Protocol Logic",
+   "technique": "Liquidation Logic Flaw",
+   "amount": 775400,
+   "chain": [
+    "Ethereum"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "4019",
+   "parentProtocolId": "parent#ajna",
+   "language": "Solidity"
+  },
+  {
+   "date": 1788566400,
+   "name": "Reddio RedSonic",
+   "classification": "Token & Share Accounting",
+   "technique": "Incorrect Share Accounting",
+   "amount": 22800,
+   "chain": [
+    "Ethereum"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": "Solidity"
+  },
+  {
+   "date": 1788134400,
+   "name": "Radix",
+   "classification": "Access Control",
+   "technique": "Improper Access Control",
+   "amount": 1249946,
+   "chain": [
+    "Radix"
+   ],
+   "bridgeHack": false,
+   "targetType": "Chain",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "chain#radix",
+   "language": "Rust"
+  },
+  {
+   "date": 1788134400,
+   "name": "Float Protocol",
+   "classification": "Oracle Manipulation",
+   "technique": "Spot Price Manipulation",
+   "amount": 28000,
+   "chain": [
+    "Ethereum"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "497",
+   "language": "Solidity"
+  },
+  {
+   "date": 1788048000,
+   "name": "Balancer V1",
+   "classification": "Token & Share Accounting",
+   "technique": "Rounding Error",
+   "amount": 234000,
+   "chain": [
+    "Ethereum"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "116",
+   "parentProtocolId": "parent#balancer",
+   "language": "Solidity"
+  },
+  {
+   "date": 1788912000,
+   "name": "BeatXswap",
+   "classification": "Oracle Manipulation",
+   "technique": "Spot Price Manipulation",
+   "amount": 77512,
+   "chain": [
+    "BSC"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": "Solidity"
+  },
+  {
+   "date": 1787875200,
+   "name": "Virtue",
+   "classification": "Oracle Manipulation",
+   "technique": "Oracle Misconfiguration",
+   "amount": 894500,
+   "chain": [
+    "Iota"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "6455",
+   "language": "Move"
+  },
+  {
+   "date": 1787875200,
+   "name": "Avici",
+   "classification": "Protocol Logic",
+   "technique": "Withdrawal Logic Flaw",
+   "amount": 500859,
+   "chain": [
+    "Solana"
+   ],
+   "bridgeHack": false,
+   "targetType": "Crypto Card",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "8034",
+   "language": "Rust"
+  },
+  {
+   "date": 1787529600,
+   "name": "Nesa",
+   "classification": "Token & Share Accounting",
+   "technique": "Arithmetic Error",
+   "amount": 50000000,
+   "chain": [
+    "Nesa"
+   ],
+   "bridgeHack": false,
+   "targetType": "Chain",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": "Go"
+  },
+  {
+   "date": 1787875200,
+   "name": "Fogo Foundation",
+   "classification": "Key Compromise",
+   "technique": "Private Key Compromised",
+   "amount": 3000000,
+   "chain": [
+    "Fogo"
+   ],
+   "bridgeHack": false,
+   "targetType": "Foundation",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "chain#fogo",
+   "language": "Rust"
+  },
+  {
+   "date": 1788825600,
+   "name": "WealthManagementV2",
+   "classification": "Key Compromise",
+   "technique": "Private Key Compromised",
+   "amount": 26414,
+   "chain": [
+    "BSC"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": "Solidity"
+  },
+  {
+   "date": 1788480000,
+   "name": "Notional V2",
+   "classification": "Token & Share Accounting",
+   "technique": "Arithmetic Error",
+   "amount": 1727782,
+   "chain": [
+    "Ethereum"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "234",
+   "parentProtocolId": "parent#notional",
+   "language": "Solidity"
+  },
+  {
+   "date": 1787356800,
+   "name": "KiiChain",
+   "classification": "Token & Share Accounting",
+   "technique": "Arithmetic Error",
+   "amount": 9700000,
+   "chain": [
+    "KiiChain"
+   ],
+   "bridgeHack": false,
+   "targetType": "Chain",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": "Go"
+  },
+  {
+   "date": 1788048000,
+   "name": "Tectonic",
+   "classification": "Token & Share Accounting",
+   "technique": "Donation Attack",
+   "amount": 124470000,
+   "chain": [
+    "Cronos"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "1115",
+   "language": "Solidity"
+  },
+  {
+   "date": 1787788800,
+   "name": "CCC",
+   "classification": "Protocol Logic",
+   "technique": "Swap Logic Flaw",
+   "amount": 117000,
+   "chain": [
+    "BSC"
+   ],
+   "bridgeHack": false,
+   "targetType": "Token",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": null,
+   "language": "Solidity"
+  },
+  {
+   "date": 1788739200,
+   "name": "Cozy V2",
+   "classification": "Protocol Logic",
+   "technique": "Unknown",
+   "amount": 163326,
+   "chain": [
+    "Optimism"
+   ],
+   "bridgeHack": false,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "2964",
+   "parentProtocolId": "parent#cozy-finance",
+   "language": "Solidity"
+  },
+  {
+   "date": 1788998400,
+   "name": "Symbiosis",
+   "classification": "Bridge & Cross-Chain",
+   "technique": "Unbacked Cross-Chain Mint",
+   "amount": 336000,
+   "chain": [
+    "BSC",
+    "Ethereum"
+   ],
+   "bridgeHack": true,
+   "targetType": "DeFi Protocol",
+   "source": "",
+   "returnedFunds": null,
+   "defillamaId": "1594",
+   "language": "Solidity"
+  }
+ ]
+}

@@ -1,0 +1,182 @@
+{
+ "_meta": {
+  "name": "18_x_syndication_pumpfun_custompairs_2097785975434846285",
+  "url": "https://cdn.syndication.twimg.com/tweet-result?id=2097785975434846285&token=a",
+  "mode": "json",
+  "http": 200,
+  "request_started_utc": "2026-09-12T21:39:10Z",
+  "observed_utc": "2026-09-12T21:39:10Z",
+  "observed_brt": "18:39:10 BRT",
+  "seconds": 0.49,
+  "bytes": 3507,
+  "content_type": "application/json; charset=utf-8",
+  "last_modified": "",
+  "date": "Sat, 12 Sep 2026 21:39:10 GMT",
+  "ratelimit_remaining": ""
+ },
+ "payload": {
+  "__typename": "Tweet",
+  "favorite_count": 3131,
+  "lang": "en",
+  "possibly_sensitive": false,
+  "created_at": "2026-09-09T20:35:26.000Z",
+  "display_text_range": [
+   0,
+   187
+  ],
+  "entities": {
+   "media": [
+    {
+     "display_url": "pic.x.com/yQorNGMBrQ",
+     "expanded_url": "https://x.com/Pumpfun/status/2097785975434846285/video/1",
+     "indices": [
+      188,
+      211
+     ],
+     "url": "https://t.co/yQorNGMBrQ"
+    }
+   ]
+  },
+  "id_str": "2097785975434846285",
+  "text": "Introducing Custom Pairs\n\nLaunch Pumpfun tokens paired with tokenized stocks, majors &amp; more on Solana.\n\nLaunch with more variety, deeper liquidity &amp; lower fees than anywhere else. https://t.co/yQorNGMBrQ",
+  "user": {
+   "id_str": "1622243071806128131",
+   "name": "Pump.fun",
+   "screen_name": "Pumpfun",
+   "is_blue_verified": true,
+   "profile_image_shape": "Square",
+   "verified": false,
+   "verified_type": "Business",
+   "profile_image_url_https": "https://pbs.twimg.com/profile_images/2039436355806416896/V0Hhi9n-_normal.jpg"
+  },
+  "edit_control": {
+   "edit_tweet_ids": [
+    "2097785975434846285"
+   ],
+   "editable_until_msecs": "1788989726000",
+   "edits_remaining": "5",
+   "is_edit_eligible": false
+  },
+  "mediaDetails": [
+   {
+    "additional_media_info": {},
+    "display_url": "pic.x.com/yQorNGMBrQ",
+    "expanded_url": "https://x.com/Pumpfun/status/2097785975434846285/video/1",
+    "ext_media_availability": {
+     "status": "Available"
+    },
+    "indices": [
+     188,
+     211
+    ],
+    "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2097785878953209859/img/-SPIWYZjoOiP55pM.jpg",
+    "original_info": {
+     "focus_rects": [],
+     "height": 1080,
+     "width": 1920
+    },
+    "sizes": {
+     "large": {
+      "h": 1080,
+      "resize": "fit",
+      "w": 1920
+     },
+     "medium": {
+      "h": 675,
+      "resize": "fit",
+      "w": 1200
+     },
+     "small": {
+      "h": 383,
+      "resize": "fit",
+      "w": 680
+     },
+     "thumb": {
+      "h": 150,
+      "resize": "crop",
+      "w": 150
+     }
+    },
+    "type": "video",
+    "url": "https://t.co/yQorNGMBrQ",
+    "video_info": {
+     "aspect_ratio": [
+      16,
+      9
+     ],
+     "duration_millis": 28016,
+     "variants": [
+      {
+       "content_type": "application/x-mpegURL",
+       "url": "https://video.twimg.com/amplify_video/2097785878953209859/pl/UU42KVglZGNHaSLt.m3u8?v=cfc"
+      },
+      {
+       "bitrate": 256000,
+       "content_type": "video/mp4",
+       "url": "https://video.twimg.com/amplify_video/2097785878953209859/vid/avc1/480x270/SL7IfME3n1NUYGTX.mp4"
+      },
+      {
+       "bitrate": 832000,
+       "content_type": "video/mp4",
+       "url": "https://video.twimg.com/amplify_video/2097785878953209859/vid/avc1/640x360/WzD-4irPOHVshRrs.mp4"
+      },
+      {
+       "bitrate": 2176000,
+       "content_type": "video/mp4",
+       "url": "https://video.twimg.com/amplify_video/2097785878953209859/vid/avc1/1280x720/AGP1mhuKoVjJfhNY.mp4"
+      },
+      {
+       "bitrate": 10368000,
+       "content_type": "video/mp4",
+       "url": "https://video.twimg.com/amplify_video/2097785878953209859/vid/avc1/1920x1080/98_j7_gCEgGJQ1ji.mp4"
+      }
+     ]
+    }
+   }
+  ],
+  "photos": [],
+  "video": {
+   "aspectRatio": [
+    16,
+    9
+   ],
+   "contentType": "media_entity",
+   "durationMs": 28016,
+   "mediaAvailability": {
+    "status": "available"
+   },
+   "poster": "https://pbs.twimg.com/amplify_video_thumb/2097785878953209859/img/-SPIWYZjoOiP55pM.jpg",
+   "variants": [
+    {
+     "type": "application/x-mpegURL",
+     "src": "https://video.twimg.com/amplify_video/2097785878953209859/pl/UU42KVglZGNHaSLt.m3u8?v=cfc"
+    },
+    {
+     "type": "video/mp4",
+     "src": "https://video.twimg.com/amplify_video/2097785878953209859/vid/avc1/480x270/SL7IfME3n1NUYGTX.mp4"
+    },
+    {
+     "type": "video/mp4",
+     "src": "https://video.twimg.com/amplify_video/2097785878953209859/vid/avc1/640x360/WzD-4irPOHVshRrs.mp4"
+    },
+    {
+     "type": "video/mp4",
+     "src": "https://video.twimg.com/amplify_video/2097785878953209859/vid/avc1/1280x720/AGP1mhuKoVjJfhNY.mp4"
+    },
+    {
+     "type": "video/mp4",
+     "src": "https://video.twimg.com/amplify_video/2097785878953209859/vid/avc1/1920x1080/98_j7_gCEgGJQ1ji.mp4"
+    }
+   ],
+   "videoId": {
+    "type": "tweet",
+    "id": "2097785975434846285"
+   },
+   "viewCount": 0
+  },
+  "conversation_count": 1149,
+  "news_action_type": "conversation",
+  "isEdited": false,
+  "isStaleEdit": false
+ }
+}

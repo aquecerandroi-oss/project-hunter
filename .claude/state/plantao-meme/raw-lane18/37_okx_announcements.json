@@ -1,0 +1,168 @@
+{
+ "_meta": {
+  "name": "37_okx_announcements",
+  "url": "https://www.okx.com/api/v5/support/announcements?annType=announcements-new-listings",
+  "mode": "json",
+  "http": 200,
+  "request_started_utc": "2026-09-12T21:43:09Z",
+  "observed_utc": "2026-09-12T21:43:10Z",
+  "observed_brt": "18:43:10 BRT",
+  "seconds": 0.63,
+  "bytes": 4812,
+  "content_type": "application/json",
+  "last_modified": "",
+  "date": "Sat, 12 Sep 2026 21:43:10 GMT",
+  "ratelimit_remaining": ""
+ },
+ "payload": {
+  "code": "0",
+  "msg": "",
+  "data": [
+   {
+    "details": [
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX to migrate USDⓢ spot trading pairs",
+      "url": "https://www.okx.com/pt-br/help/okx-to-migrate-usds-spot-trading-pairs",
+      "pTime": "1788339609053",
+      "businessPTime": "1788339600000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX to list CP/USDT (Cluster Protocol) for spot trading",
+      "url": "https://www.okx.com/pt-br/help/okx-to-list-cp-usdt-cluster-protocol-for-spot-trading",
+      "pTime": "1788238814257",
+      "businessPTime": "1788238800000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX to support KITE crypto migration",
+      "url": "https://www.okx.com/pt-br/help/okx-to-support-kite-crypto-migration",
+      "pTime": "1787713209245",
+      "businessPTime": "1787713200000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX to support NES crypto migration",
+      "url": "https://www.okx.com/pt-br/help/okx-to-support-nes-crypto-migration",
+      "pTime": "1787385610269",
+      "businessPTime": "1787385600000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "Notice: OKX BR to list USDG/BRL for Spot Trading",
+      "url": "https://www.okx.com/pt-br/help/okx-br-listing-usdg-brl",
+      "pTime": "1784552410117",
+      "businessPTime": "1784552400000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX to list SLX/USDT (Solstice) for spot trading",
+      "url": "https://www.okx.com/pt-br/help/okx-to-list-slx-usdt-solstice-for-spot-trading",
+      "pTime": "1783648816124",
+      "businessPTime": "1783648800000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX will launch SLX/USDⓈ for spot trading",
+      "url": "https://www.okx.com/pt-br/help/okx-will-launch-slx-usds-for-spot-trading",
+      "pTime": "1783648810138",
+      "businessPTime": "1783648800000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX completed IP token migration",
+      "url": "https://www.okx.com/pt-br/help/okx-completed-ip-token-migration",
+      "pTime": "1782984610606",
+      "businessPTime": "1782986400000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX will launch DATA/USDⓈ for spot trading",
+      "url": "https://www.okx.com/pt-br/help/okx-will-launch-data-usds-for-spot-trading",
+      "pTime": "1782984609694",
+      "businessPTime": "1782986400000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX to list TAO/USDT (Bittensor) for spot trading",
+      "url": "https://www.okx.com/pt-br/help/okx-to-list-tao-usdt-bittensor-for-spot-trading",
+      "pTime": "1782788410038",
+      "businessPTime": "1782788400000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX will launch TAO/USDⓈ for spot trading",
+      "url": "https://www.okx.com/pt-br/help/okx-will-launch-tao-usds-for-spot-trading",
+      "pTime": "1782788404917",
+      "businessPTime": "1782788400000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX will launch CARDS/USDⓈ for spot trading",
+      "url": "https://www.okx.com/pt-br/help/okx-will-launch-cards-usds-for-spot-trading",
+      "pTime": "1782352809692",
+      "businessPTime": "1782352800000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX to list CARDS/USDT (Collector Crypt) for spot trading",
+      "url": "https://www.okx.com/pt-br/help/okx-to-list-cards-usdt-collector-crypt-for-spot-trading",
+      "pTime": "1782352806026",
+      "businessPTime": "1782352800000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX will launch NES/USDⓈ for spot trading",
+      "url": "https://www.okx.com/pt-br/help/okx-will-launch-nes-usds-for-spot-trading",
+      "pTime": "1782291609933",
+      "businessPTime": "1782291600000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX to list NES/USDT (Nesa) for spot trading",
+      "url": "https://www.okx.com/pt-br/help/okx-to-list-nes-usdt-nesa-for-spot-trading",
+      "pTime": "1782291609679",
+      "businessPTime": "1782291600000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX will launch RE/USDⓈ for spot trading",
+      "url": "https://www.okx.com/pt-br/help/okx-will-launch-re-usds-for-spot-trading",
+      "pTime": "1781748010326",
+      "businessPTime": "1781748000000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX to list RE (Re) for spot trading and convert pre-market futures to standard perpetual futures",
+      "url": "https://www.okx.com/pt-br/help/okx-to-list-re-re-for-spot-trading-and-convert-pre-market-futures-to-standard-perpetual-futures",
+      "pTime": "1781748010269",
+      "businessPTime": "1781748000000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX will launch GRAM/USDⓈ for spot trading",
+      "url": "https://www.okx.com/pt-br/help/okx-will-launch-gram-usds-for-spot-trading",
+      "pTime": "1781681412904",
+      "businessPTime": "1781681400000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX completed TON token migration",
+      "url": "https://www.okx.com/pt-br/help/okx-completed-ton-token-migration",
+      "pTime": "1781681405838",
+      "businessPTime": "1781681400000"
+     },
+     {
+      "annType": "announcements-new-listings",
+      "title": "OKX to list IRYS/USDT (Irys) for spot trading",
+      "url": "https://www.okx.com/pt-br/help/okx-to-list-irys-usdt-irys-for-spot-trading",
+      "pTime": "1779858013753",
+      "businessPTime": "1779858000000"
+     }
+    ],
+    "totalPage": "25"
+   }
+  ]
+ }
+}

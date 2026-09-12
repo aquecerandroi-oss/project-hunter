@@ -1,0 +1,30 @@
+{
+ "_meta": {
+  "name": "14_x_oembed_pumpfun_2098818822417375528",
+  "url": "https://publish.twitter.com/oembed?url=https://x.com/Pumpfun/status/2098818822417375528&omit_script=true",
+  "mode": "json",
+  "http": 200,
+  "request_started_utc": "2026-09-12T21:37:56Z",
+  "observed_utc": "2026-09-12T21:37:57Z",
+  "observed_brt": "18:37:57 BRT",
+  "seconds": 0.77,
+  "bytes": 931,
+  "content_type": "application/json; charset=utf-8",
+  "last_modified": "Sat, 12 Sep 2026 21:37:57 GMT",
+  "date": "Sat, 12 Sep 2026 21:37:57 GMT",
+  "ratelimit_remaining": ""
+ },
+ "payload": {
+  "url": "https://x.com/Pumpfun/status/2098818822417375528",
+  "author_name": "Pump.fun",
+  "author_url": "https://x.com/Pumpfun",
+  "html": "<blockquote class=\"twitter-tweet\"><p lang=\"en\" dir=\"ltr\">We just made two HUGE changes to Pumpfun<br><br>We’re INTRODUCING Holder Rewards and REMOVING Cashback mode<br><br>Now, Holder Reward tokens pay out rewards just by holding: for longer hold times, higher ceilings &amp; communities that thrive <a href=\"https://t.co/Chq1MhsZkD\">pic.twitter.com/Chq1MhsZkD</a></p>&mdash; Pump.fun (@Pumpfun) <a href=\"https://x.com/Pumpfun/status/2098818822417375528?ref_src=twsrc%5Etfw\">September 12, 2026</a></blockquote>\n\n",
+  "width": 550,
+  "height": null,
+  "type": "rich",
+  "cache_age": "3153600000",
+  "provider_name": "X",
+  "provider_url": "https://x.com",
+  "version": "1.0"
+ }
+}

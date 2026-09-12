@@ -1,0 +1,9 @@
+{"name": "20_tg_pump_fun_text", "url": "https://t.me/s/pump_fun", "mode": "text", "http": 200, "request_started_utc": "2026-09-12T21:41:01Z", "observed_utc": "2026-09-12T21:41:02Z", "observed_brt": "18:41:02 BRT", "seconds": 1.47, "bytes": 10878, "content_type": "text/html; charset=utf-8", "last_modified": "", "date": "Sat, 12 Sep 2026 21:41:02 GMT", "ratelimit_remaining": "", "title": "Telegram: View @pump_fun", "meta_dates": []}
+
+Telegram: View @pump_fun 
+ Download
+ The Pumpsters (redemption arc) 
+ 190 members, 4 online
+ View in Telegram 
+ If you have Telegram , you can view and join 
+ The Pumpsters (redemption arc) right away.

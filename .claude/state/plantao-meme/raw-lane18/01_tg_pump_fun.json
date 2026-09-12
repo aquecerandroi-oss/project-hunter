@@ -1,0 +1,19 @@
+{
+ "_meta": {
+  "name": "01_tg_pump_fun",
+  "url": "https://t.me/s/pump_fun",
+  "mode": "tg",
+  "http": 200,
+  "request_started_utc": "2026-09-12T21:36:15Z",
+  "observed_utc": "2026-09-12T21:36:16Z",
+  "observed_brt": "18:36:16 BRT",
+  "seconds": 1.77,
+  "bytes": 10879,
+  "content_type": "text/html; charset=utf-8",
+  "last_modified": "",
+  "date": "Sat, 12 Sep 2026 21:36:16 GMT",
+  "ratelimit_remaining": "",
+  "messages": 0
+ },
+ "messages": []
+}

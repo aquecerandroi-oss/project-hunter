@@ -1,0 +1,370 @@
+{
+ "_meta": {
+  "name": "19_x_syndication_a1lon9_2093439952113520988",
+  "url": "https://cdn.syndication.twimg.com/tweet-result?id=2093439952113520988&token=a",
+  "mode": "json",
+  "http": 200,
+  "request_started_utc": "2026-09-12T21:39:11Z",
+  "observed_utc": "2026-09-12T21:39:12Z",
+  "observed_brt": "18:39:12 BRT",
+  "seconds": 0.46,
+  "bytes": 4717,
+  "content_type": "application/json; charset=utf-8",
+  "last_modified": "",
+  "date": "Sat, 12 Sep 2026 21:39:12 GMT",
+  "ratelimit_remaining": ""
+ },
+ "payload": {
+  "__typename": "Tweet",
+  "favorite_count": 429,
+  "in_reply_to_screen_name": "aptosgooner",
+  "in_reply_to_status_id_str": "2093430040168218834",
+  "in_reply_to_user_id_str": "2012056401032724489",
+  "lang": "en",
+  "created_at": "2026-08-28T20:45:53.000Z",
+  "display_text_range": [
+   13,
+   99
+  ],
+  "entities": {
+   "user_mentions": [
+    {
+     "id_str": "2012056401032724489",
+     "indices": [
+      0,
+      12
+     ],
+     "name": "aptos gooner",
+     "screen_name": "aptosgooner"
+    }
+   ]
+  },
+  "id_str": "2093439952113520988",
+  "text": "@aptosgooner everyone gets a second chance\n\ndo not fumble callout rewards\n\nSent from my Pumpfun App",
+  "user": {
+   "id_str": "1470958472409792515",
+   "name": "alon",
+   "screen_name": "a1lon9",
+   "is_blue_verified": true,
+   "profile_image_shape": "Circle",
+   "verified": false,
+   "profile_image_url_https": "https://pbs.twimg.com/profile_images/1875434258426187776/XUJTdd67_normal.jpg",
+   "highlighted_label": {
+    "badge": {
+     "url": "https://pbs.twimg.com/profile_images/2039436355806416896/V0Hhi9n-_bigger.jpg"
+    },
+    "description": "Pump.fun",
+    "url": {
+     "url": "https://twitter.com/Pumpfun",
+     "url_type": "DeepLink"
+    },
+    "user_label_display_type": "Badge",
+    "user_label_type": "BusinessLabel"
+   }
+  },
+  "edit_control": {
+   "edit_tweet_ids": [
+    "2093439952113520988"
+   ],
+   "editable_until_msecs": "1787953553000",
+   "edits_remaining": "5",
+   "is_edit_eligible": false
+  },
+  "conversation_count": 135,
+  "news_action_type": "conversation",
+  "parent": {
+   "favorite_count": 285,
+   "lang": "en",
+   "possibly_sensitive": false,
+   "reply_count": 36,
+   "retweet_count": 8,
+   "created_at": "2026-08-28T20:06:30.000Z",
+   "display_text_range": [
+    0,
+    88
+   ],
+   "entities": {
+    "media": [
+     {
+      "display_url": "pic.x.com/bImgKqYflO",
+      "expanded_url": "https://x.com/aptosgooner/status/2093430040168218834/photo/1",
+      "indices": [
+       89,
+       112
+      ],
+      "url": "https://t.co/bImgKqYflO"
+     }
+    ]
+   },
+   "id_str": "2093430040168218834",
+   "text": "i exist in the timeline that i fumble every opportunity that has ever been gifted to me. https://t.co/bImgKqYflO",
+   "user": {
+    "id_str": "2012056401032724489",
+    "name": "aptos gooner",
+    "screen_name": "aptosgooner",
+    "is_blue_verified": true,
+    "profile_image_shape": "Circle",
+    "verified": false,
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/2017408950254325761/ycgHrgZ2_normal.jpg",
+    "highlighted_label": {
+     "badge": {
+      "url": "https://pbs.twimg.com/profile_images/2098601606111715328/QTxAt30U_bigger.jpg"
+     },
+     "description": "10x",
+     "url": {
+      "url": "https://twitter.com/try10x",
+      "url_type": "DeepLink"
+     },
+     "user_label_display_type": "Badge",
+     "user_label_type": "BusinessLabel"
+    }
+   },
+   "edit_control": {
+    "edit_tweet_ids": [
+     "2093430040168218834"
+    ],
+    "editable_until_msecs": "1787951190000",
+    "edits_remaining": "5",
+    "is_edit_eligible": false
+   },
+   "mediaDetails": [
+    {
+     "display_url": "pic.x.com/bImgKqYflO",
+     "expanded_url": "https://x.com/aptosgooner/status/2093430040168218834/photo/1",
+     "ext_media_availability": {
+      "status": "Available"
+     },
+     "indices": [
+      89,
+      112
+     ],
+     "media_url_https": "https://pbs.twimg.com/media/HQ1bhnTbUAA0EUB.png",
+     "original_info": {
+      "focus_rects": [
+       {
+        "h": 337,
+        "w": 602,
+        "x": 0,
+        "y": 190
+       },
+       {
+        "h": 527,
+        "w": 527,
+        "x": 0,
+        "y": 0
+       },
+       {
+        "h": 527,
+        "w": 462,
+        "x": 0,
+        "y": 0
+       },
+       {
+        "h": 527,
+        "w": 264,
+        "x": 0,
+        "y": 0
+       },
+       {
+        "h": 527,
+        "w": 602,
+        "x": 0,
+        "y": 0
+       }
+      ],
+      "height": 527,
+      "width": 602
+     },
+     "sizes": {
+      "large": {
+       "h": 527,
+       "resize": "fit",
+       "w": 602
+      },
+      "medium": {
+       "h": 527,
+       "resize": "fit",
+       "w": 602
+      },
+      "small": {
+       "h": 527,
+       "resize": "fit",
+       "w": 602
+      },
+      "thumb": {
+       "h": 150,
+       "resize": "crop",
+       "w": 150
+      }
+     },
+     "type": "photo",
+     "url": "https://t.co/bImgKqYflO"
+    },
+    {
+     "display_url": "pic.x.com/bImgKqYflO",
+     "expanded_url": "https://x.com/aptosgooner/status/2093430040168218834/photo/1",
+     "ext_media_availability": {
+      "status": "Available"
+     },
+     "indices": [
+      89,
+      112
+     ],
+     "media_url_https": "https://pbs.twimg.com/media/HQ1bhnSaMAAnadD.png",
+     "original_info": {
+      "focus_rects": [
+       {
+        "h": 446,
+        "w": 797,
+        "x": 0,
+        "y": 75
+       },
+       {
+        "h": 760,
+        "w": 760,
+        "x": 37,
+        "y": 0
+       },
+       {
+        "h": 760,
+        "w": 667,
+        "x": 85,
+        "y": 0
+       },
+       {
+        "h": 760,
+        "w": 380,
+        "x": 228,
+        "y": 0
+       },
+       {
+        "h": 760,
+        "w": 797,
+        "x": 0,
+        "y": 0
+       }
+      ],
+      "height": 760,
+      "width": 797
+     },
+     "sizes": {
+      "large": {
+       "h": 760,
+       "resize": "fit",
+       "w": 797
+      },
+      "medium": {
+       "h": 760,
+       "resize": "fit",
+       "w": 797
+      },
+      "small": {
+       "h": 648,
+       "resize": "fit",
+       "w": 680
+      },
+      "thumb": {
+       "h": 150,
+       "resize": "crop",
+       "w": 150
+      }
+     },
+     "type": "photo",
+     "url": "https://t.co/bImgKqYflO"
+    }
+   ],
+   "photos": [
+    {
+     "backgroundColor": {
+      "red": 204,
+      "green": 214,
+      "blue": 221
+     },
+     "cropCandidates": [
+      {
+       "h": 337,
+       "w": 602,
+       "x": 0,
+       "y": 190
+      },
+      {
+       "h": 527,
+       "w": 527,
+       "x": 0,
+       "y": 0
+      },
+      {
+       "h": 527,
+       "w": 462,
+       "x": 0,
+       "y": 0
+      },
+      {
+       "h": 527,
+       "w": 264,
+       "x": 0,
+       "y": 0
+      },
+      {
+       "h": 527,
+       "w": 602,
+       "x": 0,
+       "y": 0
+      }
+     ],
+     "expandedUrl": "https://x.com/aptosgooner/status/2093430040168218834/photo/1",
+     "url": "https://pbs.twimg.com/media/HQ1bhnTbUAA0EUB.png",
+     "width": 602,
+     "height": 527
+    },
+    {
+     "backgroundColor": {
+      "red": 204,
+      "green": 214,
+      "blue": 221
+     },
+     "cropCandidates": [
+      {
+       "h": 446,
+       "w": 797,
+       "x": 0,
+       "y": 75
+      },
+      {
+       "h": 760,
+       "w": 760,
+       "x": 37,
+       "y": 0
+      },
+      {
+       "h": 760,
+       "w": 667,
+       "x": 85,
+       "y": 0
+      },
+      {
+       "h": 760,
+       "w": 380,
+       "x": 228,
+       "y": 0
+      },
+      {
+       "h": 760,
+       "w": 797,
+       "x": 0,
+       "y": 0
+      }
+     ],
+     "expandedUrl": "https://x.com/aptosgooner/status/2093430040168218834/photo/1",
+     "url": "https://pbs.twimg.com/media/HQ1bhnSaMAAnadD.png",
+     "width": 797,
+     "height": 760
+    }
+   ],
+   "isEdited": false,
+   "isStaleEdit": false
+  },
+  "isEdited": false,
+  "isStaleEdit": false
+ }
+}

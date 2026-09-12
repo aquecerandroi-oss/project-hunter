@@ -1,0 +1,19 @@
+{"name": "10_xcancel_pumpdotfun", "url": "https://xcancel.com/pumpdotfun", "mode": "text", "http": 200, "request_started_utc": "2026-09-12T21:36:34Z", "observed_utc": "2026-09-12T21:36:35Z", "observed_brt": "18:36:35 BRT", "seconds": 0.8, "bytes": 11354, "content_type": "text/html", "last_modified": "Wed, 05 Aug 2026 20:17:18 GMT", "date": "Sat, 12 Sep 2026 21:36:35 GMT", "ratelimit_remaining": "", "title": "Verifying your browser…", "meta_dates": []}
+
+Verifying your browser… 
+ Checking your browser
+ Starting verification…
+ This takes a couple of seconds and happens automatically.
+ If you can't pass the test, whitelist your extensions on this
+ website, update your browser and use a modern web browser (Firefox/Chrome/Safari).
+ You may try the automated checks a second time. Some checks may fail
+ once and succeed on a second try.
+ Reload now. 
+ Still having trouble?
+ Ask for help by sending an email at 
+ with the browser that you are using and this reference ID:
+ no_id_generated 
+ And solve an image challenge instead. 
+ ); loaded from our cached assets. -->
+ . Keep all three assets on the same value. -->
+ fingerprint -> /verify. -->

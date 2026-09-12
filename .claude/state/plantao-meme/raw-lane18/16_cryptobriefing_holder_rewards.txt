@@ -1,0 +1,168 @@
+{"name": "16_cryptobriefing_holder_rewards", "url": "https://cryptobriefing.com/pumpfun-holder-rewards-cashback-deprecated/", "mode": "text", "http": 200, "request_started_utc": "2026-09-12T21:38:01Z", "observed_utc": "2026-09-12T21:38:01Z", "observed_brt": "18:38:01 BRT", "seconds": 0.68, "bytes": 292342, "content_type": "text/html; charset=UTF-8", "last_modified": "Sat, 12 Sep 2026 17:14:53 GMT", "date": "Sat, 12 Sep 2026 21:38:01 GMT", "ratelimit_remaining": "", "title": "Pump.fun introduces Holder Rewards and sunsets Cashback mode", "meta_dates": [["article:published_time", "2026-09-12T17:07:55+00:00"]]}
+
+Pump.fun introduces Holder Rewards and sunsets Cashback mode 
+ English
+ Español 
+ Crypto
+ Finance (2026-09-09 nav taxonomy migration).
+ Links to the canonical Finance archive via the resolver, which yields the
+ base-dropped /finance/ once the term is renamed and falls back to the live
+ /category/markets/ pre-migration. -->
+ Finance 
+ Prediction
+Markets 
+ Macro 
+ AI 
+ Tech 
+ Markets 
+ Research 
+ Sports
+ Newsletter 
+ Ads 
+ Try Vera 
+ Sections
+ Bitcoin 
+ DeFi 
+ Ethereum 
+ NFTs 
+ AI Agents 
+ Regulation 
+ Web3 
+ Business 
+ Ecosystem 
+ Sections
+ Soccer 
+ Esports 
+ Crypto
+ Bitcoin 
+ DeFi 
+ Ethereum 
+ NFTs 
+ AI Agents 
+ Regulation 
+ Web3 
+ Business 
+ Ecosystem 
+ Finance; canonical resolver (base-dropped /finance/ post-migration). -->
+ Finance 
+ Prediction Markets 
+ Macro 
+ AI 
+ Tech 
+ Markets 
+ Research 
+ Sports 
+ Soccer 
+ Esports 
+ Newsletter 
+ Ads 
+ Try Vera 
+ , viewability ~27-35%). -->
+ SEARCH 
+ Searching...
+ Pump-Fun-Logo-500x281 
+ Pump.fun introduces Holder Rewards and sunsets Cashback mode 
+ The Solana memecoin launchpad is overhauling its fee distribution system to reward patient holders over active traders 
+ Share
+ this.removeAttribute('data-copied'), 2000);"
+ class="w-7 h-7 border border-foreground/30 text-foreground rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+ aria-label="Copy link"
+ >
+ Add us on Google
+ by 
+ Editorial Team 
+ Sep. 12, 2026 
+ Pump.fun has quietly rewritten the rules for how traders get paid on its platform. The Solana -based memecoin launchpad announced on September 12 that it is introducing a new “Holder Rewards” token type while fully deprecating its Cashback mode for any new token launches going forward.
+ The core logic is simple: instead of routing trading fees back to creators or returning them instantly to active traders, the new system funnels those fees into a dedicated Pump.fun distribution wallet, which then pays out to token holders several times per hour. The longer you hold, and the more you hold, the larger your cut.
+ Gloria
+ Your portfolio shows you what you own. Gloria Finance shows you what's worth looking at next.
+ Discover ideas → 
+ Advertisement
+ What changed and why
+ Cashback mode was not always part of the Pump.fun playbook. The platform introduced it in February 2026 as an attempt to redirect creator fees away from developers and toward the traders actually moving volume.
+ The problem, according to community feedback the platform cited in its announcement, was structural. Many of the highest-volume tokens on the platform no longer had active development teams behind them. In those cases, the original Cashback mechanic still disproportionately benefited creators relative to the traders engaging with the token daily.
+ Holder Rewards is the platform’s answer to that criticism. Token creators launching new projects now choose between two configurations: a standard Creator Fee token, where fees flow to the project team as before, or a Holder Rewards token, where those same fees get redistributed to holders on an ongoing basis. There is no hybrid option.
+ For existing tokens that ran under Cashback or Creator Fee structures, conversion to Holder Rewards is possible but gated. Tokens must meet specific objective criteria set by the platform, and the conversion is permanent. Once a token moves to the Holder Rewards structure, there is no reverting to prior mechanics. Existing Cashback tokens remain tradable under their original rules, and users can still claim any rewards they have already accrued.
+ The mechanics of holding-based payouts
+ Distributions go out multiple times each hour. A minimum holding threshold of $20 appears to be required for maximizing rewards under the new structure, putting a floor on who can meaningfully participate in the distribution mechanics.
+ Disclosure: This article was edited by Editorial Team. For more information on how we create and review content, see our Editorial Policy .
+ FINANCE 
+ Pump.fun introduces Holder Rewards and sunsets Cashback mode 
+ The Solana memecoin launchpad is overhauling its fee distribution system to reward patient holders over active traders 
+ by 
+ Editorial Team 
+ Sep. 12, 2026 
+ Share
+ this.removeAttribute('data-copied'), 2000);"
+ class="w-7 h-7 border border-foreground/30 text-foreground rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+ aria-label="Copy link"
+ >
+ Add us on Google
+ Pump-Fun-Logo-500x281 
+ Pump.fun has quietly rewritten the rules for how traders get paid on its platform. The Solana -based memecoin launchpad announced on September 12 that it is introducing a new “Holder Rewards” token type while fully deprecating its Cashback mode for any new token launches going forward.
+ The core logic is simple: instead of routing trading fees back to creators or returning them instantly to active traders, the new system funnels those fees into a dedicated Pump.fun distribution wallet, which then pays out to token holders several times per hour. The longer you hold, and the more you hold, the larger your cut.
+ Gloria
+ Your portfolio shows you what you own. Gloria Finance shows you what's worth looking at next.
+ Discover ideas → 
+ Advertisement
+ What changed and why
+ Cashback mode was not always part of the Pump.fun playbook. The platform introduced it in February 2026 as an attempt to redirect creator fees away from developers and toward the traders actually moving volume.
+ The problem, according to community feedback the platform cited in its announcement, was structural. Many of the highest-volume tokens on the platform no longer had active development teams behind them. In those cases, the original Cashback mechanic still disproportionately benefited creators relative to the traders engaging with the token daily.
+ Holder Rewards is the platform’s answer to that criticism. Token creators launching new projects now choose between two configurations: a standard Creator Fee token, where fees flow to the project team as before, or a Holder Rewards token, where those same fees get redistributed to holders on an ongoing basis. There is no hybrid option.
+ For existing tokens that ran under Cashback or Creator Fee structures, conversion to Holder Rewards is possible but gated. Tokens must meet specific objective criteria set by the platform, and the conversion is permanent. Once a token moves to the Holder Rewards structure, there is no reverting to prior mechanics. Existing Cashback tokens remain tradable under their original rules, and users can still claim any rewards they have already accrued.
+ The mechanics of holding-based payouts
+ Distributions go out multiple times each hour. A minimum holding threshold of $20 appears to be required for maximizing rewards under the new structure, putting a floor on who can meaningfully participate in the distribution mechanics.
+ Disclosure: This article was edited by Editorial Team. For more information on how we create and review content, see our Editorial Policy .
+ Loading more articles...
+ You've reached the end
+ Follow Us
+ Quick Links
+ Bitcoin 
+ Ethereum 
+ DeFi 
+ Finance 
+ Markets 
+ NFTs 
+ AI 
+ Tech 
+ AI Agents 
+ Newsletter 
+ Regulation 
+ Macro 
+ Advertising 
+ CB Select 
+ Company
+ Team 
+ Contact the team 
+ Advertising 
+ Account
+ Log In
+ Quick Links
+ Bitcoin 
+ Ethereum 
+ DeFi 
+ Finance 
+ Markets 
+ NFTs 
+ AI 
+ Tech 
+ AI Agents 
+ Newsletter 
+ Regulation 
+ Macro 
+ Advertising 
+ CB Select 
+ Follow Us
+ Account
+ Log In
+ All content is for informational purposes only and does not constitute investment advice. CryptoBriefing does not provide recommendations to buy, sell, or hold any asset or contract. See our Disclaimer & Risk Disclosure .
+ © Decentral Media and Crypto Briefing® 2026.
+ About Us 
+ Editorial Policy 
+ Disclaimer 
+ Privacy Policy 
+ RSS
+ Get Crypto Briefing in your inbox
+ Daily news, analysis & market insights delivered free.
+ Subscribe 
+ ×

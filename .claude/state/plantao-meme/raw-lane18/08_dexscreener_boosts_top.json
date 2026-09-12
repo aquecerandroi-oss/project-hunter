@@ -1,0 +1,617 @@
+{
+ "_meta": {
+  "name": "08_dexscreener_boosts_top",
+  "url": "https://api.dexscreener.com/token-boosts/top/v1",
+  "mode": "json",
+  "http": 200,
+  "request_started_utc": "2026-09-12T21:36:31Z",
+  "observed_utc": "2026-09-12T21:36:31Z",
+  "observed_brt": "18:36:31 BRT",
+  "seconds": 0.18,
+  "bytes": 21880,
+  "content_type": "application/json; charset=utf-8",
+  "last_modified": "",
+  "date": "Sat, 12 Sep 2026 21:36:31 GMT",
+  "ratelimit_remaining": ""
+ },
+ "payload": [
+  {
+   "url": "https://dexscreener.com/robinhood/0x9e410f73143c08a6a61db99075ba77895b4ce858",
+   "chainId": "robinhood",
+   "tokenAddress": "0x9E410F73143C08A6A61Db99075Ba77895B4CE858",
+   "description": "We Must Pace the Frontier: I’ve written a new essay on why the AI industry should slow down, with a three-part plan for doing so.",
+   "icon": "9guqm8qIoK493akE",
+   "header": "https://cdn.dexscreener.com/cms/images/JeB2474pt9Jyf4Fl?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x9e410f73143c08a6a61db99075ba77895b4ce858?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://www.frontierrh.site"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/FRONTIER_rh"
+    }
+   ],
+   "totalAmount": 500
+  },
+  {
+   "url": "https://dexscreener.com/solana/cmxsstkthrvlyvcdpzpockjyt5ampg6p3c88yppbfmpx",
+   "chainId": "solana",
+   "tokenAddress": "CmXSStKTHrVLyvCDPzPoCkjYt5aMpG6p3c88yPpbfmpx",
+   "icon": "_4mWyPKghMT06RDB",
+   "header": "https://cdn.dexscreener.com/cms/images/xBfOHyEnVdBHG9M1?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/CmXSStKTHrVLyvCDPzPoCkjYt5aMpG6p3c88yPpbfmpx?timestamp=1789248900000",
+   "links": [
+    {
+     "type": "twitter",
+     "url": "https://x.com/purrlantir"
+    }
+   ],
+   "totalAmount": 500
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xc6b7a14e5e9495f3f58be742938f15f10dddbfd4",
+   "chainId": "robinhood",
+   "tokenAddress": "0xc6b7a14E5e9495f3f58Be742938F15f10DdDBfD4",
+   "description": "GROG = GROK",
+   "icon": "HxRooQirEaPwluP9",
+   "header": "https://cdn.dexscreener.com/cms/images/ic1-Dc5Fu32JRcgz?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xc6b7a14e5e9495f3f58be742938f15f10dddbfd4?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://www.grog.site"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/grogonrh"
+    }
+   ],
+   "totalAmount": 500
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xfad40755de679b262337f8d964d75cac51f8c643",
+   "chainId": "robinhood",
+   "tokenAddress": "0xfaD40755de679B262337f8D964D75CAc51F8C643",
+   "description": "Artificial Cat brings the NVIDIA narrative together with the growing Artificial Inu ($AI) community. For those who faded $AI before, Artificial Cat gives them a second chance to get involved by simply holding $AC. Artificial Cat supports Artificial Inu while bringing both communities together under one growing ecosystem.",
+   "icon": "A62-WxFeeVGExROC",
+   "header": "https://cdn.dexscreener.com/cms/images/2MYwNolbev5ouPIz?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xfad40755de679b262337f8d964d75cac51f8c643?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://artificialcat.meme"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/_artificialcat_"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/Artificial_Cat"
+    }
+   ],
+   "totalAmount": 500
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x81e7d72f7f3d45807fb131e6476b1b37615a69aa",
+   "chainId": "robinhood",
+   "tokenAddress": "0x81e7D72F7F3D45807FB131E6476B1B37615a69Aa",
+   "description": "TITS + TESLA = TITSLA",
+   "icon": "b_cHtPNh9tmTYtM1",
+   "header": "https://cdn.dexscreener.com/cms/images/PUmy_pzlOZohZ6u7?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x81e7d72f7f3d45807fb131e6476b1b37615a69aa?timestamp=1789248900000",
+   "links": [
+    {
+     "type": "twitter",
+     "url": "https://x.com/i/communities/2027097153533792423"
+    }
+   ],
+   "totalAmount": 500
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xa92ec6dd296381fdfb33c2d0cb6603b3b9df3565",
+   "chainId": "robinhood",
+   "tokenAddress": "0xa92eC6dD296381fDFB33c2D0cb6603b3b9dF3565",
+   "description": "Order-book perpetuals on crypto and tokenized equities, margined in USDG. Sign orders off-chain, settle on-chain, and keep custody of your collateral the whole time.",
+   "icon": "tslHu84cgz5HYnVM",
+   "header": "https://cdn.dexscreener.com/cms/images/S-0n_I5RQ-ePBFpH?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xa92ec6dd296381fdfb33c2d0cb6603b3b9df3565?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://flyfox.exchange/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/FlyFoxExchange"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/FlyFoxExchange"
+    }
+   ],
+   "totalAmount": 500
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xb7ad3d8dfce6c4d4ef32781623fda02652ae4d9f",
+   "chainId": "robinhood",
+   "tokenAddress": "0xb7ad3d8Dfce6C4D4ef32781623fDa02652Ae4D9f",
+   "description": "Hold $GPU to earn AI inference credits as GPUStrategy acquires and operates real GPU hardware. Trading fees fund hardware acquisition, and a share of net fleet revenue goes to holders as inference credits and further fleet growth. Use inference credits on GPURouter or sell them for USDG.",
+   "icon": "c1TWK2wUVzedtxmg",
+   "header": "https://cdn.dexscreener.com/cms/images/dL7gr2uv0CcYe35q?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xb7ad3d8dfce6c4d4ef32781623fda02652ae4d9f?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://gpustrategy.fun/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/gpu_strategy"
+    }
+   ],
+   "totalAmount": 500
+  },
+  {
+   "url": "https://dexscreener.com/solana/ewnszw86xhj91nvxpjdzd3g1sqhhj7q8eqy6deukpump",
+   "chainId": "solana",
+   "tokenAddress": "EWnSZW86xhJ91nvxPjdZD3g1SqhHj7q8eqY6DEUKpump",
+   "description": "Satu Wallet — the all-in-one self-custody crypto super app. Swap, earn, predict, and track your portfolio across 50+ blockchains with 2M+ tokens indexed — all from a single app.\n\n$SATU is the native utility token powering the Satu Wallet ecosystem on Solana:\n\n• Affiliate Rewards — Earn 0.1% commission in $SATU on every referral swap. No cap, no expiration.\n• Fee Discounts — Pay fees with $SATU for reduced rates on swaps and premium features.\n• Governance — 1 token = 1 vote on protocol decisions.\n• Staking — Stake $SATU for passive yield and premium tier access (Q3 2026).\n• Buyback & Burn — Platform revenue funds periodic $SATU buybacks and permanent burns.\n\nKey highlights:\n→ Fair launch via PumpFun — No presale, no VC, no hidden allocations\n→ 70% public supply, locked team/marketing/airdrop allocations via Streamflow\n→ AES-256 encryption, zero-knowledge architecture, audited by Coinsult\n→ Listed on CoinGecko | Tradeable on Raydium, Orca, PumpSwap\n→ Live on Google Play & App Store\n→ NFC Cold Wallet Card in development\n\nBuilt by Bintan Teknologi Ltd",
+   "icon": "47423395cc0e2f0217437a8ab2c2a08de52f07b30e45d4867cc0a14764b5f31a",
+   "header": "https://cdn.dexscreener.com/cms/images/g7AnZ0m_CBW6M3yh?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/EWnSZW86xhJ91nvxPjdZD3g1SqhHj7q8eqY6DEUKpump?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://satuwallet.com/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/satuwallet"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/satuwallettoken"
+    },
+    {
+     "type": "instagram",
+     "url": "https://www.instagram.com/satuwalletid/"
+    }
+   ],
+   "totalAmount": 500
+  },
+  {
+   "url": "https://dexscreener.com/solana/bgu4tfdlpv1jejgxvgsbzklsrxgazcsqci1vebawjvcm",
+   "chainId": "solana",
+   "tokenAddress": "BGU4TfDLpV1JeJGXVgSbZkLSRxgAzcsQci1vEbaWJVcm",
+   "description": "Where speculative markets meet productive capital. Paired with $NVDA.",
+   "icon": "uOnf66Npa008Nh34",
+   "header": "https://cdn.dexscreener.com/cms/images/_Ulvg2QgN_Yp06Ri?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/BGU4TfDLpV1JeJGXVgSbZkLSRxgAzcsQci1vEbaWJVcm?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://cataisol.com/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/catainvda"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/catai_sol"
+    }
+   ],
+   "totalAmount": 300
+  },
+  {
+   "url": "https://dexscreener.com/solana/flk6fkan26m1ft4ucguwy3uhbmzlkceu8kmtyd2zpump",
+   "chainId": "solana",
+   "tokenAddress": "FLk6FKAN26m1FT4ucguwy3uHBMzLKcEu8KMTYD2Zpump",
+   "description": "Stunk is built different—buying dips, chasing green candles, and sending Solana memes straight to the moon!",
+   "icon": "y_wLNd0Q0nWS8Tuq",
+   "header": "https://cdn.dexscreener.com/cms/images/oZeMrK2KF0yQPV1E?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/FLk6FKAN26m1FT4ucguwy3uHBMzLKcEu8KMTYD2Zpump?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://stunksol.fun"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/StunkSOL"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/stunkportal"
+    }
+   ],
+   "totalAmount": 200
+  },
+  {
+   "url": "https://dexscreener.com/solana/84uusmjpydeacsr8fxobvck2hwzs94c6ba8kk4jnpump",
+   "chainId": "solana",
+   "tokenAddress": "84uuSMjPYDEAcsr8FXoBvCK2HwZS94c6BA8kk4jNpump",
+   "description": "Turn on the hype—$FAUCAT is making waves and the flow has only just begun. 🐱🚰💦",
+   "icon": "mWY26MzKHVWTjFcP",
+   "header": "https://cdn.dexscreener.com/cms/images/OQfPOMIif3yVvcER?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/84uuSMjPYDEAcsr8FXoBvCK2HwZS94c6BA8kk4jNpump?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://thefaucatsol.lol"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/thefaucatsol"
+    }
+   ],
+   "totalAmount": 130
+  },
+  {
+   "url": "https://dexscreener.com/solana/zzjkh1hlbvsfjxwlfe6h4jnbcnrj4eteukrw42pn2tc",
+   "chainId": "solana",
+   "tokenAddress": "zzjkh1hLbvsFJXWLfE6h4JNbcnRj4eteuKRw42PN2tC",
+   "description": "Official mascot of Stonk\nPaired with $STONK",
+   "icon": "uYGsCEF2E8zwPZss",
+   "header": "https://cdn.dexscreener.com/cms/images/5BD36s1i_nbDabfT?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/zzjkh1hLbvsFJXWLfE6h4JNbcnRj4eteuKRw42PN2tC?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://knowyourmeme.com/memes/meme-man"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/Mememancoinx"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/apikwmrgm6xpupi6ggr9mcltzxszvnhqaqjdkgpgpump",
+   "chainId": "solana",
+   "tokenAddress": "ApikwMrgm6XPupi6ggR9mCLTzXSzvnHqAQjdKgpgpump",
+   "description": "Cat baton is coming for billions and is going to bring back pumpfun in the process.",
+   "icon": "lVyFJTF-5CIiNd2o",
+   "header": "https://cdn.dexscreener.com/cms/images/CyDEPVUscfVJK2bI?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/ApikwMrgm6XPupi6ggR9mCLTzXSzvnHqAQjdKgpgpump?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://catbaton.lol/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/CatBatonX"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/66abzvkuclmwvy2jeu5cjaycusz7ycpobdfxxwv9pump",
+   "chainId": "solana",
+   "tokenAddress": "66aBzVKucLmWvY2JEU5CjAYcUSz7YcpoBDfXXWV9pump",
+   "description": "stonk fun was originally named stonkbaton.",
+   "icon": "kIFYPFMEbdIL77Ef",
+   "header": "https://cdn.dexscreener.com/cms/images/RvvuOnKbkVlgxWrs?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/66aBzVKucLmWvY2JEU5CjAYcUSz7YcpoBDfXXWV9pump?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://stonkbaton.lol/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/stonkbaton"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x04d6aaa3147b9f5b5db255d3151561c07019bdc6",
+   "chainId": "robinhood",
+   "tokenAddress": "0x04d6AAa3147B9f5b5dB255d3151561c07019BDC6",
+   "description": "Anthropig = Anthropic",
+   "icon": "TqeoIXBA7yvr-vWt",
+   "header": "https://cdn.dexscreener.com/cms/images/6kjuLIExjg884Usp?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x04d6aaa3147b9f5b5db255d3151561c07019bdc6?timestamp=1789248900000",
+   "links": [
+    {
+     "type": "twitter",
+     "url": "https://x.com/anthropig_rh"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x613476e47a0b8f503d2e94ecafaafb025bc8d645",
+   "chainId": "robinhood",
+   "tokenAddress": "0x613476e47A0B8F503D2e94ECAFaaFB025bC8d645",
+   "description": "PokePaired is a launchpad where every token launched is paired with a @Pokemon card.",
+   "icon": "nVl1iaXGEYqJ05VG",
+   "header": "https://cdn.dexscreener.com/cms/images/xYCOIMkYUivFmrbg?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x613476e47a0b8f503d2e94ecafaafb025bc8d645?timestamp=1789248900000",
+   "links": [
+    {
+     "type": "twitter",
+     "url": "https://x.com/PokePaired_RH"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/3urpncv9wapjwmayubspjwwkgn9wfjuwcrs3rmbdpair",
+   "chainId": "solana",
+   "tokenAddress": "3URpNcV9wAPjwMAyuBsPjwwkGN9wFJuwcRs3RMbdpair",
+   "description": "Pair your coin with any RWA or crypto token. Your coin. Their favourite pair.",
+   "icon": "BK5WZmLEPuq-dR4X",
+   "header": "https://cdn.dexscreener.com/cms/images/mblMUsGVVV5h0wtq?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/3URpNcV9wAPjwMAyuBsPjwwkGN9wFJuwcRs3RMbdpair?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://pairz.fun"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/pairzfun"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/3xbnqg4txddunp93ioxendturpbf2nxfbwga1t9cpump",
+   "chainId": "solana",
+   "tokenAddress": "3xbNQg4tXDdUNp93ioXeNDTURPbf2nXFbwga1t9cpump",
+   "description": "The moment memecoins started trading alongside real stocks, WALLY clocked in \n\nBorn on Solana for the moment memes and real stocks started trading on the same rails \n\nThe mascot of the crossover \nTradFi clocks out WALLY doesn’t \n\nThe opening bell just became a bark $WALLY",
+   "icon": "XnOFnz-xwzxT6B69",
+   "header": "https://cdn.dexscreener.com/cms/images/uSBLlQ2Em-NM7o3s?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/3xbNQg4tXDdUNp93ioXeNDTURPbf2nXFbwga1t9cpump?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://www.wallycoin.fun/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/realdogwally"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x1937cae1e60f3a555e4e5dff2cf0ad632bff835a",
+   "chainId": "robinhood",
+   "tokenAddress": "0x1937caE1e60F3A555e4E5Dff2Cf0aD632bfF835A",
+   "description": "Pipedog had the question. The fly had the brain. Now the pipe has wings. 🐶🪰",
+   "icon": "eCoRoyo7SgpP3dLj",
+   "header": "https://cdn.dexscreener.com/cms/images/rl0axyVoCBUPs8rt?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x1937cae1e60f3a555e4e5dff2cf0ad632bff835a?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://www.pipefly.vip"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/PipeflyRobin"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/PipeflyRobin"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/88gssgz8unpu1zgb61hyrfd7j2rats7wdnjkpxgmpump",
+   "chainId": "solana",
+   "tokenAddress": "88gsSGZ8UNpU1ZgB61HyrFd7J2RaTs7wDNJKPXGmpump",
+   "description": "commotitty",
+   "icon": "bv7kta_2EYCclMzy",
+   "header": "https://cdn.dexscreener.com/cms/images/muINKhSPMCD0WElf?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/88gsSGZ8UNpU1ZgB61HyrFd7J2RaTs7wDNJKPXGmpump?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://commotitty.fun/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/Commotitty"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/commotittyportal"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x71c486befb4e234dfd5d92bf614b939c5943b520",
+   "chainId": "robinhood",
+   "tokenAddress": "0x71C486bEfb4e234DfD5D92bf614B939C5943B520",
+   "description": "first valid moodeng on robinhood",
+   "icon": "nolgLiiSqUDZbGuJ",
+   "header": "https://cdn.dexscreener.com/cms/images/921zSWfPopHghh2h?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x71c486befb4e234dfd5d92bf614b939c5943b520?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://maplerh.lol"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/MapleHippo_RH"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x93d6e67bd9b499b0af7776ef5c109b1457543907",
+   "chainId": "robinhood",
+   "tokenAddress": "0x93d6e67bD9B499b0af7776EF5C109b1457543907",
+   "description": "Launch any token against any forex quote currency.",
+   "icon": "EwqkEAqMzxWsAIdT",
+   "header": "https://cdn.dexscreener.com/cms/images/AEystPCqnDm7eq3P?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x93d6e67bd9b499b0af7776ef5c109b1457543907?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://pairex.world"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/PairEx_RH"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xe99bd31c1761bae7ff366c510b095dc32fd562c1",
+   "chainId": "robinhood",
+   "tokenAddress": "0xE99Bd31C1761BAE7FF366c510b095Dc32fd562c1",
+   "description": "Claude GATOR brings AI brains, savage meme energy, and unstoppable GATOR vibes straight to the blockchain!",
+   "icon": "IeU1h9K9VowvY2ew",
+   "header": "https://cdn.dexscreener.com/cms/images/zXLAZjq0CHgWnWUy?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xe99bd31c1761bae7ff366c510b095dc32fd562c1?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://www.claudegator.site"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/ClaudeGATORx"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/solana/6ehectmcc85anf4x9cwx8huvwghxqtvkdhkvf2hdpump",
+   "chainId": "solana",
+   "tokenAddress": "6ehEcTMCc85aNF4x9CWx8HuvWGhxQtvKdhKVf2HDpump",
+   "description": "toescoin",
+   "icon": "eEd07gpIegaJRCp3",
+   "header": "https://cdn.dexscreener.com/cms/images/gq8qh2VihUnbZecv?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/6ehEcTMCc85aNF4x9CWx8HuvWGhxQtvKdhKVf2HDpump?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://toescoin.fun/"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/toescoinchat"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/toescoinsol"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/bsc/0xee22fce582dc4120f07e13e42b55ee75246e7777",
+   "chainId": "bsc",
+   "tokenAddress": "0xEe22fCE582Dc4120f07e13e42B55Ee75246e7777",
+   "description": "牛梦——牛市从来不只是一场梦。牛来了。你醒了吗？ Niu Meng — 'The bull run was never just a dream.' The bull is here. Are you awake? 🐂",
+   "icon": "SW-a-k-ZzjDZAlCA",
+   "header": "https://cdn.dexscreener.com/cms/images/1pRE2ofOvGzByPdM?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/bsc/0xee22fce582dc4120f07e13e42b55ee75246e7777?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://niumengbsc.com/"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/NiumengBSC"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xc01ff5b3c73f8542a49350490de0b992e4ec56bb",
+   "chainId": "robinhood",
+   "tokenAddress": "0xc01ff5b3c73F8542A49350490dE0b992e4Ec56bb",
+   "description": "Intertwining Robinhood and Pumpfun into one.",
+   "icon": "SscLl-w4-bLcifvh",
+   "header": "https://cdn.dexscreener.com/cms/images/ncmo7vuVR6mWOnkt?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xc01ff5b3c73f8542a49350490de0b992e4ec56bb?timestamp=1789248900000",
+   "links": [
+    {
+     "type": "twitter",
+     "url": "https://x.com/TWINE_RH"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x3c68382e757193f6ddd12a72dcf0adf93c961769",
+   "chainId": "robinhood",
+   "tokenAddress": "0x3C68382e757193f6DDd12A72DCF0ADF93c961769",
+   "description": "LPAD is the Official Gold Label token of Launchpad, the first Gold Label multi-chain token launchpad. It was launched on Robinhood Chain and trades through a Uniswap V3 pool.",
+   "icon": "kNZOaw9QWdSYejjU",
+   "header": "https://cdn.dexscreener.com/cms/images/7547mEh5JBklnpyy?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x3c68382e757193f6ddd12a72dcf0adf93c961769?timestamp=1789248900000",
+   "links": [
+    {
+     "url": "https://launchpad.meme/"
+    },
+    {
+     "url": "https://launchpad.meme/docs/"
+    },
+    {
+     "url": "https://linkedin.com/company/launchpadmeme"
+    },
+    {
+     "url": "https://github.com/launchpadmeme"
+    },
+    {
+     "type": "twitter",
+     "url": "https://x.com/launchpadmeme"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/launchpadmeme"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0x46b6995b02b1e3afa39033243999e00d739615f1",
+   "chainId": "robinhood",
+   "tokenAddress": "0x46B6995b02B1e3Afa39033243999e00d739615F1",
+   "description": "The first ever dog of Amazon, the official ai agent.",
+   "icon": "BlIlENosO0gzt9O_",
+   "header": "https://cdn.dexscreener.com/cms/images/A5sxt1qvc_xloMwH?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x46b6995b02b1e3afa39033243999e00d739615f1?timestamp=1789248900000",
+   "links": [
+    {
+     "type": "twitter",
+     "url": "https://x.com/rufusaiagent"
+    },
+    {
+     "type": "telegram",
+     "url": "https://t.me/RufusAiAgent"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xd1c3cfa32d6609a68917b6c56be064329a528c62",
+   "chainId": "robinhood",
+   "tokenAddress": "0xd1C3CFA32D6609A68917b6c56Be064329a528C62",
+   "description": "Tokenize 1-800 flowers and launch $tulip",
+   "icon": "qJUV53NRgo1_vFT6",
+   "header": "https://cdn.dexscreener.com/cms/images/8VF-FoclX7VZWFeQ?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xd1c3cfa32d6609a68917b6c56be064329a528c62?timestamp=1789248900000",
+   "links": [
+    {
+     "type": "twitter",
+     "url": "https://x.com/Tulipcoin_RH"
+    }
+   ],
+   "totalAmount": 100
+  },
+  {
+   "url": "https://dexscreener.com/robinhood/0xac0aebf8a26e46ded45e348a8a69b61b282f1e18",
+   "chainId": "robinhood",
+   "tokenAddress": "0xac0aEBF8a26E46DeD45e348A8A69B61B282F1e18",
+   "description": "Life is a videogame \n\nLog on everyday to win at this game we call life\n\nMission complete: get rich\n\nInspired by Minh, all fees claimable by him\n\nPaired with $TTWO powered by Long",
+   "icon": "AD4SjzUSoWrXza1t",
+   "header": "https://cdn.dexscreener.com/cms/images/WoLNENynvSDnZq-3?width=900&height=300&fit=crop&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xac0aebf8a26e46ded45e348a8a69b61b282f1e18?timestamp=1789248900000",
+   "links": [
+    {
+     "type": "twitter",
+     "url": "https://x.com/minhxdynasty/status/1980412492422758888?s=46"
+    }
+   ],
+   "totalAmount": 100
+  }
+ ]
+}

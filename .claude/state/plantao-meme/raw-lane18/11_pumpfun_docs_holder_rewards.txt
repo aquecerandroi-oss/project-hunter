@@ -1,0 +1,21 @@
+{"name": "11_pumpfun_docs_holder_rewards", "url": "https://pump.fun/docs/holder-rewards", "mode": "text", "http": 200, "request_started_utc": "2026-09-12T21:36:36Z", "observed_utc": "2026-09-12T21:36:37Z", "observed_brt": "18:36:37 BRT", "seconds": 1.38, "bytes": 1647866, "content_type": "text/html; charset=utf-8", "last_modified": "", "date": "Sat, 12 Sep 2026 21:36:36 GMT", "ratelimit_remaining": "", "title": "Pump.fun — Launch and trade memecoins on Solana", "meta_dates": []}
+
+Welcome to Pump . fun!
+ Pump lets anyone create coins, giving everyone equal access to buy and sell from the start. Prices can move quickly, so trade carefully.
+ Continue 
+ By clicking this button, you agree to the Terms and Conditions , Privacy Policy , and certify that you are over 18 years old.
+ Home 
+ Explore 
+ GO 
+ Mayhem 
+ Live 
+ Support 
+ Terminal 
+ Home 
+ Explore 
+ GO 
+ Mayhem 
+ Live 
+ Support 
+ Terminal 
+ Pump.fun — Launch and trade memecoins on Solana

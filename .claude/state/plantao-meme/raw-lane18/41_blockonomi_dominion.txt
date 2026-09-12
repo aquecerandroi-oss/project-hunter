@@ -1,0 +1,166 @@
+{"name": "41_blockonomi_dominion", "url": "https://blockonomi.com/dominion-market-halts-trading-freezes-silv-following-multisig-wallet-hack", "mode": "text", "http": 200, "request_started_utc": "2026-09-12T21:45:16Z", "observed_utc": "2026-09-12T21:45:16Z", "observed_brt": "18:45:16 BRT", "seconds": 0.82, "bytes": 230177, "content_type": "text/html; charset=UTF-8", "last_modified": "Sat, 12 Sep 2026 21:45:16 GMT", "date": "Sat, 12 Sep 2026 21:45:16 GMT", "ratelimit_remaining": "", "title": "Dominion Market Halts Trading, Freezes SILV Following Multisig Wallet Hack - Blockonomi", "meta_dates": [["article:published_time", "2026-09-11T23:21:44+00:00"]]}
+
+Dominion Market Halts Trading, Freezes SILV Following Multisig Wallet Hack - Blockonomi 
+ Facebook 
+ X (Twitter) 
+ LinkedIn 
+ Telegram 
+ About 
+ Advertise 
+ Submit Press Release 
+ Contact 
+ Facebook 
+ X (Twitter) 
+ LinkedIn 
+ Telegram 
+ Prices 
+ All Coins 
+ Bitcoin Price 
+ Ethereum Price 
+ Ripple Price 
+ EOS Price 
+ Litecoin Price 
+ Monero Price 
+ Binance Coin Price 
+ Bitcoin Cash Price 
+ Chainlink Price 
+ Cardano Price 
+ Stellar Price 
+ Tron Price 
+ Sections 
+ News Agg 
+ All 
+ Analysis 
+ Bitcoin 
+ Ethereum 
+ Education 
+ Trading 
+ Buying 
+ DeFi 
+ NFTs 
+ Metaverse 
+ Memes 
+ Exchanges 
+ Brokers 
+ Guides 
+ Gaming 
+ iGaming 
+ Collections 
+ Reviews 
+ Privacy 
+ Business 
+ Finance 
+ Regulation 
+ Security 
+ 1 BTC + 100 Free Spins! 
+ 100% Bonus! Play Now 
+ $5 Reg Bonus + 100% Bonus! 
+ 70% Rakeback & 10% Cashback 
+ Home / Contact / Advertise / Submit Press Release 
+ Security 
+ Dominion Market Halts Trading, Freezes SILV Following Multisig Wallet Hack
+ Exploited wallets depeg SILV from silver; refunds open Monday, repeg planned soon
+ By Brenda Mary September 11, 2026 No Comments 3 Mins Read 
+ Telegram 
+ Twitter 
+ LinkedIn 
+ WhatsApp 
+ Facebook 
+ Email 
+ Share 
+ Facebook 
+ Twitter 
+ LinkedIn 
+ Email 
+ Telegram 
+ WhatsApp 
+ TLDR: 
+ Table of Contents
+ Toggle 
+ TLDR: 
+ Breach Response and Wallet Security 
+ Refund Process and Path to Repegging 
+ Dominion Market’s multisig wallets were breached near 01:00 UTC on Friday, September 11. 
+ SILV bought between 01:00 and 14:00 UTC Friday will be frozen and removed from wallets. 
+ USDC refund claims open Monday, September 14 at 12:00 UTC via onchain verification. 
+ Dominion is working with SIRN and SEAL 911 while targeting a full SILV repeg soon. 
+ Dominion Market confirmed a wallet breach that pushed its Solana-based SILV token off its 1:1 silver backing. The platform moved fast, pulling liquidity and locking down compromised wallets within hours. 
+ Tokens purchased during the exploit window will be frozen, while long-term holders keep their balances untouched. A refund process opens Monday, and the team says a full repeg is coming soon. 
+ Breach Response and Wallet Security 
+ Dominion Market said the compromise began near 01:00 UTC on Friday, September 11. The team detected unusual activity roughly three hours later and moved to contain it. 
+ Founder Mark said the platform pulled liquidity, secured the affected wallets, and swapped in fresh hardware devices. He added that Dominion now has full control over its systems again. 
+ The breach caused SILV to trade well below the value of the physical silver supporting it. That gap opened the door for opportunistic buying during the compromised window. 
+ An update on $SILV bought during the incident.
+ You deserve a clear answer, so here it is.
+ Any $SILV bought between 01:00 UTC and 14:00 UTC on Friday 11 September will be removed from wallets.
+ We know that's hard to read. Many of you bought in good faith, and this affects you… pic.twitter.com/iUFAW90U6p 
+ — Dominion (@Dominion_Market) September 11, 2026 
+ Dominion said tokens acquired between 01:00 UTC and 14:00 UTC on Friday would be removed from wallets. Balances held before the exploit began remain unaffected by the freeze. 
+ The team is working with outside security groups to trace the incident. Dominion named the Solana Incident Response Network and SEAL 911 as partners in the review. 
+ Both groups focus on tracking exploits across Solana -based protocols. Dominion said it would share updates on the investigation as new details emerge. 
+ Dominion also warned its community about follow-up scams tied to the incident. The company said it will never contact holders directly about refunds through private messages. 
+ Any account offering early refunds before Monday should be treated as fraudulent. Official updates, the team said, will only come through its verified account. 
+ Refund Process and Path to Repegging 
+ Holders who bought SILV during the compromised window will be eligible for USDC refunds. Dominion set the claims window to open Monday, September 14, at 12:00 UTC. The team cited closed silver markets over the weekend as the reason for the delay. 
+ Dominion said the refund process would rely on verifiable onchain data for every claim. Affected users do not need to submit anything until the claims form goes live. The company plans to publish full instructions alongside the refund link at the same time. 
+ Beyond refunds, Dominion’s stated priority is restoring the SILV peg to physical silver. The team said it is working to add liquidity ahead of the repeg. 
+ Trading remains paused for now while the platform confirms its systems are secure. Holders have been asked to avoid trading SILV until an official repeg announcement. 
+ Reaction within the community has been mixed since the freeze was announced. Some holders welcomed the quick action to protect the token’s backing. 
+ Others expressed frustration over having tokens removed from their wallets. Dominion said the freeze protects holders who bought SILV before the breach occurred. 
+ Advertise Here 
+ Brenda Mary 
+ Related Posts 
+ Liquid Network Exploit: Blockstream Recovers 3,400 BTC After $400M Bug 
+ September 9, 2026 
+ Cronos Reverses $111M After Tectonic Exploit Triggers Network Halt 
+ September 8, 2026 
+ Why Solana Is Tripling Transaction Capacity 
+ September 7, 2026 
+ Comments are closed.
+ Search for: 
+ ⭐ Crypto Gambling Picks 
+ Betpanda NEW 
+ Visit Review 
+ CyBet 
+ Visit Review 
+ mBit Casino 
+ Visit Review 
+ Thrill 
+ Visit Review 
+ Jack.com 
+ Visit Review 
+ MetaWin 
+ Visit Review 
+ BC Game 
+ Visit Review 
+ Advertise Here 
+ Exchanges 
+ KuCoin 
+ Visit Review 
+ Coinbase 
+ Visit Review 
+ Binance 
+ Visit Review 
+ PrimeXBT 
+ Visit Review 
+ Advertise Here 
+ Trading Bots 
+ 3Commas 
+ Visit Review 
+ Cryptohopper 
+ Visit Review 
+ CoinRule 
+ Visit Review 
+ Advertise Here 
+ All content on Blockonomi.com is provided solely for informational purposes, and is not an offer to buy or sell or a solicitation of an offer to buy or sell any security, product, service or investment. The opinions expressed in this Site do not constitute investment advice and independent financial advice should be sought where appropriate.
+ Blockonomi™ Copyright © 2017 - 2026 Kooc Media Ltd . All rights reserved. Registered Company No.05695741
+ Network: Moneycheck - Finance News / CG - Tech & Finance News / Computing.net - Tech News 
+ About 
+ Contact 
+ Deals 
+ Advertise 
+ Privacy Policy 
+ Terms & Conditions 
+ Submit 
+ Type above and press Enter to search. Press Esc to cancel. 
+ Crypto Casino:100% Up To 1 BTC; Instant Withdrawals; PLAY NOW!

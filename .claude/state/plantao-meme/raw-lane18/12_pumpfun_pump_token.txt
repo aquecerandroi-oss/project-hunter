@@ -1,0 +1,141 @@
+{"name": "12_pumpfun_pump_token", "url": "https://pump.fun/pump-token", "mode": "text", "http": 200, "request_started_utc": "2026-09-12T21:36:39Z", "observed_utc": "2026-09-12T21:36:46Z", "observed_brt": "18:36:46 BRT", "seconds": 7.35, "bytes": 2210380, "content_type": "text/html; charset=utf-8", "last_modified": "", "date": "Sat, 12 Sep 2026 21:36:39 GMT", "ratelimit_remaining": "", "title": "PUMP Token ($PUMP) — Pump.fun's Native Token | Pump", "meta_dates": []}
+
+PUMP Token ($PUMP) — Pump.fun's Native Token | Pump 
+ Welcome to Pump . fun!
+ Pump lets anyone create coins, giving everyone equal access to buy and sell from the start. Prices can move quickly, so trade carefully.
+ Continue 
+ By clicking this button, you agree to the Terms and Conditions , Privacy Policy , and certify that you are over 18 years old.
+ Home 
+ Explore 
+ GO 
+ Mayhem 
+ Live 
+ Support 
+ Terminal 
+ Home 
+ Explore 
+ GO 
+ Mayhem 
+ Live 
+ Support 
+ Terminal 
+ Home 
+ Explore 
+ GO 
+ Mayhem 
+ Live 
+ Support 
+ Terminal 
+ $PUMP 
+ Create Try app 
+ Trade faster. Pump is better on mobile. 
+ Search for coins and users... ⌘ K 
+ Sign in Signed in 
+ Resources
+ PumpSwap 
+ Fees 
+ Revenue 
+ Tech updates 
+ Wallet sign-in changes 
+ Legal
+ Privacy policy 
+ Terms of service 
+ Tokenized agent disclaimer 
+ Livestream policy 
+ DMCA policy 
+ Trademark guidelines 
+ Charity coins 
+ Go.fun terms 
+ Blog 
+ © Pump.fun 2026
+ © Pump.fun 2026
+ Blog Resources Legal 
+ $PUMP token powers the world’s leading launchpad
+ Every buyback, burned forever
+ Half of every dollar Pump.fun earns buys $PUMP on the open market, then burns it forever.
+ Annualized revenue $461.49M ≈ $1.26M / day · 90d avg 
+ Total bought back and burnt $452.66M 165.29B $PUMP burned 
+ Total supply offset 
+ Cumulative buybacks
+ Total USD deployed to buy & burn $PUMP, since launch.
+ Cumulative buybacks $452.66M 
+ $PUMP FDV $3.10B 
+ Daily buyback & burn
+ USD spent per day
+ $471.6K
+ latest
+ Revenue allocated to buyback
+ % of daily revenue spent
+ 50% target 
+ Active wallets
+ Daily active wallets on Solana, with and without Pump activity.
+ Solana 812.5K 
+ excl. Pump 58.1K 
+ Data as of Sep 11 
+ Run the numbers yourself
+ See how protocol revenue stacks up against $PUMP's circulating valuation.
+ Earnings to valuation
+ Hypothetical 
+ See how protocol revenue measures up against $PUMP’s circulating valuation, with allocation fixed at 50%.
+ Monthly protocol revenue $ 30 M 
+ Assumed circulating market cap $1.54B 
+ Allocated to buyback 50% 
+ Revenue multiple market cap ÷ annual revenue 
+ 4.3 x
+ circulating market cap measured against annual revenue
+ $360.0M
+ Annual revenue
+ $0.003858
+ $PUMP price
+ 11.7%
+ Buyback yield on mkt cap
+ Illustrative only. Market cap uses circulating supply; yields use annualized revenue. Not a forecast or financial advice.
+ Every burn, on-chain
+ A verifiable record of each daily purchase and burn, settled on Solana.
+ Date $PUMP burned SOL spent USD Price % of revenue 
+ Sep 11, 2026 136.3M 4.7K $471.6K $ 0.003461 44.09 % 
+ Sep 10, 2026 155.9M 5.6K $576.2K $ 0.003695 45.17 % 
+ Sep 9, 2026 185.2M 7.6K $800.2K $ 0.004321 46.89 % 
+ Sep 8, 2026 159.0M 6.8K $711.2K $ 0.004474 50.65 % 
+ Sep 7, 2026 170.4M 6.9K $749.9K $ 0.004401 51.32 % 
+ Sep 6, 2026 114.8M 4.2K $445.2K $ 0.003878 49.12 % 
+ Sep 5, 2026 96.3M 3.8K $396.0K $ 0.004112 48.14 % 
+ Sep 4, 2026 119.1M 4.9K $524.2K $ 0.004401 49.78 % 
+ Sep 3, 2026 163.7M 7.1K $723.0K $ 0.004417 50.86 % 
+ Sep 2, 2026 189.0M 8.1K $815.3K $ 0.004314 52.28 % 
+ Showing 1–10 of 425 ‹ 1 / 43 › 
+ The native token of the Pump.fun protocol, built to grow the ecosystem with instant money, attention, and value shared back to the community.
+ 16.529% 
+ 165.29B $PUMP removed 
+ Live $PUMP market
+ Live price, chart, and market stats for $PUMP.
+ $PUMP price
+ $0.003858 
+ Market cap
+ $1.54B
+ Fully diluted val.
+ $3.86B
+ 24h volume
+ $0
+ coin_details.holders.holders
+ —
+ Circulating
+ 399.46B PUMP
+ Total supply
+ 1T PUMP
+ Why we built $PUMP
+ From the fastest-growing launchpad in history to a network for instant trading & attention.
+ Since launching in January 2024, Pump.fun set out to become a household name, letting anyone, anywhere create and trade tokens.
+ Pump.fun quickly became the fastest-growing company in history, reaching $100M, $300M, and $500M in revenue faster than any other company in the world. But that was just the beginning.
+ To unlock further growth, we launched $PUMP , the official native token of the Pump.fun protocols, delivering value to its community and incentivizing the ecosystem that helps the platform succeed.
+ 12 min
+ Token sale sellout time
+ Jan 2024
+ Pump.fun launched
+ Trade $PUMP Share 
+ Methodology
+ From 24 Oct 2025, “Revenue” includes all Pump.fun bonding curve, PumpSwap, and Terminal revenue (Solana, Base, Ethereum L1, BNB) net of referral fees and cash backs, exclusive of Mayhem Mode. As of 28 Apr 2026, 50% of revenue is programmatically locked and allocated to be burned for one year.
+ Burn addresses 99mRw3…pm4F3c 9jHrTC…6KVCXM 
+ Disclaimer
+ The $PUMP token does not represent a right to revenues or any other distribution. Any references to token purchases are for informational purposes only, and only describe historical activity. This information should not be understood as a commitment to future token purchases for any reason, except as deterministically programmed prior to April 29, 2026. Any purchases may have the effect of preventing or retarding a decline in the market price of tokens and may stabilize, maintain or otherwise affect the market price of the tokens. As a result, the market price of the tokens may be higher than the price that otherwise might exist. Entities affiliated with the pump platform may purchase or sell tokens from time to time, but are under no obligation to do so. If any purchases occur in the future, any such activity may be initiated, suspended, modified, or discontinued at any time, with or without notice, except as deterministically programmed prior to April 29, 2026. No token purchaser, holder or seller should rely on past purchases as an indication of future token purchases.
+ Trade $PUMP Share

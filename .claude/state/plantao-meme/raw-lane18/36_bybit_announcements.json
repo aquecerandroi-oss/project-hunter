@@ -1,0 +1,368 @@
+{
+ "_meta": {
+  "name": "36_bybit_announcements",
+  "url": "https://api.bybit.com/v5/announcements/index?locale=en-US&type=new_crypto&limit=20",
+  "mode": "json",
+  "http": 200,
+  "request_started_utc": "2026-09-12T21:43:07Z",
+  "observed_utc": "2026-09-12T21:43:08Z",
+  "observed_brt": "18:43:08 BRT",
+  "seconds": 0.96,
+  "bytes": 9488,
+  "content_type": "application/json; charset=utf-8",
+  "last_modified": "",
+  "date": "Sat, 12 Sep 2026 21:43:08 GMT",
+  "ratelimit_remaining": ""
+ },
+ "payload": {
+  "retCode": 0,
+  "retMsg": "OK",
+  "result": {
+   "list": [
+    {
+     "title": "New listing: HORIZONUSDT TradFi Perpetual Contract, with up to 25x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-horizonusdt-tradfi-perpetual-contract-with-up-to-25x-leverage--artb33bad26351f/",
+     "dateTimestamp": 1789112324000,
+     "startDateTimestamp": 1789112324000,
+     "endDateTimestamp": 1789112324000,
+     "publishTime": 1789112414000
+    },
+    {
+     "title": "New listing: MEITUUSDT TradFi Perpetual Contract, with up to 25x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-meituusdt-tradfi-perpetual-contract-with-up-to-25x-leverage--art0450e6f24423/",
+     "dateTimestamp": 1789112264000,
+     "startDateTimestamp": 1789112264000,
+     "endDateTimestamp": 1789112264000,
+     "publishTime": 1789112357000
+    },
+    {
+     "title": "New listing: SENSETIMEUSDT TradFi Perpetual Contract, with up to 25x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-sensetimeusdt-tradfi-perpetual-contract-with-up-to-25x-leverage--artb7e71d6ab712/",
+     "dateTimestamp": 1789112227000,
+     "startDateTimestamp": 1789112227000,
+     "endDateTimestamp": 1789112227000,
+     "publishTime": 1789112364000
+    },
+    {
+     "title": "New listing: FORMSTOCKUSDT TradFi Perpetual Contract, with up to 25x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-formstockusdt-tradfi-perpetual-contract-with-up-to-25x-leverage--art93adbfcdc60e/",
+     "dateTimestamp": 1789032232000,
+     "startDateTimestamp": 1789032232000,
+     "endDateTimestamp": 1789032232000,
+     "publishTime": 1789032305000
+    },
+    {
+     "title": "New listing: CGNXUSDT TradFi Perpetual Contract, with up to 25x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-cgnxusdt-tradfi-perpetual-contract-with-up-to-25x-leverage--artc90ab2ab1cb2/",
+     "dateTimestamp": 1789032202000,
+     "startDateTimestamp": 1789032202000,
+     "endDateTimestamp": 1789032202000,
+     "publishTime": 1789032300000
+    },
+    {
+     "title": "New listing: BTDRUSDT TradFi Perpetual Contract, with up to 25x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-btdrusdt-tradfi-perpetual-contract-with-up-to-25x-leverage--art527a866f714b/",
+     "dateTimestamp": 1789032125000,
+     "startDateTimestamp": 1789032125000,
+     "endDateTimestamp": 1789032125000,
+     "publishTime": 1789032297000
+    },
+    {
+     "title": "New listing: 4STOCKUSDT Perpetual Contract in Innovation Zone, with up to 10x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-4stockusdt-perpetual-contract-in-innovation-zone-with-up-to-10x-leverage--art5e48228cacb5/",
+     "dateTimestamp": 1788954788000,
+     "startDateTimestamp": 1788954788000,
+     "endDateTimestamp": 1788954788000,
+     "publishTime": 1788954859000
+    },
+    {
+     "title": "New listing: EURUSDUSDT TradFi Perpetual Contract, with up to 100x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-eurusdusdt-tradfi-perpetual-contract-with-up-to-100x-leverage--art24098f22b9c7/",
+     "dateTimestamp": 1788863043000,
+     "startDateTimestamp": 1788863043000,
+     "endDateTimestamp": 1788863043000,
+     "publishTime": 1788863092000
+    },
+    {
+     "title": "New listing: USDJPYUSDT TradFi Perpetual Contract, with up to 100x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-usdjpyusdt-tradfi-perpetual-contract-with-up-to-100x-leverage--art4f909309d319/",
+     "dateTimestamp": 1788859473000,
+     "startDateTimestamp": 1788859473000,
+     "endDateTimestamp": 1788859473000,
+     "publishTime": 1788859601000
+    },
+    {
+     "title": "New listing: GBPUSDUSDT TradFi Perpetual Contract, with up to 100x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-gbpusdusdt-tradfi-perpetual-contract-with-up-to-100x-leverage--art4023fe24c1b0/",
+     "dateTimestamp": 1788859406000,
+     "startDateTimestamp": 1788859406000,
+     "endDateTimestamp": 1788859406000,
+     "publishTime": 1788859485000
+    },
+    {
+     "title": "New listing: 哈基米USDT Perpetual Contract in Innovation Zone, with up to 10x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-hajimiusdt-perpetual-contract-in-innovation-zone-with-up-to-10x-leverage--arte7ee8f9bc7dc/",
+     "dateTimestamp": 1788769792000,
+     "startDateTimestamp": 1788769792000,
+     "endDateTimestamp": 1788769792000,
+     "publishTime": 1788769994000
+    },
+    {
+     "title": "New listing: HUAHONGUSDT TradFi Perpetual Contract, with up to 25x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-huahongusdt-tradfi-perpetual-contract-with-up-to-25x-leverage--art18c4f3fc8452/",
+     "dateTimestamp": 1788762962000,
+     "startDateTimestamp": 1788762962000,
+     "endDateTimestamp": 1788762962000,
+     "publishTime": 1788763154000
+    },
+    {
+     "title": "New listing: LENOVOUSDT TradFi Perpetual Contract, with up to 25x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-lenovousdt-tradfi-perpetual-contract-with-up-to-25x-leverage--art287715276c37/",
+     "dateTimestamp": 1788762931000,
+     "startDateTimestamp": 1788762931000,
+     "endDateTimestamp": 1788762931000,
+     "publishTime": 1788763161000
+    },
+    {
+     "title": "New listing: BYDUSDT TradFi Perpetual Contract, with up to 25x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-bydusdt-tradfi-perpetual-contract-with-up-to-25x-leverage--art0b888fe9272b/",
+     "dateTimestamp": 1788762901000,
+     "startDateTimestamp": 1788762901000,
+     "endDateTimestamp": 1788762901000,
+     "publishTime": 1788763168000
+    },
+    {
+     "title": "XAUT Token Splash— Grab a share of the 20 XAUT prize pool .",
+     "description": "Join our XAUT Token Splash event to share from  20 XAUT !!!",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Spot",
+      "Spot Listings"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/xaut-token-splash-grab-a-share-of-the-20-xaut-prize-pool--arte4d31f9f0aa7/",
+     "dateTimestamp": 1788747732000,
+     "startDateTimestamp": 1788747732000,
+     "endDateTimestamp": 1788747732000,
+     "publishTime": 1788778809000
+    },
+    {
+     "title": "New listing: CPUSDT Perpetual Contract in Innovation Zone, with up to 20x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-cpusdt-perpetual-contract-in-innovation-zone-with-up-to-20x-leverage--arta2f11bae44af/",
+     "dateTimestamp": 1788509791000,
+     "startDateTimestamp": 1788509791000,
+     "endDateTimestamp": 1788509791000,
+     "publishTime": 1788509838000
+    },
+    {
+     "title": "New listing: DGAIUSDT Perpetual Contract in Innovation Zone, with up to 20x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-dgaiusdt-perpetual-contract-in-innovation-zone-with-up-to-20x-leverage--art151aff198a7e/",
+     "dateTimestamp": 1788508157000,
+     "startDateTimestamp": 1788508157000,
+     "endDateTimestamp": 1788508157000,
+     "publishTime": 1788508195000
+    },
+    {
+     "title": "New listing: CVXSTOCKUSDT TradFi Perpetual Contract, with up to 25x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-cvxstockusdt-tradfi-perpetual-contract-with-up-to-25x-leverage--art0d98f57fedd4/",
+     "dateTimestamp": 1788427603000,
+     "startDateTimestamp": 1788427603000,
+     "endDateTimestamp": 1788427603000,
+     "publishTime": 1788427753000
+    },
+    {
+     "title": "New listing: TEAMUSDT TradFi Perpetual Contract, with up to 25x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-teamusdt-tradfi-perpetual-contract-with-up-to-25x-leverage--art9fe06770e3a1/",
+     "dateTimestamp": 1788427486000,
+     "startDateTimestamp": 1788427486000,
+     "endDateTimestamp": 1788427486000,
+     "publishTime": 1788427757000
+    },
+    {
+     "title": "New listing: MDBUSDT TradFi Perpetual Contract, with up to 25x leverage",
+     "description": "",
+     "type": {
+      "key": "new_crypto",
+      "title": "New Listings"
+     },
+     "tags": [
+      "Derivatives",
+      "Institutions"
+     ],
+     "url": "https://announcements.bybit.com/en-US/article/new-listing-mdbusdt-tradfi-perpetual-contract-with-up-to-25x-leverage--art54c16d329c7f/",
+     "dateTimestamp": 1788427450000,
+     "startDateTimestamp": 1788427450000,
+     "endDateTimestamp": 1788427450000,
+     "publishTime": 1788427763000
+    }
+   ],
+   "total": 1752
+  },
+  "retExtInfo": {},
+  "time": 1789249388279
+ }
+}

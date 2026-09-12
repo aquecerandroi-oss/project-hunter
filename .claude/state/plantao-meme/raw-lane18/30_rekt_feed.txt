@@ -1,0 +1,4 @@
+{"name": "30_rekt_feed", "url": "https://rekt.news/feed", "mode": "text", "http": 500, "request_started_utc": "2026-09-12T21:41:20Z", "observed_utc": "2026-09-12T21:41:21Z", "observed_brt": "18:41:21 BRT", "seconds": 1.35, "bytes": 3120, "content_type": "text/html; charset=utf-8", "last_modified": "Fri, 11 Sep 2026 19:24:49 GMT", "date": "Sat, 12 Sep 2026 21:41:21 GMT", "ratelimit_remaining": "", "title": "500: Internal Server Error", "meta_dates": []}
+
+500: Internal Server Error 500
+ Internal Server Error .
