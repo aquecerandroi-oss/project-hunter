@@ -21,12 +21,19 @@ export function memeTokenStateLabel(state: MemeTokenState): string {
   return TOKEN_STATE_LABEL[state];
 }
 
-export const MEME_SOURCES: readonly MemeSource[] = ["pumpportal_ws", "pumpfun_rest", "solana_rpc"];
+export const MEME_SOURCES: readonly MemeSource[] = [
+  "pumpportal_ws",
+  "pumpfun_rest",
+  "solana_rpc",
+  "trenches_ws",
+];
 
 const SOURCE_LABEL: Record<MemeSource, string> = {
   pumpportal_ws: "PumpPortal (WS)",
   pumpfun_rest: "pump.fun (REST)",
   solana_rpc: "Solana RPC",
+  // T4.2c: the site's own screener feed (advanced-indexer /ws/trenches).
+  trenches_ws: "boards do site (WS)",
 };
 
 export function memeSourceLabel(source: MemeSource): string {
@@ -53,16 +60,19 @@ export const MEME_NULL_REASONS: readonly MemeNullReason[] = [
   "rate_limited",
   "insufficient_coverage",
   "unsupported_quote",
+  "no_sells",
 ];
 
 const NULL_REASON_LABEL: Record<MemeNullReason, string> = {
-  no_trade_feed: "sem feed de negociações (canal pago, não contratado)",
+  no_trade_feed: "sem fita de negociações neste minuto",
   no_holders_reader: "sem leitor de holders ainda",
   denominator_unknown: "denominador da curva desconhecido",
   not_polled: "ainda não consultado nesta janela",
   rate_limited: "limite de requisições atingido",
   insufficient_coverage: "cobertura insuficiente no minuto",
   unsupported_quote: "cotação fora do padrão suportado",
+  // T4.2c: a ratio with no sells in the minute has no value, and this says why.
+  no_sells: "sem vendas no minuto (razão indefinida)",
 };
 
 export function memeNullReasonLabel(reason: MemeNullReason): string {

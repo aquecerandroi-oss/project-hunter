@@ -50,7 +50,8 @@ describe("Meme Radar labels: exhaustive over every enum value the API can send",
 
 describe("memeNullReasonText", () => {
   it("prefixes 'sem medição:' before the reason label", () => {
-    expect(memeNullReasonText("no_trade_feed")).toBe("sem medição: sem feed de negociações (canal pago, não contratado)");
+    // T4.2c: the tape now exists (swap-api); "no_trade_feed" means this minute had none.
+    expect(memeNullReasonText("no_trade_feed")).toBe("sem medição: sem fita de negociações neste minuto");
   });
 
   it("degrades honestly when no reason is given at all (should not happen, but must not crash)", () => {
