@@ -525,6 +525,86 @@ corretos. Refazer o passo (b) é `ALTER ROLE` com o valor que já está no `.env
 disso na saída da migração desde a revisão de segurança da T3.15f (MÉDIA 2),
 mas um `NOTICE` no meio de um log de deploy não é o controle; esta linha é.
 
+### 3.6 Radar de memecoins (`meme-worker`, perfil `meme` — T4.2)
+
+Serviço novo `meme-worker` (`HUNTER_ROLE=meme`) nos dois composes, **atrás do
+perfil `meme`**: ele não sobe num `up`/`update` comum. São dois interruptores, e
+a separação é deliberada — **o perfil decide se o container existe, `MEME_ENABLED`
+decide se ele coleta**:
+
+```bash
+# stack local — sobe o container com o coletor DESLIGADO
+docker compose -f infra/docker/docker-compose.yml --profile meme up -d meme-worker
+
+# stack local — sobe coletando
+MEME_ENABLED=true docker compose -f infra/docker/docker-compose.yml --profile meme up -d meme-worker
+
+# VPS — o mesmo comando que já faz o deploy, mais o perfil
+MEME=1 MEME_ENABLED=true bash infra/vps/compose.sh update
+```
+
+`MEME=1` é a única mudança em `infra/vps/compose.sh` (o mesmo padrão e o mesmo
+lugar de `MARKET_SPOT=1`), e ela **não é conveniência**: `up`/`update` rodam com
+`--remove-orphans`, então um `compose.sh update` sem o perfil **derrubaria** um
+meme-worker que alguém tivesse subido na mão. O interruptor é o que torna "o radar
+sobrevive ao próximo deploy" verdade.
+
+**Por que perfil, e não um worker comum.** Ele é o único processo que fala com
+dois endpoints de terceiros que ninguém aqui opera (`pumpportal.fun` e
+`frontend-api-v3.pump.fun`, nenhum dos dois documentado publicamente como
+contrato), e o PumpPortal serve **uma conexão por cliente** — várias simultâneas
+podem render banimento de uma hora (`docs/plans/T4-MEME-RADAR.md` §2). Por isso o
+heartbeat é a chave fixa `hb:meme:radar` em vez de `hb:meme:{host}:{pid}`: o
+coletor é singleton por construção, e a consequência está declarada — dois
+processos escreveriam a **mesma** chave em vez de aparecerem como duas
+instâncias, então "só um está rodando" é garantido pelo deployment, não pelo
+heartbeat.
+
+**Desligado, ele continua visível.** Com `MEME_ENABLED=false` o processo sobe,
+serve `/health`, `/ready` e `/metrics` e responde `radar: "disabled
+(MEME_ENABLED=false)"` no corpo do readiness. Um coletor desligado tem de ser
+*visivelmente* desligado, nunca indistinguível de um quebrado.
+
+**Readiness:** uma checagem (`discovery_connected` — o socket do PumpPortal está
+conectado) e quatro detalhes que **não** viram veredito: `discovery_stream`,
+`tracked_mints`, `last_event_age_s` (com `(stale)` acima de 10 min) e
+`ws_generation`. A separação é o critério de aceite da T4.1: *conexão viva sem
+eventos novos não é conexão caída*, e pump.fun tem períodos genuinamente quietos —
+transformar silêncio em `503` seria um loop de restart.
+
+**Verificar depois de subir:**
+
+```bash
+docker logs -f hunter-meme-worker-1 | head -40          # meme_radar_starting: tracked=N budget=60
+docker exec hunter-redis-1 redis-cli HGETALL hb:meme:radar
+curl -s localhost:8001/ready | jq                        # discovery_stream, tracked_mints, last_event_age_s
+docker exec hunter-postgres-1 psql -U hunter -d hunter -c \
+  "SELECT count(*) FROM meme_tokens; \
+   SELECT end_time, count(*) FILTER (WHERE coverage > 0) AS cobertos, count(*) AS linhas \
+     FROM meme_features_1m GROUP BY end_time ORDER BY end_time DESC LIMIT 5; \
+   SELECT stream, reason, count(*) FROM meme_ingest_gaps GROUP BY 1, 2;"
+```
+
+A terceira consulta é a que importa: um minuto com `cobertos = 0` **não** é um
+buraco silencioso — é uma linha por mint com `curve_reason` preenchido mais uma
+linha em `meme_ingest_gaps`. Nenhum minuto deve faltar sem uma das duas coisas.
+
+**Retenção e partições:** `MEME_RETENTION_DAYS` (padrão 90) governa as duas
+metades — `infra/scripts/prune_partitions.py` derruba o mês inteiro das três
+tabelas particionadas e o próprio worker poda `meme_tokens` linha a linha, em
+lotes, atrás de `SET LOCAL app.meme_retention = 'on'`. A janela é **a mesma para
+mints graduados e não graduados** (`docs/DATABASE.md` §33.4): selecionar por
+sucesso depois do fato apagaria os controles. `create_partitions.py` já planeja os
+três pais novos sem mudança nenhuma — ele os deriva dos modelos.
+
+**Sem chave, e sem esconder o custo disso:** `SOLANA_RPC_URL` vazio cai no RPC
+público (~10 req/s **e** 40 chamadas por método/10 s), que é a razão de só o
+top-K por market cap ser reconciliado contra a cadeia; o resto carrega a palavra
+do espelho REST, rotulada em `meme_curve_snapshots.source`. Contratar provedor
+pago é decisão do Everton com teto de consumo e política de degradação aprovados
+antes (`docs/plans/T4-MEME-RADAR.md` §8, decisão 3), nunca um default deste
+arquivo.
+
 ## 4. CI (GitHub Actions)
 
 `ci.yml` em cada PR e push na `main`:
@@ -883,6 +963,13 @@ AGENT → PROPOSAL → RISK → EXECUTION (`CLAUDE.md`).
 | `RADAR_PUSH_MS` | não | `1000` | cadência de push do Radar (M2) |
 | `RETENTION_CANDLES_1M_DAYS` | não | `90` | retenção de candles de 1 minuto |
 | `RETENTION_FEATURE_SNAPSHOTS_DAYS` | não | `14` | retenção de snapshots de features |
+| `MEME` | não | `0` | **só no comando** (nunca no `.env`): `MEME=1` adiciona o perfil `meme` ao `compose.sh` (§3.6) — sem ele, `update` derruba o meme-worker por `--remove-orphans` |
+| `MEME_ENABLED` | não | `false` | se o radar pump.fun **coleta**. O perfil decide se o container existe; esta flag decide se ele fala com os dois endpoints de terceiros. Desligado, serve `/health`, `/ready` e `/metrics` e diz `disabled` no readiness |
+| `SOLANA_RPC_URL` | não | público | endpoint RPC Solana do meme-worker. Vazio = `api.mainnet-beta.solana.com` (~10 req/s **e** 40 chamadas por método/10 s), que é por que só o top-K por mcap é reconciliado. Provedor com chave é decisão do Everton (T4.0 §8.3), com teto de consumo aprovado antes |
+| `MEME_RETENTION_DAYS` | não | `90` | janela de retenção do radar, **idêntica para mints graduados e não graduados** (`docs/DATABASE.md` §33.4). Governa o `DROP` mensal das três tabelas particionadas **e** a poda linha a linha de `meme_tokens` |
+| `MEME_TRACKED_MINTS_MAX` | não | `120` | teto do conjunto rastreado. O orçamento REST é 60 req/60 s, então 120 mints é uma volta completa a cada dois minutos; qualquer número maior é uma promessa que o orçamento não cumpre |
+| `MEME_TRACK_WINDOW_MINUTES` | não | `1440` | quanto tempo um mint fica rastreado depois de criado (24 h — a vida do próprio agente Mayhem). Um agente `active`/`paused` mantém o mint mesmo depois disso |
+| `MEME_RPC_TOP_K` | não | `20` | quantos mints, por market cap, são reconciliados contra a cadeia a cada ciclo |
 
 ## 8. Comandos locais reais
 

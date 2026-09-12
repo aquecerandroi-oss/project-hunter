@@ -24,7 +24,7 @@ from hunter_core.domain.enums import KillSwitchState
 from hunter_core.sharding import parse_shard_spec
 
 Environment = Literal["development", "test", "staging", "production"]
-Role = Literal["api", "market", "scanner", "strategy", "execution", "analytics", "all"]
+Role = Literal["api", "market", "scanner", "strategy", "execution", "analytics", "meme", "all"]
 MarketRole = Literal["perpetual", "spot", "both"]
 
 
@@ -122,6 +122,7 @@ class Settings(BaseSettings):
     radar_push_ms: int = 1000
     retention_candles_1m_days: int = 90
     retention_feature_snapshots_days: int = 14
+    meme_retention_days: int = 90  # T4.2, a MESMA para graduado e nao (DATABASE.md §33.4)
 
     # ---- market-worker (docs/plans/M1.md T1.3) ----
     market_universe_allowlist: list[str] = []

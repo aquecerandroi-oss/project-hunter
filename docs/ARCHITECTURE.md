@@ -66,6 +66,8 @@ Ver `SECURITY.md` §1. Resumo: requisito de "não implementar autenticação pr�
    │  execution-worker  propostas aprovadas → paper/shadow fills          │
    │                    → posições → trades → PnL                         │
    │  analytics-worker  equity snapshots, estatísticas, retenção, outcomes│
+   │  meme-worker       PumpPortal WS + curva pump.fun → meme_tokens,     │
+   │  (perfil `meme`)   meme_curve_snapshots, meme_features_1m — só leitura│
    └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -81,6 +83,15 @@ Em desenvolvimento e em deployments pequenos, `HUNTER_ROLE=all` roda todos os wo
 | `strategy-worker` | Agentes (estratégias), consenso, geração de propostas por portfolio, Risk Engine | evento | `agent_signals`, `trade_proposals`, `risk_events` | `signals.emitted`, `proposals.decided` |
 | `execution-worker` | ExecutionAdapter (paper, shadow; live desativado), ordens, fills, posições, trades, stops e alvos, kill switch enforcement | evento + 1 s (marcação a mercado) | `orders`, `fills`, `positions`, `trades`, `portfolio_equity_snapshots` | `executions.completed`, `positions.updated`, `risk.events` |
 | `analytics-worker` | Estatísticas por agente/estratégia/regime, `signal_outcomes` (shadow de sistema), jobs de retenção, heartbeats consolidados | 1 min / 1 h / diário | `agent_stats`, `signal_outcomes`, `system_events` | `analytics.updated` |
+| `meme-worker` (T4.2, perfil `meme`) | Radar pump.fun: descoberta pelo WS do PumpPortal, estado da curva dentro do orçamento de 60 req/60 s, reconciliação do top-K por mcap no RPC Solana, uma linha de feature por minuto fechado, retenção de `meme_tokens` e contabilidade de lacunas | stream + 1 min | `meme_tokens`, `meme_curve_snapshots`, `meme_features_1m`, `meme_ingest_gaps` | nada — **não publica evento nenhum** |
+
+**Isolamento do meme-worker.** Ele não publica evento, não escreve em nenhuma tabela de
+tenant e nada em `hunter_meme_worker` importa `packages/risk-core`, `hunter_core.execution` ou o
+caminho de execução: o corte do T4.2 é **monitoramento** (`docs/plans/T4-MEME-RADAR.md` §0 — não
+existe hoje um `MarketLiquidity` que descreva honestamente profundidade numa bonding curve, e
+forçar um adapter de execução ali repetiria, no pior lugar, o erro que o Risk Engine já baniu no
+book SPOT). É também o único worker que não sobe num `up` comum: `profiles: [meme]` no compose e
+`MEME_ENABLED` como segundo interruptor, porque o PumpPortal serve **uma** conexão por cliente.
 
 **Isolamento do execution-worker.** É o único processo que, no futuro, terá acesso a chaves descriptografadas de exchange. Ele não expõe HTTP além de `/health`. O `api` nunca descriptografa chaves.
 
@@ -256,7 +267,8 @@ project-hunter/
 │   ├── scanner-worker/    hunter_scanner_worker/ (feature_runner.py, anomaly_runner.py, regime_runner.py, opportunity_runner.py)
 │   ├── strategy-worker/   hunter_strategy_worker/(agent_runner.py, proposal_builder.py, risk_gate.py)
 │   ├── execution-worker/  hunter_execution_worker/(paper.py, shadow.py, position_manager.py, mtm.py)
-│   └── analytics-worker/  hunter_analytics_worker/(stats.py, outcomes.py, retention.py, equity.py)
+│   ├── analytics-worker/  hunter_analytics_worker/(stats.py, outcomes.py, retention.py, equity.py)
+│   └── meme-worker/       hunter_meme_worker/    (tracker.py, features.py, collect.py, discovery.py, repo.py)
 ├── packages/
 │   ├── core/              hunter_core     # settings, db (models, session, RLS), redis, events (envelopes, streams),
 │   │                                      # domain (enums, value objects), strategies base, execution base, audit, logging, worker runtime

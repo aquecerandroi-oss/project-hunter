@@ -19,6 +19,7 @@ members = [
   "services/strategy-worker",
   "services/execution-worker",
   "services/analytics-worker",
+  "services/meme-worker",
 ]
 
 [tool.uv.sources]
@@ -32,6 +33,7 @@ hunter-scanner-worker = { workspace = true }
 hunter-strategy-worker = { workspace = true }
 hunter-execution-worker = { workspace = true }
 hunter-analytics-worker = { workspace = true }
+hunter-meme-worker = { workspace = true }
 
 [dependency-groups]
 dev = [

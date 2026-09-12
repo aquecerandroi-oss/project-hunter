@@ -170,6 +170,14 @@ class BreadthHealth:
     def stale(self, *, now: datetime) -> bool:
         return self.last_minute is None or ensure_utc(now) - self.last_minute > STALE_AFTER
 
+    def describe(self, now: datetime) -> str:
+        """One line for ``/status``, byte for byte the string ``main`` built inline
+        until T3.90: the word an operator acts on, or the universe that answered.
+        Moved here so the four series producers publish their detail the same way
+        (``BetaHealth.describe``, ``RegimeHealth.describe``,
+        ``DispersionHealth.describe``) instead of one of them being a lambda."""
+        return "stale" if self.stale(now=now) else f"universe {self.universe_size}"
+
 
 def _inputs(exchange: str, spec: BreadthSpec, universe_as_of: datetime) -> str:
     """The knobs stored next to the result, in the canonical form.

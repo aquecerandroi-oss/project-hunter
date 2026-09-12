@@ -38,7 +38,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0019_market_breadth"
+HEAD_REVISION = "0021_meme_radar"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -58,6 +58,12 @@ LAB_SIGNALS_INDEXES_REVISION = "0014_lab_signals_indexes"
 RUNTIME_LOGIN_ROLE_REVISION = "0015_runtime_login_role"
 EXCHANGE_STATUS_REVISION = "0016_exchange_status_planned"
 ELIGIBILITY_POLICY_REVISION = "0017_eligibility_policy"
+BREADTH_REVISION = "0019_market_breadth"
+"""Named for the same reason as the line below: the two ``0019`` tests are about
+reversing **0019**, and ``"-1"`` stopped meaning that the day a revision landed on
+top of it. They now stage the database at this revision first, exactly as every
+older revision's tests already do."""
+
 REPLAY_SLICE_REVISION = "0018_replay_runs_slice_markets"
 """Named because three tests below are about what reversing **0018** does.
 
@@ -521,10 +527,13 @@ async def test_every_partitioned_parent_has_its_initial_partitions(engine: Async
     frozen_range: tuple[str, ...] = partitions.PARTITIONED_TABLES
     frozen_list: tuple[tuple[str, tuple[str, ...], str], ...] = partitions.LIST_PARTITIONED_TABLES
 
-    assert set(frozen_range) == set(partitioned_tables()), (
+    meme_range: tuple[str, ...] = migration_ddl("meme_radar").MEME_PARTITIONED_TABLES_0021
+    assert set(frozen_range) | set(meme_range) == set(partitioned_tables()), (
         "a model gained or lost a RANGE postgresql_partition_by without a "
-        "migration updating ddl.partitions.PARTITIONED_TABLES"
+        "migration updating ddl.partitions.PARTITIONED_TABLES (0001) or "
+        "ddl.meme_radar.MEME_PARTITIONED_TABLES_0021"
     )
+    assert not set(frozen_range) & set(meme_range), "a parent is frozen in two revisions"
     assert {name: (values, key) for name, values, key in frozen_list} == {
         name: (values, key) for name, (_column, values, key) in list_partitioned_tables().items()
     }, (
@@ -538,11 +547,12 @@ async def test_every_partitioned_parent_has_its_initial_partitions(engine: Async
         )
         present = {row[0] for row in result}
 
+    meme_months: tuple[tuple[int, int], ...] = migration_ddl("meme_radar").MEME_INITIAL_MONTHS_0021
     expected = {
         partition_name(table, year, month)
         for table in frozen_range
         for year, month in initial_months
-    }
+    } | {partition_name(table, year, month) for table in meme_range for year, month in meme_months}
     for parent, values, _key in frozen_list:
         for value in values:
             intermediate = list_partition_name(parent, value)
@@ -3815,9 +3825,13 @@ def test_0019_refuses_a_downgrade_that_would_lose_a_reading(upgraded: str) -> No
     exchange_id = asyncio.run(_write_exchange(upgraded, f"br-{uuid.uuid4().hex[:8]}", "active"))
     _write_reading(upgraded, exchange_id)
     try:
+        # Stage at 0019 first — the pattern every older revision's tests use, and
+        # necessary since 0020/0021 landed on top: ``"-1"`` from the head reverses
+        # *them*, and this test is about what reversing **0019** refuses to do.
+        command.downgrade(config, BREADTH_REVISION)
         with pytest.raises(DBAPIError, match="market_breadth readings exist"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == BREADTH_REVISION, "the downgrade must not commit"
         assert asyncio.run(_relation_exists(upgraded, "market_breadth")), (
             "a refused downgrade must leave the table exactly where it was"
         )
@@ -3840,6 +3854,7 @@ def test_0019_reverses_on_a_database_that_never_read_the_universe(upgraded: str)
     scanner unable to write and nothing else would say so.
     """
     config = alembic_config(upgraded)
+    command.downgrade(config, BREADTH_REVISION)
     command.downgrade(config, "-1")
     try:
         assert asyncio.run(_revision(upgraded)) == REPLAY_SLICE_REVISION
@@ -3892,3 +3907,262 @@ def test_every_revision_id_fits_the_alembic_version_column() -> None:
         ids.append(revision_id)
     assert len(ids) == len(set(ids)), "two revision files declare the same id"
     assert ids[-1] == HEAD_REVISION, "the newest revision file is not the head these tests assert"
+
+
+# ---------------------------------------------------------------------------
+# 0021_meme_radar — the pump.fun storage, and what a downgrade may not lose
+# ---------------------------------------------------------------------------
+
+MEME_TABLES = (
+    "meme_curve_snapshots",
+    "meme_features_1m",
+    "meme_ingest_gaps",
+    "meme_tokens",
+    "meme_trades",
+)
+
+_A_TOKEN = (
+    "INSERT INTO meme_tokens (mint, first_seen_source, first_seen_at, last_seen_at) "
+    "VALUES (:mint, 'pumpportal_ws', now(), now())"
+)
+
+_RETENTION_MARKER = ("SET LOCAL app.meme_retention = 'on'", {})
+
+
+def test_0021_keeps_the_meme_tables_global_and_free_of_policies(upgraded: str) -> None:
+    """The absence is **asserted**, not assumed (§25.5's rule).
+
+    "Needs no policy" and "somebody forgot the policy" are indistinguishable from
+    outside, and a tenant column appearing on one of these tables later would make
+    RLS mandatory — this is the test that forces that conversation instead of
+    letting the column arrive quietly.
+    """
+    tenant_columns = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT table_name || '.' || column_name FROM information_schema.columns "
+            "WHERE table_schema = 'public' AND column_name = 'organization_id' "
+            "AND table_name LIKE 'meme%'",
+            {},
+        )
+    )
+    assert tenant_columns == []
+    policies = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT c.relname FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid "
+            "WHERE c.relname LIKE 'meme%'",
+            {},
+        )
+    )
+    assert policies == []
+
+
+def test_0021_grants_read_to_the_api_and_append_to_the_worker(upgraded: str) -> None:
+    """Four append-only tables, one upsert table, and ``SELECT`` for the API.
+
+    ``meme_tokens`` is the single exception and a deliberate one: retention cannot
+    drop a partition of a table keyed on the mint, so the worker has ``DELETE``
+    there — gated by ``app.meme_retention`` in a trigger, the ``feature_baselines``
+    precedent (§17.2).
+    """
+    for table in ("meme_curve_snapshots", "meme_features_1m", "meme_ingest_gaps", "meme_trades"):
+        assert asyncio.run(_table_privileges(upgraded, "hunter_worker", table)) == {
+            "SELECT",
+            "INSERT",
+        }, f"{table} is not append-only for the engine"
+        assert asyncio.run(_table_privileges(upgraded, "hunter_app", table)) == {"SELECT"}
+    assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_tokens")) == {
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+    }
+    assert asyncio.run(_table_privileges(upgraded, "hunter_app", "meme_tokens")) == {"SELECT"}
+    assert asyncio.run(_table_privileges(upgraded, "hunter_app", "meme_radar_features_v1")) == {
+        "SELECT"
+    }
+
+
+def test_0021_hardens_every_meme_partition_it_created(upgraded: str) -> None:
+    """Access goes through the parent: Postgres checks a query naming a child
+    against the **child's** privileges, which is how ``DELETE FROM
+    audit_logs_2026_09`` once got through (§15.6)."""
+    meme = migration_ddl("meme_radar")
+    parents = cast("tuple[str, ...]", meme.MEME_PARTITIONED_TABLES_0021)
+    months = cast("tuple[tuple[int, int], ...]", meme.MEME_INITIAL_MONTHS_0021)
+    children = [f"{parent}_{year:04d}_{month:02d}" for parent in parents for year, month in months]
+    assert len(children) == 12
+
+    present = set(
+        asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT relname FROM pg_class WHERE relispartition AND relkind = 'r' "
+                "AND relname LIKE 'meme%'",
+                {},
+            )
+        )
+    )
+    assert set(children) <= present
+    for child in children:
+        assert asyncio.run(_table_privileges(upgraded, "hunter_worker", child)) == set(), child
+        assert asyncio.run(_table_privileges(upgraded, "hunter_app", child)) == set(), child
+
+
+def test_0021_generates_the_market_cap_and_a_zero_reserve_is_not_an_outage(
+    upgraded: str,
+) -> None:
+    """§15.8 kept intact: a feed's zero yields a NULL market cap, not a failed
+    insert. A plain division would raise inside the statement, which is worse than
+    the CHECK that section refuses to put on market data."""
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (
+                    "INSERT INTO meme_curve_snapshots (observed_at, mint, source, "
+                    "virtual_sol_reserves, virtual_token_reserves, real_sol_reserves, "
+                    "real_token_reserves, total_supply, complete) VALUES "
+                    "('2026-10-05T12:00:00Z', 'MCAP', 'solana_rpc', 30, 1073000000, 0, "
+                    "793100000, 1000000000, false), "
+                    "('2026-10-05T12:00:00Z', 'ZERO', 'solana_rpc', 30, 0, 0, 0, "
+                    "1000000000, true)",
+                    {},
+                )
+            ],
+        )
+    )
+    try:
+        values = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT coalesce(mcap_sol::text, 'null') FROM meme_curve_snapshots "
+                "WHERE mint IN ('MCAP', 'ZERO') ORDER BY mint",
+                {},
+            )
+        )
+        assert values[0].startswith("27.95899347"), values
+        assert values[1] == "null"
+    finally:
+        asyncio.run(
+            _write(
+                upgraded,
+                [("DELETE FROM meme_curve_snapshots WHERE mint IN ('MCAP', 'ZERO')", {})],
+            )
+        )
+
+
+def test_0021_refuses_a_downgrade_that_would_lose_discovery(upgraded: str) -> None:
+    """§17.7: reversing is allowed, losing evidence is not.
+
+    Discovery is the one thing here that cannot be recovered after the fact: the
+    PumpPortal feed is ephemeral and the REST mirror only lists what is recent, so
+    the universe of creations every graduation and rug rate is counted against
+    stops existing the moment the rows do.
+    """
+    config = alembic_config(upgraded)
+    asyncio.run(_write(upgraded, [(_A_TOKEN, {"mint": "GUARD_MINT"})]))
+    try:
+        with pytest.raises(DBAPIError, match="meme_tokens rows exist"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_relation_exists(upgraded, "meme_tokens")), (
+            "a refused downgrade must leave the schema exactly where it was"
+        )
+    finally:
+        command.upgrade(config, "head")
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    _RETENTION_MARKER,
+                    ("DELETE FROM meme_tokens WHERE mint = :mint", {"mint": "GUARD_MINT"}),
+                ],
+            )
+        )
+    command.check(config)
+
+
+def test_0021_reverses_on_a_database_that_never_watched_a_mint(upgraded: str) -> None:
+    """The round trip an operator runs to roll a deploy back, over a database that
+    trips no guard — and what comes back is checked, because "the tables returned"
+    and "the tables returned with their grants and their view" are different
+    facts."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) != HEAD_REVISION
+        for table in MEME_TABLES:
+            assert not asyncio.run(_relation_exists(upgraded, table)), table
+        assert not asyncio.run(_relation_exists(upgraded, "meme_radar_features_v1"))
+        assert not asyncio.run(_trigger_exists(upgraded, "meme_tokens_identity_is_written_once"))
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    for table in MEME_TABLES:
+        assert asyncio.run(_relation_exists(upgraded, table)), table
+    assert asyncio.run(_relation_exists(upgraded, "meme_radar_features_v1"))
+    assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_features_1m")) == {
+        "SELECT",
+        "INSERT",
+    }
+    command.check(config)
+
+
+def test_0021_freezes_an_identity_and_still_lets_the_lifecycle_move(upgraded: str) -> None:
+    """The trigger is the lock, not the grant: ``UPDATE`` is granted because a
+    token's lifecycle genuinely moves, and what keeps that from becoming a rewrite
+    of history is a refusal that applies to **every** role, owner included — which
+    is what this test runs as."""
+    asyncio.run(_write(upgraded, [(_A_TOKEN, {"mint": "FREEZE_MINT"})]))
+    try:
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        "UPDATE meme_tokens SET name = 'First', mayhem_state = 'active' "
+                        "WHERE mint = :mint",
+                        {"mint": "FREEZE_MINT"},
+                    )
+                ],
+            )
+        )
+        with pytest.raises(DBAPIError, match="written once"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [
+                        (
+                            "UPDATE meme_tokens SET name = 'Second' WHERE mint = :mint",
+                            {"mint": "FREEZE_MINT"},
+                        )
+                    ],
+                )
+            )
+        with pytest.raises(DBAPIError, match="declaring retention"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [("DELETE FROM meme_tokens WHERE mint = :mint", {"mint": "FREEZE_MINT"})],
+                )
+            )
+        states = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT name || '/' || mayhem_state FROM meme_tokens WHERE mint = :mint",
+                {"mint": "FREEZE_MINT"},
+            )
+        )
+        assert states == ["First/active"], "the lifecycle stopped moving with the freeze"
+    finally:
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    _RETENTION_MARKER,
+                    ("DELETE FROM meme_tokens WHERE mint = :mint", {"mint": "FREEZE_MINT"}),
+                ],
+            )
+        )

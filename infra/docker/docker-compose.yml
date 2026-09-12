@@ -597,6 +597,75 @@ services:
       start_period: 60s
       retries: 5
 
+  # Meme Radar (docs/plans/T4-MEME-RADAR.md, task T4.2). Consumes PumpPortal's
+  # two free channels (new token, migration), polls the pump.fun curve state
+  # inside its measured 60 req/60 s budget, reconciles the largest tracked mints
+  # against a Solana RPC and folds one meme_features_1m row per closed minute.
+  #
+  # `profiles: [meme]` — it does not come up with a bare `docker compose up`, and
+  # that is the point twice over: it is the only service that talks to two
+  # third-party endpoints nobody in this project operates, and PumpPortal serves
+  # **one connection per client** (several can earn an hourly ban, T4.0 §2), so
+  # this is a singleton by construction. Start it with:
+  #
+  #   docker compose --profile meme up -d meme-worker
+  #
+  # `MEME_ENABLED` is a second switch, deliberately: the profile decides whether
+  # the *container* exists, the flag decides whether it *collects*. A disabled
+  # radar still serves /health, /ready and /metrics and says "disabled" in the
+  # readiness body — a switched-off collector has to be visibly off, not
+  # indistinguishable from a broken one.
+  #
+  # `SOLANA_RPC_URL` comes from the environment and needs no key: unset, the
+  # adapter falls back to the public endpoint (~10 req/s *and* 40 calls per
+  # method/10 s, which is why only the top-K by market cap are reconciled). A
+  # keyed provider is Everton's decision, not a default this file makes (T4.0 §8
+  # decision 3: approve a spend ceiling and a degradation policy first).
+  #
+  # It places no orders and touches no portfolio: nothing in hunter_meme_worker
+  # imports risk-core, hunter_core.execution or the execution path, and
+  # `hunter_app` has SELECT and nothing else on all five meme tables.
+  meme-worker:
+    image: hunter-api:${GIT_SHA:-dev}
+    profiles: [meme]
+    # security-reviewer, T3.28a finding 3 (T3.28d) -- see market-worker above.
+    cap_drop: [NET_RAW, NET_ADMIN]
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: meme
+      HEALTH_PORT: "8001"
+      MEME_ENABLED: ${MEME_ENABLED:-false}
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
+      MEME_RETENTION_DAYS: ${MEME_RETENTION_DAYS:-90}
+      MEME_TRACKED_MINTS_MAX: ${MEME_TRACKED_MINTS_MAX:-120}
+      # Its own (small) pool: four loops, one transaction each at a time, and a
+      # per-frame upsert on the discovery loop. 2 + 2 is measured headroom over
+      # that, not a guess about concurrency this process does not have.
+      DB_POOL_SIZE: "2"
+      DB_MAX_OVERFLOW: "2"
+    env_file:
+      - path: ../../.env
+        required: false
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    # One readiness check (`discovery_connected`): the PumpPortal socket is
+    # connected. Deliberately *not* "a token arrived recently" — pump.fun has
+    # genuinely quiet stretches and T4.1's acceptance criterion separates the two;
+    # staleness is a status *detail* (`last_event_age_s`), which an operator reads
+    # without it turning into a restart loop.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://localhost:8001/ready', timeout=25); raise SystemExit(0 if response.status == 200 else 1)"]
+      interval: 15s
+      timeout: 30s
+      start_period: 90s
+      retries: 5
+
   web:
     build:
       context: ../..

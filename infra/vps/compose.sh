@@ -132,6 +132,25 @@ if [ "$MARKET_SPOT" = "1" ]; then
   PROFILE_ARGS+=(--profile spot)
 fi
 
+# T4.2 - MEME=1 adiciona o perfil `meme` (meme-worker, o radar da pump.fun).
+# Mesmo padrao e mesmo motivo do MARKET_SPOT acima: mora no ambiente do
+# comando, nunca no .env, para que ligar um coletor que fala com dois
+# endpoints de terceiros fique visivel em cada deploy.
+#
+# Sem isto NAO daria para so subir na mao uma vez: `up`/`update` rodam com
+# `--remove-orphans`, entao um `compose.sh update` sem o perfil DERRUBARIA o
+# meme-worker que alguem tinha subido com `docker compose --profile meme up`.
+# O interruptor e o que torna "o radar sobrevive ao proximo deploy" verdade.
+#
+#   MEME=1 MEME_ENABLED=true bash infra/vps/compose.sh update
+#
+# `MEME=1` sozinho sobe o container com o coletor DESLIGADO (MEME_ENABLED
+# default false): /health, /ready e /metrics no ar, nada coletado.
+MEME="${MEME:-0}"
+if [ "$MEME" = "1" ]; then
+  PROFILE_ARGS+=(--profile meme)
+fi
+
 # GIT_SHA resolvido para TODO subcomando, nao so up/update: docker-compose.yml
 # usa `image: hunter-api:${GIT_SHA:-dev}`, e `up`/`update` sao o unico lugar
 # que builda e taggeia a imagem com o SHA do commit deployado. Qualquer outro

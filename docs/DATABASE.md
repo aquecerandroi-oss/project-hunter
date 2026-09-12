@@ -67,6 +67,9 @@ O servidor roda com `statement_timeout = 0` / `lock_timeout = 0` (sem prazo) —
 | `portfolio_equity_snapshots` | LIST por `resolution`, depois RANGE por `ts`, mensal | 1m: 30 d · demais: sem limite | idem |
 | `audit_logs` | mensal | sem limite | — |
 | `system_events` | mensal | 30 d | idem |
+| `meme_curve_snapshots` | mensal | `MEME_RETENTION_DAYS` (90 d) | idem |
+| `meme_features_1m` | mensal | idem | idem |
+| `meme_trades` | mensal | idem | idem |
 | `outbox_events` | — | despachadas há mais de **7 d** (`dispatched_at IS NOT NULL AND dispatched_at < now() - interval '7 days'`); pendentes **nunca** são apagadas | `analytics-worker` diário, DELETE em lotes (M5) |
 | `shadow_outbox` | — | idem, enquanto a fila existir (§17.5 a absorve) | idem |
 
@@ -112,7 +115,7 @@ O job em si é do analytics-worker e chega no **M5**; até lá a função pura e
 tem teste e não é chamada por ninguém em produção — registrado aqui para que a
 lacuna seja um item de plano e não uma descoberta.
 
-**Duas formas de partição.** Seis tabelas são RANGE mensal simples (`audit_logs_2026_09`). `candles` e `portfolio_equity_snapshots` são particionadas primeiro por LIST (`timeframe` / `resolution`) e cada nível desses por RANGE mensal, produzindo folhas como `candles_1m_2026_09`. O motivo é a própria coluna "Retenção": as retenções diferem por timeframe, e com uma única RANGE mensal expirar 1m aos 90 dias exigiria `DELETE` linha a linha dentro de partições que também guardam o 1h que se mantém para sempre — reescrevendo e inchando exatamente os dados que queremos preservar. Com o nível LIST, expirar é `DROP TABLE candles_1m_2026_05`.
+**Duas formas de partição.** Nove tabelas são RANGE mensal simples (`audit_logs_2026_09`) — as seis da `0001` mais as três da `0021` (§33). `candles` e `portfolio_equity_snapshots` são particionadas primeiro por LIST (`timeframe` / `resolution`) e cada nível desses por RANGE mensal, produzindo folhas como `candles_1m_2026_09`. O motivo é a própria coluna "Retenção": as retenções diferem por timeframe, e com uma única RANGE mensal expirar 1m aos 90 dias exigiria `DELETE` linha a linha dentro de partições que também guardam o 1h que se mantém para sempre — reescrevendo e inchando exatamente os dados que queremos preservar. Com o nível LIST, expirar é `DROP TABLE candles_1m_2026_05`.
 
 O nível LIST é criado para **todos** os rótulos de `candle_timeframe`, não só os que a ingestão escreve hoje: uma linha sem partição é recusada, e uma escrita recusada é indisponibilidade, não aviso.
 
@@ -124,7 +127,8 @@ Partições são criadas com 3 meses de antecedência por `infra/scripts/create_
 
 **A promessa vale no mesmo instante**, e é assim que ela é verdadeira (revisão da Astra deste diff). A retenção é contada em dias inteiros, então a expiração de um mês vira à meia-noite UTC: 04:07 → 04:12 não cruza a borda, 23:59 → 00:01 cruza. Um plano montado antes da virada e podado depois pode criar um mês que a poda seguinte derruba — **uma vez**, e o próprio plano do dia seguinte já não o contém. Não é perda de dado: o que é derrubado nesse caso é justamente um mês cuja última linha retida acabou de expirar.
 
-`funding_rates` e `open_interest_history` **não são particionadas** (§4), então backfill de funding e de open interest nunca depende deste job — não há nada a provisionar para elas. `replay_runs` (`0013`, §25) também não é particionada **e não tem retenção**: é o registro de pesquisa, algumas dezenas de linhas por dia no pior caso, e apagá-la por idade seria apagar exatamente a contagem de tentativas que o protocolo de replicação existe para manter. `market_breadth` (`0019`, §31) também não é particionada, por outro motivo: a conta cabe (525 600 linhas/ano **por série**, isto é, por `(exchange, breadth_version, window_minutes)`), e o dia em que não couber é uma revisão que reconstrói a tabela, porque a PK é `id` sozinha (§15.2).
+`funding_rates` e `open_interest_history` **não são particionadas** (§4), então backfill de funding e de open interest nunca depende deste job — não há nada a provisionar para elas. `replay_runs` (`0013`, §25) também não é particionada **e não tem retenção**: é o registro de pesquisa, algumas dezenas de linhas por dia no pior caso, e apagá-la por idade seria apagar exatamente a contagem de tentativas que o protocolo de replicação existe para manter. `meme_tokens` e `meme_ingest_gaps` (`0021`, §33) também não são: a chave da primeira é o **mint**, não um instante — ela não tem mês a derrubar e por isso é podada linha a linha pelo meme-worker, atrás de `app.meme_retention` —, e a segunda é uma linha por buraco, dezenas por dia no pior caso.
+`market_breadth` (`0019`, §31) também não é particionada, por outro motivo: a conta cabe (525 600 linhas/ano **por série**, isto é, por `(exchange, breadth_version, window_minutes)`), e o dia em que não couber é uma revisão que reconstrói a tabela, porque a PK é `id` sozinha (§15.2).
 
 Tudo continua idempotente e sem trava longa: só `CREATE TABLE IF NOT EXISTS ... PARTITION OF` de partições **vazias** (nunca `ATTACH` sobre dados), uma transação por pai, `lock_timeout = 3s`. Os meses para trás são criados no nível que de fato os possui — o nível LIST (`candles_1m`, `candles_5m`, …, `portfolio_equity_snapshots_1m`, …), nunca na raiz —, que é a mesma estrutura LIST-depois-RANGE descrita acima; **não há sub-partição por hash em lugar nenhum do schema**. O planejamento mora em `infra/scripts/partition_plan.py` — `create_partitions.py` passou de 341 para além do orçamento de 350 linhas com esta mudança e o *plano* saiu do *executor*; o script reexporta `planned_groups`/`planned_statements`, que são o que os testes carregam por caminho.
 
@@ -5625,3 +5629,311 @@ das quatro colunas como `Index Cond`; com estatísticas reais ele resolve a venu
 primeiro (uma linha em `exchanges`) e as quatro viram condição de índice. Em
 nenhum dos dois casos há `Seq Scan`, e é por isso que a asserção do teste é sobre
 o **nome do índice**, não sobre a forma do *join*.
+
+## 33. O radar de memecoins vira schema — M4 (`0021_meme_radar`)
+
+Vigésima primeira revisão. **Cinco tabelas** (três delas `RANGE` mensal), seis
+índices, **uma visão**, dois gatilhos e grants por subtração. Nenhum enum,
+nenhuma política de RLS, nenhuma coluna acrescentada a tabela existente.
+
+> **§32 é da `0020_market_dispersion`** (T3.90, em voo enquanto isto é escrito).
+> O número está reservado pelo docstring daquela revisão; esta seção pula para
+> 33 em vez de disputar a numeração.
+
+Ela entrega o T4.2 sobre o adapter da T4.1
+(`packages/exchange-adapters/hunter_exchanges/pumpfun/`), o plano
+`docs/plans/T4-MEME-RADAR.md` e as correções da Astra
+(`.claude/state/notes-A4.1b-mayhem.md`). O contrato de leitura foi congelado
+**antes** do código, em `.claude/state/notes-T4.2.md` §contrato, para a T4.3
+(API + web) construir em paralelo.
+
+A frase que organiza tudo abaixo: **ausência de fonte não é zero, e o schema é
+onde isso deixa de depender de quem escreve a consulta.**
+
+### 33.1 Global, sem RLS — e a ausência é asserida
+
+As cinco tabelas são **globais** (§1.1): um token on-chain pertence à cadeia, não
+a uma organização. Sem `organization_id`, portanto sem política — a forma que
+`markets`, `market_regimes`, `market_breadth` e `market_dispersion` já têm.
+
+A ausência é **provada**, não suposta, no padrão que a §25.5 fixou para
+`replay_runs`: `test_migrations.py::test_0021_keeps_the_meme_tables_global_and_free_of_policies`
+e `test_schema_privileges.py::test_the_meme_tables_are_global_and_carry_no_tenant_column`
+contam zero em `information_schema.columns` (para `organization_id`) e zero em
+`pg_policy`. "Não precisa de política" e "alguém esqueceu a política" são
+indistinguíveis de fora, e uma coluna de tenant aparecendo aqui um dia passa a
+exigir RLS — o teste é o que obriga a conversa.
+
+### 33.2 As cinco tabelas
+
+```
+meme_tokens                                  (global, não particionada)
+  mint text PK
+  name, symbol, uri, creator                 -- todos ANULÁVEIS: NULL = não observado
+  created_at, bonding_curve
+  initial_virtual_sol_reserves, initial_virtual_token_reserves NUMERIC(28,10)
+  initial_real_token_reserves NUMERIC(28,10) -- o denominador do progresso
+  total_supply NUMERIC(28,10), pool
+  mayhem_enabled boolean NULL                -- NULL = desconhecido, nunca DEFAULT false
+  mayhem_mode, mayhem_state                  -- dois eixos, não um
+  completed_at, migrated_at, migrated_pool   -- dois eventos, não um
+  first_seen_source, first_seen_at, last_seen_at, updated_at  (NOT NULL)
+  INDEX (created_at), INDEX (first_seen_at)
+  CHECKs: rótulos de mayhem; `mayhem_enabled IS FALSE` proíbe `mayhem_state`;
+          `migrated_at` exige `migrated_pool`; identidade observada não é string vazia
+
+meme_curve_snapshots            PARTITION BY RANGE (observed_at), mensal
+  PK (observed_at, mint, source)
+  received_at, virtual_*/real_* reserves, total_supply, complete,
+  mcap_sol NUMERIC(28,10) GENERATED ALWAYS AS
+      ((virtual_sol_reserves / NULLIF(virtual_token_reserves,0)) * total_supply) STORED,
+  slot, commitment, mayhem_enabled/state/mode
+  INDEX (mint, observed_at)
+
+meme_trades                     PARTITION BY RANGE (block_time), mensal
+  PK (block_time, signature, event_index)
+  mint, slot, received_at, outer_ix_index, inner_ix_index, trader, side,
+  sol_lamports bigint, token_amount, price, quote_mint, token_decimals,
+  commitment, is_mayhem_agent boolean NULL, source
+  INDEX (mint, block_time)
+
+meme_features_1m                PARTITION BY RANGE (end_time), mensal
+  PK (end_time, mint, features_version)
+  curve_progress_pct + progress_reason, mcap_sol + curve_reason,
+  unique_buyers + reason, buy_sell_ratio + reason,
+  top10_share + reason, creator_sold + reason,
+  age_minutes, coverage NOT NULL, snapshot_observed_at, snapshot_source, computed_at
+  INDEX (mint, end_time)
+  seis CHECKs bicondicionais: valor nulo ⟺ motivo não nulo
+
+meme_ingest_gaps                             (global, append-only)
+  id uuid7 PK, stream, mint NULL, gap_start, gap_end, detected_at, reason,
+  generation, detail jsonb
+  INDEX (stream, gap_start)
+```
+
+### 33.3 Três particionadas, com a conta escrita
+
+O limiar do §1.3 é **1 M linhas/ano** (a mesma régua que a §31 aplica a
+`market_breadth`):
+
+| tabela | teto | por quê |
+|---|---|---|
+| `meme_curve_snapshots` | 60 linhas/min ≈ **31 M/ano** | o orçamento REST grátis **é** 60 req/60 s, então esse é o teto físico do poller |
+| `meme_features_1m` | 120 mints × 1 440 min ≈ **63 M/ano** | uma linha por mint rastreado por minuto fechado, no teto padrão |
+| `meme_trades` | ilimitado por transação | sem produtor hoje, e o §15.2 faz de "particionar depois" uma **reconstrução** da tabela |
+| `meme_tokens` | ~40 mil/dia, podada por linha | a chave é o mint, não um instante: não há partição mensal a criar |
+| `meme_ingest_gaps` | uma linha por buraco | dezenas por dia no pior caso |
+
+**`meme_features_1m` particionada é desvio declarado em relação ao brief**, que a
+deixava de fora: com 63 M linhas/ano ela seria a maior tabela não particionada do
+schema por duas ordens de grandeza, e a retenção nela seria um `DELETE` de dezenas
+de milhões de linhas em vez de um `DROP` — exatamente a troca que o §1.3 faz por
+`candles`.
+
+Toda coluna de partição é a **primeira da PK** (§15.2), e em `meme_features_1m`
+ela é também a ordem de leitura do Radar: "o último minuto fechado em todos os
+mints" é varredura por prefixo, nunca um `sort`.
+
+As doze partições iniciais (2026-09 a 2026-12) são fixas pelo mesmo motivo do
+§15.5 — uma migração reaplicada no futuro tem de produzir o mesmo schema — e são
+criadas já endurecidas (`REVOKE ALL` nos dois papéis; não há metade de tenant a
+instalar, porque as pais são globais). Daí em diante quem cria é
+`infra/scripts/create_partitions.py`, que **já as planeja sem uma linha nova**:
+ele deriva os pais dos modelos (`monthly_partition_parents()`).
+
+### 33.4 Retenção: 90 dias, e a mesma janela para graduado e não graduado
+
+`MEME_RETENTION_DAYS` (`Settings.meme_retention_days`, padrão 90) entra em
+`infra/scripts/partition_retention.py` para os **três** pais particionados, que
+são podados por `DROP` de mês inteiro — razão pela qual nenhum dos dois papéis tem
+`DELETE` neles.
+
+A janela é **idêntica para mints graduados e não graduados**, e isso é decisão
+registrada (T4-MEME-RADAR.md §8, decisão 2): a proposta original — guardar tudo 30
+dias e depois só os `complete = true` — foi **rejeitada pela revisão da Astra**,
+porque selecionar por sucesso depois do fato apaga os controles e cria
+sobrevivência seletiva no próprio dado histórico, contaminando qualquer análise
+futura sobre o que separa um rug de uma graduação.
+
+`meme_tokens` é a exceção estrutural: a chave é o mint, então não há partição a
+derrubar. Ela é podada **linha a linha**, em lotes, pelo meme-worker — e por isso
+é a única tabela desta revisão em que `hunter_worker` tem `DELETE` (§33.6).
+
+### 33.5 O que é NULL com motivo, e por que isso é o produto
+
+Quatro colunas de `meme_features_1m` são **NULL com motivo em toda linha que esta
+fatia escreve**, e isso fecha o MUST-FIX 1 da Astra — "ausência de feed lida como
+'ninguém comprou' ou 'o dev não vendeu'" era o erro mais grave do desenho
+original:
+
+| coluna | motivo hoje | o que falta |
+|---|---|---|
+| `unique_buyers`, `buy_sell_ratio` | `no_trade_feed` | o canal de trades do PumpPortal é pago (0,01 SOL/10 000 eventos) e o decodificador on-chain é a T4.2b |
+| `top10_share`, `creator_sold` | `no_holders_reader` | ninguém lê holders ainda; quando ler, tem de agregar **por owner** e excluir a curva, o pool e endereços de burn, senão o próprio programa aparece como top holder |
+
+Os seis CHECKs bicondicionais (`valor IS NULL` ⟺ `motivo IS NOT NULL`) são o
+precedente do `no_entry_reason` (§16.2) seis vezes: não existe linha com valor
+ausente e sem motivo, nem linha com valor **e** motivo.
+
+**`curve_reason` e `progress_reason` são dois, e a separação é uma correção feita
+ao escrever o produtor** (`.claude/state/notes-T4.2.md` §contrato, emenda 1). Com
+um motivo só, um mint cujo snapshot chegou mas cujo
+`initial_real_token_reserves` nunca foi observado tinha **mcap conhecido** e
+**progresso desconhecido** — e a bicondicional única obrigaria o coletor a jogar
+fora um número real para caber no CHECK. Duas ausências com duas causas ganham
+dois motivos.
+
+`age_minutes` é anulável **sem** coluna de motivo, e isso é decisão: a única causa
+é `meme_tokens.created_at` desconhecido, e a linha do token já diz isso — uma
+sexta coluna de motivo seria a segunda verdade do §19.3.
+
+Vocabulário congelado (a T4.3 renderiza estes e só estes):
+`no_trade_feed`, `no_holders_reader`, `denominator_unknown`, `not_polled`,
+`rate_limited`, `insufficient_coverage`, `unsupported_quote`.
+
+### 33.6 Grants: leitura para a API, acréscimo para o motor, e uma exceção
+
+| Classe (congelada em `ddl/meme_radar.py`) | Papel | Privilégios | Tabelas |
+|---|---|---|---|
+| `MEME_APP_READ_ONLY_TABLES` | `hunter_app` | `SELECT` | as cinco |
+| `MEME_WORKER_APPEND_TABLES` | `hunter_worker` | `SELECT`/`INSERT` | snapshots, trades, features, gaps |
+| `MEME_WORKER_UPSERT_TABLES` | `hunter_worker` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` | `meme_tokens` |
+
+As quatro append-only são a forma de `replay_runs`/`market_breadth`/
+`market_dispersion` (§25.4, §31): **imutabilidade por privilégio, não por
+gatilho**, porque não existe `UPDATE` legal nelas — um segundo olhar no mesmo
+instante da mesma fonte é a *mesma* linha (a PK diz isso).
+
+`meme_tokens` é a única exceção, e as duas metades dela têm dono:
+
+- **`UPDATE`** porque o ciclo de vida de um token de fato se move depois da
+  descoberta (conclusão, migração, o estado do agente Mayhem). O que impede isso
+  de virar reescrita de história **não é o grant, é o gatilho**:
+  `meme_tokens_identity_is_written_once` recusa alterar qualquer identidade ou
+  carimbo já conhecido, **para todo papel, dono incluído** — a fechadura mais
+  forte das duas, o argumento do `feature_baselines_immutable` (§17.2). `NULL` →
+  valor é permitido **uma vez**;
+- **`DELETE`** porque esta é a tabela que a retenção não poda por partição, e ~40
+  mil mints novos por dia não é algo que alguém guarde para sempre. O precedente é
+  `ANALYSIS_WORKER_APPEND_TABLES` (§17.6), e como lá a exclusão é **declarada**:
+  `meme_tokens_retention_is_declared` recusa todo `DELETE` sem
+  `SET LOCAL app.meme_retention = 'on'`. O marcador é **isolamento, não
+  autorização** (a correção do §18.8: um `SET LOCAL` que qualquer um escreve não
+  autentica ninguém) — o que ele compra é que apagar histórico de descoberta seja
+  um ato, não um acidente.
+
+Nenhuma classe nova e nenhuma tabela reclassificada:
+`test_schema_privileges.py::test_the_grant_lists_cover_every_table_exactly_once`
+une esta lista às anteriores e a partição do schema continua exata. Provado **como
+o papel**, não perguntado ao catálogo:
+`test_the_worker_appends_a_meme_observation_and_can_never_edit_it` e
+`test_the_api_role_reads_the_meme_radar_and_writes_none_of_it`.
+
+### 33.7 `mcap_sol` é gerado pelo banco, e o `NULLIF` é o §15.8 intacto
+
+```sql
+mcap_sol numeric(28,10) GENERATED ALWAYS AS
+  ((virtual_sol_reserves / NULLIF(virtual_token_reserves, 0)) * total_supply) STORED
+```
+
+Nenhum produtor escreve essa coluna. Uma cópia calculada pelo escritor poderia
+discordar das reservas ao lado dela, e "uma cópia que pode discordar da fonte é
+pior que nenhuma cópia" (§18.2, o precedente é
+`portfolio_currency_anchor_matches_observation`).
+
+O `NULLIF` é o que mantém a regra do §15.8 (tabelas de market data não levam CHECK
+de domínio, porque "um feed emite ocasionalmente um zero, e um CHECK ali
+transformaria um dado estranho em falha de ingestão"): uma divisão crua faria
+**pior** que um CHECK — levantaria `division by zero` dentro do `INSERT`. Reserva
+zero produz `mcap_sol NULL` e a linha entra.
+`test_0021_generates_the_market_cap_and_a_zero_reserve_is_not_an_outage` mede as
+duas metades.
+
+E o número é **sempre teórico** (§4 do plano): preço marginal × oferta, nunca o
+que uma venda realizaria — a curva desliza contra o próprio vendedor.
+
+### 33.8 `meme_trades` nasce sem produtor, de propósito
+
+O canal de trades do PumpPortal é pago e o decodificador on-chain é a T4.2b. A
+tabela existe agora para o schema ficar inteiro e para as quatro colunas
+dependentes poderem ser NULL **com motivo** em vez de silenciosamente zero.
+
+A PK é `(block_time, signature, event_index)`, e o `event_index` é o MUST-FIX 2 da
+Astra: chaveado só em `(signature, ts)`, **dois trades dentro da mesma transação
+eram uma linha** e o segundo sumia no `ON CONFLICT DO NOTHING` — o mesmo silêncio
+que custou 24 recibos ao replay da T3.62 (§30). `outer_ix_index`/`inner_ix_index`
+ficam ao lado como procedência; a *chave* é um inteiro só porque um CPI e o log do
+mesmo fill contam uma vez (A4.1b §6).
+
+`is_mayhem_agent` é `boolean NULL`: `NULL` = atribuição incompleta, `false`
+**só** depois de atribuir a operação a outro trader. A A4.1b §5.2 mediu uma compra
+real do agente com `signer: false`, vinda de lookup table — um filtro por fee payer
+a classificaria como orgânica. As três métricas orgânicas só podem ser calculadas
+sobre `is_mayhem_agent IS FALSE`; um `NULL` é cobertura pendente, nunca um trade
+orgânico.
+
+### 33.9 A visão que a API lê
+
+```sql
+CREATE VIEW meme_radar_features_v1 AS
+SELECT f.*, t.name, t.symbol, t.creator, t.created_at AS token_created_at, t.pool,
+       t.mayhem_enabled, t.mayhem_mode, t.mayhem_state, t.completed_at,
+       t.migrated_at, t.migrated_pool, t.first_seen_source, t.last_seen_at
+FROM meme_features_1m f JOIN meme_tokens t ON t.mint = f.mint;
+```
+
+(a lista real de colunas é explícita em `ddl/meme_radar.py`; `f.*` aqui é
+abreviação de leitura). `SELECT` para os dois papéis.
+
+A visão **não filtra tempo nem ordena**, e isso é decisão: quem pagina é o
+chamador, e os predicados descem para a partição do mês (`end_time`) ou para a PK
+(`mint`). Uma visão que embutisse `max(end_time)` viraria varredura a cada
+requisição — por isso "o último minuto" é parâmetro da API, não mágica da visão.
+
+### 33.10 Guardas
+
+**Não há guarda de upgrade, e isso é afirmação** (§19.5, §20.5, §21.4, §24.6,
+§25.6, §30.5): a revisão cria tabelas que não existiam, então não há linha
+guardada que ela possa tornar irrepresentável.
+
+**O downgrade recusa** enquanto qualquer uma das cinco tiver linha (§17.7), cada
+uma com o seu motivo nomeado:
+
+| Guarda | O que se perderia |
+|---|---|
+| `meme_tokens` | o universo de criações contra o qual toda taxa de graduação e de rug é contada — e ele **não é recomputável**: o feed do PumpPortal é efêmero e o espelho REST só lista o que é recente |
+| `meme_curve_snapshots` | ninguém serve o estado que uma curva teve num instante passado; estas linhas são a única cópia |
+| `meme_features_1m` | os snapshots de que saíram expiram na mesma janela de 90 dias, então o fold não é reproduzível depois disso |
+| `meme_trades` | trades decodificados com a atribuição de agente por operação |
+| `meme_ingest_gaps` | uma janela em que ninguém estava ouvindo não é redescobrível depois, e perdê-la transforma um buraco conhecido em continuidade aparente |
+
+Nenhuma apaga nada: contam, nomeiam e param, com a instrução de exportar antes —
+o mesmo limite declarado do §18.9, §24.6, §25.6 e §30.5. Em todo banco de hoje as
+cinco contam zero, que é exatamente por que o round trip passa sem exportar nada.
+
+### 33.11 Trava, pooler e orçamento de nome
+
+**Trava.** `CREATE TABLE` não toma trava em relação que ainda não existe, os
+`GRANT` travam só o catálogo (a medição da `0005`, §15.6) e as doze partições são
+criadas vazias. Esta revisão **não abre janela de manutenção**.
+
+**Pooler.** Nada depende de estado de sessão: cinco `CREATE TABLE`, seis
+`CREATE INDEX`, uma `CREATE VIEW`, doze partições, dois gatilhos e os grants. Sem
+prepared statement de sessão, sem `LISTEN`/`NOTIFY`, sem advisory lock de sessão —
+o único GUC envolvido, `app.meme_retention`, é escrito com `SET LOCAL` e lido com
+`NULLIF(current_setting(..., true), '')`, exatamente como `app.current_org`
+(§15.4).
+
+`0021_meme_radar` tem 15 caracteres; o teto de `alembic_version.version_num`
+continua sendo 32 (§17.6), e desde a §30.7 isso é teste e não prosa.
+
+### 33.12 O que as tarefas vizinhas têm de saber
+
+| Onde | O que muda |
+|---|---|
+| T4.3 (`apps/**`) | o contrato está congelado em `.claude/state/notes-T4.2.md` §contrato: as cinco tabelas, a visão, o vocabulário de motivos e o que **não** se pode assumir (somar volume, contar compradores ou afirmar "o dev não vendeu" — as quatro colunas são NULL com motivo hoje **e em toda linha**) |
+| `services/meme-worker/**` | o único escritor. Consome o WS, respeita o orçamento de 60/60 s, reconcilia o top-K por mcap no RPC, dobra o minuto e poda `meme_tokens` atrás do marcador |
+| `infra/scripts/create_partitions.py` / `prune_partitions.py` | **nada a mudar em código**: os dois derivam os pais dos modelos; `partition_retention.py` ganhou as três linhas de política |
+| `packages/exchange-adapters/**` | nada a mudar. Uma necessidade futura, registrada: o `NormalizedMemeTrade` entrega SOL em unidade humana e `meme_trades.sol_lamports` é inteiro de unidade-base — a conversão (×10⁹, exata, porque SOL tem 9 casas) é do produtor da T4.2b |
+| `packages/risk-core/**`, `services/execution-worker/**` | **nada, e por construção**: nenhuma tabela desta revisão é alcançável por caminho de execução, e `hunter_app` tem `SELECT` e nada mais nas cinco |

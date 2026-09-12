@@ -31,8 +31,7 @@ from hunter_scanner_worker.baseline_runner import BootstrapProgress, baseline_lo
 from hunter_scanner_worker.baselines import BaselineCache
 from hunter_scanner_worker.beta import beta_loop
 from hunter_scanner_worker.beta_job import BetaHealth
-from hunter_scanner_worker.breadth import breadth_loop
-from hunter_scanner_worker.breadth_job import BreadthHealth
+from hunter_scanner_worker.breadth import BreadthHealth, breadth_loop
 from hunter_scanner_worker.config import build_config
 from hunter_scanner_worker.consumers import (
     ConsumerHealth,
@@ -44,6 +43,7 @@ from hunter_scanner_worker.consumers import (
     run_stream_consumer,
 )
 from hunter_scanner_worker.deriv import deriv_loop
+from hunter_scanner_worker.dispersion import DispersionHealth, dispersion_loop
 from hunter_scanner_worker.health import CycleHealth, readiness_checks, write_heartbeat
 from hunter_scanner_worker.metrics import scanner_ticks_coalesced_total
 from hunter_scanner_worker.persist import DB_ROLE
@@ -104,6 +104,7 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
     beta = BetaHealth()
     regime_hourly = RegimeHealth()
     breadth = BreadthHealth()
+    dispersion = DispersionHealth()
     universe_wake = asyncio.Event()
     checks = readiness_checks(
         scanner, consumers, cycle, outbox_health, config, runtime.redis, progress
@@ -117,15 +118,13 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
     # which an operator has to see -- and means nothing at all to the Radar, the
     # baselines or the regime, which is the whole of what /ready gates.
     runtime.status_details["beta"] = lambda: beta.describe(utcnow())
-    # The hourly regime producer is a research series: a hole in it costs a
-    # cohort its context split and costs the live path nothing, so it is a
-    # status detail for the same reason beta is -- visible, never a gate.
+    # One sentence for the three research series: a hole in the hourly regime
+    # costs a cohort its context split, and one in ``breadth_5m`` (T3.77) or
+    # ``dispersion_24h`` (T3.90) makes a *gated* version refuse, fail-closed.
+    # All three are visible to the operator; none of them is a gate.
     runtime.status_details["regime_hourly"] = lambda: regime_hourly.describe(utcnow())
-    # ``breadth_5m`` (T3.77): same reason again -- a hole makes a *gated* version
-    # refuse (``breadth_unavailable``, fail-closed) and costs nobody else anything.
-    runtime.status_details["breadth"] = lambda: (
-        "stale" if breadth.stale(now=utcnow()) else f"universe {breadth.universe_size}"
-    )
+    runtime.status_details["breadth"] = lambda: breadth.describe(utcnow())
+    runtime.status_details["dispersion"] = lambda: dispersion.describe(utcnow())
 
     try:
         await refresh_universe(scanner, factory, runtime.redis)
@@ -162,6 +161,9 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
                 ),
                 "breadth": breadth_loop(
                     factory, runtime.redis, runtime, breadth, exchange=config.exchange
+                ),
+                "dispersion": dispersion_loop(
+                    factory, runtime.redis, runtime, dispersion, exchange=config.exchange
                 ),
                 "deriv": deriv_loop(scanner, factory, runtime),
                 "outbox": run_dispatcher(runtime.redis, factory, outbox_health, db_role=DB_ROLE),
@@ -203,14 +205,12 @@ async def run_scanner(runtime: WorkerRuntime) -> None:
             for name, coro in tasks.items():
                 group.create_task(forever(name, coro), name=f"scanner-{name}")
     finally:
-        runtime.status_details.pop("baselines", None)
-        runtime.status_details.pop("beta", None)
         # Every detail registered above is removed here, and the symmetry is a
         # test (``test_health.py``): a status detail left behind holds a
         # reference to the health object of a run that is over, and /status
         # would answer with the last numbers of a scanner that stopped.
-        runtime.status_details.pop("regime_hourly", None)
-        runtime.status_details.pop("breadth", None)
+        for detail in ("baselines", "beta", "regime_hourly", "breadth", "dispersion"):
+            runtime.status_details.pop(detail, None)
         for check in checks:
             if check in runtime.readiness_checks:
                 runtime.readiness_checks.remove(check)

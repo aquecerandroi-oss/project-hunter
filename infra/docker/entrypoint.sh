@@ -49,7 +49,7 @@ case "$role" in
   market)
     exec python -m hunter_market_worker
     ;;
-  scanner | strategy | execution | analytics)
+  scanner | strategy | execution | analytics | meme)
     exec python -m "hunter_${role}_worker"
     ;;
   all)

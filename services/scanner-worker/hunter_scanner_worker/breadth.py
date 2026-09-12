@@ -61,7 +61,10 @@ LOCK_TTL_S = 600
 """Ten minutes: far longer than a steady-state pass (one minute of the universe)
 and far shorter than the interval at which stale keys would accumulate."""
 
-__all__ = ["CHECK_S", "breadth_loop", "claim_minute", "main"]
+__all__ = ["CHECK_S", "BreadthHealth", "breadth_loop", "claim_minute", "main"]
+"""``BreadthHealth`` is re-exported (T3.90) so the scanner's ``main`` imports the
+loop and the health object it feeds from one place; which module the dataclass
+lives in is not ``main``'s business."""
 
 
 def _lock_key(exchange: str, cut: datetime) -> str:

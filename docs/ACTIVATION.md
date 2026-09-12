@@ -654,6 +654,59 @@ ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops
 ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops python infra/scripts/derive_variant.py momentum v11 --policy regime=btc:BTC_BULL,HIGH_VOLATILITY,hours=12-15 --changelog EXP-0023_janela_12_15_UTC --dry-run"
 ```
 
+### A dispersão BTC × alts (`dispersion=`, T3.90)
+
+A **quarta** regra do mesmo envelope: `--policy dispersion=-0.05-0.00` prende a
+versão às barras em que a **mediana do retorno de 24 h das alts menos o retorno de
+24 h do BTC** ficou entre −0,05 (inclusive) e 0,00 (exclusive) — faixa meia-aberta
+no topo, lida da série persistida `market_dispersion` (`0020`,
+`dispersion_24h_v1`, uma linha imutável por minuto fechado, produzida pelo
+`scanner-worker`). Negativo é a *discordância* que motivou a regra: em 10/09 e
+11/09 o plantão mediu a mediana das 16 perpétuas em −4,80 %/−3,85 % com o BTC em
+−1,50 %/−1,30 %, isto é, dispersão de −0,033 e −0,0255 (H-P18). A recusa por valor
+é `dispersion_gate:-0.08` (duas casas, para o histograma de `ineligible` continuar
+sendo um histograma; o valor exato com seis casas vai no envelope) e a recusa por
+ausência de série é `dispersion_unavailable`.
+
+Seis coisas que valem saber antes de digitar. (i) **Os limites são com sinal**, e
+a gramática entende os dois: `-0.05-0.00`, `-0.10--0.03` (as duas pontas
+negativas) e `0.00-0.10` são faixas válidas; o separador é o `-` **entre** os dois
+números, não o primeiro que aparece. (ii) **Não há campo de horizonte**: 24 h, o
+universo (os 16 com ≥ 90 d de velas de 1 min) e a referência (`BTCUSDT`) vivem
+dentro da string da versão, então nenhum botão da política pode reapontar uma
+célula pré-registrada para outro número — a lição da T3.88 aplicada antes de
+existir a primeira linha. (iii) **A série é obrigatória na política**:
+`--policy dispersion=-0.05-0.00` grava `dispersion_24h_v1` (resolvida **na
+derivação**, nunca relida por um build posterior) e `@<série>` a nomeia
+explicitamente; um corpo sem `version` é **recusado**, e a versão emudece em vez
+de decidir contra uma série que ninguém pré-registrou. (iv) **A âncora é exata** —
+a linha vale para o minuto que ela nomeia, então um produtor atrasado *emudece* a
+versão em vez de deixá-la decidir com o valor de quinze minutos atrás, e não há
+janela de tolerância a calibrar. (v) **Cobertura e referência recusam, nunca
+inclinam** — abaixo de 80 % do universo, ou sem retorno de 24 h do BTC, o produtor
+grava a linha como inutilizável (`insufficient_coverage`, `btc_missing`) e o
+portão responde `dispersion_unavailable`, porque uma mediana de três mercados
+diria "as alts capitularam" quando a verdade é "não deu para olhar". (vi) **A
+ordem é hora, regime, amplitude, dispersão**, e a dispersão é a última de
+propósito: uma versão que só declare as três regras antigas reporta byte a byte o
+motivo que reportava antes da T3.90 existir. Como toda regra do envelope, largar a
+dispersão do pai em silêncio é recusado: repita `dispersion=…`, escreva
+`dispersion=none` para tirá-la, ou `--policy none` para tirar o portão inteiro.
+
+Popular os 90 dias é o `infra/scripts/backfill_dispersion.py` (relatório primeiro,
+`--apply --reason` depois, sempre pelo `compose.sh run --rm ops`). O relatório traz
+uma coluna a mais que o da amplitude — `dobra` — porque aqui **três** regras
+decidem o que é dobrável: o dia passa o piso, **a véspera dele também passa** e a
+referência é densa nos dois. O motivo é o horizonte: num fold de 24 h cada minuto
+de um dia lê velas do dia anterior, então um dia mantido depois de um dia pulado
+seriam 1 440 lápides permanentes (`0020` não dá `UPDATE`/`DELETE` a ninguém).
+Consequência declarada: `--days 90` dobra no máximo **89** dias.
+
+```
+# a variante do braço A da EXP-0029 (faixa pré-registrada; --dry-run primeiro, sempre)
+ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh run --rm ops python infra/scripts/derive_variant.py mean_reversion v10 --policy dispersion=-0.10--0.03 --changelog EXP-0029_discordancia_-010_-003 --dry-run"
+```
+
 ## O que continua igual depois do passo 8
 - Só ordens a mercado, só SPOT, sem alavancagem; fill pelo livro elegível após a latência declarada; sem fill fabricado.
 - Risco 0,25 % por operação incluindo custos, soma ≤ 1 %, participação ≤ 1 % do minuto, β-BTC ≤ 0,5×, total ≤ 40 %, por moeda ≤ 10 %, máx. 5 posições, pendentes contam.

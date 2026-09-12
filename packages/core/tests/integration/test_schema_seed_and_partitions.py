@@ -165,6 +165,60 @@ def test_seeding_twice_leaves_the_same_rows(seed_db: str) -> None:
     assert counts_after_first["opportunity_weights"] == 2
 
 
+def test_the_venue_catalogue_carries_its_status_and_the_seed_can_move_it(seed_db: str) -> None:
+    """T3.44c: ``exchanges.status`` is written by the seed, both halves of it.
+
+    Two facts, and the second is the one that did not exist before ``0016``:
+    Bybit ships as ``planned`` (catalogued, no collector deployed — DATABASE.md
+    §28) rather than falling into ``server_default 'active'``, and re-seeding a
+    row that already holds a *different* label corrects it. Until this change
+    ``seed_exchanges`` named ``status`` in neither the ``INSERT`` nor the
+    ``ON CONFLICT DO UPDATE``, so a stored venue was frozen at whatever it was
+    first written with and ``seed_reference.EXCHANGES`` could not say anything
+    about it at all.
+
+    The labels are typed out here rather than imported from ``seed_reference``,
+    the rule ``test_the_seeded_paper_preset_is_the_directive`` states: a test
+    that imports the constant it checks agrees with the seed by construction.
+    """
+    _use(seed_db)
+    seed = _load_script("seed")
+    asyncio.run(seed.seed())
+
+    async def _statuses() -> dict[str, str]:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.connect() as connection:
+                result = await connection.execute(
+                    text("SELECT code, status::text FROM exchanges ORDER BY code")
+                )
+                return {row[0]: row[1] for row in result}
+        finally:
+            await engine.dispose()
+
+    assert asyncio.run(_statuses()) == {"binance": "active", "bybit": "planned"}
+
+    async def _flip(code: str, status: str) -> None:
+        engine = async_engine(seed_db)
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    text(
+                        "UPDATE exchanges SET status = CAST(:status AS exchange_status) "
+                        "WHERE code = :code"
+                    ),
+                    {"code": code, "status": status},
+                )
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_flip("bybit", "active"))
+    asyncio.run(seed.seed())
+    assert asyncio.run(_statuses())["bybit"] == "planned", (
+        "the seed no longer corrects a venue's status on a re-run"
+    )
+
+
 def test_seeded_risk_presets_carry_the_documented_limits(seed_db: str) -> None:
     """RISK_ENGINE.md §2, and fractions are JSON strings so they stay exact."""
     _use(seed_db)

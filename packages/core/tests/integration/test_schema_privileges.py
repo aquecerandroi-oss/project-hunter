@@ -114,6 +114,31 @@ def _breadth_tables(name: str) -> tuple[str, ...]:
     return cast(tuple[str, ...], getattr(migration_ddl("breadth"), name))
 
 
+def _dispersion_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0020_market_dispersion``'s lists in ``ddl/dispersion.py``.
+
+    It adds no class either: ``market_dispersion`` is read-only for ``hunter_app``
+    and append-only for ``hunter_worker`` — the scanner produces one reading per
+    closed minute, the strategy-worker's gate reads it, and neither may edit a
+    minute a decision may already have been gated by. Exactly the
+    ``market_breadth`` shape (§18.9, §31, T3.90).
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("dispersion"), name))
+
+
+def _meme_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0021_meme_radar``'s lists in ``ddl/meme_radar.py``.
+
+    It adds no class either. Four of the five tables are the ``market_breadth``
+    shape — read-only for ``hunter_app``, append-only for ``hunter_worker`` — and
+    the fifth, ``meme_tokens``, is the one place retention cannot drop a partition
+    (its key is the mint), so the worker carries ``UPDATE``/``DELETE`` there behind
+    a write-once trigger and a declared ``app.meme_retention`` marker (§17.2's
+    ``feature_baselines`` precedent).
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("meme_radar"), name))
+
+
 def _lock_tables(name: str) -> tuple[str, ...]:
     """The same, for ``0005_feature_baselines_lock_grant``'s ``ddl/baseline_lock.py``.
 
@@ -373,6 +398,8 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     execution_read_only = _paper_roles_2_tables("APP_READ_ONLY_TABLES_0008")
     replay_read_only = _replay_run_tables("REPLAY_APP_READ_ONLY_TABLES")
     breadth_read_only = _breadth_tables("BREADTH_APP_READ_ONLY_TABLES")
+    dispersion_read_only = _dispersion_tables("DISPERSION_APP_READ_ONLY_TABLES")
+    meme_read_only = _meme_tables("MEME_APP_READ_ONLY_TABLES")
 
     classified = (
         list(write)
@@ -388,6 +415,8 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(execution_read_only)
         + list(replay_read_only)
         + list(breadth_read_only)
+        + list(dispersion_read_only)
+        + list(meme_read_only)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 
@@ -1374,3 +1403,197 @@ async def test_market_breadth_is_global_and_carries_no_tenant_column(
     assert tenant_column == 0
     assert row[0] is False
     assert row[1] == 0
+
+
+# --------------------------------------------------------------------------
+# 0020_market_dispersion: the scanner appends a reading and can never edit it,
+# the API only reads it, and the runtime login reaches neither without SET ROLE —
+# DATABASE.md section 32 (owed; the conventions are section 31's, T3.90)
+# --------------------------------------------------------------------------
+
+_DISPERSION_INSERT = (
+    "INSERT INTO market_dispersion (id, exchange_id, end_time, dispersion_version, "
+    "horizon_minutes, universe_size, covered, alts_covered, alts_below_btc, btc_r24h, "
+    "median_alt_r24h, dispersion, share_below_btc, coverage, usable, reason, inputs) "
+    "VALUES (:id, :exchange, :end_time, 'dispersion_24h_v1', 1440, 16, 16, 15, 15, "
+    "CAST(:btc AS numeric), CAST(:median AS numeric), CAST(:dispersion AS numeric), "
+    "CAST(:share AS numeric), CAST(:coverage AS numeric), true, NULL, '{}'::jsonb)"
+)
+"""The plantão minute of 2026-09-10: the median alt at -4,80 % against the BTC at
+-1,50 %, which is the row the whole revision exists to be able to hold."""
+
+
+def _dispersion_params(exchange_id: uuid.UUID) -> dict[str, object]:
+    return {
+        "id": uuid7(),
+        "exchange": exchange_id,
+        "end_time": datetime(2026, 9, 10, 22, 8, tzinfo=UTC),
+        "btc": Decimal("-0.015000"),
+        "median": Decimal("-0.048000"),
+        "dispersion": Decimal("-0.033000"),
+        "share": Decimal("1.000000"),
+        "coverage": Decimal("1.000000"),
+    }
+
+
+async def test_the_worker_appends_a_dispersion_reading_and_can_never_edit_it(
+    worker_connection: AsyncConnection,
+) -> None:
+    """Measured as the role, not asked of the catalogue — ``market_breadth``'s proof
+    repeated for the second series, because the argument is the same and it has to
+    hold for both: ``0020`` installs no immutability trigger precisely because no
+    legal ``UPDATE`` exists for one to police, so withholding ``UPDATE``/``DELETE``
+    from the writer itself is the whole mechanism.
+    """
+    exchange_id = uuid7()
+    await worker_connection.execute(
+        text("INSERT INTO exchanges (id, code, name) VALUES (:id, :code, 'Probe')"),
+        {"id": exchange_id, "code": f"dispersion-{uuid.uuid4().hex[:8]}"},
+    )
+    await worker_connection.execute(text(_DISPERSION_INSERT), _dispersion_params(exchange_id))
+    assert (
+        await worker_connection.scalar(
+            text("SELECT count(*) FROM market_dispersion WHERE exchange_id = :id"),
+            {"id": exchange_id},
+        )
+        == 1
+    )
+
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await worker_connection.execute(text("UPDATE market_dispersion SET alts_below_btc = 0"))
+    await worker_connection.rollback()
+    await _set_as_worker(worker_connection)
+    with pytest.raises(ProgrammingError, match=_DENIED):
+        await worker_connection.execute(text("DELETE FROM market_dispersion"))
+    await worker_connection.rollback()
+
+
+async def test_the_two_roles_hold_exactly_select_and_select_insert_on_market_dispersion(
+    schema_engine: AsyncEngine,
+) -> None:
+    """Asserted as sets, so a later revision that hands out ``UPDATE`` for "just a
+    backfill" fails here instead of in a post-mortem about a number that changed
+    under a decision. ``hunter_runtime`` holds nothing of its own (§27.1)."""
+    async with schema_engine.connect() as connection:
+        held = {
+            role: {
+                privilege
+                for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
+                if await connection.scalar(
+                    text("SELECT has_table_privilege(:role, 'market_dispersion', :p)"),
+                    {"role": role, "p": privilege},
+                )
+            }
+            for role in ("hunter_app", "hunter_worker", "hunter_runtime")
+        }
+    assert held == {
+        "hunter_app": {"SELECT"},
+        "hunter_worker": {"SELECT", "INSERT"},
+        "hunter_runtime": set(),
+    }
+
+
+async def test_market_dispersion_is_global_and_carries_no_tenant_column(
+    schema_engine: AsyncEngine,
+) -> None:
+    """The universe belongs to the exchange, not to an organization (§1.1), so there
+    is no ``organization_id`` and no RLS policy to isolate. Asserted rather than
+    assumed, for ``market_breadth``'s reason: "no policy is needed" and "a policy
+    nobody wrote" look identical from outside."""
+    async with schema_engine.connect() as connection:
+        tenant_column = await connection.scalar(
+            text(
+                "SELECT count(*) FROM information_schema.columns "
+                "WHERE table_name = 'market_dispersion' AND column_name = 'organization_id'"
+            )
+        )
+        row = (
+            await connection.execute(
+                text(
+                    "SELECT c.relrowsecurity, count(p.polname) FROM pg_class c "
+                    "LEFT JOIN pg_policy p ON p.polrelid = c.oid "
+                    "WHERE c.relname = 'market_dispersion' GROUP BY c.relrowsecurity"
+                )
+            )
+        ).one()
+    assert tenant_column == 0
+    assert row[0] is False
+    assert row[1] == 0
+
+
+async def test_the_worker_appends_a_meme_observation_and_can_never_edit_it(
+    worker_connection: AsyncConnection,
+) -> None:
+    """Proved **as the role**, not asked of the catalogue (§18.7, §25.4's rule).
+
+    Four of the five meme tables are append-only for the engine, and the reason is
+    the ``replay_runs`` one: a reading its own writer may rewrite is not evidence.
+    There is no legal ``UPDATE`` on a curve observation — a second look at the same
+    instant from the same source is the *same* row (the primary key says so), and a
+    look at a different instant is a different row.
+    """
+    await worker_connection.execute(
+        text(
+            "INSERT INTO meme_curve_snapshots (observed_at, mint, source, "
+            "virtual_sol_reserves, virtual_token_reserves, real_sol_reserves, "
+            "real_token_reserves, total_supply, complete) VALUES "
+            "(now(), 'PROBE_MINT', 'solana_rpc', 30, 1073000000, 0, 793100000, "
+            "1000000000, false)"
+        )
+    )
+    for statement in (
+        "UPDATE meme_curve_snapshots SET complete = true WHERE mint = 'PROBE_MINT'",
+        "DELETE FROM meme_curve_snapshots WHERE mint = 'PROBE_MINT'",
+    ):
+        await worker_connection.rollback()
+        await worker_connection.begin()
+        await worker_connection.execute(text("SET LOCAL ROLE hunter_worker"))
+        with pytest.raises(ProgrammingError, match=_DENIED):
+            await worker_connection.execute(text(statement))
+
+
+async def test_the_api_role_reads_the_meme_radar_and_writes_none_of_it(
+    app_connection: AsyncConnection,
+) -> None:
+    """The slice is monitoring only (T4-MEME-RADAR.md §0), and that is a privilege
+    rather than a promise: every write the API could make is denied by the grant,
+    before any trigger or CHECK is consulted."""
+    readable = await app_connection.scalar(text("SELECT count(*) FROM meme_radar_features_v1"))
+    assert readable is not None, "the API cannot read the read model it is meant to serve"
+    for statement in (
+        "INSERT INTO meme_tokens (mint, first_seen_source, first_seen_at, last_seen_at) "
+        "VALUES ('API_MINT', 'pumpfun_rest', now(), now())",
+        "INSERT INTO meme_features_1m (end_time, mint, features_version, coverage) "
+        "VALUES (now(), 'API_MINT', 'meme_features_v1', 1)",
+        "DELETE FROM meme_ingest_gaps",
+    ):
+        await app_connection.rollback()
+        await app_connection.begin()
+        await app_connection.execute(_AS_APP)
+        with pytest.raises(ProgrammingError, match=_DENIED):
+            await app_connection.execute(text(statement))
+
+
+async def test_the_meme_tables_are_global_and_carry_no_tenant_column(
+    schema_engine: AsyncEngine,
+) -> None:
+    """``replay_runs``' assertion, five tables over: "needs no policy" and
+    "somebody forgot the policy" are indistinguishable from outside, so the
+    absence is asserted and a tenant column appearing here later becomes a
+    conversation instead of a silent hole."""
+    async with schema_engine.connect() as connection:
+        tenant_columns = await connection.scalar(
+            text(
+                "SELECT count(*) FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND column_name = 'organization_id' "
+                "AND table_name LIKE 'meme%'"
+            )
+        )
+        policies = await connection.scalar(
+            text(
+                "SELECT count(*) FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid "
+                "WHERE c.relname LIKE 'meme%'"
+            )
+        )
+    assert tenant_columns == 0
+    assert policies == 0

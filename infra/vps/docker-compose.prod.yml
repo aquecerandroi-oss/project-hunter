@@ -365,6 +365,37 @@ services:
       ENABLE_PAPER_AUTONOMY: ${ENABLE_PAPER_AUTONOMY:-false}
     logging: *prod-logging
 
+  # Meme Radar (T4.2). Mesma regra dos outros workers: sem `*prod-db-env` ele
+  # sobe com a senha de dev e reinicia em loop (medido em 2026-09-06 no deploy
+  # fa9f957). Fica no perfil `meme` do compose base, entao um `compose.sh update`
+  # comum NAO o sobe -- e proposital duas vezes: e o unico servico que fala com
+  # dois endpoints de terceiros que ninguem aqui opera, e o PumpPortal serve UMA
+  # conexao por cliente (varias podem render ban de uma hora, T4.0 §2). Subir com:
+  #
+  #   MEME_ENABLED=true bash infra/vps/compose.sh --profile meme up -d meme-worker
+  #
+  # `MEME_ENABLED` e o segundo interruptor: o perfil decide se o container
+  # existe, a flag decide se ele coleta. Desligado, o processo ainda serve
+  # /health, /ready e /metrics e diz "disabled" no corpo do readiness.
+  #
+  # `SOLANA_RPC_URL` vem do .env e nao exige chave: sem ela o adapter cai no RPC
+  # publico (~10 req/s e 40 chamadas por metodo/10 s), que e a razao de so os
+  # top-K por market cap serem reconciliados. Provedor pago e decisao do Everton
+  # (T4.0 §8 decisao 3: aprovar teto de consumo e politica de degradacao antes).
+  meme-worker:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: meme
+      HEALTH_PORT: "8001"
+      MEME_ENABLED: ${MEME_ENABLED:-false}
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
+      MEME_RETENTION_DAYS: ${MEME_RETENTION_DAYS:-90}
+      MEME_TRACKED_MINTS_MAX: ${MEME_TRACKED_MINTS_MAX:-120}
+      DB_POOL_SIZE: "2"
+      DB_MAX_OVERFLOW: "2"
+    logging: *prod-logging
+
   web:
     restart: always
     build:

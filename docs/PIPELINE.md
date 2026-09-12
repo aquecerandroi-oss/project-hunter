@@ -464,6 +464,62 @@ tenha mudado alguma coisa ou não, trinta e um dias para trás.
     testcontainer: ~1 min de leitura, ~3,5 min com `--apply` depois de a escrita
     virar um `INSERT` por lote em vez de um por minuto — eram ~100 min).
 
+16. **A dispersão BTC × alts é a quarta regra do mesmo envelope (T3.90) — e a
+    primeira série com um mercado de referência dentro do fold.** O plantão de
+    10/09 e 11/09 (`obsidian/00-INBOX/Hipoteses-do-plantao.md`, H-P18) mediu a
+    mesma forma duas vezes: a **mediana do retorno de 24 h** dos 16 mercados em
+    **−4,80 %** e **−3,85 %** enquanto o **BTC** estava em **−1,50 %** e
+    **−1,30 %** — as alts caindo sozinhas, a *discordância*. A hipótese é que esse
+    estado, lido **antes** da decisão, separa expectancy, e a única porta por onde
+    ele entra numa decisão é a política de elegibilidade. A série é
+    `market_dispersion` (`0020_market_dispersion`, `dispersion_24h_v1`,
+    `hunter_indicators.dispersion`, produtor em
+    `hunter_scanner_worker/dispersion_job.py` com a cadência e a trava de
+    `dispersion.py`): **uma linha imutável por minuto fechado por exchange**,
+    `end_time`-ancorada, com `btc_r24h`, `median_alt_r24h`,
+    `dispersion = median_alt_r24h − btc_r24h`, `share_below_btc` (fração das alts
+    com retorno estritamente abaixo do BTC) e, abaixo de 80 % de cobertura ou sem
+    retorno da referência, valores `NULL` com `reason` (`insufficient_coverage`,
+    `btc_missing`, `empty_universe`, `no_alts` — nesta precedência, que é a do
+    `market_betas`). **Cinco decisões que valem registrar:**
+    (i) **não antecipa por construção** — a leitura do minuto `T` usa exatamente
+    duas velas por mercado, `open_time = T−1min` e `open_time = T−24h−1min`, e
+    nada que abra em `T` entra (`endpoint_open_times`; provado em
+    `packages/indicators/tests/unit/test_dispersion_series.py` e, pela via do
+    banco, em `services/scanner-worker/tests/test_dispersion_job.py`);
+    (ii) **duas velas, não 1 441** — um retorno close-to-close *é* uma afirmação
+    de dois pontos, e exigir o interior (a regra que `compute_breadth` aplica a 5
+    minutos) faria a série falar de completude de feed e não de preço; quem quiser
+    o interior escreve `dispersion_24h_v2`, nunca uma edição;
+    (iii) **mediana, não média** — uma memecoin em +400 % não pode virar "as
+    alts"; (iv) **a referência é parte da versão** (`BTCUSDT` em
+    `DispersionSpec.reference_symbol`, gravado em `inputs` de toda linha): dobrar
+    contra o ETH é outra série; (v) **o universo é o mesmo do `breadth_v2`** — os
+    mercados com ≥ 90 d de velas de 1 min, pela regra única de
+    `hunter_core.universe` —, então esta série **já nasce** com passado dobrável,
+    que é exatamente o que faltou à `breadth_v1` (§4b item 15).
+    O portão (`{"dispersion": {"min": "-0.05", "max": "0.00", "version":
+    "dispersion_24h_v1"}}`, meia-aberto no `max`) lê **a linha cujo `end_time` é
+    exatamente `source_bar_close`** na série que a política nomeia — sem
+    tolerância, sem "a mais recente antes" —, e um produtor atrasado recusa com
+    `dispersion_unavailable` em vez de decidir com valor velho. Recusa por valor:
+    `dispersion_gate:-0.08` (duas casas, para o histograma de `ineligible`
+    continuar agrupável; o valor exato de seis casas vai no envelope, com o id da
+    linha). **Ordem de avaliação: hora, regime, amplitude, dispersão** — a
+    dispersão por último de propósito, para que uma versão com as três regras
+    antigas reporte byte a byte o motivo que reportava antes desta tarefa existir.
+    **Sem `horizon` na política:** o horizonte, o universo e a referência vivem
+    dentro da string da versão, que é a lição da T3.88 aplicada antes de existir
+    uma linha gravada — não há botão capaz de reapontar uma célula pré-registrada.
+    **Custo de população declarado:** o backfill
+    (`infra/scripts/backfill_dispersion.py`, relatório primeiro, `--apply
+    --reason`) dobra apenas os dias que passam o piso **e** cuja véspera também
+    passa **e** em que a referência é densa nos dois — porque num horizonte de 24 h
+    um dia mantido depois de um dia pulado são 1 440 lápides permanentes, não
+    cinco minutos; por isso `--days 90` dobra no máximo **89** dias. A regra é
+    **célula, não filtro**, até a EXP-0029
+    (`obsidian/05-EXPERIMENTS/EXP-0029-dispersao-btc-alts.md`).
+
 ## 5. Opportunity Engine
 
 **Onde:** `scanner-worker`. **Gatilho:** `features.updated`, `anomalies.detected`, `signals.emitted` (para o componente de consenso), throttle 2 s por símbolo.

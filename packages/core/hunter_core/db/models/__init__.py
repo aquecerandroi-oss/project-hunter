@@ -63,6 +63,7 @@ from hunter_core.db.models.billing import (
     Subscription,
 )
 from hunter_core.db.models.breadth import MarketBreadth
+from hunter_core.db.models.dispersion import MarketDispersion
 from hunter_core.db.models.exchanges import ExchangeConnection
 from hunter_core.db.models.execution import Order, TradeProposal
 from hunter_core.db.models.execution_fills import Fill, Position
@@ -86,6 +87,12 @@ from hunter_core.db.models.market_data import (
     OpenInterestHistory,
 )
 from hunter_core.db.models.markets import Asset, Exchange, Market
+from hunter_core.db.models.meme import MemeIngestGap, MemeToken
+from hunter_core.db.models.meme_series import (
+    MemeCurveSnapshot,
+    MemeFeatures1m,
+    MemeTrade,
+)
 from hunter_core.db.models.paper_execution import ParticipationConsumption, PortfolioExitIntent
 from hunter_core.db.models.paper_wallet import PortfolioCurrencyAnchor, PortfolioRiskState
 from hunter_core.db.models.portfolios import Portfolio, PortfolioEquitySnapshot, RiskProfile
@@ -192,8 +199,14 @@ __all__ = [
     "Market",
     "MarketBeta",
     "MarketBreadth",
+    "MarketDispersion",
     "MarketRegimeRow",
     "MarketSnapshot",
+    "MemeCurveSnapshot",
+    "MemeFeatures1m",
+    "MemeIngestGap",
+    "MemeToken",
+    "MemeTrade",
     "Notification",
     "OpenInterestHistory",
     "Opportunity",

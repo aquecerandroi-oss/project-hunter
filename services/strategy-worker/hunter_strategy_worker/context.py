@@ -31,14 +31,17 @@ the regime as the reason would name the wrong cause.
 Since T3.77 there is a **third** term, also the version's: the share of the
 monitored universe that was falling in the five minutes before the bar closed
 (:mod:`hunter_strategy_worker.breadth_gate`), read from the persisted
-``market_breadth`` series and never recomputed here.
+``market_breadth`` series and never recomputed here, and T3.90 the fourth
+(:mod:`hunter_strategy_worker.dispersion_gate`), read the same way from
+``market_dispersion``.
 
-Between themselves the order is: **hours first, regime second, breadth last**,
+Between themselves the order is: **hours, regime, breadth, dispersion**,
 and every declared rule must pass. The hours gate reads nothing at all, so
-refusing there costs no query and saves the other two theirs; breadth is last so
-that a version carrying only the two older rules reports exactly the reason it
-reported before T3.77. The visible consequence is that a bar failing several
-rules is reported by the first of them in that order.
+refusing there costs no query and saves the other three theirs; each new rule is
+appended at the end so that a version carrying only the older ones reports
+exactly the reason it reported before the newer one existed. The visible
+consequence is that a bar failing several rules is reported by the first of them
+in that order.
 """
 
 from __future__ import annotations
@@ -53,6 +56,7 @@ from hunter_strategy_worker import hot_state
 from hunter_strategy_worker.breadth_gate import load_breadth_gate
 from hunter_strategy_worker.config import PRODUCER
 from hunter_strategy_worker.derivatives import load_derivatives
+from hunter_strategy_worker.dispersion_gate import load_dispersion_gate
 from hunter_strategy_worker.hours_gate import evaluate_hours_gate
 from hunter_strategy_worker.record import Provenance
 from hunter_strategy_worker.regime_gate import load_gate
@@ -68,6 +72,7 @@ if TYPE_CHECKING:
     from hunter_strategy_worker.bar_context import BarBundle
     from hunter_strategy_worker.breadth_gate import BreadthGate
     from hunter_strategy_worker.config import ShadowConfig
+    from hunter_strategy_worker.dispersion_gate import DispersionGate
     from hunter_strategy_worker.gate_policy import GatePolicy
     from hunter_strategy_worker.hours_gate import HoursGate
     from hunter_strategy_worker.regime_gate import RegimeGate
@@ -176,6 +181,7 @@ async def build_market_context(
     gate: RegimeGate | None = None
     hours: HoursGate | None = None
     breadth: BreadthGate | None = None
+    dispersion: DispersionGate | None = None
     if eligible and policy is not None and policy.hours is not None:
         hours = evaluate_hours_gate(policy.hours, cut=source_bar_close)
         eligible, reason = hours.eligible, (None if hours.eligible else hours.reason)
@@ -187,6 +193,11 @@ async def build_market_context(
             session, policy.breadth, cut=source_bar_close, exchange=market.exchange
         )
         eligible, reason = breadth.eligible, (None if breadth.eligible else breadth.reason)
+    if eligible and policy is not None and policy.dispersion is not None:
+        dispersion = await load_dispersion_gate(
+            session, policy.dispersion, cut=source_bar_close, exchange=market.exchange
+        )
+        eligible, reason = dispersion.eligible, (None if dispersion.eligible else dispersion.reason)
     if view is None:
         deriv = await load_derivatives(session, redis, market=market, cut=source_bar_close)
         context = build_context(
@@ -221,5 +232,6 @@ async def build_market_context(
         regime_gate=gate,
         hours_gate=hours,
         breadth_gate=breadth,
+        dispersion_gate=dispersion,
     )
     return context, provenance

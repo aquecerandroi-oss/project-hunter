@@ -9,8 +9,10 @@ with the daily jobs then fighting over the same partition: the creator making it
 at 04:07 and the pruner dropping it at 04:12, every day, each taking an ``ACCESS
 EXCLUSIVE`` lock on the parent for nothing.
 
-Nothing here touches the database. ``retention_days`` reads two figures from
-``Settings`` (the tunable ones) and hard-codes the rest of DATABASE.md §1.3;
+Nothing here touches the database. ``retention_days`` reads three figures from
+``Settings`` (the tunable ones - the third, ``meme_retention_days``, governs the
+three meme parents of ``0021`` at once) and hard-codes the rest of DATABASE.md
+§1.3;
 ``is_expired`` and :func:`month_is_retained` are pure calendar arithmetic on a
 partition's **upper** bound, which is the only bound that proves no retained row
 can fall inside it.
@@ -67,6 +69,15 @@ def retention_days(settings: Settings | None = None) -> dict[str, int | None]:
         "liquidations": 30,
         "opportunity_history": 90,
         "feature_snapshots": config.retention_feature_snapshots_days,
+        # The three meme parents (0021, DATABASE.md §33). One window for all
+        # three and for graduated and non-graduated mints alike: selecting on
+        # success after the fact deletes the controls (T4-MEME-RADAR.md §8
+        # decision 2). ``meme_tokens`` is absent on purpose - its key is the
+        # mint, so it has no monthly partition to drop and the meme-worker
+        # prunes it row-wise behind ``app.meme_retention``.
+        "meme_curve_snapshots": config.meme_retention_days,
+        "meme_features_1m": config.meme_retention_days,
+        "meme_trades": config.meme_retention_days,
     }
     for label, days in candles.items():
         policy[list_partition_name("candles", label)] = days

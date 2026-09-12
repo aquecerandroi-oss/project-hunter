@@ -346,3 +346,46 @@ class TestUnattendedGate:
         with pytest.raises(RuntimeError, match="emit raised before commit"):
             await cli.seed_with_report(only="strategies", emit=_boom)
         assert await _count(engine, "strategies") == before
+
+
+class TestOnlyExchanges:
+    """T3.44c: ``--only exchanges`` — the venue catalogue joins ``--only``.
+
+    It joined only because the seed gained something to say about ``exchanges``:
+    until ``0016`` added ``planned`` (DATABASE.md §28), ``seed_exchanges`` never
+    wrote ``status``, so a re-seed of that table could not change a stored row
+    and the diff would always have been empty.
+    """
+
+    async def test_it_is_a_choice_the_cli_accepts(self, cli: ModuleType) -> None:
+        assert "exchanges" in cli.seed_dry_run.TABLE_CHOICES
+
+    async def test_a_dry_run_shows_the_label_moving_and_writes_nothing(
+        self, cli: ModuleType, engine: AsyncEngine
+    ) -> None:
+        """The operator's whole reason for the flag: see Bybit go back to
+        ``planned`` *before* committing it."""
+        await cli.seed_with_report(only="exchanges")
+        async with engine.begin() as connection:
+            await connection.execute(
+                text("UPDATE exchanges SET status = 'active' WHERE code = 'bybit'")
+            )
+        counts, diff = await cli.seed_with_report(only="exchanges", dry_run=True)
+        assert set(counts) == {"exchanges"}
+        assert any(
+            line.startswith("exchanges.bybit:") and "'active' -> " in line and "planned" in line
+            for line in diff
+        ), diff
+        assert await _count(engine, "exchanges", where="code = 'bybit' AND status = 'active'") == 1
+
+    async def test_writing_it_moves_the_label_and_touches_no_other_table(
+        self, cli: ModuleType, engine: AsyncEngine
+    ) -> None:
+        before_strategies = await _count(engine, "strategies")
+        counts, _diff = await cli.seed_with_report(only="exchanges", yes=True)
+        assert counts["exchanges"] == 2
+        assert await _count(engine, "exchanges", where="code = 'bybit' AND status = 'planned'") == 1
+        assert (
+            await _count(engine, "exchanges", where="code = 'binance' AND status = 'active'") == 1
+        )
+        assert await _count(engine, "strategies") == before_strategies

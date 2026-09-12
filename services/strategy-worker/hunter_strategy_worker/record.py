@@ -39,9 +39,12 @@ if TYPE_CHECKING:
     from hunter_core.strategies.base import Decision
     from hunter_strategy_worker.breadth_gate import BreadthGate
     from hunter_strategy_worker.catalogue import ActiveVersion
+    from hunter_strategy_worker.dispersion_gate import DispersionGate
     from hunter_strategy_worker.hours_gate import HoursGate
     from hunter_strategy_worker.regime_gate import RegimeGate
     from hunter_strategy_worker.repo import MarketRow
+
+    Gate = BreadthGate | DispersionGate | HoursGate | RegimeGate
 
 __all__ = ["Provenance", "ShadowRecord", "build_record"]
 
@@ -49,6 +52,12 @@ __all__ = ["Provenance", "ShadowRecord", "build_record"]
 def _jsonable(value: object) -> Any:
     """Canonical JSON shape: decimals as normalised strings, timestamps as ``Z``."""
     return json.loads(canonical_json(value))
+
+
+def _gate_block(gate: Gate | None) -> dict[str, Any] | None:
+    """One rule's block, ``None`` when the version declares no such rule: four rules
+    (regime, hours, breadth, dispersion), one shape, and never an empty block."""
+    return None if gate is None else gate.to_jsonable()
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +130,13 @@ class Provenance:
     decimals so the ``ineligible`` histogram stays a histogram, and this is where
     that rounding is not allowed to be the only copy.
     """
+
+    dispersion_gate: DispersionGate | None = None
+    """The BTC x alts verdict that let this decision happen (T3.90), or ``None``
+    when the version's policy carries no ``dispersion`` rule. Same reading as the
+    three gates above: the **exact** value (six decimals) and the id of the
+    ``market_dispersion`` row, because the refusal reason rounds to two decimals to
+    keep the ``ineligible`` histogram a histogram."""
 
     context_minutes: int = 0
     """How much 1m history this evaluation actually loaded (T3.54b).
@@ -243,15 +259,10 @@ def build_record(
             "open_interest_reason": provenance.open_interest_reason,
             "regime_id": regime_id,
             "regime_reason": regime_reason,
-            "regime_gate": (
-                None if provenance.regime_gate is None else provenance.regime_gate.to_jsonable()
-            ),
-            "hours_gate": (
-                None if provenance.hours_gate is None else provenance.hours_gate.to_jsonable()
-            ),
-            "breadth_gate": (
-                None if provenance.breadth_gate is None else provenance.breadth_gate.to_jsonable()
-            ),
+            "regime_gate": _gate_block(provenance.regime_gate),
+            "hours_gate": _gate_block(provenance.hours_gate),
+            "breadth_gate": _gate_block(provenance.breadth_gate),
+            "dispersion_gate": _gate_block(provenance.dispersion_gate),
         }
     )
     late = plan.late_reason
