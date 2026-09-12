@@ -1,0 +1,52 @@
+AVISO: a Astra alterou a árvore de trabalho num modo que não permite alterações:
+51a52
+> ?? .claude/state/astra-review-plantao-meme-20260912-1542.md
+**RESUMO**
+
+Testaria **M-D2 primeiro**, estratificando por existência de pool: a divergência pode comprometer diretamente o filtro de concentração. **Coletaria `tip_floor` em paralelo**, preservando histórico; M-D9 vem depois, ainda como diagnóstico.
+
+**M-D9 merece linha própria**, vinculada a M-P34 e M-D8: valida uma fonte substituta, com aceite próprio, como M-D6. M-D5 fornece a disciplina temporal, mas não responde se o rótulo representa o byte.
+
+**ARQUIVOS**
+
+Nenhum alterado. O rascunho indicado não existe neste checkout; avaliei o conteúdo colado e a memória disponível.
+
+**TESTES**
+
+Sem testes de código. Consultei documentação pública de Solana/Jito; não reproduzi as capturas históricas.
+
+**MUST-FIX**
+
+1. **M-D2: corrigir a generalização.** ANTROGPT é **15,62 < 16,52**, diferença de −0,90 pp: são **3/4 para cima**, não 4/4. Comparar mesmos denominadores, exclusões de pool e horários; depois conferir contas on-chain. **Falha:** excluir uma moeda por concentração que corresponde ao saldo do pool, ou atribuir ao pool uma diferença temporal.
+
+2. **M-D9: exigir positivos reais.** Concordância apenas em `creator`/`traders` não valida detecção de `holders`. Exigir moedas com byte verdadeiro, controles falsos e matriz por classe, idade e versão; ausência, erro e rótulo desconhecido separados. **Falha:** um classificador sempre `false` passa no aceite.
+
+3. **M-D9: página atual não comprova exposição na criação.** Guardar rótulo bruto, fonte e recebimento; só preencher exposição prospectiva quando disponível no marco previsto. Consulta posterior fica separada. **Falha:** uma página lida após graduação contamina `holder_reward_at_create`. Esse congelamento já integra [M-P34](/C:/dev/project-hunter/obsidian/00-INBOX/Hipoteses-do-plantao.md:134).
+
+4. **M-P27: separar os relógios.** Pelos horários fornecidos, os payloads distam **87 s**, os recebimentos **106 s**, com defasagens de **64 e 83 s**. Usar último valor recebido antes do marco, validade máxima e deduplicação. **Falha:** classificar uma criação com informação ainda indisponível. A regra já está em [M-P27](/C:/dev/project-hunter/obsidian/00-INBOX/Hipoteses-do-plantao.md:124).
+
+5. **Fees: endereço do programa não representa disputa pela curva.** O RPC condiciona pelas contas bloqueadas como **graváveis**; medir curvas/pools relevantes e manter essa série separada dos tips. **Falha:** transformar “89/150 zeros” em evidência de execução barata no pump. [Documentação Solana](https://solana.com/docs/rpc/http/getrecentprioritizationfees).
+
+**NICE-TO-HAVE**
+
+Em M-D9, comparar custo e cobertura do HTML com leitura RPC em lote; esclarecer se “2 MB” significa transferência comprimida ou HTML descomprimido.
+
+**O QUE EU FARIA DIFERENTE**
+
+Retiraria estas leituras indevidas:
+
+- **32,7/h:** densidade do recorte retornado, sem cobertura demonstrada para taxa global.
+- **`bo` nas lentas:** associação exploratória; não prova bundle nem vantagem.
+- **Pagamento anterior ao pool:** conhecido por nós depois; não demonstra sinal antecipável.
+- **`detectedAt +2,1 s`:** carimbo do provedor, não latência até nosso recebimento.
+- **“Nenhuma API pública”:** limitar a endpoints e mints consultados. “Máximo do dia” → máximo observado nas leituras.
+
+**CONCORDO COM**
+
+Separar erro de ausência, tratar latências de primeira consulta como limites superiores e manter M-D9 como diagnóstico. Nada neste lote demonstra vantagem de negociação.
+
+**OBSIDIAN**
+
+- **Hipoteses-do-plantao** — M-D2 por pool; M-D9 própria, com positivos obrigatórios e exposição temporal.
+- **Meme / 2026-09-12** — registrar a exceção ANTROGPT e corrigir relógios e generalizações do recorte.
+- **KB-0094 — upgrade e holder rewards** — acrescentar o HTML como fonte candidata ainda não validada.

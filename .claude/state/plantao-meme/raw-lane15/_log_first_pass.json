@@ -1,0 +1,279 @@
+{
+ "run": 15,
+ "lane": 3,
+ "start_utc": "2026-09-12T18:48:45.660972+00:00",
+ "pumpfun_host_requests": 4,
+ "requests": [
+  {
+   "file": "01_boards_movers.json",
+   "url": "https://advanced-indexer.pump.fun/boards/movers?offset=0&limit=50",
+   "request_started_utc": "2026-09-12T18:48:45.660+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:46.021+00:00",
+   "read_brt": "15:48:46",
+   "bytes": 46075,
+   "headers": {
+    "Server": "cloudflare",
+    "CF-RAY": "a3a116961cf4df6c-GRU"
+   }
+  },
+  {
+   "file": "01_boards_graduating.json",
+   "url": "https://advanced-indexer.pump.fun/boards/graduating?offset=0&limit=50",
+   "request_started_utc": "2026-09-12T18:48:47.178+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:47.387+00:00",
+   "read_brt": "15:48:47",
+   "bytes": 46157,
+   "headers": {
+    "Server": "cloudflare",
+    "CF-RAY": "a3a1169f3d7cf1ce-GRU"
+   }
+  },
+  {
+   "file": "01_boards_graduated.json",
+   "url": "https://advanced-indexer.pump.fun/boards/graduated?offset=0&limit=50",
+   "request_started_utc": "2026-09-12T18:48:48.544+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:48.776+00:00",
+   "read_brt": "15:48:48",
+   "bytes": 44267,
+   "headers": {
+    "Server": "cloudflare",
+    "CF-RAY": "a3a116a7ed167810-GRU"
+   }
+  },
+  {
+   "file": "02_sol_price.json",
+   "url": "https://frontend-api-v3.pump.fun/sol-price",
+   "request_started_utc": "2026-09-12T18:48:49.934+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:50.147+00:00",
+   "read_brt": "15:48:50",
+   "bytes": 75,
+   "headers": {
+    "x-ratelimit-limit": "50",
+    "x-ratelimit-remaining": "49",
+    "x-ratelimit-reset": "60",
+    "Server": "cloudflare",
+    "CF-RAY": "a3a116b08854ef26-GRU"
+   }
+  },
+  {
+   "file": "11_dexscreener_tokens_batch.json",
+   "url": "https://api.dexscreener.com/tokens/v1/solana/",
+   "request_started_utc": "2026-09-12T18:48:50.151+00:00",
+   "http": 404,
+   "response_received_utc": "2026-09-12T18:48:50.440+00:00",
+   "read_brt": "15:48:50",
+   "bytes": 629,
+   "headers": {
+    "Server": "cloudflare",
+    "CF-RAY": "a3a116b23ee65b29-GRU"
+   }
+  },
+  {
+   "file": "13_dexscreener_boosts_latest.json",
+   "url": "https://api.dexscreener.com/token-boosts/latest/v1",
+   "request_started_utc": "2026-09-12T18:48:51.543+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:51.634+00:00",
+   "read_brt": "15:48:51",
+   "bytes": 22769,
+   "headers": {
+    "Server": "cloudflare",
+    "CF-RAY": "a3a116ba9c4ff237-GRU"
+   }
+  },
+  {
+   "file": "14_dexscreener_boosts_top.json",
+   "url": "https://api.dexscreener.com/token-boosts/top/v1",
+   "request_started_utc": "2026-09-12T18:48:52.737+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:52.833+00:00",
+   "read_brt": "15:48:52",
+   "bytes": 21604,
+   "headers": {
+    "Server": "cloudflare",
+    "CF-RAY": "a3a116c2297ceede-GRU"
+   }
+  },
+  {
+   "file": "15_dexscreener_profiles_latest.json",
+   "url": "https://api.dexscreener.com/token-profiles/latest/v1",
+   "request_started_utc": "2026-09-12T18:48:53.936+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:54.016+00:00",
+   "read_brt": "15:48:54",
+   "bytes": 21932,
+   "headers": {
+    "Server": "cloudflare",
+    "CF-RAY": "a3a116c98df5ff8c-GRU"
+   }
+  },
+  {
+   "file": "20_jito_tip_floor.json",
+   "url": "https://bundles.jito.wtf/api/v1/bundles/tip_floor",
+   "request_started_utc": "2026-09-12T18:48:54.018+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:54.255+00:00",
+   "read_brt": "15:48:54",
+   "bytes": 315
+  },
+  {
+   "file": "21_status_solana_summary.json",
+   "url": "https://status.solana.com/api/v2/summary.json",
+   "request_started_utc": "2026-09-12T18:48:54.258+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:54.475+00:00",
+   "read_brt": "15:48:54",
+   "bytes": 2973,
+   "headers": {
+    "Server": "AtlassianEdge"
+   }
+  },
+  {
+   "file": "22_rpc_prioritization_fees.json",
+   "url": "https://api.mainnet-beta.solana.com",
+   "request_started_utc": "2026-09-12T18:48:54.479+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:55.143+00:00",
+   "read_brt": "15:48:55",
+   "bytes": 6514,
+   "headers": {
+    "x-ratelimit-tier": "free",
+    "x-ratelimit-method-limit": "20",
+    "x-ratelimit-method-remaining": "19",
+    "x-ratelimit-rps-limit": "250",
+    "x-ratelimit-rps-remaining": "249",
+    "x-ratelimit-endpoint-limit": "unlimited",
+    "x-ratelimit-endpoint-remaining": "-6664",
+    "x-ratelimit-conn-limit": "40",
+    "x-ratelimit-conn-remaining": "39",
+    "x-ratelimit-connrate-limit": "40",
+    "x-ratelimit-connrate-remaining": "39",
+    "x-ratelimit-pubsub-limit": "10",
+    "x-ratelimit-pubsub-remaining": "10"
+   }
+  },
+  {
+   "file": "23_rpc_perf_samples.json",
+   "url": "https://api.mainnet-beta.solana.com",
+   "request_started_utc": "2026-09-12T18:48:55.145+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:55.847+00:00",
+   "read_brt": "15:48:55",
+   "bytes": 601,
+   "headers": {
+    "x-ratelimit-tier": "free",
+    "x-ratelimit-method-limit": "150",
+    "x-ratelimit-method-remaining": "149",
+    "x-ratelimit-rps-limit": "250",
+    "x-ratelimit-rps-remaining": "248",
+    "x-ratelimit-endpoint-limit": "unlimited",
+    "x-ratelimit-endpoint-remaining": "-6846",
+    "x-ratelimit-conn-limit": "40",
+    "x-ratelimit-conn-remaining": "39",
+    "x-ratelimit-connrate-limit": "40",
+    "x-ratelimit-connrate-remaining": "39",
+    "x-ratelimit-pubsub-limit": "10",
+    "x-ratelimit-pubsub-remaining": "10"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://api.llama.fi/summary/fees/pump.fun",
+   "request_started_utc": "2026-09-12T18:48:55.852+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:56.990+00:00",
+   "read_brt": "15:48:56",
+   "bytes": 64319,
+   "headers": {
+    "Server": "cloudflare",
+    "CF-RAY": "a3a116d5daaaf1cd-GRU"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://api.llama.fi/summary/dexs/pumpswap",
+   "request_started_utc": "2026-09-12T18:48:56.994+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:58.081+00:00",
+   "read_brt": "15:48:58",
+   "bytes": 40544,
+   "headers": {
+    "Server": "cloudflare",
+    "CF-RAY": "a3a116dcab2e4360-GRU"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/",
+   "request_started_utc": "2026-09-12T18:48:58.084+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:58.936+00:00",
+   "read_brt": "15:48:58",
+   "bytes": 12653,
+   "headers": {
+    "Server": "nginx/1.22.1"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/fees/",
+   "request_started_utc": "2026-09-12T18:48:58.945+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:59.359+00:00",
+   "read_brt": "15:48:59",
+   "bytes": 12438,
+   "headers": {
+    "Server": "nginx/1.22.1"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/data-api/real-time/",
+   "request_started_utc": "2026-09-12T18:48:59.365+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:48:59.811+00:00",
+   "read_brt": "15:48:59",
+   "bytes": 67764,
+   "headers": {
+    "Server": "nginx/1.22.1"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/local-trading-api/trading-api/",
+   "request_started_utc": "2026-09-12T18:48:59.828+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:49:00.253+00:00",
+   "read_brt": "15:49:00",
+   "bytes": 53645,
+   "headers": {
+    "Server": "nginx/1.22.1"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/local-trading-api/jito-bundles/",
+   "request_started_utc": "2026-09-12T18:49:00.262+00:00",
+   "http": 200,
+   "response_received_utc": "2026-09-12T18:49:00.681+00:00",
+   "read_brt": "15:49:00",
+   "bytes": 88509,
+   "headers": {
+    "Server": "nginx/1.22.1"
+   }
+  },
+  {
+   "file": null,
+   "url": "https://status.pumpportal.fun/",
+   "request_started_utc": "2026-09-12T18:49:00.695+00:00",
+   "http": 0,
+   "error": "ConnectionError(MaxRetryError('HTTPSConnectionPool(host=\\'status.pumpportal.fun\\', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"HTTPSConnection(host=\\'status.pumpportal.",
+   "read_brt": "15:49:00"
+  }
+ ],
+ "end_utc": "2026-09-12T18:49:00.828062+00:00"
+}

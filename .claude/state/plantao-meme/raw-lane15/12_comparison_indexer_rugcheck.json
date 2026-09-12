@@ -1,0 +1,1319 @@
+{
+ "note": "derived; top10_ex_pool excludes topHolders whose address/owner is knownAccounts type AMM; times BRT",
+ "read_brt": "15:51:33",
+ "sol_price": {
+  "solPrice": 101.63623320808846,
+  "asOfTimestamp": 1789238929020,
+  "stale": false
+ },
+ "rows": [
+  {
+   "t": "baton",
+   "mint": "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
+   "pg": "pump",
+   "pl": null,
+   "created_brt": "09/09 17:32:10",
+   "gd_brt": "09/09 17:32:16",
+   "gd_minus_created_s": 6,
+   "ix_t10": 16.1125,
+   "rc_top10_ex": 15.12,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "rc_creator_pct": null,
+   "rc_top1_pct": 2.5105007770520738,
+   "ix_nh": 8612,
+   "rc_holders": 26650,
+   "ix_bo": 0,
+   "ix_so": 1.2179,
+   "ix_sn": 159,
+   "ix_kol": 48,
+   "ix_progress": 100,
+   "ix_quoteMint": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+   "ix_isCashbackEnabled": true,
+   "ix_mayhemState": null,
+   "ix_dev": "Fzz2amRoCCpEvxtwdurs8qLVLSdrd3dcraJVpNjE4rp4",
+   "rc_creator_addr": "CZqfz7EdR1bBz8Av6psui1P7Rq7tEQ6Wjos8NJMHCSdr",
+   "board_bo": {
+    "movers": 0
+   },
+   "board_t10": {
+    "movers": 16.1085
+   },
+   "board_nh": {
+    "movers": 8612
+   },
+   "ix_mcap": 12432596.710884139,
+   "rc_score_norm": 1,
+   "rc_score": 1,
+   "rc_risks": [],
+   "rc_liq": 1444594.0817439347,
+   "rc_lp": [
+    [
+     0,
+     "meteoraDlmm"
+    ],
+    [
+     100,
+     "pump_fun_amm"
+    ],
+    [
+     0,
+     "meteoraDlmm"
+    ],
+    [
+     0,
+     "orca"
+    ]
+   ],
+   "rc_insiders": 21,
+   "rc_rugged": false,
+   "rc_mint_auth": null,
+   "rc_freeze_auth": null,
+   "detectedAt": "2026-09-09T20:32:12.81724596Z",
+   "detectedAt_minus_created_s": 2.8,
+   "tx": 104658,
+   "pf_per_tx_lamports": 754299,
+   "tip_per_tx_lamports": 928565,
+   "dex_n_pairs": 1,
+   "dex_dexId": "pumpswap",
+   "dex_pairCreatedAt_brt": "09/09 17:32:14",
+   "dex_liq": 494788.97,
+   "dex_mcap": 12422229,
+   "dex_info_present": true,
+   "dex_boosts": null,
+   "orders": {
+    "orders": [
+     {
+      "chainId": "solana",
+      "tokenAddress": "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
+      "type": "communityTakeover",
+      "status": "approved",
+      "paymentTimestamp": 1789031412151
+     },
+     {
+      "chainId": "solana",
+      "tokenAddress": "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
+      "type": "tokenProfile",
+      "status": "approved",
+      "paymentTimestamp": 1788986644199
+     }
+    ],
+    "boosts": []
+   },
+   "coins_is_cashback_enabled": true,
+   "coins_complete": true,
+   "coins_raydium_pool": null,
+   "coins_pump_swap_pool": "Cb7ZRgPLhji3Th7htXyKEqbXvNjPpeTvckXuWakBUhXu"
+  },
+  {
+   "t": "Tulip",
+   "mint": "7vSG4GX8qz5V36noSde5Z9xV8xAXAGqivDyaNytPVDJf",
+   "pg": "raydium_launchpad",
+   "pl": "stonkfun",
+   "created_brt": "12/09 15:08:17",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "ix_t10": 0,
+   "rc_top10_ex": 14.2,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "rc_creator_pct": null,
+   "rc_top1_pct": 5.241826686322453,
+   "ix_nh": 2469,
+   "rc_holders": 6141,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 0,
+   "ix_kol": 9,
+   "ix_progress": 0,
+   "ix_quoteMint": "FLWSojG1gB5VStYR3Sb4nQFRt43UBYkqih1j2CpVLqgd",
+   "ix_isCashbackEnabled": false,
+   "ix_mayhemState": null,
+   "ix_dev": "4W3fiTa3Rai2dh5USiXA71EymrPCeLxVmSeXeU8his5C",
+   "rc_creator_addr": "4W3fiTa3Rai2dh5USiXA71EymrPCeLxVmSeXeU8his5C",
+   "board_bo": {
+    "movers": 0
+   },
+   "board_t10": {
+    "movers": 0
+   },
+   "board_nh": {
+    "movers": 2442
+   },
+   "ix_mcap": 1773047.369357965,
+   "rc_score_norm": 7,
+   "rc_score": 101,
+   "rc_risks": [
+    [
+     "Mutable metadata",
+     "warn"
+    ]
+   ],
+   "rc_liq": 350131.3843726513,
+   "rc_lp": [
+    [
+     100,
+     "raydium_cpmm"
+    ],
+    [
+     0,
+     "meteoraDlmm"
+    ],
+    [
+     0,
+     "meteoraDlmm"
+    ],
+    [
+     0,
+     "meteoraDlmm"
+    ]
+   ],
+   "rc_insiders": 30,
+   "rc_rugged": false,
+   "rc_mint_auth": null,
+   "rc_freeze_auth": null,
+   "detectedAt": "2026-09-12T18:08:18.535023857Z",
+   "detectedAt_minus_created_s": 1.5,
+   "tx": 16588,
+   "pf_per_tx_lamports": 682844,
+   "tip_per_tx_lamports": 434985,
+   "dex_n_pairs": 1,
+   "dex_dexId": "raydium",
+   "dex_pairCreatedAt_brt": "12/09 15:08:27",
+   "dex_liq": 297261.95,
+   "dex_mcap": 2550703,
+   "dex_info_present": true,
+   "dex_boosts": null,
+   "orders": {
+    "orders": [
+     {
+      "chainId": "solana",
+      "tokenAddress": "7vSG4GX8qz5V36noSde5Z9xV8xAXAGqivDyaNytPVDJf",
+      "type": "tokenProfile",
+      "status": "approved",
+      "paymentTimestamp": 1789236755994
+     }
+    ],
+    "boosts": []
+   },
+   "coins_is_cashback_enabled": null,
+   "coins_complete": false,
+   "coins_raydium_pool": null,
+   "coins_pump_swap_pool": null
+  },
+  {
+   "t": "INCOME",
+   "mint": "E7mRvAbgZdA6dF7cgXZevkbjd9Yfy5q11XEFnWZfpump",
+   "pg": "pump",
+   "pl": null,
+   "created_brt": "12/09 14:40:05",
+   "gd_brt": "12/09 14:40:37",
+   "gd_minus_created_s": 32,
+   "ix_t10": 23.9172,
+   "rc_top10_ex": 16.45,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "rc_creator_pct": null,
+   "rc_top1_pct": 9.168679559743007,
+   "ix_nh": 2492,
+   "rc_holders": 6737,
+   "ix_bo": 1.5871,
+   "ix_so": 0,
+   "ix_sn": 3,
+   "ix_kol": 10,
+   "ix_progress": 100,
+   "ix_quoteMint": "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS",
+   "ix_isCashbackEnabled": false,
+   "ix_mayhemState": null,
+   "ix_dev": "D9gQ6RhKEpnobPBUdWY5bPQt2p3zGk3iVz6ChpUi2ArA",
+   "rc_creator_addr": "5P7pH4fZt4AQa2YSEsWXUKzVi81E3PMMrMVeTDJT879u",
+   "board_bo": {
+    "movers": 1.5871,
+    "graduated": 1.5871
+   },
+   "board_t10": {
+    "movers": 23.8538,
+    "graduated": 23.8472
+   },
+   "board_nh": {
+    "movers": 2491,
+    "graduated": 2492
+   },
+   "ix_mcap": 346361.67296097777,
+   "rc_score_norm": 1,
+   "rc_score": 1,
+   "rc_risks": [],
+   "rc_liq": 70244.77874185529,
+   "rc_lp": [
+    [
+     100,
+     "pump_fun_amm"
+    ],
+    [
+     0,
+     "meteoraDlmm"
+    ],
+    [
+     0,
+     "meteora_damm_v2"
+    ],
+    [
+     0,
+     "meteora_damm_v2"
+    ]
+   ],
+   "rc_insiders": 27,
+   "rc_rugged": false,
+   "rc_mint_auth": null,
+   "rc_freeze_auth": null,
+   "detectedAt": "2026-09-12T17:40:07.175769037Z",
+   "detectedAt_minus_created_s": 2.2,
+   "tx": 17045,
+   "pf_per_tx_lamports": 380053,
+   "tip_per_tx_lamports": 321900,
+   "dex_n_pairs": 1,
+   "dex_dexId": "pumpswap",
+   "dex_pairCreatedAt_brt": "12/09 14:40:36",
+   "dex_liq": null,
+   "dex_mcap": null,
+   "dex_info_present": false,
+   "dex_boosts": null,
+   "orders": {
+    "orders": [],
+    "boosts": []
+   },
+   "coins_is_cashback_enabled": false,
+   "coins_complete": true,
+   "coins_raydium_pool": null,
+   "coins_pump_swap_pool": "6kWUsEqR22T8dF8iKDsG8pFTMVFNUmQ7vbG9cAVH3PMb"
+  },
+  {
+   "t": "ANTROGPT",
+   "mint": "CyYCtXGEoLgxCrPjHBwafKbEtDgnuiEmUCeAxmuMpump",
+   "pg": "pump",
+   "pl": null,
+   "created_brt": "12/09 15:38:51",
+   "gd_brt": "12/09 15:38:51",
+   "gd_minus_created_s": 0,
+   "ix_t10": 15.6164,
+   "rc_top10_ex": 16.52,
+   "ix_dh": 0.0857,
+   "rc_creator": 852566670965,
+   "rc_creator_pct": null,
+   "rc_top1_pct": 16.19411625366874,
+   "ix_nh": 809,
+   "rc_holders": 1035,
+   "ix_bo": 0.0857,
+   "ix_so": 0,
+   "ix_sn": 29,
+   "ix_kol": 0,
+   "ix_progress": 100,
+   "ix_quoteMint": "11111111111111111111111111111111",
+   "ix_isCashbackEnabled": false,
+   "ix_mayhemState": null,
+   "ix_dev": "CjwMLHVKn96kfbEHpJFkC7BnDYDooSieoKDstxeSmPWe",
+   "rc_creator_addr": "CjwMLHVKn96kfbEHpJFkC7BnDYDooSieoKDstxeSmPWe",
+   "board_bo": {
+    "movers": 0.0857,
+    "graduated": 0.0857
+   },
+   "board_t10": {
+    "movers": 11.2486,
+    "graduated": 11.2486
+   },
+   "board_nh": {
+    "movers": 855,
+    "graduated": 855
+   },
+   "ix_mcap": 71752.3023774277,
+   "rc_score_norm": 1,
+   "rc_score": 1,
+   "rc_risks": [],
+   "rc_liq": 22297.721780118503,
+   "rc_lp": [
+    [
+     100,
+     "pump_fun_amm"
+    ]
+   ],
+   "rc_insiders": 0,
+   "rc_rugged": false,
+   "rc_mint_auth": null,
+   "rc_freeze_auth": null,
+   "detectedAt": "2026-09-12T18:38:54.676894699Z",
+   "detectedAt_minus_created_s": 3.7,
+   "tx": 1956,
+   "pf_per_tx_lamports": 1112369,
+   "tip_per_tx_lamports": 163215,
+   "dex_n_pairs": 1,
+   "dex_dexId": "pumpfun",
+   "dex_pairCreatedAt_brt": "12/09 15:38:51",
+   "dex_liq": null,
+   "dex_mcap": 41798.84,
+   "dex_info_present": false,
+   "dex_boosts": null,
+   "orders": {
+    "orders": [],
+    "boosts": []
+   },
+   "coins_is_cashback_enabled": false,
+   "coins_complete": true,
+   "coins_raydium_pool": null,
+   "coins_pump_swap_pool": "EpZ6CZBU8tf5NgeRx8bdS2h4CoAysNzyWBB5Y15PA7u9"
+  },
+  {
+   "t": "anon",
+   "mint": "6WGQvs889hdtZWLVG8Cc94ttK9TBT3rfUKJ5Tokepump",
+   "pg": "pump",
+   "pl": null,
+   "created_brt": "12/09 15:34:19",
+   "gd_brt": "12/09 15:44:14",
+   "gd_minus_created_s": 595,
+   "ix_t10": 35.8098,
+   "rc_top10_ex": 19.63,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "rc_creator_pct": null,
+   "rc_top1_pct": 20.388181478761965,
+   "ix_nh": 815,
+   "rc_holders": 1764,
+   "ix_bo": 17.6154,
+   "ix_so": 0.0286,
+   "ix_sn": 36,
+   "ix_kol": 4,
+   "ix_progress": 100,
+   "ix_quoteMint": "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS",
+   "ix_isCashbackEnabled": false,
+   "ix_mayhemState": null,
+   "ix_dev": "FiwwHe2obYsFoxprUXRWdAgHxMfKwK7ca9YB3g8bmX13",
+   "rc_creator_addr": "Ctz5UXfFz2Xjnf3GTFSi28dSJPqfh5HsbzF4BDQiaMUy",
+   "board_bo": {
+    "movers": 18.5179,
+    "graduated": 18.5179
+   },
+   "board_t10": {
+    "movers": 37.6273,
+    "graduated": 36.7844
+   },
+   "board_nh": {
+    "movers": 813,
+    "graduated": 814
+   },
+   "ix_mcap": 75950.96612272294,
+   "rc_score_norm": 1,
+   "rc_score": 1,
+   "rc_risks": [],
+   "rc_liq": 25775.362407993765,
+   "rc_lp": [
+    [
+     100,
+     "pump_fun_amm"
+    ],
+    [
+     0,
+     "meteora_damm_v2"
+    ],
+    [
+     0,
+     "meteora_damm_v2"
+    ]
+   ],
+   "rc_insiders": 4,
+   "rc_rugged": false,
+   "rc_mint_auth": null,
+   "rc_freeze_auth": null,
+   "detectedAt": "2026-09-12T18:34:21.141470302Z",
+   "detectedAt_minus_created_s": 2.1,
+   "tx": 3397,
+   "pf_per_tx_lamports": 357059,
+   "tip_per_tx_lamports": 367773,
+   "dex_n_pairs": 1,
+   "dex_dexId": "pumpswap",
+   "dex_pairCreatedAt_brt": "12/09 15:44:14",
+   "dex_liq": null,
+   "dex_mcap": null,
+   "dex_info_present": true,
+   "dex_boosts": null,
+   "orders": {
+    "orders": [
+     {
+      "chainId": "solana",
+      "tokenAddress": "6WGQvs889hdtZWLVG8Cc94ttK9TBT3rfUKJ5Tokepump",
+      "type": "tokenProfile",
+      "status": "approved",
+      "paymentTimestamp": 1789238548045
+     }
+    ],
+    "boosts": []
+   },
+   "coins_is_cashback_enabled": false,
+   "coins_complete": true,
+   "coins_raydium_pool": null,
+   "coins_pump_swap_pool": "GRyH2CYao7kv4k7SmrhtzZ11sS1tFLhQYV4Zmedo2yoQ"
+  },
+  {
+   "t": "PEC",
+   "mint": "C4mZupcRY7meA8KTVz9b2XoynPDJKKPCwy3N23ANNuYg",
+   "pg": "raydium_launchpad",
+   "pl": "stonkfun",
+   "created_brt": "12/09 15:15:50",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "ix_t10": 0,
+   "rc_top10_ex": 23.95,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "rc_creator_pct": null,
+   "rc_top1_pct": 32.83568225532469,
+   "ix_nh": 423,
+   "rc_holders": 1927,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 38,
+   "ix_kol": 16,
+   "ix_progress": 99.99990104752503,
+   "ix_quoteMint": "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS",
+   "ix_isCashbackEnabled": false,
+   "ix_mayhemState": null,
+   "ix_dev": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+   "rc_creator_addr": null,
+   "board_bo": {
+    "graduating": 0
+   },
+   "board_t10": {
+    "graduating": 0
+   },
+   "board_nh": {
+    "graduating": 423
+   },
+   "ix_mcap": 40185.962282850945,
+   "rc_score_norm": 7,
+   "rc_score": 101,
+   "rc_risks": [
+    [
+     "Mutable metadata",
+     "warn"
+    ]
+   ],
+   "rc_liq": 20941.322340624916,
+   "rc_lp": [
+    [
+     100,
+     "raydium_cpmm"
+    ],
+    [
+     0,
+     "meteora_damm_v2"
+    ],
+    [
+     0,
+     "meteora_damm_v2"
+    ]
+   ],
+   "rc_insiders": 9,
+   "rc_rugged": false,
+   "rc_mint_auth": null,
+   "rc_freeze_auth": null,
+   "detectedAt": "2026-09-12T18:15:52.054480038Z",
+   "detectedAt_minus_created_s": 2.1,
+   "tx": 5458,
+   "pf_per_tx_lamports": 535601,
+   "tip_per_tx_lamports": 248379,
+   "dex_n_pairs": 1,
+   "dex_dexId": "raydium",
+   "dex_pairCreatedAt_brt": "12/09 15:16:21",
+   "dex_liq": 30105.22,
+   "dex_mcap": 45765,
+   "dex_info_present": false,
+   "dex_boosts": null,
+   "orders": {
+    "orders": [],
+    "boosts": []
+   },
+   "coins_is_cashback_enabled": null,
+   "coins_complete": false,
+   "coins_raydium_pool": null,
+   "coins_pump_swap_pool": null
+  },
+  {
+   "t": "emonad",
+   "mint": "R3qMyyDQSy2UqyxjYG8ZJyvYN4KTsGfLuiPJKSga5qM",
+   "pg": "raydium_launchpad",
+   "pl": "stonkfun",
+   "created_brt": "12/09 13:58:12",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "ix_t10": 0,
+   "rc_top10_ex": 23.74,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "rc_creator_pct": null,
+   "rc_top1_pct": 22.0970147090642,
+   "ix_nh": 124,
+   "rc_holders": 288,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 12,
+   "ix_kol": 4,
+   "ix_progress": 99.70897111648694,
+   "ix_quoteMint": "CrAr4RRJMBVwRsZtT62pEhfA9H5utymC2mVx8e7FreP2",
+   "ix_isCashbackEnabled": false,
+   "ix_mayhemState": null,
+   "ix_dev": "9rDMVCH7mQ9N2PkyHw8KT8wraMhF8tyMz9R631yyL1df",
+   "rc_creator_addr": null,
+   "board_bo": {
+    "graduating": 0
+   },
+   "board_t10": {
+    "graduating": 0
+   },
+   "board_nh": {
+    "graduating": 122
+   },
+   "ix_mcap": 34201.834852519256,
+   "rc_score_norm": 7,
+   "rc_score": 101,
+   "rc_risks": [
+    [
+     "Mutable metadata",
+     "warn"
+    ]
+   ],
+   "rc_liq": 14507.122156174079,
+   "rc_lp": [
+    [
+     99.99999999987827,
+     "raydium_cpmm"
+    ]
+   ],
+   "rc_insiders": 0,
+   "rc_rugged": false,
+   "rc_mint_auth": null,
+   "rc_freeze_auth": null,
+   "detectedAt": "2026-09-12T16:58:13.866038901Z",
+   "detectedAt_minus_created_s": 1.9,
+   "tx": 530,
+   "pf_per_tx_lamports": 537312,
+   "tip_per_tx_lamports": 175608,
+   "dex_n_pairs": 1,
+   "dex_dexId": "raydium",
+   "dex_pairCreatedAt_brt": "12/09 15:48:54",
+   "dex_liq": 14579.36,
+   "dex_mcap": 33729,
+   "dex_info_present": false,
+   "dex_boosts": null,
+   "orders": {
+    "orders": [],
+    "boosts": []
+   },
+   "coins_is_cashback_enabled": null,
+   "coins_complete": false,
+   "coins_raydium_pool": null,
+   "coins_pump_swap_pool": null
+  },
+  {
+   "t": "PSYOPCAT",
+   "mint": "C7GGPrNdnQ41Vq6Gfouqm2fNiKCSSzDLPiMyPx42MW7X",
+   "pg": "raydium_launchpad",
+   "pl": "stonkfun",
+   "created_brt": "12/09 15:00:00",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "ix_t10": 0,
+   "rc_top10_ex": 24.29,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "rc_creator_pct": null,
+   "rc_top1_pct": 25.35644633186266,
+   "ix_nh": 156,
+   "rc_holders": 392,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 39,
+   "ix_kol": 3,
+   "ix_progress": 97.29905795634599,
+   "ix_quoteMint": "So11111111111111111111111111111111111111112",
+   "ix_isCashbackEnabled": false,
+   "ix_mayhemState": null,
+   "ix_dev": "44fBqoHnSbDFi5JcQZBsGx9tLZLEwgU24pnpty5jzsY8",
+   "rc_creator_addr": null,
+   "board_bo": {
+    "movers": 0,
+    "graduating": 0
+   },
+   "board_t10": {
+    "movers": 0,
+    "graduating": 0
+   },
+   "board_nh": {
+    "movers": 154,
+    "graduating": 154
+   },
+   "ix_mcap": 33937.15115863494,
+   "rc_score_norm": 7,
+   "rc_score": 101,
+   "rc_risks": [
+    [
+     "Mutable metadata",
+     "warn"
+    ]
+   ],
+   "rc_liq": 14426.741108622735,
+   "rc_lp": [
+    [
+     99.99999999757884,
+     "raydium_cpmm"
+    ],
+    [
+     0,
+     "meteora_damm_v2"
+    ]
+   ],
+   "rc_insiders": 0,
+   "rc_rugged": false,
+   "rc_mint_auth": null,
+   "rc_freeze_auth": null,
+   "detectedAt": "2026-09-12T18:00:01.603271741Z",
+   "detectedAt_minus_created_s": 1.6,
+   "tx": 993,
+   "pf_per_tx_lamports": 956708,
+   "tip_per_tx_lamports": 310758,
+   "dex_n_pairs": 1,
+   "dex_dexId": "raydium",
+   "dex_pairCreatedAt_brt": "12/09 15:46:24",
+   "dex_liq": 14425.1,
+   "dex_mcap": 29445,
+   "dex_info_present": false,
+   "dex_boosts": null,
+   "orders": {
+    "orders": [],
+    "boosts": []
+   },
+   "coins_is_cashback_enabled": null,
+   "coins_complete": false,
+   "coins_raydium_pool": null,
+   "coins_pump_swap_pool": null
+  },
+  {
+   "t": "Vortex",
+   "mint": "Be9F2i3eXwZ3W3NLAiVBZUsNCPXh8ibPP4DwFHoYYPcP",
+   "pg": "pump",
+   "pl": null,
+   "created_brt": "10/09 16:33:01",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "ix_t10": 18.7899,
+   "rc_top10_ex": 18.79,
+   "ix_dh": 1.7178,
+   "rc_creator": 17177765931372,
+   "rc_creator_pct": 1.7177781619432477,
+   "rc_top1_pct": 24.383713270818223,
+   "ix_nh": 4776,
+   "rc_holders": 4811,
+   "ix_bo": 0,
+   "ix_so": 0.0001,
+   "ix_sn": 12,
+   "ix_kol": 0,
+   "ix_progress": 95.34,
+   "ix_quoteMint": "11111111111111111111111111111111",
+   "ix_isCashbackEnabled": false,
+   "ix_mayhemState": null,
+   "ix_dev": "GvWEm9wsUYAYk8BJX786whoBE7obxBs7qNz4iWt9u8T",
+   "rc_creator_addr": "GvWEm9wsUYAYk8BJX786whoBE7obxBs7qNz4iWt9u8T",
+   "board_bo": {
+    "graduating": 0
+   },
+   "board_t10": {
+    "graduating": 18.7899
+   },
+   "board_nh": {
+    "graduating": 4776
+   },
+   "ix_mcap": 32726.87802677266,
+   "rc_score_norm": 80,
+   "rc_score": 112801,
+   "rc_risks": [
+    [
+     "Creator history of rugged tokens",
+     "danger"
+    ]
+   ],
+   "rc_liq": 8494.640748997746,
+   "rc_lp": [
+    [
+     100,
+     "pump_fun"
+    ]
+   ],
+   "rc_insiders": 50,
+   "rc_rugged": false,
+   "rc_mint_auth": null,
+   "rc_freeze_auth": null,
+   "detectedAt": "2026-09-10T19:33:02.823971206Z",
+   "detectedAt_minus_created_s": 1.8,
+   "tx": 395,
+   "pf_per_tx_lamports": 310368,
+   "tip_per_tx_lamports": 35538,
+   "dex_n_pairs": 1,
+   "dex_dexId": "pumpfun",
+   "dex_pairCreatedAt_brt": "10/09 16:33:02",
+   "dex_liq": null,
+   "dex_mcap": 32726.91,
+   "dex_info_present": false,
+   "dex_boosts": null,
+   "orders": {
+    "orders": [],
+    "boosts": []
+   },
+   "coins_is_cashback_enabled": false,
+   "coins_complete": false,
+   "coins_raydium_pool": null,
+   "coins_pump_swap_pool": null
+  },
+  {
+   "t": "BlackChad",
+   "mint": "FXWB6fNPDzE8UygmAKdfZcF5PTwaEaBseAcRf8Pupump",
+   "pg": "pump",
+   "pl": null,
+   "created_brt": "09/09 23:24:59",
+   "gd_brt": null,
+   "gd_minus_created_s": null,
+   "ix_t10": 69.4189,
+   "rc_top10_ex": 69.42,
+   "ix_dh": 29.7592,
+   "rc_creator": 297591589867428,
+   "rc_creator_pct": 29.7591589867428,
+   "rc_top1_pct": 29.7591589867428,
+   "ix_nh": 64,
+   "rc_holders": 133,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 0,
+   "ix_kol": 0,
+   "ix_progress": 94.14,
+   "ix_quoteMint": "11111111111111111111111111111111",
+   "ix_isCashbackEnabled": false,
+   "ix_mayhemState": null,
+   "ix_dev": "2VFZtQGLg5qNv6d24dMDaEdixUN3VMdf7moRCDWZTWB5",
+   "rc_creator_addr": "2VFZtQGLg5qNv6d24dMDaEdixUN3VMdf7moRCDWZTWB5",
+   "board_bo": {
+    "graduating": 0
+   },
+   "board_t10": {
+    "graduating": 69.4189
+   },
+   "board_nh": {
+    "graduating": 64
+   },
+   "ix_mcap": 30775.47735463308,
+   "rc_score_norm": 49,
+   "rc_score": 9433,
+   "rc_risks": [
+    [
+     "Single holder ownership",
+     "warn"
+    ],
+    [
+     "Single holder ownership",
+     "warn"
+    ],
+    [
+     "High holder concentration",
+     "warn"
+    ]
+   ],
+   "rc_liq": 8417.149048716821,
+   "rc_lp": [
+    [
+     100,
+     "pump_fun"
+    ]
+   ],
+   "rc_insiders": 0,
+   "rc_rugged": false,
+   "rc_mint_auth": null,
+   "rc_freeze_auth": null,
+   "detectedAt": "2026-09-10T02:25:00.582326166Z",
+   "detectedAt_minus_created_s": 1.6,
+   "tx": 235,
+   "pf_per_tx_lamports": 236035,
+   "tip_per_tx_lamports": 152739,
+   "dex_n_pairs": 1,
+   "dex_dexId": "pumpfun",
+   "dex_pairCreatedAt_brt": "09/09 23:24:59",
+   "dex_liq": null,
+   "dex_mcap": 30915.31,
+   "dex_info_present": false,
+   "dex_boosts": null,
+   "orders": {
+    "orders": [],
+    "boosts": []
+   },
+   "coins_is_cashback_enabled": false,
+   "coins_complete": false,
+   "coins_raydium_pool": null,
+   "coins_pump_swap_pool": null
+  }
+ ],
+ "grad_board_stats": {
+  "n_board": 50,
+  "n_pump": 44,
+  "serverTs_brt": "12/09 15:48:48",
+  "pg_counts": {
+   "pump": 44,
+   "raydium_launchpad": 6
+  },
+  "gd_min_brt": "12/09 14:14:30",
+  "gd_max_brt": "12/09 15:46:07",
+  "span_h": 1.53,
+  "rate_per_h": 32.7,
+  "delta_s": {
+   "n": 44,
+   "min": -1,
+   "med": 24,
+   "max": 88244,
+   "le60": 28,
+   "mid": 3,
+   "gt300": 13
+  },
+  "fast": {
+   "n": 28,
+   "bo_gt0": 6,
+   "bo_max": 13.5781,
+   "t10_med": 8.0237,
+   "sn_med": 20,
+   "nh_med": 214,
+   "mc_med": 7225.2674352797885
+  },
+  "slow": {
+   "n": 13,
+   "bo_gt0": 12,
+   "bo_max": 36.2706,
+   "t10_med": 48.4764,
+   "sn_med": 9,
+   "nh_med": 199,
+   "mc_med": 15010.025686493605
+  },
+  "latest8": [
+   [
+    "BEAST",
+    "HW54tpm2SQup2PL9me1sUjVogAVxALyZC1sxZCsDpump",
+    "12/09 15:46:07",
+    "12/09 15:46:07",
+    87,
+    0.0024,
+    0,
+    0,
+    14,
+    3796775.5208816514
+   ],
+   [
+    "Apple",
+    "3FWeYB4YcixHxdeYDhnq2WEz8vTV5VFGPhvTqKLjpump",
+    "12/09 15:45:19",
+    "12/09 15:45:19",
+    1661,
+    0.4836,
+    0,
+    0,
+    15,
+    1714803.0061291999
+   ],
+   [
+    "anon",
+    "6WGQvs889hdtZWLVG8Cc94ttK9TBT3rfUKJ5Tokepump",
+    "12/09 15:44:14",
+    "12/09 15:34:19",
+    814,
+    36.7844,
+    0,
+    18.5179,
+    36,
+    63802.86185524056
+   ],
+   [
+    "MA",
+    "F7m7YXGvQPCjpqyQGCHFa3c2vGjEpk7XBGSsf9dXpump",
+    "12/09 15:43:27",
+    "12/09 15:43:23",
+    52,
+    18.5,
+    0,
+    0,
+    25,
+    30194.755789740277
+   ],
+   [
+    "PODL",
+    "5gA61GZsF5nbbkmCfC2A8fH4mcDW7htiUh61z9z6pump",
+    "12/09 15:42:48",
+    "12/09 15:42:28",
+    101,
+    65.6372,
+    0,
+    0,
+    9,
+    9397.363953896322
+   ],
+   [
+    "Verity",
+    "6nuPmphuduxGLABDm9UMfwFgfKWTFhcNNucfotVCpump",
+    "12/09 15:39:25",
+    "12/09 15:10:08",
+    201,
+    29.8137,
+    0,
+    36.2706,
+    47,
+    46413.22591212277
+   ],
+   [
+    "ANTROGPT",
+    "CyYCtXGEoLgxCrPjHBwafKbEtDgnuiEmUCeAxmuMpump",
+    "12/09 15:38:51",
+    "12/09 15:38:51",
+    855,
+    11.2486,
+    0.0857,
+    0.0857,
+    29,
+    122600.56240164056
+   ],
+   [
+    "ZGANG",
+    "EGx4Q7rKgUPWXCAH2u6jhopzWaHEFc1Q6CGBMVsbpump",
+    "12/09 15:37:52",
+    "12/09 15:37:52",
+    264,
+    3.051,
+    0,
+    0,
+    45,
+    2203.366303006219
+   ]
+  ]
+ },
+ "fresh": [
+  {
+   "t": "BEAST",
+   "mint": "HW54tpm2SQup2PL9me1sUjVogAVxALyZC1sxZCsDpump",
+   "created_brt": "12/09 15:46:07",
+   "gd_brt": "12/09 15:46:07",
+   "gd_minus_created_s": -1,
+   "dex_present": true,
+   "dex_dexIds": [
+    "pumpswap"
+   ],
+   "dex_pairCreatedAt_brt": "12/09 15:46:07",
+   "dex_pair_minus_gd_s": 0,
+   "dex_read_brt": "15:50:20",
+   "dex_seen_at_gd_plus_s": 253,
+   "rugcheck_detectedAt_minus_created_s": null,
+   "photon": {
+    "mint": "HW54tpm2SQup2PL9me1sUjVogAVxALyZC1sxZCsDpump",
+    "http": 403,
+    "read_brt": "15:50:44",
+    "title": "Just a moment..."
+   }
+  },
+  {
+   "t": "Apple",
+   "mint": "3FWeYB4YcixHxdeYDhnq2WEz8vTV5VFGPhvTqKLjpump",
+   "created_brt": "12/09 15:45:19",
+   "gd_brt": "12/09 15:45:19",
+   "gd_minus_created_s": -1,
+   "dex_present": true,
+   "dex_dexIds": [
+    "pumpswap"
+   ],
+   "dex_pairCreatedAt_brt": "12/09 15:45:19",
+   "dex_pair_minus_gd_s": 0,
+   "dex_read_brt": "15:50:20",
+   "dex_seen_at_gd_plus_s": 301,
+   "rugcheck_detectedAt_minus_created_s": null,
+   "photon": {
+    "mint": "3FWeYB4YcixHxdeYDhnq2WEz8vTV5VFGPhvTqKLjpump",
+    "http": 403,
+    "read_brt": "15:50:47",
+    "title": "Just a moment..."
+   }
+  },
+  {
+   "t": "anon",
+   "mint": "6WGQvs889hdtZWLVG8Cc94ttK9TBT3rfUKJ5Tokepump",
+   "created_brt": "12/09 15:34:19",
+   "gd_brt": "12/09 15:44:14",
+   "gd_minus_created_s": 594,
+   "dex_present": true,
+   "dex_dexIds": [
+    "pumpswap"
+   ],
+   "dex_pairCreatedAt_brt": "12/09 15:44:14",
+   "dex_pair_minus_gd_s": 0,
+   "dex_read_brt": "15:50:20",
+   "dex_seen_at_gd_plus_s": 366,
+   "rugcheck_detectedAt_minus_created_s": 2.1,
+   "photon": {
+    "mint": "6WGQvs889hdtZWLVG8Cc94ttK9TBT3rfUKJ5Tokepump",
+    "http": 403,
+    "read_brt": "15:50:49",
+    "title": "Just a moment..."
+   }
+  }
+ ],
+ "network": {
+  "jito_time": "2026-09-12T18:49:17+00:00",
+  "jito_received_brt": "15:50:40",
+  "landed_tips_25th_percentile_lamports": 4783,
+  "landed_tips_50th_percentile_lamports": 19544,
+  "landed_tips_75th_percentile_lamports": 66657,
+  "landed_tips_95th_percentile_lamports": 177147,
+  "landed_tips_99th_percentile_lamports": 1004653,
+  "ema_landed_tips_50th_percentile_lamports": 16892,
+  "pump_fee_slots": [
+   446501714,
+   446501863
+  ],
+  "pump_fee_zero": "63/150",
+  "pump_fee_mean": 927268,
+  "pump_fee_max": 9999940,
+  "tps_total": [
+   4282,
+   4146,
+   4375,
+   4414,
+   4680
+  ],
+  "tps_nonvote": [
+   2187,
+   2048,
+   2229,
+   2305,
+   2515
+  ],
+  "slots_per_min": [
+   187,
+   187,
+   191,
+   188,
+   193
+  ],
+  "status": "All Systems Operational",
+  "status_updated_at": "2026-09-12T18:44:23.162Z",
+  "incidents": 0,
+  "maintenances": 0
+ },
+ "risk_vocab": {
+  "Mutable metadata": 4,
+  "Creator history of rugged tokens": 1,
+  "Single holder ownership": 2,
+  "High holder concentration": 1
+ },
+ "dex_boosts": {
+  "latest": {
+   "n": 30,
+   "by_chain": {
+    "solana": 22,
+    "robinhood": 8
+   },
+   "ours": [],
+   "top_amounts": null
+  },
+  "top": {
+   "n": 30,
+   "by_chain": {
+    "solana": 14,
+    "robinhood": 15,
+    "bsc": 1
+   },
+   "ours": [],
+   "top_amounts": [
+    700,
+    500,
+    500,
+    500,
+    500
+   ]
+  },
+  "profiles": {
+   "n": 30,
+   "by_chain": {
+    "robinhood": 11,
+    "solana": 19
+   },
+   "ours": [
+    "6WGQvs889hdtZWLVG8Cc94ttK9TBT3rfUKJ5Tokepump",
+    "7vSG4GX8qz5V36noSde5Z9xV8xAXAGqivDyaNytPVDJf"
+   ],
+   "top_amounts": null
+  }
+ },
+ "pumpportal": [
+  {
+   "url": "https://pumpportal.fun/",
+   "read_brt": "15:50:42",
+   "text_sha1_normalized": "1105d0046545",
+   "prev_raw_sha1_run11": "937e6f3c62e3",
+   "phrases_present": [],
+   "pool_enum_mentions": [],
+   "text_len": 1013,
+   "holder_reward_mentions": []
+  },
+  {
+   "url": "https://pumpportal.fun/fees/",
+   "read_brt": "15:50:43",
+   "text_sha1_normalized": "94c4b4456f58",
+   "prev_raw_sha1_run11": "3b2d6d39b166",
+   "phrases_present": [
+    "Effective May 1, 2026",
+    "0.5% fee",
+    "1% fee",
+    "0.01 SOL"
+   ],
+   "pool_enum_mentions": [],
+   "text_len": 1247,
+   "holder_reward_mentions": []
+  },
+  {
+   "url": "https://pumpportal.fun/data-api/real-time/",
+   "read_brt": "15:50:43",
+   "text_sha1_normalized": "5102772055a4",
+   "prev_raw_sha1_run11": "015ddf804fc7",
+   "phrases_present": [
+    "one WebSocket",
+    "0.01 SOL"
+   ],
+   "pool_enum_mentions": [],
+   "text_len": 5059,
+   "holder_reward_mentions": []
+  },
+  {
+   "url": "https://pumpportal.fun/local-trading-api/trading-api/",
+   "read_brt": "15:50:44",
+   "text_sha1_normalized": "4869e50b8b19",
+   "prev_raw_sha1_run11": "a4b07aab2b1f",
+   "phrases_present": [],
+   "pool_enum_mentions": [
+    "auto"
+   ],
+   "text_len": 4552,
+   "holder_reward_mentions": []
+  },
+  {
+   "url": "https://pumpportal.fun/local-trading-api/jito-bundles/",
+   "read_brt": "15:50:44",
+   "text_sha1_normalized": "dfd48b903ff2",
+   "prev_raw_sha1_run11": "22edaef19710",
+   "phrases_present": [
+    "priority fee on the first tx is used for jito tip",
+    "up to 5 transactions"
+   ],
+   "pool_enum_mentions": [
+    "pump"
+   ],
+   "text_len": 5298,
+   "holder_reward_mentions": []
+  }
+ ],
+ "photon": [
+  {
+   "mint": "HW54tpm2SQup2PL9me1sUjVogAVxALyZC1sxZCsDpump",
+   "http": 403,
+   "read_brt": "15:50:44",
+   "title": "Just a moment..."
+  },
+  {
+   "mint": "3FWeYB4YcixHxdeYDhnq2WEz8vTV5VFGPhvTqKLjpump",
+   "http": 403,
+   "read_brt": "15:50:47",
+   "title": "Just a moment..."
+  },
+  {
+   "mint": "6WGQvs889hdtZWLVG8Cc94ttK9TBT3rfUKJ5Tokepump",
+   "http": 403,
+   "read_brt": "15:50:49",
+   "title": "Just a moment..."
+  }
+ ],
+ "defillama_fees_last5": [
+  [
+   1788739200,
+   1225798
+  ],
+  [
+   1788825600,
+   1272930
+  ],
+  [
+   1788912000,
+   1412179
+  ],
+  [
+   1788998400,
+   1135509
+  ],
+  [
+   1789084800,
+   950515
+  ]
+ ],
+ "defillama_dex_last5": [
+  [
+   1788739200,
+   873434290
+  ],
+  [
+   1788825600,
+   737124940
+  ],
+  [
+   1788912000,
+   340962649
+  ],
+  [
+   1788998400,
+   468144120
+  ],
+  [
+   1789084800,
+   294171715
+  ]
+ ],
+ "orders_approved": [
+  [
+   "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
+   [
+    [
+     "communityTakeover",
+     "approved",
+     1789031412151
+    ],
+    [
+     "tokenProfile",
+     "approved",
+     1788986644199
+    ]
+   ]
+  ],
+  [
+   "7vSG4GX8qz5V36noSde5Z9xV8xAXAGqivDyaNytPVDJf",
+   [
+    [
+     "tokenProfile",
+     "approved",
+     1789236755994
+    ]
+   ]
+  ],
+  [
+   "6WGQvs889hdtZWLVG8Cc94ttK9TBT3rfUKJ5Tokepump",
+   [
+    [
+     "tokenProfile",
+     "approved",
+     1789238548045
+    ]
+   ]
+  ]
+ ]
+}

@@ -1,0 +1,178 @@
+{
+ "movers": [
+  [
+   "baton",
+   "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
+   "pump",
+   null
+  ],
+  [
+   "Tulip",
+   "7vSG4GX8qz5V36noSde5Z9xV8xAXAGqivDyaNytPVDJf",
+   "raydium_launchpad",
+   "stonkfun"
+  ],
+  [
+   "INCOME",
+   "E7mRvAbgZdA6dF7cgXZevkbjd9Yfy5q11XEFnWZfpump",
+   "pump",
+   null
+  ],
+  [
+   "ANTROGPT",
+   "CyYCtXGEoLgxCrPjHBwafKbEtDgnuiEmUCeAxmuMpump",
+   "pump",
+   null
+  ],
+  [
+   "anon",
+   "6WGQvs889hdtZWLVG8Cc94ttK9TBT3rfUKJ5Tokepump",
+   "pump",
+   null
+  ]
+ ],
+ "graduating": [
+  [
+   "PEC",
+   "C4mZupcRY7meA8KTVz9b2XoynPDJKKPCwy3N23ANNuYg",
+   "raydium_launchpad",
+   "stonkfun"
+  ],
+  [
+   "emonad",
+   "R3qMyyDQSy2UqyxjYG8ZJyvYN4KTsGfLuiPJKSga5qM",
+   "raydium_launchpad",
+   "stonkfun"
+  ],
+  [
+   "PSYOPCAT",
+   "C7GGPrNdnQ41Vq6Gfouqm2fNiKCSSzDLPiMyPx42MW7X",
+   "raydium_launchpad",
+   "stonkfun"
+  ],
+  [
+   "Vortex",
+   "Be9F2i3eXwZ3W3NLAiVBZUsNCPXh8ibPP4DwFHoYYPcP",
+   "pump",
+   null
+  ],
+  [
+   "BlackChad",
+   "FXWB6fNPDzE8UygmAKdfZcF5PTwaEaBseAcRf8Pupump",
+   "pump",
+   null
+  ]
+ ],
+ "fresh_grads": [
+  [
+   "BEAST",
+   "HW54tpm2SQup2PL9me1sUjVogAVxALyZC1sxZCsDpump",
+   "pump",
+   null,
+   1789238767000,
+   1789238767699
+  ],
+  [
+   "Apple",
+   "3FWeYB4YcixHxdeYDhnq2WEz8vTV5VFGPhvTqKLjpump",
+   "pump",
+   null,
+   1789238719000,
+   1789238719699
+  ],
+  [
+   "anon",
+   "6WGQvs889hdtZWLVG8Cc94ttK9TBT3rfUKJ5Tokepump",
+   "pump",
+   null,
+   1789238654000,
+   1789238059699
+  ]
+ ],
+ "server_ts_brt": {
+  "movers": "12/09 15:48:45",
+  "graduating": "12/09 15:48:47",
+  "graduated": "12/09 15:48:48"
+ },
+ "graduating_top5_progress": [
+  99.99990104752503,
+  99.70560127609254,
+  97.29905795634599,
+  95.34,
+  94.14
+ ],
+ "movers_chain_counts": {
+  "solana:mainnet": 34,
+  "none": 4,
+  "eip155:4663": 12
+ },
+ "movers_pg_counts": {
+  "pump": 21,
+  "raydium_launchpad": 9,
+  "pump_amm": 3,
+  "none": 2,
+  "raydium_clmm": 1,
+  "stonkfun": 4,
+  "uniswap_v2": 1,
+  "pons": 5,
+  "uniswap_v4": 2,
+  "uniswap_v3": 2
+ },
+ "graduating_pl_counts": {
+  "stonkfun": 17,
+  "pump": 30,
+  "jup_studio": 1,
+  "moonshot": 2
+ },
+ "board_read_brt": "15:49:36",
+ "board_entry_keys": [
+  "age",
+  "ath",
+  "bc",
+  "bo",
+  "c",
+  "cb",
+  "desc",
+  "dh",
+  "dw",
+  "gd",
+  "hs",
+  "i",
+  "ic",
+  "ih",
+  "kol",
+  "lv",
+  "m",
+  "mc",
+  "mh",
+  "n",
+  "nh",
+  "np",
+  "p",
+  "pa",
+  "pg",
+  "pl",
+  "sc",
+  "sn",
+  "so",
+  "t",
+  "t10",
+  "tf",
+  "tfUsd",
+  "tg",
+  "tw",
+  "tx5",
+  "txc",
+  "v",
+  "v15",
+  "v1h",
+  "v24h",
+  "v5",
+  "vUsd",
+  "vUsd15",
+  "vUsd1h",
+  "vUsd24h",
+  "vUsd5",
+  "ws"
+ ]
+}

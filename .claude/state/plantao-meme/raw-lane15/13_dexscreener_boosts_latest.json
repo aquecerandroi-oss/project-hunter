@@ -1,0 +1,634 @@
+[
+ {
+  "url": "https://dexscreener.com/solana/hh2waxy7qfq5guyquzr3ajo29g9htvthdjfhrb1jhnrc",
+  "chainId": "solana",
+  "tokenAddress": "Hh2waXY7qfq5GUyQuzr3AJo29g9hTVThdjfHRB1jHNRC",
+  "icon": "MmacMzrPxypK5LEo",
+  "header": "https://cdn.dexscreener.com/cms/images/De-W_OjwHmLuTEPe?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/Hh2waXY7qfq5GUyQuzr3AJo29g9hTVThdjfHRB1jHNRC?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://flywheel.fyi"
+   },
+   {
+    "url": "https://embercurve.fun/t/Hh2waXY7qfq5GUyQuzr3AJo29g9hTVThdjfHRB1jHNRC"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/flywheeldotfyi"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xc6b7a14e5e9495f3f58be742938f15f10dddbfd4",
+  "chainId": "robinhood",
+  "tokenAddress": "0xc6b7a14E5e9495f3f58Be742938F15f10DdDBfD4",
+  "description": "GROG = GROK",
+  "icon": "HxRooQirEaPwluP9",
+  "header": "https://cdn.dexscreener.com/cms/images/ic1-Dc5Fu32JRcgz?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xc6b7a14e5e9495f3f58be742938f15f10dddbfd4?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://www.grog.site"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/grogonrh"
+   }
+  ],
+  "totalAmount": 500,
+  "amount": 500
+ },
+ {
+  "url": "https://dexscreener.com/solana/66abzvkuclmwvy2jeu5cjaycusz7ycpobdfxxwv9pump",
+  "chainId": "solana",
+  "tokenAddress": "66aBzVKucLmWvY2JEU5CjAYcUSz7YcpoBDfXXWV9pump",
+  "description": "stonk fun was originally named stonkbaton.",
+  "icon": "kIFYPFMEbdIL77Ef",
+  "header": "https://cdn.dexscreener.com/cms/images/RvvuOnKbkVlgxWrs?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/66aBzVKucLmWvY2JEU5CjAYcUSz7YcpoBDfXXWV9pump?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://stonkbaton.lol/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/stonkbaton"
+   }
+  ],
+  "totalAmount": 100,
+  "amount": 100
+ },
+ {
+  "url": "https://dexscreener.com/solana/9yxcekqztxknv7by3vunerya214ukfcqfb6a8xyz6m4v",
+  "chainId": "solana",
+  "tokenAddress": "9yxCEKQztXKNV7By3VUNeRYa214ukFCQfb6a8XYZ6M4V",
+  "icon": "Y8PS4xIJliGB5VpP",
+  "header": "https://cdn.dexscreener.com/cms/images/rjkb8xQjT2lnnSWG?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/9yxCEKQztXKNV7By3VUNeRYa214ukFCQfb6a8XYZ6M4V?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://otcdesks.cash/coin/9yxCEKQztXKNV7By3VUNeRYa214ukFCQfb6a8XYZ6M4V"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/ramentrade/status/2098834395046306082"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/2uu92v6onwehropdyyoxzxft7b9akbw4ygzgxswadall",
+  "chainId": "solana",
+  "tokenAddress": "2Uu92v6oNWehRopdyyoxzxfT7b9Akbw4YGzGXSwAdALL",
+  "description": "Take a little side quest with me.",
+  "icon": "QwjDC8q94RTtqMPr",
+  "header": "https://cdn.dexscreener.com/cms/images/mJ4uIqgAYNFOSweK?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/2Uu92v6oNWehRopdyyoxzxfT7b9Akbw4YGzGXSwAdALL?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://www.allonsol.fun/coin/2Uu92v6oNWehRopdyyoxzxfT7b9Akbw4YGzGXSwAdALL"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/SIDEQUESTGUYall"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/solana/gwtp6m5bxhaj1k2kxvf8hhyahe6jzmhh4ckzfucpnc83",
+  "chainId": "solana",
+  "tokenAddress": "GWTP6M5bxhaJ1k2Kxvf8hhYaHE6jZMhh4cKzFuCpnc83",
+  "description": "useful",
+  "icon": "ulVpeQoufc7F0Bgq",
+  "header": "https://cdn.dexscreener.com/cms/images/h_VaKqNPkRbtGwoK?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/GWTP6M5bxhaJ1k2Kxvf8hhYaHE6jZMhh4cKzFuCpnc83?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://www.stonkfun.xyz/token/GWTP6M5bxhaJ1k2Kxvf8hhYaHE6jZMhh4cKzFuCpnc83"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/usefulcoinmeme"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/zzjkh1hlbvsfjxwlfe6h4jnbcnrj4eteukrw42pn2tc",
+  "chainId": "solana",
+  "tokenAddress": "zzjkh1hLbvsFJXWLfE6h4JNbcnRj4eteuKRw42PN2tC",
+  "description": "Official mascot of Stonk\nPaired with $STONK",
+  "icon": "uYGsCEF2E8zwPZss",
+  "header": "https://cdn.dexscreener.com/cms/images/5BD36s1i_nbDabfT?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/zzjkh1hLbvsFJXWLfE6h4JNbcnRj4eteuKRw42PN2tC?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://knowyourmeme.com/memes/meme-man"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/Mememancoinx"
+   }
+  ],
+  "totalAmount": 100,
+  "amount": 100
+ },
+ {
+  "url": "https://dexscreener.com/solana/2aqkc1xikpeyawvzsdrulnylvuybwyx7qrsnpp8hpump",
+  "chainId": "solana",
+  "tokenAddress": "2aQKC1xiKpEyAWvzSDrULnYLVuybWyx7qrsnpP8hpump",
+  "description": "Udin Din Din Dun is an iconic figure from the Italian Brainrot universe, known across Crypto Twitter as the ultimate gigachad meme character 🍊\n\n$Udin and $TripleT will be part of the same court case!",
+  "icon": "D3RkzihPHPZo5vkq",
+  "header": "https://cdn.dexscreener.com/cms/images/ItJIhsmTMGnbmOHP?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/2aQKC1xiKpEyAWvzSDrULnYLVuybWyx7qrsnpP8hpump?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://udinthememe.com/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/udinaibrainrot?s=11"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/UdinDinPortal"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/e4ltkkdav5fpl7n4zlzmnfgfwu6wjvrgknjtbhvtpump",
+  "chainId": "solana",
+  "tokenAddress": "E4LtkkDAv5fPL7N4zLZMnFgfwu6WjVRGKnjTbHVTpump",
+  "description": "Bluxel by Pippin Creator; 100% fees to Yohei",
+  "icon": "92J9tpZmMhKQObHH",
+  "header": "https://cdn.dexscreener.com/cms/images/p5WHzLJy9BaBMWVJ?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/E4LtkkDAv5fPL7N4zLZMnFgfwu6WjVRGKnjTbHVTpump?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://x.com/yoheinakajima/status/2076005452266328560?s=20"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/i/communities/1965934800600015168"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/bnq5sptmaqksvqrzpatpykca19dufkhenoarzkzapump",
+  "chainId": "solana",
+  "tokenAddress": "BNq5SPtmAqKsVqrzpAtPYkca19dufkhENoarZkZApump",
+  "description": "Jesus is $REAL — built on one eternal truth: Jesus is real",
+  "icon": "AzaY9R-xskLUCJcR",
+  "header": "https://cdn.dexscreener.com/cms/images/xrwjEZnZ8_dx6Rb7?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/BNq5SPtmAqKsVqrzpAtPYkca19dufkhENoarZkZApump?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://www.jesusisrealsolana.xyz"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/jesusisrealxyz"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/dd3ac2cmr5rxzj6errheryx3aslvmhsbaliuqekcpump",
+  "chainId": "solana",
+  "tokenAddress": "DD3AC2Cmr5rXzJ6ErRHeryx3ASLVMhSBALiUqeKcpump",
+  "description": "a new face of cannabis and crypto",
+  "icon": "hx_yg3kytBuZKSxH",
+  "header": "https://cdn.dexscreener.com/cms/images/5fP-vvE9Wxdm40et?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/DD3AC2Cmr5rXzJ6ErRHeryx3ASLVMhSBALiUqeKcpump?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://www.itsleafy.io/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/its__leafy"
+   },
+   {
+    "type": "discord",
+    "url": "https://discord.gg/7xVAPr5fD"
+   }
+  ],
+  "totalAmount": 100,
+  "amount": 100
+ },
+ {
+  "url": "https://dexscreener.com/solana/9xl2cycfm66yk369r7sjhlgowm3ulsegqa4swusapump",
+  "chainId": "solana",
+  "tokenAddress": "9XL2Cycfm66yK369r7sJhLgoWm3ULsegqa4sWUsapump",
+  "description": "Diamond Hands - HODL 💎👊",
+  "icon": "pU9rWgM_cXJMf97T",
+  "header": "https://cdn.dexscreener.com/cms/images/xTl7cv8RX9q2V4Xs?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/9XL2Cycfm66yK369r7sJhLgoWm3ULsegqa4sWUsapump?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://hodlonsol.site"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/hodlonsolx"
+   }
+  ],
+  "totalAmount": 50,
+  "amount": 50
+ },
+ {
+  "url": "https://dexscreener.com/solana/84uusmjpydeacsr8fxobvck2hwzs94c6ba8kk4jnpump",
+  "chainId": "solana",
+  "tokenAddress": "84uuSMjPYDEAcsr8FXoBvCK2HwZS94c6BA8kk4jNpump",
+  "description": "Turn on the hype—$FAUCAT is making waves and the flow has only just begun. 🐱🚰💦",
+  "icon": "mWY26MzKHVWTjFcP",
+  "header": "https://cdn.dexscreener.com/cms/images/OQfPOMIif3yVvcER?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/84uuSMjPYDEAcsr8FXoBvCK2HwZS94c6BA8kk4jNpump?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://thefaucatsol.lol"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/thefaucatsol"
+   }
+  ],
+  "totalAmount": 130,
+  "amount": 100
+ },
+ {
+  "url": "https://dexscreener.com/solana/c5ng72gufjz6wewcgtpjcbmpsq4bwflhy5j8heo9d7rz",
+  "chainId": "solana",
+  "tokenAddress": "C5nG72gUFJz6wewcgTPjcBmpSq4BwFLHy5j8heo9d7rZ",
+  "description": "the cat is upside down , loyalty earns real $USDC",
+  "icon": "--1Tx4tzKlAKDpyy",
+  "header": "https://cdn.dexscreener.com/cms/images/IaCE0JDKh_E6Tutm?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/C5nG72gUFJz6wewcgTPjcBmpSq4BwFLHy5j8heo9d7rZ?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://www.pinterest.com/upsidedowncatSF/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/upsidedowncatSF"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/fvbnmb8ksbhcvtpulargy7rsae2re7ibdtwa85gjzfoe",
+  "chainId": "solana",
+  "tokenAddress": "FVBnmb8ksBHcvTPULARGY7rsaE2re7ibdTWA85gJzfoe",
+  "description": "A community mission to keep the Spirit alive. ✈️ $SAVE Spirit. Earn $BA. We Soar Together.",
+  "icon": "04V06R6K30Azbw4u",
+  "header": "https://cdn.dexscreener.com/cms/images/hLXEOR5OKZUIaWE7?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/FVBnmb8ksBHcvTPULARGY7rsaE2re7ibdTWA85gJzfoe?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://savespirit.framer.wiki/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/savespiritsol"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/gnuai7hez1adu5fgujezuo3d8vqcbank1fp6bkyapump",
+  "chainId": "solana",
+  "tokenAddress": "GnuAi7hEZ1Adu5FgujEzUo3D8vqCbaNK1Fp6bkyApump",
+  "description": "In a space full of noise, rugs, and emotional trades…\nDON’T BE DUMB is the voice in your head you keep ignoring.\nIt’s not just a meme — it’s a mindset.\nBuilt from chaos, street energy, and raw truth, this project represents the moment every trader faces:\npanic… or discipline.\nNo false promises. No fake hype.\nJust a reminder stamped across the culture:\nThink before you click.\nMove with intention.\nDON’T. BE. DUMB.\nFueled by community awareness and anti-rug energy, this isn’t about being perfect —\nit’s about surviving the trenches and moving smarter every time.",
+  "icon": "125VqWAZPnh8ntmI",
+  "header": "https://cdn.dexscreener.com/cms/images/APlt0n-Q-oEEgN7C?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/GnuAi7hEZ1Adu5FgujEzUo3D8vqCbaNK1Fp6bkyApump?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://dontbd.net"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/meme2026lfg?s=21"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xa22723dd32af7ef51e2d2dd76cc509e11a9c8747",
+  "chainId": "robinhood",
+  "tokenAddress": "0xa22723Dd32Af7EF51E2D2Dd76CC509e11a9c8747",
+  "description": "The memecoin that feeds cats.\n\n$BANGERCAT trades against NVDA. Every trading fee funds street-cat rescues: food, shelter and medical care. No empty promises: every mission is filmed and published",
+  "icon": "icHFtBjWniGNPjiw",
+  "header": "https://cdn.dexscreener.com/cms/images/FBhMqq-93dUacgOq?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xa22723dd32af7ef51e2d2dd76cc509e11a9c8747?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://banger.cat/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/Banger_Cat"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/banger_cat"
+   },
+   {
+    "type": "instagram",
+    "url": "https://www.instagram.com/banger_cat/"
+   }
+  ],
+  "totalAmount": 100,
+  "amount": 50
+ },
+ {
+  "url": "https://dexscreener.com/solana/ed5ssinyupmpgv9uwcskrn9ymgipkojq3vx5f6rypump",
+  "chainId": "solana",
+  "tokenAddress": "ED5sSiNyupMpgV9UwcsKRN9yMGiPKojQ3Vx5f6rYpump",
+  "description": "Thanks to this token you will be one of the main drivers to help the urgency firefighter brigade. \n\nEveryday a giveaway of the value of 5 million tokens will be done to the brigade. \n\nPartcipate now\n\nBuy now... Or cry later...",
+  "icon": "cMIxQlkfJ1r2xpKi",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/ED5sSiNyupMpgV9UwcsKRN9yMGiPKojQ3Vx5f6rYpump?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://pui-worldwidefiremen.web.app/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/PUI_fireman"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/PUI_coin"
+   },
+   {
+    "type": "discord",
+    "url": "https://discord.gg/eSX7EQGN8"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xb818ddfa44aad2157b0f7058aebcb52d4733d4c4",
+  "chainId": "robinhood",
+  "tokenAddress": "0xB818ddFA44aAd2157B0F7058AEbcb52D4733d4c4",
+  "description": "Built to launch. Nothing else.",
+  "icon": "-XBm703PMZQFpmcN",
+  "header": "https://cdn.dexscreener.com/cms/images/I-wGo91nnN82aL9K?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xb818ddfa44aad2157b0f7058aebcb52d4733d4c4?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://www.mad.rich"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/maddotrich"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/maddotrich"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/solana/5dgysznrvkytnab747xleegcbhfi8xrlgndhayyxpump",
+  "chainId": "solana",
+  "tokenAddress": "5dgYsznRVkYTnab747xLeegcBhFi8xRLgNdhayYXpump",
+  "description": "Two sides. Nine lives. One legend. 🐾♊\nGemini Cat • $GEMI",
+  "icon": "pybU2lwuCe8fuvwk",
+  "header": "https://cdn.dexscreener.com/cms/images/Oj1ThhzEP2cnF1ND?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/5dgYsznRVkYTnab747xLeegcBhFi8xRLgNdhayYXpump?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://www.geminicatonsol.lol/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/gemicatsol"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xa22723dd32af7ef51e2d2dd76cc509e11a9c8747",
+  "chainId": "robinhood",
+  "tokenAddress": "0xa22723Dd32Af7EF51E2D2Dd76CC509e11a9c8747",
+  "description": "The memecoin that feeds cats.\n\n$BANGERCAT trades against NVDA. Every trading fee funds street-cat rescues: food, shelter and medical care. No empty promises: every mission is filmed and published",
+  "icon": "icHFtBjWniGNPjiw",
+  "header": "https://cdn.dexscreener.com/cms/images/FBhMqq-93dUacgOq?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xa22723dd32af7ef51e2d2dd76cc509e11a9c8747?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://banger.cat/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/Banger_Cat"
+   },
+   {
+    "type": "telegram",
+    "url": "https://t.me/banger_cat"
+   },
+   {
+    "type": "instagram",
+    "url": "https://www.instagram.com/banger_cat/"
+   }
+  ],
+  "totalAmount": 100,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/solana/vnjvqt1pdshqx2pwlnhqltfb3dwxtxzspnlgdetpump",
+  "chainId": "solana",
+  "tokenAddress": "VnjVQt1pdsHqx2PWLnhqLtFB3DwxTXZSPnLgdEtpump",
+  "description": "$BRAIN keeps the screen in hand and signal in head, turning timeline noise into notice-think-ape conviction 🧠\nCreator rewards fuel planned buybacks, burns, and on-chain receipts while organic frens follow @brainclub_fun without bot raids 📲",
+  "icon": "-t-H6mBncLp_Bnjj",
+  "header": "https://cdn.dexscreener.com/cms/images/TelB0ezyHHjo_751?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/VnjVQt1pdsHqx2PWLnhqLtFB3DwxTXZSPnLgdEtpump?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://www.apeonbrain.fun"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/brainclub_fun/status/2098815571353534938"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/8b5c8hbbckdd4f49rhjcicntjs68vro8zjlumjnfzzhg",
+  "chainId": "solana",
+  "tokenAddress": "8b5c8hbbcKdd4F49RHjCiCntJS68Vro8ZJLumJNFZZHg",
+  "description": "Burstcoin, The only coin mentioned by 4 trillion dollar company Nvidia.",
+  "icon": "nymyrPm7aoO-SIM0",
+  "header": "https://cdn.dexscreener.com/cms/images/lj2woLqKpvX5KKCA?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/8b5c8hbbcKdd4F49RHjCiCntJS68Vro8ZJLumJNFZZHg?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://github.com/NVIDIA/sentiment-discovery/blob/17bcf051648d086a39d146378cfdf8060bb33955/data/semeval/val.csv#L397"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/i/communities/2004996398610047321"
+   }
+  ],
+  "totalAmount": 20,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xd400ab385222b1e415a56c42a6c38a09451f7820",
+  "chainId": "robinhood",
+  "tokenAddress": "0xd400aB385222B1E415A56c42a6C38a09451f7820",
+  "description": "You need to be delusional if you want to succeed",
+  "icon": "OQV4AxT4PPNzcOgK",
+  "header": "https://cdn.dexscreener.com/cms/images/_atK5LXz9NqU0X2O?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xd400ab385222b1e415a56c42a6c38a09451f7820?timestamp=1789239000000",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/delusional_rh"
+   }
+  ],
+  "totalAmount": 50,
+  "amount": 50
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x5a89bbf341531174f8ed8b1d1c72725b8bbc1f73",
+  "chainId": "robinhood",
+  "tokenAddress": "0x5a89bbF341531174F8ED8B1d1c72725b8Bbc1f73",
+  "description": "burstcoin made by nvidia",
+  "icon": "CzRu3NkfyF1g-VZY",
+  "header": "https://cdn.dexscreener.com/cms/images/zQZZlnmEumEnBHGd?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x5a89bbf341531174f8ed8b1d1c72725b8bbc1f73?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://github.com/NVIDIA/sentiment-discovery/blob/17bcf051648d086a39d146378cfdf8060bb33955/data/semeval/val.csv#L397"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/angelikdev/status/2098061247509827620"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/solana/7tsqr7xr6ktgyy8kbnhpmvl6ctaqo3xvwte2pshkkbhc",
+  "chainId": "solana",
+  "tokenAddress": "7tSQR7XR6ktgyy8kBNhpMvL6CTaqo3xVWtE2pShKkBHc",
+  "description": "It's a yield router for ZEC.\n\nYou wrap onto Solana, it points you at the best live pool (Orca, Meteora, Raydium, Kamino), you earn, then you pull back to a z-address. Solana never sees where you came from.\n\nRaydium has a lot of xStock pairs now. \nThat's real volume, which is why the LP fees are worth sitting in.",
+  "icon": "OZbhzx4WBxAFPUJi",
+  "header": "https://cdn.dexscreener.com/cms/images/87qJLCDyxs_L0Obz?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/7tSQR7XR6ktgyy8kBNhpMvL6CTaqo3xVWtE2pShKkBHc?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://zveil.wtf/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/Nostalgicgareth/status/2098792144878154116?s=20"
+   }
+  ],
+  "totalAmount": 10,
+  "amount": 10
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0x7117db2d6590309463f278bc550719a36667c26f",
+  "chainId": "robinhood",
+  "tokenAddress": "0x7117dB2D6590309463f278bC550719a36667C26f",
+  "description": "Vaulta is an AI-driven, autonomous yield infrastructure protocol built on Robinhood Chain. Deposit USDG, receive $vsUSD, and let the optimizer allocate capital. All APY figures are estimates based on current protocol conditions — not guarantees.\n\nHow it works ?\n1. User deposits USDG into a vault.\n2. Contract mints $vsUSD 1:1.\n3. AI optimizer routes capital across USDG markets, Uniswap v3, tokenized stocks, and x402 flows.\n4. Yield compounds. Redeem anytime — no lock-up.\n\nYOUR CAPITAL NEVER SLEEPS.",
+  "icon": "RWBnJzf0J-H3JY3J",
+  "header": "https://cdn.dexscreener.com/cms/images/zICJU5d6kfQ1UqlN?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0x7117db2d6590309463f278bc550719a36667c26f?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://www.vaultaworks.com/"
+   },
+   {
+    "url": "https://www.vaultaworks.com/docs"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/vaultaworks_rh"
+   }
+  ],
+  "totalAmount": 30,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/robinhood/0xd41a1dc8a42e429a66d6ac479e6f8ebf96d6eab0",
+  "chainId": "robinhood",
+  "tokenAddress": "0xD41A1DC8A42E429A66d6AC479E6F8Ebf96d6eAb0",
+  "description": "Paid endpoints in USDG over x402 — instant settlement on Robinhood Chain. The same gateway brokers agent credentials through a live vault, model-proof by design. Open source, MIT.\n\nGate an endpoint. Vault a secret. One process.\n\nThe gateway is a single zero-dependency Node service: read-only RPC proxy, x402 gates, credential vault, agent wallets, on-chain settlement. Clone it and run — MIT, no telemetry, 21-check smoke test included.\n\n• Instant USDG settlement · chain 4663\n• Nonce-replay-guarded, tx-anchored\n• Paid sessions — settle once, call N times\n• Self-host in minutes from GitHub",
+  "icon": "jJjAhufyuys8lKYS",
+  "header": "https://cdn.dexscreener.com/cms/images/HDS8PS71p8rF2QFN?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/robinhood/0xd41a1dc8a42e429a66d6ac479e6f8ebf96d6eab0?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://www.tributex402.com/"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/Tributex_402/status/2095233052431843380?s=20"
+   }
+  ],
+  "totalAmount": 100,
+  "amount": 100
+ },
+ {
+  "url": "https://dexscreener.com/solana/84uusmjpydeacsr8fxobvck2hwzs94c6ba8kk4jnpump",
+  "chainId": "solana",
+  "tokenAddress": "84uuSMjPYDEAcsr8FXoBvCK2HwZS94c6BA8kk4jNpump",
+  "description": "Turn on the hype—$FAUCAT is making waves and the flow has only just begun. 🐱🚰💦",
+  "icon": "mWY26MzKHVWTjFcP",
+  "header": "https://cdn.dexscreener.com/cms/images/OQfPOMIif3yVvcER?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/84uuSMjPYDEAcsr8FXoBvCK2HwZS94c6BA8kk4jNpump?timestamp=1789239000000",
+  "links": [
+   {
+    "url": "https://thefaucatsol.lol"
+   },
+   {
+    "type": "twitter",
+    "url": "https://x.com/thefaucatsol"
+   }
+  ],
+  "totalAmount": 130,
+  "amount": 30
+ },
+ {
+  "url": "https://dexscreener.com/solana/cmxsstkthrvlyvcdpzpockjyt5ampg6p3c88yppbfmpx",
+  "chainId": "solana",
+  "tokenAddress": "CmXSStKTHrVLyvCDPzPoCkjYt5aMpG6p3c88yPpbfmpx",
+  "icon": "_4mWyPKghMT06RDB",
+  "header": "https://cdn.dexscreener.com/cms/images/xBfOHyEnVdBHG9M1?width=900&height=300&fit=crop&quality=95&format=auto",
+  "openGraph": "https://cdn.dexscreener.com/token-images/og/solana/CmXSStKTHrVLyvCDPzPoCkjYt5aMpG6p3c88yPpbfmpx?timestamp=1789239000000",
+  "links": [
+   {
+    "type": "twitter",
+    "url": "https://x.com/purrlantir"
+   }
+  ],
+  "totalAmount": 500,
+  "amount": 500
+ }
+]
