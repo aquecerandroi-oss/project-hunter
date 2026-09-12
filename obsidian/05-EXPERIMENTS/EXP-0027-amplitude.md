@@ -1,15 +1,15 @@
 ---
 tags: [experimento, amplitude, breadth, elegibilidade, populacao, mean-reversion, pre-registro]
 updated: 2026-09-11
-status: em-andamento
+status: avaliado
 owner: quant-engineer
 exp: EXP-0027
 strategy: "mean_reversion v10 (pai sem portão) + dois braços com portão"
 version: "v18 (braço A) e v19 (braço B), derivadas de v10"
-result: nao-iniciado
-evaluable: 0
-days: 0
-last_eval: "—"
+result: reprovada
+evaluable: 856
+days: 84
+last_eval: "2026-09-11"
 ---
 
 # EXP-0027 — a amplitude do universo como estado: `breadth_v2` em 90 dias de replay
@@ -291,12 +291,110 @@ aqui**.
 `v18`/`v19` com `--dry-run` primeiro, ativar como `research_only`, replayar 12 fatias por braço e
 aplicar a régua acima — o que falhar é aposentado no mesmo dia.
 
+### Avaliação de 2026-09-11 — `as_of = 2026-09-12T01:16:02Z` (22:16 BRT de 2026-09-11)
+
+**Corridas:** 24 fatias de replay (`v18` e `v19`, 12 cada), **270 336 barras**, **0 erros**, coortes
+`replay:f2c44f18-5f63-435f-97bb-5f5aaf31cea7` (A) e `replay:a94701c9-3459-463e-8922-c1403e91d60a`
+(B), janela **2026-06-14 → 2026-09-10** (88 d, o início de `breadth_v2`), 4 fatias de 4 mercados por
+janela de ~30 d. O controle pré-declarado (`v10`, `replay:c7d138eb…`, EXP-0025) **não foi
+re-rodado**; a sua população foi cortada no mesmo início de calendário (798 → **789** decisões, as 9
+de 06-12/06-13 saem das duas leituras). Cohort redundante `replay:a42c888d-e0c7-40fa-9536-ed2378d59493`
+(4 fatias de `v18` de um loop quebrado) **confirmada e ignorada** — não entra em nenhuma soma desta
+página. Comandos e saídas verbatim em `.claude/state/notes-T3.89.md`.
+
+**Cobertura (eixo `r_ex_funding`, presente em 100 % da população; K4 só é mensurável no pai):**
+
+| versão | decisões | dias | `ineligible` (do recibo) | K4 (do pai, mesma janela) | erros |
+|---|---:|---:|---:|---:|---:|
+| `v10` (pai, cortado em 06-14) | 789 | 87 | 0 % | **0,93 %** (`replay:c7d138eb…`, 90 d completos) | 0 |
+| `v18` (A) | 540 | 84 | 71 648/135 168 = **53,00 %** | ler no pai | 0 |
+| `v19` (B) | 316 | 75 | 87 552/135 168 = **64,79 %** | ler no pai | 0 |
+
+Nenhum braço morreu por população (previsão 5 do pré-registro: A ≈ 400, B ≈ 195 — o medido, 540 e
+316, veio **acima** da projeção nos dois, porque a faixa fecha barras extras via o degrau `1,0000`
+órfão do lado de fora, e o corte por 15 min amostra mais barras `ineligible` do que a projeção linear
+sobre minutos previa).
+
+**A régua, condição por condição (Δ NÃO pareado braço−pai, blocos de dia inteiro, 20 000
+reamostragens, semente **20260912** — a semente do pré-registro, diferente da semente-padrão
+20260910 usada nas EXP-0025/0026):**
+
+| braço | 1. Δ ≥ +0,05 e IC > 0 | 2. n ≥ 100 e ≥ 30 d | 3. 2 de 3 janelas | 4. LOMO nunca negativo | 5. Δ pareado ≈ 0 | estresse | falsificação (regime ≥ breadth?) | **veredito** |
+|---|---|---|---|---|---|---|---|---|
+| `v18` (A) | **FALHA** — **−0,0184**, IC [−0,1692; +0,1350] (sinal errado) | PASSA (540/84) | **FALHA** (1/3) | **FALHA** (16 de 16 negativos, pior sem ZECUSDT −0,0633) | PASSA (**+0,0000**, 393/540 barras compartilhadas) | `sem_vantagem_na_base` (custos ×2 −0,0978; 1ª metade −0,1497 × 2ª +0,0621) | **SIM** — regime +0,0017 ≥ breadth −0,0184 | **`descartar`** |
+| `v19` (B) | **FALHA** — +0,0372, IC [−0,1574; +0,2232] (abaixo do piso e IC cruza zero) | PASSA (316/75) | **FALHA** (1/3) | **FALHA** (1 de 16, sem DASHUSDT −0,0042) | PASSA (**+0,0000**, 192/316 barras compartilhadas) | frágil a custos (×2 −0,0935); dependente de 4 mercados isolados e de metade (1ª −0,0858 × 2ª +0,0953) | **SIM** — regime +0,1456 ≥ breadth +0,0372 | **`descartar`** |
+
+**Expectativa (eixo `r_ex_funding`, IC 95 % por blocos de dia, semente 20260912):**
+
+| versão | n | dias | média | soma R | PF | IC 95 % da média |
+|---|---:|---:|---:|---:|---:|---|
+| `v10` (pai, cortado) | 789 | 87 | −0,0291 | −22,95 | 0,911 | [−0,1344; +0,0734] |
+| `v18` (A) | 540 | 84 | **−0,0475** | −25,63 | 0,851 | [−0,1559; +0,0620] |
+| `v19` (B) | 316 | 75 | **+0,0081** | +2,55 | 1,024 | [−0,1553; +0,1629] |
+
+**Por janela de 30 d (condição 3):** pai −0,1248 (n=328) / −0,0822 (n=181) / +0,1174 (n=280) · `v18`
+−0,1696 (n=226) / −0,0936 (n=131) / +0,1364 (n=183) · `v19` −0,1096 (n=130) / −0,0097 (n=63) /
++0,1416 (n=123). **As três séries só são positivas em agosto–setembro** — a mesma assinatura de
+calendário da EXP-0025/0026, e o portão de amplitude não muda essa assinatura.
+
+**Clausula de falsificação (controle de identidade), medida como partição dentro do pai (permitido
+− proibido, pareada por dia, mesmo método do §2b da T3.76), rótulos permitidos = os que dominam
+(≥ 50 % das decisões) cada braço:** para `v18` (BTC_BEAR, BTC_BULL, HIGH_VOLATILITY, 524 decisões do
+pai) o corte por regime dá **+0,0017 R**; para `v19` (HIGH_VOLATILITY, SIDEWAYS, 377 decisões do
+pai) dá **+0,1456 R**. Os dois números são **maiores ou iguais** ao Δ de `breadth_v2` medido na
+condição 1 (−0,0184 e +0,0372) — **a cláusula dispara nos dois braços**: cortar pelo regime horário
+do BTC já vencido produz tanta ou mais separação do que cortar pela amplitude do universo. `breadth_v2`
+não é um estado novo na leitura desta coorte; é consistente com ser o regime horário reamostrado por
+minuto, como a própria hipótese avisou que poderia ser.
+
+**Estresse (sessão somente-leitura, `--stress`, 2026-09-12T01:12–01:14Z / 22:12–22:14 BRT, eixo
+`r_net`):** `v18` base −0,0509 R (n=538, 2 `funding_missing`), `custos_x2` −0,1487 (Δ −0,0978, IC
+[−0,1025; −0,0933]), 1ª metade (até 07-27) −0,1497 (n=287) × 2ª metade +0,0621 (n=251) → **`sem_vantagem_na_base`**.
+`v19` base +0,0033 R (n=315), `custos_x2` −0,0902 (Δ −0,0935, IC [−0,1007; −0,0866]), dependente de
+4 mercados isolados (BNB/DASH/SAHARA/XRP viram negativos ao serem excluídos) e de metade (1ª −0,0858
+× 2ª +0,0953) → **`frágil a custos`**.
+
+**K1–K6 e C5 (medidos nas decisões, pedágio = 0,0020 / (stop_atr × ATR%), `stop_atr = 1,5` — o do
+pai/braços byte a byte):** nenhum dispara K1 ou K2; **K3 dispara no pai e em `v18`** (n ≥ 100, ≥ 30
+dias, `r_ex_funding` médio < 0) e **não dispara em `v19`** (média positiva, ainda que ínfima); K6
+(concentração ≥ 60 % num mercado) não dispara em nenhum (maior fatia: 10,5 %/10,7 %/12,0 %); C5
+(risco/entrada acima de 3 %) fica em 16,9 % (pai) / 15,0 % (`v18`) / 19,6 % (`v19`), sem outlier.
+Pedágio p50: 0,1064 R (pai) / 0,1092 R (`v18`) / 0,0988 R (`v19`) — praticamente idêntico entre as
+três, o que é esperado: nenhum parâmetro de ATR muda.
+
+**Result:** **refutou os dois braços, e refutou a hipótese principal duas vezes.** A previsão
+numérica 6 do pré-registro (Δ_A ≈ −0,039 R, Δ_B ≈ +0,013 R, "o braço de dentro sai pior que o pai e
+o braço de falseamento um pouco melhor") acertou a **direção** dos dois sinais e errou a magnitude
+por um fator de ~2× em ambos (medido: −0,0184 e +0,0372) — o mesmo sentido, mais fraco. **O braço A
+(a célula "de dentro", a que a hipótese H-P8 afirma que é onde vive a vantagem) saiu pior que o pai**,
+o oposto do que "a reversão compradora vive na amplitude intermediária" precisaria para ser
+verdadeira. **O braço B (falseamento) saiu melhor que o pai**, na mesma direção da leitura descritiva
+pré-replay (T1 baixo > T2 meio > T3 alto, monótona decrescente) — mas abaixo do piso de aprovação e
+com IC que cruza zero. **A condição 5 prova o instrumento**: Δ pareado por (mercado, barra) é
+0,0000 R nos dois braços, então a divergência de população vem só do §4b item 11 (a filha não arma a
+barreira nas barras que pula), não de um bug de leitura. **A cláusula de identidade fecha o caso**:
+em ambos os braços, cortar o pai por `regime_hourly_v1` produz separação igual ou maior do que
+`breadth_v2` produziu de fato — a amplitude do universo, nesta coorte, não é um estado que a
+`mean_reversion` deveria pagar por vigiar além do que o portão de regime (já descartado na EXP-0026,
+pelos mesmos motivos de calendário) já vigiava.
+
+**Conclusion:** `descartar` nos dois braços, pela regra pré-registrada. **Aposentados no mesmo dia**
+pela via auditada: `v18` deprecated em **2026-09-12T01:15:24Z** (22:15:24 BRT de 2026-09-11),
+`v19` deprecated em **2026-09-12T01:16:02Z** (22:16:02 BRT), ambos `successor=none`, changelog com o
+número medido embutido. Nenhuma coorte `prospective` foi aberta — nenhum braço passou.
+
+**Next Action:** nenhuma sobre `breadth_v2` nesta forma. Se a leitura descritiva monótona (T1 > T2 >
+T3, a ponta boa **abaixo** de 0,10) for perseguida, é uma EXP nova com pré-registro e prospectivo
+próprios, sabendo de antemão que a cláusula de identidade provavelmente também dispara ali — H-P18
+(dispersão BTC × alts, §"não cabe nesta série" acima) continua como candidata separada, com série
+própria (`dispersion_24h`) ainda não escrita.
+
 ## Variantes tentadas
 
 | Variante | Quando | Por quê | Onde ficou registrada |
 |---|---|---|---|
-| `v18` (A, `breadth=0.10-0.60@breadth_v2`) | 2026-09-11 | célula de dentro, a faixa pré-registrada da T3.77 | esta página |
-| `v19` (B, `breadth=0.60-1.00@breadth_v2`) | 2026-09-11 | falseamento: a venda generalizada deveria ser o pior lugar | esta página |
+| `v18` (A, `breadth=0.10-0.60@breadth_v2`) | 2026-09-11 | célula de dentro, a faixa pré-registrada da T3.77 | esta página — `descartar`, aposentada 2026-09-12T01:15:24Z |
+| `v19` (B, `breadth=0.60-1.00@breadth_v2`) | 2026-09-11 | falseamento: a venda generalizada deveria ser o pior lugar | esta página — `descartar`, aposentada 2026-09-12T01:16:02Z |
 
 ## Relacionadas
 
@@ -308,5 +406,6 @@ aplicar a régua acima — o que falhar é aposentado no mesmo dia.
 
 - pré-registro: `.claude/state/exp-drafts/EXP-0027-amplitude.md` (T3.88); brief: `.claude/state/brief-T3.89-exp-0027-amplitude.md`
 - série e portão: `docs/PIPELINE.md` §4b itens 14–15, `docs/ACTIVATION.md` §7c, `packages/indicators/hunter_indicators/breadth/`, `services/strategy-worker/hunter_strategy_worker/breadth_gate.py`, `breadth_policy.py`
-- SQL desta página: `infra/scripts/sql/research/2026-09-11-t389-q00-catalogo.sql`, `-q01-breadth-distribuicao.sql`, `-q02-breadth-nas-barras-de-15m.sql`
+- SQL desta página: `infra/scripts/sql/research/2026-09-11-t389-q00-catalogo.sql`, `-q01-breadth-distribuicao.sql`, `-q02-breadth-nas-barras-de-15m.sql`, `-q03-variantes-derivadas.sql`, `-q04-faixa-b-meia-aberta.sql`, `-q10-recibos-replay.sql`, `-q11-dump-decisoes-bracos.sql`, `-q12-k4-pai.sql`
+- análise: `.claude/state/exp-drafts/t389/analise.py` sobre `.claude/state/exp-drafts/t389-decisoes.csv` (1 645 linhas), bootstrap `.claude/state/exp-drafts/t362b/blocos90.py`
 - notas: `.claude/state/notes-T3.89.md`

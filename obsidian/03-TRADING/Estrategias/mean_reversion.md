@@ -21,6 +21,11 @@ updated: 2026-09-11
 | `v9` | `research_only` | `deprecated` | **efêmera, zero decisões** — variante do eixo de timeframe (`atr_timeframe` 1h, de `v6`), morreu por `atr_warmup`: pedia 5 820 min de contexto contra o teto de 1 560 do worker naquele instante; aposentada no mesmo turno (T3.54), sucessora `mean_reversion v10`. Sem página própria. | — |
 | `v10` | `research_only` | `active` | **reprovada em 90 dias/16 mercados** (EXP-0025, T3.62b) — 798 avaliáveis, 89 dias; ex-funding **−0,0293 R**, PF 0,910, K3 disparado. Os +0,1105 R/PF 1,451 de 31 dias eram só a janela de agosto–setembro (Δ contra jun–ago exclui zero); os 4 mercados originais caem a +0,0002 R (zero) nos 90 d; C5 (teto de risco 3 %) 16,8 % em 90 d contra 32,3 % só em agosto. Sem página própria nesta sessão. | — |
 | `v11` | `research_only` | `deprecated` | **portão de regime `btc:SIDEWAYS`, de `v6`** (G1 do [[EXP-0020-regime-gate]]) — morta no K1 (1 decisão em 31 dias, 4 mercados): `SIDEWAYS` só tem 6 h na primeira metade da janela de replay. `inconclusivo`, não negativo — as 14 decisões que o portão removeu do pai eram vencedoras (+0,2964 R), evidência **contra** a hipótese; aposentada 2026-09-09T16:07Z, sem sucessora. Sem página própria nesta sessão. | — |
+| `v15` | `research_only` | `active` | **portão de regime `SIDEWAYS,LOW_VOLATILITY`, de `v10`** ([[EXP-0026-regime-como-estrategia]]) — `descartar`: Δ +0,0651 R, IC [−0,0832; +0,2024] (contém zero); estresse frágil a custos. Não aposentada nesta sessão (bloqueio de deploy, T3.76 §7). Sem página própria. | — |
+| `v16` | `research_only` | `active` | **portão de regime `SIDEWAYS`, de `v10`** ([[EXP-0026-regime-como-estrategia]]) — `descartar`: Δ +0,0744 R, IC [−0,1135; +0,2362] (contém zero); estresse frágil a custos. Não aposentada nesta sessão (mesmo bloqueio). Sem página própria. | — |
+| `v17` | `research_only` | `active` | **portão de regime `HIGH_VOLATILITY` (falseamento), de `v10`** ([[EXP-0026-regime-como-estrategia]]) — `descartar`: Δ +0,0905 R, IC [−0,1540; +0,2763] (contém zero); falha condição de dias (21 < 30); estresse frágil a custos, dependente de metade. Não aposentada nesta sessão (mesmo bloqueio). Sem página própria. | — |
+| `v18` | `research_only` | `deprecated` | **portão de amplitude `breadth=0,10–0,60@breadth_v2`, de `v10`** ([[EXP-0027-amplitude]]) — `descartar`: Δ não pareado **−0,0184 R** contra o pai (sinal errado, IC [−0,1692; +0,1350]), 1 de 3 janelas positivas, LOMO negativo nos 16 mercados; condição 5 (Δ pareado por mercado-barra) confirma o portão em 0,0000 R; estresse `sem_vantagem_na_base`; cláusula de identidade dispara (corte por regime ≥ corte por amplitude). Aposentada **2026-09-12T01:15:24Z** (22:15 BRT), sem sucessora. Sem página própria. | — |
+| `v19` | `research_only` | `deprecated` | **portão de amplitude `breadth=0,60–1,00@breadth_v2` (falseamento), de `v10`** ([[EXP-0027-amplitude]]) — `descartar`: Δ não pareado **+0,0372 R** (abaixo do piso de +0,05, IC [−0,1574; +0,2232]), 1 de 3 janelas positivas, LOMO negativo (sem DASHUSDT); condição 5 confirma o portão em 0,0000 R; estresse frágil a custos; cláusula de identidade dispara. Aposentada **2026-09-12T01:16:02Z** (22:16 BRT), sem sucessora. Sem página própria. | — |
 
 ## Ligações
 
@@ -31,6 +36,7 @@ updated: 2026-09-11
 - Eixo "timeframe" (v6→v9/v10): [[EXP-0021-timeframe]]
 - Eixo "portão de regime" (v6→v11): [[EXP-0020-regime-gate]]
 - Replicação de 90 dias (v1/v2/v10): [[EXP-0025-mean-reversion-90-dias]]
+- Eixo "portão de amplitude" (v10→v18/v19): [[EXP-0027-amplitude]]
 - Irmã de 1 h (módulo novo, código pronto, replay pendente): [[mean_reversion_h1]]
 - Irmã de 5 min (módulo novo, ativada e **aposentada** em 2026-09-11: `descartar`, ex-funding −0,1940 R em 373 desfechos — e **o custo não foi a causa**, 89,8 % da piora é a vantagem bruta caindo de +0,1270 para +0,0346 R): [[mean_reversion_m5]] — [[EXP-0028-mean-reversion-5-min]]
 <!-- generated:end -->
@@ -121,3 +127,30 @@ Recomendação ao orquestrador: aposentar `v15`, `v16` e `v17` (a tarefa não co
 `.claude/state/notes-T3.76.md` §7: o HEAD da VPS foi para um commit sem imagem construída e
 `compose.sh ops` recusa por desenho). Enquanto isso as três estão **`active`** e decidindo na faixa
 viva.
+
+**Acréscimo de 2026-09-11/12 (T3.89, quant-engineer) — o portão de amplitude do universo
+(`breadth_v2`) também não salva a família, e a cláusula de identidade aponta para o mesmo regime.**
+[[EXP-0027-amplitude]] testou a hipótese de que a fração do universo caindo nos 5 min antes do
+fechamento da barra separa a expectancy da reversão compradora — braço A (`v18`, célula "de dentro",
+`breadth 0,10–0,60`) e braço B de falseamento (`v19`, `0,60–1,00`), ambos derivados de `v10` byte a
+byte, replayados em 2026-06-14 → 2026-09-10 (88 d, o início da série):
+
+| braço | portão | n / dias | ex-funding | PF | Δ não pareado vs pai | IC 95 % (semente 20260912) | estresse |
+|---|---|---:|---:|---:|---:|---|---|
+| `v18` (A) | `breadth 0,10–0,60` | 540 / 84 | **−0,0475** | 0,851 | **−0,0184** | [−0,1692; +0,1350] | `sem_vantagem_na_base` |
+| `v19` (B, falseamento) | `breadth 0,60–1,00` | 316 / 75 | **+0,0081** | 1,024 | **+0,0372** | [−0,1574; +0,2232] | frágil a custos |
+
+Pai `v10` cortado no mesmo início: −0,0291 R, PF 0,911, 789 decisões em 87 dias.
+
+**A célula "de dentro" saiu pior que o pai** — o oposto do que a hipótese principal precisa para ser
+verdadeira — e o **braço de falseamento saiu melhor**, replicando o gradiente monótono já visto na
+leitura descritiva pré-replay (T1 baixo > T2 meio > T3 alto). Nenhum dos dois passa: 1 de 3 janelas
+de 30 d positiva nos dois, leave-one-market-out negativo nos dois (16 de 16 em A, 1 de 16 em B), e o
+Δ de A tem o sinal errado. **A condição 5 (Δ pareado por mercado-barra) confirma o instrumento**:
+0,0000 R nos dois braços — o portão só remove barras, não muda a decisão nas que sobram. **A cláusula
+de falsificação fecha o caso**: cortar o pai por `regime_hourly_v1` em vez de `breadth_v2` produz
+separação **igual ou maior** nos dois braços (+0,0017 ≥ −0,0184 em A; +0,1456 ≥ +0,0372 em B) —
+`breadth_v2`, nesta coorte, não é um estado que a família deveria pagar por vigiar além do regime
+horário do BTC, já descartado como estratégia pela [[EXP-0026-regime-como-estrategia]]. Ambos
+aposentados no mesmo dia: `v18` às 2026-09-12T01:15:24Z, `v19` às 01:16:02Z (22:15/22:16 BRT de
+2026-09-11), `successor=none`.
