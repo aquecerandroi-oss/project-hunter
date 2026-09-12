@@ -1,0 +1,153 @@
+decisoes lidas: 542
+minutos lidos: 130080
+
+==============================================================================
+§0 COBERTURA E CHECAGEM CRUZADA — duas implementacoes da mesma definicao
+==============================================================================
+decisoes com os 240 minutos `is_final` completos: 542/542
+decisoes com buraco no caminho: 0  
+maior divergencia absoluta SQL x Python (em ATR), por coluna:
+   ret80        4.995e-09
+   ret240       4.996e-09
+   mfe80        0.000e+00
+   mae80        0.000e+00
+   mfe240       0.000e+00
+   mae240       0.000e+00
+   antes_max    0.000e+00
+   antes_min    0.000e+00
+   depois_max   0.000e+00
+   depois_min   0.000e+00
+n_antes conferido em 542/542 decisoes; n_depois em 542/542
+
+==============================================================================
+§1 O DELTA AGREGADO — a reproducao do numero do D-P23, de outro dump
+==============================================================================
+pares com os DOIS pontos: 542   so +80: 0   so +240: 0
+  D(240-80) em ATR         media +0.3007 IC95 [+0.0071; +0.5820]   mediana +0.0598 IC95 [-0.1864; +0.3470]   51.8% dos pares com D > 0   dias 83
+  D(240-80) em % do preco  media +0.2995 IC95 [+0.0081; +0.5817]   mediana +0.0664 IC95 [-0.2092; +0.2814]   51.8% dos pares com D > 0   dias 83
+
+==============================================================================
+§2 A TABELA — decomposicao do D(240-80) pelo MOTIVO REAL DE SAIDA (ATR)
+==============================================================================
+
+  em ATR da propria decisao (long-only, bruto a partir do open da entrada)
+motivo           n  dias     media   mediana            IC95 media   contrib          IC95 contrib    %>0
+stop           281    73   +0.0279   -0.2448    [-0.2639; +0.3663]   +0.0145    [-0.1457; +0.1791]  44.5%
+target         216    65   +0.6899   +0.4803    [+0.2346; +1.0810]   +0.2749    [+0.0902; +0.4476]  59.3%
+time-stop       45    26   +0.1356   +0.2410    [-0.0538; +0.3931]   +0.0113    [-0.0047; +0.0274]  62.2%
+context-lost     0     0         —         —    [      —;       —]   +0.0000    [+0.0000; +0.0000]      —
+other            0     0         —         —    [      —;       —]   +0.0000    [+0.0000; +0.0000]      —
+todos          542    83   +0.3007   +0.0598    [+0.0071; +0.5820]   +0.3007    [+0.0071; +0.5820]  51.8%
+IDENTIDADE    soma das contribuicoes = +0.300655   media total = +0.300655   erro = 5.55e-17
+
+  decis (MUST-FIX 3: 'cauda' e leitura a CONFIRMAR, nao achado)
+motivo           n  decil   contrib  decil sup  decil inf  sup/contrib   mediana          IC95 mediana
+stop           281     29   +0.0145    +0.2156    -0.1515      +14.89x   -0.2448    [-0.5219; +0.0758]
+target         216     22   +0.2749    +0.2414    -0.1373       +0.88x   +0.4803    [-0.0016; +0.9263]
+time-stop       45      5   +0.0113    +0.0107    -0.0093       +0.95x   +0.2410    [-0.0783; +0.5524]
+context-lost     0      0   +0.0000    +0.0000    +0.0000            —         —    [      —;       —]
+other            0      0   +0.0000    +0.0000    +0.0000            —         —    [      —;       —]
+todos          542     55   +0.3007    +0.4917    -0.3036       +1.64x   +0.0598    [      —;       —]
+
+==============================================================================
+§3 A MESMA TABELA EM % DO PRECO DE ENTRADA
+==============================================================================
+
+  em pontos percentuais do preco de entrada
+motivo           n  dias     media   mediana            IC95 media   contrib          IC95 contrib    %>0
+stop           281    73   +0.0801   -0.2387    [-0.2193; +0.4290]   +0.0415    [-0.1190; +0.2113]  44.5%
+target         216    65   +0.6195   +0.4626    [+0.1388; +1.0138]   +0.2469    [+0.0531; +0.4138]  59.3%
+time-stop       45    26   +0.1327   +0.2117    [-0.1577; +0.5412]   +0.0110    [-0.0152; +0.0365]  62.2%
+context-lost     0     0         —         —    [      —;       —]   +0.0000    [+0.0000; +0.0000]      —
+other            0     0         —         —    [      —;       —]   +0.0000    [+0.0000; +0.0000]      —
+todos          542    83   +0.2995   +0.0664    [+0.0081; +0.5817]   +0.2995    [+0.0081; +0.5817]  51.8%
+IDENTIDADE    soma das contribuicoes = +0.299460   media total = +0.299460   erro = 0.00e+00
+
+  decis, em % do preco
+motivo           n  decil   contrib  decil sup  decil inf  sup/contrib   mediana          IC95 mediana
+stop           281     29   +0.0415    +0.2409    -0.1605       +5.80x   -0.2387    [-0.4587; +0.0956]
+target         216     22   +0.2469    +0.2509    -0.1527       +1.02x   +0.4626    [-0.0021; +0.7495]
+time-stop       45      5   +0.0110    +0.0167    -0.0162       +1.52x   +0.2117    [-0.0494; +0.5570]
+context-lost     0      0   +0.0000    +0.0000    +0.0000            —         —    [      —;       —]
+other            0      0   +0.0000    +0.0000    +0.0000            —         —    [      —;       —]
+todos          542     55   +0.2995    +0.5187    -0.3290       +1.73x   +0.0664    [      —;       —]
+
+  ATR% por grupo (o denominador NAO e o mesmo entre grupos):
+motivo           n  atr% p50  atr% media
+stop           281    0.8308      1.0258
+target         216    0.8193      1.0575
+time-stop       45    1.1134      1.5797
+context-lost     0         —           —
+other            0         —           —
+
+==============================================================================
+§4 TIME-STOP CONTRA STOP — a pergunta do brief, isolada
+==============================================================================
+populacao restrita: 326 decisoes (45 time-stop + 281 stop), 77 dias
+
+  --- em ATR (contribuicoes recompoem a media DESTA populacao, N=326)
+motivo           n  dias     media   mediana            IC95 media   contrib     %>0  decil sup
+stop           281    73   +0.0279   -0.2448    [-0.2674; +0.3615]   +0.0241   44.5%    +0.3584
+time-stop       45    26   +0.1356   +0.2410    [-0.0586; +0.3896]   +0.0187   62.2%    +0.0179
+todos          326    77   +0.0428   -0.1130    [-0.2192; +0.3373]   +0.0428   46.9%    +0.3855
+  contraste time-stop - stop = +0.1077 IC95 [-0.2452; +0.4734]  (pareado por DIA, 20000/20000 reamostragens com os dois lados)
+
+  --- em % do preco (contribuicoes recompoem a media DESTA populacao, N=326)
+motivo           n  dias     media   mediana            IC95 media   contrib     %>0  decil sup
+stop           281    73   +0.0801   -0.2387    [-0.2201; +0.4261]   +0.0691   44.5%    +0.4005
+time-stop       45    26   +0.1327   +0.2117    [-0.1590; +0.5392]   +0.0183   62.2%    +0.0278
+todos          326    77   +0.0874   -0.0840    [-0.1832; +0.3934]   +0.0874   46.9%    +0.4269
+  contraste time-stop - stop = +0.0526 IC95 [-0.3667; +0.5502]  (pareado por DIA, 20000/20000 reamostragens com os dois lados)
+
+==============================================================================
+§4b O MESMO DELTA PARTIDO EM 'DENTRO DA POSICAO' E 'DEPOIS DA SAIDA REAL'
+==============================================================================
+  D_i = [ret(c) - ret(80)] + [ret(240) - ret(c)],  c = clamp(m_saida, 80, 240)
+  a esquerda: o trecho que a posicao de verdade atravessou (dinheiro que ela
+  poderia ter guardado); a direita: o trecho depois da saida (dinheiro que ela
+  nao podia tocar). A identidade e exata por telescopagem.
+  O corte e o FECHAMENTO que cai em `exit_ts`, nao o `exit_price` sintetico —
+  nada aqui e o resultado realizado da operacao (esse e o r_multiple, EXP-0025).
+
+  --- em ATR   (maior erro da identidade por decisao: 1.78e-15)
+motivo           n  contrib dentro           IC95 dentro  contrib depois           IC95 depois      soma
+stop           281         -0.1345    [-0.1721; -0.0992]         +0.1490    [+0.0078; +0.2942]   +0.0145
+target         216         +0.1840    [+0.1395; +0.2302]         +0.0910    [-0.0707; +0.2377]   +0.2749
+time-stop       45         +0.0113    [-0.0047; +0.0274]         +0.0000    [+0.0000; +0.0000]   +0.0113
+context-lost     0         +0.0000    [+0.0000; +0.0000]         +0.0000    [+0.0000; +0.0000]   +0.0000
+other            0         +0.0000    [+0.0000; +0.0000]         +0.0000    [+0.0000; +0.0000]   +0.0000
+todos          542         +0.0607    [-0.0128; +0.1366]         +0.2399    [-0.0136; +0.4768]   +0.3007
+  decisoes cujo trecho 80->240 e INTEIRAMENTE depois da saida: 320 (59.0%); inteiramente dentro da posicao: 45 (8.3%); partido: 177
+
+  --- em % do preco   (maior erro da identidade por decisao: 4.44e-16)
+motivo           n  contrib dentro           IC95 dentro  contrib depois           IC95 depois      soma
+stop           281         -0.1312    [-0.1650; -0.0978]         +0.1727    [+0.0293; +0.3244]   +0.0415
+target         216         +0.1895    [+0.1454; +0.2337]         +0.0574    [-0.1173; +0.2038]   +0.2469
+time-stop       45         +0.0110    [-0.0152; +0.0365]         +0.0000    [+0.0000; +0.0000]   +0.0110
+context-lost     0         +0.0000    [+0.0000; +0.0000]         +0.0000    [+0.0000; +0.0000]   +0.0000
+other            0         +0.0000    [+0.0000; +0.0000]         +0.0000    [+0.0000; +0.0000]   +0.0000
+todos          542         +0.0694    [-0.0021; +0.1421]         +0.2301    [-0.0279; +0.4709]   +0.2995
+  decisoes cujo trecho 80->240 e INTEIRAMENTE depois da saida: 320 (59.0%); inteiramente dentro da posicao: 45 (8.3%); partido: 177
+
+==============================================================================
+§5 EXCURSOES DE CLOSES — COLUNAS AUXILIARES (nao decompoem o Delta)
+==============================================================================
+  MFE/MAE = maximo/minimo do RETORNO DE FECHAMENTO na janela, com sinal
+  (OHLC nao revela ordem intrabar; nada aqui e 'o maximo que a posicao viu')
+
+motivo           n    mfe80    mae80   mfe240   mae240  m_saida  mfe antes  mae antes  n>0 dep  mfe depois  mae depois
+stop           281  +0.4012  -1.0557  +0.7291  -1.8100       43    +0.2698    -0.9432      281     +0.2203     -1.8100
+target         216  +1.4795  -0.3124  +2.6505  -0.5129       68    +1.5056    -0.2657      216     +2.6425     +0.3442
+time-stop       45  +0.7491  -0.2801  +1.1440  -0.4300      240    +1.1440    -0.4300        0           —           —
+context-lost     0        —        —        —        —        —          —          —        —           —           —
+other            0        —        —        —        —        —          —          —        —           —           —
+todos          542  +0.7496  -0.6264  +1.4758  -1.1482       61    +0.9475    -0.7175      497     +1.6179     -1.2598
+  (medianas; `m_saida` e o minuto em que a vela da saida fecha, contado da entrada)
+
+==============================================================================
+§6 SENSIBILIDADE — o Delta agregado e a historia de um dia? de um mercado?
+==============================================================================
+  tirando um dia de cada vez (83 dias): a media vai de +0.3007 para, no extremo, +0.2342 (sem 2026-08-20) — variacao -0.0665
+  tirando um mercado de cada vez (16 mercados): a media vai de +0.3007 para, no extremo, +0.3617 (sem ZECUSDT) — variacao +0.0610
+  decil superior (55 de 542) contribui +0.4917 de +0.3007; decil inferior -0.3036; os 432 do meio +0.1125
+  contribuicao do decil superior por grupo (ATR): stop=+0.2156  target=+0.2414  time-stop=+0.0107

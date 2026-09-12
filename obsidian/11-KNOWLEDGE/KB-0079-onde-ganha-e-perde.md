@@ -11,7 +11,7 @@ hipotese_testavel: "sim — o portão de regime de §5 é pré-registrável: `mo
 astra: pendente
 status: arquivada
 owner: sexta-feira
-updated: 2026-09-11
+updated: 2026-09-12
 confiança: "?"
 ---
 
@@ -265,6 +265,100 @@ a mãe e a irmã de 5 min: a transposição mudou tendência (1 h → 15 min), A
 reabre**. E nada aqui contradiz o "a perda ainda é o custo" da seção acima: a curva é **bruta**, e o
 resultado líquido da mãe em 90 dias continua sendo `r_ex_funding` **−0,0910 R** (EXP-0025).
 
+## Adendo 2026-09-12 (D-P24) — **de onde** vem aquele Δ: das saídas por **alvo**, e em minutos em que a posição já estava fechada
+
+> **Acrescentado pelo `quant-engineer` em 2026-09-12, 02:50 BRT (05:50 UTC).** Nada acima desta linha
+> foi editado — nenhum número do adendo D-P23 nem da leitura de 2026-09-09 foi tocado. Nada
+> commitado, nada escrito na VPS (três consultas em `repeatable read read only`).
+> **Proveniência:** `.claude/state/notes-D-P24.md`,
+> `infra/scripts/sql/research/2026-09-12-dp24-q0{0,1,2}-*.sql`,
+> `.claude/state/exp-drafts/dp24/{decomp.py,test_decomp.py,analise.py,dp24-decisoes.csv,dp24-caminho.csv,saida-*.txt}`.
+> **Coorte:** a **mesma** do adendo acima — `replay:fa005985-0b55-4820-904c-8ada589e441c`
+> (`mean_reversion v1`, 542 desfechos terminais, 16 mercados, 83 dias, EXP-0025). **Nenhum replay
+> novo.** **Régua:** `astra-review-plantao-20260911-1030.md`, MUST-FIX 1–3.
+
+O adendo D-P23 deixou uma pergunta aberta: o Δ(240 − 80) de **+0,3007 ATR** é dinheiro que a
+estratégia **poderia ter guardado** ou dinheiro que ela **nunca poderia tocar**? A decomposição pelo
+**motivo real de saída** responde, e a resposta muda a leitura.
+
+**O número agregado foi reproduzido dígito a dígito por outro caminho de dados** (caminho minuto a
+minuto em vez de nove endpoints, motivo de saída lido da coluna `signal_outcomes.result` em vez do
+envelope `meta.progress.result`, com **0** discordâncias em 542): média **+0,3007 ATR**
+IC [+0,0071; +0,5820], mediana +0,0598 IC [−0,1864; +0,3470]. Cobertura **542/542** com os 240 minutos
+`is_final` completos, **0** minutos faltando.
+
+**A tabela (contribuição = `Σ Δ_i do grupo / 542`; as três recompõem o total, erro 5,55e-17):**
+
+| motivo da saída | n | dias | média Δ (ATR) | mediana | **contribuição** | IC 95 % da contribuição | % do total |
+|---|---:|---:|---:|---:|---:|---|---:|
+| **`target`** | 216 | 65 | +0,6899 | +0,4803 | **+0,2749** | **[+0,0902; +0,4476]** | **91,4 %** |
+| `stop` | 281 | 73 | +0,0279 | −0,2448 | +0,0145 | [−0,1457; +0,1791] | 4,8 % |
+| `time-stop` | 45 | 26 | +0,1356 | +0,2410 | +0,0113 | [−0,0047; +0,0274] | 3,8 % |
+| `context-lost` / `other` | 0 | 0 | — | — | +0,0000 | — | 0 % |
+| **todos** | 542 | 83 | **+0,3007** | +0,0598 | +0,3007 | [+0,0071; +0,5820] | 100 % |
+
+Em **% do preço de entrada** a ordem é a mesma e as participações mudam (`target` **82,4 %**, `stop`
+13,9 %, `time-stop` 3,7 %) porque o ATR é um denominador **por decisão** e o `time-stop` é o grupo de
+ATR mais largo (ATR% p50 1,1134 % contra 0,8308 % e 0,8193 %). **Qualquer citação desta participação
+tem de carregar a unidade.**
+
+**O mesmo Δ partido pelo instante da saída real** (`Δ_i = [ret(c) − ret(80)] + [ret(240) − ret(c)]`,
+`c = clamp(m_saida, 80, 240)`; telescopa por construção, erro máximo 1,78e-15):
+
+| motivo | contribuição **dentro** da posição | IC 95 % | contribuição **depois** da saída | IC 95 % |
+|---|---:|---|---:|---|
+| `stop` | **−0,1345** | [−0,1721; −0,0992] | **+0,1490** | [+0,0078; +0,2942] |
+| `target` | +0,1840 | [+0,1395; +0,2302] | +0,0910 | [−0,0707; +0,2377] |
+| `time-stop` | +0,0113 | [−0,0047; +0,0274] | +0,0000 | (vazio por construção) |
+| **todos** | **+0,0607** | [−0,0128; +0,1366] | **+0,2399** | [−0,0136; +0,4768] |
+
+**Três coisas que esta tabela acrescenta à KB:**
+
+1. **79,8 % do Δ agregado acumula em minutos em que a posição já estava fechada** (+0,2399 de
+   +0,3007). O trecho dentro da posição soma +0,0607 e o IC dele **não** exclui zero. O "dinheiro
+   extra depois dos 80 min" é, na maior parte, dinheiro que a configuração de hoje **não podia
+   tocar** — não é lucro deixado na mesa por falta de paciência.
+2. **O `stop` some no total por cancelamento, não por imobilidade:** enquanto as 83 posições stopadas
+   depois dos 80 min ainda estavam abertas, o preço **caía** (−0,1345, IC excluindo zero pelo lado
+   negativo); depois de stopadas, subia (+0,1490, IC excluindo zero pelo lado positivo). Uma coluna
+   única esconderia isso.
+3. **O grupo em que um horizonte mais longo poderia importar (`time-stop`) responde por 3,8 %** — e
+   por aritmética de n (45 de 542), não por ausência de movimento: ele tem a **maior** mediana
+   (+0,2410) e o maior `%>0` (62,2 %) dos três. O contraste `time-stop − stop`, pareado por dia, é
+   **+0,1077 ATR IC [−0,2452; +0,4734]**: os dois grupos **não** se distinguem. E tirando as saídas
+   por alvo, os 326 restantes dão média **+0,0428 ATR** — o achado do adendo anterior desaparece.
+
+**Correção de uma frase do adendo D-P23, com o número que faltava.** Lá está escrito que a acumulação
+"é feita por uma **minoria de decisões com movimento tardio grande**, não por um deslocamento da
+distribuição inteira". Isso era **leitura a confirmar**, não achado (a Astra: média com IC acima de
+zero e mediana com IC cruzando zero não demonstram concentração). Medido agora: o **decil superior**
+(55 decisões) contribui **+0,4917**, o **decil inferior −0,3036**, e os **432 do meio +0,1125 —
+37,4 % do agregado**. Então **não** é "poucas explicam tudo" nem "a distribuição inteira se deslocou":
+são **as duas caudas grandes, com a direita maior**, e o sinal do agregado é a diferença entre elas —
+a parte menos estável de qualquer amostra. A frase do adendo anterior fica onde está, por registro; a
+leitura que vale é esta.
+
+**Fragilidade declarada:** o limite inferior do IC do agregado é **+0,0071**, e tirar **um único dia**
+(20/08/2026) move a média de +0,3007 para **+0,2342** (tirar um mercado, no extremo, para +0,3617).
+Nenhum dia ou mercado carrega o achado, mas "exclui zero" é aqui uma propriedade **frágil**. A parte
+robusta é a **decomposição** (o IC da contribuição do `target` tem limite inferior +0,0902), não a
+significância do agregado.
+
+**O que este adendo explicitamente não diz** — e é a armadilha que a
+[[KB-0054-a-cauda-direita-e-o-alvo-fixo-que-a-corta]] já registrou: os +0,0910 ATR que o grupo
+`target` acumula **depois** da própria saída **não** são dinheiro que uma variante sem alvo
+capturaria. Ela herdaria outra trajetória de desfechos — parte das 216 operações que hoje fecham no
+alvo viraria stop ou expiração —, e esse líquido é **experimento**, não leitura. Nada aqui propõe
+mudar a `mean_reversion v1` viva, nada aqui reabre a `mean_reversion_m5 v1` aposentada, e o motivo de
+saída só é conhecido **depois** da operação: ele não é, e não pode virar, seletor de entrada. O
+resultado realizado da versão continua sendo `r_ex_funding` **−0,0910 R** em 90 dias (EXP-0025).
+
+**Excursões (auxiliares, e são de FECHAMENTOS — OHLC não revela ordem intrabar).** Medianas em ATR:
+o `stop` tem MAE de closes **−1,8100** na janela de 240 min **e** na janela depois da saída (o preço
+seguiu caindo depois do stop, na mediana); o `target` tem MAE de closes **+0,3442** depois da saída
+(na mediana o preço nunca voltou à entrada depois do alvo); para o `time-stop` a janela depois é
+**vazia** (`m_saida = 240` em todas as 45).
+
 ## Proveniência
 
 | arquivo | o que produz |
@@ -283,6 +377,12 @@ resultado líquido da mãe em 90 dias continua sendo `r_ex_funding` **−0,0910 
 | `.claude/state/exp-drafts/dp23/curva.py` + `test_curva.py` | **(adendo D-P23)** curva, resumo por horizonte, Δ pareado por decisão, IC da mediana por blocos de dia, escolha do endpoint; **22 testes** com valor esperado à mão, 5 deles de anti-antecipação |
 | `.claude/state/exp-drafts/dp23/analise.py` + `saida-analise.txt` | **(adendo D-P23)** as seis seções da leitura e a saída verbatim |
 | `.claude/state/notes-D-P23.md` | **(adendo D-P23)** a nota inteira, com as oito assunções numéricas |
+| `infra/scripts/sql/research/2026-09-12-dp24-q00-motivos.sql` | **(adendo D-P24)** catálogo dos motivos reais de saída; `result` **contra** o envelope `meta.progress.result` (0 discordâncias em 542); `m_saida` por grupo; cobertura dos 240 minutos |
+| `infra/scripts/sql/research/2026-09-12-dp24-q01-decisoes.sql` | **(adendo D-P24)** uma linha por decisão (542): motivo, `m_saida`, ATR, ATR%, os dois pontos do Δ nas duas unidades, os fechamentos extremos das quatro janelas |
+| `infra/scripts/sql/research/2026-09-12-dp24-q02-caminho.sql` | **(adendo D-P24)** o caminho minuto a minuto — 130 080 linhas (542 × 240), o que põe a aritmética no módulo testado |
+| `.claude/state/exp-drafts/dp24/decomp.py` + `test_decomp.py` | **(adendo D-P24)** motivo canônico, Δ pareado, partição dentro/depois da saída, contribuição e decis, bootstrap de blocos de dia **conjunto**, excursões de closes; **41 testes** com valor esperado à mão, 5 de anti-antecipação |
+| `.claude/state/exp-drafts/dp24/analise.py` + `saida-analise.txt` | **(adendo D-P24)** as sete seções da leitura e a saída verbatim |
+| `.claude/state/notes-D-P24.md` | **(adendo D-P24)** a nota inteira, com os quatro CONCERNs e as dez assunções numéricas |
 
 **Sem antecipação:** o relógio de toda a nota é `meta->'entry_plan'->>'source_bar_close'` (a última
 vela fechada que a estratégia leu), e a linha de regime usada é a última com

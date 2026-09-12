@@ -1,0 +1,52 @@
+BEGIN
+SET
+== §1 motivo canonico do brief: n, dias, primeira/ultima entrada ==
+  motivo   | result  | tracking_state |  n  | dias | mercados |  primeira_entrada   |   ultima_entrada    
+-----------+---------+----------------+-----+------+----------+---------------------+---------------------
+ stop      | stop    | terminal       | 281 |   73 |       14 | 2026-06-13 13:46:00 | 2026-09-09 20:01:00
+ target    | target  | terminal       | 216 |   65 |       14 | 2026-06-13 20:16:00 | 2026-09-09 20:16:00
+ time-stop | expired | terminal       |  45 |   26 |       16 | 2026-06-12 21:01:00 | 2026-09-09 15:31:00
+(3 rows)
+
+== §1b o mesmo, sem o filtro `terminal`: nada pode estar escondido ==
+ tracking_state | result  |  n  
+----------------+---------+-----
+ terminal       | stop    | 281
+ terminal       | target  | 216
+ terminal       | expired |  45
+ no_entry       | open    |   1
+(4 rows)
+
+== §2 a coluna `result` contra o envelope `meta.progress.result` ==
+  n  | discordam | exit_ts_nulo | entry_ts_nulo | exit_ts_fora_do_minuto 
+-----+-----------+--------------+---------------+------------------------
+ 542 |         0 |            0 |             0 |                      0
+(1 row)
+
+== §3 duracao real e m_saida por motivo (particao das janelas) ==
+  motivo   |  n  | minimo |  p25  |  p50  |  p75  | maximo | saiu_ate_80 | saiu_entre_80_e_240 | saiu_em_240_ou_depois 
+-----------+-----+--------+-------+-------+-------+--------+-------------+---------------------+-----------------------
+ stop      | 281 |      1 |  17.0 |  43.0 |  92.0 |    239 |         198 |                  83 |                     0
+ target    | 216 |      3 |  35.0 |  68.0 | 120.8 |    232 |         122 |                  94 |                     0
+ time-stop |  45 |    240 | 240.0 | 240.0 | 240.0 |    240 |           0 |                   0 |                    45
+(3 rows)
+
+== §4 cobertura de velas: entrada, +80, +240 e os 240 minutos do caminho ==
+  n  | com_barra_de_entrada | com_endpoint_80 | com_endpoint_240 | com_240_minutos_completos | minimo_de_minutos | minutos_faltando_no_total 
+-----+----------------------+-----------------+------------------+---------------------------+-------------------+---------------------------
+ 542 |                  542 |             542 |              542 |                       542 |               240 |                         0
+(1 row)
+
+== §5 direcao, horizonte declarado e ATR presente ==
+ direcao | horizonte_s |  n  | sem_atr | atr_nao_positivo 
+---------+-------------+-----+---------+------------------
+ long    |       14400 | 542 |       0 |                0
+(1 row)
+
+== §6 a(s) decisao(oes) NAO terminal(is) da coorte: por que nao tem Delta ==
+ tracking_state | result | no_entry_reason | censored_reason | sem_entry_ts | n 
+----------------+--------+-----------------+-----------------+--------------+---
+ no_entry       | open   | geometry        |                 | t            | 1
+(1 row)
+
+COMMIT
