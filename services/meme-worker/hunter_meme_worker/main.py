@@ -1,16 +1,15 @@
-"""``HUNTER_ROLE=meme`` — the pump.fun radar, four loops under one TaskGroup.
+"""``HUNTER_ROLE=meme`` — the pump.fun radar, one TaskGroup of loops.
 
 The shape is the scanner-worker's: a thin entrypoint, a ``WorkerRuntime`` that owns
 logging, Sentry, the heartbeat and ``/health``·``/ready``·``/metrics``, and the work
 itself as supervised tasks (ARCHITECTURE.md §1.7, §11).
 
-Four tasks, and one deliberate asymmetry between them: **discovery is a stream and
-the other three are cadences.** Discovery consumes the PumpPortal socket and reacts
-to a frame; the poller, the reconciler and the folder wake on their own clock,
+Streams and cadences, and one deliberate asymmetry between them: **discovery and
+the four board streams react to frames; everything else wakes on its own clock**,
 because the budgets they spend are per unit of *time*, not per event.
 
-**Off by default** (``MEME_ENABLED``). The radar opens a WebSocket to a third party
-and polls an undocumented endpoint; a default that starts doing that on the next
+**Off by default** (``MEME_ENABLED``). The radar opens sockets to third parties
+and polls undocumented endpoints; a default that starts doing that on the next
 restart of an unrelated deploy is not a default (the ``market_spot_enabled``
 argument, ``hunter_core.settings``). Disabled, the process still serves
 ``/health``, ``/ready`` and ``/metrics`` and says so in the readiness body — a
@@ -19,15 +18,15 @@ a broken one.
 
 **Nothing here can become an order.** No import reaches ``packages/risk-core``,
 ``hunter_core.execution`` or the execution-worker, and the API role has ``SELECT``
-and nothing else on all five tables (T4-MEME-RADAR.md §0).
+and nothing else on the radar's tables (T4-MEME-RADAR.md §0).
 
-**The Lab is a fifth cadence, in the same process** (T4.6, ``lab.py``): once a
-minute it reads the closed minute the folder wrote and runs the paper engine
-over it — proposals, fills on the next snapshot, marks and exits — writing only
-the ``0022_meme_lab`` tables and ``lab_*`` fields on this worker's own
-heartbeat. Behind ``MEME_LAB_ENABLED`` (default on whenever the radar collects):
-a Lab that is switched off says so in the readiness body and in the heartbeat,
-which is the difference between "no proposals" and "nobody was looking".
+**The Lab is a cadence in the same process** (T4.6, ``lab.py``): once a minute it
+reads the closed minute the folder wrote and runs the paper engine over it.
+**The second collector** (T4.2c, ``wiring.py``): the site's boards over
+``/ws/trenches`` (holders, top-10, dev, snipers, exposure), the ``swap-api``
+tape (buys, sells, creator sells) and the risk read — each behind its own switch,
+each reported in ``hb:meme:radar`` and ``GET /meme/sources`` as connected or not,
+with its lag, its errors and its budget.
 """
 
 from __future__ import annotations
@@ -53,9 +52,20 @@ from hunter_meme_worker.lab import LabContext, LabState, lab_once, write_lab_hea
 from hunter_meme_worker.metrics import meme_tracked_mints
 from hunter_meme_worker.repo import load_tracked
 from hunter_meme_worker.tracker import MintTracker
+from hunter_meme_worker.wiring import (
+    build_boards,
+    build_risk,
+    build_sources,
+    build_trades,
+    heartbeat_once,
+    risk_once,
+    run_board,
+    trades_once,
+)
 
 if TYPE_CHECKING:
     from hunter_core.runtime import WorkerRuntime
+    from hunter_exchanges.pumpfun.trenches import TrenchesWsClient
 
 logger = get_logger(__name__)
 
@@ -66,34 +76,42 @@ quiet stretches, and T4.1's acceptance criterion separates "the socket is alive"
 from "there is activity". It shows up as a status detail, never as a red
 ``/ready`` (``hunter_core.runtime`` keeps the two apart)."""
 
-
-def build_context(runtime: WorkerRuntime, config: MemeConfig) -> RadarContext:
-    """Wire the three clients, the tracked set and the shared state."""
-    return RadarContext(
-        config=config,
-        session_factory=create_session_factory(runtime.engine),
-        tracker=MintTracker(
-            window_minutes=config.track_window_minutes,
-            cap=config.tracked_max,
-            young_minutes=config.young_minutes,
-        ),
-        state=RadarState(),
-        events=PumpPortalWsClient(),
-        curves=PumpFunRestClient(),
-        chain=SolanaRpcClient(),
-    )
-
-
 SOL_PRICE_BUDGET_PER_MINUTE = 50
 """``/sol-price`` is its own upstream rate-limit group (50/60 s, ``docs/PUMPFUN.md``
 §1.4), so the Lab's quote client gets its own bucket instead of spending the
 curve poller's 60 — and the Lab reads it at most once a minute anyway."""
 
 
+def build_context(
+    runtime: WorkerRuntime, config: MemeConfig
+) -> tuple[RadarContext, dict[str, TrenchesWsClient]]:
+    """Wire the clients, the tracked set, the shared state and the T4.2c sources."""
+    tracker = MintTracker(
+        window_minutes=config.track_window_minutes,
+        cap=config.tracked_max,
+        young_minutes=config.young_minutes,
+    )
+    sources = build_sources(config)
+    boards, board_clients = build_boards(config, tracker)
+    return RadarContext(
+        config=config,
+        session_factory=create_session_factory(runtime.engine),
+        tracker=tracker,
+        state=RadarState(),
+        events=PumpPortalWsClient(),
+        curves=PumpFunRestClient(),
+        chain=SolanaRpcClient(),
+        sources=sources,
+        boards=boards,
+        trades=build_trades(config, sources),
+        risk=build_risk(config, sources),
+    ), board_clients
+
+
 def _heartbeat_writer(runtime: WorkerRuntime) -> Callable[[dict[str, str]], Awaitable[None]]:
-    """``lab_*`` fields land on this worker's own ``hb:meme:radar`` hash; the
-    runtime's heartbeat loop keeps the key alive, so a stopped Lab shows as a
-    stale ``lab_last_tick_at`` next to a fresh ``ts``."""
+    """Fields land on this worker's own ``hb:meme:radar`` hash; the runtime's
+    heartbeat loop keeps the key alive, so a stopped loop shows as a stale
+    field next to a fresh ``ts``."""
     key = keys.heartbeat(runtime.role, runtime.instance)
 
     async def write_fields(mapping: dict[str, str]) -> None:
@@ -135,7 +153,9 @@ async def warm_tracked_set(ctx: RadarContext) -> int:
     return len(tracked)
 
 
-def _register_health(runtime: WorkerRuntime, ctx: RadarContext) -> None:
+def _register_health(
+    runtime: WorkerRuntime, ctx: RadarContext, boards: dict[str, TrenchesWsClient]
+) -> None:
     """Readiness answers "should traffic reach me"; the details answer "what is degraded"."""
 
     async def discovery_connected() -> bool:
@@ -146,6 +166,21 @@ def _register_health(runtime: WorkerRuntime, ctx: RadarContext) -> None:
     runtime.status_details["tracked_mints"] = lambda: str(len(ctx.tracker))
     runtime.status_details["last_event_age_s"] = lambda: _last_event_age(ctx)
     runtime.status_details["ws_generation"] = lambda: str(ctx.state.ws_generation)
+    runtime.status_details["trenches"] = lambda: (
+        "disabled (MEME_TRENCHES_ENABLED=false)"
+        if not boards
+        else ", ".join(f"{b}:{c.state.ws_state}" for b, c in boards.items())
+    )
+    runtime.status_details["swap_api"] = lambda: (
+        "disabled (MEME_SWAP_API_ENABLED=false)"
+        if ctx.trades is None
+        else f"{len(ctx.trades.coverage)} mints covered"
+    )
+    runtime.status_details["risk"] = lambda: (
+        "disabled (MEME_RISK_ENABLED=false)"
+        if ctx.risk is None
+        else f"{len(ctx.risk.last_read)} mints read"
+    )
 
 
 def _register_lab_health(runtime: WorkerRuntime, lab: LabContext | None) -> None:
@@ -187,15 +222,15 @@ async def run_meme(runtime: WorkerRuntime) -> None:
         await asyncio.Event().wait()
         return
 
-    ctx = build_context(runtime, config)
-    _register_health(runtime, ctx)
+    ctx, boards = build_context(runtime, config)
+    _register_health(runtime, ctx, boards)
     lab = build_lab_context(runtime, config) if config.lab_enabled else None
     _register_lab_health(runtime, lab)
+    write = _heartbeat_writer(runtime)
     if lab is None:
         logger.warning("meme_lab_disabled", reason="MEME_LAB_ENABLED is false")
         await write_lab_heartbeat(
-            LabContext(config, ctx.session_factory, LabState(), None, _heartbeat_writer(runtime)),
-            enabled=False,
+            LabContext(config, ctx.session_factory, LabState(), None, write), enabled=False
         )
     warmed = await warm_tracked_set(ctx)
     logger.info(
@@ -205,54 +240,63 @@ async def run_meme(runtime: WorkerRuntime) -> None:
         cap=config.tracked_max,
         retention_days=config.retention_days,
         lab=lab is not None,
+        trenches=sorted(boards),
+        swap_api=ctx.trades is not None,
+        risk=ctx.risk is not None,
     )
 
     async def _discovery(context: RadarContext) -> None:
         await run_discovery(context)
         runtime.mark_success()
 
+    async def _heartbeat(context: RadarContext) -> None:
+        await heartbeat_once(context, write)
+
     try:
         async with asyncio.TaskGroup() as group:
             group.create_task(_discovery(ctx), name="meme-discovery")
-            group.create_task(forever("poll", config.poll_cycle_s, _poll, ctx), name="meme-poll")
             group.create_task(
-                forever("reconcile", config.reconcile_cycle_s, _reconcile, ctx),
+                forever("poll", config.poll_cycle_s, poll_once, ctx), name="meme-poll"
+            )
+            group.create_task(
+                forever("reconcile", config.reconcile_cycle_s, reconcile_once, ctx),
                 name="meme-reconcile",
             )
             group.create_task(
-                forever("fold", config.features_cycle_s, _fold, ctx), name="meme-fold"
+                forever("fold", config.features_cycle_s, fold_once, ctx), name="meme-fold"
             )
             group.create_task(
                 forever("retention", config.retention_cycle_s, prune_once, ctx),
                 name="meme-retention",
             )
+            group.create_task(
+                forever("heartbeat", config.heartbeat_cycle_s, _heartbeat, ctx),
+                name="meme-heartbeat",
+            )
+            for board, client in boards.items():
+                group.create_task(run_board(ctx, client), name=f"meme-board-{board}")
+            if ctx.trades is not None:
+                group.create_task(
+                    forever("trades", config.trades_cycle_s, trades_once, ctx), name="meme-trades"
+                )
+            if ctx.risk is not None:
+                group.create_task(
+                    forever("risk", config.risk_cycle_s, risk_once, ctx), name="meme-risk"
+                )
             if lab is not None:
-                group.create_task(forever("lab", config.lab_cycle_s, _lab, lab), name="meme-lab")
+                group.create_task(
+                    forever("lab", config.lab_cycle_s, lab_once, lab), name="meme-lab"
+                )
     finally:
-        await _close(ctx)
+        await _close(ctx, boards)
         if lab is not None and isinstance(lab.quotes, PumpFunRestClient):
             await lab.quotes.aclose()
 
 
-async def _lab(ctx: LabContext) -> None:
-    await lab_once(ctx)
-
-
-async def _poll(ctx: RadarContext) -> None:
-    await poll_once(ctx)
-
-
-async def _reconcile(ctx: RadarContext) -> None:
-    await reconcile_once(ctx)
-
-
-async def _fold(ctx: RadarContext) -> None:
-    await fold_once(ctx)
-
-
-async def _close(ctx: RadarContext) -> None:
+async def _close(ctx: RadarContext, boards: dict[str, TrenchesWsClient]) -> None:
     """Close whatever the clients own. Best effort: shutdown must not raise."""
-    for client in (ctx.events, ctx.curves, ctx.chain):
+    clients: list[object] = [ctx.events, ctx.curves, ctx.chain, *boards.values()]
+    for client in clients:
         closer = getattr(client, "aclose", None)
         if closer is None:
             continue

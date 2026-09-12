@@ -1,11 +1,17 @@
-"""What the four loops share: the config, the session factory, the tracked set and
-the little mutable state a minute needs.
+"""What the loops share: the config, the session factory, the tracked set, the
+little mutable state a minute needs and — since T4.2c — the second collector's
+pieces (boards, tape, risk, per-source stats).
 
-Kept in its own module so ``discovery.py`` and ``collect.py`` can both see it
-without importing each other, and so the protocols below are declared once. The
-protocols are why the loops are testable without a socket: a fake that answers
-``get_curve_state`` is a legitimate ``CurveSource``, and nothing in the loops asks
-whether it was the real client.
+Kept in its own module so ``discovery.py``, ``collect.py``, ``fold.py`` and the
+T4.2c loops can all see it without importing each other, and so the protocols
+below are declared once. The protocols are why the loops are testable without a
+socket: a fake that answers ``get_curve_state`` is a legitimate ``CurveSource``,
+and nothing in the loops asks whether it was the real client.
+
+The T4.2c fields are optional with ``None`` defaults: a context built for the
+T4.2 tests, or a deployment with ``MEME_TRENCHES_ENABLED=false``, still folds
+every minute — with ``no_holders_reader``/``no_trade_feed`` where the sources
+are absent, which is the truth of that deployment and not a crash.
 """
 
 from __future__ import annotations
@@ -22,8 +28,12 @@ if TYPE_CHECKING:
 
     from hunter_exchanges.pumpfun.models import NormalizedCurveState
     from hunter_exchanges.pumpfun.ws import ConnectionState, MemeEvent
+    from hunter_meme_worker.boards import BoardCollector
     from hunter_meme_worker.config import MemeConfig
+    from hunter_meme_worker.risk import RiskReader
+    from hunter_meme_worker.sources import SourcesState
     from hunter_meme_worker.tracker import MintTracker
+    from hunter_meme_worker.trades import TradesPuller
 
 
 class EventSource(Protocol):
@@ -63,13 +73,18 @@ class RadarState:
 
     absences: dict[str, str] = field(default_factory=dict[str, str])
     """Per-mint reason for a missing observation this minute (``rate_limited``,
-    ``not_polled``). Set by whoever failed, read by the folder."""
+    ``not_polled``, ``unsupported_quote``). Set by whoever failed, read by the
+    folder."""
 
     ws_generation: int = 0
     last_event_at: datetime | None = None
     """Liveness, split in two on purpose (T4.1's acceptance criterion): a connected
     socket with no new tokens is not a dropped socket, so readiness reads
     ``ws_state`` and the *staleness* detail reads this."""
+
+    open_bets: frozenset[str] = frozenset()
+    """Mints with an open paper bet, re-read from ``meme_paper_bets`` by the
+    poller every cycle — the top of every priority list (poll, tape, risk)."""
 
     def observe(self, mint: str, observation: CurveObservation) -> None:
         current = self.observations.get(mint)
@@ -94,3 +109,7 @@ class RadarContext:
     events: EventSource
     curves: CurveSource
     chain: ChainSource
+    sources: SourcesState | None = None
+    boards: BoardCollector | None = None
+    trades: TradesPuller | None = None
+    risk: RiskReader | None = None

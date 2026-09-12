@@ -160,12 +160,43 @@ fill fabricado ao último preço visto (`docs/RISK_ENGINE_MEME.md` §10.4).
 papel nunca simula caminho mais barato que o live), impacto da própria ordem pela fórmula da curva,
 risco inicial = SOL gasto inteiro (§5), marca = o que uma venda cheia renderia agora (§6).
 
-**O que é NULL com motivo hoje:** `creator_sold` (`no_holders_reader`) e o volume do minuto (sem
-feed de trades). Com esses dois nulos **o portão congelado da EXP-M1 recusa toda linha**
-(`creator_net_seller_unknown`, `curve_volume_1m_unknown`); o laço conta as recusas por conjunto no
-heartbeat (`hb:meme:radar` → `lab_gate_refusals`) e `GET /api/v1/orgs/{org}/meme/lab` as publica em
-`sources`. A aposta hoje nasce da mesa (`POST /proposals/manual`, T4.7) e o laço faz o resto.
-Detalhe do schema: `docs/DATABASE.md` §33–§34; plano: `docs/plans/T4-MEME-RADAR.md` §T4.6.
+**O segundo coletor (T4.2c):** quatro sockets `wss://advanced-indexer.pump.fun/ws/trenches`
+(boards `new`, `graduating`, `graduated`, `movers`; snapshot + deltas por versão, backoff
+`min(1000·2^n, 30000)` ms, ressincronização em retrocesso de versão) → `meme_board_observations`
+(uma linha por mint por board por minuto fechado, com exposição e censura); a fita
+`swap-api /v2/coins/{mint}/trades` (900/60 s, cursor, prioridade aposta aberta > `graduating` > `new`
+> resto, intervalos 10/10/20/60 s) → `meme_trades` (`source='swap_api'`, `commitment NULL`); e
+`GET /in-memory-coin/{mint}` (≤ 1/mint/5 min, apostas abertas e `graduating`) → `meme_risk_snapshots`.
+O poll da curva ganhou a mesma prioridade, uma **leitura final** de toda curva concluída/migrada (a
+causa dos 0 `complete = true` medidos: a expulsão por `migrated` vinha antes do primeiro poll) e
+descarta cotação ≠ SOL na primeira recusa. Fontes desligáveis por `MEME_TRENCHES_ENABLED`,
+`MEME_SWAP_API_ENABLED`, `MEME_RISK_ENABLED` (padrão ligadas com o radar).
+
+```
+/ws/trenches ×4 ──▶ boards.py (exposição, holders) ──┐
+swap-api trades ──▶ trades.py ──▶ meme_trades ────────┤──▶ fold.py (received_at <= end_time) ──▶ meme_features_1m
+/in-memory-coin ──▶ risk.py ──▶ meme_risk_snapshots ──┘        + meme_board_observations (mesmo minuto)
+```
+
+**Não-antecipação, agora quatro vezes:** as colunas novas do minuto (`holders`, `top10_share`,
+`dev_share`, `snipers`, `buys_1m`, `sells_1m`, `unique_buyers`, `buy_sell_ratio`, `net_sol_flow_1m`,
+`curve_volume_1m_sol`, `creator_sold`, `creator_net_seller`) usam só o que tinha chegado até
+`end_time` (`features_tape.py`; teste de look-ahead em `test_features_tape.py` e no testcontainer).
+Um trade do minuto recebido depois do fecho está em minuto nenhum — a conta é "o que se sabia em T".
+
+**O que continua NULL com motivo:** `no_trade_feed` até a primeira leitura da fita de um mint,
+`no_holders_reader` até um board ou leitura de risco falar dele, `no_sells` numa razão sem vendas,
+`rate_limited`/`unsupported_quote` quando a fonte recusou. **Pendência declarada:** a porta da EXP-M1
+(`lab_repo.load_gate_rows`) ainda passa `curve_volume_1m_sol=None` e lê `creator_sold` como
+`creator_net_seller` — dois ajustes de uma linha em `lab_repo.py`, fora desta tarefa por regra do
+brief; até lá `lab_gate_refusals` continua mostrando `curve_volume_1m_unknown`.
+
+**Fontes visíveis:** `hb:meme:radar` ganhou `tracked`, `budget_used_60s`, `gaps_60s`,
+`ws_malformed_60s`, `last_snapshot_observed_at`, `lag_s`, `trenches_connected`,
+`trenches_patches_60s`, `swap_api_used_60s` e um JSON `sources` por fonte (conectada?, último
+`observed_at`, atraso, erros na última hora, orçamento usado, motivo); `GET /api/v1/orgs/{org}/meme/sources`
+os publica ao lado da última linha de cada tabela — nunca um zero silencioso.
+Detalhe do schema: `docs/DATABASE.md` §33–§35; plano: `docs/plans/T4-MEME-RADAR.md` §T4.6/§T4.2c.
 
 ## 2. Feature Engine
 

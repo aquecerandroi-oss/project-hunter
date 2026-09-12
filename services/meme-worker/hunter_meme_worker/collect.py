@@ -1,17 +1,22 @@
-"""The four periodic loops: poll, reconcile, fold, prune.
+"""The periodic loops of the curve: poll, reconcile, fold, prune.
 
 - **poll** spends the 60 requests/60 s of ``frontend-api-v3.pump.fun`` on the
-  tracked set, youngest tier first, least recently polled first inside each tier
-  (``tracker.py``). Whatever the budget does not reach is written as a
-  ``meme_ingest_gaps`` row — one row per cycle naming the count, not one per mint,
-  because a hundred rows saying the same thing is noise, not evidence;
+  tracked set in the declared priority (``tracker.py``: open paper bets, final
+  reads of finished curves, the ``graduating`` board, the ``new`` board, the
+  young tier, the rest — least recently polled first inside each). Whatever the
+  budget does not reach is written as a ``meme_ingest_gaps`` row — one row per
+  cycle naming the count, not one per mint, because a hundred rows saying the
+  same thing is noise, not evidence. A curve quoted in something other than SOL
+  is dropped from the set on the first refusal (T4.2c: it cost 2–4 requests a
+  minute for a reading the adapter will never produce);
 - **reconcile** reads the top-K tracked mints by market cap from the chain. The
   REST mirror is undocumented and best effort (T4-MEME-RADAR.md §2: never a single
   source of truth), so the mints where being wrong costs most are checked against
   the RPC — and both readings are kept, distinguished by
   ``meme_curve_snapshots.source``, rather than one overwriting the other;
-- **fold** writes one ``meme_features_1m`` row per tracked mint per closed minute,
-  with a NULL and a reason wherever the free sources cannot answer;
+- **fold** writes one ``meme_features_1m`` row per tracked mint per closed minute
+  (``fold.py``, since T4.2c with the boards and the tape), with a NULL and a
+  reason wherever a source cannot answer;
 - **prune** applies ``MEME_RETENTION_DAYS`` to ``meme_tokens`` — the one table
   retention cannot prune by dropping a partition — in batches, behind the declared
   ``app.meme_retention`` marker.
@@ -31,18 +36,19 @@ from typing import TYPE_CHECKING
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
-from hunter_meme_worker.config import CURVE_STREAM, FEATURES_STREAM
+from hunter_exchanges.base import RateLimited
+from hunter_exchanges.pumpfun.normalize import UnsupportedQuote
+from hunter_meme_worker.config import CURVE_STREAM
 from hunter_meme_worker.features import (
     NOT_POLLED,
     RATE_LIMITED,
+    UNSUPPORTED_QUOTE,
     CurveObservation,
     FeatureRow,
-    MinuteInputs,
-    build_row,
 )
+from hunter_meme_worker.fold import fold_minute
 from hunter_meme_worker.metrics import (
     meme_budget_skipped_total,
-    meme_features_rows_total,
     meme_gaps_total,
     meme_polls_total,
     meme_tokens_pruned_total,
@@ -52,18 +58,17 @@ from hunter_meme_worker.repo import (
     GapRow,
     SnapshotRow,
     TokenRow,
-    insert_features,
     insert_snapshot,
     prune_tokens,
     record_gap,
     upsert_token,
 )
-from hunter_meme_worker.tracker import TrackedMint
+from hunter_meme_worker.repo_tape import open_bet_mints
+from hunter_meme_worker.sources import PUMPFUN_REST, SOLANA_RPC
+from hunter_meme_worker.tracker import TIER_OPEN_BET, TrackedMint
 
 if TYPE_CHECKING:
     from datetime import datetime
-
-    from sqlalchemy.ext.asyncio import AsyncSession
 
     from hunter_exchanges.pumpfun.models import NormalizedCurveState
     from hunter_meme_worker.context import RadarContext
@@ -98,7 +103,7 @@ def snapshot_row(state: NormalizedCurveState) -> SnapshotRow:
 
 def token_row_from_curve(state: NormalizedCurveState) -> TokenRow:
     """What a curve reading teaches the dimension — including, **once**, the
-    progress denominator.
+    progress denominator and, once, ``completed_at``.
 
     ``initial_real_token_reserves`` is only claimed when ``real_sol_reserves`` is
     zero: a curve nobody has bought yet is the one moment its real token reserve
@@ -106,7 +111,7 @@ def token_row_from_curve(state: NormalizedCurveState) -> TokenRow:
     793,1 M constant blogs quote — and when the radar never sees that moment, the
     denominator stays unknown and progress is NULL with ``denominator_unknown``.
     """
-    untouched = state.real_sol_reserves == 0
+    untouched = state.real_sol_reserves == 0 and not state.complete
     return TokenRow(
         mint=state.mint,
         first_seen_source=state.source,
@@ -135,7 +140,9 @@ async def _persist_reading(ctx: RadarContext, state: NormalizedCurveState) -> No
             bonding_curve=tracked.bonding_curve if tracked else None,
             mayhem_state=state.mayhem_state,
             initial_real_token_reserves=(
-                state.real_token_reserves if state.real_sol_reserves == 0 else None
+                state.real_token_reserves
+                if state.real_sol_reserves == 0 and not state.complete
+                else None
             ),
             complete=state.complete,
             mcap_sol=state.market_cap_sol,
@@ -152,6 +159,17 @@ async def _persist_reading(ctx: RadarContext, state: NormalizedCurveState) -> No
             complete=state.complete,
         ),
     )
+    if ctx.sources is not None:
+        name = SOLANA_RPC if state.source == "solana_rpc" else PUMPFUN_REST
+        ctx.sources[name].record_ok(observed_at=state.observed_at, received_at=state.received_at)
+        ctx.sources.record_snapshot(observed_at=state.observed_at, received_at=state.received_at)
+
+
+async def refresh_open_bets(ctx: RadarContext) -> frozenset[str]:
+    """The Lab's open bets, from the rows — the top of every priority list."""
+    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+        ctx.state.open_bets = await open_bet_mints(session)
+    return ctx.state.open_bets
 
 
 async def poll_once(ctx: RadarContext) -> int:
@@ -159,14 +177,27 @@ async def poll_once(ctx: RadarContext) -> int:
     now = utcnow()
     aged_out, capped = ctx.tracker.prune(now)
     meme_tracked_mints.set(len(ctx.tracker))
-    plan = ctx.tracker.plan(now, ctx.config.rest_budget_per_minute)
+    open_bets = await refresh_open_bets(ctx)
+    plan = ctx.tracker.plan(
+        now,
+        ctx.config.rest_budget_per_minute,
+        boosted={mint: TIER_OPEN_BET for mint in open_bets},
+    )
     read = 0
     for mint in plan.selected:
         try:
             state = await ctx.curves.get_curve_state(mint)
+        except UnsupportedQuote:
+            ctx.tracker.mark_quote_unsupported(mint)
+            ctx.state.absences[mint] = UNSUPPORTED_QUOTE
+            meme_polls_total.labels(source="pumpfun_rest", outcome="unsupported_quote").inc()
+            _spent(ctx, now, "unsupported_quote")
+            logger.info("meme_curve_quote_unsupported", mint=mint)
+            continue
         except Exception as exc:  # one mint's failure is not the cycle's
             ctx.state.absences.setdefault(mint, RATE_LIMITED)
             meme_polls_total.labels(source="pumpfun_rest", outcome="error").inc()
+            _spent(ctx, now, "rate_limited" if isinstance(exc, RateLimited) else type(exc).__name__)
             logger.warning("meme_curve_poll_failed", mint=mint, error=str(exc))
             continue
         await _persist_reading(ctx, state)
@@ -177,6 +208,12 @@ async def poll_once(ctx: RadarContext) -> int:
     if plan.skipped or capped:
         await _record_budget_gap(ctx, now, plan.skipped_count, len(capped), len(aged_out))
     return read
+
+
+def _spent(ctx: RadarContext, at: datetime, error: str) -> None:
+    if ctx.sources is not None:
+        ctx.sources[PUMPFUN_REST].record_spent(at)
+        ctx.sources[PUMPFUN_REST].record_error(at, error)
 
 
 async def _record_budget_gap(
@@ -202,6 +239,8 @@ async def _record_budget_gap(
             ),
         )
     meme_gaps_total.labels(stream=CURVE_STREAM, reason=BUDGET_REASON).inc()
+    if ctx.sources is not None:
+        ctx.sources.gaps_60s.add(now)
 
 
 async def reconcile_once(ctx: RadarContext) -> int:
@@ -218,6 +257,8 @@ async def reconcile_once(ctx: RadarContext) -> int:
             state = await ctx.chain.get_curve_state(mint, tracked.bonding_curve)
         except Exception as exc:
             meme_polls_total.labels(source="solana_rpc", outcome="error").inc()
+            if ctx.sources is not None:
+                ctx.sources[SOLANA_RPC].record_error(utcnow(), type(exc).__name__)
             logger.warning("meme_chain_read_failed", mint=mint, error=str(exc))
             continue
         await _persist_reading(ctx, state)
@@ -243,49 +284,9 @@ async def fold_once(ctx: RadarContext) -> list[FeatureRow]:
         # would claim a completeness the process cannot honestly report.
         ctx.state.last_folded_minute = boundary
         return []
-    observations, absences = ctx.state.drain()
-    rows = [
-        build_row(
-            MinuteInputs(
-                mint=tracked.mint,
-                end_time=boundary,
-                created_at=tracked.created_at,
-                initial_real_token_reserves=tracked.initial_real_token_reserves,
-                snapshot=observations.get(tracked.mint),
-                absence_reason=absences.get(tracked.mint, NOT_POLLED),
-            ),
-            features_version=ctx.config.features_version,
-        )
-        for tracked in ctx.tracker.snapshot()
-    ]
-    if rows:
-        async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
-            await insert_features(session, rows)
-            await _record_uncovered(ctx, session, boundary, rows)
+    rows = await fold_minute(ctx, boundary)
     ctx.state.last_folded_minute = boundary
-    covered = sum(1 for row in rows if row.coverage > 0)
-    meme_features_rows_total.labels(coverage="covered").inc(covered)
-    meme_features_rows_total.labels(coverage="uncovered").inc(len(rows) - covered)
     return rows
-
-
-async def _record_uncovered(
-    ctx: RadarContext, session: AsyncSession, boundary: datetime, rows: list[FeatureRow]
-) -> None:
-    """A minute in which *nothing* was observed is a hole in the whole stream."""
-    if any(row.coverage > 0 for row in rows):
-        return
-    await record_gap(
-        session,
-        GapRow(
-            stream=FEATURES_STREAM,
-            gap_start=boundary - timedelta(minutes=1),
-            gap_end=boundary,
-            reason="insufficient_coverage",
-            detail={"tracked": len(rows)},
-        ),
-    )
-    meme_gaps_total.labels(stream=FEATURES_STREAM, reason="insufficient_coverage").inc()
 
 
 async def prune_once(ctx: RadarContext) -> int:

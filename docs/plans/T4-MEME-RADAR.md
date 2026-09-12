@@ -417,6 +417,39 @@ com a `0022` na união. Nenhum módulo importa `packages/risk-core` nem `hunter_
 pelo PumpSwap (hoje a migração fecha contra a fotografia da curva concluída, com a taxa de 1,75 %,
 declarado no `exit.trigger`), detector de rug (`rug_signal_unknown` na decisão).
 
+### T4.2c — segundo coletor: boards do site, fita do `swap-api`, risco por consulta (entregue 12/09/2026)
+
+**Escopo entregue:** adaptador `trenches.py`/`trenches_state.py` (WS `/ws/trenches` por board, snapshot +
+deltas com versão, backoff `min(1000·2^n, 30000)` ms, ressincronização em retrocesso, contadores),
+`indexer_rest.py` (twin `GET /boards/{board}` e `GET /in-memory-coin/{mint}`, 60/60 s declarado),
+`swap_api.py` (fita com cursor, 900/60 s), modelos `NormalizedBoardEntry`/`NormalizedRiskSnapshot`/
+`NormalizedSwapTrade`; migração `0023_meme_boards_trades` (`meme_board_observations`,
+`meme_risk_snapshots`, 15 colunas em `meme_features_1m`, `meme_trades.commitment` anulável —
+`docs/DATABASE.md` §35); no worker, `boards.py` (exposição + censura), `trades.py` (prioridade aposta
+aberta > `graduating` > `new` > resto; intervalos 10/10/20/60 s; alta-marca por mint), `risk.py`,
+`fold.py` (o minuto com as três fontes), `sources.py` (contadores por fonte, heartbeat);
+`GET /api/v1/orgs/{org}/meme/sources` (VIEWER+).
+
+**Causa-raiz dos 0 `complete = true` em 1 h (adendo):** o `migrate` do PumpPortal chegava antes do
+primeiro poll (43/49 graduações no próprio slot da criação), `migrated = True` expulsava o mint do
+conjunto rastreado e `_LOAD_TRACKED` o excluía no restart — a curva concluída nunca era lida, logo nem o
+snapshot `complete` nem `completed_at` existiam. O parser não era o culpado: o `/coins/{mint}` de um
+graduado real (`frontend_api_v3_coin_graduated_raw.json`) volta `complete: true` com reserva virtual
+> 0 e é aceito. Correção: `final_read_pending` mantém o mint até **uma** leitura depois da
+conclusão/migração (tier logo após apostas abertas), que grava o snapshot `complete` e `completed_at`;
+mints com cotação ≠ SOL são descartados na primeira recusa (`UnsupportedQuote`).
+
+**Não-antecipação (regra única, em `features_tape.py`):** toda coluna nova de `meme_features_1m`
+usa só observações com `received_at <= end_time`; o teste de look-ahead prova que uma leitura de
+holders ou um trade carimbado dentro do minuto mas recebido depois do fecho não muda a linha.
+
+**O que a EXP-M1 recebe agora:** `creator_sold` e `creator_net_seller` (fita do criador),
+`curve_volume_1m_sol`, `buys_1m`/`sells_1m`/`net_sol_flow_1m`, `unique_buyers`, `buy_sell_ratio`
+(`no_sells` quando não houve venda), `holders`/`top10_share`/`dev_share`/`snipers` com
+`holders_observed_at`/`holders_source`. **Pendência declarada:** `lab_repo.load_gate_rows` ainda
+passa `curve_volume_1m_sol=None` e lê `creator_sold` como `creator_net_seller` — dois ajustes de uma
+linha em `lab_repo.py`, fora do escopo desta tarefa por regra do brief (não tocar `lab*.py`).
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets

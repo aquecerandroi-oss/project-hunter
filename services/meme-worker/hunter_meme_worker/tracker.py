@@ -13,22 +13,34 @@ Membership, and every part of it is a declared choice:
 - **or the Mayhem agent is ``active``/``paused``** — a paused agent is not a
   finished one, and dropping it would lose the transition H-P28 is about;
 - **and the curve still moves**: a mint whose curve is complete or already
-  migrated leaves the set, because its reserves are static and every request
-  spent on it is a request not spent on a curve that is moving. It keeps its row
-  and its history; it just stops costing budget.
+  migrated leaves the set — **after one final read**. This is the T4.2c fix for
+  the measured "0 snapshots with ``complete = true`` in an hour": 43 of 49
+  graduations of the plantão happened in the creation slot, so the PumpPortal
+  ``migrate`` frame arrived before the first poll, ``migrated = True`` evicted the
+  mint, and no reading of the finished curve — and no ``completed_at`` — was ever
+  written. ``final_read_pending`` keeps the mint exactly until one successful
+  poll after completion/migration, which records the ``complete = true`` snapshot
+  and stamps ``meme_tokens.completed_at``; then it stops costing budget;
+- **and the quote is native SOL**: a curve paired with USDC (2026-05-21) is
+  refused by the adapter on every read, so tracking it spends 2–4 requests a
+  minute on a mint the radar will never observe (the adendo's measurement).
+  ``quote_unsupported`` drops it and the feature row says ``unsupported_quote``.
 
-Priority, and the starvation is declared rather than hidden: mints younger than
-``young_minutes`` are polled first (that is where the curve moves fastest), and
-inside each tier the **least recently polled** goes first, so the older tier is
-served with whatever budget the young tier leaves. When the young tier alone
-exceeds the budget the rest is genuinely skipped — and the collector writes that
-as a ``meme_ingest_gaps`` row instead of leaving a silent hole, which is the whole
-difference between a gap and a lie.
+Priority, and the starvation is declared rather than hidden. Tiers, in order:
+mints with an **open paper bet** (the Lab is marking them every minute),
+**final reads** of finished curves (one request each, and it is the fix above),
+mints on the site's **``graduating``** board, mints on the **``new``** board,
+then the young tier (``young_minutes``) and the rest; inside each tier the
+**least recently polled** goes first. When the budget runs out the rest is
+genuinely skipped — and the collector writes that as a ``meme_ingest_gaps`` row
+instead of leaving a silent hole, which is the whole difference between a gap
+and a lie.
 """
 
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -36,6 +48,13 @@ from decimal import Decimal
 ACTIVE_MAYHEM_STATES = frozenset({"active", "paused"})
 """``paused`` means liquidity is insufficient right now, not that the agent is
 done (A4.1b §2) — so it keeps the mint in the set."""
+
+TIER_OPEN_BET = 0
+TIER_FINAL_READ = 1
+TIER_GRADUATING = 2
+TIER_NEW = 3
+TIER_YOUNG = 4
+TIER_REST = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +64,7 @@ class TrackedMint:
     mint: str
     first_seen_at: datetime
     created_at: datetime | None = None
+    creator: str | None = None
     bonding_curve: str | None = None
     mayhem_state: str | None = None
     initial_real_token_reserves: Decimal | None = None
@@ -52,6 +72,13 @@ class TrackedMint:
     mcap_sol: Decimal | None = None
     complete: bool = False
     migrated: bool = False
+    final_read_pending: bool = False
+    """The curve finished (or left for PumpSwap) and no reading of the finished
+    state has been persisted yet: one more poll, then eviction."""
+    quote_unsupported: bool = False
+    board: str | None = None
+    """The site board that last listed the mint (``new`` / ``graduating``), a
+    priority hint — never a claim about the curve."""
 
     @property
     def age_anchor(self) -> datetime:
@@ -64,9 +91,15 @@ class TrackedMint:
         """
         return self.created_at or self.first_seen_at
 
+    @property
+    def finished(self) -> bool:
+        return self.complete or self.migrated
+
     def is_trackable(self, now: datetime, window: timedelta) -> bool:
-        if self.complete or self.migrated:
+        if self.quote_unsupported:
             return False
+        if self.finished:
+            return self.final_read_pending
         if self.mayhem_state in ACTIVE_MAYHEM_STATES:
             return True
         return now - self.age_anchor <= window
@@ -114,8 +147,9 @@ class MintTracker:
         a migration frame with no creation time, a REST read with no bonding curve
         — may fill a hole and may never blank a value. Mutable state
         (``mayhem_state``, ``complete``, ``migrated``, ``mcap_sol``,
-        ``last_polled_at``) is the opposite: the newest observation wins, because
-        that is what "state" means.
+        ``last_polled_at``, ``board``) is the opposite: the newest observation
+        wins, because that is what "state" means. ``final_read_pending`` is set
+        by whoever reports the finish and cleared only by :meth:`mark_polled`.
         """
         existing = self._mints.get(candidate.mint)
         if existing is None:
@@ -124,6 +158,7 @@ class MintTracker:
         merged = dataclasses.replace(
             existing,
             created_at=existing.created_at or candidate.created_at,
+            creator=existing.creator or candidate.creator,
             bonding_curve=existing.bonding_curve or candidate.bonding_curve,
             initial_real_token_reserves=(
                 existing.initial_real_token_reserves
@@ -134,13 +169,17 @@ class MintTracker:
             mayhem_state=candidate.mayhem_state or existing.mayhem_state,
             complete=existing.complete or candidate.complete,
             migrated=existing.migrated or candidate.migrated,
+            final_read_pending=existing.final_read_pending or candidate.final_read_pending,
+            quote_unsupported=existing.quote_unsupported or candidate.quote_unsupported,
             mcap_sol=candidate.mcap_sol if candidate.mcap_sol is not None else existing.mcap_sol,
             last_polled_at=candidate.last_polled_at or existing.last_polled_at,
+            board=candidate.board or existing.board,
         )
         self._mints[candidate.mint] = merged
         return merged
 
     def mark_polled(self, mint: str, at: datetime, *, mcap_sol: Decimal | None = None) -> None:
+        """A successful read. On a finished curve it *is* the final read."""
         current = self._mints.get(mint)
         if current is None:
             return
@@ -148,7 +187,13 @@ class MintTracker:
             current,
             last_polled_at=at,
             mcap_sol=mcap_sol if mcap_sol is not None else current.mcap_sol,
+            final_read_pending=False,
         )
+
+    def mark_quote_unsupported(self, mint: str) -> None:
+        current = self._mints.get(mint)
+        if current is not None:
+            self._mints[mint] = dataclasses.replace(current, quote_unsupported=True)
 
     def prune(self, now: datetime) -> tuple[tuple[str, ...], tuple[str, ...]]:
         """Drop what left the window, then cap. Returns ``(aged_out, capped)``.
@@ -177,15 +222,39 @@ class MintTracker:
                 del self._mints[mint]
         return aged_out, capped
 
-    def plan(self, now: datetime, budget: int) -> PollPlan:
-        """Pick up to ``budget`` mints: young tier first, least recently polled first."""
+    def tier(self, tracked: TrackedMint, now: datetime, boosted: Mapping[str, int]) -> int:
+        """The declared priority of one mint (lower polls first)."""
+        if tracked.mint in boosted and boosted[tracked.mint] == TIER_OPEN_BET:
+            return TIER_OPEN_BET
+        if tracked.finished and tracked.final_read_pending:
+            return TIER_FINAL_READ
+        if tracked.mint in boosted:
+            return boosted[tracked.mint]
+        if tracked.board == "graduating":
+            return TIER_GRADUATING
+        if tracked.board == "new":
+            return TIER_NEW
+        return TIER_YOUNG if now - tracked.age_anchor <= self._young else TIER_REST
+
+    def plan(
+        self, now: datetime, budget: int, *, boosted: Mapping[str, int] | None = None
+    ) -> PollPlan:
+        """Pick up to ``budget`` mints: by tier, least recently polled first inside
+        each. ``boosted`` names mints whose tier comes from outside the tracker —
+        an open paper bet (``TIER_OPEN_BET``) or a board listing the tracker has
+        not seen itself."""
         if budget <= 0:
             return PollPlan(selected=(), skipped=tuple(sorted(self._mints)))
-        young: list[TrackedMint] = []
-        older: list[TrackedMint] = []
-        for tracked in self._mints.values():
-            (young if now - tracked.age_anchor <= self._young else older).append(tracked)
-        ordered = _by_poll_debt(young) + _by_poll_debt(older)
+        boost = boosted or {}
+        ordered = sorted(
+            self._mints.values(),
+            key=lambda m: (
+                self.tier(m, now, boost),
+                m.last_polled_at is not None,
+                m.last_polled_at or datetime.min.replace(tzinfo=m.first_seen_at.tzinfo),
+                m.mint,
+            ),
+        )
         selected = tuple(tracked.mint for tracked in ordered[:budget])
         skipped = tuple(sorted(tracked.mint for tracked in ordered[budget:]))
         return PollPlan(selected=selected, skipped=skipped)
@@ -207,15 +276,3 @@ class MintTracker:
             reverse=True,
         )
         return tuple(m.mint for m in ranked[:k] if m.mcap_sol is not None)
-
-
-def _by_poll_debt(mints: list[TrackedMint]) -> list[TrackedMint]:
-    """Never polled first, then oldest poll first, then by mint for determinism."""
-    return sorted(
-        mints,
-        key=lambda m: (
-            m.last_polled_at is not None,
-            m.last_polled_at or datetime.min.replace(tzinfo=m.first_seen_at.tzinfo),
-            m.mint,
-        ),
-    )

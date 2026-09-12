@@ -138,6 +138,17 @@ def _meme_lab_tables(name: str) -> tuple[str, ...]:
     return cast(tuple[str, ...], getattr(migration_ddl("meme_lab"), name))
 
 
+def _meme_boards_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0023_meme_boards_trades``'s lists in ``ddl/meme_boards.py``.
+
+    It adds no class: both tables are read-only for ``hunter_app`` and
+    append-only for ``hunter_worker`` — the ``meme_curve_snapshots`` shape. The
+    columns ``0023`` adds to ``meme_features_1m`` and the ``NOT NULL`` it drops on
+    ``meme_trades.commitment`` change no grant.
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("meme_boards"), name))
+
+
 def _meme_tables(name: str) -> tuple[str, ...]:
     """The same, for ``0021_meme_radar``'s lists in ``ddl/meme_radar.py``.
 
@@ -415,6 +426,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     meme_lab_read_only = _meme_lab_tables("MEME_LAB_APP_READ_ONLY_TABLES")
     meme_lab_append = _meme_lab_tables("MEME_LAB_APP_APPEND_TABLES")
     meme_lab_decision = _meme_lab_tables("MEME_LAB_APP_DECISION_TABLES")
+    meme_boards_read_only = _meme_boards_tables("MEME_BOARDS_APP_READ_ONLY_TABLES")
 
     classified = (
         list(write)
@@ -435,6 +447,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(meme_lab_read_only)
         + list(meme_lab_append)
         + list(meme_lab_decision)
+        + list(meme_boards_read_only)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 

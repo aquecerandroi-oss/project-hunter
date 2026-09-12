@@ -33,6 +33,7 @@ from hunter_exchanges.pumpfun.models import NormalizedMemeMigration, NormalizedM
 from hunter_meme_worker.config import WS_STREAM
 from hunter_meme_worker.metrics import meme_events_total, meme_gaps_total, meme_ws_generation
 from hunter_meme_worker.repo import GapRow, TokenRow, record_gap, upsert_token
+from hunter_meme_worker.sources import PUMPPORTAL_WS
 from hunter_meme_worker.tracker import TrackedMint
 
 if TYPE_CHECKING:
@@ -97,13 +98,19 @@ def token_row_from_event(event: MemeEvent) -> TokenRow:
 
 
 def _tracked_from_row(row: TokenRow) -> TrackedMint:
+    """A migration frame keeps the mint for **one final read** (``tracker.py``):
+    the T4.2c fix for the hour with zero ``complete = true`` snapshots — 43 of 49
+    graduations of the plantão migrated in the creation slot, before the first
+    poll, and eviction on ``migrated`` meant the finished curve was never read."""
     return TrackedMint(
         mint=row.mint,
         first_seen_at=row.first_seen_at,
         created_at=row.created_at,
+        creator=row.creator,
         bonding_curve=row.bonding_curve,
         mayhem_state=row.mayhem_state,
         migrated=row.migrated_at is not None,
+        final_read_pending=row.migrated_at is not None,
     )
 
 
@@ -137,6 +144,10 @@ async def _handle(ctx: RadarContext, event: MemeEvent) -> None:
         return
     ctx.tracker.observe(_tracked_from_row(row))
     ctx.state.last_event_at = row.last_seen_at
+    if ctx.sources is not None:
+        ctx.sources[PUMPPORTAL_WS].record_ok(
+            observed_at=event.observed_at, received_at=event.received_at
+        )
     meme_events_total.labels(kind=kind).inc()
     meme_ws_generation.set(generation)
 
@@ -167,6 +178,8 @@ async def _record_reconnect_gap(
     )
     ctx.state.ws_generation = generation
     meme_gaps_total.labels(stream=WS_STREAM, reason=RECONNECT_REASON).inc()
+    if ctx.sources is not None:
+        ctx.sources.gaps_60s.add(end)
     logger.warning(
         "meme_discovery_gap_recorded",
         generation=generation,

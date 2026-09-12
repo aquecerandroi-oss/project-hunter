@@ -46,6 +46,7 @@ from hunter_api.routers import members as members_router
 from hunter_api.routers import meme as meme_router
 from hunter_api.routers import meme_desk as meme_desk_router
 from hunter_api.routers import meme_lab as meme_lab_router
+from hunter_api.routers import meme_sources as meme_sources_router
 from hunter_api.routers import opportunities as opportunities_router
 from hunter_api.routers import orders as orders_router
 from hunter_api.routers import organizations as organizations_router
@@ -203,6 +204,7 @@ def create_app(settings: ApiSettings) -> FastAPI:
     app.include_router(portfolio_router.router)
     app.include_router(meme_router.router)
     app.include_router(meme_lab_router.router)
+    app.include_router(meme_sources_router.router)
     app.include_router(meme_desk_router.router)
     app.include_router(orders_router.router)
     app.include_router(risk_router.router)

@@ -161,6 +161,35 @@ Não chamados: `GET /v1/fee-sharing/account/{addr}/shares?limit&cursor`, `GET /v
   `isMayhemMode`, `mayhemState`, `priorityFeeSol`, `totalFees`. **Black box** (não documentado), mas
   é a fonte mais rica de features de risco de rug publicamente acessível.
 
+**O que gravamos (T4.2c, migração `0023_meme_boards_trades`, medido ao vivo em 12/09/2026
+05:55–06:03 BRT, fixtures `trenches_{new,graduating,graduated,movers}.json`):**
+
+- a assinatura que responde com snapshot é `{"board":…,"tier":"web","filterKey":"default"}` na URL
+  mais o evento `subscribe`; `serverTs` é ms; `age` é **segundos** desde a criação; `t10`/`dh` são
+  **percentuais com decimais** (77,3048 = 77,3 %); `pa` é o ativo de cotação (`SOL`); `c` é a chain
+  (`movers` mistura `eip155:*`); `pg` é o programa (`pump`, `raydium_launchpad`, `pons`); `p` é o
+  progresso da curva em % (100 quando graduada); `add` traz `idx` e a entrada inteira, `remove` só o
+  mint; `ms` aparece só quando há Mayhem;
+- **a versão é por board e salta**: no `graduating` o snapshot 3137948 foi seguido por deltas
+  `baseVersion` 3137954, 3137976… (mudanças fora do top-N não são enviadas). O cliente aceita salto
+  **para a frente** (conta em `version_gaps`) e ressincroniza (fecha e reassina, snapshot novo) em
+  retrocesso, versão que não avança ou patch de mint que o espelho não tem;
+- `meme_board_observations`: **uma linha por mint por board por minuto fechado** (bucket pelo nosso
+  `received_at`; `observed_at` = último `serverTs` do board no minuto; `mint_updated_at` = último
+  patch do mint), com posição, contadores de patches, os campos acima com nomes longos, `extra` (chaves
+  não interpretadas: `ic`, `so`, `bo`, `ih`, `rid`) e o **intervalo de exposição**:
+  `first_seen_in_board_at`/`last_seen_in_board_at`, `left_board_at` só com `remove` visto,
+  `exposure_censored = true` quando o mint some no snapshot de uma reconexão (A4.0g §2);
+- `meme_risk_snapshots`: o objeto inteiro de `/in-memory-coin` em `raw jsonb` mais `holders`,
+  `top10_share`, `dev_share`, `snipers`, `sniper_share`, `bundled_share`, `progress_pct`; ≤ 1 leitura
+  por mint por 5 min, só para mints com aposta paper aberta ou no board `graduating`;
+- `meme_trades` passa a ter produtor: `swap-api /v2/coins/{mint}/trades` (`source = 'swap_api'`),
+  900/60 s de orçamento (o limite medido 1000 menos 10 %), cursor `slotIndexId-timestamp(ms)`,
+  `slot` = os 12 primeiros dígitos do `slotIndexId` (**verificado** contra `getTransaction`:
+  `000446373814…` → slot 446373814, `blockTime` = `timestamp`), só linhas `program = pump` com
+  cotação SOL exata em lamports; `commitment`, `outer_ix_index`, `inner_ix_index` e `is_mayhem_agent`
+  ficam `NULL` (a resposta não os traz); `event_index` = ordinal do trade dentro da mesma tx no lote.
+
 ### 3.2 NATS multichain: `wss://multichain-prod.nats.realtime.pump.fun`
 
 Handshake lido (só `INFO`, sem `CONNECT`): servidor NATS 2.12.11, `auth_required: true`,

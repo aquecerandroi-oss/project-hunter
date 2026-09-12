@@ -177,3 +177,22 @@ mágica da visão.
    jogar o mcap fora para caber no CHECK. Duas ausências com duas causas ganham
    dois motivos. A T4.3 renderiza os dois; o vocabulário não muda
    (`denominator_unknown` só aparece em `progress_reason`).
+2. **(T4.2c, `0023_meme_boards_trades`) `meme_trades` tem produtor: `swap-api`** (`source =
+   'swap_api'`). O que a resposta não traz fica **NULL**: `commitment` (a coluna passou a ser anulável
+   — a `0021` escreveu `NOT NULL` para um decodificador on-chain que declara finalidade; o `swap-api`
+   não declara), `outer_ix_index`, `inner_ix_index`, `is_mayhem_agent`. `slot` = os 12 primeiros
+   dígitos do `slotIndexId` (verificado contra `getTransaction`); `event_index` = ordinal do trade
+   entre os da mesma tx no lote gravado (0 em 230/230 linhas capturadas); `quote_mint` = SOL nativo
+   (só entra linha `program = pump` com `quoteAmount == amountSol` exato em lamports);
+   `token_decimals` = 6; `price` = `fillPriceSol` (a coluna `numeric(28,10)` arredonda a 10 casas —
+   recompute de `sol_lamports/token_amount` quando a precisão importar).
+3. **(T4.2c) `creator_sold` passou a ser coluna da fita**: *qualquer* venda de `meme_tokens.creator`
+   na fita coberta até `end_time`; sua ausência é `no_trade_feed` (era `no_holders_reader`).
+   `creator_net_seller` (nova, `Σ vendas − Σ compras > 0` em SOL) é o insumo da EXP-M1.
+   `top10_share` vem do `t10` do board ou do `/in-memory-coin` (procedência em `holders_source`).
+4. **(T4.2c) vocabulário de motivo ganha `no_sells`** (razão compra/venda sem vendas). Oito motivos.
+5. **(T4.2c) `first_seen_source` ganha `trenches_ws`**: mint visto primeiro no board `new`/`graduating`
+   do site; `created_at` dessa linha é `serverTs − age` (o contador do próprio site) e `creator` é o
+   `dw` (dev wallet) da entrada — declarado, como o `received_at` do PumpPortal.
+6. **(T4.2c) `meme_ingest_gaps.stream` ganha `trenches_ws`** (`reason = ws_reconnected`, `generation`
+   = reconexões + ressincronizações do board): a janela cujas linhas de exposição são censuradas.

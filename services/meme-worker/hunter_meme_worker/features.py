@@ -1,18 +1,21 @@
 """The per-minute feature math — pure, and honest about what it cannot compute.
 
 One row per tracked mint per closed minute in ``meme_features_1m``
-(``docs/DATABASE.md`` §33). Four of the columns the plan wanted are **NULL with a
-reason in every row this slice writes**, and that is the point rather than a
-shortfall: Astra's MUST-FIX 1 is that an absent trade feed read as "nobody bought"
-and an absent holders reader read as "the dev did not sell" were the gravest error
-of the original design.
+(``docs/DATABASE.md`` §33, §35). Since T4.2c the site's boards and the
+``swap-api`` tape fill what T4.2 left ``NULL`` with a reason — and the point of
+the reasons has not moved: Astra's MUST-FIX 1 is that an absent trade feed read
+as "nobody bought" and an absent holders reader read as "the dev did not sell"
+were the gravest error of the original design. A mint the tape has not been
+pulled for is still ``no_trade_feed``; a mint no board and no risk read has
+spoken about is still ``no_holders_reader``.
 
 | column | today | reason |
 |---|---|---|
 | ``curve_progress_pct`` | computed when the denominator was observed | ``progress_reason`` |
 | ``mcap_sol`` | copied from the minute's snapshot | ``curve_reason`` |
-| ``unique_buyers``, ``buy_sell_ratio`` | never | ``no_trade_feed`` — the channel is paid, the decoder is T4.2b |
-| ``top10_share``, ``creator_sold`` | never | ``no_holders_reader`` — nothing reads holders yet |
+| ``holders``, ``top10_share``, ``dev_share``, ``snipers`` | the newest board/risk reading received by ``end_time`` | ``no_holders_reader`` |
+| ``unique_buyers``, ``buy_sell_ratio``, ``buys_1m``… | the tape received by ``end_time`` | ``no_trade_feed`` / ``no_sells`` / ``rate_limited`` / ``unsupported_quote`` |
+| ``creator_sold``, ``creator_net_seller`` | the creator's trades in the tape covered so far | ``no_trade_feed`` |
 
 Nothing here clamps a strange number into a plausible one. ``curve_progress_pct``
 is stored as computed even if it falls outside ``[0, 1]``: DATABASE.md §15.8 keeps
@@ -28,9 +31,20 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import ROUND_HALF_EVEN, Decimal
 
+from hunter_meme_worker.features_tape import (
+    NO_SELLS,
+    HoldersObservation,
+    TapeMinute,
+    buy_sell_ratio,
+    fraction,
+)
+
 FEATURES_VERSION = "meme_features_v1"
 """Frozen protocol name. A different formula is a different version — a different
-row by the primary key — never an edit of a minute already cut by a hypothesis."""
+row by the primary key — never an edit of a minute already cut by a hypothesis.
+``0023`` added columns to this version: a NULL with a reason in an old row and a
+number in a new one is the same protocol with more sources, not a new formula
+for a number that already existed."""
 
 NO_TRADE_FEED = "no_trade_feed"
 NO_HOLDERS_READER = "no_holders_reader"
@@ -49,12 +63,13 @@ REASON_VOCABULARY = frozenset(
         RATE_LIMITED,
         INSUFFICIENT_COVERAGE,
         UNSUPPORTED_QUOTE,
+        NO_SELLS,
     }
 )
 """The closed set the API renders (T4.3's acceptance criterion: named states, not
 an undifferentiated ``null``). Frozen here and copied into
-``.claude/state/notes-T4.2.md`` §contrato; a seventh reason is a decision, not a
-string somebody types at a call site."""
+``.claude/state/notes-T4.2.md`` §contrato; ``no_sells`` is the eighth, added by
+``0023`` as an amendment there — a decision, not a string typed at a call site."""
 
 _FRACTION = Decimal("0.000001")
 """``NUMERIC(9,6)``'s own scale: quantizing here means the value a test reads back
@@ -85,8 +100,18 @@ class MinuteInputs:
     snapshot: CurveObservation | None
     absence_reason: str = NOT_POLLED
     """Why there is no snapshot, when there is none: ``not_polled`` (the budget
-    did not reach this mint), ``rate_limited`` (the endpoint refused) or
-    ``insufficient_coverage``. Never used when ``snapshot`` is present."""
+    did not reach this mint), ``rate_limited`` (the endpoint refused),
+    ``unsupported_quote`` or ``insufficient_coverage``. Never used when
+    ``snapshot`` is present."""
+    holders: HoldersObservation | None = None
+    """The newest board/risk reading with ``received_at <= end_time``
+    (``features_tape.holders_for``), or ``None``."""
+    tape: TapeMinute | None = None
+    """The tape of the minute (``features_tape.tape_for``), or ``None`` when the
+    mint's tape had not been pulled by ``end_time``."""
+    tape_absence_reason: str = NO_TRADE_FEED
+    """Why there is no tape when there is none: ``no_trade_feed`` (never pulled),
+    ``rate_limited`` (the pull was refused) or ``unsupported_quote``."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +138,21 @@ class FeatureRow:
     coverage: Decimal
     snapshot_observed_at: datetime | None
     snapshot_source: str | None
+    holders: int | None = None
+    holders_reason: str | None = NO_HOLDERS_READER
+    holders_observed_at: datetime | None = None
+    holders_source: str | None = None
+    dev_share: Decimal | None = None
+    dev_share_reason: str | None = NO_HOLDERS_READER
+    snipers: int | None = None
+    snipers_reason: str | None = NO_HOLDERS_READER
+    buys_1m: int | None = None
+    sells_1m: int | None = None
+    net_sol_flow_1m: Decimal | None = None
+    curve_volume_1m_sol: Decimal | None = None
+    tape_reason: str | None = NO_TRADE_FEED
+    creator_net_seller: bool | None = None
+    creator_net_seller_reason: str | None = NO_TRADE_FEED
 
 
 def curve_progress_pct(
@@ -145,56 +185,100 @@ def age_minutes(end_time: datetime, created_at: datetime | None) -> int | None:
     return int((end_time - created_at).total_seconds() // 60)
 
 
+def _holders_columns(reading: HoldersObservation | None) -> dict[str, object]:
+    """The four holder columns plus their provenance, or their reasons."""
+    if reading is None:
+        return {}
+    return {
+        "holders": reading.holders,
+        "holders_reason": None if reading.holders is not None else NO_HOLDERS_READER,
+        "holders_observed_at": reading.observed_at if reading.holders is not None else None,
+        "holders_source": reading.source if reading.holders is not None else None,
+        "top10_share": fraction(reading.top10_share),
+        "top10_share_reason": None if reading.top10_share is not None else NO_HOLDERS_READER,
+        "dev_share": fraction(reading.dev_share),
+        "dev_share_reason": None if reading.dev_share is not None else NO_HOLDERS_READER,
+        "snipers": reading.snipers,
+        "snipers_reason": None if reading.snipers is not None else NO_HOLDERS_READER,
+    }
+
+
+def _tape_columns(tape: TapeMinute | None, absence: str) -> dict[str, object]:
+    if tape is None:
+        return {
+            "unique_buyers_reason": absence,
+            "buy_sell_ratio_reason": absence,
+            "creator_sold_reason": absence,
+            "tape_reason": absence,
+            "creator_net_seller_reason": absence,
+        }
+    ratio = buy_sell_ratio(tape.buys, tape.sells)
+    return {
+        "unique_buyers": tape.unique_buyers,
+        "unique_buyers_reason": None,
+        "buy_sell_ratio": ratio,
+        "buy_sell_ratio_reason": None if ratio is not None else NO_SELLS,
+        "buys_1m": tape.buys,
+        "sells_1m": tape.sells,
+        "net_sol_flow_1m": tape.net_sol_flow,
+        "curve_volume_1m_sol": tape.volume_sol,
+        "tape_reason": None,
+        "creator_sold": tape.creator_sold,
+        "creator_sold_reason": None if tape.creator_sold is not None else NO_TRADE_FEED,
+        "creator_net_seller": tape.creator_net_seller,
+        "creator_net_seller_reason": None if tape.creator_net_seller is not None else NO_TRADE_FEED,
+    }
+
+
 def build_row(inputs: MinuteInputs, *, features_version: str = FEATURES_VERSION) -> FeatureRow:
     """Fold one minute of one mint. Total: every input shape yields a legal row."""
     snapshot = inputs.snapshot
+    curve: dict[str, object]
     if snapshot is None:
-        return FeatureRow(
-            mint=inputs.mint,
-            end_time=inputs.end_time,
-            features_version=features_version,
-            curve_progress_pct=None,
-            progress_reason=inputs.absence_reason,
-            mcap_sol=None,
-            curve_reason=inputs.absence_reason,
-            unique_buyers=None,
-            unique_buyers_reason=NO_TRADE_FEED,
-            buy_sell_ratio=None,
-            buy_sell_ratio_reason=NO_TRADE_FEED,
-            top10_share=None,
-            top10_share_reason=NO_HOLDERS_READER,
-            creator_sold=None,
-            creator_sold_reason=NO_HOLDERS_READER,
-            age_minutes=age_minutes(inputs.end_time, inputs.created_at),
-            coverage=Decimal(0),
-            snapshot_observed_at=None,
-            snapshot_source=None,
+        curve = {
+            "curve_progress_pct": None,
+            "progress_reason": inputs.absence_reason,
+            "mcap_sol": None,
+            "curve_reason": inputs.absence_reason,
+            "coverage": Decimal(0),
+            "snapshot_observed_at": None,
+            "snapshot_source": None,
+        }
+    else:
+        progress = curve_progress_pct(
+            snapshot.real_token_reserves, inputs.initial_real_token_reserves
         )
-
-    progress = curve_progress_pct(snapshot.real_token_reserves, inputs.initial_real_token_reserves)
-    mcap = snapshot.mcap_sol
+        mcap = snapshot.mcap_sol
+        curve = {
+            "curve_progress_pct": progress,
+            "progress_reason": None if progress is not None else DENOMINATOR_UNKNOWN,
+            "mcap_sol": None if mcap is None else mcap.quantize(_MONEY, rounding=ROUND_HALF_EVEN),
+            # A snapshot whose market cap is NULL is a curve the generated column
+            # could not price (a zero virtual reserve, §15.8): the observation
+            # happened, the number does not exist, and ``insufficient_coverage``
+            # is the honest label for the second half of that.
+            "curve_reason": None if mcap is not None else INSUFFICIENT_COVERAGE,
+            "coverage": Decimal(1),
+            "snapshot_observed_at": snapshot.observed_at,
+            "snapshot_source": snapshot.source,
+        }
+    columns: dict[str, object] = {
+        "unique_buyers": None,
+        "unique_buyers_reason": NO_TRADE_FEED,
+        "buy_sell_ratio": None,
+        "buy_sell_ratio_reason": NO_TRADE_FEED,
+        "top10_share": None,
+        "top10_share_reason": NO_HOLDERS_READER,
+        "creator_sold": None,
+        "creator_sold_reason": NO_TRADE_FEED,
+        **curve,
+        **_holders_columns(inputs.holders),
+        **_tape_columns(inputs.tape, inputs.tape_absence_reason),
+    }
     return FeatureRow(
         mint=inputs.mint,
         end_time=inputs.end_time,
         features_version=features_version,
-        curve_progress_pct=progress,
-        progress_reason=None if progress is not None else DENOMINATOR_UNKNOWN,
-        mcap_sol=None if mcap is None else mcap.quantize(_MONEY, rounding=ROUND_HALF_EVEN),
-        # A snapshot whose market cap is NULL is a curve the generated column
-        # could not price (a zero virtual reserve, §15.8): the observation
-        # happened, the number does not exist, and ``insufficient_coverage`` is
-        # the honest label for the second half of that.
-        curve_reason=None if mcap is not None else INSUFFICIENT_COVERAGE,
-        unique_buyers=None,
-        unique_buyers_reason=NO_TRADE_FEED,
-        buy_sell_ratio=None,
-        buy_sell_ratio_reason=NO_TRADE_FEED,
-        top10_share=None,
-        top10_share_reason=NO_HOLDERS_READER,
-        creator_sold=None,
-        creator_sold_reason=NO_HOLDERS_READER,
         age_minutes=age_minutes(inputs.end_time, inputs.created_at),
-        coverage=Decimal(1),
-        snapshot_observed_at=snapshot.observed_at,
-        snapshot_source=snapshot.source,
+        **columns,  # type: ignore[arg-type]
     )

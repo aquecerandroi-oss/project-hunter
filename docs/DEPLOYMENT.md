@@ -617,9 +617,27 @@ Com as fontes grátis de hoje `lab_gate_refusals` mostra `creator_net_seller_unk
 ausente, não o laço parado — o laço parado é `lab_last_tick_at` velho com `ts` fresco
 (`GET /api/v1/orgs/{org}/meme/lab` → `sources.lab_status = "stalled"`).
 
+**As fontes, depois da T4.2c:**
+
+```bash
+docker exec hunter-redis-1 redis-cli HGETALL hb:meme:radar | grep -A1 -E '^(tracked|budget_used_60s|gaps_60s|ws_malformed_60s|lag_s|trenches_connected|trenches_patches_60s|swap_api_used_60s|sources)$'
+curl -s -H "Authorization: Bearer $TOKEN" localhost:8000/api/v1/orgs/$ORG/meme/sources | jq '.radar_status, [.sources[] | {name, status, last_observed_at, lag_s, errors_1h, used_60s, budget_60s, reason, last_row_observed_at, row_reason}]'
+docker exec hunter-postgres-1 psql -U hunter -d hunter -c \
+  "SELECT count(*) FILTER (WHERE complete) AS completos, count(*) FROM meme_curve_snapshots; \
+   SELECT board, count(*), max(observed_at) FROM meme_board_observations GROUP BY 1; \
+   SELECT count(*), max(block_time), count(*) FILTER (WHERE commitment IS NULL) FROM meme_trades WHERE source = 'swap_api'; \
+   SELECT count(*) FILTER (WHERE holders IS NOT NULL) AS com_holders, count(*) FILTER (WHERE buys_1m IS NOT NULL) AS com_fita, count(*) FROM meme_features_1m WHERE end_time > now() - interval '10 min';"
+```
+
+`radar_status` ∈ {`alive`, `stale`, `never`, `heartbeat_missing`, `redis_unavailable`}; por fonte,
+`status` ∈ {`connected`, `disconnected`, `ok`, `erroring`, `disabled`, `unknown`} sempre com `reason`
+quando não há observação, e `row_reason = no_rows` quando a tabela está vazia — a tela nunca vê um zero
+que pareça saúde. Depois desta tarefa `completos` deixa de ser 0: toda curva concluída/migrada recebe
+uma leitura final antes de sair do conjunto rastreado (`docs/plans/T4-MEME-RADAR.md` §T4.2c).
+
 **Retenção e partições:** `MEME_RETENTION_DAYS` (padrão 90) governa as duas
-metades — `infra/scripts/prune_partitions.py` derruba o mês inteiro das três
-tabelas particionadas e o próprio worker poda `meme_tokens` linha a linha, em
+metades — `infra/scripts/prune_partitions.py` derruba o mês inteiro das cinco
+tabelas particionadas (as três da `0021` e as duas da `0023`) e o próprio worker poda `meme_tokens` linha a linha, em
 lotes, atrás de `SET LOCAL app.meme_retention = 'on'`. A janela é **a mesma para
 mints graduados e não graduados** (`docs/DATABASE.md` §33.4): selecionar por
 sucesso depois do fato apagaria os controles. `create_partitions.py` já planeja os
@@ -998,6 +1016,10 @@ AGENT → PROPOSAL → RISK → EXECUTION (`CLAUDE.md`).
 | `MEME_RETENTION_DAYS` | não | `90` | janela de retenção do radar, **idêntica para mints graduados e não graduados** (`docs/DATABASE.md` §33.4). Governa o `DROP` mensal das três tabelas particionadas **e** a poda linha a linha de `meme_tokens` |
 | `MEME_TRACKED_MINTS_MAX` | não | `120` | teto do conjunto rastreado. O orçamento REST é 60 req/60 s, então 120 mints é uma volta completa a cada dois minutos; qualquer número maior é uma promessa que o orçamento não cumpre |
 | `MEME_TRACK_WINDOW_MINUTES` | não | `1440` | quanto tempo um mint fica rastreado depois de criado (24 h — a vida do próprio agente Mayhem). Um agente `active`/`paused` mantém o mint mesmo depois disso |
+| `MEME_TRENCHES_ENABLED` | não | `true` (com `MEME_ENABLED`) | os quatro sockets `/ws/trenches` do site (T4.2c): holders, top-10 %, dev %, snipers, exposição nos boards. Sem chave. Desligado diz `trenches: disabled` no readiness e `enabled=false` no heartbeat |
+| `MEME_SWAP_API_ENABLED` | não | `true` (com `MEME_ENABLED`) | a fita de trades do `swap-api.pump.fun` (T4.2c) — `meme_trades` com `source='swap_api'` |
+| `MEME_SWAP_API_BUDGET_60S` | não | `900` | orçamento do `swap-api` por 60 s: o limite medido é 1000 e o adaptador recusa qualquer valor acima dele; 900 é 10 % de folga |
+| `MEME_RISK_ENABLED` | não | `true` (com `MEME_ENABLED`) | `GET /in-memory-coin/{mint}` (≤ 1 leitura/mint/5 min, só apostas abertas e board `graduating`) → `meme_risk_snapshots` |
 | `MEME_RPC_TOP_K` | não | `20` | quantos mints, por market cap, são reconciliados contra a cadeia a cada ciclo |
 | `MEME_LAB_ENABLED` | não | `true` | se o Lab meme (T4.6) roda dentro do meme-worker quando `MEME_ENABLED` está ligado: o laço por minuto que propõe, preenche na fotografia seguinte, marca e fecha apostas de **papel** (§3.6). Desligado, o readiness diz `lab: disabled` e o heartbeat grava `lab_enabled=false`. Sem efeito com `MEME_ENABLED=false` |
 

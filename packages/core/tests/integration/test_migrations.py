@@ -38,7 +38,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0022_meme_lab"
+HEAD_REVISION = "0023_meme_boards_trades"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -62,6 +62,9 @@ BREADTH_REVISION = "0019_market_breadth"
 MEME_RADAR_REVISION = "0021_meme_radar"
 """Named because the ``0021`` tests reverse **0021**, and ``"-1"`` stopped meaning
 that the day ``0022_meme_lab`` landed on top (the ``0019`` lesson, again)."""
+MEME_LAB_REVISION = "0022_meme_lab"
+"""The same lesson one revision later: the ``0022`` tests reverse **0022**, and
+``"-1"`` stopped meaning that the day ``0023_meme_boards_trades`` landed."""
 """Named for the same reason as the line below: the two ``0019`` tests are about
 reversing **0019**, and ``"-1"`` stopped meaning that the day a revision landed on
 top of it. They now stage the database at this revision first, exactly as every
@@ -531,12 +534,17 @@ async def test_every_partitioned_parent_has_its_initial_partitions(engine: Async
     frozen_list: tuple[tuple[str, tuple[str, ...], str], ...] = partitions.LIST_PARTITIONED_TABLES
 
     meme_range: tuple[str, ...] = migration_ddl("meme_radar").MEME_PARTITIONED_TABLES_0021
-    assert set(frozen_range) | set(meme_range) == set(partitioned_tables()), (
+    boards_range: tuple[str, ...] = migration_ddl("meme_boards").MEME_PARTITIONED_TABLES_0023
+    assert set(frozen_range) | set(meme_range) | set(boards_range) == set(partitioned_tables()), (
         "a model gained or lost a RANGE postgresql_partition_by without a "
-        "migration updating ddl.partitions.PARTITIONED_TABLES (0001) or "
-        "ddl.meme_radar.MEME_PARTITIONED_TABLES_0021"
+        "migration updating ddl.partitions.PARTITIONED_TABLES (0001), "
+        "ddl.meme_radar.MEME_PARTITIONED_TABLES_0021 or "
+        "ddl.meme_boards.MEME_PARTITIONED_TABLES_0023"
     )
     assert not set(frozen_range) & set(meme_range), "a parent is frozen in two revisions"
+    assert not (set(frozen_range) | set(meme_range)) & set(boards_range), (
+        "a parent is frozen in two revisions"
+    )
     assert {name: (values, key) for name, values, key in frozen_list} == {
         name: (values, key) for name, (_column, values, key) in list_partitioned_tables().items()
     }, (
@@ -551,11 +559,26 @@ async def test_every_partitioned_parent_has_its_initial_partitions(engine: Async
         present = {row[0] for row in result}
 
     meme_months: tuple[tuple[int, int], ...] = migration_ddl("meme_radar").MEME_INITIAL_MONTHS_0021
-    expected = {
-        partition_name(table, year, month)
-        for table in frozen_range
-        for year, month in initial_months
-    } | {partition_name(table, year, month) for table in meme_range for year, month in meme_months}
+    boards_months: tuple[tuple[int, int], ...] = migration_ddl(
+        "meme_boards"
+    ).MEME_INITIAL_MONTHS_0023
+    expected = (
+        {
+            partition_name(table, year, month)
+            for table in frozen_range
+            for year, month in initial_months
+        }
+        | {
+            partition_name(table, year, month)
+            for table in meme_range
+            for year, month in meme_months
+        }
+        | {
+            partition_name(table, year, month)
+            for table in boards_range
+            for year, month in boards_months
+        }
+    )
     for parent, values, _key in frozen_list:
         for value in values:
             intermediate = list_partition_name(parent, value)
@@ -4301,11 +4324,17 @@ def test_0022_refuses_a_downgrade_that_would_lose_a_bet(upgraded: str) -> None:
         )
     )
     try:
+        # Stage at 0022 first: ``0023`` sits on top and ``"-1"`` from the head
+        # would reverse *it*, not the Lab.
+        command.downgrade(config, MEME_LAB_REVISION)
         with pytest.raises(DBAPIError, match="meme_paper_bets rows exist"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == MEME_LAB_REVISION, (
+            "the downgrade must not commit"
+        )
         assert asyncio.run(_relation_exists(upgraded, "meme_paper_bets"))
     finally:
+        command.upgrade(config, "head")
         asyncio.run(
             _write(
                 upgraded,
@@ -4322,6 +4351,7 @@ def test_0022_reverses_with_the_seed_alone_and_comes_back_seeded(upgraded: str) 
     """The round trip an operator runs to roll a deploy back: the seed is not
     evidence, so it reverses; and what comes back is seeded and granted again."""
     config = alembic_config(upgraded)
+    command.downgrade(config, MEME_LAB_REVISION)
     command.downgrade(config, "-1")
     try:
         assert asyncio.run(_revision(upgraded)) == MEME_RADAR_REVISION
@@ -4342,4 +4372,183 @@ def test_0022_reverses_with_the_seed_alone_and_comes_back_seeded(upgraded: str) 
         "INSERT",
         "UPDATE",
     }
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0023_meme_boards_trades — the site's boards, the risk reads, the tape columns
+# ---------------------------------------------------------------------------
+
+MEME_BOARDS_TABLES = ("meme_board_observations", "meme_risk_snapshots")
+
+_A_BOARD_MINUTE = (
+    "INSERT INTO meme_board_observations (observed_at, board, mint, minute_end, version, "
+    "  position, first_seen_in_board_at, last_seen_in_board_at, source) VALUES "
+    "('2026-10-05T12:00:30Z', 'new', :mint, '2026-10-05T12:01:00Z', 1, 0, "
+    "  '2026-10-05T12:00:00Z', '2026-10-05T12:00:30Z', 'trenches_ws')"
+)
+_A_SWAP_TRADE = (
+    "INSERT INTO meme_trades (block_time, signature, event_index, mint, slot, trader, side, "
+    "  sol_lamports, token_amount, price, quote_mint, token_decimals, commitment, source) VALUES "
+    "('2026-10-05T12:00:00Z', :signature, 0, 'TAPE_MINT', 446373814, 'TRADER', 'buy', 724716993, "
+    "  16800146.527261, 0.0000000431, '11111111111111111111111111111111', 6, :commitment, "
+    "  'swap_api')"
+)
+
+
+def test_0023_adds_the_tape_columns_and_relaxes_the_trade_commitment(upgraded: str) -> None:
+    """The fifteen columns exist; a trade may say nothing about finality and may
+    not say something other than ``confirmed``/``finalized``."""
+    frozen = cast("tuple[str, ...]", migration_ddl("meme_boards_guards").FEATURE_COLUMNS_0023)
+    names = ", ".join(f"'{column}'" for column in frozen)
+    present = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT column_name FROM information_schema.columns "  # noqa: S608
+            f"WHERE table_name = 'meme_features_1m' AND column_name IN ({names})",
+            {},
+        )
+    )
+    assert set(present) == set(frozen)
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT is_nullable FROM information_schema.columns "
+            "WHERE table_name = 'meme_trades' AND column_name = 'commitment'",
+            {},
+        )
+    ) == ["YES"]
+    asyncio.run(_write(upgraded, [(_A_SWAP_TRADE, {"signature": "SIG_NULL", "commitment": None})]))
+    try:
+        with pytest.raises(DBAPIError, match="commitment_is_a_known_label"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [(_A_SWAP_TRADE, {"signature": "SIG_BAD", "commitment": "pending"})],
+                )
+            )
+        # The 0021 reasons are all given; ``holders`` is NULL and ``holders_reason``
+        # is not — an absence without a reason, the shape the biconditional refuses.
+        with pytest.raises(DBAPIError, match="holders_is_null_with_a_reason"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [
+                        (
+                            "INSERT INTO meme_features_1m (end_time, mint, features_version, "
+                            "coverage, curve_reason, progress_reason, unique_buyers_reason, "
+                            "buy_sell_ratio_reason, top10_share_reason, creator_sold_reason, "
+                            "dev_share_reason, snipers_reason, tape_reason, "
+                            "creator_net_seller_reason) VALUES ('2026-10-05T12:00:00Z', "
+                            "'NO_REASON', 'meme_features_v1', 1, 'not_polled', 'not_polled', "
+                            "'no_trade_feed', 'no_trade_feed', 'no_holders_reader', "
+                            "'no_trade_feed', 'no_holders_reader', 'no_holders_reader', "
+                            "'no_trade_feed', 'no_trade_feed')",
+                            {},
+                        )
+                    ],
+                )
+            )
+    finally:
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    ("DELETE FROM meme_trades WHERE mint = 'TAPE_MINT'", {}),
+                    ("DELETE FROM meme_features_1m WHERE mint = 'NO_REASON'", {}),
+                ],
+            )
+        )
+
+
+def test_0023_grants_read_to_the_api_and_append_to_the_worker(upgraded: str) -> None:
+    for table in MEME_BOARDS_TABLES:
+        assert asyncio.run(_table_privileges(upgraded, "hunter_worker", table)) == {
+            "SELECT",
+            "INSERT",
+        }, f"{table} is not append-only for the engine"
+        assert asyncio.run(_table_privileges(upgraded, "hunter_app", table)) == {"SELECT"}
+
+
+def test_0023_hardens_every_partition_it_created(upgraded: str) -> None:
+    boards = migration_ddl("meme_boards")
+    parents = cast("tuple[str, ...]", boards.MEME_PARTITIONED_TABLES_0023)
+    months = cast("tuple[tuple[int, int], ...]", boards.MEME_INITIAL_MONTHS_0023)
+    children = [f"{parent}_{year:04d}_{month:02d}" for parent in parents for year, month in months]
+    assert len(children) == 8
+    present = set(
+        asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT relname FROM pg_class WHERE relispartition AND relkind = 'r' "
+                "AND relname LIKE 'meme%'",
+                {},
+            )
+        )
+    )
+    assert set(children) <= present
+    for child in children:
+        assert asyncio.run(_table_privileges(upgraded, "hunter_worker", child)) == set(), child
+        assert asyncio.run(_table_privileges(upgraded, "hunter_app", child)) == set(), child
+
+
+def test_0023_refuses_a_downgrade_that_would_lose_a_board_minute(upgraded: str) -> None:
+    """§17.7: a minute of exposure nobody can re-observe — count, name, stop."""
+    config = alembic_config(upgraded)
+    asyncio.run(_write(upgraded, [(_A_BOARD_MINUTE, {"mint": "GUARD_MINT"})]))
+    try:
+        with pytest.raises(DBAPIError, match="meme_board_observations rows exist"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_relation_exists(upgraded, "meme_board_observations"))
+    finally:
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        "DELETE FROM meme_board_observations WHERE mint = :mint",
+                        {"mint": "GUARD_MINT"},
+                    )
+                ],
+            )
+        )
+    command.check(config)
+
+
+def test_0023_reverses_on_a_database_with_no_boards_and_comes_back(upgraded: str) -> None:
+    """The round trip an operator runs to roll a deploy back, and what comes back
+    is checked: the two tables, their grants, the fifteen columns and the
+    relaxed commitment."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == MEME_LAB_REVISION
+        for table in MEME_BOARDS_TABLES:
+            assert not asyncio.run(_relation_exists(upgraded, table)), table
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM information_schema.columns "
+                "WHERE table_name = 'meme_features_1m' AND column_name = 'curve_volume_1m_sol'",
+                {},
+            )
+        ) == ["0"]
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT is_nullable FROM information_schema.columns "
+                "WHERE table_name = 'meme_trades' AND column_name = 'commitment'",
+                {},
+            )
+        ) == ["NO"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    for table in MEME_BOARDS_TABLES:
+        assert asyncio.run(_relation_exists(upgraded, table)), table
+        assert asyncio.run(_table_privileges(upgraded, "hunter_worker", table)) == {
+            "SELECT",
+            "INSERT",
+        }
     command.check(config)

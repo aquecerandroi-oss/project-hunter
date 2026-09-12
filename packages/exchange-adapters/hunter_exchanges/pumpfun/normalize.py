@@ -24,6 +24,19 @@ from hunter_exchanges.pumpfun.models import (
     NormalizedMemeTokenCreated,
 )
 
+
+class UnsupportedQuote(MalformedMessage):
+    """The curve is quoted in something other than native SOL (a USDC pair of
+    2026-05-21): not malformed, just not this adapter's venue. A caller that
+    keeps polling such a mint spends budget on a curve it will never read —
+    the 2–4 wasted requests a minute the T4.2c adendo measured — so the type
+    exists for the collector to stop tracking it by name."""
+
+    def __init__(self, mint: str | None = None) -> None:
+        super().__init__("curve quote must be native SOL", exchange="pumpfun")
+        self.mint = mint
+
+
 #: The only ``pool`` value PumpPortal reports for an actual pump.fun bonding
 #: curve create event (observed live: ``"bonk"`` also flows through the same
 #: ``subscribeNewToken`` method for letsbonk.fun — a different program this
@@ -177,7 +190,7 @@ def parse_curve_state_rest(raw: dict[str, Any]) -> NormalizedCurveState:
     if missing:
         raise MalformedMessage(f"pumpfun rest curve response missing {missing}", exchange="pumpfun")
     if raw.get("quote_mint") != NATIVE_SOL_QUOTE_MINT:
-        raise MalformedMessage("curve quote must be native SOL", exchange="pumpfun")
+        raise UnsupportedQuote(str(raw.get("mint")))
     if raw.get("base_decimals", 6) != 6 or raw.get("quote_decimals", 9) != 9:
         raise MalformedMessage("unsupported curve decimals", exchange="pumpfun")
     if not isinstance(raw["complete"], bool):
@@ -220,8 +233,10 @@ def curve_state_from_rpc_account(mint: str, account: BondingCurveAccount) -> Nor
     program's own ledger) — ``source="solana_rpc"`` lets a consumer prefer
     this over the best-effort REST mirror.
     """
-    if account.quote_mint != NATIVE_SOL_QUOTE_MINT or account.virtual_token_reserves == 0:
-        raise MalformedMessage("unsupported quote or empty virtual reserve", exchange="pumpfun")
+    if account.quote_mint != NATIVE_SOL_QUOTE_MINT:
+        raise UnsupportedQuote(mint)
+    if account.virtual_token_reserves == 0:
+        raise MalformedMessage("empty virtual reserve", exchange="pumpfun")
     virtual_sol = raw_lamports_to_sol(account.virtual_sol_reserves)
     virtual_token = raw_subunits_to_tokens(account.virtual_token_reserves)
     total_supply = raw_subunits_to_tokens(account.token_total_supply)
@@ -245,6 +260,7 @@ def curve_state_from_rpc_account(mint: str, account: BondingCurveAccount) -> Nor
 __all__ = [
     "PUMPSWAP_POOL",
     "PUMP_POOL",
+    "UnsupportedQuote",
     "curve_state_from_rpc_account",
     "is_in_scope_pool",
     "is_migration_message",

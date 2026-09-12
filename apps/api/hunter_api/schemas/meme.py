@@ -38,9 +38,11 @@ MEME_LABEL = "Meme Radar — só monitoramento, nunca execução (pump.fun)"
 the "read-only" nature of this screen is stated in the payload itself, not
 only in a doc a client might not render."""
 
-MemeSource = Literal["pumpportal_ws", "pumpfun_rest", "solana_rpc"]
+MemeSource = Literal["pumpportal_ws", "pumpfun_rest", "solana_rpc", "trenches_ws"]
 """``meme_tokens.first_seen_source`` / ``meme_curve_snapshots.source`` /
-``meme_features_1m.snapshot_source`` — the three producers T4.1's adapter has
+``meme_features_1m.snapshot_source`` — the three producers T4.1's adapter has,
+plus ``trenches_ws`` (T4.2c: a mint first seen on the site's ``new``/``graduating``
+board, migration ``0023``) —
 (contract §1-§2), never a fourth, undeclared source string."""
 
 MemeTokenState = Literal["curve", "completed", "migrated"]
@@ -57,6 +59,7 @@ NullReason = Literal[
     "rate_limited",
     "insufficient_coverage",
     "unsupported_quote",
+    "no_sells",
 ]
 """The contract's frozen vocabulary (§4): "a T4.3 renderiza estes, e só
 estes" -- shared by all six ``*_reason`` columns on ``meme_features_1m``."""

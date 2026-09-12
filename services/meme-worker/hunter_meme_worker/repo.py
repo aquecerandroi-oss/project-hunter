@@ -4,7 +4,7 @@ Each function takes an ``AsyncSession`` already opened by
 ``hunter_core.db.session.role_session(..., db_role="hunter_worker")``, which is what
 issues the ``SET LOCAL ROLE`` and the ``statement_timeout`` (§1.2a) **before** any
 statement of ours. That is deliberate and it is the §27.5 finding not repeated: the
-scanner has four ``engine.begin()`` transactions with no ``SET LOCAL ROLE`` that
+scanner has four bare engine-level transactions with no ``SET LOCAL ROLE`` that
 only work because the login happens to be the owner, and under ``hunter_runtime``
 they are *permission denied*. Nothing in this module opens its own transaction.
 
@@ -198,6 +198,22 @@ _FEATURE_COLUMNS = (
     "coverage",
     "snapshot_observed_at",
     "snapshot_source",
+    # 0023 — the boards of the site and the swap-api tape.
+    "holders",
+    "holders_reason",
+    "holders_observed_at",
+    "holders_source",
+    "dev_share",
+    "dev_share_reason",
+    "snipers",
+    "snipers_reason",
+    "buys_1m",
+    "sells_1m",
+    "net_sol_flow_1m",
+    "curve_volume_1m_sol",
+    "tape_reason",
+    "creator_net_seller",
+    "creator_net_seller_reason",
 )
 
 _INSERT_FEATURES = text(
@@ -213,19 +229,21 @@ _INSERT_GAP = text(
 )
 
 _LOAD_TRACKED = text(
-    "SELECT mint, first_seen_at, created_at, bonding_curve, mayhem_state, "
+    "SELECT mint, first_seen_at, created_at, creator, bonding_curve, mayhem_state, "
     "       initial_real_token_reserves, completed_at, migrated_at "
     "FROM meme_tokens "
-    "WHERE completed_at IS NULL AND migrated_at IS NULL "
+    "WHERE completed_at IS NULL "
     "  AND (COALESCE(created_at, first_seen_at) >= :cutoff "
     "       OR mayhem_state IN ('active', 'paused')) "
     "ORDER BY COALESCE(created_at, first_seen_at) DESC LIMIT :cap"
 )
 """The tracked set is **rebuilt from the database on start**, which is the durable
 checkpoint Astra's MUST-FIX 3 asks for: a restart resumes the same universe instead
-of watching only what the WS happens to push next. A completed or migrated curve is
-excluded — its reserves are static, so every request spent on it is a request not
-spent on a curve that still moves."""
+of watching only what the WS happens to push next. A curve whose completion was
+**observed** (``completed_at``) is excluded — its reserves are static. A curve that
+migrated without a completion reading (``migrated_at`` set, ``completed_at`` NULL)
+comes back with ``final_read_pending``: one poll to record the finished state, the
+T4.2c fix for the hour with zero ``complete = true`` snapshots."""
 
 _PRUNE_TOKENS = text(
     "WITH doomed AS ("
@@ -276,11 +294,13 @@ async def load_tracked(session: AsyncSession, *, cutoff: datetime, cap: int) -> 
                 mint=str(row["mint"]),
                 first_seen_at=row["first_seen_at"],
                 created_at=row["created_at"],
+                creator=row["creator"],
                 bonding_curve=row["bonding_curve"],
                 mayhem_state=row["mayhem_state"],
                 initial_real_token_reserves=row["initial_real_token_reserves"],
                 complete=row["completed_at"] is not None,
                 migrated=row["migrated_at"] is not None,
+                final_read_pending=row["migrated_at"] is not None,
             )
         )
     return tracked

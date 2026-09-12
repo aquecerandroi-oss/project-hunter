@@ -6113,3 +6113,88 @@ caracteres; o teto de `alembic_version.version_num` continua 32 (§17.6).
 | `infra/scripts/meme_diary.py` | lê como `hunter_app` e escreve `obsidian/09-OPERATIONS/Diario-Meme/<dia>.md` (`--dry-run`/`--apply`) |
 | T4.8 (caminho de assinatura) | acrescenta `'live'` ao CHECK de `mode` com revisão própria, atrás de `ENABLE_MEME_LIVE_TRADING`; até lá nenhum papel escreve uma aposta que se diga real |
 | `packages/risk-core/**`, `services/execution-worker/**` | **nada, e por construção**: nenhuma tabela desta revisão é alcançável por caminho de execução |
+
+## 35. Os boards do site e a fita de trades viram schema — M4 (`0023_meme_boards_trades`)
+
+Vigésima terceira revisão. **Duas tabelas** (pais `RANGE` mensais), três índices, oito partições,
+quinze colunas e nove CHECKs acrescentados a `meme_features_1m`, uma coluna relaxada em
+`meme_trades`, grants por subtração. Nenhum enum, nenhuma política de RLS, nenhuma vista alterada,
+nada tocado na `0022`. Entrega a T4.2c sobre a `0021` (T4.2) e a `0022` (T4.6).
+
+### 35.1 Global, sem RLS — e a ausência é asserida
+
+As duas tabelas são **globais** (§1.1): um board é o que todo visitante vê; uma leitura de risco é
+sobre uma moeda na cadeia. Os testes `LIKE 'meme%'` da §33.1 contam estas duas também.
+
+### 35.2 As duas tabelas
+
+```
+meme_board_observations            (uma linha por mint por board por MINUTO fechado)
+  observed_at PK₁, board PK₂ ∈ {new, graduating, graduated, movers}, mint PK₃
+  minute_end (bucket pelo NOSSO received_at), received_at, mint_updated_at, version, position, patches
+  chain, program, platform, quote_asset, name, symbol
+  market_cap_usd, progress_pct, volume_{sol,usd}, volume_{5m,15m,1h,24h}_{sol,usd}, tx_5m, age_s
+  kol_count, snipers, is_mayhem, mayhem_state, has_{social,twitter,website,telegram}
+  graduated_at, ath_market_cap_usd, buys, sells, txs, holders, top10_share, dev_share (frações)
+  cashback, dev_wallet, is_live, participants, fees_{sol,usd}
+  first_seen_in_board_at, last_seen_in_board_at, left_board_at, exposure_censored, extra jsonb, source
+  CHECKs: board conhecido; posição/patches ≥ 0; last_seen ≥ first_seen; censurado ⇒ sem left_board_at
+  RANGE (observed_at); INDEX (mint, observed_at); INDEX (minute_end, board)
+
+meme_risk_snapshots                (uma leitura de /in-memory-coin)
+  observed_at PK₁, mint PK₂, received_at, source, program, platform, quote_mint, quote_asset
+  holders, top10_share, dev_share, snipers, sniper_share, bundled_share, progress_pct, graduated_at
+  is_mayhem, mayhem_state, raw jsonb NOT NULL (os 65 campos, crus)
+  RANGE (observed_at); INDEX (mint, observed_at)
+```
+
+**`observed_at` de uma linha de board** é o último `serverTs` do board no minuto (o board ainda
+listava o mint então); `mint_updated_at` é o `serverTs` do último patch do próprio mint, que pode ser
+mais velho. Um board que não enviou nada num minuto não produz linha nele: não observado não é "ainda
+lá". **Exposição** (A4.0g §2): `left_board_at` só com um `remove` visto; `exposure_censored = true`
+quando o mint some no snapshot de uma reconexão — sumiço que ninguém viu é censura, não saída.
+
+### 35.3 O que a `0023` muda nas tabelas da `0021`
+
+`meme_features_1m` ganha, cada valor com seu motivo (CHECK bicondicional, o padrão da §33.5):
+`holders` (+ `holders_observed_at`, `holders_source` — a procedência da leitura, que também é a de
+`top10_share`), `dev_share`, `snipers`, `buys_1m`/`sells_1m`/`net_sol_flow_1m`/`curve_volume_1m_sol`
+(um `tape_reason` para os quatro: vêm de uma fonte e faltam juntos), `creator_net_seller`
+(`Σ vendas − Σ compras do criador > 0` em SOL sobre a fita coberta; distinto de `creator_sold`, que
+é *qualquer* venda). Vocabulário de motivo: os sete da §33.5 mais **`no_sells`** (razão compra/venda
+sem vendas não é número).
+
+`meme_trades.commitment` vira **anulável** (`CHECK (commitment IS NULL OR commitment IN (…))`): a
+`0021` escreveu `NOT NULL` para um decodificador on-chain que declara finalidade; o produtor que de
+fato pousou (`swap-api`) não declara nenhuma, e `NULL` é a mesma palavra que
+`meme_curve_snapshots.commitment` usa para o espelho REST.
+
+**Não-antecipação é propriedade do produtor, declarada no modelo:** um valor numa linha com
+`end_time = T` foi calculado só de observações com `received_at <= T`. Um trade com `block_time`
+dentro do minuto que chegou depois de `T` **não** está em `buys_1m` — está em minuto nenhum; a conta
+por minuto é "o que se sabia em T", nunca "o que aconteceu até T".
+
+### 35.4 Grants, guardas, trava
+
+| Classe (`ddl/meme_boards.py`) | Papel | Privilégios | Tabelas |
+|---|---|---|---|
+| `MEME_BOARDS_APP_READ_ONLY_TABLES` | `hunter_app` | `SELECT` | as duas |
+| `MEME_BOARDS_WORKER_APPEND_TABLES` | `hunter_worker` | `SELECT`/`INSERT` | as duas |
+
+Partições `2026-09..12` criadas e endurecidas como as da `0021`; retenção por `DROP` de mês
+(`MEME_RETENTION_DAYS`). **Sem guarda de upgrade** (colunas anuláveis sem default e `DROP NOT NULL`
+não tornam linha nenhuma irrepresentável). **O downgrade recusa** com linha em qualquer das duas
+tabelas, com linha de feature carregando coluna da `0023`, ou com trade de `commitment NULL`
+(restaurar `NOT NULL` falharia no meio). `ADD COLUMN` anulável e `DROP NOT NULL` são só catálogo no
+PG 16; `ADD CONSTRAINT … CHECK` varre `meme_features_1m` uma vez — segundos hoje. Nome com 23
+caracteres (§17.6). Testes: `test_0023_*` em `test_migrations.py`; união de grants em
+`test_schema_privileges.py`; persistência em `services/meme-worker/tests/test_boards_trades_persistence.py`.
+
+### 35.5 O que as tarefas vizinhas têm de saber
+
+| Onde | O que muda |
+|---|---|
+| `services/meme-worker/**` | escreve as duas tabelas (`repo_boards.py`) e `meme_trades` (`source='swap_api'`); lê `meme_paper_bets` (`status='open'`) para a prioridade |
+| `GET /api/v1/orgs/{org}/meme/sources` | por fonte: conectada?, último `observed_at`, atraso, erros na última hora, orçamento usado, e a última linha da tabela como segunda testemunha |
+| T4.6 (`lab_repo.load_gate_rows`) | as colunas que o portão pede existem: `curve_volume_1m_sol` e `creator_net_seller` — dois ajustes de uma linha fora desta tarefa |
+| `apps/web/**` | nada nesta tarefa; `MemeSource` ganhou `trenches_ws` e `NullReason` ganhou `no_sells` na API (`pnpm gen:types` pendente) |

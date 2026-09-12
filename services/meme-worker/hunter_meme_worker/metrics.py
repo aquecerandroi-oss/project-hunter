@@ -72,3 +72,24 @@ meme_ws_generation = Gauge(
     "reconnect is what proves a gap — never what recovers one.",
     registry=registry,
 )
+
+meme_source_messages_total = Counter(
+    "hunter_meme_source_messages_total",
+    "Observations accepted per T4.2c source (board messages, tape pages, risk reads).",
+    ["source"],
+    registry=registry,
+)
+
+meme_source_errors_total = Counter(
+    "hunter_meme_source_errors_total",
+    "Errors per T4.2c source (rate limits, transport, malformed frames).",
+    ["source"],
+    registry=registry,
+)
+
+meme_rows_total = Counter(
+    "hunter_meme_rows_total",
+    "Rows offered to the T4.2c tables, by table (duplicates are the schema's).",
+    ["table"],
+    registry=registry,
+)

@@ -592,6 +592,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/meme/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every source of the meme radar: connected?, last observed_at, lag, errors, budget */
+        get: operations["get_meme_sources_api_v1_orgs__org_id__meme_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/meme/tokens": {
         parameters: {
             query?: never;
@@ -2173,7 +2190,7 @@ export interface components {
             /** Count */
             count: number | null;
             /** Reason */
-            reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+            reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
             /** Tracked Tokens */
             tracked_tokens: number;
         };
@@ -2826,17 +2843,17 @@ export interface components {
             /** Buy Sell Ratio */
             buy_sell_ratio: string | null;
             /** Buy Sell Ratio Reason */
-            buy_sell_ratio_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+            buy_sell_ratio_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
             /** Coverage */
             coverage: string;
             /** Creator Sold */
             creator_sold: boolean | null;
             /** Creator Sold Reason */
-            creator_sold_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+            creator_sold_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
             /** Curve Progress Pct */
             curve_progress_pct: string | null;
             /** Curve Reason */
-            curve_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+            curve_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
             /**
              * End Time
              * Format: date-time
@@ -2847,15 +2864,15 @@ export interface components {
             /** Mcap Sol */
             mcap_sol: string | null;
             /** Progress Reason */
-            progress_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+            progress_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
             /** Top10 Share */
             top10_share: string | null;
             /** Top10 Share Reason */
-            top10_share_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+            top10_share_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
             /** Unique Buyers */
             unique_buyers: number | null;
             /** Unique Buyers Reason */
-            unique_buyers_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+            unique_buyers_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells") | null;
         };
         /** MemeGapListOut */
         MemeGapListOut: {
@@ -2989,11 +3006,105 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "pumpportal_ws" | "pumpfun_rest" | "solana_rpc";
+            source: "pumpportal_ws" | "pumpfun_rest" | "solana_rpc" | "trenches_ws";
             /** Virtual Sol Reserves */
             virtual_sol_reserves: string;
             /** Virtual Token Reserves */
             virtual_token_reserves: string;
+        };
+        /** MemeSourceOut */
+        MemeSourceOut: {
+            /** Age S */
+            age_s: number | null;
+            /** Budget 60S */
+            budget_60s: number | null;
+            /** Connected */
+            connected: boolean | null;
+            /** Enabled */
+            enabled: boolean | null;
+            /** Errors 1H */
+            errors_1h: number | null;
+            /** Lag S */
+            lag_s: number | null;
+            /** Last Error */
+            last_error: string | null;
+            /** Last Error At */
+            last_error_at: string | null;
+            /** Last Observed At */
+            last_observed_at: string | null;
+            /** Last Received At */
+            last_received_at: string | null;
+            /** Last Row Observed At */
+            last_row_observed_at: string | null;
+            /** Name */
+            name: string;
+            /** Reason */
+            reason: string | null;
+            /** Row Reason */
+            row_reason: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "connected" | "disconnected" | "ok" | "erroring" | "disabled" | "unknown";
+            /** Table */
+            table: string | null;
+            /** Used 60S */
+            used_60s: number | null;
+        };
+        /** MemeSourcesOut */
+        MemeSourcesOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Budget 60S */
+            budget_60s: number | null;
+            /** Budget Used 60S */
+            budget_used_60s: number | null;
+            /** Gaps 60S */
+            gaps_60s: number | null;
+            /** Heartbeat Age S */
+            heartbeat_age_s: number | null;
+            /** Heartbeat Key */
+            heartbeat_key: string;
+            /** Heartbeat Ts */
+            heartbeat_ts: string | null;
+            /**
+             * Label
+             * @default Meme Radar — fontes de dados; só monitoramento, nunca execução (pump.fun)
+             */
+            label: string;
+            /** Lag S */
+            lag_s: number | null;
+            /** Last Snapshot Observed At */
+            last_snapshot_observed_at: string | null;
+            /** Radar Reason */
+            radar_reason: string | null;
+            /**
+             * Radar Status
+             * @enum {string}
+             */
+            radar_status: "alive" | "stale" | "never" | "heartbeat_missing" | "redis_unavailable";
+            /** Sources */
+            sources: components["schemas"]["MemeSourceOut"][];
+            /** Sources At */
+            sources_at: string | null;
+            /** Stalled After S */
+            stalled_after_s: number;
+            /** Swap Api Budget 60S */
+            swap_api_budget_60s: number | null;
+            /** Swap Api Used 60S */
+            swap_api_used_60s: number | null;
+            /** Tracked */
+            tracked: number | null;
+            /** Trenches Connected */
+            trenches_connected: boolean | null;
+            /** Trenches Patches 60S */
+            trenches_patches_60s: number | null;
+            /** Ws Malformed 60S */
+            ws_malformed_60s: number | null;
         };
         /** MemeTokenDetailOut */
         MemeTokenDetailOut: {
@@ -3054,7 +3165,7 @@ export interface components {
             /** Snapshot Observed At */
             snapshot_observed_at: string | null;
             /** Snapshot Source */
-            snapshot_source: ("pumpportal_ws" | "pumpfun_rest" | "solana_rpc") | null;
+            snapshot_source: ("pumpportal_ws" | "pumpfun_rest" | "solana_rpc" | "trenches_ws") | null;
             /**
              * State
              * @enum {string}
@@ -6746,6 +6857,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProposalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_meme_sources_api_v1_orgs__org_id__meme_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemeSourcesOut"];
                 };
             };
             /** @description Validation Error */

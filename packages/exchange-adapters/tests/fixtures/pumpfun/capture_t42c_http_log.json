@@ -1,0 +1,63 @@
+[
+ {
+  "at": "2026-09-12T08:58:00.060736+00:00",
+  "name": "indexer_boards_new",
+  "url": "https://advanced-indexer.pump.fun/boards/new?offset=0&limit=50",
+  "status": 200,
+  "ms": 563,
+  "bytes": 40878,
+  "ratelimit": {}
+ },
+ {
+  "at": "2026-09-12T08:58:01.710671+00:00",
+  "name": "indexer_in_memory_coin",
+  "url": "https://advanced-indexer.pump.fun/in-memory-coin/57ZmcJUneWCwuQ1isprgJaVuuStjrF1b55VWDFUc7tqg",
+  "status": 200,
+  "ms": 156,
+  "bytes": 1795,
+  "ratelimit": {}
+ },
+ {
+  "at": "2026-09-12T08:58:03.659699+00:00",
+  "name": "swap_api_trades_p1",
+  "url": "https://swap-api.pump.fun/v2/coins/57ZmcJUneWCwuQ1isprgJaVuuStjrF1b55VWDFUc7tqg/trades",
+  "status": 200,
+  "ms": 453,
+  "bytes": 63380,
+  "ratelimit": {
+   "x-ratelimit-limit": "1000",
+   "x-ratelimit-remaining": "913",
+   "x-ratelimit-reset": "35"
+  }
+ },
+ {
+  "at": "2026-09-12T08:58:05.433602+00:00",
+  "name": "swap_api_trades_p2",
+  "url": "https://swap-api.pump.fun/v2/coins/57ZmcJUneWCwuQ1isprgJaVuuStjrF1b55VWDFUc7tqg/trades",
+  "status": 200,
+  "ms": 266,
+  "bytes": 63337,
+  "ratelimit": {
+   "x-ratelimit-limit": "1000",
+   "x-ratelimit-remaining": "906",
+   "x-ratelimit-reset": "52"
+  }
+ },
+ {
+  "at": "2026-09-12T08:58:07.441652+00:00",
+  "name": "rpc_getTransaction",
+  "url": "https://api.mainnet-beta.solana.com",
+  "status": 200,
+  "ms": 500,
+  "bytes": 6558
+ },
+ {
+  "at": "2026-09-12T08:58:09.168944+00:00",
+  "name": "frontend_api_v3_coin_graduated",
+  "url": "https://frontend-api-v3.pump.fun/coins/5RFwNs16ShCeSNQY9Kf5iR5esbEMsnYm7PbWGQAwpump",
+  "status": 200,
+  "ms": 219,
+  "bytes": 2161,
+  "ratelimit": {}
+ }
+]

@@ -83,6 +83,9 @@ class ConnectionState:
     reconnects: int = 0
     dropped_duplicates: int = 0
     skipped_out_of_scope: int = 0
+    malformed_messages: int = 0
+    """Frames the parser refused (T4.2c): the worker turns the counter into a
+    per-minute heartbeat field instead of only logging each one."""
 
 
 def _sync_monotonic() -> float:
@@ -226,6 +229,7 @@ class PumpPortalWsClient:
                     try:
                         event = self._parse_frame(raw)
                     except MalformedMessage as exc:
+                        self.state.malformed_messages += 1
                         logger.warning("pumpportal_ws_malformed_message", error=str(exc))
                         continue
                     if event is not None:

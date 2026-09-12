@@ -54,6 +54,10 @@ class _ReceivedAtMixin(NormalizedModel):
         return ensure_utc(v)
 
 
+ReceivedAtMixin = _ReceivedAtMixin
+"""The public name of the mixin, for the T4.2c models in ``board_models.py``."""
+
+
 class NormalizedMemeTokenCreated(_ReceivedAtMixin):
     """A pump.fun ``create`` instruction, from PumpPortal's ``subscribeNewToken``.
 
@@ -223,4 +227,5 @@ __all__ = [
     "NormalizedMemeTrade",
     "NormalizedModel",
     "NormalizedSolPrice",
+    "ReceivedAtMixin",
 ]

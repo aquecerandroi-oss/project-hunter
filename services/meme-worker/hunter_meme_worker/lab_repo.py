@@ -47,7 +47,8 @@ _RULE_SETS = text(
 
 _GATE_ROWS = text(
     "SELECT f.mint, f.end_time, f.curve_progress_pct, f.progress_reason, f.mcap_sol, "
-    "       f.creator_sold, f.snapshot_observed_at, f.snapshot_source, "
+    "       f.creator_net_seller, f.curve_volume_1m_sol, "
+    "       f.snapshot_observed_at, f.snapshot_source, "
     "       t.created_at, t.completed_at, t.migrated_at, t.initial_real_token_reserves, "
     "       s.virtual_sol_reserves, s.virtual_token_reserves, s.real_sol_reserves, "
     "       s.real_token_reserves, s.total_supply, s.complete, s.mcap_sol AS snapshot_mcap_sol "
@@ -145,8 +146,11 @@ async def load_gate_rows(
                 curve_progress_pct=r["curve_progress_pct"],
                 progress_reason=r["progress_reason"],
                 mcap_sol=r["mcap_sol"],
-                creator_sold=r["creator_sold"],
-                curve_volume_1m_sol=None,  # no trade feed today (DATABASE.md §33.5)
+                # T4.2c: the tape (swap-api) fills both; NULL still means "unknown"
+                # and the gate refuses it by name (creator_net_seller_unknown /
+                # curve_volume_1m_unknown), exactly as before the feed existed.
+                creator_sold=r["creator_net_seller"],
+                curve_volume_1m_sol=r["curve_volume_1m_sol"],
                 completed_at=r["completed_at"],
                 migrated_at=r["migrated_at"],
                 snapshot=snapshot,

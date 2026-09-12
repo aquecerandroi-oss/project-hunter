@@ -340,7 +340,12 @@ async def test_retention_prunes_only_what_aged_out_and_needs_the_marker(
 async def test_the_tracked_set_is_rebuilt_from_the_rows_a_restart_left_behind(
     db_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """The durable checkpoint: a restart resumes the universe, it does not reset it."""
+    """The durable checkpoint: a restart resumes the universe, it does not reset it.
+
+    Since T4.2c a migrated curve whose completion was never *read* comes back
+    for exactly one final poll (``final_read_pending``) — the fix for the hour
+    with zero ``complete = true`` snapshots; a curve whose ``completed_at`` was
+    observed stays out, because its reserves are static."""
     now = datetime(2026, 12, 1, 12, 0, tzinfo=UTC)
     async with role_session(db_session_factory, db_role=WORKER) as session:
         await upsert_token(
@@ -356,11 +361,18 @@ async def test_the_tracked_set_is_rebuilt_from_the_rows_a_restart_left_behind(
                 migrated_pool="pump-amm",
             ),
         )
+        await upsert_token(
+            session, _token("WARM_COMPLETED", seen=now, created_at=now, completed_at=now)
+        )
     async with role_session(db_session_factory, db_role=WORKER) as session:
-        tracked = await load_tracked(session, cutoff=now - timedelta(hours=24), cap=50)
-    mints = {t.mint for t in tracked}
-    assert "WARM_YOUNG" in mints
-    assert "WARM_MIGRATED" not in mints, "a migrated curve kept costing poll budget"
+        tracked = {
+            t.mint: t for t in await load_tracked(session, cutoff=now - timedelta(hours=24), cap=50)
+        }
+    assert "WARM_YOUNG" in tracked
+    assert "WARM_COMPLETED" not in tracked, "an observed completion kept costing poll budget"
+    assert tracked["WARM_MIGRATED"].final_read_pending, (
+        "a migrated curve never read as complete must come back for its final read"
+    )
 
 
 async def test_the_api_role_reads_the_view_and_writes_none_of_it(

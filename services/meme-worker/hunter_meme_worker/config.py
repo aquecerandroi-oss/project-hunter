@@ -45,9 +45,11 @@ enforced by the deployment, not by the heartbeat.
 WS_STREAM = "pumpportal_ws"
 CURVE_STREAM = "curve_poll"
 FEATURES_STREAM = "features_1m"
-"""The three ``meme_ingest_gaps.stream`` values — three different operator
-problems: discovery dropped, the poll budget did not reach a mint, or a minute
-produced no feature row at all."""
+TRENCHES_STREAM = "trenches_ws"
+"""The ``meme_ingest_gaps.stream`` values — different operator problems:
+discovery dropped, the poll budget did not reach a mint, a minute produced no
+feature row at all, or a board socket reconnected (T4.2c: the exposure rows of
+that window are censored, and the gap says why)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +110,39 @@ class MemeConfig:
     """The SOL/USD quote is re-read at most once a minute (its own upstream
     rate-limit group, 50/60 s), and only when a fill or a sale needs it."""
 
+    trenches_enabled: bool = True
+    """The site's boards over ``/ws/trenches`` (T4.2c). ``MEME_TRENCHES_ENABLED``
+    defaults to **true** whenever the radar collects: no key, one socket per
+    board, and it is what fills ``holders``/``top10_share``/``dev_share``/
+    ``snipers``. Off says so in the readiness body and in the heartbeat."""
+
+    boards: tuple[str, ...] = ("new", "graduating", "graduated", "movers")
+
+    swap_api_enabled: bool = True
+    """The ``swap-api`` tape (T4.2c), ``MEME_SWAP_API_ENABLED``, default on."""
+
+    swap_api_budget_60s: int = 900
+    """``MEME_SWAP_API_BUDGET_60S``: the measured 1000/60 s minus 10 % of slack;
+    the adapter refuses anything above the measured limit."""
+
+    trades_cycle_s: float = 10.0
+    """The tape puller wakes every 10 s and spends a sixth of the minute's budget:
+    the mints the Lab is deciding on are read every cycle, the rest once a
+    minute (``trades.MIN_INTERVAL_S``)."""
+
+    trades_max_pages: int = 3
+
+    risk_enabled: bool = True
+    """``GET /in-memory-coin/{mint}`` for open bets and ``graduating`` (T4.2c),
+    ``MEME_RISK_ENABLED``, default on."""
+
+    risk_cycle_s: float = 60.0
+    risk_min_interval_s: int = 300
+    """At most one risk read per mint per five minutes (the brief's ceiling)."""
+
+    heartbeat_cycle_s: float = 15.0
+    """How often the radar's own fields land on ``hb:meme:radar``."""
+
 
 def _int_env(name: str, default: int) -> int:
     """An integer knob of this worker, or its default. A malformed value is the
@@ -149,6 +184,10 @@ def load_config(settings: Settings) -> MemeConfig:
         rpc_top_k=_int_env("MEME_RPC_TOP_K", 20),
         retention_days=settings.meme_retention_days,
         lab_enabled=_bool_env("MEME_LAB_ENABLED", default=True),
+        trenches_enabled=_bool_env("MEME_TRENCHES_ENABLED", default=True),
+        swap_api_enabled=_bool_env("MEME_SWAP_API_ENABLED", default=True),
+        swap_api_budget_60s=_int_env("MEME_SWAP_API_BUDGET_60S", 900),
+        risk_enabled=_bool_env("MEME_RISK_ENABLED", default=True),
     )
 
 

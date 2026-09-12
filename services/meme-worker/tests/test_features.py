@@ -100,7 +100,7 @@ def test_a_minute_with_no_observation_is_all_nulls_with_reasons_and_zero_coverag
     assert (row.unique_buyers, row.unique_buyers_reason) == (None, NO_TRADE_FEED)
     assert (row.buy_sell_ratio, row.buy_sell_ratio_reason) == (None, NO_TRADE_FEED)
     assert (row.top10_share, row.top10_share_reason) == (None, NO_HOLDERS_READER)
-    assert (row.creator_sold, row.creator_sold_reason) == (None, NO_HOLDERS_READER)
+    assert (row.creator_sold, row.creator_sold_reason) == (None, NO_TRADE_FEED)
     assert row.snapshot_observed_at is None and row.snapshot_source is None
     assert row.age_minutes == 7
 
@@ -134,14 +134,16 @@ def test_a_known_market_cap_survives_an_unknown_denominator() -> None:
     assert row.progress_reason == DENOMINATOR_UNKNOWN
 
 
-def test_the_four_trade_and_holder_columns_are_null_in_every_row_this_slice_writes() -> None:
-    """Astra's MUST-FIX 1, as a test: no feed is never "nobody bought"."""
+def test_the_four_trade_and_holder_columns_are_null_without_a_source() -> None:
+    """Astra's MUST-FIX 1, as a test: no feed is never "nobody bought". Since
+    T4.2c ``creator_sold`` is a tape column, so its absence is the tape's reason
+    (contract amendment); the holders columns keep ``no_holders_reader``."""
     for snapshot in (None, _rest_observation()):
         row = build_row(_inputs(snapshot=snapshot))
         assert row.unique_buyers is None and row.unique_buyers_reason == NO_TRADE_FEED
         assert row.buy_sell_ratio is None and row.buy_sell_ratio_reason == NO_TRADE_FEED
         assert row.top10_share is None and row.top10_share_reason == NO_HOLDERS_READER
-        assert row.creator_sold is None and row.creator_sold_reason == NO_HOLDERS_READER
+        assert row.creator_sold is None and row.creator_sold_reason == NO_TRADE_FEED
 
 
 def test_every_reason_a_row_can_carry_is_in_the_frozen_vocabulary() -> None:
