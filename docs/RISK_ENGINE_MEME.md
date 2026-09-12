@@ -609,6 +609,18 @@ Nada de "preenchido ao último preço visto".
    leitura pontual da curva pela cadeia e fecha por ela quando ela vem (`meme_lab_bet_closed_by_point_read`).
    Só sem resposta o desfecho fica indeterminado.
 
+9. **A mesa propõe pela porta E1 e diz o plano (T4.19).** Desde a `0033` o conjunto `operator` ativo é o `operator/3`:
+   a **mesma** porta e as **mesmas** exclusões do `flow_v2/1` (E1 + E2, `FLOW_V2_PARAMS` composto em SQL), relógio de
+   15 s, com só dois números próprios — a proposta ao operador espera **180 s** (`params.ttl_s`; uma compra à mão precisa do
+   minuto extra) e no máximo 2 abertas. Na mesma linha de 15 s, `flow_v2/1` e `operator/3` propõem a mesma moeda: a de
+   pesquisa nasce aprovada por `rules`, a do operador nasce `proposed`; aprovada, o fill é o do item 7 (primeira fotografia
+   depois da decisão). Cada proposta `operator` grava `suggested.manual_plan` na hora da proposta — "Comprar 0,05 SOL de
+   <TICKER> até HH:MM:SS (proposta expira). Vender até HH:MM (30 min) — antes disso se triplicar (3×), se recuar 35 % do
+   topo depois de 1,5×, se cair pela metade (−50 %), se o dev vender, ou se a linha de suporte quebrar." — todo número
+   lido dos `params` (o trailing incluído: o motor vende um recuo 2× → 1,3×, e o texto tem de dizer o mesmo que a regra),
+   horas de Brasília; a API só repete o texto, nunca o compõe. O plano é o que o operador executa à mão; a carteira observada (T4.12) grava o que ele
+   fez de fato, e o papel continua marcando a aposta por conta própria.
+
 ## 11. VM1–VM9 — as nove verificações do motor meme
 
 Equivalente das V1–V9 da T3.9 (`.claude/state/spec-T3.9-verificacoes.md`,

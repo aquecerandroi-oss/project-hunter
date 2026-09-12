@@ -45,7 +45,7 @@ from __future__ import annotations
 
 import asyncio
 import random
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -58,7 +58,16 @@ from hunter_core.domain.types import ensure_utc, utcnow
 from hunter_core.logging import get_logger
 from hunter_exchanges.base import MalformedMessage
 from hunter_exchanges.pumpfun.board_models import NormalizedSwapTrade
-from hunter_exchanges.pumpfun.rate_shared import get_json_with_budget
+from hunter_exchanges.pumpfun.market_activity import (
+    DEFAULT_WINDOWS,
+    MAX_ADDRESSES,
+    METRICS,
+    WINDOW_SECONDS,
+    ActivityBatch,
+    parse_activity_batch,
+    response_stamp,
+)
+from hunter_exchanges.pumpfun.rate_shared import get_json_with_budget, request_json_with_budget
 from hunter_exchanges.rate_limit import TokenBucketRateLimiter
 
 logger = get_logger(__name__)
@@ -146,6 +155,45 @@ class SwapApiClient:
             rand=random.uniform,
         )
         return parse_trades_page(mint, raw, received_at=utcnow())
+
+    async def market_activity_batch(
+        self, mints: Sequence[str], *, windows: Sequence[str] = DEFAULT_WINDOWS
+    ) -> ActivityBatch:
+        """``POST /v1/coins/market-activity/batch`` (T4.2g, ``market_activity.py``):
+        up to :data:`~.market_activity.MAX_ADDRESSES` coins, every metric, the
+        windows asked for — **one request of this client's budget**, the same
+        Cloudflare rule as the tape. Refuses a batch the validator would refuse
+        before spending the request."""
+        if not 1 <= len(mints) <= MAX_ADDRESSES:
+            raise ValueError(f"mints must be 1..{MAX_ADDRESSES} per request (measured)")
+        unknown = [w for w in windows if w not in WINDOW_SECONDS]
+        if unknown or not windows:
+            raise ValueError(f"windows must be among {sorted(WINDOW_SECONDS)}: {unknown}")
+        raw, headers = await request_json_with_budget(
+            self._client,
+            "POST",
+            "/v1/coins/market-activity/batch",
+            params=None,
+            json_body={
+                "addresses": list(mints),
+                "intervals": list(windows),
+                "metrics": list(METRICS),
+            },
+            exchange=EXCHANGE,
+            limiter=self._rate_limiter,
+            bucket=REQUEST_BUCKET,
+            max_retries=self._max_retries,
+            sleep=self._sleep,
+            rand=random.uniform,
+        )
+        received_at = utcnow()
+        return parse_activity_batch(
+            raw,
+            mints=mints,
+            windows=windows,
+            observed_at=response_stamp(headers, received_at=received_at),
+            received_at=received_at,
+        )
 
 
 def _malformed(text: str) -> MalformedMessage:
@@ -255,6 +303,7 @@ __all__ = [
     "MEASURED_BLOCK_S",
     "MEASURED_LIMIT",
     "REQUEST_CAPACITY",
+    "ActivityBatch",
     "SwapApiClient",
     "TradesPage",
     "parse_trade",

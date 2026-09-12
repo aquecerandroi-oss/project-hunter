@@ -32,6 +32,7 @@ SOURCE_NAMES: tuple[str, ...] = (
     "trenches_ws",
     "swap_api",
     "indexer_risk",
+    "swap_api_activity",
 )
 SOCKET_SOURCES = frozenset({"pumpportal_ws", "trenches_ws"})
 
@@ -224,5 +225,16 @@ def build_meme_sources(
         lab_bets_indeterminate_total=parse_heartbeat_int(
             fields.get("lab_bets_indeterminate_total")
         ),
+        # T4.2g: the batch loop and its share of the fold's tape — the worker's numbers.
+        tape_activity_pct=_float(fields.get("tape_activity_pct") or None),
+        activity_coverage_pct=_float(fields.get("activity_coverage_pct") or None),
+        activity_mints=parse_heartbeat_int(fields.get("activity_mints")),
+        activity_covered=parse_heartbeat_int(fields.get("activity_covered")),
+        activity_live_1m=parse_heartbeat_int(fields.get("activity_live_1m")),
+        activity_batch_calls_60s=parse_heartbeat_int(fields.get("activity_batch_calls_60s")),
+        activity_dark_60s=parse_heartbeat_int(fields.get("activity_dark_60s")),
+        activity_skipped_60s=parse_heartbeat_int(fields.get("activity_skipped_60s")),
+        activity_cycle_s=_float(fields.get("activity_cycle_s") or None),
+        activity_quote_age_s=_float(fields.get("activity_quote_age_s") or None),
         sources=[_source_out(name, blocks.get(name), latest.get(name)) for name in names],
     )

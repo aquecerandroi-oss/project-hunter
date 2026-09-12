@@ -2051,6 +2051,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Manual Plan */
+            manual_plan?: string | null;
             /** Mint */
             mint: string;
             /** Origin */
@@ -2359,7 +2361,7 @@ export interface components {
             /** Count */
             count: number | null;
             /** Reason */
-            reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
+            reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range" | "no_sol_quote") | null;
             /** Tracked Tokens */
             tracked_tokens: number;
         };
@@ -3270,17 +3272,17 @@ export interface components {
             /** Buy Sell Ratio */
             buy_sell_ratio: string | null;
             /** Buy Sell Ratio Reason */
-            buy_sell_ratio_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
+            buy_sell_ratio_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range" | "no_sol_quote") | null;
             /** Coverage */
             coverage: string;
             /** Creator Sold */
             creator_sold: boolean | null;
             /** Creator Sold Reason */
-            creator_sold_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
+            creator_sold_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range" | "no_sol_quote") | null;
             /** Curve Progress Pct */
             curve_progress_pct: string | null;
             /** Curve Reason */
-            curve_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
+            curve_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range" | "no_sol_quote") | null;
             /** Distance To Support Pct */
             distance_to_support_pct?: string | null;
             /**
@@ -3311,7 +3313,7 @@ export interface components {
             /** Mcap Sol */
             mcap_sol: string | null;
             /** Progress Reason */
-            progress_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
+            progress_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range" | "no_sol_quote") | null;
             /** Support Line Slope */
             support_line_slope?: string | null;
             /** Support Line Sol */
@@ -3319,11 +3321,11 @@ export interface components {
             /** Top10 Share */
             top10_share: string | null;
             /** Top10 Share Reason */
-            top10_share_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
+            top10_share_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range" | "no_sol_quote") | null;
             /** Unique Buyers */
             unique_buyers: number | null;
             /** Unique Buyers Reason */
-            unique_buyers_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range") | null;
+            unique_buyers_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote" | "no_sells" | "out_of_range" | "no_sol_quote") | null;
         };
         /** MemeGapListOut */
         MemeGapListOut: {
@@ -3527,6 +3529,24 @@ export interface components {
         };
         /** MemeSourcesOut */
         MemeSourcesOut: {
+            /** Activity Batch Calls 60S */
+            activity_batch_calls_60s?: number | null;
+            /** Activity Coverage Pct */
+            activity_coverage_pct?: number | null;
+            /** Activity Covered */
+            activity_covered?: number | null;
+            /** Activity Cycle S */
+            activity_cycle_s?: number | null;
+            /** Activity Dark 60S */
+            activity_dark_60s?: number | null;
+            /** Activity Live 1M */
+            activity_live_1m?: number | null;
+            /** Activity Mints */
+            activity_mints?: number | null;
+            /** Activity Quote Age S */
+            activity_quote_age_s?: number | null;
+            /** Activity Skipped 60S */
+            activity_skipped_60s?: number | null;
             /**
              * As Of
              * Format: date-time
@@ -3548,7 +3568,7 @@ export interface components {
             chain_tracked_mints?: number | null;
             /**
              * Coverage Explanation
-             * @default cobertura do último minuto dobrado: linhas com progresso ÷ linhas e linhas com fita ÷ linhas; uma linha sem fita diz o motivo em tape_reason (no_trade_feed = nunca puxada, not_polled = o orçamento da fita não a alcançou no ciclo, rate_limited = a fonte recusou); uma linha sem progresso diz progress_reason (denominator_unknown = Mayhem ainda sem a leitura on-chain de MayhemState, mayhem_pending conta quantas); desde a T4.2f a curva de todos os rastreados vem da cadeia uma vez por minuto (chain_read_mints ÷ chain_tracked_mints) e a fita é limitada pela regra do Cloudflare do swap-api (~20 req/60 s por IP, medida — swap_api_effective_budget_60s é o orçamento em vigor), não pelo x-ratelimit-limit de 1000
+             * @default cobertura do último minuto dobrado: linhas com progresso ÷ linhas e linhas com fita ÷ linhas; uma linha sem fita diz o motivo em tape_reason (no_trade_feed = nunca puxada, not_polled = o orçamento da fita não a alcançou no ciclo, rate_limited = a fonte recusou); uma linha sem progresso diz progress_reason (denominator_unknown = Mayhem ainda sem a leitura on-chain de MayhemState, mayhem_pending conta quantas); desde a T4.2f a curva de todos os rastreados vem da cadeia uma vez por minuto (chain_read_mints ÷ chain_tracked_mints) e a fita é limitada pela regra do Cloudflare do swap-api (~20 req/60 s por IP, medida — swap_api_effective_budget_60s é o orçamento em vigor), não pelo x-ratelimit-limit de 1000; desde a T4.2g a fita por lote (POST market-activity/batch, 50 moedas por requisição, activity_batch_calls_60s dentro do mesmo orçamento) preenche buys/sells/compradores do minuto quando a fita por mint não cobriu (tape_source = activity_1m; tape_activity_pct é a fração das linhas que vieram do lote; activity_dark_60s conta moedas cuja janela 1m veio nula num ciclo em que ninguém a teve preenchida — nada é escrito como zero nesse caso; no_sol_quote = o lote falou em USD e não havia cotação SOL/USD com menos de 5 min)
              */
             coverage_explanation: string;
             /**
@@ -3630,6 +3650,8 @@ export interface components {
             swap_api_measured_60s?: number | null;
             /** Swap Api Used 60S */
             swap_api_used_60s: number | null;
+            /** Tape Activity Pct */
+            tape_activity_pct?: number | null;
             /** Tape Coverage Pct */
             tape_coverage_pct?: number | null;
             /** Tape Covered Mints */

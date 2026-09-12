@@ -76,9 +76,10 @@ NullReason = Literal[
     "unsupported_quote",
     "no_sells",
     "out_of_range",
+    "no_sol_quote",
 ]
-"""The contract's frozen vocabulary (§4): "a T4.3 renderiza estes, e só
-estes" -- shared by all six ``*_reason`` columns on ``meme_features_1m``."""
+"""The contract's frozen vocabulary (§4): "a T4.3 renderiza estes, e só estes" --
+all six ``*_reason`` columns; ``no_sol_quote`` (``0032``): USD counted, no quote young enough."""
 
 LineReason = Literal["too_few_points", "no_snapshot", "flat", "out_of_range"]
 """``meme_features_1m.line_reason`` (``0026``, T4.10): why the support line

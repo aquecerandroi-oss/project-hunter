@@ -33,6 +33,7 @@ _FAST_ROWS = text(
     "       f.net_sol_flow_60s, f.curve_volume_60s_sol, f.tape_reason, f.creator_net_seller, "
     "       f.dev_share, f.dev_share_reason, f.snipers, "
     "       t.created_at, t.completed_at, t.migrated_at, t.initial_real_token_reserves, "
+    "       t.symbol, "
     "       s.virtual_sol_reserves, s.virtual_token_reserves, s.real_sol_reserves, "
     "       s.real_token_reserves, s.total_supply, s.complete, s.mcap_sol AS snapshot_mcap_sol "
     "FROM meme_features_15s f "
@@ -111,6 +112,7 @@ async def load_fast_gate_rows(
                 holders_reason=r["holders_reason"],
                 progress_rising=r["progress_rising"],
                 series=SERIES_15S,
+                symbol=None if r["symbol"] is None else str(r["symbol"]),
             )
         )
     return out

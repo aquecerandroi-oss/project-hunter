@@ -39,11 +39,12 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0031_meme_lab_ticks"
+HEAD_REVISION = "0033_meme_operator_3"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran.
-``0031`` (T4.15) sits on ``0030_meme_gate_v2`` (T4.16) once the merge points
-its ``down_revision`` there — both were written in parallel on ``0029``."""
+``0033`` (T4.19) sits on ``0032_meme_activity`` (T4.2g), which sits on
+``0031_meme_lab_ticks`` (T4.15), which sits on ``0030_meme_gate_v2`` (T4.16) —
+those two were written in parallel on ``0029``."""
 
 INITIAL_REVISION = "0001_initial_schema"
 SHADOW_REVISION = "0002_shadow_lab"
@@ -92,6 +93,12 @@ stage first, because ``"-1"`` stopped meaning 0029 the day 0030 landed."""
 MEME_GATE_V2_REVISION = "0030_meme_gate_v2"
 """What reversing **0031** lands on (T4.15) — and where the ``0030`` tests must
 stage first, because ``"-1"`` stopped meaning 0030 the day 0031 landed."""
+MEME_LAB_TICKS_REVISION = "0031_meme_lab_ticks"
+"""What reversing **0032** lands on (T4.2g) — and where the ``0031`` tests would
+stage first, because ``"-1"`` stopped meaning 0031 the day 0032 landed."""
+MEME_ACTIVITY_REVISION = "0032_meme_activity"
+"""What reversing **0033** lands on (T4.19) — and where the ``0032`` tests would
+stage first, because ``"-1"`` stopped meaning 0032 the day 0033 landed."""
 """Named for the same reason as the line below: the two ``0019`` tests are about
 reversing **0019**, and ``"-1"`` stopped meaning that the day a revision landed on
 top of it. They now stage the database at this revision first, exactly as every
@@ -563,14 +570,16 @@ async def test_every_partitioned_parent_has_its_initial_partitions(engine: Async
     meme_range: tuple[str, ...] = migration_ddl("meme_radar").MEME_PARTITIONED_TABLES_0021
     boards_range: tuple[str, ...] = migration_ddl("meme_boards").MEME_PARTITIONED_TABLES_0023
     gate_range: tuple[str, ...] = migration_ddl("meme_gate_v2").MEME_PARTITIONED_TABLES_0030
-    assert set(frozen_range) | set(meme_range) | set(boards_range) | set(gate_range) == set(
-        partitioned_tables()
-    ), (
+    activity_range: tuple[str, ...] = migration_ddl("meme_activity").MEME_PARTITIONED_TABLES_0032
+    assert set(frozen_range) | set(meme_range) | set(boards_range) | set(gate_range) | set(
+        activity_range
+    ) == set(partitioned_tables()), (
         "a model gained or lost a RANGE postgresql_partition_by without a "
         "migration updating ddl.partitions.PARTITIONED_TABLES (0001), "
         "ddl.meme_radar.MEME_PARTITIONED_TABLES_0021, "
-        "ddl.meme_boards.MEME_PARTITIONED_TABLES_0023 or "
-        "ddl.meme_gate_v2.MEME_PARTITIONED_TABLES_0030"
+        "ddl.meme_boards.MEME_PARTITIONED_TABLES_0023, "
+        "ddl.meme_gate_v2.MEME_PARTITIONED_TABLES_0030 or "
+        "ddl.meme_activity.MEME_PARTITIONED_TABLES_0032"
     )
     assert not set(frozen_range) & set(meme_range), "a parent is frozen in two revisions"
     assert not (set(frozen_range) | set(meme_range)) & set(boards_range), (
@@ -579,6 +588,9 @@ async def test_every_partitioned_parent_has_its_initial_partitions(engine: Async
     assert not (set(frozen_range) | set(meme_range) | set(boards_range)) & set(gate_range), (
         "a parent is frozen in two revisions"
     )
+    assert not (set(frozen_range) | set(meme_range) | set(boards_range) | set(gate_range)) & set(
+        activity_range
+    ), "a parent is frozen in two revisions"
     assert {name: (values, key) for name, values, key in frozen_list} == {
         name: (values, key) for name, (_column, values, key) in list_partitioned_tables().items()
     }, (
@@ -599,6 +611,9 @@ async def test_every_partitioned_parent_has_its_initial_partitions(engine: Async
     gate_months: tuple[tuple[int, int], ...] = migration_ddl(
         "meme_gate_v2"
     ).MEME_INITIAL_MONTHS_0030
+    activity_months: tuple[tuple[int, int], ...] = migration_ddl(
+        "meme_activity"
+    ).MEME_INITIAL_MONTHS_0032
     expected = (
         {
             partition_name(table, year, month)
@@ -619,6 +634,11 @@ async def test_every_partitioned_parent_has_its_initial_partitions(engine: Async
             partition_name(table, year, month)
             for table in gate_range
             for year, month in gate_months
+        }
+        | {
+            partition_name(table, year, month)
+            for table in activity_range
+            for year, month in activity_months
         }
     )
     for parent, values, _key in frozen_list:
@@ -5325,7 +5345,8 @@ def test_0029_adds_the_mark_and_venue_columns_and_seeds_the_moonshot_arms(upgrad
         ":sonda_de_hype",
         "moonshot_v0/2:research_only:EXP-M4:active:25:0.02:50:3:7200:false:true:900:50:8:0.20"
         ":sonda_de_hype",
-        "operator/2:operator:-:active:10:0.05:50:3:7200:false:true:900:50:3:0.20"
+        # ``0033`` (T4.19) retires ``operator/2`` for ``operator/3``; the params are 0029's.
+        "operator/2:operator:-:retired:10:0.05:50:3:7200:false:true:900:50:3:0.20"
         ":comprar_cedo_na_curva",
     ]
     assert asyncio.run(
@@ -5343,7 +5364,7 @@ def test_0029_adds_the_mark_and_venue_columns_and_seeds_the_moonshot_arms(upgrad
             "AND status = 'active'",
             {},
         )
-    ) == ["operator/2"], "exactly one active operator set for the desk's manual buys"
+    ) == ["operator/3"], "exactly one active operator set for the desk's manual buys (0033's)"
     try:
         asyncio.run(
             _write(
@@ -5464,14 +5485,14 @@ def test_0029_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
             "AND status = 'active'",
             dict(_SEEDED_0029),
         )
-    ) == ["3"]
+    ) == ["2"], "the two arms; operator/2 is retired again by 0033 on the way back up"
     assert asyncio.run(
         _scalars(
             upgraded,
-            "SELECT status FROM meme_rule_sets WHERE id = :id",
-            {"id": _OPERATOR_1_RULE_SET},
+            "SELECT status FROM meme_rule_sets WHERE id IN (:a, :b) ORDER BY id",
+            {"a": _OPERATOR_1_RULE_SET, "b": _OPERATOR_2_RULE_SET},
         )
-    ) == ["retired"]
+    ) == ["retired", "retired"]
     assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_trades")) == {
         "SELECT",
         "INSERT",
@@ -6268,3 +6289,437 @@ def test_0030_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
         )
     ) == ["2"]
     command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0032_meme_activity — the tape by batch (T4.2g)
+# ---------------------------------------------------------------------------
+
+_AN_ACTIVITY_ROW = (
+    "INSERT INTO meme_market_activity_1m (end_time, mint, window_name, window_s, received_at, empty, "
+    "  num_txs, buys, sells, unique_users, unique_buyers, unique_sellers, volume_usd, "
+    "  buy_volume_usd, sell_volume_usd, price_change_pct, sol_usd, sol_usd_observed_at, "
+    "  buy_volume_sol, sell_volume_sol) VALUES ('2026-10-05T12:00:00Z', 'GUARD_MINT', :window, "
+    "  :window_s, '2026-10-05T12:00:01Z', :empty, :txs, :buys, :sells, :users, :buyers, :sellers, "
+    "  :volume, :buy_usd, :sell_usd, :change, CAST(:sol_usd AS numeric), "
+    "  CAST(:quote_at AS timestamptz), CAST(:buy_sol AS numeric), CAST(:sell_sol AS numeric))"
+)
+_A_TAPED_V3_ROW = (
+    "INSERT INTO meme_features_1m (end_time, mint, features_version, coverage, "
+    "  progress_reason, curve_reason, unique_buyers, buy_sell_ratio_reason, top10_share_reason, "
+    "  creator_sold_reason, holders_reason, dev_share_reason, snipers_reason, "
+    "  buys_1m, sells_1m, net_sol_flow_1m, curve_volume_1m_sol, creator_net_seller_reason, "
+    "  tape_source, tape_window_s, tape_as_of) VALUES ('2026-10-05T12:00:00Z', 'GUARD_MINT', "
+    "  'meme_features_v3', 1, 'not_polled', 'not_polled', 3, 'no_sells', 'no_holders_reader', "
+    "  'no_trade_feed', 'no_holders_reader', 'no_holders_reader', 'no_holders_reader', "
+    "  3, 0, 0.1, 0.1, 'no_trade_feed', :source, :window_s, CAST(:as_of AS timestamptz))"
+)
+_AN_UNTAPED_V3_ROW = (
+    "INSERT INTO meme_features_1m (end_time, mint, features_version, coverage, "  # noqa: S608
+    f"  {_REASON_COLUMNS}, tape_source, tape_window_s, tape_as_of) VALUES "
+    f"('2026-10-05T12:00:00Z', 'GUARD_MINT', 'meme_features_v3', 1, {_REASON_VALUES}, "
+    "  :source, :window_s, CAST(:as_of AS timestamptz))"
+)
+_A_TAPED_15S_ROW = (
+    "INSERT INTO meme_features_15s (as_of, mint, features_version, snapshots_120s, "
+    "  window_reason, progress_reason, holders_reason, buys_60s, sells_60s, unique_buyers_60s, "
+    "  net_sol_flow_60s, curve_volume_60s_sol, creator_net_seller_reason, dev_share_reason, "
+    "  snipers_reason, tape_source, tape_window_s, tape_as_of) VALUES ('2026-10-05T12:00:00Z', "
+    "  'GUARD_MINT', 'meme_features_15s_v1', 0, 'no_snapshot', 'no_snapshot', "
+    "  'no_holders_reader', 2, 1, 2, 0.05, 0.15, 'no_trade_feed', 'no_holders_reader', "
+    "  'no_holders_reader', :source, :window_s, CAST(:as_of AS timestamptz))"
+)
+_CLEAN_0032: tuple[tuple[str, dict[str, object]], ...] = (
+    ("DELETE FROM meme_market_activity_1m WHERE mint = 'GUARD_MINT'", {}),
+    ("DELETE FROM meme_features_1m WHERE mint = 'GUARD_MINT'", {}),
+    ("DELETE FROM meme_features_15s WHERE mint = 'GUARD_MINT'", {}),
+)
+_TAPE_SOURCE_COLUMNS = (
+    "SELECT count(*)::text FROM information_schema.columns "
+    "WHERE table_name = :table AND column_name IN ('tape_source', 'tape_window_s', 'tape_as_of')"
+)
+_MINUTE_0032 = datetime(2026, 10, 5, 12, 0, tzinfo=UTC)
+_AS_OF_0032 = datetime(2026, 10, 5, 11, 59, 57, tzinfo=UTC)
+_QUOTE_AT_0032 = datetime(2026, 10, 5, 11, 59, 30, tzinfo=UTC)
+
+
+def _an_activity(**overrides: object) -> tuple[str, dict[str, object]]:
+    params: dict[str, object] = {
+        "window": "1m",
+        "window_s": 60,
+        "empty": False,
+        "txs": 5,
+        "buys": 3,
+        "sells": 2,
+        "users": 4,
+        "buyers": 3,
+        "sellers": 2,
+        "volume": Decimal("120.5"),
+        "buy_usd": Decimal("80.5"),
+        "sell_usd": Decimal("40"),
+        "change": Decimal("12.5"),
+        "sol_usd": Decimal("200"),
+        "quote_at": _QUOTE_AT_0032,
+        "buy_sol": Decimal("0.4025"),
+        "sell_sol": Decimal("0.2"),
+    }
+    params.update(overrides)
+    return _AN_ACTIVITY_ROW, params
+
+
+def test_0032_adds_the_activity_table_and_names_the_tape_of_both_series(upgraded: str) -> None:
+    """The partitioned table with its grants and CHECKs, and the three
+    provenance columns on ``meme_features_1m``/``meme_features_15s`` with
+    theirs — a source names its window and instant, is a known label, and
+    implies a tape."""
+    ddl = migration_ddl("meme_activity")
+    assert asyncio.run(_relation_exists(upgraded, "meme_market_activity_1m"))
+    for year, month in cast("tuple[tuple[int, int], ...]", ddl.MEME_INITIAL_MONTHS_0032):
+        child = partition_name("meme_market_activity_1m", year, month)
+        assert asyncio.run(_relation_exists(upgraded, child)), child
+        assert asyncio.run(_table_privileges(upgraded, "hunter_app", child)) == set()
+        assert asyncio.run(_table_privileges(upgraded, "hunter_worker", child)) == set()
+    assert asyncio.run(_table_privileges(upgraded, "hunter_app", "meme_market_activity_1m")) == {
+        "SELECT"
+    }
+    assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_market_activity_1m")) == {
+        "SELECT",
+        "INSERT",
+    }
+    for table in ("meme_features_1m", "meme_features_15s"):
+        assert asyncio.run(_scalars(upgraded, _TAPE_SOURCE_COLUMNS, {"table": table})) == ["3"]
+    try:
+        asyncio.run(_write(upgraded, [_an_activity()]))
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    _an_activity(
+                        window="5m",
+                        window_s=300,
+                        empty=True,
+                        txs=0,
+                        buys=0,
+                        sells=0,
+                        users=0,
+                        buyers=0,
+                        sellers=0,
+                        volume=0,
+                        buy_usd=0,
+                        sell_usd=0,
+                        change=None,
+                        sol_usd=None,
+                        quote_at=None,
+                        buy_sol=None,
+                        sell_sol=None,
+                    )
+                ],
+            )
+        )
+        for refused in (
+            _an_activity(window="1h", window_s=3600, quote_at=None),  # a quote names its instant
+            _an_activity(window="1h", window_s=3600, buys=-1),
+            _an_activity(window="2m", window_s=120),
+            _an_activity(window="1h", window_s=3600, empty=True),  # empty means zeros
+            _an_activity(window="1h", window_s=3600, sol_usd=Decimal(0)),
+        ):
+            with pytest.raises(DBAPIError):
+                asyncio.run(_write(upgraded, [refused]))
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        _A_TAPED_V3_ROW,
+                        {"source": "activity_1m", "window_s": 60, "as_of": _AS_OF_0032},
+                    ),
+                    (
+                        _A_TAPED_15S_ROW,
+                        {
+                            "source": "swap_api_trades",
+                            "window_s": 60,
+                            "as_of": _MINUTE_0032,
+                        },
+                    ),
+                ],
+            )
+        )
+        asyncio.run(_write(upgraded, list(_CLEAN_0032)))
+        refused_tapes: list[tuple[str, dict[str, object]]] = [
+            (
+                _A_TAPED_V3_ROW,
+                {"source": "activity_5m", "window_s": 300, "as_of": _MINUTE_0032},
+            ),
+            (_A_TAPED_V3_ROW, {"source": "activity_1m", "window_s": None, "as_of": None}),
+            (
+                _AN_UNTAPED_V3_ROW,
+                {"source": "activity_1m", "window_s": 60, "as_of": _MINUTE_0032},
+            ),
+            (_A_TAPED_15S_ROW, {"source": "activity_1m", "window_s": 60, "as_of": None}),
+            (
+                _A_TAPED_15S_ROW,
+                {"source": "batch", "window_s": 60, "as_of": _MINUTE_0032},
+            ),
+        ]
+        for statement, params in refused_tapes:
+            with pytest.raises(DBAPIError):
+                asyncio.run(_write(upgraded, [(statement, params)]))
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0032)))
+
+
+def test_0032_refuses_a_downgrade_that_would_lose_the_activity(upgraded: str) -> None:
+    """§17.7: a batch row, or a feature row that names the batch as its tape,
+    is evidence — count, name, stop. Staged at **0032** first (``0033`` sits on
+    top), then put back at ``head``."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, MEME_ACTIVITY_REVISION)
+    guarded: list[tuple[list[tuple[str, dict[str, object]]], str]] = [
+        ([_an_activity()], "meme_market_activity_1m rows exist"),
+        (
+            [
+                (
+                    _A_TAPED_V3_ROW,
+                    {"source": "activity_1m", "window_s": 60, "as_of": _AS_OF_0032},
+                )
+            ],
+            "minutes folded from the batch route",
+        ),
+        (
+            [
+                (
+                    _A_TAPED_15S_ROW,
+                    {"source": "activity_1m", "window_s": 60, "as_of": _AS_OF_0032},
+                )
+            ],
+            "instants folded from the batch route",
+        ),
+    ]
+    try:
+        for statements, message in guarded:
+            asyncio.run(_write(upgraded, statements))
+            try:
+                with pytest.raises(DBAPIError, match=message):
+                    command.downgrade(config, "-1")
+                assert asyncio.run(_revision(upgraded)) == MEME_ACTIVITY_REVISION, (
+                    "the downgrade must not commit"
+                )
+            finally:
+                asyncio.run(_write(upgraded, list(_CLEAN_0032)))
+        # A minute folded from the per-mint tape is not the batch's evidence: it reverses.
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        _A_TAPED_V3_ROW,
+                        {
+                            "source": "swap_api_trades",
+                            "window_s": 60,
+                            "as_of": _MINUTE_0032,
+                        },
+                    )
+                ],
+            )
+        )
+        command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == MEME_LAB_TICKS_REVISION
+    finally:
+        command.upgrade(config, "head")
+        asyncio.run(_write(upgraded, list(_CLEAN_0032)))
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+def test_0032_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    """The operator's rollback: the table and the six columns go; the upgrade restores all."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, MEME_LAB_TICKS_REVISION)
+    try:
+        assert asyncio.run(_revision(upgraded)) == MEME_LAB_TICKS_REVISION
+        assert not asyncio.run(_relation_exists(upgraded, "meme_market_activity_1m"))
+        for table in ("meme_features_1m", "meme_features_15s"):
+            assert asyncio.run(_scalars(upgraded, _TAPE_SOURCE_COLUMNS, {"table": table})) == ["0"]
+        assert asyncio.run(_relation_exists(upgraded, "meme_lab_ticks")), "0031 stays"
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_relation_exists(upgraded, "meme_market_activity_1m"))
+    for table in ("meme_features_1m", "meme_features_15s"):
+        assert asyncio.run(_scalars(upgraded, _TAPE_SOURCE_COLUMNS, {"table": table})) == ["3"]
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0033_meme_operator_3 — the desk proposes through the E1 gate (T4.19)
+# ---------------------------------------------------------------------------
+
+_OPERATOR_3_RULE_SET = "01994d00-6c1a-7000-8000-00000000000a"
+"""``operator/2`` is ``_OPERATOR_2_RULE_SET`` of the ``0029`` section (``…0007``)."""
+_ACTIVE_OPERATOR_SETS = (
+    "SELECT name || '/' || version FROM meme_rule_sets "
+    "WHERE kind = 'operator' AND status = 'active' ORDER BY version"
+)
+_CLEAN_0033: tuple[tuple[str, dict[str, object]], ...] = (
+    ("DELETE FROM meme_paper_bets WHERE mint = 'GUARD_MINT'", {}),
+    ("DELETE FROM meme_proposals WHERE mint = 'GUARD_MINT'", {}),
+)
+
+
+def test_0033_seeds_operator_3_through_the_flow_gate_and_retires_operator_2(
+    upgraded: str,
+) -> None:
+    """``operator/3`` = ``flow_v2/1``'s params (the E1 gate, the E2 exclusions,
+    the 15-second clock, the 3× / 35 % after 1,5× / 30 min / 50 % exits) with
+    only the two numbers the brief changes for a buy by hand: ``ttl_s = 180``
+    and ``max_open_positions = 2``; ``operator/2`` (EXP-M1's gate) retired."""
+    seeds = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') || ':' "
+            "|| status || ':' || (params ->> 'gate_key') || '/' || (params ->> 'gate_version') "
+            "|| ':' || (params ->> 'clock') || ':' || (params ->> 'pedigree_exclusions') || ':' "
+            "|| (params ->> 'ttl_s') || ':' || (params ->> 'size_sol') || ':' "
+            "|| (params ->> 'max_open_positions') || ':' || (params ->> 'target_x') || ':' "
+            "|| (params ->> 'trailing_pct') || ':' || (params ->> 'trailing_arm_x') || ':' "
+            "|| (params ->> 'max_hold_s') || ':' || (params ->> 'max_loss_pct') || ':' "
+            "|| (params ->> 'exit_on_line_break') || ':' || (params ->> 'max_sol_per_bet') "
+            "FROM meme_rule_sets WHERE id = :id",
+            {"id": _OPERATOR_3_RULE_SET},
+        )
+    )
+    assert seeds == [
+        "operator/3:operator:-:active:fluxo_e_holders/1:15s:true:180:0.05:2:3:35:1.5:1800:50"
+        ":true:0.05"
+    ]
+    same_gate = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT ((o.params - 'ttl_s' - 'max_open_positions') "
+            "        = (f.params - 'max_open_positions'))::text "
+            "FROM meme_rule_sets o, meme_rule_sets f WHERE o.id = :o AND f.id = :f",
+            {"o": _OPERATOR_3_RULE_SET, "f": _FLOW_V2_RULE_SET},
+        )
+    )
+    assert same_gate == ["true"], "every other key is flow_v2/1's, byte for byte"
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT status || ':' || (retired_at IS NOT NULL)::text FROM meme_rule_sets "
+            "WHERE id = :id",
+            {"id": _OPERATOR_2_RULE_SET},
+        )
+    ) == ["retired:true"]
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/3"], (
+        "exactly one active operator set for the desk's manual buys"
+    )
+
+
+def test_0033_refuses_a_downgrade_while_a_proposal_or_a_bet_references_operator_3(
+    upgraded: str,
+) -> None:
+    """§17.7: a proposal the desk saw and a bet it filled under ``operator/3``
+    are evidence — count, name, stop. ``0033`` is the head: no staging."""
+    config = alembic_config(upgraded)
+    proposal = "00000000-0000-4000-8000-000000000a01"
+    bet = "00000000-0000-4000-8000-000000000a02"
+    guarded: list[tuple[list[tuple[str, dict[str, object]]], str]] = [
+        (
+            [(_A_PROPOSAL, {"id": proposal, "rule_set": _OPERATOR_3_RULE_SET})],
+            "proposals reference the seeded operator/3",
+        ),
+        (
+            [
+                (_A_PROPOSAL, {"id": proposal, "rule_set": _RESEARCH_RULE_SET}),
+                (
+                    _A_BET,
+                    {
+                        "id": bet,
+                        "proposal": proposal,
+                        "rule_set": _OPERATOR_3_RULE_SET,
+                        "mode": "paper",
+                    },
+                ),
+            ],
+            "bets reference the seeded operator/3",
+        ),
+    ]
+    for statements, message in guarded:
+        asyncio.run(_write(upgraded, statements))
+        try:
+            with pytest.raises(DBAPIError, match=message):
+                command.downgrade(config, "-1")
+            assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, (
+                "the downgrade must not commit"
+            )
+        finally:
+            asyncio.run(_write(upgraded, list(_CLEAN_0033)))
+    command.check(config)
+
+
+def test_0033_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    """The operator's rollback: ``operator/3`` goes, ``operator/2`` comes back
+    active, ``0032`` stays; the upgrade restores the hand-over."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, MEME_ACTIVITY_REVISION)
+    try:
+        assert asyncio.run(_revision(upgraded)) == MEME_ACTIVITY_REVISION
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM meme_rule_sets WHERE id = :id",
+                {"id": _OPERATOR_3_RULE_SET},
+            )
+        ) == ["0"]
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT status || ':' || (retired_at IS NULL)::text FROM meme_rule_sets "
+                "WHERE id = :id",
+                {"id": _OPERATOR_2_RULE_SET},
+            )
+        ) == ["active:true"]
+        assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/2"]
+        assert asyncio.run(_relation_exists(upgraded, "meme_market_activity_1m")), "0032 stays"
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/3"]
+    command.check(config)
+
+
+_AN_EXTRA_OPERATOR_SET = (
+    "INSERT INTO meme_rule_sets (id, name, version, kind, params, code_ref, exp_ref, status) "
+    "VALUES (:id, 'operator_guard_0033', '1', 'operator', '{}'::jsonb, 'x', NULL, 'active')"
+)
+
+
+def test_0033_refuses_to_upgrade_a_desk_that_already_has_another_active_operator_set(
+    upgraded: str,
+) -> None:
+    """The desk's invariant is asserted after the hand-over: a second active
+    ``operator`` set (planted by hand) makes the upgrade stop — refused, not
+    repaired — and the failed upgrade commits nothing."""
+    config = alembic_config(upgraded)
+    extra = "00000000-0000-4000-8000-000000000a09"
+    command.downgrade(config, MEME_ACTIVITY_REVISION)
+    try:
+        asyncio.run(_write(upgraded, [(_AN_EXTRA_OPERATOR_SET, {"id": extra})]))
+        try:
+            with pytest.raises(DBAPIError, match="2 operator sets are active"):
+                command.upgrade(config, "head")
+            assert asyncio.run(_revision(upgraded)) == MEME_ACTIVITY_REVISION, (
+                "the upgrade must not commit"
+            )
+            assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == [
+                "operator_guard_0033/1",
+                "operator/2",
+            ], "the refused upgrade left operator/2 active and planted nothing"
+        finally:
+            asyncio.run(
+                _write(upgraded, [("DELETE FROM meme_rule_sets WHERE id = :id", {"id": extra})])
+            )
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/3"]

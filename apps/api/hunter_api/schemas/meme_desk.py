@@ -236,6 +236,12 @@ class DeskRowOut(BaseModel):
     token: TokenIdentityOut | None
     rule_set: RuleSetOut | None
     bet: BetOut | None
+    manual_plan: str | None = None
+    """T4.19: ``suggested.manual_plan`` as the loop wrote it at proposal time
+    for an ``operator`` proposal — "Comprar 0,05 SOL de X até HH:MM:SS
+    (proposta expira). Vender até HH:MM (30 min) — antes disso …", every
+    number from the set's params, hours in Brasília; ``None`` on a research
+    proposal or a row older than the plan. Never composed here."""
 
 
 class RuleSetBalanceOut(BaseModel):

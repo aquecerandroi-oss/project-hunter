@@ -1,0 +1,38 @@
+{
+ "EV4JbtMhfJXPsW5pquga1sbQLvXkcdhxHG4Gp25Wpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 2,
+   "volumeUSD": 99.20229804272005,
+   "numUsers": 1,
+   "numBuys": 1,
+   "numSells": 1,
+   "buyVolumeUSD": 49.60028645179046,
+   "sellVolumeUSD": 49.602011590929585,
+   "numBuyers": 1,
+   "numSellers": 1,
+   "priceChangePercent": -2.699026967752155
+  }
+ },
+ "5xXhg6fJWnm2pBwGVzRp5yXYbM2bwywpxgTbgdw1pump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 38,
+   "volumeUSD": 348.89195218762814,
+   "numUsers": 4,
+   "numBuys": 20,
+   "numSells": 18,
+   "buyVolumeUSD": 174.53868366421864,
+   "sellVolumeUSD": 174.35326852340947,
+   "numBuyers": 4,
+   "numSellers": 3,
+   "priceChangePercent": 82.92091711458596
+  }
+ }
+}

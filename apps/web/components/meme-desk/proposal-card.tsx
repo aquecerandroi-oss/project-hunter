@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { MemeDeskRow } from "@/lib/api/meme-desk-types";
 
 import { originLabel, quoteReasonLabel } from "./labels";
+import { ManualPlanBlock } from "./manual-plan-block";
 import { countdownLabel, formatMultiple } from "./meme-desk-format";
 
 function truncate(address: string): string {
@@ -134,7 +135,7 @@ export interface ProposalCardProps {
   onApproveReal: () => void;
 }
 
-/** One proposal awaiting the operator's call: countdown, why the loop proposed it, the quote and the actions (contract §Tela; "Aprovar (REAL)" per T4.17). */
+/** One proposal awaiting the operator's call: countdown, why the loop proposed it, the quote, the loop's hand-execution plan when it wrote one (T4.19/T4.20) and the actions (contract §Tela; "Aprovar (REAL)" per T4.17). */
 export function ProposalCard({ orgSlug, row, nowMs, canOperate, busy, onApprove, onReject, realAvailable, onApproveReal }: ProposalCardProps) {
   const countdown = countdownLabel(row.expires_at, nowMs);
   const expired = countdown.startsWith("expirou");
@@ -152,6 +153,7 @@ export function ProposalCard({ orgSlug, row, nowMs, canOperate, busy, onApprove,
       <ReasonsLine row={row} />
       <QuoteLine row={row} />
       <SuggestedLine row={row} />
+      {row.manual_plan ? <ManualPlanBlock plan={row.manual_plan} mint={row.mint} countdown={countdown} expired={expired} /> : null}
       <Actions canOperate={canOperate} blocked={blocked} busy={busy} onApprove={onApprove} onReject={onReject} realBlocked={realBlocked} onApproveReal={onApproveReal} />
     </li>
   );

@@ -1,0 +1,979 @@
+{
+ "EV4JbtMhfJXPsW5pquga1sbQLvXkcdhxHG4Gp25Wpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 2,
+   "volumeUSD": 99.20229804272005,
+   "numUsers": 1,
+   "numBuys": 1,
+   "numSells": 1,
+   "buyVolumeUSD": 49.60028645179046,
+   "sellVolumeUSD": 49.602011590929585,
+   "numBuyers": 1,
+   "numSellers": 1,
+   "priceChangePercent": -2.699026967752155
+  }
+ },
+ "5xXhg6fJWnm2pBwGVzRp5yXYbM2bwywpxgTbgdw1pump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 38,
+   "volumeUSD": 348.89195218762814,
+   "numUsers": 4,
+   "numBuys": 20,
+   "numSells": 18,
+   "buyVolumeUSD": 174.53868366421864,
+   "sellVolumeUSD": 174.35326852340947,
+   "numBuyers": 4,
+   "numSellers": 3,
+   "priceChangePercent": 82.92091711458596
+  }
+ },
+ "ASZhKk2oK7386psfeaN2n5TKiK8NTz7cdqxAHr2Mpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 157,
+   "volumeUSD": 389.2340399484611,
+   "numUsers": 12,
+   "numBuys": 80,
+   "numSells": 77,
+   "buyVolumeUSD": 194.60076892029747,
+   "sellVolumeUSD": 194.63327102816362,
+   "numBuyers": 12,
+   "numSellers": 11,
+   "priceChangePercent": -97.35808210451884
+  }
+ },
+ "8yPJggWb6mtfp2HmSTZnfKiPLZRTP5GdtgPunG9Bpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 58,
+   "volumeUSD": 2317.649512305548,
+   "numUsers": 25,
+   "numBuys": 28,
+   "numSells": 30,
+   "buyVolumeUSD": 1158.7672433808727,
+   "sellVolumeUSD": 1158.8822689246751,
+   "numBuyers": 25,
+   "numSellers": 25,
+   "priceChangePercent": -17.46922112009413
+  }
+ },
+ "4TotBGER78BH939Fgnup2poGVPuqajqvQum6SqZapump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 72,
+   "volumeUSD": 194.58866480739292,
+   "numUsers": 4,
+   "numBuys": 40,
+   "numSells": 32,
+   "buyVolumeUSD": 97.28752433343884,
+   "sellVolumeUSD": 97.30114047395408,
+   "numBuyers": 4,
+   "numSellers": 4,
+   "priceChangePercent": -57.70550378877426
+  }
+ },
+ "6TeWJ6jxHRP6it6xvR24Qfen5WEe9AeieLRmnSRTpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 26,
+   "volumeUSD": 70.07760492048581,
+   "numUsers": 2,
+   "numBuys": 15,
+   "numSells": 11,
+   "buyVolumeUSD": 35.039904417020075,
+   "sellVolumeUSD": 35.03770050346574,
+   "numBuyers": 2,
+   "numSellers": 2,
+   "priceChangePercent": -24.655752271301104
+  }
+ },
+ "7Xi1ZCim7SBECLRLrC8DT52ei2372uWjFiz3ZBPPpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 89,
+   "volumeUSD": 701.815616,
+   "numUsers": 6,
+   "numBuys": 37,
+   "numSells": 52,
+   "buyVolumeUSD": 350.907809,
+   "sellVolumeUSD": 350.907807,
+   "numBuyers": 5,
+   "numSellers": 6,
+   "priceChangePercent": -99.76014774981647
+  }
+ },
+ "BMZMexDDBcDXG95s9NoJChu9AJehNPxpnzKEs6dBpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 3,
+   "volumeUSD": 83.76648901497596,
+   "numUsers": 1,
+   "numBuys": 2,
+   "numSells": 1,
+   "buyVolumeUSD": 41.923980213335966,
+   "sellVolumeUSD": 41.84250880164,
+   "numBuyers": 1,
+   "numSellers": 1,
+   "priceChangePercent": -2.141627734344402
+  }
+ },
+ "HDdUqMoAFMK4Ab3MNjNkqjw1mCj2E9qNfDCpcJPopump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 150,
+   "volumeUSD": 181.6544971494913,
+   "numUsers": 15,
+   "numBuys": 76,
+   "numSells": 74,
+   "buyVolumeUSD": 91.20807054225362,
+   "sellVolumeUSD": 90.44642660723768,
+   "numBuyers": 15,
+   "numSellers": 13,
+   "priceChangePercent": -98.97057362604897
+  }
+ },
+ "9Trj4kGsEw7yYaQJJaDQytShLedg66nefKxpgM7Dpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 34,
+   "volumeUSD": 108.62243696938843,
+   "numUsers": 3,
+   "numBuys": 21,
+   "numSells": 13,
+   "buyVolumeUSD": 54.33089730090688,
+   "sellVolumeUSD": 54.29153966848156,
+   "numBuyers": 3,
+   "numSellers": 3,
+   "priceChangePercent": 130.16268668569228
+  }
+ },
+ "ART6xJM73HqbFSCmh9BizBa5jgbgttFgt6kYgJzApump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 13,
+   "volumeUSD": 47.88081998096738,
+   "numUsers": 2,
+   "numBuys": 7,
+   "numSells": 6,
+   "buyVolumeUSD": 23.940292419047974,
+   "sellVolumeUSD": 23.94052756191941,
+   "numBuyers": 2,
+   "numSellers": 2,
+   "priceChangePercent": 36.7492626672357
+  }
+ },
+ "4avriyNVMyDNzdatqU5p84q4DsV66cGsCxDUwQLipump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": {
+   "numTxs": 1,
+   "volumeUSD": 0.009977078076265414,
+   "numUsers": 1,
+   "numBuys": 1,
+   "numSells": 0,
+   "buyVolumeUSD": 0.009977078076265414,
+   "sellVolumeUSD": 0,
+   "numBuyers": 1,
+   "numSellers": 0,
+   "priceChangePercent": 0
+  },
+  "24h": {
+   "numTxs": 32,
+   "volumeUSD": 2281.4781404373853,
+   "numUsers": 16,
+   "numBuys": 15,
+   "numSells": 17,
+   "buyVolumeUSD": 1140.637837561966,
+   "sellVolumeUSD": 1140.8403028754192,
+   "numBuyers": 15,
+   "numSellers": 15,
+   "priceChangePercent": -17.191563354965414
+  }
+ },
+ "4K7tjHBDemxpeoakZ8XSLj9tAUELFh4SrTLo3YFCpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 2,
+   "volumeUSD": 2.0167443068710074,
+   "numUsers": 1,
+   "numBuys": 1,
+   "numSells": 1,
+   "buyVolumeUSD": 1.0083966455773672,
+   "sellVolumeUSD": 1.0083476612936404,
+   "numBuyers": 1,
+   "numSellers": 1,
+   "priceChangePercent": -0.06090840226883188
+  }
+ },
+ "93rznv6ZpF8myTsSpFg7Db6W985XVRftDF73RqYRpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 287,
+   "volumeUSD": 565.7958216037191,
+   "numUsers": 3,
+   "numBuys": 153,
+   "numSells": 134,
+   "buyVolumeUSD": 285.927148341947,
+   "sellVolumeUSD": 279.86867326177213,
+   "numBuyers": 3,
+   "numSellers": 2,
+   "priceChangePercent": -94.57364230741273
+  }
+ },
+ "EM8N8uzfDXKh2Tb7WETbiuLEJ2FTU5a98HX2hSBqpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": {
+   "numTxs": 52,
+   "volumeUSD": 134.3876376993523,
+   "numUsers": 6,
+   "numBuys": 26,
+   "numSells": 26,
+   "buyVolumeUSD": 67.43601568105558,
+   "sellVolumeUSD": 66.9516220182967,
+   "numBuyers": 6,
+   "numSellers": 4,
+   "priceChangePercent": -83.73829864169652
+  },
+  "24h": {
+   "numTxs": 164,
+   "volumeUSD": 1141.376006180897,
+   "numUsers": 11,
+   "numBuys": 81,
+   "numSells": 83,
+   "buyVolumeUSD": 571.6096164240306,
+   "sellVolumeUSD": 569.7663897568665,
+   "numBuyers": 11,
+   "numSellers": 9,
+   "priceChangePercent": -97.78589217473582
+  }
+ },
+ "3Vv7w1vhcgVJyazqUxQfziJViVYEv4utYMSFaisopump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 18,
+   "volumeUSD": 305.54146220207645,
+   "numUsers": 2,
+   "numBuys": 12,
+   "numSells": 6,
+   "buyVolumeUSD": 152.77097928416717,
+   "sellVolumeUSD": 152.77048291790925,
+   "numBuyers": 2,
+   "numSellers": 2,
+   "priceChangePercent": 7.429651698426562
+  }
+ },
+ "94MhgGeeP4hDnQyfCModWbVxKG2cunCDqnYqP84epump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 20,
+   "volumeUSD": 50.08819403187357,
+   "numUsers": 2,
+   "numBuys": 11,
+   "numSells": 9,
+   "buyVolumeUSD": 25.085365300852416,
+   "sellVolumeUSD": 25.002828731021154,
+   "numBuyers": 2,
+   "numSellers": 2,
+   "priceChangePercent": -1.7752182881861518
+  }
+ },
+ "f1JKgzoZavGU9FBxkZaeZx76zDjTUH1b97pKZDhpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": {
+   "numTxs": 1,
+   "volumeUSD": 0.001111027836033519,
+   "numUsers": 1,
+   "numBuys": 0,
+   "numSells": 1,
+   "buyVolumeUSD": 0,
+   "sellVolumeUSD": 0.001111027836033519,
+   "numBuyers": 0,
+   "numSellers": 1,
+   "priceChangePercent": 0
+  },
+  "24h": {
+   "numTxs": 29684,
+   "volumeUSD": 147783.45044310857,
+   "numUsers": 2214,
+   "numBuys": 14138,
+   "numSells": 15546,
+   "buyVolumeUSD": 75368.01980572846,
+   "sellVolumeUSD": 72415.43063738011,
+   "numBuyers": 897,
+   "numSellers": 2184,
+   "priceChangePercent": -95.6754549732121
+  }
+ },
+ "A9zxaXiFgUCwoZBHbw4nYm8DFGhZrmDcYzzCT4LDpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 8,
+   "volumeUSD": 520.4082128410328,
+   "numUsers": 2,
+   "numBuys": 6,
+   "numSells": 2,
+   "buyVolumeUSD": 260.134234910067,
+   "sellVolumeUSD": 260.27397793096577,
+   "numBuyers": 2,
+   "numSellers": 2,
+   "priceChangePercent": -6.21578722468383
+  }
+ },
+ "5gE2yGhjWtMp6ypRAhp2JgZJxzRMFbWW7Ggoy13Spump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 120,
+   "volumeUSD": 2305.377681881667,
+   "numUsers": 28,
+   "numBuys": 81,
+   "numSells": 39,
+   "buyVolumeUSD": 1153.0055020478424,
+   "sellVolumeUSD": 1152.3721798338242,
+   "numBuyers": 28,
+   "numSellers": 28,
+   "priceChangePercent": -3.397273131065497
+  }
+ },
+ "C27ejutTy78ErYHtwoBFvVJFXhqu1WcPuDMbj5Xcpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 9,
+   "volumeUSD": 604.7086818020855,
+   "numUsers": 4,
+   "numBuys": 4,
+   "numSells": 5,
+   "buyVolumeUSD": 302.40178363232,
+   "sellVolumeUSD": 302.3068981697655,
+   "numBuyers": 4,
+   "numSellers": 4,
+   "priceChangePercent": -3.265564945663391
+  }
+ },
+ "BJQTYEBMp85bD6m43NqHBYWMtXkiq91F9bXNFcsdpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 36,
+   "volumeUSD": 130.8641517062199,
+   "numUsers": 4,
+   "numBuys": 17,
+   "numSells": 19,
+   "buyVolumeUSD": 65.43208083792065,
+   "sellVolumeUSD": 65.43207086829925,
+   "numBuyers": 4,
+   "numSellers": 4,
+   "priceChangePercent": -83.88676714919737
+  }
+ },
+ "3uvbiyB5chaQBSCDCPiUx5gEJUp5sor96pExmZ7xpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 6,
+   "volumeUSD": 565.0937435116639,
+   "numUsers": 2,
+   "numBuys": 2,
+   "numSells": 4,
+   "buyVolumeUSD": 282.54909092846736,
+   "sellVolumeUSD": 282.5446525831965,
+   "numBuyers": 2,
+   "numSellers": 2,
+   "priceChangePercent": -9.385781161934744
+  }
+ },
+ "G1X3cZAKouKj2sR6ErV7awaGVhWnAcvKrufsDLqWpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 2,
+   "volumeUSD": 4.04277438608,
+   "numUsers": 1,
+   "numBuys": 1,
+   "numSells": 1,
+   "buyVolumeUSD": 2.02148625888,
+   "sellVolumeUSD": 2.0212881272,
+   "numBuyers": 1,
+   "numSellers": 1,
+   "priceChangePercent": -0.14167244967631365
+  }
+ },
+ "i57fXJDGE3ja6aygWnpEo3qXVEoD53RezQiV4uYpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 57,
+   "volumeUSD": 1238.1595945039376,
+   "numUsers": 7,
+   "numBuys": 29,
+   "numSells": 28,
+   "buyVolumeUSD": 619.2868872327099,
+   "sellVolumeUSD": 618.8727072712278,
+   "numBuyers": 7,
+   "numSellers": 7,
+   "priceChangePercent": -8.5802830629587
+  }
+ },
+ "CXL2TxenN6KyM4smaPHJHM9VUAHZkKgKAQZpQzffpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 228,
+   "volumeUSD": 10437.731773670275,
+   "numUsers": 76,
+   "numBuys": 104,
+   "numSells": 124,
+   "buyVolumeUSD": 5219.014380572221,
+   "sellVolumeUSD": 5218.717393098054,
+   "numBuyers": 75,
+   "numSellers": 75,
+   "priceChangePercent": -58.73202328617113
+  }
+ },
+ "C1cLaGwPQwAEv2JjjSYyUCuz467RJavnX7DxqWfApump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 75,
+   "volumeUSD": 94.02266531427291,
+   "numUsers": 3,
+   "numBuys": 38,
+   "numSells": 37,
+   "buyVolumeUSD": 47.00850390751165,
+   "sellVolumeUSD": 47.01416140676127,
+   "numBuyers": 3,
+   "numSellers": 3,
+   "priceChangePercent": -93.67276760157094
+  }
+ },
+ "huQKv1AWxDERv8LopnvgpXaVgMTj3KtkESLoCR7pump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 1,
+   "volumeUSD": 0.48888841518807713,
+   "numUsers": 1,
+   "numBuys": 1,
+   "numSells": 0,
+   "buyVolumeUSD": 0.48888841518807713,
+   "sellVolumeUSD": 0,
+   "numBuyers": 1,
+   "numSellers": 0,
+   "priceChangePercent": 0
+  }
+ },
+ "Fk54Gv6x4gxknN1fU2i7AMqHDXn2WDVNTETxeN6kpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 9,
+   "volumeUSD": 276.69895415902647,
+   "numUsers": 2,
+   "numBuys": 6,
+   "numSells": 3,
+   "buyVolumeUSD": 138.34866997088884,
+   "sellVolumeUSD": 138.3502841881376,
+   "numBuyers": 2,
+   "numSellers": 2,
+   "priceChangePercent": 41.845782373362425
+  }
+ },
+ "CSCgrdYfmRu414WZGSCRzNbZM71ypQvAgXW8CzBEpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 224,
+   "volumeUSD": 757.5736622340322,
+   "numUsers": 11,
+   "numBuys": 125,
+   "numSells": 99,
+   "buyVolumeUSD": 378.89884079656775,
+   "sellVolumeUSD": 378.67482143746446,
+   "numBuyers": 11,
+   "numSellers": 10,
+   "priceChangePercent": -96.57183651133928
+  }
+ },
+ "HSF5odAw15oNYJivZmbyRsAouMZFbmrhncURkQV7pump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 6,
+   "volumeUSD": 407.07162230978554,
+   "numUsers": 3,
+   "numBuys": 3,
+   "numSells": 3,
+   "buyVolumeUSD": 203.48774231796008,
+   "sellVolumeUSD": 203.58387999182548,
+   "numBuyers": 3,
+   "numSellers": 3,
+   "priceChangePercent": -12.135428877525168
+  }
+ },
+ "44h2RJDKJTgtmU2zqzmPQFeBnoeL8UAQDVC1sQ1Npump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 21,
+   "volumeUSD": 2201.4751449310625,
+   "numUsers": 9,
+   "numBuys": 9,
+   "numSells": 12,
+   "buyVolumeUSD": 1100.7310796905158,
+   "sellVolumeUSD": 1100.7440652405467,
+   "numBuyers": 9,
+   "numSellers": 9,
+   "priceChangePercent": -17.380013723935452
+  }
+ },
+ "C1ULKmoUcL4nZmok3tNQRJoED7yAGQuDzvSJ7tBvpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": {
+   "numTxs": 3,
+   "volumeUSD": 63.24112590195,
+   "numUsers": 2,
+   "numBuys": 2,
+   "numSells": 1,
+   "buyVolumeUSD": 58.14112600395,
+   "sellVolumeUSD": 5.099999898,
+   "numBuyers": 2,
+   "numSellers": 1,
+   "priceChangePercent": 3.2712332559282673e-09
+  },
+  "24h": {
+   "numTxs": 4,
+   "volumeUSD": 68.29479117267,
+   "numUsers": 2,
+   "numBuys": 3,
+   "numSells": 1,
+   "buyVolumeUSD": 63.19479127467,
+   "sellVolumeUSD": 5.099999898,
+   "numBuyers": 2,
+   "numSellers": 1,
+   "priceChangePercent": 3.409820714965548
+  }
+ },
+ "Dk5zQnYCKh5XPgxJvEhSy1aSw7SY9h5WndQceU3Fpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 57,
+   "volumeUSD": 1489.8733261268267,
+   "numUsers": 26,
+   "numBuys": 31,
+   "numSells": 26,
+   "buyVolumeUSD": 745.0188950273941,
+   "sellVolumeUSD": 744.8544310994326,
+   "numBuyers": 26,
+   "numSellers": 26,
+   "priceChangePercent": -13.488385420325375
+  }
+ },
+ "7qjGXhfZUEM2xaXJzUZxh4zJSzWSATLKhM2jVn8fpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 29,
+   "volumeUSD": 657.545283,
+   "numUsers": 2,
+   "numBuys": 20,
+   "numSells": 9,
+   "buyVolumeUSD": 328.772642,
+   "sellVolumeUSD": 328.772641,
+   "numBuyers": 2,
+   "numSellers": 2,
+   "priceChangePercent": 135.51777100676256
+  }
+ },
+ "CcCXVh379GKKUEy6vJn6iCi7DQ2JUNcNZVozEHqMShvW": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 5,
+   "volumeUSD": 13.053892287896147,
+   "numUsers": 3,
+   "numBuys": 3,
+   "numSells": 2,
+   "buyVolumeUSD": 6.633858616480002,
+   "sellVolumeUSD": 6.420033671416144,
+   "numBuyers": 3,
+   "numSellers": 2,
+   "priceChangePercent": -0.4000197129719056
+  }
+ },
+ "FhzCGaCjQMZjTBFof86o8sQGPE97QFCFfoVMzR1Hpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 2,
+   "volumeUSD": 4.042691881211418,
+   "numUsers": 1,
+   "numBuys": 1,
+   "numSells": 1,
+   "buyVolumeUSD": 2.021205724411418,
+   "sellVolumeUSD": 2.0214861568,
+   "numBuyers": 1,
+   "numSellers": 1,
+   "priceChangePercent": -0.11802787687390284
+  }
+ },
+ "CmCASXa9CTrEfSeyYPRS95bVyusRDE4UBiqyBn4Apump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 349,
+   "volumeUSD": 370.0345450876767,
+   "numUsers": 19,
+   "numBuys": 181,
+   "numSells": 168,
+   "buyVolumeUSD": 185.18801052670617,
+   "sellVolumeUSD": 184.84653456097053,
+   "numBuyers": 19,
+   "numSellers": 17,
+   "priceChangePercent": -99.89943483195106
+  }
+ },
+ "936i29WzXUzxJw7EDe1AdxcKz2L9qBgSFrVYPCsmpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 221,
+   "volumeUSD": 1014.1880987795971,
+   "numUsers": 22,
+   "numBuys": 116,
+   "numSells": 105,
+   "buyVolumeUSD": 507.1113224303915,
+   "sellVolumeUSD": 507.0767763492056,
+   "numBuyers": 22,
+   "numSellers": 22,
+   "priceChangePercent": -99.48709700279345
+  }
+ },
+ "BKA3NDdbCTK7E97pgmb4vLntexuBKHusfePTHkYNpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 59,
+   "volumeUSD": 1356.3257779470728,
+   "numUsers": 5,
+   "numBuys": 30,
+   "numSells": 29,
+   "buyVolumeUSD": 678.1617611970469,
+   "sellVolumeUSD": 678.1640167500259,
+   "numBuyers": 5,
+   "numSellers": 5,
+   "priceChangePercent": -0.02807173152964215
+  }
+ },
+ "7yqqyHRMsTDeGG22RLDWTSxxMmfdfYWcGC2j8wmipump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 29,
+   "volumeUSD": 681.7263397993294,
+   "numUsers": 6,
+   "numBuys": 23,
+   "numSells": 6,
+   "buyVolumeUSD": 340.863697947685,
+   "sellVolumeUSD": 340.8626418516444,
+   "numBuyers": 5,
+   "numSellers": 5,
+   "priceChangePercent": -2.702025054602046
+  }
+ },
+ "652ABuaPXZVWAb6fA9sVr7GxfiR8jC3PbYMZtUfNpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": {
+   "numTxs": 1,
+   "volumeUSD": 0.10006594424778766,
+   "numUsers": 1,
+   "numBuys": 1,
+   "numSells": 0,
+   "buyVolumeUSD": 0.10006594424778766,
+   "sellVolumeUSD": 0,
+   "numBuyers": 1,
+   "numSellers": 0,
+   "priceChangePercent": 0
+  },
+  "24h": {
+   "numTxs": 12,
+   "volumeUSD": 1528.4389437814648,
+   "numUsers": 6,
+   "numBuys": 6,
+   "numSells": 6,
+   "buyVolumeUSD": 764.2954918301333,
+   "sellVolumeUSD": 764.1434519513314,
+   "numBuyers": 6,
+   "numSellers": 5,
+   "priceChangePercent": -12.436918013889423
+  }
+ },
+ "HjN7Yp1LTn9AGn71RnG8LFLUNqcz5tdRbtLHPgJNpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 154,
+   "volumeUSD": 227.40146913755365,
+   "numUsers": 17,
+   "numBuys": 75,
+   "numSells": 79,
+   "buyVolumeUSD": 113.71196480156874,
+   "sellVolumeUSD": 113.68950433598492,
+   "numBuyers": 17,
+   "numSellers": 16,
+   "priceChangePercent": -99.52218878010807
+  }
+ },
+ "62Ura1173xWeAzbiUysxyK3XzEKi4g5AZNT3HR5cpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": {
+   "numTxs": 1,
+   "volumeUSD": 0.10001124204642647,
+   "numUsers": 1,
+   "numBuys": 1,
+   "numSells": 0,
+   "buyVolumeUSD": 0.10001124204642647,
+   "sellVolumeUSD": 0,
+   "numBuyers": 1,
+   "numSellers": 0,
+   "priceChangePercent": 0
+  },
+  "24h": {
+   "numTxs": 29,
+   "volumeUSD": 2375.902905440718,
+   "numUsers": 13,
+   "numBuys": 16,
+   "numSells": 13,
+   "buyVolumeUSD": 1187.9894349087483,
+   "sellVolumeUSD": 1187.9134705319696,
+   "numBuyers": 13,
+   "numSellers": 12,
+   "priceChangePercent": -14.385251889664639
+  }
+ },
+ "4xyC5TBCAfycmNWda99dYxggvyswo7jkpspnhGt6pump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 7,
+   "volumeUSD": 399.5357122880716,
+   "numUsers": 2,
+   "numBuys": 2,
+   "numSells": 5,
+   "buyVolumeUSD": 199.77481878469325,
+   "sellVolumeUSD": 199.76089350337836,
+   "numBuyers": 2,
+   "numSellers": 2,
+   "priceChangePercent": -8.891936566494143
+  }
+ },
+ "HBLKeRVEzaB1Qozm1SHP4X2toMbRgXSWDVpEF5nFpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 14,
+   "volumeUSD": 3171.0420130363973,
+   "numUsers": 7,
+   "numBuys": 7,
+   "numSells": 7,
+   "buyVolumeUSD": 1585.5388022584605,
+   "sellVolumeUSD": 1585.5032107779368,
+   "numBuyers": 7,
+   "numSellers": 7,
+   "priceChangePercent": -17.169549272651416
+  }
+ },
+ "9pkQ3rMJTyoiVs2ooiYrCErtBEMvjuT8xEDGUzs3pump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 63,
+   "volumeUSD": 913.3785425927618,
+   "numUsers": 22,
+   "numBuys": 22,
+   "numSells": 41,
+   "buyVolumeUSD": 456.6658715581395,
+   "sellVolumeUSD": 456.71267103462236,
+   "numBuyers": 22,
+   "numSellers": 22,
+   "priceChangePercent": -6.259907317914593
+  }
+ },
+ "GqxLgBQyirYwbECzBGc4qXBkEuT4wVcQcvHhTjkSpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 50,
+   "volumeUSD": 734.2670585789907,
+   "numUsers": 6,
+   "numBuys": 23,
+   "numSells": 27,
+   "buyVolumeUSD": 367.14221448818836,
+   "sellVolumeUSD": 367.1248440908023,
+   "numBuyers": 6,
+   "numSellers": 6,
+   "priceChangePercent": 10.849984969359
+  }
+ },
+ "BmdFLup647eygii8QsU5DN274Y65whXzhkXxxmTZpump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": {
+   "numTxs": 15,
+   "volumeUSD": 317.7359029231903,
+   "numUsers": 6,
+   "numBuys": 10,
+   "numSells": 5,
+   "buyVolumeUSD": 12.771406201693418,
+   "sellVolumeUSD": 304.96449672149686,
+   "numBuyers": 3,
+   "numSellers": 5,
+   "priceChangePercent": -12.290969098812141
+  },
+  "24h": {
+   "numTxs": 47,
+   "volumeUSD": 1203.4811774003604,
+   "numUsers": 20,
+   "numBuys": 29,
+   "numSells": 18,
+   "buyVolumeUSD": 623.5786223609169,
+   "sellVolumeUSD": 579.9025550394434,
+   "numBuyers": 20,
+   "numSellers": 18,
+   "priceChangePercent": 0.20115372246399196
+  }
+ },
+ "2y6EJwgMTucx16f49QaTVjJHmrm6oSD8bnzWLYjopump": {
+  "1m": null,
+  "5m": null,
+  "1h": null,
+  "6h": null,
+  "24h": {
+   "numTxs": 6,
+   "volumeUSD": 70.58073379885566,
+   "numUsers": 3,
+   "numBuys": 3,
+   "numSells": 3,
+   "buyVolumeUSD": 35.28863752714109,
+   "sellVolumeUSD": 35.29209627171457,
+   "numBuyers": 3,
+   "numSellers": 3,
+   "priceChangePercent": -0.32983195762190176
+  }
+ }
+}

@@ -182,6 +182,13 @@ class MemeFeatures1m(Base):
             "hype_score IS NULL OR (hype_score >= 0 AND hype_score <= 1)",
             name="hype_score_is_a_fraction",
         ),
+        CheckConstraint(
+            "(tape_source IS NULL) = (tape_window_s IS NULL) "
+            "AND (tape_source IS NULL) = (tape_as_of IS NULL) "
+            "AND (tape_source IS NULL OR tape_source IN ('swap_api_trades', 'activity_1m')) "
+            "AND (tape_source IS NULL OR buys_1m IS NOT NULL)",
+            name="tape_source_is_consistent",
+        ),
         {"postgresql_partition_by": "RANGE (end_time)"},
     )
 
@@ -333,4 +340,11 @@ class MemeFeatures1m(Base):
     ``no_tape_no_board`` when neither source spoke; ``partial`` sits next to a
     number when exactly one did."""
 
+    tape_source: Mapped[str | None] = mapped_column(Text)
+    tape_window_s: Mapped[int | None] = mapped_column(Integer)
+    tape_as_of: Mapped[datetime | None]
+    """``0032`` (T4.2g): ``swap_api_trades`` (the per-mint tape, ``tape_as_of =
+    end_time``) or ``activity_1m`` (the batch route's ``1m`` window ending at
+    ``tape_as_of`` ≤ 60 s before the close, only when the per-mint tape did not
+    cover; buyers count the creator, who sold is unknown). ``NULL`` before ``0032``."""
     computed_at: Mapped[datetime] = mapped_column(server_default=func.now())

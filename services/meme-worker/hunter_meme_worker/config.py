@@ -173,6 +173,26 @@ class MemeConfig:
     ~20/60 s rule every cycle (T4.2f). The cycle's share of the budget is what
     paces now; two in flight is enough for it."""
 
+    activity_enabled: bool = True
+    """``MEME_ACTIVITY_ENABLED`` (T4.2g): the tape by batch — ``POST
+    /v1/coins/market-activity/batch``, 50 coins a request, once a minute for
+    every tracked coin (``activity.py``). Needs the ``swap-api`` switch: it
+    spends the same Cloudflare budget, reserved off the top of the tape's."""
+
+    activity_cycle_s: float = 60.0
+    activity_lead_s: float = 3.0
+    """``MEME_ACTIVITY_CYCLE_S`` (≥ 15) and ``MEME_ACTIVITY_LEAD_S``: the loop
+    fires ``lead_s`` before each grid instant, so the ``1m`` window a response
+    describes ends a few seconds before the minute the fold judges."""
+
+    activity_max_age_s: float = 60.0
+    """A batch reading feeds a minute or an instant only if its window ended
+    less than this before it — one cycle; older is not the tape of that minute."""
+
+    activity_quote_max_age_s: float = 300.0
+    """The SOL/USD quote the batch's USD is turned into SOL with, at most five
+    minutes old; beyond that the row says ``no_sol_quote``."""
+
     chain_curves_enabled: bool = True
     """``MEME_CHAIN_CURVES_ENABLED`` (T4.2f): the curve of every tracked mint from
     the chain once a minute (``chain.py``), ``source = 'solana_rpc'``, stamped
@@ -279,6 +299,9 @@ def load_config(settings: Settings) -> MemeConfig:
         swap_api_budget_60s=_int_env("MEME_SWAP_API_BUDGET_60S", 16),
         trades_concurrency=max(1, _int_env("MEME_TRADES_CONCURRENCY", 2)),
         risk_enabled=_bool_env("MEME_RISK_ENABLED", default=True),
+        activity_enabled=_bool_env("MEME_ACTIVITY_ENABLED", default=True),
+        activity_cycle_s=float(max(15, _int_env("MEME_ACTIVITY_CYCLE_S", 60))),
+        activity_lead_s=float(max(0, min(30, _int_env("MEME_ACTIVITY_LEAD_S", 3)))),
         chain_curves_enabled=_bool_env("MEME_CHAIN_CURVES_ENABLED", default=True),
         fast_lane_enabled=_bool_env("MEME_FAST_LANE_ENABLED", default=True),
         rest_mayhem_refresh_s=max(60, _int_env("MEME_REST_MAYHEM_REFRESH_S", 300)),

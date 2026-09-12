@@ -90,6 +90,12 @@ class Fast15sRow:
     dev_share_reason: str | None
     snipers: int | None
     snipers_reason: str | None
+    tape_source: str | None = None
+    tape_window_s: int | None = None
+    tape_as_of: datetime | None = None
+    """``0032`` (T4.2g): the per-mint tape (``swap_api_trades``, window ending
+    at ``as_of``) or the batch route's ``1m`` window (``activity_1m``, ending
+    at ``tape_as_of`` ≤ ``as_of``); ``NULL`` together without a tape."""
 
 
 def _age_s(as_of: datetime, created_at: datetime | None) -> int | None:
@@ -155,6 +161,9 @@ def build_fast_row(
         snipers_reason=(
             None if latest is not None and latest.snipers is not None else NO_HOLDERS_READER
         ),
+        tape_source=None if tape is None or tape.as_of is None else tape.source,
+        tape_window_s=None if tape is None or tape.as_of is None else tape.window_s,
+        tape_as_of=None if tape is None else tape.as_of,
     )
 
 

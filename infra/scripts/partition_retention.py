@@ -83,6 +83,11 @@ def retention_days(settings: Settings | None = None) -> dict[str, int | None]:
         # diary of the week, not the quarter. On monthly partitions "7 days"
         # means the month is dropped once its end is more than seven days old.
         "meme_features_15s": 7,
+        # The batch route's per-window counts (0032, T4.2g): two windows a
+        # minute per tracked coin, ~375 k rows a day. Thirty days: the minute's
+        # features keep the numbers the gate judged for the full window above;
+        # these rows are the source's word behind them, kept for a month.
+        "meme_market_activity_1m": 30,
     }
     for label, days in candles.items():
         policy[list_partition_name("candles", label)] = days

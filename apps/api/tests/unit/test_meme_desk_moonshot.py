@@ -95,7 +95,7 @@ def test_dead_is_in_the_exit_vocabulary_and_the_mark_sources_are_two() -> None:
     assert "dead" in get_args(ExitReason)
     assert EXIT_REASON_PT["dead"] == "morta", "the tests record and its CSV print the word"
     assert set(get_args(MarkSource)) == {"curve", "pool_tape"}
-    assert OPERATOR_RULE_SET == ("operator", "2"), "0029 retired operator/1"
+    assert OPERATOR_RULE_SET == ("operator", "3"), "0029 retired operator/1; 0033 operator/2"
 
 
 # ---- the desk on a database still at 0028 ------------------------------------------------

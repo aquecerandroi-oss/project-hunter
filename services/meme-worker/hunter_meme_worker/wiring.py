@@ -22,14 +22,23 @@ from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_exchanges.pumpfun.indexer_rest import AdvancedIndexerClient
+from hunter_exchanges.pumpfun.rest import PumpFunRestClient
 from hunter_exchanges.pumpfun.swap_api import MEASURED_LIMIT, SwapApiClient
 from hunter_exchanges.pumpfun.trenches import TrenchesWsClient
+from hunter_exchanges.rate_limit import TokenBucketRateLimiter
+from hunter_meme_worker.activity import ActivityPuller
 from hunter_meme_worker.boards import BoardCollector
 from hunter_meme_worker.config import TRENCHES_STREAM
 from hunter_meme_worker.metrics import meme_gaps_total, meme_rows_total, meme_source_messages_total
 from hunter_meme_worker.repo import GapRow, record_gap, upsert_token
 from hunter_meme_worker.risk import RiskReader
-from hunter_meme_worker.sources import INDEXER_RISK, SWAP_API, TRENCHES_WS, SourcesState
+from hunter_meme_worker.sources import (
+    INDEXER_RISK,
+    SWAP_API,
+    SWAP_API_ACTIVITY,
+    TRENCHES_WS,
+    SourcesState,
+)
 from hunter_meme_worker.tracker import (
     TIER_GRADUATING,
     TIER_NEW,
@@ -50,6 +59,9 @@ logger = get_logger(__name__)
 
 WORKER_ROLE = "hunter_worker"
 HeartbeatWriter = Callable[[dict[str, str]], Awaitable[None]]
+SOL_PRICE_BUDGET_PER_MINUTE = 50
+"""``/sol-price`` is its own upstream rate-limit group (50/60 s, ``docs/PUMPFUN.md``
+§1.4): the batch loop's quote client gets its own bucket, like the Lab's."""
 
 
 def build_sources(config: MemeConfig) -> SourcesState:
@@ -61,7 +73,35 @@ def build_sources(config: MemeConfig) -> SourcesState:
     sources[SWAP_API].budget_60s = min(config.swap_api_budget_60s, MEASURED_LIMIT)
     sources[INDEXER_RISK].enabled = config.risk_enabled
     sources[INDEXER_RISK].budget_60s = 60
+    sources[SWAP_API_ACTIVITY].enabled = config.swap_api_enabled and config.activity_enabled
+    sources[SWAP_API_ACTIVITY].budget_60s = -(-config.tracked_max // 50)  # calls a minute, ceil
     return sources
+
+
+def build_activity(
+    config: MemeConfig,
+    sources: SourcesState,
+    trades: TradesPuller | None,
+    client: SwapApiClient | None,
+) -> ActivityPuller | None:
+    """The tape by batch (T4.2g), on the tape's own client and budget: the
+    same host, the same edge rule, one reservation off the top."""
+    if trades is None or client is None or not config.activity_enabled:
+        return None
+    return ActivityPuller(
+        client,
+        budget=trades.budget,
+        quotes=PumpFunRestClient(
+            rate_limiter=TokenBucketRateLimiter(
+                "pumpfun_sol_price_activity",
+                capacity=SOL_PRICE_BUDGET_PER_MINUTE,
+                refill_period_s=60.0,
+            )
+        ),
+        sources=sources,
+        max_age_s=config.activity_max_age_s,
+        quote_max_age_s=config.activity_quote_max_age_s,
+    )
 
 
 def build_boards(
@@ -73,12 +113,22 @@ def build_boards(
     return BoardCollector(tracker, boards=config.boards), clients
 
 
-def build_trades(config: MemeConfig, sources: SourcesState) -> TradesPuller | None:
+def build_swap_api(config: MemeConfig) -> SwapApiClient | None:
+    """The one ``swap-api`` client: the tape and the batch loop (T4.2g) share
+    it, and with it the bucket and the edge's rule."""
+    if not config.swap_api_enabled:
+        return None
+    return SwapApiClient(capacity=min(max(1, config.swap_api_budget_60s), MEASURED_LIMIT))
+
+
+def build_trades(
+    config: MemeConfig, sources: SourcesState, client: SwapApiClient | None = None
+) -> TradesPuller | None:
     if not config.swap_api_enabled:
         return None
     capacity = min(max(1, config.swap_api_budget_60s), MEASURED_LIMIT)
     return TradesPuller(
-        SwapApiClient(capacity=capacity),
+        client or SwapApiClient(capacity=capacity),
         budget_60s=capacity,
         cycle_s=config.trades_cycle_s,
         max_pages=config.trades_max_pages,

@@ -992,6 +992,94 @@ cadeia) — 38 verdes com Postgres; worker unit 205; ruff/format/pyright 0; `che
 `source_stats.py`, `warmup.py`, `lab_pins.py` nasceram do teto de 350). A agente foi cortada pelo limite semanal no
 passo do pyright; o orquestrador fechou os três erros de tipo restantes (`RowMapping`, `iso_or_none`) e commitou.
 
+### T4.2g — a fita por lote: `POST /v1/coins/market-activity/batch` no lugar da fita por mint (entregue 12/09/2026)
+
+**Fatos que a motivaram** (T4.2f, medido): o `swap-api` é limitado pelo Cloudflare a ~20 req/60 s por IP;
+16 pulls/min × 180 s de frescor ÷ ~130 rastreados ≈ 40 % de `tape_coverage_pct`; a porta `flow_v2/1` (EXP-M5)
+recusava ~100 de ~110 moedas jovens por tick como `buyers_unknown`/`sells_ratio_unknown`/`flow_not_polled`.
+
+**O lote, medido (17:24–17:25 BRT, 5 requisições, `docs/PUMPFUN.md` §2):** máximo **50 endereços por
+requisição** (400 nomeado em 140 e 100; 201 em 50, 982 ms, 17 KB), as **10 métricas** aceitas (compras, vendas,
+compradores, vendedores, volumes USD), janelas `1m`/`5m`/`1h`/`6h`/`24h` ecoadas; **janela sem trade = `null`**
+(50/50 em `24h`, 7/50 em `6h`, 0/50 nas curtas — moedas de 7 h); sem carimbo próprio (`Date` da resposta = fim das
+janelas); USD, não SOL; não diz quem negociou. **Não provado:** `1m` não-nulo numa moeda ativa — a 5.ª requisição
+foi gasta numa lista vazia (bug da sonda, não da API); o validador aceita `1m`, e a evidência de `6h` mostra que
+`null` = janela vazia numa janela suportada.
+
+**O que mudou:**
+1. **Adaptador:** `market_activity.py` (`NormalizedMarketActivity`, `ActivityBatch` com `windows_live`, `empty`,
+   `missing`, `malformed`; `parse_activity_batch`; `response_stamp`) e `SwapApiClient.market_activity_batch` — recusa
+   > 50 antes de gastar, uma requisição do **mesmo** bucket; `rate_shared.request_json_with_budget` (POST, devolve
+   cabeçalhos; 4xx carrega a mensagem do validador). Fixtures reais `t42g_*`; 6 testes offline.
+2. **Schema `0032_meme_activity`** (`docs/DATABASE.md` §44): `meme_market_activity_1m` (RANGE mensal por `end_time`,
+   PK `(end_time, mint, window_name)`, retenção 30 d; contagens e USD como entregues, SOL derivado com `sol_usd` +
+   `sol_usd_observed_at` ao lado, `empty` para o zero declarado) e `tape_source`/`tape_window_s`/`tape_as_of` nas
+   duas séries (`swap_api_trades` | `activity_1m`; um CHECK por série). Descida recusa com linhas do lote ou linhas
+   dobradas dele. **Cadeia: `0032` senta na `0031_meme_lab_ticks`; a `0033` (T4.19) senta nesta.**
+3. **Worker:** laço `meme-activity` (`activity.py`, `repo_activity.py`) alinhado a **3 s antes** de cada fecho
+   (`MEME_ACTIVITY_LEAD_S`), todos os rastreados na curva em lotes de 50, `TapeBudget.reserve` tira as chamadas do
+   lote do topo do orçamento da fita (16 → 13 para apostas abertas/`graduating`), 429 real mede/encolhe/bloqueia e o
+   lote não dispara no bloqueio; cotação `/sol-price` em bucket próprio, ≤ 1/min, válida 5 min. `fold.py` e
+   `fast_lane.py`: a fita por mint primeiro; sem ela, a leitura `1m` mais nova com `received_at <= instante` e fim
+   há < 60 s (`features_tape.activity_minute`/`activity_for`), `creator_net_seller_reason = no_trade_feed`,
+   `unique_buyers` com o criador; **um `null` de `1m` só vira zero num ciclo em que alguma moeda teve `1m`
+   preenchido** — senão nada é escrito e o heartbeat conta `activity_dark_60s`. Motivo novo: `no_sol_quote`.
+4. **Heartbeat/API:** `activity_coverage_pct`, `activity_batch_calls_60s`, `activity_mints`, `activity_covered`,
+   `activity_live_1m`, `activity_dark_60s`, `activity_skipped_60s`, `activity_cycle_s`, `activity_quote_age_s`,
+   `tape_activity_pct`; fonte `swap_api_activity` (tabela-testemunha `meme_market_activity_1m`); `GET /meme/sources`
+   expõe todos. `tape_coverage_pct` passa a contar fita **ou** lote — a meta ≥ 90 % se prova na VPS com
+   `infra/scripts/sql/research/2026-09-12-t42g-cobertura.sql` (§1 antes × depois, §4 a prova da janela `1m` viva,
+   §6 o orçamento por minuto ≤ 16, §7 as recusas do portão por tick).
+
+**Provas:** adaptador 170 (6 novos), worker unit 221 (`test_activity.py` 8, `test_sources.py` +1), API 121 (+1),
+core com Postgres (`0032` sobe/recusa/reverte, pais particionados, `alembic check`, grants), testcontainer do worker
+`test_activity_persistence.py` (linhas do lote com CHECKs, dedupe por instante, o fold com `activity_1m` e o
+look-ahead, a linha de 15 s); ruff/format/pyright 0; `check_file_size` 0 acima. Env: `MEME_ACTIVITY_ENABLED`,
+`MEME_ACTIVITY_CYCLE_S`, `MEME_ACTIVITY_LEAD_S` (`docs/DEPLOYMENT.md`). Notas: `.claude/state/notes-T4.2g.md`.
+
+**Pendências declaradas:** (a) a prova de `1m` viva vem da VPS (`activity_live_1m > 0` no 1.º minuto); se a janela
+ficar escura, a `5m` já está gravada em `meme_market_activity_1m` e uma T4.2g-b acrescenta `*_5m` às features com o
+portão lendo `curve_volume_5m_sol` explicitamente — nunca dividido por 5; (b) a série de 15 s recebe uma janela
+com até 60 s de atraso (`tape_as_of` diz quanto) — `MEME_ACTIVITY_CYCLE_S=30` reduz para 30 s ao custo de
+6 req/min; (c) rótulos do `apps/web` para os campos novos ficam fora desta tarefa.
+
+### T4.19 — `operator/3`: a mesa propõe pela porta E1 e cada proposta traz o plano para executar à mão (entregue 12/09/2026)
+
+**Diretiva** (Everton, 12/09 17:3x BRT): "coloca aí qual entra, quanto comprar e na mesma hora qual horário vender". Brief:
+`.claude/state/brief-T4.19-operador-3-porta-e1-na-mesa.md`. O teste real é à mão, com a carteira observada (T4.12) gravando
+a compra/venda; a mesa propunha pelo `operator/2` (porta da EXP-M1, reprovada 9/9) e os sinais da porta escolhida pelo
+estudo das 21 apostas — E1 (`flow_v2/1`, EXP-M5) com E2 (pedigree, EXP-M6) — eram `research_only` e não chegavam à mesa.
+
+**1. `operator/3`** (`0033_meme_operator_3`, `docs/DATABASE.md` §45 — a `0032` já era da T4.2g quando esta nasceu):
+`FLOW_V2_PARAMS` composto em SQL (`jsonb ||`, nunca copiado) com `ttl_s = 180` e `max_open_positions = 2`; os outros
+números do brief (0,05 SOL; 3×; trailing 35 % após 1,5×; 1 800 s; `max_loss` 50 %; `line_broken` quando houver linha;
+`creator_dump` sempre) reafirmados na sobreposição. `operator/2` aposentado **antes** do insert; a descida reverte os dois
+e recusa enquanto houver proposta/aposta sob `operator/3`. `RuleSetSpec.ttl_s` (novo, opcional): a proposta ao operador
+expira em 180 s; todo conjunto antigo continua nos 120 s do laço.
+
+**2. Plano para executar à mão** (`suggested.manual_plan`, `proposals_plan.py`, gravado na hora da proposta para todo
+conjunto `operator`): "Comprar 0,05 SOL de <TICKER> até HH:MM:SS (proposta expira). Vender até HH:MM (30 min) — antes disso
+se triplicar (3×), se recuar 35 % do topo depois de 1,5×, se cair pela metade (−50 %), se o dev vender, ou se a linha de
+suporte quebrar." Cada número vem dos `params` (`size_sol`, `ttl_s`, `max_hold_s`, `target_x`, `trailing_pct`,
+`trailing_arm_x`, `max_loss_pct`, `exit_on_line_break`), as horas de `proposed_at + ttl_s` e `+ max_hold_s` em
+America/Sao_Paulo, `<TICKER>` = `meme_tokens.symbol` (`GateRow.symbol`, lido nos dois loaders; mint abreviado sem
+identidade). Palavras só onde o número as tem (2× "dobrar", 3× "triplicar", 50 % "pela metade"); fora disso "chegar a
+N×"/"cair N %". A API expõe `DeskRowOut.manual_plan` (`GET /desk` e `ProposalOut.row`; `pnpm gen:types` regenerado);
+`null` em proposta de pesquisa ou linha anterior. **A cláusula do trailing não estava na frase do brief** — entrou pelo
+must-fix da Astra (o motor vende um recuo 2× → 1,3×; quem seguisse só o texto seguraria), lida de `trailing_pct` /
+`trailing_arm_x`.
+
+**3. O laço:** nada novo — a porta de 15 s já corria todo conjunto `15s`; `operator/3` entra no mesmo passo, sobre a mesma
+linha e o mesmo pedigree que `flow_v2/1`, e propõe a **mesma moeda no mesmo tique** (`proposed`, 180 s); aprovada, fill na
+fotografia seguinte pelo caminho de sempre (`fill_approved`).
+
+**Provas:** `test_proposals_operator_3.py` (7: mesma moeda/mesma decomposição, 180 s vs 120 s, mesmas recusas, plano
+verbatim, ticker/mint, números dos params), `test_lab_operator_3.py` (2, Postgres: semente = porta do `flow_v2/1`,
+`operator/2` fora dos ativos; mesma moeda no mesmo tique, `manual_plan` persistido, aprovação → fill em 15 s,
+`decision_to_fill_s = 2`), `test_migrations.py -k 0033` (3: semente e aposentadoria, descida recusada com
+proposta/aposta, reversão limpa), `test_meme_desk_manual_plan.py` (2). `test_lab_moonshot.py` passa a ler `operator/2`
+como aposentado. **Pendente (`apps/web`, T4.17):** mostrar `row.manual_plan` no cartão da proposta.
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets

@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from hunter_exchanges.pumpfun.rpc import CurveBatch, MayhemFlowBatch
     from hunter_exchanges.pumpfun.rpc_wallet import SignatureInfo
     from hunter_exchanges.pumpfun.ws import ConnectionState, MemeEvent
+    from hunter_meme_worker.activity import ActivityPuller
     from hunter_meme_worker.boards import BoardCollector
     from hunter_meme_worker.config import MemeConfig
     from hunter_meme_worker.graduation import GlobalParamsStore
@@ -154,3 +155,7 @@ class RadarContext:
     wallets: WalletsWatcher | None = None
     """The observed wallets (T4.12, ``wallets.py``): ``None`` when
     ``MEME_WATCH_WALLETS`` is empty — no loop, and the readiness body says so."""
+    activity: ActivityPuller | None = None
+    """The tape by batch (T4.2g, ``activity.py``): ``None`` when
+    ``MEME_ACTIVITY_ENABLED`` or the ``swap-api`` itself is off — the folds
+    then read only the per-mint tape, and every row without one says why."""

@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { MemeSourcesPanel } from "@/components/meme/meme-sources-panel";
 import type { MemeSources } from "@/lib/api/meme-types";
 
-import { sourcesPayload } from "./meme-sources-format.test";
+import { source, sourcesPayload } from "./meme-sources-format.test";
 
 afterEach(cleanup);
 
@@ -86,6 +86,20 @@ describe("MemeSourcesPanel (full)", () => {
     expect(screen.getByText(/42 moedas < 5 min no relógio de 15 s/)).toBeInTheDocument();
     expect(screen.getByText(/decisão → fill p50 \(medido\) 3.2 s/)).toBeInTheDocument();
   });
+
+  // T4.2g / T4.20: the batch tape (`swap_api_activity`) and its heartbeat counters.
+  it("shows nothing about the batch tape for a worker that predates it (never an empty line)", () => {
+    render(<MemeSourcesPanel sources={sourcesPayload()} />);
+    expect(screen.queryByText(/fita por lote/)).not.toBeInTheDocument();
+  });
+
+  it("names the batch tape source and its counters once the worker reports them", () => {
+    const batch = source({ name: "swap_api_activity", status: "ok", used_60s: 3, budget_60s: 3 });
+    render(<MemeSourcesPanel sources={sourcesPayload({ sources: [source(), batch], activity_mints: 130, activity_live_1m: 98, activity_dark_60s: 0, tape_activity_pct: 12.5 })} />);
+    expect(screen.getByText("fita por lote (swap-api)")).toBeInTheDocument();
+    expect(screen.getByText(/moedas no lote 130 · janela de 1 min viva 98 · lote sem janela de 1 min \(60 s\) 0/)).toBeInTheDocument();
+    expect(screen.getByText(/cobertura da fita por lote 12.5%/)).toBeInTheDocument();
+  });
 });
 
 describe("MemeSourcesPanel (line)", () => {
@@ -104,5 +118,11 @@ describe("MemeSourcesPanel (line)", () => {
     render(<MemeSourcesPanel sources={sourcesPayload({ tape_coverage_pct: null, fold_rows: 0 })} variant="line" />);
     const missing = screen.getByTitle("sem leitura: o último minuto dobrado não tem linhas");
     expect(missing).toHaveTextContent("fita sem leitura");
+  });
+
+  it("line: the batch tape's counters ride the same line, prefixed, with the full text in the title", () => {
+    render(<MemeSourcesPanel sources={sourcesPayload({ activity_mints: 130, activity_live_1m: 98 })} variant="line" />);
+    const line = screen.getByTitle("moedas no lote 130 · janela de 1 min viva 98");
+    expect(line).toHaveTextContent("fita por lote: moedas no lote 130 · janela de 1 min viva 98");
   });
 });

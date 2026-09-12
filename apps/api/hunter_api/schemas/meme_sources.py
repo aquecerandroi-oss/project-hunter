@@ -44,9 +44,15 @@ COVERAGE_EXPLANATION = (
     "leitura on-chain de MayhemState, mayhem_pending conta quantas); desde a T4.2f a curva de "
     "todos os rastreados vem da cadeia uma vez por minuto (chain_read_mints ÷ chain_tracked_mints) "
     "e a fita é limitada pela regra do Cloudflare do swap-api (~20 req/60 s por IP, medida — "
-    "swap_api_effective_budget_60s é o orçamento em vigor), não pelo x-ratelimit-limit de 1000"
+    "swap_api_effective_budget_60s é o orçamento em vigor), não pelo x-ratelimit-limit de 1000; "
+    "desde a T4.2g a fita por lote (POST market-activity/batch, 50 moedas por requisição, "
+    "activity_batch_calls_60s dentro do mesmo orçamento) preenche buys/sells/compradores do "
+    "minuto quando a fita por mint não cobriu (tape_source = activity_1m; tape_activity_pct é a "
+    "fração das linhas que vieram do lote; activity_dark_60s conta moedas cuja janela 1m veio "
+    "nula num ciclo em que ninguém a teve preenchida — nada é escrito como zero nesse caso; "
+    "no_sol_quote = o lote falou em USD e não havia cotação SOL/USD com menos de 5 min)"
 )
-"""T4.2e/T4.2f: what the coverage numbers are and where the missing rows explain themselves."""
+"""T4.2e/T4.2f/T4.2g: what the coverage numbers are and where the missing rows explain themselves."""
 
 RadarStatus = Literal["alive", "stale", "never", "heartbeat_missing", "redis_unavailable"]
 """The worker's own heartbeat fields: ``alive`` when ``sources_at`` is fresh,
@@ -166,5 +172,25 @@ class MemeSourcesOut(BaseModel):
     lab_bets_indeterminate_total: int | None = None
     """T4.16: bets closed without a photo to price them (``outcome_quality =
     indeterminate``), from the rows — left out of every sum of R/PnL."""
+    tape_activity_pct: float | None = None
+    """T4.2g: rows of the last folded minute whose tape came from the batch
+    route (``tape_source = activity_1m``) over its rows; ``tape_coverage_pct``
+    counts both sources. ``None`` from a worker that predates T4.2g."""
+    activity_coverage_pct: float | None = None
+    """Coins with a ``1m`` reading (a number or a stated zero) over the coins
+    the batch loop asked for in its last cycle."""
+    activity_mints: int | None = None
+    activity_covered: int | None = None
+    activity_live_1m: int | None = None
+    """Coins the route filled ``1m`` for (non-null) in the last cycle: the
+    proof the window is computed; ``0`` with ``activity_dark_60s > 0`` means
+    the route answered ``null`` for everyone and nothing was written as a zero."""
+    activity_batch_calls_60s: int | None = None
+    activity_dark_60s: int | None = None
+    activity_skipped_60s: int | None = None
+    """Cycles the loop skipped in the last minute because the edge's block was in force."""
+    activity_cycle_s: float | None = None
+    activity_quote_age_s: float | None = None
+    """Age of the SOL/USD quote the batch's USD was turned into SOL with."""
     coverage_explanation: str = COVERAGE_EXPLANATION
     sources: list[MemeSourceOut]

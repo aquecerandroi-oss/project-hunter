@@ -162,6 +162,15 @@ def _meme_gate_tables(name: str) -> tuple[str, ...]:
     return cast(tuple[str, ...], getattr(migration_ddl("meme_gate_v2"), name))
 
 
+def _meme_activity_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0032_meme_activity``'s lists in ``ddl/meme_activity.py`` (T4.2g).
+
+    It adds no class: ``meme_market_activity_1m`` is read-only for ``hunter_app``
+    and append-only for ``hunter_worker`` — the ``meme_trades`` shape.
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("meme_activity"), name))
+
+
 def _meme_lab_tick_tables(name: str) -> tuple[str, ...]:
     """The same, for ``0031_meme_lab_ticks``'s lists in ``ddl/meme_lab_ticks.py`` (T4.15).
 
@@ -465,6 +474,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     meme_live_sell_request = _meme_live_tables("MEME_LIVE_APP_SELL_REQUEST_TABLES")
     meme_lab_ticks_read_only = _meme_lab_tick_tables("MEME_LAB_TICKS_APP_READ_ONLY_TABLES")
     meme_gate_read_only = _meme_gate_tables("MEME_GATE_APP_READ_ONLY_TABLES")
+    meme_activity_read_only = _meme_activity_tables("MEME_ACTIVITY_APP_READ_ONLY_TABLES")
 
     classified = (
         list(write)
@@ -491,6 +501,7 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(meme_live_sell_request)
         + list(meme_lab_ticks_read_only)
         + list(meme_gate_read_only)
+        + list(meme_activity_read_only)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 

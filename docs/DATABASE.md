@@ -6826,3 +6826,135 @@ volta à da `0027` (`ddl/meme_wallets.recreate_scoreboard_0027`), a tabela e as 
 | `GET /api/v1/orgs/{org}/meme/{sources,desk,tests,lab}` | `fast_lane_*`, `lab_decision_to_fill_s_*`, `lab_bets_indeterminate_total`; `BetOut.outcome_quality`/`decision_to_fill_s`; `/tests`: `outcome_quality` + rótulo "indeterminado (sem fotografia)" e `totals.indeterminate`; `/lab`: `indeterminate`. As colunas da `0030` ficam **fora** da `Table` compartilhada e são lidas por sonda (`repositories/meme_desk_quality.py`, o padrão da `0029`) |
 | `infra/scripts` | `meme_reclassify_indeterminate.py`, `meme_rule_set.py`, `meme_ops_db.py`; `partition_retention.py` (7 d) |
 | `apps/web` | rótulos pendentes (fora desta tarefa): ver `docs/plans/T4-MEME-RADAR.md` §T4.16 |
+
+## 44. A fita por lote — M4 (`0032_meme_activity`)
+
+Trigésima segunda revisão (sobre a `0031_meme_lab_ticks`, T4.15; a `0033_meme_operator_3` da T4.19 — §45 — senta
+sobre esta). **Uma tabela** particionada (`meme_market_activity_1m`) e **três colunas** em cada uma das duas séries de
+features (`meme_features_1m`, `meme_features_15s`) com um CHECK por série e **sem backfill**. Nenhum enum, vista,
+política ou grant novo além dos da tabela; nada tocado na `0022`–`0031`. Entrega a T4.2g
+(`docs/plans/T4-MEME-RADAR.md` §T4.2g): a fita por mint (`meme_trades`, §35) é limitada pelo Cloudflare a ~20 req/60 s
+por IP (T4.2f, medido) e cobria ~40 % das linhas que a porta lê; `POST /v1/coins/market-activity/batch` conta 50 moedas
+por requisição (`docs/PUMPFUN.md` §2, medido em 12/09 17:24 BRT), e 3 requisições/min cobrem o conjunto inteiro.
+
+### 44.1 A tabela — `meme_market_activity_1m`
+
+```
+meme_market_activity_1m         PARTITION BY RANGE (end_time), mensal, retenção 30 d
+  PK (end_time, mint, window_name)
+  window_s, received_at, source DEFAULT 'swap_api:market-activity/batch', empty DEFAULT false,
+  num_txs, buys, sells, unique_users, unique_buyers, unique_sellers,
+  volume_usd, buy_volume_usd, sell_volume_usd, price_change_pct,
+  sol_usd, sol_usd_observed_at, buy_volume_sol, sell_volume_sol
+  INDEX (mint, end_time)
+```
+
+| coluna | definição |
+|---|---|
+| `end_time` | o **fim da janela** — o cabeçalho `Date` da resposta (segundo inteiro): a rota não carrega carimbo próprio. Chave de partição, primeira na PK (§15.2) |
+| `window_name`, `window_s` | `1m` \| `5m` \| `1h` \| `6h` \| `24h` (`window_is_a_known_label`) e o comprimento em segundos; o worker pede `1m` e `5m` (`window` é palavra reservada, daí o sufixo) |
+| `received_at` | quando a resposta chegou — o relógio da não-antecipação |
+| `empty` | `true`: a rota respondeu `null` para a janela (sem trade) **num ciclo em que a mesma janela veio preenchida para outra moeda** — um zero declarado (`an_empty_window_is_all_zeros`). Um `null` numa janela que ninguém teve preenchida **não gera linha** (a janela está "escura", `activity_dark_60s` no heartbeat) |
+| contagens | como a rota disse: `unique_buyers` **inclui o criador** (a rota não diz quem negociou); `counts_are_not_negative` |
+| `*_usd` | USD, como entregue (`volumes_are_not_negative`); `price_change_pct` como a rota diz (percentual, com sinal), `NULL` numa janela vazia |
+| `sol_usd`, `sol_usd_observed_at`, `*_sol` | os SOL **derivados** (USD ÷ cotação de `/sol-price`) com a cotação e o instante dela ao lado; `NULL` juntos sem cotação com < 5 min (`sol_figures_name_their_quote`, `quote_is_positive`) |
+
+Global e sem RLS (§1.1). `hunter_worker` `SELECT`/`INSERT` (`ON CONFLICT (end_time, mint, window_name) DO NOTHING` —
+o mesmo instante duas vezes é uma linha); `hunter_app` `SELECT`; filhas revogadas (o padrão da `0021`). Partições
+iniciais 2026-09…12 (`MEME_INITIAL_MONTHS_0032`); depois, `create_partitions.py`. Retenção **30 d** em
+`partition_retention.py` (declarado: 2 janelas × ~130 moedas × 1 440 min ≈ 375 k linhas/dia; as features guardam
+os números que o portão julgou pelo `MEME_RETENTION_DAYS` inteiro — estas linhas são a palavra da fonte por trás
+deles, por um mês).
+
+### 44.2 A procedência da fita — `tape_source`, `tape_window_s`, `tape_as_of` nas duas séries
+
+| coluna | `meme_features_1m` | `meme_features_15s` |
+|---|---|---|
+| `tape_source` | `swap_api_trades` (a fita por mint dobrada sobre `(end_time − 60 s, end_time]`) ou `activity_1m` (a janela `1m` do lote, usada **só** quando a fita por mint não cobriu o minuto) | idem, com `as_of` no lugar de `end_time` |
+| `tape_window_s` | `60` | `60` |
+| `tape_as_of` | o fim da janela: `end_time` para a fita por mint; o `Date` da resposta do lote (≤ 60 s antes do fecho — o laço dispara 3 s antes de cada minuto) | `as_of` para a fita; o `Date` do lote (≤ 60 s antes do instante — a serie de 15 s recebe a leitura mais nova) |
+
+Um CHECK por série (`tape_source_is_consistent` — curto de propósito: o Postgres trunca identificadores em 63
+caracteres e o `alembic check` não casa um nome truncado): as três são `NULL` juntas; o rótulo é conhecido;
+uma fonte implica uma fita (`buys_1m`/`buys_60s` não nulos) — a recíproca **não** é exigida, por isso as linhas
+dobradas antes da `0032` (sem procedência) continuam legais (o argumento do `line_points IS NULL` da `0026`). Uma
+linha dobrada do lote diz `unique_buyers` **com** o criador e `creator_sold`/`creator_net_seller = NULL` com
+`no_trade_feed` — o lote não diz quem vendeu; a porta `flow_v2/1` continua recusando por nome o que não sabe.
+Motivo novo no vocabulário das colunas `*_reason` (§35): **`no_sol_quote`** — o lote falou em USD e não havia cotação
+SOL/USD com menos de cinco minutos; as colunas de fita ficam `NULL` em vez de carregar uma conversão inventada.
+
+### 44.3 Guardas, trava, vizinhos
+
+**Sem guarda de subida — asserção** (tabela nova, colunas nuláveis sem default, sem backfill; `ADD CONSTRAINT CHECK`
+varre as duas séries uma vez e o predicado é trivialmente verdadeiro onde as colunas são `NULL`). **A descida recusa**
+(§17.7) enquanto `meme_market_activity_1m` tiver linha ou uma linha de qualquer das séries tiver
+`tape_source = 'activity_1m'`: sem o rótulo, esses números passariam por fita por mint (compradores sem o criador,
+colunas do criador reais) — evidência do que o portão julgou; uma linha com `swap_api_trades` reverte. Nada depende de
+estado de sessão; `0032_meme_activity` tem 18 caracteres (§17.6). Quem escreve: o laço `meme-activity`
+(`services/meme-worker/hunter_meme_worker/activity.py`, `repo_activity.py`); quem lê: o fold do minuto
+(`fold.py`) e a linha de 15 s (`fast_lane.py`) via `features_tape.activity_minute`, a API (`GET /meme/sources`,
+fonte `swap_api_activity` com esta tabela como testemunha) e o SQL de cobertura
+`infra/scripts/sql/research/2026-09-12-t42g-cobertura.sql`.
+
+## 45. A mesa passa a propor pela porta E1 — M4 (`0033_meme_operator_3`)
+
+Trigésima terceira revisão. **Uma semente que aposenta um conjunto.** Nenhuma tabela, coluna, vista, enum, política ou
+grant; nada tocado na `0022`–`0032`. Revisa a `0032_meme_activity` (T4.2g, escrita em paralelo — o brief da T4.19 ainda
+chamava esta revisão de `0032`; a cabeça no disco já tinha andado).
+
+T4.19 (Everton, 12/09/2026 17:3x BRT: "coloca aí qual entra, quanto comprar e na mesma hora qual horário vender"): o
+teste real é executado **à mão** no Terminal, com a carteira observada gravando a compra/venda (T4.12). A mesa propunha
+pelo `operator/2` (`0029`), que herdou a porta `comprar_cedo_na_curva/1` da EXP-M1 — **reprovada** (9/9 negativas). A
+porta que o estudo das 21 apostas escolheu é a E1 (`flow_v2/1`, EXP-M5) com as exclusões E2 (EXP-M6), até aqui
+`research_only`: os sinais dela não chegavam à mesa.
+
+### 45.1 A semente e a aposentadoria
+
+Id fixo, `ON CONFLICT DO NOTHING` (`ddl/meme_operator_3.py`):
+
+- **`operator/3`** (`…000a`, `kind = operator`, `exp_ref` nulo, **`clock = "15s"`**): `params` = **`FLOW_V2_PARAMS`
+  composto em SQL** (`'{…}'::jsonb || '{…}'::jsonb` — a base é a constante da `0030`, nunca copiada à mão) com a
+  sobreposição do brief: `ttl_s = 180` (a proposta ao operador espera 180 s em vez dos 120 s do laço: uma compra à mão
+  precisa do minuto extra) e `max_open_positions = 2`; os demais números da lista (0,05 SOL, alvo 3×, trailing 35 % após
+  1,5×, `max_hold_s 1800`, `max_loss_pct 50`, `exit_on_line_break`; `creator_dump` é de todo conjunto) são
+  **reafirmados** na sobreposição — iguais à base hoje, ditos para a semente dizer o que planta mesmo que a base mude.
+  Prova: `test_0033` afirma `params − ttl_s − max_open_positions = flow_v2/1.params − max_open_positions`.
+- **`operator/2`** (`…0007`) → `status = 'retired'`, `retired_at = now()` — aposentado **antes** do `INSERT`, para a
+  mesa nunca ver dois conjuntos `operator` ativos (`meme_rule_set.py` e `get_operator_rule_set()` supõem exatamente um;
+  a API lê por **nome + `status = 'active'`**, maior versão: num banco ainda na `0032` a compra manual continua sob
+  `operator/2`). A descida apaga `operator/3` e devolve `operator/2` a `active`, como a `0029` fez com o `operator/1`.
+
+`ttl_s` é chave nova de `params` (lida em `lab_models.RuleSetSpec.ttl_s`; ausente = o `lab_proposal_ttl_s` do laço —
+todo conjunto congelado antes lê exatamente como lia). Não há CHECK sobre ela: `params` é JSONB livre desde a `0022`.
+
+### 45.2 O que o laço passa a fazer (não é schema, mas é o que a semente significa)
+
+- A porta de 15 s (`lab_fast.py`) já corria todo conjunto com `clock = 15s`: o `operator/3` entra no mesmo passo que
+  o `flow_v2/1`, sobre a **mesma linha** de `meme_features_15s`, com o mesmo pedigree lido uma vez — os dois propõem a
+  mesma moeda no mesmo tique (`test_lab_operator_3.py`); a de pesquisa nasce `approved` por `rules`, a do operador nasce
+  `proposed` e expira em `proposed_at + 180 s`. Aprovada na mesa, segue o caminho de sempre: fill na primeira fotografia
+  com `observed_at > decided_at` (a seguinte, em 15 s).
+- Toda proposta `operator` grava **`suggested.manual_plan`** (`proposals_plan.py`, na hora da proposta): "Comprar 0,05
+  SOL de <TICKER> até HH:MM:SS (proposta expira). Vender até HH:MM (30 min) — antes disso se triplicar (3×), se recuar
+  35 % do topo depois de 1,5×, se cair pela metade (−50 %), se o dev vender, ou se a linha de suporte quebrar." — cada
+  número lido dos `params` do conjunto (`size_sol`, `ttl_s`, `max_hold_s`, `target_x`, `trailing_pct`,
+  `trailing_arm_x`, `max_loss_pct`, `exit_on_line_break`), horas em America/Sao_Paulo,
+  `<TICKER>` = `meme_tokens.symbol` (o mint abreviado quando a identidade não chegou). A API expõe como
+  `DeskRowOut.manual_plan` (`GET /desk`, `ProposalOut.row`) — lido do JSONB, nunca composto na API; `null` numa
+  proposta de pesquisa ou numa linha anterior ao plano.
+
+### 45.3 Guardas, trava, vizinhos
+
+**Guarda de subida: uma, depois da semente** — a revisão afirma que existe **exatamente um** conjunto `operator` ativo
+(um conjunto plantado à mão, ou um `operator/3` já existente e aposentado — `ON CONFLICT DO NOTHING` o deixaria assim —
+deixaria a mesa com dois ou nenhum: recusado, nunca consertado numa migração; sugestão da Astra). Um `UPDATE` de uma
+linha e um `INSERT` de uma linha numa tabela de uma dúzia de linhas. **A descida recusa** (§17.7) enquanto existir
+proposta ou aposta que referencie `operator/3` (uma proposta que a mesa viu e uma aposta que ela preencheu são
+evidência); depois a semente reverte, o `operator/2` volta a `active` e a mesma invariante é afirmada. Nada depende de
+estado de sessão; `0033_meme_operator_3` tem 20 caracteres (§17.6).
+
+| Onde | O que muda |
+|---|---|
+| `services/meme-worker/**` | `proposals_plan.py` (novo), `proposals.py` (`ttl` do conjunto; `manual_plan` no `suggested` do `operator`; `GateRow.symbol`), `lab_models.py` (`ttl_s`), `lab_repo.py`/`lab_repo_fast.py` (`t.symbol`) |
+| `GET /api/v1/orgs/{org}/meme/desk`, `POST …/proposals/*` | `DeskRowOut.manual_plan`; `OPERATOR_RULE_SET = ("operator", "3")` (documental — a leitura é por nome e status) |
+| `apps/web` | fora desta tarefa (T4.17 em curso): mostrar `row.manual_plan` no cartão da proposta |

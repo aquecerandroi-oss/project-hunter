@@ -24,10 +24,17 @@ from sqlalchemy.exc import IntegrityError
 
 from hunter_core.db.session import role_session
 from hunter_core.logging import get_logger
+from hunter_meme_worker.activity import batch_minute
 from hunter_meme_worker.config import FEATURES_STREAM
 from hunter_meme_worker.features import NOT_POLLED, FeatureRow, MinuteInputs, build_row
 from hunter_meme_worker.features_lines import board_standing
-from hunter_meme_worker.features_tape import HoldersObservation, TapeTrade, holders_for, tape_for
+from hunter_meme_worker.features_tape import (
+    ACTIVITY_1M,
+    HoldersObservation,
+    TapeTrade,
+    holders_for,
+    tape_for,
+)
 from hunter_meme_worker.metrics import meme_features_rows_total, meme_gaps_total
 from hunter_meme_worker.repo import GapRow, insert_features, record_gap
 from hunter_meme_worker.repo_boards import insert_board_minutes
@@ -70,7 +77,11 @@ def _tape_inputs(
         creator=tracked.creator,
         covered_since=ctx.trades.coverage_for(tracked.mint, boundary),
     )
-    return minute, ctx.trades.absence_reason(tracked.mint, at=boundary)
+    absence = ctx.trades.absence_reason(tracked.mint, at=boundary)
+    if minute is None:
+        # T4.2g: the batch route's 1m window, when the per-mint tape did not cover.
+        return batch_minute(ctx, tracked.mint, at=boundary, absence=absence)
+    return minute, absence
 
 
 async def fold_minute(ctx: RadarContext, boundary: datetime) -> list[FeatureRow]:
@@ -131,6 +142,7 @@ async def fold_minute(ctx: RadarContext, boundary: datetime) -> list[FeatureRow]
             rows=len(rows),
             with_tape=sum(1 for row in rows if row.tape_reason is None),
             with_progress=sum(1 for row in rows if row.progress_reason is None),
+            with_tape_activity=sum(1 for row in rows if row.tape_source == ACTIVITY_1M),
         )
     return rows
 

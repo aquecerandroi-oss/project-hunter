@@ -237,6 +237,22 @@ recusas de **toda** porta. **Placar honesto**: `meme_paper_bets.outcome_quality`
 `fast_lane_*`, `lab_decision_to_fill_s_p50/p95`, `lab_bets_indeterminate_total`. Plano §T4.16;
 `docs/DATABASE.md` §43; `docs/RISK_ENGINE_MEME.md` §10.7.
 
+**T4.2g — a fita por lote.** Um laço `meme-activity` (`activity.py`) dispara 3 s **antes** de cada fecho de minuto
+e pede `POST /v1/coins/market-activity/batch` para **todos** os rastreados na curva, 50 por requisição (3/min com
+~130), dentro do mesmo orçamento do Cloudflare da fita por mint (`TapeBudget.reserve`: 16 − 3 = 13 para a fita,
+que fica com apostas abertas e `graduating`). Cada resposta vira linhas de `meme_market_activity_1m` (janelas `1m`
+e `5m`; `end_time` = `Date` da resposta; `empty = true` para um `null` num ciclo em que a janela veio preenchida
+para alguém — nada é escrito quando ninguém a teve, `activity_dark_60s`). O fold do minuto e a linha de 15 s
+preferem a fita por mint; **sem ela**, leem a leitura `1m` mais nova com `received_at <= fecho` e fim da janela há
+< 60 s e escrevem `buys_1m`/`sells_1m`/`unique_buyers`/`net_sol_flow_1m`/`curve_volume_1m_sol` com
+`tape_source = activity_1m`, `tape_window_s = 60`, `tape_as_of` = o fim da janela (`0032`); `unique_buyers` conta o
+criador e `creator_net_seller` fica `no_trade_feed` — o lote não diz quem vendeu. USD → SOL com a cotação de
+`/sol-price` (bucket próprio, ≤ 1 leitura/min, guardada na linha); sem cotação com < 5 min: `no_sol_quote`.
+Heartbeat: `activity_coverage_pct`, `activity_batch_calls_60s`, `activity_live_1m`, `activity_dark_60s`,
+`activity_skipped_60s`, `activity_quote_age_s`, `tape_activity_pct` (e `tape_coverage_pct` passa a contar as
+duas fontes); fonte `swap_api_activity` em `GET /meme/sources`. Plano §T4.2g; `docs/DATABASE.md` §44;
+`docs/PUMPFUN.md` §2.
+
 ## 2. Feature Engine
 
 **Onde:** `scanner-worker`. **Gatilho:** `market.ticks` (tick-features, throttle 1 s por símbolo) e `market.candles.closed` (bar-features).

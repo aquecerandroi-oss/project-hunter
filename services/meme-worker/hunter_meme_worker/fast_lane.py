@@ -38,6 +38,7 @@ from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_exchanges.pumpfun.rpc_curves import CURVE_EMPTIED, UNSUPPORTED_QUOTE
+from hunter_meme_worker.activity import batch_minute
 from hunter_meme_worker.collect import persist_reading
 from hunter_meme_worker.features import UNSUPPORTED_QUOTE as UNSUPPORTED_QUOTE_REASON
 from hunter_meme_worker.features_fast import Fast15sRow, FastInputs, build_fast_row
@@ -123,6 +124,8 @@ async def fold_fast(
                 covered_since=ctx.trades.coverage_for(t.mint, as_of),
             )
             absence = ctx.trades.absence_reason(t.mint, at=as_of)
+            if minute is None:  # T4.2g: the batch's 1m window, at most 60 s before the instant
+                minute, absence = batch_minute(ctx, t.mint, at=as_of, absence=absence)
         rows.append(
             build_fast_row(
                 FastInputs(

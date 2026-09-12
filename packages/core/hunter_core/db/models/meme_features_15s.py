@@ -103,6 +103,14 @@ class MemeFeatures15s(Base):
             "char_length(features_version) > 0 AND char_length(mint) > 0",
             name="provenance_is_not_empty",
         ),
+        # 0032 — where the tape of the instant came from (T4.2g), like ``meme_features_1m``.
+        CheckConstraint(
+            "(tape_source IS NULL) = (tape_window_s IS NULL) "
+            "AND (tape_source IS NULL) = (tape_as_of IS NULL) "
+            "AND (tape_source IS NULL OR tape_source IN ('swap_api_trades', 'activity_1m')) "
+            "AND (tape_source IS NULL OR buys_60s IS NOT NULL)",
+            name="tape_source_is_consistent",
+        ),
         {"postgresql_partition_by": "RANGE (as_of)"},
     )
 
@@ -158,6 +166,14 @@ class MemeFeatures15s(Base):
     dev_share_reason: Mapped[str | None] = mapped_column(Text)
     snipers: Mapped[int | None] = mapped_column(Integer)
     snipers_reason: Mapped[str | None] = mapped_column(Text)
+    tape_source: Mapped[str | None] = mapped_column(Text)
+    tape_window_s: Mapped[int | None] = mapped_column(Integer)
+    tape_as_of: Mapped[datetime | None]
+    """``0032`` (T4.2g): ``swap_api_trades`` (the per-mint tape over the last
+    60 s, ``tape_as_of = as_of``) or ``activity_1m`` (the batch route's ``1m``
+    window ending at ``tape_as_of``, the newest reading received by ``as_of``
+    and at most 60 s old — a window that ended up to a minute before the
+    instant, named so the gate knows it). ``NULL`` without a tape."""
     computed_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 

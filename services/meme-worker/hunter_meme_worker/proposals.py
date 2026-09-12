@@ -38,6 +38,7 @@ from hunter_indicators.meme.curve import marginal_price_sol, quote_buy
 from hunter_indicators.meme.pedigree import PEDIGREE_V1, PedigreeFeatures, evaluate_pedigree
 from hunter_indicators.meme.rules import EntryFeatures, evaluate_entry
 from hunter_meme_worker.lab_models import RuleSetSpec, Snapshot, money_str, optional_money_str
+from hunter_meme_worker.proposals_plan import manual_plan, ticker_of
 from hunter_meme_worker.proposals_reasons import gate_reasons
 
 __all__ = [
@@ -104,6 +105,9 @@ class GateRow:
     series: str | None = None
     """``None`` for a closed minute of ``meme_features_1m``; ``SERIES_15S`` for
     a row of the 15-second series, where ``end_time`` is the instant judged."""
+    symbol: str | None = None
+    """T4.19: the token's ticker, named in the operator's ``manual_plan``;
+    ``None`` (identity never came) reads as the mint abbreviated."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -231,10 +235,15 @@ def evaluate_gate(
     pedigree was not read (``pedigree_unknown``), never a clean one. ``None``
     means the caller did not ask (the scale step, a unit test of the gate
     alone): the exclusions are not applied.
+
+    ``ttl_s`` is the loop's; a set that names its own (T4.19, ``operator/3``:
+    180 s for a buy by hand) overrides it. An ``operator`` proposal also
+    carries ``suggested.manual_plan``, written now from the set's params.
     """
     drafts: list[ProposalDraft] = []
     refusals: Counter[str] = Counter()
     evaluated = 0
+    ttl = ttl_s if spec.ttl_s is None else spec.ttl_s
     for row in rows:
         evaluated += 1
         if row.mint in already_open:
@@ -257,6 +266,11 @@ def evaluate_gate(
         if row.snapshot is None:
             refusals[REFUSAL_NO_SNAPSHOT_FOR_QUOTE] += 1
             continue
+        suggested = spec.suggested()
+        if spec.kind == "operator":
+            suggested["manual_plan"] = manual_plan(
+                spec, ticker=ticker_of(row.symbol, row.mint), proposed_at=now, ttl_s=ttl
+            )
         drafts.append(
             draft_proposal(
                 row,
@@ -269,9 +283,9 @@ def evaluate_gate(
                     pedigree_gate=PEDIGREE_V1 if lineage is not None else None,
                     series=row.series,
                 ),
-                suggested=spec.suggested(),
+                suggested=suggested,
                 now=now,
-                ttl_s=ttl_s,
+                ttl_s=ttl,
             )
         )
     return GateOutcome(drafts=drafts, refusals=refusals, evaluated=evaluated)

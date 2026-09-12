@@ -50,9 +50,13 @@ describe("Meme Radar labels: exhaustive over every enum value the API can send",
   });
 
   it("labels every null reason", () => {
+    // T4.2g: `no_sol_quote` (the batch tape spoke USD and there was no SOL/USD quote under 5 min) joined the contract's union.
+    expect(MEME_NULL_REASONS).toEqual(["no_trade_feed", "no_holders_reader", "denominator_unknown", "not_polled", "rate_limited", "insufficient_coverage", "unsupported_quote", "no_sells", "out_of_range", "no_sol_quote"]);
     for (const reason of MEME_NULL_REASONS) {
       expect(memeNullReasonLabel(reason)).toMatch(/\S/);
     }
+    expect(memeNullReasonLabel("no_sol_quote")).toBe("sem cotação SOL/USD no minuto");
+    expect(memeNullReasonLabel("no_trade_feed")).toBe("sem fita");
   });
 
   it("never returns a raw enum value as its own label", () => {
@@ -73,12 +77,15 @@ describe("Meme Radar labels: exhaustive over every enum value the API can send",
     }
   });
 
-  it("labels the six feed sources the worker reports, and humanizes one it does not know yet instead of throwing", () => {
-    expect(MEME_FEED_SOURCES).toEqual(["pumpportal_ws", "pumpfun_rest", "solana_rpc", "trenches_ws", "swap_api", "indexer_risk"]);
+  it("labels the seven feed sources the worker reports, and humanizes one it does not know yet instead of throwing", () => {
+    // T4.2g: `swap_api_activity` is the batch tape (POST market-activity/batch) -- the same swap-api budget, its own source line.
+    expect(MEME_FEED_SOURCES).toEqual(["pumpportal_ws", "pumpfun_rest", "solana_rpc", "trenches_ws", "swap_api", "indexer_risk", "swap_api_activity"]);
     for (const name of MEME_FEED_SOURCES) {
       expect(memeFeedSourceLabel(name)).toMatch(/\S/);
       expect(memeFeedSourceLabel(name)).not.toBe(name);
     }
+    expect(memeFeedSourceLabel("swap_api")).toBe("fita por mint (swap-api)");
+    expect(memeFeedSourceLabel("swap_api_activity")).toBe("fita por lote (swap-api)");
     expect(memeFeedSourceLabel("some_new_feed")).toBe("some new feed");
   });
 });
@@ -122,8 +129,9 @@ describe("Meme lines/hype labels: exhaustive over the contract's vocabularies", 
 
 describe("memeNullReasonText", () => {
   it("prefixes 'sem medição:' before the reason label", () => {
-    // T4.2c: the tape now exists (swap-api); "no_trade_feed" means this minute had none.
-    expect(memeNullReasonText("no_trade_feed")).toBe("sem medição: sem fita de negociações neste minuto");
+    // T4.2c: the tape now exists (swap-api); "no_trade_feed" means this minute had none (T4.20 wording: "sem fita").
+    expect(memeNullReasonText("no_trade_feed")).toBe("sem medição: sem fita");
+    expect(memeNullReasonText("no_sol_quote")).toBe("sem medição: sem cotação SOL/USD no minuto");
   });
 
   it("degrades honestly when no reason is given at all (should not happen, but must not crash)", () => {

@@ -42,19 +42,23 @@ export function memeSourceLabel(source: MemeSource): string {
   return SOURCE_LABEL[source];
 }
 
-// T4.3b: the six feeds the worker's heartbeat reports (`services/meme_sources.py`
+// T4.3b: the feeds the worker's heartbeat reports (`services/meme_sources.py`
 // `SOURCE_NAMES`). `name` is a plain string in the contract -- a feed added
 // upstream before this map learns it still gets a readable name (underscores
-// to spaces) instead of throwing or hiding the source.
-export const MEME_FEED_SOURCES: readonly string[] = ["pumpportal_ws", "pumpfun_rest", "solana_rpc", "trenches_ws", "swap_api", "indexer_risk"];
+// to spaces) instead of throwing or hiding the source. T4.2g added
+// `swap_api_activity`, the batch tape (POST market-activity/batch) that fills
+// the minute when the per-mint tape did not cover it -- same swap-api budget,
+// its own line here so the two tapes never read as one.
+export const MEME_FEED_SOURCES: readonly string[] = ["pumpportal_ws", "pumpfun_rest", "solana_rpc", "trenches_ws", "swap_api", "indexer_risk", "swap_api_activity"];
 
 const FEED_SOURCE_LABEL: Record<string, string> = {
   pumpportal_ws: "PumpPortal (WS)",
   pumpfun_rest: "pump.fun (REST)",
   solana_rpc: "Solana RPC",
   trenches_ws: "boards do site (WS)",
-  swap_api: "fita do site (swap-api)",
+  swap_api: "fita por mint (swap-api)",
   indexer_risk: "risco do site (indexer)",
+  swap_api_activity: "fita por lote (swap-api)",
 };
 
 export function memeFeedSourceLabel(name: string): string {
@@ -112,10 +116,11 @@ export const MEME_NULL_REASONS: readonly MemeNullReason[] = [
   "unsupported_quote",
   "no_sells",
   "out_of_range",
+  "no_sol_quote",
 ];
 
 const NULL_REASON_LABEL: Record<MemeNullReason, string> = {
-  no_trade_feed: "sem fita de negociações neste minuto",
+  no_trade_feed: "sem fita",
   no_holders_reader: "sem leitor de holders ainda",
   denominator_unknown: "denominador da curva desconhecido",
   not_polled: "ainda não consultado nesta janela",
@@ -126,6 +131,8 @@ const NULL_REASON_LABEL: Record<MemeNullReason, string> = {
   no_sells: "sem vendas no minuto (razão indefinida)",
   // A share above 100 % from the site's board in a coin's first minute is not stored.
   out_of_range: "valor da fonte fora da faixa possível (não gravado)",
+  // T4.2g: the batch tape speaks USD; without a SOL/USD quote under 5 min the SOL figures are not derived.
+  no_sol_quote: "sem cotação SOL/USD no minuto",
 };
 
 export function memeNullReasonLabel(reason: MemeNullReason): string {

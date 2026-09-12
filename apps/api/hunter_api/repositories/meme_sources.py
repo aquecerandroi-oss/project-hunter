@@ -30,6 +30,7 @@ SOURCE_TABLES: dict[str, tuple[str, str]] = {
     "trenches_ws": ("meme_board_observations", "observed_at"),
     "swap_api": ("meme_trades", "block_time"),
     "indexer_risk": ("meme_risk_snapshots", "observed_at"),
+    "swap_api_activity": ("meme_market_activity_1m", "end_time"),
 }
 """Source -> (table, instant column). The two curve readers share a table and
 are told apart by ``source`` in the query below."""

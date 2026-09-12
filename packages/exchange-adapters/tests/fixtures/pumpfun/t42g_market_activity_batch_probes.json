@@ -1,0 +1,274 @@
+{
+ "captured_at": "2026-09-12T20:25:25.710932+00:00",
+ "url": "https://swap-api.pump.fun/v1/coins/market-activity/batch",
+ "calls": 5,
+ "pace_s": 4.0,
+ "log": [
+  {
+   "name": "A_shape",
+   "call": 1,
+   "sent_at": "2026-09-12T20:24:01.944167+00:00",
+   "received_at": "2026-09-12T20:24:02.187066+00:00",
+   "elapsed_ms": 243,
+   "status": 201,
+   "bytes": 631,
+   "headers": {
+    "date": "Sat, 12 Sep 2026 20:24:02 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "content-length": "631",
+    "x-ratelimit-limit": "1000",
+    "x-ratelimit-remaining": "987",
+    "x-ratelimit-reset": "60",
+    "server": "cloudflare",
+    "cf-ray": "a3a1a224885bf1c7-GRU",
+    "cf-cache-status": "DYNAMIC"
+   },
+   "request": {
+    "addresses": 2,
+    "intervals": [
+     "1m",
+     "5m",
+     "1h",
+     "6h",
+     "24h"
+    ],
+    "metrics": [
+     "numTxs",
+     "volumeUSD",
+     "numUsers",
+     "numBuys",
+     "numSells",
+     "buyVolumeUSD",
+     "sellVolumeUSD",
+     "numBuyers",
+     "numSellers",
+     "priceChangePercent"
+    ]
+   },
+   "body": {
+    "EV4JbtMhfJXPsW5pquga1sbQLvXkcdhxHG4Gp25Wpump": {
+     "1m": null,
+     "5m": null,
+     "1h": null,
+     "6h": null,
+     "24h": {
+      "numTxs": 2,
+      "volumeUSD": 99.20229804272005,
+      "numUsers": 1,
+      "numBuys": 1,
+      "numSells": 1,
+      "buyVolumeUSD": 49.60028645179046,
+      "sellVolumeUSD": 49.602011590929585,
+      "numBuyers": 1,
+      "numSellers": 1,
+      "priceChangePercent": -2.699026967752155
+     }
+    },
+    "5xXhg6fJWnm2pBwGVzRp5yXYbM2bwywpxgTbgdw1pump": {
+     "1m": null,
+     "5m": null,
+     "1h": null,
+     "6h": null,
+     "24h": {
+      "numTxs": 38,
+      "volumeUSD": 348.89195218762814,
+      "numUsers": 4,
+      "numBuys": 20,
+      "numSells": 18,
+      "buyVolumeUSD": 174.53868366421864,
+      "sellVolumeUSD": 174.35326852340947,
+      "numBuyers": 4,
+      "numSellers": 3,
+      "priceChangePercent": 82.92091711458596
+     }
+    }
+   }
+  },
+  {
+   "name": "B_140",
+   "call": 2,
+   "sent_at": "2026-09-12T20:24:06.190198+00:00",
+   "received_at": "2026-09-12T20:24:06.365280+00:00",
+   "elapsed_ms": 175,
+   "status": 400,
+   "bytes": 214,
+   "headers": {
+    "date": "Sat, 12 Sep 2026 20:24:06 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "content-length": "214",
+    "x-ratelimit-limit": "1000",
+    "x-ratelimit-remaining": "982",
+    "x-ratelimit-reset": "56",
+    "server": "cloudflare",
+    "cf-ray": "a3a1a23ec930f1c7-GRU",
+    "cf-cache-status": "DYNAMIC"
+   },
+   "request": {
+    "addresses": 140,
+    "intervals": [
+     "1m",
+     "5m",
+     "1h",
+     "6h",
+     "24h"
+    ],
+    "metrics": [
+     "numTxs",
+     "volumeUSD",
+     "numUsers",
+     "numBuys",
+     "numSells",
+     "buyVolumeUSD",
+     "sellVolumeUSD",
+     "numBuyers",
+     "numSellers",
+     "priceChangePercent"
+    ]
+   },
+   "body": {
+    "statusCode": 400,
+    "message": "{\"message\":[\"addresses must contain no more than 50 elements\"],\"error\":\"Bad Request\",\"statusCode\":400}",
+    "error": "BadRequestException",
+    "path": "/v1/coins/market-activity/batch"
+   }
+  },
+  {
+   "name": "B_100",
+   "call": 3,
+   "sent_at": "2026-09-12T20:24:10.366242+00:00",
+   "received_at": "2026-09-12T20:24:10.537567+00:00",
+   "elapsed_ms": 172,
+   "status": 400,
+   "bytes": 214,
+   "headers": {
+    "date": "Sat, 12 Sep 2026 20:24:10 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "content-length": "214",
+    "x-ratelimit-limit": "1000",
+    "x-ratelimit-remaining": "984",
+    "x-ratelimit-reset": "55",
+    "server": "cloudflare",
+    "cf-ray": "a3a1a258de45f1c7-GRU",
+    "cf-cache-status": "DYNAMIC"
+   },
+   "request": {
+    "addresses": 100,
+    "intervals": [
+     "1m",
+     "5m",
+     "1h",
+     "6h",
+     "24h"
+    ],
+    "metrics": [
+     "numTxs",
+     "volumeUSD",
+     "numUsers",
+     "numBuys",
+     "numSells",
+     "buyVolumeUSD",
+     "sellVolumeUSD",
+     "numBuyers",
+     "numSellers",
+     "priceChangePercent"
+    ]
+   },
+   "body": {
+    "statusCode": 400,
+    "message": "{\"message\":[\"addresses must contain no more than 50 elements\"],\"error\":\"Bad Request\",\"statusCode\":400}",
+    "error": "BadRequestException",
+    "path": "/v1/coins/market-activity/batch"
+   }
+  },
+  {
+   "name": "B_50",
+   "call": 4,
+   "sent_at": "2026-09-12T20:24:14.538178+00:00",
+   "received_at": "2026-09-12T20:24:15.520373+00:00",
+   "elapsed_ms": 982,
+   "status": 201,
+   "bytes": 17103,
+   "headers": {
+    "date": "Sat, 12 Sep 2026 20:24:15 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "content-length": "17103",
+    "x-ratelimit-limit": "1000",
+    "x-ratelimit-remaining": "986",
+    "x-ratelimit-reset": "24",
+    "server": "cloudflare",
+    "cf-ray": "a3a1a272eae3f1c7-GRU",
+    "cf-cache-status": "DYNAMIC"
+   },
+   "request": {
+    "addresses": 50,
+    "intervals": [
+     "1m",
+     "5m",
+     "1h",
+     "6h",
+     "24h"
+    ],
+    "metrics": [
+     "numTxs",
+     "volumeUSD",
+     "numUsers",
+     "numBuys",
+     "numSells",
+     "buyVolumeUSD",
+     "sellVolumeUSD",
+     "numBuyers",
+     "numSellers",
+     "priceChangePercent"
+    ]
+   }
+  },
+  {
+   "name": "E_active_boards",
+   "call": 5,
+   "sent_at": "2026-09-12T20:25:25.504180+00:00",
+   "received_at": "2026-09-12T20:25:25.709928+00:00",
+   "elapsed_ms": 206,
+   "status": 400,
+   "bytes": 209,
+   "headers": {
+    "date": "Sat, 12 Sep 2026 20:25:25 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "content-length": "209",
+    "x-ratelimit-limit": "1000",
+    "x-ratelimit-remaining": "986",
+    "x-ratelimit-reset": "42",
+    "server": "cloudflare",
+    "cf-ray": "a3a1a42ece6e29e2-GRU",
+    "cf-cache-status": "DYNAMIC"
+   },
+   "request": {
+    "addresses": 0,
+    "intervals": [
+     "1m",
+     "5m",
+     "1h",
+     "6h",
+     "24h"
+    ],
+    "metrics": [
+     "numTxs",
+     "volumeUSD",
+     "numUsers",
+     "numBuys",
+     "numSells",
+     "buyVolumeUSD",
+     "sellVolumeUSD",
+     "numBuyers",
+     "numSellers",
+     "priceChangePercent"
+    ]
+   },
+   "body": {
+    "statusCode": 400,
+    "message": "{\"message\":[\"addresses must contain at least 1 elements\"],\"error\":\"Bad Request\",\"statusCode\":400}",
+    "error": "BadRequestException",
+    "path": "/v1/coins/market-activity/batch"
+   }
+  }
+ ]
+}

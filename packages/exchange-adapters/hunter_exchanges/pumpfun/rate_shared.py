@@ -97,12 +97,54 @@ async def get_json_with_budget(
     sleep: Callable[[float], Awaitable[None]],
     rand: Callable[[float, float], float],
 ) -> Any:
+    payload, _headers = await request_json_with_budget(
+        client,
+        "GET",
+        path,
+        params=params,
+        json_body=None,
+        exchange=exchange,
+        limiter=limiter,
+        bucket=bucket,
+        max_retries=max_retries,
+        sleep=sleep,
+        rand=rand,
+    )
+    return payload
+
+
+RESPONSE_HEADERS = ("date", *RATE_LIMIT_HEADERS)
+"""What a successful response is allowed to teach beside its body: the
+server's own ``Date`` (the stamp a batch of window aggregates is *as of* —
+``market_activity.py``) and the limit headers."""
+
+
+async def request_json_with_budget(
+    client: httpx.AsyncClient,
+    method: str,
+    path: str,
+    *,
+    params: dict[str, str | int] | None,
+    json_body: Any,
+    exchange: str,
+    limiter: TokenBucketRateLimiter,
+    bucket: str,
+    max_retries: int,
+    sleep: Callable[[float], Awaitable[None]],
+    rand: Callable[[float, float], float],
+) -> tuple[Any, dict[str, str]]:
+    """The budgeted request behind :func:`get_json_with_budget`, for ``GET``
+    and ``POST`` alike (T4.2g: ``POST /v1/coins/market-activity/batch``
+    answers ``201``). Returns the decoded body **and** :data:`RESPONSE_HEADERS`.
+    A ``4xx`` other than 429/418/404 is a non-retryable :class:`ExchangeError`
+    that carries the body's first 300 characters — the validator of the batch
+    route says *why* (``addresses must contain no more than 50 elements``)."""
     last_exc: Exception | None = None
     for attempt in range(max(1, max_retries)):
         is_last = attempt == max(1, max_retries) - 1
         await limiter.acquire(bucket, 1)
         try:
-            response = await client.get(path, params=params)
+            response = await client.request(method, path, params=params, json=json_body)
         except httpx.TransportError:
             last_exc = ExchangeUnavailable(f"{exchange} transport error", exchange=exchange)
             if not is_last:
@@ -133,11 +175,15 @@ async def get_json_with_budget(
                 await _backoff(attempt, sleep, rand)
             continue
         if response.status_code >= 400:
+            detail = response.text[:300].replace("\n", " ")
             raise ExchangeError(
-                f"{exchange} {response.status_code}", exchange=exchange, retryable=False
+                f"{exchange} {response.status_code}: {detail}", exchange=exchange, retryable=False
             )
+        headers = {
+            name: response.headers[name] for name in RESPONSE_HEADERS if name in response.headers
+        }
         try:
-            return json.loads(response.content, parse_float=Decimal)
+            return json.loads(response.content, parse_float=Decimal), headers
         except (ValueError, UnicodeDecodeError) as exc:
             raise MalformedMessage(f"{exchange} invalid JSON", exchange=exchange) from exc
     raise last_exc or ExchangeUnavailable(f"{exchange} request failed", exchange=exchange)
@@ -152,4 +198,11 @@ async def _backoff(
     await sleep(delay + rand(0, delay * 0.1))
 
 
-__all__ = ["RATE_LIMIT_HEADERS", "HttpRateLimited", "get_json_with_budget", "retry_after_s"]
+__all__ = [
+    "RATE_LIMIT_HEADERS",
+    "RESPONSE_HEADERS",
+    "HttpRateLimited",
+    "get_json_with_budget",
+    "request_json_with_budget",
+    "retry_after_s",
+]

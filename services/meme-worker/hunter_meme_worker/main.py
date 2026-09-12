@@ -43,6 +43,7 @@ from hunter_exchanges.pumpfun.rest import PumpFunRestClient
 from hunter_exchanges.pumpfun.rpc import SolanaRpcClient
 from hunter_exchanges.pumpfun.ws import PumpPortalWsClient
 from hunter_exchanges.rate_limit import TokenBucketRateLimiter
+from hunter_meme_worker.activity import run_activity
 from hunter_meme_worker.chain import chain_once
 from hunter_meme_worker.collect import fold_once, forever, poll_once, prune_once, reconcile_once
 from hunter_meme_worker.config import MemeConfig, load_config
@@ -56,9 +57,11 @@ from hunter_meme_worker.tracker import MintTracker
 from hunter_meme_worker.wallets import build_wallets, wallets_once
 from hunter_meme_worker.warmup import warm_tracked_set
 from hunter_meme_worker.wiring import (
+    build_activity,
     build_boards,
     build_risk,
     build_sources,
+    build_swap_api,
     build_trades,
     heartbeat_once,
     risk_once,
@@ -96,6 +99,8 @@ def build_context(
     sources = build_sources(config)
     boards, board_clients = build_boards(config, tracker)
     curves = PumpFunRestClient()
+    swap_api = build_swap_api(config)
+    trades = build_trades(config, sources, swap_api)
     return RadarContext(
         config=config,
         session_factory=create_session_factory(runtime.engine),
@@ -106,7 +111,9 @@ def build_context(
         chain=SolanaRpcClient(),
         sources=sources,
         boards=boards,
-        trades=build_trades(config, sources),
+        trades=trades,
+        # T4.2g: the batch route on the tape's client and budget, once a minute.
+        activity=build_activity(config, sources, trades, swap_api),
         risk=build_risk(config, sources),
         # The same client, the same 60/60 s bucket: a global-params read is a
         # curve read not made, once an hour (T4.2d).
@@ -175,6 +182,11 @@ def _register_health(
         if ctx.risk is None
         else f"{len(ctx.risk.last_read)} mints read"
     )
+    runtime.status_details["activity"] = lambda: (
+        "disabled (MEME_ACTIVITY_ENABLED=false or swap_api off)"
+        if ctx.activity is None
+        else f"{len(ctx.activity.readings)} mints with a 1m reading"
+    )
     runtime.status_details["wallets"] = lambda: (
         "disabled (MEME_WATCH_WALLETS empty)"
         if ctx.wallets is None
@@ -242,6 +254,7 @@ async def run_meme(runtime: WorkerRuntime) -> None:
         trenches=sorted(boards),
         swap_api=ctx.trades is not None,
         swap_api_budget_60s=config.swap_api_budget_60s,
+        activity=ctx.activity is not None,
         chain_curves=config.chain_curves_enabled,
         fast_lane=config.fast_lane_enabled and config.chain_curves_enabled,
         risk=ctx.risk is not None,
@@ -298,6 +311,9 @@ async def run_meme(runtime: WorkerRuntime) -> None:
                 group.create_task(
                     forever("trades", config.trades_cycle_s, trades_once, ctx), name="meme-trades"
                 )
+            if ctx.activity is not None:
+                # T4.2g: every tracked coin's activity by batch, lead_s before each minute.
+                group.create_task(run_activity(ctx), name="meme-activity")
             if ctx.risk is not None:
                 group.create_task(
                     forever("risk", config.risk_cycle_s, risk_once, ctx), name="meme-risk"

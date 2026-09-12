@@ -30,6 +30,7 @@ from hunter_core.db.session import role_session
 from hunter_indicators.meme.pool import quote_pool_sell
 from hunter_meme_worker.config import MemeConfig
 from hunter_meme_worker.lab import LabContext, LabState, lab_tick
+from hunter_meme_worker.lab_models import RuleSetSpec
 from hunter_meme_worker.lab_repo import load_active_rule_sets
 from hunter_meme_worker.repo_tape import TradeRow, insert_trades
 
@@ -157,13 +158,46 @@ async def _open_moonshot(
 # ---- the seed ---------------------------------------------------------------------------
 
 
+async def _seeded_spec(factory: async_sessionmaker[AsyncSession], rule_set_id: str) -> RuleSetSpec:
+    """One seeded row as the loop parses it, whatever its status — ``0033``
+    (T4.19) retired ``operator/2`` for ``operator/3``; its params are still
+    what ``0029`` planted."""
+    async with role_session(factory, db_role=WORKER) as session:
+        r = (
+            (
+                await session.execute(
+                    text(
+                        "SELECT id, name, version, kind, params, code_ref, exp_ref, status "
+                        "FROM meme_rule_sets WHERE id = :id"
+                    ),
+                    {"id": rule_set_id},
+                )
+            )
+            .mappings()
+            .one()
+        )
+    return RuleSetSpec.from_params(
+        id=str(r["id"]),
+        name=str(r["name"]),
+        version=str(r["version"]),
+        kind=str(r["kind"]),
+        exp_ref=r["exp_ref"],
+        status=str(r["status"]),
+        code_ref=str(r["code_ref"]),
+        params=r["params"],
+    )
+
+
 async def test_the_seed_plants_the_two_arms_and_operator_2_and_retires_operator_1(
     db_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     async with role_session(db_session_factory, db_role=WORKER) as session:
         specs = {s.label: s for s in await load_active_rule_sets(session)}
     assert "operator/1" not in specs, "retired by 0029"
-    ten, twenty_five, operator = specs["moonshot_v0/1"], specs["moonshot_v0/2"], specs["operator/2"]
+    assert "operator/2" not in specs, "retired by 0033 for operator/3 (T4.19)"
+    ten, twenty_five = specs["moonshot_v0/1"], specs["moonshot_v0/2"]
+    operator = await _seeded_spec(db_session_factory, OPERATOR_2_ID)
+    assert operator.status == "retired"
     for arm in (ten, twenty_five):
         assert arm.exp_ref == "EXP-M4" and arm.kind == "research_only"
         assert arm.exit_on_migration is False and arm.trailing_arm_x == Decimal(3)

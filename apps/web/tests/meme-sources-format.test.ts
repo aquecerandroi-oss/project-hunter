@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activityLine,
   BLINDNESS_SENTENCE,
   blindnessGauge,
   budgetShare,
@@ -16,7 +17,7 @@ import type { MemeSourceOut, MemeSources } from "@/lib/api/meme-types";
 
 const AS_OF = "2026-09-12T13:00:00Z"; // 10:00 Brasília
 
-function source(overrides: Partial<MemeSourceOut> = {}): MemeSourceOut {
+export function source(overrides: Partial<MemeSourceOut> = {}): MemeSourceOut {
   return {
     name: "pumpfun_rest",
     status: "ok",
@@ -167,7 +168,8 @@ describe("sourceChip: green connected/fresh, amber lagging or budget ≥ 90 %, r
     expect(chip.state).not.toContain("never_observed");
     expect(chip.detail).toBe("atraso: sem leitura · 30/60 req/min");
     expect(chip.observedAt).toBeNull();
-    expect(chip.name).toBe("fita do site (swap-api)");
+    // T4.20: "por mint" so the per-mint tape and the batch tape (`swap_api_activity`) never read as one source.
+    expect(chip.name).toBe("fita por mint (swap-api)");
   });
 
   it("grey: heartbeat without this source", () => {
@@ -194,6 +196,12 @@ describe("progressGauge / tapeGauge: the last folded minute's coverage, each wit
     const gauge = tapeGauge(sourcesPayload());
     expect(gauge.value).toBe("39.0%");
     expect(gauge.detail).toBe("98 de 250 mints com fita · ciclo 4.1 s · 20 adiado(s)/min · 12 nunca puxado(s)");
+  });
+
+  // T4.2g: the share of the folded minute's rows whose tape came from the batch route (`tape_source = activity_1m`).
+  it("tape: names the batch tape's share of the covered rows when the worker reports it (same 0..100 scale as the coverage)", () => {
+    const gauge = tapeGauge(sourcesPayload({ tape_activity_pct: 12.5 }));
+    expect(gauge.detail).toBe("98 de 250 mints com fita · cobertura da fita por lote 12.5% · ciclo 4.1 s · 20 adiado(s)/min · 12 nunca puxado(s)");
   });
 
   it("null before the first fold says so — never a 0", () => {
@@ -269,6 +277,38 @@ describe("fastLaneLine: the 15-second clock's counters and the decision→fill l
 
   it("is null (never an empty card) when a worker predates every one of these fields", () => {
     expect(fastLaneLine(sourcesPayload())).toBeNull();
+  });
+});
+
+// T4.2g: the batch tape's own heartbeat (`activity_*`) -- the proof the 1-minute
+// window is alive is `activity_live_1m > 0`; a real 0 next to `activity_dark_60s`
+// says the route answered null for everyone and nothing was written as a zero.
+describe("activityLine: the batch tape's counters, exhaustive over the contract's activity_* fields, never a raw key", () => {
+  it("joins every reported field in Portuguese", () => {
+    const line = activityLine(
+      sourcesPayload({
+        activity_mints: 130,
+        activity_live_1m: 98,
+        activity_dark_60s: 0,
+        activity_batch_calls_60s: 3,
+        activity_coverage_pct: 91.7,
+        activity_covered: 119,
+        activity_cycle_s: 28.4,
+        activity_quote_age_s: 12,
+        activity_skipped_60s: 1,
+      }),
+    );
+    expect(line).toBe(
+      "moedas no lote 130 · janela de 1 min viva 98 · lote sem janela de 1 min (60 s) 0 · chamadas do lote por minuto 3 · cobertura do lote 91.7% (119 com leitura) · ciclo do lote 28.4 s · cotação SOL/USD há 12 s · ciclos do lote pulados por minuto 1",
+    );
+  });
+
+  it("is null (never an empty line) when a worker predates every one of these fields", () => {
+    expect(activityLine(sourcesPayload())).toBeNull();
+  });
+
+  it("a real 0 beside a dark count is shown, not hidden -- that pair is the honest reading of a null window", () => {
+    expect(activityLine(sourcesPayload({ activity_live_1m: 0, activity_dark_60s: 130 }))).toBe("janela de 1 min viva 0 · lote sem janela de 1 min (60 s) 130");
   });
 });
 

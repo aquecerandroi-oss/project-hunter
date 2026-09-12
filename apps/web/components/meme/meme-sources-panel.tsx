@@ -20,6 +20,7 @@ import type { MemeLoopState } from "@/lib/api/meme-desk-types";
 import type { MemeSources } from "@/lib/api/meme-types";
 
 import {
+  activityLine,
   BLINDNESS_SENTENCE,
   fastLaneLine,
   type Gauge,
@@ -135,13 +136,15 @@ interface ViewProps {
   flags: string[];
   /** T4.16: the 15-second clock's counters and the decision→fill latency; `null` on a worker that predates them. */
   fastLane: string | null;
+  /** T4.2g: the batch tape's counters (`activity_*`); `null` on a worker that predates the batch route. */
+  activity: string | null;
 }
 
 function radarTitle(sources: MemeSources): string {
   return [`heartbeat do worker (UTC): ${sources.heartbeat_ts ?? "sem leitura"}`, `campos do radar (UTC): ${sources.sources_at ?? "sem leitura"}`].join("\n");
 }
 
-function FullPanel({ sources, chips, gauges, radar, loop, flags, fastLane }: ViewProps) {
+function FullPanel({ sources, chips, gauges, radar, loop, flags, fastLane, activity }: ViewProps) {
   return (
     <section aria-labelledby="meme-sources-heading" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -177,11 +180,12 @@ function FullPanel({ sources, chips, gauges, radar, loop, flags, fastLane }: Vie
         ))}
       </div>
       {fastLane && <p className="font-mono text-[11px] tabular-nums text-fg-subtle">{fastLane}</p>}
+      {activity && <p className="font-mono text-[11px] tabular-nums text-fg-subtle">fita por lote: {activity}</p>}
     </section>
   );
 }
 
-function LinePanel({ sources, chips, gauges, radar, loop, flags, fastLane }: ViewProps) {
+function LinePanel({ sources, chips, gauges, radar, loop, flags, fastLane, activity }: ViewProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-fg-muted">
       <span className="font-medium text-fg">Fontes</span>
@@ -199,6 +203,11 @@ function LinePanel({ sources, chips, gauges, radar, loop, flags, fastLane }: Vie
       {fastLane && (
         <span className="font-mono tabular-nums" title={fastLane}>
           15 s: {fastLane}
+        </span>
+      )}
+      {activity && (
+        <span className="font-mono tabular-nums" title={activity}>
+          fita por lote: {activity}
         </span>
       )}
       <span>
@@ -225,6 +234,7 @@ export function MemeSourcesPanel({ sources, loop, variant = "full" }: MemeSource
     loop: loop ? loopStateLabel(loop, new Date(sources.as_of).getTime()) : null,
     flags: minuteFlags(sources),
     fastLane: fastLaneLine(sources),
+    activity: activityLine(sources),
   };
   return variant === "line" ? <LinePanel {...view} /> : <FullPanel {...view} />;
 }

@@ -203,6 +203,10 @@ _FEATURE_COLUMNS = (
     "line_reason",
     "hype_score",
     "hype_reason",
+    # 0032 — where the tape came from (T4.2g, ``features_tape.py``).
+    "tape_source",
+    "tape_window_s",
+    "tape_as_of",
 )
 
 _INSERT_FEATURES = text(

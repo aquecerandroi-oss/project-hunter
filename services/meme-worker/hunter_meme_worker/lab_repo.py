@@ -55,6 +55,7 @@ _GATE_ROWS = text(
     "       f.holders, f.holders_reason, prev.holders AS holders_prev, "
     "       prev.curve_progress_pct AS progress_prev, "
     "       t.created_at, t.completed_at, t.migrated_at, t.initial_real_token_reserves, "
+    "       t.symbol, "
     "       s.virtual_sol_reserves, s.virtual_token_reserves, s.real_sol_reserves, "
     "       s.real_token_reserves, s.total_supply, s.complete, s.mcap_sol AS snapshot_mcap_sol "
     "FROM meme_features_1m f "
@@ -187,6 +188,7 @@ async def load_gate_rows(
                 holders_rising=_rising(r["holders"], r["holders_prev"]),
                 holders_reason=_trend_reason(r["holders"], r["holders_prev"], r["holders_reason"]),
                 progress_rising=_rising(r["curve_progress_pct"], r["progress_prev"]),
+                symbol=None if r["symbol"] is None else str(r["symbol"]),
             )
         )
     return out

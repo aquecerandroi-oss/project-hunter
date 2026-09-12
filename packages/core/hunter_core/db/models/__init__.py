@@ -88,6 +88,7 @@ from hunter_core.db.models.market_data import (
 )
 from hunter_core.db.models.markets import Asset, Exchange, Market
 from hunter_core.db.models.meme import MemeIngestGap, MemeToken
+from hunter_core.db.models.meme_activity import MemeMarketActivity1m
 from hunter_core.db.models.meme_boards import MemeBoardObservation, MemeRiskSnapshot
 from hunter_core.db.models.meme_features import MemeFeatures1m
 from hunter_core.db.models.meme_features_15s import MemeFeatures15s
@@ -219,6 +220,7 @@ __all__ = [
     "MemeLiveKillSwitch",
     "MemeLiveOrder",
     "MemeLivePosition",
+    "MemeMarketActivity1m",
     "MemeOperatorCommand",
     "MemePaperBet",
     "MemeProposal",

@@ -30,6 +30,10 @@ SOLANA_RPC = "solana_rpc"
 TRENCHES_WS = "trenches_ws"
 SWAP_API = "swap_api"
 INDEXER_RISK = "indexer_risk"
+SWAP_API_ACTIVITY = "swap_api_activity"
+"""T4.2g: the batch route on the same host and the same edge budget as
+``swap_api`` — its own block so an operator sees the batch's liveness apart
+from the per-mint tape's; its calls are counted in **both** ``used_60s``."""
 SOURCE_NAMES: tuple[str, ...] = (
     PUMPPORTAL_WS,
     PUMPFUN_REST,
@@ -37,6 +41,7 @@ SOURCE_NAMES: tuple[str, ...] = (
     TRENCHES_WS,
     SWAP_API,
     INDEXER_RISK,
+    SWAP_API_ACTIVITY,
 )
 
 
@@ -73,6 +78,22 @@ class SourcesState:
     """T4.2e: the last folded minute and how many of its rows carried a tape
     and a progress — ``tape_coverage_pct``/``progress_coverage_pct`` in the
     heartbeat. ``None`` until the first fold: an unknown, never ``0 %``."""
+    fold_rows_with_tape_activity: int | None = None
+    """T4.2g: of the rows with a tape, how many took it from the batch route
+    (``tape_source = activity_1m``) — ``tape_activity_pct`` in the heartbeat."""
+    activity_cycle_s: float | None = None
+    activity_mints: int | None = None
+    activity_covered: int | None = None
+    activity_live_1m: int | None = None
+    activity_quote_age_s: float | None = None
+    activity_batch_calls_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
+    activity_dark_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
+    activity_skipped_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
+    """The batch loop (T4.2g, ``activity.py``): the last cycle's duration, coins
+    asked and covered by a ``1m`` reading, coins the route filled ``1m`` for,
+    the age of the SOL/USD quote used, batch calls in the minute, coins left
+    dark (``1m`` null in a cycle nobody's was filled) and cycles skipped
+    (the edge's block) in the minute."""
     tape_cycle_s: float | None = None
     tape_planned: int | None = None
     tape_tracked_mints: int | None = None
@@ -119,12 +140,41 @@ class SourcesState:
         return self.sources[name]
 
     def record_fold(
-        self, minute: datetime, *, rows: int, with_tape: int, with_progress: int
+        self,
+        minute: datetime,
+        *,
+        rows: int,
+        with_tape: int,
+        with_progress: int,
+        with_tape_activity: int = 0,
     ) -> None:
         self.fold_minute = minute
         self.fold_rows = rows
         self.fold_rows_with_tape = with_tape
         self.fold_rows_with_progress = with_progress
+        self.fold_rows_with_tape_activity = with_tape_activity
+
+    def record_activity_cycle(
+        self,
+        at: datetime,
+        *,
+        asked: int,
+        covered: int,
+        calls: int,
+        live_1m: int,
+        dark: int,
+        skipped: bool,
+        duration_s: float,
+        quote_age_s: float | None,
+    ) -> None:
+        self.activity_cycle_s = duration_s
+        self.activity_mints = asked
+        self.activity_covered = covered
+        self.activity_live_1m = live_1m
+        self.activity_quote_age_s = quote_age_s
+        self.activity_batch_calls_60s.add(at, calls)
+        self.activity_dark_60s.add(at, dark)
+        self.activity_skipped_60s.add(at, 1 if skipped else 0)
 
     def record_tape_cycle(
         self,
@@ -250,6 +300,17 @@ class SourcesState:
             # T4.2e: the coverage of the last folded minute and the tape cycle.
             "progress_coverage_pct": _pct(self.fold_rows_with_progress, self.fold_rows),
             "tape_coverage_pct": _pct(self.fold_rows_with_tape, self.fold_rows),
+            # T4.2g: the batch loop and how much of the fold's tape it supplied.
+            "tape_activity_pct": _pct(self.fold_rows_with_tape_activity, self.fold_rows),
+            "activity_coverage_pct": _pct(self.activity_covered, self.activity_mints),
+            "activity_cycle_s": self.activity_cycle_s,
+            "activity_mints": self.activity_mints,
+            "activity_covered": self.activity_covered,
+            "activity_live_1m": self.activity_live_1m,
+            "activity_quote_age_s": self.activity_quote_age_s,
+            "activity_batch_calls_60s": self.activity_batch_calls_60s.total(now),
+            "activity_dark_60s": self.activity_dark_60s.total(now),
+            "activity_skipped_60s": self.activity_skipped_60s.total(now),
             "fold_minute": iso_or_none(self.fold_minute),
             "fold_rows": self.fold_rows,
             "tape_cycle_s": self.tape_cycle_s,

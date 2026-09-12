@@ -123,7 +123,7 @@ porque o inteiro excede 2^53 em JS.
 | 1 | `GET /v2/coins/{mint}/candles` | `createdTs(ms), interval ∈ {1s,15s,30s,1m,5m,15m,30m,1h,4h,6h,12h,24h}, limit ≤ 1000` | 200 (400 com intervalo inválido: mensagem lista os 12 valores) | 1000 | `[{timestamp(ms), open, high, low, close, volume}]` — **preços em USD e volume em USD como strings decimais**; só candles com trade (esparso); devolve os **N mais recentes**, sem parâmetro conhecido de "até"/cursor |
 | 2 | `GET /v1/coins/{mint}/line-chart` | `createdTs, timeframe=1w, width=72` | 200 | 1000 | `[{time(ms), price}]` (108 pontos) |
 | 3 | `GET /v1/coins/{mint}/market-activity` | `[program=pump]` | 200 | 1000 | `{5m,1h,6h,24h}` × `{numTxs, volumeUSD, numUsers, numBuys, numSells, buyVolumeUSD, sellVolumeUSD, numBuyers, numSellers, priceChangePercent}` |
-| 4 | `POST /v1/coins/market-activity/batch` | `{addresses[], intervals[], metrics[]}` | 201 | 1000 | `{mint: {intervalo: {métrica}}}` — **lote**, ideal para varredura |
+| 4 | `POST /v1/coins/market-activity/batch` | `{addresses[] (1–50), intervals[] ⊆ {1m,5m,1h,6h,24h}, metrics[]}` | 201 (400 com > 50 endereços: `addresses must contain no more than 50 elements`; 400 com 0) | 1000 (+ Cloudflare) | `{mint: {intervalo: {numTxs, volumeUSD, numUsers, numBuys, numSells, buyVolumeUSD, sellVolumeUSD, numBuyers, numSellers, priceChangePercent} \| null}}` — **lote**; as 10 métricas aceitas; janela sem trade = `null`; USD em floats; sem carimbo próprio (o `Date` da resposta é o fim das janelas). **T4.2g: a fita do minuto** (`meme_market_activity_1m`, migração `0032`) |
 | 5 | `GET /v2/coins/{mint}/trades` | `limit ≤ 100 (400 acima), cursor, program?, minSolAmount?, minUsdAmount?, chainId?, userAddress?, createdTs?` | 200 | 1000 | `{trades[]{slotIndexId, tx, timestamp(ISO), userAddress, type buy/sell, program (pump, raydium_cpmm, raydium_launchpad…), priceUsd, priceSol, amountUsd, amountSol, baseAmount, quoteAmount, fillPriceUsd, fillPriceSol}, pagination{nextCursor, hasMore, limit}}` — cursor `slotIndexId-timestamp` |
 | 6 | `POST /v1/coins/{mint}/trades/batch` | `{userAddresses[], program, createdTs}` | 201 | 1000 | `{wallet: [trade + isBondingCurve]}` — histórico por carteira na coin (base de `creator_sold`) |
 | 7 | `GET /v1/coins/{mint}/first-trade` | — | 200 | 1000 | trade + `isDevBuy: bool`; existe para coin de abril/2025 (histórico profundo) |
@@ -150,8 +150,27 @@ nas 5 vezes). Era isso que os 8 pulls concorrentes da T4.2c/T4.2e disparavam a c
 acima de 20) em cota exata por ciclo, e uma 429 real (`HttpRateLimited`, com os cabeçalhos) encolhe o orçamento
 para 80 % do que passou no minuto anterior e bloqueia o `retry-after`. Aritmética honesta: 16 pulls/min × 180 s
 de frescor ÷ ~130 rastreados ≈ **40 % de cobertura da fita por minuto** — o teto deste endpoint a partir de um
-IP só (a T4.2e mediu 38,8 %). `POST /v1/coins/market-activity/batch` (rota 4: N mints numa requisição, janelas
-5m/1h/6h/24h, USD) é a saída para uma feature de janela maior, não para a fita do minuto.
+IP só (a T4.2e mediu 38,8 %). A saída foi a rota 4, medida na T4.2g.
+
+**O lote medido (T4.2g, 12/09/2026 17:24–17:25 BRT; 5 requisições espaçadas 4 s, 3 × 201, 2 × 400 — fixtures
+`packages/exchange-adapters/tests/fixtures/pumpfun/t42g_market_activity_batch_{raw,50_raw,probes}.json`):**
+`POST /v1/coins/market-activity/batch` aceita **no máximo 50 endereços por requisição** (140 e 100 → 400 com
+`addresses must contain no more than 50 elements`; lista vazia → `at least 1 elements`), **todas as 10 métricas**
+(`numBuys`, `numSells`, `buyVolumeUSD`, `sellVolumeUSD`, `numBuyers`, `numSellers` incluídas — o screener do site
+só pede 4) e ecoa as janelas `1m`, `5m`, `1h`, `6h`, `24h` como chaves. **Uma janela sem trade vem `null`**, não
+um objeto de zeros: em 50 moedas de 7 h de idade, `24h` veio preenchida em 50, `6h` em 7 e `1h`/`5m`/`1m` em
+nenhuma. Volumes em **USD** (floats; o adaptador decodifica com `parse_float=Decimal`). A resposta não carrega
+carimbo próprio: `observed_at` = o cabeçalho `Date` (segundo inteiro), o fim das janelas. 50 moedas custaram
+982 ms e 17 KB, **uma requisição do mesmo orçamento do Cloudflare** — com ~130 rastreados, 3 requisições/min
+cobrem o conjunto inteiro e a fita por mint fica com 13 (apostas abertas e `graduating` primeiro).
+**Não provado pela sonda:** um bloco `1m` não-nulo numa moeda operando agora (a 5.ª requisição foi gasta numa
+lista vazia por erro da sonda); o worker só escreve zero para um `null` de `1m` num ciclo em que alguma moeda
+teve o `1m` preenchido (`activity_live_1m` no heartbeat), e conta o resto como escuro (`activity_dark_60s`).
+O lote não diz **quem** negociou (`unique_buyers` conta o criador; `creator_net_seller` fica `no_trade_feed`) nem
+fala em SOL (o worker converte com a cotação de `/sol-price` que tinha, guardada ao lado: `sol_usd`,
+`sol_usd_observed_at`; sem cotação com < 5 min, `no_sol_quote`). Adaptador:
+`hunter_exchanges/pumpfun/market_activity.py` (`NormalizedMarketActivity`, `ActivityBatch`, `parse_activity_batch`)
+e `SwapApiClient.market_activity_batch`; worker: `services/meme-worker/hunter_meme_worker/activity.py`.
 
 ## 3. Superfícies em tempo real
 

@@ -110,12 +110,25 @@ class TapeBudget:
         self.refusals_1h = RollingCounter(3600)
         self._carry = Fraction(0)
         """Exact, not a float: 2,67 + 0,33 must be 3, never 2,999…"""
+        self.reserved = 0
+        """Requests per 60 s another loop spends on the **same** edge budget
+        (T4.2g: the batch route's calls, ``activity.py``) — taken off the
+        top of what the tape may plan, so the two together never exceed
+        ``effective``."""
 
     @property
     def per_cycle_nominal(self) -> int:
         """The cycle's share, floored — what a test asks for; :meth:`per_cycle`
         carries the fraction across cycles."""
         return max(1, int(self.effective * self.cycle_s / 60))
+
+    @property
+    def available(self) -> int:
+        """What the tape itself may spend per 60 s: ``effective`` minus the reservation."""
+        return max(1, self.effective - self.reserved)
+
+    def reserve(self, requests_60s: int) -> None:
+        self.reserved = max(0, requests_60s)
 
     def blocked_at(self, at: datetime) -> bool:
         return self.blocked_until is not None and at < self.blocked_until
@@ -129,7 +142,7 @@ class TapeBudget:
         if self.restore_at is not None and now >= self.restore_at:
             self.effective = self.configured
             self.restore_at = None
-        exact = Fraction(self.effective) * Fraction(self.cycle_s) / 60 + self._carry
+        exact = Fraction(self.available) * Fraction(self.cycle_s) / 60 + self._carry
         count = int(exact)
         self._carry = exact - count
         return count

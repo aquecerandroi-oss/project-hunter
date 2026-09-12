@@ -164,6 +164,8 @@ export function progressGauge(payload: MemeSources): Gauge {
 export function tapeGauge(payload: MemeSources): Gauge {
   const parts: string[] = [];
   if (isNum(payload.tape_covered_mints) && isNum(payload.tape_tracked_mints)) parts.push(`${payload.tape_covered_mints} de ${payload.tape_tracked_mints} mints com fita`);
+  // T4.2g: the share of the minute's rows whose tape came from the batch route (`tape_source = activity_1m`), same 0..100 scale.
+  if (isNum(payload.tape_activity_pct)) parts.push(`cobertura da fita por lote ${payload.tape_activity_pct.toFixed(1)}%`);
   if (isNum(payload.tape_cycle_s)) parts.push(`ciclo ${payload.tape_cycle_s.toFixed(1)} s`);
   if (isNum(payload.tape_deferred_60s)) parts.push(`${payload.tape_deferred_60s} adiado(s)/min`);
   if (isNum(payload.tape_never_pulled)) parts.push(`${payload.tape_never_pulled} nunca puxado(s)`);
@@ -255,5 +257,28 @@ export function fastLaneLine(payload: MemeSources): string | null {
   if (isNum(payload.lab_decision_to_fill_s_p50)) parts.push(`decisão → fill p50 (medido) ${payload.lab_decision_to_fill_s_p50.toFixed(1)} s`);
   if (isNum(payload.lab_decision_to_fill_s_p95)) parts.push(`decisão → fill p95 (medido) ${payload.lab_decision_to_fill_s_p95.toFixed(1)} s`);
   if (isNum(payload.lab_bets_indeterminate_total)) parts.push(`${payload.lab_bets_indeterminate_total} indeterminadas (total)`);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+/**
+ * T4.2g: the batch tape's (`swap_api_activity`) own counters. `activity_live_1m > 0`
+ * is the proof the 1-minute window is computed; a real 0 beside
+ * `activity_dark_60s` says the route answered null for everyone and nothing
+ * was written as a zero -- so a 0 here is shown, never hidden. `null` (never an
+ * empty line) on a worker that predates the batch route.
+ */
+export function activityLine(payload: MemeSources): string | null {
+  const parts: string[] = [];
+  if (isNum(payload.activity_mints)) parts.push(`moedas no lote ${payload.activity_mints}`);
+  if (isNum(payload.activity_live_1m)) parts.push(`janela de 1 min viva ${payload.activity_live_1m}`);
+  if (isNum(payload.activity_dark_60s)) parts.push(`lote sem janela de 1 min (60 s) ${payload.activity_dark_60s}`);
+  if (isNum(payload.activity_batch_calls_60s)) parts.push(`chamadas do lote por minuto ${payload.activity_batch_calls_60s}`);
+  if (isNum(payload.activity_coverage_pct)) {
+    const covered = isNum(payload.activity_covered) ? ` (${payload.activity_covered} com leitura)` : "";
+    parts.push(`cobertura do lote ${payload.activity_coverage_pct.toFixed(1)}%${covered}`);
+  }
+  if (isNum(payload.activity_cycle_s)) parts.push(`ciclo do lote ${payload.activity_cycle_s.toFixed(1)} s`);
+  if (isNum(payload.activity_quote_age_s)) parts.push(`cotação SOL/USD há ${formatAgeS(payload.activity_quote_age_s)}`);
+  if (isNum(payload.activity_skipped_60s)) parts.push(`ciclos do lote pulados por minuto ${payload.activity_skipped_60s}`);
   return parts.length ? parts.join(" · ") : null;
 }

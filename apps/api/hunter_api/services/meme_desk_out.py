@@ -1,10 +1,9 @@
 """Repository rows → ``schemas/meme_desk.py`` payloads, and the one piece of
 pricing the API does itself: a manual proposal's ``quote`` (T4.7). Split out
-of ``services/meme_desk.py`` for the 350-line budget: this module derives and
-maps. **JSONB is read tolerantly** — ``suggested``/``decision``/``params``/
-``entry``/``exit``/``quote`` are the loop's (T4.6) or this API's own writes; a
-missing key is ``None`` in the payload, never ``0``, never a guess (DESIGN.md §2).
-"""
+of ``services/meme_desk.py`` for the 350-line budget. **JSONB is read
+tolerantly** — ``suggested``/``decision``/``params``/``entry``/``exit``/``quote``
+are the loop's (T4.6) or this API's own writes; a missing key is ``None`` in
+the payload, never ``0``, never a guess (DESIGN.md §2)."""
 
 from __future__ import annotations
 
@@ -298,6 +297,7 @@ def build_desk_row_out(row: DeskRow) -> DeskRowOut:
         token=_token_out(row.token) if row.token is not None else None,
         rule_set=_rule_set_out(row.rule_set) if row.rule_set is not None else None,
         bet=_bet_out(row.bet) if row.bet is not None else None,
+        manual_plan=_str_or_none((p.suggested or {}).get("manual_plan")),
     )
 
 

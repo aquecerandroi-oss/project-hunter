@@ -236,6 +236,52 @@ def test_the_chain_loop_and_the_edges_budget_are_the_workers_numbers() -> None:
     assert older.swap_api_blocked_until is None
 
 
+def test_the_batch_loop_and_its_share_of_the_tape_are_the_workers_numbers() -> None:
+    """T4.2g: the batch route's cycle, its coverage and how much of the fold's
+    tape it supplied come from the heartbeat as written; ``swap_api_activity``
+    is a source of its own with the batch table as its witness; a worker
+    before T4.2g yields ``None`` and an ``unknown`` source, never a zero."""
+    out = build_meme_sources(
+        _heartbeat(
+            tape_coverage_pct="90.8",
+            tape_activity_pct="69.2",
+            activity_coverage_pct="93.1",
+            activity_mints="130",
+            activity_covered="121",
+            activity_live_1m="97",
+            activity_batch_calls_60s="3",
+            activity_dark_60s="0",
+            activity_skipped_60s="0",
+            activity_cycle_s="2.917",
+            activity_quote_age_s="12.4",
+        ),
+        _latest(swap_api_activity=None),
+        as_of=AS_OF,
+        heartbeat_key=KEY,
+    )
+    assert out.tape_coverage_pct == pytest.approx(90.8)
+    assert out.tape_activity_pct == pytest.approx(69.2)
+    assert out.activity_coverage_pct == pytest.approx(93.1)
+    assert (out.activity_mints, out.activity_covered, out.activity_live_1m) == (130, 121, 97)
+    assert (out.activity_batch_calls_60s, out.activity_dark_60s, out.activity_skipped_60s) == (
+        3,
+        0,
+        0,
+    )
+    assert out.activity_cycle_s == pytest.approx(2.917)
+    assert out.activity_quote_age_s == pytest.approx(12.4)
+    assert "market-activity/batch" in out.coverage_explanation
+    assert "no_sol_quote" in out.coverage_explanation
+    activity = {s.name: s for s in out.sources}["swap_api_activity"]
+    assert activity.status == "unknown" and activity.reason == "heartbeat_missing", (
+        "the fixture heartbeat predates the batch loop: unknown, not healthy"
+    )
+    assert activity.table == "meme_market_activity_1m" and activity.row_reason == "no_rows"
+    older = build_meme_sources(_heartbeat(), _latest(), as_of=AS_OF, heartbeat_key=KEY)
+    assert older.tape_activity_pct is None and older.activity_coverage_pct is None
+    assert older.activity_batch_calls_60s is None and older.activity_live_1m is None
+
+
 def test_source_status_reads_the_workers_word_and_never_infers_health() -> None:
     assert source_status("swap_api", None) == ("unknown", "heartbeat_missing")
     assert source_status("swap_api", {"enabled": False}) == ("disabled", "disabled")

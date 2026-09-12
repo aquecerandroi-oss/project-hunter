@@ -67,13 +67,14 @@ if TYPE_CHECKING:
 
 __all__ = ["OPERATOR_RULE_SET", "MemeDeskRepository"]
 
-OPERATOR_RULE_SET = ("operator", "2")
+OPERATOR_RULE_SET = ("operator", "3")
 """``meme_rule_sets (name, version)`` a manual proposal is filed under at
-``head`` (contract §Rotas): ``0029_meme_moonshot`` (T4.11) retired ``0022``'s
-``operator/1`` and seeded ``operator/2`` (the moonshot ``suggested``, sheet
-still editable). The read is by **name and status** — the active ``operator``
-set of the highest version — so a database still at ``0028`` files under
-``operator/1`` instead of refusing ``operator_rule_set_missing``."""
+``head`` (contract §Rotas): ``0033_meme_operator_3`` (T4.19) retired ``0029``'s
+``operator/2`` (EXP-M1's gate) for ``operator/3`` (``flow_v2/1``'s E1 gate and
+E2 exclusions, ``ttl_s`` 180, sheet still editable). The read is by **name and
+status** — the active ``operator`` set of the highest version — so a database
+still at ``0032`` files under ``operator/2`` (``0028``: ``operator/1``) instead
+of refusing ``operator_rule_set_missing``."""
 
 _p = meme_proposals
 _b = meme_paper_bets

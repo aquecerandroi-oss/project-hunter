@@ -36,10 +36,12 @@ from hunter_indicators.meme.lines import LinePoint
 from hunter_meme_worker.features_lines import BoardStanding, hype_columns, line_columns
 from hunter_meme_worker.features_tape import (
     NO_SELLS,
+    NO_SOL_QUOTE,
+    NO_TRADE_FEED,
     HoldersObservation,
     TapeMinute,
-    buy_sell_ratio,
     fraction,
+    tape_columns,
 )
 
 FEATURES_VERSION = "meme_features_v3"
@@ -56,7 +58,6 @@ version, and a gate that reads a line must know the row was folded by a fold
 that draws one. The ``v2`` rows are not rewritten; the series breaks at the
 deploy and the Lab reads the version its config names (``lab_repo.load_gate_rows``)."""
 
-NO_TRADE_FEED = "no_trade_feed"
 NO_HOLDERS_READER = "no_holders_reader"
 DENOMINATOR_UNKNOWN = "denominator_unknown"
 NOT_POLLED = "not_polled"
@@ -78,12 +79,14 @@ REASON_VOCABULARY = frozenset(
         UNSUPPORTED_QUOTE,
         NO_SELLS,
         OUT_OF_RANGE,
+        NO_SOL_QUOTE,
     }
 )
 """The closed set the API renders (T4.3's acceptance criterion: named states, not
 an undifferentiated ``null``). Frozen here and copied into
 ``.claude/state/notes-T4.2.md`` §contrato; ``no_sells`` is the eighth, added by
-``0023`` as an amendment there — a decision, not a string typed at a call site."""
+``0023`` as an amendment there — a decision, not a string typed at a call site;
+``no_sol_quote`` the tenth (``0032``, ``features_tape.py``)."""
 
 _FRACTION = Decimal("0.000001")
 """``NUMERIC(9,6)``'s own scale: quantizing here means the value a test reads back
@@ -187,6 +190,9 @@ class FeatureRow:
     line_reason: str | None = None
     hype_score: Decimal | None = None
     hype_reason: str | None = None
+    tape_source: str | None = None
+    tape_window_s: int | None = None
+    tape_as_of: datetime | None = None
 
 
 def curve_progress_pct(
@@ -256,33 +262,6 @@ def share_or_reason(value: Decimal | None) -> tuple[Decimal | None, str | None]:
     return share, None
 
 
-def _tape_columns(tape: TapeMinute | None, absence: str) -> dict[str, object]:
-    if tape is None:
-        return {
-            "unique_buyers_reason": absence,
-            "buy_sell_ratio_reason": absence,
-            "creator_sold_reason": absence,
-            "tape_reason": absence,
-            "creator_net_seller_reason": absence,
-        }
-    ratio = buy_sell_ratio(tape.buys, tape.sells)
-    return {
-        "unique_buyers": tape.unique_buyers,
-        "unique_buyers_reason": None,
-        "buy_sell_ratio": ratio,
-        "buy_sell_ratio_reason": None if ratio is not None else NO_SELLS,
-        "buys_1m": tape.buys,
-        "sells_1m": tape.sells,
-        "net_sol_flow_1m": tape.net_sol_flow,
-        "curve_volume_1m_sol": tape.volume_sol,
-        "tape_reason": None,
-        "creator_sold": tape.creator_sold,
-        "creator_sold_reason": None if tape.creator_sold is not None else NO_TRADE_FEED,
-        "creator_net_seller": tape.creator_net_seller,
-        "creator_net_seller_reason": None if tape.creator_net_seller is not None else NO_TRADE_FEED,
-    }
-
-
 def build_row(inputs: MinuteInputs, *, features_version: str = FEATURES_VERSION) -> FeatureRow:
     """Fold one minute of one mint. Total: every input shape yields a legal row."""
     snapshot = inputs.snapshot
@@ -326,7 +305,7 @@ def build_row(inputs: MinuteInputs, *, features_version: str = FEATURES_VERSION)
         "creator_sold_reason": NO_TRADE_FEED,
         **curve,
         **_holders_columns(inputs.holders),
-        **_tape_columns(inputs.tape, inputs.tape_absence_reason),
+        **tape_columns(inputs.tape, inputs.tape_absence_reason),
         **line_columns(
             inputs.line_points,
             end_time=inputs.end_time,

@@ -73,6 +73,7 @@ def test_the_heartbeat_names_every_source_and_never_a_silent_zero() -> None:
         "trenches_ws",
         "swap_api",
         "indexer_risk",
+        "swap_api_activity",
     }
     assert per_source["trenches_ws"]["reason"] == "disabled"
     assert per_source["swap_api"]["reason"] == "never_observed"
@@ -155,6 +156,49 @@ def test_the_heartbeat_carries_the_chain_loop_and_the_budget_the_edge_enforces()
     assert fields["swap_api_blocked_until"] == (NOW + timedelta(seconds=60)).isoformat()
     later = sources.heartbeat_fields(NOW + timedelta(seconds=61), tracked=141)
     assert later["chain_calls_60s"] == "0" and later["swap_api_429_1h"] == "1"
+
+
+def test_the_heartbeat_carries_the_batch_loop_and_how_much_tape_it_supplied() -> None:
+    """T4.2g: the batch route's last cycle and its share of the fold's tape —
+    unknown until the loop ran (``""``), never a zero that reads as coverage."""
+    sources = SourcesState()
+    empty = sources.heartbeat_fields(NOW, tracked=0)
+    assert empty["activity_coverage_pct"] == "" and empty["activity_mints"] == ""
+    assert empty["tape_activity_pct"] == "" and empty["activity_batch_calls_60s"] == "0"
+    assert empty["activity_dark_60s"] == "0" and empty["activity_skipped_60s"] == "0"
+    sources.record_activity_cycle(
+        NOW,
+        asked=130,
+        covered=121,
+        calls=3,
+        live_1m=97,
+        dark=0,
+        skipped=False,
+        duration_s=2.917,
+        quote_age_s=12.4,
+    )
+    sources.record_fold(NOW, rows=130, with_tape=118, with_progress=120, with_tape_activity=90)
+    fields = sources.heartbeat_fields(NOW, tracked=130)
+    assert fields["activity_coverage_pct"] == "93.1" and fields["activity_mints"] == "130"
+    assert fields["activity_covered"] == "121" and fields["activity_live_1m"] == "97"
+    assert fields["activity_batch_calls_60s"] == "3" and fields["activity_cycle_s"] == "2.917"
+    assert fields["activity_quote_age_s"] == "12.4" and fields["activity_dark_60s"] == "0"
+    assert fields["tape_coverage_pct"] == "90.8" and fields["tape_activity_pct"] == "69.2"
+    sources.record_activity_cycle(
+        NOW + timedelta(seconds=60),
+        asked=130,
+        covered=0,
+        calls=0,
+        live_1m=0,
+        dark=0,
+        skipped=True,
+        duration_s=0.001,
+        quote_age_s=None,
+    )
+    later = sources.heartbeat_fields(NOW + timedelta(seconds=61), tracked=130)
+    assert later["activity_batch_calls_60s"] == "0" and later["activity_skipped_60s"] == "1"
+    assert later["activity_coverage_pct"] == "0.0", "a skipped cycle covered nobody, and says so"
+    assert later["activity_quote_age_s"] == ""
 
 
 def test_a_connected_trenches_says_true_and_a_dropped_one_false() -> None:
