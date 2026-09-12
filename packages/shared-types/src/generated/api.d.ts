@@ -2179,6 +2179,55 @@ export interface components {
             target_usd: string;
         };
         /**
+         * GraduationMatrixOut
+         * @description One Brasília day of ``meme_graduation_matrix_v1`` (``0024``, T4.2d): the
+         *     agreement matrix of the four completion signals over the mints whose
+         *     earliest signal fell on ``day_brt`` — the M-D1/M-D2 diagnostic as a panel.
+         *     ``rest_only_unclassified`` is the "77 of 140": REST said complete, nothing
+         *     else did, and the photo's reserve was zero.
+         */
+        GraduationMatrixOut: {
+            /** Completed */
+            completed: number;
+            /** Curve Filled */
+            curve_filled: number;
+            /**
+             * Day Brt
+             * Format: date
+             */
+            day_brt: string;
+            /** Disagree Board Pool */
+            disagree_board_pool: number;
+            /** Disagree Filled Board */
+            disagree_filled_board: number;
+            /** Disagree Filled Pool */
+            disagree_filled_pool: number;
+            /** Disagree Rest Board */
+            disagree_rest_board: number;
+            /** Disagree Rest Filled */
+            disagree_rest_filled: number;
+            /** Disagree Rest Pool */
+            disagree_rest_pool: number;
+            /** Graduated Board */
+            graduated_board: number;
+            /** Mints */
+            mints: number;
+            /** Pool Created */
+            pool_created: number;
+            /** Rest Complete */
+            rest_complete: number;
+            /** Rest Only Unclassified */
+            rest_only_unclassified: number;
+            /** Signals 1 */
+            signals_1: number;
+            /** Signals 2 */
+            signals_2: number;
+            /** Signals 3 */
+            signals_3: number;
+            /** Signals 4 */
+            signals_4: number;
+        };
+        /**
          * GraduationsOut
          * @description Migrations to PumpSwap in the last 24h, **out of how many tokens this
          *     radar actually tracks** — the numerator/denominator pair
@@ -2968,6 +3017,7 @@ export interface components {
             /** Coins Created 7D */
             coins_created_7d: number | null;
             coins_created_by_mode?: components["schemas"]["OverviewByModeOut"] | null;
+            graduation_matrix?: components["schemas"]["GraduationMatrixOut"] | null;
             graduations_24h: components["schemas"]["GraduationsOut"];
             /**
              * Label
@@ -3063,6 +3113,17 @@ export interface components {
             budget_60s: number | null;
             /** Budget Used 60S */
             budget_used_60s: number | null;
+            /**
+             * Discovery Blind Explanation
+             * @default programa fora do escopo do adaptador: a descoberta ouve só o programa pump (PumpPortal subscribeNewToken + boards new/graduating com pg = pump); entradas do board new em raydium_launchpad/StonkFun e afins são invisíveis por construção e não são rastreadas — a fração declara o tamanho da cegueira, não a corrige
+             */
+            discovery_blind_explanation: string;
+            /** Discovery Blind Share 1H */
+            discovery_blind_share_1h?: number | null;
+            /** Discovery New Board Entries 1H */
+            discovery_new_board_entries_1h?: number | null;
+            /** Discovery Non Pump Entries 1H */
+            discovery_non_pump_entries_1h?: number | null;
             /** Gaps 60S */
             gaps_60s: number | null;
             /** Heartbeat Age S */
@@ -3144,12 +3205,18 @@ export interface components {
         MemeTokenOut: {
             /** Age Minutes */
             age_minutes: number | null;
+            /** Completed At */
+            completed_at?: string | null;
             /** Created At */
             created_at: string | null;
             /** Creator */
             creator: string | null;
+            /** Curve Filled Seen At */
+            curve_filled_seen_at?: string | null;
             /** Curve Progress Pct */
             curve_progress_pct: string | null;
+            /** Graduated Board Seen At */
+            graduated_board_seen_at?: string | null;
             /** Mayhem Enabled */
             mayhem_enabled: boolean | null;
             /** Mayhem State */
@@ -3162,6 +3229,18 @@ export interface components {
             mint: string;
             /** Name */
             name: string | null;
+            /** Pool Created At */
+            pool_created_at?: string | null;
+            /** Pool Created Source */
+            pool_created_source?: ("pumpportal_ws" | "trenches_ws" | "indexer_rest:/boards" | "indexer_rest:/in-memory-coin") | null;
+            /**
+             * Progress Denominator Source
+             * @default unknown
+             * @enum {string}
+             */
+            progress_denominator_source: "observed_virgin" | "global_params" | "unknown";
+            /** Rest Complete Seen At */
+            rest_complete_seen_at?: string | null;
             /** Snapshot Observed At */
             snapshot_observed_at: string | null;
             /** Snapshot Source */

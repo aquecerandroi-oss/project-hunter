@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from hunter_api.repositories.meme_sources import SOURCE_TABLES, LatestRow
-from hunter_api.schemas.meme_sources import MEME_SOURCES_LABEL
+from hunter_api.schemas.meme_sources import DISCOVERY_BLIND_EXPLANATION, MEME_SOURCES_LABEL
 from hunter_api.services.meme_sources import SOURCE_NAMES, build_meme_sources, source_status
 
 pytestmark = pytest.mark.unit
@@ -131,6 +131,35 @@ def test_the_radar_status_names_every_way_the_heartbeat_can_be_absent(
         assert all(s.last_row_observed_at is not None for s in out.sources), (
             "the database still speaks"
         )
+
+
+def test_the_declared_blindness_is_exposed_with_its_explanation() -> None:
+    """T4.2d, item 3: the share of the ``new`` board that runs on a program
+    other than ``pump`` — invisible to the discovery socket by construction —
+    with the worker's counts beside it and the fixed explanation. An hour the
+    board listed nothing is ``None``, never a ``0`` that reads as full coverage."""
+    out = build_meme_sources(
+        _heartbeat(new_board_entries_1h="50", new_board_non_pump_1h="8", blind_share_1h="0.16"),
+        _latest(),
+        as_of=AS_OF,
+        heartbeat_key=KEY,
+    )
+    assert out.discovery_blind_share_1h == pytest.approx(0.16)
+    assert out.discovery_new_board_entries_1h == 50
+    assert out.discovery_non_pump_entries_1h == 8
+    assert out.discovery_blind_explanation == DISCOVERY_BLIND_EXPLANATION
+    assert "programa fora do escopo do adaptador" in DISCOVERY_BLIND_EXPLANATION
+    empty = build_meme_sources(
+        _heartbeat(new_board_entries_1h="0", new_board_non_pump_1h="0", blind_share_1h=""),
+        _latest(),
+        as_of=AS_OF,
+        heartbeat_key=KEY,
+    )
+    assert empty.discovery_blind_share_1h is None
+    assert empty.discovery_new_board_entries_1h == 0
+    older = build_meme_sources(_heartbeat(), _latest(), as_of=AS_OF, heartbeat_key=KEY)
+    assert older.discovery_blind_share_1h is None, "a worker before T4.2d says nothing"
+    assert older.discovery_new_board_entries_1h is None
 
 
 def test_source_status_reads_the_workers_word_and_never_infers_health() -> None:

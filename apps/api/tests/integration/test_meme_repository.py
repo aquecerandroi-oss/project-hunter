@@ -75,7 +75,13 @@ DDL_STATEMENTS = [
         first_seen_source text NOT NULL,
         first_seen_at timestamptz NOT NULL,
         last_seen_at timestamptz NOT NULL,
-        updated_at timestamptz NOT NULL
+        updated_at timestamptz NOT NULL,
+        rest_complete_seen_at timestamptz,
+        curve_filled_seen_at timestamptz,
+        graduated_board_seen_at timestamptz,
+        pool_created_at timestamptz,
+        pool_created_source text,
+        progress_denominator_source text
     )
     """,
     """
@@ -146,8 +152,22 @@ DDL_STATEMENTS = [
            f.creator_sold_reason, f.age_minutes, f.coverage, f.snapshot_observed_at,
            f.snapshot_source, t.name, t.symbol, t.creator, t.created_at AS token_created_at,
            t.pool, t.mayhem_enabled, t.mayhem_mode, t.mayhem_state, t.completed_at,
-           t.migrated_at, t.migrated_pool, t.first_seen_source, t.last_seen_at
+           t.migrated_at, t.migrated_pool, t.first_seen_source, t.last_seen_at,
+           t.rest_complete_seen_at, t.curve_filled_seen_at, t.graduated_board_seen_at,
+           t.pool_created_at, t.pool_created_source, t.progress_denominator_source
     FROM meme_features_1m f JOIN meme_tokens t ON t.mint = f.mint
+    """,
+    # T4.2d: the matrix view the overview reads (``0024``); empty here, its shape only.
+    """
+    CREATE VIEW meme_graduation_matrix_v1 AS
+    SELECT CAST(NULL AS date) AS day_brt, 0::bigint AS mints, 0::bigint AS completed,
+           0::bigint AS rest_complete, 0::bigint AS curve_filled, 0::bigint AS graduated_board,
+           0::bigint AS pool_created, 0::bigint AS signals_1, 0::bigint AS signals_2,
+           0::bigint AS signals_3, 0::bigint AS signals_4, 0::bigint AS disagree_rest_filled,
+           0::bigint AS disagree_rest_board, 0::bigint AS disagree_rest_pool,
+           0::bigint AS disagree_filled_board, 0::bigint AS disagree_filled_pool,
+           0::bigint AS disagree_board_pool, 0::bigint AS rest_only_unclassified
+    WHERE false
     """,
 ]
 

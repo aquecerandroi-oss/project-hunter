@@ -38,7 +38,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0023_meme_boards_trades"
+HEAD_REVISION = "0024_meme_graduation"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -65,6 +65,9 @@ that the day ``0022_meme_lab`` landed on top (the ``0019`` lesson, again)."""
 MEME_LAB_REVISION = "0022_meme_lab"
 """The same lesson one revision later: the ``0022`` tests reverse **0022**, and
 ``"-1"`` stopped meaning that the day ``0023_meme_boards_trades`` landed."""
+MEME_BOARDS_REVISION = "0023_meme_boards_trades"
+"""And once more: the ``0023`` tests reverse **0023**, and ``"-1"`` stopped meaning
+that the day ``0024_meme_graduation`` landed."""
 """Named for the same reason as the line below: the two ``0019`` tests are about
 reversing **0019**, and ``"-1"`` stopped meaning that the day a revision landed on
 top of it. They now stage the database at this revision first, exactly as every
@@ -3952,7 +3955,7 @@ _A_TOKEN = (
     "VALUES (:mint, 'pumpportal_ws', now(), now())"
 )
 
-_RETENTION_MARKER = ("SET LOCAL app.meme_retention = 'on'", {})
+_RETENTION_MARKER: tuple[str, dict[str, object]] = ("SET LOCAL app.meme_retention = 'on'", {})
 
 
 def test_0021_keeps_the_meme_tables_global_and_free_of_policies(upgraded: str) -> None:
@@ -4497,11 +4500,17 @@ def test_0023_refuses_a_downgrade_that_would_lose_a_board_minute(upgraded: str) 
     config = alembic_config(upgraded)
     asyncio.run(_write(upgraded, [(_A_BOARD_MINUTE, {"mint": "GUARD_MINT"})]))
     try:
+        # Stage at 0023 first: ``0024`` sits on top and ``"-1"`` from the head
+        # would reverse *it* (six columns, no rows carrying them), not the boards.
+        command.downgrade(config, MEME_BOARDS_REVISION)
         with pytest.raises(DBAPIError, match="meme_board_observations rows exist"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == MEME_BOARDS_REVISION, (
+            "the downgrade must not commit"
+        )
         assert asyncio.run(_relation_exists(upgraded, "meme_board_observations"))
     finally:
+        command.upgrade(config, "head")
         asyncio.run(
             _write(
                 upgraded,
@@ -4521,6 +4530,7 @@ def test_0023_reverses_on_a_database_with_no_boards_and_comes_back(upgraded: str
     is checked: the two tables, their grants, the fifteen columns and the
     relaxed commitment."""
     config = alembic_config(upgraded)
+    command.downgrade(config, MEME_BOARDS_REVISION)
     command.downgrade(config, "-1")
     try:
         assert asyncio.run(_revision(upgraded)) == MEME_LAB_REVISION
@@ -4550,5 +4560,290 @@ def test_0023_reverses_on_a_database_with_no_boards_and_comes_back(upgraded: str
         assert asyncio.run(_table_privileges(upgraded, "hunter_worker", table)) == {
             "SELECT",
             "INSERT",
+        }
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0024_meme_graduation — four completion signals, the denominator's source, the matrix
+# ---------------------------------------------------------------------------
+
+_A_COMPLETE_SNAPSHOT = (
+    "INSERT INTO meme_curve_snapshots (observed_at, mint, source, virtual_sol_reserves, "
+    "  virtual_token_reserves, real_sol_reserves, real_token_reserves, total_supply, complete) "
+    "VALUES (:at, :mint, 'pumpfun_rest', 115.005359057, 279900000, :real_sol, 0, 1000000000, true)"
+)
+_A_GRADUATED_BOARD_MINUTE = (
+    "INSERT INTO meme_board_observations (observed_at, board, mint, minute_end, version, "
+    "  position, first_seen_in_board_at, last_seen_in_board_at, source, graduated_at) VALUES "
+    "('2026-10-05T12:00:30Z', 'graduated', :mint, '2026-10-05T12:01:00Z', 1, 0, "
+    "  '2026-10-05T12:00:10Z', '2026-10-05T12:00:30Z', 'trenches_ws', :gd)"
+)
+_SIGNALS = (
+    "SELECT COALESCE(completed_at::text, '-') || '|' "
+    "|| COALESCE(rest_complete_seen_at::text, '-') || '|' "
+    "|| COALESCE(curve_filled_seen_at::text, '-') || '|' "
+    "|| COALESCE(graduated_board_seen_at::text, '-') || '|' "
+    "|| COALESCE(pool_created_at::text, '-') || '|' || COALESCE(pool_created_source, '-') "
+    "|| '|' || COALESCE(progress_denominator_source, '-') "
+    "FROM meme_tokens WHERE mint = :mint"
+)
+_CLEAN_TOKENS: tuple[tuple[str, dict[str, object]], ...] = (
+    _RETENTION_MARKER,
+    ("DELETE FROM meme_tokens WHERE mint LIKE 'G24_%'", {}),
+    ("DELETE FROM meme_curve_snapshots WHERE mint LIKE 'G24_%'", {}),
+    ("DELETE FROM meme_board_observations WHERE mint LIKE 'G24_%'", {}),
+)
+
+
+def test_0024_adds_the_six_columns_their_checks_and_the_matrix_view(upgraded: str) -> None:
+    frozen = cast("tuple[str, ...]", migration_ddl("meme_graduation").GRADUATION_COLUMNS_0024)
+    names = ", ".join(f"'{column}'" for column in frozen)
+    for relation in ("meme_tokens", "meme_radar_features_v1"):
+        present = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT column_name FROM information_schema.columns "  # noqa: S608
+                f"WHERE table_name = '{relation}' AND column_name IN ({names})",
+                {},
+            )
+        )
+        assert set(present) == set(frozen), relation
+    assert asyncio.run(_relation_exists(upgraded, "meme_graduation_matrix_v1"))
+    for role in ("hunter_app", "hunter_worker"):
+        assert asyncio.run(_table_privileges(upgraded, role, "meme_graduation_matrix_v1")) == {
+            "SELECT"
+        }, role
+    asyncio.run(_write(upgraded, [(_A_TOKEN, {"mint": "G24_CHECK"})]))
+    try:
+        for statement, constraint in (
+            ("UPDATE meme_tokens SET pool_created_at = now()", "a_pool_names_its_source"),
+            (
+                "UPDATE meme_tokens SET pool_created_at = now(), pool_created_source = 'blog'",
+                "pool_source_is_a_known_label",
+            ),
+            (
+                "UPDATE meme_tokens SET initial_real_token_reserves = 793100000",
+                "a_denominator_names_its_source",
+            ),
+            (
+                "UPDATE meme_tokens SET initial_real_token_reserves = 793100000, "
+                "progress_denominator_source = 'blog'",
+                "denominator_source_is_a_known_label",
+            ),
+        ):
+            with pytest.raises(DBAPIError, match=constraint):
+                asyncio.run(
+                    _write(upgraded, [(f"{statement} WHERE mint = :mint", {"mint": "G24_CHECK"})])
+                )
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_TOKENS)))
+
+
+def test_0024_writes_each_signal_once_and_lets_completed_at_move_only_earlier(
+    upgraded: str,
+) -> None:
+    """The stamps are first sightings (``NULL -> value`` once); ``completed_at``
+    is their reduction and may only ever move earlier — the indexer's ``gd`` is
+    retrospective — never later and never back to NULL."""
+    asyncio.run(_write(upgraded, [(_A_TOKEN, {"mint": "G24_ONCE"})]))
+    update = "UPDATE meme_tokens SET {} WHERE mint = :mint"
+    try:
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (
+                        update.format(
+                            "rest_complete_seen_at = '2026-10-05T12:01:00Z', "
+                            "completed_at = '2026-10-05T12:01:00Z'"
+                        ),
+                        {"mint": "G24_ONCE"},
+                    )
+                ],
+            )
+        )
+        with pytest.raises(DBAPIError, match="rest_complete_seen_at is written once"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [
+                        (
+                            update.format("rest_complete_seen_at = '2026-10-05T12:02:00Z'"),
+                            {"mint": "G24_ONCE"},
+                        )
+                    ],
+                )
+            )
+        asyncio.run(
+            _write(
+                upgraded,
+                [(update.format("completed_at = '2026-10-05T12:00:00Z'"), {"mint": "G24_ONCE"})],
+            )
+        )
+        for later in ("'2026-10-05T12:03:00Z'", "NULL"):
+            with pytest.raises(DBAPIError, match="may only move earlier"):
+                asyncio.run(
+                    _write(
+                        upgraded,
+                        [(update.format(f"completed_at = {later}"), {"mint": "G24_ONCE"})],
+                    )
+                )
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT completed_at::text FROM meme_tokens WHERE mint = :mint",
+                {"mint": "G24_ONCE"},
+            )
+        ) == ["2026-10-05 12:00:00+00"]
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_TOKENS)))
+
+
+def test_0024_backfills_the_signals_from_the_evidence_tables(upgraded: str) -> None:
+    """A database of ``0023`` with the three shapes the plantão measured, upgraded:
+    the REST-only zero-reserve coin (the 77) keeps its photo as a signal and loses
+    its ``completed_at``; the migrated coin on the graduated board gets the pool
+    (from the frame this radar heard) and the board signal, and its
+    ``completed_at`` is the earliest; the coin whose complete photo carried SOL
+    is completed at that photo; every denominator held is ``observed_virgin``."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, MEME_BOARDS_REVISION)
+    at = datetime(2026, 10, 5, 12, 0, tzinfo=UTC)  # asyncpg binds instants, not ISO text
+    gd = datetime(2026, 10, 5, 11, 59, 50, tzinfo=UTC)
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (
+                    "INSERT INTO meme_tokens (mint, first_seen_source, first_seen_at, "
+                    "last_seen_at, completed_at, initial_real_token_reserves) "
+                    "VALUES ('G24_ZERO', 'pumpfun_rest', :at, :at, :at, 793100000)",
+                    {"at": at},
+                ),
+                (_A_COMPLETE_SNAPSHOT, {"at": at, "mint": "G24_ZERO", "real_sol": 0}),
+                (
+                    "INSERT INTO meme_tokens (mint, first_seen_source, first_seen_at, "
+                    "last_seen_at, migrated_at, migrated_pool) "
+                    "VALUES ('G24_POOL', 'pumpportal_ws', :at, :at, '2026-10-05T12:00:20Z', "
+                    "'pump-amm')",
+                    {"at": at},
+                ),
+                (_A_GRADUATED_BOARD_MINUTE, {"mint": "G24_POOL", "gd": gd}),
+                (_A_TOKEN, {"mint": "G24_SOL"}),
+                (_A_COMPLETE_SNAPSHOT, {"at": at, "mint": "G24_SOL", "real_sol": 85.005359057}),
+            ],
+        )
+    )
+    try:
+        command.upgrade(config, "head")
+        rows = {
+            mint: asyncio.run(_scalars(upgraded, _SIGNALS, {"mint": mint}))[0]
+            for mint in ("G24_ZERO", "G24_POOL", "G24_SOL")
+        }
+        assert rows["G24_ZERO"] == "-|2026-10-05 12:00:00+00|-|-|-|-|observed_virgin", (
+            "a REST complete with a zero reserve keeps its photo and loses its verdict"
+        )
+        assert rows["G24_POOL"] == (
+            "2026-10-05 12:00:10+00|-|-|2026-10-05 12:00:10+00|2026-10-05 12:00:20+00|"
+            "pumpportal_ws|-"
+        ), "the frame this radar heard is the pool; the board's first sighting is earlier"
+        assert rows["G24_SOL"] == "2026-10-05 12:00:00+00|2026-10-05 12:00:00+00|-|-|-|-|-"
+        matrix = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT mints::text || '/' || completed || '/' || rest_complete || '/' "
+                "|| graduated_board || '/' || pool_created || '/' || signals_1 || '/' "
+                "|| signals_2 || '/' || disagree_rest_board || '/' || rest_only_unclassified "
+                "FROM meme_graduation_matrix_v1 WHERE day_brt = '2026-10-05'",
+                {},
+            )
+        )
+        assert matrix == ["3/2/2/1/1/2/1/3/1"]
+    finally:
+        command.upgrade(config, "head")
+        asyncio.run(_write(upgraded, list(_CLEAN_TOKENS)))
+    command.check(config)
+
+
+def test_0024_refuses_a_downgrade_that_would_lose_a_completion_signal(upgraded: str) -> None:
+    """§17.7: the first sighting of a graduation is not re-observable — count, name, stop."""
+    config = alembic_config(upgraded)
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (_A_TOKEN, {"mint": "G24_GUARD"}),
+                (
+                    "UPDATE meme_tokens SET graduated_board_seen_at = now() WHERE mint = :mint",
+                    {"mint": "G24_GUARD"},
+                ),
+            ],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="carry a completion signal"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_relation_exists(upgraded, "meme_graduation_matrix_v1"))
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_TOKENS)))
+    command.check(config)
+
+
+def test_0024_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    """The round trip an operator runs to roll a deploy back: the columns and the
+    matrix go, ``0021``'s view and its trigger come back exactly (``completed_at``
+    written once again), and the upgrade restores the six, the view, the grants."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == MEME_BOARDS_REVISION
+        assert not asyncio.run(_relation_exists(upgraded, "meme_graduation_matrix_v1"))
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM information_schema.columns "
+                "WHERE table_name IN ('meme_tokens', 'meme_radar_features_v1') "
+                "AND column_name = 'pool_created_at'",
+                {},
+            )
+        ) == ["0"]
+        assert asyncio.run(_table_privileges(upgraded, "hunter_app", "meme_radar_features_v1")) == {
+            "SELECT"
+        }
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    (_A_TOKEN, {"mint": "G24_BACK"}),
+                    (
+                        "UPDATE meme_tokens SET completed_at = now() WHERE mint = :mint",
+                        {"mint": "G24_BACK"},
+                    ),
+                ],
+            )
+        )
+        with pytest.raises(DBAPIError, match="completed_at is written once"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [
+                        (
+                            "UPDATE meme_tokens SET completed_at = now() - interval '1 hour' "
+                            "WHERE mint = :mint",
+                            {"mint": "G24_BACK"},
+                        )
+                    ],
+                )
+            )
+        asyncio.run(_write(upgraded, list(_CLEAN_TOKENS[:2])))
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_relation_exists(upgraded, "meme_graduation_matrix_v1"))
+    for role in ("hunter_app", "hunter_worker"):
+        assert asyncio.run(_table_privileges(upgraded, role, "meme_graduation_matrix_v1")) == {
+            "SELECT"
         }
     command.check(config)

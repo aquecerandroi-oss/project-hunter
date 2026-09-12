@@ -362,14 +362,14 @@ async def test_the_tracked_set_is_rebuilt_from_the_rows_a_restart_left_behind(
             ),
         )
         await upsert_token(
-            session, _token("WARM_COMPLETED", seen=now, created_at=now, completed_at=now)
+            session, _token("WARM_COMPLETED", seen=now, created_at=now, rest_complete_seen_at=now)
         )
     async with role_session(db_session_factory, db_role=WORKER) as session:
         tracked = {
             t.mint: t for t in await load_tracked(session, cutoff=now - timedelta(hours=24), cap=50)
         }
     assert "WARM_YOUNG" in tracked
-    assert "WARM_COMPLETED" not in tracked, "an observed completion kept costing poll budget"
+    assert "WARM_COMPLETED" not in tracked, "a REST photo said complete: it kept costing budget"
     assert tracked["WARM_MIGRATED"].final_read_pending, (
         "a migrated curve never read as complete must come back for its final read"
     )

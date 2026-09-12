@@ -167,4 +167,54 @@ def test_a_graduated_listing_seen_on_a_tracked_board_asks_for_a_final_read() -> 
     tracked = tracker.get(pump[0].mint)
     assert tracked is not None and tracked.complete and tracked.final_read_pending
     token = {t.mint: t for t in collector.take_tokens()}[pump[0].mint]
-    assert token.completed_at == pump[0].graduated_at
+    assert token.pool_created_at == pump[0].graduated_at, "gd is the pool, not a REST photo"
+    assert token.pool_created_source == "trenches_ws"
+    assert token.completed_at == pump[0].graduated_at, "a pool is evidence enough on its own"
+    assert token.rest_complete_seen_at is None and token.graduated_board_seen_at is None
+
+
+def test_the_graduated_board_stamps_the_board_signal_and_the_pool_without_tracking() -> None:
+    """T4.2d: first presence on the site's ``graduated`` board is the third
+    completion signal (``graduated_board_seen_at``, the board's own
+    ``serverTs``) and its ``gd`` the fourth (``pool_created_at``). The row is
+    written for every pump/SOL entry, tracked or not — the matrix wants the
+    cohort the boards see — and nothing is added to the poll budget: a
+    graduated curve is static."""
+    collector, tracker = _collector(("graduated",))
+    events = _events("graduated")
+    for event in events:
+        collector.ingest(event, session_key=0)
+    assert len(tracker) == 0
+    tokens = {t.mint: t for t in collector.take_tokens()}
+    pump = [e for e in events[0].entries if e.is_pump_curve_on_sol]
+    others = [e for e in events[0].entries if not e.is_pump_curve_on_sol]
+    assert pump and all(e.mint in tokens for e in pump)
+    assert all(e.mint not in tokens for e in others), "other programs are not this radar's"
+    first = tokens[pump[0].mint]
+    gd = pump[0].graduated_at
+    assert gd is not None, "the graduated board lists gd on every pump entry"
+    assert first.graduated_board_seen_at == events[0].observed_at
+    assert first.pool_created_at == gd
+    assert first.pool_created_source == "trenches_ws"
+    assert first.completed_at == min(events[0].observed_at, gd)
+    assert first.first_seen_source == "trenches_ws" and first.name == pump[0].name
+    assert first.rest_complete_seen_at is None and first.curve_filled_seen_at is None
+
+
+def test_the_new_board_reports_every_first_sighting_so_the_blind_share_can_be_counted() -> None:
+    """Item 7 of run 5: 8/50 of the ``new`` board were ``raydium_launchpad``
+    (StonkFun) — invisible to ``subscribeNewToken`` by construction. The
+    collector reports first sightings; ``wiring.run_board`` counts the ones
+    outside the adapter's program. Nothing tracks them."""
+    collector, tracker = _collector(("new",))
+    events = _events("new")
+    listings = [entry for event in events for entry in collector.ingest(event, session_key=0)]
+    first_seen: dict[str, str | None] = {}
+    for event in events:
+        for entry in event.entries:
+            first_seen.setdefault(entry.mint, entry.program)
+    assert [e.mint for e in listings] == list(first_seen), "one listing per mint, in order"
+    blind = [e for e in listings if e.program != "pump"]
+    assert len(blind) == sum(1 for program in first_seen.values() if program != "pump")
+    assert 0 < len(blind) < len(listings), "the capture holds both kinds (23 pump + 7 StonkFun)"
+    assert all(e.mint not in tracker for e in blind)

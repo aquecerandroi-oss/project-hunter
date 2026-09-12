@@ -231,28 +231,40 @@ async def test_the_real_graduated_coin_writes_completed_at_through_the_real_pars
 ) -> None:
     """The root cause, closed from the reading side: the live ``/coins/{mint}``
     of a graduated coin parses (``complete = true``, virtual reserve > 0), and
-    the token row it teaches carries ``completed_at`` — once."""
+    the token row it teaches carries ``rest_complete_seen_at`` — once. Since
+    T4.2d it does **not** carry ``completed_at``: the photo's reserve is zero
+    (the SOL left for the pool), and a zero reserve classifies nothing until
+    the PumpPortal ``migrate`` frame brings the pool."""
     state = normalize.parse_curve_state_rest(_raw("frontend_api_v3_coin_graduated_raw.json"))
-    assert state.complete and state.real_token_reserves == 0
+    assert state.complete and state.real_token_reserves == 0 and state.real_sol_reserves == 0
     row = token_row_from_curve(state)
-    assert row.completed_at == state.observed_at and row.initial_real_token_reserves is None
+    assert row.rest_complete_seen_at == state.observed_at and row.completed_at is None
+    assert row.initial_real_token_reserves is None, "no record given, no denominator claimed"
+    migrated = state.observed_at + timedelta(seconds=1)
     async with role_session(db_session_factory, db_role=WORKER) as session:
         await upsert_token(session, row)
+        before = await session.scalar(
+            text("SELECT completed_at FROM meme_tokens WHERE mint = :mint"), {"mint": state.mint}
+        )
         await upsert_token(
             session,
             TokenRow(
                 mint=state.mint,
                 first_seen_source="pumpportal_ws",
-                first_seen_at=state.observed_at,
-                last_seen_at=state.observed_at,
-                migrated_at=state.observed_at,
+                first_seen_at=migrated,
+                last_seen_at=migrated,
+                migrated_at=migrated,
                 migrated_pool="pump-amm",
+                pool_created_at=migrated,
+                pool_created_source="pumpportal_ws",
+                completed_at=migrated,
             ),
         )
         completed = await session.scalar(
             text("SELECT completed_at FROM meme_tokens WHERE mint = :mint"), {"mint": state.mint}
         )
-    assert completed == state.observed_at
+    assert before is None, "the zero-reserve photo alone is not a completion"
+    assert completed == migrated, "the pool is"
 
 
 async def test_a_migrated_mint_without_a_completion_reading_comes_back_for_its_final_read(
@@ -281,14 +293,14 @@ async def test_a_migrated_mint_without_a_completion_reading_comes_back_for_its_f
                 first_seen_at=now,
                 last_seen_at=now,
                 created_at=now,
-                completed_at=now,
+                rest_complete_seen_at=now,
             ),
         )
     async with role_session(db_session_factory, db_role=WORKER) as session:
         tracked = {
             t.mint: t for t in await load_tracked(session, cutoff=now - timedelta(hours=24), cap=50)
         }
-    assert "DONE" not in tracked, "an observed completion is static: no more budget"
+    assert "DONE" not in tracked, "a curve the REST photo said complete is static: no more budget"
     pending = tracked["FINAL_READ"]
     assert pending.migrated and pending.final_read_pending and pending.creator == "C"
     tracker = MintTracker(window_minutes=1440, cap=50)

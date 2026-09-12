@@ -20,13 +20,14 @@ instead of ever reading an empty table as "zero".
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, MetaData, Numeric, Table, Text
+from sqlalchemy import Boolean, Column, Date, DateTime, Integer, MetaData, Numeric, Table, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 __all__ = [
     "MEME_METADATA",
     "meme_curve_snapshots",
     "meme_features_1m",
+    "meme_graduation_matrix_v1",
     "meme_ingest_gaps",
     "meme_radar_features_v1",
     "meme_tokens",
@@ -59,6 +60,13 @@ meme_tokens = Table(
     Column("first_seen_at", DateTime(timezone=True), nullable=False),
     Column("last_seen_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
+    # 0024 (T4.2d): the four completion signals and the denominator's provenance.
+    Column("rest_complete_seen_at", DateTime(timezone=True)),
+    Column("curve_filled_seen_at", DateTime(timezone=True)),
+    Column("graduated_board_seen_at", DateTime(timezone=True)),
+    Column("pool_created_at", DateTime(timezone=True)),
+    Column("pool_created_source", Text),
+    Column("progress_denominator_source", Text),
 )
 
 meme_curve_snapshots = Table(
@@ -156,4 +164,36 @@ meme_radar_features_v1 = Table(
     Column("migrated_pool", Text),
     Column("first_seen_source", Text),
     Column("last_seen_at", DateTime(timezone=True)),
+    # 0024 (T4.2d), appended to the view in this order.
+    Column("rest_complete_seen_at", DateTime(timezone=True)),
+    Column("curve_filled_seen_at", DateTime(timezone=True)),
+    Column("graduated_board_seen_at", DateTime(timezone=True)),
+    Column("pool_created_at", DateTime(timezone=True)),
+    Column("pool_created_source", Text),
+    Column("progress_denominator_source", Text),
 )
+
+meme_graduation_matrix_v1 = Table(
+    "meme_graduation_matrix_v1",
+    MEME_METADATA,
+    Column("day_brt", Date, primary_key=True),
+    Column("mints", Integer),
+    Column("completed", Integer),
+    Column("rest_complete", Integer),
+    Column("curve_filled", Integer),
+    Column("graduated_board", Integer),
+    Column("pool_created", Integer),
+    Column("signals_1", Integer),
+    Column("signals_2", Integer),
+    Column("signals_3", Integer),
+    Column("signals_4", Integer),
+    Column("disagree_rest_filled", Integer),
+    Column("disagree_rest_board", Integer),
+    Column("disagree_rest_pool", Integer),
+    Column("disagree_filled_board", Integer),
+    Column("disagree_filled_pool", Integer),
+    Column("disagree_board_pool", Integer),
+    Column("rest_only_unclassified", Integer),
+)
+"""``0024`` (T4.2d): the agreement matrix of the four completion signals, one
+row per Brasília day of the earliest signal (``docs/DATABASE.md`` §36)."""

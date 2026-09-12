@@ -7,6 +7,8 @@
 import { BrasiliaInstant } from "@/components/time/brasilia-instant";
 import type { MemeOverview } from "@/lib/api/meme-types";
 
+import { MemeGraduationStrip } from "./meme-graduation-strip";
+
 function Stat({ label, value, footnote }: { label: string; value: string; footnote?: string }) {
   return (
     <div className="flex flex-col gap-1 rounded-md border border-border p-4">
@@ -58,6 +60,7 @@ export function MemeOverviewStrip({ overview }: MemeOverviewStripProps) {
           {overview.coins_created_by_mode.manual.last_24h.toLocaleString("pt-BR")} (24h)
         </p>
       )}
+      {overview.source === "meme_tokens" && <MemeGraduationStrip matrix={overview.graduation_matrix} />}
     </section>
   );
 }

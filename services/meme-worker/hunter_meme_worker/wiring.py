@@ -109,7 +109,10 @@ async def run_board(ctx: RadarContext, client: TrenchesWsClient) -> None:
         if last_session is not None and session_key != last_session:
             await _record_board_gap(ctx, client, session_key)
         last_session = session_key
-        collector.ingest(event, session_key=session_key)
+        listed = collector.ingest(event, session_key=session_key)
+        if sources is not None and client.board == "new":
+            for entry in listed:  # the declared blindness: listed here, unseen by discovery
+                sources.record_new_listing(entry.received_at, in_scope=entry.program == "pump")
         tokens = collector.take_tokens()
         if tokens:
             async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:

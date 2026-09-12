@@ -53,6 +53,43 @@ async def test_rest_all_routes() -> None:
         assert "mayhemState=paused" in paths[1]
 
 
+async def test_rest_global_params_are_read_for_the_coins_creation_instant() -> None:
+    """``GET /global-params/{created_timestamp_ms}`` (T4.2d): the curve parameters
+    in force when the coin was created — the denominator of progress and the
+    fill threshold come from here, never from a constant. The path carries the
+    instant; the response is the T4.0c capture's shape."""
+    raw: dict[str, Any] = {
+        "slot": 354155511,
+        "signature": "5" * 88,
+        "initial_virtual_token_reserves": 1073000000000000,
+        "initial_virtual_sol_reserves": 30000000000,
+        "initial_virtual_quote_reserves": 4292000000,
+        "initial_real_token_reserves": 793100000000000,
+        "token_total_supply": 1000000000000000,
+        "fee_basis_points": 95,
+        "timestamp": 1752856476446,
+    }
+    paths: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        return httpx.Response(200, json=raw)
+
+    async with httpx.AsyncClient(
+        base_url="https://test", transport=httpx.MockTransport(respond)
+    ) as http:
+        params = await PumpFunRestClient(http_client=http).get_global_params(1789184732000)
+        assert paths == ["/global-params/1789184732000"]
+        assert params.initial_real_token_reserves == 793100000000000
+        assert params.timestamp == 1752856476446
+    async with httpx.AsyncClient(
+        base_url="https://test",
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=[raw])),
+    ) as http:
+        with pytest.raises(MalformedMessage):
+            await PumpFunRestClient(http_client=http).get_global_params(1789184732000)
+
+
 async def test_rest_sol_price_is_a_quote_with_its_instant_and_staleness() -> None:
     """``/sol-price`` as captured live on 2026-09-12 02:34 BRT (plantão meme, run 1):
     the price becomes a ``Decimal`` from the JSON number, ``asOfTimestamp`` (epoch

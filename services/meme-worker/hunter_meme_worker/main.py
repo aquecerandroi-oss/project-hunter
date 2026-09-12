@@ -48,6 +48,7 @@ from hunter_meme_worker.collect import fold_once, forever, poll_once, prune_once
 from hunter_meme_worker.config import MemeConfig, load_config
 from hunter_meme_worker.context import RadarContext, RadarState
 from hunter_meme_worker.discovery import run_discovery
+from hunter_meme_worker.graduation import GlobalParamsStore
 from hunter_meme_worker.lab import LabContext, LabState, lab_once, write_lab_heartbeat
 from hunter_meme_worker.metrics import meme_tracked_mints
 from hunter_meme_worker.repo import load_tracked
@@ -93,18 +94,22 @@ def build_context(
     )
     sources = build_sources(config)
     boards, board_clients = build_boards(config, tracker)
+    curves = PumpFunRestClient()
     return RadarContext(
         config=config,
         session_factory=create_session_factory(runtime.engine),
         tracker=tracker,
         state=RadarState(),
         events=PumpPortalWsClient(),
-        curves=PumpFunRestClient(),
+        curves=curves,
         chain=SolanaRpcClient(),
         sources=sources,
         boards=boards,
         trades=build_trades(config, sources),
         risk=build_risk(config, sources),
+        # The same client, the same 60/60 s bucket: a global-params read is a
+        # curve read not made, once an hour (T4.2d).
+        params=GlobalParamsStore(curves, refresh_s=config.global_params_refresh_s),
     ), board_clients
 
 

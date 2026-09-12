@@ -12,8 +12,15 @@
  * when `virtual_token_reserves = 0` -- contract §2). Those points are
  * dropped before drawing rather than treated as `0`, and their count is
  * reported honestly in the caption instead of silently vanishing.
+ *
+ * T4.2d: `marks` are the completion signals (`meme-graduation-signals.ts`)
+ * drawn as vertical lines at their instants -- only inside the drawn span;
+ * a signal outside it (a `gd` before the first snapshot) is listed beside
+ * the chart, never squeezed onto its edge.
  */
 import type { MemeSnapshotPoint } from "@/lib/api/meme-types";
+
+import type { SignalMark } from "./meme-graduation-signals";
 
 export interface CurvePoint {
   x: number;
@@ -24,6 +31,8 @@ export interface CurveChartGeometry {
   linePoints: string;
   min: number;
   max: number;
+  minX: number;
+  maxX: number;
 }
 
 const WIDTH = 320;
@@ -43,15 +52,23 @@ export function curveChartGeometry(points: CurvePoint[]): CurveChartGeometry | n
   const scaleX = (x: number): number => ((x - minX) / spanX) * WIDTH;
   const scaleY = (y: number): number => (maxY === minY ? HEIGHT / 2 : HEIGHT - ((y - minY) / spanY) * HEIGHT);
   const linePoints = points.map((p) => `${scaleX(p.x)},${scaleY(p.y)}`).join(" ");
-  return { linePoints, min: minY, max: maxY };
+  return { linePoints, min: minY, max: maxY, minX, maxX };
+}
+
+/** The drawn x of an instant, by the same time scale as the line; `null` outside the drawn span. */
+export function markX(geometry: Pick<CurveChartGeometry, "minX" | "maxX">, x: number): number | null {
+  if (x < geometry.minX || x > geometry.maxX) return null;
+  const spanX = geometry.maxX - geometry.minX || 1;
+  return ((x - geometry.minX) / spanX) * WIDTH;
 }
 
 export interface MemeCurveChartProps {
   snapshots: MemeSnapshotPoint[];
+  marks?: SignalMark[];
 }
 
 /** Newest-last order expected (chronological, left to right) -- callers pass `[...snapshots].reverse()` when the API returned newest-first (it does, `GET .../tokens/{mint}`). */
-export function MemeCurveChart({ snapshots }: MemeCurveChartProps) {
+export function MemeCurveChart({ snapshots, marks = [] }: MemeCurveChartProps) {
   const withValue = snapshots.filter((s): s is MemeSnapshotPoint & { mcap_sol: string } => s.mcap_sol !== null);
   const omitted = snapshots.length - withValue.length;
   const points: CurvePoint[] = withValue.map((s) => ({ x: new Date(s.observed_at).getTime(), y: Number(s.mcap_sol) }));
@@ -60,6 +77,9 @@ export function MemeCurveChart({ snapshots }: MemeCurveChartProps) {
   if (!geometry) {
     return <p className="text-xs text-fg-muted">Sem histórico suficiente para o gráfico de mcap.</p>;
   }
+
+  const drawn = marks.map((mark) => ({ ...mark, x: markX(geometry, mark.x) })).filter((mark): mark is SignalMark => mark.x !== null);
+  const outside = marks.length - drawn.length;
 
   return (
     <figure>
@@ -71,10 +91,17 @@ export function MemeCurveChart({ snapshots }: MemeCurveChartProps) {
         className="text-fg-muted"
       >
         <polyline points={geometry.linePoints} fill="none" stroke="currentColor" strokeWidth={1.5} />
+        {drawn.map((mark) => (
+          <line key={`${mark.label}-${mark.x}`} x1={mark.x} x2={mark.x} y1={0} y2={HEIGHT} className="text-warning" stroke="currentColor" strokeWidth={1} strokeDasharray="2 2">
+            <title>{mark.label}</title>
+          </line>
+        ))}
       </svg>
       <figcaption className="mt-1 text-[11px] text-fg-subtle">
         Mcap teórico (SOL) · {geometry.min.toFixed(2)} a {geometry.max.toFixed(2)}
         {omitted > 0 ? ` · ${omitted} ponto(s) sem mcap omitido(s)` : ""}
+        {drawn.length > 0 ? ` · marcas: ${drawn.map((m) => m.label).join(", ")}` : ""}
+        {outside > 0 ? ` · ${outside} sinal(is) fora da janela do gráfico` : ""}
       </figcaption>
     </figure>
   );

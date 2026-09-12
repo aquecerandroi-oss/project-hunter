@@ -313,6 +313,46 @@ these fees at any time, without notice." O `fee_basis_points: 95` de `/global-pa
 6. **Mayhem Mode** (`/docs/mayhem-mode`, "Last Updated 12 November 2025", ver A4.1b): estados
    `active/paused/completed` (+ `enabled` visto na listagem), modo `auto/manual`, `pause_reason`.
 
+#### 4.2.1 O que graduar quer dizer para nós (T4.2d, 12/09/2026)
+
+O `complete = true` da REST **não é graduação**: no run 5 do plantão (05:51 BRT), das 140 moedas
+"completas" 77 tinham `real_sol_reserves = 0` (47 Mayhem, mcap mediano US$ 9,57) e 72 não estavam no
+board `graduated`; das 68 que estavam, 31 também mostravam reserva zero, porque a curva migrada esvazia
+para a pool. A fixture real `frontend_api_v3_coin_graduated_raw.json` é exatamente isso: `complete: true`,
+`real_sol_reserves: 0`, `real_token_reserves: 0`, `pump_swap_pool` preenchido. O radar guarda **quatro
+sinais separados** em `meme_tokens` (`docs/DATABASE.md` §36) e só o mais antigo deles vira
+`completed_at`, com uma exceção declarada — o `complete` da REST com reserva zero não conta sozinho:
+
+| sinal | de onde | rótulo na tela |
+|---|---|---|
+| `rest_complete_seen_at` | 1.ª fotografia REST/RPC com `complete = true` | "REST diz completa" |
+| `curve_filled_seen_at` | 1.ª fotografia com `real_sol_reserves ≥ 85,005 SOL` — o limiar é `buy_cost` dos `initial_real_token_reserves` numa curva virgem, com os parâmetros de `/global-params/{criação}` e o arredondamento do programa (`floor(a·vsol/(vtok−a)) + 1`), nunca uma constante | "curva cheia (≥ 85 SOL)" |
+| `graduated_board_seen_at` | 1.ª presença no board `graduated` do indexer | "no board graduated" |
+| `pool_created_at` (+ fonte) | o `gd` do indexer (board ou `/in-memory-coin`) ou o `migrate` do PumpPortal, o que chegar primeiro | "pool criada" |
+
+A matriz de concordância dos quatro por dia de Brasília (`meme_graduation_matrix_v1`) é o painel do
+diagnóstico M-D1/M-D2: quantos mints têm 1/2/3/4 sinais, quais pares discordam, quantos são "só REST".
+
+**Denominador do progresso.** `1 − real_token_reserves / initial_real_token_reserves` precisa do
+inicial. Até a T4.2d ele só era escrito de uma fotografia virgem (`real_sol_reserves = 0`), e um mint
+descoberto depois da primeira compra nunca ganhava denominador (117/123 linhas do portão do Lab em
+`progress_unknown` às 06:04 BRT). Agora uma curva **padrão** vista no meio da vida toma o
+`initial_real_token_reserves` do registro de `/global-params/{criação}` (`progress_denominator_source =
+global_params`); a fotografia virgem continua valendo mais (`observed_virgin`). **Mayhem é tratado à
+parte e nunca toma o registro**: o agente cunha 1 bilhão de tokens extra e `set_mayhem_virtual_params`
+move as reservas — a fixture `2sduGq…` (Mayhem pausada, `frontend_api_v3_coin_by_mint_response_raw.json`)
+tem 822,6 M tokens reais na curva, mais que os 793,1 M do registro, e 1 102,5 M virtuais com 3,08 SOL
+virtuais. Nem a conta `Global` (25 campos, T4.0d) nem `/global-params` trazem um parâmetro de reserva
+Mayhem; o campo certo vive na conta `mayhem_state`, que este projeto não decodifica. Logo, uma Mayhem só
+ganha denominador se observada virgem, e o `progress_denominator_source` fica `unknown` — declarado,
+não disfarçado.
+
+**Cegueira declarada.** A descoberta ouve só o programa `pump` (`subscribeNewToken` + boards com
+`pg = pump`); 8/50 do board `new` às 05:51 BRT eram `raydium_launchpad` (StonkFun). O worker conta por
+hora as entradas do board `new` fora do programa e expõe a fração em `GET /meme/sources`
+(`discovery_blind_share_1h`) e no heartbeat (`blind_share_1h`) — mede a cegueira, não a corrige; rastrear
+outros launchpads é decisão do Everton.
+
 ### 4.3 Estatísticas ao vivo (10 requisições a `/coins?sort=created_timestamp&order=DESC`, 02:32–02:37 BRT)
 
 Amostra: 700 linhas → **653 mints únicos**, criados entre **01:52 e 02:32 BRT** (janela de 40,6 min;

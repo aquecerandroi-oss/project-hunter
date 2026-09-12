@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from hunter_exchanges.pumpfun.ws import ConnectionState, MemeEvent
     from hunter_meme_worker.boards import BoardCollector
     from hunter_meme_worker.config import MemeConfig
+    from hunter_meme_worker.graduation import GlobalParamsStore
     from hunter_meme_worker.risk import RiskReader
     from hunter_meme_worker.sources import SourcesState
     from hunter_meme_worker.tracker import MintTracker
@@ -113,3 +114,7 @@ class RadarContext:
     boards: BoardCollector | None = None
     trades: TradesPuller | None = None
     risk: RiskReader | None = None
+    params: GlobalParamsStore | None = None
+    """``/global-params`` (T4.2d): the record the fill threshold and the
+    denominator of a mid-life standard curve are derived from. ``None`` in a
+    context built without it — every curve reading then claims neither."""

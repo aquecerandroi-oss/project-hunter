@@ -39,6 +39,7 @@ from hunter_core.logging import get_logger
 from hunter_exchanges.base import RateLimited
 from hunter_exchanges.pumpfun.normalize import UnsupportedQuote
 from hunter_meme_worker.config import CURVE_STREAM
+from hunter_meme_worker.curve_rows import snapshot_row, token_row_from_curve, tracked_from_curve
 from hunter_meme_worker.features import (
     NOT_POLLED,
     RATE_LIMITED,
@@ -54,18 +55,10 @@ from hunter_meme_worker.metrics import (
     meme_tokens_pruned_total,
     meme_tracked_mints,
 )
-from hunter_meme_worker.repo import (
-    GapRow,
-    SnapshotRow,
-    TokenRow,
-    insert_snapshot,
-    prune_tokens,
-    record_gap,
-    upsert_token,
-)
+from hunter_meme_worker.repo import GapRow, insert_snapshot, prune_tokens, record_gap, upsert_token
 from hunter_meme_worker.repo_tape import open_bet_mints
 from hunter_meme_worker.sources import PUMPFUN_REST, SOLANA_RPC
-from hunter_meme_worker.tracker import TIER_OPEN_BET, TrackedMint
+from hunter_meme_worker.tracker import TIER_OPEN_BET
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -78,76 +71,36 @@ logger = get_logger(__name__)
 WORKER_ROLE = "hunter_worker"
 BUDGET_REASON = "budget_exhausted"
 
-
-def snapshot_row(state: NormalizedCurveState) -> SnapshotRow:
-    """A normalized reading -> one row. ``mcap_sol`` is not here: the database
-    generates it, so no producer can write a market cap that disagrees with the
-    reserves next to it."""
-    return SnapshotRow(
-        observed_at=state.observed_at,
-        mint=state.mint,
-        source=state.source,
-        virtual_sol_reserves=state.virtual_sol_reserves,
-        virtual_token_reserves=state.virtual_token_reserves,
-        real_sol_reserves=state.real_sol_reserves,
-        real_token_reserves=state.real_token_reserves,
-        total_supply=state.total_supply,
-        complete=state.complete,
-        slot=state.slot,
-        commitment=state.commitment,
-        mayhem_enabled=state.mayhem_enabled,
-        mayhem_state=state.mayhem_state,
-        mayhem_mode=state.mayhem_mode,
-    )
-
-
-def token_row_from_curve(state: NormalizedCurveState) -> TokenRow:
-    """What a curve reading teaches the dimension — including, **once**, the
-    progress denominator and, once, ``completed_at``.
-
-    ``initial_real_token_reserves`` is only claimed when ``real_sol_reserves`` is
-    zero: a curve nobody has bought yet is the one moment its real token reserve
-    *is* the initial one. That is an observation (T4-MEME-RADAR.md §3), not the
-    793,1 M constant blogs quote — and when the radar never sees that moment, the
-    denominator stays unknown and progress is NULL with ``denominator_unknown``.
-    """
-    untouched = state.real_sol_reserves == 0 and not state.complete
-    return TokenRow(
-        mint=state.mint,
-        first_seen_source=state.source,
-        first_seen_at=state.observed_at,
-        last_seen_at=state.observed_at,
-        total_supply=state.total_supply,
-        initial_real_token_reserves=state.real_token_reserves if untouched else None,
-        mayhem_enabled=state.mayhem_enabled,
-        mayhem_mode=state.mayhem_mode,
-        mayhem_state=state.mayhem_state,
-        completed_at=state.observed_at if state.complete else None,
-    )
+__all__ = [
+    "fold_once",
+    "forever",
+    "minute_end",
+    "poll_once",
+    "prune_once",
+    "reconcile_once",
+    "refresh_open_bets",
+    "snapshot_row",
+    "token_row_from_curve",
+]
 
 
 async def _persist_reading(ctx: RadarContext, state: NormalizedCurveState) -> None:
-    """One transaction: the snapshot, what it teaches the token, and the tracker."""
+    """One transaction: the snapshot, what it teaches the token, and the tracker.
+
+    The ``/global-params`` record in force at the coin's creation (T4.2d) is
+    what turns the reading into a fill threshold and, for a standard curve seen
+    mid-life, a denominator — ``curve_rows.py`` decides what the reading may
+    claim; ``None`` when the store is absent or the read failed claims nothing.
+    """
+    tracked = ctx.tracker.get(state.mint)
+    params = None
+    if ctx.params is not None:
+        created_at = tracked.created_at if tracked else None
+        params = await ctx.params.resolve(created_at, now=state.received_at)
     async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
         await insert_snapshot(session, snapshot_row(state))
-        await upsert_token(session, token_row_from_curve(state))
-    tracked = ctx.tracker.get(state.mint)
-    ctx.tracker.observe(
-        TrackedMint(
-            mint=state.mint,
-            first_seen_at=tracked.first_seen_at if tracked else state.observed_at,
-            created_at=tracked.created_at if tracked else None,
-            bonding_curve=tracked.bonding_curve if tracked else None,
-            mayhem_state=state.mayhem_state,
-            initial_real_token_reserves=(
-                state.real_token_reserves
-                if state.real_sol_reserves == 0 and not state.complete
-                else None
-            ),
-            complete=state.complete,
-            mcap_sol=state.market_cap_sol,
-        )
-    )
+        await upsert_token(session, token_row_from_curve(state, params=params))
+    ctx.tracker.observe(tracked_from_curve(state, tracked, params))
     ctx.tracker.mark_polled(state.mint, state.observed_at, mcap_sol=state.market_cap_sol)
     ctx.state.observe(
         state.mint,

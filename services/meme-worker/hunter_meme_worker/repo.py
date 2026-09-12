@@ -12,97 +12,53 @@ Three idempotence rules, each enforced by the schema rather than by a prior read
 
 - a token is **upserted with ``COALESCE(existing, new)``** on every identity and
   stamp column, so a later, poorer observation fills a hole and never blanks a
-  value — which is also why the write-once trigger never fires on the happy path;
+  value — which is also why the write-once trigger never fires on the happy path.
+  ``completed_at`` is the one column that *moves*, and only earlier: it is the
+  earliest of the four completion signals (``graduation.py``), so a later
+  observation that brings an earlier signal (the indexer's retrospective ``gd``)
+  is written with ``LEAST``, and the ``0024`` trigger refuses any other move;
 - a snapshot is ``ON CONFLICT (observed_at, mint, source) DO NOTHING``: re-reading
   the same instant from the same source writes one row, not two;
 - a feature row is ``ON CONFLICT (end_time, mint, features_version) DO NOTHING``:
   a restart that re-folds a minute produces the same row, and a *different* fold
   of the same minute is a new ``features_version``, never an edit.
+
+The row shapes live in ``repo_rows.py`` and are re-exported here.
 """
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import datetime
-from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import text
 
 from hunter_core.domain.types import uuid7
 from hunter_meme_worker.features import FeatureRow
+from hunter_meme_worker.repo_rows import GapRow, SnapshotRow, TokenRow
 from hunter_meme_worker.tracker import TrackedMint
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+__all__ = [
+    "RETENTION_MARKER",
+    "GapRow",
+    "SnapshotRow",
+    "TokenRow",
+    "insert_features",
+    "insert_snapshot",
+    "load_tracked",
+    "prune_tokens",
+    "record_gap",
+    "upsert_token",
+]
+
 RETENTION_MARKER = "app.meme_retention"
 """The declared marker ``meme_tokens_retention_is_declared`` demands. Transaction
 scoped, therefore safe behind the pooler; it is isolation, not authorization
 (§18.8), and what it buys is that pruning discovery history is an act."""
-
-
-@dataclass(frozen=True, slots=True)
-class TokenRow:
-    """What one observation knows about a mint. Unknown stays ``None``."""
-
-    mint: str
-    first_seen_source: str
-    first_seen_at: datetime
-    last_seen_at: datetime
-    name: str | None = None
-    symbol: str | None = None
-    uri: str | None = None
-    creator: str | None = None
-    created_at: datetime | None = None
-    bonding_curve: str | None = None
-    initial_virtual_sol_reserves: Decimal | None = None
-    initial_virtual_token_reserves: Decimal | None = None
-    initial_real_token_reserves: Decimal | None = None
-    total_supply: Decimal | None = None
-    pool: str | None = None
-    mayhem_enabled: bool | None = None
-    mayhem_mode: str | None = None
-    mayhem_state: str | None = None
-    completed_at: datetime | None = None
-    migrated_at: datetime | None = None
-    migrated_pool: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class SnapshotRow:
-    """One curve observation. ``mcap_sol`` is absent on purpose: the database
-    generates it, so no producer can write a market cap that disagrees with the
-    reserves beside it."""
-
-    observed_at: datetime
-    mint: str
-    source: str
-    virtual_sol_reserves: Decimal
-    virtual_token_reserves: Decimal
-    real_sol_reserves: Decimal
-    real_token_reserves: Decimal
-    total_supply: Decimal
-    complete: bool
-    slot: int | None = None
-    commitment: str | None = None
-    mayhem_enabled: bool | None = None
-    mayhem_state: str | None = None
-    mayhem_mode: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class GapRow:
-    """A window the radar was not watching. ``mint`` is ``None`` for a whole-stream
-    hole, because naming one mint would understate it."""
-
-    stream: str
-    gap_start: datetime
-    gap_end: datetime
-    reason: str
-    mint: str | None = None
-    generation: int | None = None
-    detail: dict[str, Any] | None = None
 
 
 _IDENTITY_COLUMNS = (
@@ -115,23 +71,31 @@ _IDENTITY_COLUMNS = (
     "initial_virtual_sol_reserves",
     "initial_virtual_token_reserves",
     "initial_real_token_reserves",
+    "progress_denominator_source",
     "total_supply",
     "pool",
     "mayhem_enabled",
-    "completed_at",
+    "rest_complete_seen_at",
+    "curve_filled_seen_at",
+    "graduated_board_seen_at",
+    "pool_created_at",
+    "pool_created_source",
     "migrated_at",
     "migrated_pool",
 )
 """Filled once; ``COALESCE(meme_tokens.<c>, excluded.<c>)`` keeps the first answer.
-The same list the database freezes in ``ddl/meme_radar_guards.py`` — copied, never
-imported, because ``infra/migrations`` is not importable from a service and because
-the contract of the database must not follow a later edit of a Python constant."""
+The same list the database freezes in ``ddl/meme_graduation.py``
+(``WRITE_ONCE_COLUMNS_0024``) — copied, never imported, because
+``infra/migrations`` is not importable from a service and because the contract of
+the database must not follow a later edit of a Python constant. ``completed_at``
+left this list in ``0024``: it is reduced, not observed (module docstring)."""
 
 _ALL_TOKEN_COLUMNS = (
     "mint",
     "first_seen_source",
     "first_seen_at",
     "last_seen_at",
+    "completed_at",
     *_IDENTITY_COLUMNS,
 )
 
@@ -143,6 +107,8 @@ _UPSERT_TOKEN = text(
         f"{column} = COALESCE(meme_tokens.{column}, excluded.{column})"
         for column in _IDENTITY_COLUMNS
     )
+    # The earliest of the four completion signals, across every observation.
+    + ", completed_at = LEAST(meme_tokens.completed_at, excluded.completed_at)"
     # Mutable state: the newest observation wins, because that is what state means.
     + ", mayhem_mode = COALESCE(excluded.mayhem_mode, meme_tokens.mayhem_mode)"
     # And a token measured as *not* Mayhem carries no agent state: the CHECK
@@ -232,18 +198,19 @@ _LOAD_TRACKED = text(
     "SELECT mint, first_seen_at, created_at, creator, bonding_curve, mayhem_state, "
     "       initial_real_token_reserves, completed_at, migrated_at "
     "FROM meme_tokens "
-    "WHERE completed_at IS NULL "
+    "WHERE rest_complete_seen_at IS NULL "
     "  AND (COALESCE(created_at, first_seen_at) >= :cutoff "
     "       OR mayhem_state IN ('active', 'paused')) "
     "ORDER BY COALESCE(created_at, first_seen_at) DESC LIMIT :cap"
 )
 """The tracked set is **rebuilt from the database on start**, which is the durable
 checkpoint Astra's MUST-FIX 3 asks for: a restart resumes the same universe instead
-of watching only what the WS happens to push next. A curve whose completion was
-**observed** (``completed_at``) is excluded — its reserves are static. A curve that
-migrated without a completion reading (``migrated_at`` set, ``completed_at`` NULL)
-comes back with ``final_read_pending``: one poll to record the finished state, the
-T4.2c fix for the hour with zero ``complete = true`` snapshots."""
+of watching only what the WS happens to push next. A curve whose REST photo said
+``complete`` (``rest_complete_seen_at``) is excluded — its reserves are static. A
+curve that finished by another signal (migrated, on the ``graduated`` board, a
+pool) without that photo comes back with ``final_read_pending``: one poll to
+record the REST word for the matrix, the T4.2c fix for the hour with zero
+``complete = true`` snapshots, widened in T4.2d to every finish signal."""
 
 _PRUNE_TOKENS = text(
     "WITH doomed AS ("
@@ -289,6 +256,7 @@ async def load_tracked(session: AsyncSession, *, cutoff: datetime, cap: int) -> 
     result = await session.execute(_LOAD_TRACKED, {"cutoff": cutoff, "cap": cap})
     tracked: list[TrackedMint] = []
     for row in result.mappings():
+        finished_elsewhere = row["migrated_at"] is not None or row["completed_at"] is not None
         tracked.append(
             TrackedMint(
                 mint=str(row["mint"]),
@@ -298,9 +266,9 @@ async def load_tracked(session: AsyncSession, *, cutoff: datetime, cap: int) -> 
                 bonding_curve=row["bonding_curve"],
                 mayhem_state=row["mayhem_state"],
                 initial_real_token_reserves=row["initial_real_token_reserves"],
-                complete=row["completed_at"] is not None,
+                complete=False,
                 migrated=row["migrated_at"] is not None,
-                final_read_pending=row["migrated_at"] is not None,
+                final_read_pending=finished_elsewhere,
             )
         )
     return tracked

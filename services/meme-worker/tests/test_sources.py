@@ -82,6 +82,24 @@ def test_the_heartbeat_names_every_source_and_never_a_silent_zero() -> None:
     assert rest["reason"] is None
 
 
+def test_the_heartbeat_declares_the_discovery_blind_share_and_never_a_silent_zero() -> None:
+    """T4.2d, item 3: 8/50 of the ``new`` board at 05:51 BRT were
+    ``raydium_launchpad`` — invisible to ``subscribeNewToken`` by construction.
+    The share is declared from the board's own listings; an empty hour is
+    ``""`` (unknown), not ``0`` (a claim of full coverage)."""
+    sources = SourcesState()
+    empty = sources.heartbeat_fields(NOW, tracked=0)
+    assert empty["new_board_entries_1h"] == "0" and empty["new_board_non_pump_1h"] == "0"
+    assert empty["blind_share_1h"] == ""
+    for i in range(50):
+        sources.record_new_listing(NOW - timedelta(minutes=i), in_scope=i % 6 != 0)
+    fields = sources.heartbeat_fields(NOW, tracked=0)
+    assert fields["new_board_entries_1h"] == "50" and fields["new_board_non_pump_1h"] == "9"
+    assert fields["blind_share_1h"] == "0.18"
+    later = sources.heartbeat_fields(NOW + timedelta(hours=2), tracked=0)
+    assert later["new_board_entries_1h"] == "0" and later["blind_share_1h"] == ""
+
+
 def test_a_connected_trenches_says_true_and_a_dropped_one_false() -> None:
     sources = SourcesState()
     sources[TRENCHES_WS].connected = True

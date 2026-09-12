@@ -106,6 +106,26 @@ class MemeToken(Base):
             "char_length(first_seen_source) > 0 AND char_length(mint) > 0",
             name="provenance_is_not_empty",
         ),
+        # 0024 — the pool and the denominator each name their source, from a
+        # closed list; unknown is NULL on both sides of the pair.
+        CheckConstraint(
+            "(pool_created_at IS NULL) = (pool_created_source IS NULL)",
+            name="a_pool_names_its_source",
+        ),
+        CheckConstraint(
+            "pool_created_source IS NULL OR pool_created_source IN ('pumpportal_ws', "
+            "'trenches_ws', 'indexer_rest:/boards', 'indexer_rest:/in-memory-coin')",
+            name="pool_source_is_a_known_label",
+        ),
+        CheckConstraint(
+            "(initial_real_token_reserves IS NULL) = (progress_denominator_source IS NULL)",
+            name="a_denominator_names_its_source",
+        ),
+        CheckConstraint(
+            "progress_denominator_source IS NULL OR progress_denominator_source IN "
+            "('observed_virgin', 'global_params')",
+            name="denominator_source_is_a_known_label",
+        ),
     )
 
     mint: Mapped[str] = mapped_column(Text, primary_key=True)
@@ -141,12 +161,14 @@ class MemeToken(Base):
     """The **denominator of curve progress** (T4-MEME-RADAR.md §3, Astra's
     correction): ``1 - real_token_reserves / initial_real_token_reserves``.
 
-    Written once, from the first observation whose ``real_sol_reserves`` is zero
+    Written once. From the first observation whose ``real_sol_reserves`` is zero
     — a curve nobody has bought yet, so its real token reserves *are* the initial
-    ones. That is an **observation**, not the 793,1 M constant every blog quotes:
-    the plan forbids turning a third-party number into a constant, and a
-    denominator we never observed leaves ``curve_progress_pct`` NULL with
-    ``denominator_unknown`` rather than inventing a progress."""
+    ones — or, since ``0024``, from the ``/global-params`` record in force at the
+    coin's creation when the first photo already shows a buy and the curve is a
+    standard one (``progress_denominator_source`` says which). Never the 793,1 M
+    constant every blog quotes as a *fallback*: the record is read from the
+    program's own parameters, and a denominator neither observed nor derivable
+    leaves ``curve_progress_pct`` NULL with ``denominator_unknown``."""
 
     total_supply: Mapped[Decimal | None]
 
@@ -164,8 +186,44 @@ class MemeToken(Base):
     mayhem_state: Mapped[str | None] = mapped_column(Text)
 
     completed_at: Mapped[datetime | None]
-    """First observation of the curve being finished (``complete = true``).
+    """**Reduced, not observed** (``0024``, T4.2d): the earliest of the four
+    completion stamps below, except that a REST ``complete = true`` whose photo
+    carried ``real_sol_reserves = 0`` counts for nothing on its own — 77 of 140
+    "complete" coins of the plantão were exactly that, and so were 31 real
+    graduations whose SOL had already left for the pool (Astra: a zero reserve
+    classifies nothing). Written with ``LEAST(existing, new)`` and allowed by
+    the trigger to move only *earlier*: the indexer's ``gd`` is retrospective.
     Distinct from ``migrated_at`` by construction (T4-MEME-RADAR.md §3)."""
+
+    rest_complete_seen_at: Mapped[datetime | None]
+    """The first REST/RPC photo that said ``complete = true`` — the signal,
+    whatever its reserve said (``graduation.py`` decides whether it classifies)."""
+
+    curve_filled_seen_at: Mapped[datetime | None]
+    """The first photo whose ``real_sol_reserves`` reached the fill threshold —
+    derived from the ``/global-params`` record in force at the coin's creation
+    (85,005 SOL for the 2025-07-18 record; ``quote.curve_fill_threshold_lamports``),
+    never a typed constant. Unset when the record was unavailable at the read."""
+
+    graduated_board_seen_at: Mapped[datetime | None]
+    """The first presence on the site's ``graduated`` board (the board's own
+    ``serverTs``), for every pump/SOL entry the board showed — tracked or not."""
+
+    pool_created_at: Mapped[datetime | None]
+    pool_created_source: Mapped[str | None] = mapped_column(Text)
+    """The pool, by whoever reported it first: the PumpPortal ``migrate`` frame
+    (``pumpportal_ws``, our receive time) or the indexer's ``gd`` on a board
+    (``trenches_ws`` / ``indexer_rest:/boards``) or on the risk read
+    (``indexer_rest:/in-memory-coin``). Biconditional by CHECK: a pool names
+    its source."""
+
+    progress_denominator_source: Mapped[str | None] = mapped_column(Text)
+    """Where ``initial_real_token_reserves`` came from: ``observed_virgin`` (the
+    ``0021`` rule) or ``global_params`` (T4.2d: a *standard* curve seen mid-life
+    takes the record in force at its creation — a Mayhem curve never does, its
+    agent's extra billion and ``set_mayhem_virtual_params`` make the record not
+    its curve). Biconditional with the denominator; unknown is NULL on both,
+    which the API renders as ``unknown``."""
 
     migrated_at: Mapped[datetime | None]
     migrated_pool: Mapped[str | None] = mapped_column(Text)

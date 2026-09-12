@@ -67,3 +67,25 @@ def test_a_real_identity_is_untouched() -> None:
     frame = _first_pump_create()
     row = token_row_from_event(normalize.parse_new_token(frame))
     assert (row.name, row.symbol, row.uri) == (frame["name"], frame["symbol"], frame["uri"])
+
+
+def _first_migrate() -> dict[str, Any]:
+    raw = (FIXTURES / "pumpportal_ws_capture_raw.jsonl").read_text(encoding="utf-8")
+    for line in raw.splitlines():
+        if line.strip():
+            frame = json.loads(line, parse_float=Decimal)
+            if frame.get("txType") == "migrate":
+                return frame
+    raise AssertionError("the T4.1 capture no longer carries a migrate frame")
+
+
+def test_a_migration_frame_is_the_pool_created_signal_and_therefore_a_completion() -> None:
+    """T4.2d: the PumpPortal ``migrate`` is one of the four completion signals
+    (``pool_created_at``, source ``pumpportal_ws``), and a pool is evidence
+    enough on its own — unlike a REST ``complete`` with a zero reserve."""
+    row = token_row_from_event(normalize.parse_migration(_first_migrate()))
+    assert row.migrated_at is not None and row.migrated_pool == "pump-amm"
+    assert row.pool_created_at == row.migrated_at
+    assert row.pool_created_source == "pumpportal_ws"
+    assert row.completed_at == row.migrated_at
+    assert row.rest_complete_seen_at is None and row.graduated_board_seen_at is None

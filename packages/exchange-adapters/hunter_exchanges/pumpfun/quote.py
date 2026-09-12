@@ -37,6 +37,7 @@ __all__ = [
     "GlobalParams",
     "SellQuote",
     "buy_cost",
+    "curve_fill_threshold_lamports",
     "curve_progress_bps",
     "parse_global_params",
     "quote_buy",
@@ -139,6 +140,29 @@ def curve_progress_bps(reserves: CurveReserves, params: GlobalParams) -> int:
         raise ValueError("progress denominator missing")
     sold = params.initial_real_token_reserves - reserves.real_token
     return max(0, min(_BPS, sold * _BPS // params.initial_real_token_reserves))
+
+
+def curve_fill_threshold_lamports(params: GlobalParams) -> int:
+    """The SOL a curve holds when its whole real reserve has been bought — the
+    "≈ 85 SOL" of graduation, **derived** from the parameters in force at the
+    coin's creation, never a constant (T4.2d, ``docs/PUMPFUN.md`` §4.2).
+
+    It is :func:`buy_cost` of ``initial_real_token_reserves`` on a virgin curve,
+    with the program's own rounding: for the 2025-07-18 record that is
+    ``85 005 359 057`` lamports, the ``85,005 SOL`` the plantão measured as the
+    p99 of ``real_sol_reserves`` and the ``115 005 359 057`` virtual SOL of a
+    completed coin. A record whose virtual token reserve does not exceed its
+    real one is not a curve this formula describes, and says so.
+    """
+    if params.initial_virtual_token_reserves <= params.initial_real_token_reserves:
+        raise ValueError("virtual token reserves must exceed the real ones")
+    virgin = CurveReserves(
+        virtual_sol=params.initial_virtual_sol_reserves,
+        virtual_token=params.initial_virtual_token_reserves,
+        real_sol=0,
+        real_token=params.initial_real_token_reserves,
+    )
+    return buy_cost(virgin, params.initial_real_token_reserves)
 
 
 def _ceil_bps(amount: int, bps: int) -> int:

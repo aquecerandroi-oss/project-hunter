@@ -25,20 +25,23 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import DateTime, and_, func, literal, or_, select
 
 from hunter_api.repositories.meme_cursor import SORT_COLUMNS
 from hunter_api.repositories.meme_rows import (
     MemeFeatureRow,
     MemeGapRow,
+    MemeGraduationMatrixRow,
     MemeSnapshotRow,
     MemeTokenRow,
+    matrix_row_from,
     row_from_token_only,
     row_from_view,
 )
 from hunter_api.repositories.meme_tables import (
     meme_curve_snapshots,
     meme_features_1m,
+    meme_graduation_matrix_v1,
     meme_ingest_gaps,
     meme_radar_features_v1,
     meme_tokens,
@@ -52,6 +55,7 @@ if TYPE_CHECKING:
 __all__ = [
     "MemeFeatureRow",
     "MemeGapRow",
+    "MemeGraduationMatrixRow",
     "MemeRepository",
     "MemeSnapshotRow",
     "MemeTokenRow",
@@ -127,6 +131,20 @@ class MemeRepository:
     async def latest_end_time(self) -> datetime | None:
         value = await self.session.scalar(select(func.max(meme_features_1m.c.end_time)))
         return _optional(value)
+
+    async def graduation_matrix_for(self, now: datetime) -> MemeGraduationMatrixRow | None:
+        """The matrix row of the Brasília day that contains ``now`` (``0024``),
+        or ``None`` when no mint carried a completion signal that day. The day
+        is computed by the database (its own tz data), never by subtracting
+        three hours here."""
+        matrix = meme_graduation_matrix_v1
+        day = func.date(func.timezone("America/Sao_Paulo", literal(now, DateTime(timezone=True))))
+        row = (
+            (await self.session.execute(select(matrix).where(matrix.c.day_brt == day)))
+            .mappings()
+            .first()
+        )
+        return None if row is None else matrix_row_from(row)
 
     async def list_tokens(
         self,

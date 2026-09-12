@@ -22,6 +22,8 @@ from hunter_core.db.session import role_session
 from hunter_core.logging import get_logger
 from hunter_exchanges.base import RateLimited
 from hunter_meme_worker.features_tape import HoldersObservation
+from hunter_meme_worker.graduation import CompletionSignals, earliest_completion
+from hunter_meme_worker.repo import TokenRow, upsert_token
 from hunter_meme_worker.repo_boards import insert_risk_snapshot
 from hunter_meme_worker.sources import INDEXER_RISK, SourcesState
 
@@ -91,6 +93,8 @@ class RiskReader:
                 continue
             async with role_session(session_factory, db_role=WORKER_ROLE) as session:
                 await insert_risk_snapshot(session, snapshot)
+                if snapshot.graduated_at is not None:
+                    await upsert_token(session, _pool_row(snapshot))
             self._readings.setdefault(mint, deque(maxlen=HISTORY)).append(
                 HoldersObservation(
                     observed_at=snapshot.observed_at,
@@ -113,3 +117,20 @@ class RiskReader:
         if self._sources is not None:
             self._sources[INDEXER_RISK].record_spent(at)
             self._sources[INDEXER_RISK].record_error(at, error)
+
+
+def _pool_row(snapshot: NormalizedRiskSnapshot) -> TokenRow:
+    """The risk read's ``graduationDate`` is the indexer's ``gd`` too (T4.2d):
+    the pool signal, with this read as its source, once."""
+    signals = CompletionSignals(
+        pool_created_at=snapshot.graduated_at, pool_created_source=snapshot.source
+    )
+    return TokenRow(
+        mint=snapshot.mint,
+        first_seen_source=snapshot.source,
+        first_seen_at=snapshot.received_at,
+        last_seen_at=snapshot.received_at,
+        pool_created_at=signals.pool_created_at,
+        pool_created_source=signals.pool_created_source,
+        completed_at=earliest_completion(signals),
+    )

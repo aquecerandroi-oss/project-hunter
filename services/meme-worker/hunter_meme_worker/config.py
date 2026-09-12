@@ -143,6 +143,10 @@ class MemeConfig:
     heartbeat_cycle_s: float = 15.0
     """How often the radar's own fields land on ``hb:meme:radar``."""
 
+    global_params_refresh_s: float = 3600.0
+    """``/global-params`` is re-read once an hour (T4.2d): one request of the
+    curve budget for a record that changed last on 2025-07-18."""
+
 
 def _int_env(name: str, default: int) -> int:
     """An integer knob of this worker, or its default. A malformed value is the

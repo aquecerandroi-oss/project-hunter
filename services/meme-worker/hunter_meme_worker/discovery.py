@@ -31,6 +31,11 @@ from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_exchanges.pumpfun.models import NormalizedMemeMigration, NormalizedMemeTokenCreated
 from hunter_meme_worker.config import WS_STREAM
+from hunter_meme_worker.graduation import (
+    POOL_SOURCE_PUMPPORTAL,
+    CompletionSignals,
+    earliest_completion,
+)
 from hunter_meme_worker.metrics import meme_events_total, meme_gaps_total, meme_ws_generation
 from hunter_meme_worker.repo import GapRow, TokenRow, record_gap, upsert_token
 from hunter_meme_worker.sources import PUMPPORTAL_WS
@@ -84,6 +89,13 @@ def token_row_from_event(event: MemeEvent) -> TokenRow:
             mayhem_enabled=event.mayhem_enabled,
             mayhem_mode=event.mayhem_mode,
         )
+    # A migration-first row carries no identity at all, and that is the honest
+    # shape: the curve may have existed long before this process did. The columns
+    # stay NULL until a creation frame or a REST read fills them once. The frame
+    # *is* the pool signal (T4.2d): a pool is evidence enough for ``completed_at``.
+    signals = CompletionSignals(
+        pool_created_at=event.migrated_at, pool_created_source=POOL_SOURCE_PUMPPORTAL
+    )
     return TokenRow(
         mint=event.mint,
         first_seen_source=event.source,
@@ -91,10 +103,10 @@ def token_row_from_event(event: MemeEvent) -> TokenRow:
         last_seen_at=event.observed_at,
         migrated_at=event.migrated_at,
         migrated_pool=event.pool,
+        pool_created_at=signals.pool_created_at,
+        pool_created_source=signals.pool_created_source,
+        completed_at=earliest_completion(signals),
     )
-    # A migration-first row carries no identity at all, and that is the honest
-    # shape: the curve may have existed long before this process did. The columns
-    # stay NULL until a creation frame or a REST read fills them once.
 
 
 def _tracked_from_row(row: TokenRow) -> TrackedMint:

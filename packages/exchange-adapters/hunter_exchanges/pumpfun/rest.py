@@ -43,6 +43,7 @@ from hunter_exchanges.pumpfun.models import (
     NormalizedSolPrice,
 )
 from hunter_exchanges.pumpfun.normalize import parse_curve_state_rest
+from hunter_exchanges.pumpfun.quote import GlobalParams, parse_global_params
 from hunter_exchanges.rate_limit import TokenBucketRateLimiter
 
 __all__ = [
@@ -169,6 +170,20 @@ class PumpFunRestClient:
         ):
             raise MalformedMessage("mayhem listing must be an array of objects", exchange=EXCHANGE)
         return [parse_curve_state_rest(item) for item in cast(list[dict[str, Any]], raw)]
+
+    async def get_global_params(self, created_at_ms: int) -> GlobalParams:
+        """``GET /global-params/{created_timestamp_ms}`` — the curve parameters in
+        force at that instant (``docs/PUMPFUN.md`` §1.1 #19, §4.2). The
+        denominator of progress and the fill threshold are derived from this
+        record (T4.2d); its own rate-limit group upstream is 50/60 s, charged
+        here to the one bucket this client has, like ``get_sol_price``."""
+        raw = await self._get(f"/global-params/{int(created_at_ms)}")
+        if not isinstance(raw, dict):
+            raise MalformedMessage("global params must be an object", exchange=EXCHANGE)
+        try:
+            return parse_global_params(cast(dict[str, Any], raw))
+        except (KeyError, ValueError, TypeError) as exc:
+            raise MalformedMessage(f"global params malformed: {exc}", exchange=EXCHANGE) from exc
 
     async def get_mayhem_overview(self) -> NormalizedMayhemOverview:
         raw = await self._get("/mayhem/overview")

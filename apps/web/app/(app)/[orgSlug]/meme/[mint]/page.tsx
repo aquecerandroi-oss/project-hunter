@@ -4,6 +4,8 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { BrasiliaInstant } from "@/components/time/brasilia-instant";
 import { MemeCurveChart } from "@/components/meme/meme-curve-chart";
 import { MemeFeaturesTable } from "@/components/meme/meme-features-table";
+import { completionSignals, signalMarks } from "@/components/meme/meme-graduation-signals";
+import { MemeSignalMarks } from "@/components/meme/meme-signal-marks";
 import { memeSourceLabel, memeTokenStateLabel } from "@/components/meme/labels";
 import { formatMemePct, formatSol } from "@/components/meme/meme-format";
 import { SectionUnavailable } from "@/components/ui/section-unavailable";
@@ -31,7 +33,7 @@ async function loadDetail(orgId: string, mint: string): Promise<DetailLoad> {
   }
 }
 
-/** `/[orgSlug]/meme/[mint]` — one pump.fun token: identity, curve chart (mcap over time), and the per-minute feature series with honest null-with-reason cells. Read-only (T4.3). */
+/** `/[orgSlug]/meme/[mint]` — one pump.fun token: identity, the four completion signals with their marks on the curve chart (T4.2d), the mcap series, and the per-minute feature series with honest null-with-reason cells. Read-only (T4.3). */
 export default async function MemeTokenPage({ params }: MemeTokenPageProps) {
   const { orgSlug, mint } = await params;
   const membership = await resolveOrgContext(orgSlug);
@@ -94,9 +96,11 @@ function TokenDetailBody({ data, mint }: { data: MemeTokenDetail; mint: string }
         </div>
       </section>
 
+      <MemeSignalMarks token={token} />
+
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium text-fg">Mcap ao longo do tempo</h2>
-        <MemeCurveChart snapshots={chronological} />
+        <MemeCurveChart snapshots={chronological} marks={signalMarks(completionSignals(token))} />
       </section>
 
       <section className="flex flex-col gap-2">

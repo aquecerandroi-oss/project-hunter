@@ -21,6 +21,8 @@ from hunter_exchanges.pumpfun.quote import (
     BONDING_CURVE_FEE_TIER_2026_05_20,
     CurveReserves,
     FeeBps,
+    GlobalParams,
+    curve_fill_threshold_lamports,
     curve_progress_bps,
     parse_global_params,
     quote_buy,
@@ -186,3 +188,40 @@ def test_global_params_and_progress() -> None:
     assert progress == (793100000000000 - event.real_token_reserves) * 10_000 // 793100000000000
     with pytest.raises(ValueError):
         parse_global_params({"slot": 1.5})
+
+
+def test_the_fill_threshold_is_the_cost_of_the_whole_real_reserve_on_a_virgin_curve() -> None:
+    """T4.2d: the "≈ 85 SOL" of graduation is not a constant — it is what the
+    program charges for the 793,1 M real tokens of a curve nobody bought yet,
+    with the program's own rounding (``floor(a·vsol/(vtok−a)) + 1``). The
+    ``/global-params`` record of 2025-07-18 (``notes-T4.0c.md``) gives exactly
+    the 85,005 SOL the plantão measured as the p99 of ``real_sol_reserves`` and
+    the ``115 005 359 057`` virtual SOL of the completed coin WOTF."""
+    params = parse_global_params(
+        {
+            "slot": 354155511,
+            "signature": "x",
+            "initial_virtual_token_reserves": 1073000000000000,
+            "initial_virtual_sol_reserves": 30000000000,
+            "initial_virtual_quote_reserves": 4292000000,
+            "initial_real_token_reserves": 793100000000000,
+            "token_total_supply": 1000000000000000,
+            "fee_basis_points": 95,
+            "timestamp": 1752856476446,
+        }
+    )
+    assert curve_fill_threshold_lamports(params) == 85_005_359_057
+    assert params.initial_virtual_sol_reserves + 85_005_359_057 == 115_005_359_057
+    with pytest.raises(ValueError):
+        curve_fill_threshold_lamports(
+            GlobalParams(
+                slot=1,
+                signature="x",
+                initial_virtual_token_reserves=10,
+                initial_virtual_sol_reserves=30,
+                initial_real_token_reserves=10,
+                token_total_supply=10,
+                fee_basis_points=95,
+                timestamp=1,
+            )
+        )

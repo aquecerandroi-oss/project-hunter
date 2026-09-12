@@ -7,13 +7,15 @@
  * value arrays for a second, explicit exhaustiveness check (the convention
  * `components/system/latency-labels.ts` already established).
  */
-import type { MemeGapStream, MemeNullReason, MemeSource, MemeTokenState } from "@/lib/api/meme-types";
+import type { MemeGapStream, MemeNullReason, MemeSource, MemeToken, MemeTokenState } from "@/lib/api/meme-types";
 
 export const MEME_TOKEN_STATES: readonly MemeTokenState[] = ["curve", "completed", "migrated"];
 
 const TOKEN_STATE_LABEL: Record<MemeTokenState, string> = {
   curve: "Na curva",
-  completed: "Concluiu a curva",
+  // T4.2d: `completed_at` is the earliest of the four completion signals (0024),
+  // never the REST boolean alone -- the filter and this label follow it.
+  completed: "Concluída (sinal mais antigo)",
   migrated: "Migrado (PumpSwap)",
 };
 
@@ -86,4 +88,52 @@ export function memeNullReasonLabel(reason: MemeNullReason): string {
 export function memeNullReasonText(reason: MemeNullReason | null | undefined): string {
   if (!reason) return "sem medição: motivo não informado";
   return `sem medição: ${memeNullReasonLabel(reason)}`;
+}
+
+// T4.2d: the four completion signals of `meme_tokens` (migration 0024). "REST
+// diz completa" is a REST photo, not a graduation -- the plantão measured 77 of
+// 140 "complete" coins with a zero reserve -- so each signal keeps its own name
+// and the screen shows disagreement instead of folding them into one word.
+export type CompletionSignalKey = "rest_complete" | "curve_filled" | "graduated_board" | "pool_created";
+
+export const COMPLETION_SIGNAL_KEYS: readonly CompletionSignalKey[] = ["rest_complete", "curve_filled", "graduated_board", "pool_created"];
+
+const COMPLETION_SIGNAL_LABEL: Record<CompletionSignalKey, string> = {
+  rest_complete: "REST diz completa",
+  curve_filled: "curva cheia (≥ 85 SOL)",
+  graduated_board: "no board graduated",
+  pool_created: "pool criada",
+};
+
+export function memeCompletionSignalLabel(key: CompletionSignalKey): string {
+  return COMPLETION_SIGNAL_LABEL[key];
+}
+
+export type MemePoolSource = NonNullable<MemeToken["pool_created_source"]>;
+
+export const MEME_POOL_SOURCES: readonly MemePoolSource[] = ["pumpportal_ws", "trenches_ws", "indexer_rest:/boards", "indexer_rest:/in-memory-coin"];
+
+const POOL_SOURCE_LABEL: Record<MemePoolSource, string> = {
+  pumpportal_ws: "PumpPortal (evento migrate)",
+  trenches_ws: "boards do site (WS)",
+  "indexer_rest:/boards": "boards do site (REST)",
+  "indexer_rest:/in-memory-coin": "leitura de risco do site",
+};
+
+export function memePoolSourceLabel(source: MemePoolSource): string {
+  return POOL_SOURCE_LABEL[source];
+}
+
+export type MemeDenominatorSource = MemeToken["progress_denominator_source"];
+
+export const MEME_DENOMINATOR_SOURCES: readonly MemeDenominatorSource[] = ["observed_virgin", "global_params", "unknown"];
+
+const DENOMINATOR_SOURCE_LABEL: Record<MemeDenominatorSource, string> = {
+  observed_virgin: "observado na curva virgem",
+  global_params: "parâmetros globais do programa",
+  unknown: "desconhecido",
+};
+
+export function memeDenominatorSourceLabel(source: MemeDenominatorSource): string {
+  return DENOMINATOR_SOURCE_LABEL[source];
 }

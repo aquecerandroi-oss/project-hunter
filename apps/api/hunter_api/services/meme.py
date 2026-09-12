@@ -22,11 +22,13 @@ from typing import Any, cast
 from hunter_api.repositories.meme import (
     MemeFeatureRow,
     MemeGapRow,
+    MemeGraduationMatrixRow,
     MemeRepository,
     MemeSnapshotRow,
     MemeTokenRow,
 )
 from hunter_api.schemas.meme import (
+    GraduationMatrixOut,
     GraduationsOut,
     MemeFeaturePointOut,
     MemeGapOut,
@@ -43,6 +45,7 @@ from hunter_exchanges.pumpfun.rest import PumpFunRestClient
 
 __all__ = [
     "build_gap_out",
+    "build_graduation_matrix_out",
     "build_overview",
     "build_token_detail",
     "build_token_out",
@@ -83,6 +86,37 @@ def build_token_out(row: MemeTokenRow, *, now: datetime) -> MemeTokenOut:
         migrated_at=row.migrated_at,
         snapshot_observed_at=row.snapshot_observed_at,
         snapshot_source=row.snapshot_source,  # type: ignore[arg-type]
+        completed_at=row.completed_at,
+        rest_complete_seen_at=row.rest_complete_seen_at,
+        curve_filled_seen_at=row.curve_filled_seen_at,
+        graduated_board_seen_at=row.graduated_board_seen_at,
+        pool_created_at=row.pool_created_at,
+        pool_created_source=row.pool_created_source,  # type: ignore[arg-type]
+        # NULL in the column is "nowhere yet"; the payload says the word.
+        progress_denominator_source=row.progress_denominator_source or "unknown",  # type: ignore[arg-type]
+    )
+
+
+def build_graduation_matrix_out(row: MemeGraduationMatrixRow) -> GraduationMatrixOut:
+    return GraduationMatrixOut(
+        day_brt=row.day_brt,
+        mints=row.mints,
+        completed=row.completed,
+        rest_complete=row.rest_complete,
+        curve_filled=row.curve_filled,
+        graduated_board=row.graduated_board,
+        pool_created=row.pool_created,
+        signals_1=row.signals_1,
+        signals_2=row.signals_2,
+        signals_3=row.signals_3,
+        signals_4=row.signals_4,
+        disagree_rest_filled=row.disagree_rest_filled,
+        disagree_rest_board=row.disagree_rest_board,
+        disagree_rest_pool=row.disagree_rest_pool,
+        disagree_filled_board=row.disagree_filled_board,
+        disagree_filled_pool=row.disagree_filled_pool,
+        disagree_board_pool=row.disagree_board_pool,
+        rest_only_unclassified=row.rest_only_unclassified,
     )
 
 
@@ -154,6 +188,7 @@ async def _overview_from_repository(
     created_24h, created_7d = await repo.created_counts_by_window(now)
     active = await repo.mayhem_active_count()
     graduations = await repo.graduations_last_24h(now)
+    matrix = await repo.graduation_matrix_for(now)
     return MemeOverviewOut(
         source="meme_tokens",
         observed_at=now,
@@ -162,6 +197,7 @@ async def _overview_from_repository(
         coins_created_by_mode=None,
         mayhem_active_coins=active,
         graduations_24h=GraduationsOut(count=graduations, tracked_tokens=tracked),
+        graduation_matrix=None if matrix is None else build_graduation_matrix_out(matrix),
     )
 
 

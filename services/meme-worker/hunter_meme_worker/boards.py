@@ -23,6 +23,16 @@ there".
 the site's own ``age`` turned into ``created_at`` and ``dev_wallet`` as
 ``creator``, both labelled ``trenches_ws`` on the token row) — the discovery the
 adendo asked for: ``graduating`` mints get polled before the rest.
+
+**What feeds the completion signals** (T4.2d, ``graduation.py``): a ``gd`` on
+any tracked board is ``pool_created_at`` with the entry's own source; the
+first presence of a pump/SOL mint on the ``graduated`` board is
+``graduated_board_seen_at`` (the board's ``serverTs``) — written for every
+such entry, tracked or not, because the matrix wants the cohort the boards
+see, and **never** added to the poll budget: a graduated curve is static.
+:meth:`BoardCollector.ingest` returns every first sighting so ``wiring.run_board``
+can count what the discovery socket cannot see (the ``new`` board's
+non-``pump`` programs — the declared blindness of item 3).
 """
 
 from __future__ import annotations
@@ -34,6 +44,7 @@ from typing import TYPE_CHECKING
 
 from hunter_core.domain.types import utcnow
 from hunter_meme_worker.features_tape import HoldersObservation
+from hunter_meme_worker.graduation import CompletionSignals, earliest_completion
 from hunter_meme_worker.repo import TokenRow
 from hunter_meme_worker.repo_boards import BoardMinuteRow, board_minute_row
 from hunter_meme_worker.tracker import TrackedMint
@@ -44,6 +55,7 @@ if TYPE_CHECKING:
     from hunter_meme_worker.tracker import MintTracker
 
 TRACKED_BOARDS = frozenset({"new", "graduating"})
+GRADUATED_BOARD = "graduated"
 HOLDERS_HISTORY = 8
 """Readings kept per mint so the fold can pick the newest one *received by* the
 minute's close even when a newer one arrived in the seconds before the fold."""
@@ -52,6 +64,11 @@ minute's close even when a newer one arrived in the seconds before the fold."""
 def minute_end_of(received_at: datetime) -> datetime:
     """The closed minute a message belongs to: ``12:00:30`` → ``12:01:00``."""
     return received_at.replace(second=0, microsecond=0) + timedelta(minutes=1)
+
+
+def _created_at(entry: NormalizedBoardEntry) -> datetime | None:
+    """``serverTs − age``: the site's own counter, declared as such on the row."""
+    return entry.observed_at - timedelta(seconds=entry.age_s) if entry.age_s is not None else None
 
 
 @dataclass
@@ -106,10 +123,11 @@ class BoardCollector:
         return rows
 
     # ---------------------------------------------------------------- events
-    def ingest(self, event: BoardEvent, *, session_key: int) -> None:
-        """Apply one board message. ``session_key`` changes on every reconnect or
-        resync of the socket, which is how a missing mint is told apart from a
-        removed one."""
+    def ingest(self, event: BoardEvent, *, session_key: int) -> tuple[NormalizedBoardEntry, ...]:
+        """Apply one board message; returns the entries seen on this board for
+        the first time (a listing). ``session_key`` changes on every reconnect
+        or resync of the socket, which is how a missing mint is told apart from
+        a removed one."""
         mirror = self.mirrors[event.board]
         bucket = minute_end_of(event.received_at)
         self._roll_bucket(mirror, bucket)
@@ -124,9 +142,11 @@ class BoardCollector:
                 self._exit(mirror, mint, at=event.observed_at, censored=reconnected)
         for mint in event.removed:
             self._exit(mirror, mint, at=event.observed_at, censored=False)
+        listed: list[NormalizedBoardEntry] = []
         for entry in event.entries:
             presence = mirror.presences.get(entry.mint)
-            if presence is None or presence.left_at is not None:
+            first_sighting = presence is None or presence.left_at is not None
+            if first_sighting:
                 presence = Presence(
                     entry=entry,
                     first_seen_at=entry.observed_at,
@@ -135,17 +155,20 @@ class BoardCollector:
                     bucket=bucket,
                 )
                 mirror.presences[entry.mint] = presence
+                listed.append(entry)
+            assert presence is not None
             presence.entry = entry
             presence.position = entry.position
             presence.patches += 1 if event.kind == "delta" else 0
             self._remember_reading(entry)
-            self._track(entry)
+            self._learn(entry, listed=first_sighting)
         for mint, position in event.positions.items():
             presence = mirror.presences.get(mint)
             if presence is not None and presence.left_at is None:
                 presence.position = position
                 presence.last_seen_at = event.observed_at
                 presence.bucket = bucket
+        return tuple(listed)
 
     def _roll_bucket(self, mirror: BoardMirror, bucket: datetime) -> None:
         """The first message of a new minute closes the previous one."""
@@ -225,18 +248,23 @@ class BoardCollector:
             )
         )
 
-    def _track(self, entry: NormalizedBoardEntry) -> None:
-        if entry.board not in TRACKED_BOARDS or not entry.is_pump_curve_on_sol:
+    def _learn(self, entry: NormalizedBoardEntry, *, listed: bool) -> None:
+        """A pump/SOL entry teaches the tracker (``new``/``graduating``) or the
+        dimension alone (``graduated``); any other program teaches nothing."""
+        if not entry.is_pump_curve_on_sol:
             return
-        created_at = (
-            entry.observed_at - timedelta(seconds=entry.age_s) if entry.age_s is not None else None
-        )
+        if entry.board == GRADUATED_BOARD:
+            if listed and entry.mint not in self.pending_tokens:
+                self.pending_tokens[entry.mint] = self._token_row(entry, on_graduated_board=True)
+            return
+        if entry.board not in TRACKED_BOARDS:
+            return
         known = self._tracker.get(entry.mint)
         self._tracker.observe(
             TrackedMint(
                 mint=entry.mint,
                 first_seen_at=entry.received_at,
-                created_at=created_at,
+                created_at=_created_at(entry),
                 creator=entry.dev_wallet,
                 board=entry.board,
                 complete=entry.graduated_at is not None,
@@ -245,18 +273,33 @@ class BoardCollector:
             )
         )
         if known is None and entry.mint not in self.pending_tokens:
-            self.pending_tokens[entry.mint] = TokenRow(
-                mint=entry.mint,
-                first_seen_source=entry.source,
-                first_seen_at=entry.received_at,
-                last_seen_at=entry.received_at,
-                name=entry.name,
-                symbol=entry.symbol,
-                creator=entry.dev_wallet,
-                created_at=created_at,
-                pool="pump",
-                completed_at=entry.graduated_at,
-            )
+            self.pending_tokens[entry.mint] = self._token_row(entry, on_graduated_board=False)
+
+    @staticmethod
+    def _token_row(entry: NormalizedBoardEntry, *, on_graduated_board: bool) -> TokenRow:
+        """The identity the board states, plus the completion signals it carries:
+        ``gd`` is the pool (with the entry's own source), presence on the
+        ``graduated`` board is the board signal (the board's ``serverTs``)."""
+        signals = CompletionSignals(
+            graduated_board_seen_at=entry.observed_at if on_graduated_board else None,
+            pool_created_at=entry.graduated_at,
+            pool_created_source=entry.source if entry.graduated_at is not None else None,
+        )
+        return TokenRow(
+            mint=entry.mint,
+            first_seen_source=entry.source,
+            first_seen_at=entry.received_at,
+            last_seen_at=entry.received_at,
+            name=entry.name,
+            symbol=entry.symbol,
+            creator=entry.dev_wallet,
+            created_at=_created_at(entry),
+            pool="pump",
+            graduated_board_seen_at=signals.graduated_board_seen_at,
+            pool_created_at=signals.pool_created_at,
+            pool_created_source=signals.pool_created_source,
+            completed_at=earliest_completion(signals),
+        )
 
     def take_tokens(self) -> list[TokenRow]:
         rows, self.pending_tokens = list(self.pending_tokens.values()), {}

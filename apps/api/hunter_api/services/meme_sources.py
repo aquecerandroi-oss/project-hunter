@@ -184,5 +184,9 @@ def build_meme_sources(
         trenches_patches_60s=parse_heartbeat_int(fields.get("trenches_patches_60s")),
         swap_api_used_60s=parse_heartbeat_int(fields.get("swap_api_used_60s")),
         swap_api_budget_60s=parse_heartbeat_int(fields.get("swap_api_budget_60s")),
+        # T4.2d: the declared blindness — the worker's counts, never inferred here.
+        discovery_blind_share_1h=_float(fields.get("blind_share_1h") or None),
+        discovery_new_board_entries_1h=parse_heartbeat_int(fields.get("new_board_entries_1h")),
+        discovery_non_pump_entries_1h=parse_heartbeat_int(fields.get("new_board_non_pump_1h")),
         sources=[_source_out(name, blocks.get(name), latest.get(name)) for name in names],
     )

@@ -6198,3 +6198,95 @@ caracteres (§17.6). Testes: `test_0023_*` em `test_migrations.py`; união de gr
 | `GET /api/v1/orgs/{org}/meme/sources` | por fonte: conectada?, último `observed_at`, atraso, erros na última hora, orçamento usado, e a última linha da tabela como segunda testemunha |
 | T4.6 (`lab_repo.load_gate_rows`) | as colunas que o portão pede existem: `curve_volume_1m_sol` e `creator_net_seller` — dois ajustes de uma linha fora desta tarefa |
 | `apps/web/**` | nada nesta tarefa; `MemeSource` ganhou `trenches_ws` e `NullReason` ganhou `no_sells` na API (`pnpm gen:types` pendente) |
+
+## 36. O que "graduou" quer dizer — quatro sinais, o denominador com procedência, a matriz — M4 (`0024_meme_graduation`)
+
+Vigésima quarta revisão. **Seis colunas anuláveis** em `meme_tokens`, quatro CHECKs, a função do
+trigger de escrita única substituída, a vista `meme_radar_features_v1` substituída com as seis colunas
+**acrescentadas no fim**, a vista nova `meme_graduation_matrix_v1`, um backfill a partir das tabelas
+de evidência. Nenhuma tabela nova, nenhum enum, nenhuma política de RLS, nada tocado na `0022`/`0023`.
+Entrega a T4.2d sobre a `0023` (T4.2c).
+
+**O fato medido que a motiva** (plantão, run 5, 12/09/2026 05:51 BRT): das 140 moedas que a REST dizia
+`complete = true`, 77 tinham `real_sol_reserves = 0` (47 Mayhem, mcap mediano US$ 9,57) e 72 não estavam
+no board `graduated`; e das 68 que estavam, 31 também mostravam reserva zero — a curva migrada esvazia
+para a pool. Must-fixes da Astra: manter os indicadores separados; reserva zero não classifica.
+
+### 36.1 As quatro colunas de conclusão, e a redução
+
+| coluna | a primeira fotografia que… | quem escreve |
+|---|---|---|
+| `rest_complete_seen_at` | disse `complete = true` (REST/RPC) | `curve_rows.py` |
+| `curve_filled_seen_at` | tinha `real_sol_reserves ≥` o limiar de enchimento **derivado** de `/global-params` (85,005 SOL para o registro de 18/07/2025: `buy_cost` dos 793,1 M tokens reais numa curva virgem, com o arredondamento do programa — `quote.curve_fill_threshold_lamports`) | `curve_rows.py` |
+| `graduated_board_seen_at` | listou o mint no board `graduated` (o `serverTs` do board), para **toda** entrada pump/SOL, rastreada ou não | `boards.py` |
+| `pool_created_at` + `pool_created_source` | reportou uma pool: o `gd` do indexer (`trenches_ws` \| `indexer_rest:/boards` \| `indexer_rest:/in-memory-coin`) ou o `migrate` do PumpPortal (`pumpportal_ws`) — o que este radar viu primeiro | `boards.py`, `risk.py`, `discovery.py` |
+
+`completed_at` **deixa de ser observação e vira redução**: a mais antiga das quatro, **exceto** que um
+`complete` da REST cuja fotografia tinha reserva zero não conta sozinho — nem empresta o instante
+(`services/meme-worker/hunter_meme_worker/graduation.py::earliest_completion`). Sai da lista de escrita
+única e ganha um ramo próprio no trigger: escrito com `LEAST(existente, novo)`, **só pode recuar** (o `gd`
+do indexer é retrospectivo), nunca avançar, nunca voltar a NULL. As quatro estampas e as duas fontes são
+de escrita única (`WRITE_ONCE_COLUMNS_0024`, copiada em `repo._IDENTITY_COLUMNS`).
+
+### 36.2 O denominador ganha procedência
+
+`progress_denominator_source` ∈ {`observed_virgin`, `global_params`}, bicondicional com
+`initial_real_token_reserves` (CHECK); desconhecido é NULL nos dois, que a API renderiza como `unknown`.
+`observed_virgin` é a regra da `0021` (primeira fotografia com `real_sol_reserves = 0`); `global_params`
+é a T4.2d: uma curva **padrão** vista depois da primeira compra toma o `initial_real_token_reserves` do
+registro de `/global-params/{criação}` (793,1 M hoje). **Mayhem nunca toma o registro**: o agente cunha
+1 bilhão de tokens extra e `set_mayhem_virtual_params` move as reservas (RISK_ENGINE_MEME §8.3); a
+fixture `2sduGq…` (Mayhem pausada) tem 822,6 M tokens reais na curva, *mais* que os 793,1 M — nem `Global`
+nem `/global-params` trazem um parâmetro de reserva Mayhem, o campo certo vive na conta `mayhem_state`,
+que este projeto não decodifica. O mesmo guarda recusa qualquer curva com mais tokens reais que o
+inicial do registro. Consequência declarada: uma Mayhem só ganha denominador se observada virgem.
+
+### 36.3 O backfill é de evidência, nunca de palpite
+
+Com o trigger da `0021` **desligado só durante o backfill** (`DISABLE TRIGGER`/`ENABLE TRIGGER` na
+mesma transação — o único instante em que o cadeado se levanta é a revisão que redefine a coluna):
+`rest_complete_seen_at` = `min(observed_at)` das fotografias com `complete`; `graduated_board_seen_at` =
+`min(first_seen_in_board_at)` do board `graduated`; `pool_created_at` = `migrated_at` (fonte
+`pumpportal_ws`, o socket foi quem ouviu) senão o `gd` mais antigo de qualquer linha de board com a fonte
+dessa linha; `progress_denominator_source = observed_virgin` para todo denominador existente (a fotografia
+virgem era o único escritor); `completed_at` recomputado pela regra — `LEAST` de tudo NULL é NULL, logo as
+77 "só REST com reserva zero" ficam sem veredito, que é o que são. `curve_filled_seen_at` **não** é
+preenchida: o limiar precisa do registro, que uma migração não lê; a série começa no deploy e a matriz
+diz isso contando.
+
+### 36.4 As vistas
+
+`meme_radar_features_v1` = a projeção da `0021` com as seis colunas **no fim** (`CREATE OR REPLACE`
+mantém nomes, tipos, ordem e grants). `meme_graduation_matrix_v1`: uma linha por **dia de Brasília do
+sinal mais antigo** de cada mint com algum sinal — `mints`, `completed`, contagem por sinal
+(`rest_complete`, `curve_filled`, `graduated_board`, `pool_created`), `signals_1..4`, os seis pares que
+discordam (`disagree_rest_filled`, `disagree_rest_board`, `disagree_rest_pool`, `disagree_filled_board`,
+`disagree_filled_pool`, `disagree_board_pool` — um presente e o outro ausente) e `rest_only_unclassified`
+(REST disse completa, nada mais disse: os 77). Sem ORDER BY; `SELECT` para `hunter_app` e
+`hunter_worker`. A API lê o dia de hoje pedindo ao banco o dia (`timezone('America/Sao_Paulo', now)`),
+nunca subtraindo três horas.
+
+### 36.5 Grants, guardas, trava, séries
+
+Nenhum grant novo além da vista. **Sem guarda de upgrade** (colunas anuláveis sem default; os CHECKs
+entram depois do backfill que os satisfaz). **O downgrade recusa** com qualquer linha que carregue um
+sinal de conclusão ou um denominador `global_params` (a primeira visão de uma graduação não se
+reobserva); `DROP VIEW` + `CREATE VIEW` restauram o texto da `0021` (copiado, congelado) e os grants;
+`create_meme_token_guards` da `0021` devolve a função de escrita única com `completed_at` de novo. `ADD
+COLUMN` anulável é só catálogo; o backfill varre `meme_curve_snapshots` uma vez (segundos); `ADD
+CONSTRAINT … CHECK` varre `meme_tokens` sob `SHARE ROW EXCLUSIVE`. Nome com 20 caracteres (§17.6).
+**`meme_features_1m.features_version` passa a `meme_features_v2`** para as linhas novas: o
+`curve_progress_pct` pode agora vir de um denominador `global_params`; as linhas `v1` não são reescritas,
+a série quebra no deploy e o Lab lê a versão que a sua config nomeia. Testes: `test_0024_*` em
+`test_migrations.py` (colunas/CHECKs/vista, escrita única + recuo, backfill sobre uma base `0023`,
+recusa, ida e volta); `services/meme-worker/tests/test_graduation_persistence.py`.
+
+### 36.6 O que as tarefas vizinhas têm de saber
+
+| Onde | O que muda |
+|---|---|
+| `services/meme-worker/**` | `repo.upsert_token` escreve as seis colunas (`LEAST` em `completed_at`); `_LOAD_TRACKED` exclui por `rest_complete_seen_at` e traz de volta, para uma leitura final, quem concluiu por board/pool; `GlobalParamsStore` lê `/global-params` uma vez por hora no orçamento da curva |
+| `GET /api/v1/orgs/{org}/meme/tokens[/{mint}]` | os quatro sinais, `pool_created_source`, `progress_denominator_source` (`unknown` para NULL); `completed_at` no payload |
+| `GET /api/v1/orgs/{org}/meme/overview` | `graduation_matrix` = a linha de hoje (Brasília) da vista, ou `null` |
+| `GET /api/v1/orgs/{org}/meme/sources` | `discovery_blind_share_1h` + contagens + `discovery_blind_explanation` (heartbeat `blind_share_1h`, `new_board_entries_1h`, `new_board_non_pump_1h`) |
+| `apps/web` (`/meme`, `/meme/{mint}`) | faixa "Graduação hoje — quatro sinais separados" (discordâncias em âmbar); bloco "Sinais de conclusão" e marcas no gráfico de mcap; filtro `completed` = `completed_at` |

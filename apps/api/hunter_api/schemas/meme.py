@@ -22,7 +22,7 @@ that exactly, never collapsing an absence into ``0``/``false``.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
@@ -49,7 +49,20 @@ MemeTokenState = Literal["curve", "completed", "migrated"]
 """Derived, never stored: ``migrated`` (``migrated_at`` set) > ``completed``
 (``completed_at`` set, not yet migrated) > ``curve`` (neither timestamp set
 yet — includes "never observed", the contract's nullable-timestamp way of
-saying "unknown", MUST-FIX 2's concern from the original design review)."""
+saying "unknown", MUST-FIX 2's concern from the original design review).
+Since ``0024`` (T4.2d) ``completed_at`` is the **earliest of the four
+completion signals** below, never the REST boolean alone."""
+
+PoolCreatedSource = Literal[
+    "pumpportal_ws", "trenches_ws", "indexer_rest:/boards", "indexer_rest:/in-memory-coin"
+]
+"""Who reported the pool first (``meme_tokens.pool_created_source``, ``0024``)."""
+
+ProgressDenominatorSource = Literal["observed_virgin", "global_params", "unknown"]
+"""Where ``initial_real_token_reserves`` came from (``0024``): a virgin photo of
+this curve, the ``/global-params`` record in force at creation, or nowhere yet
+(``unknown`` renders the column's ``NULL`` — a Mayhem curve seen after its
+first buy stays here on purpose, see ``services/meme-worker/…/graduation.py``)."""
 
 NullReason = Literal[
     "no_trade_feed",
@@ -97,6 +110,45 @@ class GraduationsOut(BaseModel):
     reason: NullReason | None = None
 
 
+class GraduationMatrixOut(BaseModel):
+    """One Brasília day of ``meme_graduation_matrix_v1`` (``0024``, T4.2d): the
+    agreement matrix of the four completion signals over the mints whose
+    earliest signal fell on ``day_brt`` — the M-D1/M-D2 diagnostic as a panel.
+    ``rest_only_unclassified`` is the "77 of 140": REST said complete, nothing
+    else did, and the photo's reserve was zero."""
+
+    day_brt: date
+    mints: int
+    completed: int
+    rest_complete: int
+    curve_filled: int
+    graduated_board: int
+    pool_created: int
+    signals_1: int
+    signals_2: int
+    signals_3: int
+    signals_4: int
+    disagree_rest_filled: int
+    disagree_rest_board: int
+    disagree_rest_pool: int
+    disagree_filled_board: int
+    disagree_filled_pool: int
+    disagree_board_pool: int
+    rest_only_unclassified: int
+
+    @property
+    def disagreeing(self) -> int:
+        """The six pair disagreements summed — what the strip turns amber on."""
+        return (
+            self.disagree_rest_filled
+            + self.disagree_rest_board
+            + self.disagree_rest_pool
+            + self.disagree_filled_board
+            + self.disagree_filled_pool
+            + self.disagree_board_pool
+        )
+
+
 class MemeOverviewOut(BaseModel):
     """``GET /meme/overview``. Two possible shapes, both real, never a
     fabricated number (brief T4.3):
@@ -119,6 +171,10 @@ class MemeOverviewOut(BaseModel):
     coins_created_by_mode: OverviewByModeOut | None = None
     mayhem_active_coins: int | None
     graduations_24h: GraduationsOut
+    graduation_matrix: GraduationMatrixOut | None = None
+    """Today's row (Brasília) of the agreement matrix, when this radar has a
+    cohort with any completion signal today; ``None`` on the passthrough shape
+    and on a day with no signal yet."""
 
 
 class MemeTokenOut(BaseModel):
@@ -144,6 +200,15 @@ class MemeTokenOut(BaseModel):
     migrated_at: datetime | None
     snapshot_observed_at: datetime | None
     snapshot_source: MemeSource | None
+    completed_at: datetime | None = None
+    """The earliest of the four signals below (``0024``); ``None`` when none
+    classifies — a REST ``complete`` with a zero reserve does not, alone."""
+    rest_complete_seen_at: datetime | None = None
+    curve_filled_seen_at: datetime | None = None
+    graduated_board_seen_at: datetime | None = None
+    pool_created_at: datetime | None = None
+    pool_created_source: PoolCreatedSource | None = None
+    progress_denominator_source: ProgressDenominatorSource = "unknown"
 
 
 class MemeTokenListOut(BaseModel):
@@ -226,6 +291,7 @@ class MemeGapListOut(BaseModel):
 __all__ = [
     "MEME_LABEL",
     "DecimalStr",
+    "GraduationMatrixOut",
     "GraduationsOut",
     "MemeFeaturePointOut",
     "MemeGapListOut",
@@ -241,4 +307,6 @@ __all__ = [
     "NullReason",
     "OverviewByModeOut",
     "OverviewWindowCountOut",
+    "PoolCreatedSource",
+    "ProgressDenominatorSource",
 ]

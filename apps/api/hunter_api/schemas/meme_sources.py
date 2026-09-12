@@ -17,6 +17,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 __all__ = [
+    "DISCOVERY_BLIND_EXPLANATION",
     "MEME_SOURCES_LABEL",
     "MemeSourceOut",
     "MemeSourcesOut",
@@ -25,6 +26,14 @@ __all__ = [
 ]
 
 MEME_SOURCES_LABEL = "Meme Radar — fontes de dados; só monitoramento, nunca execução (pump.fun)"
+
+DISCOVERY_BLIND_EXPLANATION = (
+    "programa fora do escopo do adaptador: a descoberta ouve só o programa pump "
+    "(PumpPortal subscribeNewToken + boards new/graduating com pg = pump); entradas do "
+    "board new em raydium_launchpad/StonkFun e afins são invisíveis por construção e não "
+    "são rastreadas — a fração declara o tamanho da cegueira, não a corrige"
+)
+"""The declared blindness (T4.2d, item 3). Fixed text: the reason is structural."""
 
 RadarStatus = Literal["alive", "stale", "never", "heartbeat_missing", "redis_unavailable"]
 """The worker's own heartbeat fields: ``alive`` when ``sources_at`` is fresh,
@@ -87,4 +96,11 @@ class MemeSourcesOut(BaseModel):
     trenches_patches_60s: int | None
     swap_api_used_60s: int | None
     swap_api_budget_60s: int | None
+    discovery_blind_share_1h: float | None = None
+    """Share of the ``new`` board's listings in the last hour whose program is
+    not ``pump`` (``blind_share_1h`` of the heartbeat). ``None`` when the board
+    listed nothing in the hour, or when the worker predates T4.2d."""
+    discovery_new_board_entries_1h: int | None = None
+    discovery_non_pump_entries_1h: int | None = None
+    discovery_blind_explanation: str = DISCOVERY_BLIND_EXPLANATION
     sources: list[MemeSourceOut]

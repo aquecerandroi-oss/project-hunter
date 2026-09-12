@@ -450,6 +450,40 @@ holders ou um trade carimbado dentro do minuto mas recebido depois do fecho não
 passa `curve_volume_1m_sol=None` e lê `creator_sold` como `creator_net_seller` — dois ajustes de uma
 linha em `lab_repo.py`, fora do escopo desta tarefa por regra do brief (não tocar `lab*.py`).
 
+### T4.2d — o que "graduou" quer dizer, o denominador do progresso e a cegueira declarada (entregue 12/09/2026)
+
+**Fatos que a motivaram** (run 5 do plantão, 05:51 BRT; produção 06:04 BRT): `complete = true` da REST
+não é graduação (77/140 com `real_sol = 0`, 72/140 fora do board `graduated`); o denominador do
+progresso só era escrito de fotografia virgem (117/123 linhas do portão em `progress_unknown`); 8/50 do
+board `new` eram `raydium_launchpad`, invisíveis ao `subscribeNewToken`.
+
+**Escopo entregue:** migração `0024_meme_graduation` (`docs/DATABASE.md` §36): quatro estampas separadas
+em `meme_tokens` — `rest_complete_seen_at`, `curve_filled_seen_at` (limiar **derivado** de
+`/global-params`: `quote.curve_fill_threshold_lamports` = `buy_cost` dos 793,1 M numa curva virgem =
+85 005 359 057 lamports), `graduated_board_seen_at`, `pool_created_at`/`pool_created_source` —,
+`completed_at` = a mais antiga das quatro **exceto** REST com reserva zero sozinho (redutor
+`graduation.earliest_completion`; no banco `LEAST`, trigger só deixa recuar), `progress_denominator_source`
+(`observed_virgin` | `global_params`; NULL = `unknown`), backfill a partir das tabelas de evidência, vista
+`meme_graduation_matrix_v1` (por dia de Brasília: contagem por sinal, 1/2/3/4 sinais, seis pares que
+discordam, "só REST"). Worker: `graduation.py` (redutor, sinais da curva, denominador com guarda Mayhem,
+`GlobalParamsStore` — `/global-params` uma vez por hora no orçamento da curva), `curve_rows.py`,
+`repo_rows.py`; `boards.py` escreve o board `graduated` sem rastrear e devolve as primeiras aparições;
+`risk.py` e `discovery.py` alimentam a pool; `sources.py` conta a cegueira (`blind_share_1h`,
+`new_board_entries_1h`, `new_board_non_pump_1h`); `features_version = meme_features_v2` (série quebra no
+deploy, `v1` não reescrita). Adaptador: `PumpFunRestClient.get_global_params`. API: sinais no
+`MemeTokenOut`, `graduation_matrix` na `overview`, `discovery_blind_share_1h` + explicação em `/meme/sources`.
+Web: faixa "Graduação hoje — quatro sinais separados" em `/meme` e bloco "Sinais de conclusão" + marcas
+no gráfico em `/meme/{mint}`, discordâncias em âmbar; filtro `completed` = `completed_at`.
+
+**Mayhem, explícito:** a curva Mayhem tem 1 bilhão extra cunhado para o agente e reservas movidas por
+`set_mayhem_virtual_params` (a fixture `2sduGq…` tem 822,6 M tokens reais, mais que o inicial do registro);
+o registro não descreve essa curva, então o denominador só vem de fotografia virgem e fica `unknown` no
+resto — 64 % das criações são Mayhem, logo o portão do Lab continua recusando a maioria delas por
+`progress_unknown`; a correção real exige decodificar a conta `mayhem_state` (fora de escopo).
+
+**O que não se faz:** nenhum rastreio de StonkFun/LaunchLab — a fração de cegueira mede, não corrige; a
+decisão é do Everton (§8).
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets

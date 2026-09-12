@@ -128,12 +128,32 @@ class SourcesState:
     gaps_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
     ws_malformed_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
     trenches_patches_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
+    new_board_entries_1h: RollingCounter = field(default_factory=lambda: RollingCounter(3600))
+    new_board_non_pump_1h: RollingCounter = field(default_factory=lambda: RollingCounter(3600))
+    """The declared blindness (T4.2d, item 3): listings on the site's ``new``
+    board in the last hour, and how many of them run on a program other than
+    ``pump`` — coins ``subscribeNewToken`` never announces and this radar never
+    tracks, by construction (8/50 were ``raydium_launchpad`` at 05:51 BRT)."""
     last_snapshot_observed_at: datetime | None = None
     last_snapshot_received_at: datetime | None = None
     _sampled: dict[str, int] = field(default_factory=dict[str, int])
 
     def __getitem__(self, name: str) -> SourceStats:
         return self.sources[name]
+
+    def record_new_listing(self, at: datetime, *, in_scope: bool) -> None:
+        """One first sighting on the ``new`` board; ``in_scope`` = program ``pump``."""
+        self.new_board_entries_1h.add(at)
+        if not in_scope:
+            self.new_board_non_pump_1h.add(at)
+
+    def blind_share_1h(self, now: datetime) -> float | None:
+        """Non-``pump`` listings over all listings in the last hour; ``None`` when
+        the board listed nothing — an empty hour is unknown, not full coverage."""
+        total = self.new_board_entries_1h.total(now)
+        if total == 0:
+            return None
+        return round(self.new_board_non_pump_1h.total(now) / total, 4)
 
     def sample_counter(self, key: str, value: int, at: datetime, into: RollingCounter) -> int:
         """Turn a monotonic counter (a client's ``state.malformed``) into events:
@@ -174,6 +194,9 @@ class SourcesState:
             "trenches_patches_60s": self.trenches_patches_60s.total(now),
             "swap_api_used_60s": self.sources[SWAP_API].used_60s.total(now),
             "swap_api_budget_60s": self.sources[SWAP_API].budget_60s,
+            "new_board_entries_1h": self.new_board_entries_1h.total(now),
+            "new_board_non_pump_1h": self.new_board_non_pump_1h.total(now),
+            "blind_share_1h": self.blind_share_1h(now),
             "sources_at": now.isoformat(),
             "sources": json.dumps(
                 {name: stats.as_fields(now) for name, stats in self.sources.items()},
