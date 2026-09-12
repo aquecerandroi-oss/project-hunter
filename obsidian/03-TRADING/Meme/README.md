@@ -42,12 +42,21 @@ ver [[06-DECISIONS/2026-09-12-meta-7m-e-lab-meme]] §3.
 | `EXP-M<n>` | Pré-registro formal de um conjunto de regras sobre a curva (T4.5) — protocolo congelado, régua editorial idêntica à de `momentum`/`mean_reversion` (≥ 100 avaliáveis **e** ≥ 30 dias, IC 95 % por blocos de dia, 2 de 3 janelas) | `obsidian/05-EXPERIMENTS/EXP-M<n>-<slug>.md`, listada em [[Experiments Index]] |
 | `M-P<n>` | Hipótese de pesquisa (ainda não é candidata de estratégia) especificamente sobre meme/pump.fun, na fila do plantão | `00-INBOX/Hipoteses-do-plantao.md`, a partir desta decisão — ver o cabeçalho daquele arquivo |
 
-**Estado nesta data (2026-09-12):** nenhuma página `EXP-M*` existe ainda neste vault. A primeira,
-`EXP-M1` ("comprar cedo na curva e vender em ROI alto" — a hipótese que o próprio Everton enunciou),
-está em pré-registro pela T4.5 nesta mesma sessão (`.claude/state/brief-T4.5-simulador-curva.md`
-item 6). Quando a página existir, este README ganha uma tabela "Conjuntos ativos" com uma linha por
-`EXP-M<n>` — status (`research_only`/`paper`), veredito mais recente e link, no mesmo espírito da
-página de família de `03-TRADING/Estrategias/**` (`docs/OBSIDIAN.md` §1).
+**Estado nesta data (2026-09-12):** a primeira página `EXP-M*` existe desde a T4.5 desta mesma
+sessão — [[EXP-M1-comprar-cedo-na-curva]], "comprar cedo na curva e vender em ROI alto", a hipótese
+que o próprio Everton enunciou. Ela está **pré-registrada, não rodada**: o simulador puro existe
+(`hunter_indicators.meme`), o coletor da T4.2 ainda não gravou uma linha de `meme_curve_snapshots`, e
+por isso `result: nao-iniciado` com 0 avaliáveis e 0 dias.
+
+## Conjuntos ativos
+
+| Conjunto | Pré-registro | Status | Último veredito |
+|---|---|---|---|
+| `comprar_cedo_na_curva v1` + `alvo_2x_trailing_30_tempo_15m v1` — perfil `meme_paper_v0` (idade 30–600 s, progresso 2–50 %, participação ≤ 1 %; 2× / trailing 30 % / time stop 15 min / piso 50 % / dump do criador) | [[EXP-M1-comprar-cedo-na-curva]] | **pré-registrado** — carteira paper, sem chave, sem ordem real | — (nenhuma corrida; portão de desenho C1–C8 = `REVISE`, veredito **previsto** `descartar`) |
+
+Uma linha por `EXP-M<n>`, no mesmo espírito da página de família de `03-TRADING/Estrategias/**`
+(`docs/OBSIDIAN.md` §1). Status e veredito são copiados da página do experimento, nunca decididos
+aqui.
 
 ## O que ainda é planejado, não implementado
 
