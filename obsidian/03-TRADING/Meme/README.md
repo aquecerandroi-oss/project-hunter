@@ -79,5 +79,5 @@ depende de switch explícito do Everton (`ENABLE_MEME_LIVE_TRADING`) depois do f
 [[03-TRADING/Estrategias/README|Estrategias (catálogo geral)]] · [[Experiments Index]] ·
 [[Strategy Backlog]] · [[06-DECISIONS/2026-09-12-meta-7m-e-lab-meme]] ·
 [[02-MARKET/Meme/README|Meme (Mercado)]] · [[09-OPERATIONS/Diario-Meme/README|Diário Meme]] ·
-[[11-KNOWLEDGE/README-meme|Meme (Conhecimento)]] · [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]] ·
+[[11-KNOWLEDGE/README-meme|Meme (Conhecimento)]] · [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]] · [[03-TRADING/Meme/Terminal-do-pumpfun|Terminal do pump.fun]] ·
 `docs/plans/T4-MEME-RADAR.md` · `docs/plans/T4-MEME-RADAR-UI.md`
