@@ -100,8 +100,14 @@ _ALL_TOKEN_COLUMNS = (
 )
 
 _UPSERT_TOKEN = text(
-    f"INSERT INTO meme_tokens ({', '.join(_ALL_TOKEN_COLUMNS)}) "  # noqa: S608
-    f"VALUES ({', '.join(':' + column for column in _ALL_TOKEN_COLUMNS)}) "
+    # ``mayhem_mode``/``mayhem_state`` are mutable state, so they are not in the
+    # write-once list — but they must be *inserted* (T4.2e: until then the
+    # INSERT omitted them, ``excluded.mayhem_state`` was always NULL, the column
+    # never held a value and ``_LOAD_TRACKED``'s "a paused agent keeps the mint"
+    # never fired). The CASE is the CHECK ``a_disabled_token_has_no_agent_state``.
+    f"INSERT INTO meme_tokens ({', '.join(_ALL_TOKEN_COLUMNS)}, mayhem_mode, mayhem_state) "  # noqa: S608
+    f"VALUES ({', '.join(':' + column for column in _ALL_TOKEN_COLUMNS)}, :mayhem_mode, "
+    "CASE WHEN :mayhem_enabled IS FALSE THEN NULL ELSE :mayhem_state END) "
     "ON CONFLICT (mint) DO UPDATE SET "
     + ", ".join(
         f"{column} = COALESCE(meme_tokens.{column}, excluded.{column})"

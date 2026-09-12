@@ -75,6 +75,7 @@ __all__ = [
     "fold_once",
     "forever",
     "minute_end",
+    "persist_reading",
     "poll_once",
     "prune_once",
     "reconcile_once",
@@ -84,13 +85,18 @@ __all__ = [
 ]
 
 
-async def _persist_reading(ctx: RadarContext, state: NormalizedCurveState) -> None:
+async def persist_reading(
+    ctx: RadarContext, state: NormalizedCurveState, *, count_request: bool = True
+) -> None:
     """One transaction: the snapshot, what it teaches the token, and the tracker.
 
     The ``/global-params`` record in force at the coin's creation (T4.2d) is
     what turns the reading into a fill threshold and, for a standard curve seen
     mid-life, a denominator — ``curve_rows.py`` decides what the reading may
     claim; ``None`` when the store is absent or the read failed claims nothing.
+    ``count_request=False`` is the Mayhem batch (T4.2e, ``mayhem.py``): one
+    ``getMultipleAccounts`` serves 25 readings, and the source's ``used_60s``
+    counts requests, so the loop counts the call itself, once.
     """
     tracked = ctx.tracker.get(state.mint)
     params = None
@@ -114,7 +120,10 @@ async def _persist_reading(ctx: RadarContext, state: NormalizedCurveState) -> No
     )
     if ctx.sources is not None:
         name = SOLANA_RPC if state.source == "solana_rpc" else PUMPFUN_REST
-        ctx.sources[name].record_ok(observed_at=state.observed_at, received_at=state.received_at)
+        if count_request:
+            ctx.sources[name].record_ok(
+                observed_at=state.observed_at, received_at=state.received_at
+            )
         ctx.sources.record_snapshot(observed_at=state.observed_at, received_at=state.received_at)
 
 
@@ -153,7 +162,7 @@ async def poll_once(ctx: RadarContext) -> int:
             _spent(ctx, now, "rate_limited" if isinstance(exc, RateLimited) else type(exc).__name__)
             logger.warning("meme_curve_poll_failed", mint=mint, error=str(exc))
             continue
-        await _persist_reading(ctx, state)
+        await persist_reading(ctx, state)
         meme_polls_total.labels(source="pumpfun_rest", outcome="ok").inc()
         read += 1
     for mint in plan.skipped:
@@ -214,7 +223,7 @@ async def reconcile_once(ctx: RadarContext) -> int:
                 ctx.sources[SOLANA_RPC].record_error(utcnow(), type(exc).__name__)
             logger.warning("meme_chain_read_failed", mint=mint, error=str(exc))
             continue
-        await _persist_reading(ctx, state)
+        await persist_reading(ctx, state)
         meme_polls_total.labels(source="solana_rpc", outcome="ok").inc()
         read += 1
     return read

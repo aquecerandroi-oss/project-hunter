@@ -6290,3 +6290,41 @@ recusa, ida e volta); `services/meme-worker/tests/test_graduation_persistence.py
 | `GET /api/v1/orgs/{org}/meme/overview` | `graduation_matrix` = a linha de hoje (Brasília) da vista, ou `null` |
 | `GET /api/v1/orgs/{org}/meme/sources` | `discovery_blind_share_1h` + contagens + `discovery_blind_explanation` (heartbeat `blind_share_1h`, `new_board_entries_1h`, `new_board_non_pump_1h`) |
 | `apps/web` (`/meme`, `/meme/{mint}`) | faixa "Graduação hoje — quatro sinais separados" (discordâncias em âmbar); bloco "Sinais de conclusão" e marcas no gráfico de mcap; filtro `completed` = `completed_at` |
+
+## 37. O denominador das curvas Mayhem — `mayhem_state` — M4 (`0025_meme_mayhem_denominator`)
+
+Vigésima quinta revisão. **Um CHECK alargado** em `meme_tokens`
+(`ck_meme_tokens_denominator_source_is_a_known_label` ganha `'mayhem_state'`), e nada mais: nenhuma
+coluna, tabela, vista, trigger, enum ou política. Entrega a T4.2e sobre a `0024` (T4.2d).
+
+**O fato que a motiva** (`docs/PUMPFUN-ONCHAIN.md` §3.5): a T4.2d deixou toda curva Mayhem sem
+denominador porque a fixture `2sduGq…` tinha 822,6 M tokens reais, mais que os 793,1 M do registro. A
+T4.2e leu na cadeia, no mesmo slot, as quatro contas de cinco moedas Mayhem (`bonding_curve`,
+`MayhemState`, cofre do agente, mint): a reserva inicial **é a do registro**; o excesso é o bilhão do
+agente (supply do mint 2 B contra `token_total_supply` 1 B da curva) vendido líquido para a curva —
+`822 644 036,902123 = 793 100 000 + 29 544 036,902123`, até a subunidade. `mayhem_state` significa: o
+inicial do registro, escrito **só depois** de a identidade `cofre + líquido = supply − supply_da_curva`
+fechar naquela leitura (`services/meme-worker/hunter_meme_worker/mayhem.py`). Bicondicional com
+`initial_real_token_reserves` (CHECK da `0024`, intocado); escrita única (`WRITE_ONCE_COLUMNS_0024`).
+
+**Sem guarda de subida — e isso é uma asserção:** a lista nova é superconjunto da antiga. O CHECK é
+adicionado `NOT VALID` e depois `VALIDATE CONSTRAINT` (`SHARE UPDATE EXCLUSIVE`, que deixa os upserts
+do coletor passarem; ~40 k linhas/dia, podadas a 90 dias). **A descida recusa** enquanto houver uma
+linha com `mayhem_state` (§17.7: contar, nomear, parar; `COPY` antes).
+
+**Efeitos fora do esquema, declarados:** `curve_progress_pct` de uma Mayhem pode ser **negativo**
+(`1 − rt/inicial` com o agente vendedor líquido; o site trunca em 0, o radar guarda — §15.8, sem CHECK de
+domínio; o portão da EXP-M1 recusa por `progress_below_min`); `curve_filled_seen_at` não é reivindicado
+para Mayhem (`set_mayhem_virtual_params` move o SOL virtual). Correção de bug na mesma tarefa:
+`repo._UPSERT_TOKEN` não inseria `mayhem_state`/`mayhem_mode` (o `INSERT` os omitia e `excluded.*` era
+sempre NULL) — `meme_tokens.mayhem_state` passa a ser preenchido, o `OR mayhem_state IN
+('active','paused')` de `_LOAD_TRACKED` passa a valer, com o mesmo `CASE` do CHECK
+`a_disabled_token_has_no_agent_state` no `VALUES`. `tape_reason` ganha `not_polled` (palavra já do
+vocabulário: o orçamento da fita não alcançou o mint no ciclo).
+
+| Onde | O que muda |
+|---|---|
+| `services/meme-worker/**` | `graduation.mayhem_denominator`, laço `mayhem.py` (25 mints por `getMultipleAccounts`, uma vez por minuto), `repo._UPSERT_TOKEN` insere `mayhem_state`/`mayhem_mode` |
+| `GET /api/v1/orgs/{org}/meme/tokens[/{mint}]` | `progress_denominator_source` ∈ {`observed_virgin`, `global_params`, `mayhem_state`, `unknown`} |
+| `GET /api/v1/orgs/{org}/meme/sources` | `progress_coverage_pct`, `tape_coverage_pct`, `fold_minute`, `fold_rows`, `tape_cycle_s`, `tape_*`, `mayhem_pending`, `mayhem_denominators_60s`, `coverage_explanation` |
+| `apps/web` | **pendente**: `labels.ts` tipa `Record<MemeDenominatorSource, string>` exaustivo — precisa do rótulo `mayhem_state` e de `pnpm gen:types` (fora do escopo da T4.2e) |

@@ -343,9 +343,16 @@ parte e nunca toma o registro**: o agente cunha 1 bilhão de tokens extra e `set
 move as reservas — a fixture `2sduGq…` (Mayhem pausada, `frontend_api_v3_coin_by_mint_response_raw.json`)
 tem 822,6 M tokens reais na curva, mais que os 793,1 M do registro, e 1 102,5 M virtuais com 3,08 SOL
 virtuais. Nem a conta `Global` (25 campos, T4.0d) nem `/global-params` trazem um parâmetro de reserva
-Mayhem; o campo certo vive na conta `mayhem_state`, que este projeto não decodifica. Logo, uma Mayhem só
-ganha denominador se observada virgem, e o `progress_denominator_source` fica `unknown` — declarado,
-não disfarçado.
+Mayhem; o campo certo vive na conta `mayhem_state`. **T4.2e decodificou essa conta** (`MayhemState`,
+`docs/PUMPFUN-ONCHAIN.md` §3.5): a reserva inicial de uma curva Mayhem **é a do registro**; os 822,6 M
+são `793 100 000 + 29 544 036,902123` de tokens que o **agente** vendeu líquido para a curva, do bilhão
+cunhado só para ele (supply do mint 2 B contra `token_total_supply` 1 B da curva). O worker lê, uma vez
+por minuto e 25 mints por chamada RPC, as quatro contas de cada Mayhem rastreada sem denominador, fecha
+a identidade `cofre + líquido = supply − supply_da_curva` e só então escreve o inicial do registro com
+`progress_denominator_source = mayhem_state` (`0025`). Uma fotografia REST de Mayhem sozinha não
+reivindica nada (nem `observed_virgin`: a fixture estava a 1 lamport com 29,5 M do agente dentro).
+O progresso pode ficar **negativo** (o site trunca em 0; nós guardamos) e `curve_filled_seen_at` não é
+reivindicado para Mayhem (o agente move o SOL virtual).
 
 **Cegueira declarada.** A descoberta ouve só o programa `pump` (`subscribeNewToken` + boards com
 `pg = pump`); 8/50 do board `new` às 05:51 BRT eram `raydium_launchpad` (StonkFun). O worker conta por

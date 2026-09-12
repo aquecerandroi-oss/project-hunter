@@ -16,7 +16,7 @@ are absent, which is the truth of that deployment and not a crash.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Protocol
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from hunter_exchanges.pumpfun.models import NormalizedCurveState
+    from hunter_exchanges.pumpfun.rpc import MayhemFlowBatch
     from hunter_exchanges.pumpfun.ws import ConnectionState, MemeEvent
     from hunter_meme_worker.boards import BoardCollector
     from hunter_meme_worker.config import MemeConfig
@@ -55,6 +56,10 @@ class ChainSource(Protocol):
     """The Solana RPC — the truth, and the scarcest budget of the three."""
 
     async def get_curve_state(self, mint: str, bonding_curve: str) -> NormalizedCurveState: ...
+
+    async def get_mayhem_flows(self, mints: Sequence[str]) -> MayhemFlowBatch:
+        """Four accounts per Mayhem mint, 25 mints per call (T4.2e, ``mayhem.py``)."""
+        ...
 
 
 @dataclass

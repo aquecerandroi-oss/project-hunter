@@ -118,6 +118,14 @@ def _iso(value: datetime | None) -> str | None:
     return None if value is None else value.isoformat()
 
 
+def _pct(part: int | None, whole: int | None) -> float | None:
+    """``part`` over ``whole`` in percent, one decimal; unknown (or an empty
+    minute) is ``None`` — never a ``0`` that reads as "nothing covered"."""
+    if part is None or not whole:
+        return None
+    return round(100.0 * part / whole, 1)
+
+
 @dataclass
 class SourcesState:
     """Every source the radar has, plus the three radar-wide rolling counts."""
@@ -136,10 +144,57 @@ class SourcesState:
     tracks, by construction (8/50 were ``raydium_launchpad`` at 05:51 BRT)."""
     last_snapshot_observed_at: datetime | None = None
     last_snapshot_received_at: datetime | None = None
+    fold_minute: datetime | None = None
+    fold_rows: int | None = None
+    fold_rows_with_tape: int | None = None
+    fold_rows_with_progress: int | None = None
+    """T4.2e: the last folded minute and how many of its rows carried a tape
+    and a progress — ``tape_coverage_pct``/``progress_coverage_pct`` in the
+    heartbeat. ``None`` until the first fold: an unknown, never ``0 %``."""
+    tape_cycle_s: float | None = None
+    tape_planned: int | None = None
+    tape_tracked_mints: int | None = None
+    tape_covered_mints: int | None = None
+    tape_never_pulled: int | None = None
+    tape_deferred_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
+    """The tape puller's last cycle (``trades.py``): how long it took, how many
+    mints it planned, how many of the tracked set are covered, and how many
+    due mints the cap left out in the last minute (each ``not_polled``)."""
+    mayhem_pending: int | None = None
+    mayhem_written_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
+    mayhem_refused_1h: RollingCounter = field(default_factory=lambda: RollingCounter(3600))
+    """The Mayhem loop (``mayhem.py``): tracked Mayhem mints still without a
+    denominator, denominators written in the last minute, refusals in the hour."""
     _sampled: dict[str, int] = field(default_factory=dict[str, int])
 
     def __getitem__(self, name: str) -> SourceStats:
         return self.sources[name]
+
+    def record_fold(
+        self, minute: datetime, *, rows: int, with_tape: int, with_progress: int
+    ) -> None:
+        self.fold_minute = minute
+        self.fold_rows = rows
+        self.fold_rows_with_tape = with_tape
+        self.fold_rows_with_progress = with_progress
+
+    def record_tape_cycle(
+        self,
+        at: datetime,
+        *,
+        duration_s: float,
+        planned: int,
+        deferred: int,
+        tracked: int,
+        covered: int,
+        never_pulled: int,
+    ) -> None:
+        self.tape_cycle_s = duration_s
+        self.tape_planned = planned
+        self.tape_tracked_mints = tracked
+        self.tape_covered_mints = covered
+        self.tape_never_pulled = never_pulled
+        self.tape_deferred_60s.add(at, deferred)
 
     def record_new_listing(self, at: datetime, *, in_scope: bool) -> None:
         """One first sighting on the ``new`` board; ``in_scope`` = program ``pump``."""
@@ -197,6 +252,20 @@ class SourcesState:
             "new_board_entries_1h": self.new_board_entries_1h.total(now),
             "new_board_non_pump_1h": self.new_board_non_pump_1h.total(now),
             "blind_share_1h": self.blind_share_1h(now),
+            # T4.2e: the coverage of the last folded minute and the tape cycle.
+            "progress_coverage_pct": _pct(self.fold_rows_with_progress, self.fold_rows),
+            "tape_coverage_pct": _pct(self.fold_rows_with_tape, self.fold_rows),
+            "fold_minute": _iso(self.fold_minute),
+            "fold_rows": self.fold_rows,
+            "tape_cycle_s": self.tape_cycle_s,
+            "tape_planned": self.tape_planned,
+            "tape_tracked_mints": self.tape_tracked_mints,
+            "tape_covered_mints": self.tape_covered_mints,
+            "tape_never_pulled": self.tape_never_pulled,
+            "tape_deferred_60s": self.tape_deferred_60s.total(now),
+            "mayhem_pending": self.mayhem_pending,
+            "mayhem_written_60s": self.mayhem_written_60s.total(now),
+            "mayhem_refused_1h": self.mayhem_refused_1h.total(now),
             "sources_at": now.isoformat(),
             "sources": json.dumps(
                 {name: stats.as_fields(now) for name, stats in self.sources.items()},

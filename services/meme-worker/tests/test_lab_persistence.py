@@ -110,6 +110,9 @@ def _token(mint: str, *, created_at: datetime) -> TokenRow:
         last_seen_at=created_at,
         created_at=created_at,
         initial_real_token_reserves=Decimal("793100000"),
+        # 0024 pairs the denominator with its source (T4.2d); a bare denominator
+        # is refused by ``ck_meme_tokens_a_denominator_names_its_source``.
+        progress_denominator_source="observed_virgin",
         total_supply=Decimal(1_000_000_000),
     )
 

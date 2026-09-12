@@ -1,0 +1,23 @@
+{
+ "addresses": [
+  [
+   "bc:668QLGHFQgDPMRwWvQymZAeBCsTFQBTrqnq1hidXpump",
+   "CGDhnaNjFZdk4nWAsgfvKNwdm2VM9XCwFEdFh3Zqxfed"
+  ],
+  [
+   "ms:668QLGHFQgDPMRwWvQymZAeBCsTFQBTrqnq1hidXpump",
+   "6MCrUWQdFnu4eC1aXp6CcJeaRaNFsWavVP79b6EkWUJg"
+  ],
+  [
+   "vault:668QLGHFQgDPMRwWvQymZAeBCsTFQBTrqnq1hidXpump",
+   "244TYYPRrJwVd3NuyuFYb35Q66MH8ZWZKnqvWzDiVxLT"
+  ],
+  [
+   "mint:668QLGHFQgDPMRwWvQymZAeBCsTFQBTrqnq1hidXpump",
+   "668QLGHFQgDPMRwWvQymZAeBCsTFQBTrqnq1hidXpump"
+  ]
+ ],
+ "mints": [
+  "668QLGHFQgDPMRwWvQymZAeBCsTFQBTrqnq1hidXpump"
+ ]
+}

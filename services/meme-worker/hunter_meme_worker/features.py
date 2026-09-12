@@ -14,7 +14,7 @@ spoken about is still ``no_holders_reader``.
 | ``curve_progress_pct`` | computed when the denominator was observed | ``progress_reason`` |
 | ``mcap_sol`` | copied from the minute's snapshot | ``curve_reason`` |
 | ``holders``, ``top10_share``, ``dev_share``, ``snipers`` | the newest board/risk reading received by ``end_time`` | ``no_holders_reader`` |
-| ``unique_buyers``, ``buy_sell_ratio``, ``buys_1m``… | the tape received by ``end_time`` | ``no_trade_feed`` / ``no_sells`` / ``rate_limited`` / ``unsupported_quote`` |
+| ``unique_buyers``, ``buy_sell_ratio``, ``buys_1m``… | the tape received by ``end_time`` | ``no_trade_feed`` / ``no_sells`` / ``rate_limited`` / ``unsupported_quote`` / ``not_polled`` (T4.2e: the tape budget did not reach the mint this cycle — the curve's word for the same fact) |
 | ``creator_sold``, ``creator_net_seller`` | the creator's trades in the tape covered so far | ``no_trade_feed`` |
 
 Nothing here clamps a strange number into a plausible one. ``curve_progress_pct``

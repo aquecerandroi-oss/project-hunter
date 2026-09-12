@@ -132,6 +132,26 @@ class MemeConfig:
 
     trades_max_pages: int = 3
 
+    trades_concurrency: int = 8
+    """``MEME_TRADES_CONCURRENCY`` (T4.2e): tape pulls in flight at once, behind
+    the adapter's 900/60 s bucket, which is what paces them. Sequential pulls
+    made a 250-mint round take ~90 s (250–450 ms a request), so the "10 s"
+    tiers were read every ~90 s and ``swap_api_used_60s`` sat at ~170 of 900
+    while 109 of 250 gate rows had no tape (08:35 BRT, 12/09). Eight in flight
+    bring the round to ~10 s; ``1`` reproduces the old behaviour."""
+
+    tape_stale_s: float = 180.0
+    """A minute's tape is usable only if the mint's newest successful pull at
+    the minute's close is younger than this — three rest-tier intervals. A
+    tape the source stopped answering for is not a zero (``trades.py``)."""
+
+    mayhem_cycle_s: float = 60.0
+    """The Mayhem loop (T4.2e, ``mayhem.py``): once a minute, the tracked
+    Mayhem mints still without a denominator, 25 per RPC call."""
+
+    mayhem_batch: int = 25
+    """``getMultipleAccounts`` takes 100 addresses; four per mint."""
+
     risk_enabled: bool = True
     """``GET /in-memory-coin/{mint}`` for open bets and ``graduating`` (T4.2c),
     ``MEME_RISK_ENABLED``, default on."""
@@ -191,6 +211,7 @@ def load_config(settings: Settings) -> MemeConfig:
         trenches_enabled=_bool_env("MEME_TRENCHES_ENABLED", default=True),
         swap_api_enabled=_bool_env("MEME_SWAP_API_ENABLED", default=True),
         swap_api_budget_60s=_int_env("MEME_SWAP_API_BUDGET_60S", 900),
+        trades_concurrency=max(1, _int_env("MEME_TRADES_CONCURRENCY", 8)),
         risk_enabled=_bool_env("MEME_RISK_ENABLED", default=True),
     )
 

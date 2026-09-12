@@ -1,0 +1,164 @@
+[
+ {
+  "name": "front_coin_2sduGq",
+  "url": "https://frontend-api-v3.pump.fun/coins/2sduGq1bDtMbu6apCs3cfmqfyA32bkXA4CCBdTW5pump",
+  "status": 200,
+  "bytes": 1990,
+  "ms": 281,
+  "at": "2026-09-12T11:43:51.062019+00:00",
+  "ratelimit": {}
+ },
+ {
+  "name": "indexer_in_memory_coin_2sduGq",
+  "url": "https://advanced-indexer.pump.fun/in-memory-coin/2sduGq1bDtMbu6apCs3cfmqfyA32bkXA4CCBdTW5pump",
+  "status": 200,
+  "bytes": 1712,
+  "ms": 234,
+  "at": "2026-09-12T11:43:51.295164+00:00",
+  "ratelimit": {}
+ },
+ {
+  "name": "front_mayhem_list",
+  "url": "https://frontend-api-v3.pump.fun/coins/mayhem-mode?limit=2&mayhemState=active",
+  "status": 200,
+  "bytes": 3840,
+  "ms": 235,
+  "at": "2026-09-12T11:43:51.524303+00:00",
+  "ratelimit": {
+   "x-ratelimit-limit": "60",
+   "x-ratelimit-remaining": "59",
+   "x-ratelimit-reset": "60"
+  }
+ },
+ {
+  "name": "front_coin_mayhem_1",
+  "url": "https://frontend-api-v3.pump.fun/coins/4BTPZVKt4zC9ukLFBgEe3hQcXLTE8ATRBZFuMnRTpump",
+  "status": 200,
+  "bytes": 1925,
+  "ms": 171,
+  "at": "2026-09-12T11:43:51.697096+00:00",
+  "ratelimit": {}
+ },
+ {
+  "name": "indexer_in_memory_coin_mayhem_1",
+  "url": "https://advanced-indexer.pump.fun/in-memory-coin/4BTPZVKt4zC9ukLFBgEe3hQcXLTE8ATRBZFuMnRTpump",
+  "status": 200,
+  "bytes": 1640,
+  "ms": 141,
+  "at": "2026-09-12T11:43:51.844217+00:00",
+  "ratelimit": {}
+ },
+ {
+  "name": "front_coin_mayhem_2",
+  "url": "https://frontend-api-v3.pump.fun/coins/8pzWwaiDMYCqJV7GZFegVUgMVqXDpyzRbq1iruxnpump",
+  "status": 200,
+  "bytes": 1961,
+  "ms": 156,
+  "at": "2026-09-12T11:43:51.998839+00:00",
+  "ratelimit": {}
+ },
+ {
+  "name": "indexer_in_memory_coin_mayhem_2",
+  "url": "https://advanced-indexer.pump.fun/in-memory-coin/8pzWwaiDMYCqJV7GZFegVUgMVqXDpyzRbq1iruxnpump",
+  "status": 200,
+  "bytes": 1719,
+  "ms": 157,
+  "at": "2026-09-12T11:43:52.152176+00:00",
+  "ratelimit": {}
+ },
+ {
+  "name": "rpc_mayhem_idl",
+  "method": "getAccountInfo",
+  "status": 200,
+  "bytes": 104,
+  "ms": 1031,
+  "at": "2026-09-12T11:43:53.189305+00:00"
+ },
+ {
+  "name": "rpc_mayhem_accounts",
+  "method": "getMultipleAccounts",
+  "status": 200,
+  "bytes": 6047,
+  "ms": 329,
+  "at": "2026-09-12T11:43:53.533681+00:00"
+ },
+ {
+  "name": "front_mayhem_list_paused",
+  "url": "https://frontend-api-v3.pump.fun/coins/mayhem-mode?limit=2&mayhemState=paused",
+  "status": 200,
+  "bytes": 3804,
+  "ms": 516,
+  "at": "2026-09-12T11:52:25.766624+00:00"
+ },
+ {
+  "name": "front_coin_mayhem_3",
+  "url": "https://frontend-api-v3.pump.fun/coins/668QLGHFQgDPMRwWvQymZAeBCsTFQBTrqnq1hidXpump",
+  "status": 200,
+  "bytes": 2028,
+  "ms": 187,
+  "at": "2026-09-12T11:52:25.968354+00:00"
+ },
+ {
+  "name": "indexer_in_memory_coin_mayhem_3",
+  "url": "https://advanced-indexer.pump.fun/in-memory-coin/668QLGHFQgDPMRwWvQymZAeBCsTFQBTrqnq1hidXpump",
+  "status": 200,
+  "bytes": 1765,
+  "ms": 734,
+  "at": "2026-09-12T11:52:26.692545+00:00"
+ },
+ {
+  "name": "rpc_mayhem_accounts_paused",
+  "method": "getMultipleAccounts",
+  "status": 200,
+  "bytes": 1855,
+  "ms": 641,
+  "at": "2026-09-12T11:52:27.343638+00:00"
+ },
+ {
+  "name": "front_mayhem_list_paused50",
+  "url": "https://frontend-api-v3.pump.fun/coins/mayhem-mode?limit=50&mayhemState=paused",
+  "status": 200,
+  "bytes": 95915,
+  "ms": 390,
+  "at": "2026-09-12T11:54:20.952231+00:00",
+  "ratelimit": {
+   "x-ratelimit-limit": "60",
+   "x-ratelimit-remaining": "59",
+   "x-ratelimit-reset": "60"
+  }
+ },
+ {
+  "name": "rpc_mayhem_accounts_stable",
+  "method": "getMultipleAccounts",
+  "status": 200,
+  "bytes": 1849,
+  "ms": 407,
+  "at": "2026-09-12T11:54:21.354061+00:00"
+ },
+ {
+  "name": "front_newest",
+  "url": "https://frontend-api-v3.pump.fun/coins?offset=0&limit=2&sort=created_timestamp&order=DESC&includeNsfw=false",
+  "status": 200,
+  "bytes": 4170,
+  "ms": 172,
+  "at": "2026-09-12T11:54:21.531796+00:00",
+  "ratelimit": {
+   "x-ratelimit-limit": "60",
+   "x-ratelimit-remaining": "59",
+   "x-ratelimit-reset": "60"
+  }
+ },
+ {
+  "name": "swap_api_trades_fresh",
+  "url": "https://swap-api.pump.fun/v2/coins/FUoPttzrEHAgT6emewZA1wHMbnz56dVr1SKtSTC7pump/trades?limit=100",
+  "status": 200,
+  "bytes": 1326,
+  "ms": 343,
+  "at": "2026-09-12T11:54:21.877350+00:00",
+  "ratelimit": {
+   "x-ratelimit-limit": "1000",
+   "x-ratelimit-remaining": "908",
+   "x-ratelimit-reset": "20"
+  }
+ }
+]

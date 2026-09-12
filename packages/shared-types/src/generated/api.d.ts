@@ -3114,6 +3114,11 @@ export interface components {
             /** Budget Used 60S */
             budget_used_60s: number | null;
             /**
+             * Coverage Explanation
+             * @default cobertura do último minuto dobrado: linhas com progresso ÷ linhas e linhas com fita ÷ linhas; uma linha sem fita diz o motivo em tape_reason (no_trade_feed = nunca puxada, not_polled = o orçamento da fita não a alcançou no ciclo, rate_limited = a fonte recusou); uma linha sem progresso diz progress_reason (denominator_unknown = Mayhem ainda sem a leitura on-chain de MayhemState, mayhem_pending conta quantas)
+             */
+            coverage_explanation: string;
+            /**
              * Discovery Blind Explanation
              * @default programa fora do escopo do adaptador: a descoberta ouve só o programa pump (PumpPortal subscribeNewToken + boards new/graduating com pg = pump); entradas do board new em raydium_launchpad/StonkFun e afins são invisíveis por construção e não são rastreadas — a fração declara o tamanho da cegueira, não a corrige
              */
@@ -3124,6 +3129,10 @@ export interface components {
             discovery_new_board_entries_1h?: number | null;
             /** Discovery Non Pump Entries 1H */
             discovery_non_pump_entries_1h?: number | null;
+            /** Fold Minute */
+            fold_minute?: string | null;
+            /** Fold Rows */
+            fold_rows?: number | null;
             /** Gaps 60S */
             gaps_60s: number | null;
             /** Heartbeat Age S */
@@ -3141,6 +3150,12 @@ export interface components {
             lag_s: number | null;
             /** Last Snapshot Observed At */
             last_snapshot_observed_at: string | null;
+            /** Mayhem Denominators 60S */
+            mayhem_denominators_60s?: number | null;
+            /** Mayhem Pending */
+            mayhem_pending?: number | null;
+            /** Progress Coverage Pct */
+            progress_coverage_pct?: number | null;
             /** Radar Reason */
             radar_reason: string | null;
             /**
@@ -3158,6 +3173,18 @@ export interface components {
             swap_api_budget_60s: number | null;
             /** Swap Api Used 60S */
             swap_api_used_60s: number | null;
+            /** Tape Coverage Pct */
+            tape_coverage_pct?: number | null;
+            /** Tape Covered Mints */
+            tape_covered_mints?: number | null;
+            /** Tape Cycle S */
+            tape_cycle_s?: number | null;
+            /** Tape Deferred 60S */
+            tape_deferred_60s?: number | null;
+            /** Tape Never Pulled */
+            tape_never_pulled?: number | null;
+            /** Tape Tracked Mints */
+            tape_tracked_mints?: number | null;
             /** Tracked */
             tracked: number | null;
             /** Trenches Connected */
@@ -3238,7 +3265,7 @@ export interface components {
              * @default unknown
              * @enum {string}
              */
-            progress_denominator_source: "observed_virgin" | "global_params" | "unknown";
+            progress_denominator_source: "observed_virgin" | "global_params" | "mayhem_state" | "unknown";
             /** Rest Complete Seen At */
             rest_complete_seen_at?: string | null;
             /** Snapshot Observed At */

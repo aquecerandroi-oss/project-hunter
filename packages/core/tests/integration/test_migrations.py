@@ -38,7 +38,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0024_meme_graduation"
+HEAD_REVISION = "0025_meme_mayhem_denominator"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -68,6 +68,9 @@ MEME_LAB_REVISION = "0022_meme_lab"
 MEME_BOARDS_REVISION = "0023_meme_boards_trades"
 """And once more: the ``0023`` tests reverse **0023**, and ``"-1"`` stopped meaning
 that the day ``0024_meme_graduation`` landed."""
+MEME_GRADUATION_REVISION = "0024_meme_graduation"
+"""And again: the ``0024`` tests reverse **0024**, and ``"-1"`` stopped meaning
+that the day ``0025_meme_mayhem_denominator`` landed."""
 """Named for the same reason as the line below: the two ``0019`` tests are about
 reversing **0019**, and ``"-1"`` stopped meaning that the day a revision landed on
 top of it. They now stage the database at this revision first, exactly as every
@@ -4782,12 +4785,19 @@ def test_0024_refuses_a_downgrade_that_would_lose_a_completion_signal(upgraded: 
         )
     )
     try:
+        # Stage at 0024 first: ``0025`` sits on top and its own guard counts
+        # only ``mayhem_state`` rows, so this step passes; ``"-1"`` is then 0024.
+        command.downgrade(config, MEME_GRADUATION_REVISION)
         with pytest.raises(DBAPIError, match="carry a completion signal"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == MEME_GRADUATION_REVISION, (
+            "the downgrade must not commit"
+        )
         assert asyncio.run(_relation_exists(upgraded, "meme_graduation_matrix_v1"))
     finally:
         asyncio.run(_write(upgraded, list(_CLEAN_TOKENS)))
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     command.check(config)
 
 
@@ -4796,7 +4806,7 @@ def test_0024_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
     matrix go, ``0021``'s view and its trigger come back exactly (``completed_at``
     written once again), and the upgrade restores the six, the view, the grants."""
     config = alembic_config(upgraded)
-    command.downgrade(config, "-1")
+    command.downgrade(config, MEME_BOARDS_REVISION)  # through 0025, then 0024
     try:
         assert asyncio.run(_revision(upgraded)) == MEME_BOARDS_REVISION
         assert not asyncio.run(_relation_exists(upgraded, "meme_graduation_matrix_v1"))
@@ -4846,4 +4856,94 @@ def test_0024_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
         assert asyncio.run(_table_privileges(upgraded, role, "meme_graduation_matrix_v1")) == {
             "SELECT"
         }
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0025_meme_mayhem_denominator — the third provenance of the denominator (T4.2e)
+# ---------------------------------------------------------------------------
+
+_A_MAYHEM_DENOMINATOR = (
+    "UPDATE meme_tokens SET initial_real_token_reserves = 793100000, "
+    "progress_denominator_source = 'mayhem_state' WHERE mint = :mint"
+)
+_CLEAN_TOKENS_0025: tuple[tuple[str, dict[str, object]], ...] = (
+    _RETENTION_MARKER,
+    ("DELETE FROM meme_tokens WHERE mint LIKE 'G25_%'", {}),
+)
+
+
+def test_0025_widens_the_denominator_label_and_keeps_the_pair_rule(upgraded: str) -> None:
+    """``mayhem_state`` is a known label now; a made-up one still is not, and a
+    denominator without a source (or a source without a denominator) is still
+    refused by ``0024``'s pair CHECK, which this revision does not touch."""
+    frozen = cast("tuple[str, ...]", migration_ddl("meme_mayhem").DENOMINATOR_SOURCES_0025)
+    assert frozen == ("observed_virgin", "global_params", "mayhem_state")
+    asyncio.run(_write(upgraded, [(_A_TOKEN, {"mint": "G25_LABEL"})]))
+    try:
+        asyncio.run(_write(upgraded, [(_A_MAYHEM_DENOMINATOR, {"mint": "G25_LABEL"})]))
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT progress_denominator_source FROM meme_tokens WHERE mint = :mint",
+                {"mint": "G25_LABEL"},
+            )
+        ) == ["mayhem_state"]
+        asyncio.run(_write(upgraded, [(_A_TOKEN, {"mint": "G25_PAIR"})]))
+        for statement, constraint in (
+            (
+                "UPDATE meme_tokens SET initial_real_token_reserves = 793100000, "
+                "progress_denominator_source = 'blog'",
+                "denominator_source_is_a_known_label",
+            ),
+            (
+                "UPDATE meme_tokens SET progress_denominator_source = 'mayhem_state'",
+                "a_denominator_names_its_source",
+            ),
+        ):
+            with pytest.raises(DBAPIError, match=constraint):
+                asyncio.run(
+                    _write(upgraded, [(f"{statement} WHERE mint = :mint", {"mint": "G25_PAIR"})])
+                )
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_TOKENS_0025)))
+
+
+def test_0025_refuses_a_downgrade_that_would_lose_a_mayhem_denominator(upgraded: str) -> None:
+    """§17.7: an on-chain reconciliation the ``0024`` schema cannot hold — count, name, stop."""
+    config = alembic_config(upgraded)
+    asyncio.run(
+        _write(
+            upgraded,
+            [(_A_TOKEN, {"mint": "G25_GUARD"}), (_A_MAYHEM_DENOMINATOR, {"mint": "G25_GUARD"})],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="mayhem_state"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_TOKENS_0025)))
+    command.check(config)
+
+
+def test_0025_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    """The operator's rollback: at ``0024`` the label is refused again; the
+    upgrade accepts it once more."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == MEME_GRADUATION_REVISION
+        asyncio.run(_write(upgraded, [(_A_TOKEN, {"mint": "G25_BACK"})]))
+        with pytest.raises(DBAPIError, match="denominator_source_is_a_known_label"):
+            asyncio.run(_write(upgraded, [(_A_MAYHEM_DENOMINATOR, {"mint": "G25_BACK"})]))
+        asyncio.run(_write(upgraded, list(_CLEAN_TOKENS_0025)))
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    asyncio.run(_write(upgraded, [(_A_TOKEN, {"mint": "G25_BACK"})]))
+    try:
+        asyncio.run(_write(upgraded, [(_A_MAYHEM_DENOMINATOR, {"mint": "G25_BACK"})]))
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_TOKENS_0025)))
     command.check(config)

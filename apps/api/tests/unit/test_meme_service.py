@@ -221,6 +221,13 @@ class TestBuildTokenOut:
         assert out.progress_denominator_source == "unknown"
         assert out.pool_created_source is None
 
+    def test_a_mayhem_state_denominator_is_a_known_source(self) -> None:
+        """``0025`` (T4.2e): the record's initial, written after the chain
+        reconciled the agent's flow — rendered by name, like the other two."""
+        row = _row(progress_denominator_source="mayhem_state", mayhem_enabled=True)
+        out = build_token_out(row, now=datetime(2026, 9, 12, 12, 0, tzinfo=UTC))
+        assert out.progress_denominator_source == "mayhem_state"
+
 
 class TestGraduationMatrix:
     def test_the_matrix_carries_the_counts_and_names_the_day(self) -> None:

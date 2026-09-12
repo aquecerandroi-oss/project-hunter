@@ -484,6 +484,42 @@ resto — 64 % das criações são Mayhem, logo o portão do Lab continua recusa
 **O que não se faz:** nenhum rastreio de StonkFun/LaunchLab — a fração de cegueira mede, não corrige; a
 decisão é do Everton (§8).
 
+### T4.2e — o denominador das curvas Mayhem e a cobertura da fita (entregue 12/09/2026)
+
+**Fatos que a motivaram** (VPS `eeb566c`, 08:35 BRT): 250 linhas por tick, `progress_unknown` em 113 e
+`creator_net_seller_unknown`/`curve_volume_1m_unknown` em 109; `progress_denominator_source` NULL em 2 615
+mints; nos 3 min anteriores, 77/393 linhas com fita — com ~730 req/min de folga no `swap-api`.
+
+**Denominador Mayhem (sem constante):** quatro chamadas RPC públicas (11:43–11:54 UTC) leram, no mesmo
+slot, `bonding_curve` + `MayhemState` + cofre do agente + mint de cinco moedas Mayhem, inclusive a fixture
+`2sduGq…`. Resultado (`docs/PUMPFUN-ONCHAIN.md` §3.5): a reserva inicial de uma curva Mayhem **é a do
+registro** de `/global-params`; o que passa de 793,1 M é o bilhão do agente vendido líquido para a curva
+(`822 644 036,902123 = 793 100 000 + 29 544 036,902123`, até a subunidade). Sem IDL do programa Mayhem
+(repositório e conta de IDL on-chain ausentes), o layout de `MayhemState` é **inferido e validado em toda
+leitura** por `cofre + líquido_vendido = supply_do_mint − token_total_supply` (5/5); os discriminadores
+batem com a convenção Anchor (`sha256("account:MayhemState")[:8]`). Adaptador: `mayhem_state.py` (PDAs
+pelas seeds da IDL do Pump, decodificador, `NormalizedMayhemFlow`), `rpc.get_mayhem_flows`
+(`getMultipleAccounts`, 25 mints/chamada). Worker: `graduation.mayhem_denominator`, laço `mayhem.py` (uma
+vez por minuto, só as Mayhem rastreadas sem denominador), `progress_denominator_source = mayhem_state`
+(migração `0025`, um CHECK alargado). A fotografia REST de Mayhem sozinha não reivindica nada (nem
+`observed_virgin`), e `curve_filled_seen_at` não é reivindicado para Mayhem. Teste do brief: `4BTP…`
+reproduz os 3,43 % do site com 3,4285 % (0,002 pp); `2sduGq…` dá −3,7251 %, que o site trunca em 0 —
+guardamos o negativo, `meme_features_v2` continua (mesma fórmula; o denominador é dado do token).
+
+**Cobertura da fita — a causa:** `pull_once` era sequencial: 250 mints × 250–450 ms ≈ 90 s por "ciclo de
+10 s"; os tiers de 10 s eram puxados a cada ~90 s, a volta do tier `rest` passava de um minuto e
+`swap_api_used_60s` ficava em ~170 de 900 (= 250 ÷ 90 s). A medição foi 3 min depois de um deploy
+(reinício zera a cobertura em memória, por desenho: um minuto sem escuta não é um zero). Correção: pulls
+concorrentes (`MEME_TRADES_CONCURRENCY`, 8) atrás do bucket de 900/60 s, prioridade inalterada; o que o
+teto ainda não alcança vira `tape_reason = not_polled`; um minuto cuja última leitura bem-sucedida tem
+mais de 180 s não conta como fita (não é um zero); `covered_since` passa a ser o *receive time* da
+primeira página (um pull que cruza o fecho do minuto cobre o minuto seguinte). Bug achado no caminho:
+`repo._UPSERT_TOKEN` nunca inseria `mayhem_state`/`mayhem_mode` — o `OR mayhem_state IN (...)` do
+`_LOAD_TRACKED` era letra morta; corrigido. Heartbeat: `tape_coverage_pct`, `progress_coverage_pct`,
+`fold_minute`, `fold_rows`, `tape_cycle_s`, `tape_covered_mints`, `tape_never_pulled`,
+`tape_deferred_60s`, `mayhem_pending`, `mayhem_written_60s`; `GET /meme/sources` expõe todos.
+Prova em produção: `infra/scripts/sql/research/2026-09-12-t42e-cobertura.sql` (antes × depois).
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets

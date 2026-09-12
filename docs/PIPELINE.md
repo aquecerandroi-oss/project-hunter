@@ -198,6 +198,18 @@ brief; até lá `lab_gate_refusals` continua mostrando `curve_volume_1m_unknown`
 os publica ao lado da última linha de cada tabela — nunca um zero silencioso.
 Detalhe do schema: `docs/DATABASE.md` §33–§35; plano: `docs/plans/T4-MEME-RADAR.md` §T4.6/§T4.2c.
 
+**T4.2e — Mayhem e a fita.** Um quinto laço, `mayhem` (uma vez por minuto): as Mayhem rastreadas sem
+denominador têm as quatro contas (curva, `MayhemState`, cofre do agente, mint) lidas em **um**
+`getMultipleAccounts` por 25 mints; a identidade `cofre + líquido_vendido = supply − supply_da_curva`
+fecha e o inicial do registro é escrito com `progress_denominator_source = mayhem_state` — o excesso
+de tokens na curva é o bilhão do agente, não outra curva (`docs/PUMPFUN-ONCHAIN.md` §3.5); a curva do
+mesmo slot vira snapshot `solana_rpc`. A fita passa a ser puxada `MEME_TRADES_CONCURRENCY` (8) por vez
+atrás do bucket (sequencial, 250 mints levavam ~90 s por ciclo — a causa dos 109/250 sem fita); o que o
+teto não alcança diz `tape_reason = not_polled`; uma fita sem leitura bem-sucedida há > 180 s não é um
+zero. Heartbeat `hb:meme:radar`: `tape_coverage_pct`, `progress_coverage_pct` (linhas do último minuto
+dobrado com fita/progresso ÷ linhas), `tape_cycle_s`, `mayhem_pending`… — `GET /meme/sources` os
+expõe. Schema: `docs/DATABASE.md` §37; plano §T4.2e.
+
 ## 2. Feature Engine
 
 **Onde:** `scanner-worker`. **Gatilho:** `market.ticks` (tick-features, throttle 1 s por símbolo) e `market.candles.closed` (bar-features).

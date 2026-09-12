@@ -17,6 +17,7 @@ from decimal import Decimal
 import pytest
 from hunter_meme_worker.graduation import (
     GLOBAL_PARAMS,
+    MAYHEM_STATE,
     OBSERVED_VIRGIN,
     POOL_SOURCE_TRENCHES,
     CompletionSignals,
@@ -25,8 +26,11 @@ from hunter_meme_worker.graduation import (
     denominator_for,
     earliest_completion,
     fill_threshold_sol,
+    mayhem_denominator,
 )
 
+from hunter_exchanges.pumpfun.decode import BondingCurveAccount
+from hunter_exchanges.pumpfun.mayhem_state import NormalizedMayhemFlow
 from hunter_exchanges.pumpfun.models import NormalizedCurveState
 from hunter_exchanges.pumpfun.quote import GlobalParams
 
@@ -137,10 +141,10 @@ def test_a_virgin_curve_gives_the_observed_denominator() -> None:
     mayhem_virgin = denominator_for(
         _state(real_sol="0", real_token="822644036.902123", mayhem_state="active"), PARAMS
     )
-    assert (mayhem_virgin.value, mayhem_virgin.source) == (
-        Decimal("822644036.902123"),
-        OBSERVED_VIRGIN,
-    ), "a Mayhem curve observed before its first buy has its own, observed, initial"
+    assert (mayhem_virgin.value, mayhem_virgin.source) == (None, None), (
+        "T4.2e reverses T4.2d here: a Mayhem reserve at real_sol = 0 is not an initial — "
+        "the fixture sat at 1 lamport with 29,5 M of the agent's own tokens in the curve"
+    )
 
 
 def test_a_curve_discovered_after_the_first_buy_takes_the_records_denominator() -> None:
@@ -153,12 +157,12 @@ def test_a_curve_discovered_after_the_first_buy_takes_the_records_denominator() 
     assert (done.value, done.source) == (Decimal("793100000"), GLOBAL_PARAMS)
 
 
-def test_a_mayhem_curve_never_takes_the_records_denominator() -> None:
-    """The extra 1 B: a Mayhem coin's agent mints a billion tokens on top and
-    ``set_mayhem_virtual_params`` moves the curve's reserves (RISK_ENGINE_MEME
-    §8.3). The by-mint fixture of T4.1 (``2sduGq…``, ``mayhem_state = paused``)
-    holds 822,6 M real tokens — more than the record's 793,1 M initial. The
-    record describes the standard curve, not this one: unknown, said so."""
+def test_a_mayhem_photo_alone_claims_no_denominator() -> None:
+    """The extra 1 B is the agent's, sold net into the curve (T4.2e): the
+    by-mint fixture of T4.1 (``2sduGq…``, ``mayhem_state = paused``) holds
+    822,6 M real tokens = the record's 793,1 M + 29,5 M of the agent's. A REST
+    photo cannot tell the two apart, so it claims nothing; the chain read does
+    (:func:`mayhem_denominator`, below)."""
     by_state = denominator_for(
         _state(real_sol="0.000000001", real_token="822644036.902123", mayhem_state="paused"),
         PARAMS,
@@ -168,6 +172,69 @@ def test_a_mayhem_curve_never_takes_the_records_denominator() -> None:
         _state(real_sol="0.27", real_token="779556997.686755", mayhem_enabled=True), PARAMS
     )
     assert (by_flag.value, by_flag.source) == (None, None)
+
+
+def _flow(*, real_token: str, agent_net_sold: str, mayhem: bool = True) -> NormalizedMayhemFlow:
+    curve = BondingCurveAccount(
+        virtual_token_reserves=int(Decimal(real_token) * 1_000_000) + 279_900_000_000_000,
+        virtual_sol_reserves=3_082_705_753,
+        real_token_reserves=int(Decimal(real_token) * 1_000_000),
+        real_sol_reserves=1,
+        token_total_supply=1_000_000_000_000_000,
+        complete=False,
+        creator="CREATOR",
+        is_mayhem_mode=mayhem,
+        is_cashback_coin=False,
+        quote_mint="11111111111111111111111111111111",
+    )
+    net = Decimal(agent_net_sold)
+    return NormalizedMayhemFlow(
+        mint="MINT",
+        slot=1,
+        commitment="finalized",
+        window_start=T0,
+        window_end=T0 + timedelta(days=1),
+        curve_real_token_reserves=Decimal(real_token),
+        curve_total_supply=Decimal(1_000_000_000),
+        mint_supply=Decimal(2_000_000_000),
+        vault_tokens=Decimal(1_000_000_000) - net,
+        agent_net_sold_tokens=net,
+        agent_net_sol_in=Decimal("-0.606946990"),
+        curve=curve,
+        observed_at=T0,
+        received_at=T0,
+    )
+
+
+def test_a_mayhem_curve_takes_the_record_once_its_agent_flow_reconciles() -> None:
+    """``2sduGq…`` by its numbers: 822 644 036,902123 − 29 544 036,902123 =
+    793 100 000 = the record, to the subunit. ``4BTP…``: the agent bought net
+    (−9,99 M), the humans hold 17,2 M, both below the initial."""
+    fixture = mayhem_denominator(
+        _flow(real_token="822644036.902123", agent_net_sold="29544036.902123"), PARAMS
+    )
+    assert (fixture.value, fixture.source) == (Decimal("793100000"), MAYHEM_STATE)
+    buyer = mayhem_denominator(
+        _flow(real_token="765908543.509630", agent_net_sold="-9988703.539400"), PARAMS
+    )
+    assert (buyer.value, buyer.source) == (Decimal("793100000"), MAYHEM_STATE)
+
+
+def test_a_mayhem_flow_whose_humans_would_hold_a_negative_net_is_unknown() -> None:
+    """``real − agent_net_sold`` above the record's initial means the record is
+    not this curve's — said so, never forced."""
+    result = mayhem_denominator(_flow(real_token="822644036.902123", agent_net_sold="1.0"), PARAMS)
+    assert (result.value, result.source) == (None, None)
+    assert mayhem_denominator(_flow(real_token="1", agent_net_sold="0"), None).value is None
+
+
+def test_a_mayhem_photo_never_claims_the_records_fill_threshold() -> None:
+    """``set_mayhem_virtual_params`` moves the virtual SOL (0,46–27,9 SOL on
+    five live curves): the SOL a full Mayhem curve holds is not the record's."""
+    signals = curve_signals(_state(real_sol="85.1", real_token="0", mayhem_state="active"), PARAMS)
+    assert signals.curve_filled_seen_at is None
+    standard = curve_signals(_state(real_sol="85.1", real_token="0"), PARAMS)
+    assert standard.curve_filled_seen_at == T0
 
 
 def test_a_curve_holding_more_than_the_records_initial_is_not_the_records_curve() -> None:

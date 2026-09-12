@@ -126,11 +126,13 @@ export function memePoolSourceLabel(source: MemePoolSource): string {
 
 export type MemeDenominatorSource = MemeToken["progress_denominator_source"];
 
-export const MEME_DENOMINATOR_SOURCES: readonly MemeDenominatorSource[] = ["observed_virgin", "global_params", "unknown"];
+export const MEME_DENOMINATOR_SOURCES: readonly MemeDenominatorSource[] = ["observed_virgin", "global_params", "mayhem_state", "unknown"];
 
 const DENOMINATOR_SOURCE_LABEL: Record<MemeDenominatorSource, string> = {
   observed_virgin: "observado na curva virgem",
   global_params: "parâmetros globais do programa",
+  // T4.2e: a Mayhem curve keeps the registry reserve; the agent's extra billion lives in `MayhemState`.
+  mayhem_state: "registro + conta MayhemState (curva Mayhem)",
   unknown: "desconhecido",
 };
 

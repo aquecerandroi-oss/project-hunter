@@ -188,5 +188,18 @@ def build_meme_sources(
         discovery_blind_share_1h=_float(fields.get("blind_share_1h") or None),
         discovery_new_board_entries_1h=parse_heartbeat_int(fields.get("new_board_entries_1h")),
         discovery_non_pump_entries_1h=parse_heartbeat_int(fields.get("new_board_non_pump_1h")),
+        # T4.2e: the last folded minute's coverage and the tape cycle — the
+        # worker's numbers, never computed here.
+        progress_coverage_pct=_float(fields.get("progress_coverage_pct") or None),
+        tape_coverage_pct=_float(fields.get("tape_coverage_pct") or None),
+        fold_minute=parse_heartbeat_datetime(fields.get("fold_minute")),
+        fold_rows=parse_heartbeat_int(fields.get("fold_rows")),
+        tape_tracked_mints=parse_heartbeat_int(fields.get("tape_tracked_mints")),
+        tape_covered_mints=parse_heartbeat_int(fields.get("tape_covered_mints")),
+        tape_never_pulled=parse_heartbeat_int(fields.get("tape_never_pulled")),
+        tape_cycle_s=_float(fields.get("tape_cycle_s") or None),
+        tape_deferred_60s=parse_heartbeat_int(fields.get("tape_deferred_60s")),
+        mayhem_pending=parse_heartbeat_int(fields.get("mayhem_pending")),
+        mayhem_denominators_60s=parse_heartbeat_int(fields.get("mayhem_written_60s")),
         sources=[_source_out(name, blocks.get(name), latest.get(name)) for name in names],
     )

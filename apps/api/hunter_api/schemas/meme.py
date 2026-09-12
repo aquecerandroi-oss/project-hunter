@@ -58,11 +58,13 @@ PoolCreatedSource = Literal[
 ]
 """Who reported the pool first (``meme_tokens.pool_created_source``, ``0024``)."""
 
-ProgressDenominatorSource = Literal["observed_virgin", "global_params", "unknown"]
-"""Where ``initial_real_token_reserves`` came from (``0024``): a virgin photo of
-this curve, the ``/global-params`` record in force at creation, or nowhere yet
-(``unknown`` renders the column's ``NULL`` — a Mayhem curve seen after its
-first buy stays here on purpose, see ``services/meme-worker/…/graduation.py``)."""
+ProgressDenominatorSource = Literal["observed_virgin", "global_params", "mayhem_state", "unknown"]
+"""Where ``initial_real_token_reserves`` came from (``0024``/``0025``): a virgin
+photo of this curve, the ``/global-params`` record in force at creation, the
+same record for a Mayhem curve once its ``MayhemState`` account reconciled on
+chain (T4.2e — the agent's own billion, sold net into the curve, is what put
+the reserve above the initial), or nowhere yet (``unknown`` renders the
+column's ``NULL``; see ``services/meme-worker/…/graduation.py``)."""
 
 NullReason = Literal[
     "no_trade_feed",

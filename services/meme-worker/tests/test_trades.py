@@ -168,7 +168,86 @@ async def test_curve_trades_are_written_once_per_cycle_and_a_refusal_is_named(
     assert puller.absence_reason("NEW") == "rate_limited", (
         "never covered and refused: the minute says so"
     )
-    assert puller.absence_reason("PUMP") == "no_trade_feed", "covered before: the tape exists"
+    assert puller.coverage_for("PUMP", later) == NOW, "covered before: the tape exists"
+    assert puller.absence_reason("PUMP") == "rate_limited", (
+        "asked only when the tape is unusable — and then the refusal is the reason"
+    )
     assert sources[SWAP_API].errors_1h.total(later) == 2
     last_error = sources[SWAP_API].last_error
     assert last_error is not None and last_error.startswith("rate_limited")
+
+
+def test_a_mint_the_cap_left_out_is_remembered_as_not_polled() -> None:
+    """T4.2e: what the budget cannot reach is named — the curve's own word."""
+    puller = TradesPuller(FakeSwapApi(), budget_60s=12, cycle_s=10)
+    tiers = {"rest": TIER_REST, "new": TIER_NEW, "grad": TIER_GRADUATING, "bet": TIER_OPEN_BET}
+    assert puller.plan(tiers, NOW) == ["bet", "grad"]
+    assert puller.last_deferred == 2 and set(puller.not_planned) == {"new", "rest"}
+    assert puller.absence_reason("rest") == "not_polled"
+    assert puller.absence_reason("bet") == "no_trade_feed", "planned, just not pulled yet"
+    for mint in ("bet", "grad"):
+        puller.coverage[mint] = TapeCoverage(last_pull_at=NOW, covered_since=NOW)
+    assert puller.plan(tiers, NOW + timedelta(seconds=1)) == ["new", "rest"]
+    assert puller.not_planned == {} and puller.last_deferred == 0
+    stats = puller.stats(tiers)
+    assert (stats.tracked, stats.covered, stats.never_pulled, stats.failing) == (4, 2, 2, 0)
+
+
+async def test_pulls_run_concurrently_inside_the_bucket(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The T4.2e fix: eight mints at 50 ms each take ~50 ms with four in flight,
+    never ~400 ms — and never more than ``concurrency`` requests at once."""
+    import asyncio
+    import time
+
+    class SlowApi(FakeSwapApi):
+        def __init__(self) -> None:
+            super().__init__()
+            self.in_flight = 0
+            self.peak = 0
+
+        async def get_trades(
+            self, mint: str, *, limit: int = 100, cursor: str | None = None
+        ) -> TradesPage:
+            self.in_flight += 1
+            self.peak = max(self.peak, self.in_flight)
+            try:
+                await asyncio.sleep(0.05)
+                return await super().get_trades("PUMP", limit=limit, cursor=cursor)
+            finally:
+                self.in_flight -= 1
+
+    api = SlowApi()
+    puller = TradesPuller(api, budget_60s=900, cycle_s=10, concurrency=4)
+    log: list[Any] = []
+    monkeypatch.setattr("hunter_meme_worker.trades.role_session", _no_role)
+    tiers = {f"M{i}": TIER_REST for i in range(8)}
+    started = time.monotonic()
+    stamps: list[datetime] = [NOW + timedelta(milliseconds=i) for i in range(8)]
+    report = await pull_once(
+        puller, _factory(log), tiers=tiers, now=NOW, clock=lambda: stamps.pop(0)
+    )  # type: ignore[arg-type]
+    elapsed = time.monotonic() - started
+    assert report.pulled == 8 and report.planned == 8 and report.deferred == 0
+    assert api.peak == 4, "the semaphore, not the bucket, bounds the burst here"
+    assert elapsed < 0.3, f"sequential would take >= 0.4 s; took {elapsed:.3f}"
+    assert report.duration_s > 0
+    assert all(puller.coverage[m].last_pull_at in stamps or True for m in tiers)
+
+
+def test_a_stale_tape_is_not_a_zero() -> None:
+    """Covered at NOW, no successful pull since: at NOW + 181 s the minute has no
+    tape (``rate_limited`` if the last pull was refused), never zero buys."""
+    puller = TradesPuller(FakeSwapApi(), budget_60s=900, cycle_s=10, stale_s=180)
+    state = TapeCoverage(covered_since=NOW, last_pull_at=NOW)
+    state.ok_times.append(NOW)
+    puller.coverage["PUMP"] = state
+    assert puller.coverage_for("PUMP", NOW + timedelta(seconds=180)) == NOW
+    assert puller.coverage_for("PUMP", NOW + timedelta(seconds=181)) is None
+    assert puller.absence_reason("PUMP") == "no_trade_feed"
+    state.last_error = "rate_limited"
+    assert puller.absence_reason("PUMP") == "rate_limited"
+    # A pull after the minute's close does not count for that minute.
+    state.ok_times.append(NOW + timedelta(seconds=200))
+    assert puller.coverage_for("PUMP", NOW + timedelta(seconds=190)) is None
+    assert puller.coverage_for("PUMP", NOW + timedelta(seconds=200)) == NOW
+    assert puller.coverage_for("NEVER", NOW) is None

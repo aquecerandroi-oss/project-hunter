@@ -17,6 +17,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 __all__ = [
+    "COVERAGE_EXPLANATION",
     "DISCOVERY_BLIND_EXPLANATION",
     "MEME_SOURCES_LABEL",
     "MemeSourceOut",
@@ -34,6 +35,15 @@ DISCOVERY_BLIND_EXPLANATION = (
     "são rastreadas — a fração declara o tamanho da cegueira, não a corrige"
 )
 """The declared blindness (T4.2d, item 3). Fixed text: the reason is structural."""
+
+COVERAGE_EXPLANATION = (
+    "cobertura do último minuto dobrado: linhas com progresso ÷ linhas e linhas com fita ÷ "
+    "linhas; uma linha sem fita diz o motivo em tape_reason (no_trade_feed = nunca puxada, "
+    "not_polled = o orçamento da fita não a alcançou no ciclo, rate_limited = a fonte recusou); "
+    "uma linha sem progresso diz progress_reason (denominator_unknown = Mayhem ainda sem a "
+    "leitura on-chain de MayhemState, mayhem_pending conta quantas)"
+)
+"""T4.2e: what the two coverage numbers are and where the missing rows explain themselves."""
 
 RadarStatus = Literal["alive", "stale", "never", "heartbeat_missing", "redis_unavailable"]
 """The worker's own heartbeat fields: ``alive`` when ``sources_at`` is fresh,
@@ -103,4 +113,24 @@ class MemeSourcesOut(BaseModel):
     discovery_new_board_entries_1h: int | None = None
     discovery_non_pump_entries_1h: int | None = None
     discovery_blind_explanation: str = DISCOVERY_BLIND_EXPLANATION
+    progress_coverage_pct: float | None = None
+    """T4.2e: rows of the last folded minute with a ``curve_progress_pct`` over
+    its rows (heartbeat ``progress_coverage_pct``). ``None`` before the first
+    fold, on an empty minute, or from a worker that predates T4.2e."""
+    tape_coverage_pct: float | None = None
+    """Rows of the last folded minute with a tape over its rows."""
+    fold_minute: datetime | None = None
+    fold_rows: int | None = None
+    tape_tracked_mints: int | None = None
+    tape_covered_mints: int | None = None
+    tape_never_pulled: int | None = None
+    tape_cycle_s: float | None = None
+    """How long the last tape cycle took: the T4.2c sequential puller needed
+    ~90 s for 250 mints, which is why 109 of 250 rows had no tape."""
+    tape_deferred_60s: int | None = None
+    """Due mints the tape cap left out in the last minute (``not_polled``)."""
+    mayhem_pending: int | None = None
+    """Tracked Mayhem mints still without a denominator (the loop reads 25 a minute)."""
+    mayhem_denominators_60s: int | None = None
+    coverage_explanation: str = COVERAGE_EXPLANATION
     sources: list[MemeSourceOut]

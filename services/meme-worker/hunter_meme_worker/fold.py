@@ -65,7 +65,7 @@ def _tape_inputs(
         tape.get(tracked.mint, []),
         end_time=boundary,
         creator=tracked.creator,
-        covered_since=ctx.trades.covered_since(tracked.mint),
+        covered_since=ctx.trades.coverage_for(tracked.mint, boundary),
     )
     return minute, ctx.trades.absence_reason(tracked.mint)
 
@@ -79,7 +79,7 @@ async def fold_minute(ctx: RadarContext, boundary: datetime) -> list[FeatureRow]
         t.mint
         for t in tracked_set
         if ctx.trades is not None
-        and (since := ctx.trades.covered_since(t.mint)) is not None
+        and (since := ctx.trades.coverage_for(t.mint, boundary)) is not None
         and since <= boundary
     ]
     tape: dict[str, list[TapeTrade]] = {}
@@ -113,6 +113,15 @@ async def fold_minute(ctx: RadarContext, boundary: datetime) -> list[FeatureRow]
     covered_rows = sum(1 for row in rows if row.coverage > 0)
     meme_features_rows_total.labels(coverage="covered").inc(covered_rows)
     meme_features_rows_total.labels(coverage="uncovered").inc(len(rows) - covered_rows)
+    if ctx.sources is not None:
+        # T4.2e: the minute's coverage as the heartbeat reports it — rows with a
+        # tape and rows with a progress, over the rows actually written.
+        ctx.sources.record_fold(
+            boundary,
+            rows=len(rows),
+            with_tape=sum(1 for row in rows if row.tape_reason is None),
+            with_progress=sum(1 for row in rows if row.progress_reason is None),
+        )
     return rows
 
 

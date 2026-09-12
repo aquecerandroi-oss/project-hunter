@@ -29,15 +29,21 @@ photo (``real_sol_reserves = 0``), so a coin discovered after its first buy
 never got one — 117/123 gate rows were ``progress_unknown`` in production at
 06:04 BRT. Now a **standard** curve seen mid-life takes the record's initial
 (``global_params``); a virgin photo still wins (``observed_virgin``), because
-it is an observation of *this* curve. **Mayhem is handled explicitly and never
-takes the record**: a Mayhem coin's agent mints a billion extra tokens on top
-of the supply and ``set_mayhem_virtual_params`` moves the curve's reserves
-(``docs/RISK_ENGINE_MEME.md`` §8.3); the by-mint fixture of T4.1 (``2sduGq…``,
-``mayhem_state = paused``) holds 822,6 M real tokens on its curve, *more* than
-the record's 793,1 M initial. Neither ``Global`` nor ``/global-params`` carries
-a Mayhem reserve parameter — the right field lives in the ``mayhem_state``
-account this project does not decode — so the honest value is unknown, and
-the same guard refuses any curve holding more than the record's initial.
+it is an observation of *this* curve. **Mayhem takes the same record, but only
+through the chain** (T4.2e): the coin's agent is minted its own billion beside
+the curve's supply and sells it *net* into the curve — the by-mint fixture of
+T4.1 (``2sduGq…``, ``mayhem_state = paused``) holds 822 644 036,902123 real
+tokens = 793 100 000 + 29 544 036,902123 of the agent's net sells, to the
+subunit (``hunter_exchanges.pumpfun.mayhem_state``). So a Mayhem photo alone
+claims nothing — neither ``observed_virgin`` (a reserve seen at
+``real_sol = 0`` may hold the agent's tokens, not the initial: that fixture
+sat at 1 lamport) nor the record — and :func:`mayhem_denominator` writes the
+record once the ``MayhemState`` read reconciled and ``real − agent_net_sold ≤
+initial`` (the humans hold a non-negative net), labelled ``mayhem_state``.
+The record's fill threshold is not claimed for a Mayhem curve either:
+``set_mayhem_virtual_params`` moves its virtual SOL (0,46–27,9 SOL on five
+live curves against the record's 30), so the SOL a full Mayhem curve holds is
+not the record's number.
 """
 
 from __future__ import annotations
@@ -53,16 +59,19 @@ from hunter_exchanges.pumpfun.curve import raw_lamports_to_sol, raw_subunits_to_
 from hunter_exchanges.pumpfun.quote import GlobalParams, curve_fill_threshold_lamports
 
 if TYPE_CHECKING:
+    from hunter_exchanges.pumpfun.mayhem_state import NormalizedMayhemFlow
     from hunter_exchanges.pumpfun.models import NormalizedCurveState
 
 logger = get_logger(__name__)
 
 OBSERVED_VIRGIN = "observed_virgin"
 GLOBAL_PARAMS = "global_params"
+MAYHEM_STATE = "mayhem_state"
 DENOMINATOR_UNKNOWN = "unknown"
-"""``progress_denominator_source``: the two the worker writes, and the word the
-API renders for ``NULL`` (an unknown denominator has no source, and the column
-is ``NULL`` for the same reason every unknown in ``meme_tokens`` is)."""
+"""``progress_denominator_source``: the three the worker writes (``0025``), and
+the word the API renders for ``NULL`` (an unknown denominator has no source,
+and the column is ``NULL`` for the same reason every unknown in ``meme_tokens``
+is)."""
 
 POOL_SOURCE_PUMPPORTAL = "pumpportal_ws"
 POOL_SOURCE_TRENCHES = TRENCHES_SOURCE
@@ -112,9 +121,19 @@ def fill_threshold_sol(params: GlobalParams) -> Decimal:
     return raw_lamports_to_sol(curve_fill_threshold_lamports(params))
 
 
+def is_mayhem(state: NormalizedCurveState) -> bool:
+    """The photo says Mayhem: the on-chain flag, or the site's agent state."""
+    return state.mayhem_enabled is True or state.mayhem_state is not None
+
+
 def curve_signals(state: NormalizedCurveState, params: GlobalParams | None) -> CompletionSignals:
-    """The two REST-side signals of one photo. No record, no threshold, no claim."""
-    filled = params is not None and state.real_sol_reserves >= fill_threshold_sol(params)
+    """The two REST-side signals of one photo. No record, no threshold, no claim —
+    and no fill claim for a Mayhem curve, whose virtual SOL the agent moves."""
+    filled = (
+        params is not None
+        and not is_mayhem(state)
+        and state.real_sol_reserves >= fill_threshold_sol(params)
+    )
     return CompletionSignals(
         rest_complete_seen_at=state.observed_at if state.complete else None,
         rest_reserve_is_zero=state.real_sol_reserves == 0,
@@ -126,21 +145,48 @@ def curve_signals(state: NormalizedCurveState, params: GlobalParams | None) -> C
 class Denominator:
     value: Decimal | None
     source: str | None
-    """``observed_virgin`` | ``global_params`` | ``None`` (unknown, nothing to write)."""
+    """``observed_virgin`` | ``global_params`` | ``mayhem_state`` | ``None``
+    (unknown, nothing to write)."""
+
+
+UNKNOWN = Denominator(None, None)
 
 
 def denominator_for(state: NormalizedCurveState, params: GlobalParams | None) -> Denominator:
-    """What this photo lets the row claim as ``initial_real_token_reserves``."""
+    """What this photo lets the row claim as ``initial_real_token_reserves``.
+
+    A Mayhem photo claims nothing here: its reserve may carry the agent's own
+    tokens (module docstring), so the record is written only by
+    :func:`mayhem_denominator`, after the chain reconciled the agent's flow.
+    """
+    if is_mayhem(state):
+        return UNKNOWN
     if state.real_sol_reserves == 0 and not state.complete:
         return Denominator(state.real_token_reserves, OBSERVED_VIRGIN)
     if params is None:
-        return Denominator(None, None)
-    if state.mayhem_enabled is True or state.mayhem_state is not None:
-        return Denominator(None, None)  # the Mayhem curve is not the record's curve
+        return UNKNOWN
     initial = raw_subunits_to_tokens(params.initial_real_token_reserves)
     if state.real_token_reserves > initial:
-        return Denominator(None, None)  # holds more than the record's initial: not its curve
+        return UNKNOWN  # holds more than the record's initial: not its curve
     return Denominator(initial, GLOBAL_PARAMS)
+
+
+def mayhem_denominator(flow: NormalizedMayhemFlow, params: GlobalParams | None) -> Denominator:
+    """The record's initial for a Mayhem curve whose ``MayhemState`` reconciled.
+
+    ``flow.curve_reserve_without_agent`` is ``real_token_reserves − agent_net_sold``
+    = ``initial_real − human_net``; a value above the record's initial would
+    mean the humans hold a negative net, which no curve allows — so the record
+    is not this curve's, and the honest answer is unknown. On the five live
+    accounts of 12/09 it is at or below the initial, with equality on the
+    fixture (``2sduGq…``: the humans' net was zero).
+    """
+    if params is None:
+        return UNKNOWN
+    initial = raw_subunits_to_tokens(params.initial_real_token_reserves)
+    if flow.curve_reserve_without_agent > initial:
+        return UNKNOWN
+    return Denominator(initial, MAYHEM_STATE)
 
 
 class GlobalParamsSource(Protocol):

@@ -50,6 +50,7 @@ from hunter_meme_worker.context import RadarContext, RadarState
 from hunter_meme_worker.discovery import run_discovery
 from hunter_meme_worker.graduation import GlobalParamsStore
 from hunter_meme_worker.lab import LabContext, LabState, lab_once, write_lab_heartbeat
+from hunter_meme_worker.mayhem import mayhem_once
 from hunter_meme_worker.metrics import meme_tracked_mints
 from hunter_meme_worker.repo import load_tracked
 from hunter_meme_worker.tracker import MintTracker
@@ -266,6 +267,9 @@ async def run_meme(runtime: WorkerRuntime) -> None:
             group.create_task(
                 forever("reconcile", config.reconcile_cycle_s, reconcile_once, ctx),
                 name="meme-reconcile",
+            )
+            group.create_task(
+                forever("mayhem", config.mayhem_cycle_s, mayhem_once, ctx), name="meme-mayhem"
             )
             group.create_task(
                 forever("fold", config.features_cycle_s, fold_once, ctx), name="meme-fold"

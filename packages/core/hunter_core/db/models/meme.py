@@ -121,9 +121,10 @@ class MemeToken(Base):
             "(initial_real_token_reserves IS NULL) = (progress_denominator_source IS NULL)",
             name="a_denominator_names_its_source",
         ),
+        # 0025 — ``mayhem_state`` joins the list (T4.2e).
         CheckConstraint(
             "progress_denominator_source IS NULL OR progress_denominator_source IN "
-            "('observed_virgin', 'global_params')",
+            "('observed_virgin', 'global_params', 'mayhem_state')",
             name="denominator_source_is_a_known_label",
         ),
     )
@@ -219,11 +220,13 @@ class MemeToken(Base):
 
     progress_denominator_source: Mapped[str | None] = mapped_column(Text)
     """Where ``initial_real_token_reserves`` came from: ``observed_virgin`` (the
-    ``0021`` rule) or ``global_params`` (T4.2d: a *standard* curve seen mid-life
-    takes the record in force at its creation — a Mayhem curve never does, its
-    agent's extra billion and ``set_mayhem_virtual_params`` make the record not
-    its curve). Biconditional with the denominator; unknown is NULL on both,
-    which the API renders as ``unknown``."""
+    ``0021`` rule), ``global_params`` (T4.2d: a *standard* curve seen mid-life
+    takes the record in force at its creation) or ``mayhem_state`` (``0025``,
+    T4.2e: a Mayhem curve takes the same record, but only after its
+    ``MayhemState`` account reconciled on chain — the agent's own billion, sold
+    net into the curve, is what put the reserve above the initial; the curve's
+    initial was the record's all along). Biconditional with the denominator;
+    unknown is NULL on both, which the API renders as ``unknown``."""
 
     migrated_at: Mapped[datetime | None]
     migrated_pool: Mapped[str | None] = mapped_column(Text)

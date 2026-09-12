@@ -100,6 +100,37 @@ def test_the_heartbeat_declares_the_discovery_blind_share_and_never_a_silent_zer
     assert later["new_board_entries_1h"] == "0" and later["blind_share_1h"] == ""
 
 
+def test_the_heartbeat_reports_the_folds_coverage_and_the_tape_cycle_never_a_silent_zero() -> None:
+    """T4.2e: ``tape_coverage_pct``/``progress_coverage_pct`` are the last folded
+    minute's rows with a tape / a progress over its rows; unknown (no fold yet,
+    or an empty minute) is ``""``, never ``0``."""
+    sources = SourcesState()
+    empty = sources.heartbeat_fields(NOW, tracked=0)
+    assert empty["tape_coverage_pct"] == "" and empty["progress_coverage_pct"] == ""
+    assert (
+        empty["fold_rows"] == "" and empty["tape_cycle_s"] == "" and empty["mayhem_pending"] == ""
+    )
+    sources.record_fold(NOW, rows=250, with_tape=141, with_progress=137)
+    sources.record_tape_cycle(
+        NOW, duration_s=9.412, planned=150, deferred=3, tracked=250, covered=247, never_pulled=2
+    )
+    sources.mayhem_pending = 7
+    sources.mayhem_written_60s.add(NOW, 18)
+    sources.mayhem_refused_1h.add(NOW, 2)
+    fields = sources.heartbeat_fields(NOW, tracked=250)
+    assert fields["tape_coverage_pct"] == "56.4" and fields["progress_coverage_pct"] == "54.8"
+    assert fields["fold_minute"] == NOW.isoformat() and fields["fold_rows"] == "250"
+    assert fields["tape_cycle_s"] == "9.412" and fields["tape_planned"] == "150"
+    assert fields["tape_tracked_mints"] == "250" and fields["tape_covered_mints"] == "247"
+    assert fields["tape_never_pulled"] == "2" and fields["tape_deferred_60s"] == "3"
+    assert fields["mayhem_pending"] == "7" and fields["mayhem_written_60s"] == "18"
+    assert fields["mayhem_refused_1h"] == "2"
+    sources.record_fold(NOW, rows=0, with_tape=0, with_progress=0)
+    assert sources.heartbeat_fields(NOW, tracked=0)["tape_coverage_pct"] == "", (
+        "an empty minute is unknown coverage, not 0 %"
+    )
+
+
 def test_a_connected_trenches_says_true_and_a_dropped_one_false() -> None:
     sources = SourcesState()
     sources[TRENCHES_WS].connected = True

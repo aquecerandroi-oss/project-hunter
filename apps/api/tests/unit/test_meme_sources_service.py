@@ -162,6 +162,47 @@ def test_the_declared_blindness_is_exposed_with_its_explanation() -> None:
     assert older.discovery_new_board_entries_1h is None
 
 
+def test_the_coverage_of_the_last_fold_and_the_tape_cycle_are_the_workers_numbers() -> None:
+    """T4.2e: ``tape_coverage_pct``/``progress_coverage_pct`` come from the
+    heartbeat as written; a worker before T4.2e (or an empty minute, ``""``)
+    yields ``None``, never a ``0`` that reads as "nothing covered"."""
+    out = build_meme_sources(
+        _heartbeat(
+            progress_coverage_pct="54.8",
+            tape_coverage_pct="56.4",
+            fold_minute=(AS_OF - timedelta(seconds=20)).isoformat(),
+            fold_rows="250",
+            tape_tracked_mints="250",
+            tape_covered_mints="247",
+            tape_never_pulled="2",
+            tape_cycle_s="9.412",
+            tape_deferred_60s="3",
+            mayhem_pending="7",
+            mayhem_written_60s="18",
+        ),
+        _latest(),
+        as_of=AS_OF,
+        heartbeat_key=KEY,
+    )
+    assert out.progress_coverage_pct == pytest.approx(54.8)
+    assert out.tape_coverage_pct == pytest.approx(56.4)
+    assert out.fold_minute == AS_OF - timedelta(seconds=20) and out.fold_rows == 250
+    assert (out.tape_tracked_mints, out.tape_covered_mints, out.tape_never_pulled) == (250, 247, 2)
+    assert out.tape_cycle_s == pytest.approx(9.412) and out.tape_deferred_60s == 3
+    assert out.mayhem_pending == 7 and out.mayhem_denominators_60s == 18
+    assert "not_polled" in out.coverage_explanation and "MayhemState" in out.coverage_explanation
+    empty = build_meme_sources(
+        _heartbeat(progress_coverage_pct="", tape_coverage_pct="", fold_rows="0"),
+        _latest(),
+        as_of=AS_OF,
+        heartbeat_key=KEY,
+    )
+    assert empty.progress_coverage_pct is None and empty.tape_coverage_pct is None
+    assert empty.fold_rows == 0
+    older = build_meme_sources(_heartbeat(), _latest(), as_of=AS_OF, heartbeat_key=KEY)
+    assert older.tape_coverage_pct is None and older.mayhem_pending is None
+
+
 def test_source_status_reads_the_workers_word_and_never_infers_health() -> None:
     assert source_status("swap_api", None) == ("unknown", "heartbeat_missing")
     assert source_status("swap_api", {"enabled": False}) == ("disabled", "disabled")

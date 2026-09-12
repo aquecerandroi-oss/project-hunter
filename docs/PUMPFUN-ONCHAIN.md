@@ -518,6 +518,71 @@ limites do programa) sem ser um bit separado na `BondingCurve`/`Pool` — ou pod
 da conta `mayhem_state` (PDA do próprio programa Mayhem, não decodificada, §3.2). Marcar como
 pendência de pesquisa (T4.1b, já citada no plano) em vez de adivinhar.
 
+### 3.5 `MayhemState` — a reserva inicial de uma curva Mayhem e o saldo líquido do agente (T4.2e, 12/09/2026)
+
+**Pergunta da T4.2d:** a fixture `2sduGq…` tinha 822 644 036,902123 tokens reais na curva, mais que os
+793 100 000 de `initial_real_token_reserves` do registro de `/global-params`; nem `Global` nem o
+registro trazem "reserva Mayhem". Qual é a reserva inicial *daquela* curva? **Resposta, lida da cadeia
+em 12/09/2026, 08:43–08:54 BRT (11:43–11:54 UTC), 4 chamadas RPC públicas de 10 permitidas
+(`api.mainnet-beta.solana.com`, `finalized`, slots 446421000 / 446422623 / 446422983), fixtures
+`packages/exchange-adapters/tests/fixtures/pumpfun/t42e_*`:** a reserva inicial de uma curva Mayhem
+**é a do registro** (793,1 M), como a de qualquer curva do programa Pump; o que a empurra acima disso
+é o **bilhão do próprio agente**, cunhado ao lado do supply da curva e vendido *líquido* para dentro
+dela. Na fixture, `822 644 036,902123 = 793 100 000 + 29 544 036,902123` — até a subunidade.
+
+**As quatro contas por moeda, e de onde vêm os endereços (pela IDL do Pump, `create_v2` /
+`set_mayhem_virtual_params`, §1.3):** `bonding_curve` (seeds `["bonding-curve", mint]`, programa
+Pump); `mayhem_state` (`["mayhem-state", mint]`, programa `MAyh…`); `mayhem_token_vault` = ATA de
+`sol_vault` (`["sol-vault"]`, programa `MAyh…`) sob **Token-2022** (o `token_program` de `create_v2` é
+essa constante); e o próprio `mint` (SPL Mint). **`sol_vault` = `BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s`
+— a "carteira do agente" publicada em `pump.fun/docs/mayhem-mode` é a PDA `sol-vault` do programa Mayhem**,
+o que explica o `signer:false` da compra real da A4.1b §5.2 (uma PDA não assina; o programa assina por ela).
+
+**IDL do programa Mayhem: continua não existindo em lugar acessível.** Repositório oficial sem ela
+(§3.2) **e** conta de IDL Anchor ausente na cadeia: `create_with_seed(find_program_address([], MAyh),
+"anchor:idl", MAyh)` = `Acy6P7eBsmrzz7pxakoGkxhEB9Hcr9XzSJj8RD7yvQS4`, `getAccountInfo` → `value: null`
+(`t42e_rpc_mayhem_idl_raw.json`). O que se prova sem ela é a **convenção Anchor dos discriminadores**:
+`sha256("account:MayhemState")[:8] = b1fdbf7dcb16866b` e `sha256("account:GlobalParams")[:8] =
+79c1f857c3384c0b` batem byte a byte com os 8 primeiros bytes das duas contas (4/4 e 1/1) — os tipos se
+chamam `MayhemState` e `GlobalParams`. A `GlobalParams` (318 bytes; começa com `8000, 20 SOL, 20 SOL,
+50 M, 50 M` em u64) fica **crua, não interpretada**.
+
+**Layout de `MayhemState` (106 bytes, Borsh, little-endian) — inferido de cinco contas ao vivo e
+validado em toda leitura por uma identidade sem constante** (`hunter_exchanges/pumpfun/mayhem_state.py`):
+
+| offset | tamanho | campo | evidência |
+|---|---|---|---|
+| 0 | 8 | discriminador `b1fdbf7dcb16866b` | convenção Anchor, acima |
+| 8 | 8 | u64 `window_start` (unix s) | = `created_timestamp/1000` da REST, 5/5 |
+| 16 | 8 | u64 `window_end` | = `window_start + 86 400` (as 24 h do agente), 5/5 |
+| 24 | 32 | pubkey `mint` | = o mint pedido, 5/5 |
+| 56 | 16 | i128 SOL líquido que o agente pôs na curva (lamports; negativo = retirou) | −0,607 SOL na `2sduGq…` (vendeu), +0,020 SOL na `4BTP…` (comprou) |
+| 72 | 16 | i128 tokens líquidos que o agente vendeu para a curva (subunidades; negativo = comprou) | **`cofre + este campo = supply_do_mint − token_total_supply_da_curva` em 5/5** |
+| 88 | 18 | cauda não interpretada (u8, u64 ≈ unix s ~14 min após a criação, u8 = 1, 8 zeros) | guardada crua |
+
+**A identidade que valida cada leitura (nenhum número digitado):** o SPL Mint reporta `supply =
+2 000 000 000` enquanto `BondingCurve.token_total_supply = 1 000 000 000`; a diferença (o bilhão do
+agente) tem de estar ou no cofre (`mayhem_token_vault.amount`) ou na curva (o i128 de 72):
+
+| mint | `rt` da curva | i128@72 (líquido vendido) | cofre | cofre + líquido | `rt − líquido` vs 793,1 M | progresso site vs chain |
+|---|---|---|---|---|---|---|
+| `2sduGq…` (pausada, manual) | 822 644 036,902123 | +29 544 036,902123 | 970 455 963,097877 | 1 000 000 000 ✓ | **= 793 100 000** (humanos líquido 0; `real_sol` = 1 lamport) | 0 vs −3,7251 % (o site trunca em 0) |
+| `4BTP…` (ativa, manual) | 765 908 543,509630 | −9 988 703,539400 | 1 009 988 703,539400 | 1 000 000 000 ✓ | 775 897 247 ≤ ✓ | **3,43 vs 3,4285 %** (0,002 pp) |
+| `8pzW…` (ativa, auto) | 636 607 348,093183 | +5 670 068,993381 | 994 329 931,006619 | 1 000 000 000 ✓ | 630 937 279 ≤ ✓ | 24,7 vs 19,73 % (curva moveu ~108 M tokens entre a REST e o RPC; inconclusivo) |
+| `668Q…` (pausada, manual) | 690 274 279,549636 | +51 896 841,783969 | 948 103 158,216031 | 1 000 000 000 ✓ | 638 377 437 ≤ ✓ | 8,82 vs 12,97 % (idem, ~74 M entre leituras) |
+| `Fh42k…` (fixture T4.1, 6,5 h depois) | **1 713 296 709,488602** | +999 999 991,751764 | 8,248236 | 1 000 000 000 ✓ | 713 296 717 ≤ ✓ | (o agente vendeu o bilhão inteiro: a curva segura 2,16× o inicial) |
+
+Logo `real_token_reserves = inicial − líquido_humanos + líquido_agente`, com `inicial` = o do registro
+(igualdade exata na `2sduGq…`, e o progresso do site reproduzido em 0,002 pp na `4BTP…`). O radar escreve
+esse inicial com `progress_denominator_source = mayhem_state` (`0025`) **só depois** de ler as quatro
+contas no mesmo slot e fechar a identidade; `1 − rt/inicial` fica **negativo** quando o agente vendeu
+mais do que os humanos compraram (o site mostra 0; nós guardamos o número — `features.py` não trunca;
+o portão da EXP-M1 recusa por `progress_below_min`). O limiar de enchimento em SOL do registro (85,005
+SOL) **não** se aplica a Mayhem: `set_mayhem_virtual_params` move o SOL virtual (0,46–27,9 SOL nas
+cinco curvas contra os 30 do registro), então `curve_filled_seen_at` não é reivindicado para elas.
+O `mayhemBotCoinSupplied` do indexer (14,39 / 1,60 / 65,57 / 18,92) não é nem tokens nem SOL líquidos
+destas contas — unidade desconhecida, não usada. Comandos e saídas: `.claude/state/notes-T4.2e.md`.
+
 ---
 
 ## 4. Decodificadores open-source comparados

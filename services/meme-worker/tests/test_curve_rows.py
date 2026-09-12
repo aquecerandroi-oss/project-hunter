@@ -79,10 +79,11 @@ def test_the_real_graduated_coin_is_rest_complete_with_a_zero_reserve_and_not_co
     ), "a finished standard curve still has the record's denominator: progress = 1"
 
 
-def test_the_real_mid_curve_mayhem_coin_gets_no_denominator_from_the_record() -> None:
+def test_the_real_mid_curve_mayhem_coin_gets_no_denominator_from_the_photo_alone() -> None:
     """``frontend_api_v3_coin_by_mint_response_raw.json`` (``2sduGq…``, paused
     Mayhem): 822,6 M real tokens on the curve, above the record's 793,1 M —
-    the explicit Mayhem rule, on a real object."""
+    the photo cannot tell the agent's tokens from the initial, so it claims
+    nothing; the chain read does (``test_mayhem.py``)."""
     state = _fixture("frontend_api_v3_coin_by_mint_response_raw.json")
     assert state.real_token_reserves > Decimal("793100000")
     row = token_row_from_curve(state, params=PARAMS)

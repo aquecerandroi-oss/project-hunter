@@ -74,6 +74,8 @@ def build_trades(config: MemeConfig, sources: SourcesState) -> TradesPuller | No
         cycle_s=config.trades_cycle_s,
         max_pages=config.trades_max_pages,
         sources=sources,
+        concurrency=config.trades_concurrency,
+        stale_s=config.tape_stale_s,
     )
 
 
@@ -160,9 +162,22 @@ def tape_tiers(ctx: RadarContext) -> dict[str, int]:
 
 async def trades_once(ctx: RadarContext) -> None:
     assert ctx.trades is not None
-    report = await pull_once(ctx.trades, ctx.session_factory, tiers=tape_tiers(ctx), now=utcnow())
+    tiers = tape_tiers(ctx)
+    now = utcnow()
+    report = await pull_once(ctx.trades, ctx.session_factory, tiers=tiers, now=now, clock=utcnow)
     meme_rows_total.labels(table="meme_trades").inc(report.rows)
     meme_source_messages_total.labels(source=SWAP_API).inc(report.pages)
+    if ctx.sources is not None:
+        stats = ctx.trades.stats(tiers)
+        ctx.sources.record_tape_cycle(
+            now,
+            duration_s=report.duration_s,
+            planned=report.planned,
+            deferred=report.deferred,
+            tracked=stats.tracked,
+            covered=stats.covered,
+            never_pulled=stats.never_pulled,
+        )
 
 
 async def risk_once(ctx: RadarContext) -> None:

@@ -79,7 +79,7 @@ Não implementa execução nem simula livro de ofertas; wiring e persistência s
 |---|---|---|
 | `PumpPortalWsClient` | `wss://pumpportal.fun/api/data`: `subscribeNewToken`, `subscribeMigration` | Uma conexão por stream; ping/pong 20 s, timeout de ping 20 s, ociosidade 60 s, backoff exponencial com jitter, até 5 falhas consecutivas sem evento válido |
 | `PumpFunRestClient` | `https://frontend-api-v3.pump.fun`: `/coins/{mint}`, `/coins/mayhem-mode?limit=&mayhemState=`, `/mayhem/overview` | Token bucket 60 requisições/60 s; 429/418 propaga `RateLimited`, 5xx/transporte têm retentativas limitadas |
-| `SolanaRpcClient` | `getAccountInfo`, `base64`, compromisso `finalized` | Bucket 10 requisições/s; no endpoint público, espaçamento adicional de 0,26 s por método |
+| `SolanaRpcClient` | `getAccountInfo`, `base64`, compromisso `finalized`; **T4.2e** `getMultipleAccounts` (`get_mayhem_flows`: curva + `MayhemState` + cofre do agente + mint, 25 mints = 100 contas por chamada, reconciliadas no mesmo slot — `mayhem_state.py`, `docs/PUMPFUN-ONCHAIN.md` §3.5) | Bucket 10 requisições/s; no endpoint público, espaçamento adicional de 0,26 s por método; um lote conta **uma** requisição |
 
 Os limitadores são injetáveis e reutilizam `TokenBucketRateLimiter`; sem Redis, o orçamento
 é local à instância. O futuro serviço deve compartilhar o orçamento por IP e transformar
