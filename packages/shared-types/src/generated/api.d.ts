@@ -370,6 +370,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/lab/daily-goal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How far the Lab is from the day's R$ profit goal, and why */
+        get: operations["get_daily_goal_api_v1_orgs__org_id__lab_daily_goal_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/members": {
         parameters: {
             query?: never;
@@ -403,6 +420,74 @@ export interface paths {
         head?: never;
         /** Change a member's role */
         patch: operations["update_role_api_v1_orgs__org_id__members__user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/meme/gaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List ingestion gaps */
+        get: operations["list_gaps_api_v1_orgs__org_id__meme_gaps_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/meme/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Meme Radar overview: creation and Mayhem activity */
+        get: operations["get_overview_api_v1_orgs__org_id__meme_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/meme/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List tracked meme tokens */
+        get: operations["list_tokens_api_v1_orgs__org_id__meme_tokens_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/meme/tokens/{mint}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One meme token: curve + features */
+        get: operations["get_token_api_v1_orgs__org_id__meme_tokens__mint__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/orgs/{org_id}/portfolios": {
@@ -465,6 +550,54 @@ export interface paths {
         };
         /** Read the equity curve, in USDT and BRL */
         get: operations["get_equity_curve_api_v1_orgs__org_id__portfolios__portfolio_id__equity_curve_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/portfolios/{portfolio_id}/order-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List this wallet's manual order requests, newest first */
+        get: operations["list_manual_orders_route_api_v1_orgs__org_id__portfolios__portfolio_id__order_requests_get"];
+        put?: never;
+        /**
+         * File a manual paper order (TRADER+)
+         * @description 202 always — including a replay of the same key, decided or not
+         *     (documented deviation from "200 or 202": one status keeps the response
+         *     shape the only thing a caller has to branch on). A *different* order under
+         *     the same key is a 409 (``OrderReplayConflictError``); the wallet never
+         *     opened is a 409 (``WalletNotOpenError``); the wallet already has
+         *     ``settings.manual_order_max_pending_per_portfolio`` undecided manual
+         *     requests pending is a 409 (``TooManyPendingRequestsError``, T3.68c);
+         *     anything about the market or the direction that keeps this from ever
+         *     becoming a proposal is a 422 (``OrderRefusedError``, reason named in
+         *     ``detail``). None of these reach this function as anything but the
+         *     ``HunterError`` the global handler already renders as problem+json.
+         */
+        post: operations["file_manual_order_route_api_v1_orgs__org_id__portfolios__portfolio_id__order_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/portfolios/{portfolio_id}/order-requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one manual order request, with its outcome if it has one */
+        get: operations["get_manual_order_route_api_v1_orgs__org_id__portfolios__portfolio_id__order_requests__request_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -719,6 +852,27 @@ export interface paths {
          * @description Public, unauthenticated system metadata. No secret ever appears here.
          */
         get: operations["system_info_api_v1_system_info_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/latency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * End-to-end latency budget: market -> decision -> admission -> fill
+         * @description No Postgres involved, same as ``/workers`` — every hop is read off a
+         *     heartbeat hash a worker already writes (``schemas/latency.py``).
+         */
+        get: operations["latency_api_v1_system_latency_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1077,6 +1231,18 @@ export interface components {
             /** User Agent */
             user_agent?: string | null;
         };
+        /** AxisOut */
+        AxisOut: {
+            /** Pooled Funding Null */
+            pooled_funding_null: number;
+            /** Unique Funding Null */
+            unique_funding_null: number;
+            /**
+             * Used
+             * @default r_net
+             */
+            used: string;
+        };
         /** BookLevelOut */
         BookLevelOut: {
             /** Price */
@@ -1270,6 +1436,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** CursorPage[ManualOrderOut] */
+        CursorPage_ManualOrderOut_: {
+            /** Items */
+            items: components["schemas"]["ManualOrderOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** CursorPage[MemberOut] */
         CursorPage_MemberOut_: {
             /** Items */
@@ -1340,6 +1513,46 @@ export interface components {
              * Format: date-time
              */
             ts: string;
+        };
+        /** DailyGoalOut */
+        DailyGoalOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            axis: components["schemas"]["AxisOut"];
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /**
+             * Dedupe Order
+             * @default activated_at asc, strategy_version_id asc, signal_id asc
+             */
+            dedupe_order: string;
+            fx?: components["schemas"]["FxOut"] | null;
+            /** Fx Reason */
+            fx_reason?: string | null;
+            /** Goal Brl */
+            goal_brl: string;
+            hit_rate: components["schemas"]["RateWithCountsOut"];
+            /** Pooled Bets */
+            pooled_bets: number;
+            /** Pooled R */
+            pooled_r: string;
+            portfolio: components["schemas"]["PortfolioReferenceOut"];
+            progress: components["schemas"]["ProgressOut"];
+            /** R Per Unique Bet */
+            r_per_unique_bet: string | null;
+            /** Series 30D */
+            series_30d: components["schemas"]["SeriesPointOut"][];
+            /** Unique Bets */
+            unique_bets: number;
+            /** Unique R */
+            unique_r: string;
+            value_of_1r: components["schemas"]["ValueOfOneROut"];
         };
         /**
          * DailyReferenceOut
@@ -1530,6 +1743,45 @@ export interface components {
             /** Source */
             source: string;
         };
+        /**
+         * FxOut
+         * @description The ``fx_observations`` (T3.11) row the day's BRL conversion used —
+         *     provenance visible next to the rate, never a bare number. ``None`` (with
+         *     the sibling ``fx_reason`` naming why) when no observation was available
+         *     by the day's end.
+         */
+        FxOut: {
+            /**
+             * Available At
+             * Format: date-time
+             */
+            available_at: string;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Rate */
+            rate: string;
+            /** Source */
+            source: string;
+        };
+        /**
+         * GraduationsOut
+         * @description Migrations to PumpSwap in the last 24h, **out of how many tokens this
+         *     radar actually tracks** — the numerator/denominator pair
+         *     (``RateWithCountsOut`` convention, ``schemas/lab_scoreboard.py``) that
+         *     turns a real ``0`` into an honest one: "0 of 0 tracked" (no coverage yet)
+         *     reads differently from "0 of 4,000 tracked" (real, measured zero).
+         */
+        GraduationsOut: {
+            /** Count */
+            count: number | null;
+            /** Reason */
+            reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+            /** Tracked Tokens */
+            tracked_tokens: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1660,6 +1912,37 @@ export interface components {
             /** Drawdown Pct */
             drawdown_pct: string;
         };
+        /** LatencyHopOut */
+        LatencyHopOut: {
+            /** Hop */
+            hop: string;
+            /** P50 S */
+            p50_s?: number | null;
+            /** P95 S */
+            p95_s?: number | null;
+            status: components["schemas"]["LatencySloStatus"];
+            /** Target P50 S */
+            target_p50_s: number;
+            /** Target P95 S */
+            target_p95_s: number;
+        };
+        /** LatencyOut */
+        LatencyOut: {
+            end_to_end: components["schemas"]["LatencyHopOut"];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Hops */
+            hops: components["schemas"]["LatencyHopOut"][];
+            research_universe?: components["schemas"]["ResearchUniverseOut"] | null;
+        };
+        /**
+         * LatencySloStatus
+         * @enum {string}
+         */
+        LatencySloStatus: "ok" | "warn" | "critical" | "unknown";
         /**
          * LineageOut
          * @description A replication sibling's parent and arm — DATABASE.md §24.3.
@@ -1672,6 +1955,91 @@ export interface components {
              * Format: uuid
              */
             replication_parent_id: string;
+        };
+        /**
+         * ManualOrderCreate
+         * @description The operator's order, before the engine has seen it — RISK_ENGINE.md §8.
+         */
+        ManualOrderCreate: {
+            direction: components["schemas"]["TradeDirection"];
+            /**
+             * Market Id
+             * Format: uuid
+             */
+            market_id: string;
+            /** Requested Notional */
+            requested_notional?: (number | string) | null;
+            /** Stop */
+            stop: number | string;
+        };
+        /**
+         * ManualOrderDetailOut
+         * @description ``ManualOrderOut`` plus the order/fill it produced, when it produced one.
+         */
+        ManualOrderDetailOut: {
+            /** Decision */
+            decision: {
+                [key: string]: unknown;
+            } | null;
+            direction: components["schemas"]["TradeDirection"];
+            /**
+             * Filed At
+             * Format: date-time
+             */
+            filed_at: string;
+            /**
+             * Market Id
+             * Format: uuid
+             */
+            market_id: string;
+            outcome: components["schemas"]["OrderOut"] | null;
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "decided";
+        };
+        /**
+         * ManualOrderOut
+         * @description What the operator asked for, and what — if anything — the engine decided.
+         *
+         *     ``status`` collapses ``ProposalStatus`` to the two states a caller who did
+         *     not admit the proposal needs: ``pending`` (the engine has not reached this
+         *     row yet — up to ~1 s, ``admission_cycle``'s poll interval) or ``decided``
+         *     (approved, rejected, expired or failed all read the same from here; the
+         *     reasons live inside ``decision``).
+         */
+        ManualOrderOut: {
+            /** Decision */
+            decision: {
+                [key: string]: unknown;
+            } | null;
+            direction: components["schemas"]["TradeDirection"];
+            /**
+             * Filed At
+             * Format: date-time
+             */
+            filed_at: string;
+            /**
+             * Market Id
+             * Format: uuid
+             */
+            market_id: string;
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "decided";
         };
         /** MarketComponentsOut */
         MarketComponentsOut: {
@@ -2033,6 +2401,230 @@ export interface components {
             organization: components["schemas"]["OrganizationOut"];
             role: components["schemas"]["OrganizationRole"];
             status: components["schemas"]["MemberStatus"];
+        };
+        /**
+         * MemeFeaturePointOut
+         * @description One ``meme_features_1m`` row. Every dependent metric carries its own
+         *     ``*_reason`` sibling — see the module docstring.
+         */
+        MemeFeaturePointOut: {
+            /** Age Minutes */
+            age_minutes: number | null;
+            /** Buy Sell Ratio */
+            buy_sell_ratio: string | null;
+            /** Buy Sell Ratio Reason */
+            buy_sell_ratio_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+            /** Coverage */
+            coverage: string;
+            /** Creator Sold */
+            creator_sold: boolean | null;
+            /** Creator Sold Reason */
+            creator_sold_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+            /** Curve Progress Pct */
+            curve_progress_pct: string | null;
+            /** Curve Reason */
+            curve_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            /** Features Version */
+            features_version: string;
+            /** Mcap Sol */
+            mcap_sol: string | null;
+            /** Progress Reason */
+            progress_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+            /** Top10 Share */
+            top10_share: string | null;
+            /** Top10 Share Reason */
+            top10_share_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+            /** Unique Buyers */
+            unique_buyers: number | null;
+            /** Unique Buyers Reason */
+            unique_buyers_reason?: ("no_trade_feed" | "no_holders_reader" | "denominator_unknown" | "not_polled" | "rate_limited" | "insufficient_coverage" | "unsupported_quote") | null;
+        };
+        /** MemeGapListOut */
+        MemeGapListOut: {
+            /** Items */
+            items: components["schemas"]["MemeGapOut"][];
+            /**
+             * Label
+             * @default Meme Radar — só monitoramento, nunca execução (pump.fun)
+             */
+            label: string;
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** MemeGapOut */
+        MemeGapOut: {
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Detected At
+             * Format: date-time
+             */
+            detected_at: string;
+            /**
+             * Gap End
+             * Format: date-time
+             */
+            gap_end: string;
+            /**
+             * Gap Start
+             * Format: date-time
+             */
+            gap_start: string;
+            /** Generation */
+            generation: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mint */
+            mint: string | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Stream
+             * @enum {string}
+             */
+            stream: "pumpportal_ws" | "curve_poll" | "features_1m";
+        };
+        /**
+         * MemeOverviewOut
+         * @description ``GET /meme/overview``. Two possible shapes, both real, never a
+         *     fabricated number (brief T4.3):
+         *
+         *     - ``source="meme_tokens"``: aggregated from this radar's own stored
+         *       tokens once ``meme_tokens`` has any coverage — ``coins_created_by_mode``
+         *       is then ``None`` (``meme_tokens.mayhem_mode`` is a per-token field, not
+         *       the market-wide auto/manual split ``OverviewByModeOut`` describes).
+         *     - ``source="pumpfun_rest_mayhem_overview"``: a labelled passthrough of the
+         *       free, undocumented ``frontend-api-v3.pump.fun`` ``/mayhem/overview`` —
+         *       used whenever ``meme_tokens`` has no coverage yet (T4.2's collector not
+         *       deployed, or freshly started).
+         */
+        MemeOverviewOut: {
+            /** Coins Created 24H */
+            coins_created_24h: number | null;
+            /** Coins Created 7D */
+            coins_created_7d: number | null;
+            coins_created_by_mode?: components["schemas"]["OverviewByModeOut"] | null;
+            graduations_24h: components["schemas"]["GraduationsOut"];
+            /**
+             * Label
+             * @default Meme Radar — só monitoramento, nunca execução (pump.fun)
+             */
+            label: string;
+            /** Mayhem Active Coins */
+            mayhem_active_coins: number | null;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "meme_tokens" | "pumpfun_rest_mayhem_overview";
+        };
+        /** MemeSnapshotPointOut */
+        MemeSnapshotPointOut: {
+            /** Complete */
+            complete: boolean;
+            /** Mcap Sol */
+            mcap_sol: string | null;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Real Sol Reserves */
+            real_sol_reserves: string;
+            /** Real Token Reserves */
+            real_token_reserves: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "pumpportal_ws" | "pumpfun_rest" | "solana_rpc";
+            /** Virtual Sol Reserves */
+            virtual_sol_reserves: string;
+            /** Virtual Token Reserves */
+            virtual_token_reserves: string;
+        };
+        /** MemeTokenDetailOut */
+        MemeTokenDetailOut: {
+            /** Features */
+            features: components["schemas"]["MemeFeaturePointOut"][];
+            /**
+             * Label
+             * @default Meme Radar — só monitoramento, nunca execução (pump.fun)
+             */
+            label: string;
+            /** Snapshots */
+            snapshots: components["schemas"]["MemeSnapshotPointOut"][];
+            token: components["schemas"]["MemeTokenOut"];
+        };
+        /** MemeTokenListOut */
+        MemeTokenListOut: {
+            /** Items */
+            items: components["schemas"]["MemeTokenOut"][];
+            /**
+             * Label
+             * @default Meme Radar — só monitoramento, nunca execução (pump.fun)
+             */
+            label: string;
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /**
+         * MemeTokenOut
+         * @description One row of ``GET /meme/tokens`` — token identity plus its latest known
+         *     curve reading. ``name``/``symbol``/``creator``/``created_at`` are
+         *     ``None`` when a migration event reached this radar before the token's
+         *     own creation event did (contract §1, a documented T4.1 scenario) —
+         *     ``age_minutes`` is then also ``None`` (unknown creation time, not zero).
+         *     ``snapshot_observed_at``/``snapshot_source`` are ``None`` only when this
+         *     mint has no ``meme_features_1m`` row at all yet.
+         */
+        MemeTokenOut: {
+            /** Age Minutes */
+            age_minutes: number | null;
+            /** Created At */
+            created_at: string | null;
+            /** Creator */
+            creator: string | null;
+            /** Curve Progress Pct */
+            curve_progress_pct: string | null;
+            /** Mayhem Enabled */
+            mayhem_enabled: boolean | null;
+            /** Mayhem State */
+            mayhem_state: string | null;
+            /** Mcap Sol */
+            mcap_sol: string | null;
+            /** Migrated At */
+            migrated_at: string | null;
+            /** Mint */
+            mint: string;
+            /** Name */
+            name: string | null;
+            /** Snapshot Observed At */
+            snapshot_observed_at: string | null;
+            /** Snapshot Source */
+            snapshot_source: ("pumpportal_ws" | "pumpfun_rest" | "solana_rpc") | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "curve" | "completed" | "migrated";
+            /** Symbol */
+            symbol: string | null;
         };
         /** NoEntryCounts */
         NoEntryCounts: {
@@ -2530,6 +3122,25 @@ export interface components {
          */
         OutcomeResult: "target" | "stop" | "expired" | "invalidated" | "open";
         /**
+         * OverviewByModeOut
+         * @description pump.fun's own "auto"/"manual" Mayhem sub-modes, straight from the
+         *     upstream ``/mayhem/overview`` passthrough — **not** the same distinction
+         *     as this API's own ``mayhem_mode`` column (contract §1: ``auto`` \|
+         *     ``manual`` \| ``unknown``, "eixo separado do estado"). Only populated
+         *     when ``source == "pumpfun_rest_mayhem_overview"``.
+         */
+        OverviewByModeOut: {
+            auto: components["schemas"]["OverviewWindowCountOut"];
+            manual: components["schemas"]["OverviewWindowCountOut"];
+        };
+        /** OverviewWindowCountOut */
+        OverviewWindowCountOut: {
+            /** Last 24H */
+            last_24h: number;
+            /** Last 7D */
+            last_7d: number;
+        };
+        /**
          * PeakOut
          * @description The monotonic, **sampled** peak — never the intratick maximum.
          */
@@ -2578,6 +3189,13 @@ export interface components {
              * Format: uuid
              */
             workspace_id: string;
+        };
+        /** PortfolioReferenceOut */
+        PortfolioReferenceOut: {
+            /** Equity Usdt */
+            equity_usdt: string | null;
+            /** Source */
+            source: string;
         };
         /**
          * PortfolioRiskStateOut
@@ -2818,6 +3436,31 @@ export interface components {
             sum_positive: string;
             /** Value */
             value: string | null;
+        };
+        /** ProgressOut */
+        ProgressOut: {
+            /** Distance To Goal Label Brl */
+            distance_to_goal_label_brl: string;
+            /** Distance To Goal Real Brl */
+            distance_to_goal_real_brl: string | null;
+            /** Distance To Goal Summed Brl */
+            distance_to_goal_summed_brl?: string | null;
+            /** Label Brl */
+            label_brl: string;
+            /** Real Brl */
+            real_brl: string | null;
+            /** Real Brl Summed */
+            real_brl_summed?: string | null;
+            /** Real Usdt */
+            real_usdt: string | null;
+            /** Real Usdt Summed */
+            real_usdt_summed?: string | null;
+            /** Required 1R Brl */
+            required_1r_brl: string | null;
+            /** Required Unique R */
+            required_unique_r: string | null;
+            /** Summed Reason */
+            summed_reason?: string | null;
         };
         /** RExFundingBlock */
         RExFundingBlock: {
@@ -3247,6 +3890,28 @@ export interface components {
             wins: number;
         };
         /**
+         * ResearchUniverseOut
+         * @description T3.82: the Shadow Lab's shadow universe -- markets with enough 1m
+         *     history for the replay + replication funnel to ever validate a decision
+         *     on them (``docs/PIPELINE.md`` §6b, ``hunter_strategy_worker.universe``).
+         *
+         *     Summed across every ``STRATEGY_SHARDS`` shard's own heartbeat, the same
+         *     union ``_shadow_decision_lag`` already does for the ``decision`` hop --
+         *     each shard owns a disjoint slice of symbols, so a sum (not a max) is the
+         *     cluster-wide count. ``None`` on ``LatencyOut`` itself when no shard has
+         *     published these fields yet (worker not deployed, or
+         *     ``SHADOW_UNIVERSE_MIN_HISTORY_DAYS=0`` disables the gate) -- never a
+         *     fabricated ``0 of 0``.
+         */
+        ResearchUniverseOut: {
+            /** Markets In Universe */
+            markets_in_universe: number;
+            /** Markets Total */
+            markets_total: number;
+            /** Min History Days */
+            min_history_days: number;
+        };
+        /**
          * ResumeOut
          * @description What the resume moved, and the assessment it was allowed against.
          */
@@ -3313,6 +3978,11 @@ export interface components {
         RiskLimitsPresetOut: {
             /** Day Timezone */
             day_timezone: string;
+            /**
+             * Diverged From Engine
+             * @default false
+             */
+            diverged_from_engine: boolean;
             kill_switch_blocked: components["schemas"]["KillSwitchThresholdsOut"];
             kill_switch_warning: components["schemas"]["KillSwitchThresholdsOut"];
             /** Max Aggregate Planned Risk Pct */
@@ -3475,6 +4145,20 @@ export interface components {
             open: number;
             /** Pending */
             pending: number;
+        };
+        /** SeriesPointOut */
+        SeriesPointOut: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Pooled R */
+            pooled_r: string;
+            /** Unique R */
+            unique_r: string;
+            /** Unique Usdt */
+            unique_usdt: string | null;
         };
         /**
          * ShadowTrackingState
@@ -3918,6 +4602,27 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** ValueOfOneROut */
+        ValueOfOneROut: {
+            /** Label Brl */
+            label_brl: string;
+            /** Real Brl P10 */
+            real_brl_p10: string | null;
+            /** Real Brl P50 */
+            real_brl_p50: string | null;
+            /** Real Brl P90 */
+            real_brl_p90: string | null;
+            /** Real Usdt P10 */
+            real_usdt_p10: string | null;
+            /** Real Usdt P50 */
+            real_usdt_p50: string | null;
+            /** Real Usdt P90 */
+            real_usdt_p90: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Sample Size */
+            sample_size: number;
         };
         /** VersionCounts */
         VersionCounts: {
@@ -4895,6 +5600,39 @@ export interface operations {
             };
         };
     };
+    get_daily_goal_api_v1_orgs__org_id__lab_daily_goal_get: {
+        parameters: {
+            query?: {
+                day?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyGoalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_members_api_v1_orgs__org_id__members_get: {
         parameters: {
             query?: {
@@ -4982,6 +5720,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemberOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_gaps_api_v1_orgs__org_id__meme_gaps_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemeGapListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_overview_api_v1_orgs__org_id__meme_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemeOverviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tokens_api_v1_orgs__org_id__meme_tokens_get: {
+        parameters: {
+            query?: {
+                state?: ("curve" | "completed" | "migrated") | null;
+                sort?: "mcap" | "age" | "progress";
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemeTokenListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_token_api_v1_orgs__org_id__meme_tokens__mint__get: {
+        parameters: {
+            query?: {
+                snapshot_limit?: number;
+                feature_limit?: number;
+            };
+            header?: never;
+            path: {
+                mint: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemeTokenDetailOut"];
                 };
             };
             /** @description Validation Error */
@@ -5118,6 +5992,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AsOfPage_EquityCurvePointOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_manual_orders_route_api_v1_orgs__org_id__portfolios__portfolio_id__order_requests_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                portfolio_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_ManualOrderOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    file_manual_order_route_api_v1_orgs__org_id__portfolios__portfolio_id__order_requests_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                portfolio_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualOrderCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_manual_order_route_api_v1_orgs__org_id__portfolios__portfolio_id__order_requests__request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+                request_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualOrderDetailOut"];
                 };
             };
             /** @description Validation Error */
@@ -5644,6 +6624,26 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    latency_api_v1_system_latency_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LatencyOut"];
                 };
             };
         };

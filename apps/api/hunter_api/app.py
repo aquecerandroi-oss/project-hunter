@@ -43,6 +43,7 @@ from hunter_api.routers import lab_strategies as lab_strategies_router
 from hunter_api.routers import markets as markets_router
 from hunter_api.routers import me as me_router
 from hunter_api.routers import members as members_router
+from hunter_api.routers import meme as meme_router
 from hunter_api.routers import opportunities as opportunities_router
 from hunter_api.routers import orders as orders_router
 from hunter_api.routers import organizations as organizations_router
@@ -77,6 +78,7 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     {"name": "risk", "description": "Risk profiles, risk events and the kill switch."},
     {"name": "analytics", "description": "Performance statistics and signal outcomes."},
     {"name": "lab", "description": "Shadow Lab: hypothetical, no-capital strategy research."},
+    {"name": "meme", "description": "Meme Radar: pump.fun monitoring, read-only."},
     {"name": "system", "description": "Health, readiness, metrics and system info."},
     {"name": "audit", "description": "The append-only audit log."},
 ]
@@ -197,6 +199,7 @@ def create_app(settings: ApiSettings) -> FastAPI:
     app.include_router(lab_replays_router.router)
     app.include_router(lab_daily_goal_router.router)
     app.include_router(portfolio_router.router)
+    app.include_router(meme_router.router)
     app.include_router(orders_router.router)
     app.include_router(risk_router.router)
     app.include_router(system_router.router)

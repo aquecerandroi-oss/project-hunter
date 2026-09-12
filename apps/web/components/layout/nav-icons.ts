@@ -5,6 +5,7 @@ import {
   Bot,
   Brain,
   Building2,
+  Coins,
   FlaskConical,
   GitBranch,
   LayoutDashboard,
@@ -45,4 +46,5 @@ export const NAV_ICONS: Record<NavIconKey, LucideIcon> = {
   bell: Bell,
   server: Server,
   settings: Settings,
+  coins: Coins,
 };

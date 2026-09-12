@@ -42,6 +42,7 @@ export const NAV_ICON_KEYS = [
   "bell",
   "server",
   "settings",
+  "coins",
 ] as const;
 
 export type NavIconKey = (typeof NAV_ICON_KEYS)[number];
@@ -81,6 +82,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // route, which stays hidden in production) fits the "lab" concept and is
   // already a registered icon key -- no new icon needed.
   { key: "lab", label: "Lab", segment: "lab", icon: "flask-conical", status: "available", minRole: "VIEWER" },
+  // Meme Radar (T4.3, Everton 2026-09-12): pump.fun monitoring -- creation,
+  // bonding curve progress, migration to PumpSwap. Read-only, no order, no
+  // wallet (docs/plans/T4-MEME-RADAR.md §0). "coins" is the closest
+  // registered icon key to a memecoin radar; a new key rather than reusing
+  // "radar" (already the cross-market opportunity radar) or "activity"
+  // (reserved for the still-planned `trades` route).
+  { key: "meme", label: "Meme Radar", segment: "meme", icon: "coins", status: "available", minRole: "VIEWER" },
   { key: "agents", label: "Agents", segment: "agents", icon: "bot", status: "planned", plannedMilestone: "M4", minRole: "VIEWER" },
   { key: "arena", label: "Agent Arena", segment: "arena", icon: "swords", status: "planned", plannedMilestone: "M6", minRole: "VIEWER" },
   { key: "strategies", label: "Strategies", segment: "strategies", icon: "git-branch", status: "planned", plannedMilestone: "M6", minRole: "VIEWER" },
