@@ -11,6 +11,25 @@ describe("formatMoney", () => {
     expect(formatMoney(10)).toBe("$10.00");
   });
 
+  // Production, 12/09/2026 10:3x BRT: the meme desk showed a 0.05 SOL bet as
+  // "-18.5 SOL". `roundDecimal` incremented "00184" through BigInt (-> "185"),
+  // lost the leading zeros that place the point, and split the wrong digits.
+  // Every value below 1 whose kept fraction starts with zeros and rounds up hit it.
+  it("keeps the leading zeros of the fraction when rounding up (the -18.5 SOL bug)", () => {
+    expect(formatMoney("-0.0184879480", { decimals: 4 })).toBe("-$0.0185");
+    expect(formatMoney("-0.0454932120", { decimals: 4 })).toBe("-$0.0455");
+    expect(formatMoney("-0.0018775510", { decimals: 4 })).toBe("-$0.0019");
+    expect(formatMoney("-0.0375510204", { decimals: 2 })).toBe("-$0.04");
+    expect(formatMoney("0.0567", { decimals: 2 })).toBe("$0.06");
+    expect(formatMoney("0.00049", { decimals: 4 })).toBe("$0.0005");
+  });
+
+  it("still carries across the point when the round-up overflows the kept digits", () => {
+    expect(formatMoney("0.99996", { decimals: 4 })).toBe("$1.0000");
+    expect(formatMoney("9.999", { decimals: 2 })).toBe("$10.00");
+    expect(formatMoney("0.0099996", { decimals: 4 })).toBe("$0.0100");
+  });
+
   it("does not lose precision on a 28-digit Decimal string (never routes the full value through Number())", () => {
     expect(formatMoney("123456789012345678.1234567890")).toBe("$123,456,789,012,345,678.12");
   });

@@ -85,7 +85,12 @@ function roundDecimal(dec: ParsedDecimal, decimals: number): ParsedDecimal {
 
   let combined = `${dec.intDigits}${kept}`;
   if (roundUpDigit >= 5) {
-    combined = (BigInt(combined) + 1n).toString();
+    // `BigInt("00184")` is 184: the increment drops the leading zeros that
+    // position the decimal point, and the split below then put "-0.0185 SOL"
+    // on the meme desk as "-18.5 SOL" (production, 12/09/2026 10:3x BRT --
+    // every value below 1 whose kept digits start with zeros and round up).
+    // Pad back to the original width; a carry ("999" -> "1000") stays longer.
+    combined = (BigInt(combined) + 1n).toString().padStart(combined.length, "0");
   }
   const splitAt = combined.length - decimals;
   return {
