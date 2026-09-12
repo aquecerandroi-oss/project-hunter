@@ -59,6 +59,13 @@ Recusa nomeada em **qualquer** conjunto quando: `creator_prior_mints_1h ≥ 2` (
 (sem identidade). *Na amostra:* 11 de 20 perdedoras cairiam só por criador-em-série ou clone; a vencedora passa.
 É a mais barata de medir: só features que o radar já grava ou grava a partir de T4.2g/T4.12.
 
+*Medido fora da amostra (banco da VPS, 17:0x BRT, 1 893 moedas criadas na última hora ≈ 31/min):* criador em série
+(≥ 2 outras moedas do mesmo criador na hora anterior) **1 150 (61 %)**; clone de ticker (≥ 3 outras com o mesmo símbolo
+em 24 h) **1 053 (56 %)**; uma ou outra **1 412 (75 %)**; primeira moeda do criador na hora 522 (28 %). Os tickers mais
+clonados em 24 h: HODL ×283, ASD ×216, BALL ×125, "." ×110. Ou seja: E2 não é um filtro fino — descarta três quartos do
+que nasce, e é o que a porta `flow_v2/1` mostra no heartbeat (`creator_serial` 64 e `symbol_clone` 65 de ~110 moedas
+jovens por tique). O que sobra (~25 %) é a população onde E1/E3/E5 têm de provar valor.
+
 ### E3 — "Orgânica lenta" (EXP-M7)
 Alvo explícito das moedas que **não** graduam no slot da criação e cujo `twitter` é um post (célula lenta do plantão):
 entrada quando o progresso cruza 10–30 % com inclinação positiva de 3 fotografias, holders ≥ 20 e subindo, top-10 ≤
