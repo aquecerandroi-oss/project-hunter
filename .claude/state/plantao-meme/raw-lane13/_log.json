@@ -1,0 +1,366 @@
+{
+ "run": 13,
+ "lane": 1,
+ "requests": 22,
+ "log": [
+  {
+   "n": 1,
+   "name": "sol_price",
+   "url": "https://frontend-api-v3.pump.fun/sol-price",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:51:45+00:00",
+   "observed_at_utc": "2026-09-12T16:51:45+00:00",
+   "observed_at_brt": "13:51:45",
+   "err": null,
+   "bytes": 75,
+   "json": true,
+   "file": "01_sol_price.json",
+   "ratelimit": {
+    "x-ratelimit-limit": "50",
+    "x-ratelimit-remaining": "49",
+    "x-ratelimit-reset": "60"
+   }
+  },
+  {
+   "n": 2,
+   "name": "mayhem_overview",
+   "url": "https://frontend-api-v3.pump.fun/mayhem/overview",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:51:46+00:00",
+   "observed_at_utc": "2026-09-12T16:51:47+00:00",
+   "observed_at_brt": "13:51:47",
+   "err": null,
+   "bytes": 279,
+   "json": true,
+   "file": "02_mayhem_overview.json",
+   "ratelimit": {
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60"
+   }
+  },
+  {
+   "n": 3,
+   "name": "coins_newest70",
+   "url": "https://frontend-api-v3.pump.fun/coins?offset=0&limit=70&sort=created_timestamp&order=DESC&includeNsfw=false",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:51:48+00:00",
+   "observed_at_utc": "2026-09-12T16:51:49+00:00",
+   "observed_at_brt": "13:51:49",
+   "err": null,
+   "bytes": 133297,
+   "json": true,
+   "file": "03_coins_newest70.json",
+   "ratelimit": {
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60"
+   }
+  },
+  {
+   "n": 4,
+   "name": "boards_new",
+   "url": "https://advanced-indexer.pump.fun/boards/new?offset=0&limit=50",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:51:50+00:00",
+   "observed_at_utc": "2026-09-12T16:51:50+00:00",
+   "observed_at_brt": "13:51:50",
+   "err": null,
+   "bytes": 42178,
+   "json": true,
+   "file": "04_boards_new.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 5,
+   "name": "boards_graduated_p1",
+   "url": "https://advanced-indexer.pump.fun/boards/graduated?offset=0&limit=50",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:51:52+00:00",
+   "observed_at_utc": "2026-09-12T16:51:52+00:00",
+   "observed_at_brt": "13:51:52",
+   "err": null,
+   "bytes": 44288,
+   "json": true,
+   "file": "05_boards_graduated_p1.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 6,
+   "name": "boards_graduated_p2",
+   "url": "https://advanced-indexer.pump.fun/boards/graduated?offset=50&limit=50",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:51:54+00:00",
+   "observed_at_utc": "2026-09-12T16:51:54+00:00",
+   "observed_at_brt": "13:51:54",
+   "err": null,
+   "bytes": 44508,
+   "json": true,
+   "file": "06_boards_graduated_p2.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 7,
+   "name": "boards_graduated_p3",
+   "url": "https://advanced-indexer.pump.fun/boards/graduated?offset=100&limit=50",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:51:55+00:00",
+   "observed_at_utc": "2026-09-12T16:51:56+00:00",
+   "observed_at_brt": "13:51:56",
+   "err": null,
+   "bytes": 42673,
+   "json": true,
+   "file": "07_boards_graduated_p3.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 8,
+   "name": "boards_movers",
+   "url": "https://advanced-indexer.pump.fun/boards/movers?offset=0&limit=50",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:51:57+00:00",
+   "observed_at_utc": "2026-09-12T16:51:57+00:00",
+   "observed_at_brt": "13:51:57",
+   "err": null,
+   "bytes": 46258,
+   "json": true,
+   "file": "08_boards_movers.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 9,
+   "name": "boards_graduating",
+   "url": "https://advanced-indexer.pump.fun/boards/graduating?offset=0&limit=50",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:51:58+00:00",
+   "observed_at_utc": "2026-09-12T16:51:59+00:00",
+   "observed_at_brt": "13:51:59",
+   "err": null,
+   "bytes": 46602,
+   "json": true,
+   "file": "09_boards_graduating.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 10,
+   "name": "coins_complete_p1",
+   "url": "https://frontend-api-v3.pump.fun/coins?offset=0&limit=70&sort=created_timestamp&order=DESC&includeNsfw=false&complete=true",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:52:00+00:00",
+   "observed_at_utc": "2026-09-12T16:52:01+00:00",
+   "observed_at_brt": "13:52:01",
+   "err": null,
+   "bytes": 138034,
+   "json": true,
+   "file": "10_coins_complete_p1.json",
+   "ratelimit": {
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60"
+   }
+  },
+  {
+   "n": 11,
+   "name": "coins_complete_p2",
+   "url": "https://frontend-api-v3.pump.fun/coins?offset=70&limit=70&sort=created_timestamp&order=DESC&includeNsfw=false&complete=true",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:52:02+00:00",
+   "observed_at_utc": "2026-09-12T16:52:02+00:00",
+   "observed_at_brt": "13:52:02",
+   "err": null,
+   "bytes": 141748,
+   "json": true,
+   "file": "11_coins_complete_p2.json",
+   "ratelimit": {
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60"
+   }
+  },
+  {
+   "n": 12,
+   "name": "coins_top_mcap50",
+   "url": "https://frontend-api-v3.pump.fun/coins?offset=0&limit=50&sort=market_cap&order=DESC&includeNsfw=false",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:52:03+00:00",
+   "observed_at_utc": "2026-09-12T16:52:04+00:00",
+   "observed_at_brt": "13:52:04",
+   "err": null,
+   "bytes": 99253,
+   "json": true,
+   "file": "12_coins_top_mcap50.json",
+   "ratelimit": {
+    "x-ratelimit-limit": "60",
+    "x-ratelimit-remaining": "59",
+    "x-ratelimit-reset": "60"
+   }
+  },
+  {
+   "n": 13,
+   "name": "imc_01_6ETsbM",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/6ETsbM7oEKb8J9fwTE2f7coxMjDNF8PjHqQo5BDEvUok",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:52:05+00:00",
+   "observed_at_utc": "2026-09-12T16:52:05+00:00",
+   "observed_at_brt": "13:52:05",
+   "err": null,
+   "bytes": 1731,
+   "json": true,
+   "file": "13_imc_01_6ETsbM.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 14,
+   "name": "imc_02_3nqHij",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/3nqHijNUExsnjNBb15WJsJ2xisyMVGN6FK4aUgZk1Rwj",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:52:06+00:00",
+   "observed_at_utc": "2026-09-12T16:52:07+00:00",
+   "observed_at_brt": "13:52:07",
+   "err": null,
+   "bytes": 1723,
+   "json": true,
+   "file": "14_imc_02_3nqHij.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 15,
+   "name": "imc_03_CmXSSt",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/CmXSStKTHrVLyvCDPzPoCkjYt5aMpG6p3c88yPpbfmpx",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:52:08+00:00",
+   "observed_at_utc": "2026-09-12T16:52:08+00:00",
+   "observed_at_brt": "13:52:08",
+   "err": null,
+   "bytes": 1714,
+   "json": true,
+   "file": "15_imc_03_CmXSSt.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 16,
+   "name": "imc_04_HJE2DE",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/HJE2DEZXvErwUabTU16xzrS629qXVeVyTGvJYJVfpump",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:52:09+00:00",
+   "observed_at_utc": "2026-09-12T16:52:09+00:00",
+   "observed_at_brt": "13:52:09",
+   "err": null,
+   "bytes": 1710,
+   "json": true,
+   "file": "16_imc_04_HJE2DE.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 17,
+   "name": "imc_05_4xSfWr",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/4xSfWrG9VkyNbnCNvB6opKEex2ebXmCZCiied84fZisB",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:52:11+00:00",
+   "observed_at_utc": "2026-09-12T16:52:11+00:00",
+   "observed_at_brt": "13:52:11",
+   "err": null,
+   "bytes": 1813,
+   "json": true,
+   "file": "17_imc_05_4xSfWr.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 18,
+   "name": "coin_01_6ETsbM",
+   "url": "https://frontend-api-v3.pump.fun/coins/6ETsbM7oEKb8J9fwTE2f7coxMjDNF8PjHqQo5BDEvUok",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:52:12+00:00",
+   "observed_at_utc": "2026-09-12T16:52:12+00:00",
+   "observed_at_brt": "13:52:12",
+   "err": null,
+   "bytes": 1989,
+   "json": true,
+   "file": "18_coin_01_6ETsbM.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 19,
+   "name": "coin_02_3nqHij",
+   "url": "https://frontend-api-v3.pump.fun/coins/3nqHijNUExsnjNBb15WJsJ2xisyMVGN6FK4aUgZk1Rwj",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:52:14+00:00",
+   "observed_at_utc": "2026-09-12T16:52:14+00:00",
+   "observed_at_brt": "13:52:14",
+   "err": null,
+   "bytes": 1858,
+   "json": true,
+   "file": "19_coin_02_3nqHij.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 20,
+   "name": "coin_03_CmXSSt",
+   "url": "https://frontend-api-v3.pump.fun/coins/CmXSStKTHrVLyvCDPzPoCkjYt5aMpG6p3c88yPpbfmpx",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:52:15+00:00",
+   "observed_at_utc": "2026-09-12T16:52:15+00:00",
+   "observed_at_brt": "13:52:15",
+   "err": null,
+   "bytes": 1865,
+   "json": true,
+   "file": "20_coin_03_CmXSSt.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 21,
+   "name": "coin_04_HJE2DE",
+   "url": "https://frontend-api-v3.pump.fun/coins/HJE2DEZXvErwUabTU16xzrS629qXVeVyTGvJYJVfpump",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:52:16+00:00",
+   "observed_at_utc": "2026-09-12T16:52:17+00:00",
+   "observed_at_brt": "13:52:17",
+   "err": null,
+   "bytes": 2004,
+   "json": true,
+   "file": "21_coin_04_HJE2DE.json",
+   "ratelimit": {}
+  },
+  {
+   "n": 22,
+   "name": "coin_05_4xSfWr",
+   "url": "https://frontend-api-v3.pump.fun/coins/4xSfWrG9VkyNbnCNvB6opKEex2ebXmCZCiied84fZisB",
+   "status": 200,
+   "request_started_utc": "2026-09-12T16:52:18+00:00",
+   "observed_at_utc": "2026-09-12T16:52:18+00:00",
+   "observed_at_brt": "13:52:18",
+   "err": null,
+   "bytes": 1696,
+   "json": true,
+   "file": "22_coin_05_4xSfWr.json",
+   "ratelimit": {}
+  }
+ ],
+ "top5_movers": [
+  {
+   "pos": 1,
+   "m": "6ETsbM7oEKb8J9fwTE2f7coxMjDNF8PjHqQo5BDEvUok",
+   "t": "faucat"
+  },
+  {
+   "pos": 2,
+   "m": "3nqHijNUExsnjNBb15WJsJ2xisyMVGN6FK4aUgZk1Rwj",
+   "t": "TACZ"
+  },
+  {
+   "pos": 3,
+   "m": "CmXSStKTHrVLyvCDPzPoCkjYt5aMpG6p3c88yPpbfmpx",
+   "t": "PURRLTR"
+  },
+  {
+   "pos": 5,
+   "m": "HJE2DEZXvErwUabTU16xzrS629qXVeVyTGvJYJVfpump",
+   "t": "🙌💎"
+  },
+  {
+   "pos": 6,
+   "m": "4xSfWrG9VkyNbnCNvB6opKEex2ebXmCZCiied84fZisB",
+   "t": "MAXI"
+  }
+ ]
+}

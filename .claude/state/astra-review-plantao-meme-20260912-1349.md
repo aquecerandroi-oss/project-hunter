@@ -1,0 +1,51 @@
+**RESUMO**
+
+Testaria **1 → 3 → 2**: primeiro a cobertura do board, com universo separado por quote/programa; depois M-P33. Um instrumento que seleciona quais moedas aparecem pode distorcer tanto as células quanto a associação com posts.
+
+**M-P33 merece linha própria**, como extensão prospectiva de M-P17: testa informação incremental de irmãos do mesmo post, controlando M-P29. Hoje há motivação exploratória, ainda não confirmação.
+
+**ARQUIVOS**
+
+Nenhum arquivo criado ou modificado.
+
+**TESTES**
+
+Recontagem somente em memória com PowerShell (`ConvertFrom-Json`):
+
+- `requests=22 HTTP200=22`
+- `rounded85005=67 inside=48 outside=19 missing_pct=28.36`
+- `pump_cells=79/15/14/14/2`
+- `new_posts=31 negative_age=1 age_0_to_10min=23`
+
+Não executei testes de código nem validação on-chain.
+
+**MUST-FIX**
+
+1. **19/67 = 28,4%, não 19/86.** Os 67 já incluem os 19 ausentes; 48 estão dentro. “85,005” é valor arredondado, não igualdade exata em lamports. Corrigir item 4 e Top 3: o denominador atual subestima a divergência. Trocar também “10 maiores do dia” por **“10 maiores das 140 completas amostradas”** — a própria tabela apresenta moedas maiores em outro recorte. [Rascunho:32](C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1349-lane1.md:32), [115](C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1349-lane1.md:115), [48](C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1349-lane1.md:48).
+
+2. **Ausência nestas páginas não prova exclusão histórica nem migração.** Ordem e sobreposição das páginas conferem; versões diferentes não garantem snapshot íntegro. Sem `gd` independente dos ausentes, criação dentro da janela não garante migração dentro dela. Filtro, atraso, remoção e paginação dinâmica continuam possibilidades. Escrever “19 mints REST não encontrados nas páginas consultadas”; afirmar que o WS ficou cego poderia descartar uma observação anterior válida. [Rascunho:115](C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1349-lane1.md:115).
+
+3. **Não estratificar o teste de conclusão de M-P17 pela velocidade futura de conclusão.** Isso condiciona no próprio desfecho e exclui não concluídas. Usar estratos conhecidos na criação; velocidade pode ser desfecho separado ou estrato da análise posterior de retenção. Substituir “post ⇒ lenta”, “orgânica” e “slots distintos” por associação entre proxies no recorte `complete ∩ board`. [Rascunho:135](C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1349-lane1.md:135), [56](C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1349-lane1.md:56).
+
+4. **M-P33 precisa de relógio executável.** O link atual não comprova o metadata na criação. Congelar quando o link ficar disponível ao Radar, preservando `created_at` e `received_at`; zero significa “nenhum irmão previamente observado”, não “primeira moeda”. Sem cobertura, desconhecido. Caso contrário, reconstrução posterior inventa precedência. Retenção continua condicionada às migradas; conclusão usa todas as criações. [Rascunho:146](C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1349-lane1.md:146).
+
+5. **Separar desconhecidos:** são **22/70 quotes explicitamente não SOL + 1 nulo**; posts com idade **entre zero e dez minutos são 23/31**, não 24/31 — o negativo deve ser desconhecido. Misturá-los altera elegibilidade e taxa-base. [Rascunho:26](C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1349-lane1.md:26), [130](C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1349-lane1.md:130).
+
+**NICE-TO-HAVE**
+
+- **5 moedas em 37 s:** concentração temporal interessante; escrever “compartilhavam o link”, não “o post gerou”. Cinco endereços criadores não demonstram cinco agentes independentes.
+- **1 → 14:** mudança real da composição observada; não prova mudança de regime.
+- **65,185 SOL:** exceção REST confirmada, sem evidência de que esse fosse o saldo no instante da conclusão. Não sustenta novo limiar.
+
+**O QUE EU FARIA DIFERENTE**
+
+Antes do teste de M-P33, mediria presença atual versus primeira presença histórica no board, confrontadas com conclusão/migração independentes. Para M-P33, agruparia a incerteza também por post: irmãos compartilham o mesmo choque de atenção.
+
+**CONCORDO COM**
+
+Priorizar o diagnóstico do instrumento, separar conclusão de retenção e manter todas as criações. O faucat mostra que uma moeda posterior pode destacar-se; não estabelece vantagem dos clones.
+
+**OBSIDIAN**
+
+- **Plantão MEME — 2026-09-12:** incorporar run 13 com denominadores corrigidos e limites das inferências.
+- **Hipóteses do plantão:** acrescentar M-P33 prospectiva; registrar divergência de cobertura em M-D2/M-D3 e preservar os estratos prévios de M-P17.
