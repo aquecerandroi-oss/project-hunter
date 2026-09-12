@@ -6,10 +6,10 @@ owner: quant-engineer
 exp: EXP-M3
 strategy: "meme/pumpfun — semi-comprado por hype: sonda de 1/5 do tamanho antes de a linha existir, escalada para a perna 2 quando a linha confirma (carteira paper, sem ordem real)"
 version: "gate sonda_de_hype v1 + saida alvo_3x_trailing_40_tempo_10m v1 + escala via trendline_v0/1 (conjunto hype_probe_v0/1, migração 0026)"
-result: nao-iniciado
-evaluable: 0
-days: 0
-last_eval: ""
+result: reprovada
+evaluable: 8
+days: 1
+last_eval: "2026-09-12"
 ---
 
 # EXP-M3 — a sonda de hype: semi-comprado antes de a linha existir, escalado quando ela confirma
@@ -146,6 +146,24 @@ no mesmo dia; a página fica.
 ## Avaliações (acrescentadas, nunca reescritas)
 
 *Nenhuma.* A página nasce em 2026-09-12 com `result: nao-iniciado`, `evaluable: 0`, `days: 0`.
+
+### Avaliação 2026-09-12 (T4.16, 15:xx BRT) — veredito `descartar`, conjunto `hype_probe_v0/1` aposentado
+
+**Coorte:** prospectiva na VPS, 12/09/2026 (o primeiro e único dia; SQL do caso e
+[[03-TRADING/Meme/Estudo-2026-09-12-21-apostas|estudo das 21 apostas]]). **Números:** 8 sondas fechadas, 8
+negativas (0 escalas — **P2** "a escala quase não acontece" confirmada por excesso: nenhuma linha nasceu com a sonda
+aberta). O que a sonda comprou: **giro de robô** — 44–53 compras/min **e** 32–48 vendas/min no minuto da entrada
+(vendas/compras 0,63–1,36 em 8/8), não demanda líquida; o dev despejou antes de 2 min em 5 das 8; entrada aos
+99–289 s de vida com decisão em minuto fechado. **C1 cumprido pelo lado errado:** o `hype_score` mede hype **ou**
+simulação de hype, e o que apareceu foi o segundo. **P1** (≥ 5 sondas/dia) confirmada; **P3** (−0,40…−0,05 R,
+ponto −0,20) — o medido é pior (todas negativas, várias no piso); **P5** (perda de fill ≥ 5 %) não medida.
+**Contra a régua:** 1 dia, 8 apostas — `inconclusivo` por população, `descartar` por desenho (o score sozinho
+não separa demanda de giro). **Decisão:** `descartar`; `hype_probe_v0/1` **aposentado por script auditado**
+(`infra/scripts/meme_rule_set.py --deprecate hype_probe_v0/1 --reason … --apply`). A sucessora é
+`hype_probe_v0/2` — a mesma sonda com as três condições de fluxo (`net_sol_flow > 0`, `unique_buyers ≥ 10`,
+`sells/buys ≤ 0,6`) somadas ao score — pré-registrada como braço 2 da [[EXP-M5-fluxo-e-holders]], com as
+exclusões de pedigree ([[EXP-M6-exclusoes-de-pedigree]]) na frente. Os braços moonshot ([[EXP-M4-moonshot]]),
+que usam esta porta verbatim, ganham o pedigree como pré-condição e ficam como estão (pré-registro próprio).
 
 ## Variantes tentadas
 

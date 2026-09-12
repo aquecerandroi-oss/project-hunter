@@ -62,6 +62,20 @@ describe("MemeTestsTable (dense record)", () => {
     fireEvent.click(screen.getByRole("button", { name: "expandir detalhes" }));
     expect(screen.getByText("compra manual — não nasceu de um minuto do Lab")).toBeInTheDocument();
   });
+
+  // T4.16: an `indeterminate` close has a `r_multiple` (the CHECK requires the
+  // number) but it is not trustworthy -- the API's own label replaces it.
+  it("shows the API's outcome_quality_label instead of R for an indeterminate close, muted", () => {
+    const indeterminate = testRow({
+      id: "indeterminate-1",
+      outcome_quality: "indeterminate",
+      outcome_quality_label: "indeterminado (sem fotografia)",
+      outcome_quality_reason: "no_snapshot_in_window",
+    });
+    render(<MemeTestsTable orgSlug="ever" rows={[indeterminate]} />);
+    expect(screen.getByText("indeterminado (sem fotografia)")).toBeInTheDocument();
+    expect(screen.queryByText("0.90 R")).not.toBeInTheDocument();
+  });
 });
 
 describe("MemeTestsCards (375 px)", () => {
@@ -95,5 +109,14 @@ describe("MemeTestsTotals", () => {
     render(<MemeTestsTotals totals={payload.totals} sources={payload.sources} />);
     expect(screen.getByText("sem cotação")).toBeInTheDocument();
     expect(screen.getByText("2 fechada(s) sem cotação SOL/USD na saída")).toBeInTheDocument();
+  });
+
+  // T4.16: `wins`/`losses`/`pnl_sol`/`pnl_usd`/`r_sum` count only `measured`
+  // closes -- `indeterminate` gets its own honest count next to them.
+  it("shows the day's indeterminate count apart from the measured totals", () => {
+    const payload = testsPayload({ totals: { ...testsPayload().totals, indeterminate: 4 } });
+    render(<MemeTestsTotals totals={payload.totals} sources={payload.sources} />);
+    expect(screen.getByText("Indeterminadas")).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
   });
 });

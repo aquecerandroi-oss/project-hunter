@@ -111,6 +111,10 @@ class BetRow:
     mark_stale_s: int | None = None
     """``0029`` (T4.11): what priced the mark and how stale the tape was; ``None``
     on a row mapped without the columns — never a fabricated ``curve``."""
+    outcome_quality: str | None = None
+    outcome_quality_reason: str | None = None
+    """``0030`` (T4.16): ``measured`` | ``indeterminate`` with its reason;
+    ``None`` on a row mapped without the columns — never a fabricated ``measured``."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -292,6 +296,10 @@ def bet_from_mapping(r: RowMapping) -> BetRow:
         parent_bet_id=r.get("parent_bet_id"),
         mark_source=None if r.get("mark_source") is None else str(r["mark_source"]),
         mark_stale_s=None if r.get("mark_stale_s") is None else int(r["mark_stale_s"]),
+        outcome_quality=None if r.get("outcome_quality") is None else str(r["outcome_quality"]),
+        outcome_quality_reason=(
+            None if r.get("outcome_quality_reason") is None else str(r["outcome_quality_reason"])
+        ),
     )
 
 

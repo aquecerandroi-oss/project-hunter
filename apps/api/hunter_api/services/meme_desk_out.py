@@ -1,12 +1,9 @@
 """Repository rows → ``schemas/meme_desk.py`` payloads, and the one piece of
-pricing the API does itself: a manual proposal's ``quote`` (T4.7).
-
-Split out of ``services/meme_desk.py`` for the 350-line budget (the way
-``orders_derive.py`` backs ``orders.py``): this module derives and maps.
-
-**JSONB is read tolerantly.** ``suggested``/``decision``/``params``/``entry``
-/``exit``/``quote`` are the loop's (T4.6) or this API's own writes; a missing
-key is ``None`` in the payload — never ``0``, never a guess (DESIGN.md §2).
+pricing the API does itself: a manual proposal's ``quote`` (T4.7). Split out
+of ``services/meme_desk.py`` for the 350-line budget: this module derives and
+maps. **JSONB is read tolerantly** — ``suggested``/``decision``/``params``/
+``entry``/``exit``/``quote`` are the loop's (T4.6) or this API's own writes; a
+missing key is ``None`` in the payload, never ``0``, never a guess (DESIGN.md §2).
 """
 
 from __future__ import annotations
@@ -275,6 +272,9 @@ def _bet_out(bet: BetRow) -> BetOut:
         parent_bet_id=bet.parent_bet_id,
         mark_source=bet.mark_source,
         mark_stale_s=bet.mark_stale_s,
+        outcome_quality=bet.outcome_quality,
+        outcome_quality_reason=bet.outcome_quality_reason,
+        decision_to_fill_s=_int_or_none(bet.entry.get("decision_to_fill_s")),
     )
 
 

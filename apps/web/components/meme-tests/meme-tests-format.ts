@@ -5,7 +5,8 @@
  * (`/meme/testes` and `/meme/mesa?tab=testes`). No React, no fetch --
  * `tests/meme-tests-format.test.ts`.
  */
-import { formatDuration } from "@/components/meme-desk/meme-desk-format";
+import { outcomeQualityLabel } from "@/components/meme-desk/labels";
+import { formatDuration, formatR } from "@/components/meme-desk/meme-desk-format";
 import type { MemeTestRow } from "@/lib/api/meme-tests-types";
 import { formatMoney } from "@/lib/format";
 import { formatBrasiliaLong } from "@/lib/time";
@@ -87,4 +88,21 @@ export function betDetailHref(orgSlug: string, betId: string): string {
 /** "wallet:6nAh8drz" reads as "REAL · carteira 6nAh8drz"; every other set is the experiment's own name (`meme_paper_v0/1`). */
 export function ruleSetLabel(label: string): string {
   return label.startsWith("wallet:") ? `REAL · carteira ${label.slice("wallet:".length)}` : label;
+}
+
+export interface RMultipleView {
+  text: string;
+  /** `true` for both "sem leitura" (`—`) and `indeterminate` -- neither is a win/loss color. */
+  muted: boolean;
+}
+
+/**
+ * T4.16: an `indeterminate` row's `r_multiple` exists (the CHECK requires the
+ * number) but is not trustworthy -- the API's own `outcome_quality_label`
+ * replaces it, muted, everywhere an R prints (the dense table, the cards,
+ * the bet's own record page).
+ */
+export function rMultipleView(row: Pick<MemeTestRow, "r_multiple" | "outcome_quality" | "outcome_quality_label">): RMultipleView {
+  if (row.outcome_quality === "indeterminate") return { text: row.outcome_quality_label ?? outcomeQualityLabel("indeterminate"), muted: true };
+  return row.r_multiple === null ? { text: "—", muted: true } : { text: formatR(row.r_multiple), muted: false };
 }

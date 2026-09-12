@@ -26,7 +26,10 @@ if TYPE_CHECKING:
     from testcontainers.community.postgres import PostgresContainer
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-MIGRATIONS_DIR = REPO_ROOT / "infra" / "migrations"
+MIGRATIONS_DIR = Path(os.environ.get("HUNTER_MIGRATIONS_DIR") or REPO_ROOT / "infra" / "migrations")
+"""``HUNTER_MIGRATIONS_DIR`` (T4.16): a scratch copy of ``infra/migrations`` to
+prove a revision while a parallel task's revision still points at the old
+head; unset (the default, and CI's) is the tree itself."""
 
 
 def _docker_reachable() -> bool:

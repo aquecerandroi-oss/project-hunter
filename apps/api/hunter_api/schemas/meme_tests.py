@@ -54,6 +54,16 @@ PROVISIONAL_EXIT_LABEL = "aberta — marca atual (saída provisória)"
 UNKNOWN_EXIT_LABEL = "motivo não previsto"
 NO_EXIT_LABEL = "saída sem motivo registrado"
 
+OUTCOME_QUALITY_PT: Final[dict[str, str]] = {
+    "measured": "medido",
+    "indeterminate": "indeterminado (sem fotografia)",
+}
+"""``meme_paper_bets.outcome_quality`` (``0030``, T4.16) → Portuguese, the
+brief's own words: an ``indeterminate`` close is left out of every sum and
+counted apart. A row read from a database below ``0030`` has no quality and
+no label — never a fabricated "medido"."""
+UNKNOWN_QUALITY_LABEL = "qualidade não registrada"
+
 TestKind = Literal["paper", "real_observed"]
 WalletsSource = Literal["observada", "não observada", "leitura indisponível"]
 """Brief: when ``meme_wallet_positions`` (T4.12) does not exist the payload
@@ -166,18 +176,27 @@ class TestRowOut(BaseModel):
     lab_context: LabContextOut
     wallet: str | None
     mark_source: str | None
+    outcome_quality: str | None = None
+    outcome_quality_label: str | None = None
+    outcome_quality_reason: str | None = None
+    """``0030`` (T4.16): ``measured`` | ``indeterminate`` and its Portuguese
+    label; ``None`` on a row older than the column (or a REAL row)."""
 
 
 class TestsTotalsOut(BaseModel):
-    """The day's totals over **every** row of the filter, not only the page."""
+    """The day's totals over **every** row of the filter, not only the page.
+    Since T4.16 ``wins``/``losses``/``pnl_sol``/``pnl_usd``/``r_sum`` count
+    **measured** closes only; ``indeterminate`` counts the rest apart."""
 
     bets: int
     closed: int
     open: int
     wins: int
     losses: int
+    indeterminate: int = 0
+    """Closes the instrument could not price ("indeterminado (sem fotografia)")."""
     pnl_sol: DecimalStr
-    """Realized: closed bets only."""
+    """Realized: measured closed bets only."""
     provisional_pnl_sol: DecimalStr
     """Open bets at their last mark — what a sell at that photograph would net."""
     pnl_usd: DecimalStr | None
@@ -227,9 +246,11 @@ __all__ = [
     "EXIT_REASON_PT",
     "MEME_TESTS_LABEL",
     "NO_EXIT_LABEL",
+    "OUTCOME_QUALITY_PT",
     "PROVISIONAL_EXIT_LABEL",
     "REAL_OBSERVED_LABEL",
     "UNKNOWN_EXIT_LABEL",
+    "UNKNOWN_QUALITY_LABEL",
     "LabContextOut",
     "LabContextReason",
     "PnlUsdBasis",

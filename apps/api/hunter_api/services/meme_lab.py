@@ -82,6 +82,7 @@ def day_score_out(row: DayScoreRow) -> DayScoreOut:
             value=row.max_drawdown_sol, reason=None if closed else "no_closed_bets"
         ),
         rugs=row.rugs,
+        indeterminate=row.indeterminate,
     )
 
 

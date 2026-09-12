@@ -287,6 +287,14 @@ def restore_scoreboard_0022() -> None:
     recreate_scoreboard_0022()
 
 
+def recreate_scoreboard_0027() -> None:
+    """The board exactly as ``0027`` shipped it, with its grants — what the
+    downgrade of ``0030_meme_gate_v2`` puts back after dropping the wider one
+    (the ``recreate_scoreboard_0022`` precedent, one revision later)."""
+    op.execute(_SCOREBOARD_0027)
+    op.execute(f"GRANT SELECT ON {MEME_LAB_SCOREBOARD_VIEW} TO {APP_ROLE}, {WORKER_ROLE}")
+
+
 def drop_meme_wallet_tables() -> None:
     for table in reversed(MEME_WALLET_TABLES_0027):
         op.execute(f"DROP TABLE IF EXISTS {table}")

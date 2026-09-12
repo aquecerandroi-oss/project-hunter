@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { formatR, formatSolSigned, signClass } from "@/components/meme-desk/meme-desk-format";
+import { formatSolSigned, signClass } from "@/components/meme-desk/meme-desk-format";
 import { MemeCurveChart } from "@/components/meme/meme-curve-chart";
 import type { SignalMark } from "@/components/meme/meme-graduation-signals";
 import { formatSol } from "@/components/meme/meme-format";
@@ -9,7 +9,7 @@ import type { MemeTestDetail, MemeTestRow } from "@/lib/api/meme-tests-types";
 import { formatBrasiliaDate } from "@/lib/time";
 
 import { MemeTestRowDetail } from "./meme-test-row-detail";
-import { formatDurationSeconds, formatUsdSigned, ruleSetLabel, testsHref } from "./meme-tests-format";
+import { formatDurationSeconds, formatUsdSigned, rMultipleView, ruleSetLabel, testsHref } from "./meme-tests-format";
 
 export interface BetRecordProps {
   orgSlug: string;
@@ -41,6 +41,7 @@ function StatCard({ title, children }: { title: string; children: React.ReactNod
 }
 
 function BetStats({ row }: { row: MemeTestRow }) {
+  const r = rMultipleView(row);
   return (
     <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
       <StatCard title="Entrada">
@@ -56,7 +57,7 @@ function BetStats({ row }: { row: MemeTestRow }) {
         <p className={`font-mono text-sm tabular-nums ${row.pnl_usd === null ? "text-fg-subtle" : signClass(row.pnl_usd)}`}>{row.pnl_usd === null ? "sem cotação" : formatUsdSigned(row.pnl_usd)}</p>
       </StatCard>
       <StatCard title="R · duração">
-        <p className={`font-mono text-lg font-semibold tabular-nums ${signClass(row.r_multiple)}`}>{row.r_multiple === null ? "—" : formatR(row.r_multiple)}</p>
+        <p className={`font-mono text-lg font-semibold tabular-nums ${r.muted ? "text-fg-muted" : signClass(row.r_multiple)}`}>{r.text}</p>
         <p className="font-mono text-sm tabular-nums text-fg-muted">{formatDurationSeconds(row.duration_s)}</p>
       </StatCard>
     </section>

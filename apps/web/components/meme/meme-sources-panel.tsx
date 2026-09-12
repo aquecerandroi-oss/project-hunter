@@ -21,6 +21,7 @@ import type { MemeSources } from "@/lib/api/meme-types";
 
 import {
   BLINDNESS_SENTENCE,
+  fastLaneLine,
   type Gauge,
   minuteFlags,
   type RadarState,
@@ -132,13 +133,15 @@ interface ViewProps {
   radar: RadarState;
   loop: ReturnType<typeof loopStateLabel> | null;
   flags: string[];
+  /** T4.16: the 15-second clock's counters and the decision→fill latency; `null` on a worker that predates them. */
+  fastLane: string | null;
 }
 
 function radarTitle(sources: MemeSources): string {
   return [`heartbeat do worker (UTC): ${sources.heartbeat_ts ?? "sem leitura"}`, `campos do radar (UTC): ${sources.sources_at ?? "sem leitura"}`].join("\n");
 }
 
-function FullPanel({ sources, chips, gauges, radar, loop, flags }: ViewProps) {
+function FullPanel({ sources, chips, gauges, radar, loop, flags, fastLane }: ViewProps) {
   return (
     <section aria-labelledby="meme-sources-heading" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -173,11 +176,12 @@ function FullPanel({ sources, chips, gauges, radar, loop, flags }: ViewProps) {
           <GaugeCard key={gauge.key} gauge={gauge} />
         ))}
       </div>
+      {fastLane && <p className="font-mono text-[11px] tabular-nums text-fg-subtle">{fastLane}</p>}
     </section>
   );
 }
 
-function LinePanel({ sources, chips, gauges, radar, loop, flags }: ViewProps) {
+function LinePanel({ sources, chips, gauges, radar, loop, flags, fastLane }: ViewProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-fg-muted">
       <span className="font-medium text-fg">Fontes</span>
@@ -192,6 +196,11 @@ function LinePanel({ sources, chips, gauges, radar, loop, flags }: ViewProps) {
           {flag}
         </span>
       ))}
+      {fastLane && (
+        <span className="font-mono tabular-nums" title={fastLane}>
+          15 s: {fastLane}
+        </span>
+      )}
       <span>
         consultado em <BrasiliaShort iso={sources.as_of} />
       </span>
@@ -215,6 +224,7 @@ export function MemeSourcesPanel({ sources, loop, variant = "full" }: MemeSource
     // The API's own clock, so the loop's age is measured against the same instant as the heartbeat's.
     loop: loop ? loopStateLabel(loop, new Date(sources.as_of).getTime()) : null,
     flags: minuteFlags(sources),
+    fastLane: fastLaneLine(sources),
   };
   return variant === "line" ? <LinePanel {...view} /> : <FullPanel {...view} />;
 }

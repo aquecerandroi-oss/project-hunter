@@ -103,6 +103,9 @@ class DayScoreOut(BaseModel):
     avg_r: NullableDecimalOut
     max_drawdown_sol: NullableDecimalOut
     rugs: int
+    indeterminate: int = 0
+    """``0030`` (T4.16): closes the instrument could not price ("indeterminado
+    (sem fotografia)"), left out of ``wins``/``pnl_sol``/``r_sum`` and counted here."""
 
 
 class RuleSetBoardOut(BaseModel):

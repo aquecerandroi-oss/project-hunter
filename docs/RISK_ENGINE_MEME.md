@@ -589,6 +589,18 @@ Nada de "preenchido ao último preço visto".
    o que uma venda inteira renderia agora, taxas incluídas. Round-trip compra→venda sem movimento de
    terceiros perde **exatamente** taxas + impacto próprio — nunca lucro.
 
+7. **Fill na fotografia de 15 s e o desfecho indeterminado (T4.16).** Para as moedas com menos de 5 minutos o
+   relógio do papel é o laço `meme-fast` (uma fotografia da curva a cada 15 s, `meme_features_15s`): a porta é
+   avaliada **por fotografia** (só com o que tinha chegado até `as_of` — `received_at <= as_of`, nunca o
+   futuro) e o fill continua sendo a **primeira** fotografia com `observed_at > decided_at`, que agora chega em
+   15 s, não no minuto seguinte (`decision_to_fill_s` medido por aposta e publicado como p50/p95 no
+   heartbeat — nunca assumido pela cadência). A regra do item 4 não muda: sem fotografia posterior em 3 min,
+   **não há fill**; e uma **venda** sem fotografia em 3 min fecha a zero na linha (`rug_no_snapshot`, o
+   resultado plausível do §5) mas com `outcome_quality = indeterminate`: a linha mantém o −1 R e **nenhuma
+   soma** (placar, mesa, fechamento diário, a carteira do laço e o teto diário) o conta — o instrumento piscou,
+   o mercado não falou. A reclassificação de linhas antigas é ato auditado
+   (`infra/scripts/meme_reclassify_indeterminate.py --apply --reason`), nunca edição à mão.
+
 ## 11. VM1–VM9 — as nove verificações do motor meme
 
 Equivalente das V1–V9 da T3.9 (`.claude/state/spec-T3.9-verificacoes.md`,

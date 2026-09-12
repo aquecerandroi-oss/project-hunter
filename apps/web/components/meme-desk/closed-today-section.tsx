@@ -5,7 +5,7 @@ import { BrasiliaShort } from "@/components/time/brasilia-instant";
 import type { MemeDeskRow } from "@/lib/api/meme-desk-types";
 
 import { BetLegBadge, betAnchorId } from "./bet-leg";
-import { exitReasonLabel, proposalStatusLabel, refusalLabel } from "./labels";
+import { decisionToFillLabel, exitReasonLabel, outcomeQualityLabel, proposalStatusLabel, refusalLabel } from "./labels";
 import { formatR, formatSolSigned, signClass } from "./meme-desk-format";
 
 export interface ClosedTodaySectionProps {
@@ -39,11 +39,14 @@ export function ClosedTodaySection({ orgSlug, rows, knownBetIds = [] }: ClosedTo
                   <span className="ml-2 text-fg-muted">
                     {exitReasonLabel(bet.exit_reason)} · saiu {bet.exit_at ? <BrasiliaShort iso={bet.exit_at} /> : "—"}
                     {bet.sol_spent ? ` · entrou com ${formatSol(bet.sol_spent)}` : ""}
+                    {decisionToFillLabel(bet.decision_to_fill_s) ? ` · ${decisionToFillLabel(bet.decision_to_fill_s)}` : ""}
                   </span>
                 </span>
                 <span className="font-mono tabular-nums">
                   <span className={signClass(bet.pnl_sol)}>{bet.pnl_sol ? formatSolSigned(bet.pnl_sol) : "PnL não informado"}</span>
-                  <span className="ml-2 text-fg-muted">{bet.r_multiple ? formatR(bet.r_multiple) : ""}</span>
+                  <span className="ml-2 text-fg-muted" title={bet.outcome_quality === "indeterminate" ? (bet.outcome_quality_reason ?? undefined) : undefined}>
+                    {bet.outcome_quality === "indeterminate" ? outcomeQualityLabel(bet.outcome_quality) : bet.r_multiple ? formatR(bet.r_multiple) : ""}
+                  </span>
                 </span>
               </li>
             );

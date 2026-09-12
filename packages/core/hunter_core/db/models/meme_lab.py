@@ -35,6 +35,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from hunter_core.db.base import Base, UUIDPrimaryKeyMixin
 from hunter_core.db.models._common import JSONB_EMPTY, JSONB_EMPTY_LIST
+from hunter_core.db.models.meme_lab_commands import MemeOperatorCommand
 
 RULE_SET_KINDS = ("research_only", "operator")
 """``research_only``: the loop approves its own proposals (paper, EXP-M*).
@@ -69,6 +70,15 @@ the second leg that scales it ("escalado (perna 2)", which names its
 MARK_SOURCES = ("curve", "pool_tape")
 """``meme_paper_bets.mark_source`` (``0029``): what priced the last mark — the
 curve's snapshot, or the PumpSwap pool's last trade after the migration."""
+
+OUTCOME_QUALITIES = ("measured", "indeterminate")
+"""``meme_paper_bets.outcome_quality`` (``0030``, T4.16): ``measured`` is a
+result the simulator priced on an observation; ``indeterminate`` is a close
+the instrument could not price (``rug_no_snapshot``: no photo to sell into
+inside the window — the coin did not die, the radar blinked). The row keeps
+its numbers (``pnl_sol = −stake``, the CHECK demands them); the scoreboard,
+the desk, the wallet of the loop and the daily close **exclude** it from
+every sum of R/PnL and count it apart ("indeterminado (sem fotografia)")."""
 
 OPERATOR_COMMANDS = ("sell_now", "cancel")
 
@@ -239,6 +249,20 @@ class MemePaperBet(Base, UUIDPrimaryKeyMixin):
         CheckConstraint(
             "mark_stale_s IS NULL OR mark_stale_s >= 0", name="mark_stale_s_is_not_negative"
         ),
+        # 0030 — the quality of the outcome (T4.16).
+        CheckConstraint(
+            "outcome_quality IN ('measured', 'indeterminate')",
+            name="outcome_quality_is_a_known_label",
+        ),
+        CheckConstraint(
+            "outcome_quality = 'measured' OR status = 'closed'",
+            name="an_indeterminate_bet_is_closed",
+        ),
+        CheckConstraint(
+            "(outcome_quality = 'indeterminate') = (outcome_quality_reason IS NOT NULL) "
+            "AND (outcome_quality = 'indeterminate') = (outcome_quality_at IS NOT NULL)",
+            name="an_indeterminate_outcome_names_its_reason",
+        ),
     )
 
     proposal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("meme_proposals.id"))
@@ -286,46 +310,15 @@ class MemePaperBet(Base, UUIDPrimaryKeyMixin):
     """Seconds the pool's tape had been silent when the mark was refreshed
     (the desk's "marca envelhecida há Ns"); the ``dead`` rule reads it."""
 
+    # --- 0030: the quality of the outcome (T4.16) --------------------------------
+    outcome_quality: Mapped[str] = mapped_column(Text, server_default=text("'measured'"))
+    """``measured`` | ``indeterminate`` (:data:`OUTCOME_QUALITIES`); every bet
+    written before ``0030`` is ``measured`` by default — the audited script
+    ``infra/scripts/meme_reclassify_indeterminate.py`` is the only way a past
+    ``rug_no_snapshot`` becomes ``indeterminate``, with its reason and instant."""
 
-class MemeOperatorCommand(Base, UUIDPrimaryKeyMixin):
-    """An operator's order over an open bet (``sell_now``) or a pending
-    proposal (``cancel``). Written by the API, applied by the loop."""
-
-    __tablename__ = "meme_operator_commands"
-    __table_args__ = (
-        Index(
-            "ix_meme_operator_commands_pending",
-            "issued_at",
-            postgresql_where=text("applied_at IS NULL"),
-        ),
-        CheckConstraint("command IN ('sell_now', 'cancel')", name="command_is_a_known_label"),
-        CheckConstraint("(bet_id IS NULL) <> (proposal_id IS NULL)", name="exactly_one_target"),
-        CheckConstraint("command <> 'sell_now' OR bet_id IS NOT NULL", name="a_sale_targets_a_bet"),
-        CheckConstraint(
-            "command <> 'cancel' OR proposal_id IS NOT NULL", name="a_cancel_targets_a_proposal"
-        ),
-        CheckConstraint(
-            "(applied_at IS NULL) = (result IS NULL)", name="an_application_says_what_happened"
-        ),
-        CheckConstraint("char_length(issued_by) > 0", name="issuer_is_not_empty"),
-    )
-
-    bet_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey(
-            "meme_paper_bets.id",
-            use_alter=True,
-            name="fk_meme_proposals_bet_id_meme_paper_bets",
-        )
-    )
-    """Closes the cycle proposals -> bets -> proposals; ``use_alter`` because a
-    cycle cannot be sorted, and the DDL adds it with ``ALTER TABLE`` after both
-    tables exist (``ddl/meme_lab.py``)."""
-    proposal_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("meme_proposals.id"))
-    command: Mapped[str] = mapped_column(Text)
-    issued_by: Mapped[str] = mapped_column(Text)
-    issued_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    applied_at: Mapped[datetime | None]
-    result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    outcome_quality_reason: Mapped[str | None] = mapped_column(Text)
+    outcome_quality_at: Mapped[datetime | None]
 
 
 __all__ = [
@@ -333,6 +326,7 @@ __all__ = [
     "BET_LEGS",
     "MARK_SOURCES",
     "OPERATOR_COMMANDS",
+    "OUTCOME_QUALITIES",
     "PROPOSAL_STATUSES",
     "RULE_SET_KINDS",
     "MemeOperatorCommand",

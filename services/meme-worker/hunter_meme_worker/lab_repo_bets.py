@@ -29,12 +29,14 @@ from hunter_meme_worker.lab_models import (
     decimal_of,
 )
 from hunter_meme_worker.lab_rows import ApprovedProposal, OpenBet, snapshot_from_row
+from hunter_meme_worker.lab_values import INDETERMINATE
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 __all__ = [
     "close_bet_row",
+    "count_indeterminate",
     "first_snapshot_after",
     "load_open_bets",
     "mark_filled",
@@ -59,8 +61,10 @@ _SNAPSHOTS_AFTER = text(
 )
 
 _WALLET = text(
-    "SELECT coalesce(sum(pnl_sol) FILTER (WHERE status = 'closed'), 0) AS realized_total, "
+    "SELECT coalesce(sum(pnl_sol) FILTER (WHERE status = 'closed' "
+    "                AND outcome_quality = 'measured'), 0) AS realized_total, "
     "       coalesce(sum(pnl_sol) FILTER (WHERE status = 'closed' "
+    "                AND outcome_quality = 'measured' "
     "                AND exit_at >= :day_start AND exit_at < :day_end), 0) AS realized_today, "
     "       coalesce(sum(initial_risk_sol) FILTER (WHERE status = 'open'), 0) AS open_exposure, "
     "       count(*) FILTER (WHERE status = 'open' AND leg <> 'scale') AS open_positions "
@@ -68,7 +72,13 @@ _WALLET = text(
 )
 """``open_positions`` counts the legs that take a slot of ``max_open_positions``
 (``probe`` and ``single``): a ``scale`` leg rides on its probe's slot (T4.10 —
-the brief's ceiling is "máximo 5 sondas abertas"). Exposure counts every leg."""
+the brief's ceiling is "máximo 5 sondas abertas"). Exposure counts every leg.
+Realized sums count **measured** closes only (T4.16, ``0030``): on 12/09 five
+``rug_no_snapshot`` artefacts summed −0,25 SOL, past the 0,20 daily cap — the
+instrument, not the market, would have latched the Lab shut."""
+_INDETERMINATE = text(
+    "SELECT count(*) FROM meme_paper_bets WHERE outcome_quality = 'indeterminate'"
+)
 _EXPOSURE = text(
     "SELECT mint, sum(initial_risk_sol) AS exposure FROM meme_paper_bets "
     "WHERE rule_set_id = :rule_set_id AND status = 'open' GROUP BY mint"
@@ -113,9 +123,14 @@ _CLOSE_BET = text(
     "  pnl_sol = :pnl_sol, r_multiple = :r_multiple, sol_usd_at_exit = :sol_usd_at_exit, "
     "  mark_sol = :mark_sol, mark_at = :exit_at, mark_stale_s = NULL, "
     "  mark_source = coalesce(:mark_source, mark_source), "
-    "  exit_intent = coalesce(CAST(:exit_intent AS jsonb), exit_intent) "
+    "  exit_intent = coalesce(CAST(:exit_intent AS jsonb), exit_intent), "
+    "  outcome_quality = :outcome_quality, outcome_quality_reason = :outcome_quality_reason, "
+    "  outcome_quality_at = :outcome_quality_at "
     "WHERE id = :id AND status = 'open'"
 )
+"""``outcome_quality_at`` is bound on its own (the close's instant, or ``NULL``
+for a measured close): a ``CASE … THEN :exit_at END`` would make asyncpg
+deduce ``text`` for the parameter it shares with ``exit_at``."""
 
 
 async def first_snapshot_after(
@@ -272,5 +287,16 @@ async def close_bet_row(
             "sol_usd_at_exit": closed.sol_usd_at_exit,
             "mark_sol": Decimal(closed.exit.get("sol_received", "0")),
             "mark_source": mark_source,
+            "outcome_quality": closed.outcome_quality,
+            "outcome_quality_reason": closed.outcome_quality_reason,
+            "outcome_quality_at": (
+                closed.exit_at if closed.outcome_quality == INDETERMINATE else None
+            ),
         },
     )
+
+
+async def count_indeterminate(session: AsyncSession) -> int:
+    """Every bet closed without a photo to price it — the heartbeat's
+    ``lab_bets_indeterminate_total``, from the rows, never from memory."""
+    return int(await session.scalar(_INDETERMINATE) or 0)

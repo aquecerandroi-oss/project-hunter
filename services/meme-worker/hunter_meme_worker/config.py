@@ -97,8 +97,32 @@ class MemeConfig:
     that looks alive and proposes nothing. Off is for an operator who wants the
     collector without the loop, and the readiness body says so."""
 
-    lab_cycle_s: float = 60.0
-    """One tick per minute — the cadence of the closed minute it reads."""
+    lab_cycle_s: float = 15.0
+    """One tick every 15 s since T4.16 — the cadence of the 15-second series
+    the flow gate reads and of the photo a young mint's fill or sale waits
+    for. The closed-minute gate still runs once per closed minute
+    (``closed_minutes`` yields nothing between two closes); fills, marks,
+    exits and the heartbeat happen four times a minute."""
+
+    lab_fast_backlog_s: int = 45
+    """The 15-second gate reads rows with ``as_of`` inside the last 45 s not
+    yet evaluated by this process: a proposal on an older instant would be
+    priced against a curve that already moved twice."""
+
+    fast_lane_enabled: bool = True
+    """``MEME_FAST_LANE_ENABLED`` (T4.16): the 15-second chain clock for the
+    mints younger than ``fast_lane_max_age_s`` (``fast_lane.py``). Needs the
+    chain loop (``chain_curves_enabled``); off, the young mints are read once
+    a minute like the rest and ``meme_features_15s`` stays empty, which the
+    heartbeat says (``fast_lane_mints`` empty)."""
+
+    fast_lane_cycle_s: float = 15.0
+    fast_lane_max_age_s: int = 300
+    """Mints with a known creation time younger than five minutes: ≤ 2
+    ``getMultipleAccounts`` + ≤ 2 ``getBlockTime`` a read, four reads a
+    minute — inside the public RPC's 100 req/10 s and its 10/10 s per method."""
+
+    features_15s_version: str = "meme_features_15s_v1"
 
     lab_proposal_ttl_s: int = 120
     """``expires_at = proposed_at + 120 s`` (contract): memes move fast."""
@@ -256,6 +280,7 @@ def load_config(settings: Settings) -> MemeConfig:
         trades_concurrency=max(1, _int_env("MEME_TRADES_CONCURRENCY", 2)),
         risk_enabled=_bool_env("MEME_RISK_ENABLED", default=True),
         chain_curves_enabled=_bool_env("MEME_CHAIN_CURVES_ENABLED", default=True),
+        fast_lane_enabled=_bool_env("MEME_FAST_LANE_ENABLED", default=True),
         rest_mayhem_refresh_s=max(60, _int_env("MEME_REST_MAYHEM_REFRESH_S", 300)),
         watch_wallets=_wallets_env("MEME_WATCH_WALLETS"),
     )

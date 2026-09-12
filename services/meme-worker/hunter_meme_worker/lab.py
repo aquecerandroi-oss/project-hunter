@@ -23,12 +23,11 @@ and the cached SOL/USD quote. Everything that matters is a row.
 
 from __future__ import annotations
 
-import json
-from collections import Counter
+from collections import Counter, deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Protocol
 from zoneinfo import ZoneInfo
 
 from hunter_core.db.session import role_session
@@ -36,6 +35,8 @@ from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
 from hunter_meme_worker.collect import minute_end
 from hunter_meme_worker.lab_bets import BetsReport, FillReport, fill_approved, process_open_bets
+from hunter_meme_worker.lab_fast import fast_gate_step
+from hunter_meme_worker.lab_heartbeat import HEARTBEAT_PREFIX, heartbeat_fields, write_lab_heartbeat
 from hunter_meme_worker.lab_models import RuleSetSpec, SolUsd
 from hunter_meme_worker.lab_repo import (
     apply_command,
@@ -47,9 +48,25 @@ from hunter_meme_worker.lab_repo import (
     open_mints_for,
     pending_commands,
 )
+from hunter_meme_worker.lab_repo_bets import count_indeterminate
+from hunter_meme_worker.lab_repo_fast import pedigree_for
 from hunter_meme_worker.lab_repo_lines import open_probes_for, scaled_parent_ids
+from hunter_meme_worker.lab_ticks import record_tick
 from hunter_meme_worker.proposals import evaluate_gate
 from hunter_meme_worker.proposals_scale import REFUSAL_SCALE_GATE_INACTIVE, evaluate_scale
+
+__all__ = [
+    "HEARTBEAT_PREFIX",
+    "LabContext",
+    "LabState",
+    "TickReport",
+    "brasilia_day_bounds",
+    "closed_minutes",
+    "heartbeat_fields",
+    "lab_once",
+    "lab_tick",
+    "write_lab_heartbeat",
+]
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -62,7 +79,6 @@ logger = get_logger(__name__)
 
 WORKER_ROLE = "hunter_worker"
 SAO_PAULO = ZoneInfo("America/Sao_Paulo")
-HEARTBEAT_PREFIX = "lab_"
 
 
 class SolUsdSource(Protocol):
@@ -90,6 +106,21 @@ class LabState:
     bets_open: int = 0
     sol_usd: SolUsd | None = None
     sol_usd_error: str | None = None
+    # T4.16: the 15-second gate, the measured decision-to-fill, the indeterminate closes.
+    last_fast_as_of: datetime | None = None
+    fast_rows_evaluated: int = 0
+    fast_proposals_total: int = 0
+    fill_delays: deque[int] = field(default_factory=lambda: deque(maxlen=FILL_DELAY_SAMPLE))
+    """``entry.decision_to_fill_s`` of the last fills this process made — the
+    sample ``lab_decision_to_fill_s_p50``/``_p95`` are taken over (measured,
+    never the cadence assumed)."""
+    bets_indeterminate_total: int | None = None
+
+    def record_fill_delay(self, seconds: int) -> None:
+        self.fill_delays.append(seconds)
+
+
+FILL_DELAY_SAMPLE = 200
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,15 +206,20 @@ async def _cancel_step(ctx: LabContext, *, now: datetime) -> int:
 
 async def _gate_step(
     ctx: LabContext, specs: list[RuleSetSpec], minutes: list[datetime], *, now: datetime
-) -> tuple[int, int]:
+) -> tuple[int, int, dict[str, Counter[str]]]:
+    """The closed-minute gate for the sets on the minute clock; the refusal
+    counters come back so the 15-second step adds to them (T4.16)."""
     rows_total = proposals_total = 0
     refusals: dict[str, Counter[str]] = {spec.name: Counter() for spec in specs}
+    minute_specs = [spec for spec in specs if spec.clock == "1m"]
     for minute in minutes:
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
             rows = await load_gate_rows(
                 session, minute=minute, features_version=ctx.config.features_version
             )
-            for spec in specs:
+            # T4.16 (EXP-M6): the pedigree of the minute's mints, read once.
+            pedigree = await pedigree_for(session, sorted({row.mint for row in rows}))
+            for spec in minute_specs:
                 already_open = await open_mints_for(session, spec.id)
                 outcome = evaluate_gate(
                     spec,
@@ -191,14 +227,14 @@ async def _gate_step(
                     now=now,
                     ttl_s=ctx.config.lab_proposal_ttl_s,
                     already_open=already_open,
+                    pedigree=pedigree,
                 )
                 refusals[spec.name].update(outcome.refusals)
                 rows_total += outcome.evaluated
                 proposals_total += await insert_proposals(session, outcome.drafts)
             proposals_total += await _scale_step(ctx, session, specs, rows, refusals, now=now)
         ctx.state.last_gate_minute = minute
-    ctx.state.refusals = {name: dict(counter) for name, counter in refusals.items()}
-    return rows_total, proposals_total
+    return rows_total, proposals_total, refusals
 
 
 async def _scale_step(
@@ -247,66 +283,42 @@ async def lab_tick(ctx: LabContext, *, now: datetime | None = None) -> TickRepor
         expired = await expire_proposals(session, now=now)
     cancelled = await _cancel_step(ctx, now=now)
     minutes = closed_minutes(ctx.state, now, backlog=ctx.config.lab_gate_backlog_minutes)
-    rows, proposals = await _gate_step(ctx, specs, minutes, now=now)
+    rows, proposals, refusals = await _gate_step(ctx, specs, minutes, now=now)
+    fast_rows, fast_proposals = await fast_gate_step(ctx, specs, refusals, now=now)
+    ctx.state.refusals = {name: dict(counter) for name, counter in refusals.items()}
     fills = await fill_approved(
         ctx, {spec.id: spec for spec in specs}, now=now, day_start=day_start, day_end=day_end
     )
     bets = await process_open_bets(ctx, now=now)
+    async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
+        indeterminate = await count_indeterminate(session)
     state = ctx.state
     state.last_tick_at = now
     state.last_tick_minute = minutes[-1] if minutes else state.last_tick_minute
     state.rule_sets_active = len(specs)
     state.rows_evaluated = rows
-    state.proposals_last_tick = proposals
-    state.proposals_total += proposals
+    state.proposals_last_tick = proposals + fast_proposals
+    state.proposals_total += proposals + fast_proposals
+    state.fast_rows_evaluated = fast_rows
+    state.fast_proposals_total += fast_proposals
     state.fills_total += fills.filled
     state.unfilled_total += fills.unfilled
     state.closes_total += bets.closed
     state.bets_open = bets.open
-    await write_lab_heartbeat(ctx)
-    return TickReport(
+    state.bets_indeterminate_total = indeterminate
+    report = TickReport(
         minute=state.last_tick_minute,
         minutes_evaluated=len(minutes),
-        rows_evaluated=rows,
-        proposals=proposals,
+        rows_evaluated=rows + fast_rows,
+        proposals=proposals + fast_proposals,
         expired=expired,
         cancelled=cancelled,
         fills=fills,
         bets=bets,
     )
-
-
-def heartbeat_fields(state: LabState, *, enabled: bool = True) -> dict[str, str]:
-    """The ``lab_*`` fields — strings, like every heartbeat field of the repo."""
-    quote = state.sol_usd
-    fields: dict[str, Any] = {
-        "enabled": "true" if enabled else "false",
-        "last_tick_at": state.last_tick_at.isoformat() if state.last_tick_at else "",
-        "tick_minute": state.last_tick_minute.isoformat() if state.last_tick_minute else "",
-        "rule_sets_active": str(state.rule_sets_active),
-        "rows_evaluated": str(state.rows_evaluated),
-        "gate_refusals": json.dumps(state.refusals, sort_keys=True),
-        "proposals_last_tick": str(state.proposals_last_tick),
-        "proposals_total": str(state.proposals_total),
-        "fills_total": str(state.fills_total),
-        "unfilled_total": str(state.unfilled_total),
-        "closes_total": str(state.closes_total),
-        "bets_open": str(state.bets_open),
-        "sol_usd": "" if quote is None else str(quote.price_usd),
-        "sol_usd_observed_at": "" if quote is None else quote.observed_at.isoformat(),
-        "sol_usd_source": "" if quote is None else quote.source,
-        "sol_usd_error": state.sol_usd_error or "",
-    }
-    return {HEARTBEAT_PREFIX + key: str(value) for key, value in fields.items()}
-
-
-async def write_lab_heartbeat(ctx: LabContext, *, enabled: bool = True) -> None:
-    if ctx.heartbeat is None:
-        return
-    try:
-        await ctx.heartbeat(heartbeat_fields(ctx.state, enabled=enabled))
-    except Exception:  # a heartbeat that cannot be written must not stop the Lab
-        logger.warning("meme_lab_heartbeat_write_failed")
+    await record_tick(ctx.session_factory, state, report, now=now)
+    await write_lab_heartbeat(ctx)
+    return report
 
 
 async def lab_once(ctx: LabContext) -> None:

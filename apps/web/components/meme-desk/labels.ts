@@ -7,7 +7,16 @@
  */
 import type { Problem } from "@hunter/shared-types";
 
-import { isMemeBetLeg, isMemeExitReason, isMemeProposalStatus, type MemeBetLeg, type MemeExitReason, type MemeProposalStatus } from "@/lib/api/meme-desk-types";
+import {
+  isMemeBetLeg,
+  isMemeExitReason,
+  isMemeOutcomeQuality,
+  isMemeProposalStatus,
+  type MemeBetLeg,
+  type MemeExitReason,
+  type MemeOutcomeQuality,
+  type MemeProposalStatus,
+} from "@/lib/api/meme-desk-types";
 
 const PROPOSAL_STATUS_LABEL: Record<MemeProposalStatus, string> = {
   proposed: "Aguardando aval",
@@ -66,18 +75,62 @@ export function betLegLabel(leg: string): string {
   return isMemeBetLeg(leg) ? BET_LEG_LABEL[leg] : "perna não prevista";
 }
 
-/** `meme_proposals.refusal` (contract §Tabelas) -- named by the loop when a proposal ends `unfilled`. */
+// T4.16: `meme_paper_bets.outcome_quality` -- `indeterminate` marks a closed
+// bet whose `pnl_sol`/`r_multiple` exist (the CHECK requires the numbers) but
+// are not trustworthy (no photograph in the window); the screen shows this
+// label instead of the number, muted, never the raw slug.
+const OUTCOME_QUALITY_LABEL: Record<MemeOutcomeQuality, string> = {
+  measured: "medido",
+  indeterminate: "indeterminado (sem fotografia)",
+};
+
+/** `null`/`undefined` reads as the column's own default (`NOT NULL DEFAULT 'measured'`), not an absence. */
+export function outcomeQualityLabel(quality: string | null | undefined): string {
+  if (quality === null || quality === undefined) return OUTCOME_QUALITY_LABEL.measured;
+  return isMemeOutcomeQuality(quality) ? OUTCOME_QUALITY_LABEL[quality] : `qualidade: ${quality}`;
+}
+
+/** "decisão → fill 4.2 s" (T4.16, `BetOut.decision_to_fill_s`) -- `null`/absent is silence, not a zero. */
+export function decisionToFillLabel(seconds: number | null | undefined): string | null {
+  return typeof seconds === "number" && Number.isFinite(seconds) ? `decisão → fill ${seconds.toFixed(1)} s` : null;
+}
+
+/**
+ * `meme_proposals.refusal` (contract §Tabelas, named by the loop when a
+ * proposal ends `unfilled`) and, since T4.16, the entry gate's own named
+ * refusals (EXP-M5 flow/holders, EXP-M6 pedigree -- counted in the
+ * heartbeat's `gate_refusals` and, when a `research_only` row refuses this
+ * way, on `row.refusal` too). `flow_<motivo>`/`holders_<motivo>` are prefixes
+ * over an unknown-input reason (a missing tape is not "nobody sold").
+ */
 const REFUSAL_LABEL: Record<string, string> = {
   no_later_snapshot: "sem fotografia posterior em 3 min",
   migrated_before_fill: "a curva migrou antes do preenchimento",
   exceeds_max_sol_per_bet: "acima do teto por aposta do conjunto",
   daily_loss_cap: "teto de perda diária do conjunto atingido",
   cancelled: "cancelada pelo operador",
+  creator_serial: "criador em série",
+  symbol_clone: "clone de ticker",
+  pedigree_unknown: "pedigree não lido",
+  creator_unknown: "criador desconhecido",
+  symbol_unknown: "ticker desconhecido",
+  flow_not_positive: "sem demanda líquida",
+  buyers_below_min: "poucos compradores",
+  buyers_unknown: "compradores desconhecidos",
+  sells_ratio_above_max: "giro (vendas/compras)",
+  no_buys: "sem compras",
+  holders_not_rising: "holders não sobem",
+  progress_not_rising: "progresso não sobe",
+  progress_trend_unknown: "tendência do progresso desconhecida",
 };
 
 export function refusalLabel(refusal: string | null | undefined): string | null {
   if (!refusal) return null;
-  return REFUSAL_LABEL[refusal] ?? `recusa: ${refusal}`;
+  const known = REFUSAL_LABEL[refusal];
+  if (known !== undefined) return known;
+  if (refusal.startsWith("flow_")) return `fluxo: sem fita (${refusal.slice("flow_".length)})`;
+  if (refusal.startsWith("holders_")) return `holders: ${refusal.slice("holders_".length)}`;
+  return `recusa: ${refusal}`;
 }
 
 const QUOTE_REASON_LABEL: Record<string, string> = {

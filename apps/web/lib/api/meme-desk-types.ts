@@ -43,6 +43,18 @@ export function isMemeExitReason(value: string): value is MemeExitReason {
   return (MEME_EXIT_REASONS as readonly string[]).includes(value);
 }
 
+// T4.16: `meme_paper_bets.outcome_quality` (`NOT NULL DEFAULT 'measured'`) --
+// `indeterminate` only on a closed bet whose simulator never saw a photograph
+// in the window (the CHECK still hands the row `pnl_sol`/`r_multiple`, but
+// they are not trustworthy, so the screen shows the label instead of the
+// number wherever an R would otherwise print).
+export type MemeOutcomeQuality = "measured" | "indeterminate";
+export const MEME_OUTCOME_QUALITIES: readonly MemeOutcomeQuality[] = ["measured", "indeterminate"];
+
+export function isMemeOutcomeQuality(value: string): value is MemeOutcomeQuality {
+  return (MEME_OUTCOME_QUALITIES as readonly string[]).includes(value);
+}
+
 // T4.10b: `meme_paper_bets.leg` / `parent_bet_id` (brief T4.10 §Conjuntos de
 // regras -- the hype probe and its second leg). Read tolerantly off the bet
 // object: the backend lands these columns in parallel, so a payload from

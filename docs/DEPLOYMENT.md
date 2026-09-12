@@ -698,22 +698,34 @@ cd /opt/project-hunter && GIT_SHA="$(git rev-parse --short HEAD)" docker compose
 
 Agendamento (instalar uma vez, à mão, no padrão de `/etc/cron.d/hunter-partitions` —
 `infra/vps/README.md`; supondo a máquina em UTC, confirmar com `timedatectl`: 00:10 BRT = 03:10
-UTC; o `--day` é calculado no relógio de Brasília para nunca depender do fuso do host):
+UTC; o `--day` é calculado no relógio de Brasília para nunca depender do fuso do host). O cron
+**não** chama o `docker compose` diretamente: chama `infra/vps/meme_close_nightly.sh`, que copia
+`obsidian/` e `.claude/state/` para `/opt/hunter-close/` (`rsync --delete`), roda o job com a
+**cópia** montada e deixa `/opt/hunter-close/patch-<UTC>.diff` (`diff -ruN`, caminhos relativos à
+raiz) e `run-<UTC>.log`. A árvore de `/opt/project-hunter` fica limpa; o `git pull` do
+`compose.sh update` nunca conflita com o que o cron escreveu.
 
 ```bash
 printf '%s\n' \
   'SHELL=/bin/bash' \
   'PATH=/usr/local/bin:/usr/bin:/bin' \
-  '10 3 * * * hunter cd /opt/project-hunter && GIT_SHA="$(git rev-parse --short HEAD)" docker compose --env-file .env -p hunter -f infra/docker/docker-compose.yml -f infra/vps/docker-compose.prod.yml run --rm --user "$(id -u):$(id -g)" -v /opt/project-hunter/obsidian:/app/obsidian -v /opt/project-hunter/.claude/state:/app/.claude/state ops python infra/scripts/meme_close_day.py --day "$(TZ=America/Sao_Paulo date -d yesterday +\%F)" --apply >> /opt/backups/meme-close.log 2>&1' \
+  '10 3 * * * hunter /opt/project-hunter/infra/vps/meme_close_nightly.sh >> /opt/hunter-close/cron.log 2>&1' \
   | sudo tee /etc/cron.d/hunter-meme-close >/dev/null
 sudo chmod 644 /etc/cron.d/hunter-meme-close
 ```
 
-(`\%` porque o cron trata `%` como quebra de linha.) O que o cron escreve fica **sem commit** na
-árvore da VPS: o commit por pathspec do diário, das páginas EXP-M*, do INBOX, do README e do lote
-é do orquestrador, como todo registro do vault — decisão de operação em aberto no relatório da
-T4.15 (uma árvore suja não impede o `git pull` do `compose.sh update` enquanto ninguém editar os
-mesmos arquivos do outro lado, mas conflita no dia em que isso acontecer).
+**A rotina da manhã (orquestrador, do clone local):** puxar o patch e aplicá-lo na raiz do
+repositório, depois commitar por pathspec só o que ele tocou (diário meme do dia, páginas EXP-M*,
+INBOX, README da pasta, `lote-meme-<dia+1>.md`):
+
+```bash
+scp "hunter-vps:/opt/hunter-close/patch-$(date -u +%Y%m%d)-*.diff" /tmp/meme-close.diff
+patch -p0 --dry-run < /tmp/meme-close.diff && patch -p0 < /tmp/meme-close.diff
+```
+
+O patch é a única ponte: nada do que o cron escreve entra no `main` sem passar pelo commit por
+pathspec do orquestrador, como todo registro do vault (decisão de operação da T4.15, fechada em
+12/09/2026 à tarde).
 
 ### 3.7 Executor real de memecoins (`meme-executor`, perfil `meme-live` — T4.14)
 

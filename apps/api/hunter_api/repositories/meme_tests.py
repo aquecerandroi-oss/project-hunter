@@ -23,6 +23,11 @@ from sqlalchemy import Numeric, and_, case, func, or_, select, text
 from sqlalchemy import cast as sql_cast
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 
+from hunter_api.repositories.meme_desk_quality import (
+    IndeterminateTotals,
+    indeterminate_day_totals,
+    with_quality_0030,
+)
 from hunter_api.repositories.meme_desk_rows import (
     BetRow,
     bet_from_mapping,
@@ -63,6 +68,7 @@ __all__ = [
     "CurvePointRow",
     "DayTotalsRow",
     "FeaturesAtMinute",
+    "IndeterminateTotals",
     "MemeTestsRepository",
     "WalletPositionsRead",
 ]
@@ -121,6 +127,9 @@ class MemeTestsRepository:
     async def _assemble(self, bets: list[BetRow]) -> list[BetRecord]:
         if not bets:
             return []
+        # 0030's columns (T4.16), read tolerantly: a database below it says None.
+        by_id = await with_quality_0030(self.session, {b.id: b for b in bets})
+        bets = [by_id[b.id] for b in bets]
         proposal_ids = {b.proposal_id for b in bets}
         mints = {b.mint for b in bets}
         rule_set_ids = {b.rule_set_id for b in bets}
@@ -192,6 +201,15 @@ class MemeTestsRepository:
             pnl_usd=None if row["pnl_usd"] is None else Decimal(row["pnl_usd"]),
             unpriced_usd=int(row["unpriced_usd"]),
             r_sum=Decimal(row["r_sum"]),
+        )
+
+    async def indeterminate_totals(
+        self, *, day_start: datetime, day_end: datetime, rule_set: str | None
+    ) -> IndeterminateTotals | None:
+        """T4.16: the day's closes the instrument could not price, to be taken
+        out of the sums and shown apart; ``None`` below ``0030``."""
+        return await indeterminate_day_totals(
+            self.session, day_start=day_start, day_end=day_end, rule_set=rule_set
         )
 
     async def day_rule_set_names(self, *, day_start: datetime, day_end: datetime) -> list[str]:

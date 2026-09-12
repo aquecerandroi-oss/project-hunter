@@ -78,6 +78,11 @@ def retention_days(settings: Settings | None = None) -> dict[str, int | None]:
         "meme_curve_snapshots": config.meme_retention_days,
         "meme_features_1m": config.meme_retention_days,
         "meme_trades": config.meme_retention_days,
+        # The 15-second series of the young mints (0030, T4.16): four rows a
+        # minute per mint under five minutes of age, kept seven days — the
+        # diary of the week, not the quarter. On monthly partitions "7 days"
+        # means the month is dropped once its end is more than seven days old.
+        "meme_features_15s": 7,
     }
     for label, days in candles.items():
         policy[list_partition_name("candles", label)] = days

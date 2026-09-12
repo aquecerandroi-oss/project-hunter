@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any, cast
 from sqlalchemy import and_, case, func, or_, select, update
 
 from hunter_api.repositories.meme_desk_marks import with_marks_0029
+from hunter_api.repositories.meme_desk_quality import with_quality_0030
 from hunter_api.repositories.meme_desk_rows import (
     BetRow,
     CommandRow,
@@ -149,6 +150,7 @@ class MemeDeskRepository:
                 ).mappings()
             }
             bets = await with_marks_0029(self.session, bets)  # 0029's columns, if present
+            bets = await with_quality_0030(self.session, bets)  # 0030's, likewise
         rule_sets = {
             r["id"]: rule_set_from_mapping(r)
             for r in (
@@ -212,7 +214,8 @@ class MemeDeskRepository:
         if row is None:
             return None
         bet = bet_from_mapping(row)
-        return (await with_marks_0029(self.session, {bet.id: bet}))[bet.id]
+        bets = await with_marks_0029(self.session, {bet.id: bet})
+        return (await with_quality_0030(self.session, bets))[bet.id]
 
     async def get_token(self, mint: str) -> TokenIdentity | None:
         row = (

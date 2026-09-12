@@ -223,6 +223,20 @@ alcançou. Teto aritmético da fita com 130 rastreados e frescor de 180 s: ≈ 4
 `swap_api_effective_budget_60s`, `swap_api_429_1h`, `swap_api_blocked_until`. Plano §T4.2f;
 `docs/PUMPFUN-ONCHAIN.md` §5.5; `docs/PUMPFUN.md` §2.
 
+**T4.16 — o relógio de 15 s, a porta v2 e o placar honesto.** Um laço `meme-fast` (15 s) lê da cadeia só os
+rastreados com menos de 5 min (`fast_lane.py`, o mesmo `get_curve_states` → `persist_reading`; ≤ 16 chamadas/min)
+e grava **`meme_features_15s`** (`meme_features_15s_v1`, série separada, RANGE mensal por `as_of`, retenção
+7 d): `mcap_delta_60s`, `mcap_slope_60s`, `progress_delta_60s`, `holders_rising`, a fita dos últimos 60 s —
+tudo só com `received_at <= as_of` (`hunter_indicators.meme.fast`, `features_fast.py`, `repo_fast.py`). O Lab
+bate a cada **15 s**: a porta de minuto fechado continua por minuto fechado (`meme_features_1m`, a série
+oficial), a porta de 15 s roda sobre as linhas novas para os conjuntos com `clock = 15s` (`flow_v2/1`,
+EXP-M5), e o fill é a fotografia de 15 s seguinte (`decision_to_fill_s` medido; p50/p95 no heartbeat).
+**EXP-M6**: `creator_serial`/`symbol_clone` contados em `meme_tokens` na hora da proposta e somados às
+recusas de **toda** porta. **Placar honesto**: `meme_paper_bets.outcome_quality` — um `rug_no_snapshot` fecha
+`indeterminate` (a linha mantém −1 R; nenhuma soma o conta: placar, `/meme/tests`, carteira do laço). Heartbeat:
+`fast_lane_*`, `lab_decision_to_fill_s_p50/p95`, `lab_bets_indeterminate_total`. Plano §T4.16;
+`docs/DATABASE.md` §43; `docs/RISK_ENGINE_MEME.md` §10.7.
+
 ## 2. Feature Engine
 
 **Onde:** `scanner-worker`. **Gatilho:** `market.ticks` (tick-features, throttle 1 s por símbolo) e `market.candles.closed` (bar-features).

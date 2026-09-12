@@ -124,6 +124,7 @@ async def list_tests(
             (await repo.wallet_positions(day_start=start, day_end=end, limit=1)).source,
         )
     totals = await repo.day_totals(day_start=start, day_end=end, rule_set=rule_set)
+    indeterminate = await repo.indeterminate_totals(day_start=start, day_end=end, rule_set=rule_set)
     names = await repo.day_rule_set_names(day_start=start, day_end=end)
     names.extend(sorted({r.rule_set.label for r in real_items}))
     return TestsListOut(
@@ -133,7 +134,7 @@ async def list_tests(
         day_end=end,
         rule_set=rule_set,
         rule_sets=names,
-        totals=build_totals(totals, real_rows=len(real_items)),
+        totals=build_totals(totals, real_rows=len(real_items), indeterminate=indeterminate),
         sources=build_sources(wallets_source),
         items=items,
         real_items=real_items,

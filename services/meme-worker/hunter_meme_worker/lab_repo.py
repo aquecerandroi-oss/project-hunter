@@ -51,6 +51,9 @@ _GATE_ROWS = text(
     "       f.snapshot_observed_at, f.snapshot_source, "
     "       f.higher_lows, f.breakout_15m, f.distance_to_support_pct, f.line_reason, "
     "       f.hype_score, f.hype_reason, f.dev_share, f.dev_share_reason, f.snipers, "
+    "       f.net_sol_flow_1m, f.buys_1m, f.sells_1m, f.unique_buyers, f.tape_reason, "
+    "       f.holders, f.holders_reason, prev.holders AS holders_prev, "
+    "       prev.curve_progress_pct AS progress_prev, "
     "       t.created_at, t.completed_at, t.migrated_at, t.initial_real_token_reserves, "
     "       s.virtual_sol_reserves, s.virtual_token_reserves, s.real_sol_reserves, "
     "       s.real_token_reserves, s.total_supply, s.complete, s.mcap_sol AS snapshot_mcap_sol "
@@ -58,8 +61,15 @@ _GATE_ROWS = text(
     "JOIN meme_tokens t ON t.mint = f.mint "
     "LEFT JOIN meme_curve_snapshots s ON s.mint = f.mint "
     "  AND s.observed_at = f.snapshot_observed_at AND s.source = f.snapshot_source "
+    "LEFT JOIN meme_features_1m prev ON prev.mint = f.mint "
+    "  AND prev.features_version = f.features_version "
+    "  AND prev.end_time = f.end_time - interval '1 minute' "
     "WHERE f.end_time = :minute AND f.features_version = :version"
 )
+"""T4.16: the minute before it (``prev``) is what "holders rising" and
+"progress rising" are measured against on the minute clock — two consecutive
+readings, the study's wording; the partition key is in the join, so the read
+touches two minutes and never a month."""
 
 _OPEN_MINTS = text(
     "SELECT mint FROM meme_proposals WHERE rule_set_id = :rule_set_id "
@@ -167,9 +177,29 @@ async def load_gate_rows(
                 dev_share=r["dev_share"],
                 dev_share_reason=r["dev_share_reason"],
                 snipers=r["snipers"],
+                # T4.16: the flow of the minute and the two trends against the
+                # minute before — ``None`` with its reason, refused by name.
+                net_sol_flow_1m=r["net_sol_flow_1m"],
+                buys_1m=r["buys_1m"],
+                sells_1m=r["sells_1m"],
+                unique_buyers_1m=r["unique_buyers"],
+                tape_reason=r["tape_reason"],
+                holders_rising=_rising(r["holders"], r["holders_prev"]),
+                holders_reason=_trend_reason(r["holders"], r["holders_prev"], r["holders_reason"]),
+                progress_rising=_rising(r["curve_progress_pct"], r["progress_prev"]),
             )
         )
     return out
+
+
+def _rising(now: Any, before: Any) -> bool | None:
+    return None if now is None or before is None else bool(now > before)
+
+
+def _trend_reason(now: Any, before: Any, absent: str | None) -> str | None:
+    if now is None:
+        return absent or "no_holders_reader"
+    return "too_few_readings" if before is None else None
 
 
 async def open_mints_for(session: AsyncSession, rule_set_id: str) -> frozenset[str]:

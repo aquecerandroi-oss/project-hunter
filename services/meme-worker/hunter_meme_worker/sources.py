@@ -181,6 +181,10 @@ class SourcesState:
     """The tape budget as the edge enforces it (T4.2f, ``tape_budget.py``): the
     effective budget, the successes counted before the last real 429, real 429s
     in the hour, and until when the IP is blocked."""
+    fast_lane_mints: int | None = None
+    fast_lane_cycle_s: float | None = None
+    fast_lane_reads_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
+    fast_lane_calls_60s: RollingCounter = field(default_factory=lambda: RollingCounter(60))
     _sampled: dict[str, int] = field(default_factory=dict[str, int])
 
     def __getitem__(self, name: str) -> SourceStats:
@@ -243,6 +247,14 @@ class SourcesState:
         self.swap_api_measured_60s = measured
         self.swap_api_429_1h.add(at, refused_429)
         self.swap_api_blocked_until = blocked_until
+
+    def record_fast_cycle(
+        self, at: datetime, *, mints: int, read: int, calls: int, duration_s: float
+    ) -> None:
+        self.fast_lane_mints = mints
+        self.fast_lane_cycle_s = duration_s
+        self.fast_lane_reads_60s.add(at, read)
+        self.fast_lane_calls_60s.add(at, calls)
 
     def record_new_listing(self, at: datetime, *, in_scope: bool) -> None:
         """One first sighting on the ``new`` board; ``in_scope`` = program ``pump``."""
@@ -325,6 +337,10 @@ class SourcesState:
             "swap_api_measured_60s": self.swap_api_measured_60s,
             "swap_api_429_1h": self.swap_api_429_1h.total(now),
             "swap_api_blocked_until": _iso(self.swap_api_blocked_until),
+            "fast_lane_mints": self.fast_lane_mints,
+            "fast_lane_cycle_s": self.fast_lane_cycle_s,
+            "fast_lane_reads_60s": self.fast_lane_reads_60s.total(now),
+            "fast_lane_calls_60s": self.fast_lane_calls_60s.total(now),
             "sources_at": now.isoformat(),
             "sources": json.dumps(
                 {name: stats.as_fields(now) for name, stats in self.sources.items()},

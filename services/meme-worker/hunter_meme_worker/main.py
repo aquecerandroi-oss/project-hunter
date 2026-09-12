@@ -49,6 +49,7 @@ from hunter_meme_worker.collect import fold_once, forever, poll_once, prune_once
 from hunter_meme_worker.config import MemeConfig, load_config
 from hunter_meme_worker.context import RadarContext, RadarState
 from hunter_meme_worker.discovery import run_discovery
+from hunter_meme_worker.fast_lane import fast_once
 from hunter_meme_worker.graduation import GlobalParamsStore
 from hunter_meme_worker.lab import LabContext, LabState, lab_once, write_lab_heartbeat
 from hunter_meme_worker.mayhem import mayhem_once
@@ -258,6 +259,7 @@ async def run_meme(runtime: WorkerRuntime) -> None:
         swap_api=ctx.trades is not None,
         swap_api_budget_60s=config.swap_api_budget_60s,
         chain_curves=config.chain_curves_enabled,
+        fast_lane=config.fast_lane_enabled and config.chain_curves_enabled,
         risk=ctx.risk is not None,
         wallets=len(config.watch_wallets),
     )
@@ -281,6 +283,12 @@ async def run_meme(runtime: WorkerRuntime) -> None:
                 group.create_task(
                     forever("chain", config.chain_cycle_s, chain_once, ctx), name="meme-chain"
                 )
+                if config.fast_lane_enabled:
+                    # T4.16: the mints younger than five minutes, every 15 s.
+                    group.create_task(
+                        forever("fast", config.fast_lane_cycle_s, fast_once, ctx),
+                        name="meme-fast",
+                    )
             else:
                 group.create_task(
                     forever("reconcile", config.reconcile_cycle_s, reconcile_once, ctx),

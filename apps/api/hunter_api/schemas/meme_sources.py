@@ -151,5 +151,20 @@ class MemeSourcesOut(BaseModel):
     swap_api_measured_60s: int | None = None
     swap_api_429_1h: int | None = None
     swap_api_blocked_until: datetime | None = None
+    fast_lane_mints: int | None = None
+    """T4.16: young mints (< 5 min, known birth) the 15-second chain clock read
+    in its last cycle; ``None`` from a worker that predates T4.16 or whose
+    last read failed."""
+    fast_lane_reads_60s: int | None = None
+    fast_lane_calls_60s: int | None = None
+    fast_lane_cycle_s: float | None = None
+    lab_decision_to_fill_s_p50: int | None = None
+    """T4.16: the **measured** decision → fill latency (seconds) over the last
+    fills the Lab made — nearest-rank median; ``None`` before the first fill."""
+    lab_decision_to_fill_s_p95: int | None = None
+    lab_decision_to_fill_n: int | None = None
+    lab_bets_indeterminate_total: int | None = None
+    """T4.16: bets closed without a photo to price them (``outcome_quality =
+    indeterminate``), from the rows — left out of every sum of R/PnL."""
     coverage_explanation: str = COVERAGE_EXPLANATION
     sources: list[MemeSourceOut]

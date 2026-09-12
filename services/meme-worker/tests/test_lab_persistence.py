@@ -653,6 +653,10 @@ async def test_an_exit_that_finds_no_later_snapshot_is_a_rug_at_zero(
     assert closed["exit"]["pending_reason"] == "target"
     assert closed["pnl_sol"] == -closed["initial_risk_sol"] and closed["r_multiple"] == Decimal(-1)
     assert closed["sol_usd_at_exit"] is None
+    # T4.16 (0030): the row keeps the doctrine's number; the outcome is indeterminate.
+    assert closed["outcome_quality"] == "indeterminate"
+    assert closed["outcome_quality_reason"] == "no_snapshot_in_window"
+    assert closed["outcome_quality_at"] == closed["exit_at"]
 
 
 # ---- views and grants ------------------------------------------------------------------

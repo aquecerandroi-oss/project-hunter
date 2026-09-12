@@ -75,6 +75,17 @@ describe("MemeSourcesPanel (full)", () => {
     expect(screen.getByText("2 gap(s) no último minuto")).toBeInTheDocument();
     expect(screen.getByText("1 mensagem(ns) malformada(s) no último minuto")).toBeInTheDocument();
   });
+
+  it("shows nothing about the 15-second clock for a worker that predates it (never an empty card)", () => {
+    render(<MemeSourcesPanel sources={sourcesPayload()} />);
+    expect(screen.queryByText(/relógio de 15 s/)).not.toBeInTheDocument();
+  });
+
+  it("shows the 15-second clock's decision→fill latency once the worker reports it (T4.16)", () => {
+    render(<MemeSourcesPanel sources={sourcesPayload({ fast_lane_mints: 42, lab_decision_to_fill_s_p50: 3.2, lab_decision_to_fill_s_p95: 18.9, lab_bets_indeterminate_total: 5 })} />);
+    expect(screen.getByText(/42 moedas < 5 min no relógio de 15 s/)).toBeInTheDocument();
+    expect(screen.getByText(/decisão → fill p50 \(medido\) 3.2 s/)).toBeInTheDocument();
+  });
 });
 
 describe("MemeSourcesPanel (line)", () => {

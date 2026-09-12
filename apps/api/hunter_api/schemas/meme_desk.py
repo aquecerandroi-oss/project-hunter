@@ -66,6 +66,11 @@ MarkSource = Literal["curve", "pool_tape"]
 curva", ``pool_tape`` = "marcada pela pool (fita)" — a bet that held through
 the migration is priced by the PumpSwap pool's last trade."""
 
+OutcomeQuality = Literal["measured", "indeterminate"]
+"""``meme_paper_bets.outcome_quality`` (``0030``, T4.16): ``measured`` =
+"medido", ``indeterminate`` = "indeterminado (sem fotografia)" — a close the
+instrument could not price, left out of every sum and counted apart."""
+
 
 class DeskParamsIn(StrictModel):
     """The four parameters the operator decides (contract §Tela: ``size_sol``,
@@ -201,6 +206,13 @@ class BetOut(BaseModel):
     mark_stale_s: int | None = None
     """Seconds the pool's tape had been silent at the last mark ("marca
     envelhecida há Ns"); ``None`` while the position is priced on the curve."""
+    outcome_quality: OutcomeQuality | str | None = None
+    outcome_quality_reason: str | None = None
+    """``0030`` (T4.16): ``indeterminate`` with its reason when the close priced
+    nothing; ``None`` on a row older than the column."""
+    decision_to_fill_s: int | None = None
+    """``entry.decision_to_fill_s``: seconds between the decision and the fill
+    photograph — the latency the brief asks to be shown per bet."""
 
 
 class DeskRowOut(BaseModel):
@@ -304,6 +316,7 @@ __all__ = [
     "ExitReason",
     "ManualProposalIn",
     "MarkSource",
+    "OutcomeQuality",
     "ProposalOrigin",
     "ProposalOut",
     "ProposalStatus",

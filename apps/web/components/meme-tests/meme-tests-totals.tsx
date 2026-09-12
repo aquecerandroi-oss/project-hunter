@@ -25,12 +25,14 @@ export function MemeTestsTotals({ totals, sources }: MemeTestsTotalsProps) {
   const usd = totals.pnl_usd === null ? "sem cotação" : formatUsdSigned(totals.pnl_usd);
   const usdHint = totals.unpriced_usd > 0 ? `${totals.unpriced_usd} fechada(s) sem cotação SOL/USD na saída` : "fechadas, à cotação observada na saída";
   return (
-    <section aria-label="Totais do dia" className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+    <section aria-label="Totais do dia" className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-7">
       <Stat label="Apostas" value={String(totals.bets)} hint={`${totals.closed} fechada(s) · ${totals.open} aberta(s)`} />
       <Stat label="Acertos" value={hitRate} hint={totals.closed > 0 ? `${totals.losses} perda(s)` : undefined} />
       <Stat label="PnL SOL" value={formatSolSigned(totals.pnl_sol)} hint={`abertas à marca: ${formatSolSigned(totals.provisional_pnl_sol)}`} valueClass={signClass(totals.pnl_sol)} />
       <Stat label="PnL US$" value={usd} hint={usdHint} valueClass={totals.pnl_usd === null ? "text-fg-muted" : signClass(totals.pnl_usd)} />
-      <Stat label="R somado" value={formatR(totals.r_sum)} hint="fechadas" valueClass={signClass(totals.r_sum)} />
+      <Stat label="R somado" value={formatR(totals.r_sum)} hint="fechadas, medidas" valueClass={signClass(totals.r_sum)} />
+      {/* T4.16: `wins`/`losses`/`pnl_sol`/`pnl_usd`/`r_sum` count only `measured` closes -- `indeterminate` gets its own honest count, never folded into a loss. */}
+      <Stat label="Indeterminadas" value={String(totals.indeterminate)} hint="sem fotografia; fora das somas acima" valueClass={totals.indeterminate > 0 ? "text-warning" : "text-fg-muted"} />
       <Stat label="REAL" value={sources.wallets === "observada" ? String(totals.real_rows) : "—"} hint={walletsSourceLabel(sources.wallets)} valueClass={sources.wallets === "observada" ? "text-fg" : "text-fg-muted"} />
     </section>
   );

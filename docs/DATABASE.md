@@ -70,6 +70,7 @@ O servidor roda com `statement_timeout = 0` / `lock_timeout = 0` (sem prazo) —
 | `meme_curve_snapshots` | mensal | `MEME_RETENTION_DAYS` (90 d) | idem |
 | `meme_features_1m` | mensal | idem | idem |
 | `meme_trades` | mensal | idem | idem |
+| `meme_features_15s` | mensal | **7 d** (T4.16, `0030`: a série de 15 s das moedas jovens — em partições mensais o mês cai quando o seu fim tem mais de 7 dias) | idem |
 | `outbox_events` | — | despachadas há mais de **7 d** (`dispatched_at IS NOT NULL AND dispatched_at < now() - interval '7 days'`); pendentes **nunca** são apagadas | `analytics-worker` diário, DELETE em lotes (M5) |
 | `shadow_outbox` | — | idem, enquanto a fila existir (§17.5 a absorve) | idem |
 
@@ -6683,3 +6684,145 @@ conjuntos semeados; a semente reverte e `operator/1` volta a `active`. `meme_des
 | `services/meme-worker/**` | `lab_params.py` (split de `lab_models`), `pool_mark.py`, `lab_repo_pool.py`, `lab_bets_pool.py`; `repo_tape.trade_rows` aceita `pump_amm` e grava `program`; `lab_repo_bets` grava/lê `mark_source`/`mark_stale_s`; `paper_engine.decide_exit_at` |
 | `GET /api/v1/orgs/{org}/meme/desk` | `bet.mark_source`, `bet.mark_stale_s`, `suggested/decision/params.exit_on_migration` e `.trailing_arm_x`; `exit_reason` ganha `dead`; manual sob `operator/2`. As duas colunas ficam **fora** da `Table` compartilhada da API e são lidas por sonda (`repositories/meme_desk_marks.py`, `information_schema.columns`): num banco ainda na `0028` a mesa responde com `mark_source = null` em vez de falhar |
 | `apps/web` | T4.13 (paralela): rótulos "marcada pela pool (fita)" / "marca envelhecida há Ns" / saída "morta" |
+
+## 42. O tick do laço vira linha — M4 (`0031_meme_lab_ticks`)
+
+Trigésima primeira revisão (sobre a `0030_meme_gate_v2`, T4.16). **Uma tabela**, `meme_lab_ticks`, e grants por
+subtração; nenhuma coluna em tabela existente, nenhuma vista, enum ou política; nada tocado na `0022`–`0030`.
+Entrega a T4.15 (fechamento diário, `infra/scripts/meme_close_day.py`, `docs/plans/T4-MEME-RADAR.md` §T4.15): o
+`lab_gate_refusals` do heartbeat é sobrescrito a cada minuto, e a lição "quanto do dia o portão viu, e por que
+recusou" precisava de uma linha para ler depois de o dia acabar.
+
+| coluna | tipo | definição |
+|---|---|---|
+| `ticked_at` | `timestamptz` PK | o `now` do tick — o instante em que o laço terminou a passada |
+| `tick_minute` | `timestamptz` | o minuto fechado mais novo que o portão avaliou; `NULL` quando o backlog não tinha nenhum |
+| `minutes_evaluated`, `rows_evaluated`, `rule_sets_active`, `proposals`, `expired`, `cancelled`, `fills`, `unfilled`, `closes`, `bets_open` | `integer` ≥ 0 | os contadores do `TickReport`, exatamente como o heartbeat os publica |
+| `refusals` | `jsonb` (objeto) | `{nome do conjunto: {recusa: n}}` sobre os minutos deste tick — o `lab_gate_refusals` do heartbeat, congelado |
+
+Global e sem RLS (§1.1). `hunter_worker` `SELECT`/`INSERT` (`ON CONFLICT (ticked_at) DO NOTHING` — o mesmo
+instante não grava duas vezes); `hunter_app` `SELECT`; `UPDATE`/`DELETE` a ninguém. **Sem guarda de subida —
+asserção** (a tabela é nova). **A descida recusa** (§17.7) enquanto houver linha: os ticks são a evidência de
+cobertura que o fechamento lê e nada mais os reconstrói. Retenção: nenhuma ainda (≈ 1 440 linhas/dia, ~0,5 M
+por ano — declarado; entra na poda quando pesar). O laço grava a linha numa sessão própria de `hunter_worker`
+(`lab_ticks.record_tick`); uma falha vira `warning` (`meme_lab_tick_row_not_written`) e o tick segue — o
+fechamento escreve "sem ticks gravados" para o dia, nunca um zero silencioso.
+
+## 43. O placar honesto, a série de 15 s e a porta de fluxo — M4 (`0030_meme_gate_v2`)
+
+Trigésima revisão (sobre a `0029_meme_moonshot`, T4.11; a `0031_meme_lab_ticks` da T4.15 — §42, escrita em
+paralelo — senta sobre esta). **Três colunas** em `meme_paper_bets` com três CHECKs e **sem backfill**, **uma
+tabela** particionada (`meme_features_15s`), **uma vista reescrita** (`meme_lab_scoreboard_v1`, mesmo nome e
+grants) e uma **semente de dois conjuntos** que não aposenta nenhum. Nenhum enum, política ou grant novo além
+dos da tabela; nada tocado na `0022`–`0029`. Entrega a T4.16 sobre a pergunta do Everton de 12/09/2026 14:0x BRT
+("aparecendo bastante proposta mas estamos perdendo todas; não está analisando direito? estamos muito lentos?").
+Brief: `.claude/state/brief-T4.16-porta-v2-e-relogio-de-15s.md`; estudo: `obsidian/03-TRADING/Meme/Estudo-2026-09-12-21-apostas.md`;
+pré-registros: `obsidian/05-EXPERIMENTS/EXP-M5-fluxo-e-holders.md`, `EXP-M6-exclusoes-de-pedigree.md`.
+
+### 43.1 A qualidade do desfecho — `meme_paper_bets.outcome_quality`
+
+| coluna | tipo | definição |
+|---|---|---|
+| `outcome_quality` | `text NOT NULL DEFAULT 'measured'` ∈ {`measured`, `indeterminate`} | `measured`: o simulador precificou o fecho numa observação; `indeterminate`: o fecho não pôde ser precificado — `rug_no_snapshot`, sem fotografia para vender em 3 min. Em 12/09 foram 5 dos −7,67 R do dia, com a moeda valendo a entrada 30 min depois: o instrumento piscou, o mercado não falou |
+| `outcome_quality_reason` | `text` | o motivo: `no_snapshot_in_window` quando o laço fecha; o texto do `--reason` do operador quando o script reclassifica |
+| `outcome_quality_at` | `timestamptz` | quando a qualidade foi atribuída (o fecho, ou o `now()` do script) |
+
+CHECKs: `outcome_quality_is_a_known_label`; `an_indeterminate_bet_is_closed` (= `outcome_quality = 'measured'
+OR status = 'closed'`); `an_indeterminate_outcome_names_its_reason` (= `(outcome_quality = 'indeterminate') =
+(reason IS NOT NULL) = (at IS NOT NULL)`). **A linha mantém os números** (`pnl_sol = −aposta`, `r_multiple = −1`
+— `an_exit_carries_its_numbers` exige; o simulador recebeu 0); o que muda são as **somas**: a vista (§43.3), a
+API (`/meme/tests`: `wins`/`losses`/`pnl`/`r` só medidas + `indeterminate` à parte; `/meme/lab`: coluna
+`indeterminate`; a mesa: `outcome_quality` por aposta), a **carteira derivada do laço** (`lab_repo_bets.wallet_state`:
+`realized_total`/`realized_today` só medidas — os 5 artefatos somavam −0,25 SOL, acima do teto diário de 0,20:
+o artefato travaria o Lab) e o fechamento diário (T4.15 deve ler a coluna). **Sem backfill, por desenho**: o
+laço grava `indeterminate` nos fechos novos; os passados só pelo script auditado
+`infra/scripts/meme_reclassify_indeterminate.py` (dry-run por padrão; `--apply --reason "…"` grava o motivo em
+cada linha e uma linha em `system_events`; recusa por nome `reason_required`/`not_a_candidate`).
+
+### 43.2 A série de 15 s — `meme_features_15s` (`meme_features_15s_v1`)
+
+```
+meme_features_15s               PARTITION BY RANGE (as_of), mensal, retenção 7 d
+  PK (as_of, mint, features_version)
+  snapshot_observed_at, snapshot_source, snapshots_120s NOT NULL, age_s,
+  mcap_sol, mcap_delta_60s, mcap_slope_60s numeric(12,6), window_reason,
+  curve_progress_pct, progress_delta_60s, progress_rising, progress_reason,
+  holders, holders_prev, holders_rising, holders_reason,
+  buys_60s, sells_60s, unique_buyers_60s, net_sol_flow_60s, curve_volume_60s_sol, tape_reason,
+  creator_net_seller + reason, dev_share + reason, snipers + reason, computed_at
+  INDEX (mint, as_of)
+```
+
+**Série separada, não um `meme_features_1m` mais fino.** `as_of` é o instante julgado (o tick do laço
+`meme-fast`, a cada 15 s, sobre os rastreados com `created_at` conhecido e idade < 300 s); todo número foi
+calculado só com observações de `received_at <= as_of` — fotografias (`repo_fast.load_fast_points`), trades
+(`tape_for` com `end_time = as_of`), leituras de holders (`holders_for`) — a regra de não-antecipação do
+`meme_features_1m` (§35), provada por look-ahead no puro (`test_meme_fast.py`), no fold (`test_features_fast.py`)
+e contra Postgres (`test_lab_fast.py`: uma foto com block time dentro da janela mas entregue 5 s depois do
+instante não existe para ele). Cada valor/motivo é um CHECK bicondicional (`a_market_cap_names_its_photo`,
+`window_is_null_with_a_reason`, `progress_delta_is_null_with_a_reason`, `holders_trend_is_null_with_a_reason`,
+`tape_is_null_with_a_reason`, `creator_net_seller_…`, `dev_share_…`, `snipers_…`, `counts_are_not_negative`,
+`dev_share_is_a_fraction`, `provenance_is_not_empty`). Motivos: `no_snapshot` | `too_few_points` (nenhuma foto
+≥ 60 s mais velha que a mais nova) | `out_of_range` | `denominator_unknown` | `no_holders_reader` |
+`too_few_readings` | os da fita (`no_trade_feed`, `not_polled`, `rate_limited`, `unsupported_quote`).
+Definições em `hunter_indicators.meme.fast` (`mcap_delta_60s`, `mcap_slope_60s` = OLS de ln mcap entre a
+referência de 60 s e a foto mais nova, `progress_delta_60s`, `holders_rising` — 4 `FeatureDefinition` v1).
+Grants: `SELECT` para `hunter_app`; `SELECT`/`INSERT` para `hunter_worker`; filhas revogadas (o padrão da
+`0021`/`0023`). Partições iniciais 2026-09…12 (`MEME_INITIAL_MONTHS_0030`); depois, `create_partitions.py`
+(deriva do modelo). Retenção **7 d** em `partition_retention.py` (§1.3): 4 linhas/min por mint jovem é o
+diário da semana, não do trimestre. Quem lê: a porta de 15 s do Lab (`lab_repo_fast.load_fast_gate_rows`,
+`as_of <= tick`, atraso máximo 45 s); a proposta nascida dela leva `features_end_time = as_of` e
+`reasons[0].series = meme_features_15s_v1`.
+
+### 43.3 A vista reescrita — `meme_lab_scoreboard_v1`
+
+A de `0027` (§39.3) byte a byte, com `measured` (= `status = 'closed' AND outcome_quality = 'measured'`) a
+decidir **toda soma** — `wins`, `pnl_sol`, `pnl_usd`, `unpriced_usd`, `r_sum` e a curva do drawdown — e uma
+coluna nova no fim, **`indeterminate`** (= fechos não medidos). `closed` e `rugs` continuam contando todos os
+fechos (`rugs` = `exit.reason = 'rug_no_snapshot'`, que passa a coincidir com `indeterminate` depois da
+reclassificação). O braço da carteira observada (`UNION ALL`) carrega `0 AS indeterminate`. A API lê a coluna por
+sonda (`repositories/meme_lab.py`): num banco abaixo da `0030` responde `0`, nunca falha.
+
+### 43.4 A semente — `flow_v2/1` e `hype_probe_v0/2` (e o que **não** aposenta)
+
+Ids fixos, `ON CONFLICT DO NOTHING` (`ddl/meme_gate_v2_seed.py`):
+
+- **`flow_v2/1`** (`…0008`, EXP-M5, `research_only`, **`clock = "15s"`**, `pedigree_exclusions = true`): porta
+  `fluxo_e_holders v1` — 30–300 s; progresso ≥ 5 % **e** subindo; `require_positive_flow` (`net_sol_flow > 0`,
+  ou `mcap_delta_60s > 0` sem fita); `min_unique_buyers 10`; `max_sells_to_buys 0,6`; holders subindo em duas
+  leituras; snipers ≤ 2; `dev_share ≤ 0,10` (desconhecido recusa); criador não vendedor líquido; participação
+  ≤ 1 %; 0,05 SOL; alvo 3×, trailing 35 % com `trailing_arm_x 1,5`, `max_hold_s 1800`, `max_loss_pct 50`,
+  `exit_on_line_break` (dispara só quando houver linha), carteira 2,0, dia 0,20, **5 abertas** (declarado),
+  0,05 por mint.
+- **`hype_probe_v0/2`** (`…0009`, EXP-M5 braço 2, `research_only`, relógio de **1 min** — o `hype_score` é
+  feature do minuto e a série de 15 s não tem board, declarado): a `hype_probe_v0/1` verbatim (`gate_version 2`)
+  mais as três condições de fluxo.
+- **Aposenta nada.** `meme_paper_v0/1` (EXP-M1: `descartar`) e `hype_probe_v0/1` (EXP-M3: `descartar`) saem
+  pelo script auditado `infra/scripts/meme_rule_set.py --deprecate name/version --reason "…" --apply`
+  (`system_events`; recusa `rule_set_missing`/`already_retired`/`last_operator_set`/`reason_required`) — um ato
+  do operador com motivo registado, não um efeito colateral de um deploy. O laço lê os ativos a cada tick: o
+  conjunto para de propor no tick seguinte; as apostas abertas continuam marcadas e fechadas.
+
+Os critérios novos vivem em `hunter_indicators.meme.rules.EntryGate` (`require_positive_flow`,
+`min_unique_buyers`, `max_sells_to_buys`, `require_holders_rising`, `require_progress_rising`, todos
+desligados por padrão — EXP-M1/M2/M3/M4 byte a byte) e `rules_criteria.py`; a porta de minuto ganhou, para os
+dois "subindo", a junção com o minuto anterior (`lab_repo._GATE_ROWS`, `prev`). As exclusões de pedigree
+(EXP-M6, `hunter_indicators.meme.pedigree`) **não são schema**: são contadas em `meme_tokens` na hora da
+proposta (`lab_repo_fast.pedigree_for`: `creator_prior_mints_1h`, `symbol_dup_24h`, só moedas criadas até a
+julgada) e somadas às recusas de toda porta (`creator_serial`, `symbol_clone`, `creator_unknown`,
+`symbol_unknown`, `pedigree_unknown`); gravadas em `reasons` (`feature: pedigree`).
+
+### 43.5 Guardas, trava, vizinhos
+
+**Sem guarda de subida — asserção**: coluna com default não volátil (só catálogo no PG 16), tabela nova, vista
+recriada, `ON CONFLICT DO NOTHING`. **A descida recusa** (§17.7) enquanto existir uma aposta `indeterminate`
+(derrubar a coluna a devolveria a um −1 R que o mercado nunca produziu), uma linha em `meme_features_15s` (a
+série é evidência) ou uma proposta/aposta que referencie os dois conjuntos semeados; a semente reverte, a vista
+volta à da `0027` (`ddl/meme_wallets.recreate_scoreboard_0027`), a tabela e as colunas caem.
+
+| Onde | O que muda |
+|---|---|
+| `services/meme-worker/**` | `fast_lane.py` (laço `meme-fast`, 15 s), `features_fast.py`, `repo_fast.py`, `lab_fast.py`, `lab_repo_fast.py`, `lab_heartbeat.py`, `proposals_reasons.py`; `lab.py` a 15 s (`lab_cycle_s`), `paper_engine.close_without_snapshot` → `indeterminate`, `lab_repo_bets` (`_CLOSE_BET`, `_WALLET`, `count_indeterminate`), `lab_models` (`clock`, `pedigree_exclusions`), heartbeat `fast_lane_*`, `lab_decision_to_fill_s_p50/p95` (medidos), `lab_bets_indeterminate_total` |
+| `GET /api/v1/orgs/{org}/meme/{sources,desk,tests,lab}` | `fast_lane_*`, `lab_decision_to_fill_s_*`, `lab_bets_indeterminate_total`; `BetOut.outcome_quality`/`decision_to_fill_s`; `/tests`: `outcome_quality` + rótulo "indeterminado (sem fotografia)" e `totals.indeterminate`; `/lab`: `indeterminate`. As colunas da `0030` ficam **fora** da `Table` compartilhada e são lidas por sonda (`repositories/meme_desk_quality.py`, o padrão da `0029`) |
+| `infra/scripts` | `meme_reclassify_indeterminate.py`, `meme_rule_set.py`, `meme_ops_db.py`; `partition_retention.py` (7 d) |
+| `apps/web` | rótulos pendentes (fora desta tarefa): ver `docs/plans/T4-MEME-RADAR.md` §T4.16 |

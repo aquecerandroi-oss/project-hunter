@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { betLegLabel, exitReasonLabel, memeDeskProblemMessage, proposalStatusLabel, quoteReasonLabel, refusalLabel } from "@/components/meme-desk/labels";
-import { MEME_BET_LEGS, MEME_EXIT_REASONS, MEME_PROPOSAL_STATUSES, isMemeBetLeg, readBetLeg } from "@/lib/api/meme-desk-types";
+import { betLegLabel, decisionToFillLabel, exitReasonLabel, memeDeskProblemMessage, outcomeQualityLabel, proposalStatusLabel, quoteReasonLabel, refusalLabel } from "@/components/meme-desk/labels";
+import { MEME_BET_LEGS, MEME_EXIT_REASONS, MEME_OUTCOME_QUALITIES, MEME_PROPOSAL_STATUSES, isMemeBetLeg, readBetLeg } from "@/lib/api/meme-desk-types";
 
 describe("meme-desk labels are exhaustive and never leak a raw enum", () => {
   it("every proposal status has a Portuguese label", () => {
@@ -27,6 +27,44 @@ describe("meme-desk labels are exhaustive and never leak a raw enum", () => {
     expect(refusalLabel("daily_loss_cap")).toBe("teto de perda diária do conjunto atingido");
     expect(refusalLabel("weird_new_reason")).toBe("recusa: weird_new_reason");
     expect(refusalLabel(null)).toBeNull();
+  });
+
+  // T4.16 (EXP-M5/M6): the entry gate's own named refusals -- pedigree,
+  // flow and holders -- join the same vocabulary as the proposal's `refusal`.
+  it("every T4.16 gate refusal has a label, and the flow_/holders_ prefixes carry their motivo through", () => {
+    expect(refusalLabel("creator_serial")).toBe("criador em série");
+    expect(refusalLabel("symbol_clone")).toBe("clone de ticker");
+    expect(refusalLabel("pedigree_unknown")).toBe("pedigree não lido");
+    expect(refusalLabel("creator_unknown")).toBe("criador desconhecido");
+    expect(refusalLabel("symbol_unknown")).toBe("ticker desconhecido");
+    expect(refusalLabel("flow_not_positive")).toBe("sem demanda líquida");
+    expect(refusalLabel("buyers_below_min")).toBe("poucos compradores");
+    expect(refusalLabel("buyers_unknown")).toBe("compradores desconhecidos");
+    expect(refusalLabel("sells_ratio_above_max")).toBe("giro (vendas/compras)");
+    expect(refusalLabel("no_buys")).toBe("sem compras");
+    expect(refusalLabel("holders_not_rising")).toBe("holders não sobem");
+    expect(refusalLabel("progress_not_rising")).toBe("progresso não sobe");
+    expect(refusalLabel("progress_trend_unknown")).toBe("tendência do progresso desconhecida");
+    expect(refusalLabel("flow_no_trade_feed")).toBe("fluxo: sem fita (no_trade_feed)");
+    expect(refusalLabel("holders_no_holders_reader")).toBe("holders: no_holders_reader");
+  });
+
+  it("every outcome quality has a label; absence reads as the column's own default", () => {
+    expect(MEME_OUTCOME_QUALITIES).toEqual(["measured", "indeterminate"]);
+    for (const quality of MEME_OUTCOME_QUALITIES) {
+      expect(outcomeQualityLabel(quality)).not.toBe(quality);
+    }
+    expect(outcomeQualityLabel("measured")).toBe("medido");
+    expect(outcomeQualityLabel("indeterminate")).toBe("indeterminado (sem fotografia)");
+    expect(outcomeQualityLabel(null)).toBe("medido");
+    expect(outcomeQualityLabel(undefined)).toBe("medido");
+    expect(outcomeQualityLabel("something_new")).toBe("qualidade: something_new");
+  });
+
+  it("decisionToFillLabel: 'decisão → fill N s' when present, silence when not", () => {
+    expect(decisionToFillLabel(4.2)).toBe("decisão → fill 4.2 s");
+    expect(decisionToFillLabel(null)).toBeNull();
+    expect(decisionToFillLabel(undefined)).toBeNull();
   });
 
   it("quote reasons", () => {

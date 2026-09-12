@@ -24,6 +24,14 @@ exception, an unknown ``dev_share`` **with a reason** may pass — and a
 ``snipers`` ceiling). Every new criterion is **off by default**: a gate that does
 not ask a question does not refuse over it, so EXP-M1's frozen gate reads
 exactly as it did.
+
+T4.16 adds the criteria of EXP-M5 (the flow and the holders: net SOL flow —
+or, on the 15-second series, the 60 s market-cap delta — positive, a floor on
+distinct buyers, a ceiling on ``sells / buys``, holders and progress **rising**
+over two consecutive readings), off by default like the others. The optional
+criteria themselves live in :mod:`hunter_indicators.meme.rules_criteria`
+(the 350-line budget); this module keeps the gate, the features and the
+precedence of evaluation.
 """
 
 from __future__ import annotations
@@ -48,6 +56,7 @@ from hunter_indicators.meme.exits import (
     hit_time_stop,
     hit_trailing,
 )
+from hunter_indicators.meme.rules_criteria import flow_refusals, hype_refusals, line_refusals
 
 __all__ = [
     "EXIT_INPUTS",
@@ -82,6 +91,14 @@ GATE_INPUTS: Final = (
     "meme_features_1m.hype_score",
     "meme_features_1m.dev_share",
     "meme_features_1m.snipers",
+    "meme_features_1m.net_sol_flow_1m",
+    "meme_features_1m.unique_buyers",
+    "meme_features_1m.buys_1m",
+    "meme_features_1m.sells_1m",
+    "meme_features_1m.holders",
+    "meme_features_15s.mcap_delta_60s",
+    "meme_features_15s.holders_rising",
+    "meme_features_15s.progress_delta_60s",
 )
 
 
@@ -113,6 +130,14 @@ class EntryGate:
     """The brief's one exception to "unknown refuses": ``dev_share ≤ 0,10 ou
     NULL com motivo``. Only meaningful with ``max_dev_share`` set."""
     max_snipers: int | None = None
+    require_positive_flow: bool = False
+    """T4.16 (EXP-M5): ``net_sol_flow_1m > 0`` — or, when the tape is absent
+    and the 15-second series speaks, ``mcap_delta_60s > 0``; unknown refuses."""
+    min_unique_buyers: int | None = None
+    max_sells_to_buys: Decimal | None = None
+    """A ceiling on ``sells_1m / buys_1m`` (counts): churn is not demand."""
+    require_holders_rising: bool = False
+    require_progress_rising: bool = False
     inputs: tuple[str, ...] = GATE_INPUTS
 
     def __post_init__(self) -> None:
@@ -133,6 +158,10 @@ class EntryGate:
             raise ValueError("max_dev_share must be in [0, 1]")
         if self.max_snipers is not None and self.max_snipers < 0:
             raise ValueError("max_snipers cannot be negative")
+        if self.min_unique_buyers is not None and self.min_unique_buyers < 0:
+            raise ValueError("min_unique_buyers cannot be negative")
+        if self.max_sells_to_buys is not None and self.max_sells_to_buys < 0:
+            raise ValueError("max_sells_to_buys cannot be negative")
 
     def as_parameters(self) -> Mapping[str, str]:
         """Every threshold as a string — what a persisted decomposition stores.
@@ -158,6 +187,11 @@ class EntryGate:
             "max_dev_share": self.max_dev_share,
             "dev_share_unknown_allowed": self.dev_share_unknown_allowed or None,
             "max_snipers": self.max_snipers,
+            "require_positive_flow": self.require_positive_flow or None,
+            "min_unique_buyers": self.min_unique_buyers,
+            "max_sells_to_buys": self.max_sells_to_buys,
+            "require_holders_rising": self.require_holders_rising or None,
+            "require_progress_rising": self.require_progress_rising or None,
         }
         parameters.update({k: str(v) for k, v in optional.items() if v is not None})
         return parameters
@@ -186,6 +220,19 @@ class EntryFeatures:
     dev_share: Decimal | None = None
     dev_share_reason: str | None = None
     snipers: int | None = None
+    net_sol_flow_1m: Decimal | None = None
+    mcap_delta_60s: Decimal | None = None
+    """T4.16: the minute's net SOL flow from the tape, and — on the 15-second
+    series — the 60 s market-cap delta the gate reads when the tape is absent."""
+    buys_1m: int | None = None
+    sells_1m: int | None = None
+    unique_buyers_1m: int | None = None
+    tape_reason: str | None = None
+    """Why the tape columns are ``None`` (``no_trade_feed``, ``not_polled``…),
+    named in the refusal so blindness is counted apart from a flow that said no."""
+    holders_rising: bool | None = None
+    holders_reason: str | None = None
+    progress_rising: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,57 +302,6 @@ def _participation_refusals(features: EntryFeatures, gate: EntryGate) -> list[st
     return []
 
 
-def _line_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
-    """EXP-M2: the line must exist, its lows must rise, the previous window's
-    high must be taken out and the price must sit in the band above support."""
-    asks_line = (
-        gate.require_higher_lows
-        or gate.require_breakout_15m
-        or gate.min_distance_to_support_pct is not None
-        or gate.max_distance_to_support_pct is not None
-    )
-    if not asks_line:
-        return []
-    if features.higher_lows is None or features.distance_to_support_pct is None:
-        return [f"line_{features.line_reason or 'unknown'}"]
-    refusals: list[str] = []
-    if gate.require_higher_lows and not features.higher_lows:
-        refusals.append("no_higher_lows")
-    if gate.require_breakout_15m:
-        if features.breakout_15m is None:
-            refusals.append("breakout_unknown")
-        elif not features.breakout_15m:
-            refusals.append("no_breakout")
-    low, high = gate.min_distance_to_support_pct, gate.max_distance_to_support_pct
-    if low is not None and features.distance_to_support_pct < low:
-        refusals.append("distance_below_min")
-    if high is not None and features.distance_to_support_pct > high:
-        refusals.append("distance_above_max")
-    return refusals
-
-
-def _hype_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
-    """EXP-M3: the documented score floor, the dev's share and the snipers."""
-    refusals: list[str] = []
-    if gate.min_hype_score is not None:
-        if features.hype_score is None:
-            refusals.append(f"hype_{features.hype_reason or 'unknown'}")
-        elif features.hype_score < gate.min_hype_score:
-            refusals.append("hype_below_min")
-    if gate.max_dev_share is not None:
-        if features.dev_share is None:
-            if not (gate.dev_share_unknown_allowed and features.dev_share_reason):
-                refusals.append("dev_share_unknown")
-        elif features.dev_share > gate.max_dev_share:
-            refusals.append("dev_share_above_max")
-    if gate.max_snipers is not None:
-        if features.snipers is None:
-            refusals.append("snipers_unknown")
-        elif features.snipers > gate.max_snipers:
-            refusals.append("snipers_above_max")
-    return refusals
-
-
 def evaluate_entry(features: EntryFeatures, gate: EntryGate) -> GateDecision:
     """May we buy this mint now? Pure function of one features row and one gate."""
     refusals: list[str] = []
@@ -319,6 +315,7 @@ def evaluate_entry(features: EntryFeatures, gate: EntryGate) -> GateDecision:
     refusals.extend(_progress_refusals(features, gate))
     refusals.extend(_creator_refusals(features, gate))
     refusals.extend(_participation_refusals(features, gate))
-    refusals.extend(_line_refusals(features, gate))
-    refusals.extend(_hype_refusals(features, gate))
+    refusals.extend(line_refusals(features, gate))
+    refusals.extend(hype_refusals(features, gate))
+    refusals.extend(flow_refusals(features, gate))
     return GateDecision(allowed=not refusals, refusals=tuple(refusals))

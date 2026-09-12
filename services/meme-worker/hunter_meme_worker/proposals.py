@@ -35,10 +35,13 @@ from typing import Any
 from hunter_core.domain.types import uuid7
 from hunter_core.strategies.numeric import CONTEXT
 from hunter_indicators.meme.curve import marginal_price_sol, quote_buy
-from hunter_indicators.meme.rules import EntryFeatures, evaluate_entry, participation_pct
+from hunter_indicators.meme.pedigree import PEDIGREE_V1, PedigreeFeatures, evaluate_pedigree
+from hunter_indicators.meme.rules import EntryFeatures, evaluate_entry
 from hunter_meme_worker.lab_models import RuleSetSpec, Snapshot, money_str, optional_money_str
+from hunter_meme_worker.proposals_reasons import gate_reasons
 
 __all__ = [
+    "SERIES_15S",
     "GateOutcome",
     "GateRow",
     "ProposalDraft",
@@ -52,6 +55,9 @@ __all__ = [
 HUNDRED = Decimal(100)
 REFUSAL_ALREADY_OPEN = "already_open"
 REFUSAL_NO_SNAPSHOT_FOR_QUOTE = "no_snapshot_for_quote"
+SERIES_15S = "meme_features_15s_v1"
+"""The series a 15-second row names in ``reasons[0]`` (T4.16): the desk can
+tell a proposal judged per photo from one judged per closed minute."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +90,20 @@ class GateRow:
     snipers: int | None = None
     """T4.10 (``0026``): the line and the hype of the minute — read by the
     EXP-M2/EXP-M3 gates, ignored by a gate that does not ask."""
+    net_sol_flow_1m: Decimal | None = None
+    mcap_delta_60s: Decimal | None = None
+    buys_1m: int | None = None
+    sells_1m: int | None = None
+    unique_buyers_1m: int | None = None
+    tape_reason: str | None = None
+    holders_rising: bool | None = None
+    holders_reason: str | None = None
+    progress_rising: bool | None = None
+    """T4.16: the flow of the minute (or of the last 60 s on the 15-second
+    series) and the two trends — read by the EXP-M5 gate."""
+    series: str | None = None
+    """``None`` for a closed minute of ``meme_features_1m``; ``SERIES_15S`` for
+    a row of the 15-second series, where ``end_time`` is the instant judged."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,6 +170,15 @@ def entry_features_of(
         dev_share=row.dev_share,
         dev_share_reason=row.dev_share_reason,
         snipers=row.snipers,
+        net_sol_flow_1m=row.net_sol_flow_1m,
+        mcap_delta_60s=row.mcap_delta_60s,
+        buys_1m=row.buys_1m,
+        sells_1m=row.sells_1m,
+        unique_buyers_1m=row.unique_buyers_1m,
+        tape_reason=row.tape_reason,
+        holders_rising=row.holders_rising,
+        holders_reason=row.holders_reason,
+        progress_rising=row.progress_rising,
     )
 
 
@@ -181,59 +210,6 @@ def quote_for(
     }
 
 
-def gate_reasons(features: EntryFeatures, spec: RuleSetSpec) -> list[dict[str, Any]]:
-    """Which rule fired and the value of every feature it read — the decomposition.
-
-    The T4.10 features are listed only when the gate asked for them, so an
-    EXP-M1 proposal's ``reasons`` read exactly as they did before.
-    """
-    gate = spec.gate
-    share = participation_pct(features.intended_size_sol, features.curve_volume_1m_sol)
-    progress = features.progress_pct
-    reasons: list[dict[str, Any]] = [
-        {"rule": f"{gate.key}/{gate.version}"},
-        {"feature": "age_s", "value": features.age_s, "window": [gate.min_age_s, gate.max_age_s]},
-        {
-            "feature": "curve_progress_pct",
-            "value": optional_money_str(progress),
-            "window": [money_str(gate.min_progress_pct), money_str(gate.max_progress_pct)],
-        },
-        {"feature": "creator_net_seller", "value": features.creator_net_seller},
-        {
-            "feature": "participation_pct",
-            "value": optional_money_str(share),
-            "cap": money_str(gate.max_participation_pct),
-        },
-    ]
-    if gate.require_higher_lows or gate.require_breakout_15m or gate.max_distance_to_support_pct:
-        reasons.append(
-            {
-                "feature": "line",
-                "higher_lows": features.higher_lows,
-                "breakout_15m": features.breakout_15m,
-                "distance_to_support_pct": optional_money_str(features.distance_to_support_pct),
-                "line_reason": features.line_reason,
-                "band": [
-                    optional_money_str(gate.min_distance_to_support_pct),
-                    optional_money_str(gate.max_distance_to_support_pct),
-                ],
-            }
-        )
-    if gate.min_hype_score is not None:
-        reasons.append(
-            {
-                "feature": "hype_score",
-                "value": optional_money_str(features.hype_score),
-                "hype_reason": features.hype_reason,
-                "min": money_str(gate.min_hype_score),
-                "dev_share": optional_money_str(features.dev_share),
-                "dev_share_reason": features.dev_share_reason,
-                "snipers": features.snipers,
-            }
-        )
-    return reasons
-
-
 def evaluate_gate(
     spec: RuleSetSpec,
     rows: Iterable[GateRow],
@@ -241,8 +217,21 @@ def evaluate_gate(
     now: datetime,
     ttl_s: int,
     already_open: Mapping[str, Any] | frozenset[str] | set[str],
+    pedigree: Mapping[str, PedigreeFeatures] | None = None,
 ) -> GateOutcome:
-    """Every row of one closed minute through the gate of one rule set."""
+    """Every row of one instant (a closed minute, or a 15-second row) through
+    the gate of one rule set.
+
+    ``pedigree`` (T4.16, EXP-M6) is the two counts per mint at proposal time,
+    read by the caller (the loop always reads them); a set with
+    ``pedigree_exclusions`` refuses ``creator_serial`` / ``symbol_clone`` — or
+    the unknowns by name — **alongside** its own gate's refusals (both are
+    counted: a row excluded by its pedigree still tells the heartbeat what the
+    gate would have said), and a mint absent from the mapping is a mint whose
+    pedigree was not read (``pedigree_unknown``), never a clean one. ``None``
+    means the caller did not ask (the scale step, a unit test of the gate
+    alone): the exclusions are not applied.
+    """
     drafts: list[ProposalDraft] = []
     refusals: Counter[str] = Counter()
     evaluated = 0
@@ -251,10 +240,19 @@ def evaluate_gate(
         if row.mint in already_open:
             refusals[REFUSAL_ALREADY_OPEN] += 1
             continue
+        lineage: PedigreeFeatures | None = None
+        excluded: tuple[str, ...] = ()
+        if spec.pedigree_exclusions and pedigree is not None:
+            lineage = pedigree.get(row.mint)
+            excluded = (
+                ("pedigree_unknown",)
+                if lineage is None
+                else evaluate_pedigree(lineage, PEDIGREE_V1)
+            )
         features = entry_features_of(row, spec)
         decision = evaluate_entry(features, spec.gate)
-        if not decision.allowed:
-            refusals.update(decision.refusals)
+        if excluded or not decision.allowed:
+            refusals.update((*excluded, *decision.refusals))
             continue
         if row.snapshot is None:
             refusals[REFUSAL_NO_SNAPSHOT_FOR_QUOTE] += 1
@@ -264,7 +262,13 @@ def evaluate_gate(
                 row,
                 spec,
                 quote=quote_for(row, row.snapshot, spec),
-                reasons=gate_reasons(features, spec),
+                reasons=gate_reasons(
+                    features,
+                    spec,
+                    pedigree=lineage,
+                    pedigree_gate=PEDIGREE_V1 if lineage is not None else None,
+                    series=row.series,
+                ),
                 suggested=spec.suggested(),
                 now=now,
                 ttl_s=ttl_s,

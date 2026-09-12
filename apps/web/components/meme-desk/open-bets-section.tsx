@@ -12,7 +12,7 @@ import { sellNowAction } from "@/lib/api/meme-desk-actions";
 import type { MemeDeskBet, MemeDeskRow } from "@/lib/api/meme-desk-types";
 
 import { BetLegBadge, betAnchorId } from "./bet-leg";
-import { markSourceLabel, markStaleLabel, memeDeskProblemMessage } from "./labels";
+import { decisionToFillLabel, markSourceLabel, markStaleLabel, memeDeskProblemMessage } from "./labels";
 import { formatMultiple, formatR, formatSolSigned, remainingHoldLabel, signClass } from "./meme-desk-format";
 
 const SELL_WARNING = "vende na próxima fotografia, não neste preço";
@@ -93,6 +93,7 @@ function BetMetrics({ bet, nowMs }: { bet: MemeDeskBet; nowMs: number }) {
     readOptionalBoolean(bet.params, "exit_on_migration") === false ? "segura na migração" : null,
     markSourceLabel(readOptionalString(bet, "mark_source")),
     markStaleLabel(readOptionalNumber(bet, "mark_stale_s")),
+    decisionToFillLabel(bet.decision_to_fill_s),
   ].filter((p): p is string => p !== null);
   return (
     <div className="grid grid-cols-2 gap-2 font-mono text-xs tabular-nums sm:grid-cols-4">

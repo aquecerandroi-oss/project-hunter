@@ -22,12 +22,15 @@ from hunter_api.repositories.meme_tests import (
     BetRecord,
     DayTotalsRow,
     FeaturesAtMinute,
+    IndeterminateTotals,
 )
 from hunter_api.schemas.meme_tests import (
     EXIT_REASON_PT,
     NO_EXIT_LABEL,
+    OUTCOME_QUALITY_PT,
     PROVISIONAL_EXIT_LABEL,
     UNKNOWN_EXIT_LABEL,
+    UNKNOWN_QUALITY_LABEL,
     LabContextOut,
     LabContextReason,
     PnlUsdBasis,
@@ -53,6 +56,7 @@ __all__ = [
     "build_totals",
     "exit_reason_label",
     "int_or_none",
+    "outcome_quality_label",
     "str_or_none",
 ]
 
@@ -281,21 +285,55 @@ def build_test_row(row: BetRecord, features: FeaturesAtMinute | None) -> TestRow
         lab_context=build_lab_context(row, features),
         wallet=None,
         mark_source=None,
+        outcome_quality=bet.outcome_quality,
+        outcome_quality_label=outcome_quality_label(bet.outcome_quality),
+        outcome_quality_reason=bet.outcome_quality_reason,
     )
 
 
-def build_totals(totals: DayTotalsRow, *, real_rows: int) -> TestsTotalsOut:
+def outcome_quality_label(quality: str | None) -> str | None:
+    """``None`` for a row without the column; the brief's words otherwise."""
+    if quality is None:
+        return None
+    return OUTCOME_QUALITY_PT.get(quality, UNKNOWN_QUALITY_LABEL)
+
+
+def build_totals(
+    totals: DayTotalsRow, *, real_rows: int, indeterminate: IndeterminateTotals | None = None
+) -> TestsTotalsOut:
+    """The day's totals with the indeterminate closes **taken out** of every
+    sum of wins/losses/PnL/R and counted apart (T4.16); ``None`` (a database
+    below ``0030``) leaves the sums as the repository summed them."""
+    out = indeterminate
+    if out is None:
+        return TestsTotalsOut(
+            bets=totals.bets,
+            closed=totals.closed,
+            open=totals.open,
+            wins=totals.wins,
+            losses=totals.losses,
+            pnl_sol=totals.pnl_sol,
+            provisional_pnl_sol=totals.provisional_pnl_sol,
+            pnl_usd=totals.pnl_usd,
+            unpriced_usd=totals.unpriced_usd,
+            r_sum=totals.r_sum,
+            real_rows=real_rows,
+        )
+    pnl_usd = totals.pnl_usd
+    if pnl_usd is not None and out.pnl_usd is not None:
+        pnl_usd = pnl_usd - out.pnl_usd
     return TestsTotalsOut(
         bets=totals.bets,
         closed=totals.closed,
         open=totals.open,
-        wins=totals.wins,
-        losses=totals.losses,
-        pnl_sol=totals.pnl_sol,
+        wins=totals.wins - out.wins,
+        losses=totals.losses - out.losses,
+        indeterminate=out.bets,
+        pnl_sol=totals.pnl_sol - out.pnl_sol,
         provisional_pnl_sol=totals.provisional_pnl_sol,
-        pnl_usd=totals.pnl_usd,
-        unpriced_usd=totals.unpriced_usd,
-        r_sum=totals.r_sum,
+        pnl_usd=pnl_usd,
+        unpriced_usd=totals.unpriced_usd - out.unpriced_usd,
+        r_sum=totals.r_sum - out.r_sum,
         real_rows=real_rows,
     )
 

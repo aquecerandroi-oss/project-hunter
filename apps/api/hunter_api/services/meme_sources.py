@@ -213,5 +213,16 @@ def build_meme_sources(
         swap_api_measured_60s=parse_heartbeat_int(fields.get("swap_api_measured_60s")),
         swap_api_429_1h=parse_heartbeat_int(fields.get("swap_api_429_1h")),
         swap_api_blocked_until=parse_heartbeat_datetime(fields.get("swap_api_blocked_until")),
+        # T4.16: the 15-second clock and the measured decision → fill latency.
+        fast_lane_mints=parse_heartbeat_int(fields.get("fast_lane_mints")),
+        fast_lane_reads_60s=parse_heartbeat_int(fields.get("fast_lane_reads_60s")),
+        fast_lane_calls_60s=parse_heartbeat_int(fields.get("fast_lane_calls_60s")),
+        fast_lane_cycle_s=_float(fields.get("fast_lane_cycle_s") or None),
+        lab_decision_to_fill_s_p50=parse_heartbeat_int(fields.get("lab_decision_to_fill_s_p50")),
+        lab_decision_to_fill_s_p95=parse_heartbeat_int(fields.get("lab_decision_to_fill_s_p95")),
+        lab_decision_to_fill_n=parse_heartbeat_int(fields.get("lab_decision_to_fill_n")),
+        lab_bets_indeterminate_total=parse_heartbeat_int(
+            fields.get("lab_bets_indeterminate_total")
+        ),
         sources=[_source_out(name, blocks.get(name), latest.get(name)) for name in names],
     )

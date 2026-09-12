@@ -6,10 +6,10 @@ owner: quant-engineer
 exp: EXP-M1
 strategy: "meme/pumpfun — conjunto de regras sobre a curva de bonding (carteira paper, sem ordem real)"
 version: "gate comprar_cedo_na_curva v1 + saida alvo_2x_trailing_30_tempo_15m v1 (perfil meme_paper_v0)"
-result: nao-iniciado
-evaluable: 0
-days: 0
-last_eval: ""
+result: reprovada
+evaluable: 4
+days: 1
+last_eval: "2026-09-12"
 ---
 
 # EXP-M1 — comprar cedo na curva e vender em ROI alto
@@ -207,6 +207,27 @@ apagar.
 há uma única linha de `meme_curve_snapshots` no banco nesta data e nenhuma regra desta página foi
 executada sobre dado real. O que já existe é o instrumento (T4.5) e os testes que o provam, com as
 fixtures reais da T4.1 como entrada de fumaça.
+
+### Avaliação 2026-09-12 (T4.16, 15:xx BRT) — veredito `descartar`, conjunto `meme_paper_v0/1` aposentado
+
+**Coorte:** prospectiva na VPS, 12/09/2026 (o primeiro e único dia; `infra/scripts/sql/research/2026-09-12-t416-caso-das-21-apostas.sql`,
+lido pelo orquestrador às 14:0x BRT e cruzado no [[03-TRADING/Meme/Estudo-2026-09-12-21-apostas|estudo das 21 apostas]]).
+**Números:** 9 apostas fechadas de `meme_paper_v0/1`, **9 negativas**, expectância −0,85 R/aposta —
+**das quais 5 são artefato** (`rug_no_snapshot` a −1 R sem a moeda ter morrido: sem fotografia por 3 min antes
+das 12:14 BRT, mcap 30 min depois = mcap da entrada). Sem o artefato: 4 apostas, todas negativas, ≈ −0,17 R/aposta
+(a taxa). A `0030` reclassifica os artefatos como `indeterminate` (script auditado), então o placar honesto desta
+página é **4 medidas, 0 acertos, 5 indeterminadas**.
+**Contra a régua:** 1 dia (< 30), 4 medidas (< 100), expectância < 0 — `inconclusivo` por população e
+`descartar` por desenho: em 17 de 21 apostas do dia a moeda nunca subiu depois da entrada; a porta comprava
+moedas paradas no valor inicial (~28 SOL) com 1–7 holders, 99–289 s depois de nascerem, sem nenhum critério de
+demanda (P3 previa −0,10 R; o medido, mesmo sem o artefato, é pior). **P1 confirmada** (cegueira primeiro:
+`creator_net_seller_unknown`/`curve_volume_1m_unknown` dominaram as recusas até a fita da T4.2c). **P2** (−3,44 %
+na marcação imediata) confirmada nas entradas. **P5** (< 100 em 30 dias) — não chegou a 30 dias.
+**Decisão:** `descartar`; `meme_paper_v0/1` **aposentado por script auditado** (`infra/scripts/meme_rule_set.py
+--deprecate meme_paper_v0/1 --reason … --apply`, `system_events`), não pela migração. A sucessora é a porta de
+fluxo e holders — [[EXP-M5-fluxo-e-holders]] (`flow_v2/1`, relógio de 15 s) — com as exclusões de pedigree
+([[EXP-M6-exclusoes-de-pedigree]]) na frente. A página fica; a hipótese "comprar cedo na curva e vender em ROI
+alto" **sem critério de demanda** está falseada dentro do que um dia permite dizer.
 
 ## Variantes tentadas
 

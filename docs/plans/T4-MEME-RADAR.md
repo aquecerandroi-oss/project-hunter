@@ -848,6 +848,120 @@ faucet recusou de novo; mainnet: simulação `sigVerify=false` pelo caminho do e
 "Aprovar (REAL)" (`apps/web` intocado — o que a mesa precisa está nas notas §7), `risk_events`/transições
 persistidas do kill switch meme (só log + heartbeat).
 
+### T4.15 — o fechamento diário: as lições do dia escritas pelas linhas e a próxima leva proposta (entregue 12/09/2026)
+
+**Diretiva** (Everton, 12/09 13:2x BRT): "ele vai se auto aprimorando a cada leitura, a cada compra e venda,
+né?". Brief: `.claude/state/brief-T4.15-fechamento-diario.md`. Resposta honesta: o Lab **mede** sozinho, todo
+dia, o que o estudo das 21 apostas (`obsidian/03-TRADING/Meme/Estudo-2026-09-12-21-apostas.md`) mediu à mão —
+com n e IC — e **propõe**; não muda regra nenhuma sem pré-registro (KB-0092).
+
+**Schema** (`0031_meme_lab_ticks`, `docs/DATABASE.md` §42): `meme_lab_ticks`, uma linha por tick do laço
+(`lab_ticks.record_tick`, hunk de 3 linhas em `lab.py`): os contadores do `TickReport` e o dicionário de recusas
+do heartbeat, congelado. `hunter_worker` SELECT/INSERT, `hunter_app` SELECT, DELETE a ninguém; a descida recusa
+com linhas. Falha ao gravar é `warning`, nunca laço parado — o fechamento escreve "sem ticks gravados".
+
+**Job** (`infra/scripts/meme_close_day.py --day --dry-run|--apply`, serviço `ops`, cron 00:10 BRT —
+`docs/DEPLOYMENT.md` §3.6b; módulos `meme_close_{stats,lesson_kit,lessons,inputs,render,render_ops,outputs,
+queries}.py`, todos ≤ 350 linhas): lê como `hunter_app` e escreve **por acréscimo**, nesta ordem: (1) o diário
+`obsidian/09-OPERATIONS/Diario-Meme/<dia>.md` com a seção 6 preenchida — 14 lições, cada uma com n, IC 95 % por
+blocos de hora (bootstrap por blocos, semente 20260912, 2 000 reamostragens), "insuficiente" sob n < 30 e uma
+frase "o que muda amanhã": saídas por motivo (qual custou mais R), idade e progresso na entrada em bandas,
+snipers/top-10/dev em tercis, mesmo slot, criador em série (≥ 2 na hora anterior), clones de símbolo (≥ 3 em
+24 h), cobertura do dia (linhas do portão com progresso/fita/linha/hype; ticks, buracos e recusas somadas por
+motivo), operador (propostas × aval × expiradas, latência mediana/p90, R das aprovadas), reais × veredito do
+Lab ("`conjunto` aceitaria k de n compras reais"), leave-top-out por conjunto e a comparação com a previsão
+congelada de cada EXP-M*; (2) uma avaliação datada (`### Avaliação de <dia> — fechamento diário (T4.15)`) na
+página de cada EXP-M* ativa que fechou aposta no dia — append-only, `result` não muda; (3) linhas `M-L<n>` na
+fila `00-INBOX/Hipoteses-do-plantao.md` **só quando** o contraste passa a régua (n ≥ 30, ≥ 3 blocos, células
+≥ 10, IC 95 % do Δ pareado por blocos fora de zero); (4) a linha de índice no README da pasta (nenhuma nota
+órfã); (5) `.claude/state/lote-meme-<dia+1>.md` — manter/aposentar por conjunto (aposentar só com n ≥ 100,
+30 dias, IC < 0 **e** leave-top-out < 0), braços a pré-registrar a partir das lições que passaram (previsão
+`descartar`), "o que não fazer". Idempotente por dia: seção 6 já escrita → recusa (exit 2); stub do
+`meme_diary.py --apply` → completa; sem aposta fechada → recusa sem `--allow-empty` (exit 3).
+
+**Provas**: unit 17 (régua; cada lição com apostas sintéticas; seção 6; linhas `M-L`; lote; avaliação EXP;
+`--apply` num vault temporário, duas vezes); testcontainer 2 (um `lab_tick` real grava uma linha com
+`creator_net_seller_unknown`, o mesmo instante não grava duas, grants como os papéis; `--apply` sobre 32
+apostas plantadas numa **cópia** do vault → `obsidian_lint.py` limpo, avaliação EXP-M1 append-only, segunda
+execução recusada); `ruff`/`pyright`/`check_file_size.py` limpos nos arquivos da tarefa.
+
+**Fora**: commit/push do que o cron escreve no clone da VPS (decisão de operação, `docs/DEPLOYMENT.md`
+§3.6b), lições sobre `meme_features_15s` (T4.16), qualquer alteração de `meme_rule_sets` pelo job.
+
+### T4.16 — a porta v2 (fluxo e holders), o relógio de 15 s e o placar honesto (entregue 12/09/2026)
+
+**Diretiva** (Everton, 12/09 14:0x BRT): "aparecendo bastante proposta mas estamos perdendo todas; não está
+analisando direito? estamos muito lentos? analisa o caso". Brief: `.claude/state/brief-T4.16-porta-v2-e-relogio-de-15s.md`;
+estudo de origem: `obsidian/03-TRADING/Meme/Estudo-2026-09-12-21-apostas.md` (21 apostas, 1 acerto). Três
+defeitos medidos, três respostas — todas no motor de papel, nada real.
+
+**1. Placar honesto** (`0030_meme_gate_v2`, `docs/DATABASE.md` §43). `meme_paper_bets.outcome_quality`
+∈ {`measured`, `indeterminate`} + `outcome_quality_reason`/`_at`: um fecho `rug_no_snapshot` (sem fotografia
+para vender em 3 min) deixa de valer −1 R — em 12/09 foram 5 dos −7,67 R, com a moeda valendo a entrada 30 min
+depois: o instrumento piscou. A linha **mantém** `pnl_sol = −aposta`/`r_multiple = −1` (o CHECK exige os
+números; o simulador recebeu 0); o que muda são as somas: `meme_lab_scoreboard_v1` reescrita (`wins`/`pnl`/
+`r_sum`/drawdown só sobre `measured`, coluna nova `indeterminate`), `/meme/tests` (totais: `indeterminate` à
+parte; linha com `outcome_quality` + rótulo "indeterminado (sem fotografia)"), `/meme/lab` (`indeterminate` por
+dia) e a **carteira do próprio laço** (`wallet_state`: saldo e `realized_today` só medidas — os 5 artefatos
+somavam −0,25 SOL, acima do teto diário de 0,20: o artefato travaria o Lab). O laço fecha os novos já como
+`indeterminate` (`no_snapshot_in_window`); os passados só pelo script auditado
+`infra/scripts/meme_reclassify_indeterminate.py --day 2026-09-12 --apply --reason "…"` (dry-run por padrão,
+`system_events`). **Pendente:** o fechamento diário (T4.15) deve ler `outcome_quality` em vez de contar
+`rug_no_snapshot` como perda; `meme_diary*.py` ainda conta `rugs`.
+
+**2. Relógio de 15 s** (`fast_lane.py`, laço `meme-fast`). A cada 15 s, os rastreados com `created_at`
+conhecido e idade < 300 s (`MEME_FAST_LANE_ENABLED`, `fast_lane_max_age_s`) são lidos da cadeia pelo **mesmo**
+`get_curve_states`/`persist_reading` da T4.2f (≤ 2 `getMultipleAccounts` + ≤ 2 `getBlockTime` por leitura,
+≤ 16 chamadas/min além das ~4 do laço de 60 s — dentro dos 100 req/10 s do RPC público) e viram linhas de
+**`meme_features_15s`** (série separada, `meme_features_15s_v1`, PK `(as_of, mint, features_version)`, RANGE
+mensal, retenção 7 d): `mcap_delta_60s`, `mcap_slope_60s` (OLS de ln mcap, fração/min), `progress_delta_60s`/
+`progress_rising`, `holders_rising` (duas leituras seguidas), a fita dos últimos 60 s (`tape_for` com
+`end_time = as_of`), `dev_share`/`snipers` da última leitura — `hunter_indicators.meme.fast` (4
+`FeatureDefinition` v1). **Não-antecipação no SQL e no puro:** fotografias, trades e leituras só com
+`received_at <= as_of`; provado em `test_meme_fast.py`, `test_features_fast.py` e, contra Postgres,
+`test_lab_fast.py` (uma foto com block time dentro da janela mas entregue 5 s depois do instante não existe para
+ele — e existe 1 s depois de recebida). O Lab passa a bater a **15 s** (`lab_cycle_s = 15`): a porta de minuto
+fechado continua rodando uma vez por minuto fechado, a porta de 15 s roda sobre as linhas novas (`as_of <= now`,
+atraso máximo 45 s, `features_end_time = as_of`, `reasons[0].series = meme_features_15s_v1`), e **fills e
+vendas passam a ser avaliados a cada 15 s** — o fill de uma moeda jovem acontece na fotografia de 15 s seguinte
+(medido no testcontainer: decisão em +3 s, foto em +15 s → `decision_to_fill_s = 12`). Custo declarado:
+`meme_lab_ticks` (T4.15) recebe 4 linhas/min. `meme_features_1m` continua a série oficial por minuto.
+
+**3. Porta v2** (EXP-M5, `flow_v2/1`, `research_only`, `clock = 15s`): idade 30–300 s; `net_sol_flow_1m > 0`
+(ou `mcap_delta_60s > 0` quando a fita falta); `unique_buyers ≥ 10`; `sells/buys ≤ 0,6`; holders subindo em
+duas leituras; progresso ≥ 5 % **e** subindo; snipers ≤ 2; `dev_share ≤ 0,10` (desconhecido recusa);
+criador não vendedor líquido; participação ≤ 1 %; 0,05 SOL; alvo 3×, trailing 35 % armado após 1,5×, 1 800 s,
+`creator_dump`, `line_broken` quando houver linha, piso 50 %. Critérios novos em `EntryGate` (todos desligados
+por padrão — EXP-M1/M2/M3/M4 byte a byte; `rules_criteria.py`). `hype_probe_v0/2` (braço 2 da EXP-M5, relógio
+de 1 min — o `hype_score` é feature do minuto e a série de 15 s não tem board) = a sonda + as três condições de
+fluxo. **EXP-M6 (E2, exclusões de pedigree)** em `hunter_indicators.meme.pedigree` (`exclusoes_de_pedigree
+v1`): `creator_prior_mints_1h ≥ 2` → `creator_serial`, `symbol_dup_24h ≥ 3` → `symbol_clone`, desconhecido
+recusa por nome; contado em `meme_tokens` na hora da proposta (`lab_repo_fast.pedigree_for`) e aplicado a
+**todo** conjunto (`pedigree_exclusions`, padrão `true`), **somado** às recusas da porta (o heartbeat vê as
+duas). Aposentadoria de `meme_paper_v0/1` (EXP-M1: `descartar`) e `hype_probe_v0/1` (EXP-M3: `descartar`)
+**não** pela migração: `infra/scripts/meme_rule_set.py --deprecate name/version --reason "…" --apply`
+(auditado; `last_operator_set` recusado). Suposições declaradas: `max_open_positions = 5` no `flow_v2`,
+`dev_share_unknown_allowed = false`, `hype_probe_v0/2` no minuto.
+
+**4. Heartbeat/API:** `fast_lane_mints`, `fast_lane_reads_60s`, `fast_lane_calls_60s`, `fast_lane_cycle_s`;
+`lab_decision_to_fill_s_p50/p95` (**medidos** sobre os fills do processo, nearest-rank), `lab_decision_to_fill_n`,
+`lab_bets_indeterminate_total` (das linhas), `lab_fast_rows_evaluated`, `lab_fast_proposals_total`;
+`GET /meme/sources` os expõe; a mesa (`BetOut`) mostra `decision_to_fill_s` e `outcome_quality`; `/meme/tests`
+e `/meme/lab` contam `indeterminate` à parte. Colunas da `0030` lidas com sonda tolerante
+(`repositories/meme_desk_quality.py`, o padrão da `0029`).
+
+**Provas:** puro 84 (`test_meme_fast/pedigree/rules_flow`), worker unit 197, API unit 118, scripts 6,
+`test_migrations -k "0030 or 0029"` 10 (cadeia linear 0029 → 0030 → 0031 via cópia de rascunho — ver notas),
+testcontainers `test_lab_fast.py` 5 e `test_lab_persistence.py` 12. Notas: `.claude/state/notes-T4.16.md`.
+Rótulos do `apps/web` pendentes (fora desta tarefa): `outcome_quality` `indeterminate` → "indeterminado (sem
+fotografia)", `measured` → "medido"; `totals.indeterminate` → "indeterminadas"; `decision_to_fill_s` →
+"decisão → fill {N}s"; `reasons[0].series = meme_features_15s_v1` → "porta de 15 s"; `/meme/sources`:
+`fast_lane_mints` → "moedas < 5 min no relógio de 15 s", `lab_decision_to_fill_s_p50/p95` → "decisão → fill
+p50/p95"; `refusal` `creator_serial` → "criador em série", `symbol_clone` → "clone de ticker",
+`pedigree_unknown` → "pedigree não lido", `flow_not_positive` → "sem demanda líquida", `buyers_below_min` →
+"poucos compradores", `sells_ratio_above_max` → "giro (vendas/compras)", `holders_not_rising` → "holders
+não sobem", `progress_not_rising` → "progresso não sobe".
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets

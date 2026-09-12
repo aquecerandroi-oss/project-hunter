@@ -20,10 +20,13 @@ from typing import Any
 from hunter_indicators.meme.curve import CurveReserves
 
 __all__ = [
+    "INDETERMINATE",
     "LEGS",
     "MARK_CURVE",
     "MARK_POOL_TAPE",
     "MARK_SOURCES",
+    "MEASURED",
+    "NO_SNAPSHOT_IN_WINDOW",
     "BetExit",
     "Snapshot",
     "SolUsd",
@@ -122,6 +125,14 @@ class WalletState:
     exposure_by_mint: Mapping[str, Decimal] = field(default_factory=dict[str, Decimal])
 
 
+MEASURED = "measured"
+INDETERMINATE = "indeterminate"
+NO_SNAPSHOT_IN_WINDOW = "no_snapshot_in_window"
+"""``meme_paper_bets.outcome_quality`` (``0030``, T4.16) and the loop's own
+reason for an ``indeterminate`` close: no photo to sell into inside the
+window — the instrument blinked, the market did not speak."""
+
+
 @dataclass(frozen=True, slots=True)
 class BetExit:
     """Everything a sale (or a rug without a snapshot) writes when closing."""
@@ -131,3 +142,7 @@ class BetExit:
     pnl_sol: Decimal
     r_multiple: Decimal
     sol_usd_at_exit: Decimal | None
+    outcome_quality: str = MEASURED
+    outcome_quality_reason: str | None = None
+    """``indeterminate`` with its reason when the close priced nothing
+    (``rug_no_snapshot``); the row keeps its numbers, the sums leave it out."""

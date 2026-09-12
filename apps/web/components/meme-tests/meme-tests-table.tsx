@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { formatR, formatSolSigned, signClass } from "@/components/meme-desk/meme-desk-format";
+import { formatSolSigned, signClass } from "@/components/meme-desk/meme-desk-format";
 import { formatSol } from "@/components/meme/meme-format";
 import type { MemeTestRow } from "@/lib/api/meme-tests-types";
 import { formatBrasiliaLong } from "@/lib/time";
 
 import { MemeTestRowDetail } from "./meme-test-row-detail";
-import { formatBrasiliaClock, formatDurationSeconds, formatUsdSigned, ruleSetLabel } from "./meme-tests-format";
+import { formatBrasiliaClock, formatDurationSeconds, formatUsdSigned, rMultipleView, ruleSetLabel } from "./meme-tests-format";
 
 export interface MemeTestsTableProps {
   orgSlug: string;
@@ -68,6 +68,7 @@ function IdentityCells({ orgSlug, row }: { orgSlug: string; row: MemeTestRow }) 
 function MoneyCells({ row }: { row: MemeTestRow }) {
   const provisionalExit = row.exit.provisional ? " *" : "";
   const provisionalUsd = row.pnl_usd_basis === "entry_quote_provisional" ? " *" : "";
+  const r = rMultipleView(row);
   return (
     <>
       <Cell className="text-right font-mono tabular-nums">{row.entry.sol_spent === null ? DASH : formatSol(row.entry.sol_spent)}</Cell>
@@ -78,7 +79,9 @@ function MoneyCells({ row }: { row: MemeTestRow }) {
       <Cell className={`text-right font-mono tabular-nums ${row.pnl_usd === null ? "text-fg-subtle" : signClass(row.pnl_usd)}`}>
         {row.pnl_usd === null ? "sem cotação" : `${formatUsdSigned(row.pnl_usd)}${provisionalUsd}`}
       </Cell>
-      <Cell className={`text-right font-mono tabular-nums ${signClass(row.r_multiple)}`}>{row.r_multiple === null ? "—" : formatR(row.r_multiple)}</Cell>
+      <Cell className={`text-right font-mono tabular-nums ${r.muted ? "text-fg-muted" : signClass(row.r_multiple)}`} title={row.outcome_quality === "indeterminate" ? (row.outcome_quality_reason ?? undefined) : undefined}>
+        {r.text}
+      </Cell>
     </>
   );
 }

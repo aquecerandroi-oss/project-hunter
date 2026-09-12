@@ -1512,6 +1512,8 @@ export interface components {
          *     reason. Every ``None`` is a value the loop has not written.
          */
         BetOut: {
+            /** Decision To Fill S */
+            decision_to_fill_s?: number | null;
             /**
              * Entry At
              * Format: date-time
@@ -1549,6 +1551,10 @@ export interface components {
             mark_stale_s?: number | null;
             /** Mode */
             mode: string;
+            /** Outcome Quality */
+            outcome_quality?: ("measured" | "indeterminate") | string | null;
+            /** Outcome Quality Reason */
+            outcome_quality_reason?: string | null;
             params: components["schemas"]["DeskParamsOut"];
             /** Parent Bet Id */
             parent_bet_id?: string | null;
@@ -1963,6 +1969,11 @@ export interface components {
              * Format: date
              */
             day: string;
+            /**
+             * Indeterminate
+             * @default 0
+             */
+            indeterminate: number;
             max_drawdown_sol: components["schemas"]["NullableDecimalOut"];
             pnl_sol: components["schemas"]["NullableDecimalOut"];
             pnl_usd: components["schemas"]["NullableDecimalOut"];
@@ -3551,6 +3562,14 @@ export interface components {
             discovery_new_board_entries_1h?: number | null;
             /** Discovery Non Pump Entries 1H */
             discovery_non_pump_entries_1h?: number | null;
+            /** Fast Lane Calls 60S */
+            fast_lane_calls_60s?: number | null;
+            /** Fast Lane Cycle S */
+            fast_lane_cycle_s?: number | null;
+            /** Fast Lane Mints */
+            fast_lane_mints?: number | null;
+            /** Fast Lane Reads 60S */
+            fast_lane_reads_60s?: number | null;
             /** Fold Minute */
             fold_minute?: string | null;
             /** Fold Rows */
@@ -3563,6 +3582,14 @@ export interface components {
             heartbeat_key: string;
             /** Heartbeat Ts */
             heartbeat_ts: string | null;
+            /** Lab Bets Indeterminate Total */
+            lab_bets_indeterminate_total?: number | null;
+            /** Lab Decision To Fill N */
+            lab_decision_to_fill_n?: number | null;
+            /** Lab Decision To Fill S P50 */
+            lab_decision_to_fill_s_p50?: number | null;
+            /** Lab Decision To Fill S P95 */
+            lab_decision_to_fill_s_p95?: number | null;
             /**
              * Label
              * @default Meme Radar — fontes de dados; só monitoramento, nunca execução (pump.fun)
@@ -5998,6 +6025,12 @@ export interface components {
             mint: string;
             /** Origin */
             origin: string | null;
+            /** Outcome Quality */
+            outcome_quality?: string | null;
+            /** Outcome Quality Label */
+            outcome_quality_label?: string | null;
+            /** Outcome Quality Reason */
+            outcome_quality_reason?: string | null;
             /** Parent Bet Id */
             parent_bet_id: string | null;
             /** Pnl Sol */
@@ -6092,12 +6125,19 @@ export interface components {
         /**
          * TestsTotalsOut
          * @description The day's totals over **every** row of the filter, not only the page.
+         *     Since T4.16 ``wins``/``losses``/``pnl_sol``/``pnl_usd``/``r_sum`` count
+         *     **measured** closes only; ``indeterminate`` counts the rest apart.
          */
         TestsTotalsOut: {
             /** Bets */
             bets: number;
             /** Closed */
             closed: number;
+            /**
+             * Indeterminate
+             * @default 0
+             */
+            indeterminate: number;
             /** Losses */
             losses: number;
             /** Open */

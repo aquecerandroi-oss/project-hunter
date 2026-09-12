@@ -39,9 +39,11 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0029_meme_moonshot"
+HEAD_REVISION = "0031_meme_lab_ticks"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
-purpose: it is the one place that notices a revision file that never ran."""
+purpose: it is the one place that notices a revision file that never ran.
+``0031`` (T4.15) sits on ``0030_meme_gate_v2`` (T4.16) once the merge points
+its ``down_revision`` there — both were written in parallel on ``0029``."""
 
 INITIAL_REVISION = "0001_initial_schema"
 SHADOW_REVISION = "0002_shadow_lab"
@@ -84,6 +86,12 @@ database first, because ``"-1"`` stopped meaning 0027 the day 0028 landed."""
 MEME_LIVE_REVISION = "0028_meme_live"
 """What reversing **0029** lands on (T4.11) — and where the ``0028`` tests must
 stage first, because ``"-1"`` stopped meaning 0028 the day 0029 landed."""
+MEME_MOONSHOT_REVISION = "0029_meme_moonshot"
+"""What reversing **0030** lands on (T4.16) — and where the ``0029`` tests must
+stage first, because ``"-1"`` stopped meaning 0029 the day 0030 landed."""
+MEME_GATE_V2_REVISION = "0030_meme_gate_v2"
+"""What reversing **0031** lands on (T4.15) — and where the ``0030`` tests must
+stage first, because ``"-1"`` stopped meaning 0030 the day 0031 landed."""
 """Named for the same reason as the line below: the two ``0019`` tests are about
 reversing **0019**, and ``"-1"`` stopped meaning that the day a revision landed on
 top of it. They now stage the database at this revision first, exactly as every
@@ -554,14 +562,21 @@ async def test_every_partitioned_parent_has_its_initial_partitions(engine: Async
 
     meme_range: tuple[str, ...] = migration_ddl("meme_radar").MEME_PARTITIONED_TABLES_0021
     boards_range: tuple[str, ...] = migration_ddl("meme_boards").MEME_PARTITIONED_TABLES_0023
-    assert set(frozen_range) | set(meme_range) | set(boards_range) == set(partitioned_tables()), (
+    gate_range: tuple[str, ...] = migration_ddl("meme_gate_v2").MEME_PARTITIONED_TABLES_0030
+    assert set(frozen_range) | set(meme_range) | set(boards_range) | set(gate_range) == set(
+        partitioned_tables()
+    ), (
         "a model gained or lost a RANGE postgresql_partition_by without a "
         "migration updating ddl.partitions.PARTITIONED_TABLES (0001), "
-        "ddl.meme_radar.MEME_PARTITIONED_TABLES_0021 or "
-        "ddl.meme_boards.MEME_PARTITIONED_TABLES_0023"
+        "ddl.meme_radar.MEME_PARTITIONED_TABLES_0021, "
+        "ddl.meme_boards.MEME_PARTITIONED_TABLES_0023 or "
+        "ddl.meme_gate_v2.MEME_PARTITIONED_TABLES_0030"
     )
     assert not set(frozen_range) & set(meme_range), "a parent is frozen in two revisions"
     assert not (set(frozen_range) | set(meme_range)) & set(boards_range), (
+        "a parent is frozen in two revisions"
+    )
+    assert not (set(frozen_range) | set(meme_range) | set(boards_range)) & set(gate_range), (
         "a parent is frozen in two revisions"
     )
     assert {name: (values, key) for name, values, key in frozen_list} == {
@@ -581,6 +596,9 @@ async def test_every_partitioned_parent_has_its_initial_partitions(engine: Async
     boards_months: tuple[tuple[int, int], ...] = migration_ddl(
         "meme_boards"
     ).MEME_INITIAL_MONTHS_0023
+    gate_months: tuple[tuple[int, int], ...] = migration_ddl(
+        "meme_gate_v2"
+    ).MEME_INITIAL_MONTHS_0030
     expected = (
         {
             partition_name(table, year, month)
@@ -596,6 +614,11 @@ async def test_every_partitioned_parent_has_its_initial_partitions(engine: Async
             partition_name(table, year, month)
             for table in boards_range
             for year, month in boards_months
+        }
+        | {
+            partition_name(table, year, month)
+            for table in gate_range
+            for year, month in gate_months
         }
     )
     for parent, values, _key in frozen_list:
@@ -4391,11 +4414,13 @@ def test_0022_reverses_with_the_seed_alone_and_comes_back_seeded(upgraded: str) 
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     for relation in (*MEME_LAB_TABLES, *MEME_LAB_VIEWS):
         assert asyncio.run(_relation_exists(upgraded, relation)), relation
-    # ``0022``'s two plus ``0026``'s two plus ``0029``'s three, minus ``operator/1``
-    # (retired by ``0029``), all re-seeded on the way back up.
+    # ``0022``'s two plus ``0026``'s two plus ``0029``'s three plus ``0030``'s two,
+    # minus ``operator/1`` (retired by ``0029``), all re-seeded on the way back up.
+    # ``0030`` retires nothing: ``meme_paper_v0/1`` and ``hype_probe_v0/1`` leave by
+    # the audited ``infra/scripts/meme_rule_set.py --deprecate``, not by a deploy.
     assert asyncio.run(
         _scalars(upgraded, "SELECT count(*)::text FROM meme_rule_sets WHERE status = 'active'", {})
-    ) == ["6"]
+    ) == ["8"]
     assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_paper_bets")) == {
         "SELECT",
         "INSERT",
@@ -5365,8 +5390,10 @@ def test_0029_refuses_a_downgrade_that_would_lose_the_pool_tape_or_a_moonshot(
     upgraded: str,
 ) -> None:
     """§17.7: a pool trade, a pool-marked bet and a bet under a seeded set are
-    evidence — count, name, stop."""
+    evidence — count, name, stop. Staged at **0029** first (``0030`` and
+    ``0031`` sit on top), then put back at ``head``."""
     config = alembic_config(upgraded)
+    command.downgrade(config, MEME_MOONSHOT_REVISION)
     guarded: list[tuple[list[tuple[str, dict[str, object]]], str]] = [
         (
             [(_A_VENUE_TRADE, {"signature": "SIG_POOL_GUARD", "program": "pump_amm"})],
@@ -5378,16 +5405,20 @@ def test_0029_refuses_a_downgrade_that_would_lose_the_pool_tape_or_a_moonshot(
         ),
         (_a_marked_bet(5, _MOONSHOT_10X_RULE_SET), "reference the seeded moonshot"),
     ]
-    for statements, message in guarded:
-        asyncio.run(_write(upgraded, statements))
-        try:
-            with pytest.raises(DBAPIError, match=message):
-                command.downgrade(config, "-1")
-            assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, (
-                "the downgrade must not commit"
-            )
-        finally:
-            asyncio.run(_write(upgraded, list(_CLEAN_0029)))
+    try:
+        for statements, message in guarded:
+            asyncio.run(_write(upgraded, statements))
+            try:
+                with pytest.raises(DBAPIError, match=message):
+                    command.downgrade(config, "-1")
+                assert asyncio.run(_revision(upgraded)) == MEME_MOONSHOT_REVISION, (
+                    "the downgrade must not commit"
+                )
+            finally:
+                asyncio.run(_write(upgraded, list(_CLEAN_0029)))
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     command.check(config)
 
 
@@ -5395,7 +5426,7 @@ def test_0029_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
     """The operator's rollback: the columns and the seed go, ``operator/1``
     comes back active, the ``0028`` schema is what it was; the upgrade restores all."""
     config = alembic_config(upgraded)
-    command.downgrade(config, "-1")
+    command.downgrade(config, MEME_LIVE_REVISION)  # through 0031 and 0030, then 0029
     try:
         assert asyncio.run(_revision(upgraded)) == MEME_LIVE_REVISION
         assert asyncio.run(
@@ -5756,7 +5787,9 @@ def _a_live_position(**overrides: object) -> tuple[str, dict[str, object]]:
     return _A_LIVE_POSITION, params
 
 
-async def _column_privilege(url: str, role: str, table: str, column: str, privilege: str) -> bool:
+async def _column_privilege_named(
+    url: str, role: str, table: str, column: str, privilege: str
+) -> bool:
     engine = async_engine(url)
     try:
         async with engine.connect() as connection:
@@ -5800,17 +5833,17 @@ def test_0028_adds_the_mode_the_ledger_the_latch_and_the_grants(upgraded: str) -
         assert asyncio.run(_table_privileges(upgraded, "hunter_app", table)) == {"SELECT"}
     for column in cast("tuple[str, ...]", live.MEME_LIVE_SELL_REQUEST_COLUMNS):
         assert asyncio.run(
-            _column_privilege(upgraded, "hunter_app", "meme_live_positions", column, "UPDATE")
+            _column_privilege_named(upgraded, "hunter_app", "meme_live_positions", column, "UPDATE")
         )
     for column in ("status", "tokens", "exit_at", "mark_sol"):
         assert not asyncio.run(
-            _column_privilege(upgraded, "hunter_app", "meme_live_positions", column, "UPDATE")
+            _column_privilege_named(upgraded, "hunter_app", "meme_live_positions", column, "UPDATE")
         )
     assert asyncio.run(
-        _column_privilege(upgraded, "hunter_app", "meme_proposals", "mode", "UPDATE")
+        _column_privilege_named(upgraded, "hunter_app", "meme_proposals", "mode", "UPDATE")
     )
     assert not asyncio.run(
-        _column_privilege(upgraded, "hunter_app", "meme_proposals", "mint", "UPDATE")
+        _column_privilege_named(upgraded, "hunter_app", "meme_proposals", "mint", "UPDATE")
     ), "0022 granted the four decision columns; 0028 adds exactly `mode`"
     assert asyncio.run(
         _scalars(upgraded, "SELECT scope || ':' || state FROM meme_live_kill_switch", {})
@@ -5963,4 +5996,275 @@ def test_0028_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
     assert asyncio.run(
         _scalars(upgraded, "SELECT scope || ':' || state FROM meme_live_kill_switch", {})
     ) == ["wallet:ACTIVE"]
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0030_meme_gate_v2 — the honest scoreboard, the 15-second series, the flow gate (T4.16)
+# ---------------------------------------------------------------------------
+
+_FLOW_V2_RULE_SET = "01994d00-6c1a-7000-8000-000000000008"
+_HYPE_PROBE_2_RULE_SET = "01994d00-6c1a-7000-8000-000000000009"
+_HYPE_PROBE_1_RULE_SET = "01994d00-6c1a-7000-8000-000000000004"
+_SEEDED_0030 = {"a": _FLOW_V2_RULE_SET, "b": _HYPE_PROBE_2_RULE_SET}
+_A_QUALIFIED_BET = (
+    "INSERT INTO meme_paper_bets (id, proposal_id, rule_set_id, mint, mode, status, entry_at, "
+    "  entry, initial_risk_sol, params, exit_at, exit, pnl_sol, r_multiple, outcome_quality, "
+    "  outcome_quality_reason, outcome_quality_at) VALUES (:id, :proposal, :rule_set, "
+    "  'GUARD_MINT', 'paper', :status, now() - interval '2 minutes', '{}'::jsonb, 0.05, "
+    "  '{}'::jsonb, CAST(:exit_at AS timestamptz), CAST(:exit AS jsonb), "
+    "  CAST(:pnl AS numeric), CAST(:r AS numeric), :quality, :reason, CAST(:at AS timestamptz))"
+)
+_A_15S_ROW = (
+    "INSERT INTO meme_features_15s (as_of, mint, features_version, snapshots_120s, mcap_sol, "
+    "  window_reason, progress_reason, holders_reason, tape_reason, creator_net_seller_reason, "
+    "  dev_share_reason, snipers_reason) VALUES ('2026-10-05T12:00:00Z', 'GUARD_MINT', "
+    "  'meme_features_15s_v1', :snapshots, CAST(:mcap AS numeric), 'no_snapshot', "
+    "  'no_snapshot', 'no_holders_reader', 'no_trade_feed', 'no_trade_feed', "
+    "  'no_holders_reader', 'no_holders_reader')"
+)
+_CLEAN_0030: tuple[tuple[str, dict[str, object]], ...] = (
+    ("DELETE FROM meme_paper_bets WHERE mint = 'GUARD_MINT'", {}),
+    ("DELETE FROM meme_proposals WHERE mint = 'GUARD_MINT'", {}),
+    ("DELETE FROM meme_features_15s WHERE mint = 'GUARD_MINT'", {}),
+)
+_SCOREBOARD_COLUMNS = (
+    "SELECT column_name FROM information_schema.columns "
+    "WHERE table_name = 'meme_lab_scoreboard_v1' AND column_name = 'indeterminate'"
+)
+
+
+def _a_qualified_bet(
+    ordinal: int,
+    rule_set: str,
+    *,
+    status: str = "closed",
+    quality: str = "measured",
+    reason: str | None = None,
+    at: datetime | None = None,
+    exit_reason: str = "rug_no_snapshot",
+) -> list[tuple[str, dict[str, object]]]:
+    proposal = f"00000000-0000-4000-8000-0000000006{ordinal:02d}"
+    bet = f"00000000-0000-4000-8000-0000000007{ordinal:02d}"
+    closed = status == "closed"
+    return [
+        (_A_PROPOSAL, {"id": proposal, "rule_set": rule_set}),
+        (
+            _A_QUALIFIED_BET,
+            {
+                "id": bet,
+                "proposal": proposal,
+                "rule_set": rule_set,
+                "status": status,
+                "exit_at": datetime(2026, 10, 5, 12, 5, tzinfo=UTC) if closed else None,
+                "exit": json.dumps({"reason": exit_reason}) if closed else None,
+                "pnl": Decimal("-0.05") if closed else None,
+                "r": Decimal(-1) if closed else None,
+                "quality": quality,
+                "reason": reason,
+                "at": at,
+            },
+        ),
+    ]
+
+
+def test_0030_adds_outcome_quality_the_15s_series_and_seeds_the_flow_arms(upgraded: str) -> None:
+    """Three columns on the bet with their CHECKs, the partitioned series with
+    its grants, the scoreboard summing measured closes only, the two arms of
+    EXP-M5 with the brief's frozen parameters — and nothing retired."""
+    ddl = migration_ddl("meme_gate_v2")
+    frozen = cast("tuple[str, ...]", ddl.BET_COLUMNS_0030)
+    names = ", ".join(f"'{column}'" for column in frozen)
+    present = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT column_name FROM information_schema.columns "  # noqa: S608
+            f"WHERE table_name = 'meme_paper_bets' AND column_name IN ({names})",
+            {},
+        )
+    )
+    assert set(present) == set(frozen)
+    assert asyncio.run(_relation_exists(upgraded, "meme_features_15s"))
+    for year, month in cast("tuple[tuple[int, int], ...]", ddl.MEME_INITIAL_MONTHS_0030):
+        child = partition_name("meme_features_15s", year, month)
+        assert asyncio.run(_relation_exists(upgraded, child)), child
+        assert asyncio.run(_table_privileges(upgraded, "hunter_app", child)) == set()
+        assert asyncio.run(_table_privileges(upgraded, "hunter_worker", child)) == set()
+    assert asyncio.run(_table_privileges(upgraded, "hunter_app", "meme_features_15s")) == {"SELECT"}
+    assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_features_15s")) == {
+        "SELECT",
+        "INSERT",
+    }
+    assert asyncio.run(_scalars(upgraded, _SCOREBOARD_COLUMNS, {})) == ["indeterminate"]
+    seeds = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') || ':' "
+            "|| status || ':' || coalesce(params ->> 'clock', '1m') || ':' "
+            "|| (params ->> 'gate_key') || ':' || (params ->> 'gate_version') || ':' "
+            "|| (params ->> 'size_sol') || ':' || (params ->> 'target_x') || ':' "
+            "|| (params ->> 'trailing_pct') || ':' || coalesce(params ->> 'trailing_arm_x', '-') "
+            "|| ':' || (params ->> 'max_hold_s') || ':' || (params ->> 'max_loss_pct') || ':' "
+            "|| (params ->> 'min_unique_buyers') || ':' || (params ->> 'max_sells_to_buys') "
+            "|| ':' || (params ->> 'require_positive_flow') || ':' "
+            "|| coalesce(params ->> 'require_holders_rising', '-') || ':' "
+            "|| coalesce(params ->> 'require_progress_rising', '-') || ':' "
+            "|| (params ->> 'min_progress_pct') || ':' || (params ->> 'max_snipers') || ':' "
+            "|| (params ->> 'max_dev_share') || ':' || (params ->> 'dev_share_unknown_allowed') "
+            "|| ':' || coalesce(params ->> 'exit_on_line_break', '-') || ':' "
+            "|| coalesce(params ->> 'min_hype_score', '-') || ':' "
+            "|| coalesce(params ->> 'scale_gate', '-') || ':' || (params ->> 'max_open_positions') "
+            "|| ':' || (params ->> 'pedigree_exclusions') "
+            "FROM meme_rule_sets WHERE id IN (:a, :b) ORDER BY name, version",
+            dict(_SEEDED_0030),
+        )
+    )
+    assert seeds == [
+        "flow_v2/1:research_only:EXP-M5:active:15s:fluxo_e_holders:1:0.05:3:35:1.5:1800:50:10:0.6"
+        ":true:true:true:5:2:0.10:false:true:-:-:5:true",
+        "hype_probe_v0/2:research_only:EXP-M5:active:1m:sonda_de_hype:2:0.01:3:40:-:600:50:10:0.6"
+        ":true:-:-:0:2:0.10:true:-:0.6:trendline_v0/1:5:true",
+    ]
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT status FROM meme_rule_sets WHERE id IN (:a, :b) ORDER BY name",
+            {"a": _RESEARCH_RULE_SET, "b": _HYPE_PROBE_1_RULE_SET},
+        )
+    ) == ["active", "active"], "0030 retires nothing: the audited --deprecate does"
+    try:
+        # The default: a bet written without the column is measured.
+        asyncio.run(_write(upgraded, _a_marked_bet(6, _RESEARCH_RULE_SET)))
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT outcome_quality || ':' || (outcome_quality_reason IS NULL)::text "
+                "FROM meme_paper_bets WHERE id = '00000000-0000-4000-8000-000000000506'",
+                {},
+            )
+        ) == ["measured:true"]
+        stamp = datetime(2026, 10, 5, 12, 10, tzinfo=UTC)
+        asyncio.run(
+            _write(
+                upgraded,
+                _a_qualified_bet(
+                    1,
+                    _RESEARCH_RULE_SET,
+                    quality="indeterminate",
+                    reason="no_snapshot_in_window",
+                    at=stamp,
+                ),
+            )
+        )
+        asyncio.run(_write(upgraded, _a_qualified_bet(2, _RESEARCH_RULE_SET, exit_reason="target")))
+        refused: list[tuple[dict[str, object], str]] = [
+            ({"quality": "guess"}, "outcome_quality_is_a_known_label"),
+            (
+                {"status": "open", "quality": "indeterminate", "reason": "x", "at": stamp},
+                "an_indeterminate_bet_is_closed",
+            ),
+            ({"quality": "indeterminate"}, "an_indeterminate_outcome_names_its_reason"),
+            (
+                {"quality": "indeterminate", "reason": "x"},
+                "an_indeterminate_outcome_names_its_reason",
+            ),
+            ({"reason": "x", "at": stamp}, "an_indeterminate_outcome_names_its_reason"),
+        ]
+        for overrides, constraint in refused:
+            with pytest.raises(DBAPIError, match=constraint):
+                asyncio.run(_write(upgraded, _a_qualified_bet(3, _RESEARCH_RULE_SET, **overrides)))  # type: ignore[arg-type]
+        # The scoreboard: two closes, one measured (-0,05 SOL, -1 R) and one
+        # indeterminate that the sums leave out and the new column counts.
+        board = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT sum(closed)::text || ':' || sum(indeterminate)::text || ':' "
+                "|| sum(pnl_sol)::text || ':' || sum(r_sum)::text || ':' || sum(rugs)::text "
+                "|| ':' || sum(wins)::text "
+                "FROM meme_lab_scoreboard_v1 WHERE rule_set_id = CAST(:rs AS uuid) "
+                "AND day_brt = (now() AT TIME ZONE 'America/Sao_Paulo')::date",
+                {"rs": _RESEARCH_RULE_SET},
+            )
+        )
+        assert board == ["2:1:-0.0500000000:-1.0000000000:1:0"]
+        # The series: a blind row lands; a market cap without its photo does not.
+        asyncio.run(_write(upgraded, [(_A_15S_ROW, {"snapshots": 0, "mcap": None})]))
+        with pytest.raises(DBAPIError, match="a_market_cap_names_its_photo"):
+            asyncio.run(_write(upgraded, [(_A_15S_ROW, {"snapshots": 1, "mcap": Decimal("30")})]))
+        with pytest.raises(DBAPIError, match="counts_are_not_negative"):
+            asyncio.run(_write(upgraded, [(_A_15S_ROW, {"snapshots": -1, "mcap": None})]))
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0030)))
+        asyncio.run(_write(upgraded, list(_CLEAN_0029)))
+
+
+def test_0030_refuses_a_downgrade_that_would_lose_an_outcome_or_the_series(
+    upgraded: str,
+) -> None:
+    """§17.7: an indeterminate outcome, a 15-second row and a bet under a
+    seeded set are evidence — count, name, stop. Staged at **0030** first
+    (``0031`` sits on top), then put back at ``head``."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, MEME_GATE_V2_REVISION)
+    stamp = datetime(2026, 10, 5, 12, 10, tzinfo=UTC)
+    guarded: list[tuple[list[tuple[str, dict[str, object]]], str]] = [
+        (
+            _a_qualified_bet(4, _RESEARCH_RULE_SET, quality="indeterminate", reason="x", at=stamp),
+            "reclassified indeterminate",
+        ),
+        ([(_A_15S_ROW, {"snapshots": 0, "mcap": None})], "15-second series holds rows"),
+        (_a_qualified_bet(5, _FLOW_V2_RULE_SET), "reference the seeded flow_v2"),
+    ]
+    try:
+        for statements, message in guarded:
+            asyncio.run(_write(upgraded, statements))
+            try:
+                with pytest.raises(DBAPIError, match=message):
+                    command.downgrade(config, "-1")
+                assert asyncio.run(_revision(upgraded)) == MEME_GATE_V2_REVISION, (
+                    "the downgrade must not commit"
+                )
+            finally:
+                asyncio.run(_write(upgraded, list(_CLEAN_0030)))
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+def test_0030_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    """The operator's rollback: the columns, the series and the seed go, the
+    ``0027`` scoreboard is what it was; the upgrade restores all."""
+    config = alembic_config(upgraded)
+    columns = (
+        "SELECT count(*)::text FROM information_schema.columns "
+        "WHERE table_name = 'meme_paper_bets' AND column_name IN "
+        "('outcome_quality', 'outcome_quality_reason', 'outcome_quality_at')"
+    )
+    command.downgrade(config, MEME_MOONSHOT_REVISION)  # through 0031, then 0030
+    try:
+        assert asyncio.run(_revision(upgraded)) == MEME_MOONSHOT_REVISION
+        assert asyncio.run(_scalars(upgraded, columns, {})) == ["0"]
+        assert not asyncio.run(_relation_exists(upgraded, "meme_features_15s"))
+        assert asyncio.run(_scalars(upgraded, _SCOREBOARD_COLUMNS, {})) == []
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM meme_rule_sets WHERE id IN (:a, :b)",
+                dict(_SEEDED_0030),
+            )
+        ) == ["0"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_scalars(upgraded, columns, {})) == ["3"]
+    assert asyncio.run(_relation_exists(upgraded, "meme_features_15s"))
+    assert asyncio.run(_scalars(upgraded, _SCOREBOARD_COLUMNS, {})) == ["indeterminate"]
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT count(*)::text FROM meme_rule_sets WHERE id IN (:a, :b) AND status = 'active'",
+            dict(_SEEDED_0030),
+        )
+    ) == ["2"]
     command.check(config)

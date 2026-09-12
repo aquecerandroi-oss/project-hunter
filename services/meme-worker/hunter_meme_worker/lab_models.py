@@ -65,6 +65,7 @@ from hunter_meme_worker.lab_values import (
 )
 
 __all__ = [
+    "CLOCKS",
     "LEGS",
     "MARK_CURVE",
     "MARK_POOL_TAPE",
@@ -107,7 +108,29 @@ def _gate_from_params(name: str, version: str, params: Mapping[str, Any]) -> Ent
         max_dev_share=optional_decimal(params.get("max_dev_share")),
         dev_share_unknown_allowed=bool(params.get("dev_share_unknown_allowed", False)),
         max_snipers=None if params.get("max_snipers") is None else int(params["max_snipers"]),
+        # T4.16 (EXP-M5): the flow and the holders, each absent = not a criterion.
+        require_positive_flow=bool(params.get("require_positive_flow", False)),
+        min_unique_buyers=(
+            None if params.get("min_unique_buyers") is None else int(params["min_unique_buyers"])
+        ),
+        max_sells_to_buys=optional_decimal(params.get("max_sells_to_buys")),
+        require_holders_rising=bool(params.get("require_holders_rising", False)),
+        require_progress_rising=bool(params.get("require_progress_rising", False)),
     )
+
+
+CLOCKS: tuple[str, ...] = ("1m", "15s")
+"""``params.clock``: the series a set's gate reads — the closed minute
+(``meme_features_1m``, the default and every set frozen before T4.16) or the
+15-second series of the young mints (``meme_features_15s``). One clock per
+set: a set is never judged twice on the same instant from two series."""
+
+
+def _clock_of(value: Any) -> str:
+    clock = "1m" if value is None else str(value)
+    if clock not in CLOCKS:
+        raise ValueError(f"unknown clock {clock!r}; one of {CLOCKS}")
+    return clock
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +171,11 @@ class RuleSetSpec:
     exit_on_dead: bool = False
     dead_stale_s: int = DEFAULT_DEAD_STALE_S
     dead_mark_pct: Decimal = DEFAULT_DEAD_MARK_PCT
+    clock: str = "1m"
+    """T4.16: ``1m`` | ``15s`` (:data:`CLOCKS`) — which series this set's gate reads."""
+    pedigree_exclusions: bool = True
+    """T4.16 (EXP-M6): the cross-cutting pedigree refusals apply to this set;
+    ``false`` is the falsification arm's word, never the default."""
 
     @property
     def label(self) -> str:
@@ -202,6 +230,8 @@ class RuleSetSpec:
             exit_on_dead=bool_or(params.get("exit_on_dead"), False),
             dead_stale_s=int_or(params.get("dead_stale_s"), DEFAULT_DEAD_STALE_S),
             dead_mark_pct=decimal_or(params.get("dead_mark_pct"), DEFAULT_DEAD_MARK_PCT),
+            clock=_clock_of(params.get("clock")),
+            pedigree_exclusions=bool_or(params.get("pedigree_exclusions"), True),
         )
 
     def suggested(self) -> dict[str, Any]:

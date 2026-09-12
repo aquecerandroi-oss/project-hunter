@@ -39,6 +39,7 @@ from hunter_core.strategies.numeric import CONTEXT
 from hunter_indicators.meme.curve import quote_sell
 from hunter_indicators.meme.rules import ExitState, evaluate_exit
 from hunter_meme_worker.lab_models import BetExit, BetState, Snapshot, SolUsd, money_str
+from hunter_meme_worker.lab_values import INDETERMINATE, NO_SNAPSHOT_IN_WINDOW
 from hunter_meme_worker.paper_fill import (
     FILL_REFUSALS,
     FillVerdict,
@@ -214,11 +215,16 @@ def close_bet(
 
 
 def close_without_snapshot(bet: BetState, *, now: datetime, pending_reason: str | None) -> BetExit:
-    """No snapshot to sell into inside the window: the position is worth zero.
+    """No snapshot to sell into inside the window: the position is worth zero
+    on the row — and the outcome is **indeterminate** (T4.16, ``0030``).
 
     Not a fabricated fill at the last mark — a curve nobody observes any more is
     a curve nobody is buying from, and the doctrine's plausible outcome of a
-    curve position is the whole stake (RISK_ENGINE_MEME §5).
+    curve position is the whole stake (RISK_ENGINE_MEME §5). But the study of
+    12/09 measured five such closes whose coin was worth the entry thirty
+    minutes later: the instrument blinked. So the row keeps ``−stake``/``−1 R``
+    and says ``outcome_quality = indeterminate`` with the reason, and every sum
+    of R/PnL (scoreboard, desk, the loop's own wallet) leaves it out.
     """
     with localcontext(CONTEXT):
         pnl = -bet.sol_spent
@@ -233,8 +239,11 @@ def close_without_snapshot(bet: BetState, *, now: datetime, pending_reason: str 
             "sol_usd": None,
             "sol_usd_source": None,
             "sol_usd_reason": "no_sale_to_price",
+            "outcome_quality": INDETERMINATE,
         },
         pnl_sol=pnl,
         r_multiple=r_multiple,
         sol_usd_at_exit=None,
+        outcome_quality=INDETERMINATE,
+        outcome_quality_reason=NO_SNAPSHOT_IN_WINDOW,
     )

@@ -239,3 +239,21 @@ export function minuteFlags(payload: MemeSources): string[] {
   if (isNum(payload.ws_malformed_60s) && payload.ws_malformed_60s > 0) flags.push(`${payload.ws_malformed_60s} mensagem(ns) malformada(s) no último minuto`);
   return flags;
 }
+
+/**
+ * T4.16: the 15-second clock's own counters and the loop's decision→fill
+ * latency (Everton's priority #1 -- median < 5 s, p95 < 20 s) plus the
+ * running count of `indeterminate` closes. `null` (never an empty card) when
+ * an older worker has not started reporting any of these yet.
+ */
+export function fastLaneLine(payload: MemeSources): string | null {
+  const parts: string[] = [];
+  if (isNum(payload.fast_lane_mints)) parts.push(`${payload.fast_lane_mints} moedas < 5 min no relógio de 15 s`);
+  if (isNum(payload.fast_lane_reads_60s)) parts.push(`${payload.fast_lane_reads_60s} leituras por minuto (15 s)`);
+  if (isNum(payload.fast_lane_calls_60s)) parts.push(`${payload.fast_lane_calls_60s} chamadas por minuto (15 s)`);
+  if (isNum(payload.fast_lane_cycle_s)) parts.push(`ciclo do relógio de 15 s ${payload.fast_lane_cycle_s.toFixed(1)} s`);
+  if (isNum(payload.lab_decision_to_fill_s_p50)) parts.push(`decisão → fill p50 (medido) ${payload.lab_decision_to_fill_s_p50.toFixed(1)} s`);
+  if (isNum(payload.lab_decision_to_fill_s_p95)) parts.push(`decisão → fill p95 (medido) ${payload.lab_decision_to_fill_s_p95.toFixed(1)} s`);
+  if (isNum(payload.lab_bets_indeterminate_total)) parts.push(`${payload.lab_bets_indeterminate_total} indeterminadas (total)`);
+  return parts.length ? parts.join(" · ") : null;
+}

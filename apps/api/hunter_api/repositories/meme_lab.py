@@ -62,6 +62,9 @@ class DayScoreRow:
     r_sum: Decimal | None
     max_drawdown_sol: Decimal | None
     rugs: int
+    indeterminate: int = 0
+    """``0030`` (T4.16): closes the instrument could not price, counted apart;
+    ``0`` on a database whose board predates the column."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,9 +93,22 @@ _WALLET = text(
 
 _SCOREBOARD = text(
     "SELECT rule_set_id::text AS rule_set_id, day_brt, bets, closed, wins, pnl_sol, pnl_usd, "
-    "       unpriced_usd, r_sum, max_drawdown_sol, rugs "
+    "       unpriced_usd, r_sum, max_drawdown_sol, rugs, 0 AS indeterminate "
     "FROM meme_lab_scoreboard_v1 WHERE day_brt >= :since ORDER BY rule_set_id, day_brt DESC"
 )
+_SCOREBOARD_0030 = text(
+    "SELECT rule_set_id::text AS rule_set_id, day_brt, bets, closed, wins, pnl_sol, pnl_usd, "
+    "       unpriced_usd, r_sum, max_drawdown_sol, rugs, indeterminate "
+    "FROM meme_lab_scoreboard_v1 WHERE day_brt >= :since ORDER BY rule_set_id, day_brt DESC"
+)
+_SCOREBOARD_PROBE = text(
+    "SELECT count(*) FROM information_schema.columns "
+    "WHERE table_schema = 'public' AND table_name = 'meme_lab_scoreboard_v1' "
+    "  AND column_name = 'indeterminate'"
+)
+"""T4.16: the board of ``0030`` carries ``indeterminate`` and sums measured
+closes only; on a database below it the older board is read with a ``0`` —
+the same tolerant probe as ``repositories/meme_desk_marks.py``."""
 
 _LAST_QUOTE = text(
     "SELECT q ->> 'price_usd' AS price_usd, q ->> 'source' AS source, q ->> 'observed_at' AS observed_at "
@@ -148,7 +164,9 @@ class MemeLabRepository:
         )
 
     async def scoreboard(self, *, since: date) -> list[DayScoreRow]:
-        rows = (await self.session.execute(_SCOREBOARD, {"since": since})).mappings().all()
+        has_quality = int(await self.session.scalar(_SCOREBOARD_PROBE) or 0) == 1
+        query = _SCOREBOARD_0030 if has_quality else _SCOREBOARD
+        rows = (await self.session.execute(query, {"since": since})).mappings().all()
         return [
             DayScoreRow(
                 rule_set_id=str(r["rule_set_id"]),
@@ -162,6 +180,7 @@ class MemeLabRepository:
                 r_sum=r["r_sum"],
                 max_drawdown_sol=r["max_drawdown_sol"],
                 rugs=int(r["rugs"]),
+                indeterminate=int(r["indeterminate"]),
             )
             for r in rows
         ]

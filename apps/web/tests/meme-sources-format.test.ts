@@ -4,6 +4,7 @@ import {
   BLINDNESS_SENTENCE,
   blindnessGauge,
   budgetShare,
+  fastLaneLine,
   formatAgeS,
   formatBudget,
   progressGauge,
@@ -245,6 +246,29 @@ describe("blindnessGauge: share of the new board the radar cannot see by constru
     const gauge = blindnessGauge(payload);
     expect(gauge.reason).toBe("sem leitura: o worker não informou este número");
     expect(gauge.detail).toBeNull();
+  });
+});
+
+describe("fastLaneLine: the 15-second clock's counters and the decision→fill latency (T4.16)", () => {
+  it("joins every reported field in Portuguese, never a raw key", () => {
+    const line = fastLaneLine(
+      sourcesPayload({
+        fast_lane_mints: 42,
+        fast_lane_reads_60s: 4,
+        fast_lane_calls_60s: 84,
+        fast_lane_cycle_s: 14.6,
+        lab_decision_to_fill_s_p50: 3.2,
+        lab_decision_to_fill_s_p95: 18.9,
+        lab_bets_indeterminate_total: 5,
+      }),
+    );
+    expect(line).toBe(
+      "42 moedas < 5 min no relógio de 15 s · 4 leituras por minuto (15 s) · 84 chamadas por minuto (15 s) · ciclo do relógio de 15 s 14.6 s · decisão → fill p50 (medido) 3.2 s · decisão → fill p95 (medido) 18.9 s · 5 indeterminadas (total)",
+    );
+  });
+
+  it("is null (never an empty card) when a worker predates every one of these fields", () => {
+    expect(fastLaneLine(sourcesPayload())).toBeNull();
   });
 });
 

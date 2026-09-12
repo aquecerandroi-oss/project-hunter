@@ -63,12 +63,15 @@ function formatQuoteProgress(value: string): string {
   return Number.isFinite(n) ? `${n.toFixed(2)}%` : value;
 }
 
+/** T4.16: the 15-second clock's gate reads `meme_features_15s` instead of the closed-minute row; the minute series keeps its plain "regra x/y" text. */
+const FAST_CLOCK_SERIES = "meme_features_15s_v1";
+
 /** T4.10a proposals carry structured reasons (`{feature, value, window?, cap?}` or `{rule}`); `String(obj)` printed "[object Object]". */
-function reasonText(reason: unknown): string {
+export function reasonText(reason: unknown): string {
   if (typeof reason === "string") return reason;
   if (reason && typeof reason === "object") {
     const r = reason as Record<string, unknown>;
-    if (typeof r.rule === "string") return `regra ${r.rule}`;
+    if (typeof r.rule === "string") return r.series === FAST_CLOCK_SERIES ? `regra ${r.rule} · porta de 15 s` : `regra ${r.rule}`;
     const feature = typeof r.feature === "string" ? r.feature : "?";
     const value = r.value === undefined || r.value === null ? "" : String(r.value);
     const window = Array.isArray(r.window) ? ` (janela ${r.window.map(String).join("–")})` : "";

@@ -1,12 +1,12 @@
 import Link from "next/link";
 
-import { formatR, formatSolSigned, signClass } from "@/components/meme-desk/meme-desk-format";
+import { formatSolSigned, signClass } from "@/components/meme-desk/meme-desk-format";
 import { formatSol } from "@/components/meme/meme-format";
 import type { MemeTestRow } from "@/lib/api/meme-tests-types";
 import { formatBrasiliaLong } from "@/lib/time";
 
 import { MemeTestRowDetail } from "./meme-test-row-detail";
-import { formatBrasiliaClock, formatDurationSeconds, formatUsdSigned, ruleSetLabel } from "./meme-tests-format";
+import { formatBrasiliaClock, formatDurationSeconds, formatUsdSigned, rMultipleView, ruleSetLabel } from "./meme-tests-format";
 
 export interface MemeTestsCardsProps {
   orgSlug: string;
@@ -23,13 +23,14 @@ function Num({ label, value, className = "text-fg" }: { label: string; value: st
 }
 
 function CardNumbers({ row }: { row: MemeTestRow }) {
+  const r = rMultipleView(row);
   return (
     <div className="mt-2 grid grid-cols-3 gap-2">
       <Num label="Entrada" value={row.entry.sol_spent === null ? "—" : formatSol(row.entry.sol_spent)} />
       <Num label={row.exit.provisional ? "Saída *" : "Saída"} value={row.exit.sol_received === null ? "—" : formatSol(row.exit.sol_received)} />
       <Num label="PnL SOL" value={row.pnl_sol === null ? "—" : formatSolSigned(row.pnl_sol)} className={signClass(row.pnl_sol)} />
       <Num label="PnL US$" value={row.pnl_usd === null ? "sem cotação" : formatUsdSigned(row.pnl_usd)} className={row.pnl_usd === null ? "text-fg-subtle" : signClass(row.pnl_usd)} />
-      <Num label="R" value={row.r_multiple === null ? "—" : formatR(row.r_multiple)} className={signClass(row.r_multiple)} />
+      <Num label="R" value={r.text} className={r.muted ? "text-fg-muted" : signClass(row.r_multiple)} />
       <Num label="Duração" value={formatDurationSeconds(row.duration_s)} className="text-fg-muted" />
     </div>
   );

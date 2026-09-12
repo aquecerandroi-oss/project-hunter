@@ -21,7 +21,7 @@ import importlib.util
 import os
 import sys
 import uuid
-from collections.abc import AsyncGenerator, AsyncIterator, Iterator
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from types import ModuleType
@@ -53,7 +53,11 @@ if TYPE_CHECKING:
 pytestmark = pytest.mark.integration
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-MIGRATIONS_DIR = REPO_ROOT / "infra" / "migrations"
+MIGRATIONS_DIR = Path(os.environ.get("HUNTER_MIGRATIONS_DIR") or REPO_ROOT / "infra" / "migrations")
+"""``HUNTER_MIGRATIONS_DIR`` (T4.16's convention, ``packages/core/tests/integration
+/conftest.py``): a scratch copy of ``infra/migrations`` so a suite that migrates
+to ``head`` is not a function of another task's concurrent edits to the same
+tree. Unset — the default — is the tree itself; CI never sets it."""
 SCRIPTS_DIR = REPO_ROOT / "infra" / "scripts"
 API_DB = "hunter_api_it"
 WEB_ORIGIN = "http://web.test"
@@ -124,6 +128,28 @@ def api_database_url(postgres_container: PostgresContainer) -> Iterator[str]:
     os.environ["DATABASE_URL_MIGRATIONS"] = url
     asyncio.run(load_script("seed").seed())
     yield url
+
+
+@pytest.fixture(scope="session")
+def migrate_fresh_database(postgres_container: PostgresContainer) -> Callable[[str], str]:
+    """A factory: ``migrate_fresh_database("some_db_name")`` creates that database
+    inside the shared container and runs Alembic to ``head``, returning its URL —
+    unseeded, unlike :func:`api_database_url` above.
+
+    For a suite that wants its own tables read off the real migrations instead
+    of a frozen, hand-written DDL copy (T4.7b, ``test_meme_desk_repository.py``):
+    a database of its own means one test module's ``downgrade``/DDL-adjacent
+    assertions cannot see another's rows, the same isolation
+    ``packages/core/tests/integration/conftest.py``'s ``migrated_schema_db``/
+    ``paper_ledger_db`` give their suites.
+    """
+
+    def _migrate(name: str) -> str:
+        url = asyncio.run(_create_database(postgres_container.get_connection_url(), name))
+        command.upgrade(_alembic_config(url), "head")
+        return url
+
+    return _migrate
 
 
 @pytest.fixture(scope="session")

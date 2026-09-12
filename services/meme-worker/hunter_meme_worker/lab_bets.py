@@ -119,12 +119,16 @@ async def fill_approved(
             if verdict.kind == "filled" and verdict.entry is not None:
                 bet_id = await mark_filled(session, proposal, verdict.entry)
                 filled += 1
+                delay = verdict.entry.entry.get("decision_to_fill_s")
+                if isinstance(delay, int):  # T4.16: measured, for the heartbeat's p50/p95
+                    ctx.state.record_fill_delay(delay)
                 logger.info(
                     "meme_lab_bet_opened",
                     bet_id=bet_id,
                     mint=proposal.mint,
                     rule_set=spec.name,
                     sol_spent=money_str(verdict.entry.sol_spent),
+                    decision_to_fill_s=delay,
                 )
             elif verdict.kind == "refused" and verdict.refusal is not None:
                 await mark_unfilled(session, proposal.id, verdict.refusal)

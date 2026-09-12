@@ -15,6 +15,7 @@ desta árvore (T3.34) e o CI não o instala.
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from dataclasses import replace
@@ -195,6 +196,7 @@ def test_an_envelope_drawn_with_other_pattern_params_is_refused_not_redrawn(op: 
 
 
 def test_two_operations_mapping_to_one_file_name_fail_loud(op: Operation, tmp_path: Path) -> None:
+    pytest.importorskip("matplotlib", reason="rodar com `uv run --with matplotlib`")
     """Review of T3.50 (MEDIUM): a second operation behind the same PNG name
     must not vanish silently behind the first one's idempotent skip."""
     from render_operations import render
@@ -208,8 +210,6 @@ def test_two_operations_mapping_to_one_file_name_fail_loud(op: Operation, tmp_pa
         encoding="utf-8",
     )
     assert twin.filename() == op.filename()
-    args = type(
-        "Args", (), {"jsonl": str(jsonl), "out": str(tmp_path / "png"), "max": 10, "force": False}
-    )()
+    args = argparse.Namespace(jsonl=str(jsonl), out=str(tmp_path / "png"), max=10, force=False)
     with pytest.raises(SystemExit, match="colisão"):
         render(args)
