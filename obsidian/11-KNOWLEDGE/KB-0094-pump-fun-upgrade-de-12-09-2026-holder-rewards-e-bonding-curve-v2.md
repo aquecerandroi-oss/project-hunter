@@ -90,5 +90,16 @@ Parecer do run 14 (`.claude/state/astra-review-plantao-meme-20260912-1447.md`) r
   A exposição de M-P34 continua **não mensurável** fora da cadeia. Detalhe por campo/fonte/data em
   [[KB-0095-pump-fun-rotulos-observados-do-site-da-rest-e-os-limites-on-chain]] (parecer da Astra do run 17: KB nova + este adendo).
 
+## Adendo — run 18 (lane 2, 18:34–19:03 BRT): o anúncio oficial, datado
+
+- Post da `@Pumpfun` (id 2098818822417375528) às **13:59:36 BRT**: "We just made two HUGE changes to Pumpfun / We're INTRODUCING Holder Rewards and REMOVING Cashback
+  mode / Now, Holder Reward tokens pay out rewards just by holding…" (+ vídeo; **sem** percentual, limiar ou link). Hora obtida pelo endpoint público de sindicação por id
+  (a timeline por perfil devolveu 429 ×3); nada lido no X. Cronologia do dia, agora com o anúncio: bloco do upgrade ≈ 12:24 → merge no GitHub 12:58 → post 13:59 →
+  cryptobriefing 14:07:55 → primeiro 6074 no executor 14:09 (T4.14). Cronologia não é latência medida (parecer da Astra).
+- Imprensa × docs do programa: conversão permanente para Holder Rewards e intermediação pela equipe estão nos docs; "carteira de distribuição", "várias vezes por hora",
+  piso de US$ 20 **em posição** (não mensurável fora da cadeia), pagamento no quote e "US$ 370 M queimados" seguem **sem fonte primária** localizada (o site mostra
+  US$ 452,66 M — não reconciliado). Onde o anúncio **não** foi encontrado: `pump_tech_updates` (parado em 20/07), Telegram `@pumpfun` (só memes; identidade não verificada),
+  `pump.fun/docs` e `/blog` (casca). Fila: M-D12, M-P38.
+
 ## Ligações
 [[02-MARKET/Meme/2026-09-12]] · [[00-INBOX/Hipoteses-do-plantao]] · [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]] · [[KB-0093-dex-paid-e-boost-o-que-custam-e-o-que-medem]] · [[KB-0095-pump-fun-rotulos-observados-do-site-da-rest-e-os-limites-on-chain]] · [[03-TRADING/Meme/Estudo-2026-09-12-21-apostas]] · [[README-meme]]
