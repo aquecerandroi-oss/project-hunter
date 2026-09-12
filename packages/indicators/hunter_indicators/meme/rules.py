@@ -32,6 +32,12 @@ over two consecutive readings), off by default like the others. The optional
 criteria themselves live in :mod:`hunter_indicators.meme.rules_criteria`
 (the 350-line budget); this module keeps the gate, the features and the
 precedence of evaluation.
+
+T4.21 adds the four switches of the E1 gate's second arm (EXP-M5 arm 2,
+``fluxo_e_holders/2``): a floor on the holders count, "not falling" in place
+of "rising", an unknown creator vouched for by a measured ``dev_share``, and
+the 60 s market-cap delta as an alternative to progress rising — off by
+default, so arm 1 reads exactly as it was frozen.
 """
 
 from __future__ import annotations
@@ -56,7 +62,12 @@ from hunter_indicators.meme.exits import (
     hit_time_stop,
     hit_trailing,
 )
-from hunter_indicators.meme.rules_criteria import flow_refusals, hype_refusals, line_refusals
+from hunter_indicators.meme.rules_criteria import (
+    creator_refusals,
+    flow_refusals,
+    hype_refusals,
+    line_refusals,
+)
 
 __all__ = [
     "EXIT_INPUTS",
@@ -99,6 +110,8 @@ GATE_INPUTS: Final = (
     "meme_features_15s.mcap_delta_60s",
     "meme_features_15s.holders_rising",
     "meme_features_15s.progress_delta_60s",
+    "meme_features_15s.holders",
+    "meme_features_15s.holders_prev",
 )
 
 
@@ -138,6 +151,16 @@ class EntryGate:
     """A ceiling on ``sells_1m / buys_1m`` (counts): churn is not demand."""
     require_holders_rising: bool = False
     require_progress_rising: bool = False
+    min_holders: int | None = None
+    holders_rising_or_flat: bool = False
+    creator_unknown_allowed_if_dev_measured: bool = False
+    progress_or_mcap_rising: bool = False
+    """T4.21 (EXP-M5 arm 2): ``holders_below_min`` under the floor; with
+    ``require_holders_rising``, only a **fall** between the two readings
+    refuses (``holders_falling``); an unknown creator passes only when
+    ``dev_share`` was measured and is within ``max_dev_share`` (a known net
+    seller never passes); ``mcap_delta_60s > 0`` stands in for progress rising
+    (``progress_not_rising`` only when neither)."""
     inputs: tuple[str, ...] = GATE_INPUTS
 
     def __post_init__(self) -> None:
@@ -162,6 +185,8 @@ class EntryGate:
             raise ValueError("min_unique_buyers cannot be negative")
         if self.max_sells_to_buys is not None and self.max_sells_to_buys < 0:
             raise ValueError("max_sells_to_buys cannot be negative")
+        if self.min_holders is not None and self.min_holders < 0:
+            raise ValueError("min_holders cannot be negative")
 
     def as_parameters(self) -> Mapping[str, str]:
         """Every threshold as a string — what a persisted decomposition stores.
@@ -192,6 +217,12 @@ class EntryGate:
             "max_sells_to_buys": self.max_sells_to_buys,
             "require_holders_rising": self.require_holders_rising or None,
             "require_progress_rising": self.require_progress_rising or None,
+            "min_holders": self.min_holders,
+            "holders_rising_or_flat": self.holders_rising_or_flat or None,
+            "creator_unknown_allowed_if_dev_measured": (
+                self.creator_unknown_allowed_if_dev_measured or None
+            ),
+            "progress_or_mcap_rising": self.progress_or_mcap_rising or None,
         }
         parameters.update({k: str(v) for k, v in optional.items() if v is not None})
         return parameters
@@ -233,6 +264,10 @@ class EntryFeatures:
     holders_rising: bool | None = None
     holders_reason: str | None = None
     progress_rising: bool | None = None
+    holders: int | None = None
+    holders_prev: int | None = None
+    """T4.21: the two holders readings behind ``holders_rising`` — the floor
+    reads the newest, "not falling" compares the two."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,20 +312,6 @@ def _progress_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
     return []
 
 
-def _creator_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
-    """Off means the feature is not a criterion at all — the falsification arm.
-
-    On (the default) refuses both a known net seller and an unknown one: a gate
-    that let the unknown through would be reading a missing feed as "the dev did
-    not sell", which is the confusion Astra's MUST-FIX 1 names.
-    """
-    if not gate.require_creator_not_net_seller:
-        return []
-    if features.creator_net_seller is None:
-        return ["creator_net_seller_unknown"]
-    return ["creator_is_net_seller"] if features.creator_net_seller else []
-
-
 def _participation_refusals(features: EntryFeatures, gate: EntryGate) -> list[str]:
     if features.curve_volume_1m_sol is None:
         return ["curve_volume_1m_unknown"]
@@ -313,7 +334,7 @@ def evaluate_entry(features: EntryFeatures, gate: EntryGate) -> GateDecision:
         refusals.append("already_migrated")
     refusals.extend(_age_refusals(features, gate))
     refusals.extend(_progress_refusals(features, gate))
-    refusals.extend(_creator_refusals(features, gate))
+    refusals.extend(creator_refusals(features, gate))
     refusals.extend(_participation_refusals(features, gate))
     refusals.extend(line_refusals(features, gate))
     refusals.extend(hype_refusals(features, gate))
