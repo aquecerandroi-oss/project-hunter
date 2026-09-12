@@ -1,0 +1,168 @@
+**RESUMO**
+
+Eu seguiria **M-D2/M-D3 → M-P20 → M-P19**. M-D3 valida o instrumento; M-P20 é o primeiro teste estatístico, porque exige menos reconstrução on-chain. **M-P18 precisa de uma nova versão do protocolo antes de rodar.**
+
+A conferência dos brutos trouxe duas correções: nas 43 rápidas, `bo` q3 = **0%** e `t10` mediana = **1,3302%**; os dez mints são **4 pump e 6 raydium_launchpad**, não cinco pump. GROK entrou indevidamente na descrição “5/5 pump-nativas”. O próprio [rascunho identifica GROK como StonkFun](/C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-0429-lane3.md:30).
+
+**ARQUIVOS**
+
+Nenhum arquivo criado ou modificado; nenhum commit. Parecer em modo OPINIÃO, sob o escopo de `quant-engineer`, incluindo avaliação do contrato de dados.
+
+**TESTES**
+
+Não executei testes de software. Recalculei os agrupamentos em PowerShell, lendo os JSON com `Get-Content … | ConvertFrom-Json`. Saída real:
+
+```text
+pump: 49
+le60: 43
+middle: 0
+gt300: 6
+fast_t10_median: 1.3302
+fast_bo_q3: 0.0
+fast_bo_nonzero: 7
+
+program=pump: 4
+program=raydium_launchpad: 6
+```
+
+Consultei também documentação oficial de Solana, Jito e Raydium para conferir relógios, taxas e migração. Não reconstruí as transações dos mints; portanto, não considero bundle ou migração comprovados on-chain.
+
+**MUST-FIX**
+
+**1. M-P18: corrigir população, relógio e interpretação de bundle.**
+
+A [linha atual de M-P18](/C:/dev/project-hunter/obsidian/00-INBOX/Hipoteses-do-plantao.md:106) define população como “todas as graduadas do dia”. Isso permite estudar **retenção condicionada à graduação**, mas não o desempenho entre todas as criadas. O board acrescenta truncamento por paginação e seleção pelo momento da graduação.
+
+**Cenário de falha:** uma política parece boa porque seus fracassos antes da graduação nunca entram no denominador. Além disso, selecionar quem graduou pode induzir associação entre coordenação e demanda, pois ambas podem influenciar a graduação.
+
+Minha proposta:
+
+- **Coorte de origem:** todas as criações pump/Solana numa janela fixa, descobertas por WS e reconciliadas com a cadeia; lacunas explicitadas. Subamostra, se necessária, escolhida por hash na criação.
+- **M-P18a:** tempo até conclusão/migração entre todas as criadas, com horizonte fixo — proponho 24 h. “Não graduou até 24 h” é um resultado conhecido quando há cobertura; perda de acompanhamento é censura.
+- **M-P18b:** retenção após migração, explicitamente condicionada às migradas da coorte original. Não generalizar esse resultado às não migradas.
+- **Células de velocidade:** mesmo slot **comprovado**; slots distintos com duração ≤60 s; `(60 s, 5 min]`; `(5 min, 120 min]`; `>120 min até 24 h`; não migrada; indeterminada.
+- Contraste primário pré-fixado: mesmo slot comprovado versus `(5,120] min`. Células vazias continuam vazias; não mudar cortes após ver os desfechos.
+
+Os **43/49 = 87,8%** descrevem graduadas deste recorte com diferença temporal ≤60 s. **Não medem a fração de criadas que graduam rapidamente nem comprovam mesmo slot.** Se o contraste ficar sem potência, o resultado será inconclusivo.
+
+**2. M-P20 e M-P19: preço de pool no marco seleciona sucesso precoce.**
+
+Hoje [M-P20 exige preço de pool aos 60 s](/C:/dev/project-hunter/obsidian/00-INBOX/Hipoteses-do-plantao.md:109), e [M-P19 aos 5 min](/C:/dev/project-hunter/obsidian/00-INBOX/Hipoteses-do-plantao.md:108).
+
+**Cenário de falha:** o protocolo declara “todas as criações”, mas o cálculo elimina automaticamente quem não tinha pool naquele marco. O grupo das graduadas lentas desaparece justamente da comparação que deveria avaliá-lo.
+
+Eu separaria:
+
+| Medida | População e definição propostas |
+|---|---|
+| Conclusão até 24 h | Todas as criações amostradas; separar conclusão da curva e migração |
+| Compradores novos | Primeira compra daquele mint em `(5,35] min` para M-P19, com histórico desde a criação |
+| Retenção pós-migração | `P(pool, migração + 24 h) / P(pool, referência inicial)`; população condicional explicitada |
+| Resultado econômico | Entrada e saída executáveis pela rota disponível, tamanho e custos fixados; estudo separado da razão de preços |
+
+Para retenção, congelar pool, orientação base/quote, moeda de cotação, janela da referência inicial e tolerância de defasagem. **Não usar ATH, escolher o pool retrospectivamente nem preencher ausência com último preço.** Pool comprovadamente sem saída e falha de coleta são estados diferentes; publicar cobertura e análise de sensibilidade, sem excluir silenciosamente nenhum deles.
+
+**3. As conclusões sobre artefatos ainda excedem a evidência.**
+
+| Observação | O que concluo |
+|---|---|
+| `gd = creationTime` ao milissegundo | Igualdade de valores serializados. Em GEMEOW ambos terminam em `000`: isso não fornece resolução real de milissegundos |
+| `gd` próximo do horário do pool em três mints | Evidência compatível com **criação do pool** nesses casos; ainda não contrato universal do campo |
+| `bo` baixo nas rápidas | Baixo **na leitura posterior**. Não exclui concentração inicial seguida de venda; nem valida o detector |
+| `t10 >100%` | Inválido como participação normalizada. Denominador errado, duplicação ou leituras assíncronas são hipóteses; “artefato de supply” ainda não foi demonstrado |
+| `nh` versus `totalHolders` | Métricas não intercambiáveis sem definição de owner, conta, saldo mínimo, exclusões e instante |
+| StonkFun ~99,98%, CPMM e `gd=0` | Inconsistência entre indicadores/fontes; não prova que a curva continua aberta nem que aquele CPMM é sua migração oficial |
+
+O `blockTime` da Solana é **estimado e expresso em segundos**. Mesmo segundo não identifica slot, e mesmo slot não comprova bundle. Para distinguir os mecanismos, precisamos de criação, compras, conclusão e migração com assinaturas, slots, ordem das instruções e fluxos de tokens/SOL. [Documentação de `getBlockTime`](https://solana.com/docs/rpc/http/getblocktime).
+
+**Cenário de falha:** o classificador rotula 88% como bundle a partir de timestamps, aprende erro de relógio e passa a rejeitar lançamentos sem evidência de coordenação.
+
+Também não adotaria “erro ≤1,2 pp” como tolerância validada: TCAT diverge cerca de **3,45 pp**, e as leituras não são simultâneas. O [rascunho registra a exceção](/C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-0429-lane3.md:39). Ausência de risco bundle/sniper no rugcheck significa apenas ausência daquele alerta nesses relatórios.
+
+**4. M-D3: medir disponibilidade nossa, não inferi-la do timestamp do fornecedor.**
+
+`detectedAt` antigo não prova que o relatório estava acessível naquele instante. No Photon, **403 não é observação de ausência do pool**. ANONKNIGHT estava acessível na consulta a **+7 min 12 s**; não há limite inferior comprovado a +4 min 47 s. Portanto, nem “≤7 min” nem o intervalo entre as duas consultas está estabelecido. Os horários estão no [rascunho](/C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-0429-lane3.md:130).
+
+Gravar `request_started_at`, `response_received_at`, resultado da consulta, última ausência válida e primeira presença válida. Publicar:
+
+- atraso de nossa primeira observação;
+- intervalo possível de disponibilidade entre polls válidos;
+- fração encontrada até cada prazo;
+- erros, não encontrados e censurados.
+
+**Cenário de falha:** calcular p95 só entre respostas bem-sucedidas faz a ferramenta que bloqueia as consultas parecer rápida. Para avaliar nosso WS, a referência precisa incluir criações reconciliadas on-chain que ele perdeu.
+
+**5. M-P19: taxa de prioridade e tip não são a mesma grandeza econômica.**
+
+A comparação “média acumulada por moeda / tip mediano landed” mistura componente, janela e população. Ela **não demonstra competição local**. Consultar o endereço do programa também não reproduz necessariamente o conjunto de contas graváveis disputadas por uma compra. A RPC permite condicionar a estimativa a essas contas. [Documentação da RPC](https://solana.com/docs/rpc/http/getrecentprioritizationfees).
+
+**Cenário de falha:** M-P19 nasce explicando “bots” quando mede configurações padrão de aplicativos, limites de compute ou composição de transações.
+
+A feature deve contar **transações de compra distintas**, não linhas de trade. O schema já permite vários eventos na mesma transação, por `event_index`: [meme_series.py:164](/C:/dev/project-hunter/packages/core/hunter_core/db/models/meme_series.py:164). Repetir a taxa para cada evento distorce mediana e total.
+
+**NICE-TO-HAVE**
+
+Estratificar a validação de M-D2 por programa, idade e estado curva/pool. Para holders, reconstruir owners com saldo positivo no mesmo corte, separar contas de protocolo e declarar denominador. O [aceite de T4.2 já exige agregação por owner e exclusões](/C:/dev/project-hunter/docs/plans/T4-MEME-RADAR.md:289).
+
+**O QUE EU FARIA DIFERENTE**
+
+**(a) Funil e régua**
+
+1. **Contrato:** M-D2/M-D3 primeiro; congelar semântica, amostragem, disponibilidade e desfechos.
+2. **Replay:** validar pipeline e cobertura com capturas preservadas. O relatório atual do rugcheck não pode reconstruir score aos 60 s; onde não existe histórico, registrar “replay histórico indisponível”.
+3. **Estresse:** atrasos, 403/429, ausência de pool, desaparecimento de liquidez, transação com vários trades, tip separado, dados recebidos após o marco.
+4. **Prospectivo:** M-P20 primeiro; M-P19 depois que a coleta de transações tiver cobertura demonstrada.
+
+Para **M-P20**, manter score recebido até 60 s e amostragem por hash; escolher **conclusão em 24 h como primário sobre todas as criações**. Retenção pós-migração fica secundária e condicional. Congelar cortes do score numa calibração anterior, sem separar empates artificialmente.
+
+A margem de **±10 pp** proposta refere-se à diferença de retenção, não automaticamente à probabilidade de conclusão. Definir uma margem própria para esse primário. IC inteiramente dentro da margem sustenta equivalência; IC inteiramente além de uma borda sustenta diferença material; sobreposição com a borda é **inconclusiva**. “Não significativo” não significa equivalente.
+
+Manter **≥100 avaliáveis e ≥30 dias**, por célula comparada, IC95% por blocos de dia, três janelas cronológicas pré-fixadas e consistência em duas delas. Isso é piso editorial, não garantia de potência para equivalência. Registrar multiplicidade e todas as tentativas.
+
+Para M-P19, cortes de quartil devem vir de calibração anterior: usar o dia inteiro para classificar uma decisão daquele mesmo dia introduz informação futura. Disponibilidade exige payload e enriquecimento conhecidos no marco; não basta o trade ter ocorrido antes dele.
+
+**Retenção de armazenamento:** mesma política para todos os mints selecionados na origem, com manifestos de coorte e disponibilidade preservados. O contrato atual já determina janela igual e padrão de **90 dias**: [DATABASE.md:5745](/C:/dev/project-hunter/docs/DATABASE.md:5745).
+
+**(c) Gravação em T4.2**
+
+Eu proporia observações versionadas, mantendo separados:
+
+| Informação | Campos mínimos propostos |
+|---|---|
+| Identidade | `chain`, `program_id`, `platform`, `mint`, curva e pool |
+| Alegação do indexer | `gd_raw`, `gd_at`, `source=indexer`, horário da fonte quando disponível, `received_at`, versão do parser |
+| Conclusão observada | `completed_at` como primeira observação **nossa**; evidência e definição utilizada |
+| Eventos on-chain | `event_kind`, `slot`, `signature`, índice da instrução/evento, `block_time`, `commitment`, `received_at` |
+| Validação | `status`, motivo de desconhecimento/conflito e versão da regra |
+
+`gd=0` fica preservado no bruto e normalizado como ausência, não data de 1970. Não sobrescrever `completed_at` com `gd`.
+
+Há uma tensão concreta no código: `completed_at` recebe `state.observed_at` em [collect.py:120](/C:/dev/project-hunter/services/meme-worker/hunter_meme_worker/collect.py:120), mas `observed_at` significa horário da **fonte** em [meme_series.py:89](/C:/dev/project-hunter/packages/core/hunter_core/db/models/meme_series.py:89). Para primeira observação nossa, usar o horário de recebimento correspondente. Além disso, `created_at` vindo do WS representa recebimento, não criação on-chain: [meme.py:124](/C:/dev/project-hunter/packages/core/hunter_core/db/models/meme.py:124). Subtrair esses campos como se fossem relógios homogêneos produziria latências falsas.
+
+**Conclusão depende do programa:** em pump, distinguir curva completa e criação/migração para PumpSwap; em LaunchLab, validar estado e instrução de migração e sua ligação ao pool destino. A documentação prevê migração para CPMM ou AMM v4; ela não autentica o pool dos StonkFun observados. [Raydium LaunchLab](https://docs.raydium.io/products/launchlab/bonding-curve).
+
+Para taxas, proponho um registro por transação referenciado pelos trades:
+
+| Campo | Unidade/semântica |
+|---|---|
+| `fee_total_lamports` | Inteiro, `meta.fee` |
+| `compute_unit_price_micro_lamports` | Inteiro, µlamports/CU |
+| `compute_unit_limit`, `compute_units_consumed` | CU; solicitado/efetivo separado de consumido |
+| `priority_fee_lamports` | Inteiro, derivado com regra versionada |
+| `jito_tip_same_tx_lamports` | Transferências efetivadas a contas Jito reconhecidas |
+| Proveniência | `fee_payer`, versão da lista de contas Jito, fonte, parser, `received_at`, `available_at`, motivo de ausência |
+
+A prioridade usa **limite × preço**, arredondada para cima, não unidades consumidas. Valores em SOL derivados usam `Decimal/NUMERIC(28,10)`. [Taxas Solana](https://solana.com/docs/core/fees).
+
+Tip na mesma transação é observável; tip em outra transação do bundle pode não ser atribuível. Assim, ausência de transferência local não prova ausência de Jito. Nomear a feature conforme o que mede: **fração de transações de compra com tip Jito na própria transação**. [Documentação Jito](https://docs.jito.wtf/lowlatencytxnsend/).
+
+**CONCORDO COM**
+
+Capturar agora proveniência e disponibilidade; separar curva de pool; tratar campos inválidos/desconhecidos explicitamente; não usar LP 100% locked como discriminante nesta amostra; manter as três propostas como pesquisa, sem promoção por graduação ou correlação isolada.
+
+**OBSIDIAN**
+
+- **Plantão MEME — 2026-09-12:** acrescentar parecer final, correções de população, “mesmo slot”, latências e comparação de taxas.
+- **Hipóteses do plantão:** versionar M-P18 e corrigir população/desfechos de M-P19/M-P20 e censura de M-D3.
+- **Meme — o que uma “estratégia” é aqui:** registrar instrumento → M-P20 → M-P19 e separar retenção de preço de retorno executável.
+- **Revisões Astra — índice:** vincular este parecer, com pendências concretas para o contrato de T4.2.
