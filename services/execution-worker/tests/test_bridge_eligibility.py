@@ -55,6 +55,8 @@ async def _setup(
     engine: AsyncEngine,
     *,
     spot_volume: Decimal | None = Decimal(120_000_000),
+    candle_volume: Decimal = Decimal(4_000_000),
+    candle_minutes: int = 31,
     with_beta: bool = True,
     active_version: bool = True,
     agent_status: str = "enabled",
@@ -67,6 +69,10 @@ async def _setup(
         engine, active=active_version, at=BAR, purpose=version_purpose
     )
     await shadow.set_spot_volume(engine, tenant.market_id, volume=spot_volume)
+    await shadow.ensure_candle_partitions(engine, NOW)
+    await shadow.seed_minute_volumes(
+        engine, tenant.market_id, now=NOW, quote_volume=candle_volume, minutes=candle_minutes
+    )
     await shadow.create_agent(
         engine,
         organization_id=tenant.org_id,
@@ -298,7 +304,7 @@ async def test_without_a_beta_the_signal_is_refused_beta_unavailable(
 async def test_a_spot_pair_below_the_floor_is_refused(
     db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
 ) -> None:
-    fixture = await _setup(db_session_factory, db_engine, spot_volume=Decimal(10_000_000))
+    fixture = await _setup(db_session_factory, db_engine, candle_volume=Decimal(1_000_000))
     await shadow.emit_signal(
         db_engine,
         version_id=fixture.version_id,
@@ -313,9 +319,8 @@ async def test_a_spot_pair_below_the_floor_is_refused(
 async def test_a_spot_pair_without_a_measured_volume_is_refused_unavailable(
     db_session_factory: async_sessionmaker[AsyncSession], db_engine: AsyncEngine
 ) -> None:
-    """T3.0c has not measured this pair yet: a permission is never granted by a
-    failed read (``spot_universe.tradable_symbols``, same doctrine)."""
-    fixture = await _setup(db_session_factory, db_engine, spot_volume=None)
+    """A ticker value cannot prove liquidity when there are no observed candles."""
+    fixture = await _setup(db_session_factory, db_engine, candle_minutes=0)
     await shadow.emit_signal(
         db_engine,
         version_id=fixture.version_id,
@@ -324,7 +329,7 @@ async def test_a_spot_pair_without_a_measured_volume_is_refused_unavailable(
         purpose=shadow.PURPOSE_PAPER,
     )
     screened = await _screen(db_session_factory, fixture)
-    assert [item.refused for item in screened] == ["spot_volume_unavailable"]
+    assert [item.refused for item in screened] == ["liquidity_unproven"]
 
 
 async def test_an_expired_entry_window_is_refused(

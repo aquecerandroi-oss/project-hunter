@@ -667,6 +667,8 @@ monitoradas tinham entre 296 s e 370 s. O cenário que isso fecha: um mercado qu
 cai de 60 M para 5 M/24 h continuava passando o piso de 50 M com um `volume_ts`
 de 60 s, porque o número e o carimbo descreviam instantes diferentes.
 
+A peneira da ponte também usa `bridge_inputs.volume_window` para comparar a soma das velas SPOT ao piso existente, sem consultar `markets.volume_24h_usd`, e recusa por `liquidity_unproven` quando a soma não existe (A3.86b).
+
 ## 8. Risk events e garantias
 
 Tipos: `limits_changed`, `proposal_rejected`, `proposal_unavailable_input`, `daily_loss_warning`,

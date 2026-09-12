@@ -55,6 +55,7 @@ from hunter_core.strategies.envelope import (
     PURPOSE_RESEARCH_ONLY,
     AssumedCosts,
 )
+from hunter_execution_worker.bridge_inputs import volume_window
 from hunter_execution_worker.bridge_repo import ENTRY_WINDOW, ShadowSignal
 from hunter_execution_worker.bridge_universe import (
     SPOT_VOLUME_FLOOR_USDT,
@@ -294,9 +295,10 @@ async def screen_signal(
         return _refuse(signal, "spot_pair_unavailable", reported=reported)
     if not spot.is_monitored:
         return _refuse(signal, "spot_not_monitored", reported=reported, spot=spot.symbol)
-    if spot.volume_24h_usd is None:
-        return _refuse(signal, "spot_volume_unavailable", reported=reported, spot=spot.symbol)
-    if spot.volume_24h_usd < SPOT_VOLUME_FLOOR_USDT:
+    volumes = await volume_window(session, market_id=spot.market_id, now=now)
+    if volumes.quote_volume_24h is None:
+        return _refuse(signal, "liquidity_unproven", reported=reported, spot=spot.symbol)
+    if volumes.quote_volume_24h < SPOT_VOLUME_FLOOR_USDT:
         return _refuse(signal, "spot_volume_below_floor", reported=reported, spot=spot.symbol)
 
     beta = await current_beta(session, market_id=spot.market_id, now=now)
