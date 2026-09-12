@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 from hunter_core.db.session import role_session
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
+from hunter_exchanges.base import MalformedMessage
 from hunter_exchanges.pumpfun.normalize import curve_state_from_rpc_account
 from hunter_meme_worker.collect import persist_reading
 from hunter_meme_worker.graduation import mayhem_denominator
@@ -97,9 +98,19 @@ async def mayhem_once(ctx: RadarContext) -> MayhemReport:
         tracked = ctx.tracker.get(mint)
         if tracked is None:
             continue
-        state = curve_state_from_rpc_account(mint, flow.curve).model_copy(
-            update={"slot": flow.slot, "commitment": flow.commitment}
-        )
+        try:
+            state = curve_state_from_rpc_account(mint, flow.curve).model_copy(
+                update={"slot": flow.slot, "commitment": flow.commitment}
+            )
+        except MalformedMessage as exc:
+            # An emptied curve (reserves zero after the migrate) or any other
+            # account the decoder refuses is one mint's absence, not the loop's
+            # death: production 12/09 15:07:58Z, "empty virtual reserve" climbed
+            # through the TaskGroup and restarted the worker (the third
+            # crash-loop of the day with `healthy` in `docker ps`).
+            refused["malformed"] += 1
+            logger.warning("meme_mayhem_mint_skipped", mint=mint, error=str(exc)[:200])
+            continue
         await persist_reading(ctx, state, count_request=False)
         meme_polls_total.labels(source="solana_rpc", outcome="ok").inc()
         params = None
