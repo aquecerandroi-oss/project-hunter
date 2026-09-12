@@ -1,0 +1,287 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/8tO4G4bsddvYxoK4trH133ztOUc</id>
+  <title>arXiv Query: search_query=all:solana AND (all:MEV OR all:sandwich OR all:launchpad OR all:sniper OR all:"wash trading" OR all:"rug pull")&amp;id_list=&amp;start=0&amp;max_results=40</title>
+  <updated>2026-09-12T08:13:05Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=all:solana+AND+(all:MEV+OR+(all:sandwich+OR+(all:launchpad+OR+(all:sniper+OR+(all:%22wash+trading%22+OR+all:%22rug+pull%22)))))&amp;start=0&amp;max_results=40&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>40</opensearch:itemsPerPage>
+  <opensearch:totalResults>11</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2608.20271v1</id>
+    <title>Catching the Rug: Early Prediction of Fraudulent Memecoins on Solana via Machine Learning</title>
+    <updated>2026-08-20T17:09:41Z</updated>
+    <link href="https://arxiv.org/abs/2608.20271v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2608.20271v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The rapid proliferation of memecoins on blockchain platforms has increased the risk of fraudulent activities, particularly rug pulls. While previous studies have focused on Ethereum-based tokens, this paper shifts the spotlight to Solana, the leading blockchain for memecoins by trading volume and token count. Unlike Ethereum, where rug pulls often exploit smart contract backdoors, Solana memecoin rug pulls are predominantly driven by liquidity manipulation and social dynamics. This research pioneers large-scale rug pull early detection in the Solana ecosystem by assembling a dataset of 6.4 million tokens over 7 months. Market analysis reveals that a vast majority of these memecoins exhibit rug pull characteristics within one hour of launch, highlighting the urgency of short-horizon prediction. Despite the absence of code-level features, we demonstrate that classic machine learning models, particularly Gradient Boosting (XGBoost), achieve robust performance in detecting potential rug pulls using only the first 5 minutes of trading data. Furthermore, we evaluate cross-platform generalization between PumpFun and Raydium, revealing that multi-source data fusion significantly mitigates domain shift and improves detection reliability. This study advances the understanding of DeFi fraud on high-throughput chains and provides a practical framework for protecting investors.</summary>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.DC" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-08-20T17:09:41Z</published>
+    <arxiv:primary_category term="cs.AI"/>
+    <author>
+      <name>Jianghai Li</name>
+    </author>
+    <author>
+      <name>Pavel Kuznetsov</name>
+    </author>
+    <author>
+      <name>Yury Yanovich</name>
+    </author>
+    <author>
+      <name>Konstantin Nott-Whaley</name>
+    </author>
+    <author>
+      <name>Igor Vodolazov</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.28424v2</id>
+    <title>Demystifying Solana Bots: From GitHub Blueprints to On-Chain Fingerprints</title>
+    <updated>2026-07-31T07:11:57Z</updated>
+    <link href="https://arxiv.org/abs/2607.28424v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.28424v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Solana is an emerging blockchain platform designed for high throughput and low transaction fees, making it inexpensive to submit transactions at scale and, consequently, increasing exposure to bot spamming and related financial exploitation. Solana bots are typically off-chain software systems that operate in a competitive on-chain execution environment by constructing and submitting transactions, and the bot-related transactions on the decentralized exchanges exceed 250 million dollars in daily trading volume in January 2026. Prior studies on Solana have examined system performance, smart-contract security, and specific on-chain phenomena. However, we still lack a systematic understanding of what Solana bots implement in practice and how these implementations manifest as observable on-chain execution fingerprints. To address this gap, we performed a large-scale empirical study of Solana bots from two complementary views: (i) 586 bot repositories collected from GitHub, and (ii) 200 bot addresses on Solana, with over 44 million on-chain transactions. Our study derives an implementation-grounded taxonomy of Solana bots comprising 15 categories grouped into five domains (e.g., Trading Operations, MEV, and On-chain Analytics), identifies a largely shared five-stage operational pipeline manifested in bot implementations, and uncovers systematic variation in on-chain trading behaviors of Solana bots across diverse trading platforms and assets. Based on our findings, we highlight future research directions, and provide recommendations for building and operating bots on the Solana blockchain.</summary>
+    <category term="cs.SE" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-30T16:02:50Z</published>
+    <arxiv:comment>Accepted at ASE 2026</arxiv:comment>
+    <arxiv:primary_category term="cs.SE"/>
+    <author>
+      <name>Xiaoye Zheng</name>
+    </author>
+    <author>
+      <name>Yujing Chen</name>
+    </author>
+    <author>
+      <name>Minghao Wu</name>
+    </author>
+    <author>
+      <name>David Lo</name>
+    </author>
+    <author>
+      <name>Difan Xie</name>
+    </author>
+    <author>
+      <name>Daoyuan Wu</name>
+    </author>
+    <author>
+      <name>Xiaohu Yang</name>
+    </author>
+    <author>
+      <name>Zhiyuan Wan</name>
+    </author>
+    <arxiv:doi>10.1145/3832783.3837522</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1145/3832783.3837522" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.02830v1</id>
+    <title>Outcome-Classified Precision Auditing of Filter Rules in Algorithmic DEX Trading: Evidence from 2,400 Rejection Events</title>
+    <updated>2026-07-02T23:47:33Z</updated>
+    <link href="https://arxiv.org/abs/2607.02830v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.02830v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This paper reports a precision audit of a production filter stack against a 13-day window of post-rejection forward-market observations on Solana DEX trading (2026-04-10 to 2026-04-23, UTC). The audit yielded 99,510 follow-up samples across 2,402 unique rejection events spanning eight active filter rules. We classify each event under a five-tier outcome rule and report per-filter distributions. The headline result is the conservative save-to-miss ratio of 3.7 : 1 from windowed measured-drawdown saves alone; every active filter with adequate sample size is individually net-positive. A wider interpretation that credits single-sample-within-60-minute events as saves yields 14.8 : 1. We then test the interpretive premise of that wider tier against the deposited lifecycle data of a separately-published benchmark (RED-2400). The matched comparison shows that early-death-classified mints reach the gone state at 48.9 percent. Non-early-death rejected mints reach gone at 57.6 percent. The early-death classification does not identify tokens at elevated rug-pull risk relative to other rejected tokens. The wider 14.8 : 1 ratio therefore rests on a tier that the matched test does not validate. The conservative 3.7 : 1 is the report the lifecycle data supports. The methodological contribution is the separation of the two evidence bases and the demonstration that the wider tier does not survive matched-comparison testing.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-02T23:47:33Z</published>
+    <arxiv:comment>Preprint. Also available at SSRN 6638259. Companion dataset at Zenodo DOI 10.5281/zenodo.19987695 (CC-BY-4.0). v2 (2026-05-30)</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.02795v3</id>
+    <title>Coordinated Sniper Cohorts on Pump.fun: Detection of 1,012 Persistent Wallet Rings and a Contamination-Adjusted Estimate of Coordination-Specific First-Hour Buyer-Flow Lift</title>
+    <updated>2026-08-03T20:34:46Z</updated>
+    <link href="https://arxiv.org/abs/2607.02795v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.02795v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Motivated by Kyle (1985) informed order flow and the Meiklejohn et al. (2013) wallet-clustering tradition, we ask whether persistent coordinated wallets causally raise first-hour buyer flow on the Solana pump.fun bonding-curve marketplace. Using 1,578,333 buyer observations from 166,098 launches over 13.4 days (2026-06-11 to 2026-06-25), a two-stage detection pipeline (intra-launch first-buyer-window extraction plus cross-launch persistent-cohort surfacing via union-find on co-occurrence graphs) identifies 1,012 persistent wallet cohorts (2 to 12 wallets, 2,965 addresses) that systematically co-fire as early buyers. Under a contamination-adjusted estimator excluding cohort wallets' own buyer events from the outcome, 1:1 nearest-neighbour propensity-score matching with a 0.2-SD caliper on ten launch-quality covariates (Rosenbaum-Rubin, 1983) yields a first-30-minute buyer-count lift of +16.1% (95% CI [+13.0%, +19.4%]) on 5,419 matched pairs; the corresponding SOL-inflow lift is +6.3% ([-0.5%, +15.1%]), not distinguishable from zero. The naive contaminated same-universe pooled contrast is +130.9%; approximately half is arithmetic contamination from cohort wallets' own buys in the outcome (dropping to +63.9% after cohort exclusion), and most of the remainder is absorbed by PSM on launch-quality covariates. A parallel activity-matched placebo across 100 seeds produces lifts with median +189.6%, above zero and above the real lift in 100/100 seeds, indicating the placebo estimator is biased; we retain it as a bias diagnostic. Of 5,419 treated launches, 382 (7.0%) had zero non-cohort buyers in the first 30 minutes. We release the full cohort catalogue, detection code, PSM script, and robustness artefacts as RED-COHORT-2026-v1 under CC-BY-4.0.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-02T22:13:51Z</published>
+    <arxiv:comment>30 pages, 8 figures. v3 = major revision (BCRA critique + 360-audit): contamination-adjusted 1:1 PSM headline (+16.1% [+13.0%, +19.4%] buyer count; +6.3% [-0.5%, +15.1%] SOL, null) replaces naive +130.9%; 100-seed placebo reframed as bias diagnostic (median +189.6%, above real lift in 100/100 seeds); title reflects contamination-adjustment framing. Companion Zenodo 10.5281/zenodo.20978741</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2603.24625v2</id>
+    <title>From Hype to Collapse: Investigating Rug Pull Scams on Solana</title>
+    <updated>2026-05-31T10:48:32Z</updated>
+    <link href="https://arxiv.org/abs/2603.24625v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2603.24625v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Solana has experienced rapid growth due to its high performance and low transaction costs, but the extremely low barrier to token issuance has also enabled widespread Rug Pulls. Unlike Ethereum-based Rug Pulls, which often rely on malicious smart-contract logic, Solana's unified SPL Token program shifts fraudulent execution toward on-chain behavioral manipulation. However, existing research has not systematically examined these Solana-specific Rug Pull patterns, and no public Solana Rug Pull dataset is available for empirical research. To bridge this gap, we present a large-scale measurement study of Rug Pulls on Solana. We manually verify 68 community-reported incidents and curate a benchmark of 117 confirmed Rug Pull tokens, from which we distill three representative on-chain behavioral patterns: Freeze Authority Abuse, Liquidity Withdrawal, and Pump-and-Dump. Guided by these patterns, we design a behavior-guided candidate identification and human-validation pipeline. We apply this pipeline to 100,063 tokens newly issued on Orca, Raydium, and Meteora during the first half of 2025, identifying 76,469 Rug Pull tokens. A random manual audit of 382 samples estimates a labeling false-positive rate of 0.26\%, supporting the reliability of the dataset. We release the resulting dataset and use it to characterize the Solana Rug Pull ecosystem. Our analysis shows that Rug Pulls on Solana exhibit extremely short lifecycles, strong price-driven dynamics, severe economic losses, and highly organized group behaviors. These findings provide new insights into the Solana Rug Pull landscape and support the development of effective on-chain defense mechanisms.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-03-25T02:31:31Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Jiaxin Chen</name>
+    </author>
+    <author>
+      <name>Ziwei Li</name>
+    </author>
+    <author>
+      <name>Zigui Jiang</name>
+    </author>
+    <author>
+      <name>Ruihong He</name>
+    </author>
+    <author>
+      <name>Yantong Zhou</name>
+    </author>
+    <author>
+      <name>Jiajing Wu</name>
+    </author>
+    <author>
+      <name>Zibin Zheng</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2602.14860v1</id>
+    <title>Predicting the success of new crypto-tokens: the Pump.fun case</title>
+    <updated>2026-02-16T15:53:13Z</updated>
+    <link href="https://arxiv.org/abs/2602.14860v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2602.14860v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We study the dynamics of token launched on Pump.fun, a Solana-based launchpad platform, to identify the determinants of the token success. Pump.fun employs a bonding curve mechanism to bootstrap initial liquidity possibly leading to graduation to the on-chain market, which can be seen as a token success. We build predictive models of the probability of graduation conditional on the current amount of Solana locked in the bonding curve and a set of explanatory variables that capture structural and behavioral aspects of the launch process. Conditioning the graduation probability on these variables significantly improves its predictive power, providing insights into early-stage market behavior, speculative and manipulative dynamics, and the informational efficiency of bonding-curve-based token launches.</summary>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-02-16T15:53:13Z</published>
+    <arxiv:primary_category term="q-fin.ST"/>
+    <author>
+      <name>Giulio Marino</name>
+    </author>
+    <author>
+      <name>Manuel Naviglio</name>
+    </author>
+    <author>
+      <name>Francesco Tarantelli</name>
+    </author>
+    <author>
+      <name>Fabrizio Lillo</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2602.13480v2</id>
+    <title>MELT: A Behavioral Trace Dataset for High-Risk Memecoin Launch Detection</title>
+    <updated>2026-05-21T16:15:34Z</updated>
+    <link href="https://arxiv.org/abs/2602.13480v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2602.13480v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Launchpads have become the dominant mechanism for issuing memecoins, exposing investors to a new class of high-risk launches that existing rug-pull detection methods cannot capture. We argue that detecting these threats requires structured behavioral traces that underlie raw heterogeneous blockchain data, i.e., how insiders accumulate, coordinate, and unwind positions. To enable such analysis, we introduce MELT (MEmecoin Launch Trace, the first behavioral trace dataset for analyzing and detecting high-risk memecoin launches on Solana. MELT covers 41k+ memecoin launches with 200M+ transactions parsed into typed behavioral records that distinguish swaps, wash trades, transfers, and mints. Beyond per-account behaviors, MELT contributes bundle-trace data that links accounts controlled by the same entity, revealing that, on average, 36.5% of token supply is held by coordinated accounts, a concealment strategy that disguises the true ownership concentration from unsuspecting buyers. On top of these traces, MELT provides 122 behavioral features and risk-level annotations, enabling supervised learning at a population scale. We benchmark representative ML models on the high-risk launch detection task. Integrating their predictions into a simple memecoin selection strategy reduces investment loss significantly, demonstrating that behavioral traces can be translated into risk mitigation. Our dataset and code is available at https://github.com/git-disl/MELT.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-02-13T21:35:15Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Sihao Hu</name>
+    </author>
+    <author>
+      <name>Selim Furkan Tekin</name>
+    </author>
+    <author>
+      <name>Yichang Xu</name>
+    </author>
+    <author>
+      <name>Ling Liu</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2602.13127v1</id>
+    <title>Hybrid Femtosecond Laser and Ion-Implantation Processing for Controlled, Deep, High-Efficiency Ablation in Fused Silica</title>
+    <updated>2026-02-13T17:25:01Z</updated>
+    <link href="https://arxiv.org/abs/2602.13127v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2602.13127v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Femtosecond laser modification of fused silica enables precise surface tailoring for the fabrication of micro-optical components such as microlenses and diffractive elements. However, the process is governed by laser-matter interactions where the local fluence determines the processing depth, often limiting control over feature geometry and efficiency. Here, we present a hybrid approach combining localized Au implantation (1.8 MeV Au2+ ions) into SiO2 samples with femtosecond laser irradiation (250 fs), effectively tuning the laser-matter interaction and resulting morphology. At both 515 nm and 1030 nm irradiation wavelengths, single-shot femtosecond pulses produce cylindrical craters with sharp edges and flat-bottom profiles. Independently of the fluence, these craters exhibit a constant depth of 550 nm, corresponding to the region of maximum Au concentration. The effect manifests already at moderate fluence (app. 4 J/sq.cm) and yields high ablation efficiency, up to 15 cubic micrometers per microjoule. The hybrid method also works effectively at lower implantation doses that preserve the excellent transmission of fused silica, offering a promising pathway for the high-quality fabrication of flat optical components such as binary phase masks, phase lenses, or fused-silica micromolds.</summary>
+    <category term="physics.optics" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cond-mat.mtrl-sci" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-02-13T17:25:01Z</published>
+    <arxiv:comment>23 pages, 5 figures</arxiv:comment>
+    <arxiv:primary_category term="physics.optics"/>
+    <arxiv:journal_ref>Applied Surface Science 730, 166239 (2026)</arxiv:journal_ref>
+    <author>
+      <name>Mario Garcia-Lechuga</name>
+    </author>
+    <author>
+      <name>Yoann Levy</name>
+    </author>
+    <author>
+      <name>Irene Solana</name>
+    </author>
+    <author>
+      <name>Fatima Cabello</name>
+    </author>
+    <author>
+      <name>Maria Dolores Ynsa</name>
+    </author>
+    <author>
+      <name>Nadezhda M. Bulgakova</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2507.01963v2</id>
+    <title>A Midsummer Meme's Dream: Investigating Market Manipulations in the Meme Coin Ecosystem</title>
+    <updated>2026-01-02T09:49:45Z</updated>
+    <link href="https://arxiv.org/abs/2507.01963v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2507.01963v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>From viral jokes to a billion-dollar phenomenon, meme coins have become one of the most popular segments in cryptocurrency markets. Unlike utility-focused crypto assets like Bitcoin, meme coins derive value primarily from community sentiment, making them vulnerable to manipulation. This study presents an unprecedented cross-chain analysis of the meme coin ecosystem, examining 34,988 tokens across Ethereum, BNB Smart Chain, Solana, and Base. We characterize their tokenomics and track their growth in a three-month longitudinal analysis. We discover that among high-return tokens (&gt;100%), an alarming 82.8% show evidence of artificial growth strategies designed to create a misleading appearance of market interest. These include wash trading and a new form of manipulation we define as Liquidity Pool-Based Price Inflation (LPI), where small strategic purchases trigger dramatic price increases. We find that profit extraction schemes, such as pump and dumps and rug pulls, typically follow initial manipulations like wash trading or LPI, indicating how early manipulations create the foundation for later exploitation. We quantify the economic impact of these schemes, identifying over 17,000 victimized addresses with realized losses exceeding $9.3 million. These findings reveal that combined manipulations are widespread among high-performing meme coins, suggesting that their dramatic gains are often driven by coordinated efforts rather than natural market dynamics.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-04-16T13:54:42Z</published>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Alberto Maria Mongardini</name>
+    </author>
+    <author>
+      <name>Alessandro Mei</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2504.07132v1</id>
+    <title>SolRPDS: A Dataset for Analyzing Rug Pulls in Solana Decentralized Finance</title>
+    <updated>2025-04-06T11:36:48Z</updated>
+    <link href="https://arxiv.org/abs/2504.07132v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2504.07132v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Rug pulls in Solana have caused significant damage to users interacting with Decentralized Finance (DeFi). A rug pull occurs when developers exploit users' trust and drain liquidity from token pools on Decentralized Exchanges (DEXs), leaving users with worthless tokens. Although rug pulls in Ethereum and Binance Smart Chain (BSC) have gained attention recently, analysis of rug pulls in Solana remains largely under-explored. In this paper, we introduce SolRPDS (Solana Rug Pull Dataset), the first public rug pull dataset derived from Solana's transactions. We examine approximately four years of DeFi data (2021-2024) that covers suspected and confirmed tokens exhibiting rug pull patterns. The dataset, derived from 3.69 billion transactions, consists of 62,895 suspicious liquidity pools. The data is annotated for inactivity states, which is a key indicator, and includes several detailed liquidity activities such as additions, removals, and last interaction as well as other attributes such as inactivity periods and withdrawn token amounts, to help identify suspicious behavior. Our preliminary analysis reveals clear distinctions between legitimate and fraudulent liquidity pools and we found that 22,195 tokens in the dataset exhibit rug pull patterns during the examined period. SolRPDS can support a wide range of future research on rug pulls including the development of data-driven and heuristic-based solutions for real-time rug pull detection and mitigation.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CE" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-04-06T11:36:48Z</published>
+    <arxiv:comment>Accepted paper to appear in the 15th ACM Conference on Data and Application Security and Privacy (CODASPY 2025)</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Abdulrahman Alhaidari</name>
+    </author>
+    <author>
+      <name>Bhavani Kalal</name>
+    </author>
+    <author>
+      <name>Balaji Palanisamy</name>
+    </author>
+    <author>
+      <name>Shamik Sural</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2403.10879v1</id>
+    <title>Characterizing the Solana NFT Ecosystem</title>
+    <updated>2024-03-16T10:16:49Z</updated>
+    <link href="https://arxiv.org/abs/2403.10879v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2403.10879v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Non-Fungible Tokens (NFTs) are digital assets recorded on the blockchain, providing cryptographic proof of ownership over digital or physical items. Although Solana has only begun to gain popularity in recent years, its NFT market has seen substantial transaction volumes. In this paper, we conduct the first systematic research on the characteristics of Solana NFTs from two perspectives: longitudinal measurement and wash trading security audit. We gathered 132,736 Solana NFT from Solscan and analyzed the sales data within these collections. Investigating users' economic activity and NFT owner information reveals that the top users in Solana NFT are skewed toward a higher distribution of purchases. Subsequently, we employ the Local Outlier Factor algorithm to conduct a wash trading audit on 2,175 popular Solana NFTs. We discovered that 138 NFT pools are involved in wash trading, with 8 of these NFTs having a wash trading rate exceeding 50%. Fortunately, none of these NFTs have been entirely washed out.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2024-03-16T10:16:49Z</published>
+    <arxiv:comment>This paper has been accepted by WWW 2024</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Dechao Kong</name>
+    </author>
+    <author>
+      <name>Xiaoqi Li</name>
+    </author>
+    <author>
+      <name>Wenkai Li</name>
+    </author>
+  </entry>
+</feed>

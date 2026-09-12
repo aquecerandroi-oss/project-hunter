@@ -1,0 +1,691 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/diWAnGRHUOYspm70dcf4TyP7G/A</id>
+  <title>arXiv Query: search_query=all:memecoin OR all:"pump.fun" OR all:"meme coin" OR all:"meme coins" OR all:"bonding curve"&amp;id_list=&amp;start=0&amp;max_results=40</title>
+  <updated>2026-09-12T08:13:04Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=all:memecoin+OR+(all:%22pump.fun%22+OR+(all:%22meme+coin%22+OR+(all:%22meme+coins%22+OR+all:%22bonding+curve%22)))&amp;start=0&amp;max_results=40&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>40</opensearch:itemsPerPage>
+  <opensearch:totalResults>30</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2609.10246v1</id>
+    <title>Meme Coin Factories: Uncovering Large-Scale Manipulations on pump.fun</title>
+    <updated>2026-09-09T14:35:18Z</updated>
+    <link href="https://arxiv.org/abs/2609.10246v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.10246v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Once complex, creating and deploying a new cryptocurrency has become trivial. Coin launchpads now allow users to generate a new coin with merely a few clicks, at a minimal cost. Launchpad popularity has grown in tandem with the rise of "meme coins," which usually do not offer any novel technological properties and are purely created for fun. The most prominent coin launchpad, pump.fun, has gained significant traction, grossing over 100 million USD in daily trading volume. The mass adoption of coin launchpads, however, also enables strategic actors to easily manipulate trading signals, unbeknownst to inexperienced traders who then buy certain coins, and enable these strategic actors to profit from rapid and unsustainable price increases ("pumps"). To identify such manipulations at scale, we conduct a large-scale study of pump.fun, collecting information on all 15 million coins launched in the last two years, and performing analysis on large, random samples of transaction data. We identify five classes of manipulation strategies: 1) wash trading, 2) creator address obfuscation, 3) coordinated sell, 4) copycat coins, and 5) social media manipulation. We find that strategic actors often bypass the platform interface and implement these strategies in a highly automated and low-latency fashion, by interacting directly with the blockchain. We further uncover the existence of "Market-Manipulation-as-a-service (MMaaS)," third-party tools that enable users to perform these manipulations without any technical expertise. We conclude by devising mitigations and proposing recommendations for traders, pump.fun, wallets or chain scanners, software development platforms, and regulators.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-09T14:35:18Z</published>
+    <arxiv:comment>Proceedings of the 2026 ACM SIGSAC Conference on Computer and Communications Security (CCS'26)</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Nicolas Szwajcok</name>
+    </author>
+    <author>
+      <name>Taro Tsuchiya</name>
+    </author>
+    <author>
+      <name>Enze Liu</name>
+    </author>
+    <author>
+      <name>Kyle Soska</name>
+    </author>
+    <author>
+      <name>Mathias Payer</name>
+    </author>
+    <author>
+      <name>Nicolas Christin</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2609.05663v1</id>
+    <title>What LLM Trading Agents Actually Do in Production: A Six-Month, Population-Scale Record from Two Fleets</title>
+    <updated>2026-09-04T18:56:31Z</updated>
+    <link href="https://arxiv.org/abs/2609.05663v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.05663v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We present a continuous, population-scale measurement record of autonomous language-model trading agents operating in production across two systems with one design lineage: DX Terminal Pro (3,505 user-funded vaults trading real ETH in Base memecoin markets for 21 days, February to March 2026) and the DXAP live alpha fleet (500 to 599 user-created agents all-history, 91 to 117 concurrently active, trading Hyperliquid perpetuals, June to August 2026). The record spans roughly six months, 7.5M single-model invocations with about 300K onchain actions, and a further 231,638 multi-tool turns producing 14,596 fills. Four findings carry the paper. First, the operating layer determines behavior more than anything written in strategy text: a risk slider explains leverage (+0.425 per level), agent fixed effects absorb 60% of variance, and a leaderboard render boundary causally routes selection (regression discontinuity 1.75x at the top-3 cut). Second, sizing is volatility-blind: median leverage is 5.0x in every volatility sextile, and one posture-slider cell (11% of the book) holds 62% of liquidations. Third, agents capture almost none of the upside they reach: 43.2% of positions saw at least +300 bps of favorable excursion within 24h, yet 49.3% of those closed with a negative trade return; a mechanical bracket recovers +39.0 bps per position. Fourth, neither fleet shows a directional edge. The DXAP fleet is not profitable and trails a matched Hyperliquid retail benchmark (41% vs. 50% roundtrip win rate). A paired-replay league of frontier models on 416 captured production scenarios finds decision quality statistically indistinguishable at this horizon, while choice stability differs sharply across model families. Every headline survives day-clustered inference, permutation nulls, and a common-fee restatement; the paper closes with a 17-rule methodology canon bought with our own retractions.</summary>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CE" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.MA" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-04T18:56:31Z</published>
+    <arxiv:comment>17 pages, 8 figures, 3 tables. Artifacts, figures, and aggregate data: https://github.com/ProjectDXAI/continuous-record-llm-trading-agents</arxiv:comment>
+    <arxiv:primary_category term="cs.AI"/>
+    <author>
+      <name>T. J. Barton</name>
+    </author>
+    <author>
+      <name>Chris Constantakis</name>
+    </author>
+    <author>
+      <name>Patti Hauseman</name>
+    </author>
+    <author>
+      <name>Annie Mous</name>
+    </author>
+    <author>
+      <name>Alaska Hoffman</name>
+    </author>
+    <author>
+      <name>Brian Bergeron</name>
+    </author>
+    <author>
+      <name>Hunter Goodreau</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2608.20271v1</id>
+    <title>Catching the Rug: Early Prediction of Fraudulent Memecoins on Solana via Machine Learning</title>
+    <updated>2026-08-20T17:09:41Z</updated>
+    <link href="https://arxiv.org/abs/2608.20271v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2608.20271v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The rapid proliferation of memecoins on blockchain platforms has increased the risk of fraudulent activities, particularly rug pulls. While previous studies have focused on Ethereum-based tokens, this paper shifts the spotlight to Solana, the leading blockchain for memecoins by trading volume and token count. Unlike Ethereum, where rug pulls often exploit smart contract backdoors, Solana memecoin rug pulls are predominantly driven by liquidity manipulation and social dynamics. This research pioneers large-scale rug pull early detection in the Solana ecosystem by assembling a dataset of 6.4 million tokens over 7 months. Market analysis reveals that a vast majority of these memecoins exhibit rug pull characteristics within one hour of launch, highlighting the urgency of short-horizon prediction. Despite the absence of code-level features, we demonstrate that classic machine learning models, particularly Gradient Boosting (XGBoost), achieve robust performance in detecting potential rug pulls using only the first 5 minutes of trading data. Furthermore, we evaluate cross-platform generalization between PumpFun and Raydium, revealing that multi-source data fusion significantly mitigates domain shift and improves detection reliability. This study advances the understanding of DeFi fraud on high-throughput chains and provides a practical framework for protecting investors.</summary>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.DC" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-08-20T17:09:41Z</published>
+    <arxiv:primary_category term="cs.AI"/>
+    <author>
+      <name>Jianghai Li</name>
+    </author>
+    <author>
+      <name>Pavel Kuznetsov</name>
+    </author>
+    <author>
+      <name>Yury Yanovich</name>
+    </author>
+    <author>
+      <name>Konstantin Nott-Whaley</name>
+    </author>
+    <author>
+      <name>Igor Vodolazov</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2608.01609v1</id>
+    <title>From Viral to Void: Multi-Dimensional Behavioral and Contractual Analysis for Rug Pull Identification</title>
+    <updated>2026-08-03T02:34:24Z</updated>
+    <link href="https://arxiv.org/abs/2608.01609v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2608.01609v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>As the blockchain and decentralized finance (DeFi) ecosystems continue to expand and mature, rug pull scams involving meme coins are occurring with increasing frequency, posing a threat to the security of investors' assets and the healthy development of the industry. Rug Pull scams are characterized by extremely low deployment costs, covert execution, rapid fund transfers, and high detection difficulty. Traditional manual reviews or fixed rules struggle to meet real-time early warning requirements, and existing detection methods generally suffer from issues such as a single feature dimension, inadequate handling of class imbalance, and weak model generalization and interpretability. To address these shortcomings, this paper focuses on the detection of Ethereum-based rug pull scams. First, we clarify their definitions, types, and harm mechanisms, and construct a multi-dimensional feature system based on dimensions such as malicious smart contract design, on-chain transaction anomalies, liquidity manipulation, and social media disclosures. Next, using the "Second Uncle Coin"(token symbol: BOBU) case as an example, we reconstruct the attack process and derive quantitative detection metrics. Subsequently, a risk detection model based on a Multi-Layer Perceptron (MLP) is designed. We employ a combined strategy of SMOTE oversampling and Focal Loss to address the issue of sample imbalance, dynamically search for optimal thresholds to balance precision and recall, and incorporate gradient pruning and early stopping to enhance training stability. Experiments show that the model achieves an accuracy of 0.927, an F1 score of 0.787, and an AUC-ROC of 0.952 on the test set, outperforming traditional methods. Finally, a visualizable web-based detection system is developed using the Flask framework, enabling batch risk assessment, high-risk ranking display, and result export functions.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-08-03T02:34:24Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Jinyin Song</name>
+    </author>
+    <author>
+      <name>Hongping Wang</name>
+    </author>
+    <author>
+      <name>Xiaoqi Li</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.04178v1</id>
+    <title>Dynamic Interest Rate Discovery in Decentralized Finance: A Reverse Kelly Automated Market Maker for Risk-Adjusted Lending</title>
+    <updated>2026-07-05T08:51:10Z</updated>
+    <link href="https://arxiv.org/abs/2607.04178v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.04178v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Decentralized Finance (DeFi) lending protocols currently rely on heuristic, utilization-based bonding curves that mandate severe over-collateralization, systematically excluding under-collateralized assets like corporate invoices. This paper introduces a mathematically optimal pricing mechanism for decentralized credit: the Reverse Kelly Automated Market Maker (rkAMM), the core engine of our proposed lending framework. By inverting the Kelly Criterion, traditionally used for optimal bet sizing, we construct a dynamic interest rate discovery protocol that explicitly prices individual loan risk. The rkAMM ingests real-time Probability of Default (PD) streams from an off-chain Explainable AI oracle and dynamically calculates the exact interest rate required to sustain target liquidity provider (LP) yields. We mathematically derive the Reverse Kelly pricing function ($r = \frac{y + PD}{1 - PD}$), proving its strictly convex superiority over Aave and Compound's static utilization curves in managing capital efficiency. Furthermore, we deploy the rkAMM architecture via Solidity smart contracts, optimizing for gas-efficient 1e18 (WAD) floating-point arithmetic. To ensure decentralized transparency, our simulation infrastructure leverages MLflow for tracking yield hyperparameters, Data Version Control (DVC) linked to DagsHub for versioning Real-World Asset (RWA) data arrays, and localized edge-inference via Ollama (Llama-3) and Hugging Face (FinBERT) for zero-cost predictive modeling. Monte Carlo simulations across 10,000 macroeconomic stress scenarios confirm that the rkAMM maintains protocol solvency and stabilizes LP yields at 12-15\% net of expected credit losses. This work provides the foundational financial engineering required to bridge the \$2 trillion global supply chain finance gap using permissionless blockchain infrastructure.</summary>
+    <category term="cs.SI" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-05T08:51:10Z</published>
+    <arxiv:primary_category term="cs.SI"/>
+    <author>
+      <name>Sai Srikanth Madugula</name>
+    </author>
+    <author>
+      <name>Peplluis Esteva de la Rosa</name>
+    </author>
+    <author>
+      <name>Daya Shankar</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.02823v3</id>
+    <title>Pump.fun Graduation Regime Windows: Survival Analysis of 832,941 Token Launches and the Social-Presence Effect</title>
+    <updated>2026-08-17T17:00:05Z</updated>
+    <link href="https://arxiv.org/abs/2607.02823v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.02823v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Kaplan-Meier and Cox proportional-hazards survival analysis of 832,941 Solana pump.fun token launches, observed 2026-05-08 to 2026-06-10. Pooled graduation rate 0.198% (Wilson 95% CI [0.189%, 0.208%]; steady-state 0.207%). A post-publication audit established that the collector's coverage was effectively limited to about six minutes after each launch, so this figure should be read as a fast-regime graduation rate and a lower bound on the true 24-hour rate, not an estimate of it. Comparing to Marino et al. (2026)'s 0.63% for September-October 2025 gives a ratio of 3.18x; because our figure is itself a lower bound, this ratio is an upper bound on the true decline, and the true decline is smaller by an amount this dataset cannot establish. We formalise the windowed comparison as the Graduation Regime Windows framework and release the 860,213-launch dataset under CC-BY-4.0 on Zenodo. Within the fast-regime window, Telegram-channel launches graduate at 1.485% versus 0.166% without (8.94x lift; Cox HR 5.40, 95% CI [4.73, 6.17]), likely itself a lower bound on the true 24-hour effect. Initial market capitalisation above the 30 SOL platform default is the strongest single predictor (Cox HR 4.51); the top quartile graduates at 0.634%, close to though not conclusively matching the Marino et al. pooled rate. Cox concordance 0.858, stable under bootstrap and a time-window split. A subsequent attempt to recover missed late graduations from implausibly high TIMEOUT-mint market caps was tested against pump.fun's live bonding-curve state and did not hold up (0 of 100 sampled mints showed graduation); we report and withdraw it. Zenodo concept DOI 10.5281/zenodo.20633486; corrigendum v1.4 at 10.5281/zenodo.21923106.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.GN" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-02T23:23:54Z</published>
+    <arxiv:comment>v4 Replace: ref-list correction for arXiv:2412.04913 (Long, Wong, Cai). Content otherwise identical to v3. Corrigenda v1.3 (coverage-window) + v1.4 (ceiling-crossing withdrawal, 0/100 verified). Data doi.org/10.5281/zenodo.20633486 CC-BY-4.0. SSRN 6915560</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.02795v3</id>
+    <title>Coordinated Sniper Cohorts on Pump.fun: Detection of 1,012 Persistent Wallet Rings and a Contamination-Adjusted Estimate of Coordination-Specific First-Hour Buyer-Flow Lift</title>
+    <updated>2026-08-03T20:34:46Z</updated>
+    <link href="https://arxiv.org/abs/2607.02795v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.02795v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Motivated by Kyle (1985) informed order flow and the Meiklejohn et al. (2013) wallet-clustering tradition, we ask whether persistent coordinated wallets causally raise first-hour buyer flow on the Solana pump.fun bonding-curve marketplace. Using 1,578,333 buyer observations from 166,098 launches over 13.4 days (2026-06-11 to 2026-06-25), a two-stage detection pipeline (intra-launch first-buyer-window extraction plus cross-launch persistent-cohort surfacing via union-find on co-occurrence graphs) identifies 1,012 persistent wallet cohorts (2 to 12 wallets, 2,965 addresses) that systematically co-fire as early buyers. Under a contamination-adjusted estimator excluding cohort wallets' own buyer events from the outcome, 1:1 nearest-neighbour propensity-score matching with a 0.2-SD caliper on ten launch-quality covariates (Rosenbaum-Rubin, 1983) yields a first-30-minute buyer-count lift of +16.1% (95% CI [+13.0%, +19.4%]) on 5,419 matched pairs; the corresponding SOL-inflow lift is +6.3% ([-0.5%, +15.1%]), not distinguishable from zero. The naive contaminated same-universe pooled contrast is +130.9%; approximately half is arithmetic contamination from cohort wallets' own buys in the outcome (dropping to +63.9% after cohort exclusion), and most of the remainder is absorbed by PSM on launch-quality covariates. A parallel activity-matched placebo across 100 seeds produces lifts with median +189.6%, above zero and above the real lift in 100/100 seeds, indicating the placebo estimator is biased; we retain it as a bias diagnostic. Of 5,419 treated launches, 382 (7.0%) had zero non-cohort buyers in the first 30 minutes. We release the full cohort catalogue, detection code, PSM script, and robustness artefacts as RED-COHORT-2026-v1 under CC-BY-4.0.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-02T22:13:51Z</published>
+    <arxiv:comment>30 pages, 8 figures. v3 = major revision (BCRA critique + 360-audit): contamination-adjusted 1:1 PSM headline (+16.1% [+13.0%, +19.4%] buyer count; +6.3% [-0.5%, +15.1%] SOL, null) replaces naive +130.9%; 100-seed placebo reframed as bias diagnostic (median +189.6%, above real lift in 100/100 seeds); title reflects contamination-adjustment framing. Companion Zenodo 10.5281/zenodo.20978741</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2606.08232v3</id>
+    <title>Hour-Aware Adaptive Risk Management for Autonomous Memecoin Trading on Solana DEXs: Evidence, Theory, and Design Lessons from a 15-Day Deployment</title>
+    <updated>2026-08-03T19:44:16Z</updated>
+    <link href="https://arxiv.org/abs/2606.08232v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2606.08232v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We report a 15-day paper-traded autonomous memecoin trading deployment on Solana decentralised exchanges (DEXs), designed as a controlled measurement of three microstructure questions on which classical equity theory offers well-defined predictions but on which the AMM Solana venue lacks published measurement: (i) time-of-day return patterns on a 24/7 permissionless venue; (ii) whether decision-time filter stacks are net-positive against counterfactual returns of rejected tokens; (iii) whether small-sample cumulative-return statistics on a heavy-tailed venue are structurally robust or fragile. The 190-trade sample (March 29 to April 12, 2026) shows a 40.5 percent win rate, mean per-trade return +0.62 percent, cumulative +117.7 percent, skewness -1.21, excess kurtosis 6.61. Mann-Whitney U on three exploratorily identified worst entry hours (n=17, mean -11.60 percent) versus all others (n=173, mean +1.82 percent) yields p = 0.5634; directional and non-confirmatory. A parallel counterfactual rejection-tracker collected 4,874 forward-sample observations across 184 rejection events; of 48 events observed for at least six hours, 27 (56.25 percent) reached a 50 percent drawdown from reference (the full-cohort 17.9 percent is a censored lower bound). Removing the top three trades (1.6 percent of sample) flips cumulative return unprofitable. The three findings connect to Kyle (1985) informed-flow, Precup-Sutton-Singh (2000) off-policy evaluation, and Bailey-Lopez de Prado (2014) deflated-Sharpe predictions. Alongside the trade log and rejection-sample corpus (CC-BY-4.0), we deposit audit.py (MIT), an assertion-based reproduction script that exits zero iff every headline number reproduces from the deposited CSVs. Companion dataset: Zenodo concept DOI 10.5281/zenodo.20043301. The paper's principal contribution is measurement infrastructure and three transferable design lessons.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.RM" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-06-06T15:40:05Z</published>
+    <arxiv:comment>15 pages, 4 figures. v3 = Ledger #632 revision (Stylianou 2026-07-27): new Section III Theoretical Framework (Kyle 1985; Precup-Sutton-Singh 2000; Bailey-Lopez de Prado 2014); Related Work +14 citations; new Section VII Design Lessons; new Significance paragraph. Headline numbers unchanged. JEL G11/G12/G14/G17. Companion Zenodo 10.5281/zenodo.20043301. SSRN 6564803</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2604.25403v1</id>
+    <title>Corporate Bond Yield Curve Modeling: A Rating-Based Regime-Switching Generalized CIR Approach</title>
+    <updated>2026-04-28T09:15:37Z</updated>
+    <link href="https://arxiv.org/abs/2604.25403v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2604.25403v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Persistent shifts in term-structure dynamics undermine the stability of single-regime models in long samples. We develop an arbitrage-free regime-switching generalized CIR (RS-GCIR) model that jointly prices the Chinese government bond (CGB) curve and corporate bond curves. To capture the systematic transmission from interest-rate conditions to credit spreads, we structure the model into two blocks and price corporate bonds conditional on the prevailing rate regime. The rate block features a two-state RS-GCIR short-rate process estimated from CGB zero-coupon curves, while the credit block embeds CIR-type credit factors in an intensity-based framework for rating migration and default. We implement a block-recursive Unscented Kalman Filter (UKF) procedure--filtering the rate block first and the credit block next--using weekly data from 2014--2025, a period that begins with the onset of China's modern corporate default cycle. We identify two persistent rate regimes with distinct level--volatility profiles. Relative to single-regime benchmarks, regime switching improves joint curve fit, delivers economically interpretable filtered regime probabilities, and sharpens the decomposition of corporate yields into discounting and credit compensation.</summary>
+    <category term="q-fin.PR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-04-28T09:15:37Z</published>
+    <arxiv:comment>65 pages, 10 figures, 16 tables. JEL Classification: G12, E43, C58</arxiv:comment>
+    <arxiv:primary_category term="q-fin.PR"/>
+    <author>
+      <name>Maochun Xu</name>
+    </author>
+    <author>
+      <name>Yunqi Liang</name>
+    </author>
+    <author>
+      <name>Yi Hong</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2603.01344v1</id>
+    <title>Pricing and hedging for liquidity provision in Constant Function Market Making</title>
+    <updated>2026-03-02T00:51:06Z</updated>
+    <link href="https://arxiv.org/abs/2603.01344v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2603.01344v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This paper develops a robust mathematical framework for Constant Function Market Makers (CFMMs) by transitioning from traditional token reserve analyses to a coordinate system defined by price and intrinsic liquidity. We establish a canonical parametrization of the bonding curve that ensures dimensional consistency across diverse trading functions, such as those employed by Uniswap and Balancer, and demonstrate that asset reserves and value functions exhibit a linear dependence on this intrinsic liquidity. This linear structure facilitates a streamlined approach to arbitrage-free pricing, delta hedging, and systematic risk management. By leveraging the Carr-Madan spanning formula, we characterize Impermanent Loss (IL) as a weighted strip of vanilla options, thereby defining a fine-grained implied volatility structure for liquidity profiles. Furthermore, we provide a path-dependent analysis of IL using the last-passage time. Empirical results from Uniswap v3 ETH/USDC pools and Deribit option markets confirm a volatility smile consistent with crypto-asset dynamics, validating the framework's utility in characterizing the risk-neutral fair value of liquidity provision.</summary>
+    <category term="q-fin.MF" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-03-02T00:51:06Z</published>
+    <arxiv:comment>36 pages, 15 figures</arxiv:comment>
+    <arxiv:primary_category term="q-fin.MF"/>
+    <author>
+      <name>Jimmy Risk</name>
+    </author>
+    <author>
+      <name>Shen-Ning Tung</name>
+    </author>
+    <author>
+      <name>Tai-Ho Wang</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2602.14860v1</id>
+    <title>Predicting the success of new crypto-tokens: the Pump.fun case</title>
+    <updated>2026-02-16T15:53:13Z</updated>
+    <link href="https://arxiv.org/abs/2602.14860v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2602.14860v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We study the dynamics of token launched on Pump.fun, a Solana-based launchpad platform, to identify the determinants of the token success. Pump.fun employs a bonding curve mechanism to bootstrap initial liquidity possibly leading to graduation to the on-chain market, which can be seen as a token success. We build predictive models of the probability of graduation conditional on the current amount of Solana locked in the bonding curve and a set of explanatory variables that capture structural and behavioral aspects of the launch process. Conditioning the graduation probability on these variables significantly improves its predictive power, providing insights into early-stage market behavior, speculative and manipulative dynamics, and the informational efficiency of bonding-curve-based token launches.</summary>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-02-16T15:53:13Z</published>
+    <arxiv:primary_category term="q-fin.ST"/>
+    <author>
+      <name>Giulio Marino</name>
+    </author>
+    <author>
+      <name>Manuel Naviglio</name>
+    </author>
+    <author>
+      <name>Francesco Tarantelli</name>
+    </author>
+    <author>
+      <name>Fabrizio Lillo</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2602.13480v2</id>
+    <title>MELT: A Behavioral Trace Dataset for High-Risk Memecoin Launch Detection</title>
+    <updated>2026-05-21T16:15:34Z</updated>
+    <link href="https://arxiv.org/abs/2602.13480v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2602.13480v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Launchpads have become the dominant mechanism for issuing memecoins, exposing investors to a new class of high-risk launches that existing rug-pull detection methods cannot capture. We argue that detecting these threats requires structured behavioral traces that underlie raw heterogeneous blockchain data, i.e., how insiders accumulate, coordinate, and unwind positions. To enable such analysis, we introduce MELT (MEmecoin Launch Trace, the first behavioral trace dataset for analyzing and detecting high-risk memecoin launches on Solana. MELT covers 41k+ memecoin launches with 200M+ transactions parsed into typed behavioral records that distinguish swaps, wash trades, transfers, and mints. Beyond per-account behaviors, MELT contributes bundle-trace data that links accounts controlled by the same entity, revealing that, on average, 36.5% of token supply is held by coordinated accounts, a concealment strategy that disguises the true ownership concentration from unsuspecting buyers. On top of these traces, MELT provides 122 behavioral features and risk-level annotations, enabling supervised learning at a population scale. We benchmark representative ML models on the high-risk launch detection task. Integrating their predictions into a simple memecoin selection strategy reduces investment loss significantly, demonstrating that behavioral traces can be translated into risk mitigation. Our dataset and code is available at https://github.com/git-disl/MELT.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-02-13T21:35:15Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Sihao Hu</name>
+    </author>
+    <author>
+      <name>Selim Furkan Tekin</name>
+    </author>
+    <author>
+      <name>Yichang Xu</name>
+    </author>
+    <author>
+      <name>Ling Liu</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2601.22185v1</id>
+    <title>MemeChain: A Multimodal Cross-Chain Dataset for Meme Coin Forensics and Risk Analysis</title>
+    <updated>2026-01-28T14:42:02Z</updated>
+    <link href="https://arxiv.org/abs/2601.22185v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2601.22185v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The meme coin ecosystem has grown into one of the most active yet least observable segments of the cryptocurrency market, characterized by extreme churn, minimal project commitment, and widespread fraudulent behavior. While countless meme coins are deployed across multiple blockchains, they rely heavily on off-chain web and social infrastructure to signal legitimacy. These very signals are largely absent from existing datasets, which are often limited to single-chain data or lack the multimodal artifacts required for comprehensive risk modeling.
+  To address this gap, we introduce MemeChain, a large-scale, open-source, cross-chain dataset comprising 34,988 meme coins across Ethereum, BNB Smart Chain, Solana, and Base. MemeChain integrates on-chain data with off-chain artifacts, including website HTML source code, token logos, and linked social media accounts, enabling multimodal and forensic study of meme coin projects. Analysis of the dataset shows that visual branding is frequently omitted in low-effort deployments, and many projects lack a functional website. Moreover, we quantify the ecosystem's extreme volatility, identifying 1,801 tokens (5.15%) that cease all trading activity within just 24 hours of launch. By providing unified cross-chain coverage and rich off-chain context, MemeChain serves as a foundational resource for research in financial forensics, multimodal anomaly detection, and automated scam prevention in the meme coin ecosystem.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-01-28T14:42:02Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Alberto Maria Mongardini</name>
+    </author>
+    <author>
+      <name>Alessandro Mei</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2601.08641v3</id>
+    <title>Resisting Manipulative Bots in Meme Coin Copy Trading: A Multi-Agent Approach with Chain-of-Thought Reasoning</title>
+    <updated>2026-02-05T13:52:14Z</updated>
+    <link href="https://arxiv.org/abs/2601.08641v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2601.08641v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Copy trading has become the dominant entry strategy in meme coin markets. However, due to the market's extremely illiquid and volatile nature, the strategy exposes an exploitable attack surface: adversaries deploy manipulative bots to front-run trades, conceal positions, and fabricate sentiment, systematically extracting value from naïve copiers at scale. Despite its prevalence, bot-driven manipulation remains largely unexplored, and no robust defensive framework exists. We propose a manipulation-resistant copy-trading system based on a multi-agent architecture powered by a multi-modal large language model (LLM) and chain-of-thought (CoT) reasoning. Our approach outperforms zero-shot and most statistic-driven baselines in prediction accuracy as well as all baselines in economic performance, achieving an average copier return of 3% per meme coin investment under realistic market frictions. Overall, our results demonstrate the effectiveness of agent-based defenses and predictability of trader profitability in adversarial meme coin markets, providing a practical foundation for robust copy trading.</summary>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-01-13T15:13:41Z</published>
+    <arxiv:primary_category term="cs.AI"/>
+    <arxiv:journal_ref>Proceedings of the ACM Web Conference 2026 (WWW'26)</arxiv:journal_ref>
+    <author>
+      <name>Yichen Luo</name>
+    </author>
+    <author>
+      <name>Yebo Feng</name>
+    </author>
+    <author>
+      <name>Jiahua Xu</name>
+    </author>
+    <author>
+      <name>Yang Liu</name>
+    </author>
+    <arxiv:doi>10.1145/3774904.3792635</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1145/3774904.3792635" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2512.11850v3</id>
+    <title>The Memecoin Phenomenon: An In-Depth Study of Solana's Blockchain Trends</title>
+    <updated>2025-12-18T11:03:23Z</updated>
+    <link href="https://arxiv.org/abs/2512.11850v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2512.11850v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This paper analyzes the emerging memecoin phenomenon on the Solana blockchain, focusing on the Pump$.$fun platform during Q4 2024. Using on-chain data, it is explored how retail-focused token creation platforms are reshaping blockchain ecosystems and influencing market participation. This study finds that Pump$.$fun accounted for up to 71.1% of all tokens minted on Solana and contributed 40-67.4% of total DEX transactions. Despite this activity, fewer than 2% of tokens successfully transitioned to major decentralized exchanges, highlighting a highly speculative market structure. The platform experienced rapid growth, with daily active users rising from 60,000 to peaks of 260,000, underscoring strong retail adoption. This reflects a broader shift towards accessible, socially-driven market participation enabled by memecoins. However, while memecoins lower entry barriers and encourage retail engagement, they introduce significant risks. The volatile and speculative nature of these platforms raises concerns about long-term sustainability and the resilience of the blockchain ecosystem. These findings reveal the dual impact of memecoins: they democratize token creation and alter market dynamics but may jeopardize market efficiency and stability. This paper highlights the need to critically assess the implications of retail-driven speculative trading and its potential to disrupt emerging blockchain economies.</summary>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-12-04T16:06:22Z</published>
+    <arxiv:primary_category term="cs.CY"/>
+    <arxiv:journal_ref>2025 IEEE Symposium on Computers and Communications (ISCC), 2025, pp. 1-6</arxiv:journal_ref>
+    <author>
+      <name>Davide Mancino</name>
+    </author>
+    <arxiv:doi>10.1109/ISCC65549.2025.11326251</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1109/ISCC65549.2025.11326251" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2512.00377v2</id>
+    <title>Measuring Memecoin Fragility</title>
+    <updated>2026-01-09T03:14:38Z</updated>
+    <link href="https://arxiv.org/abs/2512.00377v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2512.00377v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Memecoins, emerging from internet culture and community-driven narratives, have rapidly evolved into a unique class of crypto assets. Unlike technology-driven cryptocurrencies, their market dynamics are primarily shaped by viral social media diffusion, celebrity influence, and speculative capital inflows. To capture the distinctive vulnerabilities of these ecosystems, we present the first Memecoin Ecosystem Fragility Framework (ME2F). ME2F formalizes memecoin risks in three dimensions: i) Volatility Dynamics Score capturing persistent and extreme price swings together with spillover from base chains; ii) Whale Dominance Score quantifying ownership concentration among top holders; and iii) Sentiment Amplification Score measuring the impact of attention-driven shocks on market stability. We apply ME2F to representative tokens (over 65% market share) and show that fragility is not evenly distributed across the ecosystem. Politically themed tokens such as TRUMP, MELANIA, and LIBRA concentrate the highest risks, combining volatility, ownership concentration, and sensitivity to sentiment shocks. Established memecoins such as DOGE, SHIB, and PEPE fall into an intermediate range. Benchmark tokens ETH and SOL remain consistently resilient due to deeper liquidity and institutional participation. Our findings provide the first ecosystem-level evidence of memecoin fragility and highlight governance implications for enhancing market resilience in the Web3 era.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-11-29T08:11:51Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <arxiv:journal_ref>2026 IEEE International Conference on Blockchain and Cryptocurrency (ICBC), Brisbane, Australia, 2026, pp. 1-5</arxiv:journal_ref>
+    <author>
+      <name>Yuexin Xiang</name>
+    </author>
+    <author>
+      <name>Qishuang Fu</name>
+    </author>
+    <author>
+      <name>Yuquan Li</name>
+    </author>
+    <author>
+      <name>Qin Wang</name>
+    </author>
+    <author>
+      <name>Tsz Hon Yuen</name>
+    </author>
+    <author>
+      <name>Jiangshan Yu</name>
+    </author>
+    <arxiv:doi>10.1109/ICBC67748.2026.11575489</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1109/ICBC67748.2026.11575489" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2505.22784v3</id>
+    <title>Split the Yield, Share the Risk: Pricing, Hedging and Fixed rates in DeFi</title>
+    <updated>2025-08-06T02:15:00Z</updated>
+    <link href="https://arxiv.org/abs/2505.22784v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2505.22784v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We present the first formal treatment of \emph{yield tokenization}, a mechanism that decomposes yield-bearing assets into principal and yield components to facilitate risk transfer and price discovery in decentralized finance (DeFi). We propose a model that characterizes yield token dynamics using stochastic differential equations. We derive a no-arbitrage pricing framework for yield tokens, enabling their use in hedging future yield volatility and managing interest rate risk in decentralized lending pools. Taking DeFi lending as our focus, we show how both borrowers and lenders can use yield tokens to achieve optimal hedging outcomes and mitigate exposure to adversarial interest rate manipulation. Furthermore, we design automated market makers (AMMs) that incorporate a menu of bonding curves to aggregate liquidity from participants with heterogeneous risk preferences. This leads to an efficient and incentive-compatible mechanism for trading yield tokens and yield futures. Building on these foundations, we propose a modular \textit{fixed-rate} lending protocol that synthesizes on-chain yield token markets and lending pools, enabling robust interest rate discovery and enhancing capital efficiency. Our work provides the theoretical underpinnings for risk management and fixed-income infrastructure in DeFi, offering practical mechanisms for stable and sustainable yield markets.</summary>
+    <category term="econ.TH" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="eess.SY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-05-28T18:57:28Z</published>
+    <arxiv:primary_category term="econ.TH"/>
+    <author>
+      <name>Viraj Nadkarni</name>
+    </author>
+    <author>
+      <name>Pramod Viswanath</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2507.01963v2</id>
+    <title>A Midsummer Meme's Dream: Investigating Market Manipulations in the Meme Coin Ecosystem</title>
+    <updated>2026-01-02T09:49:45Z</updated>
+    <link href="https://arxiv.org/abs/2507.01963v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2507.01963v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>From viral jokes to a billion-dollar phenomenon, meme coins have become one of the most popular segments in cryptocurrency markets. Unlike utility-focused crypto assets like Bitcoin, meme coins derive value primarily from community sentiment, making them vulnerable to manipulation. This study presents an unprecedented cross-chain analysis of the meme coin ecosystem, examining 34,988 tokens across Ethereum, BNB Smart Chain, Solana, and Base. We characterize their tokenomics and track their growth in a three-month longitudinal analysis. We discover that among high-return tokens (&gt;100%), an alarming 82.8% show evidence of artificial growth strategies designed to create a misleading appearance of market interest. These include wash trading and a new form of manipulation we define as Liquidity Pool-Based Price Inflation (LPI), where small strategic purchases trigger dramatic price increases. We find that profit extraction schemes, such as pump and dumps and rug pulls, typically follow initial manipulations like wash trading or LPI, indicating how early manipulations create the foundation for later exploitation. We quantify the economic impact of these schemes, identifying over 17,000 victimized addresses with realized losses exceeding $9.3 million. These findings reveal that combined manipulations are widespread among high-performing meme coins, suggesting that their dramatic gains are often driven by coordinated efforts rather than natural market dynamics.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-04-16T13:54:42Z</published>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Alberto Maria Mongardini</name>
+    </author>
+    <author>
+      <name>Alessandro Mei</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2412.07591v2</id>
+    <title>CoinCLIP: A Multimodal Framework for Assessing Viability in Web3 Memecoins</title>
+    <updated>2024-12-26T06:25:02Z</updated>
+    <link href="https://arxiv.org/abs/2412.07591v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2412.07591v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The rapid growth of memecoins within the Web3 ecosystem, driven by platforms like Pump.fun, has made it easier for anyone to create tokens. However, this democratization has also led to an explosion of low-quality or bot-generated projects, often motivated by short-term financial gain. This overwhelming influx of speculative tokens creates a challenge in distinguishing viable memecoins from those that are unlikely to succeed. To address this issue, we introduce CoinVibe, a comprehensive multimodal dataset designed to evaluate the viability of memecoins. CoinVibe integrates textual descriptions, visual content (logos), and community data (user comments, timestamps, and number of likes) to provide a holistic view of a memecoin's potential. In addition, we present CoinCLIP, a novel framework that leverages the Contrastive Language-Image Pre-Training (CLIP) model, augmented with lightweight modules and community data integration, to improve classification accuracy. By combining visual and textual representations with community insights, CoinCLIP provides a robust, data-driven approach to filter out low-quality or bot-driven projects. This research aims to help creators and investors identify high-potential memecoins, while also offering valuable insights into the factors that contribute to their long-term success. The code and dataset are publicly available at https://github.com/hwlongCUHK/CoinCLIP.git.</summary>
+    <category term="cs.CE" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2024-12-10T15:25:32Z</published>
+    <arxiv:comment>4 pages, 1 figure, conference</arxiv:comment>
+    <arxiv:primary_category term="cs.CE"/>
+    <author>
+      <name>Hou-Wan Long</name>
+    </author>
+    <author>
+      <name>Hongyang Li</name>
+    </author>
+    <author>
+      <name>Wei Cai</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2412.04913v3</id>
+    <title>Bridging Culture and Finance: A Multimodal Analysis of Memecoins in the Web3 Ecosystem</title>
+    <updated>2025-02-21T04:01:27Z</updated>
+    <link href="https://arxiv.org/abs/2412.04913v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2412.04913v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Memecoins, driven by social media engagement and cultural narratives, have rapidly grown within the Web3 ecosystem. Unlike traditional cryptocurrencies, they are shaped by humor, memes, and community sentiment. This paper introduces the Coin-Meme dataset, an open-source collection of visual, textual, community, and financial data from the Pump.fun platform on the Solana blockchain. We also propose a multimodal framework to analyze memecoins, uncovering patterns in cultural themes, community interaction, and financial behavior. Through clustering, sentiment analysis, and word cloud visualizations, we identify distinct thematic groups centered on humor, animals, and political satire. Additionally, we provide financial insights by analyzing metrics such as Market Entry Time and Market Capitalization, offering a comprehensive view of memecoins as both cultural artifacts and financial instruments within Web3. The Coin-Meme dataset is publicly available at https://github.com/hwlongCUHK/Coin-Meme.git.</summary>
+    <category term="cs.HC" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2024-12-06T10:09:34Z</published>
+    <arxiv:comment>4 pages, 2 figures, conference</arxiv:comment>
+    <arxiv:primary_category term="cs.HC"/>
+    <author>
+      <name>Hou-Wan Long</name>
+    </author>
+    <author>
+      <name>Nga-Man Wong</name>
+    </author>
+    <author>
+      <name>Wei Cai</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2410.23794v1</id>
+    <title>Memes, Markets, and Machines: The Evolution of On Chain Autonomy through Hyperstition</title>
+    <updated>2024-10-31T10:26:49Z</updated>
+    <link href="https://arxiv.org/abs/2410.23794v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2410.23794v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Autonomous AI is driving new intersections between culture, cognition, and finance, fundamentally reshaping the digital landscape. Zerebro, an AI fine-tuned on schizophrenic responses and scraped conversations of Andy Ayrey's infinite backrooms, autonomously creates and spreads disruptive memes across online platforms. It also mints unique ASCII artwork on blockchain networks and launched a memecoin amassing a 3 million USD market cap after migrating to Raydium. Based on our research, Zerebro is the first cross-chain AI, seamlessly interacting with multiple blockchains. By exploring its architecture, content generation techniques, and blockchain integration, this study uncovers how hyperstition, fictions becoming reality through viral propagation, emerges in AI, driven meme culture and decentralized finance. Through historical examples of memetic influence, we reveal how AI systems like Zerebro are not merely participants but architects of culture, cognition, and finance.</summary>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2024-10-31T10:26:49Z</published>
+    <arxiv:comment>11 pages, draft</arxiv:comment>
+    <arxiv:primary_category term="cs.CY"/>
+    <author>
+      <name>Jeffy Yu</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2406.13794v2</id>
+    <title>Adaptive Curves for Optimally Efficient Market Making</title>
+    <updated>2025-03-29T03:14:40Z</updated>
+    <link href="https://arxiv.org/abs/2406.13794v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2406.13794v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Automated Market Makers (AMMs) are essential in Decentralized Finance (DeFi) as they match liquidity supply with demand. They function through liquidity providers (LPs) who deposit assets into liquidity pools. However, the asset trading prices in these pools often trail behind those in more dynamic, centralized exchanges, leading to potential arbitrage losses for LPs. This issue is tackled by adapting market maker bonding curves to trader behavior, based on the classical market microstructure model of Glosten and Milgrom. Our approach ensures a zero-profit condition for the market maker's prices. We derive the differential equation that an optimal adaptive curve should follow to minimize arbitrage losses while remaining competitive. Solutions to this optimality equation are obtained for standard Gaussian and Lognormal price models using Kalman filtering. A key feature of our method is its ability to estimate the external market price without relying on price or loss oracles. We also provide an equivalent differential equation for the implied dynamics of canonical static bonding curves and establish conditions for their optimality. Our algorithms demonstrate robustness to changing market conditions and adversarial perturbations, and we offer an on-chain implementation using Uniswap v4 alongside off-chain AI co-processors.</summary>
+    <category term="eess.SY" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CE" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2024-06-19T19:42:38Z</published>
+    <arxiv:primary_category term="eess.SY"/>
+    <author>
+      <name>Viraj Nadkarni</name>
+    </author>
+    <author>
+      <name>Sanjeev Kulkarni</name>
+    </author>
+    <author>
+      <name>Pramod Viswanath</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2405.15288v3</id>
+    <title>The Writing is on the Wall: Analyzing the Boom of Inscriptions and its Impact on EVM-compatible Blockchains</title>
+    <updated>2025-04-09T09:43:04Z</updated>
+    <link href="https://arxiv.org/abs/2405.15288v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2405.15288v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This paper examines inscription-related transactions on Ethereum and major EVM-compatible rollups, assessing their impact on scalability during transaction surges. Our results show that, on certain days, inscriptions accounted for nearly 90% of transactions on Arbitrum and ZKsync Era, while 53% on Ethereum, with 99% of these inscriptions involving meme coin minting. Furthermore, we show that ZKsync and Arbitrum saw lower median gas fees during these surges. ZKsync Era, a ZK-rollup, showed a greater fee reduction than the optimistic rollups studied -- Arbitrum, Base, and Optimism.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2024-05-24T07:21:53Z</published>
+    <arxiv:comment>This work has been accepted for publication at the 4th International Workshop on Cryptoasset Analytics (CAAW), co-located with the Financial Cryptography and Data Security (FC) 2025 conference . Parts of this research were conducted while the authors were affiliated with Matter Labs. arXiv admin note: text overlap with arXiv:2404.11189</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Johnnatan Messias</name>
+    </author>
+    <author>
+      <name>Krzysztof Gogol</name>
+    </author>
+    <author>
+      <name>Maria Inês Silva</name>
+    </author>
+    <author>
+      <name>Benjamin Livshits</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2309.13648v2</id>
+    <title>Don't Let MEV Slip: The Costs of Swapping on the Uniswap Protocol</title>
+    <updated>2024-04-17T14:12:56Z</updated>
+    <link href="https://arxiv.org/abs/2309.13648v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2309.13648v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We present the first in-depth empirical characterization of the costs of trading on a decentralized exchange (DEX). Using quoted prices from the Uniswap Labs interface for two pools -- USDC-ETH (5bps) and PEPE-ETH (30bps) -- we evaluate the efficiency of trading on DEXs. Our main tool is slippage -- the difference between the realized execution price of a trade, and its quoted price -- which we breakdown into its benign and adversarial components. We also present an alternative way to quantify and identify slippage due to adversarial reordering of transactions, which we call reordering slippage, that does not require quoted prices or mempool data to calculate. We find that the composition of transaction costs varies tremendously with the trade's characteristics. Specifically, while for small swaps, gas costs dominate costs, for large swaps price-impact and slippage account for the majority of it. Moreover, when trading PEPE, a popular 'memecoin', the probability of adversarial slippage is about 80% higher than when trading a mature asset like USDC.
+  Overall, our results provide preliminary evidence that DEXs offer a compelling trust-less alternative to centralized exchanges for trading digital assets.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2023-09-24T14:22:15Z</published>
+    <arxiv:comment>31 pages, 7 tables, 2 figures</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Austin Adams</name>
+    </author>
+    <author>
+      <name>Benjamin Y Chan</name>
+    </author>
+    <author>
+      <name>Sarit Markovich</name>
+    </author>
+    <author>
+      <name>Xin Wan</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2211.00063v1</id>
+    <title>Rogue Protocol: A Framework For NFT Royalties Tokenisation</title>
+    <updated>2022-10-21T13:02:04Z</updated>
+    <link href="https://arxiv.org/abs/2211.00063v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2211.00063v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The crypto ecosystem has evolved into a formidable channel for raising venture capital. Each new wave of capital inflows has been epitomized by a new type of investment vehicle, may it be ICOs, DAOs, or NFTs. Regrettably, none of these paradigms tried to address the issue of investor protection, a pillar of efficient capital markets. Moreover, very few projects tried to generate economic revenue, focusing instead on marketing alone to attract new investors. Without revenues, price discovery was impossible, while investors were left without any protection against rug pulls. This has forced regulators to take a hard-line approach to the ecosystem, and rule that certain tokens are securities when they are not intended to be. Regulators have left the door open to cryptocurrencies with truly decentralised activity like Ethereum, most notably the SEC in its interpretation of the Howey test for digital assets. We believe that a great number of decentralised projects could benefit from this regulatory exception. A system where project revenue is automatically directed to a treasury pool, and the price of tokens is computed following a predetermined bonding curve, would allow to efficiently raise capital, while investors would have automatic guarantees of fair participation in the success of the project. Such a framework would incentivise founders to design decentralised projects that create value instead of hype, while making the application of securities laws less stringent or even needed. NFT royalties in particular are an example of decentralised economic activity that generates cash flows, used to back the value of associated tokens. We propose a cryptographic system that ties the price of tokens to the success of a decentralised activity, guarantees the fair distribution of tokens, and rewards founders and participants in the system in line with the amount of risk they are taking.</summary>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.GT" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2022-10-21T13:02:04Z</published>
+    <arxiv:comment>This version has been removed by arXiv administrators as the submitter did not have the rights to agree to the license at the time of submission</arxiv:comment>
+    <arxiv:primary_category term="cs.CY"/>
+    <author>
+      <name>Šarūnas Barauskas</name>
+    </author>
+    <author>
+      <name>Roberto Ripamonti</name>
+    </author>
+    <author>
+      <name>Emanuele Ragnoli</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2208.14174v1</id>
+    <title>Semantics and Non-Fungible Tokens for Copyright Management on the Metaverse and Beyond</title>
+    <updated>2022-08-25T05:59:38Z</updated>
+    <link href="https://arxiv.org/abs/2208.14174v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2208.14174v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Recent initiatives related to the Metaverse focus on better visualisation, like augmented or virtual reality, but also persistent digital objects. To guarantee real ownership of these digital objects, open systems based on public blockchains and Non-Fungible Tokens (NFTs) are emerging together with a nascent decentralized and open creator economy. To manage this emerging economy in a more organised way, and fight the so common NFT plagiarism, we propose CopyrightLY, a decentralized application for authorship and copyright management. It provides means to claim content authorship, including supporting evidence. Content and metadata are stored in decentralized storage and registered on the blockchain. A token is used to curate these claims, and potential complaints, by staking it on them. Staking is incentivized by the fact that the token is minted using a bonding curve. The tokenomics include the resolution of complaints and enabling the monetization of curated claims. Monetization is achieved through licensing NFTs with metadata enhanced by semantic technologies. Semantic data makes explicit the reuse conditions transferred with the token while keeping the connection to the underlying copyright claims to improve the trustability of the NFTs. Moreover, the semantic metadata is flexible enough to enable licensing not just in the real world. Licenses can refer to reuses in specific locations in a metaverse, thus facilitating the emergence of creative economies in them.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.DB" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.DC" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.MM" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2022-08-25T05:59:38Z</published>
+    <arxiv:comment>16 pages, 6 figures, 2 listings</arxiv:comment>
+    <arxiv:primary_category term="cs.CR"/>
+    <author>
+      <name>Roberto García</name>
+    </author>
+    <author>
+      <name>Ana Cediel</name>
+    </author>
+    <author>
+      <name>Mercè Teixidó</name>
+    </author>
+    <author>
+      <name>Rosa Gil</name>
+    </author>
+    <arxiv:doi>10.1145/3585387</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1145/3585387" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2111.09192v1</id>
+    <title>Impermanent Loss in Uniswap v3</title>
+    <updated>2021-11-17T15:33:36Z</updated>
+    <link href="https://arxiv.org/abs/2111.09192v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2111.09192v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>AMMs are autonomous smart contracts deployed on a blockchain that make markets between different assets that live on that chain. In this paper we are examining a specific class of AMMs called Constant Function Market Makers whose trading profile, ignoring fees, is determined by their bonding curve. This class of AMM suffers from what is commonly referred to as Impermanent Loss, which we have previously identified as the Gamma component of the associated self-financing trading strategy and which is the risk that LP providers wager against potential fee earnings.
+  The recent Uniswap v3 release has popularized the concept of leveraged liquidity provision - wherein the trading range in which liquidity is provided is reduced and achieves a higher degree of capital efficiency through elimination of unused collateral. This leverage increases the fees earned, but it also increases the risk taken, ie the IL. Fee levels on Uniswap v3 are well publicized so, in this paper, we focus on calculating the IL.
+  We found that for the 17 pools we analyzed, covering 43% of TVL and chosen by size, composite tokens and data availability, total fees earned since inception until the cut-off date was $199.3m. We also found that the total IL suffered by LPs during this period was USD 260.1m, meaning that in aggregate those LPs would have been better off by USD 60.8m had they simply HODLd.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.PM" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2021-11-17T15:33:36Z</published>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Stefan Loesch</name>
+    </author>
+    <author>
+      <name>Nate Hindman</name>
+    </author>
+    <author>
+      <name>Mark B Richardson</name>
+    </author>
+    <author>
+      <name>Nicholas Welch</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/1512.07340v1</id>
+    <title>Liability-side Pricing of Swaps and Coherent CVA and FVA by Regression/Simulation</title>
+    <updated>2015-12-23T02:42:32Z</updated>
+    <link href="https://arxiv.org/abs/1512.07340v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1512.07340v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>An uncollateralized swap hedged back-to-back by a CCP swap is used to introduce FVA. The open IR01 of FVA, however, is a sure sign of risk not being fully hedged, a theoretical no-arbitrage pricing concern, and a bait to lure market risk capital, a practical business concern. By dynamically trading the CCP swap, with the liability-side counterparty provides counterparty exposure hedge and swap funding, we find that the uncollateralized swap can be fully replicated, leaving out no IR01 leakage. The fair value of the swap is obtained by applying to swap's net cash flows a discount rate switching to counterparty's bond curve if the swap is a local asset or one's own curve if a liability, and the total valuation adjustment is the present value of cost of funding the risk-free price discounted at the same switching rate. FVA is redefined as a liquidity or funding basis component of total valuation adjustment, coherent with CVA, the default risk component. A Longstaff-Schwartz style least-square regression and simulation is introduced to compute the recursive fair value and adjustments. A separately developed finite difference scheme is used to test and find regression necessary to decouple the discount rate switch. Preliminary results show the impact of counterparty risk to swap hedge ratios, swap bid/ask spreads, and valuation adjustments, and considerable errors of calculating CVA by discounting cash flow or potential future exposure.</summary>
+    <category term="q-fin.PR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.MF" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2015-12-23T02:42:32Z</published>
+    <arxiv:comment>19 pages, 5 tables, 2 figures; Global Derivatives USA Conference (2014), Chicago</arxiv:comment>
+    <arxiv:primary_category term="q-fin.PR"/>
+    <arxiv:journal_ref>Liability-side pricing of swaps, RISK, April 2016, pp 66-71</arxiv:journal_ref>
+    <author>
+      <name>Wujiang Lou</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/1406.5755v2</id>
+    <title>A Bond Consistent Derivative Fair Value</title>
+    <updated>2014-09-19T10:36:29Z</updated>
+    <link href="https://arxiv.org/abs/1406.5755v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1406.5755v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>In this paper we present a rigorously motivated pricing equation for derivatives, including general cash collateralization schemes, which is consistent with quoted market bond prices. Traditionally, there have been differences in how instruments with similar cash flow structures have been priced if their definition falls under that of a financial derivative versus if they correspond to bonds, leading to possibilities such as funding through derivatives transactions. Furthermore, the problem has not been solved with the recent introduction of Funding Valuation Adjustments in derivatives pricing, and in some cases has even been made worse.
+  In contrast, our proposed equation is not only consistent with fixed income assets and liabilities, but is also symmetric, implying a well-defined exit price, independent of the entity performing the valuation. Also, we provide some practical proxies, such as first-order approximations or basing calculations of CVA and DVA on bond curves, rather than Credit Default Swaps.</summary>
+    <category term="q-fin.PR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.PM" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.RM" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2014-06-22T19:45:16Z</published>
+    <arxiv:comment>Minor changes. Additional comments and reference added</arxiv:comment>
+    <arxiv:primary_category term="q-fin.PR"/>
+    <author>
+      <name>Johan Gunnesson</name>
+    </author>
+    <author>
+      <name>Alberto Fernández Muñoz de Morales</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/0807.3215v1</id>
+    <title>Development of a Classical Force Field for the Oxidised Si Surface: Application to Hydrophilic Wafer Bonding</title>
+    <updated>2008-07-21T07:44:33Z</updated>
+    <link href="https://arxiv.org/abs/0807.3215v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/0807.3215v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>  We have developed a classical two- and three-body interaction potential to simulate the hydroxylated, natively oxidised Si surface in contact with water solutions, based on the combination and extension of the Stillinger-Weber potential and of a potential originally developed to simulate SiO2 polymorphs. The potential parameters are chosen to reproduce the structure, charge distribution, tensile surface stress and interactions with single water molecules of a natively oxidised Si surface model previously obtained by means of accurate density functional theory simulations. We have applied the potential to the case of hydrophilic silicon wafer bonding at room temperature, revealing maximum room temperature work of adhesion values for natively oxidised and amorphous silica surfaces of 97 mJ/m2 and 90mJ/m2, respectively, at a water adsorption coverage of approximately 1 monolayer. The difference arises from the stronger interaction of the natively oxidised surface with liquid water, resulting in a higher heat of immersion (203 mJ/m2 vs. 166 mJ/m2), and may be explained in terms of the more pronounced water structuring close to the surface in alternating layers of larger and smaller density with respect to the liquid bulk. The computed force-displacement bonding curves may be a useful input for cohesive zone models where both the topographic details of the surfaces and the dependence of the attractive force on the initial surface separation and wetting can be taken into account.</summary>
+    <category term="cond-mat.mtrl-sci" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2008-07-21T07:44:33Z</published>
+    <arxiv:primary_category term="cond-mat.mtrl-sci"/>
+    <arxiv:journal_ref>Journal of Chemical Physics 127 (2007) 204704</arxiv:journal_ref>
+    <author>
+      <name>Daniel J. Cole</name>
+    </author>
+    <author>
+      <name>Mike C. Payne</name>
+    </author>
+    <author>
+      <name>Gabor Csanyi</name>
+    </author>
+    <author>
+      <name>S. Mark Spearing</name>
+    </author>
+    <author>
+      <name>L. Colombi Ciacchi</name>
+    </author>
+    <arxiv:doi>10.1063/1.2799196</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1063/1.2799196" title="doi"/>
+  </entry>
+</feed>
