@@ -38,7 +38,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0021_meme_radar"
+HEAD_REVISION = "0022_meme_lab"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -59,6 +59,9 @@ RUNTIME_LOGIN_ROLE_REVISION = "0015_runtime_login_role"
 EXCHANGE_STATUS_REVISION = "0016_exchange_status_planned"
 ELIGIBILITY_POLICY_REVISION = "0017_eligibility_policy"
 BREADTH_REVISION = "0019_market_breadth"
+MEME_RADAR_REVISION = "0021_meme_radar"
+"""Named because the ``0021`` tests reverse **0021**, and ``"-1"`` stopped meaning
+that the day ``0022_meme_lab`` landed on top (the ``0019`` lesson, again)."""
 """Named for the same reason as the line below: the two ``0019`` tests are about
 reversing **0019**, and ``"-1"`` stopped meaning that the day a revision landed on
 top of it. They now stage the database at this revision first, exactly as every
@@ -4064,9 +4067,14 @@ def test_0021_refuses_a_downgrade_that_would_lose_discovery(upgraded: str) -> No
     config = alembic_config(upgraded)
     asyncio.run(_write(upgraded, [(_A_TOKEN, {"mint": "GUARD_MINT"})]))
     try:
+        # Stage at 0021 first: ``0022`` sits on top and ``"-1"`` from the head
+        # would reverse *it* (the seed alone reverses), not the radar.
+        command.downgrade(config, MEME_RADAR_REVISION)
         with pytest.raises(DBAPIError, match="meme_tokens rows exist"):
             command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_revision(upgraded)) == MEME_RADAR_REVISION, (
+            "the downgrade must not commit"
+        )
         assert asyncio.run(_relation_exists(upgraded, "meme_tokens")), (
             "a refused downgrade must leave the schema exactly where it was"
         )
@@ -4090,9 +4098,10 @@ def test_0021_reverses_on_a_database_that_never_watched_a_mint(upgraded: str) ->
     and "the tables returned with their grants and their view" are different
     facts."""
     config = alembic_config(upgraded)
+    command.downgrade(config, MEME_RADAR_REVISION)
     command.downgrade(config, "-1")
     try:
-        assert asyncio.run(_revision(upgraded)) != HEAD_REVISION
+        assert asyncio.run(_revision(upgraded)) not in (HEAD_REVISION, MEME_RADAR_REVISION)
         for table in MEME_TABLES:
             assert not asyncio.run(_relation_exists(upgraded, table)), table
         assert not asyncio.run(_relation_exists(upgraded, "meme_radar_features_v1"))
@@ -4166,3 +4175,171 @@ def test_0021_freezes_an_identity_and_still_lets_the_lifecycle_move(upgraded: st
                 ],
             )
         )
+
+
+# ---------------------------------------------------------------------------
+# 0022_meme_lab — the continuous paper Lab: rule sets, proposals, bets, commands
+# ---------------------------------------------------------------------------
+
+MEME_LAB_TABLES = ("meme_rule_sets", "meme_proposals", "meme_paper_bets", "meme_operator_commands")
+MEME_LAB_VIEWS = ("meme_lab_scoreboard_v1", "meme_desk_v1")
+_RESEARCH_RULE_SET = "01994d00-6c1a-7000-8000-000000000001"
+
+_A_PROPOSAL = (
+    "INSERT INTO meme_proposals (id, mint, rule_set_id, origin, status, expires_at, "
+    "  decision, decided_by, decided_at) VALUES (:id, 'GUARD_MINT', :rule_set, 'operator', "
+    "  'approved', now() + interval '2 minutes', '{}'::jsonb, 'user', now())"
+)
+_A_BET = (
+    "INSERT INTO meme_paper_bets (id, proposal_id, rule_set_id, mint, mode, entry_at, entry, "
+    "  initial_risk_sol, params) VALUES (:id, :proposal, :rule_set, 'GUARD_MINT', :mode, now(), "
+    "  '{}'::jsonb, 0.05, '{}'::jsonb)"
+)
+
+
+def test_0022_seeds_the_two_rule_sets_the_contract_names(upgraded: str) -> None:
+    """The seed is part of the revision: a Lab with no rule set would be a loop
+    that runs and proposes nothing while looking alive."""
+    rows = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') "
+            "FROM meme_rule_sets WHERE status = 'active' ORDER BY name",
+            {},
+        )
+    )
+    assert rows == ["meme_paper_v0/1:research_only:EXP-M1", "operator/1:operator:-"]
+    sizes = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT (params ->> 'max_sol_per_bet') || '/' || (params ->> 'wallet_max_sol') || '/' "
+            "|| (params ->> 'daily_loss_cap_sol') FROM meme_rule_sets ORDER BY name",
+            {},
+        )
+    )
+    assert sizes == ["0.05/2.0/0.20", "0.05/2.0/0.20"]
+
+
+def test_0022_grants_the_desk_two_writes_and_the_loop_its_upserts(upgraded: str) -> None:
+    """The contract's grants, as privileges: the API decides and orders, the loop
+    proposes, fills and marks, and nobody deletes."""
+    app, worker = "hunter_app", "hunter_worker"
+    assert asyncio.run(_table_privileges(upgraded, app, "meme_rule_sets")) == {"SELECT"}
+    assert asyncio.run(_table_privileges(upgraded, app, "meme_paper_bets")) == {"SELECT"}
+    assert asyncio.run(_table_privileges(upgraded, app, "meme_operator_commands")) == {
+        "SELECT",
+        "INSERT",
+    }
+    assert asyncio.run(_table_privileges(upgraded, app, "meme_proposals")) == {"SELECT", "INSERT"}
+    for column in ("status", "decision", "decided_by", "decided_at"):
+        assert asyncio.run(_column_privilege(upgraded, app, "meme_proposals", column)), column
+    for column in ("quote", "reasons", "bet_id", "refusal", "mint"):
+        assert not asyncio.run(_column_privilege(upgraded, app, "meme_proposals", column)), column
+    assert asyncio.run(_table_privileges(upgraded, worker, "meme_rule_sets")) == {"SELECT"}
+    for table in ("meme_proposals", "meme_paper_bets"):
+        assert asyncio.run(_table_privileges(upgraded, worker, table)) == {
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+        }, table
+    assert asyncio.run(_table_privileges(upgraded, worker, "meme_operator_commands")) == {"SELECT"}
+    for column in ("applied_at", "result"):
+        assert asyncio.run(_column_privilege(upgraded, worker, "meme_operator_commands", column))
+    assert not asyncio.run(_column_privilege(upgraded, worker, "meme_operator_commands", "command"))
+    for view in MEME_LAB_VIEWS:
+        assert asyncio.run(_table_privileges(upgraded, app, view)) == {"SELECT"}
+        assert asyncio.run(_table_privileges(upgraded, worker, view)) == {"SELECT"}
+
+
+def test_0022_locks_every_bet_to_paper_for_every_role(upgraded: str) -> None:
+    """``mode`` is a CHECK, not a convention: even the owner cannot write ``live``."""
+    proposal = uuid7()
+    asyncio.run(_write(upgraded, [(_A_PROPOSAL, {"id": proposal, "rule_set": _RESEARCH_RULE_SET})]))
+    try:
+        with pytest.raises(DBAPIError, match="every_bet_is_paper"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [
+                        (
+                            _A_BET,
+                            {
+                                "id": uuid7(),
+                                "proposal": proposal,
+                                "rule_set": _RESEARCH_RULE_SET,
+                                "mode": "live",
+                            },
+                        )
+                    ],
+                )
+            )
+    finally:
+        asyncio.run(
+            _write(upgraded, [("DELETE FROM meme_proposals WHERE id = :id", {"id": proposal})])
+        )
+
+
+def test_0022_refuses_a_downgrade_that_would_lose_a_bet(upgraded: str) -> None:
+    """§17.7: the ledger is evidence — count, name, stop; the schema stays."""
+    config = alembic_config(upgraded)
+    proposal, bet = uuid7(), uuid7()
+    asyncio.run(
+        _write(
+            upgraded,
+            [
+                (_A_PROPOSAL, {"id": proposal, "rule_set": _RESEARCH_RULE_SET}),
+                (
+                    _A_BET,
+                    {
+                        "id": bet,
+                        "proposal": proposal,
+                        "rule_set": _RESEARCH_RULE_SET,
+                        "mode": "paper",
+                    },
+                ),
+            ],
+        )
+    )
+    try:
+        with pytest.raises(DBAPIError, match="meme_paper_bets rows exist"):
+            command.downgrade(config, "-1")
+        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        assert asyncio.run(_relation_exists(upgraded, "meme_paper_bets"))
+    finally:
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    ("DELETE FROM meme_paper_bets WHERE id = :id", {"id": bet}),
+                    ("DELETE FROM meme_proposals WHERE id = :id", {"id": proposal}),
+                ],
+            )
+        )
+    command.check(config)
+
+
+def test_0022_reverses_with_the_seed_alone_and_comes_back_seeded(upgraded: str) -> None:
+    """The round trip an operator runs to roll a deploy back: the seed is not
+    evidence, so it reverses; and what comes back is seeded and granted again."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == MEME_RADAR_REVISION
+        for relation in (*MEME_LAB_TABLES, *MEME_LAB_VIEWS):
+            assert not asyncio.run(_relation_exists(upgraded, relation)), relation
+        for table in MEME_TABLES:
+            assert asyncio.run(_relation_exists(upgraded, table)), f"0021 lost {table}"
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    for relation in (*MEME_LAB_TABLES, *MEME_LAB_VIEWS):
+        assert asyncio.run(_relation_exists(upgraded, relation)), relation
+    assert asyncio.run(
+        _scalars(upgraded, "SELECT count(*)::text FROM meme_rule_sets WHERE status = 'active'", {})
+    ) == ["2"]
+    assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_paper_bets")) == {
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+    }
+    command.check(config)

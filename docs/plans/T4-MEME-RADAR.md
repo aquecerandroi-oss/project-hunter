@@ -324,6 +324,99 @@ compra/venda (não é feature deste corte).
 - Endpoint responde em paginação (não um `SELECT *` sem limite numa tabela que cresce ~40 mil
   linhas novas de token por dia).
 
+### T4.7 — Mesa do operador (`/meme/mesa`) — papel, nunca dinheiro real
+
+Contrato congelado com a T4.6: `.claude/state/contrato-T4.6-T4.7-mesa-meme.md` (tabelas,
+semântica do laço, rotas, tela). Everton (12/09): "quero dar o aval da compra do meme, quanto de
+espera, vender".
+
+**O que a mesa faz.** Rotas sob `/api/v1/orgs/{org}/meme` (VIEWER+ lê, TRADER+ opera — o mesmo
+papel da `order-requests`): `GET /desk` (propostas em espera → aprovadas aguardando fotografia →
+apostas abertas → histórico, cursor keyset, mais o saldo de papel por conjunto em SOL e a última
+cotação SOL/USD **observada pelo laço**, com hora); `POST /proposals/{id}/approve` (os quatro
+parâmetros `size_sol`/`target_x`/`trailing_pct`/`max_hold_s` viram `decision`; 409 se não estiver
+`proposed` ou se `expires_at` já passou; 422 `exceeds_max_sol_per_bet`); `POST .../reject`;
+`POST /proposals/manual` (mint colado → proposta `operator/1` já `approved`, cotada na última
+fotografia com taxa 1,75 %; 422 `mint_unknown`/`curve_completed`/`operator_rule_set_missing`);
+`POST /bets/{id}/sell-now` e `POST /proposals/{id}/cancel` (uma linha em
+`meme_operator_commands`, 202: o laço aplica na **próxima fotografia**). Todo POST exige
+`Idempotency-Key` (replay devolve o mesmo resultado; corpo diferente → 409) e grava `audit_logs`.
+A API escreve **só** as quatro colunas de decisão de `meme_proposals`, o `INSERT` manual e os
+comandos — exatamente o que a `0022_meme_lab` concede ao `hunter_app`; nunca `meme_paper_bets`.
+
+**Tela.** Faixa (saldo por conjunto, US$ pela cotação observada + hora, PnL do dia, laço
+vivo/parado/sem leitura), "Propostas" com contagem regressiva e folha de aprovação pré-preenchida
+com `suggested`, "Comprar manual", "Abertas" (marca, PnL/R não realizados calculados na API em
+`Decimal`, espera restante, **Vender agora** com confirmação em um toque e o aviso "vende na
+próxima fotografia, não neste preço"), "Fechadas hoje" (dia de Brasília), "Decididas
+recentemente" (recusas nomeadas do laço, ex.: `daily_loss_cap`). Rótulo permanente
+"PAPEL — nenhuma transação real; a chave e a flag ao vivo não existem neste processo".
+Atualização a cada 5 s. Item "Mesa" sob o Meme Radar na navegação.
+
+**O que a mesa não faz.** Não compra nem vende: registra decisão e intenção; quem preenche e
+vende é o laço (T4.6), na fotografia seguinte. Não lê chave, não assina, não conhece
+`ENABLE_MEME_LIVE_TRADING`. Não inventa número: sem cotação observada → "US$: sem cotação
+observada"; conjunto sem `wallet_max_sol` → "sem saldo inicial"; laço sem carimbo → "laço: sem
+leitura", distinto de "laço parado desde …" e de "nenhuma proposta nos últimos N min (laço
+vivo)". Emendas ao contrato (vista × tabelas base, chaves do `quote`, idempotência no Redis,
+`sell_now_already_pending`) estão no próprio arquivo do contrato; a execução da tarefa em
+`.claude/state/notes-T4.7.md`.
+
+### T4.6 — Lab meme contínuo: simular sem parar na curva, em papel (entregue 12/09/2026)
+
+**Escopo entregue:** migração `0022_meme_lab` (`meme_rule_sets`, `meme_proposals`,
+`meme_operator_commands`, `meme_paper_bets`, vistas `meme_lab_scoreboard_v1` e `meme_desk_v1`,
+semente `meme_paper_v0/1` + `operator/1` — `docs/DATABASE.md` §34); o laço por minuto dentro do
+próprio `meme-worker` (`lab.py`, `proposals.py`, `paper_engine.py`, `lab_bets.py`,
+`lab_repo*.py`; decisão registrada: sem serviço irmão, porque o laço só lê o que o coletor já
+escreveu e fala com um endpoint a mais, `/sol-price`, no máximo uma vez por minuto);
+`GET /api/v1/orgs/{org}/meme/lab` (VIEWER+, só leitura); `infra/scripts/meme_diary.py`
+(`--dry-run`/`--apply`, `obsidian/09-OPERATIONS/Diario-Meme/<dia>.md`).
+
+**Semântica (contrato `.claude/state/contrato-T4.6-T4.7-mesa-meme.md` §Semântica + Emendas):**
+
+1. A cada minuto fechado (`end_time <= agora − 1 min`), para cada `meme_rule_sets.status='active'`,
+   a porta de entrada da T4.5 (`hunter_indicators.meme.rules.evaluate_entry`) corre sobre cada
+   linha de `meme_features_1m` (progresso lido como fração e julgado em %; idade em segundos a
+   partir de `meme_tokens.created_at`). `research_only` nasce `approved` com `decided_by='rules'`;
+   `operator` nasce `proposed` e espera a mesa até `expires_at` (120 s).
+2. `approved` preenche **na primeira fotografia com `observed_at > decided_at`** (nunca na que
+   motivou); sem fotografia em 3 min → `unfilled` `no_later_snapshot`; tetos por conjunto com recusa
+   nomeada (`exceeds_max_sol_per_bet`, `daily_loss_cap` sobre a perda realizada do dia em Brasília,
+   `max_open_positions`, `wallet_balance_insufficient`, …). Risco inicial = SOL gasto inteiro.
+3. Aposta aberta: cada fotografia nova marca (`mark_sol` = o que uma venda cheia renderia, com 1,75 %;
+   `high_water_x`); as regras (`sell_now` do operador acima de todas; depois dump do criador quando a
+   feature existir, migração/conclusão, piso 50 %, alvo 2×, trailing 30 % do pico, 900 s) disparam na
+   fotografia k e ficam em `exit_intent`; **a venda é na fotografia k+1**; sem k+1 em 3 min →
+   `rug_no_snapshot` (fecha a zero, R = −1, `pending_reason` diz a regra que esperava).
+4. Carteira por conjunto derivada só das linhas (`wallet_max_sol + Σ pnl − Σ stake aberto`): um
+   restart não é um reset. Cotação SOL/USD observada (`/sol-price`, fonte + hora no jsonb) grava
+   `sol_usd_at_entry`/`sol_usd_at_exit`; sem cotação, `NULL` com motivo.
+5. Nada de zero silencioso: `hb:meme:radar` ganha `lab_last_tick_at`, `lab_gate_refusals` (por
+   conjunto, por motivo), contadores; `GET /meme/lab` traz `sources.lab_status` ∈ {alive, stalled,
+   never, disabled, heartbeat_missing, redis_unavailable}.
+
+**O que é verdade hoje, e está medido:** com as fontes grátis (`creator_sold` NULL com
+`no_holders_reader`, sem feed de trades) **o portão congelado da EXP-M1 recusa toda linha** por
+`creator_net_seller_unknown` e `curve_volume_1m_unknown` — a previsão P1 do pré-registro, agora
+contada a cada minuto no heartbeat. O laço, portanto, não abre aposta sozinha até um leitor de
+holders (T4.2c) e um feed de trades (T4.2b) existirem; a compra hoje entra pela mesa
+(`POST /proposals/manual`, T4.7) e o laço faz o resto (fill na fotografia seguinte, marcas, saídas,
+`sell_now`). Ligar um portão mais frouxo sem pré-registro está fora de questão (brief item 4).
+
+**Critério de aceite medido (12/09):** unit 23 (motor) + 14 (porta) + 12 (API) + 4 (diário) + 3
+(adapter `/sol-price`); testcontainer `test_lab_persistence.py` 12/12 (semente; portão sobre linhas
+reais contando recusas; fill na 1.ª fotografia posterior **e** o futuro reescrito não move a
+entrada; `unfilled` por `no_later_snapshot`, `exceeds_max_sol_per_bet`, `daily_loss_cap`; expiração e
+`cancel`; fechamento por alvo, time stop, migração e `sell_now` — cada um na fotografia seguinte;
+`rug_no_snapshot`; vistas; grants como o papel); `test_migrations.py` e `test_schema_privileges.py`
+com a `0022` na união. Nenhum módulo importa `packages/risk-core` nem `hunter_core.execution`;
+`meme_paper_bets.mode` é `CHECK (mode = 'paper')`.
+
+**Fora do corte (T4.8+):** caminho de assinatura, `ENABLE_MEME_LIVE_TRADING`, venda pós-migração
+pelo PumpSwap (hoje a migração fecha contra a fotografia da curva concluída, com a taxa de 1,75 %,
+declarado no `exit.trigger`), detector de rug (`rug_signal_unknown` na decisão).
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets

@@ -4,15 +4,15 @@ import { NAV_ICONS } from "@/components/layout/nav-icons";
 import { NAV_ICON_KEYS, NAV_ITEMS, navHref, visibleNavItems } from "@/lib/nav-registry";
 
 describe("nav-registry", () => {
-  it("lists all 19 routes (docs/PRODUCT.md §4's 17 plus `lab` for the Shadow Lab research track, S3, plus `meme` for the Meme Radar, T4.3)", () => {
-    expect(NAV_ITEMS).toHaveLength(19);
+  it("lists all 20 routes (docs/PRODUCT.md §4's 17 plus `lab` for the Shadow Lab research track, S3, plus `meme` for the Meme Radar, T4.3, plus `meme-mesa` for the operator desk, T4.7)", () => {
+    expect(NAV_ITEMS).toHaveLength(20);
     const keys = NAV_ITEMS.map((item) => item.key);
-    expect(new Set(keys).size).toBe(19);
+    expect(new Set(keys).size).toBe(20);
   });
 
-  it("marks dashboard, markets, lab, meme, radar, opportunities, portfolio, system and settings available (M1: markets/lab go live; T2.7: radar/opportunities go live; T3.8b: portfolio goes live; T4.3: meme goes live)", () => {
+  it("marks dashboard, markets, lab, meme, meme-mesa, radar, opportunities, portfolio, system and settings available (M1: markets/lab go live; T2.7: radar/opportunities go live; T3.8b: portfolio goes live; T4.3: meme goes live)", () => {
     const available = NAV_ITEMS.filter((item) => item.status === "available").map((item) => item.key);
-    expect(available.sort()).toEqual(["dashboard", "lab", "markets", "meme", "opportunities", "portfolio", "radar", "settings", "system"]);
+    expect(available.sort()).toEqual(["dashboard", "lab", "markets", "meme", "meme-mesa", "opportunities", "portfolio", "radar", "settings", "system"]);
   });
 
   it("gives every planned item a milestone", () => {
@@ -31,12 +31,12 @@ describe("nav-registry", () => {
   it("hides planned items in production", () => {
     const items = visibleNavItems("OWNER", "production");
     expect(items.every((item) => item.status === "available")).toBe(true);
-    expect(items.map((item) => item.key).sort()).toEqual(["dashboard", "lab", "markets", "meme", "opportunities", "portfolio", "radar", "settings", "system"]);
+    expect(items.map((item) => item.key).sort()).toEqual(["dashboard", "lab", "markets", "meme", "meme-mesa", "opportunities", "portfolio", "radar", "settings", "system"]);
   });
 
   it("shows planned items outside production", () => {
     const items = visibleNavItems("OWNER", "development");
-    expect(items).toHaveLength(19);
+    expect(items).toHaveLength(20);
     const trades = items.find((item) => item.key === "trades");
     expect(trades?.status).toBe("planned");
   });
@@ -44,7 +44,7 @@ describe("nav-registry", () => {
   it("never hides an available item regardless of role", () => {
     for (const role of ["OWNER", "ADMIN", "TRADER", "ANALYST", "VIEWER"] as const) {
       const items = visibleNavItems(role, "production");
-      expect(items.map((item) => item.key).sort()).toEqual(["dashboard", "lab", "markets", "meme", "opportunities", "portfolio", "radar", "settings", "system"]);
+      expect(items.map((item) => item.key).sort()).toEqual(["dashboard", "lab", "markets", "meme", "meme-mesa", "opportunities", "portfolio", "radar", "settings", "system"]);
     }
   });
 });

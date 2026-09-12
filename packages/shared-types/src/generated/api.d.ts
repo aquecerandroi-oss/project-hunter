@@ -422,6 +422,44 @@ export interface paths {
         patch: operations["update_role_api_v1_orgs__org_id__members__user_id__patch"];
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/meme/bets/{bet_id}/sell-now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the loop to sell an open paper bet on the next snapshot (TRADER+)
+         * @description 202: the command is filed, the sale happens on the next snapshot, not at
+         *     this price. 409 ``bet_not_open`` / ``sell_now_already_pending``.
+         */
+        post: operations["sell_now_route_api_v1_orgs__org_id__meme_bets__bet_id__sell_now_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/meme/desk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The operator desk: proposals, open bets, history — paper only */
+        get: operations["get_desk_api_v1_orgs__org_id__meme_desk_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/meme/gaps": {
         parameters: {
             query?: never;
@@ -431,6 +469,23 @@ export interface paths {
         };
         /** List ingestion gaps */
         get: operations["list_gaps_api_v1_orgs__org_id__meme_gaps_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/meme/lab": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The paper Lab's scoreboard per rule set per Brasília day, the goal, the sources */
+        get: operations["get_meme_lab_api_v1_orgs__org_id__meme_lab_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -450,6 +505,87 @@ export interface paths {
         get: operations["get_overview_api_v1_orgs__org_id__meme_overview_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/meme/proposals/manual": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * File a manual buy: a proposal born approved under operator/1 (TRADER+)
+         * @description 201 (also on a replay of the same key); 422 ``mint_unknown`` /
+         *     ``curve_completed`` / ``operator_rule_set_missing`` / ``exceeds_max_sol_per_bet``.
+         */
+        post: operations["manual_proposal_route_api_v1_orgs__org_id__meme_proposals_manual_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/meme/proposals/{proposal_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a proposal with the operator's four parameters (TRADER+)
+         * @description 200 with the proposal; 409 unless ``proposed`` (or past ``expires_at``);
+         *     422 ``exceeds_max_sol_per_bet``; 409 ``idempotency-key-conflict`` for a
+         *     reused key naming a different intent.
+         */
+        post: operations["approve_proposal_route_api_v1_orgs__org_id__meme_proposals__proposal_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/meme/proposals/{proposal_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a proposal that has not been filled yet (TRADER+)
+         * @description 202; 409 ``already_filled`` once a bet exists, ``not_cancellable`` for a
+         *     proposal already rejected/expired/unfilled.
+         */
+        post: operations["cancel_proposal_route_api_v1_orgs__org_id__meme_proposals__proposal_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/meme/proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject a proposal (TRADER+) */
+        post: operations["reject_proposal_route_api_v1_orgs__org_id__meme_proposals__proposal_id__reject_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1116,6 +1252,22 @@ export interface components {
          * @enum {string}
          */
         AnomalyType: "VOLUME_SPIKE" | "PRICE_ACCELERATION" | "VOLATILITY_EXPANSION" | "ORDERBOOK_IMBALANCE" | "OPEN_INTEREST_SPIKE" | "FUNDING_ANOMALY" | "LIQUIDATION_CLUSTER" | "CROSS_EXCHANGE_DIVERGENCE" | "TRADE_VELOCITY_SPIKE" | "MOMENTUM_SHIFT" | "SOCIAL_SPIKE" | "WHALE_ACTIVITY";
+        /**
+         * ApproveProposalIn
+         * @description ``POST /proposals/{id}/approve``.
+         */
+        ApproveProposalIn: {
+            /** Max Hold S */
+            max_hold_s: number;
+            /** Note */
+            note?: string | null;
+            /** Size Sol */
+            size_sol: number | string;
+            /** Target X */
+            target_x: number | string;
+            /** Trailing Pct */
+            trailing_pct: number | string;
+        };
         /** AsOfPage[EquityCurvePointOut] */
         AsOfPage_EquityCurvePointOut_: {
             /**
@@ -1242,6 +1394,63 @@ export interface components {
              * @default r_net
              */
             used: string;
+        };
+        /**
+         * BetOut
+         * @description ``meme_paper_bets`` as the desk shows it: live mark, PnL, R, the hold
+         *     deadline (``entry_at + params.max_hold_s``) and, once closed, the exit
+         *     reason. Every ``None`` is a value the loop has not written.
+         */
+        BetOut: {
+            /**
+             * Entry At
+             * Format: date-time
+             */
+            entry_at: string;
+            /** Exit At */
+            exit_at: string | null;
+            /** Exit Reason */
+            exit_reason: ("target" | "trailing" | "time_stop" | "migrated" | "creator_dump" | "sell_now" | "rug_no_snapshot") | string | null;
+            /** Fee Sol */
+            fee_sol: string | null;
+            /** High Water X */
+            high_water_x: string | null;
+            /** Hold Deadline At */
+            hold_deadline_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Initial Risk Sol */
+            initial_risk_sol: string;
+            /** Mark At */
+            mark_at: string | null;
+            /** Mark Sol */
+            mark_sol: string | null;
+            /** Mode */
+            mode: string;
+            params: components["schemas"]["DeskParamsOut"];
+            /** Pnl Sol */
+            pnl_sol: string | null;
+            /** R Multiple */
+            r_multiple: string | null;
+            /** Sol Received */
+            sol_received: string | null;
+            /** Sol Spent */
+            sol_spent: string | null;
+            /** Sol Usd At Entry */
+            sol_usd_at_entry: string | null;
+            /** Sol Usd At Exit */
+            sol_usd_at_exit: string | null;
+            /** Status */
+            status: ("open" | "closed") | string;
+            /** Tokens */
+            tokens: string | null;
+            /** Unrealized Pnl Sol */
+            unrealized_pnl_sol: string | null;
+            /** Unrealized R */
+            unrealized_r: string | null;
         };
         /** BookLevelOut */
         BookLevelOut: {
@@ -1388,6 +1597,42 @@ export interface components {
             };
             /** Total */
             total: number;
+        };
+        /**
+         * CommandOut
+         * @description ``meme_operator_commands`` as filed: the loop applies it on the next
+         *     snapshot (``applied_at``/``result`` stay ``None`` until then).
+         */
+        CommandOut: {
+            /** Applied At */
+            applied_at: string | null;
+            /** Bet Id */
+            bet_id: string | null;
+            /** Command */
+            command: ("sell_now" | "cancel") | string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            /** Issued By */
+            issued_by: string;
+            /**
+             * Label
+             * @default PAPEL — nenhuma transação real; a chave e a flag ao vivo não existem neste processo
+             */
+            label: string;
+            /** Proposal Id */
+            proposal_id: string | null;
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * ComponentQuality
@@ -1583,6 +1828,123 @@ export interface components {
          */
         DataQuality: "ok" | "stale" | "degraded" | "unavailable";
         /**
+         * DayScoreOut
+         * @description One row of ``meme_lab_scoreboard_v1``: one rule set, one Brasília day of entry.
+         */
+        DayScoreOut: {
+            avg_r: components["schemas"]["NullableDecimalOut"];
+            /** Bets */
+            bets: number;
+            /** Closed */
+            closed: number;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            max_drawdown_sol: components["schemas"]["NullableDecimalOut"];
+            pnl_sol: components["schemas"]["NullableDecimalOut"];
+            pnl_usd: components["schemas"]["NullableDecimalOut"];
+            r_sum: components["schemas"]["NullableDecimalOut"];
+            /** Rugs */
+            rugs: number;
+            /** Unpriced Usd */
+            unpriced_usd: number;
+            win_rate: components["schemas"]["NullableDecimalOut"];
+            /** Wins */
+            wins: number;
+        };
+        /** DeskListOut */
+        DeskListOut: {
+            /** Items */
+            items: components["schemas"]["DeskRowOut"][];
+            /**
+             * Label
+             * @default PAPEL — nenhuma transação real; a chave e a flag ao vivo não existem neste processo
+             */
+            label: string;
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /**
+             * Server Now
+             * Format: date-time
+             */
+            server_now: string;
+            summary: components["schemas"]["DeskSummaryOut"];
+        };
+        /**
+         * DeskParamsOut
+         * @description ``suggested``/``decision``/``params`` as the loop or the API wrote
+         *     them; a missing key is ``None`` (contract: the operator may change any of
+         *     the four, and the loop applies the set's ceilings on top).
+         */
+        DeskParamsOut: {
+            /** Max Hold S */
+            max_hold_s: number | null;
+            /** Note */
+            note?: string | null;
+            /** Size Sol */
+            size_sol: string | null;
+            /** Target X */
+            target_x: string | null;
+            /** Trailing Pct */
+            trailing_pct: string | null;
+        };
+        /**
+         * DeskRowOut
+         * @description One line of ``GET /desk``: the proposal, its token, its rule set and —
+         *     once filled — its bet.
+         */
+        DeskRowOut: {
+            bet: components["schemas"]["BetOut"] | null;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By */
+            decided_by: string | null;
+            decision: components["schemas"]["DeskParamsOut"] | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Features End Time */
+            features_end_time: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mint */
+            mint: string;
+            /** Origin */
+            origin: ("rules" | "operator") | string;
+            /**
+             * Proposed At
+             * Format: date-time
+             */
+            proposed_at: string;
+            quote: components["schemas"]["QuoteOut"];
+            /** Reasons */
+            reasons: unknown[];
+            /** Refusal */
+            refusal: string | null;
+            rule_set: components["schemas"]["RuleSetOut"] | null;
+            /** Status */
+            status: ("proposed" | "approved" | "rejected" | "expired" | "filled" | "unfilled") | string;
+            suggested: components["schemas"]["DeskParamsOut"];
+            token: components["schemas"]["TokenIdentityOut"] | null;
+        };
+        /** DeskSummaryOut */
+        DeskSummaryOut: {
+            /** Day Pnl Sol */
+            day_pnl_sol: string;
+            /** Rule Sets */
+            rule_sets: components["schemas"]["RuleSetBalanceOut"][];
+            sol_usd: components["schemas"]["SolUsdQuoteOut"] | null;
+            /** Sol Usd Reason */
+            sol_usd_reason?: "no_observed_quote" | null;
+        };
+        /**
          * DistinctOperationsOut
          * @description T3.38a: ``totals`` counted over ``identity_key`` instead of over rows --
          *     the honest denominator once sibling versions can duplicate an operation.
@@ -1765,6 +2127,39 @@ export interface components {
             rate: string;
             /** Source */
             source: string;
+        };
+        /** GoalOut */
+        GoalOut: {
+            /** Capital Sol */
+            capital_sol: string;
+            capital_usd: components["schemas"]["NullableDecimalOut"];
+            /**
+             * Clock Start
+             * Format: date
+             */
+            clock_start: string;
+            /** Clock Start Source */
+            clock_start_source: string;
+            /** Days Elapsed */
+            days_elapsed: number;
+            /** Days Remaining */
+            days_remaining: number;
+            /** Horizon Days */
+            horizon_days: number;
+            /**
+             * Label
+             * @default meta — conta sobre o alvo declarado, nunca previsão de retorno
+             */
+            label: string;
+            measured_daily_return: components["schemas"]["NullableDecimalOut"];
+            /** Pnl Today Sol */
+            pnl_today_sol: string;
+            required_daily_return: components["schemas"]["NullableDecimalOut"];
+            sol_usd: components["schemas"]["SolUsdOut"] | null;
+            /** Sol Usd Reason */
+            sol_usd_reason?: string | null;
+            /** Target Usd */
+            target_usd: string;
         };
         /**
          * GraduationsOut
@@ -2040,6 +2435,24 @@ export interface components {
              * @enum {string}
              */
             status: "pending" | "decided";
+        };
+        /**
+         * ManualProposalIn
+         * @description ``POST /proposals/manual`` — the operator pasted a mint.
+         */
+        ManualProposalIn: {
+            /** Max Hold S */
+            max_hold_s: number;
+            /** Mint */
+            mint: string;
+            /** Note */
+            note?: string | null;
+            /** Size Sol */
+            size_sol: number | string;
+            /** Target X */
+            target_x: number | string;
+            /** Trailing Pct */
+            trailing_pct: number | string;
         };
         /** MarketComponentsOut */
         MarketComponentsOut: {
@@ -2494,6 +2907,30 @@ export interface components {
              */
             stream: "pumpportal_ws" | "curve_poll" | "features_1m";
         };
+        /** MemeLabOut */
+        MemeLabOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Days Limit */
+            days_limit: number;
+            goal: components["schemas"]["GoalOut"];
+            /**
+             * Label
+             * @default PAPEL — nenhuma transação real; a chave e a flag ao vivo não existem neste processo
+             */
+            label: string;
+            /** Rule Sets */
+            rule_sets: components["schemas"]["RuleSetBoardOut"][];
+            sources: components["schemas"]["SourcesOut"];
+        };
         /**
          * MemeOverviewOut
          * @description ``GET /meme/overview``. Two possible shapes, both real, never a
@@ -2634,6 +3071,16 @@ export interface components {
             };
             /** Total */
             total: number;
+        };
+        /**
+         * NullableDecimalOut
+         * @description A number that is ``null`` with a reason instead of a zero.
+         */
+        NullableDecimalOut: {
+            /** Reason */
+            reason?: string | null;
+            /** Value */
+            value: string | null;
         };
         /**
          * NullableMetric
@@ -3462,6 +3909,45 @@ export interface components {
             /** Summed Reason */
             summed_reason?: string | null;
         };
+        /** ProposalOut */
+        ProposalOut: {
+            /**
+             * Label
+             * @default PAPEL — nenhuma transação real; a chave e a flag ao vivo não existem neste processo
+             */
+            label: string;
+            row: components["schemas"]["DeskRowOut"];
+        };
+        /**
+         * QuoteOut
+         * @description The snapshot a proposal was priced on (``meme_proposals.quote``).
+         *     Keys are the ones the manual path writes and the desk reads (contract
+         *     "Emendas", T4.7); ``reason`` names why price fields are absent.
+         */
+        QuoteOut: {
+            /** Cost Sol */
+            cost_sol: string | null;
+            /** Curve Progress Pct */
+            curve_progress_pct: string | null;
+            /** Fee Pct */
+            fee_pct: string | null;
+            /** Fee Sol */
+            fee_sol: string | null;
+            /** Mcap Sol */
+            mcap_sol: string | null;
+            /** Observed At */
+            observed_at: string | null;
+            /** Price Sol Per Token */
+            price_sol_per_token: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Size Sol */
+            size_sol: string | null;
+            /** Source */
+            source: string | null;
+            /** Tokens */
+            tokens: string | null;
+        };
         /** RExFundingBlock */
         RExFundingBlock: {
             coverage: components["schemas"]["RExFundingCoverage"];
@@ -3682,6 +4168,14 @@ export interface components {
          * @enum {string}
          */
         RegimeScope: "global" | "btc";
+        /**
+         * RejectProposalIn
+         * @description ``POST /proposals/{id}/reject``.
+         */
+        RejectProposalIn: {
+            /** Note */
+            note?: string | null;
+        };
         /**
          * ReplayBlockOut
          * @description The D14 "mass vs. evidence" pair for one version's replay cohorts,
@@ -4046,6 +4540,99 @@ export interface components {
          */
         RiskPreset: "conservative" | "balanced" | "aggressive" | "paper_v1" | "custom";
         /**
+         * RuleSetBalanceOut
+         * @description Paper balance of one active rule set, in SOL. ``balance_sol`` is
+         *     ``wallet_max_sol + realized_total_sol - open_sol``; ``None`` with
+         *     ``balance_reason`` when the set's ``params`` carry no ``wallet_max_sol``.
+         */
+        RuleSetBalanceOut: {
+            /** Balance Reason */
+            balance_reason?: "wallet_max_sol_missing" | null;
+            /** Balance Sol */
+            balance_sol: string | null;
+            /** Closed Today */
+            closed_today: number;
+            /** Daily Loss Cap Sol */
+            daily_loss_cap_sol: string | null;
+            /** Open Bets */
+            open_bets: number;
+            /** Open Sol */
+            open_sol: string;
+            /** Realized Today Sol */
+            realized_today_sol: string;
+            /** Realized Total Sol */
+            realized_total_sol: string;
+            rule_set: components["schemas"]["RuleSetOut"];
+            /** Wallet Max Sol */
+            wallet_max_sol: string | null;
+        };
+        /** RuleSetBoardOut */
+        RuleSetBoardOut: {
+            ceilings: components["schemas"]["RuleSetCeilingsOut"];
+            /** Code Ref */
+            code_ref: string;
+            /** Days */
+            days: components["schemas"]["DayScoreOut"][];
+            /** Exp Ref */
+            exp_ref: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "research_only" | "operator";
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "retired";
+            today: components["schemas"]["DayScoreOut"] | null;
+            /** Today Reason */
+            today_reason?: string | null;
+            /** Version */
+            version: string;
+            wallet: components["schemas"]["WalletOut"];
+        };
+        /** RuleSetCeilingsOut */
+        RuleSetCeilingsOut: {
+            /** Daily Loss Cap Sol */
+            daily_loss_cap_sol: string;
+            /** Max Hold S */
+            max_hold_s: number;
+            /** Max Sol Per Bet */
+            max_sol_per_bet: string;
+            /** Size Sol */
+            size_sol: string;
+            /** Target X */
+            target_x: string;
+            /** Trailing Pct */
+            trailing_pct: string;
+            /** Wallet Max Sol */
+            wallet_max_sol: string;
+        };
+        /** RuleSetOut */
+        RuleSetOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: ("research_only" | "operator") | string;
+            /** Max Sol Per Bet */
+            max_sol_per_bet: string | null;
+            /** Name */
+            name: string;
+            /** Version */
+            version: string;
+        };
+        /**
          * ScopeStatesOut
          * @description The three scopes, unmerged — the effective state is the most restrictive.
          */
@@ -4363,6 +4950,89 @@ export interface components {
             /** To */
             to: number;
         };
+        /**
+         * SolUsdOut
+         * @description An observed SOL/USD quote — the number never travels without its source.
+         */
+        SolUsdOut: {
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "worker_heartbeat" | "last_bet";
+            /** Price Usd */
+            price_usd: string;
+            /** Source */
+            source: string;
+        };
+        /** SolUsdQuoteOut */
+        SolUsdQuoteOut: {
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Rate */
+            rate: string;
+            /** Source */
+            source: string | null;
+        };
+        /**
+         * SourcesOut
+         * @description §Semântica 5: a stopped loop must be visible, not silent.
+         */
+        SourcesOut: {
+            /** Bets Open */
+            bets_open: number | null;
+            /** Closes Total */
+            closes_total: number | null;
+            /** Fills Total */
+            fills_total: number | null;
+            /** Gate Refusals */
+            gate_refusals: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            /** Heartbeat Age S */
+            heartbeat_age_s: number | null;
+            /** Heartbeat Key */
+            heartbeat_key: string;
+            /** Heartbeat Ts */
+            heartbeat_ts: string | null;
+            /** Lab Alive */
+            lab_alive: boolean;
+            /** Lab Enabled */
+            lab_enabled: boolean | null;
+            /** Lab Last Tick At */
+            lab_last_tick_at: string | null;
+            /**
+             * Lab Status
+             * @enum {string}
+             */
+            lab_status: "alive" | "stalled" | "never" | "disabled" | "heartbeat_missing" | "redis_unavailable";
+            /** Lab Tick Age S */
+            lab_tick_age_s: number | null;
+            /** Proposals Total */
+            proposals_total: number | null;
+            /** Rows Evaluated */
+            rows_evaluated: number | null;
+            /** Rule Sets Active */
+            rule_sets_active: number | null;
+            /** Sol Usd Error */
+            sol_usd_error: string | null;
+            /** Stalled After S */
+            stalled_after_s: number;
+            /** Tick Minute */
+            tick_minute: string | null;
+            /** Unfilled Total */
+            unfilled_total: number | null;
+        };
         /** StrategiesOut */
         StrategiesOut: {
             /**
@@ -4486,6 +5156,27 @@ export interface components {
          * @enum {string}
          */
         Timeframe: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+        /** TokenIdentityOut */
+        TokenIdentityOut: {
+            /** Completed At */
+            completed_at: string | null;
+            /** Created At */
+            created_at: string | null;
+            /** Creator */
+            creator: string | null;
+            /** Mayhem Enabled */
+            mayhem_enabled: boolean | null;
+            /** Mayhem State */
+            mayhem_state: string | null;
+            /** Migrated At */
+            migrated_at: string | null;
+            /** Mint */
+            mint: string;
+            /** Name */
+            name: string | null;
+            /** Symbol */
+            symbol: string | null;
+        };
         /**
          * TradeDirection
          * @description ``trade_direction`` — DATABASE.md §5 (opportunities.direction) and §6
@@ -4726,6 +5417,27 @@ export interface components {
         VersionsOut: {
             /** Items */
             items: components["schemas"]["VersionOut"][];
+        };
+        /**
+         * WalletOut
+         * @description Derived from ``meme_paper_bets`` alone: ``balance = wallet_max + Σ closed
+         *     pnl − Σ open stake``; ``equity = balance + Σ open marks``.
+         */
+        WalletOut: {
+            /** Balance Sol */
+            balance_sol: string;
+            /** Equity Sol */
+            equity_sol: string;
+            /** Open Exposure Sol */
+            open_exposure_sol: string;
+            /** Open Marks Sol */
+            open_marks_sol: string;
+            /** Open Positions */
+            open_positions: number;
+            /** Realized Today Sol */
+            realized_today_sol: string;
+            /** Realized Total Sol */
+            realized_total_sol: string;
         };
         /** WorkerHeartbeatOut */
         WorkerHeartbeatOut: {
@@ -5733,6 +6445,75 @@ export interface operations {
             };
         };
     };
+    sell_now_route_api_v1_orgs__org_id__meme_bets__bet_id__sell_now_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                bet_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_desk_api_v1_orgs__org_id__meme_desk_get: {
+        parameters: {
+            query?: {
+                status?: ("proposed" | "approved" | "rejected" | "expired" | "filled" | "unfilled") | null;
+                limit?: number | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeskListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_gaps_api_v1_orgs__org_id__meme_gaps_get: {
         parameters: {
             query?: {
@@ -5767,6 +6548,39 @@ export interface operations {
             };
         };
     };
+    get_meme_lab_api_v1_orgs__org_id__meme_lab_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemeLabOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_overview_api_v1_orgs__org_id__meme_overview_get: {
         parameters: {
             query?: never;
@@ -5785,6 +6599,153 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemeOverviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    manual_proposal_route_api_v1_orgs__org_id__meme_proposals_manual_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualProposalIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_proposal_route_api_v1_orgs__org_id__meme_proposals__proposal_id__approve_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                proposal_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveProposalIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_proposal_route_api_v1_orgs__org_id__meme_proposals__proposal_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                proposal_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_proposal_route_api_v1_orgs__org_id__meme_proposals__proposal_id__reject_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                proposal_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectProposalIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalOut"];
                 };
             };
             /** @description Validation Error */

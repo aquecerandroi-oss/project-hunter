@@ -28,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, cast
 from urllib.parse import quote
@@ -36,7 +37,11 @@ import httpx
 
 from hunter_core.domain.types import utcnow
 from hunter_exchanges.base import ExchangeError, ExchangeUnavailable, MalformedMessage, RateLimited
-from hunter_exchanges.pumpfun.models import NormalizedCurveState, NormalizedMayhemOverview
+from hunter_exchanges.pumpfun.models import (
+    NormalizedCurveState,
+    NormalizedMayhemOverview,
+    NormalizedSolPrice,
+)
 from hunter_exchanges.pumpfun.normalize import parse_curve_state_rest
 from hunter_exchanges.rate_limit import TokenBucketRateLimiter
 
@@ -172,4 +177,36 @@ class PumpFunRestClient:
         now = utcnow()
         return NormalizedMayhemOverview(
             metadata=cast(dict[str, Any], raw), observed_at=now, received_at=now
+        )
+
+    async def get_sol_price(self) -> NormalizedSolPrice:
+        """``GET /sol-price`` — ``{solPrice, asOfTimestamp (ms), stale}``.
+
+        Its own rate-limit group upstream (50/60 s, ``docs/PUMPFUN.md`` §1.4),
+        but this client charges it to the one bucket it has: a caller that
+        shares the instance with the curve poller spends curve budget on it,
+        and a caller that wants the separate group builds a second client.
+        """
+        raw = await self._get("/sol-price")
+        if not isinstance(raw, dict):
+            raise MalformedMessage("sol price must be an object", exchange=EXCHANGE)
+        payload = cast(dict[str, Any], raw)
+        price, as_of_ms, stale = (
+            payload.get("solPrice"),
+            payload.get("asOfTimestamp"),
+            payload.get("stale"),
+        )
+        if (
+            not isinstance(price, Decimal | int)
+            or not isinstance(as_of_ms, int)
+            or isinstance(as_of_ms, bool)
+        ):
+            raise MalformedMessage("sol price fields have an unexpected shape", exchange=EXCHANGE)
+        now = utcnow()
+        return NormalizedSolPrice(
+            price_usd=Decimal(price),
+            as_of=datetime.fromtimestamp(as_of_ms / 1000, tz=UTC),
+            stale=bool(stale),
+            observed_at=now,
+            received_at=now,
         )

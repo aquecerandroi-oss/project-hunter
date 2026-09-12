@@ -57,6 +57,8 @@ export interface NavItem {
   /** Milestone or phase this ships in, e.g. "M2" or "Fase 2". Required when planned. */
   plannedMilestone?: string;
   minRole: Role;
+  /** `key` of the item this one nests under (rendered indented, T4.7) -- plain data, no tree. */
+  parent?: string;
 }
 
 /** Org-scoped href for an item, e.g. `/acme/dashboard`. */
@@ -89,6 +91,11 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // "radar" (already the cross-market opportunity radar) or "activity"
   // (reserved for the still-planned `trades` route).
   { key: "meme", label: "Meme Radar", segment: "meme", icon: "coins", status: "available", minRole: "VIEWER" },
+  // T4.7: the operator desk under the Meme Radar -- paper only (contract
+  // `.claude/state/contrato-T4.6-T4.7-mesa-meme.md` §Tela). `parent` indents
+  // it under "Meme Radar" in the sidebar; VIEWER+ reads, TRADER+ operates
+  // (the buttons say why they are off, the API is the authority).
+  { key: "meme-mesa", label: "Mesa", segment: "meme/mesa", icon: "coins", status: "available", minRole: "VIEWER", parent: "meme" },
   { key: "agents", label: "Agents", segment: "agents", icon: "bot", status: "planned", plannedMilestone: "M4", minRole: "VIEWER" },
   { key: "arena", label: "Agent Arena", segment: "arena", icon: "swords", status: "planned", plannedMilestone: "M6", minRole: "VIEWER" },
   { key: "strategies", label: "Strategies", segment: "strategies", icon: "git-branch", status: "planned", plannedMilestone: "M6", minRole: "VIEWER" },

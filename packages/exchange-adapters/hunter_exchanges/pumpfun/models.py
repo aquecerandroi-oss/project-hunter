@@ -188,10 +188,39 @@ class NormalizedMayhemOverview(_ReceivedAtMixin):
     metadata: dict[str, Any]
 
 
+class NormalizedSolPrice(_ReceivedAtMixin):
+    """``GET /sol-price`` of ``frontend-api-v3.pump.fun`` — the quote pump.fun's
+    own site prices ``usd_market_cap`` with (``docs/PUMPFUN.md`` §1.1 route 4).
+
+    ``as_of`` is the upstream ``asOfTimestamp`` (epoch ms), ``stale`` is the
+    upstream's own word for it; ``observed_at`` is when we read it. A consumer
+    stores all three next to any USD figure it derives, because a dollar number
+    without the quote and its instant is a number nobody can check.
+    """
+
+    source: str = "pumpfun_rest:/sol-price"
+    price_usd: Decimal
+    as_of: datetime
+    stale: bool
+
+    @field_validator("as_of", mode="after")
+    @classmethod
+    def _as_of_is_utc(cls, v: datetime) -> datetime:
+        return ensure_utc(v)
+
+    @field_validator("price_usd", mode="after")
+    @classmethod
+    def _price_is_positive(cls, v: Decimal) -> Decimal:
+        if v <= 0:
+            raise ValueError("price_usd must be positive")
+        return v
+
+
 __all__ = [
     "NormalizedCurveState",
     "NormalizedMemeMigration",
     "NormalizedMemeTokenCreated",
     "NormalizedMemeTrade",
     "NormalizedModel",
+    "NormalizedSolPrice",
 ]

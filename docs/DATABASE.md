@@ -5937,3 +5937,179 @@ continua sendo 32 (§17.6), e desde a §30.7 isso é teste e não prosa.
 | `infra/scripts/create_partitions.py` / `prune_partitions.py` | **nada a mudar em código**: os dois derivam os pais dos modelos; `partition_retention.py` ganhou as três linhas de política |
 | `packages/exchange-adapters/**` | nada a mudar. Uma necessidade futura, registrada: o `NormalizedMemeTrade` entrega SOL em unidade humana e `meme_trades.sol_lamports` é inteiro de unidade-base — a conversão (×10⁹, exata, porque SOL tem 9 casas) é do produtor da T4.2b |
 | `packages/risk-core/**`, `services/execution-worker/**` | **nada, e por construção**: nenhuma tabela desta revisão é alcançável por caminho de execução, e `hunter_app` tem `SELECT` e nada mais nas cinco |
+
+
+## 34. O Lab meme contínuo vira schema — M4 (`0022_meme_lab`)
+
+Vigésima segunda revisão. **Quatro tabelas**, sete índices, **duas vistas**, uma
+semente de dois conjuntos de regras e grants por subtração. Nenhum enum, nenhuma
+política de RLS, nenhuma partição, nenhuma coluna acrescentada a tabela existente,
+nada tocado na `0021`.
+
+Ela entrega o T4.6 sobre o armazenamento da T4.2 (`0021_meme_radar`), o simulador
+de papel da T4.5 (`hunter_indicators.meme`) e o contrato
+`.claude/state/contrato-T4.6-T4.7-mesa-meme.md`, congelado em 12/09 04:25 BRT para
+que a Mesa do operador (T4.7, `apps/**`) e o laço (T4.6, `services/meme-worker/`)
+fossem construídos em paralelo. Todo desvio do contrato é uma linha em "Emendas"
+dele — treze da T4.6, nenhuma reescrita.
+
+A frase que organiza tudo abaixo: **quem escreve o quê é privilégio, não promessa
+— e toda aposta é papel por CHECK, não por convenção.**
+
+### 34.1 Global, sem RLS — e a ausência é asserida
+
+As quatro tabelas são **globais** (§1.1), como as cinco da `0021`: uma aposta de
+papel numa curva on-chain pertence ao Lab, não a uma organização. Sem
+`organization_id`, portanto sem política. Os dois testes `LIKE 'meme%'` da §33.1
+(`test_0021_keeps_the_meme_tables_global_and_free_of_policies`,
+`test_the_meme_tables_are_global_and_carry_no_tenant_column`) já contam estas
+quatro — uma coluna de tenant aparecendo aqui vira conversa, não buraco.
+
+### 34.2 As quatro tabelas
+
+```
+meme_rule_sets                               (um conjunto de regras congelado)
+  id uuid PK, name, version                  -- UNIQUE (name, version)
+  kind ∈ {research_only, operator}           -- o laço aprova sozinho | espera o aval da mesa
+  params jsonb                               -- porta, saídas, tamanho, tetos; decimais como STRING
+  code_ref, exp_ref (NULL só para operator), status ∈ {active, retired}, created_at, retired_at
+  CHECKs: rótulos; retired ⟺ retired_at; research nomeia o EXP-M<n>; identidade não vazia
+
+meme_proposals                               (uma intenção de compra)
+  id uuid PK, mint, rule_set_id FK, origin ∈ {rules, operator}
+  status ∈ {proposed, approved, rejected, expired, filled, unfilled}
+  proposed_at, expires_at (> proposed_at), features_end_time (obrigatório para rules)
+  quote jsonb, reasons jsonb, suggested jsonb, decision jsonb
+  decided_by, decided_at, bet_id FK (use_alter), refusal
+  INDEX (status, proposed_at), INDEX (mint, proposed_at)
+  UNIQUE (rule_set_id, mint, features_end_time) WHERE origin = 'rules'   -- idempotência do laço
+  CHECKs: decided_at ⟺ decided_by; estado decidido carrega decisão;
+          filled ⟺ bet_id; unfilled ⟺ refusal
+
+meme_paper_bets                              (a aposta, uma linha por entrada)
+  id uuid PK, proposal_id FK UNIQUE, rule_set_id FK, mint
+  mode text CHECK (mode = 'paper')           -- a T4.8 acrescenta 'live' com revisão própria
+  status ∈ {open, closed}, entry_at, entry jsonb, initial_risk_sol (= sol_spent, §5 da doutrina)
+  params jsonb (os quatro números efetivos + piso), exit_intent jsonb (a regra que disparou,
+  esperando a fotografia seguinte), exit_at, exit jsonb, pnl_sol, r_multiple,
+  mark_sol, mark_at, high_water_x, sol_usd_at_entry, sol_usd_at_exit
+  INDEX (status, entry_at), INDEX (rule_set_id, entry_at), INDEX (mint)
+  CHECKs: closed ⟺ exit_at; exit_at ⟺ exit ⟺ pnl_sol ⟺ r_multiple (tudo ou nada);
+          exit_at > entry_at; mark_sol ⟺ mark_at; initial_risk_sol > 0
+
+meme_operator_commands                       (ordem do operador)
+  id uuid PK, bet_id FK NULL, proposal_id FK NULL  -- exatamente um dos dois
+  command ∈ {sell_now → bet_id, cancel → proposal_id}
+  issued_by, issued_at, applied_at, result jsonb   -- applied_at ⟺ result
+  INDEX (issued_at) WHERE applied_at IS NULL       -- a leitura quente do laço
+```
+
+O ciclo `meme_proposals.bet_id → meme_paper_bets.proposal_id → meme_proposals` é
+fechado por `ALTER TABLE` depois das duas existirem (`use_alter` no modelo) e
+desfeito primeiro no downgrade.
+
+### 34.3 As duas vistas
+
+`meme_lab_scoreboard_v1` — por `rule_set_id` × **dia de entrada em Brasília**
+(`(entry_at AT TIME ZONE 'America/Sao_Paulo')::date`): `bets`, `closed`, `wins`
+(`pnl_sol > 0`), `pnl_sol`, `pnl_usd` (só apostas com `sol_usd_at_exit`),
+`unpriced_usd` (quantas não têm cotação), `r_sum`, `max_drawdown_sol` (a maior
+queda do PnL acumulado do dia, ordenado por `exit_at`, abaixo da máxima corrente
+com piso zero — magnitude; `NULL` sem fechadas), `rugs`
+(`exit->>'reason' = 'rug_no_snapshot'`), mais `name`/`version`/`kind`/`exp_ref`/
+`rule_set_status` do conjunto.
+
+`meme_desk_v1` — `meme_proposals JOIN meme_rule_sets LEFT JOIN meme_tokens LEFT
+JOIN meme_paper_bets`: a linha da mesa. `LEFT JOIN` no token de propósito
+(Emenda 5): a retenção de 90 dias poda a dimensão e a proposta não pode sumir da
+mesa por isso. A T4.7 acabou lendo as tabelas base (Emenda dela); a vista fica.
+
+### 34.4 Grants: quem escreve o quê
+
+| Classe (congelada em `ddl/meme_lab.py`) | Papel | Privilégios | Tabelas |
+|---|---|---|---|
+| `MEME_LAB_APP_READ_ONLY_TABLES` | `hunter_app` | `SELECT` | `meme_rule_sets`, `meme_paper_bets` |
+| `MEME_LAB_APP_APPEND_TABLES` | `hunter_app` | `SELECT`/`INSERT` | `meme_operator_commands` |
+| `MEME_LAB_APP_DECISION_TABLES` | `hunter_app` | `SELECT`/`INSERT` + `UPDATE (status, decision, decided_by, decided_at)` | `meme_proposals` |
+| `MEME_LAB_WORKER_READ_ONLY_TABLES` | `hunter_worker` | `SELECT` | `meme_rule_sets` |
+| `MEME_LAB_WORKER_UPSERT_TABLES` | `hunter_worker` | `SELECT`/`INSERT`/`UPDATE` | `meme_proposals`, `meme_paper_bets` |
+| `MEME_LAB_WORKER_APPLY_TABLES` | `hunter_worker` | `SELECT` + `UPDATE (applied_at, result)` | `meme_operator_commands` |
+
+**Ninguém tem `DELETE`** em nenhuma das quatro: uma aposta é evidência e uma
+proposta `unfilled` é a recusa que explica uma mesa vazia. A API decide e ordena
+(aprovar, recusar, compra manual, vender agora, cancelar) e não toca a cotação,
+o `bet_id` nem a recusa; o laço propõe, preenche, marca e responde à ordem, e não
+aposenta conjunto nem emite ordem. Três classes novas de `hunter_app` entram na
+união de `test_the_grant_lists_cover_every_table_exactly_once`; provado **como o
+papel** em `test_the_api_role_decides_a_meme_proposal_and_touches_nothing_else` e
+`test_the_worker_writes_the_meme_lab_and_never_deletes_it`.
+
+### 34.5 A semente está na revisão
+
+Dois conjuntos ativos (`ddl/meme_lab_views.py`, ids fixos para dois bancos
+concordarem): `meme_paper_v0/1` (`research_only`, `EXP-M1`) e `operator/1`
+(`operator`, mesma porta, só propõe). Os `params` são o perfil `meme_paper_v0` de
+`docs/RISK_ENGINE_MEME.md` §3.1 como a EXP-M1 os congelou: porta idade 30–600 s,
+progresso 2–50 %, participação ≤ 1 %, criador não vendedor líquido; saídas 2× /
+trailing 30 % / 900 s / piso 50 %; `size_sol` 0,05; tetos `wallet_max_sol` 2,0,
+`max_sol_per_bet` 0,05, `daily_loss_cap_sol` 0,20, 3 posições; `fee_pct` 1,75
+(curva 1,25 + caminho local 0,5 — o papel nunca simula caminho mais barato que o
+live, §10.2); `priority_fee_sol` **0 e declarado**: nenhum priority fee foi
+observado pelo projeto, e a EXP-M1 já diz que todo número dela é teto otimista.
+Decimais são **strings** no jsonb (`"0.05"`), para `Decimal` ler byte a byte.
+Um Lab sem conjunto seria um laço que roda e não propõe parecendo vivo — o zero
+silencioso que o contrato proíbe.
+
+### 34.6 Guardas
+
+**Sem guarda de upgrade, e isso é afirmação**: a revisão cria tabelas que não
+existiam. **O downgrade recusa** enquanto `meme_paper_bets`, `meme_proposals` ou
+`meme_operator_commands` tiverem linha (§17.7), cada uma com o motivo nomeado; a
+semente **não** é guardada, senão o round trip de um rollback recusaria em todo
+banco que esta revisão tocou. `test_0022_refuses_a_downgrade_that_would_lose_a_bet`
+e `test_0022_reverses_with_the_seed_alone_and_comes_back_seeded` medem as duas
+metades; os testes da `0021` passaram a se posicionar em `0021_meme_radar` antes
+de reverter (`"-1"` a partir do head reverte a `0022`).
+
+### 34.7 A máquina de estados, e onde a não-antecipação vira linha
+
+```
+proposta:  proposed ──(research_only: o próprio laço, decided_by='rules')──▶ approved
+           proposed ──(API: aprovar/recusar; expires_at: laço)──▶ approved | rejected | expired
+           approved ──(1.ª fotografia com observed_at > decided_at, tetos)──▶ filled (bet_id)
+           approved ──(sem fotografia em 3 min; teto estourado)──▶ unfilled (refusal)
+aposta:    open ──(cada fotografia nova: mark_sol, high_water_x)──▶ open
+           open ──(regra dispara na fotografia k: exit_intent)──▶ open (esperando k+1)
+           open ──(venda na fotografia k+1)──▶ closed (exit.reason, pnl_sol, r_multiple)
+           open ──(sem fotografia posterior em 3 min)──▶ closed (rug_no_snapshot, sol_received 0)
+```
+
+`exit.reason` ∈ {`target`, `trailing`, `time_stop`, `migrated`, `creator_dump`,
+`sell_now`, `rug_no_snapshot`, `max_loss`}; `refusal` é o vocabulário fechado de
+`hunter_meme_worker.paper_engine.FILL_REFUSALS` mais `rule_set_inactive`.
+`initial_risk_sol = sol_spent`: numa curva o risco é o valor gasto inteiro (§5 da
+doutrina), e `rug_no_snapshot` é esse §5 escrito em aritmética — sem fotografia
+para vender, o resultado plausível é −100 %, nunca um fill fabricado à última
+marca. A carteira de um conjunto **não é coluna**: `wallet_max_sol + Σ pnl
+fechado − Σ stake aberto`, derivada de `meme_paper_bets` a cada leitura, no laço e
+na API, para que um restart não seja um reset.
+
+### 34.8 Trava, pooler e orçamento de nome
+
+**Trava.** `CREATE TABLE` não toma trava em relação que ainda não existe, o
+`ALTER TABLE` do backlink trava só as duas tabelas vazias e os `GRANT` só o
+catálogo: esta revisão **não abre janela de manutenção**. **Pooler.** Nada
+depende de estado de sessão: quatro `CREATE TABLE`, um `ALTER`, sete `CREATE
+INDEX`, duas `CREATE VIEW`, um `INSERT` e os grants. `0022_meme_lab` tem 13
+caracteres; o teto de `alembic_version.version_num` continua 32 (§17.6).
+
+### 34.9 O que as tarefas vizinhas têm de saber
+
+| Onde | O que muda |
+|---|---|
+| T4.7 (`apps/**`, mesa) | escreve só `meme_proposals` (decisão) e `meme_operator_commands`; lê as tabelas base; as chaves de `quote`/`entry`/`exit` que ela lê estão nas Emendas do contrato |
+| `services/meme-worker/**` | o único escritor de apostas: `lab.py` (tick), `proposals.py` (porta), `paper_engine.py` (fill/marca/saída), `lab_repo*.py`; heartbeat `lab_*` em `hb:meme:radar` |
+| `GET /api/v1/orgs/{org}/meme/lab` | placar por conjunto por dia (Brasília), carteira derivada, meta (conta sobre o alvo), `sources.lab_status` |
+| `infra/scripts/meme_diary.py` | lê como `hunter_app` e escreve `obsidian/09-OPERATIONS/Diario-Meme/<dia>.md` (`--dry-run`/`--apply`) |
+| T4.8 (caminho de assinatura) | acrescenta `'live'` ao CHECK de `mode` com revisão própria, atrás de `ENABLE_MEME_LIVE_TRADING`; até lá nenhum papel escreve uma aposta que se diga real |
+| `packages/risk-core/**`, `services/execution-worker/**` | **nada, e por construção**: nenhuma tabela desta revisão é alcançável por caminho de execução |

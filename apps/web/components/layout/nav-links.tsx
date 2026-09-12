@@ -80,6 +80,7 @@ export function NavLinks({ items, orgSlug, collapsed = false, onNavigate = () =>
               // bar occupies so the label doesn't shift when it appears
               // (docs/DESIGN.md §3: "item ativo com barra dourada de 2px").
               "flex items-center gap-2 rounded-md border-l-2 border-transparent px-3 py-2 text-sm font-medium text-fg/80 hover:bg-bg-overlay hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset",
+              item.parent && !collapsed && "pl-8 text-[13px]",
               isActive && "border-gold bg-bg-overlay text-fg",
             )}
           >

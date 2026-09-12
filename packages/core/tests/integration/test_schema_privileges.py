@@ -126,6 +126,18 @@ def _dispersion_tables(name: str) -> tuple[str, ...]:
     return cast(tuple[str, ...], getattr(migration_ddl("dispersion"), name))
 
 
+def _meme_lab_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0022_meme_lab``'s lists in ``ddl/meme_lab.py``.
+
+    It adds **three** ``hunter_app`` classes, because the desk writes: read-only
+    (``meme_rule_sets``, ``meme_paper_bets``), append (``meme_operator_commands``
+    — an order is written once) and *decision* (``meme_proposals`` —
+    ``SELECT``/``INSERT`` plus ``UPDATE`` of exactly the four decision columns,
+    the ``0007`` column-grant shape). Nobody has ``DELETE`` on any of the four.
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("meme_lab"), name))
+
+
 def _meme_tables(name: str) -> tuple[str, ...]:
     """The same, for ``0021_meme_radar``'s lists in ``ddl/meme_radar.py``.
 
@@ -400,6 +412,9 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     breadth_read_only = _breadth_tables("BREADTH_APP_READ_ONLY_TABLES")
     dispersion_read_only = _dispersion_tables("DISPERSION_APP_READ_ONLY_TABLES")
     meme_read_only = _meme_tables("MEME_APP_READ_ONLY_TABLES")
+    meme_lab_read_only = _meme_lab_tables("MEME_LAB_APP_READ_ONLY_TABLES")
+    meme_lab_append = _meme_lab_tables("MEME_LAB_APP_APPEND_TABLES")
+    meme_lab_decision = _meme_lab_tables("MEME_LAB_APP_DECISION_TABLES")
 
     classified = (
         list(write)
@@ -417,6 +432,9 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(breadth_read_only)
         + list(dispersion_read_only)
         + list(meme_read_only)
+        + list(meme_lab_read_only)
+        + list(meme_lab_append)
+        + list(meme_lab_decision)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 
@@ -1597,3 +1615,80 @@ async def test_the_meme_tables_are_global_and_carry_no_tenant_column(
         )
     assert tenant_columns == 0
     assert policies == 0
+
+
+_A_LAB_PROPOSAL = text(
+    "INSERT INTO meme_proposals (id, mint, rule_set_id, origin, status, expires_at) "
+    "SELECT gen_random_uuid(), 'PROBE_MINT', id, 'operator', 'proposed', now() + interval '2 min' "
+    "FROM meme_rule_sets WHERE name = 'operator' RETURNING id"
+)
+
+
+async def test_the_api_role_decides_a_meme_proposal_and_touches_nothing_else(
+    app_connection: AsyncConnection,
+) -> None:
+    """The desk's two writes, proved as the role (§18.7): a manual proposal and
+    its decision are the API's; the quote, the bet and the deletion are not."""
+    proposal = await app_connection.scalar(_A_LAB_PROPOSAL)
+    await app_connection.execute(
+        text(
+            "UPDATE meme_proposals SET status = 'approved', decision = '{}'::jsonb, "
+            "decided_by = 'user', decided_at = now() WHERE id = :id"
+        ),
+        {"id": proposal},
+    )
+    await app_connection.execute(
+        text(
+            "INSERT INTO meme_operator_commands (id, proposal_id, command, issued_by) "
+            "VALUES (gen_random_uuid(), :id, 'cancel', 'user')"
+        ),
+        {"id": proposal},
+    )
+    for statement in (
+        "UPDATE meme_proposals SET quote = '{}'::jsonb WHERE id = :id",
+        "UPDATE meme_proposals SET refusal = 'x' WHERE id = :id",
+        "INSERT INTO meme_paper_bets (id, proposal_id, rule_set_id, mint, entry_at, entry, "
+        "  initial_risk_sol, params) SELECT gen_random_uuid(), :id, rule_set_id, mint, now(), "
+        "  '{}'::jsonb, 1, '{}'::jsonb FROM meme_proposals WHERE id = :id",
+        "DELETE FROM meme_proposals WHERE id = :id",
+        "UPDATE meme_operator_commands SET applied_at = now() WHERE proposal_id = :id",
+        "INSERT INTO meme_rule_sets (id, name, version, kind, code_ref) "
+        "VALUES (gen_random_uuid(), 'x', '1', 'operator', 'x')",
+    ):
+        await app_connection.rollback()
+        await app_connection.begin()
+        await app_connection.execute(_AS_APP)
+        with pytest.raises(ProgrammingError, match=_DENIED):
+            await app_connection.execute(text(statement), {"id": proposal})
+
+
+async def test_the_worker_writes_the_meme_lab_and_never_deletes_it(
+    worker_connection: AsyncConnection,
+) -> None:
+    """The loop proposes, fills, marks and answers an order; it retires no rule
+    set, issues no order and erases no evidence."""
+    proposal = await worker_connection.scalar(_A_LAB_PROPOSAL)
+    bet = await worker_connection.scalar(
+        text(
+            "INSERT INTO meme_paper_bets (id, proposal_id, rule_set_id, mint, entry_at, entry, "
+            "  initial_risk_sol, params) SELECT gen_random_uuid(), id, rule_set_id, mint, now(), "
+            "  '{}'::jsonb, 0.05, '{}'::jsonb FROM meme_proposals WHERE id = :id RETURNING id"
+        ),
+        {"id": proposal},
+    )
+    await worker_connection.execute(
+        text("UPDATE meme_paper_bets SET mark_sol = 0.04, mark_at = now() WHERE id = :id"),
+        {"id": bet},
+    )
+    for statement in (
+        "DELETE FROM meme_paper_bets WHERE id = :bet",
+        "DELETE FROM meme_proposals WHERE id = :proposal",
+        "UPDATE meme_rule_sets SET status = 'retired', retired_at = now()",
+        "INSERT INTO meme_operator_commands (id, bet_id, command, issued_by) "
+        "VALUES (gen_random_uuid(), :bet, 'sell_now', 'worker')",
+    ):
+        await worker_connection.rollback()
+        await worker_connection.begin()
+        await worker_connection.execute(text("SET LOCAL ROLE hunter_worker"))
+        with pytest.raises(ProgrammingError, match=_DENIED):
+            await worker_connection.execute(text(statement), {"bet": bet, "proposal": proposal})

@@ -132,6 +132,41 @@ Causa: um coletor perpétuo com 200 mercados já satura um core (T2.5g); somar o
 
 **Resolvido (D12, `.claude/state/decisions-delegated-2026-09-07.md`):** o universo spot flapava na borda do piso (`PROMUSDT` entrou e saiu entre dois refreshes de 15 min durante a prova de T3.0c, oscilando em torno de 50M de volume 24h). A T3.0e fechou a pergunta com uma banda **só na saída** — item 2 acima.
 
+## 1e. Radar e Lab meme — `meme-worker` (T4.2 / T4.6)
+
+**Onde:** `services/meme-worker` (`HUNTER_ROLE=meme`, perfil `meme`, `MEME_ENABLED`). **Cadência:**
+descoberta em stream (WS do PumpPortal), curva a cada 60 s dentro dos 60 req/60 s, features por
+minuto fechado, Lab por minuto (`MEME_LAB_ENABLED`, padrão ligado quando o radar coleta). **Não
+publica evento nenhum** e nenhum módulo importa `packages/risk-core` ou `hunter_core.execution`.
+
+```
+PumpPortal WS ──▶ meme_tokens ──▶ poll da curva ──▶ meme_curve_snapshots ──▶ fold ──▶ meme_features_1m
+                                                                                        │
+      (T4.6, a cada minuto fechado: end_time <= agora − 1 min)                          ▼
+      porta EXP-M1 (hunter_indicators.meme.rules) ──▶ meme_proposals ──▶ aval (rules | mesa T4.7)
+      ──▶ fill na 1.ª fotografia com observed_at > decided_at ──▶ meme_paper_bets (open)
+      ──▶ cada fotografia nova: marca honesta, high_water_x, regras de saída ──▶ exit_intent
+      ──▶ venda na fotografia seguinte ──▶ closed (pnl_sol, r_multiple) ──▶ meme_lab_scoreboard_v1
+```
+
+**Não-antecipação, três vezes:** a porta lê só minutos **fechados**; o fill só existe numa
+fotografia estritamente posterior à decisão (a primeira, nunca a mais recente — reescrever o futuro
+não move a entrada, provado em `services/meme-worker/tests/test_lab_persistence.py`); a venda é na
+fotografia seguinte à que disparou a regra. Sem fotografia posterior em 3 min: `unfilled`
+(`no_later_snapshot`) para a proposta, `rug_no_snapshot` (fecha a zero) para a aposta — nunca um
+fill fabricado ao último preço visto (`docs/RISK_ENGINE_MEME.md` §10.4).
+
+**Custos e risco:** taxa de papel 1,75 % por ponta (1,25 % da curva + 0,5 % do caminho local — o
+papel nunca simula caminho mais barato que o live), impacto da própria ordem pela fórmula da curva,
+risco inicial = SOL gasto inteiro (§5), marca = o que uma venda cheia renderia agora (§6).
+
+**O que é NULL com motivo hoje:** `creator_sold` (`no_holders_reader`) e o volume do minuto (sem
+feed de trades). Com esses dois nulos **o portão congelado da EXP-M1 recusa toda linha**
+(`creator_net_seller_unknown`, `curve_volume_1m_unknown`); o laço conta as recusas por conjunto no
+heartbeat (`hb:meme:radar` → `lab_gate_refusals`) e `GET /api/v1/orgs/{org}/meme/lab` as publica em
+`sources`. A aposta hoje nasce da mesa (`POST /proposals/manual`, T4.7) e o laço faz o resto.
+Detalhe do schema: `docs/DATABASE.md` §33–§34; plano: `docs/plans/T4-MEME-RADAR.md` §T4.6.
+
 ## 2. Feature Engine
 
 **Onde:** `scanner-worker`. **Gatilho:** `market.ticks` (tick-features, throttle 1 s por símbolo) e `market.candles.closed` (bar-features).

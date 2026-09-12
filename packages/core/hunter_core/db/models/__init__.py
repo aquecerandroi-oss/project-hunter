@@ -88,6 +88,12 @@ from hunter_core.db.models.market_data import (
 )
 from hunter_core.db.models.markets import Asset, Exchange, Market
 from hunter_core.db.models.meme import MemeIngestGap, MemeToken
+from hunter_core.db.models.meme_lab import (
+    MemeOperatorCommand,
+    MemePaperBet,
+    MemeProposal,
+    MemeRuleSet,
+)
 from hunter_core.db.models.meme_series import (
     MemeCurveSnapshot,
     MemeFeatures1m,
@@ -205,6 +211,10 @@ __all__ = [
     "MemeCurveSnapshot",
     "MemeFeatures1m",
     "MemeIngestGap",
+    "MemeOperatorCommand",
+    "MemePaperBet",
+    "MemeProposal",
+    "MemeRuleSet",
     "MemeToken",
     "MemeTrade",
     "Notification",

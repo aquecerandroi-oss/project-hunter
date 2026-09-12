@@ -53,6 +53,39 @@ async def test_rest_all_routes() -> None:
         assert "mayhemState=paused" in paths[1]
 
 
+async def test_rest_sol_price_is_a_quote_with_its_instant_and_staleness() -> None:
+    """``/sol-price`` as captured live on 2026-09-12 02:34 BRT (plantão meme, run 1):
+    the price becomes a ``Decimal`` from the JSON number, ``asOfTimestamp`` (epoch
+    ms) becomes an aware UTC instant, and ``stale`` is carried, not assumed."""
+    raw: dict[str, Any] = json.loads((FIXTURES / "sol_price_raw.json").read_text())
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/sol-price"
+        return httpx.Response(200, content=json.dumps(raw))
+
+    async with httpx.AsyncClient(
+        base_url="https://test", transport=httpx.MockTransport(respond)
+    ) as http:
+        client = PumpFunRestClient(http_client=http)
+        quote = await client.get_sol_price()
+    assert quote.source == "pumpfun_rest:/sol-price"
+    assert str(quote.price_usd).startswith("101.4445")
+    assert quote.as_of.isoformat() == "2026-09-12T05:34:01.238000+00:00"
+    assert quote.stale is False
+    assert quote.observed_at.tzinfo is not None
+
+
+@pytest.mark.parametrize("payload", [[1], {"solPrice": "abc", "asOfTimestamp": 1}, {"solPrice": 1}])
+async def test_rest_sol_price_refuses_a_malformed_quote(payload: Any) -> None:
+    async with httpx.AsyncClient(
+        base_url="https://test",
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, content=json.dumps(payload))),
+    ) as http:
+        client = PumpFunRestClient(http_client=http, max_retries=1)
+        with pytest.raises(MalformedMessage):
+            await client.get_sol_price()
+
+
 async def test_rpc_finalized_read() -> None:
     payload: dict[str, Any] = json.loads(
         (FIXTURES / "rpc_get_account_info_bonding_curve_raw.json").read_text()
