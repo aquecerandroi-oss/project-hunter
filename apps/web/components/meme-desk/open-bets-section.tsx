@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { formatSol } from "@/components/meme/meme-format";
+import type { LiveOutcomeIndex } from "@/components/meme-live/live-index";
+import { RealShadowPanel } from "@/components/meme-live/real-shadow";
 import { BrasiliaShort } from "@/components/time/brasilia-instant";
 import { Button } from "@/components/ui/button";
 import { computeAgeMs, formatAge, useAgeTicker } from "@/hooks/useAgeTicker";
@@ -119,11 +121,12 @@ function BetMetrics({ bet, nowMs }: { bet: MemeDeskBet; nowMs: number }) {
   );
 }
 
-function BetCard({ orgSlug, row, bet, knownBetIds, nowMs, canOperate, confirming, busy, onSell, onConfirm, onBack }: { orgSlug: string; row: MemeDeskRow; bet: MemeDeskBet; knownBetIds: readonly string[]; nowMs: number; canOperate: boolean; confirming: boolean; busy: boolean; onSell: () => void; onConfirm: () => void; onBack: () => void }) {
+function BetCard({ orgSlug, row, bet, knownBetIds, nowMs, canOperate, confirming, busy, onSell, onConfirm, onBack, liveOutcomes }: { orgSlug: string; row: MemeDeskRow; bet: MemeDeskBet; knownBetIds: readonly string[]; nowMs: number; canOperate: boolean; confirming: boolean; busy: boolean; onSell: () => void; onConfirm: () => void; onBack: () => void; liveOutcomes: LiveOutcomeIndex | null }) {
   return (
     <li id={betAnchorId(bet.id)} className="flex flex-col gap-2 rounded-md border border-border p-3">
       <BetHeader orgSlug={orgSlug} row={row} bet={bet} knownBetIds={knownBetIds} />
       <BetMetrics bet={bet} nowMs={nowMs} />
+      <RealShadowPanel row={row} live={liveOutcomes} />
       {confirming ? (
         <SellNowConfirm bet={bet} busy={busy} onConfirm={onConfirm} onBack={onBack} />
       ) : (
@@ -146,10 +149,12 @@ export interface OpenBetsSectionProps {
   canOperate: boolean;
   /** T4.10b: ids of every bet on the page, so a scale leg links to its probe only when the probe's card exists. */
   knownBetIds?: string[];
+  /** T4.17 deliverable 4: `null` when `GET /meme/live` itself failed -- `RealShadowPanel` renders nothing for an ordinary paper bet regardless. */
+  liveOutcomes?: LiveOutcomeIndex | null;
 }
 
 /** "Abertas" (contract §Tela): live mark, PnL, R, remaining hold, and "Vender agora" with a one-tap confirmation. */
-export function OpenBetsSection({ orgId, orgSlug, rows, serverNow, canOperate, knownBetIds = [] }: OpenBetsSectionProps) {
+export function OpenBetsSection({ orgId, orgSlug, rows, serverNow, canOperate, knownBetIds = [], liveOutcomes = null }: OpenBetsSectionProps) {
   const router = useRouter();
   const { now } = useAgeTicker(serverNow);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -210,6 +215,7 @@ export function OpenBetsSection({ orgId, orgSlug, rows, serverNow, canOperate, k
                   if (row.bet) keysRef.current.delete(row.bet.id);
                   setConfirmingId(null);
                 }}
+                liveOutcomes={liveOutcomes}
               />
             ) : null,
           )}

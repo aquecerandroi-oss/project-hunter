@@ -96,10 +96,13 @@ interface ActionsProps {
   busy: boolean;
   onApprove: () => void;
   onReject: () => void;
+  /** T4.17: `null` when the operator may open "Aprovar (REAL)" (role ok, deadline ok, executor `ligado`); otherwise the exact reason it is off. */
+  realBlocked: string | null;
+  onApproveReal: () => void;
 }
 
-/** Aprovar is off past the deadline or without the role; Recusar stays available past the deadline (a "no" is worth recording until the loop stamps `expired`). */
-function Actions({ canOperate, blocked, busy, onApprove, onReject }: ActionsProps) {
+/** Aprovar is off past the deadline or without the role; Recusar stays available past the deadline (a "no" is worth recording until the loop stamps `expired`). "Aprovar (REAL)" carries its own, separate gate (T4.17): the executor must be `ligado`, on top of the paper button's own conditions. */
+function Actions({ canOperate, blocked, busy, onApprove, onReject, realBlocked, onApproveReal }: ActionsProps) {
   const roleReason = canOperate ? undefined : "Requer o papel Trader ou superior nesta organização.";
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -109,7 +112,11 @@ function Actions({ canOperate, blocked, busy, onApprove, onReject }: ActionsProp
       <Button type="button" size="sm" variant="outline" onClick={onReject} disabled={busy || !canOperate} title={roleReason}>
         Recusar
       </Button>
+      <Button type="button" size="sm" variant="destructive" onClick={onApproveReal} disabled={busy || realBlocked !== null} title={realBlocked ?? undefined}>
+        Aprovar (REAL)
+      </Button>
       {blocked && <span className="text-[11px] text-fg-subtle">{blocked}</span>}
+      {!blocked && realBlocked && <span className="text-[11px] text-fg-subtle">{realBlocked}</span>}
     </div>
   );
 }
@@ -122,20 +129,30 @@ export interface ProposalCardProps {
   busy: boolean;
   onApprove: () => void;
   onReject: () => void;
+  /** `true` only when the executor is `ligado` (heartbeat alive, its own flag on) AND the API's own flag is on -- `lib/api/meme-live-types.ts`'s `realActionsAvailable`. */
+  realAvailable: boolean;
+  onApproveReal: () => void;
 }
 
-/** One proposal awaiting the operator's call: countdown, why the loop proposed it, the quote and the two actions (contract §Tela). */
-export function ProposalCard({ orgSlug, row, nowMs, canOperate, busy, onApprove, onReject }: ProposalCardProps) {
+/** One proposal awaiting the operator's call: countdown, why the loop proposed it, the quote and the actions (contract §Tela; "Aprovar (REAL)" per T4.17). */
+export function ProposalCard({ orgSlug, row, nowMs, canOperate, busy, onApprove, onReject, realAvailable, onApproveReal }: ProposalCardProps) {
   const countdown = countdownLabel(row.expires_at, nowMs);
   const expired = countdown.startsWith("expirou");
   const blocked = !canOperate ? "Requer o papel Trader ou superior nesta organização." : expired ? "Prazo vencido — o laço marca como expirada." : null;
+  const realBlocked = !canOperate
+    ? "Requer o papel Trader ou superior nesta organização."
+    : expired
+      ? "Prazo vencido — o laço marca como expirada."
+      : !realAvailable
+        ? "O executor real não está ligado — veja o painel Executor real."
+        : null;
   return (
     <li className="flex flex-col gap-2 rounded-md border border-border p-3">
       <Header orgSlug={orgSlug} row={row} countdown={countdown} expired={expired} />
       <ReasonsLine row={row} />
       <QuoteLine row={row} />
       <SuggestedLine row={row} />
-      <Actions canOperate={canOperate} blocked={blocked} busy={busy} onApprove={onApprove} onReject={onReject} />
+      <Actions canOperate={canOperate} blocked={blocked} busy={busy} onApprove={onApprove} onReject={onReject} realBlocked={realBlocked} onApproveReal={onApproveReal} />
     </li>
   );
 }

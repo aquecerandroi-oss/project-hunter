@@ -65,21 +65,20 @@ export function formValuesFromSuggested(suggested: MemeDeskParams | null | undef
   };
 }
 
-export function toApproveBody(values: DeskParamsFormValues): MemeDeskApproveBody {
+/** T4.17: `mode` defaults to `"paper"` for every ordinary approval; the "Aprovar (REAL)"/"Registrar (REAL)" two-step flows (`approve-real-sheet.tsx`, `manual-buy-dialog.tsx`) pass `"live"` explicitly, only after the operator typed the size back to confirm. */
+export function toApproveBody(values: DeskParamsFormValues, mode: MemeDeskApproveBody["mode"] = "paper"): MemeDeskApproveBody {
   return {
     size_sol: values.sizeSol,
     target_x: values.targetX,
     trailing_pct: values.trailingPct,
     max_hold_s: Number.parseInt(values.maxHoldS, 10),
     note: values.note === "" ? null : values.note,
-    // T4.14: the desk only files PAPER proposals until the live executor exists and
-    // `ENABLE_MEME_LIVE_TRADING` is on; "Aprovar (REAL)" is a separate, double-confirmed path.
-    mode: "paper",
+    mode,
   };
 }
 
-export function toManualBody(values: ManualBuyFormValues): MemeDeskManualBody {
-  return { ...toApproveBody(values), mint: values.mint };
+export function toManualBody(values: ManualBuyFormValues, mode: MemeDeskManualBody["mode"] = "paper"): MemeDeskManualBody {
+  return { ...toApproveBody(values, mode), mint: values.mint };
 }
 
 /** First zod issue as one sentence, for the inline error line. */

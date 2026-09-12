@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { useAgeTicker } from "@/hooks/useAgeTicker";
 import { cancelProposalAction, rejectProposalAction } from "@/lib/api/meme-desk-actions";
 import type { MemeDeskRow, MemeLoopState } from "@/lib/api/meme-desk-types";
+import type { LiveExecutor } from "@/lib/api/meme-live-types";
 
+import { ApproveRealSheet } from "./approve-real-sheet";
 import { ApproveSheet } from "./approve-sheet";
 import { memeDeskProblemMessage } from "./labels";
 import { emptyProposalsLabel, loopStateLabel, minutesSinceNewestProposal } from "./meme-desk-format";
@@ -28,6 +30,10 @@ export interface ProposalsSectionProps {
   loop: MemeLoopState;
   serverNow: string;
   canOperate: boolean;
+  /** T4.17: `true` only when the real executor is `ligado` -- gates every "Aprovar (REAL)" button on this page. */
+  realAvailable: boolean;
+  /** The executor's own heartbeat, for the REAL sheet's "tetos que se aplicam" -- `null` when there is no reading. */
+  liveExecutor: LiveExecutor | null;
 }
 
 /**
@@ -37,10 +43,11 @@ export interface ProposalsSectionProps {
  * next snapshot (cancellable until then). Reject/cancel are one tap with
  * their own fresh `Idempotency-Key`; approve opens the sheet.
  */
-export function ProposalsSection({ orgId, orgSlug, proposals, awaitingFill, allRows, loop, serverNow, canOperate }: ProposalsSectionProps) {
+export function ProposalsSection({ orgId, orgSlug, proposals, awaitingFill, allRows, loop, serverNow, canOperate, realAvailable, liveExecutor }: ProposalsSectionProps) {
   const router = useRouter();
   const { now } = useAgeTicker(serverNow);
   const [sheetRow, setSheetRow] = useState<MemeDeskRow | null>(null);
+  const [realSheetRow, setRealSheetRow] = useState<MemeDeskRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +86,8 @@ export function ProposalsSection({ orgId, orgSlug, proposals, awaitingFill, allR
               busy={busyId === row.id}
               onApprove={() => setSheetRow(row)}
               onReject={() => void run(row.id, () => rejectProposalAction(orgId, row.id, crypto.randomUUID()))}
+              realAvailable={realAvailable}
+              onApproveReal={() => setRealSheetRow(row)}
             />
           ))}
         </ul>
@@ -124,6 +133,19 @@ export function ProposalsSection({ orgId, orgSlug, proposals, awaitingFill, allR
         }}
         onApproved={() => {
           setSheetRow(null);
+          router.refresh();
+        }}
+      />
+
+      <ApproveRealSheet
+        orgId={orgId}
+        row={realSheetRow}
+        executor={liveExecutor}
+        onOpenChange={(open) => {
+          if (!open) setRealSheetRow(null);
+        }}
+        onApproved={() => {
+          setRealSheetRow(null);
           router.refresh();
         }}
       />

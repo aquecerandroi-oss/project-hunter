@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { formatSol } from "@/components/meme/meme-format";
+import type { LiveOutcomeIndex } from "@/components/meme-live/live-index";
+import { RealShadowPanel } from "@/components/meme-live/real-shadow";
 import { BrasiliaShort } from "@/components/time/brasilia-instant";
 import type { MemeDeskRow } from "@/lib/api/meme-desk-types";
 
@@ -13,10 +15,12 @@ export interface ClosedTodaySectionProps {
   rows: MemeDeskRow[];
   /** T4.10b: ids of every bet on the page (see `bet-leg.tsx`). */
   knownBetIds?: readonly string[];
+  /** T4.17 deliverable 4: `null` when `GET /meme/live` itself failed. */
+  liveOutcomes?: LiveOutcomeIndex | null;
 }
 
 /** "Fechadas hoje" (contract §Tela): exit reason, PnL, R, link to `/meme/{mint}`. Server Component -- nothing interactive. */
-export function ClosedTodaySection({ orgSlug, rows, knownBetIds = [] }: ClosedTodaySectionProps) {
+export function ClosedTodaySection({ orgSlug, rows, knownBetIds = [], liveOutcomes = null }: ClosedTodaySectionProps) {
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-sm font-medium text-fg">Fechadas hoje</h2>
@@ -28,26 +32,29 @@ export function ClosedTodaySection({ orgSlug, rows, knownBetIds = [] }: ClosedTo
             const bet = row.bet;
             if (!bet) return null;
             return (
-              <li key={bet.id} id={betAnchorId(bet.id)} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-3 text-xs">
-                <span className="min-w-0">
-                  <Link href={`/${orgSlug}/meme/${row.mint}`} className="text-sm font-medium text-fg hover:underline">
-                    {row.token?.name ?? "(nome desconhecido)"}
-                  </Link>
-                  <span className="ml-2 inline-flex flex-wrap items-baseline gap-2">
-                    <BetLegBadge bet={bet} knownBetIds={knownBetIds} />
+              <li key={bet.id} id={betAnchorId(bet.id)} className="flex flex-col gap-2 rounded-md border border-border p-3 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="min-w-0">
+                    <Link href={`/${orgSlug}/meme/${row.mint}`} className="text-sm font-medium text-fg hover:underline">
+                      {row.token?.name ?? "(nome desconhecido)"}
+                    </Link>
+                    <span className="ml-2 inline-flex flex-wrap items-baseline gap-2">
+                      <BetLegBadge bet={bet} knownBetIds={knownBetIds} />
+                    </span>
+                    <span className="ml-2 text-fg-muted">
+                      {exitReasonLabel(bet.exit_reason)} · saiu {bet.exit_at ? <BrasiliaShort iso={bet.exit_at} /> : "—"}
+                      {bet.sol_spent ? ` · entrou com ${formatSol(bet.sol_spent)}` : ""}
+                      {decisionToFillLabel(bet.decision_to_fill_s) ? ` · ${decisionToFillLabel(bet.decision_to_fill_s)}` : ""}
+                    </span>
                   </span>
-                  <span className="ml-2 text-fg-muted">
-                    {exitReasonLabel(bet.exit_reason)} · saiu {bet.exit_at ? <BrasiliaShort iso={bet.exit_at} /> : "—"}
-                    {bet.sol_spent ? ` · entrou com ${formatSol(bet.sol_spent)}` : ""}
-                    {decisionToFillLabel(bet.decision_to_fill_s) ? ` · ${decisionToFillLabel(bet.decision_to_fill_s)}` : ""}
+                  <span className="font-mono tabular-nums">
+                    <span className={signClass(bet.pnl_sol)}>{bet.pnl_sol ? formatSolSigned(bet.pnl_sol) : "PnL não informado"}</span>
+                    <span className="ml-2 text-fg-muted" title={bet.outcome_quality === "indeterminate" ? (bet.outcome_quality_reason ?? undefined) : undefined}>
+                      {bet.outcome_quality === "indeterminate" ? outcomeQualityLabel(bet.outcome_quality) : bet.r_multiple ? formatR(bet.r_multiple) : ""}
+                    </span>
                   </span>
-                </span>
-                <span className="font-mono tabular-nums">
-                  <span className={signClass(bet.pnl_sol)}>{bet.pnl_sol ? formatSolSigned(bet.pnl_sol) : "PnL não informado"}</span>
-                  <span className="ml-2 text-fg-muted" title={bet.outcome_quality === "indeterminate" ? (bet.outcome_quality_reason ?? undefined) : undefined}>
-                    {bet.outcome_quality === "indeterminate" ? outcomeQualityLabel(bet.outcome_quality) : bet.r_multiple ? formatR(bet.r_multiple) : ""}
-                  </span>
-                </span>
+                </div>
+                <RealShadowPanel row={row} live={liveOutcomes} />
               </li>
             );
           })}
