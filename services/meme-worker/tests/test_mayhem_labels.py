@@ -8,6 +8,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
+
 from hunter_exchanges.pumpfun.models import NormalizedCurveState
 from hunter_meme_worker import mayhem_labels
 from hunter_meme_worker.curve_rows import snapshot_row, token_row_from_curve, tracked_from_curve
@@ -51,7 +53,7 @@ def test_the_site_s_enabled_label_becomes_unknown_in_every_row() -> None:
     assert tracked_from_curve(state, None, None).mayhem_state == "unknown"
 
 
-def test_the_raw_label_is_logged_once_per_mint_and_label(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_the_raw_label_is_logged_once_per_mint_and_label(monkeypatch: pytest.MonkeyPatch) -> None:
     events: list[dict[str, object]] = []
 
     class _Logger:
@@ -59,7 +61,7 @@ def test_the_raw_label_is_logged_once_per_mint_and_label(monkeypatch) -> None:  
             events.append({"event": event, **kw})
 
     monkeypatch.setattr(mayhem_labels, "logger", _Logger())
-    monkeypatch.setattr(mayhem_labels, "_seen", set())
+    monkeypatch.setattr(mayhem_labels, "_seen", set[tuple[str, str, str]]())
     for _ in range(3):
         assert known_mayhem_state("enabled", mint="m1", source="pumpfun_rest") == "unknown"
     assert known_mayhem_state("enabled", mint="m2", source="pumpfun_rest") == "unknown"
