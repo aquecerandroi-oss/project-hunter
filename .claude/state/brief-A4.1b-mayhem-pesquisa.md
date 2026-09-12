@@ -1,0 +1,14 @@
+# Brief A4.1b (para a Astra, modo run) — Mayhem Mode no radar: "Modo Manual", campos da API e tagging do agente (pesquisa + proposta, SEM código)
+
+**Contexto:** Everton mostrou o "Examinador de Mayhem" do pump.fun (screener: AGENTE ATIVO / FEZ UMA PAUSA / TERMINOU, MODO Manual, MCAP, volume, tendência). A doc oficial `https://pump.fun/docs/mayhem-mode` (lida 12/09/2026 02:xx BRT; "Last Updated 12 November 2025") já está resumida no adendo de `docs/plans/T4-MEME-RADAR.md` (agente de IA do próprio pump.fun, random walk nas primeiras 24 h, 1 bi de tokens extras, carteira do agente `BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s`, programa `MAyhSmzXzV1pTf7LsNkrNwkWKTo4ougAJ1PPg47MD4e`). Um agente nosso (T4.1) está escrevendo o adapter em `packages/exchange-adapters/hunter_exchanges/pumpfun/` — **não toque nesse diretório nem em `docs/EXCHANGE_INTEGRATION.md`**.
+
+**Entregar (só arquivos novos em `.claude/state/` e uma linha na fila do Obsidian):**
+1. `.claude/state/notes-A4.1b-mayhem.md` (português, com URL aberta + hora de leitura em cada afirmação; nunca inventar):
+   - O que é o "Modo Manual" do screener (não está na doc de nov/2025): procurar em `pump.fun/docs/*`, `t.me/pump_tech_updates` (se abrir), blog do pump.fun, GitHub (`pump-fun`, IDL do programa `MAyhSmz…`), X/Twitter só via snippet de busca. Se não achar fonte, dizer "não encontrado" e listar o que foi tentado.
+   - Como o estado do agente e a flag Mayhem aparecem em `https://frontend-api-v3.pump.fun` (endpoint de coin por mint e o de listagem): quais campos existem (ex.: `mayhem_mode`, `agent_status`), com uma resposta real anonimizada de 1 moeda Mayhem e 1 não-Mayhem (curl, respeitando 60 req/60 s; sem chave; se a API recusar, registrar o código HTTP).
+   - Se existe endpoint próprio do screener (rede da página `https://pump.fun/mayhem` — Cloudflare pode bloquear; registrar o que aconteceu).
+   - Como identificar on-chain os trades do agente: instruções do programa `MAyhSmz…` e/ou trades da carteira do agente no programa da curva `6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P`; o que o IDL expõe; um exemplo real de assinatura de transação do agente (RPC público, 10 req/s).
+   - Proposta de esquema (sem implementar): colunas `meme_tokens.mayhem_enabled`, `meme_tokens.mayhem_state`, `meme_trades.is_mayhem_agent`, e a regra de exclusão das métricas orgânicas; e a hipótese H-P28 formalizada (graduação e retorno 24 h→7 d Mayhem vs não-Mayhem, mesmo denominador, mesma retenção).
+2. Uma linha `nova` em `obsidian/00-INBOX/Hipoteses-do-plantao.md` para H-P28 (formato da tabela existente; rodar `uv run python infra/scripts/obsidian_lint.py` e terminar "base limpa").
+
+**Regras:** não modificar nenhum outro arquivo; não commitar; não ler nem escrever `.env*`; nenhuma chave de API; comandos em primeiro plano com `timeout 290`; se algo não abrir, dizer. Relatório final ≤ 15 linhas em português no fim das notas, horários em Brasília (UTC−3, calcular).

@@ -1,0 +1,10 @@
+# Brief A3.86b (para a Astra, modo run) — a peneira da ponte deixa de usar a coluna congelada `markets.volume_24h_usd`
+
+**Contexto:** T3.86 (commit ad627bc; notas `.claude/state/notes-T3.86.md`, contrato `docs/RISK_ENGINE.md` v2.5 §3.1 check 9 e §7.1) passou o volume de 24 h do **motor** para a soma das velas na mesma leitura, porque a coluna `markets.volume_24h_usd` é um snapshot de ticker sem carimbo próprio (refresh de 900 s; em SPOT publica 14–25 M sem nenhuma vela). Residual declarado: `services/execution-worker/hunter_execution_worker/bridge_screen.py:297-300` ainda **peneira candidatos pela coluna** — só recusa (nunca admite), mas uma coluna congelada em 45 M esconde para sempre um mercado que subiu a 60 M, e uma coluna alta deixa passar para a admissão um mercado morto (a admissão recusa depois, com custo). A ponte está desligada em produção (`ENABLE_PAPER_AUTONOMY=false`); isto é correção de contrato, não de comportamento ao vivo.
+
+**Entregar:**
+1. A peneira usa a mesma fonte do motor: o helper de 24 h por velas de `bridge_inputs.py` (T3.86) — sem reimplementar, sem limiar novo; quando a soma não existe (SPOT sem 24 h de série) a peneira recusa por nome (`liquidity_unproven`), nunca por padrão, nunca pela coluna.
+2. Testes: unidade em `services/execution-worker/tests/` (coluna 120 M com velas 31 M → recusado; coluna 45 M com velas 60 M → passa para a admissão; sem série → `liquidity_unproven`); rodar `uv run pytest services/execution-worker/tests/test_bridge_screen*.py services/execution-worker/tests/test_volume_24h_source.py -q -p no:randomly` (testcontainer, um por vez, `timeout 290`) e a suíte unitária do worker.
+3. `docs/RISK_ENGINE.md` §7 (ponte) uma frase; `.claude/state/notes-A3.86b.md` com comandos/saídas e `git status --porcelain` dos arquivos tocados.
+
+**Regras:** não commitar; não ler nem escrever `.env*`; não tocar `packages/risk-core/**` (limites), `apps/**`, `packages/exchange-adapters/**`; arquivos ≤ 350 linhas; `ruff`/`pyright`/`check_file_size.py` limpos; nunca `git stash`/`checkout --`/`restore`/`reset`/`clean`/`commit -a`; comandos em primeiro plano com `timeout 290`. Relatório ≤ 8 linhas em português.
