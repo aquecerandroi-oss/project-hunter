@@ -1,0 +1,103 @@
+## RESUMO
+
+**Testaria primeiro M-D7**, corrigida para comparar atrasos sobre **as mesmas propostas**. Ela responde à pergunta anterior às outras: existe resultado capturável quando o sinal chega ao operador? Depois, **M-P31**; deixaria **M-P32 como diagnóstico exploratório**, sem torná-la condição para testar trailing.
+
+Os 9/9 negativos justificam investigar o funil, mas não distinguem entrada ruim, atraso, custo e saída ruim. Trato −4,95 R como contexto informado, não como medição refeita nesta revisão.
+
+## ARQUIVOS
+
+Nenhum arquivo criado ou modificado. Papel assumido: `quant-engineer`, modo OPINIÃO.
+
+## TESTES
+
+Não executei testes, SQL ou os scripts dos papers. Fiz leitura do repositório e conferência das fontes abertas, inclusive o **PDF de Kamat**, que abriu nesta revisão.
+
+## MUST-FIX
+
+### 1. M-D7 — separar relógios e associação de efeito do atraso
+
+A [linha proposta:134](C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1254-lane4.md:134) mistura atraso observado e resultado contrafactual.
+
+**Cenário de falha:** o operador aprova rapidamente moedas que já estão acelerando e demora nas duvidosas. O resultado diminui por faixa mesmo que esperar não tenha causado a diferença.
+
+Antes da fila:
+
+- Separar **evento→sinal, sinal→proposta, proposta→exibição, exibição→decisão e decisão→fill**. Sem carimbo de exibição, medir latência operacional agregada; não chamá-la de tempo humano.
+- Publicar dois resultados: associação pelos atrasos observados e **replay pareado**, aplicando atrasos fixos pré-declarados a cada proposta, inclusive recusadas e expiradas.
+- Congelar tamanho, saída, custos, regra de fill posterior e horizonte. Para medir atraso, usar inicialmente o mesmo término `sinal + H`; duração igual após cada entrada responde a outra pergunta.
+- Usar faixas exclusivas, por exemplo `[0,5)`, `[5,20)`, `[20,60)`, `[60,120)`. **Expirada é estado, não atraso observado.** A API já recusa aprovação quando `now >= expires_at` ([meme_desk.py:105](C:/dev/project-hunter/apps/api/hunter_api/services/meme_desk.py:105)); a expiração automática apenas muda o status ([lab_repo.py:80](C:/dev/project-hunter/services/meme-worker/hunter_meme_worker/lab_repo.py:80)).
+- Separar versão, sonda/escala, origem automática/humana e idade no sinal; publicar propostas, fills, recusas de execução, pendências e censuras. Fixar o início como **2026-09-12 15:14Z**, sujeito à comprovação do primeiro registro elegível.
+
+**Não exigir decaimento monotônico:** esperar pode evitar um pico. A pergunta é quanto cada atraso acrescenta ou retira de resultado executável.
+
+### 2. M-P31 — medir valor da escala, não apenas separação entre grupos
+
+A [linha proposta:114](C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1254-lane4.md:114) admite uma regra que separa dois grupos perdedores.
+
+**Cenário de falha:** escaladas dão −0,2 R e não escaladas dariam −0,8 R. A diferença de +0,6 R “aprova” C, embora cada escala continue destruindo capital.
+
+Exigiria:
+
+- Um marco comum, inicialmente **fill da sonda + T**, com N, V, T, tamanho e saídas congelados. Se C for por primeiro cruzamento, o controle precisa reproduzir esse processo temporal; não comparar cruzamentos precoces com rejeições avaliadas só no fim.
+- Contrastes separados: **C versus escalar todas as elegíveis**, e **C versus não escalar**. Publicar também resultado total sonda+escala por oportunidade inicial, incluindo sondas encerradas antes de T.
+- Definir “comprador distinto” como carteira observada, não pessoa independente; excluir nossa própria sonda do fluxo de confirmação. Especificar se V significa nível de reserva virtual, variação líquida ou compras brutas — são medidas diferentes.
+- “Sem venda do criador” somente com cobertura verificável; ausência de observação não prova ausência de venda.
+- Salvas:perdidas com **contagens e magnitudes em SOL**. Muitas perdas pequenas evitadas podem não compensar um único grande ganho perdido.
+
+**Correção bibliográfica obrigatória:** Marino exclui **graduações ocorridas em menos de 2 s**, como sensibilidade. Não propõe descontar swaps com intervalo inferior a 2 s. Esse desconto não tem sustentação no estudo. [Marino, §VI](https://arxiv.org/html/2602.14860)
+
+C também é uma **variante nova**: a escala congelada da EXP-M3 usa `trendline_v0/1`, com a sonda ainda aberta ([EXP-M3:87](C:/dev/project-hunter/obsidian/05-EXPERIMENTS/EXP-M3-sonda-de-hype.md:87)). Não substituir silenciosamente esse protocolo.
+
+### 3. M-P32 — retirar a condição “autocorrelação positiva autoriza trailing”
+
+**Cenário de falha:** calcular a autocorrelação dos primeiros 30 minutos e usá-la para escolher a saída dentro desses mesmos 30 minutos introduz futuro. Exigir 30 minutos completos também exclui moedas que morreram cedo.
+
+Antes da fila:
+
+- Definir `t0`, preço de pool, fechamento de minuto, limite de staleness e tratamento de minutos sem negociação.
+- Usar a autocorrelação desses 30 minutos **somente retrospectivamente**, ou decidir após o minuto 30 e medir o resultado posterior.
+- Não concatenar retornos de moedas distintas. Cerca de 30 retornos por moeda fornecem uma estimativa muito ruidosa; publicar incerteza e cobertura, com agrupamento por mint/dia.
+- Testar diretamente o **ΔR pareado com/sem trailing**, mantendo entrada e demais saídas iguais.
+
+Kaminski–Lo fornece condições dependentes do modelo; “momentum pode ajudar” não estabelece que autocorrelação lag-1 positiva seja condição necessária ou suficiente para nosso trailing. A nota também mistura a empiria mensal do working paper antigo com a versão publicada em 2014, cujo resumo descreve futuros diários. [Working paper](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=968338), [publicação de 2014](https://research.hhs.se/esploro/outputs/journalArticle/When-do-stop-loss-rules-stop-losses/991001480526106056)
+
+### 4. EXP-M4 — não transformar sensibilidade à cauda em conclusão estatística
+
+**Cenário de falha:** uma estratégia de ganhos raros é descartada mecanicamente porque retirar seus maiores ganhos torna a soma negativa, mesmo quando isso é compatível com sua distribuição verdadeira.
+
+R sem top-1/3/5 é excelente **diagnóstico de concentração**; sozinho, não prova expectativa negativa. O veto já congelado deve ser reportado como critério conservador do projeto ([EXP-M4:105](C:/dev/project-hunter/obsidian/05-EXPERIMENTS/EXP-M4-moonshot.md:105)), sem reescrevê-lo após observar resultados.
+
+Para a comparação nova:
+
+- Fixar R como PnL líquido dividido pelo capital em risco pré-declarado; mostrar SOL junto, especialmente nas parcelas de tamanhos diferentes.
+- Definir a cauda pelo **mesmo benchmark** para todas as políticas. Publicar ΔR absoluto; dividir pelo R total líquido pode produzir razão explosiva ou sem interpretação quando o denominador é zero/negativo.
+- Usar **Holm nos contrastes primários válidos**. Deflated Sharpe é ferramenta adicional se Sharpe for avaliado, não substituto automático para testes sobre R.
+- Preservar os dois braços congelados; a grade adicional precisa de protocolo próprio e confirmação futura.
+
+## NICE-TO-HAVE
+
+Incluir controles sem alvo e sem trailing, preservando as demais saídas obrigatórias. Isso permite identificar a contribuição de cada componente. Doze políticas são um teto razoável, não uma garantia contra sobreajuste.
+
+## O QUE EU FARIA DIFERENTE
+
+**Retiraria quatro afirmações de hype:**
+
+1. **“A cauda exige TP distante.”** Kamat confirma os números citados, mas o próprio sistema usa TP, trailing e time-stop, com limiares não divulgados. Os maiores trades realizados não demonstram trajetórias de 10×/25×. Seu +117,7% é soma de percentuais por trade, não retorno composto de carteira. [Kamat, §§IV–VI e figura 3](https://arxiv.org/pdf/2606.08232v3)
+
+2. **“Li conclui o oposto do necessário.”** Ele encontra parâmetros numa amostra e altera o split após resultados temporais ruins. Isso enfraquece a validação; não estabelece oposição a uma lei das caudas. [Li et al.](https://arxiv.org/html/2604.27150)
+
+3. **“120 s significa chegar depois da graduação.”** A mediana de 1,66 min é condicionada às graduações captadas por um coletor com visibilidade curta. Não mede tempo disponível desde nosso sinal. Os 83,3% locais são **40/48 de um board**, com ressalvas anteriores sobre proxy temporal, não taxa universal de slot comprovado ([nota diária:765](C:/dev/project-hunter/obsidian/02-MARKET/Meme/2026-09-12.md:765)). [Kamat, limitações do coletor](https://arxiv.org/html/2607.02823v3)
+
+4. **“Único deploy”, “nenhuma literatura”, “único jeito honesto”.** Trocar por “encontrado nesta busca”. Leung–Zhang demonstra complementaridade sob hipóteses específicas de difusão; não invalida TP isolado nem prova a política ótima para memes. [Leung–Zhang](https://arxiv.org/html/1701.03960)
+
+## CONCORDO COM
+
+Acompanhar rejeitadas, pré-registrar poucas políticas e reservar confirmação posterior são as contribuições mais fortes. O rastreador de Kamat é uma referência útil justamente por rejeitar a interpretação ampliada de 14,8:1; **3,7:1 continua sendo resultado daquele filtro, não expectativa transferível para C**. [Auditoria de rejeições](https://arxiv.org/abs/2607.02830)
+
+## OBSIDIAN
+
+- **Hipóteses do plantão** — inserir M-D7 primeiro; M-P31 com controles econômicos; M-P32 como diagnóstico retrospectivo.
+- **Plantão MEME — 2026-09-12** — acrescentar correções sobre 2 s, relógios, caudas e alcance das fontes.
+- **EXP-M3 — sonda de hype** — registrar C como variante proposta, preservando a escala congelada.
+- **EXP-M4 — moonshot** — acrescentar parecer sobre concentração, denominadores e protocolo separado de replay.
+- **Revisões-Astra/Index** — indexar esta revisão e sua prioridade M-D7 → M-P31 → M-P32.

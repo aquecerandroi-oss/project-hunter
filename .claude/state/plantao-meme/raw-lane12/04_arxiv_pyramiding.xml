@@ -1,0 +1,448 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/3O1gtT1JoZ4c0ajmxKPij/QTaUA</id>
+  <title>arXiv Query: search_query=(all:pyramiding OR all:"scaling in" OR all:"add to winners" OR all:"position building" OR all:"probe trade") AND cat:q-fin.*&amp;id_list=&amp;start=0&amp;max_results=20</title>
+  <updated>2026-09-12T15:58:39Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=(all:pyramiding+OR+(all:%22scaling+in%22+OR+(all:%22add+to+winners%22+OR+(all:%22position+building%22+OR+all:%22probe+trade%22))))+AND+cat:q-fin.*&amp;start=0&amp;max_results=20&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>20</opensearch:itemsPerPage>
+  <opensearch:totalResults>1673</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2102.02179v2</id>
+    <title>Pyramid scheme in stock market: a kind of financial market simulation</title>
+    <updated>2021-02-16T04:44:47Z</updated>
+    <link href="https://arxiv.org/abs/2102.02179v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2102.02179v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Artificial stock market simulation based on agent is an important means to study financial market. Based on the assumption that the investors are composed of a main fund, small trend and contrarian investors characterized by four parameters, we simulate and research a kind of financial phenomenon with the characteristics of pyramid schemes. Our simulation results and theoretical analysis reveal the relationships between the rate of return of the main fund and the proportion of the trend investors in all small investors, the small investors' parameters of taking profit and stopping loss, the order size of the main fund and the strategies adopted by the main fund. Our work are helpful to explain the financial phenomenon with the characteristics of pyramid schemes in financial markets, design trading rules for regulators and develop trading strategies for investors.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="physics.soc-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2021-02-03T18:16:21Z</published>
+    <arxiv:comment>23 pages, 11 figures, in this version we have corrected some expression errors in the previous version</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Yong Shi</name>
+    </author>
+    <author>
+      <name>Bo Li</name>
+    </author>
+    <author>
+      <name>Guangle Du</name>
+    </author>
+    <arxiv:doi>10.1088/1674-1056/abeef3</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1088/1674-1056/abeef3" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2512.14735v2</id>
+    <title>PyFi: Toward Pyramid-like Financial Image Understanding for VLMs via Adversarial Agents</title>
+    <updated>2026-04-08T06:53:15Z</updated>
+    <link href="https://arxiv.org/abs/2512.14735v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2512.14735v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This paper proposes PyFi, a novel framework for pyramid-like financial image understanding that enables vision language models (VLMs) to reason through question chains in a progressive, simple-to-complex manner. At the core of PyFi is PyFi-600K, a dataset comprising 600K financial question-answer pairs organized into a reasoning pyramid: questions at the base require only basic perception, while those toward the apex demand increasing levels of capability in financial visual understanding and expertise. This data is scalable because it is synthesized without human annotations, using PyFi-adv, a multi-agent adversarial mechanism under the Monte Carlo Tree Search (MCTS) paradigm, in which, for each image, a challenger agent competes with a solver agent by generating question chains that progressively probe deeper capability levels in financial visual reasoning. Leveraging this dataset, we present fine-grained, hierarchical, and comprehensive evaluations of advanced VLMs in the financial domain. Moreover, fine-tuning Qwen2.5-VL-3B and Qwen2.5-VL-7B on the pyramid-structured question chains enables these models to answer complex financial questions by decomposing them into sub-questions with gradually increasing reasoning demands, yielding average accuracy improvements of 19.52% and 8.06%, respectively, on the dataset. All resources of code, dataset and models are available at: https://github.com/AgenticFinLab/PyFi .</summary>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-12-11T06:04:33Z</published>
+    <arxiv:primary_category term="q-fin.CP"/>
+    <author>
+      <name>Yuqun Zhang</name>
+    </author>
+    <author>
+      <name>Yuxuan Zhao</name>
+    </author>
+    <author>
+      <name>Sijia Chen</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/physics/0703128v2</id>
+    <title>Fluctuation scaling versus gap scaling</title>
+    <updated>2007-04-05T14:18:01Z</updated>
+    <link href="https://arxiv.org/abs/physics/0703128v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/physics/0703128v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>  Fluctuation scaling is observed phenomenon from complex networks through finance to ecology. It means that the variance and the mean of a specific quantity are related as $\ev{σ^2|n}\propto \ev{n|A}^{2α}$ with $1/2\geq α\geq 1$ when a parameter $A$ (usually the system size) is varied. $A$ can be the strength of the node, the capitalization of the firm or the area of the habitat. On the other hand, quantities often obey gap scaling meaning that their density function depends on, say, the system size $A$ as $P(n|A) = n^{-1}F(n/A^Φ)$. This note describes that these two notions cannot coexist except when $α= 1$. In this way one can empirically exclude the possibility of gap scaling in many complex systems including population dynamics, stock market fluctuations and Internet router traffic, where $α&lt; 1$.</summary>
+    <category term="physics.soc-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="physics.bio-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-bio.QM" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2007-03-12T18:15:23Z</published>
+    <arxiv:comment>2 pages, 1 figure, very largely rewritten text, most content is new</arxiv:comment>
+    <arxiv:primary_category term="physics.soc-ph"/>
+    <author>
+      <name>Zoltan Eisler</name>
+    </author>
+    <author>
+      <name>Janos Kertesz</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/cond-mat/0007385v1</id>
+    <title>Scaling and Multi-scaling in Financial Markets</title>
+    <updated>2000-07-25T12:50:32Z</updated>
+    <link href="https://arxiv.org/abs/cond-mat/0007385v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/cond-mat/0007385v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>  This paper reviews some of the phenomenological models which have been introduced to incorporate the scaling properties of financial data. It also illustrates a microscopic model, based on heterogeneous interacting agents, which provides a possible explanation for the complex dynamics of markets' returns. Scaling and multi-scaling analysis performed on the simulated data is in good quantitative agreement with the empirical results.</summary>
+    <category term="cond-mat.stat-mech" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2000-07-25T12:50:32Z</published>
+    <arxiv:comment>Paper presented at the Disordered and Complex Systems s conference, King's College London, July 2000</arxiv:comment>
+    <arxiv:primary_category term="cond-mat.stat-mech"/>
+    <author>
+      <name>Giulia Iori</name>
+    </author>
+    <arxiv:doi>10.1063/1.1358199</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1063/1.1358199" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/cond-mat/9705075v3</id>
+    <title>Scaling and correlation in financial data</title>
+    <updated>1997-05-28T18:32:40Z</updated>
+    <link href="https://arxiv.org/abs/cond-mat/9705075v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/cond-mat/9705075v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>  The statistical properties of the increments x(t+T) - x(t) of a financial time series depend on the time resolution T on which the increments are considered. A non-parametric approach is used to study the scale dependence of the empirical distribution of the price increments x(t+T) - x(t) of S&amp;P Index futures, for time scales T, ranging from a few minutes to a few days using high-frequency price data. We show that while the variance increases linearly with the timescale, the kurtosis exhibits anomalous scaling properties, indicating a departure from the iid hypothesis. Study of the dependence structure of the increments shows that although the autocorrelation function decays rapidly to zero in a few minutes, the correlation of their squares exhibits a slow power law decay with exponent 0.37, indicating persistence in the scale of fluctuations. We establish a link between the scaling behavior and the dependence structure of the increments : in particular, the anomalous scaling of kurtosis may be explained by "long memory" properties of the square of the increments.</summary>
+    <category term="cond-mat.stat-mech" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cond-mat.dis-nn" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="nlin.AO" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="physics.data-an" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>1997-05-08T17:22:03Z</published>
+    <arxiv:comment>LATEX file + 8 postscript figures.</arxiv:comment>
+    <arxiv:primary_category term="cond-mat.stat-mech"/>
+    <author>
+      <name>Rama Cont</name>
+      <arxiv:affiliation>CEA Saclay &amp; CNRS Nice</arxiv:affiliation>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/cond-mat/0501325v1</id>
+    <title>Scaling analysis of multivariate intermittent time series</title>
+    <updated>2005-01-13T22:40:05Z</updated>
+    <link href="https://arxiv.org/abs/cond-mat/0501325v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/cond-mat/0501325v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>  The scaling properties of the time series of asset prices and trading volumes of stock markets are analysed. It is shown that similarly to the asset prices, the trading volume data obey multi-scaling length-distribution of low-variability periods. In the case of asset prices, such scaling behaviour can be used for risk forecasts: the probability of observing next day a large price movement is (super-universally) inversely proportional to the length of the ongoing low-variability period. Finally, a method is devised for a multi-factor scaling analysis. We apply the simplest, two-factor model to equity index and trading volume time series.</summary>
+    <category term="cond-mat.stat-mech" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2005-01-13T22:40:05Z</published>
+    <arxiv:comment>16 pages, 5 figures, accepted for publication in Physica A</arxiv:comment>
+    <arxiv:primary_category term="cond-mat.stat-mech"/>
+    <arxiv:journal_ref>Physica A, 353, 2005, 480</arxiv:journal_ref>
+    <author>
+      <name>Robert Kitt</name>
+    </author>
+    <author>
+      <name>Jaan Kalda</name>
+    </author>
+    <arxiv:doi>10.1016/j.physa.2005.01.038</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1016/j.physa.2005.01.038" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2505.23928v2</id>
+    <title>Critical Dynamics of Random Surfaces and Multifractal Scaling</title>
+    <updated>2025-11-02T11:07:21Z</updated>
+    <link href="https://arxiv.org/abs/2505.23928v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2505.23928v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The critical dynamics of conformal field theories on random surfaces is investigated beyond the previously studied dynamics of the overall area and the genus. It is found that the evolution of the order parameter in physical time performs a generalization of the multifractal random walk. Accordingly, the higher moments of time variations of the order parameter exhibit multifractal scaling. The series of Hurst exponents is computed and illustrated at the examples of the Ising-, 3-state-Potts-, and general minimal models as well as $c=1$ models on a random surface. It is noted that some of these models can replicate the observed multifractal scaling in financial markets.</summary>
+    <category term="hep-th" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cond-mat.stat-mech" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.MF" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-05-29T18:23:46Z</published>
+    <arxiv:comment>30 pages, 3 figures. Significant revision: corrected the formula for the multifractal Hurst exponents, and added a second independent derivation of this formula. Added figures, references, and a comprehensive introduction and summary</arxiv:comment>
+    <arxiv:primary_category term="hep-th"/>
+    <author>
+      <name>Christof Schmidhuber</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/1810.07832v3</id>
+    <title>Scaling Limits for Super--replication with Transient Price Impact</title>
+    <updated>2019-12-16T18:57:10Z</updated>
+    <link href="https://arxiv.org/abs/1810.07832v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1810.07832v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We prove a scaling limit theorem for the super-replication cost of options in a Cox--Ross--Rubinstein binomial model with transient price impact. The correct scaling turns out to keep the market depth parameter constant while resilience over fixed periods of time grows in inverse proportion with the duration between trading times. For vanilla options, the scaling limit is found to coincide with the one obtained by PDE methods in [12] for models with purely temporary price impact. These models are a special case of our framework and so our probabilistic scaling limit argument allows one to expand the scope of the scaling limit result to path-dependent options.</summary>
+    <category term="q-fin.MF" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2018-10-17T23:18:56Z</published>
+    <arxiv:comment>32 pages</arxiv:comment>
+    <arxiv:primary_category term="q-fin.MF"/>
+    <author>
+      <name>Peter Bank</name>
+    </author>
+    <author>
+      <name>Yan Dolinsky</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2609.03106v1</id>
+    <title>Scaling Laws, Tabular Data and Actuarial Ratemaking Models</title>
+    <updated>2026-09-02T19:40:36Z</updated>
+    <link href="https://arxiv.org/abs/2609.03106v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.03106v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Scaling laws in modern deep learning describe how held-out loss improves as model capacity, training data, and compute increase, often following power-law trends. We investigate whether analogous scaling regularities arise in actuarial ratemaking, where data are tabular, heterogeneous, and noisy, and where classical models such as GLMs remain strong baselines. Using a real-world motor insurance portfolio, we train models from different families across increasing fractions of the training data and multiple random seeds, evaluating out-of-sample Poisson deviance, a likelihood-based loss for Poisson count predictions in which lower values indicate better held-out fit. We find that all model families improve with additional data, but scaling exponents differ substantially: TabM exhibits markedly stronger data scaling than purely supervised tabular Transformers and standard MLP baselines. Transformer variants show weak parameter scaling unless augmented with additional inductive biases (TabM-style adaptation or self-supervision). These results provide quantitative guidance on model selection by data regime and suggest that effective scaling on actuarial tabular tasks depends on architecture and loss function objective design, with simple increases in Transformer size providing limited gains.</summary>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.RM" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-02T19:40:36Z</published>
+    <arxiv:primary_category term="cs.LG"/>
+    <author>
+      <name>Ronald Richman</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/1704.05818v1</id>
+    <title>Anomalous Scaling of Stochastic Processes and the Moses Effect</title>
+    <updated>2017-04-07T19:51:48Z</updated>
+    <link href="https://arxiv.org/abs/1704.05818v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1704.05818v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The state of a stochastic process evolving over a time $t$ is typically assumed to lie on a normal distribution whose width scales like $t^{1/2}$. However, processes where the probability distribution is not normal and the scaling exponent differs from $\frac{1}{2}$ are known. The search for possible origins of such "anomalous" scaling and approaches to quantify them are the motivations for the work reported here. In processes with stationary increments, where the stochastic process is time-independent, auto-correlations between increments and infinite variance of increments can cause anomalous scaling. These sources have been referred to as the $\it{Joseph}$ $\it{effect}$ the $\it{Noah}$ $\it{effect}$, respectively. If the increments are non-stationary, then scaling of increments with $t$ can also lead to anomalous scaling, a mechanism we refer to as the $\it{Moses}$ $\it{effect}$. Scaling exponents quantifying the three effects are defined and related to the Hurst exponent that characterizes the overall scaling of the stochastic process. Methods of time series analysis that enable accurate independent measurement of each exponent are presented. Simple stochastic processes are used to illustrate each effect. Intraday Financial time series data is analyzed, revealing that its anomalous scaling is due only to the Moses effect. In the context of financial market data, we reiterate that the Joseph exponent, not the Hurst exponent, is the appropriate measure to test the efficient market hypothesis.</summary>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cond-mat.stat-mech" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="math.DS" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="physics.data-an" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2017-04-07T19:51:48Z</published>
+    <arxiv:comment>13 pages, 4 figures, Supplementary Info provided by request to the authors</arxiv:comment>
+    <arxiv:primary_category term="q-fin.ST"/>
+    <author>
+      <name>Lijian Chen</name>
+    </author>
+    <author>
+      <name>Kevin E. Bassler</name>
+    </author>
+    <author>
+      <name>Joseph L. McCauley</name>
+    </author>
+    <author>
+      <name>Gemunu H. Gunaratne</name>
+    </author>
+    <arxiv:doi>10.1103/PhysRevE.95.042141</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1103/PhysRevE.95.042141" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/1503.08465v3</id>
+    <title>Anomalous volatility scaling in high frequency financial data</title>
+    <updated>2015-12-16T15:48:10Z</updated>
+    <link href="https://arxiv.org/abs/1503.08465v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1503.08465v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Volatility of intra-day stock market indices computed at various time horizons exhibits a scaling behaviour that differs from what would be expected from fractional Brownian motion (fBm). We investigate this anomalous scaling by using empirical mode decomposition (EMD), a method which separates time series into a set of cyclical components at different time-scales. By applying the EMD to fBm, we retrieve a scaling law that relates the variance of the components to a power law of the oscillating period. In contrast, when analysing 22 different stock market indices, we observe deviations from the fBm and Brownian motion scaling behaviour. We discuss and quantify these deviations, associating them to the characteristics of financial markets, with larger deviations corresponding to less developed markets.</summary>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2015-03-29T17:51:32Z</published>
+    <arxiv:comment>25 pages, 11 figure, 5 tables</arxiv:comment>
+    <arxiv:primary_category term="q-fin.CP"/>
+    <author>
+      <name>Noemi Nava</name>
+    </author>
+    <author>
+      <name>T. Di Matteo</name>
+    </author>
+    <author>
+      <name>Tomaso Aste</name>
+    </author>
+    <arxiv:doi>10.1016/j.physa.2015.12.022</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1016/j.physa.2015.12.022" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2102.13150v1</id>
+    <title>Scaling of Urban Income Inequality in the United States</title>
+    <updated>2021-02-25T20:13:31Z</updated>
+    <link href="https://arxiv.org/abs/2102.13150v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2102.13150v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Urban scaling analysis, the study of how aggregated urban features vary with the population of an urban area, provides a promising framework for discovering commonalities across cities and uncovering dynamics shared by cities across time and space. Here, we use the urban scaling framework to study an important, but under-explored feature in this community - income inequality. We propose a new method to study the scaling of income distributions by analyzing total income scaling in population percentiles. We show that income in the least wealthy decile (10%) scales close to linearly with city population, while income in the most wealthy decile scale with a significantly superlinear exponent. In contrast to the superlinear scaling of total income with city population, this decile scaling illustrates that the benefits of larger cities are increasingly unequally distributed. For the poorest income deciles, cities have no positive effect over the null expectation of a linear increase. We repeat our analysis after adjusting income by housing cost, and find similar results. We then further analyze the shapes of income distributions. First, we find that mean, variance, skewness, and kurtosis of income distributions all increase with city size. Second, the Kullback-Leibler divergence between a city's income distribution and that of the largest city decreases with city population, suggesting the overall shape of income distribution shifts with city population. As most urban scaling theories consider densifying interactions within cities as the fundamental process leading to the superlinear increase of many features, our results suggest this effect is only seen in the upper deciles of the cities. Our finding encourages future work to consider heterogeneous models of interactions to form a more coherent understanding of urban scaling.</summary>
+    <category term="physics.soc-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.GN" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2021-02-25T20:13:31Z</published>
+    <arxiv:comment>18 pages, 7 figures</arxiv:comment>
+    <arxiv:primary_category term="physics.soc-ph"/>
+    <author>
+      <name>Elisa Heinrich Mora</name>
+    </author>
+    <author>
+      <name>Jacob J. Jackson</name>
+    </author>
+    <author>
+      <name>Cate Heine</name>
+    </author>
+    <author>
+      <name>Geoffrey B. West</name>
+    </author>
+    <author>
+      <name>Vicky Chuqiao Yang</name>
+    </author>
+    <author>
+      <name>Christopher P. Kempes</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/1509.00959v1</id>
+    <title>The scaling of income inequality in cities</title>
+    <updated>2015-09-03T07:15:42Z</updated>
+    <link href="https://arxiv.org/abs/1509.00959v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1509.00959v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Developing a scientific understanding of cities in a fast urbanizing world is essential for planning sustainable urban systems. Recently, it was shown that income and wealth creation follow increasing returns, scaling superlinearly with city size. We study scaling of per capita incomes for separate census defined income categories against population size for the whole of Australia. Across several urban area definitions, we find that lowest incomes grow just linearly or sublinearly ($β= 0.94$ to $1.00$), whereas highest incomes grow superlinearly ($β= 1.00$ to $1.21$), with total income just superlinear ($β= 1.03$ to $1.05$). These findings support the earlier finding: the bigger the city, the richer the city. But, we also see an emergent metric of inequality: the larger the population size and densities of a city, higher incomes grow more quickly than lower, suggesting a disproportionate agglomeration of incomes in the highest income categories in big cities. Because there are many more people on lower incomes that scale sublinearly as compared to the highest that scale superlinearly, these findings suggest a scaling of inequality: the larger the population, the greater the inequality. Urban and economic planning will need to examine ways in which larger cities can be made more equitable.</summary>
+    <category term="physics.soc-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.GN" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2015-09-03T07:15:42Z</published>
+    <arxiv:comment>10 pages, 3 figures</arxiv:comment>
+    <arxiv:primary_category term="physics.soc-ph"/>
+    <author>
+      <name>Somwrita Sarkar</name>
+    </author>
+    <author>
+      <name>Peter Phibbs</name>
+    </author>
+    <author>
+      <name>Roderick Simpson</name>
+    </author>
+    <author>
+      <name>Sachin Wasnik</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/cond-mat/0302434v1</id>
+    <title>Using the Scaling Analysis to Characterize Financial Markets</title>
+    <updated>2003-02-21T08:56:51Z</updated>
+    <link href="https://arxiv.org/abs/cond-mat/0302434v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/cond-mat/0302434v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>  We empirically analyze the scaling properties of daily Foreign Exchange rates, Stock Market indices and Bond futures across different financial markets. We study the scaling behaviour of the time series by using a generalized Hurst exponent approach. We verify the robustness of this approach and we compare the results with the scaling properties in the frequency-domain. We find evidence of deviations from the pure Brownian motion behavior. We show that these deviations are associated with characteristics of the specific markets and they can be, therefore, used to distinguish the different degrees of development of the markets.</summary>
+    <category term="cond-mat.stat-mech" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2003-02-21T08:56:51Z</published>
+    <arxiv:comment>37 pages, 10 figures, 7 tables</arxiv:comment>
+    <arxiv:primary_category term="cond-mat.stat-mech"/>
+    <author>
+      <name>T. Di Matteo</name>
+    </author>
+    <author>
+      <name>T. Aste</name>
+    </author>
+    <author>
+      <name>M. M. Dacorogna</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2009.06874v1</id>
+    <title>Recent scaling properties of Bitcoin price returns</title>
+    <updated>2020-09-15T05:42:01Z</updated>
+    <link href="https://arxiv.org/abs/2009.06874v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2009.06874v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>While relevant stylized facts are observed for Bitcoin markets, we find a distinct property for the scaling behavior of the cumulative return distribution. For various assets, the tail index $μ$ of the cumulative return distribution exhibits $μ\approx 3$, which is referred to as "the inverse cubic law." On the other hand, that of the Bitcoin return is claimed to be $μ\approx 2$, which is known as "the inverse square law." We investigate the scaling properties using recent Bitcoin data and find that the tail index changes to $μ\approx 3$, which is consistent with the inverse cubic law. This suggests that some properties of the Bitcoin market could vary over time. We also investigate the autocorrelation of absolute returns and find that it is described by a power-law with two scaling exponents. By analyzing the absolute returns standardized by the realized volatility, we verify that the Bitcoin return time series is consistent with normal random variables with time-varying volatility.</summary>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2020-09-15T05:42:01Z</published>
+    <arxiv:comment>6 pages, 3 figures</arxiv:comment>
+    <arxiv:primary_category term="q-fin.ST"/>
+    <author>
+      <name>Tetsuya Takaishi</name>
+    </author>
+    <arxiv:doi>10.1088/1742-6596/1730/1/012124</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1088/1742-6596/1730/1/012124" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/physics/0504038v2</id>
+    <title>Scaling Analysis on Indian Foreign Exchange Market</title>
+    <updated>2005-11-02T12:40:26Z</updated>
+    <link href="https://arxiv.org/abs/physics/0504038v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/physics/0504038v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>  In this paper we investigate the scaling behavior of the average daily exchange rate returns of the Indian Rupee against four foreign currencies namely US Dollar, Euro, Great Britain Pound and Japanese Yen. Average daily exchange rate return of the Indian Rupee against US Dollar is found to exhibit a persistent scaling behavior and follow Levy stable distribution. On the contrary the average daily exchange rate returns of the other three foreign currencies do not show persistency or antipersistency and follow Gaussian distribution.</summary>
+    <category term="physics.soc-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2005-04-06T17:30:16Z</published>
+    <arxiv:comment>Revised Final Version. In Press Physica A</arxiv:comment>
+    <arxiv:primary_category term="physics.soc-ph"/>
+    <author>
+      <name>A. Sarkar</name>
+    </author>
+    <author>
+      <name>P. Barat</name>
+    </author>
+    <arxiv:doi>10.1016/j.physa.2005.09.044</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1016/j.physa.2005.09.044" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/1103.5966v1</id>
+    <title>Hedging: Scaling and the Investor Horizon</title>
+    <updated>2011-03-30T15:50:28Z</updated>
+    <link href="https://arxiv.org/abs/1103.5966v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1103.5966v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This paper examines the volatility and covariance dynamics of cash and futures contracts that underlie the Optimal Hedge Ratio (OHR) across different hedging time horizons. We examine whether hedge ratios calculated over a short term hedging horizon can be scaled and successfully applied to longer term horizons. We also test the equivalence of scaled hedge ratios with those calculated directly from lower frequency data and compare them in terms of hedging effectiveness. Our findings show that the volatility and covariance dynamics may differ considerably depending on the hedging horizon and this gives rise to significant differences between short term and longer term hedges. Despite this, scaling provides good hedging outcomes in terms of risk reduction which are comparable to those based on direct estimation.</summary>
+    <category term="q-fin.RM" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2011-03-30T15:50:28Z</published>
+    <arxiv:primary_category term="q-fin.RM"/>
+    <author>
+      <name>John Cotter</name>
+    </author>
+    <author>
+      <name>Jim Hanly</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/1103.5965v1</id>
+    <title>Scaling conditional tail probability and quantile estimators</title>
+    <updated>2011-03-30T15:48:24Z</updated>
+    <link href="https://arxiv.org/abs/1103.5965v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1103.5965v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We present a novel procedure for scaling relatively high frequency tail probability and quantile estimates for the conditional distribution of returns.</summary>
+    <category term="q-fin.RM" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2011-03-30T15:48:24Z</published>
+    <arxiv:primary_category term="q-fin.RM"/>
+    <author>
+      <name>John Cotter</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/1610.01149v1</id>
+    <title>Taylor's Law of temporal fluctuation scaling in stock illiquidity</title>
+    <updated>2016-10-04T13:10:50Z</updated>
+    <link href="https://arxiv.org/abs/1610.01149v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1610.01149v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Taylor's law of temporal fluctuation scaling, variance $\sim$ $a($mean$)^b$, is ubiquitous in natural and social sciences. We report for the first time convincing evidence of a solid temporal fluctuation scaling law in stock illiquidity by investigating the mean-variance relationship of the high-frequency illiquidity of almost all stocks traded on the Shanghai Stock Exchange (SHSE) and the Shenzhen Stock Exchange (SZSE) during the period from 1999 to 2011. Taylor's law holds for A-share markets (SZSE Main Board, SZSE Small &amp; Mediate Enterprise Board, SZSE Second Board, and SHSE Main Board) and B-share markets (SZSE B-share and SHSE B-share). We find that the scaling exponent $b$ is greater than 2 for the A-share markets and less than 2 for the B-share markets. We further unveil that Taylor's law holds for stocks in 17 industry categories, in 28 industrial sectors and in 31 provinces and direct-controlled municipalities with the majority of scaling exponents $b\in(2,3)$. We also investigate the $Δ{t}$-min illiquidity and find that the scaling exponent $b(Δ{t})$ increases logarithmically for small $Δ{t}$ values and decreases fast to a stable level.</summary>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2016-10-04T13:10:50Z</published>
+    <arxiv:comment>14 Latex pages including 4 figures and 5 tables</arxiv:comment>
+    <arxiv:primary_category term="q-fin.ST"/>
+    <arxiv:journal_ref>Fluctuation and Noise Letters 15 (4), 1650029 (2016)</arxiv:journal_ref>
+    <author>
+      <name>Qing Cai</name>
+      <arxiv:affiliation>ECUST</arxiv:affiliation>
+    </author>
+    <author>
+      <name>Hai-Chuan Xu</name>
+      <arxiv:affiliation>ECUST</arxiv:affiliation>
+    </author>
+    <author>
+      <name>Wei-Xing Zhou</name>
+      <arxiv:affiliation>ECUST</arxiv:affiliation>
+    </author>
+    <arxiv:doi>10.1142/S0219477516500292</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1142/S0219477516500292" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/cond-mat/9705087v1</id>
+    <title>Scaling in stock market data: stable laws and beyond</title>
+    <updated>1997-05-09T14:19:14Z</updated>
+    <link href="https://arxiv.org/abs/cond-mat/9705087v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/cond-mat/9705087v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>  The concepts of scale invariance, self-similarity and scaling have been fruitfully applied to the study of price fluctuations in financial markets. After a brief review of the properties of stable Levy distributions and their applications to market data we indicate the shortcomings of such models and describe the truncated Levy flight as an alternative model for price movements. Furthermore, studying the dependence structure of the price increments shows that while their autocorrelation function decreases rapidly to zero, the correlation of their squares and absolute values shows a slow power law decay, indicating persistence in the scale of fluctuations, a property which can be related to the anomalous scaling of the kurtosis. In the last section we review, in the light of these empirical facts, recent attempts to draw analogies between scaling in financial markets and in turbulent flows.</summary>
+    <category term="cond-mat.stat-mech" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cond-mat.dis-nn" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="nlin.AO" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>1997-05-09T14:19:14Z</published>
+    <arxiv:comment>Lecture given at Les Houches Workshop on Scale Invariance (March 1997). Plain TEX file, macros included. 11 pages, including 7 postscript figures</arxiv:comment>
+    <arxiv:primary_category term="cond-mat.stat-mech"/>
+    <arxiv:journal_ref>Scale Invariance and Beyond (proceedings of the CNRS Workshop on Scale Invariance, Les Houches, March 1997)</arxiv:journal_ref>
+    <author>
+      <name>Rama Cont</name>
+      <arxiv:affiliation>CEA Saclay</arxiv:affiliation>
+      <arxiv:affiliation>Science &amp; Finance</arxiv:affiliation>
+      <arxiv:affiliation>CNRS Nice</arxiv:affiliation>
+    </author>
+    <author>
+      <name>Marc Potters</name>
+      <arxiv:affiliation>Science &amp; Finance</arxiv:affiliation>
+    </author>
+    <author>
+      <name>Jean-Philippe Bouchaud</name>
+      <arxiv:affiliation>CEA Saclay</arxiv:affiliation>
+      <arxiv:affiliation>Science &amp; Finance</arxiv:affiliation>
+    </author>
+  </entry>
+</feed>

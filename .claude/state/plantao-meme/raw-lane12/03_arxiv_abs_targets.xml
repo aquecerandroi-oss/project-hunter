@@ -1,0 +1,173 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/CLtMF9fPgMt/2203jHTu2MjIfxM</id>
+  <title>arXiv Query: search_query=&amp;id_list=2606.08232,2604.27150,2607.02830,1701.03960,2607.02823,1609.00869,2006.00282,2512.00377&amp;start=0&amp;max_results=10</title>
+  <updated>2026-09-12T15:57:27Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=2606.08232,2604.27150,2607.02830,1701.03960,2607.02823,1609.00869,2006.00282,2512.00377" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>8</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2607.02830v1</id>
+    <title>Outcome-Classified Precision Auditing of Filter Rules in Algorithmic DEX Trading: Evidence from 2,400 Rejection Events</title>
+    <updated>2026-07-02T23:47:33Z</updated>
+    <link href="https://arxiv.org/abs/2607.02830v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.02830v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This paper reports a precision audit of a production filter stack against a 13-day window of post-rejection forward-market observations on Solana DEX trading (2026-04-10 to 2026-04-23, UTC). The audit yielded 99,510 follow-up samples across 2,402 unique rejection events spanning eight active filter rules. We classify each event under a five-tier outcome rule and report per-filter distributions. The headline result is the conservative save-to-miss ratio of 3.7 : 1 from windowed measured-drawdown saves alone; every active filter with adequate sample size is individually net-positive. A wider interpretation that credits single-sample-within-60-minute events as saves yields 14.8 : 1. We then test the interpretive premise of that wider tier against the deposited lifecycle data of a separately-published benchmark (RED-2400). The matched comparison shows that early-death-classified mints reach the gone state at 48.9 percent. Non-early-death rejected mints reach gone at 57.6 percent. The early-death classification does not identify tokens at elevated rug-pull risk relative to other rejected tokens. The wider 14.8 : 1 ratio therefore rests on a tier that the matched test does not validate. The conservative 3.7 : 1 is the report the lifecycle data supports. The methodological contribution is the separation of the two evidence bases and the demonstration that the wider tier does not survive matched-comparison testing.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-02T23:47:33Z</published>
+    <arxiv:comment>Preprint. Also available at SSRN 6638259. Companion dataset at Zenodo DOI 10.5281/zenodo.19987695 (CC-BY-4.0). v2 (2026-05-30)</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2604.27150v1</id>
+    <title>Optimal Stop-Loss and Take-Profit Parameterization for Autonomous Trading Agent Swarm</title>
+    <updated>2026-04-29T19:58:24Z</updated>
+    <link href="https://arxiv.org/abs/2604.27150v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2604.27150v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Autonomous crypto trading systems often spend most of their design effort on finding entries, while exits are left to fixed rules that are rarely tested in a systematic way. This paper examines whether better stop-loss and take-profit settings can improve the performance of an autonomous trading agent swarm. Using more than 900 historical trades, we replay each trade under many alternative exit policies and compare results against the existing production setup. The study finds that exit design matters meaningfully: stronger configurations improve risk-adjusted performance and generally favor tighter loss limits, earlier profit capture, and closer trailing protection. The paper also discusses a key evaluation challenge: a purely chronological split was initially used, but the newest trades fell into an unusual war-driven market period that sharply distorted test results. To reduce the influence of that single episode, the main comparison was run on randomized data, with the drawbacks of doing so acknowledged explicitly. Overall, the paper presents a practical framework for tuning exit logic in a more disciplined and transparent way.</summary>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-04-29T19:58:24Z</published>
+    <arxiv:comment>4 pages, 2 figures, 3 tables</arxiv:comment>
+    <arxiv:primary_category term="cs.AI"/>
+    <author>
+      <name>Nathan Li</name>
+    </author>
+    <author>
+      <name>Aikins Laryea</name>
+    </author>
+    <author>
+      <name>Yigit Ihlamur</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2607.02823v3</id>
+    <title>Pump.fun Graduation Regime Windows: Survival Analysis of 832,941 Token Launches and the Social-Presence Effect</title>
+    <updated>2026-08-17T17:00:05Z</updated>
+    <link href="https://arxiv.org/abs/2607.02823v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2607.02823v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Kaplan-Meier and Cox proportional-hazards survival analysis of 832,941 Solana pump.fun token launches, observed 2026-05-08 to 2026-06-10. Pooled graduation rate 0.198% (Wilson 95% CI [0.189%, 0.208%]; steady-state 0.207%). A post-publication audit established that the collector's coverage was effectively limited to about six minutes after each launch, so this figure should be read as a fast-regime graduation rate and a lower bound on the true 24-hour rate, not an estimate of it. Comparing to Marino et al. (2026)'s 0.63% for September-October 2025 gives a ratio of 3.18x; because our figure is itself a lower bound, this ratio is an upper bound on the true decline, and the true decline is smaller by an amount this dataset cannot establish. We formalise the windowed comparison as the Graduation Regime Windows framework and release the 860,213-launch dataset under CC-BY-4.0 on Zenodo. Within the fast-regime window, Telegram-channel launches graduate at 1.485% versus 0.166% without (8.94x lift; Cox HR 5.40, 95% CI [4.73, 6.17]), likely itself a lower bound on the true 24-hour effect. Initial market capitalisation above the 30 SOL platform default is the strongest single predictor (Cox HR 4.51); the top quartile graduates at 0.634%, close to though not conclusively matching the Marino et al. pooled rate. Cox concordance 0.858, stable under bootstrap and a time-window split. A subsequent attempt to recover missed late graduations from implausibly high TIMEOUT-mint market caps was tested against pump.fun's live bonding-curve state and did not hold up (0 of 100 sampled mints showed graduation); we report and withdraw it. Zenodo concept DOI 10.5281/zenodo.20633486; corrigendum v1.4 at 10.5281/zenodo.21923106.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.GN" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-07-02T23:23:54Z</published>
+    <arxiv:comment>v4 Replace: ref-list correction for arXiv:2412.04913 (Long, Wong, Cai). Content otherwise identical to v3. Corrigenda v1.3 (coverage-window) + v1.4 (ceiling-crossing withdrawal, 0/100 verified). Data doi.org/10.5281/zenodo.20633486 CC-BY-4.0. SSRN 6915560</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2512.00377v2</id>
+    <title>Measuring Memecoin Fragility</title>
+    <updated>2026-01-09T03:14:38Z</updated>
+    <link href="https://arxiv.org/abs/2512.00377v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2512.00377v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Memecoins, emerging from internet culture and community-driven narratives, have rapidly evolved into a unique class of crypto assets. Unlike technology-driven cryptocurrencies, their market dynamics are primarily shaped by viral social media diffusion, celebrity influence, and speculative capital inflows. To capture the distinctive vulnerabilities of these ecosystems, we present the first Memecoin Ecosystem Fragility Framework (ME2F). ME2F formalizes memecoin risks in three dimensions: i) Volatility Dynamics Score capturing persistent and extreme price swings together with spillover from base chains; ii) Whale Dominance Score quantifying ownership concentration among top holders; and iii) Sentiment Amplification Score measuring the impact of attention-driven shocks on market stability. We apply ME2F to representative tokens (over 65% market share) and show that fragility is not evenly distributed across the ecosystem. Politically themed tokens such as TRUMP, MELANIA, and LIBRA concentrate the highest risks, combining volatility, ownership concentration, and sensitivity to sentiment shocks. Established memecoins such as DOGE, SHIB, and PEPE fall into an intermediate range. Benchmark tokens ETH and SOL remain consistently resilient due to deeper liquidity and institutional participation. Our findings provide the first ecosystem-level evidence of memecoin fragility and highlight governance implications for enhancing market resilience in the Web3 era.</summary>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-11-29T08:11:51Z</published>
+    <arxiv:primary_category term="cs.CR"/>
+    <arxiv:journal_ref>2026 IEEE International Conference on Blockchain and Cryptocurrency (ICBC), Brisbane, Australia, 2026, pp. 1-5</arxiv:journal_ref>
+    <author>
+      <name>Yuexin Xiang</name>
+    </author>
+    <author>
+      <name>Qishuang Fu</name>
+    </author>
+    <author>
+      <name>Yuquan Li</name>
+    </author>
+    <author>
+      <name>Qin Wang</name>
+    </author>
+    <author>
+      <name>Tsz Hon Yuen</name>
+    </author>
+    <author>
+      <name>Jiangshan Yu</name>
+    </author>
+    <arxiv:doi>10.1109/ICBC67748.2026.11575489</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1109/ICBC67748.2026.11575489" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/1701.03960v2</id>
+    <title>Optimal Trading with a Trailing Stop</title>
+    <updated>2019-03-22T21:13:06Z</updated>
+    <link href="https://arxiv.org/abs/1701.03960v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1701.03960v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Trailing stop is a popular stop-loss trading strategy by which the investor will sell the asset once its price experiences a pre-specified percentage drawdown. In this paper, we study the problem of timing buy and then sell an asset subject to a trailing stop. Under a general linear diffusion framework, we study an optimal double stopping problem with a random path-dependent maturity. Specifically, we first derive the optimal liquidation strategy prior to a given trailing stop, and prove the optimality of using a sell limit order in conjunction with the trailing stop. Our analytic results for the liquidation problem is then used to solve for the optimal strategy to acquire the asset and simultaneously initiate the trailing stop. The method of solution also lends itself to an efficient numerical method for computing the the optimal acquisition and liquidation regions. For illustration, we implement an example and conduct a sensitivity analysis under the exponential Ornstein-Uhlenbeck model.</summary>
+    <category term="q-fin.MF" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2017-01-14T19:48:25Z</published>
+    <arxiv:comment>4 figures, 26 pages</arxiv:comment>
+    <arxiv:primary_category term="q-fin.MF"/>
+    <author>
+      <name>Tim Leung</name>
+    </author>
+    <author>
+      <name>Hongzhong Zhang</name>
+    </author>
+    <arxiv:doi>10.1007/s00245-019-09559-0</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1007/s00245-019-09559-0" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/1609.00869v1</id>
+    <title>Determining Optimal Stop-Loss Thresholds via Bayesian Analysis of Drawdown Distributions</title>
+    <updated>2016-09-03T22:10:45Z</updated>
+    <link href="https://arxiv.org/abs/1609.00869v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1609.00869v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Stop-loss rules are often studied in the financial literature, but the stop-loss levels are seldom constructed systematically. In many papers, and indeed in practice as well, the level of the stops is too often set arbitrarily. Guided by the overarching goal in finance to maximize expected returns given available information, we propose a natural method by which to systematically select the stop-loss threshold by analyzing the distribution of maximum drawdowns. We present results for an hourly trading strategy with two variations on the construction.</summary>
+    <category term="q-fin.RM" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.PM" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2016-09-03T22:10:45Z</published>
+    <arxiv:comment>6 pages, 8 figures, 2 tables</arxiv:comment>
+    <arxiv:primary_category term="q-fin.RM"/>
+    <author>
+      <name>Antoine Emil Zambelli</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2606.08232v3</id>
+    <title>Hour-Aware Adaptive Risk Management for Autonomous Memecoin Trading on Solana DEXs: Evidence, Theory, and Design Lessons from a 15-Day Deployment</title>
+    <updated>2026-08-03T19:44:16Z</updated>
+    <link href="https://arxiv.org/abs/2606.08232v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2606.08232v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We report a 15-day paper-traded autonomous memecoin trading deployment on Solana decentralised exchanges (DEXs), designed as a controlled measurement of three microstructure questions on which classical equity theory offers well-defined predictions but on which the AMM Solana venue lacks published measurement: (i) time-of-day return patterns on a 24/7 permissionless venue; (ii) whether decision-time filter stacks are net-positive against counterfactual returns of rejected tokens; (iii) whether small-sample cumulative-return statistics on a heavy-tailed venue are structurally robust or fragile. The 190-trade sample (March 29 to April 12, 2026) shows a 40.5 percent win rate, mean per-trade return +0.62 percent, cumulative +117.7 percent, skewness -1.21, excess kurtosis 6.61. Mann-Whitney U on three exploratorily identified worst entry hours (n=17, mean -11.60 percent) versus all others (n=173, mean +1.82 percent) yields p = 0.5634; directional and non-confirmatory. A parallel counterfactual rejection-tracker collected 4,874 forward-sample observations across 184 rejection events; of 48 events observed for at least six hours, 27 (56.25 percent) reached a 50 percent drawdown from reference (the full-cohort 17.9 percent is a censored lower bound). Removing the top three trades (1.6 percent of sample) flips cumulative return unprofitable. The three findings connect to Kyle (1985) informed-flow, Precup-Sutton-Singh (2000) off-policy evaluation, and Bailey-Lopez de Prado (2014) deflated-Sharpe predictions. Alongside the trade log and rejection-sample corpus (CC-BY-4.0), we deposit audit.py (MIT), an assertion-based reproduction script that exits zero iff every headline number reproduces from the deposited CSVs. Companion dataset: Zenodo concept DOI 10.5281/zenodo.20043301. The paper's principal contribution is measurement infrastructure and three transferable design lessons.</summary>
+    <category term="q-fin.TR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.RM" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-06-06T15:40:05Z</published>
+    <arxiv:comment>15 pages, 4 figures. v3 = Ledger #632 revision (Stylianou 2026-07-27): new Section III Theoretical Framework (Kyle 1985; Precup-Sutton-Singh 2000; Bailey-Lopez de Prado 2014); Related Work +14 citations; new Section VII Design Lessons; new Significance paragraph. Headline numbers unchanged. JEL G11/G12/G14/G17. Companion Zenodo 10.5281/zenodo.20043301. SSRN 6564803</arxiv:comment>
+    <arxiv:primary_category term="q-fin.TR"/>
+    <author>
+      <name>Arati Uday Kamat</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2006.00282v1</id>
+    <title>When to sell an asset amid anxiety about drawdowns</title>
+    <updated>2020-05-30T14:28:44Z</updated>
+    <link href="https://arxiv.org/abs/2006.00282v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2006.00282v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We consider risk averse investors with different levels of anxiety about asset price drawdowns. The latter is defined as the distance of the current price away from its best performance since inception. These drawdowns can increase either continuously or by jumps, and will contribute towards the investor's overall impatience when breaching the investor's private tolerance level. We investigate the unusual reactions of investors when aiming to sell an asset under such adverse market conditions. Mathematically, we study the optimal stopping of the utility of an asset sale with a random discounting that captures the investor's overall impatience. The random discounting is given by the cumulative amount of time spent by the drawdowns in an undesirable high region, fine tuned by the investor's personal tolerance and anxiety about drawdowns. We prove that in addition to the traditional take-profit sales, the real-life employed stop-loss orders and trailing stops may become part of the optimal selling strategy, depending on different personal characteristics. This paper thus provides insights on the effect of anxiety and its distinction with traditional risk aversion on decision making.</summary>
+    <category term="q-fin.MF" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2020-05-30T14:28:44Z</published>
+    <arxiv:primary_category term="q-fin.MF"/>
+    <author>
+      <name>Neofytos Rodosthenous</name>
+    </author>
+    <author>
+      <name>Hongzhong Zhang</name>
+    </author>
+    <arxiv:doi>10.1111/mafi.12278</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1111/mafi.12278" title="doi"/>
+  </entry>
+</feed>
