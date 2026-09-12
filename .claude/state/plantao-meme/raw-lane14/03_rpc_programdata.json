@@ -1,0 +1,21 @@
+{
+ "read_at_utc": "17:51:38Z",
+ "note": "binary program data (base64) removed; only parsed header kept",
+ "context": {
+  "apiVersion": "4.3.0-rc.0",
+  "slot": 446490673
+ },
+ "value": {
+  "lamports": 53268311040,
+  "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+  "executable": false,
+  "space": 10485760,
+  "parsed": {
+   "type": "programData",
+   "info": {
+    "slot": 446462760,
+    "authority": "7gZufwwAo17y5kg8FMyJy2phgpvv9RSdzWtdXiWHjFr8"
+   }
+  }
+ }
+}

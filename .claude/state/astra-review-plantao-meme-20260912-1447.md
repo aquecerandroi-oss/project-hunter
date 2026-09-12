@@ -1,0 +1,68 @@
+**RESUMO**
+
+**M-D8 primeiro. M-P34 merece linha própria, reutilizando os desfechos de M-P18v2 e as covariáveis de M-P17.** Parecer como `quant-engineer`: `DONE_WITH_CONCERNS`.
+
+M-D8 protege todas as hipóteses contra mudanças de formato e interpretação. Eu o colocaria na ingestão/decodificação, antes das features: programa, versão observada, slot do evento, versão/hash da IDL e do decoder, horário de recebimento e validade. **Carimbar eventos históricos com o `ProgramData.slot` atual produziria uma falsa versão histórica.**
+
+M-P34 muda a variável principal da comparação — adesão a holder rewards —, portanto justifica hipótese própria. Reutilizaria conclusão e retenção de [M-P18v2](/C:/dev/project-hunter/obsidian/00-INBOX/Hipoteses-do-plantao.md:111), sem duplicar coleta nem contar os mesmos resultados como confirmações independentes. Em M-P17, holder rewards pode ser covariável; isso não substitui seu contraste próprio.
+
+Sobre hype:
+
+- **“Várias vezes por hora” e “US$ 20”: alegações não corroboradas**, não falsidades demonstradas. A documentação primária descreve distribuição contínua, sem esses parâmetros. A reportagem não abriu nesta revisão. [Documentação oficial](https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/docs/HOLDER_REWARDS_README.md).
+- **DefiLlama: queda descritiva; extrapolação é hype.** Três valores representam **duas quedas consecutivas**. Não demonstram tendência persistente, queda de volume ou efeito do upgrade posterior.
+- **NVDA/Robinhood: narrativa promocional observada na lista de boosts.** Não demonstra demanda orgânica, migração de capital, vínculo com NVIDIA ou exposição econômica a ações.
+
+**ARQUIVOS**
+
+Nenhum criado ou modificado. Sem trade e sem commit.
+
+**TESTES**
+
+Não executei testes de código. Conferi os JSONs arquivados com `Get-Content … | ConvertFrom-Json`, contagens e agrupamento por `quote_mint`. Resultado:
+
+```text
+n=70
+mayhem_key_present=0
+holder_key_present=0
+run13_mayhem_key_present=0
+```
+
+A conversão de `1789226644` com `[DateTimeOffset]::FromUnixTimeSeconds(...)` retornou:
+
+```text
+2026-09-12T15:24:04.0000000+00:00
+```
+
+Isso confere a conversão UTC/BRT; não constitui nova consulta RPC.
+
+**MUST-FIX**
+
+1. **Separar relógio do bloco, observação e disponibilidade pública.** `12:24:04 BRT` é a estimativa temporal do bloco, não precisão comprovada da execução do upgrade; use slot e, na fronteira, ordem das transações/instruções ou estado indeterminado. O bruto de `getBlockTime` registra leitura às **14:51:48**, não 14:51:38. Retire também “atom antecipou 56 min”: data do commit não prova disponibilidade no feed `main` antes do merge. **Falha:** replay recebe informação antes de ela estar disponível. [Rascunho:33](/C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1447-lane2.md:33), [rascunho:187](/C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1447-lane2.md:187), [bruto](/C:/dev/project-hunter/.claude/state/plantao-meme/raw-lane14/04_rpc_blocktime.json:2), [Solana](https://solana.com/docs/rpc/http/getblocktime).
+
+2. **Não transformar correlação temporal em diagnóstico do 6074.** O relatório registra simulação rotulada `buy`, mas o log aponta `programs/pump/src/sell.rs:133`. Além disso, as contas adicionais descritas para compra e venda são diferentes. Isso exige conferir discriminador, instrução e contas antes de concluir “buy exige bonding_curve_v2”. O fallback documentado de `sell` não estabelece o contrato de `buy`; IDL publicada também não comprova correspondência integral com o binário implantado. **Falha:** corrigir a conta errada ou atribuir ao upgrade um defeito do construtor. [Notas T4.14:201](/C:/dev/project-hunter/.claude/state/notes-T4.14.md:201), [notas:230](/C:/dev/project-hunter/.claude/state/notes-T4.14.md:230).
+
+3. **Corrigir ausência de campos e denominadores.** Nos arquivos consultados, `is_mayhem_mode` está **ausente**, não explicitamente nulo, tanto no run 14 quanto no run 13. Portanto, esses dois brutos não sustentam “sumiu agora”. Os 38 não SOL incluem três USDC: são **35/70 candidatos a pares custom**, sujeitos à validação do programa. Liste os nove outros quotes omitidos no resumo. Compare runs com os mesmos filtros — o rascunho usa `includeNsfw=true`, enquanto M-P33 registra `false`. **Falha:** atribuir ao mercado uma mudança de universo ou schema da consulta. [Rascunho:103](/C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1447-lane2.md:103), [M-P33:130](/C:/dev/project-hunter/obsidian/00-INBOX/Hipoteses-do-plantao.md:130).
+
+4. **Congelar exposição e identidade em M-P34.** A documentação permite converter moedas existentes e informa que `BondingCurve.creator` pode ser substituído por endereço controlado pela pump.fun. Preserve `holder_reward_at_create`, conversões posteriores e identidade original do criador separadamente; registre também a habilitação global. Começar depois do upgrade não recupera automaticamente o minuto zero: histórico reconstruído deve ficar separado da coleta prospectiva. **Falha:** classificação retrospectiva da exposição e agrupamento de criadores independentes como um único emissor serial. [Documentação oficial](https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/docs/HOLDER_REWARDS_README.md).
+
+5. **Fechar os dois desfechos e retirar “<1% = hype/sem amostra”.** Conclusão em 24 h usa todas as criações acompanhadas; retenção de **preço** pós-migração usa apenas migradas, com relógio próprio, pool/referência congelados e censura explícita. Retenção de preço não mede diretamente retenção de holders. Compare braços contemporâneos, com sobreposição nos estratos; desconhecido não vira falso. Cem avaliáveis e 30 dias são piso, não potência nem prova de equivalência. Adoção abaixo de 1% pode produzir amostra grande. **Falha:** seleção das sobreviventes ou ausência de significância apresentada como “sem diferença”. [Rascunho:80](/C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1447-lane2.md:80).
+
+6. **Enfraquecer inferências dos snapshots.** `70/intervalo entre extremos` descreve densidade da página, não taxa censitária; uma página não comprova “irmão zero” nem histórico serial completo. Boosts não medem dólares transferidos entre cadeias; taxas agregadas não identificam volume; vínculo entre Callout Rewards e `kol` continua hipótese. **Falha:** promover seleção de página e mecanismos plausíveis a features validadas. [Rascunho:105](/C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1447-lane2.md:105), [129](/C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1447-lane2.md:129), [139](/C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1447-lane2.md:139), [164](/C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-1447-lane2.md:164).
+
+**NICE-TO-HAVE**
+
+Publicar cobertura de decodificação por versão e completude das features por fonte ao lado do painel de quotes.
+
+**O QUE EU FARIA DIFERENTE**
+
+Recomendaria **M-D8 → coleta de exposição para M-P34 → avaliação quando os horizontes amadurecerem**. O teste inicial de M-D8 deve provar que eventos antigos continuam interpretados corretamente após atualização do decoder e que formato desconhecido fica explicitamente indisponível.
+
+**CONCORDO COM**
+
+Priorizar integridade do instrumento, manter controle contemporâneo e tratar clones/boosts como evidência exploratória, sem novas linhas redundantes nem promoção a trade.
+
+**OBSIDIAN**
+
+- **Hipóteses do plantão** — registrar M-D8 como pré-condição e M-P34 como hipótese própria, com exposição inicial e conversões separadas.
+- **Meme / 2026-09-12** — acrescentar correções dos relógios, campos ausentes, denominadores e limites das inferências.
+- **Revisões Astra / Index** — vincular este parecer do run 14; nenhuma página foi alterada nesta revisão.
