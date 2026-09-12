@@ -1,0 +1,12 @@
+# Brief A4.0f (para a Astra, modo run) — o mapa das ferramentas com que vamos competir e das que podemos usar no pump.fun
+
+**Contexto:** Everton (12/09/2026): "mapear o pump.fun por completo — vamos operar nele"; intenção: comprar cedo na curva e vender em ROI alto. Documentos já existentes: `docs/plans/T4-MEME-RADAR.md` (+ adendo Mayhem), `.claude/state/notes-T4.0.md`, `.claude/state/notes-A4.1b-mayhem.md`, o seu parecer `.claude/state/astra-review-t40-pumpfun.md`. Dois agentes nossos estão mapeando em paralelo a API pública (T4.0c → `docs/PUMPFUN.md`) e os programas on-chain (T4.0d → `docs/PUMPFUN-ONCHAIN.md`) — **não escreva nesses arquivos**.
+
+**Entregar `docs/plans/T4-FERRAMENTAS.md`** (português; toda afirmação com URL aberta e hora de leitura em Brasília; nunca inventar preço, latência ou número):
+1. **Terminais/bots de trading no pump.fun** — Photon, BullX (Neo), GMGN, Axiom, Trojan (Telegram), Bonkbot, Maestro, Padre/"Terminal" do próprio pump.fun, Nova, Bloom: o que cada um expõe (sniper de lançamento, auto-buy por filtros, copy-trade, "bundled %", "dev holding", "sniper %", top-10, insiders, fresh wallets), taxas cobradas por trade, latência anunciada, se têm API pública, e o modelo (custódia de chave? tx assinada localmente?). Conclusão: o que eles fazem que o nosso radar precisa fazer para não estar em desvantagem, e o que NÃO precisamos copiar.
+2. **Infra de execução na Solana** que um bot honesto usa — Jito (bundles/tips, docs), priority fees (referências de estimadores públicos), Helius/QuickNode/Triton (planos e limites com data), PumpPortal Local Trading API (o que ela monta, taxa, o que fica local), Jupiter (para saída na PumpSwap?): tabela custo × latência × dependência de chave.
+3. **Serviços de análise/risco** — rugcheck.xyz (metodologia e API), solscan/solana.fm (o que é gratuito), Bitquery/Dune (o que dá para consultar sem chave), DEX Screener / DexTools (o que expõem para pump.fun e quando um token aparece lá).
+4. **O que pagar e o que não pagar** — a sua recomendação em uma tabela (grátis agora / pagar quando medir / nunca), com custo mensal citado da página.
+5. **Riscos específicos de operar via terminal de terceiros** (custódia, front-running pelo próprio terminal, taxas ocultas) — com fonte quando houver denúncia/documentação.
+
+Também `.claude/state/notes-A4.0f.md` (URLs + horas). **Regras:** não tocar código, `.env*`, nem os docs dos outros agentes; não commitar; nunca colar chave; comandos em primeiro plano com `timeout 290`; se uma página não abrir, dizer. Relatório ≤ 12 linhas em português.
