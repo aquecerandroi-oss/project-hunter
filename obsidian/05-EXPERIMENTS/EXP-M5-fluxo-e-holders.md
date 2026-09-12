@@ -159,6 +159,23 @@ script auditado (`infra/scripts/meme_rule_set.py --deprecate`) no mesmo dia; a p
 [[EXP-M1-comprar-cedo-na-curva]] · [[EXP-M3-sonda-de-hype]] · [[EXP-M4-moonshot]] · [[EXP-M6-exclusoes-de-pedigree]] ·
 [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]] · [[KB-0092-o-modelo-pre-registrado-que-morreu-no-holdout]]
 
+## Braço 2 (pré-registrado 12/09/2026 19:3x BRT — T4.21)
+
+**Por quê:** com a fita por lote viva (T4.2g, 18:44 BRT), o braço 1 não propôs nada em 30 min: 13 moedas passaram a
+base de fluxo, 12 com progresso ≥ 5 %, e `snipers ≤ 2` deixou **zero** (≤ 10: 5; ≤ 25: 9); holders subindo entre duas
+leituras 3 (não caindo com ≥ 20: 6); criador desconhecido 7 de 12. Um portão sem saída não se mede
+(`infra/scripts/sql/research/2026-09-12-t421-funil-e1.sql`; [[03-TRADING/Meme/Estudo-2026-09-12-21-apostas]] §E1).
+
+**Regra (`flow_v2/2`, `research_only`, relógio de 15 s; a mesa usa o mesmo braço como `operator/4`):** tudo do braço 1,
+exceto `max_snipers 10`, `min_holders 20` com holders **não caindo** (só a queda recusa), criador desconhecido admitido
+**só** com `dev_share` medido ≤ 10 % (vendedor conhecido continua recusado), e `mcap_delta_60s > 0` como alternativa ao
+progresso subindo. Saídas iguais (3×, trailing 35 % após 1,5×, 30 min, `creator_dump`, `line_broken`, −50 %).
+
+**Previsão congelada:** `descartar` — o braço 2 admite moedas com 3–10 snipers, que o estudo das 21 apostas associou a
+perda; a aposta é que holders ≥ 20 e fluxo líquido positivo compensem. **Régua:** a mesma do braço 1 (≥ 100 apostas e
+30 dias, IC 95 % por blocos de dia, leave-top-out); o braço 1 continua ativo e é a comparação direta (mesmo tique,
+mesma série). **O que não vale:** ajustar os limiares olhando os primeiros dias (KB-0092).
+
 ## Fontes
 
 `packages/indicators/hunter_indicators/meme/{fast,rules,rules_criteria}.py` · `packages/indicators/tests/unit/{test_meme_fast,test_meme_rules_flow}.py` ·

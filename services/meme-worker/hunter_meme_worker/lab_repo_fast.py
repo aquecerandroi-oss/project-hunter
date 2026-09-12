@@ -29,7 +29,8 @@ __all__ = ["load_fast_gate_rows", "pedigree_for"]
 _FAST_ROWS = text(
     "SELECT f.as_of, f.mint, f.snapshot_observed_at, f.snapshot_source, f.mcap_sol, "
     "       f.mcap_delta_60s, f.curve_progress_pct, f.progress_reason, f.progress_rising, "
-    "       f.holders_rising, f.holders_reason, f.buys_60s, f.sells_60s, f.unique_buyers_60s, "
+    "       f.holders, f.holders_prev, f.holders_rising, f.holders_reason, "
+    "       f.buys_60s, f.sells_60s, f.unique_buyers_60s, "
     "       f.net_sol_flow_60s, f.curve_volume_60s_sol, f.tape_reason, f.creator_net_seller, "
     "       f.dev_share, f.dev_share_reason, f.snipers, "
     "       t.created_at, t.completed_at, t.migrated_at, t.initial_real_token_reserves, "
@@ -108,6 +109,8 @@ async def load_fast_gate_rows(
                 sells_1m=r["sells_60s"],
                 unique_buyers_1m=r["unique_buyers_60s"],
                 tape_reason=r["tape_reason"],
+                holders=r["holders"],
+                holders_prev=r["holders_prev"],
                 holders_rising=r["holders_rising"],
                 holders_reason=r["holders_reason"],
                 progress_rising=r["progress_rising"],

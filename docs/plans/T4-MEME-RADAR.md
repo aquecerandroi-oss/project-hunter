@@ -1080,6 +1080,26 @@ verbatim, ticker/mint, números dos params), `test_lab_operator_3.py` (2, Postgr
 proposta/aposta, reversão limpa), `test_meme_desk_manual_plan.py` (2). `test_lab_moonshot.py` passa a ler `operator/2`
 como aposentado. **Pendente (`apps/web`, T4.17):** mostrar `row.manual_plan` no cartão da proposta.
 
+### T4.21 — `operator/4` + `flow_v2/2`: o segundo braço da porta E1, com os limiares que a fita por lote mostrou (entregue 12/09/2026)
+
+**Medido (18:3x–19:0x BRT, 30 min da série de 15 s, `infra/scripts/sql/research/2026-09-12-t421-funil-e1.sql`):** 13 moedas
+passaram a base de fluxo da E1; 12 com progresso ≥ 5 %; `snipers ≤ 2` → **0** (≤ 10: 5; ≤ 25: 9); holders subindo 3
+(não caindo com ≥ 20: 6); dev ≤ 10 % 12; criador não vendedor 5, desconhecido 7. Candidatas com tudo (snipers ≤ 10,
+holders não caindo ≥ 20, dev ≤ 10 %, criador não vendeu, progresso subindo ou mcap subindo): 1 em 30 min; com snipers
+≤ 25 e criador desconhecido admitido: 2. A E1 pré-registrada não propôs nada desde 18:44.
+
+**Entregue:** (1) `rules.py`/`rules_criteria.py`: quatro chaves opcionais, desligadas por padrão — `min_holders`
+(`holders_below_min`), `holders_rising_or_flat` (só a queda recusa: `holders_falling`; uma leitura só é
+`holders_too_few_readings`), `creator_unknown_allowed_if_dev_measured` (criador desconhecido passa só com `dev_share`
+medido dentro do teto; vendedor conhecido nunca), `progress_or_mcap_rising` (`mcap_delta_60s > 0` substitui progresso
+subindo); `creator_refusals` extraído; 11 testes. (2) `GateRow.holders/holders_prev` lidos nas duas séries e passados a
+`EntryFeatures`; `lab_models.py` lê as quatro chaves. (3) Migração `0034_meme_gate_e1_arm2` (§46 do `DATABASE.md`):
+`flow_v2/2` (EXP-M5 braço 2, previsão `descartar`) e `operator/4` (0,05 SOL, validade 180 s, `manual_plan` da T4.19),
+`operator/3` aposentado, `flow_v2/1` ativo para comparação; 4 testes de migração, os da `0033` estagiados. (4) A API
+arquiva as compras manuais sob `operator/4`. **Provas:** indicators `-k meme` 223, worker unit 221, API `-k meme` 121,
+`test_migrations -k "0033 or 0034"` 11, `test_lab_operator_3` + moonshot + persistência 19 (Postgres); ruff/format/pyright
+0; `check_file_size` 0 acima. A agente foi cortada pelo limite semanal depois das regras; o orquestrador fechou o resto.
+
 ## 7. Riscos — honestos, sem suavizar
 
 - **Rugs e bundlers:** um criador pode comprar sua própria curva com várias wallets

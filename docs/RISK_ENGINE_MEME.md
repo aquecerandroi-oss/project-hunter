@@ -621,6 +621,12 @@ Nada de "preenchido ao último preço visto".
    horas de Brasília; a API só repete o texto, nunca o compõe. O plano é o que o operador executa à mão; a carteira observada (T4.12) grava o que ele
    fez de fato, e o papel continua marcando a aposta por conta própria.
 
+10. **O segundo braço da porta E1 (T4.21).** Com a fita por lote viva, a E1 congelada (`snipers ≤ 2`, holders subindo)
+    não propôs nada em 30 min — 0 de 13 moedas com demanda tinham < 6 snipers. Desde a `0034` a mesa propõe pelo
+    `operator/4` (braço 2: snipers ≤ 10, ≥ 20 holders não caindo, criador desconhecido só com `dev_share` medido ≤ 10 %,
+    progresso **ou** mcap subindo), pré-registrado como `descartar` na EXP-M5; o braço 1 (`flow_v2/1`) continua ativo e
+    medido ao lado. Nenhuma outra régua muda: 0,05 SOL, 180 s, alvo 3×, trailing 35 % após 1,5×, 30 min, dev, pedigree.
+
 ## 11. VM1–VM9 — as nove verificações do motor meme
 
 Equivalente das V1–V9 da T3.9 (`.claude/state/spec-T3.9-verificacoes.md`,

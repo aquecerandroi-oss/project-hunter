@@ -6958,3 +6958,20 @@ estado de sessão; `0033_meme_operator_3` tem 20 caracteres (§17.6).
 | `services/meme-worker/**` | `proposals_plan.py` (novo), `proposals.py` (`ttl` do conjunto; `manual_plan` no `suggested` do `operator`; `GateRow.symbol`), `lab_models.py` (`ttl_s`), `lab_repo.py`/`lab_repo_fast.py` (`t.symbol`) |
 | `GET /api/v1/orgs/{org}/meme/desk`, `POST …/proposals/*` | `DeskRowOut.manual_plan`; `OPERATOR_RULE_SET = ("operator", "3")` (documental — a leitura é por nome e status) |
 | `apps/web` | fora desta tarefa (T4.17 em curso): mostrar `row.manual_plan` no cartão da proposta |
+
+## 46. A porta E1 ganha um segundo braço — M4 (`0034_meme_gate_e1_arm2`)
+
+**Por quê (medido, 12/09/2026 18:3x–19:0x BRT, `infra/scripts/sql/research/2026-09-12-t421-funil-e1.sql`):** com a fita
+por lote viva (§44), 13 moedas passaram em 30 min a base de fluxo da E1 (idade 30–300 s, fluxo líquido > 0, ≥ 10
+compradores, vendas/compras ≤ 0,6), 12 com progresso ≥ 5 %. `snipers ≤ 2` deixou **zero** (≤ 10: 5; ≤ 25: 9); holders
+subindo entre duas leituras 3 (não caindo com ≥ 20: 6); dev ≤ 10 % 12; criador não vendedor 5, desconhecido 7. A E1
+congelada (`flow_v2/1`, `operator/3`) não propôs nada desde 18:44 — um portão sem saída não se mede.
+
+**O que a migração faz (`ddl/meme_gate_e1_arm2.py`):** semeia `flow_v2/2` (`…000b`, `research_only`, EXP-M5 braço 2)
+e `operator/4` (`…000c`, `operator`) = `FLOW_V2_PARAMS || {gate_version 2, max_snipers 10, min_holders 20,
+holders_rising_or_flat, creator_unknown_allowed_if_dev_measured, progress_or_mcap_rising}` (o `operator/4` ainda com
+`ttl_s 180` e `max_open_positions 2` da §45); aposenta `operator/3` **antes** do insert e afirma "exatamente um `operator`
+ativo"; `flow_v2/1` **continua ativo** (o braço 1 segue sendo medido ao lado). Os quatro parâmetros novos são lidos por
+`lab_models.py` e avaliados em `hunter_indicators.meme.rules_criteria` — desligados por padrão, o braço 1 lê exatamente
+como foi congelado. O downgrade recusa enquanto uma proposta ou aposta referenciar os dois conjuntos (§17.7) e revive o
+`operator/3`. Testes: `test_0034_*` (4) e os `test_0033_*` agora estagiados em `OPERATOR_3_REVISION`.

@@ -185,6 +185,8 @@ async def load_gate_rows(
                 sells_1m=r["sells_1m"],
                 unique_buyers_1m=r["unique_buyers"],
                 tape_reason=r["tape_reason"],
+                holders=r["holders"],
+                holders_prev=r["holders_prev"],
                 holders_rising=_rising(r["holders"], r["holders_prev"]),
                 holders_reason=_trend_reason(r["holders"], r["holders_prev"], r["holders_reason"]),
                 progress_rising=_rising(r["curve_progress_pct"], r["progress_prev"]),

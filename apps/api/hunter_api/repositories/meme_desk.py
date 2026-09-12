@@ -67,7 +67,7 @@ if TYPE_CHECKING:
 
 __all__ = ["OPERATOR_RULE_SET", "MemeDeskRepository"]
 
-OPERATOR_RULE_SET = ("operator", "3")
+OPERATOR_RULE_SET = ("operator", "4")
 """``meme_rule_sets (name, version)`` a manual proposal is filed under at
 ``head`` (contract §Rotas): ``0033_meme_operator_3`` (T4.19) retired ``0029``'s
 ``operator/2`` (EXP-M1's gate) for ``operator/3`` (``flow_v2/1``'s E1 gate and

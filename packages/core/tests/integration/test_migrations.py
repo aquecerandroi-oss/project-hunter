@@ -21,6 +21,7 @@ from typing import cast
 import pytest
 import pytest_asyncio
 from alembic import command
+from alembic.config import Config
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
@@ -39,7 +40,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0033_meme_operator_3"
+HEAD_REVISION = "0034_meme_gate_e1_arm2"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran.
 ``0033`` (T4.19) sits on ``0032_meme_activity`` (T4.2g), which sits on
@@ -97,6 +98,25 @@ MEME_LAB_TICKS_REVISION = "0031_meme_lab_ticks"
 """What reversing **0032** lands on (T4.2g) — and where the ``0031`` tests would
 stage first, because ``"-1"`` stopped meaning 0031 the day 0032 landed."""
 MEME_ACTIVITY_REVISION = "0032_meme_activity"
+OPERATOR_3_REVISION = "0033_meme_operator_3"
+"""``0033``: where the ``0033`` tests stage now that ``0034`` sits on top (T4.21)."""
+
+
+class _staged_at:
+    """Downgrade to ``revision`` for the body, always come back to head (T4.21)."""
+
+    def __init__(self, upgraded: str, revision: str) -> None:
+        self.config = alembic_config(upgraded)
+        self.revision = revision
+
+    def __enter__(self) -> Config:
+        command.downgrade(self.config, self.revision)
+        return self.config
+
+    def __exit__(self, *exc: object) -> None:
+        command.upgrade(self.config, "head")
+
+
 """What reversing **0033** lands on (T4.19) — and where the ``0032`` tests would
 stage first, because ``"-1"`` stopped meaning 0032 the day 0033 landed."""
 """Named for the same reason as the line below: the two ``0019`` tests are about
@@ -6573,46 +6593,47 @@ def test_0033_seeds_operator_3_through_the_flow_gate_and_retires_operator_2(
     the 15-second clock, the 3× / 35 % after 1,5× / 30 min / 50 % exits) with
     only the two numbers the brief changes for a buy by hand: ``ttl_s = 180``
     and ``max_open_positions = 2``; ``operator/2`` (EXP-M1's gate) retired."""
-    seeds = asyncio.run(
-        _scalars(
-            upgraded,
-            "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') || ':' "
-            "|| status || ':' || (params ->> 'gate_key') || '/' || (params ->> 'gate_version') "
-            "|| ':' || (params ->> 'clock') || ':' || (params ->> 'pedigree_exclusions') || ':' "
-            "|| (params ->> 'ttl_s') || ':' || (params ->> 'size_sol') || ':' "
-            "|| (params ->> 'max_open_positions') || ':' || (params ->> 'target_x') || ':' "
-            "|| (params ->> 'trailing_pct') || ':' || (params ->> 'trailing_arm_x') || ':' "
-            "|| (params ->> 'max_hold_s') || ':' || (params ->> 'max_loss_pct') || ':' "
-            "|| (params ->> 'exit_on_line_break') || ':' || (params ->> 'max_sol_per_bet') "
-            "FROM meme_rule_sets WHERE id = :id",
-            {"id": _OPERATOR_3_RULE_SET},
+    with _staged_at(upgraded, OPERATOR_3_REVISION):
+        seeds = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') || ':' "
+                "|| status || ':' || (params ->> 'gate_key') || '/' || (params ->> 'gate_version') "
+                "|| ':' || (params ->> 'clock') || ':' || (params ->> 'pedigree_exclusions') || ':' "
+                "|| (params ->> 'ttl_s') || ':' || (params ->> 'size_sol') || ':' "
+                "|| (params ->> 'max_open_positions') || ':' || (params ->> 'target_x') || ':' "
+                "|| (params ->> 'trailing_pct') || ':' || (params ->> 'trailing_arm_x') || ':' "
+                "|| (params ->> 'max_hold_s') || ':' || (params ->> 'max_loss_pct') || ':' "
+                "|| (params ->> 'exit_on_line_break') || ':' || (params ->> 'max_sol_per_bet') "
+                "FROM meme_rule_sets WHERE id = :id",
+                {"id": _OPERATOR_3_RULE_SET},
+            )
         )
-    )
-    assert seeds == [
-        "operator/3:operator:-:active:fluxo_e_holders/1:15s:true:180:0.05:2:3:35:1.5:1800:50"
-        ":true:0.05"
-    ]
-    same_gate = asyncio.run(
-        _scalars(
-            upgraded,
-            "SELECT ((o.params - 'ttl_s' - 'max_open_positions') "
-            "        = (f.params - 'max_open_positions'))::text "
-            "FROM meme_rule_sets o, meme_rule_sets f WHERE o.id = :o AND f.id = :f",
-            {"o": _OPERATOR_3_RULE_SET, "f": _FLOW_V2_RULE_SET},
+        assert seeds == [
+            "operator/3:operator:-:active:fluxo_e_holders/1:15s:true:180:0.05:2:3:35:1.5:1800:50"
+            ":true:0.05"
+        ]
+        same_gate = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT ((o.params - 'ttl_s' - 'max_open_positions') "
+                "        = (f.params - 'max_open_positions'))::text "
+                "FROM meme_rule_sets o, meme_rule_sets f WHERE o.id = :o AND f.id = :f",
+                {"o": _OPERATOR_3_RULE_SET, "f": _FLOW_V2_RULE_SET},
+            )
         )
-    )
-    assert same_gate == ["true"], "every other key is flow_v2/1's, byte for byte"
-    assert asyncio.run(
-        _scalars(
-            upgraded,
-            "SELECT status || ':' || (retired_at IS NOT NULL)::text FROM meme_rule_sets "
-            "WHERE id = :id",
-            {"id": _OPERATOR_2_RULE_SET},
+        assert same_gate == ["true"], "every other key is flow_v2/1's, byte for byte"
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT status || ':' || (retired_at IS NOT NULL)::text FROM meme_rule_sets "
+                "WHERE id = :id",
+                {"id": _OPERATOR_2_RULE_SET},
+            )
+        ) == ["retired:true"]
+        assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/3"], (
+            "exactly one active operator set for the desk's manual buys"
         )
-    ) == ["retired:true"]
-    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/3"], (
-        "exactly one active operator set for the desk's manual buys"
-    )
 
 
 def test_0033_refuses_a_downgrade_while_a_proposal_or_a_bet_references_operator_3(
@@ -6620,41 +6641,41 @@ def test_0033_refuses_a_downgrade_while_a_proposal_or_a_bet_references_operator_
 ) -> None:
     """§17.7: a proposal the desk saw and a bet it filled under ``operator/3``
     are evidence — count, name, stop. ``0033`` is the head: no staging."""
-    config = alembic_config(upgraded)
-    proposal = "00000000-0000-4000-8000-000000000a01"
-    bet = "00000000-0000-4000-8000-000000000a02"
-    guarded: list[tuple[list[tuple[str, dict[str, object]]], str]] = [
-        (
-            [(_A_PROPOSAL, {"id": proposal, "rule_set": _OPERATOR_3_RULE_SET})],
-            "proposals reference the seeded operator/3",
-        ),
-        (
-            [
-                (_A_PROPOSAL, {"id": proposal, "rule_set": _RESEARCH_RULE_SET}),
-                (
-                    _A_BET,
-                    {
-                        "id": bet,
-                        "proposal": proposal,
-                        "rule_set": _OPERATOR_3_RULE_SET,
-                        "mode": "paper",
-                    },
-                ),
-            ],
-            "bets reference the seeded operator/3",
-        ),
-    ]
-    for statements, message in guarded:
-        asyncio.run(_write(upgraded, statements))
-        try:
-            with pytest.raises(DBAPIError, match=message):
-                command.downgrade(config, "-1")
-            assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, (
-                "the downgrade must not commit"
-            )
-        finally:
-            asyncio.run(_write(upgraded, list(_CLEAN_0033)))
-    command.check(config)
+    with _staged_at(upgraded, OPERATOR_3_REVISION) as config:
+        proposal = "00000000-0000-4000-8000-000000000a01"
+        bet = "00000000-0000-4000-8000-000000000a02"
+        guarded: list[tuple[list[tuple[str, dict[str, object]]], str]] = [
+            (
+                [(_A_PROPOSAL, {"id": proposal, "rule_set": _OPERATOR_3_RULE_SET})],
+                "proposals reference the seeded operator/3",
+            ),
+            (
+                [
+                    (_A_PROPOSAL, {"id": proposal, "rule_set": _RESEARCH_RULE_SET}),
+                    (
+                        _A_BET,
+                        {
+                            "id": bet,
+                            "proposal": proposal,
+                            "rule_set": _OPERATOR_3_RULE_SET,
+                            "mode": "paper",
+                        },
+                    ),
+                ],
+                "bets reference the seeded operator/3",
+            ),
+        ]
+        for statements, message in guarded:
+            asyncio.run(_write(upgraded, statements))
+            try:
+                with pytest.raises(DBAPIError, match=message):
+                    command.downgrade(config, "-1")
+                assert asyncio.run(_revision(upgraded)) == OPERATOR_3_REVISION, (
+                    "the downgrade must not commit"
+                )
+            finally:
+                asyncio.run(_write(upgraded, list(_CLEAN_0033)))
+    command.check(alembic_config(upgraded))
 
 
 def test_0033_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
@@ -6684,7 +6705,9 @@ def test_0033_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
-    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/3"]
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/4"], (
+        "0034 (T4.21) hands the desk to operator/4 on the way back up"
+    )
     command.check(config)
 
 
@@ -6722,4 +6745,176 @@ def test_0033_refuses_to_upgrade_a_desk_that_already_has_another_active_operator
     finally:
         command.upgrade(config, "head")
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
-    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/3"]
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/4"]
+
+
+# ---------------------------------------------------------------------------
+# 0034_meme_gate_e1_arm2 — the second arm of the E1 gate (T4.21, EXP-M5 arm 2)
+# ---------------------------------------------------------------------------
+
+_FLOW_V2_ARM2_RULE_SET = "01994d00-6c1a-7000-8000-00000000000b"
+_OPERATOR_4_RULE_SET = "01994d00-6c1a-7000-8000-00000000000c"
+_ARM2_KEYS = (
+    "'gate_version' - 'max_snipers' - 'min_holders' - 'holders_rising_or_flat' "
+    "- 'creator_unknown_allowed_if_dev_measured' - 'progress_or_mcap_rising'"
+)
+_CLEAN_0034: tuple[tuple[str, dict[str, object]], ...] = (
+    ("DELETE FROM meme_paper_bets WHERE mint = 'GUARD_MINT'", {}),
+    ("DELETE FROM meme_proposals WHERE mint = 'GUARD_MINT'", {}),
+)
+
+
+def test_0034_seeds_the_second_arm_and_hands_the_desk_to_operator_4(upgraded: str) -> None:
+    """``flow_v2/2`` = ``flow_v2/1`` + the five arm-2 keys (funnel of 12/09:
+    ``max_snipers 10``, ``min_holders 20``, not falling, dev vouches, mcap
+    delta); ``operator/4`` = ``flow_v2/2`` + ``0033``'s hand numbers;
+    ``flow_v2/1`` stays active, ``operator/3`` retired."""
+    arm2 = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') || ':' "
+            "|| status || ':' || (params ->> 'gate_key') || '/' || (params ->> 'gate_version') "
+            "|| ':' || (params ->> 'max_snipers') || ':' || (params ->> 'min_holders') || ':' "
+            "|| (params ->> 'holders_rising_or_flat') || ':' "
+            "|| (params ->> 'creator_unknown_allowed_if_dev_measured') || ':' "
+            "|| (params ->> 'progress_or_mcap_rising') || ':' || coalesce(params ->> 'ttl_s', '-') "
+            "FROM meme_rule_sets WHERE id IN (:a, :o) ORDER BY name",
+            {"a": _FLOW_V2_ARM2_RULE_SET, "o": _OPERATOR_4_RULE_SET},
+        )
+    )
+    assert arm2 == [
+        "flow_v2/2:research_only:EXP-M5:active:fluxo_e_holders/2:10:20:true:true:true:-",
+        "operator/4:operator:-:active:fluxo_e_holders/2:10:20:true:true:true:180",
+    ]
+    same_but_the_five = asyncio.run(
+        _scalars(
+            upgraded,
+            f"SELECT ((a.params - {_ARM2_KEYS}) = (f.params - {_ARM2_KEYS}))::text "  # noqa: S608 - frozen key list
+            "FROM meme_rule_sets a, meme_rule_sets f WHERE a.id = :a AND f.id = :f",
+            {"a": _FLOW_V2_ARM2_RULE_SET, "f": _FLOW_V2_RULE_SET},
+        )
+    )
+    assert same_but_the_five == ["true"], "every other key is flow_v2/1's, byte for byte"
+    desk_is_arm2 = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT ((o.params - 'ttl_s' - 'max_open_positions') "
+            "        = (a.params - 'max_open_positions'))::text "
+            "FROM meme_rule_sets o, meme_rule_sets a WHERE o.id = :o AND a.id = :a",
+            {"o": _OPERATOR_4_RULE_SET, "a": _FLOW_V2_ARM2_RULE_SET},
+        )
+    )
+    assert desk_is_arm2 == ["true"], "operator/4 is flow_v2/2 plus ttl_s and max_open_positions"
+    statuses = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version || ':' || status FROM meme_rule_sets "
+            "WHERE id IN (:f1, :o3) ORDER BY name",
+            {"f1": _FLOW_V2_RULE_SET, "o3": _OPERATOR_3_RULE_SET},
+        )
+    )
+    assert statuses == ["flow_v2/1:active", "operator/3:retired"], (
+        "arm 1 keeps being measured; the desk moved on"
+    )
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/4"]
+
+
+def test_0034_refuses_a_downgrade_while_a_proposal_or_a_bet_references_arm_2(
+    upgraded: str,
+) -> None:
+    """§17.7: a proposal under ``operator/4`` or a bet under ``flow_v2/2`` is
+    evidence — count, name, stop. ``0034`` is the head: no staging."""
+    config = alembic_config(upgraded)
+    proposal = "00000000-0000-4000-8000-000000000b01"
+    bet = "00000000-0000-4000-8000-000000000b02"
+    guarded: list[tuple[list[tuple[str, dict[str, object]]], str]] = [
+        (
+            [(_A_PROPOSAL, {"id": proposal, "rule_set": _OPERATOR_4_RULE_SET})],
+            "proposals reference the seeded flow_v2/2 or operator/4",
+        ),
+        (
+            [
+                (_A_PROPOSAL, {"id": proposal, "rule_set": _RESEARCH_RULE_SET}),
+                (
+                    _A_BET,
+                    {
+                        "id": bet,
+                        "proposal": proposal,
+                        "rule_set": _FLOW_V2_ARM2_RULE_SET,
+                        "mode": "paper",
+                    },
+                ),
+            ],
+            "bets reference the seeded flow_v2/2 or operator/4",
+        ),
+    ]
+    for statements, message in guarded:
+        asyncio.run(_write(upgraded, statements))
+        try:
+            with pytest.raises(DBAPIError, match=message):
+                command.downgrade(config, "-1")
+            assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, (
+                "the downgrade must not commit"
+            )
+        finally:
+            asyncio.run(_write(upgraded, list(_CLEAN_0034)))
+    command.check(config)
+
+
+def test_0034_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    """The operator's rollback: both arm-2 sets go, ``operator/3`` comes back
+    active, ``flow_v2/1`` untouched; the upgrade restores the hand-over."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, OPERATOR_3_REVISION)
+    try:
+        assert asyncio.run(_revision(upgraded)) == OPERATOR_3_REVISION
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM meme_rule_sets WHERE id IN (:a, :o)",
+                {"a": _FLOW_V2_ARM2_RULE_SET, "o": _OPERATOR_4_RULE_SET},
+            )
+        ) == ["0"]
+        assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/3"]
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT status FROM meme_rule_sets WHERE id = :f",
+                {"f": _FLOW_V2_RULE_SET},
+            )
+        ) == ["active"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/4"]
+    command.check(config)
+
+
+def test_0034_refuses_to_upgrade_a_desk_that_already_has_another_active_operator_set(
+    upgraded: str,
+) -> None:
+    """The desk's invariant, asserted after the hand-over (as ``0033``): a
+    second active ``operator`` set makes the upgrade stop and commit nothing."""
+    config = alembic_config(upgraded)
+    extra = "00000000-0000-4000-8000-000000000b09"
+    command.downgrade(config, OPERATOR_3_REVISION)
+    try:
+        asyncio.run(_write(upgraded, [(_AN_EXTRA_OPERATOR_SET, {"id": extra})]))
+        try:
+            with pytest.raises(DBAPIError, match="2 operator sets are active"):
+                command.upgrade(config, "head")
+            assert asyncio.run(_revision(upgraded)) == OPERATOR_3_REVISION, (
+                "the upgrade must not commit"
+            )
+            assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == [
+                "operator_guard_0033/1",
+                "operator/3",
+            ], "the refused upgrade left operator/3 active and planted nothing"
+        finally:
+            asyncio.run(
+                _write(upgraded, [("DELETE FROM meme_rule_sets WHERE id = :id", {"id": extra})])
+            )
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_scalars(upgraded, _ACTIVE_OPERATOR_SETS, {})) == ["operator/4"]

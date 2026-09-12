@@ -116,6 +116,13 @@ def _gate_from_params(name: str, version: str, params: Mapping[str, Any]) -> Ent
         max_sells_to_buys=optional_decimal(params.get("max_sells_to_buys")),
         require_holders_rising=bool(params.get("require_holders_rising", False)),
         require_progress_rising=bool(params.get("require_progress_rising", False)),
+        # T4.21 (EXP-M5 arm 2): four switches, off unless the set says so.
+        min_holders=None if params.get("min_holders") is None else int(params["min_holders"]),
+        holders_rising_or_flat=bool(params.get("holders_rising_or_flat", False)),
+        creator_unknown_allowed_if_dev_measured=bool(
+            params.get("creator_unknown_allowed_if_dev_measured", False)
+        ),
+        progress_or_mcap_rising=bool(params.get("progress_or_mcap_rising", False)),
     )
 
 

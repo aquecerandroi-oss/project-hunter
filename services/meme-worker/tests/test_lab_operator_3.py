@@ -44,6 +44,8 @@ pytestmark = pytest.mark.integration
 
 WORKER = "hunter_worker"
 OPERATOR_3_ID = "01994d00-6c1a-7000-8000-00000000000a"
+OPERATOR_4_ID = "01994d00-6c1a-7000-8000-00000000000c"
+"""T4.21 (``0034``): the desk moved to ``operator/4`` (E1 arm 2); ``operator/3`` is retired."""
 PLAN = (
     "Comprar 0,05 SOL de PEPE até 09:05:03 (proposta expira). "
     "Vender até 09:32 (30 min) — antes disso se triplicar (3×), se recuar 35 % do topo depois "
@@ -76,13 +78,14 @@ async def _proposals_of(factory: async_sessionmaker[AsyncSession], mint: str) ->
     return {str(r["label"]): r for r in rows}
 
 
-async def test_the_seed_hands_the_desk_to_operator_3_on_the_flow_gate(
+async def test_the_seed_hands_the_desk_to_operator_4_on_the_flow_gate_arm_2(
     db_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     async with role_session(db_session_factory, db_role=WORKER) as session:
         specs = {s.label: s for s in await load_active_rule_sets(session)}
-    operator, flow = specs["operator/3"], specs["flow_v2/1"]
-    assert "operator/2" not in specs and operator.id == OPERATOR_3_ID
+    operator, flow = specs["operator/4"], specs["flow_v2/2"]
+    assert "operator/3" not in specs and operator.id == OPERATOR_4_ID
+    assert "flow_v2/1" in specs, "arm 1 keeps being measured next to arm 2"
     assert operator.kind == "operator" and operator.exp_ref is None
     assert operator.clock == "15s" and operator.ttl_s == 180 and operator.max_open_positions == 2
     assert operator.pedigree_exclusions is flow.pedigree_exclusions is True
@@ -95,12 +98,12 @@ async def test_the_seed_hands_the_desk_to_operator_3_on_the_flow_gate(
     assert operator.trailing_arm_x == flow.trailing_arm_x == Decimal("1.5")
     assert (operator.max_hold_s, operator.max_loss_pct) == (1800, Decimal(50))
     assert operator.exit_on_line_break and flow.ttl_s is None
-    assert [s.label for s in specs.values() if s.kind == "operator"] == ["operator/3"], (
+    assert [s.label for s in specs.values() if s.kind == "operator"] == ["operator/4"], (
         "exactly one active operator set"
     )
 
 
-async def test_operator_3_proposes_the_same_coin_as_flow_v2_waits_180_s_and_fills_once_approved(
+async def test_operator_4_proposes_the_same_coin_as_flow_v2_2_waits_180_s_and_fills_once_approved(
     lab: LabContext,
     db_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -112,12 +115,15 @@ async def test_operator_3_proposes_the_same_coin_as_flow_v2_waits_180_s_and_fill
     as_of = photo + timedelta(seconds=2)
     async with role_session(db_session_factory, db_role=WORKER) as session:
         await insert_snapshot(session, _snapshot(mint, photo, "34", "946000000"))
-        await insert_fast_rows(session, [_fast_row(mint, as_of, photo)])
+        # Arm 2 asks for >= 20 holders, not falling (the fixture's 12/9 is arm 1's).
+        await insert_fast_rows(
+            session, [_fast_row(mint, as_of, photo, holders=24, holders_prev=21)]
+        )
     tick_1 = photo + timedelta(seconds=3)
     report = await lab_tick(lab, now=tick_1)
     assert report.proposals >= 2 and report.fills.filled == 0
     by_set = await _proposals_of(db_session_factory, mint)
-    research, proposal = by_set["flow_v2/1"], by_set["operator/3"]
+    research, proposal = by_set["flow_v2/2"], by_set["operator/4"]
     # The same coin, the same instant, the same decomposition — one approved by
     # rules, the other waiting for the desk 180 s (the set's ttl_s, not the loop's).
     assert research["status"] == "approved" and proposal["status"] == "proposed"
@@ -126,7 +132,7 @@ async def test_operator_3_proposes_the_same_coin_as_flow_v2_waits_180_s_and_fill
         proposal["reasons"][0]
         == research["reasons"][0]
         == {
-            "rule": "fluxo_e_holders/1",
+            "rule": "fluxo_e_holders/2",
             "series": "meme_features_15s_v1",
         }
     )
@@ -158,7 +164,7 @@ async def test_operator_3_proposes_the_same_coin_as_flow_v2_waits_180_s_and_fill
     bet = await _bet_of(db_session_factory, str(proposal["id"]))
     assert bet["proposal_status"] == "filled" and bet["status"] == "open"
     assert bet["entry_at"] == next_photo and bet["entry"]["decision_to_fill_s"] == 2
-    assert str(bet["rule_set_id"]) == OPERATOR_3_ID
+    assert str(bet["rule_set_id"]) == OPERATOR_4_ID
     assert (bet["params"]["target_x"], bet["params"]["max_hold_s"]) == ("3", 1800)
     assert bet["params"]["trailing_arm_x"] == "1.5" and bet["params"]["exit_on_line_break"]
     still_one = await _one(
@@ -166,6 +172,6 @@ async def test_operator_3_proposes_the_same_coin_as_flow_v2_waits_180_s_and_fill
         "SELECT count(*) AS n FROM meme_proposals WHERE mint = :m "
         "AND rule_set_id = CAST(:rs AS uuid)",
         m=mint,
-        rs=OPERATOR_3_ID,
+        rs=OPERATOR_4_ID,
     )
     assert still_one["n"] == 1, "an open bet keeps the mint from being proposed again"
