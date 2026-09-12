@@ -55,6 +55,7 @@ por isso `result: nao-iniciado` com 0 avaliáveis e 0 dias.
 | `comprar_cedo_na_curva v1` + `alvo_2x_trailing_30_tempo_15m v1` — perfil `meme_paper_v0` (idade 30–600 s, progresso 2–50 %, participação ≤ 1 %; 2× / trailing 30 % / time stop 15 min / piso 50 % / dump do criador) | [[EXP-M1-comprar-cedo-na-curva]] | **pré-registrado** — carteira paper, sem chave, sem ordem real | — (nenhuma corrida; portão de desenho C1–C8 = `REVISE`, veredito **previsto** `descartar`) |
 | `a_linha_manda v1` + `alvo_2x_trailing_30_tempo_15m_linha v1` — conjunto `trendline_v0/1` (T4.10, `0026`: EXP-M1 com idade ≥ 5 min **e** fundos ascendentes **e** rompimento da janela anterior **e** banda 0–25 % sobre o suporte; saída com **linha rompida**) | [[EXP-M2-a-linha-manda]] | **pré-registrado** — paper, sem chave, sem ordem real | — (nenhuma corrida; portão = `REVISE`, veredito **previsto** `descartar`) |
 | `sonda_de_hype v1` + `alvo_3x_trailing_40_tempo_10m v1` + escala pela porta de `trendline_v0/1` — conjunto `hype_probe_v0/1` (T4.10, `0026`: 30 s–5 min, `hype_score ≥ 0,6`, sonda 0,01 SOL → perna 2 de 0,04 SOL com `parent_bet_id`) | [[EXP-M3-sonda-de-hype]] | **pré-registrado** — paper, sem chave, sem ordem real | — (nenhuma corrida; portão = `REVISE`, veredito **previsto** `descartar`) |
+| `sonda_de_hype v1` + `alvo_10x_trailing_50_apos_3x_tempo_2h v1` / `alvo_25x_trailing_50_apos_3x_tempo_2h v1` — conjuntos `moonshot_v0/1` e `moonshot_v0/2` (T4.11, `0029`: a porta da EXP-M3, 0,02 SOL, trailing 50 % só depois de 3×, 7 200 s, **segura através da migração** e é marcada pela fita da pool PumpSwap; saída `dead`) | [[EXP-M4-moonshot]] | **pré-registrado** — paper, sem chave, sem ordem real | — (nenhuma corrida; portão = `REVISE`, veredito **previsto** `descartar`) |
 
 Uma linha por `EXP-M<n>`, no mesmo espírito da página de família de `03-TRADING/Estrategias/**`
 (`docs/OBSIDIAN.md` §1). Status e veredito são copiados da página do experimento, nunca decididos
@@ -78,7 +79,7 @@ depende de switch explícito do Everton (`ENABLE_MEME_LIVE_TRADING`) depois do f
 
 ## Relacionadas
 
-[[03-TRADING/Estrategias/README|Estrategias (catálogo geral)]] · [[Experiments Index]] ·
+[[03-TRADING/Estrategias/README|Estrategias (catálogo geral)]] · [[Experiments Index]] · [[03-TRADING/Meme/Estudo-2026-09-12-21-apostas|Estudo das 21 apostas de 12/09]] ·
 [[Strategy Backlog]] · [[06-DECISIONS/2026-09-12-meta-7m-e-lab-meme]] ·
 [[02-MARKET/Meme/README|Meme (Mercado)]] · [[09-OPERATIONS/Diario-Meme/README|Diário Meme]] ·
 [[11-KNOWLEDGE/README-meme|Meme (Conhecimento)]] · [[KB-0091-pump-fun-as-taxas-base-e-seus-denominadores]] · [[03-TRADING/Meme/Terminal-do-pumpfun|Terminal do pump.fun]] ·
