@@ -25,8 +25,10 @@ from fastapi import APIRouter, Depends, Query
 from hunter_api.auth.rbac import OrgContext, require_org
 from hunter_api.deps import OrgSession, get_redis
 from hunter_api.repositories.meme_lab import MemeLabRepository
+from hunter_api.repositories.meme_wallets import MemeWalletsRepository
 from hunter_api.schemas.meme_lab import MemeLabOut
-from hunter_api.services.meme_lab import DEFAULT_DAYS_LIMIT, build_meme_lab
+from hunter_api.services.meme_lab import DEFAULT_DAYS_LIMIT, build_meme_lab, day_bounds_brt
+from hunter_api.services.meme_wallets import SolUsdQuote, build_real_observed
 from hunter_core.domain.enums import OrganizationRole
 from hunter_core.domain.types import utcnow
 from hunter_core.logging import get_logger
@@ -72,11 +74,28 @@ async def get_meme_lab(
     days: Annotated[int, Query(ge=1, le=MAX_DAYS)] = DEFAULT_DAYS_LIMIT,
 ) -> MemeLabOut:
     heartbeat, error = await _heartbeat(redis)
-    return await build_meme_lab(
+    as_of = utcnow()
+    out = await build_meme_lab(
         MemeLabRepository(session),
         heartbeat,
-        as_of=utcnow(),
+        as_of=as_of,
         heartbeat_key=MEME_HEARTBEAT_KEY,
         redis_error=error,
         days_limit=days,
     )
+    # T4.12: the observed wallets' real fills, priced with the quote the Lab
+    # already resolved (heartbeat or last bet) — never a rate nobody observed.
+    _, day_start, day_end = day_bounds_brt(as_of)
+    quote = out.goal.sol_usd
+    watched_raw = None if heartbeat is None else heartbeat.get("wallets_watched")
+    out.real_observed = await build_real_observed(
+        MemeWalletsRepository(session),
+        day_start=day_start,
+        day_end=day_end,
+        quote=None
+        if quote is None
+        else SolUsdQuote(quote.price_usd, quote.source, quote.observed_at),
+        watched=int(watched_raw) if watched_raw and watched_raw.isdigit() else None,
+        watched_reason="heartbeat_missing" if not watched_raw else None,
+    )
+    return out

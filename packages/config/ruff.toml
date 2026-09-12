@@ -29,8 +29,9 @@ ignore = [
 "**/conftest.py" = ["S101"]
 
 [lint.isort]
-known-first-party = ["hunter_core", "hunter_exchanges", "hunter_indicators", "hunter_risk", "hunter_api",
-  "hunter_market_worker", "hunter_scanner_worker", "hunter_strategy_worker", "hunter_execution_worker", "hunter_analytics_worker"]
+known-first-party = ["hunter_core", "hunter_exchanges", "hunter_indicators", "hunter_risk", "hunter_risk_meme", "hunter_api",
+  "hunter_market_worker", "hunter_scanner_worker", "hunter_strategy_worker", "hunter_execution_worker", "hunter_analytics_worker",
+  "hunter_meme_worker", "hunter_meme_executor"]
 
 [format]
 quote-style = "double"

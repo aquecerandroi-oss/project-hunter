@@ -7,10 +7,11 @@ Usage:
 
 Exit codes: 0 all PASS; 2 no FAIL but at least one PENDING; 1 any FAIL.
 
-T4.8 scope: the execution path (signer, verifier, submitter, quote) runs for real
-over the recorded mainnet fixtures with in-memory fakes of the RPC and journal. The
-risk engine of sections 4-7 (hunter_risk_meme) does not exist yet, so VM1/VM2/VM3/
-VM7 are PENDING by name, never faked green. Test keys: seeded RNG, in memory only.
+T4.8: the execution path (signer, verifier, submitter, quote) runs for real over the
+recorded mainnet fixtures with in-memory fakes. T4.14: VM1/VM2/VM3/VM7 run over the
+engine (``meme_vm_engine.py``); VM6(c) and the Postgres halves of VM8/VM9 stay PENDING
+by name (paper simulator / ``services/meme-executor/tests/test_live_persistence.py``).
+Test keys: seeded RNG, in memory only.
 """
 
 from __future__ import annotations
@@ -40,23 +41,24 @@ from hunter_exchanges.pumpfun.quote import CurveReserves, quote_buy
 from hunter_exchanges.pumpfun.solana_codec import serialize_message
 from hunter_exchanges.pumpfun.trade_event import trade_events_from_transaction
 from hunter_exchanges.pumpfun.tx import TradeIntent, build_buy_instruction, build_trade_message
-from hunter_exchanges.pumpfun.verify import (
-    ExecutionCaps,
-    UnverifiedTransaction,
-    verify_trade_message,
-)
+from hunter_exchanges.pumpfun.tx_rpc import SimulationResult
+from hunter_exchanges.pumpfun.verify import ExecutionCaps, UnverifiedTransaction
+from hunter_exchanges.pumpfun.verify import verify_trade_message as verify_message
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from meme_vm_engine import vm1_sizing, vm2_caps, vm3_kill_switch, vm7_rug_during_hold
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "packages/exchange-adapters/tests/fixtures/pumpfun"
 NOW = datetime(2026, 9, 12, 12, 0, tzinfo=UTC)
-ENGINE_MISSING = "hunter_risk_meme (RISK_ENGINE_MEME section 13) not built by any task yet"
+ENGINE_MISSING = "Postgres half: services/meme-executor/tests/test_live_persistence.py"
 TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"  # noqa: S105 - program id
 BLOCKHASH = "BQ8v5pyUzayNkgPghSBd36pVgG14SGLExT5kwWkmYZWJ"
-PENDING = {
-    "VM1": "sizing / binding_constraint / tied_limits / counterfactuals",
-    "VM2": "caps per trade, mint, wallet and day",
-    "VM3": "latched daily kill switch, resume by OWNER, 10 s re-read",
-    "VM7": "rug during hold -> forced exit, mint ban, wallet cooldown",
+ENGINE_VMS = {
+    "VM1": vm1_sizing,
+    "VM2": vm2_caps,
+    "VM3": vm3_kill_switch,
+    "VM7": vm7_rug_during_hold,
 }
 
 
@@ -65,11 +67,6 @@ class Outcome:
     vm: str
     status: str  # PASS | FAIL | PENDING
     detail: str
-
-
-class _Sim:
-    ok = True
-    err: Any = None
 
 
 @dataclass
@@ -86,10 +83,10 @@ class FakeRpc:
     status_calls: int = 0
     simulate_hook: Callable[[], None] | None = None
 
-    def simulate_transaction(self, transaction: bytes, **_: Any) -> _Sim:
+    def simulate_transaction(self, transaction: bytes, **_: Any) -> SimulationResult:
         if self.simulate_hook is not None:
             self.simulate_hook()
-        return _Sim()
+        return SimulationResult(True, None, (), None, None, None)
 
     def send_transaction(self, transaction: bytes, *, max_retries: int = 0) -> str:
         if self.send_error is not None:
@@ -121,7 +118,7 @@ class Scenario:
     caps: ExecutionCaps
 
     def verify(self, raw: bytes) -> object:
-        return verify_trade_message(raw, self.intent, self.global_account, self.caps)
+        return verify_message(raw, self.intent, self.global_account, self.caps)
 
     def approval(self, pid: str = "p1", *, expires: datetime | None = None) -> ApprovedSubmission:
         return ApprovedSubmission(pid, expires or NOW + timedelta(seconds=5), self.message, 150)
@@ -270,7 +267,7 @@ def vm8_restart_open_position() -> Outcome:
     detail = (
         f"rows rebuilt -> reconcile {after.state if after is not None else None} with the same "
         f"signature, nothing re-sent: {all(checks[:3])}; expired approval -> {late.reason}; "
-        "position rebuild + chain reconciliation of meme_positions: PENDING (T4.6/T4.7 tables)"
+        f"position rebuild + chain reconciliation of meme_live_positions: PENDING ({ENGINE_MISSING})"
     )
     return Outcome("VM8", "PENDING" if all(checks) else "FAIL", detail)
 
@@ -308,7 +305,7 @@ def adversarial_gate() -> Outcome:
     tampered = bytearray(sc.message)
     tampered[-9] ^= 0x01  # flip a bit inside max_sol_cost (last 8 bytes of the trade data)
     try:
-        verify_trade_message(bytes(tampered), sc.intent, sc.global_account, sc.caps)
+        verify_message(bytes(tampered), sc.intent, sc.global_account, sc.caps)
     except UnverifiedTransaction as exc:
         return Outcome("9.1", "PASS", f"tampered max_sol_cost refused: {exc.reason}")
     return Outcome("9.1", "FAIL", "tampered transaction was accepted")
@@ -319,17 +316,21 @@ def main() -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
-    def pending(vm: str) -> Outcome:
-        return Outcome(vm, "PENDING", f"{PENDING[vm]}: {ENGINE_MISSING}")
+    def engine(vm: str) -> Outcome:
+        try:
+            ok, detail = ENGINE_VMS[vm]()
+        except Exception as exc:
+            return Outcome(vm, "FAIL", f"{type(exc).__name__}: {exc}")
+        return Outcome(vm, "PASS" if ok else "FAIL", detail)
 
     outcomes = [
-        pending("VM1"),
-        pending("VM2"),
-        pending("VM3"),
+        engine("VM1"),
+        engine("VM2"),
+        engine("VM3"),
         vm4_duplicate_submission(),
         vm5_rpc_failure_midsend(),
         vm6_partial_or_no_fill(),
-        pending("VM7"),
+        engine("VM7"),
         vm8_restart_open_position(),
         vm9_concurrent_sessions(),
         adversarial_gate(),

@@ -26,6 +26,11 @@ from typing import TYPE_CHECKING, Any
 
 from hunter_core.db.session import role_session
 from hunter_core.logging import get_logger
+from hunter_meme_worker.lab_bets_pool import (
+    holds_through_migration,
+    process_pool_bet,
+    settle_command,
+)
 from hunter_meme_worker.lab_models import BetState, RuleSetSpec, Snapshot, money_str
 from hunter_meme_worker.lab_repo import apply_command, load_approved_proposals, pending_commands
 from hunter_meme_worker.lab_repo_bets import (
@@ -187,6 +192,10 @@ async def _process_one(
     intent: dict[str, Any] | None = dict(state.exit_intent) if state.exit_intent else None
     if intent is None and command is not None:
         intent = _sell_now_intent(command)
+    if holds_through_migration(bet):
+        # T4.11: the curve stopped being the venue and the set did not sell on
+        # that — from here the PumpSwap pool's tape marks and sells the position.
+        return await process_pool_bet(ctx, session, bet, command, intent=intent, now=now)
     after = state.mark_at or state.entry_at
     snapshots = await snapshots_after(session, mint=state.mint, after=after)
     lines, streak = await _line_state(ctx, session, state, after=after, now=now)
@@ -207,7 +216,7 @@ async def _process_one(
             )
             exit_.exit["trigger"] = intent.get("trigger")
             await close_bet_row(session, state.id, exit_, exit_intent=intent)
-            await _settle_command(session, command, intent, exit_.exit["reason"], now=now)
+            await settle_command(session, command, intent, exit_.exit["reason"], now=now)
             logger.info(
                 "meme_lab_bet_closed",
                 bet_id=state.id,
@@ -267,7 +276,7 @@ async def _process_one(
         return "marked" if last is not None else "unchanged"
     exit_ = close_without_snapshot(state, now=now, pending_reason=pending_reason)
     await close_bet_row(session, state.id, exit_, exit_intent=intent)
-    await _settle_command(session, command, intent, "rug_no_snapshot", now=now)
+    await settle_command(session, command, intent, "rug_no_snapshot", now=now)
     logger.warning(
         "meme_lab_bet_closed_without_snapshot",
         bet_id=state.id,
@@ -299,23 +308,3 @@ async def _line_state(
     if seed is None:
         return lines, None
     return lines, next_streak(None, below_support(seed.mcap_sol, support_at(lines, after)))
-
-
-async def _settle_command(
-    session: AsyncSession,
-    command: CommandRow | None,
-    intent: Mapping[str, Any] | None,
-    exit_reason: str,
-    *,
-    now: datetime,
-) -> None:
-    """The operator's order is answered when the bet closes, whichever rule won."""
-    if command is None:
-        return
-    applied = intent is not None and intent.get("command_id") == command.id
-    await apply_command(
-        session,
-        command.id,
-        now=now,
-        result={"status": "applied" if applied else "superseded", "exit_reason": exit_reason},
-    )

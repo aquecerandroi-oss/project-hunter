@@ -6,6 +6,7 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
+
 from hunter_meme_worker.sources import (
     PUMPFUN_REST,
     SWAP_API,

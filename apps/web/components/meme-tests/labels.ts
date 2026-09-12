@@ -56,7 +56,7 @@ const LAB_CONTEXT_REASON_LABEL: Record<MemeLabContextReason, string> = {
 
 export function labContextReasonLabel(reason: string | null | undefined): string | null {
   if (!reason) return null;
-  return (MEME_LAB_CONTEXT_REASONS as readonly string[]).includes(reason) ? LAB_CONTEXT_REASON_LABEL[reason as MemeLabContextReason] : "contexto não previsto";
+  return (MEME_LAB_CONTEXT_REASONS as readonly string[]).includes(reason) ? (LAB_CONTEXT_REASON_LABEL[reason as MemeLabContextReason] ?? "contexto não previsto") : "contexto não previsto";
 }
 
 /** `meme_features_1m.line_reason` (0026) -- why no support line could be drawn that minute. */

@@ -18,6 +18,10 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import pytest
+from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError, ProgrammingError
+
+from hunter_core.db.session import role_session
 from hunter_meme_worker.features import (
     NO_HOLDERS_READER,
     NO_TRADE_FEED,
@@ -37,10 +41,6 @@ from hunter_meme_worker.repo import (
     record_gap,
     upsert_token,
 )
-from sqlalchemy import text
-from sqlalchemy.exc import DBAPIError, ProgrammingError
-
-from hunter_core.db.session import role_session
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker

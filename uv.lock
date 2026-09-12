@@ -11,6 +11,7 @@ members = [
     "hunter-execution-worker",
     "hunter-indicators",
     "hunter-market-worker",
+    "hunter-meme-executor",
     "hunter-meme-worker",
     "hunter-risk",
     "hunter-scanner-worker",
@@ -686,6 +687,23 @@ requires-dist = [
     { name = "hunter-core", editable = "packages/core" },
     { name = "hunter-exchanges", editable = "packages/exchange-adapters" },
     { name = "msgpack", specifier = ">=1.1" },
+]
+
+[[package]]
+name = "hunter-meme-executor"
+version = "0.0.0"
+source = { editable = "services/meme-executor" }
+dependencies = [
+    { name = "hunter-core" },
+    { name = "hunter-exchanges" },
+    { name = "hunter-risk" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "hunter-core", editable = "packages/core" },
+    { name = "hunter-exchanges", editable = "packages/exchange-adapters" },
+    { name = "hunter-risk", editable = "packages/risk-core" },
 ]
 
 [[package]]

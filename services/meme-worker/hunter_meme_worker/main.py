@@ -55,6 +55,7 @@ from hunter_meme_worker.mayhem import mayhem_once
 from hunter_meme_worker.metrics import meme_tracked_mints
 from hunter_meme_worker.repo import load_tracked
 from hunter_meme_worker.tracker import MintTracker
+from hunter_meme_worker.wallets import build_wallets, wallets_once
 from hunter_meme_worker.wiring import (
     build_boards,
     build_risk,
@@ -112,6 +113,7 @@ def build_context(
         # The same client, the same 60/60 s bucket: a global-params read is a
         # curve read not made, once an hour (T4.2d).
         params=GlobalParamsStore(curves, refresh_s=config.global_params_refresh_s),
+        wallets=build_wallets(config, sources),
     ), board_clients
 
 
@@ -188,6 +190,11 @@ def _register_health(
         if ctx.risk is None
         else f"{len(ctx.risk.last_read)} mints read"
     )
+    runtime.status_details["wallets"] = lambda: (
+        "disabled (MEME_WATCH_WALLETS empty)"
+        if ctx.wallets is None
+        else ctx.wallets.describe(utcnow())
+    )
 
 
 def _register_lab_health(runtime: WorkerRuntime, lab: LabContext | None) -> None:
@@ -252,6 +259,7 @@ async def run_meme(runtime: WorkerRuntime) -> None:
         swap_api_budget_60s=config.swap_api_budget_60s,
         chain_curves=config.chain_curves_enabled,
         risk=ctx.risk is not None,
+        wallets=len(config.watch_wallets),
     )
 
     async def _discovery(context: RadarContext) -> None:
@@ -302,6 +310,12 @@ async def run_meme(runtime: WorkerRuntime) -> None:
                 group.create_task(
                     forever("risk", config.risk_cycle_s, risk_once, ctx), name="meme-risk"
                 )
+            if ctx.wallets is not None:
+                # T4.12: the observed wallets' real fills, every 30 s, own RPC bucket.
+                group.create_task(
+                    forever("wallets", config.wallets_cycle_s, wallets_once, ctx),
+                    name="meme-wallets",
+                )
             if lab is not None:
                 group.create_task(
                     forever("lab", config.lab_cycle_s, lab_once, lab), name="meme-lab"
@@ -314,7 +328,7 @@ async def run_meme(runtime: WorkerRuntime) -> None:
 
 async def _close(ctx: RadarContext, boards: dict[str, TrenchesWsClient]) -> None:
     """Close whatever the clients own. Best effort: shutdown must not raise."""
-    clients: list[object] = [ctx.events, ctx.curves, ctx.chain, *boards.values()]
+    clients: list[object] = [ctx.events, ctx.curves, ctx.chain, ctx.wallets, *boards.values()]
     for client in clients:
         closer = getattr(client, "aclose", None)
         if closer is None:

@@ -192,6 +192,23 @@ class MemeConfig:
     """``/global-params`` is re-read once an hour (T4.2d): one request of the
     curve budget for a record that changed last on 2025-07-18."""
 
+    watch_wallets: tuple[str, ...] = ()
+    """``MEME_WATCH_WALLETS`` (T4.12): public Solana addresses, comma-separated,
+    whose real pump.fun fills the radar reads from the chain — **never a key**.
+    Empty (the default) means no wallet loop, and the readiness body says so.
+    A malformed entry is dropped with a warning, never a crash loop."""
+
+    wallets_cycle_s: float = 30.0
+    """One ``getSignaturesForAddress`` per wallet every 30 s, plus one
+    ``getTransaction`` per new signature — the brief's cadence."""
+
+    wallets_rpc_per_s: int = 2
+    """The wallet loop's own bucket on the public RPC: at most two requests a
+    second, whatever the chain loop spends beside it."""
+
+    wallets_signature_page: int = 100
+    """Signatures asked for per wallet per cycle (the node caps at 1000)."""
+
 
 def _int_env(name: str, default: int) -> int:
     """An integer knob of this worker, or its default. A malformed value is the
@@ -240,6 +257,7 @@ def load_config(settings: Settings) -> MemeConfig:
         risk_enabled=_bool_env("MEME_RISK_ENABLED", default=True),
         chain_curves_enabled=_bool_env("MEME_CHAIN_CURVES_ENABLED", default=True),
         rest_mayhem_refresh_s=max(60, _int_env("MEME_REST_MAYHEM_REFRESH_S", 300)),
+        watch_wallets=_wallets_env("MEME_WATCH_WALLETS"),
     )
 
 
@@ -248,3 +266,22 @@ def _bool_env(name: str, *, default: bool) -> bool:
     if not raw:
         return default
     return raw in {"1", "true", "yes"}
+
+
+_BASE58 = frozenset("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
+
+
+def _wallets_env(name: str) -> tuple[str, ...]:
+    """Public addresses, comma-separated; an entry that is not base58 of a
+    pubkey's length (32–44) is dropped **and warned**, never fatal."""
+    wallets: list[str] = []
+    for entry in os.environ.get(name, "").split(","):
+        address = entry.strip()
+        if not address:
+            continue
+        if 32 <= len(address) <= 44 and set(address) <= _BASE58:
+            if address not in wallets:
+                wallets.append(address)
+        else:
+            get_logger(__name__).warning("meme_config_invalid", variable=name, value=address[:8])
+    return tuple(wallets)

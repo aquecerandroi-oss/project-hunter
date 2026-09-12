@@ -10,6 +10,7 @@ import sys
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -140,3 +141,68 @@ def test_the_day_is_brasilia_and_the_drawdown_is_the_deepest_fall() -> None:
         [Decimal("0.1"), Decimal("-0.05"), Decimal("-0.1"), Decimal("0.3")]
     ) == Decimal("0.15")
     assert max_drawdown([Decimal("-0.02")]) == Decimal("0.02"), "a first loss counts from zero"
+
+
+def test_the_real_observed_section_is_labelled_and_reads_the_labs_verdict() -> None:
+    """T4.12: section 2b sits between 2 and 3, carries the REAL label, and a buy's
+    line says what every gate said — read from ``lab_context``, never invented."""
+    from meme_diary_render import WalletTradeLine
+    from meme_diary_wallets import lab_verdicts_of
+
+    context: dict[str, Any] = {
+        "reason": None,
+        "rule_sets": {
+            "meme_paper_v0/1": {"accepted": False, "refusals": ["creator_net_seller_unknown"]},
+            "hype_probe_v0/1": {"accepted": True, "refusals": []},
+            "trendline_v0/1": {"accepted": None, "refusals": []},
+        },
+    }
+    assert lab_verdicts_of(context) == {
+        "meme_paper_v0/1": "creator_net_seller_unknown",
+        "hype_probe_v0/1": "aceito",
+        "trendline_v0/1": "sem linha de features",
+    }
+    assert lab_verdicts_of(None) == {} and lab_verdicts_of({"reason": "no_features_row"}) == {}
+    buy = WalletTradeLine(
+        wallet="6nAh8drzAYfFZuTFFRgwRdV8tNndFiX1E8NGRAGzSk5F",
+        mint="5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump",
+        side="buy",
+        venue="curve",
+        block_time=datetime(2026, 9, 12, 16, 14, 9, tzinfo=UTC),
+        sol_total=Decimal("0.9900885"),
+        token_amount=Decimal("22628881.309131"),
+        reason=None,
+        lab_verdicts=lab_verdicts_of(context),
+        position_status="open",
+        realized_pnl_sol=Decimal(0),
+        r_multiple=None,
+    )
+    ghost = WalletTradeLine(
+        wallet=buy.wallet,
+        mint=None,
+        side="unknown",
+        venue=None,
+        block_time=None,
+        sol_total=None,
+        token_amount=None,
+        reason="transaction_not_found",
+        lab_verdicts={},
+        position_status=None,
+        realized_pnl_sol=None,
+        r_multiple=None,
+    )
+    note = render_diary(_inputs(real_observed=[buy, ghost]))
+    section = note.split("## 2b.")[1].split("## 3.")[0]
+    assert note.index("## 2.") < note.index("## 2b.") < note.index("## 3.")
+    assert "REAL — observado na cadeia, não executado por este sistema" in section
+    assert (
+        "| `6nAh8drz` | `5ejAEbzxiZuwUNgZcoryoAY8gA5oCAVJZx5AyDnApump` | compra | curve | 13:14:09 | 0.990088 | 22628881.31 | open | 0 |"
+        in section
+    )
+    assert (
+        "`hype_probe_v0/1`: aceito" in section
+        and "`meme_paper_v0/1`: creator_net_seller_unknown" in section
+    )
+    assert "desconhecido (transaction_not_found)" in section and "— (não decodificado)" in section
+    empty = render_diary(_inputs())
+    assert "Nenhuma operação real observada neste dia" in empty

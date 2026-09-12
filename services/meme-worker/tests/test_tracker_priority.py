@@ -12,6 +12,8 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+
+from hunter_exchanges.pumpfun.models import NormalizedMemeMigration, NormalizedMemeTokenCreated
 from hunter_meme_worker.discovery import token_row_from_event
 from hunter_meme_worker.tracker import (
     TIER_FINAL_READ,
@@ -23,8 +25,6 @@ from hunter_meme_worker.tracker import (
     MintTracker,
     TrackedMint,
 )
-
-from hunter_exchanges.pumpfun.models import NormalizedMemeMigration, NormalizedMemeTokenCreated
 
 pytestmark = pytest.mark.unit
 

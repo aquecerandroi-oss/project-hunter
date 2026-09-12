@@ -88,7 +88,11 @@ def envelopes_for(chunks: Sequence[Any], exchange: str, *, producer: str) -> lis
     not imported by name, or this module would import the one that imports it."""
     return [
         envelope_for(
-            chunk.target.market_id, chunk.target.symbol, exchange, chunk.gap_start, chunk.gap_end,
+            chunk.target.market_id,
+            chunk.target.symbol,
+            exchange,
+            chunk.gap_start,
+            chunk.gap_end,
             producer=producer,
         )
         for chunk in chunks

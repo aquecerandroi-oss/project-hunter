@@ -18,11 +18,11 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import pytest
-from hunter_meme_worker.graduation import GLOBAL_PARAMS, POOL_SOURCE_TRENCHES
-from hunter_meme_worker.repo import TokenRow, load_tracked, upsert_token
 from sqlalchemy import text
 
 from hunter_core.db.session import role_session
+from hunter_meme_worker.graduation import GLOBAL_PARAMS, POOL_SOURCE_TRENCHES
+from hunter_meme_worker.repo import TokenRow, load_tracked, upsert_token
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker

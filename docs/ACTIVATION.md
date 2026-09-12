@@ -778,6 +778,54 @@ VPS, o que ele faz é um `INSERT` — nenhum valor guardado é reescrito, e se
 algum dia a linha divergir do que o build carrega o próprio seed **para** com o
 nome do campo divergente em vez de sobrescrever.
 
+## 9b. Executor real de memecoins — o que o Everton digita e decide (T4.14)
+
+Nada desta lista é feito por agente; cada item é um ato dele. Contrato:
+`docs/RISK_ENGINE_MEME.md` (§3, §12); operação: `docs/DEPLOYMENT.md` §3.7; schema:
+`docs/DATABASE.md` §40.
+
+1. **Os cinco números de política** (§3.1, coluna "live" — hoje vazia de propósito):
+   `MEME_WALLET_MAX_SOL` (o que aceita perder **inteiro**), `MEME_MAX_SOL_PER_TRADE`,
+   `MEME_DAILY_LOSS_CAP_SOL`, `MEME_MAX_OPEN_POSITIONS`, `MEME_COOLDOWN_S`. Sem os cinco
+   o executor recusa subir com a flag ligada (`policy_missing`, nomes na mensagem).
+2. **A decisão escrita**, porque os Portões A (VM1–VM9 na VPS + 7 dias de papel) e B
+   (EXP-M1: ≥ 100 operações e ≥ 30 dias) estão **vermelhos** hoje: um arquivo
+   `obsidian/06-DECISIONS/AAAA-MM-DD-teste-pequeno-meme-real.md` dizendo o escopo
+   (`max_sol_per_trade`, `max_total_sol`, `max_trades`, validade). O executor lê o
+   `meme_gates.json` com `small_test_authorization` apontando para esse arquivo; o escopo
+   vira teto **adicional** (`min` com os cinco acima) e contador de compras
+   (`small_test_scope_exhausted` depois de `max_trades`).
+3. **`meme_gates.json`** em `/opt/project-hunter/run/meme/` (formato em
+   `packages/core/hunter_core/execution/meme/gates.py`), assinado por ele, com validade.
+4. **O `.env` da VPS**: `ENABLE_MEME_LIVE_TRADING` ligada, `SOLANA_WALLET_SECRET_KEY`
+   (a carteira **dedicada**, criada por ele, com saldo ≤ `MEME_WALLET_MAX_SOL` — saldo
+   acima recusa entradas, `wallet_over_max_sol`), `SOLANA_RPC_URL` (RPC próprio com
+   chave), `MEME_GATES_FILE=/run/hunter/meme_gates.json`, e — só se quiser liquidação
+   automática em `EMERGENCY` (§14.4) — `MEME_AUTO_CLOSE_ON_EMERGENCY=true`.
+5. **Subir**: `MEME_LIVE=1 MEME=1 MEME_ENABLED=true bash infra/vps/compose.sh update`;
+   conferir `hb:meme:executor` (`live_enabled=true`, `gates`, `wallet_pubkey`, `policy`,
+   `kill_switch=ACTIVE`) e `GET /api/v1/orgs/ever/meme/live` (`executor.status=alive`).
+6. **Aprovar REAL na mesa**: a proposta entra com `"mode": "live"` em
+   `POST …/meme/proposals/{id}/approve` (ou `…/proposals/manual`) — recusada
+   `meme_live_disabled` enquanto a API não tiver a mesma flag. **A tela ainda não tem o
+   botão "Aprovar (REAL)"** (a T4.14 não tocou `apps/web`; o que a mesa precisa renderizar
+   está em `.claude/state/notes-T4.14.md` §7): até lá é `curl`/HTTP com `Idempotency-Key`.
+   O laço de papel continua preenchendo a mesma proposta em sombra, para comparar.
+7. **Vender agora**: `POST …/meme/live/positions/{id}/sell-now` (TRADER+,
+   `Idempotency-Key`); o executor vende na curva na passada seguinte, ao preço de então.
+8. **Desligar em 5 s**: `touch /opt/project-hunter/run/meme/meme.kill` (§3.7); a trava
+   diária só sai pelo `UPDATE` dele.
+
+**O que não está pronto e ele precisa saber antes de ligar:** (a) venda **depois** da
+migração para a PumpSwap não existe — uma posição que migrar fica `open` com
+`blocked: pumpswap_sell_not_implemented` e sai só pelo site, na mão; com `max_hold_s`
+curto o `time_stop` vende antes na curva; (b) a devnet não foi exercida (faucet público
+recusou de novo) — a prova de ponta a ponta é a simulação na mainnet pelo caminho do
+executor, sem envio; (c) os checks 10–12 e 21 dependem do que o radar mede
+(`meme_features_1m`): mint sem `bundled_share` medido é recusado
+`bundled_share_unmeasurable`, sem volume orgânico é `volume_unavailable` — é a doutrina
+"insumo ausente não vira zero", não um defeito.
+
 ## Onde acompanhar
 `/ever/portfolio` (patrimônio, kill switch, curva), `/ever/system` (worker, `autonomy`, pendências, proteções), `hb:execution:paper` no Redis, `obsidian/05-EXPERIMENTS/EXP-0005-momentum-paper.md`.
 

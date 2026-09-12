@@ -14,6 +14,7 @@ from hunter_core.execution.meme.gates import (
     MemeExecutionMode,
     MemeGates,
     MemeLiveTradingRefused,
+    SmallTestAuthorization,
     load_execution_mode,
     load_gates,
 )
@@ -63,6 +64,7 @@ __all__ = [
     "SecretKeyMissing",
     "SignerError",
     "SigningLocked",
+    "SmallTestAuthorization",
     "SubmitPolicy",
     "SubmitResult",
     "SubmitState",

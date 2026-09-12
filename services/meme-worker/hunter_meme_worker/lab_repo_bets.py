@@ -18,6 +18,7 @@ from sqlalchemy import text
 
 from hunter_core.domain.types import uuid7
 from hunter_meme_worker.lab_models import (
+    MARK_CURVE,
     BetEntry,
     BetExit,
     BetState,
@@ -75,12 +76,13 @@ _EXPOSURE = text(
 
 _INSERT_BET = text(
     "INSERT INTO meme_paper_bets (id, proposal_id, rule_set_id, mint, mode, status, entry_at, "
-    "  entry, initial_risk_sol, params, mark_sol, mark_at, high_water_x, sol_usd_at_entry, "
-    "  leg, parent_bet_id) "
+    "  entry, initial_risk_sol, params, mark_sol, mark_at, mark_source, high_water_x, "
+    "  sol_usd_at_entry, leg, parent_bet_id) "
     "VALUES (:id, :proposal_id, :rule_set_id, :mint, 'paper', 'open', :entry_at, "
     "  CAST(:entry AS jsonb), :initial_risk_sol, CAST(:params AS jsonb), :mark_sol, :entry_at, "
-    "  :high_water_x, :sol_usd_at_entry, :leg, CAST(:parent_bet_id AS uuid))"
+    "  'curve', :high_water_x, :sol_usd_at_entry, :leg, CAST(:parent_bet_id AS uuid))"
 )
+"""The first mark is the fill's own snapshot — a curve mark by construction."""
 _FILL_PROPOSAL = text(
     "UPDATE meme_proposals SET status = 'filled', bet_id = :bet_id "
     "WHERE id = :id AND status = 'approved'"
@@ -93,8 +95,8 @@ _UNFILL_PROPOSAL = text(
 _OPEN_BETS = text(
     "SELECT b.id, b.proposal_id, b.rule_set_id, b.mint, b.entry_at, b.entry, b.initial_risk_sol, "
     "       b.params, b.high_water_x, b.mark_sol, b.mark_at, b.exit_intent, "
-    "       b.leg, b.parent_bet_id, "
-    "       t.migrated_at, t.completed_at, "
+    "       b.leg, b.parent_bet_id, b.mark_source, b.mark_stale_s, "
+    "       t.migrated_at, t.completed_at, t.total_supply, t.creator, "
     "       (SELECT f.creator_sold FROM meme_features_1m f WHERE f.mint = b.mint "
     "          AND f.creator_sold IS NOT NULL ORDER BY f.end_time DESC LIMIT 1) AS creator_sold "
     "FROM meme_paper_bets b LEFT JOIN meme_tokens t ON t.mint = b.mint "
@@ -102,13 +104,15 @@ _OPEN_BETS = text(
 )
 _UPDATE_MARK = text(
     "UPDATE meme_paper_bets SET mark_sol = :mark_sol, mark_at = :mark_at, "
-    "  high_water_x = :high_water_x, exit_intent = CAST(:exit_intent AS jsonb) "
+    "  high_water_x = :high_water_x, exit_intent = CAST(:exit_intent AS jsonb), "
+    "  mark_source = :mark_source, mark_stale_s = :mark_stale_s "
     "WHERE id = :id AND status = 'open'"
 )
 _CLOSE_BET = text(
     "UPDATE meme_paper_bets SET status = 'closed', exit_at = :exit_at, exit = CAST(:exit AS jsonb), "
     "  pnl_sol = :pnl_sol, r_multiple = :r_multiple, sol_usd_at_exit = :sol_usd_at_exit, "
-    "  mark_sol = :mark_sol, mark_at = :exit_at, "
+    "  mark_sol = :mark_sol, mark_at = :exit_at, mark_stale_s = NULL, "
+    "  mark_source = coalesce(:mark_source, mark_source), "
     "  exit_intent = coalesce(CAST(:exit_intent AS jsonb), exit_intent) "
     "WHERE id = :id AND status = 'open'"
 )
@@ -204,6 +208,8 @@ async def load_open_bets(session: AsyncSession) -> list[OpenBet]:
             priority_fee_sol=decimal_of(entry["priority_fee_sol"]),
             leg=str(r["leg"]),
             parent_bet_id=None if r["parent_bet_id"] is None else str(r["parent_bet_id"]),
+            mark_source=str(r["mark_source"] or MARK_CURVE),
+            mark_stale_s=None if r["mark_stale_s"] is None else int(r["mark_stale_s"]),
         )
         out.append(
             OpenBet(
@@ -211,6 +217,8 @@ async def load_open_bets(session: AsyncSession) -> list[OpenBet]:
                 migrated_at=r["migrated_at"],
                 completed_at=r["completed_at"],
                 creator_net_seller=r["creator_sold"],
+                total_supply=r["total_supply"],
+                creator=None if r["creator"] is None else str(r["creator"]),
             )
         )
     return out
@@ -224,6 +232,8 @@ async def update_mark(
     mark_at: datetime,
     high_water_x: Decimal,
     exit_intent: dict[str, Any] | None,
+    mark_source: str = MARK_CURVE,
+    mark_stale_s: int | None = None,
 ) -> None:
     await session.execute(
         _UPDATE_MARK,
@@ -233,6 +243,8 @@ async def update_mark(
             "mark_at": mark_at,
             "high_water_x": high_water_x,
             "exit_intent": None if exit_intent is None else json.dumps(exit_intent),
+            "mark_source": mark_source,
+            "mark_stale_s": mark_stale_s,
         },
     )
 
@@ -243,9 +255,11 @@ async def close_bet_row(
     closed: BetExit,
     *,
     exit_intent: dict[str, Any] | None = None,
+    mark_source: str | None = None,
 ) -> None:
     """Close the bet; the rule that fired stays on the row even when the trigger
-    and the sale landed in the same tick and no mark was written between."""
+    and the sale landed in the same tick and no mark was written between.
+    ``mark_source`` names what priced the sale when it was not the curve."""
     await session.execute(
         _CLOSE_BET,
         {
@@ -257,5 +271,6 @@ async def close_bet_row(
             "r_multiple": closed.r_multiple,
             "sol_usd_at_exit": closed.sol_usd_at_exit,
             "mark_sol": Decimal(closed.exit.get("sol_received", "0")),
+            "mark_source": mark_source,
         },
     )

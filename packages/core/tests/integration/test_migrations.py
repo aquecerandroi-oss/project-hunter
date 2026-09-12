@@ -39,7 +39,7 @@ from .conftest import REPO_ROOT, alembic_config, async_engine, create_database, 
 
 pytestmark = pytest.mark.integration
 
-HEAD_REVISION = "0026_meme_lines"
+HEAD_REVISION = "0029_meme_moonshot"
 """The revision ``upgrade head`` must reach. Bumped by every new revision, on
 purpose: it is the one place that notices a revision file that never ran."""
 
@@ -75,6 +75,15 @@ that the day ``0025_meme_mayhem_denominator`` landed."""
 MEME_MAYHEM_REVISION = "0025_meme_mayhem_denominator"
 """And again: the ``0025`` tests reverse **0025**, and ``"-1"`` stopped meaning
 that the day ``0026_meme_lines`` landed."""
+MEME_LINES_REVISION = "0026_meme_lines"
+"""And again: the ``0026`` tests reverse **0026**, and ``"-1"`` stopped meaning
+that the day ``0027_meme_wallets`` landed."""
+MEME_WALLETS_REVISION = "0027_meme_wallets"
+"""What reversing **0028** lands on — and where the ``0027`` tests stage the
+database first, because ``"-1"`` stopped meaning 0027 the day 0028 landed."""
+MEME_LIVE_REVISION = "0028_meme_live"
+"""What reversing **0029** lands on (T4.11) — and where the ``0028`` tests must
+stage first, because ``"-1"`` stopped meaning 0028 the day 0029 landed."""
 """Named for the same reason as the line below: the two ``0019`` tests are about
 reversing **0019**, and ``"-1"`` stopped meaning that the day a revision landed on
 top of it. They now stage the database at this revision first, exactly as every
@@ -4234,17 +4243,21 @@ def test_0022_seeds_the_two_rule_sets_the_contract_names(upgraded: str) -> None:
     """The seed is part of the revision: a Lab with no rule set would be a loop
     that runs and proposes nothing while looking alive."""
     # By id: ``0026`` seeds two more active sets on top (``trendline_v0``,
-    # ``hype_probe_v0``); this test is about the two ``0022`` planted.
+    # ``hype_probe_v0``) and ``0029`` three more while retiring ``operator/1``
+    # (``operator/2`` takes over); this test is about the two ``0022`` planted.
     seeds = {"a": _RESEARCH_RULE_SET, "b": "01994d00-6c1a-7000-8000-000000000002"}
     rows = asyncio.run(
         _scalars(
             upgraded,
             "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') "
-            "FROM meme_rule_sets WHERE status = 'active' AND id IN (:a, :b) ORDER BY name",
+            "|| ':' || status FROM meme_rule_sets WHERE id IN (:a, :b) ORDER BY name",
             dict(seeds),
         )
     )
-    assert rows == ["meme_paper_v0/1:research_only:EXP-M1", "operator/1:operator:-"]
+    assert rows == [
+        "meme_paper_v0/1:research_only:EXP-M1:active",
+        "operator/1:operator:-:retired",
+    ]
     sizes = asyncio.run(
         _scalars(
             upgraded,
@@ -4378,10 +4391,11 @@ def test_0022_reverses_with_the_seed_alone_and_comes_back_seeded(upgraded: str) 
     assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     for relation in (*MEME_LAB_TABLES, *MEME_LAB_VIEWS):
         assert asyncio.run(_relation_exists(upgraded, relation)), relation
-    # ``0022``'s two plus ``0026``'s two, all re-seeded on the way back up.
+    # ``0022``'s two plus ``0026``'s two plus ``0029``'s three, minus ``operator/1``
+    # (retired by ``0029``), all re-seeded on the way back up.
     assert asyncio.run(
         _scalars(upgraded, "SELECT count(*)::text FROM meme_rule_sets WHERE status = 'active'", {})
-    ) == ["4"]
+    ) == ["6"]
     assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_paper_bets")) == {
         "SELECT",
         "INSERT",
@@ -5123,22 +5137,31 @@ def test_0026_adds_the_columns_their_checks_and_seeds_the_two_arms(upgraded: str
 
 
 def test_0026_refuses_a_downgrade_that_would_lose_a_leg_or_a_line(upgraded: str) -> None:
-    """§17.7: a probe and the lines a fold drew are evidence — count, name, stop."""
+    """§17.7: a probe and the lines a fold drew are evidence — count, name, stop.
+    Staged at **0026** first (``"-1"`` stopped meaning 0026 the day ``0027``
+    and ``0028`` landed on top), then put back at ``head``."""
     config = alembic_config(upgraded)
-    asyncio.run(_write(upgraded, _a_legged_bet(4, _RESEARCH_RULE_SET, "probe", None)))
+    command.downgrade(config, MEME_LINES_REVISION)
     try:
-        with pytest.raises(DBAPIError, match="carry a leg"):
-            command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, "the downgrade must not commit"
+        asyncio.run(_write(upgraded, _a_legged_bet(4, _RESEARCH_RULE_SET, "probe", None)))
+        try:
+            with pytest.raises(DBAPIError, match="carry a leg"):
+                command.downgrade(config, "-1")
+            assert asyncio.run(_revision(upgraded)) == MEME_LINES_REVISION, (
+                "the downgrade must not commit"
+            )
+        finally:
+            asyncio.run(_write(upgraded, list(_CLEAN_0026)))
+        asyncio.run(_write(upgraded, [_a_v3_row("L26_GUARD")]))
+        try:
+            with pytest.raises(DBAPIError, match="carry the lines"):
+                command.downgrade(config, "-1")
+            assert asyncio.run(_revision(upgraded)) == MEME_LINES_REVISION
+        finally:
+            asyncio.run(_write(upgraded, list(_CLEAN_0026)))
     finally:
-        asyncio.run(_write(upgraded, list(_CLEAN_0026)))
-    asyncio.run(_write(upgraded, [_a_v3_row("L26_GUARD")]))
-    try:
-        with pytest.raises(DBAPIError, match="carry the lines"):
-            command.downgrade(config, "-1")
-        assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
-    finally:
-        asyncio.run(_write(upgraded, list(_CLEAN_0026)))
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
     command.check(config)
 
 
@@ -5146,7 +5169,7 @@ def test_0026_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
     """The operator's rollback: the columns and the seed go, the ``0025`` schema
     is exactly what it was, and the upgrade restores both."""
     config = alembic_config(upgraded)
-    command.downgrade(config, "-1")
+    command.downgrade(config, MEME_MAYHEM_REVISION)  # through 0028, 0027, then 0026
     try:
         assert asyncio.run(_revision(upgraded)) == MEME_MAYHEM_REVISION
         assert asyncio.run(
@@ -5181,4 +5204,763 @@ def test_0026_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None
         "INSERT",
         "UPDATE",
     }
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0029_meme_moonshot — marks on the pool tape, the venue of a trade, the 10x/25x arms (T4.11)
+# ---------------------------------------------------------------------------
+
+_MOONSHOT_10X_RULE_SET = "01994d00-6c1a-7000-8000-000000000005"
+_MOONSHOT_25X_RULE_SET = "01994d00-6c1a-7000-8000-000000000006"
+_OPERATOR_2_RULE_SET = "01994d00-6c1a-7000-8000-000000000007"
+_OPERATOR_1_RULE_SET = "01994d00-6c1a-7000-8000-000000000002"
+_A_MARKED_BET = (
+    "INSERT INTO meme_paper_bets (id, proposal_id, rule_set_id, mint, mode, entry_at, entry, "
+    "  initial_risk_sol, params, mark_sol, mark_at, mark_source, mark_stale_s) VALUES (:id, "
+    "  :proposal, :rule_set, 'GUARD_MINT', 'paper', now(), '{}'::jsonb, 0.02, '{}'::jsonb, "
+    "  CAST(:mark_sol AS numeric), CAST(:mark_at AS timestamptz), :mark_source, "
+    "  CAST(:stale AS integer))"
+)
+_A_VENUE_TRADE = (
+    "INSERT INTO meme_trades (block_time, signature, event_index, mint, slot, trader, side, "
+    "  sol_lamports, token_amount, price, quote_mint, token_decimals, source, program) VALUES "
+    "('2026-10-05T12:00:00Z', :signature, 0, 'POOL_MINT', 446390104, 'TRADER', 'sell', 54396031, "
+    "  113499.73695, 0.0000004793, '11111111111111111111111111111111', 6, 'swap_api', :program)"
+)
+_CLEAN_0029: tuple[tuple[str, dict[str, object]], ...] = (
+    ("DELETE FROM meme_paper_bets WHERE mint = 'GUARD_MINT'", {}),
+    ("DELETE FROM meme_proposals WHERE mint = 'GUARD_MINT'", {}),
+    ("DELETE FROM meme_trades WHERE mint = 'POOL_MINT'", {}),
+)
+_SEEDED_0029 = {"a": _MOONSHOT_10X_RULE_SET, "b": _MOONSHOT_25X_RULE_SET, "c": _OPERATOR_2_RULE_SET}
+
+
+def _a_marked_bet(
+    ordinal: int,
+    rule_set: str,
+    *,
+    mark_sol: Decimal | None = Decimal("0.01"),
+    mark_source: str | None = "curve",
+    stale: int | None = None,
+) -> list[tuple[str, dict[str, object]]]:
+    proposal = f"00000000-0000-4000-8000-0000000004{ordinal:02d}"
+    bet = f"00000000-0000-4000-8000-0000000005{ordinal:02d}"
+    return [
+        (_A_PROPOSAL, {"id": proposal, "rule_set": rule_set}),
+        (
+            _A_MARKED_BET,
+            {
+                "id": bet,
+                "proposal": proposal,
+                "rule_set": rule_set,
+                "mark_sol": mark_sol,
+                "mark_at": None if mark_sol is None else datetime(2026, 10, 5, 12, tzinfo=UTC),
+                "mark_source": mark_source,
+                "stale": stale,
+            },
+        ),
+    ]
+
+
+def test_0029_adds_the_mark_and_venue_columns_and_seeds_the_moonshot_arms(upgraded: str) -> None:
+    """Two columns on the bet, one on the trade, their CHECKs, the two arms and
+    ``operator/2`` with the brief's frozen parameters, ``operator/1`` retired."""
+    ddl = migration_ddl("meme_moonshot")
+    for table, frozen in (
+        ("meme_paper_bets", cast("tuple[str, ...]", ddl.BET_COLUMNS_0029)),
+        ("meme_trades", cast("tuple[str, ...]", ddl.TRADE_COLUMNS_0029)),
+    ):
+        names = ", ".join(f"'{column}'" for column in frozen)
+        present = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT column_name FROM information_schema.columns "  # noqa: S608
+                f"WHERE table_name = '{table}' AND column_name IN ({names})",
+                {},
+            )
+        )
+        assert set(present) == set(frozen), table
+    seeds = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version || ':' || kind || ':' || coalesce(exp_ref, '-') || ':' "
+            "|| status || ':' || (params ->> 'target_x') || ':' || (params ->> 'size_sol') || ':' "
+            "|| (params ->> 'trailing_pct') || ':' || (params ->> 'trailing_arm_x') || ':' "
+            "|| (params ->> 'max_hold_s') || ':' || (params ->> 'exit_on_migration') || ':' "
+            "|| (params ->> 'exit_on_dead') || ':' || (params ->> 'dead_stale_s') || ':' "
+            "|| (params ->> 'dead_mark_pct') || ':' || (params ->> 'max_open_positions') || ':' "
+            "|| (params ->> 'daily_loss_cap_sol') || ':' || (params ->> 'gate_key') "
+            "FROM meme_rule_sets WHERE id IN (:a, :b, :c) ORDER BY name, version",
+            dict(_SEEDED_0029),
+        )
+    )
+    assert seeds == [
+        "moonshot_v0/1:research_only:EXP-M4:active:10:0.02:50:3:7200:false:true:900:50:8:0.20"
+        ":sonda_de_hype",
+        "moonshot_v0/2:research_only:EXP-M4:active:25:0.02:50:3:7200:false:true:900:50:8:0.20"
+        ":sonda_de_hype",
+        "operator/2:operator:-:active:10:0.05:50:3:7200:false:true:900:50:3:0.20"
+        ":comprar_cedo_na_curva",
+    ]
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT status || ':' || (retired_at IS NOT NULL)::text FROM meme_rule_sets "
+            "WHERE id = :id",
+            {"id": _OPERATOR_1_RULE_SET},
+        )
+    ) == ["retired:true"]
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT name || '/' || version FROM meme_rule_sets WHERE name = 'operator' "
+            "AND status = 'active'",
+            {},
+        )
+    ) == ["operator/2"], "exactly one active operator set for the desk's manual buys"
+    try:
+        asyncio.run(
+            _write(
+                upgraded, _a_marked_bet(1, _RESEARCH_RULE_SET, mark_source="pool_tape", stale=930)
+            )
+        )
+        asyncio.run(
+            _write(upgraded, _a_marked_bet(2, _RESEARCH_RULE_SET, mark_sol=None, mark_source=None))
+        )
+        refused: list[tuple[dict[str, object], str]] = [
+            ({"mark_source": "blog"}, "mark_source_is_a_known_label"),
+            ({"mark_source": None}, "a_mark_names_its_source"),
+            ({"mark_sol": None, "mark_source": "curve"}, "a_mark_names_its_source"),
+            ({"stale": -1}, "mark_stale_s_is_not_negative"),
+        ]
+        for overrides, constraint in refused:
+            with pytest.raises(DBAPIError, match=constraint):
+                asyncio.run(_write(upgraded, _a_marked_bet(3, _RESEARCH_RULE_SET, **overrides)))  # type: ignore[arg-type]
+        asyncio.run(
+            _write(
+                upgraded, [(_A_VENUE_TRADE, {"signature": "SIG_POOL_0029", "program": "pump_amm"})]
+            )
+        )
+        with pytest.raises(DBAPIError, match="program_is_a_known_label"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [(_A_VENUE_TRADE, {"signature": "SIG_RAY_0029", "program": "raydium_cpmm"})],
+                )
+            )
+        venues = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT coalesce(program, '-') FROM meme_trades WHERE mint = 'POOL_MINT'",
+                {},
+            )
+        )
+        assert venues == ["pump_amm"]
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0029)))
+
+
+def test_0029_refuses_a_downgrade_that_would_lose_the_pool_tape_or_a_moonshot(
+    upgraded: str,
+) -> None:
+    """§17.7: a pool trade, a pool-marked bet and a bet under a seeded set are
+    evidence — count, name, stop."""
+    config = alembic_config(upgraded)
+    guarded: list[tuple[list[tuple[str, dict[str, object]]], str]] = [
+        (
+            [(_A_VENUE_TRADE, {"signature": "SIG_POOL_GUARD", "program": "pump_amm"})],
+            "pool trades exist",
+        ),
+        (
+            _a_marked_bet(4, _RESEARCH_RULE_SET, mark_source="pool_tape", stale=0),
+            "marked or closed on the pool",
+        ),
+        (_a_marked_bet(5, _MOONSHOT_10X_RULE_SET), "reference the seeded moonshot"),
+    ]
+    for statements, message in guarded:
+        asyncio.run(_write(upgraded, statements))
+        try:
+            with pytest.raises(DBAPIError, match=message):
+                command.downgrade(config, "-1")
+            assert asyncio.run(_revision(upgraded)) == HEAD_REVISION, (
+                "the downgrade must not commit"
+            )
+        finally:
+            asyncio.run(_write(upgraded, list(_CLEAN_0029)))
+    command.check(config)
+
+
+def test_0029_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    """The operator's rollback: the columns and the seed go, ``operator/1``
+    comes back active, the ``0028`` schema is what it was; the upgrade restores all."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, "-1")
+    try:
+        assert asyncio.run(_revision(upgraded)) == MEME_LIVE_REVISION
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM information_schema.columns "
+                "WHERE (table_name = 'meme_paper_bets' "
+                "       AND column_name IN ('mark_source', 'mark_stale_s')) "
+                "OR (table_name = 'meme_trades' AND column_name = 'program')",
+                {},
+            )
+        ) == ["0"]
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM meme_rule_sets WHERE id IN (:a, :b, :c)",
+                dict(_SEEDED_0029),
+            )
+        ) == ["0"]
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT status || ':' || (retired_at IS NOT NULL)::text FROM meme_rule_sets "
+                "WHERE id = :id",
+                {"id": _OPERATOR_1_RULE_SET},
+            )
+        ) == ["active:false"], "operator/1 is the desk's set again below 0029"
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT count(*)::text FROM meme_rule_sets WHERE id IN (:a, :b, :c) "
+            "AND status = 'active'",
+            dict(_SEEDED_0029),
+        )
+    ) == ["3"]
+    assert asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT status FROM meme_rule_sets WHERE id = :id",
+            {"id": _OPERATOR_1_RULE_SET},
+        )
+    ) == ["retired"]
+    assert asyncio.run(_table_privileges(upgraded, "hunter_worker", "meme_trades")) == {
+        "SELECT",
+        "INSERT",
+    }
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0027_meme_wallets — the observed wallet's real fills and positions (T4.12)
+# ---------------------------------------------------------------------------
+
+_W27 = "W27_6nAh8drzAYfFZuTFFRgwRdV8tNndFiX1E8NGRAGzSk5F"
+_A_WALLET_TRADE = (
+    "INSERT INTO meme_wallet_trades (wallet, signature, event_index, slot, block_time, mint, "
+    "  side, venue, sol_lamports, token_amount, fee_lamports, decode, raw, lab_context) "
+    "VALUES (:wallet, :signature, 0, 1, CAST(:block_time AS timestamptz), :mint, :side, :venue, "
+    "  :sol, :tokens, :fee, :decode, CAST(:raw AS jsonb), CAST(:lab AS jsonb))"
+)
+_A_WALLET_POSITION = (
+    "INSERT INTO meme_wallet_positions (wallet, mint, status, tokens_held, sol_spent, "
+    "  sol_received, open_cost_sol, realized_pnl_sol, buys, sells, first_buy_at, last_trade_at, "
+    "  mark_sol, mark_at, mark_source, mark_reason, unrealized_pnl_sol, r_multiple) "
+    "VALUES (:wallet, :mint, :status, :held, :spent, :received, :open_cost, :realized, :buys, "
+    "  :sells, CAST(:first_buy_at AS timestamptz), CAST(:last_trade_at AS timestamptz), "
+    "  :mark_sol, CAST(:mark_at AS timestamptz), :mark_source, :mark_reason, :unrealized, :r)"
+)
+_CLEAN_0027: tuple[tuple[str, dict[str, object]], ...] = (
+    ("DELETE FROM meme_wallet_positions WHERE wallet LIKE 'W27_%'", {}),
+    ("DELETE FROM meme_wallet_trades WHERE wallet LIKE 'W27_%'", {}),
+)
+
+
+def _a_wallet_trade(signature: str, **overrides: object) -> tuple[str, dict[str, object]]:
+    params: dict[str, object] = {
+        "wallet": _W27,
+        "signature": signature,
+        "block_time": datetime(2026, 10, 5, 12, 0, tzinfo=UTC),
+        "mint": "W27_MINT",
+        "side": "buy",
+        "venue": "curve",
+        "sol": 977_777_777,
+        "tokens": Decimal("22628881.309131"),
+        "fee": 12_310_723,
+        "decode": "trade_event",
+        "raw": "{}",
+        "lab": None,
+    }
+    params.update(overrides)
+    return _A_WALLET_TRADE, params
+
+
+def _a_wallet_position(**overrides: object) -> tuple[str, dict[str, object]]:
+    params: dict[str, object] = {
+        "wallet": _W27,
+        "mint": "W27_MINT",
+        "status": "open",
+        "held": Decimal(5),
+        "spent": Decimal(3),
+        "received": Decimal("4.5"),
+        "open_cost": Decimal(1),
+        "realized": Decimal("2.5"),
+        "buys": 2,
+        "sells": 1,
+        "first_buy_at": datetime(2026, 10, 5, 12, 0, tzinfo=UTC),
+        "last_trade_at": datetime(2026, 10, 5, 12, 2, tzinfo=UTC),
+        "mark_sol": Decimal("1.5"),
+        "mark_at": datetime(2026, 10, 5, 12, 3, tzinfo=UTC),
+        "mark_source": "tape",
+        "mark_reason": None,
+        "unrealized": Decimal("0.5"),
+        "r": Decimal(1),
+    }
+    params.update(overrides)
+    return _A_WALLET_POSITION, params
+
+
+def test_0027_creates_the_ledger_the_positions_the_board_rows_and_the_grants(
+    upgraded: str,
+) -> None:
+    """Two tables with their CHECKs, dedupe by signature as the schema's own
+    fact, the API reading and the loop appending/updating, and the wallet on
+    the scoreboard as ``wallet:<8>`` / ``real_observed`` with no dollar figure."""
+    wallets = migration_ddl("meme_wallets")
+    tables = cast("tuple[str, ...]", wallets.MEME_WALLET_TABLES_0027)
+    present = asyncio.run(
+        _scalars(
+            upgraded,
+            "SELECT tablename FROM pg_tables WHERE tablename LIKE 'meme_wallet_%'",
+            {},
+        )
+    )
+    assert set(present) == set(tables) == {"meme_wallet_trades", "meme_wallet_positions"}
+    for table in tables:
+        assert asyncio.run(_table_privileges(upgraded, "hunter_app", table)) == {"SELECT"}
+        assert asyncio.run(_table_privileges(upgraded, "hunter_worker", table)) == {
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+        }
+    try:
+        asyncio.run(_write(upgraded, [_a_wallet_trade("W27_BUY", lab='{"reason": null}')]))
+        asyncio.run(_write(upgraded, [_a_wallet_trade("W27_SELL", side="sell", sol=724_716_993)]))
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    _a_wallet_trade(
+                        "W27_GHOST",
+                        side="unknown",
+                        venue=None,
+                        mint=None,
+                        sol=None,
+                        tokens=None,
+                        fee=None,
+                        decode="none",
+                        raw='{"reason": "transaction_not_found"}',
+                    )
+                ],
+            )
+        )
+        refused: list[tuple[dict[str, object], str]] = [
+            ({"side": "unknown", "decode": "none", "raw": None}, "an_unknown_keeps_the_raw"),
+            ({"decode": "none"}, "an_unknown_is_what_nothing_decoded"),
+            ({"mint": None}, "a_fill_carries_its_numbers"),
+            ({"side": "sell", "lab": "{}"}, "lab_context_belongs_to_a_buy"),
+            ({"venue": "dex"}, "venue_is_a_known_label"),
+        ]
+        for overrides, constraint in refused:
+            with pytest.raises(DBAPIError, match=constraint):
+                asyncio.run(_write(upgraded, [_a_wallet_trade("W27_BAD", **overrides)]))
+        with pytest.raises(DBAPIError, match="pk_meme_wallet_trades"):  # dedupe by signature
+            asyncio.run(_write(upgraded, [_a_wallet_trade("W27_BUY")]))
+        asyncio.run(_write(upgraded, [_a_wallet_position()]))
+        refused_positions: list[tuple[dict[str, object], str]] = [
+            ({"mint": "W27_X", "status": "closed"}, "a_closed_position_holds_nothing"),
+            ({"mint": "W27_X", "mark_at": None}, "a_mark_names_its_source_and_when"),
+            ({"mint": "W27_X", "buys": 0}, "a_buy_says_when"),
+            ({"mint": "W27_X", "mark_source": "oracle"}, "mark_source_is_a_known_label"),
+        ]
+        for overrides, constraint in refused_positions:
+            with pytest.raises(DBAPIError, match=constraint):
+                asyncio.run(_write(upgraded, [_a_wallet_position(**overrides)]))
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    _a_wallet_position(
+                        mint="W27_DONE",
+                        status="closed",
+                        held=Decimal(0),
+                        open_cost=Decimal(0),
+                        mark_sol=None,
+                        mark_at=None,
+                        mark_source=None,
+                        mark_reason="closed",
+                        unrealized=None,
+                        r=Decimal("0.8333"),
+                    )
+                ],
+            )
+        )
+        board = asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT name || ':' || version || ':' || kind || ':' || coalesce(exp_ref, '-') "
+                "|| ':' || rule_set_status || ':' || day_brt::text || ':' || bets || ':' || closed "
+                "|| ':' || wins || ':' || coalesce(pnl_sol::text, '-') || ':' "
+                "|| coalesce(pnl_usd::text, '-') || ':' || unpriced_usd || ':' "
+                "|| coalesce(r_sum::text, '-') || ':' || rugs "
+                "|| ':' || (rule_set_id = md5('wallet:' || :wallet)::uuid)::text "
+                "FROM meme_lab_scoreboard_v1 WHERE kind = 'real_observed'",
+                {"wallet": _W27},
+            )
+        )
+        assert board == [
+            "wallet:W27_6nAh:1:real_observed:-:active:2026-10-05:2:1:1:2.5000000000:-:1:"
+            "0.8333000000:0:true"
+        ]
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0027)))
+
+
+def test_0027_refuses_a_downgrade_that_would_lose_an_observed_trade(upgraded: str) -> None:
+    """§17.7: a real fill observed on the chain is evidence — count, name, stop.
+    Staged at **0027** first (``0028`` sits on top), then put back at ``head``."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, MEME_WALLETS_REVISION)
+    try:
+        asyncio.run(_write(upgraded, [_a_wallet_trade("W27_GUARD")]))
+        try:
+            with pytest.raises(DBAPIError, match="real fills observed on the chain"):
+                command.downgrade(config, "-1")
+            assert asyncio.run(_revision(upgraded)) == MEME_WALLETS_REVISION, (
+                "the downgrade must not commit"
+            )
+        finally:
+            asyncio.run(_write(upgraded, list(_CLEAN_0027)))
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+def test_0027_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    """The operator's rollback: the two tables go, the board is ``0022``'s again
+    (no reference to the positions), and the upgrade restores all three."""
+    config = alembic_config(upgraded)
+    uses_positions = (
+        "SELECT count(*)::text FROM information_schema.view_table_usage "
+        "WHERE view_name = 'meme_lab_scoreboard_v1' AND table_name = 'meme_wallet_positions'"
+    )
+    command.downgrade(config, MEME_LINES_REVISION)  # through 0028, then 0027
+    try:
+        assert asyncio.run(_revision(upgraded)) == MEME_LINES_REVISION
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM pg_tables WHERE tablename LIKE 'meme_wallet_%'",
+                {},
+            )
+        ) == ["0"]
+        assert asyncio.run(_scalars(upgraded, uses_positions, {})) == ["0"]
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM pg_views WHERE viewname = 'meme_lab_scoreboard_v1'",
+                {},
+            )
+        ) == ["1"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_scalars(upgraded, uses_positions, {})) == ["1"]
+    assert asyncio.run(_table_privileges(upgraded, "hunter_app", "meme_lab_scoreboard_v1")) == {
+        "SELECT"
+    }
+    command.check(config)
+
+
+# ---------------------------------------------------------------------------
+# 0028_meme_live — the executor's ledger: the proposal's mode, the real orders,
+# the real positions and the durable daily latch (T4.14)
+# ---------------------------------------------------------------------------
+
+_P28 = "00000000-0000-4000-8000-000000002801"
+_O28 = "00000000-0000-4000-8000-000000002802"
+_A_LIVE_PROPOSAL = (
+    "INSERT INTO meme_proposals (id, mint, rule_set_id, origin, status, expires_at, "
+    "  decision, decided_by, decided_at, mode) VALUES (:id, 'GUARD_MINT', :rule_set, "
+    "  'operator', 'approved', now() + interval '2 minutes', '{}'::jsonb, 'user', now(), :mode)"
+)
+_A_LIVE_ORDER = (
+    "INSERT INTO meme_live_orders (id, proposal_id, side, client_order_id, attempt, status, "
+    "  reason, tx_signature, signatures, fill) VALUES (:id, :proposal, :side, :key, :attempt, "
+    "  :status, :reason, :signature, CAST(:signatures AS jsonb), CAST(:fill AS jsonb))"
+)
+_A_LIVE_POSITION = (
+    "INSERT INTO meme_live_positions (id, proposal_id, entry_order_id, mint, status, entry_at, "
+    "  entry, tokens, sol_spent_lamports, initial_risk_sol, params, mark_sol, mark_at, "
+    "  mark_source, sell_requested_at, sell_requested_by, exit_at, exit, pnl_sol, r_multiple) "
+    "VALUES (:id, :proposal, :order, 'GUARD_MINT', :status, now() - interval '1 minute', "
+    "  '{}'::jsonb, :tokens, :spent, :risk, '{}'::jsonb, :mark_sol, :mark_at, :mark_source, "
+    "  :sell_at, :sell_by, :exit_at, CAST(:exit AS jsonb), :pnl, :r)"
+)
+_CLEAN_0028: tuple[tuple[str, dict[str, object]], ...] = (
+    ("DELETE FROM meme_live_positions WHERE mint = 'GUARD_MINT'", {}),
+    (
+        "DELETE FROM meme_live_orders WHERE proposal_id IN "
+        "(SELECT id FROM meme_proposals WHERE mint = 'GUARD_MINT')",
+        {},
+    ),
+    ("DELETE FROM meme_proposals WHERE mint = 'GUARD_MINT'", {}),
+)
+
+
+def _a_live_order(**overrides: object) -> tuple[str, dict[str, object]]:
+    params: dict[str, object] = {
+        "id": _O28,
+        "proposal": _P28,
+        "side": "buy",
+        "key": f"meme:{_P28}",
+        "attempt": 1,
+        "status": "admitted",
+        "reason": None,
+        "signature": None,
+        "signatures": "[]",
+        "fill": None,
+    }
+    params.update(overrides)
+    return _A_LIVE_ORDER, params
+
+
+def _a_live_position(**overrides: object) -> tuple[str, dict[str, object]]:
+    params: dict[str, object] = {
+        "id": "00000000-0000-4000-8000-000000002803",
+        "proposal": _P28,
+        "order": _O28,
+        "status": "open",
+        "tokens": 1_000_000,
+        "spent": 10_000_000,
+        "risk": Decimal("0.01"),
+        "mark_sol": None,
+        "mark_at": None,
+        "mark_source": None,
+        "sell_at": None,
+        "sell_by": None,
+        "exit_at": None,
+        "exit": None,
+        "pnl": None,
+        "r": None,
+    }
+    params.update(overrides)
+    return _A_LIVE_POSITION, params
+
+
+async def _column_privilege(url: str, role: str, table: str, column: str, privilege: str) -> bool:
+    engine = async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            return bool(
+                await connection.scalar(
+                    text("SELECT has_column_privilege(:role, :table, :column, :privilege)"),
+                    {"role": role, "table": table, "column": column, "privilege": privilege},
+                )
+            )
+    finally:
+        await engine.dispose()
+
+
+def test_0028_adds_the_mode_the_ledger_the_latch_and_the_grants(upgraded: str) -> None:
+    """One defaulted column, three tables with their CHECKs, the two idempotency
+    keys as the schema's own facts, the seeded ``wallet`` scope, and the API able
+    to ask for a sale and to file ``mode`` — and nothing else."""
+    live = migration_ddl("meme_live")
+    tables = cast("tuple[str, ...]", live.MEME_LIVE_TABLES_0028)
+    present = asyncio.run(
+        _scalars(upgraded, "SELECT tablename FROM pg_tables WHERE tablename LIKE 'meme_live_%'", {})
+    )
+    assert (
+        set(present)
+        == set(tables)
+        == {
+            "meme_live_orders",
+            "meme_live_positions",
+            "meme_live_kill_switch",
+        }
+    )
+    for table in tables:
+        assert asyncio.run(_table_privileges(upgraded, "hunter_worker", table)) == {
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+        }
+        app = asyncio.run(_table_privileges(upgraded, "hunter_app", table))
+        assert "DELETE" not in app and "INSERT" not in app
+    for table in cast("tuple[str, ...]", live.MEME_LIVE_APP_READ_ONLY_TABLES):
+        assert asyncio.run(_table_privileges(upgraded, "hunter_app", table)) == {"SELECT"}
+    for column in cast("tuple[str, ...]", live.MEME_LIVE_SELL_REQUEST_COLUMNS):
+        assert asyncio.run(
+            _column_privilege(upgraded, "hunter_app", "meme_live_positions", column, "UPDATE")
+        )
+    for column in ("status", "tokens", "exit_at", "mark_sol"):
+        assert not asyncio.run(
+            _column_privilege(upgraded, "hunter_app", "meme_live_positions", column, "UPDATE")
+        )
+    assert asyncio.run(
+        _column_privilege(upgraded, "hunter_app", "meme_proposals", "mode", "UPDATE")
+    )
+    assert not asyncio.run(
+        _column_privilege(upgraded, "hunter_app", "meme_proposals", "mint", "UPDATE")
+    ), "0022 granted the four decision columns; 0028 adds exactly `mode`"
+    assert asyncio.run(
+        _scalars(upgraded, "SELECT scope || ':' || state FROM meme_live_kill_switch", {})
+    ) == ["wallet:ACTIVE"]
+    try:
+        # The defaulted column: a proposal of yesterday is ``paper`` without saying so.
+        asyncio.run(_write(upgraded, [(_A_PROPOSAL, {"id": _P28, "rule_set": _RESEARCH_RULE_SET})]))
+        assert asyncio.run(
+            _scalars(upgraded, "SELECT mode FROM meme_proposals WHERE id = :id", {"id": _P28})
+        ) == ["paper"]
+        with pytest.raises(DBAPIError, match="ck_meme_proposals_mode_is_a_known_label"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [("UPDATE meme_proposals SET mode = 'real' WHERE id = :id", {"id": _P28})],
+                )
+            )
+        refused_orders: list[tuple[dict[str, object], str]] = [
+            ({"status": "refused"}, "a_refusal_or_failure_names_its_reason"),
+            ({"status": "failed"}, "a_refusal_or_failure_names_its_reason"),
+            ({"status": "submitted_unconfirmed"}, "a_sent_order_has_a_signature"),
+            ({"status": "confirmed", "signature": "S28"}, "a_confirmed_order_carries_its_fill"),
+            ({"status": "landed", "reason": "x"}, "status_is_a_known_label"),
+            ({"side": "hold"}, "side_is_a_known_label"),
+            ({"attempt": 0}, "attempt_is_positive"),
+        ]
+        for overrides, constraint in refused_orders:
+            with pytest.raises(DBAPIError, match=constraint):
+                asyncio.run(_write(upgraded, [_a_live_order(**overrides)]))
+        asyncio.run(
+            _write(
+                upgraded,
+                [
+                    _a_live_order(
+                        status="confirmed",
+                        signature="S28_BUY",
+                        signatures='["S28_BUY"]',
+                        fill='{"token_amount": 1000000}',
+                    )
+                ],
+            )
+        )
+        # The two idempotency keys of §9.4: one buy per proposal, one order per signature.
+        with pytest.raises(DBAPIError, match="uq_meme_live_orders_one_buy_per_proposal"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [
+                        _a_live_order(
+                            id="00000000-0000-4000-8000-000000002809", key=f"meme:{_P28}:again"
+                        )
+                    ],
+                )
+            )
+        with pytest.raises(DBAPIError, match="uq_meme_live_orders_tx_signature"):
+            asyncio.run(
+                _write(
+                    upgraded,
+                    [
+                        _a_live_order(
+                            id="00000000-0000-4000-8000-000000002810",
+                            side="sell",
+                            key=f"meme:{_P28}:exit:1",
+                            status="submitted_unconfirmed",
+                            signature="S28_BUY",
+                            signatures='["S28_BUY"]',
+                        )
+                    ],
+                )
+            )
+        refused_positions: list[tuple[dict[str, object], str]] = [
+            ({"status": "closed"}, "a_closed_position_says_when"),
+            ({"mark_sol": Decimal("0.01")}, "a_mark_says_when_and_whence"),
+            ({"sell_at": datetime(2026, 9, 12, tzinfo=UTC)}, "a_sell_request_names_who"),
+            ({"spent": 0}, "the_risk_is_what_was_spent"),
+            (
+                {
+                    "status": "closed",
+                    "exit_at": datetime(2026, 9, 12, 15, tzinfo=UTC),
+                    "exit": "{}",
+                    "pnl": Decimal("0.001"),
+                },
+                "an_exit_carries_its_numbers",
+            ),
+        ]
+        for overrides, constraint in refused_positions:
+            with pytest.raises(DBAPIError, match=constraint):
+                asyncio.run(_write(upgraded, [_a_live_position(**overrides)]))
+        asyncio.run(_write(upgraded, [_a_live_position()]))
+        with pytest.raises(DBAPIError, match="uq_meme_live_positions_proposal_id"):
+            asyncio.run(
+                _write(upgraded, [_a_live_position(id="00000000-0000-4000-8000-000000002811")])
+            )
+    finally:
+        asyncio.run(_write(upgraded, list(_CLEAN_0028)))
+
+
+def test_0028_refuses_a_downgrade_that_would_lose_a_real_order(upgraded: str) -> None:
+    """§17.7: a signed order and a live decision are evidence — count, name, stop.
+    Staged at **0028** first (``0029`` sits on top), then put back at ``head``."""
+    config = alembic_config(upgraded)
+    command.downgrade(config, MEME_LIVE_REVISION)
+    try:
+        asyncio.run(
+            _write(
+                upgraded,
+                [(_A_LIVE_PROPOSAL, {"id": _P28, "rule_set": _RESEARCH_RULE_SET, "mode": "live"})],
+            )
+        )
+        try:
+            with pytest.raises(DBAPIError, match="real signatures and real decisions"):
+                command.downgrade(config, "-1")
+            assert asyncio.run(_revision(upgraded)) == MEME_LIVE_REVISION, (
+                "the downgrade must not commit"
+            )
+            asyncio.run(_write(upgraded, [_a_live_order()]))
+            with pytest.raises(DBAPIError, match="1 meme_live_orders rows"):
+                command.downgrade(config, "-1")
+        finally:
+            asyncio.run(_write(upgraded, list(_CLEAN_0028)))
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    command.check(config)
+
+
+def test_0028_reverses_on_a_clean_database_and_comes_back(upgraded: str) -> None:
+    """The operator's rollback: the three tables and the column go, ``0027`` is
+    what it was; the upgrade restores all and re-seeds the ``wallet`` scope."""
+    config = alembic_config(upgraded)
+    mode_column = (
+        "SELECT count(*)::text FROM information_schema.columns "
+        "WHERE table_name = 'meme_proposals' AND column_name = 'mode'"
+    )
+    command.downgrade(config, MEME_WALLETS_REVISION)  # through 0029, then 0028
+    try:
+        assert asyncio.run(_revision(upgraded)) == MEME_WALLETS_REVISION
+        assert asyncio.run(
+            _scalars(
+                upgraded,
+                "SELECT count(*)::text FROM pg_tables WHERE tablename LIKE 'meme_live_%'",
+                {},
+            )
+        ) == ["0"]
+        assert asyncio.run(_scalars(upgraded, mode_column, {})) == ["0"]
+    finally:
+        command.upgrade(config, "head")
+    assert asyncio.run(_revision(upgraded)) == HEAD_REVISION
+    assert asyncio.run(_scalars(upgraded, mode_column, {})) == ["1"]
+    assert asyncio.run(
+        _scalars(upgraded, "SELECT scope || ':' || state FROM meme_live_kill_switch", {})
+    ) == ["wallet:ACTIVE"]
     command.check(config)

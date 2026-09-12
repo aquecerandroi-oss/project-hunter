@@ -15,9 +15,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from hunter_meme_worker.discovery import token_row_from_event
 
 from hunter_exchanges.pumpfun import normalize
+from hunter_meme_worker.discovery import token_row_from_event
 
 pytestmark = pytest.mark.unit
 

@@ -79,6 +79,8 @@ class ProposalRow:
     decided_at: datetime | None
     bet_id: uuid.UUID | None
     refusal: str | None
+    mode: str = "paper"
+    """0028 (T4.14): ``paper`` | ``live``; defaulted so every existing caller stays paper."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +107,10 @@ class BetRow:
     leg: str = "single"
     parent_bet_id: uuid.UUID | None = None
     """``0026`` (T4.10): defaults so a row mapped without the columns is ``single``."""
+    mark_source: str | None = None
+    mark_stale_s: int | None = None
+    """``0029`` (T4.11): what priced the mark and how stale the tape was; ``None``
+    on a row mapped without the columns — never a fabricated ``curve``."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,6 +263,7 @@ def proposal_from_mapping(r: RowMapping) -> ProposalRow:
         decided_at=_optional(r["decided_at"]),
         bet_id=r["bet_id"],
         refusal=r["refusal"],
+        mode=str(r.get("mode") or "paper"),
     )
 
 
@@ -283,6 +290,8 @@ def bet_from_mapping(r: RowMapping) -> BetRow:
         sol_usd_at_exit=r["sol_usd_at_exit"],
         leg=str(r.get("leg") or "single"),
         parent_bet_id=r.get("parent_bet_id"),
+        mark_source=None if r.get("mark_source") is None else str(r["mark_source"]),
+        mark_stale_s=None if r.get("mark_stale_s") is None else int(r["mark_stale_s"]),
     )
 
 

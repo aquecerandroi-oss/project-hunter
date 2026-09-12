@@ -96,7 +96,9 @@ from hunter_core.db.models.meme_lab import (
     MemeProposal,
     MemeRuleSet,
 )
+from hunter_core.db.models.meme_live import MemeLiveKillSwitch, MemeLiveOrder, MemeLivePosition
 from hunter_core.db.models.meme_series import MemeCurveSnapshot, MemeTrade
+from hunter_core.db.models.meme_wallets import MemeWalletPosition, MemeWalletTrade
 from hunter_core.db.models.paper_execution import ParticipationConsumption, PortfolioExitIntent
 from hunter_core.db.models.paper_wallet import PortfolioCurrencyAnchor, PortfolioRiskState
 from hunter_core.db.models.portfolios import Portfolio, PortfolioEquitySnapshot, RiskProfile
@@ -210,6 +212,9 @@ __all__ = [
     "MemeCurveSnapshot",
     "MemeFeatures1m",
     "MemeIngestGap",
+    "MemeLiveKillSwitch",
+    "MemeLiveOrder",
+    "MemeLivePosition",
     "MemeOperatorCommand",
     "MemePaperBet",
     "MemeProposal",
@@ -217,6 +222,8 @@ __all__ = [
     "MemeRuleSet",
     "MemeToken",
     "MemeTrade",
+    "MemeWalletPosition",
+    "MemeWalletTrade",
     "Notification",
     "OpenInterestHistory",
     "Opportunity",

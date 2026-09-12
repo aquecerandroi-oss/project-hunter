@@ -14,6 +14,15 @@ row was accepted only when ``quote_is_native_sol`` held (``swap_api.py``);
 ``token_decimals`` is 6 because the curve's token is (``normalize.py`` refuses
 any other on the curve read). Dedupe is the schema's
 ``ON CONFLICT (block_time, signature, event_index) DO NOTHING``.
+
+**Two venues since T4.11** (``meme_trades.program``, ``0029``): the bonding
+curve (``pump``) and the canonical PumpSwap pool the mint migrates into
+(``pump_amm``) — the tape of a bet that holds through the migration
+(EXP-M4). Any other venue (``raydium_cpmm`` was observed live) is still
+skipped, as ``unsupported_venue``. The two reads the **fold** makes stay
+curve-only (``coalesce(program, 'pump') = 'pump'``), so ``meme_features_v3``
+means today exactly what it meant yesterday; the pool's tape is read by
+``lab_repo_pool.py``.
 """
 
 from __future__ import annotations
@@ -36,6 +45,11 @@ if TYPE_CHECKING:
 
 CURVE_TOKEN_DECIMALS = 6
 SWAP_API_SOURCE = "swap_api"
+CURVE_PROGRAM = "pump"
+POOL_PROGRAM = "pump_amm"
+PROGRAMS: tuple[str, ...] = (CURVE_PROGRAM, POOL_PROGRAM)
+"""``meme_trades.program`` (``0029``): the curve and the canonical PumpSwap pool."""
+UNSUPPORTED_VENUE = "unsupported_venue"
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,15 +74,16 @@ class TradeRow:
     inner_ix_index: int | None = None
     is_mayhem_agent: bool | None = None
     source: str = SWAP_API_SOURCE
+    program: str = CURVE_PROGRAM
 
 
 def trade_rows(trades: Sequence[NormalizedSwapTrade]) -> tuple[list[TradeRow], dict[str, int]]:
-    """Curve trades in native SOL become rows; the rest is counted by reason."""
+    """Curve and pool trades in native SOL become rows; the rest is counted by reason."""
     skipped: dict[str, int] = {}
-    accepted = [t for t in trades if t.is_bonding_curve and t.quote_is_native_sol]
+    accepted = [t for t in trades if t.program in PROGRAMS and t.quote_is_native_sol]
     for trade in trades:
-        if not trade.is_bonding_curve:
-            skipped["not_bonding_curve"] = skipped.get("not_bonding_curve", 0) + 1
+        if trade.program not in PROGRAMS:
+            skipped[UNSUPPORTED_VENUE] = skipped.get(UNSUPPORTED_VENUE, 0) + 1
         elif not trade.quote_is_native_sol:
             skipped["unsupported_quote"] = skipped.get("unsupported_quote", 0) + 1
     ordinal: dict[str, int] = {}
@@ -90,6 +105,7 @@ def trade_rows(trades: Sequence[NormalizedSwapTrade]) -> tuple[list[TradeRow], d
                 sol_lamports=trade.sol_lamports,
                 token_amount=trade.token_amount,
                 price=trade.price,
+                program=trade.program,
             )
         )
     return rows, skipped
@@ -113,18 +129,19 @@ async def insert_trades(session: AsyncSession, rows: Sequence[TradeRow]) -> int:
 
 _TAPE_MINUTE = text(
     "SELECT mint, block_time, received_at, trader, side, sol_lamports FROM meme_trades "
-    "WHERE mint = ANY(:mints) AND source = 'swap_api' "
+    "WHERE mint = ANY(:mints) AND source = 'swap_api' AND coalesce(program, 'pump') = 'pump' "
     "  AND block_time > :start AND block_time <= :end_time AND received_at <= :end_time"
 )
 _TAPE_CREATOR = text(
     "SELECT t.mint, t.block_time, t.received_at, t.trader, t.side, t.sol_lamports "
     "FROM meme_trades t JOIN meme_tokens k ON k.mint = t.mint AND k.creator = t.trader "
-    "WHERE t.mint = ANY(:mints) AND t.source = 'swap_api' "
+    "WHERE t.mint = ANY(:mints) AND t.source = 'swap_api' AND coalesce(t.program, 'pump') = 'pump' "
     "  AND t.block_time <= :end_time AND t.received_at <= :end_time"
 )
 """Two reads with the same non-anticipation predicate (``received_at <=
 end_time``): the minute's window for the counts, and the creator's whole
-covered tape for ``creator_sold``/``creator_net_seller``."""
+covered tape for ``creator_sold``/``creator_net_seller``. Both curve-only
+(``0029``): a row written before the column is a curve row by construction."""
 
 _OPEN_BETS = text("SELECT DISTINCT mint FROM meme_paper_bets WHERE status = 'open'")
 
@@ -168,8 +185,12 @@ async def open_bet_mints(session: AsyncSession) -> frozenset[str]:
 
 
 __all__ = [
+    "CURVE_PROGRAM",
     "CURVE_TOKEN_DECIMALS",
+    "POOL_PROGRAM",
+    "PROGRAMS",
     "SWAP_API_SOURCE",
+    "UNSUPPORTED_VENUE",
     "TradeRow",
     "insert_trades",
     "load_tape",

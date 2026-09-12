@@ -16,4 +16,7 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["hunter_risk"]
+# T4.14: ``hunter_risk_meme`` is the sibling engine of docs/RISK_ENGINE_MEME.md §13 —
+# same distribution, separate package, never imported by ``hunter_risk`` (nor the
+# reverse; ``tests/unit/meme/test_boundary.py`` proves it).
+packages = ["hunter_risk", "hunter_risk_meme"]

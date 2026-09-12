@@ -63,6 +63,27 @@ class BetLine:
 
 
 @dataclass(frozen=True, slots=True)
+class WalletTradeLine:
+    """One real fill of an observed wallet (T4.12, ``meme_wallet_trades``)."""
+
+    wallet: str
+    mint: str | None
+    side: str
+    venue: str | None
+    block_time: datetime | None
+    sol_total: Decimal | None
+    """A buy: SOL spent, fees included; a sell: SOL netted; ``None`` for ``unknown``."""
+    token_amount: Decimal | None
+    reason: str | None
+    lab_verdicts: Mapping[str, str]
+    """Per rule set, ``aceito`` or the refusals joined — what the Lab said in
+    the minute before a buy; empty for a sell or an unknown."""
+    position_status: str | None
+    realized_pnl_sol: Decimal | None
+    r_multiple: Decimal | None
+
+
+@dataclass(frozen=True, slots=True)
 class DiaryInputs:
     day: date
     generated_at: datetime
@@ -76,6 +97,8 @@ class DiaryInputs:
     sol_usd_observed_at: str | None
     clock_start: date | None
     lab_last_tick_at: datetime | None
+    real_observed: Sequence[WalletTradeLine] = ()
+    """The observed wallets' fills of the day (T4.12); empty = none observed."""
 
 
 def _n(value: Decimal | None, *, places: int = 6, reason: str = "sem leitura") -> str:
@@ -152,6 +175,37 @@ def _bets(inputs: DiaryInputs) -> list[str]:
             f"| `{b.mint}` | {rule} | {_brt(b.entry_at)} | {_brt(b.exit_at)} | "
             f"{b.exit_reason or 'aberta'} | {_n(b.r_multiple, places=4, reason='aberta')} | "
             f"{_n(b.pnl_sol, reason='aberta')} | {_n(b.pnl_usd, places=2, reason='sem cotação')} | {quote} |"
+        )
+    return lines
+
+
+REAL_LABEL = "REAL — observado na cadeia, não executado por este sistema"
+
+
+def _real_observed(inputs: DiaryInputs) -> list[str]:
+    lines = ["## 2b. Operações reais (carteira observada)", "", f"**{REAL_LABEL}.**", ""]
+    if not inputs.real_observed:
+        lines.append(
+            "Nenhuma operação real observada neste dia (carteira sem transação, ou "
+            "`MEME_WATCH_WALLETS` vazio)."
+        )
+        return lines
+    lines += [
+        "| carteira | mint | lado | via | hora (BRT) | SOL | tokens | posição | PnL real. SOL | R | o Lab dizia |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    for t in inputs.real_observed:
+        verdicts = (
+            "; ".join(f"`{k}`: {v}" for k, v in t.lab_verdicts.items()) or "—"
+            if t.side == "buy"
+            else "—"
+        )
+        side = {"buy": "compra", "sell": "venda"}.get(t.side, f"desconhecido ({t.reason})")
+        lines.append(
+            f"| `{t.wallet[:8]}` | `{t.mint or '—'}` | {side} | {t.venue or '—'} | {_brt(t.block_time)} | "
+            f"{_n(t.sol_total, reason='não decodificado')} | {_n(t.token_amount, places=2, reason='—')} | "
+            f"{t.position_status or '—'} | {_n(t.realized_pnl_sol, reason='aberta')} | "
+            f"{_n(t.r_multiple, places=4, reason='sem marca')} | {verdicts} |"
         )
     return lines
 
@@ -258,6 +312,8 @@ def render_diary(inputs: DiaryInputs) -> str:
         + _wallets(inputs)
         + [""]
         + _bets(inputs)
+        + [""]
+        + _real_observed(inputs)
         + [""]
         + _r_section(inputs)
         + [""]

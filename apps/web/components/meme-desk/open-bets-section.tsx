@@ -12,7 +12,7 @@ import { sellNowAction } from "@/lib/api/meme-desk-actions";
 import type { MemeDeskBet, MemeDeskRow } from "@/lib/api/meme-desk-types";
 
 import { BetLegBadge, betAnchorId } from "./bet-leg";
-import { memeDeskProblemMessage } from "./labels";
+import { markSourceLabel, markStaleLabel, memeDeskProblemMessage } from "./labels";
 import { formatMultiple, formatR, formatSolSigned, remainingHoldLabel, signClass } from "./meme-desk-format";
 
 const SELL_WARNING = "vende na próxima fotografia, não neste preço";
@@ -67,6 +67,20 @@ function BetHeader({ orgSlug, row, bet, knownBetIds }: { orgSlug: string; row: M
   );
 }
 
+/** T4.11 fields arrive only after migration 0029; read them off the record without widening the frozen types. */
+function readOptionalString(record: object, key: string): string | null {
+  const value = (record as Record<string, unknown>)[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+function readOptionalNumber(record: object, key: string): number | null {
+  const value = (record as Record<string, unknown>)[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+function readOptionalBoolean(record: object, key: string): boolean | null {
+  const value = (record as Record<string, unknown>)[key];
+  return typeof value === "boolean" ? value : null;
+}
+
 /** Live mark, unrealized PnL/R (computed by the API in Decimal) and the remaining hold -- every absent value is named, never a zero. */
 function BetMetrics({ bet, nowMs }: { bet: MemeDeskBet; nowMs: number }) {
   const markAge = computeAgeMs(bet.mark_at, nowMs);
@@ -74,6 +88,11 @@ function BetMetrics({ bet, nowMs }: { bet: MemeDeskBet; nowMs: number }) {
     bet.params.target_x ? `alvo ${formatMultiple(bet.params.target_x)}` : "alvo não informado",
     bet.params.trailing_pct ? `trailing ${bet.params.trailing_pct}%` : null,
     bet.high_water_x ? `máxima ${formatMultiple(bet.high_water_x)}` : null,
+    // T4.11 (moonshot): the params/mark fields below are optional in the payload.
+    readOptionalString(bet.params, "trailing_arm_x") ? `trailing só depois de ${formatMultiple(readOptionalString(bet.params, "trailing_arm_x") ?? "")}` : null,
+    readOptionalBoolean(bet.params, "exit_on_migration") === false ? "segura na migração" : null,
+    markSourceLabel(readOptionalString(bet, "mark_source")),
+    markStaleLabel(readOptionalNumber(bet, "mark_stale_s")),
   ].filter((p): p is string => p !== null);
   return (
     <div className="grid grid-cols-2 gap-2 font-mono text-xs tabular-nums sm:grid-cols-4">

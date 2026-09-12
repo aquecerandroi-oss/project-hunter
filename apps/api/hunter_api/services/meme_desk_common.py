@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from hunter_api.auth.rbac import OrgContext
     from hunter_api.repositories.meme_desk import MemeDeskRepository
     from hunter_api.repositories.meme_desk_rows import RuleSetRow
+    from hunter_api.schemas.meme_desk import DeskParamsIn
 
 __all__ = [
     "BetNotFoundError",
@@ -38,6 +39,7 @@ __all__ = [
     "ProposalNotFoundError",
     "ProposalStateConflictError",
     "actor_id",
+    "enforce_live_mode",
     "enforce_max_sol_per_bet",
     "proposal_out",
     "record_desk_audit",
@@ -148,6 +150,19 @@ def enforce_max_sol_per_bet(rule_set: RuleSetRow | None, size_sol: Decimal) -> N
             f"size_sol {size_sol} exceeds the rule set's max_sol_per_bet {cap} "
             "(reason: exceeds_max_sol_per_bet)"
         )
+
+
+def enforce_live_mode(body: DeskParamsIn, *, live_enabled: bool) -> str:
+    """T4.14: ``mode = "live"`` files the proposal for the real executor and needs
+    the API's own ``ENABLE_MEME_LIVE_TRADING`` (``docs/RISK_ENGINE_MEME.md`` §3.4);
+    without it the refusal is named, 422 ``meme_live_disabled``. Returns the mode
+    to persist. The API never signs: the executor admits the row again with its
+    own flag and the §12 gates."""
+    if body.mode == "live" and not live_enabled:
+        raise DeskRefusedError(
+            "mode 'live' needs ENABLE_MEME_LIVE_TRADING on the API (reason: meme_live_disabled)"
+        )
+    return body.mode
 
 
 async def replayed_proposal(

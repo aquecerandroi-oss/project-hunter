@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+
 from hunter_meme_worker.lines_exit import SupportLine, below_support, next_streak, support_at
 
 pytestmark = pytest.mark.unit

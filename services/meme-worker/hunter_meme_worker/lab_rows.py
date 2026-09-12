@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 from hunter_indicators.meme.curve import CurveReserves
@@ -36,6 +37,10 @@ class OpenBet:
     """``meme_tokens.migrated_at`` — compared per snapshot, never read as "now"."""
     completed_at: datetime | None
     creator_net_seller: bool | None
+    total_supply: Decimal | None = None
+    """``meme_tokens.total_supply`` — the pool fee tier is by price × supply (T4.11)."""
+    creator: str | None = None
+    """``meme_tokens.creator`` — the creator dump is re-read from the pool's tape."""
 
 
 @dataclass(frozen=True, slots=True)

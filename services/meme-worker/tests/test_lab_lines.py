@@ -22,6 +22,10 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import text
+
+from hunter_core.db.session import role_session
+from hunter_indicators.meme.lines import LinePoint
 from hunter_meme_worker.config import MemeConfig
 from hunter_meme_worker.features import CurveObservation, MinuteInputs, build_row
 from hunter_meme_worker.features_lines import BoardStanding
@@ -31,10 +35,6 @@ from hunter_meme_worker.lab_models import RuleSetSpec
 from hunter_meme_worker.lab_repo import load_active_rule_sets
 from hunter_meme_worker.repo import insert_features, insert_snapshot
 from hunter_meme_worker.repo_lines import load_line_points
-from sqlalchemy import text
-
-from hunter_core.db.session import role_session
-from hunter_indicators.meme.lines import LinePoint
 
 from .test_lab_persistence import (  # pyright: ignore[reportPrivateUsage]
     FakeQuotes,

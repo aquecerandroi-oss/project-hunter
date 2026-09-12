@@ -125,6 +125,14 @@ class SolanaTxRpcClient:
             )
         return payload.get("result")
 
+    def call(self, method: str, params: list[Any]) -> Any:
+        """A read-only JSON-RPC call by name (T4.14: ``getBalance``,
+        ``getTokenAccountBalance``). ``sendTransaction`` is refused here too — the
+        one method that mutates the chain has exactly one door, below."""
+        if method == "sendTransaction":
+            raise SendDisabled()
+        return self._call(method, params)
+
     # ------------------------------------------------------------------ reads
     def get_latest_blockhash(self, *, commitment: str = "confirmed") -> tuple[str, int]:
         result = cast(

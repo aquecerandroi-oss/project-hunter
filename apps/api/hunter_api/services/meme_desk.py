@@ -39,6 +39,7 @@ from hunter_api.services.meme_desk_common import (
     ProposalNotFoundError,
     ProposalStateConflictError,
     actor_id,
+    enforce_live_mode,
     enforce_max_sol_per_bet,
     proposal_out,
     record_desk_audit,
@@ -88,6 +89,7 @@ async def _decide(
     new_status: str,
     decision: dict[str, Any] | None,
     body: DeskParamsIn | RejectProposalIn,
+    live_enabled: bool = False,
 ) -> ProposalOut:
     fp = fingerprint(action, str(proposal_id), body.model_dump(mode="json"))
     replayed = await replayed_proposal(
@@ -107,14 +109,17 @@ async def _decide(
         # and that tick the row still reads ``proposed``, and approving it
         # would fill a window the contract closed at ``expires_at``.
         raise ProposalStateConflictError(proposal_id, reason="expired", current=proposal.status)
+    mode = "paper"
     if isinstance(body, DeskParamsIn):
         enforce_max_sol_per_bet(await repo.get_rule_set(proposal.rule_set_id), body.size_sol)
+        mode = enforce_live_mode(body, live_enabled=live_enabled)
     moved = await repo.decide_proposal(
         proposal_id,
         status=new_status,
         decision=decision,
         decided_by=actor_id(context),
         decided_at=now,
+        mode=mode,
     )
     if not moved:
         current = await repo.get_proposal(proposal_id)
@@ -149,8 +154,14 @@ async def approve_proposal(
     idempotency_key: str,
     body: ApproveProposalIn,
     now: datetime,
+    live_enabled: bool = False,
 ) -> ProposalOut:
-    """``proposed`` → ``approved`` with ``decision = body`` (contract §Rotas)."""
+    """``proposed`` → ``approved`` with ``decision = body`` (contract §Rotas).
+
+    T4.14: ``body.mode = "live"`` files the same proposal for the real executor
+    (``meme_proposals.mode``) — refused ``meme_live_disabled`` (422) unless the
+    API's ``ENABLE_MEME_LIVE_TRADING`` is on (``live_enabled``). The API never
+    signs; the executor admits the proposal again with its own flag and gates."""
     return await _decide(
         repo,
         store,
@@ -162,6 +173,7 @@ async def approve_proposal(
         new_status="approved",
         decision=decision_json(body),
         body=body,
+        live_enabled=live_enabled,
     )
 
 
@@ -198,10 +210,13 @@ async def file_manual_proposal(
     idempotency_key: str,
     body: ManualProposalIn,
     now: datetime,
+    live_enabled: bool = False,
 ) -> ProposalOut:
-    """A proposal born ``approved`` under ``operator/1`` (contract §Rotas):
-    422 ``mint_unknown`` / ``curve_completed`` / ``operator_rule_set_missing``
-    / ``exceeds_max_sol_per_bet``. Filled by the loop on the next snapshot."""
+    """A proposal born ``approved`` under the active ``operator`` set
+    (``operator/2`` since ``0029``; contract §Rotas): 422 ``mint_unknown`` /
+    ``curve_completed`` / ``operator_rule_set_missing`` /
+    ``exceeds_max_sol_per_bet`` / ``meme_live_disabled`` (T4.14, ``mode = "live"``
+    without the API flag). Filled by the loop on the next snapshot."""
     fp = fingerprint("meme_desk.proposal.manual", body.mint, body.model_dump(mode="json"))
     replayed = await replayed_proposal(
         repo, await find_replay(store, context.org_id, idempotency_key, fp)
@@ -220,9 +235,10 @@ async def file_manual_proposal(
     rule_set = await repo.get_operator_rule_set()
     if rule_set is None:
         raise DeskRefusedError(
-            "the operator/1 rule set does not exist yet (reason: operator_rule_set_missing)"
+            "the active operator rule set does not exist yet (reason: operator_rule_set_missing)"
         )
     enforce_max_sol_per_bet(rule_set, body.size_sol)
+    mode = enforce_live_mode(body, live_enabled=live_enabled)
     quote = await repo.latest_curve_quote(body.mint)
     features_end = await repo.latest_features_end_time(body.mint)
     decision = decision_json(body)
@@ -243,6 +259,7 @@ async def file_manual_proposal(
         decided_at=now,
         bet_id=None,
         refusal=None,
+        mode=mode,
     )
     await repo.insert_proposal(proposal)
     await record_desk_audit(

@@ -138,6 +138,21 @@ def _meme_lab_tables(name: str) -> tuple[str, ...]:
     return cast(tuple[str, ...], getattr(migration_ddl("meme_lab"), name))
 
 
+def _meme_wallet_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0027_meme_wallets``'s lists in ``ddl/meme_wallets.py`` (T4.12)."""
+    return cast(tuple[str, ...], getattr(migration_ddl("meme_wallets"), name))
+
+
+def _meme_live_tables(name: str) -> tuple[str, ...]:
+    """The same, for ``0028_meme_live``'s lists in ``ddl/meme_live.py`` (T4.14).
+
+    One class new to the desk: ``MEME_LIVE_APP_SELL_REQUEST_TABLES`` — the API
+    gets ``SELECT`` and ``UPDATE (sell_requested_at, sell_requested_by)`` on the
+    real positions, enough to ask for a sale and not enough to record one.
+    """
+    return cast(tuple[str, ...], getattr(migration_ddl("meme_live"), name))
+
+
 def _meme_boards_tables(name: str) -> tuple[str, ...]:
     """The same, for ``0023_meme_boards_trades``'s lists in ``ddl/meme_boards.py``.
 
@@ -427,6 +442,9 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
     meme_lab_append = _meme_lab_tables("MEME_LAB_APP_APPEND_TABLES")
     meme_lab_decision = _meme_lab_tables("MEME_LAB_APP_DECISION_TABLES")
     meme_boards_read_only = _meme_boards_tables("MEME_BOARDS_APP_READ_ONLY_TABLES")
+    meme_wallet_read_only = _meme_wallet_tables("MEME_WALLET_APP_READ_ONLY_TABLES")
+    meme_live_read_only = _meme_live_tables("MEME_LIVE_APP_READ_ONLY_TABLES")
+    meme_live_sell_request = _meme_live_tables("MEME_LIVE_APP_SELL_REQUEST_TABLES")
 
     classified = (
         list(write)
@@ -448,6 +466,9 @@ async def test_the_grant_lists_cover_every_table_exactly_once(
         + list(meme_lab_append)
         + list(meme_lab_decision)
         + list(meme_boards_read_only)
+        + list(meme_wallet_read_only)
+        + list(meme_live_read_only)
+        + list(meme_live_sell_request)
     )
     assert len(classified) == len(set(classified)), "a table is in two grant classes"
 

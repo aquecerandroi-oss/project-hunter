@@ -17,6 +17,9 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from sqlalchemy import text
+
+from hunter_core.db.session import role_session
 from hunter_meme_worker.config import MemeConfig
 from hunter_meme_worker.context import RadarContext, RadarState
 from hunter_meme_worker.features import DENOMINATOR_UNKNOWN, NO_TRADE_FEED, CurveObservation
@@ -27,9 +30,6 @@ from hunter_meme_worker.repo_tape import TradeRow, insert_trades
 from hunter_meme_worker.sources import SourcesState
 from hunter_meme_worker.tracker import MintTracker, TrackedMint
 from hunter_meme_worker.trades import TapeCoverage, TradesPuller
-from sqlalchemy import text
-
-from hunter_core.db.session import role_session
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker

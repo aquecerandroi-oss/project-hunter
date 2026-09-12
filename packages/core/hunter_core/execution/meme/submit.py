@@ -236,7 +236,13 @@ class MemeSubmitter:
             )
         if transaction is None:
             return self._unconfirmed(pid, "transaction_not_found_after_confirmation", signature)
-        fills = list(self._decode_fill(transaction))
+        try:
+            fills = list(self._decode_fill(transaction))
+        except Exception as exc:
+            # The transaction landed; what we could not do is *read* it (a program upgrade
+            # that changed the event layout, T4.14). Never a crash after a send: the row
+            # stays unconfirmed with the reason, and reconciliation retries the read.
+            return self._unconfirmed(pid, f"fill_decode_failed:{type(exc).__name__}", signature)
         if not fills:
             return self._unconfirmed(pid, "trade_event_missing", signature)
         fill = fills[0]
@@ -287,7 +293,12 @@ class MemeSubmitter:
             return None
         if row.state is SubmitState.CONFIRMED:
             return self._replay(row)
-        fills = list(self._decode_fill(transaction))
+        try:
+            fills = list(self._decode_fill(transaction))
+        except Exception as exc:
+            return self._unconfirmed(
+                row.proposal_id, f"fill_decode_failed:{type(exc).__name__}", signature
+            )
         if not fills:
             return self._unconfirmed(row.proposal_id, "trade_event_missing", signature)
         self._journal.record_state(row.proposal_id, SubmitState.CONFIRMED, "trade_event", fills[0])

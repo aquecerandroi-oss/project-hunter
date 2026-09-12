@@ -73,6 +73,12 @@ class TradeEvent:
     quote_amount: int
     virtual_quote_reserves: int
     real_quote_reserves: int
+    holder_rewards_basis_points: int | None = None
+    """Appended by the program upgrade seen on mainnet 2026-09-12 (IDL ``main`` of that
+    day: ``holder_rewards_bps``, ``holder_rewards`` — 16 trailing bytes). ``None`` on
+    an event of the older layout (the recorded fixtures). Not part of the buyer's
+    cost arithmetic here: the wallet's real balance delta is the ledger's truth."""
+    holder_rewards: int | None = None
 
     @property
     def sol_deducted_from_user(self) -> int:
@@ -155,6 +161,11 @@ def decode_trade_event(raw: bytes) -> TradeEvent:
     shareholders = tuple((r.pubkey(), r.u16()) for _ in range(r.u32()))
     quote_mint = r.pubkey()
     quote_amount, vquote, rquote = r.u64(), r.u64(), r.u64()
+    holder_rewards_bps: int | None = None
+    holder_rewards: int | None = None
+    if len(raw) - r.off == 16:
+        # Anchor appends new fields at the end; the 2026-09-12 layout adds exactly two u64.
+        holder_rewards_bps, holder_rewards = r.u64(), r.u64()
     if r.off != len(raw):
         raise ValueError(f"TradeEvent has {len(raw) - r.off} trailing bytes")
     return TradeEvent(
@@ -190,6 +201,8 @@ def decode_trade_event(raw: bytes) -> TradeEvent:
         quote_amount=quote_amount,
         virtual_quote_reserves=vquote,
         real_quote_reserves=rquote,
+        holder_rewards_basis_points=holder_rewards_bps,
+        holder_rewards=holder_rewards,
     )
 
 

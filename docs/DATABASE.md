@@ -6415,3 +6415,271 @@ API da mesa lê as tabelas base (Emendas da T4.7) e agora devolve `leg`/`parent_
 | `GET /api/v1/orgs/{org}/meme/tokens/{mint}` | `features[*]` ganha as 13 colunas (`line_reason`/`hype_reason` nos vocabulários acima); ausentes numa linha `v2` → `null` |
 | `GET /api/v1/orgs/{org}/meme/desk` | `bet.leg` (`probe` \| `scale` \| `single`), `bet.parent_bet_id`; `exit_reason` ganha `max_loss` e `line_broken` |
 | `apps/web` | Parte B (paralela): desenho das linhas em `/meme/{mint}`, colunas na tabela de minutos, rótulos `leg` em `labels.ts` |
+
+## 39. A carteira observada — as operações reais viram schema — M4 (`0027_meme_wallets`)
+
+Vigésima sétima revisão. **Duas tabelas** (`meme_wallet_trades`, `meme_wallet_positions`), **quatro índices**,
+grants por subtração e **uma vista reescrita** (`meme_lab_scoreboard_v1`). Nenhum enum, nenhuma política,
+nada tocado na `0022`–`0026` além da vista. Entrega a T4.12 sobre a diretiva do Everton de 12/09/2026 ("vou
+apostar dinheiro real e ter experiência real, assim você analisa"): ele opera **na mão, pelo site**; o
+sistema **não assina nada** e só lê da cadeia o endereço público em `MEME_WATCH_WALLETS`
+(`docs/DEPLOYMENT.md`), transformando cada compra/venda real em linha ao lado das apostas de papel.
+Contrato: `.claude/state/brief-T4.12-carteira-observada.md`. (O brief dizia "§40"; §39 era o próximo
+número livre — anotado, como a própria migração, que o brief chamava de 0028.) **Globais, sem RLS** (§1.1),
+a forma da `0021`/`0022`: um fill de uma carteira pública numa curva on-chain não pertence a organização.
+
+### 39.1 O livro — `meme_wallet_trades`
+
+Uma linha por fill — ou por assinatura em que nada decodificou. Chave `(signature, event_index)`: dedupe
+por assinatura é um fato do schema (`ON CONFLICT DO NOTHING`), e um bundle com dois fills numa transação não
+é cortado ao meio (a lição de `meme_trades`, §33).
+
+| coluna | tipo | definição |
+|---|---|---|
+| `wallet`, `signature`, `event_index` | text, text, smallint (default 0) | a carteira observada, a assinatura, o ordinal do fill dentro da transação |
+| `slot`, `block_time`, `received_at` | bigint, timestamptz NULL, timestamptz | `block_time` NULL só numa linha `unknown` sem hora |
+| `mint` | text NULL | NULL só numa linha `unknown` sem mint atribuível |
+| `side` | text | `buy` · `sell` · `unknown` |
+| `venue` | text NULL | `curve` (o `TradeEvent` do programa Pump, taxas exatas) · `pool` (swap na PumpSwap lido pelas deltas de saldo da própria carteira) |
+| `sol_lamports` | bigint NULL | a perna da operação como a cadeia a reporta (`sol_amount` do evento, ou a delta de SOL líquida da taxa de rede no caminho por saldo) |
+| `fee_lamports` | bigint NULL | **toda** dedução além da perna: protocolo + criador + cashback + taxa de rede **quando a carteira foi a pagadora** — uma compra custou `sol + fee`, uma venda rendeu `sol − fee`, lamport-exato (a reconciliação da T4.8) |
+| `token_amount` | numeric(28,10) NULL | tokens (unidades ÷ 10⁶) |
+| `decode` | text | `trade_event` · `balance_delta` · `none` |
+| `raw` | jsonb NULL | do fill: `fees`, `fee_bps`, `reserves_after`, `ix_name`, `quote_mint`; do `unknown`: `reason` (`no_trade_event_for_wallet`, `no_known_venue`, `no_token_delta`, `multiple_token_deltas`, `sol_leg_sign_mismatch`, `wallet_not_in_transaction`, `unsupported_quote`, `transaction_not_found`, `malformed_transaction`), `err`, `event_error`, `account_keys` (≤ 40), `log_head` (≤ 12) |
+| `lab_context` | jsonb NULL | **só numa compra**: `{minute, features_version, reason, rule_sets: {"<nome>/<versão>": {kind, accepted, refusals[]}}, hype_score, hype_reason, line_reason, evaluated_at}` — o que o portão de cada conjunto ativo dizia no **último minuto fechado antes do fill** (`end_time <= block_time`); `reason = no_features_row` com `accepted = null` quando o fold nunca escreveu aquele mint |
+| `hype_score`, `line_reason` | numeric(9,6) NULL, text NULL | do minuto (T4.10a, §38), quando existem |
+
+CHECKs: `side`/`venue`/`decode`/`line_reason` nos vocabulários; `(side = 'unknown') = (decode = 'none')`;
+`unknown` ⇒ `raw IS NOT NULL`; fill ⇒ `mint`, `venue`, `block_time`, `sol_lamports`, `fee_lamports`,
+`token_amount` todos presentes (não existe linha meio-decodificada); contadores ≥ 0; `lab_context` ⇒
+`side = 'buy'`; `hype_score` ∈ [0, 1]. Índices `(wallet, block_time)`, `(wallet, mint)`, `(mint, block_time)`.
+
+### 39.2 As posições — `meme_wallet_positions`
+
+Derivadas do livro e **recomputadas dele** a cada fill novo (e remarcadas a cada ciclo enquanto abertas):
+uma reinicialização não muda nada. PK `(wallet, mint)`.
+
+| coluna | definição |
+|---|---|
+| `status` | `open` · `closed`; `(status = 'closed') = (tokens_held = 0)` |
+| `tokens_held`, `sol_spent`, `sol_received`, `open_cost_sol` | FIFO: `sol_spent` = Σ compras com taxas (**o risco**, RISK_ENGINE_MEME §5); `open_cost_sol` = custo FIFO do que ainda está em carteira |
+| `avg_cost_sol_per_token` | numeric(38,18): `open_cost_sol / tokens_held`, NULL a zero |
+| `realized_pnl_sol` | FIFO: produto da parte casada − custo dos lotes consumidos |
+| `unmatched_sell_tokens` | tokens vendidos **sem compra observada** (a carteira já os tinha antes da observação): o produto vai para `sol_received` e para mais nada — o custo nunca foi visto, e não se inventa |
+| `buys`, `sells`, `first_buy_at`, `last_trade_at` | `(buys = 0) = (first_buy_at IS NULL)` |
+| `mark_sol`, `mark_at`, `mark_source`, `mark_reason`, `unrealized_pnl_sol` | a marca = o que uma venda total renderia agora: `curve_snapshot` (`quote_sell` à taxa dos próprios fills da carteira, fallback 1,25 %) ou `tape` (tokens × último preço de `meme_trades`), o mais novo dos dois; curva `complete` não é preço. Nulos e não-nulos **juntos**, e exatamente então `mark_reason` (`closed` · `no_snapshot_no_tape` · `curve_complete_no_tape`) |
+| `r_multiple` | `(realizado + não realizado) / sol_spent`; fechada: `realizado / sol_spent`; NULL sem risco ou sem marca |
+
+### 39.3 O placar — `meme_lab_scoreboard_v1` reescrita
+
+A vista da `0022` **byte a byte** (`UNION ALL`) mais um bloco por carteira observada × dia BRT de
+`first_buy_at`: `rule_set_id = md5('wallet:' || wallet)::uuid` (determinístico, sem linha em
+`meme_rule_sets`), `name = 'wallet:' || left(wallet, 8)`, `version = '1'`, `kind = 'real_observed'`,
+`exp_ref` NULL, `rule_set_status = 'active'`; `bets` = posições, `closed`/`wins`/`pnl_sol`/`r_sum` sobre as
+fechadas, `max_drawdown_sol` pela mesma janela cumulativa (ordenada por `last_trade_at`), **`pnl_usd` NULL e
+`unpriced_usd` = fechadas** (nenhum fill on-chain carrega cotação SOL/USD observada — o placar nunca precifica
+um dia por uma taxa que ninguém viu), `rugs` = fechadas com perda realizada ≥ 90 % do SOL gasto (definição
+declarada). Posição sem `first_buy_at` (só vendas órfãs) não entra no placar. A API de `/meme/lab` continua
+a agrupar pelos `meme_rule_sets`; a seção "Reais" lê as tabelas base.
+
+### 39.4 Quem escreve o quê, guardas, trava
+
+`hunter_worker`: `SELECT`/`INSERT`/`UPDATE` nas duas (o livro ganha `lab_context` depois do insert; as
+posições são upsert). `hunter_app`: `SELECT`. `DELETE` a ninguém — uma operação real é evidência.
+**Sem guarda de subida — asserção:** tabelas novas e uma vista cuja metade de papel é idêntica à da `0022`.
+**A descida recusa** (§17.7) enquanto `meme_wallet_trades` tiver uma linha; as posições são recomputáveis e
+não são guardadas; a vista volta à da `0022` (`ddl/meme_lab_views.recreate_scoreboard_0022`) **antes** de as
+tabelas caírem (a vista da 0027 depende de `meme_wallet_positions`). `CREATE TABLE`/`CREATE INDEX` em tabelas
+vazias e `DROP VIEW` + `CREATE VIEW` numa vista que nenhum escritor segura: sem janela de manutenção.
+
+| Onde | O que muda |
+|---|---|
+| `services/meme-worker/**` | `wallets.py`/`wallets_state.py` (laço 30 s, cursor por carteira, bucket 2 req/s), `wallet_positions.py` (FIFO/marca, puro), `wallets_repo.py`, `wallets_lab.py` (`lab_context`); `MEME_WATCH_WALLETS` em `config.py`; campos `wallets_*` no `hb:meme:radar`; detalhe `wallets` no readiness |
+| `hunter_exchanges.pumpfun` | `wallet_fills.py` (decodificação pura) e `rpc_wallet.WalletRpc` (`getSignaturesForAddress`, `getTransaction`) sobre `SolanaRpcClient.call` |
+| `GET /api/v1/orgs/{org}/meme/lab` e `/meme/desk` | campo novo opcional `real_observed` (`RealObservedOut`: rótulo "REAL — observado na cadeia, não executado por este sistema", carteiras, posições, livro, `sol_usd` nomeada ou `no_sol_usd_quote`) |
+| `infra/scripts/meme_diary.py` | seção "2b. Operações reais (carteira observada)" (`meme_diary_wallets.py`) |
+
+## 40. O executor real — a decisão da mesa vira transação assinada — M4 (`0028_meme_live`)
+
+Vigésima oitava revisão (sobre a `0027_meme_wallets`, T4.12; a `0029_meme_moonshot` da T4.11 vem em
+cima). **Uma coluna** em `meme_proposals` (`mode`, `paper` | `live`, default `paper`, CHECK e um índice
+parcial `(decided_at) WHERE mode = 'live'`), **três tabelas** (`meme_live_orders`, `meme_live_positions`,
+`meme_live_kill_switch`), seis índices, **uma linha semeada** (`meme_live_kill_switch (scope = 'wallet',
+state = 'ACTIVE')`) e grants por subtração. Nenhum enum, nenhuma política, nenhuma vista; nada tocado na
+`0022`–`0027` além da coluna e de um grant de coluna. Entrega a T4.14 sobre a diretiva do Everton de
+12/09/2026 12:3x BRT ("bora tentar logo com dinheiro real; ele faz a operação, não consegue?"): o serviço
+`services/meme-executor` (`HUNTER_ROLE=meme_executor`, perfil compose `meme-live`) liga uma aprovação da
+mesa (T4.7) a uma transação assinada na bonding curve do pump.fun — inerte até `ENABLE_MEME_LIVE_TRADING`
+**e** os portões da §12 do `docs/RISK_ENGINE_MEME.md`. Esta revisão é o livro que ele escreve e a mesa lê.
+**Globais, sem RLS** (§1.1), a forma da `0022`/`0027`: uma ordem assinada numa curva on-chain não pertence
+a organização.
+
+### 40.1 O modo da proposta — `meme_proposals.mode`
+
+`paper` | `live`, `NOT NULL DEFAULT 'paper'`: toda proposta de ontem é `paper` sem dizer. A API
+(`hunter_app`) ganha `UPDATE (mode)` ao lado das quatro colunas de decisão da `0022` e grava `live` **só**
+quando a sua própria cópia de `ENABLE_MEME_LIVE_TRADING` está ligada (`enforce_live_mode`; 422
+`meme_live_disabled` sem ela). O laço de papel continua preenchendo a mesma proposta em sombra; o executor
+lê `mode = 'live' AND status IN ('approved', 'filled', 'unfilled') AND decided_at ≥ now − 24 h` e sem
+`meme_live_orders (side = 'buy')` para a proposta, e recusa por nome (`approval_expired`) o que for mais
+velho que `MEME_LIVE_APPROVAL_TTL_S` (30 s). `rejected` nunca executa.
+
+### 40.2 As ordens — `meme_live_orders`
+
+Uma linha por **tentativa**: `client_order_id` único (`meme:{proposal_id}` a compra,
+`meme:{proposal_id}:exit:{n}` a n-ésima venda), `attempt ≥ 1`, `intent` (o que foi ao construtor:
+`token_amount`, `max_sol_cost`/`min_sol_output`, blockhash, `last_valid_block_height`, CU, `sol_final`,
+`max_sol_cost_sol`), `admission` (a `MemeDecision` inteira: os 25 checks com o nome da recusa e o sizing com
+`binding_constraint`), `status` ∈ `admitted` · `refused` · `simulated` · `submitted_unconfirmed` ·
+`confirmed` · `failed`, `reason`, `tx_signature` (a mais nova) e `signatures` (**todas** as já emitidas
+para a linha — RISK_ENGINE_MEME §9.4 regra 1), `signing_at` (a trava de assinatura, regra 2:
+`UPDATE … WHERE signing_at IS NULL RETURNING` é o que impede duas sessões), `fill` (**o `TradeEvent`
+decodificado**, §9.6: `sol_amount`, `token_amount`, `fee`, `creator_fee`, `fee_basis_points`,
+`network_fee_lamports`, `buy_total_lamports`/`sell_net_lamports`, reservas depois) e os carimbos
+`received_at`/`admitted_at`/`simulated_at`/`submitted_at`/`settled_at`.
+
+CHECKs: `side`/`status` no vocabulário; `refused`/`failed` ⇒ `reason`; `submitted_unconfirmed`/`confirmed`
+⇒ `tx_signature`; `confirmed` ⇒ `fill` **e** `tx_signature`; `attempt ≥ 1`; identidade não vazia. **As duas
+chaves de idempotência da §9.4 são fatos do schema:** `uq_meme_live_orders_one_buy_per_proposal` (parcial,
+`side = 'buy'`) — um segundo passe do laço encontra a linha; `uq_meme_live_orders_tx_signature` (parcial,
+não nulo) — um evento de stream reentregue encontra a linha, nunca cria outra. Índices
+`(status, received_at)`, `(proposal_id, side)`.
+
+### 40.3 As posições — `meme_live_positions`
+
+Derivadas das compras confirmadas, **uma por proposta** (`uq_meme_live_positions_proposal_id`),
+reconstruídas do Postgres a cada passada (restart não é reset). `entry` (o fill), `tokens` (o que a cadeia
+entregou), `sol_spent_lamports` (curva + taxas + rede), **`initial_risk_sol = sol_spent`** (§5: numa curva o
+risco é o gasto inteiro), `params` (os quatro da mesa + `decided_by`), a marca honesta
+`mark_sol`/`mark_at`/`mark_source` (`solana_rpc` · `curve_snapshot` · `tape`) — **o que uma venda inteira
+renderia agora, taxas e rede incluídas** — com `mark_reason` quando não há número (`curve_complete`,
+`curve_not_found`, `rpc_unreachable:*`), `high_water_sol` (pico da marca, para o trailing), `exit_intent`
+(a intenção durável: motivo, tentativa, `next_attempt_at` do backoff, ou `blocked: <motivo>` —
+`pumpswap_sell_not_implemented` depois da migração), `sell_requested_at/by` (o `sell_now` do operador — as
+**únicas** duas colunas que `hunter_app` atualiza aqui), `exit_order_id`/`exit_at`/`exit`/
+`sol_received_lamports`/`pnl_sol`/`r_multiple` no fechamento, `migrated`.
+
+CHECKs: `status` ∈ `open` · `closed`; `(status = 'closed') = (exit_at IS NOT NULL)`; `exit_at`, `exit`,
+`pnl_sol`, `r_multiple` nulos ou preenchidos **juntos**; `exit_at > entry_at`; `mark_sol`/`mark_at`/
+`mark_source` juntos; `mark_source` no vocabulário; `sell_requested_at`/`_by` juntos; `initial_risk_sol > 0`,
+`sol_spent_lamports > 0`, `tokens ≥ 0`. Índices `(status, entry_at)`, `(mint)`.
+
+### 40.4 A trava diária e a âncora do dia — `meme_live_kill_switch`
+
+Uma linha por escopo (`wallet` hoje, semeada `ACTIVE`): `state`, `reason`, `latched_at`/`released_at`/
+`released_by` (a trava **latched** da §7 — o executor escreve `TRADING_DISABLED` + `latched_at` quando a
+perda do dia ≥ `MEME_DAILY_LOSS_CAP_SOL`; **nenhum caminho de código a solta**: só o `UPDATE` manual do
+dono, em `docs/DEPLOYMENT.md` §3.7) e a **âncora durável do dia** (`day_start_utc`, `day_start_sol_equity`,
+`peak_sol_equity`, `anchor_observed_at`, nulos ou preenchidos juntos): a perda do dia é medida contra a
+equity persistida da meia-noite de São Paulo, nunca contra o primeiro saldo que um processo reiniciado leu.
+O `KillSwitchReader` do executor lê esta linha a cada 10 s e **de novo entre a admissão e a assinatura**
+(`refused: kill_switch_blocked_before_signing`); ilegível ⇒ `EMERGENCY` para o escopo (falha fechada).
+
+### 40.5 Quem escreve o quê, guardas, trava
+
+`hunter_worker` (o executor): `SELECT`/`INSERT`/`UPDATE` nas três. `hunter_app`: `SELECT` nas três +
+`UPDATE (sell_requested_at, sell_requested_by)` em `meme_live_positions` + `UPDATE (mode)` em
+`meme_proposals` — a API pede uma venda e arquiva um modo; nunca registra uma ordem. `DELETE` a ninguém:
+uma assinatura é evidência. **Sem guarda de subida — asserção:** coluna com default constante (só catálogo
+no PG 16), tabelas novas, seed `ON CONFLICT DO NOTHING`. **A descida recusa** (§17.7) enquanto
+`meme_live_orders` tiver uma linha **ou** uma proposta disser `mode = 'live'`
+(`refuse_a_downgrade_that_would_lose_a_real_order`, contagens nomeadas na mensagem); limpa, desfaz na
+ordem inversa e a subida re-semeia o escopo. Testes: `test_0028_*` em
+`packages/core/tests/integration/test_migrations.py`; privilégios em `test_schema_privileges.py`
+(`MEME_LIVE_APP_SELL_REQUEST_TABLES` é a classe nova de grant).
+
+| Onde | O que muda |
+|---|---|
+| `services/meme-executor/**` | `entries.py` (laço 1 s: TTL → admissão → cotação → construtor → verificador §9.1 → `simulateTransaction` → kill switch relido → assinar → enviar → `TradeEvent`), `exits.py` (marca + saídas), `kill_switch.py` (quatro fontes + trava), `journal_db.py` (`PostgresOrderJournal`: assinatura gravada **antes** do envio), `repo.py`/`repo_positions.py`, `heartbeat.py` (`hb:meme:executor`) |
+| `packages/risk-core/hunter_risk_meme/**` | o motor puro dos 25 checks e do sizing (`docs/RISK_ENGINE_MEME.md` §4–§7), cuja decisão vai inteira para `meme_live_orders.admission` |
+| `GET /api/v1/orgs/{org}/meme/live` · `POST …/meme/live/positions/{id}/sell-now` | a mesa lê as três tabelas + o heartbeat, rótulo "REAL"; o `sell-now` (TRADER+, `Idempotency-Key`) grava as duas colunas |
+| `POST …/meme/proposals/{id}/approve` · `…/proposals/manual` | `mode` no corpo (`paper` default; `live` só com a flag da API) |
+
+## 41. A aposta que sobrevive à migração e o braço moonshot — M4 (`0029_meme_moonshot`)
+
+Vigésima nona revisão (sobre a `0028_meme_live`, T4.14). **Duas colunas** em `meme_paper_bets` com três
+CHECKs e um backfill que as linhas já implicam, **uma coluna** em `meme_trades` com CHECK `NOT VALID` +
+`VALIDATE`, e uma **semente de três conjuntos de regras** que também aposenta um. Nenhuma tabela, vista,
+enum, política ou grant novo; nada tocado na `0022`–`0028`. Entrega a T4.11 sobre a diretiva do Everton de
+12/09/2026 ("pode colocar valores mais alto para sair num mega ROI, meme coin é diferente"): um braço com
+alvos de 10×/25×, espera de 2 h e uma posição que **sobrevive à migração** para a PumpSwap, marcada pela
+fita da pool em vez de vendida na conclusão da curva. Brief: `.claude/state/brief-T4.11-moonshot-e-pos-migracao.md`;
+pré-registro: `obsidian/05-EXPERIMENTS/EXP-M4-moonshot.md`.
+
+### 41.1 A marca com fonte — `meme_paper_bets.mark_source` e `mark_stale_s`
+
+| coluna | tipo | definição |
+|---|---|---|
+| `mark_source` | `text` ∈ {`curve`, `pool_tape`} | o que precificou `mark_sol`: a fotografia da curva (toda marca de hoje — **backfill** `'curve'` onde `mark_sol IS NOT NULL`, porque era isso que era) ou o último trade da pool PumpSwap depois de `meme_tokens.migrated_at` |
+| `mark_stale_s` | `integer` ≥ 0 | segundos que a fita da pool estava muda quando a marca foi atualizada (o tick − o último trade recebido até o tick, ou a migração se a pool nunca imprimiu); a mesa mostra "marca envelhecida há Ns"; a saída `dead` lê |
+
+CHECKs: `mark_source_is_a_known_label`; `a_mark_names_its_source` = `(mark_sol IS NULL) = (mark_source IS
+NULL)` (uma marca sem fonte é um número que ninguém explica); `mark_stale_s_is_not_negative`. O laço grava
+`'curve'` no fill (`_INSERT_BET`), atualiza fonte e envelhecimento a cada tick (`_UPDATE_MARK`) e zera
+`mark_stale_s` ao fechar (`_CLOSE_BET`, que também aceita a fonte da venda).
+
+### 41.2 O venue do trade — `meme_trades.program`
+
+`program text` ∈ {`pump`, `pump_amm`} (CHECK `program_is_a_known_label`, `NOT VALID` + `VALIDATE` na
+tabela particionada — o padrão da `0025`/`0026`; a fita continua inserindo). É o `program` que o
+`swap-api` declara em toda linha e que a T4.2c usava para **descartar** as linhas da pool antes de gravar
+(`not_bonding_curve`). Linhas anteriores à revisão são `NULL` = curva por construção, e por isso **toda
+leitura da fita da curva** (as duas do fold em `repo_tape.py`) diz `coalesce(program, 'pump') = 'pump'` —
+`meme_features_v3` significa hoje exatamente o que significava ontem. A fita da pool é lida só por
+`lab_repo_pool.py` (`program = 'pump_amm'`, `received_at <= tick`); `raydium_cpmm` continua descartado
+(`unsupported_venue`). Verificado ao vivo em 12/09 15:35Z: 100 trades `pump_amm` para um mint graduado
+às 08:58Z, todos em SOL nativo (`notes-T4.11.md`).
+
+### 41.3 A semente e a aposentadoria
+
+Ids fixos (o argumento de `seed_reference.py`), `ON CONFLICT DO NOTHING`:
+
+- **`moonshot_v0/1`** (`…0005`, EXP-M4, `research_only`): porta = `sonda_de_hype v1` **verbatim** (30–300 s,
+  `require_progress = false`, `min_hype_score 0,6`, `max_dev_share 0,10` com `dev_share_unknown_allowed`,
+  `max_snipers 2`, criador, participação ≤ 1 %); 0,02 SOL; alvo **10×**; `trailing_pct 50` com
+  `trailing_arm_x 3` (o trailing só arma depois de o pico chegar a 3×); `max_hold_s 7200`;
+  `exit_on_migration false`; `exit_on_dead true`, `dead_stale_s 900`, `dead_mark_pct 50`; `max_loss_pct
+  100`; carteira 2,0, dia 0,20, **8 abertas**, 0,02 por mint.
+- **`moonshot_v0/2`** (`…0006`): idêntico com alvo **25×** (o irmão de falseamento da cauda).
+- **`operator/2`** (`…0007`, `operator`): a porta e os tetos do `operator/1`, `suggested` = 10× / trailing 50 %
+  após 3× / 7 200 s / 0,05 SOL / `exit_on_migration false` / `dead`; a folha de aprovação continua editável
+  (`max_hold_s` 7 200 aceito pela API — `ge=1`, sem teto — e pelo laço, `int` inteiro, provado em
+  `test_lab_params_moonshot.py`).
+- **`operator/1`** (`…0002`) → `status = 'retired'`, `retired_at = now()`; `POST /proposals/manual` passa a
+  arquivar sob `operator/2` (`OPERATOR_RULE_SET` na API — lido por **nome + `status = 'active'`**, maior
+  versão: num banco ainda na `0028` a compra manual continua sob `operator/1`). A descida reverte a
+  aposentadoria.
+
+Suposições numéricas declaradas (o brief não as fixa): `max_loss_pct = 100` nos três (as saídas que o
+brief lista são alvo, trailing armado, 2 h, `creator_dump` e `dead` — um piso de 50 % venderia o drawdown
+que o moonshot existe para atravessar; `dead` é o piso); `wallet_max_sol = 2,0` e `max_open_positions =
+3` no `operator/2` (herdados do `operator/1`); o **0,5 % do caminho** (`fee_pct − 1,25`) continua sendo
+cobrado na pool (§10.2 da doutrina); `total_supply` desconhecido → 1 bilhão de tokens, nomeado
+(`total_supply_source = assumed_1e9`); `creator_dump` na pool lê "o criador vendeu qualquer coisa na
+fita" (curva ou pool), o mesmo insumo que o caminho da curva já lê de `creator_sold`.
+
+### 41.4 O que o laço passa a fazer (não é schema, mas é o que as colunas significam)
+
+`exit_on_migration` virou parâmetro (`hunter_indicators.meme.exits.ExitRules`, `EffectiveParams`); os
+conjuntos congelados mantêm `true` e seus `params`/`suggested` continuam byte a byte. Para um conjunto com
+`false`, a partir de `migrated_at` a aposta é percorrida sobre os trades da pool (`lab_bets_pool.py`):
+marca = preço do último trade × tokens − impacto (participação nos 5 min anteriores, teto 1 %) − taxa da
+**faixa da PumpSwap pelo mcap daquele preço** (`docs/PUMPFUN.md` §4.1, 25 faixas de 1,25 % a 0,30 %) −
+0,5 % do caminho; a regra dispara no trade *k* e a venda é o trade *k + 1*; `exit.reason` ganha `dead`
+(`fill = none`, `sol_received = 0` sem trade em 3 min). A precedência das saídas: rug → `creator_dump` →
+migração/conclusão (quando vigiadas) → **`dead`** → piso → linha → alvo → trailing (armado) → tempo.
+
+### 41.5 Guardas, trava, vistas
+
+**Sem guarda de subida — asserção.** **A descida recusa** (§17.7) enquanto existir um trade com `program =
+'pump_amm'` (derrubar a coluna transformaria a fita da pool em trades da curva), uma aposta com
+`mark_source = 'pool_tape'` ou `exit ->> 'reason' = 'dead'`, ou uma proposta/aposta que referencie os três
+conjuntos semeados; a semente reverte e `operator/1` volta a `active`. `meme_desk_v1` e
+`meme_lab_scoreboard_v1` **não mudam** (`dead` não conta como `rug` no placar — é outra palavra).
+
+| Onde | O que muda |
+|---|---|
+| `packages/indicators/hunter_indicators/meme/` | `pool.py` (faixas, impacto, `quote_pool_sell`, `trades_known_by` — 3 `FeatureDefinition` v1: `pool_fee_tier_pct`, `pool_impact_pct`, `pool_mark_sol`); `exits.py` (`trailing_arm_multiple`, `exit_on_dead`, `ExitState.mark_stale_s`, `hit_dead`) |
+| `services/meme-worker/**` | `lab_params.py` (split de `lab_models`), `pool_mark.py`, `lab_repo_pool.py`, `lab_bets_pool.py`; `repo_tape.trade_rows` aceita `pump_amm` e grava `program`; `lab_repo_bets` grava/lê `mark_source`/`mark_stale_s`; `paper_engine.decide_exit_at` |
+| `GET /api/v1/orgs/{org}/meme/desk` | `bet.mark_source`, `bet.mark_stale_s`, `suggested/decision/params.exit_on_migration` e `.trailing_arm_x`; `exit_reason` ganha `dead`; manual sob `operator/2`. As duas colunas ficam **fora** da `Table` compartilhada da API e são lidas por sonda (`repositories/meme_desk_marks.py`, `information_schema.columns`): num banco ainda na `0028` a mesa responde com `mark_source = null` em vez de falhar |
+| `apps/web` | T4.13 (paralela): rótulos "marcada pela pool (fita)" / "marca envelhecida há Ns" / saída "morta" |

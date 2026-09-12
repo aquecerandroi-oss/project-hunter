@@ -64,6 +64,8 @@ meme_proposals = Table(
     Column("decided_at", DateTime(timezone=True)),
     Column("bet_id", UUID(as_uuid=True)),
     Column("refusal", Text),
+    # 0028 (T4.14): ``paper`` | ``live``.
+    Column("mode", Text, nullable=False, server_default="paper"),
 )
 
 meme_operator_commands = Table(
@@ -104,4 +106,7 @@ meme_paper_bets = Table(
     # 0026 (T4.10) — probe and scale legs.
     Column("parent_bet_id", UUID(as_uuid=True)),
     Column("leg", Text, nullable=False),
+    # 0029 (T4.11) — ``mark_source``/``mark_stale_s`` are deliberately NOT here:
+    # ``select(meme_paper_bets)`` must keep working on a database still at
+    # ``0028``; they are read tolerantly by ``repositories/meme_desk_marks.py``.
 )

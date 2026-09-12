@@ -53,7 +53,10 @@ REASONS: tuple[str, ...] = (
     "rug_no_snapshot",
     "max_loss",
     "line_broken",
+    "dead",
 )
+"""Every ``ExitReason``, one closed bet each. ``dead`` (``0029``, T4.11) closes
+at zero without a sale, like ``rug_no_snapshot``."""
 FEATURES_END_TIME = T0 - timedelta(seconds=65)
 
 
@@ -86,6 +89,21 @@ def _exit(reason: str, received: str, at: datetime) -> dict[str, Any]:
             "snapshot": None,
             "sol_received": "0",
             "sol_usd_source": None,
+        }
+    if reason == "dead":  # 0029 (T4.11): the pool's tape went silent — no sale to price
+        return {
+            "reason": reason,
+            "fill": "none",
+            "venue": "pump_amm",
+            "mark_source": "pool_tape",
+            "snapshot": None,
+            "trade": None,
+            "last_trade_at": (at - timedelta(minutes=18)).isoformat(),
+            "mark_stale_s": 1080,
+            "sol_received": "0",
+            "sol_usd": None,
+            "sol_usd_source": None,
+            "sol_usd_reason": "no_sale_to_price",
         }
     return {
         "reason": reason,
@@ -148,10 +166,11 @@ async def _insert_bet(session: AsyncSession, row: dict[str, Any]) -> None:
             "INSERT INTO meme_paper_bets (id, proposal_id, rule_set_id, mint, mode, status, "
             "entry_at, entry, initial_risk_sol, params, exit_at, exit, pnl_sol, r_multiple, "
             "mark_sol, mark_at, high_water_x, sol_usd_at_entry, sol_usd_at_exit, leg, "
-            "parent_bet_id) VALUES (:id, :proposal_id, :rule_set_id, :mint, 'paper', :status, "
-            ":entry_at, CAST(:entry AS jsonb), :risk, CAST(:params AS jsonb), :exit_at, "
+            "parent_bet_id, mark_source) VALUES (:id, :proposal_id, :rule_set_id, :mint, 'paper', "
+            ":status, :entry_at, CAST(:entry AS jsonb), :risk, CAST(:params AS jsonb), :exit_at, "
             "CAST(:exit AS jsonb), :pnl_sol, :r_multiple, :mark_sol, :mark_at, :high_water_x, "
-            ":sol_usd_at_entry, :sol_usd_at_exit, :leg, :parent_bet_id)"
+            # 0029 (T4.11): every row here carries a mark, and a mark names its source.
+            ":sol_usd_at_entry, :sol_usd_at_exit, :leg, :parent_bet_id, 'curve')"
         ),
         row,
     )
@@ -174,7 +193,7 @@ def _bet_row(
     spent: str = "0.2",
 ) -> dict[str, Any]:
     closed = reason is not None
-    received = "0.38" if reason not in {"rug_no_snapshot", "max_loss"} else "0"
+    received = "0.38" if reason not in {"rug_no_snapshot", "max_loss", "dead"} else "0"
     if reason == "max_loss":
         received = "0.1"
     pnl = Decimal(received) - Decimal(spent) if closed else None
@@ -197,7 +216,9 @@ def _bet_row(
         "mark_at": exit_at if closed else entry_at + timedelta(minutes=3),
         "high_water_x": Decimal("2"),
         "sol_usd_at_entry": Decimal("179"),
-        "sol_usd_at_exit": Decimal("181") if closed and reason != "rug_no_snapshot" else None,
+        "sol_usd_at_exit": (
+            Decimal("181") if closed and reason not in {"rug_no_snapshot", "dead"} else None
+        ),
         "leg": leg,
         "parent_bet_id": parent,
     }
@@ -492,14 +513,14 @@ class TestListTests:
         totals = body["totals"]
         assert totals["bets"] == len(REASONS) + 4
         assert totals["closed"] == len(REASONS) + 3 and totals["open"] == 1
-        # 0.38 - 0.2 = +0.18 for seven reasons, -0.2 rug, -0.1 max_loss, manual +0.33,
-        # probe +0.37, scale +0.34
-        assert totals["wins"] == 10 and totals["losses"] == 2
+        # 0.38 - 0.2 = +0.18 for seven reasons, -0.2 rug, -0.1 max_loss, -0.2 dead (T4.11),
+        # manual +0.33, probe +0.37, scale +0.34
+        assert totals["wins"] == 10 and totals["losses"] == 3
         assert Decimal(totals["pnl_sol"]) == Decimal("1.26") + Decimal("0.33") + Decimal(
             "0.37"
-        ) + Decimal("0.34") - Decimal("0.3")
+        ) + Decimal("0.34") - Decimal("0.3") - Decimal("0.2")
         assert Decimal(totals["provisional_pnl_sol"]) == Decimal("0.05")
-        assert totals["unpriced_usd"] == 1
+        assert totals["unpriced_usd"] == 2, "rug and dead: no sale, no exit quote"
         assert set(body["rule_sets"]) == {"hype_probe_v0", "meme_paper_v0", "operator"}
 
     async def test_keyset_pages_without_overlap_or_gap(

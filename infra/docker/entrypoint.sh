@@ -52,6 +52,11 @@ case "$role" in
   scanner | strategy | execution | analytics | meme)
     exec python -m "hunter_${role}_worker"
     ;;
+  meme_executor)
+    # T4.14: the only process that reads SOLANA_WALLET_SECRET_KEY (once). Compose
+    # profile `meme-live`; inert unless ENABLE_MEME_LIVE_TRADING + the gates file.
+    exec python -m hunter_meme_executor
+    ;;
   all)
     echo "role all is not supported yet: run one HUNTER_ROLE per container (M1)"
     exit 64

@@ -1,15 +1,13 @@
 """Application settings, read from environment variables.
 
-Every field mirrors a variable in ``.env.example`` (ARCHITECTURE.md §10: "Uma
-classe Settings ... carregada de variaveis de ambiente. Nenhum arquivo .env e
-lido em producao."). ``pydantic-settings`` matches env vars to field names
-case-insensitively, so no aliases are needed.
+Every field mirrors a variable in ``.env.example`` (ARCHITECTURE.md §10: "Uma classe
+Settings ... carregada de variaveis de ambiente. Nenhum arquivo .env e lido em
+producao."). ``pydantic-settings`` matches env vars to field names case-insensitively.
 
-Fields that hold credentials or connection strings with embedded credentials
-are ``SecretStr`` so they never render in plain text (``repr``, logs, ``str``);
-``dump_safe()`` returns a dict with those masked for diagnostics endpoints.
-Fields explicitly meant to reach the browser (``NEXT_PUBLIC_*``) stay plain
-``str`` — they are public by design (see SECURITY.md §4).
+Fields that hold credentials or connection strings with embedded credentials are
+``SecretStr`` so they never render in plain text (``repr``, logs, ``str``);
+``dump_safe()`` returns a dict with those masked for diagnostics endpoints. Fields
+meant to reach the browser (``NEXT_PUBLIC_*``) stay plain ``str`` (SECURITY.md §4).
 """
 
 from __future__ import annotations
@@ -24,7 +22,9 @@ from hunter_core.domain.enums import KillSwitchState
 from hunter_core.sharding import parse_shard_spec
 
 Environment = Literal["development", "test", "staging", "production"]
-Role = Literal["api", "market", "scanner", "strategy", "execution", "analytics", "meme", "all"]
+Role = Literal[
+    "api", "market", "scanner", "strategy", "execution", "analytics", "meme", "meme_executor", "all"
+]
 MarketRole = Literal["perpetual", "spot", "both"]
 
 

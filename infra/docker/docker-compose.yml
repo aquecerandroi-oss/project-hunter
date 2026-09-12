@@ -666,6 +666,56 @@ services:
       start_period: 90s
       retries: 5
 
+  # T4.14 — the real executor of the pump.fun curve (services/meme-executor).
+  # `profiles: [meme-live]`: it never comes up with a bare `up` nor with the
+  # radar's `--profile meme`. It is the ONLY process that reads
+  # SOLANA_WALLET_SECRET_KEY (once, then removed from its environment). Two
+  # switches, deliberately: the profile decides whether the container exists,
+  # ENABLE_MEME_LIVE_TRADING decides whether it may sign — and with the flag on
+  # the process REFUSES to start unless MEME_GATES_FILE, the five MEME_* policy
+  # variables, SOLANA_RPC_URL and the key are all present (docs/DEPLOYMENT.md
+  # §3.7; docs/RISK_ENGINE_MEME.md §3.3/§3.4/§12). The flag is pinned to a
+  # substitution that defaults to false and is never written "true" in this file.
+  meme-executor:
+    image: hunter-api:${GIT_SHA:-dev}
+    profiles: [meme-live]
+    cap_drop: [NET_RAW, NET_ADMIN]
+    environment:
+      <<: *api-env
+      HUNTER_ROLE: meme_executor
+      HEALTH_PORT: "8001"
+      ENABLE_MEME_LIVE_TRADING: ${ENABLE_MEME_LIVE_TRADING:-false}
+      MEME_GATES_FILE: ${MEME_GATES_FILE:-}
+      MEME_EXECUTOR_CLUSTER: ${MEME_EXECUTOR_CLUSTER:-mainnet}
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
+      MEME_KILL_FILE: /run/hunter/meme.kill
+      MEME_AUTO_CLOSE_ON_EMERGENCY: ${MEME_AUTO_CLOSE_ON_EMERGENCY:-false}
+      MEME_LIVE_APPROVAL_TTL_S: ${MEME_LIVE_APPROVAL_TTL_S:-30}
+      # One loop, one transaction at a time, plus the journal's own writes from
+      # the submitter's thread: 2 + 2 is headroom over what this process opens.
+      DB_POOL_SIZE: "2"
+      DB_MAX_OVERFLOW: "2"
+    env_file:
+      - path: ../../.env
+        required: false
+    volumes:
+      # `touch /run/hunter/meme.kill` on the host is the 5-second stop.
+      - hunter-meme-kill:/run/hunter
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://localhost:8001/ready', timeout=25); raise SystemExit(0 if response.status == 200 else 1)"]
+      interval: 15s
+      timeout: 30s
+      start_period: 60s
+      retries: 5
+
   web:
     build:
       context: ../..
@@ -706,6 +756,7 @@ services:
         ipv4_address: 172.29.0.10
 
 volumes:
+  hunter-meme-kill:
   hunter_pg:
   hunter_redis:
 

@@ -52,8 +52,8 @@ describe("meme-tests labels are exhaustive and never leak a raw enum", () => {
 
   // The API's `ExitReason` grew to nine members (T4.10a); the desk dictionary
   // must cover every one -- three production builds broke on a missing label.
-  it("the nine exit reasons, including max_loss and line_broken, have labels", () => {
-    expect(MEME_EXIT_REASONS).toHaveLength(9);
+  it("the ten exit reasons, including max_loss and line_broken, have labels", () => {
+    expect(MEME_EXIT_REASONS).toHaveLength(10);
     expect(MEME_EXIT_REASONS).toContain("max_loss");
     expect(MEME_EXIT_REASONS).toContain("line_broken");
     expect(exitReasonLabel("max_loss")).toBe("perda máxima (piso)");

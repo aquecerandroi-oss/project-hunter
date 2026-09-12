@@ -43,6 +43,7 @@ EXIT_REASON_PT: Final[dict[str, str]] = {
     "rug_no_snapshot": "rug — sem fotografia",
     "max_loss": "perda máxima (piso)",
     "line_broken": "linha rompida",
+    "dead": "morta",
 }
 """``ExitReason`` → Portuguese, the same words ``components/meme-desk/labels.ts``
 prints (DESIGN-5: no raw enum on screen; the CSV is a screen too).

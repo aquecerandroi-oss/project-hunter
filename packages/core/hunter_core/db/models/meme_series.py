@@ -142,6 +142,10 @@ class MemeTrade(Base):
             name="instruction_indexes_are_not_negative",
         ),
         CheckConstraint("slot >= 0 AND sol_lamports >= 0", name="chain_counters_are_not_negative"),
+        # 0029 — the venue of the fill (T4.11).
+        CheckConstraint(
+            "program IS NULL OR program IN ('pump', 'pump_amm')", name="program_is_a_known_label"
+        ),
         {"postgresql_partition_by": "RANGE (block_time)"},
     )
 
@@ -200,3 +204,11 @@ class MemeTrade(Base):
     coverage, never an organic trade."""
 
     source: Mapped[str] = mapped_column(Text)
+
+    program: Mapped[str | None] = mapped_column(Text)
+    """``pump`` (the bonding curve) | ``pump_amm`` (the canonical PumpSwap pool
+    after the migration) — the venue the ``swap-api`` states on every row
+    (``0029``, T4.11). ``NULL`` on rows written before the column: curve trades
+    by construction, which is why every reader of the curve's tape says
+    ``coalesce(program, 'pump') = 'pump'``. The pool's tape is what marks a
+    paper bet that held through the migration (EXP-M4)."""

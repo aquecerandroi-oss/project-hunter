@@ -37,6 +37,7 @@ from meme_diary_render import (
     RuleSetDay,
     render_diary,
 )
+from meme_diary_wallets import gather_wallets
 from sqlalchemy import text
 
 from hunter_core.db.session import create_engine, create_session_factory, role_session
@@ -267,6 +268,7 @@ async def gather(day: date) -> DiaryInputs:
             )
             quote = (await session.execute(_LAST_QUOTE, {"day_end": day_end})).mappings().first()
             clock_start = min((r["created_at"] for r in rule_rows), default=None)
+            real_observed = await gather_wallets(session, day_start=day_start, day_end=day_end)
     finally:
         await engine.dispose()
     return DiaryInputs(
@@ -282,6 +284,7 @@ async def gather(day: date) -> DiaryInputs:
         sol_usd_observed_at=None if quote is None else quote["observed_at"],
         clock_start=None if clock_start is None else clock_start.astimezone(SAO_PAULO).date(),
         lab_last_tick_at=await _read_heartbeat_tick(),
+        real_observed=real_observed,
     )
 
 

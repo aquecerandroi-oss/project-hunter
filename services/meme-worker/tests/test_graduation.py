@@ -15,6 +15,11 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+
+from hunter_exchanges.pumpfun.decode import BondingCurveAccount
+from hunter_exchanges.pumpfun.mayhem_state import NormalizedMayhemFlow
+from hunter_exchanges.pumpfun.models import NormalizedCurveState
+from hunter_exchanges.pumpfun.quote import GlobalParams
 from hunter_meme_worker.graduation import (
     GLOBAL_PARAMS,
     MAYHEM_STATE,
@@ -28,11 +33,6 @@ from hunter_meme_worker.graduation import (
     fill_threshold_sol,
     mayhem_denominator,
 )
-
-from hunter_exchanges.pumpfun.decode import BondingCurveAccount
-from hunter_exchanges.pumpfun.mayhem_state import NormalizedMayhemFlow
-from hunter_exchanges.pumpfun.models import NormalizedCurveState
-from hunter_exchanges.pumpfun.quote import GlobalParams
 
 pytestmark = pytest.mark.unit
 

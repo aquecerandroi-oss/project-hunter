@@ -33,7 +33,22 @@ const EXIT_REASON_LABEL: Record<MemeExitReason, string> = {
   // T4.13: the same words `hunter_api.schemas.meme_tests.EXIT_REASON_PT` writes to the CSV.
   max_loss: "perda máxima (piso)",
   line_broken: "linha rompida",
+  // T4.11: the pool's tape silent for 15 min with the mark at or under half the entry.
+  dead: "morta",
 };
+
+/** T4.11 (`0029`): where the open bet's mark comes from once the coin left the curve. */
+export function markSourceLabel(source: string | null | undefined): string | null {
+  if (!source) return null;
+  if (source === "curve") return "marcada pela curva";
+  if (source === "pool_tape") return "marcada pela pool (fita)";
+  return `marcada por ${source}`;
+}
+
+/** "marca envelhecida há 930s" once the tape has been silent for 15 min (T4.11). */
+export function markStaleLabel(staleS: number | null | undefined): string | null {
+  return typeof staleS === "number" && staleS >= 900 ? `marca envelhecida há ${Math.round(staleS)}s` : null;
+}
 
 export function exitReasonLabel(reason: string | null | undefined): string {
   if (!reason) return "saída sem motivo registrado";

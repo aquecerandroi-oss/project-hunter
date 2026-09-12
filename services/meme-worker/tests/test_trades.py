@@ -15,15 +15,15 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
+from hunter_exchanges.base import RateLimited
+from hunter_exchanges.pumpfun.rate_shared import HttpRateLimited
+from hunter_exchanges.pumpfun.swap_api import TradesPage, parse_trades_page
 from hunter_meme_worker.repo_tape import trade_rows
 from hunter_meme_worker.sources import SWAP_API, SourcesState
 from hunter_meme_worker.tape_budget import BUDGET_REFUSED, TapeBudget
 from hunter_meme_worker.tracker import TIER_GRADUATING, TIER_NEW, TIER_OPEN_BET, TIER_REST
 from hunter_meme_worker.trades import TapeCoverage, TradesPuller, pull_once
-
-from hunter_exchanges.base import RateLimited
-from hunter_exchanges.pumpfun.rate_shared import HttpRateLimited
-from hunter_exchanges.pumpfun.swap_api import TradesPage, parse_trades_page
 
 pytestmark = pytest.mark.unit
 
@@ -118,11 +118,24 @@ def test_curve_rows_get_an_ordinal_per_transaction_and_others_are_counted() -> N
         r.quote_mint == "11111111111111111111111111111111" and r.token_decimals == 6 for r in rows
     )
     assert rows[0].block_time < rows[-1].block_time, "ordered by the source's own id, oldest first"
+    assert all(r.program == "pump" for r in rows)
     other = _page("swap_api_trades_page1_raw.json", "RAY")
     rows2, skipped2 = trade_rows(other.trades)
-    assert rows2 == [] and skipped2 == {"not_bonding_curve": 100}
+    assert rows2 == [] and skipped2 == {"unsupported_venue": 100}, "raydium_cpmm is not ours"
     twice = trade_rows(page.trades[:1] + page.trades[:1])[0]
     assert [r.event_index for r in twice] == [0, 1], "two events of one tx are two ordinals"
+
+
+def test_the_pool_tape_of_a_graduated_mint_is_kept_with_its_venue() -> None:
+    """T4.11: the 100 ``pump_amm`` trades of the real graduated capture become
+    rows (``program = 'pump_amm'``, native SOL) — a bet that holds through the
+    migration is marked on them. Before T4.11 they were skipped."""
+    page = _page("swap_api_trades_graduated_pump_raw.json", "GRAD")
+    rows, skipped = trade_rows(page.trades)
+    assert len(rows) == 100 and skipped == {}
+    assert {r.program for r in rows} == {"pump_amm"}
+    assert all(r.quote_mint == "11111111111111111111111111111111" for r in rows)
+    assert rows[0].block_time < rows[-1].block_time
 
 
 def test_the_plan_orders_by_tier_respects_intervals_and_caps_the_cycle() -> None:
@@ -160,7 +173,7 @@ async def test_a_pull_walks_the_cursor_to_the_cap_then_stops_at_the_high_water_m
         ("RAY", None),
         ("RAY", _page("swap_api_trades_page1_raw.json", "RAY").next_cursor),
     ]
-    assert report.rows == 0 and report.skipped == {"not_bonding_curve": 200}
+    assert report.rows == 0 and report.skipped == {"unsupported_venue": 200}
     state = puller.coverage["RAY"]
     assert state.covered_since == NOW and state.high_water == "00044638622300057700000501"
     assert sources[SWAP_API].used_60s.total(NOW) == 2

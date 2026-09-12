@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from hunter_meme_worker.features import CurveObservation
 
@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 
     from hunter_exchanges.pumpfun.models import NormalizedCurveState
     from hunter_exchanges.pumpfun.rpc import CurveBatch, MayhemFlowBatch
+    from hunter_exchanges.pumpfun.rpc_wallet import SignatureInfo
     from hunter_exchanges.pumpfun.ws import ConnectionState, MemeEvent
     from hunter_meme_worker.boards import BoardCollector
     from hunter_meme_worker.config import MemeConfig
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
     from hunter_meme_worker.sources import SourcesState
     from hunter_meme_worker.tracker import MintTracker
     from hunter_meme_worker.trades import TradesPuller
+    from hunter_meme_worker.wallets_state import WalletsWatcher
 
 
 class EventSource(Protocol):
@@ -67,6 +69,16 @@ class ChainSource(Protocol):
         """The curve of every mint, 100 per call, stamped with the slot's block
         time (T4.2f, ``chain.py``)."""
         ...
+
+
+class WalletChainSource(Protocol):
+    """The Solana RPC as the wallet loop (T4.12) needs it — reads only."""
+
+    async def get_signatures_for_address(
+        self, address: str, *, until: str | None = None, limit: int = 100
+    ) -> list[SignatureInfo]: ...
+
+    async def get_transaction(self, signature: str) -> dict[str, Any] | None: ...
 
 
 @dataclass
@@ -139,3 +151,6 @@ class RadarContext:
     """``/global-params`` (T4.2d): the record the fill threshold and the
     denominator of a mid-life standard curve are derived from. ``None`` in a
     context built without it — every curve reading then claims neither."""
+    wallets: WalletsWatcher | None = None
+    """The observed wallets (T4.12, ``wallets.py``): ``None`` when
+    ``MEME_WATCH_WALLETS`` is empty — no loop, and the readiness body says so."""

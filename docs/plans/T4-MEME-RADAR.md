@@ -652,6 +652,107 @@ proposta de escala jamais escrita.
 `parent_bet_id`, `ExitReason` ganha `max_loss` (já escrito pelo laço desde a T4.6) e `line_broken`.
 `apps/web` é a Parte B (paralela). Schema: `docs/DATABASE.md` §38. Notas: `.claude/state/notes-T4.10a.md`.
 
+### T4.11 — o braço moonshot (10×/25×) e segurar através da migração (entregue 12/09/2026)
+
+**Diretiva** (Everton, 12/09 11:0x BRT): "pode colocar valores mais alto para sair num mega ROI, meme coin
+é diferente". Brief: `.claude/state/brief-T4.11-moonshot-e-pos-migracao.md`. Nada muda nos conjuntos
+congelados (`meme_paper_v0`, `trendline_v0`, `hype_probe_v0`): continuam vendendo na migração.
+
+**A saída na migração virou parâmetro** (`exit_on_migration`, `hunter_indicators.meme.exits.ExitRules`;
+governa também a conclusão da curva, que a precede). Com `false`, a aposta **sobrevive à migração** e passa
+a ser marcada pela **fita da pool PumpSwap** (`meme_trades.program = 'pump_amm'` — a `0029` grava o venue;
+a T4.2c descartava essas linhas): `pool_mark_sol v1` = tokens × preço do último trade (recomposto de
+`sol_lamports`/`token_amount`, exato) − impacto pela participação (tamanho ÷ volume dos 5 min anteriores,
+teto 1 %; janela vazia = 1 % com motivo `no_volume_5m`) − taxa da **faixa da PumpSwap pelo mcap daquele
+preço** (`docs/PUMPFUN.md` §4.1: 25 faixas, 1,25 % → 0,30 %) − 0,5 % do caminho; `mark_source =
+'pool_tape'`, `mark_stale_s` = segundos desde o último trade recebido até o tick. A regra dispara no trade
+*k* e a venda é o trade *k + 1* (`fill = next_trade`); não-antecipação em SQL (`received_at <= tick`) e no
+puro (`trades_known_by`). Saída **`dead`**: fita muda ≥ 900 s **e** marca ≤ 50 % da entrada; sem trade em
+3 min fecha a **zero como `dead`** (`fill = none`) — o resultado plausível da doutrina §5, com o nome certo.
+Trailing **armado só depois de N×** (`trailing_arm_multiple`; "50 % só depois de 3×").
+
+**Provas:** `test_meme_pool.py` (faixas exclusivas no limite superior: 419,99 → 1,25 %, 420 → 1,20 %,
+98 240 → 0,30 %; janela `(t − 5 min, t]`; impacto capado; 1 000 tokens a 0,00001 com 5 SOL de volume =
+0,00983529 exatos; um trade recebido 1 s depois do instante não existe para ele), `test_meme_exits_moonshot.py`
+(trailing desarmado a 2,5× e armado a 3×; `dead` exige as duas condições; `mark_staleness_unknown` na curva;
+`dead` acima do piso, abaixo do dump; os dicionários congelados byte a byte), `test_pool_mark.py`,
+`test_lab_params_moonshot.py` (`max_hold_s = 7200` inteiro pelo laço; `suggested()` da EXP-M1 com as
+quatro chaves de sempre), `test_lab_moonshot.py` (contra Postgres: aposta preenchida na curva → migração →
+marcada pela pool em 30 s de envelhecimento → alvo no trade *k* → **um trade com `block_time` anterior ao
+tick mas `received_at` posterior não preenche** → venda no trade seguinte com faixa 1,20 % e impacto 1 %;
+pool muda: 900 s → intenção `dead` pelo tick, 180 s sem trade → fechada `dead` a zero).
+
+**Conjuntos (semente da `0029`, `research_only`):** `moonshot_v0/1` (10×, [[EXP-M4-moonshot]]) e
+`moonshot_v0/2` (25×, o irmão de falseamento) — porta da EXP-M3 verbatim, 0,02 SOL, 7 200 s, 8 abertas,
+0,20/dia; **`operator/2`** substitui `operator/1` (aposentado): `suggested` 10× / 50 % após 3× / 7 200 s /
+0,05 / `exit_on_migration false`, folha editável. Previsão registrada: **`descartar`** (H0: a cauda não
+paga as perdas somadas; régua ≥ 100 apostas e 30 dias por braço, IC 95 % por blocos de dia,
+**leave-top-out obrigatório**). Suposições declaradas: `max_loss_pct = 100` (sem piso — `dead` é o piso),
+0,5 % do caminho também na pool, `total_supply` desconhecido = 1 bi nomeado.
+
+**Verificado ao vivo (1 chamada, 15:35Z):** a fita do `swap-api` de um mint graduado às 08:58Z devolve 100
+trades `pump_amm` em SOL nativo, o mais novo às 10:51Z — 4,7 h de silêncio: o caso `dead` em carne e osso.
+
+**API:** `BetOut.mark_source`/`mark_stale_s`, `DeskParamsOut.exit_on_migration`/`trailing_arm_x`,
+`ExitReason` + `dead` (`EXIT_REASON_PT["dead"] = "morta"` no registro de testes e no CSV), manual sob
+`operator/2`. **A mesa continua respondendo num banco ainda na `0028`:** as duas colunas da `0029` ficam
+**fora** da `Table` compartilhada (`repositories/meme_desk_tables.py` — `select(meme_paper_bets)` é a
+leitura da mesa e do `/meme/tests`) e são lidas à parte por `repositories/meme_desk_marks.py` (sonda em
+`information_schema.columns`; sem as colunas, `mark_source`/`mark_stale_s` = `null`, nunca um `curve`
+inventado); o conjunto `operator` é lido por **nome + `status = 'active'`** (maior versão), logo abaixo da
+`0029` a compra manual continua sob `operator/1` em vez de recusar `operator_rule_set_missing`. Schema:
+`docs/DATABASE.md` §41; doutrina: `docs/RISK_ENGINE_MEME.md` §6. Notas: `.claude/state/notes-T4.11.md`.
+Rótulos do `apps/web` (`components/meme-desk/labels.ts`): `mark_source` `curve` → "marcada pela curva",
+`pool_tape` → "marcada pela pool (fita)"; `mark_stale_s` ≥ 900 → "marca envelhecida há Ns"; `exit.reason`
+`dead` → "morta" — pendentes (fora desta tarefa).
+
+### T4.12 — a carteira observada: as operações REAIS entram no radar e no Lab (entregue 12/09/2026)
+
+**Diretiva** (Everton, 12/09 11:1x BRT): "vou apostar dinheiro real e ter experiência real, assim você
+analisa". Ele opera **na mão, pelo site**; o sistema **não assina nada** — só observa o endereço público
+(`MEME_WATCH_WALLETS`, primeiro valor `6nAh8drzAYfFZuTFFRgwRdV8tNndFiX1E8NGRAGzSk5F`, a "Starting Solana
+Wallet" do Terminal; nunca uma chave) e transforma cada compra/venda real dele em dado do Lab. Contrato:
+`.claude/state/brief-T4.12-carteira-observada.md`; notas: `.claude/state/notes-T4.12.md`.
+
+**O coletor** (`services/meme-worker/hunter_meme_worker/wallets.py` + `wallets_state.py`, laço de 30 s,
+bucket próprio de 2 req/s no RPC público): por carteira, `getSignaturesForAddress` desde a última
+assinatura vista (cursor em memória, relido do livro ao reiniciar) e `getTransaction` das novas
+(`hunter_exchanges.pumpfun.rpc_wallet.WalletRpc`). A decodificação é pura
+(`hunter_exchanges.pumpfun.wallet_fills`): na curva, o `TradeEvent` do programa Pump com as taxas do próprio
+evento (protocolo + criador + cashback + taxa de rede quando a carteira é a pagadora — lamport-exato, o que
+a T4.8 reconciliou); na PumpSwap, cujo layout de `BuyEvent`/`SellEvent` o repo **não** capturou, as **deltas de
+saldo da própria carteira** (`pre/postTokenBalances` com `owner = wallet`, `pre/postBalances` no índice da
+carteira, wSOL somado ao lado SOL), `decode = 'balance_delta'`, `venue = 'pool'`; tudo o mais (transferência,
+ATA, trade de terceiro que a carteira só pagou, quote ≠ SOL, transação que o nó não serve) é
+`side = 'unknown'` com o motivo por nome e `raw` limitado — **nunca um fill inventado**. Transação falha
+(`meta.err`) não é fill. Dedupe pela chave `(signature, event_index)` do schema, não pela memória do processo.
+Falha de RPC conta em `solana_rpc` e no heartbeat (`wallets_*`) e nunca sobe — `collect.forever` derrubaria o
+radar.
+
+**O cruzamento com o Lab** (`wallets_lab.py`): cada **compra** real ganha `lab_context` — a linha de
+`meme_features_1m` do **último minuto fechado antes do fill** (`end_time <= block_time`, a não-antecipação
+do próprio Lab), passada pelo portão de **cada conjunto ativo** (`entry_features_of` + `evaluate_entry`, os
+mesmos do laço): `accepted` ou as recusas por nome; mint que o fold nunca escreveu → `no_features_row` com
+`accepted = null` (o Lab não viu — fato, não recusa). `hype_score`/`line_reason` do minuto (T4.10a) viram
+colunas ao lado.
+
+**As posições** (`wallet_positions.py`, puro, recomputadas do livro): FIFO por carteira × mint, custo =
+tudo o que saiu (risco = SOL gasto, RISK_ENGINE_MEME §5), PnL realizado da parte casada, venda sem compra
+observada = `unmatched_sell_tokens` (o produto vai para `sol_received` e para mais nada), marca = o que
+uma venda total renderia agora (`quote_sell` à taxa que os próprios fills da carteira mostraram, ou tokens ×
+último preço da fita quando ela é mais nova; curva encerrada não é preço; `mark_source`/`mark_reason`),
+R = (realizado + não realizado)/SOL gasto.
+
+**Schema `0027_meme_wallets`** (`docs/DATABASE.md` §39): `meme_wallet_trades`, `meme_wallet_positions`,
+e `meme_lab_scoreboard_v1` recriada com `UNION ALL` de uma linha por carteira × dia BRT (`wallet:<8>`,
+`kind = 'real_observed'`, `pnl_usd` NULL — nunca um dólar que ninguém observou). Descida recusa com o livro
+povoado. **API:** `GET /meme/lab` e `GET /meme/desk` ganham `real_observed` (campo novo, opcional; rótulo
+"REAL — observado na cadeia, não executado por este sistema"; US$ só com a cotação observada, nomeada).
+**Diário:** seção "2b. Operações reais (carteira observada)" com o que o Lab dizia por conjunto.
+**Testes:** adaptador (compra e venda **reais** capturadas, carteira alheia, falha, PumpSwap sintético, RPC
+offline), FIFO/marca, serviço da API, diário, e um container (`test_wallets_persistence.py`: livro, dedupe,
+`lab_context`, posições, remarcação pela fita, placar, grants) + migrações (`test_0027_*`).
+
 ### T4.13 — o registro completo de cada teste na mesa (entregue 12/09/2026)
 
 **Diretiva** (Everton, 12/09 11:3x BRT): "deixa pronto os testes na mesa colocando tempo de entrada, valor de
@@ -698,6 +799,54 @@ integração 13 em testcontainer contra o Alembic head (`test_meme_tests_api.py`
 manual, sonda+escala, ontem excluído, minuto v3, curva do detalhe, keyset, filtro, 404, CSV byte a byte); web Vitest
 44 novos (formatação Brasília com segundos, motivos, totais, link do CSV, tabela/cartões com REAL e expansão).
 Notas: `.claude/state/notes-T4.13.md`.
+
+### T4.14 — o executor real: da aprovação na mesa à transação assinada (entregue inerte em 12/09/2026)
+
+**Diretiva** (Everton, 12/09 12:3x BRT): "bora tentar logo com dinheiro real; ele faz a operação, não
+consegue?". Brief: `.claude/state/brief-T4.14-executor-real.md`. Resposta honesta: **consegue, e está
+inerte por construção** até ele digitar a chave, os cinco tetos e a flag (`docs/ACTIVATION.md` §9b) —
+os Portões A e B da `RISK_ENGINE_MEME.md` §12 seguem vermelhos, e o único caminho hoje é o **teste pequeno
+autorizado por escrito** (§12, variante).
+
+**Motor puro** (`packages/risk-core/hunter_risk_meme/`, irmão de `hunter_risk` que nunca o importa —
+`test_boundary.py`): os 25 checks da §4 com os nomes de recusa da doutrina (todos exercitados por
+`test_checks_table.py`, conjunto comparado a `REFUSAL_NAMES`), sizing §5 (mínimo entre os tetos,
+`binding_constraint`, `tied_limits` por `CAP_ORDER`, dois contrafactuais), kill switch §7 (unidade SOL,
+trava diária **latched**, `resume` só OWNER e recusado enquanto o dia ainda bloqueia), saídas §6
+(`decide_exit`: `sell_now` > `emergency_auto_close` > rug > dump do criador > migração/curva completa >
+alvo > trailing > time stop), política da carteira lida do ambiente (`limits_from_env`: os cinco `MEME_*`
+ou `policy_missing` com os nomes). `float` recusado na construção. VM1/VM2/VM3/VM7 de
+`infra/scripts/meme_vm.py` passam de fato (`meme_vm_engine.py`).
+
+**Schema** (`0028_meme_live`, `docs/DATABASE.md` §40): `meme_proposals.mode` (`paper` | `live`),
+`meme_live_orders` (uma linha por tentativa; `client_order_id = meme:{proposal_id}` e `:exit:{n}`; as duas
+chaves de idempotência da §9.4 como índices únicos parciais — uma compra por proposta, uma ordem por
+assinatura; a lista de assinaturas; a trava `signing_at`; o fill = `TradeEvent`), `meme_live_positions`
+(uma por proposta, `initial_risk_sol = SOL gasto`, marca honesta com fonte, intenção de saída durável,
+`sell_requested_at/by` = as únicas duas colunas da API), `meme_live_kill_switch` (trava latched + âncora
+durável do dia). A descida recusa com uma ordem real ou uma proposta `live`.
+
+**Executor** (`services/meme-executor/`, `HUNTER_ROLE=meme_executor`, perfil compose `meme-live`,
+`docs/DEPLOYMENT.md` §3.7): boot recusa por nome na ordem portões → política → RPC → chave; laço de 1 s
+(TTL de 30 s da aprovação → admissão → cotação sobre a curva lida agora → `build_buy` → verificador §9.1
+→ `simulateTransaction` → **kill switch relido** → assinar, assinatura gravada em Postgres **antes** do
+envio → enviar → confirmar pelo `TradeEvent` → posição); saídas a cada 5 s; kill switch de quatro fontes
+(`SYSTEM_KILL_SWITCH`, Redis `meme:kill`, arquivo `MEME_KILL_FILE`, a linha latched) relido a cada 10 s;
+reconciliação a cada 30 s (nunca reenvia); `hb:meme:executor`; `EMERGENCY` liquida só com
+`MEME_AUTO_CLOSE_ON_EMERGENCY=true`. **API**: `GET /meme/live` (VIEWER+, rótulo REAL, heartbeat + livro +
+posições), `POST /meme/live/positions/{id}/sell-now` (TRADER+, `Idempotency-Key`), `mode` no corpo de
+`approve`/`manual` (422 `meme_live_disabled` sem a flag da API).
+
+**Provas**: risk-core 63 unit + executor 43 unit (boot, construtor/fills, adversarial) + API 113 unit
+(`-k meme`) + testcontainer do executor 7 (fill confirmado + posição, idempotência por proposta e por
+assinatura, restart + `sell_now`, `approval_expired`, kill switch por Redis + trava persistida, grants,
+duas sessões, **kill switch que muda entre admissão e assinatura**) + `test_migrations -k 0028` 3;
+`meme_vm.py`: VM1–5/7 PASS, VM6(c)/VM8/VM9 PENDING por nome (metades de papel/Postgres);
+`forbidden_patterns.sh --self-test` ok; prova de rede em `.claude/state/notes-T4.14.md` §5 (devnet:
+faucet recusou de novo; mainnet: simulação `sigVerify=false` pelo caminho do executor, **zero**
+`sendTransaction`). **Fora**: venda pós-migração na PumpSwap (posição fica `blocked`), Jito, a tela
+"Aprovar (REAL)" (`apps/web` intocado — o que a mesa precisa está nas notas §7), `risk_events`/transições
+persistidas do kill switch meme (só log + heartbeat).
 
 ## 7. Riscos — honestos, sem suavizar
 

@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
+
 from hunter_meme_worker.features import NO_HOLDERS_READER, OUT_OF_RANGE, share_or_reason
 from hunter_meme_worker.features_tape import HoldersObservation
 

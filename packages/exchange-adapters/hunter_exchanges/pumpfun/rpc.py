@@ -4,8 +4,11 @@ The caller supplies the mint's bonding-curve address for a single curve read; th
 Mayhem flow read derives its four accounts from the mint by the IDL's seeds
 (``mayhem_state.py``) and batches 25 mints per ``getMultipleAccounts`` (T4.2e);
 the curve batch (``rpc_curves.py``, T4.2f) derives the curve PDA of every mint
-and reads 100 per call, stamped with the slot's block time. No transaction method
-is exposed. HTTP/RPC errors never include the injected URL (it may carry a key).
+and reads 100 per call, stamped with the slot's block time. **T4.12** adds the
+two reads a watched wallet needs — ``getSignaturesForAddress`` (newest first,
+``until`` a cursor) and ``getTransaction`` (``encoding: json``, version 0) —
+still reads only: nothing here sends. HTTP/RPC errors never include the
+injected URL (it may carry a key).
 
 **Measured limits of the public endpoint** (12/09 13:36 UTC, the RPC's own
 response headers, ``tests/fixtures/pumpfun/t42f_capture_http_log.json``):
@@ -130,6 +133,10 @@ class SolanaRpcClient:
             raise MalformedMessage(
                 "Solana RPC response has no result", exchange="pumpfun"
             ) from None
+
+    async def call(self, method: str, params: list[Any]) -> Any:
+        """One JSON-RPC call under both buckets — the seam ``rpc_wallet.py`` reads through."""
+        return await self._call(method, params)
 
     async def get_curve_state(self, mint: str, bonding_curve: str) -> NormalizedCurveState:
         result = await self._call("getAccountInfo", [bonding_curve, _FINALIZED])
@@ -292,4 +299,10 @@ def _flow(mint: str, accounts: list[Any], *, slot: int, now: Any) -> NormalizedM
     )
 
 
-__all__ = ["METHOD_SPACING_S", "PUBLIC_RPC_URL", "CurveBatch", "MayhemFlowBatch", "SolanaRpcClient"]
+__all__ = [
+    "METHOD_SPACING_S",
+    "PUBLIC_RPC_URL",
+    "CurveBatch",
+    "MayhemFlowBatch",
+    "SolanaRpcClient",
+]

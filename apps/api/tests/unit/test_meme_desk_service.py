@@ -212,6 +212,7 @@ class FakeRepository:
         decision: dict[str, Any] | None,
         decided_by: str,
         decided_at: datetime,
+        mode: str = "paper",
     ) -> bool:
         self.decide_calls += 1
         current = self.proposals[proposal_id]
@@ -223,6 +224,7 @@ class FakeRepository:
             decision=decision,
             decided_by=decided_by,
             decided_at=decided_at,
+            mode=mode,
         )
         return True
 
@@ -716,3 +718,83 @@ class TestDeskCursor:
     def test_garbage_is_a_422(self) -> None:
         with pytest.raises(InvalidDeskCursorError):
             decode_desk_cursor("not-base64!")
+
+
+class TestLiveMode:
+    """T4.14 — ``mode = "live"`` is filed only with the API's own flag; without it
+    the refusal is named and **nothing is decided** (the row stays ``proposed``)."""
+
+    async def test_default_mode_is_paper(self) -> None:
+        repo, store, _, proposal = _world()
+        await approve_proposal(
+            _repo(repo),
+            store,
+            context=_context(),
+            proposal_id=proposal.id,
+            idempotency_key=KEY,
+            body=_approve_body(),
+            now=NOW,
+        )
+        assert repo.proposals[proposal.id].mode == "paper"
+
+    async def test_live_without_the_api_flag_is_refused_by_name_and_decides_nothing(
+        self,
+    ) -> None:
+        repo, store, _, proposal = _world()
+        with pytest.raises(DeskRefusedError, match="meme_live_disabled"):
+            await approve_proposal(
+                _repo(repo),
+                store,
+                context=_context(),
+                proposal_id=proposal.id,
+                idempotency_key=KEY,
+                body=_approve_body(mode="live"),
+                now=NOW,
+                live_enabled=False,
+            )
+        assert repo.decide_calls == 0
+        assert repo.proposals[proposal.id].status == "proposed"
+
+    async def test_live_with_the_api_flag_files_the_proposal_for_the_executor(self) -> None:
+        repo, store, _, proposal = _world()
+        out = await approve_proposal(
+            _repo(repo),
+            store,
+            context=_context(),
+            proposal_id=proposal.id,
+            idempotency_key=KEY,
+            body=_approve_body(mode="live"),
+            now=NOW,
+            live_enabled=True,
+        )
+        assert out.row.status == "approved"
+        assert repo.proposals[proposal.id].mode == "live"
+
+    async def test_a_manual_live_buy_needs_the_flag_too(self) -> None:
+        repo, store, _, _ = _world()
+        body = ManualProposalIn.model_validate(
+            {
+                "mint": MINT,
+                "size_sol": "0.2",
+                "target_x": "2",
+                "trailing_pct": "30",
+                "max_hold_s": 600,
+                "mode": "live",
+            }
+        )
+        with pytest.raises(DeskRefusedError, match="meme_live_disabled"):
+            await file_manual_proposal(
+                _repo(repo), store, context=_context(), idempotency_key=KEY, body=body, now=NOW
+            )
+        assert repo.proposals == {} or all(p.mode == "paper" for p in repo.proposals.values())
+        out = await file_manual_proposal(
+            _repo(repo),
+            store,
+            context=_context(),
+            idempotency_key=KEY,
+            body=body,
+            now=NOW,
+            live_enabled=True,
+        )
+        assert out.row.status == "approved"
+        assert repo.proposals[out.row.id].mode == "live"

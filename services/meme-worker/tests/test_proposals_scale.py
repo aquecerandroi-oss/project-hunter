@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+
 from hunter_meme_worker.lab_models import RuleSetSpec, effective_params
 from hunter_meme_worker.paper_fill import evaluate_fill
 from hunter_meme_worker.proposals import GateRow, evaluate_gate

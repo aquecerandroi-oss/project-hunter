@@ -16,6 +16,8 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+
+from hunter_exchanges.pumpfun import normalize
 from hunter_meme_worker.features import (
     DENOMINATOR_UNKNOWN,
     NO_HOLDERS_READER,
@@ -29,8 +31,6 @@ from hunter_meme_worker.features import (
     build_row,
     curve_progress_pct,
 )
-
-from hunter_exchanges.pumpfun import normalize
 
 pytestmark = pytest.mark.unit
 

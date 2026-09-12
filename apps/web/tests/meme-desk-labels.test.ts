@@ -15,7 +15,7 @@ describe("meme-desk labels are exhaustive and never leak a raw enum", () => {
 
   it("every exit reason has a label; null is honest", () => {
     // T4.13: the API's `ExitReason` has nine members since T4.10a (`max_loss`, `line_broken`).
-    expect(MEME_EXIT_REASONS).toEqual(["target", "trailing", "time_stop", "migrated", "creator_dump", "sell_now", "rug_no_snapshot", "max_loss", "line_broken"]);
+    expect(MEME_EXIT_REASONS).toEqual(["target", "trailing", "time_stop", "migrated", "creator_dump", "sell_now", "rug_no_snapshot", "max_loss", "line_broken", "dead"]);
     for (const reason of MEME_EXIT_REASONS) {
       expect(exitReasonLabel(reason)).not.toBe(reason);
     }

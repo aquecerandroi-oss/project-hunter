@@ -11,12 +11,12 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+
+from hunter_indicators.meme.lines import LinePoint
 from hunter_meme_worker.features import FEATURES_VERSION, CurveObservation, MinuteInputs, build_row
 from hunter_meme_worker.features_lines import BoardStanding, board_standing
 from hunter_meme_worker.features_tape import HoldersObservation, TapeMinute
 from hunter_meme_worker.repo_boards import BoardMinuteRow
-
-from hunter_indicators.meme.lines import LinePoint
 
 pytestmark = pytest.mark.unit
 

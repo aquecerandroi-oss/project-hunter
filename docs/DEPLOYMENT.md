@@ -661,6 +661,86 @@ pago é decisão do Everton com teto de consumo e política de degradação apro
 antes (`docs/plans/T4-MEME-RADAR.md` §8, decisão 3), nunca um default deste
 arquivo.
 
+### 3.7 Executor real de memecoins (`meme-executor`, perfil `meme-live` — T4.14)
+
+Serviço `meme-executor` (`HUNTER_ROLE=meme_executor`, imagem `hunter-api`) nos dois
+composes, **atrás do perfil `meme-live`**: não sobe num `up`/`update` comum nem com
+`--profile meme`. É o **único** processo que lê `SOLANA_WALLET_SECRET_KEY` (uma vez,
+e a remove do ambiente — `docs/RISK_ENGINE_MEME.md` §3.3). Dois interruptores, de
+propósito: **o perfil decide se o container existe; `ENABLE_MEME_LIVE_TRADING` decide
+se ele pode assinar** — e com a flag ligada o boot **recusa subir** por nome
+(`MemeLiveTradingRefused`) se faltar qualquer um de: `MEME_GATES_FILE` válido (§12 —
+A/B/C passados, ou o teste pequeno autorizado por escrito), os cinco `MEME_*` de
+política, `SOLANA_RPC_URL` (nunca o endpoint público para dinheiro) e a chave, nesta
+ordem (`services/meme-executor/tests/test_config_boot.py`).
+
+O que ele faz por passada de 1 s (`docs/DATABASE.md` §40): proposta
+`meme_proposals.mode = 'live'` aprovada na mesa há menos de `MEME_LIVE_APPROVAL_TTL_S`
+(30 s) → admissão pelo motor puro `hunter_risk_meme` (25 checks + sizing; a decisão
+inteira vai para `meme_live_orders.admission`) → cotação local sobre a curva lida
+**agora** por RPC → `build_buy` → verificador §9.1 → `simulateTransaction` → kill
+switch **relido** → assinar (assinatura gravada antes do envio) → enviar → confirmar
+pelo `TradeEvent` → `meme_live_positions`. Saídas a cada 5 s: `sell_now` (mesa), alvo,
+trailing, `max_hold_s`, dump do criador. Uma posição cujo mint migrou fica `open` com
+`exit_intent = blocked: pumpswap_sell_not_implemented` (a venda na PumpSwap não existe
+na T4.8 e a T4.14 não a inventou — vender antes da migração é o caminho que existe).
+`EMERGENCY` fecha posições **só** com `MEME_AUTO_CLOSE_ON_EMERGENCY=true` (§14.4).
+
+**Como ligar — na ordem, e só o Everton:**
+
+```bash
+# 1. no .env da VPS (nunca em arquivo rastreado; o guardião de padrões recusa a flag ligada em commit,
+#    por isso o valor não está escrito aqui — é a palavra de quatro letras que o Everton digita):
+#    ENABLE_MEME_LIVE_TRADING -> ligada
+#    SOLANA_WALLET_SECRET_KEY=<a chave da carteira dedicada — só aqui, só uma vez>
+#    SOLANA_RPC_URL=https://<RPC próprio, com chave>
+#    MEME_WALLET_MAX_SOL=<o que aceita perder inteiro>  MEME_MAX_SOL_PER_TRADE=<teto por compra>
+#    MEME_DAILY_LOSS_CAP_SOL=<perda do dia que trava>   MEME_MAX_OPEN_POSITIONS=<n>  MEME_COOLDOWN_S=<s>
+#    MEME_GATES_FILE=/run/hunter/meme_gates.json
+# 2. o arquivo de portões em /opt/project-hunter/run/meme/meme_gates.json
+#    (formato: packages/core/hunter_core/execution/meme/gates.py — A/B/C passados, OU
+#     small_test_authorization {authorized_by, scope{max_sol_per_trade,max_total_sol,max_trades},
+#     expires_at, decision_note: obsidian/06-DECISIONS/<a decisão dele>.md})
+# 3. subir com o perfil (a flag NUNCA é passada aqui — vem do .env):
+MEME_LIVE=1 MEME=1 MEME_ENABLED=true bash infra/vps/compose.sh update
+# 4. conferir: hb:meme:executor (live_enabled=true, gates, wallet_pubkey, policy, kill_switch=ACTIVE)
+#    e GET /api/v1/orgs/{org}/meme/live (executor.status=alive)
+```
+
+Com o `.env` sem a flag, o mesmo comando sobe o executor **inerte**: `/ready` verde,
+`hb:meme:executor` com `live_enabled=false`, toda proposta `live` recusada
+`meme_live_disabled` e gravada assim em `meme_live_orders`.
+
+**Como desligar em 5 s — qualquer um dos três; o primeiro não precisa de deploy nem de Redis:**
+
+```bash
+# a) o arquivo: existe ⇒ EMERGENCY (relido a cada 10 s e antes de cada assinatura)
+ssh hunter-vps "touch /opt/project-hunter/run/meme/meme.kill"
+# b) o Redis: meme:kill = TRADING_DISABLED (só entradas) ou EMERGENCY
+ssh hunter-vps "cd /opt/project-hunter && bash infra/vps/compose.sh exec redis redis-cli SET meme:kill EMERGENCY"
+# c) derrubar o container: sem MEME_LIVE=1 o update remove o órfão
+MEME=1 MEME_ENABLED=true bash infra/vps/compose.sh update
+```
+
+Nenhum dos três liquida posição: as saídas continuam permitidas (regra 3) e fechar
+tudo é decisão do dono (`MEME_AUTO_CLOSE_ON_EMERGENCY`). Para voltar: `rm` do
+arquivo / `DEL meme:kill` / `MEME_LIVE=1 … update`.
+
+**A trava diária (latched) só sai pela mão do dono.** Quando a perda do dia atinge
+`MEME_DAILY_LOSS_CAP_SOL`, o executor grava `meme_live_kill_switch.state =
+'TRADING_DISABLED'` com `latched_at`; nenhum código a solta, nem a marca subindo.
+Retomar, **depois** de decidir, pelo serviço `ops` (§3.4):
+
+```sql
+UPDATE meme_live_kill_switch
+   SET state = 'ACTIVE', released_at = now(), released_by = '<quem>', reason = NULL
+ WHERE scope = 'wallet';
+```
+
+Se a perda do dia ainda estiver sobre o teto, a próxima admissão trava de novo
+(`daily_loss_cap_reached`) — é a regra "`resume` recusa enquanto a avaliação ainda
+bloqueia", aplicada pelo próprio laço.
+
 ## 4. CI (GitHub Actions)
 
 `ci.yml` em cada PR e push na `main`:
@@ -995,10 +1075,18 @@ AGENT → PROPOSAL → RISK → EXECUTION (`CLAUDE.md`).
 | Variável | Obrigatória em prod? | Default | Propósito |
 |---|---|---|---|
 | `ENABLE_LIVE_TRADING` | não | `false` | live trading; `LiveExecutionAdapter` levanta `LiveTradingDisabled` enquanto for `false` (sempre, até a Fase 4) |
-| `ENABLE_MEME_LIVE_TRADING` | não (**lida por `hunter_core.execution.meme.gates.load_execution_mode`** — T4.8; nenhum serviço a compõe ainda) | `false` | execução real na bonding curve do pump.fun (Solana). Contrato: `docs/RISK_ENGINE_MEME.md` §3.4. Só o Everton liga, no `.env` da VPS. Com `true`, o boot exige `MEME_GATES_FILE` válido (§12) ou **recusa subir** (`MemeLiveTradingRefused`, motivo nomeado); com `false`, `MemeSubmitter` levanta `MemeLiveTradingDisabled` antes de assinar. `forbidden_patterns.sh` cobre os dois nomes e as formas `=`/`:` |
+| `ENABLE_MEME_LIVE_TRADING` | não (**lida por `hunter_core.execution.meme.gates.load_execution_mode`** — T4.8; composta pelo `meme-executor`, §3.7, e lida pela API só para exibir "Aprovar (REAL)" e arquivar `mode = 'live'` — T4.14) | `false` | execução real na bonding curve do pump.fun (Solana). Contrato: `docs/RISK_ENGINE_MEME.md` §3.4. Só o Everton liga, no `.env` da VPS. Com `true`, o boot exige `MEME_GATES_FILE` válido (§12) ou **recusa subir** (`MemeLiveTradingRefused`, motivo nomeado); com `false`, `MemeSubmitter` levanta `MemeLiveTradingDisabled` antes de assinar. `forbidden_patterns.sh` cobre os dois nomes e as formas `=`/`:` |
 | `MEME_GATES_FILE` | só com a flag acima em `true` (T4.8) | vazio | caminho do `meme_gates.json` (`hunter.meme_gates/v1`: portões A/B/C com data e evidência, `signed_by`, `signed_at`, `valid_until`), escrito à mão pelo operador. Ausente, inválido, vencido ou com portão vermelho ⇒ recusa de boot **antes** de a chave ser lida |
 | `SOLANA_WALLET_SECRET_KEY` | não (**lida uma única vez por `hunter_core.execution.meme.signer.MemeSigner.from_environment`**, que a remove do ambiente ao ler — T4.8) | vazio | chave da carteira Solana dedicada ao Hunter (base58 de 64 bytes ou array JSON de 64 inteiros). Vive **só** no `.env` da VPS, digitada pelo Everton; um processo só; nunca em log, métrica, heartbeat, `repr`, exceção, pickle ou commit (`docs/RISK_ENGINE_MEME.md` §3.3; teste de não-vazamento `test_meme_signer.py`; `forbidden_patterns.sh` recusa as duas formas de chave em arquivo rastreado) |
-| `MEME_WALLET_MAX_SOL`, `MEME_MAX_SOL_PER_TRADE`, `MEME_DAILY_LOSS_CAP_SOL` | **propostas (T4.4) — valores pendentes do Everton** | — | tetos de capital da carteira meme: saldo máximo, teto por compra e perda do dia que trava a carteira (latched, retomada só por OWNER). Tabela completa em `docs/RISK_ENGINE_MEME.md` §3.1 |
+| `MEME_WALLET_MAX_SOL`, `MEME_MAX_SOL_PER_TRADE`, `MEME_DAILY_LOSS_CAP_SOL`, `MEME_MAX_OPEN_POSITIONS`, `MEME_COOLDOWN_S` | **só com `ENABLE_MEME_LIVE_TRADING` ligada — os cinco, ou recusa de boot `policy_missing` com os nomes que faltam** (`hunter_risk_meme.limits_from_env`, T4.14); **valores do Everton, nenhum default** | — | a política de capital da carteira meme (`docs/RISK_ENGINE_MEME.md` §3.1, coluna live): saldo máximo (o que ele aceita perder inteiro), teto por compra (= exposição por mint em v0), perda do dia que trava a carteira (latched, §3.7), posições simultâneas, pausa depois de um rug. Com a flag desligada o executor usa `MEME_PAPER_V0` só para admitir em papel |
+| `SOLANA_RPC_URL` | só com a flag acima em `true` (T4.14) | vazio | RPC Solana **próprio** (com chave) que o executor usa para ler a curva, simular, enviar e confirmar; ausente com a flag ligada ⇒ `rpc_url_missing`; URL de devnet com `MEME_EXECUTOR_CLUSTER=mainnet` ⇒ `rpc_url_cluster_mismatch`. Nunca o endpoint público para dinheiro (RISK_ENGINE_MEME §9.2) |
+| `MEME_EXECUTOR_CLUSTER` | não (T4.14) | `mainnet` | `mainnet` \| `devnet` — o cluster que o executor acredita estar operando; qualquer outro valor ⇒ `cluster_unknown` |
+| `MEME_GATES_FILE` (executor) | só com a flag em `true` | `/run/hunter/meme_gates.json` na VPS | caminho do arquivo de portões (linha própria acima); no compose de produção é o volume `/opt/project-hunter/run/meme` |
+| `MEME_KILL_FILE` | não (T4.14) | `/run/hunter/meme.kill` nos composes | **existe ⇒ `EMERGENCY`** para o executor: `touch` no host é o desligamento de 5 s sem Redis nem deploy (§3.7) |
+| `MEME_AUTO_CLOSE_ON_EMERGENCY` | não (T4.14) | `false` | `true` ⇒ em `EMERGENCY` o executor vende toda posição aberta na curva (`exit reason = emergency_auto_close`, cada venda verificada/simulada/assinada como qualquer outra). Default `false`: nenhum estado do kill switch liquida sozinho (RISK_ENGINE_MEME §7, pergunta §14.4 ao Everton) |
+| `MEME_LIVE_APPROVAL_TTL_S` | não (T4.14) | `30` | idade máxima de uma aprovação da mesa que o executor ainda executa; mais velha ⇒ `refused: approval_expired`, nunca executada tarde (também depois de um restart) |
+| `MEME_LIVE_LOOP_S`, `MEME_LIVE_MARK_S`, `MEME_LIVE_CONFIRM_TIMEOUT_S` | não (T4.14) | `1`, `5`, `30` | cadência do laço de entradas, cadência da marca/saídas, prazo de confirmação por `getSignatureStatuses` (estourado ⇒ `submitted_unconfirmed`, reconciliado a cada 30 s, nunca reenviado) |
+| `MEME_COMPUTE_UNIT_LIMIT`, `MEME_COMPUTE_UNIT_PRICE_MICRO_LAMPORTS` | não (T4.14) | `400000`, `10000` | o orçamento de CU e o priority fee (≈ 0,004 SOL a 10 000 µ-lamports × 400 000 CU) de cada transação; o fee entra no sizing como custo fixo e é comparado ao teto `max_priority_fee_sol` do perfil |
 | `ENABLE_SOCIAL_INTELLIGENCE` | não | `false` | Fase 2 |
 | `ENABLE_ONCHAIN` | não | `false` | Fase 3 |
 | `ENABLE_STRIPE` | não | `false` | Fase 3 |
@@ -1034,6 +1122,7 @@ AGENT → PROPOSAL → RISK → EXECUTION (`CLAUDE.md`).
 | `MEME_REST_MAYHEM_REFRESH_S` | não | `300` | com a cadeia carregando a curva, de quanto em quanto tempo o espelho REST é consultado de novo pelo estado do agente de uma moeda Mayhem `active`/`paused` (a cadeia tem a flag, não o estado); mínimo 60 |
 | `MEME_RISK_ENABLED` | não | `true` (com `MEME_ENABLED`) | `GET /in-memory-coin/{mint}` (≤ 1 leitura/mint/5 min, só apostas abertas e board `graduating`) → `meme_risk_snapshots` |
 | `MEME_RPC_TOP_K` | não | `20` | quantos mints, por market cap, são reconciliados contra a cadeia a cada ciclo |
+| `MEME_WATCH_WALLETS` | não (T4.12) | vazio | **endereços públicos** Solana, separados por vírgula, cujas operações **reais** no pump.fun o meme-worker lê da cadeia (`getSignaturesForAddress` + `getTransaction`, bucket próprio de 2 req/s no RPC público, ciclo de 30 s) e grava em `meme_wallet_trades`/`meme_wallet_positions` (`docs/DATABASE.md` §39) — o sistema **não assina nada**; só observa. Primeiro valor: `6nAh8drzAYfFZuTFFRgwRdV8tNndFiX1E8NGRAGzSk5F` (a "Starting Solana Wallet" do Terminal do pump.fun, lida em 12/09/2026). **Nunca uma chave** — uma entrada que não seja base58 de 32–44 caracteres é descartada com aviso. Vazio: sem laço, readiness diz `wallets: disabled (MEME_WATCH_WALLETS empty)`. Aparece no `hb:meme:radar` (`wallets_*`), em `GET /meme/lab` e `GET /meme/desk` (`real_observed`, rótulo "REAL — observado na cadeia, não executado por este sistema") e no diário (§2b) |
 | `MEME_LAB_ENABLED` | não | `true` | se o Lab meme (T4.6) roda dentro do meme-worker quando `MEME_ENABLED` está ligado: o laço por minuto que propõe, preenche na fotografia seguinte, marca e fecha apostas de **papel** (§3.6). Desligado, o readiness diz `lab: disabled` e o heartbeat grava `lab_enabled=false`. Sem efeito com `MEME_ENABLED=false` |
 
 ## 8. Comandos locais reais

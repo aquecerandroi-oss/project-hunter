@@ -151,6 +151,20 @@ if [ "$MEME" = "1" ]; then
   PROFILE_ARGS+=(--profile meme)
 fi
 
+# T4.14 - MEME_LIVE=1 adiciona o perfil `meme-live` (meme-executor, o unico
+# processo que le a chave da carteira Solana). Mesmo padrao e mesmo motivo do
+# MEME acima, e a mesma consequencia: sem MEME_LIVE=1 um `compose.sh update`
+# DERRUBA o executor (--remove-orphans) - o que e exatamente "como desligar":
+#
+#   MEME_LIVE=1 MEME=1 MEME_ENABLED=true bash infra/vps/compose.sh update   # ligar
+#   MEME=1 MEME_ENABLED=true bash infra/vps/compose.sh update              # desligar
+#
+# A flag ENABLE_MEME_LIVE_TRADING NUNCA e passada aqui: vive so no .env da VPS.
+MEME_LIVE="${MEME_LIVE:-0}"
+if [ "$MEME_LIVE" = "1" ]; then
+  PROFILE_ARGS+=(--profile meme-live)
+fi
+
 # GIT_SHA resolvido para TODO subcomando, nao so up/update: docker-compose.yml
 # usa `image: hunter-api:${GIT_SHA:-dev}`, e `up`/`update` sao o unico lugar
 # que builda e taggeia a imagem com o SHA do commit deployado. Qualquer outro

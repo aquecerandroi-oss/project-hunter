@@ -1,14 +1,12 @@
 """Repository rows → ``schemas/meme_desk.py`` payloads, and the one piece of
 pricing the API does itself: a manual proposal's ``quote`` (T4.7).
 
-Split out of ``services/meme_desk.py`` for the 350-line budget, the way
-``orders_derive.py`` backs ``orders.py``: this module derives and maps; that
-one decides and writes.
+Split out of ``services/meme_desk.py`` for the 350-line budget (the way
+``orders_derive.py`` backs ``orders.py``): this module derives and maps.
 
 **JSONB is read tolerantly.** ``suggested``/``decision``/``params``/``entry``
-/``exit``/``quote`` are the loop's (T4.6) or this API's own writes; a key
-that is missing or not a number is ``None`` in the payload — never ``0``,
-never a guess (DESIGN.md §2, "ausência honesta").
+/``exit``/``quote`` are the loop's (T4.6) or this API's own writes; a missing
+key is ``None`` in the payload — never ``0``, never a guess (DESIGN.md §2).
 """
 
 from __future__ import annotations
@@ -108,12 +106,15 @@ def _str_or_none(value: object) -> str | None:
 
 def params_from_json(raw: dict[str, Any] | None) -> DeskParamsOut:
     data = raw or {}
+    holds = data.get("exit_on_migration")  # T4.11: a switch is a bool or nothing
     return DeskParamsOut(
         size_sol=decimal_or_none(data.get("size_sol")),
         target_x=decimal_or_none(data.get("target_x")),
         trailing_pct=decimal_or_none(data.get("trailing_pct")),
         max_hold_s=_int_or_none(data.get("max_hold_s")),
         note=_str_or_none(data.get("note")),
+        exit_on_migration=holds if isinstance(holds, bool) else None,
+        trailing_arm_x=decimal_or_none(data.get("trailing_arm_x")),
     )
 
 
@@ -272,6 +273,8 @@ def _bet_out(bet: BetRow) -> BetOut:
         sol_usd_at_exit=bet.sol_usd_at_exit,
         leg=bet.leg,
         parent_bet_id=bet.parent_bet_id,
+        mark_source=bet.mark_source,
+        mark_stale_s=bet.mark_stale_s,
     )
 
 

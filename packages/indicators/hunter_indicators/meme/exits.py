@@ -15,23 +15,36 @@ The exit side is a declared precedence, evaluated in this order:
    out loud instead of behaving as if a rug had been ruled out;
 2. ``creator_dump`` — the creator turned net seller (``docs/RISK_ENGINE_MEME.md``
    §6). Unknown is ``creator_dump_unknown``, never "the dev did not sell";
-3. ``migrated`` / ``curve_complete`` — the curve stops being the venue;
-4. ``max_loss`` — the floor against the cost basis. It is an exit rule, **not**
+3. ``migrated`` / ``curve_complete`` — the curve stops being the venue. Since
+   T4.11 both are **parameters** (``exit_on_migration``, which also governs
+   completion — a set that holds through the migration must hold through the
+   completion that precedes it): the frozen sets keep ``True``; the moonshot
+   arms (EXP-M4) hold and are marked on the PumpSwap pool's tape instead;
+4. ``dead`` (T4.11) — the market is gone: the pool's tape has not printed a
+   trade for ``dead_stale_s`` seconds **and** the mark is at or below
+   ``dead_mark_pct`` of the cost basis. ``mark_stale_s`` is the caller's
+   measure (seconds since the last trade received by the instant judged);
+   ``None`` — a position still on the curve — cannot fire it and the decision
+   says ``mark_staleness_unknown``;
+5. ``max_loss`` — the floor against the cost basis. It is an exit rule, **not**
    the risk of the position: on a curve the risk is everything we paid
    (``docs/RISK_ENGINE_MEME.md`` §5), because the sell may not find a buyer;
-5. ``line_broken`` (T4.10, EXP-M2) — the market cap closed **below the support
+6. ``line_broken`` (T4.10, EXP-M2) — the market cap closed **below the support
    line** for ``line_break_snapshots`` consecutive snapshots. The streak is
    counted by the caller against ``meme_features_1m.support_line_sol``
    projected to each snapshot's instant; ``None`` means no line exists for the
    position and the decision says ``support_line_unknown`` — a rule set that
    watches the line and has none is blind, not safe;
-6. ``target_multiple`` — the ROI Everton asked for;
-7. ``trailing_from_peak`` — drawdown from the highest mark-to-curve seen;
-8. ``time_stop`` — the horizon.
+7. ``target_multiple`` — the ROI Everton asked for;
+8. ``trailing_from_peak`` — drawdown from the highest mark seen. With
+   ``trailing_arm_multiple`` set (T4.11: "trailing 50 % só depois de 3×") the
+   rule is **disarmed** until the peak reaches that multiple of the cost basis
+   — before it, a moonshot rides the drawdown, by design;
+9. ``time_stop`` — the horizon.
 
-Marks are always the honest mark-to-curve (what a full sell would net now, fees
-included), so ``target_multiple = 2`` means "a full exit would double what we
-paid", not "the marginal price doubled".
+Marks are always the honest mark (what a full sell would net now, fees and our
+own impact included — on the curve or on the pool), so ``target_multiple = 2``
+means "a full exit would double what we paid", not "the marginal price doubled".
 """
 
 from __future__ import annotations
@@ -50,6 +63,7 @@ __all__ = [
     "ExitState",
     "evaluate_exit",
     "hit_curve_event",
+    "hit_dead",
     "hit_line_break",
     "hit_max_loss",
     "hit_target",
@@ -65,6 +79,7 @@ EXIT_INPUTS: Final = (
     "meme_tokens.migrated_at",
     "meme_features_1m.creator_sold",
     "meme_features_1m.support_line_sol",
+    "meme_trades.block_time",
 )
 
 
@@ -87,6 +102,15 @@ class ExitRules:
     ``line_break_snapshots`` snapshots in a row. Off by default — EXP-M1's
     frozen set never watched a line and must keep not watching one."""
     line_break_snapshots: int = 2
+    trailing_arm_multiple: Decimal | None = None
+    """T4.11: the trailing rule stays disarmed until the peak mark reaches this
+    multiple of the cost basis; ``None`` (every set frozen before) = armed from
+    the entry, exactly as it always was."""
+    exit_on_dead: bool = False
+    """T4.11: sell when the tape has been silent for ``dead_stale_s`` seconds
+    and the mark sits at or below ``dead_mark_pct`` of the cost basis."""
+    dead_stale_s: int = 900
+    dead_mark_pct: Decimal = Decimal(50)
     inputs: tuple[str, ...] = EXIT_INPUTS
 
     def __post_init__(self) -> None:
@@ -102,10 +126,17 @@ class ExitRules:
             raise ValueError("time_stop_s must be at least 1 second")
         if self.line_break_snapshots < 1:
             raise ValueError("line_break_snapshots must be at least 1")
+        if self.trailing_arm_multiple is not None and self.trailing_arm_multiple <= 1:
+            raise ValueError("trailing_arm_multiple must be greater than 1 when set")
+        if self.dead_stale_s < 1:
+            raise ValueError("dead_stale_s must be at least 1 second")
+        if not 0 < self.dead_mark_pct <= HUNDRED:
+            raise ValueError("dead_mark_pct must be in (0, 100]")
 
     def as_parameters(self) -> Mapping[str, str]:
-        """The line rule is listed only when it is watched — EXP-M1's registered
-        exits must read today exactly as they did the day they were frozen."""
+        """The line rule, the trailing arm and the dead rule are listed only
+        when they are in play — EXP-M1's registered exits must read today
+        exactly as they did the day they were frozen."""
         parameters = {
             "target_multiple": str(self.target_multiple),
             "trailing_drawdown_pct": str(self.trailing_drawdown_pct),
@@ -118,6 +149,12 @@ class ExitRules:
         if self.exit_on_line_break:
             parameters["exit_on_line_break"] = "True"
             parameters["line_break_snapshots"] = str(self.line_break_snapshots)
+        if self.trailing_arm_multiple is not None:
+            parameters["trailing_arm_multiple"] = str(self.trailing_arm_multiple)
+        if self.exit_on_dead:
+            parameters["exit_on_dead"] = "True"
+            parameters["dead_stale_s"] = str(self.dead_stale_s)
+            parameters["dead_mark_pct"] = str(self.dead_mark_pct)
         return parameters
 
 
@@ -140,6 +177,10 @@ class ExitState:
     """Consecutive snapshots (this one included) whose market cap closed below
     the support line projected to their instant; ``None`` = no line is known
     for this position (``line_reason`` on the row says why)."""
+    mark_stale_s: int | None = None
+    """Seconds between the instant judged and the last pool trade it could see
+    (T4.11, ``meme_paper_bets.mark_stale_s``); ``None`` while the position is
+    priced on the curve, where staleness is not measured."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +199,17 @@ def hit_curve_event(state: ExitState, rules: ExitRules) -> str | None:
     if rules.exit_on_curve_complete and state.curve_complete:
         return "curve_complete"
     return None
+
+
+def hit_dead(state: ExitState, rules: ExitRules) -> bool:
+    """The tape silent for ``dead_stale_s`` **and** the mark at or below
+    ``dead_mark_pct`` of the cost basis — both, or the market is merely quiet."""
+    if not rules.exit_on_dead or state.mark_stale_s is None:
+        return False
+    if state.mark_stale_s < rules.dead_stale_s:
+        return False
+    with localcontext(CONTEXT):
+        return state.mark_sol <= state.cost_basis_sol * rules.dead_mark_pct / HUNDRED
 
 
 def hit_max_loss(state: ExitState, rules: ExitRules) -> bool:
@@ -181,8 +233,12 @@ def hit_target(state: ExitState, rules: ExitRules) -> bool:
 
 
 def hit_trailing(state: ExitState, rules: ExitRules) -> bool:
-    """Mark fell ``trailing_drawdown_pct`` from the highest mark seen since entry."""
+    """Mark fell ``trailing_drawdown_pct`` from the highest mark seen since entry
+    — once the peak has armed the rule (``trailing_arm_multiple``), if it has one."""
     with localcontext(CONTEXT):
+        arm = rules.trailing_arm_multiple
+        if arm is not None and state.peak_mark_sol < state.cost_basis_sol * arm:
+            return False
         trigger = state.peak_mark_sol * (HUNDRED - rules.trailing_drawdown_pct) / HUNDRED
         return state.mark_sol <= trigger
 
@@ -201,6 +257,8 @@ def evaluate_exit(state: ExitState, rules: ExitRules) -> ExitDecision:
         unknown += ("creator_dump_unknown",)
     if rules.exit_on_line_break and state.below_support_streak is None:
         unknown += ("support_line_unknown",)
+    if rules.exit_on_dead and state.mark_stale_s is None:
+        unknown += ("mark_staleness_unknown",)
     reason: str | None = None
     if state.rug_suspected:
         reason = "rug_signal"
@@ -208,6 +266,8 @@ def evaluate_exit(state: ExitState, rules: ExitRules) -> ExitDecision:
         reason = "creator_dump"
     elif (event := hit_curve_event(state, rules)) is not None:
         reason = event
+    elif hit_dead(state, rules):
+        reason = "dead"
     elif hit_max_loss(state, rules):
         reason = "max_loss"
     elif hit_line_break(state, rules):

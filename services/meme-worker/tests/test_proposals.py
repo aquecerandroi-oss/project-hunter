@@ -17,10 +17,10 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from hunter_meme_worker.lab_models import RuleSetSpec, Snapshot
-from hunter_meme_worker.proposals import GateRow, evaluate_gate
 
 from hunter_indicators.meme.curve import CurveReserves, quote_buy
+from hunter_meme_worker.lab_models import RuleSetSpec, Snapshot
+from hunter_meme_worker.proposals import GateRow, evaluate_gate
 
 from .test_paper_engine import PARAMS, RULE_SET_ID
 

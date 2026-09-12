@@ -139,6 +139,14 @@ def seed_meme_lab_rule_sets() -> None:
     op.execute(_SEED)
 
 
+def recreate_scoreboard_0022() -> None:
+    """The board exactly as ``0022`` shipped it, with its grants — what the
+    downgrade of ``0027_meme_wallets`` puts back after dropping the wider one.
+    Public so a later revision never reaches for the frozen string itself."""
+    op.execute(_SCOREBOARD)
+    op.execute(f"GRANT SELECT ON {MEME_LAB_SCOREBOARD_VIEW} TO {APP_ROLE}, {WORKER_ROLE}")
+
+
 def drop_meme_lab_views() -> None:
     for view in reversed(MEME_LAB_VIEWS_0022):
         op.execute(f"DROP VIEW IF EXISTS {view}")

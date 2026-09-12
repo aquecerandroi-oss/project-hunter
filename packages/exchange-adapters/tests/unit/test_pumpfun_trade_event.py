@@ -79,3 +79,23 @@ def test_truncated_or_foreign_bytes_are_refused() -> None:
         decode_trade_event(raw + b"\x00")
     with pytest.raises(ValueError, match="discriminator"):
         decode_trade_event(b"\x00" * 8 + raw[8:])
+
+
+def test_the_2026_09_12_layout_appends_holder_rewards_and_nothing_else_is_tolerated() -> None:
+    """T4.14: mainnet events of 2026-09-12 carry 16 more bytes than the recorded fixtures —
+    the IDL ``main`` of that day appends ``holder_rewards_bps`` and ``holder_rewards`` (two
+    u64). They decode as the optional pair; the older layout reads ``None``; any other
+    trailing length is still refused (an unknown layout is not a fill)."""
+    tx = _tx("rpc_tx_probe_raw.json")
+    line = next(m for m in tx["meta"]["logMessages"] if m.startswith("Program data: "))
+    raw = base64.b64decode(line[len("Program data: ") :])
+    older = decode_trade_event(raw)
+    assert older.holder_rewards_basis_points is None and older.holder_rewards is None
+    newer = decode_trade_event(raw + (50).to_bytes(8, "little") + (1234).to_bytes(8, "little"))
+    assert newer.holder_rewards_basis_points == 50 and newer.holder_rewards == 1234
+    assert newer.sol_amount == older.sol_amount and newer.fee == older.fee
+    assert newer.sell_net_proceeds == older.sell_net_proceeds
+    with pytest.raises(ValueError, match="8 trailing bytes"):
+        decode_trade_event(raw + b"\x00" * 8)
+    with pytest.raises(ValueError, match="24 trailing bytes"):
+        decode_trade_event(raw + b"\x00" * 24)

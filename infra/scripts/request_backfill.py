@@ -236,8 +236,8 @@ async def _run(args: argparse.Namespace) -> int:
         if not chunks:
             print("no market matched: nothing to request")
             return 1
-        start, end = funding_window_for(now, args.days) if kind == "funding" else window_for(
-            now, args.days
+        start, end = (
+            funding_window_for(now, args.days) if kind == "funding" else window_for(now, args.days)
         )
         markets = sorted({chunk.target.symbol for chunk in chunks})
         print(f"kind    {kind}")

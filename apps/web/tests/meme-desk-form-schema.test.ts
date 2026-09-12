@@ -55,7 +55,7 @@ describe("deskParamsFormSchema: the API's bounds, checked before any request", (
 
 describe("toApproveBody / toManualBody: the wire shape, money as strings", () => {
   it("keeps decimals as strings and parses the hold as an integer", () => {
-    expect(toApproveBody({ ...VALID, note: "ok" })).toEqual({ size_sol: "0.2", target_x: "2", trailing_pct: "30", max_hold_s: 900, note: "ok" });
+    expect(toApproveBody({ ...VALID, note: "ok" })).toEqual({ size_sol: "0.2", target_x: "2", trailing_pct: "30", max_hold_s: 900, note: "ok", mode: "paper" });
   });
 
   it("sends null for an empty note", () => {

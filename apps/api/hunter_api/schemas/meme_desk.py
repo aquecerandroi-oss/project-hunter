@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from hunter_api.schemas.common import StrictModel
 from hunter_api.schemas.meme import DecimalStr
+from hunter_api.schemas.meme_wallets import RealObservedOut
 from hunter_api.schemas.orders import DecimalIn
 
 MEME_DESK_LABEL = (
@@ -32,6 +33,7 @@ MIN_MINT_LENGTH = 32
 MAX_MINT_LENGTH = 64
 
 ProposalStatus = Literal["proposed", "approved", "rejected", "expired", "filled", "unfilled"]
+ProposalMode = Literal["paper", "live"]
 ProposalOrigin = Literal["rules", "operator"]
 RuleSetKind = Literal["research_only", "operator"]
 BetStatus = Literal["open", "closed"]
@@ -46,15 +48,23 @@ ExitReason = Literal[
     "rug_no_snapshot",
     "max_loss",
     "line_broken",
+    "dead",
 ]
 """The contract's seven, plus ``max_loss`` (the loop has written it since T4.6,
-Emendas 1) and ``line_broken`` (``0026``, T4.10: the market cap closed below the
-support line for two snapshots in a row — EXP-M2's own invalidation)."""
+Emendas 1), ``line_broken`` (``0026``, T4.10: the market cap closed below the
+support line for two snapshots in a row — EXP-M2's own invalidation) and
+``dead`` (``0029``, T4.11: the pool's tape silent for 15 min with the mark at
+or below half the cost — the desk's "morta")."""
 
 BetLeg = Literal["probe", "scale", "single"]
 """``meme_paper_bets.leg`` (``0026``, T4.10 — the brief's contract): ``probe``
 is the desk's "semi-comprado (sonda)", ``scale`` its "escalado (perna 2)" (a
 separate bet that names its ``parent_bet_id``), ``single`` every other bet."""
+
+MarkSource = Literal["curve", "pool_tape"]
+"""``meme_paper_bets.mark_source`` (``0029``, T4.11): ``curve`` = "marcada pela
+curva", ``pool_tape`` = "marcada pela pool (fita)" — a bet that held through
+the migration is priced by the PumpSwap pool's last trade."""
 
 
 class DeskParamsIn(StrictModel):
@@ -68,6 +78,10 @@ class DeskParamsIn(StrictModel):
     trailing_pct: DecimalIn = Field(gt=0, lt=100)
     max_hold_s: int = Field(ge=1)
     note: str | None = Field(default=None, max_length=MAX_NOTE_LENGTH)
+    mode: ProposalMode = "paper"
+    """T4.14 — ``live`` files the proposal for the real executor **and** the paper
+    loop (shadow). Refused ``meme_live_disabled`` unless the API's
+    ``ENABLE_MEME_LIVE_TRADING`` is on; the desk shows "Aprovar (REAL)" only then."""
 
 
 class ApproveProposalIn(DeskParamsIn):
@@ -96,6 +110,13 @@ class DeskParamsOut(BaseModel):
     trailing_pct: DecimalStr | None
     max_hold_s: int | None
     note: str | None = None
+    exit_on_migration: bool | None = None
+    """``0029`` (T4.11): ``False`` = the set holds through the migration (the
+    moonshot arms, ``operator/2``); ``None`` = the key is absent, which for
+    every set frozen before means "sells on migration"."""
+    trailing_arm_x: DecimalStr | None = None
+    """The trailing rule is armed only once the peak reaches this multiple
+    ("trailing 50 % só depois de 3×"); ``None`` = armed from the entry."""
 
 
 class QuoteOut(BaseModel):
@@ -174,6 +195,12 @@ class BetOut(BaseModel):
     is ``single``, which is what it was."""
     parent_bet_id: uuid.UUID | None = None
     """The probe a ``scale`` leg rides on; ``None`` for every other leg."""
+    mark_source: MarkSource | str | None = None
+    """``0029``: what priced ``mark_sol`` — ``curve`` or ``pool_tape``; ``None``
+    until the loop writes a mark (or on a row older than the column)."""
+    mark_stale_s: int | None = None
+    """Seconds the pool's tape had been silent at the last mark ("marca
+    envelhecida há Ns"); ``None`` while the position is priced on the curve."""
 
 
 class DeskRowOut(BaseModel):
@@ -235,6 +262,10 @@ class DeskListOut(BaseModel):
     summary: DeskSummaryOut
     items: list[DeskRowOut]
     next_cursor: str | None = None
+    real_observed: RealObservedOut | None = None
+    """T4.12: the observed wallets' **real** fills and positions, labelled
+    "REAL — observado na cadeia, não executado por este sistema"; ``None``
+    only when the router did not read them."""
 
 
 class CommandOut(BaseModel):
@@ -272,6 +303,7 @@ __all__ = [
     "DeskSummaryOut",
     "ExitReason",
     "ManualProposalIn",
+    "MarkSource",
     "ProposalOrigin",
     "ProposalOut",
     "ProposalStatus",

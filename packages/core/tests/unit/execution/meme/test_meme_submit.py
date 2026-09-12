@@ -346,3 +346,47 @@ def test_two_sessions_one_signature(signer: CountingSigner) -> None:
     # and after A settled, B's retry is a replay of A's signature, never a second one
     third = submitter.submit(approval())
     assert third.replayed and third.signature == first[0].signature and signer.calls == 1
+
+
+def test_a_fill_that_cannot_be_decoded_after_the_send_is_unconfirmed_never_a_crash(
+    signer: CountingSigner,
+) -> None:
+    """T4.14: the transaction landed but the event layout changed under us (a program
+    upgrade). The send happened, so the only honest state is ``submitted_unconfirmed``
+    with the reason; a later reconciliation with a decoder that understands the
+    layout settles it as ``confirmed`` with the same signature — nothing re-signed."""
+    rpc = FakeRpc()
+    journal = InMemoryOrderJournal()
+    calls = {"n": 0}
+
+    def broken(tx: dict[str, Any]) -> Sequence[Any]:
+        calls["n"] += 1
+        raise ValueError("TradeEvent has 16 trailing bytes")
+
+    def build(decoder: Any) -> MemeSubmitter:
+        return MemeSubmitter(
+            rpc=rpc,
+            signer=signer,  # type: ignore[arg-type]
+            journal=journal,
+            verify=lambda _m: None,
+            decode_fill=decoder,
+            policy=SubmitPolicy(allow_send=True, cluster="devnet", poll_interval_s=0.0),
+            now=lambda: NOW,
+            sleep=lambda _s: None,
+        )
+
+    result = build(broken).submit(approval())
+    assert result.state is SubmitState.SUBMITTED_UNCONFIRMED
+    assert result.reason == "fill_decode_failed:ValueError"
+    assert result.signature and len(rpc.sent) == 1 and signer.calls == 1
+    row = journal.get("p1")
+    assert row is not None and row.state is SubmitState.SUBMITTED_UNCONFIRMED
+    assert row.signatures == [result.signature]
+
+    settled = build(decode_fill).reconcile("p1")
+    assert settled is not None and settled.state is SubmitState.CONFIRMED
+    assert settled.signature == result.signature and len(rpc.sent) == 1 and signer.calls == 1
+
+    replay = build(broken).on_stream_event(str(result.signature), {"fill": True})
+    assert replay is not None and replay.replayed and replay.state is SubmitState.CONFIRMED
+    assert calls["n"] == 1, "a confirmed row is never decoded again"

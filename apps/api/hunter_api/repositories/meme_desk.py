@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import and_, case, func, or_, select, update
 
+from hunter_api.repositories.meme_desk_marks import with_marks_0029
 from hunter_api.repositories.meme_desk_rows import (
     BetRow,
     CommandRow,
@@ -65,9 +66,13 @@ if TYPE_CHECKING:
 
 __all__ = ["OPERATOR_RULE_SET", "MemeDeskRepository"]
 
-OPERATOR_RULE_SET = ("operator", "1")
-"""``meme_rule_sets (name, version)`` a manual proposal is filed under
-(contract §Rotas, ``POST /proposals/manual``); seeded by ``0022_meme_lab``."""
+OPERATOR_RULE_SET = ("operator", "2")
+"""``meme_rule_sets (name, version)`` a manual proposal is filed under at
+``head`` (contract §Rotas): ``0029_meme_moonshot`` (T4.11) retired ``0022``'s
+``operator/1`` and seeded ``operator/2`` (the moonshot ``suggested``, sheet
+still editable). The read is by **name and status** — the active ``operator``
+set of the highest version — so a database still at ``0028`` files under
+``operator/1`` instead of refusing ``operator_rule_set_missing``."""
 
 _p = meme_proposals
 _b = meme_paper_bets
@@ -143,6 +148,7 @@ class MemeDeskRepository:
                     await self.session.execute(select(_b).where(_b.c.id.in_(bet_ids)))
                 ).mappings()
             }
+            bets = await with_marks_0029(self.session, bets)  # 0029's columns, if present
         rule_sets = {
             r["id"]: rule_set_from_mapping(r)
             for r in (
@@ -183,15 +189,17 @@ class MemeDeskRepository:
         return None if row is None else rule_set_from_mapping(row)
 
     async def get_operator_rule_set(self) -> RuleSetRow | None:
-        name, version = OPERATOR_RULE_SET
+        name, _version = OPERATOR_RULE_SET
         row = (
             (
                 await self.session.execute(
-                    select(meme_rule_sets).where(
-                        meme_rule_sets.c.name == name,
-                        meme_rule_sets.c.version == version,
-                        meme_rule_sets.c.status == "active",
+                    select(meme_rule_sets)
+                    .where(meme_rule_sets.c.name == name, meme_rule_sets.c.status == "active")
+                    .order_by(
+                        func.length(meme_rule_sets.c.version).desc(),
+                        meme_rule_sets.c.version.desc(),
                     )
+                    .limit(1)
                 )
             )
             .mappings()
@@ -201,7 +209,10 @@ class MemeDeskRepository:
 
     async def get_bet(self, bet_id: uuid.UUID) -> BetRow | None:
         row = (await self.session.execute(select(_b).where(_b.c.id == bet_id))).mappings().first()
-        return None if row is None else bet_from_mapping(row)
+        if row is None:
+            return None
+        bet = bet_from_mapping(row)
+        return (await with_marks_0029(self.session, {bet.id: bet}))[bet.id]
 
     async def get_token(self, mint: str) -> TokenIdentity | None:
         row = (
@@ -276,6 +287,7 @@ class MemeDeskRepository:
         decision: dict[str, Any] | None,
         decided_by: str,
         decided_at: datetime,
+        mode: str = "paper",
     ) -> bool:
         """``True`` when this call moved the row out of ``proposed``; ``False``
         when something else (another operator, the loop's ``expired`` stamp)
@@ -290,6 +302,7 @@ class MemeDeskRepository:
                     decision=decision,
                     decided_by=decided_by,
                     decided_at=decided_at,
+                    mode=mode,
                 )
             ),
         )
@@ -314,6 +327,7 @@ class MemeDeskRepository:
                 decided_at=row.decided_at,
                 bet_id=row.bet_id,
                 refusal=row.refusal,
+                mode=row.mode,
             )
         )
 

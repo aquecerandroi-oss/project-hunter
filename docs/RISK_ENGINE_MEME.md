@@ -53,6 +53,14 @@ enviar ou manter posição on-chain. Os motivos são verificáveis, não pudor:
 | as nove verificações meme (VM1–VM9, §11) não existem | não há prova de caps, kill switch, idempotência e restart |
 | `ENABLE_MEME_LIVE_TRADING` não existe no código | verificado nesta sessão: `grep` não acha a variável em nenhum arquivo do repo (§15) |
 
+> **Estado em 12/09/2026, fim do dia (T4.8 + T4.14):** as cinco linhas acima mudaram de lado —
+> `hunter_risk_meme` existe (§13), o executor existe (`services/meme-executor`), a flag existe e VM1–VM5/VM7
+> passam; VM6(c) e as metades Postgres de VM8/VM9 correm no testcontainer do executor. O que **não** mudou é
+> a frase 1: nenhuma transação real foi assinada, os Portões A e B seguem vermelhos, e "operar hoje"
+> continua sendo papel + radar até ele decidir o teste pequeno por escrito (§12, variante) e digitar o
+> que só ele digita (`docs/ACTIVATION.md` §9b). Os checks 10, 11, 12 e 21 continuam a recusar todo mint
+> que o radar não mediu — hoje, `bundled_share` em todos.
+
 ## 1. Escopo — o que pode ser tocado, e nada além
 
 **Só três ações existem neste contrato:** comprar na bonding curve, vender na bonding curve, vender
@@ -213,6 +221,17 @@ sistema"):
 - **Achado a fechar antes de a flag existir:** o guardião de padrões proibidos **não** cobre o nome
   novo (§13, achado 3).
 
+> **Implementado em (T4.8 + T4.14):** a flag é lida por
+> `hunter_core.execution.meme.gates.load_execution_mode` e composta por
+> `services/meme-executor/hunter_meme_executor/config.py::boot` — portões → política (`limits_from_env`)
+> → `SOLANA_RPC_URL` → chave, cada ausência uma recusa nomeada (`gates_file_not_configured`,
+> `policy_missing`, `rpc_url_missing`, `rpc_url_cluster_mismatch`, `secret_key_missing`;
+> `services/meme-executor/tests/test_config_boot.py`). Com a flag desligada o executor sobe **inerte**
+> (`allow_send=False` no cliente RPC, `MemeLiveTradingDisabled` antes da chave, toda proposta `live`
+> gravada `refused: meme_live_disabled`). A API tem a **sua** cópia da flag (`ApiSettings.
+> enable_meme_live_trading`) para uma coisa só: arquivar `meme_proposals.mode = 'live'` e mostrar
+> "Aprovar (REAL)" — ela nunca assina.
+
 ## 4. Checks de admissão de uma compra na curva
 
 Todos os checks avaliáveis são registrados em `decision.checks[]` como
@@ -317,13 +336,27 @@ que ele decide é quantidade e roteamento, não permissão.
 | trailing | marca ≤ pico da marca × (1 − `trailing_from_peak_pct`) |
 | time stop | idade da posição ≥ `time_stop_s` |
 | dump do criador | venda líquida do criador acima do limiar, ou qualquer venda dele quando a posição dele era a maior |
-| conclusão/migração da curva | `CompleteEvent`; `CompletePumpAmmMigrationEvent` → a saída **passa a ser pelo PumpSwap** |
+| conclusão/migração da curva | `CompleteEvent`; `CompletePumpAmmMigrationEvent` → a saída **passa a ser pelo PumpSwap**. **Parâmetro desde a T4.11** (`exit_on_migration`, ver nota abaixo) |
+| morta (`dead`, T4.11) | só para um conjunto que segura através da migração: a fita da pool muda há ≥ `dead_stale_s` (900 s) **e** a marca ≤ `dead_mark_pct` (50 %) da entrada |
 | sinal de rug | `rug_signals` do coletor; marca o mint como banido (check 14) |
 | kill switch | `TRADING_DISABLED`/`EMERGENCY` não fecham posição sozinhos (§7) — as saídas acima continuam correndo |
 
 **A marca é o que uma venda inteira renderia agora, taxas incluídas** — não o preço marginal, não o
 "market cap". Preço marginal × quantidade é o número que faz um paper trade parecer lucrativo e um
 resgate real sair 30 % abaixo. O mesmo vale para o `equity_sol` (§10).
+
+**A saída na migração passou a ser parâmetro do conjunto (T4.11, `exit_on_migration`).** Os conjuntos
+congelados (`meme_paper_v0`, `trendline_v0`, `hype_probe_v0`) mantêm `true` e continuam vendendo na
+conclusão/migração da curva. `moonshot_v0/1`, `moonshot_v0/2` e `operator/2` usam `false`: a posição
+sobrevive à migração e, a partir daí, a marca honesta é **pelo último trade da fita da pool PumpSwap**
+(`meme_trades.program = 'pump_amm'`, `mark_source = 'pool_tape'`) — preço do último trade menos o impacto
+estimado pela participação (tamanho ÷ volume dos últimos 5 min, teto 1 %) menos a taxa da **faixa da
+PumpSwap pelo mcap do momento** (`docs/PUMPFUN.md` §4.1: 1,25 % logo depois da graduação, caindo por faixa
+até 0,30 %; nunca 0,30 % fixo) menos os 0,5 % do caminho; a venda é precificada no trade **seguinte**
+(`hunter_indicators.meme.pool`, `services/meme-worker/hunter_meme_worker/pool_mark.py`). A saída `dead`
+(acima) é o que substitui o piso de perda nesses conjuntos. **O real herda a regra:** um executor que segure
+através da migração vende pela PumpSwap (linha da tabela), com a mesma faixa de taxa, o mesmo orçamento de
+participação e o mesmo `mark_stale_s` como sinal de mercado morto — nunca com uma marca pela curva vazia.
 
 **A tentativa acaba, a intenção não.** Cópia literal da §10 do contrato SPOT: cada tentativa de
 venda tem identidade própria; a intenção durável guarda a quantidade remanescente; só termina quando
@@ -605,6 +638,21 @@ retenção.
 §3.1 e liga `ENABLE_MEME_LIVE_TRADING`. Com A ou B vermelho, o processo **recusa subir** — e isso é
 proteção dele contra nós, não burocracia.
 
+**Variante válida dos Portões A e B — o teste pequeno autorizado por escrito (T4.14).** O dono pode
+decidir, **por escrito e só ele**, que um teste limitado vale antes de A e B ficarem verdes — é dinheiro
+dele, e a diretiva de 2026-09-06 fala do *modo autônomo*, não de um teste que ele mesmo escopa. A forma é
+mecânica, não uma frase: `meme_gates.json` traz `small_test_authorization {authorized_by, scope
+{max_sol_per_trade, max_total_sol, max_trades}, expires_at, decision_note}` **no lugar** de
+`gate_a_engineering.passed`/`gate_b_evidence.passed` (o Portão C continua obrigatório), e
+`decision_note` tem de apontar para um arquivo em `obsidian/06-DECISIONS/` — a decisão registrada, com
+data. O executor (`hunter_core.execution.meme.gates.load_gates`) valida o bloco inteiro, recusa por nome
+(`small_test_unauthorized`, `small_test_invalid`, `small_test_without_decision_note`,
+`small_test_expired`) e transforma o escopo em **teto adicional** (`min` com os cinco `MEME_*` do `.env`:
+`max_sol_per_trade` e `max_exposure_per_mint_sol` pelo `max_sol_per_trade` do escopo, `wallet_max_sol`
+pelo `max_total_sol`) e em **contador** (`small_test_scope_exhausted` depois de `max_trades` compras
+enviadas). O heartbeat publica o escopo e a nota. Nada nisto afrouxa um check da §4: um teste pequeno
+com `bundled_share` não medido continua recusado `bundled_share_unmeasurable`.
+
 **A declaração honesta sobre "hoje":** dos três portões, hoje existe **zero**. O que existe é o
 adapter público (T4.1), o mapa on-chain (T4.0d) e este contrato. "Operar hoje" = papel + radar.
 
@@ -621,7 +669,28 @@ adapter público (T4.1), o mapa on-chain (T4.0d) e este contrato. "Operar hoje" 
 | `MarketLiquidity` exige livro (`asks[]`, `spread_pct`) e `MarketIdentity` exige `exchange`/`symbol` (`hunter_risk/inputs.py:39-47`) | reaproveitar o motor exigiria **fabricar um livro** a partir de reservas: exatamente o D1 que o projeto proíbe, e o achado que a Astra já registrou (`astra-review-t40-pumpfun.md`: "Risco SPOT não cobre execução on-chain") |
 | `grep` por `solana|pumpfun|bonding` em `hunter_risk/**` e `hunter_execution_worker/**`: nenhuma ocorrência | a fronteira está intacta hoje e deve continuar |
 
-**O que este contrato propõe criar (nada disto foi escrito nesta tarefa):**
+> **Implementado em (T4.14, 2026-09-12; inerte por construção — a doutrina não mudou):**
+> `packages/risk-core/hunter_risk_meme/` (`base.py` copia a disciplina de `hunter_risk.base` em vez de
+> importá-la; `inputs.py`, `limits.py`, `checks.py` + `checks_wallet.py`, `sizing.py`, `kill_switch.py`,
+> `decision.py`, `exits.py`, `evaluate.py`) — a fronteira é provada por
+> `packages/risk-core/tests/unit/meme/test_boundary.py` (nenhum import cruzado, nenhum `httpx`/
+> `sqlalchemy`/`redis`/`asyncio`/`time`); `services/meme-executor/` (o único leitor de
+> `SOLANA_WALLET_SECRET_KEY`; `/health`·`/ready`·`/metrics` do `WorkerRuntime`, nada mais); tabelas em
+> `0028_meme_live` (`docs/DATABASE.md` §40) com **nomes diferentes dos propostos abaixo, de propósito**:
+> `meme_orders`/`meme_signatures`/`meme_fills` viraram **uma** tabela `meme_live_orders` (a lista de
+> assinaturas e o fill são colunas jsonb da própria linha — a trava de assinatura e a assinatura têm de
+> ser gravadas na mesma linha que o submitter lê), `meme_positions`/`meme_exit_intents` viraram
+> `meme_live_positions` (a intenção durável é coluna), `meme_participation_consumptions` é computada das
+> tentativas dos últimos 60 s (`repo.participation_used_sol`), `meme_kill_switch_transitions` ficou como a
+> linha latched de `meme_live_kill_switch` (**sem** tabela de transições ainda — a soltura é um `UPDATE`
+> manual, `docs/DEPLOYMENT.md` §3.7); `meme_wallets`/`meme_proposals` são as da T4.7/T4.12. Eventos de
+> risco: **não** há linhas `risk_events` meme — cada recusa vai inteira para `meme_live_orders.admission`
+> e o heartbeat `hb:meme:executor` publica `last_refusal`, trava, fontes do kill switch; a tabela de
+> eventos fica para quem ligar a mesa a alertas. Achados 1 e 4 fechados na T4.8 (`forbidden_patterns.sh`
+> cobre `ENABLE_(MEME_)?LIVE_TRADING` nas formas `=`/`:`); achado 3 (`meme_trades` PK) segue aberto e
+> **não** afeta o executor, que lê o fill do `TradeEvent` da própria transação, nunca de `meme_trades`.
+
+**O que este contrato propôs criar (a lista original, para comparação com o bloco acima):**
 
 - `packages/risk-core/hunter_risk_meme/` — pacote puro irmão: `inputs.py`, `limits.py`, `checks.py`,
   `sizing.py`, `kill_switch.py`, `decision.py`, `exits.py`. **Nunca importado por `hunter_risk`**, e

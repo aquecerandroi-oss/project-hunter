@@ -23,6 +23,11 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError, ProgrammingError
+
+from hunter_core.db.session import role_session
+from hunter_exchanges.pumpfun.models import NormalizedSolPrice
 from hunter_meme_worker.config import MemeConfig
 from hunter_meme_worker.features import CurveObservation, MinuteInputs, build_row
 from hunter_meme_worker.lab import LabContext, LabState, closed_minutes, lab_tick
@@ -33,11 +38,6 @@ from hunter_meme_worker.repo import (
     insert_snapshot,
     upsert_token,
 )
-from sqlalchemy import text
-from sqlalchemy.exc import DBAPIError, ProgrammingError
-
-from hunter_core.db.session import role_session
-from hunter_exchanges.pumpfun.models import NormalizedSolPrice
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -213,9 +213,11 @@ async def test_the_seed_plants_the_two_rule_sets_the_contract_names(
             .mappings()
             .all()
         )
+    # 0029 (T4.11) retires ``operator/1`` in favour of ``operator/2`` (the new
+    # suggested defaults); the seed rows themselves are untouched.
     assert [(r["name"], r["version"], r["kind"], r["exp_ref"], r["status"]) for r in rows] == [
         ("meme_paper_v0", "1", "research_only", "EXP-M1", "active"),
-        ("operator", "1", "operator", None, "active"),
+        ("operator", "1", "operator", None, "retired"),
     ]
     for row in rows:
         params = row["params"]

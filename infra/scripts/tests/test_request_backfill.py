@@ -166,9 +166,7 @@ def test_a_funding_requests_identity_never_collides_with_a_candles_request() -> 
     funding_chunk = module.Chunk(target=target, gap_start=start, gap_end=end)
 
     candles_envelope = module.envelope_for(candle_chunk, "binance")
-    (funding_envelope,) = module.funding_envelopes_for(
-        [funding_chunk], "binance", producer="test"
-    )
+    (funding_envelope,) = module.funding_envelopes_for([funding_chunk], "binance", producer="test")
 
     assert candles_envelope.event_id != funding_envelope.event_id
 

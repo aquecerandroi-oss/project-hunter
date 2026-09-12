@@ -396,6 +396,30 @@ services:
       DB_MAX_OVERFLOW: "2"
     logging: *prod-logging
 
+  # T4.14 - o executor real (services/meme-executor), perfil `meme-live` do
+  # compose base: so sobe com `MEME_LIVE=1 bash infra/vps/compose.sh update`.
+  # Unico processo que le SOLANA_WALLET_SECRET_KEY (do .env, uma vez). Com
+  # ENABLE_MEME_LIVE_TRADING=false (default) sobe inerte; com true recusa subir
+  # sem MEME_GATES_FILE, os cinco MEME_* de politica, SOLANA_RPC_URL e a chave
+  # (docs/DEPLOYMENT.md §3.7). Nunca escreva "true" aqui: a flag vem do .env.
+  meme-executor:
+    restart: always
+    environment:
+      <<: *prod-db-env
+      HUNTER_ROLE: meme_executor
+      HEALTH_PORT: "8001"
+      ENABLE_MEME_LIVE_TRADING: ${ENABLE_MEME_LIVE_TRADING:-false}
+      MEME_GATES_FILE: ${MEME_GATES_FILE:-/run/hunter/meme_gates.json}
+      MEME_EXECUTOR_CLUSTER: ${MEME_EXECUTOR_CLUSTER:-mainnet}
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
+      MEME_KILL_FILE: /run/hunter/meme.kill
+      MEME_AUTO_CLOSE_ON_EMERGENCY: ${MEME_AUTO_CLOSE_ON_EMERGENCY:-false}
+      DB_POOL_SIZE: "2"
+      DB_MAX_OVERFLOW: "2"
+    volumes:
+      - /opt/project-hunter/run/meme:/run/hunter
+    logging: *prod-logging
+
   web:
     restart: always
     build:

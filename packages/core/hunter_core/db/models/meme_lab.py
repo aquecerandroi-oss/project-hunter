@@ -51,17 +51,24 @@ BET_EXIT_REASONS = (
     "rug_no_snapshot",
     "max_loss",
     "line_broken",
+    "dead",
 )
 """The contract's seven plus ``max_loss`` (Emendas 1): EXP-M1 pre-registered a
 50 % loss floor as an exit rule, and a floor that closed a bet under another name
 would be a lie in the diary. Plus ``line_broken`` (``0026``, T4.10): the market
 cap closed below the support line for two snapshots in a row — EXP-M2's own
-invalidation, named as such."""
+invalidation, named as such. Plus ``dead`` (``0029``, T4.11): the pool's tape
+silent for 15 min with the mark at or below half the cost — the market gone,
+for a bet that held through the migration."""
 
 BET_LEGS = ("probe", "scale", "single")
 """``meme_paper_bets.leg`` (``0026``): the hype probe ("semi-comprado (sonda)"),
 the second leg that scales it ("escalado (perna 2)", which names its
 ``parent_bet_id``) and the one-leg bet of every other rule set."""
+
+MARK_SOURCES = ("curve", "pool_tape")
+"""``meme_paper_bets.mark_source`` (``0029``): what priced the last mark — the
+curve's snapshot, or the PumpSwap pool's last trade after the migration."""
 
 OPERATOR_COMMANDS = ("sell_now", "cancel")
 
@@ -140,6 +147,13 @@ class MemeProposal(Base, UUIDPrimaryKeyMixin):
             name="an_unfilled_proposal_names_its_refusal",
         ),
         CheckConstraint("char_length(mint) > 0", name="mint_is_not_empty"),
+        # 0028 — the live mode (T4.14).
+        CheckConstraint("mode IN ('paper', 'live')", name="mode_is_a_known_label"),
+        Index(
+            "ix_meme_proposals_live_decided_at",
+            "decided_at",
+            postgresql_where=text("mode = 'live'"),
+        ),
     )
 
     mint: Mapped[str] = mapped_column(Text)
@@ -174,6 +188,12 @@ class MemeProposal(Base, UUIDPrimaryKeyMixin):
     tables exist (``ddl/meme_lab.py``)."""
     refusal: Mapped[str | None] = mapped_column(Text)
 
+    # --- 0028: the live mode (T4.14) ---------------------------------------------
+    mode: Mapped[str] = mapped_column(Text, server_default=text("'paper'"))
+    """``paper`` | ``live``. The desk writes ``live`` on approval only while the
+    API's ``ENABLE_MEME_LIVE_TRADING`` is on; the executor (``services/meme-executor``)
+    reads ``live`` rows and the paper loop keeps filling them in shadow."""
+
 
 class MemePaperBet(Base, UUIDPrimaryKeyMixin):
     """One paper position, from its fill to its exit. Never a real order."""
@@ -207,6 +227,17 @@ class MemePaperBet(Base, UUIDPrimaryKeyMixin):
         CheckConstraint("leg IN ('probe', 'scale', 'single')", name="leg_is_a_known_label"),
         CheckConstraint(
             "(leg = 'scale') = (parent_bet_id IS NOT NULL)", name="a_scale_leg_names_its_probe"
+        ),
+        # 0029 — the mark's source and its staleness (T4.11).
+        CheckConstraint(
+            "mark_source IS NULL OR mark_source IN ('curve', 'pool_tape')",
+            name="mark_source_is_a_known_label",
+        ),
+        CheckConstraint(
+            "(mark_sol IS NULL) = (mark_source IS NULL)", name="a_mark_names_its_source"
+        ),
+        CheckConstraint(
+            "mark_stale_s IS NULL OR mark_stale_s >= 0", name="mark_stale_s_is_not_negative"
         ),
     )
 
@@ -245,6 +276,15 @@ class MemePaperBet(Base, UUIDPrimaryKeyMixin):
     leg: Mapped[str] = mapped_column(Text, server_default=text("'single'"))
     """``probe`` | ``scale`` | ``single`` (:data:`BET_LEGS`); every bet written
     before ``0026`` is ``single`` by default, which is what it was."""
+
+    # --- 0029: the mark's source and staleness (T4.11) --------------------------
+    mark_source: Mapped[str | None] = mapped_column(Text)
+    """``curve`` | ``pool_tape`` (:data:`MARK_SOURCES`) — set exactly when
+    ``mark_sol`` is; every mark written before ``0029`` was the curve's."""
+
+    mark_stale_s: Mapped[int | None]
+    """Seconds the pool's tape had been silent when the mark was refreshed
+    (the desk's "marca envelhecida há Ns"); the ``dead`` rule reads it."""
 
 
 class MemeOperatorCommand(Base, UUIDPrimaryKeyMixin):
@@ -290,6 +330,8 @@ class MemeOperatorCommand(Base, UUIDPrimaryKeyMixin):
 
 __all__ = [
     "BET_EXIT_REASONS",
+    "BET_LEGS",
+    "MARK_SOURCES",
     "OPERATOR_COMMANDS",
     "PROPOSAL_STATUSES",
     "RULE_SET_KINDS",

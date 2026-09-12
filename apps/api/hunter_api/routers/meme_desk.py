@@ -19,10 +19,11 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, Query, status
 
 from hunter_api.auth.rbac import OrgContext, require_org
-from hunter_api.deps import OrgSession, get_redis
+from hunter_api.deps import OrgSession, get_redis, get_settings
 from hunter_api.repositories.base import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from hunter_api.repositories.meme_desk import MemeDeskRepository
 from hunter_api.repositories.meme_desk_rows import decode_desk_cursor, encode_desk_cursor
+from hunter_api.repositories.meme_wallets import MemeWalletsRepository
 from hunter_api.routers.orders import IdempotencyKey
 from hunter_api.schemas.meme_desk import (
     ApproveProposalIn,
@@ -42,11 +43,15 @@ from hunter_api.services.meme_desk import (
 )
 from hunter_api.services.meme_desk_idempotency import RedisIdempotencyStore
 from hunter_api.services.meme_desk_out import build_desk_row_out, build_summary
+from hunter_api.services.meme_lab import day_bounds_brt
+from hunter_api.services.meme_wallets import SolUsdQuote, build_real_observed
 from hunter_core.domain.enums import OrganizationRole
 from hunter_core.domain.types import utcnow
 
 if TYPE_CHECKING:
     import redis.asyncio as redis_asyncio
+
+    from hunter_api.settings import ApiSettings
 
 __all__ = ["router"]
 
@@ -55,6 +60,9 @@ router = APIRouter(prefix="/api/v1/orgs/{org_id}/meme", tags=["meme"])
 ViewerOrg = Annotated[OrgContext, Depends(require_org(OrganizationRole.VIEWER))]
 OperatorOrg = Annotated[OrgContext, Depends(require_org(OrganizationRole.TRADER))]
 Redis = Annotated["redis_asyncio.Redis", Depends(get_redis)]
+Settings = Annotated["ApiSettings", Depends(get_settings)]
+"""T4.14: only ``enable_meme_live_trading`` is read here — whether ``mode = "live"``
+may be filed. The API never signs."""
 _Limit = Annotated[int | None, Query(ge=1, le=MAX_PAGE_SIZE)]
 
 
@@ -83,11 +91,25 @@ async def get_desk(
         last = page[-1]
         next_cursor = encode_desk_cursor(last.rank, last.proposal.proposed_at, last.proposal.id)
     summary = build_summary(await repo.rule_set_balances(now), await repo.latest_sol_usd_quote())
+    # T4.12: the observed wallets' real fills, priced with the desk's own quote.
+    _, day_start, day_end = day_bounds_brt(now)
+    quote = summary.sol_usd
+    real_observed = await build_real_observed(
+        MemeWalletsRepository(session),
+        day_start=day_start,
+        day_end=day_end,
+        quote=None
+        if quote is None
+        else SolUsdQuote(quote.rate, quote.source or "unknown", quote.observed_at),
+        watched=None,
+        watched_reason="heartbeat_not_read",
+    )
     return DeskListOut(
         server_now=now,
         summary=summary,
         items=[build_desk_row_out(row) for row in page],
         next_cursor=next_cursor,
+        real_observed=real_observed,
     )
 
 
@@ -103,10 +125,12 @@ async def approve_proposal_route(
     proposal_id: uuid.UUID,
     body: ApproveProposalIn,
     idempotency_key: IdempotencyKey,
+    settings: Settings,
 ) -> ProposalOut:
     """200 with the proposal; 409 unless ``proposed`` (or past ``expires_at``);
-    422 ``exceeds_max_sol_per_bet``; 409 ``idempotency-key-conflict`` for a
-    reused key naming a different intent."""
+    422 ``exceeds_max_sol_per_bet`` / ``meme_live_disabled`` (``mode = "live"``
+    without ``ENABLE_MEME_LIVE_TRADING`` on the API, T4.14); 409
+    ``idempotency-key-conflict`` for a reused key naming a different intent."""
     return await approve_proposal(
         MemeDeskRepository(session),
         RedisIdempotencyStore(redis),
@@ -115,6 +139,7 @@ async def approve_proposal_route(
         idempotency_key=idempotency_key,
         body=body,
         now=utcnow(),
+        live_enabled=settings.enable_meme_live_trading,
     )
 
 
@@ -146,7 +171,7 @@ async def reject_proposal_route(
     "/proposals/manual",
     response_model=ProposalOut,
     status_code=status.HTTP_201_CREATED,
-    summary="File a manual buy: a proposal born approved under operator/1 (TRADER+)",
+    summary="File a manual buy: a proposal born approved under operator/2 (TRADER+)",
 )
 async def manual_proposal_route(
     context: OperatorOrg,
@@ -154,9 +179,11 @@ async def manual_proposal_route(
     redis: Redis,
     body: ManualProposalIn,
     idempotency_key: IdempotencyKey,
+    settings: Settings,
 ) -> ProposalOut:
     """201 (also on a replay of the same key); 422 ``mint_unknown`` /
-    ``curve_completed`` / ``operator_rule_set_missing`` / ``exceeds_max_sol_per_bet``."""
+    ``curve_completed`` / ``operator_rule_set_missing`` / ``exceeds_max_sol_per_bet``
+    / ``meme_live_disabled`` (T4.14)."""
     return await file_manual_proposal(
         MemeDeskRepository(session),
         RedisIdempotencyStore(redis),
@@ -164,6 +191,7 @@ async def manual_proposal_route(
         idempotency_key=idempotency_key,
         body=body,
         now=utcnow(),
+        live_enabled=settings.enable_meme_live_trading,
     )
 
 

@@ -494,6 +494,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/meme/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The real executor: heartbeat, orders and positions — label REAL */
+        get: operations["get_meme_live_api_v1_orgs__org_id__meme_live_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/meme/live/positions/{position_id}/sell-now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask the executor to sell a real position on its next pass (TRADER+) */
+        post: operations["sell_now_route_api_v1_orgs__org_id__meme_live_positions__position_id__sell_now_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/meme/overview": {
         parameters: {
             query?: never;
@@ -521,9 +555,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * File a manual buy: a proposal born approved under operator/1 (TRADER+)
+         * File a manual buy: a proposal born approved under operator/2 (TRADER+)
          * @description 201 (also on a replay of the same key); 422 ``mint_unknown`` /
-         *     ``curve_completed`` / ``operator_rule_set_missing`` / ``exceeds_max_sol_per_bet``.
+         *     ``curve_completed`` / ``operator_rule_set_missing`` / ``exceeds_max_sol_per_bet``
+         *     / ``meme_live_disabled`` (T4.14).
          */
         post: operations["manual_proposal_route_api_v1_orgs__org_id__meme_proposals_manual_post"];
         delete?: never;
@@ -544,8 +579,9 @@ export interface paths {
         /**
          * Approve a proposal with the operator's four parameters (TRADER+)
          * @description 200 with the proposal; 409 unless ``proposed`` (or past ``expires_at``);
-         *     422 ``exceeds_max_sol_per_bet``; 409 ``idempotency-key-conflict`` for a
-         *     reused key naming a different intent.
+         *     422 ``exceeds_max_sol_per_bet`` / ``meme_live_disabled`` (``mode = "live"``
+         *     without ``ENABLE_MEME_LIVE_TRADING`` on the API, T4.14); 409
+         *     ``idempotency-key-conflict`` for a reused key naming a different intent.
          */
         post: operations["approve_proposal_route_api_v1_orgs__org_id__meme_proposals__proposal_id__approve_post"];
         delete?: never;
@@ -1327,6 +1363,12 @@ export interface components {
         ApproveProposalIn: {
             /** Max Hold S */
             max_hold_s: number;
+            /**
+             * Mode
+             * @default paper
+             * @enum {string}
+             */
+            mode: "paper" | "live";
             /** Note */
             note?: string | null;
             /** Size Sol */
@@ -1478,7 +1520,7 @@ export interface components {
             /** Exit At */
             exit_at: string | null;
             /** Exit Reason */
-            exit_reason: ("target" | "trailing" | "time_stop" | "migrated" | "creator_dump" | "sell_now" | "rug_no_snapshot" | "max_loss" | "line_broken") | string | null;
+            exit_reason: ("target" | "trailing" | "time_stop" | "migrated" | "creator_dump" | "sell_now" | "rug_no_snapshot" | "max_loss" | "line_broken" | "dead") | string | null;
             /** Fee Sol */
             fee_sol: string | null;
             /** High Water X */
@@ -1501,6 +1543,10 @@ export interface components {
             mark_at: string | null;
             /** Mark Sol */
             mark_sol: string | null;
+            /** Mark Source */
+            mark_source?: ("curve" | "pool_tape") | string | null;
+            /** Mark Stale S */
+            mark_stale_s?: number | null;
             /** Mode */
             mode: string;
             params: components["schemas"]["DeskParamsOut"];
@@ -1940,6 +1986,7 @@ export interface components {
             label: string;
             /** Next Cursor */
             next_cursor?: string | null;
+            real_observed?: components["schemas"]["RealObservedOut"] | null;
             /**
              * Server Now
              * Format: date-time
@@ -1954,6 +2001,8 @@ export interface components {
          *     the four, and the loop applies the set's ceilings on top).
          */
         DeskParamsOut: {
+            /** Exit On Migration */
+            exit_on_migration?: boolean | null;
             /** Max Hold S */
             max_hold_s: number | null;
             /** Note */
@@ -1962,6 +2011,8 @@ export interface components {
             size_sol: string | null;
             /** Target X */
             target_x: string | null;
+            /** Trailing Arm X */
+            trailing_arm_x?: string | null;
             /** Trailing Pct */
             trailing_pct: string | null;
         };
@@ -2476,6 +2527,15 @@ export interface components {
             /** Unique Buyers */
             unique_buyers: number | null;
         };
+        /** LabVerdictOut */
+        LabVerdictOut: {
+            /** Accepted */
+            accepted: boolean | null;
+            /** Kind */
+            kind: string;
+            /** Refusals */
+            refusals: string[];
+        };
         /** LatencyHopOut */
         LatencyHopOut: {
             /** Hop */
@@ -2519,6 +2579,202 @@ export interface components {
              * Format: uuid
              */
             replication_parent_id: string;
+        };
+        /**
+         * LiveExecutorOut
+         * @description What ``hb:meme:executor`` says, field by field — ``None`` when it does not say.
+         */
+        LiveExecutorOut: {
+            /** Auto Close On Emergency */
+            auto_close_on_emergency?: boolean | null;
+            /**
+             * Blocked Exits
+             * @default {}
+             */
+            blocked_exits: {
+                [key: string]: string;
+            };
+            /** Cluster */
+            cluster?: string | null;
+            /** Daily Loss Sol */
+            daily_loss_sol?: string | null;
+            /** Day Start Sol Equity */
+            day_start_sol_equity?: string | null;
+            /** Equity Sol */
+            equity_sol?: string | null;
+            /** Error */
+            error?: string | null;
+            /** Executor Ts */
+            executor_ts: string | null;
+            /** Gates */
+            gates?: {
+                [key: string]: unknown;
+            } | null;
+            /** Heartbeat Key */
+            heartbeat_key: string;
+            /** Heartbeat Ts */
+            heartbeat_ts: string | null;
+            /** Kill Switch */
+            kill_switch?: string | null;
+            /** Kill Switch Latch Reason */
+            kill_switch_latch_reason?: string | null;
+            /** Kill Switch Latched */
+            kill_switch_latched?: boolean | null;
+            /**
+             * Kill Switch Sources
+             * @default {}
+             */
+            kill_switch_sources: {
+                [key: string]: string;
+            };
+            /** Last Entries Tick At */
+            last_entries_tick_at?: string | null;
+            /** Last Exits Tick At */
+            last_exits_tick_at?: string | null;
+            /** Last Refusal */
+            last_refusal?: string | null;
+            /** Last Signature */
+            last_signature?: string | null;
+            /** Live Enabled */
+            live_enabled?: boolean | null;
+            /**
+             * Orders By State
+             * @default {}
+             */
+            orders_by_state: {
+                [key: string]: number;
+            };
+            /** Policy */
+            policy?: {
+                [key: string]: unknown;
+            } | null;
+            /** Positions Open */
+            positions_open?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "alive" | "stalled" | "never" | "heartbeat_missing" | "redis_unavailable";
+            /** Wallet Pubkey */
+            wallet_pubkey?: string | null;
+            /** Wallet Read At */
+            wallet_read_at?: string | null;
+            /** Wallet Sol Balance */
+            wallet_sol_balance?: string | null;
+        };
+        /** LiveOrderOut */
+        LiveOrderOut: {
+            /** Admission Approved */
+            admission_approved: boolean | null;
+            /** Attempt */
+            attempt: number;
+            /** Binding Constraint */
+            binding_constraint: string | null;
+            /** Client Order Id */
+            client_order_id: string;
+            /** Fill */
+            fill: {
+                [key: string]: unknown;
+            } | null;
+            /** First Refusal */
+            first_refusal: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mint */
+            mint: string | null;
+            /**
+             * Proposal Id
+             * Format: uuid
+             */
+            proposal_id: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /** Settled At */
+            settled_at: string | null;
+            /** Side */
+            side: string;
+            /** Sol Final */
+            sol_final: string | null;
+            /** Status */
+            status: string;
+            /** Submitted At */
+            submitted_at: string | null;
+            /** Tx Signature */
+            tx_signature: string | null;
+        };
+        /** LivePositionOut */
+        LivePositionOut: {
+            /** Can Sell Now */
+            can_sell_now: boolean;
+            /**
+             * Entry At
+             * Format: date-time
+             */
+            entry_at: string;
+            /** Exit */
+            exit: {
+                [key: string]: unknown;
+            } | null;
+            /** Exit At */
+            exit_at: string | null;
+            /** Exit Intent */
+            exit_intent: {
+                [key: string]: unknown;
+            } | null;
+            /** High Water Sol */
+            high_water_sol: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Initial Risk Sol */
+            initial_risk_sol: string;
+            /** Mark At */
+            mark_at: string | null;
+            /** Mark Reason */
+            mark_reason: string | null;
+            /** Mark Sol */
+            mark_sol: string | null;
+            /** Mark Source */
+            mark_source: string | null;
+            /** Migrated */
+            migrated: boolean;
+            /** Mint */
+            mint: string;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            /** Pnl Sol */
+            pnl_sol: string | null;
+            /**
+             * Proposal Id
+             * Format: uuid
+             */
+            proposal_id: string;
+            /** R Multiple */
+            r_multiple: string | null;
+            /** Sell Requested At */
+            sell_requested_at: string | null;
+            /** Sell Requested By */
+            sell_requested_by: string | null;
+            /** Sol Received */
+            sol_received: string | null;
+            /** Sol Spent */
+            sol_spent: string;
+            /** Status */
+            status: string;
+            /** Tokens */
+            tokens: number;
         };
         /**
          * ManualOrderCreate
@@ -2614,6 +2870,12 @@ export interface components {
             max_hold_s: number;
             /** Mint */
             mint: string;
+            /**
+             * Mode
+             * @default paper
+             * @enum {string}
+             */
+            mode: "paper" | "live";
             /** Note */
             note?: string | null;
             /** Size Sol */
@@ -3122,9 +3384,30 @@ export interface components {
              * @default PAPEL — nenhuma transação real; a chave e a flag ao vivo não existem neste processo
              */
             label: string;
+            real_observed?: components["schemas"]["RealObservedOut"] | null;
             /** Rule Sets */
             rule_sets: components["schemas"]["RuleSetBoardOut"][];
             sources: components["schemas"]["SourcesOut"];
+        };
+        /** MemeLiveOut */
+        MemeLiveOut: {
+            /** Api Live Enabled */
+            api_live_enabled: boolean;
+            executor: components["schemas"]["LiveExecutorOut"];
+            /**
+             * Label
+             * @default REAL — transações assinadas na carteira Solana dedicada; a chave vive só no meme-executor, a API nunca assina
+             */
+            label: string;
+            /** Orders */
+            orders: components["schemas"]["LiveOrderOut"][];
+            /** Positions */
+            positions: components["schemas"]["LivePositionOut"][];
+            /**
+             * Server Now
+             * Format: date-time
+             */
+            server_now: string;
         };
         /**
          * MemeOverviewOut
@@ -3454,6 +3737,31 @@ export interface components {
          *     sample" is a different fact from "no losses" (SHADOW-LAB.md §9).
          */
         NullableMetric: {
+            /** Reason */
+            reason?: string | null;
+            /** Value */
+            value: string | null;
+        };
+        /**
+         * ObservedSolUsdOut
+         * @description The observed SOL/USD quote the dollar figures below were priced with.
+         */
+        ObservedSolUsdOut: {
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Price Usd */
+            price_usd: string;
+            /** Source */
+            source: string;
+        };
+        /**
+         * ObservedValueOut
+         * @description A number that is ``null`` with a reason instead of a zero.
+         */
+        ObservedValueOut: {
             /** Reason */
             reason?: string | null;
             /** Value */
@@ -4454,6 +4762,29 @@ export interface components {
             /** Value */
             value: string | null;
         };
+        /** RealObservedOut */
+        RealObservedOut: {
+            /**
+             * Label
+             * @default REAL — observado na cadeia, não executado por este sistema
+             */
+            label: string;
+            /** Positions */
+            positions: components["schemas"]["WalletPositionOut"][];
+            /** Reason */
+            reason?: string | null;
+            sol_usd: components["schemas"]["ObservedSolUsdOut"] | null;
+            /** Sol Usd Reason */
+            sol_usd_reason?: string | null;
+            /** Trades */
+            trades: components["schemas"]["WalletTradeOut"][];
+            /** Wallets */
+            wallets: components["schemas"]["WalletObservedOut"][];
+            /** Watched */
+            watched: number | null;
+            /** Watched Reason */
+            watched_reason?: string | null;
+        };
         /**
          * RegimeComponentOut
          * @description One line of the hourly engine's decomposition
@@ -5097,6 +5428,32 @@ export interface components {
             /** Pending */
             pending: number;
         };
+        /** SellNowOut */
+        SellNowOut: {
+            /** Already Requested */
+            already_requested: boolean;
+            /**
+             * Label
+             * @default REAL — transações assinadas na carteira Solana dedicada; a chave vive só no meme-executor, a API nunca assina
+             */
+            label: string;
+            /**
+             * Note
+             * @default vende na curva na próxima passada do executor (≤ 5 s), nunca a esta marca
+             */
+            note: string;
+            /**
+             * Position Id
+             * Format: uuid
+             */
+            position_id: string;
+            /** Sell Requested At */
+            sell_requested_at: string | null;
+            /** Sell Requested By */
+            sell_requested_by: string | null;
+            /** Status */
+            status: string;
+        };
         /** SeriesPointOut */
         SeriesPointOut: {
             /**
@@ -5605,7 +5962,7 @@ export interface components {
             /** Provisional */
             provisional: boolean;
             /** Reason */
-            reason: ("target" | "trailing" | "time_stop" | "migrated" | "creator_dump" | "sell_now" | "rug_no_snapshot" | "max_loss" | "line_broken") | string | null;
+            reason: ("target" | "trailing" | "time_stop" | "migrated" | "creator_dump" | "sell_now" | "rug_no_snapshot" | "max_loss" | "line_broken" | "dead") | string | null;
             /** Reason Label */
             reason_label: string;
             /** Sol Received */
@@ -6029,6 +6386,66 @@ export interface components {
             items: components["schemas"]["VersionOut"][];
         };
         /**
+         * WalletLabContextOut
+         * @description What every active rule set's gate said in the last closed minute before
+         *     a real buy — the answer to "would the Lab have done the same?".
+         */
+        WalletLabContextOut: {
+            /** Evaluated At */
+            evaluated_at: string | null;
+            /** Features Version */
+            features_version: string | null;
+            /** Hype Reason */
+            hype_reason: string | null;
+            /** Hype Score */
+            hype_score: string | null;
+            /** Line Reason */
+            line_reason: string | null;
+            /** Minute */
+            minute: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Rule Sets */
+            rule_sets: {
+                [key: string]: components["schemas"]["LabVerdictOut"];
+            };
+        };
+        /** WalletObservedOut */
+        WalletObservedOut: {
+            /** Closed Positions */
+            closed_positions: number;
+            /** Fills */
+            fills: number;
+            /**
+             * First Seen At
+             * Format: date-time
+             */
+            first_seen_at: string;
+            /** Last Trade At */
+            last_trade_at: string | null;
+            /** Open Cost Sol */
+            open_cost_sol: string;
+            /** Open Marks Sol */
+            open_marks_sol: string;
+            /** Open Positions */
+            open_positions: number;
+            /** Realized Today Sol */
+            realized_today_sol: string;
+            /** Realized Total Sol */
+            realized_total_sol: string;
+            realized_total_usd: components["schemas"]["ObservedValueOut"];
+            /** Trades */
+            trades: number;
+            /** Unknown */
+            unknown: number;
+            /** Unmarked Open */
+            unmarked_open: number;
+            /** Wallet */
+            wallet: string;
+            /** Wallet Short */
+            wallet_short: string;
+        };
+        /**
          * WalletOut
          * @description Derived from ``meme_paper_bets`` alone: ``balance = wallet_max + Σ closed
          *     pnl − Σ open stake``; ``equity = balance + Σ open marks``.
@@ -6048,6 +6465,114 @@ export interface components {
             realized_today_sol: string;
             /** Realized Total Sol */
             realized_total_sol: string;
+        };
+        /** WalletPositionOut */
+        WalletPositionOut: {
+            /** Avg Cost Sol Per Token */
+            avg_cost_sol_per_token: string | null;
+            /** Buys */
+            buys: number;
+            /** First Buy At */
+            first_buy_at: string | null;
+            /** Hype Score */
+            hype_score: string | null;
+            lab_context: components["schemas"]["WalletLabContextOut"] | null;
+            /**
+             * Last Trade At
+             * Format: date-time
+             */
+            last_trade_at: string;
+            /** Line Reason */
+            line_reason: string | null;
+            /** Mark At */
+            mark_at: string | null;
+            /** Mark Reason */
+            mark_reason: string | null;
+            /** Mark Sol */
+            mark_sol: string | null;
+            /** Mark Source */
+            mark_source: ("curve_snapshot" | "tape") | null;
+            /** Mint */
+            mint: string;
+            /** Name */
+            name: string | null;
+            /** Open Cost Sol */
+            open_cost_sol: string;
+            r_multiple: components["schemas"]["ObservedValueOut"];
+            /** Realized Pnl Sol */
+            realized_pnl_sol: string;
+            realized_pnl_usd: components["schemas"]["ObservedValueOut"];
+            /** Sells */
+            sells: number;
+            /** Sol Received */
+            sol_received: string;
+            /** Sol Spent */
+            sol_spent: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "closed";
+            /** Symbol */
+            symbol: string | null;
+            /** Tokens Held */
+            tokens_held: string;
+            /** Unmatched Sell Tokens */
+            unmatched_sell_tokens: string;
+            unrealized_pnl_sol: components["schemas"]["ObservedValueOut"];
+            unrealized_pnl_usd: components["schemas"]["ObservedValueOut"];
+            /** Wallet */
+            wallet: string;
+            /** Wallet Short */
+            wallet_short: string;
+        };
+        /** WalletTradeOut */
+        WalletTradeOut: {
+            /** Block Time */
+            block_time: string | null;
+            /**
+             * Decode
+             * @enum {string}
+             */
+            decode: "trade_event" | "balance_delta" | "none";
+            /** Event Index */
+            event_index: number;
+            /** Fee Lamports */
+            fee_lamports: number | null;
+            /** Hype Score */
+            hype_score: string | null;
+            lab_context: components["schemas"]["WalletLabContextOut"] | null;
+            /** Line Reason */
+            line_reason: string | null;
+            /** Mint */
+            mint: string | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "buy" | "sell" | "unknown";
+            /** Signature */
+            signature: string;
+            /** Slot */
+            slot: number;
+            /** Sol Lamports */
+            sol_lamports: number | null;
+            sol_total: components["schemas"]["ObservedValueOut"];
+            /** Token Amount */
+            token_amount: string | null;
+            /** Venue */
+            venue: ("curve" | "pool") | null;
+            /** Wallet */
+            wallet: string;
+            /** Wallet Short */
+            wallet_short: string;
         };
         /** WorkerHeartbeatOut */
         WorkerHeartbeatOut: {
@@ -7178,6 +7703,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemeLabOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_meme_live_api_v1_orgs__org_id__meme_live_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemeLiveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sell_now_route_api_v1_orgs__org_id__meme_live_positions__position_id__sell_now_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                position_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SellNowOut"];
                 };
             };
             /** @description Validation Error */

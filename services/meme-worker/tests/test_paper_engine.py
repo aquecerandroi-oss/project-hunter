@@ -17,6 +17,8 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+
+from hunter_indicators.meme.curve import CurveReserves, quote_buy, quote_sell
 from hunter_meme_worker.lab_models import (
     BetState,
     RuleSetSpec,
@@ -34,8 +36,6 @@ from hunter_meme_worker.paper_engine import (
     mark_bet,
     pick_fill_snapshot,
 )
-
-from hunter_indicators.meme.curve import CurveReserves, quote_buy, quote_sell
 
 pytestmark = pytest.mark.unit
 

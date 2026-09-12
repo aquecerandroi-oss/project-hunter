@@ -54,6 +54,7 @@ __all__ = [
     "close_bet",
     "close_without_snapshot",
     "decide_exit",
+    "decide_exit_at",
     "evaluate_fill",
     "mark_bet",
     "pick_fill_snapshot",
@@ -72,6 +73,7 @@ EXIT_REASONS: Final = frozenset(
         "rug_no_snapshot",
         "max_loss",
         "line_broken",
+        "dead",
     }
 )
 
@@ -84,10 +86,13 @@ _RULE_TO_REASON: Final[Mapping[str, str]] = {
     "creator_dump": "creator_dump",
     "max_loss": "max_loss",
     "line_broken": "line_broken",
+    "dead": "dead",
     "rug_signal": "rug_no_snapshot",
 }
 """T4.5's rule names → the contract's ``exit.reason``. Completion and migration
-both mean "the curve stopped being the venue" (``exit.trigger`` keeps which)."""
+both mean "the curve stopped being the venue" (``exit.trigger`` keeps which).
+``dead`` (T4.11) is the pool's tape silent for ``dead_stale_s`` with the mark
+at or below ``dead_mark_pct`` of the cost — the market gone, named as such."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +125,34 @@ def decide_exit(
     instant (``lines_exit.py``); ``None`` = no line known, which a rule set
     that watches the line reports as ``support_line_unknown``.
     """
+    return decide_exit_at(
+        bet,
+        mark,
+        at=snapshot.observed_at,
+        migrated=migrated,
+        curve_complete=snapshot.complete or snapshot.reserves.complete,
+        creator_net_seller=creator_net_seller,
+        sell_now=sell_now,
+        below_support_streak=below_support_streak,
+    )
+
+
+def decide_exit_at(
+    bet: BetState,
+    mark: Mark,
+    *,
+    at: datetime,
+    migrated: bool,
+    curve_complete: bool,
+    creator_net_seller: bool | None,
+    sell_now: bool,
+    below_support_streak: int | None = None,
+    mark_stale_s: int | None = None,
+) -> str | None:
+    """The exit that fires at instant ``at`` with ``mark`` — the venue-agnostic
+    core of :func:`decide_exit`, which the pool side (T4.11, ``lab_bets_pool``)
+    calls with a trade's block time, or with the tick itself for the ``dead``
+    rule (``mark_stale_s`` = seconds since the last trade it could see)."""
     if sell_now:
         return "sell_now"
     with localcontext(CONTEXT):
@@ -128,12 +161,13 @@ def decide_exit(
         mark_sol=mark.mark_sol,
         cost_basis_sol=bet.sol_spent,
         peak_mark_sol=peak,
-        held_s=int((snapshot.observed_at - bet.entry_at).total_seconds()),
-        curve_complete=snapshot.complete or snapshot.reserves.complete,
+        held_s=int((at - bet.entry_at).total_seconds()),
+        curve_complete=curve_complete,
         migrated=migrated,
         rug_suspected=None,
         creator_net_seller=creator_net_seller,
         below_support_streak=below_support_streak,
+        mark_stale_s=mark_stale_s,
     )
     decision = evaluate_exit(state, bet.params.exit_rules())
     if not decision.should_exit or decision.reason is None:

@@ -14,6 +14,9 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+
+from hunter_exchanges.pumpfun import trenches_state
+from hunter_exchanges.pumpfun.swap_api import parse_trades_page
 from hunter_meme_worker.features import (
     NO_HOLDERS_READER,
     NO_TRADE_FEED,
@@ -28,9 +31,6 @@ from hunter_meme_worker.features_tape import (
     holders_for,
     tape_for,
 )
-
-from hunter_exchanges.pumpfun import trenches_state
-from hunter_exchanges.pumpfun.swap_api import parse_trades_page
 
 pytestmark = pytest.mark.unit
 

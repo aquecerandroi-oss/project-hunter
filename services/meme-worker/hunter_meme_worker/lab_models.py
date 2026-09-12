@@ -1,7 +1,8 @@
-"""Value objects of the Lab loop: a rule set as the engine reads it, the
-effective parameters of a bet, a bet in flight and the shape a fill writes —
-plus, re-exported from :mod:`hunter_meme_worker.lab_values`, the snapshot, the
-quote, the wallet state and the exit shape.
+"""Value objects of the Lab loop: a rule set as the engine reads it, a bet in
+flight and the shape a fill writes — plus, re-exported from
+:mod:`hunter_meme_worker.lab_values` (the snapshot, the quote, the wallet state
+and the exit shape) and :mod:`hunter_meme_worker.lab_params` (the effective
+parameters of a bet, since T4.11).
 
 Everything monetary is ``Decimal`` and every decimal in ``meme_rule_sets.params``
 is a JSON **string**, read here with ``Decimal(str(...))`` so a frozen parameter
@@ -19,6 +20,12 @@ criteria of the gate (``require_higher_lows``, ``require_breakout_15m``,
 probe → scale second leg (``scale_size_sol``, ``scale_gate`` = the
 ``name/version`` of the rule set whose gate must be satisfied for the same
 mint while the probe is open).
+
+T4.11 (EXP-M4, the moonshot arms) adds ``exit_on_migration`` (``false`` = hold
+through the migration and mark on the PumpSwap pool's tape), ``trailing_arm_x``
+(trailing armed only after that multiple) and the ``dead`` exit
+(``exit_on_dead``, ``dead_stale_s``, ``dead_mark_pct``) — again optional, so
+``meme_paper_v0``/``trendline_v0``/``hype_probe_v0`` keep selling on migration.
 """
 
 from __future__ import annotations
@@ -29,9 +36,26 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from hunter_indicators.meme.rules import EntryGate, ExitRules
+from hunter_indicators.meme.rules import EntryGate
+from hunter_meme_worker.lab_params import (
+    DEFAULT_DEAD_MARK_PCT,
+    DEFAULT_DEAD_STALE_S,
+    REFUSAL_EXCEEDS_MAX_SOL_PER_BET,
+    REFUSAL_SIZE_NOT_POSITIVE,
+    EffectiveParams,
+    bool_or,
+    decimal_of,
+    decimal_or,
+    effective_params,
+    int_or,
+    optional_decimal,
+    suggested_extras,
+)
 from hunter_meme_worker.lab_values import (
     LEGS,
+    MARK_CURVE,
+    MARK_POOL_TAPE,
+    MARK_SOURCES,
     BetExit,
     Snapshot,
     SolUsd,
@@ -42,6 +66,11 @@ from hunter_meme_worker.lab_values import (
 
 __all__ = [
     "LEGS",
+    "MARK_CURVE",
+    "MARK_POOL_TAPE",
+    "MARK_SOURCES",
+    "REFUSAL_EXCEEDS_MAX_SOL_PER_BET",
+    "REFUSAL_SIZE_NOT_POSITIVE",
     "BetEntry",
     "BetExit",
     "BetState",
@@ -55,34 +84,6 @@ __all__ = [
     "money_str",
     "optional_money_str",
 ]
-
-REFUSAL_EXCEEDS_MAX_SOL_PER_BET = "exceeds_max_sol_per_bet"
-REFUSAL_SIZE_NOT_POSITIVE = "size_not_positive"
-
-
-def decimal_of(value: Any) -> Decimal:
-    """``Decimal`` from a JSON string, int or Decimal — never from a float's repr."""
-    if isinstance(value, float):
-        raise TypeError("a float is not an exact number; params carry decimals as strings")
-    return Decimal(str(value))
-
-
-def _optional_decimal(value: Any) -> Decimal | None:
-    return None if value is None else decimal_of(value)
-
-
-def _decimal_or(value: Any, default: Decimal) -> Decimal:
-    """The decision's number when it gave one, else the rule set's — a given
-    zero is a given zero, never "absent"."""
-    return default if value is None else decimal_of(value)
-
-
-def _int_or(value: Any, default: int) -> int:
-    return default if value is None else int(value)
-
-
-def _bool_or(value: Any, default: bool) -> bool:
-    return default if value is None else bool(value)
 
 
 def _gate_from_params(name: str, version: str, params: Mapping[str, Any]) -> EntryGate:
@@ -100,10 +101,10 @@ def _gate_from_params(name: str, version: str, params: Mapping[str, Any]) -> Ent
         require_progress=bool(params.get("require_progress", True)),
         require_higher_lows=bool(params.get("require_higher_lows", False)),
         require_breakout_15m=bool(params.get("require_breakout_15m", False)),
-        min_distance_to_support_pct=_optional_decimal(params.get("min_distance_to_support_pct")),
-        max_distance_to_support_pct=_optional_decimal(params.get("max_distance_to_support_pct")),
-        min_hype_score=_optional_decimal(params.get("min_hype_score")),
-        max_dev_share=_optional_decimal(params.get("max_dev_share")),
+        min_distance_to_support_pct=optional_decimal(params.get("min_distance_to_support_pct")),
+        max_distance_to_support_pct=optional_decimal(params.get("max_distance_to_support_pct")),
+        min_hype_score=optional_decimal(params.get("min_hype_score")),
+        max_dev_share=optional_decimal(params.get("max_dev_share")),
         dev_share_unknown_allowed=bool(params.get("dev_share_unknown_allowed", False)),
         max_snipers=None if params.get("max_snipers") is None else int(params["max_snipers"]),
     )
@@ -141,6 +142,12 @@ class RuleSetSpec:
     scales, and its bets are ``single``."""
     scale_gate: str | None = None
     """``name/version`` of the active rule set whose gate confirms the line."""
+    exit_on_migration: bool = True
+    """T4.11: ``False`` = the position survives the migration (EXP-M4)."""
+    trailing_arm_x: Decimal | None = None
+    exit_on_dead: bool = False
+    dead_stale_s: int = DEFAULT_DEAD_STALE_S
+    dead_mark_pct: Decimal = DEFAULT_DEAD_MARK_PCT
 
     @property
     def label(self) -> str:
@@ -188,16 +195,22 @@ class RuleSetSpec:
             priority_fee_sol=decimal_of(params.get("priority_fee_sol", "0")),
             exit_on_line_break=bool(params.get("exit_on_line_break", False)),
             line_break_snapshots=int(params.get("line_break_snapshots", 2)),
-            scale_size_sol=_optional_decimal(params.get("scale_size_sol")),
+            scale_size_sol=optional_decimal(params.get("scale_size_sol")),
             scale_gate=None if params.get("scale_gate") is None else str(params["scale_gate"]),
+            exit_on_migration=bool_or(params.get("exit_on_migration"), True),
+            trailing_arm_x=optional_decimal(params.get("trailing_arm_x")),
+            exit_on_dead=bool_or(params.get("exit_on_dead"), False),
+            dead_stale_s=int_or(params.get("dead_stale_s"), DEFAULT_DEAD_STALE_S),
+            dead_mark_pct=decimal_or(params.get("dead_mark_pct"), DEFAULT_DEAD_MARK_PCT),
         )
 
     def suggested(self) -> dict[str, Any]:
         """``meme_proposals.suggested`` — what the desk pre-fills.
 
-        The T4.10 keys appear only when they say something: a set that scales
-        opens ``probe`` legs (every other set's bets are ``single`` by default
-        at the fill) and a set that watches the line says so — EXP-M1's
+        The T4.10/T4.11 keys appear only when they say something: a set that
+        scales opens ``probe`` legs (every other set's bets are ``single`` by
+        default at the fill), a set that watches the line says so, a set that
+        holds through the migration says ``exit_on_migration: false`` — EXP-M1's
         proposals keep the four keys they always had.
         """
         suggested: dict[str, Any] = {
@@ -211,84 +224,8 @@ class RuleSetSpec:
             suggested["line_break_snapshots"] = self.line_break_snapshots
         if self.scales:
             suggested["leg"] = "probe"
+        suggested.update(suggested_extras(self))
         return suggested
-
-
-@dataclass(frozen=True, slots=True)
-class EffectiveParams:
-    """The numbers a bet actually runs on, plus the rule set's own floor."""
-
-    size_sol: Decimal
-    target_x: Decimal
-    trailing_pct: Decimal
-    max_hold_s: int
-    max_loss_pct: Decimal
-    exit_on_line_break: bool = False
-    line_break_snapshots: int = 2
-
-    def exit_rules(self, key: str = "lab_exit") -> ExitRules:
-        return ExitRules(
-            key=key,
-            version=1,
-            description="effective exits of one bet",
-            target_multiple=self.target_x,
-            trailing_drawdown_pct=self.trailing_pct,
-            time_stop_s=self.max_hold_s,
-            max_loss_pct=self.max_loss_pct,
-            exit_on_line_break=self.exit_on_line_break,
-            line_break_snapshots=self.line_break_snapshots,
-        )
-
-    def as_json(self) -> dict[str, Any]:
-        return {
-            "size_sol": money_str(self.size_sol),
-            "target_x": money_str(self.target_x),
-            "trailing_pct": money_str(self.trailing_pct),
-            "max_hold_s": self.max_hold_s,
-            "max_loss_pct": money_str(self.max_loss_pct),
-            "exit_on_line_break": self.exit_on_line_break,
-            "line_break_snapshots": self.line_break_snapshots,
-        }
-
-    @classmethod
-    def from_json(cls, params: Mapping[str, Any]) -> EffectiveParams:
-        """Rows written before T4.10 carry no line keys: they never watched one."""
-        return cls(
-            size_sol=decimal_of(params["size_sol"]),
-            target_x=decimal_of(params["target_x"]),
-            trailing_pct=decimal_of(params["trailing_pct"]),
-            max_hold_s=int(params["max_hold_s"]),
-            max_loss_pct=decimal_of(params["max_loss_pct"]),
-            exit_on_line_break=_bool_or(params.get("exit_on_line_break"), False),
-            line_break_snapshots=_int_or(params.get("line_break_snapshots"), 2),
-        )
-
-
-def effective_params(spec: RuleSetSpec, decision: Mapping[str, Any]) -> EffectiveParams | str:
-    """The decision (operator's or ``suggested``) under the rule set's ceilings.
-
-    The operator may change any of the four; the size may not exceed
-    ``max_sol_per_bet`` (refused by name, the contract's
-    ``exceeds_max_sol_per_bet``) and the loss floor is never theirs to move.
-    """
-    size = _optional_decimal(decision.get("size_sol"))
-    if size is None:
-        size = spec.size_sol
-    if size <= 0:
-        return REFUSAL_SIZE_NOT_POSITIVE
-    if size > spec.max_sol_per_bet:
-        return REFUSAL_EXCEEDS_MAX_SOL_PER_BET
-    return EffectiveParams(
-        size_sol=size,
-        target_x=_decimal_or(decision.get("target_x"), spec.target_x),
-        trailing_pct=_decimal_or(decision.get("trailing_pct"), spec.trailing_pct),
-        max_hold_s=_int_or(decision.get("max_hold_s"), spec.max_hold_s),
-        max_loss_pct=spec.max_loss_pct,
-        exit_on_line_break=_bool_or(decision.get("exit_on_line_break"), spec.exit_on_line_break),
-        line_break_snapshots=_int_or(
-            decision.get("line_break_snapshots"), spec.line_break_snapshots
-        ),
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -312,6 +249,12 @@ class BetState:
     priority_fee_sol: Decimal
     leg: str = "single"
     parent_bet_id: str | None = None
+    mark_source: str = MARK_CURVE
+    """``curve`` while the position is priced on ``meme_curve_snapshots``;
+    ``pool_tape`` once a bet that held through the migration is marked on the
+    PumpSwap pool's trades (T4.11, ``0029``)."""
+    mark_stale_s: int | None = None
+    """Seconds between the tick and the last pool trade it could see."""
 
 
 @dataclass(frozen=True, slots=True)

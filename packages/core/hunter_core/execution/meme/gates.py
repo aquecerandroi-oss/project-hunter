@@ -20,6 +20,29 @@ attested in ``meme_gates.json`` — a small, human-written state file, named by
 Every refusal is a :class:`MemeLiveTradingRefused` with a **named** reason, so the
 boot log says *which* gate is red. Nothing here reads a secret, and the flag being
 ``false`` short-circuits: paper and devnet never need this file.
+
+**The written small test (T4.14, §12 variant).** Gates A and B may be replaced —
+never gate C — by a ``small_test_authorization`` the owner decided in writing:
+
+.. code-block:: json
+
+    {
+      "schema": "hunter.meme_gates/v1",
+      "gate_a_engineering": {"passed": false, "date": "2026-09-12", "evidence": "notes-T4.14"},
+      "gate_b_evidence":    {"passed": false, "date": "2026-09-12", "evidence": "EXP-M1 open"},
+      "gate_c_owner":       {"enabled": true, "date": "2026-09-12"},
+      "small_test_authorization": {
+        "authorized_by": "everton",
+        "scope": {"max_sol_per_trade": "0.01", "max_total_sol": "0.05", "max_trades": 3},
+        "expires_at": "2026-09-13",
+        "decision_note": "obsidian/06-DECISIONS/2026-09-12-teste-pequeno-meme-real.md"
+      },
+      "signed_by": "everton", "signed_at": "2026-09-12", "valid_until": "2026-09-13"
+    }
+
+The ``decision_note`` must name a file under ``obsidian/06-DECISIONS/`` — the
+note only the orchestrator writes after the owner decides; the scope becomes a
+ceiling on top of the wallet policy (``hunter_meme_executor.config``).
 """
 
 from __future__ import annotations
@@ -28,6 +51,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
 
@@ -38,6 +62,7 @@ __all__ = [
     "MemeExecutionMode",
     "MemeGates",
     "MemeLiveTradingRefused",
+    "SmallTestAuthorization",
     "load_execution_mode",
     "load_gates",
     "parse_flag",
@@ -64,6 +89,18 @@ def parse_flag(raw: str | None, default: bool = False) -> bool:
 
 
 @dataclass(frozen=True, slots=True)
+class SmallTestAuthorization:
+    """The owner's written authorization of a bounded real test (§12 variant)."""
+
+    authorized_by: str
+    max_sol_per_trade: Decimal
+    max_total_sol: Decimal
+    max_trades: int
+    expires_at: date
+    decision_note: str
+
+
+@dataclass(frozen=True, slots=True)
 class MemeGates:
     engineering_date: date
     engineering_evidence: str
@@ -73,6 +110,8 @@ class MemeGates:
     signed_by: str
     signed_at: date
     valid_until: date
+    small_test: SmallTestAuthorization | None = None
+    """Set when gates A/B were replaced by the written small-test authorization."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,9 +154,10 @@ def load_gates(path: Path, *, today: date) -> MemeGates:
     gate_a = _section(doc, "gate_a_engineering")
     gate_b = _section(doc, "gate_b_evidence")
     gate_c = _section(doc, "gate_c_owner")
-    if gate_a.get("passed") is not True:
+    small_test = _small_test(doc, today=today)
+    if small_test is None and gate_a.get("passed") is not True:
         raise MemeLiveTradingRefused("gate_a_engineering_not_passed")
-    if gate_b.get("passed") is not True:
+    if small_test is None and gate_b.get("passed") is not True:
         raise MemeLiveTradingRefused("gate_b_evidence_not_passed")
     if gate_c.get("enabled") is not True:
         raise MemeLiveTradingRefused("gate_c_owner_not_enabled")
@@ -146,7 +186,72 @@ def load_gates(path: Path, *, today: date) -> MemeGates:
         raise MemeLiveTradingRefused("gates_expired", gates.valid_until.isoformat())
     if not gates.engineering_evidence.strip() or not gates.evidence_evidence.strip():
         raise MemeLiveTradingRefused("gates_without_evidence")
-    return gates
+    if small_test is None:
+        return gates
+    return MemeGates(
+        engineering_date=gates.engineering_date,
+        engineering_evidence=gates.engineering_evidence,
+        evidence_date=gates.evidence_date,
+        evidence_evidence=gates.evidence_evidence,
+        owner_date=gates.owner_date,
+        signed_by=gates.signed_by,
+        signed_at=gates.signed_at,
+        valid_until=gates.valid_until,
+        small_test=small_test,
+    )
+
+
+def _positive_decimal(raw: Any, field: str) -> Decimal:
+    if not isinstance(raw, str):
+        raise MemeLiveTradingRefused("small_test_invalid", f"{field} must be a decimal string")
+    try:
+        value = Decimal(raw)
+    except InvalidOperation as exc:
+        raise MemeLiveTradingRefused("small_test_invalid", f"{field}: {raw!r}") from exc
+    if not value.is_finite() or value <= 0:
+        raise MemeLiveTradingRefused("small_test_invalid", f"{field} must be positive")
+    return value
+
+
+def _small_test(doc: Mapping[str, Any], *, today: date) -> SmallTestAuthorization | None:
+    """The written authorization, validated whole, or ``None`` when absent."""
+    raw: Any = doc.get("small_test_authorization")
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise MemeLiveTradingRefused("small_test_invalid", "must be an object")
+    section = cast(dict[str, Any], raw)
+    by = section.get("authorized_by")
+    if not isinstance(by, str) or not by.strip():
+        raise MemeLiveTradingRefused("small_test_unauthorized", "authorized_by is empty")
+    scope_raw: Any = section.get("scope")
+    if not isinstance(scope_raw, dict):
+        raise MemeLiveTradingRefused("small_test_invalid", "scope must be an object")
+    scope = cast(dict[str, Any], scope_raw)
+    trades: Any = scope.get("max_trades")
+    if not isinstance(trades, int) or isinstance(trades, bool) or trades <= 0:
+        raise MemeLiveTradingRefused(
+            "small_test_invalid", "scope.max_trades must be a positive int"
+        )
+    note = section.get("decision_note")
+    if not isinstance(note, str) or not note.startswith("obsidian/06-DECISIONS/"):
+        raise MemeLiveTradingRefused(
+            "small_test_without_decision_note",
+            "decision_note must be under obsidian/06-DECISIONS/",
+        )
+    expires = _date(section.get("expires_at"), "small_test_authorization.expires_at")
+    if expires < today:
+        raise MemeLiveTradingRefused("small_test_expired", expires.isoformat())
+    return SmallTestAuthorization(
+        authorized_by=by.strip(),
+        max_sol_per_trade=_positive_decimal(
+            scope.get("max_sol_per_trade"), "scope.max_sol_per_trade"
+        ),
+        max_total_sol=_positive_decimal(scope.get("max_total_sol"), "scope.max_total_sol"),
+        max_trades=trades,
+        expires_at=expires,
+        decision_note=note,
+    )
 
 
 def load_execution_mode(env: Mapping[str, str], *, today: date) -> MemeExecutionMode:

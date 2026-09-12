@@ -19,6 +19,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from hunter_api.schemas.lab_common import DecimalStr
+from hunter_api.schemas.meme_wallets import RealObservedOut
 
 __all__ = [
     "MEME_LAB_LABEL",
@@ -175,3 +176,7 @@ class MemeLabOut(BaseModel):
     rule_sets: list[RuleSetBoardOut]
     goal: GoalOut
     sources: SourcesOut
+    real_observed: RealObservedOut | None = None
+    """T4.12: the observed wallets' **real** fills and positions, labelled
+    "REAL — observado na cadeia, não executado por este sistema"; ``None``
+    only when the router did not read them."""

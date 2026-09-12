@@ -115,6 +115,13 @@ class ApiSettings(Settings):
     authorized it; without this, removing someone from an organization leaves
     their open socket receiving that organization's data."""
 
+    enable_meme_live_trading: bool = False
+    """T4.14 — the API's copy of ``ENABLE_MEME_LIVE_TRADING`` (``docs/RISK_ENGINE_MEME.md``
+    §3.4), read for **one** purpose: whether the desk may render "Aprovar (REAL)" and
+    file ``meme_proposals.mode = 'live'``. The API never signs and never reads a key;
+    the executor (``services/meme-executor``) has its own copy of the flag and refuses
+    to boot without the gates. Off by default; only Everton sets it, in the VPS ``.env``."""
+
     daily_goal_brl: Decimal = Decimal("9000")
     """The minimum daily profit Everton set for the Lab (2026-09-10, T3.78).
     ``GET /api/v1/orgs/{org_id}/lab/daily-goal`` compares the day's unique R

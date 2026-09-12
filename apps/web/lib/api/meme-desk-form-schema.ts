@@ -72,6 +72,9 @@ export function toApproveBody(values: DeskParamsFormValues): MemeDeskApproveBody
     trailing_pct: values.trailingPct,
     max_hold_s: Number.parseInt(values.maxHoldS, 10),
     note: values.note === "" ? null : values.note,
+    // T4.14: the desk only files PAPER proposals until the live executor exists and
+    // `ENABLE_MEME_LIVE_TRADING` is on; "Aprovar (REAL)" is a separate, double-confirmed path.
+    mode: "paper",
   };
 }
 

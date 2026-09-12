@@ -21,6 +21,9 @@ from hunter_indicators.meme.curve import CurveReserves
 
 __all__ = [
     "LEGS",
+    "MARK_CURVE",
+    "MARK_POOL_TAPE",
+    "MARK_SOURCES",
     "BetExit",
     "Snapshot",
     "SolUsd",
@@ -33,6 +36,13 @@ LEGS: tuple[str, ...] = ("probe", "scale", "single")
 """``meme_paper_bets.leg`` (``0026``, T4.10): the brief's "semi-comprado (sonda)"
 (``probe``), "escalado (perna 2)" (``scale``, which names its ``parent_bet_id``)
 and the one-leg bet every other rule set opens (``single``)."""
+
+MARK_CURVE = "curve"
+MARK_POOL_TAPE = "pool_tape"
+MARK_SOURCES: tuple[str, ...] = (MARK_CURVE, MARK_POOL_TAPE)
+"""``meme_paper_bets.mark_source`` (``0029``, T4.11): what priced the last mark
+— the curve's snapshot, or the PumpSwap pool's tape after the migration (the
+desk's "marcada pela pool (fita)")."""
 
 
 def money_str(value: Decimal) -> str:

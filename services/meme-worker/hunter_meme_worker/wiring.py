@@ -221,7 +221,10 @@ async def heartbeat_once(ctx: RadarContext, write: HeartbeatWriter) -> None:
         ctx.sources.ws_malformed_60s,
     )
     ctx.sources["pumpportal_ws"].connected = ctx.events.state.ws_state == "connected"
+    fields = ctx.sources.heartbeat_fields(now, tracked=len(ctx.tracker))
+    if ctx.wallets is not None:  # T4.12: the observed wallets' own counters
+        fields.update(ctx.wallets.heartbeat_fields(now))
     try:
-        await write(ctx.sources.heartbeat_fields(now, tracked=len(ctx.tracker)))
+        await write(fields)
     except Exception:  # a heartbeat that cannot be written must not stop the radar
         logger.warning("meme_radar_heartbeat_write_failed")

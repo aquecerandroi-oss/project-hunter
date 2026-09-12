@@ -10,10 +10,10 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from hunter_meme_worker.boards import BoardCollector, minute_end_of
-from hunter_meme_worker.tracker import MintTracker
 
 from hunter_exchanges.pumpfun.trenches_state import BoardEvent, BoardState
+from hunter_meme_worker.boards import BoardCollector, minute_end_of
+from hunter_meme_worker.tracker import MintTracker
 
 pytestmark = pytest.mark.unit
 
