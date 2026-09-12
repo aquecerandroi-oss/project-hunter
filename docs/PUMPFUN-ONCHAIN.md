@@ -754,6 +754,11 @@ chaves fora do escopo desta pesquisa).
 
 ## 6b. O que o construtor de instruções faz hoje (T4.8, 2026-09-12)
 
+> **Superado em parte pela §6c (T4.8b, tarde de 12/09/2026):** a "conta não documentada"
+> `4CLQ…` do item 1 abaixo **é** a PDA `["bonding-curve-v2", mint]` da moeda da fixture; o
+> `user_volume_accumulator` do `sell` é exigência de moeda *cashback*, não do programa em
+> geral; e o `TradeEvent` ganhou dois campos. O resto desta seção continua válido.
+
 `packages/exchange-adapters/hunter_exchanges/pumpfun/tx.py` monta `buy` (disc `66063d1201daebea`)
 e `sell` (disc `33e685a4017f83ad`) — as instruções legadas só-SOL, que são as que o próprio site
 usa hoje (o `swap-build` do site devolve uma transação v0 que roteia por `6Vo3245…` e faz CPI
@@ -795,6 +800,103 @@ Cotação local em `quote.py`; contra o `swap-build` do site (0,01 SOL exact-in)
 `simulation_proof_mainnet_raw.json`. O programa e o `Global` existem na **devnet** (atividade às
 08:01 UTC de 2026-09-12), mas o faucet público recusou o airdrop (`-32603`), por isso não houve envio
 em rede nenhuma nesta tarefa.
+
+## 6c. Upgrade de 12/09/2026 — o que mudou e o que não mudou (T4.8b)
+
+Captura só-leitura no RPC público, 17:52–18:30 UTC (14:52–15:30 BRT), fixtures `t48b_*` em
+`packages/exchange-adapters/tests/fixtures/pumpfun/`; comandos e saídas em `.claude/state/notes-T4.8b.md`.
+Nenhum `sendTransaction`.
+
+**Quando.** A conta `ProgramData` do `6EF8…` (`B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu`, PDA
+`[programa]` sob `BPFLoaderUpgradeab1e…`; cabeçalho `u32 tag=3 | u64 slot | Option<Pubkey>`) diz
+`last_deploy_slot = 446462760`, cujo `getBlockTime` é **15:24:04 UTC (12:24:04 BRT)** — entre as
+fixtures da T4.8 (07:34–08:04 UTC) e a sondagem da T4.14 (17:09 UTC). `t48b_rpc_programdata_raw.json`,
+`t48b_rpc_deploy_block_time_raw.json`.
+
+**A conta da IDL on-chain não foi atualizada.** `AYgC53tU5BbP2NAnv5nConJxAdpQZctvmZK88pu69xRs`
+(`create_with_seed(find_program_address([], 6EF8)[0], "anchor:idl", 6EF8)`; layout Anchor:
+discriminador fixo `184662bf3a907b9e`, autoridade, `u32`, zlib) descomprime para a **mesma** IDL da
+manhã — 40 instruções, `TradeEvent` de 32 campos, sha256 canônico `fd48d9891733c30d…` idêntico ao de
+`idl_pump_onchain_raw.json` (`t48b_idl_pump_onchain_raw.json`, `t48b_rpc_idl_account_raw.json`). Quem
+descreve o programa novo é a IDL `main` do GitHub baixada pela T4.14 (47 instruções, 34 campos, erros
+6072–6080). Consequência: **o hash da IDL não detecta este upgrade; o slot do `ProgramData` detecta** —
+`hunter_exchanges.pumpfun.program_identity` compara os dois com `EXPECTED_PUMP_PROGRAM`.
+
+**As contas de `buy`/`sell` não mudaram — a T4.8 é que tinha uma constante no lugar de uma derivação.**
+A "conta não documentada" `4CLQeN5wrddJ9adY3GJGSTyu1AEKD4Ta14RffSy5aHud` é
+`find_program_address(["bonding-curve-v2", mint], 6EF8)` **da moeda da fixture** `5ejA…pump`
+(`tx.bonding_curve_v2_address`). Certa para aquela moeda, errada para todas as outras — o 6074
+(`InvalidBondingCurveV2`) que a T4.14 viu na `4VuV…` era a PDA de outra moeda no slot, que o programa
+novo passou a **validar** (o erro não existe na IDL on-chain da manhã; existe na `main`). Provas: (i)
+três `sell` reais da tarde — `5GfQvGkU…` (17:52:42 UTC, `t48b_rpc_tx_sell_raw.json`), `DkPsuLbm…` e
+`3g3fsXEb…` (17:53 UTC, na lista `t48b_rpc_signatures_bcv2_raw.json`) — 16 contas = 14 da IDL +
+`[bonding_curve_v2 (só leitura), Global.buyback_fee_recipients[i] (gravável)]`, paridade byte a byte com
+o primeiro; (ii) o `buy` do roteador e o `sell` do bot **da manhã** (`rpc_tx_buy_raw`, `rpc_tx_probe_raw`)
+continuam reproduzidos byte a byte com a derivação; (iii) a simulação abaixo. A conta não existe na
+cadeia para nenhuma das moedas negociadas (`t48b_rpc_bonding_curve_v2_raw.json`: `value: null`).
+
+**`user_volume_accumulator` no `sell` é exigência de moeda *cashback*, não do upgrade.** O `sell` da
+manhã (moeda `5ejA…`, `BondingCurve.is_cashback_coin = true`) leva
+`[user_volume_accumulator (w), bonding_curve_v2 (r), buyback (w)]` — 17 contas; os três `sell` da tarde
+(moedas Mayhem, não-cashback) levam só o par — 16. Os erros 6072 `MissingCashbackAccounts` e 6073
+`InvalidCashbackAccumulator` da IDL `main` nomeiam a regra. `TradeIntent.is_cashback_coin` (lido da conta
+`BondingCurve`, nunca suposto) decide; o `buy` já declara a conta na IDL (índice 13).
+
+**`TradeEvent` ganhou 16 bytes:** `holder_rewards_bps: u64`, `holder_rewards: u64` no fim (375 bytes
+contra 359). `trade_event.py` os tem como **campos** (`layout = "2026-09-12/holder_rewards"`); o layout
+antigo decodifica com `0/0` e `layout = "pre-2026-09-12"`; qualquer outro comprimento é recusado. Nos
+quatro fills reais de hoje (três `sell`, uma compra v2 do roteador) o par leu **0**; se um valor
+não-zero é fatia da `fee` (como `buyback_fee`) ou dedução extra **não está estabelecido** — o livro do
+executor usa o delta real do pagador e nomeia a diferença (`FillRecord.unexplained_lamports`).
+
+**`Global` cresceu 33 bytes** (1054 → 1087; cauda `f6e363f6…958f01`, não interpretada): os 25 campos
+decodificados são idênticos aos da manhã (`t48b_rpc_global_account_raw.json`).
+
+**Taxas: iguais, ao lamport.** `quote_sell` reproduz o `sell` real (`sol_amount` 1 237 388 211;
+`fee` 11 755 189 = ⌈95 bps⌉; `creator_fee` 3 712 165 = ⌈30 bps⌉; líquido 1 221 920 857); na compra
+`buy_exact_quote_in_v2` do roteador (`t48b_rpc_tx_buy_router_v2_raw.json`) `fee` e `creator_fee` por
+componente batem (183 957 / 58 092) e `sol_amount` difere 1 lamport (inverso do *exact-in*).
+`quote.py` inalterado. Delta do vendedor = líquido − taxa de rede (281 762) − 1 % do bot (12 219 208) −
+tip do bot (1 723 238) = 1 207 696 649 ✓ — custos do programa **do bot**, não da pump.fun.
+**Correção no executor:** `Global.creator_fee_basis_points` lê **5** bps (manhã e tarde) e o executor
+(T4.14, `build.py.fee_bps`) cotava com ele, enquanto o programa cobra **30** em todos os fills gravados
+— o teto do orçamento era furado em 0,25 % e a folga de `max_sol_cost` era 0,75 % em vez de 1 %.
+`fee_bps` passa a usar o tier provado (95/30) como **piso**, mantendo um valor on-chain maior.
+
+**O site mudou de instrução.** O roteador `6Vo3245…` compra por **`buy_exact_quote_in_v2`**
+(`c2ab1c46684d5b2f`, 27 contas, `spendable_quote_in`/`min_tokens_out`, **sem** contas restantes); as
+compras de bot amostradas também. Nenhum `buy` legado apareceu nas janelas amostradas (~30
+`getTransaction`), logo a paridade do `buy` é com o que o cluster **executou** da nossa própria
+instrução na simulação. `buy`/`sell` legados foram mantidos de propósito (SOL-only, *exact-out*).
+
+**Moedas cotadas em USDC existem e o `sell` legado as recusa:** `DU66qiF4…pump`
+(`BondingCurve.quote_mint = EPjFWdd5…`, USDC) respondeu `UnsupportedQuoteMint` (6063) na simulação.
+`build.py` recusa qualquer curva com `quote_mint ≠ SOL` por nome (`unsupported_quote`) antes de cotar.
+
+**Simulação mainnet (`sigVerify=false`, nunca enviada; `t48b_simulation_proof_mainnet_raw.json`,
+18:18–18:37 UTC).**
+Caminho do executor — `ChainReader → build_buy → verificador §9.1 → simulateTransaction` —, chave
+descartável gerada em memória como *signer*, pagador real sem assinatura: `buy` na Mayhem `2nG3hY…`
+**ok, 84 366 CU** (com criação de ATA), `Instruction: Buy` nos logs; `MemeSubmitter` recusa antes de
+assinar (`failed:meme_live_disabled`, `signatures=[]`); PDA de outra moeda no slot → **6074**; sem o
+par, ou só com o buyback → 6062; `max_sol_cost − 1` → 6002 (a cotação bate o limiar exato); a carteira
+vazia em memória como pagador → `AccountNotFound` (a simulação é real, não um `ok` de fachada); `buy` na
+moeda cashback da manhã, com `4CLQ…` = sua própria PDA → **ok, 67 793 CU**. `sell` pelo mesmo caminho
+(`build_sell` → verificador → simulação), pagador = o criador de `33ngPy4D…pump` (detém 34,27 T
+subunidades; sem assinatura), 16 contas → **ok, 65 035 CU**, `Instruction: Sell`. Os detentores das
+moedas gravadas já tinham vendido e fechado a ATA minutos depois (snipers), e `getTokenLargestAccounts`
+é limitado no RPC público — por isso o `sell` foi provado numa moeda recém-comprada pelo roteador. O
+`sell` de moeda **cashback** com o acumulador (17 contas) só tem a paridade byte a byte com o `sell`
+real da manhã (pré-upgrade); nenhum detentor de moeda cashback estava disponível para simular.
+
+**Detecção de upgrade.** `program_identity.py` (`EXPECTED_PUMP_PROGRAM`: sha256 canônico da IDL +
+`last_deploy_slot`; `read_program_identity` = 2 `getAccountInfo`, o `ProgramData` só com `dataSlice` de
+45 bytes) e `test_pumpfun_program_identity.py` (falha com "programa mudou: regravar T4.8b" se a fixture
+recapturada divergir). No executor, `program_check.py`: no boot, live ⇒ `MemeLiveTradingRefused(
+"program_upgraded")` (ou `program_identity_unreadable`, fechado), inerte ⇒ erro no log e no heartbeat;
+a cada tique do kill switch relê o slot e, se mudou, toda entrada é recusada `program_upgraded`
+(as saídas continuam guardadas pela simulação §9.2). Heartbeat: `program_idl_hash`,
+`program_last_deploy_slot`, `program_divergence`.
 
 ## 7. Resumo acionável para T4.1/Astra
 

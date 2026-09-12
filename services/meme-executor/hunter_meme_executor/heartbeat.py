@@ -92,6 +92,11 @@ async def heartbeat_fields(ctx: ExecutorContext) -> dict[str, str]:
         "exits_confirmed": str(state.exits_confirmed),
         "rpc_errors": str(state.rpc_errors),
         "auto_close_on_emergency": str(cfg.auto_close_on_emergency).lower(),
+        "program_idl_hash": state.program_idl_hash or "",
+        "program_last_deploy_slot": ""
+        if state.program_last_deploy_slot is None
+        else str(state.program_last_deploy_slot),
+        "program_divergence": state.program_divergence or "",
         "last_entries_tick_at": ""
         if state.last_entries_tick_at is None
         else state.last_entries_tick_at.isoformat(),

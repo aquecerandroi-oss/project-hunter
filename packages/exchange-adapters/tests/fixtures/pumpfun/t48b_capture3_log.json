@@ -1,0 +1,35 @@
+{
+ "started_at": "2026-09-12T17:56:23.451111+00:00",
+ "buy_router_v2": {
+  "signature": "4oKYfnbaQ4VhhPmDMea9KLDyuRnTAWSbJH5dvcqysJQzqmrMSay6fiUiBQpurXgT8wHWN9VJGtys43t7CCVwgmRv",
+  "slot": 446491398,
+  "blockTime": 1789235719
+ },
+ "calls": [
+  {
+   "n": 1,
+   "method": "getTransaction",
+   "label": "tx_router_buy_v2",
+   "at": "2026-09-12T17:56:23.451111+00:00"
+  },
+  {
+   "n": 2,
+   "method": "getTransaction",
+   "label": "tx_direct_buy",
+   "at": "2026-09-12T17:56:25.169979+00:00"
+  },
+  {
+   "n": 3,
+   "method": "getTransaction",
+   "label": "tx_direct_buy",
+   "at": "2026-09-12T17:56:26.530215+00:00"
+  },
+  {
+   "n": 4,
+   "method": "getTransaction",
+   "label": "tx_direct_buy",
+   "at": "2026-09-12T17:56:27.910875+00:00"
+  }
+ ],
+ "finished_at": "2026-09-12T17:56:28.097516+00:00"
+}

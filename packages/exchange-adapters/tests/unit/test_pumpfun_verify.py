@@ -27,6 +27,7 @@ from hunter_exchanges.pumpfun.solana_codec import (
 from hunter_exchanges.pumpfun.trade_event import trade_events_from_transaction
 from hunter_exchanges.pumpfun.tx import (
     TradeIntent,
+    bonding_curve_v2_address,
     build_buy_instruction,
     build_trade_message,
     create_ata_idempotent,
@@ -95,6 +96,10 @@ def _refused(message: Message, intent: TradeIntent, global_account: GlobalAccoun
     with pytest.raises(UnverifiedTransaction) as excinfo:
         _verify(message, intent, global_account)
     return excinfo.value.reason
+
+
+def _unchanged(ix: Instruction) -> Instruction:
+    return ix
 
 
 def _with_trade(
@@ -181,7 +186,7 @@ def test_extra_transfer_to_unknown_destination_is_refused(
         ),
         b"\x02\x00\x00\x00" + u64_le(1_000_000),
     )
-    message = _with_trade(_message(intent, global_account), lambda ix: ix, intent, [drain])
+    message = _with_trade(_message(intent, global_account), _unchanged, intent, [drain])
     assert _refused(message, intent, global_account) == "transfer_destination_not_tip_account"
 
 
@@ -195,9 +200,9 @@ def test_jito_tip_within_cap_ok_above_cap_refused(
             b"\x02\x00\x00\x00" + u64_le(lamports),
         )
 
-    ok = _with_trade(_message(intent, global_account), lambda ix: ix, intent, [tip(50_000)])
+    ok = _with_trade(_message(intent, global_account), _unchanged, intent, [tip(50_000)])
     assert _verify(ok, intent, global_account).jito_tip_lamports == 50_000
-    over = _with_trade(_message(intent, global_account), lambda ix: ix, intent, [tip(100_001)])
+    over = _with_trade(_message(intent, global_account), _unchanged, intent, [tip(100_001)])
     assert _refused(over, intent, global_account) == "jito_tip_above_cap"
 
 
@@ -207,7 +212,7 @@ def test_foreign_program_is_refused(intent: TradeIntent, global_account: GlobalA
         (AccountMeta(intent.user, True, True),),
         b"\x01",
     )
-    message = _with_trade(_message(intent, global_account), lambda ix: ix, intent, [foreign])
+    message = _with_trade(_message(intent, global_account), _unchanged, intent, [foreign])
     assert _refused(message, intent, global_account) == "program_not_allowed"
 
 
@@ -312,6 +317,40 @@ def test_site_v0_transaction_is_refused_not_parsed(
     with pytest.raises(UnverifiedTransaction) as excinfo:
         verify_trade_message(message, intent, global_account, CAPS)
     assert excinfo.value.reason == "undecodable_message"
+
+
+def test_the_old_placeholder_in_the_bonding_curve_v2_slot_is_refused_by_name(
+    intent: TradeIntent, global_account: GlobalAccount
+) -> None:
+    """T4.8b: the verifier rebuilds with the ``bonding_curve_v2`` PDA derived from the
+    intent's mint; a message carrying another coin's PDA in that slot (T4.8's constant
+    on any other mint — the 6074 of T4.14) is refused and the refusal names the slot."""
+    other_coins_pda = bonding_curve_v2_address("2nG3hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump")
+
+    def wrong_pda(ix: Instruction) -> Instruction:
+        accounts = list(ix.accounts)
+        accounts[16] = AccountMeta(other_coins_pda, False, False)
+        return replace(ix, accounts=tuple(accounts))
+
+    with pytest.raises(UnverifiedTransaction) as excinfo:
+        _verify(
+            _with_trade(_message(intent, global_account), wrong_pda, intent),
+            intent,
+            global_account,
+        )
+    assert excinfo.value.reason == "trade_instruction_differs_from_intent"
+    assert "account[16] bonding_curve_v2" in str(excinfo.value)
+
+    def drop_remaining(ix: Instruction) -> Instruction:
+        return replace(ix, accounts=ix.accounts[:16])
+
+    with pytest.raises(UnverifiedTransaction) as excinfo:
+        _verify(
+            _with_trade(_message(intent, global_account), drop_remaining, intent),
+            intent,
+            global_account,
+        )
+    assert "account_count 16 != 18" in str(excinfo.value)
 
 
 def test_sell_intent_against_buy_message_is_refused(

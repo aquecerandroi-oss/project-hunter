@@ -1,0 +1,26 @@
+{
+ "started_at": "2026-09-12T17:59:03.803092+00:00",
+ "mint": "2nG3hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump",
+ "bcv2": "DzUQdbNZopLGQkqmHouw6f8aRee1rvpSUEeX7PstHeHR",
+ "calls": [
+  {
+   "n": 1,
+   "method": "getSignaturesForAddress",
+   "label": "signatures_bcv2",
+   "at": "2026-09-12T17:59:03.803092+00:00"
+  },
+  {
+   "n": 2,
+   "method": "getTransaction",
+   "label": "tx_bcv2",
+   "at": "2026-09-12T17:59:05.879801+00:00"
+  },
+  {
+   "n": 3,
+   "method": "getTransaction",
+   "label": "tx_bcv2",
+   "at": "2026-09-12T17:59:07.240843+00:00"
+  }
+ ],
+ "finished_at": "2026-09-12T17:59:07.412067+00:00"
+}

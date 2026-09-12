@@ -13,3 +13,12 @@ Inerte por construção: com `ENABLE_MEME_LIVE_TRADING=false` o processo sobe, s
 `/health`/`/ready`/`/metrics`, escreve `hb:meme:executor` e **não assina nada** (o submitter
 levanta `MemeLiveTradingDisabled` antes da chave). Com a flag ligada e qualquer coisa faltando
 (portões, política, chave) o boot é **recusado por nome** (`MemeLiveTradingRefused`).
+
+Identidade do programa (T4.8b, `program_check.py`): no boot o executor lê a IDL on-chain e o slot do
+último deploy do programa da pump.fun e compara com o que as fixtures do construtor foram provadas
+contra (`hunter_exchanges.pumpfun.program_identity.EXPECTED_PUMP_PROGRAM`). Divergência ⇒ live recusa
+subir (`program_upgraded`; leitura impossível ⇒ `program_identity_unreadable`), inerte loga e expõe no
+heartbeat (`program_idl_hash`, `program_last_deploy_slot`, `program_divergence`). A cada tique do kill
+switch o slot é relido (45 bytes); se mudou, toda entrada é recusada `program_upgraded` até a T4.8b ser
+refeita (`docs/PUMPFUN-ONCHAIN.md` §6c). Curvas com quote ≠ SOL são recusadas em `build.py`
+(`unsupported_quote`).

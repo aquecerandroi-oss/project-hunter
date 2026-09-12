@@ -457,6 +457,17 @@ assume:
 > antes de tudo; §9.6 → `trade_event.py` (fill = `TradeEvent` decodificado; taxas do evento).
 > VM1–VM3/VM7 continuam pendentes do pacote de risco da §13 (`infra/scripts/meme_vm.py` diz isso
 > em vez de fingir verde).
+>
+> **T4.8b (tarde de 12/09/2026, `docs/PUMPFUN-ONCHAIN.md` §6c):** o programa da pump.fun foi
+> atualizado às 15:24:04 UTC (slot 446462760). A "conta não documentada" da T4.8 era a PDA
+> `["bonding-curve-v2", mint]` da moeda da fixture — agora derivada por mint (`tx.py`), com paridade
+> byte a byte com o `sell` real da tarde (`t48b_rpc_tx_sell_raw.json`) e com os dois trades da manhã, e
+> `buy`/`sell` simulados na mainnet pelo caminho do executor (`t48b_simulation_proof_mainnet_raw.json`,
+> nunca enviados). `TradeEvent` tem `holder_rewards` como campo; `build.py` recusa curvas com quote ≠ SOL
+> (`unsupported_quote`). Regra nova de §9.2: **identidade do programa** — `program_identity.py`
+> (sha256 da IDL on-chain + slot do último deploy, capturados junto com as fixtures) e, no executor,
+> `program_check.py`: divergência no boot ⇒ `program_upgraded` (live: o processo não sobe; nada
+> assinado), em tempo de execução ⇒ toda entrada recusada por esse nome até T4.8b ser refeita.
 
 ### 9.1 As duas opções, com o custo e o que sai da nossa caixa
 

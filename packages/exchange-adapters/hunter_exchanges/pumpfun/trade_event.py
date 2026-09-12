@@ -9,11 +9,24 @@ module decodes the body field by field in the exact order of the official IDL
 mainnet sell, ``tests/fixtures/pumpfun/rpc_tx_probe_raw.json``: 359 bytes
 consumed of 359).
 
+**Layout of 2026-09-12 (T4.8b).** The program deployed that afternoon (slot
+446462760) appends two ``u64`` — ``holder_rewards_bps``, ``holder_rewards`` — after
+``real_quote_reserves`` (375 bytes; real sell ``t48b_rpc_tx_sell_raw.json``, real
+router buy ``t48b_rpc_tx_buy_router_v2_raw.json``). They are fields of
+:class:`TradeEvent`; an event of the older 359-byte layout decodes with both at
+``0`` and ``layout`` naming it, so the pre-upgrade fixtures stay readable. Any
+other trailing length is refused: an unknown layout is not a fill.
+
 What a fill costs comes **from the event**, never from a constant:
 ``fee`` (protocol, ``fee_basis_points``), ``creator_fee`` and — for cashback
 coins — ``cashback``, which the T4.8 balance reconciliation proved is also
 deducted from the trader's SOL (``user`` delta = ``sol_amount − fee − cashback
 − network fee − tip``, lamport-exact) even though ``creator_fee`` reads 0.
+``holder_rewards`` read ``0`` on every fill of 2026-09-12 (three sells, one buy);
+whether a non-zero value is a split of ``fee`` (as ``buyback_fee`` is) or one more
+deduction is **not** established, so it is reported and not summed — the
+executor's ledger uses the payer's real balance delta (``docs/RISK_ENGINE_MEME.md``
+§9.6) and names the gap to the event arithmetic.
 """
 
 from __future__ import annotations
@@ -28,6 +41,8 @@ from hunter_exchanges.pumpfun.solana_codec import b58decode, b58encode
 
 __all__ = [
     "EVENT_CPI_TAG",
+    "LAYOUT_HOLDER_REWARDS",
+    "LAYOUT_PRE_HOLDER_REWARDS",
     "TRADE_EVENT_DISCRIMINATOR",
     "TradeEvent",
     "decode_trade_event",
@@ -37,6 +52,11 @@ __all__ = [
 EVENT_CPI_TAG = bytes.fromhex("e445a52e51cb9a1d")
 TRADE_EVENT_DISCRIMINATOR = bytes.fromhex("bddb7fd34ee661ee")
 _LOG_PREFIX = "Program data: "
+LAYOUT_HOLDER_REWARDS = "2026-09-12/holder_rewards"
+"""34 fields, 375 bytes: the program deployed on 2026-09-12 (slot 446462760)."""
+LAYOUT_PRE_HOLDER_REWARDS = "pre-2026-09-12"
+"""32 fields, 359 bytes: the T4.8 fixtures (morning of 2026-09-12)."""
+_HOLDER_REWARDS_TAIL = 16
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,12 +93,13 @@ class TradeEvent:
     quote_amount: int
     virtual_quote_reserves: int
     real_quote_reserves: int
-    holder_rewards_basis_points: int | None = None
-    """Appended by the program upgrade seen on mainnet 2026-09-12 (IDL ``main`` of that
-    day: ``holder_rewards_bps``, ``holder_rewards`` — 16 trailing bytes). ``None`` on
-    an event of the older layout (the recorded fixtures). Not part of the buyer's
-    cost arithmetic here: the wallet's real balance delta is the ledger's truth."""
-    holder_rewards: int | None = None
+    holder_rewards_basis_points: int
+    """Appended by the program deployed on 2026-09-12 (``holder_rewards_bps``,
+    ``holder_rewards``: two ``u64``). ``0`` on every fill recorded that day and on
+    an event of the older layout (``layout`` says which). Not summed into the
+    trader's cost here: the wallet's real balance delta is the ledger's truth."""
+    holder_rewards: int
+    layout: str = LAYOUT_HOLDER_REWARDS
 
     @property
     def sol_deducted_from_user(self) -> int:
@@ -161,13 +182,14 @@ def decode_trade_event(raw: bytes) -> TradeEvent:
     shareholders = tuple((r.pubkey(), r.u16()) for _ in range(r.u32()))
     quote_mint = r.pubkey()
     quote_amount, vquote, rquote = r.u64(), r.u64(), r.u64()
-    holder_rewards_bps: int | None = None
-    holder_rewards: int | None = None
-    if len(raw) - r.off == 16:
-        # Anchor appends new fields at the end; the 2026-09-12 layout adds exactly two u64.
-        holder_rewards_bps, holder_rewards = r.u64(), r.u64()
-    if r.off != len(raw):
-        raise ValueError(f"TradeEvent has {len(raw) - r.off} trailing bytes")
+    trailing = len(raw) - r.off
+    if trailing == _HOLDER_REWARDS_TAIL:
+        holder_rewards_bps, holder_rewards, layout = r.u64(), r.u64(), LAYOUT_HOLDER_REWARDS
+    elif trailing == 0:
+        # The layout the program emitted before its 2026-09-12 upgrade (T4.8 fixtures).
+        holder_rewards_bps, holder_rewards, layout = 0, 0, LAYOUT_PRE_HOLDER_REWARDS
+    else:
+        raise ValueError(f"TradeEvent has {trailing} trailing bytes")
     return TradeEvent(
         mint=mint,
         sol_amount=sol_amount,
@@ -203,6 +225,7 @@ def decode_trade_event(raw: bytes) -> TradeEvent:
         real_quote_reserves=rquote,
         holder_rewards_basis_points=holder_rewards_bps,
         holder_rewards=holder_rewards,
+        layout=layout,
     )
 
 

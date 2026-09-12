@@ -8,10 +8,10 @@ Usage:
 Exit codes: 0 all PASS; 2 no FAIL but at least one PENDING; 1 any FAIL.
 
 T4.8: the execution path (signer, verifier, submitter, quote) runs for real over the
-recorded mainnet fixtures with in-memory fakes. T4.14: VM1/VM2/VM3/VM7 run over the
+recorded mainnet fixtures with in-memory fakes — T4.8b: the post-upgrade ones
+(``t48b_*``, program of 2026-09-12 15:24 UTC). T4.14: VM1/VM2/VM3/VM7 run over the
 engine (``meme_vm_engine.py``); VM6(c) and the Postgres halves of VM8/VM9 stay PENDING
 by name (paper simulator / ``services/meme-executor/tests/test_live_persistence.py``).
-Test keys: seeded RNG, in memory only.
 """
 
 from __future__ import annotations
@@ -135,10 +135,10 @@ def _scenario() -> Scenario:
     env = {ENV_SECRET_KEY: b58encode(seed + pub)}
     signer = MemeSigner.from_environment(env)
     assert ENV_SECRET_KEY not in env
-    g = _fixture("rpc_global_account_raw.json")["result"]["value"]
+    g = _fixture("t48b_rpc_global_account_raw.json")["result"]["value"]
     global_account = decode_global_account(g["data"][0], owner=g["owner"])
     (event,) = trade_events_from_transaction(
-        _fixture("rpc_tx_buy_raw.json")["result"], program_id=PUMP_PROGRAM_ID
+        _fixture("t48b_rpc_tx_sell_raw.json")["result"], program_id=PUMP_PROGRAM_ID
     )
     intent = TradeIntent(
         "buy",
@@ -148,7 +148,7 @@ def _scenario() -> Scenario:
         TOKEN_2022,
         event.token_amount,
         990000001,
-        global_account.fee_recipient,
+        global_account.fee_recipients_for(is_mayhem_mode=event.mayhem_mode)[0],
         global_account.buyback_fee_recipients[0],
         event.mayhem_mode,
     )
@@ -164,7 +164,7 @@ def _scenario() -> Scenario:
 
 
 def _submitter(rpc: FakeRpc, sc: Scenario, journal: InMemoryOrderJournal) -> MemeSubmitter:
-    rpc.transaction = rpc.transaction or _fixture("rpc_tx_buy_raw.json")["result"]
+    rpc.transaction = rpc.transaction or _fixture("t48b_rpc_tx_sell_raw.json")["result"]
     policy = SubmitPolicy(True, "devnet", confirm_timeout_s=3.0, poll_interval_s=0.0)
     return MemeSubmitter(
         rpc=rpc,
@@ -227,9 +227,9 @@ def vm5_rpc_failure_midsend() -> Outcome:
 
 
 def vm6_partial_or_no_fill() -> Outcome:
-    proof = _fixture("simulation_proof_mainnet_raw.json")["simulations"]
+    proof = _fixture("t48b_simulation_proof_mainnet_raw.json")["simulations"]
     short = proof["buy_max_sol_cost_one_lamport_short"]
-    a = short["ok"] is False and short["err"] == {"InstructionError": [2, {"Custom": 6002}]}
+    a = short["ok"] is False and short["err"]["InstructionError"][1] == {"Custom": 6002}
     (event,) = trade_events_from_transaction(
         _fixture("rpc_tx_buy_raw.json")["result"], program_id=PUMP_PROGRAM_ID
     )

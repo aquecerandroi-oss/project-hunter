@@ -1,0 +1,20 @@
+{
+ "address": "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu",
+ "result": {
+  "context": {
+   "apiVersion": "4.3.0-rc.0",
+   "slot": 446490890
+  },
+  "value": {
+   "data": [
+    "AwAAACh7nBoAAAAAAWNI+4ICMfurc9wwg+Hz8Un/EltxiCDzLrGhW/781hsJ",
+    "base64"
+   ],
+   "executable": false,
+   "lamports": 53268311040,
+   "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+   "rentEpoch": 18446744073709551615,
+   "space": 10485760
+  }
+ }
+}

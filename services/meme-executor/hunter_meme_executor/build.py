@@ -1,12 +1,11 @@
 """From an approved decision to the bytes the submitter signs — and from a landed
 transaction to the fill the ledger records.
 
-Everything here composes T4.8's pure pieces (``quote``, ``tx``, ``verify``,
-``trade_event``) with the executor's config. The one policy decision this
-module makes is *which* fee recipients a coin pays (``Global``'s normal or
-reserved list, by ``is_mayhem_mode``) — the doctrine refuses Mayhem coins at
-admission, so the reserved branch is here for the verifier's completeness, not
-as a path a buy takes.
+Composes T4.8's pure pieces (``quote``, ``tx``, ``verify``, ``trade_event``) with the
+executor's config. Policy here: *which* fee recipients a coin pays (``Global``'s normal
+or reserved list, by ``is_mayhem_mode``; admission refuses Mayhem coins anyway) and a
+named refusal of any curve whose quote is not SOL (T4.8b: USDC-quoted coins exist and
+the legacy ``buy``/``sell`` answer them with ``UnsupportedQuoteMint`` 6063).
 """
 
 from __future__ import annotations
@@ -16,9 +15,10 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, cast
 
-from hunter_exchanges.pumpfun.decode import PUMP_PROGRAM_ID
+from hunter_exchanges.pumpfun.decode import NATIVE_SOL_QUOTE_MINT, PUMP_PROGRAM_ID
 from hunter_exchanges.pumpfun.global_state import GlobalAccount
 from hunter_exchanges.pumpfun.quote import (
+    BONDING_CURVE_FEE_TIER_2026_05_20,
     BuyQuote,
     CurveReserves,
     FeeBps,
@@ -53,11 +53,9 @@ LAMPORTS_PER_SOL = 1_000_000_000
 
 @dataclass(frozen=True, slots=True)
 class FillRecord:
-    """The fill as the chain reported it (§9.6): the ``TradeEvent``, the network fee
-    ``meta.fee`` and — the ledger's truth — the fee payer's real balance delta
-    (``meta.preBalances[0] − meta.postBalances[0]``), which carries everything the
-    wallet actually lost or gained: curve, every fee tier the program has today
-    (including ones this code does not name), network fee, ATA rent."""
+    """The fill as the chain reported it (§9.6): the ``TradeEvent``, ``meta.fee`` and — the
+    ledger's truth — the payer's real balance delta (``pre − post`` of index 0), which carries
+    everything the wallet lost or gained: curve, every fee the program has, rent, tips."""
 
     event: TradeEvent
     signature: str
@@ -65,13 +63,11 @@ class FillRecord:
     block_time: datetime | None
     network_fee_lamports: int
     payer_delta_lamports: int | None = None
-    """``post − pre`` of the fee payer: negative on a buy, positive on a sell; ``None``
-    when the RPC did not return balances (then the event arithmetic is used)."""
+    """``post − pre`` of the payer (negative on a buy); ``None`` without balances."""
 
     @property
     def event_buy_total_lamports(self) -> int:
-        """Curve + the event's fees + network fee — the arithmetic T4.8 proved lamport-exact
-        on the recorded fills."""
+        """Curve + the event's fees + network fee — lamport-exact on the recorded fills."""
         return self.event.buy_total_cost + self.network_fee_lamports
 
     @property
@@ -91,6 +87,16 @@ class FillRecord:
             return self.payer_delta_lamports
         return self.event_sell_net_lamports
 
+    @property
+    def unexplained_lamports(self) -> int | None:
+        """Beyond the event's arithmetic and the network fee (a router's cut, ATA rent):
+        ``0`` on a transaction this executor builds; ``None`` without balances (T4.8b)."""
+        if self.payer_delta_lamports is None:
+            return None
+        if self.event.is_buy:
+            return -self.payer_delta_lamports - self.event_buy_total_lamports
+        return self.event_sell_net_lamports - self.payer_delta_lamports
+
     def as_json(self) -> dict[str, Any]:
         e = self.event
         return {
@@ -108,8 +114,10 @@ class FillRecord:
             "cashback": e.cashback,
             "holder_rewards": e.holder_rewards,
             "holder_rewards_basis_points": e.holder_rewards_basis_points,
+            "event_layout": e.layout,
             "network_fee_lamports": self.network_fee_lamports,
             "payer_delta_lamports": self.payer_delta_lamports,
+            "unexplained_lamports": self.unexplained_lamports,
             "buy_total_lamports": self.buy_total_lamports if e.is_buy else None,
             "event_buy_total_lamports": self.event_buy_total_lamports if e.is_buy else None,
             "sell_net_lamports": self.sell_net_lamports if not e.is_buy else None,
@@ -141,8 +149,7 @@ def decode_fills(transaction: dict[str, Any]) -> list[FillRecord]:
     tx = cast(dict[str, Any], transaction.get("transaction") or {})
     signatures = cast(list[Any], tx.get("signatures") or [""])
     block_time = transaction.get("blockTime")
-    # One transaction, one payer delta: attributed to the first event (a bundle of
-    # two of our own trades in one transaction is not a path this executor builds).
+    # One transaction, one payer delta: attributed to the first event (no bundles built here).
     delta = _payer_delta(meta)
     return [
         FillRecord(
@@ -200,6 +207,8 @@ class BuiltTrade:
 
 def reserves_of(read: CurveRead) -> CurveReserves:
     a = read.account
+    if a.quote_mint != NATIVE_SOL_QUOTE_MINT:
+        raise ValueError(f"unsupported_quote:{a.quote_mint}")
     return CurveReserves(
         a.virtual_sol_reserves,
         a.virtual_token_reserves,
@@ -210,8 +219,13 @@ def reserves_of(read: CurveRead) -> CurveReserves:
 
 
 def fee_bps(global_account: GlobalAccount) -> FeeBps:
+    """Protocol bps from ``Global``; the creator share **floored at the bonding-curve tier**
+    (30 bps): ``Global.creator_fee_basis_points`` reads 5 while ``GetFeesWithQuoteMint``
+    charged 30 on every recorded fill (T4.8b) — under-estimating breaches the budget ceiling."""
+    tier = BONDING_CURVE_FEE_TIER_2026_05_20
     return FeeBps(
-        protocol=global_account.fee_basis_points, creator=global_account.creator_fee_basis_points
+        protocol=max(global_account.fee_basis_points, tier.protocol),
+        creator=max(global_account.creator_fee_basis_points, tier.creator),
     )
 
 
@@ -236,6 +250,7 @@ def _intent(
         global_account.reserved_fee_recipient if mayhem else global_account.fee_recipient,
         global_account.buyback_fee_recipients[0],
         mayhem,
+        is_cashback_coin=read.account.is_cashback_coin,
     )
 
 
@@ -252,8 +267,7 @@ def build_buy(
     compute_unit_price_micro_lamports: int,
     creates_ata: bool,
 ) -> BuiltTrade:
-    """The largest buy whose total (curve + fees) fits ``budget_sol`` — the engine's
-    ``sol_final`` is a ceiling, never a target."""
+    """The largest buy whose total (curve + fees) fits ``budget_sol`` — a ceiling, never a target."""
     budget = int(budget_sol * LAMPORTS_PER_SOL)
     quote = quote_buy_for_budget(
         reserves_of(read), budget, fee_bps(global_account), max_slippage_bps=max_slippage_bps

@@ -39,6 +39,7 @@ from hunter_meme_executor.exits import exits_once
 from hunter_meme_executor.heartbeat import heartbeat_once
 from hunter_meme_executor.journal_db import WORKER_ROLE, PostgresOrderJournal
 from hunter_meme_executor.kill_switch import KillSwitchReader
+from hunter_meme_executor.program_check import check_program_at_boot, program_check_once
 from hunter_meme_executor.repo import unconfirmed_orders
 
 if TYPE_CHECKING:
@@ -93,6 +94,7 @@ async def reconcile_once(ctx: ExecutorContext) -> None:
 
 async def kill_switch_once(ctx: ExecutorContext) -> None:
     await ctx.kill.refresh()
+    await program_check_once(ctx)
 
 
 def build_context(
@@ -158,6 +160,13 @@ async def run_meme_executor(runtime: WorkerRuntime) -> None:
         raise
     ctx = build_context(runtime, config, mode, signer)
     _register_health(runtime, ctx)
+    try:
+        # T4.8b: the chain's program must be the one the builder was proven against.
+        await check_program_at_boot(ctx)
+    except MemeLiveTradingRefused as exc:
+        ctx.chain.rpc.close()
+        logger.error("meme_executor_boot_refused", reason=exc.reason, detail=str(exc))
+        raise
     await ctx.kill.refresh()
     logger.info(
         "meme_executor_starting",

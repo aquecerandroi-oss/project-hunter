@@ -661,6 +661,60 @@ pago é decisão do Everton com teto de consumo e política de degradação apro
 antes (`docs/plans/T4-MEME-RADAR.md` §8, decisão 3), nunca um default deste
 arquivo.
 
+### 3.6b Fechamento diário do Lab meme (`meme_close_day.py`, cron às 00:10 BRT — T4.15)
+
+`infra/scripts/meme_close_day.py` fecha **o dia Brasília que acabou de terminar** (sem `--day`:
+ontem): lê como `hunter_app` (`SELECT` apenas) `meme_paper_bets`, `meme_proposals`, `meme_tokens`,
+`meme_features_1m`, `meme_lab_ticks` (uma linha por tick do laço — migração `0031`,
+`docs/DATABASE.md` §42) e `meme_wallet_trades`, e escreve **por acréscimo**, nesta ordem: o diário
+`obsidian/09-OPERATIONS/Diario-Meme/<dia>.md` com a seção 6 preenchida pelas lições (n, IC 95 %
+por blocos de hora, "o que muda amanhã"); uma avaliação datada na página de cada EXP-M* ativa que
+fechou aposta no dia; linhas `M-L<n>` em `obsidian/00-INBOX/Hipoteses-do-plantao.md` só quando o
+contraste passa a régua; a linha de índice no README da pasta; e
+`.claude/state/lote-meme-<dia+1>.md` (a próxima leva, **proposta** — o orquestrador pré-registra, o
+Everton decide). Um dia já fechado é recusado (exit 2 — a seção 6 nunca se reescreve; um diário
+gravado por `meme_diary.py --apply` com a seção 6 ainda no stub é completado); um dia sem aposta
+fechada é recusado sem `--allow-empty` (exit 3). As lições, uma a uma:
+`docs/plans/T4-MEME-RADAR.md` §T4.15.
+
+**Onde os arquivos caem.** A imagem `hunter-api` leva `infra/scripts`, mas **não** leva
+`obsidian/` nem `.claude/state/` (`Dockerfile.api-workers`); o script resolve a raiz do
+repositório por `__file__` (`/app` no container). Sem montar o clone, `--apply` gravaria dentro do
+container e o arquivo morreria com ele. Por isso o job roda com os dois diretórios montados a
+partir de `/opt/project-hunter` — e como `compose.sh ops` não aceita opções do `run`, o cron chama
+o `docker compose` com exatamente o que o `compose.sh` monta (`--env-file .env -p hunter`, os dois
+`-f`, `GIT_SHA` da árvore — só a imagem já implantada, nunca um build) mais `--user`, para que os
+arquivos fiquem do usuário de deploy e não de root:
+
+```bash
+# à mão, primeiro em dry-run (imprime o diário, as linhas M-L, as avaliações e o lote; não grava):
+cd /opt/project-hunter && GIT_SHA="$(git rev-parse --short HEAD)" docker compose --env-file .env \
+  -p hunter -f infra/docker/docker-compose.yml -f infra/vps/docker-compose.prod.yml \
+  run --rm --user "$(id -u):$(id -g)" \
+  -v /opt/project-hunter/obsidian:/app/obsidian \
+  -v /opt/project-hunter/.claude/state:/app/.claude/state \
+  ops python infra/scripts/meme_close_day.py --day 2026-09-12 --dry-run
+```
+
+Agendamento (instalar uma vez, à mão, no padrão de `/etc/cron.d/hunter-partitions` —
+`infra/vps/README.md`; supondo a máquina em UTC, confirmar com `timedatectl`: 00:10 BRT = 03:10
+UTC; o `--day` é calculado no relógio de Brasília para nunca depender do fuso do host):
+
+```bash
+printf '%s\n' \
+  'SHELL=/bin/bash' \
+  'PATH=/usr/local/bin:/usr/bin:/bin' \
+  '10 3 * * * hunter cd /opt/project-hunter && GIT_SHA="$(git rev-parse --short HEAD)" docker compose --env-file .env -p hunter -f infra/docker/docker-compose.yml -f infra/vps/docker-compose.prod.yml run --rm --user "$(id -u):$(id -g)" -v /opt/project-hunter/obsidian:/app/obsidian -v /opt/project-hunter/.claude/state:/app/.claude/state ops python infra/scripts/meme_close_day.py --day "$(TZ=America/Sao_Paulo date -d yesterday +\%F)" --apply >> /opt/backups/meme-close.log 2>&1' \
+  | sudo tee /etc/cron.d/hunter-meme-close >/dev/null
+sudo chmod 644 /etc/cron.d/hunter-meme-close
+```
+
+(`\%` porque o cron trata `%` como quebra de linha.) O que o cron escreve fica **sem commit** na
+árvore da VPS: o commit por pathspec do diário, das páginas EXP-M*, do INBOX, do README e do lote
+é do orquestrador, como todo registro do vault — decisão de operação em aberto no relatório da
+T4.15 (uma árvore suja não impede o `git pull` do `compose.sh update` enquanto ninguém editar os
+mesmos arquivos do outro lado, mas conflita no dia em que isso acontecer).
+
 ### 3.7 Executor real de memecoins (`meme-executor`, perfil `meme-live` — T4.14)
 
 Serviço `meme-executor` (`HUNTER_ROLE=meme_executor`, imagem `hunter-api`) nos dois

@@ -38,12 +38,14 @@ from hunter_exchanges.pumpfun.solana_codec import (
     serialize_message,
 )
 from hunter_exchanges.pumpfun.tx import (
+    BUY_DISCRIMINATOR,
     TradeIntent,
     build_buy_instruction,
     build_sell_instruction,
     build_trade_message,
     create_ata_idempotent,
     jito_tip_transfer,
+    trade_account_names,
 )
 
 __all__ = ["ExecutionCaps", "UnverifiedTransaction", "VerifiedTrade", "verify_trade_message"]
@@ -242,11 +244,19 @@ def _name_the_difference(
 
 
 def _diff(actual: Instruction, expected: Instruction) -> str:
+    """Name the first difference — for the trade instruction, the slot by its IDL name
+    (``bonding_curve_v2``, ``buyback_fee_recipient``… T4.8b), so a refusal says which
+    account moved, never only that bytes differ."""
     if actual.data != expected.data:
         return "data"
     if len(actual.accounts) != len(expected.accounts):
         return f"account_count {len(actual.accounts)} != {len(expected.accounts)}"
+    names: tuple[str, ...] = ()
+    if expected.program_id == PUMP_PROGRAM_ID:
+        side = "buy" if expected.data[:8] == BUY_DISCRIMINATOR else "sell"
+        names = trade_account_names(side, cashback=len(expected.accounts) == 17)
     for index, (a, e) in enumerate(zip(actual.accounts, expected.accounts, strict=True)):
         if a != e:
-            return f"account[{index}]"
+            name = f" {names[index]}" if index < len(names) else ""
+            return f"account[{index}]{name}"
     return "unknown"

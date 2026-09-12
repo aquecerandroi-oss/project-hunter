@@ -1,0 +1,40 @@
+{
+ "started_at": "2026-09-12T17:55:19.519928+00:00",
+ "deploy": {
+  "slot": 446462760,
+  "block_time": 1789226644
+ },
+ "calls": [
+  {
+   "n": 1,
+   "method": "getBlockTime",
+   "label": "deploy_block_time",
+   "at": "2026-09-12T17:55:19.519928+00:00"
+  },
+  {
+   "n": 2,
+   "method": "getSignaturesForAddress",
+   "label": "signatures_global_volume_accumulator",
+   "at": "2026-09-12T17:55:21.604902+00:00"
+  },
+  {
+   "n": 3,
+   "method": "getSignaturesForAddress",
+   "label": "signatures_router_2",
+   "at": "2026-09-12T17:55:23.540242+00:00"
+  },
+  {
+   "n": 4,
+   "method": "getTransaction",
+   "label": "tx_router_curve",
+   "at": "2026-09-12T17:55:25.188287+00:00"
+  },
+  {
+   "n": 5,
+   "method": "getTransaction",
+   "label": "tx_router_curve",
+   "at": "2026-09-12T17:55:26.695638+00:00"
+  }
+ ],
+ "finished_at": "2026-09-12T17:55:27.016765+00:00"
+}

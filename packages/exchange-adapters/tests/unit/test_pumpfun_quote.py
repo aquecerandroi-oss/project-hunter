@@ -76,6 +76,38 @@ def test_buy_quote_reproduces_the_real_fill() -> None:
     assert quote.reserves_after.virtual_sol == event.virtual_sol_reserves
 
 
+def test_sell_quote_reproduces_the_real_fill_of_2026_09_12_post_upgrade() -> None:
+    """T4.8b: the program deployed at slot 446462760 charges the same 95 + 30 bps, each
+    component rounded up separately — lamport-exact on a real sell (Mayhem coin: the
+    30 bps go to ``creator_fee``; ``holder_rewards`` reads 0). ``quote.py`` unchanged."""
+    event = _event("t48b_rpc_tx_sell_raw.json")
+    assert event.holder_rewards == 0 and event.holder_rewards_basis_points == 0
+    fees = FeeBps(event.fee_basis_points, event.creator_fee_basis_points)
+    assert fees == FEES
+    quote = quote_sell(_pre_reserves(event), event.token_amount, fees, max_slippage_bps=100)
+    assert quote.sol_amount == event.sol_amount == 1237388211
+    assert quote.protocol_fee == event.fee == 11755189
+    assert quote.creator_fee == event.creator_fee == 3712165
+    assert quote.net_proceeds == event.sell_net_proceeds == 1221920857
+    assert quote.reserves_after.virtual_sol == event.virtual_sol_reserves
+    assert quote.reserves_after.virtual_token == event.virtual_token_reserves
+
+
+def test_router_buy_exact_quote_in_v2_of_2026_09_12_charges_the_same_components() -> None:
+    """The site's router now buys exact-in (``buy_exact_quote_in_v2``); the fee per
+    component on its real fill is what ``quote_buy`` computes for the tokens it got,
+    and the curve amount is within the 1 lamport the exact-in inverse rounds."""
+    event = _event("t48b_rpc_tx_buy_router_v2_raw.json")
+    assert event.is_buy and event.ix_name == "buy_exact_quote_in"
+    fees = FeeBps(event.fee_basis_points, event.creator_fee_basis_points)
+    assert fees == FEES and event.holder_rewards == 0
+    quote = quote_buy(_pre_reserves(event), event.token_amount, fees, max_slippage_bps=0)
+    assert quote.protocol_fee == event.fee == 183957
+    assert quote.creator_fee == event.creator_fee == 58092
+    assert abs(quote.sol_amount - event.sol_amount) <= 1 and event.sol_amount == 19363872
+    assert abs(quote.total_cost - event.buy_total_cost) <= 1
+
+
 def test_fee_tier_matches_the_program_return_data() -> None:
     """``GetFeesWithQuoteMint`` returned ``AAAAAAAAAABfAAAAAAAAAB4AAAAAAAAA`` in every
     fixture: lp 0, protocol 95, creator 30 — the documented bonding-curve tier."""
@@ -138,6 +170,26 @@ def test_simulation_proof_fixture_matches_quote_and_program_threshold() -> None:
         "InstructionError": [2, {"Custom": 6062}]
     }
     assert len(sims["buy_full"]["accounts"]) == 18 and len(sims["sell_full"]["accounts"]) == 17
+
+
+def test_post_upgrade_simulation_proof_still_hits_the_programs_exact_threshold() -> None:
+    """T4.8b: our quote against the program deployed on 2026-09-12 — ``max_sol_cost =
+    total_cost − 1`` is ``TooMuchSolRequired`` (6002); with the exact cost the buy runs."""
+    proof: dict[str, Any] = json.loads(
+        (FIXTURES / "t48b_simulation_proof_mainnet_raw.json").read_text()
+    )
+    assert proof["sent"] is False and proof["sig_verify"] is False
+    curve = proof["curve"]
+    reserves = CurveReserves(
+        curve["virtual_sol"], curve["virtual_token"], curve["real_sol"], curve["real_token"]
+    )
+    quote = quote_buy(reserves, proof["buy"]["quote"]["token_amount"], FEES, max_slippage_bps=100)
+    assert quote.total_cost == proof["buy"]["quote"]["total_cost"]
+    assert quote.max_sol_cost == proof["buy"]["intent"]["sol_limit"]
+    sims = proof["simulations"]
+    assert sims["buy_full"]["ok"] is True and sims["sell_full"]["ok"] is True
+    short = sims["buy_max_sol_cost_one_lamport_short"]
+    assert short["ok"] is False and short["err"]["InstructionError"][1] == {"Custom": 6002}
 
 
 def test_slippage_is_explicit_and_bounded() -> None:

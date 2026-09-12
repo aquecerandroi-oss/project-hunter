@@ -124,6 +124,9 @@ async def handle_candidate(ctx: ExecutorContext, candidate: Candidate, *, now: d
     if ctx.signer is None or not mode.live:
         await _refuse(ctx, candidate, "meme_live_disabled", {"live": mode.live})
         return
+    if ctx.state.program_divergence is not None:  # T4.8b: never sign against an unknown program
+        await _refuse(ctx, candidate, "program_upgraded", {"detail": ctx.state.program_divergence})
+        return
     if cfg.small_test_max_trades is not None:
         async with role_session(ctx.session_factory, db_role=WORKER_ROLE) as session:
             done = await count_live_buys(session)

@@ -1,0 +1,121 @@
+{
+ "started_at": "2026-09-12T17:52:36.660985+00:00",
+ "idl": {
+  "address": "AYgC53tU5BbP2NAnv5nConJxAdpQZctvmZK88pu69xRs",
+  "sha256_canonical": "fd48d9891733c30d167691b08ca5e5996e3723db58801db889b5a253f8d3e969",
+  "sha256_canonical_t48": "fd48d9891733c30d167691b08ca5e5996e3723db58801db889b5a253f8d3e969",
+  "slot": 446490886,
+  "instructions": 40,
+  "new_instructions": []
+ },
+ "programdata": {
+  "address": "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu",
+  "last_deploy_slot": 446462760
+ },
+ "transactions": {
+  "sell": {
+   "signature": "5GfQvGkUu2KbKASQAXDw88pCo3UKyMcKpxZTJx5yteeVZRHR7zdMN6kvxQ5XwYxVH8LAfpnB6VK2N6r11sS2CG14",
+   "slot": 446490901,
+   "blockTime": 1789235562,
+   "info": {
+    "side": "sell",
+    "mint": "2nG3hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump",
+    "user": "568TAsK4pJk1Ze7UJgJeHGM1pbEVRSbPAjcHSXBwYY9Z",
+    "remaining": [
+     {
+      "index": 0,
+      "address": "DzUQdbNZopLGQkqmHouw6f8aRee1rvpSUEeX7PstHeHR",
+      "writable": false,
+      "tag": "PDA [\"bonding-curve-v2\", mint]"
+     },
+     {
+      "index": 1,
+      "address": "5cjcW9wExnJJiqgLjq7DEG75Pm6JBgE1hNv4B2vHXUW6",
+      "writable": true,
+      "tag": "Global.buyback_fee_recipients[4]"
+     }
+    ]
+   }
+  }
+ },
+ "bonding_curve_v2": {
+  "mint": "2nG3hY94XM3zwf4rtuVkTvLGCJgBfcCggARUAkFSpump",
+  "address": "DzUQdbNZopLGQkqmHouw6f8aRee1rvpSUEeX7PstHeHR",
+  "exists": false
+ },
+ "calls": [
+  {
+   "n": 1,
+   "method": "getAccountInfo",
+   "label": "idl_account",
+   "at": "2026-09-12T17:52:36.660985+00:00"
+  },
+  {
+   "n": 2,
+   "method": "getAccountInfo",
+   "label": "programdata_header",
+   "at": "2026-09-12T17:52:38.783572+00:00"
+  },
+  {
+   "n": 3,
+   "method": "getAccountInfo",
+   "label": "global",
+   "at": "2026-09-12T17:52:40.299965+00:00"
+  },
+  {
+   "n": 4,
+   "method": "getSignaturesForAddress",
+   "label": "signatures_router",
+   "at": "2026-09-12T17:52:41.797224+00:00"
+  },
+  {
+   "n": 5,
+   "method": "getSignaturesForAddress",
+   "label": "signatures_pump",
+   "at": "2026-09-12T17:52:43.304250+00:00"
+  },
+  {
+   "n": 6,
+   "method": "getTransaction",
+   "label": "tx_router",
+   "at": "2026-09-12T17:52:44.824730+00:00"
+  },
+  {
+   "n": 7,
+   "method": "getTransaction",
+   "label": "tx_router",
+   "at": "2026-09-12T17:52:46.355109+00:00"
+  },
+  {
+   "n": 8,
+   "method": "getTransaction",
+   "label": "tx_router",
+   "at": "2026-09-12T17:52:47.890254+00:00"
+  },
+  {
+   "n": 9,
+   "method": "getTransaction",
+   "label": "tx_pump",
+   "at": "2026-09-12T17:52:49.414096+00:00"
+  },
+  {
+   "n": 10,
+   "method": "getTransaction",
+   "label": "tx_pump",
+   "at": "2026-09-12T17:52:50.944111+00:00"
+  },
+  {
+   "n": 11,
+   "method": "getTransaction",
+   "label": "tx_pump",
+   "at": "2026-09-12T17:52:52.486034+00:00"
+  },
+  {
+   "n": 12,
+   "method": "getAccountInfo",
+   "label": "bonding_curve_v2",
+   "at": "2026-09-12T17:52:54.009260+00:00"
+  }
+ ],
+ "finished_at": "2026-09-12T17:52:54.292101+00:00"
+}

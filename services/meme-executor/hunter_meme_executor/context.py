@@ -43,6 +43,11 @@ class ExecutorState:
     wallet_lamports: int | None = None
     wallet_read_at: datetime | None = None
     blocked_exits: dict[str, str] = field(default_factory=lambda: dict[str, str]())
+    program_idl_hash: str | None = None
+    program_last_deploy_slot: int | None = None
+    program_divergence: str | None = None
+    """T4.8b: set when the chain's program identity differs from the fixtures' —
+    every entry is refused ``program_upgraded`` while it is set."""
 
 
 @dataclass(slots=True)

@@ -428,6 +428,25 @@ async def test_an_approval_older_than_the_ttl_is_refused_and_never_sent(
     assert harness.rpc.sent == []
 
 
+async def test_a_program_upgrade_detected_at_runtime_refuses_every_entry_by_name(
+    harness: Harness, db_engine: AsyncEngine
+) -> None:
+    """T4.8b: once the deploy slot moved, the approval is refused ``program_upgraded``
+    before any chain read, nothing built, nothing signed, nothing sent."""
+    harness.ctx.state.program_divergence = "last_deploy_slot 1 != 446462760 (programa mudou)"
+    proposal_id = await _plant_proposal(db_engine, decided_at=datetime.now(UTC))
+    await entries_once(harness.ctx)
+    orders = await _rows(
+        db_engine,
+        "SELECT status, reason, admission FROM meme_live_orders WHERE proposal_id = :p",
+        p=proposal_id,
+    )
+    assert len(orders) == 1 and orders[0]["status"] == "refused"
+    assert orders[0]["reason"] == "program_upgraded"
+    assert "programa mudou" in orders[0]["admission"]["detail"]
+    assert harness.rpc.sent == []
+
+
 async def test_the_kill_switch_from_redis_blocks_and_the_daily_latch_persists(
     harness: Harness, db_engine: AsyncEngine, db_session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
