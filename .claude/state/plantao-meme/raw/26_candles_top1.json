@@ -1,0 +1,1 @@
+{"meta": {"n": 26, "name": "candles_top1", "url": "https://frontend-api-v3.pump.fun/candlesticks/Vx5EKF7yfZt3fAXWGKNULiEbnH26bRgg9Pg9xQ9pump?offset=0&limit=1000&timeframe=5", "status": 404, "observed_at_utc": "2026-09-12T05:38:19+00:00", "observed_at_brt": "02:38:19", "err": "HTTP Error 404: Not Found", "bytes": 0}, "data": ""}

@@ -1,0 +1,1 @@
+{"meta": {"n": 13, "name": "trades_WOTF", "url": "https://frontend-api-v3.pump.fun/trades/all/Vx5EKF7yfZt3fAXWGKNULiEbnH26bRgg9Pg9xQ9pump?limit=200&offset=0&minimumSize=0", "status": 404, "observed_at_utc": "2026-09-12T05:35:44+00:00", "observed_at_brt": "02:35:44", "err": "HTTP Error 404: Not Found", "bytes": 0}, "data": ""}

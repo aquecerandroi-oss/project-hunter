@@ -1,0 +1,1 @@
+{"meta": {"n": 17, "name": "trades_NTDA", "url": "https://frontend-api-v3.pump.fun/trades/all/aUrxwWkWVYCBW4C7Zhb7fpxBVB2GCgXT9WGAsUSpump?limit=200&offset=0&minimumSize=0", "status": 404, "observed_at_utc": "2026-09-12T05:35:49+00:00", "observed_at_brt": "02:35:49", "err": "HTTP Error 404: Not Found", "bytes": 0}, "data": ""}

@@ -1,0 +1,265 @@
+{
+ "now_ms": 1789191235600,
+ "log": [
+  {
+   "n": 1,
+   "name": "mayhem_overview",
+   "url": "https://frontend-api-v3.pump.fun/mayhem/overview",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:33:55+00:00",
+   "observed_at_brt": "02:33:55",
+   "err": null,
+   "bytes": 279
+  },
+  {
+   "n": 2,
+   "name": "coins_newest",
+   "url": "https://frontend-api-v3.pump.fun/coins?offset=0&limit=50&sort=created_timestamp&order=DESC&includeNsfw=false",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:33:57+00:00",
+   "observed_at_brt": "02:33:57",
+   "err": null,
+   "bytes": 94755
+  },
+  {
+   "n": 3,
+   "name": "coins_top_mcap",
+   "url": "https://frontend-api-v3.pump.fun/coins?offset=0&limit=50&sort=market_cap&order=DESC&includeNsfw=false",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:33:58+00:00",
+   "observed_at_brt": "02:33:58",
+   "err": null,
+   "bytes": 98134
+  },
+  {
+   "n": 4,
+   "name": "king_of_the_hill",
+   "url": "https://frontend-api-v3.pump.fun/coins/king-of-the-hill?includeNsfw=false",
+   "status": 404,
+   "observed_at_utc": "2026-09-12T05:34:00+00:00",
+   "observed_at_brt": "02:34:00",
+   "err": "HTTP Error 404: Not Found",
+   "bytes": 182
+  },
+  {
+   "n": 5,
+   "name": "top_runners",
+   "url": "https://frontend-api-v3.pump.fun/coins/top-runners",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:34:01+00:00",
+   "observed_at_brt": "02:34:01",
+   "err": null,
+   "bytes": 11622
+  },
+  {
+   "n": 6,
+   "name": "sol_price",
+   "url": "https://frontend-api-v3.pump.fun/sol-price",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:34:02+00:00",
+   "observed_at_brt": "02:34:02",
+   "err": null,
+   "bytes": 75
+  },
+  {
+   "n": 7,
+   "name": "coins_complete_p1",
+   "url": "https://frontend-api-v3.pump.fun/coins?offset=0&limit=50&sort=created_timestamp&order=DESC&includeNsfw=false&complete=true",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:34:04+00:00",
+   "observed_at_brt": "02:34:04",
+   "err": null,
+   "bytes": 97421
+  },
+  {
+   "n": 8,
+   "name": "mayhem_mode_list",
+   "url": "https://frontend-api-v3.pump.fun/coins/mayhem-mode?limit=60",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:34:05+00:00",
+   "observed_at_brt": "02:34:05",
+   "err": null,
+   "bytes": 113572
+  },
+  {
+   "n": 9,
+   "name": "mayhem_top_coins",
+   "url": "https://frontend-api-v3.pump.fun/mayhem/top-coins",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:34:06+00:00",
+   "observed_at_brt": "02:34:06",
+   "err": null,
+   "bytes": 5128
+  },
+  {
+   "n": 10,
+   "name": "coins_complete_p2",
+   "url": "https://frontend-api-v3.pump.fun/coins?offset=50&limit=50&sort=created_timestamp&order=DESC&includeNsfw=false&complete=true",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:34:08+00:00",
+   "observed_at_brt": "02:34:08",
+   "err": null,
+   "bytes": 98266
+  },
+  {
+   "n": 11,
+   "name": "coins_complete_p3",
+   "url": "https://frontend-api-v3.pump.fun/coins?offset=100&limit=50&sort=created_timestamp&order=DESC&includeNsfw=false&complete=true",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:34:10+00:00",
+   "observed_at_brt": "02:34:10",
+   "err": null,
+   "bytes": 98276
+  },
+  {
+   "n": 12,
+   "name": "detail_WOTF",
+   "url": "https://frontend-api-v3.pump.fun/coins/Vx5EKF7yfZt3fAXWGKNULiEbnH26bRgg9Pg9xQ9pump",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:35:43+00:00",
+   "observed_at_brt": "02:35:43",
+   "err": null,
+   "bytes": 2068
+  },
+  {
+   "n": 13,
+   "name": "trades_WOTF",
+   "url": "https://frontend-api-v3.pump.fun/trades/all/Vx5EKF7yfZt3fAXWGKNULiEbnH26bRgg9Pg9xQ9pump?limit=200&offset=0&minimumSize=0",
+   "status": 404,
+   "observed_at_utc": "2026-09-12T05:35:44+00:00",
+   "observed_at_brt": "02:35:44",
+   "err": "HTTP Error 404: Not Found",
+   "bytes": 0
+  },
+  {
+   "n": 14,
+   "name": "detail_WOFI",
+   "url": "https://frontend-api-v3.pump.fun/coins/VEY71Uj9G6oZiVHR3dDjhMVrVAXfaTNatTjt226pump",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:35:45+00:00",
+   "observed_at_brt": "02:35:45",
+   "err": null,
+   "bytes": 1955
+  },
+  {
+   "n": 15,
+   "name": "trades_WOFI",
+   "url": "https://frontend-api-v3.pump.fun/trades/all/VEY71Uj9G6oZiVHR3dDjhMVrVAXfaTNatTjt226pump?limit=200&offset=0&minimumSize=0",
+   "status": 404,
+   "observed_at_utc": "2026-09-12T05:35:47+00:00",
+   "observed_at_brt": "02:35:47",
+   "err": "HTTP Error 404: Not Found",
+   "bytes": 0
+  },
+  {
+   "n": 16,
+   "name": "detail_NTDA",
+   "url": "https://frontend-api-v3.pump.fun/coins/aUrxwWkWVYCBW4C7Zhb7fpxBVB2GCgXT9WGAsUSpump",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:35:48+00:00",
+   "observed_at_brt": "02:35:48",
+   "err": null,
+   "bytes": 2100
+  },
+  {
+   "n": 17,
+   "name": "trades_NTDA",
+   "url": "https://frontend-api-v3.pump.fun/trades/all/aUrxwWkWVYCBW4C7Zhb7fpxBVB2GCgXT9WGAsUSpump?limit=200&offset=0&minimumSize=0",
+   "status": 404,
+   "observed_at_utc": "2026-09-12T05:35:49+00:00",
+   "observed_at_brt": "02:35:49",
+   "err": "HTTP Error 404: Not Found",
+   "bytes": 0
+  },
+  {
+   "n": 18,
+   "name": "detail_WOFI",
+   "url": "https://frontend-api-v3.pump.fun/coins/BygcY6mmCNMJRppvbvG6LPr9U6zY1PKtNixzAR5Vpump",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:35:51+00:00",
+   "observed_at_brt": "02:35:51",
+   "err": null,
+   "bytes": 1878
+  },
+  {
+   "n": 19,
+   "name": "trades_WOFI",
+   "url": "https://frontend-api-v3.pump.fun/trades/all/BygcY6mmCNMJRppvbvG6LPr9U6zY1PKtNixzAR5Vpump?limit=200&offset=0&minimumSize=0",
+   "status": 404,
+   "observed_at_utc": "2026-09-12T05:35:52+00:00",
+   "observed_at_brt": "02:35:52",
+   "err": "HTTP Error 404: Not Found",
+   "bytes": 0
+  },
+  {
+   "n": 20,
+   "name": "detail_TNT",
+   "url": "https://frontend-api-v3.pump.fun/coins/foBgNKJsAzENxzHeitFuJALvotEzpJZv8JsK7Hwpump",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:35:53+00:00",
+   "observed_at_brt": "02:35:53",
+   "err": null,
+   "bytes": 2151
+  },
+  {
+   "n": 21,
+   "name": "trades_TNT",
+   "url": "https://frontend-api-v3.pump.fun/trades/all/foBgNKJsAzENxzHeitFuJALvotEzpJZv8JsK7Hwpump?limit=200&offset=0&minimumSize=0",
+   "status": 404,
+   "observed_at_utc": "2026-09-12T05:35:54+00:00",
+   "observed_at_brt": "02:35:54",
+   "err": "HTTP Error 404: Not Found",
+   "bytes": 0
+  },
+  {
+   "n": 22,
+   "name": "detail_graduated",
+   "url": "https://frontend-api-v3.pump.fun/coins/uMi9jdkDV3BcmYfph3nboZCUNxNWYu4JWnPbWvjpump",
+   "status": 200,
+   "observed_at_utc": "2026-09-12T05:35:56+00:00",
+   "observed_at_brt": "02:35:56",
+   "err": null,
+   "bytes": 2100
+  },
+  {
+   "n": 23,
+   "name": "koth_alt",
+   "url": "https://frontend-api-v3.pump.fun/coins/king-of-the-hill",
+   "status": 404,
+   "observed_at_utc": "2026-09-12T05:35:57+00:00",
+   "observed_at_brt": "02:35:57",
+   "err": "HTTP Error 404: Not Found",
+   "bytes": 0
+  },
+  {
+   "n": 24,
+   "name": "trades_latest",
+   "url": "https://frontend-api-v3.pump.fun/trades/latest",
+   "status": 404,
+   "observed_at_utc": "2026-09-12T05:38:16+00:00",
+   "observed_at_brt": "02:38:16",
+   "err": "HTTP Error 404: Not Found",
+   "bytes": 0
+  },
+  {
+   "n": 25,
+   "name": "trades_mint_top1",
+   "url": "https://frontend-api-v3.pump.fun/trades/Vx5EKF7yfZt3fAXWGKNULiEbnH26bRgg9Pg9xQ9pump?limit=200&offset=0",
+   "status": 404,
+   "observed_at_utc": "2026-09-12T05:38:18+00:00",
+   "observed_at_brt": "02:38:18",
+   "err": "HTTP Error 404: Not Found",
+   "bytes": 0
+  },
+  {
+   "n": 26,
+   "name": "candles_top1",
+   "url": "https://frontend-api-v3.pump.fun/candlesticks/Vx5EKF7yfZt3fAXWGKNULiEbnH26bRgg9Pg9xQ9pump?offset=0&limit=1000&timeframe=5",
+   "status": 404,
+   "observed_at_utc": "2026-09-12T05:38:19+00:00",
+   "observed_at_brt": "02:38:19",
+   "err": "HTTP Error 404: Not Found",
+   "bytes": 0
+  }
+ ]
+}

@@ -1,0 +1,1 @@
+{"meta": {"n": 6, "name": "sol_price", "url": "https://frontend-api-v3.pump.fun/sol-price", "status": 200, "observed_at_utc": "2026-09-12T05:34:02+00:00", "observed_at_brt": "02:34:02", "err": null, "bytes": 75}, "data": {"solPrice": 101.44450753633912, "asOfTimestamp": 1789191241238, "stale": false}}

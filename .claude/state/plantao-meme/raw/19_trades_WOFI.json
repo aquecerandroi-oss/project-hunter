@@ -1,0 +1,1 @@
+{"meta": {"n": 19, "name": "trades_WOFI", "url": "https://frontend-api-v3.pump.fun/trades/all/BygcY6mmCNMJRppvbvG6LPr9U6zY1PKtNixzAR5Vpump?limit=200&offset=0&minimumSize=0", "status": 404, "observed_at_utc": "2026-09-12T05:35:52+00:00", "observed_at_brt": "02:35:52", "err": "HTTP Error 404: Not Found", "bytes": 0}, "data": ""}

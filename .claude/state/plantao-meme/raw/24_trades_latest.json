@@ -1,0 +1,1 @@
+{"meta": {"n": 24, "name": "trades_latest", "url": "https://frontend-api-v3.pump.fun/trades/latest", "status": 404, "observed_at_utc": "2026-09-12T05:38:16+00:00", "observed_at_brt": "02:38:16", "err": "HTTP Error 404: Not Found", "bytes": 0}, "data": ""}
