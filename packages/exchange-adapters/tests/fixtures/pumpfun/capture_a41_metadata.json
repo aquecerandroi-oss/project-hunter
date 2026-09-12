@@ -1,0 +1,22 @@
+{
+  "captured_at_utc": "2026-09-12T05:20:40.967628+00:00",
+  "kind": "live public capture",
+  "http": {
+    "mayhem_list": {
+      "path": "/coins/mayhem-mode?limit=1&mayhemState=active",
+      "status": 200,
+      "observed_at": "2026-09-12T05:20:41.424739+00:00"
+    },
+    "mayhem_overview": {
+      "path": "/mayhem/overview",
+      "status": 200,
+      "observed_at": "2026-09-12T05:20:41.636183+00:00"
+    }
+  },
+  "idl": {
+    "url": "https://raw.githubusercontent.com/chainstacklabs/pumpfun-bonkfun-bot/a0540fdc9e6bb108d52f0f512f2e396d2396bdef/idl/pump_fun_idl.json",
+    "status": 200
+  },
+  "ws_result": "55s capture deadline",
+  "ws_messages": 11
+}

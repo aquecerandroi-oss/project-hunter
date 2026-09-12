@@ -1,0 +1,46 @@
+[
+  {
+    "observed_at": "2026-09-12T05:20:42.600292+00:00",
+    "raw": "{\"message\":\"Successfully subscribed to token creation events.\"}"
+  },
+  {
+    "observed_at": "2026-09-12T05:20:42.727804+00:00",
+    "raw": "{\"message\":\"Subscribed to 'migration' events.\"}"
+  },
+  {
+    "observed_at": "2026-09-12T05:20:47.212880+00:00",
+    "raw": "{\"signature\":\"2t6Ah7W7oFYSqw3wgkyRa2gqw3JG7otgSgQBZFgA2UcZJ3ed2rNcnR5TtrwrdMMZjPD6tYx4BihN1rtRhe5TzoFN\",\"traderPublicKey\":\"2f2WLPD8mJkMuvMyzYSjRK87ZxsGrceCmC4FQcBYzkK7\",\"txType\":\"create\",\"mint\":\"Xs7ZdzSHLU9ftNJsii5fCeJhoRWSC32SQGzGQtePxNu\",\"tokensInPool\":903904001.699182,\"initialBuy\":96095998.30081797,\"solAmount\":0,\"newTokenBalance\":0,\"marketCapSol\":33.72829853337979,\"pool\":\"bonk\"}"
+  },
+  {
+    "observed_at": "2026-09-12T05:20:50.726167+00:00",
+    "raw": "{\"signature\":\"2ZSXzCY4JX7w6VZyZz4PFeae4bVdoh1uUTHJJneeaSTY5hrvZ1aH5KRLh7U9cqPU7PyeGweKPVhpaxkV1DSPf4az\",\"mint\":\"5bmYxJJnvAKn23VMxvjiTfeBckEmMok7C3SxztaA9c38\",\"traderPublicKey\":\"JDQKDrc1TQgBRvdFh56tkta5sYcDj1SoP52Eiu64rSrT\",\"txType\":\"create\",\"initialBuy\":0,\"solAmount\":0,\"bondingCurveKey\":\"EwS2prNS6MmYq9zc7BJ4wTsnPtQJBnXUi9GBZ7Zoy18C\",\"vTokensInBondingCurve\":1073000000,\"vSolInBondingCurve\":30,\"marketCapSol\":27.958993476234856,\"name\":\"Not Frong just Early\",\"symbol\":\"aaa\",\"uri\":\"https://ipfs.io/ipfs/bafkreid3kffdmc6ddjdchcpct4cc67pkg3rotfbvkmu24gr7l3s7rasm3m\",\"is_mayhem_mode\":false,\"pool\":\"pump\"}"
+  },
+  {
+    "observed_at": "2026-09-12T05:20:52.353108+00:00",
+    "raw": "{\"signature\":\"23sRUYXb6fjv6mQm4aAVtaw5WkFCsJy1rLoB9B38yFQKoeu5xqWBfHXBUkRkQEt9ZZSsYYDypwaf1Ehg1cMuFLMe\",\"mint\":\"FSFJmsVvn2FpnzjbH1NaRQHtE3obsinRtfyQe1MBpump\",\"traderPublicKey\":\"71iDspfSqfWpepHuSgiVHv4dXuD8Lv2RvxnzHCPMhsHy\",\"txType\":\"create\",\"initialBuy\":17202752.95097,\"solAmount\":0.488808424,\"bondingCurveKey\":\"BwWK17cbHxwWBKZkUYvzxLcNQ1YVyaFezduWbtm2de6s\",\"vTokensInBondingCurve\":1055797247.04903,\"vSolInBondingCurve\":30.488808424128365,\"marketCapSol\":28.877522184628788,\"name\":\"AURACOIN\",\"symbol\":\"$AURA\",\"uri\":\"https://ipfs.io/ipfs/QmZg9jBiceyo7Mhy3EmpqvVczQCFGhBJXYagxFQtWdroHN\",\"is_mayhem_mode\":true,\"pool\":\"pump\"}"
+  },
+  {
+    "observed_at": "2026-09-12T05:20:57.725876+00:00",
+    "raw": "{\"signature\":\"4EbHiTkVYJEpfGjynPekpE1b4SjN1PR76RLBrGmm7iSq81gsfQnrvm61vnbMjGXz86Yb9PeZgbM44tV4GHaHkRXA\",\"mint\":\"2zBEyXbJtK3qJPuPM1HLjMM3VU8RzWGuy7bcg3smpump\",\"traderPublicKey\":\"Cnouk2kcQ9dokRVRn7ZcJeyoYcFWuoy8sNjmER3Fym2n\",\"txType\":\"create\",\"initialBuy\":3529685.84306,\"solAmount\":0.099012169,\"bondingCurveKey\":\"6u468aqGZmNsnZpPHR8iM4k4HZJooSaBv1H7oyzscfe5\",\"vTokensInBondingCurve\":1069470314.15694,\"vSolInBondingCurve\":30.09901216881861,\"marketCapSol\":28.143850063333048,\"name\":\"CASH CAT ONLY UP\",\"symbol\":\"cash cat\",\"uri\":\"https://ipfs.io/ipfs/QmWSMakhVCBUj6hWFZXB8cXYZ7P8EikSCUPQ6XuNNdKEGG\",\"is_mayhem_mode\":true,\"pool\":\"pump\"}"
+  },
+  {
+    "observed_at": "2026-09-12T05:20:57.890158+00:00",
+    "raw": "{\"signature\":\"43gsLtUzucquKtjwKniF1G4RQuVFgArK2FxspfwwesZnr4LrbeHezg3p1nErxMDFq7a1Lc58XPknhv2cXt1E7rGw\",\"mint\":\"H8erkk9Bj5V3SouEUB4Tp1d5DX4BKQ2UkGXzGGTpump\",\"traderPublicKey\":\"CYwJxUfdMXYUvMcFox2vFBB1sJYAqawCbNkAQYsMbzPu\",\"txType\":\"create\",\"initialBuy\":353079.674144,\"solAmount\":0.009875002,\"bondingCurveKey\":\"FEbMxHAMFx7wu7Pt5L68rhHYw6GSin28D6T789EFt77k\",\"vTokensInBondingCurve\":1072646920.325856,\"vSolInBondingCurve\":30.009875001758363,\"marketCapSol\":27.97740284626162,\"name\":\"Flyalon\",\"symbol\":\"FLYALON\",\"uri\":\"https://ipfs.io/ipfs/bafkreicjnjytzdco6f7h3ro3ofqf5rynytsnq7aq4xwm23hs5pq7zkasgu\",\"is_mayhem_mode\":false,\"pool\":\"pump\"}"
+  },
+  {
+    "observed_at": "2026-09-12T05:20:57.943598+00:00",
+    "raw": "{\"signature\":\"5U8MFF4oZ9YgHD56NjoWWQzay7UWBhKCCYZacZ2eaxCCM81LgMzFd5RGz8FMhrfsYnBRm8iEyLwsKe7wNnYnUyv4\",\"mint\":\"H8erkk9Bj5V3SouEUB4Tp1d5DX4BKQ2UkGXzGGTpump\",\"txType\":\"migrate\",\"pool\":\"pump-amm\"}"
+  },
+  {
+    "observed_at": "2026-09-12T05:21:00.617528+00:00",
+    "raw": "{\"signature\":\"2nzGaqpGWC27DThfZZw1FFtWNamzPmTBGtiCBAzSd4yZXNmrZk4fKzjTkYnMMTSQquPJDnJQodTLrBn6FMEMUip7\",\"mint\":\"F75iRzoxQGak9aTXXFAuDLgVM9ahEfwrEncSc1hJpump\",\"traderPublicKey\":\"DGdAKTVXQS1xESMkUkK1DwzUfwEYwvFckw6At4jbbaQr\",\"txType\":\"create\",\"initialBuy\":3520918.746848,\"solAmount\":0.098765431,\"bondingCurveKey\":\"7DKsQHWKLNaUL9gDjZ9JwWfStZkWEtG3vGmLfC9sPNY\",\"vTokensInBondingCurve\":1069479081.253152,\"vSolInBondingCurve\":30.09876543099999,\"marketCapSol\":28.14338864462131,\"name\":\".\",\"symbol\":\".\",\"uri\":\"https://ipfs.io/ipfs/bafkreihrwkxmcc5mbzpv2eifx5spx44bozt4455plnmfbmk37ggqj3s5e4\",\"is_mayhem_mode\":true,\"pool\":\"pump\"}"
+  },
+  {
+    "observed_at": "2026-09-12T05:21:11.758703+00:00",
+    "raw": "{\"signature\":\"nVq8Wq43tS6tGWGRi4EzYD4a8i57JuGZiwhdJjastBLiXwHTszP13YfjciNL2h2Pc94bkssRDEDwJb1uSf5qYJQ\",\"mint\":\"8y9X9eZF6EFsJFGoNpyM7hfKm9s2rve9DhqDJQQzpump\",\"traderPublicKey\":\"3z4vj1nAujLnciPgZaGz4VYecZa6gbYUg3Yr9MoyuiMG\",\"txType\":\"create\",\"initialBuy\":118757998.776049,\"solAmount\":3.733581166,\"bondingCurveKey\":\"7mBM97kwe71pYgT41AWqZtnwQSSzG1yoeqoVnP75ZgRB\",\"vTokensInBondingCurve\":954242001.223951,\"vSolInBondingCurve\":33.73358116569146,\"marketCapSol\":35.351180436852864,\"name\":\"egg\",\"symbol\":\"EGG\",\"uri\":\"https://metadata.j7tracker.io/m/bFMG2ZNmkq\",\"is_mayhem_mode\":false,\"pool\":\"pump\"}"
+  },
+  {
+    "observed_at": "2026-09-12T05:21:22.509802+00:00",
+    "raw": "{\"signature\":\"5qBVZnJVEt6aUCya4ShFGze3cTEfyTXjb3W34PFwNgRgdmBPForJcb8UP9cw43w9ZHMQ51Jt1yvrbkjo4YzsP1Gp\",\"mint\":\"78UAkNDKeRwifgauM8eSDtoBVgkL65VC5s8XEqMtpump\",\"traderPublicKey\":\"jAWjap1jBXDm8wL2Qfped3j4ASa5nhKv5vmwm4gmTx4\",\"txType\":\"create\",\"initialBuy\":66285714.223523,\"solAmount\":1.97530864,\"bondingCurveKey\":\"H1dkBJLabS2KqHdybtCwD1mdKUe7fwdJSSW1DHsRGRTX\",\"vTokensInBondingCurve\":1006714285.776477,\"vSolInBondingCurve\":31.975308639999987,\"marketCapSol\":31.762049165059267,\"name\":\"Horny \",\"symbol\":\"HORNY\",\"uri\":\"https://meta.uxento.io/data/d5c2ffaf-172d-4745-9039-d3beed796ba3\",\"is_mayhem_mode\":false,\"pool\":\"pump\"}"
+  }
+]
