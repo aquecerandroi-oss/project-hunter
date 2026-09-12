@@ -1,0 +1,87 @@
+{
+ "run": 7,
+ "lane": 3,
+ "start_utc": "2026-09-12T11:33:37Z",
+ "start_brt": "08:33:37",
+ "pumpfun_host_requests": 4,
+ "requests": [
+  {
+   "file": "01_boards_movers.json",
+   "url": "https://advanced-indexer.pump.fun/boards/movers?offset=0&limit=50",
+   "http": 200,
+   "request_started_utc": "2026-09-12T11:33:37.502Z",
+   "response_received_utc": "2026-09-12T11:33:37.829Z",
+   "read_brt": "08:33:37",
+   "bytes": 45882,
+   "serverTs": 1789212817679,
+   "serverTs_brt": "12/09 08:33:37"
+  },
+  {
+   "file": "01_boards_graduating.json",
+   "url": "https://advanced-indexer.pump.fun/boards/graduating?offset=0&limit=50",
+   "http": 200,
+   "request_started_utc": "2026-09-12T11:33:38.980Z",
+   "response_received_utc": "2026-09-12T11:33:39.192Z",
+   "read_brt": "08:33:39",
+   "bytes": 43645,
+   "serverTs": 1789212819111,
+   "serverTs_brt": "12/09 08:33:39"
+  },
+  {
+   "file": "01_boards_graduated.json",
+   "url": "https://advanced-indexer.pump.fun/boards/graduated?offset=0&limit=50",
+   "http": 200,
+   "request_started_utc": "2026-09-12T11:33:40.344Z",
+   "response_received_utc": "2026-09-12T11:33:40.998Z",
+   "read_brt": "08:33:40",
+   "bytes": 43481,
+   "serverTs": 1789212820803,
+   "serverTs_brt": "12/09 08:33:40"
+  },
+  {
+   "file": "02_sol_price.json",
+   "url": "https://frontend-api-v3.pump.fun/sol-price",
+   "http": 200,
+   "request_started_utc": "2026-09-12T11:33:42.149Z",
+   "response_received_utc": "2026-09-12T11:33:42.401Z",
+   "read_brt": "08:33:42",
+   "bytes": 75
+  },
+  {
+   "file": "20_jito_tip_floor.json",
+   "url": "https://bundles.jito.wtf/api/v1/bundles/tip_floor",
+   "http": 200,
+   "request_started_utc": "2026-09-12T11:33:42.404Z",
+   "response_received_utc": "2026-09-12T11:33:42.626Z",
+   "read_brt": "08:33:42",
+   "bytes": 328
+  },
+  {
+   "file": "21_status_solana_summary.json",
+   "url": "https://status.solana.com/api/v2/summary.json",
+   "http": 200,
+   "request_started_utc": "2026-09-12T11:33:42.628Z",
+   "response_received_utc": "2026-09-12T11:33:42.974Z",
+   "read_brt": "08:33:42",
+   "bytes": 2973
+  },
+  {
+   "file": "22_rpc_prioritization_fees.json",
+   "url": "https://api.mainnet-beta.solana.com",
+   "http": 200,
+   "request_started_utc": "2026-09-12T11:33:42.975Z",
+   "response_received_utc": "2026-09-12T11:33:43.413Z",
+   "read_brt": "08:33:43",
+   "bytes": 6195
+  },
+  {
+   "file": "23_rpc_perf_samples.json",
+   "url": "https://api.mainnet-beta.solana.com",
+   "http": 200,
+   "request_started_utc": "2026-09-12T11:33:43.416Z",
+   "response_received_utc": "2026-09-12T11:33:43.822Z",
+   "read_brt": "08:33:43",
+   "bytes": 596
+  }
+ ]
+}

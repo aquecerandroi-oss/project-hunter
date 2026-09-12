@@ -1,0 +1,624 @@
+{
+ "note": "derived from 03_imc_*.json and 10_rugcheck_*.json; top10_ex_pool excludes topHolders whose owner/address is knownAccounts type AMM; times BRT",
+ "rows": [
+  {
+   "t": "PAD",
+   "pg": "pump",
+   "created_brt": "12/09 06:52:10",
+   "gd_brt": "12/09 07:03:41",
+   "ix_t10": 19.2194,
+   "rc_top10_ex": 19.32,
+   "diff_t10_pp": -0.1,
+   "ix_dh": 0.0094,
+   "rc_creator": 0.0098,
+   "ix_nh": 1627,
+   "rc_holders": 3813,
+   "ix_bo": 8.724,
+   "ix_so": 0,
+   "ix_sn": 14,
+   "rc_graphInsiders": 41,
+   "rc_insider_in_top": 0,
+   "rc_score_norm": 1,
+   "rc_risks": [],
+   "rc_pools_in_top": [
+    [
+     8.59,
+     "Pump Fun AMM"
+    ]
+   ],
+   "rc_top1_ex": [
+    2.95,
+    [
+     null,
+     null
+    ]
+   ],
+   "rc_liq": 55179,
+   "rc_lp": [
+    [
+     "pump_fun_amm",
+     100
+    ],
+    [
+     "meteoraDlmm",
+     0
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 2.3,
+   "ix_mcap": 299792,
+   "ix_ath": 393846,
+   "pf_per_tx_lamports": 268024,
+   "tip_per_tx_lamports": 188773,
+   "tx": 10074
+  },
+  {
+   "t": "POOL",
+   "pg": "pump",
+   "created_brt": "12/09 07:32:59",
+   "gd_brt": "12/09 07:42:29",
+   "ix_t10": 20.2539,
+   "rc_top10_ex": 21.54,
+   "diff_t10_pp": -1.29,
+   "ix_dh": 0,
+   "rc_creator": 3.3947,
+   "ix_nh": 994,
+   "rc_holders": 2244,
+   "ix_bo": 2.3138,
+   "ix_so": 0,
+   "ix_sn": 4,
+   "rc_graphInsiders": 0,
+   "rc_insider_in_top": 0,
+   "rc_score_norm": 1,
+   "rc_risks": [],
+   "rc_pools_in_top": [
+    [
+     14.16,
+     "Pump Fun AMM"
+    ]
+   ],
+   "rc_top1_ex": [
+    3.41,
+    [
+     null,
+     null
+    ]
+   ],
+   "rc_liq": 26470,
+   "rc_lp": [
+    [
+     "pump_fun_amm",
+     100
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ],
+    [
+     "meteora_damm_v2",
+     100
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 1.8,
+   "ix_mcap": 105334,
+   "ix_ath": 242525,
+   "pf_per_tx_lamports": 333993,
+   "tip_per_tx_lamports": 403342,
+   "tx": 4923
+  },
+  {
+   "t": "MrBeast",
+   "pg": "pump",
+   "created_brt": "12/09 08:31:07",
+   "gd_brt": "12/09 08:31:09",
+   "ix_t10": 98.8053,
+   "rc_top10_ex": 97.28,
+   "diff_t10_pp": 1.53,
+   "ix_dh": 98.7963,
+   "rc_creator": 97.2317,
+   "ix_nh": 57,
+   "rc_holders": 1569,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 3,
+   "rc_graphInsiders": 0,
+   "rc_insider_in_top": 0,
+   "rc_score_norm": 62,
+   "rc_risks": [
+    "Top 10 holders high ownership/danger",
+    "Single holder ownership/danger",
+    "High holder correlation/warn",
+    "High ownership/danger"
+   ],
+   "rc_pools_in_top": [
+    [
+     1.15,
+     "Pump Fun AMM"
+    ]
+   ],
+   "rc_top1_ex": [
+    97.27,
+    [
+     "CREATOR",
+     "Creator"
+    ]
+   ],
+   "rc_liq": 311201,
+   "rc_lp": [
+    [
+     "pump_fun_amm",
+     100
+    ]
+   ],
+   "detectedAt_minus_created_s": 2.0,
+   "ix_mcap": 13665801,
+   "ix_ath": 13665801,
+   "pf_per_tx_lamports": 122707,
+   "tip_per_tx_lamports": 365139,
+   "tx": 17
+  },
+  {
+   "t": "PUMPBRAIN",
+   "pg": "pump",
+   "created_brt": "12/09 08:21:00",
+   "gd_brt": "12/09 08:21:07",
+   "ix_t10": 8.7809,
+   "rc_top10_ex": 11.76,
+   "diff_t10_pp": -2.98,
+   "ix_dh": 0.5603,
+   "rc_creator": 0.576,
+   "ix_nh": 626,
+   "rc_holders": 862,
+   "ix_bo": 0.5603,
+   "ix_so": 0,
+   "ix_sn": 7,
+   "rc_graphInsiders": 0,
+   "rc_insider_in_top": 0,
+   "rc_score_norm": 1,
+   "rc_risks": [],
+   "rc_pools_in_top": [
+    [
+     14.16,
+     "Pump Fun AMM"
+    ]
+   ],
+   "rc_top1_ex": [
+    1.81,
+    [
+     null,
+     null
+    ]
+   ],
+   "rc_liq": 26296,
+   "rc_lp": [
+    [
+     "pump_fun_amm",
+     100
+    ],
+    [
+     "meteoraDlmm",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 2.2,
+   "ix_mcap": 118601,
+   "ix_ath": 148199,
+   "pf_per_tx_lamports": 148202,
+   "tip_per_tx_lamports": 65126,
+   "tx": 2008
+  },
+  {
+   "t": "KIMCHI",
+   "pg": "pump",
+   "created_brt": "12/09 08:14:57",
+   "gd_brt": "12/09 08:14:57",
+   "ix_t10": 1.2199,
+   "rc_top10_ex": 1.23,
+   "diff_t10_pp": -0.01,
+   "ix_dh": 0.0658,
+   "rc_creator": 0.0668,
+   "ix_nh": 3794,
+   "rc_holders": 3866,
+   "ix_bo": 0.2837,
+   "ix_so": 0.116,
+   "ix_sn": 6,
+   "rc_graphInsiders": 0,
+   "rc_insider_in_top": 0,
+   "rc_score_norm": 30,
+   "rc_risks": [
+    "High holder correlation/warn"
+   ],
+   "rc_pools_in_top": [
+    [
+     10.72,
+     "Pump Fun AMM"
+    ]
+   ],
+   "rc_top1_ex": [
+    0.27,
+    [
+     null,
+     null
+    ]
+   ],
+   "rc_liq": 31891,
+   "rc_lp": [
+    [
+     "pump_fun_amm",
+     100
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 1.3,
+   "ix_mcap": 171551,
+   "ix_ath": 226785,
+   "pf_per_tx_lamports": 16031,
+   "tip_per_tx_lamports": 18616,
+   "tx": 3420
+  },
+  {
+   "t": "TBC",
+   "pg": "raydium_launchpad",
+   "created_brt": "10/09 04:19:28",
+   "gd_brt": null,
+   "ix_t10": 0.0001,
+   "rc_top10_ex": 21.35,
+   "diff_t10_pp": -21.35,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 23,
+   "rc_holders": 332,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 19,
+   "rc_graphInsiders": 0,
+   "rc_insider_in_top": 0,
+   "rc_score_norm": 14,
+   "rc_risks": [
+    "Low Liquidity/warn",
+    "Mutable metadata/warn"
+   ],
+   "rc_pools_in_top": [
+    [
+     64.09,
+     "Raydium CPMM Pool"
+    ]
+   ],
+   "rc_top1_ex": [
+    2.82,
+    [
+     null,
+     null
+    ]
+   ],
+   "rc_liq": 5484,
+   "rc_lp": [
+    [
+     "raydium_cpmm",
+     100
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 2.2,
+   "ix_mcap": 4251,
+   "ix_ath": 74566,
+   "pf_per_tx_lamports": 313408,
+   "tip_per_tx_lamports": 266306,
+   "tx": 1333
+  },
+  {
+   "t": "SCAT",
+   "pg": "raydium_launchpad",
+   "created_brt": "11/09 12:12:48",
+   "gd_brt": null,
+   "ix_t10": 0,
+   "rc_top10_ex": 35.72,
+   "diff_t10_pp": -35.72,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 1598,
+   "rc_holders": 651,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 0,
+   "rc_graphInsiders": 4,
+   "rc_insider_in_top": 0,
+   "rc_score_norm": 7,
+   "rc_risks": [
+    "Mutable metadata/warn"
+   ],
+   "rc_pools_in_top": [
+    [
+     29.98,
+     "Raydium CPMM Pool"
+    ]
+   ],
+   "rc_top1_ex": [
+    15.91,
+    [
+     null,
+     null
+    ]
+   ],
+   "rc_liq": 12645,
+   "rc_lp": [
+    [
+     "raydium_cpmm",
+     100
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 1.6,
+   "ix_mcap": 21549,
+   "ix_ath": 548372,
+   "pf_per_tx_lamports": 386017,
+   "tip_per_tx_lamports": 123702,
+   "tx": 1092
+  },
+  {
+   "t": "BUMBLECOIN",
+   "pg": "raydium_launchpad",
+   "created_brt": "10/09 17:31:27",
+   "gd_brt": null,
+   "ix_t10": 0.0001,
+   "rc_top10_ex": 23.71,
+   "diff_t10_pp": -23.71,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 933,
+   "rc_holders": 475,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 20,
+   "rc_graphInsiders": 0,
+   "rc_insider_in_top": 0,
+   "rc_score_norm": 7,
+   "rc_risks": [
+    "Mutable metadata/warn"
+   ],
+   "rc_pools_in_top": [
+    [
+     66.27,
+     "Raydium CPMM Pool"
+    ]
+   ],
+   "rc_top1_ex": [
+    3.65,
+    [
+     null,
+     null
+    ]
+   ],
+   "rc_liq": 7373,
+   "rc_lp": [
+    [
+     "raydium_cpmm",
+     100
+    ]
+   ],
+   "detectedAt_minus_created_s": 2.3,
+   "ix_mcap": 3894,
+   "ix_ath": 56216,
+   "pf_per_tx_lamports": 401698,
+   "tip_per_tx_lamports": 218615,
+   "tx": 1647
+  },
+  {
+   "t": "OOF",
+   "pg": "raydium_launchpad",
+   "created_brt": "09/09 15:21:09",
+   "gd_brt": null,
+   "ix_t10": 0.0001,
+   "rc_top10_ex": 27.34,
+   "diff_t10_pp": -27.34,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 33,
+   "rc_holders": 284,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 0,
+   "rc_graphInsiders": 0,
+   "rc_insider_in_top": 0,
+   "rc_score_norm": 7,
+   "rc_risks": [
+    "Mutable metadata/warn"
+   ],
+   "rc_pools_in_top": [
+    [
+     53.43,
+     "Raydium CPMM Pool"
+    ]
+   ],
+   "rc_top1_ex": [
+    4.52,
+    [
+     null,
+     null
+    ]
+   ],
+   "rc_liq": 7781,
+   "rc_lp": [
+    [
+     "raydium_cpmm",
+     100
+    ],
+    [
+     "meteora_damm_v2",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 1.8,
+   "ix_mcap": 5964,
+   "ix_ath": 63473,
+   "pf_per_tx_lamports": 284190,
+   "tip_per_tx_lamports": 157338,
+   "tx": 825
+  },
+  {
+   "t": "GAYCOIN",
+   "pg": "raydium_launchpad",
+   "created_brt": "10/09 12:22:48",
+   "gd_brt": null,
+   "ix_t10": 0.0001,
+   "rc_top10_ex": 22.62,
+   "diff_t10_pp": -22.62,
+   "ix_dh": 0,
+   "rc_creator": 0,
+   "ix_nh": 8496,
+   "rc_holders": 3678,
+   "ix_bo": 0,
+   "ix_so": 0,
+   "ix_sn": 1,
+   "rc_graphInsiders": 0,
+   "rc_insider_in_top": 0,
+   "rc_score_norm": 7,
+   "rc_risks": [
+    "Mutable metadata/warn"
+   ],
+   "rc_pools_in_top": [
+    [
+     51.84,
+     "Raydium CPMM Pool"
+    ],
+    [
+     4.79,
+     "Meteora DLMM Pool"
+    ],
+    [
+     1.37,
+     "Meteora DLMM Pool"
+    ]
+   ],
+   "rc_top1_ex": [
+    5.72,
+    [
+     null,
+     null
+    ]
+   ],
+   "rc_liq": 7759,
+   "rc_lp": [
+    [
+     "raydium_cpmm",
+     100
+    ],
+    [
+     "meteoraDlmm",
+     0
+    ],
+    [
+     "meteoraDlmm",
+     0
+    ],
+    [
+     "meteoraDlmm",
+     0
+    ]
+   ],
+   "detectedAt_minus_created_s": 1.3,
+   "ix_mcap": 6527,
+   "ix_ath": 2555420,
+   "pf_per_tx_lamports": 453630,
+   "tip_per_tx_lamports": 235750,
+   "tx": 7615
+  }
+ ],
+ "stonkfun_drift_vs_run3": [
+  {
+   "t": "TBC",
+   "holders_0433": 336,
+   "holders_0835": 332,
+   "top10ex_0433": 25.07,
+   "top10ex_0835": 21.35,
+   "liq_0433": 6600,
+   "liq_0835": 5484,
+   "norm_0433": 7,
+   "norm_0835": 14,
+   "risks_0835": [
+    "Low Liquidity/warn",
+    "Mutable metadata/warn"
+   ]
+  },
+  {
+   "t": "SCAT",
+   "holders_0433": 675,
+   "holders_0835": 651,
+   "top10ex_0433": 34.41,
+   "top10ex_0835": 35.72,
+   "liq_0433": 16100,
+   "liq_0835": 12645,
+   "norm_0433": 7,
+   "norm_0835": 7,
+   "risks_0835": [
+    "Mutable metadata/warn"
+   ]
+  },
+  {
+   "t": "BUMBLECOIN",
+   "holders_0433": 478,
+   "holders_0835": 475,
+   "top10ex_0433": 23.71,
+   "top10ex_0835": 23.71,
+   "liq_0433": 7361,
+   "liq_0835": 7373,
+   "norm_0433": 7,
+   "norm_0835": 7,
+   "risks_0835": [
+    "Mutable metadata/warn"
+   ]
+  },
+  {
+   "t": "OOF",
+   "holders_0433": 286,
+   "holders_0835": 284,
+   "top10ex_0433": 27.34,
+   "top10ex_0835": 27.34,
+   "liq_0433": 7822,
+   "liq_0835": 7781,
+   "norm_0433": 7,
+   "norm_0835": 7,
+   "risks_0835": [
+    "Mutable metadata/warn"
+   ]
+  },
+  {
+   "t": "GAYCOIN",
+   "holders_0433": 3686,
+   "holders_0835": 3678,
+   "top10ex_0433": 28.27,
+   "top10ex_0835": 22.62,
+   "liq_0433": 9823,
+   "liq_0835": 7759,
+   "norm_0433": 7,
+   "norm_0835": 7,
+   "risks_0835": [
+    "Mutable metadata/warn"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,132 @@
+**RESUMO**
+
+Minha ordem é **M-D3 → M-D5 → análise de M-P27**. Começaria a coleta do `tip_floor` junto de M-D3, para preservar histórico, mas sem antecipar sua interpretação.
+
+M-D3 estabelece **o que estava acessível para nós em cada decisão**. M-D5 depende disso para distinguir mudança de valor, falta de observação e diferença entre fontes. M-P27 acrescenta contexto; não corrige um instrumento que entrega concentração desconhecida como zero.
+
+Parecer como `quant-engineer`: **M-D5 e M-P27 precisam dos ajustes abaixo antes de entrarem como protocolos executáveis na fila.**
+
+**ARQUIVOS**
+
+Nenhum arquivo criado ou modificado; nenhum commit.
+
+**TESTES**
+
+Não executei testes de software nem reconstruí transações on-chain. Conferi os JSON por PowerShell (`Get-Content -Raw … | ConvertFrom-Json`), com filtros e cálculos. Saídas reais:
+
+```text
+pump=49 le60=39 negative=12 middle=1 gt300=9
+jito_source_to_receipt_s=80.626
+PUMPBRAIN bo=0.5603 dh=0.5603
+```
+
+A contagem `negative=12` usa literalmente `gd − serverTs + age`, convertido em segundos, sem arredondar previamente o relógio do board. É evidência de incompatibilidade de resolução/relógios; não de graduação anterior à criação.
+
+Confirmei também MrBeast no movers: `age=150`, `nh=18`, `t10=0,002`, `dh=0`. Consultei documentação oficial de Jito, Solana e DEX Screener para conferir os contratos externos.
+
+**MUST-FIX**
+
+**1. M-D5: “estabilização” não identifica idade nem correção do valor.**
+
+A comparação inicial mistura **movers a +150 s** com **in-memory-coin a +268 s**, como o próprio [rascunho reconhece](/C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-0831-lane3.md:127). São duas variáveis mudando: tempo e endpoint.
+
+**Cenário de falha:** o criador compra ou vende entre leituras; o estudo atribui a mudança ao atraso do indexer. Ou o board permanece errado em zero até +600 s e recebe “estabilizou imediatamente”.
+
+Correção:
+
+- Separar séries por **endpoint, board, campo e versão da semântica**.
+- Fazer comparações board × in-memory em consultas próximas, com diferença temporal publicada.
+- Chamar `|dh@h − dh@600| > 5 pp` de **divergência em relação à referência de +600 s**, não erro, atraso ou idade do valor.
+- Para estimar atraso de atualização, confrontar o campo com estado on-chain equivalente, em cortes identificados, acompanhando mudanças reais de saldo e denominador.
+
+**+600 s é referência posterior, não verdade-terreno.** `nh` e `sn` também podem continuar mudando legitimamente; precisam de tolerâncias próprias, não de uma régua em pontos percentuais.
+
+**2. M-D5: fixar população antes da exposição ao board e manter seguimento.**
+
+“Todos os mints vistos” elimina a escolha manual dos vencedores, mas **não elimina a seleção do mecanismo que os torna visíveis**.
+
+**Cenário de falha:** moedas que desaparecem cedo perdem a leitura de +600 s. A análise só conserva as persistentes e conclui que os campos são confiáveis rapidamente.
+
+Proponho duas populações explicitamente distintas:
+
+- **Diagnóstico dos boards:** todos os mints observados neles; conclusão restrita a essa população.
+- **Diagnóstico para o funil:** coorte de criações numa janela fixa, descoberta independentemente do ranking, reconciliada on-chain; subamostra por hash, se necessária, seguida mesmo após sair do board.
+
+Separar entrada tardia na observação, ausência do board, falha de consulta, perda de seguimento e horizonte ainda não maturado. Uma saída conhecida do board é um evento de exposição; **a trajetória do campo fica sem observação**, não “estável”.
+
+Para cada marco, publicar `N elegíveis`, `N comparáveis`, divergentes e desconhecidos. Se houver `D` divergentes e `U` indeterminados entre `N` elegíveis maturados, mostrar também os limites **D/N a (D+U)/N**. Não pressupor censura independente: a saída pode depender precisamente de atividade e concentração.
+
+**3. M-D5: congelar resolução, disponibilidade e definição operacional.**
+
+O coletor consolida **uma linha por mint/board/minuto fechado**, distinguindo horário do board e última atualização do mint; isso não fornece automaticamente uma trajetória por segundo ou por campo. Veja [boards.py:1](/C:/dev/project-hunter/services/meme-worker/hunter_meme_worker/boards.py:1) e [boards.py:13](/C:/dev/project-hunter/services/meme-worker/hunter_meme_worker/boards.py:13). O leitor de risco recebe candidatos e aplica intervalo mínimo entre consultas: [risk.py:65](/C:/dev/project-hunter/services/meme-worker/hunter_meme_worker/risk.py:65).
+
+**Cenário de falha:** a linha do minuto fechado depois de +60 s é utilizada como se estivesse disponível aos +60 s; ou se publica “estabilizou em 83 s” quando só existem observações espaçadas.
+
+Antes da fila, definir:
+
+- Origem da idade: criação on-chain validada; descoberta nossa fica em outro relógio.
+- Em cada marco, último valor **recebido até o marco**, com defasagem máxima congelada; sem interpolação futura.
+- Para +600 s, regra equivalente e maturação obrigatória.
+- Se mantiver `field_settle_s`, definir tolerância por campo, persistência, número mínimo de observações e lacuna máxima. Reportar resolução/intervalo e permitir “não identificável”.
+
+**Usar +600 s como desfecho diagnóstico não é vazamento.** Vazamento aparece ao usar esse valor — ou o tempo de estabilização calculado com o futuro — para corrigir, selecionar ou decidir retrospectivamente aos +60 s.
+
+**4. M-P27: fazer o vínculo temporal pelo recebimento, preservando o horário da fonte.**
+
+O payload tem `time=11:32:22Z`, mas chegou às `11:33:42.626Z`: **80,626 s depois**. Fontes: [payload Jito:3](/C:/dev/project-hunter/.claude/state/plantao-meme/raw-lane7/20_jito_tip_floor.json:3) e [log da consulta:51](/C:/dev/project-hunter/.claude/state/plantao-meme/raw-lane7/_log_a.json:51).
+
+**Cenário de falha:** atribuir esse p95 a uma criação às 11:33Z usa uma resposta que ainda não tínhamos.
+
+Guardar payload, `source_time`, início/fim da requisição, disponibilidade e estado da consulta. Congelar validade máxima, tratamento de timestamps repetidos e ausência. Um GET por minuto pode devolver o mesmo ponto; **não significa uma nova amostra independente por minuto**.
+
+Para a hipótese sobre graduação imediata, usar regime conhecido **antes da criação**, não no instante posterior da graduação. Para os outros estudos, especificar o marco conforme a pergunta, sem misturar exposição prévia com contexto contemporâneo.
+
+**5. M-P27: congelar calibração e separar painel de teste confirmatório.**
+
+Fixar datas da calibração, população que determina os tercis — proponho grade temporal regular, não ponderação pelo número de mints —, quantis, empates, fronteiras e início da avaliação prospectiva. Não recalcular tercis usando a janela avaliada.
+
+**Cenário de falha:** escolher cortes depois de observar onde a associação aparece ou tratar milhares de mints expostos aos mesmos poucos minutos como milhares de observações independentes.
+
+As leituras de hoje pertencem à exploração. Acrescentar um estrato aos protocolos existentes exige adenda prospectiva/versionamento, sem reclassificar o passado como confirmação. Se houver teste de interação, congelar contraste, desfecho, multiplicidade, controles prévios e incerteza por blocos temporais; publicar cobertura por tercil e dias.
+
+A frase “tip barato → mais graduações no mesmo slot” precisa de **denominador de criações e slots comprovados**. Os dois recortes de graduadas e dois tips pontuais não a confirmam nem a refutam.
+
+**6. M-D3: registrar consultas válidas, não apenas três timestamps acumulados.**
+
+Guardar por fonte **e capacidade consultada**: presença válida, ausência válida, erro e não consultado, com evidência e identidade do pool. Um redirecionamento do Photon comprova mapeamento naquela resposta; não acesso às métricas do terminal.
+
+**Cenário de falha:** um pool aparece, desaparece depois e `last_valid_absence_at` ultrapassa `first_valid_presence_at`, produzindo intervalo negativo.
+
+Preservar a sequência de consultas; para a primeira detecção, associar a última ausência válida **anterior** à primeira presença. Mesmo esse intervalo só delimita uma transição sob hipótese de disponibilidade persistente: polls não excluem aparições transitórias entre consultas.
+
+**NICE-TO-HAVE**
+
+As leituras que eu retiraria ou enfraqueceria:
+
+| Formulação | O que a evidência permite |
+|---|---|
+| **`bo=dh` indica compra inicial incluída em `bo`** | Igualdade escalar em um mint, confirmada no [JSON:60](/C:/dev/project-hunter/.claude/state/plantao-meme/raw-lane7/03_imc_04_PUMPBRAIN.json:60). Pode haver sobreposição de carteiras, arredondamento ou regra compartilhada. Mesmo comprovar inclusão do criador não identifica **qual compra** gerou o saldo. |
+| **DEX Screener atrasa** | O endpoint consultado não retornou o par esperado naquele instante. Validar pool canônico e criação on-chain, consultar endereço do par e repetir acompanhamento. Sem presença posterior, há indisponibilidade observada, não atraso de listagem medido. A [API distingue consultas por token e por par](https://docs.dexscreener.com/api/reference). |
+| **A rede está mais folgada** | O p95 dos tips landed caiu entre duas leituras. Isso não mede sozinho congestionamento global nem preço executável da compra; Jito tem leilões locais por contas e distingue tip de priority fee. [Documentação Jito](https://docs.jito.wtf/lowlatencytxnsend/). |
+| **Divergência depende da idade, não do programa** | Duas observações jovens discrepantes justificam estratificação. Não separam idade, endpoint, atividade, programa e semântica. |
+| **O board está congelado** | Os cinco primeiros mantiveram ordem e progresso em duas leituras. Com outros campos mudando, não está demonstrado congelamento integral. |
+| **Rugcheck disponível ≤60 s** | `detectedAt` antigo não prova disponibilidade nossa. A conclusão reaparece indevidamente no [item 12](/C:/dev/project-hunter/.claude/state/plantao-meme/2026-09-12-0831-lane3.md:172). |
+
+Também substituiria “só coincidem no extremo” por **“PAD reúne ambos os indicadores elevados nesta amostra”**: percentual de supply e contagem de insiders não são medidas diretamente concordantes.
+
+**O QUE EU FARIA DIFERENTE**
+
+Primeiro entregaria uma tabela simples por fonte/campo/idade: **disponível, ausente, erro, defasado, divergente da referência posterior**. Só depois tentaria estimar estabilização.
+
+No primeiro replay de M-D5, exigiria quatro cenários: zero persistente errado; venda real entre marcos; saída do board antes de +600 s; resposta posterior ao prazo com timestamp antigo. Eles distinguem exatamente os mecanismos que o caso MrBeast hoje mistura.
+
+**CONCORDO COM**
+
+Preservar snapshots agora; separar os sinais de graduação; declarar a exploração anterior ao pré-registro; não transformar bloqueio HTTP em ausência; manter M-P27 como contexto de pesquisa. O caso MrBeast justifica investigar o instrumento — ainda não demonstra um atraso de enriquecimento de 268 segundos.
+
+**OBSIDIAN**
+
+- **Fila de hipóteses do plantão de mercado:** registrar M-D5 com população, referência posterior e censura; M-P27 com calibração e vínculo temporal congelados.
+- **Plantão MEME — 2026-09-12:** acrescentar correções sobre mesmo slot, disponibilidade do rugcheck, igualdade `bo=dh` e ausência no DEX Screener.
+- **Meme — o que uma “estratégia” é aqui:** registrar M-D3 → M-D5 como validação do instrumento, com coleta de tips em paralelo.
+- **Revisões Astra — índice:** vincular este parecer e os critérios pendentes para as duas linhas novas.

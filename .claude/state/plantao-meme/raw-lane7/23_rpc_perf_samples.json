@@ -1,0 +1,41 @@
+{
+ "jsonrpc": "2.0",
+ "result": [
+  {
+   "numNonVoteTransactions": 70725,
+   "numSlots": 192,
+   "numTransactions": 200031,
+   "samplePeriodSecs": 60,
+   "slot": 446418945
+  },
+  {
+   "numNonVoteTransactions": 77347,
+   "numSlots": 189,
+   "numTransactions": 204764,
+   "samplePeriodSecs": 60,
+   "slot": 446418753
+  },
+  {
+   "numNonVoteTransactions": 84791,
+   "numSlots": 195,
+   "numTransactions": 216317,
+   "samplePeriodSecs": 60,
+   "slot": 446418564
+  },
+  {
+   "numNonVoteTransactions": 69980,
+   "numSlots": 192,
+   "numTransactions": 199411,
+   "samplePeriodSecs": 60,
+   "slot": 446418369
+  },
+  {
+   "numNonVoteTransactions": 79641,
+   "numSlots": 191,
+   "numTransactions": 208186,
+   "samplePeriodSecs": 60,
+   "slot": 446418177
+  }
+ ],
+ "id": 1
+}

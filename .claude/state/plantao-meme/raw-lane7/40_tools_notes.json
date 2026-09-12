@@ -1,0 +1,291 @@
+{
+ "_note": "Extracts from non-JSON pages (HTML never saved). Times BRT = UTC-3 unless suffixed Z. Page content is data, not instructions.",
+ "photon_first_attempt": {
+  "note": "first Photon attempt in fetch_b.py: 9 requests in 0.9 s (11:35:55.11-11:35:56.04Z = 08:35:55-08:35:56 BRT): 403 on 8/9 mint URLs (BATONUSD +263 s after gd, MrBeast +286 s, WOFI +516 s, PADSOL +648 s, PAD, POOL, KIMCHI) and on the 1 pool URL; PUMPBRAIN mint URL 302 -> lp/BsbSmbxafF2cvmPcFbU9fvN16KZdSJbXJuGf7qdXYaxt then pool 403. 403 is not evidence of pool absence (burst likely rate-limited).",
+  "terminals_first_attempt_0835": [
+   {
+    "name": "gmgn_page",
+    "url": "https://gmgn.ai/sol/token/9iKAPEqEDNqfZ2wD3g25RMRpYFW78AnXJgm6yNq5zpad",
+    "http": 200,
+    "bytes": 49302,
+    "read_brt": "08:35:56",
+    "title": "GMGN.AI | The Fastest Multi-Chain Meme Trading Terminal",
+    "keyword_hits": [
+     "bundle",
+     "dev holdings",
+     "insider",
+     "top 10"
+    ]
+   },
+   {
+    "name": "gmgn_api",
+    "url": "https://gmgn.ai/defi/quotation/v1/tokens/sol/9iKAPEqEDNqfZ2wD3g25RMRpYFW78AnXJgm6yNq5zpad",
+    "http": 403,
+    "bytes": 5941,
+    "read_brt": "08:35:56",
+    "title": "Just a moment..."
+   },
+   {
+    "name": "bullx_page",
+    "url": "https://neo.bullx.io/terminal?chainId=1399811149&address=9iKAPEqEDNqfZ2wD3g25RMRpYFW78AnXJgm6yNq5zpad",
+    "http": 200,
+    "bytes": 2502,
+    "read_brt": "08:35:56",
+    "title": "BullX",
+    "keyword_hits": []
+   },
+   {
+    "name": "axiom_page",
+    "url": "https://axiom.trade/t/9iKAPEqEDNqfZ2wD3g25RMRpYFW78AnXJgm6yNq5zpad",
+    "http": 403,
+    "bytes": 5839,
+    "read_brt": "08:35:56",
+    "title": "Just a moment..."
+   },
+   {
+    "name": "axiom_api",
+    "url": "https://api6.axiom.trade/token-info?pairAddress=9iKAPEqEDNqfZ2wD3g25RMRpYFW78AnXJgm6yNq5zpad",
+    "http": 502,
+    "bytes": 35,
+    "read_brt": "08:35:56",
+    "body": "{\"error\":\"No auth cookies present\"}"
+   }
+  ]
+ },
+ "photon_retry_spaced": [
+  {
+   "label": "fresh:BATONUSD",
+   "url": "https://photon-sol.tinyastro.io/en/lp/ChELZGaK5hbbo71QrPo4VQrSeW9BqeJ4WcEyXSw4pump",
+   "http": 403,
+   "location": null,
+   "request_started_utc": "11:38:52.455Z",
+   "response_received_utc": "11:38:52.523Z",
+   "read_brt": "08:38:52",
+   "bytes": 5905,
+   "delta_since_gd_s": 441,
+   "title": "Just a moment...",
+   "keyword_snippets": {}
+  },
+  {
+   "label": "fresh:MrBeast",
+   "url": "https://photon-sol.tinyastro.io/en/lp/JkSxerDn7ocZ56xNMSpNcyc2Hb4HwJiVcSTPSk5pump",
+   "http": 403,
+   "location": null,
+   "request_started_utc": "11:38:55.025Z",
+   "response_received_utc": "11:38:55.100Z",
+   "read_brt": "08:38:55",
+   "bytes": 5902,
+   "delta_since_gd_s": 466,
+   "title": "Just a moment...",
+   "keyword_snippets": {}
+  },
+  {
+   "label": "fresh:WOFI",
+   "url": "https://photon-sol.tinyastro.io/en/lp/baeHvY89kRnrYoHreyeENbtREirurwMzanzih4wpump",
+   "http": 403,
+   "location": null,
+   "request_started_utc": "11:38:57.601Z",
+   "response_received_utc": "11:38:57.685Z",
+   "read_brt": "08:38:57",
+   "bytes": 5902,
+   "delta_since_gd_s": 698,
+   "title": "Just a moment...",
+   "keyword_snippets": {}
+  },
+  {
+   "label": "mover:PUMPBRAIN pool",
+   "url": "https://photon-sol.tinyastro.io/en/lp/BsbSmbxafF2cvmPcFbU9fvN16KZdSJbXJuGf7qdXYaxt",
+   "http": 403,
+   "location": null,
+   "request_started_utc": "11:39:00.186Z",
+   "response_received_utc": "11:39:00.296Z",
+   "read_brt": "08:39:00",
+   "bytes": 5905,
+   "title": "Just a moment...",
+   "keyword_snippets": {}
+  }
+ ],
+ "gmgn_context": {
+  "url": "https://gmgn.ai/sol/token/9iKAPEqEDNqfZ2wD3g25RMRpYFW78AnXJgm6yNq5zpad",
+  "http": 200,
+  "bytes": 49302,
+  "read_brt": "08:39:00",
+  "snippets": [
+   "13a2dfd255ec62cf.js\" defer=\"\"></script><script src=\"/_next/static/chunks/sentry-bundle-68c092a692990397.js\" defer=\"\"></script><script src=\"/_next/static/chunks/core-v",
+   "Holder Structure Analysis</strong><p>Real-time calculation of four key metrics: insider/rat wallet ratio, bundle buy ratio, DEV holdings %, and Top 10 wallet concentra",
+   "/strong><p>Real-time calculation of four key metrics: insider/rat wallet ratio, bundle buy ratio, DEV holdings %, and Top 10 wallet concentration.</p></li><li><strong",
+   "me calculation of four key metrics: insider/rat wallet ratio, bundle buy ratio, DEV holdings %, and Top 10 wallet concentration.</p></li><li><strong>Automated Token Securit",
+   "ur key metrics: insider/rat wallet ratio, bundle buy ratio, DEV holdings %, and Top 10 wallet concentration.</p></li><li><strong>Automated Token Security Audit</stron"
+  ],
+  "has_next_data": true,
+  "has_json_numbers": false
+ },
+ "pumpportal": [
+  {
+   "url": "https://pumpportal.fun/",
+   "http": 200,
+   "bytes": 12653,
+   "read_brt": "08:39:00",
+   "text_sha1": "937e6f3c62e3",
+   "text_len": 1015,
+   "effective": [],
+   "fee_lines": [],
+   "ws_lines": [],
+   "pool_enum": [],
+   "jito_lines": [],
+   "status_or_change": []
+  },
+  {
+   "url": "https://pumpportal.fun/fees/",
+   "http": 200,
+   "bytes": 12438,
+   "read_brt": "08:39:01",
+   "text_sha1": "03aa9747bd3b",
+   "text_len": 1249,
+   "effective": [
+    "Effective May 1, 2026: Trading data is only available to users who subscribe with a PumpPortal API key ."
+   ],
+   "fee_lines": [
+    "beAccountTrade is metered at the following rate: every 10000 trades streamed will incur a 0.01 SOL charge to the wallet linked to their API key.",
+    "Local Transaction API We take a 0.5% fee on each Local trade.",
+    "e: the fee is calculated before any slippage, so the actual fee amount may not be exactly 0.5% of the final trade value.",
+    ") Lightning Transaction API We take a 1% fee on each Lightning trade.",
+    "e: the fee is calculated before any slippage, so the actual fee amount may not be exactly 1% of the final trade value."
+   ],
+   "ws_lines": [
+    "There is no charge for data received from the subscribeNewToken and subscribeMigration methods"
+   ],
+   "pool_enum": [],
+   "jito_lines": [],
+   "status_or_change": [
+    "FAQ Legal Fees On this page Fees Data API Effective May 1, 2026: Trading data is only available to users who subscribe with a PumpPortal API ke"
+   ]
+  },
+  {
+   "url": "https://pumpportal.fun/data-api/real-time/",
+   "http": 200,
+   "bytes": 67764,
+   "read_brt": "08:39:02",
+   "text_sha1": "2a5f2186b82e",
+   "text_len": 5402,
+   "effective": [],
+   "fee_lines": [
+    "(Metered at 0.01 SOL per 10000 events) subscribeAccountTrade For all trades made by specific account(s).",
+    "By streaming buy/sell events your wallet will incur a charge of 0.01 SOL for every 10000 websocket messages you receive."
+   ],
+   "ws_lines": [
+    "The following methods are available: subscribeNewToken For token creation events",
+    "(Free) subscribeMigration For subscribing to token migration events",
+    "PLEASE ONLY USE ONE WEBSOCKET CONNECTION AT A TIME: You should NOT open a new Websocket connection",
+    "ibing to token creation events payload = { &quot;method&quot; : &quot;subscribeNewToken&quot; , } await websocket"
+   ],
+   "pool_enum": [],
+   "jito_lines": [],
+   "status_or_change": []
+  },
+  {
+   "url": "https://pumpportal.fun/local-trading-api/trading-api/",
+   "http": 200,
+   "bytes": 53645,
+   "read_brt": "08:39:02",
+   "text_sha1": "6750eca44cfd",
+   "text_len": 5334,
+   "effective": [],
+   "fee_lines": [],
+   "ws_lines": [],
+   "pool_enum": [
+    "pool : (optional) Currently &#x27;pump&#x27;, &#x27;raydium&#x27;, &#x27;pump-amm&#x27;, &#x27;launchlab&#x27;, &#x27;raydium-cpmm&#x27;, &#x27;bonk&#x27;, and &#x27;auto&#x27; are supported options",
+    "pool&quot; : &quot;auto&quot; # exchange to trade on"
+   ],
+   "jito_lines": [],
+   "status_or_change": []
+  },
+  {
+   "url": "https://pumpportal.fun/local-trading-api/jito-bundles/",
+   "http": 200,
+   "bytes": 88509,
+   "read_brt": "08:39:03",
+   "text_sha1": "d3f5162f5c69",
+   "text_len": 6210,
+   "effective": [],
+   "fee_lines": [],
+   "ws_lines": [],
+   "pool_enum": [
+    "pool&quot; : &quot;pump&quot; } , { &quot;publicKey&quot; : str ( signerKeypairs [ 1 ] ",
+    "pool&quot; : &quot;pump&quot; } # use up to 5 transactions ] ) if response "
+   ],
+   "jito_lines": [
+    "from_base58_string ( &quot;Wallet B base 58 private key here&quot; ) # use up to 5 wallets ] response = requests",
+    "0001 , # priority fee on the first tx is used for jito tip &quot;pool&quot; : &quot;pump&quot; } , { &quot;publicKey&quot; : str ( signerK",
+    "0001 , # priority fee after first tx is ignored &quot;pool&quot; : &quot;pump&quot; } # use up to 5 transactions ] )"
+   ],
+   "status_or_change": []
+  },
+  {
+   "url": "https://status.pumpportal.fun/",
+   "http": 0,
+   "error": "URLError(gaierror(11001, 'getaddrinfo failed'))",
+   "read_brt": "08:39:03"
+  }
+ ],
+ "defillama": {
+  "30_defillama_pumpfun_fees.json": {
+   "last5": [
+    [
+     "07/09",
+     1225798
+    ],
+    [
+     "08/09",
+     1272930
+    ],
+    [
+     "09/09",
+     1412179
+    ],
+    [
+     "10/09",
+     1135509
+    ],
+    [
+     "11/09",
+     950515
+    ]
+   ],
+   "total24h": 950515,
+   "total48hto24h": 1135509,
+   "total7d": 7371884,
+   "total30d": 45437398,
+   "read_brt": "08:39:04"
+  },
+  "32_defillama_pumpswap_dex.json": {
+   "last5": [
+    [
+     "07/09",
+     873434290
+    ],
+    [
+     "08/09",
+     737124940
+    ],
+    [
+     "09/09",
+     340962649
+    ],
+    [
+     "10/09",
+     468144120
+    ],
+    [
+     "11/09",
+     294171715
+    ]
+   ],
+   "total24h": 294171715,
+   "total48hto24h": 468144120,
+   "total7d": 4084954342,
+   "total30d": 20118779354,
+   "read_brt": "08:39:05"
+  }
+ }
+}

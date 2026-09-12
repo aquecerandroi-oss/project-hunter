@@ -1,0 +1,164 @@
+{
+ "note": "fetch_b.py crashed on stdout encoding after saving its JSON; its request log reconstructed from stdout",
+ "pumpfun_host_requests_b": 10,
+ "b_requests": [
+  {
+   "files": "03_imc_01..10",
+   "url": "https://advanced-indexer.pump.fun/in-memory-coin/{mint} x10",
+   "http": 200,
+   "read_brt": "08:35:33-08:35:45"
+  },
+  {
+   "files": "10_rugcheck_01..10",
+   "url": "https://api.rugcheck.xyz/v1/tokens/{mint}/report x10",
+   "http": 200,
+   "read_brt": "08:35:46-08:35:54"
+  },
+  {
+   "file": "11_dexscreener_tokens_batch.json",
+   "url": "https://api.dexscreener.com/tokens/v1/solana/{15 mints}",
+   "http": 200,
+   "read_brt": "08:35:55"
+  },
+  {
+   "url": "https://photon-sol.tinyastro.io/en/lp/{mint} x9 + pool x1",
+   "http": "403 x9, 302 x1",
+   "read_brt": "08:35:55-08:35:56"
+  },
+  {
+   "url": "gmgn page/api, bullx page, axiom page/api",
+   "http": "200/403/200/403/502",
+   "read_brt": "08:35:56"
+  },
+  {
+   "url": "https://pumpportal.fun/ and /fees/",
+   "http": 200,
+   "read_brt": "08:35:58-08:35:59",
+   "note": "crash after /fees/"
+  }
+ ],
+ "c_requests": [
+  {
+   "file": null,
+   "url": "https://photon-sol.tinyastro.io/en/lp/ChELZGaK5hbbo71QrPo4VQrSeW9BqeJ4WcEyXSw4pump",
+   "http": 403,
+   "request_started_utc": "11:38:52.455Z",
+   "response_received_utc": "11:38:52.523Z",
+   "read_brt": "08:38:52",
+   "bytes": 5905,
+   "error": "HTTP Error 403: Forbidden"
+  },
+  {
+   "file": null,
+   "url": "https://photon-sol.tinyastro.io/en/lp/JkSxerDn7ocZ56xNMSpNcyc2Hb4HwJiVcSTPSk5pump",
+   "http": 403,
+   "request_started_utc": "11:38:55.025Z",
+   "response_received_utc": "11:38:55.100Z",
+   "read_brt": "08:38:55",
+   "bytes": 5902,
+   "error": "HTTP Error 403: Forbidden"
+  },
+  {
+   "file": null,
+   "url": "https://photon-sol.tinyastro.io/en/lp/baeHvY89kRnrYoHreyeENbtREirurwMzanzih4wpump",
+   "http": 403,
+   "request_started_utc": "11:38:57.601Z",
+   "response_received_utc": "11:38:57.685Z",
+   "read_brt": "08:38:57",
+   "bytes": 5902,
+   "error": "HTTP Error 403: Forbidden"
+  },
+  {
+   "file": null,
+   "url": "https://photon-sol.tinyastro.io/en/lp/BsbSmbxafF2cvmPcFbU9fvN16KZdSJbXJuGf7qdXYaxt",
+   "http": 403,
+   "request_started_utc": "11:39:00.186Z",
+   "response_received_utc": "11:39:00.296Z",
+   "read_brt": "08:39:00",
+   "bytes": 5905,
+   "error": "HTTP Error 403: Forbidden"
+  },
+  {
+   "file": null,
+   "url": "https://gmgn.ai/sol/token/9iKAPEqEDNqfZ2wD3g25RMRpYFW78AnXJgm6yNq5zpad",
+   "http": 200,
+   "request_started_utc": "11:39:00.297Z",
+   "response_received_utc": "11:39:00.548Z",
+   "read_brt": "08:39:00",
+   "bytes": 49302
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/",
+   "http": 200,
+   "request_started_utc": "11:39:00.553Z",
+   "response_received_utc": "11:39:00.979Z",
+   "read_brt": "08:39:00",
+   "bytes": 12653
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/fees/",
+   "http": 200,
+   "request_started_utc": "11:39:00.988Z",
+   "response_received_utc": "11:39:01.417Z",
+   "read_brt": "08:39:01",
+   "bytes": 12438
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/data-api/real-time/",
+   "http": 200,
+   "request_started_utc": "11:39:01.426Z",
+   "response_received_utc": "11:39:02.097Z",
+   "read_brt": "08:39:02",
+   "bytes": 67764
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/local-trading-api/trading-api/",
+   "http": 200,
+   "request_started_utc": "11:39:02.124Z",
+   "response_received_utc": "11:39:02.763Z",
+   "read_brt": "08:39:02",
+   "bytes": 53645
+  },
+  {
+   "file": null,
+   "url": "https://pumpportal.fun/local-trading-api/jito-bundles/",
+   "http": 200,
+   "request_started_utc": "11:39:02.795Z",
+   "response_received_utc": "11:39:03.524Z",
+   "read_brt": "08:39:03",
+   "bytes": 88509
+  },
+  {
+   "file": null,
+   "url": "https://status.pumpportal.fun/",
+   "http": 0,
+   "request_started_utc": "11:39:03.564Z",
+   "response_received_utc": "11:39:03.612Z",
+   "read_brt": "08:39:03",
+   "bytes": 0,
+   "error": "URLError(gaierror(11001, 'getaddrinfo failed'))"
+  },
+  {
+   "file": "30_defillama_pumpfun_fees.json",
+   "url": "https://api.llama.fi/summary/fees/pump.fun?dataType=dailyFees",
+   "http": 200,
+   "request_started_utc": "11:39:03.612Z",
+   "response_received_utc": "11:39:04.811Z",
+   "read_brt": "08:39:04",
+   "bytes": 64319
+  },
+  {
+   "file": "32_defillama_pumpswap_dex.json",
+   "url": "https://api.llama.fi/summary/dexs/pumpswap?excludeTotalDataChart=false&excludeTotalDataChartBreakdown=true",
+   "http": 200,
+   "request_started_utc": "11:39:04.829Z",
+   "response_received_utc": "11:39:05.710Z",
+   "read_brt": "08:39:05",
+   "bytes": 14958
+  }
+ ]
+}
