@@ -20,7 +20,7 @@ export interface MemeDeskPageProps {
 }
 
 /** Contract §Tela / brief T4.7: "atualização a cada 5 s" -- above `MIN_AUTO_REFRESH_INTERVAL_MS` (3 s); memes move fast and the loop ticks every minute, so 5 s keeps a countdown honest without hammering the API. */
-export const DESK_REFRESH_MS = 5_000;
+const DESK_REFRESH_MS = 5_000;
 const DESK_PAGE_LIMIT = 200;
 
 type DeskLoad = { ok: true; data: MemeDesk } | { ok: false; reason: string };
